@@ -213,7 +213,7 @@ input[type=date]{color-scheme:dark}
 }
 .date-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.12)}
 
-.pages{flex:1;min-height:0;overflow-y:auto}
+.pages{flex:1;min-height:0;overflow-y:auto;padding-bottom:36px}
 .page{display:none;padding:24px 26px;animation:fade-in .2s ease}
 .page.active{display:block}
 @keyframes fade-in{from{opacity:.3;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
@@ -786,11 +786,12 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
 
 /* ── Footer ──────────────────────────────────── */
 .app-footer{
+  position:fixed;bottom:0;left:258px;right:0;
+  height:36px;z-index:50;
   background:linear-gradient(to right,rgba(11,25,41,.98),rgba(6,11,24,.98));
   border-top:1px solid rgba(59,130,246,.15);
-  padding:0 22px;height:36px;
+  padding:0 22px;
   display:flex;align-items:center;justify-content:space-between;
-  flex-shrink:0;
 }
 .footer-left{display:flex;align-items:center;gap:10px}
 .footer-pillatre{
@@ -845,6 +846,7 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
   .sb-footer{display:none}
   .main{padding-bottom:68px}
   .pages{overflow-y:auto}
+  .app-footer{left:0;bottom:68px}
   .db-grid{grid-template-columns:1fr}
 }
 /* ── Dashboard amélioré (filtres, graphiques) ─ */
