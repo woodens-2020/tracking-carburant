@@ -46,14 +46,14 @@ def client():
 @pytest.fixture(scope="module")
 def auth_client(client):
     """Client authentifié via session cookie."""
-    client.post("/api/login", json={"username": "admin", "password": "admin123"})
+    client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
     return client
 
 
 @pytest.fixture(scope="module")
 def api_key(client):
     """Récupère la clé API de l'admin."""
-    res = client.post("/api/login", json={"username": "admin", "password": "admin123"})
+    res = client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
     return res.json().get("api_key", "")
 
 

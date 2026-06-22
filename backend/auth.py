@@ -38,6 +38,25 @@ def verify_password(password: str, stored: str) -> bool:
     return hmac.compare_digest(dk.hex(), hash_hex)
 
 
+# ── Code d'accès 9 chiffres ────────────────────────────────────────
+
+def hash_code_acces(code: str) -> str:
+    """PBKDF2 du code numérique — même sécurité que les mots de passe."""
+    salt = secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac("sha256", code.encode("utf-8"), salt, PBKDF2_ITERATIONS)
+    return f"{salt.hex()}:{dk.hex()}"
+
+
+def verify_code_acces(code: str, stored: str) -> bool:
+    try:
+        salt_hex, hash_hex = stored.split(":")
+    except ValueError:
+        return False
+    salt = bytes.fromhex(salt_hex)
+    dk = hashlib.pbkdf2_hmac("sha256", code.encode("utf-8"), salt, PBKDF2_ITERATIONS)
+    return hmac.compare_digest(dk.hex(), hash_hex)
+
+
 # ── Sessions cookie ────────────────────────────────────────────────
 
 def create_session(db: Session, user_id: int) -> str:

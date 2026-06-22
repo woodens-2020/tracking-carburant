@@ -138,18 +138,20 @@ class Utilisateur(Base):
     """Compte utilisateur pouvant se connecter à l'application."""
     __tablename__ = "utilisateurs"
 
-    id             = Column(Integer, primary_key=True)
-    username       = Column(String(80), unique=True, nullable=False)
-    password_hash  = Column(String(255), nullable=False)
-    api_key_hash   = Column(String(64),  unique=True, nullable=True)
-    nom_complet    = Column(String(150), nullable=False, default="")
-    role           = Column(String(20),  nullable=False, default="operateur")
-    actif          = Column(Boolean,     nullable=False, default=True)
-    created_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    id                = Column(Integer, primary_key=True)
+    username          = Column(String(80), unique=True, nullable=False)
+    password_hash     = Column(String(255), nullable=False)
+    api_key_hash      = Column(String(64),  unique=True, nullable=True)
+    nom_complet       = Column(String(150), nullable=False, default="")
+    role              = Column(String(20),  nullable=False, default="operateur")
+    actif             = Column(Boolean,     nullable=False, default=True)
+    created_at        = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    # Authentification par email + mot de passe + code d'accès à 9 chiffres
+    email             = Column(String(254), unique=True, nullable=True)
+    code_acces_hash   = Column(String(255), nullable=True)   # hash du code 9 chiffres
     # Champs OAuth (nullable — comptes locaux n'en ont pas)
-    email          = Column(String(254), unique=True, nullable=True)
-    oauth_provider = Column(String(32),  nullable=True)   # "google" | "microsoft"
-    oauth_sub      = Column(String(255), unique=True, nullable=True)  # identifiant fournisseur
+    oauth_provider    = Column(String(32),  nullable=True)   # "google" | "microsoft"
+    oauth_sub         = Column(String(255), unique=True, nullable=True)
 
     __table_args__ = (
         CheckConstraint("role IN ('admin', 'operateur')", name="chk_utilisateur_role"),

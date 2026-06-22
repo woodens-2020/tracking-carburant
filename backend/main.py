@@ -14,6 +14,7 @@ from database import init_db, get_db, engine, SessionLocal
 from models import Produit, Pompe, Releve, Utilisateur, Livraison, PrixVente
 from auth import (
     SESSION_COOKIE, hash_password, verify_password,
+    hash_code_acces, verify_code_acces,
     create_session, get_session_user, delete_session,
     make_api_key, verify_api_key, revoke_api_key,
 )
@@ -83,22 +84,31 @@ def startup():
 
 
 # ---------- Authentification ----------
+_CODE_RE = __import__("re").compile(r"^\d{9}$")
+
+
 class LoginIn(BaseModel):
-    username: str
-    password: str
+    email:      str
+    password:   str
+    code_acces: str
 
 
 @app.post("/api/login")
 def login(data: LoginIn, response: Response, db: Session = Depends(get_db)):
-    user = db.query(Utilisateur).filter_by(username=data.username.strip()).first()
-    if not user or not user.actif or not verify_password(data.password, user.password_hash):
-        raise HTTPException(401, "Nom d'utilisateur ou mot de passe incorrect")
+    email = data.email.strip().lower()
+    user  = db.query(Utilisateur).filter_by(email=email, actif=True).first()
+    _err  = "Email, mot de passe ou code d'accès incorrect"
+    if not user:
+        raise HTTPException(401, _err)
+    if not verify_password(data.password, user.password_hash):
+        raise HTTPException(401, _err)
+    if not user.code_acces_hash or not verify_code_acces(data.code_acces, user.code_acces_hash):
+        raise HTTPException(401, _err)
     token = create_session(db, user.id)
     response.set_cookie(
         SESSION_COOKIE, token,
         httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
     )
-    # Génère (ou renouvelle) la clé API — retournée une seule fois ici
     raw_key = make_api_key(db, user.id)
     return {
         "id": user.id, "username": user.username,
@@ -201,8 +211,9 @@ class CreateUtilisateurIn(BaseModel):
     username:    str
     nom_complet: str
     password:    str
+    code_acces:  str             # exactement 9 chiffres
     role:        str = "operateur"
-    email:       Optional[str] = None
+    email:       str             # obligatoire — sert à la connexion
 
 
 def _user_public(u: Utilisateur) -> dict:
@@ -235,6 +246,8 @@ def creer_utilisateur(
         raise HTTPException(400, "Rôle invalide — choisir 'admin' ou 'operateur'")
     if len(data.password) < 6:
         raise HTTPException(400, "Le mot de passe doit contenir au moins 6 caractères")
+    if not _CODE_RE.match(data.code_acces):
+        raise HTTPException(400, "Le code d'accès doit contenir exactement 9 chiffres")
     username = data.username.strip()
     if not username:
         raise HTTPException(400, "Le nom d'utilisateur est requis")
@@ -243,21 +256,21 @@ def creer_utilisateur(
             "Identifiant invalide — 3 à 60 caractères, lettres/chiffres/points/tirets/underscores uniquement, pas d'espaces")
     if not data.nom_complet.strip():
         raise HTTPException(400, "Le nom complet est requis")
+    email_clean = data.email.strip().lower()
+    if not _EMAIL_RE.match(email_clean):
+        raise HTTPException(400, f"Adresse email invalide : {data.email}")
     if db.query(Utilisateur).filter_by(username=username).first():
         raise HTTPException(409, f"L'identifiant '{username}' est déjà utilisé")
-    if data.email:
-        email_clean = data.email.strip().lower()
-        if not _EMAIL_RE.match(email_clean):
-            raise HTTPException(400, f"Adresse email invalide : {data.email}")
-        if db.query(Utilisateur).filter_by(email=email_clean).first():
-            raise HTTPException(409, "Cet email est déjà associé à un compte")
+    if db.query(Utilisateur).filter_by(email=email_clean).first():
+        raise HTTPException(409, "Cet email est déjà associé à un compte")
 
     u = Utilisateur(
         username=username,
         password_hash=hash_password(data.password),
+        code_acces_hash=hash_code_acces(data.code_acces),
         nom_complet=data.nom_complet.strip(),
         role=data.role,
-        email=email_clean if data.email else None,
+        email=email_clean,
     )
     db.add(u)
     db.commit()

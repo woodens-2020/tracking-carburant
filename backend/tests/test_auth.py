@@ -151,7 +151,7 @@ def app_client():
 
 class TestLoginEndpoint:
     def test_login_success_returns_api_key(self, app_client):
-        res = app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        res = app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         assert res.status_code == 200
         body = res.json()
         assert "api_key" in body
@@ -160,19 +160,19 @@ class TestLoginEndpoint:
 
     def test_login_wrong_password(self):
         c = fresh_client()
-        res = c.post("/api/login", json={"username": "admin", "password": "wrong"})
+        res = c.post("/api/login", json={"email": "admin@konekta.local", "password": "wrong", "code_acces": "123456789"})
         assert res.status_code == 401
 
     def test_login_unknown_user(self):
         c = fresh_client()
-        res = c.post("/api/login", json={"username": "nobody", "password": "x"})
+        res = c.post("/api/login", json={"email": "nobody@nowhere.com", "password": "x", "code_acces": "000000000"})
         assert res.status_code == 401
 
 
 class TestApiKeyHeader:
     def test_api_key_grants_access(self):
         c = fresh_client()
-        login = c.post("/api/login", json={"username": "admin", "password": "admin123"})
+        login = c.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         key = login.json()["api_key"]
         # Nouveau client sans cookie
         c2 = fresh_client()
@@ -193,7 +193,7 @@ class TestApiKeyHeader:
 
 class TestAuthMeEndpoint:
     def test_auth_me_with_cookie(self, app_client):
-        app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         res = app_client.get("/api/auth/me")
         assert res.status_code == 200
         body = res.json()
@@ -202,7 +202,7 @@ class TestAuthMeEndpoint:
 
     def test_auth_me_with_api_key(self):
         c = fresh_client()
-        login = c.post("/api/login", json={"username": "admin", "password": "admin123"})
+        login = c.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         key = login.json()["api_key"]
         c2 = fresh_client()
         res = c2.get("/api/auth/me", headers={"X-API-Key": key})
@@ -212,7 +212,7 @@ class TestAuthMeEndpoint:
 
 class TestRotateAndRevoke:
     def test_rotate_returns_new_key(self, app_client):
-        login = app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        login = app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         old_key = login.json()["api_key"]
         rotate = app_client.post("/api/auth/api-key")
         assert rotate.status_code == 200
@@ -221,7 +221,7 @@ class TestRotateAndRevoke:
         assert new_key != old_key
 
     def test_old_key_invalid_after_rotate(self, app_client):
-        login = app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        login = app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         old_key = login.json()["api_key"]
         app_client.post("/api/auth/api-key")  # rotation
         c = fresh_client()
@@ -229,7 +229,7 @@ class TestRotateAndRevoke:
         assert res.status_code == 401
 
     def test_revoke_key(self, app_client):
-        login = app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        login = app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         key = login.json()["api_key"]
         revoke = app_client.delete("/api/auth/api-key")
         assert revoke.status_code == 200
@@ -240,14 +240,14 @@ class TestRotateAndRevoke:
 
 class TestSessionCookieStillWorks:
     def test_cookie_auth_independent_of_api_key(self, app_client):
-        app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         res = app_client.get("/api/me")
         assert res.status_code == 200
         assert res.json()["username"] == "admin"
 
     def test_logout_clears_session(self):
         c = fresh_client()
-        c.post("/api/login", json={"username": "admin", "password": "admin123"})
+        c.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         c.post("/api/logout")
         c.cookies.clear()
         res = c.get("/api/me")
@@ -270,7 +270,7 @@ class TestGestionEmployes:
     def _admin_client():
         """Client connecté en tant qu'admin via session cookie."""
         c = fresh_client()
-        c.post("/api/login", json={"username": "admin", "password": "admin123"})
+        c.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         return c
 
     @staticmethod
@@ -278,8 +278,10 @@ class TestGestionEmployes:
         """Crée un compte opérateur et retourne le résultat JSON."""
         return client.post("/api/auth/utilisateurs", json={
             "username":    f"emp_test{suffix}",
-            "nom_complet": f"Employé Test{suffix}",
+            "nom_complet": f"Employe Test{suffix}",
             "password":    "secret123",
+            "code_acces":  "987654321",
+            "email":       f"emp_test{suffix}@konekta.local",
             "role":        "operateur",
         })
 
@@ -295,7 +297,8 @@ class TestGestionEmployes:
         res = c.post("/api/auth/utilisateurs",
                      headers={"X-API-Key": master},
                      json={"username": "emp_master", "nom_complet": "Par MasterKey",
-                           "password": "pass1234", "role": "operateur"})
+                           "password": "pass1234", "code_acces": "111222333",
+                           "email": "emp_master@konekta.local", "role": "operateur"})
         assert res.status_code == 200, res.text
         body = res.json()
         assert body["username"] == "emp_master"
@@ -307,7 +310,7 @@ class TestGestionEmployes:
     # ── 2. Admin connecté (session) crée un opérateur ────────────────────
 
     def test_session_admin_creates_employee(self, app_client):
-        app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         res = self._create_operateur(app_client, "_sess")
         assert res.status_code == 200, res.text
         body = res.json()
@@ -320,7 +323,7 @@ class TestGestionEmployes:
     # ── 3. Opérateur tente de créer un compte → 403 ───────────────────────
 
     def test_operateur_cannot_create(self, app_client):
-        app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         # Crée un opérateur
         cr = self._create_operateur(app_client, "_403")
         assert cr.status_code == 200
@@ -332,7 +335,8 @@ class TestGestionEmployes:
         res = c2.post("/api/auth/utilisateurs",
                       headers={"X-API-Key": emp_key},
                       json={"username": "emp_forbidden", "nom_complet": "X",
-                            "password": "pass1234", "role": "operateur"})
+                            "password": "pass1234", "code_acces": "444555666",
+                            "email": "emp_forbidden@konekta.local", "role": "operateur"})
         assert res.status_code == 403
         # Nettoyage
         app_client.delete(f"/api/auth/utilisateurs/{emp_id}")
@@ -340,7 +344,7 @@ class TestGestionEmployes:
     # ── 4. La liste n'expose jamais api_key_hash ──────────────────────────
 
     def test_list_never_exposes_hash(self, app_client):
-        app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         res = app_client.get("/api/auth/utilisateurs")
         assert res.status_code == 200
         for u in res.json():
@@ -350,7 +354,7 @@ class TestGestionEmployes:
     # ── 5. Révocation → clé invalide ─────────────────────────────────────
 
     def test_revoke_invalidates_key(self, app_client):
-        app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         cr = self._create_operateur(app_client, "_rev")
         body    = cr.json()
         emp_key = body["api_key"]
@@ -373,7 +377,7 @@ class TestGestionEmployes:
     # ── 6. Réactivation → clé refonctionner après régénération ──────────
 
     def test_reactivate_and_regenerate(self, app_client):
-        app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         cr = self._create_operateur(app_client, "_react")
         body   = cr.json()
         emp_id = body["id"]
@@ -398,7 +402,7 @@ class TestGestionEmployes:
     # ── 7. Régénération → ancienne clé invalide, nouvelle valide ─────────
 
     def test_regenerate_invalidates_old_key(self, app_client):
-        app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         cr      = self._create_operateur(app_client, "_regen")
         body    = cr.json()
         old_key = body["api_key"]
@@ -418,7 +422,7 @@ class TestGestionEmployes:
     # ── 8. Garde-fou : le dernier admin actif ne peut pas se révoquer ────
 
     def test_last_admin_cannot_revoke_self(self, app_client):
-        app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         # Récupère l'id de l'admin
         users  = app_client.get("/api/auth/utilisateurs").json()
         admins = [u for u in users if u["role"] == "admin" and u["actif"]]
@@ -429,7 +433,7 @@ class TestGestionEmployes:
         assert res.status_code == 409
 
     def test_last_admin_cannot_delete_self(self, app_client):
-        app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         users    = app_client.get("/api/auth/utilisateurs").json()
         admin_id = next(u["id"] for u in users if u["username"] == "admin")
         res = app_client.delete(f"/api/auth/utilisateurs/{admin_id}")
@@ -495,13 +499,13 @@ class TestOAuth:
 
     def test_callback_known_email_creates_session(self, app_client, monkeypatch):
         """Un email déjà associé à un compte → connexion réussie."""
-        app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         # Nettoyage préalable (inclut l'ancien nom utilisé avant le renommage)
         self._cleanup(app_client, "emp_oauth_cb", "emp_oauth")
         cr = app_client.post("/api/auth/utilisateurs", json={
-            "username": "emp_oauth_cb", "nom_complet": "Employé OAuth CB",
-            "password": "unused123", "role": "operateur",
-            "email": self.FAKE_EMAIL,
+            "username": "emp_oauth_cb", "nom_complet": "Employe OAuth CB",
+            "password": "unused123", "code_acces": "246813579",
+            "email": self.FAKE_EMAIL, "role": "operateur",
         })
         assert cr.status_code == 200, cr.text
         emp_id = cr.json()["id"]
@@ -568,12 +572,12 @@ class TestOAuth:
 
     def test_oauth_session_grants_access(self, app_client, monkeypatch):
         """Après le flux OAuth, le cookie de session doit ouvrir /api/me."""
-        app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         self._cleanup(app_client, "emp_sess_oauth")
         cr = app_client.post("/api/auth/utilisateurs", json={
             "username": "emp_sess_oauth", "nom_complet": "Session OAuth",
-            "password": "unused", "role": "operateur",
-            "email": "sess.oauth@test.com",
+            "password": "unused123", "code_acces": "135792468",
+            "email": "sess.oauth@test.com", "role": "operateur",
         })
         assert cr.status_code == 200, cr.text
         emp_id = cr.json()["id"]
@@ -610,12 +614,12 @@ class TestOAuth:
 
     def test_oauth_operateur_cannot_manage_accounts(self, app_client, monkeypatch):
         """Un opérateur connecté via OAuth n'accède pas à GET /api/auth/utilisateurs."""
-        app_client.post("/api/login", json={"username": "admin", "password": "admin123"})
+        app_client.post("/api/login", json={"email": "admin@konekta.local", "password": "admin123", "code_acces": "123456789"})
         self._cleanup(app_client, "emp_role_oauth")
         cr = app_client.post("/api/auth/utilisateurs", json={
             "username": "emp_role_oauth", "nom_complet": "Role OAuth",
-            "password": "unused", "role": "operateur",
-            "email": "role.oauth@test.com",
+            "password": "unused123", "code_acces": "192837465",
+            "email": "role.oauth@test.com", "role": "operateur",
         })
         assert cr.status_code == 200, cr.text
         emp_id = cr.json()["id"]

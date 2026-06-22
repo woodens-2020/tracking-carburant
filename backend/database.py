@@ -102,6 +102,9 @@ def _migrate_columns():
             ("utilisateurs", "oauth_sub",
              "ALTER TABLE utilisateurs  ADD COLUMN oauth_sub VARCHAR(255)",
              "CREATE UNIQUE INDEX IF NOT EXISTS uq_utilisateurs_oauth_sub ON utilisateurs(oauth_sub)"),
+            # v3 — code d'accès 9 chiffres
+            ("utilisateurs", "code_acces_hash",
+             "ALTER TABLE utilisateurs  ADD COLUMN code_acces_hash VARCHAR(255)", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -115,6 +118,9 @@ def _migrate_columns():
              "ALTER TABLE utilisateurs ADD COLUMN oauth_provider VARCHAR(32)", None),
             ("utilisateurs", "oauth_sub",
              "ALTER TABLE utilisateurs ADD COLUMN oauth_sub VARCHAR(255) UNIQUE", None),
+            # v3 — code d'accès 9 chiffres
+            ("utilisateurs", "code_acces_hash",
+             "ALTER TABLE utilisateurs ADD COLUMN code_acces_hash VARCHAR(255)", None),
         ]
     else:
         return
@@ -151,12 +157,14 @@ def init_db():
             db.commit()
 
         if db.query(Utilisateur).count() == 0:
-            from auth import hash_password
+            from auth import hash_password, hash_code_acces
             admin = Utilisateur(
                 username="admin",
                 password_hash=hash_password("admin123"),
+                code_acces_hash=hash_code_acces("123456789"),
                 nom_complet="Administrateur",
                 role="admin",
+                email="admin@konekta.local",
             )
             db.add(admin)
             db.commit()

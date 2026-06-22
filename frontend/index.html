@@ -2661,7 +2661,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div id="adm-emp-form" style="display:none;padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.07);background:rgba(247,169,59,.04)">
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
                 <div class="admin-field">
-                  <label class="admin-lbl">Identifiant (login)</label>
+                  <label class="admin-lbl">Identifiant (login interne)</label>
                   <input type="text" id="emp-username" class="admin-input" placeholder="ex: marie.dupont" autocomplete="off">
                 </div>
                 <div class="admin-field">
@@ -2669,12 +2669,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                   <input type="text" id="emp-nomcomplet" class="admin-input" placeholder="ex: Marie Dupont" autocomplete="off">
                 </div>
                 <div class="admin-field">
+                  <label class="admin-lbl">Adresse email <span style="color:#f87171">*</span></label>
+                  <input type="email" id="emp-email" class="admin-input" placeholder="ex: marie@gmail.com" autocomplete="off" required>
+                </div>
+                <div class="admin-field">
                   <label class="admin-lbl">Mot de passe (≥ 6 caractères)</label>
                   <input type="password" id="emp-password" class="admin-input" placeholder="••••••••" autocomplete="new-password">
                 </div>
                 <div class="admin-field">
-                  <label class="admin-lbl">Email (pour connexion Google)</label>
-                  <input type="email" id="emp-email" class="admin-input" placeholder="ex: marie@gmail.com (optionnel)">
+                  <label class="admin-lbl">Code d'accès (9 chiffres) <span style="color:#f87171">*</span></label>
+                  <input type="text" id="emp-code" class="admin-input" placeholder="ex: 123456789" maxlength="9" pattern="\d{9}" inputmode="numeric" autocomplete="off">
                 </div>
               </div>
               <div class="admin-field" style="margin-bottom:14px">
@@ -7930,7 +7934,7 @@ function showCreateEmpForm(){
 }
 function hideCreateEmpForm(){
   document.getElementById('adm-emp-form').style.display = 'none';
-  ['emp-username','emp-nomcomplet','emp-password','emp-email'].forEach(id=>{
+  ['emp-username','emp-nomcomplet','emp-password','emp-email','emp-code'].forEach(id=>{
     document.getElementById(id).value='';
   });
   document.getElementById('emp-role').value = 'operateur';
@@ -7951,23 +7955,27 @@ async function submitCreateEmp(){
   const nomComplet = document.getElementById('emp-nomcomplet').value.trim();
   const password   = document.getElementById('emp-password').value;
   const email      = document.getElementById('emp-email').value.trim();
+  const codeAcces  = document.getElementById('emp-code').value.trim();
   const role       = document.getElementById('emp-role').value;
 
-  if(!username || !nomComplet || !password){
-    return _empFormMsg('Identifiant, nom et mot de passe sont requis.','err');
+  if(!username || !nomComplet || !password || !email || !codeAcces){
+    return _empFormMsg('Tous les champs sont requis (identifiant, nom, email, mot de passe, code d\'accès).','err');
   }
   if(!/^[a-zA-Z0-9._\-]{3,60}$/.test(username)){
     return _empFormMsg('Identifiant invalide — 3 à 60 caractères, lettres/chiffres/points/tirets/underscores, pas d\'espaces.','err');
   }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    return _empFormMsg('Adresse email invalide.','err');
+  }
   if(password.length < 6){
     return _empFormMsg('Le mot de passe doit contenir au moins 6 caractères.','err');
   }
-  if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
-    return _empFormMsg('Adresse email invalide.','err');
+  if(!/^\d{9}$/.test(codeAcces)){
+    return _empFormMsg('Le code d\'accès doit contenir exactement 9 chiffres.','err');
   }
   _empFormMsg('Création en cours…','');
   try{
-    const res = await POST('/auth/utilisateurs', {username, nom_complet:nomComplet, password, role, email:email||undefined});
+    const res = await POST('/auth/utilisateurs', {username, nom_complet:nomComplet, password, code_acces:codeAcces, role, email});
     hideCreateEmpForm();
     await loadEmployees();
     showKeyModal(res.api_key, `Clé de ${res.nom_complet||res.username}`);
