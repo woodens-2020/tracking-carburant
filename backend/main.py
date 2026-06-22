@@ -2129,6 +2129,59 @@ def rapport_export(
     )
 
 
+# ---------- Audit IA complet ----------
+@app.get("/api/audit/export")
+def audit_export(
+    date_debut: str,
+    date_fin: str,
+    format: str = "pdf",
+    produit_id: Optional[int] = None,
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Génère un document d'audit narratif complet rédigé par l'IA.
+    Formats : pdf, docx
+    L'IA analyse les données réelles et produit un texte d'expert structuré.
+    """
+    from audit_service   import generate_audit
+    from audit_renderer  import render_audit_pdf, render_audit_docx
+
+    try:
+        d_debut = date_type.fromisoformat(date_debut)
+        d_fin   = date_type.fromisoformat(date_fin)
+    except ValueError:
+        raise HTTPException(400, "Format de date invalide (YYYY-MM-DD)")
+
+    if d_debut > d_fin:
+        raise HTTPException(400, "date_debut doit être <= date_fin")
+
+    fmt = format.lower().strip(".")
+    if fmt not in ("pdf", "docx"):
+        raise HTTPException(400, "Format invalide — choisir parmi : pdf, docx")
+
+    try:
+        result = generate_audit(db, d_debut, d_fin, produit_id)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+    text     = result["text"]
+    filename = f"audit_station_{date_debut}_{date_fin}.{fmt}"
+
+    if fmt == "pdf":
+        data  = render_audit_pdf(text, d_debut, d_fin)
+        media = "application/pdf"
+    else:
+        data  = render_audit_docx(text, d_debut, d_fin)
+        media = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+    return StreamingResponse(
+        iter([data]),
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 # ---------- Frontend single-file ----------
 @app.get("/", include_in_schema=False)
 def serve_index():
