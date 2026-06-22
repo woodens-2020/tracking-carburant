@@ -1,105 +1,101 @@
-# Authentification — Konekta
+# Authentification & Gestion des comptes — Konekta v2
 
-Deux mécanismes coexistent. Les deux donnent accès aux mêmes routes protégées.
+## Mécanismes d'authentification
 
----
+Le système accepte **deux mécanismes simultanément**, vérifiés par `AuthMiddleware` à chaque requête :
 
-## 1. Session cookie (navigateur web)
+| Mécanisme | En-tête / Cookie | Porteur |
+|---|---|---|
+| Session cookie | `session_token` (httponly) | Utilisateur humain après `/api/login` ou OAuth |
+| Clé API | `X-API-Key: knt_…` | Intégrations, scripts, employés |
 
-Flux standard pour l'interface web.
-
-| Étape | Détail |
-|-------|--------|
-| Login | `POST /api/login` — corps JSON `{username, password}` |
-| Cookie | `session_token` httponly, durée 7 jours |
-| Logout | `POST /api/logout` — supprime le cookie et la session en base |
-
-Le cookie est envoyé automatiquement par le navigateur sur chaque requête same-origin.
+Une clé maître `ADMIN_API_KEY` (variable d'env) court-circuite la base : elle charge directement l'administrateur et n'est jamais stockée en DB.
 
 ---
 
-## 2. Clé API (header X-API-Key)
+## Système de rôles
 
-Pour les scripts, CI/CD, ou appels programmatiques.
+| Rôle | Valeur DB | Accès |
+|---|---|---|
+| Administrateur | `"admin"` | Tout, y compris la gestion des comptes |
+| Opérateur | `"operateur"` | Métier uniquement (relevés, livraisons, audit…) |
 
-### Obtenir une clé
-
-La clé est générée automatiquement à chaque connexion (`POST /api/login`) et retournée dans le corps de la réponse :
-
-```json
-{
-  "id": 1,
-  "username": "admin",
-  "nom_complet": "Administrateur",
-  "role": "admin",
-  "api_key": "knt_AbCdEf..."
-}
-```
-
-**Important :** la valeur brute n'est visible qu'une seule fois. Seul son hash SHA-256 est stocké en base.
-
-### Utiliser la clé
-
-```bash
-curl -H "X-API-Key: knt_AbCdEf..." https://votre-domaine.com/api/produits
-```
-
-### Renouveler la clé (rotation)
-
-```bash
-curl -X POST -H "X-API-Key: knt_AbCdEf..." https://votre-domaine.com/api/auth/api-key
-# Retourne {"api_key": "knt_NewKey..."}
-```
-
-L'ancienne clé est immédiatement invalidée.
-
-### Révoquer la clé
-
-```bash
-curl -X DELETE -H "X-API-Key: knt_AbCdEf..." https://votre-domaine.com/api/auth/api-key
-# Retourne {"ok": true}
-```
+La dépendance FastAPI `require_admin` lève **HTTP 403** si `request.state.user.role != "admin"`.
 
 ---
 
-## 3. Clé admin statique (.env)
+## Gestion des comptes employés
 
-Une clé de secours pour les scripts de déploiement / CI peut être définie dans `.env` :
+### Endpoints (tous sous `/api/auth/utilisateurs`, requis `require_admin`)
 
-```
-ADMIN_API_KEY=votre-cle-secrete-longue
-```
+| Méthode | Chemin | Description |
+|---|---|---|
+| `POST` | `/api/auth/utilisateurs` | Crée un compte, retourne la clé API **une seule fois** |
+| `GET` | `/api/auth/utilisateurs` | Liste tous les comptes (sans hashes) |
+| `POST` | `/api/auth/utilisateurs/{id}/revoquer` | Désactive + révoque la clé |
+| `POST` | `/api/auth/utilisateurs/{id}/reactiver` | Réactive le compte |
+| `POST` | `/api/auth/utilisateurs/{id}/regenerer` | Nouvelle clé API, retourne **une seule fois** |
+| `DELETE` | `/api/auth/utilisateurs/{id}` | Suppression définitive |
 
-Cette clé agit comme l'utilisateur `admin`. Elle ne tourne pas et n'est pas stockée en base — à n'utiliser que pour les accès systèmes (pipelines, migrations).
+### Garde-fou anti-verrouillage
 
----
+La révocation et la suppression vérifient `_count_active_admins(db) > 1` avant d'agir sur un admin. Si l'admin est le dernier actif, l'opération est rejetée avec **HTTP 409**.
 
-## Endpoints /api/auth/*
+### Création depuis l'interface
 
-| Méthode | Route | Description | Auth requise |
-|---------|-------|-------------|-------------|
-| `POST` | `/api/login` | Connexion — retourne cookie + clé API | Non |
-| `POST` | `/api/logout` | Déconnexion — supprime la session | Oui |
-| `GET` | `/api/me` | Infos utilisateur courant | Oui |
-| `GET` | `/api/auth/me` | Idem + champ `has_api_key` | Oui |
-| `POST` | `/api/auth/api-key` | Rotation de la clé API | Oui |
-| `DELETE` | `/api/auth/api-key` | Révocation de la clé API | Oui |
+Dans `page-admin` (accessible après connexion admin), la carte **Gestion des employés** permet de créer, lister, révoquer, réactiver, régénérer et supprimer des comptes. La clé API est affichée dans un modal **une seule fois** — à communiquer à l'employé par voie sécurisée.
 
 ---
 
-## Sécurité
+## Authentification Google OAuth 2.0
 
-- Mots de passe : PBKDF2-HMAC-SHA256, 200 000 itérations, sel aléatoire par utilisateur.
-- Clés API : SHA-256 (pas de sel — la clé brute est déjà un secret à haute entropie de 256 bits).
-- Clé admin statique : comparaison timing-safe via `hmac.compare_digest`.
-- Cookies : `httponly`, `samesite=lax` — inaccessibles depuis JavaScript.
-- Les clés API sont stockées dans `sessionStorage` du navigateur (effacé à la fermeture de l'onglet).
+### Flux (Authorization Code Flow)
+
+```
+Navigateur → GET /api/auth/oauth/google/login
+          ← 302 → accounts.google.com?state=<csrf>&…
+          ← 302 → /api/auth/oauth/google/callback?code=…&state=…
+          → vérifie state, échange code, récupère userinfo
+          → cherche email en DB → crée session → 302 /
+```
+
+### Variables d'environnement
+
+| Variable | Description |
+|---|---|
+| `GOOGLE_CLIENT_ID` | Client ID depuis Google Cloud Console |
+| `GOOGLE_CLIENT_SECRET` | Secret depuis Google Cloud Console |
+| `MICROSOFT_CLIENT_ID` | (optionnel) Azure App registration |
+| `MICROSOFT_CLIENT_SECRET` | (optionnel) Azure secret |
+
+### Configuration dans Google Cloud Console
+
+1. Créer un projet → **APIs & Services → Credentials**
+2. Type : **Web application**
+3. URI de redirection autorisé : `https://votre-domaine.com/api/auth/oauth/google/callback`
+4. Copier `client_id` et `client_secret` dans `.env`
+
+### Politique de compte
+
+**Aucune création automatique.** L'email retourné par Google doit exister en base (champ `utilisateurs.email`). Si inconnu → `account_not_found` (HTTP 302 vers `/login?oauth_error=account_not_found`).
+
+Workflow pour activer OAuth sur un compte existant :
+1. Créer le compte via la carte **Gestion des employés** avec le champ `email` renseigné
+2. L'employé clique sur **Se connecter avec Google** sur la page de connexion
+
+### Après la connexion OAuth
+
+Le flux appelle `create_session()` → pose le cookie `session_token` (identique à la connexion par mot de passe). Le compte local est lié via `oauth_sub` (identifiant unique Google) pour les reconnexions suivantes.
 
 ---
 
-## Lancer les tests
+## Risques et points d'attention
 
-```bash
-cd backend
-pytest tests/test_auth.py -v
-```
+| Risque | Statut | Mitigation |
+|---|---|---|
+| Credentials par défaut (`admin`/`admin123`) | ⚠️ **À changer en production** | Changer via `POST /api/auth/change-password` |
+| `backend/.env` contient `GEMINI_API_KEY` | ⚠️ **Ne jamais committer** | Ajouté à `.gitignore` |
+| `ADMIN_API_KEY` en clair dans `.env` | ⚠️ Rotation recommandée | Utiliser un gestionnaire de secrets en prod |
+| Tokens OAuth en mémoire (`_OAUTH_STATES`) | ℹ️ TTL 10 min, perdu au redémarrage | Acceptable pour un seul worker ; utiliser Redis en multi-worker |
+| Pas de rate-limiting sur `/api/login` | ⚠️ Brute-force possible | Ajouter `slowapi` ou un reverse proxy limitant les tentatives |
+| Sessions en DB sans nettoyage automatique | ℹ️ Sessions expirées restent en table | Ajouter une tâche cron `DELETE FROM sessions WHERE expires_at < now()` |

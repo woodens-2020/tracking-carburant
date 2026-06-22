@@ -34,7 +34,7 @@ _ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
 
 # Chemins accessibles sans être connecté
 _PUBLIC_PATHS    = {"/login", "/api/login"}
-_PUBLIC_PREFIXES = ("/docs", "/redoc", "/openapi.json")
+_PUBLIC_PREFIXES = ("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/")
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -161,6 +161,357 @@ def change_password(data: ChangePasswordIn, request: Request, db: Session = Depe
     user.password_hash = hash_password(data.nouveau_mot_de_passe)
     db.commit()
     return {"ok": True}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Dépendance : accès réservé aux administrateurs
+# ══════════════════════════════════════════════════════════════════════════════
+
+def require_admin(request: Request) -> Utilisateur:
+    """
+    Autorise si l'utilisateur authentifié a le rôle 'admin'.
+    La clé maître ADMIN_API_KEY (via X-API-Key) charge déjà l'admin en base
+    via AuthMiddleware — la vérification du rôle suffit donc.
+    Lève 403 sinon.
+    """
+    user = getattr(request.state, "user", None)
+    if not user or user.role != "admin":
+        raise HTTPException(403, "Accès réservé aux administrateurs")
+    return user
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Gestion des comptes employés (admin seulement)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class CreateUtilisateurIn(BaseModel):
+    username:    str
+    nom_complet: str
+    password:    str
+    role:        str = "operateur"
+    email:       Optional[str] = None
+
+
+def _user_public(u: Utilisateur) -> dict:
+    """Sérialise un Utilisateur sans exposer api_key_hash ni password_hash."""
+    return {
+        "id":            u.id,
+        "username":      u.username,
+        "nom_complet":   u.nom_complet,
+        "role":          u.role,
+        "actif":         u.actif,
+        "has_api_key":   bool(u.api_key_hash),
+        "email":         u.email,
+        "oauth_provider":u.oauth_provider,
+        "created_at":    u.created_at.isoformat() if u.created_at else None,
+    }
+
+
+def _count_active_admins(db: Session) -> int:
+    return db.query(Utilisateur).filter_by(role="admin", actif=True).count()
+
+
+@app.post("/api/auth/utilisateurs")
+def creer_utilisateur(
+    data: CreateUtilisateurIn,
+    _admin: Utilisateur = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Crée un compte employé. La clé API générée est retournée une seule fois."""
+    if data.role not in ("admin", "operateur"):
+        raise HTTPException(400, "Rôle invalide — choisir 'admin' ou 'operateur'")
+    if len(data.password) < 6:
+        raise HTTPException(400, "Le mot de passe doit contenir au moins 6 caractères")
+    username = data.username.strip()
+    if not username:
+        raise HTTPException(400, "Le nom d'utilisateur est requis")
+    if db.query(Utilisateur).filter_by(username=username).first():
+        raise HTTPException(409, f"L'identifiant '{username}' est déjà utilisé")
+    if data.email:
+        if db.query(Utilisateur).filter_by(email=data.email.strip()).first():
+            raise HTTPException(409, "Cet email est déjà associé à un compte")
+
+    u = Utilisateur(
+        username=username,
+        password_hash=hash_password(data.password),
+        nom_complet=data.nom_complet.strip(),
+        role=data.role,
+        email=data.email.strip() if data.email else None,
+    )
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    raw_key = make_api_key(db, u.id)
+    return {**_user_public(u), "api_key": raw_key}
+
+
+@app.get("/api/auth/utilisateurs")
+def lister_utilisateurs(
+    _admin: Utilisateur = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Liste tous les comptes. Ne retourne jamais api_key_hash."""
+    return [_user_public(u) for u in db.query(Utilisateur).order_by(Utilisateur.id).all()]
+
+
+@app.post("/api/auth/utilisateurs/{uid}/revoquer")
+def revoquer_utilisateur(
+    uid: int,
+    _admin: Utilisateur = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Désactive un compte et révoque sa clé API."""
+    u = db.get(Utilisateur, uid)
+    if not u:
+        raise HTTPException(404, "Utilisateur introuvable")
+    if u.role == "admin" and _count_active_admins(db) <= 1:
+        raise HTTPException(409, "Impossible : dernier administrateur actif")
+    u.actif = False
+    revoke_api_key(db, u.id)
+    db.commit()
+    return _user_public(u)
+
+
+@app.post("/api/auth/utilisateurs/{uid}/reactiver")
+def reactiver_utilisateur(
+    uid: int,
+    _admin: Utilisateur = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Réactive un compte désactivé."""
+    u = db.get(Utilisateur, uid)
+    if not u:
+        raise HTTPException(404, "Utilisateur introuvable")
+    u.actif = True
+    db.commit()
+    return _user_public(u)
+
+
+@app.post("/api/auth/utilisateurs/{uid}/regenerer")
+def regenerer_cle(
+    uid: int,
+    _admin: Utilisateur = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Génère une nouvelle clé API pour l'employé. L'ancienne est invalidée immédiatement."""
+    u = db.get(Utilisateur, uid)
+    if not u:
+        raise HTTPException(404, "Utilisateur introuvable")
+    raw_key = make_api_key(db, u.id)
+    return {**_user_public(u), "api_key": raw_key}
+
+
+@app.delete("/api/auth/utilisateurs/{uid}")
+def supprimer_utilisateur(
+    uid: int,
+    _admin: Utilisateur = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Supprime définitivement un compte. Privilégier la désactivation."""
+    u = db.get(Utilisateur, uid)
+    if not u:
+        raise HTTPException(404, "Utilisateur introuvable")
+    if u.role == "admin" and _count_active_admins(db) <= 1:
+        raise HTTPException(409, "Impossible : dernier administrateur actif")
+    db.delete(u)
+    db.commit()
+    return {"ok": True, "id": uid}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# OAuth 2.0 — Authorization Code Flow (Google + architecture multi-fournisseurs)
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Politique de création de compte :
+#   Un email inconnu de la base est REFUSÉ. L'admin doit créer le compte
+#   (via POST /api/auth/utilisateurs) avec l'email du collaborateur AVANT
+#   que celui-ci tente de se connecter via OAuth. Cette politique évite
+#   qu'un email Google aléatoire accède à l'application.
+#
+# État anti-CSRF :
+#   Dictionnaire en mémoire {state → {provider, expires_at}}.
+#   TTL = 10 minutes. Nettoyé à chaque vérification.
+#
+# Session après OAuth :
+#   Le même système de cookie session (create_session) est utilisé — aucune
+#   modification du middleware AuthMiddleware nécessaire.
+#
+# Dépendances : google-auth (déjà installé) + httpx (déjà installé)
+# ══════════════════════════════════════════════════════════════════════════════
+
+import secrets as _secrets
+import time    as _time
+from urllib.parse import urlencode as _urlencode
+
+_OAUTH_STATES: dict = {}   # {state_str: {"provider": str, "exp": float}}
+_STATE_TTL_S  = 600        # 10 minutes
+
+_OAUTH_CFG = {
+    "google": {
+        "auth_url":    "https://accounts.google.com/o/oauth2/v2/auth",
+        "token_url":   "https://oauth2.googleapis.com/token",
+        "userinfo_url":"https://www.googleapis.com/oauth2/v3/userinfo",
+        "scope":       "openid email profile",
+        "client_id":     lambda: os.getenv("GOOGLE_CLIENT_ID",     ""),
+        "client_secret": lambda: os.getenv("GOOGLE_CLIENT_SECRET", ""),
+    },
+    "microsoft": {
+        "auth_url":    "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+        "token_url":   "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "userinfo_url":"https://graph.microsoft.com/oidc/userinfo",
+        "scope":       "openid email profile",
+        "client_id":     lambda: os.getenv("MICROSOFT_CLIENT_ID",     ""),
+        "client_secret": lambda: os.getenv("MICROSOFT_CLIENT_SECRET", ""),
+    },
+}
+
+
+def _oauth_callback_url(request: Request, provider: str) -> str:
+    base = str(request.base_url).rstrip("/")
+    return f"{base}/api/auth/oauth/{provider}/callback"
+
+
+def _clean_states():
+    now = _time.time()
+    expired = [k for k, v in _OAUTH_STATES.items() if v["exp"] < now]
+    for k in expired:
+        _OAUTH_STATES.pop(k, None)
+
+
+@app.get("/api/auth/oauth/{provider}/login", include_in_schema=True)
+def oauth_login(provider: str, request: Request):
+    """
+    Démarre le flux OAuth : redirige vers la page de consentement du fournisseur.
+    Un `state` anti-CSRF est généré et stocké côté serveur.
+    """
+    if provider not in _OAUTH_CFG:
+        raise HTTPException(400, f"Fournisseur inconnu : {provider}. Valeurs : {list(_OAUTH_CFG)}")
+    cfg = _OAUTH_CFG[provider]
+    client_id = cfg["client_id"]()
+    if not client_id:
+        raise HTTPException(503, f"OAuth {provider} non configuré — définir {provider.upper()}_CLIENT_ID dans .env")
+
+    _clean_states()
+    state = _secrets.token_urlsafe(32)
+    _OAUTH_STATES[state] = {"provider": provider, "exp": _time.time() + _STATE_TTL_S}
+
+    params = {
+        "client_id":     client_id,
+        "redirect_uri":  _oauth_callback_url(request, provider),
+        "response_type": "code",
+        "scope":         cfg["scope"],
+        "state":         state,
+        "access_type":   "offline",   # Google : refresh token
+        "prompt":        "select_account",
+    }
+    return RedirectResponse(url=f"{cfg['auth_url']}?{_urlencode(params)}")
+
+
+@app.get("/api/auth/oauth/{provider}/callback", include_in_schema=True)
+def oauth_callback(
+    provider: str,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    code:  Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+):
+    """
+    Callback OAuth :
+    1. Vérifie le state anti-CSRF
+    2. Échange le code contre un token
+    3. Récupère le profil (email, sub, nom)
+    4. Rapproche avec un compte existant (email connu requis)
+    5. Crée une session et redirige vers l'interface
+    """
+    import httpx
+
+    # Erreur explicite du fournisseur
+    if error:
+        return RedirectResponse(url=f"/login?oauth_error={error}")
+
+    # Validation state anti-CSRF
+    _clean_states()
+    stored = _OAUTH_STATES.pop(state or "", None)
+    if not stored or stored.get("provider") != provider:
+        return RedirectResponse(url="/login?oauth_error=invalid_state")
+
+    if provider not in _OAUTH_CFG:
+        return RedirectResponse(url="/login?oauth_error=unknown_provider")
+    cfg = _OAUTH_CFG[provider]
+
+    client_id     = cfg["client_id"]()
+    client_secret = cfg["client_secret"]()
+    redirect_uri  = _oauth_callback_url(request, provider)
+
+    # Échange du code → access_token + id_token
+    try:
+        tok_resp = httpx.post(
+            cfg["token_url"],
+            data={
+                "grant_type":    "authorization_code",
+                "code":          code,
+                "redirect_uri":  redirect_uri,
+                "client_id":     client_id,
+                "client_secret": client_secret,
+            },
+            timeout=10,
+        )
+        tok_resp.raise_for_status()
+        tokens = tok_resp.json()
+    except Exception:
+        return RedirectResponse(url="/login?oauth_error=token_exchange_failed")
+
+    access_token = tokens.get("access_token")
+    if not access_token:
+        return RedirectResponse(url="/login?oauth_error=no_access_token")
+
+    # Récupération du profil utilisateur
+    try:
+        info_resp = httpx.get(
+            cfg["userinfo_url"],
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10,
+        )
+        info_resp.raise_for_status()
+        profile = info_resp.json()
+    except Exception:
+        return RedirectResponse(url="/login?oauth_error=userinfo_failed")
+
+    email    = (profile.get("email") or "").lower().strip()
+    sub      = profile.get("sub") or profile.get("id", "")
+    name     = profile.get("name") or profile.get("displayName") or ""
+    verified = profile.get("email_verified", True)  # Microsoft ne renvoie pas ce champ
+
+    if not email or not verified:
+        return RedirectResponse(url="/login?oauth_error=email_not_verified")
+
+    # Rapprochement : cherche d'abord par oauth_sub, puis par email
+    user = db.query(Utilisateur).filter_by(oauth_sub=sub, oauth_provider=provider).first()
+    if not user:
+        user = db.query(Utilisateur).filter_by(email=email).first()
+        if not user:
+            # Compte inconnu → refus (politique de sécurité)
+            return RedirectResponse(url="/login?oauth_error=account_not_found")
+        # Première connexion OAuth : lie l'identité externe au compte existant
+        user.oauth_provider = provider
+        user.oauth_sub      = sub
+        if not user.nom_complet and name:
+            user.nom_complet = name
+        db.commit()
+
+    if not user.actif:
+        return RedirectResponse(url="/login?oauth_error=account_disabled")
+
+    # Création de la session (même mécanisme que le login classique)
+    session_token = create_session(db, user.id)
+    redir = RedirectResponse(url="/", status_code=302)
+    redir.set_cookie(
+        "session_token", session_token,
+        httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
+    )
+    return redir
 
 
 @app.get("/login", include_in_schema=False)

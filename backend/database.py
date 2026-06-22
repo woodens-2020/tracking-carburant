@@ -70,37 +70,62 @@ def get_db():
 
 # ── Migration légère (colonnes ajoutées en v1.1) ─────────────────
 def _migrate_columns():
-    """Ajoute les nouvelles colonnes aux tables existantes (idempotent, SQLite + PostgreSQL)."""
+    """Ajoute les nouvelles colonnes aux tables existantes (idempotent, SQLite + PostgreSQL).
+
+    SQLite (< 3.37) ne supporte pas ADD COLUMN ... UNIQUE. On ajoute la
+    colonne sans contrainte puis on crée l'index UNIQUE séparément.
+    """
     from sqlalchemy import inspect, text as sql_text
 
     insp = inspect(engine)
 
     if _is_sqlite:
+        # (table, col, ddl_colonne, ddl_index_optionnel)
         new_cols = [
-            ("produits",      "actif",           "ALTER TABLE produits      ADD COLUMN actif INTEGER NOT NULL DEFAULT 1"),
-            ("produits",      "created_at",      "ALTER TABLE produits      ADD COLUMN created_at DATETIME DEFAULT NULL"),
-            ("pompes",        "actif",           "ALTER TABLE pompes        ADD COLUMN actif INTEGER NOT NULL DEFAULT 1"),
-            ("pompes",        "created_at",      "ALTER TABLE pompes        ADD COLUMN created_at DATETIME DEFAULT NULL"),
-            ("releves",       "created_at",      "ALTER TABLE releves       ADD COLUMN created_at DATETIME DEFAULT NULL"),
-            ("releves",       "updated_at",      "ALTER TABLE releves       ADD COLUMN updated_at DATETIME DEFAULT NULL"),
-            ("releves",       "nb_modifications","ALTER TABLE releves       ADD COLUMN nb_modifications INTEGER NOT NULL DEFAULT 0"),
-            ("utilisateurs",  "api_key_hash",    "ALTER TABLE utilisateurs  ADD COLUMN api_key_hash VARCHAR(64) UNIQUE"),
+            ("produits",     "actif",            "ALTER TABLE produits      ADD COLUMN actif INTEGER NOT NULL DEFAULT 1",  None),
+            ("produits",     "created_at",       "ALTER TABLE produits      ADD COLUMN created_at DATETIME DEFAULT NULL",  None),
+            ("pompes",       "actif",            "ALTER TABLE pompes        ADD COLUMN actif INTEGER NOT NULL DEFAULT 1",   None),
+            ("pompes",       "created_at",       "ALTER TABLE pompes        ADD COLUMN created_at DATETIME DEFAULT NULL",   None),
+            ("releves",      "created_at",       "ALTER TABLE releves       ADD COLUMN created_at DATETIME DEFAULT NULL",   None),
+            ("releves",      "updated_at",       "ALTER TABLE releves       ADD COLUMN updated_at DATETIME DEFAULT NULL",   None),
+            ("releves",      "nb_modifications", "ALTER TABLE releves       ADD COLUMN nb_modifications INTEGER NOT NULL DEFAULT 0", None),
+            # UNIQUE ajouté via index séparé (SQLite interdit ADD COLUMN ... UNIQUE)
+            ("utilisateurs", "api_key_hash",
+             "ALTER TABLE utilisateurs  ADD COLUMN api_key_hash VARCHAR(64)",
+             "CREATE UNIQUE INDEX IF NOT EXISTS uq_utilisateurs_api_key_hash ON utilisateurs(api_key_hash)"),
+            # v2 — OAuth + gestion des employés
+            ("utilisateurs", "email",
+             "ALTER TABLE utilisateurs  ADD COLUMN email VARCHAR(254)",
+             "CREATE UNIQUE INDEX IF NOT EXISTS uq_utilisateurs_email ON utilisateurs(email)"),
+            ("utilisateurs", "oauth_provider",
+             "ALTER TABLE utilisateurs  ADD COLUMN oauth_provider VARCHAR(32)", None),
+            ("utilisateurs", "oauth_sub",
+             "ALTER TABLE utilisateurs  ADD COLUMN oauth_sub VARCHAR(255)",
+             "CREATE UNIQUE INDEX IF NOT EXISTS uq_utilisateurs_oauth_sub ON utilisateurs(oauth_sub)"),
         ]
     elif _is_postgres:
         new_cols = [
             ("releves",      "nb_modifications",
-             "ALTER TABLE releves      ADD COLUMN nb_modifications INTEGER NOT NULL DEFAULT 0"),
+             "ALTER TABLE releves      ADD COLUMN nb_modifications INTEGER NOT NULL DEFAULT 0", None),
             ("utilisateurs", "api_key_hash",
-             "ALTER TABLE utilisateurs ADD COLUMN api_key_hash VARCHAR(64) UNIQUE"),
+             "ALTER TABLE utilisateurs ADD COLUMN api_key_hash VARCHAR(64) UNIQUE", None),
+            ("utilisateurs", "email",
+             "ALTER TABLE utilisateurs ADD COLUMN email VARCHAR(254) UNIQUE", None),
+            ("utilisateurs", "oauth_provider",
+             "ALTER TABLE utilisateurs ADD COLUMN oauth_provider VARCHAR(32)", None),
+            ("utilisateurs", "oauth_sub",
+             "ALTER TABLE utilisateurs ADD COLUMN oauth_sub VARCHAR(255) UNIQUE", None),
         ]
     else:
         return
 
     with engine.connect() as conn:
-        for table, col, ddl in new_cols:
+        for table, col, ddl_col, ddl_idx in new_cols:
             existing = [c["name"] for c in insp.get_columns(table)]
             if col not in existing:
-                conn.execute(sql_text(ddl))
+                conn.execute(sql_text(ddl_col))
+                if ddl_idx:
+                    conn.execute(sql_text(ddl_idx))
         conn.commit()
 
 

@@ -1486,6 +1486,30 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .admin-profile-row:last-child{border-bottom:none}
 .admin-profile-lbl{font-size:12px;color:var(--muted);font-weight:600}
 .admin-profile-val{font-size:13px;font-weight:700;color:var(--text1)}
+.admin-btn-secondary{display:inline-flex;align-items:center;gap:7px;padding:8px 15px;background:transparent;border:1px solid var(--border2);border-radius:var(--rsm);color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.admin-btn-secondary:hover{color:var(--text1);border-color:var(--text1)}
+/* Table employés */
+.adm-emp-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.adm-emp-table th{padding:10px 14px;text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);background:var(--panel2)}
+.adm-emp-table td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text1);vertical-align:middle}
+.adm-emp-table tr:last-child td{border-bottom:none}
+.adm-emp-table tr:hover td{background:rgba(255,255,255,.02)}
+.emp-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.emp-badge.admin{background:rgba(247,169,59,.15);color:#f7a93b;border:1px solid rgba(247,169,59,.3)}
+.emp-badge.operateur{background:rgba(63,182,168,.12);color:#3fb6a8;border:1px solid rgba(63,182,168,.25)}
+.emp-badge.actif{background:rgba(34,197,94,.1);color:#4ade80;border:1px solid rgba(34,197,94,.25)}
+.emp-badge.inactif{background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.25)}
+.emp-badge.oauth{background:rgba(99,102,241,.12);color:#818cf8;border:1px solid rgba(99,102,241,.25)}
+.emp-actions{display:flex;gap:5px;flex-wrap:wrap}
+.emp-btn{padding:3px 9px;font-size:11px;font-weight:600;border:1px solid;border-radius:6px;cursor:pointer;background:transparent;transition:opacity .15s}
+.emp-btn.rev{color:#f87171;border-color:rgba(239,68,68,.3)}
+.emp-btn.rev:hover{background:rgba(239,68,68,.1)}
+.emp-btn.react{color:#4ade80;border-color:rgba(34,197,94,.3)}
+.emp-btn.react:hover{background:rgba(34,197,94,.1)}
+.emp-btn.regen{color:#f7a93b;border-color:rgba(247,169,59,.3)}
+.emp-btn.regen:hover{background:rgba(247,169,59,.1)}
+.emp-btn.del{color:#9ca3af;border-color:rgba(156,163,175,.25)}
+.emp-btn.del:hover{color:#f87171;border-color:rgba(239,68,68,.3)}
 
 /* ── Rapports ─────────────────────────────────────────── */
 .rpt-container{display:flex;flex-direction:column;gap:20px;max-width:900px}
@@ -2615,6 +2639,94 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="admin-profile-row">
               <span class="admin-profile-lbl">Rôle</span>
               <span class="admin-profile-val" id="adm-role">—</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+        <!-- ── Gestion des employés (admin seulement) ── -->
+        <div class="admin-card" id="adm-emp-card" style="display:none;grid-column:1/-1">
+          <div class="admin-card-hdr">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Gestion des employés
+            <button class="admin-btn-primary" style="margin-left:auto;padding:5px 14px;font-size:12px" onclick="showCreateEmpForm()">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Créer un compte
+            </button>
+          </div>
+          <div class="admin-card-body" style="padding:0">
+
+            <!-- Formulaire de création (masqué par défaut) -->
+            <div id="adm-emp-form" style="display:none;padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.07);background:rgba(247,169,59,.04)">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                <div class="admin-field">
+                  <label class="admin-lbl">Identifiant (login)</label>
+                  <input type="text" id="emp-username" class="admin-input" placeholder="ex: marie.dupont" autocomplete="off">
+                </div>
+                <div class="admin-field">
+                  <label class="admin-lbl">Nom complet</label>
+                  <input type="text" id="emp-nomcomplet" class="admin-input" placeholder="ex: Marie Dupont" autocomplete="off">
+                </div>
+                <div class="admin-field">
+                  <label class="admin-lbl">Mot de passe (≥ 6 caractères)</label>
+                  <input type="password" id="emp-password" class="admin-input" placeholder="••••••••" autocomplete="new-password">
+                </div>
+                <div class="admin-field">
+                  <label class="admin-lbl">Email (pour connexion Google)</label>
+                  <input type="email" id="emp-email" class="admin-input" placeholder="ex: marie@gmail.com (optionnel)">
+                </div>
+              </div>
+              <div class="admin-field" style="margin-bottom:14px">
+                <label class="admin-lbl">Rôle</label>
+                <select id="emp-role" class="admin-input" style="cursor:pointer">
+                  <option value="operateur">Opérateur (accès métier uniquement)</option>
+                  <option value="admin">Administrateur (accès complet)</option>
+                </select>
+              </div>
+              <div id="adm-emp-form-msg" class="admin-msg" style="display:none;margin-bottom:10px"></div>
+              <div class="admin-btn-row">
+                <button class="admin-btn-primary" onclick="submitCreateEmp()">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Créer le compte
+                </button>
+                <button class="admin-btn-secondary" onclick="hideCreateEmpForm()">Annuler</button>
+              </div>
+            </div>
+
+            <!-- Tableau des comptes -->
+            <div style="overflow-x:auto">
+              <table class="adm-emp-table" id="adm-emp-table">
+                <thead>
+                  <tr>
+                    <th>Nom</th><th>Identifiant</th><th>Rôle</th><th>Email / OAuth</th><th>Statut</th><th>Clé API</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="adm-emp-tbody">
+                  <tr><td colspan="7" style="text-align:center;padding:20px;opacity:.5">Chargement…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal : clé API générée (création / régénération) -->
+        <div id="adm-key-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center">
+          <div style="background:var(--surface,#1a2233);border:1px solid rgba(247,169,59,.25);border-radius:16px;padding:30px 28px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.7)">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#f7a93b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+              <strong style="font-size:15px;color:var(--text,#e0e6f0)">Clé API générée</strong>
+            </div>
+            <p style="font-size:12.5px;color:var(--muted,#7a8ba8);margin-bottom:14px">
+              ⚠️ <strong style="color:#f7a93b">Copiez cette clé maintenant.</strong> Elle ne sera plus jamais affichée. Transmettez-la de façon sécurisée à l'employé.
+            </p>
+            <div style="background:rgba(0,0,0,.4);border:1px solid rgba(247,169,59,.2);border-radius:10px;padding:12px 14px;font-family:monospace;font-size:13px;color:#f7a93b;word-break:break-all;margin-bottom:16px" id="adm-modal-key"></div>
+            <div class="admin-btn-row">
+              <button class="admin-btn-primary" onclick="copyModalKey()">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copier la clé
+              </button>
+              <button class="admin-btn-secondary" onclick="closeKeyModal()">Fermer</button>
             </div>
           </div>
         </div>
@@ -7754,7 +7866,163 @@ async function initAdmin(){
     document.getElementById('adm-nomcomplet').textContent= me.nom_complet|| '—';
     document.getElementById('adm-role').textContent      = me.role       || '—';
     _admSetKeyStatus(me.has_api_key);
+    // Carte employés visible uniquement pour les admins
+    if(me.role === 'admin'){
+      const card = document.getElementById('adm-emp-card');
+      if(card) card.style.display = '';
+      loadEmployees();
+    }
   }catch(e){ /* silencieux */ }
+}
+
+// ── Gestion des employés ──────────────────────────────────────────
+
+async function loadEmployees(){
+  const tbody = document.getElementById('adm-emp-tbody');
+  if(!tbody) return;
+  try{
+    const list = await GET('/auth/utilisateurs');
+    if(!list.length){
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;opacity:.5">Aucun compte créé.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(u => {
+      const roleBadge   = `<span class="emp-badge ${u.role}">${u.role}</span>`;
+      const statutBadge = u.actif
+        ? '<span class="emp-badge actif">Actif</span>'
+        : '<span class="emp-badge inactif">Désactivé</span>';
+      const oauthInfo = u.oauth_provider
+        ? `<span class="emp-badge oauth">${u.oauth_provider}</span> ${u.email||''}`
+        : (u.email || '<span style="opacity:.4">—</span>');
+      const keyInfo = u.has_api_key
+        ? '<span style="color:#4ade80;font-size:11px">✓ Active</span>'
+        : '<span style="opacity:.4;font-size:11px">—</span>';
+
+      let actions = '';
+      if(u.actif){
+        actions += `<button class="emp-btn rev" onclick="revoquerEmployee(${u.id},'${_esc(u.nom_complet||u.username)}')">Révoquer</button>`;
+      } else {
+        actions += `<button class="emp-btn react" onclick="reactiverEmployee(${u.id},'${_esc(u.nom_complet||u.username)}')">Réactiver</button>`;
+      }
+      actions += `<button class="emp-btn regen" onclick="regenererCle(${u.id},'${_esc(u.nom_complet||u.username)}')">Clé</button>`;
+      actions += `<button class="emp-btn del" onclick="deleteEmployee(${u.id},'${_esc(u.nom_complet||u.username)}')">Suppr.</button>`;
+
+      return `<tr>
+        <td style="font-weight:600">${_esc(u.nom_complet||'—')}</td>
+        <td style="font-family:monospace;font-size:12px">${_esc(u.username)}</td>
+        <td>${roleBadge}</td>
+        <td style="font-size:12px">${oauthInfo}</td>
+        <td>${statutBadge}</td>
+        <td>${keyInfo}</td>
+        <td><div class="emp-actions">${actions}</div></td>
+      </tr>`;
+    }).join('');
+  }catch(e){
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#f87171">${e.message||'Erreur de chargement'}</td></tr>`;
+  }
+}
+
+function _esc(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function showCreateEmpForm(){
+  document.getElementById('adm-emp-form').style.display = '';
+  document.getElementById('emp-username').focus();
+}
+function hideCreateEmpForm(){
+  document.getElementById('adm-emp-form').style.display = 'none';
+  ['emp-username','emp-nomcomplet','emp-password','emp-email'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+  document.getElementById('emp-role').value = 'operateur';
+  _empFormMsg('','');
+}
+
+function _empFormMsg(msg, type){
+  const el = document.getElementById('adm-emp-form-msg');
+  if(!el) return;
+  if(!msg){ el.style.display='none'; return; }
+  el.textContent = msg;
+  el.className   = 'admin-msg ' + type;
+  el.style.display = '';
+}
+
+async function submitCreateEmp(){
+  const username   = document.getElementById('emp-username').value.trim();
+  const nomComplet = document.getElementById('emp-nomcomplet').value.trim();
+  const password   = document.getElementById('emp-password').value;
+  const email      = document.getElementById('emp-email').value.trim();
+  const role       = document.getElementById('emp-role').value;
+
+  if(!username || !nomComplet || !password){
+    return _empFormMsg('Identifiant, nom et mot de passe sont requis.','err');
+  }
+  _empFormMsg('Création en cours…','');
+  try{
+    const res = await POST('/auth/utilisateurs', {username, nom_complet:nomComplet, password, role, email:email||undefined});
+    hideCreateEmpForm();
+    await loadEmployees();
+    showKeyModal(res.api_key, `Clé de ${res.nom_complet||res.username}`);
+  }catch(e){
+    _empFormMsg(e.message||'Erreur lors de la création.','err');
+  }
+}
+
+async function revoquerEmployee(id, name){
+  if(!confirm(`Révoquer le compte de ${name} ? La clé API sera invalidée immédiatement.`)) return;
+  try{
+    await POST(`/auth/utilisateurs/${id}/revoquer`);
+    await loadEmployees();
+    toast(`Compte de ${name} révoqué`, 'ok');
+  }catch(e){ toast(e.message||'Erreur','err'); }
+}
+
+async function reactiverEmployee(id, name){
+  if(!confirm(`Réactiver le compte de ${name} ?`)) return;
+  try{
+    await POST(`/auth/utilisateurs/${id}/reactiver`);
+    await loadEmployees();
+    toast(`Compte de ${name} réactivé`, 'ok');
+  }catch(e){ toast(e.message||'Erreur','err'); }
+}
+
+async function regenererCle(id, name){
+  if(!confirm(`Régénérer la clé API de ${name} ? L'ancienne clé sera immédiatement invalide.`)) return;
+  try{
+    const res = await POST(`/auth/utilisateurs/${id}/regenerer`);
+    await loadEmployees();
+    showKeyModal(res.api_key, `Nouvelle clé de ${name}`);
+  }catch(e){ toast(e.message||'Erreur','err'); }
+}
+
+async function deleteEmployee(id, name){
+  if(!confirm(`Supprimer définitivement le compte de ${name} ? Cette action est irréversible.`)) return;
+  if(!confirm(`Confirmez la suppression de ${name}.`)) return;
+  try{
+    await DEL(`/auth/utilisateurs/${id}`);
+    await loadEmployees();
+    toast(`Compte de ${name} supprimé`, 'ok');
+  }catch(e){ toast(e.message||'Erreur','err'); }
+}
+
+function showKeyModal(key, title){
+  document.getElementById('adm-modal-key').textContent = key || '—';
+  const modal = document.getElementById('adm-key-modal');
+  modal.style.display = 'flex';
+}
+
+function closeKeyModal(){
+  document.getElementById('adm-key-modal').style.display = 'none';
+  document.getElementById('adm-modal-key').textContent = '';
+}
+
+async function copyModalKey(){
+  const key = document.getElementById('adm-modal-key').textContent;
+  try{
+    await navigator.clipboard.writeText(key);
+    toast('Clé copiée dans le presse-papiers', 'ok');
+  }catch(e){
+    prompt('Copiez cette clé :', key);
+  }
 }
 
 function _admSetKeyStatus(hasKey){
