@@ -194,7 +194,7 @@ input[type=date]{color-scheme:dark}
 .sb-footer span{font-size:11.5px;color:rgba(255,255,255,.35)}
 
 /* ── Main area ───────────────────────────────── */
-.main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;overflow:hidden}
 .main-header{
   background:linear-gradient(to right,var(--panel) 50%,var(--bg));
   border-bottom:1px solid var(--border);
@@ -213,7 +213,7 @@ input[type=date]{color-scheme:dark}
 }
 .date-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.12)}
 
-.pages{flex:1;overflow-y:auto}
+.pages{flex:1;min-height:0;overflow-y:auto}
 .page{display:none;padding:24px 26px;animation:fade-in .2s ease}
 .page.active{display:block}
 @keyframes fade-in{from{opacity:.3;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
@@ -786,16 +786,32 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
 
 /* ── Footer ──────────────────────────────────── */
 .app-footer{
-  background:var(--panel);border-top:1px solid var(--border);
-  padding:9px 22px;display:flex;align-items:center;justify-content:space-between;
-  flex-shrink:0;animation:footer-in .5s ease .6s both;
+  background:linear-gradient(to right,rgba(11,25,41,.98),rgba(6,11,24,.98));
+  border-top:1px solid rgba(59,130,246,.15);
+  padding:0 22px;height:36px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
 }
-@keyframes footer-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-.footer-left{display:flex;align-items:center;gap:9px}
-.footer-pillatre{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--red2);letter-spacing:.01em}
-.footer-right{font-size:10.5px;color:var(--dim)}
-.footer-divider{width:1px;height:11px;background:var(--border2)}
-.footer-version{font-size:10px;color:var(--dim);font-family:var(--mono)}
+.footer-left{display:flex;align-items:center;gap:10px}
+.footer-pillatre{
+  display:flex;align-items:center;gap:6px;
+  font-size:11px;font-weight:700;color:var(--red2);
+  letter-spacing:.03em;text-transform:uppercase;
+}
+.footer-pillatre svg{opacity:.85}
+.footer-divider{width:1px;height:12px;background:rgba(255,255,255,.1)}
+.footer-version{
+  font-size:10px;color:rgba(255,255,255,.25);
+  font-family:var(--mono);letter-spacing:.04em;
+}
+.footer-right{
+  display:flex;align-items:center;gap:8px;
+  font-size:10px;color:rgba(255,255,255,.22);letter-spacing:.02em;
+}
+.footer-dot{
+  width:4px;height:4px;border-radius:50%;
+  background:rgba(59,130,246,.4);flex-shrink:0;
+}
 
 /* ── Page title slide ────────────────────────── */
 @keyframes title-slide{from{opacity:0;transform:translateX(-7px)}to{opacity:1;transform:translateX(0)}}
@@ -2952,16 +2968,20 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   <footer class="app-footer">
     <div class="footer-left">
       <div class="footer-pillatre">
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-          <path d="M3 2h6a4 4 0 0 1 0 8H3V2Z" stroke="var(--blue2)" stroke-width="1.5" stroke-linejoin="round"/>
-          <line x1="3" y1="10" x2="3" y2="14" stroke="var(--red)" stroke-width="1.5" stroke-linecap="round"/>
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+          <path d="M3 2h6a4 4 0 0 1 0 8H3V2Z" stroke="var(--red2)" stroke-width="1.5" stroke-linejoin="round"/>
+          <line x1="3" y1="10" x2="3" y2="14" stroke="var(--blue2)" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
-        Bon Prix · Complexe Commerciale de Pillatre
+        Bon Prix &middot; Complexe Commerciale de Pillatre
       </div>
       <div class="footer-divider"></div>
       <span class="footer-version">Konekta v2.0</span>
     </div>
-    <div class="footer-right">© 2026 · Tous droits réservés</div>
+    <div class="footer-right">
+      <span>© 2026</span>
+      <div class="footer-dot"></div>
+      <span>Tous droits réservés</span>
+    </div>
   </footer>
 </div><!-- /main -->
 
