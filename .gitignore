@@ -1,0 +1,51 @@
+# ── Secrets ──────────────────────────────────────────────────────
+backend/.env
+backend/*.env.*
+
+# ── Base de données SQLite ────────────────────────────────────────
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+
+# ── Python ───────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.spec
+.venv/
+venv/
+env/
+
+# ── Logs ─────────────────────────────────────────────────────────
+backend/server.log
+backend/*.log
+*.log
+
+# ── Node / Next.js frontend ───────────────────────────────────────
+frontend/node_modules/
+frontend/.next/
+frontend/.env*
+
+# ── OS ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ──────────────────────────────────────────────────────────
+.vscode/
+.idea/
+
+# ── Rapports générés temporaires ────────────────────────────────
+frontend/audit_*.pdf
+frontend/audit_*.xlsx
+
+# ── Tests isolation databases ─────────────────────────────────────
+backend/test_*.db
+
+# ── Backup ───────────────────────────────────────────────────────
+*_backup*

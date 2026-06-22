@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+anthropic
+google-genai
+psycopg2-binary
+python-dotenv
+reportlab
+openpyxl
+python-docx
+matplotlib

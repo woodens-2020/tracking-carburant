@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+/* ─── Design tokens ───────────────────────────── */
+:root {
+  /* ── Sidebar ── */
+  --sb:     #1c3557;
+  --sb-t:   rgba(255,255,255,0.70);
+  --sb-t2:  rgba(255,255,255,0.35);
+  --sb-a:   rgba(255,255,255,0.09);
+  --sb-bar: #ef4444;
+
+  /* ── Backgrounds ── */
+  --bg:    #f0f4f8;
+  --card:  #ffffff;
+  --card2: #f8fafc;
+
+  /* ── Borders ── */
+  --b0: #f1f5f9;
+  --b1: #e2e8f0;
+  --b2: #cbd5e1;
+
+  /* ── Text ── */
+  --t0: #0f172a;
+  --t1: #475569;
+  --t2: #94a3b8;
+
+  /* ── Primary blue ── */
+  --blue:  #1d4ed8;
+  --blue2: #3b82f6;
+  --blue3: #1e3a8a;
+
+  /* ── Fuel accent ── */
+  --amber:  #d97706;
+  --amber2: #f59e0b;
+  --amber3: #b45309;
+
+  /* ── Status ── */
+  --teal:   #0891b2;
+  --teal2:  #06b6d4;
+  --teal3:  #0e7490;
+  --green:  #16a34a;
+  --red:    #dc2626;
+  --purple: #7c3aed;
+
+  /* Keep old names as aliases for backward compat */
+  --c0: var(--bg);
+  --c1: var(--card);
+  --c2: var(--card2);
+  --c3: var(--b0);
+}
+
+/* ─── Reset ──────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--t0);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100%;
+}
+
+/* ─── Scrollbar ─────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--b2); border-radius: 4px; }
+
+/* ─── Inputs ────────────────────────────────── */
+input[type="date"]   { color-scheme: light; }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { opacity: 0.3; }
+
+/* ─── Skeleton shimmer ──────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -800px 0; }
+  100% { background-position:  800px 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, var(--card2) 0%, var(--b1) 50%, var(--card2) 100%);
+  background-size: 800px 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* ─── Typography helpers ────────────────────── */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Label style (uppercase section header) */
+.label-sm {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t2);
+}

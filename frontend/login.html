@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connexion · Konekta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gold:#e8c558;--gold-l:#f7e7a8;--gold-d:#b8860b;
+  --navy:#0a1c3a;--navy2:#1a3a6b;
+  --red:#ef4444;--green:#22c55e;
+  --text:#e8eef8;--muted:#5a7ba8;
+  --font:'Calibri','Gill Sans MT','Trebuchet MS',Arial,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:var(--font);background:#010a15;color:var(--text);
+  -webkit-font-smoothing:antialiased;
+  display:flex;align-items:center;justify-content:center;min-height:100vh;
+}
+
+/* ══ FOND ══ */
+#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+/* Vignette centre */
+.vignette{
+  position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse 50% 62% at 50% 52%,rgba(1,10,21,.88) 0%,transparent 100%);
+}
+
+/* ══ CARTE ══ */
+.login-wrap{position:relative;z-index:10;width:100%;max-width:440px;padding:16px}
+
+.card{
+  background:rgba(4,13,27,.93);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid rgba(232,197,88,.16);border-radius:20px;
+  padding:42px 36px 34px;
+  box-shadow:0 0 0 1px rgba(255,255,255,.03) inset,
+             0 24px 70px rgba(0,1,12,.9),
+             0 0 80px rgba(232,197,88,.05);
+  animation:card-in .55s cubic-bezier(.22,.8,.36,1);
+  position:relative;overflow:hidden;
+}
+.card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,#7a4f00,#f7e7a8 32%,#e8c558 58%,#1a3a6b 100%);
+}
+.card::after{
+  content:'';position:absolute;top:2px;left:10%;right:10%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(232,197,88,.1),transparent);
+  pointer-events:none;
+}
+@keyframes card-in{from{opacity:0;transform:translateY(22px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+
+/* ══ BRAND ══ */
+.brand{display:flex;flex-direction:column;align-items:center;margin-bottom:30px}
+.brand-logo{
+  width:70px;height:70px;border-radius:19px;
+  background:linear-gradient(135deg,#0f2040,#0a1c3a);
+  border:1px solid rgba(232,197,88,.3);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 28px rgba(232,197,88,.13),inset 0 1px rgba(255,255,255,.06);
+  margin-bottom:14px;position:relative;padding:4px;
+}
+.brand-logo-ring{
+  position:absolute;inset:-5px;border-radius:24px;
+  border:1px solid transparent;
+  background:linear-gradient(135deg,rgba(232,197,88,.5),transparent 38%,rgba(184,134,11,.38)) border-box;
+  -webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:destination-out;mask-composite:exclude;
+  animation:ring-spin 10s linear infinite;
+}
+@keyframes ring-spin{to{transform:rotate(360deg)}}
+.brand-title{
+  font-size:25px;font-weight:800;letter-spacing:-.5px;line-height:1;
+  background:linear-gradient(135deg,#f7e7a8,#e8c558 55%,#c49a00);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.brand-sep{width:38px;height:2px;margin:9px auto 8px;border-radius:2px;background:linear-gradient(90deg,#b8860b,#f7e7a8,#b8860b)}
+.brand-sub{font-size:11px;color:var(--muted);text-align:center;line-height:1.5}
+.brand-sub strong{color:rgba(232,197,88,.72);font-weight:600}
+
+/* ══ CHAMPS ══ */
+.field{margin-bottom:18px}
+.field-label{display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:7px;transition:color .2s}
+.field:focus-within .field-label{color:var(--gold)}
+.input-wrap{position:relative;display:flex;align-items:center}
+.input-icon{position:absolute;left:13px;color:var(--muted);pointer-events:none;display:flex;align-items:center;transition:color .2s,transform .2s}
+.field:focus-within .input-icon{color:var(--gold);transform:scale(1.1)}
+.field input{
+  width:100%;padding:12px 42px;
+  background:rgba(10,22,42,.78);border:1px solid rgba(36,62,102,.9);
+  border-radius:11px;color:var(--text);font-size:14px;font-family:var(--font);outline:none;
+  transition:border-color .2s,box-shadow .2s,background .2s;
+}
+.field input[type="password"]{letter-spacing:.1em}
+.field input::placeholder{color:rgba(90,123,168,.42);font-size:13px;letter-spacing:normal}
+.field input:focus{
+  border-color:rgba(232,197,88,.38);background:rgba(15,30,55,.88);
+  box-shadow:0 0 0 3px rgba(232,197,88,.07),0 0 18px rgba(232,197,88,.05);
+}
+.pw-toggle{position:absolute;right:11px;background:none;border:none;cursor:pointer;color:var(--muted);padding:5px;border-radius:6px;display:flex;align-items:center;transition:color .18s,background .18s}
+.pw-toggle:hover{color:var(--gold);background:rgba(232,197,88,.1)}
+
+/* ══ ERREUR ══ */
+.err-box{display:flex;align-items:center;gap:8px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.28);border-left:3px solid var(--red);color:#fc8585;font-size:12.5px;font-weight:600;padding:10px 13px;border-radius:9px;margin-bottom:18px;animation:shake .38s ease}
+.err-box.hidden{display:none!important}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}55%{transform:translateX(6px)}80%{transform:translateX(-3px)}}
+
+/* ══ BOUTON ══ */
+.btn-login{
+  width:100%;padding:13px;border:none;border-radius:11px;
+  background:linear-gradient(135deg,#7a4800,#c49a00 38%,#f7e7a8 68%,#c49a00 100%);
+  color:#0a1c3a;font-weight:800;font-size:14.5px;font-family:var(--font);
+  letter-spacing:.03em;cursor:pointer;position:relative;overflow:hidden;
+  transition:transform .15s,box-shadow .2s;
+  box-shadow:0 4px 20px rgba(232,197,88,.28),0 1px rgba(255,255,255,.22) inset;
+  margin-top:4px;
+}
+.btn-login::before{content:'';position:absolute;top:0;left:-110%;width:55%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent);transform:skewX(-22deg);transition:left .55s ease;pointer-events:none}
+.btn-login:hover::before{left:160%}
+.btn-login:hover{box-shadow:0 6px 28px rgba(232,197,88,.44);transform:translateY(-1px)}
+.btn-login:active{transform:scale(.97)}
+.btn-login:disabled{opacity:.6;cursor:default;transform:none}
+
+/* ══ HINT / FOOTER ══ */
+.hint{display:flex;align-items:center;justify-content:center;gap:8px;font-size:10.5px;color:rgba(90,123,168,.5);margin-top:15px}
+.hint::before,.hint::after{content:'';flex:1;max-width:38px;height:1px;background:rgba(232,197,88,.1)}
+.login-footer{text-align:center;font-size:10.5px;color:rgba(90,123,168,.42);margin-top:18px;letter-spacing:.02em;line-height:1.7}
+.c-gold{color:rgba(232,197,88,.62);font-weight:700}
+.c-navy{color:rgba(100,140,200,.48)}
+
+/* ══ SPINNER ══ */
+.spinner{width:13px;height:13px;border-radius:50%;border:2px solid rgba(10,28,58,.3);border-top-color:#0a1c3a;animation:spin .5s linear infinite;display:inline-block;vertical-align:middle;margin-right:7px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ══ LOGO SVG DRAW ══ */
+.k-el{opacity:0;animation:k-fade .4s ease forwards}
+@keyframes k-fade{to{opacity:1}}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="vignette"></div>
+
+<div class="login-wrap">
+  <form class="card" id="login-form" autocomplete="on">
+
+    <div class="brand">
+      <div class="brand-logo">
+        <div class="brand-logo-ring"></div>
+        <svg viewBox="0 0 100 100" fill="none" width="54" height="54">
+          <defs>
+            <linearGradient id="lg-g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#f7e7a8"/><stop offset="50%" stop-color="#e8c558"/><stop offset="100%" stop-color="#c49a00"/>
+            </linearGradient>
+            <linearGradient id="lg-n" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#1a3a6b"/><stop offset="100%" stop-color="#0a1c3a"/>
+            </linearGradient>
+          </defs>
+          <line class="k-el" x1="50" y1="50" x2="18" y2="18" stroke="#e8c558" stroke-width="1.3" opacity=".6" stroke-linecap="round" style="animation-delay:.05s"/>
+          <line class="k-el" x1="50" y1="50" x2="82" y2="18" stroke="#e8c558" stroke-width="1.3" opacity=".6" stroke-linecap="round" style="animation-delay:.1s"/>
+          <line class="k-el" x1="50" y1="50" x2="6"  y2="50" stroke="#e8c558" stroke-width="1.3" opacity=".6" stroke-linecap="round" style="animation-delay:.0s"/>
+          <line class="k-el" x1="50" y1="50" x2="94" y2="50" stroke="#e8c558" stroke-width="1.3" opacity=".6" stroke-linecap="round" style="animation-delay:.08s"/>
+          <line class="k-el" x1="50" y1="50" x2="18" y2="82" stroke="#e8c558" stroke-width="1.3" opacity=".6" stroke-linecap="round" style="animation-delay:.12s"/>
+          <line class="k-el" x1="50" y1="50" x2="82" y2="82" stroke="#e8c558" stroke-width="1.3" opacity=".6" stroke-linecap="round" style="animation-delay:.15s"/>
+          <circle class="k-el" cx="18" cy="18" r="5" fill="#0a1c3a" stroke="#e8c558" stroke-width="1.8" style="animation-delay:.58s"/>
+          <circle class="k-el" cx="82" cy="18" r="5" fill="#0a1c3a" stroke="#e8c558" stroke-width="1.8" style="animation-delay:.61s"/>
+          <circle class="k-el" cx="6"  cy="50" r="5" fill="#0a1c3a" stroke="#e8c558" stroke-width="1.8" style="animation-delay:.55s"/>
+          <circle class="k-el" cx="94" cy="50" r="5" fill="#0a1c3a" stroke="#e8c558" stroke-width="1.8" style="animation-delay:.57s"/>
+          <circle class="k-el" cx="18" cy="82" r="5" fill="#0a1c3a" stroke="#e8c558" stroke-width="1.8" style="animation-delay:.63s"/>
+          <circle class="k-el" cx="82" cy="82" r="5" fill="#0a1c3a" stroke="#e8c558" stroke-width="1.8" style="animation-delay:.65s"/>
+          <circle class="k-el" cx="50" cy="50" r="33" fill="url(#lg-n)" stroke="url(#lg-g)" stroke-width="2.2" style="animation-delay:.28s"/>
+          <path class="k-el" d="M43 33 v34"    stroke="#e8c558" stroke-width="5.5" stroke-linecap="round" style="animation-delay:.85s"/>
+          <path class="k-el" d="M43 50 l13 -16" stroke="#e8c558" stroke-width="5.5" stroke-linecap="round" style="animation-delay:1s"/>
+          <path class="k-el" d="M47 52 l10 15"  stroke="#e8c558" stroke-width="5.5" stroke-linecap="round" style="animation-delay:1.1s"/>
+        </svg>
+      </div>
+      <div class="brand-title">Konekta</div>
+      <div class="brand-sep"></div>
+      <div class="brand-sub"><strong>Bon Prix</strong> · Complexe Commerciale de Pillatre</div>
+    </div>
+
+    <div class="err-box hidden" id="err-box">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span id="err-text"></span>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="username">Identifiant</label>
+      <div class="input-wrap">
+        <span class="input-icon">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </span>
+        <input type="text" id="username" name="username" autocomplete="username" placeholder="Nom d'utilisateur" required autofocus>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="password">Mot de passe</label>
+      <div class="input-wrap">
+        <span class="input-icon">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </span>
+        <input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••" required>
+        <button type="button" class="pw-toggle" id="pw-toggle">
+          <svg id="eye-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-login" id="btn-submit">Se connecter</button>
+    <div class="hint">admin / admin123 par défaut</div>
+  </form>
+
+  <div class="login-footer">
+    <span class="c-gold">Bon Prix · Complexe Commerciale de Pillatre</span><br>
+    <span class="c-navy">Konekta v2.0</span> · © 2026 · Tous droits réservés
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════
+   ANIMATION FUEL TRADING
+   Inspirée de l'image : pompe à carburant +
+   barres montantes avec flèches + courbe zigzag
+══════════════════════════════════════════════════ */
+(function(){
+  const canvas = document.getElementById('bg-canvas');
+  const ctx    = canvas.getContext('2d');
+  let W, H;
+  let scenes   = [];
+  let drops    = [];
+  let floaters = [];
+  let lastDrop  = 0;
+  let lastFloat = 0;
+
+  function rng(a,b){ return a + Math.random()*(b-a); }
+
+  function resize(){
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  /* Placer les scènes sur les bords, loin du centre */
+  function initScenes(){
+    scenes = [];
+    const slots = [
+      [rng(.02,.22), rng(.06,.38)],
+      [rng(.02,.18), rng(.56,.86)],
+      [rng(.72,.94), rng(.06,.38)],
+      [rng(.70,.92), rng(.56,.86)],
+      [rng(.28,.46), rng(.02,.17)],
+      [rng(.54,.72), rng(.02,.17)],
+      [rng(.20,.42), rng(.80,.94)],
+      [rng(.58,.80), rng(.80,.94)],
+    ];
+    slots.forEach(([fx,fy]) => scenes.push({
+      x: fx*W, y: fy*H,
+      scale:   rng(.24,.52),
+      opacity: rng(.07,.17),
+      phase:   rng(0, Math.PI*2),
+      speed:   rng(.22,.42),
+    }));
+  }
+
+  /* ══ SCÈNE CARBURANT ══
+     Espace local 240×200 unités
+     4 barres + flèches  |  courbe zigzag  |  pompe  |  goutte  */
+  function drawFuelScene(s, t){
+    const period = 5.5;
+    const tp = ((t*s.speed + s.phase/(Math.PI*2)*period) % period) / period;
+    let prog = 1, fadeA = 1;
+    if     (tp < .60){ prog = tp/.60; }
+    else if(tp < .85){ prog = 1; }
+    else             { prog = 1; fadeA = 1-(tp-.85)/.15; }
+
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.scale(s.scale, s.scale);
+
+    /* 4 barres avec flèches montantes */
+    const bars = [
+      { bx:  5, maxH: 52, col:'#5c2010' },
+      { bx: 55, maxH: 85, col:'#8a3818' },
+      { bx:105, maxH:122, col:'#b04a25' },
+      { bx:155, maxH:162, col:'#d06030' },
+    ];
+    const baseY = 190, bW = 32;
+    bars.forEach(b => {
+      const h = b.maxH * prog;
+      if(h < 1) return;
+      ctx.globalAlpha = s.opacity * fadeA;
+      ctx.fillStyle   = b.col;
+      ctx.fillRect(b.bx, baseY-h, bW, h);
+      /* Tête de flèche triangulaire */
+      ctx.beginPath();
+      ctx.moveTo(b.bx-9,      baseY-h+3);
+      ctx.lineTo(b.bx+bW/2,   baseY-h-22);
+      ctx.lineTo(b.bx+bW+9,   baseY-h+3);
+      ctx.closePath();
+      ctx.fill();
+    });
+
+    /* Courbe zigzag prix (se dessine progressivement) */
+    const pts = [
+      [0,185],[22,162],[38,174],[62,143],
+      [80,155],[102,120],[118,132],[142,94],
+      [162,62],[182,35],[205,14]
+    ];
+    const total   = pts.length;
+    const drawTo  = prog*(total-1);
+    const drawInt = Math.floor(drawTo);
+    const frac    = drawTo - drawInt;
+
+    ctx.globalAlpha = s.opacity * fadeA * .9;
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(215,232,255,.9)';
+    ctx.lineWidth   = 3.5;
+    ctx.lineJoin    = 'round';
+    ctx.lineCap     = 'round';
+    pts.forEach(([px,py],i) => {
+      if(i > drawInt+1) return;
+      if(i === 0){ ctx.moveTo(px,py); return; }
+      if(i <= drawInt){ ctx.lineTo(px,py); return; }
+      const [ppx,ppy] = pts[i-1];
+      ctx.lineTo(ppx+(px-ppx)*frac, ppy+(py-ppy)*frac);
+    });
+    ctx.stroke();
+
+    /* Pompe à carburant (apparaît en fin de cycle) */
+    if(prog > .78){
+      const na = Math.min(1,(prog-.78)/.22);
+      ctx.globalAlpha = s.opacity * fadeA * na;
+      ctx.strokeStyle = 'rgba(210,228,255,.9)';
+      ctx.fillStyle   = 'rgba(210,228,255,.9)';
+      ctx.lineWidth   = 5;
+      ctx.lineCap     = 'round';
+      ctx.lineJoin    = 'round';
+      const nx=190, ny=26;
+      /* Poignée */
+      ctx.beginPath(); ctx.moveTo(nx-20,ny+12); ctx.lineTo(nx+20,ny+12); ctx.stroke();
+      /* Corps vertical */
+      ctx.beginPath(); ctx.moveTo(nx+4,ny+12); ctx.lineTo(nx+4,ny-4); ctx.stroke();
+      /* Col courbe */
+      ctx.beginPath();
+      ctx.moveTo(nx+4,ny-4);
+      ctx.bezierCurveTo(nx+4,ny-16, nx+16,ny-19, nx+24,ny-14);
+      ctx.stroke();
+      /* Tube pistolet */
+      ctx.beginPath(); ctx.moveTo(nx+24,ny-14); ctx.lineTo(nx+46,ny-14); ctx.stroke();
+      /* Gâchette */
+      ctx.beginPath(); ctx.moveTo(nx,ny+12); ctx.lineTo(nx,ny+4); ctx.lineTo(nx+12,ny+4); ctx.stroke();
+      /* Embout */
+      ctx.beginPath(); ctx.arc(nx+46,ny-14,3.5,0,Math.PI*2); ctx.fill();
+    }
+
+    /* Goutte de carburant (oscillante) */
+    if(prog > .88){
+      const da = Math.min(1,(prog-.88)/.12);
+      const dy = Math.sin(t*2.8+s.phase)*4.5;
+      const dx=232, dY=20+dy, dr=13;
+      ctx.globalAlpha = s.opacity * fadeA * da;
+      /* Halo */
+      const grd = ctx.createRadialGradient(dx,dY+dr*.3,0, dx,dY+dr*.3,dr*2.8);
+      grd.addColorStop(0,'rgba(210,60,10,.55)');
+      grd.addColorStop(1,'rgba(210,60,10,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(dx,dY+dr*.4,dr*2.8,0,Math.PI*2); ctx.fill();
+      /* Corps */
+      ctx.fillStyle = '#c83a0c';
+      ctx.beginPath(); ctx.arc(dx,dY+dr*.4,dr,0,Math.PI*2); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(dx-dr*.68, dY+dr*.08);
+      ctx.quadraticCurveTo(dx, dY-dr*1.15, dx+dr*.68, dY+dr*.08);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  /* ══ GOUTTES TOMBANTES ══ */
+  function spawnDrop(){
+    drops.push({ x:rng(30,W-30), y:-20, r:rng(3,8), vy:rng(.5,1.6), wobble:rng(0,Math.PI*2), opacity:rng(.18,.40) });
+  }
+  function drawDroplet(d){
+    ctx.save();
+    ctx.globalAlpha = d.opacity;
+    const { x,y,r } = d;
+    const grd = ctx.createRadialGradient(x,y+r*.3,0, x,y+r*.3,r*2.6);
+    grd.addColorStop(0,'rgba(200,55,10,.5)');
+    grd.addColorStop(1,'rgba(200,55,10,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(x,y+r*.4,r*2.6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#c03a0a';
+    ctx.beginPath(); ctx.arc(x,y+r*.4,r,0,Math.PI*2); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x-r*.66, y+r*.06);
+    ctx.quadraticCurveTo(x, y-r*1.12, x+r*.66, y+r*.06);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* ══ TEXTES FLOTTANTS (prix carburant) ══ */
+  const LABELS = [
+    {t:'WTI  +1.24%',c:'#22c55e'},{t:'BRENT −0.38%',c:'#ef4444'},
+    {t:'$84.20',     c:'#e8c558'},{t:'280G ▲',      c:'#22c55e'},
+    {t:'DIESEL −1.3%',c:'#ef4444'},{t:'$87.50',     c:'#e8c558'},
+    {t:'CRUDE ▲2.1%',c:'#22c55e'},{t:'310G ▼0.9%', c:'#ef4444'},
+    {t:'+1.80%',     c:'#22c55e'},{t:'−0.65%',      c:'#ef4444'},
+    {t:'PREMIUM 280G',c:'#e8c558'},{t:'WTI $84.42', c:'#e8c558'},
+  ];
+  function spawnFloater(){
+    const f = LABELS[Math.floor(Math.random()*LABELS.length)];
+    floaters.push({ x:rng(60,W-140), y:rng(H*.45,H*.85), text:f.t, color:f.c, opacity:rng(.38,.60), vy:rng(.28,.52), size:rng(10,14) });
+  }
+
+  /* ══ BOUCLE ══ */
+  function frame(ts){
+    const t   = ts/1000;
+    const now = Date.now();
+    ctx.clearRect(0,0,W,H);
+
+    /* Fond */
+    const bg = ctx.createLinearGradient(0,0,W,H);
+    bg.addColorStop(0,'#010c1c'); bg.addColorStop(.5,'#010a17'); bg.addColorStop(1,'#000810');
+    ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+    /* Grille terminale */
+    ctx.strokeStyle='rgba(18,45,95,.11)'; ctx.lineWidth=.5;
+    for(let x=0;x<W;x+=50){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke(); }
+    for(let y=0;y<H;y+=50){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
+
+    /* Filigrane : grande goutte */
+    {
+      ctx.save(); ctx.globalAlpha=.022;
+      const r=Math.min(W,H)*.17, cx=W*.5, cy=H*.5;
+      ctx.fillStyle='#c03a0a';
+      ctx.beginPath(); ctx.arc(cx,cy+r*.4,r,0,Math.PI*2); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(cx-r*.66,cy+r*.06);
+      ctx.quadraticCurveTo(cx,cy-r*1.12,cx+r*.66,cy+r*.06);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    /* Scènes */
+    scenes.forEach(s => drawFuelScene(s,t));
+
+    /* Gouttes tombantes */
+    if(now-lastDrop > 850+Math.random()*550){ lastDrop=now; if(drops.length<10) spawnDrop(); }
+    drops = drops.filter(d => d.y < H+30);
+    drops.forEach(d => { d.y+=d.vy; d.wobble+=.045; d.x+=Math.sin(d.wobble)*.4; drawDroplet(d); });
+
+    /* Textes flottants */
+    if(now-lastFloat > 680+Math.random()*520){ lastFloat=now; if(floaters.length<14) spawnFloater(); }
+    floaters = floaters.filter(f => f.opacity>.012);
+    floaters.forEach(f => {
+      f.y-=f.vy; f.opacity-=.0042;
+      ctx.save(); ctx.globalAlpha=f.opacity; ctx.fillStyle=f.color;
+      ctx.font=`bold ${f.size}px 'JetBrains Mono',monospace`;
+      ctx.fillText(f.text,f.x,f.y); ctx.restore();
+    });
+
+    requestAnimationFrame(frame);
+  }
+
+  resize(); initScenes(); requestAnimationFrame(frame);
+  window.addEventListener('resize', ()=>{ resize(); initScenes(); });
+})();
+
+/* ══ PASSWORD TOGGLE ══ */
+const pwInput  = document.getElementById('password');
+const pwToggle = document.getElementById('pw-toggle');
+const eyeIcon  = document.getElementById('eye-icon');
+const SVG_OFF  = `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`;
+const SVG_ON   = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+pwToggle.addEventListener('click', ()=>{
+  const show = pwInput.type==='password';
+  pwInput.type=show?'text':'password';
+  eyeIcon.innerHTML=show?SVG_OFF:SVG_ON;
+});
+
+/* ══ FORMULAIRE ══ */
+const form   = document.getElementById('login-form');
+const errBox = document.getElementById('err-box');
+const errTxt = document.getElementById('err-text');
+const btn    = document.getElementById('btn-submit');
+form.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  errBox.classList.add('hidden');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Connexion…';
+  try{
+    const res=await fetch('/api/login',{
+      method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',
+      body:JSON.stringify({ username:document.getElementById('username').value.trim(), password:document.getElementById('password').value }),
+    });
+    const d=await res.json().catch(()=>({}));
+    if(!res.ok){ throw new Error(d.detail||'Identifiants incorrects'); }
+    if(d.api_key) sessionStorage.setItem('api_key',d.api_key);
+    btn.style.background='linear-gradient(135deg,#15803d,#22c55e)';
+    btn.style.color='#fff'; btn.style.boxShadow='0 4px 22px rgba(34,197,94,.4)';
+    btn.innerHTML='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:7px"><polyline points="20 6 9 17 4 12"/></svg>Connecté';
+    setTimeout(()=>{ window.location.href='/'; },480);
+  }catch(err){
+    errTxt.textContent=err.message; errBox.classList.remove('hidden');
+    btn.disabled=false; btn.innerHTML='Se connecter';
+    btn.style.background=btn.style.color=btn.style.boxShadow='';
+  }
+});
+fetch('/api/me',{credentials:'include'}).then(r=>{ if(r.ok) window.location.href='/'; }).catch(()=>{});
+</script>
+</body>
+</html>
