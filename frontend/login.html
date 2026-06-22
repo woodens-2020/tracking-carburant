@@ -245,10 +245,9 @@ body{
     </div>
 
     <button type="submit" class="btn-login" id="btn-submit">Se connecter</button>
-    <div class="hint">admin / admin123 par défaut</div>
 
     <!-- ── Connexion OAuth ── -->
-    <div class="oauth-divider">ou</div>
+    <div class="oauth-divider" id="oauth-divider-wrap">ou</div>
 
     <!--
       Bouton Google — conforme aux Google Brand Guidelines (2024) :
@@ -572,17 +571,38 @@ form.addEventListener('submit', async (e)=>{
 });
 fetch('/api/me',{credentials:'include'}).then(r=>{ if(r.ok) window.location.href='/'; }).catch(()=>{});
 
+/* ══ Affichage conditionnel du bouton Google ══ */
+(function(){
+  const btn = document.getElementById('btn-google');
+  const div = document.getElementById('oauth-divider-wrap');
+  if(!btn) return;
+  fetch('/api/auth/oauth/providers')
+    .then(r => r.ok ? r.json() : {})
+    .then(providers => {
+      if(!providers.google){
+        btn.style.display = 'none';
+        if(div) div.style.display = 'none';
+      }
+    })
+    .catch(() => {
+      btn.style.display = 'none';
+      if(div) div.style.display = 'none';
+    });
+})();
+
 /* ══ Erreurs OAuth retournées en query param ══ */
 (function(){
   const _OAUTH_MSGS = {
-    invalid_state:       'Requête de connexion expirée ou invalide. Réessayez.',
-    token_exchange_failed:'Échec de l\'échange de code avec Google. Réessayez.',
-    userinfo_failed:     'Impossible de récupérer votre profil Google.',
-    email_not_verified:  'Votre adresse email Google n\'est pas vérifiée.',
-    account_not_found:   'Aucun compte associé à cet email Google. Contactez l\'administrateur.',
-    account_disabled:    'Ce compte est désactivé. Contactez l\'administrateur.',
-    unknown_provider:    'Fournisseur OAuth inconnu.',
-    access_denied:       'Connexion annulée.',
+    invalid_state:         'Requête de connexion expirée ou invalide. Réessayez.',
+    token_exchange_failed: 'Échec de l\'échange de code avec Google. Réessayez.',
+    userinfo_failed:       'Impossible de récupérer votre profil Google.',
+    email_not_verified:    'Votre adresse email Google n\'est pas vérifiée.',
+    account_not_found:     'Aucun compte associé à cet email Google. Contactez l\'administrateur.',
+    account_disabled:      'Ce compte est désactivé. Contactez l\'administrateur.',
+    unknown_provider:      'Fournisseur OAuth inconnu.',
+    access_denied:         'Connexion annulée.',
+    no_access_token:       'Réponse Google invalide (token manquant). Réessayez.',
+    oauth_not_configured:  'La connexion Google n\'est pas encore activée sur ce serveur.',
   };
   const params = new URLSearchParams(window.location.search);
   const err    = params.get('oauth_error');

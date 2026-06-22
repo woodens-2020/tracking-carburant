@@ -74,6 +74,12 @@ app.add_middleware(AuthMiddleware)
 @app.on_event("startup")
 def startup():
     init_db()
+    # Purge des sessions expirées au démarrage (prévient l'accumulation infinie)
+    from datetime import datetime, timezone as _tz
+    from models import SessionToken as _ST
+    with SessionLocal() as _db:
+        _db.query(_ST).filter(_ST.expires_at < datetime.now(_tz.utc)).delete()
+        _db.commit()
 
 
 # ---------- Authentification ----------
@@ -151,9 +157,12 @@ class ChangePasswordIn(BaseModel):
 
 @app.post("/api/auth/change-password")
 def change_password(data: ChangePasswordIn, request: Request, db: Session = Depends(get_db)):
-    # Recharger l'utilisateur dans la session active (request.state.user vient
-    # de la session middleware qui est déjà fermée — modifier cet objet ne persiste pas)
     user = db.get(Utilisateur, request.state.user.id)
+    # Comptes OAuth : le hash sentinel ne contient pas ":" → verify_password retourne False
+    if user.oauth_provider:
+        raise HTTPException(400,
+            f"Ce compte est lié à {user.oauth_provider.capitalize()} — "
+            "la connexion par mot de passe n'est pas activée pour ce compte.")
     if not verify_password(data.ancien_mot_de_passe, user.password_hash):
         raise HTTPException(400, "Mot de passe actuel incorrect")
     if len(data.nouveau_mot_de_passe) < 6:
@@ -183,6 +192,10 @@ def require_admin(request: Request) -> Utilisateur:
 # ══════════════════════════════════════════════════════════════════════════════
 # Gestion des comptes employés (admin seulement)
 # ══════════════════════════════════════════════════════════════════════════════
+
+_USERNAME_RE = __import__("re").compile(r"^[a-zA-Z0-9._\-]{3,60}$")
+_EMAIL_RE    = __import__("re").compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
 
 class CreateUtilisateurIn(BaseModel):
     username:    str
@@ -225,10 +238,18 @@ def creer_utilisateur(
     username = data.username.strip()
     if not username:
         raise HTTPException(400, "Le nom d'utilisateur est requis")
+    if not _USERNAME_RE.match(username):
+        raise HTTPException(400,
+            "Identifiant invalide — 3 à 60 caractères, lettres/chiffres/points/tirets/underscores uniquement, pas d'espaces")
+    if not data.nom_complet.strip():
+        raise HTTPException(400, "Le nom complet est requis")
     if db.query(Utilisateur).filter_by(username=username).first():
         raise HTTPException(409, f"L'identifiant '{username}' est déjà utilisé")
     if data.email:
-        if db.query(Utilisateur).filter_by(email=data.email.strip()).first():
+        email_clean = data.email.strip().lower()
+        if not _EMAIL_RE.match(email_clean):
+            raise HTTPException(400, f"Adresse email invalide : {data.email}")
+        if db.query(Utilisateur).filter_by(email=email_clean).first():
             raise HTTPException(409, "Cet email est déjà associé à un compte")
 
     u = Utilisateur(
@@ -236,7 +257,7 @@ def creer_utilisateur(
         password_hash=hash_password(data.password),
         nom_complet=data.nom_complet.strip(),
         role=data.role,
-        email=data.email.strip() if data.email else None,
+        email=email_clean if data.email else None,
     )
     db.add(u)
     db.commit()
@@ -378,6 +399,15 @@ def _clean_states():
         _OAUTH_STATES.pop(k, None)
 
 
+@app.get("/api/auth/oauth/providers", include_in_schema=True)
+def oauth_providers():
+    """
+    Retourne les fournisseurs OAuth actifs (client_id défini).
+    Endpoint public — ne divulgue aucun secret.
+    """
+    return {p: bool(cfg["client_id"]()) for p, cfg in _OAUTH_CFG.items()}
+
+
 @app.get("/api/auth/oauth/{provider}/login", include_in_schema=True)
 def oauth_login(provider: str, request: Request):
     """
@@ -385,11 +415,12 @@ def oauth_login(provider: str, request: Request):
     Un `state` anti-CSRF est généré et stocké côté serveur.
     """
     if provider not in _OAUTH_CFG:
-        raise HTTPException(400, f"Fournisseur inconnu : {provider}. Valeurs : {list(_OAUTH_CFG)}")
+        return RedirectResponse(url="/login?oauth_error=unknown_provider")
     cfg = _OAUTH_CFG[provider]
     client_id = cfg["client_id"]()
     if not client_id:
-        raise HTTPException(503, f"OAuth {provider} non configuré — définir {provider.upper()}_CLIENT_ID dans .env")
+        # Redirige vers login avec message d'erreur plutôt que 503 brut
+        return RedirectResponse(url="/login?oauth_error=oauth_not_configured")
 
     _clean_states()
     state = _secrets.token_urlsafe(32)
@@ -401,7 +432,6 @@ def oauth_login(provider: str, request: Request):
         "response_type": "code",
         "scope":         cfg["scope"],
         "state":         state,
-        "access_type":   "offline",   # Google : refresh token
         "prompt":        "select_account",
     }
     return RedirectResponse(url=f"{cfg['auth_url']}?{_urlencode(params)}")

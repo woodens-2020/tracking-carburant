@@ -2711,7 +2711,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
 
         <!-- Modal : clé API générée (création / régénération) -->
-        <div id="adm-key-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center">
+        <div id="adm-key-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);align-items:center;justify-content:center">
           <div style="background:var(--surface,#1a2233);border:1px solid rgba(247,169,59,.25);border-radius:16px;padding:30px 28px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.7)">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#f7a93b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
@@ -7955,6 +7955,15 @@ async function submitCreateEmp(){
 
   if(!username || !nomComplet || !password){
     return _empFormMsg('Identifiant, nom et mot de passe sont requis.','err');
+  }
+  if(!/^[a-zA-Z0-9._\-]{3,60}$/.test(username)){
+    return _empFormMsg('Identifiant invalide — 3 à 60 caractères, lettres/chiffres/points/tirets/underscores, pas d\'espaces.','err');
+  }
+  if(password.length < 6){
+    return _empFormMsg('Le mot de passe doit contenir au moins 6 caractères.','err');
+  }
+  if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    return _empFormMsg('Adresse email invalide.','err');
   }
   _empFormMsg('Création en cours…','');
   try{
