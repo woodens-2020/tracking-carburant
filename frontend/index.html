@@ -1565,43 +1565,51 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .rpt-msg.ok{color:#3fb6a8}.rpt-msg.err{color:#ef4444}
 
 /* ── Audit IA ──────────────────────────────────────────── */
-.aud-container{display:flex;flex-direction:column;gap:20px;max-width:900px}
-.aud-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+/* ── Audit IA ─────────────────────────────────── */
+.aud-container{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto;gap:18px;width:100%}
+.aud-badge-row{grid-column:1/-1}
+.aud-left-col{display:flex;flex-direction:column;gap:18px}
+.aud-right-col{display:flex;flex-direction:column}
+.aud-footer-row{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;gap:12px;padding-top:4px}
+
+.aud-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;height:100%}
 .aud-card-hdr{display:flex;align-items:center;gap:10px;padding:14px 20px;background:var(--surface2);
   border-bottom:1px solid var(--border);font-size:14px;font-weight:700;color:var(--text1)}
 .aud-card-body{padding:20px}
-.aud-period-row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end}
-.aud-field{display:flex;flex-direction:column;gap:6px}
+.aud-period-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.aud-period-row .aud-field:last-child{grid-column:1/-1}
+.aud-field{display:flex;flex-direction:column;gap:7px}
 .aud-lbl{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .aud-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;
-  padding:8px 12px;color:var(--text1);font-size:13px;min-width:160px}
-.aud-input:focus{outline:none;border-color:#7c3aed}
-.aud-fmt-row{display:flex;gap:12px;flex-wrap:wrap}
-.aud-fmt-opt{display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 24px;
+  padding:9px 12px;color:var(--text1);font-size:13px;width:100%}
+.aud-input:focus{outline:none;border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.12)}
+.aud-fmt-row{display:flex;gap:12px}
+.aud-fmt-opt{display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px 16px;
   background:var(--surface2);border:2px solid var(--border);border-radius:10px;cursor:pointer;
-  transition:border-color .2s,background .2s;flex:1;min-width:160px;text-align:center}
+  transition:border-color .2s,background .2s;flex:1;text-align:center}
 .aud-fmt-opt:has(input:checked){border-color:#7c3aed;background:rgba(124,58,237,.08)}
 .aud-fmt-opt input{display:none}
-.aud-fmt-icon{font-size:30px;line-height:1}
+.aud-fmt-icon{font-size:32px;line-height:1}
 .aud-fmt-name{font-size:13px;font-weight:700;color:var(--text1)}
 .aud-fmt-desc{font-size:11px;color:var(--muted);line-height:1.4}
-.aud-what-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.aud-what-item{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--text2);line-height:1.5}
+.aud-what-grid{display:grid;grid-template-columns:1fr;gap:10px}
+.aud-what-item{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--text2);line-height:1.5;
+  padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid rgba(124,58,237,.1)}
 .aud-what-icon{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border-radius:50%;
   width:22px;height:22px;display:flex;align-items:center;justify-content:center;
   font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px}
-.aud-ai-badge{display:flex;align-items:center;gap:10px;background:rgba(124,58,237,.1);
-  border:1px solid rgba(124,58,237,.3);border-radius:10px;padding:12px 18px;font-size:13px;color:var(--text2)}
-.aud-ai-dot{width:8px;height:8px;border-radius:50%;background:#7c3aed;flex-shrink:0;
+.aud-ai-badge{display:flex;align-items:center;gap:12px;background:rgba(124,58,237,.08);
+  border:1px solid rgba(124,58,237,.25);border-radius:10px;padding:14px 20px;font-size:13px;color:var(--text2)}
+.aud-ai-dot{width:9px;height:9px;border-radius:50%;background:#7c3aed;flex-shrink:0;
   animation:aud-pulse 2s ease-in-out infinite}
 @keyframes aud-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
-.aud-generate-row{display:flex;flex-direction:column;align-items:center;gap:12px}
 .aud-btn-generate{display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,#7c3aed,#5b21b6);
-  color:#fff;border:none;border-radius:10px;padding:14px 32px;font-size:15px;font-weight:700;
-  cursor:pointer;transition:opacity .2s,transform .1s;width:100%;justify-content:center;max-width:420px}
-.aud-btn-generate:hover{opacity:.9}
+  color:#fff;border:none;border-radius:10px;padding:14px 48px;font-size:15px;font-weight:700;
+  cursor:pointer;transition:opacity .2s,transform .1s;justify-content:center;min-width:320px;
+  box-shadow:0 4px 20px rgba(124,58,237,.35)}
+.aud-btn-generate:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 6px 28px rgba(124,58,237,.45)}
 .aud-btn-generate:active{transform:scale(.98)}
-.aud-btn-generate:disabled{opacity:.5;cursor:not-allowed}
+.aud-btn-generate:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 .aud-loading{display:none;flex-direction:column;align-items:center;gap:10px;padding:16px}
 .aud-loading.visible{display:flex}
 .aud-spinner{width:36px;height:36px;border:3px solid rgba(124,58,237,.2);border-top-color:#7c3aed;
@@ -1610,6 +1618,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .aud-loading-text{font-size:13px;color:#7c3aed;font-weight:600}
 .aud-loading-sub{font-size:11px;color:var(--muted)}
 .aud-msg{font-size:13px;color:var(--muted);min-height:20px;text-align:center}
+@media(max-width:900px){
+  .aud-container{grid-template-columns:1fr}
+  .aud-left-col,.aud-right-col{grid-column:1/-1}
+  .aud-period-row{grid-template-columns:1fr}
+  .aud-period-row .aud-field:last-child{grid-column:1}
+}
 .aud-msg.ok{color:#3fb6a8}.aud-msg.err{color:#ef4444}
 </style>
 </head>
@@ -2862,90 +2876,99 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <div id="page-audit" class="page">
       <div class="aud-container">
 
-        <!-- Badge IA -->
-        <div class="aud-ai-badge">
-          <span class="aud-ai-dot"></span>
-          <span>L'Intelligence Artificielle analyse vos données réelles et rédige un document d'audit expert, structuré et professionnel — comme le ferait un auditeur financier senior.</span>
+        <!-- Badge IA — pleine largeur -->
+        <div class="aud-badge-row">
+          <div class="aud-ai-badge">
+            <span class="aud-ai-dot"></span>
+            <span>L'Intelligence Artificielle analyse vos données réelles et rédige un document d'audit expert, structuré et professionnel — comme le ferait un auditeur financier senior.</span>
+          </div>
         </div>
 
-        <!-- Période -->
-        <div class="aud-card">
-          <div class="aud-card-hdr">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px">
-              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
-              <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-            Période à auditer
-          </div>
-          <div class="aud-card-body aud-period-row">
-            <div class="aud-field">
-              <label class="aud-lbl">Du</label>
-              <input type="date" id="aud-date-debut" class="aud-input"/>
+        <!-- Colonne gauche : Période + Format -->
+        <div class="aud-left-col">
+
+          <!-- Période -->
+          <div class="aud-card">
+            <div class="aud-card-hdr">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px">
+                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              Période à auditer
             </div>
-            <div class="aud-field">
-              <label class="aud-lbl">Au</label>
-              <input type="date" id="aud-date-fin" class="aud-input"/>
+            <div class="aud-card-body aud-period-row">
+              <div class="aud-field">
+                <label class="aud-lbl">Du</label>
+                <input type="date" id="aud-date-debut" class="aud-input"/>
+              </div>
+              <div class="aud-field">
+                <label class="aud-lbl">Au</label>
+                <input type="date" id="aud-date-fin" class="aud-input"/>
+              </div>
+              <div class="aud-field">
+                <label class="aud-lbl">Période rapide</label>
+                <select id="aud-quick" class="aud-input" onchange="audQuickPick(this.value)">
+                  <option value="">— Personnalisé —</option>
+                  <option value="week">7 derniers jours</option>
+                  <option value="month">30 derniers jours</option>
+                  <option value="curmonth">Mois courant</option>
+                  <option value="quarter">90 derniers jours</option>
+                </select>
+              </div>
             </div>
-            <div class="aud-field">
-              <label class="aud-lbl">Période rapide</label>
-              <select id="aud-quick" class="aud-input" onchange="audQuickPick(this.value)">
-                <option value="">— Personnalisé —</option>
-                <option value="week">7 derniers jours</option>
-                <option value="month">30 derniers jours</option>
-                <option value="curmonth">Mois courant</option>
-                <option value="quarter">90 derniers jours</option>
-              </select>
+          </div>
+
+          <!-- Format -->
+          <div class="aud-card">
+            <div class="aud-card-hdr">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              Format du document
+            </div>
+            <div class="aud-card-body aud-fmt-row">
+              <label class="aud-fmt-opt" id="aud-fmt-pdf">
+                <input type="radio" name="aud-format" value="pdf" checked onchange="audFmtChange()"/>
+                <span class="aud-fmt-icon">📄</span>
+                <span class="aud-fmt-name">PDF</span>
+                <span class="aud-fmt-desc">Document professionnel mis en page, prêt à imprimer ou partager</span>
+              </label>
+              <label class="aud-fmt-opt" id="aud-fmt-docx">
+                <input type="radio" name="aud-format" value="docx" onchange="audFmtChange()"/>
+                <span class="aud-fmt-icon">📝</span>
+                <span class="aud-fmt-name">Word (.docx)</span>
+                <span class="aud-fmt-desc">Document éditable — ajoutez vos annotations et signatures</span>
+              </label>
             </div>
           </div>
-        </div>
 
-        <!-- Format -->
-        <div class="aud-card">
-          <div class="aud-card-hdr">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-            </svg>
-            Format du document
-          </div>
-          <div class="aud-card-body aud-fmt-row">
-            <label class="aud-fmt-opt" id="aud-fmt-pdf">
-              <input type="radio" name="aud-format" value="pdf" checked onchange="audFmtChange()"/>
-              <span class="aud-fmt-icon">📄</span>
-              <span class="aud-fmt-name">PDF</span>
-              <span class="aud-fmt-desc">Document professionnel mis en page, prêt à imprimer ou partager</span>
-            </label>
-            <label class="aud-fmt-opt" id="aud-fmt-docx">
-              <input type="radio" name="aud-format" value="docx" onchange="audFmtChange()"/>
-              <span class="aud-fmt-icon">📝</span>
-              <span class="aud-fmt-name">Word (.docx)</span>
-              <span class="aud-fmt-desc">Document éditable — ajoutez vos annotations et signatures</span>
-            </label>
-          </div>
-        </div>
+        </div><!-- /aud-left-col -->
 
-        <!-- Ce que contient l'audit -->
-        <div class="aud-card">
-          <div class="aud-card-hdr">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px">
-              <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-            </svg>
-            Structure du document d'audit
+        <!-- Colonne droite : Structure -->
+        <div class="aud-right-col">
+          <div class="aud-card">
+            <div class="aud-card-hdr">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px">
+                <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+              </svg>
+              Structure du document d'audit
+            </div>
+            <div class="aud-card-body aud-what-grid">
+              <div class="aud-what-item"><span class="aud-what-icon">1</span><span>Introduction et mandat d'audit</span></div>
+              <div class="aud-what-item"><span class="aud-what-icon">2</span><span>Analyse commerciale détaillée (produits, pompes, tendances)</span></div>
+              <div class="aud-what-item"><span class="aud-what-icon">3</span><span>Évolution vs période précédente</span></div>
+              <div class="aud-what-item"><span class="aud-what-icon">4</span><span>Contrôle interne et analyse des anomalies</span></div>
+              <div class="aud-what-item"><span class="aud-what-icon">5</span><span>Gestion des stocks et approvisionnement</span></div>
+              <div class="aud-what-item"><span class="aud-what-icon">6</span><span>Performance financière et rentabilité WAC</span></div>
+              <div class="aud-what-item"><span class="aud-what-icon">7</span><span>Conclusion et appréciation générale</span></div>
+              <div class="aud-what-item"><span class="aud-what-icon" style="background:linear-gradient(135deg,#d97706,#b45309)">★</span><span>Recommandations prioritaires actionnables</span></div>
+            </div>
           </div>
-          <div class="aud-card-body aud-what-grid">
-            <div class="aud-what-item"><span class="aud-what-icon">1</span><span>Introduction et mandat d'audit</span></div>
-            <div class="aud-what-item"><span class="aud-what-icon">2</span><span>Analyse commerciale détaillée (produits, pompes, tendances)</span></div>
-            <div class="aud-what-item"><span class="aud-what-icon">3</span><span>Évolution vs période précédente</span></div>
-            <div class="aud-what-item"><span class="aud-what-icon">4</span><span>Contrôle interne et analyse des anomalies</span></div>
-            <div class="aud-what-item"><span class="aud-what-icon">5</span><span>Gestion des stocks et approvisionnement</span></div>
-            <div class="aud-what-item"><span class="aud-what-icon">6</span><span>Performance financière et rentabilité WAC</span></div>
-            <div class="aud-what-item"><span class="aud-what-icon">7</span><span>Conclusion et appréciation générale</span></div>
-            <div class="aud-what-item"><span class="aud-what-icon">★</span><span>Recommandations prioritaires actionnables</span></div>
-          </div>
-        </div>
+        </div><!-- /aud-right-col -->
 
-        <!-- Bouton + loading -->
-        <div class="aud-generate-row">
+        <!-- Bouton + loading — pleine largeur -->
+        <div class="aud-footer-row">
           <button class="aud-btn-generate" id="aud-btn" onclick="generateAudit()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px">
               <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
