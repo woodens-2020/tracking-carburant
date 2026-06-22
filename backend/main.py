@@ -2166,13 +2166,14 @@ def audit_export(
         raise HTTPException(503, str(e))
 
     text     = result["text"]
+    kpis     = result.get("kpis", {})
     filename = f"audit_station_{date_debut}_{date_fin}.{fmt}"
 
     if fmt == "pdf":
-        data  = render_audit_pdf(text, d_debut, d_fin)
+        data  = render_audit_pdf(text, d_debut, d_fin, kpi_data=kpis)
         media = "application/pdf"
     else:
-        data  = render_audit_docx(text, d_debut, d_fin)
+        data  = render_audit_docx(text, d_debut, d_fin, kpi_data=kpis)
         media = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
     return StreamingResponse(
