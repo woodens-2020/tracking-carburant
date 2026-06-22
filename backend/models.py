@@ -171,3 +171,123 @@ class SessionToken(Base):
     __table_args__ = (
         Index("idx_sessions_user", "user_id"),
     )
+
+
+# ══════════════════════════════════════════════════════════════════
+# MODULES DE GESTION INSTITUTIONNELLE
+# ══════════════════════════════════════════════════════════════════
+
+class Employe(Base):
+    """Employé de la station."""
+    __tablename__ = "employes"
+
+    id            = Column(Integer, primary_key=True)
+    nom           = Column(String(100), nullable=False)
+    prenom        = Column(String(100), nullable=False)
+    poste         = Column(String(100), nullable=False)
+    date_embauche = Column(Date, nullable=False)
+    salaire_base  = Column(Numeric(12, 2), nullable=False)
+    type_contrat  = Column(String(30), nullable=False, default="CDI")
+    telephone     = Column(String(30), nullable=True)
+    email         = Column(String(254), nullable=True)
+    actif         = Column(Boolean, nullable=False, default=True)
+    notes         = Column(String(500), nullable=True)
+    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    fiches_paie = relationship("FichePaie", back_populates="employe", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        CheckConstraint("salaire_base >= 0", name="chk_employe_salaire_pos"),
+        CheckConstraint(
+            "type_contrat IN ('CDI','CDD','Temps partiel','Journalier','Stage')",
+            name="chk_employe_contrat",
+        ),
+        Index("idx_employes_actif", "actif"),
+    )
+
+
+class FichePaie(Base):
+    """Fiche de paie mensuelle d'un employé."""
+    __tablename__ = "fiches_paie"
+
+    id            = Column(Integer, primary_key=True)
+    employe_id    = Column(Integer, ForeignKey("employes.id", ondelete="CASCADE"), nullable=False)
+    periode_debut = Column(Date, nullable=False)
+    periode_fin   = Column(Date, nullable=False)
+    salaire_base  = Column(Numeric(12, 2), nullable=False)
+    heures_sup    = Column(Numeric(8, 2),  nullable=False, default=0)
+    taux_hs       = Column(Numeric(12, 2), nullable=False, default=0)
+    primes        = Column(Numeric(12, 2), nullable=False, default=0)
+    deductions    = Column(Numeric(12, 2), nullable=False, default=0)
+    net_a_payer   = Column(Numeric(12, 2), nullable=False)
+    statut        = Column(String(20), nullable=False, default="brouillon")
+    date_paiement = Column(Date, nullable=True)
+    notes         = Column(String(500), nullable=True)
+    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    employe = relationship("Employe", back_populates="fiches_paie")
+
+    __table_args__ = (
+        CheckConstraint("statut IN ('brouillon','paye')", name="chk_fiche_statut"),
+        CheckConstraint("net_a_payer >= 0",              name="chk_fiche_net_pos"),
+        CheckConstraint("salaire_base >= 0",             name="chk_fiche_salaire_pos"),
+        CheckConstraint("heures_sup >= 0",               name="chk_fiche_hs_pos"),
+        CheckConstraint("primes >= 0",                   name="chk_fiche_primes_pos"),
+        CheckConstraint("deductions >= 0",               name="chk_fiche_deductions_pos"),
+        Index("idx_fiches_employe",  "employe_id"),
+        Index("idx_fiches_periode",  "periode_debut", "periode_fin"),
+        Index("idx_fiches_statut",   "statut"),
+    )
+
+
+class Depense(Base):
+    """Dépense opérationnelle de la station."""
+    __tablename__ = "depenses"
+
+    id           = Column(Integer, primary_key=True)
+    categorie    = Column(String(50), nullable=False)
+    description  = Column(String(300), nullable=False)
+    montant      = Column(Numeric(12, 2), nullable=False)
+    date_depense = Column(Date, nullable=False)
+    beneficiaire = Column(String(150), nullable=True)
+    reference    = Column(String(100), nullable=True)
+    notes        = Column(String(500), nullable=True)
+    created_at   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_depense_montant_pos"),
+        CheckConstraint(
+            "categorie IN ('Salaires','Maintenance','Fournitures','Electricite',"
+            "'Eau','Loyer','Transport','Taxes','Assurance','Divers')",
+            name="chk_depense_categorie",
+        ),
+        Index("idx_depenses_date",      "date_depense"),
+        Index("idx_depenses_categorie", "categorie"),
+    )
+
+
+class Achat(Base):
+    """Achat de matériel, équipement ou fournitures (hors carburant)."""
+    __tablename__ = "achats"
+
+    id           = Column(Integer, primary_key=True)
+    fournisseur  = Column(String(150), nullable=False)
+    description  = Column(String(300), nullable=False)
+    categorie    = Column(String(50),  nullable=False)
+    montant      = Column(Numeric(12, 2), nullable=False)
+    date_achat   = Column(Date, nullable=False)
+    reference    = Column(String(100), nullable=True)
+    notes        = Column(String(500), nullable=True)
+    created_at   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_achat_montant_pos"),
+        CheckConstraint(
+            "categorie IN ('Equipement','Pieces detachees','Fournitures bureau',"
+            "'Informatique','Securite','Nettoyage','Autre')",
+            name="chk_achat_categorie",
+        ),
+        Index("idx_achats_date",       "date_achat"),
+        Index("idx_achats_categorie",  "categorie"),
+        Index("idx_achats_fournisseur","fournisseur"),
+    )

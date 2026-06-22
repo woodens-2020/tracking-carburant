@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
-from models import Produit, Pompe, Releve, Utilisateur, Livraison, PrixVente
+from models import Produit, Pompe, Releve, Utilisateur, Livraison, PrixVente, Employe, FichePaie, Depense, Achat
 from auth import (
     SESSION_COOKIE, hash_password, verify_password,
     hash_code_acces, verify_code_acces,
@@ -2575,6 +2575,525 @@ def audit_export(
         media_type=media,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ══════════════════════════════════════════════════════════════════
+# MODULE EMPLOYÉS
+# ══════════════════════════════════════════════════════════════════
+
+class EmployeIn(BaseModel):
+    nom:           str
+    prenom:        str
+    poste:         str
+    date_embauche: str
+    salaire_base:  float
+    type_contrat:  str = "CDI"
+    telephone:     Optional[str] = None
+    email:         Optional[str] = None
+    notes:         Optional[str] = None
+
+class EmployePatch(BaseModel):
+    nom:           Optional[str]   = None
+    prenom:        Optional[str]   = None
+    poste:         Optional[str]   = None
+    date_embauche: Optional[str]   = None
+    salaire_base:  Optional[float] = None
+    type_contrat:  Optional[str]   = None
+    telephone:     Optional[str]   = None
+    email:         Optional[str]   = None
+    actif:         Optional[bool]  = None
+    notes:         Optional[str]   = None
+
+_CONTRATS_VALIDES = {"CDI", "CDD", "Temps partiel", "Journalier", "Stage"}
+
+@app.get("/api/employes")
+def lister_employes(actif: Optional[bool] = None, db: Session = Depends(get_db)):
+    q = db.query(Employe)
+    if actif is not None:
+        q = q.filter(Employe.actif == actif)
+    employes = q.order_by(Employe.nom, Employe.prenom).all()
+    return [
+        {
+            "id": e.id, "nom": e.nom, "prenom": e.prenom,
+            "nom_complet": f"{e.prenom} {e.nom}",
+            "poste": e.poste, "date_embauche": str(e.date_embauche),
+            "salaire_base": float(e.salaire_base),
+            "type_contrat": e.type_contrat,
+            "telephone": e.telephone, "email": e.email,
+            "actif": e.actif, "notes": e.notes,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        }
+        for e in employes
+    ]
+
+@app.post("/api/employes", status_code=201)
+def creer_employe(data: EmployeIn, db: Session = Depends(get_db)):
+    if data.type_contrat not in _CONTRATS_VALIDES:
+        raise HTTPException(400, f"Type de contrat invalide. Valeurs : {sorted(_CONTRATS_VALIDES)}")
+    if data.salaire_base < 0:
+        raise HTTPException(400, "Le salaire de base doit être ≥ 0.")
+    try:
+        from datetime import date as _date
+        date_emb = _date.fromisoformat(data.date_embauche)
+    except ValueError:
+        raise HTTPException(400, "Format de date invalide (attendu YYYY-MM-DD).")
+    e = Employe(
+        nom=data.nom.strip(), prenom=data.prenom.strip(),
+        poste=data.poste.strip(), date_embauche=date_emb,
+        salaire_base=data.salaire_base, type_contrat=data.type_contrat,
+        telephone=data.telephone, email=data.email, notes=data.notes,
+    )
+    db.add(e)
+    db.commit()
+    db.refresh(e)
+    return {"id": e.id, "message": "Employé créé."}
+
+@app.put("/api/employes/{employe_id}")
+def modifier_employe(employe_id: int, data: EmployePatch, db: Session = Depends(get_db)):
+    e = db.query(Employe).filter(Employe.id == employe_id).first()
+    if not e:
+        raise HTTPException(404, "Employé introuvable.")
+    if data.nom          is not None: e.nom          = data.nom.strip()
+    if data.prenom       is not None: e.prenom       = data.prenom.strip()
+    if data.poste        is not None: e.poste        = data.poste.strip()
+    if data.salaire_base is not None:
+        if data.salaire_base < 0:
+            raise HTTPException(400, "Le salaire doit être ≥ 0.")
+        e.salaire_base = data.salaire_base
+    if data.type_contrat is not None:
+        if data.type_contrat not in _CONTRATS_VALIDES:
+            raise HTTPException(400, "Type de contrat invalide.")
+        e.type_contrat = data.type_contrat
+    if data.date_embauche is not None:
+        try:
+            from datetime import date as _date
+            e.date_embauche = _date.fromisoformat(data.date_embauche)
+        except ValueError:
+            raise HTTPException(400, "Format de date invalide.")
+    if data.telephone is not None: e.telephone = data.telephone
+    if data.email     is not None: e.email     = data.email
+    if data.actif     is not None: e.actif     = data.actif
+    if data.notes     is not None: e.notes     = data.notes
+    db.commit()
+    return {"message": "Employé mis à jour."}
+
+@app.delete("/api/employes/{employe_id}")
+def desactiver_employe(employe_id: int, db: Session = Depends(get_db)):
+    e = db.query(Employe).filter(Employe.id == employe_id).first()
+    if not e:
+        raise HTTPException(404, "Employé introuvable.")
+    e.actif = False
+    db.commit()
+    return {"message": "Employé désactivé."}
+
+
+# ══════════════════════════════════════════════════════════════════
+# MODULE PAYROLL (FICHES DE PAIE)
+# ══════════════════════════════════════════════════════════════════
+
+class FichePaieIn(BaseModel):
+    employe_id:    int
+    periode_debut: str
+    periode_fin:   str
+    salaire_base:  float
+    heures_sup:    float = 0.0
+    taux_hs:       float = 0.0
+    primes:        float = 0.0
+    deductions:    float = 0.0
+    notes:         Optional[str] = None
+
+class PayerFicheIn(BaseModel):
+    date_paiement: str
+
+def _calc_net(salaire_base: float, heures_sup: float, taux_hs: float,
+              primes: float, deductions: float) -> float:
+    return round(salaire_base + (heures_sup * taux_hs) + primes - deductions, 2)
+
+@app.get("/api/payroll")
+def lister_fiches(
+    employe_id: Optional[int] = None,
+    statut: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    q = db.query(FichePaie)
+    if employe_id: q = q.filter(FichePaie.employe_id == employe_id)
+    if statut:     q = q.filter(FichePaie.statut == statut)
+    fiches = q.order_by(FichePaie.periode_debut.desc()).all()
+    return [
+        {
+            "id": f.id,
+            "employe_id":    f.employe_id,
+            "employe_nom":   f"{f.employe.prenom} {f.employe.nom}",
+            "employe_poste": f.employe.poste,
+            "periode_debut": str(f.periode_debut),
+            "periode_fin":   str(f.periode_fin),
+            "salaire_base":  float(f.salaire_base),
+            "heures_sup":    float(f.heures_sup),
+            "taux_hs":       float(f.taux_hs),
+            "primes":        float(f.primes),
+            "deductions":    float(f.deductions),
+            "net_a_payer":   float(f.net_a_payer),
+            "statut":        f.statut,
+            "date_paiement": str(f.date_paiement) if f.date_paiement else None,
+            "notes":         f.notes,
+            "created_at":    f.created_at.isoformat() if f.created_at else None,
+        }
+        for f in fiches
+    ]
+
+@app.post("/api/payroll", status_code=201)
+def creer_fiche(data: FichePaieIn, db: Session = Depends(get_db)):
+    e = db.query(Employe).filter(Employe.id == data.employe_id, Employe.actif == True).first()
+    if not e:
+        raise HTTPException(404, "Employé introuvable ou inactif.")
+    for val, label in [(data.salaire_base, "salaire_base"), (data.heures_sup, "heures_sup"),
+                       (data.taux_hs, "taux_hs"), (data.primes, "primes"), (data.deductions, "deductions")]:
+        if val < 0:
+            raise HTTPException(400, f"Le champ {label} doit être ≥ 0.")
+    try:
+        from datetime import date as _date
+        pd = _date.fromisoformat(data.periode_debut)
+        pf = _date.fromisoformat(data.periode_fin)
+    except ValueError:
+        raise HTTPException(400, "Format de date invalide (attendu YYYY-MM-DD).")
+    if pf < pd:
+        raise HTTPException(400, "La date de fin doit être ≥ à la date de début.")
+    net = _calc_net(data.salaire_base, data.heures_sup, data.taux_hs, data.primes, data.deductions)
+    if net < 0:
+        raise HTTPException(400, "Le net à payer est négatif — vérifiez les déductions.")
+    f = FichePaie(
+        employe_id=data.employe_id, periode_debut=pd, periode_fin=pf,
+        salaire_base=data.salaire_base, heures_sup=data.heures_sup,
+        taux_hs=data.taux_hs, primes=data.primes, deductions=data.deductions,
+        net_a_payer=net, notes=data.notes,
+    )
+    db.add(f)
+    db.commit()
+    db.refresh(f)
+    return {"id": f.id, "net_a_payer": net, "message": "Fiche de paie créée."}
+
+@app.put("/api/payroll/{fiche_id}/payer")
+def marquer_payee(fiche_id: int, data: PayerFicheIn, db: Session = Depends(get_db)):
+    f = db.query(FichePaie).filter(FichePaie.id == fiche_id).first()
+    if not f:
+        raise HTTPException(404, "Fiche introuvable.")
+    if f.statut == "paye":
+        raise HTTPException(409, "Fiche déjà marquée comme payée.")
+    try:
+        from datetime import date as _date
+        f.date_paiement = _date.fromisoformat(data.date_paiement)
+    except ValueError:
+        raise HTTPException(400, "Format de date invalide.")
+    f.statut = "paye"
+    db.commit()
+    return {"message": "Fiche marquée comme payée."}
+
+@app.delete("/api/payroll/{fiche_id}")
+def supprimer_fiche(fiche_id: int, db: Session = Depends(get_db)):
+    f = db.query(FichePaie).filter(FichePaie.id == fiche_id).first()
+    if not f:
+        raise HTTPException(404, "Fiche introuvable.")
+    if f.statut == "paye":
+        raise HTTPException(409, "Impossible de supprimer une fiche déjà payée.")
+    db.delete(f)
+    db.commit()
+    return {"message": "Fiche supprimée."}
+
+@app.get("/api/payroll/stats")
+def stats_payroll(db: Session = Depends(get_db)):
+    fiches = db.query(FichePaie).all()
+    total_paye    = sum(float(f.net_a_payer) for f in fiches if f.statut == "paye")
+    total_pending = sum(float(f.net_a_payer) for f in fiches if f.statut == "brouillon")
+    nb_employes   = db.query(Employe).filter(Employe.actif == True).count()
+    return {
+        "nb_employes_actifs": nb_employes,
+        "total_paye_htg":     round(total_paye, 2),
+        "total_en_attente_htg": round(total_pending, 2),
+        "nb_fiches_brouillon": sum(1 for f in fiches if f.statut == "brouillon"),
+        "nb_fiches_payees":    sum(1 for f in fiches if f.statut == "paye"),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════
+# MODULE DÉPENSES
+# ══════════════════════════════════════════════════════════════════
+
+_CATEGORIES_DEPENSE = {
+    "Salaires", "Maintenance", "Fournitures", "Electricite",
+    "Eau", "Loyer", "Transport", "Taxes", "Assurance", "Divers",
+}
+
+class DepenseIn(BaseModel):
+    categorie:    str
+    description:  str
+    montant:      float
+    date_depense: str
+    beneficiaire: Optional[str] = None
+    reference:    Optional[str] = None
+    notes:        Optional[str] = None
+
+class DepensePatch(BaseModel):
+    categorie:    Optional[str]   = None
+    description:  Optional[str]   = None
+    montant:      Optional[float] = None
+    date_depense: Optional[str]   = None
+    beneficiaire: Optional[str]   = None
+    reference:    Optional[str]   = None
+    notes:        Optional[str]   = None
+
+@app.get("/api/depenses")
+def lister_depenses(
+    date_debut: Optional[str] = None,
+    date_fin:   Optional[str] = None,
+    categorie:  Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    q = db.query(Depense)
+    if date_debut:
+        try:
+            from datetime import date as _date
+            q = q.filter(Depense.date_depense >= _date.fromisoformat(date_debut))
+        except ValueError:
+            raise HTTPException(400, "date_debut invalide.")
+    if date_fin:
+        try:
+            from datetime import date as _date
+            q = q.filter(Depense.date_depense <= _date.fromisoformat(date_fin))
+        except ValueError:
+            raise HTTPException(400, "date_fin invalide.")
+    if categorie:
+        q = q.filter(Depense.categorie == categorie)
+    depenses = q.order_by(Depense.date_depense.desc()).all()
+    total = round(sum(float(d.montant) for d in depenses), 2)
+    return {
+        "total": total,
+        "nb": len(depenses),
+        "depenses": [
+            {
+                "id": d.id, "categorie": d.categorie,
+                "description": d.description, "montant": float(d.montant),
+                "date_depense": str(d.date_depense),
+                "beneficiaire": d.beneficiaire, "reference": d.reference,
+                "notes": d.notes,
+                "created_at": d.created_at.isoformat() if d.created_at else None,
+            }
+            for d in depenses
+        ],
+    }
+
+@app.post("/api/depenses", status_code=201)
+def creer_depense(data: DepenseIn, db: Session = Depends(get_db)):
+    if data.categorie not in _CATEGORIES_DEPENSE:
+        raise HTTPException(400, f"Catégorie invalide. Valeurs : {sorted(_CATEGORIES_DEPENSE)}")
+    if data.montant <= 0:
+        raise HTTPException(400, "Le montant doit être > 0.")
+    try:
+        from datetime import date as _date
+        date_d = _date.fromisoformat(data.date_depense)
+    except ValueError:
+        raise HTTPException(400, "Format de date invalide.")
+    d = Depense(
+        categorie=data.categorie, description=data.description.strip(),
+        montant=data.montant, date_depense=date_d,
+        beneficiaire=data.beneficiaire, reference=data.reference, notes=data.notes,
+    )
+    db.add(d)
+    db.commit()
+    db.refresh(d)
+    return {"id": d.id, "message": "Dépense enregistrée."}
+
+@app.put("/api/depenses/{depense_id}")
+def modifier_depense(depense_id: int, data: DepensePatch, db: Session = Depends(get_db)):
+    d = db.query(Depense).filter(Depense.id == depense_id).first()
+    if not d:
+        raise HTTPException(404, "Dépense introuvable.")
+    if data.categorie is not None:
+        if data.categorie not in _CATEGORIES_DEPENSE:
+            raise HTTPException(400, "Catégorie invalide.")
+        d.categorie = data.categorie
+    if data.description  is not None: d.description  = data.description.strip()
+    if data.montant is not None:
+        if data.montant <= 0:
+            raise HTTPException(400, "Le montant doit être > 0.")
+        d.montant = data.montant
+    if data.date_depense is not None:
+        try:
+            from datetime import date as _date
+            d.date_depense = _date.fromisoformat(data.date_depense)
+        except ValueError:
+            raise HTTPException(400, "Format de date invalide.")
+    if data.beneficiaire is not None: d.beneficiaire = data.beneficiaire
+    if data.reference    is not None: d.reference    = data.reference
+    if data.notes        is not None: d.notes        = data.notes
+    db.commit()
+    return {"message": "Dépense mise à jour."}
+
+@app.delete("/api/depenses/{depense_id}")
+def supprimer_depense(depense_id: int, db: Session = Depends(get_db)):
+    d = db.query(Depense).filter(Depense.id == depense_id).first()
+    if not d:
+        raise HTTPException(404, "Dépense introuvable.")
+    db.delete(d)
+    db.commit()
+    return {"message": "Dépense supprimée."}
+
+@app.get("/api/depenses/stats")
+def stats_depenses(
+    date_debut: Optional[str] = None,
+    date_fin:   Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    q = db.query(Depense)
+    if date_debut:
+        try:
+            from datetime import date as _date
+            q = q.filter(Depense.date_depense >= _date.fromisoformat(date_debut))
+        except ValueError:
+            raise HTTPException(400, "date_debut invalide.")
+    if date_fin:
+        try:
+            from datetime import date as _date
+            q = q.filter(Depense.date_depense <= _date.fromisoformat(date_fin))
+        except ValueError:
+            raise HTTPException(400, "date_fin invalide.")
+    depenses = q.all()
+    par_cat: dict[str, float] = {}
+    for d in depenses:
+        par_cat[d.categorie] = round(par_cat.get(d.categorie, 0) + float(d.montant), 2)
+    return {
+        "total": round(sum(par_cat.values()), 2),
+        "nb": len(depenses),
+        "par_categorie": [
+            {"categorie": k, "total": v, "pct": round(v / sum(par_cat.values()) * 100, 1) if par_cat else 0}
+            for k, v in sorted(par_cat.items(), key=lambda x: -x[1])
+        ],
+    }
+
+
+# ══════════════════════════════════════════════════════════════════
+# MODULE ACHATS
+# ══════════════════════════════════════════════════════════════════
+
+_CATEGORIES_ACHAT = {
+    "Equipement", "Pieces detachees", "Fournitures bureau",
+    "Informatique", "Securite", "Nettoyage", "Autre",
+}
+
+class AchatIn(BaseModel):
+    fournisseur: str
+    description: str
+    categorie:   str
+    montant:     float
+    date_achat:  str
+    reference:   Optional[str] = None
+    notes:       Optional[str] = None
+
+class AchatPatch(BaseModel):
+    fournisseur: Optional[str]   = None
+    description: Optional[str]   = None
+    categorie:   Optional[str]   = None
+    montant:     Optional[float] = None
+    date_achat:  Optional[str]   = None
+    reference:   Optional[str]   = None
+    notes:       Optional[str]   = None
+
+@app.get("/api/achats")
+def lister_achats(
+    date_debut:  Optional[str] = None,
+    date_fin:    Optional[str] = None,
+    categorie:   Optional[str] = None,
+    fournisseur: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    q = db.query(Achat)
+    if date_debut:
+        try:
+            from datetime import date as _date
+            q = q.filter(Achat.date_achat >= _date.fromisoformat(date_debut))
+        except ValueError:
+            raise HTTPException(400, "date_debut invalide.")
+    if date_fin:
+        try:
+            from datetime import date as _date
+            q = q.filter(Achat.date_achat <= _date.fromisoformat(date_fin))
+        except ValueError:
+            raise HTTPException(400, "date_fin invalide.")
+    if categorie:
+        q = q.filter(Achat.categorie == categorie)
+    if fournisseur:
+        q = q.filter(Achat.fournisseur.ilike(f"%{fournisseur}%"))
+    achats = q.order_by(Achat.date_achat.desc()).all()
+    total = round(sum(float(a.montant) for a in achats), 2)
+    return {
+        "total": total,
+        "nb": len(achats),
+        "achats": [
+            {
+                "id": a.id, "fournisseur": a.fournisseur,
+                "description": a.description, "categorie": a.categorie,
+                "montant": float(a.montant), "date_achat": str(a.date_achat),
+                "reference": a.reference, "notes": a.notes,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            }
+            for a in achats
+        ],
+    }
+
+@app.post("/api/achats", status_code=201)
+def creer_achat(data: AchatIn, db: Session = Depends(get_db)):
+    if data.categorie not in _CATEGORIES_ACHAT:
+        raise HTTPException(400, f"Catégorie invalide. Valeurs : {sorted(_CATEGORIES_ACHAT)}")
+    if data.montant <= 0:
+        raise HTTPException(400, "Le montant doit être > 0.")
+    try:
+        from datetime import date as _date
+        date_a = _date.fromisoformat(data.date_achat)
+    except ValueError:
+        raise HTTPException(400, "Format de date invalide.")
+    a = Achat(
+        fournisseur=data.fournisseur.strip(), description=data.description.strip(),
+        categorie=data.categorie, montant=data.montant,
+        date_achat=date_a, reference=data.reference, notes=data.notes,
+    )
+    db.add(a)
+    db.commit()
+    db.refresh(a)
+    return {"id": a.id, "message": "Achat enregistré."}
+
+@app.put("/api/achats/{achat_id}")
+def modifier_achat(achat_id: int, data: AchatPatch, db: Session = Depends(get_db)):
+    a = db.query(Achat).filter(Achat.id == achat_id).first()
+    if not a:
+        raise HTTPException(404, "Achat introuvable.")
+    if data.categorie is not None:
+        if data.categorie not in _CATEGORIES_ACHAT:
+            raise HTTPException(400, "Catégorie invalide.")
+        a.categorie = data.categorie
+    if data.fournisseur is not None: a.fournisseur = data.fournisseur.strip()
+    if data.description is not None: a.description = data.description.strip()
+    if data.montant is not None:
+        if data.montant <= 0:
+            raise HTTPException(400, "Le montant doit être > 0.")
+        a.montant = data.montant
+    if data.date_achat is not None:
+        try:
+            from datetime import date as _date
+            a.date_achat = _date.fromisoformat(data.date_achat)
+        except ValueError:
+            raise HTTPException(400, "Format de date invalide.")
+    if data.reference is not None: a.reference = data.reference
+    if data.notes     is not None: a.notes     = data.notes
+    db.commit()
+    return {"message": "Achat mis à jour."}
+
+@app.delete("/api/achats/{achat_id}")
+def supprimer_achat(achat_id: int, db: Session = Depends(get_db)):
+    a = db.query(Achat).filter(Achat.id == achat_id).first()
+    if not a:
+        raise HTTPException(404, "Achat introuvable.")
+    db.delete(a)
+    db.commit()
+    return {"message": "Achat supprimé."}
 
 
 # ---------- Frontend single-file ----------

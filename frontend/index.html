@@ -1625,6 +1625,100 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   .aud-period-row .aud-field:last-child{grid-column:1}
 }
 .aud-msg.ok{color:#3fb6a8}.aud-msg.err{color:#ef4444}
+
+/* ══════════════════════════════════════════════════════════════
+   MODULES GESTION INSTITUTIONNELLE — CSS COMMUN
+   ══════════════════════════════════════════════════════════════ */
+.gi-page{display:flex;flex-direction:column;gap:18px}
+.gi-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.gi-title{font-size:20px;font-weight:800;color:var(--text1);letter-spacing:-.02em}
+.gi-subtitle{font-size:12px;color:var(--muted);margin-top:2px}
+.gi-btn-primary{display:flex;align-items:center;gap:7px;background:var(--blue);color:#fff;
+  border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;
+  transition:opacity .15s,transform .1s}
+.gi-btn-primary:hover{opacity:.88}
+.gi-btn-primary:active{transform:scale(.97)}
+.gi-btn-secondary{display:flex;align-items:center;gap:7px;background:var(--surface2);color:var(--text1);
+  border:1px solid var(--border);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;
+  cursor:pointer;transition:background .15s}
+.gi-btn-secondary:hover{background:var(--panel2)}
+.gi-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.gi-kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.gi-kpi-lbl{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px}
+.gi-kpi-val{font-size:22px;font-weight:800;color:var(--text1);letter-spacing:-.02em}
+.gi-kpi-val.teal{color:#3fb6a8}.gi-kpi-val.amber{color:#f7a93b}.gi-kpi-val.red{color:#ef4444}.gi-kpi-val.blue{color:#60a5fa}
+.gi-kpi-sub{font-size:11px;color:var(--muted);margin-top:3px}
+.gi-filters{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;
+  background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.gi-filter-field{display:flex;flex-direction:column;gap:5px}
+.gi-filter-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.gi-filter-input{background:var(--surface2);border:1px solid var(--border);border-radius:7px;
+  padding:7px 11px;color:var(--text1);font-size:13px;min-width:140px}
+.gi-filter-input:focus{outline:none;border-color:var(--blue)}
+.gi-table-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.gi-table-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;
+  background:var(--surface2);border-bottom:1px solid var(--border)}
+.gi-table-title{font-size:13px;font-weight:700;color:var(--text1)}
+.gi-table-count{font-size:11px;color:var(--muted);background:var(--panel2);
+  border:1px solid var(--border);border-radius:20px;padding:2px 10px}
+.gi-table{width:100%;border-collapse:collapse}
+.gi-table th{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--muted);padding:10px 16px;text-align:left;border-bottom:1px solid var(--border);
+  background:var(--surface2);white-space:nowrap}
+.gi-table td{font-size:13px;color:var(--text1);padding:11px 16px;border-bottom:1px solid rgba(255,255,255,.04)}
+.gi-table tr:last-child td{border-bottom:none}
+.gi-table tr:hover td{background:rgba(255,255,255,.025)}
+.gi-table .td-muted{color:var(--muted);font-size:12px}
+.gi-table .td-amount{font-weight:700;font-family:var(--mono);color:#3fb6a8}
+.gi-table .td-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;
+  font-size:11px;font-weight:700;letter-spacing:.03em}
+.badge-green{background:rgba(52,211,153,.15);color:#34d399}
+.badge-amber{background:rgba(247,169,59,.15);color:#f7a93b}
+.badge-blue{background:rgba(96,165,250,.15);color:#60a5fa}
+.badge-red{background:rgba(239,68,68,.15);color:#ef4444}
+.badge-gray{background:rgba(255,255,255,.07);color:var(--muted)}
+.gi-empty{padding:40px;text-align:center;color:var(--muted);font-size:13px}
+.gi-empty svg{width:36px;height:36px;opacity:.3;margin-bottom:10px;display:block;margin:0 auto 10px}
+.gi-actions{display:flex;gap:6px;align-items:center}
+.gi-btn-icon{background:none;border:1px solid var(--border);border-radius:6px;
+  padding:5px 8px;cursor:pointer;color:var(--muted);font-size:11px;
+  display:flex;align-items:center;gap:4px;transition:background .15s,color .15s}
+.gi-btn-icon:hover{background:var(--surface2);color:var(--text1)}
+.gi-btn-icon.danger:hover{background:rgba(239,68,68,.12);color:#ef4444;border-color:#ef4444}
+.gi-btn-icon.success:hover{background:rgba(52,211,153,.12);color:#34d399;border-color:#34d399}
+
+/* ── Modal GI ── */
+.gi-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1000;
+  display:none;align-items:center;justify-content:center}
+.gi-modal-overlay.open{display:flex}
+.gi-modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+  width:min(560px,95vw);max-height:88vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+.gi-modal-head{display:flex;align-items:center;justify-content:space-between;
+  padding:18px 22px;border-bottom:1px solid var(--border)}
+.gi-modal-head h3{font-size:15px;font-weight:800;color:var(--text1)}
+.gi-modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;
+  line-height:1;padding:2px 6px;border-radius:6px;transition:background .15s}
+.gi-modal-close:hover{background:var(--surface2);color:var(--text1)}
+.gi-modal-body{padding:22px}
+.gi-form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.gi-form-row.full{grid-template-columns:1fr}
+.gi-form-field{display:flex;flex-direction:column;gap:6px}
+.gi-form-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.gi-form-input,.gi-form-select,.gi-form-textarea{background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:9px 12px;color:var(--text1);font-size:13px;width:100%;font-family:inherit}
+.gi-form-input:focus,.gi-form-select:focus,.gi-form-textarea:focus{outline:none;border-color:var(--blue);
+  box-shadow:0 0 0 3px rgba(59,130,246,.12)}
+.gi-form-textarea{resize:vertical;min-height:70px}
+.gi-form-select option{background:var(--panel)}
+.gi-modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 22px;
+  border-top:1px solid var(--border);background:var(--surface2)}
+.gi-net-preview{background:rgba(63,182,168,.08);border:1px solid rgba(63,182,168,.25);
+  border-radius:8px;padding:12px 16px;margin-top:6px;text-align:center}
+.gi-net-lbl{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.07em}
+.gi-net-val{font-size:24px;font-weight:800;color:#3fb6a8;margin-top:4px;font-family:var(--mono)}
+
+@media(max-width:900px){.gi-kpi-row{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.gi-kpi-row{grid-template-columns:1fr}.gi-form-row{grid-template-columns:1fr}}
 </style>
 </head>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
@@ -1742,6 +1836,40 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       </span>
       <span data-i18n="nav.stock">Stock &amp; Rentabilité</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <div class="nav-section">Gestion</div>
+
+    <button class="nav-item" data-page="employes" onclick="goTo('employes')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </span>
+      <span>Employés</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="payroll" onclick="goTo('payroll')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      </span>
+      <span>Payroll</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="depenses" onclick="goTo('depenses')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </span>
+      <span>Dépenses</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="achats" onclick="goTo('achats')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      </span>
+      <span>Achats</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -2988,6 +3116,491 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div><!-- /page-audit -->
 
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE EMPLOYÉS                                           -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-employes" class="page">
+      <div class="gi-page">
+        <div class="gi-header">
+          <div>
+            <div class="gi-title">Gestion des Employés</div>
+            <div class="gi-subtitle">Effectif actif de la station</div>
+          </div>
+          <div style="display:flex;gap:10px">
+            <button class="gi-btn-secondary" onclick="loadEmployes()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Actualiser
+            </button>
+            <button class="gi-btn-primary" onclick="openEmpModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nouvel Employé
+            </button>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="gi-kpi-row" id="emp-kpis">
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Employés actifs</div><div class="gi-kpi-val blue" id="emp-kpi-total">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Masse salariale / mois</div><div class="gi-kpi-val teal" id="emp-kpi-masse">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Fiches en attente</div><div class="gi-kpi-val amber" id="emp-kpi-pending">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Total payé (cumulé)</div><div class="gi-kpi-val" id="emp-kpi-paye">—</div></div>
+        </div>
+
+        <!-- Filtres -->
+        <div class="gi-filters">
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Statut</label>
+            <select class="gi-filter-input" id="emp-filtre-actif" onchange="loadEmployes()">
+              <option value="">Tous</option>
+              <option value="true" selected>Actifs</option>
+              <option value="false">Inactifs</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="gi-table-card">
+          <div class="gi-table-hdr">
+            <span class="gi-table-title">Liste des employés</span>
+            <span class="gi-table-count" id="emp-count">0</span>
+          </div>
+          <div id="emp-table-wrap">
+            <div class="gi-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              Chargement…
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Créer/Éditer employé -->
+      <div class="gi-modal-overlay" id="emp-modal">
+        <div class="gi-modal">
+          <div class="gi-modal-head">
+            <h3 id="emp-modal-title">Nouvel Employé</h3>
+            <button class="gi-modal-close" onclick="closeEmpModal()">×</button>
+          </div>
+          <div class="gi-modal-body">
+            <input type="hidden" id="emp-edit-id"/>
+            <div class="gi-form-row">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Prénom *</label>
+                <input class="gi-form-input" id="emp-prenom" placeholder="Jean"/>
+              </div>
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Nom *</label>
+                <input class="gi-form-input" id="emp-nom" placeholder="Dupont"/>
+              </div>
+            </div>
+            <div class="gi-form-row">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Poste *</label>
+                <input class="gi-form-input" id="emp-poste" placeholder="Pompiste"/>
+              </div>
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Type de contrat *</label>
+                <select class="gi-form-select" id="emp-contrat">
+                  <option value="CDI">CDI</option>
+                  <option value="CDD">CDD</option>
+                  <option value="Temps partiel">Temps partiel</option>
+                  <option value="Journalier">Journalier</option>
+                  <option value="Stage">Stage</option>
+                </select>
+              </div>
+            </div>
+            <div class="gi-form-row">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Date d'embauche *</label>
+                <input type="date" class="gi-form-input" id="emp-embauche"/>
+              </div>
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Salaire de base (HTG/mois) *</label>
+                <input type="number" class="gi-form-input" id="emp-salaire" placeholder="15000" min="0" step="100"/>
+              </div>
+            </div>
+            <div class="gi-form-row">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Téléphone</label>
+                <input class="gi-form-input" id="emp-tel" placeholder="509-XX-XX-XXXX"/>
+              </div>
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Email</label>
+                <input type="email" class="gi-form-input" id="emp-email" placeholder="employe@exemple.com"/>
+              </div>
+            </div>
+            <div class="gi-form-row full">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Notes</label>
+                <textarea class="gi-form-textarea" id="emp-notes" placeholder="Informations complémentaires…"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="gi-modal-foot">
+            <button class="gi-btn-secondary" onclick="closeEmpModal()">Annuler</button>
+            <button class="gi-btn-primary" onclick="submitEmp()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-employes -->
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE PAYROLL                                           -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-payroll" class="page">
+      <div class="gi-page">
+        <div class="gi-header">
+          <div>
+            <div class="gi-title">Payroll — Fiches de Paie</div>
+            <div class="gi-subtitle">Gestion des rémunérations</div>
+          </div>
+          <div style="display:flex;gap:10px">
+            <button class="gi-btn-secondary" onclick="loadPayroll()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Actualiser
+            </button>
+            <button class="gi-btn-primary" onclick="openPayrollModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nouvelle Fiche
+            </button>
+          </div>
+        </div>
+
+        <div class="gi-kpi-row">
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Employés actifs</div><div class="gi-kpi-val blue" id="pay-kpi-emp">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Fiches en brouillon</div><div class="gi-kpi-val amber" id="pay-kpi-draft">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Total en attente (HTG)</div><div class="gi-kpi-val red" id="pay-kpi-pending">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Total payé (HTG)</div><div class="gi-kpi-val teal" id="pay-kpi-paid">—</div></div>
+        </div>
+
+        <div class="gi-filters">
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Statut</label>
+            <select class="gi-filter-input" id="pay-filtre-statut" onchange="loadPayroll()">
+              <option value="">Tous</option>
+              <option value="brouillon">Brouillon</option>
+              <option value="paye">Payées</option>
+            </select>
+          </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Employé</label>
+            <select class="gi-filter-input" id="pay-filtre-emp" onchange="loadPayroll()">
+              <option value="">Tous les employés</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="gi-table-card">
+          <div class="gi-table-hdr">
+            <span class="gi-table-title">Fiches de paie</span>
+            <span class="gi-table-count" id="pay-count">0</span>
+          </div>
+          <div id="pay-table-wrap"><div class="gi-empty">Chargement…</div></div>
+        </div>
+      </div>
+
+      <!-- Modal Créer fiche de paie -->
+      <div class="gi-modal-overlay" id="pay-modal">
+        <div class="gi-modal">
+          <div class="gi-modal-head">
+            <h3>Nouvelle Fiche de Paie</h3>
+            <button class="gi-modal-close" onclick="closePayrollModal()">×</button>
+          </div>
+          <div class="gi-modal-body">
+            <div class="gi-form-row full">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Employé *</label>
+                <select class="gi-form-select" id="pay-emp-sel" onchange="payFillSalaire()">
+                  <option value="">— Sélectionner —</option>
+                </select>
+              </div>
+            </div>
+            <div class="gi-form-row">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Période du *</label>
+                <input type="date" class="gi-form-input" id="pay-debut"/>
+              </div>
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">au *</label>
+                <input type="date" class="gi-form-input" id="pay-fin"/>
+              </div>
+            </div>
+            <div class="gi-form-row">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Salaire de base (HTG) *</label>
+                <input type="number" class="gi-form-input" id="pay-salaire" placeholder="15000" min="0" step="100" oninput="calcNet()"/>
+              </div>
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Primes (HTG)</label>
+                <input type="number" class="gi-form-input" id="pay-primes" placeholder="0" min="0" step="100" oninput="calcNet()"/>
+              </div>
+            </div>
+            <div class="gi-form-row">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Heures supplémentaires</label>
+                <input type="number" class="gi-form-input" id="pay-hs" placeholder="0" min="0" step="0.5" oninput="calcNet()"/>
+              </div>
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Taux HS (HTG/heure)</label>
+                <input type="number" class="gi-form-input" id="pay-taux-hs" placeholder="0" min="0" step="10" oninput="calcNet()"/>
+              </div>
+            </div>
+            <div class="gi-form-row full">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Déductions (HTG)</label>
+                <input type="number" class="gi-form-input" id="pay-deductions" placeholder="0" min="0" step="100" oninput="calcNet()"/>
+              </div>
+            </div>
+            <div class="gi-net-preview">
+              <div class="gi-net-lbl">Net à payer</div>
+              <div class="gi-net-val" id="pay-net-preview">0 HTG</div>
+            </div>
+            <div class="gi-form-row full" style="margin-top:14px">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Notes</label>
+                <textarea class="gi-form-textarea" id="pay-notes" placeholder="Remarques éventuelles…"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="gi-modal-foot">
+            <button class="gi-btn-secondary" onclick="closePayrollModal()">Annuler</button>
+            <button class="gi-btn-primary" onclick="submitPayroll()">Créer la fiche</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-payroll -->
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE DÉPENSES                                          -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-depenses" class="page">
+      <div class="gi-page">
+        <div class="gi-header">
+          <div>
+            <div class="gi-title">Dépenses Opérationnelles</div>
+            <div class="gi-subtitle">Charges et coûts de la station</div>
+          </div>
+          <div style="display:flex;gap:10px">
+            <button class="gi-btn-secondary" onclick="loadDepenses()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Actualiser
+            </button>
+            <button class="gi-btn-primary" onclick="openDepModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nouvelle Dépense
+            </button>
+          </div>
+        </div>
+
+        <div class="gi-kpi-row" id="dep-kpis">
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Total période (HTG)</div><div class="gi-kpi-val red" id="dep-kpi-total">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Nombre de dépenses</div><div class="gi-kpi-val blue" id="dep-kpi-nb">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Catégorie principale</div><div class="gi-kpi-val amber" id="dep-kpi-cat">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Moyenne par entrée</div><div class="gi-kpi-val" id="dep-kpi-avg">—</div></div>
+        </div>
+
+        <div class="gi-filters">
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Du</label>
+            <input type="date" class="gi-filter-input" id="dep-filtre-debut" onchange="loadDepenses()"/>
+          </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Au</label>
+            <input type="date" class="gi-filter-input" id="dep-filtre-fin" onchange="loadDepenses()"/>
+          </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Catégorie</label>
+            <select class="gi-filter-input" id="dep-filtre-cat" onchange="loadDepenses()">
+              <option value="">Toutes</option>
+              <option>Salaires</option><option>Maintenance</option><option>Fournitures</option>
+              <option>Electricite</option><option>Eau</option><option>Loyer</option>
+              <option>Transport</option><option>Taxes</option><option>Assurance</option><option>Divers</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="gi-table-card">
+          <div class="gi-table-hdr">
+            <span class="gi-table-title">Liste des dépenses</span>
+            <span class="gi-table-count" id="dep-count">0</span>
+          </div>
+          <div id="dep-table-wrap"><div class="gi-empty">Chargement…</div></div>
+        </div>
+      </div>
+
+      <!-- Modal Créer/Éditer dépense -->
+      <div class="gi-modal-overlay" id="dep-modal">
+        <div class="gi-modal">
+          <div class="gi-modal-head">
+            <h3 id="dep-modal-title">Nouvelle Dépense</h3>
+            <button class="gi-modal-close" onclick="closeDepModal()">×</button>
+          </div>
+          <div class="gi-modal-body">
+            <input type="hidden" id="dep-edit-id"/>
+            <div class="gi-form-row">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Catégorie *</label>
+                <select class="gi-form-select" id="dep-cat">
+                  <option value="">— Sélectionner —</option>
+                  <option>Salaires</option><option>Maintenance</option><option>Fournitures</option>
+                  <option>Electricite</option><option>Eau</option><option>Loyer</option>
+                  <option>Transport</option><option>Taxes</option><option>Assurance</option><option>Divers</option>
+                </select>
+              </div>
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Date *</label>
+                <input type="date" class="gi-form-input" id="dep-date"/>
+              </div>
+            </div>
+            <div class="gi-form-row full">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Description *</label>
+                <input class="gi-form-input" id="dep-desc" placeholder="Ex : Facture électricité mois de juin"/>
+              </div>
+            </div>
+            <div class="gi-form-row">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Montant (HTG) *</label>
+                <input type="number" class="gi-form-input" id="dep-montant" placeholder="0" min="0.01" step="0.01"/>
+              </div>
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Bénéficiaire</label>
+                <input class="gi-form-input" id="dep-benef" placeholder="Ex : EDH, fournisseur…"/>
+              </div>
+            </div>
+            <div class="gi-form-row">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Référence / N° facture</label>
+                <input class="gi-form-input" id="dep-ref" placeholder="FAC-2026-001"/>
+              </div>
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Notes</label>
+                <input class="gi-form-input" id="dep-notes" placeholder="Informations complémentaires"/>
+              </div>
+            </div>
+          </div>
+          <div class="gi-modal-foot">
+            <button class="gi-btn-secondary" onclick="closeDepModal()">Annuler</button>
+            <button class="gi-btn-primary" onclick="submitDep()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-depenses -->
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE ACHATS                                            -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-achats" class="page">
+      <div class="gi-page">
+        <div class="gi-header">
+          <div>
+            <div class="gi-title">Gestion des Achats</div>
+            <div class="gi-subtitle">Matériel, équipements et fournitures</div>
+          </div>
+          <div style="display:flex;gap:10px">
+            <button class="gi-btn-secondary" onclick="loadAchats()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Actualiser
+            </button>
+            <button class="gi-btn-primary" onclick="openAchatModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nouvel Achat
+            </button>
+          </div>
+        </div>
+
+        <div class="gi-kpi-row">
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Total période (HTG)</div><div class="gi-kpi-val amber" id="ach-kpi-total">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Nombre d'achats</div><div class="gi-kpi-val blue" id="ach-kpi-nb">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Catégorie principale</div><div class="gi-kpi-val" id="ach-kpi-cat">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Fournisseurs distincts</div><div class="gi-kpi-val teal" id="ach-kpi-fournis">—</div></div>
+        </div>
+
+        <div class="gi-filters">
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Du</label>
+            <input type="date" class="gi-filter-input" id="ach-filtre-debut" onchange="loadAchats()"/>
+          </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Au</label>
+            <input type="date" class="gi-filter-input" id="ach-filtre-fin" onchange="loadAchats()"/>
+          </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Catégorie</label>
+            <select class="gi-filter-input" id="ach-filtre-cat" onchange="loadAchats()">
+              <option value="">Toutes</option>
+              <option>Equipement</option><option>Pieces detachees</option><option>Fournitures bureau</option>
+              <option>Informatique</option><option>Securite</option><option>Nettoyage</option><option>Autre</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="gi-table-card">
+          <div class="gi-table-hdr">
+            <span class="gi-table-title">Liste des achats</span>
+            <span class="gi-table-count" id="ach-count">0</span>
+          </div>
+          <div id="ach-table-wrap"><div class="gi-empty">Chargement…</div></div>
+        </div>
+      </div>
+
+      <!-- Modal Créer/Éditer achat -->
+      <div class="gi-modal-overlay" id="ach-modal">
+        <div class="gi-modal">
+          <div class="gi-modal-head">
+            <h3 id="ach-modal-title">Nouvel Achat</h3>
+            <button class="gi-modal-close" onclick="closeAchatModal()">×</button>
+          </div>
+          <div class="gi-modal-body">
+            <input type="hidden" id="ach-edit-id"/>
+            <div class="gi-form-row">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Fournisseur *</label>
+                <input class="gi-form-input" id="ach-fournis" placeholder="Nom du fournisseur"/>
+              </div>
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Catégorie *</label>
+                <select class="gi-form-select" id="ach-cat">
+                  <option value="">— Sélectionner —</option>
+                  <option>Equipement</option><option>Pieces detachees</option><option>Fournitures bureau</option>
+                  <option>Informatique</option><option>Securite</option><option>Nettoyage</option><option>Autre</option>
+                </select>
+              </div>
+            </div>
+            <div class="gi-form-row full">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Description *</label>
+                <input class="gi-form-input" id="ach-desc" placeholder="Ex : Remplacement filtre pompe N°2"/>
+              </div>
+            </div>
+            <div class="gi-form-row">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Montant (HTG) *</label>
+                <input type="number" class="gi-form-input" id="ach-montant" placeholder="0" min="0.01" step="0.01"/>
+              </div>
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Date d'achat *</label>
+                <input type="date" class="gi-form-input" id="ach-date"/>
+              </div>
+            </div>
+            <div class="gi-form-row">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Référence</label>
+                <input class="gi-form-input" id="ach-ref" placeholder="N° bon de commande…"/>
+              </div>
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Notes</label>
+                <input class="gi-form-input" id="ach-notes" placeholder="Informations complémentaires"/>
+              </div>
+            </div>
+          </div>
+          <div class="gi-modal-foot">
+            <button class="gi-btn-secondary" onclick="closeAchatModal()">Annuler</button>
+            <button class="gi-btn-primary" onclick="submitAchat()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-achats -->
+
   </div><!-- /pages -->
 
   <footer class="app-footer">
@@ -3621,6 +4234,10 @@ const PAGE_META={
   admin:               {title: 'Administration',                sub: 'Sécurité du compte et clé API'},
   'rapports-dl':       {title: 'Rapports',                      sub: 'Générer un rapport PDF, Word ou Excel'},
   audit:               {title: 'Audit IA',                      sub: 'Document d\'audit expert rédigé par l\'Intelligence Artificielle'},
+  employes:            {title: 'Gestion des Employés',           sub: 'Effectif, contrats et fiches des employés'},
+  payroll:             {title: 'Payroll',                        sub: 'Fiches de paie et gestion des rémunérations'},
+  depenses:            {title: 'Dépenses Opérationnelles',       sub: 'Charges et coûts de la station'},
+  achats:              {title: 'Gestion des Achats',             sub: 'Matériel, équipements et fournitures'},
 };
 
 function goTo(page){
@@ -3647,6 +4264,8 @@ function goTo(page){
   if(page==='admin')              initAdmin();
   if(page==='rapports-dl')       initRapports();
   if(page==='audit')             initAudit();
+  // Modules gestion institutionnelle
+  if(_giPageLoaders[page]) _giPageLoaders[page]();
 }
 
 // ══════════════════════════════════════════════
@@ -8382,6 +9001,535 @@ function _audMsg(msg, type){
   el.textContent = msg;
   el.className = 'aud-msg' + (type ? ' '+type : '');
 }
+
+/* ══════════════════════════════════════════════════════════════
+   MODULES GESTION INSTITUTIONNELLE — UTILITAIRES
+   ══════════════════════════════════════════════════════════════ */
+const _htg = v => new Intl.NumberFormat('fr-HT',{minimumFractionDigits:0,maximumFractionDigits:0}).format(v) + ' HTG';
+const _today = () => new Date().toISOString().slice(0,10);
+
+function _giAlert(msg, type='error'){
+  // Réutilise le système de toast existant si disponible
+  const t = document.getElementById('toast');
+  if(t){ t.textContent=msg; t.className='toast '+(type==='ok'?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',3500); }
+  else alert(msg);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MODULE EMPLOYÉS
+   ══════════════════════════════════════════════════════════════ */
+let _empData = [];
+
+async function loadEmployes(){
+  const actif = document.getElementById('emp-filtre-actif')?.value;
+  let url = '/api/employes';
+  if(actif !== '') url += '?actif=' + actif;
+  try {
+    const r = await fetch(url); if(!r.ok) throw new Error();
+    _empData = await r.json();
+    renderEmpTable(_empData);
+    // KPIs
+    const masse = _empData.reduce((s,e)=>s+e.salaire_base,0);
+    document.getElementById('emp-kpi-total').textContent = _empData.length;
+    document.getElementById('emp-kpi-masse').textContent = _htg(masse);
+    // Stats payroll
+    const ps = await fetch('/api/payroll/stats');
+    if(ps.ok){ const d=await ps.json();
+      document.getElementById('emp-kpi-pending').textContent = d.nb_fiches_brouillon;
+      document.getElementById('emp-kpi-paye').textContent = _htg(d.total_paye_htg);
+    }
+  } catch(e){ console.error(e); }
+}
+
+function renderEmpTable(data){
+  const wrap = document.getElementById('emp-table-wrap');
+  document.getElementById('emp-count').textContent = data.length;
+  if(!data.length){
+    wrap.innerHTML = '<div class="gi-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Aucun employé trouvé.</div>';
+    return;
+  }
+  const rows = data.map(e => `
+    <tr>
+      <td><strong>${e.prenom} ${e.nom}</strong></td>
+      <td>${e.poste}</td>
+      <td><span class="td-badge ${e.type_contrat==='CDI'?'badge-blue':e.type_contrat==='CDD'?'badge-amber':'badge-gray'}">${e.type_contrat}</span></td>
+      <td>${e.date_embauche}</td>
+      <td class="td-amount">${_htg(e.salaire_base)}</td>
+      <td><span class="td-badge ${e.actif?'badge-green':'badge-gray'}">${e.actif?'Actif':'Inactif'}</span></td>
+      <td class="td-muted">${e.telephone||'—'}</td>
+      <td>
+        <div class="gi-actions">
+          <button class="gi-btn-icon" onclick="openEmpModal(${e.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Éditer
+          </button>
+          ${e.actif ? `<button class="gi-btn-icon danger" onclick="desactiverEmp(${e.id},'${e.prenom} ${e.nom}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Désactiver
+          </button>` : ''}
+        </div>
+      </td>
+    </tr>`).join('');
+  wrap.innerHTML = `<table class="gi-table">
+    <thead><tr>
+      <th>Nom</th><th>Poste</th><th>Contrat</th><th>Embauche</th>
+      <th>Salaire base</th><th>Statut</th><th>Téléphone</th><th>Actions</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function openEmpModal(id=null){
+  document.getElementById('emp-edit-id').value = id||'';
+  document.getElementById('emp-modal-title').textContent = id ? 'Modifier l\'Employé' : 'Nouvel Employé';
+  if(id){
+    const e = _empData.find(x=>x.id===id);
+    if(e){
+      document.getElementById('emp-prenom').value   = e.prenom;
+      document.getElementById('emp-nom').value      = e.nom;
+      document.getElementById('emp-poste').value    = e.poste;
+      document.getElementById('emp-contrat').value  = e.type_contrat;
+      document.getElementById('emp-embauche').value = e.date_embauche;
+      document.getElementById('emp-salaire').value  = e.salaire_base;
+      document.getElementById('emp-tel').value      = e.telephone||'';
+      document.getElementById('emp-email').value    = e.email||'';
+      document.getElementById('emp-notes').value    = e.notes||'';
+    }
+  } else {
+    ['emp-prenom','emp-nom','emp-poste','emp-tel','emp-email','emp-notes'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('emp-salaire').value  = '';
+    document.getElementById('emp-embauche').value = _today();
+    document.getElementById('emp-contrat').value  = 'CDI';
+  }
+  document.getElementById('emp-modal').classList.add('open');
+}
+function closeEmpModal(){ document.getElementById('emp-modal').classList.remove('open'); }
+
+async function submitEmp(){
+  const id = document.getElementById('emp-edit-id').value;
+  const body = {
+    nom: document.getElementById('emp-nom').value.trim(),
+    prenom: document.getElementById('emp-prenom').value.trim(),
+    poste: document.getElementById('emp-poste').value.trim(),
+    date_embauche: document.getElementById('emp-embauche').value,
+    salaire_base: parseFloat(document.getElementById('emp-salaire').value)||0,
+    type_contrat: document.getElementById('emp-contrat').value,
+    telephone: document.getElementById('emp-tel').value.trim()||null,
+    email: document.getElementById('emp-email').value.trim()||null,
+    notes: document.getElementById('emp-notes').value.trim()||null,
+  };
+  if(!body.nom||!body.prenom||!body.poste||!body.date_embauche){ _giAlert('Veuillez remplir tous les champs obligatoires.'); return; }
+  try {
+    const url = id ? `/api/employes/${id}` : '/api/employes';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d = await r.json();
+    if(!r.ok){ _giAlert(d.detail||'Erreur.'); return; }
+    closeEmpModal(); loadEmployes(); _giAlert(id?'Employé mis à jour.':'Employé créé.','ok');
+  } catch(e){ _giAlert('Erreur réseau.'); }
+}
+
+async function desactiverEmp(id, nom){
+  if(!confirm(`Désactiver ${nom} ?`)) return;
+  try {
+    const r = await fetch(`/api/employes/${id}`,{method:'DELETE'});
+    if(!r.ok){ const d=await r.json(); _giAlert(d.detail||'Erreur.'); return; }
+    loadEmployes(); _giAlert('Employé désactivé.','ok');
+  } catch(e){ _giAlert('Erreur réseau.'); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MODULE PAYROLL
+   ══════════════════════════════════════════════════════════════ */
+let _payData = [];
+let _empList = [];
+
+async function loadPayroll(){
+  const statut = document.getElementById('pay-filtre-statut')?.value;
+  const empId  = document.getElementById('pay-filtre-emp')?.value;
+  let url = '/api/payroll';
+  const params = [];
+  if(statut) params.push('statut='+statut);
+  if(empId)  params.push('employe_id='+empId);
+  if(params.length) url += '?' + params.join('&');
+  try {
+    const [rp, rs] = await Promise.all([fetch(url), fetch('/api/payroll/stats')]);
+    if(!rp.ok) throw new Error();
+    _payData = await rp.json();
+    if(rs.ok){ const s=await rs.json();
+      document.getElementById('pay-kpi-emp').textContent    = s.nb_employes_actifs;
+      document.getElementById('pay-kpi-draft').textContent  = s.nb_fiches_brouillon;
+      document.getElementById('pay-kpi-pending').textContent= _htg(s.total_en_attente_htg);
+      document.getElementById('pay-kpi-paid').textContent   = _htg(s.total_paye_htg);
+    }
+    renderPayTable(_payData);
+    await _loadEmpSelectPayroll();
+  } catch(e){ console.error(e); }
+}
+
+async function _loadEmpSelectPayroll(){
+  if(_empList.length) return;
+  try {
+    const r = await fetch('/api/employes?actif=true');
+    if(!r.ok) return;
+    _empList = await r.json();
+    const sels = ['pay-filtre-emp','pay-emp-sel'];
+    sels.forEach(selId=>{
+      const sel = document.getElementById(selId);
+      if(!sel) return;
+      const cur = sel.value;
+      while(sel.options.length > 1) sel.remove(1);
+      _empList.forEach(e=>{ const o=document.createElement('option'); o.value=e.id; o.textContent=`${e.prenom} ${e.nom} — ${e.poste}`; sel.appendChild(o); });
+      if(cur) sel.value=cur;
+    });
+  } catch(e){}
+}
+
+function renderPayTable(data){
+  const wrap = document.getElementById('pay-table-wrap');
+  document.getElementById('pay-count').textContent = data.length;
+  if(!data.length){
+    wrap.innerHTML = '<div class="gi-empty">Aucune fiche de paie trouvée.</div>'; return;
+  }
+  const rows = data.map(f=>`
+    <tr>
+      <td><strong>${f.employe_nom}</strong><br><span class="td-muted">${f.employe_poste}</span></td>
+      <td class="td-muted">${f.periode_debut} → ${f.periode_fin}</td>
+      <td class="td-amount">${_htg(f.salaire_base)}</td>
+      <td class="td-muted">${f.primes>0?'+'+_htg(f.primes):'—'}</td>
+      <td class="td-muted">${f.deductions>0?'-'+_htg(f.deductions):'—'}</td>
+      <td class="td-amount" style="font-size:15px">${_htg(f.net_a_payer)}</td>
+      <td><span class="td-badge ${f.statut==='paye'?'badge-green':'badge-amber'}">${f.statut==='paye'?'Payée':'Brouillon'}</span>
+          ${f.date_paiement?`<br><span class="td-muted">${f.date_paiement}</span>`:''}</td>
+      <td>
+        <div class="gi-actions">
+          ${f.statut==='brouillon'?`
+          <button class="gi-btn-icon success" onclick="marquerPayee(${f.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><polyline points="20 6 9 17 4 12"/></svg>
+            Payer
+          </button>
+          <button class="gi-btn-icon danger" onclick="supprimerFiche(${f.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+          </button>`:''}
+        </div>
+      </td>
+    </tr>`).join('');
+  wrap.innerHTML=`<table class="gi-table">
+    <thead><tr><th>Employé</th><th>Période</th><th>Salaire base</th><th>Primes</th><th>Déductions</th><th>Net à payer</th><th>Statut</th><th>Actions</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function calcNet(){
+  const s  = parseFloat(document.getElementById('pay-salaire')?.value)||0;
+  const hs = parseFloat(document.getElementById('pay-hs')?.value)||0;
+  const th = parseFloat(document.getElementById('pay-taux-hs')?.value)||0;
+  const pr = parseFloat(document.getElementById('pay-primes')?.value)||0;
+  const de = parseFloat(document.getElementById('pay-deductions')?.value)||0;
+  const net = s + hs*th + pr - de;
+  const el = document.getElementById('pay-net-preview');
+  if(el){ el.textContent = _htg(Math.max(0,net)); el.style.color=net<0?'#ef4444':'#3fb6a8'; }
+}
+
+function payFillSalaire(){
+  const empId = parseInt(document.getElementById('pay-emp-sel')?.value);
+  if(!empId) return;
+  const emp = _empList.find(e=>e.id===empId);
+  if(emp){ const el=document.getElementById('pay-salaire'); if(el){ el.value=emp.salaire_base; calcNet(); } }
+}
+
+async function openPayrollModal(){
+  await _loadEmpSelectPayroll();
+  ['pay-emp-sel','pay-debut','pay-fin','pay-salaire','pay-hs','pay-taux-hs','pay-primes','pay-deductions','pay-notes']
+    .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  const now=new Date(); const y=now.getFullYear(); const m=String(now.getMonth()+1).padStart(2,'0');
+  const db=document.getElementById('pay-debut'); if(db) db.value=`${y}-${m}-01`;
+  const df=document.getElementById('pay-fin'); if(df){ const last=new Date(y,now.getMonth()+1,0); df.value=`${y}-${m}-${String(last.getDate()).padStart(2,'0')}`; }
+  calcNet();
+  document.getElementById('pay-modal').classList.add('open');
+}
+function closePayrollModal(){ document.getElementById('pay-modal').classList.remove('open'); }
+
+async function submitPayroll(){
+  const body={
+    employe_id: parseInt(document.getElementById('pay-emp-sel').value)||0,
+    periode_debut: document.getElementById('pay-debut').value,
+    periode_fin: document.getElementById('pay-fin').value,
+    salaire_base: parseFloat(document.getElementById('pay-salaire').value)||0,
+    heures_sup: parseFloat(document.getElementById('pay-hs').value)||0,
+    taux_hs: parseFloat(document.getElementById('pay-taux-hs').value)||0,
+    primes: parseFloat(document.getElementById('pay-primes').value)||0,
+    deductions: parseFloat(document.getElementById('pay-deductions').value)||0,
+    notes: document.getElementById('pay-notes').value.trim()||null,
+  };
+  if(!body.employe_id||!body.periode_debut||!body.periode_fin){ _giAlert('Veuillez remplir tous les champs obligatoires.'); return; }
+  try {
+    const r=await fetch('/api/payroll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(!r.ok){ _giAlert(d.detail||'Erreur.'); return; }
+    closePayrollModal(); _empList=[]; loadPayroll(); _giAlert(`Fiche créée — Net : ${_htg(d.net_a_payer)}`,'ok');
+  } catch(e){ _giAlert('Erreur réseau.'); }
+}
+
+async function marquerPayee(id){
+  const date = prompt('Date de paiement (YYYY-MM-DD) :', _today());
+  if(!date) return;
+  try {
+    const r=await fetch(`/api/payroll/${id}/payer`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({date_paiement:date})});
+    const d=await r.json();
+    if(!r.ok){ _giAlert(d.detail||'Erreur.'); return; }
+    loadPayroll(); _giAlert('Fiche marquée comme payée.','ok');
+  } catch(e){ _giAlert('Erreur réseau.'); }
+}
+
+async function supprimerFiche(id){
+  if(!confirm('Supprimer cette fiche de paie ?')) return;
+  try {
+    const r=await fetch(`/api/payroll/${id}`,{method:'DELETE'});
+    if(!r.ok){ const d=await r.json(); _giAlert(d.detail||'Erreur.'); return; }
+    loadPayroll(); _giAlert('Fiche supprimée.','ok');
+  } catch(e){ _giAlert('Erreur réseau.'); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MODULE DÉPENSES
+   ══════════════════════════════════════════════════════════════ */
+let _depData = [];
+
+async function loadDepenses(){
+  const deb = document.getElementById('dep-filtre-debut')?.value;
+  const fin = document.getElementById('dep-filtre-fin')?.value;
+  const cat = document.getElementById('dep-filtre-cat')?.value;
+  const params=[];
+  if(deb) params.push('date_debut='+deb);
+  if(fin) params.push('date_fin='+fin);
+  if(cat) params.push('categorie='+encodeURIComponent(cat));
+  const url='/api/depenses'+(params.length?'?'+params.join('&'):'');
+  try {
+    const r=await fetch(url); if(!r.ok) throw new Error();
+    const d=await r.json();
+    _depData=d.depenses;
+    document.getElementById('dep-count').textContent=d.nb;
+    document.getElementById('dep-kpi-total').textContent=_htg(d.total);
+    document.getElementById('dep-kpi-nb').textContent=d.nb;
+    const avg=d.nb?Math.round(d.total/d.nb):0;
+    document.getElementById('dep-kpi-avg').textContent=_htg(avg);
+    // Catégorie principale
+    const catMap={};
+    _depData.forEach(x=>{ catMap[x.categorie]=(catMap[x.categorie]||0)+x.montant; });
+    const topCat=Object.entries(catMap).sort((a,b)=>b[1]-a[1])[0];
+    document.getElementById('dep-kpi-cat').textContent=topCat?topCat[0]:'—';
+    renderDepTable(_depData);
+  } catch(e){ console.error(e); }
+}
+
+function renderDepTable(data){
+  const wrap=document.getElementById('dep-table-wrap');
+  if(!data.length){
+    wrap.innerHTML='<div class="gi-empty">Aucune dépense trouvée pour cette période.</div>'; return;
+  }
+  const catColors={'Salaires':'badge-blue','Maintenance':'badge-amber','Electricite':'badge-amber',
+    'Loyer':'badge-gray','Taxes':'badge-red','Assurance':'badge-gray','Fournitures':'badge-blue',
+    'Eau':'badge-blue','Transport':'badge-gray','Divers':'badge-gray'};
+  const rows=data.map(d=>`
+    <tr>
+      <td>${d.date_depense}</td>
+      <td><span class="td-badge ${catColors[d.categorie]||'badge-gray'}">${d.categorie}</span></td>
+      <td>${d.description}</td>
+      <td class="td-muted">${d.beneficiaire||'—'}</td>
+      <td class="td-amount">${_htg(d.montant)}</td>
+      <td class="td-muted">${d.reference||'—'}</td>
+      <td>
+        <div class="gi-actions">
+          <button class="gi-btn-icon" onclick="openDepModal(${d.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="gi-btn-icon danger" onclick="supprimerDep(${d.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+          </button>
+        </div>
+      </td>
+    </tr>`).join('');
+  wrap.innerHTML=`<table class="gi-table">
+    <thead><tr><th>Date</th><th>Catégorie</th><th>Description</th><th>Bénéficiaire</th><th>Montant</th><th>Référence</th><th>Actions</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function openDepModal(id=null){
+  document.getElementById('dep-edit-id').value=id||'';
+  document.getElementById('dep-modal-title').textContent=id?'Modifier la Dépense':'Nouvelle Dépense';
+  if(id){
+    const d=_depData.find(x=>x.id===id);
+    if(d){
+      document.getElementById('dep-cat').value     =d.categorie;
+      document.getElementById('dep-date').value    =d.date_depense;
+      document.getElementById('dep-desc').value    =d.description;
+      document.getElementById('dep-montant').value =d.montant;
+      document.getElementById('dep-benef').value   =d.beneficiaire||'';
+      document.getElementById('dep-ref').value     =d.reference||'';
+      document.getElementById('dep-notes').value   =d.notes||'';
+    }
+  } else {
+    ['dep-cat','dep-desc','dep-montant','dep-benef','dep-ref','dep-notes'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('dep-date').value=_today();
+  }
+  document.getElementById('dep-modal').classList.add('open');
+}
+function closeDepModal(){ document.getElementById('dep-modal').classList.remove('open'); }
+
+async function submitDep(){
+  const id=document.getElementById('dep-edit-id').value;
+  const body={
+    categorie: document.getElementById('dep-cat').value,
+    description: document.getElementById('dep-desc').value.trim(),
+    montant: parseFloat(document.getElementById('dep-montant').value)||0,
+    date_depense: document.getElementById('dep-date').value,
+    beneficiaire: document.getElementById('dep-benef').value.trim()||null,
+    reference: document.getElementById('dep-ref').value.trim()||null,
+    notes: document.getElementById('dep-notes').value.trim()||null,
+  };
+  if(!body.categorie||!body.description||!body.date_depense||body.montant<=0){ _giAlert('Veuillez remplir tous les champs obligatoires.'); return; }
+  try {
+    const url=id?`/api/depenses/${id}`:'/api/depenses';
+    const method=id?'PUT':'POST';
+    const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(!r.ok){ _giAlert(d.detail||'Erreur.'); return; }
+    closeDepModal(); loadDepenses(); _giAlert(id?'Dépense mise à jour.':'Dépense enregistrée.','ok');
+  } catch(e){ _giAlert('Erreur réseau.'); }
+}
+
+async function supprimerDep(id){
+  if(!confirm('Supprimer cette dépense ?')) return;
+  try {
+    const r=await fetch(`/api/depenses/${id}`,{method:'DELETE'});
+    if(!r.ok){ const d=await r.json(); _giAlert(d.detail||'Erreur.'); return; }
+    loadDepenses(); _giAlert('Dépense supprimée.','ok');
+  } catch(e){ _giAlert('Erreur réseau.'); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MODULE ACHATS
+   ══════════════════════════════════════════════════════════════ */
+let _achData = [];
+
+async function loadAchats(){
+  const deb=document.getElementById('ach-filtre-debut')?.value;
+  const fin=document.getElementById('ach-filtre-fin')?.value;
+  const cat=document.getElementById('ach-filtre-cat')?.value;
+  const params=[];
+  if(deb) params.push('date_debut='+deb);
+  if(fin) params.push('date_fin='+fin);
+  if(cat) params.push('categorie='+encodeURIComponent(cat));
+  const url='/api/achats'+(params.length?'?'+params.join('&'):'');
+  try {
+    const r=await fetch(url); if(!r.ok) throw new Error();
+    const d=await r.json();
+    _achData=d.achats;
+    document.getElementById('ach-count').textContent=d.nb;
+    document.getElementById('ach-kpi-total').textContent=_htg(d.total);
+    document.getElementById('ach-kpi-nb').textContent=d.nb;
+    const fournis=new Set(_achData.map(a=>a.fournisseur));
+    document.getElementById('ach-kpi-fournis').textContent=fournis.size;
+    const catMap={};
+    _achData.forEach(a=>{ catMap[a.categorie]=(catMap[a.categorie]||0)+a.montant; });
+    const topCat=Object.entries(catMap).sort((a,b)=>b[1]-a[1])[0];
+    document.getElementById('ach-kpi-cat').textContent=topCat?topCat[0]:'—';
+    renderAchTable(_achData);
+  } catch(e){ console.error(e); }
+}
+
+function renderAchTable(data){
+  const wrap=document.getElementById('ach-table-wrap');
+  if(!data.length){
+    wrap.innerHTML='<div class="gi-empty">Aucun achat trouvé pour cette période.</div>'; return;
+  }
+  const rows=data.map(a=>`
+    <tr>
+      <td>${a.date_achat}</td>
+      <td><strong>${a.fournisseur}</strong></td>
+      <td><span class="td-badge badge-blue">${a.categorie}</span></td>
+      <td>${a.description}</td>
+      <td class="td-amount">${_htg(a.montant)}</td>
+      <td class="td-muted">${a.reference||'—'}</td>
+      <td>
+        <div class="gi-actions">
+          <button class="gi-btn-icon" onclick="openAchatModal(${a.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="gi-btn-icon danger" onclick="supprimerAchat(${a.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+          </button>
+        </div>
+      </td>
+    </tr>`).join('');
+  wrap.innerHTML=`<table class="gi-table">
+    <thead><tr><th>Date</th><th>Fournisseur</th><th>Catégorie</th><th>Description</th><th>Montant</th><th>Référence</th><th>Actions</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function openAchatModal(id=null){
+  document.getElementById('ach-edit-id').value=id||'';
+  document.getElementById('ach-modal-title').textContent=id?'Modifier l\'Achat':'Nouvel Achat';
+  if(id){
+    const a=_achData.find(x=>x.id===id);
+    if(a){
+      document.getElementById('ach-fournis').value =a.fournisseur;
+      document.getElementById('ach-cat').value     =a.categorie;
+      document.getElementById('ach-desc').value    =a.description;
+      document.getElementById('ach-montant').value =a.montant;
+      document.getElementById('ach-date').value    =a.date_achat;
+      document.getElementById('ach-ref').value     =a.reference||'';
+      document.getElementById('ach-notes').value   =a.notes||'';
+    }
+  } else {
+    ['ach-fournis','ach-cat','ach-desc','ach-montant','ach-ref','ach-notes'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('ach-date').value=_today();
+  }
+  document.getElementById('ach-modal').classList.add('open');
+}
+function closeAchatModal(){ document.getElementById('ach-modal').classList.remove('open'); }
+
+async function submitAchat(){
+  const id=document.getElementById('ach-edit-id').value;
+  const body={
+    fournisseur: document.getElementById('ach-fournis').value.trim(),
+    categorie: document.getElementById('ach-cat').value,
+    description: document.getElementById('ach-desc').value.trim(),
+    montant: parseFloat(document.getElementById('ach-montant').value)||0,
+    date_achat: document.getElementById('ach-date').value,
+    reference: document.getElementById('ach-ref').value.trim()||null,
+    notes: document.getElementById('ach-notes').value.trim()||null,
+  };
+  if(!body.fournisseur||!body.categorie||!body.description||!body.date_achat||body.montant<=0){ _giAlert('Veuillez remplir tous les champs obligatoires.'); return; }
+  try {
+    const url=id?`/api/achats/${id}`:'/api/achats';
+    const method=id?'PUT':'POST';
+    const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(!r.ok){ _giAlert(d.detail||'Erreur.'); return; }
+    closeAchatModal(); loadAchats(); _giAlert(id?'Achat mis à jour.':'Achat enregistré.','ok');
+  } catch(e){ _giAlert('Erreur réseau.'); }
+}
+
+async function supprimerAchat(id){
+  if(!confirm('Supprimer cet achat ?')) return;
+  try {
+    const r=await fetch(`/api/achats/${id}`,{method:'DELETE'});
+    if(!r.ok){ const d=await r.json(); _giAlert(d.detail||'Erreur.'); return; }
+    loadAchats(); _giAlert('Achat supprimé.','ok');
+  } catch(e){ _giAlert('Erreur réseau.'); }
+}
+
+/* ── Chargement automatique à la navigation ── */
+const _giPageLoaders = {
+  employes: loadEmployes,
+  payroll:  loadPayroll,
+  depenses: loadDepenses,
+  achats:   loadAchats,
+};
 
 </script>
 </body>
