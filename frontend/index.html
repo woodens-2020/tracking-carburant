@@ -1630,6 +1630,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
    MODULES GESTION INSTITUTIONNELLE — CSS COMMUN
    ══════════════════════════════════════════════════════════════ */
 .gi-page{display:flex;flex-direction:column;gap:18px}
+.gi-page-bar{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-bottom:2px}
 .gi-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
 .gi-title{font-size:20px;font-weight:800;color:var(--text1);letter-spacing:-.02em}
 .gi-subtitle{font-size:12px;color:var(--muted);margin-top:2px}
@@ -1946,7 +1947,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <input type="date" id="date-picker" class="date-input">
   </div>
 
-  <div class="pages">
+  <div class="pages" id="pages-container">
 
     <!-- ══════ PAGE : ACCUEIL ══════ -->
     <div id="page-home" class="page active">
@@ -3121,21 +3122,15 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <div id="page-employes" class="page">
       <div class="gi-page">
-        <div class="gi-header">
-          <div>
-            <div class="gi-title">Gestion des Employés</div>
-            <div class="gi-subtitle">Effectif actif de la station</div>
-          </div>
-          <div style="display:flex;gap:10px">
-            <button class="gi-btn-secondary" onclick="loadEmployes()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              Actualiser
-            </button>
-            <button class="gi-btn-primary" onclick="openEmpModal()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Nouvel Employé
-            </button>
-          </div>
+        <div class="gi-page-bar">
+          <button class="gi-btn-secondary" onclick="loadEmployes()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Actualiser
+          </button>
+          <button class="gi-btn-primary" onclick="openEmpModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nouvel Employé
+          </button>
         </div>
 
         <!-- KPIs -->
@@ -3248,21 +3243,15 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <div id="page-payroll" class="page">
       <div class="gi-page">
-        <div class="gi-header">
-          <div>
-            <div class="gi-title">Payroll — Fiches de Paie</div>
-            <div class="gi-subtitle">Gestion des rémunérations</div>
-          </div>
-          <div style="display:flex;gap:10px">
-            <button class="gi-btn-secondary" onclick="loadPayroll()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              Actualiser
-            </button>
-            <button class="gi-btn-primary" onclick="openPayrollModal()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Nouvelle Fiche
-            </button>
-          </div>
+        <div class="gi-page-bar">
+          <button class="gi-btn-secondary" onclick="loadPayroll()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Actualiser
+          </button>
+          <button class="gi-btn-primary" onclick="openPayrollModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nouvelle Fiche
+          </button>
         </div>
 
         <div class="gi-kpi-row">
@@ -3374,21 +3363,15 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <div id="page-depenses" class="page">
       <div class="gi-page">
-        <div class="gi-header">
-          <div>
-            <div class="gi-title">Dépenses Opérationnelles</div>
-            <div class="gi-subtitle">Charges et coûts de la station</div>
-          </div>
-          <div style="display:flex;gap:10px">
-            <button class="gi-btn-secondary" onclick="loadDepenses()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              Actualiser
-            </button>
-            <button class="gi-btn-primary" onclick="openDepModal()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Nouvelle Dépense
-            </button>
-          </div>
+        <div class="gi-page-bar">
+          <button class="gi-btn-secondary" onclick="loadDepenses()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Actualiser
+          </button>
+          <button class="gi-btn-primary" onclick="openDepModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nouvelle Dépense
+          </button>
         </div>
 
         <div class="gi-kpi-row" id="dep-kpis">
@@ -3491,21 +3474,15 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <div id="page-achats" class="page">
       <div class="gi-page">
-        <div class="gi-header">
-          <div>
-            <div class="gi-title">Gestion des Achats</div>
-            <div class="gi-subtitle">Matériel, équipements et fournitures</div>
-          </div>
-          <div style="display:flex;gap:10px">
-            <button class="gi-btn-secondary" onclick="loadAchats()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              Actualiser
-            </button>
-            <button class="gi-btn-primary" onclick="openAchatModal()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Nouvel Achat
-            </button>
-          </div>
+        <div class="gi-page-bar">
+          <button class="gi-btn-secondary" onclick="loadAchats()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Actualiser
+          </button>
+          <button class="gi-btn-primary" onclick="openAchatModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nouvel Achat
+          </button>
         </div>
 
         <div class="gi-kpi-row">
@@ -4253,6 +4230,9 @@ function goTo(page){
   document.getElementById('page-title').textContent = typeof m.title==='function' ? m.title() : m.title;
   document.getElementById('page-sub').textContent   = typeof m.sub==='function'   ? m.sub()   : m.sub;
   animatePageTitle();
+  // Toujours revenir en haut lors d'un changement de page
+  const pagesContainer = document.getElementById('pages-container');
+  if(pagesContainer) pagesContainer.scrollTop = 0;
 
   if(page==='home')               loadHome();
   if(page==='dashboard')          initDashboard();
@@ -4264,8 +4244,7 @@ function goTo(page){
   if(page==='admin')              initAdmin();
   if(page==='rapports-dl')       initRapports();
   if(page==='audit')             initAudit();
-  // Modules gestion institutionnelle
-  if(_giPageLoaders[page]) _giPageLoaders[page]();
+  if(_giPageLoaders[page])        _giPageLoaders[page]();
 }
 
 // ══════════════════════════════════════════════
