@@ -1633,10 +1633,527 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .aud-msg.ok{color:#3fb6a8}.aud-msg.err{color:#ef4444}
 
 /* ══════════════════════════════════════════════════════════════
-   MODULES GESTION INSTITUTIONNELLE — CSS COMMUN
+   MODULES GESTION — DESIGN SYSTEM COMPLET v2
+   ══════════════════════════════════════════════════════════════
+
+   Variables GI
+   --gi-accent   : couleur principale du module (définie par page)
+   --gi-accent-a : variante alpha faible pour fonds
+   --gi-accent-b : variante alpha moyenne pour bordures
    ══════════════════════════════════════════════════════════════ */
-.gi-page{display:flex;flex-direction:column;gap:18px}
-.gi-page-bar{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-bottom:2px}
+
+/* ── Layout ─────────────────────────────────────────────── */
+.gi-page{
+  display:flex;flex-direction:column;gap:16px;
+  padding:18px 22px 28px;
+  box-sizing:border-box;
+}
+.page-gi{padding:0!important}
+
+/* ── Header de page ─────────────────────────────────────── */
+.gi-page-header{
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:14px;
+  padding:16px 22px;
+  background:linear-gradient(120deg,
+    rgba(var(--gi-rgb,59,130,246),.11) 0%,
+    rgba(10,20,40,.97) 55%);
+  border:1px solid rgba(var(--gi-rgb,59,130,246),.2);
+  border-radius:12px;
+  position:relative;overflow:hidden;
+  box-shadow:0 2px 16px rgba(0,0,0,.22),
+             inset 0 1px 0 rgba(255,255,255,.04);
+}
+.gi-page-header::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,
+    var(--gi-accent,#3b82f6) 0%,
+    rgba(var(--gi-rgb,59,130,246),.25) 60%,transparent);
+}
+.gi-page-header::after{
+  content:'';position:absolute;top:-80px;left:-40px;
+  width:200px;height:200px;
+  background:radial-gradient(circle,
+    rgba(var(--gi-rgb,59,130,246),.07) 0%,transparent 70%);
+  pointer-events:none;
+}
+.gi-page-header-left{
+  display:flex;align-items:center;gap:14px;
+  position:relative;z-index:1;min-width:0;
+}
+.gi-page-header-icon{
+  width:42px;height:42px;border-radius:10px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(var(--gi-rgb,59,130,246),.14);
+  border:1px solid rgba(var(--gi-rgb,59,130,246),.28);
+  box-shadow:0 0 14px rgba(var(--gi-rgb,59,130,246),.15);
+}
+.gi-page-header-icon svg{
+  width:20px;height:20px;
+  stroke:var(--gi-accent,#60a5fa);
+  fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+.gi-page-header-text{
+  display:flex;flex-direction:column;gap:2px;min-width:0;
+}
+.gi-title{
+  font-size:18px;font-weight:800;color:#fff;
+  letter-spacing:-.03em;line-height:1.2;
+  text-shadow:0 0 24px rgba(var(--gi-rgb,59,130,246),.25);
+}
+.gi-subtitle{
+  font-size:11px;color:rgba(255,255,255,.42);
+  font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.gi-page-header-actions{
+  display:flex;align-items:center;gap:8px;
+  position:relative;z-index:1;flex-wrap:wrap;
+}
+
+/* ── Boutons GI ──────────────────────────────────────────── */
+.gi-btn-primary{
+  display:inline-flex;align-items:center;gap:6px;
+  background:linear-gradient(135deg,
+    var(--gi-accent,#2563eb),
+    rgba(var(--gi-rgb,59,130,246),.75));
+  color:#fff;
+  border:1px solid rgba(var(--gi-rgb,59,130,246),.45);
+  border-radius:8px;padding:8px 16px;
+  font-size:12.5px;font-weight:700;cursor:pointer;
+  box-shadow:0 3px 10px rgba(var(--gi-rgb,59,130,246),.28),
+             inset 0 1px rgba(255,255,255,.1);
+  transition:transform .12s,box-shadow .15s,filter .15s;
+  white-space:nowrap;
+}
+.gi-btn-primary:hover{
+  filter:brightness(1.08);
+  box-shadow:0 5px 16px rgba(var(--gi-rgb,59,130,246),.42);
+  transform:translateY(-1px);
+}
+.gi-btn-primary:active{transform:scale(.97);filter:brightness(.96)}
+
+.gi-btn-secondary{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(255,255,255,.05);
+  color:rgba(255,255,255,.7);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:8px;padding:7px 13px;
+  font-size:12px;font-weight:600;cursor:pointer;
+  backdrop-filter:blur(6px);
+  transition:background .14s,border-color .14s,transform .12s,color .14s;
+  white-space:nowrap;
+}
+.gi-btn-secondary:hover{
+  background:rgba(255,255,255,.1);
+  border-color:rgba(255,255,255,.2);
+  color:#fff;transform:translateY(-1px);
+}
+.gi-btn-secondary:active{transform:scale(.97)}
+
+/* ── Barre de filtres ───────────────────────────────────── */
+.gi-filters{
+  display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:10px;
+  padding:12px 16px;
+}
+.gi-filter-field{display:flex;flex-direction:column;gap:4px}
+.gi-filter-lbl{
+  font-size:9.5px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.09em;
+  color:rgba(255,255,255,.35);
+}
+.gi-filter-input,.gi-filter-select{
+  background:rgba(0,0,0,.3);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:7px;
+  padding:6px 10px;
+  color:rgba(255,255,255,.85);
+  font-size:12.5px;font-family:inherit;
+  min-width:130px;height:32px;
+  transition:border-color .15s,box-shadow .15s;
+}
+.gi-filter-input:focus,.gi-filter-select:focus{
+  outline:none;
+  border-color:var(--gi-accent,var(--blue));
+  box-shadow:0 0 0 2px rgba(var(--gi-rgb,59,130,246),.18);
+}
+.gi-filter-select option{background:#0f1e36;color:#e2e8f0}
+
+/* ── Grille KPI ─────────────────────────────────────────── */
+.gi-kpi-row{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:12px;
+}
+.gi-kpi{
+  background:linear-gradient(160deg,rgba(255,255,255,.04) 0%,rgba(255,255,255,.01) 100%);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;
+  padding:14px 16px;
+  position:relative;overflow:hidden;
+  transition:border-color .2s,box-shadow .2s,transform .15s;
+}
+.gi-kpi::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--gi-kpi-color,rgba(255,255,255,.12));
+  border-radius:10px 10px 0 0;
+}
+.gi-kpi:hover{
+  border-color:rgba(255,255,255,.14);
+  box-shadow:0 4px 18px rgba(0,0,0,.2);
+  transform:translateY(-1px);
+}
+.gi-kpi-lbl{
+  font-size:9.5px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.1em;
+  color:rgba(255,255,255,.4);
+  margin-bottom:7px;
+}
+.gi-kpi-val{
+  font-size:21px;font-weight:900;
+  color:var(--text1);
+  letter-spacing:-.03em;line-height:1;
+}
+.gi-kpi-val.green{color:#22c55e}
+.gi-kpi-val.teal{color:#3fb6a8}
+.gi-kpi-val.amber{color:#f7a93b}
+.gi-kpi-val.red{color:#f87171}
+.gi-kpi-val.blue{color:#60a5fa}
+.gi-kpi-val.purple{color:#a78bfa}
+.gi-kpi-sub{
+  font-size:10.5px;color:rgba(255,255,255,.35);
+  margin-top:5px;line-height:1.4;
+}
+
+/* ── Carte table ─────────────────────────────────────────── */
+.gi-table-card{
+  background:rgba(255,255,255,.025);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:10px;
+  overflow:hidden;
+}
+.gi-table-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 16px;
+  background:rgba(255,255,255,.03);
+  border-bottom:1px solid rgba(255,255,255,.06);
+  gap:10px;flex-wrap:wrap;
+}
+.gi-table-title{
+  font-size:12.5px;font-weight:700;
+  color:rgba(255,255,255,.8);
+}
+.gi-table-count{
+  font-size:10.5px;color:rgba(255,255,255,.4);
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:20px;padding:2px 10px;
+  font-family:var(--mono);
+}
+
+/* ── Table ───────────────────────────────────────────────── */
+.gi-table{width:100%;border-collapse:collapse}
+.gi-table thead{position:sticky;top:0;z-index:2}
+.gi-table th{
+  font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.1em;
+  color:rgba(255,255,255,.35);
+  padding:10px 14px;text-align:left;
+  background:rgba(10,18,34,.9);
+  border-bottom:1px solid rgba(255,255,255,.07);
+  white-space:nowrap;
+}
+.gi-table td{
+  font-size:12.5px;color:rgba(255,255,255,.8);
+  padding:10px 14px;
+  border-bottom:1px solid rgba(255,255,255,.04);
+  vertical-align:middle;
+}
+.gi-table tbody tr:last-child td{border-bottom:none}
+.gi-table tbody tr:nth-child(even) td{background:rgba(255,255,255,.018)}
+.gi-table tbody tr:hover td{
+  background:rgba(var(--gi-rgb,59,130,246),.06);
+  color:#fff;
+}
+.gi-table .td-muted{color:rgba(255,255,255,.35);font-size:11.5px}
+.gi-table .td-amount{
+  font-weight:700;font-family:var(--mono);
+  color:#3fb6a8;font-size:12.5px;
+}
+.gi-table .td-badge{
+  display:inline-flex;align-items:center;
+  padding:2px 9px;border-radius:20px;
+  font-size:10.5px;font-weight:700;letter-spacing:.03em;
+}
+.badge-green{background:rgba(34,197,94,.12);color:#4ade80;border:1px solid rgba(34,197,94,.2)}
+.badge-amber{background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.2)}
+.badge-blue{background:rgba(96,165,250,.1);color:#93c5fd;border:1px solid rgba(96,165,250,.2)}
+.badge-red{background:rgba(248,113,113,.1);color:#fca5a5;border:1px solid rgba(248,113,113,.2)}
+.badge-gray{background:rgba(255,255,255,.06);color:rgba(255,255,255,.45);border:1px solid rgba(255,255,255,.1)}
+.badge-teal{background:rgba(63,182,168,.1);color:#5eead4;border:1px solid rgba(63,182,168,.2)}
+
+/* ── Actions table ──────────────────────────────────────── */
+.gi-actions{display:flex;gap:5px;align-items:center}
+.gi-btn-icon{
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:6px;
+  padding:5px 8px;cursor:pointer;
+  color:rgba(255,255,255,.45);
+  display:flex;align-items:center;gap:3px;
+  transition:all .14s;
+}
+.gi-btn-icon svg{width:12px;height:12px}
+.gi-btn-icon:hover{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.2)}
+.gi-btn-icon.danger:hover{
+  background:rgba(248,113,113,.12);
+  color:#fca5a5;border-color:rgba(248,113,113,.3);
+}
+.gi-btn-icon.success:hover{
+  background:rgba(52,211,153,.1);
+  color:#6ee7b7;border-color:rgba(52,211,153,.3);
+}
+
+/* ── État vide ───────────────────────────────────────────── */
+.gi-empty{
+  display:flex;flex-direction:column;align-items:center;
+  padding:36px 20px;
+  color:rgba(255,255,255,.3);font-size:12.5px;gap:10px;
+  text-align:center;
+}
+.gi-empty svg{width:32px;height:32px;opacity:.25}
+
+/* ── Modal GI ────────────────────────────────────────────── */
+.gi-modal-overlay{
+  position:fixed;inset:0;z-index:1000;
+  background:rgba(0,0,0,.7);
+  backdrop-filter:blur(3px);
+  display:none;align-items:center;justify-content:center;
+}
+.gi-modal-overlay.open{display:flex}
+.gi-modal{
+  background:linear-gradient(160deg,#0e1e38 0%,#09132a 100%);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:14px;
+  width:min(580px,95vw);max-height:90vh;
+  overflow-y:auto;
+  box-shadow:0 32px 80px rgba(0,0,0,.65),
+             inset 0 1px 0 rgba(255,255,255,.06);
+}
+.gi-modal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 22px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.025);
+  position:sticky;top:0;z-index:5;
+}
+.gi-modal-head h3{
+  font-size:15px;font-weight:800;color:#fff;
+  display:flex;align-items:center;gap:8px;
+}
+.gi-modal-close{
+  background:none;border:none;
+  color:rgba(255,255,255,.4);font-size:18px;
+  cursor:pointer;width:28px;height:28px;
+  border-radius:6px;display:flex;align-items:center;justify-content:center;
+  transition:background .14s,color .14s;
+}
+.gi-modal-close:hover{background:rgba(255,255,255,.08);color:#fff}
+.gi-modal-body{padding:22px}
+.gi-modal-foot{
+  display:flex;justify-content:flex-end;gap:9px;
+  padding:14px 22px;
+  border-top:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.02);
+  position:sticky;bottom:0;
+}
+
+/* ── Formulaires ─────────────────────────────────────────── */
+.gi-form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.gi-form-row.full{grid-template-columns:1fr;margin-bottom:14px}
+.gi-form-field{display:flex;flex-direction:column;gap:5px}
+.gi-form-lbl{
+  font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.07em;
+  color:rgba(255,255,255,.4);
+}
+.gi-form-input,.gi-form-select,.gi-form-textarea{
+  background:rgba(0,0,0,.35);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:8px;
+  padding:9px 12px;
+  color:rgba(255,255,255,.9);
+  font-size:13px;font-family:inherit;
+  width:100%;box-sizing:border-box;
+  transition:border-color .14s,box-shadow .14s;
+}
+.gi-form-input:focus,.gi-form-select:focus,.gi-form-textarea:focus{
+  outline:none;
+  border-color:var(--gi-accent,var(--blue));
+  box-shadow:0 0 0 3px rgba(var(--gi-rgb,59,130,246),.15);
+}
+.gi-form-input::placeholder{color:rgba(255,255,255,.22)}
+.gi-form-textarea{resize:vertical;min-height:72px}
+.gi-form-select option{background:#0e1e38;color:#e2e8f0}
+.gi-net-preview{
+  background:rgba(63,182,168,.07);
+  border:1px solid rgba(63,182,168,.22);
+  border-radius:8px;padding:12px 16px;
+  margin-top:4px;text-align:center;
+}
+.gi-net-lbl{font-size:10px;font-weight:700;text-transform:uppercase;color:rgba(255,255,255,.4);letter-spacing:.07em}
+.gi-net-val{font-size:24px;font-weight:900;color:#3fb6a8;margin-top:4px;font-family:var(--mono)}
+
+/* ── Page barre latérale ─────────────────────────────────── */
+.gi-page-bar{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+
+/* ── Tableau de Bord GI ──────────────────────────────────── */
+.gid-period-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.gid-period-btn{
+  padding:5px 13px;border-radius:20px;
+  font-size:11px;font-weight:700;cursor:pointer;
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.09);
+  color:rgba(255,255,255,.5);
+  transition:all .14s;
+}
+.gid-period-btn:hover{
+  background:rgba(167,139,250,.12);
+  border-color:rgba(167,139,250,.35);
+  color:#c4b5fd;
+}
+.gid-period-btn.active{
+  background:rgba(167,139,250,.18);
+  border-color:#a78bfa;color:#ddd6fe;
+  box-shadow:0 0 10px rgba(167,139,250,.15);
+}
+.gid-kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:11px}
+.gid-kpi{
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:10px;padding:14px 16px;
+  position:relative;overflow:hidden;
+  transition:transform .14s,border-color .14s,box-shadow .14s;
+}
+.gid-kpi:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.13);box-shadow:0 6px 20px rgba(0,0,0,.2)}
+.gid-kpi-accent{position:absolute;top:0;left:0;right:0;height:2px}
+.gid-kpi-icon{
+  width:32px;height:32px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:10px;
+}
+.gid-kpi-icon svg{width:15px;height:15px;fill:none;stroke-width:2;stroke-linecap:round}
+.gid-kpi-lbl{
+  font-size:9.5px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.1em;
+  color:rgba(255,255,255,.38);margin-bottom:4px;
+}
+.gid-kpi-val{
+  font-size:19px;font-weight:900;
+  letter-spacing:-.03em;color:var(--text1);line-height:1.1;
+}
+.gid-kpi-sub{font-size:10px;color:rgba(255,255,255,.32);margin-top:4px;line-height:1.4}
+.gid-chart-grid{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+.gid-chart-card{
+  background:rgba(255,255,255,.025);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:10px;overflow:hidden;
+}
+.gid-chart-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;
+  background:rgba(255,255,255,.03);
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.gid-chart-title{font-size:12.5px;font-weight:700;color:rgba(255,255,255,.8)}
+.gid-chart-sub{font-size:10px;color:rgba(255,255,255,.33)}
+.gid-chart-body{padding:14px;position:relative}
+.gid-bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.gid-cat-row{
+  display:flex;align-items:center;gap:9px;
+  padding:7px 0;
+  border-bottom:1px solid rgba(255,255,255,.04);
+}
+.gid-cat-row:last-child{border-bottom:none}
+.gid-cat-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.gid-cat-name{
+  font-size:12px;color:rgba(255,255,255,.75);
+  flex:1;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.gid-cat-bar-wrap{
+  width:80px;flex-shrink:0;
+  background:rgba(255,255,255,.05);
+  border-radius:3px;height:5px;overflow:hidden;
+}
+.gid-cat-bar{height:100%;border-radius:3px;transition:width .5s ease}
+.gid-cat-val{
+  font-size:11px;font-weight:700;
+  color:rgba(255,255,255,.6);
+  min-width:78px;text-align:right;flex-shrink:0;
+}
+.gid-stat-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);
+}
+.gid-stat-row:last-child{border-bottom:none}
+.gid-stat-lbl{font-size:11.5px;color:rgba(255,255,255,.4)}
+.gid-stat-val{font-size:12.5px;font-weight:700;color:rgba(255,255,255,.85)}
+.gid-empty{color:rgba(255,255,255,.28);font-size:12px;padding:18px 0;text-align:center}
+.gid-alert{
+  display:flex;align-items:center;gap:9px;
+  background:rgba(247,169,59,.07);
+  border:1px solid rgba(247,169,59,.22);
+  border-radius:8px;padding:9px 14px;
+  font-size:11.5px;color:#fbbf24;
+}
+
+/* ── Rapport de Caisse ───────────────────────────────────── */
+.caisse-cash-card{
+  background:linear-gradient(135deg,rgba(34,197,94,.12) 0%,rgba(9,19,42,.97) 65%);
+  border:1px solid rgba(34,197,94,.25);
+  border-radius:12px;padding:22px 28px;
+  text-align:center;position:relative;overflow:hidden;
+  box-shadow:0 3px 24px rgba(34,197,94,.08);
+}
+.caisse-cash-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,#16a34a,#22c55e,#4ade80,transparent);
+}
+.caisse-cash-card.negative{
+  background:linear-gradient(135deg,rgba(248,113,113,.12) 0%,rgba(9,19,42,.97) 65%);
+  border-color:rgba(248,113,113,.25);
+}
+.caisse-cash-card.negative::before{
+  background:linear-gradient(90deg,#dc2626,#f87171,transparent);
+}
+.caisse-cash-label{
+  font-size:10px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.14em;
+  color:rgba(255,255,255,.38);margin-bottom:9px;
+}
+.caisse-cash-val{
+  font-size:42px;font-weight:900;
+  letter-spacing:-.04em;color:#22c55e;line-height:1;
+}
+.caisse-cash-card.negative .caisse-cash-val{color:#f87171}
+.caisse-cash-sub{font-size:11.5px;color:rgba(255,255,255,.38);margin-top:9px}
+.caisse-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.caisse-bar-row{
+  display:flex;align-items:center;gap:10px;
+  padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04);
+}
+.caisse-bar-row:last-child{border-bottom:none}
+.caisse-bar-label{font-size:12px;color:rgba(255,255,255,.7);min-width:110px;flex-shrink:0}
+.caisse-bar-track{flex:1;background:rgba(255,255,255,.05);border-radius:3px;height:6px;overflow:hidden}
+.caisse-bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.caisse-bar-val{font-size:11.5px;font-weight:700;color:rgba(255,255,255,.6);min-width:85px;text-align:right}
+
+@media(max-width:900px){.gi-kpi-row{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.gi-kpi-row{grid-template-columns:1fr}.gi-form-row{grid-template-columns:1fr}}
 .gi-page-header{
   display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;
   position:relative;overflow:hidden;
@@ -1861,58 +2378,31 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
 /* ── Hauteur compressée : tout écran ≤ 800 px de haut ──────── */
 @media (max-height:800px){
-  /* Container de page */
-  .page{padding:14px 20px 14px}
-  .page-gi{padding-top:0}
-
-  /* Espacement interne des pages GI */
-  .gi-page{gap:11px}
-
-  /* Header GI : moins de padding, icône plus petite */
-  .gi-page-header{padding:13px 18px;gap:10px;border-radius:11px}
-  .gi-page-header-left{gap:12px}
-  .gi-page-header-icon{width:38px;height:38px;border-radius:9px}
-  .gi-page-header-icon svg{width:18px;height:18px}
-  .gi-title{font-size:17px}
-  .gi-subtitle{font-size:10.5px}
-  .gi-page-header-actions{gap:8px}
-
-  /* Boutons GI */
-  .gi-btn-primary{padding:8px 15px;font-size:12px;gap:6px;border-radius:8px}
-  .gi-btn-secondary{padding:7px 12px;font-size:12px;gap:5px;border-radius:8px}
-
-  /* Filtres */
+  .page{padding:12px 18px 16px}
+  .gi-page{gap:10px;padding:12px 18px 20px}
+  .gi-page-header{padding:11px 16px;gap:10px;border-radius:10px}
+  .gi-page-header-icon{width:34px;height:34px;border-radius:8px}
+  .gi-page-header-icon svg{width:17px;height:17px}
+  .gi-title{font-size:16px}
+  .gi-subtitle{font-size:10px}
+  .gi-btn-primary{padding:7px 13px;font-size:11.5px}
+  .gi-btn-secondary{padding:6px 11px;font-size:11.5px}
   .gi-filters{padding:9px 13px;gap:8px}
-  .gi-filter-input{padding:5px 9px;font-size:12px;min-width:115px;height:30px}
-  .gi-filter-lbl{font-size:9.5px}
-
-  /* KPI cards */
-  .gi-kpi-row{gap:10px}
-  .gi-kpi{padding:10px 13px;border-radius:8px}
-  .gi-kpi-lbl{font-size:9.5px;margin-bottom:4px}
+  .gi-filter-input,.gi-filter-select{height:30px;padding:5px 9px;font-size:12px;min-width:115px}
+  .gi-kpi-row{gap:9px}
+  .gi-kpi{padding:10px 13px}
   .gi-kpi-val{font-size:18px}
-  .gi-kpi-sub{font-size:10px;margin-top:2px}
-
-  /* Tables */
-  .gi-table th{padding:8px 12px;font-size:10px}
-  .gi-table td{padding:9px 12px;font-size:12.5px}
-  .gi-table-hdr{padding:9px 14px}
-  .gi-table-title{font-size:12px}
-
-  /* Rapport de Caisse */
-  .caisse-cash-card{padding:16px 24px}
-  .caisse-cash-label{font-size:10px;margin-bottom:7px}
+  .gi-kpi-sub{font-size:9.5px;margin-top:3px}
+  .gi-table th{padding:8px 12px}
+  .gi-table td{padding:8px 12px;font-size:12px}
+  .gi-table-hdr{padding:8px 13px}
+  .caisse-cash-card{padding:14px 22px}
   .caisse-cash-val{font-size:34px}
-  .caisse-cash-sub{font-size:11px;margin-top:7px}
-  .caisse-detail-grid{gap:11px}
-  .caisse-bar-row{padding:6px 0}
-  .caisse-bar-label{font-size:12px}
-  .caisse-bar-val{font-size:11.5px}
-
-  /* Modaux : réduit la hauteur max */
+  .caisse-detail-grid{gap:10px}
+  .gid-kpi-val{font-size:16px}
+  .gid-kpi{padding:10px 13px}
+  .gid-chart-body[style*="220px"]{height:175px!important}
   .modal-box{max-height:88vh}
-
-  /* Header principal */
   .main-header{height:46px;padding:0 20px}
   .main-title{font-size:15px}
   .main-sub{font-size:10px}
@@ -3364,7 +3854,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <div class="gi-page">
 
         <!-- Header -->
-        <div class="gi-page-header" style="--gi-accent:#a78bfa;background:linear-gradient(135deg,rgba(167,139,250,.13) 0%,rgba(11,22,40,.95) 60%);border-color:rgba(167,139,250,.22)">
+        <div class="gi-page-header" style="--gi-accent:#a78bfa;--gi-rgb:167,139,250">
           <div class="gi-page-header-left">
             <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(167,139,250,.25),rgba(167,139,250,.1));border-color:rgba(167,139,250,.3);box-shadow:0 0 18px rgba(167,139,250,.2)">
               <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
@@ -3545,7 +4035,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
     <div id="page-employes" class="page page-gi">
       <div class="gi-page">
-        <div class="gi-page-header" style="--gi-accent:#60a5fa">
+        <div class="gi-page-header" style="--gi-accent:#60a5fa;--gi-rgb:96,165,250">
           <div class="gi-page-header-left">
             <div class="gi-page-header-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -3677,7 +4167,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <div id="page-payroll" class="page page-gi">
       <div class="gi-page">
-        <div class="gi-page-header" style="--gi-accent:#3fb6a8;background:linear-gradient(135deg,rgba(63,182,168,.13) 0%,rgba(11,22,40,.95) 60%);border-color:rgba(63,182,168,.22)">
+        <div class="gi-page-header" style="--gi-accent:#3fb6a8;--gi-rgb:63,182,168">
           <div class="gi-page-header-left">
             <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(63,182,168,.25),rgba(63,182,168,.1));border-color:rgba(63,182,168,.3);box-shadow:0 0 18px rgba(63,182,168,.2)">
               <svg viewBox="0 0 24 24" fill="none" stroke="#3fb6a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
@@ -3692,7 +4182,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               Actualiser
             </button>
-            <button class="gi-btn-primary" onclick="openPayrollModal()" style="background:linear-gradient(135deg,#0d9488,#3fb6a8);border-color:rgba(63,182,168,.4);box-shadow:0 4px 14px rgba(63,182,168,.35)">
+            <button class="gi-btn-primary" onclick="openPayrollModal()" style="--gi-accent:#3fb6a8;--gi-rgb:63,182,168">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Nouvelle Fiche
             </button>
@@ -3808,7 +4298,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <div id="page-depenses" class="page page-gi">
       <div class="gi-page">
-        <div class="gi-page-header" style="--gi-accent:#f87171;background:linear-gradient(135deg,rgba(248,113,113,.12) 0%,rgba(11,22,40,.95) 60%);border-color:rgba(248,113,113,.22)">
+        <div class="gi-page-header" style="--gi-accent:#f87171;--gi-rgb:248,113,113">
           <div class="gi-page-header-left">
             <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(248,113,113,.25),rgba(248,113,113,.1));border-color:rgba(248,113,113,.3);box-shadow:0 0 18px rgba(248,113,113,.2)">
               <svg viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -3831,7 +4321,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <svg viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" style="width:13px;height:13px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="18" x2="12" y2="18"/></svg>
               PDF
             </button>
-            <button class="gi-btn-primary" onclick="openDepModal()" style="background:linear-gradient(135deg,#dc2626,#f87171);border-color:rgba(248,113,113,.4);box-shadow:0 4px 14px rgba(248,113,113,.3)">
+            <button class="gi-btn-primary" onclick="openDepModal()" style="--gi-accent:#f87171;--gi-rgb:248,113,113">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Nouvelle Dépense
             </button>
@@ -3938,7 +4428,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <div id="page-achats" class="page page-gi">
       <div class="gi-page">
-        <div class="gi-page-header" style="--gi-accent:#f7a93b;background:linear-gradient(135deg,rgba(247,169,59,.12) 0%,rgba(11,22,40,.95) 60%);border-color:rgba(247,169,59,.22)">
+        <div class="gi-page-header" style="--gi-accent:#f7a93b;--gi-rgb:247,169,59">
           <div class="gi-page-header-left">
             <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(247,169,59,.25),rgba(247,169,59,.1));border-color:rgba(247,169,59,.3);box-shadow:0 0 18px rgba(247,169,59,.2)">
               <svg viewBox="0 0 24 24" fill="none" stroke="#f7a93b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
@@ -3953,7 +4443,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               Actualiser
             </button>
-            <button class="gi-btn-primary" onclick="openAchatModal()" style="background:linear-gradient(135deg,#b45309,#f7a93b);border-color:rgba(247,169,59,.4);box-shadow:0 4px 14px rgba(247,169,59,.3);color:#0a1628">
+            <button class="gi-btn-primary" onclick="openAchatModal()" style="--gi-accent:#f7a93b;--gi-rgb:247,169,59">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Nouvel Achat
             </button>
@@ -4060,7 +4550,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <div class="gi-page">
 
         <!-- Header -->
-        <div class="gi-page-header" style="--gi-accent:#22c55e;background:linear-gradient(135deg,rgba(34,197,94,.12) 0%,rgba(11,22,40,.95) 60%);border-color:rgba(34,197,94,.22)">
+        <div class="gi-page-header" style="--gi-accent:#22c55e;--gi-rgb:34,197,94">
           <div class="gi-page-header-left">
             <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(34,197,94,.25),rgba(34,197,94,.1));border-color:rgba(34,197,94,.3);box-shadow:0 0 18px rgba(34,197,94,.2)">
               <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
