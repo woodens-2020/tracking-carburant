@@ -218,7 +218,7 @@ input[type=date]{color-scheme:dark}
 }
 .date-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.12)}
 
-.pages{flex:1;min-height:0;overflow-y:auto;padding-bottom:36px}
+.pages{flex:1;min-height:0;overflow-y:auto;padding-bottom:36px;overflow-anchor:none}
 .page{display:none;padding:24px 26px;animation:fade-in .2s ease}
 .page.active{display:block}
 .page-gi{padding-top:16px}
@@ -4239,6 +4239,8 @@ function goTo(page){
   // Toujours revenir en haut lors d'un changement de page
   const pagesContainer = document.getElementById('pages-container');
   if(pagesContainer) pagesContainer.scrollTop = 0;
+  // Second reset après le rendu (évite le scroll anchoring Chrome)
+  requestAnimationFrame(()=>{ if(pagesContainer) pagesContainer.scrollTop = 0; });
 
   if(page==='home')               loadHome();
   if(page==='dashboard')          initDashboard();
@@ -9024,6 +9026,9 @@ async function loadEmployes(){
       document.getElementById('emp-kpi-paye').textContent = _htg(d.total_paye_htg);
     }
   } catch(e){ console.error(e); }
+  // Reset scroll après chargement async (anti scroll-anchoring)
+  const pc = document.getElementById('pages-container');
+  if(pc) pc.scrollTop = 0;
 }
 
 function renderEmpTable(data){
@@ -9150,6 +9155,8 @@ async function loadPayroll(){
     renderPayTable(_payData);
     await _loadEmpSelectPayroll();
   } catch(e){ console.error(e); }
+  const pc = document.getElementById('pages-container');
+  if(pc) pc.scrollTop = 0;
 }
 
 async function _loadEmpSelectPayroll(){
@@ -9306,6 +9313,8 @@ async function loadDepenses(){
     document.getElementById('dep-kpi-cat').textContent=topCat?topCat[0]:'—';
     renderDepTable(_depData);
   } catch(e){ console.error(e); }
+  const pc = document.getElementById('pages-container');
+  if(pc) pc.scrollTop = 0;
 }
 
 function renderDepTable(data){
@@ -9423,6 +9432,8 @@ async function loadAchats(){
     document.getElementById('ach-kpi-cat').textContent=topCat?topCat[0]:'—';
     renderAchTable(_achData);
   } catch(e){ console.error(e); }
+  const pc = document.getElementById('pages-container');
+  if(pc) pc.scrollTop = 0;
 }
 
 function renderAchTable(data){
