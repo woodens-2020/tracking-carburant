@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
-from models import Produit, Pompe, Releve, Utilisateur, Livraison, PrixVente, Employe, FichePaie, Depense, Achat
+from models import Produit, Pompe, Releve, Utilisateur, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense
 from auth import (
     SESSION_COOKIE, hash_password, verify_password,
     hash_code_acces, verify_code_acces,
@@ -199,6 +199,14 @@ def require_admin(request: Request) -> Utilisateur:
     return user
 
 
+def require_pdg(request: Request) -> Utilisateur:
+    """Autorise uniquement le rôle 'pdg'. Lève 403 sinon."""
+    user = getattr(request.state, "user", None)
+    if not user or user.role != "pdg":
+        raise HTTPException(403, "Accès réservé au PDG")
+    return user
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Gestion des comptes employés (admin seulement)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -242,8 +250,8 @@ def creer_utilisateur(
     db: Session = Depends(get_db),
 ):
     """Crée un compte employé. La clé API générée est retournée une seule fois."""
-    if data.role not in ("admin", "operateur"):
-        raise HTTPException(400, "Rôle invalide — choisir 'admin' ou 'operateur'")
+    if data.role not in ("admin", "operateur", "pdg"):
+        raise HTTPException(400, "Rôle invalide — choisir 'admin', 'operateur' ou 'pdg'")
     if len(data.password) < 6:
         raise HTTPException(400, "Le mot de passe doit contenir au moins 6 caractères")
     if not _CODE_RE.match(data.code_acces):
@@ -2823,6 +2831,90 @@ _CATEGORIES_DEPENSE = {
     "Eau", "Loyer", "Transport", "Taxes", "Assurance", "Divers",
 }
 
+# ── Helpers limite ────────────────────────────────────────────────
+
+def _get_param_depense(db: Session) -> ParametreDepense:
+    """Retourne le singleton ParametreDepense (crée si absent)."""
+    p = db.query(ParametreDepense).filter(ParametreDepense.id == 1).first()
+    if not p:
+        p = ParametreDepense(id=1, limite=None, active=True)
+        db.add(p)
+        db.commit()
+        db.refresh(p)
+    return p
+
+def _total_depenses_mois_courant(db: Session, exclure_id: Optional[int] = None) -> float:
+    """Somme des dépenses du mois calendaire en cours."""
+    from datetime import date as _date
+    today = _date.today()
+    debut_mois = today.replace(day=1)
+    q = db.query(Depense).filter(
+        Depense.date_depense >= debut_mois,
+        Depense.date_depense <= today,
+    )
+    if exclure_id:
+        q = q.filter(Depense.id != exclure_id)
+    return round(sum(float(d.montant) for d in q.all()), 2)
+
+def _verifier_limite(db: Session, montant_nouveau: float, exclure_id: Optional[int] = None):
+    """Lève 403 si l'ajout dépasserait la limite mensuelle active."""
+    p = _get_param_depense(db)
+    if not p.active or p.limite is None:
+        return
+    total = _total_depenses_mois_courant(db, exclure_id)
+    if total + montant_nouveau > float(p.limite):
+        disponible = max(0.0, float(p.limite) - total)
+        raise HTTPException(
+            403,
+            f"Limite mensuelle atteinte ({float(p.limite):,.2f} G). "
+            f"Dépenses ce mois : {total:,.2f} G. "
+            f"Montant disponible : {disponible:,.2f} G."
+        )
+
+# ── Endpoints limite (PDG only) ───────────────────────────────────
+
+@app.get("/api/depenses/limite")
+def get_limite_depenses(db: Session = Depends(get_db)):
+    """Retourne la configuration de la limite mensuelle."""
+    from datetime import date as _date
+    p = _get_param_depense(db)
+    today = _date.today()
+    total_mois = _total_depenses_mois_courant(db)
+    return {
+        "limite":      float(p.limite) if p.limite is not None else None,
+        "active":      p.active,
+        "updated_at":  p.updated_at.isoformat() if p.updated_at else None,
+        "updated_by":  p.updated_by,
+        "total_mois":  total_mois,
+        "mois":        today.strftime("%B %Y"),
+        "pct":         round(total_mois / float(p.limite) * 100, 1) if p.limite else None,
+    }
+
+class LimiteDepenseIn(BaseModel):
+    limite: Optional[float] = None   # None = supprimer la limite
+    active: bool = True
+
+@app.put("/api/depenses/limite")
+def set_limite_depenses(
+    data: LimiteDepenseIn,
+    request: Request,
+    _pdg: Utilisateur = Depends(require_pdg),
+    db: Session = Depends(get_db),
+):
+    """Définit ou supprime la limite mensuelle. PDG uniquement."""
+    from datetime import datetime as _dt
+    if data.limite is not None and data.limite <= 0:
+        raise HTTPException(400, "La limite doit être > 0.")
+    p = _get_param_depense(db)
+    p.limite     = data.limite
+    p.active     = data.active
+    p.updated_at = _dt.utcnow()
+    p.updated_by = _pdg.username
+    db.commit()
+    return {"ok": True, "limite": float(p.limite) if p.limite else None, "active": p.active}
+
+# ──────────────────────────────────────────────────────────────────
+
 class DepenseIn(BaseModel):
     categorie:    str
     description:  str
@@ -2892,6 +2984,7 @@ def creer_depense(data: DepenseIn, db: Session = Depends(get_db)):
         date_d = _date.fromisoformat(data.date_depense)
     except ValueError:
         raise HTTPException(400, "Format de date invalide.")
+    _verifier_limite(db, data.montant)
     d = Depense(
         categorie=data.categorie, description=data.description.strip(),
         montant=data.montant, date_depense=date_d,
@@ -2915,6 +3008,7 @@ def modifier_depense(depense_id: int, data: DepensePatch, db: Session = Depends(
     if data.montant is not None:
         if data.montant <= 0:
             raise HTTPException(400, "Le montant doit être > 0.")
+        _verifier_limite(db, data.montant, exclure_id=depense_id)
         d.montant = data.montant
     if data.date_depense is not None:
         try:

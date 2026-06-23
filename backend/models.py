@@ -154,7 +154,7 @@ class Utilisateur(Base):
     oauth_sub         = Column(String(255), unique=True, nullable=True)
 
     __table_args__ = (
-        CheckConstraint("role IN ('admin', 'operateur')", name="chk_utilisateur_role"),
+        CheckConstraint("role IN ('admin', 'operateur', 'pdg')", name="chk_utilisateur_role"),
     )
 
 
@@ -264,6 +264,18 @@ class Depense(Base):
         Index("idx_depenses_date",      "date_depense"),
         Index("idx_depenses_categorie", "categorie"),
     )
+
+
+class ParametreDepense(Base):
+    """Configuration de la limite budgétaire mensuelle des dépenses.
+    Table singleton : toujours id=1."""
+    __tablename__ = "parametres_depenses"
+
+    id         = Column(Integer, primary_key=True)
+    limite     = Column(Numeric(14, 2), nullable=True)   # None = pas de limite
+    active     = Column(Boolean, nullable=False, default=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
+    updated_by = Column(String(100), nullable=True)
 
 
 class Achat(Base):

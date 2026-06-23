@@ -2138,6 +2138,53 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   letter-spacing:-.04em;color:#22c55e;line-height:1;
 }
 .caisse-cash-card.negative .caisse-cash-val{color:#f87171}
+/* ── Budget Dépenses ─────────────────────────────────────── */
+.dep-budget-card{
+  background:rgba(255,255,255,.025);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:10px;padding:12px 16px;
+  display:flex;flex-direction:column;gap:8px;
+}
+.dep-budget-header{
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:6px;
+}
+.dep-budget-label{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:600;color:rgba(255,255,255,.65);
+}
+.dep-budget-month{
+  font-size:11px;color:rgba(255,255,255,.35);font-weight:400;
+}
+.dep-budget-numbers{
+  display:flex;align-items:baseline;gap:4px;font-family:var(--mono);
+}
+.dep-budget-spent{font-size:14px;font-weight:700;color:#e2e8f0}
+.dep-budget-sep{font-size:12px;color:rgba(255,255,255,.3)}
+.dep-budget-limit{font-size:13px;color:rgba(255,255,255,.5)}
+.dep-budget-pct{
+  font-size:11px;font-weight:700;
+  padding:1px 6px;border-radius:20px;margin-left:4px;
+  background:rgba(34,197,94,.12);color:#4ade80;
+}
+.dep-budget-pct.warn{background:rgba(251,191,36,.12);color:#fbbf24}
+.dep-budget-pct.danger{background:rgba(248,113,113,.12);color:#f87171}
+.dep-budget-track{
+  width:100%;height:7px;background:rgba(255,255,255,.06);
+  border-radius:4px;overflow:hidden;
+}
+.dep-budget-fill{
+  height:100%;background:#22c55e;
+  border-radius:4px;transition:width .6s ease,background .4s;
+}
+.dep-budget-fill.warn{background:#f59e0b}
+.dep-budget-fill.danger{background:#f87171}
+.dep-budget-warning{
+  display:flex;align-items:center;gap:6px;
+  font-size:11.5px;color:#fbbf24;padding-top:2px;
+}
+.dep-budget-warning.danger{color:#f87171}
+/* ─────────────────────────────────────────────────────────── */
 .caisse-cash-sub{font-size:11.5px;color:rgba(255,255,255,.38);margin-top:9px}
 .caisse-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .caisse-bar-row{
@@ -4319,10 +4366,38 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <svg viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" style="width:13px;height:13px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="18" x2="12" y2="18"/></svg>
               PDF
             </button>
-            <button class="gi-btn-primary" onclick="openDepModal()">
+            <button class="gi-btn-secondary" id="dep-btn-limite" onclick="openLimiteModal()" style="display:none" title="Définir la limite mensuelle (PDG)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Limite budget
+            </button>
+            <button class="gi-btn-primary" id="dep-btn-new" onclick="openDepModal()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Nouvelle Dépense
             </button>
+          </div>
+        </div>
+
+        <!-- Barre de budget mensuel -->
+        <div class="dep-budget-card" id="dep-budget-card" style="display:none">
+          <div class="dep-budget-header">
+            <div class="dep-budget-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span>Limite mensuelle</span>
+              <span class="dep-budget-month" id="dep-budget-month"></span>
+            </div>
+            <div class="dep-budget-numbers">
+              <span class="dep-budget-spent" id="dep-budget-spent">0</span>
+              <span class="dep-budget-sep"> / </span>
+              <span class="dep-budget-limit" id="dep-budget-limit">—</span>
+              <span class="dep-budget-pct" id="dep-budget-pct"></span>
+            </div>
+          </div>
+          <div class="dep-budget-track">
+            <div class="dep-budget-fill" id="dep-budget-fill" style="width:0%"></div>
+          </div>
+          <div class="dep-budget-warning" id="dep-budget-warning" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span id="dep-budget-warning-txt"></span>
           </div>
         </div>
 
@@ -4419,6 +4494,40 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
       </div>
+      <!-- Modal Limite Budget (PDG uniquement) -->
+      <div class="gi-modal-overlay" id="limite-modal">
+        <div class="gi-modal" style="max-width:420px">
+          <div class="gi-modal-head">
+            <h3>Limite budgétaire mensuelle</h3>
+            <button class="gi-modal-close" onclick="closeLimiteModal()">×</button>
+          </div>
+          <div class="gi-modal-body">
+            <p style="color:rgba(255,255,255,.55);font-size:12px;margin:0 0 16px">
+              La limite s'applique au mois calendaire en cours. Aucune dépense ne pourra être saisie si elle dépasse ce plafond.
+            </p>
+            <div class="gi-form-field" style="margin-bottom:14px">
+              <label class="gi-form-lbl">Plafond mensuel (HTG)</label>
+              <input type="number" class="gi-form-input" id="limite-montant" placeholder="Ex : 50000" min="0.01" step="0.01"/>
+              <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:5px">Laisser vide pour supprimer la limite.</div>
+            </div>
+            <div class="gi-form-field">
+              <label style="display:flex;align-items:center;gap:9px;cursor:pointer;color:rgba(255,255,255,.75);font-size:13px">
+                <input type="checkbox" id="limite-active" style="width:16px;height:16px;accent-color:#f87171"/>
+                Limite active (bloque les nouvelles dépenses si dépassée)
+              </label>
+            </div>
+            <div class="gi-net-preview" id="limite-preview" style="display:none;margin-top:14px">
+              <div style="font-size:11px;color:rgba(255,255,255,.45);margin-bottom:6px">Aperçu</div>
+              <div id="limite-preview-txt" style="font-size:13px;color:#e2e8f0"></div>
+            </div>
+          </div>
+          <div class="gi-modal-foot">
+            <button class="gi-btn-secondary" onclick="closeLimiteModal()">Annuler</button>
+            <button class="gi-btn-primary" onclick="submitLimite()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /page-depenses -->
 
     <!-- ══════════════════════════════════════════════════════ -->
@@ -6844,9 +6953,12 @@ function setStatus(ok){
   document.getElementById('status-dot').className='dot '+(ok?'dot-ok':'dot-err');
   document.getElementById('status-txt').textContent=ok?'En ligne':'Hors ligne';
 }
+let _appUser = null;
+
 async function loadCurrentUser(){
   try{
     const u=await GET('/me');
+    _appUser = u;
     document.getElementById('user-txt').textContent=u.nom_complet||u.username;
   }catch(e){
     document.getElementById('user-txt').textContent='—';
@@ -10370,6 +10482,13 @@ let _depData = [];
 
 async function loadDepenses(){
   _giLoading('dep-table-wrap');
+
+  // Affichage du bouton PDG et chargement de la limite en parallèle
+  if(_appUser?.role === 'pdg'){
+    const btnLimite = document.getElementById('dep-btn-limite');
+    if(btnLimite) btnLimite.style.display = '';
+  }
+
   const deb = document.getElementById('dep-filtre-debut')?.value ?? '';
   const fin = document.getElementById('dep-filtre-fin')?.value ?? '';
   const cat = document.getElementById('dep-filtre-cat')?.value ?? '';
@@ -10378,24 +10497,120 @@ async function loadDepenses(){
   if(fin) params.push('date_fin='+fin);
   if(cat) params.push('categorie='+encodeURIComponent(cat));
   const qs=params.length?'?'+params.join('&'):'';
-  try {
-    const d = await apiFetch('GET','/depenses'+qs);
-    _depData = d.depenses;
-    document.getElementById('dep-count').textContent       = d.nb;
-    document.getElementById('dep-kpi-total').textContent   = _htg(d.total);
-    document.getElementById('dep-kpi-nb').textContent      = d.nb;
-    const avg = d.nb ? Math.round(d.total/d.nb) : 0;
+
+  const [d, lim] = await Promise.allSettled([
+    apiFetch('GET','/depenses'+qs),
+    apiFetch('GET','/depenses/limite'),
+  ]);
+
+  if(d.status === 'fulfilled'){
+    _depData = d.value.depenses;
+    document.getElementById('dep-count').textContent       = d.value.nb;
+    document.getElementById('dep-kpi-total').textContent   = _htg(d.value.total);
+    document.getElementById('dep-kpi-nb').textContent      = d.value.nb;
+    const avg = d.value.nb ? Math.round(d.value.total/d.value.nb) : 0;
     document.getElementById('dep-kpi-avg').textContent     = _htg(avg);
     const catMap={};
     _depData.forEach(x=>{ catMap[x.categorie]=(catMap[x.categorie]||0)+x.montant; });
     const topCat=Object.entries(catMap).sort((a,b)=>b[1]-a[1])[0];
     document.getElementById('dep-kpi-cat').textContent     = topCat?topCat[0]:'—';
     renderDepTable(_depData);
-  } catch(e){
-    console.error('loadDepenses',e);
-    _giError('dep-table-wrap', e.message || 'Erreur de chargement des dépenses.');
+  } else {
+    _giError('dep-table-wrap', d.reason?.message || 'Erreur de chargement des dépenses.');
+  }
+
+  // Affichage de la barre de budget
+  if(lim.status === 'fulfilled' && lim.value.limite){
+    _depRenderBudget(lim.value);
+  } else {
+    const card = document.getElementById('dep-budget-card');
+    if(card) card.style.display = 'none';
   }
 }
+
+function _depRenderBudget(lim){
+  const card  = document.getElementById('dep-budget-card');
+  const fill  = document.getElementById('dep-budget-fill');
+  const pctEl = document.getElementById('dep-budget-pct');
+  const warn  = document.getElementById('dep-budget-warning');
+  const warnTxt = document.getElementById('dep-budget-warning-txt');
+  const btnNew  = document.getElementById('dep-btn-new');
+  if(!card) return;
+
+  if(!lim.active){
+    card.style.display = 'none';
+    if(btnNew) btnNew.disabled = false;
+    return;
+  }
+
+  card.style.display = '';
+  document.getElementById('dep-budget-spent').textContent = _htg(lim.total_mois);
+  document.getElementById('dep-budget-limit').textContent = _htg(lim.limite);
+  document.getElementById('dep-budget-month').textContent = lim.mois || '';
+
+  const pct   = lim.pct ?? 0;
+  const pctCapped = Math.min(100, pct);
+  fill.style.width = pctCapped + '%';
+
+  const isDanger = pct >= 90;
+  const isWarn   = pct >= 70 && pct < 90;
+
+  fill.className   = 'dep-budget-fill' + (isDanger ? ' danger' : isWarn ? ' warn' : '');
+  pctEl.className  = 'dep-budget-pct'  + (isDanger ? ' danger' : isWarn ? ' warn' : '');
+  pctEl.textContent = pct + '%';
+
+  if(pct >= 100){
+    warn.style.display = '';
+    warn.className = 'dep-budget-warning danger';
+    warnTxt.textContent = 'Limite atteinte — les nouvelles dépenses sont bloquées.';
+    if(btnNew && _appUser?.role !== 'pdg') btnNew.disabled = true;
+  } else if(pct >= 70){
+    warn.style.display = '';
+    warn.className = 'dep-budget-warning';
+    const restant = Math.max(0, lim.limite - lim.total_mois);
+    warnTxt.textContent = `Attention : ${pct}% du budget consommé. Reste : ${_htg(restant)}`;
+    if(btnNew) btnNew.disabled = false;
+  } else {
+    warn.style.display = 'none';
+    if(btnNew) btnNew.disabled = false;
+  }
+}
+
+// ── Limite budgétaire (PDG) ──────────────────────────────
+async function openLimiteModal(){
+  try {
+    const lim = await apiFetch('GET','/depenses/limite');
+    document.getElementById('limite-montant').value = lim.limite ?? '';
+    document.getElementById('limite-active').checked = lim.active !== false;
+    const prev = document.getElementById('limite-preview');
+    const prevTxt = document.getElementById('limite-preview-txt');
+    if(lim.limite){
+      prev.style.display = '';
+      prevTxt.innerHTML = `Dépenses ce mois : <b>${_htg(lim.total_mois)}</b> / ${_htg(lim.limite)} (${lim.pct ?? 0}%)`;
+    } else {
+      prev.style.display = 'none';
+    }
+  } catch(e){ /* pre-fill vide */ }
+  document.getElementById('limite-modal').classList.add('open');
+}
+
+function closeLimiteModal(){ document.getElementById('limite-modal').classList.remove('open'); }
+
+async function submitLimite(){
+  const raw = document.getElementById('limite-montant').value.trim();
+  const active = document.getElementById('limite-active').checked;
+  const limite = raw ? parseFloat(raw) : null;
+  if(raw && (isNaN(limite) || limite <= 0)){
+    _giAlert('Le montant doit être un nombre positif.'); return;
+  }
+  try {
+    await apiFetch('PUT','/depenses/limite',{limite, active});
+    closeLimiteModal();
+    loadDepenses();
+    _giAlert(limite ? `Limite fixée à ${_htg(limite)} / mois.` : 'Limite supprimée.', 'ok');
+  } catch(e){ _giAlert(e.message || 'Erreur lors de l\'enregistrement.'); }
+}
+// ────────────────────────────────────────────────────────
 
 function exportDepenses(fmt){
   const deb = document.getElementById('dep-filtre-debut')?.value ?? '';

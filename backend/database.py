@@ -19,7 +19,7 @@ try:
 except ImportError:
     pass
 
-from models import Base, Produit, Pompe, Utilisateur, Employe, FichePaie, Depense, Achat
+from models import Base, Produit, Pompe, Utilisateur, Employe, FichePaie, Depense, Achat, ParametreDepense
 
 # ── URL de connexion ──────────────────────────────────────────────
 DATABASE_URL = os.environ.get(
@@ -132,6 +132,20 @@ def _migrate_columns():
                 conn.execute(sql_text(ddl_col))
                 if ddl_idx:
                     conn.execute(sql_text(ddl_idx))
+
+        # v4 — rôle PDG : mise à jour de la contrainte CHECK sur utilisateurs
+        if _is_postgres:
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE utilisateurs DROP CONSTRAINT IF EXISTS chk_utilisateur_role"
+                ))
+                conn.execute(sql_text(
+                    "ALTER TABLE utilisateurs ADD CONSTRAINT chk_utilisateur_role "
+                    "CHECK (role IN ('admin', 'operateur', 'pdg'))"
+                ))
+            except Exception:
+                pass  # contrainte déjà à jour
+
         conn.commit()
 
 
