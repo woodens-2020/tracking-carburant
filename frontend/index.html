@@ -1792,6 +1792,90 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
 @media(max-width:900px){.gi-kpi-row{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.gi-kpi-row{grid-template-columns:1fr}.gi-form-row{grid-template-columns:1fr}}
+
+/* ═══════════════════════════════════════════════════════════════
+   ÉCRAN 1366 × 768 — Optimisations spécifiques
+   Cible : tout écran ≤ 1440 px de large OU ≤ 800 px de haut
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Sidebar plus compacte (libère ~44 px de largeur utile) ── */
+@media (max-width:1440px){
+  .sidebar{width:214px}
+  .sb-name{font-size:14.5px}
+  .sb-logo{width:38px;height:38px;border-radius:10px}
+  .sb-brand{padding:18px 14px 16px;gap:10px}
+  .nav-item{padding:9px 12px;font-size:12.5px}
+}
+
+/* ── Hauteur compressée : tout écran ≤ 800 px de haut ──────── */
+@media (max-height:800px){
+  /* Container de page */
+  .page{padding:14px 20px 14px}
+  .page-gi{padding-top:0}
+
+  /* Espacement interne des pages GI */
+  .gi-page{gap:11px}
+
+  /* Header GI : moins de padding, icône plus petite */
+  .gi-page-header{padding:13px 18px;gap:10px;border-radius:11px}
+  .gi-page-header-left{gap:12px}
+  .gi-page-header-icon{width:38px;height:38px;border-radius:9px}
+  .gi-page-header-icon svg{width:18px;height:18px}
+  .gi-title{font-size:17px}
+  .gi-subtitle{font-size:10.5px}
+  .gi-page-header-actions{gap:8px}
+
+  /* Boutons GI */
+  .gi-btn-primary{padding:8px 15px;font-size:12px;gap:6px;border-radius:8px}
+  .gi-btn-secondary{padding:7px 12px;font-size:12px;gap:5px;border-radius:8px}
+
+  /* Filtres */
+  .gi-filters{padding:9px 13px;gap:8px}
+  .gi-filter-input{padding:5px 9px;font-size:12px;min-width:115px;height:30px}
+  .gi-filter-lbl{font-size:9.5px}
+
+  /* KPI cards */
+  .gi-kpi-row{gap:10px}
+  .gi-kpi{padding:10px 13px;border-radius:8px}
+  .gi-kpi-lbl{font-size:9.5px;margin-bottom:4px}
+  .gi-kpi-val{font-size:18px}
+  .gi-kpi-sub{font-size:10px;margin-top:2px}
+
+  /* Tables */
+  .gi-table th{padding:8px 12px;font-size:10px}
+  .gi-table td{padding:9px 12px;font-size:12.5px}
+  .gi-table-hdr{padding:9px 14px}
+  .gi-table-title{font-size:12px}
+
+  /* Rapport de Caisse */
+  .caisse-cash-card{padding:16px 24px}
+  .caisse-cash-label{font-size:10px;margin-bottom:7px}
+  .caisse-cash-val{font-size:34px}
+  .caisse-cash-sub{font-size:11px;margin-top:7px}
+  .caisse-detail-grid{gap:11px}
+  .caisse-bar-row{padding:6px 0}
+  .caisse-bar-label{font-size:12px}
+  .caisse-bar-val{font-size:11.5px}
+
+  /* Modaux : réduit la hauteur max */
+  .modal-box{max-height:88vh}
+
+  /* Header principal */
+  .main-header{height:46px;padding:0 20px}
+  .main-title{font-size:15px}
+  .main-sub{font-size:10px}
+}
+
+/* ── Combiné 1366 × 768 : les deux contraintes simultanées ─── */
+@media (max-width:1440px) and (max-height:800px){
+  .sidebar{width:206px}
+  .page{padding:12px 18px 12px}
+  .gi-page{gap:10px}
+  .gi-page-header{padding:12px 16px}
+  .gi-kpi{padding:9px 12px}
+  .gi-kpi-val{font-size:17px}
+  .gi-filters{padding:8px 12px}
+}
 </style>
 </head>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
