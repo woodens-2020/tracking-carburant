@@ -3609,6 +3609,167 @@ def rapport_caisse(
     }
 
 
+# ══════════════════════════════════════════════════════════════════
+# TABLEAU DE BORD GI — Données agrégées pour le dashboard interactif
+# ══════════════════════════════════════════════════════════════════
+@app.get("/api/gi/dashboard")
+def gi_dashboard(
+    date_debut: Optional[date_type] = None,
+    date_fin:   Optional[date_type] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Agrège en un seul appel toutes les données du dashboard GI :
+    ventes, trend quotidien, employés, payroll, dépenses, achats, cash.
+    """
+    from datetime import date as _date, timedelta
+    from collections import defaultdict
+
+    today = _date.today()
+    if not date_debut:
+        date_debut = _date(today.year, today.month, 1)   # début du mois courant
+    if not date_fin:
+        date_fin = today
+
+    nb_jours = (date_fin - date_debut).days + 1
+
+    # ── Ventes (releves) ───────────────────────────────────────
+    releves = (db.query(Releve)
+               .filter(Releve.date >= date_debut, Releve.date <= date_fin)
+               .order_by(Releve.date)
+               .all())
+
+    total_ventes  = round(sum(float(r.montant_vente) for r in releves), 2)
+    total_gallons = round(sum(float(r.quantite) for r in releves), 3)
+    nb_releves    = len(releves)
+
+    # Trend quotidien (regroupe par jour)
+    trend_ventes: dict[str, float] = {}
+    trend_gallons: dict[str, float] = {}
+    for r in releves:
+        k = str(r.date)
+        trend_ventes[k]  = round(trend_ventes.get(k, 0)  + float(r.montant_vente), 2)
+        trend_gallons[k] = round(trend_gallons.get(k, 0) + float(r.quantite), 3)
+
+    # Ventes par produit
+    prod_map: dict = {}
+    for r in releves:
+        nom = r.pompe.produit.nom
+        e = prod_map.setdefault(nom, {"gallons": 0.0, "montant": 0.0})
+        e["gallons"]  += float(r.quantite)
+        e["montant"]  += float(r.montant_vente)
+    ventes_par_produit = [
+        {"produit": k, "gallons": round(v["gallons"], 3), "montant": round(v["montant"], 2)}
+        for k, v in prod_map.items()
+    ]
+
+    # ── Employés ───────────────────────────────────────────────
+    tous_employes  = db.query(Employe).all()
+    employes_actifs = [e for e in tous_employes if e.actif]
+    masse_salariale = round(sum(float(e.salaire_base) for e in employes_actifs), 2)
+    repartition_postes: dict = {}
+    for e in employes_actifs:
+        repartition_postes[e.poste] = repartition_postes.get(e.poste, 0) + 1
+
+    # ── Payroll ────────────────────────────────────────────────
+    fiches_payees = (db.query(FichePaie)
+                     .filter(FichePaie.statut == "paye",
+                             FichePaie.date_paiement >= date_debut,
+                             FichePaie.date_paiement <= date_fin)
+                     .all())
+    fiches_brou   = db.query(FichePaie).filter(FichePaie.statut == "brouillon").all()
+    total_payroll_paye   = round(sum(float(f.net_a_payer) for f in fiches_payees), 2)
+    total_payroll_engage = round(sum(float(f.net_a_payer) for f in fiches_brou), 2)
+
+    # ── Dépenses ───────────────────────────────────────────────
+    depenses = (db.query(Depense)
+                .filter(Depense.date_depense >= date_debut,
+                        Depense.date_depense <= date_fin)
+                .all())
+    total_depenses = round(sum(float(d.montant) for d in depenses), 2)
+    dep_par_cat: dict[str, float] = {}
+    for d in depenses:
+        dep_par_cat[d.categorie] = round(dep_par_cat.get(d.categorie, 0) + float(d.montant), 2)
+    dep_trend: dict[str, float] = {}
+    for d in depenses:
+        k = str(d.date_depense)
+        dep_trend[k] = round(dep_trend.get(k, 0) + float(d.montant), 2)
+
+    # ── Achats ─────────────────────────────────────────────────
+    achats = (db.query(Achat)
+              .filter(Achat.date_achat >= date_debut,
+                      Achat.date_achat <= date_fin)
+              .all())
+    total_achats = round(sum(float(a.montant) for a in achats), 2)
+    ach_par_cat: dict[str, float] = {}
+    for a in achats:
+        ach_par_cat[a.categorie] = round(ach_par_cat.get(a.categorie, 0) + float(a.montant), 2)
+
+    # ── Synthèse cash ──────────────────────────────────────────
+    total_sorties   = round(total_achats + total_payroll_paye + total_depenses, 2)
+    cash_disponible = round(total_ventes - total_sorties, 2)
+    marge_pct       = round(cash_disponible / total_ventes * 100, 1) if total_ventes else 0.0
+
+    # Série de jours pour le graphique (tous les jours de la période)
+    jours_serie = []
+    cur = date_debut
+    while cur <= date_fin:
+        k = str(cur)
+        jours_serie.append({
+            "date":     k,
+            "ventes":   trend_ventes.get(k, 0),
+            "gallons":  trend_gallons.get(k, 0),
+            "depenses": dep_trend.get(k, 0),
+        })
+        cur += timedelta(days=1)
+
+    return {
+        "periode": {"debut": str(date_debut), "fin": str(date_fin), "nb_jours": nb_jours},
+        "ventes": {
+            "total":       total_ventes,
+            "gallons":     total_gallons,
+            "nb_releves":  nb_releves,
+            "par_produit": ventes_par_produit,
+        },
+        "employes": {
+            "total":           len(tous_employes),
+            "actifs":          len(employes_actifs),
+            "masse_salariale": masse_salariale,
+            "par_poste":       [{"poste": k, "nb": v} for k, v in
+                                sorted(repartition_postes.items(), key=lambda x: -x[1])],
+        },
+        "payroll": {
+            "paye":                total_payroll_paye,
+            "engage":              total_payroll_engage,
+            "nb_fiches_payees":    len(fiches_payees),
+            "nb_fiches_engage":    len(fiches_brou),
+        },
+        "depenses": {
+            "total":       total_depenses,
+            "nb":          len(depenses),
+            "par_categorie": sorted(
+                [{"categorie": k, "montant": v} for k, v in dep_par_cat.items()],
+                key=lambda x: -x["montant"],
+            ),
+        },
+        "achats": {
+            "total":       total_achats,
+            "nb":          len(achats),
+            "par_categorie": sorted(
+                [{"categorie": k, "montant": v} for k, v in ach_par_cat.items()],
+                key=lambda x: -x["montant"],
+            ),
+        },
+        "synthese": {
+            "total_sorties":    total_sorties,
+            "cash_disponible":  cash_disponible,
+            "marge_pct":        marge_pct,
+            "cash_apres_engage": round(cash_disponible - total_payroll_engage, 2),
+        },
+        "trend": jours_serie,
+    }
+
+
 # ---------- Frontend single-file ----------
 @app.get("/", include_in_schema=False)
 def serve_index():

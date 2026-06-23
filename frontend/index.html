@@ -1714,6 +1714,58 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .gi-table td{font-size:13px;color:var(--text1);padding:11px 16px;border-bottom:1px solid rgba(255,255,255,.04)}
 .gi-table tr:last-child td{border-bottom:none}
 .gi-table tr:hover td{background:rgba(255,255,255,.025)}
+/* ── Tableau de Bord GI ── */
+.gid-period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gid-period-btn{
+  padding:6px 14px;border-radius:20px;font-size:11.5px;font-weight:700;cursor:pointer;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  color:rgba(255,255,255,.6);transition:all .15s}
+.gid-period-btn:hover{background:rgba(167,139,250,.15);border-color:rgba(167,139,250,.4);color:#c4b5fd}
+.gid-period-btn.active{background:rgba(167,139,250,.2);border-color:#a78bfa;color:#c4b5fd;
+  box-shadow:0 0 12px rgba(167,139,250,.2)}
+.gid-kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.gid-kpi{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:16px 18px;position:relative;overflow:hidden;
+  transition:transform .15s,box-shadow .15s}
+.gid-kpi:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.gid-kpi-accent{position:absolute;top:0;left:0;right:0;height:3px;border-radius:12px 12px 0 0}
+.gid-kpi-icon{
+  width:34px;height:34px;border-radius:9px;display:flex;align-items:center;
+  justify-content:center;margin-bottom:10px}
+.gid-kpi-icon svg{width:16px;height:16px}
+.gid-kpi-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:4px}
+.gid-kpi-val{font-size:20px;font-weight:900;letter-spacing:-.03em;color:var(--text1);line-height:1.1}
+.gid-kpi-sub{font-size:10.5px;color:var(--muted);margin-top:4px}
+.gid-kpi-trend{font-size:10px;font-weight:700;margin-top:3px}
+.gid-chart-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.gid-chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.gid-chart-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.gid-chart-title{font-size:13px;font-weight:700;color:var(--text1)}
+.gid-chart-sub{font-size:10.5px;color:var(--muted)}
+.gid-chart-body{padding:16px;position:relative}
+.gid-bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.gid-cat-row{display:flex;align-items:center;gap:10px;padding:7px 0;
+  border-bottom:1px solid rgba(255,255,255,.04)}
+.gid-cat-row:last-child{border-bottom:none}
+.gid-cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.gid-cat-name{font-size:12px;color:var(--text1);flex:1;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gid-cat-bar-wrap{width:90px;background:rgba(255,255,255,.06);border-radius:3px;
+  height:5px;overflow:hidden;flex-shrink:0}
+.gid-cat-bar{height:100%;border-radius:3px;transition:width .6s ease}
+.gid-cat-val{font-size:11px;font-weight:700;color:var(--text2);min-width:80px;text-align:right;flex-shrink:0}
+.gid-stat-row{display:flex;align-items:center;justify-content:space-between;
+  padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.gid-stat-row:last-child{border-bottom:none}
+.gid-stat-lbl{font-size:12px;color:var(--muted)}
+.gid-stat-val{font-size:12.5px;font-weight:700;color:var(--text1)}
+.gid-empty{color:var(--muted);font-size:12px;padding:20px 0;text-align:center}
+.gid-alert{
+  display:flex;align-items:center;gap:10px;
+  background:rgba(247,169,59,.08);border:1px solid rgba(247,169,59,.25);
+  border-radius:8px;padding:10px 14px;font-size:12px;color:#f7a93b}
 /* ── Rapport de Caisse ── */
 .caisse-cash-card{
   background:linear-gradient(135deg,rgba(34,197,94,.15) 0%,rgba(11,22,40,.95) 70%);
@@ -1866,6 +1918,19 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   .main-sub{font-size:10px}
 }
 
+/* ── Dashboard GI responsive ─────────────────────────────── */
+@media (max-width:1200px){
+  .gid-kpi-grid{grid-template-columns:repeat(3,1fr)}
+  .gid-chart-grid{grid-template-columns:1fr}
+  .gid-bottom-grid{grid-template-columns:1fr}
+}
+@media (max-height:800px){
+  .gid-kpi-val{font-size:17px}
+  .gid-kpi{padding:12px 14px}
+  .gid-chart-body{padding:10px}
+  .gid-chart-body[style*="220px"]{height:180px!important}
+}
+
 /* ── Combiné 1366 × 768 : les deux contraintes simultanées ─── */
 @media (max-width:1440px) and (max-height:800px){
   .sidebar{width:206px}
@@ -1997,6 +2062,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </button>
 
     <div class="nav-section">Gestion</div>
+
+    <button class="nav-item" data-page="gi-dashboard" onclick="goTo('gi-dashboard')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      </span>
+      <span>Tableau de Bord</span>
+      <span class="nav-active-dot"></span>
+    </button>
 
     <button class="nav-item" data-page="employes" onclick="goTo('employes')">
       <span class="nav-icon">
@@ -3284,6 +3357,192 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- PAGE EMPLOYÉS                                           -->
     <!-- ══════════════════════════════════════════════════════ -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE TABLEAU DE BORD GI                               -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-gi-dashboard" class="page page-gi">
+      <div class="gi-page">
+
+        <!-- Header -->
+        <div class="gi-page-header" style="--gi-accent:#a78bfa;background:linear-gradient(135deg,rgba(167,139,250,.13) 0%,rgba(11,22,40,.95) 60%);border-color:rgba(167,139,250,.22)">
+          <div class="gi-page-header-left">
+            <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(167,139,250,.25),rgba(167,139,250,.1));border-color:rgba(167,139,250,.3);box-shadow:0 0 18px rgba(167,139,250,.2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            </div>
+            <div class="gi-page-header-text">
+              <div class="gi-title">Tableau de Bord</div>
+              <div class="gi-subtitle">Vue analytique consolidée · Ventes · Employés · Payroll · Dépenses · Cash</div>
+            </div>
+          </div>
+          <div class="gi-page-header-actions">
+            <!-- Filtres période -->
+            <div class="gid-period-bar">
+              <button class="gid-period-btn active" data-days="30"  onclick="gidSetPeriod(30,this)">30 j</button>
+              <button class="gid-period-btn"         data-days="90"  onclick="gidSetPeriod(90,this)">3 mois</button>
+              <button class="gid-period-btn"         data-days="180" onclick="gidSetPeriod(180,this)">6 mois</button>
+              <button class="gid-period-btn"         data-days="365" onclick="gidSetPeriod(365,this)">1 an</button>
+              <button class="gid-period-btn"         data-days="0"   onclick="gidSetPeriod(0,this)">Tout</button>
+            </div>
+            <button class="gi-btn-secondary" onclick="loadGiDashboard()" style="margin-left:4px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Row — 5 cartes -->
+        <div class="gid-kpi-grid">
+          <div class="gid-kpi">
+            <div class="gid-kpi-accent" style="background:#22c55e"></div>
+            <div class="gid-kpi-icon" style="background:rgba(34,197,94,.12)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div class="gid-kpi-lbl">Total Ventes</div>
+            <div class="gid-kpi-val" id="gid-kpi-ventes" style="color:#22c55e">—</div>
+            <div class="gid-kpi-sub" id="gid-kpi-ventes-sub">—</div>
+          </div>
+          <div class="gid-kpi">
+            <div class="gid-kpi-accent" id="gid-cash-accent" style="background:#22c55e"></div>
+            <div class="gid-kpi-icon" id="gid-cash-icon" style="background:rgba(34,197,94,.12)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            </div>
+            <div class="gid-kpi-lbl">Cash Disponible</div>
+            <div class="gid-kpi-val" id="gid-kpi-cash" style="color:#22c55e">—</div>
+            <div class="gid-kpi-sub" id="gid-kpi-cash-sub">—</div>
+          </div>
+          <div class="gid-kpi">
+            <div class="gid-kpi-accent" style="background:#60a5fa"></div>
+            <div class="gid-kpi-icon" style="background:rgba(96,165,250,.12)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="gid-kpi-lbl">Employés Actifs</div>
+            <div class="gid-kpi-val" id="gid-kpi-emp" style="color:#60a5fa">—</div>
+            <div class="gid-kpi-sub" id="gid-kpi-emp-sub">—</div>
+          </div>
+          <div class="gid-kpi">
+            <div class="gid-kpi-accent" style="background:#3fb6a8"></div>
+            <div class="gid-kpi-icon" style="background:rgba(63,182,168,.12)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#3fb6a8" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            </div>
+            <div class="gid-kpi-lbl">Payroll Versé</div>
+            <div class="gid-kpi-val" id="gid-kpi-payroll" style="color:#3fb6a8">—</div>
+            <div class="gid-kpi-sub" id="gid-kpi-payroll-sub">—</div>
+          </div>
+          <div class="gid-kpi">
+            <div class="gid-kpi-accent" style="background:#f87171"></div>
+            <div class="gid-kpi-icon" style="background:rgba(248,113,113,.12)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            </div>
+            <div class="gid-kpi-lbl">Total Sorties</div>
+            <div class="gid-kpi-val" id="gid-kpi-sorties" style="color:#f87171">—</div>
+            <div class="gid-kpi-sub" id="gid-kpi-sorties-sub">—</div>
+          </div>
+        </div>
+
+        <!-- Alerte payroll engagé (si applicable) -->
+        <div id="gid-alert-engage" style="display:none" class="gid-alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span id="gid-alert-engage-txt"></span>
+        </div>
+
+        <!-- Graphiques principaux -->
+        <div class="gid-chart-grid">
+          <!-- Évolution ventes vs dépenses -->
+          <div class="gid-chart-card">
+            <div class="gid-chart-hdr">
+              <div>
+                <div class="gid-chart-title">Évolution Ventes &amp; Sorties</div>
+                <div class="gid-chart-sub">Ventes journalières vs dépenses cumulées</div>
+              </div>
+              <div style="display:flex;gap:12px;font-size:10.5px">
+                <span style="display:flex;align-items:center;gap:4px;color:var(--muted)">
+                  <span style="width:10px;height:3px;background:#22c55e;border-radius:2px;display:inline-block"></span>Ventes
+                </span>
+                <span style="display:flex;align-items:center;gap:4px;color:var(--muted)">
+                  <span style="width:10px;height:3px;background:#f87171;border-radius:2px;display:inline-block"></span>Dépenses
+                </span>
+              </div>
+            </div>
+            <div class="gid-chart-body" style="height:220px">
+              <canvas id="gid-chart-trend"></canvas>
+            </div>
+          </div>
+
+          <!-- Donut répartition financière -->
+          <div class="gid-chart-card">
+            <div class="gid-chart-hdr">
+              <div>
+                <div class="gid-chart-title">Répartition Financière</div>
+                <div class="gid-chart-sub">Cash · Achats · Payroll · Dépenses</div>
+              </div>
+            </div>
+            <div class="gid-chart-body" style="height:220px;display:flex;align-items:center;justify-content:center">
+              <canvas id="gid-chart-donut" style="max-height:190px;max-width:190px"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ligne du bas : Dépenses par catégorie + Stats RH & Achats -->
+        <div class="gid-bottom-grid">
+
+          <!-- Dépenses par catégorie -->
+          <div class="gid-chart-card">
+            <div class="gid-chart-hdr">
+              <div class="gid-chart-title">Dépenses par Catégorie</div>
+              <div class="gid-chart-sub" id="gid-dep-total-sub"></div>
+            </div>
+            <div style="padding:14px 18px" id="gid-dep-cat-wrap">
+              <div class="gid-empty">Chargement…</div>
+            </div>
+          </div>
+
+          <!-- Stats RH + Achats -->
+          <div class="gid-chart-card">
+            <div class="gid-chart-hdr">
+              <div class="gid-chart-title">Ressources Humaines &amp; Achats</div>
+            </div>
+            <div style="padding:14px 18px">
+              <!-- RH -->
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#60a5fa;margin-bottom:8px">Équipe</div>
+              <div id="gid-rh-wrap">
+                <div class="gid-stat-row">
+                  <span class="gid-stat-lbl">Effectif total</span>
+                  <span class="gid-stat-val" id="gid-stat-total-emp">—</span>
+                </div>
+                <div class="gid-stat-row">
+                  <span class="gid-stat-lbl">Actifs</span>
+                  <span class="gid-stat-val" id="gid-stat-actifs">—</span>
+                </div>
+                <div class="gid-stat-row">
+                  <span class="gid-stat-lbl">Masse salariale mensuelle</span>
+                  <span class="gid-stat-val" id="gid-stat-masse">—</span>
+                </div>
+                <div class="gid-stat-row">
+                  <span class="gid-stat-lbl">Fiches payroll versées</span>
+                  <span class="gid-stat-val" id="gid-stat-fiches">—</span>
+                </div>
+              </div>
+              <div style="height:1px;background:var(--border);margin:12px 0"></div>
+              <!-- Achats -->
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#f7a93b;margin-bottom:8px">Achats</div>
+              <div id="gid-ach-wrap">
+                <div class="gid-stat-row">
+                  <span class="gid-stat-lbl">Total achats période</span>
+                  <span class="gid-stat-val" id="gid-stat-ach-total">—</span>
+                </div>
+                <div class="gid-stat-row">
+                  <span class="gid-stat-lbl">Nombre d'achats</span>
+                  <span class="gid-stat-val" id="gid-stat-ach-nb">—</span>
+                </div>
+                <div id="gid-ach-cats-wrap"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div><!-- /page-gi-dashboard -->
+
     <div id="page-employes" class="page page-gi">
       <div class="gi-page">
         <div class="gi-page-header" style="--gi-accent:#60a5fa">
@@ -4539,6 +4798,7 @@ const PAGE_META={
   payroll:             {title: 'Payroll',                        sub: 'Fiches de paie et gestion des rémunérations'},
   depenses:            {title: 'Dépenses Opérationnelles',       sub: 'Charges et coûts de la station'},
   achats:              {title: 'Gestion des Achats',             sub: 'Matériel, équipements et fournitures'},
+  'gi-dashboard':      {title: 'Tableau de Bord Gestion',        sub: 'Vue analytique consolidée — Ventes · Employés · Payroll · Dépenses · Cash'},
   caisse:              {title: 'Rapport de Caisse',              sub: 'Synthèse financière consolidée — Ventes · Achats · Payroll · Dépenses'},
 };
 
@@ -9865,12 +10125,242 @@ async function supprimerAchat(id){
 
 /* ── Chargement automatique à la navigation ── */
 const _giPageLoaders = {
-  employes: loadEmployes,
-  payroll:  loadPayroll,
-  depenses: loadDepenses,
-  achats:   loadAchats,
-  caisse:   loadCaisse,
+  'gi-dashboard': loadGiDashboard,
+  employes:       loadEmployes,
+  payroll:        loadPayroll,
+  depenses:       loadDepenses,
+  achats:         loadAchats,
+  caisse:         loadCaisse,
 };
+
+// ══════════════════════════════════════════════════════════════
+// TABLEAU DE BORD GI
+// ══════════════════════════════════════════════════════════════
+
+let _gidChartTrend  = null;
+let _gidChartDonut  = null;
+let _gidDays        = 30;
+
+function gidSetPeriod(days, btn){
+  _gidDays = days;
+  document.querySelectorAll('.gid-period-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadGiDashboard();
+}
+
+function _gidDateRange(){
+  const today = new Date();
+  if(_gidDays === 0) return {debut:'', fin:''};
+  const debut = new Date(today);
+  debut.setDate(today.getDate() - _gidDays + 1);
+  return {
+    debut: debut.toISOString().slice(0,10),
+    fin:   today.toISOString().slice(0,10),
+  };
+}
+
+async function loadGiDashboard(){
+  const {debut, fin} = _gidDateRange();
+  const params = [];
+  if(debut) params.push('date_debut='+debut);
+  if(fin)   params.push('date_fin='+fin);
+  const qs = params.length ? '?'+params.join('&') : '';
+
+  try {
+    const d = await apiFetch('GET', '/gi/dashboard'+qs);
+
+    // ── KPI ──────────────────────────────────────────────────
+    document.getElementById('gid-kpi-ventes').textContent      = _htg(d.ventes.total);
+    document.getElementById('gid-kpi-ventes-sub').textContent  =
+      d.ventes.gallons.toLocaleString('fr',{minimumFractionDigits:2})+' gal · '+d.ventes.nb_releves+' relevés';
+
+    const cash = d.synthese.cash_disponible;
+    const cashEl = document.getElementById('gid-kpi-cash');
+    cashEl.textContent = _htg(cash);
+    cashEl.style.color = cash >= 0 ? '#22c55e' : '#f87171';
+    document.getElementById('gid-kpi-cash-sub').textContent =
+      'Marge : '+(cash >= 0 ? '+' : '')+d.synthese.marge_pct+'%';
+
+    document.getElementById('gid-kpi-emp').textContent         = d.employes.actifs;
+    document.getElementById('gid-kpi-emp-sub').textContent     =
+      d.employes.total+' total · masse '+_htg(d.employes.masse_salariale);
+
+    document.getElementById('gid-kpi-payroll').textContent     = _htg(d.payroll.paye);
+    document.getElementById('gid-kpi-payroll-sub').textContent = d.payroll.nb_fiches_payees+' fiche(s) versée(s)';
+
+    document.getElementById('gid-kpi-sorties').textContent     = _htg(d.synthese.total_sorties);
+    document.getElementById('gid-kpi-sorties-sub').textContent =
+      'Dép '+_htg(d.depenses.total)+' · Ach '+_htg(d.achats.total);
+
+    // ── Alerte payroll engagé ────────────────────────────────
+    const alertEl = document.getElementById('gid-alert-engage');
+    if(d.payroll.engage > 0){
+      alertEl.style.display = 'flex';
+      document.getElementById('gid-alert-engage-txt').textContent =
+        d.payroll.nb_fiches_engage+' fiche(s) en attente de paiement — '+
+        _htg(d.payroll.engage)+' à verser · Cash estimé après versement : '+
+        _htg(d.synthese.cash_apres_engage);
+    } else {
+      alertEl.style.display = 'none';
+    }
+
+    // ── Graphique trend (barres ventes + ligne dépenses) ─────
+    const labels   = d.trend.map(t => {
+      const dt = new Date(t.date+'T00:00:00');
+      return dt.toLocaleDateString('fr',{day:'2-digit',month:'2-digit'});
+    });
+    const dataVentes  = d.trend.map(t => t.ventes);
+    const dataDep     = d.trend.map(t => t.depenses);
+
+    if(_gidChartTrend){ _gidChartTrend.destroy(); _gidChartTrend = null; }
+    const ctxT = document.getElementById('gid-chart-trend').getContext('2d');
+    _gidChartTrend = new Chart(ctxT, {
+      data: {
+        labels,
+        datasets: [
+          {
+            type: 'bar',
+            label: 'Ventes',
+            data: dataVentes,
+            backgroundColor: 'rgba(34,197,94,.55)',
+            borderColor: '#22c55e',
+            borderWidth: 1,
+            borderRadius: 3,
+            yAxisID: 'y',
+          },
+          {
+            type: 'line',
+            label: 'Dépenses',
+            data: dataDep,
+            borderColor: '#f87171',
+            backgroundColor: 'rgba(248,113,113,.08)',
+            borderWidth: 2,
+            pointRadius: dataDep.some(v=>v>0) ? 3 : 0,
+            tension: 0.4,
+            fill: true,
+            yAxisID: 'y',
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ' '+ctx.dataset.label+' : '+_htg(ctx.raw),
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: '#64748b', font:{size:9},
+              maxTicksLimit: _gidDays <= 30 ? 15 : _gidDays <= 90 ? 12 : 8,
+            },
+            grid: { color: 'rgba(255,255,255,.04)' },
+          },
+          y: {
+            ticks: {
+              color: '#64748b', font:{size:9},
+              callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' :
+                             v >= 1000    ? (v/1000).toFixed(0)+'k' : v,
+            },
+            grid: { color: 'rgba(255,255,255,.06)' },
+          },
+        },
+      },
+    });
+
+    // ── Donut répartition ────────────────────────────────────
+    const dCash   = Math.max(0, cash);
+    const dAch    = d.achats.total;
+    const dPay    = d.payroll.paye;
+    const dDep    = d.depenses.total;
+    const hasData = (dCash + dAch + dPay + dDep) > 0;
+
+    if(_gidChartDonut){ _gidChartDonut.destroy(); _gidChartDonut = null; }
+    const ctxD = document.getElementById('gid-chart-donut').getContext('2d');
+    _gidChartDonut = new Chart(ctxD, {
+      type: 'doughnut',
+      data: {
+        labels: ['Cash dispo','Achats','Payroll','Dépenses'],
+        datasets:[{
+          data: hasData ? [dCash, dAch, dPay, dDep] : [1,0,0,0],
+          backgroundColor: ['#22c55e','#f7a93b','#3fb6a8','#f87171'],
+          borderColor: ['#0b1628'],
+          borderWidth: 3,
+          hoverOffset: 6,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '68%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ' '+ctx.label+' : '+_htg(ctx.raw),
+            },
+          },
+        },
+      },
+    });
+
+    // ── Dépenses par catégorie ────────────────────────────────
+    const depCats = d.depenses.par_categorie;
+    const depTotal = d.depenses.total;
+    document.getElementById('gid-dep-total-sub').textContent = _htg(depTotal);
+    const catColors = ['#f87171','#fca5a5','#f97316','#fb923c','#fbbf24','#a78bfa','#60a5fa','#34d399','#94a3b8','#cbd5e1'];
+    const depWrap = document.getElementById('gid-dep-cat-wrap');
+    if(!depCats.length){
+      depWrap.innerHTML = '<div class="gid-empty">Aucune dépense sur cette période</div>';
+    } else {
+      const maxDep = depCats[0].montant || 1;
+      depWrap.innerHTML = depCats.map((c,i) => `
+        <div class="gid-cat-row">
+          <div class="gid-cat-dot" style="background:${catColors[i%catColors.length]}"></div>
+          <div class="gid-cat-name">${c.categorie}</div>
+          <div class="gid-cat-bar-wrap">
+            <div class="gid-cat-bar" style="width:${Math.round(c.montant/maxDep*100)}%;background:${catColors[i%catColors.length]}"></div>
+          </div>
+          <div class="gid-cat-val">${_htg(c.montant)}</div>
+        </div>`).join('');
+    }
+
+    // ── RH stats ─────────────────────────────────────────────
+    document.getElementById('gid-stat-total-emp').textContent = d.employes.total;
+    document.getElementById('gid-stat-actifs').textContent    = d.employes.actifs;
+    document.getElementById('gid-stat-masse').textContent     = _htg(d.employes.masse_salariale);
+    document.getElementById('gid-stat-fiches').textContent    = d.payroll.nb_fiches_payees;
+
+    // ── Achats ────────────────────────────────────────────────
+    document.getElementById('gid-stat-ach-total').textContent = _htg(d.achats.total);
+    document.getElementById('gid-stat-ach-nb').textContent    = d.achats.nb;
+    const achCats = d.achats.par_categorie;
+    const achWrap = document.getElementById('gid-ach-cats-wrap');
+    if(achCats.length){
+      const maxAch = achCats[0].montant || 1;
+      achWrap.innerHTML = achCats.map((c,i) => `
+        <div class="gid-cat-row">
+          <div class="gid-cat-dot" style="background:${catColors[i%catColors.length]}"></div>
+          <div class="gid-cat-name">${c.categorie}</div>
+          <div class="gid-cat-bar-wrap">
+            <div class="gid-cat-bar" style="width:${Math.round(c.montant/maxAch*100)}%;background:#f7a93b"></div>
+          </div>
+          <div class="gid-cat-val">${_htg(c.montant)}</div>
+        </div>`).join('');
+    } else {
+      achWrap.innerHTML = '<div class="gid-empty">Aucun achat sur cette période</div>';
+    }
+
+  } catch(e){
+    console.error('loadGiDashboard', e);
+  }
+}
 
 // ══════════════════════════════════════════════════════════════
 // RAPPORT DE CAISSE
