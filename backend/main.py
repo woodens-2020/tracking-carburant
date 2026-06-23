@@ -2971,6 +2971,410 @@ def stats_depenses(
 
 
 # ══════════════════════════════════════════════════════════════════
+# EXPORTS DÉPENSES — PDF + XLSX
+# ══════════════════════════════════════════════════════════════════
+
+def _query_depenses_filtrees(db, date_debut, date_fin, categorie):
+    """Requête dépenses avec filtres optionnels, triées par date desc."""
+    from datetime import date as _date
+    q = db.query(Depense)
+    if date_debut:
+        try:    q = q.filter(Depense.date_depense >= _date.fromisoformat(date_debut))
+        except ValueError: pass
+    if date_fin:
+        try:    q = q.filter(Depense.date_depense <= _date.fromisoformat(date_fin))
+        except ValueError: pass
+    if categorie:
+        q = q.filter(Depense.categorie == categorie)
+    return q.order_by(Depense.date_depense.desc()).all()
+
+
+@app.get("/api/depenses/export/xlsx")
+def export_depenses_xlsx(
+    date_debut: Optional[str] = None,
+    date_fin:   Optional[str] = None,
+    categorie:  Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Export Excel des dépenses avec feuille détail + feuille récapitulatif par catégorie."""
+    import io
+    from datetime import date as date_cls
+    from collections import defaultdict
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, numbers
+    from openpyxl.utils import get_column_letter
+
+    depenses = _query_depenses_filtrees(db, date_debut, date_fin, categorie)
+
+    # ── Styles ──────────────────────────────────────────────────
+    def _fill(hex_c):
+        return PatternFill("solid", fgColor=hex_c)
+    def _font(bold=False, color="1E293B", size=10, italic=False):
+        return Font(name="Calibri", bold=bold, color=color, size=size, italic=italic)
+    def _al(h="left", v="center", wrap=False):
+        return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
+    def _bd():
+        s = Side(style="thin", color="CBD5E1")
+        return Border(left=s, right=s, top=s, bottom=s)
+
+    HDR_BG   = _fill("F87171")   # rouge dépenses
+    HDR_FG   = _font(bold=True, color="FFFFFF", size=11)
+    TOT_BG   = _fill("FEE2E2")
+    TOT_FG   = _font(bold=True, color="7F1D1D", size=11)
+    ODD_BG   = _fill("FFF8F8")
+    EVN_BG   = _fill("FFFFFF")
+    CAT_BG   = _fill("FEF2F2")
+
+    MONEY_FMT = "#,##0.00"
+    DATE_FMT  = "DD/MM/YYYY"
+
+    # ══════════════════════════════════════════════════════════
+    # Feuille 1 — Détail des dépenses
+    # ══════════════════════════════════════════════════════════
+    wb  = Workbook()
+    ws1 = wb.active
+    ws1.title = "Dépenses"
+
+    # Titre
+    ws1.merge_cells("A1:H1")
+    c = ws1.cell(1, 1, "PétroSync — Rapport des Dépenses Opérationnelles")
+    c.font      = Font(name="Calibri", bold=True, size=14, color="DC2626")
+    c.alignment = _al("center")
+    ws1.row_dimensions[1].height = 24
+
+    # Sous-titre
+    periode_txt = ""
+    if date_debut or date_fin:
+        periode_txt = f"  ·  Période : {date_debut or '…'} → {date_fin or '…'}"
+    if categorie:
+        periode_txt += f"  ·  Catégorie : {categorie}"
+    info = f"Exporté le {date_cls.today().strftime('%d/%m/%Y')}  ·  {len(depenses)} dépense(s){periode_txt}"
+    ws1.merge_cells("A2:H2")
+    c2 = ws1.cell(2, 1, info)
+    c2.font      = Font(name="Calibri", size=9, color="94A3B8", italic=True)
+    c2.alignment = _al("center")
+    ws1.row_dimensions[2].height = 14
+
+    ws1.row_dimensions[3].height = 6  # spacer
+
+    # En-têtes colonnes
+    headers = ["#", "Date", "Catégorie", "Description", "Bénéficiaire", "Référence", "Montant (HTG)", "Notes"]
+    col_widths = [5, 14, 18, 40, 24, 18, 16, 30]
+    for ci, (h, w) in enumerate(zip(headers, col_widths), 1):
+        c = ws1.cell(4, ci, h)
+        c.font      = HDR_FG
+        c.fill      = HDR_BG
+        c.alignment = _al("center" if ci in (1, 7) else "left")
+        c.border    = _bd()
+        ws1.column_dimensions[get_column_letter(ci)].width = w
+    ws1.row_dimensions[4].height = 18
+
+    # Lignes de données
+    total = 0.0
+    par_cat = defaultdict(float)
+    for ri, d in enumerate(depenses, 5):
+        bg = ODD_BG if ri % 2 == 1 else EVN_BG
+        vals = [ri - 4, d.date_depense, d.categorie, d.description,
+                d.beneficiaire or "", d.reference or "", float(d.montant), d.notes or ""]
+        for ci, val in enumerate(vals, 1):
+            c = ws1.cell(ri, ci, val)
+            c.fill      = bg
+            c.border    = _bd()
+            c.alignment = _al("center" if ci == 1 else ("right" if ci == 7 else "left"),
+                               wrap=ci in (4, 8))
+            c.font      = _font()
+            if ci == 7:
+                c.number_format = MONEY_FMT
+            if ci == 2 and isinstance(val, __import__('datetime').date):
+                c.number_format = DATE_FMT
+        ws1.row_dimensions[ri].height = 16
+        total += float(d.montant)
+        par_cat[d.categorie] += float(d.montant)
+
+    # Ligne total
+    row_tot = len(depenses) + 5
+    ws1.merge_cells(f"A{row_tot}:F{row_tot}")
+    c = ws1.cell(row_tot, 1, "TOTAL")
+    c.font = TOT_FG;  c.fill = TOT_BG;  c.alignment = _al("right");  c.border = _bd()
+    ct = ws1.cell(row_tot, 7, round(total, 2))
+    ct.font = TOT_FG;  ct.fill = TOT_BG;  ct.alignment = _al("right")
+    ct.border = _bd();  ct.number_format = MONEY_FMT
+    ws1.cell(row_tot, 8).fill = TOT_BG
+    ws1.row_dimensions[row_tot].height = 18
+
+    # Figer la ligne d'en-têtes
+    ws1.freeze_panes = "A5"
+
+    # ══════════════════════════════════════════════════════════
+    # Feuille 2 — Récapitulatif par catégorie
+    # ══════════════════════════════════════════════════════════
+    ws2 = wb.create_sheet("Par Catégorie")
+
+    ws2.merge_cells("A1:D1")
+    c = ws2.cell(1, 1, "Récapitulatif par catégorie")
+    c.font = Font(name="Calibri", bold=True, size=13, color="DC2626")
+    c.alignment = _al("center")
+    ws2.row_dimensions[1].height = 22
+
+    ws2.row_dimensions[2].height = 6
+    hdr2 = ["Catégorie", "Nb dépenses", "Montant total (HTG)", "Part (%)"]
+    ws2.column_dimensions["A"].width = 22
+    ws2.column_dimensions["B"].width = 14
+    ws2.column_dimensions["C"].width = 20
+    ws2.column_dimensions["D"].width = 12
+    for ci, h in enumerate(hdr2, 1):
+        c = ws2.cell(3, ci, h)
+        c.font = HDR_FG;  c.fill = HDR_BG
+        c.alignment = _al("center" if ci > 1 else "left")
+        c.border = _bd()
+    ws2.row_dimensions[3].height = 18
+
+    cats_sorted = sorted(par_cat.items(), key=lambda x: -x[1])
+    grand = sum(par_cat.values()) or 1
+    nb_by_cat = defaultdict(int)
+    for d in depenses:
+        nb_by_cat[d.categorie] += 1
+
+    for ri, (cat, mnt) in enumerate(cats_sorted, 4):
+        pct = round(mnt / grand * 100, 1)
+        bg = ODD_BG if ri % 2 == 1 else EVN_BG
+        row_data = [cat, nb_by_cat[cat], round(mnt, 2), pct]
+        for ci, val in enumerate(row_data, 1):
+            c = ws2.cell(ri, ci, val)
+            c.fill = bg;  c.border = _bd()
+            c.alignment = _al("center" if ci > 1 else "left")
+            c.font = _font()
+            if ci == 3: c.number_format = MONEY_FMT
+            if ci == 4: c.number_format = "0.0\"%\""
+        ws2.row_dimensions[ri].height = 15
+
+    # Ligne total récap
+    row_t2 = len(cats_sorted) + 4
+    ws2.cell(row_t2, 1, "TOTAL").font = TOT_FG
+    ws2.cell(row_t2, 1).fill  = TOT_BG;  ws2.cell(row_t2, 1).border = _bd()
+    ws2.cell(row_t2, 2, sum(nb_by_cat.values())).font = TOT_FG
+    ws2.cell(row_t2, 2).fill  = TOT_BG;  ws2.cell(row_t2, 2).border = _bd()
+    ws2.cell(row_t2, 2).alignment = _al("center")
+    c_t = ws2.cell(row_t2, 3, round(grand, 2))
+    c_t.font = TOT_FG;  c_t.fill = TOT_BG;  c_t.border = _bd()
+    c_t.number_format = MONEY_FMT;  c_t.alignment = _al("center")
+    ws2.cell(row_t2, 4, 100).font = TOT_FG
+    ws2.cell(row_t2, 4).fill = TOT_BG;  ws2.cell(row_t2, 4).border = _bd()
+    ws2.cell(row_t2, 4).alignment = _al("center")
+    ws2.row_dimensions[row_t2].height = 18
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f"depenses_{date_cls.today().isoformat()}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+@app.get("/api/depenses/export/pdf")
+def export_depenses_pdf(
+    date_debut: Optional[str] = None,
+    date_fin:   Optional[str] = None,
+    categorie:  Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Export PDF des dépenses : entête, tableau détaillé, récapitulatif par catégorie."""
+    import io
+    from datetime import date as date_cls
+    from collections import defaultdict
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+
+    depenses = _query_depenses_filtrees(db, date_debut, date_fin, categorie)
+
+    # ── Palette ────────────────────────────────────────────────
+    C_RED    = colors.HexColor("#DC2626")
+    C_RED2   = colors.HexColor("#F87171")
+    C_DARK   = colors.HexColor("#0F172A")
+    C_GRAY   = colors.HexColor("#64748B")
+    C_LIGHT  = colors.HexColor("#FEF2F2")
+    C_LIGHT2 = colors.HexColor("#FFF8F8")
+    C_WHITE  = colors.white
+    C_TOTAL  = colors.HexColor("#FEE2E2")
+    C_GREEN  = colors.HexColor("#16A34A")
+    C_BORDER = colors.HexColor("#FECACA")
+
+    # ── Styles texte ───────────────────────────────────────────
+    st = ParagraphStyle
+    S_TITLE  = st("title",  fontName="Helvetica-Bold", fontSize=18, textColor=C_RED,  alignment=TA_CENTER, spaceAfter=2)
+    S_SUB    = st("sub",    fontName="Helvetica",      fontSize=9,  textColor=C_GRAY, alignment=TA_CENTER, spaceAfter=0)
+    S_H2     = st("h2",     fontName="Helvetica-Bold", fontSize=11, textColor=C_RED,  spaceBefore=14, spaceAfter=6)
+    S_CELL   = st("cell",   fontName="Helvetica",      fontSize=8,  textColor=C_DARK, leading=10)
+    S_TOTAL  = st("tot",    fontName="Helvetica-Bold", fontSize=9,  textColor=C_RED)
+    S_NOTE   = st("note",   fontName="Helvetica-Oblique", fontSize=7.5, textColor=C_GRAY, alignment=TA_CENTER)
+
+    def _tbl_style(has_total=False):
+        cmds = [
+            ("BACKGROUND",   (0, 0), (-1, 0),  C_DARK),
+            ("TEXTCOLOR",    (0, 0), (-1, 0),  C_WHITE),
+            ("FONTNAME",     (0, 0), (-1, 0),  "Helvetica-Bold"),
+            ("FONTSIZE",     (0, 0), (-1, -1), 8),
+            ("ALIGN",        (0, 0), (-1, -1), "LEFT"),
+            ("ALIGN",        (0, 0), (0, -1),  "CENTER"),
+            ("ALIGN",        (5, 0), (6, -1),  "RIGHT"),
+            ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -2 if has_total else -1), [C_LIGHT2, C_WHITE]),
+            ("GRID",         (0, 0), (-1, -1), 0.35, C_BORDER),
+            ("TOPPADDING",   (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
+            ("LEFTPADDING",  (0, 0), (-1, -1), 5),
+        ]
+        if has_total:
+            cmds += [
+                ("BACKGROUND",  (0, -1), (-1, -1), C_TOTAL),
+                ("FONTNAME",    (0, -1), (-1, -1), "Helvetica-Bold"),
+                ("TEXTCOLOR",   (0, -1), (-1, -1), C_RED),
+            ]
+        t = TableStyle(cmds)
+        return t
+
+    def _htg_fmt(v):
+        return f"{v:,.2f} HTG"
+
+    # ── Construction du document ───────────────────────────────
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=landscape(A4),
+        leftMargin=1.5*cm, rightMargin=1.5*cm,
+        topMargin=1.5*cm, bottomMargin=1.5*cm,
+    )
+    W = landscape(A4)[0] - 3*cm   # largeur utile
+
+    story = []
+
+    # ── En-tête document ──────────────────────────────────────
+    story.append(Paragraph("PétroSync", ParagraphStyle("brand", fontName="Helvetica-Bold", fontSize=10, textColor=C_GRAY, alignment=TA_CENTER)))
+    story.append(Paragraph("Rapport des Dépenses Opérationnelles", S_TITLE))
+
+    periode_txt = ""
+    if date_debut or date_fin:
+        periode_txt = f"Période : {date_debut or '…'} → {date_fin or '…'}  ·  "
+    if categorie:
+        periode_txt += f"Catégorie : {categorie}  ·  "
+    periode_txt += f"{len(depenses)} dépense(s)  ·  Généré le {date_cls.today().strftime('%d/%m/%Y')}"
+    story.append(Paragraph(periode_txt, S_SUB))
+    story.append(Spacer(1, 0.3*cm))
+    story.append(HRFlowable(width=W, thickness=1.5, color=C_RED2, spaceAfter=8))
+
+    # ── KPI résumé (1 ligne de 3 blocs) ──────────────────────
+    total = round(sum(float(d.montant) for d in depenses), 2)
+    par_cat = defaultdict(float)
+    for d in depenses:
+        par_cat[d.categorie] += float(d.montant)
+    cat_max = max(par_cat, key=par_cat.get) if par_cat else "—"
+
+    def _kpi(label, val):
+        return [Paragraph(f"<b><font size=7 color='#64748B'>{label}</font></b><br/>"
+                          f"<font size=13 color='#DC2626'><b>{val}</b></font>",
+                          ParagraphStyle("kpi", fontName="Helvetica", fontSize=9,
+                                         alignment=TA_CENTER, leading=16))]
+
+    kpi_data = [[_kpi("TOTAL DÉPENSES", _htg_fmt(total)),
+                 _kpi("NOMBRE DE DÉPENSES", str(len(depenses))),
+                 _kpi("CATÉGORIE PRINCIPALE", cat_max)]]
+    kpi_tbl = Table(kpi_data, colWidths=[W/3]*3)
+    kpi_tbl.setStyle(TableStyle([
+        ("BOX",        (0, 0), (-1, -1), 0.5, C_BORDER),
+        ("LINEAFTER",  (0, 0), (1, 0),   0.5, C_BORDER),
+        ("BACKGROUND", (0, 0), (-1, -1), C_LIGHT),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("ROUNDEDCORNERS", [4]),
+    ]))
+    story.append(kpi_tbl)
+    story.append(Spacer(1, 0.4*cm))
+
+    # ── Tableau détail ────────────────────────────────────────
+    story.append(Paragraph("Détail des dépenses", S_H2))
+
+    col_w = [1*cm, 2.2*cm, 2.8*cm, 6.5*cm, 3.5*cm, 2.5*cm, 3.2*cm]
+    hdr = [["#", "Date", "Catégorie", "Description", "Bénéficiaire", "Référence", "Montant (HTG)"]]
+    rows = hdr[:]
+    for i, d in enumerate(depenses, 1):
+        rows.append([
+            str(i),
+            d.date_depense.strftime("%d/%m/%Y") if d.date_depense else "",
+            d.categorie,
+            Paragraph(d.description, S_CELL),
+            d.beneficiaire or "—",
+            d.reference    or "—",
+            _htg_fmt(float(d.montant)),
+        ])
+    rows.append(["", "", "", "", "", "TOTAL", _htg_fmt(total)])
+
+    t_detail = Table(rows, colWidths=col_w, repeatRows=1)
+    t_detail.setStyle(_tbl_style(has_total=True))
+    story.append(t_detail)
+    story.append(Spacer(1, 0.5*cm))
+
+    # ── Récapitulatif par catégorie ───────────────────────────
+    if len(par_cat) > 0:
+        story.append(HRFlowable(width=W, thickness=0.5, color=C_BORDER, spaceAfter=6))
+        story.append(Paragraph("Récapitulatif par catégorie", S_H2))
+
+        cats_sorted = sorted(par_cat.items(), key=lambda x: -x[1])
+        nb_by_cat = defaultdict(int)
+        for d in depenses:
+            nb_by_cat[d.categorie] += 1
+
+        cat_col_w = [(W - 6*cm) / 2, 2*cm, 3*cm, 3*cm]
+        cat_rows = [["Catégorie", "Nb", "Montant (HTG)", "Part (%)"]]
+        for cat, mnt in cats_sorted:
+            pct = round(mnt / total * 100, 1) if total else 0
+            cat_rows.append([cat, str(nb_by_cat[cat]), _htg_fmt(mnt), f"{pct} %"])
+        cat_rows.append(["TOTAL", str(len(depenses)), _htg_fmt(total), "100.0 %"])
+
+        t_cat = Table(cat_rows, colWidths=cat_col_w, repeatRows=1)
+        cat_style = TableStyle([
+            ("BACKGROUND",   (0, 0), (-1, 0),  C_DARK),
+            ("TEXTCOLOR",    (0, 0), (-1, 0),  C_WHITE),
+            ("FONTNAME",     (0, 0), (-1, 0),  "Helvetica-Bold"),
+            ("FONTSIZE",     (0, 0), (-1, -1), 8),
+            ("ALIGN",        (1, 0), (-1, -1), "CENTER"),
+            ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -2), [C_LIGHT2, C_WHITE]),
+            ("BACKGROUND",   (0, -1), (-1, -1), C_TOTAL),
+            ("FONTNAME",     (0, -1), (-1, -1), "Helvetica-Bold"),
+            ("TEXTCOLOR",    (0, -1), (-1, -1), C_RED),
+            ("GRID",         (0, 0), (-1, -1), 0.35, C_BORDER),
+            ("TOPPADDING",   (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
+            ("LEFTPADDING",  (0, 0), (-1, -1), 5),
+        ])
+        t_cat.setStyle(cat_style)
+        story.append(t_cat)
+
+    story.append(Spacer(1, 0.4*cm))
+    story.append(HRFlowable(width=W, thickness=0.5, color=C_BORDER, spaceAfter=4))
+    story.append(Paragraph(
+        f"Document généré automatiquement par PétroSync  ·  {date_cls.today().strftime('%d/%m/%Y')}",
+        S_NOTE
+    ))
+
+    doc.build(story)
+    buf.seek(0)
+    fname = f"depenses_{date_cls.today().isoformat()}.pdf"
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+# ══════════════════════════════════════════════════════════════════
 # MODULE ACHATS
 # ══════════════════════════════════════════════════════════════════
 
