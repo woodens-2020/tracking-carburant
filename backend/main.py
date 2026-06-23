@@ -3102,4 +3102,8 @@ def serve_index():
     html_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "index.html"
     )
-    return FileResponse(html_path, media_type="text/html")
+    return FileResponse(
+        html_path,
+        media_type="text/html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )

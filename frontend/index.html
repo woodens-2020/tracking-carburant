@@ -50,6 +50,11 @@
   --shadow-sm: 0 1px 3px rgba(0,5,20,.5), 0 1px 2px rgba(0,5,20,.3);
   --shadow-md: 0 4px 20px rgba(0,5,25,.6);
   --shadow-lg: 0 12px 40px rgba(0,5,25,.7);
+
+  /* Alias modules gestion institutionnelle */
+  --card:     #0b1628;
+  --surface2: #102035;
+  --text1:    #e8eef8;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{height:100%}
@@ -216,6 +221,7 @@ input[type=date]{color-scheme:dark}
 .pages{flex:1;min-height:0;overflow-y:auto;padding-bottom:36px}
 .page{display:none;padding:24px 26px;animation:fade-in .2s ease}
 .page.active{display:block}
+.page-gi{padding-top:16px}
 @keyframes fade-in{from{opacity:.3;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
 /* ── Cards ────────────────────────────────────── */
@@ -3120,7 +3126,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- PAGE EMPLOYÉS                                           -->
     <!-- ══════════════════════════════════════════════════════ -->
-    <div id="page-employes" class="page">
+    <div id="page-employes" class="page page-gi">
       <div class="gi-page">
         <div class="gi-page-bar">
           <button class="gi-btn-secondary" onclick="loadEmployes()">
@@ -3241,7 +3247,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- PAGE PAYROLL                                           -->
     <!-- ══════════════════════════════════════════════════════ -->
-    <div id="page-payroll" class="page">
+    <div id="page-payroll" class="page page-gi">
       <div class="gi-page">
         <div class="gi-page-bar">
           <button class="gi-btn-secondary" onclick="loadPayroll()">
@@ -3361,7 +3367,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- PAGE DÉPENSES                                          -->
     <!-- ══════════════════════════════════════════════════════ -->
-    <div id="page-depenses" class="page">
+    <div id="page-depenses" class="page page-gi">
       <div class="gi-page">
         <div class="gi-page-bar">
           <button class="gi-btn-secondary" onclick="loadDepenses()">
@@ -3472,7 +3478,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- PAGE ACHATS                                            -->
     <!-- ══════════════════════════════════════════════════════ -->
-    <div id="page-achats" class="page">
+    <div id="page-achats" class="page page-gi">
       <div class="gi-page">
         <div class="gi-page-bar">
           <button class="gi-btn-secondary" onclick="loadAchats()">
