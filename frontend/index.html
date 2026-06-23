@@ -199,7 +199,7 @@ input[type=date]{color-scheme:dark}
 .sb-footer span{font-size:11.5px;color:rgba(255,255,255,.35)}
 
 /* ── Main area ───────────────────────────────── */
-.main{flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.main{min-width:0;display:flex;flex-direction:column;height:100vh;overflow:hidden}
 .main-header{
   background:linear-gradient(to right,var(--panel) 50%,var(--bg));
   border-bottom:1px solid var(--border);
@@ -218,7 +218,7 @@ input[type=date]{color-scheme:dark}
 }
 .date-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.12)}
 
-.pages{flex:1;min-height:0;overflow-y:auto;padding-bottom:36px;overflow-anchor:none;scroll-behavior:auto}
+.pages{min-height:0;overflow-y:auto;padding-bottom:36px;overflow-anchor:none;scroll-behavior:auto}
 .page{display:none;padding:24px 26px}
 .page.active{display:block;animation:fade-in .22s cubic-bezier(.22,.8,.36,1)}
 .page-gi{padding-top:0}
