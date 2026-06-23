@@ -218,10 +218,10 @@ input[type=date]{color-scheme:dark}
 }
 .date-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.12)}
 
-.pages{flex:1;min-height:0;overflow-y:auto;padding-bottom:36px;overflow-anchor:none}
-.page{display:none;padding:24px 26px;animation:fade-in .2s ease}
-.page.active{display:block}
-.page-gi{padding-top:16px}
+.pages{flex:1;min-height:0;overflow-y:auto;padding-bottom:36px;overflow-anchor:none;scroll-behavior:auto}
+.page{display:none;padding:24px 26px}
+.page.active{display:block;animation:fade-in .22s cubic-bezier(.22,.8,.36,1)}
+.page-gi{padding-top:0}
 @keyframes fade-in{from{opacity:.3;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
 /* ── Cards ────────────────────────────────────── */
@@ -4223,6 +4223,21 @@ const PAGE_META={
   achats:              {title: 'Gestion des Achats',             sub: 'Matériel, équipements et fournitures'},
 };
 
+let _scrollFixTimer = null;
+function _forceScrollTop(){
+  const pc = document.getElementById('pages-container');
+  if(pc) pc.scrollTop = 0;
+}
+function _startScrollFix(){
+  _forceScrollTop();
+  if(_scrollFixTimer) clearInterval(_scrollFixTimer);
+  const end = Date.now() + 1200;
+  _scrollFixTimer = setInterval(()=>{
+    _forceScrollTop();
+    if(Date.now() >= end){ clearInterval(_scrollFixTimer); _scrollFixTimer = null; }
+  }, 40);
+}
+
 function goTo(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -4236,11 +4251,7 @@ function goTo(page){
   document.getElementById('page-title').textContent = typeof m.title==='function' ? m.title() : m.title;
   document.getElementById('page-sub').textContent   = typeof m.sub==='function'   ? m.sub()   : m.sub;
   animatePageTitle();
-  // Toujours revenir en haut lors d'un changement de page
-  const pagesContainer = document.getElementById('pages-container');
-  if(pagesContainer) pagesContainer.scrollTop = 0;
-  // Second reset après le rendu (évite le scroll anchoring Chrome)
-  requestAnimationFrame(()=>{ if(pagesContainer) pagesContainer.scrollTop = 0; });
+  _startScrollFix();
 
   if(page==='home')               loadHome();
   if(page==='dashboard')          initDashboard();
@@ -9007,28 +9018,31 @@ function _giAlert(msg, type='error'){
    ══════════════════════════════════════════════════════════════ */
 let _empData = [];
 
+function _giLoading(wrapId){ const w=document.getElementById(wrapId); if(w) w.innerHTML='<div class="gi-empty"><div class="spinner"></div><div style="margin-top:10px">Chargement…</div></div>'; }
+function _giError(wrapId,msg){ const w=document.getElementById(wrapId); if(w) w.innerHTML=`<div class="gi-empty" style="color:var(--red)">${msg||'Erreur de chargement. Vérifiez votre connexion.'}</div>`; }
+
 async function loadEmployes(){
-  const actif = document.getElementById('emp-filtre-actif')?.value;
-  let url = '/api/employes';
-  if(actif !== '') url += '?actif=' + actif;
+  _giLoading('emp-table-wrap');
+  const actif = document.getElementById('emp-filtre-actif')?.value ?? '';
+  const qs = actif !== '' ? '?actif='+actif : '';
   try {
-    const r = await fetch(url); if(!r.ok) throw new Error();
-    _empData = await r.json();
+    const [employes, stats] = await Promise.all([
+      apiFetch('GET','/employes'+qs),
+      apiFetch('GET','/payroll/stats').catch(()=>null)
+    ]);
+    _empData = employes;
     renderEmpTable(_empData);
-    // KPIs
     const masse = _empData.reduce((s,e)=>s+e.salaire_base,0);
     document.getElementById('emp-kpi-total').textContent = _empData.length;
     document.getElementById('emp-kpi-masse').textContent = _htg(masse);
-    // Stats payroll
-    const ps = await fetch('/api/payroll/stats');
-    if(ps.ok){ const d=await ps.json();
-      document.getElementById('emp-kpi-pending').textContent = d.nb_fiches_brouillon;
-      document.getElementById('emp-kpi-paye').textContent = _htg(d.total_paye_htg);
+    if(stats){
+      document.getElementById('emp-kpi-pending').textContent = stats.nb_fiches_brouillon;
+      document.getElementById('emp-kpi-paye').textContent    = _htg(stats.total_paye_htg);
     }
-  } catch(e){ console.error(e); }
-  // Reset scroll après chargement async (anti scroll-anchoring)
-  const pc = document.getElementById('pages-container');
-  if(pc) pc.scrollTop = 0;
+  } catch(e){
+    console.error('loadEmployes',e);
+    _giError('emp-table-wrap', e.message || 'Erreur de chargement des employés.');
+  }
 }
 
 function renderEmpTable(data){
@@ -9098,34 +9112,37 @@ function closeEmpModal(){ document.getElementById('emp-modal').classList.remove(
 async function submitEmp(){
   const id = document.getElementById('emp-edit-id').value;
   const body = {
-    nom: document.getElementById('emp-nom').value.trim(),
-    prenom: document.getElementById('emp-prenom').value.trim(),
-    poste: document.getElementById('emp-poste').value.trim(),
+    nom:           document.getElementById('emp-nom').value.trim(),
+    prenom:        document.getElementById('emp-prenom').value.trim(),
+    poste:         document.getElementById('emp-poste').value.trim(),
     date_embauche: document.getElementById('emp-embauche').value,
-    salaire_base: parseFloat(document.getElementById('emp-salaire').value)||0,
-    type_contrat: document.getElementById('emp-contrat').value,
-    telephone: document.getElementById('emp-tel').value.trim()||null,
-    email: document.getElementById('emp-email').value.trim()||null,
-    notes: document.getElementById('emp-notes').value.trim()||null,
+    salaire_base:  parseFloat(document.getElementById('emp-salaire').value)||0,
+    type_contrat:  document.getElementById('emp-contrat').value,
+    telephone:     document.getElementById('emp-tel').value.trim()||null,
+    email:         document.getElementById('emp-email').value.trim()||null,
+    notes:         document.getElementById('emp-notes').value.trim()||null,
   };
-  if(!body.nom||!body.prenom||!body.poste||!body.date_embauche){ _giAlert('Veuillez remplir tous les champs obligatoires.'); return; }
+  if(!body.nom||!body.prenom||!body.poste||!body.date_embauche){
+    _giAlert('Veuillez remplir tous les champs obligatoires (Prénom, Nom, Poste, Date embauche).');
+    return;
+  }
   try {
-    const url = id ? `/api/employes/${id}` : '/api/employes';
     const method = id ? 'PUT' : 'POST';
-    const r = await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const d = await r.json();
-    if(!r.ok){ _giAlert(d.detail||'Erreur.'); return; }
-    closeEmpModal(); loadEmployes(); _giAlert(id?'Employé mis à jour.':'Employé créé.','ok');
-  } catch(e){ _giAlert('Erreur réseau.'); }
+    const path   = id ? `/employes/${id}` : '/employes';
+    await apiFetch(method, path, body);
+    closeEmpModal();
+    loadEmployes();
+    _giAlert(id ? 'Employé mis à jour.' : 'Employé créé avec succès.', 'ok');
+  } catch(e){ _giAlert(e.message||'Erreur réseau.'); }
 }
 
 async function desactiverEmp(id, nom){
   if(!confirm(`Désactiver ${nom} ?`)) return;
   try {
-    const r = await fetch(`/api/employes/${id}`,{method:'DELETE'});
-    if(!r.ok){ const d=await r.json(); _giAlert(d.detail||'Erreur.'); return; }
-    loadEmployes(); _giAlert('Employé désactivé.','ok');
-  } catch(e){ _giAlert('Erreur réseau.'); }
+    await apiFetch('DELETE', `/employes/${id}`);
+    loadEmployes();
+    _giAlert('Employé désactivé.', 'ok');
+  } catch(e){ _giAlert(e.message||'Erreur réseau.'); }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -9135,36 +9152,37 @@ let _payData = [];
 let _empList = [];
 
 async function loadPayroll(){
-  const statut = document.getElementById('pay-filtre-statut')?.value;
-  const empId  = document.getElementById('pay-filtre-emp')?.value;
-  let url = '/api/payroll';
+  _giLoading('pay-table-wrap');
+  const statut = document.getElementById('pay-filtre-statut')?.value ?? '';
+  const empId  = document.getElementById('pay-filtre-emp')?.value ?? '';
   const params = [];
   if(statut) params.push('statut='+statut);
   if(empId)  params.push('employe_id='+empId);
-  if(params.length) url += '?' + params.join('&');
+  const qs = params.length ? '?'+params.join('&') : '';
   try {
-    const [rp, rs] = await Promise.all([fetch(url), fetch('/api/payroll/stats')]);
-    if(!rp.ok) throw new Error();
-    _payData = await rp.json();
-    if(rs.ok){ const s=await rs.json();
-      document.getElementById('pay-kpi-emp').textContent    = s.nb_employes_actifs;
-      document.getElementById('pay-kpi-draft').textContent  = s.nb_fiches_brouillon;
-      document.getElementById('pay-kpi-pending').textContent= _htg(s.total_en_attente_htg);
-      document.getElementById('pay-kpi-paid').textContent   = _htg(s.total_paye_htg);
+    const [fiches, stats] = await Promise.all([
+      apiFetch('GET', '/payroll'+qs),
+      apiFetch('GET', '/payroll/stats').catch(()=>null)
+    ]);
+    _payData = fiches;
+    if(stats){
+      document.getElementById('pay-kpi-emp').textContent     = stats.nb_employes_actifs;
+      document.getElementById('pay-kpi-draft').textContent   = stats.nb_fiches_brouillon;
+      document.getElementById('pay-kpi-pending').textContent = _htg(stats.total_en_attente_htg);
+      document.getElementById('pay-kpi-paid').textContent    = _htg(stats.total_paye_htg);
     }
     renderPayTable(_payData);
     await _loadEmpSelectPayroll();
-  } catch(e){ console.error(e); }
-  const pc = document.getElementById('pages-container');
-  if(pc) pc.scrollTop = 0;
+  } catch(e){
+    console.error('loadPayroll',e);
+    _giError('pay-table-wrap', e.message || 'Erreur de chargement des fiches de paie.');
+  }
 }
 
 async function _loadEmpSelectPayroll(){
   if(_empList.length) return;
   try {
-    const r = await fetch('/api/employes?actif=true');
-    if(!r.ok) return;
-    _empList = await r.json();
+    _empList = await apiFetch('GET','/employes?actif=true');
     const sels = ['pay-filtre-emp','pay-emp-sel'];
     sels.forEach(selId=>{
       const sel = document.getElementById(selId);
@@ -9256,31 +9274,26 @@ async function submitPayroll(){
   };
   if(!body.employe_id||!body.periode_debut||!body.periode_fin){ _giAlert('Veuillez remplir tous les champs obligatoires.'); return; }
   try {
-    const r=await fetch('/api/payroll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const d=await r.json();
-    if(!r.ok){ _giAlert(d.detail||'Erreur.'); return; }
+    const d = await apiFetch('POST','/payroll',body);
     closePayrollModal(); _empList=[]; loadPayroll(); _giAlert(`Fiche créée — Net : ${_htg(d.net_a_payer)}`,'ok');
-  } catch(e){ _giAlert('Erreur réseau.'); }
+  } catch(e){ _giAlert(e.message||'Erreur réseau.'); }
 }
 
 async function marquerPayee(id){
   const date = prompt('Date de paiement (YYYY-MM-DD) :', _today());
   if(!date) return;
   try {
-    const r=await fetch(`/api/payroll/${id}/payer`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({date_paiement:date})});
-    const d=await r.json();
-    if(!r.ok){ _giAlert(d.detail||'Erreur.'); return; }
+    await apiFetch('PUT',`/payroll/${id}/payer`,{date_paiement:date});
     loadPayroll(); _giAlert('Fiche marquée comme payée.','ok');
-  } catch(e){ _giAlert('Erreur réseau.'); }
+  } catch(e){ _giAlert(e.message||'Erreur réseau.'); }
 }
 
 async function supprimerFiche(id){
   if(!confirm('Supprimer cette fiche de paie ?')) return;
   try {
-    const r=await fetch(`/api/payroll/${id}`,{method:'DELETE'});
-    if(!r.ok){ const d=await r.json(); _giAlert(d.detail||'Erreur.'); return; }
+    await apiFetch('DELETE',`/payroll/${id}`);
     loadPayroll(); _giAlert('Fiche supprimée.','ok');
-  } catch(e){ _giAlert('Erreur réseau.'); }
+  } catch(e){ _giAlert(e.message||'Erreur réseau.'); }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -9289,32 +9302,32 @@ async function supprimerFiche(id){
 let _depData = [];
 
 async function loadDepenses(){
-  const deb = document.getElementById('dep-filtre-debut')?.value;
-  const fin = document.getElementById('dep-filtre-fin')?.value;
-  const cat = document.getElementById('dep-filtre-cat')?.value;
+  _giLoading('dep-table-wrap');
+  const deb = document.getElementById('dep-filtre-debut')?.value ?? '';
+  const fin = document.getElementById('dep-filtre-fin')?.value ?? '';
+  const cat = document.getElementById('dep-filtre-cat')?.value ?? '';
   const params=[];
   if(deb) params.push('date_debut='+deb);
   if(fin) params.push('date_fin='+fin);
   if(cat) params.push('categorie='+encodeURIComponent(cat));
-  const url='/api/depenses'+(params.length?'?'+params.join('&'):'');
+  const qs=params.length?'?'+params.join('&'):'';
   try {
-    const r=await fetch(url); if(!r.ok) throw new Error();
-    const d=await r.json();
-    _depData=d.depenses;
-    document.getElementById('dep-count').textContent=d.nb;
-    document.getElementById('dep-kpi-total').textContent=_htg(d.total);
-    document.getElementById('dep-kpi-nb').textContent=d.nb;
-    const avg=d.nb?Math.round(d.total/d.nb):0;
-    document.getElementById('dep-kpi-avg').textContent=_htg(avg);
-    // Catégorie principale
+    const d = await apiFetch('GET','/depenses'+qs);
+    _depData = d.depenses;
+    document.getElementById('dep-count').textContent       = d.nb;
+    document.getElementById('dep-kpi-total').textContent   = _htg(d.total);
+    document.getElementById('dep-kpi-nb').textContent      = d.nb;
+    const avg = d.nb ? Math.round(d.total/d.nb) : 0;
+    document.getElementById('dep-kpi-avg').textContent     = _htg(avg);
     const catMap={};
     _depData.forEach(x=>{ catMap[x.categorie]=(catMap[x.categorie]||0)+x.montant; });
     const topCat=Object.entries(catMap).sort((a,b)=>b[1]-a[1])[0];
-    document.getElementById('dep-kpi-cat').textContent=topCat?topCat[0]:'—';
+    document.getElementById('dep-kpi-cat').textContent     = topCat?topCat[0]:'—';
     renderDepTable(_depData);
-  } catch(e){ console.error(e); }
-  const pc = document.getElementById('pages-container');
-  if(pc) pc.scrollTop = 0;
+  } catch(e){
+    console.error('loadDepenses',e);
+    _giError('dep-table-wrap', e.message || 'Erreur de chargement des dépenses.');
+  }
 }
 
 function renderDepTable(data){
@@ -9387,20 +9400,19 @@ async function submitDep(){
   try {
     const url=id?`/api/depenses/${id}`:'/api/depenses';
     const method=id?'PUT':'POST';
-    const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const d=await r.json();
-    if(!r.ok){ _giAlert(d.detail||'Erreur.'); return; }
+    const method = id ? 'PUT' : 'POST';
+    const path   = id ? `/depenses/${id}` : '/depenses';
+    await apiFetch(method, path, body);
     closeDepModal(); loadDepenses(); _giAlert(id?'Dépense mise à jour.':'Dépense enregistrée.','ok');
-  } catch(e){ _giAlert('Erreur réseau.'); }
+  } catch(e){ _giAlert(e.message||'Erreur réseau.'); }
 }
 
 async function supprimerDep(id){
   if(!confirm('Supprimer cette dépense ?')) return;
   try {
-    const r=await fetch(`/api/depenses/${id}`,{method:'DELETE'});
-    if(!r.ok){ const d=await r.json(); _giAlert(d.detail||'Erreur.'); return; }
+    await apiFetch('DELETE',`/depenses/${id}`);
     loadDepenses(); _giAlert('Dépense supprimée.','ok');
-  } catch(e){ _giAlert('Erreur réseau.'); }
+  } catch(e){ _giAlert(e.message||'Erreur réseau.'); }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -9409,31 +9421,32 @@ async function supprimerDep(id){
 let _achData = [];
 
 async function loadAchats(){
-  const deb=document.getElementById('ach-filtre-debut')?.value;
-  const fin=document.getElementById('ach-filtre-fin')?.value;
-  const cat=document.getElementById('ach-filtre-cat')?.value;
+  _giLoading('ach-table-wrap');
+  const deb = document.getElementById('ach-filtre-debut')?.value ?? '';
+  const fin = document.getElementById('ach-filtre-fin')?.value ?? '';
+  const cat = document.getElementById('ach-filtre-cat')?.value ?? '';
   const params=[];
   if(deb) params.push('date_debut='+deb);
   if(fin) params.push('date_fin='+fin);
   if(cat) params.push('categorie='+encodeURIComponent(cat));
-  const url='/api/achats'+(params.length?'?'+params.join('&'):'');
+  const qs=params.length?'?'+params.join('&'):'';
   try {
-    const r=await fetch(url); if(!r.ok) throw new Error();
-    const d=await r.json();
-    _achData=d.achats;
-    document.getElementById('ach-count').textContent=d.nb;
-    document.getElementById('ach-kpi-total').textContent=_htg(d.total);
-    document.getElementById('ach-kpi-nb').textContent=d.nb;
-    const fournis=new Set(_achData.map(a=>a.fournisseur));
-    document.getElementById('ach-kpi-fournis').textContent=fournis.size;
+    const d = await apiFetch('GET','/achats'+qs);
+    _achData = d.achats;
+    document.getElementById('ach-count').textContent       = d.nb;
+    document.getElementById('ach-kpi-total').textContent   = _htg(d.total);
+    document.getElementById('ach-kpi-nb').textContent      = d.nb;
+    const fournis = new Set(_achData.map(a=>a.fournisseur));
+    document.getElementById('ach-kpi-fournis').textContent = fournis.size;
     const catMap={};
     _achData.forEach(a=>{ catMap[a.categorie]=(catMap[a.categorie]||0)+a.montant; });
     const topCat=Object.entries(catMap).sort((a,b)=>b[1]-a[1])[0];
-    document.getElementById('ach-kpi-cat').textContent=topCat?topCat[0]:'—';
+    document.getElementById('ach-kpi-cat').textContent     = topCat?topCat[0]:'—';
     renderAchTable(_achData);
-  } catch(e){ console.error(e); }
-  const pc = document.getElementById('pages-container');
-  if(pc) pc.scrollTop = 0;
+  } catch(e){
+    console.error('loadAchats',e);
+    _giError('ach-table-wrap', e.message || 'Erreur de chargement des achats.');
+  }
 }
 
 function renderAchTable(data){
@@ -9501,22 +9514,19 @@ async function submitAchat(){
   };
   if(!body.fournisseur||!body.categorie||!body.description||!body.date_achat||body.montant<=0){ _giAlert('Veuillez remplir tous les champs obligatoires.'); return; }
   try {
-    const url=id?`/api/achats/${id}`:'/api/achats';
-    const method=id?'PUT':'POST';
-    const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const d=await r.json();
-    if(!r.ok){ _giAlert(d.detail||'Erreur.'); return; }
+    const method = id ? 'PUT' : 'POST';
+    const path   = id ? `/achats/${id}` : '/achats';
+    await apiFetch(method, path, body);
     closeAchatModal(); loadAchats(); _giAlert(id?'Achat mis à jour.':'Achat enregistré.','ok');
-  } catch(e){ _giAlert('Erreur réseau.'); }
+  } catch(e){ _giAlert(e.message||'Erreur réseau.'); }
 }
 
 async function supprimerAchat(id){
   if(!confirm('Supprimer cet achat ?')) return;
   try {
-    const r=await fetch(`/api/achats/${id}`,{method:'DELETE'});
-    if(!r.ok){ const d=await r.json(); _giAlert(d.detail||'Erreur.'); return; }
+    await apiFetch('DELETE',`/achats/${id}`);
     loadAchats(); _giAlert('Achat supprimé.','ok');
-  } catch(e){ _giAlert('Erreur réseau.'); }
+  } catch(e){ _giAlert(e.message||'Erreur réseau.'); }
 }
 
 /* ── Chargement automatique à la navigation ── */
