@@ -3096,6 +3096,115 @@ def supprimer_achat(achat_id: int, db: Session = Depends(get_db)):
     return {"message": "Achat supprimé."}
 
 
+# ══════════════════════════════════════════════════════════
+# RAPPORT DE CAISSE — Synthèse financière consolidée
+# ══════════════════════════════════════════════════════════
+@app.get("/api/caisse/rapport")
+def rapport_caisse(
+    date_debut: Optional[date_type] = None,
+    date_fin:   Optional[date_type] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Synthèse financière : Ventes – Achats – Payroll – Dépenses = Cash disponible.
+    Sans filtre de dates : toutes les données en base.
+    """
+    from datetime import date as _date
+
+    # ── Ventes (releves) ──────────────────────────────────
+    q_rel = db.query(Releve)
+    if date_debut: q_rel = q_rel.filter(Releve.date >= date_debut)
+    if date_fin:   q_rel = q_rel.filter(Releve.date <= date_fin)
+    releves = q_rel.all()
+    total_ventes = round(sum(float(r.montant_vente) for r in releves), 2)
+    total_gallons = round(sum(float(r.quantite) for r in releves), 3)
+
+    # Ventilation par produit
+    prod_map = {}
+    for r in releves:
+        nom = r.pompe.produit.nom
+        e = prod_map.setdefault(nom, {"gallons": 0.0, "montant": 0.0})
+        e["gallons"]  += float(r.quantite)
+        e["montant"]  += float(r.montant_vente)
+    ventes_par_produit = [
+        {"produit": k, "gallons": round(v["gallons"], 3), "montant": round(v["montant"], 2)}
+        for k, v in prod_map.items()
+    ]
+
+    # ── Achats ───────────────────────────────────────────
+    q_ach = db.query(Achat)
+    if date_debut: q_ach = q_ach.filter(Achat.date_achat >= date_debut)
+    if date_fin:   q_ach = q_ach.filter(Achat.date_achat <= date_fin)
+    achats = q_ach.all()
+    total_achats = round(sum(float(a.montant) for a in achats), 2)
+
+    # ── Payroll payé ─────────────────────────────────────
+    q_pay = db.query(FichePaie).filter(FichePaie.statut == "paye")
+    if date_debut: q_pay = q_pay.filter(FichePaie.date_paiement >= date_debut)
+    if date_fin:   q_pay = q_pay.filter(FichePaie.date_paiement <= date_fin)
+    fiches_payees = q_pay.all()
+    total_payroll_paye = round(sum(float(f.net_a_payer) for f in fiches_payees), 2)
+
+    # Payroll brouillon (engagé mais non encore versé)
+    q_brou = db.query(FichePaie).filter(FichePaie.statut == "brouillon")
+    if date_debut: q_brou = q_brou.filter(FichePaie.periode_debut >= date_debut)
+    if date_fin:   q_brou = q_brou.filter(FichePaie.periode_fin   <= date_fin)
+    fiches_brou = q_brou.all()
+    total_payroll_engage = round(sum(float(f.net_a_payer) for f in fiches_brou), 2)
+
+    # ── Dépenses ─────────────────────────────────────────
+    q_dep = db.query(Depense)
+    if date_debut: q_dep = q_dep.filter(Depense.date_depense >= date_debut)
+    if date_fin:   q_dep = q_dep.filter(Depense.date_depense <= date_fin)
+    depenses = q_dep.all()
+    total_depenses = round(sum(float(d.montant) for d in depenses), 2)
+
+    # Ventilation dépenses par catégorie
+    cat_map = {}
+    for d in depenses:
+        cat_map[d.categorie] = round(cat_map.get(d.categorie, 0.0) + float(d.montant), 2)
+    depenses_par_cat = [{"categorie": k, "montant": v} for k, v in sorted(cat_map.items(), key=lambda x: -x[1])]
+
+    # ── Synthèse ─────────────────────────────────────────
+    total_sorties = round(total_achats + total_payroll_paye + total_depenses, 2)
+    cash_disponible = round(total_ventes - total_sorties, 2)
+    cash_apres_engage = round(cash_disponible - total_payroll_engage, 2)
+
+    return {
+        "periode": {
+            "debut": str(date_debut) if date_debut else None,
+            "fin":   str(date_fin)   if date_fin   else None,
+        },
+        "ventes": {
+            "total":   total_ventes,
+            "gallons": total_gallons,
+            "nb_releves": len(releves),
+            "par_produit": ventes_par_produit,
+        },
+        "achats": {
+            "total": total_achats,
+            "nb":    len(achats),
+        },
+        "payroll": {
+            "paye":    total_payroll_paye,
+            "engage":  total_payroll_engage,
+            "nb_fiches_payees":  len(fiches_payees),
+            "nb_fiches_engage":  len(fiches_brou),
+        },
+        "depenses": {
+            "total": total_depenses,
+            "nb":    len(depenses),
+            "par_categorie": depenses_par_cat,
+        },
+        "synthese": {
+            "total_entrees":    total_ventes,
+            "total_sorties":    total_sorties,
+            "cash_disponible":  cash_disponible,
+            "cash_apres_engage": cash_apres_engage,
+        },
+    }
+
+
 # ---------- Frontend single-file ----------
 @app.get("/", include_in_schema=False)
 def serve_index():

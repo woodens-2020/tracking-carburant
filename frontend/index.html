@@ -1714,6 +1714,33 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .gi-table td{font-size:13px;color:var(--text1);padding:11px 16px;border-bottom:1px solid rgba(255,255,255,.04)}
 .gi-table tr:last-child td{border-bottom:none}
 .gi-table tr:hover td{background:rgba(255,255,255,.025)}
+/* ── Rapport de Caisse ── */
+.caisse-cash-card{
+  background:linear-gradient(135deg,rgba(34,197,94,.15) 0%,rgba(11,22,40,.95) 70%);
+  border:1px solid rgba(34,197,94,.3);border-radius:14px;
+  padding:28px 32px;text-align:center;position:relative;overflow:hidden;
+  box-shadow:0 4px 30px rgba(34,197,94,.1);
+}
+.caisse-cash-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,#16a34a,#22c55e,#4ade80,transparent);
+}
+.caisse-cash-card.negative{
+  background:linear-gradient(135deg,rgba(248,113,113,.15) 0%,rgba(11,22,40,.95) 70%);
+  border-color:rgba(248,113,113,.3);
+}
+.caisse-cash-card.negative::before{background:linear-gradient(90deg,#dc2626,#f87171,transparent)}
+.caisse-cash-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:10px}
+.caisse-cash-val{font-size:46px;font-weight:900;letter-spacing:-.04em;color:#22c55e;line-height:1}
+.caisse-cash-card.negative .caisse-cash-val{color:#f87171}
+.caisse-cash-sub{font-size:12px;color:var(--muted);margin-top:10px}
+.caisse-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.caisse-bar-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.caisse-bar-row:last-child{border-bottom:none}
+.caisse-bar-label{font-size:12.5px;color:var(--text1);min-width:120px;flex-shrink:0}
+.caisse-bar-track{flex:1;background:rgba(255,255,255,.06);border-radius:4px;height:7px;overflow:hidden}
+.caisse-bar-fill{height:100%;border-radius:4px;transition:width .5s ease}
+.caisse-bar-val{font-size:12px;font-weight:700;color:var(--text2);min-width:90px;text-align:right}
 .gi-table .td-muted{color:var(--muted);font-size:12px}
 .gi-table .td-amount{font-weight:700;font-family:var(--mono);color:#3fb6a8}
 .gi-table .td-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;
@@ -1916,6 +1943,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
       </span>
       <span>Achats</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="caisse" onclick="goTo('caisse')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+      </span>
+      <span>Rapport de Caisse</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -3667,6 +3702,114 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div><!-- /page-achats -->
 
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE RAPPORT DE CAISSE                                 -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-caisse" class="page page-gi">
+      <div class="gi-page">
+
+        <!-- Header -->
+        <div class="gi-page-header" style="--gi-accent:#22c55e;background:linear-gradient(135deg,rgba(34,197,94,.12) 0%,rgba(11,22,40,.95) 60%);border-color:rgba(34,197,94,.22)">
+          <div class="gi-page-header-left">
+            <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(34,197,94,.25),rgba(34,197,94,.1));border-color:rgba(34,197,94,.3);box-shadow:0 0 18px rgba(34,197,94,.2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            </div>
+            <div class="gi-page-header-text">
+              <div class="gi-title">Rapport de Caisse</div>
+              <div class="gi-subtitle">Synthèse financière · Ventes · Sorties · Cash disponible</div>
+            </div>
+          </div>
+          <div class="gi-page-header-actions">
+            <button class="gi-btn-secondary" onclick="loadCaisse()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Actualiser
+            </button>
+          </div>
+        </div>
+
+        <!-- Filtres période -->
+        <div class="gi-filters">
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Du</label>
+            <input type="date" class="gi-filter-input" id="caisse-debut" onchange="loadCaisse()"/>
+          </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Au</label>
+            <input type="date" class="gi-filter-input" id="caisse-fin" onchange="loadCaisse()"/>
+          </div>
+          <div class="gi-filter-field" style="justify-content:flex-end;margin-left:auto">
+            <label class="gi-filter-lbl" style="opacity:0">.</label>
+            <button class="gi-btn-secondary" onclick="caisseResetFiltres()" style="height:36px">Tout afficher</button>
+          </div>
+        </div>
+
+        <!-- KPI principal : Cash disponible -->
+        <div id="caisse-cash-card" class="caisse-cash-card">
+          <div class="caisse-cash-label">CASH DISPONIBLE</div>
+          <div class="caisse-cash-val" id="caisse-cash-val">—</div>
+          <div class="caisse-cash-sub" id="caisse-cash-sub">Chargement…</div>
+        </div>
+
+        <!-- KPI row : 4 blocs -->
+        <div class="gi-kpi-row" style="grid-template-columns:repeat(4,1fr)">
+          <div class="gi-kpi" style="border-top:3px solid #22c55e">
+            <div class="gi-kpi-lbl">Total Ventes</div>
+            <div class="gi-kpi-val" style="color:#22c55e" id="caisse-kpi-ventes">—</div>
+            <div class="gi-kpi-sub" id="caisse-kpi-ventes-gal">0 gal</div>
+          </div>
+          <div class="gi-kpi" style="border-top:3px solid #f7a93b">
+            <div class="gi-kpi-lbl">Total Achats</div>
+            <div class="gi-kpi-val" style="color:#f7a93b" id="caisse-kpi-achats">—</div>
+            <div class="gi-kpi-sub" id="caisse-kpi-achats-nb">0 achat(s)</div>
+          </div>
+          <div class="gi-kpi" style="border-top:3px solid #3fb6a8">
+            <div class="gi-kpi-lbl">Payroll versé</div>
+            <div class="gi-kpi-val" style="color:#3fb6a8" id="caisse-kpi-payroll">—</div>
+            <div class="gi-kpi-sub" id="caisse-kpi-payroll-sub">0 fiche(s) payée(s)</div>
+          </div>
+          <div class="gi-kpi" style="border-top:3px solid #f87171">
+            <div class="gi-kpi-lbl">Total Dépenses</div>
+            <div class="gi-kpi-val" style="color:#f87171" id="caisse-kpi-depenses">—</div>
+            <div class="gi-kpi-sub" id="caisse-kpi-depenses-nb">0 dépense(s)</div>
+          </div>
+        </div>
+
+        <!-- Détail : 2 colonnes -->
+        <div class="caisse-detail-grid">
+
+          <!-- Ventes par produit -->
+          <div class="gi-table-card">
+            <div class="gi-table-hdr">
+              <span class="gi-table-title" style="color:#22c55e">Ventes par produit</span>
+            </div>
+            <div id="caisse-prod-wrap" style="padding:12px 16px"></div>
+          </div>
+
+          <!-- Dépenses par catégorie -->
+          <div class="gi-table-card">
+            <div class="gi-table-hdr">
+              <span class="gi-table-title" style="color:#f87171">Dépenses par catégorie</span>
+            </div>
+            <div id="caisse-cat-wrap" style="padding:12px 16px"></div>
+          </div>
+
+        </div>
+
+        <!-- Payroll en attente (brouillon) -->
+        <div id="caisse-engage-wrap" style="display:none" class="gi-table-card">
+          <div class="gi-table-hdr">
+            <span class="gi-table-title" style="color:#f7a93b">Payroll engagé (non encore versé)</span>
+            <span class="gi-table-count" id="caisse-engage-montant">—</span>
+          </div>
+          <div style="padding:10px 16px;font-size:12px;color:var(--muted)">
+            Ces fiches de paie sont en brouillon — elles seront déduites du cash une fois marquées comme payées.
+            <br>Cash après versement estimé : <strong id="caisse-apres-engage" style="color:#f7a93b">—</strong>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-caisse -->
+
   </div><!-- /pages -->
 
   <footer class="app-footer">
@@ -4304,6 +4447,7 @@ const PAGE_META={
   payroll:             {title: 'Payroll',                        sub: 'Fiches de paie et gestion des rémunérations'},
   depenses:            {title: 'Dépenses Opérationnelles',       sub: 'Charges et coûts de la station'},
   achats:              {title: 'Gestion des Achats',             sub: 'Matériel, équipements et fournitures'},
+  caisse:              {title: 'Rapport de Caisse',              sub: 'Synthèse financière consolidée — Ventes · Achats · Payroll · Dépenses'},
 };
 
 let _scrollFixTimer = null;
@@ -9616,7 +9760,106 @@ const _giPageLoaders = {
   payroll:  loadPayroll,
   depenses: loadDepenses,
   achats:   loadAchats,
+  caisse:   loadCaisse,
 };
+
+// ══════════════════════════════════════════════════════════════
+// RAPPORT DE CAISSE
+// ══════════════════════════════════════════════════════════════
+
+async function loadCaisse(){
+  const wrap = document.getElementById('caisse-cash-card');
+  if(wrap){ wrap.classList.remove('negative'); }
+  document.getElementById('caisse-cash-val').textContent  = '…';
+  document.getElementById('caisse-cash-sub').textContent  = 'Chargement…';
+  document.getElementById('caisse-kpi-ventes').textContent   = '—';
+  document.getElementById('caisse-kpi-achats').textContent   = '—';
+  document.getElementById('caisse-kpi-payroll').textContent  = '—';
+  document.getElementById('caisse-kpi-depenses').textContent = '—';
+
+  const debut = document.getElementById('caisse-debut')?.value || '';
+  const fin   = document.getElementById('caisse-fin')?.value   || '';
+  const params = [];
+  if(debut) params.push('date_debut='+debut);
+  if(fin)   params.push('date_fin='+fin);
+  const qs = params.length ? '?'+params.join('&') : '';
+
+  try {
+    const d = await apiFetch('GET', '/caisse/rapport'+qs);
+
+    // ── Cash disponible (bloc principal) ──────────────────
+    const cash = d.synthese.cash_disponible;
+    const el   = document.getElementById('caisse-cash-val');
+    el.textContent = _htg(cash);
+    if(wrap) wrap.classList.toggle('negative', cash < 0);
+
+    const entreesLabel = _htg(d.synthese.total_entrees);
+    const sortiesLabel = _htg(d.synthese.total_sorties);
+    document.getElementById('caisse-cash-sub').textContent =
+      `Entrées ${entreesLabel}  ·  Sorties ${sortiesLabel}`;
+
+    // ── KPIs ─────────────────────────────────────────────
+    document.getElementById('caisse-kpi-ventes').textContent    = _htg(d.ventes.total);
+    document.getElementById('caisse-kpi-ventes-gal').textContent = d.ventes.gallons.toLocaleString('fr',{minimumFractionDigits:2})+' gal · '+d.ventes.nb_releves+' relevé(s)';
+
+    document.getElementById('caisse-kpi-achats').textContent     = _htg(d.achats.total);
+    document.getElementById('caisse-kpi-achats-nb').textContent  = d.achats.nb+' achat(s)';
+
+    document.getElementById('caisse-kpi-payroll').textContent    = _htg(d.payroll.paye);
+    document.getElementById('caisse-kpi-payroll-sub').textContent = d.payroll.nb_fiches_payees+' fiche(s) versée(s)';
+
+    document.getElementById('caisse-kpi-depenses').textContent   = _htg(d.depenses.total);
+    document.getElementById('caisse-kpi-depenses-nb').textContent = d.depenses.nb+' dépense(s)';
+
+    // ── Ventes par produit ────────────────────────────────
+    const maxVentes = Math.max(1, ...d.ventes.par_produit.map(p=>p.montant));
+    const prodWrap  = document.getElementById('caisse-prod-wrap');
+    if(d.ventes.par_produit.length === 0){
+      prodWrap.innerHTML = '<div class="gi-empty">Aucune vente pour cette période</div>';
+    } else {
+      prodWrap.innerHTML = d.ventes.par_produit.map(p=>`
+        <div class="caisse-bar-row">
+          <div class="caisse-bar-label">${p.produit}</div>
+          <div class="caisse-bar-track"><div class="caisse-bar-fill" style="width:${Math.round(p.montant/maxVentes*100)}%;background:#22c55e"></div></div>
+          <div class="caisse-bar-val">${_htg(p.montant)}</div>
+        </div>`).join('');
+    }
+
+    // ── Dépenses par catégorie ────────────────────────────
+    const maxDep  = Math.max(1, ...d.depenses.par_categorie.map(c=>c.montant));
+    const catWrap = document.getElementById('caisse-cat-wrap');
+    if(d.depenses.par_categorie.length === 0){
+      catWrap.innerHTML = '<div class="gi-empty">Aucune dépense pour cette période</div>';
+    } else {
+      catWrap.innerHTML = d.depenses.par_categorie.map(c=>`
+        <div class="caisse-bar-row">
+          <div class="caisse-bar-label">${c.categorie}</div>
+          <div class="caisse-bar-track"><div class="caisse-bar-fill" style="width:${Math.round(c.montant/maxDep*100)}%;background:#f87171"></div></div>
+          <div class="caisse-bar-val">${_htg(c.montant)}</div>
+        </div>`).join('');
+    }
+
+    // ── Payroll engagé ────────────────────────────────────
+    const engageWrap = document.getElementById('caisse-engage-wrap');
+    if(d.payroll.engage > 0){
+      engageWrap.style.display = '';
+      document.getElementById('caisse-engage-montant').textContent = _htg(d.payroll.engage)+' engagé(s)';
+      document.getElementById('caisse-apres-engage').textContent   = _htg(d.synthese.cash_apres_engage);
+    } else {
+      engageWrap.style.display = 'none';
+    }
+
+  } catch(e){
+    console.error('loadCaisse', e);
+    if(wrap){ document.getElementById('caisse-cash-val').textContent = 'Erreur'; }
+  }
+}
+
+function caisseResetFiltres(){
+  document.getElementById('caisse-debut').value = '';
+  document.getElementById('caisse-fin').value   = '';
+  loadCaisse();
+}
 
 </script>
 </body>
