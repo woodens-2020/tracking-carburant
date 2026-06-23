@@ -9398,8 +9398,6 @@ async function submitDep(){
   };
   if(!body.categorie||!body.description||!body.date_depense||body.montant<=0){ _giAlert('Veuillez remplir tous les champs obligatoires.'); return; }
   try {
-    const url=id?`/api/depenses/${id}`:'/api/depenses';
-    const method=id?'PUT':'POST';
     const method = id ? 'PUT' : 'POST';
     const path   = id ? `/depenses/${id}` : '/depenses';
     await apiFetch(method, path, body);
