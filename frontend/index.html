@@ -1638,25 +1638,56 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .gi-page{display:flex;flex-direction:column;gap:18px}
 .gi-page-bar{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-bottom:2px}
 .gi-page-header{
-  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
-  background:var(--card);border:1px solid var(--border);border-radius:12px;
-  padding:16px 20px;
-  border-left:4px solid var(--blue);
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;
+  position:relative;overflow:hidden;
+  background:linear-gradient(135deg,rgba(59,130,246,.13) 0%,rgba(11,22,40,.95) 60%);
+  border:1px solid rgba(59,130,246,.22);
+  border-radius:14px;
+  padding:20px 24px;
+  box-shadow:0 4px 24px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.05);
 }
-.gi-page-header-left{display:flex;flex-direction:column;gap:3px}
-.gi-page-header-actions{display:flex;align-items:center;gap:10px}
+.gi-page-header::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--gi-accent,#3b82f6),rgba(59,130,246,.3),transparent);
+}
+.gi-page-header::after{
+  content:'';position:absolute;top:-60px;left:-60px;width:180px;height:180px;
+  background:radial-gradient(circle,rgba(59,130,246,.1) 0%,transparent 70%);
+  pointer-events:none;
+}
+.gi-page-header-left{display:flex;align-items:center;gap:16px;position:relative;z-index:1}
+.gi-page-header-icon{
+  width:48px;height:48px;border-radius:12px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,rgba(59,130,246,.25),rgba(59,130,246,.1));
+  border:1px solid rgba(59,130,246,.3);
+  box-shadow:0 0 18px rgba(59,130,246,.2);
+}
+.gi-page-header-icon svg{width:22px;height:22px;stroke:var(--gi-accent,#60a5fa)}
+.gi-page-header-text{display:flex;flex-direction:column;gap:3px}
+.gi-page-header-actions{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
 .gi-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
-.gi-title{font-size:18px;font-weight:800;color:var(--text1);letter-spacing:-.02em}
-.gi-subtitle{font-size:11px;color:var(--muted)}
-.gi-btn-primary{display:flex;align-items:center;gap:7px;background:var(--blue);color:#fff;
-  border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;
-  transition:opacity .15s,transform .1s}
-.gi-btn-primary:hover{opacity:.88}
-.gi-btn-primary:active{transform:scale(.97)}
-.gi-btn-secondary{display:flex;align-items:center;gap:7px;background:var(--surface2);color:var(--text1);
-  border:1px solid var(--border);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;
-  cursor:pointer;transition:background .15s}
-.gi-btn-secondary:hover{background:var(--panel2)}
+.gi-title{font-size:20px;font-weight:800;color:#fff;letter-spacing:-.03em;
+  text-shadow:0 0 30px rgba(59,130,246,.3)}
+.gi-subtitle{font-size:11.5px;color:var(--muted);font-weight:500}
+.gi-btn-primary{
+  display:flex;align-items:center;gap:7px;
+  background:linear-gradient(135deg,#2563eb,#3b82f6);
+  color:#fff;border:1px solid rgba(96,165,250,.4);
+  border-radius:9px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;
+  box-shadow:0 4px 14px rgba(59,130,246,.35),0 1px rgba(255,255,255,.12) inset;
+  transition:transform .12s,box-shadow .15s,opacity .15s}
+.gi-btn-primary:hover{box-shadow:0 6px 20px rgba(59,130,246,.5);transform:translateY(-1px)}
+.gi-btn-primary:active{transform:scale(.97);box-shadow:0 2px 8px rgba(59,130,246,.3)}
+.gi-btn-secondary{
+  display:flex;align-items:center;gap:7px;
+  background:rgba(255,255,255,.06);color:rgba(255,255,255,.75);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:9px;padding:9px 16px;font-size:13px;font-weight:600;
+  cursor:pointer;backdrop-filter:blur(4px);
+  transition:background .15s,border-color .15s,transform .12s}
+.gi-btn-secondary:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);transform:translateY(-1px)}
+.gi-btn-secondary:active{transform:scale(.97)}
 .gi-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 .gi-kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
 .gi-kpi-lbl{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px}
@@ -3136,18 +3167,23 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <div id="page-employes" class="page page-gi">
       <div class="gi-page">
-        <div class="gi-page-header">
+        <div class="gi-page-header" style="--gi-accent:#60a5fa">
           <div class="gi-page-header-left">
-            <div class="gi-title">Gestion des Employés</div>
-            <div class="gi-subtitle">Registre du personnel et masse salariale</div>
+            <div class="gi-page-header-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="gi-page-header-text">
+              <div class="gi-title">Gestion des Employés</div>
+              <div class="gi-subtitle">Registre du personnel · masse salariale · contrats</div>
+            </div>
           </div>
           <div class="gi-page-header-actions">
             <button class="gi-btn-secondary" onclick="loadEmployes()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               Actualiser
             </button>
             <button class="gi-btn-primary" onclick="openEmpModal()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Nouvel Employé
             </button>
           </div>
@@ -3263,18 +3299,23 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <div id="page-payroll" class="page page-gi">
       <div class="gi-page">
-        <div class="gi-page-header">
+        <div class="gi-page-header" style="--gi-accent:#3fb6a8;background:linear-gradient(135deg,rgba(63,182,168,.13) 0%,rgba(11,22,40,.95) 60%);border-color:rgba(63,182,168,.22)">
           <div class="gi-page-header-left">
-            <div class="gi-title">Gestion du Payroll</div>
-            <div class="gi-subtitle">Fiches de paie et rémunérations du personnel</div>
+            <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(63,182,168,.25),rgba(63,182,168,.1));border-color:rgba(63,182,168,.3);box-shadow:0 0 18px rgba(63,182,168,.2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#3fb6a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            </div>
+            <div class="gi-page-header-text">
+              <div class="gi-title">Gestion du Payroll</div>
+              <div class="gi-subtitle">Fiches de paie · rémunérations · historique des versements</div>
+            </div>
           </div>
           <div class="gi-page-header-actions">
             <button class="gi-btn-secondary" onclick="loadPayroll()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               Actualiser
             </button>
-            <button class="gi-btn-primary" onclick="openPayrollModal()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <button class="gi-btn-primary" onclick="openPayrollModal()" style="background:linear-gradient(135deg,#0d9488,#3fb6a8);border-color:rgba(63,182,168,.4);box-shadow:0 4px 14px rgba(63,182,168,.35)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Nouvelle Fiche
             </button>
           </div>
@@ -3389,18 +3430,23 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <div id="page-depenses" class="page page-gi">
       <div class="gi-page">
-        <div class="gi-page-header">
+        <div class="gi-page-header" style="--gi-accent:#f87171;background:linear-gradient(135deg,rgba(248,113,113,.12) 0%,rgba(11,22,40,.95) 60%);border-color:rgba(248,113,113,.22)">
           <div class="gi-page-header-left">
-            <div class="gi-title">Dépenses Opérationnelles</div>
-            <div class="gi-subtitle">Charges, coûts et sorties de fonds de la station</div>
+            <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(248,113,113,.25),rgba(248,113,113,.1));border-color:rgba(248,113,113,.3);box-shadow:0 0 18px rgba(248,113,113,.2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div class="gi-page-header-text">
+              <div class="gi-title">Dépenses Opérationnelles</div>
+              <div class="gi-subtitle">Charges · coûts · sorties de fonds de la station</div>
+            </div>
           </div>
           <div class="gi-page-header-actions">
             <button class="gi-btn-secondary" onclick="loadDepenses()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               Actualiser
             </button>
-            <button class="gi-btn-primary" onclick="openDepModal()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <button class="gi-btn-primary" onclick="openDepModal()" style="background:linear-gradient(135deg,#dc2626,#f87171);border-color:rgba(248,113,113,.4);box-shadow:0 4px 14px rgba(248,113,113,.3)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Nouvelle Dépense
             </button>
           </div>
@@ -3506,18 +3552,23 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════ -->
     <div id="page-achats" class="page page-gi">
       <div class="gi-page">
-        <div class="gi-page-header">
+        <div class="gi-page-header" style="--gi-accent:#f7a93b;background:linear-gradient(135deg,rgba(247,169,59,.12) 0%,rgba(11,22,40,.95) 60%);border-color:rgba(247,169,59,.22)">
           <div class="gi-page-header-left">
-            <div class="gi-title">Gestion des Achats</div>
-            <div class="gi-subtitle">Matériel, équipements et fournitures de la station</div>
+            <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(247,169,59,.25),rgba(247,169,59,.1));border-color:rgba(247,169,59,.3);box-shadow:0 0 18px rgba(247,169,59,.2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#f7a93b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            </div>
+            <div class="gi-page-header-text">
+              <div class="gi-title">Gestion des Achats</div>
+              <div class="gi-subtitle">Matériel · équipements · fournitures de la station</div>
+            </div>
           </div>
           <div class="gi-page-header-actions">
             <button class="gi-btn-secondary" onclick="loadAchats()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               Actualiser
             </button>
-            <button class="gi-btn-primary" onclick="openAchatModal()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <button class="gi-btn-primary" onclick="openAchatModal()" style="background:linear-gradient(135deg,#b45309,#f7a93b);border-color:rgba(247,169,59,.4);box-shadow:0 4px 14px rgba(247,169,59,.3);color:#0a1628">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Nouvel Achat
             </button>
           </div>
