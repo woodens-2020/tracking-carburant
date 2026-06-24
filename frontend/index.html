@@ -5313,19 +5313,15 @@ const PAGE_META={
   caisse:              {title: 'Rapport de Caisse',              sub: 'Synthèse financière consolidée — Ventes · Achats · Payroll · Dépenses'},
 };
 
-let _scrollFixTimer = null;
 function _forceScrollTop(){
   const pc = document.getElementById('pages-container');
   if(pc) pc.scrollTop = 0;
 }
 function _startScrollFix(){
+  // Reset scroll au top immédiatement + après le prochain rendu du navigateur
+  // (corrige le scroll anchoring Chrome sans bloquer le défilement utilisateur)
   _forceScrollTop();
-  if(_scrollFixTimer) clearInterval(_scrollFixTimer);
-  const end = Date.now() + 1200;
-  _scrollFixTimer = setInterval(()=>{
-    _forceScrollTop();
-    if(Date.now() >= end){ clearInterval(_scrollFixTimer); _scrollFixTimer = null; }
-  }, 40);
+  requestAnimationFrame(_forceScrollTop);
 }
 
 function goTo(page){
