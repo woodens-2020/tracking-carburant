@@ -1767,7 +1767,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .gi-filter-lbl{
   font-size:9.5px;font-weight:700;
   text-transform:uppercase;letter-spacing:.09em;
-  color:rgba(255,255,255,.35);
+  color:rgba(255,255,255,.55);
 }
 .gi-filter-input,.gi-filter-select{
   background:rgba(0,0,0,.3);
@@ -1813,7 +1813,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .gi-kpi-lbl{
   font-size:9.5px;font-weight:700;
   text-transform:uppercase;letter-spacing:.1em;
-  color:rgba(255,255,255,.4);
+  color:rgba(255,255,255,.6);
   margin-bottom:7px;
 }
 .gi-kpi-val{
@@ -1864,7 +1864,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .gi-table th{
   font-size:10px;font-weight:700;
   text-transform:uppercase;letter-spacing:.1em;
-  color:rgba(255,255,255,.35);
+  color:rgba(255,255,255,.55);
   padding:10px 14px;text-align:left;
   background:rgba(10,18,34,.9);
   border-bottom:1px solid rgba(255,255,255,.07);
@@ -1882,7 +1882,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   background:var(--gi-bg,rgba(59,130,246,.06));
   color:#fff;
 }
-.gi-table .td-muted{color:rgba(255,255,255,.35);font-size:11.5px}
+.gi-table .td-muted{color:rgba(255,255,255,.5);font-size:11.5px}
 .gi-table .td-amount{
   font-weight:700;font-family:var(--mono);
   color:#3fb6a8;font-size:12.5px;
@@ -1925,7 +1925,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .gi-empty{
   display:flex;flex-direction:column;align-items:center;
   padding:36px 20px;
-  color:rgba(255,255,255,.3);font-size:12.5px;gap:10px;
+  color:rgba(255,255,255,.5);font-size:12.5px;gap:10px;
   text-align:center;
 }
 .gi-empty svg{width:32px;height:32px;opacity:.25}
@@ -3982,8 +3982,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <div class="gi-page" style="--gi-accent:#60a5fa;--gi-bg:rgba(96,165,250,.11);--gi-bd:rgba(96,165,250,.22);--gi-glow:rgba(96,165,250,.15)">
         <div class="gi-page-header">
           <div class="gi-page-header-left">
-            <div class="gi-page-header-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(96,165,250,.25),rgba(96,165,250,.1));border-color:rgba(96,165,250,.3);box-shadow:0 0 18px rgba(96,165,250,.2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             </div>
             <div class="gi-page-header-text">
               <div class="gi-title">Gestion des Employés</div>
@@ -4336,7 +4336,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <select class="gi-filter-input" id="dep-filtre-cat" onchange="loadDepenses()">
               <option value="">Toutes</option>
               <option>Salaires</option><option>Maintenance</option><option>Fournitures</option>
-              <option>Electricite</option><option>Eau</option><option>Loyer</option>
+              <option value="Electricite">Électricité</option><option>Eau</option><option>Loyer</option>
               <option>Transport</option><option>Taxes</option><option>Assurance</option><option>Divers</option>
             </select>
           </div>
@@ -4366,7 +4366,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <select class="gi-form-select" id="dep-cat">
                   <option value="">— Sélectionner —</option>
                   <option>Salaires</option><option>Maintenance</option><option>Fournitures</option>
-                  <option>Electricite</option><option>Eau</option><option>Loyer</option>
+                  <option value="Electricite">Électricité</option><option>Eau</option><option>Loyer</option>
                   <option>Transport</option><option>Taxes</option><option>Assurance</option><option>Divers</option>
                 </select>
               </div>
@@ -4491,8 +4491,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <label class="gi-filter-lbl">Catégorie</label>
             <select class="gi-filter-input" id="ach-filtre-cat" onchange="loadAchats()">
               <option value="">Toutes</option>
-              <option>Equipement</option><option>Pieces detachees</option><option>Fournitures bureau</option>
-              <option>Informatique</option><option>Securite</option><option>Nettoyage</option><option>Autre</option>
+              <option value="Equipement">Équipement</option><option value="Pieces detachees">Pièces détachées</option><option>Fournitures bureau</option>
+              <option>Informatique</option><option value="Securite">Sécurité</option><option>Nettoyage</option><option>Autre</option>
             </select>
           </div>
         </div>
@@ -4524,8 +4524,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <label class="gi-form-lbl">Catégorie *</label>
                 <select class="gi-form-select" id="ach-cat">
                   <option value="">— Sélectionner —</option>
-                  <option>Equipement</option><option>Pieces detachees</option><option>Fournitures bureau</option>
-                  <option>Informatique</option><option>Securite</option><option>Nettoyage</option><option>Autre</option>
+                  <option value="Equipement">Équipement</option><option value="Pieces detachees">Pièces détachées</option><option>Fournitures bureau</option>
+                  <option>Informatique</option><option value="Securite">Sécurité</option><option>Nettoyage</option><option>Autre</option>
                 </select>
               </div>
             </div>
