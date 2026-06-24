@@ -144,6 +144,7 @@ class Utilisateur(Base):
     api_key_hash      = Column(String(64),  unique=True, nullable=True)
     nom_complet       = Column(String(150), nullable=False, default="")
     role              = Column(String(20),  nullable=False, default="operateur")
+    poste             = Column(String(100), nullable=True)   # poste de l'employé → contrôle d'accès
     actif             = Column(Boolean,     nullable=False, default=True)
     created_at        = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     # Authentification par email + mot de passe + code d'accès à 9 chiffres

@@ -128,7 +128,11 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
 @app.get("/api/me")
 def me(request: Request):
     user = request.state.user
-    return {"id": user.id, "username": user.username, "nom_complet": user.nom_complet, "role": user.role}
+    return {
+        "id": user.id, "username": user.username,
+        "nom_complet": user.nom_complet, "role": user.role,
+        "poste": user.poste,
+    }
 
 
 # ---------- Gestion des clés API ----------
@@ -222,6 +226,7 @@ class CreateUtilisateurIn(BaseModel):
     code_acces:  str             # exactement 9 chiffres
     role:        str = "operateur"
     email:       str             # obligatoire — sert à la connexion
+    poste:       Optional[str] = None   # poste de l'employé → contrôle d'accès UI
 
 
 def _user_public(u: Utilisateur) -> dict:
@@ -231,6 +236,7 @@ def _user_public(u: Utilisateur) -> dict:
         "username":      u.username,
         "nom_complet":   u.nom_complet,
         "role":          u.role,
+        "poste":         u.poste,
         "actif":         u.actif,
         "has_api_key":   bool(u.api_key_hash),
         "email":         u.email,
@@ -278,6 +284,7 @@ def creer_utilisateur(
         code_acces_hash=hash_code_acces(data.code_acces),
         nom_complet=data.nom_complet.strip(),
         role=data.role,
+        poste=data.poste.strip() if data.poste else None,
         email=email_clean,
     )
     db.add(u)

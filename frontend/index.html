@@ -3614,11 +3614,30 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                   <input type="text" id="emp-code" class="admin-input" placeholder="ex: 123456789" maxlength="9" pattern="\d{9}" inputmode="numeric" autocomplete="off">
                 </div>
               </div>
-              <div class="admin-field" style="margin-bottom:14px">
-                <label class="admin-lbl">Rôle</label>
+              <div class="admin-field">
+                <label class="admin-lbl">Rôle système</label>
                 <select id="emp-role" class="admin-input" style="cursor:pointer">
-                  <option value="operateur">Opérateur (accès métier uniquement)</option>
-                  <option value="admin">Administrateur (accès complet)</option>
+                  <option value="operateur">Opérateur</option>
+                  <option value="admin">Administrateur</option>
+                  <option value="pdg">PDG</option>
+                </select>
+              </div>
+              <div class="admin-field" style="margin-bottom:14px">
+                <label class="admin-lbl">Poste (contrôle d'accès aux sections)</label>
+                <select id="emp-user-poste" class="admin-input" style="cursor:pointer">
+                  <option value="">— Aucun (accès selon rôle) —</option>
+                  <option>Pompiste</option>
+                  <option>Caissier / Caissière</option>
+                  <option>Gérant</option>
+                  <option>Superviseur</option>
+                  <option>Comptable</option>
+                  <option>Technicien</option>
+                  <option>Agent de sécurité</option>
+                  <option>Chauffeur</option>
+                  <option>Nettoyeur / Nettoyeuse</option>
+                  <option>Secrétaire</option>
+                  <option>Magasinier</option>
+                  <option>Directeur Général</option>
                 </select>
               </div>
               <div id="adm-emp-form-msg" class="admin-msg" style="display:none;margin-bottom:10px"></div>
@@ -5429,6 +5448,11 @@ function _startScrollFix(){
 }
 
 function goTo(page){
+  if(!_canAccess(page)){
+    toast('Accès non autorisé pour votre poste.','err');
+    goTo('home');
+    return;
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const pageEl=document.getElementById('page-'+page);
@@ -6969,11 +6993,49 @@ function setStatus(ok){
 }
 let _appUser = null;
 
+// ── Pages accessibles par poste ──────────────────────────────────
+const _ACCES_POSTE = {
+  // Accueil + Tableau de bord + Journal + toute la section Gestion
+  'Comptable':       ['home','dashboard','journal','gi-dashboard','employes','payroll','depenses','achats','caisse'],
+  'Superviseur':     ['home','dashboard','journal','gi-dashboard','employes','payroll','depenses','achats','caisse'],
+  // Accès complet
+  'Directeur Général': null,
+};
+// Pages interdites par défaut pour un poste non listé (Pompiste, Caissier, etc.)
+const _ACCES_DEFAUT = ['home'];
+
+function _canAccess(page){
+  const poste = _appUser?.poste || null;
+  if(!poste) return true;                      // pas de poste → accès complet (admin/pdg)
+  const pages = _ACCES_POSTE[poste];
+  if(pages === undefined) return _ACCES_DEFAUT.includes(page); // poste non listé
+  if(pages === null)      return true;         // accès complet (Directeur Général)
+  return pages.includes(page);
+}
+
+function _applyNavAccess(){
+  const poste = _appUser?.poste || null;
+  if(!poste || _ACCES_POSTE[poste] === null) return; // accès complet
+  const allowed = _ACCES_POSTE[poste] || _ACCES_DEFAUT;
+  document.querySelectorAll('.nav-item[data-page]').forEach(btn=>{
+    const p = btn.getAttribute('data-page');
+    btn.style.display = allowed.includes(p) ? '' : 'none';
+  });
+  // Masquer les nav-sections vides (ex : section "Gestion" visible, "Ventes" cachée)
+  document.querySelectorAll('.nav-section-label').forEach(label=>{
+    const section = label.closest('.nav-section') || label.parentElement;
+    if(!section) return;
+    const visibleItems = [...section.querySelectorAll('.nav-item')].filter(b=>b.style.display!=='none');
+    label.style.display = visibleItems.length ? '' : 'none';
+  });
+}
+
 async function loadCurrentUser(){
   try{
     const u=await GET('/me');
     _appUser = u;
     document.getElementById('user-txt').textContent=u.nom_complet||u.username;
+    _applyNavAccess();
   }catch(e){
     document.getElementById('user-txt').textContent='—';
   }
@@ -7448,9 +7510,9 @@ document.addEventListener('DOMContentLoaded',async()=>{
     document.getElementById('chips-ct').appendChild(btn);
   });
 
-  // Logo + utilisateur
+  // Logo + utilisateur (await pour que _appUser soit défini avant loadHome)
   initLogo();
-  loadCurrentUser();
+  await loadCurrentUser();
 
   // Charger les produits en premier
   try{
@@ -9789,6 +9851,7 @@ function showCreateEmpForm(){
 }
 function hideCreateEmpForm(){
   document.getElementById('adm-emp-form').style.display = 'none';
+  document.getElementById('emp-user-poste').value = '';
   ['emp-username','emp-nomcomplet','emp-password','emp-email','emp-code'].forEach(id=>{
     document.getElementById(id).value='';
   });
@@ -9812,6 +9875,7 @@ async function submitCreateEmp(){
   const email      = document.getElementById('emp-email').value.trim();
   const codeAcces  = document.getElementById('emp-code').value.trim();
   const role       = document.getElementById('emp-role').value;
+  const poste      = document.getElementById('emp-user-poste').value || null;
 
   if(!username || !nomComplet || !password || !email || !codeAcces){
     return _empFormMsg('Tous les champs sont requis (identifiant, nom, email, mot de passe, code d\'accès).','err');
@@ -9830,7 +9894,7 @@ async function submitCreateEmp(){
   }
   _empFormMsg('Création en cours…','');
   try{
-    const res = await POST('/auth/utilisateurs', {username, nom_complet:nomComplet, password, code_acces:codeAcces, role, email});
+    const res = await POST('/auth/utilisateurs', {username, nom_complet:nomComplet, password, code_acces:codeAcces, role, email, poste});
     hideCreateEmpForm();
     await loadEmployees();
     showKeyModal(res.api_key, `Clé de ${res.nom_complet||res.username}`);

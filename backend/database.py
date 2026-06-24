@@ -121,6 +121,9 @@ def _migrate_columns():
             # v3 — code d'accès 9 chiffres
             ("utilisateurs", "code_acces_hash",
              "ALTER TABLE utilisateurs ADD COLUMN code_acces_hash VARCHAR(255)", None),
+            # v5 — poste de l'employé (contrôle d'accès)
+            ("utilisateurs", "poste",
+             "ALTER TABLE utilisateurs ADD COLUMN poste VARCHAR(100)", None),
         ]
     else:
         return
