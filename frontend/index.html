@@ -4305,6 +4305,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
         <!-- Filtres -->
         <div class="gi-filters">
+          <div class="gi-filter-field" style="flex:1;min-width:220px">
+            <label class="gi-filter-lbl">Rechercher</label>
+            <div style="position:relative">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:rgba(255,255,255,.35);pointer-events:none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="emp-search" class="gi-filter-input" placeholder="Nom, prénom ou poste…" oninput="filterEmpLocal()" style="padding-left:30px;min-width:220px;width:100%">
+            </div>
+          </div>
           <div class="gi-filter-field">
             <label class="gi-filter-lbl">Statut</label>
             <select class="gi-filter-input" id="emp-filtre-actif" onchange="loadEmployes()">
@@ -4312,6 +4319,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option value="true" selected>Actifs</option>
               <option value="false">Inactifs</option>
             </select>
+          </div>
+          <div style="margin-top:auto">
+            <button class="gi-btn-secondary" onclick="document.getElementById('emp-search').value='';filterEmpLocal()" title="Effacer la recherche">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
           </div>
         </div>
 
@@ -11140,6 +11152,17 @@ async function loadEmployes(){
     console.error('loadEmployes',e);
     _giError('emp-table-wrap', e.message || 'Erreur de chargement des employés.');
   }
+}
+
+function filterEmpLocal(){
+  const q = (document.getElementById('emp-search')?.value || '').toLowerCase().trim();
+  if(!q){ renderEmpTable(_empData); return; }
+  const filtered = (_empData||[]).filter(e =>
+    `${e.prenom} ${e.nom}`.toLowerCase().includes(q) ||
+    (e.poste||'').toLowerCase().includes(q) ||
+    (e.email||'').toLowerCase().includes(q)
+  );
+  renderEmpTable(filtered);
 }
 
 function renderEmpTable(data){
