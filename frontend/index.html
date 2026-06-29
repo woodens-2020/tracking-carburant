@@ -4105,18 +4105,63 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
           </div>
           <div class="gi-page-header-actions">
-            <!-- Filtres période -->
-            <div class="gid-period-bar">
-              <button class="gid-period-btn active" data-days="30"  onclick="gidSetPeriod(30,this)">30 j</button>
-              <button class="gid-period-btn"         data-days="90"  onclick="gidSetPeriod(90,this)">3 mois</button>
-              <button class="gid-period-btn"         data-days="180" onclick="gidSetPeriod(180,this)">6 mois</button>
-              <button class="gid-period-btn"         data-days="365" onclick="gidSetPeriod(365,this)">1 an</button>
-              <button class="gid-period-btn"         data-days="0"   onclick="gidSetPeriod(0,this)">Tout</button>
-            </div>
-            <button class="gi-btn-secondary" onclick="loadGiDashboard()" style="margin-left:4px">
+            <button class="gi-btn-secondary" onclick="loadGiDashboard()" title="Actualiser">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
             </button>
           </div>
+        </div>
+
+        <!-- Barre de filtres avancés -->
+        <div class="gi-filters" style="gap:8px;flex-wrap:wrap;align-items:center">
+
+          <!-- Préréglages rapides -->
+          <div style="display:flex;gap:3px;align-items:center">
+            <span style="font-size:10px;font-weight:600;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em;margin-right:4px">Période</span>
+            <button class="gid-period-btn" onclick="gidSetPeriod(1,this)">Auj.</button>
+            <button class="gid-period-btn" onclick="gidSetPeriod(7,this)">7 j</button>
+            <button class="gid-period-btn active" onclick="gidSetPeriod(30,this)">30 j</button>
+            <button class="gid-period-btn" onclick="gidSetPeriod(90,this)">3 mois</button>
+            <button class="gid-period-btn" onclick="gidSetPeriod(180,this)">6 mois</button>
+            <button class="gid-period-btn" onclick="gidSetPeriod(365,this)">1 an</button>
+            <button class="gid-period-btn" onclick="gidSetPeriod(0,this)">Tout</button>
+          </div>
+
+          <!-- Séparateur -->
+          <div style="width:1px;height:22px;background:rgba(255,255,255,.1);flex-shrink:0"></div>
+
+          <!-- Plage personnalisée -->
+          <div style="display:flex;align-items:center;gap:5px">
+            <span style="font-size:10px;font-weight:600;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em">Du</span>
+            <input type="date" id="gid-debut-input" onchange="gidApplyCustomRange()" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:rgba(255,255,255,.8);font-size:11px;padding:4px 8px;outline:none;cursor:pointer">
+            <span style="font-size:10px;font-weight:600;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em">Au</span>
+            <input type="date" id="gid-fin-input" onchange="gidApplyCustomRange()" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:rgba(255,255,255,.8);font-size:11px;padding:4px 8px;outline:none;cursor:pointer">
+          </div>
+
+          <!-- Séparateur -->
+          <div style="width:1px;height:22px;background:rgba(255,255,255,.1);flex-shrink:0"></div>
+
+          <!-- Filtre produit -->
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:10px;font-weight:600;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em">Produit</span>
+            <select id="gid-produit-sel" onchange="loadGiDashboard()" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:rgba(255,255,255,.8);font-size:11px;padding:4px 10px;outline:none;cursor:pointer;min-width:110px">
+              <option value="">Tous</option>
+            </select>
+          </div>
+
+          <!-- Séparateur -->
+          <div style="width:1px;height:22px;background:rgba(255,255,255,.1);flex-shrink:0"></div>
+
+          <!-- Granularité graphique -->
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-size:10px;font-weight:600;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em;margin-right:2px">Vue</span>
+            <button class="gid-period-btn active" onclick="gidSetGran('jour',this)">Jour</button>
+            <button class="gid-period-btn" onclick="gidSetGran('semaine',this)">Semaine</button>
+            <button class="gid-period-btn" onclick="gidSetGran('mois',this)">Mois</button>
+          </div>
+
+          <!-- Indicateur période active -->
+          <div style="margin-left:auto;font-size:10.5px;color:rgba(255,255,255,.35);font-style:italic" id="gid-period-label"></div>
+
         </div>
 
         <!-- KPI Row — 5 cartes -->
@@ -12122,17 +12167,53 @@ const _giPageLoaders = {
 let _gidChartTrend  = null;
 let _gidChartDonut  = null;
 let _gidDays        = 30;
+let _gidGran        = 'jour';   // 'jour' | 'semaine' | 'mois'
+let _gidCustom      = false;    // true = plage manuelle active
 
 function gidSetPeriod(days, btn){
-  _gidDays = days;
-  document.querySelectorAll('.gid-period-btn').forEach(b => b.classList.remove('active'));
+  _gidDays   = days;
+  _gidCustom = false;
+  // Désactiver uniquement les boutons de la même ligne (préréglages)
+  btn.closest('div').querySelectorAll('.gid-period-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  // Mettre à jour les inputs date pour refléter la plage
+  const {debut, fin} = _gidDateRange();
+  const d1 = document.getElementById('gid-debut-input');
+  const d2 = document.getElementById('gid-fin-input');
+  if(d1) d1.value = debut;
+  if(d2) d2.value = fin;
   loadGiDashboard();
 }
 
+function gidApplyCustomRange(){
+  _gidCustom = true;
+  // Désactiver les boutons préréglages
+  document.querySelectorAll('.gid-period-btn[onclick*="gidSetPeriod"]').forEach(b => b.classList.remove('active'));
+  const d1 = document.getElementById('gid-debut-input')?.value;
+  const d2 = document.getElementById('gid-fin-input')?.value;
+  if(d1 && d2 && d1 <= d2) loadGiDashboard();
+}
+
+function gidSetGran(gran, btn){
+  _gidGran = gran;
+  btn.closest('div').querySelectorAll('.gid-period-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Remettre à jour le graphique avec les données déjà chargées
+  if(_gidLastTrend) _gidBuildTrend(_gidLastTrend);
+}
+
 function _gidDateRange(){
+  if(_gidCustom){
+    const d1 = document.getElementById('gid-debut-input')?.value || '';
+    const d2 = document.getElementById('gid-fin-input')?.value   || '';
+    return {debut: d1, fin: d2};
+  }
   const today = new Date();
   if(_gidDays === 0) return {debut:'', fin:''};
+  if(_gidDays === 1) return {
+    debut: today.toISOString().slice(0,10),
+    fin:   today.toISOString().slice(0,10),
+  };
   const debut = new Date(today);
   debut.setDate(today.getDate() - _gidDays + 1);
   return {
@@ -12141,12 +12222,153 @@ function _gidDateRange(){
   };
 }
 
+// Initialise les inputs date et le select produit au premier chargement
+function _gidInitFilters(){
+  const {debut, fin} = _gidDateRange();
+  const d1 = document.getElementById('gid-debut-input');
+  const d2 = document.getElementById('gid-fin-input');
+  if(d1 && !d1.value) d1.value = debut;
+  if(d2 && !d2.value) d2.value = fin;
+  // Remplir le select produit depuis la liste globale
+  const sel = document.getElementById('gid-produit-sel');
+  if(sel && sel.options.length <= 1 && typeof products !== 'undefined'){
+    (products||[]).forEach(p => {
+      const o = document.createElement('option');
+      o.value = p.id; o.textContent = p.nom; sel.appendChild(o);
+    });
+  }
+}
+
+// Regroupe les données de tendance selon la granularité choisie
+function _gidGroupTrend(serie){
+  if(_gidGran === 'jour') return serie;
+  const map = new Map();
+  serie.forEach(pt => {
+    let key;
+    const d = new Date(pt.date+'T00:00:00');
+    if(_gidGran === 'semaine'){
+      const mon = new Date(d); mon.setDate(d.getDate() - d.getDay() + 1);
+      key = mon.toISOString().slice(0,10);
+    } else {
+      key = pt.date.slice(0,7)+'-01';
+    }
+    if(!map.has(key)) map.set(key, {date:key, ventes:0, gallons:0, depenses:0});
+    const e = map.get(key);
+    e.ventes   += pt.ventes;
+    e.gallons  += pt.gallons;
+    e.depenses += pt.depenses;
+  });
+  return Array.from(map.values());
+}
+
+let _gidLastTrend = null;
+
+function _gidBuildTrend(rawSerie){
+  const serie = _gidGroupTrend(rawSerie);
+  const fmtLabel = pt => {
+    const dt = new Date(pt.date+'T00:00:00');
+    if(_gidGran === 'mois')    return dt.toLocaleDateString('fr',{month:'short',year:'2-digit'});
+    if(_gidGran === 'semaine') return 'S '+dt.toLocaleDateString('fr',{day:'2-digit',month:'2-digit'});
+    return dt.toLocaleDateString('fr',{day:'2-digit',month:'2-digit'});
+  };
+  const labels    = serie.map(fmtLabel);
+  const dataVentes = serie.map(t => t.ventes);
+  const dataDep    = serie.map(t => t.depenses);
+
+  const totalVentes = dataVentes.reduce((s,v)=>s+v,0);
+  const totalDep2   = dataDep.reduce((s,v)=>s+v,0);
+  const trendTotalEl = document.getElementById('gid-trend-total');
+  if(trendTotalEl) trendTotalEl.textContent = 'Ventes '+_htg(totalVentes)+' · Dép '+_htg(totalDep2);
+
+  if(_gidChartTrend){ _gidChartTrend.destroy(); _gidChartTrend = null; }
+  const ctxT = document.getElementById('gid-chart-trend').getContext('2d');
+
+  const gradBar = ctxT.createLinearGradient(0, 0, 0, 320);
+  gradBar.addColorStop(0,   'rgba(34,197,94,.85)');
+  gradBar.addColorStop(0.6, 'rgba(34,197,94,.45)');
+  gradBar.addColorStop(1,   'rgba(34,197,94,.08)');
+  const gradDep = ctxT.createLinearGradient(0, 0, 0, 320);
+  gradDep.addColorStop(0,   'rgba(248,113,113,.22)');
+  gradDep.addColorStop(1,   'rgba(248,113,113,.01)');
+
+  const maxTicks = _gidGran==='mois' ? 12 : _gidGran==='semaine' ? 12 : (_gidDays<=30 ? 15 : _gidDays<=90 ? 12 : 8);
+
+  _gidChartTrend = new Chart(ctxT, {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'bar', label: 'Ventes', data: dataVentes,
+          backgroundColor: gradBar, borderColor: '#22c55e',
+          borderWidth: 1, borderRadius: 5, borderSkipped: 'bottom', yAxisID: 'y',
+        },
+        {
+          type: 'line', label: 'Dépenses', data: dataDep,
+          borderColor: '#f87171', backgroundColor: gradDep,
+          borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#f87171', pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2, tension: 0.45, fill: true, yAxisID: 'y',
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      animation: { duration: 500, easing: 'easeOutQuart' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(11,22,40,.96)',
+          borderColor: 'rgba(255,255,255,.1)', borderWidth: 1, padding: 10,
+          titleColor: 'rgba(255,255,255,.7)', bodyColor: 'rgba(255,255,255,.9)',
+          callbacks: {
+            title: items => items[0].label,
+            label: ctx => {
+              const ico = ctx.datasetIndex===0 ? '▐' : '━';
+              const diff = (ctx.datasetIndex===1 && dataVentes[ctx.dataIndex]>0)
+                ? '  ('+(100*ctx.raw/dataVentes[ctx.dataIndex]).toFixed(0)+'% v.)' : '';
+              return ' '+ico+' '+ctx.dataset.label+' : '+_htg(ctx.raw)+diff;
+            },
+            afterBody: items => {
+              const i = items[0].dataIndex;
+              const net = dataVentes[i] - dataDep[i];
+              return ['', ' Net : '+(net>=0?'+':'')+_htg(net)];
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: { color: 'rgba(100,116,139,.8)', font:{size:9}, maxTicksLimit: maxTicks },
+          grid: { color: 'rgba(255,255,255,.025)' },
+          border: { color: 'rgba(255,255,255,.06)' },
+        },
+        y: {
+          ticks: {
+            color: 'rgba(100,116,139,.8)', font:{size:9},
+            callback: v => v>=1000000?(v/1000000).toFixed(1)+'M':v>=1000?(v/1000).toFixed(0)+'k':v,
+          },
+          grid: { color: 'rgba(255,255,255,.04)' },
+          border: { color: 'rgba(255,255,255,.06)', dash: [3,3] },
+        },
+      },
+    },
+  });
+}
+
 async function loadGiDashboard(){
+  _gidInitFilters();
   const {debut, fin} = _gidDateRange();
   const params = [];
   if(debut) params.push('date_debut='+debut);
   if(fin)   params.push('date_fin='+fin);
+  const prodSel = document.getElementById('gid-produit-sel');
+  if(prodSel?.value) params.push('produit_id='+prodSel.value);
   const qs = params.length ? '?'+params.join('&') : '';
+  // Indicateur période
+  const lbl = document.getElementById('gid-period-label');
+  if(lbl && debut && fin) lbl.textContent = frDate(debut)+' → '+frDate(fin);
+  else if(lbl) lbl.textContent = 'Toute la période';
 
   try {
     const d = await apiFetch('GET', '/gi/dashboard'+qs);
@@ -12186,115 +12408,9 @@ async function loadGiDashboard(){
       alertEl.style.display = 'none';
     }
 
-    // ── Graphique trend (barres ventes + ligne dépenses) ─────
-    const labels   = d.trend.map(t => {
-      const dt = new Date(t.date+'T00:00:00');
-      return dt.toLocaleDateString('fr',{day:'2-digit',month:'2-digit'});
-    });
-    const dataVentes  = d.trend.map(t => t.ventes);
-    const dataDep     = d.trend.map(t => t.depenses);
-
-    const totalVentes = dataVentes.reduce((s,v)=>s+v,0);
-    const totalDep2   = dataDep.reduce((s,v)=>s+v,0);
-    const trendTotalEl = document.getElementById('gid-trend-total');
-    if(trendTotalEl) trendTotalEl.textContent = 'Ventes '+_htg(totalVentes)+' · Dép '+_htg(totalDep2);
-
-    if(_gidChartTrend){ _gidChartTrend.destroy(); _gidChartTrend = null; }
-    const ctxT = document.getElementById('gid-chart-trend').getContext('2d');
-
-    const gradBar = ctxT.createLinearGradient(0, 0, 0, 320);
-    gradBar.addColorStop(0,   'rgba(34,197,94,.85)');
-    gradBar.addColorStop(0.6, 'rgba(34,197,94,.45)');
-    gradBar.addColorStop(1,   'rgba(34,197,94,.08)');
-    const gradDep = ctxT.createLinearGradient(0, 0, 0, 320);
-    gradDep.addColorStop(0,   'rgba(248,113,113,.22)');
-    gradDep.addColorStop(1,   'rgba(248,113,113,.01)');
-
-    _gidChartTrend = new Chart(ctxT, {
-      data: {
-        labels,
-        datasets: [
-          {
-            type: 'bar',
-            label: 'Ventes',
-            data: dataVentes,
-            backgroundColor: gradBar,
-            borderColor: '#22c55e',
-            borderWidth: 1,
-            borderRadius: 5,
-            borderSkipped: 'bottom',
-            yAxisID: 'y',
-          },
-          {
-            type: 'line',
-            label: 'Dépenses',
-            data: dataDep,
-            borderColor: '#f87171',
-            backgroundColor: gradDep,
-            borderWidth: 2.5,
-            pointRadius: 0,
-            pointHoverRadius: 5,
-            pointHoverBackgroundColor: '#f87171',
-            pointHoverBorderColor: '#fff',
-            pointHoverBorderWidth: 2,
-            tension: 0.45,
-            fill: true,
-            yAxisID: 'y',
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        animation: { duration: 600, easing: 'easeOutQuart' },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: 'rgba(11,22,40,.96)',
-            borderColor: 'rgba(255,255,255,.1)',
-            borderWidth: 1,
-            padding: 10,
-            titleColor: 'rgba(255,255,255,.7)',
-            bodyColor: 'rgba(255,255,255,.9)',
-            callbacks: {
-              title: items => items[0].label,
-              label: ctx => {
-                const ico = ctx.datasetIndex===0 ? '▐' : '━';
-                const diff = (ctx.datasetIndex===1 && dataVentes[ctx.dataIndex]>0)
-                  ? '  ('+(100*ctx.raw/dataVentes[ctx.dataIndex]).toFixed(0)+'% v.)'
-                  : '';
-                return ' '+ico+' '+ctx.dataset.label+' : '+_htg(ctx.raw)+diff;
-              },
-              afterBody: items => {
-                const i = items[0].dataIndex;
-                const net = dataVentes[i] - dataDep[i];
-                return ['', ' Net : '+(net>=0?'+':'')+_htg(net)];
-              },
-            },
-          },
-        },
-        scales: {
-          x: {
-            ticks: {
-              color: 'rgba(100,116,139,.8)', font:{size:9},
-              maxTicksLimit: _gidDays <= 30 ? 15 : _gidDays <= 90 ? 12 : 8,
-            },
-            grid: { color: 'rgba(255,255,255,.025)' },
-            border: { color: 'rgba(255,255,255,.06)' },
-          },
-          y: {
-            ticks: {
-              color: 'rgba(100,116,139,.8)', font:{size:9},
-              callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' :
-                             v >= 1000    ? (v/1000).toFixed(0)+'k' : v,
-            },
-            grid: { color: 'rgba(255,255,255,.04)' },
-            border: { color: 'rgba(255,255,255,.06)', dash: [3,3] },
-          },
-        },
-      },
-    });
+    // ── Graphique trend ───────────────────────────────────────
+    _gidLastTrend = d.trend;
+    _gidBuildTrend(d.trend);
 
     // ── Donut répartition ────────────────────────────────────
     const dCash   = Math.max(0, cash);

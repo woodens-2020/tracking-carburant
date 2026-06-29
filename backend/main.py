@@ -3727,8 +3727,9 @@ def rapport_caisse(
 # ══════════════════════════════════════════════════════════════════
 @app.get("/api/gi/dashboard")
 def gi_dashboard(
-    date_debut: Optional[date_type] = None,
-    date_fin:   Optional[date_type] = None,
+    date_debut:  Optional[date_type] = None,
+    date_fin:    Optional[date_type] = None,
+    produit_id:  Optional[int]       = None,
     db: Session = Depends(get_db),
 ):
     """
@@ -3747,10 +3748,12 @@ def gi_dashboard(
     nb_jours = (date_fin - date_debut).days + 1
 
     # ── Ventes (releves) ───────────────────────────────────────
-    releves = (db.query(Releve)
-               .filter(Releve.date >= date_debut, Releve.date <= date_fin)
-               .order_by(Releve.date)
-               .all())
+    q_releves = (db.query(Releve)
+                 .filter(Releve.date >= date_debut, Releve.date <= date_fin))
+    if produit_id:
+        from sqlalchemy.orm import joinedload
+        q_releves = q_releves.join(Releve.pompe).filter(Pompe.produit_id == produit_id)
+    releves = q_releves.order_by(Releve.date).all()
 
     total_ventes  = round(sum(float(r.montant_vente) for r in releves), 2)
     total_gallons = round(sum(float(r.quantite) for r in releves), 3)
