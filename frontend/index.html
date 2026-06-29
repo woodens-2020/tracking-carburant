@@ -2270,7 +2270,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   .gid-kpi-lbl{font-size:9px}
   .gid-kpi-sub{font-size:9px;margin-top:2px}
   .gid-chart-hdr{padding:8px 13px}
-  .gid-chart-body[style*="260px"]{height:150px!important}.gid-chart-body[style*="200px"]{height:120px!important}
+  .gid-chart-body[style*="320px"]{height:180px!important}.gid-chart-body[style*="190px"]{height:120px!important}
   .modal-box{max-height:88vh}
   .main-header{height:46px;padding:0 20px}
   .pages{top:46px}
@@ -2288,7 +2288,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   .gid-kpi-val{font-size:15px}
   .gid-kpi{padding:8px 11px}
   .gid-chart-body{padding:7px}
-  .gid-chart-body[style*="260px"]{height:150px!important}.gid-chart-body[style*="200px"]{height:120px!important}
+  .gid-chart-body[style*="320px"]{height:180px!important}.gid-chart-body[style*="190px"]{height:120px!important}
 }
 
 /* ── Combiné 1366 × 768 : les deux contraintes simultanées ─── */
@@ -4174,57 +4174,53 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <span id="gid-alert-engage-txt"></span>
         </div>
 
-        <!-- Graphiques principaux -->
-        <div class="gid-chart-grid">
-          <!-- Évolution ventes vs dépenses -->
-          <div class="gid-chart-card">
-            <div class="gid-chart-hdr">
-              <div>
-                <div class="gid-chart-title">Évolution Ventes &amp; Sorties</div>
-                <div class="gid-chart-sub">Ventes journalières vs dépenses — survolez pour les détails</div>
-              </div>
-              <div style="display:flex;gap:14px;font-size:10.5px;align-items:center">
-                <span style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,.6)">
-                  <span style="width:12px;height:4px;background:linear-gradient(90deg,#22c55e,#4ade80);border-radius:2px;display:inline-block"></span>Ventes
-                </span>
-                <span style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,.6)">
-                  <span style="width:12px;height:2px;background:#f87171;border-radius:2px;display:inline-block"></span>Dépenses
-                </span>
-                <span id="gid-trend-total" style="font-size:10px;color:rgba(255,255,255,.35);margin-left:4px"></span>
-              </div>
+        <!-- Graphique barre pleine largeur -->
+        <div class="gid-chart-card">
+          <div class="gid-chart-hdr">
+            <div>
+              <div class="gid-chart-title">Évolution Ventes &amp; Sorties</div>
+              <div class="gid-chart-sub">Ventes journalières vs dépenses — survolez pour les détails</div>
             </div>
-            <div class="gid-chart-body" style="height:260px;padding:12px 16px 8px">
-              <canvas id="gid-chart-trend"></canvas>
+            <div style="display:flex;gap:16px;font-size:10.5px;align-items:center">
+              <span style="display:flex;align-items:center;gap:6px;color:rgba(255,255,255,.65)">
+                <span style="width:14px;height:5px;background:linear-gradient(90deg,#22c55e,#4ade80);border-radius:3px;display:inline-block"></span>Ventes
+              </span>
+              <span style="display:flex;align-items:center;gap:6px;color:rgba(255,255,255,.65)">
+                <span style="width:14px;height:2px;background:#f87171;border-radius:2px;display:inline-block"></span>Dépenses
+              </span>
+              <span id="gid-trend-total" style="font-size:10px;color:rgba(255,255,255,.3);margin-left:6px"></span>
             </div>
           </div>
+          <div class="gid-chart-body" style="height:320px;padding:16px 20px 12px">
+            <canvas id="gid-chart-trend"></canvas>
+          </div>
+        </div>
+
+        <!-- Ligne du bas : Donut + Dépenses + RH/Achats -->
+        <div class="gid-bottom-grid" style="grid-template-columns:1fr 1.4fr 1fr">
 
           <!-- Donut répartition financière -->
           <div class="gid-chart-card">
             <div class="gid-chart-hdr">
               <div>
                 <div class="gid-chart-title">Répartition Financière</div>
-                <div class="gid-chart-sub">Cliquez sur un segment pour le détailler</div>
+                <div class="gid-chart-sub">Survolez un segment pour le détail</div>
               </div>
             </div>
-            <div class="gid-chart-body" style="height:200px;display:flex;align-items:center;justify-content:center;position:relative;padding:8px">
-              <canvas id="gid-chart-donut" style="max-height:180px;max-width:180px"></canvas>
+            <div class="gid-chart-body" style="height:190px;display:flex;align-items:center;justify-content:center;position:relative;padding:8px">
+              <canvas id="gid-chart-donut" style="max-height:170px;max-width:170px"></canvas>
               <div id="gid-donut-center" style="position:absolute;text-align:center;pointer-events:none">
                 <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.4)">Cash</div>
-                <div id="gid-donut-val" style="font-size:16px;font-weight:900;color:#22c55e;line-height:1.1">—</div>
+                <div id="gid-donut-val" style="font-size:15px;font-weight:900;color:#22c55e;line-height:1.1">—</div>
               </div>
             </div>
-            <!-- Légende donut -->
-            <div id="gid-donut-legend" style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;padding:0 16px 14px">
-              <div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0"></span><span style="font-size:10.5px;color:rgba(255,255,255,.55)">Cash dispo</span><span id="gid-leg-cash" style="font-size:10.5px;color:#22c55e;font-weight:700;margin-left:auto">—</span></div>
-              <div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#f7a93b;flex-shrink:0"></span><span style="font-size:10.5px;color:rgba(255,255,255,.55)">Achats</span><span id="gid-leg-ach" style="font-size:10.5px;color:#f7a93b;font-weight:700;margin-left:auto">—</span></div>
-              <div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#3fb6a8;flex-shrink:0"></span><span style="font-size:10.5px;color:rgba(255,255,255,.55)">Payroll</span><span id="gid-leg-pay" style="font-size:10.5px;color:#3fb6a8;font-weight:700;margin-left:auto">—</span></div>
-              <div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#f87171;flex-shrink:0"></span><span style="font-size:10.5px;color:rgba(255,255,255,.55)">Dépenses</span><span id="gid-leg-dep" style="font-size:10.5px;color:#f87171;font-weight:700;margin-left:auto">—</span></div>
+            <div id="gid-donut-legend" style="display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;padding:0 14px 14px">
+              <div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0"></span><span style="font-size:10px;color:rgba(255,255,255,.5)">Cash</span><span id="gid-leg-cash" style="font-size:10px;color:#22c55e;font-weight:700;margin-left:auto">—</span></div>
+              <div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#f7a93b;flex-shrink:0"></span><span style="font-size:10px;color:rgba(255,255,255,.5)">Achats</span><span id="gid-leg-ach" style="font-size:10px;color:#f7a93b;font-weight:700;margin-left:auto">—</span></div>
+              <div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#3fb6a8;flex-shrink:0"></span><span style="font-size:10px;color:rgba(255,255,255,.5)">Payroll</span><span id="gid-leg-pay" style="font-size:10px;color:#3fb6a8;font-weight:700;margin-left:auto">—</span></div>
+              <div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#f87171;flex-shrink:0"></span><span style="font-size:10px;color:rgba(255,255,255,.5)">Dépenses</span><span id="gid-leg-dep" style="font-size:10px;color:#f87171;font-weight:700;margin-left:auto">—</span></div>
             </div>
           </div>
-        </div>
-
-        <!-- Ligne du bas : Dépenses + RH/Achats -->
-        <div class="gid-bottom-grid">
 
           <!-- Dépenses par catégorie -->
           <div class="gid-chart-card">
@@ -4245,7 +4241,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div class="gid-chart-title">Ressources Humaines &amp; Achats</div>
             </div>
             <div style="padding:14px 18px 16px">
-              <!-- RH mini-cards -->
               <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#60a5fa;margin-bottom:10px;display:flex;align-items:center;gap:6px">
                 <svg viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" style="width:12px;height:12px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
                 Équipe
@@ -4263,7 +4258,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 </div>
               </div>
               <div style="height:1px;background:rgba(255,255,255,.06);margin-bottom:12px"></div>
-              <!-- Achats -->
               <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#f7a93b;margin-bottom:10px;display:flex;align-items:center;gap:6px">
                 <svg viewBox="0 0 24 24" fill="none" stroke="#f7a93b" stroke-width="2" style="width:12px;height:12px"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
                 Achats
@@ -12179,11 +12173,11 @@ async function loadGiDashboard(){
     if(_gidChartTrend){ _gidChartTrend.destroy(); _gidChartTrend = null; }
     const ctxT = document.getElementById('gid-chart-trend').getContext('2d');
 
-    const gradBar = ctxT.createLinearGradient(0, 0, 0, 250);
+    const gradBar = ctxT.createLinearGradient(0, 0, 0, 320);
     gradBar.addColorStop(0,   'rgba(34,197,94,.85)');
     gradBar.addColorStop(0.6, 'rgba(34,197,94,.45)');
     gradBar.addColorStop(1,   'rgba(34,197,94,.08)');
-    const gradDep = ctxT.createLinearGradient(0, 0, 0, 250);
+    const gradDep = ctxT.createLinearGradient(0, 0, 0, 320);
     gradDep.addColorStop(0,   'rgba(248,113,113,.22)');
     gradDep.addColorStop(1,   'rgba(248,113,113,.01)');
 
