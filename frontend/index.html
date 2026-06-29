@@ -80,6 +80,7 @@ input[type=date]{color-scheme:dark}
   display:flex;flex-direction:column;flex-shrink:0;
   position:sticky;top:0;height:100vh;overflow-y:auto;
   box-shadow:4px 0 24px rgba(0,0,0,.35);
+  z-index:20;
 }
 /* Barre accent top */
 .sidebar::before{
@@ -7732,41 +7733,49 @@ function setStatus(ok){
 let _appUser = null;
 
 // ── Pages accessibles par poste ──────────────────────────────────
+// null = accès complet ; tableau = pages autorisées
+// Tout poste NON LISTÉ → accès complet par défaut (PDG, Gérant, Chef, Admin…)
 const _ACCES_POSTE = {
-  // Accueil + Tableau de bord + Journal + toute la section Gestion + POS Bar
-  'Comptable':       ['home','dashboard','journal','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                      'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite'],
-  'Superviseur':     ['home','dashboard','journal','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                      'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite'],
-  // Accès complet
+  // ─ Direction / Management → accès complet ────────────────────
   'Directeur Général': null,
+  // ─ Comptabilité / Supervision → accès partiel ────────────────
+  'Comptable':   ['home','dashboard','journal','gi-dashboard','employes','payroll','depenses','achats','caisse',
+                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite'],
+  'Superviseur': ['home','dashboard','journal','gi-dashboard','employes','payroll','depenses','achats','caisse',
+                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite'],
+  // ─ Terrain → accès très limité ───────────────────────────────
+  'Pompiste': ['home','saisie'],
+  'Caissier': ['home','saisie','journal','dashboard'],
 };
-// Pages interdites par défaut pour un poste non listé (Pompiste, Caissier, etc.)
-const _ACCES_DEFAUT = ['home'];
 
 function _canAccess(page){
   const poste = _appUser?.poste || null;
-  if(!poste) return true;                      // pas de poste → accès complet (admin/pdg)
+  if(!poste) return true;              // pas de poste → accès complet
   const pages = _ACCES_POSTE[poste];
-  if(pages === undefined) return _ACCES_DEFAUT.includes(page); // poste non listé
-  if(pages === null)      return true;         // accès complet (Directeur Général)
+  if(pages === undefined) return true; // poste non listé → accès complet par défaut
+  if(pages === null)      return true; // accès complet explicite
   return pages.includes(page);
 }
 
 function _applyNavAccess(){
   const poste = _appUser?.poste || null;
-  if(!poste || _ACCES_POSTE[poste] === null) return; // accès complet
-  const allowed = _ACCES_POSTE[poste] || _ACCES_DEFAUT;
+  if(!poste) return; // pas de poste → accès complet
+  const allowed = _ACCES_POSTE[poste];
+  if(allowed === undefined || allowed === null) return; // accès complet
+  // Rôle avec liste restreinte → masquer les items interdits
   document.querySelectorAll('.nav-item[data-page]').forEach(btn=>{
     const p = btn.getAttribute('data-page');
     btn.style.display = allowed.includes(p) ? '' : 'none';
   });
-  // Masquer les nav-sections vides (ex : section "Gestion" visible, "Ventes" cachée)
+  // Masquer les labels de sections dont tous les items sont cachés
   document.querySelectorAll('.nav-section-label').forEach(label=>{
-    const section = label.closest('.nav-section') || label.parentElement;
-    if(!section) return;
-    const visibleItems = [...section.querySelectorAll('.nav-item')].filter(b=>b.style.display!=='none');
-    label.style.display = visibleItems.length ? '' : 'none';
+    let el = label.nextElementSibling;
+    let hasVisible = false;
+    while(el && !el.classList.contains('nav-section-label') && !el.classList.contains('nav-section')){
+      if(el.classList.contains('nav-item') && el.style.display !== 'none'){ hasVisible = true; break; }
+      el = el.nextElementSibling;
+    }
+    label.style.display = hasVisible ? '' : 'none';
   });
 }
 
