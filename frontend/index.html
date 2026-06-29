@@ -2403,7 +2403,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .pos-btn:disabled{opacity:.35;cursor:not-allowed}
 
 /* ─── Écran de caisse POS ─────────────────────────────────── */
-.pos-caisse-layout{display:grid;grid-template-columns:1fr 340px;gap:14px;min-height:500px}
+.pos-caisse-layout{display:grid;grid-template-columns:1fr 340px;gap:14px;min-height:500px;align-items:stretch}
 .pos-produit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;
   align-content:start}
 .pos-produit-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
@@ -7733,9 +7733,11 @@ let _appUser = null;
 
 // ── Pages accessibles par poste ──────────────────────────────────
 const _ACCES_POSTE = {
-  // Accueil + Tableau de bord + Journal + toute la section Gestion
-  'Comptable':       ['home','dashboard','journal','gi-dashboard','employes','payroll','depenses','achats','caisse'],
-  'Superviseur':     ['home','dashboard','journal','gi-dashboard','employes','payroll','depenses','achats','caisse'],
+  // Accueil + Tableau de bord + Journal + toute la section Gestion + POS Bar
+  'Comptable':       ['home','dashboard','journal','gi-dashboard','employes','payroll','depenses','achats','caisse',
+                      'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite'],
+  'Superviseur':     ['home','dashboard','journal','gi-dashboard','employes','payroll','depenses','achats','caisse',
+                      'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite'],
   // Accès complet
   'Directeur Général': null,
 };
@@ -12297,7 +12299,7 @@ async function posPrixModal(prodId, nom){
   liste.innerHTML = '<div style="color:rgba(255,255,255,.4);font-size:11px">Chargement…</div>';
   bg.classList.add('open');
   try {
-    const hist = await apiFetch('GET',`/pos/produits/${prodId}/prix`);
+    const hist = await apiFetch('GET',`/pos/produits/${prodId}/historique-prix`);
     if(!hist||!hist.length){
       liste.innerHTML = '<div style="color:rgba(255,255,255,.4);font-size:11px">Aucun historique</div>';
       return;
@@ -12554,7 +12556,7 @@ async function posAnnulerVente(){
   if(!id) return;
   if(!confirm('Annuler cette vente ? Le stock sera restitué.')) return;
   try {
-    await apiFetch('DELETE',`/pos/ventes/${id}`);
+    await apiFetch('PUT',`/pos/ventes/${id}/annuler`);
     document.getElementById('pos-vente-detail-bg').classList.remove('open');
     await posVentesCharger();
     posAlert('Vente annulée — stock restitué.','ok');
@@ -12629,7 +12631,7 @@ async function posEnregistrerRemb(){
   const notes    = document.getElementById('pos-remb-notes').value.trim()||null;
   if(!creditId||montant<=0){ posAlert('Montant invalide.'); return; }
   try {
-    await apiFetch('POST',`/pos/credits/${creditId}/remboursements`,{ montant, notes });
+    await apiFetch('POST',`/pos/credits/${creditId}/remboursement`,{ montant, notes });
     document.getElementById('pos-remb-modal-bg').classList.remove('open');
     await posCreditsCharger();
     posAlert('Remboursement enregistré.','ok');
@@ -12760,7 +12762,7 @@ async function posCmdEncaisser(){
   const paye   = parseFloat(document.getElementById('pos-cmd-enc-paye').value||0)||null;
   const client = document.getElementById('pos-cmd-enc-client').value.trim()||null;
   try {
-    const result = await apiFetch('POST',`/pos/commandes/${id}/encaisser`,{ mode_paiement:mode, montant_paye:paye, client_nom:client });
+    const result = await apiFetch('PUT',`/pos/commandes/${id}/encaisser`,{ mode_paiement:mode, montant_paye:paye, client_nom:client });
     document.getElementById('pos-cmd-enc-bg').classList.remove('open');
     await posCmdCharger();
     posAlert(`Ticket ${result.numero_ticket} — ${posGx(result.montant_total)}`,'ok');
@@ -12788,7 +12790,7 @@ async function _posChargerPaiements(){
   const tbody = document.getElementById('pos-paie-tbody');
   if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
-    const data = await apiFetch('GET','/pos/paie');
+    const data = await apiFetch('GET','/pos/paiements-employes');
     const pays = data.paiements||data||[];
     let total = 0, nb = 0;
     pays.forEach(p=>{ total += parseFloat(p.montant||0); nb++; });
@@ -12829,7 +12831,7 @@ async function posPaymentSauvegarder(){
   const notes  = document.getElementById('pos-pay-notes').value.trim()||null;
   if(!empId||montant<=0){ posAlert('Employé et montant requis.'); return; }
   try {
-    await apiFetch('POST','/pos/paie',{ employe_id:parseInt(empId), type_paiement:type, mode, montant, periode_debut:debut, periode_fin:fin, notes });
+    await apiFetch('POST','/pos/paiements-employes',{ employe_id:parseInt(empId), type_paiement:type, mode, montant, periode_debut:debut, periode_fin:fin, notes });
     document.getElementById('pos-pay-modal-bg').classList.remove('open');
     await _posChargerPaiements();
     posAlert('Paiement enregistré.','ok');
