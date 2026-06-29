@@ -5303,7 +5303,7 @@ function goTo(page){
   if(navEl) navEl.classList.add('active');
   currentPage=page;
   const m=PAGE_META[page]||{title:()=>page,sub:()=>''};
-  const _isGi = !!_giPageLoaders[page];
+  const _isGi = !!(typeof _giPageLoaders !== 'undefined' && _giPageLoaders[page]);
   // Mode GI : .pages devient flex-colonne non-scrollante
   document.getElementById('pages-container').classList.toggle('gi-mode', _isGi);
   // GI pages ont leur propre header riche — masquer la duplication dans le header principal
