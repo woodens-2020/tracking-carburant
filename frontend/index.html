@@ -4197,28 +4197,57 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
 
         <!-- Ligne du bas : Donut + Dépenses + RH/Achats -->
-        <div class="gid-bottom-grid" style="grid-template-columns:1fr 1.4fr 1fr">
+        <div class="gid-bottom-grid" style="grid-template-columns:2fr 1fr 1fr">
 
-          <!-- Donut répartition financière -->
-          <div class="gid-chart-card">
+          <!-- Donut répartition financière — 50% largeur -->
+          <div class="gid-chart-card" style="display:flex;flex-direction:column">
             <div class="gid-chart-hdr">
               <div>
                 <div class="gid-chart-title">Répartition Financière</div>
                 <div class="gid-chart-sub">Survolez un segment pour le détail</div>
               </div>
             </div>
-            <div class="gid-chart-body" style="height:190px;display:flex;align-items:center;justify-content:center;position:relative;padding:8px">
-              <canvas id="gid-chart-donut" style="max-height:170px;max-width:170px"></canvas>
-              <div id="gid-donut-center" style="position:absolute;text-align:center;pointer-events:none">
-                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.4)">Cash</div>
-                <div id="gid-donut-val" style="font-size:15px;font-weight:900;color:#22c55e;line-height:1.1">—</div>
+            <!-- Contenu : donut centré + légende horizontale -->
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 24px 18px;gap:20px">
+              <!-- Donut + centre -->
+              <div style="position:relative;width:240px;height:240px;flex-shrink:0">
+                <canvas id="gid-chart-donut" style="width:100%;height:100%"></canvas>
+                <div id="gid-donut-center" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
+                  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.4)">Cash disponible</div>
+                  <div id="gid-donut-val" style="font-size:22px;font-weight:900;color:#22c55e;line-height:1.15;margin-top:2px">—</div>
+                </div>
               </div>
-            </div>
-            <div id="gid-donut-legend" style="display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;padding:0 14px 14px">
-              <div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0"></span><span style="font-size:10px;color:rgba(255,255,255,.5)">Cash</span><span id="gid-leg-cash" style="font-size:10px;color:#22c55e;font-weight:700;margin-left:auto">—</span></div>
-              <div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#f7a93b;flex-shrink:0"></span><span style="font-size:10px;color:rgba(255,255,255,.5)">Achats</span><span id="gid-leg-ach" style="font-size:10px;color:#f7a93b;font-weight:700;margin-left:auto">—</span></div>
-              <div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#3fb6a8;flex-shrink:0"></span><span style="font-size:10px;color:rgba(255,255,255,.5)">Payroll</span><span id="gid-leg-pay" style="font-size:10px;color:#3fb6a8;font-weight:700;margin-left:auto">—</span></div>
-              <div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#f87171;flex-shrink:0"></span><span style="font-size:10px;color:rgba(255,255,255,.5)">Dépenses</span><span id="gid-leg-dep" style="font-size:10px;color:#f87171;font-weight:700;margin-left:auto">—</span></div>
+              <!-- Légende 2×2 plus grande -->
+              <div id="gid-donut-legend" style="display:grid;grid-template-columns:1fr 1fr;gap:10px 28px;width:100%">
+                <div style="display:flex;align-items:center;gap:8px;background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.15);border-radius:8px;padding:8px 12px">
+                  <span style="width:9px;height:9px;border-radius:50%;background:#22c55e;flex-shrink:0"></span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:10px;color:rgba(255,255,255,.45)">Cash dispo</div>
+                    <div id="gid-leg-cash" style="font-size:13px;color:#22c55e;font-weight:800">—</div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;background:rgba(247,169,59,.07);border:1px solid rgba(247,169,59,.15);border-radius:8px;padding:8px 12px">
+                  <span style="width:9px;height:9px;border-radius:50%;background:#f7a93b;flex-shrink:0"></span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:10px;color:rgba(255,255,255,.45)">Achats</div>
+                    <div id="gid-leg-ach" style="font-size:13px;color:#f7a93b;font-weight:800">—</div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;background:rgba(63,182,168,.07);border:1px solid rgba(63,182,168,.15);border-radius:8px;padding:8px 12px">
+                  <span style="width:9px;height:9px;border-radius:50%;background:#3fb6a8;flex-shrink:0"></span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:10px;color:rgba(255,255,255,.45)">Payroll</div>
+                    <div id="gid-leg-pay" style="font-size:13px;color:#3fb6a8;font-weight:800">—</div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.15);border-radius:8px;padding:8px 12px">
+                  <span style="width:9px;height:9px;border-radius:50%;background:#f87171;flex-shrink:0"></span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:10px;color:rgba(255,255,255,.45)">Dépenses</div>
+                    <div id="gid-leg-dep" style="font-size:13px;color:#f87171;font-weight:800">—</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
