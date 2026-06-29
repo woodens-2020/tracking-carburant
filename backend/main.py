@@ -12,6 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
 from models import Produit, Pompe, Releve, Utilisateur, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense
+from pos_routes import router as pos_router
 from auth import (
     SESSION_COOKIE, hash_password, verify_password,
     hash_code_acces, verify_code_acces,
@@ -70,6 +71,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(AuthMiddleware)
+
+# Module POS bar/restaurant
+app.include_router(pos_router)
 
 
 @app.on_event("startup")
@@ -894,10 +898,17 @@ def anomalies(date: date_type, db: Session = Depends(get_db)):
     # ── 3. Corrélation SAUT_ANORMAL ↔ DECALAGE_STOCK ─────────────────
     anom_compteurs, anom_stk = corr_saut_decalage(anom_compteurs, anom_stk)
 
-    # ── 4. Fusion et tri ──────────────────────────────────────────────
+    # ── 4. Anomalies bar/restaurant ───────────────────────────────────
+    try:
+        from pos_service import detecter_anomalies_bar
+        anom_bar = detecter_anomalies_bar(date, db)
+    except Exception:
+        anom_bar = []   # module bar non initialisé — ne pas bloquer les anomalies carburant
+
+    # ── 5. Fusion et tri ──────────────────────────────────────────────
     # Erreurs avant avertissements, puis par date.
     gravite_ordre = {"erreur": 0, "avertissement": 1}
-    toutes = anom_compteurs + anom_stk
+    toutes = anom_compteurs + anom_stk + anom_bar
     toutes.sort(key=lambda a: (gravite_ordre.get(a["gravite"], 2), a.get("date", "")))
 
     return {
@@ -905,6 +916,7 @@ def anomalies(date: date_type, db: Session = Depends(get_db)):
         "nb_anomalies":   len(toutes),
         "nb_compteurs":   len(anom_compteurs),
         "nb_stock":       len(anom_stk),
+        "nb_bar":         len(anom_bar),
         "anomalies":      toutes,
     }
 
@@ -3868,6 +3880,234 @@ def gi_dashboard(
             "cash_apres_engage": round(cash_disponible - total_payroll_engage, 2),
         },
         "trend": jours_serie,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════
+# STATISTIQUES AVANCÉES
+# ══════════════════════════════════════════════════════════════════
+@app.get("/api/statistiques")
+async def get_statistiques(
+    date_debut:  Optional[str] = None,
+    date_fin:    Optional[str] = None,
+    produit_id:  Optional[int] = None,
+    db:          Session = Depends(get_db),
+    current_user: Utilisateur = Depends(get_current_user),
+):
+    import statistics as _stat
+    from collections import defaultdict
+    from datetime import timedelta
+
+    today = date_type.today()
+    fin   = date_type.fromisoformat(date_fin)   if date_fin   else today
+    debut = date_type.fromisoformat(date_debut) if date_debut else fin - timedelta(days=29)
+    nb_jours = (fin - debut).days + 1
+
+    prev_fin   = debut - timedelta(days=1)
+    prev_debut = prev_fin - timedelta(days=nb_jours - 1)
+
+    # ── Requête relevés ──────────────────────────────────────────
+    def _q_releves(d0, d1):
+        q = db.query(Releve).filter(Releve.date >= d0, Releve.date <= d1)
+        if produit_id:
+            ids = [p.id for p in db.query(Pompe).filter(Pompe.produit_id == produit_id).all()]
+            q = q.filter(Releve.pompe_id.in_(ids)) if ids else q.filter(False)
+        return q.all()
+
+    releves  = _q_releves(debut, fin)
+    prev_rel = _q_releves(prev_debut, prev_fin)
+
+    ca_total  = sum(r.montant_vente for r in releves)
+    vol_total = sum(r.quantite      for r in releves)
+    ca_prev   = sum(r.montant_vente for r in prev_rel)
+    vol_prev  = sum(r.quantite      for r in prev_rel)
+
+    # ── Série journalière ────────────────────────────────────────
+    daily = defaultdict(lambda: {"montant": 0.0, "quantite": 0.0})
+    for r in releves:
+        ds = r.date.isoformat() if hasattr(r.date, "isoformat") else str(r.date)
+        daily[ds]["montant"]  += r.montant_vente
+        daily[ds]["quantite"] += r.quantite
+
+    daily_montants  = [v["montant"] for v in daily.values()]
+    nb_jours_actifs = len(daily)
+
+    std_ca = _stat.stdev(daily_montants) if len(daily_montants) > 1 else 0.0
+    moy_ca = _stat.mean(daily_montants)  if daily_montants else 0.0
+    cv_ca  = (std_ca / moy_ca * 100) if moy_ca > 0 else 0.0
+
+    max_j = max(daily.items(), key=lambda x: x[1]["montant"]) if daily else (None, {"montant": 0})
+    min_j = min(daily.items(), key=lambda x: x[1]["montant"]) if daily else (None, {"montant": 0})
+
+    matin_ca = sum(r.montant_vente for r in releves if r.periode == "Matin")
+    soir_ca  = sum(r.montant_vente for r in releves if r.periode == "Apres-midi")
+
+    ca_var  = ((ca_total  - ca_prev)  / ca_prev  * 100) if ca_prev  > 0 else None
+    vol_var = ((vol_total - vol_prev) / vol_prev * 100) if vol_prev > 0 else None
+
+    # ── Performance pompes ───────────────────────────────────────
+    pompe_map = defaultdict(lambda: {"ca": 0.0, "vol": 0.0, "nom": "", "produit": ""})
+    for r in releves:
+        pompe_map[r.pompe_id]["ca"]  += r.montant_vente
+        pompe_map[r.pompe_id]["vol"] += r.quantite
+        if r.pompe:
+            pompe_map[r.pompe_id]["nom"]     = r.pompe.nom
+            pompe_map[r.pompe_id]["produit"] = r.pompe.produit.nom if r.pompe.produit else "—"
+
+    pompes_list = [{
+        "id": pid, "nom": ps["nom"], "produit": ps["produit"],
+        "ca":      round(ps["ca"],  2),
+        "vol":     round(ps["vol"], 3),
+        "pct_ca":  round(ps["ca"]  / ca_total  * 100, 1) if ca_total  > 0 else 0,
+        "pct_vol": round(ps["vol"] / vol_total * 100, 1) if vol_total > 0 else 0,
+    } for pid, ps in sorted(pompe_map.items(), key=lambda x: x[1]["ca"], reverse=True)]
+
+    # ── Marges par produit ───────────────────────────────────────
+    produits = db.query(Produit).filter(Produit.actif == True).all()
+    marges = []
+    for prod in produits:
+        px_hist = db.query(PrixVente).filter(PrixVente.produit_id == prod.id).order_by(PrixVente.date_effet.desc()).first()
+        px_vente = float(px_hist.prix_vente_gallon) if px_hist else float(prod.prix_gallon)
+        last_deliv = db.query(Livraison).filter(Livraison.produit_id == prod.id).order_by(Livraison.date_livraison.desc()).first()
+        cout_achat = float(last_deliv.prix_achat_gallon) if last_deliv else None
+        marge_gal  = (px_vente - cout_achat) if cout_achat is not None else None
+        marge_pct  = (marge_gal / px_vente * 100) if marge_gal is not None and px_vente > 0 else None
+        marges.append({
+            "produit":    prod.nom,
+            "px_vente":   round(px_vente,  2),
+            "cout_achat": round(cout_achat, 2) if cout_achat is not None else None,
+            "marge_gal":  round(marge_gal,  2) if marge_gal  is not None else None,
+            "marge_pct":  round(marge_pct,  1) if marge_pct  is not None else None,
+        })
+
+    # ── Livraisons & coûts ───────────────────────────────────────
+    lq = db.query(Livraison).filter(Livraison.date_livraison >= debut, Livraison.date_livraison <= fin)
+    if produit_id:
+        lq = lq.filter(Livraison.produit_id == produit_id)
+    livraisons = lq.all()
+    vol_recu_total = sum(float(l.gallons_recus) for l in livraisons)
+    cout_achats    = sum(float(l.gallons_recus) * float(l.prix_achat_gallon) for l in livraisons)
+
+    # ── Dépenses ────────────────────────────────────────────────
+    depenses = db.query(Depense).filter(Depense.date_depense >= debut, Depense.date_depense <= fin).all()
+    total_dep = sum(float(d.montant) for d in depenses)
+
+    marge_brute      = ca_total - cout_achats
+    marge_brute_pct  = (marge_brute / ca_total * 100) if ca_total > 0 else 0.0
+    resultat_net     = marge_brute - total_dep
+    roi_pct          = (resultat_net / cout_achats * 100) if cout_achats > 0 else None
+
+    cat_map = defaultdict(float)
+    for d in depenses:
+        cat_map[d.categorie] += float(d.montant)
+    dep_cats = [
+        {"categorie": cat, "montant": round(m, 2), "pct": round(m / total_dep * 100, 1) if total_dep > 0 else 0}
+        for cat, m in sorted(cat_map.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+    # ── Point mort ───────────────────────────────────────────────
+    cout_var_moy  = (cout_achats / vol_recu_total) if vol_recu_total > 0 else None
+    px_vente_moy  = (ca_total / vol_total)          if vol_total > 0      else None
+    marge_contrib = (px_vente_moy - cout_var_moy)   if px_vente_moy and cout_var_moy else None
+    seuil_gal     = (total_dep / marge_contrib)      if marge_contrib and marge_contrib > 0 else None
+    seuil_ca      = (seuil_gal * px_vente_moy)       if seuil_gal and px_vente_moy else None
+    couv_pct      = (vol_total / seuil_gal * 100)    if seuil_gal else None
+
+    # ── Rotation des stocks ──────────────────────────────────────
+    rotation = []
+    for prod in produits:
+        prod_ids    = {p.id for p in prod.pompes}
+        prod_rel    = [r for r in releves if r.pompe_id in prod_ids]
+        vol_vendu   = sum(r.quantite for r in prod_rel)
+        prod_livs   = [l for l in livraisons if l.produit_id == prod.id]
+        vol_recv    = sum(float(l.gallons_recus) for l in prod_livs)
+        stock_moy   = vol_recv / 2 if vol_recv > 0 else None
+        taux_rot    = (vol_vendu / stock_moy) if stock_moy else None
+        jours_cov   = (stock_moy / (vol_vendu / nb_jours)) if stock_moy and vol_vendu > 0 else None
+        rotation.append({
+            "produit":          prod.nom,
+            "vol_vendu":        round(vol_vendu, 3),
+            "vol_recu":         round(vol_recv,  3),
+            "taux_rotation":    round(taux_rot,  2) if taux_rot  is not None else None,
+            "jours_couverture": round(jours_cov, 1) if jours_cov is not None else None,
+        })
+
+    # ── Série temporelle ─────────────────────────────────────────
+    serie, cur = [], debut
+    while cur <= fin:
+        ds = cur.isoformat()
+        serie.append({"date": ds, "montant": round(daily[ds]["montant"], 2), "quantite": round(daily[ds]["quantite"], 3)})
+        cur += timedelta(days=1)
+
+    # ── Alertes automatiques ─────────────────────────────────────
+    alertes = []
+    if ca_var is not None and ca_var >= 5:
+        alertes.append({"type": "ok",      "msg": f"Croissance du CA de +{ca_var:.1f}% vs période précédente"})
+    if cv_ca > 40:
+        alertes.append({"type": "warning", "msg": f"Forte variabilité des ventes — CV={cv_ca:.1f}% (seuil normal < 40%)"})
+    if ca_var is not None and ca_var < -10:
+        alertes.append({"type": "danger",  "msg": f"Baisse du CA de {abs(ca_var):.1f}% vs période précédente"})
+    if seuil_gal and vol_total < seuil_gal:
+        alertes.append({"type": "danger",  "msg": f"Volume vendu ({vol_total:.0f} gal) inférieur au point mort ({seuil_gal:.0f} gal)"})
+    if resultat_net < 0:
+        alertes.append({"type": "danger",  "msg": f"Résultat net négatif : {resultat_net:,.0f} G"})
+    if 0 < marge_brute_pct < 15:
+        alertes.append({"type": "warning", "msg": f"Marge brute faible : {marge_brute_pct:.1f}% (idéal ≥ 15%)"})
+    if not alertes:
+        alertes.append({"type": "ok", "msg": "Aucune alerte critique — indicateurs dans les normes"})
+
+    return {
+        "periode": {
+            "debut": debut.isoformat(), "fin": fin.isoformat(),
+            "nb_jours": nb_jours, "nb_jours_actifs": nb_jours_actifs,
+            "prev_debut": prev_debut.isoformat(), "prev_fin": prev_fin.isoformat(),
+        },
+        "synthese": {
+            "ca_total":       round(ca_total,  2),
+            "ca_moyen_jour":  round(ca_total / nb_jours, 2),
+            "ca_moyen_actif": round(ca_total / nb_jours_actifs, 2) if nb_jours_actifs else 0,
+            "vol_total":      round(vol_total, 3),
+            "vol_moyen_jour": round(vol_total / nb_jours, 3),
+            "nb_releves":     len(releves),
+            "matin_pct":      round(matin_ca / ca_total * 100, 1) if ca_total > 0 else 0,
+            "soir_pct":       round(soir_ca  / ca_total * 100, 1) if ca_total > 0 else 0,
+        },
+        "croissance": {
+            "ca_var_pct":  round(ca_var,  1) if ca_var  is not None else None,
+            "vol_var_pct": round(vol_var, 1) if vol_var is not None else None,
+            "ca_prev":     round(ca_prev,  2),
+            "vol_prev":    round(vol_prev, 3),
+        },
+        "variabilite": {
+            "ecart_type_ca": round(std_ca, 2),
+            "cv_ca":         round(cv_ca,  1),
+            "max_jour": {"date": max_j[0], "montant": round(max_j[1]["montant"], 2)} if max_j[0] else None,
+            "min_jour": {"date": min_j[0], "montant": round(min_j[1]["montant"], 2)} if min_j[0] else None,
+            "pic_periode": "Matin" if matin_ca >= soir_ca else "Après-midi",
+        },
+        "rentabilite": {
+            "ca_total":        round(ca_total,       2),
+            "cout_achats":     round(cout_achats,    2),
+            "marge_brute":     round(marge_brute,    2),
+            "marge_brute_pct": round(marge_brute_pct,1),
+            "depenses":        round(total_dep,      2),
+            "resultat_net":    round(resultat_net,   2),
+            "roi_pct":         round(roi_pct, 1) if roi_pct is not None else None,
+        },
+        "point_mort": {
+            "cout_var_moy":       round(cout_var_moy,  2) if cout_var_moy  is not None else None,
+            "px_vente_moy":       round(px_vente_moy,  2) if px_vente_moy  is not None else None,
+            "marge_contribution": round(marge_contrib,  2) if marge_contrib is not None else None,
+            "gallons_seuil":      round(seuil_gal, 1)      if seuil_gal     is not None else None,
+            "ca_seuil":           round(seuil_ca,  2)      if seuil_ca      is not None else None,
+            "couverture_pct":     round(couv_pct,  1)      if couv_pct      is not None else None,
+        },
+        "marges":              marges,
+        "pompes":              pompes_list,
+        "rotation":            rotation,
+        "depenses_categories": dep_cats,
+        "serie":               serie,
+        "alertes":             alertes,
     }
 
 

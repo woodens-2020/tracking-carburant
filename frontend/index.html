@@ -2594,6 +2594,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="statistiques" onclick="goTo('statistiques')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </span>
+      <span>Rapport Statistique</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <button class="nav-item" data-page="previsions" onclick="goTo('previsions')">
       <span class="nav-icon">
         <svg viewBox="0 0 24 24"><polyline points="2 20 8 14 13 17 22 7"/><polyline points="17 7 22 7 22 12"/></svg>
@@ -3202,6 +3210,76 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
       </div>
     </div>
+
+    <!-- ══════════════════════════════════════════
+         PAGE RAPPORT STATISTIQUE
+    ══════════════════════════════════════════ -->
+    <div id="page-statistiques" class="page page-gi">
+    <div class="gi-page">
+
+      <!-- Header -->
+      <div class="gi-page-header" style="--gi-accent:#a78bfa;--gi-bg:rgba(167,139,250,.11);--gi-bd:rgba(167,139,250,.22);--gi-glow:rgba(167,139,250,.15)">
+        <div class="gi-page-header-left">
+          <div class="gi-page-header-icon">
+            <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <div class="gi-page-header-text">
+            <div class="gi-title">Rapport Statistique</div>
+            <div class="gi-subtitle" id="stats-subtitle">Rendement · Variabilité · Rentabilité · Point mort · Rotation</div>
+          </div>
+        </div>
+        <div class="gi-page-header-actions">
+          <button class="gi-btn-secondary" onclick="exportStatsCsv()">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- Filtres -->
+      <div class="gi-filters">
+        <div class="gi-filter-field">
+          <span class="gi-filter-lbl">Période rapide</span>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            <button class="gid-period-btn active" data-sp="30j"  onclick="setStPreset('30j' ,this)">30 jours</button>
+            <button class="gid-period-btn"        data-sp="7j"   onclick="setStPreset('7j'  ,this)">7 jours</button>
+            <button class="gid-period-btn"        data-sp="mois" onclick="setStPreset('mois',this)">Ce mois</button>
+            <button class="gid-period-btn"        data-sp="trim" onclick="setStPreset('trim',this)">Trimestre</button>
+            <button class="gid-period-btn"        data-sp="an"   onclick="setStPreset('an'  ,this)">Année</button>
+          </div>
+        </div>
+        <div class="gi-filter-field">
+          <span class="gi-filter-lbl">Début</span>
+          <input type="date" id="st-debut" class="gi-filter-input" style="min-width:140px">
+        </div>
+        <div class="gi-filter-field">
+          <span class="gi-filter-lbl">Fin</span>
+          <input type="date" id="st-fin" class="gi-filter-input" style="min-width:140px">
+        </div>
+        <div class="gi-filter-field">
+          <span class="gi-filter-lbl">Produit</span>
+          <select id="st-prod" class="gi-filter-select">
+            <option value="">Tous les produits</option>
+          </select>
+        </div>
+        <div style="margin-top:auto">
+          <button class="gi-btn-primary" style="--gi-accent:#a78bfa;--gi-bd:rgba(167,139,250,.45);--gi-glow:rgba(167,139,250,.28)" onclick="loadStatistiques()">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Analyser
+          </button>
+        </div>
+      </div>
+
+      <!-- Contenu dynamique -->
+      <div id="stats-body">
+        <div class="gi-empty">
+          <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span>Sélectionnez une période et cliquez sur Analyser</span>
+        </div>
+      </div>
+
+    </div><!-- /gi-page -->
+    </div><!-- /page-statistiques -->
 
     <!-- ══ PRÉVISIONS ══════════════════════════════════════════ -->
     <div id="page-previsions" class="page">
@@ -6143,6 +6221,7 @@ const PAGE_META={
   saisie:              {title: ()=>t('page.saisie.title'),      sub: ()=>t('page.saisie.sub')},
   journal:             {title: ()=>t('page.journal.title'),     sub: ()=>t('page.journal.sub')},
   'rapport-analytique':{title: ()=>t('page.rapport.title'),    sub: ()=>t('page.rapport.sub')},
+  statistiques:        {title: 'Rapport Statistique',           sub: 'Analyse avancée — Rentabilité · Variabilité · Point mort · Rotation'},
   previsions:          {title: ()=>t('page.previsions.title'),  sub: ()=>t('page.previsions.sub')},
   rapports:            {title: ()=>t('page.rapports.title'),    sub: ()=>t('page.rapports.sub')},
   stock:               {title: ()=>t('page.stock.title'),       sub: ()=>t('page.stock.sub')},
@@ -7739,9 +7818,9 @@ const _ACCES_POSTE = {
   // ─ Direction / Management → accès complet ────────────────────
   'Directeur Général': null,
   // ─ Comptabilité / Supervision → accès partiel ────────────────
-  'Comptable':   ['home','dashboard','journal','gi-dashboard','employes','payroll','depenses','achats','caisse',
+  'Comptable':   ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite'],
-  'Superviseur': ['home','dashboard','journal','gi-dashboard','employes','payroll','depenses','achats','caisse',
+  'Superviseur': ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite'],
   // ─ Terrain → accès très limité ───────────────────────────────
   'Pompiste': ['home','saisie'],
@@ -11653,8 +11732,305 @@ async function supprimerAchat(id){
   } catch(e){ _giAlert(e.message||'Erreur réseau.'); }
 }
 
+// ══════════════════════════════════════════════════════════════
+// PAGE RAPPORT STATISTIQUE
+// ══════════════════════════════════════════════════════════════
+
+function initStatistiques(){
+  const fin   = currentDate;
+  const d     = new Date(fin); d.setDate(d.getDate()-29);
+  const debut = d.toISOString().slice(0,10);
+  document.getElementById('st-debut').value = debut;
+  document.getElementById('st-fin').value   = fin;
+  const sel = document.getElementById('st-prod');
+  sel.innerHTML = '<option value="">Tous les produits</option>';
+  (products||[]).forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.nom; sel.appendChild(o); });
+  loadStatistiques();
+}
+
+function setStPreset(preset, btn){
+  document.querySelectorAll('[data-sp]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const now = new Date(currentDate);
+  let d1, d2 = currentDate;
+  if(preset==='7j'){ const t=new Date(now); t.setDate(t.getDate()-6); d1=t.toISOString().slice(0,10); }
+  else if(preset==='30j'){ const t=new Date(now); t.setDate(t.getDate()-29); d1=t.toISOString().slice(0,10); }
+  else if(preset==='mois'){ d1=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`; }
+  else if(preset==='trim'){ const t=new Date(now); t.setDate(t.getDate()-89); d1=t.toISOString().slice(0,10); }
+  else if(preset==='an'){ d1=`${now.getFullYear()}-01-01`; }
+  document.getElementById('st-debut').value = d1;
+  document.getElementById('st-fin').value   = d2;
+}
+
+let _stData = null;
+
+async function loadStatistiques(){
+  const debut = document.getElementById('st-debut').value;
+  const fin   = document.getElementById('st-fin').value;
+  const prod  = document.getElementById('st-prod').value;
+  const body  = document.getElementById('stats-body');
+  body.innerHTML = '<div class="gi-empty"><div style="width:22px;height:22px;border:2px solid rgba(255,255,255,.15);border-top-color:#a78bfa;border-radius:50%;animation:spin .7s linear infinite"></div><span>Analyse en cours…</span></div>';
+  try{
+    let url = `/statistiques?date_debut=${debut}&date_fin=${fin}`;
+    if(prod) url += `&produit_id=${prod}`;
+    _stData = await GET(url);
+    document.getElementById('stats-subtitle').textContent =
+      `${frDate(debut)} → ${frDate(fin)}  ·  ${_stData.periode.nb_jours_actifs} jours actifs sur ${_stData.periode.nb_jours}`;
+    body.innerHTML = _renderStats(_stData);
+  }catch(e){
+    body.innerHTML = `<div class="gi-empty" style="color:#f87171"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>${esc(e.message)}</span></div>`;
+  }
+}
+
+function _renderStats(d){
+  const s=d.synthese, r=d.rentabilite, c=d.croissance, v=d.variabilite, pm=d.point_mort;
+
+  const _varBadge = pct => pct==null
+    ? '<span style="color:var(--muted);font-size:11px">Pas de comparaison</span>'
+    : `<span style="color:${pct>=0?'#22c55e':'#f87171'};font-size:11px;font-weight:700">${pct>=0?'▲':'▼'} ${Math.abs(pct).toFixed(1)}%</span>`;
+
+  const _finRow = (lbl, val, color, bold) =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0">
+      <span style="font-size:12px;color:rgba(255,255,255,.${bold?'82':'52'})">${esc(lbl)}</span>
+      <span style="font-size:${bold?'13.5':'12'}px;font-weight:${bold?800:600};color:${color};font-family:var(--mono)">${fmtG(Math.abs(val))}</span>
+    </div>`;
+
+  // ── Alertes ──────────────────────────────────────────────
+  const _alertColor = {ok:'rgba(34,197,94,.1)', warning:'rgba(247,169,59,.1)', danger:'rgba(248,113,113,.1)'};
+  const _alertBd    = {ok:'rgba(34,197,94,.22)',warning:'rgba(247,169,59,.22)',danger:'rgba(248,113,113,.22)'};
+  const _alertTxt   = {ok:'#4ade80',            warning:'#fbbf24',             danger:'#fca5a5'};
+  const _alertIcon  = {
+    ok:     '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#22c55e" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    warning:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#f7a93b" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    danger: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#f87171" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  };
+  const alertesHtml = d.alertes.map(a=>
+    `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;background:${_alertColor[a.type]};border:1px solid ${_alertBd[a.type]};border-radius:8px">
+      ${_alertIcon[a.type]||''}<span style="font-size:12.5px;color:${_alertTxt[a.type]};font-weight:600">${esc(a.msg)}</span>
+    </div>`
+  ).join('');
+
+  // ── KPI Synthèse (3 cols) ────────────────────────────────
+  const kpi1 = `<div class="gi-kpi-row" style="grid-template-columns:repeat(3,1fr)">
+    <div class="gi-kpi" style="--gi-kpi-color:#a78bfa">
+      <div class="gi-kpi-lbl">Chiffre d'Affaires</div>
+      <div class="gi-kpi-val purple">${fmtG(s.ca_total)}</div>
+      <div class="gi-kpi-sub">${fmtG(s.ca_moyen_actif)} / jour actif &nbsp;${_varBadge(c.ca_var_pct)}</div>
+    </div>
+    <div class="gi-kpi" style="--gi-kpi-color:#60a5fa">
+      <div class="gi-kpi-lbl">Volume Vendu</div>
+      <div class="gi-kpi-val blue">${fmtGal(s.vol_total,1)}</div>
+      <div class="gi-kpi-sub">${fmtGal(s.vol_moyen_jour,2)} / jour &nbsp;${_varBadge(c.vol_var_pct)}</div>
+    </div>
+    <div class="gi-kpi" style="--gi-kpi-color:${r.resultat_net>=0?'#22c55e':'#f87171'}">
+      <div class="gi-kpi-lbl">Résultat Net</div>
+      <div class="gi-kpi-val ${r.resultat_net>=0?'green':'red'}">${fmtG(r.resultat_net)}</div>
+      <div class="gi-kpi-sub">Marge brute : ${r.marge_brute_pct.toFixed(1)}%${r.roi_pct!=null?' · ROI : '+r.roi_pct.toFixed(1)+'%':''}</div>
+    </div>
+  </div>`;
+
+  // ── KPI Variabilité (4 cols) ─────────────────────────────
+  const cvColor = v.cv_ca<20?'#22c55e':v.cv_ca<40?'#f7a93b':'#f87171';
+  const kpi2 = `<div class="gi-kpi-row" style="grid-template-columns:repeat(4,1fr)">
+    <div class="gi-kpi" style="--gi-kpi-color:#3fb6a8">
+      <div class="gi-kpi-lbl">Marge Brute</div>
+      <div class="gi-kpi-val teal">${fmtG(r.marge_brute)}</div>
+      <div class="gi-kpi-sub">CA − Coût achats carburant</div>
+    </div>
+    <div class="gi-kpi" style="--gi-kpi-color:${cvColor}">
+      <div class="gi-kpi-lbl">Coeff. Variation (σ/μ)</div>
+      <div class="gi-kpi-val" style="color:${cvColor}">${v.cv_ca.toFixed(1)}%</div>
+      <div class="gi-kpi-sub">σ = ${fmtG(v.ecart_type_ca)} · ${v.cv_ca<25?'Ventes stables':v.cv_ca<40?'Variabilité modérée':'Forte irrégularité'}</div>
+    </div>
+    <div class="gi-kpi" style="--gi-kpi-color:#f7a93b">
+      <div class="gi-kpi-lbl">Meilleure Journée</div>
+      <div class="gi-kpi-val amber">${v.max_jour?fmtG(v.max_jour.montant):'—'}</div>
+      <div class="gi-kpi-sub">${v.max_jour?frDate(v.max_jour.date):'—'}</div>
+    </div>
+    <div class="gi-kpi" style="--gi-kpi-color:#a78bfa">
+      <div class="gi-kpi-lbl">Période de Pointe</div>
+      <div class="gi-kpi-val purple">${v.pic_periode}</div>
+      <div class="gi-kpi-sub">Matin ${s.matin_pct}% · Après-midi ${s.soir_pct}%</div>
+    </div>
+  </div>`;
+
+  // ── Graphique temporel (SVG bars) ────────────────────────
+  const serie = d.serie||[];
+  let chartHtml = '';
+  if(serie.length){
+    const maxM = Math.max(...serie.map(s=>s.montant), 1);
+    const bW   = Math.max(3, Math.min(16, Math.floor(560/serie.length)));
+    const gap  = Math.max(1, Math.ceil(bW*0.2));
+    const totW = serie.length*(bW+gap);
+    const H    = 72;
+    const bars = serie.map((s,i)=>{
+      const h = Math.max(2, Math.round(s.montant/maxM*H));
+      return `<rect x="${i*(bW+gap)}" y="${H-h}" width="${bW}" height="${h}" fill="${s.montant>0?'#a78bfa':'#2a2a45'}" rx="1" opacity=".85"><title>${frDate(s.date)}: ${fmtG(s.montant)}</title></rect>`;
+    }).join('');
+    const avgY = H - (serie.reduce((a,s)=>a+s.montant,0)/serie.length)/maxM*H;
+    const mid  = serie[Math.floor(serie.length/2)];
+    chartHtml = `<div class="gi-table-card">
+      <div class="gi-table-hdr">
+        <span class="gi-table-title">📈 Évolution Journalière du CA</span>
+        <span style="font-size:10px;color:rgba(255,255,255,.4)"><span style="display:inline-block;width:16px;height:1px;background:#f7a93b;margin-right:4px;vertical-align:middle"></span>Moyenne journalière</span>
+      </div>
+      <div style="padding:12px 18px 6px;overflow-x:auto">
+        <svg width="${totW}" height="${H+14}" style="display:block;max-width:100%;min-width:100%">
+          ${bars}
+          <line x1="0" y1="${avgY}" x2="${totW}" y2="${avgY}" stroke="#f7a93b" stroke-width="1" stroke-dasharray="4,3" opacity=".65"/>
+        </svg>
+        <div style="display:flex;justify-content:space-between;margin-top:2px;font-size:9px;color:rgba(255,255,255,.3)">
+          <span>${frDate(serie[0].date)}</span><span>${frDate(mid.date)}</span><span>${frDate(serie[serie.length-1].date)}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ── Compte d'exploitation + Point mort (2 cols) ──────────
+  const pmPct   = pm.couverture_pct;
+  const pmColor = pmPct==null?'rgba(255,255,255,.4)':pmPct>=100?'#22c55e':pmPct>=70?'#f7a93b':'#f87171';
+  const rentaHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div class="gi-table-card">
+      <div class="gi-table-hdr"><span class="gi-table-title">💰 Compte d'Exploitation</span></div>
+      <div style="padding:14px 18px;display:flex;flex-direction:column;gap:2px">
+        ${_finRow("Chiffre d'Affaires",      r.ca_total,     '#a78bfa', true)}
+        ${_finRow("Coût achats carburant",   -r.cout_achats, '#f87171', false)}
+        <div style="border-top:1px solid rgba(255,255,255,.06);margin:4px 0"></div>
+        ${_finRow(`Marge Brute (${r.marge_brute_pct.toFixed(1)}%)`, r.marge_brute, '#3fb6a8', true)}
+        ${_finRow("Dépenses opérationnelles",-r.depenses,    '#f7a93b', false)}
+        <div style="border-top:1px solid rgba(255,255,255,.06);margin:4px 0"></div>
+        ${_finRow("Résultat Net",             r.resultat_net, r.resultat_net>=0?'#22c55e':'#f87171', true)}
+        ${r.roi_pct!=null?`<div style="margin-top:8px;padding:7px 10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:11.5px;color:rgba(255,255,255,.55)">
+          ROI = <strong style="color:${r.roi_pct>=0?'#22c55e':'#f87171'}">${r.roi_pct.toFixed(1)}%</strong>
+          <span style="color:rgba(255,255,255,.3);margin-left:6px;font-style:italic">(Résultat Net / Coût Achats) × 100</span>
+        </div>`:''}
+      </div>
+    </div>
+    <div class="gi-table-card">
+      <div class="gi-table-hdr"><span class="gi-table-title">📐 Point Mort (Break-Even)</span></div>
+      <div style="padding:14px 18px">
+        ${pm.gallons_seuil!=null?`
+          <div style="text-align:center;margin-bottom:14px">
+            <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.45);margin-bottom:6px">Seuil de rentabilité</div>
+            <div style="font-size:30px;font-weight:900;color:${pmColor};letter-spacing:-.04em">${fmtGal(pm.gallons_seuil,0)}</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">= ${fmtG(pm.ca_seuil)} de CA minimum</div>
+          </div>
+          <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:5px">Couverture : <strong style="color:${pmColor}">${pmPct.toFixed(1)}%</strong> des gallons nécessaires vendus</div>
+          <div style="height:8px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden">
+            <div style="height:100%;background:${pmColor};width:${Math.min(pmPct,100).toFixed(1)}%;border-radius:4px;transition:width .6s"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;margin-top:12px">
+            <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:rgba(255,255,255,.45)">Prix vente moyen</span><strong>${pm.px_vente_moy!=null?pm.px_vente_moy.toFixed(2)+' G/gal':'—'}</strong></div>
+            <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:rgba(255,255,255,.45)">Coût variable moyen</span><strong>${pm.cout_var_moy!=null?pm.cout_var_moy.toFixed(2)+' G/gal':'—'}</strong></div>
+            <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:rgba(255,255,255,.45)">Marge de contribution</span><strong style="color:#3fb6a8">${pm.marge_contribution!=null?pm.marge_contribution.toFixed(2)+' G/gal':'—'}</strong></div>
+          </div>
+          <div style="margin-top:10px;padding:6px 10px;background:rgba(255,255,255,.025);border-radius:6px;font-size:10px;color:rgba(255,255,255,.35);font-style:italic">
+            Formule : Dépenses fixes ÷ (Prix vente − Coût variable par gal)
+          </div>
+        `:'<div class="gi-empty" style="padding:20px 0;font-size:11.5px">Données livraisons insuffisantes pour calculer le point mort</div>'}
+      </div>
+    </div>
+  </div>`;
+
+  // ── Performance pompes ───────────────────────────────────
+  const pompesHtml = d.pompes.length?`<div class="gi-table-card">
+    <div class="gi-table-hdr">
+      <span class="gi-table-title">⛽ Performance des Pompes</span>
+      <span class="gi-table-count">${d.pompes.length} pompe${d.pompes.length>1?'s':''}</span>
+    </div>
+    <div style="overflow-x:auto"><table class="gi-table">
+      <thead><tr><th>#</th><th>Pompe</th><th>Produit</th><th style="text-align:right">CA</th><th style="text-align:right">Volume</th><th>Part CA</th><th>Part Vol.</th></tr></thead>
+      <tbody>
+        ${d.pompes.map((p,i)=>`<tr>
+          <td><span class="td-muted">${i+1}</span></td>
+          <td><strong>${esc(p.nom)}</strong></td>
+          <td><span class="td-muted">${esc(p.produit)}</span></td>
+          <td style="text-align:right" class="td-amount">${fmtG(p.ca)}</td>
+          <td style="text-align:right"><span class="td-muted">${fmtGal(p.vol,1)}</span></td>
+          <td><div style="display:flex;align-items:center;gap:6px">
+            <div style="flex:1;height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;min-width:50px"><div style="height:100%;background:#a78bfa;width:${p.pct_ca}%;border-radius:3px"></div></div>
+            <span style="font-size:11px;font-weight:700;color:#a78bfa;min-width:34px">${p.pct_ca}%</span>
+          </div></td>
+          <td><div style="display:flex;align-items:center;gap:6px">
+            <div style="flex:1;height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;min-width:50px"><div style="height:100%;background:#60a5fa;width:${p.pct_vol}%;border-radius:3px"></div></div>
+            <span style="font-size:11px;font-weight:700;color:#60a5fa;min-width:34px">${p.pct_vol}%</span>
+          </div></td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>
+  </div>`:'';
+
+  // ── Marges + Rotation (2 cols) ────────────────────────────
+  const margesHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div class="gi-table-card">
+      <div class="gi-table-hdr"><span class="gi-table-title">📊 Marge par Produit</span></div>
+      <div style="overflow-x:auto"><table class="gi-table">
+        <thead><tr><th>Produit</th><th style="text-align:right">Prix Vente</th><th style="text-align:right">Coût Achat</th><th style="text-align:right">Marge/gal</th><th style="text-align:right">Marge %</th></tr></thead>
+        <tbody>${d.marges.map(m=>`<tr>
+          <td><strong>${esc(m.produit)}</strong></td>
+          <td style="text-align:right;font-family:var(--mono);font-size:12px">${m.px_vente.toFixed(2)} G</td>
+          <td style="text-align:right;font-family:var(--mono);font-size:12px">${m.cout_achat!=null?m.cout_achat.toFixed(2)+' G':'<span style="color:var(--muted)">—</span>'}</td>
+          <td style="text-align:right" class="td-amount">${m.marge_gal!=null?m.marge_gal.toFixed(2)+' G':'—'}</td>
+          <td style="text-align:right"><span class="td-badge ${m.marge_pct!=null&&m.marge_pct>=15?'badge-green':m.marge_pct>=5?'badge-amber':'badge-red'}">${m.marge_pct!=null?m.marge_pct.toFixed(1)+'%':'—'}</span></td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+      <div style="padding:6px 16px;font-size:10px;color:rgba(255,255,255,.3);border-top:1px solid rgba(255,255,255,.05);font-style:italic">Marge % = (Prix vente − Coût achat) / Prix vente × 100</div>
+    </div>
+    <div class="gi-table-card">
+      <div class="gi-table-hdr"><span class="gi-table-title">🔄 Rotation des Stocks</span></div>
+      <div style="overflow-x:auto"><table class="gi-table">
+        <thead><tr><th>Produit</th><th style="text-align:right">Vol. Vendu</th><th style="text-align:right">Vol. Reçu</th><th style="text-align:right">Taux Rotation</th><th style="text-align:right">Couverture</th></tr></thead>
+        <tbody>${d.rotation.map(rot=>`<tr>
+          <td><strong>${esc(rot.produit)}</strong></td>
+          <td style="text-align:right"><span class="td-muted">${fmtGal(rot.vol_vendu,1)}</span></td>
+          <td style="text-align:right"><span class="td-muted">${fmtGal(rot.vol_recu,1)}</span></td>
+          <td style="text-align:right"><span class="td-badge ${rot.taux_rotation!=null&&rot.taux_rotation>=2?'badge-green':rot.taux_rotation!=null&&rot.taux_rotation>=1?'badge-amber':'badge-gray'}">${rot.taux_rotation!=null?rot.taux_rotation.toFixed(2)+'×':'—'}</span></td>
+          <td style="text-align:right" class="td-amount">${rot.jours_couverture!=null?rot.jours_couverture.toFixed(0)+' j':'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+      <div style="padding:6px 16px;font-size:10px;color:rgba(255,255,255,.3);border-top:1px solid rgba(255,255,255,.05);font-style:italic">Taux = Vol. vendu / Stock moyen · Couverture = Stock moyen / (Ventes / Jour)</div>
+    </div>
+  </div>`;
+
+  // ── Dépenses par catégorie ────────────────────────────────
+  const depHtml = d.depenses_categories.length?`<div class="gi-table-card">
+    <div class="gi-table-hdr">
+      <span class="gi-table-title">📋 Dépenses par Catégorie</span>
+      <span class="gi-table-count">${fmtG(r.depenses)} total</span>
+    </div>
+    <div style="padding:14px 18px;display:flex;flex-direction:column;gap:8px">
+      ${d.depenses_categories.map(cat=>`
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:12px;color:rgba(255,255,255,.7);min-width:130px">${esc(cat.categorie)}</span>
+        <div style="flex:1;height:7px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden">
+          <div style="height:100%;background:#f7a93b;width:${cat.pct}%;border-radius:4px;transition:width .5s"></div>
+        </div>
+        <span style="font-size:11.5px;font-weight:700;color:#f7a93b;min-width:38px;text-align:right">${cat.pct}%</span>
+        <span style="font-size:11px;font-family:var(--mono);color:rgba(255,255,255,.55);min-width:90px;text-align:right">${fmtG(cat.montant)}</span>
+      </div>`).join('')}
+    </div>
+  </div>`:'';
+
+  return `<div style="display:flex;flex-direction:column;gap:12px;padding-bottom:12px">
+    <div style="display:flex;flex-direction:column;gap:6px">${alertesHtml}</div>
+    ${kpi1}${kpi2}${chartHtml}${rentaHtml}${pompesHtml}${margesHtml}${depHtml}
+  </div>`;
+}
+
+function exportStatsCsv(){
+  if(!_stData){ toast('Générez d\'abord une analyse.','warn'); return; }
+  const rows = [['Date','CA (G)','Volume (gal)']];
+  _stData.serie.forEach(s=>rows.push([s.date, s.montant, s.quantite]));
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const a   = document.createElement('a');
+  a.href    = 'data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
+  a.download= `statistiques-${_stData.periode.debut}-${_stData.periode.fin}.csv`;
+  a.click();
+}
+
 /* ── Chargement automatique à la navigation ── */
 const _giPageLoaders = {
+  statistiques:      initStatistiques,
   'gi-dashboard':    loadGiDashboard,
   employes:          loadEmployes,
   payroll:           loadPayroll,
