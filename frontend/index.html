@@ -1658,6 +1658,17 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   box-sizing:border-box;
 }
 .page-gi{padding:0!important}
+/* Chaque page GI gère son propre scroll — indépendant de .pages */
+.page-gi.active{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  overflow-y:auto;overflow-x:hidden;
+  padding:0 0 36px 0!important;
+  overflow-anchor:none;scroll-behavior:auto;touch-action:pan-y;
+}
+.page-gi.active::-webkit-scrollbar{width:5px}
+.page-gi.active::-webkit-scrollbar-track{background:transparent}
+.page-gi.active::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:3px}
+.page-gi.active::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.35)}
 
 /* ── Header de page ─────────────────────────────────────── */
 /*  Variables attendues en inline style sur chaque .gi-page-header :
@@ -5265,6 +5276,8 @@ const PAGE_META={
 function _forceScrollTop(){
   const pc = document.getElementById('pages-container');
   if(pc) pc.scrollTop = 0;
+  const gi = document.querySelector('.page-gi.active');
+  if(gi) gi.scrollTop = 0;
 }
 function _startScrollFix(){
   // Reset scroll au top immédiatement + après le prochain rendu du navigateur
