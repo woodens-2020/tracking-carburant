@@ -2052,9 +2052,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   border-color:#a78bfa;color:#ddd6fe;
   box-shadow:0 0 10px rgba(167,139,250,.15);
 }
-.gid-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;width:100%}
-/* Quand la 5e carte est seule sur sa ligne → elle occupe 2 colonnes centrées */
-.gid-kpi-grid>.gid-kpi:last-child:nth-child(4n+1){grid-column:2/span 2}
+.gid-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;width:100%}
 .gid-kpi{
   background:rgba(255,255,255,.04);
   border:1px solid rgba(255,255,255,.09);
@@ -2283,13 +2281,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
 /* ── Dashboard GI responsive ─────────────────────────────── */
 @media (max-width:1200px){
-  .gid-kpi-grid{grid-template-columns:repeat(2,1fr)}
   .gid-chart-grid{grid-template-columns:1fr}
   .gid-bottom-grid{grid-template-columns:1fr}
 }
-@media (max-width:700px){
-  .gid-kpi-grid{grid-template-columns:1fr}
-}
+/* gid-kpi-grid colonnes gérées par ResizeObserver en JS */
 @media (max-height:800px){
   .gid-kpi-val{font-size:15px}
   .gid-kpi{padding:8px 11px}
@@ -4171,7 +4166,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
 
         <!-- KPI Row — 5 cartes -->
-        <div class="gid-kpi-grid">
+        <div class="gid-kpi-grid" id="gidKpiGrid">
           <div class="gid-kpi">
             <div class="gid-kpi-accent" style="background:#22c55e"></div>
             <div class="gid-kpi-icon" style="background:rgba(34,197,94,.12)">
@@ -12150,7 +12145,7 @@ function exportStatsCsv(){
 /* ── Chargement automatique à la navigation ── */
 const _giPageLoaders = {
   statistiques:      initStatistiques,
-  'gi-dashboard':    loadGiDashboard,
+  'gi-dashboard':    () => { _gidStartKpiObserver(); loadGiDashboard(); },
   employes:          loadEmployes,
   payroll:           loadPayroll,
   depenses:          loadDepenses,
@@ -12226,6 +12221,42 @@ function _gidDateRange(){
     debut: debut.toISOString().slice(0,10),
     fin:   today.toISOString().slice(0,10),
   };
+}
+
+// ── Grille KPI dynamique : s'adapte à la largeur réelle du conteneur ──
+let _gidKpiObserver = null;
+function _gidKpiCols(w){
+  if(w < 480)  return 1;
+  if(w < 760)  return 2;
+  if(w < 1060) return 3;
+  return 4;
+}
+function _gidApplyKpiGrid(){
+  const grid = document.getElementById('gidKpiGrid');
+  if(!grid) return;
+  const w = grid.offsetWidth;
+  const cols = _gidKpiCols(w);
+  grid.style.gridTemplateColumns = `repeat(${cols},minmax(0,1fr))`;
+  // Centrer la dernière carte si seule sur sa ligne
+  const cards = grid.querySelectorAll('.gid-kpi');
+  cards.forEach((c,i) => {
+    const leftover = cards.length % cols;
+    const isOrphan = leftover !== 0 && i === cards.length - 1;
+    if(isOrphan && leftover === 1 && cols > 1){
+      const start = Math.floor(cols/2);
+      c.style.gridColumn = `${start} / span 2`;
+    } else {
+      c.style.gridColumn = '';
+    }
+  });
+}
+function _gidStartKpiObserver(){
+  const grid = document.getElementById('gidKpiGrid');
+  if(!grid) return;
+  if(_gidKpiObserver) _gidKpiObserver.disconnect();
+  _gidKpiObserver = new ResizeObserver(() => _gidApplyKpiGrid());
+  _gidKpiObserver.observe(grid);
+  _gidApplyKpiGrid();
 }
 
 // Initialise les inputs date et le select produit au premier chargement
