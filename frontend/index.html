@@ -1658,9 +1658,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   box-sizing:border-box;
 }
 .page-gi{padding:0!important}
-/* Chaque page GI gère son propre scroll — indépendant de .pages */
+/* .pages passe en flex-colonne quand une page GI est active (classe gi-mode) */
+.pages.gi-mode{overflow:hidden!important;display:flex;flex-direction:column}
+/* La page GI active est l'unique enfant flex qui scroll en interne */
 .page-gi.active{
-  position:absolute;top:0;left:0;right:0;bottom:0;
+  flex:1;min-height:0;
   overflow-y:auto;overflow-x:hidden;
   padding:0 0 36px 0!important;
   overflow-anchor:none;scroll-behavior:auto;touch-action:pan-y;
@@ -5301,8 +5303,16 @@ function goTo(page){
   if(navEl) navEl.classList.add('active');
   currentPage=page;
   const m=PAGE_META[page]||{title:()=>page,sub:()=>''};
-  document.getElementById('page-title').textContent = typeof m.title==='function' ? m.title() : m.title;
-  document.getElementById('page-sub').textContent   = typeof m.sub==='function'   ? m.sub()   : m.sub;
+  const _isGi = !!_giPageLoaders[page];
+  // Mode GI : .pages devient flex-colonne non-scrollante
+  document.getElementById('pages-container').classList.toggle('gi-mode', _isGi);
+  // GI pages ont leur propre header riche — masquer la duplication dans le header principal
+  document.getElementById('page-title').style.visibility = _isGi ? 'hidden' : '';
+  document.getElementById('page-sub').style.visibility   = _isGi ? 'hidden' : '';
+  if(!_isGi){
+    document.getElementById('page-title').textContent = typeof m.title==='function' ? m.title() : m.title;
+    document.getElementById('page-sub').textContent   = typeof m.sub==='function'   ? m.sub()   : m.sub;
+  }
   animatePageTitle();
   _startScrollFix();
 
