@@ -5205,10 +5205,19 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
         <div class="pos-form-row">
           <div><label class="pos-label">Unité *</label><input class="pos-input" id="pos-prod-unite" placeholder="Ex : verre, bouteille"></div>
-          <div><label class="pos-label">Prix de vente initial (G)</label><input class="pos-input" id="pos-prod-prix" type="number" min="0" placeholder="0.00"></div>
+          <div><label class="pos-label">Seuil alerte stock</label><input class="pos-input" id="pos-prod-seuil" type="number" min="0" placeholder="0"></div>
+        </div>
+        <!-- Champ prix — affiché uniquement à la création -->
+        <div id="pos-prod-prix-row" class="pos-form-row">
+          <div style="width:100%">
+            <label class="pos-label">Prix de vente initial (G) *</label>
+            <input class="pos-input" id="pos-prod-prix" type="number" min="0.01" step="0.01" placeholder="0.00" style="width:100%">
+            <div style="font-size:10.5px;color:rgba(255,255,255,.35);margin-top:4px">
+              Ce prix sera enregistré dans l'historique. Pour le modifier ensuite, utilisez le bouton <strong>Prix ₲</strong>.
+            </div>
+          </div>
         </div>
         <div class="pos-form-row">
-          <div><label class="pos-label">Seuil alerte stock</label><input class="pos-input" id="pos-prod-seuil" type="number" min="0" placeholder="0"></div>
           <div><label class="pos-label">Code barre</label><input class="pos-input" id="pos-prod-code" placeholder="Optionnel"></div>
         </div>
         <div class="pos-modal-footer">
@@ -12939,8 +12948,9 @@ function posProduitsFiltrer(){
 }
 
 function posProduitModal(id){
-  const modal = document.getElementById('pos-prod-modal-bg');
-  const title = document.getElementById('pos-prod-modal-title');
+  const modal    = document.getElementById('pos-prod-modal-bg');
+  const title    = document.getElementById('pos-prod-modal-title');
+  const prixRow  = document.getElementById('pos-prod-prix-row');
   document.getElementById('pos-prod-id').value = id||'';
   if(id){
     const p = _posProduitsAll.find(x=>x.id===id)||{};
@@ -12948,14 +12958,16 @@ function posProduitModal(id){
     document.getElementById('pos-prod-nom').value   = p.nom||'';
     document.getElementById('pos-prod-cat').value   = p.categorie||'boisson';
     document.getElementById('pos-prod-unite').value = p.unite||'';
-    document.getElementById('pos-prod-prix').value  = '';
     document.getElementById('pos-prod-seuil').value = p.seuil_alerte_stock||0;
     document.getElementById('pos-prod-code').value  = p.code_barre||'';
+    document.getElementById('pos-prod-prix').value  = '';
+    if(prixRow) prixRow.style.display = 'none';   // prix non modifiable ici
   } else {
     title.textContent = 'Nouveau produit';
-    ['pos-prod-nom','pos-prod-unite','pos-prod-prix','pos-prod-code'].forEach(id=>{ document.getElementById(id).value=''; });
+    ['pos-prod-nom','pos-prod-unite','pos-prod-prix','pos-prod-code'].forEach(fid=>{ document.getElementById(fid).value=''; });
     document.getElementById('pos-prod-seuil').value = 0;
     document.getElementById('pos-prod-cat').value   = 'boisson';
+    if(prixRow) prixRow.style.display = '';        // requis à la création
   }
   modal.classList.add('open');
 }

@@ -47,6 +47,7 @@ class ProduitIn(BaseModel):
     code_barre:          Optional[str] = None
     actif:               bool = True
     seuil_alerte_stock:  float = 0.0
+    prix_initial:        Optional[float] = None
 
 
 class PrixIn(BaseModel):
@@ -171,6 +172,8 @@ def liste_produits(actif: Optional[bool] = None, db: Session = Depends(get_db)):
 
 @router.post("/produits", status_code=201)
 def creer_produit(data: ProduitIn, request: Request, db: Session = Depends(get_db)):
+    if not data.prix_initial or data.prix_initial <= 0:
+        raise HTTPException(422, "Un prix de vente initial valide est requis pour créer un produit.")
     p = BarProduit(
         nom=data.nom.strip(),
         categorie=data.categorie.strip(),
@@ -180,6 +183,15 @@ def creer_produit(data: ProduitIn, request: Request, db: Session = Depends(get_d
         seuil_alerte_stock=data.seuil_alerte_stock,
     )
     db.add(p)
+    db.flush()   # obtenir p.id avant le commit
+    # Créer la première entrée d'historique de prix
+    db.add(BarPrixHistorique(
+        produit_id     = p.id,
+        prix           = Decimal(str(data.prix_initial)),
+        date_debut     = datetime.now(tz=timezone.utc),
+        date_fin       = None,
+        utilisateur_id = _uid(request),
+    ))
     db.commit()
     db.refresh(p)
     return {"id": p.id, "nom": p.nom, "categorie": p.categorie}
