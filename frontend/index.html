@@ -2319,6 +2319,184 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   .gid-kpi-val{font-size:13px}
   .gid-stat-row{padding:2px 0;font-size:11.5px}
 }
+
+/* ══════════════════════════════════════════════════════════════
+   MODULE BAR / RESTAURANT — POS
+   Thème : dark + ambre #f7a93b + teal #3fb6a8
+   ══════════════════════════════════════════════════════════════ */
+
+/* ─── Section sidebar ─────────────────────────────────────── */
+.nav-section-label{
+  font-size:9.5px;font-weight:700;letter-spacing:.12em;
+  color:rgba(255,255,255,.35);text-transform:uppercase;
+  padding:16px 18px 4px;margin-top:4px;
+}
+
+/* ─── Composants communs POS ──────────────────────────────── */
+.pos-page{display:flex;flex-direction:column;gap:14px;padding:16px 20px 28px;box-sizing:border-box}
+.pos-header{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:12px 18px}
+.pos-header-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pos-header-icon svg{width:20px;height:20px}
+.pos-header-title{font-size:16px;font-weight:700;color:#fff}
+.pos-header-sub{font-size:11px;color:rgba(255,255,255,.45);margin-top:1px}
+.pos-header-actions{margin-left:auto;display:flex;gap:8px}
+
+/* ─── Cartes KPI POS ──────────────────────────────────────── */
+.pos-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.pos-kpi{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+  border-radius:11px;padding:12px 14px;cursor:default}
+.pos-kpi-label{font-size:10px;color:rgba(255,255,255,.45);text-transform:uppercase;
+  letter-spacing:.06em;margin-bottom:4px}
+.pos-kpi-val{font-size:18px;font-weight:700;color:#3fb6a8}
+.pos-kpi-val.amber{color:#f7a93b}
+.pos-kpi-val.red{color:#f87171}
+.pos-kpi-sub{font-size:10px;color:rgba(255,255,255,.3);margin-top:2px}
+
+/* ─── Tableaux POS ─────────────────────────────────────────── */
+.pos-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+  border-radius:12px;overflow:hidden}
+.pos-card-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;
+  font-weight:600;color:rgba(255,255,255,.75)}
+.pos-table-wrap{overflow-x:auto}
+.pos-table{width:100%;border-collapse:collapse;font-size:12px}
+.pos-table th{padding:8px 12px;text-align:left;color:rgba(255,255,255,.4);
+  font-weight:600;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+  border-bottom:1px solid rgba(255,255,255,.06)}
+.pos-table td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.04);
+  color:rgba(255,255,255,.82);vertical-align:middle}
+.pos-table tr:hover td{background:rgba(255,255,255,.03)}
+.pos-table tr:last-child td{border-bottom:none}
+.pos-teal{color:#3fb6a8;font-weight:600}
+.pos-amber{color:#f7a93b;font-weight:600}
+.pos-red{color:#f87171;font-weight:600}
+
+/* ─── Badges statut ────────────────────────────────────────── */
+.pos-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;
+  font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  background:rgba(255,255,255,.08);color:rgba(255,255,255,.45)}
+.pos-badge.ok,.pos-badge.teal{background:rgba(63,182,168,.15);color:#3fb6a8}
+.pos-badge.warn,.pos-badge.amber{background:rgba(247,169,59,.15);color:#f7a93b}
+.pos-badge.err,.pos-badge.danger{background:rgba(248,113,113,.15);color:#f87171}
+.pos-badge.gray{background:rgba(255,255,255,.08);color:rgba(255,255,255,.45)}
+
+/* ─── Formulaires POS ──────────────────────────────────────── */
+.pos-form{display:flex;flex-direction:column;gap:12px;padding:14px}
+.pos-form-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.pos-label{font-size:10.5px;font-weight:600;color:rgba(255,255,255,.5);
+  text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;display:block}
+.pos-input,.pos-select{
+  width:100%;padding:8px 11px;border-radius:8px;font-size:12.5px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  color:#fff;box-sizing:border-box;outline:none;
+  transition:border-color .15s}
+.pos-input:focus,.pos-select:focus{border-color:#f7a93b}
+.pos-select option{background:#1a1a2e;color:#fff}
+.pos-btn{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;
+  cursor:pointer;border:none;transition:opacity .15s}
+.pos-btn:hover{opacity:.85}
+.pos-btn.primary{background:#f7a93b;color:#1a1a2e}
+.pos-btn.teal{background:#3fb6a8;color:#fff}
+.pos-btn.ghost{background:rgba(255,255,255,.08);color:rgba(255,255,255,.7)}
+.pos-btn.danger{background:rgba(248,113,113,.2);color:#f87171;border:1px solid rgba(248,113,113,.3)}
+.pos-btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* ─── Écran de caisse POS ─────────────────────────────────── */
+.pos-caisse-layout{display:grid;grid-template-columns:1fr 340px;gap:14px;min-height:500px}
+.pos-produit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;
+  align-content:start}
+.pos-produit-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;padding:12px 10px;text-align:center;cursor:pointer;
+  transition:background .15s,border-color .15s,transform .1s;user-select:none}
+.pos-produit-card:hover{background:rgba(247,169,59,.12);border-color:rgba(247,169,59,.4);
+  transform:translateY(-1px)}
+.pos-produit-card:active{transform:scale(.97)}
+.pos-produit-nom{font-size:11.5px;font-weight:600;color:#fff;margin-top:6px;
+  line-height:1.3;word-break:break-word}
+.pos-produit-cat{font-size:9.5px;color:rgba(255,255,255,.4);text-transform:uppercase;margin-top:2px}
+.pos-produit-prix{font-size:11px;color:#3fb6a8;margin-top:3px}
+.pos-produit-unite{font-size:9.5px;color:rgba(255,255,255,.35);margin-top:1px}
+.pos-produit-stock{font-size:9.5px;color:rgba(255,255,255,.35);margin-top:2px}
+.pos-produit-card.rupture{opacity:.45;pointer-events:none}
+
+/* ─── Panier de caisse ────────────────────────────────────── */
+.pos-cart-panel{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+  border-radius:12px;display:flex;flex-direction:column}
+.pos-cart-hdr{padding:12px 14px;font-size:12px;font-weight:700;color:rgba(255,255,255,.8);
+  border-bottom:1px solid rgba(255,255,255,.06)}
+.pos-cart-items{flex:1;overflow-y:auto;padding:8px 0;min-height:0}
+.pos-cart-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;
+  border-bottom:1px solid rgba(255,255,255,.04)}
+.pos-cart-item:last-child{border-bottom:none}
+.pos-cart-item-info{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+.pos-cart-item-nom{font-size:11.5px;color:#fff;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pos-cart-item-prix{font-size:10.5px;color:rgba(255,255,255,.45);white-space:nowrap}
+.pos-cart-item-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.pos-cart-item-qte{display:flex;align-items:center;gap:4px}
+.pos-cart-item-qte button{width:20px;height:20px;border-radius:5px;border:none;cursor:pointer;
+  background:rgba(255,255,255,.1);color:#fff;font-size:13px;line-height:1;padding:0}
+.pos-cart-item-qte button:hover{background:rgba(247,169,59,.3)}
+.pos-cart-item-qte span{font-size:12px;color:#fff;min-width:18px;text-align:center}
+.pos-cart-qte-btn{width:22px;height:22px;border-radius:6px;border:none;cursor:pointer;
+  background:rgba(255,255,255,.1);color:#fff;font-size:14px;display:flex;
+  align-items:center;justify-content:center;padding:0}
+.pos-cart-qte-btn:hover{background:rgba(247,169,59,.3)}
+.pos-cart-item-total{font-size:11.5px;color:#3fb6a8;font-weight:600;min-width:60px;text-align:right}
+.pos-cart-item-del{background:none;border:none;color:rgba(248,113,113,.6);cursor:pointer;
+  font-size:16px;padding:0 2px}
+.pos-cart-item-del:hover{color:#f87171}
+.pos-cart-empty{padding:32px;text-align:center;color:rgba(255,255,255,.25);font-size:12px}
+.pos-cart-footer{padding:12px 14px;border-top:1px solid rgba(255,255,255,.07)}
+.pos-cart-total-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.pos-cart-total-label{font-size:12px;color:rgba(255,255,255,.6)}
+.pos-cart-total-val{font-size:20px;font-weight:700;color:#f7a93b}
+.pos-mode-btns{display:flex;gap:6px;margin-bottom:8px}
+.pos-mode-btn{flex:1;padding:7px 4px;border-radius:8px;border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.05);color:rgba(255,255,255,.7);font-size:11px;
+  font-weight:600;cursor:pointer;transition:.15s}
+.pos-mode-btn.active{background:#f7a93b;border-color:#f7a93b;color:#1a1a2e}
+.pos-encaisser-btn{width:100%;padding:11px;background:#f7a93b;color:#1a1a2e;border:none;
+  border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s}
+.pos-encaisser-btn:hover{opacity:.88}
+.pos-encaisser-btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* ─── Catégorie tabs ──────────────────────────────────────── */
+.pos-cat-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.pos-cat-tab{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;
+  border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);
+  color:rgba(255,255,255,.6);cursor:pointer;transition:.15s}
+.pos-cat-tab.active{background:#f7a93b;border-color:#f7a93b;color:#1a1a2e}
+.pos-cat-tab:hover:not(.active){background:rgba(255,255,255,.09)}
+
+/* ─── Stock bar ────────────────────────────────────────────── */
+.pos-stock-alert{color:#f87171}
+.pos-stock-ok{color:#3fb6a8}
+.pos-stock-warn{color:#f7a93b}
+
+/* ─── Modal générique POS ─────────────────────────────────── */
+.pos-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1000;
+  display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;
+  transition:opacity .2s}
+.pos-modal-bg.open{opacity:1;pointer-events:auto}
+.pos-modal{background:#1e2235;border:1px solid rgba(255,255,255,.1);border-radius:14px;
+  padding:22px 24px;min-width:340px;max-width:520px;width:90%;max-height:80vh;
+  overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.pos-modal h3{margin:0 0 16px;font-size:15px;font-weight:700;color:#fff}
+.pos-modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+
+/* ─── Responsive compact ────────────────────────────────────── */
+@media(max-height:800px){
+  .pos-page{gap:8px;padding:8px 14px 12px}
+  .pos-kpi-val{font-size:15px}
+  .pos-kpi{padding:8px 11px}
+  .pos-caisse-layout{grid-template-columns:1fr 300px}
+  .pos-produit-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
+}
+@media(max-width:1440px) and (max-height:800px){
+  .pos-caisse-layout{grid-template-columns:1fr 280px}
+  .pos-produit-grid{grid-template-columns:repeat(auto-fill,minmax(95px,1fr))}
+}
 </style>
 </head>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
@@ -2513,6 +2691,74 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span>Audit IA</span>
       <span class="nav-active-dot"></span>
     </button>
+
+    <!-- ── Section Bar / Restaurant ── -->
+    <div class="nav-section-label">Bar / Restaurant</div>
+
+    <button class="nav-item" data-page="pos-caisse" onclick="goTo('pos-caisse')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h4M7 11h2"/><rect x="13" y="8" width="4" height="5" rx="1"/></svg>
+      </span>
+      <span>Caisse POS</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="pos-produits" onclick="goTo('pos-produits')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/></svg>
+      </span>
+      <span>Produits Bar</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="pos-stock" onclick="goTo('pos-stock')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+      </span>
+      <span>Stock Bar</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="pos-ventes" onclick="goTo('pos-ventes')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      </span>
+      <span>Ventes Bar</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="pos-credits" onclick="goTo('pos-credits')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
+      </span>
+      <span>Crédits</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="pos-commandes" onclick="goTo('pos-commandes')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+      </span>
+      <span>Commandes</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="pos-paie" onclick="goTo('pos-paie')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0112 0v2"/><path d="M16 12v4M14 14h4"/></svg>
+      </span>
+      <span>Paie Bar</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="pos-rentabilite" onclick="goTo('pos-rentabilite')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      </span>
+      <span>Rentabilité</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
   </nav>
 
   <!-- Statut connexion -->
@@ -4634,6 +4880,641 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div><!-- /page-caisse -->
 
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — CAISSE                                       -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-caisse" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#f7a93b,#e8893a)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Caisse POS</div>
+            <div class="pos-header-sub">Encaissement en temps réel — Bar / Restaurant</div>
+          </div>
+          <div class="pos-header-actions">
+            <select class="pos-select" id="pos-caissier-sel" style="width:160px">
+              <option value="">Sans caissier</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tabs catégories -->
+        <div class="pos-cat-tabs" id="pos-cat-tabs">
+          <button class="pos-cat-tab active" data-cat="TOUS" onclick="posCatFilter('TOUS',this)">Tous</button>
+        </div>
+
+        <div class="pos-caisse-layout">
+          <!-- Grille produits -->
+          <div>
+            <div class="pos-produit-grid" id="pos-produit-grid">
+              <div style="color:rgba(255,255,255,.3);font-size:12px;padding:20px">Chargement…</div>
+            </div>
+          </div>
+
+          <!-- Panier -->
+          <div class="pos-cart-panel">
+            <div class="pos-cart-hdr">
+              🛒 Panier
+              <button class="pos-btn ghost" style="font-size:10px;padding:3px 8px" onclick="posViderPanier()">Vider</button>
+            </div>
+            <div class="pos-cart-items" id="pos-cart-items">
+              <div class="pos-cart-empty">Ajoutez des articles</div>
+            </div>
+            <div class="pos-cart-footer">
+              <div class="pos-cart-total-row">
+                <span class="pos-cart-total-label">Total</span>
+                <span class="pos-cart-total-val" id="pos-cart-total">G 0.00</span>
+              </div>
+              <div style="margin-bottom:8px">
+                <label class="pos-label">Client (pour crédit)</label>
+                <input class="pos-input" id="pos-client-nom" placeholder="Nom du client (optionnel)">
+              </div>
+              <div class="pos-mode-btns">
+                <button class="pos-mode-btn active" data-mode="CASH" onclick="posSetMode('CASH',this)">CASH</button>
+                <button class="pos-mode-btn" data-mode="CREDIT" onclick="posSetMode('CREDIT',this)">CRÉDIT</button>
+                <button class="pos-mode-btn" data-mode="MIXTE" onclick="posSetMode('MIXTE',this)">MIXTE</button>
+              </div>
+              <div id="pos-mixte-row" style="display:none;margin-bottom:8px">
+                <label class="pos-label">Montant payé</label>
+                <input class="pos-input" id="pos-montant-paye" type="number" min="0" placeholder="G 0.00">
+              </div>
+              <button class="pos-encaisser-btn" id="pos-enc-btn" onclick="posEncaisser()" disabled>
+                Encaisser
+              </button>
+              <div id="pos-ticket-result" style="display:none;margin-top:8px;padding:8px 10px;
+                background:rgba(63,182,168,.1);border:1px solid rgba(63,182,168,.3);
+                border-radius:8px;font-size:11px;color:#3fb6a8;text-align:center"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-caisse -->
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — PRODUITS BAR                                 -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-produits" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#a78bfa,#7c3aed)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Produits Bar</div>
+            <div class="pos-header-sub">Catalogue articles — prix historisés</div>
+          </div>
+          <div class="pos-header-actions">
+            <button class="pos-btn primary" onclick="posProduitModal()">+ Nouveau produit</button>
+          </div>
+        </div>
+
+        <div class="pos-card">
+          <div class="pos-card-hdr">
+            <span>Liste des produits</span>
+            <input class="pos-input" id="pos-prod-search" placeholder="Rechercher…" style="width:180px;padding:5px 9px;font-size:11px" oninput="posProduitsFiltrer()">
+          </div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead>
+                <tr>
+                  <th>Nom</th><th>Catégorie</th><th>Unité</th>
+                  <th>Prix actif</th><th>Stock</th><th>CMUP</th>
+                  <th>Statut</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pos-prod-tbody">
+                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-produits -->
+
+    <!-- Modal produit -->
+    <div class="pos-modal-bg" id="pos-prod-modal-bg" onclick="if(event.target===this)posProduitModalClose()">
+      <div class="pos-modal">
+        <h3 id="pos-prod-modal-title">Nouveau produit</h3>
+        <input type="hidden" id="pos-prod-id">
+        <div class="pos-form-row">
+          <div><label class="pos-label">Nom *</label><input class="pos-input" id="pos-prod-nom" placeholder="Ex : Rhum Barbancourt"></div>
+          <div><label class="pos-label">Catégorie *</label>
+            <select class="pos-select" id="pos-prod-cat">
+              <option>boisson</option><option>alcool</option><option>soft</option>
+              <option>plat</option><option>snack</option><option>autre</option>
+            </select>
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div><label class="pos-label">Unité *</label><input class="pos-input" id="pos-prod-unite" placeholder="Ex : verre, bouteille"></div>
+          <div><label class="pos-label">Prix de vente initial (G)</label><input class="pos-input" id="pos-prod-prix" type="number" min="0" placeholder="0.00"></div>
+        </div>
+        <div class="pos-form-row">
+          <div><label class="pos-label">Seuil alerte stock</label><input class="pos-input" id="pos-prod-seuil" type="number" min="0" placeholder="0"></div>
+          <div><label class="pos-label">Code barre</label><input class="pos-input" id="pos-prod-code" placeholder="Optionnel"></div>
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="posProduitModalClose()">Annuler</button>
+          <button class="pos-btn primary" onclick="posProduitSauvegarder()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal historique prix -->
+    <div class="pos-modal-bg" id="pos-prix-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal">
+        <h3 id="pos-prix-modal-title">Historique des prix</h3>
+        <div id="pos-prix-historique-liste" style="margin-bottom:14px"></div>
+        <hr style="border-color:rgba(255,255,255,.08);margin-bottom:14px">
+        <div class="pos-form-row">
+          <div><label class="pos-label">Nouveau prix (G) *</label>
+            <input class="pos-input" id="pos-nouveau-prix" type="number" min="0.01" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="document.getElementById('pos-prix-modal-bg').classList.remove('open')">Fermer</button>
+          <button class="pos-btn primary" onclick="posChangerPrix()">Changer le prix</button>
+        </div>
+        <input type="hidden" id="pos-prix-produit-id">
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — STOCK BAR                                    -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-stock" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#34d399,#059669)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Stock Bar</div>
+            <div class="pos-header-sub">Stock calculé en temps réel — Réceptions & Ajustements</div>
+          </div>
+          <div class="pos-header-actions">
+            <button class="pos-btn teal" onclick="posStockReceptionModal()">+ Réception</button>
+            <button class="pos-btn ghost" onclick="posStockAjustModal()">Ajustement</button>
+          </div>
+        </div>
+
+        <div class="pos-kpi-grid" id="pos-stock-kpis">
+          <div class="pos-kpi"><div class="pos-kpi-label">Produits actifs</div><div class="pos-kpi-val amber" id="kpi-nb-produits">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">En alerte stock</div><div class="pos-kpi-val red" id="kpi-en-alerte">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Valeur stock CMUP</div><div class="pos-kpi-val" id="kpi-val-stock">—</div></div>
+        </div>
+
+        <div class="pos-card">
+          <div class="pos-card-hdr">Stock courant</div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead>
+                <tr><th>Produit</th><th>Catégorie</th><th>Stock</th><th>Unité</th><th>Seuil alerte</th><th>CMUP</th><th>Valeur</th><th>État</th></tr>
+              </thead>
+              <tbody id="pos-stock-tbody">
+                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-stock -->
+
+    <!-- Modal réception stock -->
+    <div class="pos-modal-bg" id="pos-recept-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal">
+        <h3>Réception de marchandises</h3>
+        <div class="pos-form-row">
+          <div><label class="pos-label">Produit *</label>
+            <select class="pos-select" id="pos-recept-produit"></select>
+          </div>
+          <div><label class="pos-label">Quantité *</label>
+            <input class="pos-input" id="pos-recept-qte" type="number" min="0.001" step="0.001" placeholder="0.000">
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div><label class="pos-label">Prix achat unitaire (G) *</label>
+            <input class="pos-input" id="pos-recept-prix" type="number" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div><label class="pos-label">Fournisseur</label>
+            <input class="pos-input" id="pos-recept-fourn" placeholder="Optionnel">
+          </div>
+        </div>
+        <div><label class="pos-label">Notes</label><input class="pos-input" id="pos-recept-notes" placeholder="Optionnel"></div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="document.getElementById('pos-recept-modal-bg').classList.remove('open')">Annuler</button>
+          <button class="pos-btn teal" onclick="posReceptionnerStock()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal ajustement stock -->
+    <div class="pos-modal-bg" id="pos-ajust-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal">
+        <h3>Ajustement de stock</h3>
+        <div class="pos-form-row">
+          <div><label class="pos-label">Produit *</label>
+            <select class="pos-select" id="pos-ajust-produit"></select>
+          </div>
+          <div><label class="pos-label">Type *</label>
+            <select class="pos-select" id="pos-ajust-type">
+              <option value="AJUSTEMENT">Ajustement</option>
+              <option value="PERTE">Perte</option>
+              <option value="CASSE">Casse</option>
+            </select>
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div><label class="pos-label">Quantité (signée) *</label>
+            <input class="pos-input" id="pos-ajust-qte" type="number" step="0.001" placeholder="-2.5 ou +5">
+          </div>
+        </div>
+        <div><label class="pos-label">Motif (min 5 caractères) *</label>
+          <input class="pos-input" id="pos-ajust-motif" placeholder="Ex : Inventaire physique — manque de 3 bouteilles">
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="document.getElementById('pos-ajust-modal-bg').classList.remove('open')">Annuler</button>
+          <button class="pos-btn danger" onclick="posAjusterStock()">Valider</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — VENTES BAR (temps réel)                     -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-ventes" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#f7a93b,#f59e0b)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Ventes Bar</div>
+            <div class="pos-header-sub">Suivi des ventes du jour et historique</div>
+          </div>
+          <div class="pos-header-actions">
+            <input type="date" class="pos-input" id="pos-ventes-debut" style="width:130px">
+            <input type="date" class="pos-input" id="pos-ventes-fin" style="width:130px">
+            <button class="pos-btn primary" onclick="posVentesCharger()">Filtrer</button>
+            <button class="pos-btn ghost" onclick="posVentesAujourdhui()">Aujourd'hui</button>
+          </div>
+        </div>
+
+        <div class="pos-kpi-grid">
+          <div class="pos-kpi"><div class="pos-kpi-label">CA période</div><div class="pos-kpi-val" id="vkpi-ca">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Nb ventes</div><div class="pos-kpi-val amber" id="vkpi-nb">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Cash encaissé</div><div class="pos-kpi-val" id="vkpi-cash">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Crédits ouverts</div><div class="pos-kpi-val red" id="vkpi-credit">—</div></div>
+        </div>
+
+        <!-- Par caissier -->
+        <div class="pos-card" id="pos-caissiers-card">
+          <div class="pos-card-hdr">Par caissier (période)</div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead><tr><th>Caissier</th><th>Nb ventes</th><th>Total</th></tr></thead>
+              <tbody id="pos-caissiers-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pos-card">
+          <div class="pos-card-hdr">
+            <span>Détail des ventes</span>
+            <select class="pos-select" id="pos-ventes-mode-f" style="width:120px" onchange="posVentesCharger()">
+              <option value="">Tous modes</option>
+              <option value="CASH">CASH</option>
+              <option value="CREDIT">CRÉDIT</option>
+              <option value="MIXTE">MIXTE</option>
+            </select>
+          </div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead>
+                <tr><th>Ticket</th><th>Date/Heure</th><th>Client</th><th>Lignes</th><th>Total</th><th>Mode</th><th>Statut</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="pos-ventes-tbody">
+                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-ventes -->
+
+    <!-- Modal détail vente -->
+    <div class="pos-modal-bg" id="pos-vente-detail-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal" style="min-width:420px">
+        <h3 id="pos-vd-titre">Ticket #</h3>
+        <div id="pos-vd-content"></div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="document.getElementById('pos-vente-detail-bg').classList.remove('open')">Fermer</button>
+          <button class="pos-btn danger" id="pos-vd-annuler-btn" onclick="posAnnulerVente()">Annuler la vente</button>
+        </div>
+        <input type="hidden" id="pos-vd-id">
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — CRÉDITS                                      -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-credits" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#f87171,#dc2626)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Crédits</div>
+            <div class="pos-header-sub">Clients à crédit — Suivi des remboursements</div>
+          </div>
+          <div class="pos-header-actions">
+            <select class="pos-select" id="pos-credits-filtre" onchange="posCreditsCharger()" style="width:140px">
+              <option value="">Tous</option>
+              <option value="OUVERT">Ouverts</option>
+              <option value="EN_RETARD">En retard</option>
+              <option value="SOLDE">Soldés</option>
+            </select>
+            <button class="pos-btn ghost" onclick="posCreditsCharger()">↺</button>
+          </div>
+        </div>
+
+        <div class="pos-kpi-grid">
+          <div class="pos-kpi"><div class="pos-kpi-label">Total dû</div><div class="pos-kpi-val red" id="ckpi-du">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Crédits ouverts</div><div class="pos-kpi-val amber" id="ckpi-nb">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">En retard</div><div class="pos-kpi-val red" id="ckpi-retard">—</div></div>
+        </div>
+
+        <div class="pos-card">
+          <div class="pos-card-hdr">Liste des crédits</div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead>
+                <tr><th>Client</th><th>Contact</th><th>Montant dû</th><th>Remboursé</th><th>Solde</th><th>Échéance</th><th>Statut</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="pos-credits-tbody">
+                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-credits -->
+
+    <!-- Modal remboursement -->
+    <div class="pos-modal-bg" id="pos-remb-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal">
+        <h3 id="pos-remb-titre">Enregistrer un remboursement</h3>
+        <input type="hidden" id="pos-remb-credit-id">
+        <div><label class="pos-label">Montant (G) *</label>
+          <input class="pos-input" id="pos-remb-montant" type="number" min="0.01" step="0.01" placeholder="0.00">
+        </div>
+        <div style="margin-top:10px"><label class="pos-label">Notes</label>
+          <input class="pos-input" id="pos-remb-notes" placeholder="Optionnel">
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="document.getElementById('pos-remb-modal-bg').classList.remove('open')">Annuler</button>
+          <button class="pos-btn teal" onclick="posEnregistrerRemb()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — COMMANDES                                    -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-commandes" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#60a5fa,#2563eb)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Commandes</div>
+            <div class="pos-header-sub">Tables et commandes en cours</div>
+          </div>
+          <div class="pos-header-actions">
+            <button class="pos-btn primary" onclick="posCmdNouvelle()">+ Nouvelle commande</button>
+            <button class="pos-btn ghost" onclick="posCmdCharger()">↺</button>
+          </div>
+        </div>
+
+        <div class="pos-card">
+          <div class="pos-card-hdr">Commandes actives</div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead>
+                <tr><th>Table/Client</th><th>Ouverture</th><th>Articles</th><th>Total estimé</th><th>Statut</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="pos-cmd-tbody">
+                <tr><td colspan="6" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-commandes -->
+
+    <!-- Modal nouvelle commande -->
+    <div class="pos-modal-bg" id="pos-cmd-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal" style="min-width:460px">
+        <h3 id="pos-cmd-modal-title">Nouvelle commande</h3>
+        <input type="hidden" id="pos-cmd-id">
+        <div class="pos-form-row">
+          <div><label class="pos-label">Numéro de table</label><input class="pos-input" id="pos-cmd-table" placeholder="Ex : Table 5"></div>
+          <div><label class="pos-label">Nom client</label><input class="pos-input" id="pos-cmd-client" placeholder="Ex : Jean"></div>
+        </div>
+        <div style="margin:10px 0 8px;font-size:11px;font-weight:600;color:rgba(255,255,255,.5)">ARTICLES</div>
+        <div id="pos-cmd-lignes"></div>
+        <button class="pos-btn ghost" style="margin-top:8px;font-size:11px" onclick="posCmdAddLigne()">+ Ajouter un article</button>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="document.getElementById('pos-cmd-modal-bg').classList.remove('open')">Annuler</button>
+          <button class="pos-btn primary" onclick="posCmdSauvegarder()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal encaissement commande -->
+    <div class="pos-modal-bg" id="pos-cmd-enc-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal">
+        <h3>Encaisser la commande</h3>
+        <input type="hidden" id="pos-cmd-enc-id">
+        <div class="pos-form-row">
+          <div><label class="pos-label">Mode de paiement</label>
+            <select class="pos-select" id="pos-cmd-enc-mode">
+              <option value="CASH">CASH</option><option value="CREDIT">CRÉDIT</option><option value="MIXTE">MIXTE</option>
+            </select>
+          </div>
+          <div><label class="pos-label">Montant payé (G)</label>
+            <input class="pos-input" id="pos-cmd-enc-paye" type="number" min="0" step="0.01" placeholder="Total si vide">
+          </div>
+        </div>
+        <div><label class="pos-label">Nom client</label><input class="pos-input" id="pos-cmd-enc-client" placeholder="Optionnel"></div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="document.getElementById('pos-cmd-enc-bg').classList.remove('open')">Annuler</button>
+          <button class="pos-btn primary" onclick="posCmdEncaisser()">Encaisser</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — PAIE BAR                                     -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-paie" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#fb923c,#ea580c)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0112 0v2"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Paie Bar</div>
+            <div class="pos-header-sub">Paiements employés — Salaires, Avances, Commissions</div>
+          </div>
+          <div class="pos-header-actions">
+            <button class="pos-btn primary" onclick="posPaymentModal()">+ Enregistrer paiement</button>
+          </div>
+        </div>
+
+        <div class="pos-kpi-grid">
+          <div class="pos-kpi"><div class="pos-kpi-label">Total versé (mois)</div><div class="pos-kpi-val" id="pkpi-total">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Nb paiements</div><div class="pos-kpi-val amber" id="pkpi-nb">—</div></div>
+        </div>
+
+        <div class="pos-card">
+          <div class="pos-card-hdr">Historique des paiements</div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead>
+                <tr><th>Employé</th><th>Date</th><th>Type</th><th>Mode</th><th>Montant</th><th>Notes</th></tr>
+              </thead>
+              <tbody id="pos-paie-tbody">
+                <tr><td colspan="6" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-paie -->
+
+    <!-- Modal paiement employé -->
+    <div class="pos-modal-bg" id="pos-pay-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal">
+        <h3>Enregistrer un paiement</h3>
+        <div class="pos-form-row">
+          <div><label class="pos-label">Employé *</label>
+            <select class="pos-select" id="pos-pay-emp"></select>
+          </div>
+          <div><label class="pos-label">Type *</label>
+            <select class="pos-select" id="pos-pay-type">
+              <option value="SALAIRE">Salaire</option>
+              <option value="AVANCE">Avance</option>
+              <option value="BONUS">Bonus</option>
+              <option value="COMMISSION">Commission</option>
+            </select>
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div><label class="pos-label">Montant (G) *</label>
+            <input class="pos-input" id="pos-pay-montant" type="number" min="0.01" step="0.01" placeholder="0.00">
+          </div>
+          <div><label class="pos-label">Mode</label>
+            <select class="pos-select" id="pos-pay-mode">
+              <option value="CASH">Cash</option>
+              <option value="VIREMENT">Virement</option>
+              <option value="CHEQUE">Chèque</option>
+            </select>
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div><label class="pos-label">Période début</label><input class="pos-input" id="pos-pay-debut" type="date"></div>
+          <div><label class="pos-label">Période fin</label><input class="pos-input" id="pos-pay-fin" type="date"></div>
+        </div>
+        <div><label class="pos-label">Notes</label><input class="pos-input" id="pos-pay-notes" placeholder="Optionnel"></div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="document.getElementById('pos-pay-modal-bg').classList.remove('open')">Annuler</button>
+          <button class="pos-btn primary" onclick="posPaymentSauvegarder()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — RENTABILITÉ                                  -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-rentabilite" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#3fb6a8,#0d9488)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Rentabilité Bar</div>
+            <div class="pos-header-sub">CA — Bénéfices — COGS — Marges (données réelles)</div>
+          </div>
+          <div class="pos-header-actions">
+            <input type="date" class="pos-input" id="pos-rent-debut" style="width:130px">
+            <input type="date" class="pos-input" id="pos-rent-fin" style="width:130px">
+            <button class="pos-btn teal" onclick="posRentCharger()">Analyser</button>
+          </div>
+        </div>
+
+        <div class="pos-kpi-grid">
+          <div class="pos-kpi"><div class="pos-kpi-label">CA total</div><div class="pos-kpi-val" id="rkpi-ca">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">COGS</div><div class="pos-kpi-val amber" id="rkpi-cogs">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Bénéfice net</div><div class="pos-kpi-val" id="rkpi-benef">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Marge globale</div><div class="pos-kpi-val" id="rkpi-marge">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Nb ventes</div><div class="pos-kpi-val amber" id="rkpi-nbv">—</div></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <!-- Graphe CA/Bénéfice par catégorie -->
+          <div class="pos-card">
+            <div class="pos-card-hdr">CA & Bénéfice par catégorie</div>
+            <div style="height:220px;padding:12px">
+              <canvas id="pos-rent-chart-cat"></canvas>
+            </div>
+          </div>
+          <!-- Top produits -->
+          <div class="pos-card">
+            <div class="pos-card-hdr">Top 10 produits (CA)</div>
+            <div style="height:220px;padding:12px">
+              <canvas id="pos-rent-chart-top"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="pos-card">
+          <div class="pos-card-hdr">Détail par produit</div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead>
+                <tr><th>Produit</th><th>Catégorie</th><th>Qté vendue</th><th>CA</th><th>COGS</th><th>Bénéfice</th><th>Marge %</th></tr>
+              </thead>
+              <tbody id="pos-rent-tbody">
+                <tr><td colspan="7" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Sélectionnez une période et cliquez sur Analyser</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-rentabilite -->
+
   </div><!-- /pages -->
 
   <footer class="app-footer">
@@ -5273,6 +6154,14 @@ const PAGE_META={
   achats:              {title: 'Gestion des Achats',             sub: 'Matériel, équipements et fournitures'},
   'gi-dashboard':      {title: 'Tableau de Bord Gestion',        sub: 'Vue analytique consolidée — Ventes · Employés · Payroll · Dépenses · Cash'},
   caisse:              {title: 'Rapport de Caisse',              sub: 'Synthèse financière consolidée — Ventes · Achats · Payroll · Dépenses'},
+  'pos-caisse':        {title: 'Caisse POS',                    sub: 'Bar / Restaurant — Encaissement en temps réel'},
+  'pos-produits':      {title: 'Produits Bar',                  sub: 'Catalogue et historique des prix'},
+  'pos-stock':         {title: 'Stock Bar',                     sub: 'Mouvements et niveaux de stock'},
+  'pos-ventes':        {title: 'Ventes Bar',                    sub: 'Suivi des ventes et encaissements'},
+  'pos-credits':       {title: 'Crédits Bar',                   sub: 'Clients à crédit et remboursements'},
+  'pos-commandes':     {title: 'Commandes Bar',                 sub: 'Tables et commandes en cours'},
+  'pos-paie':          {title: 'Paie Bar',                      sub: 'Paiements employés du bar'},
+  'pos-rentabilite':   {title: 'Rentabilité Bar',               sub: 'CA — Bénéfices — Marges — COGS'},
 };
 
 function _forceScrollTop(){
@@ -5326,7 +6215,7 @@ function goTo(page){
   if(page==='admin')              initAdmin();
   if(page==='rapports-dl')       initRapports();
   if(page==='audit')             initAudit();
-  if(_giPageLoaders[page])        _giPageLoaders[page]();
+  if(typeof _giPageLoaders !== 'undefined' && _giPageLoaders[page]) _giPageLoaders[page]();
 }
 
 // ══════════════════════════════════════════════
@@ -10755,12 +11644,20 @@ async function supprimerAchat(id){
 
 /* ── Chargement automatique à la navigation ── */
 const _giPageLoaders = {
-  'gi-dashboard': loadGiDashboard,
-  employes:       loadEmployes,
-  payroll:        loadPayroll,
-  depenses:       loadDepenses,
-  achats:         loadAchats,
-  caisse:         loadCaisse,
+  'gi-dashboard':    loadGiDashboard,
+  employes:          loadEmployes,
+  payroll:           loadPayroll,
+  depenses:          loadDepenses,
+  achats:            loadAchats,
+  caisse:            loadCaisse,
+  'pos-caisse':      loadPosCaisse,
+  'pos-produits':    loadPosProduits,
+  'pos-stock':       loadPosStock,
+  'pos-ventes':      loadPosVentes,
+  'pos-credits':     loadPosCredits,
+  'pos-commandes':   loadPosCommandes,
+  'pos-paie':        loadPosPaie,
+  'pos-rentabilite': loadPosRentabilite,
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -11088,6 +11985,971 @@ function caisseResetFiltres(){
   document.getElementById('caisse-debut').value = '';
   document.getElementById('caisse-fin').value   = '';
   loadCaisse();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// POS BAR / RESTAURANT — UTILITAIRES PARTAGÉS
+// ══════════════════════════════════════════════════════════════════════
+
+/* Formatage monétaire gourdes */
+function posGx(v){ return 'G '+parseFloat(v||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+
+/* Alert simple réutilisant _giAlert */
+function posAlert(msg,type){ _giAlert(msg, type||'err'); }
+
+/* Panier global POS Caisse */
+let _posCart = [];
+let _posMode = 'CASH';
+let _posProduits = [];  // cache des produits avec prix actif
+
+/* Charger les produits bar dans le cache */
+async function _posLoadProduitsCache(){
+  try {
+    const data = await apiFetch('GET','/pos/produits?actif=true');
+    _posProduits = data || [];
+  } catch(e){ _posProduits = []; }
+}
+
+/* Formater date ISO en local */
+function posDateFr(s){
+  if(!s) return '—';
+  const d = new Date(s);
+  return d.toLocaleDateString('fr-HT')+' '+d.toLocaleTimeString('fr-HT',{hour:'2-digit',minute:'2-digit'});
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE POS CAISSE
+// ══════════════════════════════════════════════════════════════════════
+let _posCatActuelle = 'TOUS';
+
+async function loadPosCaisse(){
+  await _posLoadProduitsCache();
+  await _posChargerCaissiers();
+  posRenderCatTabs();
+  posCatFilter(_posCatActuelle, null);
+  posRenderCart();
+}
+
+async function _posChargerCaissiers(){
+  try {
+    const data = await apiFetch('GET','/employes');
+    const sel = document.getElementById('pos-caissier-sel');
+    if(!sel) return;
+    const emps = data.employes || data || [];
+    sel.innerHTML = '<option value="">Sans caissier</option>' +
+      emps.map(e=>`<option value="${e.id}">${e.nom_complet||e.nom||'Employé '+e.id}</option>`).join('');
+  } catch(e){}
+}
+
+function posRenderCatTabs(){
+  const cats = ['TOUS', ...new Set(_posProduits.map(p=>p.categorie).filter(Boolean))];
+  const wrap = document.getElementById('pos-cat-tabs');
+  if(!wrap) return;
+  wrap.innerHTML = cats.map(c=>
+    `<button class="pos-cat-tab${c===_posCatActuelle?' active':''}" data-cat="${c}" onclick="posCatFilter('${c}',this)">${c}</button>`
+  ).join('');
+}
+
+function posCatFilter(cat, btn){
+  _posCatActuelle = cat;
+  document.querySelectorAll('.pos-cat-tab').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
+  const prods = cat==='TOUS' ? _posProduits : _posProduits.filter(p=>p.categorie===cat);
+  const grid = document.getElementById('pos-produit-grid');
+  if(!grid) return;
+  if(!prods.length){
+    grid.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:12px;padding:20px">Aucun produit dans cette catégorie</div>';
+    return;
+  }
+  grid.innerHTML = prods.map(p=>`
+    <div class="pos-produit-card" onclick="posAjouterAuPanier(${p.id})">
+      <div class="pos-produit-nom">${p.nom||'Produit'}</div>
+      <div class="pos-produit-cat">${p.categorie||''}</div>
+      <div class="pos-produit-prix">${posGx(p.prix_actif||0)}</div>
+      <div class="pos-produit-unite">${p.unite||''}</div>
+    </div>
+  `).join('');
+}
+
+function posAjouterAuPanier(prodId){
+  const prod = _posProduits.find(p=>p.id===prodId);
+  if(!prod) return;
+  const idx = _posCart.findIndex(c=>c.produit_id===prodId);
+  if(idx>=0){
+    _posCart[idx].quantite += 1;
+  } else {
+    _posCart.push({ produit_id: prodId, nom: prod.nom, prix: parseFloat(prod.prix_actif||0), quantite: 1, unite: prod.unite||'' });
+  }
+  posRenderCart();
+}
+
+function posRenderCart(){
+  const wrap = document.getElementById('pos-cart-items');
+  const totalEl = document.getElementById('pos-cart-total');
+  const encBtn = document.getElementById('pos-enc-btn');
+  if(!wrap) return;
+  if(!_posCart.length){
+    wrap.innerHTML = '<div class="pos-cart-empty">Ajoutez des articles</div>';
+    if(totalEl) totalEl.textContent = 'G 0.00';
+    if(encBtn) encBtn.disabled = true;
+    return;
+  }
+  let total = 0;
+  wrap.innerHTML = _posCart.map((it,i)=>{
+    const sous = it.prix * it.quantite;
+    total += sous;
+    return `<div class="pos-cart-item">
+      <div class="pos-cart-item-info">
+        <span class="pos-cart-item-nom">${it.nom}</span>
+        <span class="pos-cart-item-prix">${posGx(it.prix)} × </span>
+        <div class="pos-cart-item-qte">
+          <button onclick="posQte(${i},-1)">−</button>
+          <span>${it.quantite}</span>
+          <button onclick="posQte(${i},+1)">+</button>
+        </div>
+      </div>
+      <div class="pos-cart-item-right">
+        <span>${posGx(sous)}</span>
+        <button class="pos-cart-item-del" onclick="posSupprLigne(${i})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+  if(totalEl) totalEl.textContent = posGx(total);
+  if(encBtn) encBtn.disabled = false;
+}
+
+function posQte(idx, delta){
+  _posCart[idx].quantite += delta;
+  if(_posCart[idx].quantite <= 0) _posCart.splice(idx,1);
+  posRenderCart();
+}
+
+function posSupprLigne(idx){
+  _posCart.splice(idx,1);
+  posRenderCart();
+}
+
+function posViderPanier(){
+  _posCart = [];
+  posRenderCart();
+  const res = document.getElementById('pos-ticket-result');
+  if(res) res.style.display='none';
+}
+
+function posSetMode(mode, btn){
+  _posMode = mode;
+  document.querySelectorAll('.pos-mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  const mixte = document.getElementById('pos-mixte-row');
+  if(mixte) mixte.style.display = mode==='MIXTE' ? '' : 'none';
+}
+
+async function posEncaisser(){
+  if(!_posCart.length){ posAlert('Le panier est vide.'); return; }
+  const btn = document.getElementById('pos-enc-btn');
+  btn.disabled = true; btn.textContent = 'Traitement…';
+  try {
+    const caissierSel = document.getElementById('pos-caissier-sel');
+    const clientNom = (document.getElementById('pos-client-nom').value||'').trim();
+    const montantPaye = _posMode==='MIXTE' ? parseFloat(document.getElementById('pos-montant-paye').value||0) : null;
+    const payload = {
+      lignes: _posCart.map(c=>({ produit_id: c.produit_id, quantite: c.quantite })),
+      mode_paiement: _posMode,
+      client_nom: clientNom || null,
+      montant_paye: montantPaye,
+      caissier_id: caissierSel && caissierSel.value ? parseInt(caissierSel.value) : null,
+    };
+    const result = await apiFetch('POST','/pos/ventes', payload);
+    const res = document.getElementById('pos-ticket-result');
+    if(res){
+      res.style.display='';
+      res.textContent = `Ticket ${result.numero_ticket} — ${posGx(result.montant_total)} encaissé`;
+    }
+    _posCart = [];
+    document.getElementById('pos-client-nom').value = '';
+    posRenderCart();
+    posAlert(`Vente ${result.numero_ticket} enregistrée.`, 'ok');
+  } catch(e){
+    posAlert(e.message||'Erreur encaissement.');
+  } finally {
+    btn.textContent = 'Encaisser';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE POS PRODUITS
+// ══════════════════════════════════════════════════════════════════════
+let _posProduitsAll = [];
+
+async function loadPosProduits(){
+  const tbody = document.getElementById('pos-prod-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try {
+    const stocks = await apiFetch('GET','/pos/stock');
+    const stockMap = {};
+    (stocks||[]).forEach(s=>{ stockMap[s.produit_id] = s; });
+
+    const data = await apiFetch('GET','/pos/produits');
+    _posProduitsAll = data || [];
+    _posRenderProduitsTbody(_posProduitsAll, stockMap);
+  } catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+  }
+}
+
+function _posRenderProduitsTbody(prods, stockMap){
+  const tbody = document.getElementById('pos-prod-tbody');
+  if(!tbody) return;
+  if(!prods.length){
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucun produit</td></tr>';
+    return;
+  }
+  tbody.innerHTML = prods.map(p=>{
+    const s = stockMap ? (stockMap[p.id]||{}) : {};
+    const stock = s.stock_courant != null ? parseFloat(s.stock_courant) : '—';
+    const cmup  = s.cmup != null ? posGx(s.cmup) : '—';
+    const badge = p.actif
+      ? '<span class="pos-badge teal">Actif</span>'
+      : '<span class="pos-badge">Inactif</span>';
+    return `<tr>
+      <td>${p.nom||'—'}</td>
+      <td>${p.categorie||'—'}</td>
+      <td>${p.unite||'—'}</td>
+      <td>${p.prix_actif != null ? posGx(p.prix_actif) : '—'}</td>
+      <td>${stock} ${p.unite||''}</td>
+      <td>${cmup}</td>
+      <td>${badge}</td>
+      <td>
+        <button class="pos-btn ghost" style="font-size:10px;padding:3px 7px" onclick="posProduitModal(${p.id})">Éditer</button>
+        <button class="pos-btn ghost" style="font-size:10px;padding:3px 7px" onclick="posPrixModal(${p.id},'${(p.nom||'').replace(/'/g,"\\'")}')">Prix</button>
+        <button class="pos-btn danger" style="font-size:10px;padding:3px 7px" onclick="posToggleActif(${p.id},${p.actif?0:1})">${p.actif?'Désact.':'Activer'}</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function posProduitsFiltrer(){
+  const q = (document.getElementById('pos-prod-search')?.value||'').toLowerCase();
+  const filtered = q ? _posProduitsAll.filter(p=>(p.nom||'').toLowerCase().includes(q)||(p.categorie||'').toLowerCase().includes(q)) : _posProduitsAll;
+  _posRenderProduitsTbody(filtered, null);
+}
+
+function posProduitModal(id){
+  const modal = document.getElementById('pos-prod-modal-bg');
+  const title = document.getElementById('pos-prod-modal-title');
+  document.getElementById('pos-prod-id').value = id||'';
+  if(id){
+    const p = _posProduitsAll.find(x=>x.id===id)||{};
+    title.textContent = 'Modifier produit';
+    document.getElementById('pos-prod-nom').value   = p.nom||'';
+    document.getElementById('pos-prod-cat').value   = p.categorie||'boisson';
+    document.getElementById('pos-prod-unite').value = p.unite||'';
+    document.getElementById('pos-prod-prix').value  = '';
+    document.getElementById('pos-prod-seuil').value = p.seuil_alerte_stock||0;
+    document.getElementById('pos-prod-code').value  = p.code_barre||'';
+  } else {
+    title.textContent = 'Nouveau produit';
+    ['pos-prod-nom','pos-prod-unite','pos-prod-prix','pos-prod-code'].forEach(id=>{ document.getElementById(id).value=''; });
+    document.getElementById('pos-prod-seuil').value = 0;
+    document.getElementById('pos-prod-cat').value   = 'boisson';
+  }
+  modal.classList.add('open');
+}
+
+function posProduitModalClose(){
+  document.getElementById('pos-prod-modal-bg').classList.remove('open');
+}
+
+async function posProduitSauvegarder(){
+  const id    = document.getElementById('pos-prod-id').value;
+  const nom   = document.getElementById('pos-prod-nom').value.trim();
+  const cat   = document.getElementById('pos-prod-cat').value;
+  const unite = document.getElementById('pos-prod-unite').value.trim();
+  const prix  = parseFloat(document.getElementById('pos-prod-prix').value)||null;
+  const seuil = parseFloat(document.getElementById('pos-prod-seuil').value)||0;
+  const code  = document.getElementById('pos-prod-code').value.trim()||null;
+  if(!nom||!cat||!unite){ posAlert('Nom, catégorie et unité sont requis.'); return; }
+  try {
+    if(id){
+      await apiFetch('PUT',`/pos/produits/${id}`,{ nom, categorie:cat, unite, seuil_alerte_stock:seuil, code_barre:code });
+    } else {
+      if(!prix || prix<=0){ posAlert('Prix de vente initial requis pour un nouveau produit.'); return; }
+      await apiFetch('POST','/pos/produits',{ nom, categorie:cat, unite, prix_initial:prix, seuil_alerte_stock:seuil, code_barre:code });
+    }
+    posProduitModalClose();
+    await loadPosProduits();
+    posAlert(id?'Produit mis à jour.':'Produit créé.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function posToggleActif(id, actif){
+  try {
+    await apiFetch('PUT',`/pos/produits/${id}`,{ actif: !!actif });
+    await loadPosProduits();
+    posAlert('Statut mis à jour.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function posPrixModal(prodId, nom){
+  const bg = document.getElementById('pos-prix-modal-bg');
+  document.getElementById('pos-prix-produit-id').value = prodId;
+  document.getElementById('pos-prix-modal-title').textContent = `Prix — ${nom}`;
+  document.getElementById('pos-nouveau-prix').value = '';
+  const liste = document.getElementById('pos-prix-historique-liste');
+  liste.innerHTML = '<div style="color:rgba(255,255,255,.4);font-size:11px">Chargement…</div>';
+  bg.classList.add('open');
+  try {
+    const hist = await apiFetch('GET',`/pos/produits/${prodId}/prix`);
+    if(!hist||!hist.length){
+      liste.innerHTML = '<div style="color:rgba(255,255,255,.4);font-size:11px">Aucun historique</div>';
+      return;
+    }
+    liste.innerHTML = '<table class="pos-table" style="font-size:11px"><thead><tr><th>Prix</th><th>Depuis</th><th>Jusqu\'au</th></tr></thead><tbody>'+
+      hist.map(h=>`<tr>
+        <td>${posGx(h.prix)}</td>
+        <td>${posDateFr(h.date_debut)}</td>
+        <td>${h.date_fin ? posDateFr(h.date_fin) : '<span class="pos-badge teal">Actif</span>'}</td>
+      </tr>`).join('')+'</tbody></table>';
+  } catch(e){ liste.innerHTML = '<div style="color:#f87171;font-size:11px">Erreur chargement</div>'; }
+}
+
+async function posChangerPrix(){
+  const prodId = document.getElementById('pos-prix-produit-id').value;
+  const prix   = parseFloat(document.getElementById('pos-nouveau-prix').value||0);
+  if(!prix||prix<=0){ posAlert('Prix invalide.'); return; }
+  try {
+    await apiFetch('POST',`/pos/produits/${prodId}/prix`,{ prix });
+    document.getElementById('pos-prix-modal-bg').classList.remove('open');
+    await loadPosProduits();
+    posAlert('Prix mis à jour.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE POS STOCK
+// ══════════════════════════════════════════════════════════════════════
+async function loadPosStock(){
+  const tbody = document.getElementById('pos-stock-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try {
+    const [prods, stocks] = await Promise.all([
+      apiFetch('GET','/pos/produits?actif=true'),
+      apiFetch('GET','/pos/stock'),
+    ]);
+    const stockMap = {};
+    (stocks||[]).forEach(s=>{ stockMap[s.produit_id] = s; });
+
+    let totalValeur = 0, nbAlerte = 0;
+    const rows = (prods||[]).map(p=>{
+      const s = stockMap[p.id]||{};
+      const stock = parseFloat(s.stock_courant||0);
+      const cmup  = parseFloat(s.cmup||0);
+      const valeur = stock * cmup;
+      totalValeur += valeur;
+      const alerte = p.seuil_alerte_stock && stock <= p.seuil_alerte_stock;
+      if(alerte) nbAlerte++;
+      const badge = alerte
+        ? '<span class="pos-badge danger">Alerte</span>'
+        : stock<=0
+          ? '<span class="pos-badge">Épuisé</span>'
+          : '<span class="pos-badge teal">OK</span>';
+      return `<tr${alerte?' style="background:rgba(248,113,113,.06)"':''}>
+        <td>${p.nom||'—'}</td>
+        <td>${p.categorie||'—'}</td>
+        <td><strong>${stock.toFixed(3)}</strong></td>
+        <td>${p.unite||'—'}</td>
+        <td>${p.seuil_alerte_stock||'—'}</td>
+        <td>${cmup>0?posGx(cmup):'—'}</td>
+        <td>${valeur>0?posGx(valeur):'—'}</td>
+        <td>${badge}</td>
+      </tr>`;
+    });
+    if(tbody) tbody.innerHTML = rows.join('')||'<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit actif</td></tr>';
+
+    const kpis = [
+      ['kpi-nb-produits', (prods||[]).length],
+      ['kpi-en-alerte',   nbAlerte],
+      ['kpi-val-stock',   posGx(totalValeur)],
+    ];
+    kpis.forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
+
+    // Peupler les selects produits pour les modals
+    _posFillProduitSelects(prods||[]);
+  } catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+  }
+}
+
+function _posFillProduitSelects(prods){
+  ['pos-recept-produit','pos-ajust-produit'].forEach(selId=>{
+    const sel = document.getElementById(selId);
+    if(!sel) return;
+    sel.innerHTML = prods.map(p=>`<option value="${p.id}">${p.nom} (${p.unite||'?'})</option>`).join('');
+  });
+}
+
+function posStockReceptionModal(){
+  document.getElementById('pos-recept-qte').value='';
+  document.getElementById('pos-recept-prix').value='';
+  document.getElementById('pos-recept-fourn').value='';
+  document.getElementById('pos-recept-notes').value='';
+  document.getElementById('pos-recept-modal-bg').classList.add('open');
+}
+
+async function posReceptionnerStock(){
+  const prodId = document.getElementById('pos-recept-produit').value;
+  const qte    = parseFloat(document.getElementById('pos-recept-qte').value||0);
+  const prix   = parseFloat(document.getElementById('pos-recept-prix').value||0);
+  const fourn  = document.getElementById('pos-recept-fourn').value.trim()||null;
+  const notes  = document.getElementById('pos-recept-notes').value.trim()||null;
+  if(!prodId||qte<=0||prix<=0){ posAlert('Produit, quantité et prix requis.'); return; }
+  try {
+    await apiFetch('POST','/pos/achats',{ produit_id:parseInt(prodId), quantite:qte, prix_achat_unitaire:prix, fournisseur:fourn, notes });
+    document.getElementById('pos-recept-modal-bg').classList.remove('open');
+    await loadPosStock();
+    posAlert('Réception enregistrée.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+function posStockAjustModal(){
+  document.getElementById('pos-ajust-qte').value='';
+  document.getElementById('pos-ajust-motif').value='';
+  document.getElementById('pos-ajust-modal-bg').classList.add('open');
+}
+
+async function posAjusterStock(){
+  const prodId = document.getElementById('pos-ajust-produit').value;
+  const type   = document.getElementById('pos-ajust-type').value;
+  const qte    = parseFloat(document.getElementById('pos-ajust-qte').value||0);
+  const motif  = document.getElementById('pos-ajust-motif').value.trim();
+  if(!prodId||!qte){ posAlert('Produit et quantité requis.'); return; }
+  if(motif.length < 5){ posAlert('Motif trop court (min 5 caractères).'); return; }
+  try {
+    await apiFetch('POST','/pos/stock/ajustement',{ produit_id:parseInt(prodId), type_mouvement:type, quantite:qte, motif });
+    document.getElementById('pos-ajust-modal-bg').classList.remove('open');
+    await loadPosStock();
+    posAlert('Ajustement enregistré.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE POS VENTES
+// ══════════════════════════════════════════════════════════════════════
+async function loadPosVentes(){
+  posVentesAujourdhui();
+}
+
+function posVentesAujourdhui(){
+  const today = new Date().toISOString().split('T')[0];
+  const deb = document.getElementById('pos-ventes-debut');
+  const fin = document.getElementById('pos-ventes-fin');
+  if(deb) deb.value = today;
+  if(fin) fin.value = today;
+  posVentesCharger();
+}
+
+async function posVentesCharger(){
+  const tbody = document.getElementById('pos-ventes-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try {
+    const debut = document.getElementById('pos-ventes-debut')?.value||'';
+    const fin   = document.getElementById('pos-ventes-fin')?.value||'';
+    const mode  = document.getElementById('pos-ventes-mode-f')?.value||'';
+    let url = '/pos/ventes?';
+    if(debut) url += `date_debut=${debut}&`;
+    if(fin)   url += `date_fin=${fin}&`;
+    if(mode)  url += `mode_paiement=${mode}&`;
+
+    const data = await apiFetch('GET', url.slice(0,-1)||'/pos/ventes');
+    const ventes = data.ventes||data||[];
+
+    // KPIs
+    let ca=0, cash=0, credit=0;
+    ventes.filter(v=>v.statut!=='ANNULEE').forEach(v=>{
+      ca += parseFloat(v.montant_total||0);
+      if(v.mode_paiement==='CASH') cash += parseFloat(v.montant_total||0);
+      if(v.mode_paiement==='CREDIT'||v.mode_paiement==='MIXTE') credit += parseFloat(v.montant_credit||0)||0;
+    });
+    [['vkpi-ca',posGx(ca)],['vkpi-nb',ventes.filter(v=>v.statut!=='ANNULEE').length],['vkpi-cash',posGx(cash)],['vkpi-credit',posGx(credit)]]
+      .forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
+
+    // Par caissier
+    const byCaissier = {};
+    ventes.filter(v=>v.statut!=='ANNULEE').forEach(v=>{
+      const k = v.caissier_nom||'Sans caissier';
+      byCaissier[k] = byCaissier[k]||{ nb:0, total:0 };
+      byCaissier[k].nb++; byCaissier[k].total += parseFloat(v.montant_total||0);
+    });
+    const cTbody = document.getElementById('pos-caissiers-tbody');
+    if(cTbody){
+      cTbody.innerHTML = Object.entries(byCaissier).map(([k,v])=>
+        `<tr><td>${k}</td><td>${v.nb}</td><td>${posGx(v.total)}</td></tr>`
+      ).join('')||'<tr><td colspan="3" style="color:rgba(255,255,255,.3);text-align:center">—</td></tr>';
+    }
+
+    if(!ventes.length){
+      if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucune vente pour cette période</td></tr>';
+      return;
+    }
+    if(tbody) tbody.innerHTML = ventes.map(v=>{
+      const badge = v.statut==='PAYEE'
+        ? '<span class="pos-badge teal">Payée</span>'
+        : v.statut==='ANNULEE'
+          ? '<span class="pos-badge">Annulée</span>'
+          : '<span class="pos-badge amber">Crédit</span>';
+      return `<tr${v.statut==='ANNULEE'?' style="opacity:.5"':''}>
+        <td>${v.numero_ticket||'—'}</td>
+        <td>${posDateFr(v.date_vente)}</td>
+        <td>${v.client_nom||'—'}</td>
+        <td>${v.nb_lignes||'—'}</td>
+        <td>${posGx(v.montant_total)}</td>
+        <td>${v.mode_paiement||'—'}</td>
+        <td>${badge}</td>
+        <td>
+          <button class="pos-btn ghost" style="font-size:10px;padding:3px 7px" onclick="posVenteDetail(${v.id})">Voir</button>
+          ${v.statut!=='ANNULEE'?`<button class="pos-btn danger" style="font-size:10px;padding:3px 7px" onclick="posAnnulerVenteConfirm(${v.id})">Annuler</button>`:''}
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+  }
+}
+
+async function posVenteDetail(id){
+  const bg = document.getElementById('pos-vente-detail-bg');
+  document.getElementById('pos-vd-id').value = id;
+  document.getElementById('pos-vd-content').innerHTML = '<div style="color:rgba(255,255,255,.3);text-align:center;padding:16px">Chargement…</div>';
+  bg.classList.add('open');
+  try {
+    const v = await apiFetch('GET',`/pos/ventes/${id}`);
+    document.getElementById('pos-vd-titre').textContent = `Ticket ${v.numero_ticket||'#'+id}`;
+    const annBtn = document.getElementById('pos-vd-annuler-btn');
+    if(annBtn) annBtn.style.display = v.statut==='ANNULEE' ? 'none' : '';
+    const lignes = (v.lignes||[]).map(l=>`
+      <tr><td>${l.produit_nom||'—'}</td><td>${l.quantite}</td><td>${posGx(l.prix_unitaire_applique)}</td><td>${posGx(l.sous_total)}</td></tr>
+    `).join('');
+    document.getElementById('pos-vd-content').innerHTML = `
+      <table class="pos-table" style="font-size:12px;margin-bottom:12px">
+        <thead><tr><th>Article</th><th>Qté</th><th>Prix</th><th>Sous-total</th></tr></thead>
+        <tbody>${lignes}</tbody>
+      </table>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px">
+        <span>Mode : ${v.mode_paiement}</span>
+        <strong>Total : ${posGx(v.montant_total)}</strong>
+      </div>
+      ${v.client_nom?`<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:4px">Client : ${v.client_nom}</div>`:''}
+      ${v.caissier_nom?`<div style="font-size:11px;color:rgba(255,255,255,.5)">Caissier : ${v.caissier_nom}</div>`:''}
+    `;
+  } catch(e){
+    document.getElementById('pos-vd-content').innerHTML = `<div style="color:#f87171;text-align:center;padding:12px">${e.message||'Erreur'}</div>`;
+  }
+}
+
+function posAnnulerVenteConfirm(id){
+  document.getElementById('pos-vd-id').value = id;
+  posAnnulerVente();
+}
+
+async function posAnnulerVente(){
+  const id = document.getElementById('pos-vd-id').value;
+  if(!id) return;
+  if(!confirm('Annuler cette vente ? Le stock sera restitué.')) return;
+  try {
+    await apiFetch('DELETE',`/pos/ventes/${id}`);
+    document.getElementById('pos-vente-detail-bg').classList.remove('open');
+    await posVentesCharger();
+    posAlert('Vente annulée — stock restitué.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE POS CRÉDITS
+// ══════════════════════════════════════════════════════════════════════
+async function loadPosCredits(){
+  posCreditsCharger();
+}
+
+async function posCreditsCharger(){
+  const tbody = document.getElementById('pos-credits-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try {
+    const filtre = document.getElementById('pos-credits-filtre')?.value||'';
+    let url = '/pos/credits';
+    if(filtre) url += `?statut=${filtre}`;
+    const data = await apiFetch('GET', url);
+    const credits = data.credits||data||[];
+
+    let totalDu=0, nbOuverts=0, nbRetard=0;
+    credits.forEach(c=>{
+      totalDu += parseFloat(c.solde||0);
+      if(c.statut==='OUVERT') nbOuverts++;
+      if(c.statut==='EN_RETARD') { nbOuverts++; nbRetard++; }
+    });
+    [['ckpi-du',posGx(totalDu)],['ckpi-nb',nbOuverts],['ckpi-retard',nbRetard]]
+      .forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
+
+    if(!credits.length){
+      if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun crédit trouvé</td></tr>';
+      return;
+    }
+    if(tbody) tbody.innerHTML = credits.map(c=>{
+      const badge = c.statut==='SOLDE'
+        ? '<span class="pos-badge teal">Soldé</span>'
+        : c.statut==='EN_RETARD'
+          ? '<span class="pos-badge danger">En retard</span>'
+          : '<span class="pos-badge amber">Ouvert</span>';
+      return `<tr>
+        <td>${c.client_nom||'—'}</td>
+        <td>${c.client_contact||'—'}</td>
+        <td>${posGx(c.montant_du)}</td>
+        <td>${posGx(c.montant_rembourse)}</td>
+        <td><strong>${posGx(c.solde)}</strong></td>
+        <td>${c.date_echeance ? posDateFr(c.date_echeance).split(' ')[0] : '—'}</td>
+        <td>${badge}</td>
+        <td>
+          ${c.statut!=='SOLDE'?`<button class="pos-btn teal" style="font-size:10px;padding:3px 7px" onclick="posRembModal(${c.id},'${(c.client_nom||'').replace(/'/g,"\\'")}')">Rembourser</button>`:''}
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+  }
+}
+
+function posRembModal(creditId, clientNom){
+  document.getElementById('pos-remb-credit-id').value = creditId;
+  document.getElementById('pos-remb-titre').textContent = `Remboursement — ${clientNom}`;
+  document.getElementById('pos-remb-montant').value = '';
+  document.getElementById('pos-remb-notes').value = '';
+  document.getElementById('pos-remb-modal-bg').classList.add('open');
+}
+
+async function posEnregistrerRemb(){
+  const creditId = document.getElementById('pos-remb-credit-id').value;
+  const montant  = parseFloat(document.getElementById('pos-remb-montant').value||0);
+  const notes    = document.getElementById('pos-remb-notes').value.trim()||null;
+  if(!creditId||montant<=0){ posAlert('Montant invalide.'); return; }
+  try {
+    await apiFetch('POST',`/pos/credits/${creditId}/remboursements`,{ montant, notes });
+    document.getElementById('pos-remb-modal-bg').classList.remove('open');
+    await posCreditsCharger();
+    posAlert('Remboursement enregistré.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE POS COMMANDES
+// ══════════════════════════════════════════════════════════════════════
+let _posCmdLignes = [];
+
+async function loadPosCommandes(){
+  posCmdCharger();
+}
+
+async function posCmdCharger(){
+  const tbody = document.getElementById('pos-cmd-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try {
+    const data = await apiFetch('GET','/pos/commandes');
+    const cmds = data.commandes||data||[];
+    if(!cmds.length){
+      if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucune commande active</td></tr>';
+      return;
+    }
+    if(tbody) tbody.innerHTML = cmds.map(c=>{
+      const nbArt = (c.lignes||[]).length;
+      const totalEst = (c.lignes||[]).reduce((s,l)=>s+parseFloat(l.sous_total||0),0);
+      const badgeMap = { OUVERTE:'amber', ENVOYEE_CUISINE:'teal', SERVIE:'', ENCAISSEE:'teal', ANNULEE:'' };
+      const badge = `<span class="pos-badge ${badgeMap[c.statut]||''}">${c.statut}</span>`;
+      return `<tr>
+        <td>${c.numero_table||'—'} ${c.client?'('+c.client+')':''}</td>
+        <td>${posDateFr(c.date_ouverture)}</td>
+        <td>${nbArt} art.</td>
+        <td>${totalEst>0?posGx(totalEst):'—'}</td>
+        <td>${badge}</td>
+        <td>
+          <button class="pos-btn ghost" style="font-size:10px;padding:3px 7px" onclick="posCmdVoir(${c.id})">Voir/Modifier</button>
+          ${c.statut!=='ENCAISSEE'&&c.statut!=='ANNULEE'?`<button class="pos-btn primary" style="font-size:10px;padding:3px 7px" onclick="posCmdEncaisserModal(${c.id})">Encaisser</button>`:''}
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+  }
+}
+
+function posCmdNouvelle(){
+  _posCmdLignes = [];
+  document.getElementById('pos-cmd-id').value = '';
+  document.getElementById('pos-cmd-modal-title').textContent = 'Nouvelle commande';
+  document.getElementById('pos-cmd-table').value = '';
+  document.getElementById('pos-cmd-client').value = '';
+  _posCmdRenderLignes();
+  document.getElementById('pos-cmd-modal-bg').classList.add('open');
+}
+
+async function posCmdVoir(id){
+  try {
+    const c = await apiFetch('GET',`/pos/commandes/${id}`);
+    document.getElementById('pos-cmd-id').value = id;
+    document.getElementById('pos-cmd-modal-title').textContent = 'Modifier commande';
+    document.getElementById('pos-cmd-table').value  = c.numero_table||'';
+    document.getElementById('pos-cmd-client').value = c.client||'';
+    _posCmdLignes = (c.lignes||[]).map(l=>({ produit_id:l.produit_id, quantite:l.quantite, nom:l.produit_nom||'Produit' }));
+    _posCmdRenderLignes();
+    document.getElementById('pos-cmd-modal-bg').classList.add('open');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+function posCmdAddLigne(){
+  _posCmdLignes.push({ produit_id:'', quantite:1, nom:'' });
+  _posCmdRenderLignes();
+}
+
+function _posCmdRenderLignes(){
+  const wrap = document.getElementById('pos-cmd-lignes');
+  if(!wrap) return;
+  const opts = _posProduits.map(p=>`<option value="${p.id}">${p.nom}</option>`).join('');
+  wrap.innerHTML = _posCmdLignes.map((l,i)=>`
+    <div class="pos-form-row" style="margin-bottom:6px">
+      <div><select class="pos-select" onchange="_posCmdLignes[${i}].produit_id=+this.value">
+        <option value="">— Produit —</option>${opts}
+      </select></div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <input class="pos-input" type="number" min="0.001" step="0.001" value="${l.quantite}" style="width:80px"
+          onchange="_posCmdLignes[${i}].quantite=+this.value">
+        <button class="pos-btn danger" style="padding:3px 7px;font-size:11px" onclick="_posCmdLignes.splice(${i},1);_posCmdRenderLignes()">✕</button>
+      </div>
+    </div>
+  `).join('')||'<div style="color:rgba(255,255,255,.3);font-size:11px">Aucun article — Cliquez sur + pour ajouter</div>';
+  // Pré-sélectionner les produits existants
+  _posCmdLignes.forEach((l,i)=>{
+    const sel = wrap.querySelectorAll('select')[i];
+    if(sel && l.produit_id) sel.value = l.produit_id;
+  });
+}
+
+async function posCmdSauvegarder(){
+  const id     = document.getElementById('pos-cmd-id').value;
+  const table  = document.getElementById('pos-cmd-table').value.trim()||null;
+  const client = document.getElementById('pos-cmd-client').value.trim()||null;
+  const lignes = _posCmdLignes.filter(l=>l.produit_id&&l.quantite>0)
+    .map(l=>({ produit_id:parseInt(l.produit_id), quantite:parseFloat(l.quantite) }));
+  if(!lignes.length){ posAlert('Ajoutez au moins un article.'); return; }
+  try {
+    if(id){
+      await apiFetch('PUT',`/pos/commandes/${id}`,{ numero_table:table, client, lignes });
+    } else {
+      await apiFetch('POST','/pos/commandes',{ numero_table:table, client, lignes });
+    }
+    document.getElementById('pos-cmd-modal-bg').classList.remove('open');
+    await posCmdCharger();
+    posAlert(id?'Commande mise à jour.':'Commande créée.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+function posCmdEncaisserModal(id){
+  document.getElementById('pos-cmd-enc-id').value = id;
+  document.getElementById('pos-cmd-enc-paye').value = '';
+  document.getElementById('pos-cmd-enc-client').value = '';
+  document.getElementById('pos-cmd-enc-bg').classList.add('open');
+}
+
+async function posCmdEncaisser(){
+  const id     = document.getElementById('pos-cmd-enc-id').value;
+  const mode   = document.getElementById('pos-cmd-enc-mode').value;
+  const paye   = parseFloat(document.getElementById('pos-cmd-enc-paye').value||0)||null;
+  const client = document.getElementById('pos-cmd-enc-client').value.trim()||null;
+  try {
+    const result = await apiFetch('POST',`/pos/commandes/${id}/encaisser`,{ mode_paiement:mode, montant_paye:paye, client_nom:client });
+    document.getElementById('pos-cmd-enc-bg').classList.remove('open');
+    await posCmdCharger();
+    posAlert(`Ticket ${result.numero_ticket} — ${posGx(result.montant_total)}`,'ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE POS PAIE BAR
+// ══════════════════════════════════════════════════════════════════════
+async function loadPosPaie(){
+  await _posChargerEmployesPay();
+  await _posChargerPaiements();
+}
+
+async function _posChargerEmployesPay(){
+  try {
+    const data = await apiFetch('GET','/employes');
+    const emps = data.employes||data||[];
+    const sel = document.getElementById('pos-pay-emp');
+    if(sel) sel.innerHTML = emps.map(e=>`<option value="${e.id}">${e.nom_complet||e.nom||'Employé '+e.id}</option>`).join('');
+  } catch(e){}
+}
+
+async function _posChargerPaiements(){
+  const tbody = document.getElementById('pos-paie-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try {
+    const data = await apiFetch('GET','/pos/paie');
+    const pays = data.paiements||data||[];
+    let total = 0, nb = 0;
+    pays.forEach(p=>{ total += parseFloat(p.montant||0); nb++; });
+    [['pkpi-total',posGx(total)],['pkpi-nb',nb]]
+      .forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
+    if(!pays.length){
+      if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun paiement</td></tr>';
+      return;
+    }
+    if(tbody) tbody.innerHTML = pays.map(p=>`<tr>
+      <td>${p.employe_nom||'—'}</td>
+      <td>${posDateFr(p.date_paiement||p.created_at)}</td>
+      <td>${p.type_paiement||'—'}</td>
+      <td>${p.mode||'—'}</td>
+      <td>${posGx(p.montant)}</td>
+      <td>${p.notes||'—'}</td>
+    </tr>`).join('');
+  } catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+  }
+}
+
+function posPaymentModal(){
+  document.getElementById('pos-pay-montant').value='';
+  document.getElementById('pos-pay-notes').value='';
+  document.getElementById('pos-pay-debut').value='';
+  document.getElementById('pos-pay-fin').value='';
+  document.getElementById('pos-pay-modal-bg').classList.add('open');
+}
+
+async function posPaymentSauvegarder(){
+  const empId  = document.getElementById('pos-pay-emp').value;
+  const type   = document.getElementById('pos-pay-type').value;
+  const mode   = document.getElementById('pos-pay-mode').value;
+  const montant= parseFloat(document.getElementById('pos-pay-montant').value||0);
+  const debut  = document.getElementById('pos-pay-debut').value||null;
+  const fin    = document.getElementById('pos-pay-fin').value||null;
+  const notes  = document.getElementById('pos-pay-notes').value.trim()||null;
+  if(!empId||montant<=0){ posAlert('Employé et montant requis.'); return; }
+  try {
+    await apiFetch('POST','/pos/paie',{ employe_id:parseInt(empId), type_paiement:type, mode, montant, periode_debut:debut, periode_fin:fin, notes });
+    document.getElementById('pos-pay-modal-bg').classList.remove('open');
+    await _posChargerPaiements();
+    posAlert('Paiement enregistré.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE POS RENTABILITÉ
+// ══════════════════════════════════════════════════════════════════════
+let _posChartCat = null, _posChartTop = null;
+
+async function loadPosRentabilite(){
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  const lastDay  = today.toISOString().split('T')[0];
+  const deb = document.getElementById('pos-rent-debut');
+  const fin = document.getElementById('pos-rent-fin');
+  if(deb && !deb.value) deb.value = firstDay;
+  if(fin && !fin.value) fin.value = lastDay;
+  await posRentCharger();
+}
+
+async function posRentCharger(){
+  const tbody = document.getElementById('pos-rent-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try {
+    const debut = document.getElementById('pos-rent-debut')?.value||'';
+    const fin   = document.getElementById('pos-rent-fin')?.value||'';
+    let url = '/pos/stats?';
+    if(debut) url += `date_debut=${debut}&`;
+    if(fin)   url += `date_fin=${fin}&`;
+
+    const data = await apiFetch('GET', url.replace(/[&?]$/,''));
+
+    // KPIs
+    [
+      ['rkpi-ca',    posGx(data.ca_total||0)],
+      ['rkpi-cogs',  posGx(data.cogs_total||0)],
+      ['rkpi-benef', posGx(data.benefice_net||0)],
+      ['rkpi-marge', ((data.marge_globale||0)*100).toFixed(1)+'%'],
+      ['rkpi-nbv',   data.nb_ventes||0],
+    ].forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
+
+    // Tableau par produit
+    const parProd = data.par_produit||[];
+    if(tbody){
+      if(!parProd.length){
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucune donnée pour cette période</td></tr>';
+      } else {
+        tbody.innerHTML = parProd.map(p=>{
+          const marge = p.ca>0 ? ((p.benefice/p.ca)*100).toFixed(1) : '—';
+          return `<tr>
+            <td>${p.produit_nom||'—'}</td>
+            <td>${p.categorie||'—'}</td>
+            <td>${parseFloat(p.qte_vendue||0).toFixed(3)}</td>
+            <td>${posGx(p.ca)}</td>
+            <td>${posGx(p.cogs)}</td>
+            <td>${posGx(p.benefice)}</td>
+            <td>${marge}%</td>
+          </tr>`;
+        }).join('');
+      }
+    }
+
+    // Graphes (utilise Chart.js s'il est disponible)
+    if(typeof Chart !== 'undefined'){
+      _posRentChartCat(data.par_categorie||[]);
+      _posRentChartTop(data.top_produits||[]);
+    }
+
+  } catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+  }
+}
+
+function _posRentChartCat(cats){
+  const ctx = document.getElementById('pos-rent-chart-cat');
+  if(!ctx) return;
+  if(_posChartCat){ _posChartCat.destroy(); _posChartCat=null; }
+  _posChartCat = new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels: cats.map(c=>c.categorie),
+      datasets:[
+        { label:'CA', data:cats.map(c=>c.ca), backgroundColor:'rgba(247,169,59,.7)' },
+        { label:'Bénéfice', data:cats.map(c=>c.benefice), backgroundColor:'rgba(63,182,168,.7)' },
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ color:'rgba(255,255,255,.7)', font:{size:10} } } },
+      scales:{
+        x:{ ticks:{ color:'rgba(255,255,255,.5)', font:{size:9} }, grid:{ color:'rgba(255,255,255,.05)' } },
+        y:{ ticks:{ color:'rgba(255,255,255,.5)', font:{size:9} }, grid:{ color:'rgba(255,255,255,.05)' } },
+      }
+    }
+  });
+}
+
+function _posRentChartTop(tops){
+  const ctx = document.getElementById('pos-rent-chart-top');
+  if(!ctx) return;
+  if(_posChartTop){ _posChartTop.destroy(); _posChartTop=null; }
+  const top10 = tops.slice(0,10);
+  _posChartTop = new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels: top10.map(t=>t.produit_nom),
+      datasets:[{ label:'CA', data:top10.map(t=>t.ca), backgroundColor:'rgba(167,139,250,.7)' }]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ ticks:{ color:'rgba(255,255,255,.5)', font:{size:9} }, grid:{ color:'rgba(255,255,255,.05)' } },
+        y:{ ticks:{ color:'rgba(255,255,255,.5)', font:{size:9} }, grid:{ display:false } },
+      }
+    }
+  });
 }
 
 </script>
