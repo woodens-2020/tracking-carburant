@@ -2052,7 +2052,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   border-color:#a78bfa;color:#ddd6fe;
   box-shadow:0 0 10px rgba(167,139,250,.15);
 }
-.gid-kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.gid-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 .gid-kpi{
   background:rgba(255,255,255,.035);
   border:1px solid rgba(255,255,255,.08);
@@ -2280,9 +2280,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
 /* ── Dashboard GI responsive ─────────────────────────────── */
 @media (max-width:1200px){
-  .gid-kpi-grid{grid-template-columns:repeat(3,1fr)}
+  .gid-kpi-grid{grid-template-columns:repeat(2,1fr)}
   .gid-chart-grid{grid-template-columns:1fr}
   .gid-bottom-grid{grid-template-columns:1fr}
+}
+@media (max-width:700px){
+  .gid-kpi-grid{grid-template-columns:1fr}
 }
 @media (max-height:800px){
   .gid-kpi-val{font-size:15px}
