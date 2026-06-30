@@ -13034,9 +13034,6 @@ function _posRenderProduitsTbody(prods, stockMap){
               : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
             }
           </button>
-          <button class="gi-btn-icon danger" title="Supprimer définitivement" onclick="posSupprimer(${p.id},'${nomSafe}')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-          </button>
         </div>
       </td>
     </tr>`;
@@ -13149,6 +13146,11 @@ async function posProduitSauvegarder(){
   const upc   = parseInt(document.getElementById('pos-prod-upc')?.value)||null;
   if(!nom||!cat||!unite){ posAlert('Nom, catégorie et unité sont requis.'); return; }
   if(venduCaisse && (!upc||upc<1)){ posAlert('Unités par caisse requis (≥ 1) pour un produit vendu par caisse.'); return; }
+  // Vérification doublon côté client
+  if(!id){
+    const doublon = _posProduitsAll.find(p => p.nom.trim().toLowerCase() === nom.toLowerCase());
+    if(doublon){ posAlert(`Un produit nommé « ${doublon.nom} » existe déjà dans le catalogue.`); return; }
+  }
   const payload = { nom, categorie:cat, unite, seuil_alerte_stock:seuil, code_barre:code, vendu_par_caisse:venduCaisse, unites_par_caisse:venduCaisse?upc:null };
   try {
     if(id){
@@ -13266,15 +13268,6 @@ async function posToggleActif(id, actif){
     await loadPosProduits();
     posAlert('Statut mis à jour.','ok');
   } catch(e){ posAlert(e.message||'Erreur.'); }
-}
-
-async function posSupprimer(id, nom){
-  if(!confirm(`Supprimer « ${nom} » ?\n\nL'article sera désactivé et retiré de la liste.\nL'historique des ventes et du stock est conservé.`)) return;
-  try {
-    await apiFetch('DELETE',`/pos/produits/${id}`);
-    await loadPosProduits();
-    posAlert(`« ${nom} » supprimé.`, 'ok');
-  } catch(e){ posAlert(e.message||'Erreur lors de la suppression.'); }
 }
 
 async function posPrixModal(prodId, nom){

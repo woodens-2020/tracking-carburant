@@ -217,6 +217,13 @@ def creer_produit(data: ProduitIn, request: Request, db: Session = Depends(get_d
         raise HTTPException(422, "Un prix de vente initial valide est requis pour créer un produit.")
     if data.vendu_par_caisse and (not data.unites_par_caisse or data.unites_par_caisse < 1):
         raise HTTPException(422, "unites_par_caisse est obligatoire (≥ 1) pour un produit vendu par caisse.")
+    # Vérification doublon (insensible à la casse)
+    from sqlalchemy import func as _func
+    existant = db.query(BarProduit).filter(
+        _func.lower(BarProduit.nom) == data.nom.strip().lower()
+    ).first()
+    if existant:
+        raise HTTPException(409, f"Un produit nommé « {existant.nom} » existe déjà dans le catalogue.")
     p = BarProduit(
         nom                = data.nom.strip(),
         categorie          = data.categorie.strip(),
