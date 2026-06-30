@@ -48,6 +48,27 @@ class ProduitIn(BaseModel):
     actif:               bool = True
     seuil_alerte_stock:  float = 0.0
     prix_initial:        Optional[float] = None
+    vendu_par_caisse:    bool = False
+    unites_par_caisse:   Optional[int] = None
+
+    @validator('unites_par_caisse')
+    def valider_caisse(cls, v, values):
+        if values.get('vendu_par_caisse') and (v is None or v < 1):
+            raise ValueError('unites_par_caisse est obligatoire et doit être ≥ 1 lorsque vendu_par_caisse=True')
+        return v
+
+
+class ApprovisionnementIn(BaseModel):
+    nb_caisses:        int   = Field(0, ge=0)
+    nb_unites_vrac:    int   = Field(0, ge=0)
+    prix_achat_caisse: Optional[float] = Field(None, gt=0)
+    notes:             Optional[str]   = None
+
+    @validator('nb_unites_vrac')
+    def valider_quantite(cls, v, values):
+        if v == 0 and values.get('nb_caisses', 0) == 0:
+            raise ValueError('Saisir au moins nb_caisses > 0 ou nb_unites_vrac > 0')
+        return v
 
 
 class PrixIn(BaseModel):
@@ -142,49 +163,72 @@ class PaiementEmployeIn(BaseModel):
 # PRODUITS & PRIX
 # ══════════════════════════════════════════════════════════════════
 
+def _produit_dict(p: BarProduit, stk: Decimal, db: Session) -> dict:
+    """Sérialise un BarProduit avec tous les champs calculés."""
+    prix_u  = prix_actif(p.id, db) or Decimal("0")
+    stk_int = int(stk)
+    upc     = p.unites_par_caisse or 0
+    return {
+        "id":                  p.id,
+        "nom":                 p.nom,
+        "categorie":           p.categorie,
+        "unite":               p.unite,
+        "code_barre":          p.code_barre,
+        "actif":               p.actif,
+        "seuil_alerte_stock":  float(p.seuil_alerte_stock),
+        "stock_courant":       float(stk),
+        "stock_unites":        stk_int,
+        "vendu_par_caisse":    p.vendu_par_caisse,
+        "unites_par_caisse":   upc if p.vendu_par_caisse else None,
+        "caisses_completes":   (stk_int // upc) if (p.vendu_par_caisse and upc > 0) else None,
+        "unites_restantes":    (stk_int %  upc) if (p.vendu_par_caisse and upc > 0) else None,
+        "prix_actif":          float(prix_u),
+        "prix_vente_unite":    float(prix_u),
+        "prix_vente_caisse":   float(prix_u * upc) if (p.vendu_par_caisse and upc > 0) else None,
+        "stock_bas":           float(stk) <= float(p.seuil_alerte_stock) and float(p.seuil_alerte_stock) > 0,
+        "cmup":                float(cmup(p.id, db)),
+        "date_creation":       p.date_creation.isoformat() if p.date_creation else None,
+    }
+
+
 @router.get("/produits")
 def liste_produits(actif: Optional[bool] = None, db: Session = Depends(get_db)):
-    """Tous les produits du bar, avec stock courant et prix actif."""
+    """Tous les produits du bar, avec stock courant, caisse/unité et prix actif."""
     q = db.query(BarProduit)
     if actif is not None:
         q = q.filter(BarProduit.actif == actif)
     produits = q.order_by(BarProduit.categorie, BarProduit.nom).all()
+    stocks   = stock_tous_produits(db)
+    return [_produit_dict(p, stocks.get(p.id, Decimal("0")), db) for p in produits]
 
-    stocks = stock_tous_produits(db)
 
-    return [
-        {
-            "id":                 p.id,
-            "nom":                p.nom,
-            "categorie":          p.categorie,
-            "unite":              p.unite,
-            "code_barre":         p.code_barre,
-            "actif":              p.actif,
-            "seuil_alerte_stock": float(p.seuil_alerte_stock),
-            "stock_courant":      float(stocks.get(p.id, Decimal("0"))),
-            "prix_actif":         float(prix_actif(p.id, db) or 0),
-            "cmup":               float(cmup(p.id, db)),
-            "date_creation":      p.date_creation.isoformat() if p.date_creation else None,
-        }
-        for p in produits
-    ]
+@router.get("/produits/{produit_id}")
+def detail_produit(produit_id: int, db: Session = Depends(get_db)):
+    """Détail d'un produit avec stock et prix."""
+    p = db.query(BarProduit).filter_by(id=produit_id).first()
+    if not p:
+        raise HTTPException(404, "Produit introuvable")
+    return _produit_dict(p, stock_courant(produit_id, db), db)
 
 
 @router.post("/produits", status_code=201)
 def creer_produit(data: ProduitIn, request: Request, db: Session = Depends(get_db)):
     if not data.prix_initial or data.prix_initial <= 0:
         raise HTTPException(422, "Un prix de vente initial valide est requis pour créer un produit.")
+    if data.vendu_par_caisse and (not data.unites_par_caisse or data.unites_par_caisse < 1):
+        raise HTTPException(422, "unites_par_caisse est obligatoire (≥ 1) pour un produit vendu par caisse.")
     p = BarProduit(
-        nom=data.nom.strip(),
-        categorie=data.categorie.strip(),
-        unite=data.unite.strip(),
-        code_barre=data.code_barre,
-        actif=data.actif,
-        seuil_alerte_stock=data.seuil_alerte_stock,
+        nom                = data.nom.strip(),
+        categorie          = data.categorie.strip(),
+        unite              = data.unite.strip(),
+        code_barre         = data.code_barre,
+        actif              = data.actif,
+        seuil_alerte_stock = data.seuil_alerte_stock,
+        vendu_par_caisse   = data.vendu_par_caisse,
+        unites_par_caisse  = data.unites_par_caisse if data.vendu_par_caisse else None,
     )
     db.add(p)
-    db.flush()   # obtenir p.id avant le commit
-    # Créer la première entrée d'historique de prix
+    db.flush()
     db.add(BarPrixHistorique(
         produit_id     = p.id,
         prix           = Decimal(str(data.prix_initial)),
@@ -202,12 +246,16 @@ def modifier_produit(produit_id: int, data: ProduitIn, db: Session = Depends(get
     p = db.query(BarProduit).filter_by(id=produit_id).first()
     if not p:
         raise HTTPException(404, "Produit introuvable")
+    if data.vendu_par_caisse and (not data.unites_par_caisse or data.unites_par_caisse < 1):
+        raise HTTPException(422, "unites_par_caisse est obligatoire (≥ 1) pour un produit vendu par caisse.")
     p.nom                = data.nom.strip()
     p.categorie          = data.categorie.strip()
     p.unite              = data.unite.strip()
     p.code_barre         = data.code_barre
     p.actif              = data.actif
     p.seuil_alerte_stock = data.seuil_alerte_stock
+    p.vendu_par_caisse   = data.vendu_par_caisse
+    p.unites_par_caisse  = data.unites_par_caisse if data.vendu_par_caisse else None
     db.commit()
     return {"ok": True}
 
@@ -281,6 +329,78 @@ def historique_prix(produit_id: int, db: Session = Depends(get_db)):
         }
         for r in rows
     ]
+
+
+# ══════════════════════════════════════════════════════════════════
+# APPROVISIONNEMENT (logique caisse/unité)
+# ══════════════════════════════════════════════════════════════════
+
+@router.post("/produits/{produit_id}/approvisionnement", status_code=201)
+def approvisionner(produit_id: int, data: ApprovisionnementIn, request: Request, db: Session = Depends(get_db)):
+    """
+    Ajoute du stock pour un produit.
+    - Si vendu_par_caisse : nb_caisses × unites_par_caisse + nb_unites_vrac
+    - Sinon : nb_unites_vrac uniquement (nb_caisses ignoré)
+    Stock toujours stocké en UNITÉS dans BarMouvementStock.
+    """
+    p = db.query(BarProduit).filter_by(id=produit_id).first()
+    if not p:
+        raise HTTPException(404, "Produit introuvable")
+
+    upc = p.unites_par_caisse or 1
+    if p.vendu_par_caisse:
+        if p.unites_par_caisse is None or p.unites_par_caisse < 1:
+            raise HTTPException(422, "CONFIG_CAISSE_INVALIDE : unites_par_caisse non défini pour ce produit.")
+        total_unites = data.nb_caisses * upc + data.nb_unites_vrac
+    else:
+        total_unites = data.nb_unites_vrac
+
+    if total_unites <= 0:
+        raise HTTPException(422, "Le total d'unités à ajouter doit être > 0.")
+
+    now = datetime.now(tz=timezone.utc)
+    motif = (
+        f"Appro {data.nb_caisses} caisse(s) × {upc} u."
+        + (f" + {data.nb_unites_vrac} vrac" if data.nb_unites_vrac else "")
+        if p.vendu_par_caisse
+        else f"Appro {total_unites} unités"
+    ) + (f" — {data.notes}" if data.notes else "")
+
+    achat_id = None
+    if data.prix_achat_caisse and data.nb_caisses > 0 and p.vendu_par_caisse:
+        prix_unitaire = Decimal(str(data.prix_achat_caisse)) / Decimal(str(upc))
+        achat = BarAchat(
+            produit_id          = produit_id,
+            quantite            = Decimal(str(total_unites)),
+            prix_achat_unitaire = prix_unitaire,
+            utilisateur_id      = _uid(request),
+            notes               = f"Caisse G{data.prix_achat_caisse:.2f} / {upc} u.",
+        )
+        db.add(achat)
+        db.flush()
+        achat_id = achat.id
+
+    db.add(BarMouvementStock(
+        produit_id     = produit_id,
+        quantite       = Decimal(str(total_unites)),
+        type_mouvement = "ENTREE",
+        motif          = motif,
+        achat_id       = achat_id,
+        date_mouvement = now,
+        utilisateur_id = _uid(request),
+    ))
+
+    db.commit()
+    stk_apres = stock_courant(produit_id, db)
+    return {
+        "ok":               True,
+        "total_unites_ajoutes": total_unites,
+        "nb_caisses":       data.nb_caisses,
+        "nb_unites_vrac":   data.nb_unites_vrac,
+        "stock_apres":      float(stk_apres),
+        "caisses_apres":    (int(stk_apres) // upc) if p.vendu_par_caisse else None,
+        "unites_restantes": (int(stk_apres) %  upc) if p.vendu_par_caisse else None,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════

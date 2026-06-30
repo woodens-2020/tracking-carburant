@@ -5175,7 +5175,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <thead>
                 <tr>
                   <th>Nom</th><th>Catégorie</th><th>Unité</th>
-                  <th>Prix actif</th><th>Stock</th><th>CMUP</th>
+                  <th>Prix</th><th>Stock</th><th>CMUP</th>
                   <th>Statut</th><th>Actions</th>
                 </tr>
               </thead>
@@ -5195,7 +5195,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <h3 id="pos-prod-modal-title">Nouveau produit</h3>
         <input type="hidden" id="pos-prod-id">
         <div class="pos-form-row">
-          <div><label class="pos-label">Nom *</label><input class="pos-input" id="pos-prod-nom" placeholder="Ex : Rhum Barbancourt"></div>
+          <div><label class="pos-label">Nom *</label><input class="pos-input" id="pos-prod-nom" placeholder="Ex : Cola Couronne 12oz"></div>
           <div><label class="pos-label">Catégorie *</label>
             <select class="pos-select" id="pos-prod-cat">
               <option>boisson</option><option>alcool</option><option>soft</option>
@@ -5204,16 +5204,36 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
         <div class="pos-form-row">
-          <div><label class="pos-label">Unité *</label><input class="pos-input" id="pos-prod-unite" placeholder="Ex : verre, bouteille"></div>
+          <div><label class="pos-label">Unité *</label><input class="pos-input" id="pos-prod-unite" placeholder="Ex : bouteille, verre"></div>
           <div><label class="pos-label">Seuil alerte stock</label><input class="pos-input" id="pos-prod-seuil" type="number" min="0" placeholder="0"></div>
+        </div>
+        <!-- Logique caisse -->
+        <div class="pos-form-row" style="align-items:center;gap:12px">
+          <div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="posProdToggleCaisse()">
+            <div id="pos-prod-caisse-chk" style="width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all .2s">
+              <svg id="pos-prod-caisse-chk-icon" style="display:none;color:#f7a93b" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <label class="pos-label" style="cursor:pointer;margin:0">Vendu par caisse</label>
+          </div>
+          <input type="hidden" id="pos-prod-vendu-caisse" value="false">
+        </div>
+        <div id="pos-prod-caisse-row" class="pos-form-row" style="display:none;background:rgba(247,169,59,.07);border-radius:8px;padding:10px 12px;margin-top:-4px">
+          <div style="width:100%">
+            <label class="pos-label">Unités par caisse *</label>
+            <input class="pos-input" id="pos-prod-upc" type="number" min="1" step="1" placeholder="Ex : 24" oninput="posProdUpdatePrixCaisse()">
+            <div style="font-size:10.5px;color:rgba(255,255,255,.4);margin-top:4px">
+              Ex : une caisse de Cola contient 24 bouteilles.
+            </div>
+          </div>
         </div>
         <!-- Champ prix — affiché uniquement à la création -->
         <div id="pos-prod-prix-row" class="pos-form-row">
           <div style="width:100%">
-            <label class="pos-label">Prix de vente initial (G) *</label>
-            <input class="pos-input" id="pos-prod-prix" type="number" min="0.01" step="0.01" placeholder="0.00" style="width:100%">
+            <label class="pos-label">Prix de vente par unité (G) *</label>
+            <input class="pos-input" id="pos-prod-prix" type="number" min="0.01" step="0.01" placeholder="0.00" style="width:100%" oninput="posProdUpdatePrixCaisse()">
+            <div id="pos-prod-prix-caisse-info" style="display:none;font-size:11px;color:#3fb6a8;margin-top:5px;font-weight:600"></div>
             <div style="font-size:10.5px;color:rgba(255,255,255,.35);margin-top:4px">
-              Ce prix sera enregistré dans l'historique. Pour le modifier ensuite, utilisez le bouton <strong>Prix ₲</strong>.
+              Prix unitaire historisé. Pour modifier ensuite : bouton <strong>Prix ₲</strong>.
             </div>
           </div>
         </div>
@@ -5223,6 +5243,56 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="pos-modal-footer">
           <button class="pos-btn ghost" onclick="posProduitModalClose()">Annuler</button>
           <button class="pos-btn primary" onclick="posProduitSauvegarder()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal approvisionnement caisse/unité -->
+    <div class="pos-modal-bg" id="pos-appro-modal-bg" onclick="if(event.target===this)posApproModalClose()">
+      <div class="pos-modal">
+        <h3 id="pos-appro-modal-title">Approvisionnement</h3>
+        <input type="hidden" id="pos-appro-produit-id">
+        <input type="hidden" id="pos-appro-upc" value="1">
+        <input type="hidden" id="pos-appro-is-caisse" value="false">
+        <!-- Section caisses (visible si vendu_par_caisse) -->
+        <div id="pos-appro-caisse-section">
+          <div class="pos-form-row">
+            <div style="flex:1">
+              <label class="pos-label">Nombre de caisses</label>
+              <input class="pos-input" id="pos-appro-nb-caisses" type="number" min="0" step="1" placeholder="0" value="0" oninput="posApproUpdateLive()">
+            </div>
+            <div style="flex:1">
+              <label class="pos-label">Unités en vrac</label>
+              <input class="pos-input" id="pos-appro-nb-vrac" type="number" min="0" step="1" placeholder="0" value="0" oninput="posApproUpdateLive()">
+            </div>
+          </div>
+          <!-- Compteur live -->
+          <div id="pos-appro-live" style="background:rgba(63,182,168,.1);border:1px solid rgba(63,182,168,.25);border-radius:8px;padding:10px 14px;margin:4px 0 8px;font-size:13px;color:#3fb6a8;display:none">
+            <span id="pos-appro-live-txt"></span>
+          </div>
+        </div>
+        <!-- Section unités seulement (produit normal) -->
+        <div id="pos-appro-unite-section" style="display:none">
+          <div class="pos-form-row">
+            <div style="width:100%">
+              <label class="pos-label">Quantité à ajouter (unités)</label>
+              <input class="pos-input" id="pos-appro-nb-unite-seul" type="number" min="1" step="1" placeholder="0" value="" oninput="posApproUpdateLive()">
+            </div>
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Prix d'achat / caisse (G) <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
+            <input class="pos-input" id="pos-appro-prix-caisse" type="number" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div style="flex:1">
+            <label class="pos-label">Notes</label>
+            <input class="pos-input" id="pos-appro-notes" placeholder="Fournisseur, lot…">
+          </div>
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="posApproModalClose()">Annuler</button>
+          <button class="pos-btn primary" onclick="posApproSauvegarder()">Enregistrer</button>
         </div>
       </div>
     </div>
@@ -12881,48 +12951,77 @@ async function loadPosProduits(){
   const tbody = document.getElementById('pos-prod-tbody');
   if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
-    const stocks = await apiFetch('GET','/pos/stock');
-    const stockMap = {};
-    (stocks||[]).forEach(s=>{ stockMap[s.produit_id] = s; });
-
     const data = await apiFetch('GET','/pos/produits');
     _posProduitsAll = data || [];
-    _posRenderProduitsTbody(_posProduitsAll, stockMap);
+    _posRenderProduitsTbody(_posProduitsAll, null);
   } catch(e){
     if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
+}
+
+function _posStockLabel(p){
+  // Retourne le label de stock selon le mode caisse ou unité simple
+  const stk = p.stock_unites != null ? p.stock_unites : (p.stock_courant != null ? Math.round(parseFloat(p.stock_courant)) : null);
+  if(stk === null) return '<span class="td-muted">—</span>';
+  const bas = p.stock_bas ? ' style="color:#f7a93b;font-weight:700"' : '';
+  if(!p.vendu_par_caisse){
+    return `<span${bas}>${stk} <span class="td-muted">${p.unite||'u.'}</span></span>`;
+  }
+  const upc = p.unites_par_caisse||1;
+  const caisses = Math.floor(stk / upc);
+  const vrac    = stk % upc;
+  const caissesTxt = `<span style="color:#3fb6a8;font-weight:600">${caisses} caisse${caisses!==1?'s':''}</span>`;
+  const vracTxt = vrac > 0 ? ` <span style="color:#3fb6a8">+ ${vrac}</span>` : '';
+  return `<span${bas}>${stk} u. — ${caissesTxt}${vracTxt}</span>`;
 }
 
 function _posRenderProduitsTbody(prods, stockMap){
   const tbody = document.getElementById('pos-prod-tbody');
   if(!tbody) return;
   if(!prods.length){
-    tbody.innerHTML = '<tr><td colspan="8"><div class="gi-empty">Aucun produit trouvé</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9"><div class="gi-empty">Aucun produit trouvé</div></td></tr>';
     return;
   }
   const catColor = {boisson:'badge-blue',alcool:'badge-amber',soft:'badge-teal',plat:'badge-green',snack:'badge-gray',autre:'badge-gray'};
   tbody.innerHTML = prods.map(p=>{
-    const s     = stockMap ? (stockMap[p.id]||{}) : {};
-    const stock = s.stock_courant != null ? parseFloat(s.stock_courant) : '—';
-    const cmup  = s.cmup != null ? posGx(s.cmup) : '—';
+    // Fusionner données produit + stockMap si dispo
+    if(stockMap && stockMap[p.id]){
+      const s = stockMap[p.id];
+      p = Object.assign({}, p, {
+        stock_courant: s.stock_courant,
+        stock_unites:  s.stock_unites ?? Math.round(parseFloat(s.stock_courant||0)),
+        cmup: s.cmup,
+      });
+    }
+    const cmup  = p.cmup != null ? posGx(p.cmup) : '—';
     const cat   = p.categorie||'—';
     const catBadge = catColor[cat]
       ? `<span class="td-badge ${catColor[cat]}">${cat}</span>`
       : `<span class="td-muted">${cat}</span>`;
+    const caisseBadge = p.vendu_par_caisse
+      ? `<span style="font-size:9.5px;background:rgba(247,169,59,.15);color:#f7a93b;border-radius:4px;padding:1px 5px;margin-left:4px">caisse×${p.unites_par_caisse||'?'}</span>`
+      : '';
     const statBadge = p.actif
       ? '<span class="td-badge badge-green">Actif</span>'
       : '<span class="td-badge badge-gray">Inactif</span>';
+    const prixUnite = p.prix_vente_unite != null ? posGx(p.prix_vente_unite) : (p.prix_actif != null ? posGx(p.prix_actif) : '—');
+    const prixCaisse = p.vendu_par_caisse && p.prix_vente_caisse
+      ? `<br><span style="font-size:10px;color:#3fb6a8">${posGx(p.prix_vente_caisse)}/caisse</span>`
+      : '';
     const nomSafe = (p.nom||'').replace(/'/g,"\\'");
     return `<tr>
-      <td><strong style="color:rgba(255,255,255,.88)">${p.nom||'—'}</strong></td>
+      <td><strong style="color:rgba(255,255,255,.88)">${p.nom||'—'}</strong>${caisseBadge}</td>
       <td>${catBadge}</td>
       <td class="td-muted">${p.unite||'—'}</td>
-      <td class="td-amount">${p.prix_actif != null ? posGx(p.prix_actif) : '—'}</td>
-      <td>${stock !== '—' ? stock+' <span class="td-muted">'+p.unite+'</span>' : '—'}</td>
+      <td class="td-amount">${prixUnite}${prixCaisse}</td>
+      <td>${_posStockLabel(p)}</td>
       <td class="td-muted">${cmup}</td>
       <td>${statBadge}</td>
       <td>
         <div class="gi-actions">
+          <button class="gi-btn-icon" title="Approvisionner" onclick="posApproModal(${p.id})" style="color:#3fb6a8">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+          </button>
           <button class="gi-btn-icon" title="Éditer" onclick="posProduitModal(${p.id})">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
@@ -12947,6 +13046,63 @@ function posProduitsFiltrer(){
   _posRenderProduitsTbody(filtered, null);
 }
 
+function posProdToggleCaisse(){
+  const hidden   = document.getElementById('pos-prod-vendu-caisse');
+  const chkBox   = document.getElementById('pos-prod-caisse-chk');
+  const chkIcon  = document.getElementById('pos-prod-caisse-chk-icon');
+  const caisseRow = document.getElementById('pos-prod-caisse-row');
+  const isCaisse = hidden.value !== 'true';
+  hidden.value   = isCaisse ? 'true' : 'false';
+  chkBox.style.borderColor       = isCaisse ? '#f7a93b' : 'rgba(255,255,255,.3)';
+  chkBox.style.backgroundColor   = isCaisse ? 'rgba(247,169,59,.2)' : '';
+  chkIcon.style.display          = isCaisse ? '' : 'none';
+  caisseRow.style.display        = isCaisse ? '' : 'none';
+  if(!isCaisse) document.getElementById('pos-prod-upc').value = '';
+  posProdUpdatePrixCaisse();
+}
+
+function posProdUpdatePrixCaisse(){
+  const info = document.getElementById('pos-prod-prix-caisse-info');
+  if(!info) return;
+  const isCaisse = document.getElementById('pos-prod-vendu-caisse')?.value === 'true';
+  const upc  = parseInt(document.getElementById('pos-prod-upc')?.value)||0;
+  const prix = parseFloat(document.getElementById('pos-prod-prix')?.value)||0;
+  if(isCaisse && upc > 0 && prix > 0){
+    info.style.display = '';
+    info.textContent   = `= G ${(prix * upc).toFixed(2)} la caisse (${upc} × G ${prix.toFixed(2)})`;
+  } else {
+    info.style.display = 'none';
+  }
+}
+
+function _posProdResetCaisseUI(){
+  const hidden    = document.getElementById('pos-prod-vendu-caisse');
+  const chkBox    = document.getElementById('pos-prod-caisse-chk');
+  const chkIcon   = document.getElementById('pos-prod-caisse-chk-icon');
+  const caisseRow = document.getElementById('pos-prod-caisse-row');
+  const info      = document.getElementById('pos-prod-prix-caisse-info');
+  if(hidden)    hidden.value = 'false';
+  if(chkBox){   chkBox.style.borderColor = 'rgba(255,255,255,.3)'; chkBox.style.backgroundColor = ''; }
+  if(chkIcon)   chkIcon.style.display = 'none';
+  if(caisseRow) caisseRow.style.display = 'none';
+  if(info)      info.style.display = 'none';
+  const upcEl = document.getElementById('pos-prod-upc');
+  if(upcEl) upcEl.value = '';
+}
+
+function _posProdSetCaisseUI(venduParCaisse, unites){
+  const hidden    = document.getElementById('pos-prod-vendu-caisse');
+  const chkBox    = document.getElementById('pos-prod-caisse-chk');
+  const chkIcon   = document.getElementById('pos-prod-caisse-chk-icon');
+  const caisseRow = document.getElementById('pos-prod-caisse-row');
+  if(hidden)    hidden.value = venduParCaisse ? 'true' : 'false';
+  if(chkBox){   chkBox.style.borderColor = venduParCaisse ? '#f7a93b' : 'rgba(255,255,255,.3)'; chkBox.style.backgroundColor = venduParCaisse ? 'rgba(247,169,59,.2)' : ''; }
+  if(chkIcon)   chkIcon.style.display = venduParCaisse ? '' : 'none';
+  if(caisseRow) caisseRow.style.display = venduParCaisse ? '' : 'none';
+  const upcEl = document.getElementById('pos-prod-upc');
+  if(upcEl) upcEl.value = (venduParCaisse && unites) ? unites : '';
+}
+
 function posProduitModal(id){
   const modal    = document.getElementById('pos-prod-modal-bg');
   const title    = document.getElementById('pos-prod-modal-title');
@@ -12961,13 +13117,15 @@ function posProduitModal(id){
     document.getElementById('pos-prod-seuil').value = p.seuil_alerte_stock||0;
     document.getElementById('pos-prod-code').value  = p.code_barre||'';
     document.getElementById('pos-prod-prix').value  = '';
-    if(prixRow) prixRow.style.display = 'none';   // prix non modifiable ici
+    _posProdSetCaisseUI(!!p.vendu_par_caisse, p.unites_par_caisse);
+    if(prixRow) prixRow.style.display = 'none';
   } else {
     title.textContent = 'Nouveau produit';
     ['pos-prod-nom','pos-prod-unite','pos-prod-prix','pos-prod-code'].forEach(fid=>{ document.getElementById(fid).value=''; });
     document.getElementById('pos-prod-seuil').value = 0;
     document.getElementById('pos-prod-cat').value   = 'boisson';
-    if(prixRow) prixRow.style.display = '';        // requis à la création
+    _posProdResetCaisseUI();
+    if(prixRow) prixRow.style.display = '';
   }
   modal.classList.add('open');
 }
@@ -12984,13 +13142,17 @@ async function posProduitSauvegarder(){
   const prix  = parseFloat(document.getElementById('pos-prod-prix').value)||null;
   const seuil = parseFloat(document.getElementById('pos-prod-seuil').value)||0;
   const code  = document.getElementById('pos-prod-code').value.trim()||null;
+  const venduCaisse = document.getElementById('pos-prod-vendu-caisse')?.value === 'true';
+  const upc   = parseInt(document.getElementById('pos-prod-upc')?.value)||null;
   if(!nom||!cat||!unite){ posAlert('Nom, catégorie et unité sont requis.'); return; }
+  if(venduCaisse && (!upc||upc<1)){ posAlert('Unités par caisse requis (≥ 1) pour un produit vendu par caisse.'); return; }
+  const payload = { nom, categorie:cat, unite, seuil_alerte_stock:seuil, code_barre:code, vendu_par_caisse:venduCaisse, unites_par_caisse:venduCaisse?upc:null };
   try {
     if(id){
-      await apiFetch('PUT',`/pos/produits/${id}`,{ nom, categorie:cat, unite, seuil_alerte_stock:seuil, code_barre:code });
+      await apiFetch('PUT',`/pos/produits/${id}`, payload);
     } else {
       if(!prix || prix<=0){ posAlert('Prix de vente initial requis pour un nouveau produit.'); return; }
-      await apiFetch('POST','/pos/produits',{ nom, categorie:cat, unite, prix_initial:prix, seuil_alerte_stock:seuil, code_barre:code });
+      await apiFetch('POST','/pos/produits',{ ...payload, prix_initial:prix });
     }
     posProduitModalClose();
     await loadPosProduits();
@@ -12998,9 +13160,106 @@ async function posProduitSauvegarder(){
   } catch(e){ posAlert(e.message||'Erreur.'); }
 }
 
-async function posToggleActif(id, actif){
+// ── APPROVISIONNEMENT ────────────────────────────────────────────
+
+function posApproModal(prodId){
+  const p = _posProduitsAll.find(x=>x.id===prodId)||{};
+  document.getElementById('pos-appro-produit-id').value = prodId;
+  document.getElementById('pos-appro-upc').value        = p.unites_par_caisse||1;
+  document.getElementById('pos-appro-is-caisse').value  = p.vendu_par_caisse ? 'true' : 'false';
+  document.getElementById('pos-appro-modal-title').textContent = `Approvisionner — ${p.nom||''}`;
+  document.getElementById('pos-appro-nb-caisses').value  = '0';
+  document.getElementById('pos-appro-nb-vrac').value     = '0';
+  document.getElementById('pos-appro-nb-unite-seul').value = '';
+  document.getElementById('pos-appro-prix-caisse').value  = '';
+  document.getElementById('pos-appro-notes').value        = '';
+  const caisseSec  = document.getElementById('pos-appro-caisse-section');
+  const uniteSec   = document.getElementById('pos-appro-unite-section');
+  const liveDiv    = document.getElementById('pos-appro-live');
+  const prixLabel  = document.querySelector('#pos-appro-prix-caisse')?.previousElementSibling;
+  if(p.vendu_par_caisse){
+    if(caisseSec) caisseSec.style.display = '';
+    if(uniteSec)  uniteSec.style.display  = 'none';
+    if(prixLabel) prixLabel.textContent = `Prix d'achat / caisse (G)`;
+  } else {
+    if(caisseSec) caisseSec.style.display = 'none';
+    if(uniteSec)  uniteSec.style.display  = '';
+    if(prixLabel) prixLabel.textContent = `Prix d'achat / unité (G)`;
+  }
+  if(liveDiv) liveDiv.style.display = 'none';
+  document.getElementById('pos-appro-modal-bg').classList.add('open');
+}
+
+function posApproModalClose(){
+  document.getElementById('pos-appro-modal-bg').classList.remove('open');
+}
+
+function posApproUpdateLive(){
+  const isCaisse = document.getElementById('pos-appro-is-caisse')?.value === 'true';
+  const liveDiv  = document.getElementById('pos-appro-live');
+  const liveTxt  = document.getElementById('pos-appro-live-txt');
+  if(!liveDiv || !liveTxt) return;
+  if(isCaisse){
+    const upc     = parseInt(document.getElementById('pos-appro-upc')?.value)||1;
+    const caisses = parseInt(document.getElementById('pos-appro-nb-caisses')?.value)||0;
+    const vrac    = parseInt(document.getElementById('pos-appro-nb-vrac')?.value)||0;
+    const total   = caisses * upc + vrac;
+    if(total > 0){
+      liveDiv.style.display = '';
+      const detailCaisse = caisses > 0 ? `${caisses} × ${upc}` : '';
+      const detailVrac   = vrac > 0 ? (caisses > 0 ? ` + ${vrac}` : vrac) : '';
+      liveTxt.innerHTML = `${detailCaisse}${detailVrac} = <strong>${total} unités</strong> seront ajoutées`;
+    } else {
+      liveDiv.style.display = 'none';
+    }
+  } else {
+    const unite = parseInt(document.getElementById('pos-appro-nb-unite-seul')?.value)||0;
+    if(unite > 0){
+      liveDiv.style.display = '';
+      liveTxt.innerHTML = `<strong>${unite} unité${unite>1?'s':''}</strong> seront ajoutées`;
+    } else {
+      liveDiv.style.display = 'none';
+    }
+  }
+}
+
+async function posApproSauvegarder(){
+  const prodId   = parseInt(document.getElementById('pos-appro-produit-id').value);
+  const isCaisse = document.getElementById('pos-appro-is-caisse')?.value === 'true';
+  const prixCaisse = parseFloat(document.getElementById('pos-appro-prix-caisse').value)||null;
+  const notes    = document.getElementById('pos-appro-notes').value.trim()||null;
+  let nb_caisses = 0, nb_unites_vrac = 0;
+  if(isCaisse){
+    nb_caisses     = parseInt(document.getElementById('pos-appro-nb-caisses').value)||0;
+    nb_unites_vrac = parseInt(document.getElementById('pos-appro-nb-vrac').value)||0;
+  } else {
+    nb_unites_vrac = parseInt(document.getElementById('pos-appro-nb-unite-seul').value)||0;
+  }
+  if(nb_caisses===0 && nb_unites_vrac===0){ posAlert('Saisir au moins 1 caisse ou 1 unité.'); return; }
   try {
-    await apiFetch('PUT',`/pos/produits/${id}`,{ actif: !!actif });
+    const res = await apiFetch('POST',`/pos/produits/${prodId}/approvisionnement`,{
+      nb_caisses, nb_unites_vrac,
+      prix_achat_caisse: prixCaisse,
+      notes,
+    });
+    posApproModalClose();
+    await loadPosProduits();
+    let msg = `Stock mis à jour : ${res.total_unites_ajoutes} unités ajoutées.`;
+    if(res.caisses_apres != null) msg += ` Nouveau stock : ${res.caisses_apres} caisse(s) + ${res.unites_restantes} u.`;
+    posAlert(msg, 'ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function posToggleActif(id, actif){
+  const p = _posProduitsAll.find(x=>x.id===id)||{};
+  try {
+    await apiFetch('PUT',`/pos/produits/${id}`,{
+      nom: p.nom||'', categorie: p.categorie||'autre', unite: p.unite||'unite',
+      seuil_alerte_stock: p.seuil_alerte_stock||0,
+      vendu_par_caisse: !!p.vendu_par_caisse,
+      unites_par_caisse: p.unites_par_caisse||null,
+      actif: !!actif,
+    });
     await loadPosProduits();
     posAlert('Statut mis à jour.','ok');
   } catch(e){ posAlert(e.message||'Erreur.'); }

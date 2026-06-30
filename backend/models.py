@@ -304,3 +304,291 @@ class Achat(Base):
         Index("idx_achats_categorie",  "categorie"),
         Index("idx_achats_fournisseur","fournisseur"),
     )
+
+
+# ══════════════════════════════════════════════════════════════════
+# MODULE BAR / RESTAURANT — POS (Point of Sale)
+# ══════════════════════════════════════════════════════════════════
+
+class BarProduit(Base):
+    """Article du bar/restaurant : boisson, plat, snack, etc."""
+    __tablename__ = "bar_produits"
+
+    id                 = Column(Integer, primary_key=True)
+    nom                = Column(String(150), nullable=False)
+    categorie          = Column(String(50),  nullable=False)   # boisson, plat, snack, alcool, soft…
+    unite              = Column(String(30),  nullable=False, default="unite")  # bouteille, verre, assiette…
+    code_barre         = Column(String(50),  nullable=True)
+    actif              = Column(Boolean,     nullable=False, default=True)
+    seuil_alerte_stock = Column(Numeric(12, 3), nullable=False, default=0)
+    date_creation      = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    # Logique caisse/unité
+    vendu_par_caisse   = Column(Boolean,  nullable=False, default=False)
+    unites_par_caisse  = Column(Integer,  nullable=True)   # obligatoire si vendu_par_caisse=True
+
+    prix_historique = relationship("BarPrixHistorique", back_populates="produit",
+                                   cascade="all, delete-orphan",
+                                   order_by="desc(BarPrixHistorique.date_debut)")
+    mouvements      = relationship("BarMouvementStock", back_populates="produit",
+                                   foreign_keys="BarMouvementStock.produit_id")
+    lignes_vente    = relationship("BarLigneVente", back_populates="produit")
+    bar_achats      = relationship("BarAchat", back_populates="produit")
+
+    __table_args__ = (
+        Index("idx_bar_produits_categorie", "categorie"),
+        Index("idx_bar_produits_actif",     "actif"),
+    )
+
+
+class BarPrixHistorique(Base):
+    """Historique des prix de vente par article — insert-only, jamais mis à jour."""
+    __tablename__ = "bar_prix_historique"
+
+    id             = Column(Integer, primary_key=True)
+    produit_id     = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
+    prix           = Column(Numeric(12, 2), nullable=False)
+    date_debut     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    date_fin       = Column(DateTime(timezone=True), nullable=True)   # NULL = prix actuel
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    produit = relationship("BarProduit", back_populates="prix_historique")
+
+    __table_args__ = (
+        CheckConstraint("prix > 0", name="chk_bar_prix_pos"),
+        Index("idx_bar_prix_produit", "produit_id", "date_debut"),
+    )
+
+
+class BarAchat(Base):
+    """Réception de marchandises au bar (entrée de stock avec prix d'achat)."""
+    __tablename__ = "bar_achats"
+
+    id                  = Column(Integer, primary_key=True)
+    produit_id          = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
+    quantite            = Column(Numeric(12, 3), nullable=False)
+    prix_achat_unitaire = Column(Numeric(12, 2), nullable=False)
+    fournisseur         = Column(String(150), nullable=True)
+    date_achat          = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    utilisateur_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    notes               = Column(String(300), nullable=True)
+
+    produit   = relationship("BarProduit", back_populates="bar_achats")
+    mouvement = relationship("BarMouvementStock", back_populates="achat", uselist=False,
+                             foreign_keys="BarMouvementStock.achat_id")
+
+    __table_args__ = (
+        CheckConstraint("quantite > 0",            name="chk_bar_achat_qte_pos"),
+        CheckConstraint("prix_achat_unitaire >= 0", name="chk_bar_achat_prix_pos"),
+        Index("idx_bar_achats_produit", "produit_id"),
+        Index("idx_bar_achats_date",    "date_achat"),
+    )
+
+
+class BarVente(Base):
+    """Vente encaissée au bar (ticket de caisse)."""
+    __tablename__ = "bar_ventes"
+
+    id               = Column(Integer, primary_key=True)
+    numero_ticket    = Column(String(20),  nullable=False, unique=True)
+    caissier_id      = Column(Integer, ForeignKey("employes.id", ondelete="RESTRICT"), nullable=True)
+    date_heure       = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    montant_total    = Column(Numeric(14, 2), nullable=False)
+    mode_paiement    = Column(String(20),  nullable=False, default="CASH")  # CASH, CREDIT, MIXTE
+    statut           = Column(String(20),  nullable=False, default="PAYEE") # PAYEE, CREDIT_EN_COURS, ANNULEE
+    client_nom       = Column(String(150), nullable=True)
+    montant_paye     = Column(Numeric(14, 2), nullable=False, default=0)
+    montant_restant  = Column(Numeric(14, 2), nullable=False, default=0)
+
+    caissier  = relationship("Employe")
+    lignes    = relationship("BarLigneVente",    back_populates="vente", cascade="all, delete-orphan")
+    credit    = relationship("BarCredit",        back_populates="vente", uselist=False)
+    mouvements = relationship("BarMouvementStock",
+                              primaryjoin="BarVente.id == foreign(BarMouvementStock.reference_vente_id)")
+
+    __table_args__ = (
+        CheckConstraint("montant_total >= 0",   name="chk_bar_vente_total_pos"),
+        CheckConstraint("montant_paye >= 0",    name="chk_bar_vente_paye_pos"),
+        CheckConstraint("montant_restant >= 0", name="chk_bar_vente_restant_pos"),
+        CheckConstraint("mode_paiement IN ('CASH','CREDIT','MIXTE')", name="chk_bar_vente_mode"),
+        CheckConstraint("statut IN ('PAYEE','CREDIT_EN_COURS','ANNULEE')", name="chk_bar_vente_statut"),
+        Index("idx_bar_ventes_date",     "date_heure"),
+        Index("idx_bar_ventes_caissier", "caissier_id"),
+        Index("idx_bar_ventes_statut",   "statut"),
+    )
+
+
+class BarMouvementStock(Base):
+    """Mouvement de stock bar — source unique de vérité pour le stock courant."""
+    __tablename__ = "bar_mouvements_stock"
+
+    id                 = Column(Integer, primary_key=True)
+    produit_id         = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
+    type_mouvement     = Column(String(20), nullable=False)  # ENTREE, SORTIE_VENTE, AJUSTEMENT, PERTE, CASSE
+    quantite           = Column(Numeric(12, 3), nullable=False)   # signée : + entrée, - sortie
+    motif              = Column(String(300), nullable=True)
+    reference_vente_id = Column(Integer, ForeignKey("bar_ventes.id", ondelete="SET NULL"), nullable=True)
+    achat_id           = Column(Integer, ForeignKey("bar_achats.id", ondelete="SET NULL"), nullable=True)
+    date_mouvement     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    utilisateur_id     = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    produit = relationship("BarProduit", back_populates="mouvements",
+                           foreign_keys=[produit_id])
+    achat   = relationship("BarAchat",   back_populates="mouvement",
+                           foreign_keys=[achat_id])
+
+    __table_args__ = (
+        CheckConstraint(
+            "type_mouvement IN ('ENTREE','SORTIE_VENTE','AJUSTEMENT','PERTE','CASSE')",
+            name="chk_bar_mouv_type",
+        ),
+        Index("idx_bar_mouv_produit", "produit_id"),
+        Index("idx_bar_mouv_date",    "date_mouvement"),
+        Index("idx_bar_mouv_vente",   "reference_vente_id"),
+    )
+
+
+class BarLigneVente(Base):
+    """Ligne d'une vente bar (1 produit, quantité, prix historisé)."""
+    __tablename__ = "bar_lignes_vente"
+
+    id                    = Column(Integer, primary_key=True)
+    vente_id              = Column(Integer, ForeignKey("bar_ventes.id", ondelete="CASCADE"), nullable=False)
+    produit_id            = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
+    quantite              = Column(Numeric(12, 3), nullable=False)
+    prix_unitaire_applique = Column(Numeric(12, 2), nullable=False)  # prix au moment de la vente
+    sous_total            = Column(Numeric(14, 2), nullable=False)
+
+    vente   = relationship("BarVente",   back_populates="lignes")
+    produit = relationship("BarProduit", back_populates="lignes_vente")
+
+    __table_args__ = (
+        CheckConstraint("quantite > 0",    name="chk_bar_ligne_qte_pos"),
+        CheckConstraint("sous_total >= 0", name="chk_bar_ligne_total_pos"),
+        Index("idx_bar_lignes_vente",   "vente_id"),
+        Index("idx_bar_lignes_produit", "produit_id"),
+    )
+
+
+class BarCredit(Base):
+    """Crédit accordé à un client (vente partiellement ou non payée)."""
+    __tablename__ = "bar_credits"
+
+    id                = Column(Integer, primary_key=True)
+    vente_id          = Column(Integer, ForeignKey("bar_ventes.id", ondelete="RESTRICT"), nullable=False)
+    client_nom        = Column(String(150), nullable=False)
+    client_contact    = Column(String(100), nullable=True)
+    montant_du        = Column(Numeric(14, 2), nullable=False)
+    montant_rembourse = Column(Numeric(14, 2), nullable=False, default=0)
+    solde             = Column(Numeric(14, 2), nullable=False)
+    statut            = Column(String(20), nullable=False, default="OUVERT")  # OUVERT, SOLDE, EN_RETARD
+    date_creation     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    date_echeance     = Column(Date, nullable=True)
+
+    vente          = relationship("BarVente",        back_populates="credit")
+    remboursements = relationship("BarRemboursement", back_populates="credit",
+                                  cascade="all, delete-orphan")
+
+    __table_args__ = (
+        CheckConstraint("montant_du > 0",        name="chk_bar_credit_du_pos"),
+        CheckConstraint("montant_rembourse >= 0", name="chk_bar_credit_rembourse_pos"),
+        CheckConstraint("solde >= 0",            name="chk_bar_credit_solde_pos"),
+        CheckConstraint("statut IN ('OUVERT','SOLDE','EN_RETARD')", name="chk_bar_credit_statut"),
+        Index("idx_bar_credits_statut", "statut"),
+        Index("idx_bar_credits_vente",  "vente_id"),
+    )
+
+
+class BarRemboursement(Base):
+    """Remboursement partiel ou total d'un crédit bar."""
+    __tablename__ = "bar_remboursements"
+
+    id             = Column(Integer, primary_key=True)
+    credit_id      = Column(Integer, ForeignKey("bar_credits.id", ondelete="CASCADE"), nullable=False)
+    montant        = Column(Numeric(14, 2), nullable=False)
+    date_remb      = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    notes          = Column(String(300), nullable=True)
+
+    credit = relationship("BarCredit", back_populates="remboursements")
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_bar_remb_montant_pos"),
+        Index("idx_bar_remb_credit", "credit_id"),
+    )
+
+
+class BarCommande(Base):
+    """Commande en cours (table ou emporter) avant encaissement."""
+    __tablename__ = "bar_commandes"
+
+    id                = Column(Integer, primary_key=True)
+    numero_table      = Column(String(50),  nullable=True)
+    client            = Column(String(150), nullable=True)
+    statut            = Column(String(20),  nullable=False, default="OUVERTE")
+    # OUVERTE, ENVOYEE_CUISINE, SERVIE, ENCAISSEE, ANNULEE
+    caissier_id       = Column(Integer, ForeignKey("employes.id", ondelete="RESTRICT"), nullable=True)
+    date_ouverture    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    date_modification = Column(DateTime(timezone=True), nullable=True)
+
+    caissier = relationship("Employe")
+    lignes   = relationship("BarLigneCommande", back_populates="commande",
+                            cascade="all, delete-orphan")
+
+    __table_args__ = (
+        CheckConstraint(
+            "statut IN ('OUVERTE','ENVOYEE_CUISINE','SERVIE','ENCAISSEE','ANNULEE')",
+            name="chk_bar_cmd_statut",
+        ),
+        Index("idx_bar_cmd_statut", "statut"),
+        Index("idx_bar_cmd_date",   "date_ouverture"),
+    )
+
+
+class BarLigneCommande(Base):
+    """Ligne d'une commande bar (avant encaissement)."""
+    __tablename__ = "bar_lignes_commande"
+
+    id          = Column(Integer, primary_key=True)
+    commande_id = Column(Integer, ForeignKey("bar_commandes.id", ondelete="CASCADE"), nullable=False)
+    produit_id  = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
+    quantite    = Column(Numeric(12, 3), nullable=False)
+    notes       = Column(String(200), nullable=True)
+
+    commande = relationship("BarCommande", back_populates="lignes")
+    produit  = relationship("BarProduit")
+
+    __table_args__ = (
+        CheckConstraint("quantite > 0", name="chk_bar_ligne_cmd_qte_pos"),
+        Index("idx_bar_lcmd_commande", "commande_id"),
+        Index("idx_bar_lcmd_produit",  "produit_id"),
+    )
+
+
+class BarPaiementEmploye(Base):
+    """Paiement ad hoc à un employé du bar (salaire, avance, bonus, commission)."""
+    __tablename__ = "bar_paiements_employes"
+
+    id             = Column(Integer, primary_key=True)
+    employe_id     = Column(Integer, ForeignKey("employes.id", ondelete="RESTRICT"), nullable=False)
+    montant        = Column(Numeric(12, 2), nullable=False)
+    periode_debut  = Column(Date, nullable=True)
+    periode_fin    = Column(Date, nullable=True)
+    type_paiement  = Column(String(20), nullable=False, default="SALAIRE")
+    # SALAIRE, AVANCE, BONUS, COMMISSION
+    date_paiement  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    mode           = Column(String(20), nullable=False, default="CASH")  # CASH, VIREMENT, CHEQUE
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    notes          = Column(String(300), nullable=True)
+
+    employe = relationship("Employe")
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_bar_paie_montant_pos"),
+        CheckConstraint(
+            "type_paiement IN ('SALAIRE','AVANCE','BONUS','COMMISSION')",
+            name="chk_bar_paie_type",
+        ),
+        CheckConstraint("mode IN ('CASH','VIREMENT','CHEQUE')", name="chk_bar_paie_mode"),
+        Index("idx_bar_paie_employe", "employe_id"),
+        Index("idx_bar_paie_date",    "date_paiement"),
+    )
