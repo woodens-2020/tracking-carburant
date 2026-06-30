@@ -699,6 +699,13 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
 .toast-err {background:rgba(22,8,8,.95);border-color:rgba(239,68,68,.2);border-left-color:#ef4444;color:#fca5a5}
 .toast-warn{background:rgba(22,16,4,.95);border-color:rgba(247,169,59,.2);border-left-color:#f7a93b;color:#fcd34d}
 .toast-inf {background:rgba(8,12,24,.95);border-color:rgba(96,165,250,.2);border-left-color:#60a5fa;color:#93c5fd}
+.toast-close{
+  flex-shrink:0;width:22px;height:22px;border-radius:50%;border:none;cursor:pointer;
+  background:rgba(255,255,255,.08);color:inherit;opacity:.6;
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity .15s,background .15s;padding:0;margin-top:1px;
+}
+.toast-close:hover{opacity:1;background:rgba(255,255,255,.18)}
 @keyframes t-in{from{transform:translateY(-24px) scale(.93);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
 @keyframes t-out{from{transform:translateY(0) scale(1);opacity:1}to{transform:translateY(-18px) scale(.93);opacity:0}}
 
@@ -710,6 +717,7 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
 }
 #gi-confirm-overlay.show{opacity:1;pointer-events:auto}
 #gi-confirm-box{
+  position:relative;
   background:#141e2e;border:1px solid rgba(255,255,255,.12);border-radius:22px;
   padding:40px 40px 30px;max-width:480px;width:90%;
   box-shadow:0 40px 100px rgba(0,0,0,.7),0 12px 40px rgba(0,0,0,.45);
@@ -5920,6 +5928,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 <!-- ══════ MODAL CONFIRMATION GLOBALE ══════ -->
 <div id="gi-confirm-overlay">
   <div id="gi-confirm-box">
+    <button id="gi-confirm-close" onclick="_closeConfirm(false)" aria-label="Fermer"
+      style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:none;cursor:pointer;background:rgba(255,255,255,.07);color:rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s;">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
     <div id="gi-confirm-icon-wrap">
       <svg id="gi-confirm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="26" height="26"></svg>
     </div>
@@ -8136,7 +8148,7 @@ const _NOTIF_ICONS = {
 };
 const _NOTIF_LABELS = { ok:'Succès', err:'Erreur', warn:'Attention', inf:'Information' };
 
-function notify(msg, type='inf', duration=4000){
+function notify(msg, type='inf'){
   const container = document.getElementById('toasts');
   if(!container) return;
   const el = document.createElement('div');
@@ -8148,16 +8160,19 @@ function notify(msg, type='inf', duration=4000){
     <div class="toast-body">
       <div class="toast-title">${_NOTIF_LABELS[type]||''}</div>
       <div class="toast-msg">${msg}</div>
-    </div>`;
-  el.onclick = () => dismiss(el);
-  container.appendChild(el);
-  const timer = setTimeout(() => dismiss(el), duration);
-  function dismiss(t){
-    clearTimeout(timer);
-    if(!t.parentNode) return;
-    t.classList.add('t-out');
-    t.addEventListener('animationend', () => t.remove(), {once:true});
+    </div>
+    <button class="toast-close" aria-label="Fermer">
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>`;
+  function dismiss(){
+    if(!el.parentNode) return;
+    el.classList.add('t-out');
+    el.addEventListener('animationend', () => el.remove(), {once:true});
   }
+  el.querySelector('.toast-close').addEventListener('click', e => { e.stopPropagation(); dismiss(); });
+  container.appendChild(el);
 }
 
 /* Alias pratiques */
