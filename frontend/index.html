@@ -671,58 +671,65 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
 .recap-table tr:last-child td{border-bottom:none}
 .recap-total td{border-top:1px solid var(--border2)!important;background:var(--panel2);font-weight:700}
 
-/* ── Toasts ──────────────────────────────────── */
-/* ── Toasts ─────────────────────────────────────────── */
-#toasts{position:fixed;bottom:24px;right:24px;z-index:9000;display:flex;flex-direction:column-reverse;gap:10px;pointer-events:none;max-width:340px}
+/* ── Toasts — centré en haut de l'écran ─────────────── */
+#toasts{
+  position:fixed;top:28px;left:50%;transform:translateX(-50%);
+  z-index:9000;display:flex;flex-direction:column;gap:12px;
+  pointer-events:none;width:min(480px,90vw);
+  align-items:center;
+}
 .toast{
-  display:flex;align-items:flex-start;gap:11px;
-  padding:13px 16px 13px 14px;border-radius:12px;font-size:13px;font-weight:500;line-height:1.45;
-  animation:t-in .32s cubic-bezier(.34,1.56,.64,1);pointer-events:auto;
-  backdrop-filter:blur(12px);border-left:3px solid transparent;
-  box-shadow:0 8px 32px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.25);
+  display:flex;align-items:flex-start;gap:14px;
+  padding:16px 20px 16px 18px;border-radius:14px;
+  font-size:14px;font-weight:500;line-height:1.5;
+  width:100%;box-sizing:border-box;
+  animation:t-in .35s cubic-bezier(.34,1.56,.64,1);pointer-events:auto;
+  backdrop-filter:blur(16px);
+  border:1px solid transparent;border-left:4px solid transparent;
+  box-shadow:0 12px 40px rgba(0,0,0,.55),0 4px 12px rgba(0,0,0,.3);
   cursor:pointer;
 }
-.toast:hover{filter:brightness(1.1)}
-.toast.t-out{animation:t-out .24s ease forwards}
-.toast-icon{width:18px;height:18px;flex-shrink:0;margin-top:1px}
+.toast:hover{filter:brightness(1.12);transform:scale(1.01)}
+.toast.t-out{animation:t-out .26s ease forwards}
+.toast-icon{width:22px;height:22px;flex-shrink:0;margin-top:1px}
 .toast-body{flex:1}
-.toast-title{font-weight:700;font-size:12px;opacity:.7;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
-.toast-msg{color:inherit}
-.toast-ok  {background:rgba(10,18,28,.93);border:1px solid rgba(34,197,94,.2);border-left-color:#22c55e;color:#86efac}
-.toast-err {background:rgba(10,18,28,.93);border:1px solid rgba(239,68,68,.2);border-left-color:#ef4444;color:#fca5a5}
-.toast-warn{background:rgba(10,18,28,.93);border:1px solid rgba(247,169,59,.2);border-left-color:#f7a93b;color:#fcd34d}
-.toast-inf {background:rgba(10,18,28,.93);border:1px solid rgba(96,165,250,.2);border-left-color:#60a5fa;color:#93c5fd}
-@keyframes t-in{from{transform:translateX(110%) scale(.9);opacity:0}to{transform:translateX(0) scale(1);opacity:1}}
-@keyframes t-out{from{transform:translateX(0) scale(1);opacity:1}to{transform:translateX(110%) scale(.9);opacity:0}}
+.toast-title{font-weight:700;font-size:11px;opacity:.65;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.toast-msg{color:inherit;font-size:14px}
+.toast-ok  {background:rgba(8,22,16,.95);border-color:rgba(34,197,94,.2);border-left-color:#22c55e;color:#86efac}
+.toast-err {background:rgba(22,8,8,.95);border-color:rgba(239,68,68,.2);border-left-color:#ef4444;color:#fca5a5}
+.toast-warn{background:rgba(22,16,4,.95);border-color:rgba(247,169,59,.2);border-left-color:#f7a93b;color:#fcd34d}
+.toast-inf {background:rgba(8,12,24,.95);border-color:rgba(96,165,250,.2);border-left-color:#60a5fa;color:#93c5fd}
+@keyframes t-in{from{transform:translateY(-24px) scale(.93);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+@keyframes t-out{from{transform:translateY(0) scale(1);opacity:1}to{transform:translateY(-18px) scale(.93);opacity:0}}
 
 /* ── Modal confirmation globale ─────────────────────── */
 #gi-confirm-overlay{
-  position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(6px);
+  position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);
   z-index:9500;display:flex;align-items:center;justify-content:center;
-  opacity:0;pointer-events:none;transition:opacity .2s ease;
+  opacity:0;pointer-events:none;transition:opacity .22s ease;
 }
 #gi-confirm-overlay.show{opacity:1;pointer-events:auto}
 #gi-confirm-box{
-  background:#141e2e;border:1px solid rgba(255,255,255,.1);border-radius:18px;
-  padding:32px 32px 24px;max-width:420px;width:90%;
-  box-shadow:0 32px 80px rgba(0,0,0,.6),0 8px 32px rgba(0,0,0,.4);
-  transform:scale(.88) translateY(16px);opacity:0;
-  transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .2s ease;
+  background:#141e2e;border:1px solid rgba(255,255,255,.12);border-radius:22px;
+  padding:40px 40px 30px;max-width:480px;width:90%;
+  box-shadow:0 40px 100px rgba(0,0,0,.7),0 12px 40px rgba(0,0,0,.45);
+  transform:scale(.85) translateY(20px);opacity:0;
+  transition:transform .32s cubic-bezier(.34,1.56,.64,1),opacity .22s ease;
 }
 #gi-confirm-overlay.show #gi-confirm-box{transform:scale(1) translateY(0);opacity:1}
 #gi-confirm-icon-wrap{
-  width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
+  width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;
 }
-#gi-confirm-title{font-size:17px;font-weight:700;color:rgba(255,255,255,.92);text-align:center;margin-bottom:8px}
-#gi-confirm-msg{font-size:13px;color:rgba(255,255,255,.55);text-align:center;line-height:1.55;white-space:pre-line;margin-bottom:24px}
-.gi-confirm-btns{display:flex;gap:10px;justify-content:center}
+#gi-confirm-title{font-size:20px;font-weight:700;color:rgba(255,255,255,.95);text-align:center;margin-bottom:10px}
+#gi-confirm-msg{font-size:14px;color:rgba(255,255,255,.6);text-align:center;line-height:1.6;white-space:pre-line;margin-bottom:28px}
+.gi-confirm-btns{display:flex;gap:12px;justify-content:center}
 .gi-confirm-btns button{
-  flex:1;padding:10px 0;border-radius:10px;font-size:13px;font-weight:600;border:none;cursor:pointer;
+  flex:1;padding:13px 0;border-radius:12px;font-size:14px;font-weight:600;border:none;cursor:pointer;
   transition:transform .12s,filter .15s;
 }
-.gi-confirm-btns button:hover{filter:brightness(1.1)}
+.gi-confirm-btns button:hover{filter:brightness(1.12)}
 .gi-confirm-btns button:active{transform:scale(.96)}
-#gi-confirm-cancel{background:rgba(255,255,255,.07);color:rgba(255,255,255,.6)}
+#gi-confirm-cancel{background:rgba(255,255,255,.08);color:rgba(255,255,255,.65)}
 #gi-confirm-ok{background:#ef4444;color:#fff}
 #gi-confirm-ok.ok{background:#22c55e}
 #gi-confirm-ok.warn{background:#f7a93b;color:#1a1a1a}
