@@ -13119,9 +13119,9 @@ async function loadPosProduits(){
 }
 
 function _posStockLabel(p){
-  // Retourne le label de stock selon le mode caisse ou unité simple
-  const stk = p.stock_unites != null ? p.stock_unites : (p.stock_courant != null ? Math.round(parseFloat(p.stock_courant)) : null);
-  if(stk === null) return '<span class="td-muted">—</span>';
+  const stkRaw = p.stock_unites != null ? p.stock_unites : (p.stock_courant != null ? parseFloat(p.stock_courant) : null);
+  if(stkRaw === null) return '<span class="td-muted">—</span>';
+  const stk = Math.round(stkRaw);
   const bas = p.stock_bas ? ' style="color:#f7a93b;font-weight:700"' : '';
   if(!p.vendu_par_caisse){
     return `<span${bas}>${stk} <span class="td-muted">${p.unite||'u.'}</span></span>`;
@@ -13856,8 +13856,8 @@ function _posCmdRenderLignes(){
         <option value="">— Produit —</option>${opts}
       </select></div>
       <div style="display:flex;align-items:center;gap:6px">
-        <input class="pos-input" type="number" min="0.001" step="0.001" value="${l.quantite}" style="width:80px"
-          onchange="_posCmdLignes[${i}].quantite=+this.value">
+        <input class="pos-input" type="number" min="1" step="1" value="${Math.round(l.quantite||1)}" style="width:80px"
+          onchange="_posCmdLignes[${i}].quantite=Math.round(Math.max(1,+this.value))">
         <button class="pos-btn danger" style="padding:3px 7px;font-size:11px" onclick="_posCmdLignes.splice(${i},1);_posCmdRenderLignes()">✕</button>
       </div>
     </div>
@@ -13874,7 +13874,7 @@ async function posCmdSauvegarder(){
   const table  = document.getElementById('pos-cmd-table').value.trim()||null;
   const client = document.getElementById('pos-cmd-client').value.trim()||null;
   const lignes = _posCmdLignes.filter(l=>l.produit_id&&l.quantite>0)
-    .map(l=>({ produit_id:parseInt(l.produit_id), quantite:parseFloat(l.quantite) }));
+    .map(l=>({ produit_id:parseInt(l.produit_id), quantite:Math.round(l.quantite) }));
   if(!lignes.length){ posAlert('Ajoutez au moins un article.'); return; }
   try {
     if(id){
