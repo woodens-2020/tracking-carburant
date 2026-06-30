@@ -3895,7 +3895,6 @@ async def get_statistiques(
     date_fin:    Optional[str] = None,
     produit_id:  Optional[int] = None,
     db:          Session = Depends(get_db),
-    current_user: Utilisateur = Depends(get_current_user),
 ):
     import statistics as _stat
     from collections import defaultdict
