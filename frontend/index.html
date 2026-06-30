@@ -5416,25 +5416,89 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
     <!-- Modal réception stock -->
     <div class="pos-modal-bg" id="pos-recept-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
-      <div class="pos-modal">
+      <div class="pos-modal" style="max-width:520px">
         <h3>Réception de marchandises</h3>
+
+        <!-- Produit + Fournisseur -->
         <div class="pos-form-row">
-          <div><label class="pos-label">Produit *</label>
-            <select class="pos-select" id="pos-recept-produit"></select>
+          <div style="flex:2">
+            <label class="pos-label">Produit *</label>
+            <select class="pos-select" id="pos-recept-produit" onchange="posReceptOnProdChange()"></select>
           </div>
-          <div><label class="pos-label">Quantité *</label>
-            <input class="pos-input" id="pos-recept-qte" type="number" min="0.001" step="0.001" placeholder="0.000">
-          </div>
-        </div>
-        <div class="pos-form-row">
-          <div><label class="pos-label">Prix achat unitaire (G) *</label>
-            <input class="pos-input" id="pos-recept-prix" type="number" min="0" step="0.01" placeholder="0.00">
-          </div>
-          <div><label class="pos-label">Fournisseur</label>
+          <div style="flex:1">
+            <label class="pos-label">Fournisseur</label>
             <input class="pos-input" id="pos-recept-fourn" placeholder="Optionnel">
           </div>
         </div>
-        <div><label class="pos-label">Notes</label><input class="pos-input" id="pos-recept-notes" placeholder="Optionnel"></div>
+
+        <!-- Toggle mode caisse -->
+        <div style="display:flex;align-items:center;gap:12px;margin:4px 0 14px;padding:10px 14px;background:rgba(255,255,255,.04);border-radius:10px;border:1px solid rgba(255,255,255,.07)">
+          <label class="pos-label" style="margin:0;flex:1;cursor:pointer" for="pos-recept-par-caisse">
+            <span style="font-size:13px">Réception par caisse ?</span>
+            <span style="display:block;font-size:11px;color:rgba(255,255,255,.4);font-weight:400">Activer pour saisir le nombre de caisses et la contenance</span>
+          </label>
+          <div style="position:relative;width:40px;height:22px;flex-shrink:0">
+            <input type="checkbox" id="pos-recept-par-caisse" onchange="posReceptToggleCaisse()"
+              style="opacity:0;width:0;height:0;position:absolute">
+            <span id="pos-recept-toggle-track"
+              onclick="document.getElementById('pos-recept-par-caisse').click()"
+              style="position:absolute;inset:0;border-radius:11px;background:rgba(255,255,255,.12);cursor:pointer;transition:background .2s">
+              <span id="pos-recept-toggle-thumb"
+                style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;opacity:.5;transition:transform .2s,opacity .2s"></span>
+            </span>
+          </div>
+        </div>
+
+        <!-- ── Section CAISSE ── -->
+        <div id="pos-recept-caisse-section" style="display:none">
+          <div class="pos-form-row" style="align-items:flex-end">
+            <div style="flex:1">
+              <label class="pos-label">Unités par caisse *</label>
+              <input class="pos-input" id="pos-recept-upc" type="number" min="1" step="1" placeholder="ex. 24" oninput="posReceptUpdateLive()">
+            </div>
+            <div style="flex:1">
+              <label class="pos-label">Nombre de caisses</label>
+              <input class="pos-input" id="pos-recept-nb-caisses" type="number" min="0" step="1" placeholder="0" value="0" oninput="posReceptUpdateLive()">
+            </div>
+            <div style="flex:1">
+              <label class="pos-label">Unités en vrac</label>
+              <input class="pos-input" id="pos-recept-nb-vrac" type="number" min="0" step="1" placeholder="0" value="0" oninput="posReceptUpdateLive()">
+            </div>
+          </div>
+          <!-- Compteur live -->
+          <div id="pos-recept-live" style="display:none;background:rgba(63,182,168,.1);border:1px solid rgba(63,182,168,.25);border-radius:8px;padding:10px 14px;margin:4px 0 10px;font-size:13px;color:#3fb6a8">
+            <span id="pos-recept-live-txt"></span>
+          </div>
+          <div class="pos-form-row">
+            <div style="flex:1">
+              <label class="pos-label">Prix d'achat par caisse (G) *</label>
+              <input class="pos-input" id="pos-recept-prix-caisse" type="number" min="0" step="0.01" placeholder="0.00">
+            </div>
+            <div style="flex:1">
+              <label class="pos-label">Notes</label>
+              <input class="pos-input" id="pos-recept-notes-caisse" placeholder="Lot, date…">
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Section UNITÉS ── -->
+        <div id="pos-recept-unite-section">
+          <div class="pos-form-row">
+            <div style="flex:1">
+              <label class="pos-label">Quantité *</label>
+              <input class="pos-input" id="pos-recept-qte" type="number" min="1" step="1" placeholder="0">
+            </div>
+            <div style="flex:1">
+              <label class="pos-label">Prix achat unitaire (G) *</label>
+              <input class="pos-input" id="pos-recept-prix" type="number" min="0" step="0.01" placeholder="0.00">
+            </div>
+          </div>
+          <div>
+            <label class="pos-label">Notes</label>
+            <input class="pos-input" id="pos-recept-notes" placeholder="Optionnel">
+          </div>
+        </div>
+
         <div class="pos-modal-footer">
           <button class="pos-btn ghost" onclick="document.getElementById('pos-recept-modal-bg').classList.remove('open')">Annuler</button>
           <button class="pos-btn teal" onclick="posReceptionnerStock()">Enregistrer</button>
@@ -13528,25 +13592,91 @@ function _posFillProduitSelects(prods){
 }
 
 function posStockReceptionModal(){
-  document.getElementById('pos-recept-qte').value='';
-  document.getElementById('pos-recept-prix').value='';
-  document.getElementById('pos-recept-fourn').value='';
-  document.getElementById('pos-recept-notes').value='';
+  document.getElementById('pos-recept-qte').value         = '';
+  document.getElementById('pos-recept-prix').value        = '';
+  document.getElementById('pos-recept-notes').value       = '';
+  document.getElementById('pos-recept-upc').value         = '';
+  document.getElementById('pos-recept-nb-caisses').value  = '0';
+  document.getElementById('pos-recept-nb-vrac').value     = '0';
+  document.getElementById('pos-recept-prix-caisse').value = '';
+  document.getElementById('pos-recept-notes-caisse').value= '';
+  document.getElementById('pos-recept-fourn').value       = '';
+  const cb = document.getElementById('pos-recept-par-caisse');
+  cb.checked = false;
+  posReceptOnProdChange();
   document.getElementById('pos-recept-modal-bg').classList.add('open');
 }
 
+function posReceptOnProdChange(){
+  const prodId = parseInt(document.getElementById('pos-recept-produit').value);
+  const prod   = _posProduitsAll.find(p=>p.id===prodId);
+  const cb     = document.getElementById('pos-recept-par-caisse');
+  if(prod && prod.vendu_par_caisse){
+    cb.checked = true;
+    if(prod.unites_par_caisse) document.getElementById('pos-recept-upc').value = prod.unites_par_caisse;
+  } else {
+    cb.checked = false;
+  }
+  posReceptToggleCaisse();
+}
+
+function posReceptToggleCaisse(){
+  const on    = document.getElementById('pos-recept-par-caisse').checked;
+  const track = document.getElementById('pos-recept-toggle-track');
+  const thumb = document.getElementById('pos-recept-toggle-thumb');
+  if(track){ track.style.background = on ? '#3fb6a8' : 'rgba(255,255,255,.12)'; }
+  if(thumb){ thumb.style.transform  = on ? 'translateX(18px)' : 'translateX(0)'; thumb.style.opacity = on ? '1' : '.5'; }
+  document.getElementById('pos-recept-caisse-section').style.display = on ? '' : 'none';
+  document.getElementById('pos-recept-unite-section').style.display  = on ? 'none' : '';
+  document.getElementById('pos-recept-live').style.display           = 'none';
+}
+
+function posReceptUpdateLive(){
+  const upc     = parseInt(document.getElementById('pos-recept-upc').value)||0;
+  const caisses = parseInt(document.getElementById('pos-recept-nb-caisses').value)||0;
+  const vrac    = parseInt(document.getElementById('pos-recept-nb-vrac').value)||0;
+  const liveDiv = document.getElementById('pos-recept-live');
+  const liveTxt = document.getElementById('pos-recept-live-txt');
+  if(!liveDiv) return;
+  if(upc < 1){ liveDiv.style.display='none'; return; }
+  const total = caisses * upc + vrac;
+  liveDiv.style.display = total > 0 ? '' : 'none';
+  if(liveTxt) liveTxt.textContent = `Total : ${total} unité${total>1?'s':''} — ${caisses} caisse${caisses!==1?'s':''} × ${upc} + ${vrac} u. vrac`;
+}
+
 async function posReceptionnerStock(){
-  const prodId = document.getElementById('pos-recept-produit').value;
-  const qte    = parseFloat(document.getElementById('pos-recept-qte').value||0);
-  const prix   = parseFloat(document.getElementById('pos-recept-prix').value||0);
-  const fourn  = document.getElementById('pos-recept-fourn').value.trim()||null;
-  const notes  = document.getElementById('pos-recept-notes').value.trim()||null;
-  if(!prodId||qte<=0||prix<=0){ posAlert('Produit, quantité et prix requis.'); return; }
+  const prodId    = parseInt(document.getElementById('pos-recept-produit').value);
+  const fourn     = document.getElementById('pos-recept-fourn').value.trim()||null;
+  const parCaisse = document.getElementById('pos-recept-par-caisse').checked;
+
+  let quantite, prix_achat_unitaire, notes;
+
+  if(parCaisse){
+    const upc        = parseInt(document.getElementById('pos-recept-upc').value)||0;
+    const caisses    = parseInt(document.getElementById('pos-recept-nb-caisses').value)||0;
+    const vrac       = parseInt(document.getElementById('pos-recept-nb-vrac').value)||0;
+    const prixCaisse = parseFloat(document.getElementById('pos-recept-prix-caisse').value)||0;
+    notes            = document.getElementById('pos-recept-notes-caisse').value.trim()||null;
+    if(upc < 1)              { posAlert("Saisir le nombre d'unités par caisse.",'warn'); return; }
+    if(caisses===0 && vrac===0){ posAlert('Saisir au moins 1 caisse ou 1 unité en vrac.','warn'); return; }
+    if(prixCaisse <= 0)      { posAlert('Le prix par caisse est obligatoire.','warn'); return; }
+    quantite            = caisses * upc + vrac;
+    prix_achat_unitaire = prixCaisse / upc;
+  } else {
+    quantite            = parseInt(document.getElementById('pos-recept-qte').value)||0;
+    prix_achat_unitaire = parseFloat(document.getElementById('pos-recept-prix').value)||0;
+    notes               = document.getElementById('pos-recept-notes').value.trim()||null;
+    if(quantite <= 0)           { posAlert('La quantité est obligatoire.','warn'); return; }
+    if(prix_achat_unitaire <= 0){ posAlert('Le prix unitaire est obligatoire.','warn'); return; }
+  }
+
+  if(!prodId){ posAlert('Sélectionner un produit.','warn'); return; }
   try {
-    await apiFetch('POST','/pos/achats',{ produit_id:parseInt(prodId), quantite:qte, prix_achat_unitaire:prix, fournisseur:fourn, notes });
+    await apiFetch('POST','/pos/achats',{ produit_id:prodId, quantite, prix_achat_unitaire, fournisseur:fourn, notes });
     document.getElementById('pos-recept-modal-bg').classList.remove('open');
     await loadPosStock();
-    posAlert('Réception enregistrée.','ok');
+    const prod = _posProduitsAll.find(p=>p.id===prodId);
+    posAlert(`Réception enregistrée — ${quantite} unité${quantite>1?'s':''} ajoutée${quantite>1?'s':''} pour ${prod?.nom||'le produit'}.`,'ok');
   } catch(e){ posAlert(e.message||'Erreur.'); }
 }
 
