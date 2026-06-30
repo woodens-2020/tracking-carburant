@@ -672,20 +672,60 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
 .recap-total td{border-top:1px solid var(--border2)!important;background:var(--panel2);font-weight:700}
 
 /* ── Toasts ──────────────────────────────────── */
-#toasts{position:fixed;bottom:22px;right:22px;z-index:300;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+/* ── Toasts ─────────────────────────────────────────── */
+#toasts{position:fixed;bottom:24px;right:24px;z-index:9000;display:flex;flex-direction:column-reverse;gap:10px;pointer-events:none;max-width:340px}
 .toast{
-  padding:10px 16px 10px 14px;border-radius:10px;font-size:12px;font-weight:600;
-  animation:t-in .28s cubic-bezier(.34,1.56,.64,1);max-width:290px;pointer-events:auto;
-  backdrop-filter:blur(8px);
-  border-left:3px solid transparent;
-  box-shadow:0 6px 24px rgba(0,0,0,.35),0 1px 4px rgba(0,0,0,.2);
+  display:flex;align-items:flex-start;gap:11px;
+  padding:13px 16px 13px 14px;border-radius:12px;font-size:13px;font-weight:500;line-height:1.45;
+  animation:t-in .32s cubic-bezier(.34,1.56,.64,1);pointer-events:auto;
+  backdrop-filter:blur(12px);border-left:3px solid transparent;
+  box-shadow:0 8px 32px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.25);
+  cursor:pointer;
 }
-.toast.t-out{animation:t-out .22s ease forwards}
-.toast-ok {background:rgba(16,22,30,.9);border:1px solid rgba(34,197,94,.25);border-left-color:var(--green);color:var(--green)}
-.toast-err{background:rgba(16,22,30,.9);border:1px solid rgba(239,68,68,.25);border-left-color:var(--red);color:var(--red)}
-.toast-inf{background:rgba(16,22,30,.9);border:1px solid var(--border2);border-left-color:var(--blue);color:var(--text2)}
-@keyframes t-in{from{transform:translateX(110%) scale(.92);opacity:0}to{transform:translateX(0) scale(1);opacity:1}}
-@keyframes t-out{from{transform:translateX(0) scale(1);opacity:1}to{transform:translateX(110%) scale(.92);opacity:0}}
+.toast:hover{filter:brightness(1.1)}
+.toast.t-out{animation:t-out .24s ease forwards}
+.toast-icon{width:18px;height:18px;flex-shrink:0;margin-top:1px}
+.toast-body{flex:1}
+.toast-title{font-weight:700;font-size:12px;opacity:.7;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+.toast-msg{color:inherit}
+.toast-ok  {background:rgba(10,18,28,.93);border:1px solid rgba(34,197,94,.2);border-left-color:#22c55e;color:#86efac}
+.toast-err {background:rgba(10,18,28,.93);border:1px solid rgba(239,68,68,.2);border-left-color:#ef4444;color:#fca5a5}
+.toast-warn{background:rgba(10,18,28,.93);border:1px solid rgba(247,169,59,.2);border-left-color:#f7a93b;color:#fcd34d}
+.toast-inf {background:rgba(10,18,28,.93);border:1px solid rgba(96,165,250,.2);border-left-color:#60a5fa;color:#93c5fd}
+@keyframes t-in{from{transform:translateX(110%) scale(.9);opacity:0}to{transform:translateX(0) scale(1);opacity:1}}
+@keyframes t-out{from{transform:translateX(0) scale(1);opacity:1}to{transform:translateX(110%) scale(.9);opacity:0}}
+
+/* ── Modal confirmation globale ─────────────────────── */
+#gi-confirm-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(6px);
+  z-index:9500;display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s ease;
+}
+#gi-confirm-overlay.show{opacity:1;pointer-events:auto}
+#gi-confirm-box{
+  background:#141e2e;border:1px solid rgba(255,255,255,.1);border-radius:18px;
+  padding:32px 32px 24px;max-width:420px;width:90%;
+  box-shadow:0 32px 80px rgba(0,0,0,.6),0 8px 32px rgba(0,0,0,.4);
+  transform:scale(.88) translateY(16px);opacity:0;
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .2s ease;
+}
+#gi-confirm-overlay.show #gi-confirm-box{transform:scale(1) translateY(0);opacity:1}
+#gi-confirm-icon-wrap{
+  width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
+}
+#gi-confirm-title{font-size:17px;font-weight:700;color:rgba(255,255,255,.92);text-align:center;margin-bottom:8px}
+#gi-confirm-msg{font-size:13px;color:rgba(255,255,255,.55);text-align:center;line-height:1.55;white-space:pre-line;margin-bottom:24px}
+.gi-confirm-btns{display:flex;gap:10px;justify-content:center}
+.gi-confirm-btns button{
+  flex:1;padding:10px 0;border-radius:10px;font-size:13px;font-weight:600;border:none;cursor:pointer;
+  transition:transform .12s,filter .15s;
+}
+.gi-confirm-btns button:hover{filter:brightness(1.1)}
+.gi-confirm-btns button:active{transform:scale(.96)}
+#gi-confirm-cancel{background:rgba(255,255,255,.07);color:rgba(255,255,255,.6)}
+#gi-confirm-ok{background:#ef4444;color:#fff}
+#gi-confirm-ok.ok{background:#22c55e}
+#gi-confirm-ok.warn{background:#f7a93b;color:#1a1a1a}
 
 /* ── Micro-animations globales ───────────────── */
 .btn,.nav-item,.per-sel-btn,.prod-tab,.btn-row-edit,.chip,.nav-card,.btn-send{
@@ -5870,6 +5910,21 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 <!-- ══════ TOASTS ══════ -->
 <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 
+<!-- ══════ MODAL CONFIRMATION GLOBALE ══════ -->
+<div id="gi-confirm-overlay">
+  <div id="gi-confirm-box">
+    <div id="gi-confirm-icon-wrap">
+      <svg id="gi-confirm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="26" height="26"></svg>
+    </div>
+    <div id="gi-confirm-title">Confirmation</div>
+    <div id="gi-confirm-msg"></div>
+    <div class="gi-confirm-btns">
+      <button id="gi-confirm-cancel">Annuler</button>
+      <button id="gi-confirm-ok">Confirmer</button>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 
@@ -7917,7 +7972,7 @@ async function addPompe(prodId){
   }catch(e){toast(e.message,'err');}
 }
 async function delPompe(id,nom){
-  if(!confirm(`Supprimer la pompe "${nom}" ? Les relevés associés seront perdus.`)) return;
+  if(!await showConfirm(`Supprimer la pompe « ${nom} » ? Les relevés associés seront perdus.`, {title:'Supprimer la pompe', type:'danger', okLabel:'Supprimer'})) return;
   try{
     await DEL('/pompes/'+id);
     products=await GET('/produits');
@@ -8065,15 +8120,101 @@ async function logout(){
   sessionStorage.removeItem('api_key');
   window.location.href='/login';
 }
-function toast(msg,type='inf'){
-  const el=document.createElement('div');
-  el.className='toast toast-'+type;
-  el.textContent=msg;
-  document.getElementById('toasts').appendChild(el);
-  setTimeout(()=>{
-    el.classList.add('t-out');
-    el.addEventListener('animationend',()=>el.remove(),{once:true});
-  },3400);
+/* ─── Système de notifications unifié ─── */
+const _NOTIF_ICONS = {
+  ok:   '<polyline points="20 6 9 17 4 12"/>',
+  err:  '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+  warn: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  inf:  '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
+};
+const _NOTIF_LABELS = { ok:'Succès', err:'Erreur', warn:'Attention', inf:'Information' };
+
+function notify(msg, type='inf', duration=4000){
+  const container = document.getElementById('toasts');
+  if(!container) return;
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.innerHTML = `
+    <svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      ${_NOTIF_ICONS[type]||_NOTIF_ICONS.inf}
+    </svg>
+    <div class="toast-body">
+      <div class="toast-title">${_NOTIF_LABELS[type]||''}</div>
+      <div class="toast-msg">${msg}</div>
+    </div>`;
+  el.onclick = () => dismiss(el);
+  container.appendChild(el);
+  const timer = setTimeout(() => dismiss(el), duration);
+  function dismiss(t){
+    clearTimeout(timer);
+    if(!t.parentNode) return;
+    t.classList.add('t-out');
+    t.addEventListener('animationend', () => t.remove(), {once:true});
+  }
+}
+
+/* Alias pratiques */
+function toast(msg, type='inf'){ notify(msg, type); }  // compat ancien code
+
+/* ─── Modal de confirmation async ─── */
+let _confirmResolve = null;
+(function(){
+  document.addEventListener('DOMContentLoaded', () => {
+    const ok     = document.getElementById('gi-confirm-ok');
+    const cancel = document.getElementById('gi-confirm-cancel');
+    const overlay= document.getElementById('gi-confirm-overlay');
+    if(!ok) return;
+    ok.addEventListener('click',     () => _closeConfirm(true));
+    cancel.addEventListener('click', () => _closeConfirm(false));
+    overlay.addEventListener('click', e => { if(e.target===overlay) _closeConfirm(false); });
+    document.addEventListener('keydown', e => { if(e.key==='Escape' && overlay.classList.contains('show')) _closeConfirm(false); });
+  });
+})();
+
+function _closeConfirm(result){
+  const overlay = document.getElementById('gi-confirm-overlay');
+  if(overlay) overlay.classList.remove('show');
+  if(_confirmResolve){ _confirmResolve(result); _confirmResolve=null; }
+}
+
+function showConfirm(msg, opts={}){
+  // opts: { title, type:'danger'|'warn'|'ok', okLabel, cancelLabel }
+  const type   = opts.type || 'danger';
+  const title  = opts.title || 'Confirmation';
+  const okLbl  = opts.okLabel || 'Confirmer';
+  const clrLbl = opts.cancelLabel || 'Annuler';
+
+  const iconPaths = {
+    danger: { path:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>', bg:'rgba(239,68,68,.15)', color:'#ef4444' },
+    warn:   { path:'<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>', bg:'rgba(247,169,59,.15)', color:'#f7a93b' },
+    ok:     { path:'<polyline points="20 6 9 17 4 12"/>', bg:'rgba(34,197,94,.15)', color:'#22c55e' },
+  };
+  const ic = iconPaths[type] || iconPaths.danger;
+
+  const wrap   = document.getElementById('gi-confirm-icon-wrap');
+  const icon   = document.getElementById('gi-confirm-icon');
+  const titleEl= document.getElementById('gi-confirm-title');
+  const msgEl  = document.getElementById('gi-confirm-msg');
+  const okBtn  = document.getElementById('gi-confirm-ok');
+  const clrBtn = document.getElementById('gi-confirm-cancel');
+  const overlay= document.getElementById('gi-confirm-overlay');
+
+  if(!overlay) return Promise.resolve(window.confirm(msg));
+
+  if(wrap)  { wrap.style.background = ic.bg; wrap.style.color = ic.color; }
+  if(icon)  { icon.innerHTML = ic.path; icon.style.stroke = ic.color; }
+  if(titleEl) titleEl.textContent = title;
+  if(msgEl)   msgEl.textContent   = msg;
+  if(okBtn) {
+    okBtn.textContent = okLbl;
+    okBtn.className   = '';
+    okBtn.style.background = type==='ok' ? '#22c55e' : type==='warn' ? '#f7a93b' : '#ef4444';
+    okBtn.style.color      = type==='warn' ? '#1a1a1a' : '#fff';
+  }
+  if(clrBtn) clrBtn.textContent = clrLbl;
+
+  overlay.classList.add('show');
+  return new Promise(resolve => { _confirmResolve = resolve; });
 }
 
 // ══════════════════════════════════════════════
@@ -8575,7 +8716,7 @@ async function genRapport(){
   const pid   = document.getElementById('ra-prod')?.value || '';
 
   if(debut > fin){
-    alert('La date de début doit être antérieure à la date de fin.'); return;
+    notify('La date de début doit être antérieure à la date de fin.','warn'); return;
   }
 
   const content = document.getElementById('ra-content');
@@ -8969,7 +9110,7 @@ function _buildRapportPeriodeHTML(debut,fin,days,cur,prev,rent,rentPrev,evolutio
 ══════════════════════════════════════════════════════════ */
 async function downloadRotCardPNG(pid){
   const card=document.getElementById('sk-rot-card-'+pid);
-  if(!card){ alert('Carte introuvable.'); return; }
+  if(!card){ notify('Carte introuvable.','err'); return; }
   const btn=card.querySelector('.sk-rot-dl-btn');
 
   /* Feedback visuel */
@@ -9003,7 +9144,7 @@ async function downloadRotCardPNG(pid){
     link.click();
   }catch(e){
     console.error('Erreur PNG:',e);
-    alert('Impossible de générer le PNG. Vérifiez votre connexion.');
+    notify('Impossible de générer le PNG. Vérifiez votre connexion.','err');
   }finally{
     /* Restaurer le bouton */
     if(btn){
@@ -9154,7 +9295,7 @@ function printRapport(){
 
 function exportRapportCSV(){
   const data=window._raPeriodeData;
-  if(!data){ alert('Générez d\'abord un rapport de période.'); return; }
+  if(!data){ notify("Générez d'abord un rapport de période.",'warn'); return; }
   const {debut,fin,cur,rent}=data;
   const g=n=>typeof n==='number'?n.toFixed(2):'';
   let csv=`Rapport analytique Konekta\nPériode,${debut},→,${fin}\n\n`;
@@ -9639,12 +9780,12 @@ async function loadLivraisons(){
 }
 
 async function deleteLivraison(id, btn){
-  if(!confirm('Supprimer cette livraison ?')) return;
+  if(!await showConfirm('Supprimer cette livraison ?', {title:'Supprimer la livraison', type:'danger', okLabel:'Supprimer'})) return;
   btn.disabled=true;
   try{
     await DEL(`/livraisons/${id}`);
     loadLivraisons();
-  }catch(e){ alert('Erreur : '+(e.message||e)); btn.disabled=false; }
+  }catch(e){ notify('Erreur : '+(e.message||e),'err'); btn.disabled=false; }
 }
 
 // ── Rentabilité ────────────────────────────────
@@ -9655,7 +9796,7 @@ async function loadRentabilite(){
   const kpis  = document.getElementById('sk-rent-kpis');
   const detail= document.getElementById('sk-rent-detail');
 
-  if(!debut||!fin){ alert('Saisir les deux dates.'); return; }
+  if(!debut||!fin){ notify('Saisir les deux dates.','warn'); return; }
 
   kpis.innerHTML  = `<div style="color:var(--muted);font-size:12px;padding:14px 0">Calcul…</div>`;
   detail.innerHTML= '';
@@ -10924,7 +11065,7 @@ async function submitCreateEmp(){
 }
 
 async function revoquerEmployee(id, name){
-  if(!confirm(`Révoquer le compte de ${name} ? La clé API sera invalidée immédiatement.`)) return;
+  if(!await showConfirm(`Révoquer le compte de ${name} ? La clé API sera invalidée immédiatement.`, {title:'Révoquer le compte', type:'danger', okLabel:'Révoquer'})) return;
   try{
     await POST(`/auth/utilisateurs/${id}/revoquer`);
     await loadEmployees();
@@ -10933,7 +11074,7 @@ async function revoquerEmployee(id, name){
 }
 
 async function reactiverEmployee(id, name){
-  if(!confirm(`Réactiver le compte de ${name} ?`)) return;
+  if(!await showConfirm(`Réactiver le compte de ${name} ?`, {title:'Réactiver le compte', type:'ok', okLabel:'Réactiver'})) return;
   try{
     await POST(`/auth/utilisateurs/${id}/reactiver`);
     await loadEmployees();
@@ -10942,7 +11083,7 @@ async function reactiverEmployee(id, name){
 }
 
 async function regenererCle(id, name){
-  if(!confirm(`Régénérer la clé API de ${name} ? L'ancienne clé sera immédiatement invalide.`)) return;
+  if(!await showConfirm(`Régénérer la clé API de ${name} ? L'ancienne clé sera immédiatement invalide.`, {title:'Régénérer la clé API', type:'warn', okLabel:'Régénérer'})) return;
   try{
     const res = await POST(`/auth/utilisateurs/${id}/regenerer`);
     await loadEmployees();
@@ -10951,8 +11092,7 @@ async function regenererCle(id, name){
 }
 
 async function deleteEmployee(id, name){
-  if(!confirm(`Supprimer définitivement le compte de ${name} ? Cette action est irréversible.`)) return;
-  if(!confirm(`Confirmez la suppression de ${name}.`)) return;
+  if(!await showConfirm(`Supprimer définitivement le compte de ${name} ?\n\nCette action est irréversible.`, {title:'Suppression définitive', type:'danger', okLabel:'Supprimer définitivement'})) return;
   try{
     await DEL(`/auth/utilisateurs/${id}`);
     await loadEmployees();
@@ -11057,7 +11197,7 @@ async function rotateApiKey(){
 }
 
 async function revokeApiKey(){
-  if(!confirm('Révoquer la clé API ? Les scripts qui l\'utilisent perdront l\'accès immédiatement.')) return;
+  if(!await showConfirm("Révoquer la clé API ? Les scripts qui l'utilisent perdront l'accès immédiatement.", {title:'Révoquer la clé API', type:'danger', okLabel:'Révoquer'})) return;
   try{
     await apiFetch('DELETE','/auth/api-key');
     sessionStorage.removeItem('api_key');
@@ -11284,10 +11424,7 @@ const _htg = v => new Intl.NumberFormat('fr-HT',{minimumFractionDigits:0,maximum
 const _today = () => new Date().toISOString().slice(0,10);
 
 function _giAlert(msg, type='error'){
-  // Réutilise le système de toast existant si disponible
-  const t = document.getElementById('toast');
-  if(t){ t.textContent=msg; t.className='toast '+(type==='ok'?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',3500); }
-  else alert(msg);
+  notify(msg, type==='ok' ? 'ok' : type==='warn' ? 'warn' : 'err');
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -11425,7 +11562,7 @@ async function submitEmp(){
 }
 
 async function desactiverEmp(id, nom){
-  if(!confirm(`Désactiver ${nom} ?`)) return;
+  if(!await showConfirm(`Désactiver ${nom} ?`, {title:'Désactiver l\'employé', type:'warn', okLabel:'Désactiver'})) return;
   try {
     await apiFetch('DELETE', `/employes/${id}`);
     loadEmployes();
@@ -11577,7 +11714,7 @@ async function marquerPayee(id){
 }
 
 async function supprimerFiche(id){
-  if(!confirm('Supprimer cette fiche de paie ?')) return;
+  if(!await showConfirm('Supprimer cette fiche de paie ?', {title:'Supprimer la fiche', type:'danger', okLabel:'Supprimer'})) return;
   try {
     await apiFetch('DELETE',`/payroll/${id}`);
     loadPayroll(); _giAlert('Fiche supprimée.','ok');
@@ -11814,7 +11951,7 @@ async function submitDep(){
 }
 
 async function supprimerDep(id){
-  if(!confirm('Supprimer cette dépense ?')) return;
+  if(!await showConfirm('Supprimer cette dépense ?', {title:'Supprimer la dépense', type:'danger', okLabel:'Supprimer'})) return;
   try {
     await apiFetch('DELETE',`/depenses/${id}`);
     loadDepenses(); _giAlert('Dépense supprimée.','ok');
@@ -11928,7 +12065,7 @@ async function submitAchat(){
 }
 
 async function supprimerAchat(id){
-  if(!confirm('Supprimer cet achat ?')) return;
+  if(!await showConfirm('Supprimer cet achat ?', {title:'Supprimer l\'achat', type:'danger', okLabel:'Supprimer'})) return;
   try {
     await apiFetch('DELETE',`/achats/${id}`);
     loadAchats(); _giAlert('Achat supprimé.','ok');
@@ -13534,7 +13671,7 @@ function posAnnulerVenteConfirm(id){
 async function posAnnulerVente(){
   const id = document.getElementById('pos-vd-id').value;
   if(!id) return;
-  if(!confirm('Annuler cette vente ? Le stock sera restitué.')) return;
+  if(!await showConfirm('Annuler cette vente ? Le stock sera restitué.', {title:'Annuler la vente', type:'warn', okLabel:'Annuler la vente', cancelLabel:'Garder'})) return;
   try {
     await apiFetch('PUT',`/pos/ventes/${id}/annuler`);
     document.getElementById('pos-vente-detail-bg').classList.remove('open');
