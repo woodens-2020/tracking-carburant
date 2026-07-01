@@ -761,10 +761,14 @@ def ajuster_stock(data: AjustementIn, request: Request, db: Session = Depends(ge
     if not data.motif or len(data.motif.strip()) < 5:
         raise HTTPException(422, "Le motif doit contenir au moins 5 caractères.")
 
+    qte = Decimal(str(abs(data.quantite)))
+    if data.type_mouvement in ("PERTE", "CASSE"):
+        qte = -qte
+
     mouv = BarMouvementStock(
         produit_id     = data.produit_id,
         type_mouvement = data.type_mouvement,
-        quantite       = Decimal(str(data.quantite)),
+        quantite       = qte,
         motif          = data.motif.strip(),
         utilisateur_id = _uid(request),
     )
