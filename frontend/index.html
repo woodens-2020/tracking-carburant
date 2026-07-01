@@ -2501,6 +2501,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   background:rgba(255,255,255,.1);color:#fff;font-size:13px;line-height:1;padding:0}
 .pos-cart-item-qte button:hover{background:rgba(247,169,59,.3)}
 .pos-cart-item-qte span{font-size:12px;color:#fff;min-width:18px;text-align:center}
+.pos-cart-item-qte input[type=number]{font-size:12px;color:#fff;width:40px;text-align:center;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:5px;padding:2px 3px;outline:none;-moz-appearance:textfield}
+.pos-cart-item-qte input[type=number]::-webkit-inner-spin-button,.pos-cart-item-qte input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.pos-cart-item-qte input[type=number]:focus{border-color:rgba(247,169,59,.6);background:rgba(247,169,59,.1)}
 .pos-cart-qte-btn{width:22px;height:22px;border-radius:6px;border:none;cursor:pointer;
   background:rgba(255,255,255,.1);color:#fff;font-size:14px;display:flex;
   align-items:center;justify-content:center;padding:0}
@@ -5178,8 +5181,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <button class="pos-mode-btn" data-mode="CREDIT" onclick="posSetMode('CREDIT',this)">CRÉDIT</button>
                 <button class="pos-mode-btn" data-mode="MIXTE" onclick="posSetMode('MIXTE',this)">MIXTE</button>
               </div>
+              <div id="pos-cash-row" style="display:none;margin-bottom:8px">
+                <label class="pos-label">Montant reçu du client</label>
+                <input class="pos-input" id="pos-montant-recu" type="number" min="0" step="0.01" placeholder="G 0.00" oninput="posCalcMonnaie()">
+                <div id="pos-monnaie-display" style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;font-size:13px;font-weight:700;text-align:center"></div>
+              </div>
               <div id="pos-mixte-row" style="display:none;margin-bottom:8px">
-                <label class="pos-label">Montant payé</label>
+                <label class="pos-label">Montant payé en cash</label>
                 <input class="pos-input" id="pos-montant-paye" type="number" min="0" placeholder="G 0.00">
               </div>
               <button class="pos-encaisser-btn" id="pos-enc-btn" onclick="posEncaisser()" disabled>
@@ -13098,7 +13106,7 @@ function posRenderCart(){
         <span class="pos-cart-item-prix">${posGx(it.prix)} × </span>
         <div class="pos-cart-item-qte">
           <button onclick="posQte(${i},-1)">−</button>
-          <span>${it.quantite}</span>
+          <input type="number" min="1" step="1" value="${it.quantite}" onchange="posSetQte(${i},this.value)" onclick="this.select()">
           <button onclick="posQte(${i},+1)">+</button>
         </div>
       </div>
@@ -13110,11 +13118,18 @@ function posRenderCart(){
   }).join('');
   if(totalEl) totalEl.textContent = posGx(total);
   if(encBtn) encBtn.disabled = false;
+  posCalcMonnaie();
 }
 
 function posQte(idx, delta){
   _posCart[idx].quantite += delta;
   if(_posCart[idx].quantite <= 0) _posCart.splice(idx,1);
+  posRenderCart();
+}
+
+function posSetQte(idx, val){
+  const q = Math.max(1, Math.round(parseFloat(val)||1));
+  _posCart[idx].quantite = q;
   posRenderCart();
 }
 
@@ -13133,8 +13148,33 @@ function posViderPanier(){
 function posSetMode(mode, btn){
   _posMode = mode;
   document.querySelectorAll('.pos-mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
-  const mixte = document.getElementById('pos-mixte-row');
-  if(mixte) mixte.style.display = mode==='MIXTE' ? '' : 'none';
+  const cashRow = document.getElementById('pos-cash-row');
+  const mixteRow = document.getElementById('pos-mixte-row');
+  if(cashRow) cashRow.style.display = mode==='CASH' ? '' : 'none';
+  if(mixteRow) mixteRow.style.display = mode==='MIXTE' ? '' : 'none';
+  posCalcMonnaie();
+}
+
+function posCalcMonnaie(){
+  const display = document.getElementById('pos-monnaie-display');
+  if(!display) return;
+  if(_posMode !== 'CASH'){ display.style.display='none'; return; }
+  const recu = parseFloat(document.getElementById('pos-montant-recu')?.value||0);
+  if(!recu){ display.style.display='none'; return; }
+  const total = _posCart.reduce((s,it)=>s+it.prix*it.quantite, 0);
+  const monnaie = recu - total;
+  display.style.display = '';
+  if(monnaie >= 0){
+    display.style.background = 'rgba(63,182,168,.12)';
+    display.style.border = '1px solid rgba(63,182,168,.35)';
+    display.style.color = '#3fb6a8';
+    display.textContent = `Monnaie à rendre : G ${monnaie.toFixed(2)}`;
+  } else {
+    display.style.background = 'rgba(248,113,113,.1)';
+    display.style.border = '1px solid rgba(248,113,113,.3)';
+    display.style.color = '#f87171';
+    display.textContent = `Insuffisant : G ${Math.abs(monnaie).toFixed(2)} manquant`;
+  }
 }
 
 async function posEncaisser(){
@@ -13144,6 +13184,14 @@ async function posEncaisser(){
   try {
     const caissierSel = document.getElementById('pos-caissier-sel');
     const clientNom = (document.getElementById('pos-client-nom').value||'').trim();
+    if(_posMode==='CASH'){
+      const recu = parseFloat(document.getElementById('pos-montant-recu')?.value||0);
+      const total = _posCart.reduce((s,it)=>s+it.prix*it.quantite, 0);
+      if(recu > 0 && recu < total){
+        btn.disabled = false; btn.textContent = 'Encaisser';
+        posAlert(`Montant insuffisant. Il manque G ${(total-recu).toFixed(2)}.`, 'warn'); return;
+      }
+    }
     const montantPaye = _posMode==='MIXTE' ? parseFloat(document.getElementById('pos-montant-paye').value||0) : null;
     const payload = {
       lignes: _posCart.map(c=>({ produit_id: c.produit_id, quantite: c.quantite })),
@@ -13160,6 +13208,10 @@ async function posEncaisser(){
     }
     _posCart = [];
     document.getElementById('pos-client-nom').value = '';
+    const recuEl = document.getElementById('pos-montant-recu');
+    if(recuEl) recuEl.value = '';
+    const mdisplay = document.getElementById('pos-monnaie-display');
+    if(mdisplay) mdisplay.style.display='none';
     posRenderCart();
     posAlert(`Vente ${result.numero_ticket} enregistrée.`, 'ok');
   } catch(e){
