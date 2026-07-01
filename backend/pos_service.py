@@ -261,6 +261,7 @@ def encaisser_commande(commande_id: int, data: dict,
         "montant_paye":   data.get("montant_paye"),
         "client_nom":     data.get("client_nom") or commande.client,
         "client_contact": data.get("client_contact"),
+        "client_nif":     data.get("client_nif"),
         "date_echeance":  data.get("date_echeance"),
     }
     vente = encaisser_vente(vente_data, db, utilisateur_id)
