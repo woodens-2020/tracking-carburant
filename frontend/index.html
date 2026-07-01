@@ -1398,7 +1398,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   .rpt-table td,.rpt-table th{color:#000!important;border-color:#ccc!important}
   .rpt-kpi{background:#f5f5f5!important;border-color:#ddd!important}
   .rpt-kpi-val,.rpt-kpi-lbl,.rpt-kpi-sub{color:#000!important}
-  #pos-print-zone .pos-receipt-paper{width:76mm!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;border-radius:0!important;font-size:9.5pt!important;line-height:1.45!important;padding:3mm 2mm!important;margin:0 auto!important}
+  #pos-print-zone .pos-receipt-paper{width:80mm!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;border-radius:0!important;font-size:9.5pt!important;line-height:1.45!important;padding:3mm 2mm!important;margin:0 auto!important}
 }
 
 /* ── POS Receipt overlay ─────────────────────────── */
@@ -13196,7 +13196,10 @@ function posShowReceipt(result, cart, montantRecu, clientNom, mode, caissierNom)
   const lines=[];
   lines.push(dhr);
   lines.push(ctr('STATION SERVICE',W));
+  lines.push(ctr('NATIVITE',W));
   lines.push(ctr('Bar & Boutique',W));
+  lines.push(ctr('Acul du Nord, Nord, Haiti',W));
+  lines.push(ctr('Tel: (509) 3625-1100 / 4821-7700',W));
   lines.push(dhr);
   lines.push('');
   lines.push(`Ticket : ${result.numero_ticket}`);
