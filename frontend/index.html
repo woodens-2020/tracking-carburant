@@ -6346,23 +6346,30 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div id="hotel-chambres-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px"></div>
       </div>
       <!-- Modal chambre -->
-      <div id="hotel-chambre-modal-bg" class="modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
-        <div class="modal-box" style="width:480px">
-          <div class="modal-hdr"><span id="hcm-title">Nouvelle chambre</span><button class="modal-close" onclick="document.getElementById('hotel-chambre-modal-bg').classList.remove('open')">✕</button></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px">
+      <div id="hotel-chambre-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="pos-modal" style="max-width:500px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 18px">
+            <h3 style="margin:0" id="hcm-title">Nouvelle chambre</h3>
+            <button onclick="document.getElementById('hotel-chambre-modal-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;padding:0;line-height:1">✕</button>
+          </div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.3);margin-bottom:8px">Identification</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
             <div><label class="pos-label">Numéro *</label><input class="pos-input" id="hcm-numero" placeholder="101"></div>
             <div><label class="pos-label">Type</label>
               <select class="pos-input" id="hcm-type">
                 <option value="SIMPLE">Simple</option><option value="DOUBLE">Double</option><option value="SUITE">Suite</option><option value="VIP">VIP</option>
               </select>
             </div>
-            <div><label class="pos-label">Étage</label><input class="pos-input" id="hcm-etage" type="number" min="0" placeholder="1"></div>
-            <div><label class="pos-label">Capacité (personnes)</label><input class="pos-input" id="hcm-capacite" type="number" min="1" value="1"></div>
+            <div><label class="pos-label">Étage</label><input class="pos-input" id="hcm-etage" type="number" min="0" placeholder="0"></div>
+            <div><label class="pos-label">Capacité (pers.)</label><input class="pos-input" id="hcm-capacite" type="number" min="1" value="1"></div>
+          </div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.3);margin-bottom:8px">Tarifs</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
             <div><label class="pos-label">Prix / nuit (G) *</label><input class="pos-input" id="hcm-prix-nuit" type="number" min="0" step="any" placeholder="2500"></div>
             <div><label class="pos-label">Prix / moment (G)</label><input class="pos-input" id="hcm-prix-moment" type="number" min="0" step="any" placeholder="1000"></div>
-            <div style="grid-column:1/-1"><label class="pos-label">Description</label><input class="pos-input" id="hcm-description" placeholder="Chambre avec vue, AC, TV…"></div>
           </div>
-          <div style="padding:0 16px 16px;display:flex;justify-content:flex-end;gap:10px">
+          <div><label class="pos-label">Description</label><textarea class="pos-input" id="hcm-description" rows="2" placeholder="Chambre avec vue, AC, TV…" style="resize:none;height:54px"></textarea></div>
+          <div class="pos-modal-footer">
             <button class="pos-btn ghost" onclick="document.getElementById('hotel-chambre-modal-bg').classList.remove('open')">Annuler</button>
             <button class="pos-btn teal" onclick="hotelChambreSauver()">Enregistrer</button>
           </div>
@@ -6469,19 +6476,22 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
       </div>
       <!-- Modal paiement supplémentaire -->
-      <div id="hotel-paie-modal-bg" class="modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
-        <div class="modal-box" style="width:360px">
-          <div class="modal-hdr"><span>Paiement supplémentaire</span><button class="modal-close" onclick="document.getElementById('hotel-paie-modal-bg').classList.remove('open')">✕</button></div>
-          <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
-            <input type="hidden" id="hotel-paie-res-id">
+      <div id="hotel-paie-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="pos-modal" style="max-width:380px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 18px">
+            <h3 style="margin:0">Paiement supplémentaire</h3>
+            <button onclick="document.getElementById('hotel-paie-modal-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;padding:0;line-height:1">✕</button>
+          </div>
+          <input type="hidden" id="hotel-paie-res-id">
+          <div style="display:flex;flex-direction:column;gap:12px">
             <div><label class="pos-label">Montant (G) *</label><input class="pos-input" id="hotel-paie-montant" type="number" min="0" step="any"></div>
-            <div><label class="pos-label">Mode</label>
+            <div><label class="pos-label">Mode de paiement</label>
               <select class="pos-input" id="hotel-paie-mode">
                 <option value="CASH">Cash</option><option value="CARTE">Carte</option><option value="VIREMENT">Virement</option>
               </select>
             </div>
           </div>
-          <div style="padding:0 16px 16px;display:flex;justify-content:flex-end;gap:10px">
+          <div class="pos-modal-footer">
             <button class="pos-btn ghost" onclick="document.getElementById('hotel-paie-modal-bg').classList.remove('open')">Annuler</button>
             <button class="pos-btn teal" onclick="hotelPaiementSauver()">Enregistrer</button>
           </div>
@@ -6541,11 +6551,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
       </div>
       <!-- Modal employé -->
-      <div id="hotel-emp-modal-bg" class="modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
-        <div class="modal-box" style="width:480px">
-          <div class="modal-hdr"><span id="hemp-title">Nouvel employé</span><button class="modal-close" onclick="document.getElementById('hotel-emp-modal-bg').classList.remove('open')">✕</button></div>
+      <div id="hotel-emp-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="pos-modal" style="max-width:500px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 18px">
+            <h3 style="margin:0" id="hemp-title">Nouvel employé</h3>
+            <button onclick="document.getElementById('hotel-emp-modal-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;padding:0;line-height:1">✕</button>
+          </div>
           <input type="hidden" id="hemp-id">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div><label class="pos-label">Prénom *</label><input class="pos-input" id="hemp-prenom" placeholder="Prénom"></div>
             <div><label class="pos-label">Nom *</label><input class="pos-input" id="hemp-nom" placeholder="Nom"></div>
             <div><label class="pos-label">Poste</label>
@@ -6562,7 +6575,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div><label class="pos-label">Salaire base (G)</label><input class="pos-input" id="hemp-salaire" type="number" min="0" step="any"></div>
             <div style="grid-column:1/-1"><label class="pos-label">Notes</label><input class="pos-input" id="hemp-notes" placeholder="Notes…"></div>
           </div>
-          <div style="padding:0 16px 16px;display:flex;justify-content:flex-end;gap:10px">
+          <div class="pos-modal-footer">
             <button class="pos-btn ghost" onclick="document.getElementById('hotel-emp-modal-bg').classList.remove('open')">Annuler</button>
             <button class="pos-btn teal" onclick="hotelEmpSauver()">Enregistrer</button>
           </div>
