@@ -5173,9 +5173,18 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
 
-        <!-- Tabs catégories -->
-        <div class="pos-cat-tabs" id="pos-cat-tabs">
-          <button class="pos-cat-tab active" data-cat="TOUS" onclick="posCatFilter('TOUS',this)">Tous</button>
+        <!-- Filtre catégorie dropdown -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1.5" fill="rgba(255,255,255,.35)"/></svg>
+          <select id="pos-cat-select" onchange="posCatFilter(this.value,null)"
+            style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:10px;
+                   color:#fff;font-size:12.5px;font-weight:600;padding:7px 36px 7px 14px;outline:none;
+                   cursor:pointer;min-width:180px;appearance:none;-webkit-appearance:none;
+                   background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22rgba(255,255,255,.5)%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>');
+                   background-repeat:no-repeat;background-position:right 10px center;background-size:14px">
+            <option value="TOUS">Toutes les catégories</option>
+          </select>
+          <span id="pos-cat-count" style="font-size:11px;color:rgba(255,255,255,.35)"></span>
         </div>
 
         <div class="pos-caisse-layout">
@@ -13114,18 +13123,25 @@ async function _posChargerCaissiers(){
 }
 
 function posRenderCatTabs(){
-  const cats = ['TOUS', ...new Set(_posProduits.map(p=>p.categorie).filter(Boolean))];
-  const wrap = document.getElementById('pos-cat-tabs');
-  if(!wrap) return;
-  wrap.innerHTML = cats.map(c=>
-    `<button class="pos-cat-tab${c===_posCatActuelle?' active':''}" data-cat="${c}" onclick="posCatFilter('${c}',this)">${c}</button>`
-  ).join('');
+  const cats = [...new Set(_posProduits.map(p=>p.categorie).filter(Boolean))].sort();
+  const sel = document.getElementById('pos-cat-select');
+  if(!sel) return;
+  sel.innerHTML = `<option value="TOUS">Toutes les catégories (${_posProduits.length})</option>` +
+    cats.map(c=>{
+      const n = _posProduits.filter(p=>p.categorie===c).length;
+      return `<option value="${c}"${c===_posCatActuelle?' selected':''}>${c} (${n})</option>`;
+    }).join('');
+  if(_posCatActuelle!=='TOUS') sel.value = _posCatActuelle;
 }
 
 function posCatFilter(cat, btn){
   _posCatActuelle = cat;
-  document.querySelectorAll('.pos-cat-tab').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
+  const sel = document.getElementById('pos-cat-select');
+  if(sel && sel.value !== cat) sel.value = cat;
   const prods = cat==='TOUS' ? _posProduits : _posProduits.filter(p=>p.categorie===cat);
+  const cpt = document.getElementById('pos-cat-count');
+  if(cpt) cpt.textContent = cat==='TOUS' ? '' : `${prods.length} article${prods.length!==1?'s':''}`;
+
   const grid = document.getElementById('pos-produit-grid');
   if(!grid) return;
   if(!prods.length){
