@@ -134,6 +134,11 @@ class LigneCommandeIn(BaseModel):
     notes:      Optional[str] = None
 
 
+class AjoutLigneIn(BaseModel):
+    produit_id: int
+    quantite:   float = Field(gt=0, default=1.0)
+
+
 class CommandeIn(BaseModel):
     numero_table: Optional[str] = None
     client:       Optional[str] = None
@@ -974,11 +979,13 @@ def get_commande(commande_id: int, db: Session = Depends(get_db)):
         "date_ouverture": cmd.date_ouverture.isoformat(),
         "lignes": [
             {
-                "produit_id":   l.produit_id,
-                "produit_nom":  l.produit.nom if l.produit else f"Produit#{l.produit_id}",
-                "quantite":     float(l.quantite),
-                "notes":        l.notes,
-                "sous_total":   float(l.quantite) * float(prix_actif(l.produit_id, db) or 0),
+                "id":            l.id,
+                "produit_id":    l.produit_id,
+                "produit_nom":   l.produit.nom if l.produit else f"Produit#{l.produit_id}",
+                "quantite":      float(l.quantite),
+                "notes":         l.notes,
+                "prix_unitaire": float(prix_actif(l.produit_id, db) or 0),
+                "sous_total":    float(l.quantite) * float(prix_actif(l.produit_id, db) or 0),
             }
             for l in cmd.lignes
         ],
@@ -1072,6 +1079,54 @@ def modifier_commande(commande_id: int, data: CommandeIn, db: Session = Depends(
     return {"ok": True}
 
 
+@router.post("/commandes/{commande_id}/lignes", status_code=201)
+def ajouter_ligne_commande(commande_id: int, data: AjoutLigneIn, db: Session = Depends(get_db)):
+    cmd = db.query(BarCommande).filter_by(id=commande_id).first()
+    if not cmd:
+        raise HTTPException(404, "Commande introuvable")
+    if cmd.statut in ("ENCAISSEE", "ANNULEE"):
+        raise HTTPException(422, f"Commande déjà {cmd.statut.lower()}")
+    p = db.query(BarProduit).filter_by(id=data.produit_id, actif=True).first()
+    if not p:
+        raise HTTPException(404, f"Produit #{data.produit_id} introuvable")
+    existing = next((l for l in cmd.lignes if l.produit_id == data.produit_id), None)
+    if existing:
+        existing.quantite = float(existing.quantite) + data.quantite
+    else:
+        db.add(BarLigneCommande(commande_id=cmd.id, produit_id=data.produit_id, quantite=data.quantite))
+    cmd.date_modification = datetime.now(tz=timezone.utc)
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/commandes/{commande_id}/lignes/{ligne_id}")
+def retirer_ligne_commande(commande_id: int, ligne_id: int, db: Session = Depends(get_db)):
+    cmd = db.query(BarCommande).filter_by(id=commande_id).first()
+    if not cmd:
+        raise HTTPException(404, "Commande introuvable")
+    if cmd.statut in ("ENCAISSEE", "ANNULEE"):
+        raise HTTPException(422, f"Commande déjà {cmd.statut.lower()}")
+    ligne = db.query(BarLigneCommande).filter_by(id=ligne_id, commande_id=commande_id).first()
+    if not ligne:
+        raise HTTPException(404, "Article introuvable")
+    db.delete(ligne)
+    cmd.date_modification = datetime.now(tz=timezone.utc)
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/commandes/{commande_id}")
+def liberer_commande(commande_id: int, db: Session = Depends(get_db)):
+    cmd = db.query(BarCommande).filter_by(id=commande_id).first()
+    if not cmd:
+        raise HTTPException(404, "Commande introuvable")
+    if cmd.statut in ("ENCAISSEE", "ANNULEE"):
+        raise HTTPException(422, f"Table déjà {cmd.statut.lower()}")
+    cmd.statut = "ANNULEE"
+    db.commit()
+    return {"ok": True}
+
+
 @router.put("/commandes/{commande_id}/encaisser")
 def encaisser_commande_route(
     commande_id: int,
@@ -1084,10 +1139,24 @@ def encaisser_commande_route(
     except ValueError as e:
         raise HTTPException(422, str(e))
     return {
-        "vente_id":      vente.id,
-        "numero_ticket": vente.numero_ticket,
-        "montant_total": float(vente.montant_total),
-        "statut":        vente.statut,
+        "vente_id":        vente.id,
+        "numero_ticket":   vente.numero_ticket,
+        "montant_total":   float(vente.montant_total),
+        "montant_paye":    float(vente.montant_paye),
+        "montant_restant": float(vente.montant_restant),
+        "mode_paiement":   vente.mode_paiement,
+        "statut":          vente.statut,
+        "client_nom":      vente.client_nom,
+        "date_heure":      vente.date_heure.isoformat() if vente.date_heure else None,
+        "lignes": [
+            {
+                "produit_nom":   l.produit.nom if l.produit else f"#{l.produit_id}",
+                "quantite":      float(l.quantite),
+                "prix_unitaire": float(l.prix_unitaire_applique),
+                "sous_total":    float(l.sous_total),
+            }
+            for l in vente.lignes
+        ],
     }
 
 

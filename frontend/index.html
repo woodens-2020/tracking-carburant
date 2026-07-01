@@ -5986,75 +5986,160 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <div id="page-pos-commandes" class="page page-gi">
       <div class="pos-page gi-page">
 
-        <div class="pos-header">
-          <div class="pos-header-icon" style="background:linear-gradient(135deg,#60a5fa,#2563eb)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+        <!-- ── Vue Grille ──────────────────────────────────────── -->
+        <div id="pcmd-grille">
+          <div class="pos-header">
+            <div class="pos-header-icon" style="background:linear-gradient(135deg,#60a5fa,#2563eb)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2M8 7V5a2 2 0 0 0-4 0v2"/></svg>
+            </div>
+            <div>
+              <div class="pos-header-title">Tables Bar</div>
+              <div class="pos-header-sub">Gestion des tables en cours</div>
+            </div>
+            <div class="pos-header-actions">
+              <button class="pos-btn primary" onclick="pcmdNouvelleTable()">+ Ouvrir une table</button>
+              <button class="pos-btn ghost" onclick="loadPosCommandes()" title="Actualiser">↺</button>
+            </div>
           </div>
-          <div>
-            <div class="pos-header-title">Commandes</div>
-            <div class="pos-header-sub">Tables et commandes en cours</div>
+          <div id="pcmd-empty" style="display:none;text-align:center;padding:60px 20px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="width:52px;height:52px;margin:0 auto 14px;display:block;opacity:.2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2M8 7V5a2 2 0 0 0-4 0v2"/></svg>
+            <div style="font-size:14px;font-weight:600;color:rgba(255,255,255,.3)">Aucune table ouverte</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.18);margin-top:6px">Cliquez sur <b style="color:rgba(255,255,255,.35)">+ Ouvrir une table</b> pour commencer</div>
           </div>
-          <div class="pos-header-actions">
-            <button class="pos-btn primary" onclick="posCmdNouvelle()">+ Nouvelle commande</button>
-            <button class="pos-btn ghost" onclick="posCmdCharger()">↺</button>
-          </div>
+          <div id="pcmd-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:4px"></div>
         </div>
 
-        <div class="pos-card">
-          <div class="pos-card-hdr">Commandes actives</div>
-          <div class="pos-table-wrap">
-            <table class="pos-table">
-              <thead>
-                <tr><th>Table/Client</th><th>Ouverture</th><th>Articles</th><th>Total estimé</th><th>Statut</th><th>Actions</th></tr>
-              </thead>
-              <tbody id="pos-cmd-tbody">
-                <tr><td colspan="6" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
-              </tbody>
-            </table>
+        <!-- ── Vue Détail Table ─────────────────────────────────── -->
+        <div id="pcmd-detail" style="display:none">
+          <div class="pos-header" style="flex-wrap:wrap;gap:10px">
+            <button class="pos-btn ghost" style="padding:6px 14px;font-size:13px" onclick="pcmdRetour()">← Retour</button>
+            <div style="flex:1;min-width:0">
+              <div class="pos-header-title" id="pcmd-detail-titre">Table —</div>
+              <div class="pos-header-sub" id="pcmd-detail-sub">—</div>
+            </div>
+            <div class="pos-header-actions" style="gap:8px">
+              <button class="pos-btn ghost" onclick="pcmdDetailCharger(_pcmdCurrentId)" title="Actualiser">↺</button>
+              <button class="pos-btn" style="background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.2);font-size:12px" onclick="pcmdLiberer()">✗ Libérer</button>
+              <button class="pos-btn primary" onclick="pcmdEncaisserOuvrir()">💳 Encaisser</button>
+            </div>
+          </div>
+          <div class="pos-card" style="margin-bottom:0;overflow:hidden">
+            <div class="pos-card-hdr" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px">
+              <span>Articles commandés</span>
+              <button class="pos-btn ghost" style="font-size:11px;padding:5px 12px" onclick="pcmdAjoutModal()">+ Ajouter un article</button>
+            </div>
+            <div id="pcmd-detail-lignes" style="min-height:60px"></div>
+            <div style="border-top:1px solid rgba(255,255,255,.08);padding:14px 20px;display:flex;justify-content:flex-end;align-items:center;gap:16px">
+              <span style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.3)">Total</span>
+              <span style="font-size:24px;font-weight:800;color:#60a5fa" id="pcmd-detail-total">G 0.00</span>
+            </div>
           </div>
         </div>
 
       </div>
     </div><!-- /page-pos-commandes -->
 
-    <!-- Modal nouvelle commande -->
-    <div class="pos-modal-bg" id="pos-cmd-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
-      <div class="pos-modal" style="min-width:460px">
-        <h3 id="pos-cmd-modal-title">Nouvelle commande</h3>
-        <input type="hidden" id="pos-cmd-id">
-        <div class="pos-form-row">
-          <div><label class="pos-label">Numéro de table</label><input class="pos-input" id="pos-cmd-table" placeholder="Ex : Table 5"></div>
-          <div><label class="pos-label">Nom client</label><input class="pos-input" id="pos-cmd-client" placeholder="Ex : Jean"></div>
+    <!-- ── Modal : Ouvrir une table ──────────────────────────────── -->
+    <div class="pos-modal-bg" id="pcmd-new-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal" style="max-width:400px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 18px">
+          <h3 style="margin:0">Ouvrir une table</h3>
+          <button onclick="document.getElementById('pcmd-new-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;padding:0;line-height:1">✕</button>
         </div>
-        <div style="margin:10px 0 8px;font-size:11px;font-weight:600;color:rgba(255,255,255,.5)">ARTICLES</div>
-        <div id="pos-cmd-lignes"></div>
-        <button class="pos-btn ghost" style="margin-top:8px;font-size:11px" onclick="posCmdAddLigne()">+ Ajouter un article</button>
-        <div class="pos-modal-footer">
-          <button class="pos-btn ghost" onclick="document.getElementById('pos-cmd-modal-bg').classList.remove('open')">Annuler</button>
-          <button class="pos-btn primary" onclick="posCmdSauvegarder()">Enregistrer</button>
+        <label class="pos-label">Numéro / Nom de la table *</label>
+        <input class="pos-input" id="pcmd-new-table" placeholder="Ex : Table 3, Terrasse 1, Bar…" style="margin-bottom:14px"
+          onkeydown="if(event.key==='Enter')pcmdCreerTable()">
+        <label class="pos-label">Responsable (optionnel)</label>
+        <input class="pos-input" id="pcmd-new-client" placeholder="Nom de l'employé ou du client"
+          onkeydown="if(event.key==='Enter')pcmdCreerTable()">
+        <div class="pos-modal-footer" style="margin-top:18px">
+          <button class="pos-btn ghost" onclick="document.getElementById('pcmd-new-bg').classList.remove('open')">Annuler</button>
+          <button class="pos-btn primary" onclick="pcmdCreerTable()">Ouvrir la table</button>
         </div>
       </div>
     </div>
 
-    <!-- Modal encaissement commande -->
-    <div class="pos-modal-bg" id="pos-cmd-enc-bg" onclick="if(event.target===this)this.classList.remove('open')">
-      <div class="pos-modal">
-        <h3>Encaisser la commande</h3>
-        <input type="hidden" id="pos-cmd-enc-id">
-        <div class="pos-form-row">
-          <div><label class="pos-label">Mode de paiement</label>
-            <select class="pos-select" id="pos-cmd-enc-mode">
-              <option value="CASH">CASH</option><option value="CREDIT">CRÉDIT</option><option value="MIXTE">MIXTE</option>
-            </select>
-          </div>
-          <div><label class="pos-label">Montant payé (G)</label>
-            <input class="pos-input" id="pos-cmd-enc-paye" type="number" min="0" step="0.01" placeholder="Total si vide">
+    <!-- ── Modal : Ajouter un article ────────────────────────────── -->
+    <div class="pos-modal-bg" id="pcmd-ajout-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal" style="max-width:540px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 14px">
+          <h3 style="margin:0">Ajouter un article</h3>
+          <button onclick="document.getElementById('pcmd-ajout-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;padding:0;line-height:1">✕</button>
+        </div>
+        <input class="pos-input" id="pcmd-ajout-search" placeholder="Rechercher un produit…"
+          oninput="pcmdAjoutFiltrer(this.value)" style="margin-bottom:12px">
+        <div id="pcmd-ajout-grille" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;max-height:240px;overflow-y:auto;margin-bottom:12px;padding-right:2px"></div>
+        <div id="pcmd-ajout-selbox" style="display:none;background:rgba(96,165,250,.07);border:1px solid rgba(96,165,250,.2);border-radius:10px;padding:12px 14px;margin-bottom:12px">
+          <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Article sélectionné</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div>
+              <div id="pcmd-ajout-nom" style="font-size:14px;font-weight:600">—</div>
+              <div id="pcmd-ajout-prix" style="font-size:12px;color:rgba(255,255,255,.4);margin-top:2px">—</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <button class="pos-btn ghost" style="width:32px;height:32px;padding:0;font-size:18px;line-height:1;text-align:center" onclick="pcmdAjoutQte(-1)">−</button>
+              <span id="pcmd-ajout-qte" style="min-width:28px;text-align:center;font-size:20px;font-weight:700">1</span>
+              <button class="pos-btn ghost" style="width:32px;height:32px;padding:0;font-size:18px;line-height:1;text-align:center" onclick="pcmdAjoutQte(+1)">+</button>
+            </div>
           </div>
         </div>
-        <div><label class="pos-label">Nom client</label><input class="pos-input" id="pos-cmd-enc-client" placeholder="Optionnel"></div>
         <div class="pos-modal-footer">
-          <button class="pos-btn ghost" onclick="document.getElementById('pos-cmd-enc-bg').classList.remove('open')">Annuler</button>
-          <button class="pos-btn primary" onclick="posCmdEncaisser()">Encaisser</button>
+          <button class="pos-btn ghost" onclick="document.getElementById('pcmd-ajout-bg').classList.remove('open')">Annuler</button>
+          <button class="pos-btn primary" id="pcmd-ajout-btn" disabled onclick="pcmdAjouterArticle()">Ajouter à la table</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Modal : Encaisser ─────────────────────────────────────── -->
+    <div class="pos-modal-bg" id="pcmd-enc-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal" style="max-width:400px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 16px">
+          <h3 style="margin:0">Encaisser</h3>
+          <button onclick="document.getElementById('pcmd-enc-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;padding:0;line-height:1">✕</button>
+        </div>
+        <div style="background:rgba(96,165,250,.07);border:1px solid rgba(96,165,250,.18);border-radius:10px;padding:14px;margin-bottom:16px;text-align:center">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.3);margin-bottom:4px">Montant total</div>
+          <div id="pcmd-enc-total-display" style="font-size:30px;font-weight:800;color:#60a5fa">G 0.00</div>
+        </div>
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Mode de paiement</label>
+            <select class="pos-select" id="pcmd-enc-mode" onchange="pcmdEncModeChange()">
+              <option value="CASH">CASH</option>
+              <option value="CREDIT">CRÉDIT</option>
+              <option value="MIXTE">MIXTE</option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <label class="pos-label">Montant remis (G)</label>
+            <input class="pos-input" id="pcmd-enc-paye" type="number" min="0" step="0.01"
+              placeholder="Laisser vide = total exact" oninput="pcmdEncCalcMonnaie()">
+          </div>
+        </div>
+        <div id="pcmd-enc-monnaie-row" style="display:none;margin-top:10px;background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.2);border-radius:8px;padding:10px 14px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:12px;color:rgba(255,255,255,.45)">Monnaie à rendre</span>
+            <span id="pcmd-enc-monnaie" style="font-size:18px;font-weight:700;color:#34d399">G 0.00</span>
+          </div>
+        </div>
+        <div class="pos-modal-footer" style="margin-top:16px">
+          <button class="pos-btn ghost" onclick="document.getElementById('pcmd-enc-bg').classList.remove('open')">Annuler</button>
+          <button class="pos-btn primary" onclick="pcmdEncaisser()">✓ Confirmer le paiement</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Modal : Reçu ──────────────────────────────────────────── -->
+    <div class="pos-modal-bg" id="pcmd-recu-bg">
+      <div class="pos-modal" style="max-width:400px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 14px">
+          <h3 style="margin:0;color:#34d399">✓ Paiement confirmé</h3>
+          <button onclick="document.getElementById('pcmd-recu-bg').classList.remove('open');pcmdRetour()" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;padding:0;line-height:1">✕</button>
+        </div>
+        <div id="pcmd-recu-body" style="background:#0f172a;border-radius:10px;padding:16px;max-height:380px;overflow-y:auto;font-size:12px;line-height:1.9"></div>
+        <div class="pos-modal-footer" style="margin-top:14px">
+          <button class="pos-btn ghost" onclick="pcmdImprimerRecu()">🖨 Imprimer</button>
+          <button class="pos-btn primary" onclick="document.getElementById('pcmd-recu-bg').classList.remove('open');pcmdRetour()">Fermer &amp; libérer table</button>
         </div>
       </div>
     </div>
@@ -15555,134 +15640,311 @@ async function posEnregistrerRemb(){
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// PAGE POS COMMANDES
+// PAGE POS COMMANDES — GESTION DES TABLES BAR
 // ══════════════════════════════════════════════════════════════════════
-let _posCmdLignes = [];
+let _pcmdCurrentId    = null;
+let _pcmdCurrentTotal = 0;
+let _pcmdAddProdId    = null;
+let _pcmdAddQte       = 1;
 
 async function loadPosCommandes(){
-  posCmdCharger();
+  if(!_posProduits.length){
+    try { const d = await apiFetch('GET','/pos/produits?actif=true'); _posProduits = d||[]; } catch(_){}
+  }
+  await _pcmdGrilleCharger();
 }
 
-async function posCmdCharger(){
-  const tbody = document.getElementById('pos-cmd-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+async function _pcmdGrilleCharger(){
+  const cards = document.getElementById('pcmd-cards');
+  const empty = document.getElementById('pcmd-empty');
+  if(cards) cards.innerHTML = '<div style="color:rgba(255,255,255,.28);font-size:13px;padding:24px 0">Chargement…</div>';
   try {
     const data = await apiFetch('GET','/pos/commandes');
-    const cmds = data.commandes||data||[];
-    if(!cmds.length){
-      if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucune commande active</td></tr>';
+    const list = data.commandes||data||[];
+    if(!list.length){
+      if(cards) cards.innerHTML = '';
+      if(empty) empty.style.display = 'block';
       return;
     }
-    if(tbody) tbody.innerHTML = cmds.map(c=>{
-      const nbArt = (c.lignes||[]).length;
-      const totalEst = (c.lignes||[]).reduce((s,l)=>s+parseFloat(l.sous_total||0),0);
-      const badgeMap = { OUVERTE:'amber', ENVOYEE_CUISINE:'teal', SERVIE:'', ENCAISSEE:'teal', ANNULEE:'' };
-      const badge = `<span class="pos-badge ${badgeMap[c.statut]||''}">${c.statut}</span>`;
-      return `<tr>
-        <td>${c.numero_table||'—'} ${c.client?'('+c.client+')':''}</td>
-        <td>${posDateFr(c.date_ouverture)}</td>
-        <td>${nbArt} art.</td>
-        <td>${totalEst>0?posGx(totalEst):'—'}</td>
-        <td>${badge}</td>
-        <td>
-          <button class="pos-btn ghost" style="font-size:10px;padding:3px 7px" onclick="posCmdVoir(${c.id})">Voir/Modifier</button>
-          ${c.statut!=='ENCAISSEE'&&c.statut!=='ANNULEE'?`<button class="pos-btn primary" style="font-size:10px;padding:3px 7px" onclick="posCmdEncaisserModal(${c.id})">Encaisser</button>`:''}
-        </td>
-      </tr>`;
-    }).join('');
+    if(empty) empty.style.display = 'none';
+    if(cards) cards.innerHTML = list.map(c=>_pcmdCard(c)).join('');
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+    if(cards) cards.innerHTML = `<div style="color:#f87171;padding:20px">${e.message||'Erreur réseau'}</div>`;
   }
 }
 
-function posCmdNouvelle(){
-  _posCmdLignes = [];
-  document.getElementById('pos-cmd-id').value = '';
-  document.getElementById('pos-cmd-modal-title').textContent = 'Nouvelle commande';
-  document.getElementById('pos-cmd-table').value = '';
-  document.getElementById('pos-cmd-client').value = '';
-  _posCmdRenderLignes();
-  document.getElementById('pos-cmd-modal-bg').classList.add('open');
+function _pcmdCard(c){
+  const total  = parseFloat(c.total_estime||0);
+  const depuis = _pcmdDepuis(c.date_ouverture);
+  return `
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(96,165,250,.2);border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color .15s"
+         onmouseenter="this.style.borderColor='rgba(96,165,250,.5)'"
+         onmouseleave="this.style.borderColor='rgba(96,165,250,.2)'"
+         onclick="pcmdOuvrir(${c.id})">
+      <div style="background:rgba(96,165,250,.07);padding:14px 16px 12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="font-size:20px;font-weight:800;color:#60a5fa">${c.numero_table||'Table'}</div>
+          <span class="pos-badge amber" style="font-size:10px">ACTIVE</span>
+        </div>
+        <div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:3px">${c.client||'—'}</div>
+      </div>
+      <div style="padding:12px 16px 10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:12px;color:rgba(255,255,255,.4)">${c.nb_lignes||0} article(s)</span>
+          <span style="font-size:16px;font-weight:700;color:#f0f4ff">${posGx(total)}</span>
+        </div>
+        <div style="font-size:11px;color:rgba(255,255,255,.25)">⏱ Ouverte ${depuis}</div>
+      </div>
+      <div style="padding:8px 12px;background:rgba(96,165,250,.04);border-top:1px solid rgba(255,255,255,.05)">
+        <button class="pos-btn ghost" style="width:100%;font-size:12px" onclick="event.stopPropagation();pcmdOuvrir(${c.id})">Voir / Gérer →</button>
+      </div>
+    </div>`;
 }
 
-async function posCmdVoir(id){
+function _pcmdDepuis(iso){
+  if(!iso) return '—';
+  const m = Math.floor((Date.now()-new Date(iso).getTime())/60000);
+  if(m<1)  return 'à l\'instant';
+  if(m<60) return `il y a ${m} min`;
+  const h=Math.floor(m/60), r=m%60;
+  return r ? `il y a ${h}h${String(r).padStart(2,'0')}` : `il y a ${h}h`;
+}
+
+async function pcmdOuvrir(id){
+  _pcmdCurrentId = id;
+  document.getElementById('pcmd-grille').style.display = 'none';
+  document.getElementById('pcmd-detail').style.display = 'block';
+  await pcmdDetailCharger(id);
+}
+
+function pcmdRetour(){
+  _pcmdCurrentId = null;
+  document.getElementById('pcmd-detail').style.display = 'none';
+  document.getElementById('pcmd-grille').style.display  = 'block';
+  _pcmdGrilleCharger();
+}
+
+async function pcmdDetailCharger(id){
+  const lignesDiv = document.getElementById('pcmd-detail-lignes');
+  if(lignesDiv) lignesDiv.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</div>';
   try {
     const c = await apiFetch('GET',`/pos/commandes/${id}`);
-    document.getElementById('pos-cmd-id').value = id;
-    document.getElementById('pos-cmd-modal-title').textContent = 'Modifier commande';
-    document.getElementById('pos-cmd-table').value  = c.numero_table||'';
-    document.getElementById('pos-cmd-client').value = c.client||'';
-    _posCmdLignes = (c.lignes||[]).map(l=>({ produit_id:l.produit_id, quantite:l.quantite, nom:l.produit_nom||'Produit' }));
-    _posCmdRenderLignes();
-    document.getElementById('pos-cmd-modal-bg').classList.add('open');
-  } catch(e){ posAlert(e.message||'Erreur.'); }
-}
-
-function posCmdAddLigne(){
-  _posCmdLignes.push({ produit_id:'', quantite:1, nom:'' });
-  _posCmdRenderLignes();
-}
-
-function _posCmdRenderLignes(){
-  const wrap = document.getElementById('pos-cmd-lignes');
-  if(!wrap) return;
-  const opts = _posProduits.map(p=>`<option value="${p.id}">${p.nom}</option>`).join('');
-  wrap.innerHTML = _posCmdLignes.map((l,i)=>`
-    <div class="pos-form-row" style="margin-bottom:6px">
-      <div><select class="pos-select" onchange="_posCmdLignes[${i}].produit_id=+this.value">
-        <option value="">— Produit —</option>${opts}
-      </select></div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <input class="pos-input" type="number" min="1" step="1" value="${Math.round(l.quantite||1)}" style="width:80px"
-          onchange="_posCmdLignes[${i}].quantite=Math.round(Math.max(1,+this.value))">
-        <button class="pos-btn danger" style="padding:3px 7px;font-size:11px" onclick="_posCmdLignes.splice(${i},1);_posCmdRenderLignes()">✕</button>
-      </div>
-    </div>
-  `).join('')||'<div style="color:rgba(255,255,255,.3);font-size:11px">Aucun article — Cliquez sur + pour ajouter</div>';
-  // Pré-sélectionner les produits existants
-  _posCmdLignes.forEach((l,i)=>{
-    const sel = wrap.querySelectorAll('select')[i];
-    if(sel && l.produit_id) sel.value = l.produit_id;
-  });
-}
-
-async function posCmdSauvegarder(){
-  const id     = document.getElementById('pos-cmd-id').value;
-  const table  = document.getElementById('pos-cmd-table').value.trim()||null;
-  const client = document.getElementById('pos-cmd-client').value.trim()||null;
-  const lignes = _posCmdLignes.filter(l=>l.produit_id&&l.quantite>0)
-    .map(l=>({ produit_id:parseInt(l.produit_id), quantite:Math.round(l.quantite) }));
-  if(!lignes.length){ posAlert('Ajoutez au moins un article.'); return; }
-  try {
-    if(id){
-      await apiFetch('PUT',`/pos/commandes/${id}`,{ numero_table:table, client, lignes });
+    document.getElementById('pcmd-detail-titre').textContent = c.numero_table||'Table';
+    document.getElementById('pcmd-detail-sub').textContent   =
+      `${c.client||'Sans responsable'}  •  Ouverte ${_pcmdDepuis(c.date_ouverture)}`;
+    const total = (c.lignes||[]).reduce((s,l)=>s+parseFloat(l.sous_total||0),0);
+    _pcmdCurrentTotal = total;
+    document.getElementById('pcmd-detail-total').textContent = posGx(total);
+    if(!(c.lignes||[]).length){
+      lignesDiv.innerHTML = '<div style="padding:20px;color:rgba(255,255,255,.3);font-size:13px;text-align:center">Aucun article — Cliquez sur <b>+ Ajouter un article</b></div>';
     } else {
-      await apiFetch('POST','/pos/commandes',{ numero_table:table, client, lignes });
+      lignesDiv.innerHTML = `<div style="overflow-x:auto"><table class="pos-table" style="margin:0">
+        <thead><tr>
+          <th style="text-align:left;padding-left:16px">Article</th>
+          <th style="text-align:center">Qté</th>
+          <th style="text-align:right">Prix unit.</th>
+          <th style="text-align:right">Sous-total</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+          ${(c.lignes||[]).map(l=>`<tr>
+            <td style="padding-left:16px;font-weight:500">${l.produit_nom||'—'}</td>
+            <td style="text-align:center">×${Math.round(l.quantite)}</td>
+            <td style="text-align:right;color:rgba(255,255,255,.5)">${posGx(l.prix_unitaire||0)}</td>
+            <td style="text-align:right;font-weight:600">${posGx(l.sous_total||0)}</td>
+            <td style="text-align:center;padding-right:12px">
+              <button class="pos-btn danger" style="padding:2px 8px;font-size:11px;opacity:.65" onclick="pcmdRetirerArticle(${l.id})">✕</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>`;
     }
-    document.getElementById('pos-cmd-modal-bg').classList.remove('open');
-    await posCmdCharger();
-    posAlert(id?'Commande mise à jour.':'Commande créée.','ok');
-  } catch(e){ posAlert(e.message||'Erreur.'); }
+  } catch(e){
+    if(lignesDiv) lignesDiv.innerHTML = `<div style="padding:20px;color:#f87171;font-size:13px">${e.message||'Erreur.'}</div>`;
+  }
 }
 
-function posCmdEncaisserModal(id){
-  document.getElementById('pos-cmd-enc-id').value = id;
-  document.getElementById('pos-cmd-enc-paye').value = '';
-  document.getElementById('pos-cmd-enc-client').value = '';
-  document.getElementById('pos-cmd-enc-bg').classList.add('open');
+// ── Nouvelle table ────────────────────────────────────────────────────
+function pcmdNouvelleTable(){
+  document.getElementById('pcmd-new-table').value  = '';
+  document.getElementById('pcmd-new-client').value = '';
+  document.getElementById('pcmd-new-bg').classList.add('open');
+  setTimeout(()=>document.getElementById('pcmd-new-table')?.focus(),120);
 }
 
-async function posCmdEncaisser(){
-  const id     = document.getElementById('pos-cmd-enc-id').value;
-  const mode   = document.getElementById('pos-cmd-enc-mode').value;
-  const paye   = parseFloat(document.getElementById('pos-cmd-enc-paye').value||0)||null;
-  const client = document.getElementById('pos-cmd-enc-client').value.trim()||null;
+async function pcmdCreerTable(){
+  const table  = document.getElementById('pcmd-new-table').value.trim();
+  const client = document.getElementById('pcmd-new-client').value.trim()||null;
+  if(!table){ posAlert('Entrez un numéro ou nom de table.','warn'); return; }
   try {
-    const result = await apiFetch('PUT',`/pos/commandes/${id}/encaisser`,{ mode_paiement:mode, montant_paye:paye, client_nom:client });
-    document.getElementById('pos-cmd-enc-bg').classList.remove('open');
-    await posCmdCharger();
-    posAlert(`Ticket ${result.numero_ticket} — ${posGx(result.montant_total)}`,'ok');
+    const r = await apiFetch('POST','/pos/commandes',{ numero_table:table, client, lignes:[] });
+    document.getElementById('pcmd-new-bg').classList.remove('open');
+    posAlert(`Table "${table}" ouverte.`,'ok');
+    await pcmdOuvrir(r.id);
   } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ── Ajouter article ───────────────────────────────────────────────────
+function pcmdAjoutModal(){
+  _pcmdAddProdId = null; _pcmdAddQte = 1;
+  const searchEl = document.getElementById('pcmd-ajout-search');
+  if(searchEl) searchEl.value = '';
+  document.getElementById('pcmd-ajout-selbox').style.display = 'none';
+  const btn = document.getElementById('pcmd-ajout-btn');
+  if(btn) btn.disabled = true;
+  pcmdAjoutFiltrer('');
+  document.getElementById('pcmd-ajout-bg').classList.add('open');
+  setTimeout(()=>searchEl?.focus(),120);
+}
+
+function pcmdAjoutFiltrer(q){
+  const grille = document.getElementById('pcmd-ajout-grille');
+  if(!grille) return;
+  const filtre = q.toLowerCase().trim();
+  const prods  = _posProduits.filter(p=>!filtre||p.nom.toLowerCase().includes(filtre));
+  if(!prods.length){
+    grille.innerHTML = '<div style="padding:16px;color:rgba(255,255,255,.3);font-size:12px;grid-column:1/-1;text-align:center">Aucun produit trouvé</div>';
+    return;
+  }
+  grille.innerHTML = prods.map(p=>`
+    <div id="pap-${p.id}"
+         onclick="pcmdAjoutSelectionner(${p.id},${JSON.stringify(p.nom)},${p.prix_actif||0})"
+         style="background:rgba(255,255,255,.04);border:2px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 8px;cursor:pointer;text-align:center;transition:border-color .12s"
+         onmouseenter="this.style.borderColor='rgba(96,165,250,.4)'"
+         onmouseleave="this.style.borderColor=(_pcmdAddProdId===${p.id}?'rgba(96,165,250,.55)':'rgba(255,255,255,.07)')">
+      <div style="font-size:12px;font-weight:600;line-height:1.3;margin-bottom:4px">${p.nom}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.4)">${posGx(p.prix_actif||0)}</div>
+    </div>`).join('');
+}
+
+function pcmdAjoutSelectionner(id, nom, prix){
+  _pcmdAddProdId = id; _pcmdAddQte = 1;
+  document.getElementById('pcmd-ajout-qte').textContent  = '1';
+  document.getElementById('pcmd-ajout-nom').textContent  = nom;
+  document.getElementById('pcmd-ajout-prix').textContent = posGx(prix)+' / unité';
+  document.getElementById('pcmd-ajout-selbox').style.display = 'block';
+  document.getElementById('pcmd-ajout-btn').disabled = false;
+  document.querySelectorAll('[id^="pap-"]').forEach(el=>el.style.borderColor='rgba(255,255,255,.07)');
+  const el = document.getElementById(`pap-${id}`);
+  if(el) el.style.borderColor = 'rgba(96,165,250,.55)';
+}
+
+function pcmdAjoutQte(delta){
+  _pcmdAddQte = Math.max(1,(_pcmdAddQte||1)+delta);
+  document.getElementById('pcmd-ajout-qte').textContent = _pcmdAddQte;
+}
+
+async function pcmdAjouterArticle(){
+  if(!_pcmdAddProdId||!_pcmdCurrentId){ posAlert('Sélectionnez un article.','warn'); return; }
+  try {
+    await apiFetch('POST',`/pos/commandes/${_pcmdCurrentId}/lignes`,{ produit_id:_pcmdAddProdId, quantite:_pcmdAddQte });
+    document.getElementById('pcmd-ajout-bg').classList.remove('open');
+    await pcmdDetailCharger(_pcmdCurrentId);
+    posAlert('Article ajouté à la table.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function pcmdRetirerArticle(ligneId){
+  if(!_pcmdCurrentId) return;
+  try {
+    await apiFetch('DELETE',`/pos/commandes/${_pcmdCurrentId}/lignes/${ligneId}`);
+    await pcmdDetailCharger(_pcmdCurrentId);
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ── Libérer table ─────────────────────────────────────────────────────
+async function pcmdLiberer(){
+  if(!_pcmdCurrentId) return;
+  if(!confirm('Libérer cette table sans encaisser ? Les articles seront perdus.')) return;
+  try {
+    await apiFetch('DELETE',`/pos/commandes/${_pcmdCurrentId}`);
+    posAlert('Table libérée.','ok');
+    pcmdRetour();
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ── Encaisser ─────────────────────────────────────────────────────────
+function pcmdEncaisserOuvrir(){
+  if(!_pcmdCurrentId){ posAlert('Aucune table sélectionnée.'); return; }
+  if(_pcmdCurrentTotal<=0){ posAlert('Ajoutez des articles avant d\'encaisser.','warn'); return; }
+  document.getElementById('pcmd-enc-total-display').textContent = posGx(_pcmdCurrentTotal);
+  document.getElementById('pcmd-enc-paye').value  = '';
+  document.getElementById('pcmd-enc-mode').value  = 'CASH';
+  document.getElementById('pcmd-enc-monnaie-row').style.display = 'none';
+  document.getElementById('pcmd-enc-bg').classList.add('open');
+}
+
+function pcmdEncModeChange(){
+  if(document.getElementById('pcmd-enc-mode').value==='CREDIT'){
+    document.getElementById('pcmd-enc-paye').value = '0';
+    document.getElementById('pcmd-enc-monnaie-row').style.display='none';
+  }
+}
+
+function pcmdEncCalcMonnaie(){
+  const paye = parseFloat(document.getElementById('pcmd-enc-paye').value||0)||0;
+  const row  = document.getElementById('pcmd-enc-monnaie-row');
+  const mEl  = document.getElementById('pcmd-enc-monnaie');
+  if(paye>_pcmdCurrentTotal&&_pcmdCurrentTotal>0){
+    row.style.display='block';
+    mEl.textContent = posGx(paye-_pcmdCurrentTotal);
+  } else {
+    row.style.display='none';
+  }
+}
+
+async function pcmdEncaisser(){
+  const mode = document.getElementById('pcmd-enc-mode').value;
+  const paye = parseFloat(document.getElementById('pcmd-enc-paye').value||0)||null;
+  try {
+    const r = await apiFetch('PUT',`/pos/commandes/${_pcmdCurrentId}/encaisser`,{ mode_paiement:mode, montant_paye:paye });
+    document.getElementById('pcmd-enc-bg').classList.remove('open');
+    _pcmdAfficherRecu(r);
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+function _pcmdAfficherRecu(r){
+  const total   = parseFloat(r.montant_total||0);
+  const paye    = parseFloat(r.montant_paye||0);
+  const restant = parseFloat(r.montant_restant||0);
+  const monnaie = (paye>total&&total>0) ? paye-total : 0;
+  const date    = r.date_heure ? new Date(r.date_heure).toLocaleString('fr-HT') : new Date().toLocaleString('fr-HT');
+  const sep     = '<div style="border-top:1px dashed rgba(255,255,255,.15);margin:8px 0"></div>';
+  const table   = document.getElementById('pcmd-detail-titre')?.textContent||'';
+  const lignes  = (r.lignes||[]).map(l=>`
+    <div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0">
+      <span style="flex:1;min-width:0">${l.produit_nom||'—'} ×${Math.round(l.quantite||1)}</span>
+      <span style="white-space:nowrap;color:#60a5fa">${posGx(l.sous_total||0)}</span>
+    </div>`).join('');
+  document.getElementById('pcmd-recu-body').innerHTML = `
+    <div style="text-align:center;font-weight:700;font-size:14px;margin-bottom:4px">BAR — REÇU</div>
+    <div style="text-align:center;font-size:11px;color:rgba(255,255,255,.4);margin-bottom:2px">Ticket #${r.numero_ticket||'—'}</div>
+    ${table?`<div style="text-align:center;font-size:11px;color:rgba(255,255,255,.4);margin-bottom:2px">${table}</div>`:''}
+    <div style="text-align:center;font-size:11px;color:rgba(255,255,255,.3);margin-bottom:4px">${date}</div>
+    ${sep}
+    <div>${lignes||'<div style="color:rgba(255,255,255,.3)">—</div>'}</div>
+    ${sep}
+    <div style="display:flex;justify-content:space-between;font-weight:700;font-size:15px;padding:2px 0">
+      <span>TOTAL</span><span style="color:#60a5fa">${posGx(total)}</span>
+    </div>
+    ${r.mode_paiement!=='CREDIT'?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;color:rgba(255,255,255,.5)"><span>Montant reçu</span><span>${posGx(paye||total)}</span></div>`:''}
+    ${monnaie>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0;color:#34d399;font-weight:600"><span>Monnaie rendue</span><span>${posGx(monnaie)}</span></div>`:''}
+    ${restant>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0;color:#f87171;font-weight:600"><span>Reste à payer</span><span>${posGx(restant)}</span></div>`:''}
+    ${sep}
+    <div style="font-size:11px;color:rgba(255,255,255,.3)">Mode : ${r.mode_paiement||'—'}</div>
+    <div style="text-align:center;margin-top:12px;font-size:12px;color:rgba(255,255,255,.2)">Merci !</div>`;
+  document.getElementById('pcmd-recu-bg').classList.add('open');
+}
+
+function pcmdImprimerRecu(){
+  const html = document.getElementById('pcmd-recu-body')?.innerHTML||'';
+  const win  = window.open('','_blank','width=380,height=560');
+  if(!win) return;
+  win.document.write(`<!DOCTYPE html><html><head><title>Reçu</title><style>
+    body{font-family:monospace;font-size:13px;padding:20px;color:#000;background:#fff}
+    </style></head><body>${html}</body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(),300);
 }
 
 // ══════════════════════════════════════════════════════════════════════
