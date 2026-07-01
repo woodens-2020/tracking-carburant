@@ -24,6 +24,8 @@ class Produit(Base):
         cascade="all, delete-orphan",
         order_by="Pompe.id",
     )
+    bar_achats = relationship("BarAchat", back_populates="station_produit",
+                              foreign_keys="BarAchat.station_produit_id")
 
     __table_args__ = (
         CheckConstraint("prix_gallon >= 0", name="chk_produit_prix_pos"),
@@ -346,7 +348,8 @@ class BarProduit(Base):
     mouvements      = relationship("BarMouvementStock", back_populates="produit",
                                    foreign_keys="BarMouvementStock.produit_id")
     lignes_vente    = relationship("BarLigneVente", back_populates="produit")
-    bar_achats      = relationship("BarAchat", back_populates="produit")
+    bar_achats      = relationship("BarAchat", back_populates="bar_produit",
+                                   foreign_keys="BarAchat.produit_id")
 
     __table_args__ = (
         Index("idx_bar_produits_categorie", "categorie"),
@@ -374,19 +377,28 @@ class BarPrixHistorique(Base):
 
 
 class BarAchat(Base):
-    """Réception de marchandises au bar (entrée de stock avec prix d'achat)."""
+    """Réception de marchandises — bar OU station service.
+
+    Exactement un des deux FK doit être non-null :
+      - produit_id          → BarProduit (bar_produits)  : génère un mouvement de stock bar
+      - station_produit_id  → Produit    (produits)       : carburant, pas de mouvement de stock bar
+    """
     __tablename__ = "bar_achats"
 
-    id                  = Column(Integer, primary_key=True)
-    produit_id          = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
-    quantite            = Column(Numeric(12, 3), nullable=False)
-    prix_achat_unitaire = Column(Numeric(12, 2), nullable=False)
-    fournisseur         = Column(String(150), nullable=True)
-    date_achat          = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    utilisateur_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
-    notes               = Column(String(300), nullable=True)
+    id                   = Column(Integer, primary_key=True)
+    produit_id           = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=True)
+    station_produit_id   = Column(Integer, ForeignKey("produits.id",     ondelete="RESTRICT"), nullable=True)
+    quantite             = Column(Numeric(12, 3), nullable=False)
+    prix_achat_unitaire  = Column(Numeric(12, 2), nullable=False)
+    fournisseur          = Column(String(150), nullable=True)
+    date_achat           = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    utilisateur_id       = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    notes                = Column(String(300), nullable=True)
 
-    produit   = relationship("BarProduit", back_populates="bar_achats")
+    bar_produit      = relationship("BarProduit", back_populates="bar_achats",
+                                    foreign_keys=[produit_id])
+    station_produit  = relationship("Produit", back_populates="bar_achats",
+                                    foreign_keys=[station_produit_id])
     mouvement = relationship("BarMouvementStock", back_populates="achat", uselist=False,
                              foreign_keys="BarMouvementStock.achat_id")
     depenses  = relationship("BarAchatDepense", back_populates="achat",
@@ -395,8 +407,13 @@ class BarAchat(Base):
     __table_args__ = (
         CheckConstraint("quantite > 0",            name="chk_bar_achat_qte_pos"),
         CheckConstraint("prix_achat_unitaire >= 0", name="chk_bar_achat_prix_pos"),
-        Index("idx_bar_achats_produit", "produit_id"),
-        Index("idx_bar_achats_date",    "date_achat"),
+        CheckConstraint(
+            "(produit_id IS NOT NULL)::int + (station_produit_id IS NOT NULL)::int = 1",
+            name="chk_bar_achat_produit_xor",
+        ),
+        Index("idx_bar_achats_produit",         "produit_id"),
+        Index("idx_bar_achats_station_produit",  "station_produit_id"),
+        Index("idx_bar_achats_date",             "date_achat"),
     )
 
 

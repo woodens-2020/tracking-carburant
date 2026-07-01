@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from models import (
+    Produit,
     BarCategorie, BarProduit, BarPrixHistorique, BarAchat, BarAchatDepense,
     BarMouvementStock, BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande, BarPaiementEmploye, Employe,
@@ -81,9 +82,11 @@ class DepenseItem(BaseModel):
 
 
 class AchatIn(BaseModel):
-    produit_id:          int
+    # Exactement un des deux doit être renseigné
+    produit_id:          Optional[int] = None   # bar_produits (crée mouvement de stock)
+    station_produit_id:  Optional[int] = None   # produits — carburants (pas de mouvement stock bar)
     quantite:            float = Field(gt=0)
-    quantite_type:       str   = "unite"   # "unite" ou "caisse"
+    quantite_type:       str   = "unite"         # "unite" ou "caisse" (bar seulement)
     prix_achat_unitaire: float = Field(ge=0)
     fournisseur:         Optional[str] = None
     notes:               Optional[str] = None
@@ -529,58 +532,72 @@ def stock_produit(produit_id: int, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/achats")
-def liste_achats(
-    produit_id: Optional[int] = None,
-    limit: int = Query(100, le=500),
-    db: Session = Depends(get_db),
-):
-    """Liste des achats avec dépenses et coût total."""
-    q = db.query(BarAchat)
-    if produit_id:
-        q = q.filter(BarAchat.produit_id == produit_id)
-    achats = q.order_by(BarAchat.date_achat.desc()).limit(limit).all()
-
-    result = []
-    for a in achats:
-        total_dep = sum(float(d.montant) for d in a.depenses)
-        prix_total = float(a.quantite) * float(a.prix_achat_unitaire)
-        result.append({
-            "id":                  a.id,
-            "produit_id":          a.produit_id,
-            "produit_nom":         a.produit.nom if a.produit else str(a.produit_id),
-            "produit_categorie":   a.produit.categorie if a.produit else None,
-            "produit_unite":       a.produit.unite if a.produit else None,
-            "produit_par_caisse":  a.produit.vendu_par_caisse if a.produit else False,
-            "produit_upc":         a.produit.unites_par_caisse if a.produit else None,
-            "quantite":            float(a.quantite),
-            "prix_achat_unitaire": float(a.prix_achat_unitaire),
-            "prix_marchandise":    prix_total,
-            "total_depenses":      total_dep,
-            "cout_total":          prix_total + total_dep,
-            "fournisseur":         a.fournisseur,
-            "notes":               a.notes,
-            "date_achat":          a.date_achat.isoformat(),
-            "depenses": [
-                {"id": d.id, "description": d.description, "montant": float(d.montant)}
-                for d in a.depenses
-            ],
-        })
-    return result
+@router.get("/achats/produits-tous")
+def tous_les_produits_achetables(db: Session = Depends(get_db)):
+    """Retourne tous les produits disponibles pour un achat (bar + station)."""
+    bar   = db.query(BarProduit).filter_by(actif=True).order_by(BarProduit.categorie, BarProduit.nom).all()
+    stati = db.query(Produit).filter_by(actif=True).order_by(Produit.nom).all()
+    return {
+        "bar": [
+            {
+                "id":               p.id,
+                "nom":              p.nom,
+                "categorie":        p.categorie,
+                "unite":            p.unite,
+                "vendu_par_caisse": p.vendu_par_caisse,
+                "unites_par_caisse":p.unites_par_caisse,
+                "type":             "bar",
+            }
+            for p in bar
+        ],
+        "station": [
+            {
+                "id":               p.id,
+                "nom":              p.nom,
+                "categorie":        "carburant",
+                "unite":            "gallon",
+                "vendu_par_caisse": False,
+                "unites_par_caisse":None,
+                "type":             "station",
+            }
+            for p in stati
+        ],
+    }
 
 
-@router.get("/achats/{achat_id}")
-def detail_achat(achat_id: int, db: Session = Depends(get_db)):
-    a = db.query(BarAchat).filter_by(id=achat_id).first()
-    if not a:
-        raise HTTPException(404, "Achat introuvable")
+def _achat_dict(a: BarAchat) -> dict:
+    """Sérialise un BarAchat en résolvant le produit (bar ou station)."""
+    if a.produit_id and a.bar_produit:
+        p = a.bar_produit
+        nom      = p.nom
+        cat      = p.categorie
+        unite    = p.unite
+        par_caise= p.vendu_par_caisse
+        upc      = p.unites_par_caisse
+        ptype    = "bar"
+    elif a.station_produit_id and a.station_produit:
+        p = a.station_produit
+        nom      = p.nom
+        cat      = "carburant"
+        unite    = "gallon"
+        par_caise= False
+        upc      = None
+        ptype    = "station"
+    else:
+        nom = "Produit inconnu"; cat = None; unite = None; par_caise = False; upc = None; ptype = "?"
+
     total_dep  = sum(float(d.montant) for d in a.depenses)
     prix_total = float(a.quantite) * float(a.prix_achat_unitaire)
     return {
         "id":                  a.id,
         "produit_id":          a.produit_id,
-        "produit_nom":         a.produit.nom if a.produit else str(a.produit_id),
-        "produit_unite":       a.produit.unite if a.produit else None,
+        "station_produit_id":  a.station_produit_id,
+        "produit_type":        ptype,
+        "produit_nom":         nom,
+        "produit_categorie":   cat,
+        "produit_unite":       unite,
+        "produit_par_caisse":  par_caise,
+        "produit_upc":         upc,
         "quantite":            float(a.quantite),
         "prix_achat_unitaire": float(a.prix_achat_unitaire),
         "prix_marchandise":    prix_total,
@@ -589,7 +606,6 @@ def detail_achat(achat_id: int, db: Session = Depends(get_db)):
         "fournisseur":         a.fournisseur,
         "notes":               a.notes,
         "date_achat":          a.date_achat.isoformat(),
-        "stock_apres":         float(stock_courant(a.produit_id, db)),
         "depenses": [
             {"id": d.id, "description": d.description, "montant": float(d.montant)}
             for d in a.depenses
@@ -597,24 +613,68 @@ def detail_achat(achat_id: int, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/achats")
+def liste_achats(
+    produit_id:         Optional[int] = None,
+    station_produit_id: Optional[int] = None,
+    limit: int = Query(100, le=500),
+    db: Session = Depends(get_db),
+):
+    """Liste des achats (bar + station) avec dépenses et coût total."""
+    q = db.query(BarAchat)
+    if produit_id:
+        q = q.filter(BarAchat.produit_id == produit_id)
+    if station_produit_id:
+        q = q.filter(BarAchat.station_produit_id == station_produit_id)
+    achats = q.order_by(BarAchat.date_achat.desc()).limit(limit).all()
+    return [_achat_dict(a) for a in achats]
+
+
+@router.get("/achats/{achat_id}")
+def detail_achat(achat_id: int, db: Session = Depends(get_db)):
+    a = db.query(BarAchat).filter_by(id=achat_id).first()
+    if not a:
+        raise HTTPException(404, "Achat introuvable")
+    result = _achat_dict(a)
+    if a.produit_id:
+        result["stock_apres"] = float(stock_courant(a.produit_id, db))
+    return result
+
+
 @router.post("/achats", status_code=201)
 def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends(get_db)):
-    """Réceptionne des marchandises : crée un BarAchat + dépenses + mouvement ENTREE."""
-    p = db.query(BarProduit).filter_by(id=data.produit_id).first()
-    if not p:
-        raise HTTPException(404, "Produit introuvable")
+    """Réceptionne des marchandises (bar ou station) — crée dépenses + éventuellement mouvement ENTREE."""
+    # Validation : exactement un produit doit être fourni
+    if bool(data.produit_id) == bool(data.station_produit_id):
+        raise HTTPException(422, "Fournir soit produit_id (bar) soit station_produit_id (station), pas les deux.")
 
-    # Conversion caisse → unités si nécessaire
-    upc = p.unites_par_caisse or 1
-    if data.quantite_type == "caisse" and p.vendu_par_caisse and upc > 0:
-        qte_unites = Decimal(str(data.quantite)) * Decimal(str(upc))
-        qte_label  = f"{data.quantite} caisse(s) × {upc} u. = {float(qte_unites)} u."
+    qte_unites = Decimal(str(data.quantite))
+    mouv_id    = None
+    stk_apres  = None
+
+    if data.produit_id:
+        # ── Produit bar : vérifie l'existence + gère caisse/unités + crée mouvement stock ──
+        p = db.query(BarProduit).filter_by(id=data.produit_id).first()
+        if not p:
+            raise HTTPException(404, "Produit bar introuvable")
+        upc = p.unites_par_caisse or 1
+        if data.quantite_type == "caisse" and p.vendu_par_caisse and upc > 0:
+            qte_unites = Decimal(str(data.quantite)) * Decimal(str(upc))
+            qte_label  = f"{data.quantite} caisse(s)×{upc}u. = {float(qte_unites)}u."
+        else:
+            qte_label  = f"{data.quantite} {p.unite}(s)"
+        nom_prod = p.nom
     else:
-        qte_unites = Decimal(str(data.quantite))
-        qte_label  = f"{data.quantite} {p.unite}(s)"
+        # ── Produit station : vérifie l'existence seulement ──
+        s = db.query(Produit).filter_by(id=data.station_produit_id).first()
+        if not s:
+            raise HTTPException(404, "Produit station introuvable")
+        qte_label = f"{data.quantite} gallon(s)"
+        nom_prod  = s.nom
 
     achat = BarAchat(
         produit_id          = data.produit_id,
+        station_produit_id  = data.station_produit_id,
         quantite            = qte_unites,
         prix_achat_unitaire = Decimal(str(data.prix_achat_unitaire)),
         fournisseur         = data.fournisseur,
@@ -624,7 +684,6 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
     db.add(achat)
     db.flush()
 
-    # Dépenses supplémentaires
     for dep in data.depenses:
         db.add(BarAchatDepense(
             achat_id    = achat.id,
@@ -632,28 +691,38 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
             montant     = Decimal(str(dep.montant)),
         ))
 
-    mouv = BarMouvementStock(
-        produit_id     = data.produit_id,
-        type_mouvement = "ENTREE",
-        quantite       = qte_unites,
-        motif          = f"Réception {qte_label}"
-                         + (f" — {data.fournisseur}" if data.fournisseur else ""),
-        achat_id       = achat.id,
-        utilisateur_id = _uid(request),
-    )
-    db.add(mouv)
+    if data.produit_id:
+        mouv = BarMouvementStock(
+            produit_id     = data.produit_id,
+            type_mouvement = "ENTREE",
+            quantite       = qte_unites,
+            motif          = f"Réception {qte_label}"
+                             + (f" — {data.fournisseur}" if data.fournisseur else ""),
+            achat_id       = achat.id,
+            utilisateur_id = _uid(request),
+        )
+        db.add(mouv)
+        mouv_id = None  # sera set après commit
+    else:
+        mouv = None
+
     db.commit()
+    if mouv:
+        mouv_id   = mouv.id
+        stk_apres = float(stock_courant(data.produit_id, db))
 
     total_dep  = sum(float(d.montant) for d in data.depenses)
     prix_total = float(qte_unites) * float(data.prix_achat_unitaire)
     return {
-        "achat_id":          achat.id,
-        "mouvement_id":      mouv.id,
-        "quantite_unites":   float(qte_unites),
-        "prix_marchandise":  prix_total,
-        "total_depenses":    total_dep,
-        "cout_total":        prix_total + total_dep,
-        "stock_apres":       float(stock_courant(data.produit_id, db)),
+        "achat_id":         achat.id,
+        "mouvement_id":     mouv_id,
+        "produit_type":     "bar" if data.produit_id else "station",
+        "produit_nom":      nom_prod,
+        "quantite_unites":  float(qte_unites),
+        "prix_marchandise": prix_total,
+        "total_depenses":   total_dep,
+        "cout_total":       prix_total + total_dep,
+        "stock_apres":      stk_apres,
     }
 
 

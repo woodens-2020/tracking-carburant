@@ -14194,21 +14194,36 @@ async function posAjusterStock(){
 // ══════════════════════════════════════════════════════════════════════
 // PAGE POS ACHATS BAR
 // ══════════════════════════════════════════════════════════════════════
-let _paDepenses = [];
+let _paDepenses    = [];
+let _paTousProduits = { bar: [], station: [] }; // cache produits pour la modal
 
 async function loadPosAchats(){
-  const prodId = document.getElementById('pa-filtre-produit')?.value||'';
-  const params = prodId ? `?produit_id=${prodId}` : '';
+  const sel    = document.getElementById('pa-filtre-produit');
+  const cur    = sel?.value||'';
+  const params = cur ? (cur.startsWith('s_') ? `?station_produit_id=${cur.slice(2)}` : `?produit_id=${cur}`) : '';
   try {
-    const achats = await apiFetch('GET',`/pos/achats${params}`);
+    const [achats, tous] = await Promise.all([
+      apiFetch('GET',`/pos/achats${params}`),
+      apiFetch('GET','/pos/achats/produits-tous'),
+    ]);
+    _paTousProduits = tous;
     _paRenderTable(achats);
     _paRenderKpis(achats);
-    // Populate filter
-    const sel = document.getElementById('pa-filtre-produit');
-    if(sel && _posProduitsAll.length){
-      const cur = sel.value;
-      sel.innerHTML = '<option value="">Tous les produits</option>' +
-        _posProduitsAll.map(p=>`<option value="${p.id}"${String(p.id)===cur?' selected':''}>${p.nom}</option>`).join('');
+    // Populate filter with both types using optgroup
+    if(sel){
+      sel.innerHTML = '<option value="">Tous les produits</option>';
+      if(tous.bar.length){
+        const grp = document.createElement('optgroup');
+        grp.label = 'Produits Bar';
+        tous.bar.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.nom; grp.appendChild(o); });
+        sel.appendChild(grp);
+      }
+      if(tous.station.length){
+        const grp = document.createElement('optgroup');
+        grp.label = 'Carburants';
+        tous.station.forEach(p=>{ const o=document.createElement('option'); o.value=`s_${p.id}`; o.textContent=p.nom; grp.appendChild(o); });
+        sel.appendChild(grp);
+      }
       sel.value = cur;
     }
   } catch(e){ posAlert(e.message||'Erreur chargement achats.'); }
@@ -14257,18 +14272,53 @@ function _paRenderTable(achats){
   }).join('');
 }
 
-function posAchatNouveauModal(){
+function _paGetSelected(){
+  // Retourne {type:'bar'|'station', id:int, prod:object}
+  const val = document.getElementById('pa-produit')?.value||'';
+  if(!val) return null;
+  if(val.startsWith('s_')){
+    const id = parseInt(val.slice(2));
+    return { type:'station', id, prod: (_paTousProduits.station||[]).find(p=>p.id===id) };
+  }
+  const id = parseInt(val);
+  const prod = (_paTousProduits.bar||[]).find(p=>p.id===id) || _posProduitsAll.find(p=>p.id===id);
+  return { type:'bar', id, prod };
+}
+
+async function posAchatNouveauModal(){
   _paDepenses = [];
   const fields = ['pa-fourn','pa-qte','pa-prix','pa-notes'];
   fields.forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('pa-qte-type').value = 'unite';
 
+  // Charger la liste complète si pas encore chargée
+  if(!_paTousProduits.bar.length && !_paTousProduits.station.length){
+    try { _paTousProduits = await apiFetch('GET','/pos/achats/produits-tous'); } catch(e){}
+  }
+
   const sel = document.getElementById('pa-produit');
   if(sel){
-    sel.innerHTML = '<option value="">— Choisir un produit —</option>' +
-      _posProduitsAll.filter(p=>p.actif!==false).map(p=>
-        `<option value="${p.id}">${p.nom}${p.categorie?' ('+p.categorie+')':''}</option>`
-      ).join('');
+    sel.innerHTML = '<option value="">— Choisir un produit —</option>';
+    if((_paTousProduits.bar||[]).length){
+      const grp = document.createElement('optgroup');
+      grp.label = 'Produits Bar';
+      _paTousProduits.bar.forEach(p=>{
+        const o=document.createElement('option'); o.value=p.id;
+        o.textContent=`${p.nom}${p.categorie?' ('+p.categorie+')':''}`;
+        grp.appendChild(o);
+      });
+      sel.appendChild(grp);
+    }
+    if((_paTousProduits.station||[]).length){
+      const grp = document.createElement('optgroup');
+      grp.label = 'Carburants';
+      _paTousProduits.station.forEach(p=>{
+        const o=document.createElement('option'); o.value=`s_${p.id}`;
+        o.textContent=p.nom;
+        grp.appendChild(o);
+      });
+      sel.appendChild(grp);
+    }
   }
   paOnProdChange();
   paRenderDepenses();
@@ -14277,32 +14327,46 @@ function posAchatNouveauModal(){
 }
 
 function paOnProdChange(){
-  const prodId = parseInt(document.getElementById('pa-produit').value);
-  const prod   = _posProduitsAll.find(p=>p.id===prodId);
-  const type   = document.getElementById('pa-qte-type');
-  const info   = document.getElementById('pa-caisse-info');
-  if(prod && prod.vendu_par_caisse && prod.unites_par_caisse){
-    type.value = 'caisse';
-    if(info){ info.style.display=''; document.getElementById('pa-caisse-info-txt').textContent=`1 caisse = ${prod.unites_par_caisse} ${prod.unite||'unités'}`; }
-  } else {
+  const sel  = _paGetSelected();
+  const type = document.getElementById('pa-qte-type');
+  const info = document.getElementById('pa-caisse-info');
+  const qteRow = document.getElementById('pa-qte-type')?.closest('.pos-form-row');
+
+  if(!sel){ if(info) info.style.display='none'; paUpdateRecap(); return; }
+
+  if(sel.type==='station'){
+    // Carburant : toujours en unités (gallon), pas de mode caisse
     type.value = 'unite';
+    if(type.parentElement) type.parentElement.style.display='none'; // cacher le sélecteur de mode
+    if(info) info.style.display='none';
+    const lbl = document.getElementById('pa-prix-label');
+    if(lbl) lbl.textContent="Prix d'achat par gallon (G) *";
+  } else if(sel.prod && sel.prod.vendu_par_caisse && sel.prod.unites_par_caisse){
+    type.value='caisse';
+    if(type.parentElement) type.parentElement.style.display='';
+    if(info){ info.style.display=''; document.getElementById('pa-caisse-info-txt').textContent=`1 caisse = ${sel.prod.unites_par_caisse} ${sel.prod.unite||'unités'}`; }
+  } else {
+    type.value='unite';
+    if(type.parentElement) type.parentElement.style.display='';
     if(info) info.style.display='none';
   }
   paOnQteTypeChange();
 }
 
 function paOnQteTypeChange(){
-  const prodId = parseInt(document.getElementById('pa-produit').value);
-  const prod   = _posProduitsAll.find(p=>p.id===prodId);
-  const type   = document.getElementById('pa-qte-type').value;
-  const lbl    = document.getElementById('pa-prix-label');
-  const info   = document.getElementById('pa-caisse-info');
-  if(type==='caisse'){
+  const sel  = _paGetSelected();
+  const type = document.getElementById('pa-qte-type')?.value;
+  const lbl  = document.getElementById('pa-prix-label');
+  const info = document.getElementById('pa-caisse-info');
+  if(sel?.type==='station'){
+    if(lbl) lbl.textContent="Prix d'achat par gallon (G) *";
+    if(info) info.style.display='none';
+  } else if(type==='caisse' && sel?.prod){
     if(lbl) lbl.textContent="Prix d'achat par caisse (G) *";
-    if(info && prod && prod.vendu_par_caisse && prod.unites_par_caisse){
+    if(info && sel.prod.vendu_par_caisse && sel.prod.unites_par_caisse){
       info.style.display='';
       document.getElementById('pa-caisse-info-txt').textContent=
-        `Saisir le prix par caisse — converti en ${prod.unites_par_caisse} ${prod.unite||'unités'}`;
+        `Saisir le prix par caisse — converti en ${sel.prod.unites_par_caisse} ${sel.prod.unite||'unités'}`;
     }
   } else {
     if(lbl) lbl.textContent="Prix d'achat unitaire (G) *";
@@ -14360,38 +14424,31 @@ function paRenderDepenses(){
 }
 
 function paUpdateRecap(){
-  const qte   = parseFloat(document.getElementById('pa-qte')?.value)||0;
-  const prix  = parseFloat(document.getElementById('pa-prix')?.value)||0;
-  const type  = document.getElementById('pa-qte-type')?.value;
-  const prodId= parseInt(document.getElementById('pa-produit')?.value);
-  const prod  = _posProduitsAll.find(p=>p.id===prodId);
-
-  let marchandise = 0;
-  if(type==='caisse' && prod && prod.unites_par_caisse>0){
-    marchandise = qte * prix; // prix par caisse × nb caisses = total marchandise
-  } else {
-    marchandise = qte * prix;
-  }
-  const depTotal  = _paDepenses.reduce((s,d)=>s+(parseFloat(d.montant)||0),0);
-  const coutTotal = marchandise + depTotal;
+  const qte  = parseFloat(document.getElementById('pa-qte')?.value)||0;
+  const prix = parseFloat(document.getElementById('pa-prix')?.value)||0;
+  // Le récapitulatif est identique quelle que soit la source produit :
+  // qte * prix = coût marchandise (le backend gère la conversion caisse→unités)
+  const marchandise = qte * prix;
+  const depTotal    = _paDepenses.reduce((s,d)=>s+(parseFloat(d.montant)||0),0);
+  const coutTotal   = marchandise + depTotal;
   const fmt = v=>`G ${v.toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-  const el = id=>document.getElementById(id);
+  const el  = id=>document.getElementById(id);
   if(el('pa-recap-marchandise')) el('pa-recap-marchandise').textContent = fmt(marchandise);
   if(el('pa-recap-depenses'))    el('pa-recap-depenses').textContent    = fmt(depTotal);
   if(el('pa-recap-total'))       el('pa-recap-total').textContent       = fmt(coutTotal);
 }
 
 async function posEnregistrerAchat(){
-  const prodId = parseInt(document.getElementById('pa-produit').value);
-  const qte    = parseFloat(document.getElementById('pa-qte').value)||0;
-  const prix   = parseFloat(document.getElementById('pa-prix').value)||0;
-  const type   = document.getElementById('pa-qte-type').value;
-  const fourn  = document.getElementById('pa-fourn').value.trim()||null;
-  const notes  = document.getElementById('pa-notes').value.trim()||null;
+  const sel   = _paGetSelected();
+  const qte   = parseFloat(document.getElementById('pa-qte').value)||0;
+  const prix  = parseFloat(document.getElementById('pa-prix').value)||0;
+  const type  = document.getElementById('pa-qte-type').value;
+  const fourn = document.getElementById('pa-fourn').value.trim()||null;
+  const notes = document.getElementById('pa-notes').value.trim()||null;
 
-  if(!prodId)  { posAlert('Sélectionner un produit.','warn'); return; }
-  if(qte<=0)   { posAlert('La quantité doit être > 0.','warn'); return; }
-  if(prix<0)   { posAlert('Le prix ne peut pas être négatif.','warn'); return; }
+  if(!sel)   { posAlert('Sélectionner un produit.','warn'); return; }
+  if(qte<=0) { posAlert('La quantité doit être > 0.','warn'); return; }
+  if(prix<0) { posAlert('Le prix ne peut pas être négatif.','warn'); return; }
 
   for(const d of _paDepenses){
     if(!d.description.trim()){ posAlert('Saisir une description pour chaque dépense.','warn'); return; }
@@ -14402,22 +14459,27 @@ async function posEnregistrerAchat(){
     .filter(d=>d.description.trim())
     .map(d=>({description:d.description.trim(), montant:parseFloat(d.montant)||0}));
 
+  // Selon le type de produit, on passe le bon champ FK
+  const body = {
+    quantite:            qte,
+    quantite_type:       sel.type==='station' ? 'unite' : type,
+    prix_achat_unitaire: prix,
+    fournisseur:         fourn,
+    notes,
+    depenses,
+  };
+  if(sel.type==='bar')     body.produit_id         = sel.id;
+  else                     body.station_produit_id  = sel.id;
+
   try {
-    const res = await apiFetch('POST','/pos/achats',{
-      produit_id: prodId,
-      quantite: qte,
-      quantite_type: type,
-      prix_achat_unitaire: prix,
-      fournisseur: fourn,
-      notes,
-      depenses
-    });
+    const res = await apiFetch('POST','/pos/achats', body);
     document.getElementById('pos-achat-modal-bg').classList.remove('open');
     await loadPosAchats();
-    const prod = _posProduitsAll.find(p=>p.id===prodId);
-    const fmt  = v=>`G ${parseFloat(v).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-    posAlert(`Achat enregistré — ${res.quantite_unites} unité${res.quantite_unites>1?'s':''} ajoutée${res.quantite_unites>1?'s':''}${prod?' pour '+prod.nom:''}. Coût total: ${fmt(res.cout_total)}`,'ok');
-    if(typeof loadPosProduits==='function') loadPosProduits();
+    const fmt = v=>`G ${parseFloat(v).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+    const label = res.produit_nom || (sel.prod?.nom||'le produit');
+    const unLabel = sel.type==='station' ? 'gallon' : 'unité';
+    posAlert(`Achat enregistré — ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} pour ${label}. Coût total: ${fmt(res.cout_total)}`,'ok');
+    if(sel.type==='bar' && typeof loadPosProduits==='function') loadPosProduits();
   } catch(e){ posAlert(e.message||'Erreur enregistrement achat.'); }
 }
 
