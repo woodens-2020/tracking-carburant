@@ -310,6 +310,20 @@ class Achat(Base):
 # MODULE BAR / RESTAURANT — POS (Point of Sale)
 # ══════════════════════════════════════════════════════════════════
 
+class BarCategorie(Base):
+    """Catégories d'articles du bar (boisson, alcool, plat…)."""
+    __tablename__ = "bar_categories"
+
+    id            = Column(Integer, primary_key=True)
+    nom           = Column(String(80), nullable=False)
+    couleur       = Column(String(20), nullable=True)
+    date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("nom", name="uq_bar_categories_nom"),
+    )
+
+
 class BarProduit(Base):
     """Article du bar/restaurant : boisson, plat, snack, etc."""
     __tablename__ = "bar_produits"

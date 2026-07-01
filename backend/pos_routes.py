@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from models import (
-    BarProduit, BarPrixHistorique, BarAchat, BarMouvementStock,
+    BarCategorie, BarProduit, BarPrixHistorique, BarAchat, BarMouvementStock,
     BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande, BarPaiementEmploye, Employe,
 )
@@ -160,6 +160,47 @@ class PaiementEmployeIn(BaseModel):
 
 
 # ══════════════════════════════════════════════════════════════════
+# CATÉGORIES
+# ══════════════════════════════════════════════════════════════════
+
+_COULEURS_DEFAUT = {
+    'boisson': '#3fb6a8', 'alcool': '#a78bfa', 'soft': '#60a5fa',
+    'plat': '#f7a93b', 'snack': '#fb923c', 'tabac': '#f87171',
+    'dessert': '#f472b6', 'autre': '#94a3b8',
+}
+
+def _get_or_create_categorie(nom: str, db: Session) -> BarCategorie:
+    """Retourne la catégorie existante ou en crée une nouvelle."""
+    nom_clean = nom.strip().lower()
+    cat = db.query(BarCategorie).filter_by(nom=nom_clean).first()
+    if not cat:
+        cat = BarCategorie(nom=nom_clean, couleur=_COULEURS_DEFAUT.get(nom_clean, '#94a3b8'))
+        db.add(cat)
+        db.flush()
+    return cat
+
+
+@router.get("/categories")
+def liste_categories(db: Session = Depends(get_db)):
+    cats = db.query(BarCategorie).order_by(BarCategorie.nom).all()
+    return [{"id": c.id, "nom": c.nom, "couleur": c.couleur} for c in cats]
+
+
+class CategorieIn(BaseModel):
+    nom: str
+    couleur: Optional[str] = None
+
+
+@router.post("/categories", status_code=201)
+def creer_categorie(data: CategorieIn, db: Session = Depends(get_db)):
+    cat = _get_or_create_categorie(data.nom, db)
+    if data.couleur:
+        cat.couleur = data.couleur
+    db.commit()
+    return {"id": cat.id, "nom": cat.nom, "couleur": cat.couleur}
+
+
+# ══════════════════════════════════════════════════════════════════
 # PRODUITS & PRIX
 # ══════════════════════════════════════════════════════════════════
 
@@ -224,9 +265,10 @@ def creer_produit(data: ProduitIn, request: Request, db: Session = Depends(get_d
     ).first()
     if existant:
         raise HTTPException(409, f"Un produit nommé « {existant.nom} » existe déjà dans le catalogue.")
+    _get_or_create_categorie(data.categorie, db)
     p = BarProduit(
         nom                = data.nom.strip(),
-        categorie          = data.categorie.strip(),
+        categorie          = data.categorie.strip().lower(),
         unite              = data.unite.strip(),
         code_barre         = data.code_barre,
         actif              = data.actif,
@@ -255,8 +297,9 @@ def modifier_produit(produit_id: int, data: ProduitIn, db: Session = Depends(get
         raise HTTPException(404, "Produit introuvable")
     if data.vendu_par_caisse and (not data.unites_par_caisse or data.unites_par_caisse < 1):
         raise HTTPException(422, "unites_par_caisse est obligatoire (≥ 1) pour un produit vendu par caisse.")
+    _get_or_create_categorie(data.categorie, db)
     p.nom                = data.nom.strip()
-    p.categorie          = data.categorie.strip()
+    p.categorie          = data.categorie.strip().lower()
     p.unite              = data.unite.strip()
     p.code_barre         = data.code_barre
     p.actif              = data.actif

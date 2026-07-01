@@ -5246,6 +5246,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="gi-table-hdr">
             <span class="gi-table-title">Liste des produits</span>
             <div style="display:flex;align-items:center;gap:8px">
+              <select id="pos-cat-filter" onchange="posProduitsFiltrer()" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:rgba(255,255,255,.7);font-size:11.5px;padding:6px 10px;outline:none;cursor:pointer">
+                <option value="">Toutes catégories</option>
+              </select>
               <div style="position:relative">
                 <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2" style="width:13px;height:13px;position:absolute;left:9px;top:50%;transform:translateY(-50%)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <input id="pos-prod-search" placeholder="Rechercher…" oninput="posProduitsFiltrer()" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:rgba(255,255,255,.8);font-size:11.5px;padding:6px 10px 6px 30px;outline:none;width:200px">
@@ -5279,10 +5282,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="pos-form-row">
           <div><label class="pos-label">Nom *</label><input class="pos-input" id="pos-prod-nom" placeholder="Ex : Cola Couronne 12oz"></div>
           <div><label class="pos-label">Catégorie *</label>
-            <select class="pos-select" id="pos-prod-cat">
-              <option>boisson</option><option>alcool</option><option>soft</option>
-              <option>plat</option><option>snack</option><option>autre</option>
-            </select>
+            <input class="pos-input" id="pos-prod-cat" list="pos-cat-datalist" placeholder="Ex : boisson, plat…" autocomplete="off">
+            <datalist id="pos-cat-datalist"></datalist>
           </div>
         </div>
         <div class="pos-form-row">
@@ -13322,11 +13323,40 @@ async function posEncaisser(){
 // PAGE POS PRODUITS
 // ══════════════════════════════════════════════════════════════════════
 let _posProduitsAll = [];
+let _posCategories  = [];
+
+const _CAT_COULEURS = {
+  boisson:'#3fb6a8', alcool:'#a78bfa', soft:'#60a5fa', plat:'#f7a93b',
+  snack:'#fb923c', tabac:'#f87171', dessert:'#f472b6', autre:'#94a3b8',
+};
+
+function _catCouleur(nom){
+  if(!nom) return '#94a3b8';
+  const cat = _posCategories.find(c=>c.nom===nom.toLowerCase());
+  return (cat && cat.couleur) ? cat.couleur : (_CAT_COULEURS[nom.toLowerCase()]||'#94a3b8');
+}
+
+async function loadPosCategories(){
+  try {
+    _posCategories = await apiFetch('GET','/pos/categories');
+    const dl = document.getElementById('pos-cat-datalist');
+    const sel = document.getElementById('pos-cat-filter');
+    if(dl){
+      dl.innerHTML = _posCategories.map(c=>`<option value="${c.nom}">`).join('');
+    }
+    if(sel){
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">Toutes catégories</option>' +
+        _posCategories.map(c=>`<option value="${c.nom}"${c.nom===cur?' selected':''}>${c.nom}</option>`).join('');
+    }
+  } catch(e){ /* silencieux */ }
+}
 
 async function loadPosProduits(){
   const tbody = document.getElementById('pos-prod-tbody');
   if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
+    await loadPosCategories();
     const data = await apiFetch('GET','/pos/produits');
     _posProduitsAll = data || [];
     _posRenderProduitsTbody(_posProduitsAll, null);
@@ -13358,7 +13388,6 @@ function _posRenderProduitsTbody(prods, stockMap){
     tbody.innerHTML = '<tr><td colspan="9"><div class="gi-empty">Aucun produit trouvé</div></td></tr>';
     return;
   }
-  const catColor = {boisson:'badge-blue',alcool:'badge-amber',soft:'badge-teal',plat:'badge-green',snack:'badge-gray',autre:'badge-gray'};
   tbody.innerHTML = prods.map(p=>{
     // Fusionner données produit + stockMap si dispo
     if(stockMap && stockMap[p.id]){
@@ -13371,9 +13400,8 @@ function _posRenderProduitsTbody(prods, stockMap){
     }
     const cmup  = p.cmup != null ? posGx(p.cmup) : '—';
     const cat   = p.categorie||'—';
-    const catBadge = catColor[cat]
-      ? `<span class="td-badge ${catColor[cat]}">${cat}</span>`
-      : `<span class="td-muted">${cat}</span>`;
+    const clr   = _catCouleur(cat);
+    const catBadge = `<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:${clr}22;color:${clr};border:1px solid ${clr}44">${cat}</span>`;
     const caisseBadge = p.vendu_par_caisse
       ? `<span style="font-size:9.5px;background:rgba(247,169,59,.15);color:#f7a93b;border-radius:4px;padding:1px 5px;margin-left:4px">caisse×${p.unites_par_caisse||'?'}</span>`
       : '';
@@ -13417,8 +13445,11 @@ function _posRenderProduitsTbody(prods, stockMap){
 }
 
 function posProduitsFiltrer(){
-  const q = (document.getElementById('pos-prod-search')?.value||'').toLowerCase();
-  const filtered = q ? _posProduitsAll.filter(p=>(p.nom||'').toLowerCase().includes(q)||(p.categorie||'').toLowerCase().includes(q)) : _posProduitsAll;
+  const q   = (document.getElementById('pos-prod-search')?.value||'').toLowerCase();
+  const cat = (document.getElementById('pos-cat-filter')?.value||'').toLowerCase();
+  let filtered = _posProduitsAll;
+  if(cat) filtered = filtered.filter(p=>(p.categorie||'').toLowerCase()===cat);
+  if(q)   filtered = filtered.filter(p=>(p.nom||'').toLowerCase().includes(q)||(p.categorie||'').toLowerCase().includes(q));
   _posRenderProduitsTbody(filtered, null);
 }
 
