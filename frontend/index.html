@@ -1405,7 +1405,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 #pos-receipt-overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(10px);z-index:9700;display:none;align-items:center;justify-content:center;padding:20px}
 #pos-receipt-overlay.open{display:flex}
 #pos-receipt-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;max-height:90vh}
-.pos-receipt-paper{background:#fff;color:#111;font-family:'Courier New',Courier,monospace;font-size:11.5px;line-height:1.55;width:302px;max-height:calc(90vh - 90px);overflow-y:auto;padding:16px 12px;border-radius:6px;white-space:pre;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+.pos-receipt-paper{background:#fff;color:#111;font-family:Arial,sans-serif;font-size:11.5px;line-height:1.55;width:310px;max-height:calc(90vh - 90px);overflow-y:auto;padding:16px 14px;border-radius:6px;box-shadow:0 8px 40px rgba(0,0,0,.5)}
 #pos-receipt-actions{display:flex;gap:10px}
 #pos-receipt-actions .r-close{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#fff;padding:9px 20px;border-radius:9px;cursor:pointer;font-size:13px}
 #pos-receipt-actions .r-print{background:#3fb6a8;border:none;color:#fff;padding:9px 22px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600}
@@ -6212,7 +6212,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <h3 style="margin:0;color:#34d399">✓ Paiement confirmé</h3>
           <button onclick="document.getElementById('pcmd-recu-bg').classList.remove('open');pcmdRetour()" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;padding:0;line-height:1">✕</button>
         </div>
-        <div id="pcmd-recu-body" style="background:#0f172a;border-radius:10px;padding:16px;max-height:380px;overflow-y:auto;font-size:12px;line-height:1.9"></div>
+        <div id="pcmd-recu-body" style="background:#fff;color:#111;border-radius:8px;padding:16px 18px;max-height:420px;overflow-y:auto"></div>
         <div class="pos-modal-footer" style="margin-top:14px">
           <button class="pos-btn ghost" onclick="pcmdImprimerRecu()">🖨 Imprimer</button>
           <button class="pos-btn primary" onclick="document.getElementById('pcmd-recu-bg').classList.remove('open');pcmdRetour()">Fermer &amp; libérer table</button>
@@ -14104,76 +14104,109 @@ function posSetMode(mode, btn){
   posCalcMonnaie();
 }
 
+// ─── Utilitaires reçu partagés ───────────────────────────────────────────────
+const _POS_PRINT_CSS = [
+  '*{margin:0;padding:0;box-sizing:border-box}',
+  'body{font-family:Arial,sans-serif;width:80mm;margin:0 auto;padding:5mm 4mm;color:#111;background:#fff}',
+  '@page{size:80mm auto;margin:3mm}',
+  '@media print{.no-print{display:none!important}}',
+  'hr{border:none}',
+  '.sep{border-top:1px dashed #bbb;margin:8px 0}',
+  '.sep-bold{border-top:2px solid #333;margin:9px 0}',
+  'table{width:100%;border-collapse:collapse}',
+  'th,td{vertical-align:top}',
+].join('');
+
+function _posOuvrirImprimer(htmlContent, title){
+  const w = window.open('','_blank','width=370,height=720,menubar=no,toolbar=no,scrollbars=yes');
+  if(!w) return;
+  const printBtn = `<div class="no-print" style="text-align:center;margin-top:10mm">
+    <button onclick="window.print()" style="padding:7px 22px;font-size:12px;cursor:pointer;border:1px solid #bbb;border-radius:5px;background:#f0f0f0">🖨 Imprimer</button></div>`;
+  w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+    <title>${title}</title><style>${_POS_PRINT_CSS}</style></head>
+    <body>${htmlContent}${printBtn}</body></html>`);
+  w.document.close();
+  w.addEventListener('load',()=>{ try{ w.print(); }catch(_){} });
+}
+
+function _posRecuHeaderHTML(ticket, dateStr, heureStr, extraRows){
+  return `
+  <div style="text-align:center;padding-bottom:10px">
+    <div style="font-size:20px;font-weight:900;letter-spacing:.05em;color:#111">NATIVITE</div>
+    <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#555;margin-top:2px">Bar &nbsp;·&nbsp; Hôtel &nbsp;·&nbsp; Piscine</div>
+    <div style="font-size:9px;color:#888;margin-top:3px">Acul du Nord, Nord, Haïti</div>
+    <div style="font-size:9px;color:#888">Tél : (509) 3625-1100 / 4821-7700</div>
+    <hr class="sep-bold" style="margin-top:9px">
+    <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Ticket de Caisse</div>
+    <hr class="sep-bold">
+  </div>
+  <table style="margin-bottom:6px">
+    <tr><td style="font-size:11px;color:#555;padding:2px 0">Ticket N°</td><td style="font-size:11px;font-weight:700;text-align:right;padding:2px 0">${ticket}</td></tr>
+    <tr><td style="font-size:11px;color:#555;padding:2px 0">Date</td><td style="font-size:11px;text-align:right;padding:2px 0">${dateStr} &nbsp; ${heureStr}</td></tr>
+    ${(extraRows||[]).map(([l,v])=>`<tr><td style="font-size:11px;color:#555;padding:2px 0">${l}</td><td style="font-size:11px;text-align:right;padding:2px 0">${v}</td></tr>`).join('')}
+  </table>
+  <hr class="sep">`;
+}
+
+function _posRecuPiedHTML(){
+  return `<hr class="sep-bold" style="margin-top:12px">
+  <div style="text-align:center;font-size:11px;color:#555;padding-top:4px;font-style:italic">Merci de votre visite ! &nbsp; À bientôt !</div>`;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function posShowReceipt(result, cart, montantRecu, clientNom, mode, caissierNom){
-  const W = 32;
-  const hr  = '─'.repeat(W);
-  const dhr = '═'.repeat(W);
-  function rpad(s,n){ s=String(s); return s.length>=n?s.substring(0,n):s+' '.repeat(n-s.length); }
-  function lpad(s,n){ s=String(s); return s.length>=n?s.substring(s.length-n):' '.repeat(n-s.length)+s; }
-  function ctr(s,n){ const p=Math.max(0,n-s.length); const l=Math.floor(p/2); return ' '.repeat(l)+s+' '.repeat(p-l); }
-  const now=new Date();
-  const dateStr=now.toLocaleDateString('fr-HT',{day:'2-digit',month:'2-digit',year:'numeric'});
-  const timeStr=now.toLocaleTimeString('fr-HT',{hour:'2-digit',minute:'2-digit'});
-  const lines=[];
-  lines.push(dhr);
-  lines.push(ctr('NATIVITE',W));
-  lines.push(ctr('Bar, Hotel, Piscine',W));
-  lines.push(ctr('Acul du Nord, Nord, Haiti',W));
-  lines.push(ctr('Tel: (509) 3625-1100 / 4821-7700',W));
-  lines.push(dhr);
-  lines.push('');
-  lines.push(`Ticket : ${result.numero_ticket}`);
-  lines.push(`Date   : ${dateStr}  ${timeStr}`);
-  if(caissierNom) lines.push(`Caissier: ${caissierNom}`);
-  if(clientNom)   lines.push(`Client  : ${clientNom}`);
-  lines.push('');
-  lines.push(hr);
-  const nomW=W-12;
-  lines.push(rpad('ARTICLE',nomW)+lpad('QTÉ',4)+lpad('TOTAL',8));
-  lines.push(hr);
-  let total=0;
-  for(const it of cart){
-    const sous=it.prix*it.quantite;
-    total+=sous;
-    let nom=it.nom||'';
-    const chunks=[];
-    while(nom.length>0){ chunks.push(nom.substring(0,nomW)); nom=nom.substring(nomW); }
-    lines.push(rpad(chunks[0]||'',nomW)+lpad(String(it.quantite),4)+lpad('G'+sous.toFixed(0),8));
-    for(let ci=1;ci<chunks.length;ci++) lines.push(' '+chunks[ci]);
-    lines.push(rpad('  @'+lpad('G'+it.prix.toFixed(2),9),W));
-  }
-  lines.push(hr);
-  lines.push(rpad('TOTAL',W-10)+lpad('G '+total.toFixed(2),10));
-  if(mode==='CASH'&&montantRecu>0){
-    lines.push(rpad('Reçu',W-10)+lpad('G '+montantRecu.toFixed(2),10));
-    lines.push(rpad('Monnaie',W-10)+lpad('G '+(montantRecu-total).toFixed(2),10));
-  } else if(mode==='CREDIT'){
-    lines.push(rpad('Mode',W-10)+lpad('CRÉDIT',10));
-  } else if(mode==='MIXTE'){
-    lines.push(rpad('Mode',W-10)+lpad('MIXTE',10));
-  }
-  lines.push('');
-  lines.push(dhr);
-  lines.push(ctr('Merci de votre visite !',W));
-  lines.push(ctr('À bientôt !',W));
-  lines.push(dhr);
-  const paper=document.getElementById('pos-receipt-paper');
-  if(paper) paper.textContent=lines.join('\n');
+  const now      = new Date();
+  const dateStr  = now.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const heureStr = now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const ticket   = result.numero_ticket||'—';
+  const total    = cart.reduce((s,it)=>s+it.prix*it.quantite,0);
+
+  const extras = [];
+  if(caissierNom) extras.push(['Caissier', caissierNom]);
+  if(clientNom)   extras.push(['Client',   clientNom]);
+
+  const lignesHTML = cart.map(it=>{
+    const sous = it.prix * it.quantite;
+    return `<tr>
+      <td style="padding:3px 2px;font-size:11px">${it.nom||'—'}</td>
+      <td style="padding:3px 2px;text-align:center;font-size:11px;white-space:nowrap">×${it.quantite}</td>
+      <td style="padding:3px 2px;text-align:right;font-size:11px;white-space:nowrap">G ${sous.toFixed(2)}</td>
+    </tr>
+    <tr><td colspan="3" style="padding:0 2px 4px 6px;font-size:9.5px;color:#999">@ G ${it.prix.toFixed(2)} / u</td></tr>`;
+  }).join('');
+
+  const html = `
+  ${_posRecuHeaderHTML(ticket, dateStr, heureStr, extras)}
+  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:4px">Articles</div>
+  <table>
+    <thead><tr>
+      <th style="font-size:10px;text-align:left;color:#aaa;font-weight:600;padding:2px">Article</th>
+      <th style="font-size:10px;text-align:center;color:#aaa;font-weight:600;padding:2px">Qté</th>
+      <th style="font-size:10px;text-align:right;color:#aaa;font-weight:600;padding:2px">Montant</th>
+    </tr></thead>
+    <tbody>${lignesHTML}</tbody>
+  </table>
+  <hr class="sep">
+  <table>
+    <tr><td style="font-size:13px;font-weight:700;padding:2px 0">TOTAL</td><td style="font-size:13px;font-weight:700;text-align:right;padding:2px 0">G ${total.toFixed(2)}</td></tr>
+    ${mode==='CASH'&&montantRecu>0?`
+      <tr><td style="font-size:11px;color:#555;padding:2px 0">Montant reçu</td><td style="font-size:11px;text-align:right;padding:2px 0">G ${montantRecu.toFixed(2)}</td></tr>
+      <tr><td style="font-size:12px;font-weight:700;padding:3px 0">Monnaie</td><td style="font-size:12px;font-weight:700;text-align:right;padding:3px 0">G ${(montantRecu-total).toFixed(2)}</td></tr>`:''
+    }
+    ${mode==='CREDIT'?`<tr><td colspan="2" style="font-size:11px;color:#dc2626;text-align:center;padding:6px 0;font-weight:600">Mode : CRÉDIT</td></tr>`:''}
+    ${mode==='MIXTE'?`<tr><td colspan="2" style="font-size:11px;color:#d97706;text-align:center;padding:6px 0;font-weight:600">Mode : MIXTE</td></tr>`:''}
+  </table>
+  ${_posRecuPiedHTML()}`;
+
+  const paper = document.getElementById('pos-receipt-paper');
+  if(paper) paper.innerHTML = html;
   document.getElementById('pos-receipt-overlay').classList.add('open');
 }
 
 function posPrintReceipt(){
-  const paper=document.getElementById('pos-receipt-paper');
+  const paper = document.getElementById('pos-receipt-paper');
   if(!paper) return;
-  const zone=document.getElementById('pos-print-zone');
-  zone.innerHTML='';
-  const clone=paper.cloneNode(true);
-  clone.style.maxHeight='none';
-  clone.style.overflow='visible';
-  zone.appendChild(clone);
-  document.body.classList.add('print-pos');
-  window.print();
-  document.body.classList.remove('print-pos');
+  _posOuvrirImprimer(paper.innerHTML, 'Ticket NATIVITE');
 }
 
 function posCalcMonnaie(){
@@ -16224,43 +16257,51 @@ function _pcmdAfficherRecu(r){
   const paye    = parseFloat(r.montant_paye||0);
   const restant = parseFloat(r.montant_restant||0);
   const monnaie = (paye>total&&total>0) ? paye-total : 0;
-  const date    = r.date_heure ? new Date(r.date_heure).toLocaleString('fr-HT') : new Date().toLocaleString('fr-HT');
-  const sep     = '<div style="border-top:1px dashed rgba(255,255,255,.15);margin:8px 0"></div>';
-  const table   = document.getElementById('pcmd-detail-titre')?.textContent||'';
-  const lignes  = (r.lignes||[]).map(l=>`
-    <div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0">
-      <span style="flex:1;min-width:0">${l.produit_nom||'—'} ×${Math.round(l.quantite||1)}</span>
-      <span style="white-space:nowrap;color:#60a5fa">${posGx(l.sous_total||0)}</span>
-    </div>`).join('');
-  document.getElementById('pcmd-recu-body').innerHTML = `
-    <div style="text-align:center;font-weight:700;font-size:14px;margin-bottom:4px">BAR — REÇU</div>
-    <div style="text-align:center;font-size:11px;color:rgba(255,255,255,.4);margin-bottom:2px">Ticket #${r.numero_ticket||'—'}</div>
-    ${table?`<div style="text-align:center;font-size:11px;color:rgba(255,255,255,.4);margin-bottom:2px">${table}</div>`:''}
-    <div style="text-align:center;font-size:11px;color:rgba(255,255,255,.3);margin-bottom:4px">${date}</div>
-    ${sep}
-    <div>${lignes||'<div style="color:rgba(255,255,255,.3)">—</div>'}</div>
-    ${sep}
-    <div style="display:flex;justify-content:space-between;font-weight:700;font-size:15px;padding:2px 0">
-      <span>TOTAL</span><span style="color:#60a5fa">${posGx(total)}</span>
-    </div>
-    ${r.mode_paiement!=='CREDIT'?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;color:rgba(255,255,255,.5)"><span>Montant reçu</span><span>${posGx(paye||total)}</span></div>`:''}
-    ${monnaie>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0;color:#34d399;font-weight:600"><span>Monnaie rendue</span><span>${posGx(monnaie)}</span></div>`:''}
-    ${restant>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0;color:#f87171;font-weight:600"><span>Reste à payer</span><span>${posGx(restant)}</span></div>`:''}
-    ${sep}
-    <div style="font-size:11px;color:rgba(255,255,255,.3)">Mode : ${r.mode_paiement||'—'}</div>
-    <div style="text-align:center;margin-top:12px;font-size:12px;color:rgba(255,255,255,.2)">Merci !</div>`;
+  const now      = r.date_heure ? new Date(r.date_heure) : new Date();
+  const dateStr  = now.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const heureStr = now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const ticket    = r.numero_ticket||'—';
+  const mode      = r.mode_paiement||'CASH';
+  const tableName = document.getElementById('pcmd-detail-titre')?.textContent||'';
+
+  const extras = tableName ? [['Table', tableName]] : [];
+
+  const lignesHTML = (r.lignes||[]).map(l=>`
+    <tr>
+      <td style="padding:3px 2px;font-size:11px">${l.produit_nom||'—'}</td>
+      <td style="padding:3px 2px;text-align:center;font-size:11px;white-space:nowrap">×${Math.round(l.quantite||1)}</td>
+      <td style="padding:3px 2px;text-align:right;font-size:11px;white-space:nowrap">${posGx(l.sous_total||0)}</td>
+    </tr>`).join('');
+
+  const html = `
+  ${_posRecuHeaderHTML(ticket, dateStr, heureStr, extras)}
+  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:4px">Articles commandés</div>
+  <table>
+    <thead><tr>
+      <th style="font-size:10px;text-align:left;color:#aaa;font-weight:600;padding:2px">Article</th>
+      <th style="font-size:10px;text-align:center;color:#aaa;font-weight:600;padding:2px">Qté</th>
+      <th style="font-size:10px;text-align:right;color:#aaa;font-weight:600;padding:2px">Montant</th>
+    </tr></thead>
+    <tbody>${lignesHTML||'<tr><td colspan="3" style="color:#bbb;padding:4px 2px">—</td></tr>'}</tbody>
+  </table>
+  <hr class="sep">
+  <table>
+    <tr><td style="font-size:13px;font-weight:700;padding:2px 0">TOTAL</td><td style="font-size:13px;font-weight:700;text-align:right;padding:2px 0">${posGx(total)}</td></tr>
+    ${mode!=='CREDIT'?`<tr><td style="font-size:11px;color:#555;padding:2px 0">Montant reçu</td><td style="font-size:11px;text-align:right;padding:2px 0">${posGx(paye||total)}</td></tr>`:''}
+    ${monnaie>0?`<tr><td style="font-size:12px;font-weight:700;color:#16a34a;padding:3px 0">Monnaie rendue</td><td style="font-size:12px;font-weight:700;color:#16a34a;text-align:right;padding:3px 0">${posGx(monnaie)}</td></tr>`:''}
+    ${restant>0?`<tr><td style="font-size:12px;font-weight:600;color:#dc2626;padding:2px 0">Reste à payer</td><td style="font-size:12px;font-weight:600;color:#dc2626;text-align:right;padding:2px 0">${posGx(restant)}</td></tr>`:''}
+    ${mode==='CREDIT'?`<tr><td colspan="2" style="font-size:11px;color:#dc2626;text-align:center;padding:6px 0;font-weight:600">Mode : CRÉDIT</td></tr>`:''}
+    ${mode==='MIXTE'?`<tr><td colspan="2" style="font-size:11px;color:#d97706;text-align:center;padding:6px 0;font-weight:600">Mode : MIXTE</td></tr>`:''}
+  </table>
+  ${_posRecuPiedHTML()}`;
+
+  document.getElementById('pcmd-recu-body').innerHTML = html;
   document.getElementById('pcmd-recu-bg').classList.add('open');
 }
 
 function pcmdImprimerRecu(){
   const html = document.getElementById('pcmd-recu-body')?.innerHTML||'';
-  const win  = window.open('','_blank','width=380,height=560');
-  if(!win) return;
-  win.document.write(`<!DOCTYPE html><html><head><title>Reçu</title><style>
-    body{font-family:monospace;font-size:13px;padding:20px;color:#000;background:#fff}
-    </style></head><body>${html}</body></html>`);
-  win.document.close();
-  setTimeout(()=>win.print(),300);
+  _posOuvrirImprimer(html, 'Ticket NATIVITE');
 }
 
 // ══════════════════════════════════════════════════════════════════════
