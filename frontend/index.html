@@ -671,13 +671,15 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
 .recap-table tr:last-child td{border-bottom:none}
 .recap-total td{border-top:1px solid var(--border2)!important;background:var(--panel2);font-weight:700}
 
-/* ── Toasts — centré en haut de l'écran ─────────────── */
+/* ── Toasts — centré sous le header (56px) ─────────────── */
 #toasts{
-  position:fixed;top:28px;left:50%;transform:translateX(-50%);
+  position:fixed;top:72px;left:50%;transform:translateX(-50%);
   z-index:9000;display:flex;flex-direction:column;gap:12px;
   pointer-events:none;width:min(480px,90vw);
   align-items:center;
 }
+@media(max-width:768px){#toasts{top:60px}}
+@media(max-width:480px){#toasts{top:52px;width:calc(100vw - 24px)}}
 .toast{
   display:flex;align-items:flex-start;gap:14px;
   padding:16px 20px 16px 18px;border-radius:14px;
