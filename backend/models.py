@@ -536,6 +536,7 @@ class BarCredit(Base):
     vente_id          = Column(Integer, ForeignKey("bar_ventes.id", ondelete="RESTRICT"), nullable=False)
     client_nom        = Column(String(150), nullable=False)
     client_contact    = Column(String(100), nullable=True)
+    client_nif        = Column(String(50),  nullable=True)
     montant_du        = Column(Numeric(14, 2), nullable=False)
     montant_rembourse = Column(Numeric(14, 2), nullable=False, default=0)
     solde             = Column(Numeric(14, 2), nullable=False)

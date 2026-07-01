@@ -194,6 +194,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
             vente_id          = vente.id,
             client_nom        = data.get("client_nom") or "Client inconnu",
             client_contact    = data.get("client_contact"),
+            client_nif        = data.get("client_nif"),
             montant_du        = montant_restant,
             montant_rembourse = Decimal("0"),
             solde             = montant_restant,

@@ -151,6 +151,7 @@ class EncaisserCommandeIn(BaseModel):
     montant_paye:   Optional[float]= None
     client_nom:     Optional[str]  = None
     client_contact: Optional[str]  = None
+    client_nif:     Optional[str]  = None
     date_echeance:  Optional[date_type] = None
 
 
@@ -1180,6 +1181,7 @@ def liste_credits(
             "vente_id":         c.vente_id,
             "client_nom":       c.client_nom,
             "client_contact":   c.client_contact,
+            "client_nif":       c.client_nif,
             "montant_du":       float(c.montant_du),
             "montant_rembourse":float(c.montant_rembourse),
             "solde":            float(c.solde),

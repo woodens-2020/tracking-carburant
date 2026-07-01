@@ -130,6 +130,9 @@ def _migrate_columns():
             # v5 — poste de l'employé (contrôle d'accès)
             ("utilisateurs", "poste",
              "ALTER TABLE utilisateurs ADD COLUMN poste VARCHAR(100)", None),
+            # v6 — NIF client crédit bar
+            ("bar_credits", "client_nif",
+             "ALTER TABLE bar_credits ADD COLUMN client_nif VARCHAR(50)", None),
         ]
     else:
         return

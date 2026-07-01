@@ -5950,7 +5950,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-table-wrap">
             <table class="pos-table">
               <thead>
-                <tr><th>Client</th><th>Contact</th><th>Montant dû</th><th>Remboursé</th><th>Solde</th><th>Échéance</th><th>Statut</th><th>Actions</th></tr>
+                <tr><th>Client</th><th>Téléphone</th><th>NIF / ID</th><th>Montant dû</th><th>Remboursé</th><th>Solde</th><th>Échéance</th><th>Statut</th><th>Actions</th></tr>
               </thead>
               <tbody id="pos-credits-tbody">
                 <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
@@ -6122,6 +6122,26 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <span id="pcmd-enc-monnaie" style="font-size:18px;font-weight:700;color:#34d399">G 0.00</span>
           </div>
         </div>
+
+        <!-- Section info crédit (visible mode CRÉDIT / MIXTE) -->
+        <div id="pcmd-enc-credit-section" style="display:none;margin-top:14px;border:1px solid rgba(248,113,113,.25);border-radius:10px;padding:14px;background:rgba(248,113,113,.05)">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#f87171;margin-bottom:12px">⚠ Informations crédit client</div>
+          <label class="pos-label">Nom du client *</label>
+          <input class="pos-input" id="pcmd-enc-client-nom" placeholder="Nom complet" style="margin-bottom:10px">
+          <div class="pos-form-row" style="margin-bottom:10px">
+            <div style="flex:1">
+              <label class="pos-label">Téléphone</label>
+              <input class="pos-input" id="pcmd-enc-tel" placeholder="Ex : 509-XXXX-XXXX">
+            </div>
+            <div style="flex:1">
+              <label class="pos-label">NIF / Pièce d'identité</label>
+              <input class="pos-input" id="pcmd-enc-nif" placeholder="Numéro d'identité">
+            </div>
+          </div>
+          <label class="pos-label">Date d'échéance (optionnel)</label>
+          <input class="pos-input" id="pcmd-enc-echeance" type="date">
+        </div>
+
         <div class="pos-modal-footer" style="margin-top:16px">
           <button class="pos-btn ghost" onclick="document.getElementById('pcmd-enc-bg').classList.remove('open')">Annuler</button>
           <button class="pos-btn primary" onclick="pcmdEncaisser()">✓ Confirmer le paiement</button>
@@ -15603,6 +15623,7 @@ async function posCreditsCharger(){
       return `<tr>
         <td>${c.client_nom||'—'}</td>
         <td>${c.client_contact||'—'}</td>
+        <td>${c.client_nif||'—'}</td>
         <td>${posGx(c.montant_du)}</td>
         <td>${posGx(c.montant_rembourse)}</td>
         <td><strong>${posGx(c.solde)}</strong></td>
@@ -15855,7 +15876,11 @@ async function pcmdRetirerArticle(ligneId){
 // ── Libérer table ─────────────────────────────────────────────────────
 async function pcmdLiberer(){
   if(!_pcmdCurrentId) return;
-  if(!confirm('Libérer cette table sans encaisser ? Les articles seront perdus.')) return;
+  if(_pcmdCurrentTotal > 0){
+    posAlert('Cette table a des articles non encaissés. Veuillez encaisser avant de libérer.','warn');
+    return;
+  }
+  if(!confirm('Aucun article sur cette table. Confirmer la libération ?')) return;
   try {
     await apiFetch('DELETE',`/pos/commandes/${_pcmdCurrentId}`);
     posAlert('Table libérée.','ok');
@@ -15871,14 +15896,23 @@ function pcmdEncaisserOuvrir(){
   document.getElementById('pcmd-enc-paye').value  = '';
   document.getElementById('pcmd-enc-mode').value  = 'CASH';
   document.getElementById('pcmd-enc-monnaie-row').style.display = 'none';
+  document.getElementById('pcmd-enc-credit-section').style.display = 'none';
+  document.getElementById('pcmd-enc-client-nom').value = '';
+  document.getElementById('pcmd-enc-tel').value        = '';
+  document.getElementById('pcmd-enc-nif').value        = '';
+  document.getElementById('pcmd-enc-echeance').value   = '';
   document.getElementById('pcmd-enc-bg').classList.add('open');
 }
 
 function pcmdEncModeChange(){
-  if(document.getElementById('pcmd-enc-mode').value==='CREDIT'){
+  const mode    = document.getElementById('pcmd-enc-mode').value;
+  const credit  = document.getElementById('pcmd-enc-credit-section');
+  const monnaie = document.getElementById('pcmd-enc-monnaie-row');
+  if(mode==='CREDIT'){
     document.getElementById('pcmd-enc-paye').value = '0';
-    document.getElementById('pcmd-enc-monnaie-row').style.display='none';
+    monnaie.style.display='none';
   }
+  if(credit) credit.style.display = (mode==='CREDIT'||mode==='MIXTE') ? 'block' : 'none';
 }
 
 function pcmdEncCalcMonnaie(){
@@ -15896,8 +15930,18 @@ function pcmdEncCalcMonnaie(){
 async function pcmdEncaisser(){
   const mode = document.getElementById('pcmd-enc-mode').value;
   const paye = parseFloat(document.getElementById('pcmd-enc-paye').value||0)||null;
+  const body = { mode_paiement: mode, montant_paye: paye };
+  if(mode==='CREDIT'||mode==='MIXTE'){
+    const nom = document.getElementById('pcmd-enc-client-nom').value.trim();
+    if(!nom){ posAlert('Le nom du client est requis pour un crédit.','warn'); return; }
+    body.client_nom    = nom;
+    body.client_contact= document.getElementById('pcmd-enc-tel').value.trim()||null;
+    body.client_nif    = document.getElementById('pcmd-enc-nif').value.trim()||null;
+    const ech = document.getElementById('pcmd-enc-echeance').value;
+    if(ech) body.date_echeance = ech;
+  }
   try {
-    const r = await apiFetch('PUT',`/pos/commandes/${_pcmdCurrentId}/encaisser`,{ mode_paiement:mode, montant_paye:paye });
+    const r = await apiFetch('PUT',`/pos/commandes/${_pcmdCurrentId}/encaisser`, body);
     document.getElementById('pcmd-enc-bg').classList.remove('open');
     _pcmdAfficherRecu(r);
   } catch(e){ posAlert(e.message||'Erreur.'); }
