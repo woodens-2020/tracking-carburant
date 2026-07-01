@@ -19,7 +19,12 @@ try:
 except ImportError:
     pass
 
-from models import Base, Produit, Pompe, Utilisateur, Employe, FichePaie, Depense, Achat, ParametreDepense
+from models import (
+    Base, Produit, Pompe, Utilisateur, Employe, FichePaie, Depense, Achat, ParametreDepense,
+    BarProduit, BarPrixHistorique, BarAchat, BarMouvementStock,
+    BarVente, BarLigneVente, BarCredit, BarRemboursement,
+    BarCommande, BarLigneCommande, BarPaiementEmploye,
+)
 
 # ── URL de connexion ──────────────────────────────────────────────
 DATABASE_URL = os.environ.get(
