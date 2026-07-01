@@ -6399,7 +6399,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
               <div><label class="pos-label">Nom complet *</label><input class="pos-input" id="hrec-client-nom" placeholder="Prénom Nom"></div>
               <div><label class="pos-label">Contact (téléphone)</label><input class="pos-input" id="hrec-client-contact" placeholder="+509 3700 0000"></div>
-              <div><label class="pos-label">Pièce d'identité</label><input class="pos-input" id="hrec-client-piece" placeholder="CIN / Passeport n°…"></div>
+              <div><label class="pos-label">NIF / Pièce d'identité *</label><input class="pos-input" id="hrec-client-piece" placeholder="NIF, CIN, Passeport n°…"></div>
               <div><label class="pos-label">Notes</label><textarea class="pos-input" id="hrec-notes" rows="2" placeholder="Informations supplémentaires…" style="resize:vertical"></textarea></div>
             </div>
           </div>
@@ -16128,7 +16128,9 @@ async function hrecEnregistrer(){
   const clientNom = g('hrec-client-nom');
   const chambreId = document.getElementById('hrec-chambre')?.value;
   const arrivee   = document.getElementById('hrec-arrivee')?.value;
+  const idPiece = g('hrec-client-piece');
   if(!clientNom){ posAlert('Nom du client requis.','warn'); return; }
+  if(!idPiece){   posAlert('NIF / Pièce d\'identité requise.','warn'); return; }
   if(!chambreId){ posAlert('Sélectionnez une chambre.','warn'); return; }
   if(!arrivee){   posAlert('Date d\'arrivée requise.','warn');  return; }
 
@@ -16139,7 +16141,7 @@ async function hrecEnregistrer(){
     chambre_id:      parseInt(chambreId),
     client_nom:      clientNom,
     client_contact:  g('hrec-client-contact') || null,
-    client_id_piece: g('hrec-client-piece')   || null,
+    client_id_piece: idPiece,
     type_sejour:     _hrecType,
     date_arrivee:    new Date(arrivee).toISOString(),
     nb_nuits:        _hrecType==='NUIT'   ? nbN  : null,

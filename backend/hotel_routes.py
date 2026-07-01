@@ -309,7 +309,7 @@ class ReservationIn(BaseModel):
     chambre_id:      int
     client_nom:      str
     client_contact:  Optional[str] = None
-    client_id_piece: Optional[str] = None
+    client_id_piece: str
     type_sejour:     str           = "NUIT"      # NUIT | MOMENT
     date_arrivee:    str                         # ISO datetime
     nb_nuits:        Optional[int]  = None       # si NUIT
@@ -368,6 +368,8 @@ def creer_reservation(data: ReservationIn, request: Request, db: Session = Depen
 
     if not data.client_nom.strip():
         raise HTTPException(422, "Nom du client requis.")
+    if not data.client_id_piece.strip():
+        raise HTTPException(422, "NIF / Pièce d'identité requise.")
     if data.type_sejour not in ("NUIT", "MOMENT"):
         raise HTTPException(422, "type_sejour doit être NUIT ou MOMENT.")
 
