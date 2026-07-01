@@ -15929,6 +15929,7 @@ let _hotelEmployes  = [];
 let _hrecType       = 'NUIT';
 let _hcmEditId      = null;
 let _hempEditId     = null;
+let _hotelTimerIv   = null;
 
 const _STATUT_CHAMBRE_COLOR = {
   DISPONIBLE: '#34d399', OCCUPEE: '#f59e0b', MAINTENANCE: '#f87171', FERMEE: '#64748b'
@@ -16173,6 +16174,9 @@ async function loadHotelSejours(){
       return;
     }
     if(grid) grid.innerHTML = sejours.map(s => _hotelSejourCard(s)).join('');
+    if(_hotelTimerIv) clearInterval(_hotelTimerIv);
+    _hotelTimerIv = setInterval(_hotelTickTimers, 1000);
+    _hotelTickTimers();
   } catch(e){ if(grid) grid.innerHTML = `<div style="color:#f87171;padding:30px;text-align:center">${e.message||'Erreur'}</div>`; }
 }
 
@@ -16193,7 +16197,8 @@ function _hotelSejourCard(s){
       <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">Arrivée : ${arrS}</div>
       <div style="font-size:11px;color:rgba(255,255,255,.4)">Départ prévu : ${depS}</div>
       ${s.client_contact?`<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">${s.client_contact}</div>`:''}
-      <div style="margin-top:10px;padding:8px;background:rgba(255,255,255,.04);border-radius:6px;display:flex;justify-content:space-between">
+      <div class="hotel-timer-box" data-type="${s.type_sejour}" data-depart="${s.date_depart_prevue}" data-arrivee="${s.date_arrivee}" style="margin-top:10px;min-height:28px"></div>
+      <div style="margin-top:8px;padding:8px;background:rgba(255,255,255,.04);border-radius:6px;display:flex;justify-content:space-between">
         <div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.35)">Total</div><div style="font-weight:700">${_hFmt(s.montant_total)}</div></div>
         <div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.35)">Payé</div><div style="font-weight:700;color:#34d399">${_hFmt(s.montant_paye)}</div></div>
         <div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.35)">Solde</div><div style="font-weight:700;color:${hasSolde?'#f87171':'#34d399'}">${_hFmt(s.solde)}</div></div>
@@ -16205,6 +16210,61 @@ function _hotelSejourCard(s){
       </div>
     </div>
   </div>`;
+}
+
+function _hotelTickTimers(){
+  if(currentPage !== 'hotel-sejours'){
+    clearInterval(_hotelTimerIv); _hotelTimerIv = null; return;
+  }
+  const pad = n => String(n).padStart(2,'0');
+  document.querySelectorAll('.hotel-timer-box').forEach(el => {
+    const type   = el.dataset.type;
+    const depart = new Date(el.dataset.depart);
+    const arrivee= new Date(el.dataset.arrivee);
+    const now    = new Date();
+
+    if(type === 'MOMENT'){
+      const diff = depart - now;
+      if(diff <= 0){
+        // Temps dépassé
+        const sec = Math.floor(-diff / 1000);
+        const m   = Math.floor(sec / 60);
+        const s   = sec % 60;
+        el.innerHTML = `<div style="background:rgba(248,113,113,.15);border:1px solid rgba(248,113,113,.4);border-radius:6px;padding:5px 10px;text-align:center">
+          <span style="color:#f87171;font-weight:700;font-size:12px">⏰ Temps dépassé de ${m}min ${pad(s)}s</span></div>`;
+      } else {
+        const sec  = Math.floor(diff / 1000);
+        const h    = Math.floor(sec / 3600);
+        const m    = Math.floor((sec % 3600) / 60);
+        const s    = sec % 60;
+        const clr  = diff < 15*60000 ? '#f87171' : diff < 30*60000 ? '#fbbf24' : '#34d399';
+        const bgClr= diff < 15*60000 ? 'rgba(248,113,113,.1)' : diff < 30*60000 ? 'rgba(251,191,36,.1)' : 'rgba(52,211,153,.08)';
+        const bdClr= diff < 15*60000 ? 'rgba(248,113,113,.35)' : diff < 30*60000 ? 'rgba(251,191,36,.3)' : 'rgba(52,211,153,.2)';
+        const str  = h > 0 ? `${h}h ${pad(m)}min ${pad(s)}s` : `${m}min ${pad(s)}s`;
+        // Barre de progression (2h = durée totale)
+        const totalMs = 2 * 3600000;
+        const pct = Math.max(0, Math.min(100, (diff / totalMs) * 100));
+        el.innerHTML = `<div style="background:${bgClr};border:1px solid ${bdClr};border-radius:6px;padding:5px 10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="color:${clr};font-weight:700;font-size:12px">⏱ ${str} restant</span>
+            <span style="font-size:10px;color:rgba(255,255,255,.35)">${Math.round(pct)}%</span>
+          </div>
+          <div style="height:3px;background:rgba(255,255,255,.08);border-radius:2px">
+            <div style="height:100%;width:${pct}%;background:${clr};border-radius:2px;transition:width .5s"></div>
+          </div>
+        </div>`;
+      }
+    } else {
+      // NUIT : temps écoulé depuis l'arrivée
+      const elapsed = now - arrivee;
+      const d = Math.floor(elapsed / (24*3600000));
+      const h = Math.floor((elapsed % (24*3600000)) / 3600000);
+      const m = Math.floor((elapsed % 3600000) / 60000);
+      const str = d > 0 ? `${d}j ${h}h ${m}min` : h > 0 ? `${h}h ${m}min` : `${m}min`;
+      el.innerHTML = `<div style="text-align:center;padding:2px 0">
+        <span style="color:rgba(255,255,255,.38);font-size:11px">⏳ En séjour depuis ${str}</span></div>`;
+    }
+  });
 }
 
 function hotelPaiementModal(resId){
