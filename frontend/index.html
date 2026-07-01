@@ -15669,6 +15669,10 @@ let _pcmdAddProdId    = null;
 let _pcmdAddQte       = 1;
 
 async function loadPosCommandes(){
+  // Toujours revenir à la grille au chargement de la page
+  _pcmdCurrentId = null; _pcmdCurrentTotal = 0;
+  document.getElementById('pcmd-detail').style.display = 'none';
+  document.getElementById('pcmd-grille').style.display  = 'block';
   if(!_posProduits.length){
     try { const d = await apiFetch('GET','/pos/produits?actif=true'); _posProduits = d||[]; } catch(_){}
   }
