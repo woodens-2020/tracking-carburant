@@ -2869,6 +2869,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="pos-grande-caisse" onclick="goTo('pos-grande-caisse')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><circle cx="12" cy="15" r="2"/><path d="M6 15h.01M18 15h.01"/></svg>
+      </span>
+      <span>Grande Caisse</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
   </nav>
 
   <!-- Statut connexion -->
@@ -6156,6 +6164,126 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
       </div>
     </div><!-- /page-pos-rentabilite -->
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- PAGE : GRANDE CAISSE                                          -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div id="page-pos-grande-caisse" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <!-- Header -->
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><circle cx="12" cy="15" r="2"/><path d="M6 15h.01M18 15h.01"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Grande Caisse</div>
+            <div class="pos-header-sub">Vue consolidée Achats · Ventes · Bénéfice par section</div>
+          </div>
+          <div class="pos-header-actions" style="gap:8px;flex-wrap:wrap">
+            <input type="date" class="pos-input" id="gc-debut" style="width:130px">
+            <input type="date" class="pos-input" id="gc-fin" style="width:130px">
+            <select class="pos-input" id="gc-filtre-produit" style="width:160px">
+              <option value="">Tous les produits</option>
+            </select>
+            <select class="pos-input" id="gc-filtre-cat" style="width:140px">
+              <option value="">Toutes catégories</option>
+            </select>
+            <button class="pos-btn teal" onclick="gcCharger()">Analyser</button>
+            <button class="pos-btn ghost" onclick="gcResetFiltres()">Reset</button>
+          </div>
+        </div>
+
+        <!-- Tabs petites caisses -->
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button id="gc-tab-bar" class="pos-btn teal" onclick="gcSetTab('bar')" style="font-size:13px;padding:6px 18px">Bar / Restaurant</button>
+          <button id="gc-tab-hotel" class="pos-btn ghost" onclick="gcSetTab('hotel')" style="font-size:13px;padding:6px 18px;opacity:.5;cursor:not-allowed" disabled title="Bientôt disponible">Hotel</button>
+          <button id="gc-tab-piscine" class="pos-btn ghost" onclick="gcSetTab('piscine')" style="font-size:13px;padding:6px 18px;opacity:.5;cursor:not-allowed" disabled title="Bientôt disponible">Piscine</button>
+        </div>
+
+        <!-- KPIs -->
+        <div class="pos-kpi-grid" style="grid-template-columns:repeat(5,1fr)">
+          <div class="pos-kpi">
+            <div class="pos-kpi-label">Coût Achats</div>
+            <div class="pos-kpi-val amber" id="gc-kpi-achats">—</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px" id="gc-kpi-nb-achats"></div>
+          </div>
+          <div class="pos-kpi">
+            <div class="pos-kpi-label">CA Ventes</div>
+            <div class="pos-kpi-val" id="gc-kpi-ventes">—</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px" id="gc-kpi-nb-ventes"></div>
+          </div>
+          <div class="pos-kpi">
+            <div class="pos-kpi-label">Bénéfice Brut</div>
+            <div class="pos-kpi-val" id="gc-kpi-benef-brut">—</div>
+          </div>
+          <div class="pos-kpi">
+            <div class="pos-kpi-label">Paie Employés</div>
+            <div class="pos-kpi-val amber" id="gc-kpi-paie">—</div>
+          </div>
+          <div class="pos-kpi">
+            <div class="pos-kpi-label">Bénéfice Net</div>
+            <div class="pos-kpi-val" id="gc-kpi-benef-net">—</div>
+          </div>
+        </div>
+
+        <!-- Vue par produit -->
+        <div class="pos-card">
+          <div class="pos-card-hdr" style="display:flex;justify-content:space-between;align-items:center">
+            <span>Analyse par produit</span>
+            <span style="font-size:11px;color:rgba(255,255,255,.4)">Achats coût réel · CA ventes · Bénéfice</span>
+          </div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead>
+                <tr>
+                  <th>Produit</th>
+                  <th>Catégorie</th>
+                  <th style="text-align:right">Qté achetée</th>
+                  <th style="text-align:right">Coût achats</th>
+                  <th style="text-align:right">Qté vendue</th>
+                  <th style="text-align:right">CA ventes</th>
+                  <th style="text-align:right">Bénéfice</th>
+                  <th style="text-align:right">Marge %</th>
+                </tr>
+              </thead>
+              <tbody id="gc-produits-tbody">
+                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Sélectionnez une période et cliquez sur Analyser</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Détail des achats -->
+        <div class="pos-card">
+          <div class="pos-card-hdr" style="display:flex;justify-content:space-between;align-items:center">
+            <span>Détail des achats (période)</span>
+            <span style="font-size:11px;color:rgba(255,255,255,.4)">Uniquement achats confirmés</span>
+          </div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Produit</th>
+                  <th>Catégorie</th>
+                  <th>Fournisseur</th>
+                  <th style="text-align:right">Qté</th>
+                  <th style="text-align:right">Prix unit.</th>
+                  <th style="text-align:right">Marchandise</th>
+                  <th style="text-align:right">Dépenses</th>
+                  <th style="text-align:right">Coût total</th>
+                </tr>
+              </thead>
+              <tbody id="gc-achats-tbody">
+                <tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-grande-caisse -->
 
   </div><!-- /pages -->
 
@@ -12723,7 +12851,8 @@ const _giPageLoaders = {
   'pos-credits':     loadPosCredits,
   'pos-commandes':   loadPosCommandes,
   'pos-paie':        loadPosPaie,
-  'pos-rentabilite': loadPosRentabilite,
+  'pos-rentabilite':    loadPosRentabilite,
+  'pos-grande-caisse':  loadPosGrandeCaisse,
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -15308,6 +15437,166 @@ function _posRentChartTop(tops){
       }
     }
   });
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE GRANDE CAISSE
+// ══════════════════════════════════════════════════════════════════════
+let _gcTab = 'bar';
+let _gcData = null;
+
+function gcSetTab(tab){
+  _gcTab = tab;
+  ['bar','hotel','piscine'].forEach(t=>{
+    const btn = document.getElementById('gc-tab-'+t);
+    if(btn) btn.className = t===tab ? 'pos-btn teal' : 'pos-btn ghost';
+  });
+  if(_gcData) _gcRender(_gcData);
+}
+
+function gcResetFiltres(){
+  const today = new Date();
+  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  document.getElementById('gc-debut').value = first;
+  document.getElementById('gc-fin').value   = today.toISOString().split('T')[0];
+  document.getElementById('gc-filtre-produit').value = '';
+  document.getElementById('gc-filtre-cat').value     = '';
+  gcCharger();
+}
+
+async function loadPosGrandeCaisse(){
+  const today = new Date();
+  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  const deb = document.getElementById('gc-debut');
+  const fin = document.getElementById('gc-fin');
+  if(deb && !deb.value) deb.value = first;
+  if(fin && !fin.value) fin.value = today.toISOString().split('T')[0];
+
+  // Charger les produits bar pour le filtre
+  try {
+    const prods = await apiFetch('GET','/pos/produits?actif=true');
+    const sel = document.getElementById('gc-filtre-produit');
+    if(sel){
+      const existing = [...sel.options].map(o=>o.value).filter(v=>v);
+      if(!existing.length){
+        (prods||[]).forEach(p=>{
+          const o = document.createElement('option');
+          o.value = p.id; o.textContent = p.nom;
+          sel.appendChild(o);
+        });
+      }
+      // Catégories
+      const cats = [...new Set((prods||[]).map(p=>p.categorie).filter(Boolean))].sort();
+      const selCat = document.getElementById('gc-filtre-cat');
+      if(selCat && selCat.options.length<=1){
+        cats.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; selCat.appendChild(o); });
+      }
+    }
+  } catch(_){}
+
+  await gcCharger();
+}
+
+async function gcCharger(){
+  const deb    = document.getElementById('gc-debut').value;
+  const fin    = document.getElementById('gc-fin').value;
+  const prodId = document.getElementById('gc-filtre-produit').value;
+  const cat    = document.getElementById('gc-filtre-cat').value;
+
+  let qs = `/pos/grande-caisse?date_debut=${deb}&date_fin=${fin}`;
+  if(prodId) qs += `&produit_id=${prodId}`;
+  if(cat)    qs += `&categorie=${encodeURIComponent(cat)}`;
+
+  const tProd = document.getElementById('gc-produits-tbody');
+  const tAch  = document.getElementById('gc-achats-tbody');
+  if(tProd) tProd.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tAch)  tAch.innerHTML  = '<tr><td colspan="9" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+
+  try {
+    _gcData = await apiFetch('GET', qs);
+    _gcRender(_gcData);
+  } catch(e){
+    if(tProd) tProd.innerHTML = `<tr><td colspan="8" style="color:#f87171;text-align:center;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+  }
+}
+
+function _gcRender(d){
+  if(!d) return;
+  const section = d.bar; // seul tab disponible pour l'instant
+
+  const benBrut = section.benefice_brut || 0;
+  const benNet  = section.benefice_net  || 0;
+  const colorBrut = benBrut >= 0 ? '#34d399' : '#f87171';
+  const colorNet  = benNet  >= 0 ? '#34d399' : '#f87171';
+
+  // KPIs
+  _gcKpi('gc-kpi-achats',    posGx(section.achats_cout));
+  _gcKpi('gc-kpi-ventes',    posGx(section.ventes_ca));
+  _gcKpi('gc-kpi-benef-brut', posGx(benBrut), colorBrut);
+  _gcKpi('gc-kpi-paie',      posGx(section.paie));
+  _gcKpi('gc-kpi-benef-net', posGx(benNet), colorNet);
+
+  const nbA = document.getElementById('gc-kpi-nb-achats');
+  const nbV = document.getElementById('gc-kpi-nb-ventes');
+  if(nbA) nbA.textContent = section.nb_achats + ' achat(s)';
+  if(nbV) nbV.textContent = section.nb_ventes + ' ligne(s) vente';
+
+  // Table par produit
+  const tProd = document.getElementById('gc-produits-tbody');
+  if(tProd){
+    if(!d.par_produit.length){
+      tProd.innerHTML = '<tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Aucune donnée sur cette période</td></tr>';
+    } else {
+      tProd.innerHTML = d.par_produit.map(p=>{
+        const ben   = p.benefice || 0;
+        const colBen = ben >= 0 ? '#34d399' : '#f87171';
+        const marge  = p.marge_pct || 0;
+        const colMarge = marge>=30?'#34d399':marge>=10?'#fbbf24':'#f87171';
+        return `<tr>
+          <td style="font-weight:500">${p.produit_nom}</td>
+          <td><span style="font-size:11px;padding:2px 7px;background:rgba(255,255,255,.07);border-radius:4px">${p.categorie||'—'}</span></td>
+          <td style="text-align:right;color:rgba(255,255,255,.6)">${p.qte_achetee>0?p.qte_achetee.toFixed(2):'—'}</td>
+          <td style="text-align:right;color:#fbbf24">${p.achats_cout>0?posGx(p.achats_cout):'—'}</td>
+          <td style="text-align:right;color:rgba(255,255,255,.6)">${p.qte_vendue>0?p.qte_vendue.toFixed(2):'—'}</td>
+          <td style="text-align:right">${p.ventes_ca>0?posGx(p.ventes_ca):'—'}</td>
+          <td style="text-align:right;font-weight:600;color:${colBen}">${posGx(ben)}</td>
+          <td style="text-align:right"><span style="color:${colMarge};font-weight:600">${marge.toFixed(1)}%</span></td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  // Table détail achats
+  const tAch = document.getElementById('gc-achats-tbody');
+  if(tAch){
+    if(!d.achats_detail.length){
+      tAch.innerHTML = '<tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Aucun achat confirmé sur cette période</td></tr>';
+    } else {
+      tAch.innerHTML = d.achats_detail.map(a=>{
+        const dt = new Date(a.date_achat);
+        const dateStr = dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'2-digit'});
+        const hasDep = a.total_depenses > 0;
+        return `<tr>
+          <td style="color:rgba(255,255,255,.55);font-size:12px">${dateStr}</td>
+          <td style="font-weight:500">${a.produit_nom}</td>
+          <td><span style="font-size:11px;padding:2px 7px;background:rgba(255,255,255,.07);border-radius:4px">${a.categorie||'—'}</span></td>
+          <td style="color:rgba(255,255,255,.55)">${a.fournisseur}</td>
+          <td style="text-align:right">${a.quantite.toFixed(2)}</td>
+          <td style="text-align:right;color:rgba(255,255,255,.55)">${posGx(a.prix_achat_unitaire)}</td>
+          <td style="text-align:right">${posGx(a.cout_marchandise)}</td>
+          <td style="text-align:right;color:${hasDep?'#f87171':'rgba(255,255,255,.3)'}">${hasDep?posGx(a.total_depenses):'—'}</td>
+          <td style="text-align:right;font-weight:600;color:#fbbf24">${posGx(a.cout_total)}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+}
+
+function _gcKpi(id, val, color){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.textContent = val;
+  if(color) el.style.color = color; else el.style.color = '';
 }
 
 </script>

@@ -10,6 +10,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, validator
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
@@ -1266,4 +1267,183 @@ def benefices_detail(
     return {
         **data,
         "par_categorie": list(par_categorie.values()),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════
+# GRANDE CAISSE — tableau de bord financier consolidé
+# ══════════════════════════════════════════════════════════════════
+
+@router.get("/grande-caisse")
+def grande_caisse(
+    date_debut:  date_type    = Query(default=None),
+    date_fin:    date_type    = Query(default=None),
+    produit_id:  Optional[int] = Query(default=None),
+    categorie:   Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """
+    Dashboard financier consolidé :
+    coût réel des achats confirmés vs CA ventes sur la période.
+    Bénéfice brut = ventes - achats.  Bénéfice net = brut - paie.
+    """
+    from datetime import date as dt
+    today = dt.today()
+    if not date_debut:
+        date_debut = today.replace(day=1)
+    if not date_fin:
+        date_fin = today
+
+    dt_debut = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
+    dt_fin   = datetime.combine(date_fin,   time.max).replace(tzinfo=timezone.utc)
+
+    def _d(v) -> Decimal:
+        return Decimal(str(v)) if v is not None else Decimal("0")
+
+    # ── Achats bar confirmés sur la période ───────────────────────
+    q_achats = (
+        db.query(BarAchat)
+        .filter(
+            BarAchat.date_achat >= dt_debut,
+            BarAchat.date_achat <= dt_fin,
+            BarAchat.statut == "CONFIRME",
+            BarAchat.produit_id.isnot(None),
+        )
+    )
+    if produit_id:
+        q_achats = q_achats.filter(BarAchat.produit_id == produit_id)
+    if categorie:
+        q_achats = q_achats.join(BarProduit, BarAchat.produit_id == BarProduit.id)\
+                            .filter(BarProduit.categorie == categorie)
+
+    achats = q_achats.all()
+
+    # ── Ventes bar non annulées sur la période ────────────────────
+    q_lignes = (
+        db.query(BarLigneVente)
+        .join(BarVente)
+        .filter(
+            BarVente.statut != "ANNULEE",
+            BarVente.date_heure >= dt_debut,
+            BarVente.date_heure <= dt_fin,
+        )
+    )
+    if produit_id:
+        q_lignes = q_lignes.filter(BarLigneVente.produit_id == produit_id)
+    if categorie:
+        q_lignes = q_lignes.join(BarProduit, BarLigneVente.produit_id == BarProduit.id)\
+                            .filter(BarProduit.categorie == categorie)
+
+    lignes_ventes = q_lignes.all()
+
+    # ── Paie bar sur la période ───────────────────────────────────
+    paie_total = _d(
+        db.query(func.sum(BarPaiementEmploye.montant))
+        .filter(
+            BarPaiementEmploye.date_paiement >= dt_debut.date(),
+            BarPaiementEmploye.date_paiement <= dt_fin.date(),
+        )
+        .scalar()
+    )
+
+    # ── Agrégation achats ─────────────────────────────────────────
+    achats_cout_total = Decimal("0")
+    par_produit: dict[int, dict] = {}
+    achats_detail = []
+
+    for a in achats:
+        total_dep        = sum(_d(d.montant) for d in a.depenses)
+        cout_marchandise = _d(a.quantite) * _d(a.prix_achat_unitaire)
+        cout_total       = cout_marchandise + total_dep
+        achats_cout_total += cout_total
+
+        pid  = a.produit_id
+        nom  = a.bar_produit.nom        if a.bar_produit else str(pid)
+        cat  = a.bar_produit.categorie  if a.bar_produit else ""
+
+        if pid not in par_produit:
+            par_produit[pid] = {
+                "produit_id":  pid,
+                "produit_nom": nom,
+                "categorie":   cat or "Autre",
+                "achats_cout": Decimal("0"),
+                "qte_achetee": Decimal("0"),
+                "ventes_ca":   Decimal("0"),
+                "qte_vendue":  Decimal("0"),
+            }
+        par_produit[pid]["achats_cout"] += cout_total
+        par_produit[pid]["qte_achetee"] += _d(a.quantite)
+
+        achats_detail.append({
+            "id":                  a.id,
+            "produit_id":          pid,
+            "produit_nom":         nom,
+            "categorie":           cat or "Autre",
+            "date_achat":          a.date_achat.isoformat(),
+            "fournisseur":         a.fournisseur or "—",
+            "quantite":            float(_d(a.quantite)),
+            "prix_achat_unitaire": float(_d(a.prix_achat_unitaire)),
+            "cout_marchandise":    float(cout_marchandise),
+            "total_depenses":      float(total_dep),
+            "cout_total":          float(cout_total),
+            "statut":              a.statut,
+        })
+
+    # ── Agrégation ventes ─────────────────────────────────────────
+    ventes_ca_total = Decimal("0")
+
+    for lv in lignes_ventes:
+        ca  = _d(lv.sous_total)
+        pid = lv.produit_id
+        ventes_ca_total += ca
+
+        if pid not in par_produit:
+            par_produit[pid] = {
+                "produit_id":  pid,
+                "produit_nom": lv.produit.nom       if lv.produit else str(pid),
+                "categorie":   lv.produit.categorie if lv.produit else "Autre",
+                "achats_cout": Decimal("0"),
+                "qte_achetee": Decimal("0"),
+                "ventes_ca":   Decimal("0"),
+                "qte_vendue":  Decimal("0"),
+            }
+        par_produit[pid]["ventes_ca"]  += ca
+        par_produit[pid]["qte_vendue"] += _d(lv.quantite)
+
+    # ── Synthèse par produit ──────────────────────────────────────
+    produits_list = []
+    for pp in par_produit.values():
+        ben   = pp["ventes_ca"] - pp["achats_cout"]
+        marge = (ben / pp["ventes_ca"] * 100).quantize(Decimal("0.01")) \
+                if pp["ventes_ca"] > 0 else Decimal("0")
+        produits_list.append({
+            "produit_id":  pp["produit_id"],
+            "produit_nom": pp["produit_nom"],
+            "categorie":   pp["categorie"],
+            "achats_cout": float(pp["achats_cout"]),
+            "qte_achetee": float(pp["qte_achetee"]),
+            "ventes_ca":   float(pp["ventes_ca"]),
+            "qte_vendue":  float(pp["qte_vendue"]),
+            "benefice":    float(ben),
+            "marge_pct":   float(marge),
+        })
+
+    produits_list.sort(key=lambda x: x["ventes_ca"], reverse=True)
+
+    benefice_brut = ventes_ca_total - achats_cout_total
+    benefice_net  = benefice_brut - paie_total
+
+    return {
+        "periode":    {"debut": str(date_debut), "fin": str(date_fin)},
+        "bar": {
+            "achats_cout":   float(achats_cout_total),
+            "ventes_ca":     float(ventes_ca_total),
+            "paie":          float(paie_total),
+            "benefice_brut": float(benefice_brut),
+            "benefice_net":  float(benefice_net),
+            "nb_achats":     len(achats),
+            "nb_ventes":     sum(1 for lv in lignes_ventes),
+        },
+        "par_produit":   produits_list,
+        "achats_detail": sorted(achats_detail, key=lambda x: x["date_achat"], reverse=True),
     }
