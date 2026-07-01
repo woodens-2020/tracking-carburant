@@ -13564,14 +13564,13 @@ function _posProdSetCaisseUI(venduParCaisse, unites){
   if(upcEl) upcEl.value = (venduParCaisse && unites) ? unites : '';
 }
 
-function posProduitModal(id){
+async function posProduitModal(id){
   const modal    = document.getElementById('pos-prod-modal-bg');
   const title    = document.getElementById('pos-prod-modal-title');
   const prixRow  = document.getElementById('pos-prod-prix-row');
-  // S'assurer que le select catégorie est peuplé avant d'ouvrir
-  if(!document.getElementById('pos-prod-cat').options.length || document.getElementById('pos-prod-cat').options.length <= 1){
-    _posFillCatSelect();
-  }
+  // Charger les catégories depuis l'API si pas encore chargées
+  if(!_posCategories.length) await loadPosCategories();
+  else _posFillCatSelect();
   // Masquer le formulaire nouvelle catégorie
   posCatAddToggle(false);
   document.getElementById('pos-prod-id').value = id||'';
