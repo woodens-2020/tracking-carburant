@@ -200,6 +200,16 @@ def creer_categorie(data: CategorieIn, db: Session = Depends(get_db)):
     return {"id": cat.id, "nom": cat.nom, "couleur": cat.couleur}
 
 
+@router.delete("/categories/{cat_id}", status_code=200)
+def supprimer_categorie(cat_id: int, db: Session = Depends(get_db)):
+    cat = db.query(BarCategorie).filter_by(id=cat_id).first()
+    if not cat:
+        raise HTTPException(404, "Catégorie introuvable")
+    db.delete(cat)
+    db.commit()
+    return {"ok": True}
+
+
 # ══════════════════════════════════════════════════════════════════
 # PRODUITS & PRIX
 # ══════════════════════════════════════════════════════════════════

@@ -2528,6 +2528,19 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   font-size:16px;padding:0 2px}
 .pos-cart-item-del:hover{color:#f87171}
 .pos-cart-empty{padding:32px;text-align:center;color:rgba(255,255,255,.25);font-size:12px}
+/* ── Gestion catégories ── */
+.cat-panel{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px 18px;margin-bottom:16px}
+.cat-panel-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:12px}
+.cat-chips{display:flex;flex-wrap:wrap;gap:8px;min-height:30px;align-items:center}
+.cat-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 12px;border-radius:20px;font-size:11.5px;font-weight:600;cursor:default;transition:all .15s}
+.cat-chip-del{width:16px;height:16px;border-radius:50%;border:none;cursor:pointer;background:rgba(0,0,0,.2);color:inherit;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center;opacity:.6;padding:0;flex-shrink:0}
+.cat-chip-del:hover{opacity:1;background:rgba(0,0,0,.35)}
+.cat-add-row{display:flex;gap:8px;margin-top:12px;align-items:center}
+.cat-add-row input{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#fff;font-size:12px;padding:7px 12px;outline:none;min-width:0}
+.cat-add-row input:focus{border-color:rgba(167,139,250,.5);background:rgba(167,139,250,.07)}
+.cat-add-row input::placeholder{color:rgba(255,255,255,.3)}
+.cat-add-btn{flex-shrink:0;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.cat-add-btn:hover{background:rgba(167,139,250,.25)}
 .pos-cart-footer{padding:12px 14px;border-top:1px solid rgba(255,255,255,.07)}
 .pos-cart-total-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .pos-cart-total-label{font-size:12px;color:rgba(255,255,255,.6)}
@@ -5239,6 +5252,19 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Nouveau produit
             </button>
+          </div>
+        </div>
+
+        <!-- Gestion des catégories -->
+        <div class="cat-panel">
+          <div class="cat-panel-title">Catégories disponibles</div>
+          <div class="cat-chips" id="cat-chips-wrap">
+            <span style="color:rgba(255,255,255,.25);font-size:11px">Chargement…</span>
+          </div>
+          <div class="cat-add-row">
+            <input id="cat-new-input" placeholder="Ajouter une catégorie…" maxlength="60"
+              onkeydown="if(event.key==='Enter')posCatPanelAjouter()">
+            <button class="cat-add-btn" onclick="posCatPanelAjouter()">+ Ajouter</button>
           </div>
         </div>
 
@@ -13353,8 +13379,59 @@ function _catCouleur(nom){
 async function loadPosCategories(){
   try {
     _posCategories = await apiFetch('GET','/pos/categories');
+    _posCategories.sort((a,b)=>a.nom.localeCompare(b.nom));
+    posCatRenderChips();
     _posFillCatSelect();
   } catch(e){ /* silencieux */ }
+}
+
+function posCatRenderChips(){
+  const wrap = document.getElementById('cat-chips-wrap');
+  if(!wrap) return;
+  if(!_posCategories.length){
+    wrap.innerHTML = '<span style="color:rgba(255,255,255,.25);font-size:11px">Aucune catégorie — ajoutez-en une ci-dessous.</span>';
+    return;
+  }
+  wrap.innerHTML = _posCategories.map(c=>{
+    const clr = c.couleur || '#94a3b8';
+    return `<span class="cat-chip" style="background:${clr}1a;color:${clr};border:1px solid ${clr}44">
+      ${c.nom}
+      <button class="cat-chip-del" onclick="posCatPanelSupprimer(${c.id},'${c.nom.replace(/'/g,"\\'")}')" title="Supprimer">✕</button>
+    </span>`;
+  }).join('');
+}
+
+async function posCatPanelAjouter(){
+  const inp = document.getElementById('cat-new-input');
+  const nom = (inp?.value||'').trim().toLowerCase();
+  if(!nom){ posAlert('Entrez un nom de catégorie.','warn'); return; }
+  if(_posCategories.find(c=>c.nom===nom)){
+    posAlert(`La catégorie « ${nom} » existe déjà.`,'warn'); return;
+  }
+  try {
+    const cat = await apiFetch('POST','/pos/categories',{nom});
+    _posCategories.push(cat);
+    _posCategories.sort((a,b)=>a.nom.localeCompare(b.nom));
+    posCatRenderChips();
+    _posFillCatSelect();
+    if(inp) inp.value = '';
+    posAlert(`Catégorie « ${cat.nom} » ajoutée.`,'ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function posCatPanelSupprimer(id, nom){
+  const produits = _posProduitsAll.filter(p=>p.categorie===nom);
+  const msg = produits.length
+    ? `Supprimer « ${nom} » ? Elle est utilisée par ${produits.length} produit(s). Ces produits resteront mais sans catégorie associée.`
+    : `Supprimer la catégorie « ${nom } » ?`;
+  if(!await showConfirm(msg,{title:'Supprimer catégorie',type:'danger',okLabel:'Supprimer',cancelLabel:'Annuler'})) return;
+  try {
+    await apiFetch('DELETE',`/pos/categories/${id}`);
+    _posCategories = _posCategories.filter(c=>c.id!==id);
+    posCatRenderChips();
+    _posFillCatSelect();
+    posAlert(`Catégorie « ${nom} » supprimée.`,'ok');
+  } catch(e){ posAlert(e.message||'Erreur suppression.'); }
 }
 
 function _posFillCatSelect(){
