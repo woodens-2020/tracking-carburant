@@ -6008,7 +6008,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <h3 style="margin:0">Reçu de paiement</h3>
           <button onclick="document.getElementById('pos-remb-recu-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;padding:0;line-height:1">✕</button>
         </div>
-        <div id="pos-remb-recu-body" style="background:#fff;color:#111;border-radius:8px;padding:16px;font-family:'Courier New',monospace;font-size:11px;line-height:1.8;margin-bottom:14px;white-space:pre-wrap"></div>
+        <div id="pos-remb-recu-body" style="background:#fff;color:#111;border-radius:8px;padding:16px 18px;margin-bottom:14px;min-height:180px;max-height:60vh;overflow-y:auto"></div>
         <div style="margin-bottom:12px">
           <label class="pos-label">Email (pour envoi par mail)</label>
           <input class="pos-input" id="pos-remb-email-input" type="email" placeholder="client@exemple.com">
@@ -15750,50 +15750,117 @@ async function posEnregistrerRemb(){
   } catch(e){ posAlert(e.message||'Erreur.'); }
 }
 
+function _posRembRecuHTML({credit, montant, remis, monnaie, notes, solde_restant, remboursement_id, dateStr, heureStr}){
+  const ref = String(remboursement_id).padStart(6,'0');
+  const fgMontant = parseFloat(solde_restant)===0 ? '#16a34a' : '#111';
+  const row = (lbl,val,bold)=>`<tr>
+    <td style="padding:4px 0 4px 2px;font-size:12px;color:#555;line-height:1.4">${lbl}</td>
+    <td style="padding:4px 2px 4px 0;font-size:12px;text-align:right;font-weight:${bold?'700':'500'};color:${bold?fgMontant:'#333'};line-height:1.4">${val}</td>
+  </tr>`;
+  return `
+  <style scoped>
+    .recu-sep{border:none;border-top:1px dashed #bbb;margin:10px 0}
+    .recu-sep-bold{border:none;border-top:2px solid #333;margin:10px 0}
+  </style>
+  <div style="text-align:center;padding-bottom:10px">
+    <div style="font-size:20px;font-weight:900;letter-spacing:.06em;color:#111;font-family:Arial,sans-serif">NATIVITE</div>
+    <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#555;margin-top:1px;font-family:Arial,sans-serif">Bar &nbsp;·&nbsp; Hôtel &nbsp;·&nbsp; Piscine</div>
+    <hr class="recu-sep-bold">
+    <div style="font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#111;font-family:Arial,sans-serif">Reçu de Paiement</div>
+    <hr class="recu-sep-bold">
+  </div>
+  <table style="width:100%;border-collapse:collapse">
+    <tr>
+      <td style="font-size:11px;color:#555;padding:2px 0">N° Réf.</td>
+      <td style="font-size:12px;font-weight:700;color:#111;text-align:right;padding:2px 0">${ref}</td>
+    </tr>
+    <tr>
+      <td style="font-size:11px;color:#555;padding:2px 0">Date</td>
+      <td style="font-size:11px;color:#333;text-align:right;padding:2px 0">${dateStr} &nbsp; ${heureStr}</td>
+    </tr>
+  </table>
+  <hr class="recu-sep">
+  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#888;margin-bottom:5px">Client</div>
+  <div style="font-size:13px;font-weight:700;color:#111">${credit.client_nom||'—'}</div>
+  ${credit.client_contact?`<div style="font-size:11px;color:#555;margin-top:2px">Tél : ${credit.client_contact}</div>`:''}
+  ${credit.client_nif?`<div style="font-size:11px;color:#777;margin-top:1px">NIF : ${credit.client_nif}</div>`:''}
+  <hr class="recu-sep">
+  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#888;margin-bottom:5px">Détail du paiement</div>
+  <table style="width:100%;border-collapse:collapse">
+    ${row('Montant dû',posGx(credit.montant_du),false)}
+    ${row('Montant payé',posGx(montant),false)}
+    ${remis>0?row('Remis client',posGx(remis),false):''}
+    ${remis>0?row('Monnaie rendue',posGx(monnaie),false):''}
+    <tr><td colspan="2"><hr class="recu-sep" style="margin:5px 0"></td></tr>
+    ${row('Solde restant',posGx(solde_restant),true)}
+  </table>
+  ${notes?`<hr class="recu-sep"><div style="font-size:11px;color:#555"><span style="font-weight:600">Notes :</span> ${notes}</div>`:''}
+  <hr class="recu-sep-bold" style="margin-top:12px">
+  <div style="text-align:center;font-size:11px;color:#555;padding-top:4px;font-style:italic">Merci de votre confiance</div>`;
+}
+
 function _posAfficherRembRecu({credit, montant, remis, monnaie, notes, solde_restant, remboursement_id, date}){
   const d = date instanceof Date ? date : new Date(date);
-  const dateStr = d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'})
-    + ' ' + d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const dateStr  = d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const heureStr = d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const ref = String(remboursement_id).padStart(6,'0');
+
+  // Texte brut pour WhatsApp / Email
   const lines = [
-    '╔══════════════════════════════╗',
-    '║      REÇU DE PAIEMENT       ║',
-    '╚══════════════════════════════╝',
-    '',
-    `N° Réf. : ${String(remboursement_id).padStart(6,'0')}`,
-    `Date    : ${dateStr}`,
-    '',
-    '── Client ─────────────────────',
+    '================================',
+    '         NATIVITE',
+    '   Bar  ·  Hotel  ·  Piscine',
+    '================================',
+    '       REÇU DE PAIEMENT',
+    '================================',
+    `N° Réf. : ${ref}`,
+    `Date    : ${dateStr}  ${heureStr}`,
+    '--------------------------------',
+    'CLIENT',
     `Nom     : ${credit.client_nom||'—'}`,
-    ...(credit.client_contact ? [`Tél     : ${credit.client_contact}`] : []),
+    ...(credit.client_contact ? [`Tel     : ${credit.client_contact}`] : []),
     ...(credit.client_nif     ? [`NIF     : ${credit.client_nif}`]     : []),
-    '',
-    '── Paiement ────────────────────',
-    `Montant dû    : ${posGx(credit.montant_du)}`,
-    `Montant payé  : ${posGx(montant)}`,
+    '--------------------------------',
+    'PAIEMENT',
+    `Montant du    : ${posGx(credit.montant_du)}`,
+    `Montant paye  : ${posGx(montant)}`,
     ...(remis>0 ? [`Remis client  : ${posGx(remis)}`]  : []),
     ...(remis>0 ? [`Monnaie rendue: ${posGx(monnaie)}`] : []),
     `Solde restant : ${posGx(solde_restant)}`,
     ...(notes ? ['', `Notes : ${notes}`] : []),
-    '',
-    '───────────────────────────────',
+    '================================',
     '    Merci de votre confiance',
+    '================================',
   ].join('\n');
 
-  _posRembRecuCourant = { lines, credit, montant, remis, monnaie, remboursement_id, date };
-  document.getElementById('pos-remb-recu-body').textContent = lines;
+  const html = _posRembRecuHTML({credit,montant,remis,monnaie,notes,solde_restant,remboursement_id,dateStr,heureStr});
+
+  _posRembRecuCourant = { lines, html, credit, montant, remis, monnaie, remboursement_id, date };
+  document.getElementById('pos-remb-recu-body').innerHTML = html;
   document.getElementById('pos-remb-email-input').value = '';
-  const waBtn = document.getElementById('pos-remb-wa-btn');
-  waBtn.style.display = credit.client_contact ? '' : 'none';
+  document.getElementById('pos-remb-wa-btn').style.display = credit.client_contact ? '' : 'none';
   document.getElementById('pos-remb-recu-bg').classList.add('open');
 }
 
 function posRembImprimer(){
   const r = _posRembRecuCourant; if(!r) return;
-  const w = window.open('','_blank','width=400,height=620,menubar=no,toolbar=no');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reçu #${r.remboursement_id}</title>
-    <style>body{font-family:'Courier New',monospace;font-size:12px;margin:24px;color:#111;line-height:1.8}pre{white-space:pre-wrap}</style>
-    </head><body><pre>${r.lines}</pre><scr`+`ipt>window.print();setTimeout(()=>window.close(),1500);</scr`+`ipt></body></html>`);
+  const w = window.open('','_blank','width=360,height=700,menubar=no,toolbar=no,scrollbars=yes');
+  const css = `
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:Arial,sans-serif;width:80mm;margin:0 auto;padding:5mm 4mm;color:#111;background:#fff}
+    @page{size:80mm auto;margin:3mm}
+    @media print{body{width:80mm;padding:2mm}button{display:none!important}}
+    .recu-sep{border:none;border-top:1px dashed #bbb;margin:10px 0}
+    .recu-sep-bold{border:none;border-top:2px solid #333;margin:10px 0}
+    tr td{vertical-align:top}`;
+  const printBtn = `<div style="text-align:center;margin-top:8mm"><button onclick="window.print()"
+    style="padding:6px 18px;font-size:12px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#f5f5f5">
+    Imprimer</button></div>`;
+  w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+    <title>Reçu N° ${String(r.remboursement_id).padStart(6,'0')}</title>
+    <style>${css}</style></head><body>${r.html}${printBtn}</body></html>`);
   w.document.close();
+  w.addEventListener('load',()=>{ try{ w.print(); }catch(_){} });
 }
 
 function posRembWhatsApp(){
