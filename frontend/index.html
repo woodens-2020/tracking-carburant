@@ -6425,8 +6425,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div><label class="pos-label">Date & heure d'arrivée *</label><input class="pos-input" id="hrec-arrivee" type="datetime-local" onchange="hrecCalcTotal()"></div>
               <!-- Nb nuits (NUIT) -->
               <div id="hrec-nuits-row"><label class="pos-label">Nombre de nuits *</label><input class="pos-input" id="hrec-nb-nuits" type="number" min="1" value="1" oninput="hrecCalcTotal()"></div>
-              <!-- Nb heures (MOMENT) -->
-              <div id="hrec-heures-row" style="display:none"><label class="pos-label">Durée (heures) *</label><input class="pos-input" id="hrec-nb-heures" type="number" min="0.5" step="0.5" value="2" oninput="hrecCalcTotal()"></div>
+              <!-- Durée moment : fixe 2 heures -->
+              <div id="hrec-heures-row" style="display:none">
+                <input type="hidden" id="hrec-nb-heures" value="2">
+                <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px">
+                  <span style="font-size:20px;line-height:1">⏱</span>
+                  <div><div style="font-size:12px;font-weight:700;color:#fbbf24">Durée fixe : 2 heures</div><div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">Fin prévue calculée automatiquement selon l'heure d'arrivée</div></div>
+                </div>
+              </div>
               <!-- Recap prix -->
               <div id="hrec-recap" style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:8px;padding:12px;display:none">
                 <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.55)"><span id="hrec-recap-label">Prix / nuit</span><span id="hrec-recap-prix">—</span></div>
@@ -16058,13 +16064,12 @@ async function loadHotelReception(){
       selEmp.innerHTML = '<option value="">— Optionnel —</option>' +
         _hotelEmployes.map(e=>`<option value="${e.id}">${e.nom_complet} (${e.poste})</option>`).join('');
     }
-    // Initialiser date/heure arrivée à maintenant
+    // Heure d'arrivée = heure système exacte (toujours actualisée)
     const now = new Date();
-    now.setMinutes(0,0,0);
     const pad = n=>String(n).padStart(2,'0');
-    const dt = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:00`;
+    const dt = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
     const arr = document.getElementById('hrec-arrivee');
-    if(arr && !arr.value) arr.value = dt;
+    if(arr) arr.value = dt;
     hrecSetType('NUIT');
   } catch(e){ posAlert(e.message||'Erreur chargement réception.'); }
 }
@@ -16195,7 +16200,7 @@ function _hotelSejourCard(s){
       </div>
       <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
         ${hasSolde?`<button class="pos-btn ghost" style="flex:1;font-size:11px;color:#34d399;border-color:rgba(52,211,153,.3)" onclick="hotelPaiementModal(${s.id})">+ Paiement</button>`:''}
-        <button class="pos-btn ghost" style="flex:1;font-size:11px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="hotelTerminer(${s.id},'${s.client_nom.replace(/'/g,"\\'")}')">Checkout</button>
+        <button class="pos-btn teal" style="flex:1;font-size:12px" onclick="hotelTerminer(${s.id})">✓ Marquer terminé</button>
         <button class="pos-btn ghost" style="font-size:11px;padding:5px 8px;opacity:.6" onclick="hotelAnnuler(${s.id},'${s.client_nom.replace(/'/g,"\\'")}')">Annuler</button>
       </div>
     </div>
@@ -16221,8 +16226,7 @@ async function hotelPaiementSauver(){
   } catch(e){ posAlert(e.message||'Erreur.'); }
 }
 
-async function hotelTerminer(id, nom){
-  if(!confirm(`Checkout : terminer le séjour de ${nom} ?`)) return;
+async function hotelTerminer(id){
   try {
     await apiFetch('POST',`/hotel/reservations/${id}/terminer`);
     await loadHotelSejours();
