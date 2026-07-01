@@ -5485,6 +5485,21 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-kpi"><div class="pos-kpi-label">Produits actifs</div><div class="pos-kpi-val amber" id="kpi-nb-produits">—</div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">En alerte stock</div><div class="pos-kpi-val red" id="kpi-en-alerte">—</div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">Valeur stock CMUP</div><div class="pos-kpi-val" id="kpi-val-stock">—</div></div>
+          <div class="pos-kpi" style="cursor:pointer" onclick="document.getElementById('pos-attente-section').scrollIntoView({behavior:'smooth'})">
+            <div class="pos-kpi-label">Réceptions en attente</div>
+            <div class="pos-kpi-val amber" id="kpi-stock-attente">—</div>
+          </div>
+        </div>
+
+        <!-- ── Réceptions en attente de confirmation ── -->
+        <div id="pos-attente-section" class="pos-card" style="border:1.5px solid rgba(251,191,36,.25);display:none">
+          <div class="pos-card-hdr" style="display:flex;align-items:center;gap:10px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Réceptions en attente de confirmation</span>
+            <span id="pos-attente-badge" style="background:#fbbf24;color:#000;font-size:11px;font-weight:700;border-radius:20px;padding:1px 8px;margin-left:4px"></span>
+          </div>
+          <div style="font-size:12px;color:rgba(255,255,255,.45);padding:0 0 12px">Ces achats sont enregistrés mais le stock n'a pas encore été mis à jour. Confirmez chaque réception pour mettre à jour le stock.</div>
+          <div id="pos-attente-list" style="display:flex;flex-direction:column;gap:10px"></div>
         </div>
 
         <div class="pos-card">
@@ -14025,9 +14040,10 @@ async function loadPosStock(){
   const tbody = document.getElementById('pos-stock-tbody');
   if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
-    const [prods, stocks] = await Promise.all([
+    const [prods, stocks, attente] = await Promise.all([
       apiFetch('GET','/pos/produits?actif=true'),
       apiFetch('GET','/pos/stock'),
+      apiFetch('GET','/pos/achats/en-attente'),
     ]);
     const stockMap = {};
     (stocks||[]).forEach(s=>{ stockMap[s.produit_id] = s; });
@@ -14063,14 +14079,73 @@ async function loadPosStock(){
       ['kpi-nb-produits', (prods||[]).length],
       ['kpi-en-alerte',   nbAlerte],
       ['kpi-val-stock',   posGx(totalValeur)],
+      ['kpi-stock-attente', (attente||[]).length || '0'],
     ];
     kpis.forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
+
+    // Section réceptions en attente
+    _posRenderAttente(attente||[]);
 
     // Peupler les selects produits pour les modals
     _posFillProduitSelects(prods||[]);
   } catch(e){
     if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
+}
+
+function _posRenderAttente(achats){
+  const section = document.getElementById('pos-attente-section');
+  const list    = document.getElementById('pos-attente-list');
+  const badge   = document.getElementById('pos-attente-badge');
+  if(!section||!list) return;
+
+  if(!achats.length){
+    section.style.display='none';
+    if(badge) badge.textContent='';
+    return;
+  }
+  section.style.display='';
+  if(badge) badge.textContent = achats.length;
+
+  const fmt = v=>`G ${parseFloat(v).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  list.innerHTML = achats.map(a=>{
+    const d = new Date(a.date_achat);
+    const ds = d.toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'})
+             + ' ' + d.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});
+    const depInfo = a.total_depenses>0
+      ? `<span style="color:#f87171;font-size:11px"> + ${fmt(a.total_depenses)} dép.</span>`:'';
+    return `<div style="display:flex;align-items:center;gap:14px;padding:12px 14px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.18);border-radius:10px;flex-wrap:wrap">
+      <div style="flex:2;min-width:140px">
+        <div style="font-weight:700;font-size:13px">${a.produit_nom}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">${ds}${a.fournisseur?' · '+a.fournisseur:''}</div>
+      </div>
+      <div style="text-align:center;min-width:80px">
+        <div style="font-size:13px;font-weight:600">${parseFloat(a.quantite).toFixed(2)} ${a.produit_unite||'u.'}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.35)">à recevoir</div>
+      </div>
+      <div style="text-align:right;min-width:110px">
+        <div style="font-size:13px;font-weight:700;color:#3fb6a8">${fmt(a.cout_total)}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.35)">${fmt(a.prix_marchandise)} march.${depInfo}</div>
+      </div>
+      <button onclick="posConfirmerReception(${a.id})"
+        style="background:linear-gradient(135deg,#34d399,#059669);border:none;border-radius:9px;color:#fff;font-size:12px;font-weight:700;padding:9px 18px;cursor:pointer;white-space:nowrap;flex-shrink:0">
+        ✓ Confirmer la réception
+      </button>
+    </div>`;
+  }).join('');
+}
+
+async function posConfirmerReception(achatId){
+  const a = (_paAchatsCache||[]).find(x=>x.id===achatId);
+  const nom = a?.produit_nom || `Achat #${achatId}`;
+  if(!confirm(`Confirmer la réception de "${nom}" ?\n\nLe stock sera mis à jour immédiatement.`)) return;
+  try {
+    const res = await apiFetch('POST',`/pos/achats/${achatId}/confirmer`,{});
+    posAlert(`Stock mis à jour — ${nom} : ${res.stock_apres} unité${res.stock_apres!==1?'s':''} en stock.`,'ok');
+    await loadPosStock();
+    // Rafraîchir aussi la page achats si elle est visible
+    if(typeof _paAchatsCache !== 'undefined') loadPosAchats();
+  } catch(e){ posAlert(e.message||'Erreur lors de la confirmation.'); }
 }
 
 function _posFillProduitSelects(prods){
@@ -14705,8 +14780,11 @@ async function posEnregistrerAchat(){
     const fmt = v=>`G ${parseFloat(v).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
     const label = res.produit_nom || (sel.prod?.nom||'le produit');
     const unLabel = sel.type==='station' ? 'gallon' : 'unité';
-    posAlert(`Achat enregistré — ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} pour ${label}. Coût total: ${fmt(res.cout_total)}`,'ok');
-    if(sel.type==='bar' && typeof loadPosProduits==='function') loadPosProduits();
+    if(res.statut==='EN_ATTENTE'){
+      posAlert(`Achat enregistré (EN ATTENTE) — Allez dans Stock Bar pour confirmer la réception de ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} de ${label}.`,'warn');
+    } else {
+      posAlert(`Achat enregistré — ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} pour ${label}. Coût total: ${fmt(res.cout_total)}`,'ok');
+    }
   } catch(e){ posAlert(e.message||'Erreur enregistrement achat.'); }
 }
 

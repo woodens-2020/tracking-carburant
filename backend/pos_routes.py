@@ -605,6 +605,7 @@ def _achat_dict(a: BarAchat) -> dict:
         "cout_total":          prix_total + total_dep,
         "fournisseur":         a.fournisseur,
         "notes":               a.notes,
+        "statut":              a.statut,
         "date_achat":          a.date_achat.isoformat(),
         "depenses": [
             {"id": d.id, "description": d.description, "montant": float(d.montant)}
@@ -643,34 +644,29 @@ def detail_achat(achat_id: int, db: Session = Depends(get_db)):
 
 @router.post("/achats", status_code=201)
 def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends(get_db)):
-    """Réceptionne des marchandises (bar ou station) — crée dépenses + éventuellement mouvement ENTREE."""
-    # Validation : exactement un produit doit être fourni
+    """Enregistre un achat. Stock PAS encore mis à jour pour les produits bar (statut=EN_ATTENTE).
+    Les carburants (station) sont directement CONFIRME (pas de stock bar à gérer).
+    Appeler POST /achats/{id}/confirmer pour valider le stock."""
     if bool(data.produit_id) == bool(data.station_produit_id):
         raise HTTPException(422, "Fournir soit produit_id (bar) soit station_produit_id (station), pas les deux.")
 
     qte_unites = Decimal(str(data.quantite))
-    mouv_id    = None
-    stk_apres  = None
 
     if data.produit_id:
-        # ── Produit bar : vérifie l'existence + gère caisse/unités + crée mouvement stock ──
         p = db.query(BarProduit).filter_by(id=data.produit_id).first()
         if not p:
             raise HTTPException(404, "Produit bar introuvable")
         upc = p.unites_par_caisse or 1
         if data.quantite_type == "caisse" and p.vendu_par_caisse and upc > 0:
             qte_unites = Decimal(str(data.quantite)) * Decimal(str(upc))
-            qte_label  = f"{data.quantite} caisse(s)×{upc}u. = {float(qte_unites)}u."
-        else:
-            qte_label  = f"{data.quantite} {p.unite}(s)"
         nom_prod = p.nom
+        statut   = "EN_ATTENTE"
     else:
-        # ── Produit station : vérifie l'existence seulement ──
         s = db.query(Produit).filter_by(id=data.station_produit_id).first()
         if not s:
             raise HTTPException(404, "Produit station introuvable")
-        qte_label = f"{data.quantite} gallon(s)"
-        nom_prod  = s.nom
+        nom_prod = s.nom
+        statut   = "CONFIRME"  # carburants : pas de stock bar
 
     achat = BarAchat(
         produit_id          = data.produit_id,
@@ -680,6 +676,7 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
         fournisseur         = data.fournisseur,
         utilisateur_id      = _uid(request),
         notes               = data.notes,
+        statut              = statut,
     )
     db.add(achat)
     db.flush()
@@ -691,39 +688,68 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
             montant     = Decimal(str(dep.montant)),
         ))
 
-    if data.produit_id:
-        mouv = BarMouvementStock(
-            produit_id     = data.produit_id,
-            type_mouvement = "ENTREE",
-            quantite       = qte_unites,
-            motif          = f"Réception {qte_label}"
-                             + (f" — {data.fournisseur}" if data.fournisseur else ""),
-            achat_id       = achat.id,
-            utilisateur_id = _uid(request),
-        )
-        db.add(mouv)
-        mouv_id = None  # sera set après commit
-    else:
-        mouv = None
-
     db.commit()
-    if mouv:
-        mouv_id   = mouv.id
-        stk_apres = float(stock_courant(data.produit_id, db))
-
     total_dep  = sum(float(d.montant) for d in data.depenses)
     prix_total = float(qte_unites) * float(data.prix_achat_unitaire)
     return {
         "achat_id":         achat.id,
-        "mouvement_id":     mouv_id,
+        "statut":           statut,
         "produit_type":     "bar" if data.produit_id else "station",
         "produit_nom":      nom_prod,
         "quantite_unites":  float(qte_unites),
         "prix_marchandise": prix_total,
         "total_depenses":   total_dep,
         "cout_total":       prix_total + total_dep,
-        "stock_apres":      stk_apres,
     }
+
+
+@router.post("/achats/{achat_id}/confirmer", status_code=200)
+def confirmer_achat(achat_id: int, request: Request, db: Session = Depends(get_db)):
+    """Confirme la réception d'un achat bar : crée le mouvement ENTREE et met à jour le stock."""
+    a = db.query(BarAchat).filter_by(id=achat_id).first()
+    if not a:
+        raise HTTPException(404, "Achat introuvable")
+    if a.statut == "CONFIRME":
+        raise HTTPException(409, "Cet achat est déjà confirmé — stock déjà mis à jour.")
+    if not a.produit_id:
+        raise HTTPException(422, "Seuls les achats de produits bar peuvent être confirmés (stock bar).")
+
+    p       = db.query(BarProduit).filter_by(id=a.produit_id).first()
+    unite   = p.unite if p else "unité"
+
+    mouv = BarMouvementStock(
+        produit_id     = a.produit_id,
+        type_mouvement = "ENTREE",
+        quantite       = a.quantite,
+        motif          = f"Réception confirmée : {float(a.quantite)} {unite}(s)"
+                         + (f" — {a.fournisseur}" if a.fournisseur else ""),
+        achat_id       = a.id,
+        utilisateur_id = _uid(request),
+    )
+    db.add(mouv)
+    a.statut = "CONFIRME"
+    db.commit()
+
+    stk = float(stock_courant(a.produit_id, db))
+    return {
+        "ok":           True,
+        "achat_id":     a.id,
+        "mouvement_id": mouv.id,
+        "stock_apres":  stk,
+        "produit_nom":  p.nom if p else str(a.produit_id),
+    }
+
+
+@router.get("/achats/en-attente")
+def achats_en_attente(db: Session = Depends(get_db)):
+    """Achats bar en attente de confirmation stock (statut=EN_ATTENTE)."""
+    achats = (
+        db.query(BarAchat)
+        .filter(BarAchat.statut == "EN_ATTENTE", BarAchat.produit_id.isnot(None))
+        .order_by(BarAchat.date_achat.asc())
+        .all()
+    )
+    return [_achat_dict(a) for a in achats]
 
 
 @router.post("/stock/ajustement", status_code=201)

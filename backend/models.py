@@ -395,6 +395,10 @@ class BarAchat(Base):
     utilisateur_id       = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     notes                = Column(String(300), nullable=True)
 
+    statut           = Column(String(20), nullable=False, default='EN_ATTENTE')
+    # EN_ATTENTE  → achat enregistré, stock pas encore mis à jour
+    # CONFIRME    → stock mis à jour (ou non applicable pour carburants)
+
     bar_produit      = relationship("BarProduit", back_populates="bar_achats",
                                     foreign_keys=[produit_id])
     station_produit  = relationship("Produit", back_populates="bar_achats",
