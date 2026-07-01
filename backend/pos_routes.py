@@ -631,6 +631,18 @@ def liste_achats(
     return [_achat_dict(a) for a in achats]
 
 
+@router.get("/achats/en-attente")
+def achats_en_attente(db: Session = Depends(get_db)):
+    """Achats bar en attente de confirmation stock (statut=EN_ATTENTE)."""
+    achats = (
+        db.query(BarAchat)
+        .filter(BarAchat.statut == "EN_ATTENTE", BarAchat.produit_id.isnot(None))
+        .order_by(BarAchat.date_achat.asc())
+        .all()
+    )
+    return [_achat_dict(a) for a in achats]
+
+
 @router.get("/achats/{achat_id}")
 def detail_achat(achat_id: int, db: Session = Depends(get_db)):
     a = db.query(BarAchat).filter_by(id=achat_id).first()
@@ -738,18 +750,6 @@ def confirmer_achat(achat_id: int, request: Request, db: Session = Depends(get_d
         "stock_apres":  stk,
         "produit_nom":  p.nom if p else str(a.produit_id),
     }
-
-
-@router.get("/achats/en-attente")
-def achats_en_attente(db: Session = Depends(get_db)):
-    """Achats bar en attente de confirmation stock (statut=EN_ATTENTE)."""
-    achats = (
-        db.query(BarAchat)
-        .filter(BarAchat.statut == "EN_ATTENTE", BarAchat.produit_id.isnot(None))
-        .order_by(BarAchat.date_achat.asc())
-        .all()
-    )
-    return [_achat_dict(a) for a in achats]
 
 
 @router.post("/stock/ajustement", status_code=201)
