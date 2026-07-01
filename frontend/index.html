@@ -16525,15 +16525,28 @@ async function hotelEmpDesactiver(id, nom){
 
 // ── RAPPORT HÔTEL ─────────────────────────────────────────────────────
 
-function _hotelRapportDownload(format){
+async function _hotelRapportDownload(format){
   const d = document.getElementById('hrpt-debut')?.value || '';
   const f = document.getElementById('hrpt-fin')?.value   || '';
-  const a = document.createElement('a');
-  a.href = `/api/hotel/rapport/${format}?date_debut=${encodeURIComponent(d)}&date_fin=${encodeURIComponent(f)}`;
-  a.download = '';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  try {
+    const resp = await fetch(
+      `/api/hotel/rapport/${format}?date_debut=${encodeURIComponent(d)}&date_fin=${encodeURIComponent(f)}`,
+      { credentials: 'include' }
+    );
+    if(!resp.ok){
+      const err = await resp.json().catch(()=>({detail:'Erreur export.'}));
+      posAlert(err.detail || 'Erreur export.'); return;
+    }
+    const blob = await resp.blob();
+    const url  = URL.createObjectURL(blob);
+    const cd   = resp.headers.get('content-disposition') || '';
+    const fname = cd.match(/filename=([^;]+)/)?.[1]?.replace(/['"]/g,'')
+                  || `rapport_hotel.${format}`;
+    const a = document.createElement('a');
+    a.href = url; a.download = fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e){ posAlert(e.message || 'Erreur export.'); }
 }
 function hotelRapportPdf(){ _hotelRapportDownload('pdf'); }
 function hotelRapportXlsx(){ _hotelRapportDownload('xlsx'); }
