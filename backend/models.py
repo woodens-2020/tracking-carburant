@@ -321,6 +321,9 @@ class BarCategorie(Base):
     couleur       = Column(String(20), nullable=True)
     date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
+    produits = relationship("BarProduit", back_populates="categorie_obj",
+                            foreign_keys="BarProduit.categorie")
+
     __table_args__ = (
         UniqueConstraint("nom", name="uq_bar_categories_nom"),
     )
@@ -332,7 +335,7 @@ class BarProduit(Base):
 
     id                 = Column(Integer, primary_key=True)
     nom                = Column(String(150), nullable=False)
-    categorie          = Column(String(50),  nullable=False)   # boisson, plat, snack, alcool, soft…
+    categorie          = Column(String(80),  ForeignKey("bar_categories.nom", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
     unite              = Column(String(30),  nullable=False, default="unite")  # bouteille, verre, assiette…
     code_barre         = Column(String(50),  nullable=True)
     actif              = Column(Boolean,     nullable=False, default=True)
@@ -350,6 +353,8 @@ class BarProduit(Base):
     lignes_vente    = relationship("BarLigneVente", back_populates="produit")
     bar_achats      = relationship("BarAchat", back_populates="bar_produit",
                                    foreign_keys="BarAchat.produit_id")
+    categorie_obj   = relationship("BarCategorie", back_populates="produits",
+                                   foreign_keys=[categorie])
 
     __table_args__ = (
         Index("idx_bar_produits_categorie", "categorie"),

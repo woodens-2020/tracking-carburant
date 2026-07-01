@@ -194,7 +194,15 @@ def _get_or_create_categorie(nom: str, db: Session) -> BarCategorie:
 @router.get("/categories")
 def liste_categories(db: Session = Depends(get_db)):
     cats = db.query(BarCategorie).order_by(BarCategorie.nom).all()
-    return [{"id": c.id, "nom": c.nom, "couleur": c.couleur} for c in cats]
+    return [
+        {
+            "id":       c.id,
+            "nom":      c.nom,
+            "couleur":  c.couleur,
+            "nb_produits": db.query(BarProduit).filter_by(categorie=c.nom).count(),
+        }
+        for c in cats
+    ]
 
 
 class CategorieIn(BaseModel):
@@ -211,13 +219,41 @@ def creer_categorie(data: CategorieIn, db: Session = Depends(get_db)):
     return {"id": cat.id, "nom": cat.nom, "couleur": cat.couleur}
 
 
-@router.delete("/categories/{cat_id}", status_code=200)
-def supprimer_categorie(cat_id: int, db: Session = Depends(get_db)):
+@router.put("/categories/{cat_id}", status_code=200)
+def renommer_categorie(cat_id: int, data: CategorieIn, db: Session = Depends(get_db)):
+    """Renomme une catégorie — ON UPDATE CASCADE met à jour bar_produits.categorie."""
     cat = db.query(BarCategorie).filter_by(id=cat_id).first()
     if not cat:
         raise HTTPException(404, "Catégorie introuvable")
-    db.delete(cat)
+    nouveau_nom = data.nom.strip().lower()
+    if not nouveau_nom:
+        raise HTTPException(422, "Nom vide.")
+    if db.query(BarCategorie).filter(BarCategorie.nom == nouveau_nom, BarCategorie.id != cat_id).first():
+        raise HTTPException(409, f"La catégorie '{nouveau_nom}' existe déjà.")
+    old_nom = cat.nom
+    cat.nom = nouveau_nom
+    if data.couleur:
+        cat.couleur = data.couleur
     db.commit()
+    nb = db.query(BarProduit).filter_by(categorie=nouveau_nom).count()
+    return {"ok": True, "ancien_nom": old_nom, "nouveau_nom": nouveau_nom, "nb_produits_mis_a_jour": nb}
+
+
+@router.delete("/categories/{cat_id}", status_code=200)
+def supprimer_categorie(cat_id: int, db: Session = Depends(get_db)):
+    from sqlalchemy.exc import IntegrityError
+    cat = db.query(BarCategorie).filter_by(id=cat_id).first()
+    if not cat:
+        raise HTTPException(404, "Catégorie introuvable")
+    nb = db.query(BarProduit).filter_by(categorie=cat.nom).count()
+    if nb > 0:
+        raise HTTPException(409, f"Impossible : {nb} produit(s) utilisent cette catégorie. Réaffectez-les d'abord.")
+    try:
+        db.delete(cat)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Catégorie utilisée par des produits — impossible de supprimer.")
     return {"ok": True}
 
 

@@ -13701,12 +13701,30 @@ function posCatRenderChips(){
     return;
   }
   wrap.innerHTML = _posCategories.map(c=>{
-    const clr = c.couleur || '#94a3b8';
-    return `<span class="cat-chip" style="background:${clr}1a;color:${clr};border:1px solid ${clr}44">
-      ${c.nom}
-      <button class="cat-chip-del" onclick="posCatPanelSupprimer(${c.id},'${c.nom.replace(/'/g,"\\'")}')" title="Supprimer">✕</button>
+    const clr  = c.couleur || '#94a3b8';
+    const nb   = c.nb_produits || 0;
+    const safNom = (c.nom||'').replace(/'/g,"\\'");
+    return `<span class="cat-chip" style="background:${clr}1a;color:${clr};border:1px solid ${clr}44;gap:6px">
+      <span>${c.nom}</span>
+      ${nb>0?`<span style="font-size:10px;background:${clr}33;border-radius:9px;padding:1px 6px;color:${clr}">${nb}</span>`:''}
+      <button class="cat-chip-del" style="background:${clr}22;color:${clr};border:none;border-radius:4px;padding:1px 5px;cursor:pointer;font-size:11px" onclick="posCatRenommer(${c.id},'${safNom}')" title="Renommer">✎</button>
+      <button class="cat-chip-del" onclick="posCatPanelSupprimer(${c.id},'${safNom}')" title="Supprimer">✕</button>
     </span>`;
   }).join('');
+}
+
+async function posCatRenommer(id, nomActuel){
+  const nouveau = prompt(`Renommer « ${nomActuel} » en :`, nomActuel);
+  if(!nouveau || nouveau.trim().toLowerCase() === nomActuel) return;
+  try {
+    const res = await apiFetch('PUT', `/pos/categories/${id}`, { nom: nouveau.trim() });
+    const nb  = res.nb_produits_mis_a_jour || 0;
+    // Mettre à jour le cache local
+    const c = _posCategories.find(x=>x.id===id);
+    if(c){ c.nom = res.nouveau_nom; delete c.nb_produits; }
+    await loadPosCategories();
+    posAlert(`Catégorie renommée en « ${res.nouveau_nom} »${nb>0?` — ${nb} produit(s) mis à jour`:''}`, 'ok');
+  } catch(e){ posAlert(e.message||'Erreur renommage.'); }
 }
 
 async function posCatPanelAjouter(){
@@ -13728,11 +13746,13 @@ async function posCatPanelAjouter(){
 }
 
 async function posCatPanelSupprimer(id, nom){
-  const produits = _posProduitsAll.filter(p=>p.categorie===nom);
-  const msg = produits.length
-    ? `Supprimer « ${nom} » ? Elle est utilisée par ${produits.length} produit(s). Ces produits resteront mais sans catégorie associée.`
-    : `Supprimer la catégorie « ${nom } » ?`;
-  if(!await showConfirm(msg,{title:'Supprimer catégorie',type:'danger',okLabel:'Supprimer',cancelLabel:'Annuler'})) return;
+  const c = _posCategories.find(x=>x.id===id);
+  const nb = c?.nb_produits || 0;
+  if(nb > 0){
+    posAlert(`Impossible : ${nb} produit(s) utilisent « ${nom} ». Réaffectez-les d'abord.`,'warn');
+    return;
+  }
+  if(!await showConfirm(`Supprimer la catégorie « ${nom} » ?`,{title:'Supprimer catégorie',type:'danger',okLabel:'Supprimer',cancelLabel:'Annuler'})) return;
   try {
     await apiFetch('DELETE',`/pos/categories/${id}`);
     _posCategories = _posCategories.filter(c=>c.id!==id);
