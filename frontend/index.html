@@ -5962,20 +5962,76 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div><!-- /page-pos-credits -->
 
-    <!-- Modal remboursement -->
+    <!-- Modal paiement de dette -->
     <div class="pos-modal-bg" id="pos-remb-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
-      <div class="pos-modal">
-        <h3 id="pos-remb-titre">Enregistrer un remboursement</h3>
+      <div class="pos-modal" style="max-width:460px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 18px">
+          <h3 style="margin:0">Paiement de dette</h3>
+          <button onclick="document.getElementById('pos-remb-modal-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;padding:0;line-height:1">✕</button>
+        </div>
+        <!-- Info client -->
+        <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:14px 16px;margin-bottom:16px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.3);margin-bottom:6px">Client</div>
+          <div id="pos-remb-client-nom" style="font-weight:700;font-size:15px">—</div>
+          <div id="pos-remb-client-contact" style="font-size:12px;color:rgba(255,255,255,.45);margin-top:3px"></div>
+          <div id="pos-remb-client-nif" style="font-size:11px;color:rgba(255,255,255,.3);margin-top:1px"></div>
+        </div>
+        <!-- Solde à payer (fixe, non modifiable) -->
+        <div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:12px;color:rgba(255,255,255,.5)">Solde à payer</span>
+          <span id="pos-remb-solde-affiche" style="font-size:22px;font-weight:800;color:#f87171">G 0.00</span>
+        </div>
         <input type="hidden" id="pos-remb-credit-id">
-        <div><label class="pos-label">Montant (G) *</label>
-          <input class="pos-input" id="pos-remb-montant" type="number" min="0.01" step="0.01" placeholder="0.00">
+        <!-- Montant remis par le client -->
+        <label class="pos-label">Montant remis par le client (G)</label>
+        <input class="pos-input" id="pos-remb-remis" type="number" min="0" step="0.01" placeholder="0.00"
+          oninput="posRembCalcMonnaie()" style="margin-bottom:10px">
+        <!-- Monnaie à rendre (auto-calculée) -->
+        <div id="pos-remb-monnaie-box" style="display:none;background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:10px 16px;margin-bottom:14px;justify-content:space-between;align-items:center">
+          <span style="font-size:12px;color:rgba(255,255,255,.5)">Monnaie à rendre</span>
+          <span id="pos-remb-monnaie" style="font-size:20px;font-weight:800;color:#34d399">G 0.00</span>
         </div>
-        <div style="margin-top:10px"><label class="pos-label">Notes</label>
-          <input class="pos-input" id="pos-remb-notes" placeholder="Optionnel">
-        </div>
-        <div class="pos-modal-footer">
+        <!-- Notes -->
+        <label class="pos-label">Notes (optionnel)</label>
+        <input class="pos-input" id="pos-remb-notes" placeholder="Référence, observation…">
+        <div class="pos-modal-footer" style="margin-top:18px">
           <button class="pos-btn ghost" onclick="document.getElementById('pos-remb-modal-bg').classList.remove('open')">Annuler</button>
-          <button class="pos-btn teal" onclick="posEnregistrerRemb()">Enregistrer</button>
+          <button class="pos-btn teal" onclick="posEnregistrerRemb()">✓ Enregistrer le paiement</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal reçu de paiement -->
+    <div class="pos-modal-bg" id="pos-remb-recu-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal" style="max-width:400px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 14px">
+          <h3 style="margin:0">Reçu de paiement</h3>
+          <button onclick="document.getElementById('pos-remb-recu-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;padding:0;line-height:1">✕</button>
+        </div>
+        <div id="pos-remb-recu-body" style="background:#fff;color:#111;border-radius:8px;padding:16px;font-family:'Courier New',monospace;font-size:11px;line-height:1.8;margin-bottom:14px;white-space:pre-wrap"></div>
+        <div style="margin-bottom:12px">
+          <label class="pos-label">Email (pour envoi par mail)</label>
+          <input class="pos-input" id="pos-remb-email-input" type="email" placeholder="client@exemple.com">
+        </div>
+        <div class="pos-modal-footer" style="flex-wrap:wrap;gap:6px">
+          <button class="pos-btn ghost" onclick="posRembImprimer()" style="font-size:11px">🖨 Imprimer</button>
+          <button id="pos-remb-wa-btn" class="pos-btn ghost" style="background:rgba(37,211,102,.1);color:#25d366;border-color:rgba(37,211,102,.3);font-size:11px" onclick="posRembWhatsApp()">📱 WhatsApp</button>
+          <button class="pos-btn ghost" style="background:rgba(59,130,246,.1);color:#60a5fa;border-color:rgba(59,130,246,.3);font-size:11px" onclick="posRembEmail()">✉ Email</button>
+          <button class="pos-btn primary" onclick="document.getElementById('pos-remb-recu-bg').classList.remove('open')">Fermer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal historique des remboursements -->
+    <div class="pos-modal-bg" id="pos-remb-histo-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal" style="max-width:500px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 14px">
+          <h3 style="margin:0" id="pos-remb-histo-titre">Historique des paiements</h3>
+          <button onclick="document.getElementById('pos-remb-histo-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:20px;padding:0;line-height:1">✕</button>
+        </div>
+        <div id="pos-remb-histo-body"></div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="document.getElementById('pos-remb-histo-bg').classList.remove('open')">Fermer</button>
         </div>
       </div>
     </div>
@@ -15587,19 +15643,25 @@ async function posAnnulerVente(){
 // ══════════════════════════════════════════════════════════════════════
 // PAGE POS CRÉDITS
 // ══════════════════════════════════════════════════════════════════════
+let _posCredits           = [];
+let _posRembCreditCourant = null;
+let _posRembRecuCourant   = null;
+let _posHistoRembs        = [];
+
 async function loadPosCredits(){
-  posCreditsCharger();
+  await posCreditsCharger();
 }
 
 async function posCreditsCharger(){
   const tbody = document.getElementById('pos-credits-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     const filtre = document.getElementById('pos-credits-filtre')?.value||'';
     let url = '/pos/credits';
     if(filtre) url += `?statut=${filtre}`;
     const data = await apiFetch('GET', url);
     const credits = data.credits||data||[];
+    _posCredits = credits;
 
     let totalDu=0, nbOuverts=0, nbRetard=0;
     credits.forEach(c=>{
@@ -15611,7 +15673,7 @@ async function posCreditsCharger(){
       .forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
 
     if(!credits.length){
-      if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun crédit trouvé</td></tr>';
+      if(tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun crédit trouvé</td></tr>';
       return;
     }
     if(tbody) tbody.innerHTML = credits.map(c=>{
@@ -15629,35 +15691,173 @@ async function posCreditsCharger(){
         <td><strong>${posGx(c.solde)}</strong></td>
         <td>${c.date_echeance ? posDateFr(c.date_echeance).split(' ')[0] : '—'}</td>
         <td>${badge}</td>
-        <td>
-          ${c.statut!=='SOLDE'?`<button class="pos-btn teal" style="font-size:10px;padding:3px 7px" onclick="posRembModal(${c.id},'${(c.client_nom||'').replace(/'/g,"\\'")}')">Rembourser</button>`:''}
+        <td style="white-space:nowrap">
+          ${c.statut!=='SOLDE'?`<button class="pos-btn teal" style="font-size:10px;padding:3px 7px;margin-right:3px" onclick="posRembModal(${c.id})">Payer</button>`:''}
+          ${(c.nb_remboursements>0||c.statut==='SOLDE')?`<button class="pos-btn ghost" style="font-size:10px;padding:3px 7px" onclick="posHistoRemb(${c.id})">Historique</button>`:''}
         </td>
       </tr>`;
     }).join('');
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
 }
 
-function posRembModal(creditId, clientNom){
+function posRembModal(creditId){
+  const credit = _posCredits.find(c=>c.id===creditId);
+  if(!credit) return;
+  _posRembCreditCourant = credit;
   document.getElementById('pos-remb-credit-id').value = creditId;
-  document.getElementById('pos-remb-titre').textContent = `Remboursement — ${clientNom}`;
-  document.getElementById('pos-remb-montant').value = '';
+  document.getElementById('pos-remb-client-nom').textContent = credit.client_nom||'—';
+  document.getElementById('pos-remb-client-contact').textContent = credit.client_contact ? `📞 ${credit.client_contact}` : '';
+  document.getElementById('pos-remb-client-nif').textContent = credit.client_nif ? `NIF: ${credit.client_nif}` : '';
+  document.getElementById('pos-remb-solde-affiche').textContent = posGx(credit.solde);
+  document.getElementById('pos-remb-remis').value = '';
   document.getElementById('pos-remb-notes').value = '';
+  document.getElementById('pos-remb-monnaie-box').style.display = 'none';
+  document.getElementById('pos-remb-monnaie').textContent = 'G 0.00';
   document.getElementById('pos-remb-modal-bg').classList.add('open');
+  setTimeout(()=>document.getElementById('pos-remb-remis')?.focus(),120);
+}
+
+function posRembCalcMonnaie(){
+  const solde = parseFloat(_posRembCreditCourant?.solde||0);
+  const remis = parseFloat(document.getElementById('pos-remb-remis').value||0);
+  const box   = document.getElementById('pos-remb-monnaie-box');
+  const el    = document.getElementById('pos-remb-monnaie');
+  if(remis>0){
+    const monnaie = remis - solde;
+    box.style.display = 'flex';
+    el.textContent   = posGx(Math.max(0,monnaie));
+    el.style.color   = monnaie>=0 ? '#34d399' : '#f87171';
+  } else { box.style.display = 'none'; }
 }
 
 async function posEnregistrerRemb(){
-  const creditId = document.getElementById('pos-remb-credit-id').value;
-  const montant  = parseFloat(document.getElementById('pos-remb-montant').value||0);
-  const notes    = document.getElementById('pos-remb-notes').value.trim()||null;
-  if(!creditId||montant<=0){ posAlert('Montant invalide.'); return; }
+  const creditId = parseInt(document.getElementById('pos-remb-credit-id').value);
+  const credit   = _posRembCreditCourant;
+  if(!credit||!creditId){ posAlert('Crédit introuvable.'); return; }
+  const montant = parseFloat(credit.solde);
+  const remis   = parseFloat(document.getElementById('pos-remb-remis').value||0);
+  const notes   = document.getElementById('pos-remb-notes').value.trim()||null;
+  if(montant<=0){ posAlert('Solde déjà nul.'); return; }
   try {
-    await apiFetch('POST',`/pos/credits/${creditId}/remboursement`,{ montant, notes });
+    const result = await apiFetch('POST',`/pos/credits/${creditId}/remboursement`,{ montant, notes });
     document.getElementById('pos-remb-modal-bg').classList.remove('open');
+    _posAfficherRembRecu({ credit, montant, remis, monnaie: Math.max(0,remis-montant),
+      notes, solde_restant: result.solde_restant,
+      remboursement_id: result.remboursement_id, date: new Date() });
     await posCreditsCharger();
-    posAlert('Remboursement enregistré.','ok');
   } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+function _posAfficherRembRecu({credit, montant, remis, monnaie, notes, solde_restant, remboursement_id, date}){
+  const d = date instanceof Date ? date : new Date(date);
+  const dateStr = d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'})
+    + ' ' + d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const lines = [
+    '╔══════════════════════════════╗',
+    '║      REÇU DE PAIEMENT       ║',
+    '╚══════════════════════════════╝',
+    '',
+    `N° Réf. : ${String(remboursement_id).padStart(6,'0')}`,
+    `Date    : ${dateStr}`,
+    '',
+    '── Client ─────────────────────',
+    `Nom     : ${credit.client_nom||'—'}`,
+    ...(credit.client_contact ? [`Tél     : ${credit.client_contact}`] : []),
+    ...(credit.client_nif     ? [`NIF     : ${credit.client_nif}`]     : []),
+    '',
+    '── Paiement ────────────────────',
+    `Montant dû    : ${posGx(credit.montant_du)}`,
+    `Montant payé  : ${posGx(montant)}`,
+    ...(remis>0 ? [`Remis client  : ${posGx(remis)}`]  : []),
+    ...(remis>0 ? [`Monnaie rendue: ${posGx(monnaie)}`] : []),
+    `Solde restant : ${posGx(solde_restant)}`,
+    ...(notes ? ['', `Notes : ${notes}`] : []),
+    '',
+    '───────────────────────────────',
+    '    Merci de votre confiance',
+  ].join('\n');
+
+  _posRembRecuCourant = { lines, credit, montant, remis, monnaie, remboursement_id, date };
+  document.getElementById('pos-remb-recu-body').textContent = lines;
+  document.getElementById('pos-remb-email-input').value = '';
+  const waBtn = document.getElementById('pos-remb-wa-btn');
+  waBtn.style.display = credit.client_contact ? '' : 'none';
+  document.getElementById('pos-remb-recu-bg').classList.add('open');
+}
+
+function posRembImprimer(){
+  const r = _posRembRecuCourant; if(!r) return;
+  const w = window.open('','_blank','width=400,height=620,menubar=no,toolbar=no');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reçu #${r.remboursement_id}</title>
+    <style>body{font-family:'Courier New',monospace;font-size:12px;margin:24px;color:#111;line-height:1.8}pre{white-space:pre-wrap}</style>
+    </head><body><pre>${r.lines}</pre><scr`+`ipt>window.print();setTimeout(()=>window.close(),1500);</scr`+`ipt></body></html>`);
+  w.document.close();
+}
+
+function posRembWhatsApp(){
+  const r = _posRembRecuCourant; if(!r||!r.credit.client_contact) return;
+  let phone = r.credit.client_contact.replace(/\D/g,'');
+  if(phone.startsWith('0')&&phone.length<=8) phone = '509'+phone;
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(r.lines)}`,'_blank');
+}
+
+function posRembEmail(){
+  const r = _posRembRecuCourant; if(!r) return;
+  const email = document.getElementById('pos-remb-email-input').value.trim();
+  if(!email){ posAlert('Veuillez saisir une adresse email.','warn'); return; }
+  const subj = encodeURIComponent(`Reçu N° ${String(r.remboursement_id).padStart(6,'0')}`);
+  window.location.href = `mailto:${email}?subject=${subj}&body=${encodeURIComponent(r.lines)}`;
+}
+
+async function posHistoRemb(creditId){
+  const credit = _posCredits.find(c=>c.id===creditId);
+  document.getElementById('pos-remb-histo-titre').textContent = `Historique — ${credit?.client_nom||''}`;
+  const body = document.getElementById('pos-remb-histo-body');
+  body.innerHTML = '<div style="text-align:center;padding:16px;color:rgba(255,255,255,.3)">Chargement…</div>';
+  document.getElementById('pos-remb-histo-bg').classList.add('open');
+  try {
+    const data = await apiFetch('GET',`/pos/credits/${creditId}/remboursements`);
+    _posHistoRembs = data.remboursements||[];
+    const hcid = creditId;
+    if(!_posHistoRembs.length){
+      body.innerHTML = '<div style="text-align:center;padding:16px;color:rgba(255,255,255,.3)">Aucun paiement enregistré</div>';
+      return;
+    }
+    body.innerHTML = `
+      <div style="margin-bottom:8px;font-size:12px;color:rgba(255,255,255,.45)">
+        Dette initiale: ${posGx(data.montant_du)} &nbsp;|&nbsp; Payé: ${posGx(data.montant_du-data.solde)} &nbsp;|&nbsp; Reste: ${posGx(data.solde)}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr>
+          <th style="text-align:left;padding:6px 8px;color:rgba(255,255,255,.4);font-size:10px;text-transform:uppercase">Date</th>
+          <th style="text-align:right;padding:6px 8px;color:rgba(255,255,255,.4);font-size:10px;text-transform:uppercase">Montant</th>
+          <th style="text-align:left;padding:6px 8px;color:rgba(255,255,255,.4);font-size:10px;text-transform:uppercase">Notes</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${_posHistoRembs.map((r,i)=>`
+          <tr style="border-top:1px solid rgba(255,255,255,.06)">
+            <td style="padding:7px 8px">${r.date ? posDateFr(r.date) : '—'}</td>
+            <td style="padding:7px 8px;text-align:right;font-weight:600;color:#34d399">${posGx(r.montant)}</td>
+            <td style="padding:7px 8px;color:rgba(255,255,255,.45)">${r.notes||'—'}</td>
+            <td style="padding:7px 8px"><button class="pos-btn ghost" style="font-size:10px;padding:2px 6px"
+              onclick="posHistoVoirRecu(${hcid},${i})">Reçu</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch(e){ body.innerHTML = `<div style="color:#f87171;padding:12px">${e.message||'Erreur'}</div>`; }
+}
+
+function posHistoVoirRecu(creditId, idx){
+  const r      = _posHistoRembs[idx]; if(!r) return;
+  const credit = _posCredits.find(c=>c.id===creditId)||{client_nom:'—',client_contact:null,client_nif:null,montant_du:r.montant};
+  document.getElementById('pos-remb-histo-bg').classList.remove('open');
+  _posAfficherRembRecu({
+    credit, montant: parseFloat(r.montant), remis: 0, monnaie: 0,
+    notes: r.notes||null, solde_restant: 0,
+    remboursement_id: r.id, date: r.date ? new Date(r.date) : new Date(),
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════════

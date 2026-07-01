@@ -1240,6 +1240,30 @@ def enregistrer_remboursement(
     }
 
 
+@router.get("/credits/{credit_id}/remboursements")
+def historique_remboursements(credit_id: int, db: Session = Depends(get_db)):
+    credit = db.query(BarCredit).filter_by(id=credit_id).first()
+    if not credit:
+        raise HTTPException(404, "Crédit introuvable")
+    rembs = sorted(credit.remboursements, key=lambda r: r.date_remb or datetime.min, reverse=True)
+    return {
+        "credit_id":      credit_id,
+        "client_nom":     credit.client_nom,
+        "montant_du":     float(credit.montant_du),
+        "solde":          float(credit.solde),
+        "statut":         credit.statut,
+        "remboursements": [
+            {
+                "id":      r.id,
+                "montant": float(r.montant),
+                "date":    r.date_remb.isoformat() if r.date_remb else None,
+                "notes":   r.notes,
+            }
+            for r in rembs
+        ],
+    }
+
+
 # ══════════════════════════════════════════════════════════════════
 # PAIE EMPLOYÉS BAR
 # ══════════════════════════════════════════════════════════════════
