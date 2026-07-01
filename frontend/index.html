@@ -5282,8 +5282,22 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="pos-form-row">
           <div><label class="pos-label">Nom *</label><input class="pos-input" id="pos-prod-nom" placeholder="Ex : Cola Couronne 12oz"></div>
           <div><label class="pos-label">Catégorie *</label>
-            <input class="pos-input" id="pos-prod-cat" list="pos-cat-datalist" placeholder="Ex : boisson, plat…" autocomplete="off">
-            <datalist id="pos-cat-datalist"></datalist>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select class="pos-select" id="pos-prod-cat" style="flex:1;min-width:0">
+                <option value="">— Choisir —</option>
+              </select>
+              <button type="button" onclick="posCatAddToggle()" title="Nouvelle catégorie"
+                style="flex-shrink:0;width:30px;height:30px;border-radius:7px;border:1px dashed rgba(63,182,168,.5);background:rgba(63,182,168,.08);color:#3fb6a8;cursor:pointer;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center">+</button>
+            </div>
+            <div id="pos-cat-new-row" style="display:none;margin-top:7px">
+              <div style="display:flex;gap:6px;align-items:center">
+                <input class="pos-input" id="pos-cat-new-nom" placeholder="Nouvelle catégorie…" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')posCatCreer();if(event.key==='Escape')posCatAddToggle(false)">
+                <button type="button" onclick="posCatCreer()" title="Confirmer"
+                  style="flex-shrink:0;width:28px;height:28px;border-radius:6px;border:none;background:rgba(63,182,168,.2);color:#3fb6a8;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center">✓</button>
+                <button type="button" onclick="posCatAddToggle(false)" title="Annuler"
+                  style="flex-shrink:0;width:28px;height:28px;border-radius:6px;border:none;background:rgba(248,113,113,.12);color:#f87171;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center">✕</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="pos-form-row">
@@ -13339,17 +13353,57 @@ function _catCouleur(nom){
 async function loadPosCategories(){
   try {
     _posCategories = await apiFetch('GET','/pos/categories');
-    const dl = document.getElementById('pos-cat-datalist');
-    const sel = document.getElementById('pos-cat-filter');
-    if(dl){
-      dl.innerHTML = _posCategories.map(c=>`<option value="${c.nom}">`).join('');
-    }
-    if(sel){
-      const cur = sel.value;
-      sel.innerHTML = '<option value="">Toutes catégories</option>' +
-        _posCategories.map(c=>`<option value="${c.nom}"${c.nom===cur?' selected':''}>${c.nom}</option>`).join('');
-    }
+    _posFillCatSelect();
   } catch(e){ /* silencieux */ }
+}
+
+function _posFillCatSelect(){
+  // Dropdown formulaire produit
+  const formSel = document.getElementById('pos-prod-cat');
+  if(formSel){
+    const cur = formSel.value;
+    formSel.innerHTML = '<option value="">— Choisir —</option>' +
+      _posCategories.map(c=>`<option value="${c.nom}">${c.nom}</option>`).join('');
+    if(cur) formSel.value = cur;
+  }
+  // Filtre table produits
+  const filterSel = document.getElementById('pos-cat-filter');
+  if(filterSel){
+    const cur = filterSel.value;
+    filterSel.innerHTML = '<option value="">Toutes catégories</option>' +
+      _posCategories.map(c=>`<option value="${c.nom}">${c.nom}</option>`).join('');
+    if(cur) filterSel.value = cur;
+  }
+}
+
+function posCatAddToggle(show){
+  const row = document.getElementById('pos-cat-new-row');
+  const inp = document.getElementById('pos-cat-new-nom');
+  if(!row) return;
+  const visible = show === undefined ? row.style.display === 'none' : show;
+  row.style.display = visible ? '' : 'none';
+  if(visible && inp){ inp.value=''; inp.focus(); }
+}
+
+async function posCatCreer(){
+  const inp = document.getElementById('pos-cat-new-nom');
+  const nom = (inp?.value||'').trim().toLowerCase();
+  if(!nom){ posAlert('Entrez un nom de catégorie.'); return; }
+  const existe = _posCategories.find(c=>c.nom===nom);
+  if(existe){
+    document.getElementById('pos-prod-cat').value = nom;
+    posCatAddToggle(false);
+    return;
+  }
+  try {
+    const cat = await apiFetch('POST','/pos/categories',{nom});
+    _posCategories.push(cat);
+    _posCategories.sort((a,b)=>a.nom.localeCompare(b.nom));
+    _posFillCatSelect();
+    document.getElementById('pos-prod-cat').value = cat.nom;
+    posCatAddToggle(false);
+    posAlert(`Catégorie « ${cat.nom} » créée.`,'ok');
+  } catch(e){ posAlert(e.message||'Erreur création catégorie.'); }
 }
 
 async function loadPosProduits(){
@@ -13514,12 +13568,18 @@ function posProduitModal(id){
   const modal    = document.getElementById('pos-prod-modal-bg');
   const title    = document.getElementById('pos-prod-modal-title');
   const prixRow  = document.getElementById('pos-prod-prix-row');
+  // S'assurer que le select catégorie est peuplé avant d'ouvrir
+  if(!document.getElementById('pos-prod-cat').options.length || document.getElementById('pos-prod-cat').options.length <= 1){
+    _posFillCatSelect();
+  }
+  // Masquer le formulaire nouvelle catégorie
+  posCatAddToggle(false);
   document.getElementById('pos-prod-id').value = id||'';
   if(id){
     const p = _posProduitsAll.find(x=>x.id===id)||{};
     title.textContent = 'Modifier produit';
     document.getElementById('pos-prod-nom').value   = p.nom||'';
-    document.getElementById('pos-prod-cat').value   = p.categorie||'boisson';
+    document.getElementById('pos-prod-cat').value   = p.categorie||'';
     document.getElementById('pos-prod-unite').value = p.unite||'';
     document.getElementById('pos-prod-seuil').value = p.seuil_alerte_stock||0;
     document.getElementById('pos-prod-code').value  = p.code_barre||'';
@@ -13530,7 +13590,7 @@ function posProduitModal(id){
     title.textContent = 'Nouveau produit';
     ['pos-prod-nom','pos-prod-unite','pos-prod-prix','pos-prod-code'].forEach(fid=>{ document.getElementById(fid).value=''; });
     document.getElementById('pos-prod-seuil').value = 0;
-    document.getElementById('pos-prod-cat').value   = 'boisson';
+    document.getElementById('pos-prod-cat').value   = '';
     _posProdResetCaisseUI();
     if(prixRow) prixRow.style.display = '';
   }
@@ -13551,7 +13611,9 @@ async function posProduitSauvegarder(){
   const code  = document.getElementById('pos-prod-code').value.trim()||null;
   const venduCaisse = document.getElementById('pos-prod-vendu-caisse')?.value === 'true';
   const upc   = parseInt(document.getElementById('pos-prod-upc')?.value)||null;
-  if(!nom||!cat||!unite){ posAlert('Nom, catégorie et unité sont requis.'); return; }
+  if(!nom){ posAlert('Le nom du produit est requis.'); return; }
+  if(!cat){ posAlert('Choisissez une catégorie ou créez-en une avec le bouton +.'); return; }
+  if(!unite){ posAlert('L\'unité de vente est requise.'); return; }
   if(venduCaisse && (!upc||upc<1)){ posAlert('Unités par caisse requis (≥ 1) pour un produit vendu par caisse.'); return; }
   // Vérification doublon côté client
   if(!id){
