@@ -6609,6 +6609,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <input class="pos-input" type="date" id="hrpt-debut" style="width:140px" onchange="loadHotelRapport()">
             <input class="pos-input" type="date" id="hrpt-fin"   style="width:140px" onchange="loadHotelRapport()">
             <button class="pos-btn ghost" onclick="loadHotelRapport()">Actualiser</button>
+            <button class="pos-btn ghost" onclick="hotelRapportPdf()" title="Télécharger PDF" style="gap:5px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              PDF
+            </button>
+            <button class="pos-btn ghost" onclick="hotelRapportXlsx()" title="Télécharger Excel" style="gap:5px;color:#34d399">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Excel
+            </button>
           </div>
         </div>
 
@@ -16516,6 +16524,19 @@ async function hotelEmpDesactiver(id, nom){
 }
 
 // ── RAPPORT HÔTEL ─────────────────────────────────────────────────────
+
+function _hotelRapportDownload(format){
+  const d = document.getElementById('hrpt-debut')?.value || '';
+  const f = document.getElementById('hrpt-fin')?.value   || '';
+  const a = document.createElement('a');
+  a.href = `/api/hotel/rapport/${format}?date_debut=${encodeURIComponent(d)}&date_fin=${encodeURIComponent(f)}`;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+function hotelRapportPdf(){ _hotelRapportDownload('pdf'); }
+function hotelRapportXlsx(){ _hotelRapportDownload('xlsx'); }
 
 async function loadHotelRapport(){
   const today = new Date();

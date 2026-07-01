@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -504,12 +505,7 @@ def stats_hotel(db: Session = Depends(get_db)):
     }
 
 
-@router.get("/rapport")
-def rapport_hotel(
-    date_debut: Optional[str] = Query(default=None),
-    date_fin:   Optional[str] = Query(default=None),
-    db: Session = Depends(get_db),
-):
+def _get_rapport_data(db: Session, date_debut: Optional[str], date_fin: Optional[str]) -> dict:
     from datetime import date as date_type
     from collections import defaultdict
 
@@ -539,7 +535,6 @@ def rapport_hotel(
     def _sum(lst, field):
         return float(sum(_d(getattr(r, field) or 0) for r in lst))
 
-    # Par chambre
     par_chambre: dict = defaultdict(lambda: {"nb": 0, "revenu": 0.0, "moments": 0, "nuits": 0})
     for r in reservations:
         ch = r.chambre.numero if r.chambre else str(r.chambre_id)
@@ -548,8 +543,7 @@ def rapport_hotel(
         par_chambre[ch]["moments"] += 1 if r.type_sejour == "MOMENT" else 0
         par_chambre[ch]["nuits"]   += 1 if r.type_sejour == "NUIT"   else 0
 
-    # Aujourd'hui
-    dt_today = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
+    dt_today     = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
     dt_today_end = datetime(today.year, today.month, today.day, 23, 59, 59, tzinfo=timezone.utc)
     today_res = (
         db.query(HotelReservation)
@@ -558,7 +552,7 @@ def rapport_hotel(
         .all()
     )
 
-    actifs_nb = db.query(HotelReservation).filter_by(statut="EN_COURS").count()
+    actifs_nb    = db.query(HotelReservation).filter_by(statut="EN_COURS").count()
     actifs_solde = float(
         db.query(func.sum(HotelReservation.solde))
           .filter_by(statut="EN_COURS").scalar() or 0
@@ -591,3 +585,214 @@ def rapport_hotel(
             key=lambda x: x["revenu"], reverse=True
         ),
     }
+
+
+@router.get("/rapport")
+def rapport_hotel(
+    date_debut: Optional[str] = Query(default=None),
+    date_fin:   Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    return _get_rapport_data(db, date_debut, date_fin)
+
+
+@router.get("/rapport/pdf")
+def rapport_hotel_pdf(
+    date_debut: Optional[str] = Query(default=None),
+    date_fin:   Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.enums import TA_CENTER
+
+    data = _get_rapport_data(db, date_debut, date_fin)
+    buf  = io.BytesIO()
+
+    doc  = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=1.5*cm, rightMargin=1.5*cm,
+        topMargin=1.5*cm, bottomMargin=1.5*cm,
+    )
+    styles    = getSampleStyleSheet()
+    s_title   = ParagraphStyle("title", parent=styles["Title"], fontSize=18, spaceAfter=4)
+    s_sub     = ParagraphStyle("sub",   parent=styles["Normal"], fontSize=10, textColor=colors.grey, spaceAfter=10)
+    s_section = ParagraphStyle("sec",   parent=styles["Heading2"], fontSize=11, spaceBefore=14, spaceAfter=6, textColor=colors.HexColor("#1e3a5f"))
+
+    HDR_BG = colors.HexColor("#1e3a5f")
+    ALT_BG = colors.HexColor("#f0f4f8")
+    GRID_C = colors.HexColor("#cccccc")
+
+    def _gdes(v):
+        return f"G {float(v):,.2f}".replace(",", " ")
+
+    def _tbl(header, rows, widths):
+        data_t = [header] + rows
+        t = Table(data_t, colWidths=widths)
+        t.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1,  0), HDR_BG),
+            ("TEXTCOLOR",     (0, 0), (-1,  0), colors.white),
+            ("FONTNAME",      (0, 0), (-1,  0), "Helvetica-Bold"),
+            ("FONTSIZE",      (0, 0), (-1, -1), 9),
+            ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [colors.white, ALT_BG]),
+            ("GRID",          (0, 0), (-1, -1), 0.25, GRID_C),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        return t
+
+    elems = []
+    elems.append(Paragraph("Rapport Hôtel", s_title))
+    elems.append(Paragraph(f"Période : {data['periode']['debut']}  →  {data['periode']['fin']}", s_sub))
+
+    auj = data["aujourd_hui"]
+    elems.append(Paragraph("Aujourd'hui", s_section))
+    elems.append(_tbl(
+        ["Arrivées", "Moments", "Nuits", "Revenu"],
+        [[str(auj["nb"]), str(auj["moments"]), str(auj["nuits"]), _gdes(auj["revenu"])]],
+        [3.5*cm, 3.5*cm, 3.5*cm, 5*cm],
+    ))
+
+    k = data["kpis"]
+    elems.append(Paragraph(f"Période : {data['periode']['debut']} → {data['periode']['fin']}", s_section))
+    elems.append(_tbl(
+        ["Total", "Moments", "Nuits", "Revenu total", "Impayé"],
+        [[str(k["nb_total"]), str(k["nb_moments"]), str(k["nb_nuits"]),
+          _gdes(k["revenu_total"]), _gdes(k["solde_impaye"])]],
+        [2.5*cm, 2.5*cm, 2.5*cm, 5*cm, 4*cm],
+    ))
+
+    elems.append(Paragraph("Revenus par type", s_section))
+    elems.append(_tbl(
+        ["Type", "Séjours", "Revenu"],
+        [
+            ["Moments", str(k["nb_moments"]), _gdes(k["revenu_moments"])],
+            ["Nuits",   str(k["nb_nuits"]),   _gdes(k["revenu_nuits"])],
+        ],
+        [5*cm, 4*cm, 7*cm],
+    ))
+
+    if data["par_chambre"]:
+        elems.append(Paragraph("Performance par chambre", s_section))
+        elems.append(_tbl(
+            ["Chambre", "Total", "Moments", "Nuits", "Revenu"],
+            [[ch["numero"], str(ch["nb"]), str(ch["moments"]), str(ch["nuits"]), _gdes(ch["revenu"])]
+             for ch in data["par_chambre"]],
+            [3.5*cm, 2.5*cm, 3*cm, 3*cm, 5*cm],
+        ))
+
+    elems.append(Spacer(1, 0.5*cm))
+    elems.append(Paragraph(
+        f"Généré le {datetime.now(timezone.utc).strftime('%d/%m/%Y à %H:%M')} UTC",
+        ParagraphStyle("footer", parent=styles["Normal"], fontSize=8, textColor=colors.grey),
+    ))
+
+    doc.build(elems)
+    buf.seek(0)
+    fname = f"rapport_hotel_{data['periode']['debut']}_{data['periode']['fin']}.pdf"
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
+
+
+@router.get("/rapport/xlsx")
+def rapport_hotel_xlsx(
+    date_debut: Optional[str] = Query(default=None),
+    date_fin:   Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    import io
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    data = _get_rapport_data(db, date_debut, date_fin)
+
+    HDR_FILL = PatternFill("solid", fgColor="1E3A5F")
+    ALT_FILL = PatternFill("solid", fgColor="F0F4F8")
+    HDR_FONT = Font(bold=True, color="FFFFFF")
+    BOLD     = Font(bold=True)
+    _side    = Side(style="thin", color="BBBBBB")
+    BORDER   = Border(left=_side, right=_side, top=_side, bottom=_side)
+
+    def _gdes(v):
+        return f"G {float(v):,.2f}".replace(",", " ")
+
+    def _hdr(ws, row, cols):
+        for ci, val in enumerate(cols, 1):
+            c = ws.cell(row=row, column=ci, value=val)
+            c.font = HDR_FONT; c.fill = HDR_FILL
+            c.alignment = Alignment(horizontal="center"); c.border = BORDER
+
+    def _row(ws, row, vals, alt=False):
+        fill = ALT_FILL if alt else PatternFill()
+        for ci, val in enumerate(vals, 1):
+            c = ws.cell(row=row, column=ci, value=val)
+            c.fill = fill; c.border = BORDER
+            c.alignment = Alignment(horizontal="right" if isinstance(val, (int, float)) else "left")
+
+    wb = openpyxl.Workbook()
+
+    # ── Feuille 1 : Résumé ────────────────────────────────────────
+    ws1 = wb.active
+    ws1.title = "Résumé"
+    ws1.column_dimensions["A"].width = 28
+    ws1.column_dimensions["B"].width = 20
+
+    r = 1
+    t = ws1.cell(r, 1, "Rapport Hôtel"); t.font = Font(bold=True, size=14)
+    ws1.merge_cells(f"A{r}:B{r}"); r += 1
+    ws1.cell(r, 1, f"Période : {data['periode']['debut']} → {data['periode']['fin']}")
+    ws1.merge_cells(f"A{r}:B{r}"); r += 2
+
+    ws1.cell(r, 1, "Aujourd'hui").font = BOLD; r += 1
+    auj = data["aujourd_hui"]
+    for lbl, val in [("Arrivées du jour", auj["nb"]), ("Moments", auj["moments"]),
+                     ("Nuits", auj["nuits"]), ("Revenu du jour", _gdes(auj["revenu"]))]:
+        ws1.cell(r, 1, lbl); ws1.cell(r, 2, val); r += 1
+
+    r += 1
+    ws1.cell(r, 1, "Période").font = BOLD; r += 1
+    k = data["kpis"]
+    for lbl, val in [
+        ("Total séjours", k["nb_total"]), ("Moments", k["nb_moments"]), ("Nuits", k["nb_nuits"]),
+        ("Revenu total",  _gdes(k["revenu_total"])),
+        ("Rev. Moments",  _gdes(k["revenu_moments"])),
+        ("Rev. Nuits",    _gdes(k["revenu_nuits"])),
+        ("Montant facturé", _gdes(k["montant_total_facture"])),
+        ("Impayé",          _gdes(k["solde_impaye"])),
+    ]:
+        ws1.cell(r, 1, lbl); ws1.cell(r, 2, val); r += 1
+
+    r += 1
+    ws1.cell(r, 1, "Actifs en cours").font = BOLD; r += 1
+    ac = data["actifs"]
+    ws1.cell(r, 1, "Clients en cours"); ws1.cell(r, 2, ac["nb"]); r += 1
+    ws1.cell(r, 1, "Solde en attente"); ws1.cell(r, 2, _gdes(ac["solde_en_attente"])); r += 1
+
+    # ── Feuille 2 : Par Chambre ───────────────────────────────────
+    ws2 = wb.create_sheet("Par Chambre")
+    for i, w in enumerate([14, 10, 12, 10, 20], 1):
+        ws2.column_dimensions[get_column_letter(i)].width = w
+    _hdr(ws2, 1, ["Chambre", "Total", "Moments", "Nuits", "Revenu"])
+    for idx, ch in enumerate(data["par_chambre"], 2):
+        _row(ws2, idx,
+             [ch["numero"], ch["nb"], ch["moments"], ch["nuits"], _gdes(ch["revenu"])],
+             alt=(idx % 2 == 1))
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f"rapport_hotel_{data['periode']['debut']}_{data['periode']['fin']}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
