@@ -651,3 +651,105 @@ class BarPaiementEmploye(Base):
         Index("idx_bar_paie_employe", "employe_id"),
         Index("idx_bar_paie_date",    "date_paiement"),
     )
+
+
+# ══════════════════════════════════════════════════════════════════
+# HOTEL
+# ══════════════════════════════════════════════════════════════════
+
+class HotelChambre(Base):
+    """Chambre de l'hôtel — configuration et état."""
+    __tablename__ = "hotel_chambres"
+
+    id            = Column(Integer, primary_key=True)
+    numero        = Column(String(20),  nullable=False)
+    type_chambre  = Column(String(20),  nullable=False, default="SIMPLE")
+    etage         = Column(Integer,     nullable=True)
+    capacite      = Column(Integer,     nullable=False, default=1)
+    prix_nuit     = Column(Numeric(12,2), nullable=False)
+    prix_moment   = Column(Numeric(12,2), nullable=True)   # prix/heure pour séjour moment
+    statut        = Column(String(20),  nullable=False, default="DISPONIBLE")
+    description   = Column(String(300), nullable=True)
+    actif         = Column(Boolean,     nullable=False, default=True)
+    date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    reservations = relationship("HotelReservation", back_populates="chambre")
+
+    __table_args__ = (
+        UniqueConstraint("numero", name="uq_hotel_chambre_numero"),
+        CheckConstraint("type_chambre IN ('SIMPLE','DOUBLE','SUITE','VIP')",
+                        name="chk_hotel_chambre_type"),
+        CheckConstraint("statut IN ('DISPONIBLE','OCCUPEE','MAINTENANCE','FERMEE')",
+                        name="chk_hotel_chambre_statut"),
+        CheckConstraint("prix_nuit > 0", name="chk_hotel_chambre_prix_nuit"),
+        CheckConstraint("capacite >= 1", name="chk_hotel_chambre_capacite"),
+        Index("idx_hotel_chambres_statut", "statut"),
+        Index("idx_hotel_chambres_actif",  "actif"),
+    )
+
+
+class HotelEmploye(Base):
+    """Employé de la section hôtel."""
+    __tablename__ = "hotel_employes"
+
+    id            = Column(Integer, primary_key=True)
+    nom           = Column(String(100), nullable=False)
+    prenom        = Column(String(100), nullable=False)
+    poste         = Column(String(40),  nullable=False, default="RECEPTIONNISTE")
+    telephone     = Column(String(30),  nullable=True)
+    email         = Column(String(100), nullable=True)
+    date_embauche = Column(Date,        nullable=True)
+    salaire_base  = Column(Numeric(12,2), nullable=True)
+    actif         = Column(Boolean,     nullable=False, default=True)
+    notes         = Column(String(300), nullable=True)
+    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    reservations = relationship("HotelReservation", back_populates="employe")
+
+    __table_args__ = (
+        CheckConstraint(
+            "poste IN ('RECEPTIONNISTE','FEMME_DE_CHAMBRE','GERANT','SECURITE','AUTRE')",
+            name="chk_hotel_emp_poste",
+        ),
+        Index("idx_hotel_employes_actif", "actif"),
+    )
+
+
+class HotelReservation(Base):
+    """Enregistrement client — nuit ou moment."""
+    __tablename__ = "hotel_reservations"
+
+    id                 = Column(Integer, primary_key=True)
+    chambre_id         = Column(Integer, ForeignKey("hotel_chambres.id", ondelete="RESTRICT"), nullable=False)
+    client_nom         = Column(String(150), nullable=False)
+    client_contact     = Column(String(100), nullable=True)
+    client_id_piece    = Column(String(80),  nullable=True)
+    type_sejour        = Column(String(10),  nullable=False)   # NUIT | MOMENT
+    date_arrivee       = Column(DateTime(timezone=True), nullable=False)
+    date_depart_prevue = Column(DateTime(timezone=True), nullable=False)
+    date_depart_reel   = Column(DateTime(timezone=True), nullable=True)
+    nb_nuits           = Column(Integer,     nullable=True)
+    nb_heures          = Column(Numeric(5,2), nullable=True)
+    prix_unitaire      = Column(Numeric(12,2), nullable=False)
+    montant_total      = Column(Numeric(12,2), nullable=False)
+    montant_paye       = Column(Numeric(12,2), nullable=False, default=0)
+    solde              = Column(Numeric(12,2), nullable=False, default=0)
+    statut             = Column(String(20),  nullable=False, default="EN_COURS")
+    mode_paiement      = Column(String(20),  nullable=True)
+    notes              = Column(String(300), nullable=True)
+    employe_id         = Column(Integer, ForeignKey("hotel_employes.id", ondelete="SET NULL"), nullable=True)
+    created_at         = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    chambre = relationship("HotelChambre", back_populates="reservations")
+    employe = relationship("HotelEmploye", back_populates="reservations")
+
+    __table_args__ = (
+        CheckConstraint("type_sejour IN ('NUIT','MOMENT')",   name="chk_hotel_res_type"),
+        CheckConstraint("statut IN ('EN_COURS','TERMINEE','ANNULEE')", name="chk_hotel_res_statut"),
+        CheckConstraint("montant_total >= 0",  name="chk_hotel_res_total_pos"),
+        CheckConstraint("montant_paye  >= 0",  name="chk_hotel_res_paye_pos"),
+        CheckConstraint("solde         >= 0",  name="chk_hotel_res_solde_pos"),
+        Index("idx_hotel_res_chambre", "chambre_id"),
+        Index("idx_hotel_res_statut",  "statut"),
+        Index("idx_hotel_res_date",    "date_arrivee"),
+    )

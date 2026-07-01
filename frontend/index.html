@@ -2794,6 +2794,39 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <!-- ── Section Hôtel ── -->
+    <div class="nav-section-label">Hôtel</div>
+
+    <button class="nav-item" data-page="hotel-chambres" onclick="goTo('hotel-chambres')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 22V12a9 9 0 0118 0v10"/><path d="M3 12h18M12 3v4"/><rect x="9" y="16" width="6" height="6"/></svg></span>
+      <span>Chambres</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="hotel-reception" onclick="goTo('hotel-reception')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></span>
+      <span>Réception</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="hotel-sejours" onclick="goTo('hotel-sejours')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg></span>
+      <span>Séjours actifs</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="hotel-historique" onclick="goTo('hotel-historique')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+      <span>Historique</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="hotel-employes" onclick="goTo('hotel-employes')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0112 0v2"/></svg></span>
+      <span>Employés Hôtel</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <!-- ── Section Bar / Restaurant ── -->
     <div class="nav-section-label">Bar / Restaurant</div>
 
@@ -6284,6 +6317,258 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
       </div>
     </div><!-- /page-pos-grande-caisse -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- HOTEL — CHAMBRES                                          -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-hotel-chambres" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#6366f1,#4f46e5)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M3 22V12a9 9 0 0118 0v10"/><rect x="9" y="16" width="6" height="6"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Chambres</div>
+            <div class="pos-header-sub">Configuration et état des chambres</div>
+          </div>
+          <div class="pos-header-actions">
+            <button class="pos-btn teal" onclick="hotelChambreModal()">+ Ajouter chambre</button>
+          </div>
+        </div>
+        <!-- KPIs -->
+        <div class="pos-kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+          <div class="pos-kpi"><div class="pos-kpi-label">Total chambres</div><div class="pos-kpi-val" id="hkpi-total">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Disponibles</div><div class="pos-kpi-val" id="hkpi-dispo" style="color:#34d399">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Occupées</div><div class="pos-kpi-val amber" id="hkpi-occup">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Taux occupation</div><div class="pos-kpi-val" id="hkpi-taux">—</div></div>
+        </div>
+        <!-- Grille chambres -->
+        <div id="hotel-chambres-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px"></div>
+      </div>
+      <!-- Modal chambre -->
+      <div id="hotel-chambre-modal-bg" class="modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal-box" style="width:480px">
+          <div class="modal-hdr"><span id="hcm-title">Nouvelle chambre</span><button class="modal-close" onclick="document.getElementById('hotel-chambre-modal-bg').classList.remove('open')">✕</button></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px">
+            <div><label class="pos-label">Numéro *</label><input class="pos-input" id="hcm-numero" placeholder="101"></div>
+            <div><label class="pos-label">Type</label>
+              <select class="pos-input" id="hcm-type">
+                <option value="SIMPLE">Simple</option><option value="DOUBLE">Double</option><option value="SUITE">Suite</option><option value="VIP">VIP</option>
+              </select>
+            </div>
+            <div><label class="pos-label">Étage</label><input class="pos-input" id="hcm-etage" type="number" min="0" placeholder="1"></div>
+            <div><label class="pos-label">Capacité (personnes)</label><input class="pos-input" id="hcm-capacite" type="number" min="1" value="1"></div>
+            <div><label class="pos-label">Prix / nuit (G) *</label><input class="pos-input" id="hcm-prix-nuit" type="number" min="0" step="any" placeholder="2500"></div>
+            <div><label class="pos-label">Prix / moment (G)</label><input class="pos-input" id="hcm-prix-moment" type="number" min="0" step="any" placeholder="1000"></div>
+            <div style="grid-column:1/-1"><label class="pos-label">Description</label><input class="pos-input" id="hcm-description" placeholder="Chambre avec vue, AC, TV…"></div>
+          </div>
+          <div style="padding:0 16px 16px;display:flex;justify-content:flex-end;gap:10px">
+            <button class="pos-btn ghost" onclick="document.getElementById('hotel-chambre-modal-bg').classList.remove('open')">Annuler</button>
+            <button class="pos-btn teal" onclick="hotelChambreSauver()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-hotel-chambres -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- HOTEL — RÉCEPTION                                         -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-hotel-reception" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#10b981,#059669)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Réception</div>
+            <div class="pos-header-sub">Enregistrement client — Nuit ou Moment</div>
+          </div>
+        </div>
+        <!-- Formulaire enregistrement -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <!-- Colonne gauche : informations client -->
+          <div class="pos-card">
+            <div class="pos-card-hdr">Informations client</div>
+            <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+              <div><label class="pos-label">Nom complet *</label><input class="pos-input" id="hrec-client-nom" placeholder="Prénom Nom"></div>
+              <div><label class="pos-label">Contact (téléphone)</label><input class="pos-input" id="hrec-client-contact" placeholder="+509 3700 0000"></div>
+              <div><label class="pos-label">Pièce d'identité</label><input class="pos-input" id="hrec-client-piece" placeholder="CIN / Passeport n°…"></div>
+              <div><label class="pos-label">Notes</label><textarea class="pos-input" id="hrec-notes" rows="2" placeholder="Informations supplémentaires…" style="resize:vertical"></textarea></div>
+            </div>
+          </div>
+          <!-- Colonne droite : séjour -->
+          <div class="pos-card">
+            <div class="pos-card-hdr">Détails du séjour</div>
+            <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+              <!-- Type séjour -->
+              <div>
+                <label class="pos-label">Type de séjour</label>
+                <div style="display:flex;gap:8px;margin-top:6px">
+                  <button id="hrec-btn-nuit" class="pos-btn teal" onclick="hrecSetType('NUIT')" style="flex:1">Nuit</button>
+                  <button id="hrec-btn-moment" class="pos-btn ghost" onclick="hrecSetType('MOMENT')" style="flex:1">Moment</button>
+                </div>
+              </div>
+              <!-- Chambre -->
+              <div><label class="pos-label">Chambre *</label>
+                <select class="pos-input" id="hrec-chambre" onchange="hrecOnChambreChange()">
+                  <option value="">— Choisir une chambre disponible —</option>
+                </select>
+              </div>
+              <!-- Date arrivée -->
+              <div><label class="pos-label">Date & heure d'arrivée *</label><input class="pos-input" id="hrec-arrivee" type="datetime-local" onchange="hrecCalcTotal()"></div>
+              <!-- Nb nuits (NUIT) -->
+              <div id="hrec-nuits-row"><label class="pos-label">Nombre de nuits *</label><input class="pos-input" id="hrec-nb-nuits" type="number" min="1" value="1" oninput="hrecCalcTotal()"></div>
+              <!-- Nb heures (MOMENT) -->
+              <div id="hrec-heures-row" style="display:none"><label class="pos-label">Durée (heures) *</label><input class="pos-input" id="hrec-nb-heures" type="number" min="0.5" step="0.5" value="2" oninput="hrecCalcTotal()"></div>
+              <!-- Recap prix -->
+              <div id="hrec-recap" style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:8px;padding:12px;display:none">
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.55)"><span id="hrec-recap-label">Prix / nuit</span><span id="hrec-recap-prix">—</span></div>
+                <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:6px;font-size:15px"><span>Total</span><span id="hrec-recap-total" style="color:#a78bfa">—</span></div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.4);margin-top:2px"><span>Départ prévu</span><span id="hrec-recap-depart">—</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Paiement -->
+        <div class="pos-card" style="margin-top:0">
+          <div class="pos-card-hdr">Paiement à l'enregistrement</div>
+          <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+            <div><label class="pos-label">Mode de paiement</label>
+              <select class="pos-input" id="hrec-mode">
+                <option value="">— Mode —</option>
+                <option value="CASH">Cash</option><option value="CARTE">Carte</option><option value="VIREMENT">Virement</option><option value="CREDIT">Crédit</option>
+              </select>
+            </div>
+            <div><label class="pos-label">Montant payé (G)</label><input class="pos-input" id="hrec-montant-paye" type="number" min="0" step="any" value="0" oninput="hrecCalcSolde()"></div>
+            <div><label class="pos-label">Solde restant</label><div id="hrec-solde" style="font-size:18px;font-weight:700;color:#f87171;padding:8px 0">—</div></div>
+            <div><label class="pos-label">Réceptionniste</label>
+              <select class="pos-input" id="hrec-employe"><option value="">— Optionnel —</option></select>
+            </div>
+          </div>
+          <div style="padding:0 14px 14px;display:flex;justify-content:flex-end">
+            <button class="pos-btn teal" style="font-size:15px;padding:10px 32px" onclick="hrecEnregistrer()">Enregistrer le client</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-hotel-reception -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- HOTEL — SÉJOURS ACTIFS                                    -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-hotel-sejours" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+          <div><div class="pos-header-title">Séjours actifs</div><div class="pos-header-sub">Clients en cours — checkout et paiements</div></div>
+          <div class="pos-header-actions"><button class="pos-btn ghost" onclick="loadHotelSejours()">Actualiser</button></div>
+        </div>
+        <div id="hotel-sejours-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">
+          <div style="color:rgba(255,255,255,.3);padding:30px;text-align:center">Chargement…</div>
+        </div>
+      </div>
+      <!-- Modal paiement supplémentaire -->
+      <div id="hotel-paie-modal-bg" class="modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal-box" style="width:360px">
+          <div class="modal-hdr"><span>Paiement supplémentaire</span><button class="modal-close" onclick="document.getElementById('hotel-paie-modal-bg').classList.remove('open')">✕</button></div>
+          <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+            <input type="hidden" id="hotel-paie-res-id">
+            <div><label class="pos-label">Montant (G) *</label><input class="pos-input" id="hotel-paie-montant" type="number" min="0" step="any"></div>
+            <div><label class="pos-label">Mode</label>
+              <select class="pos-input" id="hotel-paie-mode">
+                <option value="CASH">Cash</option><option value="CARTE">Carte</option><option value="VIREMENT">Virement</option>
+              </select>
+            </div>
+          </div>
+          <div style="padding:0 16px 16px;display:flex;justify-content:flex-end;gap:10px">
+            <button class="pos-btn ghost" onclick="document.getElementById('hotel-paie-modal-bg').classList.remove('open')">Annuler</button>
+            <button class="pos-btn teal" onclick="hotelPaiementSauver()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-hotel-sejours -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- HOTEL — HISTORIQUE                                        -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-hotel-historique" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#64748b,#475569)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <div><div class="pos-header-title">Historique séjours</div><div class="pos-header-sub">Toutes les réservations</div></div>
+          <div class="pos-header-actions" style="gap:8px">
+            <select class="pos-input" id="hhist-statut" style="width:140px" onchange="loadHotelHistorique()">
+              <option value="">Tous</option><option value="EN_COURS">En cours</option><option value="TERMINEE">Terminés</option><option value="ANNULEE">Annulés</option>
+            </select>
+            <select class="pos-input" id="hhist-type" style="width:130px" onchange="loadHotelHistorique()">
+              <option value="">Tous types</option><option value="NUIT">Nuit</option><option value="MOMENT">Moment</option>
+            </select>
+          </div>
+        </div>
+        <div class="pos-card">
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead><tr><th>Date</th><th>Client</th><th>Chambre</th><th>Type</th><th>Durée</th><th style="text-align:right">Total</th><th style="text-align:right">Payé</th><th style="text-align:right">Solde</th><th>Statut</th></tr></thead>
+              <tbody id="hhist-tbody"><tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-hotel-historique -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- HOTEL — EMPLOYÉS                                          -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-hotel-employes" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0112 0v2"/></svg>
+          </div>
+          <div><div class="pos-header-title">Employés Hôtel</div><div class="pos-header-sub">Personnel de l'hôtel</div></div>
+          <div class="pos-header-actions"><button class="pos-btn teal" onclick="hotelEmpModal()">+ Ajouter employé</button></div>
+        </div>
+        <div class="pos-card">
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead><tr><th>Nom</th><th>Poste</th><th>Téléphone</th><th>Embauche</th><th style="text-align:right">Salaire base</th><th>Statut</th><th></th></tr></thead>
+              <tbody id="hotel-emp-tbody"><tr><td colspan="7" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <!-- Modal employé -->
+      <div id="hotel-emp-modal-bg" class="modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal-box" style="width:480px">
+          <div class="modal-hdr"><span id="hemp-title">Nouvel employé</span><button class="modal-close" onclick="document.getElementById('hotel-emp-modal-bg').classList.remove('open')">✕</button></div>
+          <input type="hidden" id="hemp-id">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px">
+            <div><label class="pos-label">Prénom *</label><input class="pos-input" id="hemp-prenom" placeholder="Prénom"></div>
+            <div><label class="pos-label">Nom *</label><input class="pos-input" id="hemp-nom" placeholder="Nom"></div>
+            <div><label class="pos-label">Poste</label>
+              <select class="pos-input" id="hemp-poste">
+                <option value="RECEPTIONNISTE">Réceptionniste</option>
+                <option value="FEMME_DE_CHAMBRE">Femme de chambre</option>
+                <option value="GERANT">Gérant</option>
+                <option value="SECURITE">Sécurité</option>
+                <option value="AUTRE">Autre</option>
+              </select>
+            </div>
+            <div><label class="pos-label">Téléphone</label><input class="pos-input" id="hemp-tel" placeholder="+509…"></div>
+            <div><label class="pos-label">Date embauche</label><input class="pos-input" id="hemp-embauche" type="date"></div>
+            <div><label class="pos-label">Salaire base (G)</label><input class="pos-input" id="hemp-salaire" type="number" min="0" step="any"></div>
+            <div style="grid-column:1/-1"><label class="pos-label">Notes</label><input class="pos-input" id="hemp-notes" placeholder="Notes…"></div>
+          </div>
+          <div style="padding:0 16px 16px;display:flex;justify-content:flex-end;gap:10px">
+            <button class="pos-btn ghost" onclick="document.getElementById('hotel-emp-modal-bg').classList.remove('open')">Annuler</button>
+            <button class="pos-btn teal" onclick="hotelEmpSauver()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-hotel-employes -->
 
   </div><!-- /pages -->
 
@@ -12853,6 +13138,11 @@ const _giPageLoaders = {
   'pos-paie':        loadPosPaie,
   'pos-rentabilite':    loadPosRentabilite,
   'pos-grande-caisse':  loadPosGrandeCaisse,
+  'hotel-chambres':     loadHotelChambres,
+  'hotel-reception':    loadHotelReception,
+  'hotel-sejours':      loadHotelSejours,
+  'hotel-historique':   loadHotelHistorique,
+  'hotel-employes':     loadHotelEmployes,
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -15610,6 +15900,447 @@ function _gcRender(d){
       }).join('');
     }
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// HOTEL
+// ══════════════════════════════════════════════════════════════════════
+let _hotelChambres  = [];
+let _hotelEmployes  = [];
+let _hrecType       = 'NUIT';
+let _hcmEditId      = null;
+let _hempEditId     = null;
+
+const _STATUT_CHAMBRE_COLOR = {
+  DISPONIBLE: '#34d399', OCCUPEE: '#f59e0b', MAINTENANCE: '#f87171', FERMEE: '#64748b'
+};
+const _TYPE_CHAMBRE_LABEL = { SIMPLE: 'Simple', DOUBLE: 'Double', SUITE: 'Suite', VIP: 'VIP' };
+
+function _hFmt(v){ return posGx(v); }
+
+// ── CHAMBRES ──────────────────────────────────────────────────────────
+
+async function loadHotelChambres(){
+  try {
+    const [stats, chambres] = await Promise.all([
+      apiFetch('GET','/hotel/stats'),
+      apiFetch('GET','/hotel/chambres'),
+    ]);
+    _hotelChambres = chambres || [];
+    // KPIs
+    const el = id => document.getElementById(id);
+    if(el('hkpi-total')) el('hkpi-total').textContent = stats.total_chambres;
+    if(el('hkpi-dispo')) el('hkpi-dispo').textContent = stats.chambres_dispo;
+    if(el('hkpi-occup')) el('hkpi-occup').textContent = stats.chambres_occupees;
+    if(el('hkpi-taux'))  el('hkpi-taux').textContent  = stats.taux_occupation + '%';
+    // Grille
+    const grid = el('hotel-chambres-grid');
+    if(!grid) return;
+    if(!_hotelChambres.length){
+      grid.innerHTML = '<div style="color:rgba(255,255,255,.3);padding:30px;text-align:center;grid-column:1/-1">Aucune chambre — ajoutez-en une.</div>';
+      return;
+    }
+    grid.innerHTML = _hotelChambres.map(c => _hotelChambreCard(c)).join('');
+  } catch(e){ posAlert(e.message||'Erreur chargement chambres.'); }
+}
+
+function _hotelChambreCard(c){
+  const clr  = _STATUT_CHAMBRE_COLOR[c.statut] || '#94a3b8';
+  const type = _TYPE_CHAMBRE_LABEL[c.type_chambre] || c.type_chambre;
+  return `<div class="pos-card" style="border-top:3px solid ${clr}">
+    <div style="padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-size:22px;font-weight:800;letter-spacing:-.04em">Chambre ${c.numero}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">${type} · ${c.capacite} pers.${c.etage!=null?' · Étage '+c.etage:''}</div>
+        </div>
+        <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${clr}22;color:${clr};border:1px solid ${clr}44">${c.statut}</span>
+      </div>
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:4px">
+        <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:rgba(255,255,255,.45)">Nuit</span><strong>${_hFmt(c.prix_nuit)}</strong></div>
+        ${c.prix_moment!=null?`<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:rgba(255,255,255,.45)">Moment/h</span><strong>${_hFmt(c.prix_moment)}</strong></div>`:''}
+        ${c.description?`<div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:4px;font-style:italic">${c.description}</div>`:''}
+      </div>
+      <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
+        <button class="pos-btn ghost" style="flex:1;font-size:11px;padding:5px 8px" onclick="hotelChambreModal(${c.id})">Modifier</button>
+        ${c.statut==='DISPONIBLE'?`<button class="pos-btn ghost" style="font-size:11px;padding:5px 8px;color:#fbbf24;border-color:rgba(251,191,36,.3)" onclick="hotelSetStatut(${c.id},'MAINTENANCE')" title="Mettre en maintenance">⚙</button>`:''}
+        ${c.statut==='MAINTENANCE'?`<button class="pos-btn ghost" style="font-size:11px;padding:5px 8px;color:#34d399;border-color:rgba(52,211,153,.3)" onclick="hotelSetStatut(${c.id},'DISPONIBLE')" title="Remettre disponible">✓</button>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function hotelChambreModal(id){
+  _hcmEditId = id || null;
+  const el = n => document.getElementById(n);
+  el('hcm-title').textContent = id ? 'Modifier la chambre' : 'Nouvelle chambre';
+  if(id){
+    const c = _hotelChambres.find(x=>x.id===id);
+    if(c){
+      el('hcm-numero').value       = c.numero;
+      el('hcm-type').value         = c.type_chambre;
+      el('hcm-etage').value        = c.etage ?? '';
+      el('hcm-capacite').value     = c.capacite;
+      el('hcm-prix-nuit').value    = c.prix_nuit;
+      el('hcm-prix-moment').value  = c.prix_moment ?? '';
+      el('hcm-description').value  = c.description ?? '';
+    }
+  } else {
+    ['hcm-numero','hcm-etage','hcm-prix-nuit','hcm-prix-moment','hcm-description'].forEach(n=>{ el(n).value=''; });
+    el('hcm-type').value     = 'SIMPLE';
+    el('hcm-capacite').value = '1';
+  }
+  el('hotel-chambre-modal-bg').classList.add('open');
+}
+
+async function hotelChambreSauver(){
+  const el = n => document.getElementById(n);
+  const num = el('hcm-numero').value.trim();
+  const pn  = parseFloat(el('hcm-prix-nuit').value||0);
+  if(!num || pn<=0){ posAlert('Numéro et prix/nuit requis.','warn'); return; }
+  const body = {
+    numero:       num,
+    type_chambre: el('hcm-type').value,
+    etage:        el('hcm-etage').value ? parseInt(el('hcm-etage').value) : null,
+    capacite:     parseInt(el('hcm-capacite').value||1),
+    prix_nuit:    pn,
+    prix_moment:  el('hcm-prix-moment').value ? parseFloat(el('hcm-prix-moment').value) : null,
+    description:  el('hcm-description').value.trim() || null,
+    actif:        true,
+  };
+  try {
+    if(_hcmEditId) await apiFetch('PUT', `/hotel/chambres/${_hcmEditId}`, body);
+    else           await apiFetch('POST','/hotel/chambres', body);
+    el('hotel-chambre-modal-bg').classList.remove('open');
+    await loadHotelChambres();
+    posAlert('Chambre enregistrée.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function hotelSetStatut(id, statut){
+  try {
+    await apiFetch('PATCH', `/hotel/chambres/${id}/statut?statut=${statut}`);
+    await loadHotelChambres();
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ── RÉCEPTION ─────────────────────────────────────────────────────────
+
+async function loadHotelReception(){
+  // Charger chambres disponibles + employés
+  try {
+    const [dispo, emps] = await Promise.all([
+      apiFetch('GET','/hotel/chambres/disponibles'),
+      apiFetch('GET','/hotel/employes?actif=true'),
+    ]);
+    _hotelEmployes = emps || [];
+    const selCh = document.getElementById('hrec-chambre');
+    if(selCh){
+      selCh.innerHTML = '<option value="">— Choisir une chambre disponible —</option>' +
+        (dispo||[]).map(c=>`<option value="${c.id}" data-prix-nuit="${c.prix_nuit}" data-prix-moment="${c.prix_moment||0}" data-has-moment="${c.prix_moment?1:0}">
+          Chambre ${c.numero} — ${_TYPE_CHAMBRE_LABEL[c.type_chambre]||c.type_chambre}</option>`).join('');
+    }
+    const selEmp = document.getElementById('hrec-employe');
+    if(selEmp){
+      selEmp.innerHTML = '<option value="">— Optionnel —</option>' +
+        _hotelEmployes.map(e=>`<option value="${e.id}">${e.nom_complet} (${e.poste})</option>`).join('');
+    }
+    // Initialiser date/heure arrivée à maintenant
+    const now = new Date();
+    now.setMinutes(0,0,0);
+    const pad = n=>String(n).padStart(2,'0');
+    const dt = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:00`;
+    const arr = document.getElementById('hrec-arrivee');
+    if(arr && !arr.value) arr.value = dt;
+    hrecSetType('NUIT');
+  } catch(e){ posAlert(e.message||'Erreur chargement réception.'); }
+}
+
+function hrecSetType(type){
+  _hrecType = type;
+  document.getElementById('hrec-btn-nuit').className   = type==='NUIT'   ? 'pos-btn teal' : 'pos-btn ghost';
+  document.getElementById('hrec-btn-moment').className = type==='MOMENT' ? 'pos-btn teal' : 'pos-btn ghost';
+  document.getElementById('hrec-nuits-row').style.display  = type==='NUIT'   ? '' : 'none';
+  document.getElementById('hrec-heures-row').style.display = type==='MOMENT' ? '' : 'none';
+  hrecCalcTotal();
+}
+
+function hrecOnChambreChange(){ hrecCalcTotal(); }
+
+function hrecCalcTotal(){
+  const selCh = document.getElementById('hrec-chambre');
+  const opt   = selCh?.options[selCh.selectedIndex];
+  if(!opt || !opt.value){ document.getElementById('hrec-recap').style.display='none'; return; }
+  const prixNuit   = parseFloat(opt.dataset.prixNuit||0);
+  const prixMoment = parseFloat(opt.dataset.prixMoment||0);
+  const nbN  = parseInt(document.getElementById('hrec-nb-nuits').value||1);
+  const nbH  = parseFloat(document.getElementById('hrec-nb-heures').value||2);
+  const arr  = document.getElementById('hrec-arrivee').value;
+
+  let total = 0, labelPrix = '', depStr = '—';
+  if(_hrecType === 'NUIT'){
+    total    = prixNuit * nbN;
+    labelPrix = `${posGx(prixNuit)} × ${nbN} nuit(s)`;
+    if(arr){ const d=new Date(arr); d.setDate(d.getDate()+nbN); depStr=d.toLocaleString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
+  } else {
+    total    = prixMoment * nbH;
+    labelPrix = `${posGx(prixMoment)} × ${nbH}h`;
+    if(arr){ const d=new Date(arr); d.setTime(d.getTime()+nbH*3600000); depStr=d.toLocaleString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
+  }
+  document.getElementById('hrec-recap').style.display     = '';
+  document.getElementById('hrec-recap-label').textContent = labelPrix;
+  document.getElementById('hrec-recap-prix').textContent  = posGx(_hrecType==='NUIT'?prixNuit:prixMoment);
+  document.getElementById('hrec-recap-total').textContent = posGx(total);
+  document.getElementById('hrec-recap-depart').textContent = depStr;
+  hrecCalcSolde();
+}
+
+function hrecCalcSolde(){
+  const totalEl = document.getElementById('hrec-recap-total');
+  const total   = totalEl ? parseFloat((totalEl.textContent||'0').replace(/[^0-9.]/g,'')) : 0;
+  const paye    = parseFloat(document.getElementById('hrec-montant-paye').value||0);
+  const solde   = Math.max(0, total - paye);
+  const soldeEl = document.getElementById('hrec-solde');
+  if(soldeEl){ soldeEl.textContent = posGx(solde); soldeEl.style.color = solde>0?'#f87171':'#34d399'; }
+}
+
+async function hrecEnregistrer(){
+  const g = id => document.getElementById(id)?.value?.trim();
+  const clientNom = g('hrec-client-nom');
+  const chambreId = document.getElementById('hrec-chambre')?.value;
+  const arrivee   = document.getElementById('hrec-arrivee')?.value;
+  if(!clientNom){ posAlert('Nom du client requis.','warn'); return; }
+  if(!chambreId){ posAlert('Sélectionnez une chambre.','warn'); return; }
+  if(!arrivee){   posAlert('Date d\'arrivée requise.','warn');  return; }
+
+  const nbN = parseInt(document.getElementById('hrec-nb-nuits').value||1);
+  const nbH = parseFloat(document.getElementById('hrec-nb-heures').value||2);
+
+  const body = {
+    chambre_id:      parseInt(chambreId),
+    client_nom:      clientNom,
+    client_contact:  g('hrec-client-contact') || null,
+    client_id_piece: g('hrec-client-piece')   || null,
+    type_sejour:     _hrecType,
+    date_arrivee:    new Date(arrivee).toISOString(),
+    nb_nuits:        _hrecType==='NUIT'   ? nbN  : null,
+    nb_heures:       _hrecType==='MOMENT' ? nbH  : null,
+    montant_paye:    parseFloat(document.getElementById('hrec-montant-paye').value||0),
+    mode_paiement:   document.getElementById('hrec-mode').value || null,
+    employe_id:      document.getElementById('hrec-employe').value ? parseInt(document.getElementById('hrec-employe').value) : null,
+    notes:           g('hrec-notes') || null,
+  };
+  try {
+    await apiFetch('POST','/hotel/reservations', body);
+    // Reset form
+    ['hrec-client-nom','hrec-client-contact','hrec-client-piece','hrec-notes','hrec-montant-paye'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.value=id==='hrec-montant-paye'?'0':'';
+    });
+    document.getElementById('hrec-chambre').value='';
+    document.getElementById('hrec-recap').style.display='none';
+    posAlert('Client enregistré avec succès.','ok');
+    await loadHotelReception();
+  } catch(e){ posAlert(e.message||'Erreur enregistrement.'); }
+}
+
+// ── SÉJOURS ACTIFS ────────────────────────────────────────────────────
+
+async function loadHotelSejours(){
+  const grid = document.getElementById('hotel-sejours-grid');
+  if(grid) grid.innerHTML = '<div style="color:rgba(255,255,255,.3);padding:30px;text-align:center">Chargement…</div>';
+  try {
+    const sejours = await apiFetch('GET','/hotel/reservations/en-cours');
+    if(!sejours.length){
+      if(grid) grid.innerHTML = '<div style="color:rgba(255,255,255,.3);padding:40px;text-align:center;grid-column:1/-1">Aucun séjour en cours</div>';
+      return;
+    }
+    if(grid) grid.innerHTML = sejours.map(s => _hotelSejourCard(s)).join('');
+  } catch(e){ if(grid) grid.innerHTML = `<div style="color:#f87171;padding:30px;text-align:center">${e.message||'Erreur'}</div>`; }
+}
+
+function _hotelSejourCard(s){
+  const arr  = new Date(s.date_arrivee);
+  const dep  = new Date(s.date_depart_prevue);
+  const arrS = arr.toLocaleString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+  const depS = dep.toLocaleString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+  const duree = s.type_sejour==='NUIT' ? `${s.nb_nuits} nuit(s)` : `${s.nb_heures}h`;
+  const hasSolde = s.solde > 0;
+  return `<div class="pos-card" style="border-left:3px solid ${s.type_sejour==='NUIT'?'#6366f1':'#f59e0b'}">
+    <div style="padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:18px;font-weight:700">${s.client_nom}</span>
+        <span style="font-size:11px;background:${s.type_sejour==='NUIT'?'rgba(99,102,241,.2)':'rgba(245,158,11,.2)'};color:${s.type_sejour==='NUIT'?'#a78bfa':'#fbbf24'};padding:2px 8px;border-radius:12px">${s.type_sejour}</span>
+      </div>
+      <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.7)">Chambre ${s.chambre_numero} · ${duree}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">Arrivée : ${arrS}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.4)">Départ prévu : ${depS}</div>
+      ${s.client_contact?`<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">${s.client_contact}</div>`:''}
+      <div style="margin-top:10px;padding:8px;background:rgba(255,255,255,.04);border-radius:6px;display:flex;justify-content:space-between">
+        <div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.35)">Total</div><div style="font-weight:700">${_hFmt(s.montant_total)}</div></div>
+        <div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.35)">Payé</div><div style="font-weight:700;color:#34d399">${_hFmt(s.montant_paye)}</div></div>
+        <div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.35)">Solde</div><div style="font-weight:700;color:${hasSolde?'#f87171':'#34d399'}">${_hFmt(s.solde)}</div></div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+        ${hasSolde?`<button class="pos-btn ghost" style="flex:1;font-size:11px;color:#34d399;border-color:rgba(52,211,153,.3)" onclick="hotelPaiementModal(${s.id})">+ Paiement</button>`:''}
+        <button class="pos-btn ghost" style="flex:1;font-size:11px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="hotelTerminer(${s.id},'${s.client_nom.replace(/'/g,"\\'")}')">Checkout</button>
+        <button class="pos-btn ghost" style="font-size:11px;padding:5px 8px;opacity:.6" onclick="hotelAnnuler(${s.id},'${s.client_nom.replace(/'/g,"\\'")}')">Annuler</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function hotelPaiementModal(resId){
+  document.getElementById('hotel-paie-res-id').value = resId;
+  document.getElementById('hotel-paie-montant').value = '';
+  document.getElementById('hotel-paie-modal-bg').classList.add('open');
+}
+
+async function hotelPaiementSauver(){
+  const resId  = parseInt(document.getElementById('hotel-paie-res-id').value);
+  const montant = parseFloat(document.getElementById('hotel-paie-montant').value||0);
+  const mode   = document.getElementById('hotel-paie-mode').value;
+  if(!montant || montant<=0){ posAlert('Montant requis.','warn'); return; }
+  try {
+    await apiFetch('POST',`/hotel/reservations/${resId}/paiement`,{ montant, mode_paiement: mode });
+    document.getElementById('hotel-paie-modal-bg').classList.remove('open');
+    await loadHotelSejours();
+    posAlert('Paiement enregistré.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function hotelTerminer(id, nom){
+  if(!confirm(`Checkout : terminer le séjour de ${nom} ?`)) return;
+  try {
+    await apiFetch('POST',`/hotel/reservations/${id}/terminer`);
+    await loadHotelSejours();
+    posAlert('Séjour terminé — chambre libérée.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function hotelAnnuler(id, nom){
+  if(!confirm(`Annuler le séjour de ${nom} ? La chambre sera libérée.`)) return;
+  try {
+    await apiFetch('POST',`/hotel/reservations/${id}/annuler`);
+    await loadHotelSejours();
+    posAlert('Séjour annulé.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ── HISTORIQUE ────────────────────────────────────────────────────────
+
+async function loadHotelHistorique(){
+  const tbody  = document.getElementById('hhist-tbody');
+  const statut = document.getElementById('hhist-statut')?.value || '';
+  const type   = document.getElementById('hhist-type')?.value   || '';
+  let qs = '/hotel/reservations?';
+  if(statut) qs += `statut=${statut}&`;
+  if(type)   qs += `chambre_id=0&`;
+  if(tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try {
+    let res = await apiFetch('GET', '/hotel/reservations' + (statut?`?statut=${statut}`:''));
+    if(type) res = res.filter(r=>r.type_sejour===type);
+    if(!res.length){
+      if(tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Aucune réservation</td></tr>';
+      return;
+    }
+    const _SC = { EN_COURS:'#fbbf24', TERMINEE:'#34d399', ANNULEE:'#f87171' };
+    if(tbody) tbody.innerHTML = res.map(r=>{
+      const dt = new Date(r.date_arrivee).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'2-digit'});
+      const duree = r.type_sejour==='NUIT'?`${r.nb_nuits}n`:`${r.nb_heures}h`;
+      const sc = _SC[r.statut]||'#94a3b8';
+      return `<tr>
+        <td style="font-size:12px;color:rgba(255,255,255,.55)">${dt}</td>
+        <td style="font-weight:500">${r.client_nom}${r.client_contact?`<br><span style="font-size:10px;color:rgba(255,255,255,.35)">${r.client_contact}</span>`:''}</td>
+        <td>Ch. ${r.chambre_numero}</td>
+        <td><span style="font-size:11px;padding:2px 7px;background:rgba(255,255,255,.07);border-radius:4px">${r.type_sejour}</span></td>
+        <td>${duree}</td>
+        <td style="text-align:right">${_hFmt(r.montant_total)}</td>
+        <td style="text-align:right;color:#34d399">${_hFmt(r.montant_paye)}</td>
+        <td style="text-align:right;color:${r.solde>0?'#f87171':'#34d399'}">${_hFmt(r.solde)}</td>
+        <td><span style="font-size:11px;color:${sc};font-weight:600">${r.statut}</span></td>
+      </tr>`;
+    }).join('');
+  } catch(e){ if(tbody) tbody.innerHTML = `<tr><td colspan="9" style="color:#f87171;text-align:center;padding:20px">${e.message||'Erreur'}</td></tr>`; }
+}
+
+// ── EMPLOYÉS HÔTEL ────────────────────────────────────────────────────
+
+async function loadHotelEmployes(){
+  const tbody = document.getElementById('hotel-emp-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try {
+    _hotelEmployes = await apiFetch('GET','/hotel/employes') || [];
+    if(!_hotelEmployes.length){
+      if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Aucun employé — ajoutez-en un.</td></tr>';
+      return;
+    }
+    const _POSTES = { RECEPTIONNISTE:'Réceptionniste', FEMME_DE_CHAMBRE:'F. de chambre', GERANT:'Gérant', SECURITE:'Sécurité', AUTRE:'Autre' };
+    if(tbody) tbody.innerHTML = _hotelEmployes.map(e=>`<tr>
+      <td style="font-weight:500">${e.nom_complet}</td>
+      <td><span style="font-size:11px;padding:2px 7px;background:rgba(255,255,255,.07);border-radius:4px">${_POSTES[e.poste]||e.poste}</span></td>
+      <td style="color:rgba(255,255,255,.55)">${e.telephone||'—'}</td>
+      <td style="color:rgba(255,255,255,.55);font-size:12px">${e.date_embauche||'—'}</td>
+      <td style="text-align:right">${e.salaire_base!=null?_hFmt(e.salaire_base):'—'}</td>
+      <td><span style="font-size:11px;color:${e.actif?'#34d399':'#f87171'}">${e.actif?'Actif':'Inactif'}</span></td>
+      <td style="text-align:right">
+        <button class="pos-btn ghost" style="font-size:11px;padding:4px 10px" onclick="hotelEmpModal(${e.id})">Modifier</button>
+        ${e.actif?`<button class="pos-btn ghost" style="font-size:11px;padding:4px 10px;color:#f87171;margin-left:4px" onclick="hotelEmpDesactiver(${e.id},'${e.nom_complet.replace(/'/g,"\\'")}')">Retirer</button>`:''}
+      </td>
+    </tr>`).join('');
+  } catch(e){ if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="color:#f87171;text-align:center;padding:20px">${e.message||'Erreur'}</td></tr>`; }
+}
+
+function hotelEmpModal(id){
+  _hempEditId = id || null;
+  const el = n => document.getElementById(n);
+  el('hemp-title').textContent = id ? 'Modifier employé' : 'Nouvel employé';
+  if(id){
+    const e = _hotelEmployes.find(x=>x.id===id);
+    if(e){
+      el('hemp-prenom').value   = e.prenom;
+      el('hemp-nom').value      = e.nom;
+      el('hemp-poste').value    = e.poste;
+      el('hemp-tel').value      = e.telephone||'';
+      el('hemp-embauche').value = e.date_embauche||'';
+      el('hemp-salaire').value  = e.salaire_base!=null?e.salaire_base:'';
+      el('hemp-notes').value    = e.notes||'';
+    }
+  } else {
+    ['hemp-prenom','hemp-nom','hemp-tel','hemp-embauche','hemp-salaire','hemp-notes'].forEach(n=>{ el(n).value=''; });
+    el('hemp-poste').value='RECEPTIONNISTE';
+  }
+  el('hotel-emp-modal-bg').classList.add('open');
+}
+
+async function hotelEmpSauver(){
+  const el = n => document.getElementById(n)?.value?.trim();
+  const prenom = el('hemp-prenom'), nom = el('hemp-nom');
+  if(!prenom||!nom){ posAlert('Prénom et nom requis.','warn'); return; }
+  const body = {
+    prenom, nom,
+    poste:         document.getElementById('hemp-poste').value,
+    telephone:     el('hemp-tel')||null,
+    date_embauche: el('hemp-embauche')||null,
+    salaire_base:  el('hemp-salaire')?parseFloat(el('hemp-salaire'))||null:null,
+    notes:         el('hemp-notes')||null,
+    actif:         true,
+  };
+  try {
+    if(_hempEditId) await apiFetch('PUT', `/hotel/employes/${_hempEditId}`, body);
+    else            await apiFetch('POST','/hotel/employes', body);
+    document.getElementById('hotel-emp-modal-bg').classList.remove('open');
+    await loadHotelEmployes();
+    posAlert('Employé enregistré.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function hotelEmpDesactiver(id, nom){
+  if(!confirm(`Retirer ${nom} ?`)) return;
+  try {
+    await apiFetch('DELETE',`/hotel/employes/${id}`);
+    await loadHotelEmployes();
+    posAlert(`${nom} retiré.`,'ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
 }
 
 function _gcKpi(id, val, color){

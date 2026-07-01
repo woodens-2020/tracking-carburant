@@ -13,6 +13,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from database import init_db, get_db, engine, SessionLocal
 from models import Produit, Pompe, Releve, Utilisateur, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense
 from pos_routes import router as pos_router
+from hotel_routes import router as hotel_router
 from auth import (
     SESSION_COOKIE, hash_password, verify_password,
     hash_code_acces, verify_code_acces,
@@ -74,6 +75,7 @@ app.add_middleware(AuthMiddleware)
 
 # Module POS bar/restaurant
 app.include_router(pos_router)
+app.include_router(hotel_router)
 
 
 @app.on_event("startup")

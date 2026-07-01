@@ -24,6 +24,7 @@ from models import (
     BarProduit, BarPrixHistorique, BarAchat, BarMouvementStock,
     BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande, BarPaiementEmploye,
+    HotelChambre, HotelEmploye, HotelReservation,
 )
 
 # ── URL de connexion ──────────────────────────────────────────────
