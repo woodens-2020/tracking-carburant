@@ -2821,6 +2821,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="pos-achats" onclick="goTo('pos-achats')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+      </span>
+      <span>Achats Bar</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <button class="nav-item" data-page="pos-ventes" onclick="goTo('pos-ventes')">
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
@@ -5615,6 +5623,140 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="pos-modal-footer">
           <button class="pos-btn ghost" onclick="document.getElementById('pos-ajust-modal-bg').classList.remove('open')">Annuler</button>
           <button class="pos-btn danger" onclick="posAjusterStock()">Valider</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — ACHATS BAR                                  -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-achats" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#f7a93b,#ea580c)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Achats Bar</div>
+            <div class="pos-header-sub">Réceptions de marchandises — dépenses supplémentaires et coût total</div>
+          </div>
+          <div class="pos-header-actions">
+            <button class="pos-btn teal" onclick="posAchatNouveauModal()">+ Nouvel achat</button>
+          </div>
+        </div>
+
+        <div class="pos-kpi-grid">
+          <div class="pos-kpi"><div class="pos-kpi-label">Achats ce mois</div><div class="pos-kpi-val amber" id="kpi-achats-nb">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Coût marchandises</div><div class="pos-kpi-val" id="kpi-achats-marchandise">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Dépenses supp.</div><div class="pos-kpi-val red" id="kpi-achats-depenses">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Coût total</div><div class="pos-kpi-val teal" id="kpi-achats-total">—</div></div>
+        </div>
+
+        <div class="pos-card" style="padding:14px 16px">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <select class="pos-select" id="pa-filtre-produit" onchange="loadPosAchats()" style="flex:1;min-width:150px">
+              <option value="">Tous les produits</option>
+            </select>
+            <button class="pos-btn ghost" onclick="loadPosAchats()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:4px"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>Rafraîchir
+            </button>
+          </div>
+        </div>
+
+        <div class="pos-card">
+          <div class="pos-card-hdr">Historique des achats</div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead>
+                <tr><th>Date</th><th>Produit</th><th>Quantité</th><th>Prix marchandise</th><th>Dép. supp.</th><th>Coût total</th><th>Fournisseur</th></tr>
+              </thead>
+              <tbody id="pos-achats-tbody">
+                <tr><td colspan="7" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-achats -->
+
+    <!-- Modal Nouvel Achat -->
+    <div class="pos-modal-bg" id="pos-achat-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal" style="max-width:600px;max-height:90vh;overflow-y:auto">
+        <h3>Nouvel achat / Réception</h3>
+
+        <div class="pos-form-row">
+          <div style="flex:2">
+            <label class="pos-label">Produit *</label>
+            <select class="pos-select" id="pa-produit" onchange="paOnProdChange()"></select>
+          </div>
+          <div style="flex:1">
+            <label class="pos-label">Fournisseur</label>
+            <input class="pos-input" id="pa-fourn" placeholder="Optionnel">
+          </div>
+        </div>
+
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Quantité *</label>
+            <input class="pos-input" id="pa-qte" type="number" min="0.001" step="0.001" placeholder="0" oninput="paUpdateRecap()">
+          </div>
+          <div style="flex:1">
+            <label class="pos-label">Unité de saisie</label>
+            <select class="pos-select" id="pa-qte-type" onchange="paOnQteTypeChange()">
+              <option value="unite">En unités</option>
+              <option value="caisse">En caisses</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="pa-caisse-info" style="display:none;background:rgba(63,182,168,.08);border:1px solid rgba(63,182,168,.2);border-radius:8px;padding:10px 14px;margin:0 0 12px;font-size:12px;color:rgba(255,255,255,.6)">
+          <span id="pa-caisse-info-txt"></span>
+        </div>
+
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label" id="pa-prix-label">Prix d'achat unitaire (G) *</label>
+            <input class="pos-input" id="pa-prix" type="number" min="0" step="0.01" placeholder="0.00" oninput="paUpdateRecap()">
+          </div>
+          <div style="flex:1">
+            <label class="pos-label">Notes</label>
+            <input class="pos-input" id="pa-notes" placeholder="Optionnel">
+          </div>
+        </div>
+
+        <!-- Dépenses supplémentaires -->
+        <div style="margin-top:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.75)">Dépenses supplémentaires</div>
+            <button type="button" class="pos-btn ghost" style="padding:5px 12px;font-size:12px" onclick="paAjouterDepense()">+ Ajouter</button>
+          </div>
+          <div id="pa-depenses-list" style="display:flex;flex-direction:column;gap:8px"></div>
+          <div id="pa-depenses-empty" style="font-size:12px;color:rgba(255,255,255,.3);text-align:center;padding:8px 0">Aucune dépense supplémentaire</div>
+        </div>
+
+        <!-- Récapitulatif -->
+        <div style="margin-top:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px">
+          <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Récapitulatif</div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:7px">
+            <span style="color:rgba(255,255,255,.55)">Prix marchandise</span>
+            <span id="pa-recap-marchandise" style="color:#fff;font-weight:600">G 0.00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:7px">
+            <span style="color:rgba(255,255,255,.55)">Dépenses supplémentaires</span>
+            <span id="pa-recap-depenses" style="color:#f87171;font-weight:600">G 0.00</span>
+          </div>
+          <div style="height:1px;background:rgba(255,255,255,.08);margin:10px 0"></div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="color:#fff;font-weight:700;font-size:14px">Coût total</span>
+            <span id="pa-recap-total" style="color:#3fb6a8;font-weight:700;font-size:17px">G 0.00</span>
+          </div>
+        </div>
+
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="document.getElementById('pos-achat-modal-bg').classList.remove('open')">Annuler</button>
+          <button class="pos-btn teal" onclick="posEnregistrerAchat()">Enregistrer l'achat</button>
         </div>
       </div>
     </div>
@@ -12561,6 +12703,7 @@ const _giPageLoaders = {
   'pos-caisse':      loadPosCaisse,
   'pos-produits':    loadPosProduits,
   'pos-stock':       loadPosStock,
+  'pos-achats':      loadPosAchats,
   'pos-ventes':      loadPosVentes,
   'pos-credits':     loadPosCredits,
   'pos-commandes':   loadPosCommandes,
@@ -14046,6 +14189,236 @@ async function posAjusterStock(){
     await loadPosStock();
     posAlert('Ajustement enregistré.','ok');
   } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE POS ACHATS BAR
+// ══════════════════════════════════════════════════════════════════════
+let _paDepenses = [];
+
+async function loadPosAchats(){
+  const prodId = document.getElementById('pa-filtre-produit')?.value||'';
+  const params = prodId ? `?produit_id=${prodId}` : '';
+  try {
+    const achats = await apiFetch('GET',`/pos/achats${params}`);
+    _paRenderTable(achats);
+    _paRenderKpis(achats);
+    // Populate filter
+    const sel = document.getElementById('pa-filtre-produit');
+    if(sel && _posProduitsAll.length){
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">Tous les produits</option>' +
+        _posProduitsAll.map(p=>`<option value="${p.id}"${String(p.id)===cur?' selected':''}>${p.nom}</option>`).join('');
+      sel.value = cur;
+    }
+  } catch(e){ posAlert(e.message||'Erreur chargement achats.'); }
+}
+
+function _paRenderKpis(achats){
+  const now   = new Date();
+  const debut = new Date(now.getFullYear(), now.getMonth(), 1);
+  const mois  = achats.filter(a=>new Date(a.date_achat)>=debut);
+  const totalM = mois.reduce((s,a)=>s+a.prix_marchandise,0);
+  const totalD = mois.reduce((s,a)=>s+a.total_depenses,0);
+  const totalT = mois.reduce((s,a)=>s+a.cout_total,0);
+  const fmt = v=>`G ${v.toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const el = id=>document.getElementById(id);
+  if(el('kpi-achats-nb'))          el('kpi-achats-nb').textContent          = mois.length;
+  if(el('kpi-achats-marchandise')) el('kpi-achats-marchandise').textContent = fmt(totalM);
+  if(el('kpi-achats-depenses'))    el('kpi-achats-depenses').textContent    = fmt(totalD);
+  if(el('kpi-achats-total'))       el('kpi-achats-total').textContent       = fmt(totalT);
+}
+
+function _paRenderTable(achats){
+  const tbody = document.getElementById('pos-achats-tbody');
+  if(!tbody) return;
+  if(!achats.length){
+    tbody.innerHTML='<tr><td colspan="7" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Aucun achat enregistré</td></tr>';
+    return;
+  }
+  const fmt = v=>`G ${parseFloat(v).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  tbody.innerHTML = achats.map(a=>{
+    const d = new Date(a.date_achat);
+    const ds = d.toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'})
+             + ' ' + d.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});
+    const depDetail = (a.depenses||[]).map(dep=>
+      `<div style="color:rgba(255,255,255,.4);font-size:11px;line-height:1.4">${dep.description}: G ${parseFloat(dep.montant).toFixed(2)}</div>`
+    ).join('');
+    const hasD = a.total_depenses > 0;
+    return `<tr>
+      <td style="font-size:12px;white-space:nowrap;color:rgba(255,255,255,.6)">${ds}</td>
+      <td><span style="font-weight:600">${a.produit_nom}</span><div style="font-size:11px;color:rgba(255,255,255,.35)">${a.produit_categorie||''}</div></td>
+      <td>${parseFloat(a.quantite).toFixed(2)} ${a.produit_unite||'u.'}</td>
+      <td>${fmt(a.prix_marchandise)}<div style="font-size:11px;color:rgba(255,255,255,.35)">${parseFloat(a.prix_achat_unitaire).toFixed(2)}/u.</div></td>
+      <td>${hasD?`<span style="color:#f87171;font-weight:600">${fmt(a.total_depenses)}</span><div>${depDetail}</div>`:'<span style="color:rgba(255,255,255,.2)">—</span>'}</td>
+      <td><span style="color:#3fb6a8;font-weight:700;font-size:14px">${fmt(a.cout_total)}</span></td>
+      <td style="color:rgba(255,255,255,.45);font-size:12px">${a.fournisseur||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function posAchatNouveauModal(){
+  _paDepenses = [];
+  const fields = ['pa-fourn','pa-qte','pa-prix','pa-notes'];
+  fields.forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('pa-qte-type').value = 'unite';
+
+  const sel = document.getElementById('pa-produit');
+  if(sel){
+    sel.innerHTML = '<option value="">— Choisir un produit —</option>' +
+      _posProduitsAll.filter(p=>p.actif!==false).map(p=>
+        `<option value="${p.id}">${p.nom}${p.categorie?' ('+p.categorie+')':''}</option>`
+      ).join('');
+  }
+  paOnProdChange();
+  paRenderDepenses();
+  paUpdateRecap();
+  document.getElementById('pos-achat-modal-bg').classList.add('open');
+}
+
+function paOnProdChange(){
+  const prodId = parseInt(document.getElementById('pa-produit').value);
+  const prod   = _posProduitsAll.find(p=>p.id===prodId);
+  const type   = document.getElementById('pa-qte-type');
+  const info   = document.getElementById('pa-caisse-info');
+  if(prod && prod.vendu_par_caisse && prod.unites_par_caisse){
+    type.value = 'caisse';
+    if(info){ info.style.display=''; document.getElementById('pa-caisse-info-txt').textContent=`1 caisse = ${prod.unites_par_caisse} ${prod.unite||'unités'}`; }
+  } else {
+    type.value = 'unite';
+    if(info) info.style.display='none';
+  }
+  paOnQteTypeChange();
+}
+
+function paOnQteTypeChange(){
+  const prodId = parseInt(document.getElementById('pa-produit').value);
+  const prod   = _posProduitsAll.find(p=>p.id===prodId);
+  const type   = document.getElementById('pa-qte-type').value;
+  const lbl    = document.getElementById('pa-prix-label');
+  const info   = document.getElementById('pa-caisse-info');
+  if(type==='caisse'){
+    if(lbl) lbl.textContent="Prix d'achat par caisse (G) *";
+    if(info && prod && prod.vendu_par_caisse && prod.unites_par_caisse){
+      info.style.display='';
+      document.getElementById('pa-caisse-info-txt').textContent=
+        `Saisir le prix par caisse — converti en ${prod.unites_par_caisse} ${prod.unite||'unités'}`;
+    }
+  } else {
+    if(lbl) lbl.textContent="Prix d'achat unitaire (G) *";
+    if(info) info.style.display='none';
+  }
+  paUpdateRecap();
+}
+
+function paAjouterDepense(){
+  _paDepenses.push({description:'',montant:0});
+  paRenderDepenses();
+  // focus last description input
+  setTimeout(()=>{
+    const inputs = document.querySelectorAll('#pa-depenses-list input[type="text"],#pa-depenses-list input:not([type])');
+    if(inputs.length) inputs[inputs.length-1].focus();
+  },50);
+}
+
+function paSupprimerDepense(idx){
+  _paDepenses.splice(idx,1);
+  paRenderDepenses();
+  paUpdateRecap();
+}
+
+function paDepenseChanged(idx,field,val){
+  if(!_paDepenses[idx]) return;
+  if(field==='montant') _paDepenses[idx].montant = parseFloat(val)||0;
+  else                  _paDepenses[idx].description = val;
+  paUpdateRecap();
+}
+
+function paRenderDepenses(){
+  const list  = document.getElementById('pa-depenses-list');
+  const empty = document.getElementById('pa-depenses-empty');
+  if(!list) return;
+  if(!_paDepenses.length){
+    list.innerHTML='';
+    if(empty) empty.style.display='';
+    return;
+  }
+  if(empty) empty.style.display='none';
+  list.innerHTML = _paDepenses.map((d,i)=>`
+    <div style="display:flex;gap:8px;align-items:center">
+      <input class="pos-input" placeholder="Description (transport, manutention…)" style="flex:2"
+        value="${(d.description||'').replace(/"/g,'&quot;')}"
+        oninput="paDepenseChanged(${i},'description',this.value)">
+      <input class="pos-input" type="number" min="0" step="0.01" placeholder="Montant G" style="flex:1"
+        value="${d.montant||''}"
+        oninput="paDepenseChanged(${i},'montant',this.value)">
+      <button type="button" onclick="paSupprimerDepense(${i})"
+        style="background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.25);border-radius:8px;color:#f87171;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;padding:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>`).join('');
+}
+
+function paUpdateRecap(){
+  const qte   = parseFloat(document.getElementById('pa-qte')?.value)||0;
+  const prix  = parseFloat(document.getElementById('pa-prix')?.value)||0;
+  const type  = document.getElementById('pa-qte-type')?.value;
+  const prodId= parseInt(document.getElementById('pa-produit')?.value);
+  const prod  = _posProduitsAll.find(p=>p.id===prodId);
+
+  let marchandise = 0;
+  if(type==='caisse' && prod && prod.unites_par_caisse>0){
+    marchandise = qte * prix; // prix par caisse × nb caisses = total marchandise
+  } else {
+    marchandise = qte * prix;
+  }
+  const depTotal  = _paDepenses.reduce((s,d)=>s+(parseFloat(d.montant)||0),0);
+  const coutTotal = marchandise + depTotal;
+  const fmt = v=>`G ${v.toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const el = id=>document.getElementById(id);
+  if(el('pa-recap-marchandise')) el('pa-recap-marchandise').textContent = fmt(marchandise);
+  if(el('pa-recap-depenses'))    el('pa-recap-depenses').textContent    = fmt(depTotal);
+  if(el('pa-recap-total'))       el('pa-recap-total').textContent       = fmt(coutTotal);
+}
+
+async function posEnregistrerAchat(){
+  const prodId = parseInt(document.getElementById('pa-produit').value);
+  const qte    = parseFloat(document.getElementById('pa-qte').value)||0;
+  const prix   = parseFloat(document.getElementById('pa-prix').value)||0;
+  const type   = document.getElementById('pa-qte-type').value;
+  const fourn  = document.getElementById('pa-fourn').value.trim()||null;
+  const notes  = document.getElementById('pa-notes').value.trim()||null;
+
+  if(!prodId)  { posAlert('Sélectionner un produit.','warn'); return; }
+  if(qte<=0)   { posAlert('La quantité doit être > 0.','warn'); return; }
+  if(prix<0)   { posAlert('Le prix ne peut pas être négatif.','warn'); return; }
+
+  for(const d of _paDepenses){
+    if(!d.description.trim()){ posAlert('Saisir une description pour chaque dépense.','warn'); return; }
+    if(d.montant<0)           { posAlert('Les montants de dépenses ne peuvent pas être négatifs.','warn'); return; }
+  }
+
+  const depenses = _paDepenses
+    .filter(d=>d.description.trim())
+    .map(d=>({description:d.description.trim(), montant:parseFloat(d.montant)||0}));
+
+  try {
+    const res = await apiFetch('POST','/pos/achats',{
+      produit_id: prodId,
+      quantite: qte,
+      quantite_type: type,
+      prix_achat_unitaire: prix,
+      fournisseur: fourn,
+      notes,
+      depenses
+    });
+    document.getElementById('pos-achat-modal-bg').classList.remove('open');
+    await loadPosAchats();
+    const prod = _posProduitsAll.find(p=>p.id===prodId);
+    const fmt  = v=>`G ${parseFloat(v).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+    posAlert(`Achat enregistré — ${res.quantite_unites} unité${res.quantite_unites>1?'s':''} ajoutée${res.quantite_unites>1?'s':''}${prod?' pour '+prod.nom:''}. Coût total: ${fmt(res.cout_total)}`,'ok');
+    if(typeof loadPosProduits==='function') loadPosProduits();
+  } catch(e){ posAlert(e.message||'Erreur enregistrement achat.'); }
 }
 
 // ══════════════════════════════════════════════════════════════════════

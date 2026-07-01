@@ -389,12 +389,31 @@ class BarAchat(Base):
     produit   = relationship("BarProduit", back_populates="bar_achats")
     mouvement = relationship("BarMouvementStock", back_populates="achat", uselist=False,
                              foreign_keys="BarMouvementStock.achat_id")
+    depenses  = relationship("BarAchatDepense", back_populates="achat",
+                             cascade="all, delete-orphan", order_by="BarAchatDepense.id")
 
     __table_args__ = (
         CheckConstraint("quantite > 0",            name="chk_bar_achat_qte_pos"),
         CheckConstraint("prix_achat_unitaire >= 0", name="chk_bar_achat_prix_pos"),
         Index("idx_bar_achats_produit", "produit_id"),
         Index("idx_bar_achats_date",    "date_achat"),
+    )
+
+
+class BarAchatDepense(Base):
+    """Dépense supplémentaire liée à un achat bar (transport, manutention, etc.)."""
+    __tablename__ = "bar_achat_depenses"
+
+    id          = Column(Integer, primary_key=True)
+    achat_id    = Column(Integer, ForeignKey("bar_achats.id", ondelete="CASCADE"), nullable=False)
+    description = Column(String(150), nullable=False)
+    montant     = Column(Numeric(12, 2), nullable=False)
+
+    achat = relationship("BarAchat", back_populates="depenses")
+
+    __table_args__ = (
+        CheckConstraint("montant >= 0", name="chk_bar_achat_dep_montant_pos"),
+        Index("idx_bar_achat_dep_achat", "achat_id"),
     )
 
 

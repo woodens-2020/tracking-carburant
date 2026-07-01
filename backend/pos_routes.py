@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from models import (
-    BarCategorie, BarProduit, BarPrixHistorique, BarAchat, BarMouvementStock,
-    BarVente, BarLigneVente, BarCredit, BarRemboursement,
+    BarCategorie, BarProduit, BarPrixHistorique, BarAchat, BarAchatDepense,
+    BarMouvementStock, BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande, BarPaiementEmploye, Employe,
 )
 from pos_service import (
@@ -75,12 +75,19 @@ class PrixIn(BaseModel):
     prix: float = Field(gt=0)
 
 
+class DepenseItem(BaseModel):
+    description: str
+    montant:     float = Field(ge=0)
+
+
 class AchatIn(BaseModel):
     produit_id:          int
     quantite:            float = Field(gt=0)
+    quantite_type:       str   = "unite"   # "unite" ou "caisse"
     prix_achat_unitaire: float = Field(ge=0)
     fournisseur:         Optional[str] = None
     notes:               Optional[str] = None
+    depenses:            List[DepenseItem] = []
 
 
 class AjustementIn(BaseModel):
@@ -522,17 +529,94 @@ def stock_produit(produit_id: int, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/achats")
+def liste_achats(
+    produit_id: Optional[int] = None,
+    limit: int = Query(100, le=500),
+    db: Session = Depends(get_db),
+):
+    """Liste des achats avec dépenses et coût total."""
+    q = db.query(BarAchat)
+    if produit_id:
+        q = q.filter(BarAchat.produit_id == produit_id)
+    achats = q.order_by(BarAchat.date_achat.desc()).limit(limit).all()
+
+    result = []
+    for a in achats:
+        total_dep = sum(float(d.montant) for d in a.depenses)
+        prix_total = float(a.quantite) * float(a.prix_achat_unitaire)
+        result.append({
+            "id":                  a.id,
+            "produit_id":          a.produit_id,
+            "produit_nom":         a.produit.nom if a.produit else str(a.produit_id),
+            "produit_categorie":   a.produit.categorie if a.produit else None,
+            "produit_unite":       a.produit.unite if a.produit else None,
+            "produit_par_caisse":  a.produit.vendu_par_caisse if a.produit else False,
+            "produit_upc":         a.produit.unites_par_caisse if a.produit else None,
+            "quantite":            float(a.quantite),
+            "prix_achat_unitaire": float(a.prix_achat_unitaire),
+            "prix_marchandise":    prix_total,
+            "total_depenses":      total_dep,
+            "cout_total":          prix_total + total_dep,
+            "fournisseur":         a.fournisseur,
+            "notes":               a.notes,
+            "date_achat":          a.date_achat.isoformat(),
+            "depenses": [
+                {"id": d.id, "description": d.description, "montant": float(d.montant)}
+                for d in a.depenses
+            ],
+        })
+    return result
+
+
+@router.get("/achats/{achat_id}")
+def detail_achat(achat_id: int, db: Session = Depends(get_db)):
+    a = db.query(BarAchat).filter_by(id=achat_id).first()
+    if not a:
+        raise HTTPException(404, "Achat introuvable")
+    total_dep  = sum(float(d.montant) for d in a.depenses)
+    prix_total = float(a.quantite) * float(a.prix_achat_unitaire)
+    return {
+        "id":                  a.id,
+        "produit_id":          a.produit_id,
+        "produit_nom":         a.produit.nom if a.produit else str(a.produit_id),
+        "produit_unite":       a.produit.unite if a.produit else None,
+        "quantite":            float(a.quantite),
+        "prix_achat_unitaire": float(a.prix_achat_unitaire),
+        "prix_marchandise":    prix_total,
+        "total_depenses":      total_dep,
+        "cout_total":          prix_total + total_dep,
+        "fournisseur":         a.fournisseur,
+        "notes":               a.notes,
+        "date_achat":          a.date_achat.isoformat(),
+        "stock_apres":         float(stock_courant(a.produit_id, db)),
+        "depenses": [
+            {"id": d.id, "description": d.description, "montant": float(d.montant)}
+            for d in a.depenses
+        ],
+    }
+
+
 @router.post("/achats", status_code=201)
 def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends(get_db)):
-    """Réceptionne des marchandises : crée un BarAchat + mouvement ENTREE."""
+    """Réceptionne des marchandises : crée un BarAchat + dépenses + mouvement ENTREE."""
     p = db.query(BarProduit).filter_by(id=data.produit_id).first()
     if not p:
         raise HTTPException(404, "Produit introuvable")
 
+    # Conversion caisse → unités si nécessaire
+    upc = p.unites_par_caisse or 1
+    if data.quantite_type == "caisse" and p.vendu_par_caisse and upc > 0:
+        qte_unites = Decimal(str(data.quantite)) * Decimal(str(upc))
+        qte_label  = f"{data.quantite} caisse(s) × {upc} u. = {float(qte_unites)} u."
+    else:
+        qte_unites = Decimal(str(data.quantite))
+        qte_label  = f"{data.quantite} {p.unite}(s)"
+
     achat = BarAchat(
         produit_id          = data.produit_id,
-        quantite            = data.quantite,
-        prix_achat_unitaire = data.prix_achat_unitaire,
+        quantite            = qte_unites,
+        prix_achat_unitaire = Decimal(str(data.prix_achat_unitaire)),
         fournisseur         = data.fournisseur,
         utilisateur_id      = _uid(request),
         notes               = data.notes,
@@ -540,11 +624,19 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
     db.add(achat)
     db.flush()
 
+    # Dépenses supplémentaires
+    for dep in data.depenses:
+        db.add(BarAchatDepense(
+            achat_id    = achat.id,
+            description = dep.description.strip(),
+            montant     = Decimal(str(dep.montant)),
+        ))
+
     mouv = BarMouvementStock(
         produit_id     = data.produit_id,
         type_mouvement = "ENTREE",
-        quantite       = Decimal(str(data.quantite)),
-        motif          = f"Réception de {data.quantite} {p.unite}(s)"
+        quantite       = qte_unites,
+        motif          = f"Réception {qte_label}"
                          + (f" — {data.fournisseur}" if data.fournisseur else ""),
         achat_id       = achat.id,
         utilisateur_id = _uid(request),
@@ -552,10 +644,16 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
     db.add(mouv)
     db.commit()
 
+    total_dep  = sum(float(d.montant) for d in data.depenses)
+    prix_total = float(qte_unites) * float(data.prix_achat_unitaire)
     return {
-        "achat_id":    achat.id,
-        "mouvement_id": mouv.id,
-        "stock_apres": float(stock_courant(data.produit_id, db)),
+        "achat_id":          achat.id,
+        "mouvement_id":      mouv.id,
+        "quantite_unites":   float(qte_unites),
+        "prix_marchandise":  prix_total,
+        "total_depenses":    total_dep,
+        "cout_total":        prix_total + total_dep,
+        "stock_apres":       float(stock_courant(data.produit_id, db)),
     }
 
 
