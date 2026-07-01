@@ -15829,7 +15829,8 @@ function pcmdAjoutFiltrer(q){
   }
   grille.innerHTML = prods.map(p=>`
     <div id="pap-${p.id}"
-         onclick="pcmdAjoutSelectionner(${p.id},${JSON.stringify(p.nom)},${p.prix_actif||0})"
+         data-nom="${(p.nom||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')}"
+         onclick="pcmdAjoutSelectionner(${p.id},this.dataset.nom,${p.prix_actif||0})"
          style="background:rgba(255,255,255,.04);border:2px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 8px;cursor:pointer;text-align:center;transition:border-color .12s"
          onmouseenter="this.style.borderColor='rgba(96,165,250,.4)'"
          onmouseleave="this.style.borderColor=(_pcmdAddProdId===${p.id}?'rgba(96,165,250,.55)':'rgba(255,255,255,.07)')">
