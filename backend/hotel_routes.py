@@ -502,3 +502,92 @@ def stats_hotel(db: Session = Depends(get_db)):
         "revenu_total":    float(revenu_mois),
         "solde_en_attente": float(solde_total),
     }
+
+
+@router.get("/rapport")
+def rapport_hotel(
+    date_debut: Optional[str] = Query(default=None),
+    date_fin:   Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    from datetime import date as date_type
+    from collections import defaultdict
+
+    today = datetime.now(timezone.utc).date()
+    try:
+        d_debut = datetime.strptime(date_debut, "%Y-%m-%d").date() if date_debut else date_type(today.year, today.month, 1)
+    except ValueError:
+        d_debut = date_type(today.year, today.month, 1)
+    try:
+        d_fin = datetime.strptime(date_fin, "%Y-%m-%d").date() if date_fin else today
+    except ValueError:
+        d_fin = today
+
+    dt_debut = datetime(d_debut.year, d_debut.month, d_debut.day, tzinfo=timezone.utc)
+    dt_fin   = datetime(d_fin.year,   d_fin.month,   d_fin.day, 23, 59, 59, tzinfo=timezone.utc)
+
+    reservations = (
+        db.query(HotelReservation)
+        .filter(HotelReservation.date_arrivee >= dt_debut,
+                HotelReservation.date_arrivee <= dt_fin)
+        .all()
+    )
+
+    moments = [r for r in reservations if r.type_sejour == "MOMENT"]
+    nuits   = [r for r in reservations if r.type_sejour == "NUIT"]
+
+    def _sum(lst, field):
+        return float(sum(_d(getattr(r, field) or 0) for r in lst))
+
+    # Par chambre
+    par_chambre: dict = defaultdict(lambda: {"nb": 0, "revenu": 0.0, "moments": 0, "nuits": 0})
+    for r in reservations:
+        ch = r.chambre.numero if r.chambre else str(r.chambre_id)
+        par_chambre[ch]["nb"]     += 1
+        par_chambre[ch]["revenu"] += float(_d(r.montant_paye or 0))
+        par_chambre[ch]["moments"] += 1 if r.type_sejour == "MOMENT" else 0
+        par_chambre[ch]["nuits"]   += 1 if r.type_sejour == "NUIT"   else 0
+
+    # Aujourd'hui
+    dt_today = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
+    dt_today_end = datetime(today.year, today.month, today.day, 23, 59, 59, tzinfo=timezone.utc)
+    today_res = (
+        db.query(HotelReservation)
+        .filter(HotelReservation.date_arrivee >= dt_today,
+                HotelReservation.date_arrivee <= dt_today_end)
+        .all()
+    )
+
+    actifs_nb = db.query(HotelReservation).filter_by(statut="EN_COURS").count()
+    actifs_solde = float(
+        db.query(func.sum(HotelReservation.solde))
+          .filter_by(statut="EN_COURS").scalar() or 0
+    )
+
+    return {
+        "periode": {"debut": str(d_debut), "fin": str(d_fin)},
+        "kpis": {
+            "nb_total":              len(reservations),
+            "nb_moments":            len(moments),
+            "nb_nuits":              len(nuits),
+            "revenu_total":          _sum(reservations, "montant_paye"),
+            "revenu_moments":        _sum(moments,      "montant_paye"),
+            "revenu_nuits":          _sum(nuits,        "montant_paye"),
+            "montant_total_facture": _sum(reservations, "montant_total"),
+            "solde_impaye":          _sum(reservations, "solde"),
+        },
+        "aujourd_hui": {
+            "nb":      len(today_res),
+            "moments": sum(1 for r in today_res if r.type_sejour == "MOMENT"),
+            "nuits":   sum(1 for r in today_res if r.type_sejour == "NUIT"),
+            "revenu":  sum(float(_d(r.montant_paye or 0)) for r in today_res),
+        },
+        "actifs": {
+            "nb":               actifs_nb,
+            "solde_en_attente": actifs_solde,
+        },
+        "par_chambre": sorted(
+            [{"numero": ch, **v} for ch, v in par_chambre.items()],
+            key=lambda x: x["revenu"], reverse=True
+        ),
+    }
