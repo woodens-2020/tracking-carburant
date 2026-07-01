@@ -16208,7 +16208,6 @@ function _hotelSejourCard(s){
       <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
         ${hasSolde?`<button class="pos-btn ghost" style="flex:1;font-size:11px;color:#34d399;border-color:rgba(52,211,153,.3)" onclick="hotelPaiementModal(${s.id})">+ Paiement</button>`:''}
         <button class="pos-btn teal" style="flex:1;font-size:12px" onclick="hotelTerminer(${s.id})">✓ Marquer terminé</button>
-        <button class="pos-btn ghost" style="font-size:11px;padding:5px 8px;opacity:.6" onclick="hotelAnnuler(${s.id},'${s.client_nom.replace(/'/g,"\\'")}')">Annuler</button>
       </div>
     </div>
   </div>`;
