@@ -2924,6 +2924,39 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <!-- ── Section Cuisine ── -->
+    <div class="nav-section-label">Cuisine</div>
+
+    <button class="nav-item" data-page="cuisine-caisse" onclick="goTo('cuisine-caisse')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg></span>
+      <span>Caisse Cuisine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="cuisine-plats" onclick="goTo('cuisine-plats')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11c0-4.97 4.03-9 9-9s9 4.03 9 9"/><path d="M3 11h18"/><path d="M12 11v10"/><path d="M8 21h8"/></svg></span>
+      <span>Menu / Plats</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="cuisine-depenses" onclick="goTo('cuisine-depenses')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg></span>
+      <span>Dépenses</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="cuisine-ventes" onclick="goTo('cuisine-ventes')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+      <span>Ventes</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="cuisine-stats" onclick="goTo('cuisine-stats')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg></span>
+      <span>Rentabilité</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
   </nav>
 
   <!-- Statut connexion -->
@@ -6645,6 +6678,393 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
       </div>
     </div><!-- /page-pos-analyse -->
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- CUISINE — CAISSE                                              -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div id="page-cuisine-caisse" class="page page-gi">
+      <div class="pos-page gi-page" style="display:grid;grid-template-columns:1fr 340px;grid-template-rows:auto 1fr;gap:14px;height:100%">
+
+        <!-- Colonne gauche : menu -->
+        <div style="display:flex;flex-direction:column;gap:10px;min-height:0">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <h2 style="margin:0;font-size:18px;font-weight:800;flex:1">Caisse Cuisine</h2>
+            <select class="pos-select" id="ck-filtre-cat" onchange="ckFiltrerPlats()" style="min-width:140px">
+              <option value="">Toutes catégories</option>
+            </select>
+            <input class="pos-input" id="ck-search" placeholder="Rechercher plat…" oninput="ckFiltrerPlats()" style="min-width:160px">
+          </div>
+          <div id="ck-plats-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;overflow-y:auto;padding-right:4px">
+            <div style="padding:20px;text-align:center;color:rgba(255,255,255,.3);grid-column:1/-1">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- Colonne droite : panier -->
+        <div class="pos-card" style="display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden">
+          <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.07);font-size:13px;font-weight:700">Commande</div>
+          <div id="ck-cart-body" style="flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+            <div style="text-align:center;color:rgba(255,255,255,.25);padding:20px 0;font-size:12px">Panier vide</div>
+          </div>
+          <div style="padding:12px 16px;border-top:1px solid rgba(255,255,255,.07)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <span style="font-size:11px;color:rgba(255,255,255,.4)">TOTAL</span>
+              <span id="ck-total" style="font-size:22px;font-weight:800;color:#3fb6a8">G 0.00</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <button class="pos-btn" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1)" onclick="ckViderPanier()">Vider</button>
+              <button class="pos-btn teal" onclick="ckOuvrirPaiement()">Encaisser</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal paiement cuisine -->
+      <div id="ck-pay-bg" class="pos-modal-bg" style="display:none" onclick="if(event.target===this)ckFermerPaiement()">
+        <div class="pos-modal" style="max-width:420px;width:95%">
+          <div style="font-size:16px;font-weight:700;margin-bottom:16px">Paiement</div>
+          <div class="pos-card" style="padding:12px 14px;margin-bottom:14px;background:rgba(63,182,168,.08);border:1px solid rgba(63,182,168,.2)">
+            <div style="font-size:11px;color:rgba(255,255,255,.4)">Montant à payer</div>
+            <div id="ck-pay-total" style="font-size:24px;font-weight:800;color:#3fb6a8">G 0.00</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+            <div>
+              <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Montant reçu</label>
+              <input class="pos-input" id="ck-pay-recu" type="number" min="0" step="1" placeholder="0" oninput="ckCalcMonnaie()" style="width:100%">
+            </div>
+            <div id="ck-pay-monnaie-box" style="display:none;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.25);border-radius:8px;padding:10px 14px">
+              <div style="font-size:10px;color:rgba(255,255,255,.4)">Monnaie à rendre</div>
+              <div id="ck-pay-monnaie" style="font-size:20px;font-weight:700;color:#34d399">G 0.00</div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Mode paiement</label>
+              <select class="pos-select" id="ck-pay-mode" style="width:100%">
+                <option value="CASH">Cash</option>
+                <option value="CREDIT">Crédit</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Client (optionnel)</label>
+              <input class="pos-input" id="ck-pay-client" placeholder="Nom du client" style="width:100%">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="pos-btn ghost" style="flex:1" onclick="ckFermerPaiement()">Annuler</button>
+            <button class="pos-btn teal" style="flex:2" onclick="ckEnregistrerVente()">Valider la vente</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal reçu cuisine -->
+      <div id="ck-recu-bg" class="pos-modal-bg" style="display:none">
+        <div class="pos-modal" style="max-width:420px;width:95%">
+          <div style="font-size:16px;font-weight:700;margin-bottom:16px">Reçu</div>
+          <div id="ck-recu-body" style="background:#fff;color:#111;border-radius:8px;padding:16px 18px;max-height:420px;overflow-y:auto;margin-bottom:14px"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="pos-btn ghost" onclick="ckImprimerRecu()">🖨 Imprimer</button>
+            <button class="pos-btn ghost" onclick="ckWhatsApp()">WhatsApp</button>
+            <button class="pos-btn teal" style="margin-left:auto" onclick="document.getElementById('ck-recu-bg').style.display='none';ckViderPanier()">Fermer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /cuisine-caisse -->
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- CUISINE — PLATS                                               -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div id="page-cuisine-plats" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+          <h2 style="margin:0;font-size:20px;font-weight:800">Menu / Plats</h2>
+          <button class="pos-btn teal" onclick="ckPlatOuvrirModal()">+ Ajouter un plat</button>
+        </div>
+        <div class="pos-card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <select class="pos-select" id="plats-filtre-cat" onchange="ckPlatsAfficher()" style="min-width:140px">
+            <option value="">Toutes catégories</option>
+          </select>
+          <select class="pos-select" id="plats-filtre-actif" onchange="ckPlatsAfficher()" style="min-width:130px">
+            <option value="">Tous</option>
+            <option value="1">Actifs</option>
+            <option value="0">Retirés</option>
+          </select>
+          <input class="pos-input" id="plats-search" placeholder="Rechercher…" oninput="ckPlatsAfficher()" style="min-width:160px;flex:1">
+        </div>
+        <div class="pos-card" style="padding:0;overflow:hidden">
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead>
+                <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.08)">
+                  <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Plat</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Catégorie</th>
+                  <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Prix vente</th>
+                  <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Coût est.</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35);min-width:100px">Marge</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Statut</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="plats-tbody">
+                <tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal ajout/modif plat -->
+      <div id="plat-modal-bg" class="pos-modal-bg" style="display:none" onclick="if(event.target===this)ckPlatFermerModal()">
+        <div class="pos-modal" style="max-width:460px;width:95%">
+          <div id="plat-modal-titre" style="font-size:16px;font-weight:700;margin-bottom:16px">Nouveau plat</div>
+          <input type="hidden" id="plat-modal-id">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div>
+              <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Nom du plat *</label>
+              <input class="pos-input" id="plat-nom" placeholder="Ex : Riz aux haricots" style="width:100%">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
+                <input class="pos-input" id="plat-cat" placeholder="Ex : Plat principal" style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Prix de vente (G) *</label>
+                <input class="pos-input" id="plat-prix" type="number" min="0.01" step="1" placeholder="0.00" style="width:100%">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Coût estimé (G) <span style="opacity:.5">— pour calcul de marge</span></label>
+              <input class="pos-input" id="plat-cout" type="number" min="0" step="1" placeholder="0.00" style="width:100%">
+            </div>
+            <div>
+              <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Description</label>
+              <input class="pos-input" id="plat-desc" placeholder="Ingrédients, préparation…" style="width:100%">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="pos-btn ghost" style="flex:1" onclick="ckPlatFermerModal()">Annuler</button>
+            <button class="pos-btn teal" style="flex:2" onclick="ckPlatSauvegarder()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /cuisine-plats -->
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- CUISINE — DÉPENSES                                            -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div id="page-cuisine-depenses" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+          <h2 style="margin:0;font-size:20px;font-weight:800">Dépenses Cuisine</h2>
+          <button class="pos-btn teal" onclick="ckDepOuvrirModal()">+ Ajouter dépense</button>
+        </div>
+        <div class="pos-card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div style="display:flex;gap:6px;align-items:center">
+            <label style="font-size:11px;color:rgba(255,255,255,.4)">Du</label>
+            <input class="pos-input" id="dep-debut" type="date" style="width:140px">
+            <label style="font-size:11px;color:rgba(255,255,255,.4)">au</label>
+            <input class="pos-input" id="dep-fin" type="date" style="width:140px">
+          </div>
+          <select class="pos-select" id="dep-filtre-cat" onchange="ckDepAfficher()" style="min-width:140px">
+            <option value="">Toutes catégories</option>
+            <option value="INGREDIENTS">Ingrédients</option>
+            <option value="EQUIPEMENT">Équipement</option>
+            <option value="ENERGIE">Énergie</option>
+            <option value="PERSONNEL">Personnel</option>
+            <option value="AUTRE">Autre</option>
+          </select>
+          <button class="pos-btn teal" onclick="ckDepCharger()">Filtrer</button>
+        </div>
+        <!-- KPI dépenses -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
+          <div class="pos-card" style="padding:12px 14px;border-top:3px solid #f87171">
+            <div style="font-size:10px;color:rgba(255,255,255,.35)">Total période</div>
+            <div id="dep-kpi-total" style="font-size:20px;font-weight:800;color:#f87171">—</div>
+          </div>
+          <div class="pos-card" style="padding:12px 14px;border-top:3px solid #f59e0b">
+            <div style="font-size:10px;color:rgba(255,255,255,.35)">Ingrédients</div>
+            <div id="dep-kpi-ing" style="font-size:20px;font-weight:800;color:#f59e0b">—</div>
+          </div>
+          <div class="pos-card" style="padding:12px 14px;border-top:3px solid #818cf8">
+            <div style="font-size:10px;color:rgba(255,255,255,.35)">Équipement</div>
+            <div id="dep-kpi-equip" style="font-size:20px;font-weight:800;color:#818cf8">—</div>
+          </div>
+          <div class="pos-card" style="padding:12px 14px;border-top:3px solid #60a5fa">
+            <div style="font-size:10px;color:rgba(255,255,255,.35)">Nb entrées</div>
+            <div id="dep-kpi-nb" style="font-size:20px;font-weight:800;color:#60a5fa">—</div>
+          </div>
+        </div>
+        <div class="pos-card" style="padding:0;overflow:hidden">
+          <div style="overflow-x:auto;max-height:450px;overflow-y:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead style="position:sticky;top:0;background:#1a1f2e;z-index:1">
+                <tr style="border-bottom:1px solid rgba(255,255,255,.08)">
+                  <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Date</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Description</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Catégorie</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Fournisseur</th>
+                  <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Montant</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="dep-tbody">
+                <tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal dépense -->
+      <div id="dep-modal-bg" class="pos-modal-bg" style="display:none" onclick="if(event.target===this)ckDepFermerModal()">
+        <div class="pos-modal" style="max-width:440px;width:95%">
+          <div id="dep-modal-titre" style="font-size:16px;font-weight:700;margin-bottom:16px">Nouvelle dépense</div>
+          <input type="hidden" id="dep-modal-id">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div>
+              <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Description *</label>
+              <input class="pos-input" id="dep-desc" placeholder="Ex : Achat farine, huile…" style="width:100%">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
+                <select class="pos-select" id="dep-cat" style="width:100%">
+                  <option value="INGREDIENTS">Ingrédients</option>
+                  <option value="EQUIPEMENT">Équipement</option>
+                  <option value="ENERGIE">Énergie</option>
+                  <option value="PERSONNEL">Personnel</option>
+                  <option value="AUTRE">Autre</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Montant (G) *</label>
+                <input class="pos-input" id="dep-montant" type="number" min="0.01" step="1" placeholder="0.00" style="width:100%">
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Date</label>
+                <input class="pos-input" id="dep-date" type="date" style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Fournisseur</label>
+                <input class="pos-input" id="dep-fournisseur" placeholder="Nom fournisseur" style="width:100%">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Notes</label>
+              <input class="pos-input" id="dep-notes" placeholder="Remarques…" style="width:100%">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="pos-btn ghost" style="flex:1" onclick="ckDepFermerModal()">Annuler</button>
+            <button class="pos-btn teal" style="flex:2" onclick="ckDepSauvegarder()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /cuisine-depenses -->
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- CUISINE — VENTES                                              -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div id="page-cuisine-ventes" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+          <h2 style="margin:0;font-size:20px;font-weight:800">Ventes Cuisine</h2>
+          <button class="pos-btn ghost" onclick="ckVentesCharger()">↺ Actualiser</button>
+        </div>
+        <div class="pos-card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div style="display:flex;gap:6px;align-items:center">
+            <label style="font-size:11px;color:rgba(255,255,255,.4)">Du</label>
+            <input class="pos-input" id="ventes-debut" type="date" style="width:140px">
+            <label style="font-size:11px;color:rgba(255,255,255,.4)">au</label>
+            <input class="pos-input" id="ventes-fin" type="date" style="width:140px">
+          </div>
+          <button class="pos-btn teal" onclick="ckVentesCharger()">Filtrer</button>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="pos-btn ghost" style="font-size:11px" onclick="ckVentesPeriode(0)">Auj.</button>
+            <button class="pos-btn ghost" style="font-size:11px" onclick="ckVentesPeriode(7)">7j</button>
+            <button class="pos-btn ghost" style="font-size:11px" onclick="ckVentesPeriode(30)">30j</button>
+          </div>
+        </div>
+        <!-- KPIs ventes -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
+          <div class="pos-card" style="padding:12px 14px;border-top:3px solid #3fb6a8">
+            <div style="font-size:10px;color:rgba(255,255,255,.35)">CA période</div>
+            <div id="ventes-kpi-ca" style="font-size:20px;font-weight:800;color:#3fb6a8">—</div>
+          </div>
+          <div class="pos-card" style="padding:12px 14px;border-top:3px solid #60a5fa">
+            <div style="font-size:10px;color:rgba(255,255,255,.35)">Nb ventes</div>
+            <div id="ventes-kpi-nb" style="font-size:20px;font-weight:800;color:#60a5fa">—</div>
+          </div>
+          <div class="pos-card" style="padding:12px 14px;border-top:3px solid #f59e0b">
+            <div style="font-size:10px;color:rgba(255,255,255,.35)">Ticket moyen</div>
+            <div id="ventes-kpi-moy" style="font-size:20px;font-weight:800;color:#f59e0b">—</div>
+          </div>
+        </div>
+        <div class="pos-card" style="padding:0;overflow:hidden">
+          <div style="overflow-x:auto;max-height:450px;overflow-y:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead style="position:sticky;top:0;background:#1a1f2e;z-index:1">
+                <tr style="border-bottom:1px solid rgba(255,255,255,.08)">
+                  <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Ticket</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Date/Heure</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Client</th>
+                  <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Total</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Mode</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Statut</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="ventes-tbody">
+                <tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal détail vente -->
+      <div id="ventes-detail-bg" class="pos-modal-bg" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+        <div class="pos-modal" style="max-width:460px;width:95%">
+          <div id="ventes-detail-body"></div>
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <button class="pos-btn ghost" style="flex:1" onclick="document.getElementById('ventes-detail-bg').style.display='none'">Fermer</button>
+            <button class="pos-btn ghost" id="ventes-detail-annuler" style="flex:1;color:#f87171;border-color:rgba(248,113,113,.3)">Annuler vente</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /cuisine-ventes -->
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- CUISINE — STATS / RENTABILITÉ                                 -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div id="page-cuisine-stats" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+          <div>
+            <h2 style="margin:0;font-size:20px;font-weight:800">Rentabilité Cuisine</h2>
+            <div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:2px">CA — Dépenses = Bénéfice net</div>
+          </div>
+          <button class="pos-btn ghost" onclick="ckStatsCharger()">↺ Actualiser</button>
+        </div>
+        <div class="pos-card" style="padding:10px 14px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div style="display:flex;gap:6px;align-items:center">
+            <label style="font-size:11px;color:rgba(255,255,255,.4)">Du</label>
+            <input class="pos-input" id="stats-debut" type="date" style="width:140px">
+            <label style="font-size:11px;color:rgba(255,255,255,.4)">au</label>
+            <input class="pos-input" id="stats-fin" type="date" style="width:140px">
+          </div>
+          <button class="pos-btn teal" onclick="ckStatsCharger()">Calculer</button>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="pos-btn ghost" style="font-size:11px" onclick="ckStatsPeriode('mois')">Ce mois</button>
+            <button class="pos-btn ghost" style="font-size:11px" onclick="ckStatsPeriode('trim')">3 mois</button>
+          </div>
+        </div>
+        <div id="ck-stats-body">
+          <div style="text-align:center;padding:40px;color:rgba(255,255,255,.3)">Sélectionnez une période et cliquez Calculer</div>
+        </div>
+      </div>
+    </div><!-- /cuisine-stats -->
 
     <!-- ══════════════════════════════════════════════════════════ -->
     <!-- HOTEL — CHAMBRES                                          -->
@@ -13581,6 +14001,11 @@ const _giPageLoaders = {
   'pos-rentabilite':    loadPosRentabilite,
   'pos-grande-caisse':  loadPosGrandeCaisse,
   'pos-analyse':        loadPosAnalyse,
+  'cuisine-caisse':     loadCuisineCaisse,
+  'cuisine-plats':      loadCuisinePlats,
+  'cuisine-depenses':   loadCuisineDepenses,
+  'cuisine-ventes':     loadCuisineVentes,
+  'cuisine-stats':      loadCuisineStats,
   'hotel-chambres':     loadHotelChambres,
   'hotel-reception':    loadHotelReception,
   'hotel-sejours':      loadHotelSejours,
@@ -17273,6 +17698,759 @@ async function anaChargerRentabilite(){
     body.innerHTML = kpis + catHTML + table;
   } catch(e){
     body.innerHTML = `<div style="color:#f87171;padding:16px">${e.message || 'Erreur réseau'}</div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// MODULE CUISINE
+// ══════════════════════════════════════════════════════════════════════
+
+let _ckPlats  = [];   // cache plats actifs
+let _ckCart   = [];   // panier caisse [{plat_id, nom, prix, quantite}]
+let _ckDepots = [];   // cache dépenses chargées
+let _ckVentes = [];   // cache ventes chargées
+let _ckRecuCourant = null;
+
+// ── Helpers communs ────────────────────────────────────────────────
+
+function _ckDateFmt(d){
+  if(!d) return '—';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function _ckHeureFmt(d){
+  if(!d) return '';
+  return new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CAISSE CUISINE
+// ══════════════════════════════════════════════════════════════════
+
+async function loadCuisineCaisse(){
+  try {
+    _ckPlats = await apiFetch('GET', '/cuisine/plats?actif=true');
+  } catch(e){ _ckPlats = []; }
+  _ckRenderCatFilter();
+  ckFiltrerPlats();
+  ckRenderCart();
+}
+
+function _ckRenderCatFilter(){
+  const cats = [...new Set(_ckPlats.map(p => p.categorie).filter(Boolean))].sort();
+  const sel  = document.getElementById('ck-filtre-cat');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">Toutes catégories</option>' +
+    cats.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+function ckFiltrerPlats(){
+  const cat    = document.getElementById('ck-filtre-cat')?.value || '';
+  const search = (document.getElementById('ck-search')?.value || '').toLowerCase();
+  const grid   = document.getElementById('ck-plats-grid'); if(!grid) return;
+
+  const visible = _ckPlats.filter(p =>
+    (!cat    || p.categorie === cat) &&
+    (!search || p.nom.toLowerCase().includes(search))
+  );
+
+  if(!visible.length){
+    grid.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.3);grid-column:1/-1">Aucun plat trouvé</div>';
+    return;
+  }
+
+  grid.innerHTML = visible.map(p => `
+    <div onclick="ckAjouterAuPanier(${p.id})" style="cursor:pointer;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 10px;display:flex;flex-direction:column;gap:4px;transition:.15s;user-select:none"
+      onmouseover="this.style.background='rgba(63,182,168,.12)';this.style.borderColor='rgba(63,182,168,.3)'"
+      onmouseout="this.style.background='rgba(255,255,255,.04)';this.style.borderColor='rgba(255,255,255,.08)'">
+      <div style="font-size:12px;font-weight:700;line-height:1.3">${p.nom}</div>
+      ${p.categorie ? `<div style="font-size:10px;color:rgba(255,255,255,.35)">${p.categorie}</div>` : ''}
+      <div style="font-size:14px;font-weight:800;color:#3fb6a8;margin-top:4px">${posGx(p.prix_vente)}</div>
+    </div>`
+  ).join('');
+}
+
+function ckAjouterAuPanier(platId){
+  const plat = _ckPlats.find(p => p.id === platId);
+  if(!plat) return;
+  const existing = _ckCart.find(c => c.plat_id === platId);
+  if(existing){ existing.quantite++; }
+  else { _ckCart.push({ plat_id: platId, nom: plat.nom, prix: plat.prix_vente, quantite: 1 }); }
+  ckRenderCart();
+}
+
+function ckQte(idx, delta){
+  if(!_ckCart[idx]) return;
+  _ckCart[idx].quantite = Math.max(1, _ckCart[idx].quantite + delta);
+  ckRenderCart();
+}
+
+function ckSupprLigne(idx){
+  _ckCart.splice(idx, 1);
+  ckRenderCart();
+}
+
+function ckViderPanier(){
+  _ckCart = [];
+  ckRenderCart();
+}
+
+function ckRenderCart(){
+  const body  = document.getElementById('ck-cart-body');
+  const total = _ckCart.reduce((s, it) => s + it.prix * it.quantite, 0);
+  const elTot = document.getElementById('ck-total');
+  if(elTot) elTot.textContent = posGx(total);
+  if(!body) return;
+  if(!_ckCart.length){
+    body.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.25);padding:20px 0;font-size:12px">Panier vide</div>';
+    return;
+  }
+  body.innerHTML = _ckCart.map((it, i) => {
+    const sous = it.prix * it.quantite;
+    return `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:8px 10px;display:flex;gap:8px;align-items:center">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.nom}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.4)">${posGx(it.prix)} × ${it.quantite} = <span style="color:#3fb6a8;font-weight:600">${posGx(sous)}</span></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        <button onclick="ckQte(${i},-1)" style="width:24px;height:24px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">−</button>
+        <span style="font-size:12px;font-weight:700;min-width:20px;text-align:center">${it.quantite}</span>
+        <button onclick="ckQte(${i},+1)" style="width:24px;height:24px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">+</button>
+        <button onclick="ckSupprLigne(${i})" style="width:24px;height:24px;border-radius:6px;border:none;background:rgba(248,113,113,.15);color:#f87171;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;margin-left:4px">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function ckOuvrirPaiement(){
+  if(!_ckCart.length){ posAlert('Le panier est vide.','warn'); return; }
+  const total = _ckCart.reduce((s, it) => s + it.prix * it.quantite, 0);
+  const el    = document.getElementById('ck-pay-total');
+  if(el) el.textContent = posGx(total);
+  document.getElementById('ck-pay-recu').value       = '';
+  document.getElementById('ck-pay-client').value     = '';
+  document.getElementById('ck-pay-mode').value       = 'CASH';
+  const mb = document.getElementById('ck-pay-monnaie-box');
+  if(mb) mb.style.display = 'none';
+  document.getElementById('ck-pay-bg').style.display = 'flex';
+  setTimeout(() => document.getElementById('ck-pay-recu')?.focus(), 100);
+}
+
+function ckFermerPaiement(){
+  document.getElementById('ck-pay-bg').style.display = 'none';
+}
+
+function ckCalcMonnaie(){
+  const total = _ckCart.reduce((s, it) => s + it.prix * it.quantite, 0);
+  const recu  = parseFloat(document.getElementById('ck-pay-recu')?.value || 0);
+  const box   = document.getElementById('ck-pay-monnaie-box');
+  const el    = document.getElementById('ck-pay-monnaie');
+  if(recu >= total && box && el){
+    box.style.display = '';
+    el.textContent    = posGx(recu - total);
+  } else if(box){
+    box.style.display = 'none';
+  }
+}
+
+async function ckEnregistrerVente(){
+  if(!_ckCart.length){ posAlert('Panier vide.','warn'); return; }
+  const mode   = document.getElementById('ck-pay-mode')?.value || 'CASH';
+  const client = document.getElementById('ck-pay-client')?.value.trim() || '';
+  const recu   = parseFloat(document.getElementById('ck-pay-recu')?.value || 0);
+  const total  = _ckCart.reduce((s, it) => s + it.prix * it.quantite, 0);
+  if(mode === 'CASH' && recu < total){ posAlert('Montant reçu insuffisant.','warn'); return; }
+
+  const payload = {
+    lignes: _ckCart.map(it => ({
+      plat_id:       it.plat_id,
+      nom_plat:      it.nom,
+      quantite:      it.quantite,
+      prix_unitaire: it.prix,
+    })),
+    mode_paiement: mode,
+    client_nom:    client,
+  };
+
+  try {
+    const result = await apiFetch('POST', '/cuisine/ventes', payload);
+    ckFermerPaiement();
+    _ckRecuCourant = { result, cart: [..._ckCart], total, recu, mode, client };
+    ckAfficherRecu(_ckRecuCourant);
+  } catch(e){
+    posAlert(e.message || 'Erreur lors de la vente.', 'error');
+  }
+}
+
+function ckAfficherRecu({ result, cart, total, recu, mode, client }){
+  const now      = new Date();
+  const dateStr  = now.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric'});
+  const heureStr = now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+  const ticket   = result.numero_ticket || '—';
+  const monnaie  = mode === 'CASH' && recu > total ? recu - total : 0;
+
+  const lignesHTML = cart.map(it => {
+    const sous = it.prix * it.quantite;
+    return `<tr>
+      <td style="padding:3px 2px;font-size:11px">${it.nom}</td>
+      <td style="padding:3px 2px;text-align:center;font-size:11px">×${it.quantite}</td>
+      <td style="padding:3px 2px;text-align:right;font-size:11px;white-space:nowrap">G ${sous.toFixed(2)}</td>
+    </tr>
+    <tr><td colspan="3" style="padding:0 2px 4px 6px;font-size:9.5px;color:#999">@ G ${it.prix.toFixed(2)} / u</td></tr>`;
+  }).join('');
+
+  const extras = client ? [['Client', client]] : [];
+  const html = `
+    ${_posRecuHeaderHTML(ticket, dateStr, heureStr, [['Section','Cuisine'], ...extras])}
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:4px">Plats commandés</div>
+    <table style="width:100%;border-collapse:collapse">${lignesHTML}</table>
+    <hr class="sep">
+    <table style="width:100%;border-collapse:collapse">
+      <tr>
+        <td style="font-size:13px;font-weight:700;padding:2px 0">TOTAL</td>
+        <td style="font-size:13px;font-weight:700;text-align:right;padding:2px 0">G ${total.toFixed(2)}</td>
+      </tr>
+      ${mode === 'CASH' && recu > 0 ? `
+      <tr><td style="font-size:11px;color:#555;padding:2px 0">Reçu</td><td style="font-size:11px;text-align:right;padding:2px 0">G ${recu.toFixed(2)}</td></tr>
+      <tr><td style="font-size:12px;font-weight:700;color:#228b22;padding:2px 0">Monnaie</td><td style="font-size:12px;font-weight:700;text-align:right;padding:2px 0;color:#228b22">G ${monnaie.toFixed(2)}</td></tr>
+      ` : ''}
+      ${mode === 'CREDIT' ? `<tr><td colspan="2" style="font-size:11px;color:#dc2626;text-align:center;padding:6px 0;font-weight:600">Mode : CRÉDIT</td></tr>` : ''}
+    </table>
+    ${_posRecuPiedHTML()}`;
+
+  const body = document.getElementById('ck-recu-body');
+  if(body) body.innerHTML = html;
+  document.getElementById('ck-recu-bg').style.display = 'flex';
+}
+
+function ckImprimerRecu(){
+  const html = document.getElementById('ck-recu-body')?.innerHTML || '';
+  _posOuvrirImprimer(html, 'Ticket Cuisine NATIVITE');
+}
+
+function ckWhatsApp(){
+  if(!_ckRecuCourant) return;
+  const { cart, total, result } = _ckRecuCourant;
+  const lignes = cart.map(it => `• ${it.nom} ×${it.quantite} = G ${(it.prix*it.quantite).toFixed(2)}`).join('\n');
+  const msg    = `🍽 NATIVITE Cuisine\nTicket: ${result.numero_ticket}\n\n${lignes}\n\nTOTAL: G ${total.toFixed(2)}\nMerci !`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PLATS
+// ══════════════════════════════════════════════════════════════════
+
+let _ckTousPlats = [];  // cache incluant inactifs
+
+async function loadCuisinePlats(){
+  try {
+    _ckTousPlats = await apiFetch('GET', '/cuisine/plats');
+  } catch(e){ _ckTousPlats = []; posAlert('Erreur chargement plats.','error'); return; }
+  _ckPlats = _ckTousPlats.filter(p => p.actif);
+  ckPlatsRafraichirFiltres();
+  ckPlatsAfficher();
+}
+
+function ckPlatsRafraichirFiltres(){
+  const cats = [...new Set(_ckTousPlats.map(p => p.categorie).filter(Boolean))].sort();
+  const sel  = document.getElementById('plats-filtre-cat');
+  if(!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Toutes catégories</option>' +
+    cats.map(c => `<option value="${c}">${c}</option>`).join('');
+  sel.value = cur;
+}
+
+function ckPlatsAfficher(){
+  const tbody  = document.getElementById('plats-tbody'); if(!tbody) return;
+  const cat    = document.getElementById('plats-filtre-cat')?.value || '';
+  const actif  = document.getElementById('plats-filtre-actif')?.value || '';
+  const search = (document.getElementById('plats-search')?.value || '').toLowerCase();
+
+  let plats = _ckTousPlats.filter(p =>
+    (!cat    || p.categorie === cat) &&
+    (!search || p.nom.toLowerCase().includes(search)) &&
+    (actif === '' || (actif === '1' ? p.actif : !p.actif))
+  );
+
+  if(!plats.length){
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucun plat</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = plats.map(p => {
+    const mc = p.marge_pct !== null
+      ? (p.marge_pct >= 40 ? '#34d399' : p.marge_pct >= 20 ? '#f59e0b' : '#f87171')
+      : 'rgba(255,255,255,.3)';
+    const margeHtml = p.marge_pct !== null
+      ? `<div style="display:flex;align-items:center;gap:5px">
+          <div style="width:40px;height:4px;background:rgba(255,255,255,.08);border-radius:2px">
+            <div style="height:100%;width:${Math.min(100,Math.max(0,p.marge_pct))}%;background:${mc};border-radius:2px"></div>
+          </div>
+          <span style="font-size:11px;color:${mc};font-weight:700">${p.marge_pct.toFixed(1)}%</span>
+        </div>`
+      : '<span style="color:rgba(255,255,255,.25);font-size:11px">—</span>';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+      <td style="padding:9px 12px;font-weight:600">${p.nom}${p.description ? `<div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:1px">${p.description}</div>` : ''}</td>
+      <td style="padding:9px 8px;font-size:11px;color:rgba(255,255,255,.45)">${p.categorie || '—'}</td>
+      <td style="padding:9px 8px;text-align:right;font-weight:700;color:#3fb6a8">${posGx(p.prix_vente)}</td>
+      <td style="padding:9px 8px;text-align:right;font-size:11px;color:rgba(255,255,255,.5)">${p.cout_estime !== null ? posGx(p.cout_estime) : '—'}</td>
+      <td style="padding:9px 8px">${margeHtml}</td>
+      <td style="padding:9px 8px;text-align:center">${p.actif ? '<span class="pos-badge teal" style="font-size:9px">Actif</span>' : '<span class="pos-badge" style="font-size:9px;opacity:.5">Retiré</span>'}</td>
+      <td style="padding:9px 8px;text-align:center">
+        <div style="display:flex;gap:4px;justify-content:center">
+          <button class="pos-btn ghost" style="font-size:10px;padding:3px 8px" onclick="ckPlatOuvrirModal(${p.id})">Modifier</button>
+          ${p.actif ? `<button class="pos-btn ghost" style="font-size:10px;padding:3px 8px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="ckPlatRetirer(${p.id})">Retirer</button>` : `<button class="pos-btn ghost" style="font-size:10px;padding:3px 8px;color:#34d399;border-color:rgba(52,211,153,.3)" onclick="ckPlatActiver(${p.id})">Activer</button>`}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function ckPlatOuvrirModal(platId){
+  const modal = document.getElementById('plat-modal-bg'); if(!modal) return;
+  document.getElementById('plat-modal-id').value = platId || '';
+  document.getElementById('plat-modal-titre').textContent = platId ? 'Modifier le plat' : 'Nouveau plat';
+  if(platId){
+    const p = _ckTousPlats.find(x => x.id === platId);
+    if(p){
+      document.getElementById('plat-nom').value   = p.nom;
+      document.getElementById('plat-cat').value   = p.categorie || '';
+      document.getElementById('plat-prix').value  = p.prix_vente;
+      document.getElementById('plat-cout').value  = p.cout_estime !== null ? p.cout_estime : '';
+      document.getElementById('plat-desc').value  = p.description || '';
+    }
+  } else {
+    ['plat-nom','plat-cat','plat-prix','plat-cout','plat-desc'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+  }
+  modal.style.display = 'flex';
+  setTimeout(() => document.getElementById('plat-nom')?.focus(), 100);
+}
+
+function ckPlatFermerModal(){
+  document.getElementById('plat-modal-bg').style.display = 'none';
+}
+
+async function ckPlatSauvegarder(){
+  const id   = document.getElementById('plat-modal-id').value;
+  const nom  = document.getElementById('plat-nom').value.trim();
+  const prix = parseFloat(document.getElementById('plat-prix').value);
+  if(!nom){ posAlert('Le nom est requis.','warn'); return; }
+  if(!prix || prix <= 0){ posAlert('Le prix doit être positif.','warn'); return; }
+  const cout = parseFloat(document.getElementById('plat-cout').value) || null;
+  const payload = {
+    nom,
+    categorie:   document.getElementById('plat-cat').value.trim(),
+    description: document.getElementById('plat-desc').value.trim(),
+    prix_vente:  prix,
+    cout_estime: cout,
+  };
+  try {
+    if(id){ await apiFetch('PUT', `/cuisine/plats/${id}`, payload); }
+    else   { await apiFetch('POST', '/cuisine/plats', payload); }
+    ckPlatFermerModal();
+    posAlert('Plat enregistré.', 'success');
+    loadCuisinePlats();
+  } catch(e){ posAlert(e.message || 'Erreur.','error'); }
+}
+
+async function ckPlatRetirer(id){
+  try {
+    await apiFetch('DELETE', `/cuisine/plats/${id}`);
+    posAlert('Plat retiré du menu.','success');
+    loadCuisinePlats();
+  } catch(e){ posAlert(e.message||'Erreur.','error'); }
+}
+
+async function ckPlatActiver(id){
+  try {
+    await apiFetch('PUT', `/cuisine/plats/${id}`, { actif: true });
+    posAlert('Plat réactivé.','success');
+    loadCuisinePlats();
+  } catch(e){ posAlert(e.message||'Erreur.','error'); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// DÉPENSES
+// ══════════════════════════════════════════════════════════════════
+
+async function loadCuisineDepenses(){
+  const today = new Date();
+  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  const fmt   = d => d.toISOString().split('T')[0];
+  const dDeb  = document.getElementById('dep-debut');
+  const dFin  = document.getElementById('dep-fin');
+  if(dDeb && !dDeb.value) dDeb.value = first;
+  if(dFin && !dFin.value) dFin.value = fmt(today);
+  await ckDepCharger();
+}
+
+async function ckDepCharger(){
+  const debut = document.getElementById('dep-debut')?.value;
+  const fin   = document.getElementById('dep-fin')?.value;
+  const tbody = document.getElementById('dep-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try {
+    let url = '/cuisine/depenses';
+    if(debut || fin) url += `?date_debut=${debut||''}&date_fin=${fin||''}`;
+    _ckDepots = await apiFetch('GET', url);
+    ckDepAfficher();
+  } catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:20px;text-align:center;color:#f87171">${e.message||'Erreur'}</td></tr>`;
+  }
+}
+
+function ckDepAfficher(){
+  const tbody = document.getElementById('dep-tbody'); if(!tbody) return;
+  const cat   = document.getElementById('dep-filtre-cat')?.value || '';
+  const deps  = _ckDepots.filter(d => !cat || d.categorie === cat);
+
+  const total    = deps.reduce((s, d) => s + d.montant, 0);
+  const ing      = deps.filter(d => d.categorie === 'INGREDIENTS').reduce((s,d)=>s+d.montant,0);
+  const equip    = deps.filter(d => d.categorie === 'EQUIPEMENT').reduce((s,d)=>s+d.montant,0);
+  [['dep-kpi-total', posGx(total)],['dep-kpi-ing', posGx(ing)],
+   ['dep-kpi-equip', posGx(equip)],['dep-kpi-nb', deps.length]
+  ].forEach(([id, v]) => { const el = document.getElementById(id); if(el) el.textContent = v; });
+
+  if(!deps.length){
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune dépense</td></tr>';
+    return;
+  }
+
+  const catColors = {INGREDIENTS:'#f59e0b',EQUIPEMENT:'#818cf8',ENERGIE:'#60a5fa',PERSONNEL:'#34d399',AUTRE:'rgba(255,255,255,.4)'};
+  tbody.innerHTML = deps.map(d => {
+    const cc = catColors[d.categorie] || catColors.AUTRE;
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+      <td style="padding:9px 12px;font-size:11px;color:rgba(255,255,255,.5)">${_ckDateFmt(d.date_depense)}</td>
+      <td style="padding:9px 8px;font-weight:600">${d.description}</td>
+      <td style="padding:9px 8px"><span style="font-size:10px;font-weight:700;color:${cc};background:${cc}18;border:1px solid ${cc}33;border-radius:4px;padding:2px 6px">${d.categorie}</span></td>
+      <td style="padding:9px 8px;font-size:11px;color:rgba(255,255,255,.45)">${d.fournisseur || '—'}</td>
+      <td style="padding:9px 8px;text-align:right;font-weight:700;color:#f87171">${posGx(d.montant)}</td>
+      <td style="padding:9px 8px;text-align:center">
+        <div style="display:flex;gap:4px;justify-content:center">
+          <button class="pos-btn ghost" style="font-size:10px;padding:3px 8px" onclick="ckDepOuvrirModal(${d.id})">Modifier</button>
+          <button class="pos-btn ghost" style="font-size:10px;padding:3px 8px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="ckDepSupprimer(${d.id})">Suppr.</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function ckDepOuvrirModal(depId){
+  const modal = document.getElementById('dep-modal-bg'); if(!modal) return;
+  document.getElementById('dep-modal-id').value    = depId || '';
+  document.getElementById('dep-modal-titre').textContent = depId ? 'Modifier la dépense' : 'Nouvelle dépense';
+  if(depId){
+    const d = _ckDepots.find(x => x.id === depId);
+    if(d){
+      document.getElementById('dep-desc').value        = d.description;
+      document.getElementById('dep-cat').value         = d.categorie || 'AUTRE';
+      document.getElementById('dep-montant').value     = d.montant;
+      document.getElementById('dep-date').value        = d.date_depense ? d.date_depense.split('T')[0] : '';
+      document.getElementById('dep-fournisseur').value = d.fournisseur || '';
+      document.getElementById('dep-notes').value       = d.notes || '';
+    }
+  } else {
+    const today = new Date().toISOString().split('T')[0];
+    ['dep-desc','dep-montant','dep-fournisseur','dep-notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('dep-cat').value  = 'INGREDIENTS';
+    document.getElementById('dep-date').value = today;
+  }
+  modal.style.display = 'flex';
+  setTimeout(() => document.getElementById('dep-desc')?.focus(), 100);
+}
+
+function ckDepFermerModal(){
+  document.getElementById('dep-modal-bg').style.display = 'none';
+}
+
+async function ckDepSauvegarder(){
+  const id      = document.getElementById('dep-modal-id').value;
+  const desc    = document.getElementById('dep-desc').value.trim();
+  const montant = parseFloat(document.getElementById('dep-montant').value);
+  if(!desc){ posAlert('La description est requise.','warn'); return; }
+  if(!montant || montant <= 0){ posAlert('Le montant doit être positif.','warn'); return; }
+  const payload = {
+    description:  desc,
+    categorie:    document.getElementById('dep-cat').value,
+    montant,
+    date_depense: document.getElementById('dep-date').value || null,
+    fournisseur:  document.getElementById('dep-fournisseur').value.trim(),
+    notes:        document.getElementById('dep-notes').value.trim(),
+  };
+  try {
+    if(id){ await apiFetch('PUT', `/cuisine/depenses/${id}`, payload); }
+    else   { await apiFetch('POST', '/cuisine/depenses', payload); }
+    ckDepFermerModal();
+    posAlert('Dépense enregistrée.','success');
+    ckDepCharger();
+  } catch(e){ posAlert(e.message||'Erreur.','error'); }
+}
+
+async function ckDepSupprimer(id){
+  if(!confirm('Supprimer cette dépense ?')) return;
+  try {
+    await apiFetch('DELETE', `/cuisine/depenses/${id}`);
+    posAlert('Dépense supprimée.','success');
+    ckDepCharger();
+  } catch(e){ posAlert(e.message||'Erreur.','error'); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// VENTES
+// ══════════════════════════════════════════════════════════════════
+
+async function loadCuisineVentes(){
+  const today = new Date().toISOString().split('T')[0];
+  const dDeb  = document.getElementById('ventes-debut');
+  const dFin  = document.getElementById('ventes-fin');
+  if(dDeb && !dDeb.value) dDeb.value = today;
+  if(dFin && !dFin.value) dFin.value = today;
+  await ckVentesCharger();
+}
+
+function ckVentesPeriode(jours){
+  const today = new Date();
+  const debut = jours === 0 ? today : new Date(today); if(jours>0) debut.setDate(debut.getDate()-jours+1);
+  const fmt   = d => d.toISOString().split('T')[0];
+  document.getElementById('ventes-debut').value = fmt(debut);
+  document.getElementById('ventes-fin').value   = fmt(today);
+  ckVentesCharger();
+}
+
+async function ckVentesCharger(){
+  const debut = document.getElementById('ventes-debut')?.value;
+  const fin   = document.getElementById('ventes-fin')?.value;
+  const tbody = document.getElementById('ventes-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try {
+    let url = '/cuisine/ventes';
+    if(debut||fin) url += `?date_debut=${debut||''}&date_fin=${fin||''}`;
+    _ckVentes = await apiFetch('GET', url);
+
+    const validees = _ckVentes.filter(v => v.statut === 'VALIDEE');
+    const ca   = validees.reduce((s,v) => s+v.total, 0);
+    const nb   = validees.length;
+    const moy  = nb > 0 ? ca/nb : 0;
+    [['ventes-kpi-ca', posGx(ca)],['ventes-kpi-nb', nb],['ventes-kpi-moy', posGx(moy)]
+    ].forEach(([id,v]) => { const el=document.getElementById(id); if(el) el.textContent=v; });
+
+    if(!_ckVentes.length){
+      if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune vente</td></tr>';
+      return;
+    }
+    tbody.innerHTML = _ckVentes.map(v => {
+      const annulee = v.statut === 'ANNULEE';
+      const modeBadge = v.mode_paiement === 'CREDIT'
+        ? '<span style="font-size:10px;color:#f87171;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);border-radius:4px;padding:2px 6px">Crédit</span>'
+        : '<span style="font-size:10px;color:#34d399;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.2);border-radius:4px;padding:2px 6px">Cash</span>';
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);opacity:${annulee?'.45':'1'}">
+        <td style="padding:9px 12px;font-weight:600;font-family:monospace;font-size:11px">${v.numero_ticket}</td>
+        <td style="padding:9px 8px;font-size:11px;color:rgba(255,255,255,.5)">${_ckDateFmt(v.date_heure)} ${_ckHeureFmt(v.date_heure)}</td>
+        <td style="padding:9px 8px;font-size:11px;color:rgba(255,255,255,.5)">${v.client_nom || '—'}</td>
+        <td style="padding:9px 8px;text-align:right;font-weight:700;color:${annulee?'rgba(255,255,255,.3)':'#3fb6a8'}">${posGx(v.total)}</td>
+        <td style="padding:9px 8px;text-align:center">${modeBadge}</td>
+        <td style="padding:9px 8px;text-align:center">${annulee ? '<span class="pos-badge danger" style="font-size:9px">Annulée</span>' : '<span class="pos-badge teal" style="font-size:9px">Validée</span>'}</td>
+        <td style="padding:9px 8px;text-align:center">
+          <button class="pos-btn ghost" style="font-size:10px;padding:3px 8px" onclick="ckVenteDetail(${v.id})">Détail</button>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;text-align:center;color:#f87171">${e.message||'Erreur'}</td></tr>`;
+  }
+}
+
+function ckVenteDetail(id){
+  const v = _ckVentes.find(x => x.id === id); if(!v) return;
+  const body = document.getElementById('ventes-detail-body');
+  if(body){
+    body.innerHTML = `
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">Ticket : ${v.numero_ticket}</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px">
+      <div><div style="font-size:10px;color:rgba(255,255,255,.35)">Date</div><div style="font-size:12px">${_ckDateFmt(v.date_heure)} ${_ckHeureFmt(v.date_heure)}</div></div>
+      <div><div style="font-size:10px;color:rgba(255,255,255,.35)">Mode</div><div style="font-size:12px">${v.mode_paiement}</div></div>
+      <div><div style="font-size:10px;color:rgba(255,255,255,.35)">Client</div><div style="font-size:12px">${v.client_nom || '—'}</div></div>
+      <div><div style="font-size:10px;color:rgba(255,255,255,.35)">Statut</div><div style="font-size:12px;color:${v.statut==='ANNULEE'?'#f87171':'#34d399'}">${v.statut}</div></div>
+    </div>
+    <div class="pos-card" style="padding:0;overflow:hidden;margin-bottom:0">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="border-bottom:1px solid rgba(255,255,255,.08)">
+          <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.35)">Plat</th>
+          <th style="padding:8px 6px;text-align:center;color:rgba(255,255,255,.35)">Qté</th>
+          <th style="padding:8px 6px;text-align:right;color:rgba(255,255,255,.35)">Prix</th>
+          <th style="padding:8px 10px;text-align:right;color:rgba(255,255,255,.35)">Sous-total</th>
+        </tr></thead>
+        <tbody>
+          ${v.lignes.map(l=>`<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+            <td style="padding:7px 10px;font-weight:600">${l.nom_plat}</td>
+            <td style="padding:7px 6px;text-align:center">${l.quantite}</td>
+            <td style="padding:7px 6px;text-align:right">${posGx(l.prix_unitaire)}</td>
+            <td style="padding:7px 10px;text-align:right;font-weight:700;color:#3fb6a8">${posGx(l.sous_total)}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr style="border-top:1px solid rgba(255,255,255,.1)">
+          <td colspan="3" style="padding:8px 10px;font-weight:700">TOTAL</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:800;color:#3fb6a8;font-size:14px">${posGx(v.total)}</td>
+        </tr></tfoot>
+      </table>
+    </div>`;
+  }
+  const btnAnn = document.getElementById('ventes-detail-annuler');
+  if(btnAnn){
+    btnAnn.style.display = v.statut === 'ANNULEE' ? 'none' : '';
+    btnAnn.onclick = () => ckVenteAnnuler(v.id);
+  }
+  document.getElementById('ventes-detail-bg').style.display = 'flex';
+}
+
+async function ckVenteAnnuler(id){
+  if(!confirm('Annuler cette vente ?')) return;
+  try {
+    await apiFetch('PUT', `/cuisine/ventes/${id}/annuler`);
+    document.getElementById('ventes-detail-bg').style.display = 'none';
+    posAlert('Vente annulée.','success');
+    ckVentesCharger();
+  } catch(e){ posAlert(e.message||'Erreur.','error'); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// STATS / RENTABILITÉ
+// ══════════════════════════════════════════════════════════════════
+
+async function loadCuisineStats(){
+  const today = new Date();
+  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  const fmt   = d => d.toISOString().split('T')[0];
+  const sDeb  = document.getElementById('stats-debut');
+  const sFin  = document.getElementById('stats-fin');
+  if(sDeb && !sDeb.value) sDeb.value = first;
+  if(sFin && !sFin.value) sFin.value = fmt(today);
+  await ckStatsCharger();
+}
+
+function ckStatsPeriode(periode){
+  const today = new Date();
+  let debut;
+  if(periode === 'mois')     debut = new Date(today.getFullYear(), today.getMonth(), 1);
+  else if(periode === 'trim'){ debut = new Date(today); debut.setMonth(debut.getMonth()-3); }
+  else                       { debut = new Date(today); debut.setFullYear(debut.getFullYear()-1); }
+  const fmt = d => d.toISOString().split('T')[0];
+  document.getElementById('stats-debut').value = fmt(debut);
+  document.getElementById('stats-fin').value   = fmt(today);
+  ckStatsCharger();
+}
+
+async function ckStatsCharger(){
+  const debut = document.getElementById('stats-debut')?.value;
+  const fin   = document.getElementById('stats-fin')?.value;
+  if(!debut||!fin){ posAlert('Sélectionnez une période.','warn'); return; }
+  const body  = document.getElementById('ck-stats-body');
+  if(body) body.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</div>';
+  try {
+    const d = await apiFetch('GET', `/cuisine/stats?date_debut=${debut}&date_fin=${fin}`);
+
+    const benefCoul = d.benefice >= 0 ? '#34d399' : '#f87171';
+    const margeCoul = d.marge_pct >= 30 ? '#34d399' : d.marge_pct >= 10 ? '#f59e0b' : '#f87171';
+
+    const kpis = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px">
+      <div class="pos-card" style="padding:12px 14px;border-top:3px solid #3fb6a8">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px">CA total</div>
+        <div style="font-size:20px;font-weight:800;color:#3fb6a8">${posGx(d.ca_total)}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">${d.nb_ventes} vente${d.nb_ventes!==1?'s':''}</div>
+      </div>
+      <div class="pos-card" style="padding:12px 14px;border-top:3px solid #f87171">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px">Dépenses</div>
+        <div style="font-size:20px;font-weight:800;color:#f87171">${posGx(d.total_depenses)}</div>
+      </div>
+      <div class="pos-card" style="padding:12px 14px;border-top:3px solid ${benefCoul}">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px">Bénéfice net</div>
+        <div style="font-size:20px;font-weight:800;color:${benefCoul}">${posGx(d.benefice)}</div>
+      </div>
+      <div class="pos-card" style="padding:12px 14px;border-top:3px solid ${margeCoul}">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px">Marge</div>
+        <div style="font-size:20px;font-weight:800;color:${margeCoul}">${d.marge_pct.toFixed(1)}%</div>
+      </div>
+      <div class="pos-card" style="padding:12px 14px;border-top:3px solid #f59e0b">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px">Ticket moyen</div>
+        <div style="font-size:20px;font-weight:800;color:#f59e0b">${posGx(d.ticket_moyen)}</div>
+      </div>
+    </div>`;
+
+    // Évolution
+    const evo = d.evolution || [];
+    const maxCA = Math.max(...evo.map(e=>e.ca), 1);
+    const chartEvo = evo.length ? `<div class="pos-card" style="padding:14px;margin-bottom:14px">
+      <div style="font-size:11px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Évolution CA journalier</div>
+      <div style="display:flex;align-items:flex-end;gap:${evo.length>20?'2':'4'}px;height:80px">
+        ${evo.map(e=>{
+          const h = Math.max(3, Math.round(e.ca/maxCA*100));
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:${evo.length>20?'4':'8'}px" title="${e.date}: ${posGx(e.ca)}">
+            <div style="width:100%;height:${h}px;background:#3fb6a8;border-radius:2px 2px 0 0"></div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,.25);margin-top:4px">
+        <span>${evo[0]?.date||''}</span><span>${evo[evo.length-1]?.date||''}</span>
+      </div>
+    </div>` : '';
+
+    // Top plats
+    const topPlats = (d.top_plats||[]);
+    const maxCaPlat = Math.max(...topPlats.map(p=>p.ca),1);
+    const topHtml = topPlats.length ? `<div class="pos-card" style="padding:14px;margin-bottom:14px">
+      <div style="font-size:11px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Top 10 plats</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${topPlats.map((p,i) => {
+          const pct = Math.round(p.ca/maxCaPlat*100);
+          const coul = i===0?'#f59e0b': i===1?'#c0c0c0': i===2?'#cd7f32':'#3fb6a8';
+          return `<div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:11px;font-weight:700;color:${coul};width:18px">${i+1}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nom}</div>
+              <div style="margin-top:3px;height:4px;background:rgba(255,255,255,.08);border-radius:2px">
+                <div style="height:100%;width:${pct}%;background:${coul};border-radius:2px"></div>
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-size:11px;font-weight:700;color:#3fb6a8">${posGx(p.ca)}</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.35)">${p.qte} vendu${p.qte>1?'s':''}</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
+    // Dépenses par catégorie
+    const deps = (d.deps_par_cat||[]);
+    const totalDeps = deps.reduce((s,c)=>s+c.montant,0);
+    const catColors2 = {INGREDIENTS:'#f59e0b',EQUIPEMENT:'#818cf8',ENERGIE:'#60a5fa',PERSONNEL:'#34d399',AUTRE:'rgba(255,255,255,.4)'};
+    const depsHtml = deps.length ? `<div class="pos-card" style="padding:14px">
+      <div style="font-size:11px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Dépenses par catégorie</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${deps.map(c=>{
+          const pct = totalDeps>0 ? Math.round(c.montant/totalDeps*100) : 0;
+          const coul = catColors2[c.categorie]||catColors2.AUTRE;
+          return `<div style="display:flex;align-items:center;gap:10px">
+            <div style="width:90px;font-size:11px;font-weight:600;color:${coul}">${c.categorie}</div>
+            <div style="flex:1;height:6px;background:rgba(255,255,255,.07);border-radius:3px">
+              <div style="height:100%;width:${pct}%;background:${coul};border-radius:3px"></div>
+            </div>
+            <div style="font-size:11px;font-weight:700;color:#f87171;width:80px;text-align:right">${posGx(c.montant)}</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.35);width:34px;text-align:right">${pct}%</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
+    body.innerHTML = kpis + chartEvo + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+      <div>${topHtml}</div>
+      <div>${depsHtml}</div>
+    </div>`;
+  } catch(e){
+    if(body) body.innerHTML = `<div style="color:#f87171;padding:16px">${e.message||'Erreur réseau'}</div>`;
   }
 }
 

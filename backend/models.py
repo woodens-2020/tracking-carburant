@@ -754,3 +754,94 @@ class HotelReservation(Base):
         Index("idx_hotel_res_statut",  "statut"),
         Index("idx_hotel_res_date",    "date_arrivee"),
     )
+
+
+# ══════════════════════════════════════════════════════════════════
+# MODULE CUISINE
+# ══════════════════════════════════════════════════════════════════
+
+class CuisinePlat(Base):
+    """Plat du menu de la cuisine."""
+    __tablename__ = "cuisine_plats"
+
+    id            = Column(Integer,     primary_key=True)
+    nom           = Column(String(150), nullable=False)
+    categorie     = Column(String(80),  nullable=True)
+    description   = Column(String(300), nullable=True)
+    prix_vente    = Column(Numeric(12, 2), nullable=False)
+    cout_estime   = Column(Numeric(12, 2), nullable=True)
+    actif         = Column(Boolean, nullable=False, default=True)
+    date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    lignes_vente = relationship("CuisineLigneVente", back_populates="plat")
+
+    __table_args__ = (
+        CheckConstraint("prix_vente > 0", name="chk_cuisine_plat_prix_pos"),
+    )
+
+
+class CuisineDepense(Base):
+    """Achat ou dépense cuisine (ingrédients, équipement, gaz, personnel…)."""
+    __tablename__ = "cuisine_depenses"
+
+    id           = Column(Integer,     primary_key=True)
+    description  = Column(String(200), nullable=False)
+    categorie    = Column(String(80),  nullable=True)
+    montant      = Column(Numeric(12, 2), nullable=False)
+    date_depense = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    fournisseur  = Column(String(150), nullable=True)
+    notes        = Column(String(300), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_cuisine_dep_montant_pos"),
+        Index("idx_cuisine_depenses_date", "date_depense"),
+    )
+
+
+class CuisineVente(Base):
+    """Vente de plats — ticket de caisse cuisine."""
+    __tablename__ = "cuisine_ventes"
+
+    id             = Column(Integer,    primary_key=True)
+    numero_ticket  = Column(String(30), unique=True, nullable=False)
+    date_heure     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    total          = Column(Numeric(12, 2), nullable=False)
+    mode_paiement  = Column(String(20), nullable=False, default="CASH")
+    client_nom     = Column(String(100), nullable=True)
+    notes          = Column(String(200), nullable=True)
+    statut         = Column(String(20), nullable=False, default="VALIDEE")
+
+    lignes = relationship("CuisineLigneVente", back_populates="vente",
+                          cascade="all, delete-orphan")
+
+    __table_args__ = (
+        CheckConstraint("total >= 0",                              name="chk_cuisine_vente_total_pos"),
+        CheckConstraint("statut IN ('VALIDEE','ANNULEE')",         name="chk_cuisine_vente_statut"),
+        CheckConstraint("mode_paiement IN ('CASH','CREDIT')",      name="chk_cuisine_vente_mode"),
+        Index("idx_cuisine_ventes_date",   "date_heure"),
+        Index("idx_cuisine_ventes_statut", "statut"),
+    )
+
+
+class CuisineLigneVente(Base):
+    """Ligne d'une vente cuisine."""
+    __tablename__ = "cuisine_lignes_vente"
+
+    id            = Column(Integer, primary_key=True)
+    vente_id      = Column(Integer, ForeignKey("cuisine_ventes.id", ondelete="CASCADE"), nullable=False)
+    plat_id       = Column(Integer, ForeignKey("cuisine_plats.id",  ondelete="SET NULL"), nullable=True)
+    nom_plat      = Column(String(150), nullable=False)
+    quantite      = Column(Integer,     nullable=False)
+    prix_unitaire = Column(Numeric(12, 2), nullable=False)
+    sous_total    = Column(Numeric(12, 2), nullable=False)
+
+    vente = relationship("CuisineVente",  back_populates="lignes")
+    plat  = relationship("CuisinePlat",   back_populates="lignes_vente")
+
+    __table_args__ = (
+        CheckConstraint("quantite > 0",       name="chk_cuisine_lv_qte_pos"),
+        CheckConstraint("prix_unitaire >= 0",  name="chk_cuisine_lv_prix_pos"),
+        CheckConstraint("sous_total >= 0",     name="chk_cuisine_lv_sous_pos"),
+        Index("idx_cuisine_lv_vente", "vente_id"),
+        Index("idx_cuisine_lv_plat",  "plat_id"),
+    )
