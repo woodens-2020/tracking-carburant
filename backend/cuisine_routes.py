@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import CuisinePlat, CuisineDepense, CuisineVente, CuisineLigneVente, CuisineAchat, BarLigneVente
+from models import CuisinePlat, CuisineDepense, CuisineVente, CuisineLigneVente, CuisineAchat
 
 router = APIRouter(prefix="/api/cuisine", tags=["Cuisine"])
 
@@ -327,32 +327,21 @@ def statistiques(
     dt_deb = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
     dt_fin = datetime.combine(date_fin,   time.max).replace(tzinfo=timezone.utc)
 
-    # Ventes validées (caisse cuisine)
+    # Toutes les ventes cuisine validées (caisse directe + via bar)
     ventes = db.query(CuisineVente).filter(
         CuisineVente.statut == "VALIDEE",
         CuisineVente.date_heure >= dt_deb,
         CuisineVente.date_heure <= dt_fin,
     ).all()
 
-    ca_cuisine = sum(float(_dec(v.total)) for v in ventes)
-    nb_ventes  = len(ventes)
+    ventes_directes = [v for v in ventes if not (v.notes or "").startswith("Via Bar")]
+    ventes_bar      = [v for v in ventes if (v.notes or "").startswith("Via Bar")]
 
-    # Ventes via caisse bar (cross-selling)
-    from models import BarVente
-    lignes_bar = (
-        db.query(BarLigneVente)
-        .join(BarVente, BarLigneVente.vente_id == BarVente.id)
-        .filter(
-            BarLigneVente.cuisine_plat_id.isnot(None),
-            BarVente.statut != "ANNULEE",
-            BarVente.date_heure >= dt_deb,
-            BarVente.date_heure <= dt_fin,
-        )
-        .all()
-    )
-    ca_bar    = sum(float(_dec(l.sous_total)) for l in lignes_bar)
-    nb_bar    = len(set(l.vente_id for l in lignes_bar))
-    ca_total  = ca_cuisine + ca_bar
+    ca_total   = sum(float(_dec(v.total)) for v in ventes)
+    ca_cuisine = sum(float(_dec(v.total)) for v in ventes_directes)
+    ca_bar     = sum(float(_dec(v.total)) for v in ventes_bar)
+    nb_ventes  = len(ventes_directes)
+    nb_bar     = len(ventes_bar)
 
     # Dépenses
     depenses = db.query(CuisineDepense).filter(
@@ -364,7 +353,7 @@ def statistiques(
     benefice       = ca_total - total_depenses
     marge_pct      = round(benefice / ca_total * 100, 1) if ca_total > 0 else 0.0
 
-    # Top plats (cuisine caisse + bar cross-sell)
+    # Top plats (toutes sources : caisse directe + via bar)
     top_plats: dict[str, dict] = {}
     for v in ventes:
         for l in v.lignes:
@@ -373,12 +362,6 @@ def statistiques(
                 top_plats[k] = {"nom": k, "qte": 0, "ca": 0.0}
             top_plats[k]["qte"] += l.quantite
             top_plats[k]["ca"]  += float(_dec(l.sous_total))
-    for lb in lignes_bar:
-        nom = lb.cuisine_plat.nom if lb.cuisine_plat else f"Plat #{lb.cuisine_plat_id}"
-        if nom not in top_plats:
-            top_plats[nom] = {"nom": nom, "qte": 0, "ca": 0.0}
-        top_plats[nom]["qte"] += float(_dec(lb.quantite))
-        top_plats[nom]["ca"]  += float(_dec(lb.sous_total))
 
     top_plats_list = sorted(top_plats.values(), key=lambda x: x["ca"], reverse=True)[:10]
 
@@ -388,7 +371,7 @@ def statistiques(
         cat = d.categorie or "AUTRE"
         deps_cat[cat] = deps_cat.get(cat, 0.0) + float(_dec(d.montant))
 
-    # Évolution journalière (cuisine + bar)
+    # Évolution journalière
     evo: dict[str, dict] = {}
     for v in ventes:
         k = v.date_heure.date().isoformat()
@@ -396,11 +379,8 @@ def statistiques(
             evo[k] = {"date": k, "ca": 0.0, "nb": 0, "ca_bar": 0.0}
         evo[k]["ca"] += float(_dec(v.total))
         evo[k]["nb"] += 1
-    for lb in lignes_bar:
-        k = lb.vente.date_heure.date().isoformat() if lb.vente else str(date_type.today())
-        if k not in evo:
-            evo[k] = {"date": k, "ca": 0.0, "nb": 0, "ca_bar": 0.0}
-        evo[k]["ca_bar"] += float(_dec(lb.sous_total))
+        if (v.notes or "").startswith("Via Bar"):
+            evo[k]["ca_bar"] += float(_dec(v.total))
 
     return {
         "date_debut":     str(date_debut),
@@ -555,38 +535,36 @@ def ventes_via_bar(
     date_fin:   Optional[date_type] = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    """Plats cuisine vendus depuis la caisse bar — pour tableau de bord cuisine."""
+    """Ventes cuisine enregistrées via la caisse bar."""
     today = date_type.today()
     if not date_debut: date_debut = today
     if not date_fin:   date_fin   = today
 
-    from models import BarVente
-    from sqlalchemy import and_
-
     dt_deb = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
     dt_fin = datetime.combine(date_fin,   time.max).replace(tzinfo=timezone.utc)
 
-    lignes = (
-        db.query(BarLigneVente)
-        .join(BarVente, BarLigneVente.vente_id == BarVente.id)
-        .filter(
-            BarLigneVente.cuisine_plat_id.isnot(None),
-            BarVente.statut != "ANNULEE",
-            BarVente.date_heure >= dt_deb,
-            BarVente.date_heure <= dt_fin,
-        )
-        .all()
-    )
+    ventes = db.query(CuisineVente).filter(
+        CuisineVente.statut == "VALIDEE",
+        CuisineVente.notes.like("Via Bar%"),
+        CuisineVente.date_heure >= dt_deb,
+        CuisineVente.date_heure <= dt_fin,
+    ).order_by(CuisineVente.date_heure.desc()).all()
 
     return [
         {
-            "plat_id":       l.cuisine_plat_id,
-            "plat_nom":      l.cuisine_plat.nom if l.cuisine_plat else f"Plat #{l.cuisine_plat_id}",
-            "quantite":      float(_dec(l.quantite)),
-            "prix_unitaire": float(_dec(l.prix_unitaire_applique)),
-            "sous_total":    float(_dec(l.sous_total)),
-            "ticket_bar":    l.vente.numero_ticket if l.vente else None,
-            "date_heure":    l.vente.date_heure.isoformat() if l.vente else None,
+            "id":            v.id,
+            "numero_ticket": v.numero_ticket,
+            "date_heure":    v.date_heure.isoformat(),
+            "total":         float(_dec(v.total)),
+            "ticket_bar":    (v.notes or "").replace("Via Bar — ", ""),
+            "lignes": [
+                {
+                    "nom_plat":  l.nom_plat,
+                    "quantite":  l.quantite,
+                    "sous_total": float(_dec(l.sous_total)),
+                }
+                for l in v.lignes
+            ],
         }
-        for l in lignes
+        for v in ventes
     ]

@@ -19,7 +19,7 @@ from models import (
     BarProduit, BarPrixHistorique, BarAchat, BarMouvementStock,
     BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande,
-    CuisinePlat,
+    CuisinePlat, CuisineVente, CuisineLigneVente,
 )
 
 
@@ -82,7 +82,7 @@ def cmup(produit_id: int, db: Session) -> Decimal:
 
 
 def generer_numero_ticket(db: Session) -> str:
-    """Génère un numéro de ticket unique au format TK-YYYYMMDD-XXXX."""
+    """Génère un numéro de ticket bar unique au format TK-YYYYMMDD-XXXX."""
     today = datetime.now(tz=timezone.utc).strftime("%Y%m%d")
     count = (
         db.query(BarVente)
@@ -90,6 +90,17 @@ def generer_numero_ticket(db: Session) -> str:
         .count()
     )
     return f"TK{today}{str(count + 1).zfill(4)}"
+
+
+def _generer_ticket_cuisine(db: Session) -> str:
+    """Génère un numéro de ticket cuisine unique au format CK-YYYYMMDD-XXXX."""
+    today = datetime.now(tz=timezone.utc).strftime("%Y%m%d")
+    count = (
+        db.query(CuisineVente)
+        .filter(CuisineVente.numero_ticket.like(f"CK{today}%"))
+        .count()
+    )
+    return f"CK{today}{str(count + 1).zfill(4)}"
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -215,6 +226,30 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
                 utilisateur_id     = utilisateur_id,
             ))
 
+    # ── CuisineVente automatique pour les plats cuisine vendus via bar ──
+    lignes_cuisine = [l for l in lignes_traitees if l["cuisine_plat_id"]]
+    if lignes_cuisine:
+        total_cuisine = sum(l["sous_total"] for l in lignes_cuisine)
+        cv = CuisineVente(
+            numero_ticket = _generer_ticket_cuisine(db),
+            total         = total_cuisine,
+            mode_paiement = "CASH" if mode in ("CASH", "MIXTE") else "CASH",
+            client_nom    = data.get("client_nom"),
+            notes         = f"Via Bar — {vente.numero_ticket}",
+            statut        = "VALIDEE",
+        )
+        db.add(cv)
+        db.flush()
+        for l in lignes_cuisine:
+            db.add(CuisineLigneVente(
+                vente_id      = cv.id,
+                plat_id       = l["cuisine_plat_id"],
+                nom_plat      = l["produit_nom"],
+                quantite      = int(l["quantite"]),
+                prix_unitaire = l["prix"],
+                sous_total    = l["sous_total"],
+            ))
+
     if statut == "CREDIT_EN_COURS":
         db.add(BarCredit(
             vente_id          = vente.id,
@@ -255,6 +290,12 @@ def annuler_vente(vente_id: int, db: Session, utilisateur_id: int | None = None)
                 reference_vente_id = vente.id,
                 utilisateur_id     = utilisateur_id,
             ))
+
+    # Annuler la CuisineVente liée (si des plats cuisine étaient dans ce ticket)
+    cv_ref = f"Via Bar — {vente.numero_ticket}"
+    cv = db.query(CuisineVente).filter(CuisineVente.notes == cv_ref).first()
+    if cv and cv.statut != "ANNULEE":
+        cv.statut = "ANNULEE"
 
     # Clore le crédit éventuel
     if vente.credit and vente.credit.statut != "SOLDE":
