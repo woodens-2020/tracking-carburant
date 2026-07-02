@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Numeric, Boolean, Date,
+    Column, Integer, String, Numeric, Boolean, Date, Text,
     ForeignKey, DateTime, UniqueConstraint, CheckConstraint,
     Index, func, text, JSON,
 )
@@ -189,8 +189,12 @@ class SessionToken(Base):
     id         = Column(Integer, primary_key=True)
     token      = Column(String(64), unique=True, nullable=False, index=True)
     user_id    = Column(Integer, ForeignKey("utilisateurs.id", ondelete="CASCADE"), nullable=False)
+    ip_address = Column(String(45),  nullable=True)
+    user_agent = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    user = relationship("Utilisateur")
 
     __table_args__ = (
         Index("idx_sessions_user", "user_id"),
@@ -216,6 +220,28 @@ class OTPCode(Base):
         Index("idx_otp_user_id", "user_id"),
         Index("idx_otp_pending", "pending_token"),
         Index("idx_otp_expires", "expires_at"),
+    )
+
+
+class AuditLog(Base):
+    """Journal d'activité — toutes les actions sensibles du système."""
+    __tablename__ = "audit_logs"
+
+    id             = Column(Integer, primary_key=True)
+    user_id        = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    action         = Column(String(50),  nullable=False)
+    target_user_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    ip_address     = Column(String(45),  nullable=True)
+    details        = Column(Text,        nullable=True)   # JSON sérialisé
+    created_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    user        = relationship("Utilisateur", foreign_keys=[user_id])
+    target_user = relationship("Utilisateur", foreign_keys=[target_user_id])
+
+    __table_args__ = (
+        Index("idx_audit_user",    "user_id"),
+        Index("idx_audit_action",  "action"),
+        Index("idx_audit_created", "created_at"),
     )
 
 

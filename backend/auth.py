@@ -59,10 +59,19 @@ def verify_code_acces(code: str, stored: str) -> bool:
 
 # ── Sessions cookie ────────────────────────────────────────────────
 
-def create_session(db: Session, user_id: int) -> str:
+def create_session(
+    db: Session,
+    user_id: int,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> str:
     token   = secrets.token_urlsafe(32)
     expires = datetime.now(timezone.utc) + timedelta(hours=SESSION_DURATION_HOURS)
-    db.add(SessionToken(token=token, user_id=user_id, expires_at=expires))
+    db.add(SessionToken(
+        token=token, user_id=user_id, expires_at=expires,
+        ip_address=ip_address,
+        user_agent=(user_agent or "")[:255] if user_agent else None,
+    ))
     db.commit()
     return token
 

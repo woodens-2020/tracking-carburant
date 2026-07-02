@@ -1,14 +1,22 @@
-"""Routes d'administration : gestion des rôles et des comptes utilisateurs."""
+"""Routes d'administration : gestion des rôles, comptes, sessions et journal."""
+import json
 import re
+from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
+from activity_log import (
+    log_event,
+    SESSION_REVOKED, SESSIONS_CLEARED, PASSWORD_RESET, PIN_RESET,
+    USER_CREATED, USER_UPDATED, USER_DISABLED, USER_ENABLED,
+)
 from auth import hash_code_acces, hash_password, make_api_key
 from database import get_db
-from models import Role, Utilisateur
+from models import AuditLog, Role, SessionToken, Utilisateur
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -286,8 +294,9 @@ def modifier_user(
 @router.post("/users/{uid}/reset-password")
 def reset_password(
     uid: int,
+    request: Request,
     data: ResetPasswordIn,
-    _admin: Utilisateur = Depends(_require_admin),
+    admin: Utilisateur = Depends(_require_admin),
     db: Session = Depends(get_db),
 ):
     u = db.get(Utilisateur, uid)
@@ -297,14 +306,17 @@ def reset_password(
         raise HTTPException(400, "Le mot de passe doit contenir au moins 6 caractères")
     u.password_hash = hash_password(data.nouveau_mot_de_passe)
     db.commit()
+    log_event(db, PASSWORD_RESET, user_id=admin.id, target_user_id=uid,
+              ip_address=request.client.host if request.client else None)
     return {"ok": True}
 
 
 @router.post("/users/{uid}/reset-pin")
 def reset_pin(
     uid: int,
+    request: Request,
     data: ResetPinIn,
-    _admin: Utilisateur = Depends(_require_admin),
+    admin: Utilisateur = Depends(_require_admin),
     db: Session = Depends(get_db),
 ):
     u = db.get(Utilisateur, uid)
@@ -314,4 +326,145 @@ def reset_pin(
         raise HTTPException(400, "Le code PIN doit contenir exactement 9 chiffres")
     u.code_acces_hash = hash_code_acces(data.nouveau_code)
     db.commit()
+    log_event(db, PIN_RESET, user_id=admin.id, target_user_id=uid,
+              ip_address=request.client.host if request.client else None)
     return {"ok": True}
+
+
+# ══════════════════════════════════════════════════════════════════
+# GESTION DES SESSIONS ACTIVES
+# ══════════════════════════════════════════════════════════════════
+
+@router.get("/sessions")
+def list_sessions(
+    _admin: Utilisateur = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    """Liste toutes les sessions actives avec info utilisateur."""
+    now = datetime.now(timezone.utc)
+    rows = (
+        db.query(SessionToken)
+        .filter(SessionToken.expires_at > now)
+        .order_by(desc(SessionToken.created_at))
+        .all()
+    )
+    result = []
+    for s in rows:
+        u = db.get(Utilisateur, s.user_id)
+        if not u:
+            continue
+        exp = s.expires_at.replace(tzinfo=timezone.utc) if s.expires_at.tzinfo is None else s.expires_at
+        created = s.created_at.replace(tzinfo=timezone.utc) if s.created_at.tzinfo is None else s.created_at
+        result.append({
+            "session_id":  s.id,
+            "user_id":     u.id,
+            "nom_complet": u.nom_complet or u.username,
+            "email":       u.email,
+            "role":        u.role,
+            "ip_address":  s.ip_address,
+            "user_agent":  s.user_agent,
+            "created_at":  created.isoformat(),
+            "expires_at":  exp.isoformat(),
+        })
+    return result
+
+
+@router.delete("/sessions/{session_id}")
+def revoke_session(
+    session_id: int,
+    request: Request,
+    admin: Utilisateur = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    """Déconnecte une session spécifique."""
+    s = db.get(SessionToken, session_id)
+    if not s:
+        raise HTTPException(404, "Session introuvable")
+    target_uid = s.user_id
+    db.delete(s)
+    db.commit()
+    log_event(db, SESSION_REVOKED, user_id=admin.id, target_user_id=target_uid,
+              ip_address=request.client.host if request.client else None,
+              details={"session_id": session_id})
+    return {"ok": True}
+
+
+@router.delete("/sessions/user/{uid}")
+def revoke_user_sessions(
+    uid: int,
+    request: Request,
+    admin: Utilisateur = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    """Déconnecte toutes les sessions d'un utilisateur."""
+    u = db.get(Utilisateur, uid)
+    if not u:
+        raise HTTPException(404, "Utilisateur introuvable")
+    count = db.query(SessionToken).filter(SessionToken.user_id == uid).delete()
+    db.commit()
+    log_event(db, SESSIONS_CLEARED, user_id=admin.id, target_user_id=uid,
+              ip_address=request.client.host if request.client else None,
+              details={"sessions_supprimees": count})
+    return {"ok": True, "sessions_supprimees": count}
+
+
+# ══════════════════════════════════════════════════════════════════
+# JOURNAL D'ACTIVITÉ
+# ══════════════════════════════════════════════════════════════════
+
+_ACTION_LABELS = {
+    "login_success":    "Connexion réussie",
+    "login_failed":     "Échec de connexion",
+    "logout":           "Déconnexion",
+    "otp_sent":         "Code OTP envoyé",
+    "otp_verified":     "Code OTP vérifié",
+    "otp_failed":       "Code OTP incorrect",
+    "session_revoked":  "Session révoquée",
+    "sessions_cleared": "Toutes les sessions supprimées",
+    "password_reset":   "Mot de passe réinitialisé",
+    "pin_reset":        "Code PIN réinitialisé",
+    "user_created":     "Compte créé",
+    "user_updated":     "Compte modifié",
+    "user_disabled":    "Compte désactivé",
+    "user_enabled":     "Compte activé",
+}
+
+
+@router.get("/audit-log")
+def get_audit_log(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    action: Optional[str] = Query(None),
+    user_id: Optional[int] = Query(None),
+    _admin: Utilisateur = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    """Journal d'activité paginé avec filtres optionnels."""
+    q = db.query(AuditLog).order_by(desc(AuditLog.created_at))
+    if action:
+        q = q.filter(AuditLog.action == action)
+    if user_id:
+        q = q.filter(
+            (AuditLog.user_id == user_id) | (AuditLog.target_user_id == user_id)
+        )
+    total = q.count()
+    rows  = q.offset((page - 1) * per_page).limit(per_page).all()
+
+    items = []
+    for r in rows:
+        actor  = db.get(Utilisateur, r.user_id)        if r.user_id        else None
+        target = db.get(Utilisateur, r.target_user_id) if r.target_user_id else None
+        created = r.created_at.replace(tzinfo=timezone.utc) if r.created_at.tzinfo is None else r.created_at
+        items.append({
+            "id":           r.id,
+            "action":       r.action,
+            "action_label": _ACTION_LABELS.get(r.action, r.action),
+            "actor":        actor.nom_complet or actor.email if actor else "Système",
+            "actor_id":     r.user_id,
+            "target":       target.nom_complet or target.email if target else None,
+            "target_id":    r.target_user_id,
+            "ip_address":   r.ip_address,
+            "details":      json.loads(r.details) if r.details else None,
+            "created_at":   created.isoformat(),
+        })
+    return {"total": total, "page": page, "per_page": per_page, "items": items}

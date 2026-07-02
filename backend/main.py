@@ -20,6 +20,11 @@ from otp_service import (
     OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
     create_otp, send_otp_email, verify_otp, cleanup_expired_otps, _mask_email,
 )
+from activity_log import (
+    log_event,
+    LOGIN_SUCCESS, LOGIN_FAILED, LOGOUT,
+    OTP_SENT, OTP_VERIFIED, OTP_FAILED,
+)
 from pos_routes import router as pos_router
 from pos_analyse_routes import router as pos_analyse_router
 from hotel_routes import router as hotel_router
@@ -121,15 +126,20 @@ class LoginIn(BaseModel):
 
 
 @app.post("/api/login")
-def login(data: LoginIn, response: Response, db: Session = Depends(get_db)):
+def login(data: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
+    ip    = request.client.host if request.client else None
+    ua    = request.headers.get("user-agent", "")
     email = data.email.strip().lower()
     user  = db.query(Utilisateur).filter_by(email=email, actif=True).first()
     _err  = "Email, mot de passe ou code d'accès incorrect"
     if not user:
+        log_event(db, LOGIN_FAILED, ip_address=ip, details={"email": email, "raison": "utilisateur_inconnu"})
         raise HTTPException(401, _err)
     if not verify_password(data.password, user.password_hash):
+        log_event(db, LOGIN_FAILED, user_id=user.id, ip_address=ip, details={"raison": "mot_de_passe_incorrect"})
         raise HTTPException(401, _err)
     if not user.code_acces_hash or not verify_code_acces(data.code_acces, user.code_acces_hash):
+        log_event(db, LOGIN_FAILED, user_id=user.id, ip_address=ip, details={"raison": "pin_incorrect"})
         raise HTTPException(401, _err)
 
     # ── Vérification en deux étapes (OTP) ────────────────────────────
@@ -144,6 +154,7 @@ def login(data: LoginIn, response: Response, db: Session = Depends(get_db)):
         except RuntimeError as e:
             raise HTTPException(503, str(e))
 
+        log_event(db, OTP_SENT, user_id=user.id, ip_address=ip)
         response.set_cookie(
             OTP_PENDING_COOKIE, pending_token,
             httponly=True, samesite="lax", max_age=OTP_PENDING_MAX_AGE, path="/",
@@ -154,7 +165,8 @@ def login(data: LoginIn, response: Response, db: Session = Depends(get_db)):
         }
 
     # ── Connexion directe (OTP désactivé) ────────────────────────────
-    token = create_session(db, user.id)
+    token = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     response.set_cookie(
         SESSION_COOKIE, token,
         httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
@@ -174,17 +186,20 @@ class OTPVerifyIn(BaseModel):
 @app.post("/api/otp/verify")
 def otp_verify(data: OTPVerifyIn, request: Request, response: Response, db: Session = Depends(get_db)):
     """Étape 2 — vérifie le code OTP et ouvre la session si valide."""
+    ip            = request.client.host if request.client else None
+    ua            = request.headers.get("user-agent", "")
     pending_token = request.cookies.get(OTP_PENDING_COOKIE, "")
     try:
         user = verify_otp(db, pending_token, data.code)
     except ValueError as e:
+        log_event(db, OTP_FAILED, ip_address=ip, details={"raison": str(e)})
         raise HTTPException(401, str(e))
 
-    # Invalider le cookie OTP en attente
+    log_event(db, OTP_VERIFIED, user_id=user.id, ip_address=ip)
     response.delete_cookie(OTP_PENDING_COOKIE, path="/")
 
-    # Créer la vraie session
-    token = create_session(db, user.id)
+    token = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     response.set_cookie(
         SESSION_COOKIE, token,
         httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
@@ -199,8 +214,12 @@ def otp_verify(data: OTPVerifyIn, request: Request, response: Response, db: Sess
 
 @app.post("/api/logout")
 def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    ip    = request.client.host if request.client else None
     token = request.cookies.get(SESSION_COOKIE)
+    user  = get_session_user(db, token) if token else None
     delete_session(db, token)
+    if user:
+        log_event(db, LOGOUT, user_id=user.id, ip_address=ip)
     response.delete_cookie(SESSION_COOKIE, path="/")
     return {"ok": True}
 
@@ -671,6 +690,8 @@ def oauth_callback(
             import traceback; traceback.print_exc()
             log.error("Exception inattendue OTP OAuth : %s", exc)
             return RedirectResponse(url=f"/login?oauth_error=otp_failed", status_code=302)
+        log_event(db, OTP_SENT, user_id=user.id,
+                  ip_address=request.client.host if request.client else None)
         hint = url_quote(_mask_email(user.email), safe="")
         redir = RedirectResponse(url=f"/login?otp=1&hint={hint}", status_code=302)
         redir.set_cookie(
@@ -680,7 +701,10 @@ def oauth_callback(
         return redir
 
     # ── Connexion directe (OTP désactivé) ────────────────────────────
-    session_token = create_session(db, user.id)
+    ip = request.client.host if request.client else None
+    ua = request.headers.get("user-agent", "")
+    session_token = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     redir = RedirectResponse(url="/", status_code=302)
     redir.set_cookie(
         "session_token", session_token,
