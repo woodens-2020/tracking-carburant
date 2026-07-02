@@ -2957,6 +2957,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="cuisine-achats" onclick="goTo('cuisine-achats')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg></span>
+      <span>Achats Cuisine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
   </nav>
 
   <!-- Statut connexion -->
@@ -7067,6 +7073,162 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div><!-- /cuisine-stats -->
 
     <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- CUISINE — ACHATS                                          -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-cuisine-achats" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#f7a93b,#e8893a)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Achats Cuisine</div>
+            <div class="pos-header-sub">Déclaration ingrédients & matières premières</div>
+          </div>
+          <div class="pos-header-actions">
+            <button class="gi-btn-primary" onclick="ckAchatsNouvelModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nouvel achat
+            </button>
+          </div>
+        </div>
+
+        <!-- Filtres -->
+        <div class="pos-card" style="padding:10px 14px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div style="display:flex;gap:6px;align-items:center">
+            <label style="font-size:11px;color:rgba(255,255,255,.4)">Du</label>
+            <input class="pos-input" id="ckac-debut" type="date" style="width:140px">
+            <label style="font-size:11px;color:rgba(255,255,255,.4)">au</label>
+            <input class="pos-input" id="ckac-fin" type="date" style="width:140px">
+          </div>
+          <select class="pos-select" id="ckac-filtre-plat" style="min-width:160px">
+            <option value="">Tous les plats</option>
+          </select>
+          <button class="pos-btn teal" onclick="ckAchatsCharger()">Actualiser</button>
+        </div>
+
+        <!-- KPIs -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px">
+          <div class="pos-card" style="padding:14px 16px">
+            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">TOTAL ACHATS</div>
+            <div id="ckac-kpi-total" style="font-size:20px;font-weight:800;color:#f7a93b">—</div>
+          </div>
+          <div class="pos-card" style="padding:14px 16px">
+            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">NB ACHATS</div>
+            <div id="ckac-kpi-nb" style="font-size:20px;font-weight:800;color:#3fb6a8">—</div>
+          </div>
+          <div class="pos-card" style="padding:14px 16px">
+            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">COÛT MOYEN</div>
+            <div id="ckac-kpi-moy" style="font-size:20px;font-weight:800;color:#a78bfa">—</div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="pos-card" style="overflow:hidden">
+          <table class="gi-table" style="width:100%">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Plat lié</th>
+                <th>Catégorie</th>
+                <th>Qté / Unité</th>
+                <th>Coût unit.</th>
+                <th>Total</th>
+                <th>Fournisseur</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="ckac-tbody">
+              <tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">Chargement…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div><!-- /cuisine-achats -->
+
+    <!-- Modal Nouvel Achat Cuisine -->
+    <div class="pos-modal-bg" id="ckac-modal">
+      <div class="pos-modal" style="max-width:480px">
+        <div class="pos-modal-hdr">
+          <span id="ckac-modal-titre">Nouvel achat</span>
+          <button class="pos-modal-close" onclick="document.getElementById('ckac-modal').classList.remove('open')">✕</button>
+        </div>
+        <div style="display:grid;gap:10px;padding:16px">
+          <input type="hidden" id="ckac-edit-id">
+          <div>
+            <label class="pos-label">Description *</label>
+            <input class="pos-input" id="ckac-desc" placeholder="Ex: Achat viande griot (5 kg)">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label class="pos-label">Plat lié (optionnel)</label>
+              <select class="pos-select" id="ckac-plat-id">
+                <option value="">— Général —</option>
+              </select>
+            </div>
+            <div>
+              <label class="pos-label">Catégorie</label>
+              <select class="pos-select" id="ckac-categorie">
+                <option value="INGREDIENTS">Ingrédients</option>
+                <option value="EPICES">Épices / Condiments</option>
+                <option value="EMBALLAGE">Emballage</option>
+                <option value="GAZ">Gaz / Énergie</option>
+                <option value="EQUIPEMENT">Équipement</option>
+                <option value="AUTRE">Autre</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <div>
+              <label class="pos-label">Quantité *</label>
+              <input class="pos-input" id="ckac-qte" type="number" min="0.001" step="any" placeholder="0">
+            </div>
+            <div>
+              <label class="pos-label">Unité</label>
+              <select class="pos-select" id="ckac-unite">
+                <option value="kg">kg</option>
+                <option value="g">g</option>
+                <option value="L">L</option>
+                <option value="mL">mL</option>
+                <option value="portion">portion</option>
+                <option value="unité">unité</option>
+                <option value="sac">sac</option>
+                <option value="bouteille">bouteille</option>
+              </select>
+            </div>
+            <div>
+              <label class="pos-label">Coût unit. (G)</label>
+              <input class="pos-input" id="ckac-cout" type="number" min="0" step="0.01" placeholder="0.00" oninput="ckAchatsCalcTotal()">
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label class="pos-label">Date achat</label>
+              <input class="pos-input" id="ckac-date" type="date">
+            </div>
+            <div>
+              <label class="pos-label">Fournisseur</label>
+              <input class="pos-input" id="ckac-fournisseur" placeholder="Nom fournisseur">
+            </div>
+          </div>
+          <div>
+            <label class="pos-label">Notes</label>
+            <input class="pos-input" id="ckac-notes" placeholder="Notes optionnelles">
+          </div>
+          <div style="background:rgba(247,169,59,.1);border:1px solid rgba(247,169,59,.25);border-radius:8px;padding:10px 14px;font-size:13px">
+            Total estimé : <strong id="ckac-total-preview" style="color:#f7a93b">G 0.00</strong>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+            <button class="pos-btn ghost" onclick="document.getElementById('ckac-modal').classList.remove('open')">Annuler</button>
+            <button class="pos-btn teal" onclick="ckAchatsSauvegarder()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
     <!-- HOTEL — CHAMBRES                                          -->
     <!-- ══════════════════════════════════════════════════════════ -->
     <div id="page-hotel-chambres" class="page page-gi">
@@ -9677,11 +9839,11 @@ const _ACCES_POSTE = {
   // ─ Comptabilité / Supervision → accès partiel ────────────────
   'Comptable':   ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse',
-                  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats',
+                  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
                   'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse',
-                  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats',
+                  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
                   'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
   // ─ Terrain → accès très limité ───────────────────────────────
   'Pompiste': ['home','saisie'],
@@ -14010,6 +14172,7 @@ const _giPageLoaders = {
   'cuisine-depenses':   loadCuisineDepenses,
   'cuisine-ventes':     loadCuisineVentes,
   'cuisine-stats':      loadCuisineStats,
+  'cuisine-achats':     loadCuisineAchats,
   'hotel-chambres':     loadHotelChambres,
   'hotel-reception':    loadHotelReception,
   'hotel-sejours':      loadHotelSejours,
@@ -14536,7 +14699,8 @@ function posAlert(msg,type){ _giAlert(msg, type||'err'); }
 /* Panier global POS Caisse */
 let _posCart = [];
 let _posMode = 'CASH';
-let _posProduits = [];  // cache des produits avec prix actif
+let _posProduits = [];       // cache des produits bar avec prix actif
+let _posCuisinePlats = [];   // cache des plats cuisine pour vente via bar
 
 /* Charger les produits bar dans le cache */
 async function _posLoadProduitsCache(){
@@ -14544,6 +14708,14 @@ async function _posLoadProduitsCache(){
     const data = await apiFetch('GET','/pos/produits?actif=true');
     _posProduits = data || [];
   } catch(e){ _posProduits = []; }
+}
+
+/* Charger les plats cuisine dans le cache (cross-sell via bar) */
+async function _posLoadCuisinePlatsCache(){
+  try {
+    const data = await apiFetch('GET','/cuisine/plats?actif=true');
+    _posCuisinePlats = data || [];
+  } catch(e){ _posCuisinePlats = []; }
 }
 
 /* Formater date ISO en local */
@@ -14559,7 +14731,7 @@ function posDateFr(s){
 let _posCatActuelle = 'TOUS';
 
 async function loadPosCaisse(){
-  await _posLoadProduitsCache();
+  await Promise.all([_posLoadProduitsCache(), _posLoadCuisinePlatsCache()]);
   await _posChargerCaissiers();
   posRenderCatTabs();
   posCatFilter(_posCatActuelle, null);
@@ -14579,9 +14751,14 @@ async function _posChargerCaissiers(){
 
 function posRenderCatTabs(){
   const cats = [...new Set(_posProduits.map(p=>p.categorie).filter(Boolean))].sort();
+  const total = _posProduits.length;
   const sel = document.getElementById('pos-cat-select');
   if(!sel) return;
-  sel.innerHTML = `<option value="TOUS">Toutes les catégories (${_posProduits.length})</option>` +
+  sel.innerHTML =
+    `<option value="TOUS">Toutes les catégories bar (${total})</option>` +
+    (_posCuisinePlats.length
+      ? `<option value="__CUISINE__">🍽️ Plats Cuisine (${_posCuisinePlats.length})</option>`
+      : '') +
     cats.map(c=>{
       const n = _posProduits.filter(p=>p.categorie===c).length;
       return `<option value="${c}"${c===_posCatActuelle?' selected':''}>${c} (${n})</option>`;
@@ -14593,12 +14770,33 @@ function posCatFilter(cat, btn){
   _posCatActuelle = cat;
   const sel = document.getElementById('pos-cat-select');
   if(sel && sel.value !== cat) sel.value = cat;
-  const prods = cat==='TOUS' ? _posProduits : _posProduits.filter(p=>p.categorie===cat);
   const cpt = document.getElementById('pos-cat-count');
-  if(cpt) cpt.textContent = cat==='TOUS' ? '' : `${prods.length} article${prods.length!==1?'s':''}`;
-
   const grid = document.getElementById('pos-produit-grid');
   if(!grid) return;
+
+  // ── Affichage plats cuisine ────────────────────────────────────
+  if(cat === '__CUISINE__'){
+    const plats = _posCuisinePlats;
+    if(cpt) cpt.textContent = `${plats.length} plat${plats.length!==1?'s':''}`;
+    if(!plats.length){
+      grid.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:12px;padding:20px">Aucun plat cuisine actif</div>';
+      return;
+    }
+    grid.innerHTML = plats.map(p=>`
+      <div class="pos-produit-card" style="border-color:rgba(247,169,59,.35);background:rgba(247,169,59,.08)"
+           onclick="posCuisineAjouterAuPanier(${p.id})">
+        <div class="pos-produit-nom">${p.nom||'Plat'}</div>
+        <div class="pos-produit-cat" style="color:#f7a93b">${p.categorie||'Cuisine'}</div>
+        <div class="pos-produit-prix" style="color:#f7a93b">${posGx(p.prix_vente||0)}</div>
+        <div class="pos-produit-unite">portion</div>
+      </div>
+    `).join('');
+    return;
+  }
+
+  // ── Affichage produits bar ─────────────────────────────────────
+  const prods = cat==='TOUS' ? _posProduits : _posProduits.filter(p=>p.categorie===cat);
+  if(cpt) cpt.textContent = cat==='TOUS' ? '' : `${prods.length} article${prods.length!==1?'s':''}`;
   if(!prods.length){
     grid.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:12px;padding:20px">Aucun produit dans cette catégorie</div>';
     return;
@@ -14611,6 +14809,27 @@ function posCatFilter(cat, btn){
       <div class="pos-produit-unite">${p.unite||''}</div>
     </div>
   `).join('');
+}
+
+/* Ajouter un plat cuisine au panier (cross-sell via bar) */
+function posCuisineAjouterAuPanier(platId){
+  const plat = _posCuisinePlats.find(p=>p.id===platId);
+  if(!plat) return;
+  const idx = _posCart.findIndex(c=>c._cuisine && c.cuisine_plat_id===platId);
+  if(idx>=0){
+    _posCart[idx].quantite += 1;
+  } else {
+    _posCart.push({
+      cuisine_plat_id: platId,
+      produit_id:      null,
+      nom:             plat.nom,
+      prix:            parseFloat(plat.prix_vente||0),
+      quantite:        1,
+      unite:           'portion',
+      _cuisine:        true,
+    });
+  }
+  posRenderCart();
 }
 
 function posAjouterAuPanier(prodId){
@@ -14640,9 +14859,12 @@ function posRenderCart(){
   wrap.innerHTML = _posCart.map((it,i)=>{
     const sous = it.prix * it.quantite;
     total += sous;
+    const badge = it._cuisine
+      ? '<span style="font-size:9px;background:#f7a93b;color:#1a1a2e;border-radius:3px;padding:1px 5px;margin-left:5px;font-weight:700">CUISINE</span>'
+      : '';
     return `<div class="pos-cart-item">
       <div class="pos-cart-item-info">
-        <span class="pos-cart-item-nom">${it.nom}</span>
+        <span class="pos-cart-item-nom">${it.nom}${badge}</span>
         <span class="pos-cart-item-prix">${posGx(it.prix)} × </span>
         <div class="pos-cart-item-qte">
           <button onclick="posQte(${i},-1)">−</button>
@@ -14841,7 +15063,10 @@ async function posEncaisser(){
     const montantPaye = _posMode==='MIXTE' ? parseFloat(document.getElementById('pos-montant-paye').value||0) : null;
     const cartSnapshot = _posCart.map(it=>({...it}));
     const payload = {
-      lignes: _posCart.map(c=>({ produit_id: c.produit_id, quantite: c.quantite })),
+      lignes: _posCart.map(c => c._cuisine
+        ? { cuisine_plat_id: c.cuisine_plat_id, quantite: c.quantite, prix_unitaire: c.prix }
+        : { produit_id: c.produit_id, quantite: c.quantite }
+      ),
       mode_paiement: _posMode,
       client_nom: clientNom || null,
       montant_paye: montantPaye,
@@ -18359,11 +18584,15 @@ async function ckStatsCharger(){
     const benefCoul = d.benefice >= 0 ? '#34d399' : '#f87171';
     const margeCoul = d.marge_pct >= 30 ? '#34d399' : d.marge_pct >= 10 ? '#f59e0b' : '#f87171';
 
+    const barBadge = d.ca_bar > 0
+      ? `<div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">dont ${posGx(d.ca_bar)} via Bar</div>`
+      : '';
     const kpis = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px">
       <div class="pos-card" style="padding:12px 14px;border-top:3px solid #3fb6a8">
-        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px">CA total</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px">CA total cuisine</div>
         <div style="font-size:20px;font-weight:800;color:#3fb6a8">${posGx(d.ca_total)}</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">${d.nb_ventes} vente${d.nb_ventes!==1?'s':''}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">${d.nb_ventes} vente${d.nb_ventes!==1?'s':''} caisse</div>
+        ${barBadge}
       </div>
       <div class="pos-card" style="padding:12px 14px;border-top:3px solid #f87171">
         <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px">Dépenses</div>
@@ -18381,6 +18610,11 @@ async function ckStatsCharger(){
         <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px">Ticket moyen</div>
         <div style="font-size:20px;font-weight:800;color:#f59e0b">${posGx(d.ticket_moyen)}</div>
       </div>
+      ${d.ca_bar > 0 ? `<div class="pos-card" style="padding:12px 14px;border-top:3px solid #f7a93b">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px">CA via Bar 🍽️</div>
+        <div style="font-size:20px;font-weight:800;color:#f7a93b">${posGx(d.ca_bar)}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">${d.nb_ventes_bar} ticket${d.nb_ventes_bar!==1?'s':''} bar</div>
+      </div>` : ''}
     </div>`;
 
     // Évolution
@@ -18455,6 +18689,176 @@ async function ckStatsCharger(){
     </div>`;
   } catch(e){
     if(body) body.innerHTML = `<div style="color:#f87171;padding:16px">${e.message||'Erreur réseau'}</div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// CUISINE ACHATS
+// ══════════════════════════════════════════════════════════════════════
+let _ckAchatsEditId = null;
+let _ckAchatsTousPlats = [];
+
+async function loadCuisineAchats(){
+  const today = new Date();
+  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  const fmt = d => d.toISOString().split('T')[0];
+  const deb = document.getElementById('ckac-debut');
+  const fin = document.getElementById('ckac-fin');
+  if(deb && !deb.value) deb.value = first;
+  if(fin && !fin.value) fin.value = fmt(today);
+  try {
+    const plats = await apiFetch('GET', '/cuisine/plats?actif=true');
+    _ckAchatsTousPlats = plats || [];
+    _ckAchatsRemplirSelects();
+  } catch(_){}
+  ckAchatsCharger();
+}
+
+function _ckAchatsRemplirSelects(){
+  const opts = _ckAchatsTousPlats.map(p=>`<option value="${p.id}">${p.nom}</option>`).join('');
+  const selFiltre = document.getElementById('ckac-filtre-plat');
+  if(selFiltre) selFiltre.innerHTML = '<option value="">Tous les plats</option>' + opts;
+  const selModal = document.getElementById('ckac-plat-id');
+  if(selModal) selModal.innerHTML = '<option value="">— Général —</option>' + opts;
+}
+
+async function ckAchatsCharger(){
+  const deb = document.getElementById('ckac-debut')?.value;
+  const fin = document.getElementById('ckac-fin')?.value;
+  const plat = document.getElementById('ckac-filtre-plat')?.value;
+  let url = '/cuisine/achats';
+  const params = [];
+  if(deb) params.push(`date_debut=${deb}`);
+  if(fin) params.push(`date_fin=${fin}`);
+  if(plat) params.push(`plat_id=${plat}`);
+  if(params.length) url += '?' + params.join('&');
+
+  const tbody = document.getElementById('ckac-tbody');
+  try {
+    const d = await apiFetch('GET', url);
+    const achats = d.achats || [];
+
+    document.getElementById('ckac-kpi-total').textContent = posGx(d.total_achats||0);
+    document.getElementById('ckac-kpi-nb').textContent = d.nb_achats||0;
+    const moy = d.nb_achats > 0 ? (d.total_achats / d.nb_achats) : 0;
+    document.getElementById('ckac-kpi-moy').textContent = posGx(moy);
+
+    if(!achats.length){
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">Aucun achat sur cette période</td></tr>';
+      return;
+    }
+    tbody.innerHTML = achats.map(a=>`
+      <tr>
+        <td style="white-space:nowrap">${posDateFr(a.date_achat)}</td>
+        <td>${a.description}</td>
+        <td style="color:#f7a93b">${a.plat_nom||'—'}</td>
+        <td><span style="font-size:10px;background:rgba(247,169,59,.15);color:#f7a93b;padding:2px 6px;border-radius:4px">${a.categorie}</span></td>
+        <td>${parseFloat(a.quantite||0).toFixed(3)} ${a.unite||''}</td>
+        <td>${posGx(a.cout_unitaire)}</td>
+        <td style="font-weight:700;color:#f7a93b">${posGx(a.total)}</td>
+        <td>${a.fournisseur||'—'}</td>
+        <td style="white-space:nowrap">
+          <button class="pos-btn ghost" style="font-size:10px;padding:2px 7px" onclick="ckAchatsEditer(${a.id})">✏</button>
+          <button class="pos-btn" style="font-size:10px;padding:2px 7px;background:rgba(248,113,113,.15);color:#f87171" onclick="ckAchatsSupprimer(${a.id})">✕</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch(e){
+    tbody.innerHTML = `<tr><td colspan="9" style="color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+  }
+}
+
+function ckAchatsNouvelModal(){
+  _ckAchatsEditId = null;
+  document.getElementById('ckac-modal-titre').textContent = 'Nouvel achat';
+  document.getElementById('ckac-edit-id').value = '';
+  document.getElementById('ckac-desc').value = '';
+  document.getElementById('ckac-plat-id').value = '';
+  document.getElementById('ckac-categorie').value = 'INGREDIENTS';
+  document.getElementById('ckac-qte').value = '';
+  document.getElementById('ckac-unite').value = 'kg';
+  document.getElementById('ckac-cout').value = '';
+  document.getElementById('ckac-fournisseur').value = '';
+  document.getElementById('ckac-notes').value = '';
+  document.getElementById('ckac-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('ckac-total-preview').textContent = 'G 0.00';
+  if(!_ckAchatsTousPlats.length){
+    apiFetch('GET','/cuisine/plats?actif=true').then(d=>{ _ckAchatsTousPlats=d||[]; _ckAchatsRemplirSelects(); }).catch(_=>{});
+  }
+  document.getElementById('ckac-modal').classList.add('open');
+}
+
+function ckAchatsCalcTotal(){
+  const qte  = parseFloat(document.getElementById('ckac-qte').value||0);
+  const cout = parseFloat(document.getElementById('ckac-cout').value||0);
+  document.getElementById('ckac-total-preview').textContent = posGx(qte * cout);
+}
+
+function ckAchatsEditer(id){
+  const el = document.getElementById('ckac-tbody');
+  if(!el) return;
+  apiFetch('GET', `/cuisine/achats?date_debut=2000-01-01&date_fin=2099-12-31`).then(d=>{
+    const a = (d.achats||[]).find(x=>x.id===id);
+    if(!a) return;
+    _ckAchatsEditId = id;
+    document.getElementById('ckac-modal-titre').textContent = 'Modifier achat';
+    document.getElementById('ckac-edit-id').value = id;
+    document.getElementById('ckac-desc').value = a.description;
+    document.getElementById('ckac-plat-id').value = a.plat_id||'';
+    document.getElementById('ckac-categorie').value = a.categorie||'INGREDIENTS';
+    document.getElementById('ckac-qte').value = a.quantite;
+    document.getElementById('ckac-unite').value = a.unite||'kg';
+    document.getElementById('ckac-cout').value = a.cout_unitaire;
+    document.getElementById('ckac-fournisseur').value = a.fournisseur||'';
+    document.getElementById('ckac-notes').value = a.notes||'';
+    document.getElementById('ckac-date').value = a.date_achat ? a.date_achat.split('T')[0] : '';
+    document.getElementById('ckac-total-preview').textContent = posGx(a.total);
+    document.getElementById('ckac-modal').classList.add('open');
+  }).catch(_=>{});
+}
+
+async function ckAchatsSauvegarder(){
+  const desc  = document.getElementById('ckac-desc').value.trim();
+  const qte   = parseFloat(document.getElementById('ckac-qte').value||0);
+  const cout  = parseFloat(document.getElementById('ckac-cout').value||0);
+  if(!desc){ posAlert('La description est requise.','warn'); return; }
+  if(qte <= 0){ posAlert('La quantité doit être positive.','warn'); return; }
+
+  const payload = {
+    description:   desc,
+    plat_id:       parseInt(document.getElementById('ckac-plat-id').value)||null,
+    categorie:     document.getElementById('ckac-categorie').value,
+    quantite:      qte,
+    unite:         document.getElementById('ckac-unite').value,
+    cout_unitaire: cout,
+    date_achat:    document.getElementById('ckac-date').value||null,
+    fournisseur:   document.getElementById('ckac-fournisseur').value.trim()||null,
+    notes:         document.getElementById('ckac-notes').value.trim()||null,
+  };
+
+  try {
+    if(_ckAchatsEditId){
+      await apiFetch('PUT', `/cuisine/achats/${_ckAchatsEditId}`, payload);
+      posAlert('Achat modifié.','ok');
+    } else {
+      await apiFetch('POST', '/cuisine/achats', payload);
+      posAlert('Achat enregistré.','ok');
+    }
+    document.getElementById('ckac-modal').classList.remove('open');
+    ckAchatsCharger();
+  } catch(e){
+    posAlert(e.message||'Erreur réseau.','error');
+  }
+}
+
+async function ckAchatsSupprimer(id){
+  if(!confirm('Supprimer cet achat ?')) return;
+  try {
+    await apiFetch('DELETE', `/cuisine/achats/${id}`);
+    posAlert('Achat supprimé.','ok');
+    ckAchatsCharger();
+  } catch(e){
+    posAlert(e.message||'Erreur réseau.','error');
   }
 }
 

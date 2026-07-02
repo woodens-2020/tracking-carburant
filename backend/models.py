@@ -510,21 +510,25 @@ class BarLigneVente(Base):
     """Ligne d'une vente bar (1 produit, quantité, prix historisé)."""
     __tablename__ = "bar_lignes_vente"
 
-    id                    = Column(Integer, primary_key=True)
-    vente_id              = Column(Integer, ForeignKey("bar_ventes.id", ondelete="CASCADE"), nullable=False)
-    produit_id            = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
-    quantite              = Column(Numeric(12, 3), nullable=False)
-    prix_unitaire_applique = Column(Numeric(12, 2), nullable=False)  # prix au moment de la vente
-    sous_total            = Column(Numeric(14, 2), nullable=False)
+    id                     = Column(Integer, primary_key=True)
+    vente_id               = Column(Integer, ForeignKey("bar_ventes.id",      ondelete="CASCADE"),  nullable=False)
+    produit_id             = Column(Integer, ForeignKey("bar_produits.id",    ondelete="RESTRICT"), nullable=True)
+    cuisine_plat_id        = Column(Integer, ForeignKey("cuisine_plats.id",   ondelete="SET NULL"), nullable=True)
+    quantite               = Column(Numeric(12, 3), nullable=False)
+    prix_unitaire_applique = Column(Numeric(12, 2), nullable=False)
+    sous_total             = Column(Numeric(14, 2), nullable=False)
 
-    vente   = relationship("BarVente",   back_populates="lignes")
-    produit = relationship("BarProduit", back_populates="lignes_vente")
+    vente        = relationship("BarVente",    back_populates="lignes")
+    produit      = relationship("BarProduit",  back_populates="lignes_vente")
+    cuisine_plat = relationship("CuisinePlat")
 
     __table_args__ = (
-        CheckConstraint("quantite > 0",    name="chk_bar_ligne_qte_pos"),
-        CheckConstraint("sous_total >= 0", name="chk_bar_ligne_total_pos"),
-        Index("idx_bar_lignes_vente",   "vente_id"),
-        Index("idx_bar_lignes_produit", "produit_id"),
+        CheckConstraint("quantite > 0",                                              name="chk_bar_ligne_qte_pos"),
+        CheckConstraint("sous_total >= 0",                                           name="chk_bar_ligne_total_pos"),
+        CheckConstraint("produit_id IS NOT NULL OR cuisine_plat_id IS NOT NULL",     name="chk_bar_ligne_produit_ou_cuisine"),
+        Index("idx_bar_lignes_vente",        "vente_id"),
+        Index("idx_bar_lignes_produit",      "produit_id"),
+        Index("idx_bar_lignes_cuisine_plat", "cuisine_plat_id"),
     )
 
 
@@ -774,6 +778,7 @@ class CuisinePlat(Base):
     date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     lignes_vente = relationship("CuisineLigneVente", back_populates="plat")
+    achats       = relationship("CuisineAchat",      back_populates="plat")
 
     __table_args__ = (
         CheckConstraint("prix_vente > 0", name="chk_cuisine_plat_prix_pos"),
@@ -844,4 +849,31 @@ class CuisineLigneVente(Base):
         CheckConstraint("sous_total >= 0",     name="chk_cuisine_lv_sous_pos"),
         Index("idx_cuisine_lv_vente", "vente_id"),
         Index("idx_cuisine_lv_plat",  "plat_id"),
+    )
+
+
+class CuisineAchat(Base):
+    """Déclaration d'achat ingrédients / matières premières cuisine."""
+    __tablename__ = "cuisine_achats"
+
+    id            = Column(Integer,      primary_key=True)
+    plat_id       = Column(Integer,      ForeignKey("cuisine_plats.id", ondelete="SET NULL"), nullable=True)
+    description   = Column(String(200),  nullable=False)
+    categorie     = Column(String(80),   nullable=True,  default="INGREDIENTS")
+    quantite      = Column(Numeric(10, 3), nullable=False)
+    unite         = Column(String(20),   nullable=True,  default="kg")
+    cout_unitaire = Column(Numeric(12, 2), nullable=False)
+    total         = Column(Numeric(14, 2), nullable=False)
+    date_achat    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    fournisseur   = Column(String(150),  nullable=True)
+    notes         = Column(String(300),  nullable=True)
+
+    plat = relationship("CuisinePlat", back_populates="achats")
+
+    __table_args__ = (
+        CheckConstraint("quantite > 0",       name="chk_cuisine_achat_qte_pos"),
+        CheckConstraint("cout_unitaire >= 0",  name="chk_cuisine_achat_cout_pos"),
+        CheckConstraint("total >= 0",          name="chk_cuisine_achat_total_pos"),
+        Index("idx_cuisine_achats_plat",  "plat_id"),
+        Index("idx_cuisine_achats_date",  "date_achat"),
     )

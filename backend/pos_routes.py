@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, model_validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -108,8 +108,16 @@ class AjustementIn(BaseModel):
 
 
 class LigneVenteIn(BaseModel):
-    produit_id: int
-    quantite:   float = Field(gt=0)
+    produit_id:      Optional[int]   = None
+    cuisine_plat_id: Optional[int]   = None
+    prix_unitaire:   Optional[float] = None   # requis si cuisine_plat_id
+    quantite:        float = Field(gt=0)
+
+    @model_validator(mode="after")
+    def check_produit_ou_plat(self):
+        if self.produit_id is None and self.cuisine_plat_id is None:
+            raise ValueError("produit_id ou cuisine_plat_id est requis")
+        return self
 
 
 class VenteIn(BaseModel):

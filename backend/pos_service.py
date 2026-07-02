@@ -19,6 +19,7 @@ from models import (
     BarProduit, BarPrixHistorique, BarAchat, BarMouvementStock,
     BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande,
+    CuisinePlat,
 )
 
 
@@ -116,8 +117,29 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     erreurs = []
 
     for l in lignes_input:
-        pid = int(l["produit_id"])
         qte = _dec(l["quantite"])
+
+        # ── Ligne Plat Cuisine (vendu via bar) ───────────────────────
+        if l.get("cuisine_plat_id"):
+            cid = int(l["cuisine_plat_id"])
+            plat = db.query(CuisinePlat).filter_by(id=cid, actif=True).first()
+            if not plat:
+                erreurs.append(f"Plat cuisine #{cid} introuvable ou inactif.")
+                continue
+            prix = _dec(l.get("prix_unitaire") or plat.prix_vente)
+            sous_total = (qte * prix).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            lignes_traitees.append({
+                "cuisine_plat_id": cid,
+                "produit_id":      None,
+                "produit_nom":     plat.nom,
+                "quantite":        qte,
+                "prix":            prix,
+                "sous_total":      sous_total,
+            })
+            continue
+
+        # ── Ligne Produit Bar (logique habituelle) ────────────────────
+        pid = int(l["produit_id"])
 
         produit = db.query(BarProduit).filter_by(id=pid, actif=True).first()
         if not produit:
@@ -139,11 +161,12 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
 
         sous_total = (qte * prix).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         lignes_traitees.append({
-            "produit_id": pid,
-            "produit_nom": produit.nom,
-            "quantite":    qte,
-            "prix":        prix,
-            "sous_total":  sous_total,
+            "cuisine_plat_id": None,
+            "produit_id":      pid,
+            "produit_nom":     produit.nom,
+            "quantite":        qte,
+            "prix":            prix,
+            "sous_total":      sous_total,
         })
 
     if erreurs:
@@ -176,18 +199,21 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
         db.add(BarLigneVente(
             vente_id               = vente.id,
             produit_id             = l["produit_id"],
+            cuisine_plat_id        = l["cuisine_plat_id"],
             quantite               = l["quantite"],
             prix_unitaire_applique = l["prix"],
             sous_total             = l["sous_total"],
         ))
-        db.add(BarMouvementStock(
-            produit_id         = l["produit_id"],
-            type_mouvement     = "SORTIE_VENTE",
-            quantite           = -l["quantite"],   # négatif = sortie
-            motif              = f"Vente ticket {vente.numero_ticket}",
-            reference_vente_id = vente.id,
-            utilisateur_id     = utilisateur_id,
-        ))
+        # Mouvement stock uniquement pour les produits bar (pas les plats cuisine)
+        if l["produit_id"]:
+            db.add(BarMouvementStock(
+                produit_id         = l["produit_id"],
+                type_mouvement     = "SORTIE_VENTE",
+                quantite           = -l["quantite"],
+                motif              = f"Vente ticket {vente.numero_ticket}",
+                reference_vente_id = vente.id,
+                utilisateur_id     = utilisateur_id,
+            ))
 
     if statut == "CREDIT_EN_COURS":
         db.add(BarCredit(
@@ -220,14 +246,15 @@ def annuler_vente(vente_id: int, db: Session, utilisateur_id: int | None = None)
     vente.statut = "ANNULEE"
 
     for ligne in vente.lignes:
-        db.add(BarMouvementStock(
-            produit_id         = ligne.produit_id,
-            type_mouvement     = "ENTREE",
-            quantite           = ligne.quantite,   # positif = réintégration
-            motif              = f"Annulation vente {vente.numero_ticket}",
-            reference_vente_id = vente.id,
-            utilisateur_id     = utilisateur_id,
-        ))
+        if ligne.produit_id:   # plats cuisine n'ont pas de stock bar
+            db.add(BarMouvementStock(
+                produit_id         = ligne.produit_id,
+                type_mouvement     = "ENTREE",
+                quantite           = ligne.quantite,
+                motif              = f"Annulation vente {vente.numero_ticket}",
+                reference_vente_id = vente.id,
+                utilisateur_id     = utilisateur_id,
+            ))
 
     # Clore le crédit éventuel
     if vente.credit and vente.credit.statut != "SOLDE":

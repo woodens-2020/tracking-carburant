@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import CuisinePlat, CuisineDepense, CuisineVente, CuisineLigneVente
+from models import CuisinePlat, CuisineDepense, CuisineVente, CuisineLigneVente, CuisineAchat, BarLigneVente
 
 router = APIRouter(prefix="/api/cuisine", tags=["Cuisine"])
 
@@ -327,15 +327,32 @@ def statistiques(
     dt_deb = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
     dt_fin = datetime.combine(date_fin,   time.max).replace(tzinfo=timezone.utc)
 
-    # Ventes validées
+    # Ventes validées (caisse cuisine)
     ventes = db.query(CuisineVente).filter(
         CuisineVente.statut == "VALIDEE",
         CuisineVente.date_heure >= dt_deb,
         CuisineVente.date_heure <= dt_fin,
     ).all()
 
-    ca_total  = sum(float(_dec(v.total)) for v in ventes)
-    nb_ventes = len(ventes)
+    ca_cuisine = sum(float(_dec(v.total)) for v in ventes)
+    nb_ventes  = len(ventes)
+
+    # Ventes via caisse bar (cross-selling)
+    from models import BarVente
+    lignes_bar = (
+        db.query(BarLigneVente)
+        .join(BarVente, BarLigneVente.vente_id == BarVente.id)
+        .filter(
+            BarLigneVente.cuisine_plat_id.isnot(None),
+            BarVente.statut != "ANNULEE",
+            BarVente.date_heure >= dt_deb,
+            BarVente.date_heure <= dt_fin,
+        )
+        .all()
+    )
+    ca_bar    = sum(float(_dec(l.sous_total)) for l in lignes_bar)
+    nb_bar    = len(set(l.vente_id for l in lignes_bar))
+    ca_total  = ca_cuisine + ca_bar
 
     # Dépenses
     depenses = db.query(CuisineDepense).filter(
@@ -347,7 +364,7 @@ def statistiques(
     benefice       = ca_total - total_depenses
     marge_pct      = round(benefice / ca_total * 100, 1) if ca_total > 0 else 0.0
 
-    # Top plats
+    # Top plats (cuisine caisse + bar cross-sell)
     top_plats: dict[str, dict] = {}
     for v in ventes:
         for l in v.lignes:
@@ -356,6 +373,12 @@ def statistiques(
                 top_plats[k] = {"nom": k, "qte": 0, "ca": 0.0}
             top_plats[k]["qte"] += l.quantite
             top_plats[k]["ca"]  += float(_dec(l.sous_total))
+    for lb in lignes_bar:
+        nom = lb.cuisine_plat.nom if lb.cuisine_plat else f"Plat #{lb.cuisine_plat_id}"
+        if nom not in top_plats:
+            top_plats[nom] = {"nom": nom, "qte": 0, "ca": 0.0}
+        top_plats[nom]["qte"] += float(_dec(lb.quantite))
+        top_plats[nom]["ca"]  += float(_dec(lb.sous_total))
 
     top_plats_list = sorted(top_plats.values(), key=lambda x: x["ca"], reverse=True)[:10]
 
@@ -365,25 +388,205 @@ def statistiques(
         cat = d.categorie or "AUTRE"
         deps_cat[cat] = deps_cat.get(cat, 0.0) + float(_dec(d.montant))
 
-    # Évolution journalière
+    # Évolution journalière (cuisine + bar)
     evo: dict[str, dict] = {}
     for v in ventes:
         k = v.date_heure.date().isoformat()
         if k not in evo:
-            evo[k] = {"date": k, "ca": 0.0, "nb": 0}
+            evo[k] = {"date": k, "ca": 0.0, "nb": 0, "ca_bar": 0.0}
         evo[k]["ca"] += float(_dec(v.total))
         evo[k]["nb"] += 1
+    for lb in lignes_bar:
+        k = lb.vente.date_heure.date().isoformat() if lb.vente else str(date_type.today())
+        if k not in evo:
+            evo[k] = {"date": k, "ca": 0.0, "nb": 0, "ca_bar": 0.0}
+        evo[k]["ca_bar"] += float(_dec(lb.sous_total))
 
     return {
         "date_debut":     str(date_debut),
         "date_fin":       str(date_fin),
         "ca_total":       round(ca_total, 2),
+        "ca_cuisine":     round(ca_cuisine, 2),
+        "ca_bar":         round(ca_bar, 2),
         "nb_ventes":      nb_ventes,
+        "nb_ventes_bar":  nb_bar,
         "total_depenses": round(total_depenses, 2),
         "benefice":       round(benefice, 2),
         "marge_pct":      marge_pct,
-        "ticket_moyen":   round(ca_total / nb_ventes, 2) if nb_ventes > 0 else 0.0,
+        "ticket_moyen":   round(ca_cuisine / nb_ventes, 2) if nb_ventes > 0 else 0.0,
         "top_plats":      top_plats_list,
         "deps_par_cat":   [{"categorie": k, "montant": round(v, 2)} for k, v in sorted(deps_cat.items())],
         "evolution":      sorted(evo.values(), key=lambda x: x["date"]),
     }
+
+
+# ══════════════════════════════════════════════════════════════════
+# ACHATS / MATIÈRES PREMIÈRES
+# ══════════════════════════════════════════════════════════════════
+
+def _achat_dict(a: CuisineAchat) -> dict:
+    return {
+        "id":            a.id,
+        "plat_id":       a.plat_id,
+        "plat_nom":      a.plat.nom if a.plat else None,
+        "description":   a.description,
+        "categorie":     a.categorie or "INGREDIENTS",
+        "quantite":      float(_dec(a.quantite)),
+        "unite":         a.unite or "kg",
+        "cout_unitaire": float(_dec(a.cout_unitaire)),
+        "total":         float(_dec(a.total)),
+        "date_achat":    a.date_achat.isoformat() if a.date_achat else None,
+        "fournisseur":   a.fournisseur or "",
+        "notes":         a.notes or "",
+    }
+
+
+@router.get("/achats")
+def liste_achats(
+    plat_id:    Optional[int]       = Query(default=None),
+    date_debut: Optional[date_type] = Query(default=None),
+    date_fin:   Optional[date_type] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    today = date_type.today()
+    if not date_debut: date_debut = today.replace(day=1)
+    if not date_fin:   date_fin   = today
+    dt_deb = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
+    dt_fin = datetime.combine(date_fin,   time.max).replace(tzinfo=timezone.utc)
+
+    q = db.query(CuisineAchat).filter(
+        CuisineAchat.date_achat >= dt_deb,
+        CuisineAchat.date_achat <= dt_fin,
+    )
+    if plat_id:
+        q = q.filter(CuisineAchat.plat_id == plat_id)
+    achats = q.order_by(CuisineAchat.date_achat.desc()).all()
+
+    total = sum(float(_dec(a.total)) for a in achats)
+    return {
+        "achats": [_achat_dict(a) for a in achats],
+        "total_achats": round(total, 2),
+        "nb_achats": len(achats),
+    }
+
+
+@router.post("/achats", status_code=201)
+def creer_achat(data: dict, db: Session = Depends(get_db)):
+    desc = (data.get("description") or "").strip()
+    if not desc:
+        raise HTTPException(400, "La description est requise")
+    qte = float(data.get("quantite") or 0)
+    if qte <= 0:
+        raise HTTPException(400, "La quantité doit être positive")
+    cout = float(data.get("cout_unitaire") or 0)
+    if cout < 0:
+        raise HTTPException(400, "Le coût unitaire ne peut pas être négatif")
+
+    date_achat = datetime.now(timezone.utc)
+    if data.get("date_achat"):
+        try:
+            raw = data["date_achat"]
+            if "T" in raw:
+                date_achat = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            else:
+                date_achat = datetime.combine(
+                    date_type.fromisoformat(raw), time.min
+                ).replace(tzinfo=timezone.utc)
+        except (ValueError, AttributeError):
+            pass
+
+    a = CuisineAchat(
+        plat_id       = data.get("plat_id") or None,
+        description   = desc,
+        categorie     = data.get("categorie") or "INGREDIENTS",
+        quantite      = Decimal(str(qte)),
+        unite         = (data.get("unite") or "kg").strip() or "kg",
+        cout_unitaire = Decimal(str(cout)),
+        total         = Decimal(str(round(qte * cout, 2))),
+        date_achat    = date_achat,
+        fournisseur   = (data.get("fournisseur") or "").strip() or None,
+        notes         = (data.get("notes") or "").strip() or None,
+    )
+    db.add(a); db.commit(); db.refresh(a)
+    return {"id": a.id, "message": "Achat enregistré", "total": float(a.total)}
+
+
+@router.put("/achats/{achat_id}")
+def modifier_achat(achat_id: int, data: dict, db: Session = Depends(get_db)):
+    a = db.query(CuisineAchat).filter_by(id=achat_id).first()
+    if not a:
+        raise HTTPException(404, "Achat introuvable")
+
+    if "description"   in data and data["description"]:
+        a.description   = data["description"].strip()
+    if "categorie"     in data: a.categorie     = data["categorie"] or "INGREDIENTS"
+    if "plat_id"       in data: a.plat_id       = data["plat_id"] or None
+    if "fournisseur"   in data: a.fournisseur   = (data["fournisseur"] or "").strip() or None
+    if "notes"         in data: a.notes         = (data["notes"] or "").strip() or None
+    if "unite"         in data: a.unite         = data["unite"] or "kg"
+
+    if "quantite" in data or "cout_unitaire" in data:
+        qte  = float(data.get("quantite")      or a.quantite)
+        cout = float(data.get("cout_unitaire") or a.cout_unitaire)
+        a.quantite      = Decimal(str(qte))
+        a.cout_unitaire = Decimal(str(cout))
+        a.total         = Decimal(str(round(qte * cout, 2)))
+
+    db.commit()
+    return {"message": "Achat modifié"}
+
+
+@router.delete("/achats/{achat_id}")
+def supprimer_achat(achat_id: int, db: Session = Depends(get_db)):
+    a = db.query(CuisineAchat).filter_by(id=achat_id).first()
+    if not a:
+        raise HTTPException(404, "Achat introuvable")
+    db.delete(a); db.commit()
+    return {"message": "Achat supprimé"}
+
+
+# ══════════════════════════════════════════════════════════════════
+# VENTES VIA BAR (cross-selling) — lecture seule pour le dashboard
+# ══════════════════════════════════════════════════════════════════
+
+@router.get("/ventes-bar")
+def ventes_via_bar(
+    date_debut: Optional[date_type] = Query(default=None),
+    date_fin:   Optional[date_type] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """Plats cuisine vendus depuis la caisse bar — pour tableau de bord cuisine."""
+    today = date_type.today()
+    if not date_debut: date_debut = today
+    if not date_fin:   date_fin   = today
+
+    from models import BarVente
+    from sqlalchemy import and_
+
+    dt_deb = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
+    dt_fin = datetime.combine(date_fin,   time.max).replace(tzinfo=timezone.utc)
+
+    lignes = (
+        db.query(BarLigneVente)
+        .join(BarVente, BarLigneVente.vente_id == BarVente.id)
+        .filter(
+            BarLigneVente.cuisine_plat_id.isnot(None),
+            BarVente.statut != "ANNULEE",
+            BarVente.date_heure >= dt_deb,
+            BarVente.date_heure <= dt_fin,
+        )
+        .all()
+    )
+
+    return [
+        {
+            "plat_id":       l.cuisine_plat_id,
+            "plat_nom":      l.cuisine_plat.nom if l.cuisine_plat else f"Plat #{l.cuisine_plat_id}",
+            "quantite":      float(_dec(l.quantite)),
+            "prix_unitaire": float(_dec(l.prix_unitaire_applique)),
+            "sous_total":    float(_dec(l.sous_total)),
+            "ticket_bar":    l.vente.numero_ticket if l.vente else None,
+            "date_heure":    l.vente.date_heure.isoformat() if l.vente else None,
+        }
+        for l in lignes
+    ]
