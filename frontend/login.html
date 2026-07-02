@@ -1058,6 +1058,16 @@ fetch('/api/me',{credentials:'include'}).then(r=>{ if(r.ok) window.location.href
     window.history.replaceState({},'','/login');
   }
 })();
+
+// ── OTP après redirection OAuth ──────────────────────────────────────────────
+(function(){
+  var p = new URLSearchParams(window.location.search);
+  if(p.get('otp') === '1'){
+    var hint = decodeURIComponent(p.get('hint') || 'votre email');
+    window.history.replaceState({},'','/login');
+    if(typeof showOtpStep === 'function') showOtpStep(hint);
+  }
+})();
 </script>
 </body>
 </html>

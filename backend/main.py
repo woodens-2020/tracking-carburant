@@ -1,7 +1,11 @@
 import hmac
+import logging
 import os
 from datetime import date as date_type
 from typing import List, Optional
+from urllib.parse import quote as url_quote
+
+log = logging.getLogger("main")
 
 from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -654,7 +658,30 @@ def oauth_callback(
     if not user.actif:
         return RedirectResponse(url="/login?oauth_error=account_disabled")
 
-    # Création de la session (même mécanisme que le login classique)
+    # ── Vérification en deux étapes (OTP) après OAuth ────────────────
+    if OTP_ENABLED and user.email:
+        try:
+            code, pending_token = create_otp(db, user.id)
+            send_otp_email(user.nom_complet or user.email, user.email, code)
+        except (ValueError, RuntimeError) as exc:
+            log.warning("OTP impossible pour %s via OAuth : %s", _mask_email(user.email), exc)
+            # Fallback : session directe si OTP indisponible (email non-livrable, rate limit)
+            session_token = create_session(db, user.id)
+            redir = RedirectResponse(url="/", status_code=302)
+            redir.set_cookie(
+                "session_token", session_token,
+                httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
+            )
+            return redir
+        hint = url_quote(_mask_email(user.email), safe="")
+        redir = RedirectResponse(url=f"/login?otp=1&hint={hint}", status_code=302)
+        redir.set_cookie(
+            OTP_PENDING_COOKIE, pending_token,
+            httponly=True, samesite="lax", max_age=OTP_PENDING_MAX_AGE, path="/",
+        )
+        return redir
+
+    # ── Connexion directe (OTP désactivé) ────────────────────────────
     session_token = create_session(db, user.id)
     redir = RedirectResponse(url="/", status_code=302)
     redir.set_cookie(
