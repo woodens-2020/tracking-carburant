@@ -6864,7 +6864,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <label style="font-size:11px;color:rgba(255,255,255,.4)">au</label>
             <input class="pos-input" id="dep-fin" type="date" style="width:140px">
           </div>
-          <select class="pos-select" id="dep-filtre-cat" onchange="ckDepAfficher()" style="min-width:140px">
+          <select class="pos-select" id="ckdep-filtre-cat" onchange="ckDepAfficher()" style="min-width:140px">
             <option value="">Toutes catégories</option>
             <option value="INGREDIENTS">Ingrédients</option>
             <option value="EQUIPEMENT">Équipement</option>
@@ -6922,12 +6922,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div style="display:flex;flex-direction:column;gap:10px">
             <div>
               <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Description *</label>
-              <input class="pos-input" id="dep-desc" placeholder="Ex : Achat farine, huile…" style="width:100%">
+              <input class="pos-input" id="ckdep-desc" placeholder="Ex : Achat farine, huile…" style="width:100%">
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div>
                 <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
-                <select class="pos-select" id="dep-cat" style="width:100%">
+                <select class="pos-select" id="ckdep-cat" style="width:100%">
                   <option value="INGREDIENTS">Ingrédients</option>
                   <option value="EQUIPEMENT">Équipement</option>
                   <option value="ENERGIE">Énergie</option>
@@ -6937,13 +6937,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               </div>
               <div>
                 <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Montant (G) *</label>
-                <input class="pos-input" id="dep-montant" type="number" min="0.01" step="1" placeholder="0.00" style="width:100%">
+                <input class="pos-input" id="ckdep-montant" type="number" min="0.01" step="1" placeholder="0.00" style="width:100%">
               </div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div>
                 <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Date</label>
-                <input class="pos-input" id="dep-date" type="date" style="width:100%">
+                <input class="pos-input" id="ckdep-date" type="date" style="width:100%">
               </div>
               <div>
                 <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Fournisseur</label>
@@ -6952,7 +6952,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
             <div>
               <label style="font-size:11px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Notes</label>
-              <input class="pos-input" id="dep-notes" placeholder="Remarques…" style="width:100%">
+              <input class="pos-input" id="ckdep-notes" placeholder="Remarques…" style="width:100%">
             </div>
           </div>
           <div style="display:flex;gap:8px;margin-top:16px">
@@ -18104,7 +18104,7 @@ async function ckDepCharger(){
 
 function ckDepAfficher(){
   const tbody = document.getElementById('dep-tbody'); if(!tbody) return;
-  const cat   = document.getElementById('dep-filtre-cat')?.value || '';
+  const cat   = document.getElementById('ckdep-filtre-cat')?.value || '';
   const deps  = _ckDepots.filter(d => !cat || d.categorie === cat);
 
   const total    = deps.reduce((s, d) => s + d.montant, 0);
@@ -18145,21 +18145,21 @@ function ckDepOuvrirModal(depId){
   if(depId){
     const d = _ckDepots.find(x => x.id === depId);
     if(d){
-      document.getElementById('dep-desc').value        = d.description;
-      document.getElementById('dep-cat').value         = d.categorie || 'AUTRE';
-      document.getElementById('dep-montant').value     = d.montant;
-      document.getElementById('dep-date').value        = d.date_depense ? d.date_depense.split('T')[0] : '';
-      document.getElementById('dep-fournisseur').value = d.fournisseur || '';
-      document.getElementById('dep-notes').value       = d.notes || '';
+      document.getElementById('ckdep-desc').value        = d.description;
+      document.getElementById('ckdep-cat').value         = d.categorie || 'AUTRE';
+      document.getElementById('ckdep-montant').value     = d.montant;
+      document.getElementById('ckdep-date').value        = d.date_depense ? d.date_depense.split('T')[0] : '';
+      document.getElementById('dep-fournisseur').value   = d.fournisseur || '';
+      document.getElementById('ckdep-notes').value       = d.notes || '';
     }
   } else {
     const today = new Date().toISOString().split('T')[0];
-    ['dep-desc','dep-montant','dep-fournisseur','dep-notes'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('dep-cat').value  = 'INGREDIENTS';
-    document.getElementById('dep-date').value = today;
+    ['ckdep-desc','ckdep-montant','dep-fournisseur','ckdep-notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('ckdep-cat').value  = 'INGREDIENTS';
+    document.getElementById('ckdep-date').value = today;
   }
   modal.style.display = 'flex';
-  setTimeout(() => document.getElementById('dep-desc')?.focus(), 100);
+  setTimeout(() => document.getElementById('ckdep-desc')?.focus(), 100);
 }
 
 function ckDepFermerModal(){
@@ -18168,17 +18168,17 @@ function ckDepFermerModal(){
 
 async function ckDepSauvegarder(){
   const id      = document.getElementById('dep-modal-id').value;
-  const desc    = document.getElementById('dep-desc').value.trim();
-  const montant = parseFloat(document.getElementById('dep-montant').value);
+  const desc    = document.getElementById('ckdep-desc').value.trim();
+  const montant = parseFloat(document.getElementById('ckdep-montant').value);
   if(!desc){ posAlert('La description est requise.','warn'); return; }
   if(!montant || montant <= 0){ posAlert('Le montant doit être positif.','warn'); return; }
   const payload = {
     description:  desc,
-    categorie:    document.getElementById('dep-cat').value,
+    categorie:    document.getElementById('ckdep-cat').value,
     montant,
-    date_depense: document.getElementById('dep-date').value || null,
+    date_depense: document.getElementById('ckdep-date').value || null,
     fournisseur:  document.getElementById('dep-fournisseur').value.trim(),
-    notes:        document.getElementById('dep-notes').value.trim(),
+    notes:        document.getElementById('ckdep-notes').value.trim(),
   };
   try {
     if(id){ await apiFetch('PUT', `/cuisine/depenses/${id}`, payload); }
