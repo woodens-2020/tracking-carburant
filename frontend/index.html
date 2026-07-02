@@ -2916,6 +2916,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="pos-analyse" onclick="goTo('pos-analyse')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-8"/></svg>
+      </span>
+      <span>Analyse & Contrôle</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
   </nav>
 
   <!-- Statut connexion -->
@@ -6484,6 +6492,159 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
       </div>
     </div><!-- /page-pos-grande-caisse -->
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — ANALYSE & CONTRÔLE DES ARTICLES                   -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div id="page-pos-analyse" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <!-- En-tête -->
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+          <div>
+            <h2 style="margin:0;font-size:20px;font-weight:800">Analyse &amp; Contrôle des Articles</h2>
+            <div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:3px">Suivi des achats, ventes, rentabilité et stocks en temps réel</div>
+          </div>
+          <button class="pos-btn ghost" onclick="loadPosAnalyse()" style="font-size:12px">↺ Actualiser</button>
+        </div>
+
+        <!-- KPI Cards -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px">
+          <div class="pos-card" style="padding:14px 16px;border-top:3px solid #3fb6a8">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.35);margin-bottom:6px">Articles actifs</div>
+            <div id="ana-kpi-nb" style="font-size:26px;font-weight:800;color:#3fb6a8">—</div>
+          </div>
+          <div class="pos-card" style="padding:14px 16px;border-top:3px solid #f87171">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.35);margin-bottom:6px">En rupture</div>
+            <div id="ana-kpi-vide" style="font-size:26px;font-weight:800;color:#f87171">—</div>
+          </div>
+          <div class="pos-card" style="padding:14px 16px;border-top:3px solid #f59e0b">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.35);margin-bottom:6px">Stock bas</div>
+            <div id="ana-kpi-bas" style="font-size:26px;font-weight:800;color:#f59e0b">—</div>
+          </div>
+          <div class="pos-card" style="padding:14px 16px;border-top:3px solid #818cf8">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.35);margin-bottom:6px">Valeur stock</div>
+            <div id="ana-kpi-valeur" style="font-size:20px;font-weight:800;color:#818cf8">—</div>
+          </div>
+          <div class="pos-card" style="padding:14px 16px;border-top:3px solid #34d399">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.35);margin-bottom:6px">CA 30 jours</div>
+            <div id="ana-kpi-ca30" style="font-size:20px;font-weight:800;color:#34d399">—</div>
+          </div>
+        </div>
+
+        <!-- Onglets -->
+        <div style="display:flex;gap:4px;margin-bottom:0;border-bottom:1px solid rgba(255,255,255,.08)">
+          <button id="ana-tab-controle"    onclick="anaSetTab('controle')"    class="pos-btn ghost" style="font-size:12px;border-radius:8px 8px 0 0;padding:8px 14px;border-bottom:2px solid #3fb6a8;color:#3fb6a8">Tableau de contrôle</button>
+          <button id="ana-tab-evolution"   onclick="anaSetTab('evolution')"   class="pos-btn ghost" style="font-size:12px;border-radius:8px 8px 0 0;padding:8px 14px;border-bottom:2px solid transparent">Évolution ventes</button>
+          <button id="ana-tab-lots"        onclick="anaSetTab('lots')"        class="pos-btn ghost" style="font-size:12px;border-radius:8px 8px 0 0;padding:8px 14px;border-bottom:2px solid transparent">Suivi par lot</button>
+          <button id="ana-tab-rentabilite" onclick="anaSetTab('rentabilite')" class="pos-btn ghost" style="font-size:12px;border-radius:8px 8px 0 0;padding:8px 14px;border-bottom:2px solid transparent">Rentabilité</button>
+        </div>
+
+        <!-- Panel : Tableau de contrôle -->
+        <div id="ana-panel-controle" style="padding-top:14px">
+          <div class="pos-card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <select class="pos-select" id="ana-filtre-cat" onchange="anaTblFiltrer()" style="min-width:140px">
+              <option value="">Toutes catégories</option>
+            </select>
+            <select class="pos-select" id="ana-filtre-statut" onchange="anaTblFiltrer()" style="min-width:140px">
+              <option value="">Tous statuts</option>
+              <option value="VIDE">En rupture</option>
+              <option value="BAS">Stock bas</option>
+              <option value="OK">OK</option>
+            </select>
+            <input class="pos-input" id="ana-filtre-search" placeholder="Rechercher article…" oninput="anaTblFiltrer()" style="min-width:180px;flex:1">
+          </div>
+          <div class="pos-card" style="padding:0;overflow:hidden">
+            <div style="overflow-x:auto">
+              <table style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead>
+                  <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.08)">
+                    <th onclick="anaTblTrier('nom')"         style="padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);cursor:pointer;white-space:nowrap">Article ↕</th>
+                    <th                                      style="padding:10px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Catégorie</th>
+                    <th onclick="anaTblTrier('stock')"       style="padding:10px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);cursor:pointer;white-space:nowrap">Stock ↕</th>
+                    <th                                      style="padding:10px 8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Statut</th>
+                    <th onclick="anaTblTrier('cmup')"        style="padding:10px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);cursor:pointer;white-space:nowrap">CMUP ↕</th>
+                    <th                                      style="padding:10px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);white-space:nowrap">Prix vente</th>
+                    <th onclick="anaTblTrier('marge_pct')"   style="padding:10px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);cursor:pointer;white-space:nowrap;min-width:110px">Marge ↕</th>
+                    <th onclick="anaTblTrier('valeur_stock')" style="padding:10px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);cursor:pointer;white-space:nowrap">Val. stock ↕</th>
+                    <th onclick="anaTblTrier('ventes_30j')"  style="padding:10px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);cursor:pointer;white-space:nowrap">CA 30j ↕</th>
+                    <th                                      style="padding:10px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);white-space:nowrap">Dernier achat</th>
+                    <th                                      style="padding:10px 8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Lots</th>
+                  </tr>
+                </thead>
+                <tbody id="ana-tbl-body">
+                  <tr><td colspan="11" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel : Évolution ventes -->
+        <div id="ana-panel-evolution" style="display:none;padding-top:14px">
+          <div class="pos-card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <div style="display:flex;gap:6px;align-items:center">
+              <label style="font-size:11px;color:rgba(255,255,255,.4)">Du</label>
+              <input class="pos-input" id="ana-evo-debut" type="date" style="width:140px">
+              <label style="font-size:11px;color:rgba(255,255,255,.4)">au</label>
+              <input class="pos-input" id="ana-evo-fin" type="date" style="width:140px">
+            </div>
+            <select class="pos-select" id="ana-evo-gran" style="min-width:120px">
+              <option value="jour">Par jour</option>
+              <option value="semaine">Par semaine</option>
+              <option value="mois">Par mois</option>
+            </select>
+            <select class="pos-select" id="ana-evo-produit" style="min-width:160px">
+              <option value="">Tous les articles</option>
+            </select>
+            <button class="pos-btn teal" onclick="anaChargerEvolution()">Analyser</button>
+            <div style="display:flex;gap:6px;margin-left:auto">
+              <button class="pos-btn ghost" style="font-size:11px" onclick="anaEvoPeriode(7)">7j</button>
+              <button class="pos-btn ghost" style="font-size:11px" onclick="anaEvoPeriode(30)">30j</button>
+              <button class="pos-btn ghost" style="font-size:11px" onclick="anaEvoPeriode(90)">90j</button>
+            </div>
+          </div>
+          <div id="ana-evo-body">
+            <div style="text-align:center;padding:40px;color:rgba(255,255,255,.3)">Sélectionnez une période et cliquez Analyser</div>
+          </div>
+        </div>
+
+        <!-- Panel : Suivi par lot -->
+        <div id="ana-panel-lots" style="display:none;padding-top:14px">
+          <div class="pos-card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <select class="pos-select" id="ana-lots-produit" style="flex:1;min-width:200px">
+              <option value="">Sélectionner un article…</option>
+            </select>
+            <button class="pos-btn teal" onclick="anaChargerLots()">Analyser les lots</button>
+          </div>
+          <div id="ana-lots-body">
+            <div style="text-align:center;padding:40px;color:rgba(255,255,255,.3)">Sélectionnez un article pour analyser ses lots d'achat</div>
+          </div>
+        </div>
+
+        <!-- Panel : Rentabilité -->
+        <div id="ana-panel-rentabilite" style="display:none;padding-top:14px">
+          <div class="pos-card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <div style="display:flex;gap:6px;align-items:center">
+              <label style="font-size:11px;color:rgba(255,255,255,.4)">Du</label>
+              <input class="pos-input" id="ana-rent-debut" type="date" style="width:140px">
+              <label style="font-size:11px;color:rgba(255,255,255,.4)">au</label>
+              <input class="pos-input" id="ana-rent-fin" type="date" style="width:140px">
+            </div>
+            <button class="pos-btn teal" onclick="anaChargerRentabilite()">Calculer</button>
+            <div style="display:flex;gap:6px;margin-left:auto">
+              <button class="pos-btn ghost" style="font-size:11px" onclick="anaRentPeriode('mois')">Ce mois</button>
+              <button class="pos-btn ghost" style="font-size:11px" onclick="anaRentPeriode('trim')">3 mois</button>
+              <button class="pos-btn ghost" style="font-size:11px" onclick="anaRentPeriode('an')">12 mois</button>
+            </div>
+          </div>
+          <div id="ana-rent-body">
+            <div style="text-align:center;padding:40px;color:rgba(255,255,255,.3)">Sélectionnez une période et cliquez Calculer</div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-analyse -->
 
     <!-- ══════════════════════════════════════════════════════════ -->
     <!-- HOTEL — CHAMBRES                                          -->
@@ -13419,6 +13580,7 @@ const _giPageLoaders = {
   'pos-paie':        loadPosPaie,
   'pos-rentabilite':    loadPosRentabilite,
   'pos-grande-caisse':  loadPosGrandeCaisse,
+  'pos-analyse':        loadPosAnalyse,
   'hotel-chambres':     loadHotelChambres,
   'hotel-reception':    loadHotelReception,
   'hotel-sejours':      loadHotelSejours,
@@ -16639,6 +16801,478 @@ function _gcRender(d){
         </tr>`;
       }).join('');
     }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE POS — ANALYSE & CONTRÔLE
+// ══════════════════════════════════════════════════════════════════════
+
+let _anaArticles  = [];
+let _anaSortField = 'nom';
+let _anaSortAsc   = true;
+
+async function loadPosAnalyse(){
+  const today  = new Date();
+  const il30   = new Date(today); il30.setDate(today.getDate() - 29);
+  const fmt    = d => d.toISOString().split('T')[0];
+
+  const eDeb = document.getElementById('ana-evo-debut');
+  const eFin = document.getElementById('ana-evo-fin');
+  if(eDeb && !eDeb.value) eDeb.value = fmt(il30);
+  if(eFin && !eFin.value) eFin.value = fmt(today);
+
+  const rDeb = document.getElementById('ana-rent-debut');
+  const rFin = document.getElementById('ana-rent-fin');
+  if(rDeb && !rDeb.value) rDeb.value = fmt(new Date(today.getFullYear(), today.getMonth(), 1));
+  if(rFin && !rFin.value) rFin.value = fmt(today);
+
+  await anaChargerTableau();
+}
+
+async function anaChargerTableau(){
+  const tbody = document.getElementById('ana-tbl-body');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+
+  try {
+    const data = await apiFetch('GET', '/pos/analyse/tableau');
+    _anaArticles = data.articles || [];
+
+    const k = data.kpis || {};
+    [['ana-kpi-nb', k.nb_articles], ['ana-kpi-vide', k.articles_vide],
+     ['ana-kpi-bas', k.articles_bas], ['ana-kpi-valeur', posGx(k.valeur_stock || 0)],
+     ['ana-kpi-ca30', posGx(k.ca_30j || 0)]
+    ].forEach(([id, v]) => { const el = document.getElementById(id); if(el) el.textContent = v; });
+
+    const cats = [...new Set(_anaArticles.map(a => a.categorie).filter(c => c && c !== '—'))].sort();
+    const selCat = document.getElementById('ana-filtre-cat');
+    if(selCat){
+      const cur = selCat.value;
+      selCat.innerHTML = '<option value="">Toutes catégories</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+      selCat.value = cur;
+    }
+
+    const optsAll = '<option value="">Tous les articles</option>' +
+      _anaArticles.map(a => `<option value="${a.id}">${a.nom}</option>`).join('');
+    const selEvo  = document.getElementById('ana-evo-produit');
+    const selLots = document.getElementById('ana-lots-produit');
+    if(selEvo) selEvo.innerHTML = optsAll;
+    if(selLots) selLots.innerHTML = '<option value="">Sélectionner un article…</option>' +
+      _anaArticles.map(a => `<option value="${a.id}">${a.nom}</option>`).join('');
+
+    anaTblAfficher();
+  } catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="11" style="padding:24px;text-align:center;color:#f87171">${e.message || 'Erreur réseau'}</td></tr>`;
+  }
+}
+
+function anaTblFiltrer(){ anaTblAfficher(); }
+
+function anaTblTrier(champ){
+  if(_anaSortField === champ) _anaSortAsc = !_anaSortAsc;
+  else { _anaSortField = champ; _anaSortAsc = true; }
+  anaTblAfficher();
+}
+
+function anaTblAfficher(){
+  const tbody  = document.getElementById('ana-tbl-body'); if(!tbody) return;
+  const cat    = document.getElementById('ana-filtre-cat')?.value || '';
+  const statut = document.getElementById('ana-filtre-statut')?.value || '';
+  const search = (document.getElementById('ana-filtre-search')?.value || '').toLowerCase();
+
+  let arts = _anaArticles.filter(a =>
+    (!cat    || a.categorie === cat) &&
+    (!statut || a.statut_stock === statut) &&
+    (!search || a.nom.toLowerCase().includes(search))
+  );
+
+  arts = arts.sort((a, b) => {
+    let va, vb;
+    if(_anaSortField === 'nom')           { va = a.nom;             vb = b.nom; }
+    else if(_anaSortField === 'stock')    { va = a.stock;           vb = b.stock; }
+    else if(_anaSortField === 'cmup')     { va = a.cmup;            vb = b.cmup; }
+    else if(_anaSortField === 'marge_pct'){ va = a.marge_pct;       vb = b.marge_pct; }
+    else if(_anaSortField === 'valeur_stock'){ va = a.valeur_stock; vb = b.valeur_stock; }
+    else if(_anaSortField === 'ventes_30j') { va = a.ventes_30j.ca; vb = b.ventes_30j.ca; }
+    else { va = a.nom; vb = b.nom; }
+    if(typeof va === 'string') return _anaSortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return _anaSortAsc ? va - vb : vb - va;
+  });
+
+  if(!arts.length){
+    tbody.innerHTML = '<tr><td colspan="11" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucun article trouvé</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = arts.map(a => {
+    const sc = a.statut_stock === 'VIDE' ? '#f87171' : a.statut_stock === 'BAS' ? '#f59e0b' : '#34d399';
+    const badge = a.statut_stock === 'VIDE'
+      ? '<span class="pos-badge danger" style="font-size:9px">VIDE</span>'
+      : a.statut_stock === 'BAS'
+        ? '<span class="pos-badge amber" style="font-size:9px">BAS</span>'
+        : '<span class="pos-badge teal" style="font-size:9px">OK</span>';
+    const mc = a.marge_pct >= 30 ? '#34d399' : a.marge_pct >= 10 ? '#f59e0b' : '#f87171';
+    const margeBar = `<div style="display:flex;align-items:center;gap:4px;min-width:90px">
+      <div style="flex:1;height:4px;background:rgba(255,255,255,.08);border-radius:2px">
+        <div style="height:100%;width:${Math.min(100,Math.max(0,a.marge_pct))}%;background:${mc};border-radius:2px"></div>
+      </div>
+      <span style="font-size:11px;color:${mc};font-weight:700;white-space:nowrap">${a.marge_pct.toFixed(1)}%</span>
+    </div>`;
+    const dateA = a.achats.dernier ? posDateFr(a.achats.dernier).split(' ')[0] : '—';
+    const stk = a.stock % 1 === 0 ? a.stock.toFixed(0) : a.stock.toFixed(2);
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+      <td style="padding:9px 12px;font-weight:600;font-size:12px">${a.nom}</td>
+      <td style="padding:9px 8px;font-size:11px;color:rgba(255,255,255,.45)">${a.categorie}</td>
+      <td style="padding:9px 8px;text-align:right;font-size:13px;font-weight:700;color:${sc}">${stk}</td>
+      <td style="padding:9px 8px;text-align:center">${badge}</td>
+      <td style="padding:9px 8px;text-align:right;font-size:11px;color:rgba(255,255,255,.6)">${posGx(a.cmup)}</td>
+      <td style="padding:9px 8px;text-align:right;font-size:11px;font-weight:600">${posGx(a.prix_vente)}</td>
+      <td style="padding:9px 8px">${margeBar}</td>
+      <td style="padding:9px 8px;text-align:right;font-size:11px;color:#818cf8;font-weight:600">${posGx(a.valeur_stock)}</td>
+      <td style="padding:9px 8px;text-align:right;font-size:11px;color:#34d399;font-weight:600">${posGx(a.ventes_30j.ca)}</td>
+      <td style="padding:9px 8px;text-align:right;font-size:11px;color:rgba(255,255,255,.4)">${dateA}</td>
+      <td style="padding:9px 8px;text-align:center">
+        <button class="pos-btn ghost" style="font-size:10px;padding:3px 8px" onclick="anaOuvrirLots(${a.id})">Lots (${a.achats.nb})</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function anaSetTab(tab){
+  ['controle','evolution','lots','rentabilite'].forEach(t => {
+    const btn   = document.getElementById(`ana-tab-${t}`);
+    const panel = document.getElementById(`ana-panel-${t}`);
+    const active = t === tab;
+    if(btn){
+      btn.style.borderBottomColor = active ? '#3fb6a8' : 'transparent';
+      btn.style.color             = active ? '#3fb6a8' : '';
+    }
+    if(panel) panel.style.display = active ? '' : 'none';
+  });
+}
+
+// ── Tab Évolution ──────────────────────────────────────────────────
+
+function anaEvoPeriode(jours){
+  const today = new Date();
+  const debut = new Date(today); debut.setDate(debut.getDate() - jours + 1);
+  const fmt = d => d.toISOString().split('T')[0];
+  document.getElementById('ana-evo-debut').value = fmt(debut);
+  document.getElementById('ana-evo-fin').value   = fmt(today);
+  anaChargerEvolution();
+}
+
+async function anaChargerEvolution(){
+  const debut = document.getElementById('ana-evo-debut')?.value;
+  const fin   = document.getElementById('ana-evo-fin')?.value;
+  const gran  = document.getElementById('ana-evo-gran')?.value || 'jour';
+  const pid   = document.getElementById('ana-evo-produit')?.value;
+  if(!debut || !fin){ posAlert('Sélectionnez une période.', 'warn'); return; }
+
+  const body = document.getElementById('ana-evo-body');
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</div>';
+
+  try {
+    let url = `/pos/analyse/evolution?date_debut=${debut}&date_fin=${fin}&granularite=${gran}`;
+    if(pid) url += `&produit_id=${pid}`;
+    const data   = await apiFetch('GET', url);
+    const series = data.series || [];
+
+    if(!series.length){
+      body.innerHTML = '<div class="pos-card" style="padding:32px;text-align:center;color:rgba(255,255,255,.3)">Aucune vente sur cette période</div>';
+      return;
+    }
+
+    const maxCA = Math.max(...series.map(s => s.ca), 1);
+
+    const chart = `<div class="pos-card" style="padding:16px 14px;margin-bottom:14px">
+      <div style="font-size:11px;color:rgba(255,255,255,.35);margin-bottom:12px;text-transform:uppercase;letter-spacing:.07em">CA par ${gran} (G)</div>
+      <div style="display:flex;align-items:flex-end;gap:${series.length > 30 ? '2' : '4'}px;height:110px;overflow-x:auto;padding-bottom:4px">
+        ${series.map(s => {
+          const h = Math.max(3, Math.round(s.ca / maxCA * 100));
+          const lbl = series.length <= 20 ? `<div style="font-size:8px;color:rgba(255,255,255,.3);writing-mode:vertical-lr;transform:rotate(180deg);margin-top:3px">${s.periode.slice(-5)}</div>` : '';
+          return `<div style="flex:1;min-width:${series.length > 30 ? '5' : '10'}px;display:flex;flex-direction:column;align-items:center" title="${s.periode} : ${posGx(s.ca)}">
+            <div style="width:100%;height:${h}px;background:#3fb6a8;border-radius:2px 2px 0 0;min-height:3px"></div>${lbl}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+    const resume = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
+      <div class="pos-card" style="padding:12px 14px">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:4px">CA total</div>
+        <div style="font-size:20px;font-weight:800;color:#3fb6a8">${posGx(data.total_ca)}</div>
+      </div>
+      <div class="pos-card" style="padding:12px 14px">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:4px">Qté vendue</div>
+        <div style="font-size:20px;font-weight:800">${data.total_qte.toFixed(1)}</div>
+      </div>
+      <div class="pos-card" style="padding:12px 14px">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:4px">Périodes actives</div>
+        <div style="font-size:20px;font-weight:800">${series.length}</div>
+      </div>
+      <div class="pos-card" style="padding:12px 14px">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:4px">Moy. / période</div>
+        <div style="font-size:20px;font-weight:800">${posGx(data.total_ca / series.length)}</div>
+      </div>
+    </div>`;
+
+    const tableau = `<div class="pos-card" style="padding:0;overflow:hidden">
+      <div style="overflow-x:auto;max-height:340px;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead style="position:sticky;top:0;background:#1a1f2e;z-index:1">
+            <tr style="border-bottom:1px solid rgba(255,255,255,.08)">
+              <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Période</th>
+              <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">CA</th>
+              <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Qté vendue</th>
+              <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Nb ventes</th>
+              <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Évolution</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${series.map((s, i) => {
+              const prev = series[i - 1];
+              const prog = prev && prev.ca > 0 ? ((s.ca - prev.ca) / prev.ca * 100) : null;
+              const progHtml = prog !== null
+                ? `<span style="font-size:11px;font-weight:600;color:${prog >= 0 ? '#34d399' : '#f87171'}">${prog >= 0 ? '+' : ''}${prog.toFixed(1)}%</span>`
+                : '<span style="color:rgba(255,255,255,.3)">—</span>';
+              return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+                <td style="padding:8px 12px;font-weight:600">${s.periode}</td>
+                <td style="padding:8px 8px;text-align:right;color:#3fb6a8;font-weight:700">${posGx(s.ca)}</td>
+                <td style="padding:8px 8px;text-align:right">${s.quantite.toFixed(1)}</td>
+                <td style="padding:8px 8px;text-align:right;color:rgba(255,255,255,.5)">${s.nb_transactions}</td>
+                <td style="padding:8px 12px">${progHtml}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+    body.innerHTML = chart + resume + tableau;
+  } catch(e){
+    body.innerHTML = `<div style="color:#f87171;padding:16px">${e.message || 'Erreur réseau'}</div>`;
+  }
+}
+
+// ── Tab Lots ───────────────────────────────────────────────────────
+
+function anaOuvrirLots(produitId){
+  anaSetTab('lots');
+  const sel = document.getElementById('ana-lots-produit');
+  if(sel) sel.value = produitId;
+  anaChargerLots();
+}
+
+async function anaChargerLots(){
+  const pid  = document.getElementById('ana-lots-produit')?.value;
+  const body = document.getElementById('ana-lots-body');
+  if(!pid){
+    body.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,.3)">Sélectionnez un article pour analyser ses lots d\'achat</div>';
+    return;
+  }
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</div>';
+
+  try {
+    const data = await apiFetch('GET', `/pos/analyse/lots/${pid}`);
+    const lots = data.lots || [];
+
+    const entete = `<div class="pos-card" style="padding:14px 16px;margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+      <div>
+        <div style="font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em">Produit</div>
+        <div style="font-size:16px;font-weight:800;margin-top:2px">${data.produit_nom}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.4)">${data.categorie || '—'}</div>
+      </div>
+      <div style="border-left:1px solid rgba(255,255,255,.08);padding-left:20px">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em">Stock courant</div>
+        <div style="font-size:18px;font-weight:800;color:${data.stock_courant <= 0 ? '#f87171' : '#34d399'};margin-top:2px">${data.stock_courant.toFixed(1)}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.4)">CMUP : ${posGx(data.cmup)}</div>
+      </div>
+      <div style="border-left:1px solid rgba(255,255,255,.08);padding-left:20px">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em">Prix de vente</div>
+        <div style="font-size:18px;font-weight:800;color:#60a5fa;margin-top:2px">${posGx(data.prix_vente)}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.4)">Val. stock : ${posGx(data.valeur_stock)}</div>
+      </div>
+      <div style="border-left:1px solid rgba(255,255,255,.08);padding-left:20px">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em">Lots enregistrés</div>
+        <div style="font-size:18px;font-weight:800;margin-top:2px">${data.nb_lots}</div>
+      </div>
+    </div>`;
+
+    if(!lots.length){
+      body.innerHTML = entete + '<div class="pos-card" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucun achat enregistré pour cet article</div>';
+      return;
+    }
+
+    const lotsHTML = `<div class="pos-card" style="padding:0;overflow:hidden">
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.08)">
+              <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35);white-space:nowrap">Date achat</th>
+              <th style="padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Fournisseur</th>
+              <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35);white-space:nowrap">Qté achetée</th>
+              <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35);white-space:nowrap">Prix/u</th>
+              <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35);white-space:nowrap">Coût lot</th>
+              <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35);white-space:nowrap">Qté vendue</th>
+              <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35);white-space:nowrap">CA généré</th>
+              <th style="padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35);min-width:100px">Récup.</th>
+              <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35);white-space:nowrap">Bénéfice est.</th>
+              <th style="padding:9px 8px;text-align:center;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lots.map(lot => {
+              const pct = lot.ventes.recuperation_pct;
+              const pctC = pct >= 100 ? '#34d399' : pct >= 50 ? '#f59e0b' : '#f87171';
+              const benef = lot.ventes.benefice_estime;
+              const bC = benef >= 0 ? '#34d399' : '#f87171';
+              const sBadge = lot.statut === 'CONFIRME'
+                ? '<span class="pos-badge teal" style="font-size:9px">Confirmé</span>'
+                : '<span class="pos-badge amber" style="font-size:9px">En attente</span>';
+              return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+                <td style="padding:9px 12px;font-weight:600;white-space:nowrap">${posDateFr(lot.date_achat).split(' ')[0]}</td>
+                <td style="padding:9px 8px;font-size:11px;color:rgba(255,255,255,.5)">${lot.fournisseur || '—'}</td>
+                <td style="padding:9px 8px;text-align:right;font-weight:600">${lot.qte_achetee.toFixed(1)}</td>
+                <td style="padding:9px 8px;text-align:right;font-size:11px">${posGx(lot.prix_unitaire)}</td>
+                <td style="padding:9px 8px;text-align:right;font-size:11px;color:rgba(255,255,255,.6)">${posGx(lot.cout_total)}</td>
+                <td style="padding:9px 8px;text-align:right;font-size:11px">${lot.ventes.qte_vendue.toFixed(1)}</td>
+                <td style="padding:9px 8px;text-align:right;font-weight:600;color:#60a5fa">${posGx(lot.ventes.ca_genere)}</td>
+                <td style="padding:9px 8px">
+                  <div style="display:flex;align-items:center;gap:5px">
+                    <div style="flex:1;height:5px;background:rgba(255,255,255,.08);border-radius:3px">
+                      <div style="height:100%;width:${Math.min(100,pct)}%;background:${pctC};border-radius:3px"></div>
+                    </div>
+                    <span style="font-size:11px;font-weight:700;color:${pctC};white-space:nowrap">${pct.toFixed(1)}%</span>
+                  </div>
+                </td>
+                <td style="padding:9px 8px;text-align:right;font-weight:700;color:${bC}">${posGx(benef)}</td>
+                <td style="padding:9px 8px;text-align:center">${sBadge}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+    body.innerHTML = entete + lotsHTML;
+  } catch(e){
+    body.innerHTML = `<div style="color:#f87171;padding:16px">${e.message || 'Erreur réseau'}</div>`;
+  }
+}
+
+// ── Tab Rentabilité ────────────────────────────────────────────────
+
+function anaRentPeriode(periode){
+  const today = new Date();
+  let debut;
+  if(periode === 'mois')     debut = new Date(today.getFullYear(), today.getMonth(), 1);
+  else if(periode === 'trim'){ debut = new Date(today); debut.setMonth(debut.getMonth() - 3); }
+  else                       { debut = new Date(today); debut.setFullYear(debut.getFullYear() - 1); }
+  const fmt = d => d.toISOString().split('T')[0];
+  document.getElementById('ana-rent-debut').value = fmt(debut);
+  document.getElementById('ana-rent-fin').value   = fmt(today);
+  anaChargerRentabilite();
+}
+
+async function anaChargerRentabilite(){
+  const debut = document.getElementById('ana-rent-debut')?.value;
+  const fin   = document.getElementById('ana-rent-fin')?.value;
+  if(!debut || !fin){ posAlert('Sélectionnez une période.', 'warn'); return; }
+
+  const body = document.getElementById('ana-rent-body');
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</div>';
+
+  try {
+    const data    = await apiFetch('GET', `/pos/benefices?date_debut=${debut}&date_fin=${fin}`);
+    const prods   = (data.par_produit || []).sort((a, b) => b.benefice - a.benefice);
+    const cats    = (data.par_categorie || []).sort((a, b) => b.benefice - a.benefice);
+
+    const kpis = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
+      <div class="pos-card" style="padding:12px 14px;border-top:3px solid #3fb6a8">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px">CA période</div>
+        <div style="font-size:20px;font-weight:800;color:#3fb6a8">${posGx(data.ca_total)}</div>
+      </div>
+      <div class="pos-card" style="padding:12px 14px;border-top:3px solid #f59e0b">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px">Coût des ventes</div>
+        <div style="font-size:20px;font-weight:800;color:#f59e0b">${posGx(data.cogs_total)}</div>
+      </div>
+      <div class="pos-card" style="padding:12px 14px;border-top:3px solid #34d399">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px">Bénéfice brut</div>
+        <div style="font-size:20px;font-weight:800;color:#34d399">${posGx(data.benefice_net)}</div>
+      </div>
+      <div class="pos-card" style="padding:12px 14px;border-top:3px solid #818cf8">
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:3px">Marge globale</div>
+        <div style="font-size:20px;font-weight:800;color:#818cf8">${(data.marge_globale || 0).toFixed(1)}%</div>
+      </div>
+    </div>`;
+
+    const catHTML = cats.length ? `<div class="pos-card" style="padding:14px 16px;margin-bottom:14px">
+      <div style="font-size:11px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Par catégorie</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${cats.map(c => {
+          const mc = c.marge_pct >= 30 ? '#34d399' : c.marge_pct >= 10 ? '#f59e0b' : '#f87171';
+          return `<div style="display:flex;align-items:center;gap:10px">
+            <div style="width:110px;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.categorie}</div>
+            <div style="flex:1;height:6px;background:rgba(255,255,255,.07);border-radius:3px">
+              <div style="height:100%;width:${Math.min(100, Math.max(0, c.marge_pct))}%;background:${mc};border-radius:3px"></div>
+            </div>
+            <div style="font-size:11px;font-weight:700;color:${mc};width:42px;text-align:right">${c.marge_pct !== undefined ? c.marge_pct.toFixed(1) : '—'}%</div>
+            <div style="font-size:11px;color:#3fb6a8;width:90px;text-align:right">${posGx(c.ca)}</div>
+            <div style="font-size:11px;color:#34d399;width:90px;text-align:right">${posGx(c.benefice)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
+    if(!prods.length){
+      body.innerHTML = kpis + catHTML + '<div class="pos-card" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune vente sur cette période</div>';
+      return;
+    }
+
+    const table = `<div class="pos-card" style="padding:0;overflow:hidden">
+      <div style="overflow-x:auto;max-height:380px;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead style="position:sticky;top:0;background:#1a1f2e;z-index:1">
+            <tr style="border-bottom:1px solid rgba(255,255,255,.08)">
+              <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Produit</th>
+              <th style="padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Catégorie</th>
+              <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35);white-space:nowrap">Qté vendue</th>
+              <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">CA</th>
+              <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">COGS</th>
+              <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35)">Bénéfice</th>
+              <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:rgba(255,255,255,.35);min-width:110px">Marge</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${prods.map(p => {
+              const mc = p.marge_pct >= 30 ? '#34d399' : p.marge_pct >= 10 ? '#f59e0b' : '#f87171';
+              const bc = p.benefice >= 0 ? '#34d399' : '#f87171';
+              return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+                <td style="padding:8px 12px;font-weight:600">${p.produit_nom}</td>
+                <td style="padding:8px 8px;font-size:11px;color:rgba(255,255,255,.4)">${p.categorie || '—'}</td>
+                <td style="padding:8px 8px;text-align:right">${p.quantite.toFixed(1)}</td>
+                <td style="padding:8px 8px;text-align:right;font-weight:600;color:#60a5fa">${posGx(p.ca)}</td>
+                <td style="padding:8px 8px;text-align:right;color:rgba(255,255,255,.5)">${posGx(p.cogs)}</td>
+                <td style="padding:8px 8px;text-align:right;font-weight:700;color:${bc}">${posGx(p.benefice)}</td>
+                <td style="padding:8px 12px">
+                  <div style="display:flex;align-items:center;gap:5px">
+                    <div style="width:50px;height:4px;background:rgba(255,255,255,.08);border-radius:2px">
+                      <div style="height:100%;width:${Math.min(100, Math.max(0, p.marge_pct))}%;background:${mc};border-radius:2px"></div>
+                    </div>
+                    <span style="font-size:11px;font-weight:700;color:${mc}">${p.marge_pct.toFixed(1)}%</span>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+    body.innerHTML = kpis + catHTML + table;
+  } catch(e){
+    body.innerHTML = `<div style="color:#f87171;padding:16px">${e.message || 'Erreur réseau'}</div>`;
   }
 }
 
