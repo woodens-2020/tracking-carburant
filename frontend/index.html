@@ -17949,7 +17949,7 @@ let _ckTousPlats = [];  // cache incluant inactifs
 async function loadCuisinePlats(){
   try {
     _ckTousPlats = await apiFetch('GET', '/cuisine/plats');
-  } catch(e){ _ckTousPlats = []; posAlert('Erreur chargement plats.','error'); return; }
+  } catch(e){ _ckTousPlats = []; posAlert('Erreur plats: ' + (e.message||e), 'error'); return; }
   _ckPlats = _ckTousPlats.filter(p => p.actif);
   ckPlatsRafraichirFiltres();
   ckPlatsAfficher();
