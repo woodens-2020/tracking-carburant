@@ -197,6 +197,28 @@ class SessionToken(Base):
     )
 
 
+class OTPCode(Base):
+    """Code OTP à usage unique pour la vérification en deux étapes."""
+    __tablename__ = "otp_codes"
+
+    id            = Column(Integer, primary_key=True)
+    user_id       = Column(Integer, ForeignKey("utilisateurs.id", ondelete="CASCADE"), nullable=False)
+    code_hash     = Column(String(64),  nullable=False)
+    pending_token = Column(String(64),  nullable=True, unique=True)
+    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    expires_at    = Column(DateTime(timezone=True), nullable=False)
+    attempts      = Column(Integer,     nullable=False, default=0)
+    used          = Column(Boolean,     nullable=False, default=False)
+
+    user = relationship("Utilisateur")
+
+    __table_args__ = (
+        Index("idx_otp_user_id", "user_id"),
+        Index("idx_otp_pending", "pending_token"),
+        Index("idx_otp_expires", "expires_at"),
+    )
+
+
 # ══════════════════════════════════════════════════════════════════
 # MODULES DE GESTION INSTITUTIONNELLE
 # ══════════════════════════════════════════════════════════════════

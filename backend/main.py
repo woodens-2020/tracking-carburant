@@ -11,7 +11,11 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
-from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense
+from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode
+from otp_service import (
+    OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
+    create_otp, send_otp_email, verify_otp, cleanup_expired_otps, _mask_email,
+)
 from pos_routes import router as pos_router
 from pos_analyse_routes import router as pos_analyse_router
 from hotel_routes import router as hotel_router
@@ -39,7 +43,7 @@ MAX_MODIFICATIONS_PAR_RELEVE = 2
 _ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
 
 # Chemins accessibles sans être connecté
-_PUBLIC_PATHS    = {"/login", "/api/login"}
+_PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify"}
 _PUBLIC_PREFIXES = ("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/")
 
 
@@ -87,12 +91,19 @@ app.include_router(admin_router)
 @app.on_event("startup")
 def startup():
     init_db()
-    # Purge des sessions expirées au démarrage (prévient l'accumulation infinie)
     from datetime import datetime, timezone as _tz
     from models import SessionToken as _ST
     with SessionLocal() as _db:
+        # Purge des sessions expirées
         _db.query(_ST).filter(_ST.expires_at < datetime.now(_tz.utc)).delete()
         _db.commit()
+        # Purge des OTP expirés ou utilisés
+        try:
+            n = cleanup_expired_otps(_db)
+            if n:
+                import logging; logging.getLogger("otp").info("Startup: %d OTP expirés supprimés", n)
+        except Exception:
+            pass  # Table pas encore créée (avant migration)
 
 
 # ---------- Authentification ----------
@@ -116,6 +127,59 @@ def login(data: LoginIn, response: Response, db: Session = Depends(get_db)):
         raise HTTPException(401, _err)
     if not user.code_acces_hash or not verify_code_acces(data.code_acces, user.code_acces_hash):
         raise HTTPException(401, _err)
+
+    # ── Vérification en deux étapes (OTP) ────────────────────────────
+    if OTP_ENABLED:
+        if not user.email:
+            raise HTTPException(400, "Aucun email associé à ce compte — contactez l'administrateur.")
+        try:
+            code, pending_token = create_otp(db, user.id)
+            send_otp_email(user.nom_complet or user.username, user.email, code)
+        except ValueError as e:
+            raise HTTPException(429, str(e))
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+
+        response.set_cookie(
+            OTP_PENDING_COOKIE, pending_token,
+            httponly=True, samesite="lax", max_age=OTP_PENDING_MAX_AGE, path="/",
+        )
+        return {
+            "otp_required": True,
+            "email_hint":   _mask_email(user.email),
+        }
+
+    # ── Connexion directe (OTP désactivé) ────────────────────────────
+    token = create_session(db, user.id)
+    response.set_cookie(
+        SESSION_COOKIE, token,
+        httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
+    )
+    raw_key = make_api_key(db, user.id)
+    return {
+        "id": user.id, "username": user.username,
+        "nom_complet": user.nom_complet, "role": user.role,
+        "api_key": raw_key,
+    }
+
+
+class OTPVerifyIn(BaseModel):
+    code: str
+
+
+@app.post("/api/otp/verify")
+def otp_verify(data: OTPVerifyIn, request: Request, response: Response, db: Session = Depends(get_db)):
+    """Étape 2 — vérifie le code OTP et ouvre la session si valide."""
+    pending_token = request.cookies.get(OTP_PENDING_COOKIE, "")
+    try:
+        user = verify_otp(db, pending_token, data.code)
+    except ValueError as e:
+        raise HTTPException(401, str(e))
+
+    # Invalider le cookie OTP en attente
+    response.delete_cookie(OTP_PENDING_COOKIE, path="/")
+
+    # Créer la vraie session
     token = create_session(db, user.id)
     response.set_cookie(
         SESSION_COOKIE, token,
