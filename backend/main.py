@@ -664,15 +664,13 @@ def oauth_callback(
             code, pending_token = create_otp(db, user.id)
             send_otp_email(user.nom_complet or user.email, user.email, code)
         except (ValueError, RuntimeError) as exc:
+            import traceback; traceback.print_exc()
             log.warning("OTP impossible pour %s via OAuth : %s", _mask_email(user.email), exc)
-            # Fallback : session directe si OTP indisponible (email non-livrable, rate limit)
-            session_token = create_session(db, user.id)
-            redir = RedirectResponse(url="/", status_code=302)
-            redir.set_cookie(
-                "session_token", session_token,
-                httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
-            )
-            return redir
+            return RedirectResponse(url=f"/login?oauth_error=otp_failed", status_code=302)
+        except Exception as exc:
+            import traceback; traceback.print_exc()
+            log.error("Exception inattendue OTP OAuth : %s", exc)
+            return RedirectResponse(url=f"/login?oauth_error=otp_failed", status_code=302)
         hint = url_quote(_mask_email(user.email), safe="")
         redir = RedirectResponse(url=f"/login?otp=1&hint={hint}", status_code=302)
         redir.set_cookie(

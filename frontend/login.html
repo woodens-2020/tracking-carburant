@@ -1022,7 +1022,10 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
 })();
 
 /* ══ REDIRECTION SI DÉJÀ CONNECTÉ ══ */
-fetch('/api/me',{credentials:'include'}).then(r=>{ if(r.ok) window.location.href='/'; }).catch(()=>{});
+/* Skip si on est en étape OTP (vient d'un redirect OAuth avec ?otp=1) */
+if(new URLSearchParams(window.location.search).get('otp') !== '1'){
+  fetch('/api/me',{credentials:'include'}).then(r=>{ if(r.ok) window.location.href='/'; }).catch(()=>{});
+}
 
 /* ══ AFFICHAGE CONDITIONNEL GOOGLE ══ */
 (function(){
@@ -1048,6 +1051,7 @@ fetch('/api/me',{credentials:'include'}).then(r=>{ if(r.ok) window.location.href
     access_denied:         'Connexion annulée.',
     no_access_token:       'Réponse Google invalide. Veuillez réessayer.',
     oauth_not_configured:  'La connexion Google n\'est pas configurée sur ce serveur.',
+    otp_failed:            'Impossible d\'envoyer le code de vérification. Réessayez dans quelques instants.',
   };
   const p = new URLSearchParams(window.location.search);
   const e = p.get('oauth_error');
