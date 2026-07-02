@@ -6720,7 +6720,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
 
       <!-- Modal paiement cuisine -->
-      <div id="ck-pay-bg" class="pos-modal-bg" style="display:none" onclick="if(event.target===this)ckFermerPaiement()">
+      <div id="ck-pay-bg" class="pos-modal-bg" onclick="if(event.target===this)ckFermerPaiement()">
         <div class="pos-modal" style="max-width:420px;width:95%">
           <div style="font-size:16px;font-weight:700;margin-bottom:16px">Paiement</div>
           <div class="pos-card" style="padding:12px 14px;margin-bottom:14px;background:rgba(63,182,168,.08);border:1px solid rgba(63,182,168,.2)">
@@ -6756,14 +6756,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
 
       <!-- Modal reçu cuisine -->
-      <div id="ck-recu-bg" class="pos-modal-bg" style="display:none">
+      <div id="ck-recu-bg" class="pos-modal-bg">
         <div class="pos-modal" style="max-width:420px;width:95%">
           <div style="font-size:16px;font-weight:700;margin-bottom:16px">Reçu</div>
           <div id="ck-recu-body" style="background:#fff;color:#111;border-radius:8px;padding:16px 18px;max-height:420px;overflow-y:auto;margin-bottom:14px"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="pos-btn ghost" onclick="ckImprimerRecu()">🖨 Imprimer</button>
             <button class="pos-btn ghost" onclick="ckWhatsApp()">WhatsApp</button>
-            <button class="pos-btn teal" style="margin-left:auto" onclick="document.getElementById('ck-recu-bg').style.display='none';ckViderPanier()">Fermer</button>
+            <button class="pos-btn teal" style="margin-left:auto" onclick="document.getElementById('ck-recu-bg').classList.remove('open');ckViderPanier()">Fermer</button>
           </div>
         </div>
       </div>
@@ -6812,7 +6812,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
 
       <!-- Modal ajout/modif plat -->
-      <div id="plat-modal-bg" class="pos-modal-bg" style="display:none" onclick="if(event.target===this)ckPlatFermerModal()">
+      <div id="plat-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)ckPlatFermerModal()">
         <div class="pos-modal" style="max-width:460px;width:95%">
           <div id="plat-modal-titre" style="font-size:16px;font-weight:700;margin-bottom:16px">Nouveau plat</div>
           <input type="hidden" id="plat-modal-id">
@@ -6915,7 +6915,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
 
       <!-- Modal dépense -->
-      <div id="dep-modal-bg" class="pos-modal-bg" style="display:none" onclick="if(event.target===this)ckDepFermerModal()">
+      <div id="dep-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)ckDepFermerModal()">
         <div class="pos-modal" style="max-width:440px;width:95%">
           <div id="dep-modal-titre" style="font-size:16px;font-weight:700;margin-bottom:16px">Nouvelle dépense</div>
           <input type="hidden" id="dep-modal-id">
@@ -7024,11 +7024,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
 
       <!-- Modal détail vente -->
-      <div id="ventes-detail-bg" class="pos-modal-bg" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+      <div id="ventes-detail-bg" class="pos-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
         <div class="pos-modal" style="max-width:460px;width:95%">
           <div id="ventes-detail-body"></div>
           <div style="display:flex;gap:8px;margin-top:14px">
-            <button class="pos-btn ghost" style="flex:1" onclick="document.getElementById('ventes-detail-bg').style.display='none'">Fermer</button>
+            <button class="pos-btn ghost" style="flex:1" onclick="document.getElementById('ventes-detail-bg').classList.remove('open')">Fermer</button>
             <button class="pos-btn ghost" id="ventes-detail-annuler" style="flex:1;color:#f87171;border-color:rgba(248,113,113,.3)">Annuler vente</button>
           </div>
         </div>
@@ -9676,9 +9676,13 @@ const _ACCES_POSTE = {
   'Directeur Général': null,
   // ─ Comptabilité / Supervision → accès partiel ────────────────
   'Comptable':   ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite'],
+                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse',
+                  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats',
+                  'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite'],
+                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse',
+                  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats',
+                  'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
   // ─ Terrain → accès très limité ───────────────────────────────
   'Pompiste': ['home','saisie'],
   'Caissier': ['home','saisie','journal','dashboard'],
@@ -17832,12 +17836,12 @@ function ckOuvrirPaiement(){
   document.getElementById('ck-pay-mode').value       = 'CASH';
   const mb = document.getElementById('ck-pay-monnaie-box');
   if(mb) mb.style.display = 'none';
-  document.getElementById('ck-pay-bg').style.display = 'flex';
+  document.getElementById('ck-pay-bg').classList.add('open');
   setTimeout(() => document.getElementById('ck-pay-recu')?.focus(), 100);
 }
 
 function ckFermerPaiement(){
-  document.getElementById('ck-pay-bg').style.display = 'none';
+  document.getElementById('ck-pay-bg').classList.remove('open');
 }
 
 function ckCalcMonnaie(){
@@ -17920,7 +17924,7 @@ function ckAfficherRecu({ result, cart, total, recu, mode, client }){
 
   const body = document.getElementById('ck-recu-body');
   if(body) body.innerHTML = html;
-  document.getElementById('ck-recu-bg').style.display = 'flex';
+  document.getElementById('ck-recu-bg').classList.add('open');
 }
 
 function ckImprimerRecu(){
@@ -18025,12 +18029,12 @@ function ckPlatOuvrirModal(platId){
       document.getElementById(id).value = '';
     });
   }
-  modal.style.display = 'flex';
+  modal.classList.add('open');
   setTimeout(() => document.getElementById('plat-nom')?.focus(), 100);
 }
 
 function ckPlatFermerModal(){
-  document.getElementById('plat-modal-bg').style.display = 'none';
+  document.getElementById('plat-modal-bg').classList.remove('open');
 }
 
 async function ckPlatSauvegarder(){
@@ -18158,12 +18162,12 @@ function ckDepOuvrirModal(depId){
     document.getElementById('ckdep-cat').value  = 'INGREDIENTS';
     document.getElementById('ckdep-date').value = today;
   }
-  modal.style.display = 'flex';
+  modal.classList.add('open');
   setTimeout(() => document.getElementById('ckdep-desc')?.focus(), 100);
 }
 
 function ckDepFermerModal(){
-  document.getElementById('dep-modal-bg').style.display = 'none';
+  document.getElementById('dep-modal-bg').classList.remove('open');
 }
 
 async function ckDepSauvegarder(){
@@ -18303,14 +18307,14 @@ function ckVenteDetail(id){
     btnAnn.style.display = v.statut === 'ANNULEE' ? 'none' : '';
     btnAnn.onclick = () => ckVenteAnnuler(v.id);
   }
-  document.getElementById('ventes-detail-bg').style.display = 'flex';
+  document.getElementById('ventes-detail-bg').classList.add('open');
 }
 
 async function ckVenteAnnuler(id){
   if(!confirm('Annuler cette vente ?')) return;
   try {
     await apiFetch('PUT', `/cuisine/ventes/${id}/annuler`);
-    document.getElementById('ventes-detail-bg').style.display = 'none';
+    document.getElementById('ventes-detail-bg').classList.remove('open');
     posAlert('Vente annulée.','success');
     ckVentesCharger();
   } catch(e){ posAlert(e.message||'Erreur.','error'); }
