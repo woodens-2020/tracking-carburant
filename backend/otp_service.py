@@ -38,7 +38,7 @@ EMAIL_PASSWORD  = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Konekta · Bon Prix")
 
 OTP_PENDING_COOKIE  = "otp_pending"
-OTP_PENDING_MAX_AGE = (OTP_RATE_WINDOW_MIN + 2) * 60  # léger délai tampon
+OTP_PENDING_MAX_AGE = 300  # 5 minutes — aligné sur OTP_DURATION_MIN
 
 
 # ── Primitives cryptographiques ───────────────────────────────────────────────

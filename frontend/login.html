@@ -544,6 +544,7 @@ body{
       <div class="otp-hint" id="otp-hint">
         Un code à 6 chiffres a été envoyé à<br><strong id="otp-email-hint">votre email</strong>
       </div>
+      <div id="otp-expire-timer" style="font-size:11px;color:rgba(232,197,88,.65);text-align:center;margin-top:6px;min-height:16px;letter-spacing:.3px"></div>
 
       <!-- 6 cases de saisie -->
       <div class="otp-boxes" id="otp-boxes">
@@ -893,24 +894,27 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
   // ── Afficher / masquer les étapes ─────────────────────────────
   window.showOtpStep = function(emailHint){
     document.getElementById('otp-email-hint').textContent = emailHint;
-    document.getElementById('login-form').style.display  = 'none';
-    document.getElementById('oauth-wrap') && (document.getElementById('oauth-wrap').style.display='none');
+    document.getElementById('login-form').style.display   = 'none';
+    var ow = document.getElementById('oauth-wrap');
+    if(ow) ow.style.display = 'none';
     document.getElementById('err-box').classList.add('hidden');
     document.getElementById('otp-step').classList.add('show');
     clearOtpBoxes();
     OTP_BOXES[0].focus();
     startResendCooldown(60);
+    startOtpExpireCountdown();
   };
 
   window.otpBack = function(){
     document.getElementById('otp-step').classList.remove('show');
     document.getElementById('login-form').style.display = '';
-    document.getElementById('oauth-wrap') && (document.getElementById('oauth-wrap').style.display='');
+    var ow = document.getElementById('oauth-wrap');
+    if(ow) ow.style.display = '';
     clearOtpBoxes();
-    if(_resendTimer){ clearInterval(_resendTimer); _resendTimer=null; }
+    if(_resendTimer){  clearInterval(_resendTimer);  _resendTimer=null;  }
+    if(_otpExpireTimer){ clearInterval(_otpExpireTimer); _otpExpireTimer=null; }
     timerEl.textContent = '';
     btnResend.disabled  = false;
-    // Invalider le cookie otp_pending côté client (le serveur le fera aussi)
     document.cookie = 'otp_pending=;path=/;max-age=0';
   };
 
@@ -949,11 +953,30 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
       errEl.textContent = '';
       OTP_BOXES[0].focus();
       startResendCooldown(60);
-    }catch(){ errEl.textContent='Erreur réseau'; btnResend.disabled=false; }
+    }catch(err){ errEl.textContent='Erreur réseau'; btnResend.disabled=false; }
   };
 
+  // ── Compte à rebours 5 min — reset auto vers login ────────────
+  let _otpExpireTimer = null;
+  function startOtpExpireCountdown(){
+    let left = 5 * 60; // 5 minutes en secondes
+    if(_otpExpireTimer) clearInterval(_otpExpireTimer);
+    _otpExpireTimer = setInterval(()=>{
+      left--;
+      const min = Math.floor(left/60);
+      const sec = String(left%60).padStart(2,'0');
+      const el  = document.getElementById('otp-expire-timer');
+      if(el) el.textContent = `Code valide ${min}:${sec}`;
+      if(left <= 0){
+        clearInterval(_otpExpireTimer); _otpExpireTimer=null;
+        setOtpErr('Code expiré — reconnectez-vous.');
+        setTimeout(()=>{ otpBack(); }, 2200);
+      }
+    }, 1000);
+  }
+
   // ── Vérifier le code ──────────────────────────────────────────
-  btnVerify.addEventListener('click', async () => {
+  btnVerify.addEventListener('click', async function(){
     const code = getOtpCode();
     if(code.length !== 6) return;
     btnVerify.disabled = true;
@@ -964,22 +987,23 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
         credentials:'include',
         body:JSON.stringify({code}),
       });
-      const d = await res.json().catch(()=>({}));
+      const d = await res.json().catch(function(){ return {}; });
       if(!res.ok){
         setOtpErr(d.detail||'Code incorrect');
         clearOtpBoxes(); OTP_BOXES[0].focus();
-        btnVerify.disabled = true;
-        btnVerify.innerHTML= 'Vérifier le code';
+        btnVerify.disabled  = true;
+        btnVerify.innerHTML = 'Vérifier le code';
         return;
       }
+      if(_otpExpireTimer){ clearInterval(_otpExpireTimer); _otpExpireTimer=null; }
       if(d.api_key) sessionStorage.setItem('api_key', d.api_key);
       btnVerify.classList.add('success');
       btnVerify.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Connecté !';
-      setTimeout(()=>{ window.location.href='/'; }, 450);
-    }catch(){
+      setTimeout(function(){ window.location.href='/'; }, 450);
+    }catch(err){
       setOtpErr('Erreur réseau — réessayez');
-      btnVerify.disabled=false;
-      btnVerify.innerHTML='Vérifier le code';
+      btnVerify.disabled  = false;
+      btnVerify.innerHTML = 'Vérifier le code';
     }
   });
 
