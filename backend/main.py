@@ -11,11 +11,12 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
-from models import Produit, Pompe, Releve, Utilisateur, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense
+from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense
 from pos_routes import router as pos_router
 from pos_analyse_routes import router as pos_analyse_router
 from hotel_routes import router as hotel_router
 from cuisine_routes import router as cuisine_router
+from admin_routes import router as admin_router
 from auth import (
     SESSION_COOKIE, hash_password, verify_password,
     hash_code_acces, verify_code_acces,
@@ -80,6 +81,7 @@ app.include_router(pos_router)
 app.include_router(pos_analyse_router)
 app.include_router(hotel_router)
 app.include_router(cuisine_router)
+app.include_router(admin_router)
 
 
 @app.on_event("startup")
@@ -136,12 +138,27 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
 
 
 @app.get("/api/me")
-def me(request: Request):
-    user = request.state.user
+def me(request: Request, db: Session = Depends(get_db)):
+    state_user = request.state.user
+    user = db.get(Utilisateur, state_user.id)
+    if not user:
+        raise HTTPException(401, "Session invalide")
+    perms = None
+    role_nom = user.poste
+    if user.role_obj:
+        perms = user.role_obj.permissions
+        role_nom = user.role_obj.nom
     return {
-        "id": user.id, "username": user.username,
-        "nom_complet": user.nom_complet, "role": user.role,
-        "poste": user.poste,
+        "id":          user.id,
+        "username":    user.username,
+        "nom_complet": user.nom_complet,
+        "email":       user.email,
+        "role":        user.role,
+        "poste":       user.poste,
+        "role_id":     user.role_id,
+        "role_nom":    role_nom,
+        "permissions": perms,
+        "est_admin":   user.role == "admin" or bool(perms and perms.get("admin", False)),
     }
 
 
@@ -200,17 +217,18 @@ def change_password(data: ChangePasswordIn, request: Request, db: Session = Depe
 # Dépendance : accès réservé aux administrateurs
 # ══════════════════════════════════════════════════════════════════════════════
 
-def require_admin(request: Request) -> Utilisateur:
-    """
-    Autorise si l'utilisateur authentifié a le rôle 'admin'.
-    La clé maître ADMIN_API_KEY (via X-API-Key) charge déjà l'admin en base
-    via AuthMiddleware — la vérification du rôle suffit donc.
-    Lève 403 sinon.
-    """
+def require_admin(request: Request, db: Session = Depends(get_db)) -> Utilisateur:
+    """Autorise si l'utilisateur a le rôle 'admin' ou permissions.admin == True."""
     user = getattr(request.state, "user", None)
-    if not user or user.role != "admin":
+    if not user:
         raise HTTPException(403, "Accès réservé aux administrateurs")
-    return user
+    if user.role == "admin":
+        return user
+    if user.role_id:
+        u = db.get(Utilisateur, user.id)
+        if u and u.role_obj and u.role_obj.permissions.get("admin", False):
+            return u
+    raise HTTPException(403, "Accès réservé aux administrateurs")
 
 
 def require_pdg(request: Request) -> Utilisateur:

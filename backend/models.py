@@ -1,7 +1,7 @@
 from sqlalchemy import (
     Column, Integer, String, Numeric, Boolean, Date,
     ForeignKey, DateTime, UniqueConstraint, CheckConstraint,
-    Index, func, text,
+    Index, func, text, JSON,
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -136,6 +136,25 @@ class PrixVente(Base):
     )
 
 
+class Role(Base):
+    """Rôle utilisateur avec matrice de permissions par domaine fonctionnel."""
+    __tablename__ = "roles"
+
+    id            = Column(Integer, primary_key=True)
+    nom           = Column(String(100), unique=True, nullable=False)
+    description   = Column(String(300), nullable=True)
+    permissions   = Column(JSON, nullable=False, default=dict)
+    est_admin     = Column(Boolean, nullable=False, default=False)
+    est_systeme   = Column(Boolean, nullable=False, default=False)
+    date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    utilisateurs = relationship("Utilisateur", back_populates="role_obj")
+
+    __table_args__ = (
+        Index("idx_roles_nom", "nom"),
+    )
+
+
 class Utilisateur(Base):
     """Compte utilisateur pouvant se connecter à l'application."""
     __tablename__ = "utilisateurs"
@@ -146,18 +165,20 @@ class Utilisateur(Base):
     api_key_hash      = Column(String(64),  unique=True, nullable=True)
     nom_complet       = Column(String(150), nullable=False, default="")
     role              = Column(String(20),  nullable=False, default="operateur")
-    poste             = Column(String(100), nullable=True)   # poste de l'employé → contrôle d'accès
+    poste             = Column(String(100), nullable=True)
     actif             = Column(Boolean,     nullable=False, default=True)
     created_at        = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    # Authentification par email + mot de passe + code d'accès à 9 chiffres
     email             = Column(String(254), unique=True, nullable=True)
-    code_acces_hash   = Column(String(255), nullable=True)   # hash du code 9 chiffres
-    # Champs OAuth (nullable — comptes locaux n'en ont pas)
-    oauth_provider    = Column(String(32),  nullable=True)   # "google" | "microsoft"
+    code_acces_hash   = Column(String(255), nullable=True)
+    oauth_provider    = Column(String(32),  nullable=True)
     oauth_sub         = Column(String(255), unique=True, nullable=True)
+    role_id           = Column(Integer, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True)
+
+    role_obj = relationship("Role", back_populates="utilisateurs")
 
     __table_args__ = (
         CheckConstraint("role IN ('admin', 'operateur', 'pdg')", name="chk_utilisateur_role"),
+        Index("idx_utilisateurs_role_id", "role_id"),
     )
 
 

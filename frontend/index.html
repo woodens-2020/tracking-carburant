@@ -2963,6 +2963,21 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <!-- ── Section Administration (admin seulement) ── -->
+    <div class="nav-section-label" id="nav-admin-label" style="display:none">Administration</div>
+
+    <button class="nav-item" id="nav-btn-admin-roles" data-page="admin-roles" onclick="goTo('admin-roles')" style="display:none">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>
+      <span>Rôles &amp; Accès</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" id="nav-btn-admin-users" data-page="admin-users" onclick="goTo('admin-users')" style="display:none">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+      <span>Comptes Utilisateurs</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
   </nav>
 
   <!-- Statut connexion -->
@@ -7605,6 +7620,202 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div><!-- /page-hotel-rapport -->
 
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- ADMIN — RÔLES & ACCÈS                                    -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-admin-roles" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#7c3aed,#5b21b6)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Rôles &amp; Accès</div>
+            <div class="pos-header-sub">Définissez les niveaux de permission par domaine fonctionnel</div>
+          </div>
+          <div class="pos-header-actions">
+            <button class="pos-btn" onclick="adminRolesNouveauModal()" style="background:linear-gradient(135deg,#7c3aed,#5b21b6)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nouveau rôle
+            </button>
+          </div>
+        </div>
+
+        <!-- Grille des rôles -->
+        <div id="admin-roles-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">
+          <div style="grid-column:1/-1;text-align:center;padding:40px;color:rgba(255,255,255,.3)">Chargement…</div>
+        </div>
+      </div>
+    </div><!-- /page-admin-roles -->
+
+    <!-- ── Modal rôle ── -->
+    <div id="admin-role-modal-bg" class="pos-modal-bg">
+      <div class="pos-modal" style="max-width:560px">
+        <div class="pos-modal-hdr">
+          <span id="admin-role-modal-title">Nouveau rôle</span>
+          <button class="pos-modal-close" onclick="adminRolesCloseModal()">✕</button>
+        </div>
+        <div class="pos-modal-body" style="padding:20px">
+          <input type="hidden" id="arm-id">
+          <div style="display:grid;gap:14px">
+            <div>
+              <label class="pos-label">Nom du rôle *</label>
+              <input class="pos-input" id="arm-nom" placeholder="Ex. Responsable Hôtel" style="width:100%">
+            </div>
+            <div>
+              <label class="pos-label">Description</label>
+              <input class="pos-input" id="arm-desc" placeholder="Décrivez ce rôle…" style="width:100%">
+            </div>
+            <!-- Matrice de permissions -->
+            <div style="border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow:hidden">
+              <div style="padding:12px 16px;background:rgba(255,255,255,.04);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.5)">
+                Domaines d'accès
+              </div>
+              <div id="arm-perms-matrix" style="padding:4px 0"></div>
+            </div>
+            <!-- Permission admin -->
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 14px;border:1px solid rgba(124,58,237,.3);border-radius:8px;background:rgba(124,58,237,.06)">
+              <input type="checkbox" id="arm-admin" style="width:16px;height:16px;accent-color:#7c3aed">
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#a78bfa">Administration</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">Peut gérer les utilisateurs et les rôles</div>
+              </div>
+            </label>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">
+            <button class="pos-btn ghost" onclick="adminRolesCloseModal()">Annuler</button>
+            <button class="pos-btn" onclick="adminRolesSauvegarder()" style="background:linear-gradient(135deg,#7c3aed,#5b21b6)">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /admin-role-modal -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- ADMIN — COMPTES UTILISATEURS                              -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-admin-users" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#0ea5e9,#0369a1)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Comptes Utilisateurs</div>
+            <div class="pos-header-sub">Créez et gérez les accès à l'application</div>
+          </div>
+          <div class="pos-header-actions">
+            <button class="pos-btn" onclick="adminUsersNouveauModal()" style="background:linear-gradient(135deg,#0ea5e9,#0369a1)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nouveau compte
+            </button>
+          </div>
+        </div>
+
+        <!-- Tableau des utilisateurs -->
+        <div class="pos-card">
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead>
+                <tr>
+                  <th>Nom complet</th>
+                  <th>Email</th>
+                  <th>Rôle</th>
+                  <th style="text-align:center">Statut</th>
+                  <th style="text-align:right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users-tbody">
+                <tr><td colspan="5" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-admin-users -->
+
+    <!-- ── Modal créer/modifier utilisateur ── -->
+    <div id="admin-user-modal-bg" class="pos-modal-bg">
+      <div class="pos-modal" style="max-width:500px">
+        <div class="pos-modal-hdr">
+          <span id="admin-user-modal-title">Nouveau compte</span>
+          <button class="pos-modal-close" onclick="adminUsersCloseModal()">✕</button>
+        </div>
+        <div class="pos-modal-body" style="padding:20px">
+          <input type="hidden" id="aum-id">
+          <div style="display:grid;gap:12px">
+            <div>
+              <label class="pos-label">Nom complet *</label>
+              <input class="pos-input" id="aum-nom" placeholder="Jean Pierre Dupont" style="width:100%">
+            </div>
+            <div>
+              <label class="pos-label">Email *</label>
+              <input class="pos-input" id="aum-email" type="email" placeholder="jean@exemple.com" style="width:100%">
+            </div>
+            <div id="aum-username-row">
+              <label class="pos-label">Nom d'utilisateur *</label>
+              <input class="pos-input" id="aum-username" placeholder="jean.pierre" style="width:100%">
+            </div>
+            <div id="aum-password-row">
+              <label class="pos-label">Mot de passe * <span style="font-size:10px;color:rgba(255,255,255,.4)">(min. 6 caractères)</span></label>
+              <input class="pos-input" id="aum-password" type="password" placeholder="••••••••" style="width:100%">
+            </div>
+            <div id="aum-pin-row">
+              <label class="pos-label">Code PIN * <span style="font-size:10px;color:rgba(255,255,255,.4)">(exactement 9 chiffres)</span></label>
+              <input class="pos-input" id="aum-pin" type="password" placeholder="123456789" maxlength="9" style="width:100%" inputmode="numeric">
+            </div>
+            <div>
+              <label class="pos-label">Rôle *</label>
+              <select class="pos-input" id="aum-role-id" style="width:100%">
+                <option value="">Choisir un rôle…</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">
+            <button class="pos-btn ghost" onclick="adminUsersCloseModal()">Annuler</button>
+            <button class="pos-btn" onclick="adminUsersSauvegarder()" style="background:linear-gradient(135deg,#0ea5e9,#0369a1)">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /admin-user-modal -->
+
+    <!-- ── Modal reset mot de passe ── -->
+    <div id="admin-reset-pwd-bg" class="pos-modal-bg">
+      <div class="pos-modal" style="max-width:400px">
+        <div class="pos-modal-hdr">
+          <span>Réinitialiser le mot de passe</span>
+          <button class="pos-modal-close" onclick="adminResetPwdClose()">✕</button>
+        </div>
+        <div class="pos-modal-body" style="padding:20px">
+          <input type="hidden" id="arpwd-uid">
+          <label class="pos-label">Nouveau mot de passe *</label>
+          <input class="pos-input" id="arpwd-pwd" type="password" placeholder="••••••••" style="width:100%;margin-bottom:16px">
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="pos-btn ghost" onclick="adminResetPwdClose()">Annuler</button>
+            <button class="pos-btn" onclick="adminResetPwdSauvegarder()" style="background:#e0536a">Réinitialiser</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Modal reset PIN ── -->
+    <div id="admin-reset-pin-bg" class="pos-modal-bg">
+      <div class="pos-modal" style="max-width:400px">
+        <div class="pos-modal-hdr">
+          <span>Réinitialiser le code PIN</span>
+          <button class="pos-modal-close" onclick="adminResetPinClose()">✕</button>
+        </div>
+        <div class="pos-modal-body" style="padding:20px">
+          <input type="hidden" id="arpin-uid">
+          <label class="pos-label">Nouveau PIN * <span style="font-size:10px;color:rgba(255,255,255,.4)">(9 chiffres)</span></label>
+          <input class="pos-input" id="arpin-pin" type="password" placeholder="123456789" maxlength="9" style="width:100%;margin-bottom:16px" inputmode="numeric">
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="pos-btn ghost" onclick="adminResetPinClose()">Annuler</button>
+            <button class="pos-btn" onclick="adminResetPinSauvegarder()" style="background:#f7a93b;color:#000">Réinitialiser</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /pages -->
 
   <footer class="app-footer">
@@ -9841,13 +10052,37 @@ function setStatus(ok){
 }
 let _appUser = null;
 
-// ── Pages accessibles par poste ──────────────────────────────────
-// null = accès complet ; tableau = pages autorisées
-// Tout poste NON LISTÉ → accès complet par défaut (PDG, Gérant, Chef, Admin…)
-const _ACCES_POSTE = {
-  // ─ Direction / Management → accès complet ────────────────────
+// ── Matrice de pages par domaine fonctionnel ─────────────────────
+const _AREA_PAGES = {
+  carburant: {
+    complet: ['home','saisie'],
+    lecture: ['home'],
+  },
+  finance: {
+    complet: ['dashboard','journal','statistiques','gi-dashboard','depenses','achats','caisse'],
+    lecture: ['dashboard','journal','statistiques','gi-dashboard'],
+  },
+  bar: {
+    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite'],
+    lecture: ['pos-ventes','pos-credits','pos-commandes','pos-analyse','pos-grande-caisse','pos-rentabilite'],
+  },
+  cuisine: {
+    complet: ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats'],
+    lecture: ['cuisine-ventes','cuisine-stats'],
+  },
+  hotel: {
+    complet: ['hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
+    lecture: ['hotel-historique','hotel-rapport'],
+  },
+  employes: {
+    complet: ['employes','payroll'],
+    lecture: ['employes'],
+  },
+};
+
+// Fallback pour utilisateurs sans role_id (compatibilité ascendante)
+const _ACCES_POSTE_LEGACY = {
   'Directeur Général': null,
-  // ─ Comptabilité / Supervision → accès partiel ────────────────
   'Comptable':   ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
@@ -9856,32 +10091,61 @@ const _ACCES_POSTE = {
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
                   'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
-  // ─ Terrain → accès très limité ───────────────────────────────
   'Pompiste': ['home','saisie'],
   'Caissier': ['home','saisie','journal','dashboard'],
 };
 
+function _getAllowedPages(){
+  if(!_appUser) return new Set();
+  const perms = _appUser.permissions;
+  if(perms){
+    if(perms.admin === true) return null; // null = accès complet
+    const allowed = new Set();
+    for(const [area, levels] of Object.entries(_AREA_PAGES)){
+      const level = perms[area] || 'aucun';
+      if(level === 'complet') levels.complet.forEach(p => allowed.add(p));
+      else if(level === 'lecture') levels.lecture.forEach(p => allowed.add(p));
+    }
+    return allowed;
+  }
+  // Fallback poste legacy
+  const poste = _appUser.poste || null;
+  if(!poste) return null;
+  const pages = _ACCES_POSTE_LEGACY[poste];
+  if(pages === undefined || pages === null) return null;
+  return new Set(pages);
+}
+
 function _canAccess(page){
-  const poste = _appUser?.poste || null;
-  if(!poste) return true;              // pas de poste → accès complet
-  const pages = _ACCES_POSTE[poste];
-  if(pages === undefined) return true; // poste non listé → accès complet par défaut
-  if(pages === null)      return true; // accès complet explicite
-  return pages.includes(page);
+  if(!_appUser) return false;
+  const perms = _appUser.permissions;
+  if(perms){
+    if(perms.admin === true) return true;
+    if(page === 'admin-roles' || page === 'admin-users') return false;
+  }
+  const allowed = _getAllowedPages();
+  if(allowed === null) return true;
+  return allowed.has(page);
 }
 
 function _applyNavAccess(){
-  const poste = _appUser?.poste || null;
-  if(!poste) return; // pas de poste → accès complet
-  const allowed = _ACCES_POSTE[poste];
-  if(allowed === undefined || allowed === null) return; // accès complet
-  // Rôle avec liste restreinte → masquer les items interdits
+  const isAdmin = _appUser?.est_admin || _appUser?.role === 'admin' || _appUser?.permissions?.admin === true;
+  // Montrer/cacher la section admin
+  ['nav-admin-label','nav-btn-admin-roles','nav-btn-admin-users'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.style.display = isAdmin ? '' : 'none';
+  });
+  const allowed = _getAllowedPages();
+  if(allowed === null) return; // accès complet — tout visible
+  // Masquer items de nav interdits (sauf admin qui est géré ci-dessus)
   document.querySelectorAll('.nav-item[data-page]').forEach(btn=>{
     const p = btn.getAttribute('data-page');
-    btn.style.display = allowed.includes(p) ? '' : 'none';
+    if(p === 'admin-roles' || p === 'admin-users') return; // géré séparément
+    btn.style.display = allowed.has(p) ? '' : 'none';
   });
   // Masquer les labels de sections dont tous les items sont cachés
   document.querySelectorAll('.nav-section-label').forEach(label=>{
+    if(label.id === 'nav-admin-label') return;
     let el = label.nextElementSibling;
     let hasVisible = false;
     while(el && !el.classList.contains('nav-section-label') && !el.classList.contains('nav-section')){
@@ -9894,12 +10158,15 @@ function _applyNavAccess(){
 
 async function loadCurrentUser(){
   try{
-    const u=await GET('/me');
+    const u = await GET('/me');
     _appUser = u;
-    document.getElementById('user-txt').textContent=u.nom_complet||u.username;
+    const roleLabel = u.role_nom || u.poste || u.role || '';
+    document.getElementById('user-txt').textContent = u.nom_complet || u.username;
+    const roleBadge = document.getElementById('user-role-badge');
+    if(roleBadge) roleBadge.textContent = roleLabel;
     _applyNavAccess();
   }catch(e){
-    document.getElementById('user-txt').textContent='—';
+    document.getElementById('user-txt').textContent = '—';
   }
 }
 async function logout(){
@@ -14190,7 +14457,327 @@ const _giPageLoaders = {
   'hotel-historique':   loadHotelHistorique,
   'hotel-employes':     loadHotelEmployes,
   'hotel-rapport':      loadHotelRapport,
+  'admin-roles':        loadAdminRoles,
+  'admin-users':        loadAdminUsers,
 };
+
+// ══════════════════════════════════════════════════════════════
+// ADMIN — RÔLES & ACCÈS
+// ══════════════════════════════════════════════════════════════
+let _adminRolesData = [];
+let _adminRoleEditId = null;
+
+const _ARM_DOMAINES = [
+  { key:'carburant', label:'⛽ Carburant',   color:'#f7a93b' },
+  { key:'finance',   label:'💰 Finance',     color:'#34d399' },
+  { key:'bar',       label:'🍺 Bar & POS',   color:'#60a5fa' },
+  { key:'cuisine',   label:'🍽️ Cuisine',     color:'#fb923c' },
+  { key:'hotel',     label:'🏨 Hôtel',       color:'#a78bfa' },
+  { key:'employes',  label:'👥 Employés',    color:'#f472b6' },
+];
+
+async function loadAdminRoles(){
+  try{
+    _adminRolesData = await apiFetch('GET','/admin/roles');
+    adminRolesRender();
+  }catch(e){ posAlert('Erreur chargement rôles','err'); }
+}
+
+function adminRolesRender(){
+  const grid = document.getElementById('admin-roles-grid');
+  if(!grid) return;
+  if(!_adminRolesData.length){
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:rgba(255,255,255,.3)">Aucun rôle défini</div>';
+    return;
+  }
+  grid.innerHTML = _adminRolesData.map(r => {
+    const badges = _ARM_DOMAINES.map(d => {
+      const level = (r.permissions||{})[d.key] || 'aucun';
+      const col = level==='complet' ? d.color : level==='lecture' ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.08)';
+      const txt = level==='complet' ? 'Complet' : level==='lecture' ? 'Lecture' : 'Aucun';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+        <span style="font-size:12px">${d.label}</span>
+        <span style="font-size:11px;font-weight:600;color:${col};background:${col}18;padding:2px 8px;border-radius:4px">${txt}</span>
+      </div>`;
+    }).join('');
+    const adminBadge = (r.permissions||{}).admin === true
+      ? '<span style="font-size:10px;background:rgba(124,58,237,.2);color:#a78bfa;padding:2px 7px;border-radius:4px;border:1px solid rgba(124,58,237,.3)">ADMIN</span>'
+      : '';
+    const systBadge = r.est_systeme
+      ? '<span style="font-size:10px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);padding:2px 7px;border-radius:4px">système</span>'
+      : '';
+    const nbUsers = r.nb_utilisateurs || 0;
+    return `<div class="pos-card" style="display:flex;flex-direction:column;gap:0">
+      <div style="padding:14px 16px 10px;border-bottom:1px solid rgba(255,255,255,.06)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">
+          <div style="font-weight:700;font-size:14px">${r.nom}</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">${adminBadge}${systBadge}</div>
+        </div>
+        <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">${r.description||'—'}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.3)">${nbUsers} utilisateur${nbUsers!==1?'s':''}</div>
+      </div>
+      <div style="padding:8px 16px;flex:1">${badges}</div>
+      <div style="padding:10px 16px;border-top:1px solid rgba(255,255,255,.06);display:flex;gap:8px;justify-content:flex-end">
+        <button class="pos-btn ghost" onclick="adminRolesEditer(${r.id})" style="font-size:12px;padding:5px 12px">Modifier</button>
+        ${!r.est_systeme ? `<button class="pos-btn ghost" onclick="adminRolesSupprimer(${r.id},'${r.nom.replace(/'/g,"\\'")}',${r.nb_utilisateurs})" style="font-size:12px;padding:5px 12px;color:#f87171">Supprimer</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _armBuildMatrix(perms){
+  const matrix = document.getElementById('arm-perms-matrix');
+  if(!matrix) return;
+  matrix.innerHTML = _ARM_DOMAINES.map(d => {
+    const cur = (perms||{})[d.key] || 'aucun';
+    const opts = ['complet','lecture','aucun'].map(v =>
+      `<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px">
+        <input type="radio" name="arm-${d.key}" value="${v}" ${cur===v?'checked':''} style="accent-color:${d.color}"> ${v.charAt(0).toUpperCase()+v.slice(1)}
+       </label>`
+    ).join('');
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.04)">
+      <span style="font-size:13px;min-width:130px">${d.label}</span>
+      <div style="display:flex;gap:14px">${opts}</div>
+    </div>`;
+  }).join('');
+}
+
+function _armReadPerms(){
+  const perms = {};
+  _ARM_DOMAINES.forEach(d => {
+    const sel = document.querySelector(`input[name="arm-${d.key}"]:checked`);
+    perms[d.key] = sel ? sel.value : 'aucun';
+  });
+  perms.admin = document.getElementById('arm-admin').checked;
+  return perms;
+}
+
+function adminRolesNouveauModal(){
+  _adminRoleEditId = null;
+  document.getElementById('admin-role-modal-title').textContent = 'Nouveau rôle';
+  document.getElementById('arm-id').value = '';
+  document.getElementById('arm-nom').value = '';
+  document.getElementById('arm-desc').value = '';
+  document.getElementById('arm-admin').checked = false;
+  _armBuildMatrix({});
+  document.getElementById('admin-role-modal-bg').classList.add('open');
+}
+
+function adminRolesEditer(id){
+  const r = _adminRolesData.find(x => x.id === id);
+  if(!r) return;
+  _adminRoleEditId = id;
+  document.getElementById('admin-role-modal-title').textContent = 'Modifier le rôle';
+  document.getElementById('arm-id').value = id;
+  document.getElementById('arm-nom').value = r.nom;
+  document.getElementById('arm-desc').value = r.description || '';
+  document.getElementById('arm-admin').checked = !!(r.permissions||{}).admin;
+  _armBuildMatrix(r.permissions);
+  document.getElementById('admin-role-modal-bg').classList.add('open');
+}
+
+function adminRolesCloseModal(){
+  document.getElementById('admin-role-modal-bg').classList.remove('open');
+}
+
+async function adminRolesSauvegarder(){
+  const nom = document.getElementById('arm-nom').value.trim();
+  if(!nom){ posAlert('Le nom du rôle est requis','err'); return; }
+  const body = {
+    nom,
+    description: document.getElementById('arm-desc').value.trim() || null,
+    permissions: _armReadPerms(),
+  };
+  try{
+    if(_adminRoleEditId){
+      await apiFetch('PUT',`/admin/roles/${_adminRoleEditId}`, body);
+      posAlert('Rôle modifié','ok');
+    } else {
+      await apiFetch('POST','/admin/roles', body);
+      posAlert('Rôle créé','ok');
+    }
+    adminRolesCloseModal();
+    loadAdminRoles();
+  }catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+async function adminRolesSupprimer(id, nom, nbUsers){
+  if(nbUsers > 0){
+    posAlert(`Ce rôle est attribué à ${nbUsers} utilisateur(s) — réassignez-les d'abord`,'err');
+    return;
+  }
+  if(!confirm(`Supprimer le rôle "${nom}" ?`)) return;
+  try{
+    await apiFetch('DELETE',`/admin/roles/${id}`);
+    posAlert('Rôle supprimé','ok');
+    loadAdminRoles();
+  }catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// ADMIN — COMPTES UTILISATEURS
+// ══════════════════════════════════════════════════════════════
+let _adminUsersData  = [];
+let _adminRolesList  = [];
+let _adminUserEditId = null;
+
+async function loadAdminUsers(){
+  try{
+    [_adminUsersData, _adminRolesList] = await Promise.all([
+      apiFetch('GET','/admin/users'),
+      apiFetch('GET','/admin/roles'),
+    ]);
+    adminUsersRender();
+  }catch(e){ posAlert('Erreur chargement utilisateurs','err'); }
+}
+
+function adminUsersRender(){
+  const tbody = document.getElementById('admin-users-tbody');
+  if(!tbody) return;
+  if(!_adminUsersData.length){
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Aucun compte</td></tr>';
+    return;
+  }
+  tbody.innerHTML = _adminUsersData.map(u => {
+    const statut = u.actif
+      ? '<span style="font-size:11px;color:#34d399;background:rgba(52,211,153,.1);padding:2px 8px;border-radius:4px">Actif</span>'
+      : '<span style="font-size:11px;color:#f87171;background:rgba(248,113,113,.1);padding:2px 8px;border-radius:4px">Inactif</span>';
+    const toggleBtn = u.actif
+      ? `<button class="pos-btn ghost" onclick="adminUsersToggleActif(${u.id},false)" style="font-size:11px;padding:3px 9px;color:#f87171" title="Désactiver">Désactiver</button>`
+      : `<button class="pos-btn ghost" onclick="adminUsersToggleActif(${u.id},true)" style="font-size:11px;padding:3px 9px;color:#34d399" title="Activer">Activer</button>`;
+    return `<tr>
+      <td><div style="font-weight:600">${u.nom_complet||'—'}</div><div style="font-size:11px;color:rgba(255,255,255,.4)">${u.username}</div></td>
+      <td style="font-size:12px">${u.email||'—'}</td>
+      <td><span style="font-size:12px;background:rgba(255,255,255,.08);padding:2px 8px;border-radius:4px">${u.role_nom||u.poste||u.role||'—'}</span></td>
+      <td style="text-align:center">${statut}</td>
+      <td style="text-align:right">
+        <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+          <button class="pos-btn ghost" onclick="adminUsersEditer(${u.id})" style="font-size:11px;padding:3px 9px">Modifier</button>
+          <button class="pos-btn ghost" onclick="adminResetPwdOpen(${u.id})" style="font-size:11px;padding:3px 9px" title="Réinitialiser mot de passe">MDP</button>
+          <button class="pos-btn ghost" onclick="adminResetPinOpen(${u.id})" style="font-size:11px;padding:3px 9px;color:#f7a93b" title="Réinitialiser PIN">PIN</button>
+          ${toggleBtn}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function _adminPopulateRoleSelect(selectId, currentRoleId){
+  const sel = document.getElementById(selectId);
+  if(!sel) return;
+  sel.innerHTML = '<option value="">Choisir un rôle…</option>' +
+    _adminRolesList.map(r =>
+      `<option value="${r.id}" ${r.id === currentRoleId ? 'selected' : ''}>${r.nom}</option>`
+    ).join('');
+}
+
+function adminUsersNouveauModal(){
+  _adminUserEditId = null;
+  document.getElementById('admin-user-modal-title').textContent = 'Nouveau compte';
+  document.getElementById('aum-id').value = '';
+  document.getElementById('aum-nom').value = '';
+  document.getElementById('aum-email').value = '';
+  document.getElementById('aum-username').value = '';
+  document.getElementById('aum-password').value = '';
+  document.getElementById('aum-pin').value = '';
+  document.getElementById('aum-username-row').style.display = '';
+  document.getElementById('aum-password-row').style.display = '';
+  document.getElementById('aum-pin-row').style.display = '';
+  _adminPopulateRoleSelect('aum-role-id', null);
+  document.getElementById('admin-user-modal-bg').classList.add('open');
+}
+
+function adminUsersEditer(id){
+  const u = _adminUsersData.find(x => x.id === id);
+  if(!u) return;
+  _adminUserEditId = id;
+  document.getElementById('admin-user-modal-title').textContent = 'Modifier le compte';
+  document.getElementById('aum-id').value = id;
+  document.getElementById('aum-nom').value = u.nom_complet || '';
+  document.getElementById('aum-email').value = u.email || '';
+  document.getElementById('aum-username').value = u.username || '';
+  document.getElementById('aum-username-row').style.display = 'none';
+  document.getElementById('aum-password-row').style.display = 'none';
+  document.getElementById('aum-pin-row').style.display = 'none';
+  _adminPopulateRoleSelect('aum-role-id', u.role_id);
+  document.getElementById('admin-user-modal-bg').classList.add('open');
+}
+
+function adminUsersCloseModal(){
+  document.getElementById('admin-user-modal-bg').classList.remove('open');
+}
+
+async function adminUsersSauvegarder(){
+  const nom  = document.getElementById('aum-nom').value.trim();
+  const email = document.getElementById('aum-email').value.trim();
+  const roleId = parseInt(document.getElementById('aum-role-id').value);
+  if(!nom)  { posAlert('Le nom complet est requis','err'); return; }
+  if(!email){ posAlert('L\'email est requis','err'); return; }
+  if(!roleId){ posAlert('Le rôle est requis','err'); return; }
+  try{
+    if(_adminUserEditId){
+      await apiFetch('PUT',`/admin/users/${_adminUserEditId}`, { nom_complet:nom, email, role_id:roleId });
+      posAlert('Compte modifié','ok');
+    } else {
+      const username  = document.getElementById('aum-username').value.trim();
+      const password  = document.getElementById('aum-password').value;
+      const code_acces = document.getElementById('aum-pin').value.trim();
+      if(!username){ posAlert('Le nom d\'utilisateur est requis','err'); return; }
+      if(!password){ posAlert('Le mot de passe est requis','err'); return; }
+      if(!code_acces){ posAlert('Le code PIN est requis','err'); return; }
+      await apiFetch('POST','/admin/users', { nom_complet:nom, email, username, password, code_acces, role_id:roleId });
+      posAlert('Compte créé','ok');
+    }
+    adminUsersCloseModal();
+    loadAdminUsers();
+  }catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+async function adminUsersToggleActif(id, actif){
+  try{
+    await apiFetch('PUT',`/admin/users/${id}`, { actif });
+    posAlert(actif ? 'Compte activé' : 'Compte désactivé','ok');
+    loadAdminUsers();
+  }catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+function adminResetPwdOpen(uid){
+  document.getElementById('arpwd-uid').value = uid;
+  document.getElementById('arpwd-pwd').value = '';
+  document.getElementById('admin-reset-pwd-bg').classList.add('open');
+}
+function adminResetPwdClose(){
+  document.getElementById('admin-reset-pwd-bg').classList.remove('open');
+}
+async function adminResetPwdSauvegarder(){
+  const uid = document.getElementById('arpwd-uid').value;
+  const pwd = document.getElementById('arpwd-pwd').value;
+  if(!pwd){ posAlert('Le mot de passe est requis','err'); return; }
+  try{
+    await apiFetch('POST',`/admin/users/${uid}/reset-password`, { nouveau_mot_de_passe: pwd });
+    posAlert('Mot de passe réinitialisé','ok');
+    adminResetPwdClose();
+  }catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+function adminResetPinOpen(uid){
+  document.getElementById('arpin-uid').value = uid;
+  document.getElementById('arpin-pin').value = '';
+  document.getElementById('admin-reset-pin-bg').classList.add('open');
+}
+function adminResetPinClose(){
+  document.getElementById('admin-reset-pin-bg').classList.remove('open');
+}
+async function adminResetPinSauvegarder(){
+  const uid = document.getElementById('arpin-uid').value;
+  const pin = document.getElementById('arpin-pin').value.trim();
+  if(!pin){ posAlert('Le code PIN est requis','err'); return; }
+  try{
+    await apiFetch('POST',`/admin/users/${uid}/reset-pin`, { nouveau_code: pin });
+    posAlert('Code PIN réinitialisé','ok');
+    adminResetPinClose();
+  }catch(e){ posAlert(e.message||'Erreur','err'); }
+}
 
 // ══════════════════════════════════════════════════════════════
 // TABLEAU DE BORD GI
