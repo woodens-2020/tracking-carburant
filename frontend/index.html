@@ -8016,6 +8016,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <option value="">Choisir un rôle…</option>
               </select>
             </div>
+            <div id="aum-employe-row">
+              <label class="pos-label">Lier à un employé <span style="font-size:10px;color:rgba(255,255,255,.4)">(caissière — accès à ses propres données)</span></label>
+              <select class="pos-input" id="aum-employe-id" style="width:100%">
+                <option value="0">Aucun (pas un caissier)</option>
+              </select>
+            </div>
           </div>
           <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">
             <button class="pos-btn ghost" onclick="adminUsersCloseModal()">Annuler</button>
@@ -14936,6 +14942,16 @@ function _adminPopulateRoleSelect(selectId, currentRoleId){
     ).join('');
 }
 
+async function _adminPopulateEmployeSelect(currentEmployeId){
+  const sel = document.getElementById('aum-employe-id');
+  if(!sel) return;
+  try {
+    const emps = await apiFetch('GET', '/pos/caisse/caissieres');
+    sel.innerHTML = '<option value="0">Aucun (pas un caissier)</option>' +
+      emps.map(e=>`<option value="${e.id}" ${e.id===currentEmployeId?'selected':''}>${e.nom} ${e.prenom} — ${e.poste}</option>`).join('');
+  } catch(e){ sel.innerHTML = '<option value="0">Aucun</option>'; }
+}
+
 function adminUsersNouveauModal(){
   _adminUserEditId = null;
   document.getElementById('admin-user-modal-title').textContent = 'Nouveau compte';
@@ -14948,11 +14964,12 @@ function adminUsersNouveauModal(){
   document.getElementById('aum-username-row').style.display = '';
   document.getElementById('aum-password-row').style.display = '';
   document.getElementById('aum-pin-row').style.display = '';
+  document.getElementById('aum-employe-row').style.display = 'none';
   _adminPopulateRoleSelect('aum-role-id', null);
   document.getElementById('admin-user-modal-bg').classList.add('open');
 }
 
-function adminUsersEditer(id){
+async function adminUsersEditer(id){
   const u = _adminUsersData.find(x => x.id === id);
   if(!u) return;
   _adminUserEditId = id;
@@ -14965,7 +14982,9 @@ function adminUsersEditer(id){
   document.getElementById('aum-username-row').style.display = 'none';
   document.getElementById('aum-password-row').style.display = 'none';
   document.getElementById('aum-pin-row').style.display = 'none';
+  document.getElementById('aum-employe-row').style.display = '';
   _adminPopulateRoleSelect('aum-role-id', u.role_id);
+  await _adminPopulateEmployeSelect(u.employe_id || 0);
   document.getElementById('admin-user-modal-bg').classList.add('open');
 }
 
@@ -14982,7 +15001,8 @@ async function adminUsersSauvegarder(){
   if(!roleId){ posAlert('Le rôle est requis','err'); return; }
   try{
     if(_adminUserEditId){
-      await apiFetch('PUT',`/admin/users/${_adminUserEditId}`, { nom_complet:nom, email, role_id:roleId });
+      const employe_id = parseInt(document.getElementById('aum-employe-id')?.value||0)||0;
+      await apiFetch('PUT',`/admin/users/${_adminUserEditId}`, { nom_complet:nom, email, role_id:roleId, employe_id });
       const emailChanged = email && email !== _adminUserEditPrevEmail;
       if(emailChanged){
         try{
@@ -15779,6 +15799,16 @@ async function loadPosCaisse(){
   posRenderCatTabs();
   posCatFilter(_posCatActuelle, null);
   posRenderCart();
+  // Auto-sélection si l'utilisateur connecté est lié à un employé
+  if(_appUser?.employe_id){
+    const sel = document.getElementById('pos-caissier-sel');
+    if(sel){
+      sel.value = String(_appUser.employe_id);
+      sel.disabled = true;
+      sel.title = 'Votre identité caissière est verrouillée';
+    }
+    posCaissierChange(_appUser.employe_id);
+  }
 }
 
 async function _posChargerCaissiers(){
@@ -17510,6 +17540,11 @@ async function loadPosVentes(){
     if(sel) sel.innerHTML = '<option value="">Tous les caissiers</option>' +
       emps.map(e=>`<option value="${e.id}">${e.nom} ${e.prenom}</option>`).join('');
   } catch(e){}
+  // Verrouiller sur le propre employé si caissière connectée
+  if(_appUser?.employe_id){
+    const sel = document.getElementById('pos-ventes-caissier-f');
+    if(sel){ sel.value = String(_appUser.employe_id); sel.disabled = true; }
+  }
   posVentesAujourdhui();
 }
 
@@ -17651,13 +17686,16 @@ async function loadPosCredits(){
   await posCreditsCharger();
 }
 
+
 async function posCreditsCharger(){
   const tbody = document.getElementById('pos-credits-tbody');
   if(tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     const filtre = document.getElementById('pos-credits-filtre')?.value||'';
-    let url = '/pos/credits';
-    if(filtre) url += `?statut=${filtre}`;
+    let url = '/pos/credits?';
+    if(filtre) url += `statut=${filtre}&`;
+    if(_appUser?.employe_id) url += `caissier_id=${_appUser.employe_id}&`;
+    url = url.slice(0,-1)||'/pos/credits';
     const data = await apiFetch('GET', url);
     const credits = data.credits||data||[];
     _posCredits = credits;
@@ -19115,6 +19153,13 @@ async function loadPosSessionsCaisse(){
     if(sel) sel.innerHTML = '<option value="">Tous les caissiers</option>' +
       emps.map(e=>`<option value="${e.id}">${e.nom} ${e.prenom}</option>`).join('');
   } catch(e){}
+  // Si caissière connectée : verrouiller sur son propre ID
+  if(_appUser?.employe_id){
+    const sel = document.getElementById('sc-filtre-caissier');
+    if(sel){ sel.value = String(_appUser.employe_id); sel.disabled = true; }
+    // Cacher les boutons admin (valider)
+    document.getElementById('sc-kpis')?.style && (document.getElementById('sc-kpis').style.display = '');
+  }
   scAujourdhui();
 }
 
@@ -19171,7 +19216,8 @@ async function scCharger(){
       const soumis_at = s.soumis_at ? new Date(s.soumis_at).toLocaleString('fr-HT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : '—';
       const valide_par = s.valide_par ? `<span title="${s.valide_par}" style="font-size:11px;color:rgba(255,255,255,.5)">${s.valide_par}</span>` : '—';
 
-      const btnValider = s.statut !== 'VALIDE'
+      const estAdmin = _appUser?.est_admin || !_appUser?.employe_id;
+      const btnValider = (s.statut !== 'VALIDE' && estAdmin)
         ? `<button class="pos-btn teal" style="font-size:11px;padding:3px 10px" onclick="scValider(${s.id})">Accepter</button>`
         : '';
       const btnPdf  = `<button class="pos-btn ghost" style="font-size:11px;padding:3px 10px" onclick="scExport(${s.id},'pdf')">PDF</button>`;
@@ -19263,7 +19309,8 @@ async function scResume(session_id){
     `;
 
     if(acts){
-      const btnVal = d.statut !== 'VALIDE'
+      const estAdmin = _appUser?.est_admin || !_appUser?.employe_id;
+      const btnVal = (d.statut !== 'VALIDE' && estAdmin)
         ? `<button class="pos-btn teal" onclick="scValider(${session_id});scFermerDetail()">Accepter</button>`
         : '';
       acts.innerHTML = `

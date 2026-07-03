@@ -315,6 +315,7 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
 
 @app.get("/api/me")
 def me(request: Request, db: Session = Depends(get_db)):
+    from models import Employe as _Employe
     state_user = request.state.user
     user = db.get(Utilisateur, state_user.id)
     if not user:
@@ -324,6 +325,7 @@ def me(request: Request, db: Session = Depends(get_db)):
     if user.role_obj:
         perms = user.role_obj.permissions
         role_nom = user.role_obj.nom
+    emp = db.query(_Employe).filter_by(utilisateur_id=user.id).first()
     return {
         "id":          user.id,
         "username":    user.username,
@@ -335,6 +337,8 @@ def me(request: Request, db: Session = Depends(get_db)):
         "role_nom":    role_nom,
         "permissions": perms,
         "est_admin":   user.role == "admin" or bool(perms and perms.get("admin", False)),
+        "employe_id":  emp.id if emp else None,
+        "employe_nom": (emp.nom + " " + emp.prenom) if emp else None,
     }
 
 

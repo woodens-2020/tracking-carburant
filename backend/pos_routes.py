@@ -1175,12 +1175,15 @@ def encaisser_commande_route(
 
 @router.get("/credits")
 def liste_credits(
-    statut: Optional[str] = None,
+    statut:      Optional[str] = None,
+    caissier_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     q = db.query(BarCredit)
     if statut:
         q = q.filter(BarCredit.statut == statut.upper())
+    if caissier_id:
+        q = q.join(BarVente, BarCredit.vente_id == BarVente.id).filter(BarVente.caissier_id == caissier_id)
     credits = q.order_by(BarCredit.date_creation.desc()).all()
 
     return [
@@ -1197,6 +1200,7 @@ def liste_credits(
             "date_creation":    c.date_creation.isoformat(),
             "date_echeance":    str(c.date_echeance) if c.date_echeance else None,
             "nb_remboursements": len(c.remboursements),
+            "caissier_id":      c.vente.caissier_id if c.vente else None,
         }
         for c in credits
     ]

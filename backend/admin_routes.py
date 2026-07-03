@@ -19,7 +19,7 @@ from activity_log import (
 from auth import hash_code_acces, hash_password, make_api_key
 from otp_service import send_welcome_email
 from database import get_db
-from models import AuditLog, Role, SessionToken, Utilisateur
+from models import AuditLog, Employe, Role, SessionToken, Utilisateur
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -71,7 +71,11 @@ def _role_public(r: Role) -> dict:
     }
 
 
-def _user_public(u: Utilisateur) -> dict:
+def _user_public(u: Utilisateur, db: Session = None) -> dict:
+    employe_id = None
+    if db:
+        emp = db.query(Employe).filter_by(utilisateur_id=u.id).first()
+        employe_id = emp.id if emp else None
     return {
         "id":             u.id,
         "username":       u.username,
@@ -84,6 +88,7 @@ def _user_public(u: Utilisateur) -> dict:
         "actif":          u.actif,
         "created_at":     u.created_at.isoformat() if u.created_at else None,
         "oauth_provider": u.oauth_provider,
+        "employe_id":     employe_id,
     }
 
 
@@ -191,6 +196,7 @@ class UpdateUserIn(BaseModel):
     email:       Optional[str] = None
     role_id:     Optional[int] = None
     actif:       Optional[bool] = None
+    employe_id:  Optional[int] = None  # 0 = délier ; N = lier à cet employé
 
 
 class ResetPasswordIn(BaseModel):
@@ -206,7 +212,7 @@ def lister_users(
     _admin: Utilisateur = Depends(_require_admin),
     db: Session = Depends(get_db),
 ):
-    return [_user_public(u) for u in db.query(Utilisateur).order_by(Utilisateur.id).all()]
+    return [_user_public(u, db) for u in db.query(Utilisateur).order_by(Utilisateur.id).all()]
 
 
 @router.post("/users", status_code=201)
@@ -297,9 +303,19 @@ def modifier_user(
             if nb_admins <= 1:
                 raise HTTPException(409, "Impossible : dernier administrateur actif")
         u.actif = data.actif
+    if data.employe_id is not None:
+        # Délier l'ancienne association si elle existait
+        ancien = db.query(Employe).filter_by(utilisateur_id=uid).first()
+        if ancien:
+            ancien.utilisateur_id = None
+        if data.employe_id > 0:
+            emp = db.get(Employe, data.employe_id)
+            if not emp:
+                raise HTTPException(404, "Employé introuvable")
+            emp.utilisateur_id = uid
     db.commit()
     db.refresh(u)
-    return _user_public(u)
+    return _user_public(u, db)
 
 
 @router.post("/users/{uid}/reset-password")
