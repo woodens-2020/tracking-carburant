@@ -28,6 +28,9 @@ USER_CREATED     = "user_created"
 USER_UPDATED     = "user_updated"
 USER_DISABLED    = "user_disabled"
 USER_ENABLED     = "user_enabled"
+ADMIN_CODE_REQUESTED = "admin_code_requested"
+ADMIN_CODE_VERIFIED  = "admin_code_verified"
+ADMIN_CODE_FAILED    = "admin_code_failed"
 
 
 def log_event(

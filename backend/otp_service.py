@@ -20,7 +20,7 @@ from email.mime.text import MIMEText
 
 from sqlalchemy.orm import Session
 
-from models import OTPCode, Utilisateur
+from models import OTPCode, Utilisateur, AdminCode
 
 log = logging.getLogger("otp")
 
@@ -412,3 +412,213 @@ def cleanup_expired_otps(db: Session) -> int:
     )
     db.commit()
     return deleted
+
+
+# ── Code administrateur 5 chiffres ───────────────────────────────────────────
+
+def _generate_admin_code() -> str:
+    """Code 5 chiffres uniforme via CSPRNG (10 000 – 99 999)."""
+    return f"{secrets.randbelow(90_000) + 10_000}"
+
+
+def create_admin_code(db: Session, user_id: int) -> str:
+    """
+    Génère un code admin 5 chiffres pour l'utilisateur.
+    Invalide tout code actif existant.
+    Retourne le code en clair — à envoyer UNIQUEMENT à l'email admin.
+    """
+    db.query(AdminCode).filter(
+        AdminCode.user_id == user_id,
+        AdminCode.used.is_(False),
+    ).update({"used": True}, synchronize_session=False)
+
+    code       = _generate_admin_code()
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+
+    ac = AdminCode(
+        user_id   = user_id,
+        code_hash = _hash_code(code),
+        expires_at= expires_at,
+        used      = False,
+        attempts  = 0,
+    )
+    db.add(ac)
+    db.commit()
+    return code
+
+
+def _build_admin_code_email_html(nom_employe: str, username_employe: str, code: str) -> str:
+    digits = "&nbsp;&nbsp;".join(code)
+    return f"""<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#070e1c;font-family:Arial,Helvetica,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#070e1c;padding:36px 16px">
+  <tr><td align="center">
+    <table width="100%" style="max-width:480px;background:#0b1628;border-radius:14px;border:1px solid rgba(232,197,88,.22);overflow:hidden">
+
+      <tr>
+        <td style="padding:28px 32px 24px;text-align:center;border-bottom:2px solid #e8c558">
+          <div style="font-size:32px;font-weight:900;color:#e8c558;line-height:1">K</div>
+          <div style="font-size:13px;font-weight:800;color:#e8c558;letter-spacing:3px;margin-top:4px">KONEKTA</div>
+          <div style="font-size:10px;color:rgba(232,197,88,.45);margin-top:3px">
+            Bon Prix &middot; Complexe Commerciale de Pillatre
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:12px 32px;background:rgba(239,68,68,.09);border-bottom:1px solid rgba(239,68,68,.18)">
+          <div style="font-size:12px;font-weight:800;color:#fc8585;text-align:center;letter-spacing:.08em;text-transform:uppercase">
+            ⚡ ACTION REQUISE — Code d'accès employé
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:28px 32px 20px">
+          <p style="margin:0 0 18px;color:rgba(221,232,248,.75);font-size:13px;line-height:1.65">
+            L'employé <strong style="color:#e8c558">{nom_employe}</strong>
+            (<span style="font-family:monospace;color:rgba(232,197,88,.8)">{username_employe}</span>)
+            a demandé un code d'accès alternatif car il ne peut pas recevoir son code OTP par email.
+          </p>
+
+          <div style="background:#050c18;border:2px solid #e8c558;border-radius:12px;padding:26px 20px;text-align:center;margin:0 0 22px">
+            <div style="font-size:10px;font-weight:800;color:rgba(232,197,88,.5);letter-spacing:.18em;text-transform:uppercase;margin-bottom:12px">
+              Code administrateur
+            </div>
+            <div style="font-size:48px;font-weight:900;color:#e8c558;letter-spacing:18px;
+                        font-family:'Courier New',Courier,monospace">
+              {digits}
+            </div>
+            <div style="font-size:11px;color:rgba(232,197,88,.38);margin-top:14px">
+              ⏱ Valide <strong style="color:rgba(232,197,88,.6)">24 heures</strong>
+              &nbsp;&middot;&nbsp; Usage unique
+            </div>
+          </div>
+
+          <table cellpadding="0" cellspacing="0" width="100%"
+                 style="background:rgba(14,165,233,.07);border:1px solid rgba(14,165,233,.2);
+                        border-left:3px solid #0ea5e9;border-radius:8px;margin:0 0 16px">
+            <tr>
+              <td style="padding:12px 14px;color:rgba(147,213,248,.9);font-size:12px;line-height:1.6">
+                📞 <strong>Communiquez ce code verbalement</strong> à l'employé.
+                Ne l'envoyez jamais par email ou messagerie.
+              </td>
+            </tr>
+          </table>
+
+          <table cellpadding="0" cellspacing="0" width="100%"
+                 style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.22);
+                        border-left:3px solid #ef4444;border-radius:8px">
+            <tr>
+              <td style="padding:11px 14px;color:rgba(252,133,133,.9);font-size:12px;line-height:1.5">
+                ⚠️ Si vous ne reconnaissez pas cet employé ou cette demande, ignorez ce message.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:14px 32px;border-top:1px solid rgba(255,255,255,.06);text-align:center">
+          <p style="margin:0;color:rgba(255,255,255,.18);font-size:10px">
+            &copy; 2026 Konekta &nbsp;&middot;&nbsp; Message automatique &mdash; ne pas répondre.
+          </p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>"""
+
+
+def send_admin_code_email(nom_employe: str, username_employe: str, code: str) -> None:
+    """
+    Envoie le code admin 5 chiffres à EMAIL_USER (l'administrateur).
+    Ce code ne doit JAMAIS être envoyé à l'employé — l'admin le communique verbalement.
+    """
+    if not EMAIL_USER or not EMAIL_PASSWORD:
+        raise RuntimeError("Email non configuré dans backend/.env")
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"[KONEKTA] Code d'accès pour {nom_employe} — action requise"
+    msg["From"]    = f"{EMAIL_FROM_NAME} <{EMAIL_USER}>"
+    msg["To"]      = EMAIL_USER
+    msg["X-Priority"] = "1"
+
+    msg.attach(MIMEText(_build_admin_code_email_html(nom_employe, username_employe, code), "html", "utf-8"))
+
+    try:
+        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=10) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
+            smtp.login(EMAIL_USER, EMAIL_PASSWORD)
+            smtp.sendmail(EMAIL_USER, [EMAIL_USER], msg.as_string())
+        log.info("Code admin envoyé pour l'employé %s", username_employe)
+    except smtplib.SMTPAuthenticationError:
+        log.error("Échec auth SMTP pour email code admin")
+        raise RuntimeError("Impossible d'envoyer le code admin — vérifiez la configuration SMTP.")
+    except Exception as exc:
+        log.error("Erreur envoi email code admin : %s", exc)
+        raise RuntimeError(f"L'email admin n'a pas pu être envoyé : {exc}")
+
+
+def verify_admin_code(db: Session, pending_token: str, submitted_code: str) -> Utilisateur:
+    """
+    Vérifie le code admin 5 chiffres soumis par l'employé.
+    Identifie l'utilisateur via le pending_token OTP (même cookie que l'étape 1).
+    """
+    if not pending_token:
+        raise ValueError("Session expirée — recommencez la connexion.")
+
+    otp = db.query(OTPCode).filter(OTPCode.pending_token == pending_token).first()
+    if not otp:
+        raise ValueError("Session invalide — recommencez la connexion.")
+
+    user_id = otp.user_id
+    now     = datetime.now(timezone.utc)
+
+    ac = (
+        db.query(AdminCode)
+        .filter(
+            AdminCode.user_id   == user_id,
+            AdminCode.used.is_(False),
+            AdminCode.expires_at > now,
+        )
+        .order_by(AdminCode.created_at.desc())
+        .first()
+    )
+    if not ac:
+        raise ValueError("Aucun code administrateur actif — demandez un nouveau code.")
+
+    if ac.attempts >= 3:
+        ac.used = True
+        db.commit()
+        raise ValueError("Trop de tentatives — recommencez la connexion.")
+
+    import hmac as _hmac
+    expected = _hash_code(submitted_code.strip())
+    if not _hmac.compare_digest(expected, ac.code_hash):
+        ac.attempts += 1
+        remaining = 3 - ac.attempts
+        if remaining <= 0:
+            ac.used = True
+            db.commit()
+            raise ValueError("Code incorrect — trop de tentatives. Recommencez la connexion.")
+        db.commit()
+        raise ValueError(
+            f"Code incorrect. {remaining} tentative{'s' if remaining > 1 else ''} restante{'s' if remaining > 1 else ''}."
+        )
+
+    ac.used = True
+    db.commit()
+
+    user = db.get(Utilisateur, user_id)
+    if not user or not user.actif:
+        raise ValueError("Compte introuvable ou désactivé.")
+
+    return user

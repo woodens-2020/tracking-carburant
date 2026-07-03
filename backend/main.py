@@ -19,11 +19,13 @@ from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVen
 from otp_service import (
     OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
     create_otp, send_otp_email, verify_otp, cleanup_expired_otps, _mask_email,
+    create_admin_code, send_admin_code_email, verify_admin_code, EMAIL_USER,
 )
 from activity_log import (
     log_event,
     LOGIN_SUCCESS, LOGIN_FAILED, LOGOUT,
     OTP_SENT, OTP_VERIFIED, OTP_FAILED,
+    ADMIN_CODE_REQUESTED, ADMIN_CODE_VERIFIED, ADMIN_CODE_FAILED,
 )
 from pos_routes import router as pos_router
 from pos_analyse_routes import router as pos_analyse_router
@@ -52,7 +54,7 @@ MAX_MODIFICATIONS_PAR_RELEVE = 2
 _ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
 
 # Chemins accessibles sans être connecté
-_PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify"}
+_PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code"}
 _PUBLIC_PREFIXES = ("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/")
 
 
@@ -202,6 +204,85 @@ def otp_verify(data: OTPVerifyIn, request: Request, response: Response, db: Sess
         raise HTTPException(401, str(e))
 
     log_event(db, OTP_VERIFIED, user_id=user.id, ip_address=ip)
+    response.delete_cookie(OTP_PENDING_COOKIE, path="/")
+
+    token = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
+    response.set_cookie(
+        SESSION_COOKIE, token,
+        httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
+    )
+    raw_key = make_api_key(db, user.id)
+    return {
+        "id": user.id, "username": user.username,
+        "nom_complet": user.nom_complet, "role": user.role,
+        "api_key": raw_key,
+    }
+
+
+@app.post("/api/otp/request-admin-code")
+def otp_request_admin_code(request: Request, response: Response, db: Session = Depends(get_db)):
+    """
+    Génère un code 5 chiffres et l'envoie à l'email administrateur.
+    L'employé doit contacter l'admin verbalement pour obtenir ce code.
+    Prolonge le cookie pending_token à 60 min pour laisser le temps à l'admin de répondre.
+    """
+    ip            = request.client.host if request.client else None
+    pending_token = request.cookies.get(OTP_PENDING_COOKIE, "")
+
+    if not pending_token:
+        raise HTTPException(400, "Session expirée — recommencez la connexion.")
+
+    otp = db.query(OTPCode).filter(OTPCode.pending_token == pending_token).first()
+    if not otp:
+        raise HTTPException(400, "Session invalide — recommencez la connexion.")
+
+    user = db.get(Utilisateur, otp.user_id)
+    if not user or not user.actif:
+        raise HTTPException(400, "Compte introuvable ou désactivé.")
+
+    try:
+        code = create_admin_code(db, user.id)
+        send_admin_code_email(user.nom_complet or user.username, user.username, code)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+    log_event(db, ADMIN_CODE_REQUESTED, user_id=user.id, ip_address=ip)
+
+    # Prolonger le cookie à 60 min pour que l'employé ait le temps de contacter l'admin
+    response.set_cookie(
+        OTP_PENDING_COOKIE, pending_token,
+        httponly=True, samesite="lax", max_age=3600, path="/",
+    )
+    return {
+        "admin_code_sent": True,
+        "admin_email_hint": _mask_email(EMAIL_USER) if EMAIL_USER else "l'administrateur",
+    }
+
+
+class AdminCodeVerifyIn(BaseModel):
+    code: str
+
+
+@app.post("/api/otp/verify-admin-code")
+def otp_verify_admin_code(
+    data: AdminCodeVerifyIn,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Vérifie le code admin 5 chiffres et ouvre la session si valide."""
+    ip            = request.client.host if request.client else None
+    ua            = request.headers.get("user-agent", "")
+    pending_token = request.cookies.get(OTP_PENDING_COOKIE, "")
+
+    try:
+        user = verify_admin_code(db, pending_token, data.code)
+    except ValueError as e:
+        log_event(db, ADMIN_CODE_FAILED, ip_address=ip, details={"raison": str(e)})
+        raise HTTPException(401, str(e))
+
+    log_event(db, ADMIN_CODE_VERIFIED, user_id=user.id, ip_address=ip)
     response.delete_cookie(OTP_PENDING_COOKIE, path="/")
 
     token = create_session(db, user.id, ip_address=ip, user_agent=ua)

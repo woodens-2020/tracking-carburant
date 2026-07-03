@@ -540,38 +540,106 @@ body{
           <polyline points="16 2 16 8 22 8"/>
         </svg>
       </div>
-      <div class="otp-title">Vérification en deux étapes</div>
+      <div class="otp-title" id="otp-step-title">Vérification en deux étapes</div>
       <div class="otp-hint" id="otp-hint">
         Un code à 6 chiffres a été envoyé à<br><strong id="otp-email-hint">votre email</strong>
       </div>
       <div id="otp-expire-timer" style="font-size:11px;color:rgba(232,197,88,.65);text-align:center;margin-top:6px;min-height:16px;letter-spacing:.3px"></div>
 
-      <!-- 6 cases de saisie -->
-      <div class="otp-boxes" id="otp-boxes">
-        <input class="otp-box" id="ob0" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
-        <input class="otp-box" id="ob1" maxlength="1" inputmode="numeric">
-        <input class="otp-box" id="ob2" maxlength="1" inputmode="numeric">
-        <input class="otp-box" id="ob3" maxlength="1" inputmode="numeric">
-        <input class="otp-box" id="ob4" maxlength="1" inputmode="numeric">
-        <input class="otp-box" id="ob5" maxlength="1" inputmode="numeric">
+      <!-- ── Mode OTP (défaut) ── -->
+      <div id="otp-mode-content" style="display:flex;flex-direction:column;align-items:center;width:100%">
+        <!-- 6 cases de saisie -->
+        <div class="otp-boxes" id="otp-boxes">
+          <input class="otp-box" id="ob0" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+          <input class="otp-box" id="ob1" maxlength="1" inputmode="numeric">
+          <input class="otp-box" id="ob2" maxlength="1" inputmode="numeric">
+          <input class="otp-box" id="ob3" maxlength="1" inputmode="numeric">
+          <input class="otp-box" id="ob4" maxlength="1" inputmode="numeric">
+          <input class="otp-box" id="ob5" maxlength="1" inputmode="numeric">
+        </div>
+
+        <div class="otp-err" id="otp-err"></div>
+
+        <button type="button" class="btn-login" id="btn-otp-verify" style="margin-top:4px" disabled>
+          Vérifier le code
+        </button>
+
+        <div style="font-size:11px;color:rgba(232,197,88,.5);text-align:center;margin-top:2px;line-height:1.5;padding:0 4px">
+          📬 Vérifiez aussi vos <strong style="color:rgba(232,197,88,.75)">spams / courriers indésirables</strong>
+        </div>
+
+        <div class="otp-resend">
+          Vous n'avez pas reçu le code ?
+          <button type="button" id="btn-resend" onclick="otpResend()">Renvoyer</button>
+          <span id="resend-timer" style="color:rgba(78,109,149,.45);margin-left:4px"></span>
+        </div>
+
+        <button type="button" class="otp-back" onclick="otpBack()">← Retour à la connexion</button>
+
+        <!-- Bascule vers code admin -->
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.05);width:100%;text-align:center">
+          <button type="button" onclick="switchToAdminCode()"
+            style="background:none;border:none;cursor:pointer;font-size:11px;
+                   color:rgba(232,197,88,.38);text-decoration:underline;text-decoration-style:dotted;
+                   padding:2px 4px;transition:color .15s;font-family:var(--f)">
+            Utiliser un code administrateur →
+          </button>
+        </div>
       </div>
 
-      <div class="otp-err" id="otp-err"></div>
+      <!-- ── Mode code administrateur ── -->
+      <div id="admin-code-mode-content" style="display:none;flex-direction:column;align-items:center;width:100%">
 
-      <button type="button" class="btn-login" id="btn-otp-verify" style="margin-top:4px" disabled>
-        Vérifier le code
-      </button>
+        <!-- Phase 1 : demander le code -->
+        <div id="admin-request-phase" style="display:flex;flex-direction:column;align-items:center;width:100%">
+          <div style="text-align:center;font-size:13px;color:rgba(221,232,248,.6);
+                      line-height:1.65;margin:14px 0 18px;padding:0 8px">
+            L'administrateur recevra un email avec un code.<br>
+            <span style="color:rgba(232,197,88,.48);font-size:11.5px">
+              Demandez-lui verbalement ce code à 5 chiffres.
+            </span>
+          </div>
+          <button type="button" class="btn-login" id="btn-request-admin-code" onclick="requestAdminCode()">
+            Envoyer la demande à l'admin
+          </button>
+          <div class="otp-err" id="admin-request-err" style="margin-top:8px"></div>
+        </div>
 
-      <div style="font-size:11px;color:rgba(232,197,88,.5);text-align:center;margin-top:2px;line-height:1.5;padding:0 4px">
-        📬 Vérifiez aussi vos <strong style="color:rgba(232,197,88,.75)">spams / courriers indésirables</strong>
+        <!-- Phase 2 : saisir le code -->
+        <div id="admin-enter-phase" style="display:none;flex-direction:column;align-items:center;width:100%">
+          <div style="margin-bottom:14px;text-align:center">
+            <div style="font-size:12px;color:rgba(52,211,153,.72);margin-bottom:6px">
+              ✅ Demande envoyée — contactez l'administrateur
+            </div>
+            <div style="font-size:11.5px;color:rgba(221,232,248,.48);line-height:1.5">
+              Saisissez le code à 5 chiffres qu'il vous communique.
+            </div>
+          </div>
+
+          <div class="otp-boxes" id="admin-code-boxes" style="gap:10px;margin-bottom:12px">
+            <input class="otp-box" id="ac0" maxlength="1" inputmode="numeric">
+            <input class="otp-box" id="ac1" maxlength="1" inputmode="numeric">
+            <input class="otp-box" id="ac2" maxlength="1" inputmode="numeric">
+            <input class="otp-box" id="ac3" maxlength="1" inputmode="numeric">
+            <input class="otp-box" id="ac4" maxlength="1" inputmode="numeric">
+          </div>
+
+          <div class="otp-err" id="admin-code-err"></div>
+
+          <button type="button" class="btn-login" id="btn-verify-admin-code" style="margin-top:4px" disabled onclick="verifyAdminCode()">
+            Valider le code admin
+          </button>
+          <div style="font-size:10.5px;color:rgba(78,109,149,.3);text-align:center;margin-top:8px">
+            Code valide 24&nbsp;h &nbsp;·&nbsp; Usage unique &nbsp;·&nbsp; Max 3 tentatives
+          </div>
+        </div>
+
+        <!-- Retour au mode OTP -->
+        <button type="button" class="otp-back" onclick="switchToOtp()" style="margin-top:12px">
+          ← Retour au code email
+        </button>
       </div>
 
-      <div class="otp-resend">
-        Vous n'avez pas reçu le code ?
-        <button type="button" id="btn-resend" onclick="otpResend()">Renvoyer</button>
-        <span id="resend-timer" style="color:rgba(78,109,149,.45);margin-left:4px"></span>
-      </div>
-      <button type="button" class="otp-back" onclick="otpBack()">← Retour à la connexion</button>
     </div>
 
   </div><!-- /card -->
@@ -903,6 +971,12 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
     if(ow) ow.style.display = 'none';
     document.getElementById('err-box').classList.add('hidden');
     document.getElementById('otp-step').classList.add('show');
+    // Toujours démarrer en mode OTP
+    document.getElementById('otp-mode-content').style.display = 'flex';
+    var _ac=document.getElementById('admin-code-mode-content'); if(_ac)_ac.style.display='none';
+    var _arp=document.getElementById('admin-request-phase'); if(_arp)_arp.style.display='flex';
+    var _aep=document.getElementById('admin-enter-phase'); if(_aep)_aep.style.display='none';
+    var _rba=document.getElementById('btn-request-admin-code'); if(_rba){_rba.disabled=false;_rba.innerHTML='Envoyer la demande à l\'admin';}
     clearOtpBoxes();
     OTP_BOXES[0].focus();
     startResendCooldown(60);
@@ -920,7 +994,21 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
     timerEl.textContent = '';
     btnResend.disabled  = false;
     document.cookie = 'otp_pending=;path=/;max-age=0';
+    // Réinitialiser le mode admin
+    var _amc=document.getElementById('admin-code-mode-content'); if(_amc)_amc.style.display='none';
+    var _omc=document.getElementById('otp-mode-content'); if(_omc)_omc.style.display='flex';
+    var _arp=document.getElementById('admin-request-phase'); if(_arp)_arp.style.display='flex';
+    var _aep=document.getElementById('admin-enter-phase'); if(_aep)_aep.style.display='none';
+    var _rba=document.getElementById('btn-request-admin-code'); if(_rba){_rba.disabled=false;_rba.innerHTML='Envoyer la demande à l\'admin';}
+    var _are=document.getElementById('admin-request-err'); if(_are)_are.textContent='';
+    var _et=document.getElementById('otp-expire-timer'); if(_et)_et.textContent='';
   };
+
+  // Exposer les contrôles de timer pour le module code admin
+  window._stopOtpExpireTimer = function(){
+    if(_otpExpireTimer){ clearInterval(_otpExpireTimer); _otpExpireTimer=null; }
+  };
+  window._startOtpExpireTimer = startOtpExpireCountdown;
 
   // ── Compte à rebours renvoi ────────────────────────────────────
   function startResendCooldown(sec){
@@ -1023,6 +1111,152 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
     }
   `;
   document.head.appendChild(style);
+})();
+
+/* ══ CODE ADMINISTRATEUR ══ */
+(function(){
+  var _initDone = false;
+
+  function _initAdminBoxes(){
+    if(_initDone) return;
+    var boxes = [0,1,2,3,4].map(function(i){ return document.getElementById('ac'+i); });
+    var btnV  = document.getElementById('btn-verify-admin-code');
+    var errEl = document.getElementById('admin-code-err');
+
+    function updateState(){
+      var code = boxes.map(function(b){ return b.value; }).join('');
+      if(btnV) btnV.disabled = code.length !== 5;
+      boxes.forEach(function(b){ if(b) b.classList.toggle('filled', b.value !== ''); });
+      if(errEl) errEl.textContent = '';
+      boxes.forEach(function(b){ if(b) b.classList.remove('err'); });
+    }
+
+    boxes.forEach(function(box, idx){
+      if(!box) return;
+      box.addEventListener('keydown', function(e){
+        if(e.key==='Backspace' && !box.value && idx>0){
+          boxes[idx-1].focus(); boxes[idx-1].value=''; updateState(); e.preventDefault();
+        }
+      });
+      box.addEventListener('input', function(){
+        var v = box.value.replace(/\D/g,'');
+        box.value = v ? v[0] : '';
+        if(v && idx<4) boxes[idx+1].focus();
+        updateState();
+      });
+      box.addEventListener('paste', function(e){
+        var t = (e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'').slice(0,5);
+        if(!t){ e.preventDefault(); return; }
+        t.split('').forEach(function(ch,i){ if(boxes[i]) boxes[i].value=ch; });
+        boxes[Math.min(t.length,4)].focus(); updateState(); e.preventDefault();
+      });
+    });
+    _initDone = true;
+  }
+
+  window._clearAdminBoxes = function(){
+    [0,1,2,3,4].forEach(function(i){
+      var b=document.getElementById('ac'+i); if(b){b.value='';b.classList.remove('filled','err');}
+    });
+    var btnV=document.getElementById('btn-verify-admin-code'); if(btnV) btnV.disabled=true;
+    var e=document.getElementById('admin-code-err'); if(e) e.textContent='';
+  };
+
+  window._setAdminErr = function(msg){
+    var e=document.getElementById('admin-code-err'); if(e) e.textContent=msg;
+    [0,1,2,3,4].forEach(function(i){ var b=document.getElementById('ac'+i); if(b) b.classList.add('err'); });
+    var b0=document.getElementById('ac0'); if(b0) b0.focus();
+    var boxes=document.getElementById('admin-code-boxes');
+    if(boxes){ boxes.style.animation='none'; void boxes.offsetWidth; boxes.style.animation='shake .38s ease'; }
+  };
+
+  window.switchToAdminCode = function(){
+    document.getElementById('otp-mode-content').style.display='none';
+    var ac=document.getElementById('admin-code-mode-content'); if(ac) ac.style.display='flex';
+    // Arrêter le compte à rebours OTP et afficher info code admin
+    if(window._stopOtpExpireTimer) window._stopOtpExpireTimer();
+    var et=document.getElementById('otp-expire-timer');
+    if(et) et.textContent='Code admin valide 24 heures';
+    var ht=document.getElementById('otp-hint');
+    if(ht) ht.style.opacity='.45';
+  };
+
+  window.switchToOtp = function(){
+    var ac=document.getElementById('admin-code-mode-content'); if(ac) ac.style.display='none';
+    document.getElementById('otp-mode-content').style.display='flex';
+    // Réinitialiser les phases
+    var arp=document.getElementById('admin-request-phase'); if(arp) arp.style.display='flex';
+    var aep=document.getElementById('admin-enter-phase'); if(aep) aep.style.display='none';
+    var rba=document.getElementById('btn-request-admin-code');
+    if(rba){ rba.disabled=false; rba.innerHTML='Envoyer la demande à l\'admin'; }
+    var are=document.getElementById('admin-request-err'); if(are) are.textContent='';
+    if(window._clearAdminBoxes) window._clearAdminBoxes();
+    // Restaurer l'opacité du hint et relancer le timer OTP
+    var ht=document.getElementById('otp-hint'); if(ht) ht.style.opacity='';
+    var et=document.getElementById('otp-expire-timer'); if(et) et.textContent='';
+    if(window._startOtpExpireTimer) window._startOtpExpireTimer();
+  };
+
+  window.requestAdminCode = async function(){
+    var btn=document.getElementById('btn-request-admin-code');
+    var errEl=document.getElementById('admin-request-err');
+    btn.disabled=true;
+    btn.innerHTML='<span class="spinner" style="border-top-color:#0a1c3a"></span>Envoi en cours…';
+    try{
+      var res=await fetch('/api/otp/request-admin-code',{
+        method:'POST',credentials:'include',
+        headers:{'Content-Type':'application/json'},body:'{}',
+      });
+      var d=await res.json().catch(function(){ return {}; });
+      if(!res.ok){
+        btn.disabled=false;
+        btn.innerHTML='Envoyer la demande à l\'admin';
+        if(errEl) errEl.textContent=d.detail||'Erreur lors de l\'envoi';
+        return;
+      }
+      // Passer à la phase de saisie
+      var arp=document.getElementById('admin-request-phase'); if(arp) arp.style.display='none';
+      var aep=document.getElementById('admin-enter-phase'); if(aep) aep.style.display='flex';
+      _initAdminBoxes();
+      var b0=document.getElementById('ac0'); if(b0) b0.focus();
+    }catch(err){
+      btn.disabled=false;
+      btn.innerHTML='Envoyer la demande à l\'admin';
+      if(errEl) errEl.textContent='Erreur réseau';
+    }
+  };
+
+  window.verifyAdminCode = async function(){
+    var boxes=[0,1,2,3,4].map(function(i){ return document.getElementById('ac'+i); });
+    var code=boxes.map(function(b){ return b?b.value:''; }).join('');
+    if(code.length!==5) return;
+    var btnV=document.getElementById('btn-verify-admin-code');
+    btnV.disabled=true;
+    btnV.innerHTML='<span class="spinner" style="border-top-color:#0a1c3a"></span>Vérification…';
+    try{
+      var res=await fetch('/api/otp/verify-admin-code',{
+        method:'POST',credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({code:code}),
+      });
+      var d=await res.json().catch(function(){ return {}; });
+      if(!res.ok){
+        if(window._setAdminErr) window._setAdminErr(d.detail||'Code incorrect');
+        if(window._clearAdminBoxes) window._clearAdminBoxes();
+        btnV.disabled=true;
+        btnV.innerHTML='Valider le code admin';
+        return;
+      }
+      if(d.api_key) sessionStorage.setItem('api_key',d.api_key);
+      btnV.classList.add('success');
+      btnV.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Connecté !';
+      setTimeout(function(){ window.location.href='/'; }, 450);
+    }catch(err){
+      if(window._setAdminErr) window._setAdminErr('Erreur réseau — réessayez');
+      btnV.disabled=false;
+      btnV.innerHTML='Valider le code admin';
+    }
+  };
 })();
 
 /* ══ REDIRECTION SI DÉJÀ CONNECTÉ ══ */

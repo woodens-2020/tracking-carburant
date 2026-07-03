@@ -223,6 +223,26 @@ class OTPCode(Base):
     )
 
 
+class AdminCode(Base):
+    """Code 5 chiffres généré par l'admin pour débloquer un employé sans email OTP."""
+    __tablename__ = "admin_codes"
+
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("utilisateurs.id", ondelete="CASCADE"), nullable=False)
+    code_hash  = Column(String(64),  nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used       = Column(Boolean,     nullable=False, default=False)
+    attempts   = Column(Integer,     nullable=False, default=0)
+
+    user = relationship("Utilisateur")
+
+    __table_args__ = (
+        Index("idx_admin_code_user",    "user_id"),
+        Index("idx_admin_code_expires", "expires_at"),
+    )
+
+
 class AuditLog(Base):
     """Journal d'activité — toutes les actions sensibles du système."""
     __tablename__ = "audit_logs"
