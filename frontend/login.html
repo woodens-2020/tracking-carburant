@@ -337,6 +337,39 @@ body{
 }
 .otp-back:hover{color:var(--muted)}
 
+/* ═══ LIEN MOT DE PASSE OUBLIÉ ═════════════════════════════════ */
+.forgot-link{
+  display:block;text-align:right;font-size:10.5px;
+  color:rgba(232,197,88,.42);font-weight:600;
+  text-decoration:underline;text-decoration-style:dotted;
+  background:none;border:none;cursor:pointer;padding:0;
+  margin-top:-4px;margin-bottom:4px;width:100%;text-align:right;
+  transition:color .15s;font-family:var(--f);
+}
+.forgot-link:hover{color:rgba(232,197,88,.75)}
+
+/* ═══ ÉTAPES OUBLI / RESET ══════════════════════════════════════ */
+.extra-step{display:none;flex-direction:column;align-items:center;gap:0}
+.extra-step.show{display:flex}
+.extra-step-title{font-size:18px;font-weight:800;letter-spacing:-.3px;margin-bottom:5px;text-align:center}
+.extra-step-hint{font-size:12px;color:var(--muted);text-align:center;line-height:1.55;margin-bottom:20px}
+.extra-step-hint strong{color:rgba(232,197,88,.7);font-family:var(--mono);font-size:12.5px}
+.extra-step-err{
+  color:#fc8585;font-size:12px;font-weight:600;
+  min-height:16px;text-align:center;margin-bottom:6px;
+}
+.reset-success-icon{
+  width:56px;height:56px;border-radius:50%;
+  background:rgba(34,197,94,.1);border:2px solid rgba(34,197,94,.35);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:14px;
+}
+.pw-strength{
+  height:4px;border-radius:4px;background:rgba(30,55,100,.6);
+  margin-top:6px;overflow:hidden;
+}
+.pw-strength-bar{height:100%;border-radius:4px;transition:width .3s,background .3s;width:0}
+
 /* ═══ FOOTER ════════════════════════════════════════════════════ */
 .login-footer{
   text-align:center;font-size:10.5px;
@@ -509,6 +542,10 @@ body{
       <button type="submit" class="btn-login" id="btn-submit" style="margin-top:20px">
         Se connecter
       </button>
+
+      <button type="button" class="forgot-link" onclick="showForgotStep()">
+        Mot de passe oublié ?
+      </button>
     </form>
 
     <!-- ── OAuth Google ── -->
@@ -529,6 +566,124 @@ body{
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         <span id="oauth-err-text"></span>
+      </div>
+    </div>
+
+    <!-- ── Étape : Mot de passe oublié ── -->
+    <div class="extra-step" id="forgot-step">
+      <div class="otp-icon">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#e8c558" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+          <polyline points="22,6 12,13 2,6"/>
+        </svg>
+      </div>
+      <div class="extra-step-title">Réinitialiser le mot de passe</div>
+      <div class="extra-step-hint">
+        Entrez votre email ou nom d'utilisateur.<br>
+        Nous vous enverrons un lien valable <strong>30 minutes</strong>.
+      </div>
+
+      <div class="fields" style="width:100%">
+        <div class="field">
+          <label class="field-label" for="forgot-identifier">Email ou identifiant</label>
+          <div class="input-wrap">
+            <span class="input-icon">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+            </span>
+            <input type="text" id="forgot-identifier" placeholder="vous@exemple.com ou votre pseudo"
+              autocomplete="email" style="width:100%;padding:12px 14px 12px 42px;
+              background:var(--input-bg);border:1px solid rgba(30,55,100,.9);border-radius:12px;
+              color:var(--text);font-size:14px;font-family:var(--f);outline:none;
+              transition:border-color .2s,box-shadow .2s,background .2s">
+          </div>
+        </div>
+      </div>
+
+      <div class="extra-step-err" id="forgot-err" style="margin-top:10px"></div>
+
+      <button type="button" class="btn-login" id="btn-forgot-send" onclick="forgotSend()" style="margin-top:10px">
+        Envoyer le lien
+      </button>
+      <button type="button" class="otp-back" onclick="hideForgotStep()" style="margin-top:10px">
+        ← Retour à la connexion
+      </button>
+    </div>
+
+    <!-- ── Étape : Saisir le nouveau mot de passe ── -->
+    <div class="extra-step" id="reset-step">
+      <div class="otp-icon">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#e8c558" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </div>
+      <div class="extra-step-title">Nouveau mot de passe</div>
+      <div class="extra-step-hint" id="reset-hint">
+        Choisissez un mot de passe fort d'au moins <strong>8 caractères</strong>.
+      </div>
+
+      <div class="fields" style="width:100%">
+        <div class="field">
+          <label class="field-label" for="reset-pw1">Nouveau mot de passe</label>
+          <div class="input-wrap">
+            <span class="input-icon">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </span>
+            <input type="password" id="reset-pw1" placeholder="••••••••"
+              oninput="resetPwStrength()" style="width:100%;padding:12px 14px 12px 42px;
+              background:var(--input-bg);border:1px solid rgba(30,55,100,.9);border-radius:12px;
+              color:var(--text);font-size:14px;font-family:var(--f);letter-spacing:.1em;outline:none;
+              transition:border-color .2s,box-shadow .2s,background .2s">
+            <button type="button" class="pw-toggle" onclick="toggleResetPw('reset-pw1',this)" tabindex="-1">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+          <div class="pw-strength"><div class="pw-strength-bar" id="pw-strength-bar"></div></div>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="reset-pw2">Confirmer le mot de passe</label>
+          <div class="input-wrap">
+            <span class="input-icon">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </span>
+            <input type="password" id="reset-pw2" placeholder="••••••••"
+              style="width:100%;padding:12px 14px 12px 42px;
+              background:var(--input-bg);border:1px solid rgba(30,55,100,.9);border-radius:12px;
+              color:var(--text);font-size:14px;font-family:var(--f);letter-spacing:.1em;outline:none;
+              transition:border-color .2s,box-shadow .2s,background .2s">
+          </div>
+        </div>
+      </div>
+
+      <div class="extra-step-err" id="reset-err" style="margin-top:10px"></div>
+
+      <button type="button" class="btn-login" id="btn-reset-submit" onclick="resetSubmit()" style="margin-top:10px">
+        Enregistrer le nouveau mot de passe
+      </button>
+    </div>
+
+    <!-- ── Étape : Succès réinitialisation ── -->
+    <div class="extra-step" id="reset-success-step">
+      <div class="reset-success-icon">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#22c55e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <div class="extra-step-title" style="color:#22c55e">Mot de passe modifié !</div>
+      <div class="extra-step-hint">
+        Votre mot de passe a été réinitialisé.<br>
+        Toutes vos sessions actives ont été révoquées.<br><br>
+        Vous allez être redirigé vers la connexion…
       </div>
     </div>
 
@@ -1327,6 +1482,168 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
     window.history.replaceState({},'','/login');
     if(typeof showOtpStep === 'function') showOtpStep(hint);
   }
+})();
+
+/* ══ RÉCUPÉRATION DE MOT DE PASSE ══════════════════════════════ */
+(function(){
+
+  var _resetToken = null;
+
+  // ── Helpers visibilité des étapes ──────────────────────────────
+  function _hideAll(){
+    var ids=['login-form','oauth-wrap','otp-step','forgot-step','reset-step','reset-success-step'];
+    ids.forEach(function(id){ var el=document.getElementById(id); if(el){ el.style.display='none'; el.classList.remove('show'); } });
+  }
+  function _showLoginForm(){
+    _hideAll();
+    var f=document.getElementById('login-form'); if(f) f.style.display='';
+    var o=document.getElementById('oauth-wrap'); if(o) o.style.display='';
+  }
+
+  // ── Étape Oublié ────────────────────────────────────────────────
+  window.showForgotStep = function(){
+    _hideAll();
+    var el=document.getElementById('forgot-step'); if(el){ el.style.display='flex'; el.classList.add('show'); }
+    var inp=document.getElementById('forgot-identifier'); if(inp){ inp.value=''; inp.focus(); }
+    var err=document.getElementById('forgot-err'); if(err) err.textContent='';
+    var btn=document.getElementById('btn-forgot-send'); if(btn){ btn.disabled=false; btn.innerHTML='Envoyer le lien'; }
+  };
+
+  window.hideForgotStep = function(){
+    _showLoginForm();
+    var err=document.getElementById('forgot-err'); if(err) err.textContent='';
+  };
+
+  window.forgotSend = async function(){
+    var identifier=(document.getElementById('forgot-identifier').value||'').trim();
+    var errEl=document.getElementById('forgot-err');
+    var btn=document.getElementById('btn-forgot-send');
+    if(!identifier){ if(errEl) errEl.textContent='Veuillez entrer votre email ou identifiant.'; return; }
+    if(errEl) errEl.textContent='';
+    btn.disabled=true;
+    btn.innerHTML='<span class="spinner" style="border-top-color:#0a1c3a"></span>Envoi en cours…';
+    try{
+      var res=await fetch('/api/auth/forgot-password',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({identifier:identifier}),
+      });
+      var d=await res.json().catch(function(){ return {}; });
+      if(!res.ok){
+        if(errEl) errEl.textContent=d.detail||'Erreur lors de l\'envoi.';
+        btn.disabled=false; btn.innerHTML='Envoyer le lien'; return;
+      }
+      // Succès ou compte inconnu — même réponse (anti-énumération)
+      btn.classList.add('success');
+      btn.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Email envoyé !';
+      if(errEl){
+        errEl.style.color='rgba(34,197,94,.8)';
+        errEl.textContent='Si cet identifiant est associé à un compte, un email a été envoyé. Vérifiez aussi vos spams.';
+      }
+    }catch(err){
+      if(errEl) errEl.textContent='Erreur réseau — réessayez.';
+      btn.disabled=false; btn.innerHTML='Envoyer le lien';
+    }
+  };
+
+  // ── Étape Reset ─────────────────────────────────────────────────
+  function _showResetStep(username){
+    _hideAll();
+    var el=document.getElementById('reset-step'); if(el){ el.style.display='flex'; el.classList.add('show'); }
+    var h=document.getElementById('reset-hint');
+    if(h && username) h.innerHTML='Bonjour <strong style="color:var(--text)">'+username+'</strong>. Choisissez un mot de passe d\'au moins <strong>8 caractères</strong>.';
+    var pw1=document.getElementById('reset-pw1'); if(pw1){ pw1.value=''; pw1.focus(); }
+    var pw2=document.getElementById('reset-pw2'); if(pw2) pw2.value='';
+    var err=document.getElementById('reset-err'); if(err) err.textContent='';
+    var bar=document.getElementById('pw-strength-bar'); if(bar){ bar.style.width='0'; bar.style.background=''; }
+    var btn=document.getElementById('btn-reset-submit'); if(btn){ btn.disabled=false; btn.innerHTML='Enregistrer le nouveau mot de passe'; btn.classList.remove('success'); }
+  }
+
+  window.resetPwStrength = function(){
+    var v=(document.getElementById('reset-pw1')||{}).value||'';
+    var bar=document.getElementById('pw-strength-bar'); if(!bar) return;
+    var score=0;
+    if(v.length>=8) score++;
+    if(v.length>=12) score++;
+    if(/[A-Z]/.test(v)) score++;
+    if(/[0-9]/.test(v)) score++;
+    if(/[^A-Za-z0-9]/.test(v)) score++;
+    var pct=Math.round(score/5*100);
+    var col=pct<40?'#ef4444':pct<70?'#f59e0b':'#22c55e';
+    bar.style.width=pct+'%'; bar.style.background=col;
+  };
+
+  window.toggleResetPw = function(inputId, btn){
+    var inp=document.getElementById(inputId); if(!inp) return;
+    var show=inp.type==='password';
+    inp.type=show?'text':'password';
+    btn.innerHTML=show
+      ? '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+      : '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  };
+
+  window.resetSubmit = async function(){
+    var pw1=(document.getElementById('reset-pw1')||{}).value||'';
+    var pw2=(document.getElementById('reset-pw2')||{}).value||'';
+    var errEl=document.getElementById('reset-err');
+    var btn=document.getElementById('btn-reset-submit');
+    if(!pw1){ if(errEl) errEl.textContent='Entrez un mot de passe.'; return; }
+    if(pw1.length<8){ if(errEl) errEl.textContent='Le mot de passe doit contenir au moins 8 caractères.'; return; }
+    if(pw1!==pw2){ if(errEl) errEl.textContent='Les deux mots de passe ne correspondent pas.'; return; }
+    if(errEl) errEl.textContent='';
+    btn.disabled=true;
+    btn.innerHTML='<span class="spinner" style="border-top-color:#0a1c3a"></span>Enregistrement…';
+    try{
+      var res=await fetch('/api/auth/reset-password',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({token:_resetToken, new_password:pw1}),
+      });
+      var d=await res.json().catch(function(){ return {}; });
+      if(!res.ok){
+        if(errEl) errEl.textContent=d.detail||'Erreur lors de la réinitialisation.';
+        btn.disabled=false; btn.innerHTML='Enregistrer le nouveau mot de passe'; return;
+      }
+      // Succès
+      _hideAll();
+      var s=document.getElementById('reset-success-step');
+      if(s){ s.style.display='flex'; s.classList.add('show'); }
+      _resetToken=null;
+      window.history.replaceState({},'','/login');
+      setTimeout(function(){ _showLoginForm(); }, 3500);
+    }catch(e){
+      if(errEl) errEl.textContent='Erreur réseau — réessayez.';
+      btn.disabled=false; btn.innerHTML='Enregistrer le nouveau mot de passe';
+    }
+  };
+
+  // ── Détection du token dans l'URL (?token=xxx) ─────────────────
+  (function(){
+    var p=new URLSearchParams(window.location.search);
+    var tok=p.get('token');
+    if(!tok) return;
+    _resetToken=tok;
+    window.history.replaceState({},'','/login');
+    // Pré-vérifier le token avant d'afficher le formulaire
+    fetch('/api/auth/reset-password/verify?token='+encodeURIComponent(tok))
+      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return {ok:r.ok,d:d}; }); })
+      .then(function(res){
+        if(!res.ok){
+          // Token invalide → afficher erreur sur la page de login
+          var eb=document.getElementById('err-box');
+          var et=document.getElementById('err-text');
+          if(eb&&et){ et.textContent=res.d.detail||'Ce lien est invalide ou expiré.'; eb.classList.remove('hidden'); }
+          _resetToken=null;
+          return;
+        }
+        _showResetStep(res.d.username||'');
+      })
+      .catch(function(){
+        var eb=document.getElementById('err-box');
+        var et=document.getElementById('err-text');
+        if(eb&&et){ et.textContent='Impossible de vérifier le lien. Réessayez.'; eb.classList.remove('hidden'); }
+        _resetToken=null;
+      });
+  })();
+
 })();
 </script>
 </body>

@@ -970,6 +970,27 @@ class CuisineAchat(Base):
     )
 
 
+class PasswordResetToken(Base):
+    """Token de réinitialisation de mot de passe — URL sécurisée, usage unique, 30 min."""
+    __tablename__ = "password_reset_tokens"
+
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("utilisateurs.id", ondelete="CASCADE"), nullable=False)
+    token_hash = Column(String(64), nullable=False, unique=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used       = Column(Boolean, nullable=False, default=False)
+    ip_address = Column(String(45), nullable=True)
+
+    user = relationship("Utilisateur")
+
+    __table_args__ = (
+        Index("idx_prt_user",    "user_id"),
+        Index("idx_prt_expires", "expires_at"),
+        Index("idx_prt_hash",    "token_hash"),
+    )
+
+
 class BarSessionCaisse(Base):
     """Session de caisse — suivi des ventes par caissière par jour."""
     __tablename__ = "bar_sessions_caisse"

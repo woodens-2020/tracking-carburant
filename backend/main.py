@@ -39,6 +39,7 @@ from auth import (
     create_session, get_session_user, delete_session,
     make_api_key, verify_api_key, revoke_api_key,
 )
+from password_reset import request_reset, verify_reset_token, consume_reset_token
 
 app = FastAPI(title="Suivi des Meters - Station")
 
@@ -55,7 +56,8 @@ MAX_MODIFICATIONS_PAR_RELEVE = 2
 _ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
 
 # Chemins accessibles sans être connecté
-_PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code"}
+_PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code",
+                    "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify"}
 _PUBLIC_PREFIXES = ("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/")
 
 
@@ -391,6 +393,55 @@ def change_password(data: ChangePasswordIn, request: Request, db: Session = Depe
     user.password_hash = hash_password(data.nouveau_mot_de_passe)
     db.commit()
     return {"ok": True}
+
+
+# ── Récupération de mot de passe (endpoints publics) ─────────────────────────
+
+class ForgotPasswordIn(BaseModel):
+    identifier: str   # email ou username
+
+
+@app.post("/api/auth/forgot-password")
+async def forgot_password(data: ForgotPasswordIn, request: Request, db: Session = Depends(get_db)):
+    """
+    Envoie un email de réinitialisation.
+    Retourne toujours la même réponse (anti-énumération).
+    """
+    ip       = request.client.host if request.client else None
+    base_url = str(request.base_url).rstrip("/")
+    try:
+        request_reset(data.identifier, db, ip, base_url)
+    except ValueError as e:
+        # Rate limit uniquement — on propage le message
+        raise HTTPException(429, str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return {"ok": True, "message": "Si cet identifiant existe, un email a été envoyé."}
+
+
+@app.get("/api/auth/reset-password/verify")
+def verify_reset(token: str, db: Session = Depends(get_db)):
+    """Vérifie un token sans le consommer (pré-validation à l'ouverture du formulaire)."""
+    try:
+        user = verify_reset_token(token, db)
+        return {"ok": True, "username": user.username}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+class ResetPasswordIn(BaseModel):
+    token:        str
+    new_password: str
+
+
+@app.post("/api/auth/reset-password")
+def reset_password(data: ResetPasswordIn, db: Session = Depends(get_db)):
+    """Consomme le token et change le mot de passe. Révoque toutes les sessions."""
+    try:
+        consume_reset_token(data.token, data.new_password, db)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, "message": "Mot de passe modifié. Toutes les sessions ont été révoquées."}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
