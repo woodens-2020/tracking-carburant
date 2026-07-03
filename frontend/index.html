@@ -10356,6 +10356,13 @@ const _ACCES_POSTE_LEGACY = {
   'Caissier': ['home','saisie','journal','dashboard','pos-caisse','pos-ventes','pos-credits','pos-sessions-caisse'],
 };
 
+// Pages systématiquement interdites aux comptes caissière (employe_id défini),
+// quel que soit le rôle ou le poste.
+const _CAISSIER_BLOCKED = new Set([
+  'pos-achats','pos-paie','pos-rentabilite','pos-grande-caisse',
+  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
+]);
+
 function _getAllowedPages(){
   if(!_appUser) return new Set();
   const perms = _appUser.permissions;
@@ -10384,6 +10391,7 @@ function _canAccess(page){
     if(perms.admin === true) return true;
     if(['admin-roles','admin-users','admin-sessions','admin-audit'].includes(page)) return false;
   }
+  if(_appUser.employe_id && _CAISSIER_BLOCKED.has(page)) return false;
   const allowed = _getAllowedPages();
   if(allowed === null) return true;
   return allowed.has(page);
@@ -10398,17 +10406,18 @@ function _applyNavAccess(){
     if(el) el.style.display = isAdmin ? '' : 'none';
   });
   const allowed = _getAllowedPages();
-  if(allowed === null) return; // accès complet — tout visible
+  const isCaissiere = !!_appUser?.employe_id;
+  if(allowed === null && !isCaissiere) return; // accès complet sans restrictions caissière
   // Masquer items de nav interdits (sauf admin qui est géré ci-dessus)
   document.querySelectorAll('.nav-item[data-page]').forEach(btn=>{
     const p = btn.getAttribute('data-page');
     if(['admin-roles','admin-users','admin-sessions','admin-audit'].includes(p)) return;
-    btn.style.display = allowed.has(p) ? '' : 'none';
+    btn.style.display = _canAccess(p) ? '' : 'none';
   });
   // Masquer les nav-cards de la home page pour les pages interdites
   document.querySelectorAll('.nav-card[onclick]').forEach(card=>{
     const m = card.getAttribute('onclick').match(/goTo\('([^']+)'\)/);
-    if(m) card.style.display = allowed.has(m[1]) ? '' : 'none';
+    if(m) card.style.display = _canAccess(m[1]) ? '' : 'none';
   });
   // Masquer les labels de sections dont tous les items sont cachés
   document.querySelectorAll('.nav-section-label').forEach(label=>{
