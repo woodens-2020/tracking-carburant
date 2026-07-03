@@ -146,6 +146,12 @@ def login(data: LoginIn, request: Request, response: Response, db: Session = Dep
     if OTP_ENABLED:
         if not user.email:
             raise HTTPException(400, "Aucun email associé à ce compte — contactez l'administrateur.")
+        # Domaines internes/fictifs qui ne peuvent pas recevoir d'email
+        _bad_tlds = {".local", ".localhost", ".internal", ".test", ".example", ".invalid", ".lan"}
+        if any(user.email.lower().endswith(t) for t in _bad_tlds):
+            raise HTTPException(503,
+                f"L'adresse email de ce compte ({user.email}) ne peut pas recevoir de messages. "
+                "Contactez l'administrateur pour mettre à jour l'email.")
         try:
             code, pending_token = create_otp(db, user.id)
             send_otp_email(user.nom_complet or user.username, user.email, code)

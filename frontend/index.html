@@ -14761,7 +14761,13 @@ function adminUsersRender(){
       : `<button class="pos-btn ghost" onclick="adminUsersToggleActif(${u.id},true)" style="font-size:11px;padding:3px 9px;color:#34d399" title="Activer">Activer</button>`;
     return `<tr>
       <td><div style="font-weight:600">${u.nom_complet||'—'}</div><div style="font-size:11px;color:rgba(255,255,255,.4)">${u.username}</div></td>
-      <td style="font-size:12px">${u.email||'—'}</td>
+      <td style="font-size:12px">${(()=>{
+        const badTlds=['.local','.localhost','.internal','.test','.example','.invalid','.lan'];
+        const isBad = u.email && badTlds.some(t=>u.email.toLowerCase().endsWith(t));
+        return isBad
+          ? `${u.email} <span title="Email non-livrable : domaine fictif — mettez à jour l'email pour que l'OTP fonctionne" style="color:#f87171;font-size:10px;background:rgba(248,113,113,.12);padding:1px 5px;border-radius:3px;cursor:help">⚠ invalide</span>`
+          : (u.email||'—');
+      })()}</td>
       <td><span style="font-size:12px;background:rgba(255,255,255,.08);padding:2px 8px;border-radius:4px">${u.role_nom||u.poste||u.role||'—'}</span></td>
       <td style="text-align:center">${statut}</td>
       <td style="text-align:right">
