@@ -7814,6 +7814,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
               Actualiser
             </button>
+            <button class="pos-btn ghost" onclick="exportAuditXlsx()" style="font-size:12px;color:#34d399;border-color:rgba(52,211,153,.3)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Télécharger XLSX
+            </button>
           </div>
         </div>
         <div class="pos-card">
@@ -15013,6 +15017,24 @@ async function sessionRevoquer(sessionId, nom){
 // ══════════════════════════════════════════════════════════════
 
 let _auditPage = 1;
+
+async function exportAuditXlsx(){
+  const action = document.getElementById('audit-filter-action').value;
+  let url = '/api/admin/audit-log/export';
+  if(action) url += `?action=${encodeURIComponent(action)}`;
+  try{
+    const res = await fetch(url, {credentials:'include'});
+    if(!res.ok){ posAlert('Erreur lors de l\'export','err'); return; }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const cd = res.headers.get('Content-Disposition') || '';
+    const m  = cd.match(/filename="([^"]+)"/);
+    a.download = m ? m[1] : 'journal_activite.xlsx';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }catch(e){ posAlert('Erreur réseau','err'); }
+}
 
 async function loadAdminAudit(page){
   page = page || _auditPage;

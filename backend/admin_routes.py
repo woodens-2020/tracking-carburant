@@ -1,10 +1,12 @@
 """Routes d'administration : gestion des rôles, comptes, sessions et journal."""
+import io
 import json
 import re
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
@@ -459,6 +461,148 @@ _ACTION_LABELS = {
     "user_disabled":    "Compte désactivé",
     "user_enabled":     "Compte activé",
 }
+
+
+@router.get("/audit-log/export")
+def export_audit_log_xlsx(
+    action:  Optional[str] = Query(None),
+    user_id: Optional[int] = Query(None),
+    _admin:  Utilisateur   = Depends(_require_admin),
+    db:      Session       = Depends(get_db),
+):
+    """Exporte tout le journal d'activité filtré en fichier Excel (.xlsx)."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    q = db.query(AuditLog).order_by(desc(AuditLog.created_at))
+    if action:
+        q = q.filter(AuditLog.action == action)
+    if user_id:
+        q = q.filter(
+            (AuditLog.user_id == user_id) | (AuditLog.target_user_id == user_id)
+        )
+    rows = q.limit(10_000).all()
+
+    # ── Styles ────────────────────────────────────────────────────────
+    NAVY  = "0F172A"
+    AMBER = "B45309"
+    LGRAY = "F1F5F9"
+    WHITE = "FFFFFF"
+
+    def _hf(c=WHITE):   return Font(bold=True, color=c, name="Calibri", size=10)
+    def _nf(bold=False): return Font(bold=bold,  name="Calibri", size=10)
+    def _fill(h):        return PatternFill("solid", fgColor=h)
+    def _brd():
+        s = Side(style="thin", color="CCCCCC")
+        return Border(left=s, right=s, top=s, bottom=s)
+    def _ctr():          return Alignment(horizontal="center", vertical="center", wrap_text=True)
+    def _lft():          return Alignment(horizontal="left",   vertical="center", wrap_text=True)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Journal d'Activité"
+    ws.sheet_view.showGridLines = False
+    ws.freeze_panes = "A2"
+
+    # ── En-tête ───────────────────────────────────────────────────────
+    headers = ["Date & Heure", "Action", "Code Action", "Utilisateur", "Cible", "Adresse IP", "Détails"]
+    widths  = [20,             28,       18,            22,            22,      16,            40]
+    for col, (h, w) in enumerate(zip(headers, widths), 1):
+        c = ws.cell(row=1, column=col, value=h)
+        c.font      = _hf()
+        c.fill      = _fill(NAVY)
+        c.alignment = _ctr()
+        c.border    = _brd()
+        ws.column_dimensions[get_column_letter(col)].width = w
+    ws.row_dimensions[1].height = 20
+
+    # ── Données ───────────────────────────────────────────────────────
+    ACTION_COLORS = {
+        "login_success":    "15803D",
+        "login_failed":     "B91C1C",
+        "logout":           "334155",
+        "otp_sent":         "1D4ED8",
+        "otp_verified":     "0369A1",
+        "otp_failed":       "C2410C",
+        "session_revoked":  "7C3AED",
+        "sessions_cleared": "6D28D9",
+        "password_reset":   "0E7490",
+        "pin_reset":        "0E7490",
+        "user_created":     "166534",
+        "user_updated":     "1E40AF",
+        "user_disabled":    "92400E",
+        "user_enabled":     "065F46",
+    }
+
+    for ri, r in enumerate(rows, 2):
+        actor  = db.get(Utilisateur, r.user_id)        if r.user_id        else None
+        target = db.get(Utilisateur, r.target_user_id) if r.target_user_id else None
+        created = r.created_at.replace(tzinfo=timezone.utc) if r.created_at.tzinfo is None else r.created_at
+        dt_local = created.strftime("%Y-%m-%d %H:%M:%S")
+
+        details_dict = json.loads(r.details) if r.details else {}
+        details_str  = " | ".join(f"{k}: {v}" for k, v in details_dict.items()) if details_dict else ""
+
+        bg = "F8FAFC" if ri % 2 == 0 else WHITE
+        action_col = ACTION_COLORS.get(r.action, "334155")
+
+        vals = [
+            dt_local,
+            _ACTION_LABELS.get(r.action, r.action),
+            r.action,
+            actor.nom_complet  or actor.email  if actor  else "Système",
+            target.nom_complet or target.email if target else "",
+            r.ip_address or "",
+            details_str,
+        ]
+        for ci, val in enumerate(vals, 1):
+            cell = ws.cell(row=ri, column=ci, value=val)
+            cell.border    = _brd()
+            cell.alignment = _ctr() if ci in (1, 3, 6) else _lft()
+            cell.fill      = _fill(bg)
+            if ci == 2:  # Action label colorée
+                cell.font = Font(bold=True, color=action_col, name="Calibri", size=10)
+            else:
+                cell.font = _nf()
+
+    # ── Figer + auto-filtre ───────────────────────────────────────────
+    ws.auto_filter.ref = f"A1:G{max(len(rows)+1, 1)}"
+
+    # ── Onglet récapitulatif ──────────────────────────────────────────
+    ws2 = wb.create_sheet("Résumé")
+    ws2.sheet_view.showGridLines = False
+    from collections import Counter
+    counts = Counter(r.action for r in rows)
+    ws2.cell(1, 1, "Action").font = _hf(); ws2.cell(1, 1).fill = _fill(NAVY); ws2.cell(1, 1).alignment = _ctr()
+    ws2.cell(1, 2, "Libellé").font = _hf(); ws2.cell(1, 2).fill = _fill(NAVY); ws2.cell(1, 2).alignment = _ctr()
+    ws2.cell(1, 3, "Occurrences").font = _hf(); ws2.cell(1, 3).fill = _fill(NAVY); ws2.cell(1, 3).alignment = _ctr()
+    ws2.column_dimensions["A"].width = 22
+    ws2.column_dimensions["B"].width = 30
+    ws2.column_dimensions["C"].width = 14
+    for ri2, (act, cnt) in enumerate(sorted(counts.items(), key=lambda x: -x[1]), 2):
+        bg2 = "F8FAFC" if ri2 % 2 == 0 else WHITE
+        for ci2, val2 in enumerate([act, _ACTION_LABELS.get(act, act), cnt], 1):
+            cell2 = ws2.cell(ri2, ci2, val2)
+            cell2.fill = _fill(bg2); cell2.border = _brd()
+            cell2.alignment = _ctr() if ci2 == 3 else _lft()
+            cell2.font = _nf(ci2 == 3)
+
+    # ── Stream ────────────────────────────────────────────────────────
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    from datetime import date as date_type
+    fname = f"journal_activite_{date_type.today().isoformat()}.xlsx"
+    if action:
+        fname = f"journal_{action}_{date_type.today().isoformat()}.xlsx"
+
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 @router.get("/audit-log")
