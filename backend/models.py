@@ -273,18 +273,19 @@ class Employe(Base):
     """Employé de la station."""
     __tablename__ = "employes"
 
-    id            = Column(Integer, primary_key=True)
-    nom           = Column(String(100), nullable=False)
-    prenom        = Column(String(100), nullable=False)
-    poste         = Column(String(100), nullable=False)
-    date_embauche = Column(Date, nullable=False)
-    salaire_base  = Column(Numeric(12, 2), nullable=False)
-    type_contrat  = Column(String(30), nullable=False, default="CDI")
-    telephone     = Column(String(30), nullable=True)
-    email         = Column(String(254), nullable=True)
-    actif         = Column(Boolean, nullable=False, default=True)
-    notes         = Column(String(500), nullable=True)
-    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    id             = Column(Integer, primary_key=True)
+    nom            = Column(String(100), nullable=False)
+    prenom         = Column(String(100), nullable=False)
+    poste          = Column(String(100), nullable=False)
+    date_embauche  = Column(Date, nullable=False)
+    salaire_base   = Column(Numeric(12, 2), nullable=False)
+    type_contrat   = Column(String(30), nullable=False, default="CDI")
+    telephone      = Column(String(30), nullable=True)
+    email          = Column(String(254), nullable=True)
+    actif          = Column(Boolean, nullable=False, default=True)
+    notes          = Column(String(500), nullable=True)
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     fiches_paie = relationship("FichePaie", back_populates="employe", cascade="all, delete-orphan")
 
@@ -294,7 +295,8 @@ class Employe(Base):
             "type_contrat IN ('CDI','CDD','Temps partiel','Journalier','Stage')",
             name="chk_employe_contrat",
         ),
-        Index("idx_employes_actif", "actif"),
+        Index("idx_employes_actif",       "actif"),
+        Index("idx_employe_utilisateur",  "utilisateur_id"),
     )
 
 
@@ -965,4 +967,30 @@ class CuisineAchat(Base):
         CheckConstraint("total >= 0",          name="chk_cuisine_achat_total_pos"),
         Index("idx_cuisine_achats_plat",  "plat_id"),
         Index("idx_cuisine_achats_date",  "date_achat"),
+    )
+
+
+class BarSessionCaisse(Base):
+    """Session de caisse — suivi des ventes par caissière par jour."""
+    __tablename__ = "bar_sessions_caisse"
+
+    id            = Column(Integer, primary_key=True)
+    caissier_id   = Column(Integer, ForeignKey("employes.id",    ondelete="RESTRICT"), nullable=False)
+    date_session  = Column(Date, nullable=False)
+    statut        = Column(String(20), nullable=False, default="EN_COURS")  # EN_COURS, SOUMIS, VALIDE
+    soumis_at     = Column(DateTime(timezone=True), nullable=True)
+    valide_at     = Column(DateTime(timezone=True), nullable=True)
+    valide_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    notes_admin   = Column(String(500), nullable=True)
+    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    caissier   = relationship("Employe",      foreign_keys=[caissier_id])
+    valide_par = relationship("Utilisateur",  foreign_keys=[valide_par_id])
+
+    __table_args__ = (
+        UniqueConstraint("caissier_id", "date_session", name="uq_session_caissier_date"),
+        CheckConstraint("statut IN ('EN_COURS','SOUMIS','VALIDE')", name="chk_session_statut"),
+        Index("idx_session_caissier", "caissier_id"),
+        Index("idx_session_date",     "date_session"),
+        Index("idx_session_statut",   "statut"),
     )

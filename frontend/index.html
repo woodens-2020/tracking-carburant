@@ -2924,6 +2924,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="pos-sessions-caisse" onclick="goTo('pos-sessions-caisse')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/><path d="M8 14h2M12 14h4M8 18h2M12 18h2"/></svg>
+      </span>
+      <span>Sessions Caissières</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <!-- ── Section Cuisine ── -->
     <div class="nav-section-label">Cuisine</div>
 
@@ -5296,9 +5304,53 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="pos-header-sub">Encaissement en temps réel — Bar / Restaurant</div>
           </div>
           <div class="pos-header-actions">
-            <select class="pos-select" id="pos-caissier-sel" style="width:160px">
+            <select class="pos-select" id="pos-caissier-sel" style="width:180px" onchange="posCaissierChange(this.value)">
               <option value="">Sans caissier</option>
             </select>
+            <button class="pos-btn ghost" id="pos-btn-soumettre" style="display:none;font-size:12px;padding:6px 14px;border-color:rgba(99,210,190,.4);color:#3fb6a8" onclick="posSoumettreSession()">
+              Soumettre rapport
+            </button>
+          </div>
+        </div>
+
+        <!-- Mini-dashboard caissière -->
+        <div id="pos-dash-caissier" style="display:none;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,.9)" id="pos-dash-nom">—</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span id="pos-dash-statut" style="font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700"></span>
+              <button onclick="posDashRefresh()" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,.4);font-size:11px;padding:2px 6px">↻ Actualiser</button>
+            </div>
+          </div>
+          <!-- KPIs -->
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+            <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
+              <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">Nb ventes</div>
+              <div id="pos-dash-nb" style="font-size:20px;font-weight:800;color:#f7a93b">0</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
+              <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">Total CA</div>
+              <div id="pos-dash-total" style="font-size:16px;font-weight:700;color:#3fb6a8">G 0</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
+              <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">Cash encaissé</div>
+              <div id="pos-dash-cash" style="font-size:16px;font-weight:700;color:#a78bfa">G 0</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
+              <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">Crédit</div>
+              <div id="pos-dash-credit" style="font-size:16px;font-weight:700;color:#f87171">G 0</div>
+            </div>
+          </div>
+          <!-- Évolution + Top produits -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:6px;font-weight:600">Dernières ventes</div>
+              <div id="pos-dash-evolution" style="max-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:3px"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:6px;font-weight:600">Top produits</div>
+              <div id="pos-dash-top" style="max-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:3px"></div>
+            </div>
           </div>
         </div>
 
@@ -5922,9 +5974,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="pos-header-title">Ventes Bar</div>
             <div class="pos-header-sub">Suivi des ventes du jour et historique</div>
           </div>
-          <div class="pos-header-actions">
+          <div class="pos-header-actions" style="flex-wrap:wrap">
             <input type="date" class="pos-input" id="pos-ventes-debut" style="width:130px">
             <input type="date" class="pos-input" id="pos-ventes-fin" style="width:130px">
+            <select class="pos-select" id="pos-ventes-caissier-f" style="width:150px" onchange="posVentesCharger()">
+              <option value="">Tous les caissiers</option>
+            </select>
             <button class="pos-btn primary" onclick="posVentesCharger()">Filtrer</button>
             <button class="pos-btn ghost" onclick="posVentesAujourdhui()">Aujourd'hui</button>
           </div>
@@ -6569,6 +6624,88 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
       </div>
     </div><!-- /page-pos-grande-caisse -->
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- PAGE SESSIONS CAISSIÈRES                                       -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div id="page-pos-sessions-caisse" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#3fb6a8,#2a9d8f)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/><path d="M8 14h2M12 14h4M8 18h2M12 18h2"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Sessions Caissières</div>
+            <div class="pos-header-sub">Suivi · validation · export des rapports de caisse</div>
+          </div>
+          <div class="pos-header-actions" style="flex-wrap:wrap;gap:8px">
+            <select class="pos-select" id="sc-filtre-caissier" style="width:165px">
+              <option value="">Tous les caissiers</option>
+            </select>
+            <select class="pos-select" id="sc-filtre-statut" style="width:130px">
+              <option value="">Tous statuts</option>
+              <option value="EN_COURS">En cours</option>
+              <option value="SOUMIS">Soumis</option>
+              <option value="VALIDE">Validé</option>
+            </select>
+            <input type="date" class="pos-input" id="sc-debut" style="width:130px">
+            <input type="date" class="pos-input" id="sc-fin" style="width:130px">
+            <button class="pos-btn teal" onclick="scCharger()">Filtrer</button>
+            <button class="pos-btn ghost" onclick="scAujourdhui()">Aujourd'hui</button>
+          </div>
+        </div>
+
+        <!-- KPIs résumé -->
+        <div class="pos-kpi-grid" style="grid-template-columns:repeat(4,1fr)" id="sc-kpis">
+          <div class="pos-kpi"><div class="pos-kpi-label">Sessions</div><div class="pos-kpi-val amber" id="sc-kpi-total">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">En cours</div><div class="pos-kpi-val" id="sc-kpi-encours">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Soumises</div><div class="pos-kpi-val" style="color:#f7a93b" id="sc-kpi-soumis">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Validées</div><div class="pos-kpi-val" style="color:#3fb6a8" id="sc-kpi-valide">—</div></div>
+        </div>
+
+        <!-- Table sessions -->
+        <div class="pos-card">
+          <div class="pos-card-hdr">
+            <span>Sessions de caisse</span>
+            <span id="sc-count-lbl" style="font-size:11px;color:rgba(255,255,255,.4)"></span>
+          </div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Caissière</th>
+                  <th>Statut</th>
+                  <th style="text-align:right">Ventes</th>
+                  <th style="text-align:right">Total CA</th>
+                  <th style="text-align:right">Cash</th>
+                  <th>Soumis le</th>
+                  <th>Validé par</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="sc-tbody">
+                <tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-sessions-caisse -->
+
+    <!-- Modal résumé session -->
+    <div class="pos-modal-bg" id="sc-detail-bg" onclick="if(event.target===this)scFermerDetail()">
+      <div class="pos-modal" style="min-width:540px;max-width:700px" id="sc-detail-modal">
+        <div class="pos-modal-hdr">
+          <span id="sc-detail-titre">Rapport de session</span>
+          <button class="pos-modal-close" onclick="scFermerDetail()">✕</button>
+        </div>
+        <div id="sc-detail-body" style="padding:16px"></div>
+        <div style="display:flex;gap:8px;padding:0 16px 16px;flex-wrap:wrap" id="sc-detail-actions"></div>
+      </div>
+    </div>
 
     <!-- ══════════════════════════════════════════════════════════════ -->
     <!-- PAGE POS — ANALYSE & CONTRÔLE DES ARTICLES                   -->
@@ -8597,7 +8734,8 @@ const PAGE_META={
   'pos-credits':       {title: 'Crédits Bar',                   sub: 'Clients à crédit et remboursements'},
   'pos-commandes':     {title: 'Commandes Bar',                 sub: 'Tables et commandes en cours'},
   'pos-paie':          {title: 'Paie Bar',                      sub: 'Paiements employés du bar'},
-  'pos-rentabilite':   {title: 'Rentabilité Bar',               sub: 'CA — Bénéfices — Marges — COGS'},
+  'pos-rentabilite':      {title: 'Rentabilité Bar',            sub: 'CA — Bénéfices — Marges — COGS'},
+  'pos-sessions-caisse':  {title: 'Sessions Caissières',        sub: 'Suivi · validation · export des rapports de caisse'},
 };
 
 function _forceScrollTop(){
@@ -10178,8 +10316,8 @@ const _AREA_PAGES = {
     lecture: ['dashboard','journal','statistiques','gi-dashboard'],
   },
   bar: {
-    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite'],
-    lecture: ['pos-ventes','pos-credits','pos-commandes','pos-analyse','pos-grande-caisse','pos-rentabilite'],
+    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse'],
+    lecture: ['pos-ventes','pos-credits','pos-commandes','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse'],
   },
   cuisine: {
     complet: ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats'],
@@ -10199,11 +10337,11 @@ const _AREA_PAGES = {
 const _ACCES_POSTE_LEGACY = {
   'Directeur Général': null,
   'Comptable':   ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse',
+                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
                   'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse',
+                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
                   'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
   'Pompiste': ['home','saisie'],
@@ -14559,8 +14697,9 @@ const _giPageLoaders = {
   'pos-commandes':   loadPosCommandes,
   'pos-paie':        loadPosPaie,
   'pos-rentabilite':    loadPosRentabilite,
-  'pos-grande-caisse':  loadPosGrandeCaisse,
-  'pos-analyse':        loadPosAnalyse,
+  'pos-grande-caisse':      loadPosGrandeCaisse,
+  'pos-analyse':            loadPosAnalyse,
+  'pos-sessions-caisse':    loadPosSessionsCaisse,
   'cuisine-caisse':     loadCuisineCaisse,
   'cuisine-plats':      loadCuisinePlats,
   'cuisine-depenses':   loadCuisineDepenses,
@@ -15644,13 +15783,111 @@ async function loadPosCaisse(){
 
 async function _posChargerCaissiers(){
   try {
-    const data = await apiFetch('GET','/employes');
+    const data = await apiFetch('GET', '/pos/caisse/caissieres');
     const sel = document.getElementById('pos-caissier-sel');
     if(!sel) return;
-    const emps = data.employes || data || [];
     sel.innerHTML = '<option value="">Sans caissier</option>' +
-      emps.map(e=>`<option value="${e.id}">${e.nom_complet||e.nom||'Employé '+e.id}</option>`).join('');
+      data.map(e=>`<option value="${e.id}">${e.nom} ${e.prenom}</option>`).join('');
   } catch(e){}
+}
+
+// ── Mini-dashboard caissière ──────────────────────────────────────
+let _posDashCaissierInterval = null;
+let _posDashSessionId = null;
+
+function posCaissierChange(caissier_id){
+  const dash = document.getElementById('pos-dash-caissier');
+  const btnSoumettre = document.getElementById('pos-btn-soumettre');
+  if(!caissier_id){
+    if(dash) dash.style.display = 'none';
+    if(btnSoumettre) btnSoumettre.style.display = 'none';
+    clearInterval(_posDashCaissierInterval);
+    _posDashCaissierInterval = null;
+    return;
+  }
+  if(dash) dash.style.display = '';
+  if(btnSoumettre) btnSoumettre.style.display = '';
+  _posDashLoadData(caissier_id);
+  clearInterval(_posDashCaissierInterval);
+  _posDashCaissierInterval = setInterval(()=>{ const v=document.getElementById('pos-caissier-sel')?.value; if(v) _posDashLoadData(v); }, 60000);
+}
+
+async function _posDashLoadData(caissier_id){
+  try {
+    const d = await apiFetch('GET', `/pos/caisse/dashboard?caissier_id=${caissier_id}`);
+    _posDashSessionId = d.session_id;
+
+    const nomEl = document.getElementById('pos-dash-nom');
+    if(nomEl) nomEl.textContent = d.caissier_nom + ' — ' + d.date;
+
+    const statutEl = document.getElementById('pos-dash-statut');
+    if(statutEl){
+      const s = d.session_statut||'EN_COURS';
+      const colors = {EN_COURS:'rgba(247,169,59,.2);color:#f7a93b', SOUMIS:'rgba(99,210,190,.2);color:#3fb6a8', VALIDE:'rgba(63,182,168,.3);color:#3fb6a8'};
+      statutEl.style.cssText = `background:${(colors[s]||'rgba(255,255,255,.1);color:rgba(255,255,255,.5)')};border-radius:20px;font-size:11px;padding:3px 10px;font-weight:700`;
+      statutEl.textContent = {EN_COURS:'En cours', SOUMIS:'Soumis', VALIDE:'Validé'}[s]||s;
+    }
+
+    const btnSoumettre = document.getElementById('pos-btn-soumettre');
+    if(btnSoumettre) btnSoumettre.style.display = (d.session_statut==='VALIDE') ? 'none' : '';
+
+    const nb    = document.getElementById('pos-dash-nb');
+    const total = document.getElementById('pos-dash-total');
+    const cash  = document.getElementById('pos-dash-cash');
+    const cred  = document.getElementById('pos-dash-credit');
+    if(nb)    nb.textContent    = d.nb_ventes||0;
+    if(total) total.textContent = posGx(d.total||0);
+    if(cash)  cash.textContent  = posGx(d.cash||0);
+    if(cred)  cred.textContent  = posGx(d.credit||0);
+
+    // Évolution
+    const evEl = document.getElementById('pos-dash-evolution');
+    if(evEl){
+      const evo = (d.evolution||[]).slice(-8).reverse();
+      evEl.innerHTML = evo.length ? evo.map(e=>
+        `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 6px;background:rgba(255,255,255,.04);border-radius:6px">
+          <span style="color:rgba(255,255,255,.5)">${e.heure} <span style="color:rgba(255,255,255,.25);font-size:10px">${e.ticket}</span></span>
+          <span style="font-weight:700;color:#f7a93b">${posGx(e.montant)}</span>
+        </div>`
+      ).join('') : '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:4px">Aucune vente</div>';
+    }
+
+    // Top produits
+    const topEl = document.getElementById('pos-dash-top');
+    if(topEl){
+      const top = d.top_produits||[];
+      topEl.innerHTML = top.length ? top.slice(0,5).map((p,i)=>
+        `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 6px;background:rgba(255,255,255,.04);border-radius:6px">
+          <span style="color:rgba(255,255,255,.7)">${i+1}. ${p.nom}</span>
+          <span style="font-weight:700;color:#3fb6a8">${posGx(p.total)}</span>
+        </div>`
+      ).join('') : '<div style="color:rgba(255,255,255,.3);font-size:11px;padding:4px">—</div>';
+    }
+  } catch(e){}
+}
+
+function posDashRefresh(){
+  const v = document.getElementById('pos-caissier-sel')?.value;
+  if(v) _posDashLoadData(v);
+}
+
+async function posSoumettreSession(){
+  if(!_posDashSessionId){
+    // Ouvrir d'abord une session
+    const cid = document.getElementById('pos-caissier-sel')?.value;
+    if(!cid){ posAlert('Sélectionnez un caissier.'); return; }
+    try {
+      const s = await apiFetch('POST', '/pos/caisse/sessions/ouvrir', {caissier_id: parseInt(cid)});
+      _posDashSessionId = s.id;
+    } catch(e){ posAlert(e.message||'Erreur ouverture session'); return; }
+  }
+  if(!await showConfirm('Soumettre le rapport de caisse pour validation par l\'admin ?', {title:'Soumettre rapport', okLabel:'Soumettre', type:'warn'})) return;
+  try {
+    await apiFetch('POST', `/pos/caisse/sessions/${_posDashSessionId}/soumettre`, {});
+    const cid = document.getElementById('pos-caissier-sel')?.value;
+    if(cid) await _posDashLoadData(cid);
+    _giAlert('Rapport soumis — l\'admin peut maintenant le valider.', 'ok');
+  } catch(e){ posAlert(e.message||'Erreur soumission.'); }
 }
 
 function posRenderCatTabs(){
@@ -17266,6 +17503,13 @@ async function posEnregistrerAchat(){
 // PAGE POS VENTES
 // ══════════════════════════════════════════════════════════════════════
 async function loadPosVentes(){
+  // Peupler le filtre caissier
+  try {
+    const emps = await apiFetch('GET', '/pos/caisse/caissieres');
+    const sel = document.getElementById('pos-ventes-caissier-f');
+    if(sel) sel.innerHTML = '<option value="">Tous les caissiers</option>' +
+      emps.map(e=>`<option value="${e.id}">${e.nom} ${e.prenom}</option>`).join('');
+  } catch(e){}
   posVentesAujourdhui();
 }
 
@@ -17285,10 +17529,12 @@ async function posVentesCharger(){
     const debut = document.getElementById('pos-ventes-debut')?.value||'';
     const fin   = document.getElementById('pos-ventes-fin')?.value||'';
     const mode  = document.getElementById('pos-ventes-mode-f')?.value||'';
+    const caissier = document.getElementById('pos-ventes-caissier-f')?.value||'';
     let url = '/pos/ventes?';
-    if(debut) url += `date_debut=${debut}&`;
-    if(fin)   url += `date_fin=${fin}&`;
-    if(mode)  url += `mode_paiement=${mode}&`;
+    if(debut)    url += `date_debut=${debut}&`;
+    if(fin)      url += `date_fin=${fin}&`;
+    if(mode)     url += `mode_paiement=${mode}&`;
+    if(caissier) url += `caissier_id=${caissier}&`;
 
     const data = await apiFetch('GET', url.slice(0,-1)||'/pos/ventes');
     const ventes = data.ventes||data||[];
@@ -18854,6 +19100,192 @@ function _ckDateFmt(d){
 function _ckHeureFmt(d){
   if(!d) return '';
   return new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SESSIONS CAISSIÈRES (admin)
+// ══════════════════════════════════════════════════════════════════
+let _scSessions = [];
+
+async function loadPosSessionsCaisse(){
+  // Peupler dropdown caissiers
+  try {
+    const emps = await apiFetch('GET', '/pos/caisse/caissieres');
+    const sel = document.getElementById('sc-filtre-caissier');
+    if(sel) sel.innerHTML = '<option value="">Tous les caissiers</option>' +
+      emps.map(e=>`<option value="${e.id}">${e.nom} ${e.prenom}</option>`).join('');
+  } catch(e){}
+  scAujourdhui();
+}
+
+function scAujourdhui(){
+  const today = new Date().toISOString().split('T')[0];
+  const deb = document.getElementById('sc-debut');
+  const fin = document.getElementById('sc-fin');
+  if(deb) deb.value = today;
+  if(fin) fin.value = today;
+  scCharger();
+}
+
+async function scCharger(){
+  const tbody = document.getElementById('sc-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try {
+    const caissier = document.getElementById('sc-filtre-caissier')?.value||'';
+    const statut   = document.getElementById('sc-filtre-statut')?.value||'';
+    const debut    = document.getElementById('sc-debut')?.value||'';
+    const fin      = document.getElementById('sc-fin')?.value||'';
+    let url = '/pos/caisse/sessions?';
+    if(caissier) url += `caissier_id=${caissier}&`;
+    if(statut)   url += `statut=${statut}&`;
+    if(debut)    url += `date_debut=${debut}&`;
+    if(fin)      url += `date_fin=${fin}&`;
+
+    _scSessions = await apiFetch('GET', url.slice(0,-1)||'/pos/caisse/sessions');
+
+    // KPIs
+    const nb       = _scSessions.length;
+    const encours  = _scSessions.filter(s=>s.statut==='EN_COURS').length;
+    const soumis   = _scSessions.filter(s=>s.statut==='SOUMIS').length;
+    const valide   = _scSessions.filter(s=>s.statut==='VALIDE').length;
+    ['sc-kpi-total',nb], ['sc-kpi-encours',encours], ['sc-kpi-soumis',soumis], ['sc-kpi-valide',valide];
+    [['sc-kpi-total',nb],['sc-kpi-encours',encours],['sc-kpi-soumis',soumis],['sc-kpi-valide',valide]]
+      .forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
+
+    const lbl = document.getElementById('sc-count-lbl');
+    if(lbl) lbl.textContent = `${nb} session${nb!==1?'s':''}`;
+
+    if(!nb){
+      if(tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.3);padding:24px">Aucune session</td></tr>';
+      return;
+    }
+
+    const statutBadge = {
+      EN_COURS: '<span style="background:rgba(247,169,59,.2);color:#f7a93b;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700">En cours</span>',
+      SOUMIS:   '<span style="background:rgba(99,210,190,.2);color:#3fb6a8;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700">Soumis</span>',
+      VALIDE:   '<span style="background:rgba(63,182,168,.3);color:#2dd4bf;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700">Validé ✓</span>',
+    };
+
+    if(tbody) tbody.innerHTML = _scSessions.map(s=>{
+      const st = statutBadge[s.statut]||s.statut;
+      const soumis_at = s.soumis_at ? new Date(s.soumis_at).toLocaleString('fr-HT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : '—';
+      const valide_par = s.valide_par ? `<span title="${s.valide_par}" style="font-size:11px;color:rgba(255,255,255,.5)">${s.valide_par}</span>` : '—';
+
+      const btnValider = s.statut !== 'VALIDE'
+        ? `<button class="pos-btn teal" style="font-size:11px;padding:3px 10px" onclick="scValider(${s.id})">Accepter</button>`
+        : '';
+      const btnPdf  = `<button class="pos-btn ghost" style="font-size:11px;padding:3px 10px" onclick="scExport(${s.id},'pdf')">PDF</button>`;
+      const btnXlsx = `<button class="pos-btn ghost" style="font-size:11px;padding:3px 10px" onclick="scExport(${s.id},'xlsx')">XLSX</button>`;
+      const btnRes  = `<button class="pos-btn primary" style="font-size:11px;padding:3px 10px" onclick="scResume(${s.id})">Résumé</button>`;
+
+      return `<tr>
+        <td>${s.date_session}</td>
+        <td style="font-weight:600">${s.caissier_nom||'—'}</td>
+        <td>${st}</td>
+        <td style="text-align:right">${s.nb_ventes||0}</td>
+        <td style="text-align:right;font-weight:700;color:#3fb6a8">${posGx(s.total||0)}</td>
+        <td style="text-align:right">${posGx(s.cash||0)}</td>
+        <td>${soumis_at}</td>
+        <td>${valide_par}</td>
+        <td><div style="display:flex;gap:4px;flex-wrap:wrap">${btnRes}${btnValider}${btnPdf}${btnXlsx}</div></td>
+      </tr>`;
+    }).join('');
+
+  } catch(e){
+    const tbody = document.getElementById('sc-tbody');
+    if(tbody) tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur'}</td></tr>`;
+  }
+}
+
+async function scValider(session_id){
+  if(!await showConfirm('Valider cette session de caisse ?', {title:'Valider la session', okLabel:'Valider', type:'ok'})) return;
+  try {
+    await apiFetch('POST', `/pos/caisse/sessions/${session_id}/valider`, {});
+    _giAlert('Session validée avec succès.', 'ok');
+    scCharger();
+  } catch(e){ _giAlert(e.message||'Erreur validation.', 'err'); }
+}
+
+async function scResume(session_id){
+  const bg    = document.getElementById('sc-detail-bg');
+  const body  = document.getElementById('sc-detail-body');
+  const titre = document.getElementById('sc-detail-titre');
+  const acts  = document.getElementById('sc-detail-actions');
+  if(!bg||!body) return;
+
+  body.innerHTML = '<div style="text-align:center;padding:30px;color:rgba(255,255,255,.4)">Chargement…</div>';
+  bg.classList.add('open');
+
+  try {
+    const d = await apiFetch('GET', `/pos/caisse/sessions/${session_id}`);
+    if(titre) titre.textContent = `Session — ${d.caissier_nom||'?'} · ${d.date_session}`;
+
+    const modeCols = {CASH:'#3fb6a8', CREDIT:'#f87171', MIXTE:'#a78bfa'};
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+        <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">Nb ventes</div>
+          <div style="font-size:22px;font-weight:800;color:#f7a93b">${d.nb_ventes||0}</div>
+        </div>
+        <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">Total CA</div>
+          <div style="font-size:18px;font-weight:700;color:#3fb6a8">${posGx(d.total||0)}</div>
+        </div>
+        <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">Cash</div>
+          <div style="font-size:18px;font-weight:700;color:#a78bfa">${posGx(d.cash||0)}</div>
+        </div>
+      </div>
+      ${d.top_produits && d.top_produits.length ? `
+        <div style="font-size:11px;color:rgba(255,255,255,.4);font-weight:600;margin-bottom:6px">Top produits</div>
+        <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:12px">
+          ${d.top_produits.slice(0,5).map((p,i)=>`
+            <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:6px">
+              <span style="color:rgba(255,255,255,.7)">${i+1}. ${p.nom}</span>
+              <span style="font-weight:700;color:#f7a93b">×${p.quantite.toFixed(0)} — ${posGx(p.total)}</span>
+            </div>`).join('')}
+        </div>` : ''}
+      <div style="font-size:11px;color:rgba(255,255,255,.4);font-weight:600;margin-bottom:6px">Détail ventes (${(d.ventes||[]).length})</div>
+      <div style="max-height:220px;overflow-y:auto">
+        <table class="pos-table" style="font-size:11px">
+          <thead><tr><th>Ticket</th><th>Heure</th><th>Mode</th><th>Client</th><th>Total</th></tr></thead>
+          <tbody>${(d.ventes||[]).map(v=>`
+            <tr>
+              <td>${v.numero_ticket}</td>
+              <td>${new Date(v.date_heure).toLocaleTimeString('fr-HT',{hour:'2-digit',minute:'2-digit'})}</td>
+              <td><span style="color:${modeCols[v.mode_paiement]||'#fff'};font-weight:700">${v.mode_paiement}</span></td>
+              <td>${v.client_nom||'—'}</td>
+              <td style="font-weight:700">${posGx(v.montant_total)}</td>
+            </tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:rgba(255,255,255,.3)">Aucune vente</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    if(acts){
+      const btnVal = d.statut !== 'VALIDE'
+        ? `<button class="pos-btn teal" onclick="scValider(${session_id});scFermerDetail()">Accepter</button>`
+        : '';
+      acts.innerHTML = `
+        ${btnVal}
+        <button class="pos-btn ghost" onclick="scExport(${session_id},'pdf')">Télécharger PDF</button>
+        <button class="pos-btn ghost" onclick="scExport(${session_id},'xlsx')">Télécharger XLSX</button>
+        <button class="pos-btn ghost" onclick="scFermerDetail()">Fermer</button>
+      `;
+    }
+  } catch(e){
+    body.innerHTML = `<div style="color:#f87171;padding:20px">${e.message||'Erreur'}</div>`;
+  }
+}
+
+function scFermerDetail(){
+  const bg = document.getElementById('sc-detail-bg');
+  if(bg) bg.classList.remove('open');
+}
+
+function scExport(session_id, format){
+  const url = `/api/pos/caisse/sessions/${session_id}/rapport.${format}`;
+  window.open(url, '_blank');
 }
 
 // ══════════════════════════════════════════════════════════════════
