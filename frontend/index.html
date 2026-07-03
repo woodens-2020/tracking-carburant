@@ -10353,14 +10353,13 @@ const _ACCES_POSTE_LEGACY = {
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
                   'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
   'Pompiste': ['home','saisie'],
-  'Caissier': ['home','saisie','journal','dashboard','pos-caisse','pos-ventes','pos-credits','pos-sessions-caisse'],
+  'Caissier': ['home','pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite'],
 };
 
-// Pages systématiquement interdites aux comptes caissière (employe_id défini),
-// quel que soit le rôle ou le poste.
-const _CAISSIER_BLOCKED = new Set([
-  'pos-achats','pos-paie','pos-rentabilite','pos-grande-caisse',
-  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
+// Whitelist stricte des pages accessibles aux comptes caissière (employe_id défini).
+// Toute page absente de cette liste est automatiquement bloquée, quel que soit le rôle.
+const _CAISSIER_ALLOWED = new Set([
+  'home','pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite',
 ]);
 
 function _getAllowedPages(){
@@ -10391,7 +10390,7 @@ function _canAccess(page){
     if(perms.admin === true) return true;
     if(['admin-roles','admin-users','admin-sessions','admin-audit'].includes(page)) return false;
   }
-  if(_appUser.employe_id && _CAISSIER_BLOCKED.has(page)) return false;
+  if(_appUser.employe_id) return _CAISSIER_ALLOWED.has(page);
   const allowed = _getAllowedPages();
   if(allowed === null) return true;
   return allowed.has(page);
