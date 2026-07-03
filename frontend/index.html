@@ -8759,8 +8759,10 @@ function _startScrollFix(){
 
 function goTo(page){
   if(!_canAccess(page)){
-    toast('Accès non autorisé pour votre poste.','err');
-    goTo('home');
+    if(page !== 'home'){
+      toast('Accès non autorisé pour votre poste.','err');
+      goTo('home');
+    }
     return;
   }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -10351,7 +10353,7 @@ const _ACCES_POSTE_LEGACY = {
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
                   'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
   'Pompiste': ['home','saisie'],
-  'Caissier': ['home','saisie','journal','dashboard'],
+  'Caissier': ['home','saisie','journal','dashboard','pos-caisse','pos-ventes','pos-credits','pos-sessions-caisse'],
 };
 
 function _getAllowedPages(){
@@ -10402,6 +10404,11 @@ function _applyNavAccess(){
     const p = btn.getAttribute('data-page');
     if(['admin-roles','admin-users','admin-sessions','admin-audit'].includes(p)) return;
     btn.style.display = allowed.has(p) ? '' : 'none';
+  });
+  // Masquer les nav-cards de la home page pour les pages interdites
+  document.querySelectorAll('.nav-card[onclick]').forEach(card=>{
+    const m = card.getAttribute('onclick').match(/goTo\('([^']+)'\)/);
+    if(m) card.style.display = allowed.has(m[1]) ? '' : 'none';
   });
   // Masquer les labels de sections dont tous les items sont cachés
   document.querySelectorAll('.nav-section-label').forEach(label=>{
