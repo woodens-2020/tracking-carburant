@@ -416,14 +416,19 @@ def cleanup_expired_otps(db: Session) -> int:
 
 # ── Code administrateur 5 chiffres ───────────────────────────────────────────
 
+# Caractères sans ambiguïté visuelle (0/O, 1/I/L exclus)
+_ADMIN_CODE_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+_ADMIN_CODE_LEN     = 9
+
+
 def _generate_admin_code() -> str:
-    """Code 5 chiffres uniforme via CSPRNG (10 000 – 99 999)."""
-    return f"{secrets.randbelow(90_000) + 10_000}"
+    """Code 9 caractères alphanumériques via CSPRNG — lisibles verbalement."""
+    return "".join(secrets.choice(_ADMIN_CODE_CHARSET) for _ in range(_ADMIN_CODE_LEN))
 
 
 def create_admin_code(db: Session, user_id: int) -> str:
     """
-    Génère un code admin 5 chiffres pour l'utilisateur.
+    Génère un code admin 9 caractères alphanumériques pour l'utilisateur.
     Invalide tout code actif existant.
     Retourne le code en clair — à envoyer UNIQUEMENT à l'email admin.
     """
@@ -448,7 +453,11 @@ def create_admin_code(db: Session, user_id: int) -> str:
 
 
 def _build_admin_code_email_html(nom_employe: str, username_employe: str, code: str) -> str:
-    digits = "&nbsp;&nbsp;".join(code)
+    # Grouper XXX-XXX-XXX pour lecture verbale
+    g1, g2, g3 = code[:3], code[3:6], code[6:]
+    grp1 = "&thinsp;".join(g1)
+    grp2 = "&thinsp;".join(g2)
+    grp3 = "&thinsp;".join(g3)
     return f"""<!DOCTYPE html>
 <html lang="fr">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -483,15 +492,35 @@ def _build_admin_code_email_html(nom_employe: str, username_employe: str, code: 
             a demandé un code d'accès alternatif car il ne peut pas recevoir son code OTP par email.
           </p>
 
-          <div style="background:#050c18;border:2px solid #e8c558;border-radius:12px;padding:26px 20px;text-align:center;margin:0 0 22px">
-            <div style="font-size:10px;font-weight:800;color:rgba(232,197,88,.5);letter-spacing:.18em;text-transform:uppercase;margin-bottom:12px">
-              Code administrateur
+          <div style="background:#050c18;border:2px solid #e8c558;border-radius:12px;padding:24px 16px;text-align:center;margin:0 0 22px">
+            <div style="font-size:10px;font-weight:800;color:rgba(232,197,88,.5);letter-spacing:.18em;text-transform:uppercase;margin-bottom:14px">
+              Code administrateur &mdash; 9 caractères
             </div>
-            <div style="font-size:48px;font-weight:900;color:#e8c558;letter-spacing:18px;
-                        font-family:'Courier New',Courier,monospace">
-              {digits}
+            <!-- Groupes XXX — XXX — XXX -->
+            <div style="display:inline-flex;align-items:center;gap:10px">
+              <span style="font-size:30px;font-weight:900;color:#e8c558;letter-spacing:6px;
+                           font-family:'Courier New',Courier,monospace;background:rgba(232,197,88,.07);
+                           padding:10px 14px;border-radius:8px;border:1px solid rgba(232,197,88,.2)">
+                {grp1}
+              </span>
+              <span style="font-size:20px;color:rgba(232,197,88,.3);font-weight:700">&mdash;</span>
+              <span style="font-size:30px;font-weight:900;color:#e8c558;letter-spacing:6px;
+                           font-family:'Courier New',Courier,monospace;background:rgba(232,197,88,.07);
+                           padding:10px 14px;border-radius:8px;border:1px solid rgba(232,197,88,.2)">
+                {grp2}
+              </span>
+              <span style="font-size:20px;color:rgba(232,197,88,.3);font-weight:700">&mdash;</span>
+              <span style="font-size:30px;font-weight:900;color:#e8c558;letter-spacing:6px;
+                           font-family:'Courier New',Courier,monospace;background:rgba(232,197,88,.07);
+                           padding:10px 14px;border-radius:8px;border:1px solid rgba(232,197,88,.2)">
+                {grp3}
+              </span>
             </div>
-            <div style="font-size:11px;color:rgba(232,197,88,.38);margin-top:14px">
+            <div style="font-size:10px;color:rgba(232,197,88,.35);margin-top:12px;letter-spacing:.05em">
+              {code[:3]} &mdash; {code[3:6]} &mdash; {code[6:]}
+              &nbsp;&nbsp;·&nbsp;&nbsp; Majuscules uniquement
+            </div>
+            <div style="font-size:11px;color:rgba(232,197,88,.38);margin-top:10px">
               ⏱ Valide <strong style="color:rgba(232,197,88,.6)">24 heures</strong>
               &nbsp;&middot;&nbsp; Usage unique
             </div>
@@ -601,7 +630,9 @@ def verify_admin_code(db: Session, pending_token: str, submitted_code: str) -> U
         raise ValueError("Trop de tentatives — recommencez la connexion.")
 
     import hmac as _hmac
-    expected = _hash_code(submitted_code.strip())
+    # Normaliser : majuscules, ignorer tirets et espaces
+    normalized = submitted_code.strip().upper().replace("-", "").replace(" ", "")
+    expected = _hash_code(normalized)
     if not _hmac.compare_digest(expected, ac.code_hash):
         ac.attempts += 1
         remaining = 3 - ac.attempts

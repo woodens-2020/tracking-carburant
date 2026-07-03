@@ -616,12 +616,25 @@ body{
             </div>
           </div>
 
-          <div class="otp-boxes" id="admin-code-boxes" style="gap:10px;margin-bottom:12px">
-            <input class="otp-box" id="ac0" maxlength="1" inputmode="numeric">
-            <input class="otp-box" id="ac1" maxlength="1" inputmode="numeric">
-            <input class="otp-box" id="ac2" maxlength="1" inputmode="numeric">
-            <input class="otp-box" id="ac3" maxlength="1" inputmode="numeric">
-            <input class="otp-box" id="ac4" maxlength="1" inputmode="numeric">
+          <!-- Groupes 3+3+3 style XXX — XXX — XXX -->
+          <div id="admin-code-boxes" style="display:flex;align-items:center;gap:6px;margin-bottom:12px">
+            <div style="display:flex;gap:4px">
+              <input class="otp-box" id="ac0" maxlength="1" inputmode="text" autocapitalize="characters" style="width:33px;font-size:17px">
+              <input class="otp-box" id="ac1" maxlength="1" inputmode="text" autocapitalize="characters" style="width:33px;font-size:17px">
+              <input class="otp-box" id="ac2" maxlength="1" inputmode="text" autocapitalize="characters" style="width:33px;font-size:17px">
+            </div>
+            <span style="color:rgba(232,197,88,.25);font-size:18px;font-weight:700;flex-shrink:0">&mdash;</span>
+            <div style="display:flex;gap:4px">
+              <input class="otp-box" id="ac3" maxlength="1" inputmode="text" autocapitalize="characters" style="width:33px;font-size:17px">
+              <input class="otp-box" id="ac4" maxlength="1" inputmode="text" autocapitalize="characters" style="width:33px;font-size:17px">
+              <input class="otp-box" id="ac5" maxlength="1" inputmode="text" autocapitalize="characters" style="width:33px;font-size:17px">
+            </div>
+            <span style="color:rgba(232,197,88,.25);font-size:18px;font-weight:700;flex-shrink:0">&mdash;</span>
+            <div style="display:flex;gap:4px">
+              <input class="otp-box" id="ac6" maxlength="1" inputmode="text" autocapitalize="characters" style="width:33px;font-size:17px">
+              <input class="otp-box" id="ac7" maxlength="1" inputmode="text" autocapitalize="characters" style="width:33px;font-size:17px">
+              <input class="otp-box" id="ac8" maxlength="1" inputmode="text" autocapitalize="characters" style="width:33px;font-size:17px">
+            </div>
           </div>
 
           <div class="otp-err" id="admin-code-err"></div>
@@ -630,7 +643,7 @@ body{
             Valider le code admin
           </button>
           <div style="font-size:10.5px;color:rgba(78,109,149,.3);text-align:center;margin-top:8px">
-            Code valide 24&nbsp;h &nbsp;·&nbsp; Usage unique &nbsp;·&nbsp; Max 3 tentatives
+            9 caractères · Code valide 24&nbsp;h · Max 3 tentatives
           </div>
         </div>
 
@@ -1116,16 +1129,19 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
 /* ══ CODE ADMINISTRATEUR ══ */
 (function(){
   var _initDone = false;
+  var _ADMIN_LEN = 9;
+  // Caractères valides (même charset que backend)
+  var _VALID_RE = /[A-Za-z2-9]/;
 
   function _initAdminBoxes(){
     if(_initDone) return;
-    var boxes = [0,1,2,3,4].map(function(i){ return document.getElementById('ac'+i); });
+    var boxes = [0,1,2,3,4,5,6,7,8].map(function(i){ return document.getElementById('ac'+i); });
     var btnV  = document.getElementById('btn-verify-admin-code');
     var errEl = document.getElementById('admin-code-err');
 
     function updateState(){
       var code = boxes.map(function(b){ return b.value; }).join('');
-      if(btnV) btnV.disabled = code.length !== 5;
+      if(btnV) btnV.disabled = code.length !== _ADMIN_LEN;
       boxes.forEach(function(b){ if(b) b.classList.toggle('filled', b.value !== ''); });
       if(errEl) errEl.textContent = '';
       boxes.forEach(function(b){ if(b) b.classList.remove('err'); });
@@ -1139,23 +1155,25 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
         }
       });
       box.addEventListener('input', function(){
-        var v = box.value.replace(/\D/g,'');
+        // Accepter lettres et chiffres, forcer majuscule
+        var v = box.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase();
         box.value = v ? v[0] : '';
-        if(v && idx<4) boxes[idx+1].focus();
+        if(v && idx < _ADMIN_LEN-1) boxes[idx+1].focus();
         updateState();
       });
       box.addEventListener('paste', function(e){
-        var t = (e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'').slice(0,5);
+        var raw = (e.clipboardData||window.clipboardData).getData('text');
+        var t = raw.replace(/[^A-Za-z0-9]/g,'').toUpperCase().slice(0, _ADMIN_LEN);
         if(!t){ e.preventDefault(); return; }
         t.split('').forEach(function(ch,i){ if(boxes[i]) boxes[i].value=ch; });
-        boxes[Math.min(t.length,4)].focus(); updateState(); e.preventDefault();
+        boxes[Math.min(t.length, _ADMIN_LEN-1)].focus(); updateState(); e.preventDefault();
       });
     });
     _initDone = true;
   }
 
   window._clearAdminBoxes = function(){
-    [0,1,2,3,4].forEach(function(i){
+    [0,1,2,3,4,5,6,7,8].forEach(function(i){
       var b=document.getElementById('ac'+i); if(b){b.value='';b.classList.remove('filled','err');}
     });
     var btnV=document.getElementById('btn-verify-admin-code'); if(btnV) btnV.disabled=true;
@@ -1164,7 +1182,7 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
 
   window._setAdminErr = function(msg){
     var e=document.getElementById('admin-code-err'); if(e) e.textContent=msg;
-    [0,1,2,3,4].forEach(function(i){ var b=document.getElementById('ac'+i); if(b) b.classList.add('err'); });
+    [0,1,2,3,4,5,6,7,8].forEach(function(i){ var b=document.getElementById('ac'+i); if(b) b.classList.add('err'); });
     var b0=document.getElementById('ac0'); if(b0) b0.focus();
     var boxes=document.getElementById('admin-code-boxes');
     if(boxes){ boxes.style.animation='none'; void boxes.offsetWidth; boxes.style.animation='shake .38s ease'; }
@@ -1227,9 +1245,9 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
   };
 
   window.verifyAdminCode = async function(){
-    var boxes=[0,1,2,3,4].map(function(i){ return document.getElementById('ac'+i); });
+    var boxes=[0,1,2,3,4,5,6,7,8].map(function(i){ return document.getElementById('ac'+i); });
     var code=boxes.map(function(b){ return b?b.value:''; }).join('');
-    if(code.length!==5) return;
+    if(code.length!==_ADMIN_LEN) return;
     var btnV=document.getElementById('btn-verify-admin-code');
     btnV.disabled=true;
     btnV.innerHTML='<span class="spinner" style="border-top-color:#0a1c3a"></span>Vérification…';
