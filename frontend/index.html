@@ -14734,6 +14734,7 @@ async function adminRolesSupprimer(id, nom, nbUsers){
 let _adminUsersData  = [];
 let _adminRolesList  = [];
 let _adminUserEditId = null;
+let _adminUserEditPrevEmail = '';
 
 async function loadAdminUsers(){
   try{
@@ -14773,6 +14774,7 @@ function adminUsersRender(){
       <td style="text-align:right">
         <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
           <button class="pos-btn ghost" onclick="adminUsersEditer(${u.id})" style="font-size:11px;padding:3px 9px">Modifier</button>
+          <button class="pos-btn ghost" onclick="adminTestEmail(${u.id},'${(u.email||'').replace(/'/g,"\\'")}',this)" style="font-size:11px;padding:3px 9px;color:#60a5fa" title="Envoyer un email de test pour vérifier la livraison OTP">📧 Tester</button>
           <button class="pos-btn ghost" onclick="adminResetPwdOpen(${u.id})" style="font-size:11px;padding:3px 9px" title="Réinitialiser mot de passe">MDP</button>
           <button class="pos-btn ghost" onclick="adminResetPinOpen(${u.id})" style="font-size:11px;padding:3px 9px;color:#f7a93b" title="Réinitialiser PIN">PIN</button>
           ${toggleBtn}
@@ -14811,6 +14813,7 @@ function adminUsersEditer(id){
   const u = _adminUsersData.find(x => x.id === id);
   if(!u) return;
   _adminUserEditId = id;
+  _adminUserEditPrevEmail = u.email || '';
   document.getElementById('admin-user-modal-title').textContent = 'Modifier le compte';
   document.getElementById('aum-id').value = id;
   document.getElementById('aum-nom').value = u.nom_complet || '';
@@ -14837,7 +14840,17 @@ async function adminUsersSauvegarder(){
   try{
     if(_adminUserEditId){
       await apiFetch('PUT',`/admin/users/${_adminUserEditId}`, { nom_complet:nom, email, role_id:roleId });
-      posAlert('Compte modifié','ok');
+      const emailChanged = email && email !== _adminUserEditPrevEmail;
+      if(emailChanged){
+        try{
+          await apiFetch('POST',`/admin/users/${_adminUserEditId}/test-email`);
+          posAlert(`Compte modifié ✓ — email de confirmation envoyé à ${email}`,'ok');
+        }catch(_){
+          posAlert(`Compte modifié ✓ — échec envoi email à ${email}, vérifiez l'adresse`,'warn');
+        }
+      } else {
+        posAlert('Compte modifié','ok');
+      }
     } else {
       const username  = document.getElementById('aum-username').value.trim();
       const password  = document.getElementById('aum-password').value;
@@ -14845,8 +14858,11 @@ async function adminUsersSauvegarder(){
       if(!username){ posAlert('Le nom d\'utilisateur est requis','err'); return; }
       if(!password){ posAlert('Le mot de passe est requis','err'); return; }
       if(!code_acces){ posAlert('Le code PIN est requis','err'); return; }
-      await apiFetch('POST','/admin/users', { nom_complet:nom, email, username, password, code_acces, role_id:roleId });
-      posAlert('Compte créé','ok');
+      const created = await apiFetch('POST','/admin/users', { nom_complet:nom, email, username, password, code_acces, role_id:roleId });
+      posAlert(created.welcome_email_sent
+        ? `Compte créé ✓ — email de bienvenue envoyé à ${email}`
+        : `Compte créé ✓ — vérifiez l'adresse email (envoi échoué)`
+      , created.welcome_email_sent ? 'ok' : 'warn');
     }
     adminUsersCloseModal();
     loadAdminUsers();
@@ -14859,6 +14875,24 @@ async function adminUsersToggleActif(id, actif){
     posAlert(actif ? 'Compte activé' : 'Compte désactivé','ok');
     loadAdminUsers();
   }catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+async function adminTestEmail(uid, email, btn){
+  if(!email){ posAlert('Aucun email configuré pour cet utilisateur.','err'); return; }
+  const orig = btn.textContent;
+  btn.textContent = '⏳ Envoi…';
+  btn.disabled = true;
+  try{
+    await apiFetch('POST', `/admin/users/${uid}/test-email`);
+    btn.textContent = '✓ Envoyé';
+    btn.style.color = '#34d399';
+    posAlert(`Email de test envoyé à ${email} — vérifiez la boîte de réception et les spams.`,'ok');
+    setTimeout(()=>{ btn.textContent=orig; btn.style.color=''; btn.disabled=false; }, 4000);
+  }catch(e){
+    btn.textContent = orig;
+    btn.disabled = false;
+    posAlert(e.message||'Erreur envoi email','err');
+  }
 }
 
 function adminResetPwdOpen(uid){

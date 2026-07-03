@@ -15,6 +15,7 @@ from activity_log import (
     USER_CREATED, USER_UPDATED, USER_DISABLED, USER_ENABLED,
 )
 from auth import hash_code_acces, hash_password, make_api_key
+from otp_service import send_welcome_email
 from database import get_db
 from models import AuditLog, Role, SessionToken, Utilisateur
 
@@ -247,8 +248,16 @@ def creer_user(
     db.commit()
     db.refresh(u)
     raw_key = make_api_key(db, u.id)
+    # Email de bienvenue — livraison non bloquante
+    welcome_sent = False
+    try:
+        send_welcome_email(u.nom_complet or u.username, u.email, u.username)
+        welcome_sent = True
+    except Exception:
+        pass
     result = _user_public(u)
     result["api_key"] = raw_key
+    result["welcome_email_sent"] = welcome_sent
     return result
 
 
@@ -329,6 +338,28 @@ def reset_pin(
     log_event(db, PIN_RESET, user_id=admin.id, target_user_id=uid,
               ip_address=request.client.host if request.client else None)
     return {"ok": True}
+
+
+@router.post("/users/{uid}/test-email")
+def test_email(
+    uid: int,
+    _admin: Utilisateur = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    """Envoie un email de test à l'utilisateur pour vérifier la livraison."""
+    u = db.get(Utilisateur, uid)
+    if not u:
+        raise HTTPException(404, "Utilisateur introuvable")
+    if not u.email:
+        raise HTTPException(400, "Cet utilisateur n'a pas d'adresse email.")
+    bad_tlds = {".local", ".localhost", ".internal", ".test", ".example", ".invalid", ".lan"}
+    if any(u.email.lower().endswith(t) for t in bad_tlds):
+        raise HTTPException(400, f"Domaine email invalide ({u.email}) — mettez à jour l'email.")
+    try:
+        send_welcome_email(u.nom_complet or u.username, u.email, u.username)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return {"ok": True, "email": u.email}
 
 
 # ══════════════════════════════════════════════════════════════════

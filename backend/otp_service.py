@@ -240,6 +240,101 @@ def send_otp_email(nom: str, email: str, code: str) -> None:
         )
 
 
+# ── Email de bienvenue / test de livraison ────────────────────────────────────
+
+def _build_welcome_html(nom: str, username: str) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#070e1c;font-family:Arial,Helvetica,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#070e1c;padding:36px 16px">
+  <tr><td align="center">
+    <table width="100%" style="max-width:480px;background:#0b1628;border-radius:14px;border:1px solid rgba(232,197,88,.22);overflow:hidden">
+
+      <tr>
+        <td style="padding:28px 32px 24px;text-align:center;border-bottom:2px solid #e8c558">
+          <div style="font-size:32px;font-weight:900;color:#e8c558;line-height:1">K</div>
+          <div style="font-size:13px;font-weight:800;color:#e8c558;letter-spacing:3px;margin-top:4px">KONEKTA</div>
+          <div style="font-size:10px;color:rgba(232,197,88,.45);margin-top:3px">
+            Bon Prix &middot; Complexe Commerciale de Pillatre
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:32px 32px 24px">
+          <p style="margin:0 0 6px;color:#dde8f8;font-size:15px;font-weight:600">
+            Bonjour <span style="color:#e8c558">{nom}</span>,
+          </p>
+          <p style="margin:0 0 24px;color:rgba(221,232,248,.65);font-size:13px;line-height:1.65">
+            Votre adresse email a été enregistrée dans le système <strong style="color:#e8c558">Konekta</strong>.
+            Cet email confirme que la livraison fonctionne correctement.
+          </p>
+
+          <div style="background:#050c18;border:1px solid rgba(232,197,88,.2);border-radius:10px;padding:18px 20px;margin:0 0 22px">
+            <div style="font-size:11px;color:rgba(232,197,88,.5);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Votre compte</div>
+            <div style="color:#dde8f8;font-size:13px"><strong style="color:rgba(255,255,255,.5)">Identifiant :</strong> <span style="color:#e8c558;font-family:monospace">{username}</span></div>
+            <div style="color:rgba(221,232,248,.5);font-size:12px;margin-top:8px;line-height:1.5">
+              À chaque connexion, un code à 6 chiffres vous sera envoyé à cette adresse.
+              Saisissez-le dans l'application pour accéder au système.
+            </div>
+          </div>
+
+          <table cellpadding="0" cellspacing="0" width="100%"
+                 style="background:rgba(14,165,233,.07);border:1px solid rgba(14,165,233,.2);
+                        border-left:3px solid #0ea5e9;border-radius:8px;margin:0 0 16px">
+            <tr>
+              <td style="padding:11px 14px;color:rgba(147,213,248,.9);font-size:12px;line-height:1.5">
+                ℹ️ Si vous ne reconnaissez pas ce compte, contactez l'administrateur.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:14px 32px;border-top:1px solid rgba(255,255,255,.06);text-align:center">
+          <p style="margin:0;color:rgba(255,255,255,.18);font-size:10px">
+            &copy; 2026 Konekta &nbsp;&middot;&nbsp; Message automatique &mdash; ne pas répondre.
+          </p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>"""
+
+
+def send_welcome_email(nom: str, email: str, username: str) -> None:
+    """Envoie un email de bienvenue / test de livraison à l'adresse enregistrée."""
+    if not EMAIL_USER or not EMAIL_PASSWORD:
+        raise RuntimeError("Email non configuré dans backend/.env")
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Bienvenue sur Konekta — votre accès est configuré"
+    msg["From"]    = f"{EMAIL_FROM_NAME} <{EMAIL_USER}>"
+    msg["To"]      = email
+
+    msg.attach(MIMEText(_build_welcome_html(nom, username), "html", "utf-8"))
+
+    try:
+        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=10) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
+            smtp.login(EMAIL_USER, EMAIL_PASSWORD)
+            smtp.sendmail(EMAIL_USER, [email], msg.as_string())
+        log.info("Email de bienvenue envoyé à %s", _mask_email(email))
+    except smtplib.SMTPAuthenticationError:
+        log.error("Échec auth SMTP pour email de bienvenue")
+        raise RuntimeError("Impossible d'envoyer l'email — vérifiez la configuration SMTP.")
+    except Exception as exc:
+        log.error("Erreur envoi email bienvenue : %s", exc)
+        raise RuntimeError(f"L'email n'a pas pu être envoyé : {exc}")
+
+
 # ── Vérification ──────────────────────────────────────────────────────────────
 
 def verify_otp(db: Session, pending_token: str, submitted_code: str) -> Utilisateur:
