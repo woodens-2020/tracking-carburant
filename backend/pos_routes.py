@@ -1051,9 +1051,10 @@ def dashboard_bar(
         .join(BarLigneVente, BarProduit.id == BarLigneVente.produit_id)
         .join(BarVente,      BarVente.id   == BarLigneVente.vente_id)
         .filter(
-            BarVente.date_heure >= dt_debut,
-            BarVente.date_heure <= dt_fin,
-            BarVente.statut     != "ANNULEE",
+            BarVente.date_heure      >= dt_debut,
+            BarVente.date_heure      <= dt_fin,
+            BarVente.statut          != "ANNULEE",
+            BarLigneVente.produit_id != None,
         )
     )
     if caissier_id:   top_q = top_q.filter(BarVente.caissier_id   == caissier_id)

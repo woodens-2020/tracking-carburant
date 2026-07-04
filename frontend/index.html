@@ -16125,13 +16125,14 @@ async function loadPosDashboardBar(){
     document.head.appendChild(s);
   }
 
-  // Init date inputs à aujourd'hui
+  // Init date inputs aux 7 derniers jours par défaut
   const today = new Date().toISOString().split('T')[0];
+  const deb7  = new Date(); deb7.setDate(deb7.getDate() - 6);
   const deb = document.getElementById('posdb-f-debut');
   const fin = document.getElementById('posdb-f-fin');
-  if(deb && !deb.value) deb.value = today;
+  if(deb && !deb.value) deb.value = deb7.toISOString().split('T')[0];
   if(fin && !fin.value) fin.value = today;
-  _posDbSetActivePreset('today');
+  _posDbSetActivePreset('7j');
 
   // Peupler le select employé
   try {
