@@ -8470,7 +8470,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════ MODALS CRM ══════ -->
 
     <!-- Modal client -->
-    <div id="crm-cl-modal-bg" class="pos-modal-bg">
+    <div id="crm-cl-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)crmClientFermer()">
       <div class="pos-modal" style="max-width:520px">
         <div class="pos-modal-hdr">
           <span id="crm-cl-modal-title">Nouveau partenaire</span>
@@ -8524,7 +8524,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div>
 
     <!-- Modal crédit -->
-    <div id="crm-cr-modal-bg" class="pos-modal-bg">
+    <div id="crm-cr-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)crmCreditFermer()">
       <div class="pos-modal" style="max-width:520px">
         <div class="pos-modal-hdr">
           <span id="crm-cr-modal-title">Nouveau crédit</span>
@@ -8575,7 +8575,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div>
 
     <!-- Modal remboursement -->
-    <div id="crm-remb-modal-bg" class="pos-modal-bg">
+    <div id="crm-remb-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)crmRembFermer()">
       <div class="pos-modal" style="max-width:420px">
         <div class="pos-modal-hdr">
           <span id="crm-remb-titre">Enregistrer un remboursement</span>
@@ -8603,7 +8603,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div>
 
     <!-- Modal facture -->
-    <div id="crm-fac-modal-bg" class="pos-modal-bg">
+    <div id="crm-fac-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)crmFactureFermer()">
       <div class="pos-modal" style="max-width:680px">
         <div class="pos-modal-hdr">
           <span>Nouvelle facture</span>
@@ -8650,7 +8650,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div>
 
     <!-- Modal interactions partenaire -->
-    <div id="crm-inter-modal-bg" class="pos-modal-bg">
+    <div id="crm-inter-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)crmInteractionsFermer()">
       <div class="pos-modal" style="max-width:560px">
         <div class="pos-modal-hdr">
           <span id="crm-inter-titre">Interactions</span>
@@ -22560,9 +22560,9 @@ async function crmClientOuvrir(id){
       g('crm-cl-notes').value   = c.notes;
     }catch(e){ posAlert('Impossible de charger le client'); return; }
   }
-  g('crm-cl-modal-bg').classList.add('active');
+  g('crm-cl-modal-bg').classList.add('open');
 }
-function crmClientFermer(){ g('crm-cl-modal-bg').classList.remove('active'); }
+function crmClientFermer(){ g('crm-cl-modal-bg').classList.remove('open'); }
 
 async function crmClientSauvegarder(){
   const id  = g('crm-cl-id').value;
@@ -22603,10 +22603,10 @@ async function crmInteractionsOuvrir(clientId, clientNom){
   g('crm-inter-type').value = 'APPEL';
   g('crm-inter-titre-inp').value = '';
   g('crm-inter-desc').value = '';
-  g('crm-inter-modal-bg').classList.add('active');
+  g('crm-inter-modal-bg').classList.add('open');
   await crmInteractionsCharger();
 }
-function crmInteractionsFermer(){ g('crm-inter-modal-bg').classList.remove('active'); }
+function crmInteractionsFermer(){ g('crm-inter-modal-bg').classList.remove('open'); }
 
 async function crmInteractionsCharger(){
   try{
@@ -22716,9 +22716,9 @@ async function crmCreditOuvrir(){
   selPr.innerHTML = '<option value="">— Aucun —</option>' +
     _crmProduits.map(p=>`<option value="${p.id}">${p.nom}</option>`).join('');
   ['crm-cr-qte','crm-cr-prixu','crm-cr-montant','crm-cr-echeance','crm-cr-notes'].forEach(x=>g(x).value='');
-  g('crm-cr-modal-bg').classList.add('active');
+  g('crm-cr-modal-bg').classList.add('open');
 }
-function crmCreditFermer(){ g('crm-cr-modal-bg').classList.remove('active'); }
+function crmCreditFermer(){ g('crm-cr-modal-bg').classList.remove('open'); }
 
 function crmCreditCalc(){
   const qte  = parseFloat(g('crm-cr-qte').value)||0;
@@ -22770,9 +22770,9 @@ async function crmRembOuvrir(creditId){
     </div>`;
   g('crm-remb-montant').value = '';
   g('crm-remb-notes').value = '';
-  g('crm-remb-modal-bg').classList.add('active');
+  g('crm-remb-modal-bg').classList.add('open');
 }
-function crmRembFermer(){ g('crm-remb-modal-bg').classList.remove('active'); }
+function crmRembFermer(){ g('crm-remb-modal-bg').classList.remove('open'); }
 
 async function crmRembSauvegarder(){
   const creditId = g('crm-remb-credit-id').value;
@@ -22848,9 +22848,9 @@ async function crmFactureOuvrir(){
   g('crm-fac-lignes').innerHTML = '';
   g('crm-fac-total-ttc').textContent = '0.00 HTG';
   crmFacAjouterLigne();
-  g('crm-fac-modal-bg').classList.add('active');
+  g('crm-fac-modal-bg').classList.add('open');
 }
-function crmFactureFermer(){ g('crm-fac-modal-bg').classList.remove('active'); }
+function crmFactureFermer(){ g('crm-fac-modal-bg').classList.remove('open'); }
 
 let _crmLigneIdx = 0;
 function crmFacAjouterLigne(){
