@@ -18390,9 +18390,9 @@ async function loadPosVentes(){
   const thead = document.getElementById('pos-ventes-thead');
   if(thead){
     if(isCaissiere){
-      thead.innerHTML = '<tr><th>Ticket</th><th>Date</th><th>Heure</th><th>Client</th><th>Articles</th><th>Total</th><th>Mode</th><th>Statut</th><th>Actions</th></tr>';
+      thead.innerHTML = '<tr><th>Ticket</th><th>Date</th><th>Heure</th><th>Client</th><th>Articles commandés</th><th>Total</th><th>Mode</th><th>Statut</th><th>Actions</th></tr>';
     } else {
-      thead.innerHTML = '<tr><th>Ticket</th><th>Date</th><th>Heure</th><th>Employé</th><th>Client</th><th>Articles</th><th>Total</th><th>Mode</th><th>Statut</th><th>Actions</th></tr>';
+      thead.innerHTML = '<tr><th>Ticket</th><th>Date</th><th>Heure</th><th>Employé</th><th>Client</th><th>Articles commandés</th><th>Total</th><th>Mode</th><th>Statut</th><th>Actions</th></tr>';
     }
   }
 
@@ -18627,18 +18627,25 @@ async function posVentesCharger(){
           ? '<span class="pos-badge">Annulée</span>'
           : '<span class="pos-badge amber">Crédit</span>';
       const empCol = isCaissiere ? '' : `<td style="font-size:11px;color:rgba(255,255,255,.65)">${v.caissier_nom||'—'}</td>`;
+      const arts = (v.articles||[]);
+      const artHtml = arts.length
+        ? arts.map(a=>`<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(255,255,255,.07);border-radius:4px;padding:1px 6px;font-size:10px;white-space:nowrap">
+            <span style="color:rgba(255,255,255,.9);font-weight:600">${esc(a.nom)}</span>
+            <span style="color:rgba(255,255,255,.4)">×${a.quantite%1===0?a.quantite.toFixed(0):a.quantite.toFixed(1)}</span>
+          </span>`).join(' ')
+        : '<span style="color:rgba(255,255,255,.3);font-size:11px">—</span>';
       return `<tr${v.statut==='ANNULEE'?' style="opacity:.5"':''}>
-        <td>${v.numero_ticket||'—'}</td>
+        <td style="font-size:11px;color:rgba(255,255,255,.5)">${v.numero_ticket||'—'}</td>
         <td>${posDateFr(v.date_vente)}</td>
         <td style="font-size:12px;color:rgba(255,255,255,.6)">${heureStr}</td>
         ${empCol}
-        <td>${v.client_nom||'—'}</td>
-        <td>${v.nb_lignes||'—'}</td>
-        <td>${posGx(v.montant_total)}</td>
-        <td>${v.mode_paiement||'—'}</td>
+        <td style="font-size:11px">${v.client_nom||'—'}</td>
+        <td style="max-width:260px"><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">${artHtml}</div></td>
+        <td style="font-weight:700;color:#4ade80">${posGx(v.montant_total)}</td>
+        <td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.08)">${v.mode_paiement||'—'}</span></td>
         <td>${badge}</td>
-        <td>
-          <button class="pos-btn ghost" style="font-size:10px;padding:3px 7px" onclick="posVenteDetail(${v.id})">Voir</button>
+        <td style="white-space:nowrap">
+          <button class="pos-btn ghost" style="font-size:10px;padding:3px 7px" onclick="posVenteDetail(${v.id})">Détail</button>
           ${v.statut!=='ANNULEE'?`<button class="pos-btn danger" style="font-size:10px;padding:3px 7px" onclick="posAnnulerVenteConfirm(${v.id})">Annuler</button>`:''}
         </td>
       </tr>`;

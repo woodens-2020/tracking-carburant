@@ -11,7 +11,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, validator, model_validator
 from sqlalchemy import func
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from database import get_db
 from models import (
@@ -902,7 +902,22 @@ def liste_ventes(
         except ValueError:
             pass
 
-    ventes = q.order_by(BarVente.date_heure.desc()).limit(limit).all()
+    ventes = (
+        q.options(
+            selectinload(BarVente.lignes)
+            .selectinload(BarLigneVente.produit),
+            selectinload(BarVente.lignes)
+            .selectinload(BarLigneVente.cuisine_plat),
+        )
+        .order_by(BarVente.date_heure.desc())
+        .limit(limit)
+        .all()
+    )
+
+    def _ligne_nom(l):
+        if l.produit:      return l.produit.nom
+        if l.cuisine_plat: return l.cuisine_plat.nom
+        return "—"
 
     return [
         {
@@ -920,6 +935,14 @@ def liste_ventes(
             "caissier_id":     v.caissier_id,
             "caissier_nom":    (v.caissier.nom + " " + v.caissier.prenom) if v.caissier else "Sans caissier",
             "nb_lignes":       len(v.lignes),
+            "articles": [
+                {
+                    "nom":      _ligne_nom(l),
+                    "quantite": float(l.quantite),
+                    "total":    float(l.sous_total),
+                }
+                for l in v.lignes
+            ],
         }
         for v in ventes
     ]
