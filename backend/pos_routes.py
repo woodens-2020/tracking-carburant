@@ -859,9 +859,12 @@ def liste_ventes(
     mode_paiement: Optional[str]       = None,
     statut:        Optional[str]       = None,
     produit_id:    Optional[int]       = None,
+    heure_debut:   Optional[str]       = None,   # format "HH:MM"
+    heure_fin:     Optional[str]       = None,   # format "HH:MM"
     limit:         int = Query(50, le=500),
     db: Session = Depends(get_db),
 ):
+    from sqlalchemy import extract
     q = db.query(BarVente)
     if date_debut:
         dt = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
@@ -878,6 +881,26 @@ def liste_ventes(
     if produit_id:
         sub = db.query(BarLigneVente.vente_id).filter(BarLigneVente.produit_id == produit_id)
         q   = q.filter(BarVente.id.in_(sub))
+    if heure_debut:
+        try:
+            h, m = (int(x) for x in heure_debut.split(':'))
+            minutes = h * 60 + m
+            q = q.filter(
+                extract('hour', BarVente.date_heure) * 60 +
+                extract('minute', BarVente.date_heure) >= minutes
+            )
+        except ValueError:
+            pass
+    if heure_fin:
+        try:
+            h, m = (int(x) for x in heure_fin.split(':'))
+            minutes = h * 60 + m
+            q = q.filter(
+                extract('hour', BarVente.date_heure) * 60 +
+                extract('minute', BarVente.date_heure) <= minutes
+            )
+        except ValueError:
+            pass
 
     ventes = q.order_by(BarVente.date_heure.desc()).limit(limit).all()
 

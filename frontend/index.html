@@ -5991,11 +5991,18 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <button class="pos-btn ghost" style="font-size:11px" onclick="posVentesPreset('month')">Mois</button>
             <input type="date" class="pos-input" id="pos-ventes-debut" style="width:130px">
             <input type="date" class="pos-input" id="pos-ventes-fin" style="width:130px">
-            <select class="pos-select" id="pos-ventes-produit-f" style="width:160px" onchange="posVentesCharger()">
+            <!-- Filtre heure — visible uniquement pour les gestionnaires -->
+            <span id="pos-ventes-heure-wrap" style="display:none;align-items:center;gap:4px">
+              <input type="time" class="pos-input" id="pos-ventes-heure-debut" style="width:100px" title="Heure de début">
+              <span style="color:rgba(255,255,255,.4);font-size:11px">→</span>
+              <input type="time" class="pos-input" id="pos-ventes-heure-fin" style="width:100px" title="Heure de fin">
+            </span>
+            <select class="pos-select" id="pos-ventes-produit-f" style="width:155px" onchange="posVentesCharger()">
               <option value="">Tous les produits</option>
             </select>
-            <select class="pos-select" id="pos-ventes-caissier-f" style="width:150px" onchange="posVentesCharger()">
-              <option value="">Tous les caissiers</option>
+            <!-- Filtre employé — visible uniquement pour les gestionnaires -->
+            <select class="pos-select" id="pos-ventes-caissier-f" style="width:160px" onchange="posVentesCharger()">
+              <option value="">Tous les employés</option>
             </select>
             <button class="pos-btn primary" onclick="posVentesCharger()">Filtrer</button>
           </div>
@@ -6008,12 +6015,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-kpi"><div class="pos-kpi-label">Crédits ouverts</div><div class="pos-kpi-val red" id="vkpi-credit">—</div></div>
         </div>
 
-        <!-- Par caissier — masqué pour les caissières (elles voient toujours leurs propres données) -->
+        <!-- Par employé — visible uniquement pour les gestionnaires -->
         <div class="pos-card" id="pos-caissiers-card">
-          <div class="pos-card-hdr">Par caissier (période)</div>
+          <div class="pos-card-hdr">Résumé par employé (période)</div>
           <div class="pos-table-wrap">
             <table class="pos-table">
-              <thead><tr><th>Caissier</th><th>Nb ventes</th><th>Total</th></tr></thead>
+              <thead><tr><th>Employé</th><th>Nb ventes</th><th>CA Total</th><th>Cash</th><th>Crédit</th></tr></thead>
               <tbody id="pos-caissiers-tbody"></tbody>
             </table>
           </div>
@@ -6021,7 +6028,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
         <div class="pos-card">
           <div class="pos-card-hdr">
-            <span>Détail des ventes</span>
+            <span id="pos-ventes-detail-titre">Détail des ventes</span>
             <select class="pos-select" id="pos-ventes-mode-f" style="width:120px" onchange="posVentesCharger()">
               <option value="">Tous modes</option>
               <option value="CASH">CASH</option>
@@ -6030,12 +6037,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </select>
           </div>
           <div class="pos-table-wrap">
-            <table class="pos-table">
-              <thead>
-                <tr><th>Ticket</th><th>Date/Heure</th><th>Client</th><th>Articles</th><th>Total</th><th>Mode</th><th>Statut</th><th>Actions</th></tr>
+            <table class="pos-table" id="pos-ventes-table">
+              <thead id="pos-ventes-thead">
+                <tr><th>Ticket</th><th>Date</th><th>Heure</th><th>Client</th><th>Articles</th><th>Total</th><th>Mode</th><th>Statut</th><th>Actions</th></tr>
               </thead>
               <tbody id="pos-ventes-tbody">
-                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                <tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -17621,9 +17628,21 @@ async function loadPosVentes(){
     if(sel){ sel.value = String(_appUser.employe_id); sel.disabled = true; sel.style.display = 'none'; }
   }
 
-  // Filtre caissier masqué pour les caissières (elles voient seulement leurs données)
-  const caissSel = document.getElementById('pos-ventes-caissier-f');
-  if(caissSel) caissSel.style.display = isCaissiere ? 'none' : '';
+  // Filtre employé et filtre heure — visibles uniquement pour les gestionnaires
+  const caissSel    = document.getElementById('pos-ventes-caissier-f');
+  const heureWrap   = document.getElementById('pos-ventes-heure-wrap');
+  if(caissSel)  caissSel.style.display  = isCaissiere ? 'none' : '';
+  if(heureWrap) heureWrap.style.display = isCaissiere ? 'none' : 'flex';
+
+  // Colonne Employé dans le tableau — visible seulement pour les gestionnaires
+  const thead = document.getElementById('pos-ventes-thead');
+  if(thead){
+    if(isCaissiere){
+      thead.innerHTML = '<tr><th>Ticket</th><th>Date</th><th>Heure</th><th>Client</th><th>Articles</th><th>Total</th><th>Mode</th><th>Statut</th><th>Actions</th></tr>';
+    } else {
+      thead.innerHTML = '<tr><th>Ticket</th><th>Date</th><th>Heure</th><th>Employé</th><th>Client</th><th>Articles</th><th>Total</th><th>Mode</th><th>Statut</th><th>Actions</th></tr>';
+    }
+  }
 
   // Peupler le filtre produit
   try {
@@ -17662,61 +17681,95 @@ function posVentesAujourdhui(){
 }
 
 async function posVentesCharger(){
+  const isCaissiere = _posVentesIsCaissiere();
+  const cols = isCaissiere ? 9 : 10;
   const tbody = document.getElementById('pos-ventes-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = `<tr><td colspan="${cols}" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>`;
   try {
-    const debut   = document.getElementById('pos-ventes-debut')?.value||'';
-    const fin     = document.getElementById('pos-ventes-fin')?.value||'';
-    const mode    = document.getElementById('pos-ventes-mode-f')?.value||'';
-    const caissier= document.getElementById('pos-ventes-caissier-f')?.value||'';
-    const produit = document.getElementById('pos-ventes-produit-f')?.value||'';
-    let url = '/pos/ventes?limit=200&';
-    if(debut)   url += `date_debut=${debut}&`;
-    if(fin)     url += `date_fin=${fin}&`;
-    if(mode)    url += `mode_paiement=${mode}&`;
-    if(caissier)url += `caissier_id=${caissier}&`;
-    if(produit) url += `produit_id=${produit}&`;
+    const debut      = document.getElementById('pos-ventes-debut')?.value||'';
+    const fin        = document.getElementById('pos-ventes-fin')?.value||'';
+    const mode       = document.getElementById('pos-ventes-mode-f')?.value||'';
+    const produit    = document.getElementById('pos-ventes-produit-f')?.value||'';
+    const heureDebut = document.getElementById('pos-ventes-heure-debut')?.value||'';
+    const heureFin   = document.getElementById('pos-ventes-heure-fin')?.value||'';
 
-    const data = await apiFetch('GET', url.slice(0,-1)||'/pos/ventes');
+    // Isolation caissière : forcer TOUJOURS leur propre ID dans l'appel API
+    // même si quelqu'un manipule l'interface
+    let caissierId = '';
+    if(isCaissiere){
+      caissierId = String(_appUser.employe_id || '');
+    } else {
+      caissierId = document.getElementById('pos-ventes-caissier-f')?.value||'';
+    }
+
+    let url = '/pos/ventes?limit=500&';
+    if(debut)      url += `date_debut=${debut}&`;
+    if(fin)        url += `date_fin=${fin}&`;
+    if(mode)       url += `mode_paiement=${mode}&`;
+    if(caissierId) url += `caissier_id=${caissierId}&`;
+    if(produit)    url += `produit_id=${produit}&`;
+    if(heureDebut) url += `heure_debut=${heureDebut}&`;
+    if(heureFin)   url += `heure_fin=${heureFin}&`;
+
+    const data   = await apiFetch('GET', url.slice(0,-1)||'/pos/ventes');
     const ventes = data.ventes||data||[];
+    const actives = ventes.filter(v=>v.statut!=='ANNULEE');
 
     // KPIs
     let ca=0, cash=0, credit=0;
-    ventes.filter(v=>v.statut!=='ANNULEE').forEach(v=>{
-      ca += parseFloat(v.montant_total||0);
-      if(v.mode_paiement==='CASH') cash += parseFloat(v.montant_total||0);
+    actives.forEach(v=>{
+      ca     += parseFloat(v.montant_total||0);
+      if(v.mode_paiement==='CASH')                            cash   += parseFloat(v.montant_total||0);
       if(v.mode_paiement==='CREDIT'||v.mode_paiement==='MIXTE') credit += parseFloat(v.montant_credit||0)||0;
     });
-    [['vkpi-ca',posGx(ca)],['vkpi-nb',ventes.filter(v=>v.statut!=='ANNULEE').length],['vkpi-cash',posGx(cash)],['vkpi-credit',posGx(credit)]]
-      .forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
+    [['vkpi-ca',posGx(ca)],['vkpi-nb',actives.length],['vkpi-cash',posGx(cash)],['vkpi-credit',posGx(credit)]]
+      .forEach(([id,val])=>{ const el=document.getElementById(id); if(el) el.textContent=val; });
 
-    // Par caissier
-    const byCaissier = {};
-    ventes.filter(v=>v.statut!=='ANNULEE').forEach(v=>{
-      const k = v.caissier_nom||'Sans caissier';
-      byCaissier[k] = byCaissier[k]||{ nb:0, total:0 };
-      byCaissier[k].nb++; byCaissier[k].total += parseFloat(v.montant_total||0);
-    });
-    const cTbody = document.getElementById('pos-caissiers-tbody');
-    if(cTbody){
-      cTbody.innerHTML = Object.entries(byCaissier).map(([k,v])=>
-        `<tr><td>${k}</td><td>${v.nb}</td><td>${posGx(v.total)}</td></tr>`
-      ).join('')||'<tr><td colspan="3" style="color:rgba(255,255,255,.3);text-align:center">—</td></tr>';
+    // Résumé par employé (admin uniquement)
+    if(!isCaissiere){
+      const byEmp = {};
+      actives.forEach(v=>{
+        const k = v.caissier_nom||'Sans employé';
+        byEmp[k] = byEmp[k]||{ nb:0, total:0, cash:0, credit:0 };
+        byEmp[k].nb++;
+        byEmp[k].total  += parseFloat(v.montant_total||0);
+        if(v.mode_paiement==='CASH') byEmp[k].cash += parseFloat(v.montant_total||0);
+        if(v.mode_paiement==='CREDIT'||v.mode_paiement==='MIXTE') byEmp[k].credit += parseFloat(v.montant_credit||0)||0;
+      });
+      const cTbody = document.getElementById('pos-caissiers-tbody');
+      if(cTbody){
+        cTbody.innerHTML = Object.entries(byEmp)
+          .sort((a,b)=>b[1].total-a[1].total)
+          .map(([k,v])=>`<tr>
+            <td><strong>${k}</strong></td>
+            <td>${v.nb}</td>
+            <td style="color:#4ade80">${posGx(v.total)}</td>
+            <td>${posGx(v.cash)}</td>
+            <td style="color:#f87171">${posGx(v.credit)}</td>
+          </tr>`).join('')
+          ||'<tr><td colspan="5" style="color:rgba(255,255,255,.3);text-align:center">—</td></tr>';
+      }
     }
 
     if(!ventes.length){
-      if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucune vente pour cette période</td></tr>';
+      const msg = isCaissiere ? 'Aucune vente pour vous sur cette période' : 'Aucune vente pour ces critères';
+      if(tbody) tbody.innerHTML = `<tr><td colspan="${cols}" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">${msg}</td></tr>`;
       return;
     }
+
     if(tbody) tbody.innerHTML = ventes.map(v=>{
+      const heureStr = v.date_heure ? v.date_heure.split('T')[1]?.slice(0,5)||'—' : '—';
       const badge = v.statut==='PAYEE'
         ? '<span class="pos-badge teal">Payée</span>'
         : v.statut==='ANNULEE'
           ? '<span class="pos-badge">Annulée</span>'
           : '<span class="pos-badge amber">Crédit</span>';
+      const empCol = isCaissiere ? '' : `<td style="font-size:11px;color:rgba(255,255,255,.65)">${v.caissier_nom||'—'}</td>`;
       return `<tr${v.statut==='ANNULEE'?' style="opacity:.5"':''}>
         <td>${v.numero_ticket||'—'}</td>
         <td>${posDateFr(v.date_vente)}</td>
+        <td style="font-size:12px;color:rgba(255,255,255,.6)">${heureStr}</td>
+        ${empCol}
         <td>${v.client_nom||'—'}</td>
         <td>${v.nb_lignes||'—'}</td>
         <td>${posGx(v.montant_total)}</td>
@@ -17729,7 +17782,8 @@ async function posVentesCharger(){
       </tr>`;
     }).join('');
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+    const cols2 = _posVentesIsCaissiere() ? 9 : 10;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="${cols2}" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
 }
 
