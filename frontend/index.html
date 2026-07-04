@@ -5354,6 +5354,43 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
 
+        <!-- Tableau de bord admin — Performance du Bar (masqué pour les caissières) -->
+        <div id="pos-caisse-admin-dash" style="display:none;margin-bottom:12px">
+          <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,.9)">Performance Bar — Aujourd'hui</div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <span id="pos-caisse-admin-updated" style="font-size:10px;color:rgba(255,255,255,.3)"></span>
+                <button onclick="posCaisseBarDashCharger()" style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:8px;cursor:pointer;color:rgba(255,255,255,.5);font-size:11px;padding:3px 10px">↻ Actualiser</button>
+              </div>
+            </div>
+            <!-- KPIs globaux bar -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+              <div style="background:rgba(247,169,59,.08);border:1px solid rgba(247,169,59,.2);border-radius:10px;padding:10px;text-align:center">
+                <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">Nb Ventes</div>
+                <div id="pos-caisse-admin-nb" style="font-size:22px;font-weight:800;color:#f7a93b">—</div>
+              </div>
+              <div style="background:rgba(63,182,168,.08);border:1px solid rgba(63,182,168,.2);border-radius:10px;padding:10px;text-align:center">
+                <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">CA Total</div>
+                <div id="pos-caisse-admin-ca" style="font-size:16px;font-weight:700;color:#3fb6a8">—</div>
+              </div>
+              <div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);border-radius:10px;padding:10px;text-align:center">
+                <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">Cash Total</div>
+                <div id="pos-caisse-admin-cash" style="font-size:16px;font-weight:700;color:#a78bfa">—</div>
+              </div>
+              <div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:10px;padding:10px;text-align:center">
+                <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">Crédit Total</div>
+                <div id="pos-caisse-admin-credit" style="font-size:16px;font-weight:700;color:#f87171">—</div>
+              </div>
+            </div>
+            <!-- Classement employés -->
+            <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Classement du jour</div>
+            <div id="pos-caisse-admin-ranking" style="display:flex;flex-direction:column;gap:6px">
+              <div style="color:rgba(255,255,255,.25);font-size:12px;text-align:center;padding:12px">Chargement…</div>
+            </div>
+          </div>
+        </div>
+
         <!-- Filtre catégorie + bouton cuisine -->
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
           <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1.5" fill="rgba(255,255,255,.35)"/></svg>
@@ -6013,6 +6050,20 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-kpi"><div class="pos-kpi-label">Nb ventes</div><div class="pos-kpi-val amber" id="vkpi-nb">—</div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">Cash encaissé</div><div class="pos-kpi-val" id="vkpi-cash">—</div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">Crédits ouverts</div><div class="pos-kpi-val red" id="vkpi-credit">—</div></div>
+        </div>
+
+        <!-- Classement du jour — Temps réel (admin uniquement) -->
+        <div class="pos-card" id="pos-classement-card">
+          <div class="pos-card-hdr">
+            <span>Classement du jour — Temps réel</span>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span id="pos-classement-updated" style="font-size:10px;color:rgba(255,255,255,.3);font-weight:400"></span>
+              <button onclick="posVentesClassementCharger()" style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:8px;cursor:pointer;color:rgba(255,255,255,.5);font-size:11px;padding:3px 10px;font-weight:500">↻</button>
+            </div>
+          </div>
+          <div id="pos-classement-wrap" style="padding:4px 0">
+            <div style="color:rgba(255,255,255,.3);font-size:12px;text-align:center;padding:16px">Chargement…</div>
+          </div>
         </div>
 
         <!-- Par employé — visible uniquement pour les gestionnaires -->
@@ -15843,6 +15894,21 @@ async function loadPosCaisse(){
   posRenderCatTabs();
   posCatFilter(_posCatActuelle, null);
   posRenderCart();
+
+  const isCaissiere = !!_appUser?.employe_id || (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier');
+  const adminDash = document.getElementById('pos-caisse-admin-dash');
+
+  if(!isCaissiere){
+    if(adminDash) adminDash.style.display = '';
+    posCaisseBarDashCharger();
+    clearInterval(_posCaisseBarDashInterval);
+    _posCaisseBarDashInterval = setInterval(posCaisseBarDashCharger, 60000);
+  } else {
+    if(adminDash) adminDash.style.display = 'none';
+    clearInterval(_posCaisseBarDashInterval);
+    _posCaisseBarDashInterval = null;
+  }
+
   // Auto-sélection si l'utilisateur connecté est lié à un employé
   if(_appUser?.employe_id){
     const sel = document.getElementById('pos-caissier-sel');
@@ -17607,11 +17673,20 @@ async function loadPosVentes(){
     if(subEl)   subEl.textContent   = 'Suivi exclusif de vos ventes · filtrez par date ou produit';
     const card = document.getElementById('pos-caissiers-card');
     if(card) card.style.display = 'none';
+    const clCard = document.getElementById('pos-classement-card');
+    if(clCard) clCard.style.display = 'none';
+    clearInterval(_posVentesClassementInterval);
+    _posVentesClassementInterval = null;
   } else {
     if(titleEl) titleEl.textContent = 'Ventes Bar';
     if(subEl)   subEl.textContent   = 'Suivi des ventes du jour et historique';
     const card = document.getElementById('pos-caissiers-card');
     if(card) card.style.display = '';
+    const clCard = document.getElementById('pos-classement-card');
+    if(clCard) clCard.style.display = '';
+    posVentesClassementCharger();
+    clearInterval(_posVentesClassementInterval);
+    _posVentesClassementInterval = setInterval(posVentesClassementCharger, 60000);
   }
 
   // Peupler le filtre caissier
@@ -17678,6 +17753,116 @@ function posVentesAujourdhui(){
   if(deb) deb.value = today;
   if(fin) fin.value = today;
   posVentesCharger();
+}
+
+// ── Classement du jour — Temps réel (admin pos-ventes) ──────────────
+let _posVentesClassementInterval = null;
+
+async function posVentesClassementCharger(){
+  const wrap    = document.getElementById('pos-classement-wrap');
+  const updated = document.getElementById('pos-classement-updated');
+  if(!wrap) return;
+  try {
+    const d = await apiFetch('GET', '/pos/ventes/temps-reel');
+    const list = (d.par_caissier||[]);
+    const maxTotal = list.length ? Math.max(...list.map(e=>e.total||0)) : 1;
+
+    if(!list.length){
+      wrap.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:12px;text-align:center;padding:16px">Aucune vente aujourd\'hui</div>';
+    } else {
+      const medals = ['🥇','🥈','🥉'];
+      wrap.innerHTML = `
+        <div style="display:grid;grid-template-columns:24px 1fr 70px 90px 90px;align-items:center;gap:6px;padding:4px 8px;font-size:10px;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:6px">
+          <span>#</span><span>Employé</span><span style="text-align:right">Ventes</span><span style="text-align:right">Cash</span><span style="text-align:right">CA Total</span>
+        </div>
+        ${list.map((e,i)=>{
+          const pct = maxTotal>0 ? Math.round((e.total/maxTotal)*100) : 0;
+          const isTop = i===0;
+          const rankIcon = medals[i]||`<span style="font-size:11px;color:rgba(255,255,255,.3)">${i+1}</span>`;
+          return `<div style="display:grid;grid-template-columns:24px 1fr 70px 90px 90px;align-items:center;gap:6px;padding:7px 8px;border-radius:9px;background:${isTop?'rgba(247,169,59,.07)':'rgba(255,255,255,.02)'};margin-bottom:3px">
+            <span style="font-size:14px;text-align:center">${rankIcon}</span>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:${isTop?'#f7a93b':'rgba(255,255,255,.85)'}">${e.nom}</div>
+              <div style="height:4px;background:rgba(255,255,255,.07);border-radius:4px;margin-top:4px;overflow:hidden">
+                <div style="height:100%;width:${pct}%;background:${isTop?'linear-gradient(90deg,#f7a93b,#f59e0b)':'linear-gradient(90deg,#3fb6a8,#2dd4bf)'};border-radius:4px;transition:width .4s"></div>
+              </div>
+            </div>
+            <div style="text-align:right;font-size:12px;font-weight:700;color:rgba(255,255,255,.7)">${e.nb_ventes}</div>
+            <div style="text-align:right;font-size:12px;font-weight:700;color:#a78bfa">${posGx(e.cash||0)}</div>
+            <div style="text-align:right;font-size:13px;font-weight:800;color:#4ade80">${posGx(e.total||0)}</div>
+          </div>`;
+        }).join('')}
+        <div style="display:grid;grid-template-columns:24px 1fr 70px 90px 90px;gap:6px;padding:8px 8px 2px;border-top:1px solid rgba(255,255,255,.07);margin-top:4px">
+          <span></span>
+          <span style="font-size:11px;font-weight:700;color:rgba(255,255,255,.45)">Total bar</span>
+          <span style="text-align:right;font-size:11px;font-weight:700;color:rgba(255,255,255,.7)">${d.nb_ventes}</span>
+          <span style="text-align:right;font-size:11px;font-weight:700;color:#a78bfa">${posGx(d.cash_jour||0)}</span>
+          <span style="text-align:right;font-size:12px;font-weight:800;color:#4ade80">${posGx(d.ca_jour||0)}</span>
+        </div>`;
+    }
+    if(updated){
+      const now = new Date();
+      updated.textContent = `Mis à jour ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+    }
+  } catch(e){
+    if(wrap) wrap.innerHTML = '<div style="color:#f87171;font-size:12px;text-align:center;padding:12px">Erreur de chargement</div>';
+  }
+}
+
+// ── Bar dashboard admin dans pos-caisse ──────────────────────────────
+let _posCaisseBarDashInterval = null;
+
+async function posCaisseBarDashCharger(){
+  const rankWrap = document.getElementById('pos-caisse-admin-ranking');
+  const updated  = document.getElementById('pos-caisse-admin-updated');
+  try {
+    const d    = await apiFetch('GET', '/pos/ventes/temps-reel');
+    const list = (d.par_caissier||[]);
+    const maxTotal = list.length ? Math.max(...list.map(e=>e.total||0)) : 1;
+
+    const nbEl   = document.getElementById('pos-caisse-admin-nb');
+    const caEl   = document.getElementById('pos-caisse-admin-ca');
+    const cashEl = document.getElementById('pos-caisse-admin-cash');
+    const crEl   = document.getElementById('pos-caisse-admin-credit');
+    const totalCredit = list.reduce((s,e)=>s+(e.credit||0),0);
+    if(nbEl)   nbEl.textContent   = d.nb_ventes||0;
+    if(caEl)   caEl.textContent   = posGx(d.ca_jour||0);
+    if(cashEl) cashEl.textContent = posGx(d.cash_jour||0);
+    if(crEl)   crEl.textContent   = posGx(totalCredit);
+
+    if(rankWrap){
+      if(!list.length){
+        rankWrap.innerHTML = '<div style="color:rgba(255,255,255,.25);font-size:12px;text-align:center;padding:12px">Aucune vente aujourd\'hui</div>';
+      } else {
+        const medals = ['🥇','🥈','🥉'];
+        rankWrap.innerHTML = list.map((e,i)=>{
+          const pct = maxTotal>0 ? Math.round((e.total/maxTotal)*100) : 0;
+          const isTop = i===0;
+          return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:${isTop?'rgba(247,169,59,.08)':'rgba(255,255,255,.03)'}">
+            <span style="font-size:16px;width:24px;text-align:center;flex-shrink:0">${medals[i]||`<span style="font-size:11px;color:rgba(255,255,255,.3)">${i+1}</span>`}</span>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+                <span style="font-size:12px;font-weight:700;color:${isTop?'#f7a93b':'rgba(255,255,255,.85)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.nom}</span>
+                <span style="font-size:13px;font-weight:800;color:#4ade80;margin-left:8px;flex-shrink:0">${posGx(e.total||0)}</span>
+              </div>
+              <div style="height:5px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden">
+                <div style="height:100%;width:${pct}%;background:${isTop?'linear-gradient(90deg,#f7a93b,#f59e0b)':'linear-gradient(90deg,#3fb6a8,#2dd4bf)'};border-radius:4px"></div>
+              </div>
+              <div style="display:flex;gap:12px;margin-top:4px">
+                <span style="font-size:10px;color:rgba(255,255,255,.4)">${e.nb_ventes} vente${e.nb_ventes>1?'s':''}</span>
+                <span style="font-size:10px;color:#a78bfa">Cash: ${posGx(e.cash||0)}</span>
+                <span style="font-size:10px;color:#f87171">Crédit: ${posGx(e.credit||0)}</span>
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+      }
+    }
+    if(updated){
+      const now = new Date();
+      updated.textContent = `↻ ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+    }
+  } catch(e){}
 }
 
 async function posVentesCharger(){

@@ -950,16 +950,22 @@ def ventes_temps_reel(db: Session = Depends(get_db)):
         cid  = v.caissier_id or 0
         nom  = v.caissier.nom + " " + v.caissier.prenom if v.caissier else "Sans caissier"
         if cid not in par_caissier:
-            par_caissier[cid] = {"caissier_id": cid, "nom": nom, "nb_ventes": 0, "total": 0.0}
+            par_caissier[cid] = {"caissier_id": cid, "nom": nom, "nb_ventes": 0, "total": 0.0, "cash": 0.0, "credit": 0.0}
         par_caissier[cid]["nb_ventes"] += 1
         par_caissier[cid]["total"]     += float(v.montant_total)
+        if v.mode_paiement in ("CASH", "MIXTE"):
+            par_caissier[cid]["cash"]  += float(v.montant_paye)
+        if v.mode_paiement in ("CREDIT", "MIXTE"):
+            par_caissier[cid]["credit"] += float(v.montant_restant)
+
+    ranked = sorted(par_caissier.values(), key=lambda x: x["total"], reverse=True)
 
     return {
-        "date":        str(today),
-        "nb_ventes":   len(ventes),
-        "ca_jour":     ca_jour,
-        "cash_jour":   cash_jour,
-        "par_caissier": list(par_caissier.values()),
+        "date":         str(today),
+        "nb_ventes":    len(ventes),
+        "ca_jour":      ca_jour,
+        "cash_jour":    cash_jour,
+        "par_caissier": ranked,
     }
 
 
