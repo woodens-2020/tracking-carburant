@@ -2719,6 +2719,30 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="crm-clients" onclick="goTo('crm-clients')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </span>
+      <span>Partenaires CRM</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="crm-credits" onclick="goTo('crm-credits')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+      </span>
+      <span>Crédits CRM</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="crm-factures" onclick="goTo('crm-factures')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </span>
+      <span>Factures CRM</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <div class="nav-section">Gestion</div>
 
     <button class="nav-item" data-page="gi-dashboard" onclick="goTo('gi-dashboard')">
@@ -8319,6 +8343,302 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div><!-- /page-admin-audit -->
 
+    <!-- ══════════════════════════════════════════════════════════════
+         CRM — PARTENAIRES
+    ══════════════════════════════════════════════════════════════ -->
+    <div id="page-crm-clients" class="page">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;flex:1;min-width:0">
+          <input class="pos-input" id="crm-cl-search" placeholder="Rechercher (nom, tél, email, NIF…)" style="width:260px" oninput="crmClientsSearch()">
+          <select class="pos-input" id="crm-cl-filtre-actif" onchange="crmClientsSearch()" style="width:140px">
+            <option value="">Tous</option>
+            <option value="true" selected>Actifs</option>
+            <option value="false">Archivés</option>
+          </select>
+        </div>
+        <button class="pos-btn pos-btn-primary" onclick="crmClientOuvrir()">+ Nouveau partenaire</button>
+      </div>
+
+      <!-- KPI mini-dashboard -->
+      <div id="crm-kpi-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px"></div>
+
+      <div class="pos-card">
+        <div class="pos-table-wrap">
+          <table class="pos-table">
+            <thead><tr>
+              <th>Nom</th>
+              <th>Type</th>
+              <th>Téléphone</th>
+              <th>Email</th>
+              <th>NIF</th>
+              <th style="text-align:center">Crédits</th>
+              <th style="text-align:center">Factures</th>
+              <th style="text-align:center">Statut</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="crm-cl-tbody"><tr><td colspan="9" style="text-align:center;padding:32px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /page-crm-clients -->
+
+    <!-- ══════════════════════════════════════════════════════════════
+         CRM — CRÉDITS
+    ══════════════════════════════════════════════════════════════ -->
+    <div id="page-crm-credits" class="page">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;flex:1;min-width:0">
+          <select class="pos-input" id="crm-cr-filtre-statut" onchange="crmCreditsLoad()" style="width:150px">
+            <option value="">Tous statuts</option>
+            <option value="EN_COURS" selected>En cours</option>
+            <option value="SOLDE">Soldés</option>
+            <option value="ANNULE">Annulés</option>
+          </select>
+          <input class="pos-input" type="date" id="crm-cr-date-debut" onchange="crmCreditsLoad()" style="width:145px">
+          <input class="pos-input" type="date" id="crm-cr-date-fin" onchange="crmCreditsLoad()" style="width:145px">
+        </div>
+        <button class="pos-btn pos-btn-primary" onclick="crmCreditOuvrir()">+ Nouveau crédit</button>
+      </div>
+      <div class="pos-card">
+        <div class="pos-table-wrap">
+          <table class="pos-table">
+            <thead><tr>
+              <th>N°</th>
+              <th>Partenaire</th>
+              <th>Produit</th>
+              <th style="text-align:right">Montant</th>
+              <th style="text-align:right">Payé</th>
+              <th style="text-align:right">Restant</th>
+              <th>Échéance</th>
+              <th>Statut</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="crm-cr-tbody"><tr><td colspan="9" style="text-align:center;padding:32px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /page-crm-credits -->
+
+    <!-- ══════════════════════════════════════════════════════════════
+         CRM — FACTURES
+    ══════════════════════════════════════════════════════════════ -->
+    <div id="page-crm-factures" class="page">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;flex:1;min-width:0">
+          <select class="pos-input" id="crm-fac-filtre-statut" onchange="crmFacturesLoad()" style="width:150px">
+            <option value="">Tous statuts</option>
+            <option value="BROUILLON">Brouillon</option>
+            <option value="ENVOYEE">Envoyée</option>
+            <option value="PAYEE">Payée</option>
+            <option value="ANNULEE">Annulée</option>
+          </select>
+          <input class="pos-input" type="date" id="crm-fac-date-debut" onchange="crmFacturesLoad()" style="width:145px">
+          <input class="pos-input" type="date" id="crm-fac-date-fin" onchange="crmFacturesLoad()" style="width:145px">
+        </div>
+        <button class="pos-btn pos-btn-primary" onclick="crmFactureOuvrir()">+ Nouvelle facture</button>
+      </div>
+      <div class="pos-card">
+        <div class="pos-table-wrap">
+          <table class="pos-table">
+            <thead><tr>
+              <th>N° Facture</th>
+              <th>Partenaire</th>
+              <th>Date</th>
+              <th>Échéance</th>
+              <th style="text-align:right">HT</th>
+              <th style="text-align:right">TVA</th>
+              <th style="text-align:right">TTC</th>
+              <th>Statut</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="crm-fac-tbody"><tr><td colspan="9" style="text-align:center;padding:32px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /page-crm-factures -->
+
+    <!-- ══════ MODALS CRM ══════ -->
+
+    <!-- Modal client -->
+    <div id="crm-cl-modal-bg" class="pos-modal-bg">
+      <div class="pos-modal" style="max-width:520px">
+        <div class="pos-modal-hdr">
+          <span id="crm-cl-modal-title">Nouveau partenaire</span>
+          <button class="pos-modal-close" onclick="crmClientFermer()">✕</button>
+        </div>
+        <div class="pos-modal-body" style="padding:20px">
+          <input type="hidden" id="crm-cl-id">
+          <div style="display:grid;gap:12px">
+            <div>
+              <label class="pos-label">Nom / Raison sociale *</label>
+              <input class="pos-input" id="crm-cl-nom" placeholder="Ex: Entreprise Dupont" style="width:100%">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <label class="pos-label">Type</label>
+                <select class="pos-input" id="crm-cl-type" style="width:100%">
+                  <option value="PARTICULIER">Particulier</option>
+                  <option value="ENTREPRISE">Entreprise</option>
+                </select>
+              </div>
+              <div>
+                <label class="pos-label">NIF</label>
+                <input class="pos-input" id="crm-cl-nif" placeholder="Ex: 000-000-0" style="width:100%">
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <label class="pos-label">Téléphone</label>
+                <input class="pos-input" id="crm-cl-tel" placeholder="+509 xxxx-xxxx" style="width:100%">
+              </div>
+              <div>
+                <label class="pos-label">Email</label>
+                <input class="pos-input" id="crm-cl-email" type="email" placeholder="contact@exemple.com" style="width:100%">
+              </div>
+            </div>
+            <div>
+              <label class="pos-label">Adresse</label>
+              <input class="pos-input" id="crm-cl-adresse" placeholder="Rue, ville, pays" style="width:100%">
+            </div>
+            <div>
+              <label class="pos-label">Notes internes</label>
+              <textarea class="pos-input" id="crm-cl-notes" rows="2" placeholder="Informations complémentaires…" style="width:100%;resize:vertical"></textarea>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+            <button class="pos-btn" onclick="crmClientFermer()">Annuler</button>
+            <button class="pos-btn pos-btn-primary" onclick="crmClientSauvegarder()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal crédit -->
+    <div id="crm-cr-modal-bg" class="pos-modal-bg">
+      <div class="pos-modal" style="max-width:520px">
+        <div class="pos-modal-hdr">
+          <span id="crm-cr-modal-title">Nouveau crédit</span>
+          <button class="pos-modal-close" onclick="crmCreditFermer()">✕</button>
+        </div>
+        <div class="pos-modal-body" style="padding:20px">
+          <input type="hidden" id="crm-cr-id">
+          <div style="display:grid;gap:12px">
+            <div>
+              <label class="pos-label">Partenaire *</label>
+              <select class="pos-input" id="crm-cr-client" style="width:100%"></select>
+            </div>
+            <div>
+              <label class="pos-label">Produit carburant (optionnel)</label>
+              <select class="pos-input" id="crm-cr-produit" style="width:100%">
+                <option value="">— Aucun —</option>
+              </select>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <label class="pos-label">Quantité (gallons)</label>
+                <input class="pos-input" id="crm-cr-qte" type="number" min="0" step="0.001" placeholder="0.000" style="width:100%">
+              </div>
+              <div>
+                <label class="pos-label">Prix unitaire (HTG)</label>
+                <input class="pos-input" id="crm-cr-prixu" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%" oninput="crmCreditCalc()">
+              </div>
+            </div>
+            <div>
+              <label class="pos-label">Montant total (HTG) *</label>
+              <input class="pos-input" id="crm-cr-montant" type="number" min="0.01" step="0.01" placeholder="0.00" style="width:100%">
+            </div>
+            <div>
+              <label class="pos-label">Date d'échéance</label>
+              <input class="pos-input" id="crm-cr-echeance" type="date" style="width:100%">
+            </div>
+            <div>
+              <label class="pos-label">Notes</label>
+              <textarea class="pos-input" id="crm-cr-notes" rows="2" style="width:100%;resize:vertical"></textarea>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+            <button class="pos-btn" onclick="crmCreditFermer()">Annuler</button>
+            <button class="pos-btn pos-btn-primary" onclick="crmCreditSauvegarder()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal remboursement -->
+    <div id="crm-remb-modal-bg" class="pos-modal-bg">
+      <div class="pos-modal" style="max-width:420px">
+        <div class="pos-modal-hdr">
+          <span id="crm-remb-titre">Enregistrer un remboursement</span>
+          <button class="pos-modal-close" onclick="crmRembFermer()">✕</button>
+        </div>
+        <div class="pos-modal-body" style="padding:20px">
+          <input type="hidden" id="crm-remb-credit-id">
+          <div id="crm-remb-info" style="background:rgba(255,255,255,.05);border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:rgba(221,232,248,.7)"></div>
+          <div style="display:grid;gap:12px">
+            <div>
+              <label class="pos-label">Montant remboursé (HTG) *</label>
+              <input class="pos-input" id="crm-remb-montant" type="number" min="0.01" step="0.01" placeholder="0.00" style="width:100%">
+            </div>
+            <div>
+              <label class="pos-label">Notes</label>
+              <textarea class="pos-input" id="crm-remb-notes" rows="2" style="width:100%;resize:vertical"></textarea>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+            <button class="pos-btn" onclick="crmRembFermer()">Annuler</button>
+            <button class="pos-btn pos-btn-primary" onclick="crmRembSauvegarder()">Confirmer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal facture -->
+    <div id="crm-fac-modal-bg" class="pos-modal-bg">
+      <div class="pos-modal" style="max-width:680px">
+        <div class="pos-modal-hdr">
+          <span>Nouvelle facture</span>
+          <button class="pos-modal-close" onclick="crmFactureFermer()">✕</button>
+        </div>
+        <div class="pos-modal-body" style="padding:20px">
+          <div style="display:grid;gap:14px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <label class="pos-label">Partenaire *</label>
+                <select class="pos-input" id="crm-fac-client" style="width:100%"></select>
+              </div>
+              <div>
+                <label class="pos-label">Date d'échéance</label>
+                <input class="pos-input" id="crm-fac-echeance" type="date" style="width:100%">
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end">
+              <label class="pos-label" style="margin:0">Lignes de la facture</label>
+              <button class="pos-btn" onclick="crmFacAjouterLigne()" style="padding:6px 14px;font-size:12px">+ Ajouter une ligne</button>
+            </div>
+            <div id="crm-fac-lignes" style="display:grid;gap:8px"></div>
+            <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center">
+              <div>
+                <label class="pos-label">TVA globale (%)</label>
+                <input class="pos-input" id="crm-fac-tva" type="number" min="0" step="0.1" value="0" style="width:120px" oninput="crmFacCalcTotal()">
+              </div>
+              <div id="crm-fac-total-box" style="text-align:right">
+                <div style="font-size:11px;color:rgba(221,232,248,.4)">TOTAL TTC</div>
+                <div id="crm-fac-total-ttc" style="font-size:22px;font-weight:800;color:#e8c558">0.00 HTG</div>
+              </div>
+            </div>
+            <div>
+              <label class="pos-label">Notes</label>
+              <textarea class="pos-input" id="crm-fac-notes" rows="2" style="width:100%;resize:vertical"></textarea>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+            <button class="pos-btn" onclick="crmFactureFermer()">Annuler</button>
+            <button class="pos-btn pos-btn-primary" onclick="crmFactureSauvegarder()">Créer la facture</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Modal créer/modifier utilisateur ── -->
     <div id="admin-user-modal-bg" class="pos-modal-bg">
       <div class="pos-modal" style="max-width:500px">
@@ -9081,6 +9401,9 @@ const PAGE_META={
   'pos-paie':          {title: 'Paie Bar',                      sub: 'Paiements employés du bar'},
   'pos-rentabilite':      {title: 'Rentabilité Bar',            sub: 'CA — Bénéfices — Marges — COGS'},
   'pos-sessions-caisse':  {title: 'Sessions Caissières',        sub: 'Suivi · validation · export des rapports de caisse'},
+  'crm-clients':          {title: 'Partenaires CRM',            sub: 'Clients et partenaires commerciaux de la station'},
+  'crm-credits':          {title: 'Crédits CRM',                sub: 'Gestion des crédits carburant accordés aux partenaires'},
+  'crm-factures':         {title: 'Factures CRM',               sub: 'Création et envoi de factures commerciales par email'},
 };
 
 function _forceScrollTop(){
@@ -9136,6 +9459,9 @@ function goTo(page){
   if(page==='admin')              initAdmin();
   if(page==='rapports-dl')       initRapports();
   if(page==='audit')             initAudit();
+  if(page==='crm-clients')       initCrmClients();
+  if(page==='crm-credits')       initCrmCredits();
+  if(page==='crm-factures')      initCrmFactures();
   if(typeof _giPageLoaders !== 'undefined' && _giPageLoaders[page]) _giPageLoaders[page]();
 }
 
@@ -10678,6 +11004,10 @@ const _AREA_PAGES = {
     complet: ['employes','payroll'],
     lecture: ['employes'],
   },
+  crm: {
+    complet: ['crm-clients','crm-credits','crm-factures'],
+    lecture: ['crm-credits','crm-factures'],
+  },
 };
 
 // Fallback pour utilisateurs sans role_id (compatibilité ascendante)
@@ -10686,11 +11016,13 @@ const _ACCES_POSTE_LEGACY = {
   'Comptable':   ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
-                  'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
+                  'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport',
+                  'crm-clients','crm-credits','crm-factures'],
   'Superviseur': ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
-                  'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
+                  'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport',
+                  'crm-clients','crm-credits','crm-factures'],
   'Pompiste': ['home','saisie'],
   'Caissier': ['home','pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite'],
 };
@@ -22029,6 +22361,436 @@ function _gcKpi(id, val, color){
   if(!el) return;
   el.textContent = val;
   if(color) el.style.color = color; else el.style.color = '';
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// CRM STATION — Partenaires · Crédits · Factures
+// ══════════════════════════════════════════════════════════════════════
+
+const _crmFmt = v => new Intl.NumberFormat('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v||0);
+const _crmDate = s => s ? new Date(s).toLocaleDateString('fr-FR') : '—';
+
+const _crmStatutBadge = s => {
+  const map = {
+    EN_COURS:'#fbbf24', SOLDE:'#34d399', ANNULE:'#ef4444',
+    BROUILLON:'#94a3b8', ENVOYEE:'#60a5fa', PAYEE:'#34d399', ANNULEE:'#ef4444',
+  };
+  const lbl = {EN_COURS:'En cours', SOLDE:'Soldé', ANNULE:'Annulé',
+                BROUILLON:'Brouillon', ENVOYEE:'Envoyée', PAYEE:'Payée', ANNULEE:'Annulée'};
+  const c = map[s]||'#94a3b8';
+  return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:${c}22;color:${c};font-size:11px;font-weight:700;border:1px solid ${c}44">${lbl[s]||s}</span>`;
+};
+
+// ── État local ─────────────────────────────────────────────────────────────
+let _crmClients = [];
+let _crmProduits = [];
+
+async function _crmLoadProduits(){
+  if(_crmProduits.length) return;
+  try{ _crmProduits = await GET('/produits'); } catch(e){}
+}
+
+async function _crmLoadClientsCache(){
+  _crmClients = await GET('/crm/clients?actif=true');
+}
+
+// ── PAGE PARTENAIRES ───────────────────────────────────────────────────────
+async function initCrmClients(){
+  await crmClientsLoad();
+  await _crmLoadDashboard();
+}
+
+async function crmClientsSearch(){
+  const search = g('crm-cl-search').value.trim();
+  const actif  = g('crm-cl-filtre-actif').value;
+  let url = '/crm/clients';
+  const params = [];
+  if(search) params.push('search='+encodeURIComponent(search));
+  if(actif !== '') params.push('actif='+actif);
+  if(params.length) url += '?' + params.join('&');
+  try{
+    const data = await GET(url);
+    _renderCrmClients(data);
+  }catch(e){ posAlert(e.message||'Erreur'); }
+}
+
+async function crmClientsLoad(){
+  await crmClientsSearch();
+}
+
+function _renderCrmClients(list){
+  const tb = g('crm-cl-tbody');
+  if(!list.length){
+    tb.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:rgba(255,255,255,.3)">Aucun partenaire trouvé</td></tr>';
+    return;
+  }
+  tb.innerHTML = list.map(c => `<tr>
+    <td><strong>${c.nom}</strong></td>
+    <td><span style="font-size:11px;color:rgba(221,232,248,.5)">${c.type_client}</span></td>
+    <td>${c.telephone||'—'}</td>
+    <td>${c.email||'—'}</td>
+    <td>${c.nif||'—'}</td>
+    <td style="text-align:center">${c.nb_credits}</td>
+    <td style="text-align:center">${c.nb_factures}</td>
+    <td>${c.actif ? '<span style="color:#34d399;font-size:11px;font-weight:700">Actif</span>' : '<span style="color:#ef4444;font-size:11px;font-weight:700">Archivé</span>'}</td>
+    <td style="white-space:nowrap">
+      <button class="pos-btn" onclick="crmClientOuvrir(${c.id})" style="padding:4px 10px;font-size:12px;margin-right:4px">Modifier</button>
+      <button class="pos-btn" onclick="crmClientSupprimer(${c.id},'${c.nom.replace(/'/g,"\'")}')" style="padding:4px 10px;font-size:12px;background:rgba(239,68,68,.15);color:#ef4444">Supprimer</button>
+    </td>
+  </tr>`).join('');
+}
+
+async function _crmLoadDashboard(){
+  try{
+    const d = await GET('/crm/dashboard');
+    const kpiRow = g('crm-kpi-row');
+    if(!kpiRow) return;
+    kpiRow.innerHTML = [
+      {label:'Partenaires actifs', val: d.total_clients,    color:'#e8c558'},
+      {label:'Crédits en cours',   val: d.credits_en_cours, color:'#fbbf24'},
+      {label:'Montant dû (HTG)',   val: _crmFmt(d.montant_en_cours), color:'#f87171'},
+      {label:'Crédits soldés',     val: d.credits_soldes,   color:'#34d399'},
+      {label:'Factures envoyées',  val: d.factures_envoyees,color:'#60a5fa'},
+      {label:'Factures payées',    val: d.factures_payees,  color:'#a78bfa'},
+    ].map(k=>`<div class="pos-kpi-card" style="padding:14px 18px;background:rgba(255,255,255,.04);border-radius:10px;border:1px solid rgba(255,255,255,.08)">
+      <div style="font-size:10px;color:rgba(221,232,248,.4);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">${k.label}</div>
+      <div style="font-size:22px;font-weight:800;color:${k.color}">${k.val}</div>
+    </div>`).join('');
+  }catch(e){}
+}
+
+async function crmClientOuvrir(id){
+  g('crm-cl-id').value = id||'';
+  g('crm-cl-modal-title').textContent = id ? 'Modifier le partenaire' : 'Nouveau partenaire';
+  g('crm-cl-nom').value = '';
+  g('crm-cl-type').value = 'PARTICULIER';
+  g('crm-cl-nif').value = '';
+  g('crm-cl-tel').value = '';
+  g('crm-cl-email').value = '';
+  g('crm-cl-adresse').value = '';
+  g('crm-cl-notes').value = '';
+  if(id){
+    try{
+      const c = await GET('/crm/clients/'+id);
+      g('crm-cl-nom').value     = c.nom;
+      g('crm-cl-type').value    = c.type_client;
+      g('crm-cl-nif').value     = c.nif;
+      g('crm-cl-tel').value     = c.telephone;
+      g('crm-cl-email').value   = c.email;
+      g('crm-cl-adresse').value = c.adresse;
+      g('crm-cl-notes').value   = c.notes;
+    }catch(e){ posAlert('Impossible de charger le client'); return; }
+  }
+  g('crm-cl-modal-bg').classList.add('active');
+}
+function crmClientFermer(){ g('crm-cl-modal-bg').classList.remove('active'); }
+
+async function crmClientSauvegarder(){
+  const id  = g('crm-cl-id').value;
+  const nom = g('crm-cl-nom').value.trim();
+  if(!nom){ posAlert('Le nom est obligatoire'); return; }
+  const body = {
+    nom, type_client: g('crm-cl-type').value,
+    telephone: g('crm-cl-tel').value.trim()||null,
+    email:     g('crm-cl-email').value.trim()||null,
+    nif:       g('crm-cl-nif').value.trim()||null,
+    adresse:   g('crm-cl-adresse').value.trim()||null,
+    notes:     g('crm-cl-notes').value.trim()||null,
+  };
+  try{
+    if(id) await apiFetch('PUT','/crm/clients/'+id,body);
+    else   await apiFetch('POST','/crm/clients',body);
+    crmClientFermer();
+    toast(id ? 'Partenaire mis à jour' : 'Partenaire créé','ok');
+    await crmClientsLoad();
+    await _crmLoadDashboard();
+    _crmClients = [];
+  }catch(e){ posAlert(e.message||'Erreur enregistrement'); }
+}
+
+async function crmClientSupprimer(id, nom){
+  if(!confirm(`Supprimer le partenaire "${nom}" ?`)) return;
+  try{
+    await apiFetch('DELETE','/crm/clients/'+id);
+    toast('Partenaire supprimé','ok');
+    await crmClientsLoad();
+    await _crmLoadDashboard();
+    _crmClients = [];
+  }catch(e){ posAlert(e.message||'Erreur suppression'); }
+}
+
+// ── PAGE CRÉDITS ───────────────────────────────────────────────────────────
+async function initCrmCredits(){
+  await crmCreditsLoad();
+}
+
+async function crmCreditsLoad(){
+  const statut = g('crm-cr-filtre-statut').value;
+  const dd     = g('crm-cr-date-debut').value;
+  const df     = g('crm-cr-date-fin').value;
+  const params = [];
+  if(statut) params.push('statut='+statut);
+  if(dd)     params.push('date_debut='+dd);
+  if(df)     params.push('date_fin='+df);
+  const url = '/crm/credits' + (params.length ? '?'+params.join('&') : '');
+  try{
+    const list = await GET(url);
+    _renderCrmCredits(list);
+  }catch(e){ posAlert(e.message||'Erreur chargement crédits'); }
+}
+
+function _renderCrmCredits(list){
+  const tb = g('crm-cr-tbody');
+  if(!list.length){
+    tb.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:rgba(255,255,255,.3)">Aucun crédit trouvé</td></tr>';
+    return;
+  }
+  tb.innerHTML = list.map(cr => `<tr>
+    <td><code style="font-size:11px;color:#e8c558">${cr.numero}</code></td>
+    <td><strong>${cr.client_nom}</strong></td>
+    <td>${cr.produit_nom||'—'}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums">${_crmFmt(cr.montant_total)}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums;color:#34d399">${_crmFmt(cr.montant_paye)}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums;color:#f87171;font-weight:700">${_crmFmt(cr.montant_restant)}</td>
+    <td>${_crmDate(cr.date_echeance)}</td>
+    <td>${_crmStatutBadge(cr.statut)}</td>
+    <td style="white-space:nowrap">
+      ${cr.statut==='EN_COURS' ? `<button class="pos-btn" onclick="crmRembOuvrir(${cr.id})" style="padding:4px 10px;font-size:12px;margin-right:4px;background:rgba(52,211,153,.15);color:#34d399">Rembourser</button>` : ''}
+      <button class="pos-btn" onclick="crmCreditSupprimer(${cr.id},'${cr.numero}')" style="padding:4px 10px;font-size:12px;background:rgba(239,68,68,.15);color:#ef4444">✕</button>
+    </td>
+  </tr>`).join('');
+}
+
+async function crmCreditOuvrir(){
+  await _crmLoadClientsCache();
+  await _crmLoadProduits();
+  g('crm-cr-id').value = '';
+  g('crm-cr-modal-title').textContent = 'Nouveau crédit';
+  const selCl = g('crm-cr-client');
+  selCl.innerHTML = '<option value="">— Sélectionner un partenaire —</option>' +
+    _crmClients.map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
+  const selPr = g('crm-cr-produit');
+  selPr.innerHTML = '<option value="">— Aucun —</option>' +
+    _crmProduits.map(p=>`<option value="${p.id}">${p.nom}</option>`).join('');
+  g('crm-cr-qte').value = '';
+  g('crm-cr-prixu').value = '';
+  g('crm-cr-montant').value = '';
+  g('crm-cr-echeance').value = '';
+  g('crm-cr-notes').value = '';
+  g('crm-cr-modal-bg').classList.add('active');
+}
+function crmCreditFermer(){ g('crm-cr-modal-bg').classList.remove('active'); }
+
+function crmCreditCalc(){
+  const qte  = parseFloat(g('crm-cr-qte').value)||0;
+  const prix = parseFloat(g('crm-cr-prixu').value)||0;
+  if(qte>0 && prix>0) g('crm-cr-montant').value = (qte*prix).toFixed(2);
+}
+
+async function crmCreditSauvegarder(){
+  const client_id = parseInt(g('crm-cr-client').value);
+  const montant   = parseFloat(g('crm-cr-montant').value);
+  if(!client_id){ posAlert('Sélectionnez un partenaire'); return; }
+  if(!montant||montant<=0){ posAlert('Le montant doit être > 0'); return; }
+  const body = {
+    client_id,
+    produit_id: parseInt(g('crm-cr-produit').value)||null,
+    montant_total: montant,
+    quantite:      parseFloat(g('crm-cr-qte').value)||null,
+    prix_unitaire: parseFloat(g('crm-cr-prixu').value)||null,
+    date_echeance: g('crm-cr-echeance').value||null,
+    notes:         g('crm-cr-notes').value.trim()||null,
+  };
+  try{
+    await apiFetch('POST','/crm/credits',body);
+    crmCreditFermer();
+    toast('Crédit enregistré','ok');
+    await crmCreditsLoad();
+  }catch(e){ posAlert(e.message||'Erreur enregistrement'); }
+}
+
+async function crmCreditSupprimer(id, numero){
+  if(!confirm(`Supprimer le crédit ${numero} ?`)) return;
+  try{
+    await apiFetch('DELETE','/crm/credits/'+id);
+    toast('Crédit supprimé','ok');
+    await crmCreditsLoad();
+  }catch(e){ posAlert(e.message||'Erreur suppression'); }
+}
+
+// ── Modal remboursement ─────────────────────────────────────────────────────
+async function crmRembOuvrir(creditId){
+  const cr = await GET('/crm/credits/'+creditId);
+  g('crm-remb-credit-id').value = creditId;
+  g('crm-remb-titre').textContent = `Remboursement — ${cr.numero}`;
+  g('crm-remb-info').innerHTML = `
+    <div><strong>${cr.client_nom}</strong></div>
+    <div style="margin-top:6px;display:flex;gap:20px;flex-wrap:wrap">
+      <span>Total : <strong>${_crmFmt(cr.montant_total)} HTG</strong></span>
+      <span>Payé : <strong style="color:#34d399">${_crmFmt(cr.montant_paye)} HTG</strong></span>
+      <span>Restant : <strong style="color:#f87171">${_crmFmt(cr.montant_restant)} HTG</strong></span>
+    </div>`;
+  g('crm-remb-montant').value = '';
+  g('crm-remb-notes').value = '';
+  g('crm-remb-modal-bg').classList.add('active');
+}
+function crmRembFermer(){ g('crm-remb-modal-bg').classList.remove('active'); }
+
+async function crmRembSauvegarder(){
+  const creditId = g('crm-remb-credit-id').value;
+  const montant  = parseFloat(g('crm-remb-montant').value);
+  if(!montant||montant<=0){ posAlert('Le montant doit être > 0'); return; }
+  try{
+    await apiFetch('POST','/crm/credits/'+creditId+'/rembourser',{
+      montant, notes: g('crm-remb-notes').value.trim()||null
+    });
+    crmRembFermer();
+    toast('Remboursement enregistré','ok');
+    await crmCreditsLoad();
+  }catch(e){ posAlert(e.message||'Erreur remboursement'); }
+}
+
+// ── PAGE FACTURES ─────────────────────────────────────────────────────────
+async function initCrmFactures(){
+  await crmFacturesLoad();
+}
+
+async function crmFacturesLoad(){
+  const statut = g('crm-fac-filtre-statut').value;
+  const dd     = g('crm-fac-date-debut').value;
+  const df     = g('crm-fac-date-fin').value;
+  const params = [];
+  if(statut) params.push('statut='+statut);
+  if(dd)     params.push('date_debut='+dd);
+  if(df)     params.push('date_fin='+df);
+  const url = '/crm/factures' + (params.length ? '?'+params.join('&') : '');
+  try{
+    const list = await GET(url);
+    _renderCrmFactures(list);
+  }catch(e){ posAlert(e.message||'Erreur chargement factures'); }
+}
+
+function _renderCrmFactures(list){
+  const tb = g('crm-fac-tbody');
+  if(!list.length){
+    tb.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:rgba(255,255,255,.3)">Aucune facture trouvée</td></tr>';
+    return;
+  }
+  tb.innerHTML = list.map(f => `<tr>
+    <td><code style="font-size:11px;color:#e8c558">${f.numero_facture}</code></td>
+    <td><strong>${f.client_nom}</strong></td>
+    <td>${_crmDate(f.date_facture)}</td>
+    <td>${_crmDate(f.date_echeance)}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums">${_crmFmt(f.montant_ht)}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums">${_crmFmt(f.montant_tva)}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#e8c558">${_crmFmt(f.montant_ttc)}</td>
+    <td>${_crmStatutBadge(f.statut)}</td>
+    <td style="white-space:nowrap">
+      ${f.statut!=='ANNULEE' && f.client_email ? `<button class="pos-btn" onclick="crmFactureEnvoyer(${f.id},'${f.numero_facture}')" style="padding:4px 10px;font-size:12px;margin-right:4px;background:rgba(96,165,250,.15);color:#60a5fa" title="Envoyer par email">✉</button>` : ''}
+      ${f.statut==='ENVOYEE' ? `<button class="pos-btn" onclick="crmFactureStatut(${f.id},'PAYEE')" style="padding:4px 10px;font-size:12px;margin-right:4px;background:rgba(52,211,153,.15);color:#34d399">Marquer payée</button>` : ''}
+      ${f.statut==='BROUILLON' ? `<button class="pos-btn" onclick="crmFactureSupprimer(${f.id},'${f.numero_facture}')" style="padding:4px 10px;font-size:12px;background:rgba(239,68,68,.15);color:#ef4444">✕</button>` : ''}
+    </td>
+  </tr>`).join('');
+}
+
+async function crmFactureOuvrir(){
+  await _crmLoadClientsCache();
+  const selCl = g('crm-fac-client');
+  selCl.innerHTML = '<option value="">— Sélectionner un partenaire —</option>' +
+    _crmClients.map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
+  g('crm-fac-echeance').value = '';
+  g('crm-fac-tva').value = '0';
+  g('crm-fac-notes').value = '';
+  g('crm-fac-lignes').innerHTML = '';
+  g('crm-fac-total-ttc').textContent = '0.00 HTG';
+  crmFacAjouterLigne();
+  g('crm-fac-modal-bg').classList.add('active');
+}
+function crmFactureFermer(){ g('crm-fac-modal-bg').classList.remove('active'); }
+
+let _crmLigneIdx = 0;
+function crmFacAjouterLigne(){
+  const idx = _crmLigneIdx++;
+  const div = document.createElement('div');
+  div.id = 'crm-fac-ligne-'+idx;
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 80px 100px auto;gap:8px;align-items:center';
+  div.innerHTML = `
+    <input class="pos-input" id="crm-fl-desc-${idx}" placeholder="Description *" style="width:100%" oninput="crmFacCalcTotal()">
+    <input class="pos-input" id="crm-fl-qte-${idx}" type="number" min="0.001" step="0.001" placeholder="Qté" style="width:100%" oninput="crmFacCalcTotal()">
+    <input class="pos-input" id="crm-fl-prix-${idx}" type="number" min="0.01" step="0.01" placeholder="Prix unit." style="width:100%" oninput="crmFacCalcTotal()">
+    <button class="pos-btn" onclick="document.getElementById('crm-fac-ligne-${idx}').remove();crmFacCalcTotal()" style="padding:6px 10px;background:rgba(239,68,68,.15);color:#ef4444">✕</button>`;
+  g('crm-fac-lignes').appendChild(div);
+}
+
+function crmFacCalcTotal(){
+  const lignes = g('crm-fac-lignes').children;
+  let ht = 0;
+  for(const l of lignes){
+    const idx = l.id.replace('crm-fac-ligne-','');
+    const qte  = parseFloat(document.getElementById('crm-fl-qte-'+idx)?.value)||0;
+    const prix = parseFloat(document.getElementById('crm-fl-prix-'+idx)?.value)||0;
+    ht += qte * prix;
+  }
+  const tva = parseFloat(g('crm-fac-tva').value)||0;
+  const ttc = ht * (1 + tva/100);
+  g('crm-fac-total-ttc').textContent = _crmFmt(ttc) + ' HTG';
+}
+
+async function crmFactureSauvegarder(){
+  const client_id = parseInt(g('crm-fac-client').value);
+  if(!client_id){ posAlert('Sélectionnez un partenaire'); return; }
+  const lignesEls = g('crm-fac-lignes').children;
+  const lignes = [];
+  for(const l of lignesEls){
+    const idx  = l.id.replace('crm-fac-ligne-','');
+    const desc = document.getElementById('crm-fl-desc-'+idx)?.value.trim();
+    const qte  = parseFloat(document.getElementById('crm-fl-qte-'+idx)?.value);
+    const prix = parseFloat(document.getElementById('crm-fl-prix-'+idx)?.value);
+    if(!desc||!qte||!prix){ posAlert('Chaque ligne doit avoir une description, une quantité et un prix'); return; }
+    if(qte<=0||prix<=0){ posAlert('La quantité et le prix doivent être > 0'); return; }
+    lignes.push({description:desc, quantite:qte, prix_unitaire:prix, tva_pct:0});
+  }
+  if(!lignes.length){ posAlert('Ajoutez au moins une ligne'); return; }
+  const body = {
+    client_id,
+    date_echeance: g('crm-fac-echeance').value||null,
+    lignes,
+    taux_tva: parseFloat(g('crm-fac-tva').value)||0,
+    notes: g('crm-fac-notes').value.trim()||null,
+  };
+  try{
+    await apiFetch('POST','/crm/factures',body);
+    crmFactureFermer();
+    toast('Facture créée','ok');
+    await crmFacturesLoad();
+    _crmClients = [];
+  }catch(e){ posAlert(e.message||'Erreur création facture'); }
+}
+
+async function crmFactureEnvoyer(id, numero){
+  if(!confirm(`Envoyer la facture ${numero} par email au partenaire ?`)) return;
+  try{
+    await apiFetch('POST','/crm/factures/'+id+'/envoyer');
+    toast('Facture envoyée par email','ok');
+    await crmFacturesLoad();
+  }catch(e){ posAlert(e.message||'Erreur envoi email'); }
+}
+
+async function crmFactureStatut(id, statut){
+  try{
+    await apiFetch('PUT','/crm/factures/'+id,{statut});
+    toast('Statut mis à jour','ok');
+    await crmFacturesLoad();
+  }catch(e){ posAlert(e.message||'Erreur'); }
+}
+
+async function crmFactureSupprimer(id, numero){
+  if(!confirm(`Supprimer la facture ${numero} ?`)) return;
+  try{
+    await apiFetch('DELETE','/crm/factures/'+id);
+    toast('Facture supprimée','ok');
+    await crmFacturesLoad();
+  }catch(e){ posAlert(e.message||'Erreur suppression'); }
 }
 
 </script>

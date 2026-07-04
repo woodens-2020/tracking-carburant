@@ -993,6 +993,124 @@ class PasswordResetToken(Base):
     )
 
 
+# ══════════════════════════════════════════════════════════════════
+# CRM STATION — Partenaires, Crédits, Factures
+# ══════════════════════════════════════════════════════════════════
+
+class StationClient(Base):
+    """Partenaire/client commercial de la station (achat carburant en crédit, etc.)."""
+    __tablename__ = "station_clients"
+
+    id          = Column(Integer,      primary_key=True)
+    nom         = Column(String(150),  nullable=False)
+    telephone   = Column(String(30),   nullable=True)
+    email       = Column(String(254),  nullable=True)
+    nif         = Column(String(50),   nullable=True)
+    adresse     = Column(String(300),  nullable=True)
+    type_client = Column(String(20),   nullable=False, default="PARTICULIER")
+    notes       = Column(String(500),  nullable=True)
+    actif       = Column(Boolean,      nullable=False, default=True)
+    created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    credits  = relationship("StationCredit",  back_populates="client",
+                            cascade="all, delete-orphan")
+    factures = relationship("StationFacture", back_populates="client",
+                            cascade="all, delete-orphan")
+
+    __table_args__ = (
+        CheckConstraint("type_client IN ('PARTICULIER','ENTREPRISE')", name="chk_sc_type"),
+        Index("idx_sc_nom",    "nom"),
+        Index("idx_sc_actif",  "actif"),
+    )
+
+
+class StationCredit(Base):
+    """Crédit carburant accordé à un partenaire de la station."""
+    __tablename__ = "station_credits"
+
+    id            = Column(Integer,      primary_key=True)
+    client_id     = Column(Integer,      ForeignKey("station_clients.id", ondelete="RESTRICT"), nullable=False)
+    produit_id    = Column(Integer,      ForeignKey("produits.id",        ondelete="SET NULL"),  nullable=True)
+    numero        = Column(String(30),   unique=True, nullable=False)
+    montant_total = Column(Numeric(14, 2), nullable=False)
+    montant_paye  = Column(Numeric(14, 2), nullable=False, default=0)
+    quantite      = Column(Numeric(12, 3), nullable=True)
+    prix_unitaire = Column(Numeric(12, 2), nullable=True)
+    statut        = Column(String(20),   nullable=False, default="EN_COURS")
+    date_credit   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    date_echeance = Column(Date,         nullable=True)
+    notes         = Column(String(500),  nullable=True)
+
+    client  = relationship("StationClient",  back_populates="credits")
+    produit = relationship("Produit")
+    remboursements = relationship(
+        "StationCreditRemboursement",
+        back_populates="credit",
+        cascade="all, delete-orphan",
+        order_by="StationCreditRemboursement.date_remboursement",
+    )
+
+    __table_args__ = (
+        CheckConstraint("montant_total > 0",  name="chk_scredit_total_pos"),
+        CheckConstraint("montant_paye >= 0",  name="chk_scredit_paye_pos"),
+        CheckConstraint("statut IN ('EN_COURS','SOLDE','ANNULE')", name="chk_scredit_statut"),
+        Index("idx_scredit_client", "client_id"),
+        Index("idx_scredit_statut", "statut"),
+        Index("idx_scredit_date",   "date_credit"),
+    )
+
+
+class StationCreditRemboursement(Base):
+    """Remboursement (partiel ou total) d'un crédit station."""
+    __tablename__ = "station_credit_remboursements"
+
+    id                 = Column(Integer,      primary_key=True)
+    credit_id          = Column(Integer,      ForeignKey("station_credits.id", ondelete="CASCADE"), nullable=False)
+    montant            = Column(Numeric(14, 2), nullable=False)
+    date_remboursement = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    notes              = Column(String(300),  nullable=True)
+
+    credit = relationship("StationCredit", back_populates="remboursements")
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_scrembours_montant_pos"),
+        Index("idx_scrembours_credit", "credit_id"),
+    )
+
+
+class StationFacture(Base):
+    """Facture commerciale émise à un partenaire de la station."""
+    __tablename__ = "station_factures"
+
+    id              = Column(Integer,      primary_key=True)
+    client_id       = Column(Integer,      ForeignKey("station_clients.id", ondelete="RESTRICT"), nullable=False)
+    numero_facture  = Column(String(30),   unique=True, nullable=False)
+    date_facture    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    date_echeance   = Column(Date,         nullable=True)
+    lignes          = Column(JSON,         nullable=False, default=list)
+    montant_ht      = Column(Numeric(14, 2), nullable=False, default=0)
+    taux_tva        = Column(Numeric(5, 2),  nullable=False, default=0)
+    montant_tva     = Column(Numeric(14, 2), nullable=False, default=0)
+    montant_ttc     = Column(Numeric(14, 2), nullable=False, default=0)
+    statut          = Column(String(20),   nullable=False, default="BROUILLON")
+    notes           = Column(String(500),  nullable=True)
+    email_envoye_at = Column(DateTime(timezone=True), nullable=True)
+
+    client = relationship("StationClient", back_populates="factures")
+
+    __table_args__ = (
+        CheckConstraint("montant_ttc >= 0",  name="chk_sfact_ttc_pos"),
+        CheckConstraint("taux_tva >= 0",     name="chk_sfact_tva_pos"),
+        CheckConstraint(
+            "statut IN ('BROUILLON','ENVOYEE','PAYEE','ANNULEE')",
+            name="chk_sfact_statut",
+        ),
+        Index("idx_sfact_client", "client_id"),
+        Index("idx_sfact_statut", "statut"),
+        Index("idx_sfact_date",   "date_facture"),
+    )
+
+
 class BarSessionCaisse(Base):
     """Session de caisse — suivi des ventes par caissière par jour."""
     __tablename__ = "bar_sessions_caisse"
