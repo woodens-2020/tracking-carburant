@@ -1101,6 +1101,39 @@ def dashboard_bar(
         if v.mode_paiement in ("CASH",   "MIXTE"): par_caissier[cid]["cash"]   += float(v.montant_paye)
         if v.mode_paiement in ("CREDIT", "MIXTE"): par_caissier[cid]["credit"] += float(v.montant_restant)
 
+    # ── Dettes & Remboursements ───────────────────────────────────────
+    all_credits = db.query(BarCredit).all()
+    total_du        = sum(float(c.montant_du)        for c in all_credits)
+    total_rembourse = sum(float(c.montant_rembourse) for c in all_credits)
+    solde_total     = sum(float(c.solde)             for c in all_credits)
+    nb_ouvertes = sum(1 for c in all_credits if c.statut == "OUVERT")
+    nb_soldes   = sum(1 for c in all_credits if c.statut == "SOLDE")
+
+    rembs_periode = db.query(BarRemboursement).filter(
+        BarRemboursement.date_remb >= dt_debut,
+        BarRemboursement.date_remb <= dt_fin,
+    ).all()
+    rembs_periode_total = sum(float(r.montant) for r in rembs_periode)
+
+    rembs_par_jour: dict = {}
+    for r in rembs_periode:
+        k = r.date_remb.astimezone(timezone.utc).date().isoformat()
+        rembs_par_jour[k] = rembs_par_jour.get(k, 0.0) + float(r.montant)
+    rembs_par_jour_list = [{"date": k, "montant": v} for k, v in sorted(rembs_par_jour.items())]
+
+    par_client: dict = {}
+    for c in all_credits:
+        k = c.client_nom or "Client inconnu"
+        if k not in par_client:
+            par_client[k] = {"client": k, "montant_du": 0.0, "rembourse": 0.0, "solde": 0.0, "nb": 0, "statut": "SOLDE"}
+        par_client[k]["montant_du"] += float(c.montant_du)
+        par_client[k]["rembourse"]  += float(c.montant_rembourse)
+        par_client[k]["solde"]      += float(c.solde)
+        par_client[k]["nb"]         += 1
+        if c.statut != "SOLDE":
+            par_client[k]["statut"] = "OUVERT"
+    par_client_list = sorted(par_client.values(), key=lambda x: x["solde"], reverse=True)
+
     heure_fmt = "%H:%M" if is_single else "%d/%m %H:%M"
     return {
         "meta": {
@@ -1134,6 +1167,16 @@ def dashboard_bar(
             }
             for r in ventes[:15]
         ],
+        "dettes": {
+            "total_du":        total_du,
+            "total_rembourse": total_rembourse,
+            "solde_total":     solde_total,
+            "nb_ouvertes":     nb_ouvertes,
+            "nb_soldes":       nb_soldes,
+            "rembs_periode":   rembs_periode_total,
+            "rembs_par_jour":  rembs_par_jour_list,
+            "par_client":      par_client_list,
+        },
     }
 
 

@@ -5480,6 +5480,77 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
 
+        <!-- ══ Section Dettes & Remboursements ══ -->
+        <div class="pos-card" style="margin-top:14px;border-top:2px solid rgba(248,113,113,.25)">
+          <div class="pos-card-hdr" style="padding-bottom:14px">
+            <span style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" style="width:16px;height:16px"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+              Dettes & Remboursements
+            </span>
+            <span id="posdb-dette-pct" style="font-size:11px;color:rgba(255,255,255,.4);font-weight:400"></span>
+          </div>
+
+          <!-- 4 KPIs dettes -->
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px" id="posdb-dette-kpis">
+            <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:14px;border:1px solid rgba(255,255,255,.07)">
+              <div style="font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Total dû (cumul)</div>
+              <div id="posdb-dette-du" style="font-size:18px;font-weight:800;color:#f87171">—</div>
+              <div id="posdb-dette-nb" style="font-size:10px;color:rgba(255,255,255,.3);margin-top:3px">— dettes</div>
+            </div>
+            <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:14px;border:1px solid rgba(255,255,255,.07)">
+              <div style="font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Total remboursé</div>
+              <div id="posdb-dette-remb" style="font-size:18px;font-weight:800;color:#4ade80">—</div>
+              <div id="posdb-dette-soldes" style="font-size:10px;color:rgba(255,255,255,.3);margin-top:3px">— soldées</div>
+            </div>
+            <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:14px;border:1px solid rgba(255,255,255,.07)">
+              <div style="font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Solde restant</div>
+              <div id="posdb-dette-solde" style="font-size:18px;font-weight:800;color:#f7a93b">—</div>
+              <div id="posdb-dette-ouvertes" style="font-size:10px;color:rgba(255,255,255,.3);margin-top:3px">— encore ouvertes</div>
+            </div>
+            <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:14px;border:1px solid rgba(255,255,255,.07)">
+              <div style="font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Payé cette période</div>
+              <div id="posdb-dette-periode" style="font-size:18px;font-weight:800;color:#a78bfa">—</div>
+              <div id="posdb-dette-periode-lbl" style="font-size:10px;color:rgba(255,255,255,.3);margin-top:3px">sur la période</div>
+            </div>
+          </div>
+
+          <!-- Barre de progression globale -->
+          <div style="margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,.4);margin-bottom:5px">
+              <span>Progression des remboursements</span>
+              <span id="posdb-dette-pct-bar">0%</span>
+            </div>
+            <div style="height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden">
+              <div id="posdb-dette-bar" style="height:100%;background:linear-gradient(90deg,#4ade80,#22c55e);border-radius:4px;transition:width .6s ease;width:0%"></div>
+            </div>
+          </div>
+
+          <!-- Grille : chart évolution + table par client -->
+          <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:14px">
+            <!-- Chart évolution remboursements -->
+            <div>
+              <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.5);margin-bottom:10px">Évolution des paiements</div>
+              <div style="position:relative;height:160px"><canvas id="posdb-dette-chart"></canvas></div>
+            </div>
+            <!-- Table par client -->
+            <div>
+              <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.5);margin-bottom:10px">Détail par client</div>
+              <div style="overflow-y:auto;max-height:180px">
+                <table class="pos-table" style="font-size:11px">
+                  <thead><tr>
+                    <th>Client</th>
+                    <th style="text-align:right">Dû</th>
+                    <th style="text-align:right">Remboursé</th>
+                    <th style="text-align:right">Reste</th>
+                    <th>Statut</th>
+                  </tr></thead>
+                  <tbody id="posdb-dette-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div><!-- /page-pos-dashboard-bar -->
 
@@ -16182,6 +16253,7 @@ async function _posDbDashLoad(){
     _posDbRenderClassement(d.par_caissier);
     _posDbRenderProduits(d.top_produits);
     _posDbRenderRecents(d.recents);
+    _posDbRenderDettes(d.dettes, d.meta);
     _posDbUpdateSubtitle(d.meta, caissId, mode);
 
     const upd = document.getElementById('posdb-updated');
@@ -16559,6 +16631,88 @@ function _posDbRenderRecents(recents){
     <td><span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700;background:${(modeColors[r.mode]||'#94a3b8')}22;color:${modeColors[r.mode]||'rgba(255,255,255,.5)'}">${r.mode}</span></td>
     <td><span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700;background:${(statutColors[r.statut]||'rgba(255,255,255,.08)')}22;color:${statutColors[r.statut]||'rgba(255,255,255,.4)'}">${r.statut}</span></td>
   </tr>`).join('');
+}
+
+function _posDbRenderDettes(dettes, meta){
+  if(!dettes) return;
+  const gx = posGx;
+
+  // KPIs
+  const pct = dettes.total_du > 0 ? (dettes.total_rembourse / dettes.total_du * 100) : 0;
+  const set = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+  set('posdb-dette-du',       gx(dettes.total_du));
+  set('posdb-dette-nb',       dettes.nb_ouvertes + dettes.nb_soldes + ' dette(s)');
+  set('posdb-dette-remb',     gx(dettes.total_rembourse));
+  set('posdb-dette-soldes',   dettes.nb_soldes + ' soldée(s)');
+  set('posdb-dette-solde',    gx(dettes.solde_total));
+  set('posdb-dette-ouvertes', dettes.nb_ouvertes + ' encore ouverte(s)');
+  set('posdb-dette-periode',  gx(dettes.rembs_periode));
+  set('posdb-dette-pct',      pct.toFixed(1) + '% remboursé');
+  set('posdb-dette-pct-bar',  pct.toFixed(1) + '%');
+  const bar = document.getElementById('posdb-dette-bar');
+  if(bar) bar.style.width = Math.min(pct, 100).toFixed(1) + '%';
+
+  // Chart évolution remboursements
+  const ctx = document.getElementById('posdb-dette-chart');
+  if(ctx){
+    if(_posDbCharts['dette']){ _posDbCharts['dette'].destroy(); delete _posDbCharts['dette']; }
+    const pts = dettes.rembs_par_jour || [];
+    if(pts.length){
+      _posDbCharts['dette'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: pts.map(p => { const d = new Date(p.date); return d.getDate()+'/'+(d.getMonth()+1); }),
+          datasets: [{
+            label: 'Remboursé',
+            data: pts.map(p => p.montant),
+            backgroundColor: 'rgba(74,222,128,.7)',
+            borderColor: '#4ade80',
+            borderWidth: 1,
+            borderRadius: 4,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => 'G ' + c.parsed.y.toLocaleString('fr') } } },
+          scales: {
+            x: { ticks: { color:'rgba(255,255,255,.4)', font:{size:10} }, grid: { display:false } },
+            y: { ticks: { color:'rgba(255,255,255,.4)', font:{size:10}, callback: v => 'G '+v.toLocaleString('fr') }, grid: { color:'rgba(255,255,255,.05)' } }
+          }
+        }
+      });
+    } else {
+      ctx.parentElement.innerHTML = '<div style="color:rgba(255,255,255,.25);font-size:12px;text-align:center;padding:40px 0">Aucun remboursement sur la période</div>';
+    }
+  }
+
+  // Table par client
+  const tbody = document.getElementById('posdb-dette-tbody');
+  if(tbody){
+    const clients = dettes.par_client || [];
+    if(!clients.length){
+      tbody.innerHTML = '<tr><td colspan="5" style="color:rgba(255,255,255,.3);text-align:center;padding:16px">Aucune dette</td></tr>';
+      return;
+    }
+    tbody.innerHTML = clients.map(c => {
+      const pctC = c.montant_du > 0 ? (c.rembourse / c.montant_du * 100) : 0;
+      const badge = c.statut === 'SOLDE'
+        ? '<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(74,222,128,.15);color:#4ade80;font-weight:700">SOLDÉ</span>'
+        : '<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(248,113,113,.15);color:#f87171;font-weight:700">OUVERT</span>';
+      const progColor = c.statut === 'SOLDE' ? '#4ade80' : (pctC > 50 ? '#f7a93b' : '#f87171');
+      return `<tr>
+        <td>
+          <div style="font-weight:600;font-size:11px">${esc(c.client)}</div>
+          <div style="height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:3px;width:80px">
+            <div style="height:100%;width:${Math.min(pctC,100).toFixed(0)}%;background:${progColor};border-radius:2px"></div>
+          </div>
+        </td>
+        <td style="text-align:right;color:#f87171;font-weight:600">${gx(c.montant_du)}</td>
+        <td style="text-align:right;color:#4ade80;font-weight:600">${gx(c.rembourse)}</td>
+        <td style="text-align:right;color:#f7a93b;font-weight:700">${gx(c.solde)}</td>
+        <td>${badge}</td>
+      </tr>`;
+    }).join('');
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════
