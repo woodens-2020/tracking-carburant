@@ -2836,6 +2836,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ── Section Bar / Restaurant ── -->
     <div class="nav-section-label">Bar / Restaurant</div>
 
+    <button class="nav-item" data-page="pos-dashboard-bar" onclick="goTo('pos-dashboard-bar')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17h7M17 14v7"/></svg>
+      </span>
+      <span>Dashboard Bar</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <button class="nav-item" data-page="pos-caisse" onclick="goTo('pos-caisse')">
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h4M7 11h2"/><rect x="13" y="8" width="4" height="5" rx="1"/></svg>
@@ -5288,6 +5296,157 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
       </div>
     </div><!-- /page-caisse -->
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — DASHBOARD BAR                                -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-dashboard-bar" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <!-- Header -->
+        <div class="pos-header" style="margin-bottom:16px">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#4ade80,#22c55e)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17h7M17 14v7"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Dashboard Bar</div>
+            <div class="pos-header-sub" id="posdb-date-sub">Tableau de bord temps réel — Bar / Restaurant</div>
+          </div>
+          <div class="pos-header-actions" style="align-items:center;gap:14px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="width:7px;height:7px;border-radius:50%;background:#4ade80;display:inline-block;animation:posdbPulse 1.5s infinite"></span>
+              <span style="font-size:11px;color:#4ade80;font-weight:700">LIVE</span>
+            </div>
+            <div id="posdb-clock" style="font-size:13px;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums;min-width:56px;text-align:right"></div>
+            <span id="posdb-updated" style="font-size:10px;color:rgba(255,255,255,.3)"></span>
+            <button onclick="_posDbDashLoad()" style="background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.3);border-radius:9px;cursor:pointer;color:#4ade80;font-size:11px;font-weight:700;padding:5px 12px">↻ Actualiser</button>
+          </div>
+        </div>
+
+        <!-- KPI Row -->
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px" id="posdb-kpi-row">
+          <!-- CA Jour -->
+          <div style="background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.18);border-radius:14px;padding:14px;position:relative;overflow:hidden">
+            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#4ade80,#22c55e)"></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <div style="width:28px;height:28px;border-radius:8px;background:rgba(74,222,128,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#4ade80" stroke-width="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+              </div>
+              <span style="font-size:10px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px">CA Jour</span>
+            </div>
+            <div id="posdb-kpi-ca" style="font-size:20px;font-weight:800;color:#4ade80;margin-bottom:6px">—</div>
+            <div id="posdb-kpi-ca-trend" style="font-size:11px;color:rgba(255,255,255,.35)">vs hier : —</div>
+          </div>
+          <!-- Cash -->
+          <div style="background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.18);border-radius:14px;padding:14px;position:relative;overflow:hidden">
+            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#a78bfa,#8b5cf6)"></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <div style="width:28px;height:28px;border-radius:8px;background:rgba(167,139,250,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#a78bfa" stroke-width="2.5"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 12h.01M18 12h.01"/></svg>
+              </div>
+              <span style="font-size:10px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px">Cash</span>
+            </div>
+            <div id="posdb-kpi-cash" style="font-size:20px;font-weight:800;color:#a78bfa;margin-bottom:6px">—</div>
+            <div id="posdb-kpi-cash-pct" style="font-size:11px;color:rgba(255,255,255,.35)">— % du CA</div>
+          </div>
+          <!-- Crédit -->
+          <div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.18);border-radius:14px;padding:14px;position:relative;overflow:hidden">
+            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#f87171,#dc2626)"></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <div style="width:28px;height:28px;border-radius:8px;background:rgba(248,113,113,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#f87171" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
+              </div>
+              <span style="font-size:10px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px">Crédit</span>
+            </div>
+            <div id="posdb-kpi-credit" style="font-size:20px;font-weight:800;color:#f87171;margin-bottom:6px">—</div>
+            <div id="posdb-kpi-credit-pct" style="font-size:11px;color:rgba(255,255,255,.35)">— % du CA</div>
+          </div>
+          <!-- Nb Ventes -->
+          <div style="background:rgba(247,169,59,.07);border:1px solid rgba(247,169,59,.18);border-radius:14px;padding:14px;position:relative;overflow:hidden">
+            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#f7a93b,#f59e0b)"></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <div style="width:28px;height:28px;border-radius:8px;background:rgba(247,169,59,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#f7a93b" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+              </div>
+              <span style="font-size:10px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px">Transactions</span>
+            </div>
+            <div id="posdb-kpi-nb" style="font-size:26px;font-weight:800;color:#f7a93b;margin-bottom:6px">—</div>
+            <div id="posdb-kpi-moy" style="font-size:11px;color:rgba(255,255,255,.35)">Moy / ticket : —</div>
+          </div>
+          <!-- Vs Hier -->
+          <div style="background:rgba(99,210,190,.07);border:1px solid rgba(99,210,190,.18);border-radius:14px;padding:14px;position:relative;overflow:hidden">
+            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#3fb6a8,#2dd4bf)"></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <div style="width:28px;height:28px;border-radius:8px;background:rgba(63,182,168,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#3fb6a8" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+              </div>
+              <span style="font-size:10px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px">CA Hier</span>
+            </div>
+            <div id="posdb-kpi-hier" style="font-size:20px;font-weight:800;color:#3fb6a8;margin-bottom:6px">—</div>
+            <div id="posdb-kpi-delta" style="font-size:12px;font-weight:700">—</div>
+          </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div style="display:grid;grid-template-columns:3fr 2fr;gap:12px;margin-bottom:12px">
+          <!-- Hourly area chart -->
+          <div class="pos-card" style="padding:16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+              <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.8)">Ventes par heure — Aujourd'hui</div>
+              <div style="display:flex;gap:12px">
+                <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:rgba(255,255,255,.45)"><span style="width:10px;height:3px;background:#4ade80;display:inline-block;border-radius:2px"></span>CA (G)</span>
+                <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:rgba(255,255,255,.45)"><span style="width:10px;height:3px;background:#f7a93b;display:inline-block;border-radius:2px"></span>Nb ventes</span>
+              </div>
+            </div>
+            <div style="position:relative;height:180px"><canvas id="posdb-chart-heure"></canvas></div>
+          </div>
+          <!-- Donut mode paiement -->
+          <div class="pos-card" style="padding:16px;display:flex;flex-direction:column">
+            <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:12px">Répartition des paiements</div>
+            <div style="position:relative;height:130px;display:flex;align-items:center;justify-content:center">
+              <canvas id="posdb-chart-mode"></canvas>
+              <div style="position:absolute;text-align:center;pointer-events:none">
+                <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:2px">CA Total</div>
+                <div id="posdb-donut-center" style="font-size:15px;font-weight:800;color:#fff">—</div>
+              </div>
+            </div>
+            <div id="posdb-mode-legend" style="display:flex;flex-direction:column;gap:7px;margin-top:12px">
+              <!-- rendered by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Classement + Top Produits -->
+        <div style="display:grid;grid-template-columns:2fr 3fr;gap:12px;margin-bottom:12px">
+          <!-- Classement caissières -->
+          <div class="pos-card" style="padding:16px">
+            <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:14px">🏆 Classement du jour</div>
+            <div id="posdb-classement" style="display:flex;flex-direction:column;gap:8px">
+              <div style="color:rgba(255,255,255,.25);font-size:12px;text-align:center;padding:12px">Chargement…</div>
+            </div>
+          </div>
+          <!-- Top Produits horizontal bar -->
+          <div class="pos-card" style="padding:16px">
+            <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:14px">📦 Top produits — Aujourd'hui</div>
+            <div style="position:relative;height:200px"><canvas id="posdb-chart-produits"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Transactions récentes -->
+        <div class="pos-card">
+          <div class="pos-card-hdr">Transactions récentes</div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead><tr><th>Heure</th><th>Ticket</th><th>Caissière</th><th>Montant</th><th>Mode</th><th>Statut</th></tr></thead>
+              <tbody id="posdb-recents-tbody">
+                <tr><td colspan="6" style="text-align:center;color:rgba(255,255,255,.3);padding:18px">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-dashboard-bar -->
 
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- PAGE POS — CAISSE                                       -->
@@ -14789,6 +14948,7 @@ const _giPageLoaders = {
   depenses:          loadDepenses,
   achats:            loadAchats,
   caisse:            loadCaisse,
+  'pos-dashboard-bar': loadPosDashboardBar,
   'pos-caisse':      loadPosCaisse,
   'pos-produits':    loadPosProduits,
   'pos-stock':       loadPosStock,
@@ -15886,6 +16046,348 @@ function posDateFr(s){
 // ══════════════════════════════════════════════════════════════════════
 // PAGE POS CAISSE
 // ══════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+// DASHBOARD BAR — Tableau de bord bar/restaurant
+// ══════════════════════════════════════════════════════════════════
+
+(function injectPosDashCss(){
+  if(document.getElementById('posdb-css')) return;
+  const s = document.createElement('style');
+  s.id = 'posdb-css';
+  s.textContent = `
+    @keyframes posdbPulse {
+      0%,100%{opacity:1;transform:scale(1)}
+      50%{opacity:.4;transform:scale(1.4)}
+    }
+  `;
+  document.head.appendChild(s);
+})();
+
+let _posDbCharts   = {};
+let _posDbInterval = null;
+let _posDbClockTick = null;
+
+async function loadPosDashboardBar(){
+  clearInterval(_posDbInterval);
+  clearInterval(_posDbClockTick);
+
+  const now = new Date();
+  const sub = document.getElementById('posdb-date-sub');
+  const jours = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+  if(sub) sub.textContent = jours[now.getDay()] + ' ' + now.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}) + ' — Tableau de bord temps réel';
+
+  const clockEl = document.getElementById('posdb-clock');
+  function _tick(){
+    if(!clockEl || !document.getElementById('page-pos-dashboard-bar')?.classList.contains('active')) {
+      clearInterval(_posDbClockTick); return;
+    }
+    const t = new Date();
+    clockEl.textContent = `${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}:${t.getSeconds().toString().padStart(2,'0')}`;
+  }
+  _tick();
+  _posDbClockTick = setInterval(_tick, 1000);
+
+  await _posDbDashLoad();
+  _posDbInterval = setInterval(_posDbDashLoad, 60000);
+}
+
+async function _posDbDashLoad(){
+  try {
+    const d = await apiFetch('GET', '/pos/dashboard/bar');
+    _posDbRenderKpis(d.kpis);
+    _posDbRenderHeure(d.par_heure);
+    _posDbRenderMode(d.par_mode, d.kpis.ca_jour);
+    _posDbRenderClassement(d.par_caissier);
+    _posDbRenderProduits(d.top_produits);
+    _posDbRenderRecents(d.recents);
+    const upd = document.getElementById('posdb-updated');
+    if(upd){
+      const t = new Date();
+      upd.textContent = `Mis à jour ${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}`;
+    }
+  } catch(e){ console.error('Dashboard bar:', e); }
+}
+
+function _posDbRenderKpis(k){
+  const ca     = k.ca_jour     || 0;
+  const cash   = k.cash_jour   || 0;
+  const credit = k.credit_jour || 0;
+  const nb     = k.nb_ventes   || 0;
+  const hier   = k.ca_hier     || 0;
+
+  const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+
+  set('posdb-kpi-ca',     posGx(ca));
+  set('posdb-kpi-cash',   posGx(cash));
+  set('posdb-kpi-credit', posGx(credit));
+  set('posdb-kpi-nb',     nb);
+  set('posdb-kpi-hier',   posGx(hier));
+
+  set('posdb-kpi-cash-pct',   ca > 0 ? `${Math.round(cash/ca*100)} % du CA` : '—');
+  set('posdb-kpi-credit-pct', ca > 0 ? `${Math.round(credit/ca*100)} % du CA` : '—');
+  set('posdb-kpi-moy',        nb > 0 ? `Moy / ticket : ${posGx(ca/nb)}` : 'Aucune vente');
+
+  const trendEl = document.getElementById('posdb-kpi-ca-trend');
+  const deltaEl = document.getElementById('posdb-kpi-delta');
+  if(hier > 0){
+    const pct  = ((ca - hier) / hier * 100).toFixed(1);
+    const up   = ca >= hier;
+    const sign = up ? '▲' : '▼';
+    const col  = up ? '#4ade80' : '#f87171';
+    if(trendEl){ trendEl.textContent = `${sign} ${Math.abs(pct)} % vs hier`; trendEl.style.color = col; }
+    if(deltaEl){ deltaEl.innerHTML = `<span style="color:${col};font-weight:700">${sign} ${Math.abs(pct)} %</span><span style="color:rgba(255,255,255,.4);font-size:10px"> vs hier</span>`; }
+  } else {
+    if(trendEl){ trendEl.textContent = 'Premier jour'; trendEl.style.color = 'rgba(255,255,255,.35)'; }
+    if(deltaEl){ deltaEl.innerHTML = '<span style="color:rgba(255,255,255,.4);font-size:10px">Pas de données hier</span>'; }
+  }
+}
+
+function _posDbRenderHeure(parHeure){
+  const ctx = document.getElementById('posdb-chart-heure');
+  if(!ctx) return;
+
+  const now = new Date();
+  const maxH = now.getHours();
+  const heureMap = {};
+  (parHeure||[]).forEach(h => { heureMap[h.heure] = h; });
+
+  const labels = [], caData = [], nbData = [];
+  for(let i = 6; i <= Math.max(maxH, 6); i++){
+    const key = i.toString().padStart(2,'0');
+    labels.push(key + 'h');
+    caData.push(heureMap[key]?.ca   || 0);
+    nbData.push(heureMap[key]?.nb   || 0);
+  }
+
+  if(_posDbCharts.heure){ _posDbCharts.heure.destroy(); delete _posDbCharts.heure; }
+
+  const gradient = ctx.getContext('2d').createLinearGradient(0,0,0,180);
+  gradient.addColorStop(0,   'rgba(74,222,128,.35)');
+  gradient.addColorStop(1,   'rgba(74,222,128,.01)');
+
+  _posDbCharts.heure = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'CA (G)',
+          data: caData,
+          fill: true,
+          backgroundColor: gradient,
+          borderColor: '#4ade80',
+          borderWidth: 2,
+          tension: 0.4,
+          pointRadius: 3,
+          pointBackgroundColor: '#4ade80',
+          pointHoverRadius: 5,
+          yAxisID: 'y',
+        },
+        {
+          label: 'Nb ventes',
+          data: nbData,
+          fill: false,
+          borderColor: '#f7a93b',
+          borderWidth: 1.5,
+          borderDash: [4,3],
+          tension: 0.4,
+          pointRadius: 2,
+          pointBackgroundColor: '#f7a93b',
+          yAxisID: 'y1',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.4)', font: { size: 10 } } },
+        y: { position: 'left',  grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#4ade80', font: { size: 10 }, callback: v => 'G ' + Math.round(v) } },
+        y1:{ position: 'right', grid: { display: false }, ticks: { color: '#f7a93b', font: { size: 10 } } },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(15,20,35,.92)',
+          borderColor: 'rgba(255,255,255,.1)',
+          borderWidth: 1,
+          callbacks: {
+            label: ctx => ctx.datasetIndex===0 ? ' CA : ' + posGx(ctx.raw) : ' Ventes : ' + ctx.raw,
+          },
+        },
+      },
+    },
+  });
+}
+
+function _posDbRenderMode(parMode, caTotal){
+  const ctx = document.getElementById('posdb-chart-mode');
+  const leg = document.getElementById('posdb-mode-legend');
+  const ctr = document.getElementById('posdb-donut-center');
+  if(!ctx) return;
+
+  const MODES = [
+    { key: 'CASH',   label: 'Cash',   color: '#4ade80' },
+    { key: 'CREDIT', label: 'Crédit', color: '#f87171' },
+    { key: 'MIXTE',  label: 'Mixte',  color: '#a78bfa' },
+  ];
+
+  const vals   = MODES.map(m => parMode[m.key] || 0);
+  const colors = MODES.map(m => m.color);
+  const total  = vals.reduce((s,v) => s+v, 0);
+
+  if(_posDbCharts.mode){ _posDbCharts.mode.destroy(); delete _posDbCharts.mode; }
+
+  if(ctr) ctr.textContent = posGx(caTotal || total);
+
+  _posDbCharts.mode = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: MODES.map(m => m.label),
+      datasets: [{ data: vals, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }],
+    },
+    options: {
+      cutout: '68%',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(15,20,35,.92)',
+          callbacks: {
+            label: ctx => ` ${ctx.label} : ${posGx(ctx.raw)} (${total>0?Math.round(ctx.raw/total*100):0}%)`,
+          },
+        },
+      },
+    },
+  });
+
+  if(leg){
+    leg.innerHTML = MODES.map((m,i) => {
+      const v   = vals[i];
+      const pct = total > 0 ? Math.round(v/total*100) : 0;
+      return `<div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:7px">
+          <span style="width:9px;height:9px;border-radius:3px;background:${m.color};display:inline-block;flex-shrink:0"></span>
+          <span style="font-size:11px;color:rgba(255,255,255,.6)">${m.label}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;font-weight:700;color:${m.color}">${posGx(v)}</span>
+          <span style="font-size:10px;color:rgba(255,255,255,.3);min-width:28px;text-align:right">${pct} %</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function _posDbRenderClassement(parCaissier){
+  const wrap = document.getElementById('posdb-classement');
+  if(!wrap) return;
+  const list = parCaissier || [];
+  if(!list.length){
+    wrap.innerHTML = '<div style="color:rgba(255,255,255,.25);font-size:12px;text-align:center;padding:12px">Aucune vente aujourd\'hui</div>';
+    return;
+  }
+  const max    = Math.max(...list.map(e => e.total || 0));
+  const medals = ['🥇','🥈','🥉'];
+  wrap.innerHTML = list.map((e,i) => {
+    const pct  = max > 0 ? Math.round((e.total/max)*100) : 0;
+    const isT  = i === 0;
+    const col  = isT ? '#f7a93b' : '#3fb6a8';
+    return `<div style="padding:10px 12px;border-radius:10px;background:${isT?'rgba(247,169,59,.08)':'rgba(255,255,255,.03)'}">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:16px;flex-shrink:0">${medals[i]||`<span style="font-size:11px;color:rgba(255,255,255,.35)">${i+1}</span>`}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:700;color:${col};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.nom}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.35)">${e.nb_ventes} vente${e.nb_ventes>1?'s':''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:13px;font-weight:800;color:#4ade80">${posGx(e.total)}</div>
+        </div>
+      </div>
+      <div style="height:4px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${isT?'linear-gradient(90deg,#f7a93b,#f59e0b)':'linear-gradient(90deg,#3fb6a8,#2dd4bf)'};border-radius:4px;transition:width .5s"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:5px">
+        <span style="font-size:10px;color:#a78bfa">💜 ${posGx(e.cash)}</span>
+        <span style="font-size:10px;color:#f87171">⬜ ${posGx(e.credit)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _posDbRenderProduits(topProduits){
+  const ctx = document.getElementById('posdb-chart-produits');
+  if(!ctx) return;
+
+  const prods = (topProduits || []).slice(0, 8);
+  if(_posDbCharts.produits){ _posDbCharts.produits.destroy(); delete _posDbCharts.produits; }
+
+  if(!prods.length){
+    const parent = ctx.parentElement;
+    if(parent) parent.innerHTML = '<div style="color:rgba(255,255,255,.25);font-size:12px;text-align:center;padding:30px">Aucun produit vendu</div>';
+    return;
+  }
+
+  const GRAD_COLORS = ['#4ade80','#3fb6a8','#a78bfa','#f7a93b','#f87171','#60a5fa','#2dd4bf','#fb923c'];
+
+  _posDbCharts.produits = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: prods.map(p => p.nom.length > 20 ? p.nom.slice(0,18)+'…' : p.nom),
+      datasets: [{
+        label: 'CA (G)',
+        data:  prods.map(p => p.total),
+        backgroundColor: prods.map((_,i) => GRAD_COLORS[i % GRAD_COLORS.length] + 'cc'),
+        borderColor:     prods.map((_,i) => GRAD_COLORS[i % GRAD_COLORS.length]),
+        borderWidth: 1,
+        borderRadius: 5,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.4)', font: { size: 10 }, callback: v => 'G ' + Math.round(v) } },
+        y: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,.75)', font: { size: 10.5 } } },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(15,20,35,.92)',
+          callbacks: {
+            label: ctx => ` ${posGx(ctx.raw)} — ${(topProduits||[])[ctx.dataIndex]?.quantite||0} unités`,
+          },
+        },
+      },
+    },
+  });
+}
+
+function _posDbRenderRecents(recents){
+  const tbody = document.getElementById('posdb-recents-tbody');
+  if(!tbody) return;
+  const list = recents || [];
+  if(!list.length){
+    tbody.innerHTML = '<tr><td colspan="6" style="color:rgba(255,255,255,.3);text-align:center;padding:18px">Aucune transaction aujourd\'hui</td></tr>';
+    return;
+  }
+  const modeColors = { CASH:'#4ade80', CREDIT:'#f87171', MIXTE:'#a78bfa' };
+  const statutColors = { PAYEE:'#4ade80', CREDIT:'#f7a93b', ANNULEE:'#64748b' };
+  tbody.innerHTML = list.map(r => `<tr>
+    <td style="font-weight:700;color:rgba(255,255,255,.6);font-size:12px">${r.heure}</td>
+    <td style="font-size:11px;color:rgba(255,255,255,.4)">${r.ticket}</td>
+    <td style="font-size:12px">${r.caissier}</td>
+    <td style="font-size:13px;font-weight:700;color:#4ade80">${posGx(r.montant)}</td>
+    <td><span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700;background:${(modeColors[r.mode]||'#94a3b8')}22;color:${modeColors[r.mode]||'rgba(255,255,255,.5)'}">${r.mode}</span></td>
+    <td><span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700;background:${(statutColors[r.statut]||'rgba(255,255,255,.08)')}22;color:${statutColors[r.statut]||'rgba(255,255,255,.4)'}">${r.statut}</span></td>
+  </tr>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════
+
 let _posCatActuelle = 'TOUS';
 
 async function loadPosCaisse(){

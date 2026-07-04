@@ -969,6 +969,106 @@ def ventes_temps_reel(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/dashboard/bar")
+def dashboard_bar(db: Session = Depends(get_db)):
+    """Dashboard complet bar/restaurant — données du jour + comparaison hier."""
+    from datetime import timedelta
+    today     = datetime.now(tz=timezone.utc).date()
+    yesterday = today - timedelta(days=1)
+    dt_debut  = datetime.combine(today,     time.min).replace(tzinfo=timezone.utc)
+    dt_fin    = datetime.combine(today,     time.max).replace(tzinfo=timezone.utc)
+    dt_hier_d = datetime.combine(yesterday, time.min).replace(tzinfo=timezone.utc)
+    dt_hier_f = datetime.combine(yesterday, time.max).replace(tzinfo=timezone.utc)
+
+    ventes = (
+        db.query(BarVente)
+        .filter(BarVente.date_heure >= dt_debut, BarVente.date_heure <= dt_fin, BarVente.statut != "ANNULEE")
+        .order_by(BarVente.date_heure.desc())
+        .all()
+    )
+    ventes_hier = (
+        db.query(BarVente)
+        .filter(BarVente.date_heure >= dt_hier_d, BarVente.date_heure <= dt_hier_f, BarVente.statut != "ANNULEE")
+        .all()
+    )
+
+    ca_jour     = sum(float(v.montant_total)   for v in ventes)
+    cash_jour   = sum(float(v.montant_paye)    for v in ventes if v.mode_paiement in ("CASH",   "MIXTE"))
+    credit_jour = sum(float(v.montant_restant) for v in ventes if v.mode_paiement in ("CREDIT", "MIXTE"))
+    ca_hier     = sum(float(v.montant_total)   for v in ventes_hier)
+
+    par_heure: dict = {}
+    for v in ventes:
+        h = v.date_heure.astimezone(timezone.utc).strftime("%H")
+        if h not in par_heure:
+            par_heure[h] = {"heure": h, "ca": 0.0, "nb": 0}
+        par_heure[h]["ca"] += float(v.montant_total)
+        par_heure[h]["nb"] += 1
+
+    par_mode: dict = {}
+    for v in ventes:
+        m = v.mode_paiement or "CASH"
+        par_mode[m] = par_mode.get(m, 0.0) + float(v.montant_total)
+
+    top_prods = (
+        db.query(
+            BarProduit.nom,
+            func.sum(BarLigneVente.sous_total).label("total"),
+            func.sum(BarLigneVente.quantite).label("quantite"),
+        )
+        .join(BarLigneVente, BarProduit.id == BarLigneVente.produit_id)
+        .join(BarVente,      BarVente.id   == BarLigneVente.vente_id)
+        .filter(
+            BarVente.date_heure >= dt_debut,
+            BarVente.date_heure <= dt_fin,
+            BarVente.statut != "ANNULEE",
+        )
+        .group_by(BarProduit.id, BarProduit.nom)
+        .order_by(func.sum(BarLigneVente.sous_total).desc())
+        .limit(8)
+        .all()
+    )
+
+    par_caissier: dict = {}
+    for v in ventes:
+        cid = v.caissier_id or 0
+        nom = (v.caissier.nom + " " + v.caissier.prenom) if v.caissier else "Sans caissier"
+        if cid not in par_caissier:
+            par_caissier[cid] = {"nom": nom, "total": 0.0, "nb_ventes": 0, "cash": 0.0, "credit": 0.0}
+        par_caissier[cid]["total"]     += float(v.montant_total)
+        par_caissier[cid]["nb_ventes"] += 1
+        if v.mode_paiement in ("CASH",   "MIXTE"): par_caissier[cid]["cash"]   += float(v.montant_paye)
+        if v.mode_paiement in ("CREDIT", "MIXTE"): par_caissier[cid]["credit"] += float(v.montant_restant)
+
+    return {
+        "kpis": {
+            "ca_jour":     ca_jour,
+            "cash_jour":   cash_jour,
+            "credit_jour": credit_jour,
+            "nb_ventes":   len(ventes),
+            "ca_hier":     ca_hier,
+        },
+        "par_heure":    sorted(par_heure.values(), key=lambda x: x["heure"]),
+        "par_mode":     par_mode,
+        "top_produits": [
+            {"nom": p.nom, "total": float(p.total or 0), "quantite": int(p.quantite or 0)}
+            for p in top_prods
+        ],
+        "par_caissier": sorted(par_caissier.values(), key=lambda x: x["total"], reverse=True),
+        "recents": [
+            {
+                "heure":    r.date_heure.astimezone(timezone.utc).strftime("%H:%M"),
+                "caissier": (r.caissier.nom + " " + r.caissier.prenom) if r.caissier else "—",
+                "montant":  float(r.montant_total),
+                "mode":     r.mode_paiement or "—",
+                "ticket":   r.numero_ticket or "—",
+                "statut":   r.statut or "—",
+            }
+            for r in ventes[:10]
+        ],
+    }
+
+
 @router.get("/ventes/{vente_id}")
 def detail_vente(vente_id: int, db: Session = Depends(get_db)):
     v = db.query(BarVente).filter_by(id=vente_id).first()
