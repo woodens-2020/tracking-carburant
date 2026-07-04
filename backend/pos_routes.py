@@ -88,7 +88,7 @@ class AchatIn(BaseModel):
     station_produit_id:  Optional[int] = None   # produits — carburants (pas de mouvement stock bar)
     quantite:            float = Field(gt=0)
     quantite_type:       str   = "unite"         # "unite" ou "caisse" (bar seulement)
-    prix_achat_unitaire: float = Field(ge=0)
+    prix_achat_unitaire: float = Field(gt=0)
     fournisseur:         Optional[str] = None
     notes:               Optional[str] = None
     depenses:            List[DepenseItem] = []

@@ -143,14 +143,18 @@ def generer_numero_ticket(db: Session) -> str:
 
 
 def _generer_ticket_cuisine(db: Session) -> str:
-    """Génère un numéro de ticket cuisine unique au format CK-YYYYMMDD-XXXX."""
-    today = datetime.now(tz=timezone.utc).strftime("%Y%m%d")
-    count = (
-        db.query(CuisineVente)
-        .filter(CuisineVente.numero_ticket.like(f"CK{today}%"))
-        .count()
+    """Génère un numéro de ticket cuisine unique — SELECT FOR UPDATE évite la race condition."""
+    today  = datetime.now(tz=timezone.utc).strftime("%Y%m%d")
+    prefix = f"CK{today}"
+    last = (
+        db.query(CuisineVente.numero_ticket)
+        .filter(CuisineVente.numero_ticket.like(f"{prefix}%"))
+        .with_for_update()
+        .order_by(CuisineVente.numero_ticket.desc())
+        .first()
     )
-    return f"CK{today}{str(count + 1).zfill(4)}"
+    seq = int(last.numero_ticket[len(prefix):]) + 1 if last else 1
+    return f"{prefix}{str(seq).zfill(4)}"
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -239,7 +243,10 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     if montant_restant < 0:
         montant_restant = Decimal("0")
 
-    mode   = data.get("mode_paiement", "CASH").upper()
+    _MODES_VALIDES = {"CASH", "CREDIT", "MIXTE"}
+    mode = data.get("mode_paiement", "CASH").upper()
+    if mode not in _MODES_VALIDES:
+        raise ValueError(f"mode_paiement invalide : '{mode}'. Valeurs acceptées : {sorted(_MODES_VALIDES)}")
     statut = "CREDIT_EN_COURS" if montant_restant > 0 else "PAYEE"
 
     # Créer la vente
@@ -537,8 +544,13 @@ def stats_bar(date_debut: date_type, date_fin: date_type, db: Session) -> dict:
             nom        = l.produit.nom if l.produit else str(l.produit_id)
             cat        = l.produit.categorie if l.produit else ""
         else:
-            # Plat cuisine vendu via bar — pas de coût bar
-            cogs_ligne = Decimal("0")
+            # Plat cuisine vendu via bar — utilise cout_estime si disponible
+            cout_estime = (
+                _dec(l.cuisine_plat.cout_estime)
+                if l.cuisine_plat and l.cuisine_plat.cout_estime
+                else Decimal("0")
+            )
+            cogs_ligne = (_dec(l.quantite) * cout_estime).quantize(Decimal("0.01"))
             key        = -(l.cuisine_plat_id or 0)
             nom        = l.cuisine_plat.nom if l.cuisine_plat else "Plat inconnu"
             cat        = "cuisine"

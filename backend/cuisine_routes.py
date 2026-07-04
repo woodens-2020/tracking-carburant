@@ -19,11 +19,18 @@ def _dec(v) -> Decimal:
 
 
 def _generer_ticket(db: Session) -> str:
-    today = datetime.now(tz=timezone.utc).strftime("%Y%m%d")
-    count = db.query(CuisineVente).filter(
-        CuisineVente.numero_ticket.like(f"CK{today}%")
-    ).count()
-    return f"CK{today}{str(count + 1).zfill(4)}"
+    """Génère un numéro de ticket cuisine unique — SELECT FOR UPDATE évite la race condition."""
+    today  = datetime.now(tz=timezone.utc).strftime("%Y%m%d")
+    prefix = f"CK{today}"
+    last = (
+        db.query(CuisineVente.numero_ticket)
+        .filter(CuisineVente.numero_ticket.like(f"{prefix}%"))
+        .with_for_update()
+        .order_by(CuisineVente.numero_ticket.desc())
+        .first()
+    )
+    seq = int(last.numero_ticket[len(prefix):]) + 1 if last else 1
+    return f"{prefix}{str(seq).zfill(4)}"
 
 
 def _plat_dict(p: CuisinePlat) -> dict:
@@ -88,7 +95,11 @@ def modifier_plat(plat_id: int, data: dict, db: Session = Depends(get_db)):
         p.nom = data["nom"].strip()
     if "categorie"   in data: p.categorie   = (data["categorie"] or "").strip() or None
     if "description" in data: p.description = (data["description"] or "").strip() or None
-    if "prix_vente"  in data: p.prix_vente  = Decimal(str(data["prix_vente"]))
+    if "prix_vente" in data:
+        pv = float(data["prix_vente"] or 0)
+        if pv <= 0:
+            raise HTTPException(400, "Le prix de vente doit être > 0")
+        p.prix_vente = Decimal(str(pv))
     if "cout_estime" in data:
         p.cout_estime = Decimal(str(data["cout_estime"])) if data.get("cout_estime") else None
     if "actif" in data:       p.actif = bool(data["actif"])
@@ -224,7 +235,8 @@ def liste_ventes(
     ventes = (
         db.query(CuisineVente)
         .filter(CuisineVente.date_heure >= dt_deb,
-                CuisineVente.date_heure <= dt_fin)
+                CuisineVente.date_heure <= dt_fin,
+                CuisineVente.statut != "ANNULEE")
         .order_by(CuisineVente.date_heure.desc())
         .all()
     )
@@ -267,6 +279,8 @@ def enregistrer_vente(data: dict, db: Session = Depends(get_db)):
         nom_plat  = (l.get("nom_plat") or "").strip()
         qte       = int(l.get("quantite") or 1)
         prix      = Decimal(str(l.get("prix_unitaire") or 0))
+        if prix <= 0:
+            raise HTTPException(400, f"Le prix unitaire doit être > 0 pour chaque ligne")
         sous      = prix * qte
         total    += sous
 
@@ -463,8 +477,8 @@ def creer_achat(data: dict, db: Session = Depends(get_db)):
     if qte <= 0:
         raise HTTPException(400, "La quantité doit être positive")
     cout = float(data.get("cout_unitaire") or 0)
-    if cout < 0:
-        raise HTTPException(400, "Le coût unitaire ne peut pas être négatif")
+    if cout <= 0:
+        raise HTTPException(400, "Le coût unitaire doit être > 0")
 
     date_achat = datetime.now(timezone.utc)
     if data.get("date_achat"):
@@ -510,8 +524,18 @@ def modifier_achat(achat_id: int, data: dict, db: Session = Depends(get_db)):
     if "unite"         in data: a.unite         = data["unite"] or "kg"
 
     if "quantite" in data or "cout_unitaire" in data:
-        qte  = float(data.get("quantite")      or a.quantite)
-        cout = float(data.get("cout_unitaire") or a.cout_unitaire)
+        if "quantite" in data:
+            qte = float(data["quantite"])
+            if qte <= 0:
+                raise HTTPException(400, "La quantité doit être > 0")
+        else:
+            qte = float(a.quantite)
+        if "cout_unitaire" in data:
+            cout = float(data["cout_unitaire"])
+            if cout <= 0:
+                raise HTTPException(400, "Le coût unitaire doit être > 0")
+        else:
+            cout = float(a.cout_unitaire)
         a.quantite      = Decimal(str(qte))
         a.cout_unitaire = Decimal(str(cout))
         a.total         = Decimal(str(round(qte * cout, 2)))
