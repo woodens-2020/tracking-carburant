@@ -18,7 +18,7 @@ from models import (
     Produit,
     BarCategorie, BarProduit, BarPrixHistorique, BarAchat, BarAchatDepense,
     BarMouvementStock, BarVente, BarLigneVente, BarCredit, BarRemboursement,
-    BarCommande, BarLigneCommande, BarPaiementEmploye, Employe,
+    BarCommande, BarLigneCommande, BarPaiementEmploye, Employe, CuisinePlat,
 )
 from pos_service import (
     stock_courant, stock_tous_produits, prix_actif, cmup,
@@ -1042,25 +1042,27 @@ def dashboard_bar(
         m = v.mode_paiement or "CASH"
         par_mode[m] = par_mode.get(m, 0.0) + float(v.montant_total)
 
+    _nom_col = func.coalesce(BarProduit.nom, CuisinePlat.nom)
     top_q = (
         db.query(
-            BarProduit.nom,
+            _nom_col.label("nom"),
             func.sum(BarLigneVente.sous_total).label("total"),
             func.sum(BarLigneVente.quantite).label("quantite"),
         )
-        .join(BarLigneVente, BarProduit.id == BarLigneVente.produit_id)
-        .join(BarVente,      BarVente.id   == BarLigneVente.vente_id)
+        .select_from(BarLigneVente)
+        .outerjoin(BarProduit,  BarProduit.id  == BarLigneVente.produit_id)
+        .outerjoin(CuisinePlat, CuisinePlat.id == BarLigneVente.cuisine_plat_id)
+        .join(BarVente, BarVente.id == BarLigneVente.vente_id)
         .filter(
-            BarVente.date_heure      >= dt_debut,
-            BarVente.date_heure      <= dt_fin,
-            BarVente.statut          != "ANNULEE",
-            BarLigneVente.produit_id != None,
+            BarVente.date_heure >= dt_debut,
+            BarVente.date_heure <= dt_fin,
+            BarVente.statut     != "ANNULEE",
         )
     )
     if caissier_id:   top_q = top_q.filter(BarVente.caissier_id   == caissier_id)
     if mode_paiement: top_q = top_q.filter(BarVente.mode_paiement == mode_paiement)
     top_prods = (
-        top_q.group_by(BarProduit.id, BarProduit.nom)
+        top_q.group_by(_nom_col)
         .order_by(func.sum(BarLigneVente.sous_total).desc())
         .limit(8).all()
     )
@@ -1131,7 +1133,11 @@ def detail_vente(vente_id: int, db: Session = Depends(get_db)):
         "lignes": [
             {
                 "produit_id":              l.produit_id,
-                "produit_nom":             l.produit.nom if l.produit else str(l.produit_id),
+                "cuisine_plat_id":         l.cuisine_plat_id,
+                "produit_nom":             (
+                    l.produit.nom        if l.produit       else
+                    l.cuisine_plat.nom   if l.cuisine_plat  else "—"
+                ),
                 "quantite":                float(l.quantite),
                 "prix_unitaire_applique":  float(l.prix_unitaire_applique),
                 "sous_total":              float(l.sous_total),
@@ -1716,14 +1722,18 @@ def grande_caisse(
 
     for lv in lignes_ventes:
         ca  = _d(lv.sous_total)
-        pid = lv.produit_id
+        # Clé unique : positif = bar_produit, négatif = cuisine_plat
+        pid = lv.produit_id if lv.produit_id is not None else -(lv.cuisine_plat_id or 0)
         ventes_ca_total += ca
 
         if pid not in par_produit:
             par_produit[pid] = {
-                "produit_id":  pid,
-                "produit_nom": lv.produit.nom       if lv.produit else str(pid),
-                "categorie":   lv.produit.categorie if lv.produit else "Autre",
+                "produit_id":  lv.produit_id,
+                "produit_nom": (
+                    lv.produit.nom      if lv.produit      else
+                    lv.cuisine_plat.nom if lv.cuisine_plat else "—"
+                ),
+                "categorie":   lv.produit.categorie if lv.produit else "Cuisine",
                 "achats_cout": Decimal("0"),
                 "qte_achetee": Decimal("0"),
                 "ventes_ca":   Decimal("0"),
