@@ -970,47 +970,79 @@ def ventes_temps_reel(db: Session = Depends(get_db)):
 
 
 @router.get("/dashboard/bar")
-def dashboard_bar(db: Session = Depends(get_db)):
-    """Dashboard complet bar/restaurant — données du jour + comparaison hier."""
+def dashboard_bar(
+    db:            Session       = Depends(get_db),
+    date_debut:    Optional[str] = None,
+    date_fin:      Optional[str] = None,
+    caissier_id:   Optional[int] = None,
+    mode_paiement: Optional[str] = None,
+):
+    """Dashboard complet bar/restaurant — filtrable par date, employé, mode."""
     from datetime import timedelta
-    today     = datetime.now(tz=timezone.utc).date()
-    yesterday = today - timedelta(days=1)
-    dt_debut  = datetime.combine(today,     time.min).replace(tzinfo=timezone.utc)
-    dt_fin    = datetime.combine(today,     time.max).replace(tzinfo=timezone.utc)
-    dt_hier_d = datetime.combine(yesterday, time.min).replace(tzinfo=timezone.utc)
-    dt_hier_f = datetime.combine(yesterday, time.max).replace(tzinfo=timezone.utc)
 
-    ventes = (
-        db.query(BarVente)
-        .filter(BarVente.date_heure >= dt_debut, BarVente.date_heure <= dt_fin, BarVente.statut != "ANNULEE")
-        .order_by(BarVente.date_heure.desc())
-        .all()
+    today = datetime.now(tz=timezone.utc).date()
+
+    try:    d_debut = date_type.fromisoformat(date_debut) if date_debut else today
+    except ValueError: d_debut = today
+    try:    d_fin   = date_type.fromisoformat(date_fin)   if date_fin   else today
+    except ValueError: d_fin = today
+    if d_fin < d_debut: d_fin = d_debut
+
+    dt_debut = datetime.combine(d_debut, time.min).replace(tzinfo=timezone.utc)
+    dt_fin   = datetime.combine(d_fin,   time.max).replace(tzinfo=timezone.utc)
+
+    nb_jours    = (d_fin - d_debut).days + 1
+    is_single   = (d_debut == d_fin)
+    d_prev_fin  = d_debut - timedelta(days=1)
+    d_prev_deb  = d_prev_fin - timedelta(days=nb_jours - 1)
+    dt_prev_d   = datetime.combine(d_prev_deb, time.min).replace(tzinfo=timezone.utc)
+    dt_prev_f   = datetime.combine(d_prev_fin, time.max).replace(tzinfo=timezone.utc)
+
+    def _base_q():
+        q = db.query(BarVente).filter(
+            BarVente.date_heure >= dt_debut,
+            BarVente.date_heure <= dt_fin,
+            BarVente.statut     != "ANNULEE",
+        )
+        if caissier_id:   q = q.filter(BarVente.caissier_id   == caissier_id)
+        if mode_paiement: q = q.filter(BarVente.mode_paiement == mode_paiement)
+        return q
+
+    ventes = _base_q().order_by(BarVente.date_heure.desc()).all()
+
+    q_prev = db.query(BarVente).filter(
+        BarVente.date_heure >= dt_prev_d,
+        BarVente.date_heure <= dt_prev_f,
+        BarVente.statut     != "ANNULEE",
     )
-    ventes_hier = (
-        db.query(BarVente)
-        .filter(BarVente.date_heure >= dt_hier_d, BarVente.date_heure <= dt_hier_f, BarVente.statut != "ANNULEE")
-        .all()
-    )
+    if caissier_id:   q_prev = q_prev.filter(BarVente.caissier_id   == caissier_id)
+    if mode_paiement: q_prev = q_prev.filter(BarVente.mode_paiement == mode_paiement)
+    ca_prev = sum(float(v.montant_total) for v in q_prev.all())
 
-    ca_jour     = sum(float(v.montant_total)   for v in ventes)
-    cash_jour   = sum(float(v.montant_paye)    for v in ventes if v.mode_paiement in ("CASH",   "MIXTE"))
-    credit_jour = sum(float(v.montant_restant) for v in ventes if v.mode_paiement in ("CREDIT", "MIXTE"))
-    ca_hier     = sum(float(v.montant_total)   for v in ventes_hier)
+    ca      = sum(float(v.montant_total)   for v in ventes)
+    cash    = sum(float(v.montant_paye)    for v in ventes if v.mode_paiement in ("CASH",   "MIXTE"))
+    credit  = sum(float(v.montant_restant) for v in ventes if v.mode_paiement in ("CREDIT", "MIXTE"))
 
-    par_heure: dict = {}
+    par_periode: dict = {}
     for v in ventes:
-        h = v.date_heure.astimezone(timezone.utc).strftime("%H")
-        if h not in par_heure:
-            par_heure[h] = {"heure": h, "ca": 0.0, "nb": 0}
-        par_heure[h]["ca"] += float(v.montant_total)
-        par_heure[h]["nb"] += 1
+        if is_single:
+            key = v.date_heure.astimezone(timezone.utc).strftime("%H")
+            lbl = key + "h"
+        else:
+            key = v.date_heure.date().isoformat()
+            lbl = v.date_heure.astimezone(timezone.utc).strftime("%d/%m")
+        if key not in par_periode:
+            par_periode[key] = {"label": lbl, "ca": 0.0, "nb": 0}
+        par_periode[key]["ca"] += float(v.montant_total)
+        par_periode[key]["nb"] += 1
+    par_periode_list = [v for _, v in sorted(par_periode.items())]
 
     par_mode: dict = {}
     for v in ventes:
         m = v.mode_paiement or "CASH"
         par_mode[m] = par_mode.get(m, 0.0) + float(v.montant_total)
 
-    top_prods = (
+    top_q = (
         db.query(
             BarProduit.nom,
             func.sum(BarLigneVente.sous_total).label("total"),
@@ -1021,12 +1053,15 @@ def dashboard_bar(db: Session = Depends(get_db)):
         .filter(
             BarVente.date_heure >= dt_debut,
             BarVente.date_heure <= dt_fin,
-            BarVente.statut != "ANNULEE",
+            BarVente.statut     != "ANNULEE",
         )
-        .group_by(BarProduit.id, BarProduit.nom)
+    )
+    if caissier_id:   top_q = top_q.filter(BarVente.caissier_id   == caissier_id)
+    if mode_paiement: top_q = top_q.filter(BarVente.mode_paiement == mode_paiement)
+    top_prods = (
+        top_q.group_by(BarProduit.id, BarProduit.nom)
         .order_by(func.sum(BarLigneVente.sous_total).desc())
-        .limit(8)
-        .all()
+        .limit(8).all()
     )
 
     par_caissier: dict = {}
@@ -1040,15 +1075,22 @@ def dashboard_bar(db: Session = Depends(get_db)):
         if v.mode_paiement in ("CASH",   "MIXTE"): par_caissier[cid]["cash"]   += float(v.montant_paye)
         if v.mode_paiement in ("CREDIT", "MIXTE"): par_caissier[cid]["credit"] += float(v.montant_restant)
 
+    heure_fmt = "%H:%M" if is_single else "%d/%m %H:%M"
     return {
-        "kpis": {
-            "ca_jour":     ca_jour,
-            "cash_jour":   cash_jour,
-            "credit_jour": credit_jour,
-            "nb_ventes":   len(ventes),
-            "ca_hier":     ca_hier,
+        "meta": {
+            "date_debut":  d_debut.isoformat(),
+            "date_fin":    d_fin.isoformat(),
+            "nb_jours":    nb_jours,
+            "is_single":   is_single,
         },
-        "par_heure":    sorted(par_heure.values(), key=lambda x: x["heure"]),
+        "kpis": {
+            "ca_jour":     ca,
+            "cash_jour":   cash,
+            "credit_jour": credit,
+            "nb_ventes":   len(ventes),
+            "ca_hier":     ca_prev,
+        },
+        "par_periode":  par_periode_list,
         "par_mode":     par_mode,
         "top_produits": [
             {"nom": p.nom, "total": float(p.total or 0), "quantite": int(p.quantite or 0)}
@@ -1057,14 +1099,14 @@ def dashboard_bar(db: Session = Depends(get_db)):
         "par_caissier": sorted(par_caissier.values(), key=lambda x: x["total"], reverse=True),
         "recents": [
             {
-                "heure":    r.date_heure.astimezone(timezone.utc).strftime("%H:%M"),
+                "heure":    r.date_heure.astimezone(timezone.utc).strftime(heure_fmt),
                 "caissier": (r.caissier.nom + " " + r.caissier.prenom) if r.caissier else "—",
                 "montant":  float(r.montant_total),
                 "mode":     r.mode_paiement or "—",
                 "ticket":   r.numero_ticket or "—",
                 "statut":   r.statut or "—",
             }
-            for r in ventes[:10]
+            for r in ventes[:15]
         ],
     }
 
