@@ -10390,7 +10390,7 @@ function _canAccess(page){
     if(perms.admin === true) return true;
     if(['admin-roles','admin-users','admin-sessions','admin-audit'].includes(page)) return false;
   }
-  if(_appUser.employe_id || _appUser.poste === 'Caissier') return _CAISSIER_ALLOWED.has(page);
+  if(_appUser.employe_id || (_appUser.role_nom||_appUser.poste||'').toLowerCase().startsWith('caissier')) return _CAISSIER_ALLOWED.has(page);
   const allowed = _getAllowedPages();
   if(allowed === null) return true;
   return allowed.has(page);
@@ -10405,7 +10405,7 @@ function _applyNavAccess(){
     if(el) el.style.display = isAdmin ? '' : 'none';
   });
   const allowed = _getAllowedPages();
-  const isCaissiere = !!_appUser?.employe_id || _appUser?.poste === 'Caissier';
+  const isCaissiere = !!_appUser?.employe_id || (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier');
   if(allowed === null && !isCaissiere) return; // accès complet sans restrictions caissière
   // Masquer items de nav interdits (sauf admin qui est géré ci-dessus)
   document.querySelectorAll('.nav-item[data-page]').forEach(btn=>{
