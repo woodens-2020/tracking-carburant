@@ -66,12 +66,16 @@ def prix_actif(produit_id: int, db: Session) -> Decimal | None:
 
 def cmup(produit_id: int, db: Session) -> Decimal:
     """
-    Coût moyen pondéré (CMUP) basé sur l'historique des achats.
-    Retourne 0 si aucun achat enregistré.
+    Coût moyen pondéré (CMUP) basé sur les achats CONFIRMÉS uniquement.
+    Retourne 0 si aucun achat confirmé.
     """
     achats = (
         db.query(BarAchat)
-        .filter(BarAchat.produit_id == produit_id, BarAchat.quantite > 0)
+        .filter(
+            BarAchat.produit_id == produit_id,
+            BarAchat.quantite > 0,
+            BarAchat.statut == 'CONFIRME',
+        )
         .all()
     )
     total_qte     = sum(_dec(a.quantite) for a in achats)
@@ -81,15 +85,61 @@ def cmup(produit_id: int, db: Session) -> Decimal:
     return (total_montant / total_qte).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
 
-def generer_numero_ticket(db: Session) -> str:
-    """Génère un numéro de ticket bar unique au format TK-YYYYMMDD-XXXX."""
-    today = datetime.now(tz=timezone.utc).strftime("%Y%m%d")
-    count = (
-        db.query(BarVente)
-        .filter(BarVente.numero_ticket.like(f"TK{today}%"))
-        .count()
+def cmup_batch(db: Session) -> dict[int, Decimal]:
+    """CMUP de tous les produits bar en une seule requête GROUP BY (évite N+1)."""
+    rows = (
+        db.query(
+            BarAchat.produit_id,
+            func.sum(BarAchat.quantite * BarAchat.prix_achat_unitaire),
+            func.sum(BarAchat.quantite),
+        )
+        .filter(
+            BarAchat.produit_id.isnot(None),
+            BarAchat.quantite > 0,
+            BarAchat.statut == 'CONFIRME',
+        )
+        .group_by(BarAchat.produit_id)
+        .all()
     )
-    return f"TK{today}{str(count + 1).zfill(4)}"
+    result: dict[int, Decimal] = {}
+    for pid, total_montant, total_qte in rows:
+        if total_qte and _dec(total_qte) > 0:
+            result[pid] = (
+                _dec(total_montant) / _dec(total_qte)
+            ).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+        else:
+            result[pid] = Decimal("0")
+    return result
+
+
+def prix_actif_batch(db: Session) -> dict[int, Decimal]:
+    """Prix de vente actif (date_fin IS NULL) de tous les produits en une requête."""
+    rows = (
+        db.query(BarPrixHistorique)
+        .filter(BarPrixHistorique.date_fin.is_(None))
+        .order_by(BarPrixHistorique.produit_id, BarPrixHistorique.date_debut.desc())
+        .all()
+    )
+    result: dict[int, Decimal] = {}
+    for r in rows:
+        if r.produit_id not in result:
+            result[r.produit_id] = _dec(r.prix)
+    return result
+
+
+def generer_numero_ticket(db: Session) -> str:
+    """Génère un numéro de ticket bar unique — SELECT FOR UPDATE évite la race condition."""
+    today  = datetime.now(tz=timezone.utc).strftime("%Y%m%d")
+    prefix = f"TK{today}"
+    last = (
+        db.query(BarVente.numero_ticket)
+        .filter(BarVente.numero_ticket.like(f"{prefix}%"))
+        .with_for_update()
+        .order_by(BarVente.numero_ticket.desc())
+        .first()
+    )
+    seq = int(last.numero_ticket[len(prefix):]) + 1 if last else 1
+    return f"{prefix}{str(seq).zfill(4)}"
 
 
 def _generer_ticket_cuisine(db: Session) -> str:
@@ -233,7 +283,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
         cv = CuisineVente(
             numero_ticket = _generer_ticket_cuisine(db),
             total         = total_cuisine,
-            mode_paiement = "CASH" if mode in ("CASH", "MIXTE") else "CASH",
+            mode_paiement = "CASH" if mode in ("CASH", "MIXTE") else "CREDIT",
             client_nom    = data.get("client_nom"),
             notes         = f"Via Bar — {vente.numero_ticket}",
             statut        = "VALIDEE",
@@ -347,14 +397,18 @@ def detecter_anomalies_bar(date_cible: date_type, db: Session) -> list[dict]:
     """
     Détecte les anomalies spécifiques au module bar pour une date donnée.
     Retourne une liste de dicts au même format que les anomalies existantes.
+    Utilise des requêtes batch pour éviter le N+1.
     """
     anomalies = []
 
-    # ── STOCK_NEGATIF_BAR & VENTE_SANS_PRIX & CONFIG_CAISSE_INVALIDE ─
     produits = db.query(BarProduit).filter_by(actif=True).all()
+    stocks   = stock_tous_produits(db)
+    prix_map = prix_actif_batch(db)
+
+    # ── STOCK_NEGATIF_BAR & VENTE_SANS_PRIX & CONFIG_CAISSE_INVALIDE & DECALAGE ─
     for p in produits:
-        stk  = stock_courant(p.id, db)
-        prix = prix_actif(p.id, db)
+        stk  = stocks.get(p.id, Decimal("0"))
+        prix = prix_map.get(p.id)
 
         if p.vendu_par_caisse and (not p.unites_par_caisse or p.unites_par_caisse < 1):
             anomalies.append({
@@ -393,6 +447,21 @@ def detecter_anomalies_bar(date_cible: date_type, db: Session) -> list[dict]:
                 "message": f"Produit actif sans prix de vente défini : « {p.nom} ».",
             })
 
+        if p.seuil_alerte_stock and stk <= _dec(p.seuil_alerte_stock):
+            anomalies.append({
+                "type":          "DECALAGE_STOCK_BAR",
+                "gravite":       "avertissement",
+                "produit_id":    p.id,
+                "produit_nom":   p.nom,
+                "date":          str(date_cible),
+                "stock_courant": float(stk),
+                "seuil_alerte":  float(p.seuil_alerte_stock),
+                "message": (
+                    f"Stock bas pour « {p.nom} » : {float(stk):.3f} unités "
+                    f"(seuil d'alerte : {float(p.seuil_alerte_stock):.3f})."
+                ),
+            })
+
     # ── CREDIT_EN_RETARD ─────────────────────────────────────────
     credits_retard = (
         db.query(BarCredit)
@@ -405,42 +474,22 @@ def detecter_anomalies_bar(date_cible: date_type, db: Session) -> list[dict]:
     )
     for c in credits_retard:
         anomalies.append({
-            "type":           "CREDIT_EN_RETARD",
-            "gravite":        "avertissement",
-            "credit_id":      c.id,
-            "client_nom":     c.client_nom,
-            "date":           str(date_cible),
-            "solde":          float(c.solde),
-            "date_echeance":  str(c.date_echeance),
+            "type":          "CREDIT_EN_RETARD",
+            "gravite":       "avertissement",
+            "credit_id":     c.id,
+            "client_nom":    c.client_nom,
+            "date":          str(date_cible),
+            "solde":         float(c.solde),
+            "date_echeance": str(c.date_echeance),
             "message": (
                 f"Crédit en retard pour {c.client_nom} : "
                 f"{float(c.solde):.2f} G (échéance : {c.date_echeance})."
             ),
         })
-        # Mise à jour automatique du statut
         c.statut = "EN_RETARD"
 
     if credits_retard:
         db.commit()
-
-    # ── DECALAGE_STOCK_BAR ───────────────────────────────────────
-    # Vérifie les produits dont le stock théorique < seuil_alerte_stock
-    for p in produits:
-        stk = stock_courant(p.id, db)
-        if p.seuil_alerte_stock and stk <= _dec(p.seuil_alerte_stock):
-            anomalies.append({
-                "type":              "DECALAGE_STOCK_BAR",
-                "gravite":           "avertissement",
-                "produit_id":        p.id,
-                "produit_nom":       p.nom,
-                "date":              str(date_cible),
-                "stock_courant":     float(stk),
-                "seuil_alerte":      float(p.seuil_alerte_stock),
-                "message": (
-                    f"Stock bas pour « {p.nom} » : {float(stk):.3f} unités "
-                    f"(seuil d'alerte : {float(p.seuil_alerte_stock):.3f})."
-                ),
-            })
 
     return anomalies
 
@@ -472,33 +521,45 @@ def stats_bar(date_debut: date_type, date_fin: date_type, db: Session) -> dict:
         .all()
     )
 
+    cmup_map: dict[int, Decimal] = cmup_batch(db)
+
     ca_total    = Decimal("0")
     cogs_total  = Decimal("0")
-    par_produit: dict[int, dict] = {}
+    par_produit: dict = {}
 
     for l in lignes:
-        ca         = _dec(l.sous_total)
-        cout_unit  = cmup(l.produit_id, db)
-        cogs_ligne = (_dec(l.quantite) * cout_unit).quantize(Decimal("0.01"))
+        ca = _dec(l.sous_total)
+
+        if l.produit_id:
+            cout_unit  = cmup_map.get(l.produit_id, Decimal("0"))
+            cogs_ligne = (_dec(l.quantite) * cout_unit).quantize(Decimal("0.01"))
+            key        = l.produit_id
+            nom        = l.produit.nom if l.produit else str(l.produit_id)
+            cat        = l.produit.categorie if l.produit else ""
+        else:
+            # Plat cuisine vendu via bar — pas de coût bar
+            cogs_ligne = Decimal("0")
+            key        = -(l.cuisine_plat_id or 0)
+            nom        = l.cuisine_plat.nom if l.cuisine_plat else "Plat inconnu"
+            cat        = "cuisine"
 
         ca_total   += ca
         cogs_total += cogs_ligne
 
-        pid = l.produit_id
-        if pid not in par_produit:
-            par_produit[pid] = {
-                "produit_id":  pid,
-                "produit_nom": l.produit.nom if l.produit else str(pid),
-                "categorie":   l.produit.categorie if l.produit else "",
+        if key not in par_produit:
+            par_produit[key] = {
+                "produit_id":  l.produit_id,
+                "produit_nom": nom,
+                "categorie":   cat,
                 "quantite":    Decimal("0"),
                 "ca":          Decimal("0"),
                 "cogs":        Decimal("0"),
                 "benefice":    Decimal("0"),
                 "marge_pct":   Decimal("0"),
             }
-        par_produit[pid]["quantite"] += _dec(l.quantite)
-        par_produit[pid]["ca"]       += ca
-        par_produit[pid]["cogs"]     += cogs_ligne
+        par_produit[key]["quantite"] += _dec(l.quantite)
+        par_produit[key]["ca"]       += ca
+        par_produit[key]["cogs"]     += cogs_ligne
 
     # Calcul des bénéfices et marges par produit
     for pp in par_produit.values():

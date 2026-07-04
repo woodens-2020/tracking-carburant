@@ -448,6 +448,7 @@ class BarProduit(Base):
                                    foreign_keys=[categorie])
 
     __table_args__ = (
+        UniqueConstraint("nom", name="uq_bar_produit_nom"),
         Index("idx_bar_produits_categorie", "categorie"),
         Index("idx_bar_produits_actif",     "actif"),
     )
@@ -511,6 +512,7 @@ class BarAchat(Base):
             "(produit_id IS NOT NULL)::int + (station_produit_id IS NOT NULL)::int = 1",
             name="chk_bar_achat_produit_xor",
         ),
+        CheckConstraint("statut IN ('EN_ATTENTE','CONFIRME','ANNULE')", name="chk_bar_achat_statut"),
         Index("idx_bar_achats_produit",         "produit_id"),
         Index("idx_bar_achats_station_produit",  "station_produit_id"),
         Index("idx_bar_achats_date",             "date_achat"),
@@ -604,7 +606,7 @@ class BarLigneVente(Base):
     id                     = Column(Integer, primary_key=True)
     vente_id               = Column(Integer, ForeignKey("bar_ventes.id",      ondelete="CASCADE"),  nullable=False)
     produit_id             = Column(Integer, ForeignKey("bar_produits.id",    ondelete="RESTRICT"), nullable=True)
-    cuisine_plat_id        = Column(Integer, ForeignKey("cuisine_plats.id",   ondelete="SET NULL"), nullable=True)
+    cuisine_plat_id        = Column(Integer, ForeignKey("cuisine_plats.id",   ondelete="RESTRICT"), nullable=True)
     quantite               = Column(Numeric(12, 3), nullable=False)
     prix_unitaire_applique = Column(Numeric(12, 2), nullable=False)
     sous_total             = Column(Numeric(14, 2), nullable=False)

@@ -168,6 +168,14 @@ class RemboursementIn(BaseModel):
     notes:   Optional[str] = None
 
 
+class ModifierCreditIn(BaseModel):
+    client_nom:     Optional[str] = None
+    client_contact: Optional[str] = None
+    client_nif:     Optional[str] = None
+    date_echeance:  Optional[str] = None
+    statut:         Optional[str] = None
+
+
 class PaiementEmployeIn(BaseModel):
     employe_id:    int
     montant:       float = Field(gt=0)
@@ -381,13 +389,14 @@ def modifier_produit(produit_id: int, data: ProduitIn, db: Session = Depends(get
     return {"ok": True}
 
 
-@router.delete("/produits/{produit_id}", status_code=204)
+@router.delete("/produits/{produit_id}")
 def desactiver_produit(produit_id: int, db: Session = Depends(get_db)):
     p = db.query(BarProduit).filter_by(id=produit_id).first()
     if not p:
         raise HTTPException(404, "Produit introuvable")
     p.actif = False
     db.commit()
+    return {"id": produit_id, "nom": p.nom, "actif": False}
 
 
 @router.post("/produits/{produit_id}/prix", status_code=201)
@@ -1102,11 +1111,12 @@ def dashboard_bar(
         if v.mode_paiement in ("CREDIT", "MIXTE"): par_caissier[cid]["credit"] += float(v.montant_restant)
 
     # ── Dettes & Remboursements ───────────────────────────────────────
+    # Totaux globaux (toutes périodes confondues)
     all_credits = db.query(BarCredit).all()
     total_du        = sum(float(c.montant_du)        for c in all_credits)
     total_rembourse = sum(float(c.montant_rembourse) for c in all_credits)
     solde_total     = sum(float(c.solde)             for c in all_credits)
-    nb_ouvertes = sum(1 for c in all_credits if c.statut == "OUVERT")
+    nb_ouvertes = sum(1 for c in all_credits if c.statut in ("OUVERT", "EN_RETARD"))
     nb_soldes   = sum(1 for c in all_credits if c.statut == "SOLDE")
 
     rembs_periode = db.query(BarRemboursement).filter(
@@ -1121,8 +1131,13 @@ def dashboard_bar(
         rembs_par_jour[k] = rembs_par_jour.get(k, 0.0) + float(r.montant)
     rembs_par_jour_list = [{"date": k, "montant": v} for k, v in sorted(rembs_par_jour.items())]
 
+    # par_client : crédits créés dans la période sélectionnée
+    credits_periode = db.query(BarCredit).filter(
+        BarCredit.date_creation >= dt_debut,
+        BarCredit.date_creation <= dt_fin,
+    ).all()
     par_client: dict = {}
-    for c in all_credits:
+    for c in credits_periode:
         k = c.client_nom or "Client inconnu"
         if k not in par_client:
             par_client[k] = {"client": k, "montant_du": 0.0, "rembourse": 0.0, "solde": 0.0, "nb": 0, "statut": "SOLDE"}
@@ -1457,6 +1472,59 @@ def liste_credits(
     ]
 
 
+@router.get("/credits/{credit_id}")
+def detail_credit(credit_id: int, db: Session = Depends(get_db)):
+    credit = db.query(BarCredit).filter_by(id=credit_id).first()
+    if not credit:
+        raise HTTPException(404, "Crédit introuvable")
+    rembs = sorted(credit.remboursements, key=lambda r: r.date_remb or datetime.min, reverse=True)
+    return {
+        "id":                credit.id,
+        "vente_id":          credit.vente_id,
+        "client_nom":        credit.client_nom,
+        "client_contact":    credit.client_contact,
+        "client_nif":        credit.client_nif,
+        "montant_du":        float(credit.montant_du),
+        "montant_rembourse": float(credit.montant_rembourse),
+        "solde":             float(credit.solde),
+        "statut":            credit.statut,
+        "date_creation":     credit.date_creation.isoformat(),
+        "date_echeance":     str(credit.date_echeance) if credit.date_echeance else None,
+        "caissier_id":       credit.vente.caissier_id if credit.vente else None,
+        "remboursements": [
+            {
+                "id":      r.id,
+                "montant": float(r.montant),
+                "date":    r.date_remb.isoformat() if r.date_remb else None,
+                "notes":   r.notes,
+            }
+            for r in rembs
+        ],
+    }
+
+
+@router.put("/credits/{credit_id}")
+def modifier_credit(credit_id: int, data: ModifierCreditIn, db: Session = Depends(get_db)):
+    credit = db.query(BarCredit).filter_by(id=credit_id).first()
+    if not credit:
+        raise HTTPException(404, "Crédit introuvable")
+    if data.client_nom     is not None: credit.client_nom     = data.client_nom
+    if data.client_contact is not None: credit.client_contact = data.client_contact
+    if data.client_nif     is not None: credit.client_nif     = data.client_nif
+    if data.date_echeance  is not None:
+        from datetime import date as date_type
+        try:
+            credit.date_echeance = date_type.fromisoformat(data.date_echeance)
+        except ValueError:
+            raise HTTPException(422, "date_echeance invalide (format attendu : YYYY-MM-DD)")
+    if data.statut is not None:
+        if data.statut.upper() not in ("OUVERT", "SOLDE", "EN_RETARD"):
+            raise HTTPException(422, "statut invalide — valeurs acceptées : OUVERT, SOLDE, EN_RETARD")
+        credit.statut = data.statut.upper()
+    db.commit()
+    return {"ok": True, "id": credit.id, "statut": credit.statut}
+
+
 @router.post("/credits/{credit_id}/remboursement", status_code=201)
 def enregistrer_remboursement(
     credit_id: int,
@@ -1488,9 +1556,14 @@ def enregistrer_remboursement(
         credit.solde  = Decimal("0")
         credit.statut = "SOLDE"
 
-        # Mettre à jour la vente associée
-        vente = db.query(BarVente).filter_by(id=credit.vente_id).first()
-        if vente:
+    # Mettre à jour la vente associée (partiel ou total)
+    vente = db.query(BarVente).filter_by(id=credit.vente_id).first()
+    if vente:
+        paye    = Decimal(str(vente.montant_paye))    + montant
+        restant = Decimal(str(vente.montant_restant)) - montant
+        vente.montant_paye    = min(Decimal(str(vente.montant_total)), paye)
+        vente.montant_restant = max(Decimal("0"), restant)
+        if credit.statut == "SOLDE":
             vente.montant_restant = Decimal("0")
             vente.montant_paye    = vente.montant_total
             vente.statut          = "PAYEE"
