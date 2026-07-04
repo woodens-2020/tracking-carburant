@@ -1012,10 +1012,13 @@ class StationClient(Base):
     actif       = Column(Boolean,      nullable=False, default=True)
     created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    credits  = relationship("StationCredit",  back_populates="client",
-                            cascade="all, delete-orphan")
-    factures = relationship("StationFacture", back_populates="client",
-                            cascade="all, delete-orphan")
+    credits      = relationship("StationCredit",      back_populates="client",
+                                cascade="all, delete-orphan")
+    factures     = relationship("StationFacture",     back_populates="client",
+                                cascade="all, delete-orphan")
+    interactions = relationship("StationInteraction", back_populates="client",
+                                cascade="all, delete-orphan",
+                                order_by="StationInteraction.date_interaction.desc()")
 
     __table_args__ = (
         CheckConstraint("type_client IN ('PARTICULIER','ENTREPRISE')", name="chk_sc_type"),
@@ -1108,6 +1111,32 @@ class StationFacture(Base):
         Index("idx_sfact_client", "client_id"),
         Index("idx_sfact_statut", "statut"),
         Index("idx_sfact_date",   "date_facture"),
+    )
+
+
+class StationInteraction(Base):
+    """Interaction enregistrée avec un partenaire CRM (appel, email, réunion, note, visite)."""
+    __tablename__ = "station_interactions"
+
+    id               = Column(Integer,      primary_key=True)
+    client_id        = Column(Integer,      ForeignKey("station_clients.id", ondelete="CASCADE"), nullable=False)
+    utilisateur_id   = Column(Integer,      ForeignKey("utilisateurs.id",    ondelete="SET NULL"), nullable=True)
+    type_interaction = Column(String(20),   nullable=False)
+    titre            = Column(String(150),  nullable=False)
+    description      = Column(Text,         nullable=True)
+    date_interaction = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at       = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    client      = relationship("StationClient", back_populates="interactions")
+    utilisateur = relationship("Utilisateur")
+
+    __table_args__ = (
+        CheckConstraint(
+            "type_interaction IN ('APPEL','EMAIL','REUNION','NOTE','VISITE')",
+            name="chk_si_type",
+        ),
+        Index("idx_si_client", "client_id"),
+        Index("idx_si_date",   "date_interaction"),
     )
 
 
