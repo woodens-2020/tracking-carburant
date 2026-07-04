@@ -18404,14 +18404,24 @@ async function loadPosVentes(){
       prods.map(p=>`<option value="${p.id}">${p.nom}</option>`).join('');
   } catch(e){}
 
-  posVentesAujourdhui();
+  // Défaut : 7 derniers jours pour toujours avoir des données visibles
+  const _now = new Date();
+  const _fmt = d => d.toISOString().split('T')[0];
+  const _deb7 = new Date(_now); _deb7.setDate(_now.getDate() - 6);
+  const debEl0 = document.getElementById('pos-ventes-debut');
+  const finEl0 = document.getElementById('pos-ventes-fin');
+  if(debEl0 && !debEl0.value) debEl0.value = _fmt(_deb7);
+  if(finEl0 && !finEl0.value) finEl0.value = _fmt(_now);
+  posVentesCharger();
 }
 
 function posVentesPreset(range){
   const now = new Date();
   const fmt = d => d.toISOString().split('T')[0];
   let deb = now, fin = now;
-  if(range === 'week'){
+  if(range === 'today'){
+    /* deb/fin = aujourd'hui */
+  } else if(range === 'week'){
     deb = new Date(now); deb.setDate(now.getDate() - 6);
   } else if(range === 'month'){
     deb = new Date(now.getFullYear(), now.getMonth(), 1);
