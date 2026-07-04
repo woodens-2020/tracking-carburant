@@ -5966,22 +5966,38 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <div id="page-pos-ventes" class="page page-gi">
       <div class="pos-page gi-page">
 
+        <!-- Bandeau de bienvenue caissière (masqué pour les gestionnaires) -->
+        <div id="pos-ventes-bienvenue" style="display:none;background:linear-gradient(135deg,rgba(247,169,59,.12),rgba(245,158,11,.06));border:1px solid rgba(247,169,59,.25);border-radius:12px;padding:14px 20px;margin-bottom:12px;display:flex;align-items:center;gap:14px">
+          <div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#f7a93b,#f59e0b);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div>
+            <div id="pos-ventes-bienvenue-nom" style="font-size:15px;font-weight:700;color:#f7a93b"></div>
+            <div id="pos-ventes-bienvenue-date" style="font-size:12px;color:rgba(255,255,255,.45);margin-top:2px"></div>
+          </div>
+        </div>
+
         <div class="pos-header">
           <div class="pos-header-icon" style="background:linear-gradient(135deg,#f7a93b,#f59e0b)">
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
           </div>
           <div>
-            <div class="pos-header-title">Ventes Bar</div>
-            <div class="pos-header-sub">Suivi des ventes du jour et historique</div>
+            <div class="pos-header-title" id="pos-ventes-header-title">Ventes Bar</div>
+            <div class="pos-header-sub" id="pos-ventes-header-sub">Suivi des ventes du jour et historique</div>
           </div>
-          <div class="pos-header-actions" style="flex-wrap:wrap">
+          <div class="pos-header-actions" style="flex-wrap:wrap;gap:6px">
+            <button class="pos-btn ghost" style="font-size:11px" onclick="posVentesPreset('today')">Aujourd'hui</button>
+            <button class="pos-btn ghost" style="font-size:11px" onclick="posVentesPreset('week')">Semaine</button>
+            <button class="pos-btn ghost" style="font-size:11px" onclick="posVentesPreset('month')">Mois</button>
             <input type="date" class="pos-input" id="pos-ventes-debut" style="width:130px">
             <input type="date" class="pos-input" id="pos-ventes-fin" style="width:130px">
+            <select class="pos-select" id="pos-ventes-produit-f" style="width:160px" onchange="posVentesCharger()">
+              <option value="">Tous les produits</option>
+            </select>
             <select class="pos-select" id="pos-ventes-caissier-f" style="width:150px" onchange="posVentesCharger()">
               <option value="">Tous les caissiers</option>
             </select>
             <button class="pos-btn primary" onclick="posVentesCharger()">Filtrer</button>
-            <button class="pos-btn ghost" onclick="posVentesAujourdhui()">Aujourd'hui</button>
           </div>
         </div>
 
@@ -5992,7 +6008,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-kpi"><div class="pos-kpi-label">Crédits ouverts</div><div class="pos-kpi-val red" id="vkpi-credit">—</div></div>
         </div>
 
-        <!-- Par caissier -->
+        <!-- Par caissier — masqué pour les caissières (elles voient toujours leurs propres données) -->
         <div class="pos-card" id="pos-caissiers-card">
           <div class="pos-card-hdr">Par caissier (période)</div>
           <div class="pos-table-wrap">
@@ -6016,7 +6032,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-table-wrap">
             <table class="pos-table">
               <thead>
-                <tr><th>Ticket</th><th>Date/Heure</th><th>Client</th><th>Lignes</th><th>Total</th><th>Mode</th><th>Statut</th><th>Actions</th></tr>
+                <tr><th>Ticket</th><th>Date/Heure</th><th>Client</th><th>Articles</th><th>Total</th><th>Mode</th><th>Statut</th><th>Actions</th></tr>
               </thead>
               <tbody id="pos-ventes-tbody">
                 <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
@@ -11013,8 +11029,14 @@ document.addEventListener('DOMContentLoaded',async()=>{
     setStatus(true);
   }catch(e){ setStatus(false); }
 
-  // Charger la page d'accueil
-  await loadHome();
+  // Les caissières arrivent directement sur leur espace POS
+  const _isCaissiereLogin = !!_appUser?.employe_id ||
+    (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier');
+  if(_isCaissiereLogin){
+    goTo('pos-caisse');
+  } else {
+    await loadHome();
+  }
 });
 
 // ══════════════════════════════════════════════
@@ -17547,7 +17569,44 @@ async function posEnregistrerAchat(){
 // ══════════════════════════════════════════════════════════════════════
 // PAGE POS VENTES
 // ══════════════════════════════════════════════════════════════════════
+function _posVentesIsCaissiere(){
+  return !!_appUser?.employe_id || (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier');
+}
+
 async function loadPosVentes(){
+  const isCaissiere = _posVentesIsCaissiere();
+
+  // Bandeau personnalisé pour la caissière
+  const bienvenue = document.getElementById('pos-ventes-bienvenue');
+  if(bienvenue){
+    if(isCaissiere){
+      bienvenue.style.display = 'flex';
+      const now = new Date();
+      const jours = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+      document.getElementById('pos-ventes-bienvenue-nom').textContent =
+        'Bonjour, ' + (_appUser.nom_complet || _appUser.username) + ' — Votre espace de ventes';
+      document.getElementById('pos-ventes-bienvenue-date').textContent =
+        jours[now.getDay()] + ' ' + now.toLocaleDateString('fr-FR', {day:'2-digit',month:'long',year:'numeric'});
+    } else {
+      bienvenue.style.display = 'none';
+    }
+  }
+
+  // Titre selon le profil
+  const titleEl = document.getElementById('pos-ventes-header-title');
+  const subEl   = document.getElementById('pos-ventes-header-sub');
+  if(isCaissiere){
+    if(titleEl) titleEl.textContent = 'Mes Ventes';
+    if(subEl)   subEl.textContent   = 'Suivi exclusif de vos ventes · filtrez par date ou produit';
+    const card = document.getElementById('pos-caissiers-card');
+    if(card) card.style.display = 'none';
+  } else {
+    if(titleEl) titleEl.textContent = 'Ventes Bar';
+    if(subEl)   subEl.textContent   = 'Suivi des ventes du jour et historique';
+    const card = document.getElementById('pos-caissiers-card');
+    if(card) card.style.display = '';
+  }
+
   // Peupler le filtre caissier
   try {
     const emps = await apiFetch('GET', '/pos/caisse/caissieres');
@@ -17555,12 +17614,42 @@ async function loadPosVentes(){
     if(sel) sel.innerHTML = '<option value="">Tous les caissiers</option>' +
       emps.map(e=>`<option value="${e.id}">${e.nom} ${e.prenom}</option>`).join('');
   } catch(e){}
+
   // Verrouiller sur le propre employé si caissière connectée
   if(_appUser?.employe_id){
     const sel = document.getElementById('pos-ventes-caissier-f');
-    if(sel){ sel.value = String(_appUser.employe_id); sel.disabled = true; }
+    if(sel){ sel.value = String(_appUser.employe_id); sel.disabled = true; sel.style.display = 'none'; }
   }
+
+  // Filtre caissier masqué pour les caissières (elles voient seulement leurs données)
+  const caissSel = document.getElementById('pos-ventes-caissier-f');
+  if(caissSel) caissSel.style.display = isCaissiere ? 'none' : '';
+
+  // Peupler le filtre produit
+  try {
+    const prods = await apiFetch('GET', '/pos/produits?actif=true');
+    const psel = document.getElementById('pos-ventes-produit-f');
+    if(psel) psel.innerHTML = '<option value="">Tous les produits</option>' +
+      prods.map(p=>`<option value="${p.id}">${p.nom}</option>`).join('');
+  } catch(e){}
+
   posVentesAujourdhui();
+}
+
+function posVentesPreset(range){
+  const now = new Date();
+  const fmt = d => d.toISOString().split('T')[0];
+  let deb = now, fin = now;
+  if(range === 'week'){
+    deb = new Date(now); deb.setDate(now.getDate() - 6);
+  } else if(range === 'month'){
+    deb = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  const debEl = document.getElementById('pos-ventes-debut');
+  const finEl = document.getElementById('pos-ventes-fin');
+  if(debEl) debEl.value = fmt(deb);
+  if(finEl) finEl.value = fmt(fin);
+  posVentesCharger();
 }
 
 function posVentesAujourdhui(){
@@ -17576,15 +17665,17 @@ async function posVentesCharger(){
   const tbody = document.getElementById('pos-ventes-tbody');
   if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
-    const debut = document.getElementById('pos-ventes-debut')?.value||'';
-    const fin   = document.getElementById('pos-ventes-fin')?.value||'';
-    const mode  = document.getElementById('pos-ventes-mode-f')?.value||'';
-    const caissier = document.getElementById('pos-ventes-caissier-f')?.value||'';
-    let url = '/pos/ventes?';
-    if(debut)    url += `date_debut=${debut}&`;
-    if(fin)      url += `date_fin=${fin}&`;
-    if(mode)     url += `mode_paiement=${mode}&`;
-    if(caissier) url += `caissier_id=${caissier}&`;
+    const debut   = document.getElementById('pos-ventes-debut')?.value||'';
+    const fin     = document.getElementById('pos-ventes-fin')?.value||'';
+    const mode    = document.getElementById('pos-ventes-mode-f')?.value||'';
+    const caissier= document.getElementById('pos-ventes-caissier-f')?.value||'';
+    const produit = document.getElementById('pos-ventes-produit-f')?.value||'';
+    let url = '/pos/ventes?limit=200&';
+    if(debut)   url += `date_debut=${debut}&`;
+    if(fin)     url += `date_fin=${fin}&`;
+    if(mode)    url += `mode_paiement=${mode}&`;
+    if(caissier)url += `caissier_id=${caissier}&`;
+    if(produit) url += `produit_id=${produit}&`;
 
     const data = await apiFetch('GET', url.slice(0,-1)||'/pos/ventes');
     const ventes = data.ventes||data||[];

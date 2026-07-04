@@ -858,6 +858,7 @@ def liste_ventes(
     caissier_id:   Optional[int]       = None,
     mode_paiement: Optional[str]       = None,
     statut:        Optional[str]       = None,
+    produit_id:    Optional[int]       = None,
     limit:         int = Query(50, le=500),
     db: Session = Depends(get_db),
 ):
@@ -874,6 +875,9 @@ def liste_ventes(
         q = q.filter(BarVente.mode_paiement == mode_paiement.upper())
     if statut:
         q = q.filter(BarVente.statut == statut.upper())
+    if produit_id:
+        sub = db.query(BarLigneVente.vente_id).filter(BarLigneVente.produit_id == produit_id)
+        q   = q.filter(BarVente.id.in_(sub))
 
     ventes = q.order_by(BarVente.date_heure.desc()).limit(limit).all()
 
@@ -882,13 +886,16 @@ def liste_ventes(
             "id":              v.id,
             "numero_ticket":   v.numero_ticket,
             "date_heure":      v.date_heure.isoformat(),
+            "date_vente":      v.date_heure.date().isoformat(),
             "montant_total":   float(v.montant_total),
             "montant_paye":    float(v.montant_paye),
             "montant_restant": float(v.montant_restant),
+            "montant_credit":  float(v.montant_restant) if v.mode_paiement in ("CREDIT", "MIXTE") else 0.0,
             "mode_paiement":   v.mode_paiement,
             "statut":          v.statut,
             "client_nom":      v.client_nom,
             "caissier_id":     v.caissier_id,
+            "caissier_nom":    (v.caissier.nom + " " + v.caissier.prenom) if v.caissier else "Sans caissier",
             "nb_lignes":       len(v.lignes),
         }
         for v in ventes

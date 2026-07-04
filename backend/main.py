@@ -328,6 +328,26 @@ def me(request: Request, db: Session = Depends(get_db)):
         perms = user.role_obj.permissions
         role_nom = user.role_obj.nom
     emp = db.query(_Employe).filter_by(utilisateur_id=user.id).first()
+
+    # Auto-créer un enregistrement Employe pour les comptes caissière qui n'en ont pas.
+    # Cela permet au système POS de filtrer leurs ventes par caissier_id.
+    if not emp and (role_nom or user.poste or "").lower().startswith("caissier"):
+        from datetime import date as _date
+        parts = (user.nom_complet or user.username).split(" ", 1)
+        emp = _Employe(
+            prenom=parts[0],
+            nom=parts[1] if len(parts) > 1 else parts[0],
+            poste="Caissier",
+            date_embauche=_date.today(),
+            salaire_base=0,
+            type_contrat="CDI",
+            actif=True,
+            utilisateur_id=user.id,
+        )
+        db.add(emp)
+        db.commit()
+        db.refresh(emp)
+
     return {
         "id":          user.id,
         "username":    user.username,
