@@ -16157,7 +16157,7 @@ async function _posDbDashLoad(){
   const caissId = document.getElementById('posdb-f-caissier')?.value || '';
   const mode    = document.getElementById('posdb-f-mode')?.value     || '';
 
-  let url = '/api/pos/dashboard/bar?';
+  let url = '/pos/dashboard/bar?';
   if(deb)     url += `date_debut=${deb}&`;
   if(fin)     url += `date_fin=${fin}&`;
   if(caissId) url += `caissier_id=${caissId}&`;
