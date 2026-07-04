@@ -185,7 +185,11 @@ def modifier_depense(dep_id: int, data: dict, db: Session = Depends(get_db)):
     if "description" in data and data["description"]:
         d.description = data["description"].strip()
     if "categorie"   in data: d.categorie   = data["categorie"] or "AUTRE"
-    if "montant"     in data: d.montant     = Decimal(str(data["montant"]))
+    if "montant" in data:
+        montant = float(data["montant"] or 0)
+        if montant <= 0:
+            raise HTTPException(400, "Le montant doit être positif")
+        d.montant = Decimal(str(montant))
     if "fournisseur" in data: d.fournisseur = (data["fournisseur"] or "").strip() or None
     if "notes"       in data: d.notes       = (data["notes"] or "").strip() or None
     db.commit()

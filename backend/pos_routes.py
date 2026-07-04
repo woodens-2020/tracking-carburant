@@ -79,7 +79,7 @@ class PrixIn(BaseModel):
 
 class DepenseItem(BaseModel):
     description: str
-    montant:     float = Field(ge=0)
+    montant:     float = Field(gt=0)
 
 
 class AchatIn(BaseModel):

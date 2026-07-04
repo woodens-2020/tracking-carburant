@@ -18436,7 +18436,7 @@ async function posEnregistrerAchat(){
 
   for(const d of _paDepenses){
     if(!d.description.trim()){ posAlert('Saisir une description pour chaque dépense.','warn'); return; }
-    if(d.montant<0)           { posAlert('Les montants de dépenses ne peuvent pas être négatifs.','warn'); return; }
+    if(!d.montant || d.montant<=0){ posAlert('Le montant de chaque dépense doit être supérieur à 0.','warn'); return; }
   }
 
   const depenses = _paDepenses

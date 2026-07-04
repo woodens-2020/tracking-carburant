@@ -10,7 +10,7 @@ log = logging.getLogger("main")
 from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -3238,7 +3238,7 @@ def set_limite_depenses(
 class DepenseIn(BaseModel):
     categorie:    str
     description:  str
-    montant:      float
+    montant:      float = Field(gt=0)
     date_depense: str
     beneficiaire: Optional[str] = None
     reference:    Optional[str] = None
@@ -3247,7 +3247,7 @@ class DepenseIn(BaseModel):
 class DepensePatch(BaseModel):
     categorie:    Optional[str]   = None
     description:  Optional[str]   = None
-    montant:      Optional[float] = None
+    montant:      Optional[float] = Field(None, gt=0)
     date_depense: Optional[str]   = None
     beneficiaire: Optional[str]   = None
     reference:    Optional[str]   = None
