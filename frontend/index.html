@@ -22424,8 +22424,9 @@ function _gcKpi(id, val, color){
 // CRM STATION — Partenaires · Crédits · Factures · Interactions
 // ══════════════════════════════════════════════════════════════════════
 
-const _crmFmt = v => new Intl.NumberFormat('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v||0);
+const _crmFmt = v => new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v||0);
 const _crmDate = s => s ? new Date(s).toLocaleDateString('fr-FR') : '—';
+const _crmEsc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 const _crmStatutBadge = s => {
   const map = {
@@ -22447,14 +22448,16 @@ let _crmPage = 1;
 
 async function _crmLoadProduits(){
   if(_crmProduits.length) return;
-  try{ _crmProduits = await GET('/produits'); } catch(e){}
+  try{ _crmProduits = await GET('/produits'); }
+  catch(e){ log.warn?.('CRM: produits non chargés', e); }
 }
 
 async function _crmLoadClientsCache(){
   try{
     const r = await GET('/crm/clients?actif=true&par_page=200');
     _crmClients = r.items || [];
-  }catch(e){ _crmClients = []; }
+    if(!_crmClients.length) console.warn('CRM: aucun partenaire actif chargé pour le cache');
+  }catch(e){ _crmClients = []; console.error('CRM: erreur chargement cache clients', e); }
 }
 
 // ── PAGE PARTENAIRES ───────────────────────────────────────────────────────
@@ -22484,20 +22487,20 @@ function _renderCrmClients(list, total, page, par_page){
     tb.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:rgba(255,255,255,.3)">Aucun partenaire trouvé</td></tr>';
   } else {
     tb.innerHTML = list.map(c => `<tr>
-      <td><strong>${c.nom}</strong></td>
-      <td><span style="font-size:11px;color:rgba(221,232,248,.5)">${c.type_client}</span></td>
-      <td>${c.telephone||'—'}</td>
-      <td>${c.email||'—'}</td>
-      <td>${c.nif||'—'}</td>
+      <td><strong>${_crmEsc(c.nom)}</strong></td>
+      <td><span style="font-size:11px;color:rgba(221,232,248,.5)">${_crmEsc(c.type_client)}</span></td>
+      <td>${_crmEsc(c.telephone)||'—'}</td>
+      <td>${_crmEsc(c.email)||'—'}</td>
+      <td>${_crmEsc(c.nif)||'—'}</td>
       <td style="text-align:center">${c.nb_credits}</td>
       <td style="text-align:center">${c.nb_factures}</td>
       <td>${c.actif ? '<span style="color:#34d399;font-size:11px;font-weight:700">Actif</span>' : '<span style="color:#ef4444;font-size:11px;font-weight:700">Archivé</span>'}</td>
       <td style="white-space:nowrap">
-        <button class="pos-btn" onclick="crmInteractionsOuvrir(${c.id},'${c.nom.replace(/'/g,"\\'")}')" style="padding:4px 8px;font-size:11px;margin-right:4px;background:rgba(167,139,250,.15);color:#a78bfa" title="Historique interactions">📋</button>
+        <button class="pos-btn" onclick="crmInteractionsOuvrir(${c.id},${JSON.stringify(c.nom)})" style="padding:4px 8px;font-size:11px;margin-right:4px;background:rgba(167,139,250,.15);color:#a78bfa" title="Historique interactions">📋</button>
         <button class="pos-btn" onclick="crmClientOuvrir(${c.id})" style="padding:4px 10px;font-size:12px;margin-right:4px">Modifier</button>
       </td>
       <td>
-        <button class="pos-btn" onclick="crmClientSupprimer(${c.id},'${c.nom.replace(/'/g,"\\'")}')" style="padding:4px 10px;font-size:12px;background:rgba(239,68,68,.15);color:#ef4444">✕</button>
+        <button class="pos-btn" onclick="crmClientSupprimer(${c.id},${JSON.stringify(c.nom)})" style="padding:4px 10px;font-size:12px;background:rgba(239,68,68,.15);color:#ef4444">✕</button>
       </td>
     </tr>`).join('');
   }
@@ -22621,10 +22624,11 @@ async function crmInteractionsCharger(){
           <div style="font-size:20px;flex-shrink:0">${_crmTypeIcon(i.type_interaction)}</div>
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
-              <strong style="font-size:13px">${i.titre}</strong>
+              <strong style="font-size:13px">${_crmEsc(i.titre)}</strong>
               <span style="font-size:10px;color:rgba(221,232,248,.35)">${_crmDate(i.date_interaction)}</span>
+              ${i.utilisateur ? `<span style="font-size:10px;color:rgba(221,232,248,.25)">${_crmEsc(i.utilisateur)}</span>` : ''}
             </div>
-            ${i.description ? `<div style="font-size:12px;color:rgba(221,232,248,.55);margin-top:2px">${i.description}</div>` : ''}
+            ${i.description ? `<div style="font-size:12px;color:rgba(221,232,248,.55);margin-top:2px">${_crmEsc(i.description)}</div>` : ''}
           </div>
           <button class="pos-btn" onclick="crmInteractionSupprimer(${i.id})" style="padding:2px 8px;font-size:11px;background:rgba(239,68,68,.12);color:#ef4444;flex-shrink:0">✕</button>
         </div>`).join('');
@@ -22649,6 +22653,7 @@ async function crmInteractionAjouter(){
 }
 
 async function crmInteractionSupprimer(id){
+  if(!confirm('Supprimer cette interaction ?')) return;
   try{
     await apiFetch('DELETE','/crm/interactions/'+id);
     await crmInteractionsCharger();
@@ -22680,9 +22685,9 @@ function _renderCrmCredits(list, total, page, par_page){
     tb.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:rgba(255,255,255,.3)">Aucun crédit trouvé</td></tr>';
   } else {
     tb.innerHTML = list.map(cr => `<tr>
-      <td><code style="font-size:11px;color:#e8c558">${cr.numero}</code></td>
-      <td><strong>${cr.client_nom}</strong></td>
-      <td>${cr.produit_nom||'—'}</td>
+      <td><code style="font-size:11px;color:#e8c558">${_crmEsc(cr.numero)}</code></td>
+      <td><strong>${_crmEsc(cr.client_nom)}</strong></td>
+      <td>${_crmEsc(cr.produit_nom)||'—'}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums">${_crmFmt(cr.montant_total)}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;color:#34d399">${_crmFmt(cr.montant_paye)}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;color:#f87171;font-weight:700">${_crmFmt(cr.montant_restant)}</td>
@@ -22758,19 +22763,21 @@ async function crmCreditSupprimer(id, numero){
 
 // ── Modal remboursement ─────────────────────────────────────────────────────
 async function crmRembOuvrir(creditId){
-  const cr = await GET('/crm/credits/'+creditId);
-  g('crm-remb-credit-id').value = creditId;
-  g('crm-remb-titre').textContent = `Remboursement — ${cr.numero}`;
-  g('crm-remb-info').innerHTML = `
-    <div><strong>${cr.client_nom}</strong></div>
-    <div style="margin-top:6px;display:flex;gap:20px;flex-wrap:wrap">
-      <span>Total : <strong>${_crmFmt(cr.montant_total)} HTG</strong></span>
-      <span>Payé : <strong style="color:#34d399">${_crmFmt(cr.montant_paye)} HTG</strong></span>
-      <span>Restant : <strong style="color:#f87171">${_crmFmt(cr.montant_restant)} HTG</strong></span>
-    </div>`;
-  g('crm-remb-montant').value = '';
-  g('crm-remb-notes').value = '';
-  g('crm-remb-modal-bg').classList.add('open');
+  try{
+    const cr = await GET('/crm/credits/'+creditId);
+    g('crm-remb-credit-id').value = creditId;
+    g('crm-remb-titre').textContent = `Remboursement — ${cr.numero}`;
+    g('crm-remb-info').innerHTML = `
+      <div><strong>${_crmEsc(cr.client_nom)}</strong></div>
+      <div style="margin-top:6px;display:flex;gap:20px;flex-wrap:wrap">
+        <span>Total : <strong>${_crmFmt(cr.montant_total)} HTG</strong></span>
+        <span>Payé : <strong style="color:#34d399">${_crmFmt(cr.montant_paye)} HTG</strong></span>
+        <span>Restant : <strong style="color:#f87171">${_crmFmt(cr.montant_restant)} HTG</strong></span>
+      </div>`;
+    g('crm-remb-montant').value = '';
+    g('crm-remb-notes').value = '';
+    g('crm-remb-modal-bg').classList.add('open');
+  }catch(e){ posAlert(e.message||'Impossible de charger le crédit'); }
 }
 function crmRembFermer(){ g('crm-remb-modal-bg').classList.remove('open'); }
 
@@ -22812,8 +22819,8 @@ function _renderCrmFactures(list, total, page, par_page){
     tb.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:rgba(255,255,255,.3)">Aucune facture trouvée</td></tr>';
   } else {
     tb.innerHTML = list.map(f => `<tr>
-      <td><code style="font-size:11px;color:#e8c558">${f.numero_facture}</code></td>
-      <td><strong>${f.client_nom}</strong></td>
+      <td><code style="font-size:11px;color:#e8c558">${_crmEsc(f.numero_facture)}</code></td>
+      <td><strong>${_crmEsc(f.client_nom)}</strong></td>
       <td>${_crmDate(f.date_facture)}</td>
       <td>${_crmDate(f.date_echeance)}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums">${_crmFmt(f.montant_ht)}</td>
@@ -22888,7 +22895,7 @@ async function crmFactureSauvegarder(){
     const prix = parseFloat(document.getElementById('crm-fl-prix-'+idx)?.value);
     if(!desc||!qte||!prix){ posAlert('Chaque ligne doit avoir une description, une quantité et un prix'); return; }
     if(qte<=0||prix<=0){ posAlert('Quantité et prix doivent être > 0'); return; }
-    lignes.push({description:desc, quantite:qte, prix_unitaire:prix, tva_pct:0});
+    lignes.push({description:desc, quantite:qte, prix_unitaire:prix, tva_pct: parseFloat(g('crm-fac-tva').value)||0});
   }
   if(!lignes.length){ posAlert('Ajoutez au moins une ligne'); return; }
   try{
@@ -22915,6 +22922,8 @@ async function crmFactureEnvoyer(id, numero){
 }
 
 async function crmFactureStatut(id, statut){
+  const labels = {PAYEE:'Marquer cette facture comme payée ?', ANNULEE:'Annuler cette facture ?'};
+  if(!confirm(labels[statut]||`Changer le statut en ${statut} ?`)) return;
   try{
     await apiFetch('PUT','/crm/factures/'+id,{statut});
     toast('Statut mis à jour','ok');

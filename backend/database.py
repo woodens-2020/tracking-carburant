@@ -10,8 +10,6 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import NullPool
-
 # Chargement du fichier .env si python-dotenv est disponible
 try:
     from dotenv import load_dotenv

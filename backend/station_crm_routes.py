@@ -26,7 +26,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func as sqlfunc
@@ -309,6 +309,19 @@ class FactureIn(BaseModel):
         return v
 
 
+class FacturePatch(BaseModel):
+    statut:        Optional[str]       = None
+    notes:         Optional[str]       = None
+    date_echeance: Optional[date_type] = None
+
+    @field_validator("statut")
+    @classmethod
+    def statut_valide(cls, v: Optional[str]) -> Optional[str]:
+        if v and v.upper() not in _STATUTS_FACTURE:
+            raise ValueError(f"Statut invalide. Valeurs : {_STATUTS_FACTURE}")
+        return v.upper() if v else None
+
+
 class InteractionIn(BaseModel):
     type_interaction: str
     titre:            str
@@ -487,17 +500,25 @@ def liste_interactions(
 
 
 @router.post("/clients/{client_id}/interactions", status_code=201)
-def ajouter_interaction(client_id: int, data: InteractionIn, db: Session = Depends(get_db)):
+def ajouter_interaction(client_id: int, data: InteractionIn, request: Request, db: Session = Depends(get_db)):
     if not db.query(StationClient).filter(StationClient.id == client_id).first():
         raise HTTPException(404, "Client introuvable")
+    state_user = getattr(request.state, "user", None)
     i = StationInteraction(
         client_id=client_id,
+        utilisateur_id=state_user.id if state_user else None,
         type_interaction=data.type_interaction,
         titre=data.titre,
         description=data.description,
         date_interaction=data.date_interaction or datetime.now(tz=timezone.utc),
     )
-    db.add(i); db.commit(); db.refresh(i)
+    db.add(i); db.commit()
+    i = (
+        db.query(StationInteraction)
+        .options(joinedload(StationInteraction.utilisateur))
+        .filter(StationInteraction.id == i.id)
+        .first()
+    )
     return _interaction_dict(i)
 
 
@@ -636,6 +657,13 @@ def modifier_credit(credit_id: int, data: CreditPatch, db: Session = Depends(get
     if not cr:
         raise HTTPException(404, "Crédit introuvable")
     patch = data.model_dump(exclude_unset=True)
+    # Empêcher le passage manuel à SOLDE sans remboursement complet
+    if patch.get("statut") == "SOLDE" and _dec(cr.montant_paye) < _dec(cr.montant_total):
+        raise HTTPException(
+            409,
+            f"Impossible de marquer soldé : restant dû = {float(_dec(cr.montant_total) - _dec(cr.montant_paye)):.2f} HTG. "
+            "Utilisez l'endpoint /rembourser."
+        )
     for field, value in patch.items():
         setattr(cr, field, value)
     db.commit(); db.refresh(cr)
@@ -777,20 +805,22 @@ def get_facture(facture_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/factures/{facture_id}")
-def modifier_facture(facture_id: int, data: dict, db: Session = Depends(get_db)):
+def modifier_facture(facture_id: int, data: FacturePatch, db: Session = Depends(get_db)):
     f = db.query(StationFacture).filter(StationFacture.id == facture_id).first()
     if not f:
         raise HTTPException(404, "Facture introuvable")
-    if f.statut != "BROUILLON" and "statut" not in data:
-        raise HTTPException(409, "Seules les factures en brouillon peuvent être modifiées")
-    if "statut" in data:
-        s = str(data["statut"]).upper()
-        if s not in _STATUTS_FACTURE:
-            raise HTTPException(400, f"Statut invalide. Valeurs : {_STATUTS_FACTURE}")
-        f.statut = s
-    for field in ("notes", "date_echeance"):
-        if field in data:
-            setattr(f, field, data[field])
+    patch = data.model_dump(exclude_unset=True)
+    if f.statut != "BROUILLON":
+        # Hors brouillon : seul le changement de statut est autorisé
+        champs_extra = patch.keys() - {"statut"}
+        if champs_extra:
+            raise HTTPException(409, "Une facture non-brouillon ne peut pas être modifiée (seul le statut peut changer)")
+    if "statut" in patch:
+        f.statut = patch["statut"]
+    if "notes" in patch:
+        f.notes = patch["notes"]
+    if "date_echeance" in patch:
+        f.date_echeance = patch["date_echeance"]
     db.commit(); db.refresh(f)
     return _facture_dict(f)
 

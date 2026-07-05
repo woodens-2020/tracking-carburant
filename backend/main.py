@@ -873,7 +873,7 @@ def oauth_callback(
     log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     redir = RedirectResponse(url="/", status_code=302)
     redir.set_cookie(
-        "session_token", session_token,
+        SESSION_COOKIE, session_token,
         httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
     )
     return redir
