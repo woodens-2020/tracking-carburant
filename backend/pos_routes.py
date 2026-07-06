@@ -10,7 +10,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, validator, model_validator
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from database import get_db
@@ -604,12 +604,10 @@ def bilan_caissiers(
     Bilan complet de l'activité de vente de chaque caissière et administrateur.
     Inclut : CA total, nb ventes, sessions, crédits en cours, breakdown par mode.
     """
-    from sqlalchemy import or_
-
     d_debut = date_type.fromisoformat(debut) if debut else None
     d_fin   = date_type.fromisoformat(fin)   if fin   else date_type.today()
 
-    # Tous les employés actifs de type caissier ou admin
+    # Employés actifs : caissiers (poste) + utilisateurs admin/pdg
     employes = (
         db.query(Employe)
         .outerjoin(Utilisateur, Employe.utilisateur_id == Utilisateur.id)
@@ -617,12 +615,11 @@ def bilan_caissiers(
             Employe.actif == True,
             or_(
                 func.lower(Employe.poste).contains("caissier"),
-                func.lower(Employe.poste).contains("administrateur"),
-                func.lower(Employe.poste).contains("directeur"),
+                func.lower(Employe.poste).contains("caissière"),
                 Utilisateur.role.in_(["admin", "pdg"]),
             ),
         )
-        .order_by(Employe.prenom, Employe.nom)
+        .order_by(Employe.nom, Employe.prenom)
         .all()
     )
 
