@@ -8233,6 +8233,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="pos-header-sub">Employés connectés en ce moment — révoquez à distance</div>
           </div>
           <div class="pos-header-actions">
+            <button class="pos-btn ghost" onclick="purgeInactiveSessions()" style="font-size:12px;color:#f87171;border-color:rgba(248,113,113,.3)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+              Purger inactives
+            </button>
             <button class="pos-btn ghost" onclick="loadAdminSessions()" style="font-size:12px">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
               Actualiser
@@ -8249,11 +8253,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                   <th>Adresse IP</th>
                   <th>Navigateur</th>
                   <th>Connecté le</th>
+                  <th>Statut / Dernière activité</th>
                   <th style="text-align:center">Action</th>
                 </tr>
               </thead>
               <tbody id="sessions-tbody">
-                <tr><td colspan="6" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+                <tr><td colspan="7" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -15494,16 +15499,41 @@ function _fmtDate(iso){
   return d.toLocaleString('fr-HT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 }
 
+function _sessionStatut(s){
+  const now = Date.now();
+  if(s.last_activity_at){
+    const lastMs = new Date(s.last_activity_at).getTime();
+    const diffMin = (now - lastMs) / 60000;
+    if(diffMin < 15) return {dot:'#10b981', label:'Actif', ago: _agoStr(diffMin)};
+    if(diffMin < 120) return {dot:'#f59e0b', label:'Inactif', ago: _agoStr(diffMin)};
+    return {dot:'#f87171', label:'Abandonné', ago: _agoStr(diffMin)};
+  }
+  // Pas encore de last_activity_at (session juste créée ou colonne vide)
+  const createdMs = new Date(s.created_at).getTime();
+  const diffMin = (now - createdMs) / 60000;
+  if(diffMin < 60) return {dot:'#10b981', label:'Actif', ago:'récemment connecté'};
+  return {dot:'#f87171', label:'Inconnu', ago:'aucune activité enregistrée'};
+}
+
+function _agoStr(diffMin){
+  if(diffMin < 1) return 'à l\'instant';
+  if(diffMin < 60) return `il y a ${Math.round(diffMin)} min`;
+  const h = Math.floor(diffMin/60), m = Math.round(diffMin%60);
+  return `il y a ${h}h${m>0?m+'m':''}`;
+}
+
 async function loadAdminSessions(){
   const tbody = document.getElementById('sessions-tbody');
-  tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr>`;
   try{
     const sessions = await apiFetch('GET','/admin/sessions');
     if(!sessions.length){
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Aucune session active</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Aucune session active</td></tr>`;
       return;
     }
-    tbody.innerHTML = sessions.map(s => `
+    tbody.innerHTML = sessions.map(s => {
+      const st = _sessionStatut(s);
+      return `
       <tr>
         <td>
           <div style="font-weight:600;color:var(--white)">${s.nom_complet||s.email}</div>
@@ -15513,14 +15543,24 @@ async function loadAdminSessions(){
         <td style="font-family:monospace;font-size:12px">${s.ip_address||'—'}</td>
         <td style="font-size:12px">${_fmtUA(s.user_agent)}</td>
         <td style="font-size:12px">${_fmtDate(s.created_at)}</td>
+        <td style="font-size:12px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="width:8px;height:8px;border-radius:50%;background:${st.dot};flex-shrink:0"></span>
+            <div>
+              <div style="font-weight:600;color:${st.dot}">${st.label}</div>
+              <div style="font-size:10px;color:var(--muted)">${st.ago}</div>
+            </div>
+          </div>
+        </td>
         <td style="text-align:center">
           <button class="pos-btn ghost" onclick="sessionRevoquer(${s.session_id},'${(s.nom_complet||s.email).replace(/'/g,"\\'")}'"
             style="font-size:11px;padding:3px 9px;color:#f87171;border-color:rgba(248,113,113,.3)">
             Déconnecter
           </button>
         </td>
-      </tr>`).join('');
-  }catch(e){ tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#f87171">${e.message}</td></tr>`; }
+      </tr>`;
+    }).join('');
+  }catch(e){ tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:#f87171">${e.message}</td></tr>`; }
 }
 
 async function sessionRevoquer(sessionId, nom){
@@ -15528,6 +15568,15 @@ async function sessionRevoquer(sessionId, nom){
   try{
     await apiFetch('DELETE',`/admin/sessions/${sessionId}`);
     posAlert('Session révoquée','ok');
+    loadAdminSessions();
+  }catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+async function purgeInactiveSessions(){
+  if(!confirm('Supprimer toutes les sessions expirées et abandonnées depuis plus de 2 heures ?')) return;
+  try{
+    const r = await apiFetch('DELETE','/admin/sessions/purge-inactive');
+    posAlert(`${r.sessions_supprimees} session(s) supprimée(s)`,'ok');
     loadAdminSessions();
   }catch(e){ posAlert(e.message||'Erreur','err'); }
 }

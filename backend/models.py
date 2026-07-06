@@ -191,8 +191,9 @@ class SessionToken(Base):
     user_id    = Column(Integer, ForeignKey("utilisateurs.id", ondelete="CASCADE"), nullable=False)
     ip_address = Column(String(45),  nullable=True)
     user_agent = Column(String(255), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at       = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    expires_at       = Column(DateTime(timezone=True), nullable=False)
+    last_activity_at = Column(DateTime(timezone=True), nullable=True)
 
     user = relationship("Utilisateur")
 

@@ -2,7 +2,7 @@
 import io
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -402,20 +402,55 @@ def list_sessions(
         u = db.get(Utilisateur, s.user_id)
         if not u:
             continue
-        exp = s.expires_at.replace(tzinfo=timezone.utc) if s.expires_at.tzinfo is None else s.expires_at
+        exp     = s.expires_at.replace(tzinfo=timezone.utc) if s.expires_at.tzinfo is None else s.expires_at
         created = s.created_at.replace(tzinfo=timezone.utc) if s.created_at.tzinfo is None else s.created_at
+        last_act = None
+        if s.last_activity_at:
+            last_act = s.last_activity_at.replace(tzinfo=timezone.utc) if s.last_activity_at.tzinfo is None else s.last_activity_at
         result.append({
-            "session_id":  s.id,
-            "user_id":     u.id,
-            "nom_complet": u.nom_complet or u.username,
-            "email":       u.email,
-            "role":        u.role,
-            "ip_address":  s.ip_address,
-            "user_agent":  s.user_agent,
-            "created_at":  created.isoformat(),
-            "expires_at":  exp.isoformat(),
+            "session_id":       s.id,
+            "user_id":          u.id,
+            "nom_complet":      u.nom_complet or u.username,
+            "email":            u.email,
+            "role":             u.role,
+            "ip_address":       s.ip_address,
+            "user_agent":       s.user_agent,
+            "created_at":       created.isoformat(),
+            "expires_at":       exp.isoformat(),
+            "last_activity_at": last_act.isoformat() if last_act else None,
         })
     return result
+
+
+@router.delete("/sessions/purge-inactive")
+def purge_inactive_sessions(
+    request: Request,
+    admin: Utilisateur = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    """Supprime les sessions expirées et celles sans activité depuis plus de 2 heures."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=2)
+
+    # Sessions expirées
+    expired = db.query(SessionToken).filter(SessionToken.expires_at <= now)
+    count_expired = expired.count()
+    expired.delete(synchronize_session=False)
+
+    # Sessions abandonnées (last_activity_at > 2h et non nulles)
+    abandoned = db.query(SessionToken).filter(
+        SessionToken.last_activity_at != None,
+        SessionToken.last_activity_at < cutoff,
+    )
+    count_abandoned = abandoned.count()
+    abandoned.delete(synchronize_session=False)
+
+    db.commit()
+    total = count_expired + count_abandoned
+    log_event(db, SESSION_REVOKED, user_id=admin.id,
+              ip_address=request.client.host if request.client else None,
+              details={"purge_expirees": count_expired, "purge_abandonnees": count_abandoned})
+    return {"ok": True, "sessions_supprimees": total}
 
 
 @router.delete("/sessions/{session_id}")

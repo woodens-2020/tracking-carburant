@@ -109,6 +109,9 @@ def _migrate_columns():
             # v3 — code d'accès 9 chiffres
             ("utilisateurs", "code_acces_hash",
              "ALTER TABLE utilisateurs  ADD COLUMN code_acces_hash VARCHAR(255)", None),
+            # v7 — suivi activité sessions
+            ("sessions", "last_activity_at",
+             "ALTER TABLE sessions ADD COLUMN last_activity_at DATETIME DEFAULT NULL", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -131,6 +134,9 @@ def _migrate_columns():
             # v6 — NIF client crédit bar
             ("bar_credits", "client_nif",
              "ALTER TABLE bar_credits ADD COLUMN client_nif VARCHAR(50)", None),
+            # v7 — suivi activité sessions
+            ("sessions", "last_activity_at",
+             "ALTER TABLE sessions ADD COLUMN last_activity_at TIMESTAMP WITH TIME ZONE", None),
         ]
     else:
         return

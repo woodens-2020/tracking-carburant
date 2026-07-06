@@ -92,6 +92,8 @@ def get_session_user(db: Session, token: str):
     user = db.query(Utilisateur).get(s.user_id)
     if not user or not user.actif:
         return None
+    s.last_activity_at = datetime.now(timezone.utc)
+    db.commit()
     return user
 
 
