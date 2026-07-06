@@ -23,6 +23,8 @@ from models import (
     BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande, BarPaiementEmploye,
     HotelChambre, HotelEmploye, HotelReservation,
+    StationClient, StationCredit, StationCreditRemboursement,
+    StationFacture, StationInteraction,
 )
 
 # ── URL de connexion ──────────────────────────────────────────────
