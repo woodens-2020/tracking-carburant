@@ -121,6 +121,14 @@ app.include_router(zelle_router)
 @app.on_event("startup")
 def startup():
     init_db()
+    # Migration douce — ajoute source_fond si la colonne n'existe pas encore
+    from sqlalchemy import text as _text
+    try:
+        with engine.connect() as _c:
+            _c.execute(_text("ALTER TABLE zelle_transactions ADD COLUMN IF NOT EXISTS source_fond VARCHAR(50)"))
+            _c.commit()
+    except Exception:
+        pass
     from datetime import datetime, timezone as _tz
     from models import SessionToken as _ST
     with SessionLocal() as _db:

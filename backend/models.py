@@ -1065,6 +1065,7 @@ class ZelleTransaction(Base):
     frais            = Column(Numeric(14, 2), nullable=False, default=0)
     taux_applique    = Column(Numeric(10, 4), nullable=False, default=130)
     statut           = Column(String(20), nullable=False, default="EN_ATTENTE")
+    source_fond      = Column(String(50), nullable=True)   # PDG, Gaz, Autre
     date_transaction = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     notes            = Column(String(300), nullable=True)
 
@@ -1074,4 +1075,20 @@ class ZelleTransaction(Base):
         CheckConstraint("statut IN ('EN_ATTENTE','REMIS','ANNULE')", name="chk_zelle_statut"),
         Index("idx_zelle_date",   "date_transaction"),
         Index("idx_zelle_statut", "statut"),
+    )
+
+
+class ZelleFond(Base):
+    """Réception de fonds dans le département Zelle (renflouement de la caisse)."""
+    __tablename__ = "zelle_fonds"
+
+    id             = Column(Integer, primary_key=True)
+    montant_usd    = Column(Numeric(14, 2), nullable=False)
+    source         = Column(String(50), nullable=False, default="PDG")
+    date_reception = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    notes          = Column(String(300), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("montant_usd > 0", name="chk_fond_montant_pos"),
+        Index("idx_fond_date", "date_reception"),
     )
