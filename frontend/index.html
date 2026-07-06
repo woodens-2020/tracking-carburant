@@ -5800,7 +5800,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <thead>
                 <tr>
                   <th>Nom</th><th>Catégorie</th><th>Unité</th>
-                  <th>Prix</th><th>Stock</th><th>CMUP</th>
+                  <th>Prix</th><th>Stock</th><th>Coût en stock</th>
                   <th>Statut</th><th>Actions</th>
                 </tr>
               </thead>
@@ -5976,7 +5976,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="pos-kpi-grid" id="pos-stock-kpis">
           <div class="pos-kpi"><div class="pos-kpi-label">Produits actifs</div><div class="pos-kpi-val amber" id="kpi-nb-produits">—</div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">En alerte stock</div><div class="pos-kpi-val red" id="kpi-en-alerte">—</div></div>
-          <div class="pos-kpi"><div class="pos-kpi-label">Valeur stock CMUP</div><div class="pos-kpi-val" id="kpi-val-stock">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Valeur totale du stock</div><div class="pos-kpi-val" id="kpi-val-stock">—</div></div>
           <div class="pos-kpi" style="cursor:pointer" onclick="document.getElementById('pos-attente-section').scrollIntoView({behavior:'smooth'})">
             <div class="pos-kpi-label">Réceptions en attente</div>
             <div class="pos-kpi-val amber" id="kpi-stock-attente">—</div>
@@ -5999,10 +5999,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-table-wrap">
             <table class="pos-table">
               <thead>
-                <tr><th>Produit</th><th>Catégorie</th><th>Stock</th><th>Unité</th><th>Seuil alerte</th><th>CMUP</th><th>Valeur</th><th>État</th></tr>
+                <tr><th>Produit</th><th>Catégorie</th><th>Stock</th><th>Unité</th><th>Seuil alerte</th><th>Coût en stock</th><th>État</th></tr>
               </thead>
               <tbody id="pos-stock-tbody">
-                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                <tr><td colspan="7" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -6305,8 +6305,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <!-- Légende des sigles -->
             <div style="margin-top:14px;padding:10px 14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;font-size:11px;color:rgba(255,255,255,.4);line-height:1.8">
               <span style="font-weight:600;color:rgba(255,255,255,.55);display:block;margin-bottom:4px">Définition des termes :</span>
-              <span style="color:rgba(255,255,255,.55)">CMUP</span> — Coût Moyen Unitaire Pondéré : prix d'achat moyen de chaque unité, calculé sur tous les achats confirmés.&nbsp;&nbsp;
-              <span style="color:rgba(255,255,255,.55)">Valeur estimée</span> — Ce que le stock actuel vous a coûté (Stock disponible × CMUP).&nbsp;&nbsp;
+              <span style="color:rgba(255,255,255,.55)">Coût en stock</span> — Ce que la marchandise disponible vous a coûté (Quantité en stock × Prix d'achat moyen pondéré).&nbsp;&nbsp;
               <span style="color:rgba(255,255,255,.55)">Potentiel CA</span> — Revenu maximal si tout le stock est vendu (Stock × Prix de vente).&nbsp;&nbsp;
               <span style="color:rgba(255,255,255,.55)">Écoulement</span> — Quantité vendue depuis la dernière commande confirmée.&nbsp;&nbsp;
               <span style="color:rgba(255,255,255,.55)">CA</span> — Chiffre d'Affaires.
@@ -7213,17 +7212,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                     <th                                      style="padding:10px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Catégorie</th>
                     <th onclick="anaTblTrier('stock')"       style="padding:10px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);cursor:pointer;white-space:nowrap">Stock ↕</th>
                     <th                                      style="padding:10px 8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Statut</th>
-                    <th onclick="anaTblTrier('cmup')"        style="padding:10px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);cursor:pointer;white-space:nowrap">CMUP ↕</th>
                     <th                                      style="padding:10px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);white-space:nowrap">Prix vente</th>
                     <th onclick="anaTblTrier('marge_pct')"   style="padding:10px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);cursor:pointer;white-space:nowrap;min-width:110px">Marge ↕</th>
-                    <th onclick="anaTblTrier('valeur_stock')" style="padding:10px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);cursor:pointer;white-space:nowrap">Val. stock ↕</th>
+                    <th onclick="anaTblTrier('valeur_stock')" style="padding:10px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);cursor:pointer;white-space:nowrap">Coût en stock ↕</th>
                     <th onclick="anaTblTrier('ventes_30j')"  style="padding:10px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);cursor:pointer;white-space:nowrap">CA 30j ↕</th>
                     <th                                      style="padding:10px 8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);white-space:nowrap">Dernier achat</th>
                     <th                                      style="padding:10px 8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Lots</th>
                   </tr>
                 </thead>
                 <tbody id="ana-tbl-body">
-                  <tr><td colspan="11" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+                  <tr><td colspan="10" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -17855,7 +17853,9 @@ function _posRenderProduitsTbody(prods, stockMap){
         cmup: s.cmup,
       });
     }
-    const cmup  = p.cmup != null ? posGx(p.cmup) : '—';
+    const stockCourant = parseFloat(p.stock_courant||0);
+    const cmupVal = parseFloat(p.cmup||0);
+    const coutStock = (cmupVal > 0 && stockCourant > 0) ? posGx(stockCourant * cmupVal) : '—';
     const cat   = p.categorie||'—';
     const clr   = _catCouleur(cat);
     const catBadge = `<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:${clr}22;color:${clr};border:1px solid ${clr}44">${cat}</span>`;
@@ -17876,7 +17876,7 @@ function _posRenderProduitsTbody(prods, stockMap){
       <td class="td-muted">${p.unite||'—'}</td>
       <td class="td-amount">${prixUnite}${prixCaisse}</td>
       <td>${_posStockLabel(p)}</td>
-      <td class="td-muted">${cmup}</td>
+      <td class="td-muted">${coutStock}</td>
       <td>${statBadge}</td>
       <td>
         <div class="gi-actions">
@@ -18211,12 +18211,11 @@ async function loadPosStock(){
         <td><strong>${stock.toFixed(3)}</strong></td>
         <td>${p.unite||'—'}</td>
         <td>${p.seuil_alerte_stock||'—'}</td>
-        <td>${cmup>0?posGx(cmup):'—'}</td>
         <td>${valeur>0?posGx(valeur):'—'}</td>
         <td>${badge}</td>
       </tr>`;
     });
-    if(tbody) tbody.innerHTML = rows.join('')||'<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit actif</td></tr>';
+    if(tbody) tbody.innerHTML = rows.join('')||'<tr><td colspan="7" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit actif</td></tr>';
 
     const kpis = [
       ['kpi-nb-produits', (prods||[]).length],
@@ -18611,7 +18610,7 @@ async function posFicheTechniqueOuvrir(){
         <td style="padding:10px 12px;text-align:left">${dernCommande}</td>
         <td style="padding:10px 12px;text-align:right;font-weight:700;font-size:14px;color:${stockColor}">${fmtQte(p.stock_courant, p.unite)}</td>
         <td style="padding:10px 12px;text-align:right;color:#f7a93b;font-weight:600">${Gx(p.valeur_stock)}
-          <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:2px">CMUP : G&nbsp;${parseFloat(p.cmup||0).toFixed(2)}/unité</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:2px">Prix moy. d'achat : G&nbsp;${parseFloat(p.cmup||0).toFixed(2)}/u</div>
         </td>
         <td style="padding:10px 12px;text-align:right;color:rgba(255,255,255,.7)">${Gx(p.prix_vente)}</td>
         <td style="padding:10px 12px;text-align:right;color:#3fb6a8;font-weight:700">${Gx(p.potentiel_ca)}</td>
@@ -18754,7 +18753,7 @@ function pftExcelFiche(){
     ['Valeur totale du stock (G)', d.total_valeur_stock, '', 'Potentiel CA si tout vendu (G)', d.total_potentiel_ca, '', 'Marge nette potentielle (G)', d.total_marge_nette],
     [],
     ['DÉTAIL PAR PRODUIT','','','','','',''],
-    ['Produit','Catégorie','Unité','Dernière commande (qté)','Date dernière commande','Prix achat/u (G)','Statut commande','Stock disponible','CMUP (G/unité)','Valeur estimée (G)','Prix vente (G)','Potentiel CA (G)','Écoulement dep. commande','Statut stock'],
+    ['Produit','Catégorie','Unité','Dernière commande (qté)','Date dernière commande','Prix achat/u (G)','Statut commande','Stock disponible','Coût en stock (G)','Prix vente (G)','Potentiel CA (G)','Écoulement dep. commande','Statut stock'],
     ...(d.produits||[]).map(p=>[
       p.nom, p.categorie,
       (!p.unite || /^\d+(\.\d+)?$/.test(String(p.unite).trim())) ? '' : p.unite,
@@ -18763,7 +18762,6 @@ function pftExcelFiche(){
       p.dernier_prix_achat != null ? parseFloat(p.dernier_prix_achat).toFixed(2) : '—',
       p.dernier_achat_statut === 'CONFIRME' ? 'Confirmé' : (p.dernier_achat_statut ? 'En attente' : '—'),
       fmt(p.stock_courant),
-      parseFloat(p.cmup||0).toFixed(4),
       parseFloat(p.valeur_stock||0).toFixed(2),
       parseFloat(p.prix_vente||0).toFixed(2),
       parseFloat(p.potentiel_ca||0).toFixed(2),
@@ -18772,8 +18770,7 @@ function pftExcelFiche(){
     ]),
     [],
     ['LÉGENDE DES TERMES',''],
-    ['CMUP','Coût Moyen Unitaire Pondéré — prix de revient moyen de chaque unité en stock'],
-    ['Valeur estimée','Stock disponible × CMUP — ce que représente votre stock en coût d\'achat'],
+    ['Coût en stock','Ce que la marchandise en stock vous a coûté — Quantité × Prix d\'achat moyen pondéré'],
     ['Potentiel CA','Stock disponible × Prix de vente — revenu maximal si tout est vendu'],
     ['Écoulement','Quantité vendue depuis la dernière commande confirmée'],
     ['CA','Chiffre d\'Affaires — total des ventes en valeur (G = Gourdes haïtiennes)'],
@@ -18892,8 +18889,8 @@ tbody td{border-bottom:1px solid #edf1f7}
   <div class="legende">
     <div class="legende-title">Définition des termes</div>
     <div class="legende-grid">
-      <div class="legende-item"><strong>CMUP</strong> — Coût Moyen Unitaire Pondéré : prix de revient moyen par unité en stock</div>
-      <div class="legende-item"><strong>Valeur estimée</strong> — Stock disponible × CMUP : valeur de votre stock en coût d'achat</div>
+      <div class="legende-item"><strong>Coût en stock</strong> — Ce que la marchandise en stock vous a coûté (Quantité × Prix d'achat moyen)</div>
+      <div class="legende-item"><strong>Prix moy. d'achat</strong> — Prix de revient moyen pondéré de chaque unité, calculé sur tous les achats confirmés</div>
       <div class="legende-item"><strong>Potentiel CA</strong> — Stock disponible × Prix de vente : revenu maximal si tout est vendu</div>
       <div class="legende-item"><strong>Écoulement</strong> — Quantité vendue depuis la dernière commande confirmée</div>
       <div class="legende-item"><strong>CA</strong> — Chiffre d'Affaires : total des ventes en valeur</div>
@@ -20704,7 +20701,7 @@ async function loadPosAnalyse(){
 
 async function anaChargerTableau(){
   const tbody = document.getElementById('ana-tbl-body');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
 
   try {
     const data = await apiFetch('GET', '/pos/analyse/tableau');
@@ -20734,7 +20731,7 @@ async function anaChargerTableau(){
 
     anaTblAfficher();
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="11" style="padding:24px;text-align:center;color:#f87171">${e.message || 'Erreur réseau'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="10" style="padding:24px;text-align:center;color:#f87171">${e.message || 'Erreur réseau'}</td></tr>`;
   }
 }
 
@@ -20762,7 +20759,7 @@ function anaTblAfficher(){
     let va, vb;
     if(_anaSortField === 'nom')           { va = a.nom;             vb = b.nom; }
     else if(_anaSortField === 'stock')    { va = a.stock;           vb = b.stock; }
-    else if(_anaSortField === 'cmup')     { va = a.cmup;            vb = b.cmup; }
+    else if(_anaSortField === 'valeur_stock') { va = a.valeur_stock; vb = b.valeur_stock; }
     else if(_anaSortField === 'marge_pct'){ va = a.marge_pct;       vb = b.marge_pct; }
     else if(_anaSortField === 'valeur_stock'){ va = a.valeur_stock; vb = b.valeur_stock; }
     else if(_anaSortField === 'ventes_30j') { va = a.ventes_30j.ca; vb = b.ventes_30j.ca; }
@@ -20772,7 +20769,7 @@ function anaTblAfficher(){
   });
 
   if(!arts.length){
-    tbody.innerHTML = '<tr><td colspan="11" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucun article trouvé</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucun article trouvé</td></tr>';
     return;
   }
 
@@ -20797,7 +20794,6 @@ function anaTblAfficher(){
       <td style="padding:9px 8px;font-size:11px;color:rgba(255,255,255,.45)">${a.categorie}</td>
       <td style="padding:9px 8px;text-align:right;font-size:13px;font-weight:700;color:${sc}">${stk}</td>
       <td style="padding:9px 8px;text-align:center">${badge}</td>
-      <td style="padding:9px 8px;text-align:right;font-size:11px;color:rgba(255,255,255,.6)">${posGx(a.cmup)}</td>
       <td style="padding:9px 8px;text-align:right;font-size:11px;font-weight:600">${posGx(a.prix_vente)}</td>
       <td style="padding:9px 8px">${margeBar}</td>
       <td style="padding:9px 8px;text-align:right;font-size:11px;color:#818cf8;font-weight:600">${posGx(a.valeur_stock)}</td>
@@ -20958,12 +20954,12 @@ async function anaChargerLots(){
       <div style="border-left:1px solid rgba(255,255,255,.08);padding-left:20px">
         <div style="font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em">Stock courant</div>
         <div style="font-size:18px;font-weight:800;color:${data.stock_courant <= 0 ? '#f87171' : '#34d399'};margin-top:2px">${data.stock_courant.toFixed(1)}</div>
-        <div style="font-size:11px;color:rgba(255,255,255,.4)">CMUP : ${posGx(data.cmup)}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.4)">Coût en stock : ${posGx(data.valeur_stock)}</div>
       </div>
       <div style="border-left:1px solid rgba(255,255,255,.08);padding-left:20px">
         <div style="font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em">Prix de vente</div>
         <div style="font-size:18px;font-weight:800;color:#60a5fa;margin-top:2px">${posGx(data.prix_vente)}</div>
-        <div style="font-size:11px;color:rgba(255,255,255,.4)">Val. stock : ${posGx(data.valeur_stock)}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.4)">Potentiel CA : ${posGx(parseFloat(data.prix_vente||0) * parseFloat(data.stock_courant||0))}</div>
       </div>
       <div style="border-left:1px solid rgba(255,255,255,.08);padding-left:20px">
         <div style="font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em">Lots enregistrés</div>
