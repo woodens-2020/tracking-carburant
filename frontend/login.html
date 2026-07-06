@@ -1049,21 +1049,29 @@ function _capturePhoto(){
   return _capturePromise;
 }
 
-async function _sendLoginMeta(){
-  // Géolocalisation avec haute précision désactivée (plus rapide)
-  var locPromise = new Promise(function(resolve){
+function _getGeolocation(){
+  return new Promise(function(resolve){
     if(!navigator.geolocation){ resolve(null); return; }
-    navigator.geolocation.getCurrentPosition(
-      resolve,
-      function(err){ console.warn('[sécurité] Géolocalisation:', err && err.message); resolve(null); },
-      {timeout:8000, maximumAge:120000, enableHighAccuracy:false}
-    );
+    // Étape 1 : réseau rapide (Wi-Fi / IP), timeout 6 s
+    navigator.geolocation.getCurrentPosition(resolve, function(){
+      // Étape 2 : sans haute précision, encore 8 s
+      navigator.geolocation.getCurrentPosition(resolve, function(err){
+        console.warn('[sécurité] Géolocalisation échouée:', err && err.message);
+        resolve(null);
+      }, {timeout:8000, maximumAge:0, enableHighAccuracy:false});
+    }, {timeout:6000, maximumAge:0, enableHighAccuracy:true});
   });
+}
+
+async function _sendLoginMeta(){
   // Photo et géolocalisation en parallèle
-  var results = await Promise.all([locPromise, _capturePromise || Promise.resolve()]);
+  var results = await Promise.all([
+    _getGeolocation(),
+    _capturePromise || Promise.resolve()
+  ]);
   var pos   = results[0];
   var photo = _loginPhoto || null;
-  _loginPhoto = null;
+  _loginPhoto     = null;
   _capturePromise = null;
   var lat = pos ? pos.coords.latitude  : null;
   var lng = pos ? pos.coords.longitude : null;

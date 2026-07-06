@@ -334,6 +334,30 @@ class LoginMetaIn(BaseModel):
     longitude: Optional[float] = None
 
 
+def _ip_geoloc(ip: str | None):
+    """Retourne (lat, lng) approximatif via ip-api.com ou (None, None) si indisponible."""
+    if not ip or ip in ("127.0.0.1", "::1", "localhost"):
+        return None, None
+    # Ignorer les IP privées
+    import ipaddress as _ip
+    try:
+        obj = _ip.ip_address(ip)
+        if obj.is_private or obj.is_loopback:
+            return None, None
+    except ValueError:
+        return None, None
+    try:
+        import requests as _req
+        r = _req.get(f"http://ip-api.com/json/{ip}?fields=status,lat,lon",
+                     timeout=2, headers={"User-Agent": "tracking-carburant/1.0"})
+        d = r.json()
+        if d.get("status") == "success":
+            return float(d["lat"]), float(d["lon"])
+    except Exception:
+        pass
+    return None, None
+
+
 @app.post("/api/auth/login-meta")
 def login_meta_save(data: LoginMetaIn, request: Request, db: Session = Depends(get_db)):
     """Enregistre la photo et la géolocalisation de connexion."""
@@ -342,13 +366,20 @@ def login_meta_save(data: LoginMetaIn, request: Request, db: Session = Depends(g
         raise HTTPException(401, "Non authentifié")
     token   = request.cookies.get(SESSION_COOKIE)
     session = db.query(SessionToken).filter_by(token=token).first() if token else None
-    event   = LoginSecurityEvent(
+    ip      = request.client.host if request.client else None
+
+    lat, lng = data.latitude, data.longitude
+    # Fallback : géolocalisation par IP si le navigateur n'a pas transmis de coordonnées
+    if lat is None or lng is None:
+        lat, lng = _ip_geoloc(ip)
+
+    event = LoginSecurityEvent(
         user_id    = user.id,
         session_id = session.id if session else None,
         photo_b64  = data.photo_b64,
-        latitude   = data.latitude,
-        longitude  = data.longitude,
-        ip_address = request.client.host if request.client else None,
+        latitude   = lat,
+        longitude  = lng,
+        ip_address = ip,
         user_agent = request.headers.get("user-agent", "")[:255],
     )
     db.add(event)
