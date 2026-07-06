@@ -18405,6 +18405,7 @@ async function posAjusterStock(){
 // ══════════════════════════════════════════════════════════════════════
 let _paDepenses    = [];
 let _paTousProduits = { bar: [], station: [] }; // cache produits pour la modal
+let _paAutoConfirmer = false; // true quand on passe par fiche technique → confirme stock immédiatement
 
 async function loadPosAchats(){
   const sel    = document.getElementById('pa-filtre-produit');
@@ -18648,6 +18649,7 @@ async function pftConfirmerInventaire(){
   }
 
   document.getElementById('pos-fiche-tech-modal').classList.remove('open');
+  _paAutoConfirmer = true; // achat issu d'un inventaire physique → confirmer le stock automatiquement
   await _posOuvrirFormAchat();
 }
 
@@ -19145,9 +19147,9 @@ async function posEnregistrerAchat(){
   const fourn = document.getElementById('pa-fourn').value.trim()||null;
   const notes = document.getElementById('pa-notes').value.trim()||null;
 
-  if(!sel)   { posAlert('Sélectionner un produit.','warn'); return; }
-  if(qte<=0) { posAlert('La quantité doit être > 0.','warn'); return; }
-  if(prix<0) { posAlert('Le prix ne peut pas être négatif.','warn'); return; }
+  if(!sel)    { posAlert('Sélectionner un produit.','warn'); return; }
+  if(qte<=0)  { posAlert('La quantité doit être > 0.','warn'); return; }
+  if(prix<=0) { posAlert('Le prix d\'achat unitaire doit être > 0.','warn'); return; }
 
   for(const d of _paDepenses){
     if(!d.description.trim()){ posAlert('Saisir une description pour chaque dépense.','warn'); return; }
@@ -19173,16 +19175,32 @@ async function posEnregistrerAchat(){
   try {
     const res = await apiFetch('POST','/pos/achats', body);
     document.getElementById('pos-achat-modal-bg').classList.remove('open');
-    await loadPosAchats();
+
     const fmt = v=>`G ${parseFloat(v).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
     const label = res.produit_nom || (sel.prod?.nom||'le produit');
     const unLabel = sel.type==='station' ? 'gallon' : 'unité';
-    if(res.statut==='EN_ATTENTE'){
-      posAlert(`Achat enregistré (EN ATTENTE) — Allez dans Stock Bar pour confirmer la réception de ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} de ${label}.`,'warn');
+
+    // Auto-confirmation si l'achat provient du flux fiche technique (inventaire confirmé)
+    if(_paAutoConfirmer && res.statut === 'EN_ATTENTE' && res.achat_id){
+      _paAutoConfirmer = false;
+      try {
+        await apiFetch('POST', `/pos/achats/${res.achat_id}/confirmer`);
+        await loadPosAchats();
+        posAlert(`Achat confirmé — stock mis à jour : ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} de ${label}. Coût total: ${fmt(res.cout_total)}`,'ok');
+      } catch(ce){
+        await loadPosAchats();
+        posAlert(`Achat enregistré mais confirmation stock échouée : ${ce.message||ce}. Allez dans Stock Bar pour confirmer.`,'warn');
+      }
     } else {
-      posAlert(`Achat enregistré — ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} pour ${label}. Coût total: ${fmt(res.cout_total)}`,'ok');
+      _paAutoConfirmer = false;
+      await loadPosAchats();
+      if(res.statut==='EN_ATTENTE'){
+        posAlert(`Achat enregistré (EN ATTENTE) — Allez dans Stock Bar pour confirmer la réception de ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} de ${label}.`,'warn');
+      } else {
+        posAlert(`Achat enregistré — ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} pour ${label}. Coût total: ${fmt(res.cout_total)}`,'ok');
+      }
     }
-  } catch(e){ posAlert(e.message||'Erreur enregistrement achat.'); }
+  } catch(e){ _paAutoConfirmer = false; posAlert(e.message||'Erreur enregistrement achat.'); }
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -22312,6 +22330,7 @@ async function ckAchatsSauvegarder(){
   const cout  = parseFloat(document.getElementById('ckac-cout').value||0);
   if(!desc){ posAlert('La description est requise.','warn'); return; }
   if(qte <= 0){ posAlert('La quantité doit être positive.','warn'); return; }
+  if(cout <= 0){ posAlert('Le coût unitaire doit être supérieur à 0.','warn'); return; }
 
   const payload = {
     description:   desc,
