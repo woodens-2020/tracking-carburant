@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 # Chargement du fichier .env si python-dotenv est disponible
 try:
     from dotenv import load_dotenv
-    load_dotenv(Path(__file__).parent / ".env")
+    load_dotenv(Path(__file__).parent / ".env", override=True)
 except ImportError:
     pass
 
