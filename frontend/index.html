@@ -15553,8 +15553,7 @@ async function loadAdminSessions(){
           </div>
         </td>
         <td style="text-align:center">
-          <button class="pos-btn ghost" onclick="sessionRevoquer(${s.session_id},'${(s.nom_complet||s.email).replace(/'/g,"\\'")}'"
-            style="font-size:11px;padding:3px 9px;color:#f87171;border-color:rgba(248,113,113,.3)">
+          <button class="pos-btn ghost btn-revoquer" data-sid="${s.session_id}" data-nom="${(s.nom_complet||s.email).replace(/"/g,'&quot;')}" style="font-size:11px;padding:3px 9px;color:#f87171;border-color:rgba(248,113,113,.3)">
             Déconnecter
           </button>
         </td>
@@ -15571,6 +15570,12 @@ async function sessionRevoquer(sessionId, nom){
     loadAdminSessions();
   }catch(e){ posAlert(e.message||'Erreur','err'); }
 }
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.btn-revoquer');
+  if(!btn) return;
+  sessionRevoquer(btn.dataset.sid, btn.dataset.nom);
+});
 
 async function purgeInactiveSessions(){
   if(!confirm('Supprimer toutes les sessions expirées et abandonnées depuis plus de 2 heures ?')) return;
