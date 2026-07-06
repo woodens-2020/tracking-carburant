@@ -7242,7 +7242,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════════════ -->
     <!-- PAGE ZELLE                                                      -->
     <!-- ══════════════════════════════════════════════════════════════ -->
-    <!-- ══ PAGE ZELLE ══ -->
+    <!-- ══════════════════════════════ PAGE ZELLE ══════════════════════════════ -->
     <div id="page-zelle" class="page page-gi">
       <div class="gi-page-inner">
 
@@ -7256,7 +7256,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <span style="font-size:.85rem;color:var(--text-muted);">Taux :</span>
             <span id="zelle-taux-display" style="font-size:1.1rem;font-weight:700;color:var(--accent);">—</span>
             <span style="font-size:.82rem;color:var(--text-muted);">HTG/USD</span>
-            <button class="btn btn-sm btn-outline" onclick="zelleOpenConfig()">&#9881; Paramètres</button>
+            <button class="gi-btn-secondary" onclick="zelleOpenConfig()">&#9881; Paramètres</button>
           </div>
         </div>
 
@@ -7301,34 +7301,34 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <!-- injecté par JS -->
         </div>
 
-        <!-- Tabs -->
-        <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0;">
+        <!-- Tabs navigation -->
+        <div style="display:flex;gap:2px;margin-bottom:18px;border-bottom:1px solid rgba(255,255,255,.08);">
           <button id="ztab-transactions" class="zelle-tab active" onclick="zelleTab('transactions')">Transactions Zelle</button>
-          <button id="ztab-fonds"         class="zelle-tab"        onclick="zelleTab('fonds')">Réception de Fonds</button>
+          <button id="ztab-fonds"        class="zelle-tab"        onclick="zelleTab('fonds')">Réception de Fonds</button>
         </div>
 
-        <!-- Panel Transactions -->
+        <!-- ── Panel Transactions ── -->
         <div id="zpanel-transactions">
-          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px;">
-            <button class="btn btn-primary" onclick="zelleOpenForm()">+ Nouvelle transaction</button>
+          <div class="gi-filters" style="margin-bottom:14px;">
+            <button class="gi-btn-primary" onclick="zelleOpenForm()">+ Nouvelle transaction</button>
             <div style="flex:1;min-width:0;"></div>
-            <select id="zf-statut" class="form-control" style="width:130px;" onchange="zelleLoadTransactions()">
+            <select id="zf-statut" class="gi-form-select" style="width:130px;" onchange="zelleLoadTransactions()">
               <option value="">Tous statuts</option>
               <option value="EN_ATTENTE">En attente</option>
               <option value="REMIS">Remis</option>
               <option value="ANNULE">Annulé</option>
             </select>
-            <select id="zf-source" class="form-control" style="width:110px;" onchange="zelleLoadTransactions()">
-              <option value="">Toutes sources</option>
+            <select id="zf-source" class="gi-form-select" style="width:110px;" onchange="zelleLoadTransactions()">
+              <option value="">Ts sources</option>
               <option value="PDG">PDG</option>
               <option value="Gaz">Gaz</option>
               <option value="Autre">Autre</option>
             </select>
-            <input type="date" id="zf-debut" class="form-control" style="width:138px;" onchange="zelleLoadTransactions()">
-            <input type="date" id="zf-fin"   class="form-control" style="width:138px;" onchange="zelleLoadTransactions()">
-            <button class="btn btn-sm btn-outline" onclick="zelleResetTxFilters()">&#8635;</button>
+            <input type="date" id="zf-debut" class="gi-form-input" style="width:138px;" onchange="zelleLoadTransactions()">
+            <input type="date" id="zf-fin"   class="gi-form-input" style="width:138px;" onchange="zelleLoadTransactions()">
+            <button class="gi-btn-secondary" onclick="zelleResetTxFilters()" title="Effacer les filtres">&#8635;</button>
           </div>
-          <div class="table-responsive">
+          <div style="overflow-x:auto;">
             <table class="gi-table">
               <thead>
                 <tr>
@@ -7336,8 +7336,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                   <th>Nom &amp; Prénom</th>
                   <th>Identifiant</th>
                   <th>Contact</th>
-                  <th style="text-align:right;">Montant HT</th>
-                  <th style="text-align:right;">Montant $</th>
+                  <th style="text-align:right;">M. HTG</th>
+                  <th style="text-align:right;">M. USD</th>
                   <th style="text-align:right;">Frais</th>
                   <th style="text-align:right;">À remettre</th>
                   <th>Source</th>
@@ -7347,40 +7347,40 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 </tr>
               </thead>
               <tbody id="zelle-tbody">
-                <tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:32px;">Chargement…</td></tr>
+                <tr><td colspan="12" style="text-align:center;padding:32px;color:rgba(255,255,255,.35);">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <!-- Panel Fonds -->
+        <!-- ── Panel Fonds ── -->
         <div id="zpanel-fonds" style="display:none;">
-          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px;">
-            <button class="btn btn-primary" onclick="zelleOpenFondForm()">+ Déclarer réception de fonds</button>
+          <div class="gi-filters" style="margin-bottom:14px;">
+            <button class="gi-btn-primary" onclick="zelleOpenFondForm()">+ Déclarer réception de fonds</button>
             <div style="flex:1;min-width:0;"></div>
-            <select id="zff-source" class="form-control" style="width:110px;" onchange="zelleLoadFonds()">
-              <option value="">Toutes sources</option>
+            <select id="zff-source" class="gi-form-select" style="width:110px;" onchange="zelleLoadFonds()">
+              <option value="">Ts sources</option>
               <option value="PDG">PDG</option>
               <option value="Gaz">Gaz</option>
               <option value="Autre">Autre</option>
             </select>
-            <input type="date" id="zff-debut" class="form-control" style="width:138px;" onchange="zelleLoadFonds()">
-            <input type="date" id="zff-fin"   class="form-control" style="width:138px;" onchange="zelleLoadFonds()">
-            <button class="btn btn-sm btn-outline" onclick="zelleResetFondFilters()">&#8635;</button>
+            <input type="date" id="zff-debut" class="gi-form-input" style="width:138px;" onchange="zelleLoadFonds()">
+            <input type="date" id="zff-fin"   class="gi-form-input" style="width:138px;" onchange="zelleLoadFonds()">
+            <button class="gi-btn-secondary" onclick="zelleResetFondFilters()" title="Effacer les filtres">&#8635;</button>
           </div>
-          <div class="table-responsive">
+          <div style="overflow-x:auto;">
             <table class="gi-table">
               <thead>
                 <tr>
                   <th>Source</th>
-                  <th style="text-align:right;">Montant $</th>
+                  <th style="text-align:right;">Montant USD</th>
                   <th>Date de réception</th>
                   <th>Notes</th>
                   <th style="text-align:center;">Actions</th>
                 </tr>
               </thead>
               <tbody id="zelle-fonds-tbody">
-                <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px;">Chargement…</td></tr>
+                <tr><td colspan="5" style="text-align:center;padding:32px;color:rgba(255,255,255,.35);">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -7389,140 +7389,155 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div><!-- /gi-page-inner -->
     </div><!-- /page-zelle -->
 
-    <!-- Modal Paramètres Zelle -->
-    <div id="modal-zelle-config" class="modal-overlay" style="display:none;" onclick="if(event.target===this)zelleCloseConfig()">
-      <div class="modal-box" style="max-width:460px;">
-        <div class="modal-header">
-          <span class="modal-title">&#9881; Paramètres Zelle</span>
-          <button class="modal-close" onclick="zelleCloseConfig()">&#10005;</button>
+    <!-- ── Modal Paramètres Zelle ── -->
+    <div class="gi-modal-overlay" id="modal-zelle-config" onclick="if(event.target===this)zelleCloseConfig()">
+      <div class="gi-modal" style="width:min(480px,95vw);">
+        <div class="gi-modal-head">
+          <h3>&#9881; Paramètres Zelle</h3>
+          <button class="gi-modal-close" onclick="zelleCloseConfig()">&#215;</button>
         </div>
-        <div class="modal-body" style="padding:20px;">
-          <p style="font-size:.83rem;color:var(--text-muted);margin:0 0 16px;">Ces paramètres s'appliquent à tout le département Zelle.</p>
-          <div class="form-group">
-            <label class="form-label">Taux de change (HTG par USD)</label>
-            <input type="number" id="zcfg-taux" class="form-control" step="0.01" min="1" placeholder="130">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Balance avant en $ <span style="color:var(--text-muted);font-size:.8rem;">(solde initial — report du mois précédent)</span></label>
-            <input type="number" id="zcfg-bal" class="form-control" step="0.01" min="0" placeholder="0.00">
-          </div>
-          <div style="margin-top:18px;padding:12px;background:rgba(255,255,255,.04);border-radius:8px;border:1px solid var(--border);">
-            <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:8px;">Sources disponibles</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <span class="zelle-badge remis" style="font-size:.8rem;padding:4px 12px;">PDG</span>
-              <span class="zelle-badge en-attente" style="font-size:.8rem;padding:4px 12px;">Gaz</span>
-              <span class="zelle-badge annule" style="font-size:.8rem;padding:4px 12px;">Autre</span>
+        <div class="gi-modal-body">
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin:0 0 18px;">Ces paramètres s'appliquent à tout le département Zelle.</p>
+          <div class="gi-form-row">
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Taux de change (HTG / USD)</label>
+              <input type="number" id="zcfg-taux" class="gi-form-input" step="0.01" min="1" placeholder="130">
             </div>
-            <p style="font-size:.78rem;color:var(--text-muted);margin:8px 0 0;">Sélectionnables lors de chaque transaction et réception de fonds.</p>
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Balance avant en $ (report mois précédent)</label>
+              <input type="number" id="zcfg-bal" class="gi-form-input" step="0.01" min="0" placeholder="0.00">
+            </div>
+          </div>
+          <div style="margin-top:16px;padding:14px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.08);">
+            <div class="gi-form-lbl" style="margin-bottom:10px;">Sources disponibles</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <span class="zelle-badge zelle-src-pdg">PDG</span>
+              <span class="zelle-badge zelle-src-gaz">Gaz</span>
+              <span class="zelle-badge zelle-src-autre">Autre</span>
+            </div>
+            <p style="font-size:11px;color:rgba(255,255,255,.35);margin:10px 0 0;">Sélectionnables à chaque transaction et réception de fonds.</p>
           </div>
         </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline" onclick="zelleCloseConfig()">Annuler</button>
-          <button class="btn btn-primary" onclick="zelleSaveConfig()">Enregistrer</button>
+        <div class="gi-modal-foot">
+          <button class="gi-btn-secondary" onclick="zelleCloseConfig()">Annuler</button>
+          <button class="gi-btn-primary"   onclick="zelleSaveConfig()">Enregistrer</button>
         </div>
       </div>
     </div>
 
-    <!-- Modal transaction Zelle -->
-    <div id="modal-zelle-form" class="modal-overlay" style="display:none;" onclick="if(event.target===this)zelleCloseForm()">
-      <div class="modal-box" style="max-width:540px;">
-        <div class="modal-header">
-          <span id="zf-modal-title" class="modal-title">Nouvelle transaction</span>
-          <button class="modal-close" onclick="zelleCloseForm()">&#10005;</button>
+    <!-- ── Modal Transaction Zelle ── -->
+    <div class="gi-modal-overlay" id="modal-zelle-form" onclick="if(event.target===this)zelleCloseForm()">
+      <div class="gi-modal" style="width:min(580px,95vw);">
+        <div class="gi-modal-head">
+          <h3 id="zf-modal-title">Nouvelle transaction</h3>
+          <button class="gi-modal-close" onclick="zelleCloseForm()">&#215;</button>
         </div>
-        <div class="modal-body" style="padding:20px;">
+        <div class="gi-modal-body">
           <input type="hidden" id="zf-id">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-            <div class="form-group">
-              <label class="form-label">Numéro interne</label>
-              <input type="text" id="zf-numero" class="form-control" placeholder="Facultatif">
+          <div class="gi-form-row">
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Numéro interne</label>
+              <input type="text" id="zf-numero" class="gi-form-input" placeholder="Facultatif">
             </div>
-            <div class="form-group">
-              <label class="form-label">Nom &amp; Prénom <span style="color:var(--danger)">*</span></label>
-              <input type="text" id="zf-nom" class="form-control" placeholder="Jean Dupont">
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Nom &amp; Prénom *</label>
+              <input type="text" id="zf-nom" class="gi-form-input" placeholder="Jean Dupont">
             </div>
-            <div class="form-group">
-              <label class="form-label">Identifiant Zelle</label>
-              <input type="text" id="zf-identifiant" class="form-control" placeholder="email ou téléphone">
+          </div>
+          <div class="gi-form-row">
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Identifiant Zelle</label>
+              <input type="text" id="zf-identifiant" class="gi-form-input" placeholder="email ou téléphone">
             </div>
-            <div class="form-group">
-              <label class="form-label">Contact</label>
-              <input type="text" id="zf-contact" class="form-control" placeholder="Téléphone…">
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Contact</label>
+              <input type="text" id="zf-contact" class="gi-form-input" placeholder="Téléphone…">
             </div>
-            <div class="form-group">
-              <label class="form-label">Montant en $ <span style="color:var(--danger)">*</span></label>
-              <input type="number" id="zf-montant" class="form-control" step="0.01" min="0.01" placeholder="0.00">
+          </div>
+          <div class="gi-form-row">
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Montant en $ *</label>
+              <input type="number" id="zf-montant" class="gi-form-input" step="0.01" min="0.01" placeholder="0.00">
             </div>
-            <div class="form-group">
-              <label class="form-label">Frais ($)</label>
-              <input type="number" id="zf-frais" class="form-control" step="0.01" min="0" value="0" placeholder="0.00">
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Frais ($)</label>
+              <input type="number" id="zf-frais" class="gi-form-input" step="0.01" min="0" value="0" placeholder="0.00">
             </div>
-            <div class="form-group">
-              <label class="form-label">Source de fonds</label>
-              <select id="zf-source-fond" class="form-control">
+          </div>
+          <div class="gi-form-row">
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Source de fonds</label>
+              <select id="zf-source-fond" class="gi-form-select">
                 <option value="">— Sélectionner —</option>
                 <option value="PDG">PDG</option>
                 <option value="Gaz">Gaz</option>
                 <option value="Autre">Autre</option>
               </select>
             </div>
-            <div class="form-group">
-              <label class="form-label">Date</label>
-              <input type="date" id="zf-date" class="form-control">
-            </div>
-            <div class="form-group" style="grid-column:1/-1;">
-              <label class="form-label">Notes</label>
-              <textarea id="zf-notes" class="form-control" rows="2" placeholder="Remarques…"></textarea>
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Date</label>
+              <input type="date" id="zf-date" class="gi-form-input">
             </div>
           </div>
-          <div id="zf-a-remettre-preview" style="margin-top:10px;padding:12px 16px;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.25);border-radius:8px;display:none;">
-            <span style="font-size:.82rem;color:var(--text-muted);">À remettre :</span>
-            <strong id="zf-preview-val" style="font-size:1.1rem;color:#4ade80;margin-left:8px;font-variant-numeric:tabular-nums;">—</strong>
+          <div class="gi-form-row full">
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Notes</label>
+              <textarea id="zf-notes" class="gi-form-textarea" rows="2" placeholder="Remarques…"></textarea>
+            </div>
+          </div>
+          <div id="zf-a-remettre-preview" class="gi-net-preview" style="display:none;">
+            <div class="gi-net-lbl">À remettre</div>
+            <div id="zf-preview-val" style="font-size:1.3rem;font-weight:800;color:#4ade80;font-variant-numeric:tabular-nums;margin-top:4px;">—</div>
           </div>
         </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline" onclick="zelleCloseForm()">Annuler</button>
-          <button class="btn btn-primary" onclick="zelleSaveForm()">Enregistrer</button>
+        <div class="gi-modal-foot">
+          <button class="gi-btn-secondary" onclick="zelleCloseForm()">Annuler</button>
+          <button class="gi-btn-primary"   onclick="zelleSaveForm()">Enregistrer</button>
         </div>
       </div>
     </div>
 
-    <!-- Modal réception de fonds -->
-    <div id="modal-zelle-fond" class="modal-overlay" style="display:none;" onclick="if(event.target===this)zelleCloseFondForm()">
-      <div class="modal-box" style="max-width:440px;">
-        <div class="modal-header">
-          <span id="zff-modal-title" class="modal-title">Déclarer réception de fonds</span>
-          <button class="modal-close" onclick="zelleCloseFondForm()">&#10005;</button>
+    <!-- ── Modal Réception de Fonds ── -->
+    <div class="gi-modal-overlay" id="modal-zelle-fond" onclick="if(event.target===this)zelleCloseFondForm()">
+      <div class="gi-modal" style="width:min(460px,95vw);">
+        <div class="gi-modal-head">
+          <h3 id="zff-modal-title">Déclarer réception de fonds</h3>
+          <button class="gi-modal-close" onclick="zelleCloseFondForm()">&#215;</button>
         </div>
-        <div class="modal-body" style="padding:20px;">
+        <div class="gi-modal-body">
           <input type="hidden" id="zff-id">
-          <div class="form-group">
-            <label class="form-label">Montant reçu en $ <span style="color:var(--danger)">*</span></label>
-            <input type="number" id="zff-montant" class="form-control" step="0.01" min="0.01" placeholder="0.00">
+          <div class="gi-form-row">
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Montant reçu en $ *</label>
+              <input type="number" id="zff-montant" class="gi-form-input" step="0.01" min="0.01" placeholder="0.00">
+            </div>
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Source *</label>
+              <select id="zff-source-sel" class="gi-form-select">
+                <option value="PDG">PDG</option>
+                <option value="Gaz">Gaz</option>
+                <option value="Autre">Autre</option>
+              </select>
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Source <span style="color:var(--danger)">*</span></label>
-            <select id="zff-source-sel" class="form-control">
-              <option value="PDG">PDG</option>
-              <option value="Gaz">Gaz</option>
-              <option value="Autre">Autre</option>
-            </select>
+          <div class="gi-form-row">
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Date de réception</label>
+              <input type="date" id="zff-date" class="gi-form-input">
+            </div>
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Notes</label>
+              <input type="text" id="zff-notes" class="gi-form-input" placeholder="Remarques…">
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Date de réception</label>
-            <input type="date" id="zff-date" class="form-control">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Notes</label>
-            <textarea id="zff-notes" class="form-control" rows="2" placeholder="Remarques…"></textarea>
-          </div>
-          <div id="zff-impact" style="margin-top:10px;padding:12px 16px;background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.25);border-radius:8px;font-size:.85rem;display:none;">
-            Ce fond sera ajouté à la balance disponible.
+          <div id="zff-impact" class="gi-net-preview" style="display:none;">
+            <div class="gi-net-lbl">Impact balance</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:6px;">Ce fond s'additionnera à la balance disponible dès l'enregistrement.</div>
           </div>
         </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline" onclick="zelleCloseFondForm()">Annuler</button>
-          <button class="btn btn-primary" onclick="zelleSaveFond()">Enregistrer</button>
+        <div class="gi-modal-foot">
+          <button class="gi-btn-secondary" onclick="zelleCloseFondForm()">Annuler</button>
+          <button class="gi-btn-primary"   onclick="zelleSaveFond()">Enregistrer</button>
         </div>
       </div>
     </div>
@@ -23971,13 +23986,13 @@ async function zelleLoadTransactions(){
       html += '<td>' + _zSrc(t.source_fond) + '</td>';
       html += '<td>' + badge + '</td>';
       html += '<td style="color:var(--text-muted);font-size:.83rem;">' + dateStr + '</td>';
-      html += '<td style="text-align:center;white-space:nowrap;">';
+      html += '<td style="text-align:center;white-space:nowrap;display:flex;gap:4px;justify-content:center;">';
       if(t.statut === 'EN_ATTENTE'){
-        html += '<button class="btn btn-xs btn-outline" style="margin-right:3px;color:#4ade80;border-color:rgba(74,222,128,.4);" onclick="zelleSetStatut(' + t.id + ',\'REMIS\')">&#10003;</button>';
-        html += '<button class="btn btn-xs btn-outline" style="margin-right:3px;color:#f87171;border-color:rgba(248,113,113,.4);" onclick="zelleSetStatut(' + t.id + ',\'ANNULE\')">&#10005;</button>';
+        html += '<button class="gi-btn-icon success" title="Marquer remis" onclick="zelleSetStatut(' + t.id + ',\'REMIS\')">&#10003;</button>';
+        html += '<button class="gi-btn-icon danger"  title="Annuler"      onclick="zelleSetStatut(' + t.id + ',\'ANNULE\')">&#10005;</button>';
       }
-      html += '<button class="btn btn-xs btn-outline" style="margin-right:3px;" onclick="zelleOpenEdit(' + t.id + ')">&#9998;</button>';
-      html += '<button class="btn btn-xs btn-outline" style="color:#f87171;border-color:rgba(248,113,113,.4);" onclick="zelleDeleteTx(' + t.id + ')">&#128465;</button>';
+      html += '<button class="gi-btn-icon" title="Modifier" onclick="zelleOpenEdit(' + t.id + ')">&#9998;</button>';
+      html += '<button class="gi-btn-icon danger" title="Supprimer" onclick="zelleDeleteTx(' + t.id + ')">&#128465;</button>';
       html += '</td></tr>';
     }
     tbody.innerHTML = html;
@@ -24021,9 +24036,10 @@ async function zelleLoadFonds(){
       html += '<td style="text-align:right;font-weight:700;color:#60a5fa;font-variant-numeric:tabular-nums;">' + _zelleUsd(f.montant_usd) + '</td>';
       html += '<td style="color:var(--text-muted);font-size:.83rem;">' + dateStr + '</td>';
       html += '<td style="color:var(--text-muted);font-size:.83rem;">' + (f.notes || '—') + '</td>';
-      html += '<td style="text-align:center;white-space:nowrap;">';
-      html += '<button class="btn btn-xs btn-outline" style="margin-right:3px;" onclick="zelleOpenFondEdit(' + f.id + ')">&#9998;</button>';
-      html += '<button class="btn btn-xs btn-outline" style="color:#f87171;border-color:rgba(248,113,113,.4);" onclick="zelleDeleteFond(' + f.id + ')">&#128465;</button>';
+      html += '<td style="text-align:center;white-space:nowrap;"><div style="display:flex;gap:4px;justify-content:center;">';
+      html += '<button class="gi-btn-icon" title="Modifier"    onclick="zelleOpenFondEdit(' + f.id + ')">&#9998;</button>';
+      html += '<button class="gi-btn-icon danger" title="Supprimer" onclick="zelleDeleteFond(' + f.id + ')">&#128465;</button>';
+      html += '</div>';
       html += '</td></tr>';
     }
     // ligne total
@@ -24047,10 +24063,10 @@ function zelleResetFondFilters(){
 function zelleOpenConfig(){
   document.getElementById('zcfg-taux').value = _zelleConfig.taux || 130;
   document.getElementById('zcfg-bal').value  = _zelleConfig.balance_avant_usd || 0;
-  document.getElementById('modal-zelle-config').style.display = 'flex';
+  document.getElementById('modal-zelle-config').classList.add('open');
 }
 function zelleCloseConfig(){
-  document.getElementById('modal-zelle-config').style.display = 'none';
+  document.getElementById('modal-zelle-config').classList.remove('open');
 }
 async function zelleSaveConfig(){
   const taux = parseFloat(document.getElementById('zcfg-taux').value);
@@ -24092,7 +24108,7 @@ function zelleOpenForm(){
   document.getElementById('zf-date').value        = new Date().toISOString().substring(0,10);
   const pv = document.getElementById('zf-a-remettre-preview');
   if(pv) pv.style.display = 'none';
-  document.getElementById('modal-zelle-form').style.display = 'flex';
+  document.getElementById('modal-zelle-form').classList.add('open');
   setTimeout(function(){ const el=document.getElementById('zf-nom'); if(el) el.focus(); }, 80);
 }
 
@@ -24111,11 +24127,11 @@ function zelleOpenEdit(id){
   document.getElementById('zf-notes').value       = t.notes        || '';
   document.getElementById('zf-date').value        = t.date_transaction ? t.date_transaction.substring(0,10) : '';
   _zellePreviewRemettre();
-  document.getElementById('modal-zelle-form').style.display = 'flex';
+  document.getElementById('modal-zelle-form').classList.add('open');
 }
 
 function zelleCloseForm(){
-  document.getElementById('modal-zelle-form').style.display = 'none';
+  document.getElementById('modal-zelle-form').classList.remove('open');
 }
 
 async function zelleSaveForm(){
@@ -24175,7 +24191,7 @@ function zelleOpenFondForm(){
   document.getElementById('zff-date').value         = new Date().toISOString().substring(0,10);
   document.getElementById('zff-notes').value        = '';
   const imp = document.getElementById('zff-impact'); if(imp) imp.style.display='block';
-  document.getElementById('modal-zelle-fond').style.display = 'flex';
+  document.getElementById('modal-zelle-fond').classList.add('open');
   setTimeout(function(){ const el=document.getElementById('zff-montant'); if(el) el.focus(); }, 80);
 }
 
@@ -24189,11 +24205,11 @@ function zelleOpenFondEdit(id){
   document.getElementById('zff-date').value         = f.date_reception ? f.date_reception.substring(0,10) : '';
   document.getElementById('zff-notes').value        = f.notes || '';
   const imp = document.getElementById('zff-impact'); if(imp) imp.style.display='none';
-  document.getElementById('modal-zelle-fond').style.display = 'flex';
+  document.getElementById('modal-zelle-fond').classList.add('open');
 }
 
 function zelleCloseFondForm(){
-  document.getElementById('modal-zelle-fond').style.display = 'none';
+  document.getElementById('modal-zelle-fond').classList.remove('open');
 }
 
 async function zelleSaveFond(){
