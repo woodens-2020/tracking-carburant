@@ -609,8 +609,8 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
     prix_map  = prix_actif_batch(db)
     cmup_map  = cmup_batch(db)
 
-    # Dernier achat CONFIRMÉ complet par produit (date + quantité + prix unitaire)
-    derniers_achats_map: dict[int, BarAchat] = {}
+    # Dernier achat CONFIRMÉ par produit — sert au calcul de l'écoulement
+    derniers_achats_confirmes: dict[int, BarAchat] = {}
     for pid, max_date in (
         db.query(BarAchat.produit_id, func.max(BarAchat.date_achat))
         .filter(BarAchat.produit_id.isnot(None), BarAchat.statut == "CONFIRME")
@@ -623,17 +623,33 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
             .first()
         )
         if achat:
-            derniers_achats_map[pid] = achat
+            derniers_achats_confirmes[pid] = achat
+
+    # Dernier achat TOUS STATUTS par produit — sert à l'affichage de la date/qté commande
+    derniers_achats_tous: dict[int, BarAchat] = {}
+    for pid, max_date in (
+        db.query(BarAchat.produit_id, func.max(BarAchat.date_achat))
+        .filter(BarAchat.produit_id.isnot(None))
+        .group_by(BarAchat.produit_id)
+        .all()
+    ):
+        achat = (
+            db.query(BarAchat)
+            .filter(BarAchat.produit_id == pid, BarAchat.date_achat == max_date)
+            .first()
+        )
+        if achat:
+            derniers_achats_tous[pid] = achat
 
     # Quantité écoulée (SORTIE_VENTE) depuis dernier achat confirmé
     sorties_depuis_achat: dict[int, float] = {}
     for p in produits:
-        achat = derniers_achats_map.get(p.id)
-        if achat:
+        achat_ref = derniers_achats_confirmes.get(p.id)
+        if achat_ref:
             qte = db.query(func.sum(BarMouvementStock.quantite)).filter(
                 BarMouvementStock.produit_id == p.id,
                 BarMouvementStock.type_mouvement == "SORTIE_VENTE",
-                BarMouvementStock.date_mouvement >= achat.date_achat,
+                BarMouvementStock.date_mouvement >= achat_ref.date_achat,
             ).scalar()
             sorties_depuis_achat[p.id] = abs(float(qte or 0))
 
@@ -647,7 +663,8 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
         potentiel_ca   = round(stock_pos * prix, 2)
         valeur_stock   = round(stock_pos * cout_moy, 2)
 
-        last = derniers_achats_map.get(p.id)
+        # Pour affichage : prendre le dernier achat tous statuts (même EN_ATTENTE)
+        last = derniers_achats_tous.get(p.id)
         resultats.append({
             "produit_id":              p.id,
             "nom":                     p.nom,
@@ -662,6 +679,7 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
             "derniere_qte_commandee":  float(last.quantite) if last else None,
             "dernier_prix_achat":      float(last.prix_achat_unitaire) if last else None,
             "dernier_achat":           last.date_achat.isoformat() if last else None,
+            "dernier_achat_statut":    last.statut if last else None,
             "seuil_alerte":            float(p.seuil_alerte_stock),
             "en_alerte":               stock <= float(p.seuil_alerte_stock),
             "rupture":                 stock <= 0,

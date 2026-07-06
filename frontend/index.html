@@ -18562,45 +18562,66 @@ async function posFicheTechniqueOuvrir(){
       return;
     }
 
-    const fmt  = v => parseFloat(v||0) % 1 === 0 ? parseFloat(v||0).toFixed(0) : parseFloat(v||0).toFixed(2);
-    const fmtd = iso => iso ? new Date(iso).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+    const fmt  = v => { const n = parseFloat(v||0); return n % 1 === 0 ? n.toFixed(0) : n.toFixed(2); };
+    const fmtd = iso => iso ? new Date(iso).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : null;
+    // Affiche une quantité avec son unité de façon lisible.
+    // Si l'unité est un chiffre pur (ex: "1", "10"), on ne l'affiche pas brut
+    // car "44 1" ou "0 10" n'a aucun sens — on montre à la place "unité(s)".
+    const fmtQte = (v, unite) => {
+      const n = fmt(v);
+      if(!unite || /^\d+(\.\d+)?$/.test(String(unite).trim())) return `${n} unité(s)`;
+      return `${n} ${unite}`;
+    };
 
     tbody.innerHTML = produits.map(p => {
-      // Statut badge
+      // Badge statut stock
       let statutBadge;
       if(p.rupture){
-        statutBadge = `<span style="background:rgba(248,113,113,.18);color:#f87171;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700">✗ Rupture</span>`;
+        statutBadge = `<span style="background:rgba(248,113,113,.18);color:#f87171;padding:4px 10px;border-radius:5px;font-size:11px;font-weight:700;white-space:nowrap">✗ Rupture de stock</span>`;
       } else if(p.en_alerte){
-        statutBadge = `<span style="background:rgba(251,191,36,.15);color:#fbbf24;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700">⚠ Faible</span>`;
+        statutBadge = `<span style="background:rgba(251,191,36,.15);color:#fbbf24;padding:4px 10px;border-radius:5px;font-size:11px;font-weight:700;white-space:nowrap">⚠ Stock faible</span>`;
       } else {
-        statutBadge = `<span style="background:rgba(52,211,153,.12);color:#34d399;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700">✓ OK</span>`;
+        statutBadge = `<span style="background:rgba(52,211,153,.12);color:#34d399;padding:4px 10px;border-radius:5px;font-size:11px;font-weight:700;white-space:nowrap">✓ Stock OK</span>`;
       }
 
-      // Dernière commande
-      const dernCommande = p.derniere_qte_commandee != null
-        ? `<span style="font-weight:600;color:#fff">${fmt(p.derniere_qte_commandee)} ${p.unite}</span>
-           <div style="font-size:10px;color:rgba(255,255,255,.35)">à G ${parseFloat(p.dernier_prix_achat||0).toFixed(2)}/u · ${fmtd(p.dernier_achat)}</div>`
-        : `<span style="color:rgba(255,255,255,.25)">Aucune commande</span>`;
+      // Dernière commande — afficher qté + date + prix + statut de l'achat
+      let dernCommande;
+      if(p.derniere_qte_commandee != null){
+        const dateStr = fmtd(p.dernier_achat) || '—';
+        const prixStr = p.dernier_prix_achat != null
+          ? `G&nbsp;${parseFloat(p.dernier_prix_achat).toFixed(2)} par unité`
+          : '—';
+        const achatStatut = p.dernier_achat_statut === 'CONFIRME'
+          ? `<span style="color:#34d399;font-size:9px">● Confirmé</span>`
+          : `<span style="color:#fbbf24;font-size:9px">● En attente</span>`;
+        dernCommande = `
+          <div style="font-weight:700;font-size:13px;color:#fff">${fmtQte(p.derniere_qte_commandee, p.unite)}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.45);margin-top:2px">Date : ${dateStr}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.35)">Prix : ${prixStr}</div>
+          <div style="margin-top:3px">${achatStatut}</div>`;
+      } else {
+        dernCommande = `<span style="color:rgba(255,255,255,.2);font-style:italic;font-size:12px">Jamais commandé</span>`;
+      }
 
-      // Stock coloré
+      // Stock coloré selon alerte
       const stockColor = p.rupture ? '#f87171' : (p.en_alerte ? '#fbbf24' : '#fff');
 
       return `<tr>
-        <td>
+        <td style="padding:10px 12px">
           <div style="font-weight:700;font-size:13px">${p.nom}</div>
-          <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">${p.categorie}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:3px">${p.categorie}</div>
         </td>
-        <td style="text-align:center">${dernCommande}</td>
-        <td style="text-align:right;font-weight:700;font-size:13px;color:${stockColor}">${fmt(p.stock_courant)}&nbsp;${p.unite}</td>
-        <td style="text-align:right;color:#f7a93b;font-weight:600">${Gx(p.valeur_stock)}
-          <div style="font-size:10px;color:rgba(255,255,255,.3)">CMUP G ${parseFloat(p.cmup||0).toFixed(2)}</div>
+        <td style="padding:10px 12px;text-align:left">${dernCommande}</td>
+        <td style="padding:10px 12px;text-align:right;font-weight:700;font-size:14px;color:${stockColor}">${fmtQte(p.stock_courant, p.unite)}</td>
+        <td style="padding:10px 12px;text-align:right;color:#f7a93b;font-weight:600">${Gx(p.valeur_stock)}
+          <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:2px">CMUP : G&nbsp;${parseFloat(p.cmup||0).toFixed(2)}/unité</div>
         </td>
-        <td style="text-align:right;color:rgba(255,255,255,.7)">${Gx(p.prix_vente)}</td>
-        <td style="text-align:right;color:#3fb6a8;font-weight:700">${Gx(p.potentiel_ca)}</td>
-        <td style="text-align:right;color:rgba(255,255,255,.55)">${fmt(p.ecoulement)}&nbsp;${p.unite}
-          <div style="font-size:10px;color:rgba(255,255,255,.25)">dep. commande</div>
+        <td style="padding:10px 12px;text-align:right;color:rgba(255,255,255,.7)">${Gx(p.prix_vente)}</td>
+        <td style="padding:10px 12px;text-align:right;color:#3fb6a8;font-weight:700">${Gx(p.potentiel_ca)}</td>
+        <td style="padding:10px 12px;text-align:right;color:rgba(255,255,255,.55)">${fmtQte(p.ecoulement, p.unite)}
+          <div style="font-size:10px;color:rgba(255,255,255,.25);margin-top:2px">depuis dernière commande</div>
         </td>
-        <td style="text-align:center">${statutBadge}</td>
+        <td style="padding:10px 12px;text-align:center">${statutBadge}</td>
       </tr>`;
     }).join('');
 
@@ -18736,18 +18757,21 @@ function pftExcelFiche(){
     ['Valeur totale du stock (G)', d.total_valeur_stock, '', 'Potentiel CA si tout vendu (G)', d.total_potentiel_ca, '', 'Marge nette potentielle (G)', d.total_marge_nette],
     [],
     ['DÉTAIL PAR PRODUIT','','','','','',''],
-    ['Produit','Catégorie','Unité','Dernière commande (qté)','Date dernière commande','Prix achat/u (G)','Stock disponible','Valeur estimée (G)','Prix vente (G)','Potentiel CA (G)','Écoulement dep. commande','Statut'],
+    ['Produit','Catégorie','Unité','Dernière commande (qté)','Date dernière commande','Prix achat/u (G)','Statut commande','Stock disponible','CMUP (G/unité)','Valeur estimée (G)','Prix vente (G)','Potentiel CA (G)','Écoulement dep. commande','Statut stock'],
     ...(d.produits||[]).map(p=>[
-      p.nom, p.categorie, p.unite,
-      p.derniere_qte_commandee != null ? fmt(p.derniere_qte_commandee) : 'Aucune',
-      fmtd(p.dernier_achat),
+      p.nom, p.categorie,
+      (!p.unite || /^\d+(\.\d+)?$/.test(String(p.unite).trim())) ? 'unité(s)' : p.unite,
+      p.derniere_qte_commandee != null ? fmt(p.derniere_qte_commandee) : 'Jamais commandé',
+      fmtd(p.dernier_achat) || '—',
       p.dernier_prix_achat != null ? parseFloat(p.dernier_prix_achat).toFixed(2) : '—',
+      p.dernier_achat_statut === 'CONFIRME' ? 'Confirmé' : (p.dernier_achat_statut ? 'En attente' : '—'),
       fmt(p.stock_courant),
+      parseFloat(p.cmup||0).toFixed(4),
       parseFloat(p.valeur_stock||0).toFixed(2),
       parseFloat(p.prix_vente||0).toFixed(2),
       parseFloat(p.potentiel_ca||0).toFixed(2),
       fmt(p.ecoulement),
-      p.rupture ? 'Rupture' : (p.en_alerte ? 'Faible' : 'OK')
+      p.rupture ? 'Rupture de stock' : (p.en_alerte ? 'Stock faible' : 'Stock OK')
     ]),
     [],
     ['LÉGENDE DES TERMES',''],
@@ -18770,13 +18794,27 @@ function pftPDFFiche(){
   const d   = _pftFicheData;
   const now = new Date();
   const Gf  = v => parseFloat(v||0).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})+' G';
-  const fmt  = v => parseFloat(v||0) % 1 === 0 ? parseFloat(v||0).toFixed(0) : parseFloat(v||0).toFixed(2);
-  const fmtd = iso => iso ? new Date(iso).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+  const fmt  = v => { const n = parseFloat(v||0); return n % 1 === 0 ? n.toFixed(0) : n.toFixed(2); };
+  const fmtd = iso => iso ? new Date(iso).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : null;
+  const fmtQte = (v, unite) => {
+    const n = fmt(v);
+    if(!unite || /^\d+(\.\d+)?$/.test(String(unite).trim())) return `${n} unité(s)`;
+    return `${n} ${unite}`;
+  };
 
   const lignes = (d.produits||[]).map((p,i) => {
-    const dernCommande = p.derniere_qte_commandee != null
-      ? `<strong>${fmt(p.derniere_qte_commandee)} ${p.unite}</strong><div style="font-size:7pt;color:#64748b">à ${Gf(p.dernier_prix_achat)}/u · ${fmtd(p.dernier_achat)}</div>`
-      : `<span style="color:#94a3b8">Aucune commande</span>`;
+    let dernCommande;
+    if(p.derniere_qte_commandee != null){
+      const dateStr = fmtd(p.dernier_achat) || '—';
+      const statutLabel = p.dernier_achat_statut === 'CONFIRME' ? '● Confirmé' : '● En attente';
+      const statutColor = p.dernier_achat_statut === 'CONFIRME' ? '#16a34a' : '#d97706';
+      dernCommande = `<strong>${fmtQte(p.derniere_qte_commandee, p.unite)}</strong>
+        <div style="font-size:7pt;color:#64748b">Date : ${dateStr}</div>
+        <div style="font-size:7pt;color:#64748b">Prix : ${Gf(p.dernier_prix_achat)}/unité</div>
+        <div style="font-size:7pt;color:${statutColor}">${statutLabel}</div>`;
+    } else {
+      dernCommande = `<span style="color:#94a3b8;font-style:italic">Jamais commandé</span>`;
+    }
     const stockColor = p.rupture ? '#dc2626' : (p.en_alerte ? '#d97706' : '#1a1a1a');
     let statutBadge;
     if(p.rupture) statutBadge = '<span style="background:#fef2f2;color:#dc2626;padding:2px 7px;border-radius:4px;font-size:7pt;font-weight:700">✗ Rupture</span>';
@@ -18785,11 +18823,11 @@ function pftPDFFiche(){
     return `<tr style="${i%2===1?'background:#f8fafc':''}">
       <td style="padding:5px 8px;font-weight:600">${p.nom}<div style="font-size:7.5pt;color:#64748b;font-weight:400">${p.categorie}</div></td>
       <td style="padding:5px 8px;text-align:center;font-size:8pt">${dernCommande}</td>
-      <td style="padding:5px 8px;text-align:right;font-weight:700;color:${stockColor}">${fmt(p.stock_courant)} ${p.unite}</td>
-      <td style="padding:5px 8px;text-align:right;color:#d97706;font-weight:600">${Gf(p.valeur_stock)}<div style="font-size:7pt;color:#94a3b8">CMUP ${Gf(p.cmup)}</div></td>
+      <td style="padding:5px 8px;text-align:right;font-weight:700;color:${stockColor}">${fmtQte(p.stock_courant, p.unite)}</td>
+      <td style="padding:5px 8px;text-align:right;color:#d97706;font-weight:600">${Gf(p.valeur_stock)}<div style="font-size:7pt;color:#94a3b8">CMUP : ${Gf(p.cmup)}/u</div></td>
       <td style="padding:5px 8px;text-align:right">${Gf(p.prix_vente)}</td>
       <td style="padding:5px 8px;text-align:right;color:#0891b2;font-weight:700">${Gf(p.potentiel_ca)}</td>
-      <td style="padding:5px 8px;text-align:right;color:#64748b">${fmt(p.ecoulement)} ${p.unite}</td>
+      <td style="padding:5px 8px;text-align:right;color:#64748b">${fmtQte(p.ecoulement, p.unite)}</td>
       <td style="padding:5px 8px;text-align:center">${statutBadge}</td>
     </tr>`;
   }).join('');
