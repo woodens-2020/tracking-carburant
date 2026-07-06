@@ -6304,11 +6304,21 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </table>
           </div>
 
-          <div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
-            <button class="pos-btn ghost" onclick="document.getElementById('pos-fiche-tech-modal').classList.remove('open')">Fermer</button>
-            <button class="pos-btn teal" onclick="pftPasserInventaire()">
-              Inventaire physique →
-            </button>
+          <div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap">
+            <div style="display:flex;gap:8px">
+              <button class="pos-btn ghost" onclick="pftExcelFiche()" title="Télécharger Excel (.csv)" style="color:#34d399;border-color:rgba(52,211,153,.3);gap:5px;display:flex;align-items:center">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                Excel
+              </button>
+              <button class="pos-btn ghost" onclick="pftPDFFiche()" title="Télécharger PDF" style="color:#a78bfa;border-color:rgba(167,139,250,.3);gap:5px;display:flex;align-items:center">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                PDF
+              </button>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="pos-btn ghost" onclick="document.getElementById('pos-fiche-tech-modal').classList.remove('open')">Fermer</button>
+              <button class="pos-btn teal" onclick="pftPasserInventaire()">Inventaire physique →</button>
+            </div>
           </div>
         </div>
 
@@ -7864,12 +7874,24 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div id="ckac-bilan-generaux" style="display:none;margin:0 20px 14px;padding:10px 14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;font-size:12px;color:rgba(255,255,255,.5)"></div>
 
         <!-- Footer -->
-        <div class="pos-modal-footer" style="padding:14px 20px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:flex-end;gap:10px">
-          <button class="pos-btn ghost" onclick="document.getElementById('ckac-bilan-modal').classList.remove('open')">Fermer</button>
-          <button class="gi-btn-primary" onclick="ckAchatsBilanContinuer()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Déclarer un nouvel achat
-          </button>
+        <div class="pos-modal-footer" style="padding:14px 20px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="display:flex;gap:8px">
+            <button class="pos-btn ghost" onclick="ckAchatsBilanExcel()" title="Télécharger Excel (.csv)" style="color:#34d399;border-color:rgba(52,211,153,.3);gap:5px;display:flex;align-items:center">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              Excel
+            </button>
+            <button class="pos-btn ghost" onclick="ckAchatsBilanPDF()" title="Télécharger PDF" style="color:#a78bfa;border-color:rgba(167,139,250,.3);gap:5px;display:flex;align-items:center">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              PDF
+            </button>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="pos-btn ghost" onclick="document.getElementById('ckac-bilan-modal').classList.remove('open')">Fermer</button>
+            <button class="gi-btn-primary" onclick="ckAchatsBilanContinuer()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Déclarer un nouvel achat
+            </button>
+          </div>
         </div>
       </div>
     </div><!-- /ckac-bilan-modal -->
@@ -18669,6 +18691,123 @@ async function _posOuvrirFormAchat(){
   document.getElementById('pos-achat-modal-bg').classList.add('open');
 }
 
+function pftExcelFiche(){
+  if(!_pftFicheData){ posAlert('Chargez la fiche d\'abord.','warn'); return; }
+  const d = _pftFicheData;
+  const sep = ';';
+  const esc = v => `"${String(v==null?'':v).replace(/"/g,'""')}"`;
+  const now = new Date().toLocaleDateString('fr');
+  const fmt3 = v => parseFloat(v||0).toFixed(3);
+  const rows = [
+    [`Fiche Technique Stock Bar — ${now}`,'','','','','','','',''],
+    [],
+    ['RÉSUMÉ GLOBAL','','','','','','','',''],
+    ['Potentiel CA Total', d.total_potentiel_ca, '', 'Coût Stock Total', d.total_cout_stock, '', 'Marge Potentielle', d.total_marge_potentielle, ''],
+    [],
+    ['DÉTAIL PAR PRODUIT','','','','','','','',''],
+    ['Produit','Catégorie','Unité','Stock Courant','Prix Vente (G)','CMUP (G)','Potentiel CA (G)','Coût Stock (G)','Marge Pot. (G)','Marge %','Vendu dep. achat','CA dep. achat (G)','Dernier Achat'],
+    ...(d.produits||[]).map(p=>[
+      p.nom, p.categorie, p.unite, fmt3(p.stock_courant),
+      p.prix_vente, p.cmup, p.potentiel_ca, p.cout_stock, p.marge_potentielle,
+      p.marge_pct+'%', fmt3(p.vendu_depuis_dernier_achat), p.ca_depuis_dernier_achat,
+      p.dernier_achat ? new Date(p.dernier_achat).toLocaleDateString('fr') : 'jamais'
+    ])
+  ];
+  const csv = rows.map(r => r.map(c=>esc(c)).join(sep)).join('\r\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(csv);
+  a.download = `fiche_technique_bar_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+function pftPDFFiche(){
+  if(!_pftFicheData){ posAlert('Chargez la fiche d\'abord.','warn'); return; }
+  const d   = _pftFicheData;
+  const now = new Date();
+  const Gf  = v => parseFloat(v||0).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})+' G';
+  const fmt3 = v => parseFloat(v||0).toFixed(3);
+
+  const lignes = (d.produits||[]).map((p,i) => {
+    const alertIcon = p.en_alerte ? '<span style="color:#dc2626;font-weight:700"> ⚠</span>' : '';
+    const mOk = parseFloat(p.marge_potentielle) >= 0;
+    const mColor = mOk ? '#16a34a' : '#dc2626';
+    const dernAchat = p.dernier_achat ? new Date(p.dernier_achat).toLocaleDateString('fr') : '—';
+    return `<tr style="${i%2===1?'background:#f8fafc':''}">
+      <td style="padding:5px 8px;font-weight:600">${p.nom}${alertIcon}<div style="font-size:7.5pt;color:#64748b;font-weight:400">${p.categorie}</div></td>
+      <td style="padding:5px 8px;text-align:right;font-weight:700">${fmt3(p.stock_courant)} ${p.unite}</td>
+      <td style="padding:5px 8px;text-align:right">${Gf(p.prix_vente)}</td>
+      <td style="padding:5px 8px;text-align:right;color:#64748b">${Gf(p.cmup)}</td>
+      <td style="padding:5px 8px;text-align:right;color:#0891b2;font-weight:700">${Gf(p.potentiel_ca)}</td>
+      <td style="padding:5px 8px;text-align:right;color:#dc2626">${Gf(p.cout_stock)}</td>
+      <td style="padding:5px 8px;text-align:right;font-weight:700;color:${mColor}">${Gf(p.marge_potentielle)}</td>
+      <td style="padding:5px 8px;text-align:right;color:#64748b">${fmt3(p.vendu_depuis_dernier_achat)}</td>
+      <td style="padding:5px 8px;text-align:right;color:#64748b">${Gf(p.ca_depuis_dernier_achat)}<div style="font-size:7pt;color:#94a3b8">dep. ${dernAchat}</div></td>
+    </tr>`;
+  }).join('');
+
+  const doc = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<title>Fiche Technique Stock Bar</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:9pt;color:#1a1a1a;background:#fff}
+@page{size:A4 landscape;margin:10mm 12mm}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+.hdr{background:#0f2744;color:#fff;padding:12px 18px;display:flex;justify-content:space-between;align-items:center}
+.hdr-brand{font-size:16pt;font-weight:800}
+.hdr-sub{font-size:8.5pt;opacity:.75;margin-top:2px}
+.hdr-title{font-size:11pt;font-weight:700;border:2px solid rgba(255,255,255,.4);padding:4px 12px;border-radius:5px;margin-bottom:4px;text-align:center}
+.hdr-date{font-size:7.5pt;opacity:.7;text-align:right}
+.body{padding:12px 18px}
+.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.kpi{border:1px solid #dde5ef;border-radius:6px;padding:8px 12px}
+.kpi-label{font-size:7pt;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.kpi-val{font-size:13pt;font-weight:800}
+.section-title{font-size:7.5pt;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#0f2744;border-bottom:2px solid #0f2744;padding-bottom:2px;margin:10px 0 6px}
+table{width:100%;border-collapse:collapse;font-size:8pt}
+thead tr{background:#0f2744;color:#fff}
+thead th{padding:5px 8px;font-weight:600;text-align:left;font-size:7.5pt}
+thead th:not(:first-child){text-align:right}
+tbody td{border-bottom:1px solid #edf1f7}
+.footer{margin-top:10px;padding-top:6px;border-top:1px solid #dde5ef;display:flex;justify-content:space-between;font-size:7pt;color:#94a3b8}
+</style></head><body>
+<div class="hdr">
+  <div><div class="hdr-brand">NATIVITE</div><div class="hdr-sub">Bar · Hôtel · Piscine — Acul du Nord, Haïti</div></div>
+  <div>
+    <div class="hdr-title">FICHE TECHNIQUE STOCK BAR</div>
+    <div class="hdr-date">Généré le ${now.toLocaleDateString('fr',{day:'2-digit',month:'long',year:'numeric'})} à ${now.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}</div>
+  </div>
+</div>
+<div class="body">
+  <div class="section-title">Résumé global</div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Potentiel CA Total</div><div class="kpi-val" style="color:#0891b2">${Gf(d.total_potentiel_ca)}</div></div>
+    <div class="kpi"><div class="kpi-label">Coût Stock Total</div><div class="kpi-val" style="color:#dc2626">${Gf(d.total_cout_stock)}</div></div>
+    <div class="kpi"><div class="kpi-label">Marge Potentielle</div><div class="kpi-val" style="color:${parseFloat(d.total_marge_potentielle)>=0?'#16a34a':'#dc2626'}">${Gf(d.total_marge_potentielle)}</div></div>
+  </div>
+  <div class="section-title">Détail par produit</div>
+  <table>
+    <thead><tr>
+      <th>Produit / Catégorie</th><th style="text-align:right">Stock</th><th style="text-align:right">Prix Vente</th>
+      <th style="text-align:right">CMUP</th><th style="text-align:right">Potentiel CA</th>
+      <th style="text-align:right">Coût Stock</th><th style="text-align:right">Marge Pot.</th>
+      <th style="text-align:right">Vendu dep. achat</th><th style="text-align:right">CA dep. achat</th>
+    </tr></thead>
+    <tbody>${lignes}</tbody>
+  </table>
+  <div class="footer">
+    <span>Tracking Carburant — NATIVITE</span>
+    <span>Document confidentiel</span>
+    <span>Généré automatiquement</span>
+  </div>
+</div>
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+
+  const w = window.open('','_blank','width=1200,height=820');
+  w.document.write(doc);
+  w.document.close();
+}
+
 function paOnProdChange(){
   const sel  = _paGetSelected();
   const type = document.getElementById('pa-qte-type');
@@ -21934,6 +22073,7 @@ async function ckAchatsBilanOuvrir(){
   document.getElementById('ckac-bilan-generaux').style.display = 'none';
   try {
     const d = await apiFetch('GET', '/cuisine/bilan-rentabilite');
+    _ckBilanData = d;
     const Gx = v => posGx(v);
 
     // KPIs globaux
@@ -22015,6 +22155,126 @@ function ckAchatsBilanContinuer(){
     apiFetch('GET','/cuisine/plats?actif=true').then(d=>{ _ckAchatsTousPlats=d||[]; _ckAchatsRemplirSelects(); }).catch(_=>{});
   }
   document.getElementById('ckac-modal').classList.add('open');
+}
+
+function ckAchatsBilanExcel(){
+  if(!_ckBilanData){ posAlert('Chargez le bilan d\'abord.','warn'); return; }
+  const d = _ckBilanData;
+  const sep = ';';
+  const esc = v => `"${String(v==null?'':v).replace(/"/g,'""')}"`;
+  const now = new Date().toLocaleDateString('fr');
+  const rows = [
+    [`Bilan de Rentabilité Cuisine — ${now}`,'','','','','',''],
+    [],
+    ['RÉSUMÉ GLOBAL','','','','','',''],
+    ['CA Total Ventes', d.total_ca, '','Coût Achats Total', d.total_cout_achats,'Bénéfice Net', d.total_benefice],
+    ['Marge Globale %', d.marge_globale_pct+'%','','Achats généraux (frais)', d.achats_generaux,'',''],
+    [],
+    ['ANALYSE PAR PLAT','','','','','',''],
+    ['Plat','Coût Achats (G)','CA Ventes (G)','Portions Vendues','Bénéfice (G)','Marge %','Dernier Achat'],
+    ...(d.plats||[]).map(p=>[
+      p.plat_nom, p.cout_achats, p.ca_ventes, p.nb_portions_vendues,
+      p.benefice, p.marge_pct+'%',
+      p.dernier_achat ? new Date(p.dernier_achat).toLocaleDateString('fr') : 'jamais'
+    ])
+  ];
+  const csv = rows.map(r => r.map(c=>esc(c)).join(sep)).join('\r\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(csv);
+  a.download = `bilan_rentabilite_cuisine_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// Cache pour l'export PDF/Excel
+let _ckBilanData = null;
+
+function ckAchatsBilanPDF(){
+  if(!_ckBilanData){ posAlert('Chargez le bilan d\'abord.','warn'); return; }
+  const d   = _ckBilanData;
+  const now = new Date();
+  const Gf  = v => parseFloat(v||0).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})+' G';
+  const pct = v => parseFloat(v||0).toFixed(1)+'%';
+  const benefOk = v => parseFloat(v) >= 0;
+
+  const lignesPlats = (d.plats||[]).map((p,i) => {
+    const bOk = benefOk(p.benefice);
+    const mOk = parseFloat(p.marge_pct) >= 0;
+    const mColor = mOk ? (parseFloat(p.marge_pct)>30?'#16a34a':parseFloat(p.marge_pct)>10?'#b45309':'#92400e') : '#b91c1c';
+    const dern = p.dernier_achat ? new Date(p.dernier_achat).toLocaleDateString('fr') : 'jamais';
+    return `<tr style="${i%2===1?'background:#f8fafc':''}">
+      <td style="padding:7px 10px;font-weight:600">${p.plat_nom}</td>
+      <td style="padding:7px 10px;text-align:right;color:#dc2626">${Gf(p.cout_achats)}</td>
+      <td style="padding:7px 10px;text-align:right;color:#0891b2">${Gf(p.ca_ventes)}</td>
+      <td style="padding:7px 10px;text-align:right">${p.nb_portions_vendues}</td>
+      <td style="padding:7px 10px;text-align:right;font-weight:700;color:${bOk?'#16a34a':'#dc2626'}">${Gf(p.benefice)}</td>
+      <td style="padding:7px 10px;text-align:center"><span style="background:${mColor}22;color:${mColor};padding:2px 8px;border-radius:4px;font-size:8.5pt;font-weight:700">${pct(p.marge_pct)}</span></td>
+      <td style="padding:7px 10px;text-align:right;color:#64748b;font-size:8.5pt">${dern}</td>
+    </tr>`;
+  }).join('');
+
+  const doc = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<title>Bilan Rentabilité Cuisine</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:10pt;color:#1a1a1a;background:#fff}
+@page{size:A4 landscape;margin:12mm 14mm}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+.hdr{background:#0f2744;color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center}
+.hdr-brand{font-size:18pt;font-weight:800}
+.hdr-sub{font-size:9pt;opacity:.75;margin-top:3px}
+.hdr-right{text-align:right}
+.hdr-title{font-size:12pt;font-weight:700;border:2px solid rgba(255,255,255,.4);padding:5px 14px;border-radius:6px;margin-bottom:6px}
+.hdr-date{font-size:8pt;opacity:.7}
+.body{padding:14px 20px}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.kpi{border:1px solid #dde5ef;border-radius:8px;padding:10px 14px}
+.kpi-label{font-size:7.5pt;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.kpi-val{font-size:15pt;font-weight:800}
+.section-title{font-size:8pt;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#0f2744;border-bottom:2px solid #0f2744;padding-bottom:3px;margin:14px 0 8px}
+table{width:100%;border-collapse:collapse;font-size:9pt}
+thead tr{background:#0f2744;color:#fff}
+thead th{padding:7px 10px;font-weight:600;text-align:left;font-size:8pt}
+thead th:not(:first-child){text-align:right}
+tbody td{border-bottom:1px solid #edf1f7}
+.footer{margin-top:14px;padding-top:8px;border-top:1px solid #dde5ef;display:flex;justify-content:space-between;font-size:7.5pt;color:#94a3b8}
+</style></head><body>
+<div class="hdr">
+  <div><div class="hdr-brand">NATIVITE</div><div class="hdr-sub">Bar · Hôtel · Piscine — Acul du Nord, Haïti</div></div>
+  <div class="hdr-right">
+    <div class="hdr-title">BILAN DE RENTABILITÉ — CUISINE</div>
+    <div class="hdr-date">Généré le ${now.toLocaleDateString('fr',{day:'2-digit',month:'long',year:'numeric'})} à ${now.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}</div>
+  </div>
+</div>
+<div class="body">
+  <div class="section-title">Résumé global</div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">CA Total Ventes</div><div class="kpi-val" style="color:#0891b2">${Gf(d.total_ca)}</div></div>
+    <div class="kpi"><div class="kpi-label">Coût Achats Total</div><div class="kpi-val" style="color:#dc2626">${Gf(d.total_cout_achats)}</div></div>
+    <div class="kpi"><div class="kpi-label">Bénéfice Net</div><div class="kpi-val" style="color:${benefOk(d.total_benefice)?'#16a34a':'#dc2626'}">${Gf(d.total_benefice)}</div></div>
+    <div class="kpi"><div class="kpi-label">Marge Globale</div><div class="kpi-val" style="color:${benefOk(d.total_benefice)?'#7c3aed':'#dc2626'}">${pct(d.marge_globale_pct)}</div></div>
+  </div>
+  <div class="section-title">Analyse par plat</div>
+  <table>
+    <thead><tr>
+      <th>Plat</th><th style="text-align:right">Coût Achats</th><th style="text-align:right">CA Ventes</th>
+      <th style="text-align:right">Portions</th><th style="text-align:right">Bénéfice</th>
+      <th style="text-align:center">Marge</th><th style="text-align:right">Dernier achat</th>
+    </tr></thead>
+    <tbody>${lignesPlats}</tbody>
+  </table>
+  ${d.achats_generaux>0?`<div style="margin-top:10px;padding:8px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:9pt;color:#92400e">Achats généraux (non liés à un plat) : <strong>${Gf(d.achats_generaux)}</strong></div>`:''}
+  <div class="footer">
+    <span>Tracking Carburant — NATIVITE</span>
+    <span>Ce document est confidentiel</span>
+    <span>Généré automatiquement</span>
+  </div>
+</div>
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+
+  const w = window.open('','_blank','width=1100,height=780');
+  w.document.write(doc);
+  w.document.close();
 }
 
 function ckAchatsCalcTotal(){
