@@ -609,36 +609,33 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
     prix_map  = prix_actif_batch(db)
     cmup_map  = cmup_batch(db)
 
-    # Dernier achat CONFIRMÉ par produit
-    derniers_achats = dict(
+    # Dernier achat CONFIRMÉ complet par produit (date + quantité + prix unitaire)
+    derniers_achats_map: dict[int, BarAchat] = {}
+    for pid, max_date in (
         db.query(BarAchat.produit_id, func.max(BarAchat.date_achat))
         .filter(BarAchat.produit_id.isnot(None), BarAchat.statut == "CONFIRME")
         .group_by(BarAchat.produit_id)
         .all()
-    )
+    ):
+        achat = (
+            db.query(BarAchat)
+            .filter(BarAchat.produit_id == pid, BarAchat.date_achat == max_date, BarAchat.statut == "CONFIRME")
+            .first()
+        )
+        if achat:
+            derniers_achats_map[pid] = achat
 
-    # Quantité vendue (mouvements SORTIE_VENTE) depuis dernier achat, par produit
-    # Requête unique pour tous les produits (évite N+1)
+    # Quantité écoulée (SORTIE_VENTE) depuis dernier achat confirmé
     sorties_depuis_achat: dict[int, float] = {}
-    ca_depuis_achat: dict[int, float] = {}
     for p in produits:
-        dernier = derniers_achats.get(p.id)
-        if dernier:
+        achat = derniers_achats_map.get(p.id)
+        if achat:
             qte = db.query(func.sum(BarMouvementStock.quantite)).filter(
                 BarMouvementStock.produit_id == p.id,
                 BarMouvementStock.type_mouvement == "SORTIE_VENTE",
-                BarMouvementStock.date_mouvement >= dernier,
+                BarMouvementStock.date_mouvement >= achat.date_achat,
             ).scalar()
             sorties_depuis_achat[p.id] = abs(float(qte or 0))
-
-            ca = db.query(func.sum(BarLigneVente.sous_total)).join(
-                BarVente, BarLigneVente.vente_id == BarVente.id
-            ).filter(
-                BarLigneVente.produit_id == p.id,
-                BarVente.date_heure >= dernier,
-                BarVente.statut != "ANNULEE",
-            ).scalar()
-            ca_depuis_achat[p.id] = float(ca or 0)
 
     resultats = []
     for p in produits:
@@ -647,38 +644,36 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
         cout_moy  = float(cmup_map.get(p.id, 0))
         stock_pos = max(stock, 0)
 
-        potentiel_ca       = round(stock_pos * prix, 2)
-        cout_stock_val     = round(stock_pos * cout_moy, 2)
-        marge_potentielle  = round(potentiel_ca - cout_stock_val, 2)
-        marge_pct          = round(marge_potentielle / potentiel_ca * 100, 1) if potentiel_ca > 0 else 0.0
+        potentiel_ca   = round(stock_pos * prix, 2)
+        valeur_stock   = round(stock_pos * cout_moy, 2)
 
-        dernier = derniers_achats.get(p.id)
+        last = derniers_achats_map.get(p.id)
         resultats.append({
-            "produit_id":               p.id,
-            "nom":                      p.nom,
-            "categorie":                p.categorie,
-            "unite":                    p.unite,
-            "stock_courant":            round(stock, 3),
-            "prix_vente":               round(prix, 2),
-            "cmup":                     round(cout_moy, 4),
-            "potentiel_ca":             potentiel_ca,
-            "cout_stock":               cout_stock_val,
-            "marge_potentielle":        marge_potentielle,
-            "marge_pct":                marge_pct,
-            "vendu_depuis_dernier_achat": round(sorties_depuis_achat.get(p.id, 0), 3),
-            "ca_depuis_dernier_achat":    round(ca_depuis_achat.get(p.id, 0), 2),
-            "dernier_achat":            dernier.isoformat() if dernier else None,
-            "seuil_alerte":             float(p.seuil_alerte_stock),
-            "en_alerte":                stock <= float(p.seuil_alerte_stock),
+            "produit_id":              p.id,
+            "nom":                     p.nom,
+            "categorie":               p.categorie,
+            "unite":                   p.unite,
+            "stock_courant":           round(stock, 3),
+            "prix_vente":              round(prix, 2),
+            "cmup":                    round(cout_moy, 4),
+            "valeur_stock":            valeur_stock,
+            "potentiel_ca":            potentiel_ca,
+            "ecoulement":              round(sorties_depuis_achat.get(p.id, 0), 3),
+            "derniere_qte_commandee":  float(last.quantite) if last else None,
+            "dernier_prix_achat":      float(last.prix_achat_unitaire) if last else None,
+            "dernier_achat":           last.date_achat.isoformat() if last else None,
+            "seuil_alerte":            float(p.seuil_alerte_stock),
+            "en_alerte":               stock <= float(p.seuil_alerte_stock),
+            "rupture":                 stock <= 0,
         })
 
-    total_potentiel_ca  = sum(r["potentiel_ca"]  for r in resultats)
-    total_cout_stock    = sum(r["cout_stock"]     for r in resultats)
+    total_potentiel_ca = sum(r["potentiel_ca"]  for r in resultats)
+    total_valeur_stock = sum(r["valeur_stock"]  for r in resultats)
     return {
-        "produits":              resultats,
-        "total_potentiel_ca":    round(total_potentiel_ca, 2),
-        "total_cout_stock":      round(total_cout_stock, 2),
-        "total_marge_potentielle": round(total_potentiel_ca - total_cout_stock, 2),
+        "produits":            resultats,
+        "total_potentiel_ca":  round(total_potentiel_ca, 2),
+        "total_valeur_stock":  round(total_valeur_stock, 2),
+        "total_marge_nette":   round(total_potentiel_ca - total_valeur_stock, 2),
     }
 
 

@@ -6284,24 +6284,33 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
           <!-- Table -->
           <div style="overflow-y:auto;flex:1;padding:0 20px 4px">
-            <table class="pos-table" style="width:100%;min-width:700px">
+            <table class="pos-table" style="width:100%;min-width:640px">
               <thead>
                 <tr>
                   <th style="text-align:left">Produit</th>
-                  <th style="text-align:right">Stock</th>
-                  <th style="text-align:right">Prix vente</th>
-                  <th style="text-align:right">CMUP</th>
+                  <th style="text-align:center">Dernière commande</th>
+                  <th style="text-align:right">Stock disponible</th>
+                  <th style="text-align:right">Valeur estimée</th>
+                  <th style="text-align:right">Prix de vente</th>
                   <th style="text-align:right">Potentiel CA</th>
-                  <th style="text-align:right">Coût stock</th>
-                  <th style="text-align:right">Marge pot.</th>
-                  <th style="text-align:right">Vendu (dep. achat)</th>
-                  <th style="text-align:right">CA dep. achat</th>
+                  <th style="text-align:right">Écoulement</th>
+                  <th style="text-align:center">Statut</th>
                 </tr>
               </thead>
               <tbody id="pft-tbody">
-                <tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Chargement…</td></tr>
+                <tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
+
+            <!-- Légende des sigles -->
+            <div style="margin-top:14px;padding:10px 14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;font-size:11px;color:rgba(255,255,255,.4);line-height:1.8">
+              <span style="font-weight:600;color:rgba(255,255,255,.55);display:block;margin-bottom:4px">Définition des termes :</span>
+              <span style="color:rgba(255,255,255,.55)">CMUP</span> — Coût Moyen Unitaire Pondéré : prix d'achat moyen de chaque unité, calculé sur tous les achats confirmés.&nbsp;&nbsp;
+              <span style="color:rgba(255,255,255,.55)">Valeur estimée</span> — Ce que le stock actuel vous a coûté (Stock disponible × CMUP).&nbsp;&nbsp;
+              <span style="color:rgba(255,255,255,.55)">Potentiel CA</span> — Revenu maximal si tout le stock est vendu (Stock × Prix de vente).&nbsp;&nbsp;
+              <span style="color:rgba(255,255,255,.55)">Écoulement</span> — Quantité vendue depuis la dernière commande confirmée.&nbsp;&nbsp;
+              <span style="color:rgba(255,255,255,.55)">CA</span> — Chiffre d'Affaires.
+            </div>
           </div>
 
           <div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap">
@@ -18520,64 +18529,83 @@ async function posFicheTechniqueOuvrir(){
 
   const tbody = document.getElementById('pft-tbody');
   const kpis  = document.getElementById('pft-kpis');
-  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Chargement…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Chargement…</td></tr>';
   kpis.innerHTML  = '';
 
   try {
     const d = await apiFetch('GET', '/pos/fiche-technique');
-    _pftFicheData   = d;
-    const Gx = v => posGx(v);
-    const produits  = d.produits || [];
+    _pftFicheData = d;
+    const Gx  = v => posGx(v);
+    const produits = d.produits || [];
 
-    // KPIs
+    // KPIs globaux — 3 chiffres essentiels
     kpis.innerHTML = `
-      <div class="pos-card" style="padding:12px 14px">
-        <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Potentiel CA total</div>
-        <div style="font-size:18px;font-weight:800;color:#3fb6a8">${Gx(d.total_potentiel_ca)}</div>
+      <div class="pos-card" style="padding:12px 16px">
+        <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Valeur totale du stock</div>
+        <div style="font-size:19px;font-weight:800;color:#f7a93b">${Gx(d.total_valeur_stock)}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:3px">Ce que vous avez investi</div>
       </div>
-      <div class="pos-card" style="padding:12px 14px">
-        <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Coût stock total</div>
-        <div style="font-size:18px;font-weight:800;color:#f87171">${Gx(d.total_cout_stock)}</div>
+      <div class="pos-card" style="padding:12px 16px">
+        <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Potentiel CA si tout vendu</div>
+        <div style="font-size:19px;font-weight:800;color:#3fb6a8">${Gx(d.total_potentiel_ca)}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:3px">Revenu maximal possible</div>
       </div>
-      <div class="pos-card" style="padding:12px 14px">
-        <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Marge potentielle</div>
-        <div style="font-size:18px;font-weight:800;color:${d.total_marge_potentielle>=0?'#34d399':'#f87171'}">${Gx(d.total_marge_potentielle)}</div>
+      <div class="pos-card" style="padding:12px 16px">
+        <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Marge nette potentielle</div>
+        <div style="font-size:19px;font-weight:800;color:${d.total_marge_nette>=0?'#34d399':'#f87171'}">${Gx(d.total_marge_nette)}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:3px">Potentiel CA − Valeur stock</div>
       </div>
     `;
 
     if(!produits.length){
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit actif.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit actif.</td></tr>';
       return;
     }
 
-    const fmt3 = v => parseFloat(v).toFixed(3).replace(/\.?0+$/,'');
+    const fmt  = v => parseFloat(v||0) % 1 === 0 ? parseFloat(v||0).toFixed(0) : parseFloat(v||0).toFixed(2);
+    const fmtd = iso => iso ? new Date(iso).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+
     tbody.innerHTML = produits.map(p => {
-      const alertBadge = p.en_alerte
-        ? `<span style="font-size:10px;background:rgba(248,113,113,.18);color:#f87171;padding:1px 5px;border-radius:3px;margin-left:5px">⚠</span>`
-        : '';
-      const stockColor = p.en_alerte ? '#f87171' : (p.stock_courant <= 0 ? 'rgba(255,255,255,.25)' : '#fff');
-      const mOk = p.marge_potentielle >= 0;
-      const dernierAchat = p.dernier_achat
-        ? new Date(p.dernier_achat).toLocaleDateString('fr', {day:'2-digit',month:'2-digit',year:'numeric'})
-        : '—';
+      // Statut badge
+      let statutBadge;
+      if(p.rupture){
+        statutBadge = `<span style="background:rgba(248,113,113,.18);color:#f87171;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700">✗ Rupture</span>`;
+      } else if(p.en_alerte){
+        statutBadge = `<span style="background:rgba(251,191,36,.15);color:#fbbf24;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700">⚠ Faible</span>`;
+      } else {
+        statutBadge = `<span style="background:rgba(52,211,153,.12);color:#34d399;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700">✓ OK</span>`;
+      }
+
+      // Dernière commande
+      const dernCommande = p.derniere_qte_commandee != null
+        ? `<span style="font-weight:600;color:#fff">${fmt(p.derniere_qte_commandee)} ${p.unite}</span>
+           <div style="font-size:10px;color:rgba(255,255,255,.35)">à G ${parseFloat(p.dernier_prix_achat||0).toFixed(2)}/u · ${fmtd(p.dernier_achat)}</div>`
+        : `<span style="color:rgba(255,255,255,.25)">Aucune commande</span>`;
+
+      // Stock coloré
+      const stockColor = p.rupture ? '#f87171' : (p.en_alerte ? '#fbbf24' : '#fff');
+
       return `<tr>
         <td>
-          <span style="font-weight:600">${p.nom}</span>${alertBadge}
-          <div style="font-size:10px;color:rgba(255,255,255,.35)">${p.categorie}</div>
+          <div style="font-weight:700;font-size:13px">${p.nom}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">${p.categorie}</div>
         </td>
-        <td style="text-align:right;color:${stockColor};font-weight:600">${fmt3(p.stock_courant)} ${p.unite}</td>
-        <td style="text-align:right">${Gx(p.prix_vente)}</td>
-        <td style="text-align:right;font-size:11px;color:rgba(255,255,255,.45)">${Gx(p.cmup)}</td>
+        <td style="text-align:center">${dernCommande}</td>
+        <td style="text-align:right;font-weight:700;font-size:13px;color:${stockColor}">${fmt(p.stock_courant)}&nbsp;${p.unite}</td>
+        <td style="text-align:right;color:#f7a93b;font-weight:600">${Gx(p.valeur_stock)}
+          <div style="font-size:10px;color:rgba(255,255,255,.3)">CMUP G ${parseFloat(p.cmup||0).toFixed(2)}</div>
+        </td>
+        <td style="text-align:right;color:rgba(255,255,255,.7)">${Gx(p.prix_vente)}</td>
         <td style="text-align:right;color:#3fb6a8;font-weight:700">${Gx(p.potentiel_ca)}</td>
-        <td style="text-align:right;color:#f87171">${Gx(p.cout_stock)}</td>
-        <td style="text-align:right;color:${mOk?'#34d399':'#f87171'};font-weight:700">${Gx(p.marge_potentielle)}</td>
-        <td style="text-align:right;color:rgba(255,255,255,.55)">${fmt3(p.vendu_depuis_dernier_achat)}</td>
-        <td style="text-align:right;color:rgba(255,255,255,.55)">${Gx(p.ca_depuis_dernier_achat)}<div style="font-size:10px;color:rgba(255,255,255,.3)">dep. ${dernierAchat}</div></td>
+        <td style="text-align:right;color:rgba(255,255,255,.55)">${fmt(p.ecoulement)}&nbsp;${p.unite}
+          <div style="font-size:10px;color:rgba(255,255,255,.25)">dep. commande</div>
+        </td>
+        <td style="text-align:center">${statutBadge}</td>
       </tr>`;
     }).join('');
 
   } catch(e){
-    tbody.innerHTML = `<tr><td colspan="9" style="color:#f87171;padding:16px;text-align:center">${e.message||'Erreur chargement fiche technique'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="color:#f87171;padding:16px;text-align:center">${e.message||'Erreur chargement fiche technique'}</td></tr>`;
   }
 }
 
@@ -18695,25 +18723,40 @@ async function _posOuvrirFormAchat(){
 
 function pftExcelFiche(){
   if(!_pftFicheData){ posAlert('Chargez la fiche d\'abord.','warn'); return; }
-  const d = _pftFicheData;
+  const d   = _pftFicheData;
   const sep = ';';
   const esc = v => `"${String(v==null?'':v).replace(/"/g,'""')}"`;
   const now = new Date().toLocaleDateString('fr');
-  const fmt3 = v => parseFloat(v||0).toFixed(3);
+  const fmt = v => parseFloat(v||0) % 1 === 0 ? parseFloat(v||0).toFixed(0) : parseFloat(v||0).toFixed(2);
+  const fmtd = iso => iso ? new Date(iso).toLocaleDateString('fr') : 'Aucune commande';
   const rows = [
-    [`Fiche Technique Stock Bar — ${now}`,'','','','','','','',''],
+    [`Fiche Technique Stock Bar — ${now}`,'','','','','',''],
     [],
-    ['RÉSUMÉ GLOBAL','','','','','','','',''],
-    ['Potentiel CA Total', d.total_potentiel_ca, '', 'Coût Stock Total', d.total_cout_stock, '', 'Marge Potentielle', d.total_marge_potentielle, ''],
+    ['RÉSUMÉ GLOBAL','','','','','',''],
+    ['Valeur totale du stock (G)', d.total_valeur_stock, '', 'Potentiel CA si tout vendu (G)', d.total_potentiel_ca, '', 'Marge nette potentielle (G)', d.total_marge_nette],
     [],
-    ['DÉTAIL PAR PRODUIT','','','','','','','',''],
-    ['Produit','Catégorie','Unité','Stock Courant','Prix Vente (G)','CMUP (G)','Potentiel CA (G)','Coût Stock (G)','Marge Pot. (G)','Marge %','Vendu dep. achat','CA dep. achat (G)','Dernier Achat'],
+    ['DÉTAIL PAR PRODUIT','','','','','',''],
+    ['Produit','Catégorie','Unité','Dernière commande (qté)','Date dernière commande','Prix achat/u (G)','Stock disponible','Valeur estimée (G)','Prix vente (G)','Potentiel CA (G)','Écoulement dep. commande','Statut'],
     ...(d.produits||[]).map(p=>[
-      p.nom, p.categorie, p.unite, fmt3(p.stock_courant),
-      p.prix_vente, p.cmup, p.potentiel_ca, p.cout_stock, p.marge_potentielle,
-      p.marge_pct+'%', fmt3(p.vendu_depuis_dernier_achat), p.ca_depuis_dernier_achat,
-      p.dernier_achat ? new Date(p.dernier_achat).toLocaleDateString('fr') : 'jamais'
-    ])
+      p.nom, p.categorie, p.unite,
+      p.derniere_qte_commandee != null ? fmt(p.derniere_qte_commandee) : 'Aucune',
+      fmtd(p.dernier_achat),
+      p.dernier_prix_achat != null ? parseFloat(p.dernier_prix_achat).toFixed(2) : '—',
+      fmt(p.stock_courant),
+      parseFloat(p.valeur_stock||0).toFixed(2),
+      parseFloat(p.prix_vente||0).toFixed(2),
+      parseFloat(p.potentiel_ca||0).toFixed(2),
+      fmt(p.ecoulement),
+      p.rupture ? 'Rupture' : (p.en_alerte ? 'Faible' : 'OK')
+    ]),
+    [],
+    ['LÉGENDE DES TERMES',''],
+    ['CMUP','Coût Moyen Unitaire Pondéré — prix de revient moyen de chaque unité en stock'],
+    ['Valeur estimée','Stock disponible × CMUP — ce que représente votre stock en coût d\'achat'],
+    ['Potentiel CA','Stock disponible × Prix de vente — revenu maximal si tout est vendu'],
+    ['Écoulement','Quantité vendue depuis la dernière commande confirmée'],
+    ['CA','Chiffre d\'Affaires — total des ventes en valeur (G = Gourdes haïtiennes)'],
+    ['Marge nette','Potentiel CA − Valeur estimée du stock'],
   ];
   const csv = rows.map(r => r.map(c=>esc(c)).join(sep)).join('\r\n');
   const a = document.createElement('a');
@@ -18727,23 +18770,27 @@ function pftPDFFiche(){
   const d   = _pftFicheData;
   const now = new Date();
   const Gf  = v => parseFloat(v||0).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})+' G';
-  const fmt3 = v => parseFloat(v||0).toFixed(3);
+  const fmt  = v => parseFloat(v||0) % 1 === 0 ? parseFloat(v||0).toFixed(0) : parseFloat(v||0).toFixed(2);
+  const fmtd = iso => iso ? new Date(iso).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
 
   const lignes = (d.produits||[]).map((p,i) => {
-    const alertIcon = p.en_alerte ? '<span style="color:#dc2626;font-weight:700"> ⚠</span>' : '';
-    const mOk = parseFloat(p.marge_potentielle) >= 0;
-    const mColor = mOk ? '#16a34a' : '#dc2626';
-    const dernAchat = p.dernier_achat ? new Date(p.dernier_achat).toLocaleDateString('fr') : '—';
+    const dernCommande = p.derniere_qte_commandee != null
+      ? `<strong>${fmt(p.derniere_qte_commandee)} ${p.unite}</strong><div style="font-size:7pt;color:#64748b">à ${Gf(p.dernier_prix_achat)}/u · ${fmtd(p.dernier_achat)}</div>`
+      : `<span style="color:#94a3b8">Aucune commande</span>`;
+    const stockColor = p.rupture ? '#dc2626' : (p.en_alerte ? '#d97706' : '#1a1a1a');
+    let statutBadge;
+    if(p.rupture) statutBadge = '<span style="background:#fef2f2;color:#dc2626;padding:2px 7px;border-radius:4px;font-size:7pt;font-weight:700">✗ Rupture</span>';
+    else if(p.en_alerte) statutBadge = '<span style="background:#fffbeb;color:#d97706;padding:2px 7px;border-radius:4px;font-size:7pt;font-weight:700">⚠ Faible</span>';
+    else statutBadge = '<span style="background:#f0fdf4;color:#16a34a;padding:2px 7px;border-radius:4px;font-size:7pt;font-weight:700">✓ OK</span>';
     return `<tr style="${i%2===1?'background:#f8fafc':''}">
-      <td style="padding:5px 8px;font-weight:600">${p.nom}${alertIcon}<div style="font-size:7.5pt;color:#64748b;font-weight:400">${p.categorie}</div></td>
-      <td style="padding:5px 8px;text-align:right;font-weight:700">${fmt3(p.stock_courant)} ${p.unite}</td>
+      <td style="padding:5px 8px;font-weight:600">${p.nom}<div style="font-size:7.5pt;color:#64748b;font-weight:400">${p.categorie}</div></td>
+      <td style="padding:5px 8px;text-align:center;font-size:8pt">${dernCommande}</td>
+      <td style="padding:5px 8px;text-align:right;font-weight:700;color:${stockColor}">${fmt(p.stock_courant)} ${p.unite}</td>
+      <td style="padding:5px 8px;text-align:right;color:#d97706;font-weight:600">${Gf(p.valeur_stock)}<div style="font-size:7pt;color:#94a3b8">CMUP ${Gf(p.cmup)}</div></td>
       <td style="padding:5px 8px;text-align:right">${Gf(p.prix_vente)}</td>
-      <td style="padding:5px 8px;text-align:right;color:#64748b">${Gf(p.cmup)}</td>
       <td style="padding:5px 8px;text-align:right;color:#0891b2;font-weight:700">${Gf(p.potentiel_ca)}</td>
-      <td style="padding:5px 8px;text-align:right;color:#dc2626">${Gf(p.cout_stock)}</td>
-      <td style="padding:5px 8px;text-align:right;font-weight:700;color:${mColor}">${Gf(p.marge_potentielle)}</td>
-      <td style="padding:5px 8px;text-align:right;color:#64748b">${fmt3(p.vendu_depuis_dernier_achat)}</td>
-      <td style="padding:5px 8px;text-align:right;color:#64748b">${Gf(p.ca_depuis_dernier_achat)}<div style="font-size:7pt;color:#94a3b8">dep. ${dernAchat}</div></td>
+      <td style="padding:5px 8px;text-align:right;color:#64748b">${fmt(p.ecoulement)} ${p.unite}</td>
+      <td style="padding:5px 8px;text-align:center">${statutBadge}</td>
     </tr>`;
   }).join('');
 
@@ -18764,13 +18811,20 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:9pt;color:#1a1a1a;backgro
 .kpi{border:1px solid #dde5ef;border-radius:6px;padding:8px 12px}
 .kpi-label{font-size:7pt;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
 .kpi-val{font-size:13pt;font-weight:800}
+.kpi-hint{font-size:6.5pt;color:#94a3b8;margin-top:2px}
 .section-title{font-size:7.5pt;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#0f2744;border-bottom:2px solid #0f2744;padding-bottom:2px;margin:10px 0 6px}
 table{width:100%;border-collapse:collapse;font-size:8pt}
 thead tr{background:#0f2744;color:#fff}
 thead th{padding:5px 8px;font-weight:600;text-align:left;font-size:7.5pt}
 thead th:not(:first-child){text-align:right}
+thead th:nth-child(2),thead th:last-child{text-align:center}
 tbody td{border-bottom:1px solid #edf1f7}
-.footer{margin-top:10px;padding-top:6px;border-top:1px solid #dde5ef;display:flex;justify-content:space-between;font-size:7pt;color:#94a3b8}
+.legende{margin-top:10px;padding:8px 12px;background:#f8fafc;border-left:3px solid #0f2744;border-radius:4px}
+.legende-title{font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#0f2744;margin-bottom:5px}
+.legende-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.legende-item{font-size:6.5pt;color:#475569}
+.legende-item strong{color:#0f2744}
+.footer{margin-top:8px;padding-top:6px;border-top:1px solid #dde5ef;display:flex;justify-content:space-between;font-size:7pt;color:#94a3b8}
 </style></head><body>
 <div class="hdr">
   <div><div class="hdr-brand">NATIVITE</div><div class="hdr-sub">Bar · Hôtel · Piscine — Acul du Nord, Haïti</div></div>
@@ -18782,20 +18836,35 @@ tbody td{border-bottom:1px solid #edf1f7}
 <div class="body">
   <div class="section-title">Résumé global</div>
   <div class="kpi-grid">
-    <div class="kpi"><div class="kpi-label">Potentiel CA Total</div><div class="kpi-val" style="color:#0891b2">${Gf(d.total_potentiel_ca)}</div></div>
-    <div class="kpi"><div class="kpi-label">Coût Stock Total</div><div class="kpi-val" style="color:#dc2626">${Gf(d.total_cout_stock)}</div></div>
-    <div class="kpi"><div class="kpi-label">Marge Potentielle</div><div class="kpi-val" style="color:${parseFloat(d.total_marge_potentielle)>=0?'#16a34a':'#dc2626'}">${Gf(d.total_marge_potentielle)}</div></div>
+    <div class="kpi"><div class="kpi-label">Valeur totale du stock</div><div class="kpi-val" style="color:#d97706">${Gf(d.total_valeur_stock)}</div><div class="kpi-hint">Ce que vous avez investi</div></div>
+    <div class="kpi"><div class="kpi-label">Potentiel CA si tout vendu</div><div class="kpi-val" style="color:#0891b2">${Gf(d.total_potentiel_ca)}</div><div class="kpi-hint">Revenu maximal possible</div></div>
+    <div class="kpi"><div class="kpi-label">Marge nette potentielle</div><div class="kpi-val" style="color:${parseFloat(d.total_marge_nette)>=0?'#16a34a':'#dc2626'}">${Gf(d.total_marge_nette)}</div><div class="kpi-hint">Potentiel CA − Valeur stock</div></div>
   </div>
   <div class="section-title">Détail par produit</div>
   <table>
     <thead><tr>
-      <th>Produit / Catégorie</th><th style="text-align:right">Stock</th><th style="text-align:right">Prix Vente</th>
-      <th style="text-align:right">CMUP</th><th style="text-align:right">Potentiel CA</th>
-      <th style="text-align:right">Coût Stock</th><th style="text-align:right">Marge Pot.</th>
-      <th style="text-align:right">Vendu dep. achat</th><th style="text-align:right">CA dep. achat</th>
+      <th>Produit / Catégorie</th>
+      <th style="text-align:center">Dernière commande</th>
+      <th style="text-align:right">Stock disponible</th>
+      <th style="text-align:right">Valeur estimée</th>
+      <th style="text-align:right">Prix de vente</th>
+      <th style="text-align:right">Potentiel CA</th>
+      <th style="text-align:right">Écoulement</th>
+      <th style="text-align:center">Statut</th>
     </tr></thead>
     <tbody>${lignes}</tbody>
   </table>
+  <div class="legende">
+    <div class="legende-title">Définition des termes</div>
+    <div class="legende-grid">
+      <div class="legende-item"><strong>CMUP</strong> — Coût Moyen Unitaire Pondéré : prix de revient moyen par unité en stock</div>
+      <div class="legende-item"><strong>Valeur estimée</strong> — Stock disponible × CMUP : valeur de votre stock en coût d'achat</div>
+      <div class="legende-item"><strong>Potentiel CA</strong> — Stock disponible × Prix de vente : revenu maximal si tout est vendu</div>
+      <div class="legende-item"><strong>Écoulement</strong> — Quantité vendue depuis la dernière commande confirmée</div>
+      <div class="legende-item"><strong>CA</strong> — Chiffre d'Affaires : total des ventes en valeur</div>
+      <div class="legende-item"><strong>G</strong> — Gourdes haïtiennes (monnaie locale)</div>
+    </div>
+  </div>
   <div class="footer">
     <span>Tracking Carburant — NATIVITE</span>
     <span>Document confidentiel</span>
