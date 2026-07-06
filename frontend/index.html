@@ -8266,6 +8266,55 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div><!-- /page-admin-sessions -->
 
+    <!-- ══════ MODAL : CONFIRMER DÉCONNEXION SESSION ══════ -->
+    <div id="modal-session-revoquer" class="overlay hidden" onclick="if(event.target===this)closeSessionModal()">
+      <div class="modal-box" style="max-width:440px">
+        <div class="card-head" style="border-top-color:#f87171">
+          <div class="card-title" style="color:#f87171;gap:8px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Déconnecter un employé
+          </div>
+          <button onclick="closeSessionModal()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1">✕</button>
+        </div>
+        <div style="padding:20px 22px">
+          <!-- Carte employé -->
+          <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(255,255,255,.05);border-radius:12px;margin-bottom:16px">
+            <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#f87171,#dc2626);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0" id="msr-avatar">?</div>
+            <div>
+              <div style="font-weight:700;font-size:15px;color:var(--white)" id="msr-nom">—</div>
+              <div style="font-size:12px;color:var(--muted)" id="msr-email">—</div>
+              <span style="font-size:11px;background:rgba(248,113,113,.15);color:#f87171;padding:2px 8px;border-radius:99px;margin-top:4px;display:inline-block" id="msr-role">—</span>
+            </div>
+          </div>
+          <!-- Détails de session -->
+          <div style="display:grid;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,.03);border-radius:8px">
+              <span style="font-size:12px;color:var(--muted)">Connecté le</span>
+              <span style="font-size:12px;font-weight:600;color:var(--white)" id="msr-created">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,.03);border-radius:8px">
+              <span style="font-size:12px;color:var(--muted)">Dernière activité</span>
+              <span style="font-size:12px;font-weight:600" id="msr-activity">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,.03);border-radius:8px">
+              <span style="font-size:12px;color:var(--muted)">Adresse IP</span>
+              <span style="font-size:12px;font-family:monospace;color:var(--white)" id="msr-ip">—</span>
+            </div>
+          </div>
+          <div style="margin-top:16px;padding:10px 14px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:10px;font-size:12px;color:#fca5a5">
+            Cette action déconnecte l'employé immédiatement. Il devra se reconnecter pour accéder au système.
+          </div>
+        </div>
+        <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-secondary" onclick="closeSessionModal()">Annuler</button>
+          <button class="btn" onclick="doRevoquerSession()" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;display:flex;align-items:center;gap:6px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Confirmer la déconnexion
+          </button>
+        </div>
+      </div>
+    </div><!-- /modal-session-revoquer -->
+
     <!-- ══════ PAGE : JOURNAL D'ACTIVITÉ ══════ -->
     <div id="page-admin-audit" class="page page-gi">
       <div class="pos-page gi-page">
@@ -15553,7 +15602,15 @@ async function loadAdminSessions(){
           </div>
         </td>
         <td style="text-align:center">
-          <button class="pos-btn ghost btn-revoquer" data-sid="${s.session_id}" data-nom="${(s.nom_complet||s.email).replace(/"/g,'&quot;')}" style="font-size:11px;padding:3px 9px;color:#f87171;border-color:rgba(248,113,113,.3)">
+          <button class="pos-btn ghost btn-revoquer"
+            data-sid="${s.session_id}"
+            data-nom="${(s.nom_complet||s.email).replace(/"/g,'&quot;')}"
+            data-email="${(s.email||'').replace(/"/g,'&quot;')}"
+            data-role="${s.role||''}"
+            data-created="${s.created_at||''}"
+            data-activity="${s.last_activity_at||''}"
+            data-ip="${s.ip_address||''}"
+            style="font-size:11px;padding:3px 9px;color:#f87171;border-color:rgba(248,113,113,.3)">
             Déconnecter
           </button>
         </td>
@@ -15562,10 +15619,47 @@ async function loadAdminSessions(){
   }catch(e){ tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:#f87171">${e.message}</td></tr>`; }
 }
 
-async function sessionRevoquer(sessionId, nom){
-  if(!confirm(`Déconnecter ${nom} ?`)) return;
+let _msrPendingId = null;
+
+function sessionRevoquer(btn){
+  const d = btn.dataset;
+  _msrPendingId = d.sid;
+
+  // Avatar initiale
+  const nom = d.nom || d.email || '?';
+  document.getElementById('msr-avatar').textContent = nom.charAt(0).toUpperCase();
+  document.getElementById('msr-nom').textContent    = nom;
+  document.getElementById('msr-email').textContent  = d.email || '—';
+  document.getElementById('msr-role').textContent   = d.role  || '—';
+  document.getElementById('msr-created').textContent = _fmtDate(d.created);
+  document.getElementById('msr-ip').textContent     = d.ip    || '—';
+
+  // Dernière activité avec couleur de statut
+  const actEl = document.getElementById('msr-activity');
+  if(d.activity){
+    const diffMin = (Date.now() - new Date(d.activity).getTime()) / 60000;
+    const color = diffMin < 15 ? '#10b981' : diffMin < 120 ? '#f59e0b' : '#f87171';
+    actEl.style.color = color;
+    actEl.textContent = _fmtDate(d.activity);
+  } else {
+    actEl.style.color = 'var(--muted)';
+    actEl.textContent = 'Non enregistrée';
+  }
+
+  document.getElementById('modal-session-revoquer').classList.remove('hidden');
+}
+
+function closeSessionModal(){
+  document.getElementById('modal-session-revoquer').classList.add('hidden');
+  _msrPendingId = null;
+}
+
+async function doRevoquerSession(){
+  if(!_msrPendingId) return;
+  const sid = _msrPendingId;
+  closeSessionModal();
   try{
-    await apiFetch('DELETE',`/admin/sessions/${sessionId}`);
+    await apiFetch('DELETE',`/admin/sessions/${sid}`);
     posAlert('Session révoquée','ok');
     loadAdminSessions();
   }catch(e){ posAlert(e.message||'Erreur','err'); }
@@ -15574,7 +15668,7 @@ async function sessionRevoquer(sessionId, nom){
 document.addEventListener('click', e => {
   const btn = e.target.closest('.btn-revoquer');
   if(!btn) return;
-  sessionRevoquer(btn.dataset.sid, btn.dataset.nom);
+  sessionRevoquer(btn);
 });
 
 async function purgeInactiveSessions(){
