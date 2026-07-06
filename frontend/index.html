@@ -21450,7 +21450,7 @@ function scExport(session_id, format){
 
 let _perfData        = null;
 let _perfDetailId    = null;
-let _perfDetailFilters = { mode: '', statut: '' };
+let _perfDetailFilters = { mode: '', statut: '', debut: '', fin: '' };
 
 function perfPeriode(mode){
   const today = new Date().toISOString().slice(0,10);
@@ -21666,7 +21666,11 @@ async function perfCharger(){
 // ── Détail ventes + filtres ──────────────────────────────────────
 async function perfOuvrirDetail(employeId, nom){
   _perfDetailId = employeId;
-  _perfDetailFilters = { mode:'', statut:'' };
+  _perfDetailFilters = {
+    mode: '', statut: '',
+    debut: document.getElementById('perf-debut')?.value || '',
+    fin:   document.getElementById('perf-fin')?.value   || new Date().toISOString().slice(0,10),
+  };
   var bg    = document.getElementById('perf-detail-bg');
   var titre = document.getElementById('perf-detail-titre');
   if(!bg||!titre) return;
@@ -21682,8 +21686,8 @@ async function _perfDetailCharger(){
   var Gx = function(v){ return posGx(v); };
 
   try {
-    var debut = document.getElementById('perf-debut')?.value || '';
-    var fin   = document.getElementById('perf-fin')?.value   || new Date().toISOString().slice(0,10);
+    var debut = _perfDetailFilters.debut;
+    var fin   = _perfDetailFilters.fin || new Date().toISOString().slice(0,10);
     var params = debut ? '?debut='+debut+'&fin='+fin : '?fin='+fin;
     if(_perfDetailFilters.mode)   params += '&mode_paiement='+_perfDetailFilters.mode;
     if(_perfDetailFilters.statut) params += '&statut_filtre='+_perfDetailFilters.statut;
@@ -21692,19 +21696,25 @@ async function _perfDetailCharger(){
     var ventes = d.ventes || [];
     var topProduits = d.top_produits || [];
 
-    // Barre de filtres
+    // Barre de filtres avec dates
     var selMode   = _perfDetailFilters.mode;
     var selStatut = _perfDetailFilters.statut;
-    var filterBar = '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px 16px;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.07)">'
+    var selDebut  = _perfDetailFilters.debut;
+    var selFin    = _perfDetailFilters.fin;
+    var inStyle   = 'background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:#fff;border-radius:6px;padding:4px 8px;font-size:12px';
+    var filterBar = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 16px;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.07)">'
       +'<span style="font-size:11px;color:rgba(255,255,255,.35)">Filtrer :</span>'
-      +'<select id="perf-fmode" onchange="_perfApplyFilter()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:#fff;border-radius:6px;padding:4px 8px;font-size:12px">'
-      +'<option value="">Tous les modes</option>'
+      +'<input type="date" id="perf-fdebut" value="'+selDebut+'" onchange="_perfApplyFilter()" style="'+inStyle+';width:120px" title="Date début">'
+      +'<span style="color:rgba(255,255,255,.25);font-size:11px">&#8594;</span>'
+      +'<input type="date" id="perf-ffin"   value="'+selFin+'"   onchange="_perfApplyFilter()" style="'+inStyle+';width:120px" title="Date fin">'
+      +'<select id="perf-fmode" onchange="_perfApplyFilter()" style="'+inStyle+'">'
+      +'<option value="">Tous modes</option>'
       +'<option value="CASH"'+(selMode==='CASH'?' selected':'')+'>Cash</option>'
       +'<option value="CREDIT"'+(selMode==='CREDIT'?' selected':'')+'>Crédit</option>'
       +'<option value="MIXTE"'+(selMode==='MIXTE'?' selected':'')+'>Mixte</option>'
       +'</select>'
-      +'<select id="perf-fstatut" onchange="_perfApplyFilter()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:#fff;border-radius:6px;padding:4px 8px;font-size:12px">'
-      +'<option value="">Tous les statuts</option>'
+      +'<select id="perf-fstatut" onchange="_perfApplyFilter()" style="'+inStyle+'">'
+      +'<option value="">Tous statuts</option>'
       +'<option value="PAYEE"'+(selStatut==='PAYEE'?' selected':'')+'>Payée</option>'
       +'<option value="CREDIT_EN_COURS"'+(selStatut==='CREDIT_EN_COURS'?' selected':'')+'>Crédit en cours</option>'
       +'</select>'
@@ -21795,10 +21805,14 @@ async function _perfDetailCharger(){
 }
 
 function _perfApplyFilter(){
+  var dEl = document.getElementById('perf-fdebut');
+  var fEl = document.getElementById('perf-ffin');
   var mEl = document.getElementById('perf-fmode');
   var sEl = document.getElementById('perf-fstatut');
-  _perfDetailFilters.mode   = mEl  ? mEl.value  : '';
-  _perfDetailFilters.statut = sEl  ? sEl.value  : '';
+  _perfDetailFilters.debut  = dEl ? dEl.value : _perfDetailFilters.debut;
+  _perfDetailFilters.fin    = fEl ? fEl.value : _perfDetailFilters.fin;
+  _perfDetailFilters.mode   = mEl ? mEl.value : '';
+  _perfDetailFilters.statut = sEl ? sEl.value : '';
   _perfDetailCharger();
 }
 
