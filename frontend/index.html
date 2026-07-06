@@ -7100,16 +7100,18 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
 
         <!-- ═══════════════════════════════════════════════
-             PERFORMANCE DES CAISSIÈRES & ADMINISTRATEURS
+             TABLEAU DE BORD — VENTES PAR CAISSIÈRE
              ═══════════════════════════════════════════════ -->
         <div class="pos-card" style="margin-bottom:16px">
+
+          <!-- En-tête + filtres période -->
           <div class="pos-card-hdr" style="flex-wrap:wrap;gap:10px">
-            <span style="font-size:14px;font-weight:700">Performance des caissières & administrateurs</span>
+            <span style="font-size:14px;font-weight:700">Tableau de bord — Ventes par caissière</span>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto">
-              <input type="date" class="pos-input" id="perf-debut" style="width:130px" title="Début de période">
+              <input type="date" class="pos-input" id="perf-debut" style="width:130px" title="Début">
               <span style="color:rgba(255,255,255,.3);font-size:12px">→</span>
-              <input type="date" class="pos-input" id="perf-fin"   style="width:130px" title="Fin de période">
-              <button class="pos-btn teal"  onclick="perfCharger()">Actualiser</button>
+              <input type="date" class="pos-input" id="perf-fin"   style="width:130px" title="Fin">
+              <button class="pos-btn teal"  onclick="perfCharger()">&#x21BB; Actualiser</button>
               <button class="pos-btn ghost" onclick="perfPeriode('today')">Aujourd'hui</button>
               <button class="pos-btn ghost" onclick="perfPeriode('7j')">7 jours</button>
               <button class="pos-btn ghost" onclick="perfPeriode('30j')">30 jours</button>
@@ -7117,17 +7119,30 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
           </div>
 
-          <!-- KPIs globaux performance -->
-          <div class="pos-kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px" id="perf-kpis">
+          <!-- KPIs globaux -->
+          <div class="pos-kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px" id="perf-kpis">
             <div class="pos-kpi"><div class="pos-kpi-label">CA total (période)</div><div class="pos-kpi-val" style="color:#3fb6a8" id="perf-kpi-ca">—</div></div>
-            <div class="pos-kpi"><div class="pos-kpi-label">Ventes validées</div><div class="pos-kpi-val amber" id="perf-kpi-ventes">—</div></div>
+            <div class="pos-kpi"><div class="pos-kpi-label">Ventes enregistrées</div><div class="pos-kpi-val amber" id="perf-kpi-ventes">—</div></div>
             <div class="pos-kpi"><div class="pos-kpi-label">Caissières actives</div><div class="pos-kpi-val" id="perf-kpi-nb">—</div></div>
             <div class="pos-kpi"><div class="pos-kpi-label">Crédits non soldés</div><div class="pos-kpi-val red" id="perf-kpi-credits">—</div></div>
           </div>
 
+          <!-- Rangée graphiques : comparatif + modes de paiement -->
+          <div style="display:grid;grid-template-columns:1fr 200px;gap:20px;margin-bottom:20px;align-items:start">
+            <div>
+              <div style="font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Comparatif CA par employé</div>
+              <div id="perf-chart"><div style="color:rgba(255,255,255,.2);font-size:12px;padding:16px;text-align:center">Chargement…</div></div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Modes de paiement</div>
+              <div id="perf-modes-bar" style="height:10px;border-radius:5px;overflow:hidden;display:flex;margin-bottom:10px"></div>
+              <div id="perf-modes-legend" style="display:flex;flex-direction:column;gap:5px"></div>
+            </div>
+          </div>
+
           <!-- Cartes par caissière -->
-          <div id="perf-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:16px">
-            <div style="color:rgba(255,255,255,.3);font-size:13px;padding:24px;text-align:center;grid-column:1/-1">Chargement…</div>
+          <div id="perf-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:20px">
+            <div style="color:rgba(255,255,255,.3);font-size:13px;padding:32px;text-align:center;grid-column:1/-1">Chargement…</div>
           </div>
 
           <!-- Tableau récapitulatif -->
@@ -7137,14 +7152,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <tr>
                   <th>Caissière / Poste</th>
                   <th style="text-align:right">CA total</th>
-                  <th style="text-align:right">Nb ventes</th>
-                  <th style="text-align:right">Moy. / vente</th>
-                  <th style="text-align:right">CA aujourd'hui</th>
-                  <th style="text-align:right">CA 7 jours</th>
-                  <th style="text-align:right">CA 30 jours</th>
+                  <th style="text-align:right">Ventes</th>
+                  <th style="text-align:right">Moy./vente</th>
+                  <th style="text-align:right">Aujourd'hui</th>
+                  <th style="text-align:right">7 jours</th>
+                  <th style="text-align:right">30 jours</th>
                   <th style="text-align:right">Sessions</th>
                   <th style="text-align:right">Crédits ouverts</th>
-                  <th style="text-align:center">Détail</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody id="perf-tbody">
@@ -21433,249 +21448,367 @@ function scExport(session_id, format){
 // PERFORMANCE CAISSIÈRES & ADMINISTRATEURS
 // ══════════════════════════════════════════════════════════════
 
-let _perfData = null; // cache bilan caissières
+let _perfData        = null;
+let _perfDetailId    = null;
+let _perfDetailFilters = { mode: '', statut: '' };
 
 function perfPeriode(mode){
   const today = new Date().toISOString().slice(0,10);
-  const d = (n) => { const dt = new Date(); dt.setDate(dt.getDate()-n); return dt.toISOString().slice(0,10); };
+  const d = n => { const dt = new Date(); dt.setDate(dt.getDate()-n); return dt.toISOString().slice(0,10); };
   const debutEl = document.getElementById('perf-debut');
   const finEl   = document.getElementById('perf-fin');
-  if(mode === 'today'){ debutEl.value = today; finEl.value = today; }
-  else if(mode === '7j'){ debutEl.value = d(7); finEl.value = today; }
-  else if(mode === '30j'){ debutEl.value = d(30); finEl.value = today; }
-  else { debutEl.value = ''; finEl.value = today; }
+  if(mode === 'today')     { debutEl.value = today; finEl.value = today; }
+  else if(mode === '7j')   { debutEl.value = d(7);  finEl.value = today; }
+  else if(mode === '30j')  { debutEl.value = d(30); finEl.value = today; }
+  else                     { debutEl.value = '';     finEl.value = today; }
   perfCharger();
 }
 
+// ── Helpers graphiques ────────────────────────────────────────────
+function _perfDrawChart(caissiers){
+  if(!caissiers.length) return '';
+  const maxCA = Math.max.apply(null, caissiers.map(c => c.ca_total).concat([1]));
+  return caissiers.map(c => {
+    const pct = Math.max((c.ca_total / maxCA) * 100, 0).toFixed(1);
+    const isTop = c.ca_total === maxCA && c.ca_total > 0;
+    const grad = isTop ? 'linear-gradient(90deg,#1a7a72,#3fb6a8)' : 'linear-gradient(90deg,#1e4a46,#2a6d66)';
+    return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+      + '<div style="width:110px;font-size:11px;color:rgba(255,255,255,.55);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + c.nom + '">' + c.nom + '</div>'
+      + '<div style="flex:1;background:rgba(255,255,255,.05);border-radius:4px;height:22px;overflow:hidden">'
+      +   '<div style="width:' + pct + '%;background:' + grad + ';height:100%;border-radius:4px;transition:width .6s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;min-width:' + (c.ca_total > 0 ? '2' : '0') + 'px">'
+      +     (c.ca_total > 0 ? '<span style="font-size:10px;font-weight:700;color:#fff;white-space:nowrap">' + posGx(c.ca_total) + '</span>' : '')
+      +   '</div>'
+      + '</div>'
+      + '<div style="width:52px;font-size:10px;color:rgba(255,255,255,.35);text-align:right">' + c.nb_ventes + 'v</div>'
+      + '</div>';
+  }).join('');
+}
+
+function _perfDrawModes(caissiers){
+  var totals = {};
+  caissiers.forEach(c => { Object.keys(c.par_mode).forEach(m => { totals[m] = (totals[m]||0) + c.par_mode[m]; }); });
+  var grand = Object.values(totals).reduce((a,b)=>a+b, 0);
+  if(!grand) return { bar:'', legend:'' };
+  var palette = { CASH:'#3fb6a8', CREDIT:'#f87171', MIXTE:'#f7a93b', AUTRE:'#94a3b8' };
+  var segs = Object.keys(totals).sort((a,b)=>totals[b]-totals[a]).map(m => ({
+    m, v: totals[m], pct: ((totals[m]/grand)*100).toFixed(1), color: palette[m]||palette.AUTRE
+  }));
+  var bar = segs.map(s => '<div style="flex:' + s.pct + ';background:' + s.color + ';min-width:2px" title="' + s.m + ' : ' + posGx(s.v) + '"></div>').join('');
+  var legend = segs.map(s =>
+    '<div style="display:flex;align-items:center;gap:6px;font-size:11px">'
+    + '<span style="width:9px;height:9px;border-radius:2px;background:' + s.color + ';flex-shrink:0;display:inline-block"></span>'
+    + '<span style="color:rgba(255,255,255,.45)">' + s.m.replace('_',' ') + '</span>'
+    + '<span style="font-weight:600;color:rgba(255,255,255,.75);margin-left:auto">' + posGx(s.v) + '</span>'
+    + '</div>'
+  ).join('');
+  return { bar, legend };
+}
+
+function _perfSparkline(parJour, w, h){
+  if(!parJour || parJour.length < 2) return '';
+  var maxCA = Math.max.apply(null, parJour.map(p=>p.ca).concat([1]));
+  var n = parJour.length;
+  var pts = parJour.map((p,i) => {
+    var x = (i/(n-1))*w;
+    var y = (h-4) - (p.ca/maxCA)*(h-8) + 4;
+    return x.toFixed(1)+','+y.toFixed(1);
+  }).join(' ');
+  var last = parJour[n-1];
+  var lx = w.toFixed(1);
+  var ly = ((h-4)-(last.ca/maxCA)*(h-8)+4).toFixed(1);
+  return '<svg width="'+w+'" height="'+h+'" style="overflow:visible;display:block">'
+    +'<polyline points="'+pts+'" fill="none" stroke="rgba(63,182,168,.55)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>'
+    +'<circle cx="'+lx+'" cy="'+ly+'" r="2.5" fill="#3fb6a8"/>'
+    +'</svg>';
+}
+
+// ── Chargement principal ──────────────────────────────────────────
 async function perfCharger(){
   const debut = document.getElementById('perf-debut')?.value || '';
   const fin   = document.getElementById('perf-fin')?.value   || new Date().toISOString().slice(0,10);
   const cards  = document.getElementById('perf-cards');
   const tbody  = document.getElementById('perf-tbody');
+  const chart  = document.getElementById('perf-chart');
   const Gx = v => posGx(v);
-  if(cards) cards.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:13px;padding:24px;text-align:center;grid-column:1/-1">Chargement…</div>';
+  if(cards) cards.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:13px;padding:32px;text-align:center;grid-column:1/-1">Chargement…</div>';
   if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>';
+  if(chart) chart.innerHTML = '<div style="color:rgba(255,255,255,.2);font-size:12px;padding:16px;text-align:center">Chargement…</div>';
 
   try {
-    const params = debut ? `?debut=${debut}&fin=${fin}` : `?fin=${fin}`;
-    const d = await apiFetch('GET', `/pos/caissiers/bilan${params}`);
+    const params = debut ? '?debut='+debut+'&fin='+fin : '?fin='+fin;
+    const d = await apiFetch('GET', '/pos/caissiers/bilan'+params);
     _perfData = d;
     const caissiers = d.caissiers || [];
 
-    // — KPIs globaux —
-    document.getElementById('perf-kpi-ca').textContent     = Gx(d.total_ca);
-    document.getElementById('perf-kpi-ventes').textContent = d.total_ventes;
-    document.getElementById('perf-kpi-nb').textContent     = caissiers.length;
-    const totalCredits = caissiers.reduce((s,c)=>s+c.solde_credits,0);
-    document.getElementById('perf-kpi-credits').textContent = Gx(totalCredits);
+    // KPIs globaux
+    var elCa = document.getElementById('perf-kpi-ca');
+    var elV  = document.getElementById('perf-kpi-ventes');
+    var elNb = document.getElementById('perf-kpi-nb');
+    var elCr = document.getElementById('perf-kpi-credits');
+    if(elCa) elCa.textContent = Gx(d.total_ca);
+    if(elV)  elV.textContent  = d.total_ventes;
+    if(elNb) elNb.textContent = caissiers.length;
+    var totCr = caissiers.reduce(function(s,c){ return s+c.solde_credits; }, 0);
+    if(elCr) elCr.textContent = Gx(totCr);
 
     if(!caissiers.length){
-      if(cards) cards.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:13px;padding:32px;text-align:center;grid-column:1/-1">Aucune caissière ou administrateur actif trouvé.</div>';
+      if(cards) cards.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:13px;padding:32px;text-align:center;grid-column:1/-1">Aucune caissière ou administrateur actif.</div>';
       if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Aucune donnée</td></tr>';
+      if(chart) chart.innerHTML = '';
       return;
     }
 
-    // — Cartes par caissière —
-    if(cards) cards.innerHTML = caissiers.map(c => {
-      const initiales = c.nom.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
-      const hasActivity = c.nb_ventes > 0;
-      const creditBadge = c.nb_credits > 0
-        ? `<div style="font-size:10px;background:rgba(248,113,113,.15);color:#f87171;border-radius:4px;padding:2px 7px;margin-top:4px">⚠ ${c.nb_credits} crédit(s) non soldé(s) — ${Gx(c.solde_credits)}</div>`
-        : '';
+    // Graphique comparatif
+    if(chart) chart.innerHTML = _perfDrawChart(caissiers);
 
-      // Breakdown par mode de paiement
-      const modesHtml = Object.entries(c.par_mode).length
-        ? Object.entries(c.par_mode).map(([m,v])=>
-            `<div style="display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,.45);margin-top:3px">
-              <span>${m.replace('_',' ')}</span><span style="font-weight:600;color:rgba(255,255,255,.7)">${Gx(v)}</span>
-            </div>`
-          ).join('')
-        : '<div style="font-size:10px;color:rgba(255,255,255,.2);margin-top:4px">Aucune vente sur cette période</div>';
+    // Modes de paiement
+    var mResult = _perfDrawModes(caissiers);
+    var mBar = document.getElementById('perf-modes-bar');
+    var mLeg = document.getElementById('perf-modes-legend');
+    if(mBar) mBar.innerHTML = mResult.bar;
+    if(mLeg) mLeg.innerHTML = mResult.legend;
 
-      return `
-        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px;transition:border-color .2s"
-             onmouseover="this.style.borderColor='rgba(63,182,168,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.08)'">
-          <!-- En-tête caissière -->
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#3fb6a8,#2a9d8f);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff;flex-shrink:0">${initiales}</div>
-            <div>
-              <div style="font-weight:700;font-size:14px">${c.nom}</div>
-              <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">${c.poste}</div>
-            </div>
-            <div style="margin-left:auto;text-align:right">
-              <div style="font-size:18px;font-weight:800;color:${hasActivity?'#3fb6a8':'rgba(255,255,255,.2)'}">${Gx(c.ca_total)}</div>
-              <div style="font-size:10px;color:rgba(255,255,255,.35)">${c.nb_ventes} vente(s)</div>
-            </div>
-          </div>
+    // Cartes employés
+    if(cards){
+      cards.innerHTML = caissiers.map(function(c){
+        var initiales = c.nom.split(' ').filter(Boolean).map(function(p){ return p[0]; }).join('').slice(0,2).toUpperCase();
+        var hasAct = c.ca_total > 0;
+        var spark  = _perfSparkline(c.par_jour||[], 110, 30);
+        var nomEsc = c.nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 
-          <!-- Sous-périodes -->
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
-            <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:8px;text-align:center">
-              <div style="font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">Aujourd'hui</div>
-              <div style="font-size:13px;font-weight:700;color:#fff;margin-top:2px">${Gx(c.ca_aujourd_hui)}</div>
-              <div style="font-size:9px;color:rgba(255,255,255,.3)">${c.nb_ventes_today} vte(s)</div>
-            </div>
-            <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:8px;text-align:center">
-              <div style="font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">7 jours</div>
-              <div style="font-size:13px;font-weight:700;color:#fff;margin-top:2px">${Gx(c.ca_7j)}</div>
-              <div style="font-size:9px;color:rgba(255,255,255,.3)">${c.nb_ventes_7j} vte(s)</div>
-            </div>
-            <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:8px;text-align:center">
-              <div style="font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">30 jours</div>
-              <div style="font-size:13px;font-weight:700;color:#fff;margin-top:2px">${Gx(c.ca_30j)}</div>
-              <div style="font-size:9px;color:rgba(255,255,255,.3)">${c.nb_ventes_30j} vte(s)</div>
-            </div>
-          </div>
+        var creditBadge = c.nb_credits > 0
+          ? '<div style="font-size:10px;background:rgba(248,113,113,.12);color:#f87171;border-radius:4px;padding:3px 8px;margin-top:2px">&#9888; '+c.nb_credits+' crédit(s) — '+Gx(c.solde_credits)+'</div>'
+          : '';
 
-          <!-- Breakdown modes de paiement -->
-          <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:8px">
-            <div style="font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Modes de paiement</div>
-            ${modesHtml}
-          </div>
+        var modesRows = Object.keys(c.par_mode).map(function(m){
+          return '<div style="display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,.4);padding:2px 0">'
+            +'<span>'+m.replace('_',' ')+'</span>'
+            +'<span style="font-weight:600;color:rgba(255,255,255,.65)">'+Gx(c.par_mode[m])+'</span>'
+            +'</div>';
+        }).join('');
 
-          <!-- Sessions -->
-          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-            <span style="font-size:11px;color:rgba(255,255,255,.35)">Sessions :</span>
-            <span style="font-size:11px;background:rgba(63,182,168,.12);color:#3fb6a8;padding:2px 8px;border-radius:12px">${c.nb_sessions} total</span>
-            ${c.nb_s_encours?`<span style="font-size:11px;background:rgba(251,191,36,.1);color:#fbbf24;padding:2px 8px;border-radius:12px">${c.nb_s_encours} en cours</span>`:''}
-            ${c.nb_s_valide?`<span style="font-size:11px;background:rgba(52,211,153,.1);color:#34d399;padding:2px 8px;border-radius:12px">${c.nb_s_valide} validée(s)</span>`:''}
-          </div>
+        return '<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px;transition:border-color .2s" onmouseover="this.style.borderColor=\'rgba(63,182,168,.35)\'" onmouseout="this.style.borderColor=\'rgba(255,255,255,.08)\'">'
+          // En-tête
+          +'<div style="display:flex;align-items:center;gap:12px">'
+          +  '<div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#1a7a72,#3fb6a8);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff;flex-shrink:0">'+initiales+'</div>'
+          +  '<div style="flex:1;min-width:0">'
+          +    '<div style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.nom+'</div>'
+          +    '<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">'+c.poste+'</div>'
+          +  '</div>'
+          +  '<div style="text-align:right;flex-shrink:0">'
+          +    '<div style="font-size:17px;font-weight:800;color:'+(hasAct?'#3fb6a8':'rgba(255,255,255,.2)')+'">'+Gx(c.ca_total)+'</div>'
+          +    '<div style="font-size:10px;color:rgba(255,255,255,.3)">'+c.nb_ventes+' vente(s)</div>'
+          +  '</div>'
+          +'</div>'
+          // Sparkline + mini KPIs
+          +'<div style="display:flex;gap:10px;align-items:center">'
+          +  (spark ? '<div style="flex-shrink:0;opacity:.85">'+spark+'</div>' : '')
+          +  '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;flex:1">'
+          +    '<div style="background:rgba(255,255,255,.04);border-radius:7px;padding:6px;text-align:center">'
+          +      '<div style="font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase">Auj.</div>'
+          +      '<div style="font-size:12px;font-weight:700;margin-top:1px">'+Gx(c.ca_aujourd_hui)+'</div>'
+          +      '<div style="font-size:9px;color:rgba(255,255,255,.3)">'+c.nb_ventes_today+'v</div>'
+          +    '</div>'
+          +    '<div style="background:rgba(255,255,255,.04);border-radius:7px;padding:6px;text-align:center">'
+          +      '<div style="font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase">7j</div>'
+          +      '<div style="font-size:12px;font-weight:700;margin-top:1px">'+Gx(c.ca_7j)+'</div>'
+          +      '<div style="font-size:9px;color:rgba(255,255,255,.3)">'+c.nb_ventes_7j+'v</div>'
+          +    '</div>'
+          +    '<div style="background:rgba(255,255,255,.04);border-radius:7px;padding:6px;text-align:center">'
+          +      '<div style="font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase">30j</div>'
+          +      '<div style="font-size:12px;font-weight:700;margin-top:1px">'+Gx(c.ca_30j)+'</div>'
+          +      '<div style="font-size:9px;color:rgba(255,255,255,.3)">'+c.nb_ventes_30j+'v</div>'
+          +    '</div>'
+          +  '</div>'
+          +'</div>'
+          // Modes
+          +(modesRows ? '<div style="border-top:1px solid rgba(255,255,255,.07);padding-top:8px"><div style="font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;margin-bottom:4px">Modes de paiement</div>'+modesRows+'</div>' : '')
+          // Sessions
+          +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+          +  '<span style="font-size:11px;color:rgba(255,255,255,.3)">Sessions :</span>'
+          +  '<span style="font-size:11px;background:rgba(63,182,168,.1);color:#3fb6a8;padding:2px 8px;border-radius:12px">'+c.nb_sessions+' total</span>'
+          +  (c.nb_s_encours ? '<span style="font-size:11px;background:rgba(251,191,36,.1);color:#fbbf24;padding:2px 8px;border-radius:12px">'+c.nb_s_encours+' en cours</span>' : '')
+          +  (c.nb_s_valide  ? '<span style="font-size:11px;background:rgba(52,211,153,.1);color:#34d399;padding:2px 8px;border-radius:12px">'+c.nb_s_valide+' valid.</span>' : '')
+          +'</div>'
+          +creditBadge
+          +'<button class="pos-btn teal" style="margin-top:4px;font-size:12px" onclick="perfOuvrirDetail('+c.employe_id+',\''+nomEsc+'\')">Voir toutes les ventes &#8594;</button>'
+          +'</div>';
+      }).join('');
+    }
 
-          ${creditBadge}
-
-          <!-- Bouton détail -->
-          <button class="pos-btn teal" style="margin-top:4px;font-size:12px"
-            onclick="perfOuvrirDetail(${c.employe_id},'${c.nom.replace(/'/g,"\\'")}')">
-            Voir toutes les ventes →
-          </button>
-        </div>`;
-    }).join('');
-
-    // — Tableau récapitulatif —
-    if(tbody) tbody.innerHTML = caissiers.map(c => `
-      <tr>
-        <td>
-          <div style="font-weight:600">${c.nom}</div>
-          <div style="font-size:10px;color:rgba(255,255,255,.35)">${c.poste}</div>
-        </td>
-        <td style="text-align:right;color:#3fb6a8;font-weight:700">${Gx(c.ca_total)}</td>
-        <td style="text-align:right">${c.nb_ventes}</td>
-        <td style="text-align:right;color:rgba(255,255,255,.55)">${c.nb_ventes?Gx(c.montant_moyen):'—'}</td>
-        <td style="text-align:right">${Gx(c.ca_aujourd_hui)}</td>
-        <td style="text-align:right">${Gx(c.ca_7j)}</td>
-        <td style="text-align:right">${Gx(c.ca_30j)}</td>
-        <td style="text-align:right">${c.nb_sessions}</td>
-        <td style="text-align:right;color:${c.solde_credits>0?'#f87171':'rgba(255,255,255,.4)'}">${c.solde_credits>0?Gx(c.solde_credits):'—'}</td>
-        <td style="text-align:center">
-          <button class="pos-btn ghost" style="font-size:11px;padding:4px 10px"
-            onclick="perfOuvrirDetail(${c.employe_id},'${c.nom.replace(/'/g,"\\'")}')">Détail</button>
-        </td>
-      </tr>`).join('');
+    // Tableau récapitulatif
+    if(tbody){
+      tbody.innerHTML = caissiers.map(function(c){
+        var nomEsc = c.nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        return '<tr>'
+          +'<td><div style="font-weight:600">'+c.nom+'</div><div style="font-size:10px;color:rgba(255,255,255,.35)">'+c.poste+'</div></td>'
+          +'<td style="text-align:right;color:#3fb6a8;font-weight:700">'+Gx(c.ca_total)+'</td>'
+          +'<td style="text-align:right">'+c.nb_ventes+'</td>'
+          +'<td style="text-align:right;color:rgba(255,255,255,.45)">'+(c.nb_ventes?Gx(c.montant_moyen):'—')+'</td>'
+          +'<td style="text-align:right">'+Gx(c.ca_aujourd_hui)+'</td>'
+          +'<td style="text-align:right">'+Gx(c.ca_7j)+'</td>'
+          +'<td style="text-align:right">'+Gx(c.ca_30j)+'</td>'
+          +'<td style="text-align:right">'+c.nb_sessions+'</td>'
+          +'<td style="text-align:right;color:'+(c.solde_credits>0?'#f87171':'rgba(255,255,255,.4)')+'">'+( c.solde_credits>0?Gx(c.solde_credits):'—')+'</td>'
+          +'<td style="text-align:center"><button class="pos-btn ghost" style="font-size:11px;padding:4px 10px" onclick="perfOuvrirDetail('+c.employe_id+',\''+nomEsc+'\')">Détail</button></td>'
+          +'</tr>';
+      }).join('');
+    }
 
   } catch(e){
-    const msg = `<div style="color:#f87171;padding:24px;text-align:center;grid-column:1/-1">${e.message||'Erreur chargement'}</div>`;
-    if(cards) cards.innerHTML = msg;
-    if(tbody) tbody.innerHTML = `<tr><td colspan="10" style="color:#f87171;text-align:center;padding:24px">${e.message||'Erreur'}</td></tr>`;
+    var errMsg = (e && e.message) || 'Erreur chargement';
+    if(cards) cards.innerHTML = '<div style="color:#f87171;padding:24px;text-align:center;grid-column:1/-1">'+errMsg+'</div>';
+    if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="color:#f87171;text-align:center;padding:24px">'+errMsg+'</td></tr>';
+    if(chart) chart.innerHTML = '';
   }
 }
 
+// ── Détail ventes + filtres ──────────────────────────────────────
 async function perfOuvrirDetail(employeId, nom){
-  const bg    = document.getElementById('perf-detail-bg');
-  const titre = document.getElementById('perf-detail-titre');
-  const body  = document.getElementById('perf-detail-body');
-  if(!bg||!titre||!body) return;
-  titre.textContent = `Ventes de ${nom}`;
-  body.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</div>';
+  _perfDetailId = employeId;
+  _perfDetailFilters = { mode:'', statut:'' };
+  var bg    = document.getElementById('perf-detail-bg');
+  var titre = document.getElementById('perf-detail-titre');
+  if(!bg||!titre) return;
+  titre.textContent = 'Ventes de '+nom;
   bg.classList.add('open');
+  await _perfDetailCharger();
+}
+
+async function _perfDetailCharger(){
+  var body = document.getElementById('perf-detail-body');
+  if(!body) return;
+  body.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</div>';
+  var Gx = function(v){ return posGx(v); };
 
   try {
-    const debut = document.getElementById('perf-debut')?.value || '';
-    const fin   = document.getElementById('perf-fin')?.value   || new Date().toISOString().slice(0,10);
-    const params = debut ? `?debut=${debut}&fin=${fin}` : `?fin=${fin}`;
-    const d = await apiFetch('GET', `/pos/caissiers/${employeId}/ventes${params}`);
-    const ventes = d.ventes || [];
-    const Gx = v => posGx(v);
+    var debut = document.getElementById('perf-debut')?.value || '';
+    var fin   = document.getElementById('perf-fin')?.value   || new Date().toISOString().slice(0,10);
+    var params = debut ? '?debut='+debut+'&fin='+fin : '?fin='+fin;
+    if(_perfDetailFilters.mode)   params += '&mode_paiement='+_perfDetailFilters.mode;
+    if(_perfDetailFilters.statut) params += '&statut_filtre='+_perfDetailFilters.statut;
 
-    if(!ventes.length){
-      body.innerHTML = `
-        <div style="text-align:center;padding:48px;color:rgba(255,255,255,.3)">
-          <div style="font-size:32px;margin-bottom:12px">📭</div>
-          <div>Aucune vente enregistrée pour cette période.</div>
-        </div>`;
-      return;
+    var d = await apiFetch('GET', '/pos/caissiers/'+_perfDetailId+'/ventes'+params);
+    var ventes = d.ventes || [];
+    var topProduits = d.top_produits || [];
+
+    // Barre de filtres
+    var selMode   = _perfDetailFilters.mode;
+    var selStatut = _perfDetailFilters.statut;
+    var filterBar = '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px 16px;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.07)">'
+      +'<span style="font-size:11px;color:rgba(255,255,255,.35)">Filtrer :</span>'
+      +'<select id="perf-fmode" onchange="_perfApplyFilter()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:#fff;border-radius:6px;padding:4px 8px;font-size:12px">'
+      +'<option value="">Tous les modes</option>'
+      +'<option value="CASH"'+(selMode==='CASH'?' selected':'')+'>Cash</option>'
+      +'<option value="CREDIT"'+(selMode==='CREDIT'?' selected':'')+'>Crédit</option>'
+      +'<option value="MIXTE"'+(selMode==='MIXTE'?' selected':'')+'>Mixte</option>'
+      +'</select>'
+      +'<select id="perf-fstatut" onchange="_perfApplyFilter()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:#fff;border-radius:6px;padding:4px 8px;font-size:12px">'
+      +'<option value="">Tous les statuts</option>'
+      +'<option value="PAYEE"'+(selStatut==='PAYEE'?' selected':'')+'>Payée</option>'
+      +'<option value="CREDIT_EN_COURS"'+(selStatut==='CREDIT_EN_COURS'?' selected':'')+'>Crédit en cours</option>'
+      +'</select>'
+      +'<span style="font-size:11px;color:rgba(255,255,255,.3);margin-left:auto">'+ventes.length+' vente(s) — '+Gx(d.total_ca)+'</span>'
+      +'</div>';
+
+    // Résumé KPIs
+    var summary = '<div style="display:flex;gap:10px;flex-wrap:wrap;padding:14px 16px">'
+      +'<div style="background:rgba(63,182,168,.1);border:1px solid rgba(63,182,168,.2);border-radius:8px;padding:10px 14px;flex:1;min-width:100px">'
+      +  '<div style="font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em">CA total</div>'
+      +  '<div style="font-size:20px;font-weight:800;color:#3fb6a8">'+Gx(d.total_ca)+'</div>'
+      +'</div>'
+      +'<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 14px;flex:1;min-width:100px">'
+      +  '<div style="font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em">Ventes</div>'
+      +  '<div style="font-size:20px;font-weight:800">'+d.nb_ventes+'</div>'
+      +'</div>'
+      +'<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 14px;flex:1;min-width:100px">'
+      +  '<div style="font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em">Moy./vente</div>'
+      +  '<div style="font-size:20px;font-weight:800">'+(d.nb_ventes?Gx(d.total_ca/d.nb_ventes):'—')+'</div>'
+      +'</div>'
+      +'</div>';
+
+    // Top produits
+    var prodSection = '';
+    if(topProduits.length){
+      var maxP = Math.max.apply(null, topProduits.map(function(p){ return p.ca; }).concat([1]));
+      var prodRows = topProduits.slice(0,10).map(function(p, i){
+        var pct = ((p.ca/maxP)*100).toFixed(1);
+        return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+          +'<div style="width:16px;font-size:10px;color:rgba(255,255,255,.3);text-align:right">'+(i+1)+'</div>'
+          +'<div style="width:130px;font-size:11px;color:rgba(255,255,255,.65);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+p.nom+'">'+p.nom+'</div>'
+          +'<div style="flex:1;background:rgba(255,255,255,.05);border-radius:3px;height:14px;overflow:hidden">'
+          +  '<div style="width:'+pct+'%;background:linear-gradient(90deg,#1e4a46,#3fb6a8);height:100%;border-radius:3px"></div>'
+          +'</div>'
+          +'<div style="width:80px;font-size:11px;font-weight:600;color:#3fb6a8;text-align:right">'+Gx(p.ca)+'</div>'
+          +'<div style="width:40px;font-size:10px;color:rgba(255,255,255,.3);text-align:right">'+Math.round(p.qte)+'u</div>'
+          +'</div>';
+      }).join('');
+      prodSection = '<div style="border-top:1px solid rgba(255,255,255,.07);padding:12px 16px">'
+        +'<div style="font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Top produits vendus</div>'
+        +prodRows
+        +'</div>';
     }
 
-    // Résumé en haut
-    const caissierData = (_perfData?.caissiers||[]).find(c=>c.employe_id===employeId);
-    const modesHtml = caissierData ? Object.entries(caissierData.par_mode).map(([m,v])=>
-      `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(255,255,255,.04);border-radius:6px">
-        <span style="font-size:12px;color:rgba(255,255,255,.55)">${m.replace('_',' ')}</span>
-        <span style="font-weight:700;color:#3fb6a8">${Gx(v)}</span>
-      </div>`
-    ).join('') : '';
+    // Liste des ventes
+    var ventesHtml = '';
+    if(!ventes.length){
+      ventesHtml = '<div style="border-top:1px solid rgba(255,255,255,.07);text-align:center;padding:40px;color:rgba(255,255,255,.3)">'
+        +'<div style="font-size:28px;margin-bottom:8px">&#128235;</div>'
+        +'<div>Aucune vente pour ces filtres.</div>'
+        +'</div>';
+    } else {
+      var rows = ventes.map(function(v){
+        var dt = v.date_heure ? new Date(v.date_heure) : null;
+        var dateStr  = dt ? dt.toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+        var heureStr = dt ? dt.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'}) : '';
+        var isCredit = v.statut === 'CREDIT_EN_COURS';
+        var creditBadge = isCredit
+          ? ' <span style="font-size:10px;background:rgba(248,113,113,.15);color:#f87171;padding:2px 6px;border-radius:4px">Crédit'+(v.credit_solde!=null?' — '+Gx(v.credit_solde)+' restant':'')+'</span>'
+          : '';
+        var lignesRows = (v.lignes||[]).map(function(l){
+          return '<div style="display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,.4);padding:2px 0;border-bottom:1px solid rgba(255,255,255,.04)">'
+            +'<span>'+l.produit+' &times; '+l.qte+' (G '+l.pu.toFixed(2)+'/u)</span>'
+            +'<span style="font-weight:600">'+Gx(l.total)+'</span>'
+            +'</div>';
+        }).join('');
+        return '<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 12px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+          +  '<div>'
+          +    '<span style="font-weight:700;font-size:13px">'+(v.numero||'#'+v.vente_id)+'</span>'
+          +    creditBadge
+          +    '<div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">'+dateStr+' à '+heureStr+' · '+(v.mode_paiement||'—').replace('_',' ')+(v.client_nom?' · '+v.client_nom:'')+'</div>'
+          +  '</div>'
+          +  '<div style="font-size:15px;font-weight:800;color:'+(isCredit?'#f87171':'#3fb6a8')+';white-space:nowrap;margin-left:12px">'+Gx(v.montant_total)+'</div>'
+          +'</div>'
+          +(lignesRows ? '<div style="margin-top:6px;border-top:1px solid rgba(255,255,255,.06);padding-top:6px">'+lignesRows+'</div>' : '')
+          +'</div>';
+      }).join('');
+      ventesHtml = '<div style="border-top:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:6px;padding:12px 16px">'+rows+'</div>';
+    }
 
-    body.innerHTML = `
-      <!-- Résumé global -->
-      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
-        <div style="background:rgba(63,182,168,.1);border:1px solid rgba(63,182,168,.2);border-radius:10px;padding:12px 16px;flex:1;min-width:120px">
-          <div style="font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em">CA total</div>
-          <div style="font-size:22px;font-weight:800;color:#3fb6a8;margin-top:3px">${Gx(d.total_ca)}</div>
-        </div>
-        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 16px;flex:1;min-width:120px">
-          <div style="font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em">Nb ventes</div>
-          <div style="font-size:22px;font-weight:800;margin-top:3px">${d.nb_ventes}</div>
-        </div>
-        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 16px;flex:1;min-width:120px">
-          <div style="font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em">Moy. par vente</div>
-          <div style="font-size:22px;font-weight:800;margin-top:3px">${d.nb_ventes?Gx(d.total_ca/d.nb_ventes):'—'}</div>
-        </div>
-        ${modesHtml ? `<div style="flex:2;min-width:180px;display:flex;flex-direction:column;gap:4px;justify-content:center">${modesHtml}</div>` : ''}
-      </div>
+    body.innerHTML = filterBar + summary + prodSection + ventesHtml;
 
-      <!-- Liste des ventes -->
-      <div style="font-size:11px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Détail de chaque vente</div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        ${ventes.map(v => {
-          const dt = v.date_heure ? new Date(v.date_heure) : null;
-          const dateStr = dt ? dt.toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
-          const heureStr = dt ? dt.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'}) : '';
-          const isCredit = v.statut === 'CREDIT_EN_COURS';
-          const creditBadge = isCredit
-            ? `<span style="font-size:10px;background:rgba(248,113,113,.15);color:#f87171;padding:2px 7px;border-radius:4px;margin-left:6px">Crédit ${v.credit_solde!=null?'— '+Gx(v.credit_solde)+' restant':''}</span>`
-            : '';
-          const lignesHtml = (v.lignes||[]).map(l=>
-            `<div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.45);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)">
-              <span>${l.produit} × ${l.qte}</span>
-              <span>${Gx(l.total)}</span>
-            </div>`
-          ).join('');
-          return `
-            <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:12px">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:${lignesHtml?'8px':'0'}">
-                <div>
-                  <span style="font-weight:700;font-size:13px">${v.numero||'#'+v.vente_id}</span>
-                  ${creditBadge}
-                  <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:3px">${dateStr} à ${heureStr} · ${(v.mode_paiement||'—').replace('_',' ')}${v.client_nom?` · Client : ${v.client_nom}`:''}</div>
-                </div>
-                <div style="font-size:16px;font-weight:800;color:${isCredit?'#f87171':'#3fb6a8'};white-space:nowrap;margin-left:12px">${Gx(v.montant_total)}</div>
-              </div>
-              ${lignesHtml ? `<div style="margin-top:4px">${lignesHtml}</div>` : ''}
-            </div>`;
-        }).join('')}
-      </div>`;
-  } catch(e){
-    body.innerHTML = `<div style="color:#f87171;padding:24px;text-align:center">${e.message||'Erreur chargement des ventes'}</div>`;
+  } catch(err){
+    var body2 = document.getElementById('perf-detail-body');
+    if(body2) body2.innerHTML = '<div style="color:#f87171;padding:24px;text-align:center">'+(err&&err.message?err.message:'Erreur chargement')+'</div>';
   }
+}
+
+function _perfApplyFilter(){
+  var mEl = document.getElementById('perf-fmode');
+  var sEl = document.getElementById('perf-fstatut');
+  _perfDetailFilters.mode   = mEl  ? mEl.value  : '';
+  _perfDetailFilters.statut = sEl  ? sEl.value  : '';
+  _perfDetailCharger();
 }
 
 function perfFermerDetail(){
-  const bg = document.getElementById('perf-detail-bg');
+  var bg = document.getElementById('perf-detail-bg');
   if(bg) bg.classList.remove('open');
 }
 
-// Initialiser la performance quand on arrive sur la page sessions
 function _initPerfSection(){
-  const finEl = document.getElementById('perf-fin');
+  var finEl = document.getElementById('perf-fin');
   if(finEl && !finEl.value) finEl.value = new Date().toISOString().slice(0,10);
   perfCharger();
 }

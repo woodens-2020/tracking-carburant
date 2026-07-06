@@ -689,9 +689,28 @@ def bilan_caissiers(
         nb_credits    = credits_res[0] or 0
         solde_credits = round(float(credits_res[1] or 0), 2)
 
+        # Ventilation journalière pour sparklines
+        dq = (
+            db.query(
+                func.date(BarVente.date_heure).label("jour"),
+                func.sum(BarVente.montant_total).label("ca"),
+                func.count(BarVente.id).label("nb"),
+            )
+            .filter(
+                BarVente.caissier_id == emp.id,
+                BarVente.statut.in_(["PAYEE", "CREDIT_EN_COURS"]),
+            )
+            .group_by(func.date(BarVente.date_heure))
+            .order_by(func.date(BarVente.date_heure))
+        )
+        if d_debut:
+            dq = dq.filter(func.date(BarVente.date_heure) >= d_debut)
+        dq = dq.filter(func.date(BarVente.date_heure) <= d_fin)
+        par_jour = [{"date": str(r.jour), "ca": float(r.ca), "nb": int(r.nb)} for r in dq.all()]
+
         resultats.append({
             "employe_id":       emp.id,
-            "nom":              f"{emp.prenom} {emp.nom}",
+            "nom":              f"{emp.nom} {emp.prenom}",
             "poste":            emp.poste,
             "telephone":        emp.telephone,
             # Période sélectionnée
@@ -700,6 +719,7 @@ def bilan_caissiers(
             "montant_moyen":    round(ca_periode / nb_periode, 2) if nb_periode else 0,
             "derniere_vente":   derniere_vente,
             "par_mode":         modes,
+            "par_jour":         par_jour,
             # Sous-périodes fixes
             "ca_aujourd_hui":   _ca(ventes_today),
             "nb_ventes_today":  len(ventes_today),
@@ -730,12 +750,14 @@ def bilan_caissiers(
 
 @router.get("/caissiers/{employe_id}/ventes")
 def detail_ventes_caissier(
-    employe_id: int,
-    debut: Optional[str] = Query(None),
-    fin:   Optional[str] = Query(None),
-    db:    Session = Depends(get_db),
+    employe_id:    int,
+    debut:         Optional[str] = Query(None),
+    fin:           Optional[str] = Query(None),
+    mode_paiement: Optional[str] = Query(None),
+    statut_filtre: Optional[str] = Query(None),
+    db:            Session = Depends(get_db),
 ):
-    """Retourne toutes les ventes d'une caissière avec le détail des lignes."""
+    """Retourne les ventes d'une caissière avec détail des lignes et résumé produits."""
     emp = db.query(Employe).filter_by(id=employe_id, actif=True).first()
     if not emp:
         raise HTTPException(status_code=404, detail="Employé introuvable")
@@ -745,13 +767,19 @@ def detail_ventes_caissier(
 
     q = (
         db.query(BarVente)
-        .filter(
-            BarVente.caissier_id == emp.id,
-            BarVente.statut.in_(["PAYEE", "CREDIT_EN_COURS"]),
+        .filter(BarVente.caissier_id == emp.id)
+        .options(
+            joinedload(BarVente.lignes).joinedload(BarLigneVente.produit),
+            joinedload(BarVente.lignes).joinedload(BarLigneVente.cuisine_plat),
         )
-        .options(joinedload(BarVente.lignes).joinedload(BarLigneVente.produit))
         .order_by(BarVente.date_heure.desc())
     )
+    if statut_filtre in ("PAYEE", "CREDIT_EN_COURS", "ANNULEE"):
+        q = q.filter(BarVente.statut == statut_filtre)
+    else:
+        q = q.filter(BarVente.statut.in_(["PAYEE", "CREDIT_EN_COURS"]))
+    if mode_paiement:
+        q = q.filter(BarVente.mode_paiement == mode_paiement)
     if d_debut:
         q = q.filter(func.date(BarVente.date_heure) >= d_debut)
     q = q.filter(func.date(BarVente.date_heure) <= d_fin)
@@ -759,36 +787,52 @@ def detail_ventes_caissier(
 
     rows = []
     for v in ventes:
-        lignes = [
-            {
-                "produit": l.produit.nom if l.produit else "—",
+        lignes = []
+        for l in (v.lignes or []):
+            nom_prod = "—"
+            if l.produit:
+                nom_prod = l.produit.nom
+            elif l.cuisine_plat:
+                nom_prod = l.cuisine_plat.nom
+            lignes.append({
+                "produit": nom_prod,
                 "qte":     float(l.quantite),
-                "pu":      float(l.prix_unitaire),
-                "total":   float(l.total_ligne),
-            }
-            for l in (v.lignes or [])
-        ]
+                "pu":      float(l.prix_unitaire_applique),
+                "total":   float(l.sous_total),
+            })
         credit = db.query(BarCredit).filter_by(vente_id=v.id).first()
         rows.append({
-            "vente_id":       v.id,
-            "numero":         v.numero_ticket,
-            "date_heure":     v.date_heure.isoformat() if v.date_heure else None,
-            "montant_total":  float(v.montant_total or 0),
-            "mode_paiement":  v.mode_paiement,
-            "statut":         v.statut,
-            "client_nom":     v.client_nom,
-            "lignes":         lignes,
-            "credit_solde":   float(credit.solde or 0) if credit else None,
-            "credit_statut":  credit.statut if credit else None,
+            "vente_id":      v.id,
+            "numero":        v.numero_ticket,
+            "date_heure":    v.date_heure.isoformat() if v.date_heure else None,
+            "montant_total": float(v.montant_total or 0),
+            "mode_paiement": v.mode_paiement,
+            "statut":        v.statut,
+            "client_nom":    v.client_nom,
+            "lignes":        lignes,
+            "credit_solde":  float(credit.solde or 0) if credit else None,
+            "credit_statut": credit.statut if credit else None,
         })
 
+    # Résumé par produit (top 15 par CA)
+    produits_map: dict[str, dict] = {}
+    for r in rows:
+        for l in r["lignes"]:
+            n = l["produit"]
+            if n not in produits_map:
+                produits_map[n] = {"nom": n, "qte": 0.0, "ca": 0.0}
+            produits_map[n]["qte"] = round(produits_map[n]["qte"] + l["qte"], 3)
+            produits_map[n]["ca"]  = round(produits_map[n]["ca"]  + l["total"], 2)
+    top_produits = sorted(produits_map.values(), key=lambda x: x["ca"], reverse=True)[:15]
+
     return {
-        "employe_id":  emp.id,
-        "nom":         f"{emp.prenom} {emp.nom}",
-        "poste":       emp.poste,
-        "ventes":      rows,
-        "total_ca":    round(sum(r["montant_total"] for r in rows), 2),
-        "nb_ventes":   len(rows),
+        "employe_id":   emp.id,
+        "nom":          f"{emp.nom} {emp.prenom}",
+        "poste":        emp.poste,
+        "ventes":       rows,
+        "total_ca":     round(sum(r["montant_total"] for r in rows), 2),
+        "nb_ventes":    len(rows),
+        "top_produits": top_produits,
     }
 
 
