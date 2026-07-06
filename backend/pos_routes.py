@@ -18,7 +18,8 @@ from models import (
     Produit,
     BarCategorie, BarProduit, BarPrixHistorique, BarAchat, BarAchatDepense,
     BarMouvementStock, BarVente, BarLigneVente, BarCredit, BarRemboursement,
-    BarCommande, BarLigneCommande, BarPaiementEmploye, Employe, CuisinePlat,
+    BarCommande, BarLigneCommande, BarPaiementEmploye, BarSessionCaisse,
+    Employe, Utilisateur, CuisinePlat,
 )
 from pos_service import (
     stock_courant, stock_tous_produits, prix_actif, cmup,
@@ -590,6 +591,207 @@ def stock_produit(produit_id: int, db: Session = Depends(get_db)):
             }
             for m in mouvements
         ],
+    }
+
+
+@router.get("/caissiers/bilan")
+def bilan_caissiers(
+    debut: Optional[str] = Query(None),
+    fin:   Optional[str] = Query(None),
+    db:    Session = Depends(get_db),
+):
+    """
+    Bilan complet de l'activité de vente de chaque caissière et administrateur.
+    Inclut : CA total, nb ventes, sessions, crédits en cours, breakdown par mode.
+    """
+    from sqlalchemy import or_
+
+    d_debut = date_type.fromisoformat(debut) if debut else None
+    d_fin   = date_type.fromisoformat(fin)   if fin   else date_type.today()
+
+    # Tous les employés actifs de type caissier ou admin
+    employes = (
+        db.query(Employe)
+        .outerjoin(Utilisateur, Employe.utilisateur_id == Utilisateur.id)
+        .filter(
+            Employe.actif == True,
+            or_(
+                func.lower(Employe.poste).contains("caissier"),
+                func.lower(Employe.poste).contains("administrateur"),
+                func.lower(Employe.poste).contains("directeur"),
+                Utilisateur.role.in_(["admin", "pdg"]),
+            ),
+        )
+        .order_by(Employe.prenom, Employe.nom)
+        .all()
+    )
+
+    today = date_type.today()
+    debut_7j  = date_type.fromordinal(today.toordinal() - 7)
+    debut_30j = date_type.fromordinal(today.toordinal() - 30)
+
+    resultats = []
+    for emp in employes:
+        # — Ventes de la période —
+        def _ventes_q(d_start, d_end):
+            q = (
+                db.query(BarVente)
+                .filter(
+                    BarVente.caissier_id == emp.id,
+                    BarVente.statut.in_(["PAYEE", "CREDIT_EN_COURS"]),
+                )
+            )
+            if d_start:
+                q = q.filter(func.date(BarVente.date_heure) >= d_start)
+            if d_end:
+                q = q.filter(func.date(BarVente.date_heure) <= d_end)
+            return q.all()
+
+        ventes_periode = _ventes_q(d_debut, d_fin)
+        ventes_7j      = _ventes_q(debut_7j, today)
+        ventes_30j     = _ventes_q(debut_30j, today)
+        ventes_today   = _ventes_q(today, today)
+
+        def _ca(ventes):
+            return round(sum(float(v.montant_total or 0) for v in ventes), 2)
+
+        ca_periode = _ca(ventes_periode)
+        nb_periode = len(ventes_periode)
+
+        # Breakdown par mode de paiement (période sélectionnée)
+        modes: dict[str, float] = {}
+        for v in ventes_periode:
+            m = v.mode_paiement or "AUTRE"
+            modes[m] = round(modes.get(m, 0) + float(v.montant_total or 0), 2)
+
+        # Dernière vente
+        dates_ventes = [v.date_heure for v in ventes_periode if v.date_heure]
+        derniere_vente = max(dates_ventes).isoformat() if dates_ventes else None
+
+        # — Sessions —
+        sq = db.query(BarSessionCaisse).filter(BarSessionCaisse.caissier_id == emp.id)
+        if d_debut:
+            sq = sq.filter(BarSessionCaisse.date_session >= d_debut)
+        sq = sq.filter(BarSessionCaisse.date_session <= d_fin)
+        sessions = sq.all()
+        nb_sessions    = len(sessions)
+        nb_s_encours   = sum(1 for s in sessions if s.statut == "EN_COURS")
+        nb_s_soumis    = sum(1 for s in sessions if s.statut == "SOUMIS")
+        nb_s_valide    = sum(1 for s in sessions if s.statut == "VALIDE")
+
+        # — Crédits en cours (via bar_ventes -> bar_credits) —
+        credits_res = (
+            db.query(func.count(BarCredit.id), func.sum(BarCredit.solde))
+            .join(BarVente, BarCredit.vente_id == BarVente.id)
+            .filter(
+                BarVente.caissier_id == emp.id,
+                BarCredit.statut.in_(["OUVERT", "EN_RETARD"]),
+            )
+            .first()
+        )
+        nb_credits    = credits_res[0] or 0
+        solde_credits = round(float(credits_res[1] or 0), 2)
+
+        resultats.append({
+            "employe_id":       emp.id,
+            "nom":              f"{emp.prenom} {emp.nom}",
+            "poste":            emp.poste,
+            "telephone":        emp.telephone,
+            # Période sélectionnée
+            "ca_total":         ca_periode,
+            "nb_ventes":        nb_periode,
+            "montant_moyen":    round(ca_periode / nb_periode, 2) if nb_periode else 0,
+            "derniere_vente":   derniere_vente,
+            "par_mode":         modes,
+            # Sous-périodes fixes
+            "ca_aujourd_hui":   _ca(ventes_today),
+            "nb_ventes_today":  len(ventes_today),
+            "ca_7j":            _ca(ventes_7j),
+            "nb_ventes_7j":     len(ventes_7j),
+            "ca_30j":           _ca(ventes_30j),
+            "nb_ventes_30j":    len(ventes_30j),
+            # Sessions
+            "nb_sessions":      nb_sessions,
+            "nb_s_encours":     nb_s_encours,
+            "nb_s_soumis":      nb_s_soumis,
+            "nb_s_valide":      nb_s_valide,
+            # Crédits
+            "nb_credits":       nb_credits,
+            "solde_credits":    solde_credits,
+        })
+
+    total_ca     = round(sum(r["ca_total"]  for r in resultats), 2)
+    total_ventes = sum(r["nb_ventes"] for r in resultats)
+
+    return {
+        "caissiers":     resultats,
+        "total_ca":      total_ca,
+        "total_ventes":  total_ventes,
+        "periode":       {"debut": debut or "tout", "fin": d_fin.isoformat()},
+    }
+
+
+@router.get("/caissiers/{employe_id}/ventes")
+def detail_ventes_caissier(
+    employe_id: int,
+    debut: Optional[str] = Query(None),
+    fin:   Optional[str] = Query(None),
+    db:    Session = Depends(get_db),
+):
+    """Retourne toutes les ventes d'une caissière avec le détail des lignes."""
+    emp = db.query(Employe).filter_by(id=employe_id, actif=True).first()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employé introuvable")
+
+    d_debut = date_type.fromisoformat(debut) if debut else None
+    d_fin   = date_type.fromisoformat(fin)   if fin   else date_type.today()
+
+    q = (
+        db.query(BarVente)
+        .filter(
+            BarVente.caissier_id == emp.id,
+            BarVente.statut.in_(["PAYEE", "CREDIT_EN_COURS"]),
+        )
+        .options(joinedload(BarVente.lignes).joinedload(BarLigneVente.produit))
+        .order_by(BarVente.date_heure.desc())
+    )
+    if d_debut:
+        q = q.filter(func.date(BarVente.date_heure) >= d_debut)
+    q = q.filter(func.date(BarVente.date_heure) <= d_fin)
+    ventes = q.all()
+
+    rows = []
+    for v in ventes:
+        lignes = [
+            {
+                "produit": l.produit.nom if l.produit else "—",
+                "qte":     float(l.quantite),
+                "pu":      float(l.prix_unitaire),
+                "total":   float(l.total_ligne),
+            }
+            for l in (v.lignes or [])
+        ]
+        credit = db.query(BarCredit).filter_by(vente_id=v.id).first()
+        rows.append({
+            "vente_id":       v.id,
+            "numero":         v.numero_ticket,
+            "date_heure":     v.date_heure.isoformat() if v.date_heure else None,
+            "montant_total":  float(v.montant_total or 0),
+            "mode_paiement":  v.mode_paiement,
+            "statut":         v.statut,
+            "client_nom":     v.client_nom,
+            "lignes":         lignes,
+            "credit_solde":   float(credit.solde or 0) if credit else None,
+            "credit_statut":  credit.statut if credit else None,
+        })
+
+    return {
+        "employe_id":  emp.id,
+        "nom":         f"{emp.prenom} {emp.nom}",
+        "poste":       emp.poste,
+        "ventes":      rows,
+        "total_ca":    round(sum(r["montant_total"] for r in rows), 2),
+        "nb_ventes":   len(rows),
     }
 
 

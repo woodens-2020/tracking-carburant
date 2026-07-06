@@ -7099,6 +7099,61 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-kpi"><div class="pos-kpi-label">Validées</div><div class="pos-kpi-val" style="color:#3fb6a8" id="sc-kpi-valide">—</div></div>
         </div>
 
+        <!-- ═══════════════════════════════════════════════
+             PERFORMANCE DES CAISSIÈRES & ADMINISTRATEURS
+             ═══════════════════════════════════════════════ -->
+        <div class="pos-card" style="margin-bottom:16px">
+          <div class="pos-card-hdr" style="flex-wrap:wrap;gap:10px">
+            <span style="font-size:14px;font-weight:700">Performance des caissières & administrateurs</span>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto">
+              <input type="date" class="pos-input" id="perf-debut" style="width:130px" title="Début de période">
+              <span style="color:rgba(255,255,255,.3);font-size:12px">→</span>
+              <input type="date" class="pos-input" id="perf-fin"   style="width:130px" title="Fin de période">
+              <button class="pos-btn teal"  onclick="perfCharger()">Actualiser</button>
+              <button class="pos-btn ghost" onclick="perfPeriode('today')">Aujourd'hui</button>
+              <button class="pos-btn ghost" onclick="perfPeriode('7j')">7 jours</button>
+              <button class="pos-btn ghost" onclick="perfPeriode('30j')">30 jours</button>
+              <button class="pos-btn ghost" onclick="perfPeriode('all')">Tout</button>
+            </div>
+          </div>
+
+          <!-- KPIs globaux performance -->
+          <div class="pos-kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px" id="perf-kpis">
+            <div class="pos-kpi"><div class="pos-kpi-label">CA total (période)</div><div class="pos-kpi-val" style="color:#3fb6a8" id="perf-kpi-ca">—</div></div>
+            <div class="pos-kpi"><div class="pos-kpi-label">Ventes validées</div><div class="pos-kpi-val amber" id="perf-kpi-ventes">—</div></div>
+            <div class="pos-kpi"><div class="pos-kpi-label">Caissières actives</div><div class="pos-kpi-val" id="perf-kpi-nb">—</div></div>
+            <div class="pos-kpi"><div class="pos-kpi-label">Crédits non soldés</div><div class="pos-kpi-val red" id="perf-kpi-credits">—</div></div>
+          </div>
+
+          <!-- Cartes par caissière -->
+          <div id="perf-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:16px">
+            <div style="color:rgba(255,255,255,.3);font-size:13px;padding:24px;text-align:center;grid-column:1/-1">Chargement…</div>
+          </div>
+
+          <!-- Tableau récapitulatif -->
+          <div class="pos-table-wrap">
+            <table class="pos-table" style="font-size:12px">
+              <thead>
+                <tr>
+                  <th>Caissière / Poste</th>
+                  <th style="text-align:right">CA total</th>
+                  <th style="text-align:right">Nb ventes</th>
+                  <th style="text-align:right">Moy. / vente</th>
+                  <th style="text-align:right">CA aujourd'hui</th>
+                  <th style="text-align:right">CA 7 jours</th>
+                  <th style="text-align:right">CA 30 jours</th>
+                  <th style="text-align:right">Sessions</th>
+                  <th style="text-align:right">Crédits ouverts</th>
+                  <th style="text-align:center">Détail</th>
+                </tr>
+              </thead>
+              <tbody id="perf-tbody">
+                <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- Table sessions -->
         <div class="pos-card">
           <div class="pos-card-hdr">
@@ -7139,6 +7194,17 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
         <div id="sc-detail-body" style="padding:16px"></div>
         <div style="display:flex;gap:8px;padding:0 16px 16px;flex-wrap:wrap" id="sc-detail-actions"></div>
+      </div>
+    </div>
+
+    <!-- Modal détail ventes caissière -->
+    <div class="pos-modal-bg" id="perf-detail-bg" onclick="if(event.target===this)perfFermerDetail()">
+      <div class="pos-modal" style="min-width:640px;max-width:860px;max-height:88vh;overflow-y:auto" id="perf-detail-modal">
+        <div class="pos-modal-hdr">
+          <span id="perf-detail-titre">Activité de vente</span>
+          <button class="pos-modal-close" onclick="perfFermerDetail()">✕</button>
+        </div>
+        <div id="perf-detail-body" style="padding:16px"></div>
       </div>
     </div>
 
@@ -21187,6 +21253,8 @@ async function loadPosSessionsCaisse(){
     document.getElementById('sc-kpis')?.style && (document.getElementById('sc-kpis').style.display = '');
   }
   scAujourdhui();
+  // Charger aussi la section performance caissières
+  _initPerfSection();
 }
 
 function scAujourdhui(){
@@ -21359,6 +21427,257 @@ function scFermerDetail(){
 function scExport(session_id, format){
   const url = `/api/pos/caisse/sessions/${session_id}/rapport.${format}`;
   window.open(url, '_blank');
+}
+
+// ══════════════════════════════════════════════════════════════
+// PERFORMANCE CAISSIÈRES & ADMINISTRATEURS
+// ══════════════════════════════════════════════════════════════
+
+let _perfData = null; // cache bilan caissières
+
+function perfPeriode(mode){
+  const today = new Date().toISOString().slice(0,10);
+  const d = (n) => { const dt = new Date(); dt.setDate(dt.getDate()-n); return dt.toISOString().slice(0,10); };
+  const debutEl = document.getElementById('perf-debut');
+  const finEl   = document.getElementById('perf-fin');
+  if(mode === 'today'){ debutEl.value = today; finEl.value = today; }
+  else if(mode === '7j'){ debutEl.value = d(7); finEl.value = today; }
+  else if(mode === '30j'){ debutEl.value = d(30); finEl.value = today; }
+  else { debutEl.value = ''; finEl.value = today; }
+  perfCharger();
+}
+
+async function perfCharger(){
+  const debut = document.getElementById('perf-debut')?.value || '';
+  const fin   = document.getElementById('perf-fin')?.value   || new Date().toISOString().slice(0,10);
+  const cards  = document.getElementById('perf-cards');
+  const tbody  = document.getElementById('perf-tbody');
+  const Gx = v => posGx(v);
+  if(cards) cards.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:13px;padding:24px;text-align:center;grid-column:1/-1">Chargement…</div>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>';
+
+  try {
+    const params = debut ? `?debut=${debut}&fin=${fin}` : `?fin=${fin}`;
+    const d = await apiFetch('GET', `/pos/caissiers/bilan${params}`);
+    _perfData = d;
+    const caissiers = d.caissiers || [];
+
+    // — KPIs globaux —
+    document.getElementById('perf-kpi-ca').textContent     = Gx(d.total_ca);
+    document.getElementById('perf-kpi-ventes').textContent = d.total_ventes;
+    document.getElementById('perf-kpi-nb').textContent     = caissiers.length;
+    const totalCredits = caissiers.reduce((s,c)=>s+c.solde_credits,0);
+    document.getElementById('perf-kpi-credits').textContent = Gx(totalCredits);
+
+    if(!caissiers.length){
+      if(cards) cards.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:13px;padding:32px;text-align:center;grid-column:1/-1">Aucune caissière ou administrateur actif trouvé.</div>';
+      if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Aucune donnée</td></tr>';
+      return;
+    }
+
+    // — Cartes par caissière —
+    if(cards) cards.innerHTML = caissiers.map(c => {
+      const initiales = c.nom.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+      const hasActivity = c.nb_ventes > 0;
+      const creditBadge = c.nb_credits > 0
+        ? `<div style="font-size:10px;background:rgba(248,113,113,.15);color:#f87171;border-radius:4px;padding:2px 7px;margin-top:4px">⚠ ${c.nb_credits} crédit(s) non soldé(s) — ${Gx(c.solde_credits)}</div>`
+        : '';
+
+      // Breakdown par mode de paiement
+      const modesHtml = Object.entries(c.par_mode).length
+        ? Object.entries(c.par_mode).map(([m,v])=>
+            `<div style="display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,.45);margin-top:3px">
+              <span>${m.replace('_',' ')}</span><span style="font-weight:600;color:rgba(255,255,255,.7)">${Gx(v)}</span>
+            </div>`
+          ).join('')
+        : '<div style="font-size:10px;color:rgba(255,255,255,.2);margin-top:4px">Aucune vente sur cette période</div>';
+
+      return `
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px;transition:border-color .2s"
+             onmouseover="this.style.borderColor='rgba(63,182,168,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.08)'">
+          <!-- En-tête caissière -->
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#3fb6a8,#2a9d8f);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff;flex-shrink:0">${initiales}</div>
+            <div>
+              <div style="font-weight:700;font-size:14px">${c.nom}</div>
+              <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:1px">${c.poste}</div>
+            </div>
+            <div style="margin-left:auto;text-align:right">
+              <div style="font-size:18px;font-weight:800;color:${hasActivity?'#3fb6a8':'rgba(255,255,255,.2)'}">${Gx(c.ca_total)}</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.35)">${c.nb_ventes} vente(s)</div>
+            </div>
+          </div>
+
+          <!-- Sous-périodes -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+            <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:8px;text-align:center">
+              <div style="font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">Aujourd'hui</div>
+              <div style="font-size:13px;font-weight:700;color:#fff;margin-top:2px">${Gx(c.ca_aujourd_hui)}</div>
+              <div style="font-size:9px;color:rgba(255,255,255,.3)">${c.nb_ventes_today} vte(s)</div>
+            </div>
+            <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:8px;text-align:center">
+              <div style="font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">7 jours</div>
+              <div style="font-size:13px;font-weight:700;color:#fff;margin-top:2px">${Gx(c.ca_7j)}</div>
+              <div style="font-size:9px;color:rgba(255,255,255,.3)">${c.nb_ventes_7j} vte(s)</div>
+            </div>
+            <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:8px;text-align:center">
+              <div style="font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em">30 jours</div>
+              <div style="font-size:13px;font-weight:700;color:#fff;margin-top:2px">${Gx(c.ca_30j)}</div>
+              <div style="font-size:9px;color:rgba(255,255,255,.3)">${c.nb_ventes_30j} vte(s)</div>
+            </div>
+          </div>
+
+          <!-- Breakdown modes de paiement -->
+          <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:8px">
+            <div style="font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Modes de paiement</div>
+            ${modesHtml}
+          </div>
+
+          <!-- Sessions -->
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <span style="font-size:11px;color:rgba(255,255,255,.35)">Sessions :</span>
+            <span style="font-size:11px;background:rgba(63,182,168,.12);color:#3fb6a8;padding:2px 8px;border-radius:12px">${c.nb_sessions} total</span>
+            ${c.nb_s_encours?`<span style="font-size:11px;background:rgba(251,191,36,.1);color:#fbbf24;padding:2px 8px;border-radius:12px">${c.nb_s_encours} en cours</span>`:''}
+            ${c.nb_s_valide?`<span style="font-size:11px;background:rgba(52,211,153,.1);color:#34d399;padding:2px 8px;border-radius:12px">${c.nb_s_valide} validée(s)</span>`:''}
+          </div>
+
+          ${creditBadge}
+
+          <!-- Bouton détail -->
+          <button class="pos-btn teal" style="margin-top:4px;font-size:12px"
+            onclick="perfOuvrirDetail(${c.employe_id},'${c.nom.replace(/'/g,"\\'")}')">
+            Voir toutes les ventes →
+          </button>
+        </div>`;
+    }).join('');
+
+    // — Tableau récapitulatif —
+    if(tbody) tbody.innerHTML = caissiers.map(c => `
+      <tr>
+        <td>
+          <div style="font-weight:600">${c.nom}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.35)">${c.poste}</div>
+        </td>
+        <td style="text-align:right;color:#3fb6a8;font-weight:700">${Gx(c.ca_total)}</td>
+        <td style="text-align:right">${c.nb_ventes}</td>
+        <td style="text-align:right;color:rgba(255,255,255,.55)">${c.nb_ventes?Gx(c.montant_moyen):'—'}</td>
+        <td style="text-align:right">${Gx(c.ca_aujourd_hui)}</td>
+        <td style="text-align:right">${Gx(c.ca_7j)}</td>
+        <td style="text-align:right">${Gx(c.ca_30j)}</td>
+        <td style="text-align:right">${c.nb_sessions}</td>
+        <td style="text-align:right;color:${c.solde_credits>0?'#f87171':'rgba(255,255,255,.4)'}">${c.solde_credits>0?Gx(c.solde_credits):'—'}</td>
+        <td style="text-align:center">
+          <button class="pos-btn ghost" style="font-size:11px;padding:4px 10px"
+            onclick="perfOuvrirDetail(${c.employe_id},'${c.nom.replace(/'/g,"\\'")}')">Détail</button>
+        </td>
+      </tr>`).join('');
+
+  } catch(e){
+    const msg = `<div style="color:#f87171;padding:24px;text-align:center;grid-column:1/-1">${e.message||'Erreur chargement'}</div>`;
+    if(cards) cards.innerHTML = msg;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="10" style="color:#f87171;text-align:center;padding:24px">${e.message||'Erreur'}</td></tr>`;
+  }
+}
+
+async function perfOuvrirDetail(employeId, nom){
+  const bg    = document.getElementById('perf-detail-bg');
+  const titre = document.getElementById('perf-detail-titre');
+  const body  = document.getElementById('perf-detail-body');
+  if(!bg||!titre||!body) return;
+  titre.textContent = `Ventes de ${nom}`;
+  body.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</div>';
+  bg.classList.add('open');
+
+  try {
+    const debut = document.getElementById('perf-debut')?.value || '';
+    const fin   = document.getElementById('perf-fin')?.value   || new Date().toISOString().slice(0,10);
+    const params = debut ? `?debut=${debut}&fin=${fin}` : `?fin=${fin}`;
+    const d = await apiFetch('GET', `/pos/caissiers/${employeId}/ventes${params}`);
+    const ventes = d.ventes || [];
+    const Gx = v => posGx(v);
+
+    if(!ventes.length){
+      body.innerHTML = `
+        <div style="text-align:center;padding:48px;color:rgba(255,255,255,.3)">
+          <div style="font-size:32px;margin-bottom:12px">📭</div>
+          <div>Aucune vente enregistrée pour cette période.</div>
+        </div>`;
+      return;
+    }
+
+    // Résumé en haut
+    const caissierData = (_perfData?.caissiers||[]).find(c=>c.employe_id===employeId);
+    const modesHtml = caissierData ? Object.entries(caissierData.par_mode).map(([m,v])=>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(255,255,255,.04);border-radius:6px">
+        <span style="font-size:12px;color:rgba(255,255,255,.55)">${m.replace('_',' ')}</span>
+        <span style="font-weight:700;color:#3fb6a8">${Gx(v)}</span>
+      </div>`
+    ).join('') : '';
+
+    body.innerHTML = `
+      <!-- Résumé global -->
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+        <div style="background:rgba(63,182,168,.1);border:1px solid rgba(63,182,168,.2);border-radius:10px;padding:12px 16px;flex:1;min-width:120px">
+          <div style="font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em">CA total</div>
+          <div style="font-size:22px;font-weight:800;color:#3fb6a8;margin-top:3px">${Gx(d.total_ca)}</div>
+        </div>
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 16px;flex:1;min-width:120px">
+          <div style="font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em">Nb ventes</div>
+          <div style="font-size:22px;font-weight:800;margin-top:3px">${d.nb_ventes}</div>
+        </div>
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 16px;flex:1;min-width:120px">
+          <div style="font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em">Moy. par vente</div>
+          <div style="font-size:22px;font-weight:800;margin-top:3px">${d.nb_ventes?Gx(d.total_ca/d.nb_ventes):'—'}</div>
+        </div>
+        ${modesHtml ? `<div style="flex:2;min-width:180px;display:flex;flex-direction:column;gap:4px;justify-content:center">${modesHtml}</div>` : ''}
+      </div>
+
+      <!-- Liste des ventes -->
+      <div style="font-size:11px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Détail de chaque vente</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${ventes.map(v => {
+          const dt = v.date_heure ? new Date(v.date_heure) : null;
+          const dateStr = dt ? dt.toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+          const heureStr = dt ? dt.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'}) : '';
+          const isCredit = v.statut === 'CREDIT_EN_COURS';
+          const creditBadge = isCredit
+            ? `<span style="font-size:10px;background:rgba(248,113,113,.15);color:#f87171;padding:2px 7px;border-radius:4px;margin-left:6px">Crédit ${v.credit_solde!=null?'— '+Gx(v.credit_solde)+' restant':''}</span>`
+            : '';
+          const lignesHtml = (v.lignes||[]).map(l=>
+            `<div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.45);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+              <span>${l.produit} × ${l.qte}</span>
+              <span>${Gx(l.total)}</span>
+            </div>`
+          ).join('');
+          return `
+            <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:12px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:${lignesHtml?'8px':'0'}">
+                <div>
+                  <span style="font-weight:700;font-size:13px">${v.numero||'#'+v.vente_id}</span>
+                  ${creditBadge}
+                  <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:3px">${dateStr} à ${heureStr} · ${(v.mode_paiement||'—').replace('_',' ')}${v.client_nom?` · Client : ${v.client_nom}`:''}</div>
+                </div>
+                <div style="font-size:16px;font-weight:800;color:${isCredit?'#f87171':'#3fb6a8'};white-space:nowrap;margin-left:12px">${Gx(v.montant_total)}</div>
+              </div>
+              ${lignesHtml ? `<div style="margin-top:4px">${lignesHtml}</div>` : ''}
+            </div>`;
+        }).join('')}
+      </div>`;
+  } catch(e){
+    body.innerHTML = `<div style="color:#f87171;padding:24px;text-align:center">${e.message||'Erreur chargement des ventes'}</div>`;
+  }
+}
+
+function perfFermerDetail(){
+  const bg = document.getElementById('perf-detail-bg');
+  if(bg) bg.classList.remove('open');
+}
+
+// Initialiser la performance quand on arrive sur la page sessions
+function _initPerfSection(){
+  const finEl = document.getElementById('perf-fin');
+  if(finEl && !finEl.value) finEl.value = new Date().toISOString().slice(0,10);
+  perfCharger();
 }
 
 // ══════════════════════════════════════════════════════════════════
