@@ -1007,47 +1007,54 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
 
 /* ══ SÉCURITÉ — CAPTURE PHOTO + GÉOLOCALISATION ══════════════ */
 var _loginPhoto = null;
+var _capturePromise = null;
 
 function _capturePhoto(){
-  if(_loginPhoto !== null) return; // déjà capturée
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-  navigator.mediaDevices.getUserMedia({video:{width:320,height:240,facingMode:'user'}})
+  if(_capturePromise) return _capturePromise;
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    _capturePromise = Promise.resolve(); return _capturePromise;
+  }
+  _capturePromise = navigator.mediaDevices.getUserMedia({video:{width:320,height:240,facingMode:'user'}})
     .then(function(stream){
-      var vid = document.createElement('video');
-      vid.srcObject = stream;
-      vid.autoplay = true;
-      vid.playsInline = true;
-      vid.style.cssText = 'position:fixed;opacity:0;pointer-events:none;top:-9999px;left:-9999px;width:1px;height:1px';
-      document.body.appendChild(vid);
-      var done = false;
-      function shoot(){
-        if(done) return; done = true;
-        var c = document.createElement('canvas');
-        c.width = 320; c.height = 240;
-        c.getContext('2d').drawImage(vid, 0, 0, 320, 240);
-        _loginPhoto = c.toDataURL('image/jpeg', 0.65);
-        stream.getTracks().forEach(function(t){ t.stop(); });
-        try{ document.body.removeChild(vid); }catch(e){}
-      }
-      vid.oncanplay = function(){ setTimeout(shoot, 700); };
-      setTimeout(function(){ if(!done) shoot(); }, 2500);
+      return new Promise(function(resolve){
+        var vid = document.createElement('video');
+        vid.srcObject = stream;
+        vid.autoplay = true;
+        vid.playsInline = true;
+        vid.style.cssText = 'position:fixed;opacity:0;pointer-events:none;top:-9999px;left:-9999px;width:1px;height:1px';
+        document.body.appendChild(vid);
+        var done = false;
+        function shoot(){
+          if(done) return; done = true;
+          var c = document.createElement('canvas');
+          c.width = 320; c.height = 240;
+          c.getContext('2d').drawImage(vid, 0, 0, 320, 240);
+          _loginPhoto = c.toDataURL('image/jpeg', 0.65);
+          stream.getTracks().forEach(function(t){ t.stop(); });
+          try{ document.body.removeChild(vid); }catch(e){}
+          resolve();
+        }
+        vid.oncanplay = function(){ setTimeout(shoot, 700); };
+        setTimeout(function(){ if(!done) shoot(); }, 2500);
+      });
     })
-    .catch(function(){ _loginPhoto = ''; }); // accès refusé — on continue
+    .catch(function(){ _loginPhoto = null; });
+  return _capturePromise;
 }
 
 async function _sendLoginMeta(){
+  // Photo et géolocalisation en parallèle pour minimiser le délai
+  var locPromise = new Promise(function(resolve){
+    if(!navigator.geolocation){ resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(resolve, function(){ resolve(null); }, {timeout:4000,maximumAge:60000});
+  });
+  var results = await Promise.all([locPromise, _capturePromise || Promise.resolve()]);
+  var pos = results[0];
   var photo = _loginPhoto || null;
   _loginPhoto = null;
-  var lat = null, lng = null;
-  if(navigator.geolocation){
-    try{
-      var pos = await new Promise(function(res,rej){
-        navigator.geolocation.getCurrentPosition(res, rej, {timeout:4000,maximumAge:60000});
-      });
-      lat = pos.coords.latitude;
-      lng = pos.coords.longitude;
-    }catch(e){ /* refusé */ }
-  }
+  _capturePromise = null;
+  var lat = pos ? pos.coords.latitude : null;
+  var lng = pos ? pos.coords.longitude : null;
   try{
     await fetch('/api/auth/login-meta',{
       method:'POST', credentials:'include',
