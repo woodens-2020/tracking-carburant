@@ -18564,12 +18564,9 @@ async function posFicheTechniqueOuvrir(){
 
     const fmt  = v => { const n = parseFloat(v||0); return n % 1 === 0 ? n.toFixed(0) : n.toFixed(2); };
     const fmtd = iso => iso ? new Date(iso).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : null;
-    // Affiche une quantité avec son unité de façon lisible.
-    // Si l'unité est un chiffre pur (ex: "1", "10"), on ne l'affiche pas brut
-    // car "44 1" ou "0 10" n'a aucun sens — on montre à la place "unité(s)".
     const fmtQte = (v, unite) => {
       const n = fmt(v);
-      if(!unite || /^\d+(\.\d+)?$/.test(String(unite).trim())) return `${n} unité(s)`;
+      if(!unite || /^\d+(\.\d+)?$/.test(String(unite).trim())) return n;
       return `${n} ${unite}`;
     };
 
@@ -18760,7 +18757,7 @@ function pftExcelFiche(){
     ['Produit','Catégorie','Unité','Dernière commande (qté)','Date dernière commande','Prix achat/u (G)','Statut commande','Stock disponible','CMUP (G/unité)','Valeur estimée (G)','Prix vente (G)','Potentiel CA (G)','Écoulement dep. commande','Statut stock'],
     ...(d.produits||[]).map(p=>[
       p.nom, p.categorie,
-      (!p.unite || /^\d+(\.\d+)?$/.test(String(p.unite).trim())) ? 'unité(s)' : p.unite,
+      (!p.unite || /^\d+(\.\d+)?$/.test(String(p.unite).trim())) ? '' : p.unite,
       p.derniere_qte_commandee != null ? fmt(p.derniere_qte_commandee) : 'Jamais commandé',
       fmtd(p.dernier_achat) || '—',
       p.dernier_prix_achat != null ? parseFloat(p.dernier_prix_achat).toFixed(2) : '—',
@@ -18798,7 +18795,7 @@ function pftPDFFiche(){
   const fmtd = iso => iso ? new Date(iso).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : null;
   const fmtQte = (v, unite) => {
     const n = fmt(v);
-    if(!unite || /^\d+(\.\d+)?$/.test(String(unite).trim())) return `${n} unité(s)`;
+    if(!unite || /^\d+(\.\d+)?$/.test(String(unite).trim())) return n;
     return `${n} ${unite}`;
   };
 
