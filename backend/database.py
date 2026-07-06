@@ -23,6 +23,7 @@ from models import (
     BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande, BarPaiementEmploye,
     HotelChambre, HotelEmploye, HotelReservation,
+    LoginSecurityEvent,  # noqa: F401 — nécessaire pour create_all
 )
 
 # ── URL de connexion ──────────────────────────────────────────────

