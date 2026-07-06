@@ -24,7 +24,7 @@ SOURCES = ("PDG", "Gaz", "Autre")
 
 class ConfigIn(BaseModel):
     taux:              float = Field(..., gt=0)
-    balance_avant_usd: float = 0.0
+    balance_avant_usd: float = 0.0  # conservé pour compat, non exposé dans l'UI
 
 
 class TransactionIn(BaseModel):
@@ -44,7 +44,8 @@ class StatutIn(BaseModel):
 
 
 class FondIn(BaseModel):
-    montant_usd:    float = Field(..., gt=0)
+    montant_ht:     float = Field(..., gt=0)   # montant en HTG
+    taux:           float = Field(..., gt=0)   # taux utilisé pour conversion
     source:         str = "PDG"
     date_reception: Optional[str] = None
     notes:          Optional[str] = None
@@ -85,10 +86,12 @@ def _tx_dict(t: ZelleTransaction) -> dict:
     }
 
 
-def _fond_dict(f: ZelleFond) -> dict:
+def _fond_dict(f: ZelleFond, taux: float = 1.0) -> dict:
+    mu = float(f.montant_usd)
     return {
         "id":             f.id,
-        "montant_usd":    float(f.montant_usd),
+        "montant_usd":    mu,
+        "montant_ht":     round(mu * taux, 2),
         "source":         f.source,
         "date_reception": f.date_reception.isoformat() if f.date_reception else None,
         "notes":          f.notes,
@@ -144,6 +147,8 @@ def get_bilan(db: Session = Depends(get_db)):
     remis = [t for t in txs if t.statut == "REMIS"]
     total_remis_usd = round(sum(float(t.montant_usd) - float(t.frais) for t in remis), 2)
     total_remis_ht  = round(total_remis_usd * taux, 2)
+    total_frais_usd = round(sum(float(t.frais) for t in remis), 2)
+    total_frais_ht  = round(sum(float(t.frais) * float(t.taux_applique) for t in remis), 2)
 
     # Fonds reçus
     fonds = db.query(ZelleFond).all()
@@ -180,6 +185,8 @@ def get_bilan(db: Session = Depends(get_db)):
         "total_remis_ht":     total_remis_ht,
         "balance_usd":        balance_usd,
         "balance_ht":         balance_ht,
+        "total_frais_usd":    total_frais_usd,
+        "total_frais_ht":     total_frais_ht,
         "sources":            sources_data,
     }
 
@@ -193,6 +200,8 @@ def list_fonds(
     fin:    Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
+    cfg  = _get_or_create_config(db)
+    taux = float(cfg.taux)
     q = db.query(ZelleFond).order_by(ZelleFond.date_reception.desc())
     if source:
         q = q.filter(ZelleFond.source == source)
@@ -200,15 +209,17 @@ def list_fonds(
         q = q.filter(func.date(ZelleFond.date_reception) >= date_type.fromisoformat(debut))
     if fin:
         q = q.filter(func.date(ZelleFond.date_reception) <= date_type.fromisoformat(fin))
-    return [_fond_dict(f) for f in q.all()]
+    return [_fond_dict(f, taux) for f in q.all()]
 
 
 @router.post("/fonds")
 def create_fond(data: FondIn, db: Session = Depends(get_db)):
     if data.source not in SOURCES:
         raise HTTPException(status_code=400, detail="Source invalide")
+    # montant_ht / taux = montant_usd
+    montant_usd = round(data.montant_ht / data.taux, 6)
     f = ZelleFond(
-        montant_usd = Decimal(str(data.montant_usd)),
+        montant_usd = Decimal(str(montant_usd)),
         source      = data.source,
         notes       = data.notes.strip() if data.notes else None,
     )
@@ -219,7 +230,7 @@ def create_fond(data: FondIn, db: Session = Depends(get_db)):
     db.add(f)
     db.commit()
     db.refresh(f)
-    return _fond_dict(f)
+    return _fond_dict(f, data.taux)
 
 
 @router.put("/fonds/{fond_id}")
@@ -229,7 +240,8 @@ def update_fond(fond_id: int, data: FondIn, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Fond introuvable")
     if data.source not in SOURCES:
         raise HTTPException(status_code=400, detail="Source invalide")
-    f.montant_usd = Decimal(str(data.montant_usd))
+    montant_usd = round(data.montant_ht / data.taux, 6)
+    f.montant_usd = Decimal(str(montant_usd))
     f.source      = data.source
     f.notes       = data.notes.strip() if data.notes else None
     if data.date_reception:
@@ -237,7 +249,7 @@ def update_fond(fond_id: int, data: FondIn, db: Session = Depends(get_db)):
         if dt:
             f.date_reception = dt
     db.commit()
-    return _fond_dict(f)
+    return _fond_dict(f, data.taux)
 
 
 @router.delete("/fonds/{fond_id}")
@@ -248,6 +260,8 @@ def delete_fond(fond_id: int, db: Session = Depends(get_db)):
     db.delete(f)
     db.commit()
     return {"ok": True}
+
+
 
 
 # ── Transactions ──────────────────────────────────────────────────────────────
