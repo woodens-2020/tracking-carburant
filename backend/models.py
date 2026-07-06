@@ -1040,3 +1040,38 @@ class BarSessionCaisse(Base):
         Index("idx_session_date",     "date_session"),
         Index("idx_session_statut",   "statut"),
     )
+
+
+class ZelleConfig(Base):
+    """Configuration du département Zelle (taux de change, balance initiale)."""
+    __tablename__ = "zelle_config"
+
+    id                = Column(Integer, primary_key=True)
+    taux              = Column(Numeric(10, 4), nullable=False, default=130)
+    balance_avant_usd = Column(Numeric(14, 2), nullable=False, default=0)
+    date_maj          = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ZelleTransaction(Base):
+    """Transaction Zelle — réception USD et remise HTG."""
+    __tablename__ = "zelle_transactions"
+
+    id               = Column(Integer, primary_key=True)
+    numero_int       = Column(String(30),  nullable=True)
+    nom_prenom       = Column(String(150), nullable=False)
+    identifiant      = Column(String(150), nullable=True)
+    contact          = Column(String(100), nullable=True)
+    montant_usd      = Column(Numeric(14, 2), nullable=False)
+    frais            = Column(Numeric(14, 2), nullable=False, default=0)
+    taux_applique    = Column(Numeric(10, 4), nullable=False, default=130)
+    statut           = Column(String(20), nullable=False, default="EN_ATTENTE")
+    date_transaction = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    notes            = Column(String(300), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("montant_usd > 0",   name="chk_zelle_montant_pos"),
+        CheckConstraint("frais >= 0",         name="chk_zelle_frais_pos"),
+        CheckConstraint("statut IN ('EN_ATTENTE','REMIS','ANNULE')", name="chk_zelle_statut"),
+        Index("idx_zelle_date",   "date_transaction"),
+        Index("idx_zelle_statut", "statut"),
+    )
