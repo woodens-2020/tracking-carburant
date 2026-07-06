@@ -554,6 +554,91 @@ def supprimer_achat(achat_id: int, db: Session = Depends(get_db)):
 
 
 # ══════════════════════════════════════════════════════════════════
+# BILAN DE RENTABILITÉ PAR PLAT
+# ══════════════════════════════════════════════════════════════════
+
+@router.get("/bilan-rentabilite")
+def bilan_rentabilite(db: Session = Depends(get_db)):
+    """
+    Tableau de bord rentabilité : coût des achats vs CA ventes, par plat actif.
+    Affiché avant la déclaration d'un nouvel achat cuisine.
+    """
+    from sqlalchemy import func as sqlfunc
+
+    plats = db.query(CuisinePlat).filter_by(actif=True).order_by(CuisinePlat.nom).all()
+
+    achats_par_plat = dict(
+        db.query(CuisineAchat.plat_id, sqlfunc.sum(CuisineAchat.total))
+        .filter(CuisineAchat.plat_id.isnot(None))
+        .group_by(CuisineAchat.plat_id)
+        .all()
+    )
+
+    derniers_achats = dict(
+        db.query(CuisineAchat.plat_id, sqlfunc.max(CuisineAchat.date_achat))
+        .filter(CuisineAchat.plat_id.isnot(None))
+        .group_by(CuisineAchat.plat_id)
+        .all()
+    )
+
+    ventes_rows = (
+        db.query(
+            CuisineLigneVente.plat_id,
+            sqlfunc.sum(CuisineLigneVente.sous_total),
+            sqlfunc.sum(CuisineLigneVente.quantite),
+        )
+        .join(CuisineVente, CuisineLigneVente.vente_id == CuisineVente.id)
+        .filter(
+            CuisineLigneVente.plat_id.isnot(None),
+            CuisineVente.statut == "VALIDEE",
+        )
+        .group_by(CuisineLigneVente.plat_id)
+        .all()
+    )
+    ca_par_plat = {pid: float(_dec(ca)) for pid, ca, _ in ventes_rows}
+    nb_par_plat = {pid: int(nb or 0)    for pid, _, nb in ventes_rows}
+
+    achats_generaux = float(_dec(
+        db.query(sqlfunc.sum(CuisineAchat.total))
+        .filter(CuisineAchat.plat_id.is_(None))
+        .scalar()
+    ))
+
+    resultats = []
+    for p in plats:
+        cout_achats  = float(_dec(achats_par_plat.get(p.id, 0)))
+        ca_ventes    = ca_par_plat.get(p.id, 0.0)
+        nb_portions  = nb_par_plat.get(p.id, 0)
+        benefice     = ca_ventes - cout_achats
+        marge_pct    = round(benefice / ca_ventes * 100, 1) if ca_ventes > 0 else 0.0
+        dernier_achat = derniers_achats.get(p.id)
+        resultats.append({
+            "plat_id":             p.id,
+            "plat_nom":            p.nom,
+            "prix_vente":          float(_dec(p.prix_vente)),
+            "cout_estime":         float(_dec(p.cout_estime)) if p.cout_estime else None,
+            "cout_achats":         round(cout_achats, 2),
+            "ca_ventes":           round(ca_ventes, 2),
+            "nb_portions_vendues": nb_portions,
+            "benefice":            round(benefice, 2),
+            "marge_pct":           marge_pct,
+            "dernier_achat":       dernier_achat.isoformat() if dernier_achat else None,
+        })
+
+    total_cout = sum(r["cout_achats"] for r in resultats) + achats_generaux
+    total_ca   = sum(r["ca_ventes"]   for r in resultats)
+    total_ben  = total_ca - total_cout
+    return {
+        "plats":             resultats,
+        "achats_generaux":   round(achats_generaux, 2),
+        "total_cout_achats": round(total_cout, 2),
+        "total_ca":          round(total_ca, 2),
+        "total_benefice":    round(total_ben, 2),
+        "marge_globale_pct": round(total_ben / total_ca * 100, 1) if total_ca > 0 else 0.0,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════
 # VENTES VIA BAR (cross-selling) — lecture seule pour le dashboard
 # ══════════════════════════════════════════════════════════════════
 
