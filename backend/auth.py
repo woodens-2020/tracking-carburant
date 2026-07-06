@@ -94,6 +94,7 @@ def get_session_user(db: Session, token: str):
         return None
     s.last_activity_at = datetime.now(timezone.utc)
     db.commit()
+    db.refresh(user)  # recharge les attributs expirés par commit avant fermeture de session
     return user
 
 

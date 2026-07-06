@@ -88,7 +88,20 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 return JSONResponse({"detail": "Non authentifié"}, status_code=401)
             return RedirectResponse(url="/login")
 
-        request.state.user = user
+        # Stocker les attributs scalaires dans un objet simple avant la fermeture de session
+        class _UserProxy:
+            __slots__ = ("id","role","role_id","actif","nom_complet","username","poste","email","api_key_hash")
+        proxy = _UserProxy()
+        proxy.id           = user.id
+        proxy.role         = user.role
+        proxy.role_id      = user.role_id
+        proxy.actif        = user.actif
+        proxy.nom_complet  = user.nom_complet
+        proxy.username     = user.username
+        proxy.poste        = user.poste
+        proxy.email        = user.email
+        proxy.api_key_hash = user.api_key_hash
+        request.state.user = proxy
         return await call_next(request)
 
 
