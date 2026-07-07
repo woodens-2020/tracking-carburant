@@ -11613,11 +11613,10 @@ function _getAllowedPages(){
 
 function _canAccess(page){
   if(!_appUser) return false;
-  const perms = _appUser.permissions;
-  if(perms){
-    if(perms.admin === true) return true;
-    if(['admin-roles','admin-users','admin-sessions','admin-audit','admin-security'].includes(page)) return false;
-  }
+  // Admin vérifié sur les 3 indicateurs (est_admin, role, permissions.admin)
+  if(_isAdmin()) return true;
+  // Pages admin interdites à tous les non-admins, sans exception
+  if(['admin-roles','admin-users','admin-sessions','admin-audit','admin-security'].includes(page)) return false;
   if((_appUser.role_nom||_appUser.poste||'').toLowerCase() === 'manager') return _MANAGER_ALLOWED.has(page);
   if(_appUser.employe_id || (_appUser.role_nom||_appUser.poste||'').toLowerCase().startsWith('caissier')) return _CAISSIER_ALLOWED.has(page);
   const allowed = _getAllowedPages();
@@ -11626,7 +11625,7 @@ function _canAccess(page){
 }
 
 function _applyNavAccess(){
-  const isAdmin = _appUser?.est_admin || _appUser?.role === 'admin' || _appUser?.permissions?.admin === true;
+  const isAdmin = _isAdmin();
   // Montrer/cacher la section admin
   ['nav-admin-label','nav-btn-admin-roles','nav-btn-admin-users',
    'nav-btn-admin-sessions','nav-btn-admin-audit','nav-btn-admin-security'].forEach(id=>{
