@@ -9942,11 +9942,19 @@ function _startScrollFix(){
   requestAnimationFrame(_forceScrollTop);
 }
 
+function _defaultPage(){
+  const rn = (_appUser?.role_nom||_appUser?.poste||'').toLowerCase();
+  if(rn === 'manager') return 'pos-produits';
+  if(rn.startsWith('caissier') || !!_appUser?.employe_id) return 'pos-caisse';
+  return 'home';
+}
+
 function goTo(page){
   if(!_canAccess(page)){
-    if(page !== 'home'){
+    const def = _defaultPage();
+    if(page !== def){
       toast('Accès non autorisé pour votre poste.','err');
-      goTo('home');
+      goTo(def);
     }
     return;
   }
@@ -11538,19 +11546,18 @@ const _ACCES_POSTE_LEGACY = {
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
                   'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
   'Pompiste': ['home','saisie'],
-  'Caissier': ['home','pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite'],
-  'Manager':  ['home','gi-dashboard','pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-rentabilite','pos-analyse','pos-sessions-caisse','hotel-sejours','hotel-employes','hotel-rapport'],
+  'Caissier': ['pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite'],
+  'Manager':  ['pos-produits','pos-stock','pos-ventes','pos-credits','pos-rentabilite','pos-analyse','pos-sessions-caisse','hotel-sejours','hotel-employes','hotel-rapport'],
 };
 
 // Whitelist stricte des pages accessibles aux comptes caissière (employe_id défini).
 // Toute page absente de cette liste est automatiquement bloquée, quel que soit le rôle.
 const _CAISSIER_ALLOWED = new Set([
-  'home','pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite',
+  'pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite',
 ]);
 
 // Whitelist stricte pour les comptes Manager.
 const _MANAGER_ALLOWED = new Set([
-  'home',
   'pos-produits','pos-stock',
   'pos-ventes','pos-credits','pos-rentabilite','pos-analyse','pos-sessions-caisse',
   'hotel-sejours','hotel-employes','hotel-rapport',
@@ -12226,10 +12233,11 @@ document.addEventListener('DOMContentLoaded',async()=>{
     setStatus(true);
   }catch(e){ setStatus(false); }
 
-  // Les caissières arrivent directement sur leur espace POS
-  const _isCaissiereLogin = !!_appUser?.employe_id ||
-    (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier');
-  if(_isCaissiereLogin){
+  // Redirection post-login selon le rôle
+  const _rlNom = (_appUser?.role_nom||_appUser?.poste||'').toLowerCase();
+  if(_rlNom === 'manager'){
+    goTo('pos-produits');
+  } else if(!!_appUser?.employe_id || _rlNom.startsWith('caissier')){
     goTo('pos-caisse');
   } else {
     await loadHome();
