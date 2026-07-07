@@ -9186,6 +9186,33 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div><!-- /admin-user-modal -->
 
+    <!-- ── Modal changer rôle rapide ── -->
+    <div id="modal-change-role-bg" class="pos-modal-bg">
+      <div class="pos-modal" style="max-width:420px">
+        <div class="pos-modal-hdr">
+          <span>Changer le rôle</span>
+          <button class="pos-modal-close" onclick="adminChangeRoleClose()">✕</button>
+        </div>
+        <div class="pos-modal-body" style="padding:20px">
+          <input type="hidden" id="acr-uid">
+          <div id="acr-user-card"></div>
+          <div style="margin-top:16px">
+            <label class="pos-label">Nouveau rôle *</label>
+            <select class="pos-input" id="acr-role-id" style="width:100%" onchange="adminChangeRoleWarn()">
+              <option value="">Choisir un rôle…</option>
+            </select>
+          </div>
+          <div id="acr-warning" style="display:none;margin-top:12px;padding:10px 14px;background:rgba(251,191,36,.08);border-radius:8px;border:1px solid rgba(251,191,36,.25);font-size:12px;color:#fbbf24">
+            Ce compte est lié à un employé caissier. En changeant le rôle pour un rôle non-caissier, la liaison sera supprimée automatiquement.
+          </div>
+          <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">
+            <button class="pos-btn ghost" onclick="adminChangeRoleClose()">Annuler</button>
+            <button class="pos-btn" onclick="adminChangeRoleSauvegarder()" style="background:linear-gradient(135deg,#a78bfa,#7c3aed)">Confirmer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /modal-change-role -->
+
     <!-- ── Modal reset mot de passe ── -->
     <div id="admin-reset-pwd-bg" class="pos-modal-bg">
       <div class="pos-modal" style="max-width:400px">
@@ -11558,6 +11585,7 @@ function _canAccess(page){
     if(perms.admin === true) return true;
     if(['admin-roles','admin-users','admin-sessions','admin-audit','admin-security'].includes(page)) return false;
   }
+  if((_appUser.role_nom||_appUser.poste||'').toLowerCase() === 'manager') return _MANAGER_ALLOWED.has(page);
   if(_appUser.employe_id || (_appUser.role_nom||_appUser.poste||'').toLowerCase().startsWith('caissier')) return _CAISSIER_ALLOWED.has(page);
   const allowed = _getAllowedPages();
   if(allowed === null) return true;
@@ -11573,7 +11601,8 @@ function _applyNavAccess(){
     if(el) el.style.display = isAdmin ? '' : 'none';
   });
   const allowed = _getAllowedPages();
-  const isCaissiere = !!_appUser?.employe_id || (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier');
+  const _isManager = (_appUser?.role_nom||_appUser?.poste||'').toLowerCase() === 'manager';
+  const isCaissiere = !_isManager && (!!_appUser?.employe_id || (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier'));
   if(allowed === null && !isCaissiere) return; // accès complet sans restrictions caissière
   // Masquer items de nav interdits (sauf admin qui est géré ci-dessus)
   document.querySelectorAll('.nav-item[data-page]').forEach(btn=>{
@@ -16117,6 +16146,7 @@ function adminUsersRender(){
       <td style="text-align:right">
         <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
           <button class="pos-btn ghost" onclick="adminUsersEditer(${u.id})" style="font-size:11px;padding:3px 9px">Modifier</button>
+          <button class="pos-btn ghost" onclick="adminChangeRoleOpen(${u.id})" style="font-size:11px;padding:3px 9px;color:#a78bfa" title="Changer le rôle">Rôle</button>
           <button class="pos-btn ghost" onclick="adminTestEmail(${u.id},'${(u.email||'').replace(/'/g,"\\'")}',this)" style="font-size:11px;padding:3px 9px;color:#60a5fa" title="Envoyer un email de test pour vérifier la livraison OTP">📧 Tester</button>
           <button class="pos-btn ghost" onclick="adminResetPwdOpen(${u.id})" style="font-size:11px;padding:3px 9px" title="Réinitialiser mot de passe">MDP</button>
           <button class="pos-btn ghost" onclick="adminResetPinOpen(${u.id})" style="font-size:11px;padding:3px 9px;color:#f7a93b" title="Réinitialiser PIN">PIN</button>
@@ -16185,6 +16215,59 @@ async function adminUsersEditer(id){
 function adminUsersCloseModal(){
   document.getElementById('admin-user-modal-bg').classList.remove('open');
 }
+
+// ── Changer rôle rapide ────────────────────────────────────────────────────
+let _acrUser = null;
+
+function adminChangeRoleOpen(id){
+  const u = _adminUsersData.find(x => x.id === id);
+  if(!u) return;
+  _acrUser = u;
+  document.getElementById('acr-uid').value = id;
+  const initiale = (u.nom_complet||'?')[0].toUpperCase();
+  document.getElementById('acr-user-card').innerHTML =
+    '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:rgba(255,255,255,.05);border-radius:10px">'
+    + '<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#a78bfa,#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:16px;flex-shrink:0">' + initiale + '</div>'
+    + '<div><div style="font-weight:600;font-size:14px">' + (u.nom_complet||'—') + '</div>'
+    + '<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:3px">' + u.username + '</div>'
+    + '<span style="font-size:11px;background:rgba(255,255,255,.08);padding:1px 8px;border-radius:4px">Rôle actuel : ' + (u.role_nom||u.poste||'—') + '</span></div></div>';
+  const sel = document.getElementById('acr-role-id');
+  sel.innerHTML = '<option value="">Choisir un rôle…</option>'
+    + _adminRolesList.map(function(r){ return '<option value="' + r.id + '"' + (r.id === u.role_id ? ' selected' : '') + '>' + r.nom + '</option>'; }).join('');
+  adminChangeRoleWarn();
+  document.getElementById('modal-change-role-bg').classList.add('open');
+}
+
+function adminChangeRoleWarn(){
+  if(!_acrUser) return;
+  const roleId = parseInt(document.getElementById('acr-role-id').value) || 0;
+  const chosen = _adminRolesList.find(function(r){ return r.id === roleId; });
+  const isCaissiereRole = chosen && chosen.nom.toLowerCase().includes('caissier');
+  const warn = document.getElementById('acr-warning');
+  if(warn) warn.style.display = (_acrUser.employe_id && !isCaissiereRole && roleId) ? '' : 'none';
+}
+
+function adminChangeRoleClose(){
+  document.getElementById('modal-change-role-bg').classList.remove('open');
+  _acrUser = null;
+}
+
+async function adminChangeRoleSauvegarder(){
+  if(!_acrUser) return;
+  const roleId = parseInt(document.getElementById('acr-role-id').value) || 0;
+  if(!roleId){ posAlert('Choisissez un rôle','err'); return; }
+  const chosen = _adminRolesList.find(function(r){ return r.id === roleId; });
+  const isCaissiereRole = chosen && chosen.nom.toLowerCase().includes('caissier');
+  const payload = { role_id: roleId };
+  if(_acrUser.employe_id && !isCaissiereRole) payload.employe_id = 0;
+  try{
+    await apiFetch('PUT', '/admin/users/' + _acrUser.id, payload);
+    posAlert('Rôle mis à jour ✓ — ' + (chosen ? chosen.nom : ''), 'ok');
+    adminChangeRoleClose();
+    await loadAdminUsers();
+  }catch(e){ posAlert('Erreur lors de la mise à jour du rôle','err'); }
+}
+// ──────────────────────────────────────────────────────────────────────────────
 
 async function adminUsersSauvegarder(){
   const nom  = document.getElementById('aum-nom').value.trim();
