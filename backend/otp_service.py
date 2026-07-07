@@ -438,7 +438,7 @@ def create_admin_code(db: Session, user_id: int) -> str:
     ).update({"used": True}, synchronize_session=False)
 
     code       = _generate_admin_code()
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=4)
 
     ac = AdminCode(
         user_id   = user_id,

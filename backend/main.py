@@ -1,6 +1,8 @@
+import collections
 import hmac
 import logging
 import os
+import time as _time
 from datetime import date as date_type
 from typing import List, Optional
 from urllib.parse import quote as url_quote
@@ -42,10 +44,54 @@ from auth import (
 )
 from password_reset import request_reset, verify_reset_token, consume_reset_token
 
-app = FastAPI(title="Suivi des Meters - Station")
+# ── Sécurité — configuration depuis .env ──────────────────────────────────────
+# SECURE_COOKIES=true  → activer en production HTTPS
+# ALLOWED_ORIGINS      → origines CORS autorisées (vide = même-origine uniquement)
+# DEBUG=true           → activer /docs, /redoc, /openapi.json
+_SECURE_COOKIES  = os.getenv("SECURE_COOKIES", "false").lower() in ("1", "true", "yes")
+_DEBUG_MODE      = os.getenv("DEBUG", "false").lower() in ("1", "true", "yes")
+_ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 
+app = FastAPI(
+    title="Suivi des Meters - Station",
+    docs_url="/docs"        if _DEBUG_MODE else None,
+    redoc_url="/redoc"      if _DEBUG_MODE else None,
+    openapi_url="/openapi.json" if _DEBUG_MODE else None,
+)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Injecte les en-têtes HTTP de sécurité sur toutes les réponses."""
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        h = response.headers
+        h.setdefault("X-Content-Type-Options", "nosniff")
+        h.setdefault("X-Frame-Options", "DENY")
+        h.setdefault("X-XSS-Protection", "1; mode=block")
+        h.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        h.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' blob:; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; "
+            "font-src 'self' data:; "
+            "connect-src 'self'; "
+            "worker-src blob:; "
+            "frame-ancestors 'none';"
+        )
+        if _SECURE_COOKIES:
+            h.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+    CORSMiddleware,
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    allow_credentials=False,
 )
 
 PERIODES = ["Matin", "Apres-midi"]
@@ -56,10 +102,34 @@ MAX_MODIFICATIONS_PAR_RELEVE = 2
 # Clé API statique admin depuis .env (override de secours pour scripts/CI)
 _ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
 
+# ── Rate limiting brute-force sur /api/login ──────────────────────────────────
+_LOGIN_ATTEMPTS: dict[str, list[float]] = collections.defaultdict(list)
+_LOGIN_MAX_FAILURES = 10    # tentatives échouées avant blocage
+_LOGIN_WINDOW_SEC   = 900   # fenêtre glissante : 15 minutes
+
+def _check_login_rate(ip: str | None) -> None:
+    """Lève HTTPException 429 si l'IP a trop de tentatives échouées récentes."""
+    if not ip:
+        return
+    now = _time.monotonic()
+    cut = now - _LOGIN_WINDOW_SEC
+    _LOGIN_ATTEMPTS[ip] = [t for t in _LOGIN_ATTEMPTS[ip] if t > cut]
+    if len(_LOGIN_ATTEMPTS[ip]) >= _LOGIN_MAX_FAILURES:
+        raise HTTPException(429, "Trop de tentatives — réessayez dans 15 minutes.")
+
+def _record_login_failure(ip: str | None) -> None:
+    if ip:
+        _LOGIN_ATTEMPTS[ip].append(_time.monotonic())
+
+def _clear_login_failures(ip: str | None) -> None:
+    if ip:
+        _LOGIN_ATTEMPTS.pop(ip, None)
+
 # Chemins accessibles sans être connecté
 _PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code",
                     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify"}
-_PUBLIC_PREFIXES = ("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/")
+_PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/") if _DEBUG_MODE
+                    else ("/api/auth/oauth/",))
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -185,16 +255,20 @@ class LoginIn(BaseModel):
 def login(data: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
     ip    = request.client.host if request.client else None
     ua    = request.headers.get("user-agent", "")
+    _check_login_rate(ip)   # bloquer les IPs en brute-force
     email = data.email.strip().lower()
     user  = db.query(Utilisateur).filter_by(email=email, actif=True).first()
     _err  = "Email, mot de passe ou code d'accès incorrect"
     if not user:
+        _record_login_failure(ip)
         log_event(db, LOGIN_FAILED, ip_address=ip, details={"email": email, "raison": "utilisateur_inconnu"})
         raise HTTPException(401, _err)
     if not verify_password(data.password, user.password_hash):
+        _record_login_failure(ip)
         log_event(db, LOGIN_FAILED, user_id=user.id, ip_address=ip, details={"raison": "mot_de_passe_incorrect"})
         raise HTTPException(401, _err)
     if not user.code_acces_hash or not verify_code_acces(data.code_acces, user.code_acces_hash):
+        _record_login_failure(ip)
         log_event(db, LOGIN_FAILED, user_id=user.id, ip_address=ip, details={"raison": "pin_incorrect"})
         raise HTTPException(401, _err)
 
@@ -219,7 +293,8 @@ def login(data: LoginIn, request: Request, response: Response, db: Session = Dep
         log_event(db, OTP_SENT, user_id=user.id, ip_address=ip)
         response.set_cookie(
             OTP_PENDING_COOKIE, pending_token,
-            httponly=True, samesite="lax", max_age=OTP_PENDING_MAX_AGE, path="/",
+            httponly=True, samesite="lax", secure=_SECURE_COOKIES,
+            max_age=OTP_PENDING_MAX_AGE, path="/",
         )
         return {
             "otp_required": True,
@@ -227,11 +302,13 @@ def login(data: LoginIn, request: Request, response: Response, db: Session = Dep
         }
 
     # ── Connexion directe (OTP désactivé) ────────────────────────────
+    _clear_login_failures(ip)
     token = create_session(db, user.id, ip_address=ip, user_agent=ua)
     log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     response.set_cookie(
         SESSION_COOKIE, token,
-        httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
+        httponly=True, samesite="lax", secure=_SECURE_COOKIES,
+        max_age=7 * 24 * 3600, path="/",
     )
     raw_key = make_api_key(db, user.id)
     return {
@@ -258,13 +335,15 @@ def otp_verify(data: OTPVerifyIn, request: Request, response: Response, db: Sess
         raise HTTPException(401, str(e))
 
     log_event(db, OTP_VERIFIED, user_id=user.id, ip_address=ip)
+    _clear_login_failures(ip)
     response.delete_cookie(OTP_PENDING_COOKIE, path="/")
 
     token = create_session(db, user.id, ip_address=ip, user_agent=ua)
     log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     response.set_cookie(
         SESSION_COOKIE, token,
-        httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
+        httponly=True, samesite="lax", secure=_SECURE_COOKIES,
+        max_age=7 * 24 * 3600, path="/",
     )
     raw_key = make_api_key(db, user.id)
     return {
@@ -306,7 +385,8 @@ def otp_request_admin_code(request: Request, response: Response, db: Session = D
     # Prolonger le cookie à 60 min pour que l'employé ait le temps de contacter l'admin
     response.set_cookie(
         OTP_PENDING_COOKIE, pending_token,
-        httponly=True, samesite="lax", max_age=3600, path="/",
+        httponly=True, samesite="lax", secure=_SECURE_COOKIES,
+        max_age=3600, path="/",
     )
     return {
         "admin_code_sent": True,
@@ -337,13 +417,15 @@ def otp_verify_admin_code(
         raise HTTPException(401, str(e))
 
     log_event(db, ADMIN_CODE_VERIFIED, user_id=user.id, ip_address=ip)
+    _clear_login_failures(ip)
     response.delete_cookie(OTP_PENDING_COOKIE, path="/")
 
     token = create_session(db, user.id, ip_address=ip, user_agent=ua)
     log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     response.set_cookie(
         SESSION_COOKIE, token,
-        httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
+        httponly=True, samesite="lax", secure=_SECURE_COOKIES,
+        max_age=7 * 24 * 3600, path="/",
     )
     raw_key = make_api_key(db, user.id)
     return {

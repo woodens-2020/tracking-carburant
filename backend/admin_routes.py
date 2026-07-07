@@ -232,8 +232,8 @@ def creer_user(
         raise HTTPException(400, "Identifiant invalide (3-60 chars, lettres/chiffres/._-)")
     if not data.nom_complet.strip():
         raise HTTPException(400, "Le nom complet est requis")
-    if len(data.password) < 6:
-        raise HTTPException(400, "Le mot de passe doit contenir au moins 6 caractères")
+    if len(data.password) < 8:
+        raise HTTPException(400, "Le mot de passe doit contenir au moins 8 caractères")
     if not _CODE_RE.match(data.code_acces):
         raise HTTPException(400, "Le code PIN doit contenir exactement 9 chiffres")
     if db.query(Utilisateur).filter_by(username=username).first():
@@ -329,8 +329,8 @@ def reset_password(
     u = db.get(Utilisateur, uid)
     if not u:
         raise HTTPException(404, "Utilisateur introuvable")
-    if len(data.nouveau_mot_de_passe) < 6:
-        raise HTTPException(400, "Le mot de passe doit contenir au moins 6 caractères")
+    if len(data.nouveau_mot_de_passe) < 8:
+        raise HTTPException(400, "Le mot de passe doit contenir au moins 8 caractères")
     u.password_hash = hash_password(data.nouveau_mot_de_passe)
     db.commit()
     log_event(db, PASSWORD_RESET, user_id=admin.id, target_user_id=uid,
