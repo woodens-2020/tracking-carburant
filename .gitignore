@@ -47,5 +47,8 @@ frontend/audit_*.xlsx
 # ── Tests isolation databases ─────────────────────────────────────
 backend/test_*.db
 
-# ── Backup ───────────────────────────────────────────────────────
-*_backup*
+# ── Backup dumps (jamais dans git) ──────────────────────────────
+*.dump
+*_backup*.dump
+# Les scripts d'infrastructure backup sont inclus dans git
+!scripts/*.ps1
