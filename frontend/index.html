@@ -7416,48 +7416,71 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══ Page Réception de Fonds ═══════════════════════════════════════════ -->
     <div class="page page-gi" id="page-zelle-fonds">
       <div class="gi-page-inner">
-        <div class="gi-page-hdr">
+
+        <!-- ── En-tête ── -->
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
           <div>
-            <h2>Réception de Fonds</h2>
-            <p class="gi-page-sub">Déclaration des fonds reçus — montants en gourdes (HTG)</p>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+              <button class="gi-btn-secondary" onclick="goTo('zelle')" style="padding:5px 10px;font-size:.78rem;">&#8592; Bord</button>
+              <h2 style="margin:0;">Réception de Fonds</h2>
+            </div>
+            <p class="gi-page-sub" style="margin-left:70px;">Déclaration des fonds reçus &mdash; montants en gourdes (HTG)</p>
           </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <button class="gi-btn-secondary" onclick="goTo('zelle')">&#8592; Tableau de bord</button>
-            <button class="gi-btn-primary"   onclick="zelleOpenFondForm()">+ Déclarer réception de fonds</button>
+          <button class="gi-btn-primary" onclick="zelleOpenFondForm()" style="padding:9px 18px;font-size:.9rem;white-space:nowrap;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Déclarer un renflouement
+          </button>
+        </div>
+
+        <!-- ── Cartes métriques ── -->
+        <div id="zfd-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:10px;margin-bottom:16px;">
+          <!-- injecté par JS -->
+        </div>
+
+        <!-- ── Barre de filtres ── -->
+        <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span style="font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.4);white-space:nowrap;flex-shrink:0;">Filtres</span>
+            <div style="width:1px;height:20px;background:var(--border);flex-shrink:0;"></div>
+            <select id="zfd-source" class="gi-form-select" style="width:130px;" onchange="loadZelleFonds()">
+              <option value="">Toutes sources</option>
+              <option value="PDG">PDG</option>
+              <option value="Gaz">Gaz</option>
+              <option value="Autre">Autre</option>
+            </select>
+            <div style="width:1px;height:20px;background:var(--border);flex-shrink:0;"></div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:.75rem;color:rgba(255,255,255,.4);">Du</span>
+              <input type="date" id="zfd-debut" class="gi-form-input" style="width:148px;" onchange="loadZelleFonds()">
+              <span style="font-size:.75rem;color:rgba(255,255,255,.4);">au</span>
+              <input type="date" id="zfd-fin"   class="gi-form-input" style="width:148px;" onchange="loadZelleFonds()">
+            </div>
+            <button class="gi-btn-secondary" onclick="zelleResetFondsFilters()" title="Réinitialiser" style="padding:6px 10px;margin-left:auto;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.89"/></svg>
+            </button>
           </div>
         </div>
 
-        <!-- Filtres -->
-        <div class="gi-filters" style="margin-bottom:14px;">
-          <select id="zfd-source" class="gi-form-select" style="width:110px;" onchange="loadZelleFonds()">
-            <option value="">Ts sources</option>
-            <option value="PDG">PDG</option>
-            <option value="Gaz">Gaz</option>
-            <option value="Autre">Autre</option>
-          </select>
-          <input type="date" id="zfd-debut" class="gi-form-input" style="width:138px;" onchange="loadZelleFonds()">
-          <input type="date" id="zfd-fin"   class="gi-form-input" style="width:138px;" onchange="loadZelleFonds()">
-          <button class="gi-btn-secondary" onclick="zelleResetFondsFilters()" title="Effacer les filtres">&#8635;</button>
+        <!-- ── Table ── -->
+        <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+          <div style="overflow-x:auto;">
+            <table class="gi-table" style="border-radius:0;border:none;">
+              <thead>
+                <tr>
+                  <th style="padding-left:16px;">Source</th>
+                  <th style="text-align:right;">Montant HTG</th>
+                  <th style="text-align:right;">Équiv. USD</th>
+                  <th>Date de réception</th>
+                  <th>Notes</th>
+                  <th style="text-align:center;padding-right:16px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="zfd-tbody">
+                <tr><td colspan="6" style="text-align:center;padding:40px;color:rgba(255,255,255,.3);">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <!-- Table -->
-        <div style="overflow-x:auto;">
-          <table class="gi-table">
-            <thead>
-              <tr>
-                <th>Source</th>
-                <th style="text-align:right;">Montant HTG</th>
-                <th style="text-align:right;">Equiv. USD</th>
-                <th>Date de réception</th>
-                <th>Notes</th>
-                <th style="text-align:center;">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="zfd-tbody">
-              <tr><td colspan="6" style="text-align:center;padding:32px;color:rgba(255,255,255,.35);">Chargement…</td></tr>
-            </tbody>
-          </table>
-        </div>
       </div>
     </div><!-- /page-zelle-fonds -->
 
@@ -24163,7 +24186,7 @@ async function loadZelleFonds(){
   await _zelleLoadBilan();
   const tbody = document.getElementById('zfd-tbody');
   if(!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">Chargement…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px;">Chargement…</td></tr>';
   try{
     const parts = [];
     const src = (document.getElementById('zfd-source')||{}).value || '';
@@ -24174,32 +24197,68 @@ async function loadZelleFonds(){
     if(d2)  parts.push('fin='+encodeURIComponent(d2));
     const qs = parts.length ? '?' + parts.join('&') : '';
     _zelleFonds = await apiFetch('GET','/zelle/fonds'+qs);
+
+    // ── Cartes métriques ──
+    const cards = document.getElementById('zfd-cards');
+    if(cards){
+      const totHt  = _zelleFonds.reduce(function(a,f){ return a+(f.montant_ht||0); },0);
+      const totUsd = _zelleFonds.reduce(function(a,f){ return a+(f.montant_usd||0); },0);
+      const byPdg  = _zelleFonds.filter(function(f){ return f.source==='PDG'; }).reduce(function(a,f){ return a+(f.montant_ht||0); },0);
+      const byGaz  = _zelleFonds.filter(function(f){ return f.source==='Gaz'; }).reduce(function(a,f){ return a+(f.montant_ht||0); },0);
+      cards.innerHTML =
+        '<div class="zelle-bilan-card">'
+          +'<div class="zbc-label">Renflouements</div>'
+          +'<div class="zbc-val" style="font-size:1.4rem;">'+_zelleFonds.length+'</div>'
+          +'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">'
+            +'<span class="zelle-badge zelle-src-pdg">PDG</span>'
+            +'<span class="zelle-badge zelle-src-gaz">Gaz</span>'
+          +'</div>'
+        +'</div>'
+        +'<div class="zelle-bilan-card zbc-fond">'
+          +'<div class="zbc-label">Total reçu HTG</div>'
+          +'<div class="zbc-val">'+_zelleHtg(totHt)+'</div>'
+          +'<div style="font-size:.75rem;color:rgba(255,255,255,.4);margin-top:4px;">≈ '+_zelleUsd(totUsd)+'</div>'
+        +'</div>'
+        +'<div class="zelle-bilan-card" style="border-color:rgba(74,222,128,.3);">'
+          +'<div class="zbc-label">PDG</div>'
+          +'<div class="zbc-val" style="color:#4ade80;">'+_zelleHtg(byPdg)+'</div>'
+        +'</div>'
+        +'<div class="zelle-bilan-card" style="border-color:rgba(96,165,250,.3);">'
+          +'<div class="zbc-label">Gaz</div>'
+          +'<div class="zbc-val" style="color:#60a5fa;">'+_zelleHtg(byGaz)+'</div>'
+        +'</div>';
+    }
+
     if(!_zelleFonds.length){
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px;">Aucun fond déclaré</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:40px;">Aucun fond déclaré</td></tr>';
       return;
     }
+
     let html = '';
     let totalHt = 0, totalUsd = 0;
     for(const f of _zelleFonds){
-      totalHt  += f.montant_ht;
-      totalUsd += f.montant_usd;
-      const dateStr = f.date_reception ? f.date_reception.substring(0,10) : '—';
+      totalHt  += f.montant_ht  || 0;
+      totalUsd += f.montant_usd || 0;
+      const dp  = f.date_reception ? f.date_reception.substring(0,10).split('-') : null;
+      const dateStr = dp ? dp[2]+'/'+dp[1]+'/'+dp[0] : '—';
       html += '<tr>';
-      html += '<td>' + _zSrc(f.source) + '</td>';
-      html += '<td style="text-align:right;font-weight:700;color:#60a5fa;font-variant-numeric:tabular-nums;">' + _zelleHtg(f.montant_ht) + '</td>';
-      html += '<td style="text-align:right;color:var(--text-muted);font-variant-numeric:tabular-nums;font-size:.83rem;">' + _zelleUsd(f.montant_usd) + '</td>';
-      html += '<td style="color:var(--text-muted);font-size:.83rem;">' + dateStr + '</td>';
-      html += '<td style="color:var(--text-muted);font-size:.83rem;">' + (f.notes || '—') + '</td>';
-      html += '<td style="text-align:center;"><div style="display:flex;gap:4px;justify-content:center;">';
-      html += '<button class="gi-btn-icon" title="Imprimer fiche" onclick="zelleImprimerFiche(' + f.id + ')">&#128438;</button>';
+      html += '<td style="padding-left:16px;">' + _zSrc(f.source) + '</td>';
+      html += '<td style="text-align:right;font-weight:700;color:#60a5fa;font-size:.92rem;font-variant-numeric:tabular-nums;">' + _zelleHtg(f.montant_ht) + '</td>';
+      html += '<td style="text-align:right;color:var(--text-muted);font-variant-numeric:tabular-nums;font-size:.8rem;">' + _zelleUsd(f.montant_usd) + '</td>';
+      html += '<td style="color:var(--text-muted);font-size:.82rem;white-space:nowrap;">' + dateStr + '</td>';
+      html += '<td style="color:var(--text-muted);font-size:.82rem;max-width:200px;">' + (f.notes || '<span style="opacity:.35">—</span>') + '</td>';
+      html += '<td style="text-align:center;padding-right:16px;"><div style="display:flex;gap:3px;justify-content:center;">';
+      html += '<button class="gi-btn-icon" title="Imprimer fiche" onclick="zelleImprimerFiche(' + f.id + ')">'
+            + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>';
       html += '<button class="gi-btn-icon" title="Modifier"       onclick="zelleOpenFondEdit(' + f.id + ')">&#9998;</button>';
       html += '<button class="gi-btn-icon danger" title="Supprimer" onclick="zelleDeleteFond(' + f.id + ')">&#128465;</button>';
       html += '</div></td></tr>';
     }
-    html += '<tr style="border-top:2px solid var(--border);font-weight:700;">';
-    html += '<td>Total</td>';
+    // Ligne total
+    html += '<tr style="border-top:2px solid var(--border);background:rgba(255,255,255,.025);font-weight:700;">';
+    html += '<td style="padding-left:16px;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.5);">Total</td>';
     html += '<td style="text-align:right;color:#60a5fa;font-variant-numeric:tabular-nums;">' + _zelleHtg(totalHt) + '</td>';
-    html += '<td style="text-align:right;color:var(--text-muted);font-variant-numeric:tabular-nums;font-size:.83rem;">' + _zelleUsd(totalUsd) + '</td>';
+    html += '<td style="text-align:right;color:var(--text-muted);font-variant-numeric:tabular-nums;font-size:.82rem;">' + _zelleUsd(totalUsd) + '</td>';
     html += '<td colspan="3"></td></tr>';
     tbody.innerHTML = html;
   }catch(e){
