@@ -24098,7 +24098,8 @@ async function loadZellePaiements(){
         html += '<button class="gi-btn-icon success" title="Marquer remis" onclick="zelleSetStatut(' + t.id + ',\'REMIS\')">&#10003;</button>';
         html += '<button class="gi-btn-icon danger"  title="Annuler"      onclick="zelleSetStatut(' + t.id + ',\'ANNULE\')">&#10005;</button>';
       }
-      html += '<button class="gi-btn-icon" title="Modifier" onclick="zelleOpenEdit(' + t.id + ')">&#9998;</button>';
+      html += '<button class="gi-btn-icon" title="Imprimer reçu" onclick="zelleImprimerRecu(' + t.id + ')">&#128176;</button>';
+      html += '<button class="gi-btn-icon" title="Modifier"      onclick="zelleOpenEdit(' + t.id + ')">&#9998;</button>';
       html += '<button class="gi-btn-icon danger" title="Supprimer" onclick="zelleDeleteTx(' + t.id + ')">&#128465;</button>';
       html += '</div></td></tr>';
     }
@@ -24725,6 +24726,126 @@ async function zelleDeleteFond(id){
     if(currentPage === 'zelle-fonds') await loadZelleFonds();
     else await Promise.all([_zelleLoadBilan(), _zelleLoadRecent()]);
   }catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+// ── Impression Reçu POS (ticket thermique 80mm) ────────────────
+function zelleImprimerRecu(id){
+  const t = _zelleData.find(function(x){ return x.id === id; });
+  if(!t){ posAlert('Transaction introuvable','err'); return; }
+
+  const taux    = t.taux_applique || _zelleConfig.taux || 130;
+  const now     = new Date();
+  const rawDate = t.date_transaction ? t.date_transaction.substring(0,10) : now.toISOString().substring(0,10);
+  const dp      = rawDate.split('-');
+  const dateAff = dp[2]+'/'+dp[1]+'/'+dp[0];
+  const heureAff= String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  const ref     = 'ZL-'+String(t.id).padStart(6,'0');
+
+  function fmtH(v){ return (parseFloat(v)||0).toLocaleString('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function line(l,r,w){
+    w = w||38;
+    const gap = w - String(l).length - String(r).length;
+    return l + (gap>0?Array(gap+1).join(' '):'  ') + r;
+  }
+  function dline(){ return Array(40).join('-'); }
+  function eline(){ return Array(40).join('='); }
+  function center(s,w){ w=w||38; const p=Math.max(0,Math.floor((w-s.length)/2)); return Array(p+1).join(' ')+s; }
+
+  const statut = t.statut==='REMIS' ? 'REMIS ✓' : t.statut==='ANNULE' ? 'ANNULE ✗' : 'EN ATTENTE';
+  const src    = t.source_fond || '—';
+
+  const html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
+    +'<title>Reçu '+ref+'</title>'
+    +'<style>'
+    +'*{margin:0;padding:0;box-sizing:border-box;}'
+    +'@page{size:80mm auto;margin:4mm 3mm;}'
+    +'body{'
+    +'  font-family:"Courier New",Courier,monospace;'
+    +'  font-size:10.5pt;'
+    +'  color:#000;'
+    +'  background:#fff;'
+    +'  width:74mm;'
+    +'  margin:0 auto;'
+    +'  line-height:1.4;'
+    +'}'
+    +'.c{text-align:center;}'
+    +'.bold{font-weight:700;}'
+    +'.big{font-size:13pt;font-weight:700;}'
+    +'.xl{font-size:15pt;font-weight:900;letter-spacing:.03em;}'
+    +'.sep{border-top:1px dashed #000;margin:4px 0;}'
+    +'.sep2{border-top:2px solid #000;margin:4px 0;}'
+    +'.row{display:flex;justify-content:space-between;}'
+    +'.montant-box{'
+    +'  border:2px solid #000;'
+    +'  border-radius:3px;'
+    +'  padding:6px 8px;'
+    +'  margin:6px 0;'
+    +'  text-align:center;'
+    +'}'
+    +'.montant-box .lbl{font-size:8.5pt;text-transform:uppercase;letter-spacing:.08em;color:#333;}'
+    +'.montant-box .val{font-size:16pt;font-weight:900;letter-spacing:.02em;}'
+    +'.montant-box .sub{font-size:8pt;color:#555;margin-top:1px;}'
+    +'.footer-msg{font-size:8.5pt;text-align:center;margin-top:4px;color:#333;}'
+    +'@media print{'
+    +'  body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+    +'}'
+    +'</style></head><body>'
+
+    // ── En-tête ──
+    +'<div class="c bold" style="font-size:9pt;letter-spacing:.05em;">COMPLEXE COMMERCIAL DE PILLATRE</div>'
+    +'<div class="c xl" style="margin:2px 0;">BON PRIX</div>'
+    +'<div class="c" style="font-size:8.5pt;color:#444;">Département Zelle</div>'
+    +'<div class="c" style="font-size:8pt;color:#555;margin-top:1px;">Tél : +509 3456-7890</div>'
+    +'<div class="sep2"></div>'
+
+    // ── Titre ──
+    +'<div class="c bold" style="font-size:11pt;letter-spacing:.05em;margin:3px 0;">REÇU DE PAIEMENT ZELLE</div>'
+    +'<div class="sep"></div>'
+
+    // ── Référence & date ──
+    +'<div class="row"><span class="bold">Réf :</span><span>'+ref+'</span></div>'
+    +'<div class="row"><span class="bold">Date :</span><span>'+dateAff+'</span></div>'
+    +'<div class="row"><span class="bold">Heure :</span><span>'+heureAff+'</span></div>'
+    +'<div class="sep"></div>'
+
+    // ── Infos client ──
+    +'<div class="bold" style="font-size:8.5pt;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Informations client</div>'
+    +'<div class="row"><span>Nom :</span><span style="font-weight:600;">'+t.nom_prenom+'</span></div>'
+    +(t.identifiant?'<div class="row"><span>ID Zelle :</span><span style="font-size:9pt;">'+t.identifiant+'</span></div>':'')
+    +(t.contact?'<div class="row"><span>Contact :</span><span>'+t.contact+'</span></div>':'')
+    +'<div class="sep"></div>'
+
+    // ── Montant principal ──
+    +'<div class="montant-box">'
+    +'<div class="lbl">Montant à remettre</div>'
+    +'<div class="val">'+fmtH(t.a_remettre_ht)+' <span style="font-size:10pt;">HTG</span></div>'
+    +'<div class="sub">= $ '+fmtH(t.a_remettre)+' USD (taux '+Number(taux).toFixed(2)+')</div>'
+    +'</div>'
+
+    // ── Détail ──
+    +'<div class="row" style="font-size:9pt;"><span>Montant brut :</span><span>'+fmtH(t.montant_ht)+' HTG</span></div>'
+    +'<div class="row" style="font-size:9pt;"><span>Frais :</span><span style="color:#444;">- '+fmtH(t.frais*taux)+' HTG</span></div>'
+    +'<div class="sep"></div>'
+
+    // ── Infos opération ──
+    +'<div class="row" style="font-size:9pt;"><span>Source :</span><span class="bold">'+src+'</span></div>'
+    +'<div class="row" style="font-size:9pt;"><span>Statut :</span><span class="bold">'+statut+'</span></div>'
+    +(t.notes?'<div style="font-size:8.5pt;margin-top:2px;">Note : '+t.notes+'</div>':'')
+    +'<div class="sep2"></div>'
+
+    // ── Pied ──
+    +'<div class="footer-msg">Merci de votre confiance !</div>'
+    +'<div class="footer-msg" style="margin-top:2px;">— Bon Prix, Complexe de Pillatre —</div>'
+    +'<div class="c" style="font-size:7.5pt;color:#888;margin-top:6px;">'+ref+' &bull; '+dateAff+' '+heureAff+'</div>'
+    +'<div style="height:12mm;"></div>'
+
+    +'<script>window.onload=function(){ window.print(); };<\/script>'
+    +'</body></html>';
+
+  const w = window.open('','_blank','width=420,height=700,scrollbars=yes');
+  if(!w){ posAlert('Autorisez les pop-ups pour imprimer le reçu','err'); return; }
+  w.document.write(html);
+  w.document.close();
 }
 
 // ── Impression Fiche de Renflouement ───────────────────────────
