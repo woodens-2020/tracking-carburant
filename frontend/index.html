@@ -6673,7 +6673,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div class="pos-header-sub">Gestion des tables en cours</div>
             </div>
             <div class="pos-header-actions">
-              <button class="pos-btn primary" onclick="pcmdNouvelleTable()">+ Ouvrir une table</button>
+              <button id="btn-cuisine-new-table" class="pos-btn primary" onclick="pcmdNouvelleTable()">+ Ouvrir une table</button>
               <button class="pos-btn ghost" onclick="loadPosCommandes()" title="Actualiser">↺</button>
             </div>
           </div>
@@ -7926,7 +7926,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <div class="pos-page gi-page">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
           <h2 style="margin:0;font-size:20px;font-weight:800">Menu / Plats</h2>
-          <button class="pos-btn teal" onclick="ckPlatOuvrirModal()">+ Ajouter un plat</button>
+          <button id="btn-cuisine-plat-new" class="pos-btn teal" onclick="ckPlatOuvrirModal()">+ Ajouter un plat</button>
         </div>
         <div class="pos-card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <select class="pos-select" id="plats-filtre-cat" onchange="ckPlatsAfficher()" style="min-width:140px">
@@ -8005,7 +8005,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <div class="pos-page gi-page">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
           <h2 style="margin:0;font-size:20px;font-weight:800">Dépenses Cuisine</h2>
-          <button class="pos-btn teal" onclick="ckDepOuvrirModal()">+ Ajouter dépense</button>
+          <button id="btn-cuisine-dep-new" class="pos-btn teal" onclick="ckDepOuvrirModal()">+ Ajouter dépense</button>
         </div>
         <div class="pos-card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <div style="display:flex;gap:6px;align-items:center">
@@ -8230,7 +8230,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="pos-header-sub">Déclaration ingrédients & matières premières</div>
           </div>
           <div class="pos-header-actions">
-            <button class="gi-btn-primary" onclick="ckAchatsNouvelModal()">
+            <button id="btn-cuisine-achat-new" class="gi-btn-primary" onclick="ckAchatsNouvelModal()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Nouvel achat
             </button>
@@ -11653,6 +11653,8 @@ function _applyNavAccess(){
   const _ro = _isReadOnly();
   ['btn-pos-nouveau-produit','btn-pos-stock-reception','btn-pos-stock-ajust',
    'btn-hotel-emp-ajouter','btn-hotel-chambre-new','btn-hrec-enregistrer','cat-add-row',
+   // Cuisine — écriture
+   'btn-cuisine-plat-new','btn-cuisine-dep-new','btn-cuisine-achat-new','btn-cuisine-new-table',
    // Zelle — écriture + téléchargements
    'btn-zelle-config','btn-zelle-new-tx','btn-zelle-new-fond',
    'btn-zpf-pdf','btn-zpf-xls',
@@ -20815,6 +20817,7 @@ async function pcmdDetailCharger(id){
 
 // ── Nouvelle table ────────────────────────────────────────────────────
 function pcmdNouvelleTable(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   document.getElementById('pcmd-new-table').value  = '';
   document.getElementById('pcmd-new-client').value = '';
   document.getElementById('pcmd-new-bg').classList.add('open');
@@ -20822,6 +20825,7 @@ function pcmdNouvelleTable(){
 }
 
 async function pcmdCreerTable(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const table  = document.getElementById('pcmd-new-table').value.trim();
   const client = document.getElementById('pcmd-new-client').value.trim()||null;
   if(!table){ posAlert('Entrez un numéro ou nom de table.','warn'); return; }
@@ -20835,6 +20839,7 @@ async function pcmdCreerTable(){
 
 // ── Ajouter article ───────────────────────────────────────────────────
 function pcmdAjoutModal(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   _pcmdAddProdId = null; _pcmdAddQte = 1;
   const searchEl = document.getElementById('pcmd-ajout-search');
   if(searchEl) searchEl.value = '';
@@ -20904,6 +20909,7 @@ async function pcmdRetirerArticle(ligneId){
 
 // ── Libérer table ─────────────────────────────────────────────────────
 async function pcmdLiberer(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   if(!_pcmdCurrentId) return;
   if(_pcmdCurrentTotal > 0){
     posAlert('Cette table a des articles non encaissés. Veuillez encaisser avant de libérer.','warn');
@@ -20919,6 +20925,7 @@ async function pcmdLiberer(){
 
 // ── Encaisser ─────────────────────────────────────────────────────────
 function pcmdEncaisserOuvrir(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   if(!_pcmdCurrentId){ posAlert('Aucune table sélectionnée.'); return; }
   if(_pcmdCurrentTotal<=0){ posAlert('Ajoutez des articles avant d\'encaisser.','warn'); return; }
   document.getElementById('pcmd-enc-total-display').textContent = posGx(_pcmdCurrentTotal);
@@ -20957,6 +20964,7 @@ function pcmdEncCalcMonnaie(){
 }
 
 async function pcmdEncaisser(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const mode = document.getElementById('pcmd-enc-mode').value;
   const paye = parseFloat(document.getElementById('pcmd-enc-paye').value||0)||null;
   const body = { mode_paiement: mode, montant_paye: paye };
@@ -22714,16 +22722,17 @@ function ckPlatsAfficher(){
       <td style="padding:9px 8px">${margeHtml}</td>
       <td style="padding:9px 8px;text-align:center">${p.actif ? '<span class="pos-badge teal" style="font-size:9px">Actif</span>' : '<span class="pos-badge" style="font-size:9px;opacity:.5">Retiré</span>'}</td>
       <td style="padding:9px 8px;text-align:center">
-        <div style="display:flex;gap:4px;justify-content:center">
+        ${!_isReadOnly() ? `<div style="display:flex;gap:4px;justify-content:center">
           <button class="pos-btn ghost" style="font-size:10px;padding:3px 8px" onclick="ckPlatOuvrirModal(${p.id})">Modifier</button>
           ${p.actif ? `<button class="pos-btn ghost" style="font-size:10px;padding:3px 8px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="ckPlatRetirer(${p.id})">Retirer</button>` : `<button class="pos-btn ghost" style="font-size:10px;padding:3px 8px;color:#34d399;border-color:rgba(52,211,153,.3)" onclick="ckPlatActiver(${p.id})">Activer</button>`}
-        </div>
+        </div>` : ''}
       </td>
     </tr>`;
   }).join('');
 }
 
 function ckPlatOuvrirModal(platId){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const modal = document.getElementById('plat-modal-bg'); if(!modal) return;
   document.getElementById('plat-modal-id').value = platId || '';
   document.getElementById('plat-modal-titre').textContent = platId ? 'Modifier le plat' : 'Nouveau plat';
@@ -22750,6 +22759,7 @@ function ckPlatFermerModal(){
 }
 
 async function ckPlatSauvegarder(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const id   = document.getElementById('plat-modal-id').value;
   const nom  = document.getElementById('plat-nom').value.trim();
   const prix = parseFloat(document.getElementById('plat-prix').value);
@@ -22773,6 +22783,7 @@ async function ckPlatSauvegarder(){
 }
 
 async function ckPlatRetirer(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   try {
     await apiFetch('DELETE', `/cuisine/plats/${id}`);
     posAlert('Plat retiré du menu.','success');
@@ -22781,6 +22792,7 @@ async function ckPlatRetirer(id){
 }
 
 async function ckPlatActiver(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   try {
     await apiFetch('PUT', `/cuisine/plats/${id}`, { actif: true });
     posAlert('Plat réactivé.','success');
@@ -22845,16 +22857,17 @@ function ckDepAfficher(){
       <td style="padding:9px 8px;font-size:11px;color:rgba(255,255,255,.45)">${d.fournisseur || '—'}</td>
       <td style="padding:9px 8px;text-align:right;font-weight:700;color:#f87171">${posGx(d.montant)}</td>
       <td style="padding:9px 8px;text-align:center">
-        <div style="display:flex;gap:4px;justify-content:center">
+        ${!_isReadOnly() ? `<div style="display:flex;gap:4px;justify-content:center">
           <button class="pos-btn ghost" style="font-size:10px;padding:3px 8px" onclick="ckDepOuvrirModal(${d.id})">Modifier</button>
           <button class="pos-btn ghost" style="font-size:10px;padding:3px 8px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="ckDepSupprimer(${d.id})">Suppr.</button>
-        </div>
+        </div>` : ''}
       </td>
     </tr>`;
   }).join('');
 }
 
 function ckDepOuvrirModal(depId){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const modal = document.getElementById('dep-modal-bg'); if(!modal) return;
   document.getElementById('dep-modal-id').value    = depId || '';
   document.getElementById('dep-modal-titre').textContent = depId ? 'Modifier la dépense' : 'Nouvelle dépense';
@@ -22883,6 +22896,7 @@ function ckDepFermerModal(){
 }
 
 async function ckDepSauvegarder(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const id      = document.getElementById('dep-modal-id').value;
   const desc    = document.getElementById('ckdep-desc').value.trim();
   const montant = parseFloat(document.getElementById('ckdep-montant').value);
@@ -22906,6 +22920,7 @@ async function ckDepSauvegarder(){
 }
 
 async function ckDepSupprimer(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   if(!confirm('Supprimer cette dépense ?')) return;
   try {
     await apiFetch('DELETE', `/cuisine/depenses/${id}`);
@@ -23245,8 +23260,8 @@ async function ckAchatsCharger(){
         <td style="font-weight:700;color:#f7a93b">${posGx(a.total)}</td>
         <td>${a.fournisseur||'—'}</td>
         <td style="white-space:nowrap">
-          <button class="pos-btn ghost" style="font-size:10px;padding:2px 7px" onclick="ckAchatsEditer(${a.id})">✏</button>
-          <button class="pos-btn" style="font-size:10px;padding:2px 7px;background:rgba(248,113,113,.15);color:#f87171" onclick="ckAchatsSupprimer(${a.id})">✕</button>
+          ${!_isReadOnly() ? `<button class="pos-btn ghost" style="font-size:10px;padding:2px 7px" onclick="ckAchatsEditer(${a.id})">✏</button>
+          <button class="pos-btn" style="font-size:10px;padding:2px 7px;background:rgba(248,113,113,.15);color:#f87171" onclick="ckAchatsSupprimer(${a.id})">✕</button>` : ''}
         </td>
       </tr>
     `).join('');
@@ -23256,6 +23271,7 @@ async function ckAchatsCharger(){
 }
 
 function ckAchatsNouvelModal(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   // Affiche le bilan de rentabilité avant d'ouvrir le formulaire d'achat
   ckAchatsBilanOuvrir();
 }
@@ -23332,6 +23348,7 @@ async function ckAchatsBilanOuvrir(){
 }
 
 function ckAchatsBilanContinuer(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   document.getElementById('ckac-bilan-modal').classList.remove('open');
   // Ouvre le formulaire de déclaration d'achat
   _ckAchatsEditId = null;
@@ -23480,6 +23497,7 @@ function ckAchatsCalcTotal(){
 }
 
 function ckAchatsEditer(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const el = document.getElementById('ckac-tbody');
   if(!el) return;
   apiFetch('GET', `/cuisine/achats?date_debut=2000-01-01&date_fin=2099-12-31`).then(d=>{
@@ -23503,6 +23521,7 @@ function ckAchatsEditer(id){
 }
 
 async function ckAchatsSauvegarder(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const desc  = document.getElementById('ckac-desc').value.trim();
   const qte   = parseFloat(document.getElementById('ckac-qte').value||0);
   const cout  = parseFloat(document.getElementById('ckac-cout').value||0);
@@ -23538,6 +23557,7 @@ async function ckAchatsSauvegarder(){
 }
 
 async function ckAchatsSupprimer(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   if(!confirm('Supprimer cet achat ?')) return;
   try {
     await apiFetch('DELETE', `/cuisine/achats/${id}`);
