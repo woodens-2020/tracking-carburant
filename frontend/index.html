@@ -5802,7 +5802,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
           </div>
           <div class="gi-page-header-actions">
-            <button class="gi-btn-primary" onclick="posProduitModal()">
+            <button id="btn-pos-nouveau-produit" class="gi-btn-primary" onclick="posProduitModal()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Nouveau produit
             </button>
@@ -5815,7 +5815,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="cat-chips" id="cat-chips-wrap">
             <span style="color:rgba(255,255,255,.25);font-size:11px">Chargement…</span>
           </div>
-          <div class="cat-add-row">
+          <div id="cat-add-row" class="cat-add-row">
             <input id="cat-new-input" placeholder="Ajouter une catégorie…" maxlength="60"
               onkeydown="if(event.key==='Enter')posCatPanelAjouter()">
             <button class="cat-add-btn" onclick="posCatPanelAjouter()">+ Ajouter</button>
@@ -6013,8 +6013,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="pos-header-sub">Stock calculé en temps réel — Réceptions & Ajustements</div>
           </div>
           <div class="pos-header-actions">
-            <button class="pos-btn teal" onclick="posStockReceptionModal()">+ Réception</button>
-            <button class="pos-btn ghost" onclick="posStockAjustModal()">Ajustement</button>
+            <button id="btn-pos-stock-reception" class="pos-btn teal" onclick="posStockReceptionModal()">+ Réception</button>
+            <button id="btn-pos-stock-ajust" class="pos-btn ghost" onclick="posStockAjustModal()">Ajustement</button>
           </div>
         </div>
 
@@ -8665,7 +8665,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0112 0v2"/></svg>
           </div>
           <div><div class="pos-header-title">Employés Hôtel</div><div class="pos-header-sub">Personnel de l'hôtel</div></div>
-          <div class="pos-header-actions"><button class="pos-btn teal" onclick="hotelEmpModal()">+ Ajouter employé</button></div>
+          <div class="pos-header-actions"><button id="btn-hotel-emp-ajouter" class="pos-btn teal" onclick="hotelEmpModal()">+ Ajouter employé</button></div>
         </div>
         <div class="pos-card">
           <div class="pos-table-wrap">
@@ -11551,10 +11551,19 @@ const _CAISSIER_ALLOWED = new Set([
 // Whitelist stricte pour les comptes Manager.
 const _MANAGER_ALLOWED = new Set([
   'home',
-  'gi-dashboard','pos-caisse','pos-produits','pos-stock',
+  'pos-produits','pos-stock',
   'pos-ventes','pos-credits','pos-rentabilite','pos-analyse','pos-sessions-caisse',
   'hotel-sejours','hotel-employes','hotel-rapport',
 ]);
+
+function _isReadOnly(){
+  if(!_appUser) return true;
+  const rn = (_appUser.role_nom||_appUser.poste||'').toLowerCase();
+  return rn === 'manager' || rn.startsWith('caissier') || !!_appUser.employe_id;
+}
+function _isAdmin(){
+  return !!(_appUser?.est_admin || _appUser?.permissions?.admin === true || _appUser?.role === 'admin');
+}
 
 function _getAllowedPages(){
   if(!_appUser) return new Set();
@@ -11614,6 +11623,13 @@ function _applyNavAccess(){
   document.querySelectorAll('.nav-card[onclick]').forEach(card=>{
     const m = card.getAttribute('onclick').match(/goTo\('([^']+)'\)/);
     if(m) card.style.display = _canAccess(m[1]) ? '' : 'none';
+  });
+  // Masquer les boutons d'écriture pour les utilisateurs en lecture seule
+  const _ro = _isReadOnly();
+  ['btn-pos-nouveau-produit','btn-pos-stock-reception','btn-pos-stock-ajust',
+   'btn-hotel-emp-ajouter','cat-add-row'].forEach(function(id){
+    const el = document.getElementById(id);
+    if(el) el.style.display = _ro ? 'none' : '';
   });
   // Masquer les labels de sections dont tous les items sont cachés
   document.querySelectorAll('.nav-section-label').forEach(label=>{
@@ -18514,6 +18530,7 @@ function _posRenderProduitsTbody(prods, stockMap){
       <td>${statBadge}</td>
       <td>
         <div class="gi-actions">
+          ${!_isReadOnly() ? `
           <button class="gi-btn-icon" title="Approvisionner" onclick="posApproModal(${p.id})" style="color:#3fb6a8">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
           </button>
@@ -18528,7 +18545,7 @@ function _posRenderProduitsTbody(prods, stockMap){
               ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>'
               : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
             }
-          </button>
+          </button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -18602,6 +18619,7 @@ function _posProdSetCaisseUI(venduParCaisse, unites){
 }
 
 async function posProduitModal(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const modal    = document.getElementById('pos-prod-modal-bg');
   const title    = document.getElementById('pos-prod-modal-title');
   const prixRow  = document.getElementById('pos-prod-prix-row');
@@ -18933,6 +18951,7 @@ function _posFillProduitSelects(prods){
 }
 
 function posStockReceptionModal(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   document.getElementById('pos-recept-qte').value         = '';
   document.getElementById('pos-recept-prix').value        = '';
   document.getElementById('pos-recept-notes').value       = '';
@@ -19022,6 +19041,7 @@ async function posReceptionnerStock(){
 }
 
 function posStockAjustModal(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   document.getElementById('pos-ajust-qte').value='';
   document.getElementById('pos-ajust-motif').value='';
   document.getElementById('pos-ajust-modal-bg').classList.add('open');
@@ -20278,7 +20298,7 @@ async function posVentesCharger(){
         <td>${badge}</td>
         <td style="white-space:nowrap">
           <button class="pos-btn ghost" style="font-size:10px;padding:3px 7px" onclick="posVenteDetail(${v.id})">Détail</button>
-          ${v.statut!=='ANNULEE'?`<button class="pos-btn danger" style="font-size:10px;padding:3px 7px" onclick="posAnnulerVenteConfirm(${v.id})">Annuler</button>`:''}
+          ${v.statut!=='ANNULEE'&&_isAdmin()?`<button class="pos-btn danger" style="font-size:10px;padding:3px 7px" onclick="posAnnulerVenteConfirm(${v.id})">Annuler</button>`:''}
         </td>
       </tr>`;
     }).join('');
@@ -20297,7 +20317,7 @@ async function posVenteDetail(id){
     const v = await apiFetch('GET',`/pos/ventes/${id}`);
     document.getElementById('pos-vd-titre').textContent = `Ticket ${v.numero_ticket||'#'+id}`;
     const annBtn = document.getElementById('pos-vd-annuler-btn');
-    if(annBtn) annBtn.style.display = v.statut==='ANNULEE' ? 'none' : '';
+    if(annBtn) annBtn.style.display = (v.statut==='ANNULEE' || !_isAdmin()) ? 'none' : '';
     const lignes = (v.lignes||[]).map(l=>`
       <tr><td>${l.produit_nom||'—'}</td><td>${l.quantite}</td><td>${posGx(l.prix_unitaire_applique)}</td><td>${posGx(l.sous_total)}</td></tr>
     `).join('');
@@ -20319,11 +20339,13 @@ async function posVenteDetail(id){
 }
 
 function posAnnulerVenteConfirm(id){
+  if(!_isAdmin()){ _giAlert('Action réservée à l\'administrateur.','err'); return; }
   document.getElementById('pos-vd-id').value = id;
   posAnnulerVente();
 }
 
 async function posAnnulerVente(){
+  if(!_isAdmin()){ _giAlert('Action réservée à l\'administrateur.','err'); return; }
   const id = document.getElementById('pos-vd-id').value;
   if(!id) return;
   if(!await showConfirm('Annuler cette vente ? Le stock sera restitué.', {title:'Annuler la vente', type:'warn', okLabel:'Annuler la vente', cancelLabel:'Garder'})) return;
@@ -20390,7 +20412,7 @@ async function posCreditsCharger(){
         <td>${c.date_echeance ? posDateFr(c.date_echeance).split(' ')[0] : '—'}</td>
         <td>${badge}</td>
         <td style="white-space:nowrap">
-          ${c.statut!=='SOLDE'?`<button class="pos-btn teal" style="font-size:10px;padding:3px 7px;margin-right:3px" onclick="posRembModal(${c.id})">Payer</button>`:''}
+          ${c.statut!=='SOLDE'&&!_isReadOnly()?`<button class="pos-btn teal" style="font-size:10px;padding:3px 7px;margin-right:3px" onclick="posRembModal(${c.id})">Payer</button>`:''}
           ${(c.nb_remboursements>0||c.statut==='SOLDE')?`<button class="pos-btn ghost" style="font-size:10px;padding:3px 7px" onclick="posHistoRemb(${c.id})">Historique</button>`:''}
         </td>
       </tr>`;
@@ -20401,6 +20423,7 @@ async function posCreditsCharger(){
 }
 
 function posRembModal(creditId){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const credit = _posCredits.find(c=>c.id===creditId);
   if(!credit) return;
   _posRembCreditCourant = credit;
@@ -21878,8 +21901,7 @@ async function scCharger(){
       const soumis_at = s.soumis_at ? new Date(s.soumis_at).toLocaleString('fr-HT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : '—';
       const valide_par = s.valide_par ? `<span title="${s.valide_par}" style="font-size:11px;color:rgba(255,255,255,.5)">${s.valide_par}</span>` : '—';
 
-      const estAdmin = _appUser?.est_admin || !_appUser?.employe_id;
-      const btnValider = (s.statut !== 'VALIDE' && estAdmin)
+      const btnValider = (s.statut !== 'VALIDE' && _isAdmin())
         ? `<button class="pos-btn teal" style="font-size:11px;padding:3px 10px" onclick="scValider(${s.id})">Accepter</button>`
         : '';
       const btnPdf  = `<button class="pos-btn ghost" style="font-size:11px;padding:3px 10px" onclick="scExport(${s.id},'pdf')">PDF</button>`;
@@ -21906,6 +21928,7 @@ async function scCharger(){
 }
 
 async function scValider(session_id){
+  if(!_isAdmin()){ _giAlert('Action réservée à l\'administrateur.','err'); return; }
   if(!await showConfirm('Valider cette session de caisse ?', {title:'Valider la session', okLabel:'Valider', type:'ok'})) return;
   try {
     await apiFetch('POST', `/pos/caisse/sessions/${session_id}/valider`, {});
@@ -23773,10 +23796,10 @@ function _hotelSejourCard(s){
         <div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.35)">Payé</div><div style="font-weight:700;color:#34d399">${_hFmt(s.montant_paye)}</div></div>
         <div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.35)">Solde</div><div style="font-weight:700;color:${hasSolde?'#f87171':'#34d399'}">${_hFmt(s.solde)}</div></div>
       </div>
-      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+      ${!_isReadOnly()?`<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
         ${hasSolde?`<button class="pos-btn ghost" style="flex:1;font-size:11px;color:#34d399;border-color:rgba(52,211,153,.3)" onclick="hotelPaiementModal(${s.id})">+ Paiement</button>`:''}
         <button class="pos-btn teal" style="flex:1;font-size:12px" onclick="hotelTerminer(${s.id})">✓ Marquer terminé</button>
-      </div>
+      </div>`:''}
     </div>
   </div>`;
 }
@@ -23837,6 +23860,7 @@ function _hotelTickTimers(){
 }
 
 function hotelPaiementModal(resId){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   document.getElementById('hotel-paie-res-id').value = resId;
   document.getElementById('hotel-paie-montant').value = '';
   document.getElementById('hotel-paie-modal-bg').classList.add('open');
@@ -23856,6 +23880,7 @@ async function hotelPaiementSauver(){
 }
 
 async function hotelTerminer(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   try {
     await apiFetch('POST',`/hotel/reservations/${id}/terminer`);
     await loadHotelSejours();
@@ -23929,14 +23954,15 @@ async function loadHotelEmployes(){
       <td style="text-align:right">${e.salaire_base!=null?_hFmt(e.salaire_base):'—'}</td>
       <td><span style="font-size:11px;color:${e.actif?'#34d399':'#f87171'}">${e.actif?'Actif':'Inactif'}</span></td>
       <td style="text-align:right">
-        <button class="pos-btn ghost" style="font-size:11px;padding:4px 10px" onclick="hotelEmpModal(${e.id})">Modifier</button>
-        ${e.actif?`<button class="pos-btn ghost" style="font-size:11px;padding:4px 10px;color:#f87171;margin-left:4px" onclick="hotelEmpDesactiver(${e.id},'${e.nom_complet.replace(/'/g,"\\'")}')">Retirer</button>`:''}
+        ${!_isReadOnly()?`<button class="pos-btn ghost" style="font-size:11px;padding:4px 10px" onclick="hotelEmpModal(${e.id})">Modifier</button>`:''}
+        ${e.actif&&!_isReadOnly()?`<button class="pos-btn ghost" style="font-size:11px;padding:4px 10px;color:#f87171;margin-left:4px" onclick="hotelEmpDesactiver(${e.id},'${e.nom_complet.replace(/'/g,"\\'")}')">Retirer</button>`:''}
       </td>
     </tr>`).join('');
   } catch(e){ if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="color:#f87171;text-align:center;padding:20px">${e.message||'Erreur'}</td></tr>`; }
 }
 
 function hotelEmpModal(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   _hempEditId = id || null;
   const el = n => document.getElementById(n);
   el('hemp-title').textContent = id ? 'Modifier employé' : 'Nouvel employé';
@@ -23981,6 +24007,7 @@ async function hotelEmpSauver(){
 }
 
 async function hotelEmpDesactiver(id, nom){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   if(!confirm(`Retirer ${nom} ?`)) return;
   try {
     await apiFetch('DELETE',`/hotel/employes/${id}`);
