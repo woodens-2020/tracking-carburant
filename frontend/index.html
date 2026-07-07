@@ -11581,9 +11581,14 @@ const _ACCES_POSTE_LEGACY = {
 function _isReadOnly(){
   if(!_appUser) return true;
   const rn = (_appUser.role_nom||_appUser.poste||'').toLowerCase();
-  // Assistant Directeur : lecture seule sauf Zelle (Zelle n'a pas de guard _isReadOnly)
   return rn === 'manager' || rn.startsWith('caissier') || !!_appUser.employe_id
       || rn === 'assistant directeur';
+}
+function _isZelleReadOnly(){
+  if(!_appUser) return true;
+  const rn = (_appUser.role_nom||_appUser.poste||'').toLowerCase();
+  // AD a le plein accès Zelle — seuls manager et caissier sont bloqués
+  return rn === 'manager' || rn.startsWith('caissier') || !!_appUser.employe_id;
 }
 function _isAdmin(){
   return !!(_appUser?.est_admin || _appUser?.permissions?.admin === true || _appUser?.role === 'admin');
@@ -11655,9 +11660,6 @@ function _applyNavAccess(){
    'btn-hotel-emp-ajouter','btn-hotel-chambre-new','btn-hrec-enregistrer','cat-add-row',
    // Cuisine — écriture
    'btn-cuisine-plat-new','btn-cuisine-dep-new','btn-cuisine-achat-new','btn-cuisine-new-table',
-   // Zelle — écriture + téléchargements
-   'btn-zelle-config','btn-zelle-new-tx','btn-zelle-new-fond',
-   'btn-zpf-pdf','btn-zpf-xls',
    // Hôtel rapport — téléchargements
    'btn-hotel-rapport-pdf','btn-hotel-rapport-xls',
    // Journal — téléchargements
@@ -11665,6 +11667,14 @@ function _applyNavAccess(){
   ].forEach(function(id){
     const el = document.getElementById(id);
     if(el) el.style.display = _ro ? 'none' : '';
+  });
+  // Boutons Zelle : bloqués pour manager/caissier uniquement — AD a le plein accès
+  const _roZelle = _isZelleReadOnly();
+  ['btn-zelle-config','btn-zelle-new-tx','btn-zelle-new-fond',
+   'btn-zpf-pdf','btn-zpf-xls',
+  ].forEach(function(id){
+    const el = document.getElementById(id);
+    if(el) el.style.display = _roZelle ? 'none' : '';
   });
   // Masquer les labels de sections dont tous les items sont cachés
   document.querySelectorAll('.nav-section-label').forEach(label=>{
@@ -24460,7 +24470,7 @@ function zelleResetFondsFilters(){
 
 // ── Config ─────────────────────────────────────────────────────
 function zelleOpenConfig(){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   document.getElementById('zcfg-taux').value = _zelleConfig.taux || 130;
   document.getElementById('modal-zelle-config').classList.add('open');
 }
@@ -24496,7 +24506,7 @@ function _zellePreviewRemettre(){
 }
 
 function zelleOpenForm(){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   document.getElementById('zf-id').value          = '';
   document.getElementById('zf-modal-title').textContent = 'Nouvelle transaction';
   document.getElementById('zf-numero').value      = '';
@@ -24515,7 +24525,7 @@ function zelleOpenForm(){
 }
 
 function zelleOpenEdit(id){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   const t = _zelleData.find(function(x){ return x.id === id; });
   if(!t) return;
   document.getElementById('zf-id').value          = t.id;
@@ -24538,7 +24548,7 @@ function zelleCloseForm(){
 }
 
 async function zelleSaveForm(){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   const id      = document.getElementById('zf-id').value;
   const nom     = document.getElementById('zf-nom').value.trim();
   const montant = parseFloat(document.getElementById('zf-montant').value);
@@ -24571,7 +24581,7 @@ async function zelleSaveForm(){
 }
 
 async function zelleSetStatut(id, statut){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   try{
     await apiFetch('PATCH','/zelle/transactions/'+id+'/statut', {statut});
     posAlert(statut === 'REMIS' ? 'Marqué comme remis' : 'Annulé','ok');
@@ -24581,7 +24591,7 @@ async function zelleSetStatut(id, statut){
 }
 
 async function zelleDeleteTx(id){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   if(!confirm('Supprimer cette transaction ?')) return;
   try{
     await apiFetch('DELETE','/zelle/transactions/'+id);
@@ -24595,7 +24605,7 @@ async function zelleDeleteTx(id){
 let _zellePreFondSnap = {bilan: null, txs: [], fonds: []};
 
 async function zelleOpenFondForm(){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   // Afficher le rapport de synthèse avant d'ouvrir le formulaire de fond
   await zellePreRenflouement();
 }
@@ -24730,14 +24740,14 @@ function zelleClosePreFond(){
 }
 
 function zellePreFondContinuer(){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   zelleClosePreFond();
   _zelleOpenFondFormDirect();
 }
 
 // ── Téléchargement PDF ─────────────────────────────────────────
 function zellePreFondPDF(){
-  if(_isReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return; }
   const {bilan, txs, fonds} = _zellePreFondSnap;
   const taux = (bilan && bilan.taux) || _zelleConfig.taux || 130;
   const now  = new Date();
@@ -24867,7 +24877,7 @@ function zellePreFondPDF(){
 
 // ── Téléchargement Excel (SpreadsheetML) ───────────────────────
 function zellePreFondXLS(){
-  if(_isReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return; }
   const {bilan, txs, fonds} = _zellePreFondSnap;
   const taux = (bilan && bilan.taux) || _zelleConfig.taux || 130;
   const now  = new Date();
@@ -24967,7 +24977,7 @@ function zellePreFondXLS(){
 // ── Form Fond ──────────────────────────────────────────────────
 
 function zelleOpenFondEdit(id){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   const f = _zelleFonds.find(function(x){ return x.id === id; });
   if(!f) return;
   document.getElementById('zff-id').value           = f.id;
@@ -24986,7 +24996,7 @@ function zelleCloseFondForm(){
 }
 
 async function zelleSaveFond(){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   const id        = document.getElementById('zff-id').value;
   const montantHt = parseFloat(document.getElementById('zff-montant').value);
   const source    = document.getElementById('zff-source-sel').value;
@@ -25021,7 +25031,7 @@ async function zelleSaveFond(){
 }
 
 async function zelleDeleteFond(id){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   if(!confirm('Supprimer ce fond déclaré ?')) return;
   try{
     await apiFetch('DELETE','/zelle/fonds/'+id);
@@ -25033,7 +25043,7 @@ async function zelleDeleteFond(id){
 
 // ── Impression Reçu POS (ticket thermique 80mm) ────────────────
 function zelleImprimerRecu(id){
-  if(_isReadOnly()){ _giAlert('Impression non autorisée.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Impression non autorisée.','err'); return; }
   const t = _zelleData.find(function(x){ return x.id === id; });
   if(!t){ posAlert('Transaction introuvable','err'); return; }
 
@@ -25154,7 +25164,7 @@ function zelleImprimerRecu(id){
 
 // ── Impression Fiche de Renflouement ───────────────────────────
 async function zelleImprimerFiche(id){
-  if(_isReadOnly()){ _giAlert('Impression non autorisée.','err'); return; }
+  if(_isZelleReadOnly()){ _giAlert('Impression non autorisée.','err'); return; }
   const f = _zelleFonds.find(function(x){ return x.id === id; });
   if(!f){ posAlert('Fond introuvable','err'); return; }
 
