@@ -237,16 +237,25 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     if erreurs:
         raise ValueError("; ".join(erreurs))
 
-    montant_total   = sum(l["sous_total"] for l in lignes_traitees)
-    montant_paye    = _dec(data.get("montant_paye", montant_total))
-    montant_restant = (montant_total - montant_paye).quantize(Decimal("0.01"))
-    if montant_restant < 0:
-        montant_restant = Decimal("0")
+    montant_total = sum(l["sous_total"] for l in lignes_traitees)
 
     _MODES_VALIDES = {"CASH", "CREDIT", "MIXTE"}
     mode = data.get("mode_paiement", "CASH").upper()
     if mode not in _MODES_VALIDES:
         raise ValueError(f"mode_paiement invalide : '{mode}'. Valeurs acceptées : {sorted(_MODES_VALIDES)}")
+
+    raw_paye = data.get("montant_paye")
+    if raw_paye is None:
+        # CASH sans montant explicite → client paie l'intégralité
+        # CREDIT → aucun paiement immédiat
+        montant_paye = montant_total if mode == "CASH" else Decimal("0")
+    else:
+        montant_paye = _dec(raw_paye)
+
+    montant_restant = (montant_total - montant_paye).quantize(Decimal("0.01"))
+    if montant_restant < 0:
+        montant_restant = Decimal("0")
+
     statut = "CREDIT_EN_COURS" if montant_restant > 0 else "PAYEE"
 
     # Créer la vente
