@@ -28,15 +28,17 @@ class ConfigIn(BaseModel):
 
 
 class TransactionIn(BaseModel):
-    numero_int:       Optional[str] = None
-    nom_prenom:       str
-    identifiant:      Optional[str] = None
-    contact:          Optional[str] = None
-    montant_usd:      float = Field(..., gt=0)
-    frais:            float = Field(0.0, ge=0)
-    source_fond:      Optional[str] = None
-    date_transaction: Optional[str] = None
-    notes:            Optional[str] = None
+    numero_int:          Optional[str] = None
+    nom_prenom:          str
+    identifiant:         Optional[str] = None
+    contact:             Optional[str] = None
+    expediteur_nom:      Optional[str] = None
+    expediteur_contact:  Optional[str] = None
+    montant_usd:         float = Field(..., gt=0)
+    frais:               float = Field(0.0, ge=0)
+    source_fond:         Optional[str] = None
+    date_transaction:    Optional[str] = None
+    notes:               Optional[str] = None
 
 
 class StatutIn(BaseModel):
@@ -68,21 +70,23 @@ def _tx_dict(t: ZelleTransaction) -> dict:
     fr  = float(t.frais)
     tau = float(t.taux_applique)
     return {
-        "id":               t.id,
-        "numero_int":       t.numero_int,
-        "nom_prenom":       t.nom_prenom,
-        "identifiant":      t.identifiant,
-        "contact":          t.contact,
-        "montant_usd":      mu,
-        "montant_ht":       round(mu * tau, 2),
-        "frais":            fr,
-        "a_remettre":       round(mu - fr, 2),
-        "a_remettre_ht":    round((mu - fr) * tau, 2),
-        "taux_applique":    tau,
-        "statut":           t.statut,
-        "source_fond":      t.source_fond,
-        "date_transaction": t.date_transaction.isoformat() if t.date_transaction else None,
-        "notes":            t.notes,
+        "id":                  t.id,
+        "numero_int":          t.numero_int,
+        "nom_prenom":          t.nom_prenom,
+        "identifiant":         t.identifiant,
+        "contact":             t.contact,
+        "expediteur_nom":      t.expediteur_nom,
+        "expediteur_contact":  t.expediteur_contact,
+        "montant_usd":         mu,
+        "montant_ht":          round(mu * tau, 2),
+        "frais":               fr,
+        "a_remettre":          round(mu - fr, 2),
+        "a_remettre_ht":       round((mu - fr) * tau, 2),
+        "taux_applique":       tau,
+        "statut":              t.statut,
+        "source_fond":         t.source_fond,
+        "date_transaction":    t.date_transaction.isoformat() if t.date_transaction else None,
+        "notes":               t.notes,
     }
 
 
@@ -292,16 +296,18 @@ def create_transaction(data: TransactionIn, db: Session = Depends(get_db)):
     cfg = _get_or_create_config(db)
     sf  = data.source_fond if data.source_fond in SOURCES else None
     t = ZelleTransaction(
-        numero_int    = data.numero_int.strip()    if data.numero_int    else None,
-        nom_prenom    = data.nom_prenom.strip(),
-        identifiant   = data.identifiant.strip()   if data.identifiant   else None,
-        contact       = data.contact.strip()       if data.contact       else None,
-        montant_usd   = Decimal(str(data.montant_usd)),
-        frais         = Decimal(str(data.frais)),
-        taux_applique = cfg.taux,
-        statut        = "EN_ATTENTE",
-        source_fond   = sf,
-        notes         = data.notes.strip()         if data.notes         else None,
+        numero_int         = data.numero_int.strip()           if data.numero_int         else None,
+        nom_prenom         = data.nom_prenom.strip(),
+        identifiant        = data.identifiant.strip()          if data.identifiant        else None,
+        contact            = data.contact.strip()              if data.contact            else None,
+        expediteur_nom     = data.expediteur_nom.strip()       if data.expediteur_nom     else None,
+        expediteur_contact = data.expediteur_contact.strip()   if data.expediteur_contact else None,
+        montant_usd        = Decimal(str(data.montant_usd)),
+        frais              = Decimal(str(data.frais)),
+        taux_applique      = cfg.taux,
+        statut             = "EN_ATTENTE",
+        source_fond        = sf,
+        notes              = data.notes.strip()                if data.notes              else None,
     )
     if data.date_transaction:
         dt = _parse_dt(data.date_transaction)
@@ -319,14 +325,16 @@ def update_transaction(tx_id: int, data: TransactionIn, db: Session = Depends(ge
     if not t:
         raise HTTPException(status_code=404, detail="Transaction introuvable")
     sf = data.source_fond if data.source_fond in SOURCES else None
-    t.numero_int  = data.numero_int.strip()    if data.numero_int    else None
-    t.nom_prenom  = data.nom_prenom.strip()
-    t.identifiant = data.identifiant.strip()   if data.identifiant   else None
-    t.contact     = data.contact.strip()       if data.contact       else None
-    t.montant_usd = Decimal(str(data.montant_usd))
-    t.frais       = Decimal(str(data.frais))
-    t.source_fond = sf
-    t.notes       = data.notes.strip()         if data.notes         else None
+    t.numero_int         = data.numero_int.strip()           if data.numero_int         else None
+    t.nom_prenom         = data.nom_prenom.strip()
+    t.identifiant        = data.identifiant.strip()          if data.identifiant        else None
+    t.contact            = data.contact.strip()              if data.contact            else None
+    t.expediteur_nom     = data.expediteur_nom.strip()       if data.expediteur_nom     else None
+    t.expediteur_contact = data.expediteur_contact.strip()   if data.expediteur_contact else None
+    t.montant_usd        = Decimal(str(data.montant_usd))
+    t.frais              = Decimal(str(data.frais))
+    t.source_fond        = sf
+    t.notes              = data.notes.strip()                if data.notes              else None
     if data.date_transaction:
         dt = _parse_dt(data.date_transaction)
         if dt:

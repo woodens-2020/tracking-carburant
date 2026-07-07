@@ -121,11 +121,17 @@ app.include_router(zelle_router)
 @app.on_event("startup")
 def startup():
     init_db()
-    # Migration douce — ajoute source_fond si la colonne n'existe pas encore
+    # Migrations douces — colonnes ajoutées progressivement
     from sqlalchemy import text as _text
+    _migrations = [
+        "ALTER TABLE zelle_transactions ADD COLUMN IF NOT EXISTS source_fond VARCHAR(50)",
+        "ALTER TABLE zelle_transactions ADD COLUMN IF NOT EXISTS expediteur_nom VARCHAR(150)",
+        "ALTER TABLE zelle_transactions ADD COLUMN IF NOT EXISTS expediteur_contact VARCHAR(100)",
+    ]
     try:
         with engine.connect() as _c:
-            _c.execute(_text("ALTER TABLE zelle_transactions ADD COLUMN IF NOT EXISTS source_fond VARCHAR(50)"))
+            for _sql in _migrations:
+                _c.execute(_text(_sql))
             _c.commit()
     except Exception:
         pass

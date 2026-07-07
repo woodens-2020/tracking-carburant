@@ -7391,8 +7391,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <thead>
                 <tr>
                   <th style="padding-left:16px;">#</th>
-                  <th>Client</th>
-                  <th>Contact</th>
+                  <th>Bénéficiaire</th>
+                  <th>Expéditeur</th>
                   <th style="text-align:right;">Montant HTG</th>
                   <th style="text-align:right;">Montant USD</th>
                   <th style="text-align:right;">Frais</th>
@@ -7541,8 +7541,18 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <input type="text" id="zf-identifiant" class="gi-form-input" placeholder="email ou téléphone">
             </div>
             <div class="gi-form-field">
-              <label class="gi-form-lbl">Contact</label>
+              <label class="gi-form-lbl">Contact bénéficiaire</label>
               <input type="text" id="zf-contact" class="gi-form-input" placeholder="Téléphone…">
+            </div>
+          </div>
+          <div class="gi-form-row" style="border-top:1px solid rgba(255,255,255,.07);padding-top:10px;margin-top:2px;">
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Nom de l'expéditeur</label>
+              <input type="text" id="zf-expediteur-nom" class="gi-form-input" placeholder="Personne qui envoie…">
+            </div>
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Tél. expéditeur</label>
+              <input type="text" id="zf-expediteur-contact" class="gi-form-input" placeholder="+1 (555) …">
             </div>
           </div>
           <div class="gi-form-row">
@@ -24341,11 +24351,13 @@ async function loadZellePaiements(){
       const dateStr = dp ? dp[2]+'/'+dp[1]+'/'+dp[0] : '—';
       html += '<tr>';
       html += '<td style="padding-left:16px;color:var(--text-muted);font-size:.78rem;font-variant-numeric:tabular-nums;">' + (t.numero_int || '<span style="opacity:.4">—</span>') + '</td>';
-      // Client : nom + identifiant empilés
+      // Bénéficiaire : nom + identifiant + contact empilés
       html += '<td><div style="font-weight:600;font-size:.88rem;">' + t.nom_prenom + '</div>'
-            + (t.identifiant ? '<div style="font-size:.75rem;color:var(--text-muted);margin-top:1px;">'+t.identifiant+'</div>' : '') + '</td>';
-      // Contact
-      html += '<td style="color:var(--text-muted);font-size:.82rem;">' + (t.contact || '<span style="opacity:.35">—</span>') + '</td>';
+            + (t.identifiant ? '<div style="font-size:.73rem;color:var(--text-muted);margin-top:1px;">'+t.identifiant+'</div>' : '')
+            + (t.contact ? '<div style="font-size:.73rem;color:var(--text-muted);">'+t.contact+'</div>' : '') + '</td>';
+      // Expéditeur
+      html += '<td><div style="font-size:.85rem;">' + (t.expediteur_nom || '<span style="opacity:.35">—</span>') + '</div>'
+            + (t.expediteur_contact ? '<div style="font-size:.73rem;color:var(--text-muted);">'+t.expediteur_contact+'</div>' : '') + '</td>';
       html += '<td style="text-align:right;font-weight:700;font-size:.9rem;font-variant-numeric:tabular-nums;">' + _zelleHtg(t.montant_ht) + '</td>';
       html += '<td style="text-align:right;color:var(--text-muted);font-variant-numeric:tabular-nums;font-size:.8rem;">' + _zelleUsd(t.montant_usd) + '</td>';
       html += '<td style="text-align:right;color:#fbbf24;font-variant-numeric:tabular-nums;font-size:.82rem;">' + _zelleUsd(t.frais) + '</td>';
@@ -24507,17 +24519,19 @@ function _zellePreviewRemettre(){
 
 function zelleOpenForm(){
   if(_isZelleReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
-  document.getElementById('zf-id').value          = '';
-  document.getElementById('zf-modal-title').textContent = 'Nouvelle transaction';
-  document.getElementById('zf-numero').value      = '';
-  document.getElementById('zf-nom').value         = '';
-  document.getElementById('zf-identifiant').value = '';
-  document.getElementById('zf-contact').value     = '';
-  document.getElementById('zf-montant').value     = '';
-  document.getElementById('zf-frais').value       = '0';
-  document.getElementById('zf-source-fond').value = '';
-  document.getElementById('zf-notes').value       = '';
-  document.getElementById('zf-date').value        = new Date().toISOString().substring(0,10);
+  document.getElementById('zf-id').value                    = '';
+  document.getElementById('zf-modal-title').textContent     = 'Nouvelle transaction';
+  document.getElementById('zf-numero').value                = '';
+  document.getElementById('zf-nom').value                   = '';
+  document.getElementById('zf-identifiant').value           = '';
+  document.getElementById('zf-contact').value               = '';
+  document.getElementById('zf-expediteur-nom').value        = '';
+  document.getElementById('zf-expediteur-contact').value    = '';
+  document.getElementById('zf-montant').value               = '';
+  document.getElementById('zf-frais').value                 = '0';
+  document.getElementById('zf-source-fond').value           = '';
+  document.getElementById('zf-notes').value                 = '';
+  document.getElementById('zf-date').value                  = new Date().toISOString().substring(0,10);
   const pv = document.getElementById('zf-a-remettre-preview');
   if(pv) pv.style.display = 'none';
   document.getElementById('modal-zelle-form').classList.add('open');
@@ -24528,17 +24542,19 @@ function zelleOpenEdit(id){
   if(_isZelleReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   const t = _zelleData.find(function(x){ return x.id === id; });
   if(!t) return;
-  document.getElementById('zf-id').value          = t.id;
-  document.getElementById('zf-modal-title').textContent = 'Modifier transaction';
-  document.getElementById('zf-numero').value      = t.numero_int   || '';
-  document.getElementById('zf-nom').value         = t.nom_prenom;
-  document.getElementById('zf-identifiant').value = t.identifiant  || '';
-  document.getElementById('zf-contact').value     = t.contact      || '';
-  document.getElementById('zf-montant').value     = t.montant_usd;
-  document.getElementById('zf-frais').value       = t.frais;
-  document.getElementById('zf-source-fond').value = t.source_fond  || '';
-  document.getElementById('zf-notes').value       = t.notes        || '';
-  document.getElementById('zf-date').value        = t.date_transaction ? t.date_transaction.substring(0,10) : '';
+  document.getElementById('zf-id').value                    = t.id;
+  document.getElementById('zf-modal-title').textContent     = 'Modifier transaction';
+  document.getElementById('zf-numero').value                = t.numero_int          || '';
+  document.getElementById('zf-nom').value                   = t.nom_prenom;
+  document.getElementById('zf-identifiant').value           = t.identifiant         || '';
+  document.getElementById('zf-contact').value               = t.contact             || '';
+  document.getElementById('zf-expediteur-nom').value        = t.expediteur_nom      || '';
+  document.getElementById('zf-expediteur-contact').value    = t.expediteur_contact  || '';
+  document.getElementById('zf-montant').value               = t.montant_usd;
+  document.getElementById('zf-frais').value                 = t.frais;
+  document.getElementById('zf-source-fond').value           = t.source_fond         || '';
+  document.getElementById('zf-notes').value                 = t.notes               || '';
+  document.getElementById('zf-date').value                  = t.date_transaction ? t.date_transaction.substring(0,10) : '';
   _zellePreviewRemettre();
   document.getElementById('modal-zelle-form').classList.add('open');
 }
@@ -24556,15 +24572,17 @@ async function zelleSaveForm(){
   if(!nom)           { posAlert('Nom requis','err'); return; }
   if(!montant||montant<=0){ posAlert('Montant invalide','err'); return; }
   const payload = {
-    numero_int:       document.getElementById('zf-numero').value.trim()      || null,
-    nom_prenom:       nom,
-    identifiant:      document.getElementById('zf-identifiant').value.trim() || null,
-    contact:          document.getElementById('zf-contact').value.trim()     || null,
-    montant_usd:      montant,
-    frais:            frais,
-    source_fond:      document.getElementById('zf-source-fond').value        || null,
-    date_transaction: document.getElementById('zf-date').value               || null,
-    notes:            document.getElementById('zf-notes').value.trim()       || null,
+    numero_int:          document.getElementById('zf-numero').value.trim()              || null,
+    nom_prenom:          nom,
+    identifiant:         document.getElementById('zf-identifiant').value.trim()         || null,
+    contact:             document.getElementById('zf-contact').value.trim()             || null,
+    expediteur_nom:      document.getElementById('zf-expediteur-nom').value.trim()      || null,
+    expediteur_contact:  document.getElementById('zf-expediteur-contact').value.trim()  || null,
+    montant_usd:         montant,
+    frais:               frais,
+    source_fond:         document.getElementById('zf-source-fond').value                || null,
+    date_transaction:    document.getElementById('zf-date').value                       || null,
+    notes:               document.getElementById('zf-notes').value.trim()               || null,
   };
   try{
     if(id){
@@ -25122,11 +25140,15 @@ function zelleImprimerRecu(id){
     +'<div class="row"><span class="bold">Heure :</span><span>'+heureAff+'</span></div>'
     +'<div class="sep"></div>'
 
-    // ── Infos client ──
-    +'<div class="bold" style="font-size:8.5pt;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Informations client</div>'
+    // ── Infos bénéficiaire ──
+    +'<div class="bold" style="font-size:8.5pt;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Bénéficiaire</div>'
     +'<div class="row"><span>Nom :</span><span style="font-weight:600;">'+t.nom_prenom+'</span></div>'
     +(t.identifiant?'<div class="row"><span>ID Zelle :</span><span style="font-size:9pt;">'+t.identifiant+'</span></div>':'')
     +(t.contact?'<div class="row"><span>Contact :</span><span>'+t.contact+'</span></div>':'')
+    +(t.expediteur_nom||t.expediteur_contact?'<div class="sep"></div>':'')
+    +(t.expediteur_nom||t.expediteur_contact?'<div class="bold" style="font-size:8.5pt;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Expéditeur</div>':'')
+    +(t.expediteur_nom?'<div class="row"><span>Nom :</span><span style="font-weight:600;">'+t.expediteur_nom+'</span></div>':'')
+    +(t.expediteur_contact?'<div class="row"><span>Tél :</span><span>'+t.expediteur_contact+'</span></div>':'')
     +'<div class="sep"></div>'
 
     // ── Montant principal ──

@@ -1056,18 +1056,20 @@ class ZelleTransaction(Base):
     """Transaction Zelle — réception USD et remise HTG."""
     __tablename__ = "zelle_transactions"
 
-    id               = Column(Integer, primary_key=True)
-    numero_int       = Column(String(30),  nullable=True)
-    nom_prenom       = Column(String(150), nullable=False)
-    identifiant      = Column(String(150), nullable=True)
-    contact          = Column(String(100), nullable=True)
-    montant_usd      = Column(Numeric(14, 2), nullable=False)
-    frais            = Column(Numeric(14, 2), nullable=False, default=0)
-    taux_applique    = Column(Numeric(10, 4), nullable=False, default=130)
-    statut           = Column(String(20), nullable=False, default="EN_ATTENTE")
-    source_fond      = Column(String(50), nullable=True)   # PDG, Gaz, Autre
-    date_transaction = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    notes            = Column(String(300), nullable=True)
+    id                  = Column(Integer, primary_key=True)
+    numero_int          = Column(String(30),  nullable=True)
+    nom_prenom          = Column(String(150), nullable=False)
+    identifiant         = Column(String(150), nullable=True)
+    contact             = Column(String(100), nullable=True)
+    expediteur_nom      = Column(String(150), nullable=True)
+    expediteur_contact  = Column(String(100), nullable=True)
+    montant_usd         = Column(Numeric(14, 2), nullable=False)
+    frais               = Column(Numeric(14, 2), nullable=False, default=0)
+    taux_applique       = Column(Numeric(10, 4), nullable=False, default=130)
+    statut              = Column(String(20), nullable=False, default="EN_ATTENTE")
+    source_fond         = Column(String(50), nullable=True)
+    date_transaction    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    notes               = Column(String(300), nullable=True)
 
     __table_args__ = (
         CheckConstraint("montant_usd > 0",   name="chk_zelle_montant_pos"),
