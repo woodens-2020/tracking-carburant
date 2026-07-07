@@ -11535,25 +11535,7 @@ const _AREA_PAGES = {
   },
 };
 
-// Fallback pour utilisateurs sans role_id (compatibilité ascendante)
-const _ACCES_POSTE_LEGACY = {
-  'Directeur Général': null,
-  'Comptable':   ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','zelle','zelle-paiements','zelle-fonds',
-                  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
-                  'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
-  'Superviseur': ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','zelle','zelle-paiements','zelle-fonds',
-                  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
-                  'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
-  'Pompiste': ['home','saisie'],
-  'Caissier':            ['pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite'],
-  'Manager':             ['pos-produits','pos-stock','pos-ventes','pos-credits','pos-rentabilite','pos-analyse','pos-sessions-caisse','hotel-sejours','hotel-employes','hotel-rapport'],
-  'Assistant Directeur': Array.from(_AD_ALLOWED),
-};
-
 // Whitelist stricte des pages accessibles aux comptes caissière (employe_id défini).
-// Toute page absente de cette liste est automatiquement bloquée, quel que soit le rôle.
 const _CAISSIER_ALLOWED = new Set([
   'pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite',
 ]);
@@ -11568,20 +11550,31 @@ const _MANAGER_ALLOWED = new Set([
 // Assistant Directeur — tous les rapports en lecture + Zelle complet
 const _AD_ALLOWED = new Set([
   'home',
-  // Finance
   'dashboard','journal','statistiques','gi-dashboard','depenses','achats','caisse',
-  // Bar (rapports uniquement — pas de caisse POS)
   'pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes',
   'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse',
-  // Cuisine
   'cuisine-plats','cuisine-ventes','cuisine-stats','cuisine-achats',
-  // Hôtel
   'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport',
-  // Employés
   'employes','payroll',
-  // Zelle — accès complet
   'zelle','zelle-paiements','zelle-fonds',
 ]);
+
+// Fallback pour utilisateurs sans role_id (compatibilité ascendante)
+const _ACCES_POSTE_LEGACY = {
+  'Directeur Général': null,
+  'Comptable':   ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
+                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','zelle','zelle-paiements','zelle-fonds',
+                  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
+                  'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
+  'Superviseur': ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
+                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','zelle','zelle-paiements','zelle-fonds',
+                  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
+                  'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
+  'Pompiste':            ['home','saisie'],
+  'Caissier':            Array.from(_CAISSIER_ALLOWED),
+  'Manager':             Array.from(_MANAGER_ALLOWED),
+  'Assistant Directeur': Array.from(_AD_ALLOWED),
+};
 
 function _isReadOnly(){
   if(!_appUser) return true;
