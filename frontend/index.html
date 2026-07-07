@@ -7593,6 +7593,26 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div>
 
+    <!-- ── Modal Rapport Pré-Renflouement ── -->
+    <div class="gi-modal-overlay" id="modal-zelle-pre-fond" onclick="if(event.target===this)zelleClosePreFond()">
+      <div class="gi-modal" style="width:min(820px,96vw);display:flex;flex-direction:column;max-height:92vh;">
+        <div class="gi-modal-head" style="flex-shrink:0;">
+          <h3>&#128203; Rapport avant renflouement</h3>
+          <button class="gi-modal-close" onclick="zelleClosePreFond()">&#215;</button>
+        </div>
+        <div class="gi-modal-body" id="zpf-body" style="overflow-y:auto;flex:1;">
+          <div style="text-align:center;padding:40px;color:rgba(255,255,255,.4);">Chargement du rapport…</div>
+        </div>
+        <div class="gi-modal-foot" style="flex-shrink:0;flex-wrap:wrap;gap:8px;">
+          <button class="gi-btn-secondary" onclick="zellePreFondPDF()" style="gap:6px;">&#128438; Télécharger PDF</button>
+          <button class="gi-btn-secondary" onclick="zellePreFondXLS()" style="gap:6px;">&#128196; Télécharger Excel</button>
+          <div style="flex:1;min-width:10px;"></div>
+          <button class="gi-btn-secondary" onclick="zelleClosePreFond()">Annuler</button>
+          <button class="gi-btn-primary"   onclick="zellePreFondContinuer()">Confirmer et déclarer le renflouement &#8594;</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal résumé session -->
     <div class="pos-modal-bg" id="sc-detail-bg" onclick="if(event.target===this)scFermerDetail()">
       <div class="pos-modal" style="min-width:540px;max-width:700px" id="sc-detail-modal">
@@ -24274,20 +24294,376 @@ async function zelleDeleteTx(id){
   }catch(e){ posAlert(e.message||'Erreur','err'); }
 }
 
-// ── Form Fond ──────────────────────────────────────────────────
-function zelleOpenFondForm(){
+// ── Rapport Pré-Renflouement ────────────────────────────────────
+let _zellePreFondSnap = {bilan: null, txs: [], fonds: []};
+
+async function zelleOpenFondForm(){
+  // Afficher le rapport de synthèse avant d'ouvrir le formulaire de fond
+  await zellePreRenflouement();
+}
+
+function _zelleOpenFondFormDirect(){
   document.getElementById('zff-id').value           = '';
   document.getElementById('zff-modal-title').textContent = 'Déclarer réception de fonds';
   document.getElementById('zff-montant').value      = '';
   document.getElementById('zff-source-sel').value   = 'PDG';
   document.getElementById('zff-date').value         = new Date().toISOString().substring(0,10);
   document.getElementById('zff-notes').value        = '';
-  // afficher taux actuel dans le modal
   const tr = document.getElementById('zff-taux-ref');
   if(tr) tr.textContent = Number(_zelleConfig.taux || 130).toFixed(2) + ' HTG/USD';
   document.getElementById('modal-zelle-fond').classList.add('open');
   setTimeout(function(){ const el=document.getElementById('zff-montant'); if(el) el.focus(); }, 80);
 }
+
+async function zellePreRenflouement(){
+  document.getElementById('modal-zelle-pre-fond').classList.add('open');
+  const body = document.getElementById('zpf-body');
+  body.innerHTML = '<div style="text-align:center;padding:40px;color:rgba(255,255,255,.4);">Chargement…</div>';
+  try{
+    const [bilan, txs, fonds] = await Promise.all([
+      apiFetch('GET','/zelle/bilan'),
+      apiFetch('GET','/zelle/transactions'),
+      apiFetch('GET','/zelle/fonds'),
+    ]);
+    _zellePreFondSnap = {bilan, txs, fonds};
+    const taux = bilan.taux || _zelleConfig.taux || 130;
+
+    // Dernier fond reçu
+    const dernierFond = fonds.length
+      ? fonds.reduce(function(a,b){ return (a.date_reception||'') > (b.date_reception||'') ? a : b; })
+      : null;
+
+    // Transactions depuis le dernier fond
+    const sinceDate = dernierFond ? (dernierFond.date_reception||'').substring(0,10) : null;
+    const txsSince  = sinceDate
+      ? txs.filter(function(t){ return (t.date_transaction||'').substring(0,10) >= sinceDate; })
+      : txs;
+    const txsActives = txsSince.filter(function(t){ return t.statut !== 'ANNULE'; });
+
+    const totMht   = txsActives.reduce(function(a,t){ return a+(t.montant_ht||0); }, 0);
+    const totRemHt = txsActives.filter(function(t){ return t.statut==='REMIS'; }).reduce(function(a,t){ return a+(t.a_remettre_ht||0); }, 0);
+    const totFrHt  = txsActives.reduce(function(a,t){ return a+(t.frais||0)*(t.taux_applique||taux); }, 0);
+    const nbRemis  = txsActives.filter(function(t){ return t.statut==='REMIS'; }).length;
+    const nbAtt    = txsActives.filter(function(t){ return t.statut==='EN_ATTENTE'; }).length;
+
+    function htg(v){ const n=parseFloat(v)||0; return n.toLocaleString('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2})+' HTG'; }
+    function fmtDate(s){ if(!s) return '—'; const p=s.substring(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+
+    let html = '';
+
+    // Info dernier fond
+    if(dernierFond){
+      const srcCls = dernierFond.source==='PDG'?'zelle-src-pdg':dernierFond.source==='Gaz'?'zelle-src-gaz':'zelle-src-autre';
+      html += '<div style="background:rgba(201,160,32,.08);border:1px solid rgba(201,160,32,.25);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">'
+        +'<div style="font-size:.75rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.08em;">Dernier renflouement</div>'
+        +'<span class="zelle-badge '+srcCls+'">'+dernierFond.source+'</span>'
+        +'<strong style="color:#c9a020;font-variant-numeric:tabular-nums;">'+htg(dernierFond.montant_ht)+'</strong>'
+        +'<span style="color:rgba(255,255,255,.4);font-size:.82rem;">reçu le '+fmtDate(dernierFond.date_reception)+'</span>'
+        +'<span style="margin-left:auto;font-size:.75rem;color:rgba(255,255,255,.4);">Rapport des paiements effectués depuis cette date</span>'
+        +'</div>';
+    }
+
+    // Métriques
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:18px;">';
+    const cards = [
+      {label:'Transactions actives', val: txsActives.length + ' ('+nbRemis+' remises, '+nbAtt+' en attente)', color:'#60a5fa'},
+      {label:'Total paiements HTG', val: htg(totMht), color:'var(--accent)'},
+      {label:'Total remis HTG', val: htg(totRemHt), color:'#4ade80'},
+      {label:'Total frais HTG', val: htg(totFrHt), color:'#fbbf24'},
+    ];
+    for(const c of cards){
+      html += '<div class="zelle-bilan-card"><div class="zbc-label">'+c.label+'</div>'
+        +'<div class="zbc-val" style="color:'+c.color+';font-size:1rem;">'+c.val+'</div></div>';
+    }
+    html += '</div>';
+
+    // Balance actuelle
+    html += '<div class="zelle-balance-hero" style="margin-bottom:16px;padding:14px 18px;">'
+      +'<div><div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.5);margin-bottom:4px;">Balance disponible actuelle</div>'
+      +'<div style="font-size:1.6rem;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;">'+htg(bilan.balance_ht)+'</div></div>'
+      +'<div style="text-align:right;"><div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.4);margin-bottom:4px;">Taux actuel</div>'
+      +'<div style="font-size:1.1rem;font-weight:700;color:rgba(255,255,255,.8);">'+Number(taux).toFixed(2)+' HTG/USD</div></div>'
+      +'</div>';
+
+    // Table des transactions
+    html += '<div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:rgba(201,160,32,.9);border-bottom:1px solid rgba(201,160,32,.3);padding-bottom:4px;margin-bottom:10px;">Détail des paiements</div>';
+    if(!txsActives.length){
+      html += '<div style="text-align:center;padding:24px;color:rgba(255,255,255,.35);">Aucun paiement enregistré depuis le dernier renflouement.</div>';
+    } else {
+      html += '<div style="overflow-x:auto;"><table class="gi-table" style="font-size:.8rem;">'
+        +'<thead><tr>'
+        +'<th>Nom &amp; Prénom</th><th>Identifiant</th><th style="text-align:right;">Montant HTG</th>'
+        +'<th style="text-align:right;">À remettre HTG</th><th style="text-align:right;">Frais USD</th>'
+        +'<th>Source</th><th>Statut</th><th>Date</th>'
+        +'</tr></thead><tbody>';
+      for(const t of txsActives){
+        const badge = t.statut==='REMIS'
+          ?'<span class="zelle-badge remis">Remis</span>'
+          :'<span class="zelle-badge en-attente">En attente</span>';
+        html += '<tr>'
+          +'<td style="font-weight:600;">'+t.nom_prenom+'</td>'
+          +'<td style="color:var(--text-muted);font-size:.78rem;">'+(t.identifiant||'—')+'</td>'
+          +'<td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">'+htg(t.montant_ht)+'</td>'
+          +'<td style="text-align:right;color:#4ade80;font-variant-numeric:tabular-nums;">'+htg(t.a_remettre_ht)+'</td>'
+          +'<td style="text-align:right;color:#fbbf24;font-variant-numeric:tabular-nums;font-size:.78rem;">$ '+Number(t.frais||0).toFixed(2)+'</td>'
+          +'<td>'+_zSrc(t.source_fond)+'</td>'
+          +'<td>'+badge+'</td>'
+          +'<td style="color:var(--text-muted);font-size:.78rem;">'+fmtDate(t.date_transaction)+'</td>'
+          +'</tr>';
+      }
+      // Ligne totaux
+      html += '<tr style="border-top:2px solid var(--border);font-weight:700;background:rgba(255,255,255,.03);">'
+        +'<td colspan="2">TOTAL</td>'
+        +'<td style="text-align:right;font-variant-numeric:tabular-nums;">'+htg(totMht)+'</td>'
+        +'<td style="text-align:right;color:#4ade80;font-variant-numeric:tabular-nums;">'+htg(totRemHt)+'</td>'
+        +'<td style="text-align:right;color:#fbbf24;font-variant-numeric:tabular-nums;">'+htg(totFrHt)+'</td>'
+        +'<td colspan="3"></td></tr>';
+      html += '</tbody></table></div>';
+    }
+
+    body.innerHTML = html;
+  }catch(e){
+    body.innerHTML = '<div style="color:var(--danger);padding:24px;">Erreur : '+(e.message||'inconnue')+'</div>';
+  }
+}
+
+function zelleClosePreFond(){
+  document.getElementById('modal-zelle-pre-fond').classList.remove('open');
+}
+
+function zellePreFondContinuer(){
+  zelleClosePreFond();
+  _zelleOpenFondFormDirect();
+}
+
+// ── Téléchargement PDF ─────────────────────────────────────────
+function zellePreFondPDF(){
+  const {bilan, txs, fonds} = _zellePreFondSnap;
+  const taux = (bilan && bilan.taux) || _zelleConfig.taux || 130;
+  const now  = new Date();
+  const genDate = String(now.getDate()).padStart(2,'0')+'/'+String(now.getMonth()+1).padStart(2,'0')+'/'+now.getFullYear()
+                + ' '+String(now.getHours()).padStart(2,'0')+'h'+String(now.getMinutes()).padStart(2,'0');
+
+  function htg(v){ return (parseFloat(v)||0).toLocaleString('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2})+' HTG'; }
+  function fmtDate(s){ if(!s) return '—'; const p=s.substring(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+
+  const dernierFond = fonds.length
+    ? fonds.reduce(function(a,b){ return (a.date_reception||'')>(b.date_reception||'')?a:b; })
+    : null;
+  const sinceDate = dernierFond ? (dernierFond.date_reception||'').substring(0,10) : null;
+  const txsActives = (sinceDate
+    ? txs.filter(function(t){ return (t.date_transaction||'').substring(0,10)>=sinceDate; })
+    : txs
+  ).filter(function(t){ return t.statut!=='ANNULE'; });
+
+  const totMht   = txsActives.reduce(function(a,t){ return a+(t.montant_ht||0); },0);
+  const totRemHt = txsActives.filter(function(t){ return t.statut==='REMIS'; }).reduce(function(a,t){ return a+(t.a_remettre_ht||0); },0);
+  const totFrHt  = txsActives.reduce(function(a,t){ return a+(t.frais||0)*(t.taux_applique||taux); },0);
+
+  let rows='';
+  for(const t of txsActives){
+    const statut = t.statut==='REMIS'?'Remis':'En attente';
+    rows += '<tr>'
+      +'<td>'+t.nom_prenom+'</td>'
+      +'<td>'+(t.identifiant||'—')+'</td>'
+      +'<td class="r">'+htg(t.montant_ht)+'</td>'
+      +'<td class="r">'+htg(t.a_remettre_ht)+'</td>'
+      +'<td class="r">$ '+Number(t.frais||0).toFixed(2)+'</td>'
+      +'<td>'+(t.source_fond||'—')+'</td>'
+      +'<td>'+statut+'</td>'
+      +'<td>'+fmtDate(t.date_transaction)+'</td>'
+      +'</tr>';
+  }
+  rows += '<tr class="tot"><td colspan="2">TOTAL</td>'
+    +'<td class="r">'+htg(totMht)+'</td>'
+    +'<td class="r">'+htg(totRemHt)+'</td>'
+    +'<td class="r">'+htg(totFrHt)+'</td>'
+    +'<td colspan="3"></td></tr>';
+
+  const dernierFondInfo = dernierFond
+    ? 'Dernier renflouement : <strong>'+htg(dernierFond.montant_ht)+'</strong> ('+dernierFond.source+') reçu le '+fmtDate(dernierFond.date_reception)
+    : 'Aucun renflouement précédent enregistré';
+
+  const html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Rapport Pré-Renflouement</title>'
+    +'<style>*{box-sizing:border-box;margin:0;padding:0;}'
+    +'body{font-family:Georgia,serif;font-size:10pt;color:#111;background:#fff;}'
+    +'@page{size:A4 landscape;margin:14mm 12mm;}'
+    +'.page{max-width:100%;}'
+    +'.entete{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #1a2f5e;padding-bottom:12px;margin-bottom:0;}'
+    +'.logo{width:70px;height:70px;background:#1a2f5e;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;}'
+    +'.logo-star{font-size:1.8rem;}'
+    +'.logo-sub{font-size:.45rem;letter-spacing:.1em;color:#c9a020;text-transform:uppercase;}'
+    +'.cie{flex:1;text-align:center;padding:0 12px;}'
+    +'.cie-nom{font-size:1.2rem;font-weight:900;color:#1a2f5e;text-transform:uppercase;}'
+    +'.cie-sous{font-size:.65rem;color:#c9a020;font-weight:700;letter-spacing:.12em;text-transform:uppercase;}'
+    +'.cie-dept{font-size:.6rem;color:#555;margin-top:2px;}'
+    +'.ref{text-align:right;font-size:.68rem;color:#444;}'
+    +'.titre{background:#1a2f5e;color:#fff;text-align:center;padding:8px;font-size:.95rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;}'
+    +'.titre span{color:#c9a020;font-size:.68rem;font-weight:400;display:block;margin-top:2px;}'
+    +'.dernier-fond{background:#fffbea;border:1px solid #c9a020;border-radius:5px;padding:8px 12px;font-size:.78rem;margin-bottom:12px;}'
+    +'.metriques{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}'
+    +'.met{border:1px solid #ddd;border-radius:5px;padding:8px 10px;}'
+    +'.met-label{font-size:.62rem;color:#666;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;}'
+    +'.met-val{font-size:.95rem;font-weight:800;color:#1a2f5e;}'
+    +'.balance{background:#1a2f5e;color:#fff;border-radius:6px;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}'
+    +'.bal-label{font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.5);margin-bottom:3px;}'
+    +'.bal-val{font-size:1.3rem;font-weight:900;}'
+    +'table{width:100%;border-collapse:collapse;font-size:.75rem;}'
+    +'thead{background:#1a2f5e;color:#fff;}'
+    +'th{padding:6px 8px;text-align:left;font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;}'
+    +'td{padding:5px 8px;border-bottom:1px solid #eee;}'
+    +'td.r{text-align:right;font-variant-numeric:tabular-nums;}'
+    +'.tot{background:#f5f5f5;font-weight:700;border-top:2px solid #1a2f5e;}'
+    +'.sig{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:20px;}'
+    +'.sig-block{border-top:1px solid #333;padding-top:6px;}'
+    +'.sig-label{font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;color:#555;margin-bottom:24px;}'
+    +'.sig-line{font-size:.65rem;color:#888;border-top:1px dashed #ccc;padding-top:3px;}'
+    +'.footer{margin-top:16px;border-top:2px solid #1a2f5e;padding-top:6px;display:flex;justify-content:space-between;font-size:.6rem;color:#888;}'
+    +'.footer-c{color:#c9a020;font-weight:700;text-align:center;}'
+    +'@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}'
+    +'</style></head><body><div class="page">'
+
+    +'<div class="entete">'
+    +'<div class="logo"><div class="logo-star">&#11088;</div><div class="logo-sub">Bon Prix</div></div>'
+    +'<div class="cie"><div class="cie-nom">Complexe Commercial de Pillatre</div><div class="cie-sous">Bon Prix</div><div class="cie-dept">Rapport Pré-Renflouement &mdash; Département Zelle</div></div>'
+    +'<div class="ref"><strong>Rapport du '+genDate+'</strong><br>Taux : '+Number(taux).toFixed(2)+' HTG/USD</div>'
+    +'</div>'
+
+    +'<div class="titre">Rapport de Synthèse des Paiements<span>À valider avant tout nouveau renflouement de la Grande Caisse</span></div>'
+
+    +'<div class="dernier-fond">'+dernierFondInfo+'</div>'
+
+    +'<div class="metriques">'
+    +'<div class="met"><div class="met-label">Transactions actives</div><div class="met-val">'+txsActives.length+'</div></div>'
+    +'<div class="met"><div class="met-label">Total paiements</div><div class="met-val">'+htg(totMht)+'</div></div>'
+    +'<div class="met"><div class="met-label">Total remis</div><div class="met-val" style="color:#166534;">'+htg(totRemHt)+'</div></div>'
+    +'<div class="met"><div class="met-label">Total frais</div><div class="met-val" style="color:#92400e;">'+htg(totFrHt)+'</div></div>'
+    +'</div>'
+
+    +'<div class="balance">'
+    +'<div><div class="bal-label">Balance disponible</div><div class="bal-val">'+htg((bilan&&bilan.balance_ht)||0)+'</div></div>'
+    +'<div style="text-align:right;"><div class="bal-label">Fonds reçus total</div><div class="bal-val" style="font-size:.95rem;color:#c9a020;">'+htg((bilan&&bilan.total_fonds_ht)||0)+'</div></div>'
+    +'</div>'
+
+    +'<table><thead><tr><th>Nom &amp; Prénom</th><th>Identifiant</th><th>Montant HTG</th><th>À remettre HTG</th><th>Frais</th><th>Source</th><th>Statut</th><th>Date</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table>'
+
+    +'<div class="sig">'
+    +'<div class="sig-block"><div class="sig-label">Vérifié par</div><div class="sig-line">Nom &amp; Signature : ____________________</div><div class="sig-line" style="margin-top:4px;">Date : _______________</div></div>'
+    +'<div class="sig-block"><div class="sig-label">Approuvé par (PDG)</div><div class="sig-line">Nom &amp; Signature : ____________________</div><div class="sig-line" style="margin-top:4px;">Date : _______________</div></div>'
+    +'<div class="sig-block"><div class="sig-label">Nouveau renflouement autorisé</div><div class="sig-line">Montant autorisé : ___________________</div><div class="sig-line" style="margin-top:4px;">Date : _______________</div></div>'
+    +'</div>'
+
+    +'<div class="footer"><div>Généré le '+genDate+'</div><div class="footer-c">Complexe Commercial de Pillatre &mdash; BON PRIX</div><div>Document confidentiel</div></div>'
+    +'</div>'
+    +'<script>window.onload=function(){ window.print(); };<\/script>'
+    +'</body></html>';
+
+  const w = window.open('','_blank','width=1100,height=860,scrollbars=yes');
+  if(!w){ posAlert('Autorisez les pop-ups pour le téléchargement PDF','err'); return; }
+  w.document.write(html);
+  w.document.close();
+}
+
+// ── Téléchargement Excel (SpreadsheetML) ───────────────────────
+function zellePreFondXLS(){
+  const {bilan, txs, fonds} = _zellePreFondSnap;
+  const taux = (bilan && bilan.taux) || _zelleConfig.taux || 130;
+  const now  = new Date();
+  function fmtDate(s){ if(!s) return ''; const p=s.substring(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  const dernierFond = fonds.length
+    ? fonds.reduce(function(a,b){ return (a.date_reception||'')>(b.date_reception||'')?a:b; })
+    : null;
+  const sinceDate = dernierFond ? (dernierFond.date_reception||'').substring(0,10) : null;
+  const txsActives = (sinceDate
+    ? txs.filter(function(t){ return (t.date_transaction||'').substring(0,10)>=sinceDate; })
+    : txs
+  ).filter(function(t){ return t.statut!=='ANNULE'; });
+
+  const totMht   = txsActives.reduce(function(a,t){ return a+(t.montant_ht||0); },0);
+  const totRemHt = txsActives.filter(function(t){ return t.statut==='REMIS'; }).reduce(function(a,t){ return a+(t.a_remettre_ht||0); },0);
+  const totFrHt  = txsActives.reduce(function(a,t){ return a+(t.frais||0)*(t.taux_applique||taux); },0);
+
+  function cell(v,type,bold,bg){
+    let s='';
+    if(bold||bg) s=' ss:StyleID="'+(bold&&bg?'hdr':bold?'b':'bg')+'"';
+    return '<Cell'+s+'><Data ss:Type="'+(type||'String')+'">'+esc(v)+'</Data></Cell>';
+  }
+
+  let dataRows='';
+  for(const t of txsActives){
+    dataRows += '<Row>'
+      +cell(t.nom_prenom)
+      +cell(t.identifiant||'')
+      +cell(t.contact||'')
+      +cell((t.montant_ht||0).toFixed(2),'Number')
+      +cell((t.montant_usd||0).toFixed(2),'Number')
+      +cell((t.a_remettre_ht||0).toFixed(2),'Number')
+      +cell((t.frais||0).toFixed(2),'Number')
+      +cell(t.source_fond||'')
+      +cell(t.statut==='REMIS'?'Remis':'En attente')
+      +cell(fmtDate(t.date_transaction))
+      +'</Row>';
+  }
+  dataRows += '<Row>'
+    +cell('TOTAL','String',true)
+    +cell('')
+    +cell('')
+    +cell(totMht.toFixed(2),'Number',true)
+    +cell('','String',true)
+    +cell(totRemHt.toFixed(2),'Number',true)
+    +cell(totFrHt.toFixed(2),'Number',true)
+    +cell('')+cell('')+cell('')
+    +'</Row>';
+
+  const xls = '<?xml version="1.0" encoding="UTF-8"?>'
+    +'<?mso-application progid="Excel.Sheet"?>'
+    +'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"'
+    +' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"'
+    +' xmlns:x="urn:schemas-microsoft-com:office:excel">'
+    +'<Styles>'
+    +'<Style ss:ID="hdr"><Font ss:Bold="1"/><Interior ss:Color="#1a2f5e" ss:Pattern="Solid"/><Font ss:Color="#FFFFFF" ss:Bold="1"/></Style>'
+    +'<Style ss:ID="b"><Font ss:Bold="1"/></Style>'
+    +'<Style ss:ID="bg"><Interior ss:Color="#F5F5F5" ss:Pattern="Solid"/></Style>'
+    +'</Styles>'
+    +'<Worksheet ss:Name="Rapport Zelle">'
+    +'<Table>'
+    // En-tête société
+    +'<Row><Cell ss:MergeAcross="9" ss:StyleID="hdr"><Data ss:Type="String">COMPLEXE COMMERCIAL DE PILLATRE — BON PRIX — Rapport Pré-Renflouement</Data></Cell></Row>'
+    +'<Row><Cell ss:MergeAcross="9"><Data ss:Type="String">Généré le : '+now.toLocaleDateString('fr-FR')+' — Taux : '+Number(taux).toFixed(2)+' HTG/USD</Data></Cell></Row>'
+    +(dernierFond?'<Row><Cell ss:MergeAcross="9"><Data ss:Type="String">Dernier renflouement : '+esc(dernierFond.source)+' — '+Number(dernierFond.montant_ht||0).toFixed(2)+' HTG — reçu le '+fmtDate(dernierFond.date_reception)+'</Data></Cell></Row>':'')
+    +'<Row></Row>'
+    // Métriques
+    +'<Row>'+cell('Transactions actives','String',true)+cell(txsActives.length,'Number')
+    +cell('Total paiements HTG','String',true)+cell(totMht.toFixed(2),'Number')
+    +cell('Total remis HTG','String',true)+cell(totRemHt.toFixed(2),'Number')
+    +cell('Total frais HTG','String',true)+cell(totFrHt.toFixed(2),'Number')
+    +cell('Balance actuelle HTG','String',true)+cell(((bilan&&bilan.balance_ht)||0).toFixed(2),'Number')
+    +'</Row>'
+    +'<Row></Row>'
+    // En-têtes colonnes
+    +'<Row ss:StyleID="hdr">'
+    +cell('Nom & Prénom')+cell('Identifiant')+cell('Contact')
+    +cell('Montant HTG')+cell('Montant USD')+cell('À remettre HTG')
+    +cell('Frais USD')+cell('Source')+cell('Statut')+cell('Date')
+    +'</Row>'
+    +dataRows
+    +'</Table></Worksheet></Workbook>';
+
+  const blob = new Blob([xls], {type:'application/vnd.ms-excel;charset=UTF-8'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'rapport-zelle-'+now.toISOString().substring(0,10)+'.xls';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── Form Fond ──────────────────────────────────────────────────
 
 function zelleOpenFondEdit(id){
   const f = _zelleFonds.find(function(x){ return x.id === id; });
