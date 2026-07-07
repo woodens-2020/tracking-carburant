@@ -142,6 +142,21 @@ def startup():
                 import logging; logging.getLogger("otp").info("Startup: %d OTP expirés supprimés", n)
         except Exception:
             pass  # Table pas encore créée (avant migration)
+        # Seed rôle Manager si absent
+        try:
+            _manager = _db.query(Role).filter_by(nom="Manager").first()
+            if not _manager:
+                _manager = Role(
+                    nom="Manager",
+                    description="Accès manager : dashboard bar, produits, stock, ventes, crédits, rentabilité, analyse, sessions caissière + hôtel (séjours, employés, rapport).",
+                    permissions={"finance":"aucun","bar":"complet","cuisine":"aucun","hotel":"complet","employes":"aucun","carburant":"aucun","admin":False},
+                    est_admin=False,
+                    est_systeme=True,
+                )
+                _db.add(_manager)
+                _db.commit()
+        except Exception:
+            pass
 
 
 # ---------- Authentification ----------

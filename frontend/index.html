@@ -11512,6 +11512,7 @@ const _ACCES_POSTE_LEGACY = {
                   'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
   'Pompiste': ['home','saisie'],
   'Caissier': ['home','pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite'],
+  'Manager':  ['home','gi-dashboard','pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-rentabilite','pos-analyse','pos-sessions-caisse','hotel-sejours','hotel-employes','hotel-rapport'],
 };
 
 // Whitelist stricte des pages accessibles aux comptes caissière (employe_id défini).
@@ -11520,8 +11521,17 @@ const _CAISSIER_ALLOWED = new Set([
   'home','pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite',
 ]);
 
+// Whitelist stricte pour les comptes Manager.
+const _MANAGER_ALLOWED = new Set([
+  'home',
+  'gi-dashboard','pos-caisse','pos-produits','pos-stock',
+  'pos-ventes','pos-credits','pos-rentabilite','pos-analyse','pos-sessions-caisse',
+  'hotel-sejours','hotel-employes','hotel-rapport',
+]);
+
 function _getAllowedPages(){
   if(!_appUser) return new Set();
+  if((_appUser.role_nom||_appUser.poste||'').toLowerCase() === 'manager') return _MANAGER_ALLOWED;
   const perms = _appUser.permissions;
   if(perms){
     if(perms.admin === true) return null; // null = accès complet
