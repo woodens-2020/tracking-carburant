@@ -7262,7 +7262,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <span style="font-size:.82rem;color:rgba(255,255,255,.4);">Taux du jour :</span>
             <span class="zelle-taux-val" style="font-size:1.05rem;font-weight:800;color:var(--accent);">—</span>
             <span style="font-size:.78rem;color:rgba(255,255,255,.35);">HTG/USD</span>
-            <button class="gi-btn-secondary" onclick="zelleOpenConfig()">&#9881; Configurer taux</button>
+            <button id="btn-zelle-config" class="gi-btn-secondary" onclick="zelleOpenConfig()">&#9881; Configurer taux</button>
           </div>
         </div>
 
@@ -7344,7 +7344,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
             <p class="gi-page-sub" style="margin-left:70px;">Toutes les transactions &mdash; montants en gourdes (HTG)</p>
           </div>
-          <button class="gi-btn-primary" onclick="zelleOpenForm()" style="padding:9px 18px;font-size:.9rem;white-space:nowrap;">
+          <button id="btn-zelle-new-tx" class="gi-btn-primary" onclick="zelleOpenForm()" style="padding:9px 18px;font-size:.9rem;white-space:nowrap;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nouvelle transaction
           </button>
         </div>
@@ -7426,7 +7426,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
             <p class="gi-page-sub" style="margin-left:70px;">Déclaration des fonds reçus &mdash; montants en gourdes (HTG)</p>
           </div>
-          <button class="gi-btn-primary" onclick="zelleOpenFondForm()" style="padding:9px 18px;font-size:.9rem;white-space:nowrap;">
+          <button id="btn-zelle-new-fond" class="gi-btn-primary" onclick="zelleOpenFondForm()" style="padding:9px 18px;font-size:.9rem;white-space:nowrap;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Déclarer un renflouement
           </button>
         </div>
@@ -7645,8 +7645,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div style="text-align:center;padding:40px;color:rgba(255,255,255,.4);">Chargement du rapport…</div>
         </div>
         <div class="gi-modal-foot" style="flex-shrink:0;flex-wrap:wrap;gap:8px;">
-          <button class="gi-btn-secondary" onclick="zellePreFondPDF()" style="gap:6px;">&#128438; Télécharger PDF</button>
-          <button class="gi-btn-secondary" onclick="zellePreFondXLS()" style="gap:6px;">&#128196; Télécharger Excel</button>
+          <button id="btn-zpf-pdf" class="gi-btn-secondary" onclick="zellePreFondPDF()" style="gap:6px;">&#128438; Télécharger PDF</button>
+          <button id="btn-zpf-xls" class="gi-btn-secondary" onclick="zellePreFondXLS()" style="gap:6px;">&#128196; Télécharger Excel</button>
           <div style="flex:1;min-width:10px;"></div>
           <button class="gi-btn-secondary" onclick="zelleClosePreFond()">Annuler</button>
           <button class="gi-btn-primary"   onclick="zellePreFondContinuer()">Confirmer et déclarer le renflouement &#8594;</button>
@@ -8723,11 +8723,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <input class="pos-input" type="date" id="hrpt-debut" style="width:140px" onchange="loadHotelRapport()">
             <input class="pos-input" type="date" id="hrpt-fin"   style="width:140px" onchange="loadHotelRapport()">
             <button class="pos-btn ghost" onclick="loadHotelRapport()">Actualiser</button>
-            <button class="pos-btn ghost" onclick="hotelRapportPdf()" title="Télécharger PDF" style="gap:5px">
+            <button id="btn-hotel-rapport-pdf" class="pos-btn ghost" onclick="hotelRapportPdf()" title="Télécharger PDF" style="gap:5px">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               PDF
             </button>
-            <button class="pos-btn ghost" onclick="hotelRapportXlsx()" title="Télécharger Excel" style="gap:5px;color:#34d399">
+            <button id="btn-hotel-rapport-xls" class="pos-btn ghost" onclick="hotelRapportXlsx()" title="Télécharger Excel" style="gap:5px;color:#34d399">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Excel
             </button>
@@ -11118,6 +11118,7 @@ async function loadJournal(){
 }
 
 function downloadJournalPdf(){
+  if(_isReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return; }
   const debut=document.getElementById('jf-debut').value;
   const fin  =document.getElementById('jf-fin').value;
   const prodId=document.getElementById('jf-prod').value;
@@ -11132,6 +11133,7 @@ function downloadJournalPdf(){
 }
 
 function downloadJournalXls(){
+  if(_isReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return; }
   const debut=document.getElementById('jf-debut').value;
   const fin  =document.getElementById('jf-fin').value;
   const prodId=document.getElementById('jf-prod').value;
@@ -11650,7 +11652,15 @@ function _applyNavAccess(){
   // Masquer les boutons d'écriture pour les utilisateurs en lecture seule
   const _ro = _isReadOnly();
   ['btn-pos-nouveau-produit','btn-pos-stock-reception','btn-pos-stock-ajust',
-   'btn-hotel-emp-ajouter','cat-add-row'].forEach(function(id){
+   'btn-hotel-emp-ajouter','cat-add-row',
+   // Zelle — écriture + téléchargements
+   'btn-zelle-config','btn-zelle-new-tx','btn-zelle-new-fond',
+   'btn-zpf-pdf','btn-zpf-xls',
+   // Hôtel rapport — téléchargements
+   'btn-hotel-rapport-pdf','btn-hotel-rapport-xls',
+   // Journal — téléchargements
+   'btn-journal-pdf','btn-journal-xls',
+  ].forEach(function(id){
     const el = document.getElementById(id);
     if(el) el.style.display = _ro ? 'none' : '';
   });
@@ -21930,8 +21940,8 @@ async function scCharger(){
       const btnValider = (s.statut !== 'VALIDE' && _isAdmin())
         ? `<button class="pos-btn teal" style="font-size:11px;padding:3px 10px" onclick="scValider(${s.id})">Accepter</button>`
         : '';
-      const btnPdf  = `<button class="pos-btn ghost" style="font-size:11px;padding:3px 10px" onclick="scExport(${s.id},'pdf')">PDF</button>`;
-      const btnXlsx = `<button class="pos-btn ghost" style="font-size:11px;padding:3px 10px" onclick="scExport(${s.id},'xlsx')">XLSX</button>`;
+      const btnPdf  = !_isReadOnly() ? `<button class="pos-btn ghost" style="font-size:11px;padding:3px 10px" onclick="scExport(${s.id},'pdf')">PDF</button>` : '';
+      const btnXlsx = !_isReadOnly() ? `<button class="pos-btn ghost" style="font-size:11px;padding:3px 10px" onclick="scExport(${s.id},'xlsx')">XLSX</button>` : '';
       const btnRes  = `<button class="pos-btn primary" style="font-size:11px;padding:3px 10px" onclick="scResume(${s.id})">Résumé</button>`;
 
       return `<tr>
@@ -24067,8 +24077,8 @@ async function _hotelRapportDownload(format){
     URL.revokeObjectURL(url);
   } catch(e){ posAlert(e.message || 'Erreur export.'); }
 }
-function hotelRapportPdf(){ _hotelRapportDownload('pdf'); }
-function hotelRapportXlsx(){ _hotelRapportDownload('xlsx'); }
+function hotelRapportPdf(){ if(_isReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return; } _hotelRapportDownload('pdf'); }
+function hotelRapportXlsx(){ if(_isReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return; } _hotelRapportDownload('xlsx'); }
 
 async function loadHotelRapport(){
   const today = new Date();
@@ -24307,13 +24317,15 @@ async function loadZellePaiements(){
       html += '<td style="text-align:center;">' + badge + '</td>';
       html += '<td style="color:var(--text-muted);font-size:.8rem;white-space:nowrap;">' + dateStr + '</td>';
       html += '<td style="text-align:center;padding-right:16px;"><div style="display:flex;gap:3px;justify-content:center;">';
-      if(t.statut === 'EN_ATTENTE'){
-        html += '<button class="gi-btn-icon success" title="Marquer remis" onclick="zelleSetStatut(' + t.id + ',\'REMIS\')">&#10003;</button>';
-        html += '<button class="gi-btn-icon danger"  title="Annuler"      onclick="zelleSetStatut(' + t.id + ',\'ANNULE\')">&#10005;</button>';
+      if(!_isReadOnly()){
+        if(t.statut === 'EN_ATTENTE'){
+          html += '<button class="gi-btn-icon success" title="Marquer remis" onclick="zelleSetStatut(' + t.id + ',\'REMIS\')">&#10003;</button>';
+          html += '<button class="gi-btn-icon danger"  title="Annuler"      onclick="zelleSetStatut(' + t.id + ',\'ANNULE\')">&#10005;</button>';
+        }
+        html += '<button class="gi-btn-icon" title="Imprimer reçu" onclick="zelleImprimerRecu(' + t.id + ')">' + _zpayPrinterSvg + '</button>';
+        html += '<button class="gi-btn-icon" title="Modifier"      onclick="zelleOpenEdit(' + t.id + ')">&#9998;</button>';
+        html += '<button class="gi-btn-icon danger" title="Supprimer" onclick="zelleDeleteTx(' + t.id + ')">&#128465;</button>';
       }
-      html += '<button class="gi-btn-icon" title="Imprimer reçu" onclick="zelleImprimerRecu(' + t.id + ')">' + _zpayPrinterSvg + '</button>';
-      html += '<button class="gi-btn-icon" title="Modifier"      onclick="zelleOpenEdit(' + t.id + ')">&#9998;</button>';
-      html += '<button class="gi-btn-icon danger" title="Supprimer" onclick="zelleDeleteTx(' + t.id + ')">&#128465;</button>';
       html += '</div></td></tr>';
     }
     tbody.innerHTML = html;
@@ -24394,10 +24406,12 @@ async function loadZelleFonds(){
       html += '<td style="color:var(--text-muted);font-size:.82rem;white-space:nowrap;">' + dateStr + '</td>';
       html += '<td style="color:var(--text-muted);font-size:.82rem;max-width:200px;">' + (f.notes || '<span style="opacity:.35">—</span>') + '</td>';
       html += '<td style="text-align:center;padding-right:16px;"><div style="display:flex;gap:3px;justify-content:center;">';
-      html += '<button class="gi-btn-icon" title="Imprimer fiche" onclick="zelleImprimerFiche(' + f.id + ')">'
-            + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>';
-      html += '<button class="gi-btn-icon" title="Modifier"       onclick="zelleOpenFondEdit(' + f.id + ')">&#9998;</button>';
-      html += '<button class="gi-btn-icon danger" title="Supprimer" onclick="zelleDeleteFond(' + f.id + ')">&#128465;</button>';
+      if(!_isReadOnly()){
+        html += '<button class="gi-btn-icon" title="Imprimer fiche" onclick="zelleImprimerFiche(' + f.id + ')">'
+              + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>';
+        html += '<button class="gi-btn-icon" title="Modifier"       onclick="zelleOpenFondEdit(' + f.id + ')">&#9998;</button>';
+        html += '<button class="gi-btn-icon danger" title="Supprimer" onclick="zelleDeleteFond(' + f.id + ')">&#128465;</button>';
+      }
       html += '</div></td></tr>';
     }
     // Ligne total
@@ -24419,6 +24433,7 @@ function zelleResetFondsFilters(){
 
 // ── Config ─────────────────────────────────────────────────────
 function zelleOpenConfig(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   document.getElementById('zcfg-taux').value = _zelleConfig.taux || 130;
   document.getElementById('modal-zelle-config').classList.add('open');
 }
@@ -24454,6 +24469,7 @@ function _zellePreviewRemettre(){
 }
 
 function zelleOpenForm(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   document.getElementById('zf-id').value          = '';
   document.getElementById('zf-modal-title').textContent = 'Nouvelle transaction';
   document.getElementById('zf-numero').value      = '';
@@ -24472,6 +24488,7 @@ function zelleOpenForm(){
 }
 
 function zelleOpenEdit(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   const t = _zelleData.find(function(x){ return x.id === id; });
   if(!t) return;
   document.getElementById('zf-id').value          = t.id;
@@ -24494,6 +24511,7 @@ function zelleCloseForm(){
 }
 
 async function zelleSaveForm(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   const id      = document.getElementById('zf-id').value;
   const nom     = document.getElementById('zf-nom').value.trim();
   const montant = parseFloat(document.getElementById('zf-montant').value);
@@ -24526,6 +24544,7 @@ async function zelleSaveForm(){
 }
 
 async function zelleSetStatut(id, statut){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   try{
     await apiFetch('PATCH','/zelle/transactions/'+id+'/statut', {statut});
     posAlert(statut === 'REMIS' ? 'Marqué comme remis' : 'Annulé','ok');
@@ -24535,6 +24554,7 @@ async function zelleSetStatut(id, statut){
 }
 
 async function zelleDeleteTx(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   if(!confirm('Supprimer cette transaction ?')) return;
   try{
     await apiFetch('DELETE','/zelle/transactions/'+id);
@@ -24548,6 +24568,7 @@ async function zelleDeleteTx(id){
 let _zellePreFondSnap = {bilan: null, txs: [], fonds: []};
 
 async function zelleOpenFondForm(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   // Afficher le rapport de synthèse avant d'ouvrir le formulaire de fond
   await zellePreRenflouement();
 }
@@ -24682,12 +24703,14 @@ function zelleClosePreFond(){
 }
 
 function zellePreFondContinuer(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   zelleClosePreFond();
   _zelleOpenFondFormDirect();
 }
 
 // ── Téléchargement PDF ─────────────────────────────────────────
 function zellePreFondPDF(){
+  if(_isReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return; }
   const {bilan, txs, fonds} = _zellePreFondSnap;
   const taux = (bilan && bilan.taux) || _zelleConfig.taux || 130;
   const now  = new Date();
@@ -24817,6 +24840,7 @@ function zellePreFondPDF(){
 
 // ── Téléchargement Excel (SpreadsheetML) ───────────────────────
 function zellePreFondXLS(){
+  if(_isReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return; }
   const {bilan, txs, fonds} = _zellePreFondSnap;
   const taux = (bilan && bilan.taux) || _zelleConfig.taux || 130;
   const now  = new Date();
@@ -24916,6 +24940,7 @@ function zellePreFondXLS(){
 // ── Form Fond ──────────────────────────────────────────────────
 
 function zelleOpenFondEdit(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   const f = _zelleFonds.find(function(x){ return x.id === id; });
   if(!f) return;
   document.getElementById('zff-id').value           = f.id;
@@ -24934,6 +24959,7 @@ function zelleCloseFondForm(){
 }
 
 async function zelleSaveFond(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   const id        = document.getElementById('zff-id').value;
   const montantHt = parseFloat(document.getElementById('zff-montant').value);
   const source    = document.getElementById('zff-source-sel').value;
@@ -24968,6 +24994,7 @@ async function zelleSaveFond(){
 }
 
 async function zelleDeleteFond(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
   if(!confirm('Supprimer ce fond déclaré ?')) return;
   try{
     await apiFetch('DELETE','/zelle/fonds/'+id);
@@ -24979,6 +25006,7 @@ async function zelleDeleteFond(id){
 
 // ── Impression Reçu POS (ticket thermique 80mm) ────────────────
 function zelleImprimerRecu(id){
+  if(_isReadOnly()){ _giAlert('Impression non autorisée.','err'); return; }
   const t = _zelleData.find(function(x){ return x.id === id; });
   if(!t){ posAlert('Transaction introuvable','err'); return; }
 
@@ -25099,6 +25127,7 @@ function zelleImprimerRecu(id){
 
 // ── Impression Fiche de Renflouement ───────────────────────────
 async function zelleImprimerFiche(id){
+  if(_isReadOnly()){ _giAlert('Impression non autorisée.','err'); return; }
   const f = _zelleFonds.find(function(x){ return x.id === id; });
   if(!f){ posAlert('Fond introuvable','err'); return; }
 
