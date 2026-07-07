@@ -23937,8 +23937,8 @@ let _zelleFonds  = [];
 let _zelleConfig = {taux: 130, balance_avant_usd: 0};
 let _zelleActiveTab = 'transactions';
 
-function _zelleUsd(v){ return '$ ' + Number(v).toLocaleString('fr-HT', {minimumFractionDigits:2, maximumFractionDigits:2}); }
-function _zelleHtg(v){ return Number(v).toLocaleString('fr-HT', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' HTG'; }
+function _zelleUsd(v){ const n=parseFloat(v)||0; return '$ ' + n.toLocaleString('fr-HT', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function _zelleHtg(v){ const n=parseFloat(v)||0; return n.toLocaleString('fr-HT', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' HTG'; }
 
 function _zSrc(src){
   if(!src) return '<span style="color:var(--text-muted);font-size:.82rem;">—</span>';
@@ -23957,11 +23957,11 @@ async function _zelleLoadBilan(){
     _zelleConfig.taux              = d.taux;
     _zelleConfig.balance_avant_usd = d.balance_avant_usd;
     function _set(id,val){ const e=document.getElementById(id); if(e) e.textContent=val; }
-    _set('zb-fonds-ht',   _zelleHtg(d.total_fonds_ht));
-    _set('zb-entree-ht',  _zelleHtg(d.entree_ht));
-    _set('zb-remis-ht',   _zelleHtg(d.total_remis_ht));
-    _set('zb-frais-ht',   _zelleHtg(d.total_frais_ht));
-    _set('zb-balance-ht', _zelleHtg(d.balance_ht));
+    _set('zb-fonds-ht',   _zelleHtg(d.total_fonds_ht   || 0));
+    _set('zb-entree-ht',  _zelleHtg(d.entree_ht        || 0));
+    _set('zb-remis-ht',   _zelleHtg(d.total_remis_ht   || 0));
+    _set('zb-frais-ht',   _zelleHtg(d.total_frais_ht   || 0));
+    _set('zb-balance-ht', _zelleHtg(d.balance_ht       || 0));
     // taux dans le hero
     document.querySelectorAll('.zelle-taux-val').forEach(function(el){ el.textContent = Number(d.taux).toFixed(2); });
     // taux dans le modal fond

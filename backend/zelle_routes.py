@@ -147,8 +147,9 @@ def get_bilan(db: Session = Depends(get_db)):
     remis = [t for t in txs if t.statut == "REMIS"]
     total_remis_usd = round(sum(float(t.montant_usd) - float(t.frais) for t in remis), 2)
     total_remis_ht  = round(total_remis_usd * taux, 2)
-    total_frais_usd = round(sum(float(t.frais) for t in remis), 2)
-    total_frais_ht  = round(sum(float(t.frais) * float(t.taux_applique) for t in remis), 2)
+    # Frais sur toutes les transactions actives (EN_ATTENTE + REMIS)
+    total_frais_usd = round(sum(float(t.frais) for t in txs), 2)
+    total_frais_ht  = round(sum(float(t.frais) * float(t.taux_applique) for t in txs), 2)
 
     # Fonds reçus
     fonds = db.query(ZelleFond).all()
