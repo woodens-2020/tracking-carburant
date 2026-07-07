@@ -142,19 +142,25 @@ def startup():
                 import logging; logging.getLogger("otp").info("Startup: %d OTP expirés supprimés", n)
         except Exception:
             pass  # Table pas encore créée (avant migration)
-        # Seed rôle Manager si absent
+        # Seed rôles système si absents
+        _roles_seed = [
+            dict(
+                nom="Manager",
+                description="Accès manager : produits, stock, ventes, crédits, rentabilité, analyse, sessions + hôtel (séjours, employés, rapport). Lecture seule.",
+                permissions={"finance":"aucun","bar":"complet","cuisine":"aucun","hotel":"complet","employes":"aucun","carburant":"aucun","admin":False},
+            ),
+            dict(
+                nom="Assistant Directeur",
+                description="Lecture de tous les rapports + accès complet au département Zelle.",
+                permissions={"finance":"complet","bar":"complet","cuisine":"complet","hotel":"complet","employes":"complet","carburant":"complet","admin":False},
+            ),
+        ]
         try:
-            _manager = _db.query(Role).filter_by(nom="Manager").first()
-            if not _manager:
-                _manager = Role(
-                    nom="Manager",
-                    description="Accès manager : dashboard bar, produits, stock, ventes, crédits, rentabilité, analyse, sessions caissière + hôtel (séjours, employés, rapport).",
-                    permissions={"finance":"aucun","bar":"complet","cuisine":"aucun","hotel":"complet","employes":"aucun","carburant":"aucun","admin":False},
-                    est_admin=False,
-                    est_systeme=True,
-                )
-                _db.add(_manager)
-                _db.commit()
+            for _rs in _roles_seed:
+                if not _db.query(Role).filter_by(nom=_rs["nom"]).first():
+                    _db.add(Role(nom=_rs["nom"], description=_rs["description"],
+                                 permissions=_rs["permissions"], est_admin=False, est_systeme=True))
+            _db.commit()
         except Exception:
             pass
 
