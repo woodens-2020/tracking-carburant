@@ -24126,7 +24126,8 @@ async function loadZelleFonds(){
       html += '<td style="color:var(--text-muted);font-size:.83rem;">' + dateStr + '</td>';
       html += '<td style="color:var(--text-muted);font-size:.83rem;">' + (f.notes || '—') + '</td>';
       html += '<td style="text-align:center;"><div style="display:flex;gap:4px;justify-content:center;">';
-      html += '<button class="gi-btn-icon" title="Modifier"    onclick="zelleOpenFondEdit(' + f.id + ')">&#9998;</button>';
+      html += '<button class="gi-btn-icon" title="Imprimer fiche" onclick="zelleImprimerFiche(' + f.id + ')">&#128438;</button>';
+      html += '<button class="gi-btn-icon" title="Modifier"       onclick="zelleOpenFondEdit(' + f.id + ')">&#9998;</button>';
       html += '<button class="gi-btn-icon danger" title="Supprimer" onclick="zelleDeleteFond(' + f.id + ')">&#128465;</button>';
       html += '</div></td></tr>';
     }
@@ -24321,16 +24322,22 @@ async function zelleSaveFond(){
     notes:          document.getElementById('zff-notes').value.trim() || null,
   };
   try{
+    let newFond = null;
     if(id){
       await apiFetch('PUT','/zelle/fonds/'+id, payload);
       posAlert('Fond modifié','ok');
     } else {
-      await apiFetch('POST','/zelle/fonds', payload);
+      newFond = await apiFetch('POST','/zelle/fonds', payload);
       posAlert('Fond déclaré — balance mise à jour','ok');
     }
     zelleCloseFondForm();
     if(currentPage === 'zelle-fonds') await loadZelleFonds();
     else await Promise.all([_zelleLoadBilan(), _zelleLoadRecent()]);
+    // Proposer l'impression après création
+    if(newFond && newFond.id){
+      _zelleFonds = await apiFetch('GET','/zelle/fonds');
+      zelleImprimerFiche(newFond.id);
+    }
   }catch(e){ posAlert(e.message||'Erreur','err'); }
 }
 
@@ -24342,6 +24349,190 @@ async function zelleDeleteFond(id){
     if(currentPage === 'zelle-fonds') await loadZelleFonds();
     else await Promise.all([_zelleLoadBilan(), _zelleLoadRecent()]);
   }catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+// ── Impression Fiche de Renflouement ───────────────────────────
+async function zelleImprimerFiche(id){
+  const f = _zelleFonds.find(function(x){ return x.id === id; });
+  if(!f){ posAlert('Fond introuvable','err'); return; }
+
+  let bilan = null;
+  try{ bilan = await apiFetch('GET','/zelle/bilan'); }catch(e){}
+
+  const taux   = _zelleConfig.taux || 130;
+  const rawDate = f.date_reception ? f.date_reception.substring(0,10) : new Date().toISOString().substring(0,10);
+  const parts   = rawDate.split('-');
+  const dateAff = parts[2]+'/'+parts[1]+'/'+parts[0];
+  const now     = new Date();
+  const genDate = String(now.getDate()).padStart(2,'0')+'/'+String(now.getMonth()+1).padStart(2,'0')+'/'+now.getFullYear()
+                + ' à '+String(now.getHours()).padStart(2,'0')+'h'+String(now.getMinutes()).padStart(2,'0');
+  const ref     = 'RENF-'+now.getFullYear()+'-'+String(id).padStart(4,'0');
+  const srcLabel= f.source || '—';
+  const montHtg = Number(f.montant_ht||0).toLocaleString('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const montUsd = Number(f.montant_usd||0).toLocaleString('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const tauxAff = Number(taux).toFixed(2);
+
+  const bilanRows = bilan ? (
+    '<tr><td class="lbl">Total fonds reçus</td><td class="val">'
+      +Number(bilan.total_fonds_ht||0).toLocaleString('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2})+' HTG</td></tr>'
+    +'<tr><td class="lbl">Total paiements effectués</td><td class="val">'
+      +Number(bilan.total_remis_ht||0).toLocaleString('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2})+' HTG</td></tr>'
+    +'<tr><td class="lbl" style="font-weight:700;color:#1a2f5e;">Balance disponible</td><td class="val" style="font-weight:800;font-size:1.1rem;color:#1a2f5e;">'
+      +Number(bilan.balance_ht||0).toLocaleString('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2})+' HTG</td></tr>'
+  ) : '<tr><td colspan="2" style="color:#888;font-style:italic;">Données de balance non disponibles</td></tr>';
+
+  const html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
+    +'<title>Fiche de Renflouement '+ref+'</title>'
+    +'<style>'
+    +'*{box-sizing:border-box;margin:0;padding:0;}'
+    +'body{font-family:Georgia,serif;background:#fff;color:#1a1a2e;}'
+    +'@page{size:A4 portrait;margin:18mm 16mm;}'
+    +'.page{max-width:740px;margin:0 auto;padding:24px;}'
+
+    /* ── En-tête ── */
+    +'.entete{display:flex;align-items:center;justify-content:space-between;border-bottom:4px solid #1a2f5e;padding-bottom:16px;margin-bottom:0;}'
+    +'.entete-logo{display:flex;flex-direction:column;align-items:center;justify-content:center;width:90px;height:90px;background:#1a2f5e;border-radius:8px;flex-shrink:0;}'
+    +'.logo-star{font-size:2.2rem;line-height:1;}'
+    +'.logo-sub{font-size:.55rem;letter-spacing:.12em;color:#c9a020;text-transform:uppercase;margin-top:2px;}'
+    +'.entete-info{flex:1;text-align:center;padding:0 16px;}'
+    +'.cie-nom{font-size:1.45rem;font-weight:900;color:#1a2f5e;letter-spacing:.03em;text-transform:uppercase;line-height:1.1;}'
+    +'.cie-sous{font-size:.78rem;color:#c9a020;font-weight:700;letter-spacing:.15em;text-transform:uppercase;margin-top:3px;}'
+    +'.cie-dept{font-size:.7rem;color:#555;margin-top:4px;letter-spacing:.05em;}'
+    +'.entete-ref{text-align:right;font-size:.75rem;color:#444;min-width:120px;}'
+    +'.entete-ref strong{display:block;font-size:.9rem;color:#1a2f5e;}'
+
+    /* ── Titre fiche ── */
+    +'.titre-fiche{background:#1a2f5e;color:#fff;text-align:center;padding:10px 20px;font-size:1.05rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:20px;}'
+    +'.titre-fiche span{color:#c9a020;font-size:.78rem;font-weight:400;display:block;letter-spacing:.05em;margin-top:3px;}'
+
+    /* ── Sections ── */
+    +'.section{margin-bottom:18px;}'
+    +'.section-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#c9a020;border-bottom:1px solid #c9a020;padding-bottom:4px;margin-bottom:12px;}'
+    +'table.info{width:100%;border-collapse:collapse;}'
+    +'table.info td{padding:7px 10px;font-size:.88rem;border-bottom:1px solid #eee;}'
+    +'table.info td.lbl{color:#555;width:48%;font-style:italic;}'
+    +'table.info td.val{font-weight:600;color:#1a1a2e;}'
+    +'.montant-hero{background:linear-gradient(135deg,#1a2f5e 0%,#2a4a8e 100%);border-radius:8px;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;margin:16px 0;}'
+    +'.mh-label{font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.6);margin-bottom:4px;}'
+    +'.mh-val{font-size:1.8rem;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;}'
+    +'.mh-sub{font-size:.82rem;color:rgba(255,255,255,.5);}'
+    +'.mh-right{text-align:right;}'
+    +'.mh-usd{font-size:1rem;font-weight:700;color:#c9a020;}'
+    +'.badge-source{display:inline-block;padding:3px 12px;border-radius:20px;font-size:.78rem;font-weight:700;letter-spacing:.05em;}'
+    +'.src-pdg{background:rgba(74,222,128,.15);color:#166534;border:1px solid #166534;}'
+    +'.src-gaz{background:rgba(59,130,246,.15);color:#1e3a8a;border:1px solid #1e3a8a;}'
+    +'.src-autre{background:rgba(139,92,246,.15);color:#4c1d95;border:1px solid #4c1d95;}'
+
+    /* ── Signatures ── */
+    +'.signatures{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:24px;}'
+    +'.sig-block{border-top:1px solid #333;padding-top:8px;}'
+    +'.sig-label{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:#555;margin-bottom:32px;}'
+    +'.sig-name{font-size:.72rem;color:#888;border-top:1px dashed #ccc;padding-top:4px;margin-top:4px;}'
+    +'.sig-date{font-size:.65rem;color:#aaa;}'
+
+    /* ── Pied de page ── */
+    +'.footer{margin-top:28px;border-top:2px solid #1a2f5e;padding-top:8px;display:flex;justify-content:space-between;align-items:center;}'
+    +'.footer-left{font-size:.65rem;color:#888;}'
+    +'.footer-center{font-size:.6rem;color:#c9a020;font-weight:700;letter-spacing:.08em;text-align:center;}'
+    +'.footer-right{font-size:.62rem;color:#aaa;text-align:right;}'
+    +'@media print{'
+    +'  body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+    +'  .no-print{display:none;}'
+    +'}'
+    +'</style></head><body>'
+
+    +'<div class="page">'
+
+    /* En-tête */
+    +'<div class="entete">'
+    +'  <div class="entete-logo">'
+    +'    <div class="logo-star">&#11088;</div>'
+    +'    <div class="logo-sub">Bon Prix</div>'
+    +'  </div>'
+    +'  <div class="entete-info">'
+    +'    <div class="cie-nom">Complexe Commercial de Pillatre</div>'
+    +'    <div class="cie-sous">Bon Prix</div>'
+    +'    <div class="cie-dept">Département Zelle &mdash; Grande Caisse</div>'
+    +'  </div>'
+    +'  <div class="entete-ref">'
+    +'    <strong>'+ref+'</strong>'
+    +'    Date : '+genDate
+    +'  </div>'
+    +'</div>'
+
+    /* Titre */
+    +'<div class="titre-fiche">Fiche de Renflouement de la Grande Caisse'
+    +'  <span>Document officiel &mdash; conserver dans le dossier comptable</span>'
+    +'</div>'
+
+    /* Montant hero */
+    +'<div class="montant-hero">'
+    +'  <div>'
+    +'    <div class="mh-label">Montant reçu</div>'
+    +'    <div class="mh-val">'+montHtg+' <span style="font-size:1rem;color:rgba(255,255,255,.6);">HTG</span></div>'
+    +'    <div class="mh-sub">Gourdes haïtiennes</div>'
+    +'  </div>'
+    +'  <div class="mh-right">'
+    +'    <div class="mh-label">Équivalent USD</div>'
+    +'    <div class="mh-usd">$ '+montUsd+'</div>'
+    +'    <div class="mh-sub">au taux de '+tauxAff+' HTG/USD</div>'
+    +'  </div>'
+    +'</div>'
+
+    /* Informations */
+    +'<div class="section">'
+    +'  <div class="section-title">Informations du renflouement</div>'
+    +'  <table class="info">'
+    +'    <tr><td class="lbl">Numéro de référence</td><td class="val">'+ref+'</td></tr>'
+    +'    <tr><td class="lbl">Date de réception</td><td class="val">'+dateAff+'</td></tr>'
+    +'    <tr><td class="lbl">Source de fonds</td><td class="val">'
+    +'      <span class="badge-source '+(srcLabel==='PDG'?'src-pdg':srcLabel==='Gaz'?'src-gaz':'src-autre')+'">'+srcLabel+'</span>'
+    +'    </td></tr>'
+    +'    <tr><td class="lbl">Taux appliqué</td><td class="val">'+tauxAff+' HTG / USD</td></tr>'
+    +(f.notes ? '<tr><td class="lbl">Notes / Observations</td><td class="val">'+f.notes+'</td></tr>' : '')
+    +'  </table>'
+    +'</div>'
+
+    /* État de la balance */
+    +'<div class="section">'
+    +'  <div class="section-title">État actuel de la balance</div>'
+    +'  <table class="info">'+bilanRows+'</table>'
+    +'</div>'
+
+    /* Signatures */
+    +'<div class="signatures">'
+    +'  <div class="sig-block">'
+    +'    <div class="sig-label">Remis par</div>'
+    +'    <div class="sig-name">Nom &amp; Signature : ____________________</div>'
+    +'    <div class="sig-date">Date : _______________</div>'
+    +'  </div>'
+    +'  <div class="sig-block">'
+    +'    <div class="sig-label">Approuvé par</div>'
+    +'    <div class="sig-name">Nom &amp; Signature : ____________________</div>'
+    +'    <div class="sig-date">Date : _______________</div>'
+    +'  </div>'
+    +'  <div class="sig-block">'
+    +'    <div class="sig-label">Reçu par (Caissier)</div>'
+    +'    <div class="sig-name">Nom &amp; Signature : ____________________</div>'
+    +'    <div class="sig-date">Date : _______________</div>'
+    +'  </div>'
+    +'</div>'
+
+    /* Pied de page */
+    +'<div class="footer">'
+    +'  <div class="footer-left">Généré le '+genDate+'</div>'
+    +'  <div class="footer-center">Complexe Commercial de Pillatre &mdash; BON PRIX</div>'
+    +'  <div class="footer-right">Réf. '+ref+'</div>'
+    +'</div>'
+
+    +'</div>'
+    +'<script>window.onload=function(){ window.print(); };<\/script>'
+    +'</body></html>';
+
+  const w = window.open('','_blank','width=860,height=1100,scrollbars=yes');
+  if(!w){ posAlert('Autorisez les pop-ups pour imprimer la fiche','err'); return; }
+  w.document.write(html);
+  w.document.close();
 }
 
 // Live preview
