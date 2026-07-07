@@ -8452,7 +8452,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="pos-header-sub">Configuration et état des chambres</div>
           </div>
           <div class="pos-header-actions">
-            <button class="pos-btn teal" onclick="hotelChambreModal()">+ Ajouter chambre</button>
+            <button id="btn-hotel-chambre-new" class="pos-btn teal" onclick="hotelChambreModal()">+ Ajouter chambre</button>
           </div>
         </div>
         <!-- KPIs -->
@@ -8579,7 +8579,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
           </div>
           <div style="padding:0 14px 14px;display:flex;justify-content:flex-end">
-            <button class="pos-btn teal" style="font-size:15px;padding:10px 32px" onclick="hrecEnregistrer()">Enregistrer le client</button>
+            <button id="btn-hrec-enregistrer" class="pos-btn teal" style="font-size:15px;padding:10px 32px" onclick="hrecEnregistrer()">Enregistrer le client</button>
           </div>
         </div>
       </div>
@@ -11652,7 +11652,7 @@ function _applyNavAccess(){
   // Masquer les boutons d'écriture pour les utilisateurs en lecture seule
   const _ro = _isReadOnly();
   ['btn-pos-nouveau-produit','btn-pos-stock-reception','btn-pos-stock-ajust',
-   'btn-hotel-emp-ajouter','cat-add-row',
+   'btn-hotel-emp-ajouter','btn-hotel-chambre-new','btn-hrec-enregistrer','cat-add-row',
    // Zelle — écriture + téléchargements
    'btn-zelle-config','btn-zelle-new-tx','btn-zelle-new-fond',
    'btn-zpf-pdf','btn-zpf-xls',
@@ -23609,15 +23609,16 @@ function _hotelChambreCard(c){
         ${c.description?`<div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:4px;font-style:italic">${c.description}</div>`:''}
       </div>
       <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
-        <button class="pos-btn ghost" style="flex:1;font-size:11px;padding:5px 8px" onclick="hotelChambreModal(${c.id})">Modifier</button>
-        ${c.statut==='DISPONIBLE'?`<button class="pos-btn ghost" style="font-size:11px;padding:5px 8px;color:#fbbf24;border-color:rgba(251,191,36,.3)" onclick="hotelSetStatut(${c.id},'MAINTENANCE')" title="Mettre en maintenance">⚙</button>`:''}
-        ${c.statut==='MAINTENANCE'?`<button class="pos-btn ghost" style="font-size:11px;padding:5px 8px;color:#34d399;border-color:rgba(52,211,153,.3)" onclick="hotelSetStatut(${c.id},'DISPONIBLE')" title="Remettre disponible">✓</button>`:''}
+        ${!_isReadOnly()?`<button class="pos-btn ghost" style="flex:1;font-size:11px;padding:5px 8px" onclick="hotelChambreModal(${c.id})">Modifier</button>`:''}
+        ${!_isReadOnly()&&c.statut==='DISPONIBLE'?`<button class="pos-btn ghost" style="font-size:11px;padding:5px 8px;color:#fbbf24;border-color:rgba(251,191,36,.3)" onclick="hotelSetStatut(${c.id},'MAINTENANCE')" title="Mettre en maintenance">⚙</button>`:''}
+        ${!_isReadOnly()&&c.statut==='MAINTENANCE'?`<button class="pos-btn ghost" style="font-size:11px;padding:5px 8px;color:#34d399;border-color:rgba(52,211,153,.3)" onclick="hotelSetStatut(${c.id},'DISPONIBLE')" title="Remettre disponible">✓</button>`:''}
       </div>
     </div>
   </div>`;
 }
 
 function hotelChambreModal(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   _hcmEditId = id || null;
   const el = n => document.getElementById(n);
   el('hcm-title').textContent = id ? 'Modifier la chambre' : 'Nouvelle chambre';
@@ -23641,6 +23642,7 @@ function hotelChambreModal(id){
 }
 
 async function hotelChambreSauver(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const el = n => document.getElementById(n);
   const num = el('hcm-numero').value.trim();
   const pn  = parseFloat(el('hcm-prix-nuit').value||0);
@@ -23665,6 +23667,7 @@ async function hotelChambreSauver(){
 }
 
 async function hotelSetStatut(id, statut){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   try {
     await apiFetch('PATCH', `/hotel/chambres/${id}/statut?statut=${statut}`);
     await loadHotelChambres();
@@ -23751,6 +23754,7 @@ function hrecCalcSolde(){
 }
 
 async function hrecEnregistrer(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const g = id => document.getElementById(id)?.value?.trim();
   const clientNom = g('hrec-client-nom');
   const chambreId = document.getElementById('hrec-chambre')?.value;
@@ -23903,6 +23907,7 @@ function hotelPaiementModal(resId){
 }
 
 async function hotelPaiementSauver(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const resId  = parseInt(document.getElementById('hotel-paie-res-id').value);
   const montant = parseFloat(document.getElementById('hotel-paie-montant').value||0);
   const mode   = document.getElementById('hotel-paie-mode').value;
@@ -23925,6 +23930,7 @@ async function hotelTerminer(id){
 }
 
 async function hotelAnnuler(id, nom){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   if(!confirm(`Annuler le séjour de ${nom} ? La chambre sera libérée.`)) return;
   try {
     await apiFetch('POST',`/hotel/reservations/${id}/annuler`);
@@ -24021,6 +24027,7 @@ function hotelEmpModal(id){
 }
 
 async function hotelEmpSauver(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const el = n => document.getElementById(n)?.value?.trim();
   const prenom = el('hemp-prenom'), nom = el('hemp-nom');
   if(!prenom||!nom){ posAlert('Prénom et nom requis.','warn'); return; }
