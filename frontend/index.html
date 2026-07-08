@@ -20374,7 +20374,8 @@ async function posVentesCharger(){
         <td>${badge}</td>
         <td style="white-space:nowrap">
           <button class="pos-btn ghost" style="font-size:10px;padding:3px 7px" onclick="posVenteDetail(${v.id})">Détail</button>
-          ${v.statut!=='ANNULEE'&&_isAdmin()?`<button class="pos-btn danger" style="font-size:10px;padding:3px 7px" onclick="posAnnulerVenteConfirm(${v.id})">Annuler</button>`:''}
+          ${v.statut==='CREDIT_EN_COURS'&&!_isReadOnly()?`<button class="pos-btn teal" style="font-size:10px;padding:3px 7px;margin-left:3px" onclick="posPayerCredit(${v.id},${v.montant_restant||v.montant_total},'${(v.client_nom||'').replace(/'/g,"\\'")}')" title="Encaisser le montant dû et marquer payée">Payer</button>`:''}
+          ${v.statut!=='ANNULEE'&&_isAdmin()?`<button class="pos-btn danger" style="font-size:10px;padding:3px 7px;margin-left:3px" onclick="posAnnulerVenteConfirm(${v.id})">Annuler</button>`:''}
         </td>
       </tr>`;
     }).join('');
@@ -20430,6 +20431,19 @@ async function posAnnulerVente(){
     document.getElementById('pos-vente-detail-bg').classList.remove('open');
     await posVentesCharger();
     posAlert('Vente annulée — stock restitué.','ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function posPayerCredit(venteId, montantRestant, clientNom){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
+  const montant = parseFloat(montantRestant)||0;
+  const client  = clientNom ? ` — ${clientNom}` : '';
+  const msg = `Confirmer la réception de <strong>${posGx(montant)}</strong>${client} et marquer cette vente comme payée ?`;
+  if(!await showConfirm(msg, {title:'Encaisser le crédit', type:'info', okLabel:`Marquer payée`, cancelLabel:'Annuler'})) return;
+  try {
+    await apiFetch('PUT',`/pos/ventes/${venteId}/payer`);
+    await posVentesCharger();
+    posAlert(`Vente soldée — ${posGx(montant)} encaissés.`, 'ok');
   } catch(e){ posAlert(e.message||'Erreur.'); }
 }
 

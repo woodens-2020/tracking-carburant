@@ -1595,6 +1595,36 @@ def annuler_vente_route(vente_id: int, request: Request, db: Session = Depends(g
     return {"ok": True, "statut": vente.statut}
 
 
+@router.put("/ventes/{vente_id}/payer")
+def payer_vente_credit(vente_id: int, request: Request, db: Session = Depends(get_db)):
+    """Marquer une vente CREDIT_EN_COURS comme entièrement payée."""
+    vente = db.query(BarVente).filter_by(id=vente_id).first()
+    if not vente:
+        raise HTTPException(404, "Vente introuvable")
+    if vente.statut != "CREDIT_EN_COURS":
+        raise HTTPException(422, f"La vente est déjà '{vente.statut}' — seules les ventes CREDIT_EN_COURS peuvent être soldées.")
+
+    montant_encaisse = Decimal(str(vente.montant_restant))
+    vente.montant_paye    = vente.montant_total
+    vente.montant_restant = Decimal("0")
+    vente.statut          = "PAYEE"
+
+    # Solder aussi le BarCredit associé si existant
+    credit = db.query(BarCredit).filter_by(vente_id=vente_id).first()
+    if credit and credit.statut != "SOLDE":
+        credit.montant_rembourse = credit.montant_du
+        credit.solde             = Decimal("0")
+        credit.statut            = "SOLDE"
+
+    db.commit()
+    return {
+        "ok":              True,
+        "statut":          vente.statut,
+        "montant_encaisse": float(montant_encaisse),
+        "montant_total":   float(vente.montant_total),
+    }
+
+
 # ══════════════════════════════════════════════════════════════════
 # COMMANDES
 # ══════════════════════════════════════════════════════════════════
