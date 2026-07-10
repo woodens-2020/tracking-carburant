@@ -12,6 +12,7 @@ log = logging.getLogger("main")
 from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -4603,6 +4604,13 @@ async def get_statistiques(
         "serie":               serie,
         "alertes":             alertes,
     }
+
+
+# ---------- Librairies front hébergées localement (chart.js, html2canvas) ----------
+# Servies en self-host pour respecter le CSP strict (script-src 'self') sans
+# dépendre d'un CDN externe.
+_VENDOR_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "vendor")
+app.mount("/vendor", StaticFiles(directory=_VENDOR_DIR), name="vendor")
 
 
 # ---------- Frontend single-file ----------
