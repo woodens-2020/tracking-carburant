@@ -52,3 +52,6 @@ backend/test_*.db
 *_backup*.dump
 # Les scripts d'infrastructure backup sont inclus dans git
 !scripts/*.ps1
+
+# ── Environnement de test local ──────────────────────────────────
+scripts/.test-local.pid.json

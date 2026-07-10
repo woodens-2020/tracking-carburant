@@ -11,9 +11,10 @@ from pathlib import Path
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 # Chargement du fichier .env si python-dotenv est disponible
+# ENV_FILE permet de pointer vers un autre fichier (ex: .env.test) sans toucher au .env de prod
 try:
     from dotenv import load_dotenv
-    load_dotenv(Path(__file__).parent / ".env", override=True)
+    load_dotenv(Path(__file__).parent / os.environ.get("ENV_FILE", ".env"), override=True)
 except ImportError:
     pass
 
