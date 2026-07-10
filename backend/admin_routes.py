@@ -28,7 +28,7 @@ _USERNAME_RE = re.compile(r"^[a-zA-Z0-9._\-]{3,60}$")
 _CODE_RE     = re.compile(r"^\d{9}$")
 
 DOMAINES = ["finance", "bar", "cuisine", "hotel", "employes", "carburant"]
-NIVEAUX  = ["aucun", "lecture", "complet"]
+NIVEAUX  = ["aucun", "lecture", "operationnel", "complet"]
 
 _PERMS_VIDES: dict = {d: "aucun" for d in DOMAINES}
 _PERMS_VIDES["admin"] = False

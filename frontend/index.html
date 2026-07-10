@@ -11683,6 +11683,8 @@ const _AREA_PAGES = {
   },
   hotel: {
     complet: ['hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
+    // Accès opérationnel : réception + séjours + historique + rapport, sans gestion des chambres ni du personnel hôtel
+    operationnel: ['hotel-reception','hotel-sejours','hotel-historique','hotel-rapport'],
     lecture: ['hotel-historique','hotel-rapport'],
   },
   employes: {
@@ -11760,6 +11762,7 @@ function _getAllowedPages(){
     for(const [area, levels] of Object.entries(_AREA_PAGES)){
       const level = perms[area] || 'aucun';
       if(level === 'complet') levels.complet.forEach(p => allowed.add(p));
+      else if(level === 'operationnel' && levels.operationnel) levels.operationnel.forEach(p => allowed.add(p));
       else if(level === 'lecture') levels.lecture.forEach(p => allowed.add(p));
     }
     return allowed;
