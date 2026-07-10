@@ -11703,11 +11703,11 @@ const _CAISSIER_ALLOWED = new Set([
   'pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite',
 ]);
 
-// Whitelist stricte pour les comptes Manager.
+// Whitelist stricte pour les comptes Manager — accès complet Bar/Restaurant + Hôtel.
 const _MANAGER_ALLOWED = new Set([
-  'pos-produits','pos-stock',
-  'pos-ventes','pos-credits','pos-rentabilite','pos-analyse','pos-sessions-caisse',
-  'hotel-sejours','hotel-employes','hotel-rapport',
+  'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes',
+  'pos-stock','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse',
+  'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport',
 ]);
 
 // Assistant Directeur — tous les rapports en lecture + Zelle complet
@@ -11742,7 +11742,8 @@ const _ACCES_POSTE_LEGACY = {
 function _isReadOnly(){
   if(!_appUser) return true;
   const rn = (_appUser.role_nom||_appUser.poste||'').toLowerCase();
-  return rn === 'manager' || rn.startsWith('caissier') || !!_appUser.employe_id
+  // Manager a désormais l'accès complet (lecture + écriture) sur Bar et Hôtel
+  return rn.startsWith('caissier') || !!_appUser.employe_id
       || rn === 'assistant directeur';
 }
 function _isZelleReadOnly(){
