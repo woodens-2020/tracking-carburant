@@ -1143,6 +1143,7 @@ async function _sendLoginMeta(){
 
       // Connexion directe (sans OTP) — capturer photo + localisation
       _capturePhoto();
+      sessionStorage.setItem('konekta_just_logged_in','1');
       _sendLoginMeta().finally(function(){ window.location.href='/'; });
     }catch(err){
       showErr(err.message);
@@ -1341,6 +1342,7 @@ async function _sendLoginMeta(){
       if(d.api_key) sessionStorage.setItem('api_key', d.api_key);
       btnVerify.classList.add('success');
       btnVerify.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Connecté !';
+      sessionStorage.setItem('konekta_just_logged_in','1');
       _sendLoginMeta().finally(function(){ window.location.href='/'; });
     }catch(err){
       setOtpErr('Erreur réseau — réessayez');
@@ -1505,6 +1507,7 @@ async function _sendLoginMeta(){
       if(d.api_key) sessionStorage.setItem('api_key',d.api_key);
       btnV.classList.add('success');
       btnV.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Connecté !';
+      sessionStorage.setItem('konekta_just_logged_in','1');
       _sendLoginMeta().finally(function(){ window.location.href='/'; });
     }catch(err){
       if(window._setAdminErr) window._setAdminErr('Erreur réseau — réessayez');

@@ -1060,7 +1060,7 @@ def oauth_callback(
     ua = request.headers.get("user-agent", "")
     session_token = create_session(db, user.id, ip_address=ip, user_agent=ua)
     log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
-    redir = RedirectResponse(url="/", status_code=302)
+    redir = RedirectResponse(url="/?just_logged_in=1", status_code=302)
     redir.set_cookie(
         SESSION_COOKIE, session_token,
         httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
