@@ -8824,6 +8824,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
           <div><div class="pos-header-title">Rapport Hôtel</div><div class="pos-header-sub">Statistiques, moments et nuits</div></div>
           <div class="pos-header-actions" style="gap:8px">
+            <select class="pos-input" id="hrpt-type" style="width:120px" onchange="loadHotelRapport()">
+              <option value="">Tous les séjours</option>
+              <option value="NUIT">Nuits</option>
+              <option value="MOMENT">Moments</option>
+            </select>
             <input class="pos-input" type="date" id="hrpt-debut" style="width:140px" onchange="loadHotelRapport()">
             <input class="pos-input" type="date" id="hrpt-fin"   style="width:140px" onchange="loadHotelRapport()">
             <button class="pos-btn ghost" onclick="loadHotelRapport()">Actualiser</button>
@@ -24297,9 +24302,10 @@ async function hotelEmpDesactiver(id, nom){
 async function _hotelRapportDownload(format){
   const d = document.getElementById('hrpt-debut')?.value || '';
   const f = document.getElementById('hrpt-fin')?.value   || '';
+  const t = document.getElementById('hrpt-type')?.value  || '';
   try {
     const resp = await fetch(
-      `/api/hotel/rapport/${format}?date_debut=${encodeURIComponent(d)}&date_fin=${encodeURIComponent(f)}`,
+      `/api/hotel/rapport/${format}?date_debut=${encodeURIComponent(d)}&date_fin=${encodeURIComponent(f)}${t ? '&type_sejour=' + encodeURIComponent(t) : ''}`,
       { credentials: 'include' }
     );
     if(!resp.ok){
@@ -24331,9 +24337,10 @@ async function loadHotelRapport(){
   if(fEl && !fEl.value) fEl.value = todayStr;
   const debut = dEl?.value || firstDay;
   const fin   = fEl?.value || todayStr;
+  const type  = document.getElementById('hrpt-type')?.value || '';
 
   try {
-    const r = await apiFetch('GET', `/hotel/rapport?date_debut=${debut}&date_fin=${fin}`);
+    const r = await apiFetch('GET', `/hotel/rapport?date_debut=${debut}&date_fin=${fin}${type ? '&type_sejour=' + type : ''}`);
     const g = id => document.getElementById(id);
 
     // Aujourd'hui

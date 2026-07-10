@@ -505,9 +505,19 @@ def stats_hotel(db: Session = Depends(get_db)):
     }
 
 
-def _get_rapport_data(db: Session, date_debut: Optional[str], date_fin: Optional[str]) -> dict:
+def _get_rapport_data(
+    db: Session,
+    date_debut: Optional[str],
+    date_fin: Optional[str],
+    type_sejour: Optional[str] = None,
+) -> dict:
     from datetime import date as date_type
     from collections import defaultdict
+
+    # Filtre optionnel par type de séjour (NUIT | MOMENT) — aucune valeur = tous
+    type_sejour = type_sejour.strip().upper() if type_sejour else None
+    if type_sejour not in ("NUIT", "MOMENT"):
+        type_sejour = None
 
     today = datetime.now(timezone.utc).date()
     try:
@@ -522,12 +532,13 @@ def _get_rapport_data(db: Session, date_debut: Optional[str], date_fin: Optional
     dt_debut = datetime(d_debut.year, d_debut.month, d_debut.day, tzinfo=timezone.utc)
     dt_fin   = datetime(d_fin.year,   d_fin.month,   d_fin.day, 23, 59, 59, tzinfo=timezone.utc)
 
-    reservations = (
-        db.query(HotelReservation)
-        .filter(HotelReservation.date_arrivee >= dt_debut,
-                HotelReservation.date_arrivee <= dt_fin)
-        .all()
+    _res_query = db.query(HotelReservation).filter(
+        HotelReservation.date_arrivee >= dt_debut,
+        HotelReservation.date_arrivee <= dt_fin,
     )
+    if type_sejour:
+        _res_query = _res_query.filter(HotelReservation.type_sejour == type_sejour)
+    reservations = _res_query.all()
 
     moments = [r for r in reservations if r.type_sejour == "MOMENT"]
     nuits   = [r for r in reservations if r.type_sejour == "NUIT"]
@@ -545,18 +556,21 @@ def _get_rapport_data(db: Session, date_debut: Optional[str], date_fin: Optional
 
     dt_today     = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
     dt_today_end = datetime(today.year, today.month, today.day, 23, 59, 59, tzinfo=timezone.utc)
-    today_res = (
-        db.query(HotelReservation)
-        .filter(HotelReservation.date_arrivee >= dt_today,
-                HotelReservation.date_arrivee <= dt_today_end)
-        .all()
+    _today_query = db.query(HotelReservation).filter(
+        HotelReservation.date_arrivee >= dt_today,
+        HotelReservation.date_arrivee <= dt_today_end,
     )
+    if type_sejour:
+        _today_query = _today_query.filter(HotelReservation.type_sejour == type_sejour)
+    today_res = _today_query.all()
 
-    actifs_nb    = db.query(HotelReservation).filter_by(statut="EN_COURS").count()
-    actifs_solde = float(
-        db.query(func.sum(HotelReservation.solde))
-          .filter_by(statut="EN_COURS").scalar() or 0
-    )
+    _actifs_query = db.query(HotelReservation).filter_by(statut="EN_COURS")
+    _actifs_solde_query = db.query(func.sum(HotelReservation.solde)).filter_by(statut="EN_COURS")
+    if type_sejour:
+        _actifs_query       = _actifs_query.filter(HotelReservation.type_sejour == type_sejour)
+        _actifs_solde_query = _actifs_solde_query.filter(HotelReservation.type_sejour == type_sejour)
+    actifs_nb    = _actifs_query.count()
+    actifs_solde = float(_actifs_solde_query.scalar() or 0)
 
     return {
         "periode": {"debut": str(d_debut), "fin": str(d_fin)},
@@ -589,17 +603,19 @@ def _get_rapport_data(db: Session, date_debut: Optional[str], date_fin: Optional
 
 @router.get("/rapport")
 def rapport_hotel(
-    date_debut: Optional[str] = Query(default=None),
-    date_fin:   Optional[str] = Query(default=None),
+    date_debut:  Optional[str] = Query(default=None),
+    date_fin:    Optional[str] = Query(default=None),
+    type_sejour: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    return _get_rapport_data(db, date_debut, date_fin)
+    return _get_rapport_data(db, date_debut, date_fin, type_sejour)
 
 
 @router.get("/rapport/pdf")
 def rapport_hotel_pdf(
-    date_debut: Optional[str] = Query(default=None),
-    date_fin:   Optional[str] = Query(default=None),
+    date_debut:  Optional[str] = Query(default=None),
+    date_fin:    Optional[str] = Query(default=None),
+    type_sejour: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
 ):
     import io
@@ -610,7 +626,7 @@ def rapport_hotel_pdf(
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.enums import TA_CENTER
 
-    data = _get_rapport_data(db, date_debut, date_fin)
+    data = _get_rapport_data(db, date_debut, date_fin, type_sejour)
     buf  = io.BytesIO()
 
     doc  = SimpleDocTemplate(
@@ -647,8 +663,10 @@ def rapport_hotel_pdf(
         return t
 
     elems = []
+    _ts_norm = type_sejour.strip().upper() if type_sejour else None
+    _filtre_label = {"NUIT": " — Nuits uniquement", "MOMENT": " — Moments uniquement"}.get(_ts_norm, "")
     elems.append(Paragraph("Rapport Hôtel", s_title))
-    elems.append(Paragraph(f"Période : {data['periode']['debut']}  →  {data['periode']['fin']}", s_sub))
+    elems.append(Paragraph(f"Période : {data['periode']['debut']}  →  {data['periode']['fin']}{_filtre_label}", s_sub))
 
     auj = data["aujourd_hui"]
     elems.append(Paragraph("Aujourd'hui", s_section))
@@ -704,8 +722,9 @@ def rapport_hotel_pdf(
 
 @router.get("/rapport/xlsx")
 def rapport_hotel_xlsx(
-    date_debut: Optional[str] = Query(default=None),
-    date_fin:   Optional[str] = Query(default=None),
+    date_debut:  Optional[str] = Query(default=None),
+    date_fin:    Optional[str] = Query(default=None),
+    type_sejour: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
 ):
     import io
@@ -713,7 +732,7 @@ def rapport_hotel_xlsx(
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
 
-    data = _get_rapport_data(db, date_debut, date_fin)
+    data = _get_rapport_data(db, date_debut, date_fin, type_sejour)
 
     HDR_FILL = PatternFill("solid", fgColor="1E3A5F")
     ALT_FILL = PatternFill("solid", fgColor="F0F4F8")
