@@ -11703,11 +11703,12 @@ const _CAISSIER_ALLOWED = new Set([
   'pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite',
 ]);
 
-// Whitelist stricte pour les comptes Manager — Bar/Restaurant + Hôtel (sans Tables, Grande Caisse, Chambres, Réception).
+// Whitelist stricte pour les comptes Manager — Bar/Restaurant + Hôtel (sans Tables, Grande Caisse, Chambres, Réception) + Cuisine complète.
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse',
   'hotel-sejours','hotel-historique','hotel-employes','hotel-rapport',
+  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
 ]);
 
 // Assistant Directeur — tous les rapports en lecture + Zelle complet
