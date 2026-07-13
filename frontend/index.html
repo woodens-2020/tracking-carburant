@@ -2510,6 +2510,21 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .pos-header-sub{font-size:14px;color:rgba(255,255,255,.45);margin-top:1px}
 .pos-header-actions{margin-left:auto;display:flex;gap:8px}
 
+/* ── Barre de recherche articles POS ─────────────────────── */
+.pos-search-wrap{position:relative;margin-bottom:12px}
+.pos-search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);
+  width:18px;height:18px;stroke:rgba(255,255,255,.35);fill:none;stroke-width:2;pointer-events:none}
+.pos-search-inp{
+  width:100%;padding:13px 42px 13px 44px;border-radius:12px;font-size:16px;font-weight:500;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+  color:#fff;outline:none;transition:border-color .15s,background .15s,box-shadow .15s;box-sizing:border-box}
+.pos-search-inp::placeholder{color:rgba(255,255,255,.32)}
+.pos-search-inp:focus{border-color:#f7a93b;background:rgba(255,255,255,.09);box-shadow:0 0 0 3px rgba(247,169,59,.14)}
+.pos-search-clear{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  width:26px;height:26px;border-radius:50%;border:none;cursor:pointer;
+  background:rgba(255,255,255,.1);color:rgba(255,255,255,.6);font-size:14px;line-height:1;padding:0}
+.pos-search-clear:hover{background:rgba(248,113,113,.25);color:#f87171}
+
 /* ─── Cartes KPI POS ──────────────────────────────────────── */
 .pos-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .pos-kpi{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
@@ -5803,6 +5818,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div style="color:rgba(255,255,255,.25);font-size:14px;text-align:center;padding:12px">Chargement…</div>
             </div>
           </div>
+        </div>
+
+        <!-- Barre de recherche articles -->
+        <div class="pos-search-wrap">
+          <svg class="pos-search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="pos-search-inp" class="pos-search-inp"
+                 placeholder="Rechercher un article par son nom…"
+                 autocomplete="off" oninput="posSearchProduits(this.value)"
+                 onkeydown="if(event.key==='Escape') posSearchClear()">
+          <button id="pos-search-clear" class="pos-search-clear" style="display:none" title="Effacer la recherche" onclick="posSearchClear()">✕</button>
         </div>
 
         <!-- Filtre catégorie + bouton cuisine -->
@@ -18222,15 +18247,84 @@ function posRenderCatTabs(){
   if(_posCatActuelle!=='TOUS') sel.value = _posCatActuelle;
 }
 
+let _posSearchTerm = '';
+
+function _posCardPlatHTML(p){
+  return `
+    <div class="pos-produit-card" style="border-color:rgba(247,169,59,.35);background:rgba(247,169,59,.08)"
+         onclick="posCuisineAjouterAuPanier(${p.id})">
+      <div class="pos-produit-accent" style="background:#f7a93b"></div>
+      <div class="pos-produit-body">
+        <div class="pos-produit-nom">${p.nom||'Plat'}</div>
+        <div class="pos-produit-cat" style="color:#f7a93b">${p.categorie||'Cuisine'}</div>
+        <div class="pos-produit-prix" style="color:#f7a93b">${posGx(p.prix_vente||0)}</div>
+        <div class="pos-produit-unite">portion</div>
+      </div>
+    </div>`;
+}
+
+function _posCardProduitHTML(p){
+  const catClr = _catCouleur(p.categorie||'');
+  const stk = parseFloat(p.stock_courant??0);
+  const rupture = stk <= 0;
+  const stkClr = rupture ? '#f87171' : (p.stock_bas ? '#fb923c' : '#4ade80');
+  const stkTxt = rupture ? 'Rupture' : (p.stock_bas ? 'Stock bas' : 'En stock');
+  const stkQte = stk % 1 === 0 ? stk.toFixed(0) : stk.toFixed(1);
+  const stkBadge = `<div class="pos-produit-stock-badge" style="background:${stkClr}22;color:${stkClr};border:1px solid ${stkClr}44"><span class="pos-produit-stock-dot" style="background:${stkClr}"></span>${stkTxt} · ${stkQte}</div>`;
+  return `<div class="pos-produit-card${rupture?' rupture':''}" onclick="posAjouterAuPanier(${p.id})">
+    <div class="pos-produit-accent" style="background:${catClr}"></div>
+    <div class="pos-produit-body">
+      <div class="pos-produit-nom">${p.nom||'Produit'}</div>
+      <div class="pos-produit-cat" style="color:${catClr}">${p.categorie||''}</div>
+      <div class="pos-produit-prix">${posGx(p.prix_actif||0)}</div>
+      <div class="pos-produit-unite">${p.unite||''}</div>
+      ${stkBadge}
+    </div>
+  </div>`;
+}
+
 function posCatFilter(cat, btn){
   _posCatActuelle = cat;
   const sel = document.getElementById('pos-cat-select');
   if(sel && sel.value !== cat) sel.value = cat;
-  const cpt = document.getElementById('pos-cat-count');
-  const grid = document.getElementById('pos-produit-grid');
-  if(!grid) return;
+  posRenderGrid();
+}
 
-  // ── Affichage plats cuisine ────────────────────────────────────
+function posSearchProduits(term){
+  _posSearchTerm = (term||'').trim().toLowerCase();
+  const clearBtn = document.getElementById('pos-search-clear');
+  if(clearBtn) clearBtn.style.display = _posSearchTerm ? '' : 'none';
+  posRenderGrid();
+}
+
+function posSearchClear(){
+  const inp = document.getElementById('pos-search-inp');
+  if(inp) inp.value = '';
+  posSearchProduits('');
+  if(inp) inp.focus();
+}
+
+function posRenderGrid(){
+  const grid = document.getElementById('pos-produit-grid');
+  const cpt  = document.getElementById('pos-cat-count');
+  if(!grid) return;
+  const term = _posSearchTerm;
+
+  if(term){
+    const prodMatches = _posProduits.filter(p=>(p.nom||'').toLowerCase().includes(term));
+    const platMatches = _posCuisinePlats.filter(p=>(p.nom||'').toLowerCase().includes(term));
+    const total = prodMatches.length + platMatches.length;
+    if(cpt) cpt.textContent = `${total} résultat${total!==1?'s':''} pour « ${term} »`;
+    if(!total){
+      grid.innerHTML = `<div style="color:rgba(255,255,255,.3);font-size:14px;padding:20px">Aucun article trouvé pour « ${term} »</div>`;
+      return;
+    }
+    grid.innerHTML = platMatches.map(_posCardPlatHTML).join('') + prodMatches.map(_posCardProduitHTML).join('');
+    return;
+  }
+
+  const cat = _posCatActuelle;
+
   if(cat === '__CUISINE__'){
     const plats = _posCuisinePlats;
     if(cpt) cpt.textContent = `${plats.length} plat${plats.length!==1?'s':''}`;
@@ -18238,47 +18332,17 @@ function posCatFilter(cat, btn){
       grid.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:14px;padding:20px">Aucun plat cuisine actif</div>';
       return;
     }
-    grid.innerHTML = plats.map(p=>`
-      <div class="pos-produit-card" style="border-color:rgba(247,169,59,.35);background:rgba(247,169,59,.08)"
-           onclick="posCuisineAjouterAuPanier(${p.id})">
-        <div class="pos-produit-accent" style="background:#f7a93b"></div>
-        <div class="pos-produit-body">
-          <div class="pos-produit-nom">${p.nom||'Plat'}</div>
-          <div class="pos-produit-cat" style="color:#f7a93b">${p.categorie||'Cuisine'}</div>
-          <div class="pos-produit-prix" style="color:#f7a93b">${posGx(p.prix_vente||0)}</div>
-          <div class="pos-produit-unite">portion</div>
-        </div>
-      </div>
-    `).join('');
+    grid.innerHTML = plats.map(_posCardPlatHTML).join('');
     return;
   }
 
-  // ── Affichage produits bar ─────────────────────────────────────
   const prods = cat==='TOUS' ? _posProduits : _posProduits.filter(p=>p.categorie===cat);
   if(cpt) cpt.textContent = cat==='TOUS' ? '' : `${prods.length} article${prods.length!==1?'s':''}`;
   if(!prods.length){
     grid.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:14px;padding:20px">Aucun produit dans cette catégorie</div>';
     return;
   }
-  grid.innerHTML = prods.map(p=>{
-    const catClr = _catCouleur(p.categorie||'');
-    const stk = parseFloat(p.stock_courant??0);
-    const rupture = stk <= 0;
-    const stkClr = rupture ? '#f87171' : (p.stock_bas ? '#fb923c' : '#4ade80');
-    const stkTxt = rupture ? 'Rupture' : (p.stock_bas ? 'Stock bas' : 'En stock');
-    const stkQte = stk % 1 === 0 ? stk.toFixed(0) : stk.toFixed(1);
-    const stkBadge = `<div class="pos-produit-stock-badge" style="background:${stkClr}22;color:${stkClr};border:1px solid ${stkClr}44"><span class="pos-produit-stock-dot" style="background:${stkClr}"></span>${stkTxt} · ${stkQte}</div>`;
-    return `<div class="pos-produit-card${rupture?' rupture':''}" onclick="posAjouterAuPanier(${p.id})">
-      <div class="pos-produit-accent" style="background:${catClr}"></div>
-      <div class="pos-produit-body">
-        <div class="pos-produit-nom">${p.nom||'Produit'}</div>
-        <div class="pos-produit-cat" style="color:${catClr}">${p.categorie||''}</div>
-        <div class="pos-produit-prix">${posGx(p.prix_actif||0)}</div>
-        <div class="pos-produit-unite">${p.unite||''}</div>
-        ${stkBadge}
-      </div>
-    </div>`;
-  }).join('');
+  grid.innerHTML = prods.map(_posCardProduitHTML).join('');
 }
 
 /* Ajouter un plat cuisine au panier (cross-sell via bar) */
