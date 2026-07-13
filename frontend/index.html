@@ -24643,12 +24643,14 @@ async function loadZellePaiements(){
       html += '<td style="text-align:center;">' + badge + '</td>';
       html += '<td style="color:var(--text-muted);font-size:.8rem;white-space:nowrap;">' + dateStr + '</td>';
       html += '<td style="text-align:center;padding-right:16px;"><div style="display:flex;gap:3px;justify-content:center;">';
+      // Impression du reçu : action de lecture seule, jamais bloquée par _isReadOnly()
+      // (permet a Assistant Directeur d'imprimer sans avoir les droits d'edition/suppression)
+      html += '<button class="gi-btn-icon" title="Imprimer reçu" onclick="zelleImprimerRecu(' + t.id + ')">' + _zpayPrinterSvg + '</button>';
       if(!_isReadOnly()){
         if(t.statut === 'EN_ATTENTE'){
           html += '<button class="gi-btn-icon success" title="Marquer remis" onclick="zelleSetStatut(' + t.id + ',\'REMIS\')">&#10003;</button>';
           html += '<button class="gi-btn-icon danger"  title="Annuler"      onclick="zelleSetStatut(' + t.id + ',\'ANNULE\')">&#10005;</button>';
         }
-        html += '<button class="gi-btn-icon" title="Imprimer reçu" onclick="zelleImprimerRecu(' + t.id + ')">' + _zpayPrinterSvg + '</button>';
         html += '<button class="gi-btn-icon" title="Modifier"      onclick="zelleOpenEdit(' + t.id + ')">&#9998;</button>';
         html += '<button class="gi-btn-icon danger" title="Supprimer" onclick="zelleDeleteTx(' + t.id + ')">&#128465;</button>';
       }
