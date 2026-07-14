@@ -134,6 +134,24 @@ def update_config(data: ConfigIn, db: Session = Depends(get_db)):
 
 # ── Bilan complet ─────────────────────────────────────────────────────────────
 
+def _zelle_balance_usd(db: Session) -> float:
+    """
+    Solde disponible = solde de depart + fonds injectes - montants DEJA remis
+    (montant plein, hors frais). Les transactions EN_ATTENTE (pas encore payees)
+    et les frais ne sont jamais melanges dans ce calcul.
+    """
+    cfg    = _get_or_create_config(db)
+    bal_av = float(cfg.balance_avant_usd)
+    total_fonds_usd = float(
+        db.query(func.sum(ZelleFond.montant_usd)).scalar() or 0
+    )
+    total_remis_usd = float(
+        db.query(func.sum(ZelleTransaction.montant_usd))
+          .filter(ZelleTransaction.statut == "REMIS").scalar() or 0
+    )
+    return round(bal_av + total_fonds_usd - total_remis_usd, 2)
+
+
 @router.get("/bilan")
 def get_bilan(db: Session = Depends(get_db)):
     cfg    = _get_or_create_config(db)
@@ -145,13 +163,17 @@ def get_bilan(db: Session = Depends(get_db)):
         ZelleTransaction.statut.in_(["EN_ATTENTE", "REMIS"])
     ).all()
 
+    # Total entre Zelle — indicatif uniquement (demandes en attente + remises),
+    # n'entre plus dans le calcul du solde disponible.
     entree_usd = sum(float(t.montant_usd) for t in txs)
     entree_ht  = round(entree_usd * taux, 2)
 
     remis = [t for t in txs if t.statut == "REMIS"]
-    total_remis_usd = round(sum(float(t.montant_usd) - float(t.frais) for t in remis), 2)
+    # Montant plein verse au beneficiaire — les frais ne sortent jamais du solde,
+    # ils sont suivis separement (total_frais_*) pour le tableau de bord.
+    total_remis_usd = round(sum(float(t.montant_usd) for t in remis), 2)
     total_remis_ht  = round(total_remis_usd * taux, 2)
-    # Frais sur toutes les transactions actives (EN_ATTENTE + REMIS)
+    # Frais sur toutes les transactions actives (EN_ATTENTE + REMIS) — informatif
     total_frais_usd = round(sum(float(t.frais) for t in txs), 2)
     total_frais_ht  = round(sum(float(t.frais) * float(t.taux_applique) for t in txs), 2)
 
@@ -161,14 +183,17 @@ def get_bilan(db: Session = Depends(get_db)):
     total_fonds_ht  = round(total_fonds_usd * taux, 2)
 
     bal_av_ht        = round(bal_av * taux, 2)
-    balance_usd      = round(bal_av + total_fonds_usd + entree_usd - total_remis_usd, 2)
+    # Solde disponible : depart + fonds - deja remis (montant plein). Evolue
+    # uniquement quand un paiement est effectivement remis, jamais avec les
+    # transactions en attente ni avec les frais.
+    balance_usd      = round(bal_av + total_fonds_usd - total_remis_usd, 2)
     balance_ht       = round(balance_usd * taux, 2)
 
     # Répartition par source
     sources_data: dict[str, dict] = {}
     for src in SOURCES:
         fonds_src  = round(sum(float(f.montant_usd) for f in fonds if f.source == src), 2)
-        remis_src  = round(sum(float(t.montant_usd) - float(t.frais) for t in remis if t.source_fond == src), 2)
+        remis_src  = round(sum(float(t.montant_usd) for t in remis if t.source_fond == src), 2)
         sources_data[src] = {
             "fonds_usd": fonds_src,
             "fonds_ht":  round(fonds_src * taux, 2),
@@ -353,6 +378,14 @@ def update_statut(tx_id: int, data: StatutIn, db: Session = Depends(get_db)):
     t = db.query(ZelleTransaction).filter_by(id=tx_id).first()
     if not t:
         raise HTTPException(status_code=404, detail="Transaction introuvable")
+    if data.statut == "REMIS" and t.statut != "REMIS":
+        solde = _zelle_balance_usd(db)
+        montant = float(t.montant_usd)
+        if montant > solde:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Solde insuffisant : ${montant:.2f} demandé, ${solde:.2f} disponible.",
+            )
     t.statut = data.statut
     db.commit()
     return _tx_dict(t)
