@@ -7651,8 +7651,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <input type="hidden" id="zf-id">
           <div class="gi-form-row">
             <div class="gi-form-field">
-              <label class="gi-form-lbl">Numéro interne</label>
-              <input type="text" id="zf-numero" class="gi-form-input" placeholder="Facultatif">
+              <label class="gi-form-lbl">Code interne</label>
+              <input type="text" id="zf-numero" class="gi-form-input" placeholder="Généré automatiquement" readonly disabled style="opacity:.55;cursor:not-allowed">
             </div>
             <div class="gi-form-field">
               <label class="gi-form-lbl">Nom &amp; Prénom *</label>
@@ -10149,6 +10149,7 @@ function goTo(page){
   const navEl=document.querySelector(`[data-page="${page}"]`);
   if(navEl) navEl.classList.add('active');
   currentPage=page;
+  try{ sessionStorage.setItem('konekta_current_page', page); }catch(e){}
   const m=PAGE_META[page]||{title:()=>page,sub:()=>''};
   const _isGi = !!(typeof _giPageLoaders !== 'undefined' && _giPageLoaders[page]);
   // Mode GI : .pages devient flex-colonne non-scrollante
@@ -12427,23 +12428,25 @@ document.addEventListener('DOMContentLoaded',async()=>{
   applyTheme();
   applyLang();
 
+  // Détection : connexion fraîche (login) vs simple rafraîchissement de page.
+  // Sert à la fois pour la charte de responsabilité et pour savoir si on doit
+  // restaurer la dernière page visitée ou repartir sur la page par défaut du rôle.
+  const _justLoggedInFlag  = sessionStorage.getItem('konekta_just_logged_in') === '1';
+  const _loginParams       = new URLSearchParams(window.location.search);
+  const _justLoggedInOAuth = _loginParams.get('just_logged_in') === '1';
+  const _isFreshLogin      = _justLoggedInFlag || _justLoggedInOAuth;
+
   // Charte de responsabilité — affichée uniquement juste après une connexion
-  // (pas à chaque rafraîchissement de page), déclenchée par le login (email/OTP/code
-  // admin via sessionStorage, OAuth Google via paramètre d'URL).
-  (function(){
-    const justLoggedInFlag  = sessionStorage.getItem('konekta_just_logged_in') === '1';
-    const params            = new URLSearchParams(window.location.search);
-    const justLoggedInOAuth = params.get('just_logged_in') === '1';
-    if(justLoggedInFlag || justLoggedInOAuth){
-      sessionStorage.removeItem('konekta_just_logged_in');
-      if(justLoggedInOAuth){
-        params.delete('just_logged_in');
-        const qs = params.toString();
-        history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
-      }
-      showResponsabiliteModal();
+  // (pas à chaque rafraîchissement de page).
+  if(_isFreshLogin){
+    sessionStorage.removeItem('konekta_just_logged_in');
+    if(_justLoggedInOAuth){
+      _loginParams.delete('just_logged_in');
+      const qs = _loginParams.toString();
+      history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
     }
-  })();
+    showResponsabiliteModal();
+  }
 
   // Date picker
   const dp=document.getElementById('date-picker');
@@ -12483,16 +12486,21 @@ document.addEventListener('DOMContentLoaded',async()=>{
     setStatus(true);
   }catch(e){ setStatus(false); }
 
-  // Redirection post-login selon le rôle
-  const _rlNom = (_appUser?.role_nom||_appUser?.poste||'').toLowerCase();
-  if(_rlNom === 'manager'){
+  // Restauration de la page en cours (simple rafraîchissement) ou redirection
+  // post-login selon le rôle (connexion fraîche / page sauvegardée invalide).
+  const _rlNom     = (_appUser?.role_nom||_appUser?.poste||'').toLowerCase();
+  let _savedPage   = null;
+  try{ _savedPage = sessionStorage.getItem('konekta_current_page'); }catch(e){}
+  if(!_isFreshLogin && _savedPage && _canAccess(_savedPage)){
+    goTo(_savedPage);
+  } else if(_rlNom === 'manager'){
     goTo('pos-produits');
   } else if(_rlNom === 'assistant directeur'){
     goTo('zelle');
   } else if(!!_appUser?.employe_id || _rlNom.startsWith('caissier')){
     goTo('pos-caisse');
   } else {
-    await loadHome();
+    goTo('home');
   }
 });
 
@@ -24851,7 +24859,6 @@ async function zelleSaveForm(){
   if(!nom)           { posAlert('Nom requis','err'); return; }
   if(!montant||montant<=0){ posAlert('Montant invalide','err'); return; }
   const payload = {
-    numero_int:          document.getElementById('zf-numero').value.trim()              || null,
     nom_prenom:          nom,
     identifiant:         document.getElementById('zf-identifiant').value.trim()         || null,
     contact:             document.getElementById('zf-contact').value.trim()             || null,
@@ -25350,7 +25357,7 @@ function zelleImprimerRecu(id){
   const dp      = rawDate.split('-');
   const dateAff = dp[2]+'/'+dp[1]+'/'+dp[0];
   const heureAff= String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-  const ref     = 'ZL-'+String(t.id).padStart(6,'0');
+  const ref     = t.numero_int || ('ZL-'+String(t.id).padStart(6,'0'));
 
   function fmtH(v){ return (parseFloat(v)||0).toLocaleString('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2}); }
   function line(l,r,w){

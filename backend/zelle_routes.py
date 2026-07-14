@@ -296,7 +296,6 @@ def create_transaction(data: TransactionIn, db: Session = Depends(get_db)):
     cfg = _get_or_create_config(db)
     sf  = data.source_fond if data.source_fond in SOURCES else None
     t = ZelleTransaction(
-        numero_int         = data.numero_int.strip()           if data.numero_int         else None,
         nom_prenom         = data.nom_prenom.strip(),
         identifiant        = data.identifiant.strip()          if data.identifiant        else None,
         contact            = data.contact.strip()              if data.contact            else None,
@@ -314,6 +313,10 @@ def create_transaction(data: TransactionIn, db: Session = Depends(get_db)):
         if dt:
             t.date_transaction = dt
     db.add(t)
+    db.flush()  # attribue l'id auto-incremente sans committer
+    # Code interne unique genere automatiquement — jamais saisi manuellement,
+    # garanti unique car derive de la cle primaire.
+    t.numero_int = f"ZL-{t.id:06d}"
     db.commit()
     db.refresh(t)
     return _tx_dict(t)
@@ -325,7 +328,7 @@ def update_transaction(tx_id: int, data: TransactionIn, db: Session = Depends(ge
     if not t:
         raise HTTPException(status_code=404, detail="Transaction introuvable")
     sf = data.source_fond if data.source_fond in SOURCES else None
-    t.numero_int         = data.numero_int.strip()           if data.numero_int         else None
+    # numero_int n'est jamais modifie ici : genere une seule fois a la creation
     t.nom_prenom         = data.nom_prenom.strip()
     t.identifiant        = data.identifiant.strip()          if data.identifiant        else None
     t.contact            = data.contact.strip()              if data.contact            else None
