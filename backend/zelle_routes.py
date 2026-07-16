@@ -152,6 +152,24 @@ def _zelle_balance_usd(db: Session) -> float:
     return round(bal_av + total_fonds_usd - total_remis_usd, 2)
 
 
+def _zelle_engage_usd(db: Session, exclude_tx_id: Optional[int] = None) -> float:
+    """Somme des transactions EN_ATTENTE — deja reservees sur le solde meme si
+    pas encore remises, pour eviter de sur-engager le fonds sur plusieurs
+    transactions en parallele."""
+    q = db.query(func.sum(ZelleTransaction.montant_usd)).filter(
+        ZelleTransaction.statut == "EN_ATTENTE"
+    )
+    if exclude_tx_id is not None:
+        q = q.filter(ZelleTransaction.id != exclude_tx_id)
+    return float(q.scalar() or 0)
+
+
+def _zelle_engageable_usd(db: Session, exclude_tx_id: Optional[int] = None) -> float:
+    """Ce qui reste reellement disponible pour engager une NOUVELLE transaction :
+    solde disponible moins ce qui est deja reserve par les transactions en attente."""
+    return round(_zelle_balance_usd(db) - _zelle_engage_usd(db, exclude_tx_id), 2)
+
+
 @router.get("/bilan")
 def get_bilan(db: Session = Depends(get_db)):
     cfg    = _get_or_create_config(db)
@@ -203,21 +221,30 @@ def get_bilan(db: Session = Depends(get_db)):
             "net_ht":    round((fonds_src - remis_src) * taux, 2),
         }
 
+    # Ce qui reste reellement engageable sur une NOUVELLE transaction, une fois
+    # deduites les transactions deja en attente (reservees mais pas encore remises).
+    montant_engage_usd    = round(sum(float(t.montant_usd) for t in txs if t.statut == "EN_ATTENTE"), 2)
+    solde_engageable_usd  = round(balance_usd - montant_engage_usd, 2)
+    solde_engageable_ht   = round(solde_engageable_usd * taux, 2)
+
     return {
-        "taux":               taux,
-        "balance_avant_usd":  bal_av,
-        "balance_avant_ht":   bal_av_ht,
-        "total_fonds_usd":    total_fonds_usd,
-        "total_fonds_ht":     total_fonds_ht,
-        "entree_usd":         round(entree_usd, 2),
-        "entree_ht":          entree_ht,
-        "total_remis_usd":    total_remis_usd,
-        "total_remis_ht":     total_remis_ht,
-        "balance_usd":        balance_usd,
-        "balance_ht":         balance_ht,
-        "total_frais_usd":    total_frais_usd,
-        "total_frais_ht":     total_frais_ht,
-        "sources":            sources_data,
+        "taux":                  taux,
+        "balance_avant_usd":     bal_av,
+        "balance_avant_ht":      bal_av_ht,
+        "total_fonds_usd":       total_fonds_usd,
+        "total_fonds_ht":        total_fonds_ht,
+        "entree_usd":            round(entree_usd, 2),
+        "entree_ht":             entree_ht,
+        "total_remis_usd":       total_remis_usd,
+        "total_remis_ht":        total_remis_ht,
+        "balance_usd":           balance_usd,
+        "balance_ht":            balance_ht,
+        "montant_engage_usd":    montant_engage_usd,
+        "solde_engageable_usd":  solde_engageable_usd,
+        "solde_engageable_ht":   solde_engageable_ht,
+        "total_frais_usd":       total_frais_usd,
+        "total_frais_ht":        total_frais_ht,
+        "sources":               sources_data,
     }
 
 
@@ -318,6 +345,16 @@ def list_transactions(
 
 @router.post("/transactions")
 def create_transaction(data: TransactionIn, db: Session = Depends(get_db)):
+    # Verification des le debut de la transaction, pas seulement au moment de
+    # la remise : bloque la creation si le fond ne suffira pas a la couvrir,
+    # en tenant compte des transactions deja en attente sur le meme solde.
+    engageable = _zelle_engageable_usd(db)
+    montant = float(data.montant_usd)
+    if montant > engageable:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Solde insuffisant pour cette transaction : ${montant:.2f} demandé, ${engageable:.2f} disponible.",
+        )
     cfg = _get_or_create_config(db)
     sf  = data.source_fond if data.source_fond in SOURCES else None
     t = ZelleTransaction(
@@ -352,6 +389,16 @@ def update_transaction(tx_id: int, data: TransactionIn, db: Session = Depends(ge
     t = db.query(ZelleTransaction).filter_by(id=tx_id).first()
     if not t:
         raise HTTPException(status_code=404, detail="Transaction introuvable")
+    if t.statut == "EN_ATTENTE":
+        # Reverifie le solde si le montant est augmente (exclut la reservation
+        # actuelle de cette transaction pour ne pas la compter deux fois).
+        engageable = _zelle_engageable_usd(db, exclude_tx_id=tx_id)
+        montant = float(data.montant_usd)
+        if montant > engageable:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Solde insuffisant pour ce montant : ${montant:.2f} demandé, ${engageable:.2f} disponible.",
+            )
     sf = data.source_fond if data.source_fond in SOURCES else None
     # numero_int n'est jamais modifie ici : genere une seule fois a la creation
     t.nom_prenom         = data.nom_prenom.strip()

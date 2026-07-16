@@ -198,6 +198,8 @@ def startup():
         "ALTER TABLE zelle_transactions ADD COLUMN IF NOT EXISTS source_fond VARCHAR(50)",
         "ALTER TABLE zelle_transactions ADD COLUMN IF NOT EXISTS expediteur_nom VARCHAR(150)",
         "ALTER TABLE zelle_transactions ADD COLUMN IF NOT EXISTS expediteur_contact VARCHAR(100)",
+        "ALTER TABLE login_security_events ADD COLUMN IF NOT EXISTS distance_km FLOAT",
+        "ALTER TABLE login_security_events ADD COLUMN IF NOT EXISTS statut_geoloc VARCHAR(20)",
     ]
     try:
         with engine.connect() as _c:
@@ -449,9 +451,10 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
 
 
 class LoginMetaIn(BaseModel):
-    photo_b64: Optional[str] = None
-    latitude:  Optional[float] = None
-    longitude: Optional[float] = None
+    photo_b64:     Optional[str] = None
+    latitude:      Optional[float] = None
+    longitude:     Optional[float] = None
+    statut_geoloc: Optional[str] = None  # 'ok' | 'refuse' | 'erreur' — envoyé par le front
 
 
 def _ip_geoloc(ip: str | None):
@@ -488,19 +491,36 @@ def login_meta_save(data: LoginMetaIn, request: Request, db: Session = Depends(g
     session = db.query(SessionToken).filter_by(token=token).first() if token else None
     ip      = request.client.host if request.client else None
 
+    statut_geoloc = data.statut_geoloc if data.statut_geoloc in ("ok", "refuse", "erreur") else None
+
+    # Distance à l'institution : uniquement si le navigateur a fourni un vrai fix
+    # GPS ('ok'). La géolocalisation de secours par IP (ci-dessous) ne sert qu'à
+    # l'affichage — jamais au calcul de distance/anomalie (inutilisable pour les
+    # employés distants via Tailscale : l'IP vue par le serveur est celle du tunnel).
+    distance_km = None
+    if statut_geoloc == "ok" and data.latitude is not None and data.longitude is not None:
+        from geoloc_service import get_or_create_geoloc_config, haversine_km
+        cfg = get_or_create_geoloc_config(db)
+        if cfg.institution_latitude is not None and cfg.institution_longitude is not None:
+            distance_km = haversine_km(
+                data.latitude, data.longitude, cfg.institution_latitude, cfg.institution_longitude
+            )
+
     lat, lng = data.latitude, data.longitude
     # Fallback : géolocalisation par IP si le navigateur n'a pas transmis de coordonnées
     if lat is None or lng is None:
         lat, lng = _ip_geoloc(ip)
 
     event = LoginSecurityEvent(
-        user_id    = user.id,
-        session_id = session.id if session else None,
-        photo_b64  = data.photo_b64,
-        latitude   = lat,
-        longitude  = lng,
-        ip_address = ip,
-        user_agent = request.headers.get("user-agent", "")[:255],
+        user_id       = user.id,
+        session_id    = session.id if session else None,
+        photo_b64     = data.photo_b64,
+        latitude      = lat,
+        longitude     = lng,
+        distance_km   = distance_km,
+        statut_geoloc = statut_geoloc,
+        ip_address    = ip,
+        user_agent    = request.headers.get("user-agent", "")[:255],
     )
     db.add(event)
     db.commit()
@@ -1297,6 +1317,10 @@ def anomalies(date: date_type, db: Session = Depends(get_db)):
 
     Corrélation : SAUT_ANORMAL + DECALAGE_STOCK le même jour/produit
     → champ incident_lie ajouté aux deux anomalies.
+
+    Anomalies géolocalisation connexions (visibilité uniquement, jamais de
+    blocage automatique) :
+      CONNEXION_HORS_PERIMETRE, GEOLOCALISATION_REFUSEE
     """
     # ── 1. Relevés compteurs ──────────────────────────────────────────
     releves = db.query(Releve).filter(Releve.date <= date).all()
@@ -1398,10 +1422,14 @@ def anomalies(date: date_type, db: Session = Depends(get_db)):
     except Exception:
         anom_bar = []   # module bar non initialisé — ne pas bloquer les anomalies carburant
 
-    # ── 5. Fusion et tri ──────────────────────────────────────────────
+    # ── 5. Anomalies géolocalisation connexions ────────────────────────
+    from geoloc_service import anomalies_geoloc
+    anom_geo = anomalies_geoloc(db, date)
+
+    # ── 6. Fusion et tri ──────────────────────────────────────────────
     # Erreurs avant avertissements, puis par date.
     gravite_ordre = {"erreur": 0, "avertissement": 1}
-    toutes = anom_compteurs + anom_stk + anom_bar
+    toutes = anom_compteurs + anom_stk + anom_bar + anom_geo
     toutes.sort(key=lambda a: (gravite_ordre.get(a["gravite"], 2), a.get("date", "")))
 
     return {
@@ -1410,6 +1438,7 @@ def anomalies(date: date_type, db: Session = Depends(get_db)):
         "nb_compteurs":   len(anom_compteurs),
         "nb_stock":       len(anom_stk),
         "nb_bar":         len(anom_bar),
+        "nb_geoloc":      len(anom_geo),
         "anomalies":      toutes,
     }
 

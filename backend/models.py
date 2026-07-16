@@ -212,6 +212,8 @@ class LoginSecurityEvent(Base):
     photo_b64    = Column(Text, nullable=True)
     latitude     = Column(Float, nullable=True)
     longitude    = Column(Float, nullable=True)
+    distance_km   = Column(Float, nullable=True)      # distance a l'institution (calculee uniquement si statut_geoloc='ok')
+    statut_geoloc = Column(String(20), nullable=True)  # 'ok' | 'refuse' | 'erreur'
     ip_address   = Column(String(45), nullable=True)
     user_agent   = Column(String(255), nullable=True)
     created_at   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -1050,6 +1052,20 @@ class ZelleConfig(Base):
     taux              = Column(Numeric(10, 4), nullable=False, default=130)
     balance_avant_usd = Column(Numeric(14, 2), nullable=False, default=0)
     date_maj          = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class GeolocalisationConfig(Base):
+    """Coordonnées de l'institution et rayon d'alerte pour la visibilité
+    géographique des connexions. Table singleton (toujours 1 ligne).
+    Tant que institution_latitude/longitude sont NULL, la fonctionnalité
+    est inerte : aucune anomalie CONNEXION_HORS_PERIMETRE n'est générée."""
+    __tablename__ = "geolocalisation_config"
+
+    id                     = Column(Integer, primary_key=True)
+    institution_latitude   = Column(Float, nullable=True)
+    institution_longitude  = Column(Float, nullable=True)
+    rayon_alerte_km        = Column(Float, nullable=False, default=1.0)
+    updated_at             = Column(DateTime(timezone=True), nullable=True)
 
 
 class ZelleTransaction(Base):

@@ -9228,17 +9228,64 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="pos-header-sub">Photo + géolocalisation enregistrées à chaque connexion</div>
           </div>
           <div class="pos-header-actions">
+            <button class="pos-btn ghost" onclick="geolocOpenConfig()" style="font-size:14px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><circle cx="12" cy="10" r="3"/><path d="M12 21s7-6.5 7-11a7 7 0 10-14 0c0 4.5 7 11 7 11z"/></svg>
+              Configurer périmètre
+            </button>
             <button class="pos-btn ghost" onclick="loadAdminSecurity()" style="font-size:14px">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
               Actualiser
             </button>
           </div>
         </div>
+        <div id="geoloc-insecure-banner" style="display:none;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#fbbf24">
+          ⚠ Connexion non sécurisée détectée (HTTP) — la géolocalisation sera bloquée par le navigateur pour les employés distants tant que HTTPS n'est pas activé. La plupart des connexions apparaîtront comme « géolocalisation refusée » même si l'employé n'a rien refusé.
+        </div>
         <div id="security-events-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;padding:4px 0">
           <div style="text-align:center;padding:40px;color:rgba(255,255,255,.3);grid-column:1/-1">Chargement…</div>
         </div>
       </div>
     </div><!-- /page-admin-security -->
+
+    <!-- ══════ MODAL : CONFIGURATION PÉRIMÈTRE GÉOGRAPHIQUE ══════ -->
+    <div id="modal-geoloc-config" class="overlay hidden" onclick="if(event.target===this)geolocCloseConfig()">
+      <div class="modal-box" style="max-width:440px">
+        <div class="card-head" style="border-top-color:#7c3aed">
+          <div class="card-title" style="color:#a78bfa;gap:8px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><circle cx="12" cy="10" r="3"/><path d="M12 21s7-6.5 7-11a7 7 0 10-14 0c0 4.5 7 11 7 11z"/></svg>
+            Périmètre géographique
+          </div>
+          <button onclick="geolocCloseConfig()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1">✕</button>
+        </div>
+        <div style="padding:20px 22px">
+          <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;line-height:1.6">
+            Coordonnées de l'institution et rayon d'alerte. Tant qu'aucune coordonnée n'est renseignée, aucune anomalie de périmètre n'est générée.
+          </p>
+          <div class="gi-form-row">
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Latitude</label>
+              <input type="number" id="gcfg-lat" class="gi-form-input" step="0.000001" placeholder="ex : 18.594354">
+            </div>
+            <div class="gi-form-field">
+              <label class="gi-form-lbl">Longitude</label>
+              <input type="number" id="gcfg-lng" class="gi-form-input" step="0.000001" placeholder="ex : -72.307495">
+            </div>
+          </div>
+          <button class="pos-btn ghost" onclick="geolocUseMyPosition()" style="font-size:12.5px;margin:10px 0 4px;width:100%;justify-content:center">
+            📍 Utiliser ma position actuelle
+          </button>
+          <div id="gcfg-mypos-msg" style="font-size:12px;color:var(--muted);text-align:center;min-height:16px;margin-bottom:8px"></div>
+          <div class="gi-form-field">
+            <label class="gi-form-lbl">Rayon d'alerte (km)</label>
+            <input type="number" id="gcfg-rayon" class="gi-form-input" step="0.1" min="0.01" value="1">
+          </div>
+        </div>
+        <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px">
+          <button class="btn btn-secondary" onclick="geolocCloseConfig()">Annuler</button>
+          <button class="btn btn-primary" onclick="geolocSaveConfig()">Enregistrer</button>
+        </div>
+      </div>
+    </div><!-- /modal-geoloc-config -->
 
     <!-- ══════ MODAL : DÉTAIL CONNEXION SÉCURITÉ ══════ -->
     <div id="modal-security-detail" class="overlay hidden" onclick="if(event.target===this)closeSecurityModal()">
@@ -9272,6 +9319,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,.03);border-radius:8px">
               <span style="font-size:14px;color:var(--muted)">Localisation</span>
               <span id="msd-loc" style="font-size:14px;color:var(--white)">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,.03);border-radius:8px">
+              <span style="font-size:14px;color:var(--muted)">Distance institution</span>
+              <span id="msd-distance" style="font-size:14px;color:var(--white)">—</span>
             </div>
           </div>
         </div>
@@ -9684,7 +9735,7 @@ const LANGS = {
     'sk.kpi.benefice': 'Bénéfice net', 'sk.kpi.marge': 'Marge brute',
     'sk.kpi.vendus': 'Gallons vendus', 'sk.kpi.cmp': 'Coût moy. pondéré',
     'sk.warn.no.livr': 'Aucune livraison — COGS non calculable',
-    'sk.anom.compteurs': 'Anomalies compteurs', 'sk.anom.stock': 'Anomalies stock',
+    'sk.anom.compteurs': 'Anomalies compteurs', 'sk.anom.stock': 'Anomalies stock', 'sk.anom.geoloc': 'Anomalies connexions',
     // Thème
     'theme.light':  'Clair',
     'theme.dark':   'Sombre',
@@ -9886,7 +9937,7 @@ const LANGS = {
     'sk.kpi.benefice': 'Net profit', 'sk.kpi.marge': 'Gross margin',
     'sk.kpi.vendus': 'Gallons sold', 'sk.kpi.cmp': 'Weighted avg. cost',
     'sk.warn.no.livr': 'No delivery — COGS not calculable',
-    'sk.anom.compteurs': 'Meter anomalies', 'sk.anom.stock': 'Stock anomalies',
+    'sk.anom.compteurs': 'Meter anomalies', 'sk.anom.stock': 'Stock anomalies', 'sk.anom.geoloc': 'Login anomalies',
     'theme.light':  'Light',
     'theme.dark':   'Dark',
     'ra.date':        'Report date',
@@ -10250,8 +10301,8 @@ function renderHomeAnom(data){
     return `<div class="anom-item anom-${a.gravite} stagger" style="animation-delay:${i*45}ms">
       <span class="anom-icon" style="color:${c}">${a.gravite==='erreur'?'⚠':'△'}</span>
       <div>
-        <div class="anom-title" style="color:${c}">${esc(a.pompe_nom)} — ${esc(a.type.replace(/_/g,' '))}</div>
-        <div class="anom-meta">${esc(a.date)} · ${esc(a.periode)} · ${esc(a.message.slice(0,80))}…</div>
+        <div class="anom-title" style="color:${c}">${esc(a.pompe_nom||a.produit_nom||a.utilisateur_nom||'')} — ${esc(a.type.replace(/_/g,' '))}</div>
+        <div class="anom-meta">${esc(a.date)}${a.periode?' · '+esc(a.periode):''} · ${esc(a.message.slice(0,80))}…</div>
       </div>
     </div>`;
   }).join('');
@@ -12461,28 +12512,38 @@ function _idxCapturePhoto(){
     })
     .catch(function(err){ console.warn('[sécurité] Caméra indisponible:', err && err.name); return null; });
 }
+/* Résout {status, coords} — mêmes règles que login.html : un refus explicite
+   (code 1) n'est jamais réessayé ni confondu avec une erreur technique. */
 function _idxGetGeolocation(){
   return new Promise(function(resolve){
-    if(!navigator.geolocation){ resolve(null); return; }
-    navigator.geolocation.getCurrentPosition(resolve, function(){
-      navigator.geolocation.getCurrentPosition(resolve, function(err){
-        console.warn('[sécurité] Géolocalisation échouée:', err && err.message);
-        resolve(null);
-      }, {timeout:8000, maximumAge:0, enableHighAccuracy:false});
+    if(!navigator.geolocation){ resolve({status:'erreur', coords:null}); return; }
+    function onError(err){
+      var refuse = err && err.code === 1;
+      console.warn('[sécurité] Géolocalisation échouée:', err && err.message);
+      resolve({status: refuse ? 'refuse' : 'erreur', coords:null});
+    }
+    navigator.geolocation.getCurrentPosition(function(pos){
+      resolve({status:'ok', coords:{latitude:pos.coords.latitude, longitude:pos.coords.longitude}});
+    }, function(err){
+      if(err && err.code === 1){ onError(err); return; }
+      navigator.geolocation.getCurrentPosition(function(pos){
+        resolve({status:'ok', coords:{latitude:pos.coords.latitude, longitude:pos.coords.longitude}});
+      }, onError, {timeout:8000, maximumAge:0, enableHighAccuracy:false});
     }, {timeout:6000, maximumAge:0, enableHighAccuracy:true});
   });
 }
 async function _idxSendLoginMeta(){
   try{
     var results = await Promise.all([_idxGetGeolocation(), _idxCapturePhoto()]);
-    var pos = results[0], photo = results[1];
+    var geo = results[0], photo = results[1];
     await fetch('/api/auth/login-meta',{
       method:'POST', credentials:'include',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         photo_b64: photo,
-        latitude:  pos ? pos.coords.latitude  : null,
-        longitude: pos ? pos.coords.longitude : null,
+        latitude:  geo.coords ? geo.coords.latitude  : null,
+        longitude: geo.coords ? geo.coords.longitude : null,
+        statut_geoloc: geo.status,
       }),
     });
   }catch(e){ console.warn('[sécurité] Envoi métadonnées OAuth:', e); }
@@ -13565,6 +13626,7 @@ async function loadStock(){
     const allAnom = anomData.anomalies || [];
     const anomC = allAnom.filter(a=>['QUANTITE_NEGATIVE','REGRESSION_METER','SAUT_ANORMAL'].includes(a.type));
     const anomS = allAnom.filter(a=>['STOCK_NEGATIF','VENTE_SANS_STOCK','PRIX_MANQUANT','DECALAGE_STOCK'].includes(a.type));
+    const anomG = allAnom.filter(a=>['CONNEXION_HORS_PERIMETRE','GEOLOCALISATION_REFUSEE'].includes(a.type));
 
     if(allAnom.length===0){
       anomWrap.innerHTML=`<div style="color:var(--muted);font-size:14px;margin-top:10px">✓ Aucune anomalie aujourd'hui.</div>`;
@@ -13582,6 +13644,12 @@ async function loadStock(){
           ${anomS.map(a=>_anomItem(a)).join('')}
         </div>`;
       }
+      if(anomG.length>0){
+        html += `<div class="sk-anom-group">
+          <div class="sk-anom-lbl">${t('sk.anom.geoloc')} (${anomG.length})</div>
+          ${anomG.map(a=>_anomItem(a)).join('')}
+        </div>`;
+      }
       anomWrap.innerHTML = html;
     }
   }catch(e){
@@ -13593,7 +13661,7 @@ function _anomItem(a){
   const cls = a.gravite==='erreur' ? 'err' : 'warn';
   const linked = a.incident_lie ? `<span class="sk-anom-linked">${a.incident_lie}</span>` : '';
   return `<div class="sk-anom-item ${cls}">
-    <b>${a.type}</b>${linked} · ${a.pompe_nom||a.produit_nom||''} · ${a.date||''}
+    <b>${a.type}</b>${linked} · ${a.pompe_nom||a.produit_nom||a.utilisateur_nom||''} · ${a.date||''}
     <div style="color:var(--muted);margin-top:2px">${a.message||''}</div>
   </div>`;
 }
@@ -16905,6 +16973,8 @@ async function purgeInactiveSessions(){
 let _securityEventSelected = null;
 
 async function loadAdminSecurity(){
+  const banner = document.getElementById('geoloc-insecure-banner');
+  if(banner) banner.style.display = window.isSecureContext ? 'none' : 'block';
   const grid = document.getElementById('security-events-grid');
   grid.innerHTML = `<div style="text-align:center;padding:40px;color:rgba(255,255,255,.3);grid-column:1/-1">Chargement…</div>`;
   try{
@@ -16917,9 +16987,12 @@ async function loadAdminSecurity(){
       const photoHtml = ev.has_photo
         ? `<img src="${ev.photo_b64}" style="width:100%;height:130px;object-fit:cover;border-radius:10px 10px 0 0;display:block">`
         : `<div style="width:100%;height:130px;background:rgba(255,255,255,.04);border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.18);font-size:14px">Aucune photo</div>`;
-      const locHtml = (ev.latitude && ev.longitude)
-        ? `<a href="https://maps.google.com/?q=${ev.latitude},${ev.longitude}" target="_blank" rel="noopener" style="color:#60a5fa;font-size:13px;text-decoration:none">📍 ${ev.latitude.toFixed(4)}, ${ev.longitude.toFixed(4)}</a>`
-        : `<span style="font-size:13px;color:rgba(255,255,255,.25)">Localisation inconnue</span>`;
+      const distSuffix = ev.distance_km != null ? ` · ${ev.distance_km.toFixed(1)} km` : '';
+      const locHtml = ev.statut_geoloc === 'refuse'
+        ? `<span style="font-size:13px;color:#fbbf24">🚫 Géolocalisation refusée</span>`
+        : (ev.latitude && ev.longitude)
+          ? `<a href="https://maps.google.com/?q=${ev.latitude},${ev.longitude}" target="_blank" rel="noopener" style="color:#60a5fa;font-size:13px;text-decoration:none">📍 ${ev.latitude.toFixed(4)}, ${ev.longitude.toFixed(4)}${distSuffix}</a>`
+          : `<span style="font-size:13px;color:rgba(255,255,255,.25)">Localisation inconnue</span>`;
       return `<div class="pos-card" style="cursor:pointer;padding:0;overflow:hidden;border-radius:12px;transition:transform .15s,box-shadow .15s" onclick="openSecurityEvent(${ev.id})" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform=''">
         ${photoHtml}
         <div style="padding:12px 14px">
@@ -16956,13 +17029,63 @@ function openSecurityEvent(id){
   document.getElementById('msd-ip').textContent    = ev.ip_address || '—';
 
   const locEl = document.getElementById('msd-loc');
-  if(ev.latitude && ev.longitude){
+  if(ev.statut_geoloc === 'refuse'){
+    locEl.innerHTML = `<span style="color:#fbbf24">🚫 Refusée par l'employé</span>`;
+  } else if(ev.latitude && ev.longitude){
     locEl.innerHTML = `<a href="https://maps.google.com/?q=${ev.latitude},${ev.longitude}" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:none">📍 ${ev.latitude.toFixed(5)}, ${ev.longitude.toFixed(5)}</a>`;
   } else {
-    locEl.textContent = 'Inconnue';
+    locEl.textContent = ev.statut_geoloc === 'erreur' ? 'Erreur technique (GPS indisponible)' : 'Inconnue';
   }
+  document.getElementById('msd-distance').textContent =
+    ev.distance_km != null ? `${ev.distance_km.toFixed(2)} km` : '—';
 
   document.getElementById('modal-security-detail').classList.remove('hidden');
+}
+
+/* ── Configuration du périmètre géographique (admin) ─────────────── */
+async function geolocOpenConfig(){
+  const banner = document.getElementById('geoloc-insecure-banner');
+  if(banner) banner.style.display = window.isSecureContext ? 'none' : 'block';
+  try{
+    const cfg = await apiFetch('GET','/admin/geoloc-config');
+    document.getElementById('gcfg-lat').value   = cfg.institution_latitude  ?? '';
+    document.getElementById('gcfg-lng').value   = cfg.institution_longitude ?? '';
+    document.getElementById('gcfg-rayon').value = cfg.rayon_alerte_km ?? 1;
+    document.getElementById('gcfg-mypos-msg').textContent = '';
+    document.getElementById('modal-geoloc-config').classList.remove('hidden');
+  }catch(e){ posAlert(e.message||'Erreur chargement configuration.','err'); }
+}
+function geolocCloseConfig(){
+  document.getElementById('modal-geoloc-config').classList.add('hidden');
+}
+function geolocUseMyPosition(){
+  const msg = document.getElementById('gcfg-mypos-msg');
+  if(!navigator.geolocation){ msg.textContent = 'Géolocalisation non disponible sur ce navigateur.'; return; }
+  msg.textContent = 'Localisation en cours…';
+  navigator.geolocation.getCurrentPosition(function(pos){
+    document.getElementById('gcfg-lat').value = pos.coords.latitude.toFixed(6);
+    document.getElementById('gcfg-lng').value = pos.coords.longitude.toFixed(6);
+    msg.textContent = 'Position actuelle renseignée.';
+  }, function(err){
+    msg.textContent = err && err.code === 1
+      ? 'Permission refusée pour ce navigateur.'
+      : 'Position indisponible (vérifiez que la page est servie en HTTPS ou en local).';
+  }, {timeout:8000, enableHighAccuracy:true});
+}
+async function geolocSaveConfig(){
+  const lat   = document.getElementById('gcfg-lat').value;
+  const lng   = document.getElementById('gcfg-lng').value;
+  const rayon = parseFloat(document.getElementById('gcfg-rayon').value);
+  if(!rayon || rayon <= 0){ posAlert('Rayon d\'alerte invalide.','err'); return; }
+  try{
+    await apiFetch('PUT','/admin/geoloc-config', {
+      institution_latitude:  lat === '' ? null : parseFloat(lat),
+      institution_longitude: lng === '' ? null : parseFloat(lng),
+      rayon_alerte_km: rayon,
+    });
+    posAlert('Configuration mise à jour','ok');
+    geolocCloseConfig();
+  }catch(e){ posAlert(e.message||'Erreur enregistrement.','err'); }
 }
 
 function closeSecurityModal(){

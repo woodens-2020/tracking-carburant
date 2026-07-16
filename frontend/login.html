@@ -1049,16 +1049,27 @@ function _capturePhoto(){
   return _capturePromise;
 }
 
+/* Résout {status, coords} — status : 'ok' | 'refuse' | 'erreur'.
+   Un refus explicite (code 1 = PERMISSION_DENIED) n'est jamais réessayé et
+   n'est jamais confondu avec une simple erreur technique (GPS indisponible,
+   timeout) : les deux doivent rester distinguables côté serveur. */
 function _getGeolocation(){
   return new Promise(function(resolve){
-    if(!navigator.geolocation){ resolve(null); return; }
-    // Étape 1 : réseau rapide (Wi-Fi / IP), timeout 6 s
-    navigator.geolocation.getCurrentPosition(resolve, function(){
+    if(!navigator.geolocation){ resolve({status:'erreur', coords:null}); return; }
+    function onError(err){
+      var refuse = err && err.code === 1;
+      console.warn('[sécurité] Géolocalisation échouée:', err && err.message);
+      resolve({status: refuse ? 'refuse' : 'erreur', coords:null});
+    }
+    // Étape 1 : haute précision, timeout 6 s
+    navigator.geolocation.getCurrentPosition(function(pos){
+      resolve({status:'ok', coords:{latitude:pos.coords.latitude, longitude:pos.coords.longitude}});
+    }, function(err){
+      if(err && err.code === 1){ onError(err); return; } // refus : inutile de réessayer
       // Étape 2 : sans haute précision, encore 8 s
-      navigator.geolocation.getCurrentPosition(resolve, function(err){
-        console.warn('[sécurité] Géolocalisation échouée:', err && err.message);
-        resolve(null);
-      }, {timeout:8000, maximumAge:0, enableHighAccuracy:false});
+      navigator.geolocation.getCurrentPosition(function(pos){
+        resolve({status:'ok', coords:{latitude:pos.coords.latitude, longitude:pos.coords.longitude}});
+      }, onError, {timeout:8000, maximumAge:0, enableHighAccuracy:false});
     }, {timeout:6000, maximumAge:0, enableHighAccuracy:true});
   });
 }
@@ -1069,17 +1080,20 @@ async function _sendLoginMeta(){
     _getGeolocation(),
     _capturePromise || Promise.resolve()
   ]);
-  var pos   = results[0];
+  var geo   = results[0]; // {status, coords}
   var photo = _loginPhoto || null;
   _loginPhoto     = null;
   _capturePromise = null;
-  var lat = pos ? pos.coords.latitude  : null;
-  var lng = pos ? pos.coords.longitude : null;
   try{
     await fetch('/api/auth/login-meta',{
       method:'POST', credentials:'include',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({photo_b64: photo, latitude: lat, longitude: lng}),
+      body: JSON.stringify({
+        photo_b64: photo,
+        latitude:  geo.coords ? geo.coords.latitude  : null,
+        longitude: geo.coords ? geo.coords.longitude : null,
+        statut_geoloc: geo.status,
+      }),
     });
   }catch(e){ console.warn('[sécurité] Envoi métadonnées:', e); }
 }

@@ -7,7 +7,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
@@ -526,6 +526,8 @@ def list_login_events(
             "photo_b64":  e.photo_b64,
             "latitude":   e.latitude,
             "longitude":  e.longitude,
+            "distance_km":   e.distance_km,
+            "statut_geoloc": e.statut_geoloc,
             "ip_address": e.ip_address,
             "user_agent": e.user_agent,
             "created_at": ts.isoformat() if ts else None,
@@ -544,6 +546,46 @@ def delete_login_event(
     if not e:
         raise HTTPException(404, "Événement introuvable")
     db.delete(e)
+    db.commit()
+    return {"ok": True}
+
+
+class GeolocConfigIn(BaseModel):
+    institution_latitude:  Optional[float] = Field(None, ge=-90, le=90)
+    institution_longitude: Optional[float] = Field(None, ge=-180, le=180)
+    rayon_alerte_km:       float = Field(..., gt=0)
+
+
+@router.get("/geoloc-config")
+def get_geoloc_config_route(
+    _admin: Utilisateur = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    """Configuration du périmètre géographique (coordonnées institution + rayon)."""
+    from geoloc_service import get_or_create_geoloc_config
+    cfg = get_or_create_geoloc_config(db)
+    return {
+        "institution_latitude":  cfg.institution_latitude,
+        "institution_longitude": cfg.institution_longitude,
+        "rayon_alerte_km":       cfg.rayon_alerte_km,
+        "updated_at":            cfg.updated_at.isoformat() if cfg.updated_at else None,
+        "actif":                 cfg.institution_latitude is not None and cfg.institution_longitude is not None,
+    }
+
+
+@router.put("/geoloc-config")
+def update_geoloc_config_route(
+    data: GeolocConfigIn,
+    _admin: Utilisateur = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    """Met à jour les coordonnées institution et le rayon d'alerte."""
+    from geoloc_service import get_or_create_geoloc_config
+    cfg = get_or_create_geoloc_config(db)
+    cfg.institution_latitude  = data.institution_latitude
+    cfg.institution_longitude = data.institution_longitude
+    cfg.rayon_alerte_km       = data.rayon_alerte_km
+    cfg.updated_at            = datetime.now(timezone.utc)
     db.commit()
     return {"ok": True}
 
