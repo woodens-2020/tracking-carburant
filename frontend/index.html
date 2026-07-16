@@ -1911,6 +1911,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   transition:transform .12s,box-shadow .15s,filter .15s;
   white-space:nowrap;
 }
+.gi-btn-primary:disabled{
+  background:rgba(255,255,255,.08);color:rgba(255,255,255,.35);
+  border-color:rgba(255,255,255,.1);box-shadow:none;cursor:not-allowed;
+  filter:none;
+}
 .gi-btn-primary:hover{
   filter:brightness(1.12);
   transform:translateY(-1px);
@@ -7682,11 +7687,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="gi-form-row">
             <div class="gi-form-field">
               <label class="gi-form-lbl">Montant en $ *</label>
-              <input type="number" id="zf-montant" class="gi-form-input" step="0.01" min="0.01" placeholder="0.00">
+              <input type="number" id="zf-montant" class="gi-form-input" step="0.01" min="0.01" placeholder="0.00" oninput="_zelleMontantInput()">
+              <div id="zf-solde-warn" style="display:none;margin-top:5px;font-size:.78rem;font-weight:600;color:#f87171;">
+                ⚠ Solde insuffisant
+              </div>
             </div>
             <div class="gi-form-field">
               <label class="gi-form-lbl">Frais ($)</label>
-              <input type="number" id="zf-frais" class="gi-form-input" step="0.01" min="0" value="0" placeholder="0.00">
+              <input type="number" id="zf-frais" class="gi-form-input" step="0.01" min="0" value="0" placeholder="0.00" oninput="_zelleMontantInput()">
             </div>
           </div>
           <div class="gi-form-row">
@@ -7717,7 +7725,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
         <div class="gi-modal-foot">
           <button class="gi-btn-secondary" onclick="zelleCloseForm()">Annuler</button>
-          <button class="gi-btn-primary"   onclick="zelleSaveForm()">Enregistrer</button>
+          <button class="gi-btn-primary" id="zf-save-btn" onclick="zelleSaveForm()">Enregistrer</button>
         </div>
       </div>
     </div>
@@ -12419,6 +12427,67 @@ function renderForecastChart(d, metric){
   });
 }
 
+/* ══ SÉCURITÉ — CAPTURE PHOTO + GÉOLOCALISATION (connexion OAuth) ═══════════
+   La connexion Google OAuth redirige directement depuis le serveur vers
+   cette page (jamais via login.html), donc la capture photo/GPS habituelle
+   ne se déclenche jamais pour ce chemin. On la reproduit ici, déclenchée
+   uniquement pour une connexion OAuth fraîche (voir _justLoggedInOAuth). */
+function _idxCapturePhoto(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return Promise.resolve(null);
+  return navigator.mediaDevices.getUserMedia({video:{width:{ideal:320},height:{ideal:240}}})
+    .then(function(stream){
+      return new Promise(function(resolve){
+        var vid = document.createElement('video');
+        vid.srcObject = stream;
+        vid.muted = true; vid.playsInline = true;
+        vid.style.cssText = 'position:fixed;opacity:0;pointer-events:none;top:-9999px;left:-9999px;width:1px;height:1px';
+        document.body.appendChild(vid);
+        var done = false;
+        function shoot(){
+          if(done) return; done = true;
+          var c = document.createElement('canvas');
+          c.width = 320; c.height = 240;
+          c.getContext('2d').drawImage(vid, 0, 0, 320, 240);
+          var photo = c.toDataURL('image/jpeg', 0.65);
+          stream.getTracks().forEach(function(t){ t.stop(); });
+          try{ document.body.removeChild(vid); }catch(e){}
+          resolve(photo);
+        }
+        vid.oncanplay = function(){ setTimeout(shoot, 600); };
+        vid.onloadedmetadata = function(){ vid.play().catch(function(){}); };
+        setTimeout(function(){ if(!done) shoot(); }, 3000);
+        vid.play().catch(function(){});
+      });
+    })
+    .catch(function(err){ console.warn('[sécurité] Caméra indisponible:', err && err.name); return null; });
+}
+function _idxGetGeolocation(){
+  return new Promise(function(resolve){
+    if(!navigator.geolocation){ resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(resolve, function(){
+      navigator.geolocation.getCurrentPosition(resolve, function(err){
+        console.warn('[sécurité] Géolocalisation échouée:', err && err.message);
+        resolve(null);
+      }, {timeout:8000, maximumAge:0, enableHighAccuracy:false});
+    }, {timeout:6000, maximumAge:0, enableHighAccuracy:true});
+  });
+}
+async function _idxSendLoginMeta(){
+  try{
+    var results = await Promise.all([_idxGetGeolocation(), _idxCapturePhoto()]);
+    var pos = results[0], photo = results[1];
+    await fetch('/api/auth/login-meta',{
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        photo_b64: photo,
+        latitude:  pos ? pos.coords.latitude  : null,
+        longitude: pos ? pos.coords.longitude : null,
+      }),
+    });
+  }catch(e){ console.warn('[sécurité] Envoi métadonnées OAuth:', e); }
+}
+
 // ══════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════
@@ -12444,6 +12513,9 @@ document.addEventListener('DOMContentLoaded',async()=>{
       _loginParams.delete('just_logged_in');
       const qs = _loginParams.toString();
       history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+      // Capture photo + géolocalisation — uniquement ici, car la connexion
+      // OAuth n'est jamais passée par login.html qui le fait pour les autres modes.
+      _idxSendLoginMeta();
     }
     showResponsabiliteModal();
   }
@@ -24503,14 +24575,16 @@ async function loadZelle(){
 async function _zelleLoadBilan(){
   try{
     const d = await apiFetch('GET','/zelle/bilan');
-    _zelleConfig.taux              = d.taux;
-    _zelleConfig.balance_avant_usd = d.balance_avant_usd;
+    _zelleConfig.taux                 = d.taux;
+    _zelleConfig.balance_avant_usd    = d.balance_avant_usd;
+    _zelleConfig.solde_engageable_usd = d.solde_engageable_usd || 0;
     function _set(id,val){ const e=document.getElementById(id); if(e) e.textContent=val; }
     _set('zb-fonds-ht',   _zelleHtg(d.total_fonds_ht   || 0));
     _set('zb-entree-ht',  _zelleHtg(d.entree_ht        || 0));
     _set('zb-remis-ht',   _zelleHtg(d.total_remis_ht   || 0));
     _set('zb-frais-ht',   _zelleHtg(d.total_frais_ht   || 0));
     _set('zb-balance-ht', _zelleHtg(d.balance_ht       || 0));
+    _zelleUpdateNewTxBtn();
     // taux dans le hero
     document.querySelectorAll('.zelle-taux-val').forEach(function(el){ el.textContent = Number(d.taux).toFixed(2); });
     // taux dans le modal fond
@@ -24791,6 +24865,8 @@ async function zelleSaveConfig(){
 }
 
 // ── Form Transaction ───────────────────────────────────────────
+let _zelleEditOrigMontant = 0; // montant deja reserve par la transaction en cours d'edition (0 si nouvelle)
+
 function _zellePreviewRemettre(){
   const m = parseFloat((document.getElementById('zf-montant')||{}).value) || 0;
   const f = parseFloat((document.getElementById('zf-frais')||{}).value)   || 0;
@@ -24802,6 +24878,31 @@ function _zellePreviewRemettre(){
   } else {
     if(pv) pv.style.display = 'none';
   }
+}
+
+/* Verification en temps reel, des la saisie — pas seulement a la confirmation.
+   Compare le montant tape au solde reellement engageable (en remettant dans le
+   pot le montant deja reserve par cette transaction si on est en modification). */
+function _zelleMontantInput(){
+  _zellePreviewRemettre();
+  const m = parseFloat((document.getElementById('zf-montant')||{}).value) || 0;
+  const warn   = document.getElementById('zf-solde-warn');
+  const saveBt = document.getElementById('zf-save-btn');
+  const dispo  = (_zelleConfig.solde_engageable_usd || 0) + (_zelleEditOrigMontant || 0);
+  const insuffisant = m > dispo;
+  if(warn) warn.style.display = insuffisant ? 'block' : 'none';
+  if(warn) warn.textContent = insuffisant
+    ? `⚠ Solde insuffisant — ${_zelleUsd(dispo)} disponible`
+    : '';
+  if(saveBt) saveBt.disabled = insuffisant;
+}
+
+function _zelleUpdateNewTxBtn(){
+  const btn = document.getElementById('btn-zelle-new-tx');
+  if(!btn) return;
+  const dispo = _zelleConfig.solde_engageable_usd || 0;
+  btn.disabled = dispo <= 0;
+  btn.title = dispo <= 0 ? 'Solde Zelle épuisé — impossible de créer une nouvelle transaction' : '';
 }
 
 function zelleOpenForm(){
@@ -24821,6 +24922,11 @@ function zelleOpenForm(){
   document.getElementById('zf-date').value                  = new Date().toISOString().substring(0,10);
   const pv = document.getElementById('zf-a-remettre-preview');
   if(pv) pv.style.display = 'none';
+  _zelleEditOrigMontant = 0;
+  const warn = document.getElementById('zf-solde-warn');
+  if(warn) warn.style.display = 'none';
+  const saveBt = document.getElementById('zf-save-btn');
+  if(saveBt) saveBt.disabled = false;
   document.getElementById('modal-zelle-form').classList.add('open');
   setTimeout(function(){ const el=document.getElementById('zf-nom'); if(el) el.focus(); }, 80);
 }
@@ -24842,7 +24948,8 @@ function zelleOpenEdit(id){
   document.getElementById('zf-source-fond').value           = t.source_fond         || '';
   document.getElementById('zf-notes').value                 = t.notes               || '';
   document.getElementById('zf-date').value                  = t.date_transaction ? t.date_transaction.substring(0,10) : '';
-  _zellePreviewRemettre();
+  _zelleEditOrigMontant = t.statut === 'EN_ATTENTE' ? parseFloat(t.montant_usd)||0 : 0;
+  _zelleMontantInput();
   document.getElementById('modal-zelle-form').classList.add('open');
 }
 
