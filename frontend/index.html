@@ -7448,7 +7448,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="zbc-val" id="zb-entree-ht">—</div>
           </div>
           <div class="zelle-bilan-card zbc-paiement">
-            <div class="zbc-label">Total reçu</div>
+            <div class="zbc-label">Total à remettre</div>
             <div class="zbc-val" id="zb-remis-ht">—</div>
           </div>
           <div class="zelle-bilan-card" style="border-color:rgba(251,191,36,.3);">
@@ -25851,7 +25851,7 @@ async function zelleImprimerFiche(id){
   const bilanRows = bilan ? (
     '<tr><td class="lbl">Total fonds reçus</td><td class="val">'
       +Number(bilan.total_fonds_ht||0).toLocaleString('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2})+' HTG</td></tr>'
-    +'<tr><td class="lbl">Total reçu</td><td class="val">'
+    +'<tr><td class="lbl">Total à remettre</td><td class="val">'
       +Number(bilan.total_remis_ht||0).toLocaleString('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2})+' HTG</td></tr>'
     +'<tr><td class="lbl" style="font-weight:700;color:#1a2f5e;">Balance disponible</td><td class="val" style="font-weight:800;font-size:1.1rem;color:#1a2f5e;">'
       +Number(bilan.balance_ht||0).toLocaleString('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2})+' HTG</td></tr>'
