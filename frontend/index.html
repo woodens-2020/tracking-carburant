@@ -122,6 +122,32 @@ input[type=date]{color-scheme:dark}
   background:rgba(232,197,88,.7);display:inline-block;flex-shrink:0;
 }
 
+/* ── Recherche sidebar ─────────────────────────── */
+.sb-search{position:relative;flex-shrink:0;margin:14px 14px 0}
+.sb-search-icon{
+  position:absolute;left:10px;top:50%;transform:translateY(-50%);
+  width:15px;height:15px;color:rgba(255,255,255,.32);pointer-events:none;
+}
+.sb-search input{
+  width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
+  border-radius:9px;padding:8px 30px 8px 32px;color:#e8eef8;font-size:13px;
+  font-family:inherit;outline:none;transition:border-color .15s ease,background .15s ease;
+}
+.sb-search input::placeholder{color:rgba(255,255,255,.28)}
+.sb-search input:focus{border-color:rgba(59,130,246,.5);background:rgba(255,255,255,.07)}
+.sb-search-clear{
+  position:absolute;right:5px;top:50%;transform:translateY(-50%);
+  width:20px;height:20px;border:none;background:transparent;color:rgba(255,255,255,.35);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:5px;
+}
+.sb-search-clear:hover{background:rgba(255,255,255,.1);color:#fff}
+.sb-nav-empty{padding:16px 14px 4px;font-size:12.5px;color:rgba(255,255,255,.3);text-align:center;display:none}
+[data-theme="light"] .sb-search input{background:rgba(255,255,255,.35);border-color:rgba(15,30,55,.14);color:#0f1e35}
+[data-theme="light"] .sb-search input::placeholder{color:rgba(15,30,55,.35)}
+[data-theme="light"] .sb-search-icon{color:rgba(15,30,55,.35)}
+[data-theme="light"] .sb-search-clear{color:rgba(15,30,55,.4)}
+[data-theme="light"] .sb-search-clear:hover{background:rgba(15,30,55,.08);color:#0f1e35}
+
 /* ── Navigation ────────────────────────────────── */
 .sb-nav{padding:14px 10px;flex:1;overflow-y:auto}
 .nav-section{
@@ -998,6 +1024,7 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
     box-shadow:0 -4px 20px rgba(0,0,0,.4);
   }
   .sb-brand{display:none}
+  .sb-search{display:none}
   .sb-nav{flex-direction:row;padding:0;gap:0;display:flex}
   .nav-section{display:none}
   .nav-item{
@@ -2792,8 +2819,19 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div>
   </div>
 
+  <!-- Recherche -->
+  <div class="sb-search">
+    <svg class="sb-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="sb-search-input" placeholder="Rechercher une section…" autocomplete="off"
+           oninput="navSearchFilter(this.value)" onkeydown="navSearchKeydown(event)">
+    <button class="sb-search-clear" id="sb-search-clear" onclick="navSearchClear()" style="display:none" aria-label="Effacer la recherche" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
   <!-- Navigation -->
   <nav class="sb-nav">
+    <div class="sb-nav-empty" id="sb-nav-empty">Aucune section trouvée</div>
     <div class="nav-section" data-i18n="nav.navigation">Navigation</div>
 
     <button class="nav-item active" data-page="home" onclick="goTo('home')">
@@ -11895,17 +11933,21 @@ function _applyNavAccess(){
   ['nav-admin-label','nav-btn-admin-roles','nav-btn-admin-users',
    'nav-btn-admin-sessions','nav-btn-admin-audit','nav-btn-admin-security'].forEach(id=>{
     const el = document.getElementById(id);
-    if(el) el.style.display = isAdmin ? '' : 'none';
+    if(!el) return;
+    el.style.display = isAdmin ? '' : 'none';
+    if(el.classList.contains('nav-item')) el.dataset.navAllowed = isAdmin ? '1' : '0';
   });
   const allowed = _getAllowedPages();
   const _isManager = (_appUser?.role_nom||_appUser?.poste||'').toLowerCase() === 'manager';
   const isCaissiere = !_isManager && (!!_appUser?.employe_id || (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier'));
-  if(allowed === null && !isCaissiere) return; // accès complet sans restrictions caissière
+  if(allowed === null && !isCaissiere){ _updateNavSectionVisibility(); return; } // accès complet sans restrictions caissière
   // Masquer items de nav interdits (sauf admin qui est géré ci-dessus)
   document.querySelectorAll('.nav-item[data-page]').forEach(btn=>{
     const p = btn.getAttribute('data-page');
     if(['admin-roles','admin-users','admin-sessions','admin-audit','admin-security'].includes(p)) return;
-    btn.style.display = _canAccess(p) ? '' : 'none';
+    const ok = _canAccess(p);
+    btn.style.display = ok ? '' : 'none';
+    btn.dataset.navAllowed = ok ? '1' : '0';
   });
   // Masquer les nav-cards de la home page pour les pages interdites
   document.querySelectorAll('.nav-card[onclick]').forEach(card=>{
@@ -11934,8 +11976,13 @@ function _applyNavAccess(){
     const el = document.getElementById(id);
     if(el) el.style.display = _roZelle ? 'none' : '';
   });
-  // Masquer les labels de sections dont tous les items sont cachés
-  document.querySelectorAll('.nav-section-label').forEach(label=>{
+  _updateNavSectionVisibility();
+}
+
+// Masque les en-têtes de section (grands et petits) dont tous les items sont cachés —
+// réutilisé à la fois par les permissions de rôle et par le filtre de recherche.
+function _updateNavSectionVisibility(){
+  document.querySelectorAll('.nav-section-label, .nav-section').forEach(label=>{
     if(label.id === 'nav-admin-label') return;
     let el = label.nextElementSibling;
     let hasVisible = false;
@@ -11945,6 +11992,69 @@ function _applyNavAccess(){
     }
     label.style.display = hasVisible ? '' : 'none';
   });
+}
+
+// ══════════════════════════════════════════════
+// RECHERCHE SIDEBAR — filtre les sections par mot-clé
+// ══════════════════════════════════════════════
+let _navSearchIndexed = false;
+const _NAV_DIACRITICS_RE = /[̀-ͯ]/g;
+
+function _navNorm(s){
+  return (s||'').normalize('NFD').replace(_NAV_DIACRITICS_RE,'').toLowerCase().trim();
+}
+
+// Indexe chaque item une seule fois : texte du label de section (ex. "Zelle") +
+// texte visible de l'item + son data-page — permet à "zelle" de faire remonter
+// "Tableau de bord" / "Paiements" / "Fonds" même si ces mots ne contiennent pas "zelle".
+function _navBuildSearchIndex(){
+  if(_navSearchIndexed) return;
+  document.querySelectorAll('.nav-item[data-page]').forEach(btn=>{
+    let sectionLabel = '';
+    let el = btn.previousElementSibling;
+    while(el){
+      if(el.classList.contains('nav-section-label') || el.classList.contains('nav-section')){ sectionLabel = el.textContent; break; }
+      el = el.previousElementSibling;
+    }
+    const page = (btn.getAttribute('data-page')||'').replace(/-/g,' ');
+    btn.dataset.searchText = _navNorm(sectionLabel + ' ' + btn.textContent + ' ' + page);
+  });
+  _navSearchIndexed = true;
+}
+
+function navSearchFilter(raw){
+  _navBuildSearchIndex();
+  const q = _navNorm(raw);
+  const clearBtn = document.getElementById('sb-search-clear');
+  if(clearBtn) clearBtn.style.display = q ? '' : 'none';
+
+  let anyVisible = false;
+  document.querySelectorAll('.nav-item[data-page]').forEach(btn=>{
+    if(btn.dataset.navAllowed === '0'){ btn.style.display = 'none'; return; } // interdit par le rôle : la recherche ne le réaffiche jamais
+    if(!q){ btn.style.display = ''; anyVisible = true; return; }
+    const match = btn.dataset.searchText.includes(q);
+    btn.style.display = match ? '' : 'none';
+    if(match) anyVisible = true;
+  });
+  _updateNavSectionVisibility();
+
+  const empty = document.getElementById('sb-nav-empty');
+  if(empty) empty.style.display = (q && !anyVisible) ? '' : 'none';
+}
+
+function navSearchClear(){
+  const input = document.getElementById('sb-search-input');
+  if(input){ input.value = ''; input.focus(); }
+  navSearchFilter('');
+}
+
+function navSearchKeydown(e){
+  if(e.key === 'Escape'){ navSearchClear(); e.target.blur(); return; }
+  if(e.key === 'Enter'){
+    const first = Array.from(document.querySelectorAll('.nav-item[data-page]'))
+      .find(btn => btn.style.display !== 'none');
+    if(first){ first.click(); navSearchClear(); }
+  }
 }
 
 async function loadCurrentUser(){
