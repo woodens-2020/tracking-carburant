@@ -539,10 +539,14 @@ def me(request: Request, db: Session = Depends(get_db)):
     if user.role_obj:
         perms = user.role_obj.permissions
         role_nom = user.role_obj.nom
-    emp = db.query(_Employe).filter_by(utilisateur_id=user.id).first()
+    emp = db.query(_Employe).filter_by(utilisateur_id=user.id, actif=True).first()
 
-    # Auto-créer un enregistrement Employe pour les comptes caissière qui n'en ont pas.
-    # Cela permet au système POS de filtrer leurs ventes par caissier_id.
+    # Auto-créer un enregistrement Employe pour les comptes caissière qui n'en ont pas
+    # (ou dont la fiche liée a été désactivée par erreur). Cela permet au système POS
+    # de filtrer leurs ventes par caissier_id — un employe inactif ne doit jamais être
+    # renvoyé ici : il n'apparaît pas dans /pos/caisse/caissieres, donc le menu caissier
+    # du POS ne peut pas se pré-sélectionner et se verrouille sur "Sans caissier",
+    # rendant ses ventes invisibles dans les rapports par caissière.
     if not emp and (role_nom or user.poste or "").lower().startswith("caissier"):
         from datetime import date as _date
         parts = (user.nom_complet or user.username).split(" ", 1)
