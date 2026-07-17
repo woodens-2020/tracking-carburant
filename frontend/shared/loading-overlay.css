@@ -1,0 +1,25 @@
+#load-overlay{
+  position:fixed;inset:0;z-index:99999;
+  display:flex;align-items:center;justify-content:center;
+  background:#050b16;
+  transition:opacity .25s ease;
+}
+#load-overlay.lo-hide{opacity:0;pointer-events:none}
+.lo-badge{
+  position:relative;width:72px;height:72px;
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(145deg,#0e1e38,#081428);border-radius:20px;
+  border:1px solid rgba(232,197,88,.28);
+}
+.lo-badge .lo-k{
+  font:800 28px/1 'Calibri','Trebuchet MS',sans-serif;
+  background:linear-gradient(140deg,#f7e7a8 0%,#e8c558 55%,#c49a00 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.lo-ring{
+  position:absolute;inset:-8px;border-radius:26px;
+  border:3px solid transparent;
+  border-top-color:#f7a93b;border-right-color:rgba(247,169,59,.35);
+  animation:lo-spin .9s linear infinite;
+}
+@keyframes lo-spin{to{transform:rotate(360deg)}}

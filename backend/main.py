@@ -129,8 +129,8 @@ def _clear_login_failures(ip: str | None) -> None:
 # Chemins accessibles sans être connecté
 _PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code",
                     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify"}
-_PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/") if _DEBUG_MODE
-                    else ("/api/auth/oauth/",))
+_PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/") if _DEBUG_MODE
+                    else ("/api/auth/oauth/", "/shared/"))
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -4640,6 +4640,10 @@ async def get_statistiques(
 # dépendre d'un CDN externe.
 _VENDOR_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "vendor")
 app.mount("/vendor", StaticFiles(directory=_VENDOR_DIR), name="vendor")
+
+# ---------- Assets front partagés entre login.html et index.html ----------
+_SHARED_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "shared")
+app.mount("/shared", StaticFiles(directory=_SHARED_DIR), name="shared")
 
 
 # ---------- Frontend single-file ----------
