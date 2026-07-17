@@ -11879,6 +11879,16 @@ function _isReadOnly(){
   return rn.startsWith('caissier') || !!_appUser.employe_id
       || rn === 'assistant directeur';
 }
+function _isCaissiere(){
+  if(!_appUser) return false;
+  const rn = (_appUser.role_nom||_appUser.poste||'').toLowerCase();
+  return rn.startsWith('caissier') || !!_appUser.employe_id;
+}
+// Réception d'un paiement de crédit : autorisé en écriture normale, ET pour les
+// caissières malgré leur statut lecture-seule sur le reste du POS (même droit que l'admin).
+function _canPayerCredit(){
+  return !_isReadOnly() || _isCaissiere();
+}
 function _isZelleReadOnly(){
   if(!_appUser) return true;
   const rn = (_appUser.role_nom||_appUser.poste||'').toLowerCase();
@@ -20936,7 +20946,7 @@ async function posVentesCharger(){
         <td>${badge}</td>
         <td style="white-space:nowrap">
           <button class="pos-btn ghost" style="font-size:12px;padding:3px 7px" onclick="posVenteDetail(${v.id})">Détail</button>
-          ${v.statut==='CREDIT_EN_COURS'&&!_isReadOnly()?`<button class="pos-btn teal" style="font-size:12px;padding:3px 7px;margin-left:3px" onclick="posPayerCredit(${v.id},${v.montant_restant||v.montant_total},'${(v.client_nom||'').replace(/'/g,"\\'")}')" title="Encaisser le montant dû et marquer payée">Payer</button>`:''}
+          ${v.statut==='CREDIT_EN_COURS'&&_canPayerCredit()?`<button class="pos-btn teal" style="font-size:12px;padding:3px 7px;margin-left:3px" onclick="posPayerCredit(${v.id},${v.montant_restant||v.montant_total},'${(v.client_nom||'').replace(/'/g,"\\'")}')" title="Encaisser le montant dû et marquer payée">Payer</button>`:''}
           ${v.statut!=='ANNULEE'&&_isAdmin()?`<button class="pos-btn danger" style="font-size:12px;padding:3px 7px;margin-left:3px" onclick="posAnnulerVenteConfirm(${v.id})">Annuler</button>`:''}
         </td>
       </tr>`;
@@ -20997,7 +21007,7 @@ async function posAnnulerVente(){
 }
 
 async function posPayerCredit(venteId, montantRestant, clientNom){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
+  if(!_canPayerCredit()){ _giAlert('Accès lecture seule.','err'); return; }
   const montant = parseFloat(montantRestant)||0;
   const client  = clientNom ? ` — ${clientNom}` : '';
   const msg = `Confirmer la réception de <strong>${posGx(montant)}</strong>${client} et marquer cette vente comme payée ?`;
@@ -21064,7 +21074,7 @@ async function posCreditsCharger(){
         <td>${c.date_echeance ? posDateFr(c.date_echeance).split(' ')[0] : '—'}</td>
         <td>${badge}</td>
         <td style="white-space:nowrap">
-          ${c.statut!=='SOLDE'&&!_isReadOnly()?`<button class="pos-btn teal" style="font-size:12px;padding:3px 7px;margin-right:3px" onclick="posRembModal(${c.id})">Payer</button>`:''}
+          ${c.statut!=='SOLDE'&&_canPayerCredit()?`<button class="pos-btn teal" style="font-size:12px;padding:3px 7px;margin-right:3px" onclick="posRembModal(${c.id})">Payer</button>`:''}
           ${(c.nb_remboursements>0||c.statut==='SOLDE')?`<button class="pos-btn ghost" style="font-size:12px;padding:3px 7px" onclick="posHistoRemb(${c.id})">Historique</button>`:''}
         </td>
       </tr>`;
@@ -21075,7 +21085,7 @@ async function posCreditsCharger(){
 }
 
 function posRembModal(creditId){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
+  if(!_canPayerCredit()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   const credit = _posCredits.find(c=>c.id===creditId);
   if(!credit) return;
   _posRembCreditCourant = credit;
