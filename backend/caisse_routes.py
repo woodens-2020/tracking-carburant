@@ -61,9 +61,38 @@ def _ventes_session(session: BarSessionCaisse, db: Session):
     )
 
 
-def _stats_ventes(ventes):
+def _cash_remboursements_collectes(employe: Optional[Employe], jour: date, db: Session) -> float:
+    """Cash physiquement recu ce jour-la par cette caissiere en reglement
+    d'un credit — quelle que soit la date de la vente d'origine (un credit
+    peut avoir ete vendu un autre jour). Le paiement d'un credit
+    (PUT /ventes/{id}/payer ou POST /credits/{id}/remboursement) ne change
+    jamais le mode_paiement ni la date_heure de la vente d'origine, donc ce
+    cash ne peut pas etre retrouve via _ventes_session/mode_paiement — il
+    est traque separement via bar_remboursements (date_remb + utilisateur_id
+    de la personne qui a encaisse), rattache a la caissiere via son compte
+    utilisateur lie (Employe.utilisateur_id)."""
+    from models import BarRemboursement
+    if not employe or not employe.utilisateur_id:
+        return 0.0
+    jour_start = datetime.combine(jour, datetime.min.time()).replace(tzinfo=timezone.utc)
+    jour_end   = datetime.combine(jour, datetime.max.time()).replace(tzinfo=timezone.utc)
+    rembs = (
+        db.query(BarRemboursement)
+        .filter(
+            BarRemboursement.utilisateur_id == employe.utilisateur_id,
+            BarRemboursement.date_remb >= jour_start,
+            BarRemboursement.date_remb <= jour_end,
+        )
+        .all()
+    )
+    return sum(float(r.montant) for r in rembs)
+
+
+def _stats_ventes(ventes, employe: Optional[Employe] = None, jour: Optional[date] = None, db: Session = None):
     total      = sum(float(v.montant_total) for v in ventes)
     cash       = sum(float(v.montant_paye)  for v in ventes if v.mode_paiement in ("CASH", "MIXTE"))
+    if employe is not None and jour is not None and db is not None:
+        cash += _cash_remboursements_collectes(employe, jour, db)
     credit_tot = sum(float(v.montant_total) for v in ventes if v.mode_paiement == "CREDIT")
     modes      = {}
     for v in ventes:
@@ -179,7 +208,7 @@ def dashboard_caissiere(
             "ticket":  v.numero_ticket,
         })
 
-    stats = _stats_ventes(ventes)
+    stats = _stats_ventes(ventes, employe, jour, db)
     return {
         "date":          str(jour),
         "caissier_id":   caissier_id,
@@ -214,7 +243,7 @@ def liste_sessions(
     result = []
     for s in sessions:
         ventes = _ventes_session(s, db)
-        stats  = _stats_ventes(ventes)
+        stats  = _stats_ventes(ventes, s.caissier, s.date_session, db)
         result.append(_session_dict(s, stats))
     return result
 
@@ -223,7 +252,7 @@ def liste_sessions(
 def detail_session(session_id: int, db: Session = Depends(get_db)):
     s      = _session_ou_404(session_id, db)
     ventes = _ventes_session(s, db)
-    stats  = _stats_ventes(ventes)
+    stats  = _stats_ventes(ventes, s.caissier, s.date_session, db)
     d      = _session_dict(s, stats)
     d["ventes"] = [
         {
@@ -277,7 +306,7 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
         db.refresh(session)
 
     ventes = _ventes_session(session, db)
-    stats  = _stats_ventes(ventes)
+    stats  = _stats_ventes(ventes, session.caissier, session.date_session, db)
     return _session_dict(session, stats)
 
 
@@ -297,7 +326,7 @@ def soumettre_session(session_id: int, body: NoteIn = NoteIn(), db: Session = De
         s.notes_admin = body.notes
     db.commit()
     ventes = _ventes_session(s, db)
-    return _session_dict(s, _stats_ventes(ventes))
+    return _session_dict(s, _stats_ventes(ventes, s.caissier, s.date_session, db))
 
 
 class ValiderIn(BaseModel):
@@ -315,7 +344,7 @@ def valider_session(session_id: int, body: ValiderIn = ValiderIn(), request: Req
         s.notes_admin = body.notes
     db.commit()
     ventes = _ventes_session(s, db)
-    return _session_dict(s, _stats_ventes(ventes))
+    return _session_dict(s, _stats_ventes(ventes, s.caissier, s.date_session, db))
 
 
 # ── Exports PDF / XLSX ────────────────────────────────────────────────
@@ -323,7 +352,7 @@ def valider_session(session_id: int, body: ValiderIn = ValiderIn(), request: Req
 def _build_rapport_data(session_id: int, db: Session):
     s      = _session_ou_404(session_id, db)
     ventes = _ventes_session(s, db)
-    stats  = _stats_ventes(ventes)
+    stats  = _stats_ventes(ventes, s.caissier, s.date_session, db)
     return s, ventes, stats
 
 

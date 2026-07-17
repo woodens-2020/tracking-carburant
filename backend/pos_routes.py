@@ -1615,6 +1615,17 @@ def payer_vente_credit(vente_id: int, request: Request, db: Session = Depends(ge
         credit.montant_rembourse = credit.montant_du
         credit.solde             = Decimal("0")
         credit.statut            = "SOLDE"
+        if montant_encaisse > 0:
+            # Journal du cash reçu — indispensable pour que le compteur de
+            # cash de la session caissière du jour reflète ce paiement, quelle
+            # que soit la date de la vente d'origine (crédit vendu un autre
+            # jour). Voir _cash_remboursements_collectes (caisse_routes.py).
+            db.add(BarRemboursement(
+                credit_id      = credit.id,
+                montant        = montant_encaisse,
+                utilisateur_id = _uid(request),
+                notes          = "Règlement complet du crédit (bouton Payer)",
+            ))
 
     db.commit()
     return {
