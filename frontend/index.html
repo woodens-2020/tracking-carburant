@@ -11994,9 +11994,11 @@ function notify(msg, type='inf'){
     </button>`;
   function dismiss(){
     if(!el.parentNode) return;
+    clearTimeout(autoTimer);
     el.classList.add('t-out');
     el.addEventListener('animationend', () => el.remove(), {once:true});
   }
+  const autoTimer = setTimeout(dismiss, 10000);
   el.querySelector('.toast-close').addEventListener('click', e => { e.stopPropagation(); dismiss(); });
   container.appendChild(el);
 }
