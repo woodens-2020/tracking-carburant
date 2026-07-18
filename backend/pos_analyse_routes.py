@@ -222,8 +222,9 @@ def suivi_lots_produit(produit_id: int, db: Session = Depends(get_db)):
 
     lots = []
     for i, achat in enumerate(achats):
-        debut = achat.date_achat
-        fin   = achats[i + 1].date_achat if i + 1 < len(achats) else now_utc
+        debut    = achat.date_achat
+        en_cours = (i + 1 >= len(achats))
+        fin      = achats[i + 1].date_achat if not en_cours else now_utc
 
         ventes_lot = [lv for lv in lignes_vente if debut <= lv.vente.date_heure < fin]
         qte_vendue = sum(float(_dec(lv.quantite)) for lv in ventes_lot)
@@ -232,6 +233,20 @@ def suivi_lots_produit(produit_id: int, db: Session = Depends(get_db)):
         cout_lot   = float(_dec(achat.quantite)) * float(_dec(achat.prix_achat_unitaire))
         dep_total  = sum(float(_dec(d.montant)) for d in (achat.depenses or []))
         cout_total = cout_lot + dep_total
+        recup_pct  = round(ca_genere / cout_total * 100, 1) if cout_total > 0 else 0.0
+
+        # Statut d'évaluation de rentabilité — distinct du statut de l'achat
+        # (CONFIRME/EN_ATTENTE) déjà exposé ci-dessous. "en_cours" = dernier
+        # achat de ce produit, fenêtre de vente encore ouverte, pas de verdict
+        # final ; les autres sont jugés sur leur taux de récupération final.
+        if en_cours:
+            statut_rentabilite = "en_cours"
+        elif recup_pct >= 100:
+            statut_rentabilite = "rentable"
+        elif recup_pct >= 60:
+            statut_rentabilite = "a_surveiller"
+        else:
+            statut_rentabilite = "perte"
 
         lots.append({
             "achat_id":         achat.id,
@@ -245,11 +260,13 @@ def suivi_lots_produit(produit_id: int, db: Session = Depends(get_db)):
             "cout_total":       cout_total,
             "notes":            achat.notes,
             "ventes": {
-                "qte_vendue":       round(qte_vendue, 3),
-                "ca_genere":        round(ca_genere, 2),
-                "nb_lignes":        len(ventes_lot),
-                "recuperation_pct": round(ca_genere / cout_total * 100, 1) if cout_total > 0 else 0.0,
-                "benefice_estime":  round(ca_genere - cout_total, 2),
+                "qte_vendue":         round(qte_vendue, 3),
+                "ca_genere":          round(ca_genere, 2),
+                "nb_lignes":          len(ventes_lot),
+                "recuperation_pct":   recup_pct,
+                "benefice_estime":    round(ca_genere - cout_total, 2),
+                "en_cours":           en_cours,
+                "statut_rentabilite": statut_rentabilite,
             },
         })
 

@@ -2087,6 +2087,24 @@ def historique_paiements_employe(employe_id: int, db: Session = Depends(get_db))
 # STATISTIQUES & RENTABILITÉ
 # ══════════════════════════════════════════════════════════════════
 
+def _periode_precedente(date_debut: date_type, date_fin: date_type, db: Session) -> dict:
+    """Résumé CA/COGS/bénéfice/marge de la période précédente de durée égale,
+    immédiatement avant date_debut — pour les badges de comparaison ▲/▼."""
+    from datetime import timedelta
+    nb_jours   = (date_fin - date_debut).days + 1
+    prev_fin   = date_debut - timedelta(days=1)
+    prev_debut = prev_fin - timedelta(days=nb_jours - 1)
+    prev       = stats_bar(prev_debut, prev_fin, db)
+    return {
+        "periode":       prev["periode"],
+        "ca_total":      prev["ca_total"],
+        "cogs_total":    prev["cogs_total"],
+        "benefice_net":  prev["benefice_net"],
+        "marge_globale": prev["marge_globale"],
+        "nb_ventes":     prev["nb_ventes"],
+    }
+
+
 @router.get("/stats")
 def statistiques_bar(
     date_debut: date_type = Query(default=None),
@@ -2101,7 +2119,9 @@ def statistiques_bar(
     if not date_fin:
         date_fin = today
 
-    return stats_bar(date_debut, date_fin, db)
+    data = stats_bar(date_debut, date_fin, db)
+    data["precedent"] = _periode_precedente(date_debut, date_fin, db)
+    return data
 
 
 @router.get("/benefices")
@@ -2133,6 +2153,7 @@ def benefices_detail(
     return {
         **data,
         "par_categorie": list(par_categorie.values()),
+        "precedent": _periode_precedente(date_debut, date_fin, db),
     }
 
 

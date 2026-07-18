@@ -7121,9 +7121,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
 
         <div class="pos-kpi-grid">
-          <div class="pos-kpi"><div class="pos-kpi-label">CA total</div><div class="pos-kpi-val" id="rkpi-ca">—</div></div>
-          <div class="pos-kpi"><div class="pos-kpi-label">COGS</div><div class="pos-kpi-val amber" id="rkpi-cogs">—</div></div>
-          <div class="pos-kpi"><div class="pos-kpi-label">Bénéfice net</div><div class="pos-kpi-val" id="rkpi-benef">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">CA total</div><div class="pos-kpi-val" id="rkpi-ca">—</div><div id="rkpi-ca-badge" style="font-size:12px;font-weight:700;margin-top:2px"></div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">COGS</div><div class="pos-kpi-val amber" id="rkpi-cogs">—</div><div id="rkpi-cogs-badge" style="font-size:12px;font-weight:700;margin-top:2px"></div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Bénéfice net</div><div class="pos-kpi-val" id="rkpi-benef">—</div><div id="rkpi-benef-badge" style="font-size:12px;font-weight:700;margin-top:2px"></div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">Marge globale</div><div class="pos-kpi-val" id="rkpi-marge">—</div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">Nb ventes</div><div class="pos-kpi-val amber" id="rkpi-nbv">—</div></div>
         </div>
@@ -21935,9 +21935,24 @@ async function posRentCharger(){
       ['rkpi-ca',    posGx(data.ca_total||0)],
       ['rkpi-cogs',  posGx(data.cogs_total||0)],
       ['rkpi-benef', posGx(data.benefice_net||0)],
-      ['rkpi-marge', ((data.marge_globale||0)*100).toFixed(1)+'%'],
+      ['rkpi-marge', (data.marge_globale||0).toFixed(1)+'%'],
       ['rkpi-nbv',   data.nb_ventes||0],
     ].forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
+
+    // Comparaison vs période précédente de durée égale
+    const prev = data.precedent || {};
+    [
+      ['rkpi-ca-badge',    data.ca_total,     prev.ca_total],
+      ['rkpi-cogs-badge',  data.cogs_total,   prev.cogs_total],
+      ['rkpi-benef-badge', data.benefice_net, prev.benefice_net],
+    ].forEach(([id,cur,prv])=>{
+      const el = document.getElementById(id);
+      if(!el) return;
+      if(typeof prv !== 'number' || prv === 0){ el.innerHTML=''; return; }
+      const pct = (cur - prv) / Math.abs(prv) * 100;
+      const col = pct>=0 ? '#22c55e' : '#ef4444', icon = pct>=0 ? '▲' : '▼';
+      el.innerHTML = `<span style="color:${col}">${icon} ${Math.abs(pct).toFixed(1)}% vs précédent</span>`;
+    });
 
     // Tableau par produit
     const parProd = data.par_produit||[];
@@ -22430,6 +22445,13 @@ function anaOuvrirLots(produitId){
   anaChargerLots();
 }
 
+const _ANA_STATUT_LABEL = {
+  rentable:     { label: 'Rentable',     color: '#22c55e' },
+  en_cours:     { label: 'En cours',     color: '#60a5fa' },
+  a_surveiller: { label: 'À surveiller', color: '#f7a93b' },
+  perte:        { label: 'Perte',        color: '#ef4444' },
+};
+
 async function anaChargerLots(){
   const pid  = document.getElementById('ana-lots-produit')?.value;
   const body = document.getElementById('ana-lots-body');
@@ -22484,7 +22506,8 @@ async function anaChargerLots(){
               <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35);white-space:nowrap">CA généré</th>
               <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35);min-width:100px">Récup.</th>
               <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35);white-space:nowrap">Bénéfice est.</th>
-              <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Statut</th>
+              <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Réception</th>
+              <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Évaluation</th>
             </tr>
           </thead>
           <tbody>
@@ -22496,6 +22519,8 @@ async function anaChargerLots(){
               const sBadge = lot.statut === 'CONFIRME'
                 ? '<span class="pos-badge teal" style="font-size:11px">Confirmé</span>'
                 : '<span class="pos-badge amber" style="font-size:11px">En attente</span>';
+              const rentSt = _ANA_STATUT_LABEL[lot.ventes.statut_rentabilite] || { label: '—', color: '#94a3b8' };
+              const rentBadge = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:${rentSt.color}22;color:${rentSt.color}">${rentSt.label}</span>`;
               return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
                 <td style="padding:9px 12px;font-weight:600;white-space:nowrap">${posDateFr(lot.date_achat).split(' ')[0]}</td>
                 <td style="padding:9px 8px;font-size:13px;color:rgba(255,255,255,.5)">${lot.fournisseur || '—'}</td>
@@ -22514,6 +22539,7 @@ async function anaChargerLots(){
                 </td>
                 <td style="padding:9px 8px;text-align:right;font-weight:700;color:${bC}">${posGx(benef)}</td>
                 <td style="padding:9px 8px;text-align:center">${sBadge}</td>
+                <td style="padding:9px 8px;text-align:center">${rentBadge}</td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -22554,18 +22580,28 @@ async function anaChargerRentabilite(){
     const prods   = (data.par_produit || []).sort((a, b) => b.benefice - a.benefice);
     const cats    = (data.par_categorie || []).sort((a, b) => b.benefice - a.benefice);
 
+    const prev = data.precedent || {};
+    const badge = (cur, prv) => {
+      if(typeof prv !== 'number' || prv === 0) return '';
+      const pct = (cur - prv) / Math.abs(prv) * 100;
+      const col = pct>=0 ? '#22c55e' : '#ef4444', icon = pct>=0 ? '▲' : '▼';
+      return `<div style="font-size:12px;font-weight:700;color:${col};margin-top:3px">${icon} ${Math.abs(pct).toFixed(1)}% vs précédent</div>`;
+    };
     const kpis = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
       <div class="pos-card" style="padding:12px 14px;border-top:3px solid #3fb6a8">
         <div style="font-size:12px;color:rgba(255,255,255,.35);margin-bottom:3px">CA période</div>
         <div style="font-size:22px;font-weight:800;color:#3fb6a8">${posGx(data.ca_total)}</div>
+        ${badge(data.ca_total, prev.ca_total)}
       </div>
       <div class="pos-card" style="padding:12px 14px;border-top:3px solid #f59e0b">
         <div style="font-size:12px;color:rgba(255,255,255,.35);margin-bottom:3px">Coût des ventes</div>
         <div style="font-size:22px;font-weight:800;color:#f59e0b">${posGx(data.cogs_total)}</div>
+        ${badge(data.cogs_total, prev.cogs_total)}
       </div>
       <div class="pos-card" style="padding:12px 14px;border-top:3px solid #34d399">
         <div style="font-size:12px;color:rgba(255,255,255,.35);margin-bottom:3px">Bénéfice brut</div>
         <div style="font-size:22px;font-weight:800;color:#34d399">${posGx(data.benefice_net)}</div>
+        ${badge(data.benefice_net, prev.benefice_net)}
       </div>
       <div class="pos-card" style="padding:12px 14px;border-top:3px solid #818cf8">
         <div style="font-size:12px;color:rgba(255,255,255,.35);margin-bottom:3px">Marge globale</div>
