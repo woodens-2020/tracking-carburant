@@ -3184,6 +3184,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="cuisine-analyse" onclick="goTo('cuisine-analyse')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 3 5-8"/></svg></span>
+      <span>Analyse Cuisine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <!-- ── Section Administration (admin seulement) ── -->
     <div class="nav-section-label" id="nav-admin-label" style="display:none">Administration</div>
 
@@ -8623,6 +8629,172 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div><!-- /ckac-bilan-modal -->
 
     <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- CUISINE — ANALYSE (ventes vs achats, rentabilité par achat) -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-cuisine-analyse" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 3 5-8"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Analyse Cuisine</div>
+            <div class="pos-header-sub">Ventes vs achats, rentabilité réelle par plat et par achat</div>
+          </div>
+        </div>
+
+        <!-- Onglets -->
+        <div style="display:flex;gap:4px;margin-bottom:0;border-bottom:1px solid rgba(255,255,255,.08)">
+          <button id="cka-tab-synthese" onclick="ckaSetTab('synthese')" class="pos-btn ghost" style="font-size:14px;border-radius:8px 8px 0 0;padding:8px 14px;border-bottom:2px solid #8b5cf6;color:#8b5cf6">Synthèse</button>
+          <button id="cka-tab-lots"     onclick="ckaSetTab('lots')"     class="pos-btn ghost" style="font-size:14px;border-radius:8px 8px 0 0;padding:8px 14px;border-bottom:2px solid transparent">Rentabilité par achat</button>
+        </div>
+
+        <!-- Panel : Synthèse -->
+        <div id="cka-panel-synthese" style="padding-top:14px">
+          <div class="pos-card" style="padding:10px 14px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <div style="display:flex;gap:6px;align-items:center">
+              <label style="font-size:13px;color:rgba(255,255,255,.4)">Du</label>
+              <input class="pos-input" id="cka-syn-debut" type="date" style="width:140px">
+              <label style="font-size:13px;color:rgba(255,255,255,.4)">au</label>
+              <input class="pos-input" id="cka-syn-fin" type="date" style="width:140px">
+            </div>
+            <button class="pos-btn teal" onclick="ckaSyntheseCharger()">Analyser</button>
+            <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
+              <button class="pos-btn ghost" style="font-size:13px" onclick="ckaSynthesePeriode('mois')">Ce mois</button>
+              <button class="pos-btn ghost" style="font-size:13px" onclick="ckaSynthesePeriode('mois_dernier')">Mois dernier</button>
+              <button class="pos-btn ghost" style="font-size:13px" onclick="ckaSynthesePeriode('trim')">3 mois</button>
+              <button class="pos-btn ghost" style="font-size:13px" onclick="ckaSynthesePeriode('an')">Cette année</button>
+            </div>
+          </div>
+
+          <!-- KPI Cards -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px">
+            <div class="pos-card" style="padding:14px 16px;border-top:3px solid #3fb6a8">
+              <div style="font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);margin-bottom:6px">Chiffre d'affaires</div>
+              <div id="cka-kpi-ca" style="font-size:20px;font-weight:800;color:#3fb6a8">—</div>
+              <div id="cka-kpi-ca-badge" style="font-size:12px;font-weight:700;margin-top:4px"></div>
+            </div>
+            <div class="pos-card" style="padding:14px 16px;border-top:3px solid #f7a93b">
+              <div style="font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);margin-bottom:6px">Coût des achats</div>
+              <div id="cka-kpi-couts" style="font-size:20px;font-weight:800;color:#f7a93b">—</div>
+              <div id="cka-kpi-couts-badge" style="font-size:12px;font-weight:700;margin-top:4px"></div>
+            </div>
+            <div class="pos-card" style="padding:14px 16px;border-top:3px solid #60a5fa">
+              <div style="font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);margin-bottom:6px">Bénéfice net</div>
+              <div id="cka-kpi-benefice" style="font-size:20px;font-weight:800">—</div>
+              <div id="cka-kpi-benefice-badge" style="font-size:12px;font-weight:700;margin-top:4px"></div>
+            </div>
+            <div class="pos-card" style="padding:14px 16px;border-top:3px solid #a78bfa">
+              <div style="font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);margin-bottom:6px">Marge nette</div>
+              <div id="cka-kpi-marge" style="font-size:20px;font-weight:800">—</div>
+            </div>
+            <div class="pos-card" style="padding:14px 16px;border-top:3px solid #34d399">
+              <div style="font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);margin-bottom:6px">Quantité vendue</div>
+              <div id="cka-kpi-qte" style="font-size:20px;font-weight:800;color:#34d399">—</div>
+            </div>
+          </div>
+
+          <!-- Charts -->
+          <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:12px;margin-bottom:14px">
+            <div class="pos-card" style="padding:14px 16px">
+              <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,.7);margin-bottom:10px">Évolution — Ventes vs Achats</div>
+              <div style="position:relative;height:240px"><canvas id="cka-chart-evo"></canvas></div>
+            </div>
+            <div class="pos-card" style="padding:14px 16px">
+              <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,.7);margin-bottom:10px">Achats par catégorie</div>
+              <div style="position:relative;height:240px"><canvas id="cka-chart-cat"></canvas></div>
+            </div>
+          </div>
+
+          <!-- Top plats -->
+          <div class="pos-card" style="padding:0;overflow:hidden">
+            <div style="padding:12px 16px;font-size:13px;font-weight:700;color:rgba(255,255,255,.7);border-bottom:1px solid rgba(255,255,255,.06)">Top plats par bénéfice réel</div>
+            <div style="overflow-x:auto">
+              <table style="width:100%;border-collapse:collapse;font-size:14px">
+                <thead>
+                  <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.08)">
+                    <th style="padding:10px 12px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Plat</th>
+                    <th style="padding:10px 8px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">CA</th>
+                    <th style="padding:10px 8px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Coût achats</th>
+                    <th style="padding:10px 8px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Bénéfice</th>
+                    <th style="padding:10px 8px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);min-width:110px">Marge</th>
+                    <th style="padding:10px 8px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Qté vendue</th>
+                  </tr>
+                </thead>
+                <tbody id="cka-top-plats-tbody">
+                  <tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Sélectionnez une période et cliquez Analyser</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel : Rentabilité par achat -->
+        <div id="cka-panel-lots" style="display:none;padding-top:14px">
+          <div class="pos-card" style="padding:10px 14px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <select class="pos-select" id="cka-lots-plat" style="min-width:180px">
+              <option value="">Tous les plats</option>
+            </select>
+            <div style="display:flex;gap:6px;align-items:center">
+              <label style="font-size:13px;color:rgba(255,255,255,.4)">Achats du</label>
+              <input class="pos-input" id="cka-lots-debut" type="date" style="width:140px">
+              <label style="font-size:13px;color:rgba(255,255,255,.4)">au</label>
+              <input class="pos-input" id="cka-lots-fin" type="date" style="width:140px">
+            </div>
+            <button class="pos-btn teal" onclick="ckaLotsCharger()">Analyser</button>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px">
+            <div class="pos-card" style="padding:14px 16px">
+              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">TOTAL INVESTI</div>
+              <div id="cka-lots-kpi-investi" style="font-size:20px;font-weight:800;color:#f7a93b">—</div>
+            </div>
+            <div class="pos-card" style="padding:14px 16px">
+              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">TOTAL RÉCUPÉRÉ</div>
+              <div id="cka-lots-kpi-recupere" style="font-size:20px;font-weight:800;color:#3fb6a8">—</div>
+            </div>
+            <div class="pos-card" style="padding:14px 16px">
+              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">TAUX MOYEN</div>
+              <div id="cka-lots-kpi-taux" style="font-size:20px;font-weight:800;color:#a78bfa">—</div>
+            </div>
+            <div class="pos-card" style="padding:14px 16px">
+              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">ACHATS ANALYSÉS</div>
+              <div id="cka-lots-kpi-nb" style="font-size:20px;font-weight:800;color:#60a5fa">—</div>
+            </div>
+          </div>
+
+          <div style="font-size:12.5px;color:rgba(255,255,255,.35);margin-bottom:10px">
+            Seuls les achats liés à un plat précis sont affichés ici — les achats généraux (gaz, équipement…) n'ont pas de fenêtre de vente calculable et restent comptés dans le coût total de l'onglet Synthèse.
+          </div>
+
+          <div class="pos-card" style="padding:0;overflow:hidden">
+            <div style="overflow-x:auto">
+              <table style="width:100%;border-collapse:collapse;font-size:14px">
+                <thead>
+                  <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.08)">
+                    <th style="padding:10px 12px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);white-space:nowrap">Date achat</th>
+                    <th style="padding:10px 8px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Plat</th>
+                    <th style="padding:10px 8px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Description</th>
+                    <th style="padding:10px 8px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Coût</th>
+                    <th style="padding:10px 8px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);white-space:nowrap">Qté vendue</th>
+                    <th style="padding:10px 8px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);white-space:nowrap">CA généré</th>
+                    <th style="padding:10px 8px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);white-space:nowrap">Récupération</th>
+                    <th style="padding:10px 8px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Bénéfice</th>
+                    <th style="padding:10px 8px;text-align:center;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35)">Statut</th>
+                  </tr>
+                </thead>
+                <tbody id="cka-lots-tbody">
+                  <tr><td colspan="9" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Sélectionnez une période et cliquez Analyser</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-cuisine-analyse -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
     <!-- HOTEL — CHAMBRES                                          -->
     <!-- ══════════════════════════════════════════════════════════ -->
     <div id="page-hotel-chambres" class="page page-gi">
@@ -11815,7 +11987,7 @@ const _AREA_PAGES = {
     lecture: ['pos-ventes','pos-credits','pos-commandes','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','zelle','zelle-paiements','zelle-fonds'],
   },
   cuisine: {
-    complet: ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats'],
+    complet: ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse'],
     lecture: ['cuisine-ventes','cuisine-stats'],
   },
   hotel: {
@@ -11840,7 +12012,7 @@ const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse',
   'hotel-sejours','hotel-historique','hotel-employes','hotel-rapport',
-  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
+  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
 ]);
 
 // Assistant Directeur — tous les rapports en lecture + Zelle complet
@@ -11849,7 +12021,7 @@ const _AD_ALLOWED = new Set([
   'dashboard','journal','statistiques','gi-dashboard','depenses','achats','caisse',
   'pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes',
   'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse',
-  'cuisine-plats','cuisine-ventes','cuisine-stats','cuisine-achats',
+  'cuisine-plats','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport',
   'employes','payroll',
   'zelle','zelle-paiements','zelle-fonds',
@@ -11860,11 +12032,11 @@ const _ACCES_POSTE_LEGACY = {
   'Directeur Général': null,
   'Comptable':   ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','zelle','zelle-paiements','zelle-fonds',
-                  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
+                  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','zelle','zelle-paiements','zelle-fonds',
-                  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats',
+                  'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
   'Pompiste':            ['home','saisie'],
   'Caissier':            Array.from(_CAISSIER_ALLOWED),
@@ -16481,6 +16653,7 @@ const _giPageLoaders = {
   'cuisine-ventes':     loadCuisineVentes,
   'cuisine-stats':      loadCuisineStats,
   'cuisine-achats':     loadCuisineAchats,
+  'cuisine-analyse':    loadCuisineAnalyse,
   'hotel-chambres':     loadHotelChambres,
   'hotel-reception':    loadHotelReception,
   'hotel-sejours':      loadHotelSejours,
@@ -24189,6 +24362,234 @@ async function ckAchatsSupprimer(id){
     ckAchatsCharger();
   } catch(e){
     posAlert(e.message||'Erreur réseau.','error');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// CUISINE — ANALYSE (ventes vs achats, rentabilité par achat)
+// ══════════════════════════════════════════════════════════════════════
+let _ckaCharts   = {};
+let _ckaTousPlats = [];
+let _ckaTab       = 'synthese';
+
+function _ckaDate(s){
+  if(!s) return '—';
+  const p = s.slice(0, 10).split('-');
+  return `${p[2]}/${p[1]}/${p[0]}`;
+}
+
+function _ckaVarBadge(cur, prv){
+  if(!prv) return '';
+  const pct = prv !== 0 ? ((cur - prv) / Math.abs(prv) * 100) : null;
+  if(pct === null) return '';
+  const col = pct >= 0 ? '#22c55e' : '#ef4444', icon = pct >= 0 ? '▲' : '▼';
+  return `<span style="color:${col}">${icon} ${Math.abs(pct).toFixed(1)}% vs période préc.</span>`;
+}
+
+const _CKA_STATUT_LABEL = {
+  rentable:     { label: 'Rentable',      color: '#22c55e' },
+  en_cours:     { label: 'En cours',      color: '#60a5fa' },
+  a_surveiller: { label: 'À surveiller',  color: '#f7a93b' },
+  perte:        { label: 'Perte',         color: '#ef4444' },
+};
+
+async function loadCuisineAnalyse(){
+  const today = new Date();
+  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  const fmt   = d => d.toISOString().split('T')[0];
+  ['cka-syn-debut','cka-lots-debut'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el && !el.value) el.value = first;
+  });
+  ['cka-syn-fin','cka-lots-fin'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el && !el.value) el.value = fmt(today);
+  });
+  try {
+    _ckaTousPlats = await apiFetch('GET', '/cuisine/plats?actif=true') || [];
+    const sel = document.getElementById('cka-lots-plat');
+    if(sel) sel.innerHTML = '<option value="">Tous les plats</option>' + _ckaTousPlats.map(p=>`<option value="${p.id}">${p.nom}</option>`).join('');
+  } catch(_){}
+  ckaSetTab('synthese');
+  ckaSyntheseCharger();
+}
+
+function ckaSetTab(tab){
+  _ckaTab = tab;
+  ['synthese','lots'].forEach(t=>{
+    const panel = document.getElementById('cka-panel-'+t);
+    const btn   = document.getElementById('cka-tab-'+t);
+    if(panel) panel.style.display = (t === tab) ? '' : 'none';
+    if(btn){
+      btn.style.borderBottomColor = (t === tab) ? '#8b5cf6' : 'transparent';
+      btn.style.color = (t === tab) ? '#8b5cf6' : '';
+    }
+  });
+  if(tab === 'lots' && !_ckaLotsCharge) ckaLotsCharger();
+}
+
+function ckaSynthesePeriode(periode){
+  const today = new Date();
+  let deb, fin;
+  if(periode === 'mois'){
+    deb = new Date(today.getFullYear(), today.getMonth(), 1);
+    fin = today;
+  } else if(periode === 'mois_dernier'){
+    deb = new Date(today.getFullYear(), today.getMonth()-1, 1);
+    fin = new Date(today.getFullYear(), today.getMonth(), 0);
+  } else if(periode === 'trim'){
+    deb = new Date(today.getFullYear(), today.getMonth()-2, 1);
+    fin = today;
+  } else if(periode === 'an'){
+    deb = new Date(today.getFullYear(), 0, 1);
+    fin = today;
+  }
+  const fmt = d => d.toISOString().split('T')[0];
+  document.getElementById('cka-syn-debut').value = fmt(deb);
+  document.getElementById('cka-syn-fin').value   = fmt(fin);
+  ckaSyntheseCharger();
+}
+
+async function ckaSyntheseCharger(){
+  const deb = document.getElementById('cka-syn-debut')?.value;
+  const fin = document.getElementById('cka-syn-fin')?.value;
+  if(!deb || !fin) return;
+  if(deb > fin){ posAlert('La date de début doit précéder la date de fin.', 'warn'); return; }
+  try {
+    const d = await apiFetch('GET', `/cuisine/analyse/synthese?date_debut=${deb}&date_fin=${fin}`);
+    const a = d.actuel, p = d.precedent;
+
+    document.getElementById('cka-kpi-ca').textContent       = posGx(a.ca_total);
+    document.getElementById('cka-kpi-ca-badge').innerHTML   = _ckaVarBadge(a.ca_total, p.ca_total);
+    document.getElementById('cka-kpi-couts').textContent    = posGx(a.cout_achats_total);
+    document.getElementById('cka-kpi-couts-badge').innerHTML= _ckaVarBadge(a.cout_achats_total, p.cout_achats_total);
+
+    const benEl = document.getElementById('cka-kpi-benefice');
+    benEl.textContent = posGx(a.benefice_net);
+    benEl.style.color = a.benefice_net >= 0 ? '#4ade80' : '#f87171';
+    document.getElementById('cka-kpi-benefice-badge').innerHTML = _ckaVarBadge(a.benefice_net, p.benefice_net);
+
+    const margeEl = document.getElementById('cka-kpi-marge');
+    margeEl.textContent = a.marge_pct.toFixed(1) + '%';
+    margeEl.style.color = a.marge_pct >= 30 ? '#4ade80' : a.marge_pct >= 10 ? '#f7a93b' : '#f87171';
+
+    document.getElementById('cka-kpi-qte').textContent = a.qte_vendue.toLocaleString('fr-HT');
+
+    _ckaRenderCharts(d);
+    _ckaRenderTopPlats(d.top_plats || []);
+  } catch(e){
+    posAlert(e.message || 'Erreur lors du chargement de la synthèse.');
+  }
+}
+
+function _ckaRenderCharts(d){
+  if(_ckaCharts.evo){ _ckaCharts.evo.destroy(); delete _ckaCharts.evo; }
+  if(_ckaCharts.cat){ _ckaCharts.cat.destroy(); delete _ckaCharts.cat; }
+  const TICK = 'rgba(255,255,255,.5)', GRID = 'rgba(255,255,255,.05)';
+
+  const c1 = document.getElementById('cka-chart-evo');
+  const evo = d.evolution || [];
+  if(c1 && evo.length){
+    _ckaCharts.evo = new Chart(c1.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: evo.map(e => e.date.length > 7 ? e.date.slice(5).replace('-','/') : e.date),
+        datasets: [
+          { label: 'CA',     data: evo.map(e => e.ca),     borderColor: '#3fb6a8', backgroundColor: 'rgba(63,182,168,.1)', fill: true, tension: .35, pointRadius: 2, borderWidth: 2 },
+          { label: 'Achats', data: evo.map(e => e.achats), borderColor: '#f7a93b', backgroundColor: 'rgba(247,169,59,.08)', fill: true, tension: .35, pointRadius: 2, borderWidth: 2 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 600 },
+        plugins: { legend: { labels: { color: TICK, font: { size: 10 } } },
+          tooltip: { callbacks: { label: c => `${c.dataset.label} : ${posGx(c.parsed.y)}` } } },
+        scales: {
+          x: { ticks: { color: TICK, font: { size: 9 }, maxTicksLimit: 12 }, grid: { color: GRID } },
+          y: { ticks: { color: TICK, font: { size: 9 }, callback: v => posGx(v) }, grid: { color: GRID } },
+        },
+      },
+    });
+  }
+
+  const c2 = document.getElementById('cka-chart-cat');
+  const cats = d.achats_par_categorie || [];
+  if(c2 && cats.length){
+    const COLS = ['#f7a93b','#8b5cf6','#3b82f6','#22c55e','#ef4444','#64748b'];
+    _ckaCharts.cat = new Chart(c2.getContext('2d'), {
+      type: 'doughnut',
+      data: { labels: cats.map(c => c.categorie), datasets: [{ data: cats.map(c => c.montant), backgroundColor: COLS.slice(0, cats.length), borderWidth: 2, hoverOffset: 6 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '60%', animation: { duration: 600 },
+        plugins: { legend: { position: 'right', labels: { color: TICK, font: { size: 10 }, boxWidth: 10, usePointStyle: true } },
+          tooltip: { callbacks: { label: c => `${c.label} : ${posGx(c.parsed)}` } } },
+      },
+    });
+  }
+}
+
+function _ckaRenderTopPlats(plats){
+  const tbody = document.getElementById('cka-top-plats-tbody');
+  if(!tbody) return;
+  if(!plats.length){
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune vente sur cette période</td></tr>';
+    return;
+  }
+  tbody.innerHTML = plats.map(p => {
+    const margeColor = p.marge_pct >= 30 ? '#4ade80' : p.marge_pct >= 10 ? '#f7a93b' : '#f87171';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+      <td style="padding:9px 12px;font-weight:600">${esc(p.plat_nom)}</td>
+      <td style="padding:9px 8px;text-align:right;color:#3fb6a8">${posGx(p.ca)}</td>
+      <td style="padding:9px 8px;text-align:right;color:#f7a93b">${posGx(p.cout_achats)}</td>
+      <td style="padding:9px 8px;text-align:right;font-weight:700;color:${p.benefice>=0?'#4ade80':'#f87171'}">${posGx(p.benefice)}</td>
+      <td style="padding:9px 8px;color:${margeColor};font-weight:600">${p.marge_pct.toFixed(1)}%</td>
+      <td style="padding:9px 8px;text-align:right">${p.quantite_vendue.toLocaleString('fr-HT')}</td>
+    </tr>`;
+  }).join('');
+}
+
+let _ckaLotsCharge = false;
+
+async function ckaLotsCharger(){
+  const plat = document.getElementById('cka-lots-plat')?.value;
+  const deb  = document.getElementById('cka-lots-debut')?.value;
+  const fin  = document.getElementById('cka-lots-fin')?.value;
+  const params = [];
+  if(plat) params.push(`plat_id=${plat}`);
+  if(deb)  params.push(`date_debut=${deb}`);
+  if(fin)  params.push(`date_fin=${fin}`);
+  let url = '/cuisine/analyse/lots';
+  if(params.length) url += '?' + params.join('&');
+  try {
+    const d = await apiFetch('GET', url);
+    _ckaLotsCharge = true;
+    const r = d.resume || {};
+    document.getElementById('cka-lots-kpi-investi').textContent  = posGx(r.total_investi || 0);
+    document.getElementById('cka-lots-kpi-recupere').textContent = posGx(r.total_recupere || 0);
+    document.getElementById('cka-lots-kpi-taux').textContent     = (r.taux_moyen_pct || 0).toFixed(1) + '%';
+    document.getElementById('cka-lots-kpi-nb').textContent       = r.nb_achats || 0;
+
+    const tbody = document.getElementById('cka-lots-tbody');
+    const lots = d.lots || [];
+    if(!lots.length){
+      tbody.innerHTML = '<tr><td colspan="9" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucun achat lié à un plat sur cette période</td></tr>';
+      return;
+    }
+    tbody.innerHTML = lots.map(l => {
+      const st = _CKA_STATUT_LABEL[l.statut] || { label: l.statut, color: '#94a3b8' };
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+        <td style="padding:9px 12px;white-space:nowrap">${_ckaDate(l.date_achat)}</td>
+        <td style="padding:9px 8px;font-weight:600">${esc(l.plat_nom)}</td>
+        <td style="padding:9px 8px;color:rgba(255,255,255,.6)">${esc(l.description || '—')}</td>
+        <td style="padding:9px 8px;text-align:right;color:#f7a93b">${posGx(l.cout_achat)}</td>
+        <td style="padding:9px 8px;text-align:right">${l.quantite_vendue.toLocaleString('fr-HT')}</td>
+        <td style="padding:9px 8px;text-align:right;color:#3fb6a8">${posGx(l.ca_genere)}</td>
+        <td style="padding:9px 8px;text-align:right">${l.recuperation_pct.toFixed(1)}%</td>
+        <td style="padding:9px 8px;text-align:right;font-weight:700;color:${l.benefice_estime>=0?'#4ade80':'#f87171'}">${posGx(l.benefice_estime)}</td>
+        <td style="padding:9px 8px;text-align:center"><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:${st.color}22;color:${st.color}">${st.label}</span></td>
+      </tr>`;
+    }).join('');
+  } catch(e){
+    posAlert(e.message || 'Erreur lors du chargement des lots.');
   }
 }
 

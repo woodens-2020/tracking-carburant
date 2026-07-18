@@ -35,6 +35,7 @@ from pos_analyse_routes import router as pos_analyse_router
 from caisse_routes import router as caisse_router
 from hotel_routes import router as hotel_router
 from cuisine_routes import router as cuisine_router
+from cuisine_analyse_routes import router as cuisine_analyse_router
 from admin_routes import router as admin_router
 from zelle_routes import router as zelle_router
 from auth import (
@@ -185,6 +186,7 @@ app.include_router(pos_analyse_router)
 app.include_router(caisse_router)
 app.include_router(hotel_router)
 app.include_router(cuisine_router)
+app.include_router(cuisine_analyse_router)
 app.include_router(admin_router)
 app.include_router(zelle_router)
 
