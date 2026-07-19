@@ -505,6 +505,218 @@ def stats_hotel(db: Session = Depends(get_db)):
     }
 
 
+def _hotel_bornes(d_debut, d_fin) -> tuple[datetime, datetime]:
+    return (
+        datetime(d_debut.year, d_debut.month, d_debut.day, tzinfo=timezone.utc),
+        datetime(d_fin.year,   d_fin.month,   d_fin.day, 23, 59, 59, tzinfo=timezone.utc),
+    )
+
+
+def _hotel_revenu_periode(db: Session, d_debut, d_fin) -> float:
+    """Revenu encaisse (montant_paye) des reservations arrivees dans la periode —
+    meme convention que _get_rapport_data (filtre sur date_arrivee)."""
+    dt_debut, dt_fin = _hotel_bornes(d_debut, d_fin)
+    total = (
+        db.query(func.sum(HotelReservation.montant_paye))
+        .filter(HotelReservation.date_arrivee >= dt_debut, HotelReservation.date_arrivee <= dt_fin)
+        .scalar()
+    )
+    return float(total or 0)
+
+
+def _bucket_evolution_hotel(evolution: list[dict], nb_jours: int) -> list[dict]:
+    """Regroupe l'evolution quotidienne par semaine (<=90j) ou par mois (plus long)
+    — meme seuil que l'Analyse Cuisine et le Rapport Analytique carburant."""
+    if not evolution:
+        return evolution
+    from datetime import date as date_type
+    mensuel = nb_jours > 90
+    buckets: dict[str, dict] = {}
+    for e in evolution:
+        d = date_type.fromisoformat(e["date"])
+        key = d.strftime("%Y-%m") if mensuel else (d - timedelta(days=d.weekday())).isoformat()
+        b = buckets.setdefault(key, {"date": key, "revenu": 0.0})
+        b["revenu"] += e["revenu"]
+    result = sorted(buckets.values(), key=lambda x: x["date"])
+    for r in result:
+        r["revenu"] = round(r["revenu"], 2)
+    return result
+
+
+@router.get("/dashboard")
+def dashboard_hotel(
+    date_debut: Optional[str] = Query(default=None),
+    date_fin:   Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """Tableau de bord hôtel : KPI + comparaison période précédente, répartition
+    des chambres par statut/type, évolution du revenu, arrivées/départs du jour,
+    départs à venir. Agrège tout en un seul appel (même esprit que /api/gi/dashboard)."""
+    from datetime import date as date_type
+
+    today = datetime.now(timezone.utc).date()
+    try:
+        d_debut = datetime.strptime(date_debut, "%Y-%m-%d").date() if date_debut else date_type(today.year, today.month, 1)
+    except ValueError:
+        d_debut = date_type(today.year, today.month, 1)
+    try:
+        d_fin = datetime.strptime(date_fin, "%Y-%m-%d").date() if date_fin else today
+    except ValueError:
+        d_fin = today
+    if d_debut > d_fin:
+        raise HTTPException(422, "date_debut doit précéder date_fin")
+
+    dt_debut, dt_fin = _hotel_bornes(d_debut, d_fin)
+
+    # ── KPI + comparaison période précédente de durée égale ──
+    total_chambres  = db.query(HotelChambre).filter_by(actif=True).count()
+    chambres_occup  = db.query(HotelChambre).filter_by(statut="OCCUPEE").count()
+    chambres_dispo  = db.query(HotelChambre).filter_by(statut="DISPONIBLE", actif=True).count()
+    chambres_maint  = db.query(HotelChambre).filter_by(statut="MAINTENANCE").count()
+    sejours_actifs  = db.query(HotelReservation).filter_by(statut="EN_COURS").count()
+    nb_arrivees_periode = (
+        db.query(HotelReservation)
+        .filter(HotelReservation.date_arrivee >= dt_debut, HotelReservation.date_arrivee <= dt_fin)
+        .count()
+    )
+    revenu_periode = _hotel_revenu_periode(db, d_debut, d_fin)
+
+    nb_jours   = (d_fin - d_debut).days + 1
+    prev_fin   = d_debut - timedelta(days=1)
+    prev_debut = prev_fin - timedelta(days=nb_jours - 1)
+    revenu_periode_prec = _hotel_revenu_periode(db, prev_debut, prev_fin)
+
+    # ── Répartition des chambres par statut (donut) ──
+    statut_rows = (
+        db.query(HotelChambre.statut, func.count(HotelChambre.id))
+        .filter(HotelChambre.actif == True)
+        .group_by(HotelChambre.statut)
+        .all()
+    )
+    statut_chambres = [{"statut": s, "nb": n} for s, n in statut_rows]
+
+    # ── Répartition par type de chambre (barres) ──
+    chambres = db.query(HotelChambre).filter_by(actif=True).all()
+    par_type: dict[str, dict] = {}
+    for c in chambres:
+        t = c.type_chambre or "SIMPLE"
+        if t not in par_type:
+            par_type[t] = {"type_chambre": t, "nb_chambres": 0, "nb_occupees": 0, "revenu": 0.0}
+        par_type[t]["nb_chambres"] += 1
+        if c.statut == "OCCUPEE":
+            par_type[t]["nb_occupees"] += 1
+
+    revenu_type_rows = (
+        db.query(HotelChambre.type_chambre, func.sum(HotelReservation.montant_paye))
+        .join(HotelReservation, HotelReservation.chambre_id == HotelChambre.id)
+        .filter(HotelReservation.date_arrivee >= dt_debut, HotelReservation.date_arrivee <= dt_fin)
+        .group_by(HotelChambre.type_chambre)
+        .all()
+    )
+    for t, revenu in revenu_type_rows:
+        t = t or "SIMPLE"
+        if t not in par_type:
+            par_type[t] = {"type_chambre": t, "nb_chambres": 0, "nb_occupees": 0, "revenu": 0.0}
+        par_type[t]["revenu"] = float(revenu or 0)
+
+    # ── Évolution quotidienne du revenu (courbe) ──
+    reservations_periode = (
+        db.query(HotelReservation)
+        .filter(HotelReservation.date_arrivee >= dt_debut, HotelReservation.date_arrivee <= dt_fin)
+        .all()
+    )
+    evo_map: dict[str, float] = {}
+    for r in reservations_periode:
+        k = r.date_arrivee.date().isoformat()
+        evo_map[k] = evo_map.get(k, 0.0) + float(_d(r.montant_paye or 0))
+    evolution = [{"date": k, "revenu": round(v, 2)} for k, v in sorted(evo_map.items())]
+    if nb_jours > 32:
+        evolution = _bucket_evolution_hotel(evolution, nb_jours)
+
+    # ── Arrivées & départs du jour ──
+    dt_today, dt_today_fin = _hotel_bornes(today, today)
+    arrivees_jour = (
+        db.query(HotelReservation)
+        .filter(HotelReservation.date_arrivee >= dt_today, HotelReservation.date_arrivee <= dt_today_fin)
+        .all()
+    )
+    departs_jour = (
+        db.query(HotelReservation)
+        .filter(
+            HotelReservation.date_depart_prevue >= dt_today,
+            HotelReservation.date_depart_prevue <= dt_today_fin,
+            HotelReservation.statut == "EN_COURS",
+        )
+        .all()
+    )
+    arrivees_departs_jour = sorted(
+        [
+            {
+                "reservation_id": r.id,
+                "client_nom":     r.client_nom,
+                "chambre_numero": r.chambre.numero if r.chambre else str(r.chambre_id),
+                "heure":          r.date_arrivee.strftime("%H:%M"),
+                "type":           "arrivee",
+                "statut":         r.statut,
+            }
+            for r in arrivees_jour
+        ] + [
+            {
+                "reservation_id": r.id,
+                "client_nom":     r.client_nom,
+                "chambre_numero": r.chambre.numero if r.chambre else str(r.chambre_id),
+                "heure":          r.date_depart_prevue.strftime("%H:%M"),
+                "type":           "depart",
+                "statut":         r.statut,
+            }
+            for r in departs_jour
+        ],
+        key=lambda x: x["heure"],
+    )
+
+    # ── Départs à venir (séjours en cours, triés par date de départ prévue) ──
+    prochains = (
+        db.query(HotelReservation)
+        .filter(HotelReservation.statut == "EN_COURS")
+        .order_by(HotelReservation.date_depart_prevue.asc())
+        .limit(10)
+        .all()
+    )
+    departs_a_venir = [
+        {
+            "reservation_id":      r.id,
+            "client_nom":          r.client_nom,
+            "chambre_numero":      r.chambre.numero if r.chambre else str(r.chambre_id),
+            "date_depart_prevue":  r.date_depart_prevue.isoformat(),
+            "montant_total":       float(_d(r.montant_total)),
+            "solde":               float(_d(r.solde)),
+            "statut":              r.statut,
+        }
+        for r in prochains
+    ]
+
+    return {
+        "periode":            {"debut": str(d_debut), "fin": str(d_fin)},
+        "periode_precedente": {"debut": str(prev_debut), "fin": str(prev_fin)},
+        "kpi": {
+            "total_chambres":       total_chambres,
+            "chambres_occupees":    chambres_occup,
+            "chambres_dispo":       chambres_dispo,
+            "chambres_maintenance": chambres_maint,
+            "taux_occupation":      round(chambres_occup / total_chambres * 100, 1) if total_chambres else 0.0,
+            "sejours_actifs":       sejours_actifs,
+            "nb_arrivees_periode":  nb_arrivees_periode,
+            "revenu_periode":       round(revenu_periode, 2),
+            "revenu_periode_prec":  round(revenu_periode_prec, 2),
+        },
+        "statut_chambres":       statut_chambres,
+        "par_type_chambre":      sorted(par_type.values(), key=lambda x: x["revenu"], reverse=True),
+        "evolution_revenu":      evolution,
+        "arrivees_departs_jour": arrivees_departs_jour,
+        "departs_a_venir":       departs_a_venir,
+    }
+
+
 def _get_rapport_data(
     db: Session,
     date_debut: Optional[str],
