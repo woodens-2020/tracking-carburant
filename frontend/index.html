@@ -6397,6 +6397,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <select class="pos-select" id="pa-filtre-produit" onchange="loadPosAchats()" style="flex:1;min-width:150px">
               <option value="">Tous les produits</option>
             </select>
+            <input class="pos-input" id="pa-recherche" type="text" placeholder="Rechercher : produit, fournisseur, dépense…" style="flex:2;min-width:220px" oninput="_paAppliquerRecherche()">
             <button class="pos-btn ghost" onclick="loadPosAchats()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:4px"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>Rafraîchir
             </button>
@@ -8222,6 +8223,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <option value="PERSONNEL">Personnel</option>
             <option value="AUTRE">Autre</option>
           </select>
+          <input class="pos-input" id="ckdep-recherche" type="text" placeholder="Rechercher : description, fournisseur, notes…" style="flex:1;min-width:200px" oninput="ckDepAfficher()">
           <button class="pos-btn teal" onclick="ckDepCharger()">Filtrer</button>
         </div>
         <!-- KPI dépenses -->
@@ -8449,6 +8451,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <select class="pos-select" id="ckac-filtre-plat" style="min-width:160px">
             <option value="">Tous les plats</option>
           </select>
+          <input class="pos-input" id="ckac-recherche" type="text" placeholder="Rechercher : description, fournisseur, plat…" style="flex:1;min-width:200px" oninput="ckAchatsAppliquerRecherche()">
           <button class="pos-btn teal" onclick="ckAchatsCharger()">Actualiser</button>
         </div>
 
@@ -20087,8 +20090,8 @@ async function loadPosAchats(){
       apiFetch('GET','/pos/achats/produits-tous'),
     ]);
     _paTousProduits = tous;
-    _paRenderTable(achats);
-    _paRenderKpis(achats);
+    _paAllAchats = achats;
+    _paAppliquerRecherche();
     // Populate filter with both types using optgroup
     if(sel){
       sel.innerHTML = '<option value="">Tous les produits</option>';
@@ -20125,13 +20128,28 @@ function _paRenderKpis(achats){
 }
 
 let _paAchatsCache = []; // cache pour accès rapide lors de la génération PDF
+let _paAllAchats   = []; // liste complète recue du serveur (avant filtre de recherche)
+
+// Filtre en direct (côté client) sur produit/catégorie/fournisseur/dépenses
+// liées — insensible aux accents (_navNorm, partagé avec la recherche sidebar).
+function _paAppliquerRecherche(){
+  const q = _navNorm(document.getElementById('pa-recherche')?.value || '');
+  const achats = !q ? _paAllAchats : _paAllAchats.filter(a=>{
+    const depTxt = (a.depenses||[]).map(dep=>dep.description).join(' ');
+    const hay = _navNorm([a.produit_nom, a.produit_categorie, a.fournisseur, depTxt].filter(Boolean).join(' '));
+    return hay.includes(q);
+  });
+  _paRenderTable(achats);
+  _paRenderKpis(achats);
+}
 
 function _paRenderTable(achats){
   _paAchatsCache = achats;
   const tbody = document.getElementById('pos-achats-tbody');
   if(!tbody) return;
   if(!achats.length){
-    tbody.innerHTML='<tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Aucun achat enregistré</td></tr>';
+    const raw = document.getElementById('pa-recherche')?.value || '';
+    tbody.innerHTML = `<tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">${raw ? `Aucun achat ne correspond à « ${esc(raw)} »` : 'Aucun achat enregistré'}</td></tr>`;
     return;
   }
   const fmt = v=>`G ${parseFloat(v).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -23853,7 +23871,13 @@ async function ckDepCharger(){
 function ckDepAfficher(){
   const tbody = document.getElementById('dep-tbody'); if(!tbody) return;
   const cat   = document.getElementById('ckdep-filtre-cat')?.value || '';
-  const deps  = _ckDepots.filter(d => !cat || d.categorie === cat);
+  const q     = _navNorm(document.getElementById('ckdep-recherche')?.value || '');
+  const deps  = _ckDepots.filter(d => {
+    if(cat && d.categorie !== cat) return false;
+    if(!q) return true;
+    const hay = _navNorm([d.description, d.categorie, d.fournisseur, d.notes].filter(Boolean).join(' '));
+    return hay.includes(q);
+  });
 
   const total    = deps.reduce((s, d) => s + d.montant, 0);
   const ing      = deps.filter(d => d.categorie === 'INGREDIENTS').reduce((s,d)=>s+d.montant,0);
@@ -23863,7 +23887,8 @@ function ckDepAfficher(){
   ].forEach(([id, v]) => { const el = document.getElementById(id); if(el) el.textContent = v; });
 
   if(!deps.length){
-    tbody.innerHTML = '<tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune dépense</td></tr>';
+    const raw = document.getElementById('ckdep-recherche')?.value || '';
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">${raw ? `Aucune dépense ne correspond à « ${esc(raw)} »` : 'Aucune dépense'}</td></tr>`;
     return;
   }
 
@@ -24222,6 +24247,7 @@ async function ckStatsCharger(){
 // ══════════════════════════════════════════════════════════════════════
 let _ckAchatsEditId = null;
 let _ckAchatsTousPlats = [];
+let _ckAchatsData = [];
 
 async function loadCuisineAchats(){
   const today = new Date();
@@ -24261,37 +24287,53 @@ async function ckAchatsCharger(){
   const tbody = document.getElementById('ckac-tbody');
   try {
     const d = await apiFetch('GET', url);
-    const achats = d.achats || [];
-
-    document.getElementById('ckac-kpi-total').textContent = posGx(d.total_achats||0);
-    document.getElementById('ckac-kpi-nb').textContent = d.nb_achats||0;
-    const moy = d.nb_achats > 0 ? (d.total_achats / d.nb_achats) : 0;
-    document.getElementById('ckac-kpi-moy').textContent = posGx(moy);
-
-    if(!achats.length){
-      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">Aucun achat sur cette période</td></tr>';
-      return;
-    }
-    tbody.innerHTML = achats.map(a=>`
-      <tr>
-        <td style="white-space:nowrap">${posDateFr(a.date_achat)}</td>
-        <td>${_ckJoursBadge(a.jours)}</td>
-        <td>${a.description}</td>
-        <td style="color:#f7a93b">${a.plat_nom||'—'}</td>
-        <td><span style="font-size:12px;background:rgba(247,169,59,.15);color:#f7a93b;padding:2px 6px;border-radius:4px">${a.categorie}</span></td>
-        <td>${parseFloat(a.quantite||0).toFixed(3)} ${a.unite||''}</td>
-        <td>${posGx(a.cout_unitaire)}</td>
-        <td style="font-weight:700;color:#f7a93b">${posGx(a.total)}</td>
-        <td>${a.fournisseur||'—'}</td>
-        <td style="white-space:nowrap">
-          ${!_isReadOnly() ? `<button class="pos-btn ghost" style="font-size:12px;padding:2px 7px" onclick="ckAchatsEditer(${a.id})">✏</button>
-          <button class="pos-btn" style="font-size:12px;padding:2px 7px;background:rgba(248,113,113,.15);color:#f87171" onclick="ckAchatsSupprimer(${a.id})">✕</button>` : ''}
-        </td>
-      </tr>
-    `).join('');
+    _ckAchatsData = d.achats || [];
+    ckAchatsAppliquerRecherche();
   } catch(e){
     tbody.innerHTML = `<tr><td colspan="10" style="color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
+}
+
+// Filtre en direct (côté client) la liste déjà chargée depuis le serveur
+// (déjà restreinte par date/plat) sur description/fournisseur/plat/catégorie —
+// insensible aux accents (_navNorm, partagé avec la recherche sidebar).
+function ckAchatsAppliquerRecherche(){
+  const tbody = document.getElementById('ckac-tbody');
+  if(!tbody) return;
+  const q = _navNorm(document.getElementById('ckac-recherche')?.value || '');
+  const achats = !q ? _ckAchatsData : _ckAchatsData.filter(a=>{
+    const hay = _navNorm([a.description, a.plat_nom, a.categorie, a.fournisseur].filter(Boolean).join(' '));
+    return hay.includes(q);
+  });
+
+  const total = achats.reduce((s,a)=>s+(a.total||0), 0);
+  document.getElementById('ckac-kpi-total').textContent = posGx(total);
+  document.getElementById('ckac-kpi-nb').textContent = achats.length;
+  const moy = achats.length > 0 ? (total / achats.length) : 0;
+  document.getElementById('ckac-kpi-moy').textContent = posGx(moy);
+
+  if(!achats.length){
+    const raw = document.getElementById('ckac-recherche')?.value || '';
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">${raw ? `Aucun achat ne correspond à « ${esc(raw)} »` : 'Aucun achat sur cette période'}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = achats.map(a=>`
+    <tr>
+      <td style="white-space:nowrap">${posDateFr(a.date_achat)}</td>
+      <td>${_ckJoursBadge(a.jours)}</td>
+      <td>${a.description}</td>
+      <td style="color:#f7a93b">${a.plat_nom||'—'}</td>
+      <td><span style="font-size:12px;background:rgba(247,169,59,.15);color:#f7a93b;padding:2px 6px;border-radius:4px">${a.categorie}</span></td>
+      <td>${parseFloat(a.quantite||0).toFixed(3)} ${a.unite||''}</td>
+      <td>${posGx(a.cout_unitaire)}</td>
+      <td style="font-weight:700;color:#f7a93b">${posGx(a.total)}</td>
+      <td>${a.fournisseur||'—'}</td>
+      <td style="white-space:nowrap">
+        ${!_isReadOnly() ? `<button class="pos-btn ghost" style="font-size:12px;padding:2px 7px" onclick="ckAchatsEditer(${a.id})">✏</button>
+        <button class="pos-btn" style="font-size:12px;padding:2px 7px;background:rgba(248,113,113,.15);color:#f87171" onclick="ckAchatsSupprimer(${a.id})">✕</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
 }
 
 // Badge d'ancienneté réutilisé par les tableaux Achats et Dépenses Cuisine —
