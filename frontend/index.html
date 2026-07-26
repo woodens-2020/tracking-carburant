@@ -5188,6 +5188,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option>Transport</option><option>Taxes</option><option>Assurance</option><option>Divers</option>
             </select>
           </div>
+          <div class="gi-filter-field" style="flex:1;min-width:200px">
+            <label class="gi-filter-lbl">Recherche</label>
+            <input type="text" class="gi-filter-input" id="dep-recherche" placeholder="Description, bénéficiaire, référence…" oninput="depRechercheFiltrer()"/>
+          </div>
         </div>
 
         <div class="gi-table-card">
@@ -16169,16 +16173,7 @@ async function loadDepenses(){
 
   if(d.status === 'fulfilled'){
     _depData = d.value.depenses;
-    document.getElementById('dep-count').textContent       = d.value.nb;
-    document.getElementById('dep-kpi-total').textContent   = _htg(d.value.total);
-    document.getElementById('dep-kpi-nb').textContent      = d.value.nb;
-    const avg = d.value.nb ? Math.round(d.value.total/d.value.nb) : 0;
-    document.getElementById('dep-kpi-avg').textContent     = _htg(avg);
-    const catMap={};
-    _depData.forEach(x=>{ catMap[x.categorie]=(catMap[x.categorie]||0)+x.montant; });
-    const topCat=Object.entries(catMap).sort((a,b)=>b[1]-a[1])[0];
-    document.getElementById('dep-kpi-cat').textContent     = topCat?topCat[0]:'—';
-    renderDepTable(_depData);
+    depRechercheFiltrer(); // applique la recherche en cours (si active) + KPIs + tableau
   } else {
     _giError('dep-table-wrap', d.reason?.message || 'Erreur de chargement des dépenses.');
   }
@@ -16293,10 +16288,40 @@ function exportDepenses(fmt){
   document.body.removeChild(a);
 }
 
+function _depUpdateKpis(data){
+  const total = data.reduce((s,x)=>s+x.montant, 0);
+  document.getElementById('dep-count').textContent     = data.length;
+  document.getElementById('dep-kpi-total').textContent = _htg(total);
+  document.getElementById('dep-kpi-nb').textContent    = data.length;
+  const avg = data.length ? Math.round(total/data.length) : 0;
+  document.getElementById('dep-kpi-avg').textContent   = _htg(avg);
+  const catMap={};
+  data.forEach(x=>{ catMap[x.categorie]=(catMap[x.categorie]||0)+x.montant; });
+  const topCat=Object.entries(catMap).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('dep-kpi-cat').textContent   = topCat?topCat[0]:'—';
+}
+
+// Filtre en direct (côté client, sans requête serveur) la liste déjà chargée
+// par description/catégorie/bénéficiaire/référence — réutilise _navNorm (déjà
+// défini pour la recherche de la sidebar) pour un match insensible aux accents.
+function depRechercheFiltrer(){
+  const q = _navNorm(document.getElementById('dep-recherche')?.value || '');
+  const filtered = !q ? _depData : (_depData||[]).filter(d=>{
+    const hay = _navNorm([d.description, d.categorie, d.beneficiaire, d.reference].filter(Boolean).join(' '));
+    return hay.includes(q);
+  });
+  _depUpdateKpis(filtered);
+  renderDepTable(filtered);
+}
+
 function renderDepTable(data){
   const wrap=document.getElementById('dep-table-wrap');
   if(!data.length){
-    wrap.innerHTML='<div class="gi-empty">Aucune dépense trouvée pour cette période.</div>'; return;
+    const q = document.getElementById('dep-recherche')?.value || '';
+    wrap.innerHTML = q
+      ? `<div class="gi-empty">Aucune dépense ne correspond à « ${esc(q)} ».</div>`
+      : '<div class="gi-empty">Aucune dépense trouvée pour cette période.</div>';
+    return;
   }
   const catColors={'Salaires':'badge-blue','Maintenance':'badge-amber','Electricite':'badge-amber',
     'Loyer':'badge-gray','Taxes':'badge-red','Assurance':'badge-gray','Fournitures':'badge-blue',
