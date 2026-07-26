@@ -8362,6 +8362,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                   <th style="padding:9px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Ticket</th>
                   <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Date/Heure</th>
                   <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Client</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Plats</th>
                   <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Total</th>
                   <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Mode</th>
                   <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Statut</th>
@@ -8369,7 +8370,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 </tr>
               </thead>
               <tbody id="ventes-tbody">
-                <tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+                <tr><td colspan="8" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -24017,7 +24018,7 @@ async function ckVentesCharger(){
     ].forEach(([id,v]) => { const el=document.getElementById(id); if(el) el.textContent=v; });
 
     if(!_ckVentes.length){
-      if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune vente</td></tr>';
+      if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune vente</td></tr>';
       return;
     }
     tbody.innerHTML = _ckVentes.map(v => {
@@ -24025,10 +24026,18 @@ async function ckVentesCharger(){
       const modeBadge = v.mode_paiement === 'CREDIT'
         ? '<span style="font-size:12px;color:#f87171;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);border-radius:4px;padding:2px 6px">Crédit</span>'
         : '<span style="font-size:12px;color:#34d399;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.2);border-radius:4px;padding:2px 6px">Cash</span>';
+      const plats = (v.lignes||[]);
+      const platsHtml = plats.length
+        ? plats.map(l=>`<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(255,255,255,.07);border-radius:4px;padding:1px 6px;font-size:12px;white-space:nowrap">
+            <span style="color:rgba(255,255,255,.9);font-weight:600">${esc(l.nom_plat)}</span>
+            <span style="color:rgba(255,255,255,.4)">×${l.quantite%1===0?l.quantite.toFixed(0):l.quantite.toFixed(1)}</span>
+          </span>`).join(' ')
+        : '<span style="color:rgba(255,255,255,.3);font-size:13px">—</span>';
       return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);opacity:${annulee?'.45':'1'}">
         <td style="padding:9px 12px;font-weight:600;font-family:monospace;font-size:13px">${v.numero_ticket}</td>
         <td style="padding:9px 8px;font-size:13px;color:rgba(255,255,255,.5)">${_ckDateFmt(v.date_heure)} ${_ckHeureFmt(v.date_heure)}</td>
         <td style="padding:9px 8px;font-size:13px;color:rgba(255,255,255,.5)">${v.client_nom || '—'}</td>
+        <td style="padding:9px 8px;max-width:280px"><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">${platsHtml}</div></td>
         <td style="padding:9px 8px;text-align:right;font-weight:700;color:${annulee?'rgba(255,255,255,.3)':'#3fb6a8'}">${posGx(v.total)}</td>
         <td style="padding:9px 8px;text-align:center">${modeBadge}</td>
         <td style="padding:9px 8px;text-align:center">${annulee ? '<span class="pos-badge danger" style="font-size:11px">Annulée</span>' : '<span class="pos-badge teal" style="font-size:11px">Validée</span>'}</td>
@@ -24038,7 +24047,7 @@ async function ckVentesCharger(){
       </tr>`;
     }).join('');
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;text-align:center;color:#f87171">${e.message||'Erreur'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="padding:20px;text-align:center;color:#f87171">${e.message||'Erreur'}</td></tr>`;
   }
 }
 
