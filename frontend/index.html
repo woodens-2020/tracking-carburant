@@ -8245,6 +8245,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <thead style="position:sticky;top:0;background:#1a1f2e;z-index:1">
                 <tr style="border-bottom:1px solid rgba(255,255,255,.08)">
                   <th style="padding:9px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Date</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Jours</th>
                   <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Description</th>
                   <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Catégorie</th>
                   <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Fournisseur</th>
@@ -8253,7 +8254,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 </tr>
               </thead>
               <tbody id="dep-tbody">
-                <tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+                <tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -8469,6 +8470,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <thead>
               <tr>
                 <th>Date</th>
+                <th>Jours</th>
                 <th>Description</th>
                 <th>Plat lié</th>
                 <th>Catégorie</th>
@@ -8480,7 +8482,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               </tr>
             </thead>
             <tbody id="ckac-tbody">
-              <tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">Chargement…</td></tr>
+              <tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">Chargement…</td></tr>
             </tbody>
           </table>
         </div>
@@ -8829,6 +8831,18 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <label style="font-size:13px;color:rgba(255,255,255,.4)">au</label>
             <input class="pos-input" id="hd-fin" type="date" style="width:140px">
           </div>
+          <select class="pos-select" id="hd-filtre-sejour" onchange="hotelDashCharger()" style="min-width:130px">
+            <option value="">Tous séjours</option>
+            <option value="NUIT">Nuit</option>
+            <option value="MOMENT">Moment</option>
+          </select>
+          <select class="pos-select" id="hd-filtre-chambre" onchange="hotelDashCharger()" style="min-width:140px">
+            <option value="">Toutes chambres</option>
+            <option value="SIMPLE">Simple</option>
+            <option value="DOUBLE">Double</option>
+            <option value="SUITE">Suite</option>
+            <option value="VIP">VIP</option>
+          </select>
           <button class="pos-btn teal" onclick="hotelDashCharger()">Analyser</button>
           <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
             <button class="pos-btn ghost" style="font-size:13px" onclick="hotelDashPeriode('jour')">Aujourd'hui</button>
@@ -8874,6 +8888,15 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="gid-kpi-lbl">Revenu période</div>
             <div class="gid-kpi-val" id="hd-kpi-revenu" style="color:#22c55e">—</div>
             <div class="gid-kpi-sub" id="hd-kpi-revenu-sub">—</div>
+          </div>
+          <div class="gid-kpi">
+            <div class="gid-kpi-accent" style="background:#f87171"></div>
+            <div class="gid-kpi-icon" style="background:rgba(248,113,113,.12)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <div class="gid-kpi-lbl">Solde impayé</div>
+            <div class="gid-kpi-val" id="hd-kpi-impaye" style="color:#f87171">—</div>
+            <div class="gid-kpi-sub" id="hd-kpi-impaye-sub">—</div>
           </div>
         </div>
 
@@ -23791,14 +23814,14 @@ async function ckDepCharger(){
   const debut = document.getElementById('dep-debut')?.value;
   const fin   = document.getElementById('dep-fin')?.value;
   const tbody = document.getElementById('dep-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     let url = '/cuisine/depenses';
     if(debut || fin) url += `?date_debut=${debut||''}&date_fin=${fin||''}`;
     _ckDepots = await apiFetch('GET', url);
     ckDepAfficher();
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:20px;text-align:center;color:#f87171">${e.message||'Erreur'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;text-align:center;color:#f87171">${e.message||'Erreur'}</td></tr>`;
   }
 }
 
@@ -23815,7 +23838,7 @@ function ckDepAfficher(){
   ].forEach(([id, v]) => { const el = document.getElementById(id); if(el) el.textContent = v; });
 
   if(!deps.length){
-    tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune dépense</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune dépense</td></tr>';
     return;
   }
 
@@ -23824,6 +23847,7 @@ function ckDepAfficher(){
     const cc = catColors[d.categorie] || catColors.AUTRE;
     return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
       <td style="padding:9px 12px;font-size:13px;color:rgba(255,255,255,.5)">${_ckDateFmt(d.date_depense)}</td>
+      <td style="padding:9px 8px">${_ckJoursBadge(d.jours)}</td>
       <td style="padding:9px 8px;font-weight:600">${d.description}</td>
       <td style="padding:9px 8px"><span style="font-size:12px;font-weight:700;color:${cc};background:${cc}18;border:1px solid ${cc}33;border-radius:4px;padding:2px 6px">${d.categorie}</span></td>
       <td style="padding:9px 8px;font-size:13px;color:rgba(255,255,255,.45)">${d.fournisseur || '—'}</td>
@@ -23874,11 +23898,13 @@ async function ckDepSauvegarder(){
   const montant = parseFloat(document.getElementById('ckdep-montant').value);
   if(!desc){ posAlert('La description est requise.','warn'); return; }
   if(!montant || montant <= 0){ posAlert('Le montant doit être positif.','warn'); return; }
+  const dateChoisie = document.getElementById('ckdep-date').value || null;
+  _ckAvertirSiAntidatage(dateChoisie);
   const payload = {
     description:  desc,
     categorie:    document.getElementById('ckdep-cat').value,
     montant,
-    date_depense: document.getElementById('ckdep-date').value || null,
+    date_depense: dateChoisie,
     fournisseur:  document.getElementById('dep-fournisseur').value.trim(),
     notes:        document.getElementById('ckdep-notes').value.trim(),
   };
@@ -24218,12 +24244,13 @@ async function ckAchatsCharger(){
     document.getElementById('ckac-kpi-moy').textContent = posGx(moy);
 
     if(!achats.length){
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">Aucun achat sur cette période</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">Aucun achat sur cette période</td></tr>';
       return;
     }
     tbody.innerHTML = achats.map(a=>`
       <tr>
         <td style="white-space:nowrap">${posDateFr(a.date_achat)}</td>
+        <td>${_ckJoursBadge(a.jours)}</td>
         <td>${a.description}</td>
         <td style="color:#f7a93b">${a.plat_nom||'—'}</td>
         <td><span style="font-size:12px;background:rgba(247,169,59,.15);color:#f7a93b;padding:2px 6px;border-radius:4px">${a.categorie}</span></td>
@@ -24238,7 +24265,30 @@ async function ckAchatsCharger(){
       </tr>
     `).join('');
   } catch(e){
-    tbody.innerHTML = `<tr><td colspan="9" style="color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+  }
+}
+
+// Badge d'ancienneté réutilisé par les tableaux Achats et Dépenses Cuisine —
+// neutre ≤2j, ambre ≤14j, rouge au-delà : repère visuellement les entrées
+// anciennes ou antidatées sans avoir à comparer les dates manuellement.
+function _ckJoursBadge(jours){
+  if(jours === null || jours === undefined) return '—';
+  const j = parseInt(jours);
+  const label = j === 0 ? "Aujourd'hui" : j === 1 ? '1 jour' : `${j} jours`;
+  const color = j <= 2 ? 'rgba(255,255,255,.5)' : j <= 14 ? '#f7a93b' : '#f87171';
+  const weight = j > 14 ? '700' : '600';
+  return `<span style="color:${color};font-weight:${weight};white-space:nowrap">${label}</span>`;
+}
+
+// Avertit avant l'envoi si une date passée est choisie par un non-admin —
+// le serveur reste la seule autorité réelle (403 si refusé), ceci n'est
+// qu'un avertissement anticipé pour éviter une découverte tardive par erreur.
+function _ckAvertirSiAntidatage(dateChoisie){
+  if(!dateChoisie || _appUser?.est_admin) return;
+  const aujourdhui = new Date().toISOString().split('T')[0];
+  if(dateChoisie < aujourdhui){
+    posAlert("Date dans le passé : seul un administrateur peut enregistrer une entrée antidatée.", 'warn');
   }
 }
 
@@ -24512,6 +24562,7 @@ async function ckAchatsSauvegarder(){
     fournisseur:   document.getElementById('ckac-fournisseur').value.trim()||null,
     notes:         document.getElementById('ckac-notes').value.trim()||null,
   };
+  _ckAvertirSiAntidatage(payload.date_achat);
 
   try {
     if(_ckAchatsEditId){
@@ -24823,12 +24874,17 @@ function hotelDashPeriode(periode){
 }
 
 async function hotelDashCharger(){
-  const deb = document.getElementById('hd-debut')?.value;
-  const fin = document.getElementById('hd-fin')?.value;
+  const deb    = document.getElementById('hd-debut')?.value;
+  const fin    = document.getElementById('hd-fin')?.value;
+  const sejour = document.getElementById('hd-filtre-sejour')?.value || '';
+  const chambre = document.getElementById('hd-filtre-chambre')?.value || '';
   if(!deb || !fin) return;
   if(deb > fin){ posAlert('La date de début doit précéder la date de fin.', 'warn'); return; }
   try {
-    const d = await apiFetch('GET', `/hotel/dashboard?date_debut=${deb}&date_fin=${fin}`);
+    let url = `/hotel/dashboard?date_debut=${deb}&date_fin=${fin}`;
+    if(sejour)  url += `&type_sejour=${sejour}`;
+    if(chambre) url += `&type_chambre=${chambre}`;
+    const d = await apiFetch('GET', url);
     const k = d.kpi;
 
     document.getElementById('hd-kpi-taux').textContent    = k.taux_occupation.toFixed(1) + '%';
@@ -24842,6 +24898,9 @@ async function hotelDashCharger(){
 
     document.getElementById('hd-kpi-revenu').textContent = posGx(k.revenu_periode);
     document.getElementById('hd-kpi-revenu-sub').innerHTML = _hdVarBadge(k.revenu_periode, k.revenu_periode_prec);
+
+    document.getElementById('hd-kpi-impaye').textContent = posGx(k.solde_impaye);
+    document.getElementById('hd-kpi-impaye-sub').textContent = `Facturé : ${posGx(k.montant_facture)}`;
 
     _hdRenderCharts(d);
     _hdRenderArriveesDeparts(d.arrivees_departs_jour || []);

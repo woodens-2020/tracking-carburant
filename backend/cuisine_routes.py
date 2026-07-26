@@ -5,17 +5,49 @@ from datetime import datetime, timezone, date as date_type, time
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import CuisinePlat, CuisineDepense, CuisineVente, CuisineLigneVente, CuisineAchat
+from models import CuisinePlat, CuisineDepense, CuisineVente, CuisineLigneVente, CuisineAchat, Utilisateur
 
 router = APIRouter(prefix="/api/cuisine", tags=["Cuisine"])
 
 
 def _dec(v) -> Decimal:
     return Decimal(str(v)) if v is not None else Decimal("0")
+
+
+def _est_admin_utilisateur(request: Request, db: Session) -> bool:
+    """Meme logique que admin_routes._require_admin, sans lever d'exception —
+    utilisee pour des controles conditionnels (pas un Depends() global)."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        return False
+    if user.role == "admin":
+        return True
+    if user.role_id:
+        u = db.get(Utilisateur, user.id)
+        if u and u.role_obj and u.role_obj.permissions.get("admin", False):
+            return True
+    return False
+
+
+def _verifier_permission_date(request: Request, db: Session, nouvelle_date, ancienne_date=None):
+    """Reserve l'antidatage (date < aujourd'hui) aux administrateurs. Une
+    modification qui laisse la date inchangee (meme jour calendaire que
+    ancienne_date) n'est jamais bloquee — seul un VRAI changement vers le
+    passe declenche la verification, pour ne pas empecher un non-admin de
+    corriger un autre champ sur une entree deja antidatee par un admin."""
+    if not nouvelle_date:
+        return
+    aujourdhui = datetime.now(timezone.utc).date()
+    if nouvelle_date.date() >= aujourdhui:
+        return
+    if ancienne_date and ancienne_date.date() == nouvelle_date.date():
+        return
+    if not _est_admin_utilisateur(request, db):
+        raise HTTPException(403, "Seul un administrateur peut enregistrer une entrée à une date passée.")
 
 
 def _generer_ticket(db: Session) -> str:
@@ -147,6 +179,7 @@ def liste_depenses(
             "categorie":   d.categorie or "AUTRE",
             "montant":     float(_dec(d.montant)),
             "date_depense": d.date_depense.isoformat(),
+            "jours":       (today - d.date_depense.date()).days,
             "fournisseur": d.fournisseur or "",
             "notes":       d.notes or "",
         }
@@ -155,7 +188,7 @@ def liste_depenses(
 
 
 @router.post("/depenses")
-def ajouter_depense(data: dict, db: Session = Depends(get_db)):
+def ajouter_depense(data: dict, request: Request, db: Session = Depends(get_db)):
     desc = (data.get("description") or "").strip()
     if not desc:
         raise HTTPException(400, "La description est requise")
@@ -163,18 +196,8 @@ def ajouter_depense(data: dict, db: Session = Depends(get_db)):
     if montant <= 0:
         raise HTTPException(400, "Le montant doit être positif")
 
-    date_dep = datetime.now(timezone.utc)
-    if data.get("date_depense"):
-        try:
-            raw = data["date_depense"]
-            if "T" in raw:
-                date_dep = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-            else:
-                date_dep = datetime.combine(
-                    date_type.fromisoformat(raw), time.min
-                ).replace(tzinfo=timezone.utc)
-        except (ValueError, AttributeError):
-            pass
+    date_dep = _parse_date_saisie(data.get("date_depense")) or datetime.now(timezone.utc)
+    _verifier_permission_date(request, db, date_dep)
 
     d = CuisineDepense(
         description  = desc,
@@ -189,7 +212,7 @@ def ajouter_depense(data: dict, db: Session = Depends(get_db)):
 
 
 @router.put("/depenses/{dep_id}")
-def modifier_depense(dep_id: int, data: dict, db: Session = Depends(get_db)):
+def modifier_depense(dep_id: int, data: dict, request: Request, db: Session = Depends(get_db)):
     d = db.query(CuisineDepense).filter_by(id=dep_id).first()
     if not d:
         raise HTTPException(404, "Dépense introuvable")
@@ -203,6 +226,11 @@ def modifier_depense(dep_id: int, data: dict, db: Session = Depends(get_db)):
         d.montant = Decimal(str(montant))
     if "fournisseur" in data: d.fournisseur = (data["fournisseur"] or "").strip() or None
     if "notes"       in data: d.notes       = (data["notes"] or "").strip() or None
+    if "date_depense" in data:
+        parsed = _parse_date_saisie(data.get("date_depense"))
+        if parsed:
+            _verifier_permission_date(request, db, parsed, d.date_depense)
+            d.date_depense = parsed
     db.commit()
     return {"message": "Dépense modifiée"}
 
@@ -434,6 +462,7 @@ def _achat_dict(a: CuisineAchat) -> dict:
         "cout_unitaire": float(_dec(a.cout_unitaire)),
         "total":         float(_dec(a.total)),
         "date_achat":    a.date_achat.isoformat() if a.date_achat else None,
+        "jours":         (date_type.today() - a.date_achat.date()).days if a.date_achat else None,
         "fournisseur":   a.fournisseur or "",
         "notes":         a.notes or "",
     }
@@ -468,8 +497,31 @@ def liste_achats(
     }
 
 
+def _parse_date_saisie(raw):
+    """Parse une date saisie par l'utilisateur (ISO datetime ou simple
+    YYYY-MM-DD) — retourne None si absente/invalide, pour laisser l'appelant
+    decider du fallback.
+
+    Une date SEULE (sans heure) est stockee a MIDI UTC, pas minuit : la
+    session Postgres reconvertit les timestamptz dans son fuseau horaire
+    (America/Los_Angeles, UTC-7/-8) a la lecture, donc minuit UTC redevient
+    17h/16h la VEILLE en heure locale — la date affichee/reeditee dans le
+    formulaire glisse d'un jour en arriere a chaque aller-retour. Midi UTC
+    reste toujours le meme jour calendaire quel que soit le decalage horaire
+    reel de ce serveur.
+    """
+    if not raw:
+        return None
+    try:
+        if "T" in raw:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        return datetime.combine(date_type.fromisoformat(raw), time(12, 0)).replace(tzinfo=timezone.utc)
+    except (ValueError, AttributeError):
+        return None
+
+
 @router.post("/achats", status_code=201)
-def creer_achat(data: dict, db: Session = Depends(get_db)):
+def creer_achat(data: dict, request: Request, db: Session = Depends(get_db)):
     desc = (data.get("description") or "").strip()
     if not desc:
         raise HTTPException(400, "La description est requise")
@@ -480,18 +532,8 @@ def creer_achat(data: dict, db: Session = Depends(get_db)):
     if cout <= 0:
         raise HTTPException(400, "Le coût unitaire doit être > 0")
 
-    date_achat = datetime.now(timezone.utc)
-    if data.get("date_achat"):
-        try:
-            raw = data["date_achat"]
-            if "T" in raw:
-                date_achat = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-            else:
-                date_achat = datetime.combine(
-                    date_type.fromisoformat(raw), time.min
-                ).replace(tzinfo=timezone.utc)
-        except (ValueError, AttributeError):
-            pass
+    date_achat = _parse_date_saisie(data.get("date_achat")) or datetime.now(timezone.utc)
+    _verifier_permission_date(request, db, date_achat)
 
     a = CuisineAchat(
         plat_id       = data.get("plat_id") or None,
@@ -510,7 +552,7 @@ def creer_achat(data: dict, db: Session = Depends(get_db)):
 
 
 @router.put("/achats/{achat_id}")
-def modifier_achat(achat_id: int, data: dict, db: Session = Depends(get_db)):
+def modifier_achat(achat_id: int, data: dict, request: Request, db: Session = Depends(get_db)):
     a = db.query(CuisineAchat).filter_by(id=achat_id).first()
     if not a:
         raise HTTPException(404, "Achat introuvable")
@@ -522,6 +564,11 @@ def modifier_achat(achat_id: int, data: dict, db: Session = Depends(get_db)):
     if "fournisseur"   in data: a.fournisseur   = (data["fournisseur"] or "").strip() or None
     if "notes"         in data: a.notes         = (data["notes"] or "").strip() or None
     if "unite"         in data: a.unite         = data["unite"] or "kg"
+    if "date_achat"    in data:
+        parsed = _parse_date_saisie(data.get("date_achat"))
+        if parsed:
+            _verifier_permission_date(request, db, parsed, a.date_achat)
+            a.date_achat = parsed
 
     if "quantite" in data or "cout_unitaire" in data:
         if "quantite" in data:

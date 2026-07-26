@@ -103,9 +103,20 @@ def _fond_dict(f: ZelleFond, taux: float = 1.0) -> dict:
 
 
 def _parse_dt(s: str) -> Optional[datetime]:
+    """Parse une date/heure saisie par l'utilisateur. Une date SEULE (input
+    HTML type="date", ex: "2026-07-15", sans heure) est ramenee a MIDI UTC et
+    non minuit : la session Postgres reconvertit les timestamptz dans son
+    fuseau horaire (America/Los_Angeles, UTC-7/-8) a la lecture, donc minuit
+    UTC redevient 17h/16h la VEILLE en heure locale — la date affichee glisse
+    d'un jour en arriere a chaque aller-retour. Midi UTC reste toujours le
+    meme jour calendaire quel que soit le decalage horaire reel du serveur."""
     try:
         dt = datetime.fromisoformat(s)
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        if dt.tzinfo:
+            return dt
+        if dt.hour == 0 and dt.minute == 0 and dt.second == 0 and "T" not in s and " " not in s:
+            dt = dt.replace(hour=12)
+        return dt.replace(tzinfo=timezone.utc)
     except (ValueError, TypeError):
         return None
 
