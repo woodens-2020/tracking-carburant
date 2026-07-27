@@ -188,6 +188,12 @@ def fifo_allocation_livraisons(db: Session, produit_id: int) -> list[dict]:
     Retourne une liste ordonnée (même ordre que les livraisons, du plus
     ancien au plus récent) de dicts : livraison_id, terminee,
     gallons_disponibles, gallons_consommes, gallons_restants.
+
+    Pour une livraison terminée, gallons_restants vaut toujours 0 — une
+    cargaison clôturée n'a plus rien de disponible à la vente, qu'il
+    s'agisse de gallons reportés vers une autre cargaison ou simplement
+    figés/écartés. Le reste tel qu'il était au moment de la clôture reste
+    consultable séparément via Livraison.gallons_restants_cloture (audit).
     """
     livraisons = (
         db.query(Livraison)
@@ -202,15 +208,17 @@ def fifo_allocation_livraisons(db: Session, produit_id: int) -> list[dict]:
         dispo = round(float(l.gallons_recus) + float(l.gallons_report_recu or 0), 3)
         if l.terminee:
             consomme = round(dispo - float(l.gallons_restants_cloture or 0), 3)
+            restant  = 0.0
         else:
             consomme = round(min(dispo, max(pool, 0.0)), 3)
+            restant  = round(dispo - consomme, 3)
         pool = round(pool - consomme, 3)
         out.append({
             "livraison_id":        l.id,
             "terminee":            l.terminee,
             "gallons_disponibles": dispo,
             "gallons_consommes":   consomme,
-            "gallons_restants":    round(dispo - consomme, 3),
+            "gallons_restants":    restant,
         })
     return out
 
