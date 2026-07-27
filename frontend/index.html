@@ -9971,10 +9971,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div>
     <div style="padding:16px 18px">
       <div id="cl-info" class="c-dim" style="font-size:13.5px;line-height:1.6;margin-bottom:14px"></div>
-      <div id="cl-report-question" style="display:none;font-size:13.5px;font-weight:600;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:4px">
-        Additionner le reste (<strong id="cl-reste-val"></strong> gal) sur la cargaison du <strong id="cl-cible-date"></strong> ?
-      </div>
-      <div id="cl-no-cible" style="display:none;color:var(--muted);font-size:12.5px;line-height:1.5"></div>
+      <div id="cl-report-question" style="display:none;font-size:13.5px;font-weight:600;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:4px"></div>
+      <div id="cl-no-cible" style="display:none;color:var(--muted);font-size:12.5px;line-height:1.5;margin-top:6px"></div>
       <div id="cl-actions" style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end"></div>
     </div>
   </div>
@@ -14270,33 +14268,41 @@ function ouvrirClotureLivraison(id){
 
   document.getElementById('cl-info').innerHTML =
     `Cargaison du <strong>${frDate(lv.date_livraison)}</strong> (${esc(lv.produit_nom)}) — ${parseFloat(lv.gallons_recus).toFixed(3)} gal reçus.<br>
-     Reste calculé (FIFO) : <strong>${reste.toFixed(3)} gal</strong>.`;
+     Reste calculé : <strong>${reste.toFixed(3)} gal</strong>.`;
 
   const question = document.getElementById('cl-report-question');
   const noCible   = document.getElementById('cl-no-cible');
   const actions   = document.getElementById('cl-actions');
 
-  if(reste>0 && cible){
-    // Décision explicite requise : reporter le reste sur la nouvelle cargaison ou non
-    question.style.display='block';
-    noCible.style.display='none';
-    document.getElementById('cl-reste-val').textContent  = reste.toFixed(3);
-    document.getElementById('cl-cible-date').textContent = frDate(cible.date_livraison);
-    actions.innerHTML = `
-      <button class="btn btn-secondary" onclick="confirmerClotureLivraison(false)">Non, ne pas reporter</button>
-      <button class="btn btn-primary" onclick="confirmerClotureLivraison(true)">Oui, reporter le reste</button>`;
-  } else {
+  if(reste<=0){
+    // Rien à mettre à zéro ni à reporter — simple confirmation de clôture
     question.style.display='none';
-    if(reste>0){
-      noCible.style.display='block';
-      noCible.textContent = `Il reste ${reste.toFixed(3)} gal, mais aucune cargaison plus récente n'est disponible pour ce produit — le reste sera simplement clôturé (non reporté).`;
-    } else {
-      noCible.style.display='none';
-      noCible.textContent='';
-    }
+    noCible.style.display='none';
     actions.innerHTML = `
       <button class="btn btn-secondary" onclick="fermerClotureLivraison()">Annuler</button>
       <button class="btn btn-primary" onclick="confirmerClotureLivraison(false)">Clôturer</button>`;
+    document.getElementById('modal-cloture-livraison').classList.remove('hidden');
+    return;
+  }
+
+  // Décision explicite requise à chaque clôture : mettre le stock à zéro
+  // (la nouvelle livraison démarre alors complètement neuve, sans mélange
+  // avec cette cargaison), ou reporter le reste sur la cargaison suivante.
+  question.style.display='block';
+  question.innerHTML = `Voulez-vous mettre ce stock à zéro (${reste.toFixed(3)} gal) ?<br>
+    <span style="font-weight:400;font-size:12.5px;color:var(--muted)">La nouvelle livraison sera alors comptée tout neuve, sans mélanger ses données avec celles de cette cargaison.</span>`;
+
+  if(cible){
+    noCible.style.display='none';
+    actions.innerHTML = `
+      <button class="btn btn-secondary" onclick="confirmerClotureLivraison(true)">Non, additionner à la cargaison du ${frDate(cible.date_livraison)}</button>
+      <button class="btn btn-primary" onclick="confirmerClotureLivraison(false)">Oui, mettre le stock à zéro</button>`;
+  } else {
+    noCible.style.display='block';
+    noCible.textContent = `Aucune cargaison plus récente n'est disponible pour ce produit — le reste sera mis à zéro si vous confirmez.`;
+    actions.innerHTML = `
+      <button class="btn btn-secondary" onclick="fermerClotureLivraison()">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmerClotureLivraison(false)">Oui, mettre le stock à zéro</button>`;
   }
   document.getElementById('modal-cloture-livraison').classList.remove('hidden');
 }

@@ -123,22 +123,51 @@ def gallons_livres(
 # 3. STOCK
 # ══════════════════════════════════════════════════════════════════════════
 
+def gallons_ecartes(db: Session, produit_id: int) -> float:
+    """
+    Gallons définitivement écartés (perdus) : cargaisons clôturées dont le
+    reste n'a PAS été reporté vers une autre cargaison.
+
+    Ces gallons ont été reçus (comptés dans gallons_livres) mais ne seront
+    plus jamais vendus ni disponibles — l'admin l'a explicitement déclaré
+    en clôturant sans reporter. Ils doivent donc être retirés du stock
+    affiché, sinon le tableau de bord continuerait de montrer un stock
+    "disponible" que l'opérateur vient de déclarer terminé.
+
+    Les cargaisons dont le reste A été reporté ne comptent PAS ici : ces
+    gallons ne sont pas perdus, juste réattribués à une autre cargaison —
+    ils restent donc dans total_livre - total_vendu comme avant.
+    """
+    livraisons = (
+        db.query(Livraison)
+        .filter(
+            Livraison.produit_id == produit_id,
+            Livraison.terminee == True,        # noqa: E712
+            Livraison.report_vers_livraison_id.is_(None),
+        )
+        .all()
+    )
+    return round(sum(float(l.gallons_restants_cloture or 0) for l in livraisons), 3)
+
+
 def stock_restant(
     db: Session,
     produit_id: int,
     seuil_jours: int = SEUIL_ALERTE_JOURS_PAR_DEFAUT,
 ) -> dict:
     """
-    Stock restant calculé = Σ(gallons livrés) − Σ(gallons vendus des relevés).
+    Stock restant calculé = Σ(gallons livrés) − Σ(gallons vendus des relevés)
+    − Σ(gallons écartés via une clôture de cargaison sans report).
     Retourne aussi l'alerte stock bas si < seuil_jours de vente.
 
     Note : le stock théorique peut être négatif si des ventes sont enregistrées
     sans livraison correspondante (anomalie STOCK_NEGATIF déclenchée ailleurs).
     """
-    aujourd_hui  = date.today()
-    total_livre  = gallons_livres(db, produit_id, jusqu_a=aujourd_hui)
-    total_vendu  = gallons_vendus(db, produit_id, date(2000, 1, 1), aujourd_hui)
-    restant      = round(total_livre - total_vendu, 3)
+    aujourd_hui   = date.today()
+    total_livre   = gallons_livres(db, produit_id, jusqu_a=aujourd_hui)
+    total_vendu   = gallons_vendus(db, produit_id, date(2000, 1, 1), aujourd_hui)
+    total_ecarte  = gallons_ecartes(db, produit_id)
+    restant       = round(total_livre - total_vendu - total_ecarte, 3)
 
     # Moyenne journalière sur les 30 derniers jours pour l'alerte
     debut_30j    = aujourd_hui - timedelta(days=29)
@@ -155,14 +184,15 @@ def stock_restant(
     ) or restant < 0
 
     return {
-        "produit_id":      produit_id,
+        "produit_id":       produit_id,
         "gallons_restants": restant,
-        "gallons_livres":  total_livre,
-        "gallons_vendus":  total_vendu,
-        "moyenne_jour":    moy_jour,
-        "jours_de_stock":  jours_de_stock,
-        "alerte_bas":      alerte_bas,
-        "seuil_jours":     seuil_jours,
+        "gallons_livres":   total_livre,
+        "gallons_vendus":   total_vendu,
+        "gallons_ecartes":  total_ecarte,
+        "moyenne_jour":     moy_jour,
+        "jours_de_stock":   jours_de_stock,
+        "alerte_bas":       alerte_bas,
+        "seuil_jours":      seuil_jours,
     }
 
 
@@ -180,10 +210,14 @@ def fifo_allocation_livraisons(db: Session, produit_id: int) -> list[dict]:
     de ventes après coup, même si le pool restant à ce stade est positif.
     Le pool continue alors vers la livraison suivante.
 
-    N'affecte PAS gallons_livres()/stock_restant() : c'est une vue
-    additionnelle de suivi par cargaison. Les totaux agrégés (utilisés par
-    les tableaux de bord existants, la rentabilité, les anomalies) restent
-    calculés indépendamment de cette allocation.
+    N'affecte PAS gallons_livres() (les gallons reçus restent un fait
+    physique immuable). Affecte en revanche stock_restant() via
+    gallons_ecartes() : une cargaison clôturée SANS report retire son reste
+    du stock affiché sur tous les tableaux de bord (Stock actuel, chatbot,
+    rapports) — cohérent avec la déclaration explicite de l'opérateur que
+    ces gallons ne sont plus disponibles. Une cargaison clôturée AVEC
+    report ne change rien à l'agrégat : les gallons ne sont pas perdus,
+    juste réattribués à une autre cargaison.
 
     Retourne une liste ordonnée (même ordre que les livraisons, du plus
     ancien au plus récent) de dicts : livraison_id, terminee,
