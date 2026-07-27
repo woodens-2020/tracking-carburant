@@ -132,6 +132,9 @@ def _migrate_columns():
              "ALTER TABLE livraisons ADD COLUMN rapport_gallons_vendus NUMERIC DEFAULT NULL", None),
             ("livraisons", "rapport_revenu",
              "ALTER TABLE livraisons ADD COLUMN rapport_revenu NUMERIC DEFAULT NULL", None),
+            # v10 — reste avant saisi manuellement (compté dans le stock agrégé)
+            ("livraisons", "gallons_reste_manuel",
+             "ALTER TABLE livraisons ADD COLUMN gallons_reste_manuel NUMERIC DEFAULT 0", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -175,6 +178,9 @@ def _migrate_columns():
              "ALTER TABLE livraisons ADD COLUMN rapport_gallons_vendus NUMERIC(14,3)", None),
             ("livraisons", "rapport_revenu",
              "ALTER TABLE livraisons ADD COLUMN rapport_revenu NUMERIC(14,2)", None),
+            # v10 — reste avant saisi manuellement (compté dans le stock agrégé)
+            ("livraisons", "gallons_reste_manuel",
+             "ALTER TABLE livraisons ADD COLUMN gallons_reste_manuel NUMERIC(14,3) NOT NULL DEFAULT 0", None),
         ]
     else:
         return

@@ -114,7 +114,8 @@ class Livraison(Base):
     # explicitement reporté sur une cargaison plus récente au lieu d'être
     # implicitement mélangé.
     terminee                = Column(Boolean, nullable=False, default=False)
-    gallons_report_recu     = Column(Numeric(14, 3), nullable=False, default=0)   # reçu d'une cargaison clôturée
+    gallons_report_recu     = Column(Numeric(14, 3), nullable=False, default=0)   # reçu d'une cargaison clôturée (transfert interne, déjà compté dans gallons_livres via la cargaison source)
+    gallons_reste_manuel    = Column(Numeric(14, 3), nullable=False, default=0)   # "reste avant" saisi manuellement à la création — pas un transfert, compté en plus dans gallons_livres
     gallons_restants_cloture = Column(Numeric(14, 3), nullable=True)              # figé au moment de la clôture
     date_cloture             = Column(DateTime(timezone=True), nullable=True)
     utilisateur_cloture_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)

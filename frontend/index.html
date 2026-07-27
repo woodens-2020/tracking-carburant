@@ -14253,7 +14253,7 @@ async function loadLivraisons(){
           return `<tr>
             <td>${l.date_livraison}</td>
             <td>${l.produit_nom}</td>
-            <td class="tr">${parseFloat(l.gallons_recus).toLocaleString('fr-HT',{minimumFractionDigits:3})}${l.gallons_report_recu>0?`<br><span style="font-size:11px;color:var(--muted)">+${parseFloat(l.gallons_report_recu).toLocaleString('fr-HT',{minimumFractionDigits:3})} reste</span>`:''}</td>
+            <td class="tr">${parseFloat(l.gallons_recus).toLocaleString('fr-HT',{minimumFractionDigits:3})}${(l.gallons_report_recu+l.gallons_reste_manuel)>0?`<br><span style="font-size:11px;color:var(--muted)">+${(l.gallons_report_recu+l.gallons_reste_manuel).toLocaleString('fr-HT',{minimumFractionDigits:3})} reste</span>`:''}</td>
             <td class="tr">${parseFloat(l.prix_achat_gallon).toLocaleString('fr-HT',{minimumFractionDigits:2})} G</td>
             <td class="tr">${fmtG2(l.gallons_recus*l.prix_achat_gallon)}</td>
             <td class="tr">${reste!=null?reste.toLocaleString('fr-HT',{minimumFractionDigits:3})+' gal':'—'}</td>

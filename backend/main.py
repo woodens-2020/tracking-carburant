@@ -2830,6 +2830,7 @@ def _livraison_dict(l: Livraison, fifo: Optional[dict] = None) -> dict:
         "created_at":               str(l.created_at),
         "terminee":                 l.terminee,
         "gallons_report_recu":      float(l.gallons_report_recu or 0),
+        "gallons_reste_manuel":     float(l.gallons_reste_manuel or 0),
         "gallons_restants_cloture": float(l.gallons_restants_cloture) if l.gallons_restants_cloture is not None else None,
         "date_cloture":             l.date_cloture.isoformat() if l.date_cloture else None,
         "utilisateur_cloture_nom":  l.utilisateur_cloture.nom_complet if l.utilisateur_cloture else None,
@@ -2886,7 +2887,7 @@ def create_livraison(payload: LivraisonIn, db: Session = Depends(get_db)):
         fournisseur          = payload.fournisseur,
         reference_camion     = payload.reference_camion,
         notes                = payload.notes,
-        gallons_report_recu  = payload.reste_avant,
+        gallons_reste_manuel = payload.reste_avant,
     )
     try:
         db.add(lv)

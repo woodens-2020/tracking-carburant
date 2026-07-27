@@ -103,31 +103,6 @@ def revenu_ventes(
     return round(sum(r.montant_vente for r in releves if r.quantite >= 0), 2)
 
 
-def revenu_vendus_par_jour(
-    db: Session,
-    produit_id: int,
-    date_debut: date,
-    date_fin: date,
-) -> dict[str, float]:
-    """Retourne un dict {date_iso: revenu_gourdes} pour chaque jour de la période."""
-    releves = (
-        db.query(Releve)
-        .join(Pompe, Releve.pompe_id == Pompe.id)
-        .filter(
-            Pompe.produit_id == produit_id,
-            Releve.date >= date_debut,
-            Releve.date <= date_fin,
-        )
-        .all()
-    )
-    par_jour: dict[str, float] = {}
-    for r in releves:
-        if r.quantite >= 0:
-            k = str(r.date)
-            par_jour[k] = round(par_jour.get(k, 0.0) + r.montant_vente, 2)
-    return par_jour
-
-
 # ══════════════════════════════════════════════════════════════════════════
 # 2. LIVRAISONS
 # ══════════════════════════════════════════════════════════════════════════
@@ -137,11 +112,27 @@ def gallons_livres(
     produit_id: int,
     jusqu_a: Optional[date] = None,
 ) -> float:
-    """Total cumulé des gallons livrés pour un produit jusqu'à une date (incluse)."""
+    """
+    Total cumulé des gallons livrés pour un produit jusqu'à une date (incluse).
+
+    Inclut gallons_reste_manuel (le "reste avant" saisi manuellement à la
+    création d'une livraison) : c'est une déclaration de stock physique
+    supplémentaire, pas un simple transfert entre deux livraisons déjà
+    comptées — il doit donc augmenter le total reconnu, sinon "Stock
+    actuel" afficherait moins de gallons que la somme des cargaisons
+    individuelles (incohérence entre les deux vues).
+
+    N'inclut PAS gallons_report_recu (le report automatique fait à la
+    clôture d'une cargaison) : ces gallons sont déjà comptés via la
+    cargaison source elle-même — les recompter ici les compterait deux fois.
+    """
     q = db.query(Livraison).filter(Livraison.produit_id == produit_id)
     if jusqu_a is not None:
         q = q.filter(Livraison.date_livraison <= jusqu_a)
-    return round(sum(float(l.gallons_recus) for l in q.all()), 3)
+    livraisons = q.all()
+    return round(
+        sum(float(l.gallons_recus) + float(l.gallons_reste_manuel or 0) for l in livraisons), 3
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -227,32 +218,36 @@ def stock_restant(
 
 def fifo_allocation_livraisons(db: Session, produit_id: int) -> list[dict]:
     """
-    Alloue les ventes agrégées du produit aux livraisons (cargaisons) dans
-    l'ordre FIFO — la plus ancienne cargaison se vide en premier.
+    Attribue les ventes du produit aux livraisons (cargaisons) par FENÊTRE
+    DE DATES propre à chaque cargaison — pas par un pool global qui se
+    déverse d'une cargaison à l'autre.
+
+    Une cargaison encore OUVERTE ne comptabilise que les ventes survenues
+    À PARTIR de sa propre date de livraison, jusqu'à la date de la
+    cargaison suivante (exclue) ou aujourd'hui s'il n'y en a pas encore.
+    Concrètement : déclarer une nouvelle livraison repart TOUJOURS de zéro
+    pour elle — elle n'est jamais réduite par des ventes déjà comptabilisées
+    sur une cargaison précédente, même si celle-ci n'a plus assez de
+    gallons disponibles pour couvrir tout ce qui a été vendu pendant sa
+    propre fenêtre. Dans ce cas l'écart reste sur cette cargaison-là
+    (reste à 0, consommation plafonnée à ce qu'elle avait réellement
+    disponible) plutôt que de "déborder" silencieusement sur la suivante.
 
     Une livraison "terminée" (clôturée) garde sa consommation figée au
-    moment de la clôture (gallons_restants_cloture) — elle ne reçoit plus
-    de ventes après coup, même si le pool restant à ce stade est positif.
-    Le pool continue alors vers la livraison suivante.
+    moment de la clôture (gallons_restants_cloture) — sa fenêtre de dates
+    n'est alors plus jamais recalculée.
 
     N'affecte PAS gallons_livres() (les gallons reçus restent un fait
-    physique immuable). Affecte en revanche stock_restant() via
+    physique immuable) ni gallons_vendus() (les ventes agrégées restent
+    calculées uniquement depuis les relevés). Affecte stock_restant() via
     gallons_ecartes() : une cargaison clôturée SANS report retire son reste
     du stock affiché sur tous les tableaux de bord (Stock actuel, chatbot,
-    rapports) — cohérent avec la déclaration explicite de l'opérateur que
-    ces gallons ne sont plus disponibles. Une cargaison clôturée AVEC
-    report ne change rien à l'agrégat : les gallons ne sont pas perdus,
-    juste réattribués à une autre cargaison.
+    rapports).
 
-    Retourne une liste ordonnée (même ordre que les livraisons, du plus
-    ancien au plus récent) de dicts : livraison_id, terminee,
-    gallons_disponibles, gallons_consommes, gallons_restants.
-
-    Pour une livraison terminée, gallons_restants vaut toujours 0 — une
-    cargaison clôturée n'a plus rien de disponible à la vente, qu'il
-    s'agisse de gallons reportés vers une autre cargaison ou simplement
-    figés/écartés. Le reste tel qu'il était au moment de la clôture reste
-    consultable séparément via Livraison.gallons_restants_cloture (audit).
+    Retourne une liste ordonnée (du plus ancien au plus récent) de dicts :
+    livraison_id, terminee, gallons_disponibles, gallons_consommes,
+    gallons_restants, fenetre_debut, fenetre_fin (ces deux derniers None
+    pour une cargaison clôturée — sa fenêtre n'est plus pertinente).
     """
     livraisons = (
         db.query(Livraison)
@@ -260,30 +255,53 @@ def fifo_allocation_livraisons(db: Session, produit_id: int) -> list[dict]:
         .order_by(Livraison.date_livraison, Livraison.id)
         .all()
     )
-    pool = gallons_vendus(db, produit_id, date(2000, 1, 1), date.today())
 
     out = []
-    for l in livraisons:
-        dispo = round(float(l.gallons_recus) + float(l.gallons_report_recu or 0), 3)
+    for i, l in enumerate(livraisons):
+        dispo = round(
+            float(l.gallons_recus)
+            + float(l.gallons_report_recu or 0)
+            + float(l.gallons_reste_manuel or 0),
+            3,
+        )
+
         if l.terminee:
             consomme = round(dispo - float(l.gallons_restants_cloture or 0), 3)
-            restant  = 0.0
+            out.append({
+                "livraison_id":        l.id,
+                "terminee":            True,
+                "gallons_disponibles": dispo,
+                "gallons_consommes":   consomme,
+                "gallons_restants":    0.0,
+                "fenetre_debut":       None,
+                "fenetre_fin":         None,
+            })
+            continue
+
+        debut = date(2000, 1, 1) if i == 0 else l.date_livraison
+        if i + 1 < len(livraisons):
+            fin = livraisons[i + 1].date_livraison - timedelta(days=1)
+            if fin < debut:
+                fin = debut
         else:
-            consomme = round(min(dispo, max(pool, 0.0)), 3)
-            restant  = round(dispo - consomme, 3)
-        pool = round(pool - consomme, 3)
+            fin = date.today()
+
+        vendu_fenetre = gallons_vendus(db, produit_id, debut, fin)
+        consomme = round(min(dispo, vendu_fenetre), 3)
         out.append({
             "livraison_id":        l.id,
-            "terminee":            l.terminee,
+            "terminee":            False,
             "gallons_disponibles": dispo,
             "gallons_consommes":   consomme,
-            "gallons_restants":    restant,
+            "gallons_restants":    round(dispo - consomme, 3),
+            "fenetre_debut":       debut,
+            "fenetre_fin":         fin,
         })
     return out
 
 
 def reste_livraison(db: Session, livraison: Livraison) -> float:
-    """Gallons restants actuellement calculés (FIFO) pour une livraison donnée."""
+    """Gallons restants actuellement calculés pour une livraison donnée."""
     for a in fifo_allocation_livraisons(db, livraison.produit_id):
         if a["livraison_id"] == livraison.id:
             return a["gallons_restants"]
@@ -292,41 +310,37 @@ def reste_livraison(db: Session, livraison: Livraison) -> float:
 
 def fifo_allocation_revenu(db: Session, produit_id: int) -> list[dict]:
     """
-    Alloue le revenu (gourdes) des ventes aux livraisons, dans les mêmes
-    bornes en gallons que fifo_allocation_livraisons() — jamais recalculées
-    indépendamment ici, les gallons restent l'unique source de vérité. Ceci
-    ne fait que répartir le revenu à l'intérieur de ces bornes, jour par
-    jour, à partir de Releve.montant_vente (revenu_vendus_par_jour).
+    Alloue le revenu (gourdes) par la même fenêtre de dates que
+    fifo_allocation_livraisons() pour chaque cargaison ouverte — cohérent
+    avec l'attribution des gallons (mêmes bornes, jamais recalculées
+    indépendamment). Si les gallons vendus dans la fenêtre dépassent ce que
+    la cargaison a de disponible (écart/survente), le revenu est réduit
+    dans la même proportion que les gallons retenus, pour rester cohérent
+    avec le COGS figé à la clôture (rapport_gallons_vendus × prix_achat_gallon).
 
     Retourne une liste ordonnée de dicts : livraison_id, gallons_consommes,
     revenu_consomme.
     """
-    alloc_gal = fifo_allocation_livraisons(db, produit_id)
-    jours_gal = gallons_vendus_par_jour(db, produit_id, date(2000, 1, 1), date.today())
-    jours_rev = revenu_vendus_par_jour(db, produit_id, date(2000, 1, 1), date.today())
-
-    # Ledger mutable trié par date : [gallons_restants, revenu_restant] par jour
-    ledger = [[jours_gal[j], jours_rev.get(j, 0.0)] for j in sorted(jours_gal)]
-    cursor = 0
+    alloc = fifo_allocation_livraisons(db, produit_id)
     out = []
-    for a in alloc_gal:
-        besoin = a["gallons_consommes"]
-        revenu_lot = 0.0
-        while besoin > 1e-9 and cursor < len(ledger):
-            gal_j, rev_j = ledger[cursor]
-            if gal_j <= 1e-9:
-                cursor += 1
-                continue
-            pris = min(besoin, gal_j)
-            part_rev = rev_j * (pris / gal_j) if gal_j > 0 else 0.0
-            revenu_lot += part_rev
-            ledger[cursor][0] -= pris
-            ledger[cursor][1] -= part_rev
-            besoin -= pris
+    for a in alloc:
+        if a["terminee"]:
+            # Le revenu d'une cargaison clôturée est figé séparément
+            # (Livraison.rapport_revenu) — non recalculé ici.
+            out.append({
+                "livraison_id":      a["livraison_id"],
+                "gallons_consommes": a["gallons_consommes"],
+                "revenu_consomme":   0.0,
+            })
+            continue
+        debut, fin = a["fenetre_debut"], a["fenetre_fin"]
+        vendu_fenetre  = gallons_vendus(db, produit_id, debut, fin)
+        revenu_fenetre = revenu_ventes(db, produit_id, debut, fin)
+        ratio = (a["gallons_consommes"] / vendu_fenetre) if vendu_fenetre > 0 else 0.0
         out.append({
             "livraison_id":      a["livraison_id"],
             "gallons_consommes": a["gallons_consommes"],
-            "revenu_consomme":   round(revenu_lot, 2),
+            "revenu_consomme":   round(revenu_fenetre * ratio, 2),
         })
     return out
 
