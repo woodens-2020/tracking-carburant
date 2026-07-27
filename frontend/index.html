@@ -9959,6 +9959,31 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   </div>
 </div>
 
+<!-- ══════ MODAL CLÔTURE LIVRAISON (stock terminé) ══════ -->
+<div id="modal-cloture-livraison" class="overlay hidden">
+  <div class="modal-box" style="max-width:460px">
+    <div class="card-head">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Clôturer la cargaison
+      </div>
+      <button onclick="fermerClotureLivraison()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:16px 18px">
+      <div id="cl-info" class="c-dim" style="font-size:13.5px;line-height:1.6;margin-bottom:14px"></div>
+      <label id="cl-report-section" style="display:none;align-items:center;gap:8px;font-size:13.5px;cursor:pointer;padding:10px;border:1px solid var(--border);border-radius:8px">
+        <input type="checkbox" id="cl-reporter">
+        <span>Additionner le reste (<strong id="cl-reste-val"></strong> gal) sur la cargaison du <strong id="cl-cible-date"></strong></span>
+      </label>
+      <div id="cl-no-cible" style="display:none;color:var(--muted);font-size:12.5px;line-height:1.5"></div>
+      <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+        <button class="btn btn-secondary" onclick="fermerClotureLivraison()">Annuler</button>
+        <button class="btn btn-primary" onclick="confirmerClotureLivraison()">Clôturer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══════ TOASTS ══════ -->
 <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 
@@ -14172,6 +14197,9 @@ async function saveLivraison(){
   }
 }
 
+let _skLivraisons  = [];
+let _clLivraisonId = null;
+
 async function loadLivraisons(){
   const wrap   = document.getElementById('sk-livr-table');
   const filtre = document.getElementById('sk-livr-filtre').value;
@@ -14180,7 +14208,8 @@ async function loadLivraisons(){
     let url = '/livraisons?';
     if(filtre) url += `produit_id=${filtre}&`;
     const d = await GET(url);
-    if(!d.livraisons||d.livraisons.length===0){
+    _skLivraisons = d.livraisons||[];
+    if(!_skLivraisons.length){
       wrap.innerHTML=`<div style="color:var(--muted);font-size:14px;padding:14px 0">Aucune livraison enregistrée.</div>`;
       return;
     }
@@ -14188,19 +14217,31 @@ async function loadLivraisons(){
       <thead><tr>
         <th>Date</th><th>Produit</th><th class="tr">Gallons</th>
         <th class="tr">Prix achat/gal</th><th class="tr">Valeur</th>
+        <th class="tr">Reste (FIFO)</th><th>Statut</th>
         <th>Fournisseur</th><th>Camion</th><th></th>
       </tr></thead>
       <tbody>
-        ${d.livraisons.map(l=>`<tr>
-          <td>${l.date_livraison}</td>
-          <td>${l.produit_nom}</td>
-          <td class="tr">${parseFloat(l.gallons_recus).toLocaleString('fr-HT',{minimumFractionDigits:3})}</td>
-          <td class="tr">${parseFloat(l.prix_achat_gallon).toLocaleString('fr-HT',{minimumFractionDigits:2})} G</td>
-          <td class="tr">${fmtG2(l.gallons_recus*l.prix_achat_gallon)}</td>
-          <td>${l.fournisseur||'—'}</td>
-          <td>${l.reference_camion||'—'}</td>
-          <td><button class="btn btn-secondary" style="padding:2px 8px;font-size:12px" onclick="deleteLivraison(${l.id},this)">✕</button></td>
-        </tr>`).join('')}
+        ${_skLivraisons.map(l=>{
+          const reste = l.gallons_restants!=null ? parseFloat(l.gallons_restants) : null;
+          const statutBadge = l.terminee
+            ? `<span class="badge" style="background:rgba(148,163,184,.12);color:var(--muted);border:1px solid rgba(148,163,184,.25)">Terminée</span>`
+            : `<span class="badge" style="background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.25)">Ouverte</span>`;
+          const actionBtn = l.terminee
+            ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:12px" onclick="reouvrirLivraison(${l.id})" title="Annuler la clôture">↺ Rouvrir</button>`
+            : `<button class="btn btn-secondary" style="padding:2px 8px;font-size:12px" onclick="ouvrirClotureLivraison(${l.id})" title="Marquer cette cargaison comme terminée">Terminée ?</button>`;
+          return `<tr>
+            <td>${l.date_livraison}</td>
+            <td>${l.produit_nom}</td>
+            <td class="tr">${parseFloat(l.gallons_recus).toLocaleString('fr-HT',{minimumFractionDigits:3})}</td>
+            <td class="tr">${parseFloat(l.prix_achat_gallon).toLocaleString('fr-HT',{minimumFractionDigits:2})} G</td>
+            <td class="tr">${fmtG2(l.gallons_recus*l.prix_achat_gallon)}</td>
+            <td class="tr">${reste!=null?reste.toLocaleString('fr-HT',{minimumFractionDigits:3})+' gal':'—'}</td>
+            <td>${statutBadge}</td>
+            <td>${l.fournisseur||'—'}</td>
+            <td>${l.reference_camion||'—'}</td>
+            <td style="white-space:nowrap"><div style="display:flex;gap:4px">${actionBtn}<button class="btn btn-secondary" style="padding:2px 8px;font-size:12px" onclick="deleteLivraison(${l.id},this)">✕</button></div></td>
+          </tr>`;
+        }).join('')}
       </tbody>
     </table>`;
   }catch(e){
@@ -14215,6 +14256,71 @@ async function deleteLivraison(id, btn){
     await DEL(`/livraisons/${id}`);
     loadLivraisons();
   }catch(e){ notify('Erreur : '+(e.message||e),'err'); btn.disabled=false; }
+}
+
+// ── Clôture de cargaison (stock terminé) ────────
+function ouvrirClotureLivraison(id){
+  const lv = _skLivraisons.find(x=>x.id===id);
+  if(!lv) return;
+  _clLivraisonId = id;
+  const reste = lv.gallons_restants!=null ? parseFloat(lv.gallons_restants) : 0;
+
+  // Cargaison cible potentielle : même produit, plus récente, encore ouverte
+  const candidats = _skLivraisons
+    .filter(x=>x.produit_id===lv.produit_id && x.id!==lv.id && !x.terminee)
+    .filter(x=> x.date_livraison>lv.date_livraison || (x.date_livraison===lv.date_livraison && x.id>lv.id))
+    .sort((a,b)=> a.date_livraison===b.date_livraison ? a.id-b.id : (a.date_livraison<b.date_livraison?-1:1));
+  const cible = candidats[0] || null;
+
+  document.getElementById('cl-info').innerHTML =
+    `Cargaison du <strong>${frDate(lv.date_livraison)}</strong> (${esc(lv.produit_nom)}) — ${parseFloat(lv.gallons_recus).toFixed(3)} gal reçus.<br>
+     Reste calculé (FIFO) : <strong>${reste.toFixed(3)} gal</strong>.`;
+
+  const reportSection = document.getElementById('cl-report-section');
+  const noCible        = document.getElementById('cl-no-cible');
+  const chk             = document.getElementById('cl-reporter');
+  chk.checked = false;
+  if(reste>0 && cible){
+    reportSection.style.display='flex';
+    noCible.style.display='none';
+    document.getElementById('cl-reste-val').textContent  = reste.toFixed(3);
+    document.getElementById('cl-cible-date').textContent = frDate(cible.date_livraison);
+  } else {
+    reportSection.style.display='none';
+    if(reste>0){
+      noCible.style.display='block';
+      noCible.textContent = `Il reste ${reste.toFixed(3)} gal, mais aucune cargaison plus récente n'est disponible pour ce produit — le reste sera simplement clôturé (non reporté).`;
+    } else {
+      noCible.style.display='none';
+      noCible.textContent='';
+    }
+  }
+  document.getElementById('modal-cloture-livraison').classList.remove('hidden');
+}
+function fermerClotureLivraison(){
+  document.getElementById('modal-cloture-livraison').classList.add('hidden');
+  _clLivraisonId = null;
+}
+async function confirmerClotureLivraison(){
+  if(!_clLivraisonId) return;
+  const reporter = document.getElementById('cl-reporter').checked;
+  try{
+    const res = await POST(`/livraisons/${_clLivraisonId}/cloturer`,{reporter_reste:reporter});
+    fermerClotureLivraison();
+    notify(res.reste_reporte
+      ? `Cargaison clôturée — reste reporté vers la cargaison du ${frDate(res.reporte_vers_date)}`
+      : 'Cargaison clôturée', 'ok');
+    loadLivraisons();
+    if(document.getElementById('sk-stock').style.display!=='none') loadStock();
+  }catch(e){ notify('Erreur : '+(e.message||e),'err'); }
+}
+async function reouvrirLivraison(id){
+  if(!await showConfirm('Annuler la clôture de cette cargaison ? Elle redevient active pour les ventes futures.', {title:'Rouvrir la cargaison', type:'warn', okLabel:'Rouvrir'})) return;
+  try{
+    await POST(`/livraisons/${id}/reouvrir`,{});
+    notify('Cargaison rouverte','ok');
+    loadLivraisons();
+  }catch(e){ notify('Erreur : '+(e.message||e),'err'); }
 }
 
 // ── Rentabilité ────────────────────────────────

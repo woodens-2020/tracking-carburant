@@ -108,7 +108,21 @@ class Livraison(Base):
     notes             = Column(String(500), nullable=True)
     created_at        = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    produit = relationship("Produit")
+    # ── Clôture de cargaison (suivi FIFO, indépendant du stock agrégé) ──────
+    # Marquer une livraison "terminée" l'exclut des futures allocations FIFO
+    # (stock_service.fifo_allocation_livraisons) ; son reste peut être
+    # explicitement reporté sur une cargaison plus récente au lieu d'être
+    # implicitement mélangé.
+    terminee                = Column(Boolean, nullable=False, default=False)
+    gallons_report_recu     = Column(Numeric(14, 3), nullable=False, default=0)   # reçu d'une cargaison clôturée
+    gallons_restants_cloture = Column(Numeric(14, 3), nullable=True)              # figé au moment de la clôture
+    date_cloture             = Column(DateTime(timezone=True), nullable=True)
+    utilisateur_cloture_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    report_vers_livraison_id = Column(Integer, ForeignKey("livraisons.id", ondelete="SET NULL"), nullable=True)
+
+    produit             = relationship("Produit")
+    utilisateur_cloture = relationship("Utilisateur", foreign_keys=[utilisateur_cloture_id])
+    report_vers         = relationship("Livraison", remote_side=[id], foreign_keys=[report_vers_livraison_id])
 
     __table_args__ = (
         CheckConstraint("gallons_recus > 0",      name="chk_livraison_gallons_pos"),

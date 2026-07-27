@@ -2787,6 +2787,8 @@ from stock_service import (
     rentabilite_globale,
     anomalies_stock,
     corr_saut_decalage,
+    fifo_allocation_livraisons,
+    reste_livraison,
     SEUIL_ALERTE_JOURS_PAR_DEFAUT,
 )
 
@@ -2806,6 +2808,36 @@ class PrixVenteIn(BaseModel):
     produit_id:        int
     prix_vente_gallon: float
     date_effet:        str           # YYYY-MM-DD
+
+
+class ClotureLivraisonIn(BaseModel):
+    reporter_reste: bool = False   # additionner le reste sur la cargaison plus récente ?
+
+
+def _livraison_dict(l: Livraison, fifo: Optional[dict] = None) -> dict:
+    d = {
+        "id":                       l.id,
+        "produit_id":               l.produit_id,
+        "produit_nom":              l.produit.nom,
+        "date_livraison":           str(l.date_livraison),
+        "gallons_recus":            float(l.gallons_recus),
+        "prix_achat_gallon":        float(l.prix_achat_gallon),
+        "fournisseur":              l.fournisseur,
+        "reference_camion":         l.reference_camion,
+        "notes":                    l.notes,
+        "created_at":               str(l.created_at),
+        "terminee":                 l.terminee,
+        "gallons_report_recu":      float(l.gallons_report_recu or 0),
+        "gallons_restants_cloture": float(l.gallons_restants_cloture) if l.gallons_restants_cloture is not None else None,
+        "date_cloture":             l.date_cloture.isoformat() if l.date_cloture else None,
+        "utilisateur_cloture_nom":  l.utilisateur_cloture.nom_complet if l.utilisateur_cloture else None,
+        "report_vers_livraison_id": l.report_vers_livraison_id,
+    }
+    if fifo:
+        d["gallons_disponibles"] = fifo["gallons_disponibles"]
+        d["gallons_consommes"]   = fifo["gallons_consommes"]
+        d["gallons_restants"]    = fifo["gallons_restants"]
+    return d
 
 
 # ---------- Livraisons ----------
@@ -2839,17 +2871,7 @@ def create_livraison(payload: LivraisonIn, db: Session = Depends(get_db)):
     except Exception:
         db.rollback()
         raise
-    return {
-        "id":                lv.id,
-        "produit_id":        lv.produit_id,
-        "produit_nom":       produit.nom,
-        "date_livraison":    str(lv.date_livraison),
-        "gallons_recus":     float(lv.gallons_recus),
-        "prix_achat_gallon": float(lv.prix_achat_gallon),
-        "fournisseur":       lv.fournisseur,
-        "reference_camion":  lv.reference_camion,
-        "notes":             lv.notes,
-    }
+    return _livraison_dict(lv)
 
 
 @app.get("/api/livraisons")
@@ -2873,21 +2895,18 @@ def list_livraisons(
         except ValueError:
             raise HTTPException(400, "date_fin invalide")
     livraisons = q.order_by(Livraison.date_livraison.desc(), Livraison.id.desc()).all()
+
+    # Allocation FIFO par produit, calculée une seule fois par produit concerné
+    fifo_par_produit: dict[int, dict[int, dict]] = {}
+    for l in livraisons:
+        if l.produit_id not in fifo_par_produit:
+            alloc = fifo_allocation_livraisons(db, l.produit_id)
+            fifo_par_produit[l.produit_id] = {a["livraison_id"]: a for a in alloc}
+
     return {
         "nb": len(livraisons),
         "livraisons": [
-            {
-                "id":                l.id,
-                "produit_id":        l.produit_id,
-                "produit_nom":       l.produit.nom,
-                "date_livraison":    str(l.date_livraison),
-                "gallons_recus":     float(l.gallons_recus),
-                "prix_achat_gallon": float(l.prix_achat_gallon),
-                "fournisseur":       l.fournisseur,
-                "reference_camion":  l.reference_camion,
-                "notes":             l.notes,
-                "created_at":        str(l.created_at),
-            }
+            _livraison_dict(l, fifo_par_produit[l.produit_id].get(l.id))
             for l in livraisons
         ],
     }
@@ -2905,6 +2924,92 @@ def delete_livraison(livraison_id: int, db: Session = Depends(get_db)):
         db.rollback()
         raise
     return {"detail": "Livraison supprimée"}
+
+
+@app.post("/api/livraisons/{livraison_id}/cloturer")
+def cloturer_livraison(
+    livraison_id: int,
+    payload: ClotureLivraisonIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Marque une cargaison (livraison) comme terminée : elle est exclue des
+    futures allocations FIFO (stock_service.fifo_allocation_livraisons).
+    Si reporter_reste=True et qu'une cargaison plus récente (non clôturée)
+    existe pour le même produit, le reste calculé est ajouté à son pool
+    disponible — sinon il est simplement figé, sans être reporté.
+    """
+    lv = db.query(Livraison).get(livraison_id)
+    if not lv:
+        raise HTTPException(404, "Livraison introuvable")
+    if lv.terminee:
+        raise HTTPException(400, "Cette cargaison est déjà terminée")
+
+    reste = reste_livraison(db, lv)
+
+    cible = None
+    if payload.reporter_reste and reste > 0:
+        cible = (
+            db.query(Livraison)
+            .filter(
+                Livraison.produit_id == lv.produit_id,
+                Livraison.terminee == False,  # noqa: E712
+                Livraison.id != lv.id,
+            )
+            .filter(
+                (Livraison.date_livraison > lv.date_livraison) |
+                ((Livraison.date_livraison == lv.date_livraison) & (Livraison.id > lv.id))
+            )
+            .order_by(Livraison.date_livraison, Livraison.id)
+            .first()
+        )
+        if cible:
+            cible.gallons_report_recu = float(cible.gallons_report_recu or 0) + reste
+            lv.report_vers_livraison_id = cible.id
+
+    from datetime import datetime as _dt, timezone as _tz
+    user = getattr(request.state, "user", None)
+    lv.terminee                  = True
+    lv.gallons_restants_cloture  = reste
+    lv.date_cloture              = _dt.now(_tz.utc)
+    lv.utilisateur_cloture_id    = user.id if user else None
+
+    db.commit(); db.refresh(lv)
+
+    alloc = {a["livraison_id"]: a for a in fifo_allocation_livraisons(db, lv.produit_id)}
+    out = _livraison_dict(lv, alloc.get(lv.id))
+    out["reste_reporte"]      = bool(cible)
+    out["reporte_vers_id"]    = cible.id if cible else None
+    out["reporte_vers_date"]  = str(cible.date_livraison) if cible else None
+    return out
+
+
+@app.post("/api/livraisons/{livraison_id}/reouvrir")
+def reouvrir_livraison(livraison_id: int, db: Session = Depends(get_db)):
+    """Annule la clôture d'une livraison — corrige une clôture faite par erreur."""
+    lv = db.query(Livraison).get(livraison_id)
+    if not lv:
+        raise HTTPException(404, "Livraison introuvable")
+    if not lv.terminee:
+        raise HTTPException(400, "Cette cargaison n'est pas clôturée")
+
+    if lv.report_vers_livraison_id:
+        cible = db.query(Livraison).get(lv.report_vers_livraison_id)
+        if cible:
+            cible.gallons_report_recu = max(
+                0.0, float(cible.gallons_report_recu or 0) - float(lv.gallons_restants_cloture or 0)
+            )
+        lv.report_vers_livraison_id = None
+
+    lv.terminee                 = False
+    lv.gallons_restants_cloture = None
+    lv.date_cloture              = None
+    lv.utilisateur_cloture_id    = None
+
+    db.commit(); db.refresh(lv)
+    alloc = {a["livraison_id"]: a for a in fifo_allocation_livraisons(db, lv.produit_id)}
+    return _livraison_dict(lv, alloc.get(lv.id))
 
 
 # ---------- Prix de vente ----------

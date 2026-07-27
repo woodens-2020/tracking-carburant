@@ -114,6 +114,19 @@ def _migrate_columns():
             # v7 — suivi activité sessions
             ("sessions", "last_activity_at",
              "ALTER TABLE sessions ADD COLUMN last_activity_at DATETIME DEFAULT NULL", None),
+            # v8 — clôture de cargaison (suivi FIFO par livraison)
+            ("livraisons", "terminee",
+             "ALTER TABLE livraisons ADD COLUMN terminee INTEGER NOT NULL DEFAULT 0", None),
+            ("livraisons", "gallons_report_recu",
+             "ALTER TABLE livraisons ADD COLUMN gallons_report_recu NUMERIC DEFAULT 0", None),
+            ("livraisons", "gallons_restants_cloture",
+             "ALTER TABLE livraisons ADD COLUMN gallons_restants_cloture NUMERIC DEFAULT NULL", None),
+            ("livraisons", "date_cloture",
+             "ALTER TABLE livraisons ADD COLUMN date_cloture DATETIME DEFAULT NULL", None),
+            ("livraisons", "utilisateur_cloture_id",
+             "ALTER TABLE livraisons ADD COLUMN utilisateur_cloture_id INTEGER DEFAULT NULL", None),
+            ("livraisons", "report_vers_livraison_id",
+             "ALTER TABLE livraisons ADD COLUMN report_vers_livraison_id INTEGER DEFAULT NULL", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -139,6 +152,19 @@ def _migrate_columns():
             # v7 — suivi activité sessions
             ("sessions", "last_activity_at",
              "ALTER TABLE sessions ADD COLUMN last_activity_at TIMESTAMP WITH TIME ZONE", None),
+            # v8 — clôture de cargaison (suivi FIFO par livraison)
+            ("livraisons", "terminee",
+             "ALTER TABLE livraisons ADD COLUMN terminee BOOLEAN NOT NULL DEFAULT FALSE", None),
+            ("livraisons", "gallons_report_recu",
+             "ALTER TABLE livraisons ADD COLUMN gallons_report_recu NUMERIC(14,3) NOT NULL DEFAULT 0", None),
+            ("livraisons", "gallons_restants_cloture",
+             "ALTER TABLE livraisons ADD COLUMN gallons_restants_cloture NUMERIC(14,3)", None),
+            ("livraisons", "date_cloture",
+             "ALTER TABLE livraisons ADD COLUMN date_cloture TIMESTAMP WITH TIME ZONE", None),
+            ("livraisons", "utilisateur_cloture_id",
+             "ALTER TABLE livraisons ADD COLUMN utilisateur_cloture_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
+            ("livraisons", "report_vers_livraison_id",
+             "ALTER TABLE livraisons ADD COLUMN report_vers_livraison_id INTEGER REFERENCES livraisons(id) ON DELETE SET NULL", None),
         ]
     else:
         return

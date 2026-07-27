@@ -170,6 +170,59 @@ def stock_restant(
 # 4. COÛT MOYEN PONDÉRÉ (WAC)
 # ══════════════════════════════════════════════════════════════════════════
 
+def fifo_allocation_livraisons(db: Session, produit_id: int) -> list[dict]:
+    """
+    Alloue les ventes agrégées du produit aux livraisons (cargaisons) dans
+    l'ordre FIFO — la plus ancienne cargaison se vide en premier.
+
+    Une livraison "terminée" (clôturée) garde sa consommation figée au
+    moment de la clôture (gallons_restants_cloture) — elle ne reçoit plus
+    de ventes après coup, même si le pool restant à ce stade est positif.
+    Le pool continue alors vers la livraison suivante.
+
+    N'affecte PAS gallons_livres()/stock_restant() : c'est une vue
+    additionnelle de suivi par cargaison. Les totaux agrégés (utilisés par
+    les tableaux de bord existants, la rentabilité, les anomalies) restent
+    calculés indépendamment de cette allocation.
+
+    Retourne une liste ordonnée (même ordre que les livraisons, du plus
+    ancien au plus récent) de dicts : livraison_id, terminee,
+    gallons_disponibles, gallons_consommes, gallons_restants.
+    """
+    livraisons = (
+        db.query(Livraison)
+        .filter(Livraison.produit_id == produit_id)
+        .order_by(Livraison.date_livraison, Livraison.id)
+        .all()
+    )
+    pool = gallons_vendus(db, produit_id, date(2000, 1, 1), date.today())
+
+    out = []
+    for l in livraisons:
+        dispo = round(float(l.gallons_recus) + float(l.gallons_report_recu or 0), 3)
+        if l.terminee:
+            consomme = round(dispo - float(l.gallons_restants_cloture or 0), 3)
+        else:
+            consomme = round(min(dispo, max(pool, 0.0)), 3)
+        pool = round(pool - consomme, 3)
+        out.append({
+            "livraison_id":        l.id,
+            "terminee":            l.terminee,
+            "gallons_disponibles": dispo,
+            "gallons_consommes":   consomme,
+            "gallons_restants":    round(dispo - consomme, 3),
+        })
+    return out
+
+
+def reste_livraison(db: Session, livraison: Livraison) -> float:
+    """Gallons restants actuellement calculés (FIFO) pour une livraison donnée."""
+    for a in fifo_allocation_livraisons(db, livraison.produit_id):
+        if a["livraison_id"] == livraison.id:
+            return a["gallons_restants"]
+    return 0.0
+
+
 def cout_moyen_pondere(
     db: Session,
     produit_id: int,
