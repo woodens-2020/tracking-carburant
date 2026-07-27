@@ -3929,6 +3929,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <label class="sk-label">Réf. camion <span class="sk-opt">(optionnel)</span></label>
                 <input id="sk-livr-camion" type="text" class="sk-input" placeholder="ex : CT-0042">
               </div>
+              <div class="sk-field">
+                <label class="sk-label">Reste avant (gal) <span class="sk-opt">(optionnel)</span></label>
+                <input id="sk-livr-reste" type="number" min="0" step="0.001" class="sk-input" placeholder="0.000">
+                <div class="c-dim" style="font-size:11.5px;margin-top:3px">Gallons restants de l'ancienne cargaison à additionner à cette nouvelle livraison.</div>
+              </div>
               <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="saveLivraison()">
                 <svg viewBox="0 0 24 24" width="13" height="13"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 <span data-i18n="sk.livr.save">Enregistrer la livraison</span>
@@ -14182,11 +14187,13 @@ async function saveLivraison(){
   const prix  = parseFloat(document.getElementById('sk-livr-prix').value);
   const fourn = document.getElementById('sk-livr-fourn').value.trim();
   const camion= document.getElementById('sk-livr-camion').value.trim();
+  const reste = parseFloat(document.getElementById('sk-livr-reste').value) || 0;
 
   if(!pid){ msg.textContent='Sélectionner un produit.'; msg.style.color='var(--red)'; return; }
   if(!date){ msg.textContent='Saisir une date.'; msg.style.color='var(--red)'; return; }
   if(!gal||gal<=0){ msg.textContent='Gallons reçus doit être > 0.'; msg.style.color='var(--red)'; return; }
   if(isNaN(prix)||prix<0){ msg.textContent='Prix achat invalide.'; msg.style.color='var(--red)'; return; }
+  if(reste<0){ msg.textContent='Reste avant doit être >= 0.'; msg.style.color='var(--red)'; return; }
 
   msg.textContent='Enregistrement…'; msg.style.color='var(--muted)';
   try{
@@ -14194,6 +14201,7 @@ async function saveLivraison(){
       produit_id: parseInt(pid), date_livraison: date,
       gallons_recus: gal, prix_achat_gallon: prix,
       fournisseur: fourn||null, reference_camion: camion||null,
+      reste_avant: reste,
     });
     msg.textContent='✓ Livraison enregistrée.'; msg.style.color='var(--green2)';
     // Réinitialiser les champs
@@ -14201,6 +14209,7 @@ async function saveLivraison(){
     document.getElementById('sk-livr-prix').value='';
     document.getElementById('sk-livr-fourn').value='';
     document.getElementById('sk-livr-camion').value='';
+    document.getElementById('sk-livr-reste').value='';
     loadLivraisons();
     // Mettre à jour le stock en fond
     if(document.getElementById('sk-stock').style.display!=='none') loadStock();
@@ -14244,7 +14253,7 @@ async function loadLivraisons(){
           return `<tr>
             <td>${l.date_livraison}</td>
             <td>${l.produit_nom}</td>
-            <td class="tr">${parseFloat(l.gallons_recus).toLocaleString('fr-HT',{minimumFractionDigits:3})}</td>
+            <td class="tr">${parseFloat(l.gallons_recus).toLocaleString('fr-HT',{minimumFractionDigits:3})}${l.gallons_report_recu>0?`<br><span style="font-size:11px;color:var(--muted)">+${parseFloat(l.gallons_report_recu).toLocaleString('fr-HT',{minimumFractionDigits:3})} reste</span>`:''}</td>
             <td class="tr">${parseFloat(l.prix_achat_gallon).toLocaleString('fr-HT',{minimumFractionDigits:2})} G</td>
             <td class="tr">${fmtG2(l.gallons_recus*l.prix_achat_gallon)}</td>
             <td class="tr">${reste!=null?reste.toLocaleString('fr-HT',{minimumFractionDigits:3})+' gal':'—'}</td>

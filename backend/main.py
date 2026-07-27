@@ -2803,6 +2803,7 @@ class LivraisonIn(BaseModel):
     fournisseur:       Optional[str] = None
     reference_camion:  Optional[str] = None
     notes:             Optional[str] = None
+    reste_avant:       float = 0     # reste (gal) de l'ancienne cargaison, saisi manuellement
 
 
 class PrixVenteIn(BaseModel):
@@ -2871,18 +2872,21 @@ def create_livraison(payload: LivraisonIn, db: Session = Depends(get_db)):
         raise HTTPException(400, "gallons_recus doit être > 0")
     if payload.prix_achat_gallon < 0:
         raise HTTPException(400, "prix_achat_gallon doit être >= 0")
+    if payload.reste_avant < 0:
+        raise HTTPException(400, "reste_avant doit être >= 0")
     produit = db.query(Produit).filter(Produit.id == payload.produit_id).first()
     if not produit:
         raise HTTPException(404, "Produit introuvable")
 
     lv = Livraison(
-        produit_id        = payload.produit_id,
-        date_livraison    = d,
-        gallons_recus     = payload.gallons_recus,
-        prix_achat_gallon = payload.prix_achat_gallon,
-        fournisseur       = payload.fournisseur,
-        reference_camion  = payload.reference_camion,
-        notes             = payload.notes,
+        produit_id           = payload.produit_id,
+        date_livraison       = d,
+        gallons_recus        = payload.gallons_recus,
+        prix_achat_gallon    = payload.prix_achat_gallon,
+        fournisseur          = payload.fournisseur,
+        reference_camion     = payload.reference_camion,
+        notes                = payload.notes,
+        gallons_report_recu  = payload.reste_avant,
     )
     try:
         db.add(lv)
