@@ -16,7 +16,7 @@ variations — documenter dans les rapports.
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -216,38 +216,68 @@ def stock_restant(
 # 4. COÛT MOYEN PONDÉRÉ (WAC)
 # ══════════════════════════════════════════════════════════════════════════
 
+def _gallons_et_revenu_saisis_entre(
+    db: Session,
+    produit_id: int,
+    apres_ts: Optional[datetime],
+    avant_ts: Optional[datetime],
+) -> tuple[float, float]:
+    """
+    Gallons vendus + revenu, filtrés par Releve.created_at (moment de SAISIE
+    du relevé dans le système) — pas par Releve.date (date du relevé).
+
+    Nécessaire pour distinguer, à l'intérieur d'une même journée calendaire,
+    les relevés déjà saisis AVANT la création d'une nouvelle livraison de
+    ceux saisis après : deux livraisons datées du même jour, ou un relevé du
+    matin saisi avant qu'une livraison de l'après-midi soit enregistrée,
+    créeraient une ambiguïté si on filtrait seulement par date.
+    """
+    q = db.query(Releve).join(Pompe, Releve.pompe_id == Pompe.id).filter(
+        Pompe.produit_id == produit_id
+    )
+    if apres_ts is not None:
+        q = q.filter(Releve.created_at >= apres_ts)
+    if avant_ts is not None:
+        q = q.filter(Releve.created_at < avant_ts)
+    releves = q.all()
+    gal = round(sum(r.quantite for r in releves if r.quantite >= 0), 3)
+    rev = round(sum(r.montant_vente for r in releves if r.quantite >= 0), 2)
+    return gal, rev
+
+
 def fifo_allocation_livraisons(db: Session, produit_id: int) -> list[dict]:
     """
     Attribue les ventes du produit aux livraisons (cargaisons) par FENÊTRE
-    DE DATES propre à chaque cargaison — pas par un pool global qui se
-    déverse d'une cargaison à l'autre.
+    DE SAISIE propre à chaque cargaison — pas par un pool global qui se
+    déverse d'une cargaison à l'autre, et pas par date calendaire (ambiguë
+    si une livraison et un relevé partagent la même date).
 
-    Une cargaison encore OUVERTE ne comptabilise que les ventes survenues
-    À PARTIR de sa propre date de livraison, jusqu'à la date de la
-    cargaison suivante (exclue) ou aujourd'hui s'il n'y en a pas encore.
-    Concrètement : déclarer une nouvelle livraison repart TOUJOURS de zéro
-    pour elle — elle n'est jamais réduite par des ventes déjà comptabilisées
-    sur une cargaison précédente, même si celle-ci n'a plus assez de
+    Une cargaison encore OUVERTE ne comptabilise que les relevés SAISIS à
+    partir du moment (Livraison.created_at) où elle a été enregistrée,
+    jusqu'au moment où la cargaison suivante a été enregistrée (exclu), ou
+    jusqu'à maintenant s'il n'y en a pas encore. Concrètement : déclarer une
+    nouvelle livraison repart TOUJOURS de zéro pour elle — aucun relevé déjà
+    saisi avant cet instant ne peut jamais lui être attribué, même s'il
+    porte la même date, et même si l'ancienne cargaison n'a plus assez de
     gallons disponibles pour couvrir tout ce qui a été vendu pendant sa
-    propre fenêtre. Dans ce cas l'écart reste sur cette cargaison-là
-    (reste à 0, consommation plafonnée à ce qu'elle avait réellement
-    disponible) plutôt que de "déborder" silencieusement sur la suivante.
+    propre fenêtre (l'écart reste alors sur cette cargaison-là — reste à 0,
+    consommation plafonnée à ce qu'elle avait réellement disponible —
+    plutôt que de "déborder" silencieusement sur la suivante).
 
     Une livraison "terminée" (clôturée) garde sa consommation figée au
-    moment de la clôture (gallons_restants_cloture) — sa fenêtre de dates
-    n'est alors plus jamais recalculée.
+    moment de la clôture (gallons_restants_cloture) — sa fenêtre n'est
+    alors plus jamais recalculée.
 
     N'affecte PAS gallons_livres() (les gallons reçus restent un fait
     physique immuable) ni gallons_vendus() (les ventes agrégées restent
-    calculées uniquement depuis les relevés). Affecte stock_restant() via
-    gallons_ecartes() : une cargaison clôturée SANS report retire son reste
-    du stock affiché sur tous les tableaux de bord (Stock actuel, chatbot,
-    rapports).
+    calculées uniquement depuis les relevés, par date). Affecte
+    stock_restant() via gallons_ecartes() : une cargaison clôturée SANS
+    report retire son reste du stock affiché sur tous les tableaux de bord.
 
     Retourne une liste ordonnée (du plus ancien au plus récent) de dicts :
     livraison_id, terminee, gallons_disponibles, gallons_consommes,
-    gallons_restants, fenetre_debut, fenetre_fin (ces deux derniers None
-    pour une cargaison clôturée — sa fenêtre n'est plus pertinente).
+    gallons_restants, fenetre_debut, fenetre_fin (timestamps de saisie ;
+    None pour une cargaison clôturée — sa fenêtre n'est plus pertinente).
     """
     livraisons = (
         db.query(Livraison)
@@ -278,15 +308,10 @@ def fifo_allocation_livraisons(db: Session, produit_id: int) -> list[dict]:
             })
             continue
 
-        debut = date(2000, 1, 1) if i == 0 else l.date_livraison
-        if i + 1 < len(livraisons):
-            fin = livraisons[i + 1].date_livraison - timedelta(days=1)
-            if fin < debut:
-                fin = debut
-        else:
-            fin = date.today()
+        apres_ts = l.created_at if i > 0 else None
+        avant_ts = livraisons[i + 1].created_at if i + 1 < len(livraisons) else None
 
-        vendu_fenetre = gallons_vendus(db, produit_id, debut, fin)
+        vendu_fenetre, _ = _gallons_et_revenu_saisis_entre(db, produit_id, apres_ts, avant_ts)
         consomme = round(min(dispo, vendu_fenetre), 3)
         out.append({
             "livraison_id":        l.id,
@@ -294,8 +319,8 @@ def fifo_allocation_livraisons(db: Session, produit_id: int) -> list[dict]:
             "gallons_disponibles": dispo,
             "gallons_consommes":   consomme,
             "gallons_restants":    round(dispo - consomme, 3),
-            "fenetre_debut":       debut,
-            "fenetre_fin":         fin,
+            "fenetre_debut":       apres_ts,
+            "fenetre_fin":         avant_ts,
         })
     return out
 
@@ -310,10 +335,10 @@ def reste_livraison(db: Session, livraison: Livraison) -> float:
 
 def fifo_allocation_revenu(db: Session, produit_id: int) -> list[dict]:
     """
-    Alloue le revenu (gourdes) par la même fenêtre de dates que
+    Alloue le revenu (gourdes) par la même fenêtre de saisie que
     fifo_allocation_livraisons() pour chaque cargaison ouverte — cohérent
     avec l'attribution des gallons (mêmes bornes, jamais recalculées
-    indépendamment). Si les gallons vendus dans la fenêtre dépassent ce que
+    indépendamment). Si les gallons saisis dans la fenêtre dépassent ce que
     la cargaison a de disponible (écart/survente), le revenu est réduit
     dans la même proportion que les gallons retenus, pour rester cohérent
     avec le COGS figé à la clôture (rapport_gallons_vendus × prix_achat_gallon).
@@ -333,9 +358,9 @@ def fifo_allocation_revenu(db: Session, produit_id: int) -> list[dict]:
                 "revenu_consomme":   0.0,
             })
             continue
-        debut, fin = a["fenetre_debut"], a["fenetre_fin"]
-        vendu_fenetre  = gallons_vendus(db, produit_id, debut, fin)
-        revenu_fenetre = revenu_ventes(db, produit_id, debut, fin)
+        vendu_fenetre, revenu_fenetre = _gallons_et_revenu_saisis_entre(
+            db, produit_id, a["fenetre_debut"], a["fenetre_fin"]
+        )
         ratio = (a["gallons_consommes"] / vendu_fenetre) if vendu_fenetre > 0 else 0.0
         out.append({
             "livraison_id":      a["livraison_id"],

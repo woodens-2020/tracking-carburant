@@ -15568,6 +15568,7 @@ async function loadProfitEvolution(debut, fin, pid){
 // Charger les données de l'onglet actif lors du changement
 document.addEventListener('DOMContentLoaded',()=>{
   const tabs={
+    'sk-stock': ()=>loadStock(),
     'sk-livr':  ()=>loadLivraisons(),
     'sk-prix':  ()=>loadPrixVente(),
     'sk-histo': ()=>loadHistoriqueVente(),
