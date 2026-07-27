@@ -8332,6 +8332,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <label style="font-size:13px;color:rgba(255,255,255,.4)">au</label>
             <input class="pos-input" id="ventes-fin" type="date" style="width:140px">
           </div>
+          <select class="pos-select" id="ventes-filtre-plat" onchange="ckVentesAppliquerFiltrePlat()" style="min-width:160px">
+            <option value="">Tous les plats</option>
+          </select>
           <button class="pos-btn teal" onclick="ckVentesCharger()">Filtrer</button>
           <div style="margin-left:auto;display:flex;gap:6px">
             <button class="pos-btn ghost" style="font-size:13px" onclick="ckVentesPeriode(0)">Auj.</button>
@@ -23982,12 +23985,19 @@ async function ckDepSupprimer(id){
 // VENTES
 // ══════════════════════════════════════════════════════════════════
 
+let _ckVentesAll = [];
+
 async function loadCuisineVentes(){
   const today = new Date().toISOString().split('T')[0];
   const dDeb  = document.getElementById('ventes-debut');
   const dFin  = document.getElementById('ventes-fin');
   if(dDeb && !dDeb.value) dDeb.value = today;
   if(dFin && !dFin.value) dFin.value = today;
+  try {
+    const plats = await apiFetch('GET', '/cuisine/plats?actif=true');
+    const sel = document.getElementById('ventes-filtre-plat');
+    if(sel) sel.innerHTML = '<option value="">Tous les plats</option>' + (plats||[]).map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
+  } catch(_){}
   await ckVentesCharger();
 }
 
@@ -24004,24 +24014,39 @@ async function ckVentesCharger(){
   const debut = document.getElementById('ventes-debut')?.value;
   const fin   = document.getElementById('ventes-fin')?.value;
   const tbody = document.getElementById('ventes-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     let url = '/cuisine/ventes';
     if(debut||fin) url += `?date_debut=${debut||''}&date_fin=${fin||''}`;
-    _ckVentes = await apiFetch('GET', url);
+    _ckVentesAll = await apiFetch('GET', url);
+    ckVentesAppliquerFiltrePlat();
+  } catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="padding:20px;text-align:center;color:#f87171">${e.message||'Erreur'}</td></tr>`;
+  }
+}
 
-    const validees = _ckVentes.filter(v => v.statut === 'VALIDEE');
-    const ca   = validees.reduce((s,v) => s+v.total, 0);
-    const nb   = validees.length;
-    const moy  = nb > 0 ? ca/nb : 0;
-    [['ventes-kpi-ca', posGx(ca)],['ventes-kpi-nb', nb],['ventes-kpi-moy', posGx(moy)]
-    ].forEach(([id,v]) => { const el=document.getElementById(id); if(el) el.textContent=v; });
+// Filtre en direct (côté client) les ventes déjà chargées pour ne garder que
+// celles contenant le plat sélectionné — une vente peut contenir plusieurs
+// plats, donc on vérifie chaque ligne plutôt qu'un champ unique.
+function ckVentesAppliquerFiltrePlat(){
+  const tbody  = document.getElementById('ventes-tbody');
+  const platId = document.getElementById('ventes-filtre-plat')?.value || '';
+  _ckVentes = !platId ? _ckVentesAll : _ckVentesAll.filter(v => (v.lignes||[]).some(l => String(l.plat_id) === platId));
 
-    if(!_ckVentes.length){
-      if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune vente</td></tr>';
-      return;
-    }
-    tbody.innerHTML = _ckVentes.map(v => {
+  const validees = _ckVentes.filter(v => v.statut === 'VALIDEE');
+  const ca   = validees.reduce((s,v) => s+v.total, 0);
+  const nb   = validees.length;
+  const moy  = nb > 0 ? ca/nb : 0;
+  [['ventes-kpi-ca', posGx(ca)],['ventes-kpi-nb', nb],['ventes-kpi-moy', posGx(moy)]
+  ].forEach(([id,v]) => { const el=document.getElementById(id); if(el) el.textContent=v; });
+
+  if(!_ckVentes.length){
+    const nomPlat = document.getElementById('ventes-filtre-plat');
+    const label = nomPlat && platId ? nomPlat.options[nomPlat.selectedIndex].text : '';
+    if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">${label ? `Aucune vente contenant « ${esc(label)} »` : 'Aucune vente'}</td></tr>`;
+    return;
+  }
+  if(tbody) tbody.innerHTML = _ckVentes.map(v => {
       const annulee = v.statut === 'ANNULEE';
       const modeBadge = v.mode_paiement === 'CREDIT'
         ? '<span style="font-size:12px;color:#f87171;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);border-radius:4px;padding:2px 6px">Crédit</span>'
@@ -24046,9 +24071,6 @@ async function ckVentesCharger(){
         </td>
       </tr>`;
     }).join('');
-  } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="padding:20px;text-align:center;color:#f87171">${e.message||'Erreur'}</td></tr>`;
-  }
 }
 
 function ckVenteDetail(id){
