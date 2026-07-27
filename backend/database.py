@@ -127,6 +127,11 @@ def _migrate_columns():
              "ALTER TABLE livraisons ADD COLUMN utilisateur_cloture_id INTEGER DEFAULT NULL", None),
             ("livraisons", "report_vers_livraison_id",
              "ALTER TABLE livraisons ADD COLUMN report_vers_livraison_id INTEGER DEFAULT NULL", None),
+            # v9 — rapport de vente figé par cargaison (historique de vente)
+            ("livraisons", "rapport_gallons_vendus",
+             "ALTER TABLE livraisons ADD COLUMN rapport_gallons_vendus NUMERIC DEFAULT NULL", None),
+            ("livraisons", "rapport_revenu",
+             "ALTER TABLE livraisons ADD COLUMN rapport_revenu NUMERIC DEFAULT NULL", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -165,6 +170,11 @@ def _migrate_columns():
              "ALTER TABLE livraisons ADD COLUMN utilisateur_cloture_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
             ("livraisons", "report_vers_livraison_id",
              "ALTER TABLE livraisons ADD COLUMN report_vers_livraison_id INTEGER REFERENCES livraisons(id) ON DELETE SET NULL", None),
+            # v9 — rapport de vente figé par cargaison (historique de vente)
+            ("livraisons", "rapport_gallons_vendus",
+             "ALTER TABLE livraisons ADD COLUMN rapport_gallons_vendus NUMERIC(14,3)", None),
+            ("livraisons", "rapport_revenu",
+             "ALTER TABLE livraisons ADD COLUMN rapport_revenu NUMERIC(14,2)", None),
         ]
     else:
         return

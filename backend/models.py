@@ -120,6 +120,14 @@ class Livraison(Base):
     utilisateur_cloture_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     report_vers_livraison_id = Column(Integer, ForeignKey("livraisons.id", ondelete="SET NULL"), nullable=True)
 
+    # Rapport de vente figé à la clôture (jamais recalculé ensuite — protège
+    # cette cargaison des effets rétroactifs d'un nouveau prix d'achat sur
+    # une autre livraison). Le coût/bénéfice se dérivent à la lecture à
+    # partir de ces gallons figés × prix_achat_gallon (immuable), donc ne
+    # sont pas stockés séparément.
+    rapport_gallons_vendus = Column(Numeric(14, 3), nullable=True)
+    rapport_revenu         = Column(Numeric(14, 2), nullable=True)
+
     produit             = relationship("Produit")
     utilisateur_cloture = relationship("Utilisateur", foreign_keys=[utilisateur_cloture_id])
     report_vers         = relationship("Livraison", remote_side=[id], foreign_keys=[report_vers_livraison_id])

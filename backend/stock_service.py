@@ -103,6 +103,31 @@ def revenu_ventes(
     return round(sum(r.montant_vente for r in releves if r.quantite >= 0), 2)
 
 
+def revenu_vendus_par_jour(
+    db: Session,
+    produit_id: int,
+    date_debut: date,
+    date_fin: date,
+) -> dict[str, float]:
+    """Retourne un dict {date_iso: revenu_gourdes} pour chaque jour de la période."""
+    releves = (
+        db.query(Releve)
+        .join(Pompe, Releve.pompe_id == Pompe.id)
+        .filter(
+            Pompe.produit_id == produit_id,
+            Releve.date >= date_debut,
+            Releve.date <= date_fin,
+        )
+        .all()
+    )
+    par_jour: dict[str, float] = {}
+    for r in releves:
+        if r.quantite >= 0:
+            k = str(r.date)
+            par_jour[k] = round(par_jour.get(k, 0.0) + r.montant_vente, 2)
+    return par_jour
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # 2. LIVRAISONS
 # ══════════════════════════════════════════════════════════════════════════
@@ -265,14 +290,56 @@ def reste_livraison(db: Session, livraison: Livraison) -> float:
     return 0.0
 
 
+def fifo_allocation_revenu(db: Session, produit_id: int) -> list[dict]:
+    """
+    Alloue le revenu (gourdes) des ventes aux livraisons, dans les mêmes
+    bornes en gallons que fifo_allocation_livraisons() — jamais recalculées
+    indépendamment ici, les gallons restent l'unique source de vérité. Ceci
+    ne fait que répartir le revenu à l'intérieur de ces bornes, jour par
+    jour, à partir de Releve.montant_vente (revenu_vendus_par_jour).
+
+    Retourne une liste ordonnée de dicts : livraison_id, gallons_consommes,
+    revenu_consomme.
+    """
+    alloc_gal = fifo_allocation_livraisons(db, produit_id)
+    jours_gal = gallons_vendus_par_jour(db, produit_id, date(2000, 1, 1), date.today())
+    jours_rev = revenu_vendus_par_jour(db, produit_id, date(2000, 1, 1), date.today())
+
+    # Ledger mutable trié par date : [gallons_restants, revenu_restant] par jour
+    ledger = [[jours_gal[j], jours_rev.get(j, 0.0)] for j in sorted(jours_gal)]
+    cursor = 0
+    out = []
+    for a in alloc_gal:
+        besoin = a["gallons_consommes"]
+        revenu_lot = 0.0
+        while besoin > 1e-9 and cursor < len(ledger):
+            gal_j, rev_j = ledger[cursor]
+            if gal_j <= 1e-9:
+                cursor += 1
+                continue
+            pris = min(besoin, gal_j)
+            part_rev = rev_j * (pris / gal_j) if gal_j > 0 else 0.0
+            revenu_lot += part_rev
+            ledger[cursor][0] -= pris
+            ledger[cursor][1] -= part_rev
+            besoin -= pris
+        out.append({
+            "livraison_id":      a["livraison_id"],
+            "gallons_consommes": a["gallons_consommes"],
+            "revenu_consomme":   round(revenu_lot, 2),
+        })
+    return out
+
+
 def cout_moyen_pondere(
     db: Session,
     produit_id: int,
     jusqu_a: Optional[date] = None,
+    uniquement_ouvertes: bool = False,
 ) -> Optional[float]:
     """
     WAC = Σ(gallons_recus × prix_achat_gallon) / Σ(gallons_recus)
-    sur toutes les livraisons jusqu'à la date indiquée.
+    sur les livraisons jusqu'à la date indiquée.
 
     Retourne None si aucune livraison enregistrée (ne pas inventer de coût).
 
@@ -281,11 +348,33 @@ def cout_moyen_pondere(
     livraison — impossible en pratique. WAC est l'approche standard (IAS 2).
     Impact : sur une période où le prix monte de 50 G à 80 G, le WAC sera
     ~65 G, sous-estimant le coût réel des dernières ventes.
+
+    uniquement_ouvertes=True exclut les livraisons déjà clôturées **à la
+    date `jusqu_a`** (ou aujourd'hui si `jusqu_a` est omis) — pas seulement
+    celles clôturées maintenant. Une cargaison clôturée APRÈS `jusqu_a` a
+    forcément vendu à son prix pendant toute la période demandée, donc son
+    prix doit rester dans le calcul pour cette période-là ; une cargaison
+    déjà clôturée AVANT `jusqu_a` ne doit plus jamais influencer le coût
+    d'une période où elle n'était plus active. Sans cette distinction,
+    clôturer une cargaison aujourd'hui recalculerait le bénéfice affiché
+    pour un mois déjà passé en excluant un prix qui était pourtant bien en
+    vigueur pendant ce mois-là — exactement le bug que ce paramètre corrige.
+    Utilisé pour "Stock actuel"/"Rentabilité" : une cargaison clôturée
+    n'influence donc plus le coût des périodes *postérieures* à sa clôture
+    — son économie propre est figée une fois pour toutes dans son rapport
+    (Livraison.rapport_gallons_vendus/rapport_revenu), consultable dans
+    "Historique de vente".
     """
     q = db.query(Livraison).filter(Livraison.produit_id == produit_id)
     if jusqu_a is not None:
         q = q.filter(Livraison.date_livraison <= jusqu_a)
     livraisons = q.all()
+    if uniquement_ouvertes:
+        borne = jusqu_a if jusqu_a is not None else date.today()
+        livraisons = [
+            l for l in livraisons
+            if not (l.terminee and l.date_cloture is not None and l.date_cloture.date() <= borne)
+        ]
     if not livraisons:
         return None
     total_gallons = sum(float(l.gallons_recus) for l in livraisons)
@@ -332,13 +421,19 @@ def rentabilite_produit(
     - COGS     : gallons_vendus × WAC des livraisons jusqu'à date_fin
     - Bénéfice : Revenu − COGS
 
-    Si le WAC est None (pas de livraison) : bénéfice = None avec fiable=False.
-    Si aucun relevé : bénéfice = None avec fiable=False.
+    Si le WAC est None (pas de livraison OUVERTE) : bénéfice = None avec
+    fiable=False. Si aucun relevé : bénéfice = None avec fiable=False.
     Ne jamais inventer un chiffre.
+
+    Le WAC ne considère que les cargaisons encore ouvertes
+    (cout_moyen_pondere(..., uniquement_ouvertes=True)) : une fois clôturée,
+    une cargaison ne doit plus jamais influencer rétroactivement le bénéfice
+    affiché ici — son économie propre est figée dans son rapport de clôture,
+    consultable dans "Historique de vente".
     """
     vendus  = gallons_vendus(db, produit_id, date_debut, date_fin)
     revenu  = revenu_ventes(db, produit_id, date_debut, date_fin)
-    cmp     = cout_moyen_pondere(db, produit_id, jusqu_a=date_fin)
+    cmp     = cout_moyen_pondere(db, produit_id, jusqu_a=date_fin, uniquement_ouvertes=True)
 
     cogs_total: Optional[float] = None
     benefice:   Optional[float] = None
@@ -356,6 +451,19 @@ def rentabilite_produit(
     # Détail par jour
     par_jour_gal = gallons_vendus_par_jour(db, produit_id, date_debut, date_fin)
 
+    avertissement = None
+    if not fiable:
+        if cmp is None:
+            a_une_livraison = db.query(Livraison).filter(Livraison.produit_id == produit_id).first() is not None
+            avertissement = (
+                "Toutes les cargaisons de ce produit sont clôturées — voir "
+                "leur rapport dans Historique de vente."
+                if a_une_livraison else
+                "Aucune livraison enregistrée — COGS non calculable."
+            )
+        else:
+            avertissement = "Aucun relevé de vente sur cette période."
+
     return {
         "produit_id":     produit_id,
         "date_debut":     str(date_debut),
@@ -369,11 +477,7 @@ def rentabilite_produit(
         "b_par_gallon":   b_par_gal,
         "fiable":         fiable,
         "par_jour":       par_jour_gal,
-        "avertissement":  None if fiable else (
-            "Aucune livraison enregistrée — COGS non calculable."
-            if cmp is None else
-            "Aucun relevé de vente sur cette période."
-        ),
+        "avertissement":  avertissement,
     }
 
 

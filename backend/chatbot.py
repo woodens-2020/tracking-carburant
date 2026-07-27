@@ -110,7 +110,7 @@ def _run_tool(db: Session, name: str, args: dict) -> dict:
         for p in produits:
             s = stock_restant(db, p.id, seuil_jours=seuil_jours)
             s["produit_nom"] = p.nom
-            s["cout_moyen_pondere"] = cout_moyen_pondere(db, p.id)
+            s["cout_moyen_pondere"] = cout_moyen_pondere(db, p.id, uniquement_ouvertes=True)
             resultats.append(s)
         return {"stocks": resultats, "nb_alertes": sum(1 for r in resultats if r["alerte_bas"])}
 

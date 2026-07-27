@@ -3802,6 +3802,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <div class="sk-tabs">
         <button class="sk-tab active" data-tab="sk-stock" onclick="skTab(this,'sk-stock')" data-i18n="sk.tab.stock">Stock actuel</button>
         <button class="sk-tab" data-tab="sk-livr"  onclick="skTab(this,'sk-livr')"  data-i18n="sk.tab.livr">Livraisons</button>
+        <button class="sk-tab" data-tab="sk-histo" onclick="skTab(this,'sk-histo')" data-i18n="sk.tab.histo">Historique de vente</button>
         <button class="sk-tab" data-tab="sk-rent"  onclick="skTab(this,'sk-rent')"  data-i18n="sk.tab.rent">Rentabilité</button>
         <button class="sk-tab" data-tab="sk-prix"  onclick="skTab(this,'sk-prix')"  data-i18n="sk.tab.prix">Prix de vente</button>
         <button class="sk-tab" data-tab="sk-rapports" onclick="skTab(this,'sk-rapports');initReport()">
@@ -3950,6 +3951,21 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div id="sk-livr-table" class="sk-scroll"></div>
           </div>
         </div>
+      </div>
+
+      <!-- ── Onglet : Historique de vente ─────────────────────── -->
+      <div id="sk-histo" class="sk-panel" style="display:none">
+        <div class="sk-toolbar">
+          <label class="sk-inline-label">Produit</label>
+          <select id="sk-histo-produit" class="sk-input" style="width:auto">
+            <option value="">Tous produits</option>
+          </select>
+          <button class="btn btn-secondary btn-icon" onclick="loadHistoriqueVente()" title="Actualiser">
+            <svg viewBox="0 0 24 24" width="13" height="13"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+          </button>
+        </div>
+        <div id="sk-histo-kpis" class="sk-kpis-grid" style="margin-top:12px"></div>
+        <div id="sk-histo-table" class="sk-scroll" style="margin-top:12px"></div>
       </div>
 
       <!-- ── Onglet 3 : Rentabilité ─────────────────────────── -->
@@ -10124,6 +10140,7 @@ const LANGS = {
     // Stock module
     'sk.tab.stock': 'Stock actuel', 'sk.tab.livr': 'Livraisons',
     'sk.tab.rent':  'Rentabilité',  'sk.tab.prix': 'Prix de vente',
+    'sk.tab.histo': 'Historique de vente',
     'sk.seuil.label': 'Alerte si stock <', 'sk.seuil.unit': 'jours de vente',
     'sk.refresh': 'Actualiser',
     'sk.livr.new':  'Nouvelle livraison', 'sk.livr.save': 'Enregistrer la livraison',
@@ -10326,6 +10343,7 @@ const LANGS = {
     'page.stock.sub':          'Delivery tracking · Weighted average cost · Profit by product',
     'sk.tab.stock': 'Current Stock', 'sk.tab.livr': 'Deliveries',
     'sk.tab.rent':  'Profitability', 'sk.tab.prix': 'Sale Prices',
+    'sk.tab.histo': 'Sales History',
     'sk.seuil.label': 'Alert if stock <', 'sk.seuil.unit': 'days of sales',
     'sk.refresh': 'Refresh',
     'sk.livr.new':  'New Delivery', 'sk.livr.save': 'Save delivery',
@@ -14050,7 +14068,7 @@ async function initStock(){
     // Remplir les sélecteurs de produits
     try{
       const produits = await GET('/produits');
-      ['sk-livr-produit','sk-livr-filtre','sk-rent-produit','sk-prix-produit'].forEach(id=>{
+      ['sk-livr-produit','sk-livr-filtre','sk-rent-produit','sk-prix-produit','sk-histo-produit'].forEach(id=>{
         const sel = document.getElementById(id);
         if(!sel) return;
         // Garder l'option vide initiale si elle existe
@@ -14331,6 +14349,78 @@ async function reouvrirLivraison(id){
   }catch(e){ notify('Erreur : '+(e.message||e),'err'); }
 }
 
+// ── Historique de vente (rapports figés par cargaison clôturée) ──
+async function loadHistoriqueVente(){
+  const pid   = document.getElementById('sk-histo-produit').value;
+  const kpis  = document.getElementById('sk-histo-kpis');
+  const wrap  = document.getElementById('sk-histo-table');
+  kpis.innerHTML = '';
+  wrap.innerHTML = `<div style="color:var(--muted);font-size:14px;padding:14px 0">Chargement…</div>`;
+  try{
+    let url = '/livraisons?terminee=true';
+    if(pid) url += `&produit_id=${pid}`;
+    const d = await GET(url);
+    const rows = (d.livraisons||[]).filter(l=>l.rapport_gallons_vendus!=null);
+    const sansRapport = (d.livraisons||[]).length - rows.length;
+
+    const totGal  = rows.reduce((s,l)=>s+parseFloat(l.rapport_gallons_vendus||0),0);
+    const totRev  = rows.reduce((s,l)=>s+parseFloat(l.rapport_revenu||0),0);
+    const totCogs = rows.reduce((s,l)=>s+parseFloat(l.rapport_cogs||0),0);
+    const totBen  = rows.reduce((s,l)=>s+parseFloat(l.rapport_benefice||0),0);
+    const margeMoy= totRev>0 ? totBen/totRev*100 : null;
+
+    kpis.innerHTML = [
+      {lbl:'Cargaisons clôturées', val:String((d.livraisons||[]).length), cls:''},
+      {lbl:'Gallons vendus',       val:fmtGal3(totGal),                   cls:''},
+      {lbl:'Revenu',               val:fmtG2(totRev),                     cls:''},
+      {lbl:'COGS',                 val:fmtG2(totCogs),                    cls:''},
+      {lbl:'Bénéfice',             val:fmtG2(totBen),                     cls:totBen>=0?'sk-pos':'sk-neg'},
+      {lbl:'Marge moyenne',        val:fmtPct(margeMoy),                  cls:margeMoy>=0?'sk-pos':'sk-neg'},
+    ].map(k=>`<div class="sk-kpi">
+      <div class="sk-kpi-label">${k.lbl}</div>
+      <div class="sk-kpi-val ${k.cls}">${k.val}</div>
+    </div>`).join('');
+
+    if(!(d.livraisons||[]).length){
+      wrap.innerHTML = `<div style="color:var(--muted);font-size:14px;padding:14px 0">Aucune cargaison clôturée.</div>`;
+      return;
+    }
+
+    wrap.innerHTML = `<table class="sk-table">
+      <thead><tr>
+        <th>Date livraison</th><th>Produit</th>
+        <th class="tr">Gallons reçus</th><th class="tr">Gallons vendus</th>
+        <th class="tr">Revenu</th><th class="tr">COGS</th>
+        <th class="tr">Bénéfice</th><th class="tr">Marge</th>
+        <th>Date clôture</th><th>Reste</th>
+      </tr></thead>
+      <tbody>
+        ${d.livraisons.map(l=>{
+          const aRapport = l.rapport_gallons_vendus!=null;
+          const reste = l.report_vers_livraison_id
+            ? `Reporté (cargaison #${l.report_vers_livraison_id})`
+            : (l.gallons_restants_cloture>0 ? `${fmtGal3(l.gallons_restants_cloture)} écartés` : '—');
+          return `<tr>
+            <td>${l.date_livraison}</td>
+            <td>${l.produit_nom}</td>
+            <td class="tr">${fmtGal3(l.gallons_recus)}</td>
+            <td class="tr">${aRapport?fmtGal3(l.rapport_gallons_vendus):'—'}</td>
+            <td class="tr">${aRapport?fmtG2(l.rapport_revenu):'—'}</td>
+            <td class="tr">${aRapport?fmtG2(l.rapport_cogs):'—'}</td>
+            <td class="tr" style="color:${aRapport?(l.rapport_benefice>=0?'#3fb6a8':'#ef4444'):'inherit'}">${aRapport?fmtG2(l.rapport_benefice):'—'}</td>
+            <td class="tr">${aRapport?fmtPct(l.rapport_marge_pct):'—'}</td>
+            <td>${l.date_cloture?frDate(l.date_cloture.slice(0,10)):'—'}</td>
+            <td style="font-size:12.5px;color:var(--muted)">${reste}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    ${sansRapport>0?`<div style="color:var(--muted);font-size:12.5px;padding:8px 0">${sansRapport} cargaison(s) clôturée(s) avant l'ajout de cette fonctionnalité — rapport non disponible ("—").</div>`:''}`;
+  }catch(e){
+    wrap.innerHTML = `<div style="color:var(--red);font-size:14px">Erreur : ${e.message||e}</div>`;
+  }
+}
+
 // ── Rentabilité ────────────────────────────────
 async function loadRentabilite(){
   const debut = document.getElementById('sk-rent-debut').value;
@@ -14364,8 +14454,9 @@ async function loadRentabilite(){
     </div>`).join('');
 
     if(!fiable){
+      const msgSpecifique = (pid && d.produits && d.produits.length===1) ? d.produits[0].avertissement : null;
       kpis.innerHTML += `<div class="sk-alert-bar" style="grid-column:1/-1">
-        ⚠ ${t('sk.warn.no.livr')} — enregistrer les livraisons pour calculer le bénéfice.
+        ⚠ ${msgSpecifique ? esc(msgSpecifique) : t('sk.warn.no.livr')+' — enregistrer les livraisons pour calculer le bénéfice.'}
       </div>`;
     }
 
@@ -15468,8 +15559,9 @@ async function loadProfitEvolution(debut, fin, pid){
 // Charger les données de l'onglet actif lors du changement
 document.addEventListener('DOMContentLoaded',()=>{
   const tabs={
-    'sk-livr': ()=>loadLivraisons(),
-    'sk-prix': ()=>loadPrixVente(),
+    'sk-livr':  ()=>loadLivraisons(),
+    'sk-prix':  ()=>loadPrixVente(),
+    'sk-histo': ()=>loadHistoriqueVente(),
   };
   document.querySelectorAll('#page-stock .sk-tab').forEach(btn=>{
     btn.addEventListener('click',()=>{

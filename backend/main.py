@@ -2788,6 +2788,7 @@ from stock_service import (
     anomalies_stock,
     corr_saut_decalage,
     fifo_allocation_livraisons,
+    fifo_allocation_revenu,
     reste_livraison,
     SEUIL_ALERTE_JOURS_PAR_DEFAUT,
 )
@@ -2837,6 +2838,25 @@ def _livraison_dict(l: Livraison, fifo: Optional[dict] = None) -> dict:
         d["gallons_disponibles"] = fifo["gallons_disponibles"]
         d["gallons_consommes"]   = fifo["gallons_consommes"]
         d["gallons_restants"]    = fifo["gallons_restants"]
+
+    # Rapport de vente figé à la clôture — jamais recalculé, protège cette
+    # cargaison des effets rétroactifs d'un nouveau prix d'achat ailleurs.
+    if l.rapport_gallons_vendus is not None:
+        gal_rapport = float(l.rapport_gallons_vendus)
+        rev_rapport = float(l.rapport_revenu or 0)
+        cogs_rapport = round(gal_rapport * float(l.prix_achat_gallon), 2)
+        benefice_rapport = round(rev_rapport - cogs_rapport, 2)
+        d["rapport_gallons_vendus"] = gal_rapport
+        d["rapport_revenu"]         = rev_rapport
+        d["rapport_cogs"]           = cogs_rapport
+        d["rapport_benefice"]       = benefice_rapport
+        d["rapport_marge_pct"]      = round(benefice_rapport / rev_rapport * 100, 2) if rev_rapport > 0 else 0.0
+    else:
+        d["rapport_gallons_vendus"] = None
+        d["rapport_revenu"]         = None
+        d["rapport_cogs"]           = None
+        d["rapport_benefice"]       = None
+        d["rapport_marge_pct"]      = None
     return d
 
 
@@ -2879,11 +2899,14 @@ def list_livraisons(
     produit_id: Optional[int]  = None,
     date_debut: Optional[str]  = None,
     date_fin:   Optional[str]  = None,
+    terminee:   Optional[bool] = None,
     db: Session = Depends(get_db),
 ):
     q = db.query(Livraison)
     if produit_id:
         q = q.filter(Livraison.produit_id == produit_id)
+    if terminee is not None:
+        q = q.filter(Livraison.terminee == terminee)
     if date_debut:
         try:
             q = q.filter(Livraison.date_livraison >= date_type.fromisoformat(date_debut))
@@ -2948,6 +2971,12 @@ def cloturer_livraison(
 
     reste = reste_livraison(db, lv)
 
+    # Rapport de vente figé pour CETTE cargaison — calculé avant le
+    # changement de terminee (donc à partir de l'allocation FIFO courante,
+    # où lv est encore ouverte) et jamais recalculé après coup.
+    alloc_rev = {a["livraison_id"]: a for a in fifo_allocation_revenu(db, lv.produit_id)}
+    info_rev  = alloc_rev.get(lv.id, {"gallons_consommes": 0.0, "revenu_consomme": 0.0})
+
     cible = None
     if payload.reporter_reste and reste > 0:
         cible = (
@@ -2974,6 +3003,8 @@ def cloturer_livraison(
     lv.gallons_restants_cloture  = reste
     lv.date_cloture              = _dt.now(_tz.utc)
     lv.utilisateur_cloture_id    = user.id if user else None
+    lv.rapport_gallons_vendus    = info_rev["gallons_consommes"]
+    lv.rapport_revenu            = info_rev["revenu_consomme"]
 
     db.commit(); db.refresh(lv)
 
@@ -3006,6 +3037,8 @@ def reouvrir_livraison(livraison_id: int, db: Session = Depends(get_db)):
     lv.gallons_restants_cloture = None
     lv.date_cloture              = None
     lv.utilisateur_cloture_id    = None
+    lv.rapport_gallons_vendus    = None
+    lv.rapport_revenu            = None
 
     db.commit(); db.refresh(lv)
     alloc = {a["livraison_id"]: a for a in fifo_allocation_livraisons(db, lv.produit_id)}
@@ -3092,7 +3125,7 @@ def stock_endpoint(
     for p in produits:
         s = stock_restant(db, p.id, seuil_jours=seuil_jours)
         s["produit_nom"] = p.nom
-        cmp = cout_moyen_pondere(db, p.id)
+        cmp = cout_moyen_pondere(db, p.id, uniquement_ouvertes=True)
         s["cout_moyen_pondere"] = cmp
         s["valeur_stock_gourdes"] = round(float(s["gallons_restants"]) * cmp, 2) if cmp and s["gallons_restants"] > 0 else None
         resultats.append(s)
