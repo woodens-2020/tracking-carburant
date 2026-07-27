@@ -135,6 +135,26 @@ def gallons_livres(
     )
 
 
+def gallons_livres_cargaisons_ouvertes(db: Session, produit_id: int) -> float:
+    """
+    Gallons livrés, mais uniquement pour la/les cargaison(s) ENCORE
+    OUVERTES — par opposition à gallons_livres(), qui est un cumul
+    historique depuis le début des temps ("depuis le début").
+
+    Sert à afficher un "Total livré" cohérent avec "Stock restant" et
+    "Déjà vendu" sur "Stock actuel" : une cargaison clôturée ne doit plus
+    peser sur ce qui décrit la cargaison actuellement en cours.
+    """
+    livraisons = (
+        db.query(Livraison)
+        .filter(Livraison.produit_id == produit_id, Livraison.terminee == False)  # noqa: E712
+        .all()
+    )
+    return round(
+        sum(float(l.gallons_recus) + float(l.gallons_reste_manuel or 0) for l in livraisons), 3
+    )
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # 3. STOCK
 # ══════════════════════════════════════════════════════════════════════════
@@ -226,6 +246,7 @@ def stock_restant(
         "produit_id":       produit_id,
         "gallons_restants": restant,
         "gallons_livres":   total_livre,
+        "gallons_livres_cargaison_active": gallons_livres_cargaisons_ouvertes(db, produit_id),
         "gallons_vendus":   total_vendu,
         "gallons_vendus_cargaison_active": gallons_vendus_cargaisons_ouvertes(db, produit_id),
         "gallons_ecartes":  total_ecarte,

@@ -15120,7 +15120,7 @@ function renderStockCharts(stocks, seuil){
   const GRID='rgba(255,255,255,.05)';
 
   /* ── Bandeau KPI ── */
-  const totLiv = stocks.reduce((a,s)=>a+(parseFloat(s.gallons_livres)||0),0);
+  const totLiv = stocks.reduce((a,s)=>a+(parseFloat(s.gallons_livres_cargaison_active)||0),0);
   const totVnd = stocks.reduce((a,s)=>a+(parseFloat(s.gallons_vendus_cargaison_active)||0),0);
   const totRst = stocks.reduce((a,s)=>a+Math.max(0,parseFloat(s.gallons_restants)||0),0);
   const jArr   = stocks.filter(s=>s.jours_de_stock!=null).map(s=>s.jours_de_stock);
@@ -15200,8 +15200,8 @@ function renderStockCharts(stocks, seuil){
           </div>
           <div class="sk-gauge-stat">
             <div class="sk-gauge-stat-lbl">Total livré</div>
-            <div class="sk-gauge-stat-val">${fmtGal3(parseFloat(s.gallons_livres)||0)}</div>
-            <div class="sk-gauge-stat-sub">depuis le début</div>
+            <div class="sk-gauge-stat-val">${fmtGal3(parseFloat(s.gallons_livres_cargaison_active)||0)}</div>
+            <div class="sk-gauge-stat-sub">cargaison(s) actuelle(s)</div>
           </div>
           <div class="sk-gauge-stat">
             <div class="sk-gauge-stat-lbl">Prix moyen (CMP)</div>
@@ -15258,7 +15258,7 @@ function renderStockCharts(stocks, seuil){
 
   /* ── Barres horizontales ── */
   const labels=stocks.map(s=>s.produit_nom);
-  const livres=stocks.map(s=>parseFloat(s.gallons_livres)||0);
+  const livres=stocks.map(s=>parseFloat(s.gallons_livres_cargaison_active)||0);
   const vendus=stocks.map(s=>parseFloat(s.gallons_vendus_cargaison_active)||0);
   const rests =stocks.map(s=>Math.max(0,parseFloat(s.gallons_restants)||0));
   const barH  =Math.max(120, stocks.length*72);
@@ -15300,7 +15300,7 @@ function renderStockCharts(stocks, seuil){
   rotGrid.innerHTML=stocks.map((s,i)=>{
     const rest=Math.max(0,parseFloat(s.gallons_restants)||0);
     const vend=parseFloat(s.gallons_vendus_cargaison_active)||0;
-    const livre=parseFloat(s.gallons_livres)||0;
+    const livre=parseFloat(s.gallons_livres_cargaison_active)||0;
     const total=rest+vend;
     const txNum=total>0?(vend/total*100):0;
     const tx=total>0?txNum.toFixed(1)+'%':'—';
