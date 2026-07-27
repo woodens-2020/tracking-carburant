@@ -15121,7 +15121,7 @@ function renderStockCharts(stocks, seuil){
 
   /* ── Bandeau KPI ── */
   const totLiv = stocks.reduce((a,s)=>a+(parseFloat(s.gallons_livres)||0),0);
-  const totVnd = stocks.reduce((a,s)=>a+(parseFloat(s.gallons_vendus)||0),0);
+  const totVnd = stocks.reduce((a,s)=>a+(parseFloat(s.gallons_vendus_cargaison_active)||0),0);
   const totRst = stocks.reduce((a,s)=>a+Math.max(0,parseFloat(s.gallons_restants)||0),0);
   const jArr   = stocks.filter(s=>s.jours_de_stock!=null).map(s=>s.jours_de_stock);
   const avgJ   = jArr.length?jArr.reduce((a,v)=>a+v,0)/jArr.length:0;
@@ -15153,7 +15153,7 @@ function renderStockCharts(stocks, seuil){
   const gaugesWrap=document.getElementById('sk-gauges-wrap');
   gaugesWrap.innerHTML=stocks.map((s,i)=>{
     const rest=Math.max(0,parseFloat(s.gallons_restants)||0);
-    const vend=parseFloat(s.gallons_vendus)||0;
+    const vend=parseFloat(s.gallons_vendus_cargaison_active)||0;
     const total=rest+vend;
     const pctR=total>0?(rest/total*100).toFixed(1):'0.0';
     const pctV=total>0?(vend/total*100).toFixed(1):'0.0';
@@ -15236,7 +15236,7 @@ function renderStockCharts(stocks, seuil){
 
   stocks.forEach((s,i)=>{
     const rest=Math.max(0,parseFloat(s.gallons_restants)||0);
-    const vend=parseFloat(s.gallons_vendus)||0;
+    const vend=parseFloat(s.gallons_vendus_cargaison_active)||0;
     const c=document.getElementById(`sk-gauge-${i}`);
     if(!c) return;
     _skDonuts.push(new Chart(c.getContext('2d'),{
@@ -15259,7 +15259,7 @@ function renderStockCharts(stocks, seuil){
   /* ── Barres horizontales ── */
   const labels=stocks.map(s=>s.produit_nom);
   const livres=stocks.map(s=>parseFloat(s.gallons_livres)||0);
-  const vendus=stocks.map(s=>parseFloat(s.gallons_vendus)||0);
+  const vendus=stocks.map(s=>parseFloat(s.gallons_vendus_cargaison_active)||0);
   const rests =stocks.map(s=>Math.max(0,parseFloat(s.gallons_restants)||0));
   const barH  =Math.max(120, stocks.length*72);
   const barWrap=document.getElementById('sk-bar-gallons-wrap');
@@ -15299,7 +15299,7 @@ function renderStockCharts(stocks, seuil){
   const rotGrid=document.getElementById('sk-rotation-grid');
   rotGrid.innerHTML=stocks.map((s,i)=>{
     const rest=Math.max(0,parseFloat(s.gallons_restants)||0);
-    const vend=parseFloat(s.gallons_vendus)||0;
+    const vend=parseFloat(s.gallons_vendus_cargaison_active)||0;
     const livre=parseFloat(s.gallons_livres)||0;
     const total=rest+vend;
     const txNum=total>0?(vend/total*100):0;
@@ -15379,7 +15379,7 @@ function renderStockCharts(stocks, seuil){
 
   setTimeout(()=>{
     stocks.forEach((s,i)=>{
-      const vend=parseFloat(s.gallons_vendus)||0;
+      const vend=parseFloat(s.gallons_vendus_cargaison_active)||0;
       const total=Math.max(0,parseFloat(s.gallons_restants)||0)+vend||1;
       const el=document.getElementById(`sk-rpf-${s.produit_nom.replace(/\s+/g,'_')}`);
       if(el) el.style.width=Math.min(100,vend/total*100)+'%';

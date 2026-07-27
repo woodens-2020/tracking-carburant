@@ -166,6 +166,29 @@ def gallons_ecartes(db: Session, produit_id: int) -> float:
     return round(sum(float(l.gallons_restants_cloture or 0) for l in livraisons), 3)
 
 
+def gallons_vendus_cargaisons_ouvertes(db: Session, produit_id: int) -> float:
+    """
+    Gallons vendus, mais uniquement depuis la/les cargaison(s) ENCORE
+    OUVERTES (somme des gallons_consommes de fifo_allocation_livraisons()
+    pour les livraisons non clôturées) — par opposition à gallons_vendus(),
+    qui est un cumul historique depuis le début des temps.
+
+    Sert à afficher un "déjà vendu" cohérent avec gallons_restants sur
+    "Stock actuel" : une nouvelle cargaison démarre à 0 vendu, comme son
+    reste démarre à gallons_recus plein — les deux chiffres doivent
+    raconter la même histoire (la cargaison actuelle), pas mélanger un
+    "restant" propre à la cargaison avec un "vendu" cumulé depuis toujours.
+    """
+    return round(
+        sum(
+            a["gallons_consommes"]
+            for a in fifo_allocation_livraisons(db, produit_id)
+            if not a["terminee"]
+        ),
+        3,
+    )
+
+
 def stock_restant(
     db: Session,
     produit_id: int,
@@ -204,6 +227,7 @@ def stock_restant(
         "gallons_restants": restant,
         "gallons_livres":   total_livre,
         "gallons_vendus":   total_vendu,
+        "gallons_vendus_cargaison_active": gallons_vendus_cargaisons_ouvertes(db, produit_id),
         "gallons_ecartes":  total_ecarte,
         "moyenne_jour":     moy_jour,
         "jours_de_stock":   jours_de_stock,
