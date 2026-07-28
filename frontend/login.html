@@ -1275,20 +1275,32 @@ async function _sendLoginMeta(){
   };
 
   window.chooseChannel = async function(channel){
-    const email      = document.getElementById('email').value.trim();
-    const password   = document.getElementById('password').value;
-    const code_acces = document.getElementById('code_acces').value.trim();
     const btnE = document.getElementById('btn-channel-email');
     const btnW = document.getElementById('btn-channel-whatsapp');
     const errEl2 = document.getElementById('channel-err');
     btnE.disabled = true; btnW.disabled = true;
     errEl2.textContent = '';
     try{
-      const res = await fetch('/api/login',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        credentials:'include',
-        body:JSON.stringify({email, password, code_acces, channel}),
-      });
+      let res;
+      if(window._oauthPendingMode){
+        // Connexion OAuth — pas de mot de passe à resoumettre, le cookie
+        // oauth_pending (posé par le serveur après le callback) identifie
+        // le compte.
+        res = await fetch('/api/oauth/otp/send',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          credentials:'include',
+          body:JSON.stringify({channel}),
+        });
+      } else {
+        const email      = document.getElementById('email').value.trim();
+        const password   = document.getElementById('password').value;
+        const code_acces = document.getElementById('code_acces').value.trim();
+        res = await fetch('/api/login',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          credentials:'include',
+          body:JSON.stringify({email, password, code_acces, channel}),
+        });
+      }
       const d = await res.json().catch(()=>({}));
       if(!res.ok) throw new Error(d.detail || 'Erreur');
       document.getElementById('channel-step').classList.remove('show');
@@ -1327,6 +1339,8 @@ async function _sendLoginMeta(){
   window.otpBack = function(){
     document.getElementById('otp-step').classList.remove('show');
     document.getElementById('channel-step').classList.remove('show');
+    window._oauthPendingMode = false;
+    document.cookie = 'oauth_pending=;path=/;max-age=0';
     document.getElementById('login-form').style.display = '';
     var ow = document.getElementById('oauth-wrap');
     if(ow) ow.style.display = '';
@@ -1371,16 +1385,25 @@ async function _sendLoginMeta(){
 
   // ── Renvoyer le code ──────────────────────────────────────────
   window.otpResend = async function(){
-    const email = document.getElementById('email').value.trim();
-    const pwd   = document.getElementById('password').value;
-    const pin   = document.getElementById('code_acces').value.trim();
     btnResend.disabled = true;
     try{
-      const res = await fetch('/api/login',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        credentials:'include',
-        body:JSON.stringify({email,password:pwd,code_acces:pin,channel:window._otpChannel||'email'}),
-      });
+      let res;
+      if(window._oauthPendingMode){
+        res = await fetch('/api/oauth/otp/send',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          credentials:'include',
+          body:JSON.stringify({channel:window._otpChannel||'email'}),
+        });
+      } else {
+        const email = document.getElementById('email').value.trim();
+        const pwd   = document.getElementById('password').value;
+        const pin   = document.getElementById('code_acces').value.trim();
+        res = await fetch('/api/login',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          credentials:'include',
+          body:JSON.stringify({email,password:pwd,code_acces:pin,channel:window._otpChannel||'email'}),
+        });
+      }
       const d = await res.json().catch(()=>({}));
       if(!res.ok){ errEl.textContent = d.detail||'Erreur'; btnResend.disabled=false; return; }
       clearOtpBoxes();
@@ -1657,6 +1680,16 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
     var hint = decodeURIComponent(p.get('hint') || 'votre email');
     window.history.replaceState({},'','/login');
     if(typeof showOtpStep === 'function') showOtpStep('email', hint);
+  }
+  // Un numéro est disponible sur ce compte — l'utilisateur doit choisir
+  // le canal avant que quoi que ce soit ne soit envoyé (pas de mot de
+  // passe à resoumettre pour ce flux, contrairement à la connexion classique).
+  if(p.get('otp_choice') === '1'){
+    var emailHint = decodeURIComponent(p.get('email_hint') || 'votre email');
+    var phoneHint = decodeURIComponent(p.get('phone_hint') || 'votre téléphone');
+    window.history.replaceState({},'','/login');
+    window._oauthPendingMode = true;
+    if(typeof showChannelStep === 'function') showChannelStep(emailHint, phoneHint);
   }
 })();
 

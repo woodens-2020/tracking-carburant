@@ -130,7 +130,8 @@ def _clear_login_failures(ip: str | None) -> None:
 
 # Chemins accessibles sans être connecté
 _PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code",
-                    "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify"}
+                    "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify",
+                    "/api/oauth/otp/send"}
 _PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/") if _DEBUG_MODE
                     else ("/api/auth/oauth/", "/shared/"))
 
@@ -912,6 +913,33 @@ from urllib.parse import urlencode as _urlencode
 _OAUTH_STATES: dict = {}   # {state_str: {"provider": str, "exp": float}}
 _STATE_TTL_S  = 600        # 10 minutes
 
+# ── Choix du canal OTP après OAuth (pas de mot de passe à resoumettre —
+# un jeton éphémère fait le pont entre le callback OAuth et l'endpoint qui
+# envoie effectivement l'OTP une fois le canal choisi) ────────────────────
+_OAUTH_PENDING: dict = {}   # {token: {"user_id": int, "exp": float}}
+OAUTH_PENDING_COOKIE = "oauth_pending"
+_OAUTH_PENDING_TTL   = OTP_PENDING_MAX_AGE   # même fenêtre que l'OTP normal (5 min)
+
+
+def _clean_oauth_pending():
+    now = _time.time()
+    expired = [k for k, v in _OAUTH_PENDING.items() if v["exp"] < now]
+    for k in expired:
+        _OAUTH_PENDING.pop(k, None)
+
+
+def _create_oauth_pending(user_id: int) -> str:
+    _clean_oauth_pending()
+    token = _secrets.token_urlsafe(32)
+    _OAUTH_PENDING[token] = {"user_id": user_id, "exp": _time.time() + _OAUTH_PENDING_TTL}
+    return token
+
+
+def _get_oauth_pending_user_id(token: str) -> Optional[int]:
+    _clean_oauth_pending()
+    entry = _OAUTH_PENDING.get(token)
+    return entry["user_id"] if entry else None
+
 _OAUTH_CFG = {
     "google": {
         "auth_url":    "https://accounts.google.com/o/oauth2/v2/auth",
@@ -1081,6 +1109,25 @@ def oauth_callback(
 
     # ── Vérification en deux étapes (OTP) après OAuth ────────────────
     if OTP_ENABLED and user.email:
+        # Un numéro est disponible — laisser choisir le canal avant tout
+        # envoi, comme pour la connexion par mot de passe. Pas de mot de
+        # passe à resoumettre ici, donc un jeton éphémère fait le pont
+        # jusqu'à /api/oauth/otp/send.
+        if user.telephone:
+            token = _create_oauth_pending(user.id)
+            email_hint = url_quote(_mask_email(user.email), safe="")
+            phone_hint = url_quote(_mask_telephone(user.telephone), safe="")
+            redir = RedirectResponse(
+                url=f"/login?otp_choice=1&email_hint={email_hint}&phone_hint={phone_hint}",
+                status_code=302,
+            )
+            redir.set_cookie(
+                OAUTH_PENDING_COOKIE, token,
+                httponly=True, samesite="lax", secure=_SECURE_COOKIES,
+                max_age=_OAUTH_PENDING_TTL, path="/",
+            )
+            return redir
+
         try:
             code, pending_token = create_otp(db, user.id)
             send_otp_email(user.nom_complet or user.email, user.email, code)
@@ -1114,6 +1161,62 @@ def oauth_callback(
         httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
     )
     return redir
+
+
+class OAuthOtpSendIn(BaseModel):
+    channel: str   # "email" | "whatsapp"
+
+
+@app.post("/api/oauth/otp/send")
+def oauth_otp_send(
+    data: OAuthOtpSendIn,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """
+    Envoie l'OTP après une connexion OAuth, une fois le canal choisi par
+    l'utilisateur sur l'écran de choix (voir oauth_callback). Le jeton
+    oauth_pending (posé par oauth_callback) identifie le compte — il n'y a
+    pas de mot de passe à resoumettre pour ce flux.
+    """
+    token = request.cookies.get(OAUTH_PENDING_COOKIE)
+    user_id = _get_oauth_pending_user_id(token) if token else None
+    if not user_id:
+        raise HTTPException(400, "Session expirée — reconnectez-vous.")
+    user = db.get(Utilisateur, user_id)
+    if not user or not user.actif:
+        raise HTTPException(400, "Compte introuvable.")
+    if data.channel not in ("email", "whatsapp"):
+        raise HTTPException(400, "Canal invalide.")
+
+    channel = "whatsapp" if (data.channel == "whatsapp" and user.telephone) else "email"
+
+    try:
+        code, pending_token = create_otp(db, user.id)
+        if channel == "whatsapp":
+            send_otp_whatsapp(user.telephone, code)
+        else:
+            send_otp_email(user.nom_complet or user.email, user.email, code)
+    except ValueError as e:
+        raise HTTPException(429, str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+    log_event(db, OTP_SENT, user_id=user.id,
+              ip_address=request.client.host if request.client else None,
+              details={"canal": channel, "via": "oauth"})
+    response.set_cookie(
+        OTP_PENDING_COOKIE, pending_token,
+        httponly=True, samesite="lax", secure=_SECURE_COOKIES,
+        max_age=OTP_PENDING_MAX_AGE, path="/",
+    )
+    return {
+        "otp_required": True,
+        "channel":      channel,
+        "email_hint":   _mask_email(user.email) if channel == "email" else None,
+        "phone_hint":   _mask_telephone(user.telephone) if channel == "whatsapp" else None,
+    }
 
 
 @app.get("/login", include_in_schema=False)
