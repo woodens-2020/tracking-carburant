@@ -135,6 +135,9 @@ def _migrate_columns():
             # v10 — reste avant saisi manuellement (compté dans le stock agrégé)
             ("livraisons", "gallons_reste_manuel",
              "ALTER TABLE livraisons ADD COLUMN gallons_reste_manuel NUMERIC DEFAULT 0", None),
+            # v11 — téléphone utilisateur (second canal OTP par SMS)
+            ("utilisateurs", "telephone",
+             "ALTER TABLE utilisateurs ADD COLUMN telephone VARCHAR(20)", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -181,6 +184,9 @@ def _migrate_columns():
             # v10 — reste avant saisi manuellement (compté dans le stock agrégé)
             ("livraisons", "gallons_reste_manuel",
              "ALTER TABLE livraisons ADD COLUMN gallons_reste_manuel NUMERIC(14,3) NOT NULL DEFAULT 0", None),
+            # v11 — téléphone utilisateur (second canal OTP par SMS)
+            ("utilisateurs", "telephone",
+             "ALTER TABLE utilisateurs ADD COLUMN telephone VARCHAR(20)", None),
         ]
     else:
         return

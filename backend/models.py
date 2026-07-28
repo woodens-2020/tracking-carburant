@@ -196,6 +196,7 @@ class Utilisateur(Base):
     oauth_provider    = Column(String(32),  nullable=True)
     oauth_sub         = Column(String(255), unique=True, nullable=True)
     role_id           = Column(Integer, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True)
+    telephone         = Column(String(20),  nullable=True)  # format E.164 (+509XXXXXXXX) — second canal OTP (SMS)
 
     role_obj = relationship("Role", back_populates="utilisateurs")
 

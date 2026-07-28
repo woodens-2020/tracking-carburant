@@ -17,7 +17,7 @@ from activity_log import (
     USER_CREATED, USER_UPDATED, USER_DISABLED, USER_ENABLED,
 )
 from auth import hash_code_acces, hash_password, make_api_key
-from otp_service import send_welcome_email
+from otp_service import send_welcome_email, send_otp_sms
 from database import get_db
 from models import AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur
 
@@ -26,6 +26,25 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 _EMAIL_RE    = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _USERNAME_RE = re.compile(r"^[a-zA-Z0-9._\-]{3,60}$")
 _CODE_RE     = re.compile(r"^\d{9}$")
+_E164_RE     = re.compile(r"^\+[1-9]\d{7,14}$")
+
+
+def _normaliser_telephone(brut: str) -> str:
+    """
+    Normalise un numéro saisi vers le format E.164 exigé par Twilio.
+    Accepte soit un numéro déjà international (+509XXXXXXXX), soit un
+    numéro local haïtien à 8 chiffres (préfixe +509 ajouté automatiquement).
+    Lève ValueError si le résultat n'est pas un E.164 valide.
+    """
+    nettoye = re.sub(r"[\s\-.()]", "", brut.strip())
+    if nettoye and not nettoye.startswith("+") and len(nettoye) == 8 and nettoye.isdigit():
+        nettoye = "+509" + nettoye
+    if not _E164_RE.match(nettoye):
+        raise ValueError(
+            "Numéro de téléphone invalide — utilisez le format international "
+            "(+509XXXXXXXX) ou un numéro local haïtien à 8 chiffres."
+        )
+    return nettoye
 
 DOMAINES = ["finance", "bar", "cuisine", "hotel", "employes", "carburant"]
 NIVEAUX  = ["aucun", "lecture", "operationnel", "complet"]
@@ -89,6 +108,7 @@ def _user_public(u: Utilisateur, db: Session = None) -> dict:
         "created_at":     u.created_at.isoformat() if u.created_at else None,
         "oauth_provider": u.oauth_provider,
         "employe_id":     employe_id,
+        "telephone":      u.telephone,
     }
 
 
@@ -185,6 +205,7 @@ def supprimer_role(
 class CreateUserIn(BaseModel):
     nom_complet: str
     email:       str
+    telephone:   Optional[str] = None
     username:    str
     password:    str
     code_acces:  str
@@ -194,6 +215,7 @@ class CreateUserIn(BaseModel):
 class UpdateUserIn(BaseModel):
     nom_complet: Optional[str] = None
     email:       Optional[str] = None
+    telephone:   Optional[str] = None  # chaîne vide = retirer le numéro
     role_id:     Optional[int] = None
     actif:       Optional[bool] = None
     employe_id:  Optional[int] = None  # 0 = délier ; N = lier à cet employé
@@ -240,6 +262,12 @@ def creer_user(
         raise HTTPException(409, f"L'identifiant '{username}' est déjà utilisé")
     if db.query(Utilisateur).filter_by(email=email).first():
         raise HTTPException(409, "Cet email est déjà associé à un compte")
+    telephone = None
+    if data.telephone and data.telephone.strip():
+        try:
+            telephone = _normaliser_telephone(data.telephone)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
     u = Utilisateur(
         username=username,
@@ -247,6 +275,7 @@ def creer_user(
         code_acces_hash=hash_code_acces(data.code_acces),
         nom_complet=data.nom_complet.strip(),
         email=email,
+        telephone=telephone,
         role="admin" if role.est_admin else "operateur",
         role_id=role.id,
         poste=role.nom,
@@ -290,6 +319,14 @@ def modifier_user(
         if db.query(Utilisateur).filter(Utilisateur.email == email, Utilisateur.id != uid).first():
             raise HTTPException(409, "Cet email est déjà associé à un autre compte")
         u.email = email
+    if data.telephone is not None:
+        if data.telephone.strip():
+            try:
+                u.telephone = _normaliser_telephone(data.telephone)
+            except ValueError as e:
+                raise HTTPException(400, str(e))
+        else:
+            u.telephone = None
     if data.role_id is not None:
         role = db.get(Role, data.role_id)
         if not role:
@@ -378,6 +415,25 @@ def test_email(
     except RuntimeError as e:
         raise HTTPException(503, str(e))
     return {"ok": True, "email": u.email}
+
+
+@router.post("/users/{uid}/test-sms")
+def test_sms(
+    uid: int,
+    _admin: Utilisateur = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    """Envoie un SMS de test à l'utilisateur pour vérifier la livraison (second canal OTP)."""
+    u = db.get(Utilisateur, uid)
+    if not u:
+        raise HTTPException(404, "Utilisateur introuvable")
+    if not u.telephone:
+        raise HTTPException(400, "Cet utilisateur n'a pas de numéro de téléphone.")
+    try:
+        send_otp_sms(u.telephone, "000000")
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return {"ok": True, "telephone": u.telephone}
 
 
 # ══════════════════════════════════════════════════════════════════

@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+import requests
 from sqlalchemy.orm import Session
 
 from models import OTPCode, Utilisateur, AdminCode
@@ -36,6 +37,11 @@ EMAIL_PORT      = int(os.getenv("EMAIL_PORT",  "587"))
 EMAIL_USER      = os.getenv("EMAIL_HOST_USER",     "")
 EMAIL_PASSWORD  = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Konekta · Bon Prix")
+
+TWILIO_ACCOUNT_SID  = os.getenv("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN   = os.getenv("TWILIO_AUTH_TOKEN", "")
+TWILIO_FROM_NUMBER  = os.getenv("TWILIO_FROM_NUMBER", "")
+TWILIO_API_URL      = "https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json"
 
 OTP_PENDING_COOKIE  = "otp_pending"
 OTP_PENDING_MAX_AGE = 300  # 5 minutes — aligné sur OTP_DURATION_MIN
@@ -60,6 +66,13 @@ def _mask_email(email: str) -> str:
         return f"{local[0]}***@{domain}"
     except Exception:
         return "***"
+
+
+def _mask_telephone(telephone: str) -> str:
+    """Masque partiel pour l'UI : +509****5678."""
+    if len(telephone) <= 4:
+        return "***"
+    return f"{telephone[:4]}{'*' * (len(telephone) - 8)}{telephone[-4:]}" if len(telephone) > 8 else f"{telephone[:2]}***{telephone[-2:]}"
 
 
 # ── Rate limiting ─────────────────────────────────────────────────────────────
@@ -238,6 +251,46 @@ def send_otp_email(nom: str, email: str, code: str) -> None:
         raise RuntimeError(
             "L'email de vérification n'a pas pu être envoyé. Réessayez dans un moment."
         )
+
+
+# ── SMS (Twilio) — second canal OTP ────────────────────────────────────────────
+
+def send_otp_sms(telephone: str, code: str) -> None:
+    """
+    Envoie le code OTP par SMS via l'API REST Twilio (appel direct, sans le
+    SDK Twilio, pour éviter une dépendance pip supplémentaire en production).
+
+    `telephone` doit déjà être au format E.164 (ex. +50912345678) — la
+    normalisation se fait à la saisie (admin_routes.py), jamais ici.
+
+    C'est un canal SECONDAIRE : un échec ici ne doit jamais empêcher la
+    connexion si l'email a déjà été envoyé — l'appelant doit intercepter
+    RuntimeError sans bloquer le flux de connexion.
+    """
+    if not TWILIO_ACCOUNT_SID or not TWILIO_AUTH_TOKEN or not TWILIO_FROM_NUMBER:
+        raise RuntimeError(
+            "SMS non configuré. Définissez TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN "
+            "et TWILIO_FROM_NUMBER dans backend/.env"
+        )
+
+    try:
+        resp = requests.post(
+            TWILIO_API_URL.format(sid=TWILIO_ACCOUNT_SID),
+            auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN),
+            data={
+                "To":   telephone,
+                "From": TWILIO_FROM_NUMBER,
+                "Body": f"Konekta — votre code de vérification : {code}",
+            },
+            timeout=10,
+        )
+        if resp.status_code >= 300:
+            log.error("Échec envoi SMS OTP à %s : %s %s", _mask_telephone(telephone), resp.status_code, resp.text[:300])
+            raise RuntimeError("Le SMS de vérification n'a pas pu être envoyé.")
+        log.info("OTP SMS envoyé à %s", _mask_telephone(telephone))
+    except requests.RequestException as exc:
+        log.error("Erreur réseau envoi SMS OTP : %s", exc)
+        raise RuntimeError("Le SMS de vérification n'a pas pu être envoyé (erreur réseau).")
 
 
 # ── Email de bienvenue / test de livraison ────────────────────────────────────

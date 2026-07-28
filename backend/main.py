@@ -21,7 +21,7 @@ from database import init_db, get_db, engine, SessionLocal
 from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken
 from otp_service import (
     OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
-    create_otp, send_otp_email, verify_otp, cleanup_expired_otps, _mask_email,
+    create_otp, send_otp_email, send_otp_sms, verify_otp, cleanup_expired_otps, _mask_email,
     create_admin_code, send_admin_code_email, verify_admin_code, EMAIL_USER,
 )
 from activity_log import (
@@ -294,6 +294,14 @@ def login(data: LoginIn, request: Request, response: Response, db: Session = Dep
             raise HTTPException(429, str(e))
         except RuntimeError as e:
             raise HTTPException(503, str(e))
+
+        # Second canal (SMS) — non bloquant : l'email a déjà été envoyé,
+        # un échec SMS ne doit jamais empêcher la connexion.
+        if user.telephone:
+            try:
+                send_otp_sms(user.telephone, code)
+            except RuntimeError as exc:
+                log.warning("OTP SMS échoué pour user_id=%s : %s", user.id, exc)
 
         log_event(db, OTP_SENT, user_id=user.id, ip_address=ip)
         response.set_cookie(
@@ -1072,6 +1080,13 @@ def oauth_callback(
             import traceback; traceback.print_exc()
             log.error("Exception inattendue OTP OAuth : %s", exc)
             return RedirectResponse(url=f"/login?oauth_error=otp_failed", status_code=302)
+
+        if user.telephone:
+            try:
+                send_otp_sms(user.telephone, code)
+            except RuntimeError as exc:
+                log.warning("OTP SMS échoué pour user_id=%s via OAuth : %s", user.id, exc)
+
         log_event(db, OTP_SENT, user_id=user.id,
                   ip_address=request.client.host if request.client else None)
         hint = url_quote(_mask_email(user.email), safe="")

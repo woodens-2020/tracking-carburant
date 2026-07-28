@@ -9758,6 +9758,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <label class="pos-label">Email *</label>
               <input class="pos-input" id="aum-email" type="email" placeholder="jean@exemple.com" style="width:100%">
             </div>
+            <div>
+              <label class="pos-label">Téléphone <span style="font-size:12px;color:rgba(255,255,255,.4)">(optionnel — second canal OTP par SMS)</span></label>
+              <input class="pos-input" id="aum-telephone" type="tel" placeholder="+509 xxxx xxxx" style="width:100%">
+            </div>
             <div id="aum-username-row">
               <label class="pos-label">Nom d'utilisateur *</label>
               <input class="pos-input" id="aum-username" placeholder="jean.pierre" style="width:100%">
@@ -17270,9 +17274,11 @@ function adminUsersRender(){
       <td style="font-size:14px">${(()=>{
         const badTlds=['.local','.localhost','.internal','.test','.example','.invalid','.lan'];
         const isBad = u.email && badTlds.some(t=>u.email.toLowerCase().endsWith(t));
-        return isBad
+        const emailHtml = isBad
           ? `${u.email} <span title="Email non-livrable : domaine fictif — mettez à jour l'email pour que l'OTP fonctionne" style="color:#f87171;font-size:12px;background:rgba(248,113,113,.12);padding:1px 5px;border-radius:3px;cursor:help">⚠ invalide</span>`
           : (u.email||'—');
+        const telHtml = u.telephone ? `<div style="font-size:12px;color:rgba(255,255,255,.4)">📱 ${u.telephone}</div>` : '';
+        return emailHtml + telHtml;
       })()}</td>
       <td><span style="font-size:14px;background:rgba(255,255,255,.08);padding:2px 8px;border-radius:4px">${u.role_nom||u.poste||u.role||'—'}</span></td>
       <td style="text-align:center">${statut}</td>
@@ -17281,6 +17287,7 @@ function adminUsersRender(){
           <button class="pos-btn ghost" onclick="adminUsersEditer(${u.id})" style="font-size:13px;padding:3px 9px">Modifier</button>
           <button class="pos-btn ghost" onclick="adminChangeRoleOpen(${u.id})" style="font-size:13px;padding:3px 9px;color:#a78bfa" title="Changer le rôle">Rôle</button>
           <button class="pos-btn ghost" onclick="adminTestEmail(${u.id},'${(u.email||'').replace(/'/g,"\\'")}',this)" style="font-size:13px;padding:3px 9px;color:#60a5fa" title="Envoyer un email de test pour vérifier la livraison OTP">📧 Tester</button>
+          ${u.telephone?`<button class="pos-btn ghost" onclick="adminTestSms(${u.id},'${u.telephone.replace(/'/g,"\\'")}',this)" style="font-size:13px;padding:3px 9px;color:#34d399" title="Envoyer un SMS de test pour vérifier la livraison OTP">📱 Tester</button>`:''}
           <button class="pos-btn ghost" onclick="adminResetPwdOpen(${u.id})" style="font-size:13px;padding:3px 9px" title="Réinitialiser mot de passe">MDP</button>
           <button class="pos-btn ghost" onclick="adminResetPinOpen(${u.id})" style="font-size:13px;padding:3px 9px;color:#f7a93b" title="Réinitialiser PIN">PIN</button>
           ${toggleBtn}
@@ -17315,6 +17322,7 @@ function adminUsersNouveauModal(){
   document.getElementById('aum-id').value = '';
   document.getElementById('aum-nom').value = '';
   document.getElementById('aum-email').value = '';
+  document.getElementById('aum-telephone').value = '';
   document.getElementById('aum-username').value = '';
   document.getElementById('aum-password').value = '';
   document.getElementById('aum-pin').value = '';
@@ -17335,6 +17343,7 @@ async function adminUsersEditer(id){
   document.getElementById('aum-id').value = id;
   document.getElementById('aum-nom').value = u.nom_complet || '';
   document.getElementById('aum-email').value = u.email || '';
+  document.getElementById('aum-telephone').value = u.telephone || '';
   document.getElementById('aum-username').value = u.username || '';
   document.getElementById('aum-username-row').style.display = 'none';
   document.getElementById('aum-password-row').style.display = 'none';
@@ -17405,6 +17414,7 @@ async function adminChangeRoleSauvegarder(){
 async function adminUsersSauvegarder(){
   const nom  = document.getElementById('aum-nom').value.trim();
   const email = document.getElementById('aum-email').value.trim();
+  const telephone = document.getElementById('aum-telephone').value.trim();
   const roleId = parseInt(document.getElementById('aum-role-id').value);
   if(!nom)  { posAlert('Le nom complet est requis','err'); return; }
   if(!email){ posAlert('L\'email est requis','err'); return; }
@@ -17412,7 +17422,7 @@ async function adminUsersSauvegarder(){
   try{
     if(_adminUserEditId){
       const employe_id = parseInt(document.getElementById('aum-employe-id')?.value||0)||0;
-      await apiFetch('PUT',`/admin/users/${_adminUserEditId}`, { nom_complet:nom, email, role_id:roleId, employe_id });
+      await apiFetch('PUT',`/admin/users/${_adminUserEditId}`, { nom_complet:nom, email, telephone, role_id:roleId, employe_id });
       const emailChanged = email && email !== _adminUserEditPrevEmail;
       if(emailChanged){
         try{
@@ -17431,7 +17441,7 @@ async function adminUsersSauvegarder(){
       if(!username){ posAlert('Le nom d\'utilisateur est requis','err'); return; }
       if(!password){ posAlert('Le mot de passe est requis','err'); return; }
       if(!code_acces){ posAlert('Le code PIN est requis','err'); return; }
-      const created = await apiFetch('POST','/admin/users', { nom_complet:nom, email, username, password, code_acces, role_id:roleId });
+      const created = await apiFetch('POST','/admin/users', { nom_complet:nom, email, telephone, username, password, code_acces, role_id:roleId });
       posAlert(created.welcome_email_sent
         ? `Compte créé ✓ — email de bienvenue envoyé à ${email}`
         : `Compte créé ✓ — vérifiez l'adresse email (envoi échoué)`
@@ -17465,6 +17475,24 @@ async function adminTestEmail(uid, email, btn){
     btn.textContent = orig;
     btn.disabled = false;
     posAlert(e.message||'Erreur envoi email','err');
+  }
+}
+
+async function adminTestSms(uid, telephone, btn){
+  if(!telephone){ posAlert('Aucun numéro de téléphone configuré pour cet utilisateur.','err'); return; }
+  const orig = btn.textContent;
+  btn.textContent = '⏳ Envoi…';
+  btn.disabled = true;
+  try{
+    await apiFetch('POST', `/admin/users/${uid}/test-sms`);
+    btn.textContent = '✓ Envoyé';
+    btn.style.color = '#34d399';
+    posAlert(`SMS de test envoyé à ${telephone}.`,'ok');
+    setTimeout(()=>{ btn.textContent=orig; btn.style.color=''; btn.disabled=false; }, 4000);
+  }catch(e){
+    btn.textContent = orig;
+    btn.disabled = false;
+    posAlert(e.message||'Erreur envoi SMS','err');
   }
 }
 
