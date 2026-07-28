@@ -21,7 +21,8 @@ from database import init_db, get_db, engine, SessionLocal
 from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken
 from otp_service import (
     OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
-    create_otp, send_otp_email, send_otp_sms, verify_otp, cleanup_expired_otps, _mask_email,
+    create_otp, send_otp_email, send_otp_whatsapp, verify_otp, cleanup_expired_otps,
+    _mask_email, _mask_telephone,
     create_admin_code, send_admin_code_email, verify_admin_code, EMAIL_USER,
 )
 from activity_log import (
@@ -254,6 +255,7 @@ class LoginIn(BaseModel):
     email:      str
     password:   str
     code_acces: str
+    channel:    Optional[str] = None   # "email" | "whatsapp" — choix du canal OTP
 
 
 @app.post("/api/login")
@@ -287,23 +289,31 @@ def login(data: LoginIn, request: Request, response: Response, db: Session = Dep
             raise HTTPException(503,
                 f"L'adresse email de ce compte ({user.email}) ne peut pas recevoir de messages. "
                 "Contactez l'administrateur pour mettre à jour l'email.")
+        # Si un téléphone est disponible et qu'aucun canal n'a encore été
+        # choisi, proposer le choix avant d'envoyer quoi que ce soit — pas
+        # d'envoi silencieux, l'utilisateur décide explicitement.
+        if user.telephone and data.channel not in ("email", "whatsapp"):
+            return {
+                "otp_required":           True,
+                "channel_choice_required": True,
+                "email_hint": _mask_email(user.email),
+                "phone_hint": _mask_telephone(user.telephone),
+            }
+
+        channel = "whatsapp" if (user.telephone and data.channel == "whatsapp") else "email"
+
         try:
             code, pending_token = create_otp(db, user.id)
-            send_otp_email(user.nom_complet or user.username, user.email, code)
+            if channel == "whatsapp":
+                send_otp_whatsapp(user.telephone, code)
+            else:
+                send_otp_email(user.nom_complet or user.username, user.email, code)
         except ValueError as e:
             raise HTTPException(429, str(e))
         except RuntimeError as e:
             raise HTTPException(503, str(e))
 
-        # Second canal (SMS) — non bloquant : l'email a déjà été envoyé,
-        # un échec SMS ne doit jamais empêcher la connexion.
-        if user.telephone:
-            try:
-                send_otp_sms(user.telephone, code)
-            except RuntimeError as exc:
-                log.warning("OTP SMS échoué pour user_id=%s : %s", user.id, exc)
-
-        log_event(db, OTP_SENT, user_id=user.id, ip_address=ip)
+        log_event(db, OTP_SENT, user_id=user.id, ip_address=ip, details={"canal": channel})
         response.set_cookie(
             OTP_PENDING_COOKIE, pending_token,
             httponly=True, samesite="lax", secure=_SECURE_COOKIES,
@@ -311,7 +321,9 @@ def login(data: LoginIn, request: Request, response: Response, db: Session = Dep
         )
         return {
             "otp_required": True,
-            "email_hint":   _mask_email(user.email),
+            "channel":      channel,
+            "email_hint":   _mask_email(user.email) if channel == "email" else None,
+            "phone_hint":   _mask_telephone(user.telephone) if channel == "whatsapp" else None,
         }
 
     # ── Connexion directe (OTP désactivé) ────────────────────────────
@@ -1080,12 +1092,6 @@ def oauth_callback(
             import traceback; traceback.print_exc()
             log.error("Exception inattendue OTP OAuth : %s", exc)
             return RedirectResponse(url=f"/login?oauth_error=otp_failed", status_code=302)
-
-        if user.telephone:
-            try:
-                send_otp_sms(user.telephone, code)
-            except RuntimeError as exc:
-                log.warning("OTP SMS échoué pour user_id=%s via OAuth : %s", user.id, exc)
 
         log_event(db, OTP_SENT, user_id=user.id,
                   ip_address=request.client.host if request.client else None)

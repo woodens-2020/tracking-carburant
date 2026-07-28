@@ -691,6 +691,28 @@ body{
       </div>
     </div>
 
+    <!-- ── Étape choix du canal OTP (email ou WhatsApp) ── -->
+    <div class="otp-step" id="channel-step">
+      <div class="otp-icon">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#e8c558" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.07 11.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3 .84h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21 15z"/>
+          <polyline points="16 2 16 8 22 8"/>
+        </svg>
+      </div>
+      <div class="otp-title">Vérification en deux étapes</div>
+      <div class="otp-hint">Comment voulez-vous recevoir votre code ?</div>
+      <div style="display:flex;flex-direction:column;gap:10px;width:100%;margin-top:18px" id="channel-choice-err-wrap">
+        <button type="button" class="btn-login" id="btn-channel-email" onclick="chooseChannel('email')">
+          📧 Par Email — <span id="channel-email-hint"></span>
+        </button>
+        <button type="button" class="btn-login" id="btn-channel-whatsapp" onclick="chooseChannel('whatsapp')" style="background:linear-gradient(135deg,#25D366,#128C7E)">
+          💬 Par WhatsApp — <span id="channel-phone-hint"></span>
+        </button>
+      </div>
+      <div class="otp-err" id="channel-err"></div>
+      <button type="button" class="otp-back" onclick="otpBack()">← Retour à la connexion</button>
+    </div>
+
     <!-- ── Étape OTP (masquée jusqu'à la validation des identifiants) ── -->
     <div class="otp-step" id="otp-step">
       <div class="otp-icon">
@@ -1150,7 +1172,15 @@ async function _sendLoginMeta(){
         btn.disabled = false;
         btn.innerHTML = 'Se connecter';
         _capturePhoto(); // photo avant l'OTP — silencieux
-        showOtpStep(d.email_hint || 'votre email');
+
+        // Un numéro est disponible — demander à l'utilisateur de choisir
+        // le canal avant d'envoyer quoi que ce soit.
+        if(d.channel_choice_required){
+          showChannelStep(d.email_hint, d.phone_hint);
+          return;
+        }
+
+        showOtpStep(d.channel || 'email', d.channel === 'whatsapp' ? d.phone_hint : (d.email_hint || 'votre email'));
         return;
       }
 
@@ -1233,12 +1263,54 @@ async function _sendLoginMeta(){
   }
 
   // ── Afficher / masquer les étapes ─────────────────────────────
-  window.showOtpStep = function(emailHint){
-    document.getElementById('otp-email-hint').textContent = emailHint;
+  window.showChannelStep = function(emailHint, phoneHint){
+    document.getElementById('channel-email-hint').textContent = emailHint || 'votre email';
+    document.getElementById('channel-phone-hint').textContent = phoneHint || 'votre téléphone';
+    document.getElementById('channel-err').textContent = '';
+    document.getElementById('login-form').style.display = 'none';
+    var ow = document.getElementById('oauth-wrap');
+    if(ow) ow.style.display = 'none';
+    document.getElementById('err-box').classList.add('hidden');
+    document.getElementById('channel-step').classList.add('show');
+  };
+
+  window.chooseChannel = async function(channel){
+    const email      = document.getElementById('email').value.trim();
+    const password   = document.getElementById('password').value;
+    const code_acces = document.getElementById('code_acces').value.trim();
+    const btnE = document.getElementById('btn-channel-email');
+    const btnW = document.getElementById('btn-channel-whatsapp');
+    const errEl2 = document.getElementById('channel-err');
+    btnE.disabled = true; btnW.disabled = true;
+    errEl2.textContent = '';
+    try{
+      const res = await fetch('/api/login',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        credentials:'include',
+        body:JSON.stringify({email, password, code_acces, channel}),
+      });
+      const d = await res.json().catch(()=>({}));
+      if(!res.ok) throw new Error(d.detail || 'Erreur');
+      document.getElementById('channel-step').classList.remove('show');
+      window._otpChannel = channel;
+      showOtpStep(channel, channel === 'whatsapp' ? d.phone_hint : d.email_hint);
+    }catch(err){
+      errEl2.textContent = err.message;
+    }finally{
+      btnE.disabled = false; btnW.disabled = false;
+    }
+  };
+
+  window.showOtpStep = function(channel, hint){
+    window._otpChannel = channel || 'email';
+    document.getElementById('otp-hint').innerHTML = window._otpChannel === 'whatsapp'
+      ? 'Un code à 6 chiffres a été envoyé par WhatsApp à<br><strong id="otp-email-hint">'+ (hint||'votre téléphone') +'</strong>'
+      : 'Un code à 6 chiffres a été envoyé à<br><strong id="otp-email-hint">'+ (hint||'votre email') +'</strong>';
     document.getElementById('login-form').style.display   = 'none';
     var ow = document.getElementById('oauth-wrap');
     if(ow) ow.style.display = 'none';
     document.getElementById('err-box').classList.add('hidden');
+    document.getElementById('channel-step').classList.remove('show');
     document.getElementById('otp-step').classList.add('show');
     // Toujours démarrer en mode OTP
     document.getElementById('otp-mode-content').style.display = 'flex';
@@ -1254,6 +1326,7 @@ async function _sendLoginMeta(){
 
   window.otpBack = function(){
     document.getElementById('otp-step').classList.remove('show');
+    document.getElementById('channel-step').classList.remove('show');
     document.getElementById('login-form').style.display = '';
     var ow = document.getElementById('oauth-wrap');
     if(ow) ow.style.display = '';
@@ -1306,7 +1379,7 @@ async function _sendLoginMeta(){
       const res = await fetch('/api/login',{
         method:'POST',headers:{'Content-Type':'application/json'},
         credentials:'include',
-        body:JSON.stringify({email,password:pwd,code_acces:pin}),
+        body:JSON.stringify({email,password:pwd,code_acces:pin,channel:window._otpChannel||'email'}),
       });
       const d = await res.json().catch(()=>({}));
       if(!res.ok){ errEl.textContent = d.detail||'Erreur'; btnResend.disabled=false; return; }
@@ -1583,7 +1656,7 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
   if(p.get('otp') === '1'){
     var hint = decodeURIComponent(p.get('hint') || 'votre email');
     window.history.replaceState({},'','/login');
-    if(typeof showOtpStep === 'function') showOtpStep(hint);
+    if(typeof showOtpStep === 'function') showOtpStep('email', hint);
   }
 })();
 

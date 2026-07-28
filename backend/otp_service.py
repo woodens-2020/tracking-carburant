@@ -38,10 +38,11 @@ EMAIL_USER      = os.getenv("EMAIL_HOST_USER",     "")
 EMAIL_PASSWORD  = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Konekta · Bon Prix")
 
-TWILIO_ACCOUNT_SID  = os.getenv("TWILIO_ACCOUNT_SID", "")
-TWILIO_AUTH_TOKEN   = os.getenv("TWILIO_AUTH_TOKEN", "")
-TWILIO_FROM_NUMBER  = os.getenv("TWILIO_FROM_NUMBER", "")
-TWILIO_API_URL      = "https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json"
+TWILIO_ACCOUNT_SID   = os.getenv("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN    = os.getenv("TWILIO_AUTH_TOKEN", "")
+TWILIO_FROM_NUMBER   = os.getenv("TWILIO_FROM_NUMBER", "")
+TWILIO_WHATSAPP_FROM = os.getenv("TWILIO_WHATSAPP_FROM", "").replace("whatsapp:", "")
+TWILIO_API_URL       = "https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json"
 
 OTP_PENDING_COOKIE  = "otp_pending"
 OTP_PENDING_MAX_AGE = 300  # 5 minutes — aligné sur OTP_DURATION_MIN
@@ -291,6 +292,52 @@ def send_otp_sms(telephone: str, code: str) -> None:
     except requests.RequestException as exc:
         log.error("Erreur réseau envoi SMS OTP : %s", exc)
         raise RuntimeError("Le SMS de vérification n'a pas pu être envoyé (erreur réseau).")
+
+
+def send_otp_whatsapp(telephone: str, code: str) -> None:
+    """
+    Envoie le code OTP par WhatsApp via l'API REST Twilio (canal `whatsapp:`
+    du même endpoint Messages que le SMS).
+
+    `telephone` doit déjà être au format E.164 (ex. +50912345678).
+
+    Utilise TWILIO_WHATSAPP_FROM, distinct de TWILIO_FROM_NUMBER : c'est le
+    numéro WhatsApp Twilio (le numéro du Sandbox en test, ex. +14155238886,
+    ou un expéditeur WhatsApp Business approuvé en production). En mode
+    Sandbox, chaque destinataire doit d'abord envoyer le mot de code du
+    Sandbox à ce numéro une seule fois pour pouvoir recevoir des messages.
+
+    Canal choisi explicitement par l'utilisateur à la connexion (pas un
+    envoi silencieux en arrière-plan) — un échec ici doit être remonté
+    clairement à l'appelant, pas absorbé.
+    """
+    if not TWILIO_ACCOUNT_SID or not TWILIO_AUTH_TOKEN or not TWILIO_WHATSAPP_FROM:
+        raise RuntimeError(
+            "WhatsApp non configuré. Définissez TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN "
+            "et TWILIO_WHATSAPP_FROM dans backend/.env"
+        )
+
+    try:
+        resp = requests.post(
+            TWILIO_API_URL.format(sid=TWILIO_ACCOUNT_SID),
+            auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN),
+            data={
+                "To":   f"whatsapp:{telephone}",
+                "From": f"whatsapp:{TWILIO_WHATSAPP_FROM}",
+                "Body": f"Konekta — votre code de vérification : {code}",
+            },
+            timeout=10,
+        )
+        if resp.status_code >= 300:
+            log.error("Échec envoi WhatsApp OTP à %s : %s %s", _mask_telephone(telephone), resp.status_code, resp.text[:300])
+            raise RuntimeError(
+                "Le message WhatsApp n'a pas pu être envoyé. Si vous utilisez le Sandbox "
+                "Twilio, vérifiez que ce numéro a bien rejoint le Sandbox."
+            )
+        log.info("OTP WhatsApp envoyé à %s", _mask_telephone(telephone))
+    except requests.RequestException as exc:
+        log.error("Erreur réseau envoi WhatsApp OTP : %s", exc)
+        raise RuntimeError("Le message WhatsApp n'a pas pu être envoyé (erreur réseau).")
 
 
 # ── Email de bienvenue / test de livraison ────────────────────────────────────
