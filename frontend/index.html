@@ -17288,6 +17288,7 @@ function adminUsersRender(){
           <button class="pos-btn ghost" onclick="adminChangeRoleOpen(${u.id})" style="font-size:13px;padding:3px 9px;color:#a78bfa" title="Changer le rôle">Rôle</button>
           <button class="pos-btn ghost" onclick="adminTestEmail(${u.id},'${(u.email||'').replace(/'/g,"\\'")}',this)" style="font-size:13px;padding:3px 9px;color:#60a5fa" title="Envoyer un email de test pour vérifier la livraison OTP">📧 Tester</button>
           ${u.telephone?`<button class="pos-btn ghost" onclick="adminTestSms(${u.id},'${u.telephone.replace(/'/g,"\\'")}',this)" style="font-size:13px;padding:3px 9px;color:#34d399" title="Envoyer un SMS de test pour vérifier la livraison OTP">📱 Tester</button>`:''}
+          ${u.telephone?`<button class="pos-btn ghost" onclick="adminTestWhatsapp(${u.id},'${u.telephone.replace(/'/g,"\\'")}',this)" style="font-size:13px;padding:3px 9px;color:#25D366" title="Envoyer un message WhatsApp de test pour vérifier la livraison OTP">💬 Tester</button>`:''}
           <button class="pos-btn ghost" onclick="adminResetPwdOpen(${u.id})" style="font-size:13px;padding:3px 9px" title="Réinitialiser mot de passe">MDP</button>
           <button class="pos-btn ghost" onclick="adminResetPinOpen(${u.id})" style="font-size:13px;padding:3px 9px;color:#f7a93b" title="Réinitialiser PIN">PIN</button>
           ${toggleBtn}
@@ -17493,6 +17494,24 @@ async function adminTestSms(uid, telephone, btn){
     btn.textContent = orig;
     btn.disabled = false;
     posAlert(e.message||'Erreur envoi SMS','err');
+  }
+}
+
+async function adminTestWhatsapp(uid, telephone, btn){
+  if(!telephone){ posAlert('Aucun numéro de téléphone configuré pour cet utilisateur.','err'); return; }
+  const orig = btn.textContent;
+  btn.textContent = '⏳ Envoi…';
+  btn.disabled = true;
+  try{
+    await apiFetch('POST', `/admin/users/${uid}/test-whatsapp`);
+    btn.textContent = '✓ Envoyé';
+    btn.style.color = '#25D366';
+    posAlert(`Message WhatsApp de test envoyé à ${telephone}.`,'ok');
+    setTimeout(()=>{ btn.textContent=orig; btn.style.color=''; btn.disabled=false; }, 4000);
+  }catch(e){
+    btn.textContent = orig;
+    btn.disabled = false;
+    posAlert(e.message||'Erreur envoi WhatsApp','err');
   }
 }
 

@@ -17,7 +17,7 @@ from activity_log import (
     USER_CREATED, USER_UPDATED, USER_DISABLED, USER_ENABLED,
 )
 from auth import hash_code_acces, hash_password, make_api_key
-from otp_service import send_welcome_email, send_otp_sms
+from otp_service import send_welcome_email, send_otp_sms, send_otp_whatsapp
 from database import get_db
 from models import AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur
 
@@ -431,6 +431,25 @@ def test_sms(
         raise HTTPException(400, "Cet utilisateur n'a pas de numéro de téléphone.")
     try:
         send_otp_sms(u.telephone, "000000")
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return {"ok": True, "telephone": u.telephone}
+
+
+@router.post("/users/{uid}/test-whatsapp")
+def test_whatsapp(
+    uid: int,
+    _admin: Utilisateur = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    """Envoie un message WhatsApp de test à l'utilisateur pour vérifier la livraison (second canal OTP)."""
+    u = db.get(Utilisateur, uid)
+    if not u:
+        raise HTTPException(404, "Utilisateur introuvable")
+    if not u.telephone:
+        raise HTTPException(400, "Cet utilisateur n'a pas de numéro de téléphone.")
+    try:
+        send_otp_whatsapp(u.telephone, "000000")
     except RuntimeError as e:
         raise HTTPException(503, str(e))
     return {"ok": True, "telephone": u.telephone}
