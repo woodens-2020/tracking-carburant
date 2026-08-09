@@ -1,7 +1,10 @@
 providers = ["python"]
 
 [phases.setup]
-nixPkgs = ["python312", "python312Packages.pip"]
+nixPkgs = ["python312"]
 
 [phases.install]
-cmds = ["python -m pip install --break-system-packages --no-cache-dir -r backend/requirements.txt"]
+cmds = [
+  "python -m venv /opt/venv",
+  "/opt/venv/bin/pip install --no-cache-dir -r backend/requirements.txt"
+]
