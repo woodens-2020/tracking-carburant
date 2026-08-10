@@ -1016,30 +1016,57 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
 /* ── Mobile ──────────────────────────────────── */
 @media(max-width:768px){
   body{flex-direction:column}
+
+  /* Sidebar → tiroir hors-écran (drawer). Layout interne (nav-item, recherche,
+     sections) reste identique au desktop — seul le conteneur change de position. */
   .sidebar{
-    width:100%;min-height:auto;height:auto;
-    position:fixed;bottom:0;left:0;right:0;z-index:100;
-    flex-direction:row;border-right:none;
-    border-top:1px solid rgba(59,130,246,.15);
-    box-shadow:0 -4px 20px rgba(0,0,0,.4);
+    position:fixed;top:0;bottom:0;left:0;width:min(300px,84vw);
+    min-height:100vh;height:100vh;
+    transform:translateX(-100%);
+    transition:transform .25s cubic-bezier(.22,.8,.36,1);
+    z-index:300;box-shadow:8px 0 40px rgba(0,0,0,.5);
   }
-  .sb-brand{display:none}
-  .sb-search{display:none}
-  .sb-nav{flex-direction:row;padding:0;gap:0;display:flex}
-  .nav-section{display:none}
-  .nav-item{
-    flex:1;flex-direction:column;padding:8px 4px;
-    font-size:11px;gap:3px;border-radius:0;
-    justify-content:center;margin-bottom:0;
+  .sidebar.mnav-open{transform:translateX(0)}
+  .sb-nav{overflow-y:auto}
+
+  /* Scrim derrière le tiroir */
+  .mnav-scrim{position:fixed;inset:0;background:rgba(0,3,15,.6);z-index:290;opacity:0;pointer-events:none;transition:opacity .2s}
+  .mnav-scrim.mnav-open{opacity:1;pointer-events:auto}
+
+  /* Barre fixe en bas : 4 raccourcis + Menu */
+  .mnav-bar{
+    position:fixed;bottom:0;left:0;right:0;z-index:100;display:flex;
+    background:var(--panel);border-top:1px solid var(--border);
+    box-shadow:0 -4px 20px rgba(0,0,0,.25);
+    padding-bottom:env(safe-area-inset-bottom,0);
   }
-  .nav-item .nav-icon{width:26px;height:26px;border-radius:6px;background:transparent}
-  .nav-item svg{width:17px;height:17px}
-  .nav-item.active::before{top:0;bottom:auto;left:25%;right:25%;width:auto;height:2px;border-radius:0 0 2px 2px;background:linear-gradient(90deg,#3b82f6,#60a5fa)}
-  .nav-active-dot{display:none!important}
-  .sb-footer{display:none}
-  .pages{top:56px;bottom:104px} /* 68px nav + 36px footer */
-  .app-footer{left:0;bottom:68px}
+  .mnav-btn{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:3px;padding:8px 4px;min-height:56px;background:none;border:none;
+    color:var(--muted);font-size:11px;font-family:var(--font);position:relative;cursor:pointer;
+  }
+  .mnav-btn .nav-icon{width:26px;height:26px;border-radius:6px;background:transparent}
+  .mnav-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2}
+  .mnav-btn.active{color:#60a5fa}
+  .mnav-btn.active::before{content:'';position:absolute;top:0;left:25%;right:25%;height:2px;border-radius:0 0 2px 2px;background:linear-gradient(90deg,#3b82f6,#60a5fa)}
+
+  .pages{top:56px;bottom:calc(56px + env(safe-area-inset-bottom,0px))}
+  .app-footer{display:none} /* bandeau décoratif — plus de place une fois la barre du bas ajoutée */
   .db-grid{grid-template-columns:1fr}
+
+  /* ── Cibles tactiles ── */
+  .btn{padding:11px 18px;font-size:15px;min-height:44px}
+  .sb-search-clear{width:32px;height:32px}
+  .gi-modal-close{width:36px;height:36px}
+
+  /* ── Tableaux : défilement horizontal universel ── */
+  table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
+
+  /* ── Modales plein écran ── */
+  .overlay{padding:0}
+  .modal-box{width:100vw;max-width:100vw;height:100vh;max-height:100vh;border-radius:0;border-top:none}
+  .gi-modal-overlay{padding:0}
+  .gi-modal{width:100vw;max-width:100vw;height:100vh;max-height:100vh;border-radius:0}
 }
 /* ── Dashboard amélioré (filtres, graphiques) ─ */
 /* ── Filtre dashboard ──────────────────────────── */
@@ -2774,7 +2801,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 <script src="/shared/loading-overlay.js"></script>
 
 <!-- ═══════ SIDEBAR ═══════ -->
-<aside class="sidebar">
+<aside class="sidebar" id="mnav-drawer">
 
   <!-- Brand -->
   <div class="sb-brand">
@@ -3258,6 +3285,32 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </svg>
   </div>
 </aside>
+
+<!-- ═══════ NAVIGATION MOBILE : scrim + barre du bas ═══════ -->
+<div class="mnav-scrim" id="mnav-scrim" onclick="closeMobileDrawer()"></div>
+<nav class="mnav-bar" id="mnav-bar">
+  <button class="mnav-btn" data-page="home" onclick="goTo('home')">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+    <span>Accueil</span>
+  </button>
+  <button class="mnav-btn" data-page="saisie" onclick="goTo('saisie')">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
+    <span>Saisie</span>
+  </button>
+  <button class="mnav-btn" data-page="dashboard" onclick="goTo('dashboard')">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17h7M17 14v7"/></svg></span>
+    <span>Tableau</span>
+  </button>
+  <button class="mnav-btn" data-page="caisse" onclick="goTo('caisse')">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M2 11h20"/></svg></span>
+    <span>Caisse</span>
+  </button>
+  <button class="mnav-btn mnav-menu-btn" id="mnav-menu-toggle" onclick="toggleMobileDrawer()"
+          aria-expanded="false" aria-controls="mnav-drawer" aria-label="Ouvrir le menu complet">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span>
+    <span>Menu</span>
+  </button>
+</nav>
 
 <!-- ═══════ MAIN ═══════ -->
 <div class="main">
@@ -10633,12 +10686,11 @@ function goTo(page){
     return;
   }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.nav-item, .mnav-btn').forEach(n=>n.classList.remove('active'));
   const pageEl=document.getElementById('page-'+page);
   if(!pageEl) return;
   pageEl.classList.add('active');
-  const navEl=document.querySelector(`[data-page="${page}"]`);
-  if(navEl) navEl.classList.add('active');
+  document.querySelectorAll(`[data-page="${page}"]`).forEach(navEl=>navEl.classList.add('active'));
   currentPage=page;
   try{ sessionStorage.setItem('konekta_current_page', page); }catch(e){}
   const m=PAGE_META[page]||{title:()=>page,sub:()=>''};
@@ -12342,7 +12394,7 @@ function _applyNavAccess(){
   const isCaissiere = !_isManager && (!!_appUser?.employe_id || (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier'));
   if(allowed === null && !isCaissiere){ _updateNavSectionVisibility(); return; } // accès complet sans restrictions caissière
   // Masquer items de nav interdits (sauf admin qui est géré ci-dessus)
-  document.querySelectorAll('.nav-item[data-page]').forEach(btn=>{
+  document.querySelectorAll('.nav-item[data-page], .mnav-btn[data-page]').forEach(btn=>{
     const p = btn.getAttribute('data-page');
     if(['admin-roles','admin-users','admin-sessions','admin-audit','admin-security'].includes(p)) return;
     const ok = _canAccess(p);
@@ -12456,6 +12508,23 @@ function navSearchKeydown(e){
     if(first){ first.click(); navSearchClear(); }
   }
 }
+
+/* ── Tiroir de navigation mobile ─────────────────────────────── */
+function toggleMobileDrawer(){
+  const drawer = document.getElementById('mnav-drawer');
+  if(!drawer) return;
+  const open = drawer.classList.toggle('mnav-open');
+  document.getElementById('mnav-scrim')?.classList.toggle('mnav-open', open);
+  document.getElementById('mnav-menu-toggle')?.setAttribute('aria-expanded', String(open));
+}
+function closeMobileDrawer(){
+  document.getElementById('mnav-drawer')?.classList.remove('mnav-open');
+  document.getElementById('mnav-scrim')?.classList.remove('mnav-open');
+  document.getElementById('mnav-menu-toggle')?.setAttribute('aria-expanded', 'false');
+}
+document.querySelector('.sb-nav')?.addEventListener('click', e=>{
+  if(e.target.closest('.nav-item')) closeMobileDrawer();
+});
 
 async function loadCurrentUser(){
   try{
