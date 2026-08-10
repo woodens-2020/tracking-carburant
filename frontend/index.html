@@ -1098,6 +1098,36 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
   #hrpt-actifs-nb{font-size:36px!important}
 
   .mnav-btn span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+
+  /* ── Formulaires de filtre (Tableau de bord, Saisie) : une colonne propre ── */
+  .db-custom-filters{padding:12px 14px}
+  .filter-group{width:100%}
+  .filter-input,.filter-select{width:100%}
+
+  /* ── Saisie : tableau de saisie → cartes verticales (au lieu de défiler
+     horizontalement pendant qu'on tape des chiffres) ── */
+  #saisie-content table.dt{display:block;width:100%;white-space:normal}
+  #saisie-content table.dt thead{display:none}
+  #saisie-content table.dt tbody{display:block}
+  #saisie-content table.dt tr{
+    display:block;margin-bottom:12px;padding:12px 14px;
+    border:1px solid var(--border);border-radius:var(--r);background:var(--panel2);
+  }
+  #saisie-content table.dt tr:last-child{margin-bottom:0}
+  #saisie-content table.dt td{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);white-space:normal;
+  }
+  #saisie-content table.dt td:last-child{border-bottom:none}
+  #saisie-content table.dt td:first-child{
+    display:block;font-size:16px;font-weight:700;padding:0 0 8px;
+    border-bottom:1px solid var(--border);margin-bottom:4px;
+  }
+  #saisie-content table.dt td[data-label]::before{
+    content:attr(data-label);font-size:11.5px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--muted);flex-shrink:0;
+  }
+  #saisie-content table.dt td .inp{width:130px}
 }
 
 /* ── Très petits écrans (Tecno/Android d'entrée de gamme, iPhone SE/mini) ── */
@@ -11571,12 +11601,12 @@ function renderSaisie(){
                   data-is-edit="${isEdit?'1':'0'}" data-nb-mod="${nbMod}"
                   data-av="${av}" data-ap="${ap}">
         <td style="font-weight:600">${esc(po.nom)}</td>
-        <td class="tr"><input class="inp inp-sm inp-px" type="number" step="0.01" value="${px}" oninput="calcRow(this.closest('tr'))"></td>
-        <td class="tr"><input class="inp inp-av" type="number" step="0.001" value="" readonly placeholder="${av||'—'}" oninput="calcRow(this.closest('tr'))"></td>
-        <td class="tr"><input class="inp inp-ap" type="number" step="0.001" value="" readonly placeholder="${ap||'—'}" oninput="calcRow(this.closest('tr'))"></td>
-        <td class="tr num ${qcol} val-qte">${isEdit?fmtGal(qte):'—'}</td>
-        <td class="tr num c-amber val-mnt">${isEdit?fmtG(mnt):'—'}</td>
-        <td><span class="row-badge">${actionHtml}</span></td>
+        <td class="tr" data-label="Prix / gal"><input class="inp inp-sm inp-px" type="number" step="0.01" value="${px}" oninput="calcRow(this.closest('tr'))"></td>
+        <td class="tr" data-label="Meter avant"><input class="inp inp-av" type="number" step="0.001" value="" readonly placeholder="${av||'—'}" oninput="calcRow(this.closest('tr'))"></td>
+        <td class="tr" data-label="Meter après"><input class="inp inp-ap" type="number" step="0.001" value="" readonly placeholder="${ap||'—'}" oninput="calcRow(this.closest('tr'))"></td>
+        <td class="tr num ${qcol} val-qte" data-label="Qté (gal)">${isEdit?fmtGal(qte):'—'}</td>
+        <td class="tr num c-amber val-mnt" data-label="Montant (G)">${isEdit?fmtG(mnt):'—'}</td>
+        <td data-label="Statut"><span class="row-badge">${actionHtml}</span></td>
       </tr>`;
     }).join('')||`<tr><td colspan="7" class="empty">Aucune pompe pour ce produit.</td></tr>`;
 
