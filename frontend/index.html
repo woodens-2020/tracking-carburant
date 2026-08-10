@@ -1013,6 +1013,11 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
 @keyframes count-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 .kpi-count{animation:count-in .38s cubic-bezier(.22,.8,.36,1) both}
 
+/* ── Navigation mobile : invisible par défaut, activée uniquement dans le
+   media query ci-dessous. Sans ça, ces éléments (bouton "Menu", barre du
+   bas) s'affichent sans style, en pleine page, même sur ordinateur. ── */
+.mnav-scrim,.mnav-bar{display:none}
+
 /* ── Mobile ──────────────────────────────────── */
 @media(max-width:768px){
   body{flex-direction:column}
@@ -1030,7 +1035,7 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
   .sb-nav{overflow-y:auto}
 
   /* Scrim derrière le tiroir */
-  .mnav-scrim{position:fixed;inset:0;background:rgba(0,3,15,.6);z-index:290;opacity:0;pointer-events:none;transition:opacity .2s}
+  .mnav-scrim{display:block;position:fixed;inset:0;background:rgba(0,3,15,.6);z-index:290;opacity:0;pointer-events:none;transition:opacity .2s}
   .mnav-scrim.mnav-open{opacity:1;pointer-events:auto}
 
   /* Barre fixe en bas : 4 raccourcis + Menu */
