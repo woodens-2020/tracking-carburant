@@ -1094,6 +1094,38 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
   #zelle-sources-wrap,#zpay-cards,#zfd-cards{grid-template-columns:1fr!important}
   #page-zelle div[style*="minmax(220px"]{grid-template-columns:1fr!important}
 
+  /* ── Règle générique : toute grille 2/3 colonnes rigides définie en style=
+     inline (Hôtel Réception, modales Hôtel/Cuisine, POS Rentabilité,
+     Statistiques...) — passe systématiquement en 1 colonne sur mobile ── */
+  [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
+  #hotel-sejours-grid{grid-template-columns:1fr!important}
+  #page-cuisine-analyse div[style*="1.6fr 1fr"]{grid-template-columns:1fr!important}
+
+  /* ── Zelle : balance proéminente ── */
+  .zelle-balance-hero{flex-wrap:wrap;gap:10px}
+  #zb-balance-ht{font-size:1.6rem!important}
+
+  /* ── Filtres "Du ... au ..." qui débordaient au lieu de passer à la ligne
+     (Zelle, Cuisine) ── */
+  input[type="date"][style*="148px"]{width:110px!important}
+  div:has(>input[type="date"]){flex-wrap:wrap;row-gap:6px}
+
+  /* ── POS Analyse : onglets qui débordaient → défilement horizontal ── */
+  #page-pos-analyse div[style*="border-bottom:1px solid rgba(255,255,255,.08)"]{
+    overflow-x:auto;-webkit-overflow-scrolling:touch;
+  }
+  #page-pos-analyse div[style*="border-bottom:1px solid rgba(255,255,255,.08)"]>button{flex-shrink:0}
+
+  /* ── Journal : séparateur de chaîne décalé de 130px, inutile en 1 colonne ── */
+  .janom-chain-sep{padding-left:0!important}
+
+  /* ── Caisse (carburant) : gros chiffre non réduit en largeur ── */
+  .caisse-cash-val{font-size:30px!important}
+
+  /* ── Admin Rôles : ligne de permission (label + options radio) ── */
+  .arm-perm-row{flex-wrap:wrap;gap:6px}
+  .arm-perm-opts{flex-wrap:wrap;gap:8px!important}
+
   /* ── Barres d'outils/actions qui débordaient au lieu de passer à la ligne ── */
   #page-pos-produits .gi-table-hdr>div[style*="display:flex"]{flex-wrap:wrap}
   .pos-header{flex-wrap:wrap}
@@ -17312,9 +17344,9 @@ function _armBuildMatrix(perms){
         <input type="radio" name="arm-${d.key}" value="${v}" ${cur===v?'checked':''} style="accent-color:${d.color}"> ${v.charAt(0).toUpperCase()+v.slice(1)}
        </label>`
     ).join('');
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.04)">
+    return `<div class="arm-perm-row" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.04)">
       <span style="font-size:15px;min-width:130px">${d.label}</span>
-      <div style="display:flex;gap:14px">${opts}</div>
+      <div class="arm-perm-opts" style="display:flex;gap:14px">${opts}</div>
     </div>`;
   }).join('');
 }
