@@ -13,7 +13,6 @@ import hashlib
 import logging
 import os
 import secrets
-import smtplib
 from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -22,14 +21,12 @@ from sqlalchemy.orm import Session
 
 from models import PasswordResetToken, SessionToken, Utilisateur
 from auth import hash_password
+from otp_service import _smtp_connect
 
 log = logging.getLogger("password_reset")
 
 # ── Config (héritée de l'environnement via otp_service) ────────────
-EMAIL_HOST      = os.getenv("EMAIL_HOST",           "smtp.gmail.com")
-EMAIL_PORT      = int(os.getenv("EMAIL_PORT",       "587"))
 EMAIL_USER      = os.getenv("EMAIL_HOST_USER",      "")
-EMAIL_PASSWORD  = os.getenv("EMAIL_HOST_PASSWORD",  "")
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME",       "Konekta · Bon Prix")
 
 RESET_EXPIRY_MIN   = 30
@@ -196,10 +193,7 @@ def _send_reset_email(user: Utilisateur, raw_token: str, base_url: str) -> None:
     msg["To"]      = user.email
     msg.attach(MIMEText(html, "html", "utf-8"))
 
-    with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=15) as smtp:
-        smtp.ehlo()
-        smtp.starttls()
-        smtp.login(EMAIL_USER, EMAIL_PASSWORD)
+    with _smtp_connect() as smtp:
         smtp.sendmail(EMAIL_USER, [user.email], msg.as_string())
 
 

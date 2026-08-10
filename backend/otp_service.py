@@ -48,6 +48,25 @@ OTP_PENDING_COOKIE  = "otp_pending"
 OTP_PENDING_MAX_AGE = 300  # 5 minutes — aligné sur OTP_DURATION_MIN
 
 
+def _smtp_connect() -> smtplib.SMTP:
+    """
+    Ouvre une connexion SMTP authentifiée.
+
+    Port 465 : SSL implicite dès la connexion (nécessaire sur les réseaux qui
+    bloquent le port 587/STARTTLS, ex. certains hébergeurs cloud).
+    Autre port (587 par défaut) : STARTTLS, comportement historique inchangé.
+    """
+    if EMAIL_PORT == 465:
+        smtp = smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT, timeout=10)
+    else:
+        smtp = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=10)
+        smtp.ehlo()
+        smtp.starttls()
+    smtp.ehlo()
+    smtp.login(EMAIL_USER, EMAIL_PASSWORD)
+    return smtp
+
+
 # ── Primitives cryptographiques ───────────────────────────────────────────────
 
 def _generate_code() -> str:
@@ -234,11 +253,7 @@ def send_otp_email(nom: str, email: str, code: str) -> None:
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     try:
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=10) as smtp:
-            smtp.ehlo()
-            smtp.starttls()
-            smtp.ehlo()
-            smtp.login(EMAIL_USER, EMAIL_PASSWORD)
+        with _smtp_connect() as smtp:
             smtp.sendmail(EMAIL_USER, [email], msg.as_string())
         log.info("OTP email envoyé à %s", _mask_email(email))
     except smtplib.SMTPAuthenticationError:
@@ -420,11 +435,7 @@ def send_welcome_email(nom: str, email: str, username: str) -> None:
     msg.attach(MIMEText(_build_welcome_html(nom, username), "html", "utf-8"))
 
     try:
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=10) as smtp:
-            smtp.ehlo()
-            smtp.starttls()
-            smtp.ehlo()
-            smtp.login(EMAIL_USER, EMAIL_PASSWORD)
+        with _smtp_connect() as smtp:
             smtp.sendmail(EMAIL_USER, [email], msg.as_string())
         log.info("Email de bienvenue envoyé à %s", _mask_email(email))
     except smtplib.SMTPAuthenticationError:
@@ -681,11 +692,7 @@ def send_admin_code_email(nom_employe: str, username_employe: str, code: str) ->
     msg.attach(MIMEText(_build_admin_code_email_html(nom_employe, username_employe, code), "html", "utf-8"))
 
     try:
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=10) as smtp:
-            smtp.ehlo()
-            smtp.starttls()
-            smtp.ehlo()
-            smtp.login(EMAIL_USER, EMAIL_PASSWORD)
+        with _smtp_connect() as smtp:
             smtp.sendmail(EMAIL_USER, [EMAIL_USER], msg.as_string())
         log.info("Code admin envoyé pour l'employé %s", username_employe)
     except smtplib.SMTPAuthenticationError:
