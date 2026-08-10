@@ -1,0 +1,33 @@
+name: Sauvegarde quotidienne — base Railway
+
+on:
+  schedule:
+    # 06:00 UTC = 02:00 Haiti (EDT/UTC-4) — heure creuse
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Installer les outils PostgreSQL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Dump de la base Railway
+        env:
+          DATABASE_URL: ${{ secrets.RAILWAY_BACKUP_DATABASE_URL }}
+        run: |
+          mkdir -p backup
+          STAMP=$(date -u +%Y%m%d-%H%M%S)
+          pg_dump "$DATABASE_URL" --format=custom --no-owner --no-acl \
+            --file="backup/railway_${STAMP}.dump"
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+
+      - name: Publier la sauvegarde en artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: railway-db-backup-${{ env.STAMP }}
+          path: backup/*.dump
+          retention-days: 30
