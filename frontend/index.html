@@ -1086,7 +1086,16 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
   .gi-kpi-row{grid-template-columns:1fr!important}
   .pos-kpi-grid{grid-template-columns:1fr!important}
 
+  /* ── Panneaux à colonne fixe restants (440px et plus large aussi) ── */
+  #page-cuisine-caisse .pos-page{grid-template-columns:1fr!important}
+  #page-pos-sessions-caisse div[style*="1fr 200px"]{grid-template-columns:1fr!important}
+  .pos-form-row{grid-template-columns:1fr}
+  .sk-two-col,.sk-two-col-narrow{grid-template-columns:1fr}
+  #zelle-sources-wrap,#zpay-cards,#zfd-cards{grid-template-columns:1fr!important}
+  #page-zelle div[style*="minmax(220px"]{grid-template-columns:1fr!important}
+
   /* ── Barres d'outils/actions qui débordaient au lieu de passer à la ligne ── */
+  #page-pos-produits .gi-table-hdr>div[style*="display:flex"]{flex-wrap:wrap}
   .pos-header{flex-wrap:wrap}
   .pos-header-actions{margin-left:0;flex-wrap:wrap}
   #pos-receipt-actions,.aud-fmt-row,.cat-add-row,.gi-actions{flex-wrap:wrap}
