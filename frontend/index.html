@@ -3623,36 +3623,36 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#22c55e" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             </div>
             <div>
-              <div class="xls-title" style="font-size:14px">Exporter les relevés</div>
-              <div style="font-size:12px;color:var(--muted)">Fichier .xlsx · 3 feuilles (relevés, par produit, par pompe)</div>
+              <div class="xls-title" style="font-size:14px" data-i18n="saisie.export.title">Exporter les relevés</div>
+              <div style="font-size:12px;color:var(--muted)" data-i18n="saisie.export.sub">Fichier .xlsx · 3 feuilles (relevés, par produit, par pompe)</div>
             </div>
           </div>
         </div>
         <div class="db-custom-filters">
           <div class="filter-group">
-            <label class="filter-label">De</label>
+            <label class="filter-label" data-i18n="saisie.export.from">De</label>
             <input type="date" id="xls-debut" class="filter-input">
           </div>
           <div class="filter-group">
-            <label class="filter-label">À</label>
+            <label class="filter-label" data-i18n="saisie.export.to">À</label>
             <input type="date" id="xls-fin" class="filter-input">
           </div>
           <div class="filter-group">
-            <label class="filter-label">Produit</label>
+            <label class="filter-label" data-i18n="saisie.export.product">Produit</label>
             <select id="xls-prod" class="filter-select">
-              <option value="">Tous les produits</option>
+              <option value="" data-i18n="saisie.export.product.all">Tous les produits</option>
             </select>
           </div>
           <div class="filter-group">
-            <label class="filter-label">Pompe</label>
+            <label class="filter-label" data-i18n="saisie.export.pompe">Pompe</label>
             <select id="xls-pompe" class="filter-select">
-              <option value="">Toutes les pompes</option>
+              <option value="" data-i18n="saisie.export.pompe.all">Toutes les pompes</option>
             </select>
           </div>
           <div class="filter-spacer"></div>
           <button class="btn-xls" onclick="exportXls()">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Télécharger .xlsx
+            <span data-i18n="saisie.export.download">Télécharger .xlsx</span>
           </button>
         </div>
       </div>
@@ -3661,18 +3661,18 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="prod-tabs" id="prod-tabs"></div>
         <button class="btn btn-secondary" onclick="openGestion()">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-          Gérer produits / pompes
+          <span data-i18n="saisie.manage">Gérer produits / pompes</span>
         </button>
       </div>
       <!-- Sélecteur Matin / Après-midi -->
       <div class="per-selector">
         <button class="per-sel-btn active" data-per="Matin" onclick="selectPeriode('Matin')">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
-          Matin
+          <span data-i18n="saisie.period.matin">Matin</span>
         </button>
         <button class="per-sel-btn" data-per="Apres-midi" onclick="selectPeriode('Apres-midi')">
           <svg viewBox="0 0 24 24"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="1" y1="18" x2="3" y2="18"/><line x1="21" y1="18" x2="23" y2="18"/><line x1="18.36" y1="11.64" x2="19.78" y2="10.22"/></svg>
-          Après-midi
+          <span data-i18n="saisie.period.apresmidi">Après-midi</span>
         </button>
       </div>
       <div id="saisie-content"></div>
@@ -10060,7 +10060,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <div class="card-head">
       <div class="card-title">
         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-        Confirmer l'enregistrement
+        <span data-i18n="saisie.confirm.title">Confirmer l'enregistrement</span>
       </div>
       <button onclick="closeConfirm()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
     </div>
@@ -10070,20 +10070,20 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <div style="padding:14px 18px;overflow-x:auto">
       <table class="recap-table">
         <thead><tr>
-          <th>Pompe</th>
-          <th class="tr">Meter avant</th>
-          <th class="tr">Meter après</th>
-          <th class="tr">Quantité</th>
-          <th class="tr">Montant</th>
+          <th data-i18n="saisie.table.pompe">Pompe</th>
+          <th class="tr" data-i18n="saisie.table.av">Meter avant</th>
+          <th class="tr" data-i18n="saisie.table.ap">Meter après</th>
+          <th class="tr" data-i18n="saisie.confirm.qte">Quantité</th>
+          <th class="tr" data-i18n="saisie.confirm.mnt">Montant</th>
         </tr></thead>
         <tbody id="confirm-rows"></tbody>
       </table>
     </div>
     <div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end">
-      <button class="btn btn-secondary" onclick="closeConfirm()">Annuler</button>
+      <button class="btn btn-secondary" onclick="closeConfirm()" data-i18n="saisie.confirm.cancel">Annuler</button>
       <button class="btn btn-primary" onclick="doSave()">
         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-        Confirmer et enregistrer
+        <span data-i18n="saisie.confirm.submit">Confirmer et enregistrer</span>
       </button>
     </div>
   </div>
@@ -10100,9 +10100,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </svg>
     </div>
 
-    <p class="resp-eyebrow">Avant de continuer</p>
-    <h1 class="resp-title">Charte de responsabilité</h1>
-    <p class="resp-lead">Vous êtes connecté(e) au système de gestion de l'institution. Merci de prendre connaissance des points suivants avant de poursuivre.</p>
+    <p class="resp-eyebrow" data-i18n="resp.eyebrow">Avant de continuer</p>
+    <h1 class="resp-title" data-i18n="resp.title">Charte de responsabilité</h1>
+    <p class="resp-lead" data-i18n="resp.lead">Vous êtes connecté(e) au système de gestion de l'institution. Merci de prendre connaissance des points suivants avant de poursuivre.</p>
 
     <div class="resp-points">
       <div class="resp-point">
@@ -10110,8 +10110,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
         </div>
         <div class="resp-point-txt">
-          <h3>Responsabilité individuelle</h3>
-          <p>Chaque action effectuée sous votre compte vous engage personnellement : saisies, modifications, suppressions, transactions et consultations sont enregistrées et associées à votre identifiant. Utilisez le système exclusivement dans le cadre de vos fonctions.</p>
+          <h3 data-i18n="resp.p1.title">Responsabilité individuelle</h3>
+          <p data-i18n="resp.p1.text">Chaque action effectuée sous votre compte vous engage personnellement : saisies, modifications, suppressions, transactions et consultations sont enregistrées et associées à votre identifiant. Utilisez le système exclusivement dans le cadre de vos fonctions.</p>
         </div>
       </div>
       <div class="resp-point">
@@ -10119,15 +10119,15 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11a9 9 0 0 1 18 0v6a3 3 0 0 1-3 3h-1v-7h4"/><path d="M3 17v-6h4v7H6a3 3 0 0 1-3-3z"/></svg>
         </div>
         <div class="resp-point-txt">
-          <h3>Un problème, un doute ?</h3>
-          <p>En cas de problème, d'anomalie ou de doute sur une manipulation, <strong>contactez immédiatement le département informatique</strong> avant de poursuivre — mieux vaut vérifier que corriger après coup.</p>
+          <h3 data-i18n="resp.p2.title">Un problème, un doute ?</h3>
+          <p data-i18n-html="resp.p2.text">En cas de problème, d'anomalie ou de doute sur une manipulation, <strong>contactez immédiatement le département informatique</strong> avant de poursuivre — mieux vaut vérifier que corriger après coup.</p>
         </div>
       </div>
     </div>
 
     <button class="btn btn-primary resp-ok-btn" id="resp-ok-btn" onclick="closeResponsabiliteModal()">
       <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-      J'ai compris et j'accepte
+      <span data-i18n="resp.ok">J'ai compris et j'accepte</span>
     </button>
   </div>
 </div>
@@ -10138,17 +10138,17 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <div class="card-head">
       <div class="card-title">
         <svg viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-        Produits &amp; Pompes
+        <span data-i18n="gestion.title">Produits &amp; Pompes</span>
       </div>
       <button onclick="closeGestion()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
     </div>
 
     <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
-      <div class="filter-label" style="margin-bottom:8px">Nouveau produit</div>
+      <div class="filter-label" style="margin-bottom:8px" data-i18n="gestion.new.product">Nouveau produit</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <input id="np-nom"  class="filter-input" placeholder="Nom (ex. Gazoline)" style="flex:1;min-width:120px">
-        <input id="np-prix" class="filter-input" type="number" placeholder="Prix/gal" style="width:100px;font-family:var(--mono)">
-        <button class="btn btn-primary" style="height:34px;padding:0 14px" onclick="addProduit()">+ Ajouter</button>
+        <input id="np-nom"  class="filter-input" data-i18n-ph="gestion.new.nom.ph" placeholder="Nom (ex. Gazoline)" style="flex:1;min-width:120px">
+        <input id="np-prix" class="filter-input" type="number" data-i18n-ph="gestion.new.prix.ph" placeholder="Prix/gal" style="width:100px;font-family:var(--mono)">
+        <button class="btn btn-primary" style="height:34px;padding:0 14px" onclick="addProduit()" data-i18n="gestion.new.add">+ Ajouter</button>
       </div>
     </div>
 
@@ -10494,6 +10494,80 @@ const LANGS = {
     'fc.note.normale': 'Hypothèse de normalité utilisée pour les probabilités.',
     'fc.forecast.day': 'J+',
     'fc.err.vide':     'Aucune donnée disponible dans la base.',
+
+    'saisie.export.title':      'Exporter les relevés',
+    'saisie.export.sub':        'Fichier .xlsx · 3 feuilles (relevés, par produit, par pompe)',
+    'saisie.export.from':       'De',
+    'saisie.export.to':         'À',
+    'saisie.export.product':    'Produit',
+    'saisie.export.product.all':'Tous les produits',
+    'saisie.export.pompe':      'Pompe',
+    'saisie.export.pompe.all':  'Toutes les pompes',
+    'saisie.export.download':   'Télécharger .xlsx',
+    'saisie.export.preparing':  'Préparation du fichier Excel…',
+    'saisie.manage':            'Gérer produits / pompes',
+    'saisie.period.matin':      'Matin',
+    'saisie.period.apresmidi':  'Après-midi',
+    'saisie.noproduct':         'Sélectionnez ou créez un produit.',
+    'saisie.noproduct.empty':   'Aucun produit — cliquez sur "Gérer"',
+    'saisie.table.pompe':       'Pompe',
+    'saisie.table.px':          'Prix / gal',
+    'saisie.table.av':          'Meter avant',
+    'saisie.table.ap':          'Meter après',
+    'saisie.table.qte':         'Qté (gal)',
+    'saisie.table.mnt':         'Montant (G)',
+    'saisie.table.statut':      'Statut',
+    'saisie.nopompe':           'Aucune pompe pour ce produit.',
+    'saisie.btn.save':          'Enregistrer',
+    'saisie.badge.locked':      'Limite atteinte',
+    'saisie.btn.modify':        'Modifier',
+    'saisie.btn.modify.title':  'Modifier les compteurs',
+    'saisie.btn.modify.remaining': '{n} restant(s)',
+    'saisie.btn.create':        '+ Créer',
+    'saisie.btn.create.title':  'Saisir les compteurs',
+    'saisie.badge.editing.mod': '✎ En modification',
+    'saisie.badge.editing.new': '◎ En saisie',
+    'saisie.badge.modified':    '✎ Modifié',
+    'saisie.badge.new':         '◎ Nouveau',
+    'saisie.confirm.title':     "Confirmer l'enregistrement",
+    'saisie.confirm.cancel':    'Annuler',
+    'saisie.confirm.submit':    'Confirmer et enregistrer',
+    'saisie.confirm.qte':       'Quantité',
+    'saisie.confirm.mnt':       'Montant',
+    'saisie.recap.total':       'TOTAL',
+    'saisie.err.rowError':      '{pompe} : Meter après ({ap}) < Meter avant ({av})',
+    'saisie.err.noData':        'Aucune donnée à enregistrer (remplissez au moins une ligne)',
+    'saisie.load.err':          'Chargement : {msg}',
+    'saisie.save.ok':           '✓ {n} relevé(s) enregistré(s)',
+    'saisie.save.err':          '{n} erreur(s) : {msg}',
+
+    'resp.eyebrow':    'Avant de continuer',
+    'resp.title':      'Charte de responsabilité',
+    'resp.lead':       'Vous êtes connecté(e) au système de gestion de l\'institution. Merci de prendre connaissance des points suivants avant de poursuivre.',
+    'resp.p1.title':   'Responsabilité individuelle',
+    'resp.p1.text':    'Chaque action effectuée sous votre compte vous engage personnellement : saisies, modifications, suppressions, transactions et consultations sont enregistrées et associées à votre identifiant. Utilisez le système exclusivement dans le cadre de vos fonctions.',
+    'resp.p2.title':   'Un problème, un doute ?',
+    'resp.p2.text':    'En cas de problème, d\'anomalie ou de doute sur une manipulation, <strong>contactez immédiatement le département informatique</strong> avant de poursuivre — mieux vaut vérifier que corriger après coup.',
+    'resp.ok':         "J'ai compris et j'accepte",
+
+    'gestion.title':       'Produits & Pompes',
+    'gestion.new.product':  'Nouveau produit',
+    'gestion.new.nom.ph':   'Nom (ex. Gazoline)',
+    'gestion.new.prix.ph':  'Prix/gal',
+    'gestion.new.add':      '+ Ajouter',
+    'gestion.empty.products': 'Aucun produit. Ajoutez-en un ci-dessus.',
+    'gestion.pompe.count':    '{n} pompe(s)',
+    'gestion.empty.pompe':    'Aucune pompe.',
+    'gestion.pompe.name.ph':  'Nom de la pompe',
+    'gestion.add.pompe':      '+ Pompe',
+    'gestion.err.nom.produit':'Entrez un nom de produit',
+    'gestion.err.nom.pompe':  'Entrez un nom de pompe',
+    'gestion.toast.produit.added': 'Produit "{nom}" ajouté',
+    'gestion.toast.pompe.added':   'Pompe "{nom}" ajoutée',
+    'gestion.toast.pompe.deleted': 'Pompe "{nom}" supprimée',
+    'gestion.confirm.delpompe.body':  'Supprimer la pompe « {nom} » ? Les relevés associés seront perdus.',
+    'gestion.confirm.delpompe.title': 'Supprimer la pompe',
+    'gestion.confirm.delpompe.ok':    'Supprimer',
   },
   en: {
     'nav.navigation':  'NAVIGATION',
@@ -10687,6 +10761,80 @@ const LANGS = {
     'fc.note.normale': 'Normality assumption used for probabilities.',
     'fc.forecast.day': 'D+',
     'fc.err.vide':     'No data available in the database.',
+
+    'saisie.export.title':      'Export readings',
+    'saisie.export.sub':        '.xlsx file · 3 sheets (readings, by product, by pump)',
+    'saisie.export.from':       'From',
+    'saisie.export.to':         'To',
+    'saisie.export.product':    'Product',
+    'saisie.export.product.all':'All products',
+    'saisie.export.pompe':      'Pump',
+    'saisie.export.pompe.all':  'All pumps',
+    'saisie.export.download':   'Download .xlsx',
+    'saisie.export.preparing':  'Preparing Excel file…',
+    'saisie.manage':            'Manage products / pumps',
+    'saisie.period.matin':      'Morning',
+    'saisie.period.apresmidi':  'Afternoon',
+    'saisie.noproduct':         'Select or create a product.',
+    'saisie.noproduct.empty':   'No products — click "Manage"',
+    'saisie.table.pompe':       'Pump',
+    'saisie.table.px':          'Price / gal',
+    'saisie.table.av':          'Meter before',
+    'saisie.table.ap':          'Meter after',
+    'saisie.table.qte':         'Qty (gal)',
+    'saisie.table.mnt':         'Amount (G)',
+    'saisie.table.statut':      'Status',
+    'saisie.nopompe':           'No pump for this product.',
+    'saisie.btn.save':          'Save',
+    'saisie.badge.locked':      'Limit reached',
+    'saisie.btn.modify':        'Modify',
+    'saisie.btn.modify.title':  'Edit meter readings',
+    'saisie.btn.modify.remaining': '{n} remaining',
+    'saisie.btn.create':        '+ Create',
+    'saisie.btn.create.title':  'Enter meter readings',
+    'saisie.badge.editing.mod': '✎ Editing',
+    'saisie.badge.editing.new': '◎ Entering',
+    'saisie.badge.modified':    '✎ Modified',
+    'saisie.badge.new':         '◎ New',
+    'saisie.confirm.title':     'Confirm saving',
+    'saisie.confirm.cancel':    'Cancel',
+    'saisie.confirm.submit':    'Confirm and save',
+    'saisie.confirm.qte':       'Quantity',
+    'saisie.confirm.mnt':       'Amount',
+    'saisie.recap.total':       'TOTAL',
+    'saisie.err.rowError':      '{pompe}: Meter after ({ap}) < Meter before ({av})',
+    'saisie.err.noData':        'No data to save (fill in at least one row)',
+    'saisie.load.err':          'Loading: {msg}',
+    'saisie.save.ok':           '✓ {n} reading(s) saved',
+    'saisie.save.err':          '{n} error(s): {msg}',
+
+    'resp.eyebrow':    'Before you continue',
+    'resp.title':      'Responsibility charter',
+    'resp.lead':       'You are logged into the institution\'s management system. Please review the following points before continuing.',
+    'resp.p1.title':   'Individual responsibility',
+    'resp.p1.text':    'Every action taken under your account is your personal responsibility: entries, edits, deletions, transactions and consultations are logged and linked to your identifier. Use the system exclusively within the scope of your duties.',
+    'resp.p2.title':   'A problem or a doubt?',
+    'resp.p2.text':    'If you encounter a problem, an anomaly, or have a doubt about an action, <strong>contact the IT department immediately</strong> before continuing — better to check first than to fix it afterward.',
+    'resp.ok':         'I understand and accept',
+
+    'gestion.title':       'Products & Pumps',
+    'gestion.new.product':  'New product',
+    'gestion.new.nom.ph':   'Name (e.g. Gasoline)',
+    'gestion.new.prix.ph':  'Price/gal',
+    'gestion.new.add':      '+ Add',
+    'gestion.empty.products': 'No products. Add one above.',
+    'gestion.pompe.count':    '{n} pump(s)',
+    'gestion.empty.pompe':    'No pumps.',
+    'gestion.pompe.name.ph':  'Pump name',
+    'gestion.add.pompe':      '+ Pump',
+    'gestion.err.nom.produit':'Enter a product name',
+    'gestion.err.nom.pompe':  'Enter a pump name',
+    'gestion.toast.produit.added': 'Product "{nom}" added',
+    'gestion.toast.pompe.added':   'Pump "{nom}" added',
+    'gestion.toast.pompe.deleted': 'Pump "{nom}" deleted',
+    'gestion.confirm.delpompe.body':  'Delete pump "{nom}"? Associated readings will be lost.',
+    'gestion.confirm.delpompe.title': 'Delete pump',
+    'gestion.confirm.delpompe.ok':    'Delete',
   },
   es: {
     'nav.navigation':  'NAVEGACIÓN',
@@ -10880,6 +11028,80 @@ const LANGS = {
     'fc.note.normale': 'Se usa el supuesto de normalidad para las probabilidades.',
     'fc.forecast.day': 'D+',
     'fc.err.vide':     'No hay datos disponibles en la base de datos.',
+
+    'saisie.export.title':      'Exportar lecturas',
+    'saisie.export.sub':        'Archivo .xlsx · 3 hojas (lecturas, por producto, por surtidor)',
+    'saisie.export.from':       'Desde',
+    'saisie.export.to':         'Hasta',
+    'saisie.export.product':    'Producto',
+    'saisie.export.product.all':'Todos los productos',
+    'saisie.export.pompe':      'Surtidor',
+    'saisie.export.pompe.all':  'Todos los surtidores',
+    'saisie.export.download':   'Descargar .xlsx',
+    'saisie.export.preparing':  'Preparando el archivo Excel…',
+    'saisie.manage':            'Gestionar productos / surtidores',
+    'saisie.period.matin':      'Mañana',
+    'saisie.period.apresmidi':  'Tarde',
+    'saisie.noproduct':         'Selecciona o crea un producto.',
+    'saisie.noproduct.empty':   'Ningún producto — haz clic en "Gestionar"',
+    'saisie.table.pompe':       'Surtidor',
+    'saisie.table.px':          'Precio / gal',
+    'saisie.table.av':          'Contador antes',
+    'saisie.table.ap':          'Contador después',
+    'saisie.table.qte':         'Cant. (gal)',
+    'saisie.table.mnt':         'Monto (G)',
+    'saisie.table.statut':      'Estado',
+    'saisie.nopompe':           'No hay surtidores para este producto.',
+    'saisie.btn.save':          'Guardar',
+    'saisie.badge.locked':      'Límite alcanzado',
+    'saisie.btn.modify':        'Modificar',
+    'saisie.btn.modify.title':  'Modificar los contadores',
+    'saisie.btn.modify.remaining': '{n} restante(s)',
+    'saisie.btn.create':        '+ Crear',
+    'saisie.btn.create.title':  'Ingresar los contadores',
+    'saisie.badge.editing.mod': '✎ En modificación',
+    'saisie.badge.editing.new': '◎ En captura',
+    'saisie.badge.modified':    '✎ Modificado',
+    'saisie.badge.new':         '◎ Nuevo',
+    'saisie.confirm.title':     'Confirmar el registro',
+    'saisie.confirm.cancel':    'Cancelar',
+    'saisie.confirm.submit':    'Confirmar y guardar',
+    'saisie.confirm.qte':       'Cantidad',
+    'saisie.confirm.mnt':       'Monto',
+    'saisie.recap.total':       'TOTAL',
+    'saisie.err.rowError':      '{pompe}: Contador después ({ap}) < Contador antes ({av})',
+    'saisie.err.noData':        'No hay datos para guardar (complete al menos una fila)',
+    'saisie.load.err':          'Carga: {msg}',
+    'saisie.save.ok':           '✓ {n} lectura(s) guardada(s)',
+    'saisie.save.err':          '{n} error(es): {msg}',
+
+    'resp.eyebrow':    'Antes de continuar',
+    'resp.title':      'Carta de responsabilidad',
+    'resp.lead':       'Ha iniciado sesión en el sistema de gestión de la institución. Revise los siguientes puntos antes de continuar.',
+    'resp.p1.title':   'Responsabilidad individual',
+    'resp.p1.text':    'Cada acción realizada bajo su cuenta es su responsabilidad personal: capturas, modificaciones, eliminaciones, transacciones y consultas quedan registradas y asociadas a su identificador. Use el sistema exclusivamente en el marco de sus funciones.',
+    'resp.p2.title':   '¿Un problema o una duda?',
+    'resp.p2.text':    'Si detecta un problema, una anomalía o tiene una duda sobre una acción, <strong>contacte de inmediato al departamento de informática</strong> antes de continuar — es mejor verificar que corregir después.',
+    'resp.ok':         'Entendido, acepto',
+
+    'gestion.title':       'Productos y Surtidores',
+    'gestion.new.product':  'Nuevo producto',
+    'gestion.new.nom.ph':   'Nombre (ej. Gasolina)',
+    'gestion.new.prix.ph':  'Precio/gal',
+    'gestion.new.add':      '+ Agregar',
+    'gestion.empty.products': 'No hay productos. Agregue uno arriba.',
+    'gestion.pompe.count':    '{n} surtidor(es)',
+    'gestion.empty.pompe':    'No hay surtidores.',
+    'gestion.pompe.name.ph':  'Nombre del surtidor',
+    'gestion.add.pompe':      '+ Surtidor',
+    'gestion.err.nom.produit':'Ingrese un nombre de producto',
+    'gestion.err.nom.pompe':  'Ingrese un nombre de surtidor',
+    'gestion.toast.produit.added': 'Producto "{nom}" agregado',
+    'gestion.toast.pompe.added':   'Surtidor "{nom}" agregado',
+    'gestion.toast.pompe.deleted': 'Surtidor "{nom}" eliminado',
+    'gestion.confirm.delpompe.body':  '¿Eliminar el surtidor « {nom} »? Las lecturas asociadas se perderán.',
+    'gestion.confirm.delpompe.title': 'Eliminar surtidor',
+    'gestion.confirm.delpompe.ok':    'Eliminar',
   },
 };
 
@@ -11759,7 +11981,7 @@ function buildPmpChart(stats){
 // ══════════════════════════════════════════════
 function initExportSelects(){
   const sp=document.getElementById('xls-prod');
-  sp.innerHTML='<option value="">Tous les produits</option>'+
+  sp.innerHTML=`<option value="" data-i18n="saisie.export.product.all">${t('saisie.export.product.all')}</option>`+
     products.map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
   sp.onchange=updateExportPompes;
   updateExportPompes();
@@ -11770,7 +11992,7 @@ function updateExportPompes(){
   const pumps=prodId
     ? products.filter(p=>p.id===prodId).flatMap(p=>p.pompes)
     : products.flatMap(p=>p.pompes);
-  sp.innerHTML='<option value="">Toutes les pompes</option>'+
+  sp.innerHTML=`<option value="" data-i18n="saisie.export.pompe.all">${t('saisie.export.pompe.all')}</option>`+
     pumps.map(po=>`<option value="${po.id}">${esc(po.nom)}</option>`).join('');
 }
 
@@ -11783,13 +12005,13 @@ async function loadSaisie(){
     renderProdTabs();
     renderSaisie();
     initExportSelects();
-  }catch(e){ toast('Chargement : '+e.message,'err'); }
+  }catch(e){ toast(t('saisie.load.err',{msg:e.message}),'err'); }
 }
 
 function renderProdTabs(){
   const el=document.getElementById('prod-tabs');
   if(!products.length){
-    el.innerHTML='<span class="c-muted" style="font-size:14px">Aucun produit — cliquez sur "Gérer"</span>';
+    el.innerHTML=`<span class="c-muted" style="font-size:14px">${t('saisie.noproduct.empty')}</span>`;
     return;
   }
   if(!currentProdId||!products.find(p=>p.id===currentProdId))
@@ -11811,10 +12033,10 @@ function selectPeriode(per){
 function renderSaisie(){
   const el=document.getElementById('saisie-content');
   const p=products.find(x=>x.id===currentProdId);
-  if(!p){ el.innerHTML='<div class="empty">Sélectionnez ou créez un produit.</div>'; return; }
+  if(!p){ el.innerHTML=`<div class="empty">${t('saisie.noproduct')}</div>`; return; }
 
   const html=[currentPeriode].map(per=>{
-    const label=per==='Matin'?'Matin':'Après-midi';
+    const label=per==='Matin'?t('saisie.period.matin'):t('saisie.period.apresmidi');
     const perRel=releves.filter(r=>r.periode===per&&r.produit_id===p.id);
 
     const rows=p.pompes.map(po=>{
@@ -11832,15 +12054,15 @@ function renderSaisie(){
       // Bouton d'activation (ou badge verrouillé)
       let actionHtml;
       if(locked){
-        actionHtml='<span class="badge badge-locked">&#128274; Limite atteinte</span>';
+        actionHtml=`<span class="badge badge-locked">&#128274; ${t('saisie.badge.locked')}</span>`;
       } else if(isEdit){
         const rest=2-nbMod;
-        actionHtml=`<button class="btn-row-edit btn-row-mod" onclick="enableRow(this.closest('tr'))" title="Modifier les compteurs">
-          ✎ Modifier <span style="opacity:.7">(${rest} restant${rest>1?'s':''})</span>
+        actionHtml=`<button class="btn-row-edit btn-row-mod" onclick="enableRow(this.closest('tr'))" title="${t('saisie.btn.modify.title')}">
+          ✎ ${t('saisie.btn.modify')} <span style="opacity:.7">(${t('saisie.btn.modify.remaining',{n:rest})})</span>
         </button>`;
       } else {
-        actionHtml=`<button class="btn-row-edit btn-row-new" onclick="enableRow(this.closest('tr'))" title="Saisir les compteurs">
-          + Créer
+        actionHtml=`<button class="btn-row-edit btn-row-new" onclick="enableRow(this.closest('tr'))" title="${t('saisie.btn.create.title')}">
+          ${t('saisie.btn.create')}
         </button>`;
       }
 
@@ -11848,33 +12070,33 @@ function renderSaisie(){
                   data-is-edit="${isEdit?'1':'0'}" data-nb-mod="${nbMod}"
                   data-av="${av}" data-ap="${ap}">
         <td style="font-weight:600">${esc(po.nom)}</td>
-        <td class="tr" data-label="Prix / gal"><input class="inp inp-sm inp-px" type="number" step="0.01" value="${px}" oninput="calcRow(this.closest('tr'))"></td>
-        <td class="tr" data-label="Meter avant"><input class="inp inp-av" type="number" step="0.001" value="" readonly placeholder="${av||'—'}" oninput="calcRow(this.closest('tr'))"></td>
-        <td class="tr" data-label="Meter après"><input class="inp inp-ap" type="number" step="0.001" value="" readonly placeholder="${ap||'—'}" oninput="calcRow(this.closest('tr'))"></td>
-        <td class="tr num ${qcol} val-qte" data-label="Qté (gal)">${isEdit?fmtGal(qte):'—'}</td>
-        <td class="tr num c-amber val-mnt" data-label="Montant (G)">${isEdit?fmtG(mnt):'—'}</td>
-        <td data-label="Statut"><span class="row-badge">${actionHtml}</span></td>
+        <td class="tr" data-label="${t('saisie.table.px')}"><input class="inp inp-sm inp-px" type="number" step="0.01" value="${px}" oninput="calcRow(this.closest('tr'))"></td>
+        <td class="tr" data-label="${t('saisie.table.av')}"><input class="inp inp-av" type="number" step="0.001" value="" readonly placeholder="${av||'—'}" oninput="calcRow(this.closest('tr'))"></td>
+        <td class="tr" data-label="${t('saisie.table.ap')}"><input class="inp inp-ap" type="number" step="0.001" value="" readonly placeholder="${ap||'—'}" oninput="calcRow(this.closest('tr'))"></td>
+        <td class="tr num ${qcol} val-qte" data-label="${t('saisie.table.qte')}">${isEdit?fmtGal(qte):'—'}</td>
+        <td class="tr num c-amber val-mnt" data-label="${t('saisie.table.mnt')}">${isEdit?fmtG(mnt):'—'}</td>
+        <td data-label="${t('saisie.table.statut')}"><span class="row-badge">${actionHtml}</span></td>
       </tr>`;
-    }).join('')||`<tr><td colspan="7" class="empty">Aucune pompe pour ce produit.</td></tr>`;
+    }).join('')||`<tr><td colspan="7" class="empty">${t('saisie.nopompe')}</td></tr>`;
 
     return `<div class="card mb14">
       <div class="card-head">
         <div class="per-head"><div class="per-dot"></div><div class="per-title">${label}</div></div>
         <button class="btn btn-primary" style="padding:5px 14px;font-size:14px" onclick="prepareConfirm('${per}')">
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          Enregistrer
+          ${t('saisie.btn.save')}
         </button>
       </div>
       <div class="tbl-wrap">
         <table class="dt">
           <thead><tr>
-            <th>Pompe</th>
-            <th class="tr">Prix / gal</th>
-            <th class="tr">Meter avant</th>
-            <th class="tr">Meter après</th>
-            <th class="tr">Qté (gal)</th>
-            <th class="tr">Montant (G)</th>
-            <th>Statut</th>
+            <th>${t('saisie.table.pompe')}</th>
+            <th class="tr">${t('saisie.table.px')}</th>
+            <th class="tr">${t('saisie.table.av')}</th>
+            <th class="tr">${t('saisie.table.ap')}</th>
+            <th class="tr">${t('saisie.table.qte')}</th>
+            <th class="tr">${t('saisie.table.mnt')}</th>
+            <th>${t('saisie.table.statut')}</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
@@ -11908,8 +12130,8 @@ function enableRow(tr){
   const badge=tr.querySelector('.row-badge');
   if(badge){
     badge.innerHTML=isEdit
-      ?'<span class="badge badge-mod">✎ En modification</span>'
-      :'<span class="badge badge-new">◎ En saisie</span>';
+      ?`<span class="badge badge-mod">${t('saisie.badge.editing.mod')}</span>`
+      :`<span class="badge badge-new">${t('saisie.badge.editing.new')}</span>`;
   }
 }
 
@@ -11934,8 +12156,8 @@ function calcRow(tr){
   const badge=tr.querySelector('.row-badge');
   if(badge){
     badge.innerHTML=isEdit
-      ?'<span class="badge badge-mod">✎ Modifié</span>'
-      :'<span class="badge badge-new">◎ Nouveau</span>';
+      ?`<span class="badge badge-mod">${t('saisie.badge.modified')}</span>`
+      :`<span class="badge badge-new">${t('saisie.badge.new')}</span>`;
   }
 }
 
@@ -11964,7 +12186,7 @@ function prepareConfirm(periode){
 
     if(isNaN(av)||isNaN(ap)) continue;   // ligne vide → ignorer
     if(ap<av){
-      toast(`${pompe?.nom||'Pompe'} : Meter après (${ap}) < Meter avant (${av})`,'err');
+      toast(t('saisie.err.rowError',{pompe:pompe?.nom||t('saisie.table.pompe'),ap,av}),'err');
       tr.querySelector('.inp-ap').classList.add('err');
       hasError=true;
       continue;
@@ -11975,12 +12197,12 @@ function prepareConfirm(periode){
   }
 
   if(hasError) return;
-  if(!data.length){toast('Aucune donnée à enregistrer (remplissez au moins une ligne)','inf');return;}
+  if(!data.length){toast(t('saisie.err.noData'),'inf');return;}
 
   pendingSave={periode,produitId:currentProdId,rows:data};
 
   // Remplir le modal
-  const label=periode==='Matin'?'Matin':'Après-midi';
+  const label=periode==='Matin'?t('saisie.period.matin'):t('saisie.period.apresmidi');
   document.getElementById('confirm-info').innerHTML=
     `<strong>${esc(p.nom)}</strong> · <strong>${label}</strong> · <span class="num">${frDate(currentDate)}</span>`;
 
@@ -11996,7 +12218,7 @@ function prepareConfirm(periode){
       <td class="tr num c-amber">${fmtG(r.mnt)}</td>
     </tr>`).join('')+
     `<tr class="recap-total">
-      <td colspan="3" style="font-weight:700;letter-spacing:.04em">TOTAL</td>
+      <td colspan="3" style="font-weight:700;letter-spacing:.04em">${t('saisie.recap.total')}</td>
       <td class="tr num c-teal" style="font-weight:700">${fmtGal(totQte)}</td>
       <td class="tr num c-amber" style="font-weight:700">${fmtG(totMnt)}</td>
     </tr>`;
@@ -12034,8 +12256,8 @@ async function doSave(){
     }
   }
 
-  if(ok)   toast(`✓ ${ok} relevé(s) enregistré(s)`,'ok');
-  if(errs) toast(`${errs} erreur(s) : ${lastErrMsg}`,'err');
+  if(ok)   toast(t('saisie.save.ok',{n:ok}),'ok');
+  if(errs) toast(t('saisie.save.err',{n:errs,msg:lastErrMsg}),'err');
 
   if(ok){
     await loadSaisie();
@@ -12210,7 +12432,7 @@ function exportXls(){
   if(prodId)  p.push(`produit_id=${prodId}`);
   if(pompeId) p.push(`pompe_id=${pompeId}`);
   if(p.length) url+='?'+p.join('&');
-  toast('Préparation du fichier Excel…','inf');
+  toast(t('saisie.export.preparing'),'inf');
   window.location.href=url;
 }
 
@@ -12424,13 +12646,13 @@ function closeGestion(){ document.getElementById('modal-gestion').classList.add(
 
 function renderModalList(){
   const el=document.getElementById('modal-list');
-  if(!products.length){ el.innerHTML='<div class="empty">Aucun produit. Ajoutez-en un ci-dessus.</div>'; return; }
+  if(!products.length){ el.innerHTML=`<div class="empty">${t('gestion.empty.products')}</div>`; return; }
   el.innerHTML=products.map(p=>`
     <div style="border:1px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden">
       <div style="display:flex;align-items:center;gap:9px;padding:9px 14px;background:var(--panel2);border-bottom:1px solid var(--border)">
         <span style="font-weight:600;font-size:15px">${esc(p.nom)}</span>
         <span class="num c-amber" style="font-size:13px">${fmtG(p.prix_gallon)}/gal</span>
-        <span class="c-dim" style="font-size:12px;margin-left:auto">${p.pompes.length} pompe(s)</span>
+        <span class="c-dim" style="font-size:12px;margin-left:auto">${t('gestion.pompe.count',{n:p.pompes.length})}</span>
       </div>
       <div style="padding:10px 14px">
         ${p.pompes.map(po=>`
@@ -12438,10 +12660,10 @@ function renderModalList(){
             <span style="font-size:15px">${esc(po.nom)}</span>
             <button class="btn-ghost" onclick="delPompe(${po.id},'${esc(po.nom)}')">✕</button>
           </div>`).join('')}
-        ${p.pompes.length===0?'<div class="c-dim" style="font-size:13px;padding:4px 0">Aucune pompe.</div>':''}
+        ${p.pompes.length===0?`<div class="c-dim" style="font-size:13px;padding:4px 0">${t('gestion.empty.pompe')}</div>`:''}
         <div style="display:flex;gap:7px;margin-top:8px">
-          <input id="np-${p.id}" class="filter-input" placeholder="Nom de la pompe" style="flex:1;height:32px;font-size:14px">
-          <button class="btn btn-secondary" style="height:32px;padding:0 10px;font-size:14px" onclick="addPompe(${p.id})">+ Pompe</button>
+          <input id="np-${p.id}" class="filter-input" placeholder="${t('gestion.pompe.name.ph')}" style="flex:1;height:32px;font-size:14px">
+          <button class="btn btn-secondary" style="height:32px;padding:0 10px;font-size:14px" onclick="addPompe(${p.id})">${t('gestion.add.pompe')}</button>
         </div>
       </div>
     </div>`).join('');
@@ -12450,7 +12672,7 @@ function renderModalList(){
 async function addProduit(){
   const nom=document.getElementById('np-nom').value.trim();
   const prix=parseFloat(document.getElementById('np-prix').value)||0;
-  if(!nom){toast('Entrez un nom de produit','err');return;}
+  if(!nom){toast(t('gestion.err.nom.produit'),'err');return;}
   try{
     await POST('/produits',{nom,prix_gallon:prix});
     document.getElementById('np-nom').value='';
@@ -12458,29 +12680,29 @@ async function addProduit(){
     products=await GET('/produits');
     renderModalList();
     renderProdTabs();
-    toast(`Produit "${nom}" ajouté`,'ok');
+    toast(t('gestion.toast.produit.added',{nom}),'ok');
   }catch(e){toast(e.message,'err');}
 }
 async function addPompe(prodId){
   const inp=document.getElementById('np-'+prodId);
   const nom=inp?inp.value.trim():'';
-  if(!nom){toast('Entrez un nom de pompe','err');return;}
+  if(!nom){toast(t('gestion.err.nom.pompe'),'err');return;}
   try{
     await POST('/produits/'+prodId+'/pompes',{nom});
     products=await GET('/produits');
     renderModalList();
     renderSaisie();
-    toast(`Pompe "${nom}" ajoutée`,'ok');
+    toast(t('gestion.toast.pompe.added',{nom}),'ok');
   }catch(e){toast(e.message,'err');}
 }
 async function delPompe(id,nom){
-  if(!await showConfirm(`Supprimer la pompe « ${nom} » ? Les relevés associés seront perdus.`, {title:'Supprimer la pompe', type:'danger', okLabel:'Supprimer'})) return;
+  if(!await showConfirm(t('gestion.confirm.delpompe.body',{nom}), {title:t('gestion.confirm.delpompe.title'), type:'danger', okLabel:t('gestion.confirm.delpompe.ok')})) return;
   try{
     await DEL('/pompes/'+id);
     products=await GET('/produits');
     renderModalList();
     renderSaisie();
-    toast(`Pompe "${nom}" supprimée`,'ok');
+    toast(t('gestion.toast.pompe.deleted',{nom}),'ok');
   }catch(e){toast(e.message,'err');}
 }
 
