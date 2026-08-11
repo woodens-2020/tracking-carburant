@@ -3466,7 +3466,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="kpi-icon-wrap" style="background:rgba(245,158,11,.12)">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#f59e0b" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           </div>
-          <div class="kpi-label">Ventes du jour</div>
+          <div class="kpi-label" data-i18n="home.kpi.day">Ventes du jour</div>
           <div class="kpi-val c-amber" id="kpi-day">—</div>
           <div class="kpi-sub" id="kpi-day-qte">0 gal · aujourd'hui</div>
         </div>
@@ -3474,23 +3474,23 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="kpi-icon-wrap" style="background:rgba(34,197,94,.12)">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#22c55e" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
           </div>
-          <div class="kpi-label">Total semaine</div>
+          <div class="kpi-label" data-i18n="home.kpi.week">Total semaine</div>
           <div class="kpi-val c-teal" id="kpi-week">—</div>
-          <div class="kpi-sub" id="kpi-week-var">vs semaine précédente</div>
+          <div class="kpi-sub" id="kpi-week-var" data-i18n="home.kpi.week.sub">vs semaine précédente</div>
         </div>
         <div class="kpi-card" style="border-top-color:#ef4444">
           <div class="kpi-icon-wrap" style="background:rgba(239,68,68,.12)">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#ef4444" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </div>
-          <div class="kpi-label">Anomalies détectées</div>
+          <div class="kpi-label" data-i18n="home.kpi.anom">Anomalies détectées</div>
           <div class="kpi-val" id="kpi-anom" style="color:var(--green)">—</div>
-          <div class="kpi-sub" id="kpi-anom-sub">aujourd'hui</div>
+          <div class="kpi-sub" id="kpi-anom-sub" data-i18n="home.kpi.anom.sub">aujourd'hui</div>
         </div>
         <div class="kpi-card" style="border-top-color:#a78bfa">
           <div class="kpi-icon-wrap" style="background:rgba(167,139,250,.12)">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#a78bfa" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
           </div>
-          <div class="kpi-label">Produits actifs</div>
+          <div class="kpi-label" data-i18n="home.kpi.prods">Produits actifs</div>
           <div class="kpi-val" style="color:#a78bfa" id="kpi-prods">—</div>
           <div class="kpi-sub" id="kpi-pompes-sub">0 pompes</div>
         </div>
@@ -3502,36 +3502,36 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="nav-card-icon" style="background:rgba(59,130,246,.12)">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#3b82f6" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           </div>
-          <h3>Tableau de bord</h3>
-          <p>Analysez les ventes avec des filtres de date, produit et période. Visualisez les tendances.</p>
+          <h3 data-i18n="home.card.dashboard.title">Tableau de bord</h3>
+          <p data-i18n="home.card.dashboard.text">Analysez les ventes avec des filtres de date, produit et période. Visualisez les tendances.</p>
         </div>
         <div class="nav-card" onclick="goTo('saisie')" style="border-top:2px solid rgba(34,197,94,.4)">
           <div class="nav-card-icon" style="background:rgba(34,197,94,.12)">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#22c55e" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </div>
-          <h3>Saisie des relevés</h3>
-          <p>Enregistrez les lectures des compteurs matin et après-midi pour chaque pompe.</p>
+          <h3 data-i18n="home.card.saisie.title">Saisie des relevés</h3>
+          <p data-i18n="home.card.saisie.text">Enregistrez les lectures des compteurs matin et après-midi pour chaque pompe.</p>
         </div>
         <div class="nav-card" onclick="goTo('journal')" style="border-top:2px solid rgba(249,115,22,.4)">
           <div class="nav-card-icon" style="background:rgba(249,115,22,.12)">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#f97316" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           </div>
-          <h3>Journal des Meters</h3>
-          <p>Historique complet avec analyse automatique des décalages, erreurs et recommandations.</p>
+          <h3 data-i18n="home.card.journal.title">Journal des Meters</h3>
+          <p data-i18n="home.card.journal.text">Historique complet avec analyse automatique des décalages, erreurs et recommandations.</p>
         </div>
         <div class="nav-card" onclick="goTo('rapports')" style="border-top:2px solid rgba(167,139,250,.4)">
           <div class="nav-card-icon" style="background:rgba(167,139,250,.12)">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           </div>
-          <h3>Rapports IA</h3>
-          <p>Posez des questions en langage naturel. L'IA génère des rapports depuis les vraies données.</p>
+          <h3 data-i18n="home.card.rapports.title">Rapports IA</h3>
+          <p data-i18n="home.card.rapports.text">Posez des questions en langage naturel. L'IA génère des rapports depuis les vraies données.</p>
         </div>
         <div class="nav-card" onclick="openGestion()" style="border-top:2px solid rgba(124,58,237,.4)">
           <div class="nav-card-icon" style="background:rgba(124,58,237,.12)">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#7c3aed" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
           </div>
-          <h3>Gérer la station</h3>
-          <p>Ajoutez ou supprimez des produits et des pompes.</p>
+          <h3 data-i18n="home.card.gerer.title">Gérer la station</h3>
+          <p data-i18n="home.card.gerer.text">Ajoutez ou supprimez des produits et des pompes.</p>
         </div>
       </div>
 
@@ -3540,12 +3540,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="card-head">
           <div class="card-title">
             <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            Anomalies détectées — <span id="home-anom-date" style="font-weight:400;color:var(--muted)"></span>
+            <span data-i18n="home.anom.title">Anomalies détectées —</span> <span id="home-anom-date" style="font-weight:400;color:var(--muted)"></span>
           </div>
           <span id="home-anom-badge"></span>
         </div>
         <div class="card-body" id="home-anom-body" style="padding:12px">
-          <div class="loading-row"><span class="spinner"></span>Chargement…</div>
+          <div class="loading-row"><span class="spinner"></span><span data-i18n="home.anom.loading">Chargement…</span></div>
         </div>
       </div>
     </div>
@@ -3557,49 +3557,49 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <div class="db-filters-card">
         <!-- Ligne 1 : presets rapides -->
         <div class="db-preset-bar">
-          <span class="db-preset-lbl">Période rapide</span>
+          <span class="db-preset-lbl" data-i18n="dash.preset.label">Période rapide</span>
           <div class="db-presets-wrap">
-            <button class="db-preset" onclick="setPreset('today')" data-p="today">Aujourd'hui</button>
-            <button class="db-preset" onclick="setPreset('7j')" data-p="7j">7 jours</button>
-            <button class="db-preset" onclick="setPreset('30j')" data-p="30j">30 jours</button>
-            <button class="db-preset active" onclick="setPreset('mois')" data-p="mois">Ce mois</button>
-            <button class="db-preset" onclick="setPreset('prev')" data-p="prev">Mois précédent</button>
+            <button class="db-preset" onclick="setPreset('today')" data-p="today" data-i18n="dash.preset.today">Aujourd'hui</button>
+            <button class="db-preset" onclick="setPreset('7j')" data-p="7j" data-i18n="dash.preset.7j">7 jours</button>
+            <button class="db-preset" onclick="setPreset('30j')" data-p="30j" data-i18n="dash.preset.30j">30 jours</button>
+            <button class="db-preset active" onclick="setPreset('mois')" data-p="mois" data-i18n="dash.preset.mois">Ce mois</button>
+            <button class="db-preset" onclick="setPreset('prev')" data-p="prev" data-i18n="dash.preset.prev">Mois précédent</button>
           </div>
         </div>
         <!-- Ligne 2 : filtres personnalisés -->
         <div class="db-custom-filters">
           <div class="filter-group">
-            <label class="filter-label">Du</label>
+            <label class="filter-label" data-i18n="dash.filter.from">Du</label>
             <input type="date" id="f-debut" class="filter-input">
           </div>
           <div class="filter-group">
-            <label class="filter-label">Au</label>
+            <label class="filter-label" data-i18n="dash.filter.to">Au</label>
             <input type="date" id="f-fin" class="filter-input">
           </div>
           <div class="filter-group">
-            <label class="filter-label">Produit</label>
+            <label class="filter-label" data-i18n="dash.filter.product">Produit</label>
             <select id="f-prod" class="filter-select" onchange="updatePompeFilter()">
-              <option value="">Tous les produits</option>
+              <option value="" data-i18n="dash.filter.product.all">Tous les produits</option>
             </select>
           </div>
           <div class="filter-group">
-            <label class="filter-label">Pompe</label>
+            <label class="filter-label" data-i18n="dash.filter.pompe">Pompe</label>
             <select id="f-pompe" class="filter-select">
-              <option value="">Toutes les pompes</option>
+              <option value="" data-i18n="dash.filter.pompe.all">Toutes les pompes</option>
             </select>
           </div>
           <div class="filter-group">
-            <label class="filter-label">Période journée</label>
+            <label class="filter-label" data-i18n="dash.filter.periode">Période journée</label>
             <select id="f-per" class="filter-select">
-              <option value="">Matin + Après-midi</option>
-              <option value="Matin">Matin seulement</option>
-              <option value="Apres-midi">Après-midi seulement</option>
+              <option value="" data-i18n="dash.filter.periode.both">Matin + Après-midi</option>
+              <option value="Matin" data-i18n="dash.filter.periode.matin">Matin seulement</option>
+              <option value="Apres-midi" data-i18n="dash.filter.periode.pm">Après-midi seulement</option>
             </select>
           </div>
           <div class="filter-spacer"></div>
           <button class="btn btn-primary db-btn-analyze" onclick="applyFilters()">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            Analyser
+            <span data-i18n="dash.analyze">Analyser</span>
           </button>
         </div>
       </div>
@@ -3607,7 +3607,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <div id="db-content">
         <div class="db-empty-state">
           <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="var(--border2)" stroke-width="1.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <p style="margin-top:14px;font-size:16px;color:var(--muted)">Sélectionnez une période et cliquez sur <strong style="color:var(--blue)">Analyser</strong></p>
+          <p style="margin-top:14px;font-size:16px;color:var(--muted)" data-i18n-html="dash.empty">Sélectionnez une période et cliquez sur <strong style="color:var(--blue)">Analyser</strong></p>
         </div>
       </div>
     </div>
@@ -10541,6 +10541,96 @@ const LANGS = {
     'saisie.save.ok':           '✓ {n} relevé(s) enregistré(s)',
     'saisie.save.err':          '{n} erreur(s) : {msg}',
 
+    'home.kpi.day':          'Ventes du jour',
+    'home.kpi.day.sub':      '{qte} gal · aujourd\'hui',
+    'home.kpi.week':         'Total semaine',
+    'home.kpi.week.sub':     'vs semaine précédente',
+    'home.kpi.week.sub.none':'Pas de comparaison',
+    'home.kpi.week.sub.up':  '▲ +{pct}% vs sem. préc.',
+    'home.kpi.week.sub.down':'▼ {pct}% vs sem. préc.',
+    'home.kpi.anom':         'Anomalies détectées',
+    'home.kpi.anom.sub':     'aujourd\'hui',
+    'home.kpi.anom.sub.ok':  'Compteurs cohérents',
+    'home.kpi.anom.sub.n':   '{n} anomalie(s)',
+    'home.kpi.prods':        'Produits actifs',
+    'home.kpi.prods.sub':    '{n} pompe(s)',
+    'home.greeting':         'Bonjour — {day} {date}',
+    'home.subtitle':         'Station carburant · Données en temps réel',
+    'home.day.dim':          'Dimanche', 'home.day.lun':'Lundi', 'home.day.mar':'Mardi',
+    'home.day.mer':          'Mercredi', 'home.day.jeu':'Jeudi', 'home.day.ven':'Vendredi', 'home.day.sam':'Samedi',
+    'home.card.dashboard.title': 'Tableau de bord',
+    'home.card.dashboard.text':  'Analysez les ventes avec des filtres de date, produit et période. Visualisez les tendances.',
+    'home.card.saisie.title':    'Saisie des relevés',
+    'home.card.saisie.text':     'Enregistrez les lectures des compteurs matin et après-midi pour chaque pompe.',
+    'home.card.journal.title':   'Journal des Meters',
+    'home.card.journal.text':    'Historique complet avec analyse automatique des décalages, erreurs et recommandations.',
+    'home.card.rapports.title':  'Rapports IA',
+    'home.card.rapports.text':   'Posez des questions en langage naturel. L\'IA génère des rapports depuis les vraies données.',
+    'home.card.gerer.title':     'Gérer la station',
+    'home.card.gerer.text':      'Ajoutez ou supprimez des produits et des pompes.',
+    'home.anom.title':        'Anomalies détectées —',
+    'home.anom.loading':      'Chargement…',
+    'home.anom.ok':           'Compteurs cohérents — aucune anomalie détectée',
+    'home.anom.badge.ok':     'OK',
+    'home.anom.badge.err':    '{n} erreur(s)',
+    'home.anom.badge.warn':   '{n} avert.',
+    'home.anom.more':         '+ {n} autres anomalies',
+
+    'dash.preset.label':   'Période rapide',
+    'dash.preset.today':   "Aujourd'hui",
+    'dash.preset.7j':      '7 jours',
+    'dash.preset.30j':     '30 jours',
+    'dash.preset.mois':    'Ce mois',
+    'dash.preset.prev':    'Mois précédent',
+    'dash.filter.from':    'Du',
+    'dash.filter.to':      'Au',
+    'dash.filter.product': 'Produit',
+    'dash.filter.product.all': 'Tous les produits',
+    'dash.filter.pompe':   'Pompe',
+    'dash.filter.pompe.all': 'Toutes les pompes',
+    'dash.filter.periode': 'Période journée',
+    'dash.filter.periode.both': 'Matin + Après-midi',
+    'dash.filter.periode.matin':'Matin seulement',
+    'dash.filter.periode.pm':   'Après-midi seulement',
+    'dash.analyze':        'Analyser',
+    'dash.empty':           'Sélectionnez une période et cliquez sur <strong style="color:var(--blue)">Analyser</strong>',
+    'dash.err.dates':       'Sélectionnez une plage de dates',
+    'dash.loading':         'Analyse en cours…',
+    'dash.err.prefix':      'Erreur : {msg}',
+    'dash.kpi.revenue':     "Chiffre d'affaires",
+    'dash.kpi.volume':      'Volume vendu',
+    'dash.kpi.volume.sub':  '{n} relevé(s) saisi(s)',
+    'dash.kpi.avg':         'Moyenne / jour actif',
+    'dash.kpi.avg.sub':     '{active}j actifs/{total} · {pct}%',
+    'dash.kpi.price':       'Prix moyen / gallon',
+    'dash.kpi.price.sub':   '{qte} · {n} relevés',
+    'dash.kpi.trend':       'Tendance',
+    'dash.kpi.trend.sub':   'vs même durée préc.',
+    'dash.var.none':        '— pas de données précédentes',
+    'dash.var.up':          '▲ +{pct}% vs période préc.',
+    'dash.var.down':        '▼ {pct}% vs période préc.',
+    'dash.chart.evolution': 'Évolution sur la période',
+    'dash.metric.montant':  'Montant',
+    'dash.metric.volume':   'Volume',
+    'dash.charttype.bar':   'Barres',
+    'dash.charttype.line':  'Ligne',
+    'dash.chart.byproduct': 'Par produit',
+    'dash.chart.byproduct.sub': 'répartition',
+    'dash.chart.byperiod':  'Matin vs Après-midi',
+    'dash.chart.byperiod.sub': 'comparaison',
+    'dash.chart.bypump':    'Par pompe',
+    'dash.chart.bypump.sub':'montant',
+    'dash.perf.title':      'Performance par pompe',
+    'dash.perf.sub':        "trié par chiffre d'affaires",
+    'dash.nodata':          'Aucune donnée disponible',
+    'dash.top.title':       'Meilleurs jours',
+    'dash.top.sub':         "Top 5 · chiffre d'affaires le plus élevé",
+    'dash.top.nodata':      'Aucune donnée sur cette période',
+    'dash.top.col.date':    'Date',
+    'dash.top.col.montant': 'Montant',
+    'dash.top.col.volume':  'Volume',
+    'dash.top.col.perf':    'Performance relative',
+
     'resp.eyebrow':    'Avant de continuer',
     'resp.title':      'Charte de responsabilité',
     'resp.lead':       'Vous êtes connecté(e) au système de gestion de l\'institution. Merci de prendre connaissance des points suivants avant de poursuivre.',
@@ -10807,6 +10897,96 @@ const LANGS = {
     'saisie.load.err':          'Loading: {msg}',
     'saisie.save.ok':           '✓ {n} reading(s) saved',
     'saisie.save.err':          '{n} error(s): {msg}',
+
+    'home.kpi.day':          "Today's sales",
+    'home.kpi.day.sub':      '{qte} gal · today',
+    'home.kpi.week':         'Total this week',
+    'home.kpi.week.sub':     'vs previous week',
+    'home.kpi.week.sub.none':'No comparison',
+    'home.kpi.week.sub.up':  '▲ +{pct}% vs prev. wk.',
+    'home.kpi.week.sub.down':'▼ {pct}% vs prev. wk.',
+    'home.kpi.anom':         'Anomalies detected',
+    'home.kpi.anom.sub':     'today',
+    'home.kpi.anom.sub.ok':  'Consistent readings',
+    'home.kpi.anom.sub.n':   '{n} anomaly(-ies)',
+    'home.kpi.prods':        'Active products',
+    'home.kpi.prods.sub':    '{n} pump(s)',
+    'home.greeting':         'Hello — {day} {date}',
+    'home.subtitle':         'Fuel station · Real-time data',
+    'home.day.dim':          'Sunday', 'home.day.lun':'Monday', 'home.day.mar':'Tuesday',
+    'home.day.mer':          'Wednesday', 'home.day.jeu':'Thursday', 'home.day.ven':'Friday', 'home.day.sam':'Saturday',
+    'home.card.dashboard.title': 'Dashboard',
+    'home.card.dashboard.text':  'Analyze sales with date, product and period filters. Visualize trends.',
+    'home.card.saisie.title':    'Meter readings entry',
+    'home.card.saisie.text':     'Record morning and afternoon meter readings for each pump.',
+    'home.card.journal.title':   'Meter log',
+    'home.card.journal.text':    'Full history with automatic analysis of discrepancies, errors and recommendations.',
+    'home.card.rapports.title':  'AI reports',
+    'home.card.rapports.text':   'Ask questions in plain language. The AI generates reports from real data.',
+    'home.card.gerer.title':     'Manage the station',
+    'home.card.gerer.text':      'Add or remove products and pumps.',
+    'home.anom.title':        'Anomalies detected —',
+    'home.anom.loading':      'Loading…',
+    'home.anom.ok':           'Consistent readings — no anomalies detected',
+    'home.anom.badge.ok':     'OK',
+    'home.anom.badge.err':    '{n} error(s)',
+    'home.anom.badge.warn':   '{n} warn.',
+    'home.anom.more':         '+ {n} more anomalies',
+
+    'dash.preset.label':   'Quick period',
+    'dash.preset.today':   'Today',
+    'dash.preset.7j':      '7 days',
+    'dash.preset.30j':     '30 days',
+    'dash.preset.mois':    'This month',
+    'dash.preset.prev':    'Previous month',
+    'dash.filter.from':    'From',
+    'dash.filter.to':      'To',
+    'dash.filter.product': 'Product',
+    'dash.filter.product.all': 'All products',
+    'dash.filter.pompe':   'Pump',
+    'dash.filter.pompe.all': 'All pumps',
+    'dash.filter.periode': 'Time of day',
+    'dash.filter.periode.both': 'Morning + Afternoon',
+    'dash.filter.periode.matin':'Morning only',
+    'dash.filter.periode.pm':   'Afternoon only',
+    'dash.analyze':        'Analyze',
+    'dash.empty':           'Select a period and click <strong style="color:var(--blue)">Analyze</strong>',
+    'dash.err.dates':       'Select a date range',
+    'dash.loading':         'Analyzing…',
+    'dash.err.prefix':      'Error: {msg}',
+    'dash.kpi.revenue':     'Revenue',
+    'dash.kpi.volume':      'Volume sold',
+    'dash.kpi.volume.sub':  '{n} reading(s) entered',
+    'dash.kpi.avg':         'Average / active day',
+    'dash.kpi.avg.sub':     '{active}d active/{total} · {pct}%',
+    'dash.kpi.price':       'Average price / gallon',
+    'dash.kpi.price.sub':   '{qte} · {n} readings',
+    'dash.kpi.trend':       'Trend',
+    'dash.kpi.trend.sub':   'vs same previous period',
+    'dash.var.none':        '— no previous data',
+    'dash.var.up':          '▲ +{pct}% vs prev. period',
+    'dash.var.down':        '▼ {pct}% vs prev. period',
+    'dash.chart.evolution': 'Trend over the period',
+    'dash.metric.montant':  'Amount',
+    'dash.metric.volume':   'Volume',
+    'dash.charttype.bar':   'Bars',
+    'dash.charttype.line':  'Line',
+    'dash.chart.byproduct': 'By product',
+    'dash.chart.byproduct.sub': 'breakdown',
+    'dash.chart.byperiod':  'Morning vs Afternoon',
+    'dash.chart.byperiod.sub': 'comparison',
+    'dash.chart.bypump':    'By pump',
+    'dash.chart.bypump.sub':'amount',
+    'dash.perf.title':      'Performance by pump',
+    'dash.perf.sub':        'sorted by revenue',
+    'dash.nodata':          'No data available',
+    'dash.top.title':       'Best days',
+    'dash.top.sub':         'Top 5 · highest revenue',
+    'dash.top.nodata':      'No data for this period',
+    'dash.top.col.date':    'Date',
+    'dash.top.col.montant': 'Amount',
+    'dash.top.col.volume':  'Volume',
+    'dash.top.col.perf':    'Relative performance',
 
     'resp.eyebrow':    'Before you continue',
     'resp.title':      'Responsibility charter',
@@ -11075,6 +11255,96 @@ const LANGS = {
     'saisie.save.ok':           '✓ {n} lectura(s) guardada(s)',
     'saisie.save.err':          '{n} error(es): {msg}',
 
+    'home.kpi.day':          'Ventas del día',
+    'home.kpi.day.sub':      '{qte} gal · hoy',
+    'home.kpi.week':         'Total semanal',
+    'home.kpi.week.sub':     'vs semana anterior',
+    'home.kpi.week.sub.none':'Sin comparación',
+    'home.kpi.week.sub.up':  '▲ +{pct}% vs sem. ant.',
+    'home.kpi.week.sub.down':'▼ {pct}% vs sem. ant.',
+    'home.kpi.anom':         'Anomalías detectadas',
+    'home.kpi.anom.sub':     'hoy',
+    'home.kpi.anom.sub.ok':  'Contadores coherentes',
+    'home.kpi.anom.sub.n':   '{n} anomalía(s)',
+    'home.kpi.prods':        'Productos activos',
+    'home.kpi.prods.sub':    '{n} surtidor(es)',
+    'home.greeting':         'Hola — {day} {date}',
+    'home.subtitle':         'Estación de combustible · Datos en tiempo real',
+    'home.day.dim':          'Domingo', 'home.day.lun':'Lunes', 'home.day.mar':'Martes',
+    'home.day.mer':          'Miércoles', 'home.day.jeu':'Jueves', 'home.day.ven':'Viernes', 'home.day.sam':'Sábado',
+    'home.card.dashboard.title': 'Tablero',
+    'home.card.dashboard.text':  'Analice las ventas con filtros de fecha, producto y período. Visualice las tendencias.',
+    'home.card.saisie.title':    'Captura de lecturas',
+    'home.card.saisie.text':     'Registre las lecturas de los contadores de la mañana y la tarde para cada surtidor.',
+    'home.card.journal.title':   'Registro de contadores',
+    'home.card.journal.text':    'Historial completo con análisis automático de desviaciones, errores y recomendaciones.',
+    'home.card.rapports.title':  'Informes IA',
+    'home.card.rapports.text':   'Haga preguntas en lenguaje natural. La IA genera informes a partir de datos reales.',
+    'home.card.gerer.title':     'Gestionar la estación',
+    'home.card.gerer.text':      'Agregue o elimine productos y surtidores.',
+    'home.anom.title':        'Anomalías detectadas —',
+    'home.anom.loading':      'Cargando…',
+    'home.anom.ok':           'Contadores coherentes — ninguna anomalía detectada',
+    'home.anom.badge.ok':     'OK',
+    'home.anom.badge.err':    '{n} error(es)',
+    'home.anom.badge.warn':   '{n} aviso(s)',
+    'home.anom.more':         '+ {n} anomalías más',
+
+    'dash.preset.label':   'Período rápido',
+    'dash.preset.today':   'Hoy',
+    'dash.preset.7j':      '7 días',
+    'dash.preset.30j':     '30 días',
+    'dash.preset.mois':    'Este mes',
+    'dash.preset.prev':    'Mes anterior',
+    'dash.filter.from':    'Desde',
+    'dash.filter.to':      'Hasta',
+    'dash.filter.product': 'Producto',
+    'dash.filter.product.all': 'Todos los productos',
+    'dash.filter.pompe':   'Surtidor',
+    'dash.filter.pompe.all': 'Todos los surtidores',
+    'dash.filter.periode': 'Período del día',
+    'dash.filter.periode.both': 'Mañana + Tarde',
+    'dash.filter.periode.matin':'Solo mañana',
+    'dash.filter.periode.pm':   'Solo tarde',
+    'dash.analyze':        'Analizar',
+    'dash.empty':           'Seleccione un período y haga clic en <strong style="color:var(--blue)">Analizar</strong>',
+    'dash.err.dates':       'Seleccione un rango de fechas',
+    'dash.loading':         'Analizando…',
+    'dash.err.prefix':      'Error: {msg}',
+    'dash.kpi.revenue':     'Ingresos',
+    'dash.kpi.volume':      'Volumen vendido',
+    'dash.kpi.volume.sub':  '{n} lectura(s) registrada(s)',
+    'dash.kpi.avg':         'Promedio / día activo',
+    'dash.kpi.avg.sub':     '{active}d activos/{total} · {pct}%',
+    'dash.kpi.price':       'Precio promedio / galón',
+    'dash.kpi.price.sub':   '{qte} · {n} lecturas',
+    'dash.kpi.trend':       'Tendencia',
+    'dash.kpi.trend.sub':   'vs mismo período anterior',
+    'dash.var.none':        '— sin datos anteriores',
+    'dash.var.up':          '▲ +{pct}% vs período ant.',
+    'dash.var.down':        '▼ {pct}% vs período ant.',
+    'dash.chart.evolution': 'Evolución en el período',
+    'dash.metric.montant':  'Monto',
+    'dash.metric.volume':   'Volumen',
+    'dash.charttype.bar':   'Barras',
+    'dash.charttype.line':  'Línea',
+    'dash.chart.byproduct': 'Por producto',
+    'dash.chart.byproduct.sub': 'distribución',
+    'dash.chart.byperiod':  'Mañana vs Tarde',
+    'dash.chart.byperiod.sub': 'comparación',
+    'dash.chart.bypump':    'Por surtidor',
+    'dash.chart.bypump.sub':'monto',
+    'dash.perf.title':      'Rendimiento por surtidor',
+    'dash.perf.sub':        'ordenado por ingresos',
+    'dash.nodata':          'No hay datos disponibles',
+    'dash.top.title':       'Mejores días',
+    'dash.top.sub':         'Top 5 · mayores ingresos',
+    'dash.top.nodata':      'No hay datos para este período',
+    'dash.top.col.date':    'Fecha',
+    'dash.top.col.montant': 'Monto',
+    'dash.top.col.volume':  'Volumen',
+    'dash.top.col.perf':    'Rendimiento relativo',
+
     'resp.eyebrow':    'Antes de continuar',
     'resp.title':      'Carta de responsabilidad',
     'resp.lead':       'Ha iniciado sesión en el sistema de gestión de la institución. Revise los siguientes puntos antes de continuar.',
@@ -11105,7 +11375,12 @@ const LANGS = {
   },
 };
 
-function t(key){ return LANGS[currentLang][key] || LANGS['fr'][key] || key; }
+function t(key,vars){
+  let s = LANGS[currentLang][key] || LANGS['fr'][key] || key;
+  if(vars) for(const k in vars) s = s.replace('{'+k+'}', vars[k]);
+  return s;
+}
+function _locale(){ return currentLang==='en'?'en-US':currentLang==='es'?'es-ES':'fr-FR'; }
 
 function applyLang(){
   document.documentElement.lang = currentLang;
@@ -11266,11 +11541,10 @@ function goTo(page){
 async function loadHome(){
   // Greeting & date
   const now=new Date();
-  const days=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+  const dayKeys=['dim','lun','mar','mer','jeu','ven','sam'];
   document.getElementById('home-greeting').textContent=
-    'Bonjour — '+days[now.getDay()]+' '+frDate(currentDate);
-  document.getElementById('home-date').textContent=
-    'Station carburant · Données en temps réel';
+    t('home.greeting',{day:t('home.day.'+dayKeys[now.getDay()]),date:frDate(currentDate)});
+  document.getElementById('home-date').textContent=t('home.subtitle');
   document.getElementById('home-anom-date').textContent=frDate(currentDate);
 
   try{
@@ -11286,8 +11560,8 @@ async function loadHome(){
     document.getElementById('kpi-week').textContent=fmtG(serie.total_periode);
     const v=serie.variation_pct;
     document.getElementById('kpi-week-var').textContent=
-      v==null ? 'Pas de comparaison'
-      : (v>=0 ? '▲ +'+v.toFixed(1)+'% vs sem. préc.' : '▼ '+v.toFixed(1)+'% vs sem. préc.');
+      v==null ? t('home.kpi.week.sub.none')
+      : (v>=0 ? t('home.kpi.week.sub.up',{pct:v.toFixed(1)}) : t('home.kpi.week.sub.down',{pct:v.toFixed(1)}));
     document.getElementById('kpi-week-var').style.color=
       v==null?'var(--muted)':v>=0?'var(--green)':'var(--red)';
 
@@ -11295,12 +11569,12 @@ async function loadHome(){
     document.getElementById('kpi-anom').textContent=String(nb);
     document.getElementById('kpi-anom').style.color=nb>0?'var(--red)':'var(--green)';
     document.getElementById('kpi-anom-sub').textContent=
-      nb===0?'Compteurs cohérents':nb+' anomalie'+(nb>1?'s':'');
+      nb===0?t('home.kpi.anom.sub.ok'):t('home.kpi.anom.sub.n',{n:nb});
 
     const nbP=products.length;
     const nbPo=products.reduce((s,p)=>s+p.pompes.length,0);
     document.getElementById('kpi-prods').textContent=String(nbP);
-    document.getElementById('kpi-pompes-sub').textContent=nbPo+' pompe'+(nbPo>1?'s':'');
+    document.getElementById('kpi-pompes-sub').textContent=t('home.kpi.prods.sub',{n:nbPo});
 
     renderHomeAnom(anom);
     setStatus(true);
@@ -11311,14 +11585,14 @@ function renderHomeAnom(data){
   const body=document.getElementById('home-anom-body');
   const badge=document.getElementById('home-anom-badge');
   if(!data||data.nb_anomalies===0){
-    body.innerHTML=`<div style="display:flex;align-items:center;gap:8px;color:var(--green);padding:4px 0"><span style="font-size:18px">✓</span><span style="font-size:15px;font-weight:500">Compteurs cohérents — aucune anomalie détectée</span></div>`;
-    badge.innerHTML='<span style="background:rgba(34,197,94,.15);color:var(--green);border-radius:20px;padding:2px 9px;font-size:12px;font-weight:700">OK</span>';
+    body.innerHTML=`<div style="display:flex;align-items:center;gap:8px;color:var(--green);padding:4px 0"><span style="font-size:18px">✓</span><span style="font-size:15px;font-weight:500">${t('home.anom.ok')}</span></div>`;
+    badge.innerHTML=`<span style="background:rgba(34,197,94,.15);color:var(--green);border-radius:20px;padding:2px 9px;font-size:12px;font-weight:700">${t('home.anom.badge.ok')}</span>`;
     return;
   }
   const errs=data.anomalies.filter(a=>a.gravite==='erreur');
   const bcol=errs.length>0?'var(--red)':'var(--orange)';
   const bbg =errs.length>0?'rgba(239,68,68,.15)':'rgba(249,115,22,.15)';
-  const btxt=(errs.length>0?errs.length+' erreur'+(errs.length>1?'s':''):data.nb_anomalies+' avert.');
+  const btxt=(errs.length>0?t('home.anom.badge.err',{n:errs.length}):t('home.anom.badge.warn',{n:data.nb_anomalies}));
   badge.innerHTML=`<span style="background:${bbg};color:${bcol};border-radius:20px;padding:2px 9px;font-size:12px;font-weight:700">${btxt}</span>`;
   body.innerHTML=data.anomalies.slice(0,4).map((a,i)=>{
     const c=a.gravite==='erreur'?'var(--red)':'var(--orange)';
@@ -11330,7 +11604,7 @@ function renderHomeAnom(data){
       </div>
     </div>`;
   }).join('');
-  if(data.anomalies.length>4) body.innerHTML+=`<div style="font-size:12px;color:var(--dim);padding:4px 10px">+ ${data.anomalies.length-4} autres anomalies</div>`;
+  if(data.anomalies.length>4) body.innerHTML+=`<div style="font-size:12px;color:var(--dim);padding:4px 10px">${t('home.anom.more',{n:data.anomalies.length-4})}</div>`;
 }
 
 // ══════════════════════════════════════════════
@@ -11405,10 +11679,11 @@ function initDashboard(){
   if(!dp.value){ dp.value=currentDate; }
   if(!dd.value){ dd.value=currentDate.slice(0,8)+'01'; }
   const sel=document.getElementById('f-prod');
-  sel.innerHTML='<option value="">Tous les produits</option>'+
+  sel.innerHTML=`<option value="" data-i18n="dash.filter.product.all">${t('dash.filter.product.all')}</option>`+
     products.map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
   updatePompeFilter();
   if(!lastStats) setPreset('mois');
+  else renderDashboard(lastStats,lastSerie,document.getElementById('f-debut').value,document.getElementById('f-fin').value);
 }
 
 function updatePompeFilter(){
@@ -11418,7 +11693,7 @@ function updatePompeFilter(){
     : products.flatMap(p=>p.pompes);
   const sel=document.getElementById('f-pompe');
   const prev=sel.value;
-  sel.innerHTML='<option value="">Toutes les pompes</option>'+
+  sel.innerHTML=`<option value="" data-i18n="dash.filter.pompe.all">${t('dash.filter.pompe.all')}</option>`+
     pumps.map(po=>`<option value="${po.id}">${esc(po.nom)}</option>`).join('');
   if(pumps.find(po=>po.id==prev)) sel.value=prev;
 }
@@ -11504,11 +11779,11 @@ async function applyFilters(){
   const prodId =document.getElementById('f-prod').value;
   const pompeId=document.getElementById('f-pompe').value;
   const per    =document.getElementById('f-per').value;
-  if(!debut||!fin){toast('Sélectionnez une plage de dates','err');return;}
+  if(!debut||!fin){toast(t('dash.err.dates'),'err');return;}
 
   destroyDbCharts();
   const ct=document.getElementById('db-content');
-  ct.innerHTML='<div class="loading-row" style="padding:64px 20px;justify-content:center"><span class="spinner"></span><span style="margin-left:10px;font-size:15px;color:var(--muted)">Analyse en cours…</span></div>';
+  ct.innerHTML=`<div class="loading-row" style="padding:64px 20px;justify-content:center"><span class="spinner"></span><span style="margin-left:10px;font-size:15px;color:var(--muted)">${t('dash.loading')}</span></div>`;
 
   try{
     let statsUrl=`/stats?date_debut=${debut}&date_fin=${fin}`;
@@ -11527,7 +11802,7 @@ async function applyFilters(){
     lastSerie=serie; lastStats=stats;
     renderDashboard(stats,serie,debut,fin);
   }catch(e){
-    ct.innerHTML=`<div class="db-empty-state" style="color:var(--red)">Erreur : ${esc(e.message)}</div>`;
+    ct.innerHTML=`<div class="db-empty-state" style="color:var(--red)">${esc(t('dash.err.prefix',{msg:e.message}))}</div>`;
   }
 }
 
@@ -11536,10 +11811,10 @@ function renderDashboard(stats,serie,debut,fin){
 
   const v=serie.variation_pct;
   const varBadge=v==null
-    ?'<span class="var-badge var-flat">— pas de données précédentes</span>'
+    ?`<span class="var-badge var-flat">${t('dash.var.none')}</span>`
     :v>=0
-      ?`<span class="var-badge var-up">▲ +${v.toFixed(1)}% vs période préc.</span>`
-      :`<span class="var-badge var-down">▼ ${v.toFixed(1)}% vs période préc.</span>`;
+      ?`<span class="var-badge var-up">${t('dash.var.up',{pct:v.toFixed(1)})}</span>`
+      :`<span class="var-badge var-down">${t('dash.var.down',{pct:v.toFixed(1)})}</span>`;
 
   const nbJours=Math.round((new Date(fin+'T12:00:00')-new Date(debut+'T12:00:00'))/86400000)+1;
   const moy    =stats.nb_jours_couverts>0?stats.total_montant/stats.nb_jours_couverts:0;
@@ -11580,7 +11855,7 @@ function renderDashboard(stats,serie,debut,fin){
   const medals=['🥇','🥈','🥉'];
   const topRows=topJours.map((d,i)=>{
     const dt=new Date(d.date+'T12:00:00');
-    const label=dt.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
+    const label=dt.toLocaleDateString(_locale(),{weekday:'short',day:'numeric',month:'short'});
     const pct=Math.round(d.total_montant/maxTop*100);
     return `<tr>
       <td class="dbt-rank">${medals[i]||'#'+(i+1)}</td>
@@ -11599,7 +11874,7 @@ function renderDashboard(stats,serie,debut,fin){
       <div class="kpi-icon-wrap" style="background:rgba(59,130,246,.12)">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#3b82f6" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       </div>
-      <div class="kpi-label">Chiffre d'affaires</div>
+      <div class="kpi-label">${t('dash.kpi.revenue')}</div>
       <div class="kpi-val" style="color:#3b82f6">${fmtG(stats.total_montant)}</div>
       <div class="kpi-sub">${frDate(debut)} → ${frDate(fin)}</div>
     </div>
@@ -11608,36 +11883,36 @@ function renderDashboard(stats,serie,debut,fin){
       <div class="kpi-icon-wrap" style="background:rgba(34,197,94,.12)">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#22c55e" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 16 4-4 4 4 5-5"/></svg>
       </div>
-      <div class="kpi-label">Volume vendu</div>
+      <div class="kpi-label">${t('dash.kpi.volume')}</div>
       <div class="kpi-val" style="color:#22c55e">${fmtGal(stats.total_quantite,1)}</div>
-      <div class="kpi-sub">${stats.nb_releves} relevé${stats.nb_releves!==1?'s':''} saisi${stats.nb_releves!==1?'s':''}</div>
+      <div class="kpi-sub">${t('dash.kpi.volume.sub',{n:stats.nb_releves})}</div>
     </div>
 
     <div class="kpi-card" style="border-top-color:var(--border2)">
       <div class="kpi-icon-wrap" style="background:rgba(255,255,255,.07)">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="var(--text2)" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       </div>
-      <div class="kpi-label">Moyenne / jour actif</div>
+      <div class="kpi-label">${t('dash.kpi.avg')}</div>
       <div class="kpi-val" style="color:var(--text1)">${fmtG(moy)}</div>
-      <div class="kpi-sub">${stats.nb_jours_couverts}j actifs/${nbJours} · ${tauxCouv}%</div>
+      <div class="kpi-sub">${t('dash.kpi.avg.sub',{active:stats.nb_jours_couverts,total:nbJours,pct:tauxCouv})}</div>
     </div>
 
     <div class="kpi-card" style="border-top-color:#a78bfa">
       <div class="kpi-icon-wrap" style="background:rgba(167,139,250,.12)">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
       </div>
-      <div class="kpi-label">Prix moyen / gallon</div>
+      <div class="kpi-label">${t('dash.kpi.price')}</div>
       <div class="kpi-val" style="color:#a78bfa">${fmtG(prixMoy)}</div>
-      <div class="kpi-sub">${fmtGal(stats.total_quantite,1)} · ${stats.nb_releves} relevés</div>
+      <div class="kpi-sub">${t('dash.kpi.price.sub',{qte:fmtGal(stats.total_quantite,1),n:stats.nb_releves})}</div>
     </div>
 
     <div class="kpi-card" style="border-top-color:${trendColor}">
       <div class="kpi-icon-wrap" style="background:${trendBg}">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="${trendColor}" stroke-width="2">${trendSvg}</svg>
       </div>
-      <div class="kpi-label">Tendance</div>
+      <div class="kpi-label">${t('dash.kpi.trend')}</div>
       <div class="kpi-val" style="color:${trendColor}">${trendVal}</div>
-      <div class="kpi-sub">vs même durée préc.</div>
+      <div class="kpi-sub">${t('dash.kpi.trend.sub')}</div>
     </div>
 
   </div>
@@ -11647,16 +11922,16 @@ function renderDashboard(stats,serie,debut,fin){
     <div class="card-head">
       <div class="card-title">
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        Évolution sur la période &nbsp;${varBadge}
+        ${t('dash.chart.evolution')} &nbsp;${varBadge}
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="metric-toggle">
-          <button class="mt-btn active" data-m="montant" onclick="switchMetric('montant')">Montant</button>
-          <button class="mt-btn" data-m="quantite" onclick="switchMetric('quantite')">Volume</button>
+          <button class="mt-btn active" data-m="montant" onclick="switchMetric('montant')">${t('dash.metric.montant')}</button>
+          <button class="mt-btn" data-m="quantite" onclick="switchMetric('quantite')">${t('dash.metric.volume')}</button>
         </div>
         <div class="chart-toggle">
-          <button class="ct-btn active" data-ct="bar" onclick="switchChartType('bar')">Barres</button>
-          <button class="ct-btn" data-ct="line" onclick="switchChartType('line')">Ligne</button>
+          <button class="ct-btn active" data-ct="bar" onclick="switchChartType('bar')">${t('dash.charttype.bar')}</button>
+          <button class="ct-btn" data-ct="line" onclick="switchChartType('line')">${t('dash.charttype.line')}</button>
         </div>
       </div>
     </div>
@@ -11671,9 +11946,9 @@ function renderDashboard(stats,serie,debut,fin){
       <div class="card-head">
         <div class="card-title">
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20"/><path d="M12 2v20"/></svg>
-          Par produit
+          ${t('dash.chart.byproduct')}
         </div>
-        <span style="font-size:12px;color:var(--muted)">répartition</span>
+        <span style="font-size:12px;color:var(--muted)">${t('dash.chart.byproduct.sub')}</span>
       </div>
       <div class="db-chart-canvas-wrap" style="height:190px"><canvas id="db-chart-prod"></canvas></div>
     </div>
@@ -11681,9 +11956,9 @@ function renderDashboard(stats,serie,debut,fin){
       <div class="card-head">
         <div class="card-title">
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41"/></svg>
-          Matin vs Après-midi
+          ${t('dash.chart.byperiod')}
         </div>
-        <span style="font-size:12px;color:var(--muted)">comparaison</span>
+        <span style="font-size:12px;color:var(--muted)">${t('dash.chart.byperiod.sub')}</span>
       </div>
       <div class="db-chart-canvas-wrap" style="height:190px"><canvas id="db-chart-per"></canvas></div>
     </div>
@@ -11691,9 +11966,9 @@ function renderDashboard(stats,serie,debut,fin){
       <div class="card-head">
         <div class="card-title">
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-          Par pompe
+          ${t('dash.chart.bypump')}
         </div>
-        <span style="font-size:12px;color:var(--muted)">montant</span>
+        <span style="font-size:12px;color:var(--muted)">${t('dash.chart.bypump.sub')}</span>
       </div>
       <div class="db-chart-canvas-wrap" style="height:190px"><canvas id="db-chart-pmp"></canvas></div>
     </div>
@@ -11704,13 +11979,13 @@ function renderDashboard(stats,serie,debut,fin){
     <div class="card-head">
       <div class="card-title">
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-        Performance par pompe
+        ${t('dash.perf.title')}
       </div>
-      <span style="font-size:12px;color:var(--muted)">trié par chiffre d'affaires</span>
+      <span style="font-size:12px;color:var(--muted)">${t('dash.perf.sub')}</span>
     </div>
     ${pompes.length>0
       ? `<div style="padding:4px 0">${pompeRows}</div>`
-      : '<div class="db-no-data">Aucune donnée disponible</div>'}
+      : `<div class="db-no-data">${t('dash.nodata')}</div>`}
   </div>
 
   <!-- ── Top 5 meilleurs jours ──────────────────── -->
@@ -11718,17 +11993,17 @@ function renderDashboard(stats,serie,debut,fin){
     <div class="card-head">
       <div class="card-title">
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        Meilleurs jours
+        ${t('dash.top.title')}
       </div>
-      <span style="font-size:12px;color:var(--muted)">Top 5 · chiffre d'affaires le plus élevé</span>
+      <span style="font-size:12px;color:var(--muted)">${t('dash.top.sub')}</span>
     </div>
     <div style="padding:0 4px">
       ${topJours.length
         ?`<table class="db-top-table">
-          <thead><tr><th>#</th><th>Date</th><th>Montant</th><th>Volume</th><th style="width:28%;padding-right:18px">Performance relative</th></tr></thead>
+          <thead><tr><th>#</th><th>${t('dash.top.col.date')}</th><th>${t('dash.top.col.montant')}</th><th>${t('dash.top.col.volume')}</th><th style="width:28%;padding-right:18px">${t('dash.top.col.perf')}</th></tr></thead>
           <tbody>${topRows}</tbody>
         </table>`
-        :`<div class="db-no-data">Aucune donnée sur cette période</div>`}
+        :`<div class="db-no-data">${t('dash.top.nodata')}</div>`}
     </div>
   </div>
   `;
@@ -11767,7 +12042,7 @@ function buildTrendChart(serie){
   const isMonant=dbMetric==='montant';
   const labels=days.map(d=>{
     const dt=new Date(d.date+'T12:00:00');
-    return dt.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+    return dt.toLocaleDateString(_locale(),{day:'numeric',month:'short'});
   });
   const data=days.map(d=>isMonant?d.total_montant:(d.total_quantite||0));
   const color='#3b82f6';
@@ -11782,7 +12057,7 @@ function buildTrendChart(serie){
     data:{
       labels,
       datasets:[{
-        label:isMonant?'Montant (G)':'Volume (gal)',
+        label:isMonant?t('dash.metric.montant')+' (G)':t('dash.metric.volume')+' (gal)',
         data,
         backgroundColor:dbChartType==='line'?grad:days.map((_,i)=>hexToRgba(color,i===days.length-1?0.9:0.55)),
         borderColor:color,
@@ -11839,7 +12114,7 @@ function buildProdChart(stats){
   const canvas=document.getElementById('db-chart-prod');
   if(!canvas) return;
   const entries=Object.entries(stats.par_produit||{});
-  if(!entries.length){canvas.parentElement.innerHTML='<div class="db-no-data">Aucune donnée</div>';return;}
+  if(!entries.length){canvas.parentElement.innerHTML=`<div class="db-no-data">${t('dash.nodata')}</div>`;return;}
 
   dbChartProd=new Chart(canvas.getContext('2d'),{
     type:'doughnut',
@@ -11883,16 +12158,17 @@ function buildPerChart(stats){
   const canvas=document.getElementById('db-chart-per');
   if(!canvas) return;
   const entries=Object.entries(stats.par_periode||{});
-  if(!entries.length){canvas.parentElement.innerHTML='<div class="db-no-data">Aucune donnée</div>';return;}
+  if(!entries.length){canvas.parentElement.innerHTML=`<div class="db-no-data">${t('dash.nodata')}</div>`;return;}
 
   const colors=['#3b82f6','#f97316','#22c55e','#a78bfa'];
+  const _perLabel=k=>k==='Matin'?t('saisie.period.matin'):k==='Apres-midi'?t('saisie.period.apresmidi'):k;
   dbChartPer=new Chart(canvas.getContext('2d'),{
     type:'bar',
     data:{
-      labels:entries.map(([k])=>k),
+      labels:entries.map(([k])=>_perLabel(k)),
       datasets:[
         {
-          label:'Montant',
+          label:t('dash.metric.montant'),
           data:entries.map(([,v])=>v.montant),
           backgroundColor:entries.map((_,i)=>hexToRgba(colors[i%colors.length],0.75)),
           borderColor:entries.map((_,i)=>colors[i%colors.length]),
@@ -11900,7 +12176,7 @@ function buildPerChart(stats){
           yAxisID:'y',
         },
         {
-          label:'Volume',
+          label:t('dash.metric.volume'),
           data:entries.map(([,v])=>v.quantite||0),
           backgroundColor:entries.map((_,i)=>hexToRgba(colors[i%colors.length],0.22)),
           borderColor:entries.map((_,i)=>hexToRgba(colors[i%colors.length],0.5)),
@@ -11925,7 +12201,7 @@ function buildPerChart(stats){
           backgroundColor:'#0d1d35',borderColor:'rgba(59,130,246,.3)',borderWidth:1,
           titleColor:'#e8eef8',bodyColor:'#bfcce0',padding:10,
           callbacks:{
-            label:ctx=>ctx.datasetIndex===0?` Montant: ${fmtG(ctx.raw)}`:`  Volume: ${fmtGal(ctx.raw,1)}`
+            label:ctx=>ctx.datasetIndex===0?` ${t('dash.metric.montant')}: ${fmtG(ctx.raw)}`:`  ${t('dash.metric.volume')}: ${fmtGal(ctx.raw,1)}`
           }
         }
       },
@@ -11943,14 +12219,14 @@ function buildPmpChart(stats){
   const canvas=document.getElementById('db-chart-pmp');
   if(!canvas) return;
   const entries=Object.entries(stats.par_pompe||{}).sort((a,b)=>b[1].montant-a[1].montant);
-  if(!entries.length){canvas.parentElement.innerHTML='<div class="db-no-data">Aucune donnée</div>';return;}
+  if(!entries.length){canvas.parentElement.innerHTML=`<div class="db-no-data">${t('dash.nodata')}</div>`;return;}
 
   dbChartPmp=new Chart(canvas.getContext('2d'),{
     type:'bar',
     data:{
       labels:entries.map(([k])=>k),
       datasets:[{
-        label:'Montant',
+        label:t('dash.metric.montant'),
         data:entries.map(([,v])=>v.montant),
         backgroundColor:entries.map((_,i)=>hexToRgba(DB_COLORS[i%DB_COLORS.length],0.7)),
         borderColor:entries.map((_,i)=>DB_COLORS[i%DB_COLORS.length]),
