@@ -1,4 +1,4 @@
-import type { Produit, Releve, Rapport, Stats, AnomaliesResult, ChatMessage } from './types'
+import type { Produit, Releve, Rapport, Stats, AnomaliesResult, ChatMessage, ChatConversationMeta } from './types'
 
 async function req<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, options)
@@ -51,10 +51,17 @@ export const api = {
     return req<Stats>(`/api/stats?${p}`)
   },
   anomalies: (date: string) => req<AnomaliesResult>(`/api/anomalies?date=${date}`),
-  chat: (message: string, historique: ChatMessage[]) =>
-    req<{ reponse: string; historique: ChatMessage[] }>('/api/chat', {
+  chat: (message: string, historique: ChatMessage[], conversation_id?: number | null) =>
+    req<{ reponse: string; historique: ChatMessage[]; conversation_id: number }>('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, historique }),
+      body: JSON.stringify({ message, historique, conversation_id: conversation_id ?? null }),
     }),
+  conversations: {
+    list: () => req<ChatConversationMeta[]>('/api/chat/conversations'),
+    get: (id: number) =>
+      req<{ id: number; titre: string; historique: ChatMessage[] }>(`/api/chat/conversations/${id}`),
+    delete: (id: number) =>
+      req<{ ok: boolean }>(`/api/chat/conversations/${id}`, { method: 'DELETE' }),
+  },
 }

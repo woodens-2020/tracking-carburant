@@ -1134,3 +1134,22 @@ class ZelleFond(Base):
         CheckConstraint("montant_usd > 0", name="chk_fond_montant_pos"),
         Index("idx_fond_date", "date_reception"),
     )
+
+
+class ChatConversation(Base):
+    """Conversation avec l'assistant IA — historique persistant par utilisateur."""
+    __tablename__ = "chat_conversations"
+
+    id             = Column(Integer, primary_key=True)
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="CASCADE"), nullable=False)
+    titre          = Column(String(200), nullable=True)
+    historique     = Column(JSON, nullable=False, default=list)
+    created_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    utilisateur = relationship("Utilisateur")
+
+    __table_args__ = (
+        Index("idx_chat_conv_utilisateur", "utilisateur_id"),
+        Index("idx_chat_conv_updated", "updated_at"),
+    )

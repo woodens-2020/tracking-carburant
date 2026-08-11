@@ -3768,9 +3768,26 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div style="font-size:13px;color:var(--muted)">Posez des questions en langage naturel · données en temps réel</div>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;position:relative">
+            <button onclick="newConversation()" title="Nouvelle conversation"
+              style="width:28px;height:28px;border-radius:7px;background:var(--panel3);border:1px solid var(--border);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <button onclick="toggleHistoryPanel()" id="chat-hist-btn" title="Historique des conversations"
+              style="width:28px;height:28px;border-radius:7px;background:var(--panel3);border:1px solid var(--border);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>
+            </button>
             <span style="font-size:11.5px;font-weight:700;color:var(--muted);background:var(--panel3);border:1px solid var(--border);padding:3px 9px;border-radius:5px;font-family:var(--mono)">claude-sonnet</span>
             <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;box-shadow:0 0 6px rgba(34,197,94,.5);flex-shrink:0"></span>
+
+            <!-- Panneau historique -->
+            <div id="chat-hist-panel" style="display:none;position:absolute;top:36px;right:0;width:280px;max-height:320px;overflow-y:auto;background:var(--panel2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:30">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid var(--border)">
+                <span style="font-size:11px;font-weight:700;color:var(--text1)">Conversations précédentes</span>
+                <span onclick="toggleHistoryPanel()" style="cursor:pointer;color:var(--muted);font-size:14px;line-height:1">×</span>
+              </div>
+              <div id="chat-hist-list" style="padding:6px 0"></div>
+            </div>
           </div>
         </div>
         <div class="chips" id="chips-ct"></div>
@@ -10210,6 +10227,7 @@ let releves        = [];
 let currentProdId  = null;
 let currentPeriode = 'Matin';
 let histFull      = [];
+let currentConvId = null;
 let lastSerie     = null;
 let pendingSave   = null;   // données en attente de confirmation
 
@@ -13435,9 +13453,10 @@ async function sendFull(){
   appendMsg('full-msgs','user',esc(msg));
   const th=appendThink('full-msgs');
   try{
-    const res=await POST('/chat',{message:msg,historique:histFull});
+    const res=await POST('/chat',{message:msg,historique:histFull,conversation_id:currentConvId});
     th.remove();
     histFull=res.historique||histFull;
+    currentConvId=res.conversation_id||currentConvId;
     appendMsg('full-msgs','bot',renderMd(res.reponse));
   }catch(e){
     th.remove();
@@ -13445,6 +13464,81 @@ async function sendFull(){
   }
 }
 function useChip(t){ document.getElementById('full-inp').value=t; document.getElementById('full-inp').focus(); }
+
+// ── Historique des conversations ────────────────────────────────
+function newConversation(){
+  histFull=[];
+  currentConvId=null;
+  document.getElementById('full-msgs').innerHTML='';
+  document.getElementById('chat-hist-panel').style.display='none';
+}
+
+function toggleHistoryPanel(){
+  const panel=document.getElementById('chat-hist-panel');
+  const opening = panel.style.display==='none';
+  panel.style.display = opening ? 'block' : 'none';
+  if(opening) loadConversationsList();
+}
+
+async function loadConversationsList(){
+  const list=document.getElementById('chat-hist-list');
+  list.innerHTML='<div style="padding:16px;text-align:center;font-size:12px;color:var(--muted)">Chargement…</div>';
+  try{
+    const convs=await GET('/chat/conversations');
+    if(!convs.length){
+      list.innerHTML='<div style="padding:16px;text-align:center;font-size:12px;color:var(--muted)">Aucune conversation sauvegardée.</div>';
+      return;
+    }
+    list.innerHTML='';
+    convs.forEach(c=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border)'+(c.id===currentConvId?';background:rgba(59,130,246,.08)':'');
+      row.onmouseenter=()=>row.style.background='var(--panel3)';
+      row.onmouseleave=()=>row.style.background=(c.id===currentConvId?'rgba(59,130,246,.08)':'transparent');
+      row.onclick=()=>openConversation(c.id);
+      const d=new Date(c.updated_at);
+      row.innerHTML=`
+        <div style="min-width:0">
+          <div style="font-size:12px;font-weight:600;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px">${esc(c.titre||'Conversation')}</div>
+          <div style="font-size:10px;color:var(--muted)">${c.nb_messages} message${c.nb_messages>1?'s':''} · ${d.toLocaleDateString('fr-FR')}</div>
+        </div>
+        <span data-del="${c.id}" title="Supprimer" style="flex-shrink:0;color:var(--muted);padding:2px">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </span>`;
+      row.querySelector('[data-del]').onclick=(e)=>{ e.stopPropagation(); deleteConversation(c.id); };
+      list.appendChild(row);
+    });
+  }catch(e){
+    list.innerHTML='<div style="padding:16px;text-align:center;font-size:12px;color:var(--red)">Erreur de chargement</div>';
+  }
+}
+
+async function openConversation(id){
+  try{
+    const conv=await GET('/chat/conversations/'+id);
+    currentConvId=conv.id;
+    histFull=conv.historique||[];
+    const c=document.getElementById('full-msgs');
+    c.innerHTML='';
+    histFull.forEach(m=>appendMsg('full-msgs',m.role==='user'?'user':'bot',m.role==='user'?esc(m.content):renderMd(m.content)));
+    document.getElementById('chat-hist-panel').style.display='none';
+  }catch(e){ toast(e.message,'err'); }
+}
+
+async function deleteConversation(id){
+  try{
+    await DEL('/chat/conversations/'+id);
+    if(id===currentConvId) newConversation();
+    loadConversationsList();
+  }catch(e){ toast(e.message,'err'); }
+}
+
+document.addEventListener('click',(e)=>{
+  const panel=document.getElementById('chat-hist-panel');
+  const btn=document.getElementById('chat-hist-btn');
+  if(!panel||panel.style.display==='none') return;
+  if(!panel.contains(e.target) && e.target!==btn && !btn.contains(e.target)) panel.style.display='none';
+});
 
 // ══════════════════════════════════════════════
 // LOGO & ANIMATIONS

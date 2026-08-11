@@ -95,3 +95,10 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
 }
+
+export interface ChatConversationMeta {
+  id: number
+  titre: string
+  updated_at: string
+  nb_messages: number
+}

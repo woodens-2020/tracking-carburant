@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
-from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken
+from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation
 from otp_service import (
     OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
     create_otp, send_otp_email, send_otp_whatsapp, verify_otp, cleanup_expired_otps,
@@ -1416,12 +1416,76 @@ def stats_endpoint(date_debut: date_type, date_fin: date_type,
 class ChatIn(BaseModel):
     message: str
     historique: list = []
+    conversation_id: Optional[int] = None
 
 
 @app.post("/api/chat")
-def chat_endpoint(data: ChatIn, db: Session = Depends(get_db)):
+def chat_endpoint(data: ChatIn, request: Request, db: Session = Depends(get_db)):
     from chatbot import chat
-    return chat(db, data.message, data.historique)
+    user   = request.state.user
+    result = chat(db, data.message, data.historique)
+
+    conv = None
+    if data.conversation_id:
+        conv = (db.query(ChatConversation)
+                .filter_by(id=data.conversation_id, utilisateur_id=user.id)
+                .first())
+    if conv:
+        conv.historique = result["historique"]
+    else:
+        conv = ChatConversation(
+            utilisateur_id=user.id,
+            titre=data.message.strip()[:80] or "Conversation",
+            historique=result["historique"],
+        )
+        db.add(conv)
+    db.commit()
+    db.refresh(conv)
+    result["conversation_id"] = conv.id
+    return result
+
+
+@app.get("/api/chat/conversations")
+def list_conversations(request: Request, db: Session = Depends(get_db)):
+    user = request.state.user
+    convs = (db.query(ChatConversation)
+             .filter_by(utilisateur_id=user.id)
+             .order_by(ChatConversation.updated_at.desc())
+             .limit(100)
+             .all())
+    return [
+        {
+            "id":         c.id,
+            "titre":      c.titre or "Conversation",
+            "updated_at": c.updated_at,
+            "nb_messages": len(c.historique or []),
+        }
+        for c in convs
+    ]
+
+
+@app.get("/api/chat/conversations/{conversation_id}")
+def get_conversation(conversation_id: int, request: Request, db: Session = Depends(get_db)):
+    user = request.state.user
+    conv = (db.query(ChatConversation)
+            .filter_by(id=conversation_id, utilisateur_id=user.id)
+            .first())
+    if not conv:
+        raise HTTPException(404, "Conversation introuvable")
+    return {"id": conv.id, "titre": conv.titre, "historique": conv.historique}
+
+
+@app.delete("/api/chat/conversations/{conversation_id}")
+def delete_conversation(conversation_id: int, request: Request, db: Session = Depends(get_db)):
+    user = request.state.user
+    conv = (db.query(ChatConversation)
+            .filter_by(id=conversation_id, utilisateur_id=user.id)
+            .first())
+    if not conv:
+        raise HTTPException(404, "Conversation introuvable")
+    db.delete(conv)
+    db.commit()
+    return {"ok": True}
 
 
 # ---------- Detection d'anomalies dans la suite des meters ----------
