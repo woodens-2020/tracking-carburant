@@ -23,7 +23,7 @@ from stock_service import (
 )
 from models import Base
 
-MAX_TOOL_ROUNDS = 8
+MAX_TOOL_ROUNDS = 20
 GEMINI_MODELS   = ["gemini-flash-latest", "gemini-flash-lite-latest"]
 CLAUDE_MODEL    = "claude-sonnet-4-6"
 
@@ -87,7 +87,12 @@ def _executer_requete(db: Session, sql: str) -> dict:
     try:
         resultat = db.execute(sql_text(propre))
     except Exception as e:
-        return {"erreur": f"Erreur SQL : {e}"}
+        # Une requête en échec laisse la transaction Postgres avortée : sans rollback,
+        # TOUS les appels suivants sur cette session (y compris get_stats, get_stock...)
+        # échoueraient en cascade avec "current transaction is aborted".
+        db.rollback()
+        message = str(getattr(e, "orig", e)).strip().split("\n")[0]
+        return {"erreur": f"Erreur SQL : {message}"}
     colonnes = list(resultat.keys())
     lignes = resultat.fetchmany(_LIMITE_LIGNES_REQUETE + 1)
     tronque = len(lignes) > _LIMITE_LIGNES_REQUETE
@@ -164,6 +169,21 @@ Convertis TOUJOURS en AAAA-MM-JJ avant d'appeler un outil :
                       de passe, OTP, tokens, logs d'audit) NE SONT PAS accessibles, même si
                       on te le demande explicitement — explique poliment que c'est hors
                       périmètre du chatbot si on insiste.
+
+                      ⚠️ IMPORTANT — MINIMISE LE NOMBRE D'APPELS : pour une question qui
+                      touche plusieurs départements ou plusieurs métriques (ex: "résumé de
+                      toute l'activité", "chiffre d'affaires de tous les départements"),
+                      NE FAIS PAS un executer_requete séparé par métrique/département.
+                      Combine tout en UNE SEULE requête avec UNION ALL ou des sous-requêtes,
+                      par exemple :
+                        SELECT 'bar' AS dept, COUNT(*) AS nb, COALESCE(SUM(montant_total),0) AS total
+                        FROM bar_ventes WHERE date_heure::date BETWEEN '...' AND '...'
+                        UNION ALL
+                        SELECT 'cuisine', COUNT(*), COALESCE(SUM(total),0)
+                        FROM cuisine_ventes WHERE date_heure::date BETWEEN '...' AND '...'
+                        UNION ALL ...
+                      Objectif : répondre à une question large en 2-4 appels d'outils maximum,
+                      jamais un par métrique.
 
 ━━━ RÈGLES ABSOLUES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. ZÉRO chiffre inventé. Pour tout montant, quantité, stock ou bénéfice,
