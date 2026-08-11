@@ -5985,15 +5985,15 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
           </div>
           <div>
-            <div class="pos-header-title">Caisse POS</div>
-            <div class="pos-header-sub">Encaissement en temps réel — Bar / Restaurant</div>
+            <div class="pos-header-title" data-i18n="pos.caisse.title">Caisse POS</div>
+            <div class="pos-header-sub" data-i18n="pos.caisse.subtitle">Encaissement en temps réel — Bar / Restaurant</div>
           </div>
           <div class="pos-header-actions">
             <select class="pos-select" id="pos-caissier-sel" style="width:180px" onchange="posCaissierChange(this.value)">
-              <option value="">Sans caissier</option>
+              <option value="" data-i18n="pos.caisse.sanscaissier">Sans caissier</option>
             </select>
             <button class="pos-btn ghost" id="pos-btn-soumettre" style="display:none;font-size:14px;padding:6px 14px;border-color:rgba(99,210,190,.4);color:#3fb6a8" onclick="posSoumettreSession()">
-              Soumettre rapport
+              <span data-i18n="pos.caisse.soumettre">Soumettre rapport</span>
             </button>
           </div>
         </div>
@@ -6004,36 +6004,36 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div style="font-size:15px;font-weight:700;color:rgba(255,255,255,.9)" id="pos-dash-nom">—</div>
             <div style="display:flex;align-items:center;gap:8px">
               <span id="pos-dash-statut" style="font-size:13px;padding:3px 10px;border-radius:20px;font-weight:700"></span>
-              <button onclick="posDashRefresh()" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,.4);font-size:13px;padding:2px 6px">↻ Actualiser</button>
+              <button onclick="posDashRefresh()" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,.4);font-size:13px;padding:2px 6px" data-i18n="pos.caisse.refresh">↻ Actualiser</button>
             </div>
           </div>
           <!-- KPIs -->
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
             <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
-              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">Nb ventes</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.mini.nbventes">Nb ventes</div>
               <div id="pos-dash-nb" style="font-size:22px;font-weight:800;color:#f7a93b">0</div>
             </div>
             <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
-              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">Total CA</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.mini.totalca">Total CA</div>
               <div id="pos-dash-total" style="font-size:18px;font-weight:700;color:#3fb6a8">G 0</div>
             </div>
             <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
-              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">Cash encaissé</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.mini.cash">Cash encaissé</div>
               <div id="pos-dash-cash" style="font-size:18px;font-weight:700;color:#a78bfa">G 0</div>
             </div>
             <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
-              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">Crédit</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.mini.credit">Crédit</div>
               <div id="pos-dash-credit" style="font-size:18px;font-weight:700;color:#f87171">G 0</div>
             </div>
           </div>
           <!-- Évolution + Top produits -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div>
-              <div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:6px;font-weight:600">Dernières ventes</div>
+              <div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:6px;font-weight:600" data-i18n="pos.caisse.mini.dernieres">Dernières ventes</div>
               <div id="pos-dash-evolution" style="max-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:3px"></div>
             </div>
             <div>
-              <div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:6px;font-weight:600">Top produits</div>
+              <div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:6px;font-weight:600" data-i18n="pos.caisse.mini.topprod">Top produits</div>
               <div id="pos-dash-top" style="max-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:3px"></div>
             </div>
           </div>
@@ -6043,35 +6043,35 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div id="pos-caisse-admin-dash" style="display:none;margin-bottom:12px">
           <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-              <div style="font-size:15px;font-weight:700;color:rgba(255,255,255,.9)">Performance Bar — Aujourd'hui</div>
+              <div style="font-size:15px;font-weight:700;color:rgba(255,255,255,.9)" data-i18n="pos.caisse.admin.perf">Performance Bar — Aujourd'hui</div>
               <div style="display:flex;align-items:center;gap:10px">
                 <span id="pos-caisse-admin-updated" style="font-size:12px;color:rgba(255,255,255,.3)"></span>
-                <button onclick="posCaisseBarDashCharger()" style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:8px;cursor:pointer;color:rgba(255,255,255,.5);font-size:13px;padding:3px 10px">↻ Actualiser</button>
+                <button onclick="posCaisseBarDashCharger()" style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:8px;cursor:pointer;color:rgba(255,255,255,.5);font-size:13px;padding:3px 10px" data-i18n="pos.caisse.refresh">↻ Actualiser</button>
               </div>
             </div>
             <!-- KPIs globaux bar -->
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
               <div style="background:rgba(247,169,59,.08);border:1px solid rgba(247,169,59,.2);border-radius:10px;padding:10px;text-align:center">
-                <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">Nb Ventes</div>
+                <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.admin.nbventes">Nb Ventes</div>
                 <div id="pos-caisse-admin-nb" style="font-size:23px;font-weight:800;color:#f7a93b">—</div>
               </div>
               <div style="background:rgba(63,182,168,.08);border:1px solid rgba(63,182,168,.2);border-radius:10px;padding:10px;text-align:center">
-                <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">CA Total</div>
+                <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.admin.ca">CA Total</div>
                 <div id="pos-caisse-admin-ca" style="font-size:18px;font-weight:700;color:#3fb6a8">—</div>
               </div>
               <div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);border-radius:10px;padding:10px;text-align:center">
-                <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">Cash Total</div>
+                <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.admin.cash">Cash Total</div>
                 <div id="pos-caisse-admin-cash" style="font-size:18px;font-weight:700;color:#a78bfa">—</div>
               </div>
               <div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:10px;padding:10px;text-align:center">
-                <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">Crédit Total</div>
+                <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.admin.credit">Crédit Total</div>
                 <div id="pos-caisse-admin-credit" style="font-size:18px;font-weight:700;color:#f87171">—</div>
               </div>
             </div>
             <!-- Classement employés -->
-            <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Classement du jour</div>
+            <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px" data-i18n="pos.caisse.admin.classement">Classement du jour</div>
             <div id="pos-caisse-admin-ranking" style="display:flex;flex-direction:column;gap:6px">
-              <div style="color:rgba(255,255,255,.25);font-size:14px;text-align:center;padding:12px">Chargement…</div>
+              <div style="color:rgba(255,255,255,.25);font-size:14px;text-align:center;padding:12px" data-i18n="pos.caisse.loading">Chargement…</div>
             </div>
           </div>
         </div>
@@ -6080,10 +6080,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="pos-search-wrap">
           <svg class="pos-search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
           <input type="text" id="pos-search-inp" class="pos-search-inp"
-                 placeholder="Rechercher un article par son nom…"
+                 placeholder="Rechercher un article par son nom…" data-i18n-ph="pos.caisse.search.ph"
                  autocomplete="off" oninput="posSearchProduits(this.value)"
                  onkeydown="if(event.key==='Escape') posSearchClear()">
-          <button id="pos-search-clear" class="pos-search-clear" style="display:none" title="Effacer la recherche" onclick="posSearchClear()">✕</button>
+          <button id="pos-search-clear" class="pos-search-clear" style="display:none" title="Effacer la recherche" data-i18n-title="pos.caisse.search.clear.title" onclick="posSearchClear()">✕</button>
         </div>
 
         <!-- Filtre catégorie + bouton cuisine -->
@@ -6095,17 +6095,17 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                    cursor:pointer;min-width:180px;appearance:none;-webkit-appearance:none;
                    background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22rgba(255,255,255,.5)%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>');
                    background-repeat:no-repeat;background-position:right 10px center;background-size:14px">
-            <option value="TOUS">Toutes les catégories</option>
+            <option value="TOUS" data-i18n="pos.caisse.cat.all">Toutes les catégories</option>
           </select>
           <button id="pos-btn-cuisine" onclick="posCatFilter('__CUISINE__',null)"
             style="background:rgba(247,169,59,.18);border:1px solid rgba(247,169,59,.4);border-radius:10px;
                    color:#f7a93b;font-size:14.5px;font-weight:700;padding:7px 14px;cursor:pointer;
-                   display:none;white-space:nowrap">
+                   display:none;white-space:nowrap" data-i18n="pos.caisse.btn.cuisine">
             🍽️ Plats Cuisine
           </button>
           <button onclick="posCatFilter('TOUS',null)"
             style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;
-                   color:rgba(255,255,255,.6);font-size:14px;padding:7px 12px;cursor:pointer;white-space:nowrap">
+                   color:rgba(255,255,255,.6);font-size:14px;padding:7px 12px;cursor:pointer;white-space:nowrap" data-i18n="pos.caisse.btn.bar">
             Bar
           </button>
           <span id="pos-cat-count" style="font-size:13px;color:rgba(255,255,255,.35)"></span>
@@ -6115,44 +6115,44 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <!-- Grille produits -->
           <div>
             <div class="pos-produit-grid" id="pos-produit-grid">
-              <div style="color:rgba(255,255,255,.3);font-size:14px;padding:20px">Chargement…</div>
+              <div style="color:rgba(255,255,255,.3);font-size:14px;padding:20px" data-i18n="pos.caisse.loading">Chargement…</div>
             </div>
           </div>
 
           <!-- Panier -->
           <div class="pos-cart-panel">
             <div class="pos-cart-hdr">
-              🛒 Panier
+              <span data-i18n="pos.caisse.cart.title">🛒 Panier</span>
               <span class="pos-cart-count" id="pos-cart-count" style="display:none">0</span>
-              <button class="pos-btn ghost" style="font-size:12px;padding:4px 10px;margin-left:auto" onclick="posViderPanier()">Vider</button>
+              <button class="pos-btn ghost" style="font-size:12px;padding:4px 10px;margin-left:auto" onclick="posViderPanier()" data-i18n="pos.caisse.cart.vider">Vider</button>
             </div>
             <div class="pos-cart-items" id="pos-cart-items">
-              <div class="pos-cart-empty">🛒<br>Ajoutez des articles</div>
+              <div class="pos-cart-empty" data-i18n-html="pos.caisse.cart.empty">🛒<br>Ajoutez des articles</div>
             </div>
             <div class="pos-cart-footer">
               <div class="pos-cart-total-row">
-                <span class="pos-cart-total-label">Total</span>
+                <span class="pos-cart-total-label" data-i18n="pos.caisse.cart.total">Total</span>
                 <span class="pos-cart-total-val" id="pos-cart-total">G 0.00</span>
               </div>
               <div style="margin-bottom:8px">
-                <label class="pos-label">Client (pour crédit)</label>
-                <input class="pos-input" id="pos-client-nom" placeholder="Nom du client (optionnel)">
+                <label class="pos-label" data-i18n="pos.caisse.client.label">Client (pour crédit)</label>
+                <input class="pos-input" id="pos-client-nom" placeholder="Nom du client (optionnel)" data-i18n-ph="pos.caisse.client.ph">
               </div>
               <div class="pos-mode-btns">
-                <button class="pos-mode-btn active" data-mode="CASH" onclick="posSetMode('CASH',this)">CASH</button>
-                <button class="pos-mode-btn" data-mode="CREDIT" onclick="posSetMode('CREDIT',this)">CRÉDIT</button>
-                <button class="pos-mode-btn" data-mode="MIXTE" onclick="posSetMode('MIXTE',this)">MIXTE</button>
+                <button class="pos-mode-btn active" data-mode="CASH" onclick="posSetMode('CASH',this)" data-i18n="pos.caisse.mode.cash">CASH</button>
+                <button class="pos-mode-btn" data-mode="CREDIT" onclick="posSetMode('CREDIT',this)" data-i18n="pos.caisse.mode.credit">CRÉDIT</button>
+                <button class="pos-mode-btn" data-mode="MIXTE" onclick="posSetMode('MIXTE',this)" data-i18n="pos.caisse.mode.mixte">MIXTE</button>
               </div>
               <div id="pos-cash-row" style="display:none;margin-bottom:8px">
-                <label class="pos-label">Montant reçu du client</label>
+                <label class="pos-label" data-i18n="pos.caisse.recu.label">Montant reçu du client</label>
                 <input class="pos-input" id="pos-montant-recu" type="number" min="0" step="0.01" placeholder="G 0.00" oninput="posCalcMonnaie()">
                 <div id="pos-monnaie-display" style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;font-size:15px;font-weight:700;text-align:center"></div>
               </div>
               <div id="pos-mixte-row" style="display:none;margin-bottom:8px">
-                <label class="pos-label">Montant payé en cash</label>
+                <label class="pos-label" data-i18n="pos.caisse.paye.label">Montant payé en cash</label>
                 <input class="pos-input" id="pos-montant-paye" type="number" min="0" placeholder="G 0.00">
               </div>
-              <button class="pos-encaisser-btn" id="pos-enc-btn" onclick="posEncaisser()" disabled>
+              <button class="pos-encaisser-btn" id="pos-enc-btn" onclick="posEncaisser()" disabled data-i18n="pos.caisse.encaisser">
                 Encaisser
               </button>
               <div id="pos-ticket-result" style="display:none;margin-top:8px;padding:8px 10px;
@@ -10705,6 +10705,73 @@ const LANGS = {
     'pos.dash.dettes.ouvert.badge':'OUVERT',
     'pos.dash.updated':     'Mis à jour {time}',
 
+    'pos.caisse.title':     'Caisse POS',
+    'pos.caisse.subtitle':  'Encaissement en temps réel — Bar / Restaurant',
+    'pos.caisse.sanscaissier':'Sans caissier',
+    'pos.caisse.soumettre': 'Soumettre rapport',
+    'pos.caisse.refresh':   '↻ Actualiser',
+    'pos.caisse.mini.nbventes':'Nb ventes',
+    'pos.caisse.mini.totalca':'Total CA',
+    'pos.caisse.mini.cash':  'Cash encaissé',
+    'pos.caisse.mini.credit':'Crédit',
+    'pos.caisse.mini.dernieres':'Dernières ventes',
+    'pos.caisse.mini.topprod':'Top produits',
+    'pos.caisse.admin.perf':'Performance Bar — Aujourd\'hui',
+    'pos.caisse.admin.nbventes':'Nb Ventes',
+    'pos.caisse.admin.ca':  'CA Total',
+    'pos.caisse.admin.cash':'Cash Total',
+    'pos.caisse.admin.credit':'Crédit Total',
+    'pos.caisse.admin.classement':'Classement du jour',
+    'pos.caisse.loading':   'Chargement…',
+    'pos.caisse.search.ph': 'Rechercher un article par son nom…',
+    'pos.caisse.search.clear.title':'Effacer la recherche',
+    'pos.caisse.cat.all':   'Toutes les catégories',
+    'pos.caisse.btn.cuisine':'🍽️ Plats Cuisine',
+    'pos.caisse.btn.bar':   'Bar',
+    'pos.caisse.cart.title':'🛒 Panier',
+    'pos.caisse.cart.vider':'Vider',
+    'pos.caisse.cart.empty':'🛒<br>Ajoutez des articles',
+    'pos.caisse.cart.total':'Total',
+    'pos.caisse.client.label':'Client (pour crédit)',
+    'pos.caisse.client.ph': 'Nom du client (optionnel)',
+    'pos.caisse.mode.cash': 'CASH',
+    'pos.caisse.mode.credit':'CRÉDIT',
+    'pos.caisse.mode.mixte':'MIXTE',
+    'pos.caisse.recu.label':'Montant reçu du client',
+    'pos.caisse.paye.label':'Montant payé en cash',
+    'pos.caisse.encaisser': 'Encaisser',
+    'pos.caisse.encaisser.wait':'Traitement…',
+    'pos.caisse.statut.encours':'En cours',
+    'pos.caisse.statut.soumis':'Soumis',
+    'pos.caisse.statut.valide':'Validé',
+    'pos.caisse.aucune.vente':'Aucune vente',
+    'pos.caisse.err.selectcaissier':'Sélectionnez un caissier.',
+    'pos.caisse.err.ouvertureSession':'Erreur ouverture session',
+    'pos.caisse.confirm.soumettre.body':'Soumettre le rapport de caisse pour validation par l\'admin ?',
+    'pos.caisse.confirm.soumettre.title':'Soumettre rapport',
+    'pos.caisse.confirm.soumettre.ok':'Soumettre',
+    'pos.caisse.err.soumission':'Erreur soumission.',
+    'pos.caisse.ok.soumis':'Rapport soumis — l\'admin peut maintenant le valider.',
+    'pos.caisse.cat.allbar':'Toutes les catégories bar ({n})',
+    'pos.caisse.cat.cuisine':'🍽️ Plats Cuisine ({n})',
+    'pos.caisse.result.for':'{n} résultat(s) pour « {term} »',
+    'pos.caisse.result.none':'Aucun article trouvé pour « {term} »',
+    'pos.caisse.plats.none':'Aucun plat cuisine actif',
+    'pos.caisse.plats.count':'{n} plat(s)',
+    'pos.caisse.articles.count':'{n} article(s)',
+    'pos.caisse.produit.none':'Aucun produit dans cette catégorie',
+    'pos.caisse.stock.rupture':'Rupture',
+    'pos.caisse.stock.bas':'Stock bas',
+    'pos.caisse.stock.ok':'En stock',
+    'pos.caisse.badge.cuisine':'CUISINE',
+    'pos.caisse.monnaie.rendre':'Monnaie à rendre : G {v}',
+    'pos.caisse.monnaie.insuffisant':'Insuffisant : G {v} manquant',
+    'pos.caisse.err.panierVide':'Le panier est vide.',
+    'pos.caisse.err.montantInsuffisant':'Montant insuffisant. Il manque G {v}.',
+    'pos.caisse.err.encaissement':'Erreur encaissement.',
+    'pos.caisse.classement.cash':'Cash :',
+    'pos.caisse.classement.credit':'Crédit :',
+
     'resp.eyebrow':    'Avant de continuer',
     'resp.title':      'Charte de responsabilité',
     'resp.lead':       'Vous êtes connecté(e) au système de gestion de l\'institution. Merci de prendre connaissance des points suivants avant de poursuivre.',
@@ -11136,6 +11203,73 @@ const LANGS = {
     'pos.dash.dettes.ouvert.badge':'OPEN',
     'pos.dash.updated':     'Updated {time}',
 
+    'pos.caisse.title':     'POS Register',
+    'pos.caisse.subtitle':  'Real-time checkout — Bar / Restaurant',
+    'pos.caisse.sanscaissier':'No cashier',
+    'pos.caisse.soumettre': 'Submit report',
+    'pos.caisse.refresh':   '↻ Refresh',
+    'pos.caisse.mini.nbventes':'Nb sales',
+    'pos.caisse.mini.totalca':'Total revenue',
+    'pos.caisse.mini.cash':  'Cash collected',
+    'pos.caisse.mini.credit':'Credit',
+    'pos.caisse.mini.dernieres':'Latest sales',
+    'pos.caisse.mini.topprod':'Top products',
+    'pos.caisse.admin.perf':'Bar performance — Today',
+    'pos.caisse.admin.nbventes':'Nb Sales',
+    'pos.caisse.admin.ca':  'Total revenue',
+    'pos.caisse.admin.cash':'Total cash',
+    'pos.caisse.admin.credit':'Total credit',
+    'pos.caisse.admin.classement':'Today\'s ranking',
+    'pos.caisse.loading':   'Loading…',
+    'pos.caisse.search.ph': 'Search an item by name…',
+    'pos.caisse.search.clear.title':'Clear search',
+    'pos.caisse.cat.all':   'All categories',
+    'pos.caisse.btn.cuisine':'🍽️ Kitchen dishes',
+    'pos.caisse.btn.bar':   'Bar',
+    'pos.caisse.cart.title':'🛒 Cart',
+    'pos.caisse.cart.vider':'Clear',
+    'pos.caisse.cart.empty':'🛒<br>Add items',
+    'pos.caisse.cart.total':'Total',
+    'pos.caisse.client.label':'Customer (for credit)',
+    'pos.caisse.client.ph': 'Customer name (optional)',
+    'pos.caisse.mode.cash': 'CASH',
+    'pos.caisse.mode.credit':'CREDIT',
+    'pos.caisse.mode.mixte':'MIXED',
+    'pos.caisse.recu.label':'Amount received from customer',
+    'pos.caisse.paye.label':'Amount paid in cash',
+    'pos.caisse.encaisser': 'Charge',
+    'pos.caisse.encaisser.wait':'Processing…',
+    'pos.caisse.statut.encours':'In progress',
+    'pos.caisse.statut.soumis':'Submitted',
+    'pos.caisse.statut.valide':'Validated',
+    'pos.caisse.aucune.vente':'No sales',
+    'pos.caisse.err.selectcaissier':'Select a cashier.',
+    'pos.caisse.err.ouvertureSession':'Error opening session',
+    'pos.caisse.confirm.soumettre.body':'Submit the register report for admin validation?',
+    'pos.caisse.confirm.soumettre.title':'Submit report',
+    'pos.caisse.confirm.soumettre.ok':'Submit',
+    'pos.caisse.err.soumission':'Submission error.',
+    'pos.caisse.ok.soumis':'Report submitted — the admin can now validate it.',
+    'pos.caisse.cat.allbar':'All bar categories ({n})',
+    'pos.caisse.cat.cuisine':'🍽️ Kitchen dishes ({n})',
+    'pos.caisse.result.for':'{n} result(s) for "{term}"',
+    'pos.caisse.result.none':'No item found for "{term}"',
+    'pos.caisse.plats.none':'No active kitchen dish',
+    'pos.caisse.plats.count':'{n} dish(es)',
+    'pos.caisse.articles.count':'{n} item(s)',
+    'pos.caisse.produit.none':'No product in this category',
+    'pos.caisse.stock.rupture':'Out of stock',
+    'pos.caisse.stock.bas':'Low stock',
+    'pos.caisse.stock.ok':'In stock',
+    'pos.caisse.badge.cuisine':'KITCHEN',
+    'pos.caisse.monnaie.rendre':'Change due: G {v}',
+    'pos.caisse.monnaie.insuffisant':'Insufficient: G {v} missing',
+    'pos.caisse.err.panierVide':'The cart is empty.',
+    'pos.caisse.err.montantInsuffisant':'Insufficient amount. G {v} missing.',
+    'pos.caisse.err.encaissement':'Checkout error.',
+    'pos.caisse.classement.cash':'Cash:',
+    'pos.caisse.classement.credit':'Credit:',
+
     'resp.eyebrow':    'Before you continue',
     'resp.title':      'Responsibility charter',
     'resp.lead':       'You are logged into the institution\'s management system. Please review the following points before continuing.',
@@ -11566,6 +11700,73 @@ const LANGS = {
     'pos.dash.dettes.solde.badge':'SALDADO',
     'pos.dash.dettes.ouvert.badge':'ABIERTO',
     'pos.dash.updated':     'Actualizado {time}',
+
+    'pos.caisse.title':     'Caja POS',
+    'pos.caisse.subtitle':  'Cobro en tiempo real — Bar / Restaurante',
+    'pos.caisse.sanscaissier':'Sin cajero',
+    'pos.caisse.soumettre': 'Enviar reporte',
+    'pos.caisse.refresh':   '↻ Actualizar',
+    'pos.caisse.mini.nbventes':'N.° ventas',
+    'pos.caisse.mini.totalca':'Ingresos totales',
+    'pos.caisse.mini.cash':  'Efectivo cobrado',
+    'pos.caisse.mini.credit':'Crédito',
+    'pos.caisse.mini.dernieres':'Últimas ventas',
+    'pos.caisse.mini.topprod':'Productos más vendidos',
+    'pos.caisse.admin.perf':'Rendimiento del Bar — Hoy',
+    'pos.caisse.admin.nbventes':'N.° Ventas',
+    'pos.caisse.admin.ca':  'Ingresos totales',
+    'pos.caisse.admin.cash':'Efectivo total',
+    'pos.caisse.admin.credit':'Crédito total',
+    'pos.caisse.admin.classement':'Ranking del día',
+    'pos.caisse.loading':   'Cargando…',
+    'pos.caisse.search.ph': 'Buscar un artículo por nombre…',
+    'pos.caisse.search.clear.title':'Borrar búsqueda',
+    'pos.caisse.cat.all':   'Todas las categorías',
+    'pos.caisse.btn.cuisine':'🍽️ Platos de cocina',
+    'pos.caisse.btn.bar':   'Bar',
+    'pos.caisse.cart.title':'🛒 Carrito',
+    'pos.caisse.cart.vider':'Vaciar',
+    'pos.caisse.cart.empty':'🛒<br>Agregue artículos',
+    'pos.caisse.cart.total':'Total',
+    'pos.caisse.client.label':'Cliente (para crédito)',
+    'pos.caisse.client.ph': 'Nombre del cliente (opcional)',
+    'pos.caisse.mode.cash': 'EFECTIVO',
+    'pos.caisse.mode.credit':'CRÉDITO',
+    'pos.caisse.mode.mixte':'MIXTO',
+    'pos.caisse.recu.label':'Monto recibido del cliente',
+    'pos.caisse.paye.label':'Monto pagado en efectivo',
+    'pos.caisse.encaisser': 'Cobrar',
+    'pos.caisse.encaisser.wait':'Procesando…',
+    'pos.caisse.statut.encours':'En curso',
+    'pos.caisse.statut.soumis':'Enviado',
+    'pos.caisse.statut.valide':'Validado',
+    'pos.caisse.aucune.vente':'Sin ventas',
+    'pos.caisse.err.selectcaissier':'Seleccione un cajero.',
+    'pos.caisse.err.ouvertureSession':'Error al abrir la sesión',
+    'pos.caisse.confirm.soumettre.body':'¿Enviar el reporte de caja para validación del administrador?',
+    'pos.caisse.confirm.soumettre.title':'Enviar reporte',
+    'pos.caisse.confirm.soumettre.ok':'Enviar',
+    'pos.caisse.err.soumission':'Error al enviar.',
+    'pos.caisse.ok.soumis':'Reporte enviado — el administrador ya puede validarlo.',
+    'pos.caisse.cat.allbar':'Todas las categorías del bar ({n})',
+    'pos.caisse.cat.cuisine':'🍽️ Platos de cocina ({n})',
+    'pos.caisse.result.for':'{n} resultado(s) para «{term}»',
+    'pos.caisse.result.none':'Ningún artículo encontrado para «{term}»',
+    'pos.caisse.plats.none':'Ningún plato de cocina activo',
+    'pos.caisse.plats.count':'{n} plato(s)',
+    'pos.caisse.articles.count':'{n} artículo(s)',
+    'pos.caisse.produit.none':'Ningún producto en esta categoría',
+    'pos.caisse.stock.rupture':'Agotado',
+    'pos.caisse.stock.bas':'Stock bajo',
+    'pos.caisse.stock.ok':'En stock',
+    'pos.caisse.badge.cuisine':'COCINA',
+    'pos.caisse.monnaie.rendre':'Cambio a devolver: G {v}',
+    'pos.caisse.monnaie.insuffisant':'Insuficiente: faltan G {v}',
+    'pos.caisse.err.panierVide':'El carrito está vacío.',
+    'pos.caisse.err.montantInsuffisant':'Monto insuficiente. Faltan G {v}.',
+    'pos.caisse.err.encaissement':'Error al cobrar.',
+    'pos.caisse.classement.cash':'Efectivo:',
+    'pos.caisse.classement.credit':'Crédito:',
 
     'resp.eyebrow':    'Antes de continuar',
     'resp.title':      'Carta de responsabilidad',
@@ -20230,7 +20431,7 @@ async function _posDashLoadData(caissier_id){
       const s = d.session_statut||'EN_COURS';
       const colors = {EN_COURS:'rgba(247,169,59,.2);color:#f7a93b', SOUMIS:'rgba(99,210,190,.2);color:#3fb6a8', VALIDE:'rgba(63,182,168,.3);color:#3fb6a8'};
       statutEl.style.cssText = `background:${(colors[s]||'rgba(255,255,255,.1);color:rgba(255,255,255,.5)')};border-radius:20px;font-size:13px;padding:3px 10px;font-weight:700`;
-      statutEl.textContent = {EN_COURS:'En cours', SOUMIS:'Soumis', VALIDE:'Validé'}[s]||s;
+      statutEl.textContent = {EN_COURS:t('pos.caisse.statut.encours'), SOUMIS:t('pos.caisse.statut.soumis'), VALIDE:t('pos.caisse.statut.valide')}[s]||s;
     }
 
     const btnSoumettre = document.getElementById('pos-btn-soumettre');
@@ -20254,7 +20455,7 @@ async function _posDashLoadData(caissier_id){
           <span style="color:rgba(255,255,255,.5)">${e.heure} <span style="color:rgba(255,255,255,.25);font-size:12px">${e.ticket}</span></span>
           <span style="font-weight:700;color:#f7a93b">${posGx(e.montant)}</span>
         </div>`
-      ).join('') : '<div style="color:rgba(255,255,255,.3);font-size:13px;padding:4px">Aucune vente</div>';
+      ).join('') : `<div style="color:rgba(255,255,255,.3);font-size:13px;padding:4px">${t('pos.caisse.aucune.vente')}</div>`;
     }
 
     // Top produits
@@ -20280,19 +20481,19 @@ async function posSoumettreSession(){
   if(!_posDashSessionId){
     // Ouvrir d'abord une session
     const cid = document.getElementById('pos-caissier-sel')?.value;
-    if(!cid){ posAlert('Sélectionnez un caissier.'); return; }
+    if(!cid){ posAlert(t('pos.caisse.err.selectcaissier')); return; }
     try {
       const s = await apiFetch('POST', '/pos/caisse/sessions/ouvrir', {caissier_id: parseInt(cid)});
       _posDashSessionId = s.id;
-    } catch(e){ posAlert(e.message||'Erreur ouverture session'); return; }
+    } catch(e){ posAlert(e.message||t('pos.caisse.err.ouvertureSession')); return; }
   }
-  if(!await showConfirm('Soumettre le rapport de caisse pour validation par l\'admin ?', {title:'Soumettre rapport', okLabel:'Soumettre', type:'warn'})) return;
+  if(!await showConfirm(t('pos.caisse.confirm.soumettre.body'), {title:t('pos.caisse.confirm.soumettre.title'), okLabel:t('pos.caisse.confirm.soumettre.ok'), type:'warn'})) return;
   try {
     await apiFetch('POST', `/pos/caisse/sessions/${_posDashSessionId}/soumettre`, {});
     const cid = document.getElementById('pos-caissier-sel')?.value;
     if(cid) await _posDashLoadData(cid);
-    _giAlert('Rapport soumis — l\'admin peut maintenant le valider.', 'ok');
-  } catch(e){ posAlert(e.message||'Erreur soumission.'); }
+    _giAlert(t('pos.caisse.ok.soumis'), 'ok');
+  } catch(e){ posAlert(e.message||t('pos.caisse.err.soumission')); }
 }
 
 function posRenderCatTabs(){
@@ -20301,9 +20502,9 @@ function posRenderCatTabs(){
   const sel = document.getElementById('pos-cat-select');
   if(!sel) return;
   sel.innerHTML =
-    `<option value="TOUS">Toutes les catégories bar (${total})</option>` +
+    `<option value="TOUS">${t('pos.caisse.cat.allbar',{n:total})}</option>` +
     (_posCuisinePlats.length
-      ? `<option value="__CUISINE__">🍽️ Plats Cuisine (${_posCuisinePlats.length})</option>`
+      ? `<option value="__CUISINE__">${t('pos.caisse.cat.cuisine',{n:_posCuisinePlats.length})}</option>`
       : '') +
     cats.map(c=>{
       const n = _posProduits.filter(p=>p.categorie===c).length;
@@ -20333,7 +20534,7 @@ function _posCardProduitHTML(p){
   const stk = parseFloat(p.stock_courant??0);
   const rupture = stk <= 0;
   const stkClr = rupture ? '#f87171' : (p.stock_bas ? '#fb923c' : '#4ade80');
-  const stkTxt = rupture ? 'Rupture' : (p.stock_bas ? 'Stock bas' : 'En stock');
+  const stkTxt = rupture ? t('pos.caisse.stock.rupture') : (p.stock_bas ? t('pos.caisse.stock.bas') : t('pos.caisse.stock.ok'));
   const stkQte = stk % 1 === 0 ? stk.toFixed(0) : stk.toFixed(1);
   const stkBadge = `<div class="pos-produit-stock-badge" style="background:${stkClr}22;color:${stkClr};border:1px solid ${stkClr}44"><span class="pos-produit-stock-dot" style="background:${stkClr}"></span>${stkTxt} · ${stkQte}</div>`;
   return `<div class="pos-produit-card${rupture?' rupture':''}" onclick="posAjouterAuPanier(${p.id})">
@@ -20379,9 +20580,9 @@ function posRenderGrid(){
     const prodMatches = _posProduits.filter(p=>(p.nom||'').toLowerCase().includes(term));
     const platMatches = _posCuisinePlats.filter(p=>(p.nom||'').toLowerCase().includes(term));
     const total = prodMatches.length + platMatches.length;
-    if(cpt) cpt.textContent = `${total} résultat${total!==1?'s':''} pour « ${term} »`;
+    if(cpt) cpt.textContent = t('pos.caisse.result.for',{n:total,term});
     if(!total){
-      grid.innerHTML = `<div style="color:rgba(255,255,255,.3);font-size:14px;padding:20px">Aucun article trouvé pour « ${term} »</div>`;
+      grid.innerHTML = `<div style="color:rgba(255,255,255,.3);font-size:14px;padding:20px">${t('pos.caisse.result.none',{term})}</div>`;
       return;
     }
     grid.innerHTML = platMatches.map(_posCardPlatHTML).join('') + prodMatches.map(_posCardProduitHTML).join('');
@@ -20392,9 +20593,9 @@ function posRenderGrid(){
 
   if(cat === '__CUISINE__'){
     const plats = _posCuisinePlats;
-    if(cpt) cpt.textContent = `${plats.length} plat${plats.length!==1?'s':''}`;
+    if(cpt) cpt.textContent = t('pos.caisse.plats.count',{n:plats.length});
     if(!plats.length){
-      grid.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:14px;padding:20px">Aucun plat cuisine actif</div>';
+      grid.innerHTML = `<div style="color:rgba(255,255,255,.3);font-size:14px;padding:20px">${t('pos.caisse.plats.none')}</div>`;
       return;
     }
     grid.innerHTML = plats.map(_posCardPlatHTML).join('');
@@ -20402,9 +20603,9 @@ function posRenderGrid(){
   }
 
   const prods = cat==='TOUS' ? _posProduits : _posProduits.filter(p=>p.categorie===cat);
-  if(cpt) cpt.textContent = cat==='TOUS' ? '' : `${prods.length} article${prods.length!==1?'s':''}`;
+  if(cpt) cpt.textContent = cat==='TOUS' ? '' : t('pos.caisse.articles.count',{n:prods.length});
   if(!prods.length){
-    grid.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:14px;padding:20px">Aucun produit dans cette catégorie</div>';
+    grid.innerHTML = `<div style="color:rgba(255,255,255,.3);font-size:14px;padding:20px">${t('pos.caisse.produit.none')}</div>`;
     return;
   }
   grid.innerHTML = prods.map(_posCardProduitHTML).join('');
@@ -20455,7 +20656,7 @@ function posRenderCart(){
     countEl.style.display = nbArticles > 0 ? '' : 'none';
   }
   if(!_posCart.length){
-    wrap.innerHTML = '<div class="pos-cart-empty">🛒<br>Ajoutez des articles</div>';
+    wrap.innerHTML = `<div class="pos-cart-empty">${t('pos.caisse.cart.empty')}</div>`;
     if(totalEl) totalEl.textContent = 'G 0.00';
     if(encBtn) encBtn.disabled = true;
     return;
@@ -20465,7 +20666,7 @@ function posRenderCart(){
     const sous = it.prix * it.quantite;
     total += sous;
     const badge = it._cuisine
-      ? '<span style="font-size:11px;background:#f7a93b;color:#1a1a2e;border-radius:3px;padding:1px 5px;margin-left:5px;font-weight:700">CUISINE</span>'
+      ? `<span style="font-size:11px;background:#f7a93b;color:#1a1a2e;border-radius:3px;padding:1px 5px;margin-left:5px;font-weight:700">${t('pos.caisse.badge.cuisine')}</span>`
       : '';
     return `<div class="pos-cart-item">
       <div class="pos-cart-item-info">
@@ -20640,19 +20841,19 @@ function posCalcMonnaie(){
     display.style.background = 'rgba(63,182,168,.12)';
     display.style.border = '1px solid rgba(63,182,168,.35)';
     display.style.color = '#3fb6a8';
-    display.textContent = `Monnaie à rendre : G ${monnaie.toFixed(2)}`;
+    display.textContent = t('pos.caisse.monnaie.rendre',{v:monnaie.toFixed(2)});
   } else {
     display.style.background = 'rgba(248,113,113,.1)';
     display.style.border = '1px solid rgba(248,113,113,.3)';
     display.style.color = '#f87171';
-    display.textContent = `Insuffisant : G ${Math.abs(monnaie).toFixed(2)} manquant`;
+    display.textContent = t('pos.caisse.monnaie.insuffisant',{v:Math.abs(monnaie).toFixed(2)});
   }
 }
 
 async function posEncaisser(){
-  if(!_posCart.length){ posAlert('Le panier est vide.'); return; }
+  if(!_posCart.length){ posAlert(t('pos.caisse.err.panierVide')); return; }
   const btn = document.getElementById('pos-enc-btn');
-  btn.disabled = true; btn.textContent = 'Traitement…';
+  btn.disabled = true; btn.textContent = t('pos.caisse.encaisser.wait');
   try {
     const caissierSel = document.getElementById('pos-caissier-sel');
     const clientNom = (document.getElementById('pos-client-nom').value||'').trim();
@@ -20661,8 +20862,8 @@ async function posEncaisser(){
     if(_posMode==='CASH'){
       const total = _posCart.reduce((s,it)=>s+it.prix*it.quantite, 0);
       if(montantRecuVal > 0 && montantRecuVal < total){
-        btn.disabled = false; btn.textContent = 'Encaisser';
-        posAlert(`Montant insuffisant. Il manque G ${(total-montantRecuVal).toFixed(2)}.`, 'warn'); return;
+        btn.disabled = false; btn.textContent = t('pos.caisse.encaisser');
+        posAlert(t('pos.caisse.err.montantInsuffisant',{v:(total-montantRecuVal).toFixed(2)}), 'warn'); return;
       }
     }
     const montantPaye = _posMode==='MIXTE' ? parseFloat(document.getElementById('pos-montant-paye').value||0) : null;
@@ -20687,9 +20888,9 @@ async function posEncaisser(){
     posRenderCart();
     posShowReceipt(result, cartSnapshot, montantRecuVal, clientNom, _posMode, caissierNom);
   } catch(e){
-    posAlert(e.message||'Erreur encaissement.');
+    posAlert(e.message||t('pos.caisse.err.encaissement'));
   } finally {
-    btn.textContent = 'Encaisser';
+    btn.textContent = t('pos.caisse.encaisser');
   }
 }
 
@@ -22560,7 +22761,7 @@ async function posCaisseBarDashCharger(){
 
     if(rankWrap){
       if(!list.length){
-        rankWrap.innerHTML = '<div style="color:rgba(255,255,255,.25);font-size:14px;text-align:center;padding:12px">Aucune vente aujourd\'hui</div>';
+        rankWrap.innerHTML = `<div style="color:rgba(255,255,255,.25);font-size:14px;text-align:center;padding:12px">${t('pos.dash.classement.none')}</div>`;
       } else {
         const medals = ['🥇','🥈','🥉'];
         rankWrap.innerHTML = list.map((e,i)=>{
@@ -22577,9 +22778,9 @@ async function posCaisseBarDashCharger(){
                 <div style="height:100%;width:${pct}%;background:${isTop?'linear-gradient(90deg,#f7a93b,#f59e0b)':'linear-gradient(90deg,#3fb6a8,#2dd4bf)'};border-radius:4px"></div>
               </div>
               <div style="display:flex;gap:12px;margin-top:4px">
-                <span style="font-size:12px;color:rgba(255,255,255,.4)">${e.nb_ventes} vente${e.nb_ventes>1?'s':''}</span>
-                <span style="font-size:12px;color:#a78bfa">Cash: ${posGx(e.cash||0)}</span>
-                <span style="font-size:12px;color:#f87171">Crédit: ${posGx(e.credit||0)}</span>
+                <span style="font-size:12px;color:rgba(255,255,255,.4)">${t('pos.dash.classement.ventes',{n:e.nb_ventes})}</span>
+                <span style="font-size:12px;color:#a78bfa">${t('pos.caisse.classement.cash')} ${posGx(e.cash||0)}</span>
+                <span style="font-size:12px;color:#f87171">${t('pos.caisse.classement.credit')} ${posGx(e.credit||0)}</span>
               </div>
             </div>
           </div>`;
