@@ -24,7 +24,7 @@ from stock_service import (
 from models import Base
 
 MAX_TOOL_ROUNDS = 8
-GEMINI_MODELS   = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-001"]
+GEMINI_MODELS   = ["gemini-flash-latest", "gemini-flash-lite-latest"]
 CLAUDE_MODEL    = "claude-sonnet-4-6"
 
 
