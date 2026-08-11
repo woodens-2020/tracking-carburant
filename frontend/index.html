@@ -5729,17 +5729,17 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17h7M17 14v7"/></svg>
           </div>
           <div>
-            <div class="pos-header-title">Dashboard Bar</div>
-            <div class="pos-header-sub" id="posdb-date-sub">Tableau de bord temps réel — Bar / Restaurant</div>
+            <div class="pos-header-title" data-i18n="pos.dash.title">Dashboard Bar</div>
+            <div class="pos-header-sub" id="posdb-date-sub" data-i18n="pos.dash.subtitle">Tableau de bord temps réel — Bar / Restaurant</div>
           </div>
           <div class="pos-header-actions" style="align-items:center;gap:14px">
             <div style="display:flex;align-items:center;gap:6px">
               <span style="width:7px;height:7px;border-radius:50%;background:#4ade80;display:inline-block;animation:posdbPulse 1.5s infinite"></span>
-              <span style="font-size:13px;color:#4ade80;font-weight:700">LIVE</span>
+              <span style="font-size:13px;color:#4ade80;font-weight:700" data-i18n="pos.dash.live">LIVE</span>
             </div>
             <div id="posdb-clock" style="font-size:15px;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums;min-width:56px;text-align:right"></div>
             <span id="posdb-updated" style="font-size:12px;color:rgba(255,255,255,.3)"></span>
-            <button onclick="_posDbDashLoad()" style="background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.3);border-radius:9px;cursor:pointer;color:#4ade80;font-size:13px;font-weight:700;padding:5px 12px">↻ Actualiser</button>
+            <button onclick="_posDbDashLoad()" style="background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.3);border-radius:9px;cursor:pointer;color:#4ade80;font-size:13px;font-weight:700;padding:5px 12px" data-i18n="pos.dash.refresh">↻ Actualiser</button>
           </div>
         </div>
 
@@ -5747,11 +5747,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <!-- Presets rapides -->
           <div style="display:flex;gap:5px;flex-shrink:0" id="posdb-presets">
-            <button onclick="_posDbPreset('today')"     class="posdb-preset-btn" data-key="today">Aujourd'hui</button>
-            <button onclick="_posDbPreset('yesterday')" class="posdb-preset-btn" data-key="yesterday">Hier</button>
-            <button onclick="_posDbPreset('7j')"        class="posdb-preset-btn" data-key="7j">7 jours</button>
-            <button onclick="_posDbPreset('30j')"       class="posdb-preset-btn" data-key="30j">30 jours</button>
-            <button onclick="_posDbPreset('month')"     class="posdb-preset-btn" data-key="month">Ce mois</button>
+            <button onclick="_posDbPreset('today')"     class="posdb-preset-btn" data-key="today" data-i18n="dash.preset.today">Aujourd'hui</button>
+            <button onclick="_posDbPreset('yesterday')" class="posdb-preset-btn" data-key="yesterday" data-i18n="pos.dash.preset.yesterday">Hier</button>
+            <button onclick="_posDbPreset('7j')"        class="posdb-preset-btn" data-key="7j" data-i18n="dash.preset.7j">7 jours</button>
+            <button onclick="_posDbPreset('30j')"       class="posdb-preset-btn" data-key="30j" data-i18n="dash.preset.30j">30 jours</button>
+            <button onclick="_posDbPreset('month')"     class="posdb-preset-btn" data-key="month" data-i18n="dash.preset.mois">Ce mois</button>
           </div>
           <div style="width:1px;height:22px;background:rgba(255,255,255,.12);flex-shrink:0"></div>
           <!-- Dates -->
@@ -5764,18 +5764,18 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div style="width:1px;height:22px;background:rgba(255,255,255,.12);flex-shrink:0"></div>
           <!-- Employé -->
           <select id="posdb-f-caissier" class="pos-select" style="width:160px;padding:5px 10px;font-size:14px" onchange="_posDbDashLoad()">
-            <option value="">Tous les employés</option>
+            <option value="" data-i18n="pos.dash.employee.all">Tous les employés</option>
           </select>
           <!-- Mode paiement -->
           <select id="posdb-f-mode" class="pos-select" style="width:130px;padding:5px 10px;font-size:14px" onchange="_posDbDashLoad()">
-            <option value="">Tous modes</option>
-            <option value="CASH">Cash</option>
-            <option value="CREDIT">Crédit</option>
-            <option value="MIXTE">Mixte</option>
+            <option value="" data-i18n="pos.dash.mode.all">Tous modes</option>
+            <option value="CASH" data-i18n="pos.dash.mode.cash">Cash</option>
+            <option value="CREDIT" data-i18n="pos.dash.mode.credit">Crédit</option>
+            <option value="MIXTE" data-i18n="pos.dash.mode.mixte">Mixte</option>
           </select>
           <div style="flex:1"></div>
           <!-- Reset -->
-          <button onclick="_posDbReset()" style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:8px;cursor:pointer;color:rgba(255,255,255,.4);font-size:13px;padding:5px 12px;white-space:nowrap">✕ Réinitialiser</button>
+          <button onclick="_posDbReset()" style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:8px;cursor:pointer;color:rgba(255,255,255,.4);font-size:13px;padding:5px 12px;white-space:nowrap" data-i18n="pos.dash.reset">✕ Réinitialiser</button>
         </div>
 
         <!-- KPI Row -->
@@ -5787,7 +5787,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div style="width:28px;height:28px;border-radius:8px;background:rgba(74,222,128,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#4ade80" stroke-width="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
               </div>
-              <span style="font-size:12px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px">CA Jour</span>
+              <span style="font-size:12px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px" data-i18n="pos.dash.kpi.ca">CA Jour</span>
             </div>
             <div id="posdb-kpi-ca" style="font-size:22px;font-weight:800;color:#4ade80;margin-bottom:6px">—</div>
             <div id="posdb-kpi-ca-trend" style="font-size:13px;color:rgba(255,255,255,.35)">vs hier : —</div>
@@ -5799,7 +5799,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div style="width:28px;height:28px;border-radius:8px;background:rgba(167,139,250,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#a78bfa" stroke-width="2.5"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 12h.01M18 12h.01"/></svg>
               </div>
-              <span style="font-size:12px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px">Cash</span>
+              <span style="font-size:12px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px" data-i18n="pos.dash.kpi.cash">Cash</span>
             </div>
             <div id="posdb-kpi-cash" style="font-size:22px;font-weight:800;color:#a78bfa;margin-bottom:6px">—</div>
             <div id="posdb-kpi-cash-pct" style="font-size:13px;color:rgba(255,255,255,.35)">— % du CA</div>
@@ -5811,7 +5811,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div style="width:28px;height:28px;border-radius:8px;background:rgba(248,113,113,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#f87171" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
               </div>
-              <span style="font-size:12px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px">Crédit</span>
+              <span style="font-size:12px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px" data-i18n="pos.dash.kpi.credit">Crédit</span>
             </div>
             <div id="posdb-kpi-credit" style="font-size:22px;font-weight:800;color:#f87171;margin-bottom:6px">—</div>
             <div id="posdb-kpi-credit-pct" style="font-size:13px;color:rgba(255,255,255,.35)">— % du CA</div>
@@ -5823,7 +5823,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div style="width:28px;height:28px;border-radius:8px;background:rgba(247,169,59,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#f7a93b" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
               </div>
-              <span style="font-size:12px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px">Transactions</span>
+              <span style="font-size:12px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px" data-i18n="pos.dash.kpi.transactions">Transactions</span>
             </div>
             <div id="posdb-kpi-nb" style="font-size:27px;font-weight:800;color:#f7a93b;margin-bottom:6px">—</div>
             <div id="posdb-kpi-moy" style="font-size:13px;color:rgba(255,255,255,.35)">Moy / ticket : —</div>
@@ -5835,7 +5835,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div style="width:28px;height:28px;border-radius:8px;background:rgba(63,182,168,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#3fb6a8" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
               </div>
-              <span id="posdb-kpi-hier-lbl" style="font-size:12px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px">CA Hier</span>
+              <span id="posdb-kpi-hier-lbl" style="font-size:12px;color:rgba(255,255,255,.45);font-weight:600;text-transform:uppercase;letter-spacing:.6px" data-i18n="pos.dash.kpi.hier">CA Hier</span>
             </div>
             <div id="posdb-kpi-hier" style="font-size:22px;font-weight:800;color:#3fb6a8;margin-bottom:6px">—</div>
             <div id="posdb-kpi-delta" style="font-size:14px;font-weight:700">—</div>
@@ -5847,21 +5847,21 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <!-- Hourly area chart -->
           <div class="pos-card" style="padding:16px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-              <div id="posdb-chart-hdr" style="font-size:14px;font-weight:700;color:rgba(255,255,255,.8)">Ventes par heure — Aujourd'hui</div>
+              <div id="posdb-chart-hdr" style="font-size:14px;font-weight:700;color:rgba(255,255,255,.8)" data-i18n="pos.dash.chart.hourly.today">Ventes par heure — Aujourd'hui</div>
               <div style="display:flex;gap:12px">
-                <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,.45)"><span style="width:10px;height:3px;background:#4ade80;display:inline-block;border-radius:2px"></span>CA (G)</span>
-                <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,.45)"><span style="width:10px;height:3px;background:#f7a93b;display:inline-block;border-radius:2px"></span>Nb ventes</span>
+                <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,.45)"><span style="width:10px;height:3px;background:#4ade80;display:inline-block;border-radius:2px"></span><span data-i18n="pos.dash.legend.ca">CA (G)</span></span>
+                <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,.45)"><span style="width:10px;height:3px;background:#f7a93b;display:inline-block;border-radius:2px"></span><span data-i18n="pos.dash.legend.nbventes">Nb ventes</span></span>
               </div>
             </div>
             <div style="position:relative;height:180px"><canvas id="posdb-chart-heure"></canvas></div>
           </div>
           <!-- Donut mode paiement -->
           <div class="pos-card" style="padding:16px;display:flex;flex-direction:column">
-            <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:12px">Répartition des paiements</div>
+            <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:12px" data-i18n="pos.dash.payments.title">Répartition des paiements</div>
             <div style="position:relative;height:130px;display:flex;align-items:center;justify-content:center">
               <canvas id="posdb-chart-mode"></canvas>
               <div style="position:absolute;text-align:center;pointer-events:none">
-                <div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:2px">CA Total</div>
+                <div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:2px" data-i18n="pos.dash.payments.total">CA Total</div>
                 <div id="posdb-donut-center" style="font-size:17px;font-weight:800;color:#fff">—</div>
               </div>
             </div>
@@ -5875,26 +5875,26 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div style="display:grid;grid-template-columns:2fr 3fr;gap:12px;margin-bottom:12px">
           <!-- Classement caissières -->
           <div class="pos-card" style="padding:16px">
-            <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:14px">🏆 Classement du jour</div>
+            <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:14px" data-i18n="pos.dash.classement.title">🏆 Classement du jour</div>
             <div id="posdb-classement" style="display:flex;flex-direction:column;gap:8px">
-              <div style="color:rgba(255,255,255,.25);font-size:14px;text-align:center;padding:12px">Chargement…</div>
+              <div style="color:rgba(255,255,255,.25);font-size:14px;text-align:center;padding:12px" data-i18n="pos.dash.loading">Chargement…</div>
             </div>
           </div>
           <!-- Top Produits horizontal bar -->
           <div class="pos-card" style="padding:16px">
-            <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:14px">📦 Top produits — Aujourd'hui</div>
+            <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:14px" data-i18n="pos.dash.topprod.title">📦 Top produits — Aujourd'hui</div>
             <div style="position:relative;height:200px"><canvas id="posdb-chart-produits"></canvas></div>
           </div>
         </div>
 
         <!-- Transactions récentes -->
         <div class="pos-card">
-          <div class="pos-card-hdr">Transactions récentes</div>
+          <div class="pos-card-hdr" data-i18n="pos.dash.recent.title">Transactions récentes</div>
           <div class="pos-table-wrap">
             <table class="pos-table">
-              <thead><tr><th>Heure</th><th>Ticket</th><th>Caissière</th><th>Montant</th><th>Mode</th><th>Statut</th></tr></thead>
+              <thead><tr><th data-i18n="pos.dash.recent.col.heure">Heure</th><th data-i18n="pos.dash.recent.col.ticket">Ticket</th><th data-i18n="pos.dash.recent.col.caissiere">Caissière</th><th data-i18n="pos.dash.recent.col.montant">Montant</th><th data-i18n="pos.dash.recent.col.mode">Mode</th><th data-i18n="pos.dash.recent.col.statut">Statut</th></tr></thead>
               <tbody id="posdb-recents-tbody">
-                <tr><td colspan="6" style="text-align:center;color:rgba(255,255,255,.3);padding:18px">Chargement…</td></tr>
+                <tr><td colspan="6" style="text-align:center;color:rgba(255,255,255,.3);padding:18px" data-i18n="pos.dash.loading">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -5905,7 +5905,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-card-hdr" style="padding-bottom:14px">
             <span style="display:flex;align-items:center;gap:8px">
               <svg viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" style="width:16px;height:16px"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-              Dettes & Remboursements
+              <span data-i18n="pos.dash.dettes.title">Dettes & Remboursements</span>
             </span>
             <span id="posdb-dette-pct" style="font-size:13px;color:rgba(255,255,255,.4);font-weight:400"></span>
           </div>
@@ -5913,31 +5913,31 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <!-- 4 KPIs dettes -->
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px" id="posdb-dette-kpis">
             <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:14px;border:1px solid rgba(255,255,255,.07)">
-              <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Total dû (cumul)</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px" data-i18n="pos.dash.dettes.total_du">Total dû (cumul)</div>
               <div id="posdb-dette-du" style="font-size:20px;font-weight:800;color:#f87171">—</div>
               <div id="posdb-dette-nb" style="font-size:12px;color:rgba(255,255,255,.3);margin-top:3px">— dettes</div>
             </div>
             <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:14px;border:1px solid rgba(255,255,255,.07)">
-              <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Total remboursé</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px" data-i18n="pos.dash.dettes.total_remb">Total remboursé</div>
               <div id="posdb-dette-remb" style="font-size:20px;font-weight:800;color:#4ade80">—</div>
               <div id="posdb-dette-soldes" style="font-size:12px;color:rgba(255,255,255,.3);margin-top:3px">— soldées</div>
             </div>
             <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:14px;border:1px solid rgba(255,255,255,.07)">
-              <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Solde restant</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px" data-i18n="pos.dash.dettes.solde_restant">Solde restant</div>
               <div id="posdb-dette-solde" style="font-size:20px;font-weight:800;color:#f7a93b">—</div>
               <div id="posdb-dette-ouvertes" style="font-size:12px;color:rgba(255,255,255,.3);margin-top:3px">— encore ouvertes</div>
             </div>
             <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:14px;border:1px solid rgba(255,255,255,.07)">
-              <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Payé cette période</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px" data-i18n="pos.dash.dettes.paye_periode">Payé cette période</div>
               <div id="posdb-dette-periode" style="font-size:20px;font-weight:800;color:#a78bfa">—</div>
-              <div id="posdb-dette-periode-lbl" style="font-size:12px;color:rgba(255,255,255,.3);margin-top:3px">sur la période</div>
+              <div id="posdb-dette-periode-lbl" style="font-size:12px;color:rgba(255,255,255,.3);margin-top:3px" data-i18n="pos.dash.dettes.surperiode">sur la période</div>
             </div>
           </div>
 
           <!-- Barre de progression globale -->
           <div style="margin-bottom:16px">
             <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.4);margin-bottom:5px">
-              <span>Progression des remboursements</span>
+              <span data-i18n="pos.dash.dettes.progress">Progression des remboursements</span>
               <span id="posdb-dette-pct-bar">0%</span>
             </div>
             <div style="height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden">
@@ -5949,20 +5949,20 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:14px">
             <!-- Chart évolution remboursements -->
             <div>
-              <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.5);margin-bottom:10px">Évolution des paiements</div>
+              <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.5);margin-bottom:10px" data-i18n="pos.dash.dettes.evol">Évolution des paiements</div>
               <div style="position:relative;height:160px"><canvas id="posdb-dette-chart"></canvas></div>
             </div>
             <!-- Table par client -->
             <div>
-              <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.5);margin-bottom:10px">Détail par client</div>
+              <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.5);margin-bottom:10px" data-i18n="pos.dash.dettes.detail">Détail par client</div>
               <div style="overflow-y:auto;max-height:180px">
                 <table class="pos-table" style="font-size:13px">
                   <thead><tr>
-                    <th>Client</th>
-                    <th style="text-align:right">Dû</th>
-                    <th style="text-align:right">Remboursé</th>
-                    <th style="text-align:right">Reste</th>
-                    <th>Statut</th>
+                    <th data-i18n="pos.dash.dettes.col.client">Client</th>
+                    <th style="text-align:right" data-i18n="pos.dash.dettes.col.du">Dû</th>
+                    <th style="text-align:right" data-i18n="pos.dash.dettes.col.remb">Remboursé</th>
+                    <th style="text-align:right" data-i18n="pos.dash.dettes.col.reste">Reste</th>
+                    <th data-i18n="pos.dash.dettes.col.statut">Statut</th>
                   </tr></thead>
                   <tbody id="posdb-dette-tbody"></tbody>
                 </table>
@@ -10631,6 +10631,80 @@ const LANGS = {
     'dash.top.col.volume':  'Volume',
     'dash.top.col.perf':    'Performance relative',
 
+    'pos.dash.title':       'Dashboard Bar',
+    'pos.dash.subtitle':    'Tableau de bord temps réel — Bar / Restaurant',
+    'pos.dash.live':        'LIVE',
+    'pos.dash.refresh':     '↻ Actualiser',
+    'pos.dash.preset.yesterday': 'Hier',
+    'pos.dash.employee.all':'Tous les employés',
+    'pos.dash.mode.all':    'Tous modes',
+    'pos.dash.mode.cash':   'Cash',
+    'pos.dash.mode.credit': 'Crédit',
+    'pos.dash.mode.mixte':  'Mixte',
+    'pos.dash.reset':       '✕ Réinitialiser',
+    'pos.dash.kpi.ca':      'CA Jour',
+    'pos.dash.kpi.cash':    'Cash',
+    'pos.dash.kpi.credit':  'Crédit',
+    'pos.dash.kpi.transactions': 'Transactions',
+    'pos.dash.kpi.avgticket':'Moy / ticket : {v}',
+    'pos.dash.kpi.novente': 'Aucune vente',
+    'pos.dash.kpi.hier':    'CA Hier',
+    'pos.dash.kpi.precedente': 'Période préc.',
+    'pos.dash.pctofca':     '{pct} % du CA',
+    'pos.dash.trend.vshier':'vs hier',
+    'pos.dash.trend.vsNj':  'vs {n}j préc.',
+    'pos.dash.trend.value': '{sign} {pct} % {lbl}',
+    'pos.dash.trend.none':  'Aucune donnée précédente',
+    'pos.dash.trend.nodata.short':'Pas de données',
+    'pos.dash.chart.hourly.today':"Ventes par heure — Aujourd'hui",
+    'pos.dash.chart.daily': 'Ventes par jour — {n} jours',
+    'pos.dash.ndays':       '{n} jours',
+    'pos.dash.legend.ca':   'CA (G)',
+    'pos.dash.legend.nbventes':'Nb ventes',
+    'pos.dash.tooltip.ca':  'CA :',
+    'pos.dash.tooltip.ventes':'Ventes :',
+    'pos.dash.payments.title':'Répartition des paiements',
+    'pos.dash.payments.total':'CA Total',
+    'pos.dash.classement.title':'🏆 Classement du jour',
+    'pos.dash.classement.none':'Aucune vente aujourd\'hui',
+    'pos.dash.classement.ventes':'{n} vente(s)',
+    'pos.dash.topprod.title':'📦 Top produits — Aujourd\'hui',
+    'pos.dash.topprod.none':'Aucun produit vendu',
+    'pos.dash.topprod.units':'{n} unités',
+    'pos.dash.recent.title':'Transactions récentes',
+    'pos.dash.recent.col.heure':'Heure',
+    'pos.dash.recent.col.ticket':'Ticket',
+    'pos.dash.recent.col.caissiere':'Caissière',
+    'pos.dash.recent.col.montant':'Montant',
+    'pos.dash.recent.col.mode':'Mode',
+    'pos.dash.recent.col.statut':'Statut',
+    'pos.dash.recent.none': 'Aucune transaction aujourd\'hui',
+    'pos.dash.loading':     'Chargement…',
+    'pos.dash.dettes.title':'Dettes & Remboursements',
+    'pos.dash.dettes.total_du':'Total dû (cumul)',
+    'pos.dash.dettes.total_remb':'Total remboursé',
+    'pos.dash.dettes.solde_restant':'Solde restant',
+    'pos.dash.dettes.paye_periode':'Payé cette période',
+    'pos.dash.dettes.surperiode':'sur la période',
+    'pos.dash.dettes.nb':   '{n} dette(s)',
+    'pos.dash.dettes.soldes':'{n} soldée(s)',
+    'pos.dash.dettes.ouvertes':'{n} encore ouverte(s)',
+    'pos.dash.dettes.progress':'Progression des remboursements',
+    'pos.dash.dettes.pctremb':'{pct}% remboursé',
+    'pos.dash.dettes.evol': 'Évolution des paiements',
+    'pos.dash.dettes.detail':'Détail par client',
+    'pos.dash.dettes.col.client':'Client',
+    'pos.dash.dettes.col.du':'Dû',
+    'pos.dash.dettes.col.remb':'Remboursé',
+    'pos.dash.dettes.col.reste':'Reste',
+    'pos.dash.dettes.col.statut':'Statut',
+    'pos.dash.dettes.remboursed':'Remboursé',
+    'pos.dash.dettes.none': 'Aucun remboursement sur la période',
+    'pos.dash.dettes.aucune':'Aucune dette',
+    'pos.dash.dettes.solde.badge':'SOLDÉ',
+    'pos.dash.dettes.ouvert.badge':'OUVERT',
+    'pos.dash.updated':     'Mis à jour {time}',
+
     'resp.eyebrow':    'Avant de continuer',
     'resp.title':      'Charte de responsabilité',
     'resp.lead':       'Vous êtes connecté(e) au système de gestion de l\'institution. Merci de prendre connaissance des points suivants avant de poursuivre.',
@@ -10988,6 +11062,80 @@ const LANGS = {
     'dash.top.col.volume':  'Volume',
     'dash.top.col.perf':    'Relative performance',
 
+    'pos.dash.title':       'Bar Dashboard',
+    'pos.dash.subtitle':    'Real-time dashboard — Bar / Restaurant',
+    'pos.dash.live':        'LIVE',
+    'pos.dash.refresh':     '↻ Refresh',
+    'pos.dash.preset.yesterday': 'Yesterday',
+    'pos.dash.employee.all':'All employees',
+    'pos.dash.mode.all':    'All modes',
+    'pos.dash.mode.cash':   'Cash',
+    'pos.dash.mode.credit': 'Credit',
+    'pos.dash.mode.mixte':  'Mixed',
+    'pos.dash.reset':       '✕ Reset',
+    'pos.dash.kpi.ca':      'Revenue today',
+    'pos.dash.kpi.cash':    'Cash',
+    'pos.dash.kpi.credit':  'Credit',
+    'pos.dash.kpi.transactions': 'Transactions',
+    'pos.dash.kpi.avgticket':'Avg / ticket: {v}',
+    'pos.dash.kpi.novente': 'No sales',
+    'pos.dash.kpi.hier':    'Revenue yesterday',
+    'pos.dash.kpi.precedente': 'Previous period',
+    'pos.dash.pctofca':     '{pct} % of revenue',
+    'pos.dash.trend.vshier':'vs yesterday',
+    'pos.dash.trend.vsNj':  'vs prev. {n}d',
+    'pos.dash.trend.value': '{sign} {pct} % {lbl}',
+    'pos.dash.trend.none':  'No previous data',
+    'pos.dash.trend.nodata.short':'No data',
+    'pos.dash.chart.hourly.today':'Sales by hour — Today',
+    'pos.dash.chart.daily': 'Sales by day — {n} days',
+    'pos.dash.ndays':       '{n} days',
+    'pos.dash.legend.ca':   'Revenue (G)',
+    'pos.dash.legend.nbventes':'Nb sales',
+    'pos.dash.tooltip.ca':  'Revenue:',
+    'pos.dash.tooltip.ventes':'Sales:',
+    'pos.dash.payments.title':'Payment breakdown',
+    'pos.dash.payments.total':'Total revenue',
+    'pos.dash.classement.title':'🏆 Today\'s ranking',
+    'pos.dash.classement.none':'No sales today',
+    'pos.dash.classement.ventes':'{n} sale(s)',
+    'pos.dash.topprod.title':'📦 Top products — Today',
+    'pos.dash.topprod.none':'No products sold',
+    'pos.dash.topprod.units':'{n} units',
+    'pos.dash.recent.title':'Recent transactions',
+    'pos.dash.recent.col.heure':'Time',
+    'pos.dash.recent.col.ticket':'Ticket',
+    'pos.dash.recent.col.caissiere':'Cashier',
+    'pos.dash.recent.col.montant':'Amount',
+    'pos.dash.recent.col.mode':'Mode',
+    'pos.dash.recent.col.statut':'Status',
+    'pos.dash.recent.none': 'No transactions today',
+    'pos.dash.loading':     'Loading…',
+    'pos.dash.dettes.title':'Debts & Refunds',
+    'pos.dash.dettes.total_du':'Total owed (cumulative)',
+    'pos.dash.dettes.total_remb':'Total refunded',
+    'pos.dash.dettes.solde_restant':'Remaining balance',
+    'pos.dash.dettes.paye_periode':'Paid this period',
+    'pos.dash.dettes.surperiode':'over the period',
+    'pos.dash.dettes.nb':   '{n} debt(s)',
+    'pos.dash.dettes.soldes':'{n} settled',
+    'pos.dash.dettes.ouvertes':'{n} still open',
+    'pos.dash.dettes.progress':'Refund progress',
+    'pos.dash.dettes.pctremb':'{pct}% refunded',
+    'pos.dash.dettes.evol': 'Payment history',
+    'pos.dash.dettes.detail':'Detail by customer',
+    'pos.dash.dettes.col.client':'Customer',
+    'pos.dash.dettes.col.du':'Owed',
+    'pos.dash.dettes.col.remb':'Refunded',
+    'pos.dash.dettes.col.reste':'Remaining',
+    'pos.dash.dettes.col.statut':'Status',
+    'pos.dash.dettes.remboursed':'Refunded',
+    'pos.dash.dettes.none': 'No refunds for this period',
+    'pos.dash.dettes.aucune':'No debts',
+    'pos.dash.dettes.solde.badge':'SETTLED',
+    'pos.dash.dettes.ouvert.badge':'OPEN',
+    'pos.dash.updated':     'Updated {time}',
+
     'resp.eyebrow':    'Before you continue',
     'resp.title':      'Responsibility charter',
     'resp.lead':       'You are logged into the institution\'s management system. Please review the following points before continuing.',
@@ -11344,6 +11492,80 @@ const LANGS = {
     'dash.top.col.montant': 'Monto',
     'dash.top.col.volume':  'Volumen',
     'dash.top.col.perf':    'Rendimiento relativo',
+
+    'pos.dash.title':       'Panel del Bar',
+    'pos.dash.subtitle':    'Panel en tiempo real — Bar / Restaurante',
+    'pos.dash.live':        'EN VIVO',
+    'pos.dash.refresh':     '↻ Actualizar',
+    'pos.dash.preset.yesterday': 'Ayer',
+    'pos.dash.employee.all':'Todos los empleados',
+    'pos.dash.mode.all':    'Todos los modos',
+    'pos.dash.mode.cash':   'Efectivo',
+    'pos.dash.mode.credit': 'Crédito',
+    'pos.dash.mode.mixte':  'Mixto',
+    'pos.dash.reset':       '✕ Restablecer',
+    'pos.dash.kpi.ca':      'Ingresos del día',
+    'pos.dash.kpi.cash':    'Efectivo',
+    'pos.dash.kpi.credit':  'Crédito',
+    'pos.dash.kpi.transactions': 'Transacciones',
+    'pos.dash.kpi.avgticket':'Prom / ticket: {v}',
+    'pos.dash.kpi.novente': 'Sin ventas',
+    'pos.dash.kpi.hier':    'Ingresos de ayer',
+    'pos.dash.kpi.precedente': 'Período anterior',
+    'pos.dash.pctofca':     '{pct} % de ingresos',
+    'pos.dash.trend.vshier':'vs ayer',
+    'pos.dash.trend.vsNj':  'vs {n}d ant.',
+    'pos.dash.trend.value': '{sign} {pct} % {lbl}',
+    'pos.dash.trend.none':  'Sin datos anteriores',
+    'pos.dash.trend.nodata.short':'Sin datos',
+    'pos.dash.chart.hourly.today':'Ventas por hora — Hoy',
+    'pos.dash.chart.daily': 'Ventas por día — {n} días',
+    'pos.dash.ndays':       '{n} días',
+    'pos.dash.legend.ca':   'Ingresos (G)',
+    'pos.dash.legend.nbventes':'N.° ventas',
+    'pos.dash.tooltip.ca':  'Ingresos:',
+    'pos.dash.tooltip.ventes':'Ventas:',
+    'pos.dash.payments.title':'Distribución de pagos',
+    'pos.dash.payments.total':'Ingresos totales',
+    'pos.dash.classement.title':'🏆 Ranking del día',
+    'pos.dash.classement.none':'Sin ventas hoy',
+    'pos.dash.classement.ventes':'{n} venta(s)',
+    'pos.dash.topprod.title':'📦 Productos más vendidos — Hoy',
+    'pos.dash.topprod.none':'Ningún producto vendido',
+    'pos.dash.topprod.units':'{n} unidades',
+    'pos.dash.recent.title':'Transacciones recientes',
+    'pos.dash.recent.col.heure':'Hora',
+    'pos.dash.recent.col.ticket':'Ticket',
+    'pos.dash.recent.col.caissiere':'Cajera',
+    'pos.dash.recent.col.montant':'Monto',
+    'pos.dash.recent.col.mode':'Modo',
+    'pos.dash.recent.col.statut':'Estado',
+    'pos.dash.recent.none': 'Sin transacciones hoy',
+    'pos.dash.loading':     'Cargando…',
+    'pos.dash.dettes.title':'Deudas y reembolsos',
+    'pos.dash.dettes.total_du':'Total adeudado (acumulado)',
+    'pos.dash.dettes.total_remb':'Total reembolsado',
+    'pos.dash.dettes.solde_restant':'Saldo restante',
+    'pos.dash.dettes.paye_periode':'Pagado este período',
+    'pos.dash.dettes.surperiode':'en el período',
+    'pos.dash.dettes.nb':   '{n} deuda(s)',
+    'pos.dash.dettes.soldes':'{n} saldada(s)',
+    'pos.dash.dettes.ouvertes':'{n} aún abierta(s)',
+    'pos.dash.dettes.progress':'Progreso de reembolsos',
+    'pos.dash.dettes.pctremb':'{pct}% reembolsado',
+    'pos.dash.dettes.evol': 'Historial de pagos',
+    'pos.dash.dettes.detail':'Detalle por cliente',
+    'pos.dash.dettes.col.client':'Cliente',
+    'pos.dash.dettes.col.du':'Adeudado',
+    'pos.dash.dettes.col.remb':'Reembolsado',
+    'pos.dash.dettes.col.reste':'Restante',
+    'pos.dash.dettes.col.statut':'Estado',
+    'pos.dash.dettes.remboursed':'Reembolsado',
+    'pos.dash.dettes.none': 'Sin reembolsos en este período',
+    'pos.dash.dettes.aucune':'Sin deudas',
+    'pos.dash.dettes.solde.badge':'SALDADO',
+    'pos.dash.dettes.ouvert.badge':'ABIERTO',
+    'pos.dash.updated':     'Actualizado {time}',
 
     'resp.eyebrow':    'Antes de continuar',
     'resp.title':      'Carta de responsabilidad',
@@ -19471,8 +19693,8 @@ async function _posDbDashLoad(){
 
     const upd = document.getElementById('posdb-updated');
     if(upd){
-      const t = new Date();
-      upd.textContent = `Mis à jour ${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}`;
+      const tt = new Date();
+      upd.textContent = t('pos.dash.updated',{time:`${tt.getHours().toString().padStart(2,'0')}:${tt.getMinutes().toString().padStart(2,'0')}`});
     }
   } catch(e){
     ['posdb-kpi-ca','posdb-kpi-cash','posdb-kpi-credit','posdb-kpi-nb','posdb-kpi-hier'].forEach(id=>{
@@ -19485,15 +19707,14 @@ async function _posDbDashLoad(){
 function _posDbUpdateSubtitle(meta, caissId, mode){
   const sub = document.getElementById('posdb-date-sub');
   if(!sub) return;
-  const jours = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
-  const now = new Date();
+  const dayKeys = ['dim','lun','mar','mer','jeu','ven','sam'];
   let parts = [];
   if(meta.is_single){
     const d = new Date(meta.date_debut + 'T12:00:00');
-    parts.push(jours[d.getDay()] + ' ' + d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}));
+    parts.push(t('home.day.'+dayKeys[d.getDay()]) + ' ' + d.toLocaleDateString(_locale(),{day:'2-digit',month:'long',year:'numeric'}));
   } else {
-    const fmt = s => new Date(s+'T12:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
-    parts.push(`${fmt(meta.date_debut)} → ${fmt(meta.date_fin)} (${meta.nb_jours} jours)`);
+    const fmt = s => new Date(s+'T12:00:00').toLocaleDateString(_locale(),{day:'2-digit',month:'short'});
+    parts.push(`${fmt(meta.date_debut)} → ${fmt(meta.date_fin)} (${t('pos.dash.ndays',{n:meta.nb_jours})})`);
   }
   const sel = document.getElementById('posdb-f-caissier');
   if(caissId && sel) parts.push(sel.options[sel.selectedIndex]?.text || '');
@@ -19550,7 +19771,7 @@ function _posDbRenderKpis(k, meta){
   const nb     = k.nb_ventes   || 0;
   const prev   = k.ca_hier     || 0;
   const nbJ    = meta?.nb_jours || 1;
-  const prevLbl = nbJ === 1 ? 'vs hier' : `vs ${nbJ}j préc.`;
+  const prevLbl = nbJ === 1 ? t('pos.dash.trend.vshier') : t('pos.dash.trend.vsNj',{n:nbJ});
 
   const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
 
@@ -19560,13 +19781,13 @@ function _posDbRenderKpis(k, meta){
   set('posdb-kpi-nb',     nb);
   set('posdb-kpi-hier',   posGx(prev));
 
-  set('posdb-kpi-cash-pct',   ca > 0 ? `${Math.round(cash/ca*100)} % du CA` : '—');
-  set('posdb-kpi-credit-pct', ca > 0 ? `${Math.round(credit/ca*100)} % du CA` : '—');
-  set('posdb-kpi-moy',        nb > 0 ? `Moy / ticket : ${posGx(ca/nb)}` : 'Aucune vente');
+  set('posdb-kpi-cash-pct',   ca > 0 ? t('pos.dash.pctofca',{pct:Math.round(cash/ca*100)}) : '—');
+  set('posdb-kpi-credit-pct', ca > 0 ? t('pos.dash.pctofca',{pct:Math.round(credit/ca*100)}) : '—');
+  set('posdb-kpi-moy',        nb > 0 ? t('pos.dash.kpi.avgticket',{v:posGx(ca/nb)}) : t('pos.dash.kpi.novente'));
 
   // Libellé "CA Hier" / "CA Période préc."
   const hierLblEl = document.getElementById('posdb-kpi-hier-lbl');
-  if(hierLblEl) hierLblEl.textContent = nbJ === 1 ? 'CA Hier' : 'Période préc.';
+  if(hierLblEl) hierLblEl.textContent = nbJ === 1 ? t('pos.dash.kpi.hier') : t('pos.dash.kpi.precedente');
 
   const trendEl = document.getElementById('posdb-kpi-ca-trend');
   const deltaEl = document.getElementById('posdb-kpi-delta');
@@ -19575,11 +19796,11 @@ function _posDbRenderKpis(k, meta){
     const up   = ca >= prev;
     const sign = up ? '▲' : '▼';
     const col  = up ? '#4ade80' : '#f87171';
-    if(trendEl){ trendEl.textContent = `${sign} ${Math.abs(pct)} % ${prevLbl}`; trendEl.style.color = col; }
+    if(trendEl){ trendEl.textContent = t('pos.dash.trend.value',{sign,pct:Math.abs(pct),lbl:prevLbl}); trendEl.style.color = col; }
     if(deltaEl){ deltaEl.innerHTML = `<span style="color:${col};font-weight:700">${sign} ${Math.abs(pct)} %</span><span style="color:rgba(255,255,255,.4);font-size:12px"> ${prevLbl}</span>`; }
   } else {
-    if(trendEl){ trendEl.textContent = 'Aucune donnée précédente'; trendEl.style.color = 'rgba(255,255,255,.35)'; }
-    if(deltaEl){ deltaEl.innerHTML = '<span style="color:rgba(255,255,255,.4);font-size:12px">Pas de données</span>'; }
+    if(trendEl){ trendEl.textContent = t('pos.dash.trend.none'); trendEl.style.color = 'rgba(255,255,255,.35)'; }
+    if(deltaEl){ deltaEl.innerHTML = `<span style="color:rgba(255,255,255,.4);font-size:12px">${t('pos.dash.trend.nodata.short')}</span>`; }
   }
 }
 
@@ -19627,7 +19848,7 @@ function _posDbRenderPeriode(parPeriode, meta){
       labels,
       datasets: [
         {
-          label: 'CA (G)',
+          label: t('pos.dash.legend.ca'),
           data: caData,
           fill: true,
           backgroundColor: gradient,
@@ -19640,7 +19861,7 @@ function _posDbRenderPeriode(parPeriode, meta){
           yAxisID: 'y',
         },
         {
-          label: 'Nb ventes',
+          label: t('pos.dash.legend.nbventes'),
           data: nbData,
           fill: false,
           borderColor: '#f7a93b',
@@ -19669,7 +19890,7 @@ function _posDbRenderPeriode(parPeriode, meta){
           borderColor: 'rgba(255,255,255,.1)',
           borderWidth: 1,
           callbacks: {
-            label: c => c.datasetIndex === 0 ? ' CA : ' + posGx(c.raw) : ' Ventes : ' + c.raw,
+            label: c => c.datasetIndex === 0 ? ' '+t('pos.dash.tooltip.ca')+' ' + posGx(c.raw) : ' '+t('pos.dash.tooltip.ventes')+' ' + c.raw,
           },
         },
       },
@@ -19678,7 +19899,7 @@ function _posDbRenderPeriode(parPeriode, meta){
 
   // Mettre à jour le titre du chart selon la granularité
   const hdrEl = document.getElementById('posdb-chart-hdr');
-  if(hdrEl) hdrEl.textContent = isSingle ? 'Ventes par heure — Aujourd\'hui' : `Ventes par jour — ${meta.nb_jours} jours`;
+  if(hdrEl) hdrEl.textContent = isSingle ? t('pos.dash.chart.hourly.today') : t('pos.dash.chart.daily',{n:meta.nb_jours});
 }
 
 function _posDbRenderMode(parMode, caTotal){
@@ -19688,9 +19909,9 @@ function _posDbRenderMode(parMode, caTotal){
   if(!ctx) return;
 
   const MODES = [
-    { key: 'CASH',   label: 'Cash',   color: '#4ade80' },
-    { key: 'CREDIT', label: 'Crédit', color: '#f87171' },
-    { key: 'MIXTE',  label: 'Mixte',  color: '#a78bfa' },
+    { key: 'CASH',   label: t('pos.dash.mode.cash'),   color: '#4ade80' },
+    { key: 'CREDIT', label: t('pos.dash.mode.credit'), color: '#f87171' },
+    { key: 'MIXTE',  label: t('pos.dash.mode.mixte'),  color: '#a78bfa' },
   ];
 
   const vals   = MODES.map(m => parMode[m.key] || 0);
@@ -19746,7 +19967,7 @@ function _posDbRenderClassement(parCaissier){
   if(!wrap) return;
   const list = parCaissier || [];
   if(!list.length){
-    wrap.innerHTML = '<div style="color:rgba(255,255,255,.25);font-size:14px;text-align:center;padding:12px">Aucune vente aujourd\'hui</div>';
+    wrap.innerHTML = `<div style="color:rgba(255,255,255,.25);font-size:14px;text-align:center;padding:12px">${t('pos.dash.classement.none')}</div>`;
     return;
   }
   const max    = Math.max(...list.map(e => e.total || 0));
@@ -19760,7 +19981,7 @@ function _posDbRenderClassement(parCaissier){
         <span style="font-size:18px;flex-shrink:0">${medals[i]||`<span style="font-size:13px;color:rgba(255,255,255,.35)">${i+1}</span>`}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:14px;font-weight:700;color:${col};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.nom}</div>
-          <div style="font-size:12px;color:rgba(255,255,255,.35)">${e.nb_ventes} vente${e.nb_ventes>1?'s':''}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.35)">${t('pos.dash.classement.ventes',{n:e.nb_ventes})}</div>
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-size:15px;font-weight:800;color:#4ade80">${posGx(e.total)}</div>
@@ -19786,7 +20007,7 @@ function _posDbRenderProduits(topProduits){
 
   if(!prods.length){
     const parent = ctx.parentElement;
-    if(parent) parent.innerHTML = '<div style="color:rgba(255,255,255,.25);font-size:14px;text-align:center;padding:30px">Aucun produit vendu</div>';
+    if(parent) parent.innerHTML = `<div style="color:rgba(255,255,255,.25);font-size:14px;text-align:center;padding:30px">${t('pos.dash.topprod.none')}</div>`;
     return;
   }
 
@@ -19797,7 +20018,7 @@ function _posDbRenderProduits(topProduits){
     data: {
       labels: prods.map(p => p.nom.length > 20 ? p.nom.slice(0,18)+'…' : p.nom),
       datasets: [{
-        label: 'CA (G)',
+        label: t('pos.dash.legend.ca'),
         data:  prods.map(p => p.total),
         backgroundColor: prods.map((_,i) => GRAD_COLORS[i % GRAD_COLORS.length] + 'cc'),
         borderColor:     prods.map((_,i) => GRAD_COLORS[i % GRAD_COLORS.length]),
@@ -19818,7 +20039,7 @@ function _posDbRenderProduits(topProduits){
         tooltip: {
           backgroundColor: 'rgba(15,20,35,.92)',
           callbacks: {
-            label: ctx => ` ${posGx(ctx.raw)} — ${(topProduits||[])[ctx.dataIndex]?.quantite||0} unités`,
+            label: ctx => ` ${posGx(ctx.raw)} — ${t('pos.dash.topprod.units',{n:(topProduits||[])[ctx.dataIndex]?.quantite||0})}`,
           },
         },
       },
@@ -19831,7 +20052,7 @@ function _posDbRenderRecents(recents){
   if(!tbody) return;
   const list = recents || [];
   if(!list.length){
-    tbody.innerHTML = '<tr><td colspan="6" style="color:rgba(255,255,255,.3);text-align:center;padding:18px">Aucune transaction aujourd\'hui</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="6" style="color:rgba(255,255,255,.3);text-align:center;padding:18px">${t('pos.dash.recent.none')}</td></tr>`;
     return;
   }
   const modeColors = { CASH:'#4ade80', CREDIT:'#f87171', MIXTE:'#a78bfa' };
@@ -19854,13 +20075,13 @@ function _posDbRenderDettes(dettes, meta){
   const pct = dettes.total_du > 0 ? (dettes.total_rembourse / dettes.total_du * 100) : 0;
   const set = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
   set('posdb-dette-du',       gx(dettes.total_du));
-  set('posdb-dette-nb',       dettes.nb_ouvertes + dettes.nb_soldes + ' dette(s)');
+  set('posdb-dette-nb',       t('pos.dash.dettes.nb',{n:dettes.nb_ouvertes + dettes.nb_soldes}));
   set('posdb-dette-remb',     gx(dettes.total_rembourse));
-  set('posdb-dette-soldes',   dettes.nb_soldes + ' soldée(s)');
+  set('posdb-dette-soldes',   t('pos.dash.dettes.soldes',{n:dettes.nb_soldes}));
   set('posdb-dette-solde',    gx(dettes.solde_total));
-  set('posdb-dette-ouvertes', dettes.nb_ouvertes + ' encore ouverte(s)');
+  set('posdb-dette-ouvertes', t('pos.dash.dettes.ouvertes',{n:dettes.nb_ouvertes}));
   set('posdb-dette-periode',  gx(dettes.rembs_periode));
-  set('posdb-dette-pct',      pct.toFixed(1) + '% remboursé');
+  set('posdb-dette-pct',      t('pos.dash.dettes.pctremb',{pct:pct.toFixed(1)}));
   set('posdb-dette-pct-bar',  pct.toFixed(1) + '%');
   const bar = document.getElementById('posdb-dette-bar');
   if(bar) bar.style.width = Math.min(pct, 100).toFixed(1) + '%';
@@ -19876,7 +20097,7 @@ function _posDbRenderDettes(dettes, meta){
         data: {
           labels: pts.map(p => { const d = new Date(p.date); return d.getDate()+'/'+(d.getMonth()+1); }),
           datasets: [{
-            label: 'Remboursé',
+            label: t('pos.dash.dettes.remboursed'),
             data: pts.map(p => p.montant),
             backgroundColor: 'rgba(74,222,128,.7)',
             borderColor: '#4ade80',
@@ -19894,7 +20115,7 @@ function _posDbRenderDettes(dettes, meta){
         }
       });
     } else {
-      ctx.parentElement.innerHTML = '<div style="color:rgba(255,255,255,.25);font-size:14px;text-align:center;padding:40px 0">Aucun remboursement sur la période</div>';
+      ctx.parentElement.innerHTML = `<div style="color:rgba(255,255,255,.25);font-size:14px;text-align:center;padding:40px 0">${t('pos.dash.dettes.none')}</div>`;
     }
   }
 
@@ -19903,14 +20124,14 @@ function _posDbRenderDettes(dettes, meta){
   if(tbody){
     const clients = dettes.par_client || [];
     if(!clients.length){
-      tbody.innerHTML = '<tr><td colspan="5" style="color:rgba(255,255,255,.3);text-align:center;padding:16px">Aucune dette</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="5" style="color:rgba(255,255,255,.3);text-align:center;padding:16px">${t('pos.dash.dettes.aucune')}</td></tr>`;
       return;
     }
     tbody.innerHTML = clients.map(c => {
       const pctC = c.montant_du > 0 ? (c.rembourse / c.montant_du * 100) : 0;
       const badge = c.statut === 'SOLDE'
-        ? '<span style="font-size:11px;padding:2px 6px;border-radius:4px;background:rgba(74,222,128,.15);color:#4ade80;font-weight:700">SOLDÉ</span>'
-        : '<span style="font-size:11px;padding:2px 6px;border-radius:4px;background:rgba(248,113,113,.15);color:#f87171;font-weight:700">OUVERT</span>';
+        ? `<span style="font-size:11px;padding:2px 6px;border-radius:4px;background:rgba(74,222,128,.15);color:#4ade80;font-weight:700">${t('pos.dash.dettes.solde.badge')}</span>`
+        : `<span style="font-size:11px;padding:2px 6px;border-radius:4px;background:rgba(248,113,113,.15);color:#f87171;font-weight:700">${t('pos.dash.dettes.ouvert.badge')}</span>`;
       const progColor = c.statut === 'SOLDE' ? '#4ade80' : (pctC > 50 ? '#f7a93b' : '#f87171');
       return `<tr>
         <td>
