@@ -114,6 +114,17 @@ body{
 }
 .brand-sub strong{color:rgba(232,197,88,.7);font-weight:600}
 
+/* ═══ SÉLECTEUR DE LANGUE ═══════════════════════════════════════ */
+.lang-switcher{display:flex;gap:6px;margin-top:14px}
+.lang-btn{
+  display:inline-flex;align-items:center;padding:4px 10px;height:26px;
+  border-radius:7px;border:1px solid rgba(78,109,149,.3);
+  background:transparent;color:var(--muted);font-size:12px;font-weight:700;
+  cursor:pointer;transition:all .15s;font-family:var(--f);letter-spacing:.02em;
+}
+.lang-btn:hover{border-color:var(--gold);color:var(--gold)}
+.lang-btn.active-lang{background:rgba(232,197,88,.1);border-color:var(--gold);color:var(--gold)}
+
 /* ═══ TITRE SECTION ════════════════════════════════════════════ */
 .section-title{
   font-size:13px;font-weight:700;text-transform:uppercase;
@@ -408,6 +419,7 @@ body{
 
 <div id="load-overlay"><div class="lo-badge"><div class="lo-ring"></div><span class="lo-k">K</span></div></div>
 <script src="/shared/loading-overlay.js"></script>
+<script src="/shared/i18n-errors.js"></script>
 
 <canvas id="bg-canvas"></canvas>
 <div class="vignette"></div>
@@ -452,6 +464,11 @@ body{
       <div class="brand-name">Konekta</div>
       <div class="brand-sep"></div>
       <div class="brand-sub"><strong>Bon Prix</strong> · Complexe Commerciale de Pillatre</div>
+      <div class="lang-switcher">
+        <button type="button" class="lang-btn" id="btn-lang-fr" onclick="setLang('fr')">FR</button>
+        <button type="button" class="lang-btn" id="btn-lang-en" onclick="setLang('en')">EN</button>
+        <button type="button" class="lang-btn" id="btn-lang-es" onclick="setLang('es')">ES</button>
+      </div>
     </div>
 
     <!-- ── Message d'erreur global ── -->
@@ -468,7 +485,7 @@ body{
 
         <!-- Email -->
         <div class="field">
-          <label class="field-label" for="email">Adresse email</label>
+          <label class="field-label" for="email" data-i18n="login.email">Adresse email</label>
           <div class="input-wrap">
             <span class="input-icon">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -477,14 +494,14 @@ body{
               </svg>
             </span>
             <input type="email" id="email" name="email"
-              autocomplete="email" placeholder="vous@exemple.com"
+              autocomplete="email" placeholder="vous@exemple.com" data-i18n-ph="login.email.ph"
               required autofocus>
           </div>
         </div>
 
         <!-- Mot de passe -->
         <div class="field">
-          <label class="field-label" for="password">Mot de passe</label>
+          <label class="field-label" for="password" data-i18n="login.password">Mot de passe</label>
           <div class="input-wrap">
             <span class="input-icon">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -505,7 +522,7 @@ body{
         <!-- Code PIN -->
         <div class="field">
           <div class="field-label">
-            <span>Code PIN</span>
+            <span data-i18n="login.pin">Code PIN</span>
             <span id="pin-count" class="pin-count">0 / 9</span>
           </div>
           <div class="input-wrap">
@@ -518,7 +535,7 @@ body{
             </span>
             <input type="password" id="code_acces" name="code_acces"
               autocomplete="one-time-code"
-              placeholder="9 chiffres"
+              placeholder="9 chiffres" data-i18n-ph="login.pin.ph"
               maxlength="9" pattern="\d{9}"
               inputmode="numeric" required>
             <button type="button" class="pw-toggle" id="pin-toggle" tabindex="-1" aria-label="Afficher le code PIN">
@@ -543,18 +560,18 @@ body{
 
       </div><!-- /fields -->
 
-      <button type="submit" class="btn-login" id="btn-submit" style="margin-top:20px">
+      <button type="submit" class="btn-login" id="btn-submit" style="margin-top:20px" data-i18n="login.submit">
         Se connecter
       </button>
 
-      <button type="button" class="forgot-link" onclick="showForgotStep()">
+      <button type="button" class="forgot-link" onclick="showForgotStep()" data-i18n="login.forgot">
         Mot de passe oublié ?
       </button>
     </form>
 
     <!-- ── OAuth Google ── -->
     <div class="oauth-wrap" id="oauth-wrap">
-      <div class="oauth-divider">ou</div>
+      <div class="oauth-divider" data-i18n="login.oauth.or">ou</div>
       <a href="/api/auth/oauth/google/login" class="btn-google" id="btn-google">
         <svg class="g-logo" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
@@ -562,7 +579,7 @@ body{
           <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
           <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/>
         </svg>
-        Se connecter avec Google
+        <span data-i18n="login.oauth.google">Se connecter avec Google</span>
       </a>
 
       <div class="oauth-err" id="oauth-err-box">
@@ -581,15 +598,15 @@ body{
           <polyline points="22,6 12,13 2,6"/>
         </svg>
       </div>
-      <div class="extra-step-title">Réinitialiser le mot de passe</div>
-      <div class="extra-step-hint">
+      <div class="extra-step-title" data-i18n="pwreset.title">Réinitialiser le mot de passe</div>
+      <div class="extra-step-hint" data-i18n-html="pwreset.hint">
         Entrez votre email ou nom d'utilisateur.<br>
         Nous vous enverrons un lien valable <strong>30 minutes</strong>.
       </div>
 
       <div class="fields" style="width:100%">
         <div class="field">
-          <label class="field-label" for="forgot-identifier">Email ou identifiant</label>
+          <label class="field-label" for="forgot-identifier" data-i18n="pwreset.identifier">Email ou identifiant</label>
           <div class="input-wrap">
             <span class="input-icon">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -597,7 +614,7 @@ body{
                 <polyline points="22,6 12,13 2,6"/>
               </svg>
             </span>
-            <input type="text" id="forgot-identifier" placeholder="vous@exemple.com ou votre pseudo"
+            <input type="text" id="forgot-identifier" placeholder="vous@exemple.com ou votre pseudo" data-i18n-ph="pwreset.identifier.ph"
               autocomplete="email" style="width:100%;padding:12px 14px 12px 42px;
               background:var(--input-bg);border:1px solid rgba(30,55,100,.9);border-radius:12px;
               color:var(--text);font-size:14px;font-family:var(--f);outline:none;
@@ -608,10 +625,10 @@ body{
 
       <div class="extra-step-err" id="forgot-err" style="margin-top:10px"></div>
 
-      <button type="button" class="btn-login" id="btn-forgot-send" onclick="forgotSend()" style="margin-top:10px">
+      <button type="button" class="btn-login" id="btn-forgot-send" onclick="forgotSend()" style="margin-top:10px" data-i18n="pwreset.send">
         Envoyer le lien
       </button>
-      <button type="button" class="otp-back" onclick="hideForgotStep()" style="margin-top:10px">
+      <button type="button" class="otp-back" onclick="hideForgotStep()" style="margin-top:10px" data-i18n="pwreset.back">
         ← Retour à la connexion
       </button>
     </div>
@@ -624,14 +641,14 @@ body{
           <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
         </svg>
       </div>
-      <div class="extra-step-title">Nouveau mot de passe</div>
-      <div class="extra-step-hint" id="reset-hint">
+      <div class="extra-step-title" data-i18n="pwreset.new.title">Nouveau mot de passe</div>
+      <div class="extra-step-hint" id="reset-hint" data-i18n-html="pwreset.new.hint">
         Choisissez un mot de passe fort d'au moins <strong>8 caractères</strong>.
       </div>
 
       <div class="fields" style="width:100%">
         <div class="field">
-          <label class="field-label" for="reset-pw1">Nouveau mot de passe</label>
+          <label class="field-label" for="reset-pw1" data-i18n="pwreset.new.pw1">Nouveau mot de passe</label>
           <div class="input-wrap">
             <span class="input-icon">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -653,7 +670,7 @@ body{
         </div>
 
         <div class="field">
-          <label class="field-label" for="reset-pw2">Confirmer le mot de passe</label>
+          <label class="field-label" for="reset-pw2" data-i18n="pwreset.new.pw2">Confirmer le mot de passe</label>
           <div class="input-wrap">
             <span class="input-icon">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -671,7 +688,7 @@ body{
 
       <div class="extra-step-err" id="reset-err" style="margin-top:10px"></div>
 
-      <button type="button" class="btn-login" id="btn-reset-submit" onclick="resetSubmit()" style="margin-top:10px">
+      <button type="button" class="btn-login" id="btn-reset-submit" onclick="resetSubmit()" style="margin-top:10px" data-i18n="pwreset.new.save">
         Enregistrer le nouveau mot de passe
       </button>
     </div>
@@ -683,8 +700,8 @@ body{
           <polyline points="20 6 9 17 4 12"/>
         </svg>
       </div>
-      <div class="extra-step-title" style="color:#22c55e">Mot de passe modifié !</div>
-      <div class="extra-step-hint">
+      <div class="extra-step-title" style="color:#22c55e" data-i18n="pwreset.done.title">Mot de passe modifié !</div>
+      <div class="extra-step-hint" data-i18n-html="pwreset.done.hint">
         Votre mot de passe a été réinitialisé.<br>
         Toutes vos sessions actives ont été révoquées.<br><br>
         Vous allez être redirigé vers la connexion…
@@ -699,18 +716,18 @@ body{
           <polyline points="16 2 16 8 22 8"/>
         </svg>
       </div>
-      <div class="otp-title">Vérification en deux étapes</div>
-      <div class="otp-hint">Comment voulez-vous recevoir votre code ?</div>
+      <div class="otp-title" data-i18n="otp.title">Vérification en deux étapes</div>
+      <div class="otp-hint" data-i18n="otp.channel.q">Comment voulez-vous recevoir votre code ?</div>
       <div style="display:flex;flex-direction:column;gap:10px;width:100%;margin-top:18px" id="channel-choice-err-wrap">
         <button type="button" class="btn-login" id="btn-channel-email" onclick="chooseChannel('email')">
-          📧 Par Email — <span id="channel-email-hint"></span>
+          <span data-i18n="otp.channel.email">📧 Par Email — </span><span id="channel-email-hint"></span>
         </button>
         <button type="button" class="btn-login" id="btn-channel-whatsapp" onclick="chooseChannel('whatsapp')" style="background:linear-gradient(135deg,#25D366,#128C7E)">
-          💬 Par WhatsApp — <span id="channel-phone-hint"></span>
+          <span data-i18n="otp.channel.whatsapp">💬 Par WhatsApp — </span><span id="channel-phone-hint"></span>
         </button>
       </div>
       <div class="otp-err" id="channel-err"></div>
-      <button type="button" class="otp-back" onclick="otpBack()">← Retour à la connexion</button>
+      <button type="button" class="otp-back" onclick="otpBack()" data-i18n="otp.back">← Retour à la connexion</button>
     </div>
 
     <!-- ── Étape OTP (masquée jusqu'à la validation des identifiants) ── -->
@@ -721,7 +738,9 @@ body{
           <polyline points="16 2 16 8 22 8"/>
         </svg>
       </div>
-      <div class="otp-title" id="otp-step-title">Vérification en deux étapes</div>
+      <div class="otp-title" id="otp-step-title" data-i18n="otp.title">Vérification en deux étapes</div>
+      <!-- Contenu toujours régénéré par showOtpStep() (JS), jamais par data-i18n --
+           il contient une valeur variable ({hint}) qu'applyLang() ne sait pas injecter. -->
       <div class="otp-hint" id="otp-hint">
         Un code à 6 chiffres a été envoyé à<br><strong id="otp-email-hint">votre email</strong>
       </div>
@@ -741,28 +760,28 @@ body{
 
         <div class="otp-err" id="otp-err"></div>
 
-        <button type="button" class="btn-login" id="btn-otp-verify" style="margin-top:4px" disabled>
+        <button type="button" class="btn-login" id="btn-otp-verify" style="margin-top:4px" disabled data-i18n="otp.verify">
           Vérifier le code
         </button>
 
-        <div style="font-size:11px;color:rgba(232,197,88,.5);text-align:center;margin-top:2px;line-height:1.5;padding:0 4px">
+        <div style="font-size:11px;color:rgba(232,197,88,.5);text-align:center;margin-top:2px;line-height:1.5;padding:0 4px" data-i18n-html="otp.spam.hint">
           📬 Vérifiez aussi vos <strong style="color:rgba(232,197,88,.75)">spams / courriers indésirables</strong>
         </div>
 
         <div class="otp-resend">
-          Vous n'avez pas reçu le code ?
-          <button type="button" id="btn-resend" onclick="otpResend()">Renvoyer</button>
+          <span data-i18n="otp.resend.q">Vous n'avez pas reçu le code ?</span>
+          <button type="button" id="btn-resend" onclick="otpResend()" data-i18n="otp.resend.btn">Renvoyer</button>
           <span id="resend-timer" style="color:rgba(78,109,149,.45);margin-left:4px"></span>
         </div>
 
-        <button type="button" class="otp-back" onclick="otpBack()">← Retour à la connexion</button>
+        <button type="button" class="otp-back" onclick="otpBack()" data-i18n="otp.back">← Retour à la connexion</button>
 
         <!-- Bascule vers code admin -->
         <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.05);width:100%;text-align:center">
           <button type="button" onclick="switchToAdminCode()"
             style="background:none;border:none;cursor:pointer;font-size:11px;
                    color:rgba(232,197,88,.38);text-decoration:underline;text-decoration-style:dotted;
-                   padding:2px 4px;transition:color .15s;font-family:var(--f)">
+                   padding:2px 4px;transition:color .15s;font-family:var(--f)" data-i18n="otp.useadmincode">
             Utiliser un code administrateur →
           </button>
         </div>
@@ -775,12 +794,12 @@ body{
         <div id="admin-request-phase" style="display:flex;flex-direction:column;align-items:center;width:100%">
           <div style="text-align:center;font-size:13px;color:rgba(221,232,248,.6);
                       line-height:1.65;margin:14px 0 18px;padding:0 8px">
-            L'administrateur recevra un email avec un code.<br>
-            <span style="color:rgba(232,197,88,.48);font-size:11.5px">
-              Demandez-lui verbalement ce code à 5 chiffres.
+            <span data-i18n="admincode.info">L'administrateur recevra un email avec un code.</span><br>
+            <span style="color:rgba(232,197,88,.48);font-size:11.5px" data-i18n="admincode.info.sub">
+              Demandez-lui verbalement ce code à 9 caractères.
             </span>
           </div>
-          <button type="button" class="btn-login" id="btn-request-admin-code" onclick="requestAdminCode()">
+          <button type="button" class="btn-login" id="btn-request-admin-code" onclick="requestAdminCode()" data-i18n="admincode.request">
             Envoyer la demande à l'admin
           </button>
           <div class="otp-err" id="admin-request-err" style="margin-top:8px"></div>
@@ -789,11 +808,11 @@ body{
         <!-- Phase 2 : saisir le code -->
         <div id="admin-enter-phase" style="display:none;flex-direction:column;align-items:center;width:100%">
           <div style="margin-bottom:14px;text-align:center">
-            <div style="font-size:12px;color:rgba(52,211,153,.72);margin-bottom:6px">
+            <div style="font-size:12px;color:rgba(52,211,153,.72);margin-bottom:6px" data-i18n="admincode.sent">
               ✅ Demande envoyée — contactez l'administrateur
             </div>
-            <div style="font-size:11.5px;color:rgba(221,232,248,.48);line-height:1.5">
-              Saisissez le code à 5 chiffres qu'il vous communique.
+            <div style="font-size:11.5px;color:rgba(221,232,248,.48);line-height:1.5" data-i18n="admincode.enter.hint">
+              Saisissez le code à 9 caractères qu'il vous communique.
             </div>
           </div>
 
@@ -820,16 +839,16 @@ body{
 
           <div class="otp-err" id="admin-code-err"></div>
 
-          <button type="button" class="btn-login" id="btn-verify-admin-code" style="margin-top:4px" disabled onclick="verifyAdminCode()">
+          <button type="button" class="btn-login" id="btn-verify-admin-code" style="margin-top:4px" disabled onclick="verifyAdminCode()" data-i18n="admincode.verify">
             Valider le code admin
           </button>
-          <div style="font-size:10.5px;color:rgba(78,109,149,.3);text-align:center;margin-top:8px">
+          <div style="font-size:10.5px;color:rgba(78,109,149,.3);text-align:center;margin-top:8px" data-i18n-html="admincode.rules">
             9 caractères · Code valide 24&nbsp;h · Max 3 tentatives
           </div>
         </div>
 
         <!-- Retour au mode OTP -->
-        <button type="button" class="otp-back" onclick="switchToOtp()" style="margin-top:12px">
+        <button type="button" class="otp-back" onclick="switchToOtp()" style="margin-top:12px" data-i18n="admincode.back">
           ← Retour au code email
         </button>
       </div>
@@ -841,11 +860,346 @@ body{
   <!-- Footer -->
   <div class="login-footer">
     <span class="c-gold">Bon Prix &middot; Complexe Commerciale de Pillatre</span><br>
-    <span class="c-dim">Konekta v2.0 &nbsp;&middot;&nbsp; © 2026 &nbsp;&middot;&nbsp; Tous droits réservés</span>
+    <span class="c-dim">Konekta v2.0 &nbsp;&middot;&nbsp; © 2026 &nbsp;&middot;&nbsp; <span data-i18n="footer.rights">Tous droits réservés</span></span>
   </div>
 </div><!-- /login-wrap -->
 
 <script>
+/* ══════════════════════════════════════════════════════════════
+   TRADUCTION FR / EN / ES
+══════════════════════════════════════════════════════════════ */
+let currentLang = localStorage.getItem('ps-lang') || 'fr';
+
+const LANGS = {
+  fr: {
+    'login.email':        'Adresse email',
+    'login.email.ph':     'vous@exemple.com',
+    'login.password':     'Mot de passe',
+    'login.pin':          'Code PIN',
+    'login.pin.ph':       '9 chiffres',
+    'login.submit':       'Se connecter',
+    'login.submit.wait':  'Connexion en cours…',
+    'login.forgot':       'Mot de passe oublié ?',
+    'login.oauth.or':     'ou',
+    'login.oauth.google': 'Se connecter avec Google',
+    'login.success':      'Connecté !',
+    'login.err.email':    "L'adresse email est requise.",
+    'login.err.password': 'Le mot de passe est requis.',
+    'login.err.pin':      'Le code PIN doit contenir exactement 9 chiffres.',
+    'login.err.default':  'Identifiants incorrects',
+
+    'pwreset.title':          'Réinitialiser le mot de passe',
+    'pwreset.hint':            "Entrez votre email ou nom d'utilisateur.<br>Nous vous enverrons un lien valable <strong>30 minutes</strong>.",
+    'pwreset.identifier':      'Email ou identifiant',
+    'pwreset.identifier.ph':   'vous@exemple.com ou votre pseudo',
+    'pwreset.send':            'Envoyer le lien',
+    'pwreset.send.wait':       'Envoi en cours…',
+    'pwreset.sent':            'Email envoyé !',
+    'pwreset.back':            '← Retour à la connexion',
+    'pwreset.err.required':    'Veuillez entrer votre email ou identifiant.',
+    'pwreset.err.send':        "Erreur lors de l'envoi.",
+    'pwreset.err.network':     'Erreur réseau — réessayez.',
+    'pwreset.confirm':         'Si cet identifiant est associé à un compte, un email a été envoyé. Vérifiez aussi vos spams.',
+    'pwreset.new.title':       'Nouveau mot de passe',
+    'pwreset.new.hint':        "Choisissez un mot de passe fort d'au moins <strong>8 caractères</strong>.",
+    'pwreset.new.hint.hello':  'Bonjour <strong style="color:var(--text)">{user}</strong>. Choisissez un mot de passe d\'au moins <strong>8 caractères</strong>.',
+    'pwreset.new.pw1':         'Nouveau mot de passe',
+    'pwreset.new.pw2':         'Confirmer le mot de passe',
+    'pwreset.new.save':        'Enregistrer le nouveau mot de passe',
+    'pwreset.new.saving':      'Enregistrement…',
+    'pwreset.err.empty':       'Entrez un mot de passe.',
+    'pwreset.err.short':       'Le mot de passe doit contenir au moins 8 caractères.',
+    'pwreset.err.mismatch':    'Les deux mots de passe ne correspondent pas.',
+    'pwreset.err.save':        'Erreur lors de la réinitialisation.',
+    'pwreset.done.title':      'Mot de passe modifié !',
+    'pwreset.done.hint':       'Votre mot de passe a été réinitialisé.<br>Toutes vos sessions actives ont été révoquées.<br><br>Vous allez être redirigé vers la connexion…',
+    'pwreset.link.invalid':    'Ce lien est invalide ou expiré.',
+    'pwreset.link.checkfail':  'Impossible de vérifier le lien. Réessayez.',
+
+    'otp.title':          'Vérification en deux étapes',
+    'otp.channel.q':      'Comment voulez-vous recevoir votre code ?',
+    'otp.channel.email':  '📧 Par Email — ',
+    'otp.channel.whatsapp':'💬 Par WhatsApp — ',
+    'otp.channel.err':    'Erreur',
+    'otp.sent.email':     'Un code à 6 chiffres a été envoyé à<br><strong id="otp-email-hint">{hint}</strong>',
+    'otp.sent.whatsapp':  'Un code à 6 chiffres a été envoyé par WhatsApp à<br><strong id="otp-email-hint">{hint}</strong>',
+    'otp.hint.email.default': 'votre email',
+    'otp.hint.phone.default': 'votre téléphone',
+    'otp.verify':          'Vérifier le code',
+    'otp.verify.wait':     'Vérification…',
+    'otp.err.default':     'Code incorrect',
+    'otp.err.network':     'Erreur réseau',
+    'otp.err.network.retry': 'Erreur réseau — réessayez',
+    'otp.err.expired':     'Code expiré — reconnectez-vous.',
+    'otp.spam.hint':       '📬 Vérifiez aussi vos <strong style="color:rgba(232,197,88,.75)">spams / courriers indésirables</strong>',
+    'otp.resend.q':        "Vous n'avez pas reçu le code ?",
+    'otp.resend.btn':      'Renvoyer',
+    'otp.back':            '← Retour à la connexion',
+    'otp.expire.timer':    'Code valide {time}',
+    'otp.useadmincode':    'Utiliser un code administrateur →',
+
+    'admincode.info':       "L'administrateur recevra un email avec un code.",
+    'admincode.info.sub':   'Demandez-lui verbalement ce code à 9 caractères.',
+    'admincode.request':    "Envoyer la demande à l'admin",
+    'admincode.request.wait': 'Envoi en cours…',
+    'admincode.sent':       '✅ Demande envoyée — contactez l\'administrateur',
+    'admincode.enter.hint': 'Saisissez le code à 9 caractères qu\'il vous communique.',
+    'admincode.verify':     'Valider le code admin',
+    'admincode.verify.wait':'Vérification…',
+    'admincode.rules':      '9 caractères · Code valide 24&nbsp;h · Max 3 tentatives',
+    'admincode.back':       '← Retour au code email',
+    'admincode.err.send':   "Erreur lors de l'envoi",
+    'admincode.err.network':'Erreur réseau',
+    'admincode.err.default':'Code incorrect',
+    'admincode.err.network.retry': 'Erreur réseau — réessayez',
+    'admincode.timer':      'Code admin valide 24 heures',
+
+    'oauth.err.invalid_state':         'Requête expirée ou invalide. Veuillez réessayer.',
+    'oauth.err.token_exchange_failed': "Échec d'échange de code avec Google. Réessayez.",
+    'oauth.err.userinfo_failed':       'Impossible de récupérer votre profil Google.',
+    'oauth.err.email_not_verified':    "Votre adresse email Google n'est pas vérifiée.",
+    'oauth.err.account_not_found':     'Aucun compte associé à cet email. Contactez l\'administrateur.',
+    'oauth.err.account_disabled':      'Ce compte est désactivé. Contactez l\'administrateur.',
+    'oauth.err.unknown_provider':      'Fournisseur OAuth inconnu.',
+    'oauth.err.access_denied':         'Connexion annulée.',
+    'oauth.err.no_access_token':       'Réponse Google invalide. Veuillez réessayer.',
+    'oauth.err.oauth_not_configured':  "La connexion Google n'est pas configurée sur ce serveur.",
+    'oauth.err.otp_failed':            'Impossible d\'envoyer le code de vérification. Réessayez dans quelques instants.',
+    'oauth.err.unknown':               'Erreur : {code}',
+
+    'footer.rights': 'Tous droits réservés',
+  },
+  en: {
+    'login.email':        'Email address',
+    'login.email.ph':     'you@example.com',
+    'login.password':     'Password',
+    'login.pin':          'PIN Code',
+    'login.pin.ph':       '9 digits',
+    'login.submit':       'Sign in',
+    'login.submit.wait':  'Signing in…',
+    'login.forgot':       'Forgot password?',
+    'login.oauth.or':     'or',
+    'login.oauth.google': 'Sign in with Google',
+    'login.success':      'Signed in!',
+    'login.err.email':    'Email address is required.',
+    'login.err.password': 'Password is required.',
+    'login.err.pin':      'The PIN code must contain exactly 9 digits.',
+    'login.err.default':  'Incorrect credentials',
+
+    'pwreset.title':          'Reset password',
+    'pwreset.hint':            'Enter your email or username.<br>We will send you a link valid for <strong>30 minutes</strong>.',
+    'pwreset.identifier':      'Email or username',
+    'pwreset.identifier.ph':   'you@example.com or your username',
+    'pwreset.send':            'Send link',
+    'pwreset.send.wait':       'Sending…',
+    'pwreset.sent':            'Email sent!',
+    'pwreset.back':            '← Back to login',
+    'pwreset.err.required':    'Please enter your email or username.',
+    'pwreset.err.send':        'Error while sending.',
+    'pwreset.err.network':     'Network error — please try again.',
+    'pwreset.confirm':         'If this identifier is linked to an account, an email has been sent. Also check your spam folder.',
+    'pwreset.new.title':       'New password',
+    'pwreset.new.hint':        'Choose a strong password of at least <strong>8 characters</strong>.',
+    'pwreset.new.hint.hello':  'Hello <strong style="color:var(--text)">{user}</strong>. Choose a password of at least <strong>8 characters</strong>.',
+    'pwreset.new.pw1':         'New password',
+    'pwreset.new.pw2':         'Confirm password',
+    'pwreset.new.save':        'Save new password',
+    'pwreset.new.saving':      'Saving…',
+    'pwreset.err.empty':       'Enter a password.',
+    'pwreset.err.short':       'The password must be at least 8 characters long.',
+    'pwreset.err.mismatch':    'The two passwords do not match.',
+    'pwreset.err.save':        'Error while resetting password.',
+    'pwreset.done.title':      'Password changed!',
+    'pwreset.done.hint':       'Your password has been reset.<br>All active sessions have been revoked.<br><br>You will be redirected to the login page…',
+    'pwreset.link.invalid':    'This link is invalid or has expired.',
+    'pwreset.link.checkfail':  'Unable to verify the link. Please try again.',
+
+    'otp.title':          'Two-step verification',
+    'otp.channel.q':      'How would you like to receive your code?',
+    'otp.channel.email':  '📧 By Email — ',
+    'otp.channel.whatsapp':'💬 By WhatsApp — ',
+    'otp.channel.err':    'Error',
+    'otp.sent.email':     'A 6-digit code has been sent to<br><strong id="otp-email-hint">{hint}</strong>',
+    'otp.sent.whatsapp':  'A 6-digit code has been sent via WhatsApp to<br><strong id="otp-email-hint">{hint}</strong>',
+    'otp.hint.email.default': 'your email',
+    'otp.hint.phone.default': 'your phone',
+    'otp.verify':          'Verify code',
+    'otp.verify.wait':     'Verifying…',
+    'otp.err.default':     'Incorrect code',
+    'otp.err.network':     'Network error',
+    'otp.err.network.retry': 'Network error — please try again',
+    'otp.err.expired':     'Code expired — please sign in again.',
+    'otp.spam.hint':       '📬 Also check your <strong style="color:rgba(232,197,88,.75)">spam / junk folder</strong>',
+    'otp.resend.q':        "Didn't receive the code?",
+    'otp.resend.btn':      'Resend',
+    'otp.back':            '← Back to login',
+    'otp.expire.timer':    'Code valid {time}',
+    'otp.useadmincode':    'Use an administrator code →',
+
+    'admincode.info':       'The administrator will receive an email with a code.',
+    'admincode.info.sub':   'Ask them to tell you this 9-character code verbally.',
+    'admincode.request':    'Send request to admin',
+    'admincode.request.wait': 'Sending…',
+    'admincode.sent':       '✅ Request sent — contact the administrator',
+    'admincode.enter.hint': 'Enter the 9-character code they give you.',
+    'admincode.verify':     'Verify admin code',
+    'admincode.verify.wait':'Verifying…',
+    'admincode.rules':      '9 characters · Valid 24&nbsp;h · Max 3 attempts',
+    'admincode.back':       '← Back to email code',
+    'admincode.err.send':   'Error while sending',
+    'admincode.err.network':'Network error',
+    'admincode.err.default':'Incorrect code',
+    'admincode.err.network.retry': 'Network error — please try again',
+    'admincode.timer':      'Admin code valid for 24 hours',
+
+    'oauth.err.invalid_state':         'Request expired or invalid. Please try again.',
+    'oauth.err.token_exchange_failed': 'Failed to exchange code with Google. Please try again.',
+    'oauth.err.userinfo_failed':       'Unable to retrieve your Google profile.',
+    'oauth.err.email_not_verified':    'Your Google email address is not verified.',
+    'oauth.err.account_not_found':     'No account linked to this email. Contact the administrator.',
+    'oauth.err.account_disabled':      'This account is disabled. Contact the administrator.',
+    'oauth.err.unknown_provider':      'Unknown OAuth provider.',
+    'oauth.err.access_denied':         'Sign-in cancelled.',
+    'oauth.err.no_access_token':       'Invalid Google response. Please try again.',
+    'oauth.err.oauth_not_configured':  'Google sign-in is not configured on this server.',
+    'oauth.err.otp_failed':            'Unable to send the verification code. Please try again shortly.',
+    'oauth.err.unknown':               'Error: {code}',
+
+    'footer.rights': 'All rights reserved',
+  },
+  es: {
+    'login.email':        'Correo electrónico',
+    'login.email.ph':     'tu@ejemplo.com',
+    'login.password':     'Contraseña',
+    'login.pin':          'Código PIN',
+    'login.pin.ph':       '9 dígitos',
+    'login.submit':       'Iniciar sesión',
+    'login.submit.wait':  'Iniciando sesión…',
+    'login.forgot':       '¿Olvidaste tu contraseña?',
+    'login.oauth.or':     'o',
+    'login.oauth.google': 'Iniciar sesión con Google',
+    'login.success':      '¡Sesión iniciada!',
+    'login.err.email':    'La dirección de correo es obligatoria.',
+    'login.err.password': 'La contraseña es obligatoria.',
+    'login.err.pin':      'El código PIN debe tener exactamente 9 dígitos.',
+    'login.err.default':  'Credenciales incorrectas',
+
+    'pwreset.title':          'Restablecer contraseña',
+    'pwreset.hint':            'Ingresa tu correo o nombre de usuario.<br>Te enviaremos un enlace válido por <strong>30 minutos</strong>.',
+    'pwreset.identifier':      'Correo o nombre de usuario',
+    'pwreset.identifier.ph':   'tu@ejemplo.com o tu usuario',
+    'pwreset.send':            'Enviar enlace',
+    'pwreset.send.wait':       'Enviando…',
+    'pwreset.sent':            '¡Correo enviado!',
+    'pwreset.back':            '← Volver al inicio de sesión',
+    'pwreset.err.required':    'Ingresa tu correo o nombre de usuario.',
+    'pwreset.err.send':        'Error al enviar.',
+    'pwreset.err.network':     'Error de red — inténtalo de nuevo.',
+    'pwreset.confirm':         'Si este identificador está asociado a una cuenta, se ha enviado un correo. Revisa también tu carpeta de spam.',
+    'pwreset.new.title':       'Nueva contraseña',
+    'pwreset.new.hint':        'Elige una contraseña segura de al menos <strong>8 caracteres</strong>.',
+    'pwreset.new.hint.hello':  'Hola <strong style="color:var(--text)">{user}</strong>. Elige una contraseña de al menos <strong>8 caracteres</strong>.',
+    'pwreset.new.pw1':         'Nueva contraseña',
+    'pwreset.new.pw2':         'Confirmar contraseña',
+    'pwreset.new.save':        'Guardar nueva contraseña',
+    'pwreset.new.saving':      'Guardando…',
+    'pwreset.err.empty':       'Ingresa una contraseña.',
+    'pwreset.err.short':       'La contraseña debe tener al menos 8 caracteres.',
+    'pwreset.err.mismatch':    'Las dos contraseñas no coinciden.',
+    'pwreset.err.save':        'Error al restablecer la contraseña.',
+    'pwreset.done.title':      '¡Contraseña modificada!',
+    'pwreset.done.hint':       'Tu contraseña ha sido restablecida.<br>Todas tus sesiones activas han sido revocadas.<br><br>Serás redirigido al inicio de sesión…',
+    'pwreset.link.invalid':    'Este enlace no es válido o ha expirado.',
+    'pwreset.link.checkfail':  'No se pudo verificar el enlace. Inténtalo de nuevo.',
+
+    'otp.title':          'Verificación en dos pasos',
+    'otp.channel.q':      '¿Cómo quieres recibir tu código?',
+    'otp.channel.email':  '📧 Por Email — ',
+    'otp.channel.whatsapp':'💬 Por WhatsApp — ',
+    'otp.channel.err':    'Error',
+    'otp.sent.email':     'Se ha enviado un código de 6 dígitos a<br><strong id="otp-email-hint">{hint}</strong>',
+    'otp.sent.whatsapp':  'Se ha enviado un código de 6 dígitos por WhatsApp a<br><strong id="otp-email-hint">{hint}</strong>',
+    'otp.hint.email.default': 'tu correo',
+    'otp.hint.phone.default': 'tu teléfono',
+    'otp.verify':          'Verificar código',
+    'otp.verify.wait':     'Verificando…',
+    'otp.err.default':     'Código incorrecto',
+    'otp.err.network':     'Error de red',
+    'otp.err.network.retry': 'Error de red — inténtalo de nuevo',
+    'otp.err.expired':     'Código expirado — inicia sesión de nuevo.',
+    'otp.spam.hint':       '📬 Revisa también tu carpeta de <strong style="color:rgba(232,197,88,.75)">spam / correo no deseado</strong>',
+    'otp.resend.q':        '¿No recibiste el código?',
+    'otp.resend.btn':      'Reenviar',
+    'otp.back':            '← Volver al inicio de sesión',
+    'otp.expire.timer':    'Código válido {time}',
+    'otp.useadmincode':    'Usar un código de administrador →',
+
+    'admincode.info':       'El administrador recibirá un correo con un código.',
+    'admincode.info.sub':   'Pídele que te diga verbalmente este código de 9 caracteres.',
+    'admincode.request':    'Enviar solicitud al administrador',
+    'admincode.request.wait': 'Enviando…',
+    'admincode.sent':       '✅ Solicitud enviada — contacta al administrador',
+    'admincode.enter.hint': 'Ingresa el código de 9 caracteres que te indique.',
+    'admincode.verify':     'Validar código de administrador',
+    'admincode.verify.wait':'Verificando…',
+    'admincode.rules':      '9 caracteres · Válido 24&nbsp;h · Máx 3 intentos',
+    'admincode.back':       '← Volver al código por email',
+    'admincode.err.send':   'Error al enviar',
+    'admincode.err.network':'Error de red',
+    'admincode.err.default':'Código incorrecto',
+    'admincode.err.network.retry': 'Error de red — inténtalo de nuevo',
+    'admincode.timer':      'Código de administrador válido por 24 horas',
+
+    'oauth.err.invalid_state':         'Solicitud expirada o inválida. Inténtalo de nuevo.',
+    'oauth.err.token_exchange_failed': 'Error al intercambiar el código con Google. Inténtalo de nuevo.',
+    'oauth.err.userinfo_failed':       'No se pudo obtener tu perfil de Google.',
+    'oauth.err.email_not_verified':    'Tu dirección de correo de Google no está verificada.',
+    'oauth.err.account_not_found':     'Ninguna cuenta asociada a este correo. Contacta al administrador.',
+    'oauth.err.account_disabled':      'Esta cuenta está deshabilitada. Contacta al administrador.',
+    'oauth.err.unknown_provider':      'Proveedor OAuth desconocido.',
+    'oauth.err.access_denied':         'Inicio de sesión cancelado.',
+    'oauth.err.no_access_token':       'Respuesta de Google inválida. Inténtalo de nuevo.',
+    'oauth.err.oauth_not_configured':  'El inicio de sesión con Google no está configurado en este servidor.',
+    'oauth.err.otp_failed':            'No se pudo enviar el código de verificación. Inténtalo de nuevo en unos instantes.',
+    'oauth.err.unknown':               'Error: {code}',
+
+    'footer.rights': 'Todos los derechos reservados',
+  },
+};
+
+function t(key, vars){
+  let s = (LANGS[currentLang] && LANGS[currentLang][key]) || LANGS['fr'][key] || key;
+  if(vars) for(const k in vars) s = s.replace('{'+k+'}', vars[k]);
+  return s;
+}
+
+function applyLang(){
+  document.documentElement.lang = currentLang;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{
+    el.placeholder = t(el.getAttribute('data-i18n-ph'));
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach(el=>{
+    el.innerHTML = t(el.getAttribute('data-i18n-html'));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>{
+    el.title = t(el.getAttribute('data-i18n-title'));
+  });
+  document.getElementById('btn-lang-fr').classList.toggle('active-lang', currentLang==='fr');
+  document.getElementById('btn-lang-en').classList.toggle('active-lang', currentLang==='en');
+  document.getElementById('btn-lang-es').classList.toggle('active-lang', currentLang==='es');
+}
+
+function setLang(lang){
+  currentLang = lang;
+  localStorage.setItem('ps-lang', lang);
+  applyLang();
+}
+
+document.addEventListener('DOMContentLoaded', applyLang);
+
 /* ══════════════════════════════════════════════════════════════
    FOND ANIMÉ — carburant / prix
 ══════════════════════════════════════════════════════════════ */
@@ -1151,12 +1505,12 @@ async function _sendLoginMeta(){
     const code_acces = document.getElementById('code_acces').value.trim();
 
     // Validations côté client
-    if(!email)      { showErr('L\'adresse email est requise.'); return; }
-    if(!password)   { showErr('Le mot de passe est requis.'); return; }
-    if(!/^\d{9}$/.test(code_acces)){ showErr('Le code PIN doit contenir exactement 9 chiffres.'); return; }
+    if(!email)      { showErr(t('login.err.email')); return; }
+    if(!password)   { showErr(t('login.err.password')); return; }
+    if(!/^\d{9}$/.test(code_acces)){ showErr(t('login.err.pin')); return; }
 
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>Connexion en cours…';
+    btn.innerHTML = '<span class="spinner"></span>' + t('login.submit.wait');
 
     try{
       const res = await fetch('/api/login',{
@@ -1165,12 +1519,12 @@ async function _sendLoginMeta(){
         body:JSON.stringify({email, password, code_acces}),
       });
       const d = await res.json().catch(()=>({}));
-      if(!res.ok) throw new Error(d.detail || 'Identifiants incorrects');
+      if(!res.ok) throw new Error((d.detail && window.translateApiError ? window.translateApiError(d.detail) : d.detail) || t('login.err.default'));
 
       // Vérification en deux étapes activée côté serveur
       if(d.otp_required){
         btn.disabled = false;
-        btn.innerHTML = 'Se connecter';
+        btn.innerHTML = t('login.submit');
         _capturePhoto(); // photo avant l'OTP — silencieux
 
         // Un numéro est disponible — demander à l'utilisateur de choisir
@@ -1180,14 +1534,14 @@ async function _sendLoginMeta(){
           return;
         }
 
-        showOtpStep(d.channel || 'email', d.channel === 'whatsapp' ? d.phone_hint : (d.email_hint || 'votre email'));
+        showOtpStep(d.channel || 'email', d.channel === 'whatsapp' ? d.phone_hint : (d.email_hint || t('otp.hint.email.default')));
         return;
       }
 
       if(d.api_key) sessionStorage.setItem('api_key', d.api_key);
 
       btn.classList.add('success');
-      btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Connecté !';
+      btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + t('login.success');
 
       // Connexion directe (sans OTP) — capturer photo + localisation
       _capturePhoto();
@@ -1197,7 +1551,7 @@ async function _sendLoginMeta(){
       showErr(err.message);
       btn.disabled = false;
       btn.classList.remove('success');
-      btn.innerHTML = 'Se connecter';
+      btn.innerHTML = t('login.submit');
     }
   });
 })();
@@ -1264,8 +1618,8 @@ async function _sendLoginMeta(){
 
   // ── Afficher / masquer les étapes ─────────────────────────────
   window.showChannelStep = function(emailHint, phoneHint){
-    document.getElementById('channel-email-hint').textContent = emailHint || 'votre email';
-    document.getElementById('channel-phone-hint').textContent = phoneHint || 'votre téléphone';
+    document.getElementById('channel-email-hint').textContent = emailHint || t('otp.hint.email.default');
+    document.getElementById('channel-phone-hint').textContent = phoneHint || t('otp.hint.phone.default');
     document.getElementById('channel-err').textContent = '';
     document.getElementById('login-form').style.display = 'none';
     var ow = document.getElementById('oauth-wrap');
@@ -1302,7 +1656,7 @@ async function _sendLoginMeta(){
         });
       }
       const d = await res.json().catch(()=>({}));
-      if(!res.ok) throw new Error(d.detail || 'Erreur');
+      if(!res.ok) throw new Error((d.detail && window.translateApiError ? window.translateApiError(d.detail) : d.detail) || t('otp.channel.err'));
       document.getElementById('channel-step').classList.remove('show');
       window._otpChannel = channel;
       showOtpStep(channel, channel === 'whatsapp' ? d.phone_hint : d.email_hint);
@@ -1316,8 +1670,8 @@ async function _sendLoginMeta(){
   window.showOtpStep = function(channel, hint){
     window._otpChannel = channel || 'email';
     document.getElementById('otp-hint').innerHTML = window._otpChannel === 'whatsapp'
-      ? 'Un code à 6 chiffres a été envoyé par WhatsApp à<br><strong id="otp-email-hint">'+ (hint||'votre téléphone') +'</strong>'
-      : 'Un code à 6 chiffres a été envoyé à<br><strong id="otp-email-hint">'+ (hint||'votre email') +'</strong>';
+      ? t('otp.sent.whatsapp', {hint: hint || t('otp.hint.phone.default')})
+      : t('otp.sent.email', {hint: hint || t('otp.hint.email.default')});
     document.getElementById('login-form').style.display   = 'none';
     var ow = document.getElementById('oauth-wrap');
     if(ow) ow.style.display = 'none';
@@ -1329,7 +1683,7 @@ async function _sendLoginMeta(){
     var _ac=document.getElementById('admin-code-mode-content'); if(_ac)_ac.style.display='none';
     var _arp=document.getElementById('admin-request-phase'); if(_arp)_arp.style.display='flex';
     var _aep=document.getElementById('admin-enter-phase'); if(_aep)_aep.style.display='none';
-    var _rba=document.getElementById('btn-request-admin-code'); if(_rba){_rba.disabled=false;_rba.innerHTML='Envoyer la demande à l\'admin';}
+    var _rba=document.getElementById('btn-request-admin-code'); if(_rba){_rba.disabled=false;_rba.innerHTML=t('admincode.request');}
     clearOtpBoxes();
     OTP_BOXES[0].focus();
     startResendCooldown(60);
@@ -1355,7 +1709,7 @@ async function _sendLoginMeta(){
     var _omc=document.getElementById('otp-mode-content'); if(_omc)_omc.style.display='flex';
     var _arp=document.getElementById('admin-request-phase'); if(_arp)_arp.style.display='flex';
     var _aep=document.getElementById('admin-enter-phase'); if(_aep)_aep.style.display='none';
-    var _rba=document.getElementById('btn-request-admin-code'); if(_rba){_rba.disabled=false;_rba.innerHTML='Envoyer la demande à l\'admin';}
+    var _rba=document.getElementById('btn-request-admin-code'); if(_rba){_rba.disabled=false;_rba.innerHTML=t('admincode.request');}
     var _are=document.getElementById('admin-request-err'); if(_are)_are.textContent='';
     var _et=document.getElementById('otp-expire-timer'); if(_et)_et.textContent='';
   };
@@ -1405,12 +1759,12 @@ async function _sendLoginMeta(){
         });
       }
       const d = await res.json().catch(()=>({}));
-      if(!res.ok){ errEl.textContent = d.detail||'Erreur'; btnResend.disabled=false; return; }
+      if(!res.ok){ errEl.textContent = (d.detail && window.translateApiError ? window.translateApiError(d.detail) : d.detail) || t('otp.channel.err'); btnResend.disabled=false; return; }
       clearOtpBoxes();
       errEl.textContent = '';
       OTP_BOXES[0].focus();
       startResendCooldown(60);
-    }catch(err){ errEl.textContent='Erreur réseau'; btnResend.disabled=false; }
+    }catch(err){ errEl.textContent=t('otp.err.network'); btnResend.disabled=false; }
   };
 
   // ── Compte à rebours 5 min — reset auto vers login ────────────
@@ -1423,10 +1777,10 @@ async function _sendLoginMeta(){
       const min = Math.floor(left/60);
       const sec = String(left%60).padStart(2,'0');
       const el  = document.getElementById('otp-expire-timer');
-      if(el) el.textContent = `Code valide ${min}:${sec}`;
+      if(el) el.textContent = t('otp.expire.timer', {time: `${min}:${sec}`});
       if(left <= 0){
         clearInterval(_otpExpireTimer); _otpExpireTimer=null;
-        setOtpErr('Code expiré — reconnectez-vous.');
+        setOtpErr(t('otp.err.expired'));
         setTimeout(()=>{ otpBack(); }, 2200);
       }
     }, 1000);
@@ -1437,7 +1791,7 @@ async function _sendLoginMeta(){
     const code = getOtpCode();
     if(code.length !== 6) return;
     btnVerify.disabled = true;
-    btnVerify.innerHTML = '<span class="spinner"></span>Vérification…';
+    btnVerify.innerHTML = '<span class="spinner"></span>' + t('otp.verify.wait');
     try{
       const res = await fetch('/api/otp/verify',{
         method:'POST',headers:{'Content-Type':'application/json'},
@@ -1446,22 +1800,22 @@ async function _sendLoginMeta(){
       });
       const d = await res.json().catch(function(){ return {}; });
       if(!res.ok){
-        setOtpErr(d.detail||'Code incorrect');
+        setOtpErr((d.detail && window.translateApiError ? window.translateApiError(d.detail) : d.detail) || t('otp.err.default'));
         clearOtpBoxes(); OTP_BOXES[0].focus();
         btnVerify.disabled  = true;
-        btnVerify.innerHTML = 'Vérifier le code';
+        btnVerify.innerHTML = t('otp.verify');
         return;
       }
       if(_otpExpireTimer){ clearInterval(_otpExpireTimer); _otpExpireTimer=null; }
       if(d.api_key) sessionStorage.setItem('api_key', d.api_key);
       btnVerify.classList.add('success');
-      btnVerify.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Connecté !';
+      btnVerify.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + t('login.success');
       sessionStorage.setItem('konekta_just_logged_in','1');
       _sendLoginMeta().finally(function(){ window.location.href='/'; });
     }catch(err){
-      setOtpErr('Erreur réseau — réessayez');
+      setOtpErr(t('otp.err.network.retry'));
       btnVerify.disabled  = false;
-      btnVerify.innerHTML = 'Vérifier le code';
+      btnVerify.innerHTML = t('otp.verify');
     }
   });
 
@@ -1547,7 +1901,7 @@ async function _sendLoginMeta(){
     // Arrêter le compte à rebours OTP et afficher info code admin
     if(window._stopOtpExpireTimer) window._stopOtpExpireTimer();
     var et=document.getElementById('otp-expire-timer');
-    if(et) et.textContent='Code admin valide 24 heures';
+    if(et) et.textContent=t('admincode.timer');
     var ht=document.getElementById('otp-hint');
     if(ht) ht.style.opacity='.45';
   };
@@ -1559,7 +1913,7 @@ async function _sendLoginMeta(){
     var arp=document.getElementById('admin-request-phase'); if(arp) arp.style.display='flex';
     var aep=document.getElementById('admin-enter-phase'); if(aep) aep.style.display='none';
     var rba=document.getElementById('btn-request-admin-code');
-    if(rba){ rba.disabled=false; rba.innerHTML='Envoyer la demande à l\'admin'; }
+    if(rba){ rba.disabled=false; rba.innerHTML=t('admincode.request'); }
     var are=document.getElementById('admin-request-err'); if(are) are.textContent='';
     if(window._clearAdminBoxes) window._clearAdminBoxes();
     // Restaurer l'opacité du hint et relancer le timer OTP
@@ -1572,7 +1926,7 @@ async function _sendLoginMeta(){
     var btn=document.getElementById('btn-request-admin-code');
     var errEl=document.getElementById('admin-request-err');
     btn.disabled=true;
-    btn.innerHTML='<span class="spinner" style="border-top-color:#0a1c3a"></span>Envoi en cours…';
+    btn.innerHTML='<span class="spinner" style="border-top-color:#0a1c3a"></span>' + t('admincode.request.wait');
     try{
       var res=await fetch('/api/otp/request-admin-code',{
         method:'POST',credentials:'include',
@@ -1581,8 +1935,8 @@ async function _sendLoginMeta(){
       var d=await res.json().catch(function(){ return {}; });
       if(!res.ok){
         btn.disabled=false;
-        btn.innerHTML='Envoyer la demande à l\'admin';
-        if(errEl) errEl.textContent=d.detail||'Erreur lors de l\'envoi';
+        btn.innerHTML=t('admincode.request');
+        if(errEl) errEl.textContent=(d.detail && window.translateApiError ? window.translateApiError(d.detail) : d.detail)||t('admincode.err.send');
         return;
       }
       // Passer à la phase de saisie
@@ -1592,8 +1946,8 @@ async function _sendLoginMeta(){
       var b0=document.getElementById('ac0'); if(b0) b0.focus();
     }catch(err){
       btn.disabled=false;
-      btn.innerHTML='Envoyer la demande à l\'admin';
-      if(errEl) errEl.textContent='Erreur réseau';
+      btn.innerHTML=t('admincode.request');
+      if(errEl) errEl.textContent=t('admincode.err.network');
     }
   };
 
@@ -1603,7 +1957,7 @@ async function _sendLoginMeta(){
     if(code.length!==_ADMIN_LEN) return;
     var btnV=document.getElementById('btn-verify-admin-code');
     btnV.disabled=true;
-    btnV.innerHTML='<span class="spinner" style="border-top-color:#0a1c3a"></span>Vérification…';
+    btnV.innerHTML='<span class="spinner" style="border-top-color:#0a1c3a"></span>' + t('admincode.verify.wait');
     try{
       var res=await fetch('/api/otp/verify-admin-code',{
         method:'POST',credentials:'include',
@@ -1612,21 +1966,21 @@ async function _sendLoginMeta(){
       });
       var d=await res.json().catch(function(){ return {}; });
       if(!res.ok){
-        if(window._setAdminErr) window._setAdminErr(d.detail||'Code incorrect');
+        if(window._setAdminErr) window._setAdminErr((d.detail && window.translateApiError ? window.translateApiError(d.detail) : d.detail)||t('admincode.err.default'));
         if(window._clearAdminBoxes) window._clearAdminBoxes();
         btnV.disabled=true;
-        btnV.innerHTML='Valider le code admin';
+        btnV.innerHTML=t('admincode.verify');
         return;
       }
       if(d.api_key) sessionStorage.setItem('api_key',d.api_key);
       btnV.classList.add('success');
-      btnV.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Connecté !';
+      btnV.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + t('login.success');
       sessionStorage.setItem('konekta_just_logged_in','1');
       _sendLoginMeta().finally(function(){ window.location.href='/'; });
     }catch(err){
-      if(window._setAdminErr) window._setAdminErr('Erreur réseau — réessayez');
+      if(window._setAdminErr) window._setAdminErr(t('admincode.err.network.retry'));
       btnV.disabled=false;
-      btnV.innerHTML='Valider le code admin';
+      btnV.innerHTML=t('admincode.verify');
     }
   };
 })();
@@ -1651,24 +2005,24 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
 /* ══ ERREURS OAUTH ══ */
 (function(){
   const MSGS={
-    invalid_state:         'Requête expirée ou invalide. Veuillez réessayer.',
-    token_exchange_failed: 'Échec d\'échange de code avec Google. Réessayez.',
-    userinfo_failed:       'Impossible de récupérer votre profil Google.',
-    email_not_verified:    'Votre adresse email Google n\'est pas vérifiée.',
-    account_not_found:     'Aucun compte associé à cet email. Contactez l\'administrateur.',
-    account_disabled:      'Ce compte est désactivé. Contactez l\'administrateur.',
-    unknown_provider:      'Fournisseur OAuth inconnu.',
-    access_denied:         'Connexion annulée.',
-    no_access_token:       'Réponse Google invalide. Veuillez réessayer.',
-    oauth_not_configured:  'La connexion Google n\'est pas configurée sur ce serveur.',
-    otp_failed:            'Impossible d\'envoyer le code de vérification. Réessayez dans quelques instants.',
+    invalid_state:         'oauth.err.invalid_state',
+    token_exchange_failed: 'oauth.err.token_exchange_failed',
+    userinfo_failed:       'oauth.err.userinfo_failed',
+    email_not_verified:    'oauth.err.email_not_verified',
+    account_not_found:     'oauth.err.account_not_found',
+    account_disabled:      'oauth.err.account_disabled',
+    unknown_provider:      'oauth.err.unknown_provider',
+    access_denied:         'oauth.err.access_denied',
+    no_access_token:       'oauth.err.no_access_token',
+    oauth_not_configured:  'oauth.err.oauth_not_configured',
+    otp_failed:            'oauth.err.otp_failed',
   };
   const p = new URLSearchParams(window.location.search);
   const e = p.get('oauth_error');
   if(e){
     const box=document.getElementById('oauth-err-box');
     const txt=document.getElementById('oauth-err-text');
-    if(box&&txt){ txt.textContent=MSGS[e]||`Erreur : ${e}`; box.classList.add('show'); }
+    if(box&&txt){ txt.textContent=MSGS[e]?t(MSGS[e]):t('oauth.err.unknown',{code:e}); box.classList.add('show'); }
     window.history.replaceState({},'','/login');
   }
 })();
@@ -1677,7 +2031,7 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
 (function(){
   var p = new URLSearchParams(window.location.search);
   if(p.get('otp') === '1'){
-    var hint = decodeURIComponent(p.get('hint') || 'votre email');
+    var hint = decodeURIComponent(p.get('hint') || t('otp.hint.email.default'));
     window.history.replaceState({},'','/login');
     if(typeof showOtpStep === 'function') showOtpStep('email', hint);
   }
@@ -1685,8 +2039,8 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
   // le canal avant que quoi que ce soit ne soit envoyé (pas de mot de
   // passe à resoumettre pour ce flux, contrairement à la connexion classique).
   if(p.get('otp_choice') === '1'){
-    var emailHint = decodeURIComponent(p.get('email_hint') || 'votre email');
-    var phoneHint = decodeURIComponent(p.get('phone_hint') || 'votre téléphone');
+    var emailHint = decodeURIComponent(p.get('email_hint') || t('otp.hint.email.default'));
+    var phoneHint = decodeURIComponent(p.get('phone_hint') || t('otp.hint.phone.default'));
     window.history.replaceState({},'','/login');
     window._oauthPendingMode = true;
     if(typeof showChannelStep === 'function') showChannelStep(emailHint, phoneHint);
@@ -1715,7 +2069,7 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
     var el=document.getElementById('forgot-step'); if(el){ el.style.display='flex'; el.classList.add('show'); }
     var inp=document.getElementById('forgot-identifier'); if(inp){ inp.value=''; inp.focus(); }
     var err=document.getElementById('forgot-err'); if(err) err.textContent='';
-    var btn=document.getElementById('btn-forgot-send'); if(btn){ btn.disabled=false; btn.innerHTML='Envoyer le lien'; }
+    var btn=document.getElementById('btn-forgot-send'); if(btn){ btn.disabled=false; btn.innerHTML=t('pwreset.send'); }
   };
 
   window.hideForgotStep = function(){
@@ -1727,10 +2081,10 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
     var identifier=(document.getElementById('forgot-identifier').value||'').trim();
     var errEl=document.getElementById('forgot-err');
     var btn=document.getElementById('btn-forgot-send');
-    if(!identifier){ if(errEl) errEl.textContent='Veuillez entrer votre email ou identifiant.'; return; }
+    if(!identifier){ if(errEl) errEl.textContent=t('pwreset.err.required'); return; }
     if(errEl) errEl.textContent='';
     btn.disabled=true;
-    btn.innerHTML='<span class="spinner" style="border-top-color:#0a1c3a"></span>Envoi en cours…';
+    btn.innerHTML='<span class="spinner" style="border-top-color:#0a1c3a"></span>' + t('pwreset.send.wait');
     try{
       var res=await fetch('/api/auth/forgot-password',{
         method:'POST',headers:{'Content-Type':'application/json'},
@@ -1738,19 +2092,19 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
       });
       var d=await res.json().catch(function(){ return {}; });
       if(!res.ok){
-        if(errEl) errEl.textContent=d.detail||'Erreur lors de l\'envoi.';
-        btn.disabled=false; btn.innerHTML='Envoyer le lien'; return;
+        if(errEl) errEl.textContent=(d.detail && window.translateApiError ? window.translateApiError(d.detail) : d.detail)||t('pwreset.err.send');
+        btn.disabled=false; btn.innerHTML=t('pwreset.send'); return;
       }
       // Succès ou compte inconnu — même réponse (anti-énumération)
       btn.classList.add('success');
-      btn.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Email envoyé !';
+      btn.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + t('pwreset.sent');
       if(errEl){
         errEl.style.color='rgba(34,197,94,.8)';
-        errEl.textContent='Si cet identifiant est associé à un compte, un email a été envoyé. Vérifiez aussi vos spams.';
+        errEl.textContent=t('pwreset.confirm');
       }
     }catch(err){
-      if(errEl) errEl.textContent='Erreur réseau — réessayez.';
-      btn.disabled=false; btn.innerHTML='Envoyer le lien';
+      if(errEl) errEl.textContent=t('pwreset.err.network');
+      btn.disabled=false; btn.innerHTML=t('pwreset.send');
     }
   };
 
@@ -1759,12 +2113,12 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
     _hideAll();
     var el=document.getElementById('reset-step'); if(el){ el.style.display='flex'; el.classList.add('show'); }
     var h=document.getElementById('reset-hint');
-    if(h && username) h.innerHTML='Bonjour <strong style="color:var(--text)">'+username+'</strong>. Choisissez un mot de passe d\'au moins <strong>8 caractères</strong>.';
+    if(h && username) h.innerHTML=t('pwreset.new.hint.hello',{user:username});
     var pw1=document.getElementById('reset-pw1'); if(pw1){ pw1.value=''; pw1.focus(); }
     var pw2=document.getElementById('reset-pw2'); if(pw2) pw2.value='';
     var err=document.getElementById('reset-err'); if(err) err.textContent='';
     var bar=document.getElementById('pw-strength-bar'); if(bar){ bar.style.width='0'; bar.style.background=''; }
-    var btn=document.getElementById('btn-reset-submit'); if(btn){ btn.disabled=false; btn.innerHTML='Enregistrer le nouveau mot de passe'; btn.classList.remove('success'); }
+    var btn=document.getElementById('btn-reset-submit'); if(btn){ btn.disabled=false; btn.innerHTML=t('pwreset.new.save'); btn.classList.remove('success'); }
   }
 
   window.resetPwStrength = function(){
@@ -1795,12 +2149,12 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
     var pw2=(document.getElementById('reset-pw2')||{}).value||'';
     var errEl=document.getElementById('reset-err');
     var btn=document.getElementById('btn-reset-submit');
-    if(!pw1){ if(errEl) errEl.textContent='Entrez un mot de passe.'; return; }
-    if(pw1.length<8){ if(errEl) errEl.textContent='Le mot de passe doit contenir au moins 8 caractères.'; return; }
-    if(pw1!==pw2){ if(errEl) errEl.textContent='Les deux mots de passe ne correspondent pas.'; return; }
+    if(!pw1){ if(errEl) errEl.textContent=t('pwreset.err.empty'); return; }
+    if(pw1.length<8){ if(errEl) errEl.textContent=t('pwreset.err.short'); return; }
+    if(pw1!==pw2){ if(errEl) errEl.textContent=t('pwreset.err.mismatch'); return; }
     if(errEl) errEl.textContent='';
     btn.disabled=true;
-    btn.innerHTML='<span class="spinner" style="border-top-color:#0a1c3a"></span>Enregistrement…';
+    btn.innerHTML='<span class="spinner" style="border-top-color:#0a1c3a"></span>' + t('pwreset.new.saving');
     try{
       var res=await fetch('/api/auth/reset-password',{
         method:'POST',headers:{'Content-Type':'application/json'},
@@ -1808,8 +2162,8 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
       });
       var d=await res.json().catch(function(){ return {}; });
       if(!res.ok){
-        if(errEl) errEl.textContent=d.detail||'Erreur lors de la réinitialisation.';
-        btn.disabled=false; btn.innerHTML='Enregistrer le nouveau mot de passe'; return;
+        if(errEl) errEl.textContent=(d.detail && window.translateApiError ? window.translateApiError(d.detail) : d.detail)||t('pwreset.err.save');
+        btn.disabled=false; btn.innerHTML=t('pwreset.new.save'); return;
       }
       // Succès
       _hideAll();
@@ -1819,8 +2173,8 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
       window.history.replaceState({},'','/login');
       setTimeout(function(){ _showLoginForm(); }, 3500);
     }catch(e){
-      if(errEl) errEl.textContent='Erreur réseau — réessayez.';
-      btn.disabled=false; btn.innerHTML='Enregistrer le nouveau mot de passe';
+      if(errEl) errEl.textContent=t('pwreset.err.network');
+      btn.disabled=false; btn.innerHTML=t('pwreset.new.save');
     }
   };
 
@@ -1839,7 +2193,7 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
           // Token invalide → afficher erreur sur la page de login
           var eb=document.getElementById('err-box');
           var et=document.getElementById('err-text');
-          if(eb&&et){ et.textContent=res.d.detail||'Ce lien est invalide ou expiré.'; eb.classList.remove('hidden'); }
+          if(eb&&et){ et.textContent=(res.d.detail && window.translateApiError ? window.translateApiError(res.d.detail) : res.d.detail)||t('pwreset.link.invalid'); eb.classList.remove('hidden'); }
           _resetToken=null;
           return;
         }
@@ -1848,7 +2202,7 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
       .catch(function(){
         var eb=document.getElementById('err-box');
         var et=document.getElementById('err-text');
-        if(eb&&et){ et.textContent='Impossible de vérifier le lien. Réessayez.'; eb.classList.remove('hidden'); }
+        if(eb&&et){ et.textContent=t('pwreset.link.checkfail'); eb.classList.remove('hidden'); }
         _resetToken=null;
       });
   })();

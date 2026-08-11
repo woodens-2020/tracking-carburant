@@ -2916,6 +2916,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
 <div id="load-overlay"><div class="lo-badge"><div class="lo-ring"></div><span class="lo-k">K</span></div></div>
 <script src="/shared/loading-overlay.js"></script>
+<script src="/shared/i18n-errors.js"></script>
 
 <!-- ═══════ SIDEBAR ═══════ -->
 <aside class="sidebar" id="mnav-drawer">
@@ -3444,6 +3445,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </button>
       <button class="toggle-btn" id="btn-lang-fr" onclick="setLang('fr')">FR</button>
       <button class="toggle-btn" id="btn-lang-en" onclick="setLang('en')">EN</button>
+      <button class="toggle-btn" id="btn-lang-es" onclick="setLang('es')">ES</button>
     </div>
     <input type="date" id="date-picker" class="date-input">
   </div>
@@ -10263,9 +10265,10 @@ async function apiFetch(method,path,body){
   }
   if(!res.ok){
     const err=await res.json().catch(()=>({detail:res.statusText}));
-    const msg = Array.isArray(err.detail)
+    let msg = Array.isArray(err.detail)
       ? err.detail.map(e=>e.msg||JSON.stringify(e)).join(', ')
       : (err.detail || res.statusText);
+    if(typeof window.translateApiError === 'function') msg = window.translateApiError(msg);
     const e = new Error(`[${res.status}] ${msg}`);
     e.status = res.status;
     throw e;
@@ -10685,11 +10688,205 @@ const LANGS = {
     'fc.forecast.day': 'D+',
     'fc.err.vide':     'No data available in the database.',
   },
+  es: {
+    'nav.navigation':  'NAVEGACIÓN',
+    'nav.home':        'Inicio',
+    'nav.dashboard':   'Panel de control',
+    'nav.saisie':      'Registro',
+    'nav.journal':     'Registro de medidores',
+    'nav.rapport':     'Informe Analítico',
+    'nav.previsions':  'Pronósticos',
+    'nav.ai':          'Informes IA',
+    'nav.stock':       'Inventario y Rentabilidad',
+    'nav.config':      'CONFIGURACIÓN',
+    'nav.gestion':     'Productos y Bombas',
+    'page.home.title':       'Inicio',
+    'page.home.sub':         'Resumen de la estación',
+    'page.dashboard.title':  'Panel de control',
+    'page.dashboard.sub':    'Filtros de período y producto',
+    'page.saisie.title':     'Registro de lecturas',
+    'page.saisie.sub':       'Registro de lecturas de medidores',
+    'page.journal.title':    'Registro de medidores',
+    'page.journal.sub':      'Historial y análisis de desviaciones de medidores',
+    'page.rapport.title':    'Informe Analítico',
+    'page.rapport.sub':      'Estadísticas, alertas y pistas de decisión',
+    'page.rapports.title':     'Informes IA',
+    'page.rapports.sub':       'Análisis inteligente de datos',
+    'page.previsions.title':   'Pronóstico de ventas',
+    'page.previsions.sub':     'Modelos estadísticos · Intervalos de confianza · Escenarios',
+    'page.stock.title':        'Inventario y Rentabilidad',
+    'page.stock.sub':          'Seguimiento de entregas · Costo promedio ponderado · Beneficio por producto',
+    'sk.tab.stock': 'Inventario actual', 'sk.tab.livr': 'Entregas',
+    'sk.tab.rent':  'Rentabilidad',  'sk.tab.prix': 'Precios de venta',
+    'sk.tab.histo': 'Historial de ventas',
+    'sk.seuil.label': 'Alertar si inventario <', 'sk.seuil.unit': 'días de venta',
+    'sk.refresh': 'Actualizar',
+    'sk.livr.new':  'Nueva entrega', 'sk.livr.save': 'Guardar entrega',
+    'sk.livr.list': 'Entregas recientes',
+    'sk.f.produit': 'Producto', 'sk.f.date': 'Fecha de entrega',
+    'sk.f.gallons': 'Galones recibidos', 'sk.f.prix.achat': 'Precio compra / gal (G)',
+    'sk.f.fournisseur': 'Proveedor', 'sk.f.camion': 'Ref. camión',
+    'sk.rent.from': 'Desde', 'sk.rent.to': 'hasta', 'sk.rent.calc': 'Calcular',
+    'sk.all.products': 'Todos los productos',
+    'sk.prix.new':  'Nuevo precio de venta', 'sk.prix.save': 'Guardar precio',
+    'sk.prix.hist': 'Historial de precios', 'sk.f.prix.vente': 'Precio venta / gal (G)',
+    'sk.f.date.effet': 'Fecha de vigencia',
+    'sk.kpi.revenu': 'Ingresos', 'sk.kpi.cogs': 'Costo de ventas (COGS)',
+    'sk.kpi.benefice': 'Beneficio neto', 'sk.kpi.marge': 'Margen bruto',
+    'sk.kpi.vendus': 'Galones vendidos', 'sk.kpi.cmp': 'Costo prom. ponderado',
+    'sk.warn.no.livr': 'Sin entregas — COGS no calculable',
+    'sk.anom.compteurs': 'Anomalías de medidores', 'sk.anom.stock': 'Anomalías de inventario', 'sk.anom.geoloc': 'Anomalías de acceso',
+    'theme.light':  'Claro',
+    'theme.dark':   'Oscuro',
+    'ra.date':        'Fecha del informe',
+    'ra.gen':         'Generar informe',
+    'ra.pdf':         'PDF',
+    'ra.xlsx':        'Excel',
+    'ra.exec':        'Resumen ejecutivo',
+    'ra.kpi.today':   'Ingresos de hoy',
+    'ra.kpi.hier':    'Ingresos de ayer',
+    'ra.kpi.7j':      'Ingresos últimos 7 días',
+    'ra.kpi.mois':    'Ingresos del mes',
+    'ra.kpi.vol':     'Volumen del mes',
+    'ra.kpi.prix':    'Precio por galón',
+    'ra.kpi.moy':     'Prom. días activos',
+    'ra.kpi.anom':    'Anomalías',
+    'ra.pompes':      'Desglose por bomba',
+    'ra.periodes':    'Desglose por período',
+    'ra.qualite':     'Calidad de datos',
+    'ra.topjours':    'Mejores días (últimos 30 días)',
+    'ra.alertes':     'Alertas y Anomalías',
+    'ra.decisions':   'Pistas de decisión',
+    'ra.empty':       'Selecciona una fecha y haz clic en Generar informe',
+    'ra.loading':     'Generando informe…',
+    'ra.mois.debut':  'desde el',
+    'ra.j.actifs':    'días activos',
+    'ra.releve':      'lectura(s)',
+    'ra.vs.hier':     'vs. ayer',
+    'ra.priorite':    'Prioridad',
+    'ra.action':      'Acción',
+    'ra.objectif':    'Objetivo',
+    'ra.impact':      'Impacto',
+    'ra.imm':         '🔴 Inmediato',
+    'ra.week':        '🟡 Esta semana',
+    'ra.month':       '🟢 Este mes',
+    'ra.critique':    'crítica(s)',
+    'ra.al.nosaisie.t':   'Sin registro hoy',
+    'ra.al.nosaisie.m':   'aún no tiene lecturas registradas. El día no se contabiliza.',
+    'ra.al.apm.t':        'Tarde sin registrar',
+    'ra.al.apm.m':        '0 G registrado en la Tarde durante todo el mes. ¿Falta el registro o la estación estuvo cerrada?',
+    'ra.al.hist.t':       'Historial incompleto',
+    'ra.al.hist.m':       'Reconstruye los datos faltantes para análisis confiables.',
+    'ra.al.conc.t':       'Concentración elevada',
+    'ra.al.noalert':      'No se detectaron alertas',
+    'ra.al.noalert.m':    'Los datos del período son coherentes y completos.',
+    'ra.dec.anomcorr.a':  'Corregir anomalías de medidor',
+    'ra.dec.anomcorr.o':  'Integridad de los datos',
+    'ra.dec.saisir.a':    'Registrar las lecturas de hoy',
+    'ra.dec.saisir.o':    'Cobertura 100% del día',
+    'ra.dec.apm.a':       'Aclarar la política de la Tarde',
+    'ra.dec.apm.o':       'Recuperar ingresos no registrados',
+    'ra.dec.hist.a':      'Reconstruir el historial faltante',
+    'ra.dec.hist.o':      'Análisis de tendencias confiables',
+    'ra.dec.form.a':      'Capacitar a los operadores en el registro',
+    'ra.dec.form.o':      'Registro diario sistemático',
+    'ra.dec.pomp.a':      'Revisar bombas subutilizadas',
+    'ra.dec.pomp.o':      'Optimizar capacidad de la estación',
+    'ra.imp.high':        'Impacto alto',
+    'ra.imp.vhigh':       'Impacto muy alto',
+    'ra.imp.med':         'Impacto medio',
+    'th.pompe':       'Bomba',
+    'th.produit':     'Producto',
+    'th.volume':      'Volumen',
+    'th.ca':          'Ingresos',
+    'th.part':        'Parte',
+    'th.periode':     'Período',
+    'th.date':        'Fecha',
+    'th.rang':        '#',
+    'th.qualite':     'Calidad',
+    'th.statut':      'Estado',
+    'th.note':        'Nota',
+    'q.saisie':   'Registro de hoy',
+    'q.apm':      'Cobertura de la Tarde',
+    'q.hist':     'Historial del mes',
+    'q.anom':     'Anomalías de medidores',
+    'q.absent':   'Ausente',
+    'q.ok':       'OK',
+    'q.aucune':   'Ninguna',
+    'ra.footer':  'Informe generado por Konekta · Bon Prix',
+    'ra.dl.pdf':  'Descargar PDF',
+    'ra.dl.xlsx': 'Descargar Excel',
+    'topj.actif':  'Activo',
+    'topj.vide':   'Sin datos',
+    'exec.nosaisie': 'Sin registro para el',
+    'exec.derniere': 'Último día activo',
+    'exec.veille':   '(día anterior)',
+    'exec.mois':     'Ingresos del mes',
+    'exec.jactif':   'día(s) activo(s)',
+    'exec.anom':     'Anomalías detectadas',
+    'exec.caday':    'Ingresos de hoy',
+    'exec.vendus':   'vendidos',
+    'exec.varveille':'Variación vs. día anterior',
+    'status.connect': 'Conectando…',
+    'status.ok':      'En línea',
+    'status.err':     'Fuera de línea',
+    'logout.title':   'Cerrar sesión',
+    // Página de Pronósticos
+    'fc.metric':       'Métrica',
+    'fc.opt.montant':  'Ingresos (Gourdes)',
+    'fc.opt.quantite': 'Volumen (galones)',
+    'fc.horizon':      'Horizonte',
+    'fc.objectif':     'Meta diaria (G)',
+    'fc.calc':         'Calcular pronóstico',
+    'fc.empty':        'Configura el horizonte y haz clic en Calcular pronóstico',
+    'fc.loading':      'Calculando…',
+    'fc.fiab':         'Confiabilidad',
+    'fc.best':         'Mejor modelo',
+    'fc.rmse':         'Error RMSE',
+    'fc.ic':           'IC 95% (D+1)',
+    'fc.chart.title':  'Historial + Pronóstico',
+    'fc.hist':         'Historial',
+    'fc.fit':          'Modelo ajustado',
+    'fc.prev':         'Pronóstico',
+    'fc.ic80':         'IC 80%',
+    'fc.ic95':         'IC 95%',
+    'fc.models':       'Comparación de modelos',
+    'fc.model':        'Modelo',
+    'fc.statut':       'Estado',
+    'fc.mae':          'MAE',
+    'fc.mape':         'MAPE',
+    'fc.param':        'Parámetros',
+    'fc.scenarios':    'Escenarios (D+1)',
+    'fc.sc.opt':       'Optimista',
+    'fc.sc.real':      'Realista',
+    'fc.sc.pes':       'Pesimista',
+    'fc.proba':        'Probabilidades',
+    'fc.seuil':        'Umbral de ingresos diarios',
+    'fc.prob.dep':     'P(superar)',
+    'fc.stats.title':  'Estadísticas descriptivas (días activos)',
+    'fc.stats.n':      'N observaciones',
+    'fc.stats.moy':    'Media',
+    'fc.stats.med':    'Mediana',
+    'fc.stats.sig':    'Desviación estándar',
+    'fc.stats.cv':     'CV (%)',
+    'fc.stats.min':    'Mín',
+    'fc.stats.max':    'Máx',
+    'fc.stats.skew':   'Asimetría',
+    'fc.stats.out':    'Valores atípicos',
+    'fc.warn.insuf':   'Datos insuficientes',
+    'fc.warn.court':   'Historial corto',
+    'fc.warn.couv':    'Tasa de cobertura baja',
+    'fc.note.fiab':    'Nota de confiabilidad:',
+    'fc.note.normale': 'Se usa el supuesto de normalidad para las probabilidades.',
+    'fc.forecast.day': 'D+',
+    'fc.err.vide':     'No hay datos disponibles en la base de datos.',
+  },
 };
 
 function t(key){ return LANGS[currentLang][key] || LANGS['fr'][key] || key; }
 
 function applyLang(){
+  document.documentElement.lang = currentLang;
   document.querySelectorAll('[data-i18n]').forEach(el=>{
     const key = el.getAttribute('data-i18n');
     el.textContent = t(key);
@@ -10700,9 +10897,13 @@ function applyLang(){
   document.querySelectorAll('[data-i18n-title]').forEach(el=>{
     el.title = t(el.getAttribute('data-i18n-title'));
   });
+  document.querySelectorAll('[data-i18n-html]').forEach(el=>{
+    el.innerHTML = t(el.getAttribute('data-i18n-html'));
+  });
   // Boutons langue actif
   document.getElementById('btn-lang-fr').classList.toggle('active-lang', currentLang==='fr');
   document.getElementById('btn-lang-en').classList.toggle('active-lang', currentLang==='en');
+  document.getElementById('btn-lang-es').classList.toggle('active-lang', currentLang==='es');
   // Bouton thème
   const isDark = currentTheme==='dark';
   document.getElementById('theme-label').textContent = isDark ? t('theme.light') : t('theme.dark');
