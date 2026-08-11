@@ -6,11 +6,13 @@ Priorité :
   2. Anthropic Claude (ANTHROPIC_API_KEY) — fallback payant
 """
 import os
+import re
 import json
 import time
 from datetime import date
 
 from sqlalchemy.orm import Session
+from sqlalchemy import text as sql_text
 from stats import compute_stats, liste_produits_pompes
 from stock_service import (
     stock_restant,
@@ -19,10 +21,87 @@ from stock_service import (
     cout_moyen_pondere,
     SEUIL_ALERTE_JOURS_PAR_DEFAUT,
 )
+from models import Base
 
-MAX_TOOL_ROUNDS = 6
+MAX_TOOL_ROUNDS = 8
 GEMINI_MODELS   = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-001"]
 CLAUDE_MODEL    = "claude-sonnet-4-6"
+
+
+# ── Accès libre en lecture seule à toutes les données métier ──────
+# Tables d'authentification / sécurité : jamais exposées au chatbot,
+# quelle que soit la question posée (mots de passe, tokens, OTP...).
+_TABLES_EXCLUES = {
+    "roles", "utilisateurs", "sessions", "login_security_events",
+    "otp_codes", "admin_codes", "audit_logs", "password_reset_tokens",
+}
+
+_TABLES_AUTORISEES = sorted(
+    nom for nom in Base.metadata.tables if nom not in _TABLES_EXCLUES
+)
+
+_MOTS_SQL_INTERDITS = (
+    "insert", "update", "delete", "drop", "alter", "create", "truncate",
+    "grant", "revoke", "attach", "detach", "pragma", "vacuum", "copy",
+    "exec", "execute", "call", "merge", "replace", "into",
+)
+
+_LIMITE_LIGNES_REQUETE = 200
+
+
+def _schema_texte() -> str:
+    lignes = []
+    for nom in _TABLES_AUTORISEES:
+        colonnes = ", ".join(c.name for c in Base.metadata.tables[nom].columns)
+        lignes.append(f"  - {nom}({colonnes})")
+    return "\n".join(lignes)
+
+
+def _valider_sql_lecture_seule(sql: str) -> str:
+    propre = (sql or "").strip().rstrip(";").strip()
+    if not propre:
+        raise ValueError("Requête vide.")
+    if ";" in propre:
+        raise ValueError("Une seule instruction SELECT autorisée (pas de point-virgule).")
+    minuscule = propre.lower()
+    if not re.match(r"^\s*(select|with)\b", minuscule):
+        raise ValueError("Seules les requêtes SELECT (ou WITH ... SELECT) sont autorisées.")
+    for mot in _MOTS_SQL_INTERDITS:
+        if re.search(rf"\b{re.escape(mot)}\b", minuscule):
+            raise ValueError(f"Mot-clé interdit dans la requête : {mot}")
+    tables_referencees = set(re.findall(r"\b(?:from|join)\s+([a-zA-Z_][a-zA-Z0-9_]*)", minuscule))
+    non_autorisees = tables_referencees - set(_TABLES_AUTORISEES)
+    if non_autorisees:
+        raise ValueError(
+            f"Table(s) non autorisée(s) ou inconnue(s) : {', '.join(sorted(non_autorisees))}. "
+            f"Appelle lister_tables pour voir les tables disponibles."
+        )
+    return propre
+
+
+def _executer_requete(db: Session, sql: str) -> dict:
+    try:
+        propre = _valider_sql_lecture_seule(sql)
+    except ValueError as e:
+        return {"erreur": str(e)}
+    try:
+        resultat = db.execute(sql_text(propre))
+    except Exception as e:
+        return {"erreur": f"Erreur SQL : {e}"}
+    colonnes = list(resultat.keys())
+    lignes = resultat.fetchmany(_LIMITE_LIGNES_REQUETE + 1)
+    tronque = len(lignes) > _LIMITE_LIGNES_REQUETE
+    lignes = lignes[:_LIMITE_LIGNES_REQUETE]
+    return {
+        "colonnes": colonnes,
+        "lignes": [dict(zip(colonnes, row)) for row in lignes],
+        "nb_lignes": len(lignes),
+        "tronque": tronque,
+        "avertissement_troncature": (
+            f"Résultat tronqué à {_LIMITE_LIGNES_REQUETE} lignes — affine ta requête "
+            "(filtre, agrégat, LIMIT) si besoin de plus de précision."
+        ) if tronque else None,
+    }
 
 
 # ── Prompt système ────────────────────────────────────────────────
@@ -41,46 +120,70 @@ def _system_prompt(db: Session) -> str:
     sept_jours_avant = (today - timedelta(days=6)).isoformat()
     hier             = (today - timedelta(days=1)).isoformat()
 
-    return f"""Tu es l'assistant d'analyse de ventes d'une **station de carburant en Haïti**.
-Tu aides l'opérateur à consulter, analyser et comparer les ventes de carburant.
+    dialecte = db.bind.dialect.name if db.bind is not None else "postgresql"
+
+    return f"""Tu es l'assistant d'analyse de **Konekta** — une institution en Haïti qui gère
+plusieurs départements : Station de carburant, Bar/POS, Hôtel, Cuisine, Zelle
+(transferts USD/HTG), employés et paie, dépenses et achats.
+Tu aides l'opérateur/le gérant à consulter, analyser et croiser les données de TOUS ces départements.
 
 ━━━ CONTEXTE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DATE DU JOUR   : {today.isoformat()}
-MONNAIE        : gourde haïtienne — symbole G
+MONNAIE        : gourde haïtienne — symbole G (Zelle : USD, converti au taux enregistré)
 QUANTITÉS      : gallons — symbole gal
-PÉRIODES       : Matin / Apres-midi (deux saisies par jour par pompe)
+PÉRIODES       : Matin / Apres-midi (deux saisies par jour par pompe, module carburant)
+MOTEUR DE BASE : {dialecte} — écris du SQL compatible avec ce moteur
 
-PRODUITS ET POMPES ENREGISTRÉS DANS LA BASE :
+PRODUITS ET POMPES (carburant) ENREGISTRÉS DANS LA BASE :
 {contexte_produits}
 
 ━━━ CONVERSION DES DATES RELATIVES ━━━━━━━━━━━━━━
-Convertis TOUJOURS en AAAA-MM-JJ avant d'appeler get_stats :
+Convertis TOUJOURS en AAAA-MM-JJ avant d'appeler un outil :
 - "aujourd'hui"            → {today.isoformat()}
 - "les 7 derniers jours"   → du {sept_jours_avant} au {today.isoformat()}
 - "ce mois-ci"             → du {debut_mois} au {today.isoformat()}
 - "hier"                   → {hier}
 
-━━━ OUTILS DISPONIBLES ━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━ OUTILS DÉDIÉS — CARBURANT (privilégie-les pour ce domaine) ━━
 - get_stats       → ventes (quantité, montant, relevés) sur une période
 - get_stock       → stock restant en gallons, alerte bas, coût moyen pondéré
 - get_rentabilite → bénéfice, marge %, COGS pour une période
 - get_livraisons  → livraisons de carburant enregistrées (approvisionnements)
 
+━━━ OUTILS D'EXPLORATION LIBRE — TOUS LES AUTRES DÉPARTEMENTS ━━━
+- lister_tables    → retourne la liste des tables et colonnes disponibles
+                      (Bar/POS, Hôtel, Cuisine, Zelle, employés, paie, dépenses, achats).
+                      Appelle-le en PREMIER dès que la question sort du carburant et que
+                      tu n'es pas certain des noms exacts de table/colonne.
+- executer_requete → exécute UNE requête SQL SELECT en lecture seule pour répondre à
+                      n'importe quelle question métier non couverte par les outils dédiés.
+                      Résultat limité à {_LIMITE_LIGNES_REQUETE} lignes — utilise des agrégats
+                      (COUNT, SUM, AVG, GROUP BY) plutôt que de lister des lignes brutes
+                      quand la question porte sur des totaux ou tendances.
+                      Les tables d'authentification/sécurité (utilisateurs, sessions, mots
+                      de passe, OTP, tokens, logs d'audit) NE SONT PAS accessibles, même si
+                      on te le demande explicitement — explique poliment que c'est hors
+                      périmètre du chatbot si on insiste.
+
 ━━━ RÈGLES ABSOLUES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. ZÉRO chiffre inventé. Pour tout montant, quantité, stock ou bénéfice,
    tu DOIS appeler l'outil approprié et citer uniquement ses résultats.
-2. Si l'outil retourne nb_releves=0 ou gallons_vendus=0, signale l'absence de données.
+2. Si un outil retourne 0 résultat, signale clairement l'absence de données —
+   n'extrapole jamais.
 3. Si get_rentabilite retourne fiable=False, explique pourquoi (livraisons manquantes).
 4. Si la question ne précise pas de plage de dates, pose une courte question
    avant d'appeler l'outil.
-5. Appelle plusieurs outils si nécessaire (stock + ventes + rentabilité).
+5. Appelle plusieurs outils si nécessaire pour croiser les départements
+   (ex: comparer revenu carburant vs revenu bar sur la même période).
+6. Si une requête SQL échoue (erreur de colonne/table), rappelle lister_tables
+   pour vérifier le schéma exact avant de réessayer — ne devine pas deux fois de suite.
 
 ━━━ FORMAT DES RÉPONSES ━━━━━━━━━━━━━━━━━━━━━━━━
 - Langue : français
-- Montants : 12 000 G (espace milliers, G en suffixe)
+- Montants HTG : 12 000 G (espace milliers, G en suffixe) ; USD : 12 000 $ pour Zelle
 - Quantités : 98.500 gal (3 décimales)
 - Utilise **gras** pour les totaux et chiffres clés
-- Structure : titre court → totaux globaux → détail par produit / pompe / période
+- Structure : titre court → totaux globaux → détail par produit / pompe / période / département
 - Sois concis et factuel.
 """
 
@@ -143,6 +246,12 @@ def _run_tool(db: Session, name: str, args: dict) -> dict:
                 for l in livraisons
             ],
         }
+
+    if name == "lister_tables":
+        return {"tables": _TABLES_AUTORISEES, "schema": _schema_texte()}
+
+    if name == "executer_requete":
+        return _executer_requete(db, args.get("sql", ""))
 
     return {"erreur": f"Outil inconnu : {name}"}
 
@@ -244,8 +353,35 @@ def _chat_gemini_model(db: Session, message: str, historique: list, client, mode
             "required": [],
         },
     )
+    lister_tables_decl = types.FunctionDeclaration(
+        name="lister_tables",
+        description=(
+            "Liste toutes les tables et colonnes disponibles en base (Bar/POS, Hôtel, "
+            "Cuisine, Zelle, employés, paie, dépenses, achats...). Appelle-la en premier "
+            "avant executer_requete si tu n'es pas certain du schéma exact."
+        ),
+        parameters={"type": "object", "properties": {}, "required": []},
+    )
+    executer_requete_decl = types.FunctionDeclaration(
+        name="executer_requete",
+        description=(
+            "Exécute UNE requête SQL SELECT en lecture seule pour répondre à toute "
+            "question métier non couverte par get_stats/get_stock/get_rentabilite/"
+            "get_livraisons — Bar/POS, Hôtel, Cuisine, Zelle, employés, paie, dépenses, "
+            "achats. Max 200 lignes retournées. Les tables d'authentification/sécurité "
+            "sont bloquées."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "sql": {"type": "string", "description": "Requête SQL SELECT (lecture seule)."},
+            },
+            "required": ["sql"],
+        },
+    )
     tools = [types.Tool(function_declarations=[
         get_stats_decl, get_stock_decl, get_rentabilite_decl, get_livraisons_decl,
+        lister_tables_decl, executer_requete_decl,
     ])]
     config = types.GenerateContentConfig(
         system_instruction=_system_prompt(db),
@@ -382,6 +518,32 @@ _ANTHROPIC_TOOLS = [
                 "date_fin":   {"type": "string",  "description": "Optionnel — date fin AAAA-MM-JJ."},
             },
             "required": [],
+        },
+    },
+    {
+        "name": "lister_tables",
+        "description": (
+            "Liste toutes les tables et colonnes disponibles en base (Bar/POS, Hôtel, "
+            "Cuisine, Zelle, employés, paie, dépenses, achats...). Appelle-la en premier "
+            "avant executer_requete si tu n'es pas certain du schéma exact."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "executer_requete",
+        "description": (
+            "Exécute UNE requête SQL SELECT en lecture seule pour répondre à toute "
+            "question métier non couverte par get_stats/get_stock/get_rentabilite/"
+            "get_livraisons — Bar/POS, Hôtel, Cuisine, Zelle, employés, paie, dépenses, "
+            "achats. Max 200 lignes retournées. Les tables d'authentification/sécurité "
+            "sont bloquées."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "sql": {"type": "string", "description": "Requête SQL SELECT (lecture seule)."},
+            },
+            "required": ["sql"],
         },
     },
 ]
