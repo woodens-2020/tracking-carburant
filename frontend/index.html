@@ -18464,9 +18464,57 @@ async function loadStatistiques(){
     document.getElementById('stats-subtitle').textContent =
       `${frDate(debut)} → ${frDate(fin)}  ·  ${_stData.periode.nb_jours_actifs} jours actifs sur ${_stData.periode.nb_jours}`;
     body.innerHTML = _renderStats(_stData);
+    _renderStatsChart(_stData.serie||[]);
   }catch(e){
     body.innerHTML = `<div class="gi-empty" style="color:#f87171"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>${esc(e.message)}</span></div>`;
   }
+}
+
+let _stChart = null;
+function _renderStatsChart(serie){
+  const canvas = document.getElementById('st-chart-ca');
+  if(_stChart){ _stChart.destroy(); _stChart = null; }
+  if(!canvas || !serie.length) return;
+  const TICK='rgba(150,180,220,.75)', GRID='rgba(255,255,255,.05)';
+  const moyenne = serie.reduce((a,s)=>a+s.montant,0)/serie.length;
+  _stChart = new Chart(canvas.getContext('2d'), {
+    data:{
+      labels: serie.map(s=>frDate(s.date)),
+      datasets:[
+        {
+          type:'bar', label:'CA',
+          data: serie.map(s=>s.montant),
+          backgroundColor:'rgba(167,139,250,.7)',
+          hoverBackgroundColor:'rgba(167,139,250,1)',
+          borderRadius:4, borderSkipped:false, maxBarThickness:24,
+          order:2,
+        },
+        {
+          type:'line', label:'Moyenne journalière',
+          data: serie.map(()=>moyenne),
+          borderColor:'#f7a93b', borderWidth:1.5, borderDash:[5,4],
+          pointRadius:0, pointHoverRadius:0, fill:false, tension:0,
+          order:1,
+        },
+      ],
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:{duration:600},
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            label: c => c.dataset.type==='line' ? `Moyenne : ${fmtG(c.parsed.y)}` : `CA : ${fmtG(c.parsed.y)}`,
+          },
+        },
+      },
+      scales:{
+        x:{ ticks:{color:TICK,font:{size:10},maxTicksLimit:10,maxRotation:0}, grid:{display:false} },
+        y:{ beginAtZero:true, ticks:{color:TICK,font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}, grid:{color:GRID} },
+      },
+    },
+  });
 }
 
 function _renderStats(d){
@@ -18541,33 +18589,21 @@ function _renderStats(d){
     </div>
   </div>`;
 
-  // ── Graphique temporel (SVG bars) ────────────────────────
+  // ── Graphique temporel (Chart.js) ────────────────────────
   const serie = d.serie||[];
   let chartHtml = '';
   if(serie.length){
-    const maxM = Math.max(...serie.map(s=>s.montant), 1);
-    const bW   = Math.max(3, Math.min(16, Math.floor(560/serie.length)));
-    const gap  = Math.max(1, Math.ceil(bW*0.2));
-    const totW = serie.length*(bW+gap);
-    const H    = 72;
-    const bars = serie.map((s,i)=>{
-      const h = Math.max(2, Math.round(s.montant/maxM*H));
-      return `<rect x="${i*(bW+gap)}" y="${H-h}" width="${bW}" height="${h}" fill="${s.montant>0?'#a78bfa':'#2a2a45'}" rx="1" opacity=".85"><title>${frDate(s.date)}: ${fmtG(s.montant)}</title></rect>`;
-    }).join('');
-    const avgY = H - (serie.reduce((a,s)=>a+s.montant,0)/serie.length)/maxM*H;
-    const mid  = serie[Math.floor(serie.length/2)];
+    const moyenne = serie.reduce((a,s)=>a+s.montant,0)/serie.length;
     chartHtml = `<div class="gi-table-card">
       <div class="gi-table-hdr">
-        <span class="gi-table-title">📈 Évolution Journalière du CA</span>
-        <span style="font-size:12px;color:rgba(255,255,255,.4)"><span style="display:inline-block;width:16px;height:1px;background:#f7a93b;margin-right:4px;vertical-align:middle"></span>Moyenne journalière</span>
+        <span class="gi-table-title">Évolution journalière du CA</span>
+        <span style="font-size:12px;color:rgba(255,255,255,.45);display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:14px;height:2px;background:#f7a93b;border-radius:1px"></span>Moyenne journalière (${fmtG(moyenne)})
+        </span>
       </div>
-      <div style="padding:12px 18px 6px;overflow-x:auto">
-        <svg width="${totW}" height="${H+14}" style="display:block;max-width:100%;min-width:100%">
-          ${bars}
-          <line x1="0" y1="${avgY}" x2="${totW}" y2="${avgY}" stroke="#f7a93b" stroke-width="1" stroke-dasharray="4,3" opacity=".65"/>
-        </svg>
-        <div style="display:flex;justify-content:space-between;margin-top:2px;font-size:11px;color:rgba(255,255,255,.3)">
-          <span>${frDate(serie[0].date)}</span><span>${frDate(mid.date)}</span><span>${frDate(serie[serie.length-1].date)}</span>
+      <div style="padding:16px 18px">
+        <div style="position:relative;width:100%;height:230px">
+          <canvas id="st-chart-ca"></canvas>
         </div>
       </div>
     </div>`;
