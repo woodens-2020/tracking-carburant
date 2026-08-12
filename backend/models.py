@@ -1179,6 +1179,34 @@ class NotificationEtat(Base):
     )
 
 
+class ZelleDepense(Base):
+    """Dépense payée depuis le fonds Zelle (USD) — reste EN_ATTENTE et ne
+    réduit jamais le solde disponible tant que le PDG ne l'a pas approuvée."""
+    __tablename__ = "zelle_depenses"
+
+    id            = Column(Integer, primary_key=True)
+    description   = Column(String(200), nullable=False)
+    montant_usd   = Column(Numeric(14, 2), nullable=False)
+    categorie     = Column(String(50), nullable=True)
+    date_depense  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    statut        = Column(String(20), nullable=False, default="EN_ATTENTE")  # EN_ATTENTE, APPROUVEE, REJETEE
+    demandeur_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    valide_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    valide_at     = Column(DateTime(timezone=True), nullable=True)
+    notes         = Column(String(300), nullable=True)
+    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    demandeur  = relationship("Utilisateur", foreign_keys=[demandeur_id])
+    valide_par = relationship("Utilisateur", foreign_keys=[valide_par_id])
+
+    __table_args__ = (
+        CheckConstraint("montant_usd > 0", name="chk_zelle_dep_montant_pos"),
+        CheckConstraint("statut IN ('EN_ATTENTE','APPROUVEE','REJETEE')", name="chk_zelle_dep_statut"),
+        Index("idx_zelle_dep_statut", "statut"),
+        Index("idx_zelle_dep_date",   "date_depense"),
+    )
+
+
 class ChatConversation(Base):
     """Conversation avec l'assistant IA — historique persistant par utilisateur."""
     __tablename__ = "chat_conversations"

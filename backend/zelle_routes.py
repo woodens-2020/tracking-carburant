@@ -7,13 +7,13 @@ from datetime import date as date_type, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import ZelleConfig, ZelleTransaction, ZelleFond
+from models import ZelleConfig, ZelleTransaction, ZelleFond, ZelleDepense, Utilisateur
 
 router = APIRouter(prefix="/api/zelle", tags=["zelle"])
 
@@ -51,6 +51,14 @@ class FondIn(BaseModel):
     source:         str = "PDG"
     date_reception: Optional[str] = None
     notes:          Optional[str] = None
+
+
+class ZelleDepenseIn(BaseModel):
+    description:   str
+    montant_usd:   float = Field(..., gt=0)
+    categorie:     Optional[str] = None
+    date_depense:  Optional[str] = None
+    notes:         Optional[str] = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -102,6 +110,15 @@ def _fond_dict(f: ZelleFond, taux: float = 1.0) -> dict:
     }
 
 
+def _require_pdg(request: Request) -> Utilisateur:
+    """Meme logique que main.require_pdg — dupliquee localement pour eviter
+    un import circulaire (main.py importe deja ce routeur)."""
+    user = getattr(request.state, "user", None)
+    if not user or user.role != "pdg":
+        raise HTTPException(403, "Accès réservé au PDG")
+    return user
+
+
 def _parse_dt(s: str) -> Optional[datetime]:
     """Parse une date/heure saisie par l'utilisateur. Une date SEULE (input
     HTML type="date", ex: "2026-07-15", sans heure) est ramenee a MIDI UTC et
@@ -145,14 +162,23 @@ def update_config(data: ConfigIn, db: Session = Depends(get_db)):
 
 # ── Bilan complet ─────────────────────────────────────────────────────────────
 
+def _zelle_depenses_approuvees_usd(db: Session) -> float:
+    return float(
+        db.query(func.sum(ZelleDepense.montant_usd))
+          .filter(ZelleDepense.statut == "APPROUVEE").scalar() or 0
+    )
+
+
 def _zelle_balance_usd(db: Session) -> float:
     """
-    Solde disponible = solde de depart + fonds injectes - montants DEJA remis.
+    Solde disponible = solde de depart + fonds injectes - montants DEJA remis
+    - depenses Zelle APPROUVEES par le PDG.
     Le montant qui sort reellement du fonds est le montant NET remis en cash
     au beneficiaire (a_remettre = montant - frais) : les frais restent acquis
     a l'entreprise, ils ne sont jamais physiquement decaisses du fonds. Les
-    transactions EN_ATTENTE (pas encore payees) ne sont jamais melangees dans
-    ce calcul.
+    transactions EN_ATTENTE (pas encore payees) et les depenses EN_ATTENTE/
+    REJETEE (pas encore validees) ne sont jamais melangees dans ce calcul —
+    seul le PDG, en approuvant une depense, la fait sortir du solde.
     """
     cfg    = _get_or_create_config(db)
     bal_av = float(cfg.balance_avant_usd)
@@ -163,7 +189,23 @@ def _zelle_balance_usd(db: Session) -> float:
         db.query(func.sum(ZelleTransaction.montant_usd - ZelleTransaction.frais))
           .filter(ZelleTransaction.statut == "REMIS").scalar() or 0
     )
-    return round(bal_av + total_fonds_usd - total_remis_usd, 2)
+    total_depenses_usd = _zelle_depenses_approuvees_usd(db)
+    return round(bal_av + total_fonds_usd - total_remis_usd - total_depenses_usd, 2)
+
+
+def _zelle_dep_dict(d: ZelleDepense) -> dict:
+    return {
+        "id":             d.id,
+        "description":    d.description,
+        "montant_usd":    float(d.montant_usd),
+        "categorie":      d.categorie,
+        "date_depense":   d.date_depense.isoformat() if d.date_depense else None,
+        "statut":         d.statut,
+        "demandeur_nom":  d.demandeur.nom_complet if d.demandeur else None,
+        "valide_par_nom": d.valide_par.nom_complet if d.valide_par else None,
+        "valide_at":      d.valide_at.isoformat() if d.valide_at else None,
+        "notes":          d.notes,
+    }
 
 
 def _zelle_engage_usd(db: Session, exclude_tx_id: Optional[int] = None) -> float:
@@ -264,6 +306,12 @@ def get_bilan(db: Session = Depends(get_db)):
         )
         db.commit()
 
+    total_depenses_usd = _zelle_depenses_approuvees_usd(db)
+    nb_depenses_attente = (
+        db.query(func.count(ZelleDepense.id))
+          .filter(ZelleDepense.statut == "EN_ATTENTE").scalar() or 0
+    )
+
     return {
         "taux":                  taux,
         "balance_avant_usd":     bal_av,
@@ -274,6 +322,9 @@ def get_bilan(db: Session = Depends(get_db)):
         "entree_ht":             entree_ht,
         "total_remis_usd":       total_remis_usd,
         "total_remis_ht":        total_remis_ht,
+        "total_depenses_usd":    total_depenses_usd,
+        "total_depenses_ht":     round(total_depenses_usd * taux, 2),
+        "nb_depenses_attente":   nb_depenses_attente,
         "balance_usd":           balance_usd,
         "balance_ht":            balance_ht,
         "montant_engage_usd":    montant_engage_usd,
@@ -283,6 +334,106 @@ def get_bilan(db: Session = Depends(get_db)):
         "total_frais_ht":        total_frais_ht,
         "sources":               sources_data,
     }
+
+
+# ── Dépenses Zelle (nécessitent validation PDG avant déduction du solde) ──────
+
+@router.get("/depenses")
+def lister_zelle_depenses(statut: Optional[str] = None, db: Session = Depends(get_db)):
+    q = db.query(ZelleDepense)
+    if statut:
+        q = q.filter(ZelleDepense.statut == statut)
+    deps = q.order_by(ZelleDepense.date_depense.desc()).all()
+    return {"depenses": [_zelle_dep_dict(d) for d in deps], "nb": len(deps)}
+
+
+@router.post("/depenses", status_code=201)
+def creer_zelle_depense(data: ZelleDepenseIn, request: Request, db: Session = Depends(get_db)):
+    user = getattr(request.state, "user", None)
+    d = ZelleDepense(
+        description=data.description.strip(),
+        montant_usd=Decimal(str(data.montant_usd)),
+        categorie=data.categorie,
+        notes=data.notes,
+        demandeur_id=user.id if user else None,
+    )
+    if data.date_depense:
+        dt = _parse_dt(data.date_depense)
+        if dt:
+            d.date_depense = dt
+    db.add(d)
+
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="zelle", type_="depense_en_attente",
+        titre=f"Dépense Zelle en attente de validation — ${data.montant_usd:.2f}",
+        message=f"{d.description}" + (f" ({d.categorie})" if d.categorie else ""),
+        lien="zelle-depenses",
+        dedupe_minutes=None,
+    )
+    db.commit()
+    db.refresh(d)
+    return {"id": d.id, "message": "Dépense enregistrée, en attente de validation PDG."}
+
+
+@router.post("/depenses/{depense_id}/approuver")
+def approuver_zelle_depense(
+    depense_id: int, db: Session = Depends(get_db),
+    _pdg: Utilisateur = Depends(_require_pdg),
+):
+    d = db.query(ZelleDepense).filter(ZelleDepense.id == depense_id).first()
+    if not d:
+        raise HTTPException(404, "Dépense introuvable.")
+    if d.statut != "EN_ATTENTE":
+        raise HTTPException(400, f"Cette dépense est déjà {d.statut.lower()}.")
+    solde_avant = _zelle_balance_usd(db)
+    if float(d.montant_usd) > solde_avant:
+        raise HTTPException(
+            400,
+            f"Solde Zelle insuffisant : ${float(d.montant_usd):.2f} demandé, "
+            f"${solde_avant:.2f} disponible.",
+        )
+    d.statut         = "APPROUVEE"
+    d.valide_par_id   = _pdg.id
+    d.valide_at       = datetime.now(timezone.utc)
+
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="zelle", type_="depense_approuvee",
+        titre=f"Dépense Zelle approuvée — ${float(d.montant_usd):.2f}",
+        message=d.description, lien="zelle-depenses", dedupe_minutes=None,
+    )
+    db.commit()
+    return {"message": "Dépense approuvée et déduite du solde Zelle."}
+
+
+@router.post("/depenses/{depense_id}/rejeter")
+def rejeter_zelle_depense(
+    depense_id: int, db: Session = Depends(get_db),
+    _pdg: Utilisateur = Depends(_require_pdg),
+):
+    d = db.query(ZelleDepense).filter(ZelleDepense.id == depense_id).first()
+    if not d:
+        raise HTTPException(404, "Dépense introuvable.")
+    if d.statut != "EN_ATTENTE":
+        raise HTTPException(400, f"Cette dépense est déjà {d.statut.lower()}.")
+    d.statut       = "REJETEE"
+    d.valide_par_id = _pdg.id
+    d.valide_at     = datetime.now(timezone.utc)
+    db.commit()
+    return {"message": "Dépense rejetée."}
+
+
+@router.delete("/depenses/{depense_id}")
+def supprimer_zelle_depense(depense_id: int, db: Session = Depends(get_db)):
+    d = db.query(ZelleDepense).filter(ZelleDepense.id == depense_id).first()
+    if not d:
+        raise HTTPException(404, "Dépense introuvable.")
+    if d.statut != "EN_ATTENTE":
+        raise HTTPException(400, "Seules les dépenses en attente peuvent être supprimées.")
+    db.delete(d)
+    db.commit()
+    return {"ok": True}
 
 
 # ── Fonds (réception) ─────────────────────────────────────────────────────────
