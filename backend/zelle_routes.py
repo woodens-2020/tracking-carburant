@@ -3,7 +3,7 @@ Routes API Département Zelle — préfixe /api/zelle
 """
 from __future__ import annotations
 
-from datetime import date as date_type, datetime, timezone
+from datetime import date as date_type, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
@@ -243,6 +243,26 @@ def get_bilan(db: Session = Depends(get_db)):
     montant_engage_usd    = _zelle_engage_usd(db)
     solde_engageable_usd  = round(balance_usd - montant_engage_usd, 2)
     solde_engageable_ht   = round(solde_engageable_usd * taux, 2)
+
+    # Alerte transactions en attente depuis trop longtemps (verification
+    # opportuniste a chaque chargement du tableau de bord, pas de cron dedie).
+    seuil_attente = datetime.now(timezone.utc) - timedelta(hours=24)
+    en_attente_vieilles = [
+        t for t in txs
+        if t.statut == "EN_ATTENTE"
+        and (t.date_transaction.replace(tzinfo=timezone.utc) if t.date_transaction.tzinfo is None else t.date_transaction) < seuil_attente
+    ]
+    if en_attente_vieilles:
+        from notifications_service import creer_notification
+        creer_notification(
+            db, module="zelle", type_="transactions_en_attente",
+            titre=f"{len(en_attente_vieilles)} transaction(s) Zelle en attente depuis plus de 24h",
+            message=", ".join(t.nom_prenom for t in en_attente_vieilles[:5])
+                    + (f" (+{len(en_attente_vieilles)-5} autres)" if len(en_attente_vieilles) > 5 else ""),
+            lien="zelle",
+            dedupe_minutes=1440,
+        )
+        db.commit()
 
     return {
         "taux":                  taux,

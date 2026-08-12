@@ -1683,6 +1683,30 @@ def anomalies(date: date_type, db: Session = Depends(get_db)):
     toutes = anom_compteurs + anom_stk + anom_bar + anom_geo
     toutes.sort(key=lambda a: (gravite_ordre.get(a["gravite"], 2), a.get("date", "")))
 
+    if toutes:
+        from notifications_service import creer_notification
+        _MODULE_PAR_TYPE = {
+            "QUANTITE_NEGATIVE": "carburant", "REGRESSION_METER": "carburant", "SAUT_ANORMAL": "carburant",
+            "STOCK_NEGATIF": "carburant", "VENTE_SANS_STOCK": "carburant",
+            "PRIX_MANQUANT": "carburant", "DECALAGE_STOCK": "carburant",
+        }
+        for a in toutes:
+            typ = a.get("type", "ANOMALIE")
+            if typ.endswith("_BAR") or "bar" in typ.lower():
+                module = "pos"
+            elif typ.startswith("CONNEXION") or typ.startswith("GEOLOCALISATION"):
+                module = "systeme"
+            else:
+                module = _MODULE_PAR_TYPE.get(typ, "systeme")
+            label = a.get("pompe_nom") or a.get("produit_nom") or a.get("nom") or ""
+            titre = f"Anomalie {typ.replace('_',' ').title()}" + (f" — {label}" if label else "") + f" ({a.get('date', date)})"
+            creer_notification(
+                db, module=module, type_=typ.lower(), titre=titre,
+                message=a.get("message") or a.get("description"),
+                lien="journal", dedupe_minutes=1440,
+            )
+        db.commit()
+
     return {
         "date":           str(date),
         "nb_anomalies":   len(toutes),
