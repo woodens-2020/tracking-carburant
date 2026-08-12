@@ -14834,8 +14834,14 @@ async function _genRapportPeriode(debut, fin, pid, content){
       buckets.push({label:bS.toLocaleDateString('fr-HT',{month:'short',year:'2-digit'}),from:fmtD(bS),to:fmtD(bE)});
       cur2.setMonth(cur2.getMonth()+1); cur2.setDate(1);
     }
-    const evoResults=await Promise.all(buckets.slice(0,18).map(b=>GET(rUrl(b.from,b.to)).catch(()=>null)));
-    evolution=buckets.slice(0,18).map((b,i)=>({label:b.label,ca:evoResults[i]?.total?.revenu_total||0,benefice:evoResults[i]?.total?.benefice||0}));
+    const bSlice=buckets.slice(0,18);
+    const [evoResults,evoStats]=await Promise.all([
+      Promise.all(bSlice.map(b=>GET(rUrl(b.from,b.to)).catch(()=>null))),
+      Promise.all(bSlice.map(b=>GET(sUrl(b.from,b.to)).catch(()=>null))),
+    ]);
+    /* CA = /api/stats (source unique, jamais /api/rentabilite qui exclut les
+       produits desactives) — seul benefice reste tire de /api/rentabilite. */
+    evolution=bSlice.map((b,i)=>({label:b.label,ca:evoStats[i]?.total_montant||0,benefice:evoResults[i]?.total?.benefice||0}));
   }
 
   /* Série quotidienne filtrée sur la période */
@@ -14928,15 +14934,20 @@ function _buildRapportPeriodeHTML(debut,fin,days,cur,prev,rent,rentPrev,evolutio
     return `<span style="font-size:13px;font-weight:700;color:${col};margin-left:6px">${icon} ${Math.abs(pct).toFixed(1)}%</span>`;
   };
 
-  /* Les champs réels retournés par /rentabilite : revenu_total, cogs_total */
-  const ca=rent?.total?.revenu_total||0;
-  const cout=rent?.total?.cogs_total||0;
-  const benef=rent?.total?.benefice||0;
-  const marge=rent?.total?.marge_pct||0;
-  const fiable=rent?.total?.fiable!==false; /* false si livraisons manquantes */
-  const caP=rentPrev?.total?.revenu_total||0, benefP=rentPrev?.total?.benefice||0;
   const vol=cur.total_quantite||0, mnt=cur.total_montant||0, volP=prev.total_quantite||0;
   const nbJ=cur.nb_jours_couverts||0, nbR=cur.nb_releves||0;
+  /* Chiffre d'affaires = /api/stats (source unique de vérité pour les ventes,
+     comme partout ailleurs dans l'appli). /api/rentabilite ne totalise que les
+     produits actifs (necessaire pour le WAC/COGS) — l'utiliser pour le CA
+     sous-evaluerait silencieusement le total si un produit etait desactive. */
+  const ca=mnt, caP=prev.total_montant||0;
+  const cout=rent?.total?.cogs_total||0;
+  const benef=rent?.total?.benefice||0;
+  const fiable=rent?.total?.fiable!==false; /* false si livraisons manquantes */
+  /* Marge recalculee sur le vrai CA (ca) plutot que rent.total.marge_pct,
+     qui serait incoherente avec ca des que rentabilite diverge des stats. */
+  const marge=fiable&&ca>0?+(benef/ca*100).toFixed(2):0;
+  const benefP=rentPrev?.total?.benefice||0;
   /* Prix moyen gallon = montant ventes / volume vendu */
   const prixMoy=vol>0?(mnt/vol):0;
 
@@ -14983,13 +14994,13 @@ function _buildRapportPeriodeHTML(debut,fin,days,cur,prev,rent,rentPrev,evolutio
         </div>
         <div class="rpt-kpi" style="border-top-color:#8b5cf6">
           <div class="rpt-kpi-lbl">Chiffre d'affaires</div>
-          <div class="rpt-kpi-val">${g(ca||mnt)}</div>
-          <div class="rpt-kpi-sub">${nbJ>0?g((ca||mnt)/nbJ)+'/jour':''} ${varBadge(ca||mnt,caP||0)}</div>
+          <div class="rpt-kpi-val">${g(ca)}</div>
+          <div class="rpt-kpi-sub">${nbJ>0?g(ca/nbJ)+'/jour':''} ${varBadge(ca,caP)}</div>
         </div>
         <div class="rpt-kpi" style="border-top-color:#f59e0b">
           <div class="rpt-kpi-lbl">Coût d'achat</div>
           <div class="rpt-kpi-val">${fiable?g(cout):'—'}</div>
-          <div class="rpt-kpi-sub">${fiable&&(ca||mnt)>0?(cout/(ca||mnt)*100).toFixed(1)+'% du CA':'Livraisons manquantes'}</div>
+          <div class="rpt-kpi-sub">${fiable&&ca>0?(cout/ca*100).toFixed(1)+'% du CA':'Livraisons manquantes'}</div>
         </div>
         <div class="rpt-kpi" style="border-top-color:${fiable?(benef>=0?'#22c55e':'#ef4444'):'#6b7280'}">
           <div class="rpt-kpi-lbl">Bénéfice net</div>
@@ -15037,13 +15048,15 @@ function _buildRapportPeriodeHTML(debut,fin,days,cur,prev,rent,rentPrev,evolutio
         <tbody>
           ${Object.entries(parProd).map(([nom,d],i)=>{
             const rt=parProdRent[nom]||{};
-            /* Champs réels du backend: revenu_total, cogs_total, benefice, marge_pct */
             const pvol=d.quantite||0;
-            const pca=rt.revenu_total||d.montant||0;
+            /* CA par produit = /api/stats (d.montant), jamais rt.revenu_total —
+               meme raison que le total : rt vient de /api/rentabilite qui
+               n'existe pas du tout pour un produit desactive. */
+            const pca=d.montant||0;
             const pcout=rt.cogs_total||0;
             const pben=rt.benefice!==undefined?rt.benefice:(pca-pcout);
-            const pmarge=rt.marge_pct!==undefined&&rt.marge_pct!==null?rt.marge_pct:(pca>0?(pben/pca*100):0);
             const pFiable=rt.fiable!==false&&pcout>0;
+            const pmarge=pFiable&&pca>0?+(pben/pca*100).toFixed(2):0;
             const partVol=vol>0?(pvol/vol*100):0;
             const col=['#3fb6a8','#3b82f6','#8b5cf6','#f59e0b','#22c55e'][i%5];
             return `<tr>
