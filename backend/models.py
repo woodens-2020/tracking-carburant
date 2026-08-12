@@ -1136,6 +1136,43 @@ class ZelleFond(Base):
     )
 
 
+class Notification(Base):
+    """Événement notifiable du système — partagé entre tous les utilisateurs.
+    Le statut lu/non-lu/supprimé est individuel, voir NotificationEtat."""
+    __tablename__ = "notifications"
+
+    id         = Column(Integer, primary_key=True)
+    module     = Column(String(30),  nullable=False)   # carburant, hotel, cuisine, pos, zelle, rh, systeme
+    type       = Column(String(50),  nullable=False)    # ex: 'stock_bas', 'nouvelle_reservation'...
+    titre      = Column(String(200), nullable=False)
+    message    = Column(String(500), nullable=True)
+    lien       = Column(String(100), nullable=True)     # page frontend a ouvrir au clic (data-page)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_notif_created", "created_at"),
+        Index("idx_notif_module",  "module"),
+    )
+
+
+class NotificationEtat(Base):
+    """Statut lu/non-lu/supprimé d'une notification, propre à chaque utilisateur.
+    Absence de ligne = non-lu, non-supprimé (état par défaut)."""
+    __tablename__ = "notification_etats"
+
+    id              = Column(Integer, primary_key=True)
+    notification_id = Column(Integer, ForeignKey("notifications.id",  ondelete="CASCADE"), nullable=False)
+    utilisateur_id  = Column(Integer, ForeignKey("utilisateurs.id",   ondelete="CASCADE"), nullable=False)
+    lu              = Column(Boolean, nullable=False, default=False)
+    supprime        = Column(Boolean, nullable=False, default=False)
+    lu_at           = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("notification_id", "utilisateur_id", name="uq_notif_etat_user"),
+        Index("idx_notif_etat_user", "utilisateur_id"),
+    )
+
+
 class ChatConversation(Base):
     """Conversation avec l'assistant IA — historique persistant par utilisateur."""
     __tablename__ = "chat_conversations"

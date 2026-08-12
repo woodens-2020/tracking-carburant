@@ -426,6 +426,16 @@ def creer_reservation(data: ReservationIn, request: Request, db: Session = Depen
 
     # Marquer la chambre comme occupée
     chambre.statut = "OCCUPEE"
+
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="hotel", type_="nouvelle_reservation",
+        titre=f"Nouvelle réservation — {r.client_nom}",
+        message=f"Chambre {chambre.numero} · {r.type_sejour} · {montant} G",
+        lien="hotel-reservation",
+        dedupe_minutes=None,
+    )
+
     db.commit()
     db.refresh(r)
     return _res_dict(r)

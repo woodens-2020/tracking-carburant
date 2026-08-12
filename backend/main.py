@@ -1346,6 +1346,22 @@ def upsert_releve(data: ReleveIn, db: Session = Depends(get_db)):
     r.metter_avant = data.metter_avant
     r.metter_apres = data.metter_apres
     db.commit(); db.refresh(r)
+
+    pompe = db.query(Pompe).get(r.pompe_id)
+    if pompe:
+        from stock_service import stock_restant
+        from notifications_service import creer_notification
+        s = stock_restant(db, pompe.produit_id)
+        if s.get("alerte_bas"):
+            produit = db.query(Produit).get(pompe.produit_id)
+            creer_notification(
+                db, module="carburant", type_="stock_bas",
+                titre=f"Stock bas — {produit.nom if produit else pompe.produit_id}",
+                message=f"{s.get('gallons_restants', 0):.0f} gal restants",
+                lien="stock",
+            )
+            db.commit()
+
     return _releve_dict(r)
 
 
@@ -1485,6 +1501,47 @@ def delete_conversation(conversation_id: int, request: Request, db: Session = De
         raise HTTPException(404, "Conversation introuvable")
     db.delete(conv)
     db.commit()
+    return {"ok": True}
+
+
+# ---------- Notifications ----------
+@app.get("/api/notifications")
+def api_lister_notifications(request: Request, non_lues: bool = False, db: Session = Depends(get_db)):
+    from notifications_service import lister_notifications
+    return lister_notifications(db, request.state.user.id, seulement_non_lues=non_lues)
+
+
+@app.get("/api/notifications/non-lues-count")
+def api_compter_non_lues(request: Request, db: Session = Depends(get_db)):
+    from notifications_service import compter_non_lues
+    return {"count": compter_non_lues(db, request.state.user.id)}
+
+
+@app.post("/api/notifications/{notification_id}/lu")
+def api_marquer_lu(notification_id: int, request: Request, db: Session = Depends(get_db)):
+    from notifications_service import marquer_lu
+    marquer_lu(db, notification_id, request.state.user.id, lu=True)
+    return {"ok": True}
+
+
+@app.post("/api/notifications/{notification_id}/non-lu")
+def api_marquer_non_lu(notification_id: int, request: Request, db: Session = Depends(get_db)):
+    from notifications_service import marquer_lu
+    marquer_lu(db, notification_id, request.state.user.id, lu=False)
+    return {"ok": True}
+
+
+@app.post("/api/notifications/marquer-tout-lu")
+def api_marquer_tout_lu(request: Request, db: Session = Depends(get_db)):
+    from notifications_service import marquer_tout_lu
+    marquer_tout_lu(db, request.state.user.id)
+    return {"ok": True}
+
+
+@app.delete("/api/notifications/{notification_id}")
+def api_supprimer_notification(notification_id: int, request: Request, db: Session = Depends(get_db)):
+    from notifications_service import supprimer_pour_utilisateur
+    supprimer_pour_utilisateur(db, notification_id, request.state.user.id)
     return {"ok": True}
 
 
@@ -3530,6 +3587,16 @@ def creer_employe(data: EmployeIn, db: Session = Depends(get_db)):
         telephone=data.telephone, email=data.email, notes=data.notes,
     )
     db.add(e)
+
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="rh", type_="nouvel_employe",
+        titre=f"Nouvel employé — {e.prenom} {e.nom}",
+        message=f"{e.poste} · {e.type_contrat}",
+        lien="employes",
+        dedupe_minutes=None,
+    )
+
     db.commit()
     db.refresh(e)
     return {"id": e.id, "message": "Employé créé."}
@@ -3869,6 +3936,16 @@ def creer_depense(data: DepenseIn, db: Session = Depends(get_db)):
         beneficiaire=data.beneficiaire, reference=data.reference, notes=data.notes,
     )
     db.add(d)
+
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="rh", type_="nouvelle_depense",
+        titre=f"Nouvelle dépense — {d.categorie}",
+        message=f"{d.description} · {d.montant} G",
+        lien="depenses",
+        dedupe_minutes=None,
+    )
+
     db.commit()
     db.refresh(d)
     return {"id": d.id, "message": "Dépense enregistrée."}
@@ -4432,6 +4509,16 @@ def creer_achat(data: AchatIn, db: Session = Depends(get_db)):
         date_achat=date_a, reference=data.reference, notes=data.notes,
     )
     db.add(a)
+
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="rh", type_="nouvel_achat",
+        titre=f"Nouvel achat — {a.categorie}",
+        message=f"{a.description} · {a.montant} G · {a.fournisseur}",
+        lien="achats",
+        dedupe_minutes=None,
+    )
+
     db.commit()
     db.refresh(a)
     return {"id": a.id, "message": "Achat enregistré."}

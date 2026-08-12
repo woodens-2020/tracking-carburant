@@ -398,6 +398,16 @@ def create_transaction(data: TransactionIn, db: Session = Depends(get_db)):
     # Code interne unique genere automatiquement — jamais saisi manuellement,
     # garanti unique car derive de la cle primaire.
     t.numero_int = f"ZL-{t.id:06d}"
+
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="zelle", type_="nouvelle_transaction",
+        titre=f"Nouvelle transaction Zelle — {t.nom_prenom}",
+        message=f"${t.montant_usd} USD · {t.numero_int}",
+        lien="zelle",
+        dedupe_minutes=None,
+    )
+
     db.commit()
     db.refresh(t)
     return _tx_dict(t)
