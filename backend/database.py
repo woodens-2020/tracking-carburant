@@ -142,6 +142,9 @@ def _migrate_columns():
             ("depenses", "produit_id",
              "ALTER TABLE depenses ADD COLUMN produit_id INTEGER REFERENCES produits(id)",
              "CREATE INDEX IF NOT EXISTS idx_depenses_produit ON depenses(produit_id)"),
+            # v13 — taux HTG/USD fige a la saisie d'une depense Zelle
+            ("zelle_depenses", "taux_applique",
+             "ALTER TABLE zelle_depenses ADD COLUMN taux_applique NUMERIC NOT NULL DEFAULT 130", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -195,6 +198,9 @@ def _migrate_columns():
             ("depenses", "produit_id",
              "ALTER TABLE depenses ADD COLUMN produit_id INTEGER REFERENCES produits(id) ON DELETE SET NULL",
              "CREATE INDEX IF NOT EXISTS idx_depenses_produit ON depenses(produit_id)"),
+            # v13 — taux HTG/USD fige a la saisie d'une depense Zelle
+            ("zelle_depenses", "taux_applique",
+             "ALTER TABLE zelle_depenses ADD COLUMN taux_applique NUMERIC(10,4) NOT NULL DEFAULT 130", None),
         ]
     else:
         return

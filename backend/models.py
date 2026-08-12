@@ -1187,6 +1187,9 @@ class ZelleDepense(Base):
     id            = Column(Integer, primary_key=True)
     description   = Column(String(200), nullable=False)
     montant_usd   = Column(Numeric(14, 2), nullable=False)
+    # Taux HTG/USD au moment de la saisie — fige la conversion (comme
+    # ZelleTransaction.taux_applique) meme si la saisie initiale etait en HTG.
+    taux_applique = Column(Numeric(10, 4), nullable=False, default=130)
     categorie     = Column(String(50), nullable=True)
     date_depense  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     statut        = Column(String(20), nullable=False, default="EN_ATTENTE")  # EN_ATTENTE, APPROUVEE, REJETEE

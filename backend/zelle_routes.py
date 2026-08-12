@@ -55,7 +55,8 @@ class FondIn(BaseModel):
 
 class ZelleDepenseIn(BaseModel):
     description:   str
-    montant_usd:   float = Field(..., gt=0)
+    montant:       float = Field(..., gt=0)   # dans la devise choisie (devise)
+    devise:        str = "USD"                # "USD" ou "HTG"
     categorie:     Optional[str] = None
     date_depense:  Optional[str] = None
     notes:         Optional[str] = None
@@ -117,6 +118,23 @@ def _require_pdg(request: Request) -> Utilisateur:
     if not user or user.role != "pdg":
         raise HTTPException(403, "Accès réservé au PDG")
     return user
+
+
+def _require_pdg_or_admin(request: Request, db: Session = Depends(get_db)) -> Utilisateur:
+    """Approbation d'une depense (sortie reelle de fonds) reste reservee au
+    PDG seul — mais le rejet (aucun impact sur le solde) est aussi ouvert
+    aux administrateurs. Meme logique que main.require_admin pour le volet
+    admin, dupliquee ici pour eviter un import circulaire."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise HTTPException(403, "Non autorisé")
+    if user.role in ("pdg", "admin"):
+        return user
+    if user.role_id:
+        u = db.get(Utilisateur, user.id)
+        if u and u.role_obj and u.role_obj.permissions.get("admin", False):
+            return u
+    raise HTTPException(403, "Accès réservé au PDG ou à un administrateur")
 
 
 def _parse_dt(s: str) -> Optional[datetime]:
@@ -194,10 +212,14 @@ def _zelle_balance_usd(db: Session) -> float:
 
 
 def _zelle_dep_dict(d: ZelleDepense) -> dict:
+    mu  = float(d.montant_usd)
+    tau = float(d.taux_applique)
     return {
         "id":             d.id,
         "description":    d.description,
-        "montant_usd":    float(d.montant_usd),
+        "montant_usd":    mu,
+        "montant_htg":    round(mu * tau, 2),
+        "taux_applique":  tau,
         "categorie":      d.categorie,
         "date_depense":   d.date_depense.isoformat() if d.date_depense else None,
         "statut":         d.statut,
@@ -349,10 +371,17 @@ def lister_zelle_depenses(statut: Optional[str] = None, db: Session = Depends(ge
 
 @router.post("/depenses", status_code=201)
 def creer_zelle_depense(data: ZelleDepenseIn, request: Request, db: Session = Depends(get_db)):
+    if data.devise not in ("USD", "HTG"):
+        raise HTTPException(400, "Devise invalide — 'USD' ou 'HTG'.")
+    cfg  = _get_or_create_config(db)
+    taux = float(cfg.taux)
+    montant_usd = round(data.montant, 2) if data.devise == "USD" else round(data.montant / taux, 2)
+
     user = getattr(request.state, "user", None)
     d = ZelleDepense(
         description=data.description.strip(),
-        montant_usd=Decimal(str(data.montant_usd)),
+        montant_usd=Decimal(str(montant_usd)),
+        taux_applique=Decimal(str(taux)),
         categorie=data.categorie,
         notes=data.notes,
         demandeur_id=user.id if user else None,
@@ -363,10 +392,11 @@ def creer_zelle_depense(data: ZelleDepenseIn, request: Request, db: Session = De
             d.date_depense = dt
     db.add(d)
 
+    montant_ht = round(montant_usd * taux, 2)
     from notifications_service import creer_notification
     creer_notification(
         db, module="zelle", type_="depense_en_attente",
-        titre=f"Dépense Zelle en attente de validation — ${data.montant_usd:.2f}",
+        titre=f"Dépense Zelle en attente de validation — ${montant_usd:.2f} ({montant_ht:,.0f} G)",
         message=f"{d.description}" + (f" ({d.categorie})" if d.categorie else ""),
         lien="zelle-depenses",
         dedupe_minutes=None,
@@ -410,7 +440,7 @@ def approuver_zelle_depense(
 @router.post("/depenses/{depense_id}/rejeter")
 def rejeter_zelle_depense(
     depense_id: int, db: Session = Depends(get_db),
-    _pdg: Utilisateur = Depends(_require_pdg),
+    _user: Utilisateur = Depends(_require_pdg_or_admin),
 ):
     d = db.query(ZelleDepense).filter(ZelleDepense.id == depense_id).first()
     if not d:
@@ -418,7 +448,7 @@ def rejeter_zelle_depense(
     if d.statut != "EN_ATTENTE":
         raise HTTPException(400, f"Cette dépense est déjà {d.statut.lower()}.")
     d.statut       = "REJETEE"
-    d.valide_par_id = _pdg.id
+    d.valide_par_id = _user.id
     d.valide_at     = datetime.now(timezone.utc)
     db.commit()
     return {"message": "Dépense rejetée."}
