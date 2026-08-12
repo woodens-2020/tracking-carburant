@@ -5424,6 +5424,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option>Transport</option><option>Taxes</option><option>Assurance</option><option>Divers</option>
             </select>
           </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Caisse</label>
+            <select class="gi-filter-input" id="dep-filtre-caisse" onchange="loadDepenses()">
+              <option value="">Toutes</option>
+            </select>
+          </div>
           <div class="gi-filter-field" style="flex:1;min-width:200px">
             <label class="gi-filter-lbl">Recherche</label>
             <input type="text" class="gi-filter-input" id="dep-recherche" placeholder="Description, bénéficiaire, référence…" oninput="depRechercheFiltrer()"/>
@@ -5461,6 +5467,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Date *</label>
                 <input type="date" class="gi-form-input" id="dep-date"/>
+              </div>
+            </div>
+            <div class="gi-form-row full">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Caisse d'origine</label>
+                <select class="gi-form-select" id="dep-caisse">
+                  <option value="">— Générale (aucune caisse spécifique) —</option>
+                </select>
               </div>
             </div>
             <div class="gi-form-row full">
@@ -17939,8 +17953,21 @@ async function supprimerFiche(id){
    ══════════════════════════════════════════════════════════════ */
 let _depData = [];
 
+function _depPopulateCaisseSelects(){
+  if(!products || !products.length) return;
+  [document.getElementById('dep-caisse'), document.getElementById('dep-filtre-caisse')].forEach(sel=>{
+    if(!sel || sel.dataset.populated) return;
+    products.forEach(p=>{
+      const o=document.createElement('option');
+      o.value=p.id; o.textContent=p.nom; sel.appendChild(o);
+    });
+    sel.dataset.populated='1';
+  });
+}
+
 async function loadDepenses(){
   _giLoading('dep-table-wrap');
+  _depPopulateCaisseSelects();
 
   // Affichage du bouton PDG et chargement de la limite en parallèle
   if(_appUser?.role === 'pdg'){
@@ -17948,13 +17975,15 @@ async function loadDepenses(){
     if(btnLimite) btnLimite.style.display = '';
   }
 
-  const deb = document.getElementById('dep-filtre-debut')?.value ?? '';
-  const fin = document.getElementById('dep-filtre-fin')?.value ?? '';
-  const cat = document.getElementById('dep-filtre-cat')?.value ?? '';
+  const deb    = document.getElementById('dep-filtre-debut')?.value ?? '';
+  const fin    = document.getElementById('dep-filtre-fin')?.value ?? '';
+  const cat    = document.getElementById('dep-filtre-cat')?.value ?? '';
+  const caisse = document.getElementById('dep-filtre-caisse')?.value ?? '';
   const params=[];
   if(deb) params.push('date_debut='+deb);
   if(fin) params.push('date_fin='+fin);
   if(cat) params.push('categorie='+encodeURIComponent(cat));
+  if(caisse) params.push('produit_id='+caisse);
   const qs=params.length?'?'+params.join('&'):'';
 
   const [d, lim] = await Promise.allSettled([
@@ -18117,10 +18146,12 @@ function renderDepTable(data){
   const catColors={'Salaires':'badge-blue','Maintenance':'badge-amber','Electricite':'badge-amber',
     'Loyer':'badge-gray','Taxes':'badge-red','Assurance':'badge-gray','Fournitures':'badge-blue',
     'Eau':'badge-blue','Transport':'badge-gray','Divers':'badge-gray'};
+  const caisseColors={'Gazoline':'badge-amber','Diesel':'badge-blue'};
   const rows=data.map(d=>`
     <tr>
       <td>${d.date_depense}</td>
       <td><span class="td-badge ${catColors[d.categorie]||'badge-gray'}">${d.categorie}</span></td>
+      <td>${d.produit_nom?`<span class="td-badge ${caisseColors[d.produit_nom]||'badge-gray'}">${d.produit_nom}</span>`:'<span class="td-muted">Générale</span>'}</td>
       <td>${d.description}</td>
       <td class="td-muted">${d.beneficiaire||'—'}</td>
       <td class="td-amount">${_htg(d.montant)}</td>
@@ -18137,12 +18168,13 @@ function renderDepTable(data){
       </td>
     </tr>`).join('');
   wrap.innerHTML=`<table class="gi-table">
-    <thead><tr><th>Date</th><th>Catégorie</th><th>Description</th><th>Bénéficiaire</th><th>Montant</th><th>Référence</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Date</th><th>Catégorie</th><th>Caisse</th><th>Description</th><th>Bénéficiaire</th><th>Montant</th><th>Référence</th><th>Actions</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
 
 function openDepModal(id=null){
+  _depPopulateCaisseSelects();
   document.getElementById('dep-edit-id').value=id||'';
   document.getElementById('dep-modal-title').textContent=id?'Modifier la Dépense':'Nouvelle Dépense';
   if(id){
@@ -18150,6 +18182,7 @@ function openDepModal(id=null){
     if(d){
       document.getElementById('dep-cat').value     =d.categorie;
       document.getElementById('dep-date').value    =d.date_depense;
+      document.getElementById('dep-caisse').value  =d.produit_id||'';
       document.getElementById('dep-desc').value    =d.description;
       document.getElementById('dep-montant').value =d.montant;
       document.getElementById('dep-benef').value   =d.beneficiaire||'';
@@ -18157,7 +18190,7 @@ function openDepModal(id=null){
       document.getElementById('dep-notes').value   =d.notes||'';
     }
   } else {
-    ['dep-cat','dep-desc','dep-montant','dep-benef','dep-ref','dep-notes'].forEach(i=>document.getElementById(i).value='');
+    ['dep-cat','dep-caisse','dep-desc','dep-montant','dep-benef','dep-ref','dep-notes'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('dep-date').value=_today();
   }
   document.getElementById('dep-modal').classList.add('open');
@@ -18166,6 +18199,7 @@ function closeDepModal(){ document.getElementById('dep-modal').classList.remove(
 
 async function submitDep(){
   const id=document.getElementById('dep-edit-id').value;
+  const caisseVal=document.getElementById('dep-caisse').value;
   const body={
     categorie: document.getElementById('dep-cat').value,
     description: document.getElementById('dep-desc').value.trim(),
@@ -18174,7 +18208,9 @@ async function submitDep(){
     beneficiaire: document.getElementById('dep-benef').value.trim()||null,
     reference: document.getElementById('dep-ref').value.trim()||null,
     notes: document.getElementById('dep-notes').value.trim()||null,
+    produit_id: caisseVal?parseInt(caisseVal,10):null,
   };
+  if(id && !caisseVal) body.caisse_generale=true;
   if(!body.categorie||!body.description||!body.date_depense||body.montant<=0){ _giAlert('Veuillez remplir tous les champs obligatoires.'); return; }
   try {
     const method = id ? 'PUT' : 'POST';

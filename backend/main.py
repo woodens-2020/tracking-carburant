@@ -3892,6 +3892,7 @@ class DepenseIn(BaseModel):
     beneficiaire: Optional[str] = None
     reference:    Optional[str] = None
     notes:        Optional[str] = None
+    produit_id:   Optional[int] = None   # caisse d'origine (Gazoline/Diesel) — None = generale
 
 class DepensePatch(BaseModel):
     categorie:    Optional[str]   = None
@@ -3901,12 +3902,15 @@ class DepensePatch(BaseModel):
     beneficiaire: Optional[str]   = None
     reference:    Optional[str]   = None
     notes:        Optional[str]   = None
+    produit_id:   Optional[int]   = None
+    caisse_generale: Optional[bool] = None  # true = detacher explicitement la caisse (produit_id -> NULL)
 
 @app.get("/api/depenses")
 def lister_depenses(
     date_debut: Optional[str] = None,
     date_fin:   Optional[str] = None,
     categorie:  Optional[str] = None,
+    produit_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     q = db.query(Depense)
@@ -3924,6 +3928,8 @@ def lister_depenses(
             raise HTTPException(400, "date_fin invalide.")
     if categorie:
         q = q.filter(Depense.categorie == categorie)
+    if produit_id:
+        q = q.filter(Depense.produit_id == produit_id)
     depenses = q.order_by(Depense.date_depense.desc()).all()
     total = round(sum(float(d.montant) for d in depenses), 2)
     return {
@@ -3936,6 +3942,8 @@ def lister_depenses(
                 "date_depense": str(d.date_depense),
                 "beneficiaire": d.beneficiaire, "reference": d.reference,
                 "notes": d.notes,
+                "produit_id": d.produit_id,
+                "produit_nom": d.produit.nom if d.produit else None,
                 "created_at": d.created_at.isoformat() if d.created_at else None,
             }
             for d in depenses
@@ -3953,18 +3961,25 @@ def creer_depense(data: DepenseIn, db: Session = Depends(get_db)):
         date_d = _date.fromisoformat(data.date_depense)
     except ValueError:
         raise HTTPException(400, "Format de date invalide.")
+    produit = None
+    if data.produit_id is not None:
+        produit = db.query(Produit).filter(Produit.id == data.produit_id).first()
+        if not produit:
+            raise HTTPException(400, "Produit (caisse) introuvable.")
     _verifier_limite(db, data.montant)
     d = Depense(
         categorie=data.categorie, description=data.description.strip(),
         montant=data.montant, date_depense=date_d,
         beneficiaire=data.beneficiaire, reference=data.reference, notes=data.notes,
+        produit_id=produit.id if produit else None,
     )
     db.add(d)
 
     from notifications_service import creer_notification
+    caisse_txt = f" — Caisse {produit.nom}" if produit else ""
     creer_notification(
         db, module="rh", type_="nouvelle_depense",
-        titre=f"Nouvelle dépense — {d.categorie}",
+        titre=f"Nouvelle dépense — {d.categorie}{caisse_txt}",
         message=f"{d.description} · {d.montant} G",
         lien="depenses",
         dedupe_minutes=None,
@@ -3998,6 +4013,13 @@ def modifier_depense(depense_id: int, data: DepensePatch, db: Session = Depends(
     if data.beneficiaire is not None: d.beneficiaire = data.beneficiaire
     if data.reference    is not None: d.reference    = data.reference
     if data.notes        is not None: d.notes        = data.notes
+    if data.caisse_generale:
+        d.produit_id = None
+    elif data.produit_id is not None:
+        produit = db.query(Produit).filter(Produit.id == data.produit_id).first()
+        if not produit:
+            raise HTTPException(400, "Produit (caisse) introuvable.")
+        d.produit_id = produit.id
     db.commit()
     return {"message": "Dépense mise à jour."}
 
@@ -4031,14 +4053,21 @@ def stats_depenses(
             raise HTTPException(400, "date_fin invalide.")
     depenses = q.all()
     par_cat: dict[str, float] = {}
+    par_caisse: dict[str, float] = {}
     for d in depenses:
         par_cat[d.categorie] = round(par_cat.get(d.categorie, 0) + float(d.montant), 2)
+        caisse_nom = d.produit.nom if d.produit else "Générale"
+        par_caisse[caisse_nom] = round(par_caisse.get(caisse_nom, 0) + float(d.montant), 2)
     return {
         "total": round(sum(par_cat.values()), 2),
         "nb": len(depenses),
         "par_categorie": [
             {"categorie": k, "total": v, "pct": round(v / sum(par_cat.values()) * 100, 1) if par_cat else 0}
             for k, v in sorted(par_cat.items(), key=lambda x: -x[1])
+        ],
+        "par_caisse": [
+            {"caisse": k, "total": v, "pct": round(v / sum(par_caisse.values()) * 100, 1) if par_caisse else 0}
+            for k, v in sorted(par_caisse.items(), key=lambda x: -x[1])
         ],
     }
 

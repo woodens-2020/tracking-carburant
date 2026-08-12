@@ -138,6 +138,10 @@ def _migrate_columns():
             # v11 — téléphone utilisateur (second canal OTP par SMS)
             ("utilisateurs", "telephone",
              "ALTER TABLE utilisateurs ADD COLUMN telephone VARCHAR(20)", None),
+            # v12 — caisse d'origine (Gazoline/Diesel) d'une dépense
+            ("depenses", "produit_id",
+             "ALTER TABLE depenses ADD COLUMN produit_id INTEGER REFERENCES produits(id)",
+             "CREATE INDEX IF NOT EXISTS idx_depenses_produit ON depenses(produit_id)"),
         ]
     elif _is_postgres:
         new_cols = [
@@ -187,6 +191,10 @@ def _migrate_columns():
             # v11 — téléphone utilisateur (second canal OTP par SMS)
             ("utilisateurs", "telephone",
              "ALTER TABLE utilisateurs ADD COLUMN telephone VARCHAR(20)", None),
+            # v12 — caisse d'origine (Gazoline/Diesel) d'une dépense
+            ("depenses", "produit_id",
+             "ALTER TABLE depenses ADD COLUMN produit_id INTEGER REFERENCES produits(id) ON DELETE SET NULL",
+             "CREATE INDEX IF NOT EXISTS idx_depenses_produit ON depenses(produit_id)"),
         ]
     else:
         return

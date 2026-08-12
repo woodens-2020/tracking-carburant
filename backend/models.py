@@ -395,7 +395,12 @@ class Depense(Base):
     beneficiaire = Column(String(150), nullable=True)
     reference    = Column(String(100), nullable=True)
     notes        = Column(String(500), nullable=True)
+    # Caisse d'origine (Gazoline / Diesel) — NULL = depense generale, non
+    # attribuee a une caisse carburant specifique.
+    produit_id   = Column(Integer, ForeignKey("produits.id", ondelete="SET NULL"), nullable=True)
     created_at   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    produit = relationship("Produit")
 
     __table_args__ = (
         CheckConstraint("montant > 0", name="chk_depense_montant_pos"),
@@ -406,6 +411,7 @@ class Depense(Base):
         ),
         Index("idx_depenses_date",      "date_depense"),
         Index("idx_depenses_categorie", "categorie"),
+        Index("idx_depenses_produit",   "produit_id"),
     )
 
 
