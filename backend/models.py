@@ -1219,6 +1219,49 @@ class ZelleDepense(Base):
     )
 
 
+class Tache(Base):
+    """Tâche planifiée par un employé — individuelle ou collective selon le
+    nombre de participants. Statut unique partagé entre tous les participants
+    (n'importe lequel peut le faire évoluer)."""
+    __tablename__ = "taches"
+
+    id            = Column(Integer, primary_key=True)
+    titre         = Column(String(200), nullable=False)
+    description   = Column(String(1000), nullable=True)
+    createur_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    date_echeance = Column(Date, nullable=True)
+    statut        = Column(String(20), nullable=False, default="A_FAIRE")  # A_FAIRE, EN_COURS, TERMINEE, ANNULEE
+    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    createur     = relationship("Utilisateur")
+    participants = relationship("TacheParticipant", back_populates="tache", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        CheckConstraint("statut IN ('A_FAIRE','EN_COURS','TERMINEE','ANNULEE')", name="chk_tache_statut"),
+        Index("idx_tache_createur",  "createur_id"),
+        Index("idx_tache_statut",    "statut"),
+        Index("idx_tache_echeance",  "date_echeance"),
+    )
+
+
+class TacheParticipant(Base):
+    """Employé sélectionné pour voir/participer à une tâche."""
+    __tablename__ = "tache_participants"
+
+    id             = Column(Integer, primary_key=True)
+    tache_id       = Column(Integer, ForeignKey("taches.id",       ondelete="CASCADE"), nullable=False)
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="CASCADE"), nullable=False)
+
+    tache       = relationship("Tache", back_populates="participants")
+    utilisateur = relationship("Utilisateur")
+
+    __table_args__ = (
+        UniqueConstraint("tache_id", "utilisateur_id", name="uq_tache_participant"),
+        Index("idx_tache_part_user", "utilisateur_id"),
+    )
+
+
 class ChatConversation(Base):
     """Conversation avec l'assistant IA — historique persistant par utilisateur."""
     __tablename__ = "chat_conversations"

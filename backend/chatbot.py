@@ -35,6 +35,7 @@ _TABLES_EXCLUES = {
     "roles", "utilisateurs", "sessions", "login_security_events",
     "otp_codes", "admin_codes", "audit_logs", "password_reset_tokens",
     "chat_conversations",  # confidentiel — conversations privées des autres utilisateurs
+    "taches", "tache_participants",  # confidentiel — assignations interpersonnelles
 }
 
 _TABLES_AUTORISEES = sorted(
