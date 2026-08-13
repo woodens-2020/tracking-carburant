@@ -20766,7 +20766,12 @@ async function loadPosCaisse(){
   posCatFilter(_posCatActuelle, null);
   posRenderCart();
 
-  const isCaissiere = !!_appUser?.employe_id || (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier');
+  // caisse_employe_id : peuplé pour les vraies caissières ET les managers
+  // (contrairement à employe_id, réservé aux caissières — voir /api/me).
+  // Un manager qui encaisse une vente ici doit être verrouillé sur sa propre
+  // identité, exactement comme une caissière, sans perdre son accès complet
+  // ailleurs dans l'appli.
+  const isCaissiere = !!_appUser?.caisse_employe_id || (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier');
   const adminDash = document.getElementById('pos-caisse-admin-dash');
 
   if(!isCaissiere){
@@ -20780,15 +20785,15 @@ async function loadPosCaisse(){
     _posCaisseBarDashInterval = null;
   }
 
-  // Auto-sélection si l'utilisateur connecté est lié à un employé
-  if(_appUser?.employe_id){
+  // Auto-sélection si l'utilisateur connecté est lié à un employé (caissière ou manager)
+  if(_appUser?.caisse_employe_id){
     const sel = document.getElementById('pos-caissier-sel');
     if(sel){
-      sel.value = String(_appUser.employe_id);
+      sel.value = String(_appUser.caisse_employe_id);
       sel.disabled = true;
       sel.title = 'Votre identité caissière est verrouillée';
     }
-    posCaissierChange(_appUser.employe_id);
+    posCaissierChange(_appUser.caisse_employe_id);
   }
 }
 
