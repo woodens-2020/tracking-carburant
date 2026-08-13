@@ -1144,20 +1144,29 @@ class ZelleFond(Base):
 
 class Notification(Base):
     """Événement notifiable du système — partagé entre tous les utilisateurs.
-    Le statut lu/non-lu/supprimé est individuel, voir NotificationEtat."""
+    Le statut lu/non-lu/supprimé est individuel, voir NotificationEtat.
+    Le statut résolu est global : résoudre un problème (ex: stock bas traité)
+    est un fait objectif sur le systeme, pas une préférence de lecture
+    personnelle — donc visible identiquement par tous les utilisateurs."""
     __tablename__ = "notifications"
 
-    id         = Column(Integer, primary_key=True)
-    module     = Column(String(30),  nullable=False)   # carburant, hotel, cuisine, pos, zelle, rh, systeme
-    type       = Column(String(50),  nullable=False)    # ex: 'stock_bas', 'nouvelle_reservation'...
-    titre      = Column(String(200), nullable=False)
-    message    = Column(String(500), nullable=True)
-    lien       = Column(String(100), nullable=True)     # page frontend a ouvrir au clic (data-page)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    id            = Column(Integer, primary_key=True)
+    module        = Column(String(30),  nullable=False)   # carburant, hotel, cuisine, pos, zelle, rh, systeme
+    type          = Column(String(50),  nullable=False)    # ex: 'stock_bas', 'nouvelle_reservation'...
+    titre         = Column(String(200), nullable=False)
+    message       = Column(String(500), nullable=True)
+    lien          = Column(String(100), nullable=True)     # page frontend a ouvrir au clic (data-page)
+    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    resolu        = Column(Boolean, nullable=False, default=False)
+    resolu_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    resolu_at     = Column(DateTime(timezone=True), nullable=True)
+
+    resolu_par = relationship("Utilisateur")
 
     __table_args__ = (
         Index("idx_notif_created", "created_at"),
         Index("idx_notif_module",  "module"),
+        Index("idx_notif_resolu",  "resolu"),
     )
 
 

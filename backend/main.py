@@ -1524,9 +1524,15 @@ def delete_conversation(conversation_id: int, request: Request, db: Session = De
 
 # ---------- Notifications ----------
 @app.get("/api/notifications")
-def api_lister_notifications(request: Request, non_lues: bool = False, db: Session = Depends(get_db)):
+def api_lister_notifications(
+    request: Request, non_lues: bool = False, resolues: bool = False,
+    db: Session = Depends(get_db),
+):
     from notifications_service import lister_notifications
-    return lister_notifications(db, request.state.user.id, seulement_non_lues=non_lues)
+    return lister_notifications(
+        db, request.state.user.id,
+        seulement_non_lues=non_lues, seulement_resolues=resolues,
+    )
 
 
 @app.get("/api/notifications/non-lues-count")
@@ -1560,6 +1566,24 @@ def api_marquer_tout_lu(request: Request, db: Session = Depends(get_db)):
 def api_supprimer_notification(notification_id: int, request: Request, db: Session = Depends(get_db)):
     from notifications_service import supprimer_pour_utilisateur
     supprimer_pour_utilisateur(db, notification_id, request.state.user.id)
+    return {"ok": True}
+
+
+@app.post("/api/notifications/{notification_id}/resoudre")
+def api_marquer_resolu(notification_id: int, request: Request, db: Session = Depends(get_db)):
+    from notifications_service import marquer_resolu
+    notif = marquer_resolu(db, notification_id, request.state.user.id, resolu=True)
+    if not notif:
+        raise HTTPException(404, "Notification introuvable.")
+    return {"ok": True}
+
+
+@app.post("/api/notifications/{notification_id}/rouvrir")
+def api_marquer_non_resolu(notification_id: int, request: Request, db: Session = Depends(get_db)):
+    from notifications_service import marquer_resolu
+    notif = marquer_resolu(db, notification_id, request.state.user.id, resolu=False)
+    if not notif:
+        raise HTTPException(404, "Notification introuvable.")
     return {"ok": True}
 
 

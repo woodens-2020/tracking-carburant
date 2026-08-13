@@ -3564,8 +3564,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <div class="card">
         <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:16px">
           <div style="display:flex;gap:6px">
-            <button class="db-preset active" id="notif-filter-all" onclick="setNotifFilter(false)">Toutes</button>
-            <button class="db-preset" id="notif-filter-unread" onclick="setNotifFilter(true)">Non lues</button>
+            <button class="db-preset active" id="notif-filter-all" onclick="setNotifFilter('all')">Toutes</button>
+            <button class="db-preset" id="notif-filter-unread" onclick="setNotifFilter('unread')">Non lues</button>
+            <button class="db-preset" id="notif-filter-resolved" onclick="setNotifFilter('resolved')">Résolu</button>
           </div>
           <button class="btn-xls" onclick="marquerToutNotifLu()">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
@@ -13662,7 +13663,7 @@ document.addEventListener('click',(e)=>{
 // ══════════════════════════════════════════════
 // NOTIFICATIONS
 // ══════════════════════════════════════════════
-let notifFilterUnread = false;
+let notifFilterMode = 'all'; // 'all' | 'unread' | 'resolved'
 const NOTIF_MODULE_LABELS = {
   carburant:'Carburant', hotel:'Hôtel', cuisine:'Cuisine',
   pos:'Bar/POS', zelle:'Zelle', rh:'RH/Finance', systeme:'Système',
@@ -13682,10 +13683,11 @@ function notifTimeAgo(iso){
 
 async function loadNotificationsPage(){ await renderNotifList(); }
 
-function setNotifFilter(unread){
-  notifFilterUnread=unread;
-  document.getElementById('notif-filter-all').classList.toggle('active',!unread);
-  document.getElementById('notif-filter-unread').classList.toggle('active',unread);
+function setNotifFilter(mode){
+  notifFilterMode=mode;
+  document.getElementById('notif-filter-all').classList.toggle('active',mode==='all');
+  document.getElementById('notif-filter-unread').classList.toggle('active',mode==='unread');
+  document.getElementById('notif-filter-resolved').classList.toggle('active',mode==='resolved');
   renderNotifList();
 }
 
@@ -13694,9 +13696,12 @@ async function renderNotifList(){
   if(!box) return;
   box.innerHTML='<div class="loading-row" style="padding:20px"><span class="spinner"></span><span>Chargement…</span></div>';
   try{
-    const items=await GET('/notifications'+(notifFilterUnread?'?non_lues=true':''));
+    const qs = notifFilterMode==='unread' ? '?non_lues=true'
+             : notifFilterMode==='resolved' ? '?resolues=true' : '';
+    const items=await GET('/notifications'+qs);
     if(!items.length){
-      box.innerHTML=`<div style="padding:30px;text-align:center;color:var(--muted);font-size:13px">Aucune notification${notifFilterUnread?' non lue':''}.</div>`;
+      const vide = notifFilterMode==='unread' ? ' non lue' : notifFilterMode==='resolved' ? ' résolue' : '';
+      box.innerHTML=`<div style="padding:30px;text-align:center;color:var(--muted);font-size:13px">Aucune notification${vide}.</div>`;
       return;
     }
     box.innerHTML='';
@@ -13710,11 +13715,21 @@ async function renderNotifList(){
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span style="font-size:10px;font-weight:800;color:${color};background:${color}1a;padding:2px 7px;border-radius:5px;text-transform:uppercase">${NOTIF_MODULE_LABELS[n.module]||n.module}</span>
             <span style="font-size:10px;color:var(--muted)">${notifTimeAgo(n.created_at)}</span>
+            ${n.resolu?`<span style="font-size:10px;font-weight:800;color:#4ade80;background:rgba(74,222,128,.12);padding:2px 7px;border-radius:5px">✓ Résolu${n.resolu_par_nom?' par '+esc(n.resolu_par_nom):''}</span>`:''}
           </div>
           <div style="font-size:13px;font-weight:700;color:var(--text1);margin-top:4px">${esc(n.titre)}</div>
           ${n.message?`<div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(n.message)}</div>`:''}
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
+          ${n.resolu
+            ? `<button title="Rouvrir" onclick="rouvrirNotif(${n.id},event)"
+                style="width:26px;height:26px;border-radius:6px;background:var(--panel3);border:1px solid var(--border);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 .49-3.89"/></svg>
+              </button>`
+            : `<button title="Résoudre" onclick="resoudreNotif(${n.id},event)"
+                style="width:26px;height:26px;border-radius:6px;background:var(--panel3);border:1px solid var(--border);color:#4ade80;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </button>`}
           <button title="${n.lu?'Marquer non lu':'Marquer lu'}" onclick="toggleNotifLu(${n.id},${n.lu},event)"
             style="width:26px;height:26px;border-radius:6px;background:var(--panel3);border:1px solid var(--border);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer">
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2">${n.lu?'<circle cx="12" cy="12" r="9"/>':'<polyline points="20 6 9 17 4 12"/>'}</svg>
@@ -13729,6 +13744,22 @@ async function renderNotifList(){
   }catch(e){
     box.innerHTML='<div style="padding:20px;text-align:center;color:var(--red);font-size:13px">Erreur de chargement.</div>';
   }
+}
+
+async function resoudreNotif(id,event){
+  if(event) event.stopPropagation();
+  try{
+    await POST(`/notifications/${id}/resoudre`,{});
+    renderNotifList();
+  }catch(e){ toast(e.message,'err'); }
+}
+
+async function rouvrirNotif(id,event){
+  if(event) event.stopPropagation();
+  try{
+    await POST(`/notifications/${id}/rouvrir`,{});
+    renderNotifList();
+  }catch(e){ toast(e.message,'err'); }
 }
 
 function _notifClick(id,lien){

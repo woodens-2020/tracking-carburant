@@ -43,7 +43,12 @@ def creer_notification(
     return notif
 
 
-def lister_notifications(db: Session, utilisateur_id: int, seulement_non_lues: bool = False, limite: int = 200) -> list[dict]:
+def lister_notifications(
+    db: Session, utilisateur_id: int,
+    seulement_non_lues: bool = False,
+    seulement_resolues: bool = False,
+    limite: int = 200,
+) -> list[dict]:
     q = (
         db.query(Notification, NotificationEtat)
         .outerjoin(
@@ -60,6 +65,8 @@ def lister_notifications(db: Session, utilisateur_id: int, seulement_non_lues: b
         lu = bool(etat.lu) if etat else False
         if seulement_non_lues and lu:
             continue
+        if seulement_resolues and not notif.resolu:
+            continue
         resultats.append({
             "id": notif.id,
             "module": notif.module,
@@ -69,6 +76,9 @@ def lister_notifications(db: Session, utilisateur_id: int, seulement_non_lues: b
             "lien": notif.lien,
             "created_at": notif.created_at,
             "lu": lu,
+            "resolu": bool(notif.resolu),
+            "resolu_par_nom": notif.resolu_par.nom_complet if notif.resolu_par else None,
+            "resolu_at": notif.resolu_at,
         })
     return resultats
 
@@ -117,3 +127,16 @@ def supprimer_pour_utilisateur(db: Session, notification_id: int, utilisateur_id
     etat = _get_or_create_etat(db, notification_id, utilisateur_id)
     etat.supprime = True
     db.commit()
+
+
+def marquer_resolu(db: Session, notification_id: int, utilisateur_id: int, resolu: bool = True) -> Notification | None:
+    """Statut global (partage entre tous) — resoudre un probleme est un fait
+    objectif sur le systeme, pas une preference de lecture personnelle."""
+    notif = db.query(Notification).filter_by(id=notification_id).first()
+    if not notif:
+        return None
+    notif.resolu = resolu
+    notif.resolu_par_id = utilisateur_id if resolu else None
+    notif.resolu_at = datetime.now(timezone.utc) if resolu else None
+    db.commit()
+    return notif

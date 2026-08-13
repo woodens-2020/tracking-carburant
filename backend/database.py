@@ -145,6 +145,14 @@ def _migrate_columns():
             # v13 — taux HTG/USD fige a la saisie d'une depense Zelle
             ("zelle_depenses", "taux_applique",
              "ALTER TABLE zelle_depenses ADD COLUMN taux_applique NUMERIC NOT NULL DEFAULT 130", None),
+            # v14 — statut resolu (global) d'une notification
+            ("notifications", "resolu",
+             "ALTER TABLE notifications ADD COLUMN resolu INTEGER NOT NULL DEFAULT 0",
+             "CREATE INDEX IF NOT EXISTS idx_notif_resolu ON notifications(resolu)"),
+            ("notifications", "resolu_par_id",
+             "ALTER TABLE notifications ADD COLUMN resolu_par_id INTEGER REFERENCES utilisateurs(id)", None),
+            ("notifications", "resolu_at",
+             "ALTER TABLE notifications ADD COLUMN resolu_at DATETIME DEFAULT NULL", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -201,6 +209,14 @@ def _migrate_columns():
             # v13 — taux HTG/USD fige a la saisie d'une depense Zelle
             ("zelle_depenses", "taux_applique",
              "ALTER TABLE zelle_depenses ADD COLUMN taux_applique NUMERIC(10,4) NOT NULL DEFAULT 130", None),
+            # v14 — statut resolu (global) d'une notification
+            ("notifications", "resolu",
+             "ALTER TABLE notifications ADD COLUMN resolu BOOLEAN NOT NULL DEFAULT FALSE",
+             "CREATE INDEX IF NOT EXISTS idx_notif_resolu ON notifications(resolu)"),
+            ("notifications", "resolu_par_id",
+             "ALTER TABLE notifications ADD COLUMN resolu_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
+            ("notifications", "resolu_at",
+             "ALTER TABLE notifications ADD COLUMN resolu_at TIMESTAMP WITH TIME ZONE", None),
         ]
     else:
         return
