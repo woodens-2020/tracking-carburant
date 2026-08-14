@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, validator, model_validator
 from sqlalchemy import func, or_, exists
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -557,6 +558,93 @@ def stock_global(db: Session = Depends(get_db)):
         }
         for p in produits
     ]
+
+
+@router.get("/stock/export/pdf")
+def export_stock_pdf(
+    recherche:     Optional[str] = None,
+    disponibilite: Optional[str] = None,   # "disponible" | "non_disponible" | None
+    db: Session = Depends(get_db),
+):
+    """Export PDF de la liste du stock bar — respecte les mêmes filtres
+    (recherche, disponibilité) que ceux affichés à l'écran."""
+    import io
+    from datetime import date as date_cls
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+    from reportlab.lib.enums import TA_CENTER
+
+    produits = db.query(BarProduit).filter_by(actif=True).order_by(BarProduit.categorie, BarProduit.nom).all()
+    stocks   = stock_tous_produits(db)
+
+    lignes = []
+    for p in produits:
+        if recherche and recherche.strip().lower() not in p.nom.lower():
+            continue
+        stock = float(stocks.get(p.id, Decimal("0")))
+        dispo = stock > 0
+        if disponibilite == "disponible" and not dispo:
+            continue
+        if disponibilite == "non_disponible" and dispo:
+            continue
+        alerte = p.seuil_alerte_stock and stock <= float(p.seuil_alerte_stock)
+        etat = "Alerte" if alerte else ("Épuisé" if stock <= 0 else "OK")
+        lignes.append([p.nom, p.categorie or "—", f"{stock:.3f}", p.unite or "—", etat])
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                             leftMargin=1.8*cm, rightMargin=1.8*cm,
+                             topMargin=1.8*cm, bottomMargin=1.8*cm)
+    ORANGE = colors.HexColor("#E8893A")
+    DARK   = colors.HexColor("#1A1A2E")
+
+    title_style = ParagraphStyle("title", fontSize=16, textColor=DARK, fontName="Helvetica-Bold", spaceAfter=4)
+    sub_style   = ParagraphStyle("sub",   fontSize=10, textColor=colors.grey, spaceAfter=12)
+
+    story = [Paragraph("Stock Bar", title_style)]
+    filtre_txt = []
+    if recherche: filtre_txt.append(f"Recherche : « {recherche} »")
+    if disponibilite == "disponible": filtre_txt.append("Disponibles uniquement")
+    if disponibilite == "non_disponible": filtre_txt.append("Non disponibles uniquement")
+    filtre_txt.append(f"{len(lignes)} produit(s)")
+    filtre_txt.append(f"Généré le {date_cls.today().strftime('%d/%m/%Y')}")
+    story.append(Paragraph("  ·  ".join(filtre_txt), sub_style))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=ORANGE))
+    story.append(Spacer(1, 10))
+
+    data = [["Produit", "Catégorie", "Stock", "Unité", "État"]] + lignes
+    t = Table(data, colWidths=[6.5*cm, 3.5*cm, 2.5*cm, 2.5*cm, 2.5*cm])
+    t.setStyle(TableStyle([
+        ("BACKGROUND",   (0,0),(-1,0), DARK),
+        ("TEXTCOLOR",    (0,0),(-1,0), colors.white),
+        ("FONTNAME",     (0,0),(-1,0), "Helvetica-Bold"),
+        ("FONTSIZE",     (0,0),(-1,-1), 9),
+        ("ROWBACKGROUNDS",(0,1),(-1,-1), [colors.HexColor("#F5F5F5"), colors.white]),
+        ("GRID",         (0,0),(-1,-1), 0.4, colors.HexColor("#CCCCCC")),
+        ("ALIGN",        (2,0),(4,-1), "CENTER"),
+        ("BOTTOMPADDING",(0,0),(-1,-1), 5),
+        ("TOPPADDING",   (0,0),(-1,-1), 5),
+    ]))
+    story.append(t)
+
+    story.append(Spacer(1, 16))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.grey))
+    story.append(Paragraph(
+        f"Généré le {date_cls.today().strftime('%Y-%m-%d')} — Konekta · Bon Prix",
+        ParagraphStyle("footer", fontSize=7, textColor=colors.grey, alignment=TA_CENTER, spaceBefore=4),
+    ))
+
+    doc.build(story)
+    buf.seek(0)
+    fname = f"stock_bar_{date_cls.today().isoformat()}.pdf"
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 @router.get("/stock/{produit_id}")

@@ -6524,6 +6524,24 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-header-actions">
             <button id="btn-pos-stock-reception" class="pos-btn teal" onclick="posStockReceptionModal()">+ Réception</button>
             <button id="btn-pos-stock-ajust" class="pos-btn ghost" onclick="posStockAjustModal()">Ajustement</button>
+            <button id="btn-pos-stock-pdf" class="pos-btn ghost" onclick="posStockExportPdf()">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:5px;vertical-align:middle"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Recherche + filtre disponibilité ── -->
+        <div class="pos-card" style="padding:12px 16px;margin-bottom:14px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="position:relative;flex:1;min-width:200px">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="pos-stock-recherche" class="pos-input" placeholder="Rechercher un produit…" style="padding-left:32px;width:100%" oninput="posStockFiltrer()">
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="db-preset active" id="pos-stock-dispo-tous" onclick="posStockSetDispo('')">Tous</button>
+              <button class="db-preset" id="pos-stock-dispo-oui" onclick="posStockSetDispo('disponible')">Disponible</button>
+              <button class="db-preset" id="pos-stock-dispo-non" onclick="posStockSetDispo('non_disponible')">Non disponible</button>
+            </div>
           </div>
         </div>
 
@@ -22086,6 +22104,9 @@ async function posChangerPrix(){
 // ══════════════════════════════════════════════════════════════════════
 // PAGE POS STOCK
 // ══════════════════════════════════════════════════════════════════════
+let _posStockCache = { prods: [], stockMap: {} };
+let _posStockDispoFiltre = ''; // '' | 'disponible' | 'non_disponible'
+
 async function loadPosStock(){
   const tbody = document.getElementById('pos-stock-tbody');
   if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
@@ -22097,33 +22118,18 @@ async function loadPosStock(){
     ]);
     const stockMap = {};
     (stocks||[]).forEach(s=>{ stockMap[s.produit_id] = s; });
+    _posStockCache = { prods: prods||[], stockMap };
 
     let totalValeur = 0, nbAlerte = 0;
-    const rows = (prods||[]).map(p=>{
+    (prods||[]).forEach(p=>{
       const s = stockMap[p.id]||{};
       const stock = parseFloat(s.stock_courant||0);
       const cmup  = parseFloat(s.cmup||0);
-      const valeur = stock * cmup;
-      totalValeur += valeur;
-      const alerte = p.seuil_alerte_stock && stock <= p.seuil_alerte_stock;
-      if(alerte) nbAlerte++;
-      const badge = alerte
-        ? '<span class="pos-badge danger">Alerte</span>'
-        : stock<=0
-          ? '<span class="pos-badge">Épuisé</span>'
-          : '<span class="pos-badge teal">OK</span>';
-      return `<tr${alerte?' style="background:rgba(248,113,113,.06)"':''}>
-        <td><strong>${p.nom||'—'}</strong></td>
-        <td>${p.categorie||'—'}</td>
-        <td><strong>${stock.toFixed(3)}</strong></td>
-        <td>${p.unite||'—'}</td>
-        <td>${p.seuil_alerte_stock||'—'}</td>
-        <td>${valeur>0?posGx(valeur):'—'}</td>
-        <td>${badge}</td>
-        <td>${stock!==0?`<button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posStockReinitialiser(${p.id},'${esc(p.nom||'')}',${stock})">Réinitialiser</button>`:'<span style="color:rgba(255,255,255,.25);font-size:12px">—</span>'}</td>
-      </tr>`;
+      totalValeur += stock * cmup;
+      if(p.seuil_alerte_stock && stock <= p.seuil_alerte_stock) nbAlerte++;
     });
-    if(tbody) tbody.innerHTML = rows.join('')||'<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit actif</td></tr>';
+
+    _posStockRenderTable();
 
     const kpis = [
       ['kpi-nb-produits', (prods||[]).length],
@@ -22141,6 +22147,63 @@ async function loadPosStock(){
   } catch(e){
     if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
+}
+
+function _posStockRenderTable(){
+  const tbody = document.getElementById('pos-stock-tbody');
+  if(!tbody) return;
+  const { prods, stockMap } = _posStockCache;
+  const recherche = (document.getElementById('pos-stock-recherche')?.value||'').trim().toLowerCase();
+
+  const filtres = prods.filter(p=>{
+    if(recherche && !(p.nom||'').toLowerCase().includes(recherche)) return false;
+    const stock = parseFloat((stockMap[p.id]||{}).stock_courant||0);
+    if(_posStockDispoFiltre==='disponible' && !(stock>0)) return false;
+    if(_posStockDispoFiltre==='non_disponible' && stock>0) return false;
+    return true;
+  });
+
+  const rows = filtres.map(p=>{
+    const s = stockMap[p.id]||{};
+    const stock = parseFloat(s.stock_courant||0);
+    const cmup  = parseFloat(s.cmup||0);
+    const valeur = stock * cmup;
+    const alerte = p.seuil_alerte_stock && stock <= p.seuil_alerte_stock;
+    const badge = alerte
+      ? '<span class="pos-badge danger">Alerte</span>'
+      : stock<=0
+        ? '<span class="pos-badge">Épuisé</span>'
+        : '<span class="pos-badge teal">OK</span>';
+    return `<tr${alerte?' style="background:rgba(248,113,113,.06)"':''}>
+      <td><strong>${p.nom||'—'}</strong></td>
+      <td>${p.categorie||'—'}</td>
+      <td><strong>${stock.toFixed(3)}</strong></td>
+      <td>${p.unite||'—'}</td>
+      <td>${p.seuil_alerte_stock||'—'}</td>
+      <td>${valeur>0?posGx(valeur):'—'}</td>
+      <td>${badge}</td>
+      <td>${stock!==0?`<button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posStockReinitialiser(${p.id},'${esc(p.nom||'')}',${stock})">Réinitialiser</button>`:'<span style="color:rgba(255,255,255,.25);font-size:12px">—</span>'}</td>
+    </tr>`;
+  });
+  tbody.innerHTML = rows.join('') || `<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit ${recherche||_posStockDispoFiltre?'ne correspond aux filtres':'actif'}</td></tr>`;
+}
+
+function posStockFiltrer(){ _posStockRenderTable(); }
+
+function posStockSetDispo(valeur){
+  _posStockDispoFiltre = valeur;
+  document.getElementById('pos-stock-dispo-tous').classList.toggle('active', valeur==='');
+  document.getElementById('pos-stock-dispo-oui').classList.toggle('active', valeur==='disponible');
+  document.getElementById('pos-stock-dispo-non').classList.toggle('active', valeur==='non_disponible');
+  _posStockRenderTable();
+}
+
+function posStockExportPdf(){
+  const params = new URLSearchParams();
+  const recherche = (document.getElementById('pos-stock-recherche')?.value||'').trim();
+  if(recherche) params.set('recherche', recherche);
+  if(_posStockDispoFiltre) params.set('disponibilite', _posStockDispoFiltre);
+  window.open('/api/pos/stock/export/pdf?'+params.toString(), '_blank');
 }
 
 async function posStockReinitialiser(produitId, produitNom, stockActuel){
