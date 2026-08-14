@@ -1199,6 +1199,39 @@ def ajuster_stock(data: AjustementIn, request: Request, db: Session = Depends(ge
     }
 
 
+@router.post("/stock/{produit_id}/reinitialiser", status_code=201)
+def reinitialiser_stock(produit_id: int, request: Request, db: Session = Depends(get_db)):
+    """Ramène le stock calculé d'un produit à exactement 0, via un mouvement
+    d'ajustement compensatoire — pour repartir sur un nouvel inventaire
+    authentique sans le mélanger à l'historique de mouvements existant.
+    Le stock avant/après est calculé côté serveur au moment de l'exécution
+    (jamais côté client) pour éviter tout écart lié à une vente concurrente."""
+    p = db.query(BarProduit).filter_by(id=produit_id).first()
+    if not p:
+        raise HTTPException(404, "Produit introuvable")
+
+    stock_avant = stock_courant(produit_id, db)
+    if stock_avant == 0:
+        raise HTTPException(400, "Le stock de ce produit est déjà à zéro.")
+
+    mouv = BarMouvementStock(
+        produit_id     = produit_id,
+        type_mouvement = "AJUSTEMENT",
+        quantite       = -stock_avant,
+        motif          = f"Réinitialisation du stock (nouvel inventaire) — ancien stock : {float(stock_avant):.3f} {p.unite}",
+        utilisateur_id = _uid(request),
+    )
+    db.add(mouv)
+    db.commit()
+
+    return {
+        "ok":          True,
+        "produit_nom": p.nom,
+        "stock_avant": float(stock_avant),
+        "stock_apres": 0.0,
+    }
+
+
 # ══════════════════════════════════════════════════════════════════
 # VENTES & CAISSE
 # ══════════════════════════════════════════════════════════════════

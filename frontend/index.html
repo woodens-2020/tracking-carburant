@@ -6553,10 +6553,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-table-wrap">
             <table class="pos-table">
               <thead>
-                <tr><th>Produit</th><th>Catégorie</th><th>Stock</th><th>Unité</th><th>Seuil alerte</th><th>Coût en stock</th><th>État</th></tr>
+                <tr><th>Produit</th><th>Catégorie</th><th>Stock</th><th>Unité</th><th>Seuil alerte</th><th>Coût en stock</th><th>État</th><th>Actions</th></tr>
               </thead>
               <tbody id="pos-stock-tbody">
-                <tr><td colspan="7" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -22120,9 +22120,10 @@ async function loadPosStock(){
         <td>${p.seuil_alerte_stock||'—'}</td>
         <td>${valeur>0?posGx(valeur):'—'}</td>
         <td>${badge}</td>
+        <td>${stock!==0?`<button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posStockReinitialiser(${p.id},'${esc(p.nom||'')}',${stock})">Réinitialiser</button>`:'<span style="color:rgba(255,255,255,.25);font-size:12px">—</span>'}</td>
       </tr>`;
     });
-    if(tbody) tbody.innerHTML = rows.join('')||'<tr><td colspan="7" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit actif</td></tr>';
+    if(tbody) tbody.innerHTML = rows.join('')||'<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit actif</td></tr>';
 
     const kpis = [
       ['kpi-nb-produits', (prods||[]).length],
@@ -22140,6 +22141,20 @@ async function loadPosStock(){
   } catch(e){
     if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
+}
+
+async function posStockReinitialiser(produitId, produitNom, stockActuel){
+  const ok = await showConfirm(
+    `Le stock actuel de « ${produitNom} » (${stockActuel.toFixed(3)}) sera ramené à zéro. ` +
+    `Cette action est tracée comme un ajustement (irréversible) — à utiliser pour repartir sur un nouvel inventaire authentique, sans le mélanger à l'historique existant.`,
+    {title:'Réinitialiser le stock', type:'danger', okLabel:'Réinitialiser à zéro'}
+  );
+  if(!ok) return;
+  try{
+    const res = await apiFetch('POST', `/pos/stock/${produitId}/reinitialiser`, {});
+    toast(`Stock de « ${res.produit_nom} » réinitialisé (${res.stock_avant.toFixed(3)} → 0).`,'ok');
+    loadPosStock();
+  }catch(e){ toast(e.message||'Erreur lors de la réinitialisation.','err'); }
 }
 
 function _posRenderAttente(achats){
