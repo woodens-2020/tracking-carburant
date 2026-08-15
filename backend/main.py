@@ -4862,7 +4862,14 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
         cat_map[d.categorie] = round(cat_map.get(d.categorie, 0.0) + float(d.montant), 2)
     depenses_par_cat = [{"categorie": k, "montant": v} for k, v in sorted(cat_map.items(), key=lambda x: -x[1])]
 
-    total_depenses = round(depenses_station + depenses_cuisine, 2)
+    # ── Sorties : Dépenses Hôtel ──────────────────────────────────
+    from models import HotelDepense
+    q_hd = db.query(HotelDepense)
+    if dt_debut: q_hd = q_hd.filter(HotelDepense.date_depense >= dt_debut)
+    if dt_fin:   q_hd = q_hd.filter(HotelDepense.date_depense <= dt_fin)
+    depenses_hotel = round(sum(float(d.montant) for d in q_hd.all()), 2)
+
+    total_depenses = round(depenses_station + depenses_cuisine + depenses_hotel, 2)
 
     # ── Sorties : Payroll (RH tous départements + paiements ad hoc Bar) ──
     q_pay = db.query(FichePaie).filter(FichePaie.statut == "paye")
@@ -4904,6 +4911,7 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
             "achats_cuisine":   achats_cuisine,
             "depenses_station": depenses_station,
             "depenses_cuisine": depenses_cuisine,
+            "depenses_hotel":   depenses_hotel,
             "payroll_rh":       total_payroll_rh,
             "payroll_bar":      total_payroll_bar,
             "total_achats":     total_achats,
@@ -4978,6 +4986,7 @@ def rapport_caisse(
             "achats_bar":     synth["sorties"]["achats_bar"],
             "achats_cuisine": synth["sorties"]["achats_cuisine"],
             "depenses_cuisine": synth["sorties"]["depenses_cuisine"],
+            "depenses_hotel": synth["sorties"]["depenses_hotel"],
             "payroll_bar":    synth["sorties"]["payroll_bar"],
         },
         "renflouements": {
@@ -5153,6 +5162,7 @@ def gi_dashboard(
             "achats_bar":       synth["sorties"]["achats_bar"],
             "achats_cuisine":   synth["sorties"]["achats_cuisine"],
             "depenses_cuisine": synth["sorties"]["depenses_cuisine"],
+            "depenses_hotel":   synth["sorties"]["depenses_hotel"],
             "payroll_bar":      synth["sorties"]["payroll_bar"],
         },
         "renflouements": {

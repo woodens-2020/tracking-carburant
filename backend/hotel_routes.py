@@ -15,7 +15,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import HotelChambre, HotelEmploye, HotelReservation
+from models import HotelChambre, HotelEmploye, HotelReservation, HotelDepense, Utilisateur
 
 router = APIRouter(prefix="/api/hotel", tags=["Hotel"])
 
@@ -1072,3 +1072,147 @@ def rapport_hotel_xlsx(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={fname}"},
     )
+
+
+# ══════════════════════════════════════════════════════════════════
+# DÉPENSES HÔTEL
+# ══════════════════════════════════════════════════════════════════
+
+def _est_admin_utilisateur_hotel(request: Request, db: Session) -> bool:
+    """Même logique que cuisine_routes._est_admin_utilisateur — dupliquée
+    ici pour éviter un import circulaire entre routers."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        return False
+    if user.role == "admin":
+        return True
+    if user.role_id:
+        u = db.get(Utilisateur, user.id)
+        if u and u.role_obj and u.role_obj.permissions.get("admin", False):
+            return True
+    return False
+
+
+def _verifier_permission_date_hotel(request: Request, db: Session, nouvelle_date, ancienne_date=None):
+    """Réserve l'antidatage (date < aujourd'hui) aux administrateurs — même
+    règle que Cuisine, pour éviter les entrées rétroactives non contrôlées."""
+    if not nouvelle_date:
+        return
+    aujourdhui = datetime.now(timezone.utc).date()
+    if nouvelle_date.date() >= aujourdhui:
+        return
+    if ancienne_date and ancienne_date.date() == nouvelle_date.date():
+        return
+    if not _est_admin_utilisateur_hotel(request, db):
+        raise HTTPException(403, "Seul un administrateur peut enregistrer une entrée à une date passée.")
+
+
+def _parse_date_saisie_hotel(raw):
+    """Une date seule (sans heure) est stockée à MIDI UTC, pas minuit — voir
+    cuisine_routes._parse_date_saisie pour l'explication complète du fuseau."""
+    from datetime import date as _date, time as _time
+    if not raw:
+        return None
+    try:
+        if "T" in raw:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        return datetime.combine(_date.fromisoformat(raw), _time(12, 0)).replace(tzinfo=timezone.utc)
+    except (ValueError, AttributeError):
+        return None
+
+
+@router.get("/depenses")
+def liste_depenses_hotel(
+    date_debut: Optional[str] = Query(default=None),
+    date_fin:   Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    from datetime import date as date_type, time as time_type
+    today = date_type.today()
+    d_debut = date_type.fromisoformat(date_debut) if date_debut else today.replace(day=1)
+    d_fin   = date_type.fromisoformat(date_fin)   if date_fin   else today
+    dt_deb = datetime.combine(d_debut, time_type.min).replace(tzinfo=timezone.utc)
+    dt_fin = datetime.combine(d_fin,   time_type.max).replace(tzinfo=timezone.utc)
+
+    deps = (
+        db.query(HotelDepense)
+        .filter(HotelDepense.date_depense >= dt_deb, HotelDepense.date_depense <= dt_fin)
+        .order_by(HotelDepense.date_depense.desc())
+        .all()
+    )
+    from pieces_jointes_routes import compter_pieces_jointes_par_entite
+    nb_pj = compter_pieces_jointes_par_entite(db, "hotel_depense", [d.id for d in deps])
+    return [
+        {
+            "id":          d.id,
+            "description": d.description,
+            "categorie":   d.categorie or "AUTRE",
+            "montant":     float(_d(d.montant)),
+            "date_depense": d.date_depense.isoformat(),
+            "jours":       (today - d.date_depense.date()).days,
+            "fournisseur": d.fournisseur or "",
+            "notes":       d.notes or "",
+            "sans_justificatif": nb_pj.get(d.id, 0) == 0,
+        }
+        for d in deps
+    ]
+
+
+@router.post("/depenses")
+def ajouter_depense_hotel(data: dict, request: Request, db: Session = Depends(get_db)):
+    desc = (data.get("description") or "").strip()
+    if not desc:
+        raise HTTPException(400, "La description est requise")
+    montant = float(data.get("montant") or 0)
+    if montant <= 0:
+        raise HTTPException(400, "Le montant doit être positif")
+
+    date_dep = _parse_date_saisie_hotel(data.get("date_depense")) or datetime.now(timezone.utc)
+    _verifier_permission_date_hotel(request, db, date_dep)
+
+    d = HotelDepense(
+        description  = desc,
+        categorie    = data.get("categorie") or "AUTRE",
+        montant      = Decimal(str(montant)),
+        date_depense = date_dep,
+        fournisseur  = (data.get("fournisseur") or "").strip() or None,
+        notes        = (data.get("notes") or "").strip() or None,
+    )
+    db.add(d)
+    from pieces_jointes_routes import notifier_si_sans_justificatif
+    notifier_si_sans_justificatif(db, "hotel", desc, "hotel-depenses")
+    db.commit(); db.refresh(d)
+    return {"id": d.id, "message": "Dépense enregistrée"}
+
+
+@router.put("/depenses/{dep_id}")
+def modifier_depense_hotel(dep_id: int, data: dict, request: Request, db: Session = Depends(get_db)):
+    d = db.query(HotelDepense).filter_by(id=dep_id).first()
+    if not d:
+        raise HTTPException(404, "Dépense introuvable")
+    if "description" in data and data["description"]:
+        d.description = data["description"].strip()
+    if "categorie"   in data: d.categorie   = data["categorie"] or "AUTRE"
+    if "montant" in data:
+        montant = float(data["montant"] or 0)
+        if montant <= 0:
+            raise HTTPException(400, "Le montant doit être positif")
+        d.montant = Decimal(str(montant))
+    if "fournisseur" in data: d.fournisseur = (data["fournisseur"] or "").strip() or None
+    if "notes"       in data: d.notes       = (data["notes"] or "").strip() or None
+    if "date_depense" in data:
+        parsed = _parse_date_saisie_hotel(data.get("date_depense"))
+        if parsed:
+            _verifier_permission_date_hotel(request, db, parsed, d.date_depense)
+            d.date_depense = parsed
+    db.commit()
+    return {"message": "Dépense modifiée"}
+
+
+@router.delete("/depenses/{dep_id}")
+def supprimer_depense_hotel(dep_id: int, db: Session = Depends(get_db)):
+    d = db.query(HotelDepense).filter_by(id=dep_id).first()
+    if not d:
+        raise HTTPException(404, "Dépense introuvable")
+    db.delete(d); db.commit()
+    return {"message": "Dépense supprimée"}

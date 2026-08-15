@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import (
-    PieceJointe, Depense, Achat, CuisineDepense, CuisineAchat, ZelleDepense, BarAchat,
+    PieceJointe, Depense, Achat, CuisineDepense, CuisineAchat, ZelleDepense, BarAchat, HotelDepense,
 )
 
 router = APIRouter(prefix="/api/pieces-jointes", tags=["pieces-jointes"])
@@ -29,6 +29,7 @@ _TYPES_AUTORISES = {
     "cuisine_achat":   CuisineAchat,
     "zelle_depense":   ZelleDepense,
     "bar_achat":       BarAchat,
+    "hotel_depense":   HotelDepense,
 }
 
 _MIME_AUTORISES     = {"application/pdf", "image/jpeg", "image/jpg", "image/png"}

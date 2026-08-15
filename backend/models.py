@@ -908,6 +908,25 @@ class HotelReservation(Base):
     )
 
 
+class HotelDepense(Base):
+    """Dépense opérationnelle de l'hôtel (entretien, blanchisserie,
+    fournitures, maintenance…) — même modèle que CuisineDepense."""
+    __tablename__ = "hotel_depenses"
+
+    id           = Column(Integer,     primary_key=True)
+    description  = Column(String(200), nullable=False)
+    categorie    = Column(String(80),  nullable=True)
+    montant      = Column(Numeric(12, 2), nullable=False)
+    date_depense = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    fournisseur  = Column(String(150), nullable=True)
+    notes        = Column(String(300), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_hotel_dep_montant_pos"),
+        Index("idx_hotel_depenses_date", "date_depense"),
+    )
+
+
 # ══════════════════════════════════════════════════════════════════
 # MODULE CUISINE
 # ══════════════════════════════════════════════════════════════════

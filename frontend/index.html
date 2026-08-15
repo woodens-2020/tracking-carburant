@@ -3182,6 +3182,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="hotel-depenses" onclick="goTo('hotel-depenses')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+      <span>Dépenses Hôtel</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <button class="nav-item" data-page="hotel-rapport" onclick="goTo('hotel-rapport')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 17V13"/><path d="M12 17V7"/><path d="M16 17V11"/></svg></span>
       <span>Rapport Hôtel</span>
@@ -9758,6 +9764,127 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div><!-- /page-hotel-employes -->
 
     <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- HOTEL — DÉPENSES                                          -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-hotel-depenses" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+          <h2 style="margin:0;font-size:22px;font-weight:800">Dépenses Hôtel</h2>
+          <button id="btn-hotel-dep-new" class="pos-btn teal" onclick="hdepOuvrirModal()">+ Ajouter dépense</button>
+        </div>
+        <div class="pos-card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div style="display:flex;gap:6px;align-items:center">
+            <label style="font-size:13px;color:rgba(255,255,255,.4)">Du</label>
+            <input class="pos-input" id="hdep-debut" type="date" style="width:140px">
+            <label style="font-size:13px;color:rgba(255,255,255,.4)">au</label>
+            <input class="pos-input" id="hdep-fin" type="date" style="width:140px">
+          </div>
+          <select class="pos-select" id="hdep-filtre-cat" onchange="hdepAfficher()" style="min-width:140px">
+            <option value="">Toutes catégories</option>
+            <option value="ENTRETIEN">Entretien</option>
+            <option value="BLANCHISSERIE">Blanchisserie</option>
+            <option value="FOURNITURES">Fournitures</option>
+            <option value="MAINTENANCE">Maintenance</option>
+            <option value="ENERGIE">Énergie</option>
+            <option value="PERSONNEL">Personnel</option>
+            <option value="AUTRE">Autre</option>
+          </select>
+          <input class="pos-input" id="hdep-recherche" type="text" placeholder="Rechercher : description, fournisseur, notes…" style="flex:1;min-width:200px" oninput="hdepAfficher()">
+          <button class="pos-btn teal" onclick="hdepCharger()">Filtrer</button>
+        </div>
+        <!-- KPI dépenses -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
+          <div class="pos-card" style="padding:12px 14px;border-top:3px solid #f87171">
+            <div style="font-size:12px;color:rgba(255,255,255,.35)">Total période</div>
+            <div id="hdep-kpi-total" style="font-size:22px;font-weight:800;color:#f87171">—</div>
+          </div>
+          <div class="pos-card" style="padding:12px 14px;border-top:3px solid #f59e0b">
+            <div style="font-size:12px;color:rgba(255,255,255,.35)">Entretien</div>
+            <div id="hdep-kpi-entretien" style="font-size:22px;font-weight:800;color:#f59e0b">—</div>
+          </div>
+          <div class="pos-card" style="padding:12px 14px;border-top:3px solid #818cf8">
+            <div style="font-size:12px;color:rgba(255,255,255,.35)">Maintenance</div>
+            <div id="hdep-kpi-maintenance" style="font-size:22px;font-weight:800;color:#818cf8">—</div>
+          </div>
+          <div class="pos-card" style="padding:12px 14px;border-top:3px solid #60a5fa">
+            <div style="font-size:12px;color:rgba(255,255,255,.35)">Nb entrées</div>
+            <div id="hdep-kpi-nb" style="font-size:22px;font-weight:800;color:#60a5fa">—</div>
+          </div>
+        </div>
+        <div class="pos-card" style="padding:0;overflow:hidden">
+          <div style="overflow-x:auto;max-height:450px;overflow-y:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:14px">
+              <thead style="position:sticky;top:0;background:#1a1f2e;z-index:1">
+                <tr style="border-bottom:1px solid rgba(255,255,255,.08)">
+                  <th style="padding:9px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Date</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Jours</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Description</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Catégorie</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Fournisseur</th>
+                  <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Montant</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="hdep-tbody">
+                <tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal dépense -->
+      <div id="hdep-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)hdepFermerModal()">
+        <div class="pos-modal" style="max-width:440px;width:95%">
+          <div id="hdep-modal-titre" style="font-size:18px;font-weight:700;margin-bottom:16px">Nouvelle dépense</div>
+          <input type="hidden" id="hdep-modal-id">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Description *</label>
+              <input class="pos-input" id="hdep-desc" placeholder="Ex : Draps, savon, réparation clim…" style="width:100%">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
+                <select class="pos-select" id="hdep-cat" style="width:100%">
+                  <option value="ENTRETIEN">Entretien</option>
+                  <option value="BLANCHISSERIE">Blanchisserie</option>
+                  <option value="FOURNITURES">Fournitures</option>
+                  <option value="MAINTENANCE">Maintenance</option>
+                  <option value="ENERGIE">Énergie</option>
+                  <option value="PERSONNEL">Personnel</option>
+                  <option value="AUTRE">Autre</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Montant (G) *</label>
+                <input class="pos-input" id="hdep-montant" type="number" min="0.01" step="1" placeholder="0.00" style="width:100%">
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Date</label>
+                <input class="pos-input" id="hdep-date" type="date" style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Fournisseur</label>
+                <input class="pos-input" id="hdep-fournisseur" placeholder="Nom fournisseur" style="width:100%">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Notes</label>
+              <input class="pos-input" id="hdep-notes" placeholder="Remarques…" style="width:100%">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="pos-btn ghost" style="flex:1" onclick="hdepFermerModal()">Annuler</button>
+            <button class="pos-btn teal" style="flex:2" onclick="hdepSauvegarder()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-hotel-depenses -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
     <!-- HOTEL — RAPPORT                                           -->
     <!-- ══════════════════════════════════════════════════════════ -->
     <div id="page-hotel-rapport" class="page page-gi">
@@ -14300,7 +14427,7 @@ const _AREA_PAGES = {
     lecture: ['cuisine-ventes','cuisine-stats'],
   },
   hotel: {
-    complet: ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
+    complet: ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
     // Accès opérationnel : réception + séjours + historique + rapport, sans gestion des chambres ni du personnel hôtel
     operationnel: ['hotel-dashboard','hotel-reception','hotel-sejours','hotel-historique','hotel-rapport'],
     lecture: ['hotel-dashboard','hotel-historique','hotel-rapport'],
@@ -14320,7 +14447,7 @@ const _CAISSIER_ALLOWED = new Set([
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse',
-  'hotel-dashboard','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport',
+  'hotel-dashboard','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
 ]);
 
@@ -14331,7 +14458,7 @@ const _AD_ALLOWED = new Set([
   'pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes',
   'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse',
   'cuisine-plats','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
-  'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport',
+  'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'employes','payroll',
   'zelle','zelle-paiements','zelle-fonds',
 ]);
@@ -14342,11 +14469,11 @@ const _ACCES_POSTE_LEGACY = {
   'Comptable':   ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
-                  'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
+                  'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
-                  'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-rapport'],
+                  'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Pompiste':            ['home','saisie'],
   'Caissier':            Array.from(_CAISSIER_ALLOWED),
   'Manager':             Array.from(_MANAGER_ALLOWED),
@@ -19267,6 +19394,7 @@ const _giPageLoaders = {
   'hotel-sejours':      loadHotelSejours,
   'hotel-historique':   loadHotelHistorique,
   'hotel-employes':     loadHotelEmployes,
+  'hotel-depenses':     loadHotelDepenses,
   'hotel-rapport':      loadHotelRapport,
   'admin-roles':        loadAdminRoles,
   'admin-users':        loadAdminUsers,
@@ -20379,10 +20507,10 @@ async function loadGiDashboard(){
 
     // ── KPI (totaux consolidés — toute l'institution ; détail par
     //         département sur la page Rapport de Caisse) ─────────
-    const ad = d.autres_departements || {ventes_bar:0, ventes_cuisine:0, ventes_hotel:0, achats_bar:0, achats_cuisine:0, depenses_cuisine:0, payroll_bar:0};
+    const ad = d.autres_departements || {ventes_bar:0, ventes_cuisine:0, ventes_hotel:0, achats_bar:0, achats_cuisine:0, depenses_cuisine:0, depenses_hotel:0, payroll_bar:0};
     const ventesTotal   = d.synthese.total_entrees;
     const achatsTotal   = d.achats.total + ad.achats_bar + ad.achats_cuisine;
-    const depensesTotal = d.depenses.total + ad.depenses_cuisine;
+    const depensesTotal = d.depenses.total + ad.depenses_cuisine + ad.depenses_hotel;
 
     document.getElementById('gid-kpi-ventes').textContent      = _htg(ventesTotal);
     document.getElementById('gid-kpi-ventes-sub').textContent  =
@@ -20600,10 +20728,10 @@ async function loadCaisse(){
     }
 
     // ── KPIs (totaux consolidés — toute l'institution) ────
-    const ad = d.autres_departements || {ventes_bar:0, ventes_cuisine:0, ventes_hotel:0, achats_bar:0, achats_cuisine:0, depenses_cuisine:0, payroll_bar:0};
+    const ad = d.autres_departements || {ventes_bar:0, ventes_cuisine:0, ventes_hotel:0, achats_bar:0, achats_cuisine:0, depenses_cuisine:0, depenses_hotel:0, payroll_bar:0};
     const ventesTotal   = d.synthese.total_entrees;
     const achatsTotal   = d.achats.total + ad.achats_bar + ad.achats_cuisine;
-    const depensesTotal = d.depenses.total + ad.depenses_cuisine;
+    const depensesTotal = d.depenses.total + ad.depenses_cuisine + ad.depenses_hotel;
 
     document.getElementById('caisse-kpi-ventes').textContent    = _htg(ventesTotal);
     document.getElementById('caisse-kpi-ventes-gal').textContent = 'dont station : '+d.ventes.gallons.toLocaleString('fr',{minimumFractionDigits:2})+' gal · '+d.ventes.nb_releves+' relevé(s)';
@@ -20627,6 +20755,7 @@ async function loadCaisse(){
         {label:'Achats Bar (confirmés)',       val: ad.achats_bar,     sens:'sortie'},
         {label:'Achats Cuisine',               val: ad.achats_cuisine, sens:'sortie'},
         {label:'Dépenses Cuisine',             val: ad.depenses_cuisine, sens:'sortie'},
+        {label:'Dépenses Hôtel',               val: ad.depenses_hotel, sens:'sortie'},
         {label:'Payiements employés Bar',      val: ad.payroll_bar,    sens:'sortie'},
       ];
       adWrap.innerHTML = rows.map(r => `
@@ -28213,6 +28342,150 @@ async function hotelEmpDesactiver(id, nom){
     await loadHotelEmployes();
     posAlert(`${nom} retiré.`,'ok');
   } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ── DÉPENSES HÔTEL ────────────────────────────────────────────────────
+
+let _hdepData = [];
+
+async function loadHotelDepenses(){
+  const today = new Date();
+  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  const fmt   = d => d.toISOString().split('T')[0];
+  const dDeb  = document.getElementById('hdep-debut');
+  const dFin  = document.getElementById('hdep-fin');
+  if(dDeb && !dDeb.value) dDeb.value = first;
+  if(dFin && !dFin.value) dFin.value = fmt(today);
+  await hdepCharger();
+}
+
+async function hdepCharger(){
+  const debut = document.getElementById('hdep-debut')?.value;
+  const fin   = document.getElementById('hdep-fin')?.value;
+  const tbody = document.getElementById('hdep-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try {
+    let url = '/hotel/depenses';
+    if(debut || fin) url += `?date_debut=${debut||''}&date_fin=${fin||''}`;
+    _hdepData = await apiFetch('GET', url);
+    hdepAfficher();
+  } catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;text-align:center;color:#f87171">${e.message||'Erreur'}</td></tr>`;
+  }
+}
+
+function hdepAfficher(){
+  const tbody = document.getElementById('hdep-tbody'); if(!tbody) return;
+  const cat   = document.getElementById('hdep-filtre-cat')?.value || '';
+  const q     = _navNorm(document.getElementById('hdep-recherche')?.value || '');
+  const deps  = _hdepData.filter(d => {
+    if(cat && d.categorie !== cat) return false;
+    if(!q) return true;
+    const hay = _navNorm([d.description, d.categorie, d.fournisseur, d.notes].filter(Boolean).join(' '));
+    return hay.includes(q);
+  });
+
+  const total      = deps.reduce((s, d) => s + d.montant, 0);
+  const entretien   = deps.filter(d => d.categorie === 'ENTRETIEN').reduce((s,d)=>s+d.montant,0);
+  const maintenance = deps.filter(d => d.categorie === 'MAINTENANCE').reduce((s,d)=>s+d.montant,0);
+  [['hdep-kpi-total', posGx(total)],['hdep-kpi-entretien', posGx(entretien)],
+   ['hdep-kpi-maintenance', posGx(maintenance)],['hdep-kpi-nb', deps.length]
+  ].forEach(([id, v]) => { const el = document.getElementById(id); if(el) el.textContent = v; });
+
+  if(!deps.length){
+    const raw = document.getElementById('hdep-recherche')?.value || '';
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">${raw ? `Aucune dépense ne correspond à « ${esc(raw)} »` : 'Aucune dépense'}</td></tr>`;
+    return;
+  }
+
+  const catColors = {ENTRETIEN:'#f59e0b',BLANCHISSERIE:'#60a5fa',FOURNITURES:'#34d399',MAINTENANCE:'#818cf8',ENERGIE:'#fb923c',PERSONNEL:'#a78bfa',AUTRE:'rgba(255,255,255,.4)'};
+  tbody.innerHTML = deps.map(d => {
+    const cc = catColors[d.categorie] || catColors.AUTRE;
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+      <td style="padding:9px 12px;font-size:13px;color:rgba(255,255,255,.5)">${_ckDateFmt(d.date_depense)}</td>
+      <td style="padding:9px 8px">${_ckJoursBadge(d.jours)}</td>
+      <td style="padding:9px 8px;font-weight:600">${d.description}${d.sans_justificatif?' <span style="font-size:11px;font-weight:700;color:#f87171;background:rgba(248,113,113,.12);border-radius:4px;padding:2px 6px">⚠ Inachevée</span>':''}</td>
+      <td style="padding:9px 8px"><span style="font-size:12px;font-weight:700;color:${cc};background:${cc}18;border:1px solid ${cc}33;border-radius:4px;padding:2px 6px">${d.categorie}</span></td>
+      <td style="padding:9px 8px;font-size:13px;color:rgba(255,255,255,.45)">${d.fournisseur || '—'}</td>
+      <td style="padding:9px 8px;text-align:right;font-weight:700;color:#f87171">${posGx(d.montant)}</td>
+      <td style="padding:9px 8px;text-align:center">
+        <div style="display:flex;gap:4px;justify-content:center">
+          <button class="pos-btn ghost" style="font-size:12px;padding:3px 8px${d.sans_justificatif?';color:#f87171;border-color:rgba(248,113,113,.3)':''}" title="${d.sans_justificatif?'Document manquant — ':''}Pièces jointes" onclick="pjOpenModal('hotel_depense',${d.id},'${esc((d.description||'').replace(/'/g,"\\'"))}')">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:middle"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          ${!_isReadOnly() ? `
+          <button class="pos-btn ghost" style="font-size:12px;padding:3px 8px" onclick="hdepOuvrirModal(${d.id})">Modifier</button>
+          <button class="pos-btn ghost" style="font-size:12px;padding:3px 8px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="hdepSupprimer(${d.id})">Suppr.</button>
+          ` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function hdepOuvrirModal(depId){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
+  const modal = document.getElementById('hdep-modal-bg'); if(!modal) return;
+  document.getElementById('hdep-modal-id').value    = depId || '';
+  document.getElementById('hdep-modal-titre').textContent = depId ? 'Modifier la dépense' : 'Nouvelle dépense';
+  if(depId){
+    const d = _hdepData.find(x => x.id === depId);
+    if(d){
+      document.getElementById('hdep-desc').value        = d.description;
+      document.getElementById('hdep-cat').value         = d.categorie || 'AUTRE';
+      document.getElementById('hdep-montant').value     = d.montant;
+      document.getElementById('hdep-date').value        = d.date_depense ? d.date_depense.split('T')[0] : '';
+      document.getElementById('hdep-fournisseur').value = d.fournisseur || '';
+      document.getElementById('hdep-notes').value       = d.notes || '';
+    }
+  } else {
+    const today = new Date().toISOString().split('T')[0];
+    ['hdep-desc','hdep-montant','hdep-fournisseur','hdep-notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('hdep-cat').value  = 'ENTRETIEN';
+    document.getElementById('hdep-date').value = today;
+  }
+  modal.classList.add('open');
+  setTimeout(() => document.getElementById('hdep-desc')?.focus(), 100);
+}
+
+function hdepFermerModal(){
+  document.getElementById('hdep-modal-bg').classList.remove('open');
+}
+
+async function hdepSauvegarder(){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
+  const id      = document.getElementById('hdep-modal-id').value;
+  const desc    = document.getElementById('hdep-desc').value.trim();
+  const montant = parseFloat(document.getElementById('hdep-montant').value);
+  if(!desc){ posAlert('La description est requise.','warn'); return; }
+  if(!montant || montant <= 0){ posAlert('Le montant doit être positif.','warn'); return; }
+  const dateChoisie = document.getElementById('hdep-date').value || null;
+  _ckAvertirSiAntidatage(dateChoisie);
+  const payload = {
+    description:  desc,
+    categorie:    document.getElementById('hdep-cat').value,
+    montant,
+    date_depense: dateChoisie,
+    fournisseur:  document.getElementById('hdep-fournisseur').value.trim(),
+    notes:        document.getElementById('hdep-notes').value.trim(),
+  };
+  try {
+    if(id){ await apiFetch('PUT', `/hotel/depenses/${id}`, payload); }
+    else   { await apiFetch('POST', '/hotel/depenses', payload); }
+    hdepFermerModal();
+    posAlert('Dépense enregistrée.','success');
+    hdepCharger();
+  } catch(e){ posAlert(e.message||'Erreur.','error'); }
+}
+
+async function hdepSupprimer(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
+  if(!confirm('Supprimer cette dépense ?')) return;
+  try {
+    await apiFetch('DELETE', `/hotel/depenses/${id}`);
+    posAlert('Dépense supprimée.','success');
+    hdepCharger();
+  } catch(e){ posAlert(e.message||'Erreur.','error'); }
 }
 
 // ── RAPPORT HÔTEL ─────────────────────────────────────────────────────
