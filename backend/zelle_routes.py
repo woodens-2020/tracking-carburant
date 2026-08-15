@@ -111,20 +111,10 @@ def _fond_dict(f: ZelleFond, taux: float = 1.0) -> dict:
     }
 
 
-def _require_pdg(request: Request) -> Utilisateur:
-    """Meme logique que main.require_pdg — dupliquee localement pour eviter
-    un import circulaire (main.py importe deja ce routeur)."""
-    user = getattr(request.state, "user", None)
-    if not user or user.role != "pdg":
-        raise HTTPException(403, "Accès réservé au PDG")
-    return user
-
-
 def _require_pdg_or_admin(request: Request, db: Session = Depends(get_db)) -> Utilisateur:
-    """Approbation d'une depense (sortie reelle de fonds) reste reservee au
-    PDG seul — mais le rejet (aucun impact sur le solde) est aussi ouvert
-    aux administrateurs. Meme logique que main.require_admin pour le volet
-    admin, dupliquee ici pour eviter un import circulaire."""
+    """Approbation et rejet d'une dépense Zelle sont ouverts au PDG et aux
+    administrateurs. Même logique que main.require_admin pour le volet
+    admin, dupliquée ici pour éviter un import circulaire."""
     user = getattr(request.state, "user", None)
     if not user:
         raise HTTPException(403, "Non autorisé")
@@ -358,7 +348,7 @@ def get_bilan(db: Session = Depends(get_db)):
     }
 
 
-# ── Dépenses Zelle (nécessitent validation PDG avant déduction du solde) ──────
+# ── Dépenses Zelle (nécessitent validation PDG/admin avant déduction du solde) ──────
 
 @router.get("/depenses")
 def lister_zelle_depenses(statut: Optional[str] = None, db: Session = Depends(get_db)):
@@ -412,13 +402,13 @@ def creer_zelle_depense(data: ZelleDepenseIn, request: Request, db: Session = De
     notifier_si_sans_justificatif(db, "zelle", d.description, "zelle-depenses")
     db.commit()
     db.refresh(d)
-    return {"id": d.id, "message": "Dépense enregistrée, en attente de validation PDG."}
+    return {"id": d.id, "message": "Dépense enregistrée, en attente de validation PDG/admin."}
 
 
 @router.post("/depenses/{depense_id}/approuver")
 def approuver_zelle_depense(
     depense_id: int, db: Session = Depends(get_db),
-    _pdg: Utilisateur = Depends(_require_pdg),
+    _user: Utilisateur = Depends(_require_pdg_or_admin),
 ):
     d = db.query(ZelleDepense).filter(ZelleDepense.id == depense_id).first()
     if not d:
@@ -433,7 +423,7 @@ def approuver_zelle_depense(
             f"${solde_avant:.2f} disponible.",
         )
     d.statut         = "APPROUVEE"
-    d.valide_par_id   = _pdg.id
+    d.valide_par_id   = _user.id
     d.valide_at       = datetime.now(timezone.utc)
 
     from notifications_service import creer_notification

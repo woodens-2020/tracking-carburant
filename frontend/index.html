@@ -7861,7 +7861,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div>
             <div class="gi-form-lbl" style="margin-bottom:2px;">Dépenses Zelle</div>
             <div style="font-size:.75rem;color:rgba(255,255,255,.4);">
-              Déduites du solde uniquement après validation du PDG · <span id="zdep-attente-count">0</span> en attente
+              Déduites du solde uniquement après validation du PDG ou d'un admin · <span id="zdep-attente-count">0</span> en attente
             </div>
           </div>
           <button class="gi-btn-primary" style="padding:8px 16px;font-size:.85rem;" onclick="zdepOpenModal()">
@@ -7923,7 +7923,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 </div>
               </div>
               <p style="font-size:.78rem;color:rgba(255,255,255,.4);margin:4px 0 0;">
-                Cette dépense restera « En attente » et n'affectera pas le solde disponible tant que le PDG ne l'aura pas approuvée.
+                Cette dépense restera « En attente » et n'affectera pas le solde disponible tant que le PDG ou un administrateur ne l'aura pas approuvée.
               </p>
             </div>
             <div class="gi-modal-foot">
@@ -28189,8 +28189,9 @@ async function _zdepLoad(){
       tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:rgba(255,255,255,.35);">Aucune dépense Zelle</td></tr>';
       return;
     }
-    const isPdg   = _appUser?.role === 'pdg';
-    const canReject = isPdg || _isAdmin();
+    const isPdg     = _appUser?.role === 'pdg';
+    const canApprove = isPdg || _isAdmin();
+    const canReject   = isPdg || _isAdmin();
     let html='';
     for(const dep of deps){
       const badge = dep.statut==='APPROUVEE'
@@ -28202,7 +28203,7 @@ async function _zdepLoad(){
       let actions = '—';
       if(dep.statut==='EN_ATTENTE'){
         const btns = [];
-        if(isPdg) btns.push(`<button class="gi-btn-icon" title="Approuver" onclick="zdepApprouver(${dep.id})" style="color:#4ade80;">
+        if(canApprove) btns.push(`<button class="gi-btn-icon" title="Approuver" onclick="zdepApprouver(${dep.id})" style="color:#4ade80;">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
             </button>`);
         if(canReject) btns.push(`<button class="gi-btn-icon danger" title="Rejeter" onclick="zdepRejeter(${dep.id})">
@@ -28210,7 +28211,7 @@ async function _zdepLoad(){
             </button>`);
         actions = btns.length
           ? `<div style="display:flex;gap:6px;justify-content:center;">${btns.join('')}</div>`
-          : '<span style="font-size:.75rem;color:rgba(255,255,255,.35);">Attente PDG</span>';
+          : '<span style="font-size:.75rem;color:rgba(255,255,255,.35);">Attente PDG/admin</span>';
       }
       html += `<tr>
         <td>${dep.description}${dep.sans_justificatif?' <span style="font-size:11px;font-weight:700;color:#f87171;background:rgba(248,113,113,.12);border-radius:4px;padding:2px 6px">⚠ Inachevée</span>':''}</td>
@@ -28262,7 +28263,7 @@ async function zdepSubmit(){
   if(!description || montant<=0){ toast('Description et montant requis.','err'); return; }
   try{
     await apiFetch('POST','/zelle/depenses', {description, montant, devise, categorie, notes});
-    toast('Dépense soumise, en attente de validation PDG.','ok');
+    toast('Dépense soumise, en attente de validation PDG/admin.','ok');
     zdepCloseModal();
     _zdepLoad();
   }catch(e){ toast(e.message,'err'); }
