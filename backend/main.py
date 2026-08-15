@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
-from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation
+from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse
 from otp_service import (
     OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
     create_otp, send_otp_email, send_otp_whatsapp, verify_otp, cleanup_expired_otps,
@@ -749,6 +749,22 @@ def require_pdg(request: Request) -> Utilisateur:
     if not user or user.role != "pdg":
         raise HTTPException(403, "Accès réservé au PDG")
     return user
+
+
+def require_pdg_ou_admin(request: Request, db: Session = Depends(get_db)) -> Utilisateur:
+    """Autorise le PDG ou un administrateur — utilisé pour les actions qui
+    affectent directement le solde central (ex: renflouement de la Grande
+    Caisse), où une erreur de saisie doit rester rare et traçable."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise HTTPException(403, "Non autorisé")
+    if user.role in ("pdg", "admin"):
+        return user
+    if user.role_id:
+        u = db.get(Utilisateur, user.id)
+        if u and u.role_obj and u.role_obj.permissions.get("admin", False):
+            return u
+    raise HTTPException(403, "Accès réservé au PDG et aux administrateurs")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -4671,6 +4687,70 @@ def supprimer_achat(achat_id: int, db: Session = Depends(get_db)):
 
 
 # ══════════════════════════════════════════════════════════
+# RENFLOUEMENT DE LA GRANDE CAISSE
+# ══════════════════════════════════════════════════════════
+
+class RenflouementIn(BaseModel):
+    montant: float = Field(..., gt=0)
+    source:  Optional[str] = None
+    notes:   Optional[str] = None
+
+
+def _renflouement_dict(r: RenflouementCaisse) -> dict:
+    return {
+        "id":                r.id,
+        "montant":           float(r.montant),
+        "source":            r.source,
+        "date_renflouement": r.date_renflouement.isoformat() if r.date_renflouement else None,
+        "enregistre_par":    r.enregistre_par.nom_complet if r.enregistre_par else None,
+        "notes":             r.notes,
+    }
+
+
+@app.get("/api/caisse/renflouements")
+def lister_renflouements(
+    date_debut: Optional[date_type] = None,
+    date_fin:   Optional[date_type] = None,
+    limit: int = Query(50, le=200),
+    db: Session = Depends(get_db),
+):
+    from datetime import datetime as _dt, time as _dtime, timezone as _tz
+    q = db.query(RenflouementCaisse)
+    if date_debut:
+        q = q.filter(RenflouementCaisse.date_renflouement >= _dt.combine(date_debut, _dtime.min).replace(tzinfo=_tz.utc))
+    if date_fin:
+        q = q.filter(RenflouementCaisse.date_renflouement <= _dt.combine(date_fin, _dtime.max).replace(tzinfo=_tz.utc))
+    rows = q.order_by(RenflouementCaisse.date_renflouement.desc()).limit(limit).all()
+    return {"renflouements": [_renflouement_dict(r) for r in rows]}
+
+
+@app.post("/api/caisse/renflouements", status_code=201)
+def creer_renflouement(
+    data: RenflouementIn, request: Request, db: Session = Depends(get_db),
+    _user: Utilisateur = Depends(require_pdg_ou_admin),
+):
+    r = RenflouementCaisse(
+        montant=data.montant,
+        source=(data.source or "").strip() or None,
+        notes=(data.notes or "").strip() or None,
+        enregistre_par_id=_user.id,
+    )
+    db.add(r)
+
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="systeme", type_="renflouement_caisse",
+        titre=f"Renflouement de la Grande Caisse — {data.montant:,.2f} G",
+        message=(data.source or "Source non précisée") + (f" · {data.notes}" if data.notes else ""),
+        lien="caisse",
+        dedupe_minutes=None,
+    )
+    db.commit()
+    db.refresh(r)
+    return _renflouement_dict(r)
+
+
+# ══════════════════════════════════════════════════════════
 # SYNTHÈSE CASH CONSOLIDÉE — toute l'institution
 # ══════════════════════════════════════════════════════════
 def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], date_fin: Optional[date_type]) -> dict:
@@ -4731,7 +4811,14 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     if date_fin:   q_hr = q_hr.filter(HotelReservation.date_arrivee <= dt_fin)
     ventes_hotel = round(sum(float(r.montant_paye or 0) for r in q_hr.all()), 2)
 
-    total_entrees = round(ventes_station + ventes_bar + ventes_cuisine + ventes_hotel, 2)
+    # ── Entrées : Renflouements manuels de la Grande Caisse ─────
+    q_renfl = db.query(RenflouementCaisse)
+    if dt_debut: q_renfl = q_renfl.filter(RenflouementCaisse.date_renflouement >= dt_debut)
+    if dt_fin:   q_renfl = q_renfl.filter(RenflouementCaisse.date_renflouement <= dt_fin)
+    renfl_rows = q_renfl.order_by(RenflouementCaisse.date_renflouement.desc()).all()
+    total_renflouements = round(sum(float(r.montant) for r in renfl_rows), 2)
+
+    total_entrees = round(ventes_station + ventes_bar + ventes_cuisine + ventes_hotel + total_renflouements, 2)
 
     # ── Sorties : Achats Station ─────────────────────────────────
     q_ach = db.query(Achat)
@@ -4803,12 +4890,14 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
 
     return {
         "entrees": {
-            "station": ventes_station,
-            "bar":     ventes_bar,
-            "cuisine": ventes_cuisine,
-            "hotel":   ventes_hotel,
-            "total":   total_entrees,
+            "station":       ventes_station,
+            "bar":           ventes_bar,
+            "cuisine":       ventes_cuisine,
+            "hotel":         ventes_hotel,
+            "renflouements": total_renflouements,
+            "total":         total_entrees,
         },
+        "renflouements_liste": [_renflouement_dict(r) for r in renfl_rows[:20]],
         "sorties": {
             "achats_station":   achats_station,
             "achats_bar":       achats_bar,
@@ -4890,6 +4979,10 @@ def rapport_caisse(
             "achats_cuisine": synth["sorties"]["achats_cuisine"],
             "depenses_cuisine": synth["sorties"]["depenses_cuisine"],
             "payroll_bar":    synth["sorties"]["payroll_bar"],
+        },
+        "renflouements": {
+            "total": synth["entrees"]["renflouements"],
+            "liste": synth["renflouements_liste"],
         },
         "achats": {
             "total": synth["sorties"]["achats_station"],
@@ -5061,6 +5154,10 @@ def gi_dashboard(
             "achats_cuisine":   synth["sorties"]["achats_cuisine"],
             "depenses_cuisine": synth["sorties"]["depenses_cuisine"],
             "payroll_bar":      synth["sorties"]["payroll_bar"],
+        },
+        "renflouements": {
+            "total": synth["entrees"]["renflouements"],
+            "liste": synth["renflouements_liste"],
         },
         "synthese": {
             "total_entrees":     synth["synthese"]["total_entrees"],

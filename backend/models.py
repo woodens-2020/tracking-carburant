@@ -1219,6 +1219,28 @@ class ZelleDepense(Base):
     )
 
 
+class RenflouementCaisse(Base):
+    """Injection manuelle de fonds (HTG) dans la Grande Caisse — capital,
+    prêt, transfert externe... distincte des ventes. Compte comme entrée
+    dans la synthèse cash consolidée de l'institution (voir
+    _synthese_cash_institution dans main.py). Réservé au PDG/admin."""
+    __tablename__ = "renflouements_caisse"
+
+    id                 = Column(Integer, primary_key=True)
+    montant            = Column(Numeric(14, 2), nullable=False)
+    source             = Column(String(100), nullable=True)
+    date_renflouement  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    enregistre_par_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    notes              = Column(String(300), nullable=True)
+
+    enregistre_par = relationship("Utilisateur")
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_renfl_caisse_montant_pos"),
+        Index("idx_renfl_caisse_date", "date_renflouement"),
+    )
+
+
 class Tache(Base):
     """Tâche planifiée par un employé — individuelle ou collective selon le
     nombre de participants. Statut unique partagé entre tous les participants
