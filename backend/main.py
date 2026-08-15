@@ -4671,6 +4671,173 @@ def supprimer_achat(achat_id: int, db: Session = Depends(get_db)):
 
 
 # ══════════════════════════════════════════════════════════
+# SYNTHÈSE CASH CONSOLIDÉE — toute l'institution
+# ══════════════════════════════════════════════════════════
+def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], date_fin: Optional[date_type]) -> dict:
+    """Entrées = cash réellement encaissé (Station + Bar + Cuisine + Hôtel).
+    Sorties  = Achats (Station + Bar confirmés + Cuisine) + Dépenses (Station +
+    Cuisine) + Payroll (RH tous départements + paiements ad hoc Bar).
+
+    Bar et Cuisine : on exclut les ventes CRÉDIT tant qu'elles ne sont pas
+    remboursées — sinon le cash serait compté avant d'être physiquement reçu.
+    Les remboursements de crédit Bar sont rattachés à leur propre date
+    (date_remb), pas à la date de la vente d'origine (voir BarRemboursement).
+
+    Utilisée par /api/caisse/rapport et /api/gi/dashboard pour que les deux
+    affichent toujours le même chiffre — plus de calcul dupliqué qui pourrait
+    diverger avec le temps.
+
+    Zelle est un fonds séparé en USD, distinct de ce cash HTG — volontairement
+    exclu ici (voir /api/zelle/bilan pour son propre solde)."""
+    from datetime import datetime as _dt, time as _dtime, timezone as _tz
+    from models import (
+        BarVente, BarRemboursement, BarAchat, BarAchatDepense, BarPaiementEmploye,
+        CuisineVente, CuisineAchat, CuisineDepense, HotelReservation,
+    )
+
+    dt_debut = _dt.combine(date_debut, _dtime.min).replace(tzinfo=_tz.utc) if date_debut else None
+    dt_fin   = _dt.combine(date_fin,   _dtime.max).replace(tzinfo=_tz.utc) if date_fin   else None
+
+    # ── Entrées : Station (carburant) ──────────────────────────
+    q_rel = db.query(Releve)
+    if date_debut: q_rel = q_rel.filter(Releve.date >= date_debut)
+    if date_fin:   q_rel = q_rel.filter(Releve.date <= date_fin)
+    ventes_station = round(sum(float(r.montant_vente) for r in q_rel.all()), 2)
+
+    # ── Entrées : Bar (cash CASH/MIXTE encaissé à la vente + crédits remboursés) ──
+    q_bv = db.query(BarVente).filter(BarVente.statut != "ANNULEE")
+    if dt_debut: q_bv = q_bv.filter(BarVente.date_heure >= dt_debut)
+    if dt_fin:   q_bv = q_bv.filter(BarVente.date_heure <= dt_fin)
+    cash_bar_ventes = sum(
+        float(v.montant_paye) for v in q_bv.all() if v.mode_paiement in ("CASH", "MIXTE")
+    )
+    q_remb = db.query(BarRemboursement)
+    if dt_debut: q_remb = q_remb.filter(BarRemboursement.date_remb >= dt_debut)
+    if dt_fin:   q_remb = q_remb.filter(BarRemboursement.date_remb <= dt_fin)
+    cash_bar_remb = sum(float(r.montant) for r in q_remb.all())
+    ventes_bar = round(cash_bar_ventes + cash_bar_remb, 2)
+
+    # ── Entrées : Cuisine (mode CASH uniquement — CREDIT pas encore encaissé) ──
+    q_cv = db.query(CuisineVente).filter(
+        CuisineVente.statut == "VALIDEE", CuisineVente.mode_paiement == "CASH",
+    )
+    if dt_debut: q_cv = q_cv.filter(CuisineVente.date_heure >= dt_debut)
+    if dt_fin:   q_cv = q_cv.filter(CuisineVente.date_heure <= dt_fin)
+    ventes_cuisine = round(sum(float(v.total) for v in q_cv.all()), 2)
+
+    # ── Entrées : Hôtel (montant réellement payé) ───────────────
+    q_hr = db.query(HotelReservation)
+    if date_debut: q_hr = q_hr.filter(HotelReservation.date_arrivee >= dt_debut)
+    if date_fin:   q_hr = q_hr.filter(HotelReservation.date_arrivee <= dt_fin)
+    ventes_hotel = round(sum(float(r.montant_paye or 0) for r in q_hr.all()), 2)
+
+    total_entrees = round(ventes_station + ventes_bar + ventes_cuisine + ventes_hotel, 2)
+
+    # ── Sorties : Achats Station ─────────────────────────────────
+    q_ach = db.query(Achat)
+    if date_debut: q_ach = q_ach.filter(Achat.date_achat >= date_debut)
+    if date_fin:   q_ach = q_ach.filter(Achat.date_achat <= date_fin)
+    achats_station_rows = q_ach.all()
+    achats_station = round(sum(float(a.montant) for a in achats_station_rows), 2)
+
+    # ── Sorties : Achats Bar (confirmés uniquement, marchandise + dépenses liées) ──
+    q_ba = db.query(BarAchat).filter(BarAchat.statut == "CONFIRME")
+    if dt_debut: q_ba = q_ba.filter(BarAchat.date_achat >= dt_debut)
+    if dt_fin:   q_ba = q_ba.filter(BarAchat.date_achat <= dt_fin)
+    bar_achats_rows = q_ba.all()
+    achats_bar = round(sum(
+        float(a.quantite) * float(a.prix_achat_unitaire)
+        + sum(float(d.montant) for d in a.depenses)
+        for a in bar_achats_rows
+    ), 2)
+
+    # ── Sorties : Achats + Dépenses Cuisine ─────────────────────
+    q_ca = db.query(CuisineAchat)
+    if dt_debut: q_ca = q_ca.filter(CuisineAchat.date_achat >= dt_debut)
+    if dt_fin:   q_ca = q_ca.filter(CuisineAchat.date_achat <= dt_fin)
+    achats_cuisine = round(sum(float(a.total) for a in q_ca.all()), 2)
+
+    q_cd = db.query(CuisineDepense)
+    if dt_debut: q_cd = q_cd.filter(CuisineDepense.date_depense >= dt_debut)
+    if dt_fin:   q_cd = q_cd.filter(CuisineDepense.date_depense <= dt_fin)
+    depenses_cuisine = round(sum(float(d.montant) for d in q_cd.all()), 2)
+
+    total_achats = round(achats_station + achats_bar + achats_cuisine, 2)
+
+    # ── Sorties : Dépenses Station ───────────────────────────────
+    q_dep = db.query(Depense)
+    if date_debut: q_dep = q_dep.filter(Depense.date_depense >= date_debut)
+    if date_fin:   q_dep = q_dep.filter(Depense.date_depense <= date_fin)
+    depenses = q_dep.all()
+    depenses_station = round(sum(float(d.montant) for d in depenses), 2)
+    cat_map = {}
+    for d in depenses:
+        cat_map[d.categorie] = round(cat_map.get(d.categorie, 0.0) + float(d.montant), 2)
+    depenses_par_cat = [{"categorie": k, "montant": v} for k, v in sorted(cat_map.items(), key=lambda x: -x[1])]
+
+    total_depenses = round(depenses_station + depenses_cuisine, 2)
+
+    # ── Sorties : Payroll (RH tous départements + paiements ad hoc Bar) ──
+    q_pay = db.query(FichePaie).filter(FichePaie.statut == "paye")
+    if date_debut: q_pay = q_pay.filter(FichePaie.date_paiement >= date_debut)
+    if date_fin:   q_pay = q_pay.filter(FichePaie.date_paiement <= date_fin)
+    fiches_payees = q_pay.all()
+    total_payroll_rh = round(sum(float(f.net_a_payer) for f in fiches_payees), 2)
+
+    q_brou = db.query(FichePaie).filter(FichePaie.statut == "brouillon")
+    if date_debut: q_brou = q_brou.filter(FichePaie.periode_debut >= date_debut)
+    if date_fin:   q_brou = q_brou.filter(FichePaie.periode_fin   <= date_fin)
+    fiches_brou = q_brou.all()
+    total_payroll_engage = round(sum(float(f.net_a_payer) for f in fiches_brou), 2)
+
+    q_bpe = db.query(BarPaiementEmploye)
+    if dt_debut: q_bpe = q_bpe.filter(BarPaiementEmploye.date_paiement >= dt_debut)
+    if dt_fin:   q_bpe = q_bpe.filter(BarPaiementEmploye.date_paiement <= dt_fin)
+    total_payroll_bar = round(sum(float(p.montant) for p in q_bpe.all()), 2)
+
+    total_payroll_paye = round(total_payroll_rh + total_payroll_bar, 2)
+
+    total_sorties     = round(total_achats + total_payroll_paye + total_depenses, 2)
+    cash_disponible   = round(total_entrees - total_sorties, 2)
+    cash_apres_engage = round(cash_disponible - total_payroll_engage, 2)
+
+    return {
+        "entrees": {
+            "station": ventes_station,
+            "bar":     ventes_bar,
+            "cuisine": ventes_cuisine,
+            "hotel":   ventes_hotel,
+            "total":   total_entrees,
+        },
+        "sorties": {
+            "achats_station":   achats_station,
+            "achats_bar":       achats_bar,
+            "achats_cuisine":   achats_cuisine,
+            "depenses_station": depenses_station,
+            "depenses_cuisine": depenses_cuisine,
+            "payroll_rh":       total_payroll_rh,
+            "payroll_bar":      total_payroll_bar,
+            "total_achats":     total_achats,
+            "total_depenses":   total_depenses,
+            "total_payroll":    total_payroll_paye,
+            "total":            total_sorties,
+        },
+        "depenses_par_categorie": depenses_par_cat,
+        "nb_achats":     len(achats_station_rows),
+        "nb_depenses":   len(depenses),
+        "nb_fiches_payees": len(fiches_payees),
+        "nb_fiches_engage": len(fiches_brou),
+        "payroll_engage":   total_payroll_engage,
+        "synthese": {
+            "total_entrees":     total_entrees,
+            "total_sorties":     total_sorties,
+            "cash_disponible":   cash_disponible,
+            "cash_apres_engage": cash_apres_engage,
+        },
+    }
+
+
+# ══════════════════════════════════════════════════════════
 # RAPPORT DE CAISSE — Synthèse financière consolidée
 # ══════════════════════════════════════════════════════════
 @app.get("/api/caisse/rapport")
@@ -4680,20 +4847,17 @@ def rapport_caisse(
     db: Session = Depends(get_db),
 ):
     """
-    Synthèse financière : Ventes – Achats – Payroll – Dépenses = Cash disponible.
+    Synthèse financière consolidée de toute l'institution : Ventes (Station +
+    Bar + Cuisine + Hôtel) – Achats – Payroll – Dépenses = Cash disponible.
     Sans filtre de dates : toutes les données en base.
     """
-    from datetime import date as _date
-
-    # ── Ventes (releves) ──────────────────────────────────
+    # ── Ventes carburant (releves) — détail station, pour le graphique ──
     q_rel = db.query(Releve)
     if date_debut: q_rel = q_rel.filter(Releve.date >= date_debut)
     if date_fin:   q_rel = q_rel.filter(Releve.date <= date_fin)
     releves = q_rel.all()
-    total_ventes = round(sum(float(r.montant_vente) for r in releves), 2)
     total_gallons = round(sum(float(r.quantite) for r in releves), 3)
 
-    # Ventilation par produit
     prod_map = {}
     for r in releves:
         nom = r.pompe.produit.nom
@@ -4705,44 +4869,7 @@ def rapport_caisse(
         for k, v in prod_map.items()
     ]
 
-    # ── Achats ───────────────────────────────────────────
-    q_ach = db.query(Achat)
-    if date_debut: q_ach = q_ach.filter(Achat.date_achat >= date_debut)
-    if date_fin:   q_ach = q_ach.filter(Achat.date_achat <= date_fin)
-    achats = q_ach.all()
-    total_achats = round(sum(float(a.montant) for a in achats), 2)
-
-    # ── Payroll payé ─────────────────────────────────────
-    q_pay = db.query(FichePaie).filter(FichePaie.statut == "paye")
-    if date_debut: q_pay = q_pay.filter(FichePaie.date_paiement >= date_debut)
-    if date_fin:   q_pay = q_pay.filter(FichePaie.date_paiement <= date_fin)
-    fiches_payees = q_pay.all()
-    total_payroll_paye = round(sum(float(f.net_a_payer) for f in fiches_payees), 2)
-
-    # Payroll brouillon (engagé mais non encore versé)
-    q_brou = db.query(FichePaie).filter(FichePaie.statut == "brouillon")
-    if date_debut: q_brou = q_brou.filter(FichePaie.periode_debut >= date_debut)
-    if date_fin:   q_brou = q_brou.filter(FichePaie.periode_fin   <= date_fin)
-    fiches_brou = q_brou.all()
-    total_payroll_engage = round(sum(float(f.net_a_payer) for f in fiches_brou), 2)
-
-    # ── Dépenses ─────────────────────────────────────────
-    q_dep = db.query(Depense)
-    if date_debut: q_dep = q_dep.filter(Depense.date_depense >= date_debut)
-    if date_fin:   q_dep = q_dep.filter(Depense.date_depense <= date_fin)
-    depenses = q_dep.all()
-    total_depenses = round(sum(float(d.montant) for d in depenses), 2)
-
-    # Ventilation dépenses par catégorie
-    cat_map = {}
-    for d in depenses:
-        cat_map[d.categorie] = round(cat_map.get(d.categorie, 0.0) + float(d.montant), 2)
-    depenses_par_cat = [{"categorie": k, "montant": v} for k, v in sorted(cat_map.items(), key=lambda x: -x[1])]
-
-    # ── Synthèse ─────────────────────────────────────────
-    total_sorties = round(total_achats + total_payroll_paye + total_depenses, 2)
-    cash_disponible = round(total_ventes - total_sorties, 2)
-    cash_apres_engage = round(cash_disponible - total_payroll_engage, 2)
+    synth = _synthese_cash_institution(db, date_debut, date_fin)
 
     return {
         "periode": {
@@ -4750,32 +4877,36 @@ def rapport_caisse(
             "fin":   str(date_fin)   if date_fin   else None,
         },
         "ventes": {
-            "total":   total_ventes,
+            "total":   synth["entrees"]["station"],
             "gallons": total_gallons,
             "nb_releves": len(releves),
             "par_produit": ventes_par_produit,
         },
+        "autres_departements": {
+            "ventes_bar":     synth["entrees"]["bar"],
+            "ventes_cuisine": synth["entrees"]["cuisine"],
+            "ventes_hotel":   synth["entrees"]["hotel"],
+            "achats_bar":     synth["sorties"]["achats_bar"],
+            "achats_cuisine": synth["sorties"]["achats_cuisine"],
+            "depenses_cuisine": synth["sorties"]["depenses_cuisine"],
+            "payroll_bar":    synth["sorties"]["payroll_bar"],
+        },
         "achats": {
-            "total": total_achats,
-            "nb":    len(achats),
+            "total": synth["sorties"]["achats_station"],
+            "nb":    synth["nb_achats"],
         },
         "payroll": {
-            "paye":    total_payroll_paye,
-            "engage":  total_payroll_engage,
-            "nb_fiches_payees":  len(fiches_payees),
-            "nb_fiches_engage":  len(fiches_brou),
+            "paye":    synth["sorties"]["total_payroll"],
+            "engage":  synth["payroll_engage"],
+            "nb_fiches_payees":  synth["nb_fiches_payees"],
+            "nb_fiches_engage":  synth["nb_fiches_engage"],
         },
         "depenses": {
-            "total": total_depenses,
-            "nb":    len(depenses),
-            "par_categorie": depenses_par_cat,
+            "total": synth["sorties"]["depenses_station"],
+            "nb":    synth["nb_depenses"],
+            "par_categorie": synth["depenses_par_categorie"],
         },
-        "synthese": {
-            "total_entrees":    total_ventes,
-            "total_sorties":    total_sorties,
-            "cash_disponible":  cash_disponible,
-            "cash_apres_engage": cash_apres_engage,
-        },
+        "synthese": synth["synthese"],
     }
 
 
@@ -4844,22 +4975,11 @@ def gi_dashboard(
     for e in employes_actifs:
         repartition_postes[e.poste] = repartition_postes.get(e.poste, 0) + 1
 
-    # ── Payroll ────────────────────────────────────────────────
-    fiches_payees = (db.query(FichePaie)
-                     .filter(FichePaie.statut == "paye",
-                             FichePaie.date_paiement >= date_debut,
-                             FichePaie.date_paiement <= date_fin)
-                     .all())
-    fiches_brou   = db.query(FichePaie).filter(FichePaie.statut == "brouillon").all()
-    total_payroll_paye   = round(sum(float(f.net_a_payer) for f in fiches_payees), 2)
-    total_payroll_engage = round(sum(float(f.net_a_payer) for f in fiches_brou), 2)
-
-    # ── Dépenses ───────────────────────────────────────────────
+    # ── Dépenses (détail station, pour trend + par_categorie) ───
     depenses = (db.query(Depense)
                 .filter(Depense.date_depense >= date_debut,
                         Depense.date_depense <= date_fin)
                 .all())
-    total_depenses = round(sum(float(d.montant) for d in depenses), 2)
     dep_par_cat: dict[str, float] = {}
     for d in depenses:
         dep_par_cat[d.categorie] = round(dep_par_cat.get(d.categorie, 0) + float(d.montant), 2)
@@ -4868,20 +4988,20 @@ def gi_dashboard(
         k = str(d.date_depense)
         dep_trend[k] = round(dep_trend.get(k, 0) + float(d.montant), 2)
 
-    # ── Achats ─────────────────────────────────────────────────
+    # ── Achats (détail station, pour par_categorie) ─────────────
     achats = (db.query(Achat)
               .filter(Achat.date_achat >= date_debut,
                       Achat.date_achat <= date_fin)
               .all())
-    total_achats = round(sum(float(a.montant) for a in achats), 2)
     ach_par_cat: dict[str, float] = {}
     for a in achats:
         ach_par_cat[a.categorie] = round(ach_par_cat.get(a.categorie, 0) + float(a.montant), 2)
 
-    # ── Synthèse cash ──────────────────────────────────────────
-    total_sorties   = round(total_achats + total_payroll_paye + total_depenses, 2)
-    cash_disponible = round(total_ventes - total_sorties, 2)
-    marge_pct       = round(cash_disponible / total_ventes * 100, 1) if total_ventes else 0.0
+    # ── Synthèse cash consolidée (toute l'institution) ──────────
+    synth = _synthese_cash_institution(db, date_debut, date_fin)
+    cash_disponible = synth["synthese"]["cash_disponible"]
+    total_entrees   = synth["synthese"]["total_entrees"]
+    marge_pct       = round(cash_disponible / total_entrees * 100, 1) if total_entrees else 0.0
 
     # Série de jours pour le graphique (tous les jours de la période)
     jours_serie = []
@@ -4912,13 +5032,13 @@ def gi_dashboard(
                                 sorted(repartition_postes.items(), key=lambda x: -x[1])],
         },
         "payroll": {
-            "paye":                total_payroll_paye,
-            "engage":              total_payroll_engage,
-            "nb_fiches_payees":    len(fiches_payees),
-            "nb_fiches_engage":    len(fiches_brou),
+            "paye":                synth["sorties"]["payroll_rh"],
+            "engage":              synth["payroll_engage"],
+            "nb_fiches_payees":    synth["nb_fiches_payees"],
+            "nb_fiches_engage":    synth["nb_fiches_engage"],
         },
         "depenses": {
-            "total":       total_depenses,
+            "total":       synth["sorties"]["depenses_station"],
             "nb":          len(depenses),
             "par_categorie": sorted(
                 [{"categorie": k, "montant": v} for k, v in dep_par_cat.items()],
@@ -4926,18 +5046,28 @@ def gi_dashboard(
             ),
         },
         "achats": {
-            "total":       total_achats,
+            "total":       synth["sorties"]["achats_station"],
             "nb":          len(achats),
             "par_categorie": sorted(
                 [{"categorie": k, "montant": v} for k, v in ach_par_cat.items()],
                 key=lambda x: -x["montant"],
             ),
         },
+        "autres_departements": {
+            "ventes_bar":       synth["entrees"]["bar"],
+            "ventes_cuisine":   synth["entrees"]["cuisine"],
+            "ventes_hotel":     synth["entrees"]["hotel"],
+            "achats_bar":       synth["sorties"]["achats_bar"],
+            "achats_cuisine":   synth["sorties"]["achats_cuisine"],
+            "depenses_cuisine": synth["sorties"]["depenses_cuisine"],
+            "payroll_bar":      synth["sorties"]["payroll_bar"],
+        },
         "synthese": {
-            "total_sorties":    total_sorties,
-            "cash_disponible":  cash_disponible,
-            "marge_pct":        marge_pct,
-            "cash_apres_engage": round(cash_disponible - total_payroll_engage, 2),
+            "total_entrees":     synth["synthese"]["total_entrees"],
+            "total_sorties":     synth["synthese"]["total_sorties"],
+            "cash_disponible":   cash_disponible,
+            "marge_pct":         marge_pct,
+            "cash_apres_engage": synth["synthese"]["cash_apres_engage"],
         },
         "trend": jours_serie,
     }

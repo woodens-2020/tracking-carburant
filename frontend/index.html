@@ -5812,22 +5812,22 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <!-- KPI row : 4 blocs -->
         <div class="gi-kpi-row" style="grid-template-columns:repeat(4,1fr)">
           <div class="gi-kpi" style="border-top:3px solid #22c55e">
-            <div class="gi-kpi-lbl">Total Ventes</div>
+            <div class="gi-kpi-lbl">Total Ventes (toute l'institution)</div>
             <div class="gi-kpi-val" style="color:#22c55e" id="caisse-kpi-ventes">—</div>
             <div class="gi-kpi-sub" id="caisse-kpi-ventes-gal">0 gal</div>
           </div>
           <div class="gi-kpi" style="border-top:3px solid #f7a93b">
-            <div class="gi-kpi-lbl">Total Achats</div>
+            <div class="gi-kpi-lbl">Total Achats (toute l'institution)</div>
             <div class="gi-kpi-val" style="color:#f7a93b" id="caisse-kpi-achats">—</div>
             <div class="gi-kpi-sub" id="caisse-kpi-achats-nb">0 achat(s)</div>
           </div>
           <div class="gi-kpi" style="border-top:3px solid #3fb6a8">
-            <div class="gi-kpi-lbl">Payroll versé</div>
+            <div class="gi-kpi-lbl">Payroll versé (RH + Bar)</div>
             <div class="gi-kpi-val" style="color:#3fb6a8" id="caisse-kpi-payroll">—</div>
             <div class="gi-kpi-sub" id="caisse-kpi-payroll-sub">0 fiche(s) payée(s)</div>
           </div>
           <div class="gi-kpi" style="border-top:3px solid #f87171">
-            <div class="gi-kpi-lbl">Total Dépenses</div>
+            <div class="gi-kpi-lbl">Total Dépenses (toute l'institution)</div>
             <div class="gi-kpi-val" style="color:#f87171" id="caisse-kpi-depenses">—</div>
             <div class="gi-kpi-sub" id="caisse-kpi-depenses-nb">0 dépense(s)</div>
           </div>
@@ -5839,7 +5839,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <!-- Ventes par produit -->
           <div class="gi-table-card">
             <div class="gi-table-hdr">
-              <span class="gi-table-title" style="color:#22c55e">Ventes par produit</span>
+              <span class="gi-table-title" style="color:#22c55e">Ventes carburant par produit</span>
             </div>
             <div id="caisse-prod-wrap" style="padding:12px 16px"></div>
           </div>
@@ -5847,11 +5847,19 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <!-- Dépenses par catégorie -->
           <div class="gi-table-card">
             <div class="gi-table-hdr">
-              <span class="gi-table-title" style="color:#f87171">Dépenses par catégorie</span>
+              <span class="gi-table-title" style="color:#f87171">Dépenses station par catégorie</span>
             </div>
             <div id="caisse-cat-wrap" style="padding:12px 16px"></div>
           </div>
 
+        </div>
+
+        <!-- Autres départements (Bar, Cuisine, Hôtel) -->
+        <div class="gi-table-card" style="margin-top:16px">
+          <div class="gi-table-hdr">
+            <span class="gi-table-title" style="color:#a78bfa">Autres départements — détail</span>
+          </div>
+          <div id="caisse-autres-dept-wrap" style="padding:12px 16px"></div>
         </div>
 
         <!-- Payroll en attente (brouillon) -->
@@ -20314,10 +20322,16 @@ async function loadGiDashboard(){
   try {
     const d = await apiFetch('GET', '/gi/dashboard'+qs);
 
-    // ── KPI ──────────────────────────────────────────────────
-    document.getElementById('gid-kpi-ventes').textContent      = _htg(d.ventes.total);
+    // ── KPI (totaux consolidés — toute l'institution ; détail par
+    //         département sur la page Rapport de Caisse) ─────────
+    const ad = d.autres_departements || {ventes_bar:0, ventes_cuisine:0, ventes_hotel:0, achats_bar:0, achats_cuisine:0, depenses_cuisine:0, payroll_bar:0};
+    const ventesTotal   = d.synthese.total_entrees;
+    const achatsTotal   = d.achats.total + ad.achats_bar + ad.achats_cuisine;
+    const depensesTotal = d.depenses.total + ad.depenses_cuisine;
+
+    document.getElementById('gid-kpi-ventes').textContent      = _htg(ventesTotal);
     document.getElementById('gid-kpi-ventes-sub').textContent  =
-      d.ventes.gallons.toLocaleString('fr',{minimumFractionDigits:2})+' gal · '+d.ventes.nb_releves+' relevés';
+      'dont station : '+d.ventes.gallons.toLocaleString('fr',{minimumFractionDigits:2})+' gal · '+d.ventes.nb_releves+' relevés';
 
     const cash = d.synthese.cash_disponible;
     const cashEl = document.getElementById('gid-kpi-cash');
@@ -20335,7 +20349,7 @@ async function loadGiDashboard(){
 
     document.getElementById('gid-kpi-sorties').textContent     = _htg(d.synthese.total_sorties);
     document.getElementById('gid-kpi-sorties-sub').textContent =
-      'Dép '+_htg(d.depenses.total)+' · Ach '+_htg(d.achats.total);
+      'Dép '+_htg(depensesTotal)+' · Ach '+_htg(achatsTotal);
 
     // ── Alerte payroll engagé ────────────────────────────────
     const alertEl = document.getElementById('gid-alert-engage');
@@ -20355,9 +20369,9 @@ async function loadGiDashboard(){
 
     // ── Donut répartition ────────────────────────────────────
     const dCash   = Math.max(0, cash);
-    const dAch    = d.achats.total;
+    const dAch    = achatsTotal;
     const dPay    = d.payroll.paye;
-    const dDep    = d.depenses.total;
+    const dDep    = depensesTotal;
     const hasData = (dCash + dAch + dPay + dDep) > 0;
 
     const donutValEl = document.getElementById('gid-donut-val');
@@ -20507,18 +20521,42 @@ async function loadCaisse(){
     document.getElementById('caisse-cash-sub').textContent =
       `Entrées ${entreesLabel}  ·  Sorties ${sortiesLabel}`;
 
-    // ── KPIs ─────────────────────────────────────────────
-    document.getElementById('caisse-kpi-ventes').textContent    = _htg(d.ventes.total);
-    document.getElementById('caisse-kpi-ventes-gal').textContent = d.ventes.gallons.toLocaleString('fr',{minimumFractionDigits:2})+' gal · '+d.ventes.nb_releves+' relevé(s)';
+    // ── KPIs (totaux consolidés — toute l'institution) ────
+    const ad = d.autres_departements || {ventes_bar:0, ventes_cuisine:0, ventes_hotel:0, achats_bar:0, achats_cuisine:0, depenses_cuisine:0, payroll_bar:0};
+    const ventesTotal   = d.synthese.total_entrees;
+    const achatsTotal   = d.achats.total + ad.achats_bar + ad.achats_cuisine;
+    const depensesTotal = d.depenses.total + ad.depenses_cuisine;
 
-    document.getElementById('caisse-kpi-achats').textContent     = _htg(d.achats.total);
-    document.getElementById('caisse-kpi-achats-nb').textContent  = d.achats.nb+' achat(s)';
+    document.getElementById('caisse-kpi-ventes').textContent    = _htg(ventesTotal);
+    document.getElementById('caisse-kpi-ventes-gal').textContent = 'dont station : '+d.ventes.gallons.toLocaleString('fr',{minimumFractionDigits:2})+' gal · '+d.ventes.nb_releves+' relevé(s)';
+
+    document.getElementById('caisse-kpi-achats').textContent     = _htg(achatsTotal);
+    document.getElementById('caisse-kpi-achats-nb').textContent  = 'dont station : '+d.achats.nb+' achat(s)';
 
     document.getElementById('caisse-kpi-payroll').textContent    = _htg(d.payroll.paye);
     document.getElementById('caisse-kpi-payroll-sub').textContent = d.payroll.nb_fiches_payees+' fiche(s) versée(s)';
 
-    document.getElementById('caisse-kpi-depenses').textContent   = _htg(d.depenses.total);
-    document.getElementById('caisse-kpi-depenses-nb').textContent = d.depenses.nb+' dépense(s)';
+    document.getElementById('caisse-kpi-depenses').textContent   = _htg(depensesTotal);
+    document.getElementById('caisse-kpi-depenses-nb').textContent = 'dont station : '+d.depenses.nb+' dépense(s)';
+
+    // ── Autres départements — détail ──────────────────────
+    const adWrap = document.getElementById('caisse-autres-dept-wrap');
+    if(adWrap){
+      const rows = [
+        {label:'Ventes Bar (cash encaissé)',   val: ad.ventes_bar,     sens:'entree'},
+        {label:'Ventes Cuisine (cash)',        val: ad.ventes_cuisine, sens:'entree'},
+        {label:'Ventes Hôtel (encaissé)',      val: ad.ventes_hotel,   sens:'entree'},
+        {label:'Achats Bar (confirmés)',       val: ad.achats_bar,     sens:'sortie'},
+        {label:'Achats Cuisine',               val: ad.achats_cuisine, sens:'sortie'},
+        {label:'Dépenses Cuisine',             val: ad.depenses_cuisine, sens:'sortie'},
+        {label:'Payiements employés Bar',      val: ad.payroll_bar,    sens:'sortie'},
+      ];
+      adWrap.innerHTML = rows.map(r => `
+        <div class="caisse-bar-row" style="justify-content:space-between">
+          <div class="caisse-bar-label" style="min-width:0">${r.label}</div>
+          <div class="caisse-bar-val" style="color:${r.sens==='entree'?'#22c55e':'#f87171'}">${r.sens==='entree'?'+':'−'} ${_htg(r.val)}</div>
+        </div>`).join('');
+    }
 
     // ── Ventes par produit ────────────────────────────────
     const maxVentes = Math.max(1, ...d.ventes.par_produit.map(p=>p.montant));
