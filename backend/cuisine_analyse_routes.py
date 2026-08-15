@@ -17,7 +17,7 @@ from sqlalchemy import func as sqlfunc
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import CuisinePlat, CuisineVente, CuisineLigneVente, CuisineAchat
+from models import CuisinePlat, CuisineVente, CuisineLigneVente, CuisineAchat, CuisineDepense, RenflouementDepartement
 
 router = APIRouter(prefix="/api/cuisine/analyse", tags=["Cuisine Analyse"])
 
@@ -212,6 +212,30 @@ def synthese(
     top_plats.sort(key=lambda x: x["benefice"], reverse=True)
     top_plats = top_plats[:10]
 
+    # ── Caisse Cuisine disponible : cash réellement encaissé (mode CASH
+    # uniquement — une vente CREDIT n'est pas encore du cash) + renflouements
+    # - achats - dépenses. Distinct de "actuel.benefice_net" ci-dessus qui est
+    # une marge sur ventes totales (CASH+CREDIT), pas un vrai solde de caisse. ──
+    ventes_cash = float(_dec(
+        db.query(sqlfunc.sum(CuisineVente.total))
+        .filter(CuisineVente.statut == "VALIDEE", CuisineVente.mode_paiement == "CASH",
+                CuisineVente.date_heure >= dt_deb, CuisineVente.date_heure <= dt_fin)
+        .scalar()
+    ))
+    depenses_periode = float(_dec(
+        db.query(sqlfunc.sum(CuisineDepense.montant))
+        .filter(CuisineDepense.date_depense >= dt_deb, CuisineDepense.date_depense <= dt_fin)
+        .scalar()
+    ))
+    renflouements_periode = float(_dec(
+        db.query(sqlfunc.sum(RenflouementDepartement.montant))
+        .filter(RenflouementDepartement.departement == "CUISINE",
+                RenflouementDepartement.date_renflouement >= dt_deb,
+                RenflouementDepartement.date_renflouement <= dt_fin)
+        .scalar()
+    ))
+    caisse_disponible = round(ventes_cash + renflouements_periode - actuel["cout_achats_total"] - depenses_periode, 2)
+
     return {
         "periode":              {"debut": str(date_debut), "fin": str(date_fin)},
         "periode_precedente":   {"debut": str(prev_debut),  "fin": str(prev_fin)},
@@ -220,6 +244,13 @@ def synthese(
         "evolution":            evolution,
         "top_plats":            top_plats,
         "achats_par_categorie": [{"categorie": k, "montant": round(v, 2)} for k, v in sorted(achats_par_cat.items())],
+        "caisse": {
+            "ventes_cash":     round(ventes_cash, 2),
+            "achats":          actuel["cout_achats_total"],
+            "depenses":        round(depenses_periode, 2),
+            "renflouements":   round(renflouements_periode, 2),
+            "disponible":      caisse_disponible,
+        },
     }
 
 

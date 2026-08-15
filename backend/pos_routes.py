@@ -20,7 +20,7 @@ from models import (
     BarCategorie, BarProduit, BarPrixHistorique, BarAchat, BarAchatDepense,
     BarMouvementStock, BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande, BarPaiementEmploye, BarSessionCaisse,
-    Employe, Utilisateur, CuisinePlat,
+    Employe, Utilisateur, CuisinePlat, RenflouementDepartement,
 )
 from pos_service import (
     stock_courant, stock_tous_produits, prix_actif, cmup,
@@ -39,6 +39,21 @@ def _user(request: Request):
 def _uid(request: Request) -> int | None:
     u = _user(request)
     return u.id if u else None
+
+
+def _require_pdg_ou_admin_pos(request: Request, db: Session = Depends(get_db)) -> Utilisateur:
+    """Même logique que main.require_pdg_ou_admin — dupliquée ici pour
+    éviter un import circulaire entre routers."""
+    user = _user(request)
+    if not user:
+        raise HTTPException(403, "Non autorisé")
+    if user.role in ("pdg", "admin"):
+        return user
+    if user.role_id:
+        u = db.get(Utilisateur, user.id)
+        if u and u.role_obj and u.role_obj.permissions.get("admin", False):
+            return u
+    raise HTTPException(403, "Accès réservé au PDG et aux administrateurs")
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -2290,6 +2305,65 @@ def benefices_detail(
 
 
 # ══════════════════════════════════════════════════════════════════
+# RENFLOUEMENT CAISSE BAR
+# ══════════════════════════════════════════════════════════════════
+
+def _renflouement_dict_bar(r: RenflouementDepartement) -> dict:
+    return {
+        "id":                r.id,
+        "montant":           float(r.montant),
+        "source":            r.source,
+        "date_renflouement": r.date_renflouement.isoformat() if r.date_renflouement else None,
+        "enregistre_par":    r.enregistre_par.nom_complet if r.enregistre_par else None,
+        "notes":             r.notes,
+    }
+
+
+@router.get("/renflouements")
+def lister_renflouements_bar(
+    date_debut: Optional[str] = Query(default=None),
+    date_fin:   Optional[str] = Query(default=None),
+    limit: int = Query(50, le=200),
+    db: Session = Depends(get_db),
+):
+    q = db.query(RenflouementDepartement).filter(RenflouementDepartement.departement == "BAR")
+    if date_debut:
+        q = q.filter(RenflouementDepartement.date_renflouement >= datetime.strptime(date_debut, "%Y-%m-%d").replace(hour=0,  minute=0,  second=0,  tzinfo=timezone.utc))
+    if date_fin:
+        q = q.filter(RenflouementDepartement.date_renflouement <= datetime.strptime(date_fin,   "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=timezone.utc))
+    rows = q.order_by(RenflouementDepartement.date_renflouement.desc()).limit(limit).all()
+    return {"renflouements": [_renflouement_dict_bar(r) for r in rows]}
+
+
+@router.post("/renflouements", status_code=201)
+def creer_renflouement_bar(
+    data: dict, db: Session = Depends(get_db),
+    _user: Utilisateur = Depends(_require_pdg_ou_admin_pos),
+):
+    montant = float(data.get("montant") or 0)
+    if montant <= 0:
+        raise HTTPException(400, "Le montant doit être positif.")
+    r = RenflouementDepartement(
+        departement="BAR",
+        montant=montant,
+        source=(data.get("source") or "").strip() or None,
+        notes=(data.get("notes") or "").strip() or None,
+        enregistre_par_id=_user.id,
+    )
+    db.add(r)
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="pos", type_="renflouement_departement",
+        titre=f"Renflouement Caisse Bar — {montant:,.2f} G",
+        message=(data.get("source") or "Source non précisée"),
+        lien="pos-grande-caisse",
+        dedupe_minutes=None,
+    )
+    db.commit(); db.refresh(r)
+    return _renflouement_dict_bar(r)
+
+
+# ══════════════════════════════════════════════════════════════════
 # GRANDE CAISSE — tableau de bord financier consolidé
 # ══════════════════════════════════════════════════════════════════
 
@@ -2456,6 +2530,34 @@ def grande_caisse(
     benefice_brut = ventes_ca_total - achats_cout_total
     benefice_net  = benefice_brut - paie_total
 
+    # ── Caisse Bar disponible : cash réellement encaissé (CASH/MIXTE +
+    # crédits remboursés) + renflouements - achats confirmés - paie. Distinct
+    # de "benefice_net" ci-dessus qui compte les ventes CRÉDIT non encore
+    # encaissées comme si c'était du cash — voir _synthese_cash_institution
+    # dans main.py pour la même logique au niveau de l'institution. ──
+    # Note : la caisse Bar est un concept global, pas filtrable par produit
+    # (un ticket encaissé mélange souvent plusieurs articles) — le filtre
+    # produit_id/categorie de cet endpoint ne s'applique pas à ce bloc.
+    q_bv_cash = db.query(BarVente).filter(
+        BarVente.statut != "ANNULEE",
+        BarVente.date_heure >= dt_debut, BarVente.date_heure <= dt_fin,
+    )
+    cash_ventes = sum(
+        float(v.montant_paye) for v in q_bv_cash.all() if v.mode_paiement in ("CASH", "MIXTE")
+    )
+    q_remb = db.query(BarRemboursement).filter(
+        BarRemboursement.date_remb >= dt_debut, BarRemboursement.date_remb <= dt_fin,
+    )
+    cash_remb = sum(float(r.montant) for r in q_remb.all())
+    renflouements_periode = float(
+        db.query(func.sum(RenflouementDepartement.montant))
+        .filter(RenflouementDepartement.departement == "BAR",
+                RenflouementDepartement.date_renflouement >= dt_debut,
+                RenflouementDepartement.date_renflouement <= dt_fin)
+        .scalar() or 0
+    )
+    caisse_disponible = round(cash_ventes + cash_remb + renflouements_periode - float(achats_cout_total) - float(paie_total), 2)
+
     return {
         "periode":    {"debut": str(date_debut), "fin": str(date_fin)},
         "bar": {
@@ -2466,6 +2568,13 @@ def grande_caisse(
             "benefice_net":  float(benefice_net),
             "nb_achats":     len(achats),
             "nb_ventes":     sum(1 for lv in lignes_ventes),
+        },
+        "caisse": {
+            "ventes_cash":    round(cash_ventes + cash_remb, 2),
+            "achats":         float(achats_cout_total),
+            "paie":           float(paie_total),
+            "renflouements":  round(renflouements_periode, 2),
+            "disponible":     caisse_disponible,
         },
         "par_produit":   produits_list,
         "achats_detail": sorted(achats_detail, key=lambda x: x["date_achat"], reverse=True),

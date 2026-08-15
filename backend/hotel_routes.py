@@ -15,7 +15,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import HotelChambre, HotelEmploye, HotelReservation, HotelDepense, Utilisateur
+from models import HotelChambre, HotelEmploye, HotelReservation, HotelDepense, RenflouementDepartement, Utilisateur
 
 router = APIRouter(prefix="/api/hotel", tags=["Hotel"])
 
@@ -27,6 +27,21 @@ def _uid(request: Request) -> int | None:
 
 def _d(v) -> Decimal:
     return Decimal(str(v)) if v is not None else Decimal("0")
+
+
+def _require_pdg_ou_admin_hotel(request: Request, db: Session = Depends(get_db)) -> Utilisateur:
+    """Même logique que main.require_pdg_ou_admin — dupliquée ici pour
+    éviter un import circulaire entre routers."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise HTTPException(403, "Non autorisé")
+    if user.role in ("pdg", "admin"):
+        return user
+    if user.role_id:
+        u = db.get(Utilisateur, user.id)
+        if u and u.role_obj and u.role_obj.permissions.get("admin", False):
+            return u
+    raise HTTPException(403, "Accès réservé au PDG et aux administrateurs")
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -632,6 +647,21 @@ def dashboard_hotel(
     prev_debut = prev_fin - timedelta(days=nb_jours - 1)
     kpi_precedent = _hotel_kpis_periode(db, prev_debut, prev_fin, type_sejour, type_chambre)
 
+    # ── Caisse Hôtel : revenu réellement encaissé + renflouements - dépenses ──
+    depenses_periode = float(
+        db.query(func.sum(HotelDepense.montant))
+        .filter(HotelDepense.date_depense >= dt_debut, HotelDepense.date_depense <= dt_fin)
+        .scalar() or 0
+    )
+    renflouements_periode = float(
+        db.query(func.sum(RenflouementDepartement.montant))
+        .filter(RenflouementDepartement.departement == "HOTEL",
+                RenflouementDepartement.date_renflouement >= dt_debut,
+                RenflouementDepartement.date_renflouement <= dt_fin)
+        .scalar() or 0
+    )
+    caisse_disponible = round(kpi_periode["revenu"] + renflouements_periode - depenses_periode, 2)
+
     # ── Répartition des chambres par statut (donut) ──
     statut_counts: dict[str, int] = {}
     for c in chambres:
@@ -753,6 +783,9 @@ def dashboard_hotel(
             "revenu_periode_prec":  round(kpi_precedent["revenu"], 2),
             "montant_facture":      round(kpi_periode["facture"], 2),
             "solde_impaye":         round(kpi_periode["solde"], 2),
+            "depenses_periode":     round(depenses_periode, 2),
+            "renflouements_periode": round(renflouements_periode, 2),
+            "caisse_disponible":    caisse_disponible,
         },
         "statut_chambres":       statut_chambres,
         "par_type_chambre":      sorted(par_type.values(), key=lambda x: x["revenu"], reverse=True),
@@ -1072,6 +1105,65 @@ def rapport_hotel_xlsx(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={fname}"},
     )
+
+
+# ══════════════════════════════════════════════════════════════════
+# RENFLOUEMENT CAISSE HÔTEL
+# ══════════════════════════════════════════════════════════════════
+
+def _renflouement_dict_hotel(r: RenflouementDepartement) -> dict:
+    return {
+        "id":                r.id,
+        "montant":           float(r.montant),
+        "source":            r.source,
+        "date_renflouement": r.date_renflouement.isoformat() if r.date_renflouement else None,
+        "enregistre_par":    r.enregistre_par.nom_complet if r.enregistre_par else None,
+        "notes":             r.notes,
+    }
+
+
+@router.get("/renflouements")
+def lister_renflouements_hotel(
+    date_debut: Optional[str] = Query(default=None),
+    date_fin:   Optional[str] = Query(default=None),
+    limit: int = Query(50, le=200),
+    db: Session = Depends(get_db),
+):
+    q = db.query(RenflouementDepartement).filter(RenflouementDepartement.departement == "HOTEL")
+    if date_debut:
+        q = q.filter(RenflouementDepartement.date_renflouement >= datetime.strptime(date_debut, "%Y-%m-%d").replace(hour=0,  minute=0,  second=0,  tzinfo=timezone.utc))
+    if date_fin:
+        q = q.filter(RenflouementDepartement.date_renflouement <= datetime.strptime(date_fin,   "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=timezone.utc))
+    rows = q.order_by(RenflouementDepartement.date_renflouement.desc()).limit(limit).all()
+    return {"renflouements": [_renflouement_dict_hotel(r) for r in rows]}
+
+
+@router.post("/renflouements", status_code=201)
+def creer_renflouement_hotel(
+    data: dict, db: Session = Depends(get_db),
+    _user: Utilisateur = Depends(_require_pdg_ou_admin_hotel),
+):
+    montant = float(data.get("montant") or 0)
+    if montant <= 0:
+        raise HTTPException(400, "Le montant doit être positif.")
+    r = RenflouementDepartement(
+        departement="HOTEL",
+        montant=montant,
+        source=(data.get("source") or "").strip() or None,
+        notes=(data.get("notes") or "").strip() or None,
+        enregistre_par_id=_user.id,
+    )
+    db.add(r)
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="hotel", type_="renflouement_departement",
+        titre=f"Renflouement Caisse Hôtel — {montant:,.2f} G",
+        message=(data.get("source") or "Source non précisée"),
+        lien="hotel-dashboard",
+        dedupe_minutes=None,
+    )
+    db.commit(); db.refresh(r)
+    return _renflouement_dict_hotel(r)
 
 
 # ══════════════════════════════════════════════════════════════════

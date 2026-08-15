@@ -3654,11 +3654,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div>
 
-    <!-- Modal renflouement de la Grande Caisse (accessible depuis Rapport de Caisse et Tableau de Bord) -->
+    <!-- Modal renflouement (générique — Grande Caisse, Hôtel, Cuisine, Bar) -->
     <div class="gi-modal-overlay" id="renfl-modal">
       <div class="gi-modal" style="max-width:420px;">
         <div class="gi-modal-head">
-          <h3>Renflouement de la Grande Caisse</h3>
+          <h3 id="renfl-modal-titre">Renflouement de la Grande Caisse</h3>
           <button class="gi-modal-close" onclick="renflCloseModal()">&times;</button>
         </div>
         <div class="gi-modal-body">
@@ -3680,7 +3680,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <textarea class="gi-form-input" id="renfl-notes" rows="2"></textarea>
             </div>
           </div>
-          <p style="font-size:.78rem;color:rgba(255,255,255,.4);margin:4px 0 0;">
+          <p style="font-size:.78rem;color:rgba(255,255,255,.4);margin:4px 0 0;" id="renfl-modal-note">
             Ce montant sera immédiatement ajouté au Cash disponible de l'institution.
           </p>
         </div>
@@ -4938,7 +4938,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
           </div>
           <div class="gi-page-header-actions">
-            <button class="gi-btn-primary" id="gid-btn-renfl" onclick="renflOpenModal()" style="display:none;">
+            <button class="gi-btn-primary" id="gid-btn-renfl" onclick="renflOpenModal('institution')" style="display:none;">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Renflouement Grande Caisse
             </button>
             <button class="gi-btn-secondary" onclick="loadGiDashboard()" title="Actualiser">
@@ -5853,7 +5853,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="caisse-cash-label">CASH DISPONIBLE</div>
           <div class="caisse-cash-val" id="caisse-cash-val">—</div>
           <div class="caisse-cash-sub" id="caisse-cash-sub">Chargement…</div>
-          <button class="gi-btn-primary" id="caisse-btn-renfl" onclick="renflOpenModal()" style="display:none;margin-top:12px;">
+          <button class="gi-btn-primary" id="caisse-btn-renfl" onclick="renflOpenModal('institution')" style="display:none;margin-top:12px;">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Renflouement de la Grande Caisse
           </button>
         </div>
@@ -7628,6 +7628,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </select>
             <button class="pos-btn teal" onclick="gcCharger()">Analyser</button>
             <button class="pos-btn ghost" onclick="gcResetFiltres()">Reset</button>
+            <button class="pos-btn" id="gc-btn-renfl" onclick="renflOpenModal('bar')" style="display:none;background:#3fb6a8;color:#0b1628">+ Renflouement Caisse Bar</button>
           </div>
         </div>
 
@@ -7661,6 +7662,15 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-kpi">
             <div class="pos-kpi-label">Bénéfice Net</div>
             <div class="pos-kpi-val" id="gc-kpi-benef-net">—</div>
+          </div>
+        </div>
+
+        <!-- Caisse Bar disponible (cash réel) -->
+        <div class="pos-card" style="padding:14px 18px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em">Caisse Bar disponible (cash réel)</div>
+            <div style="font-size:26px;font-weight:800" id="gc-kpi-caisse">—</div>
+            <div style="font-size:12.5px;color:rgba(255,255,255,.4)" id="gc-kpi-caisse-sub">Ventes cash + remboursements + renflouements − achats − paie</div>
           </div>
         </div>
 
@@ -9239,6 +9249,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
           </div>
 
+          <!-- Caisse Cuisine disponible (cash réel) -->
+          <div class="pos-card" style="padding:14px 18px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+            <div>
+              <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em">Caisse Cuisine disponible (cash réel)</div>
+              <div style="font-size:26px;font-weight:800" id="cka-kpi-caisse">—</div>
+              <div style="font-size:12.5px;color:rgba(255,255,255,.4)">Ventes cash + renflouements − achats − dépenses</div>
+            </div>
+            <button class="pos-btn" id="cka-btn-renfl" onclick="renflOpenModal('cuisine')" style="display:none;background:#3fb6a8;color:#0b1628">+ Renflouement Caisse Cuisine</button>
+          </div>
+
           <!-- Charts -->
           <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:12px;margin-bottom:14px">
             <div class="pos-card" style="padding:14px 16px">
@@ -9356,6 +9376,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
           </div>
           <div class="gi-page-header-actions">
+            <button class="gi-btn-primary" id="hd-btn-renfl" onclick="renflOpenModal('hotel')" style="display:none;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Renflouement Caisse Hôtel
+            </button>
             <button class="gi-btn-secondary" onclick="loadHotelDashboard()" title="Actualiser">↺</button>
           </div>
         </div>
@@ -9434,6 +9457,24 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="gid-kpi-lbl">Solde impayé</div>
             <div class="gid-kpi-val" id="hd-kpi-impaye" style="color:#f87171">—</div>
             <div class="gid-kpi-sub" id="hd-kpi-impaye-sub">—</div>
+          </div>
+          <div class="gid-kpi">
+            <div class="gid-kpi-accent" style="background:#fb923c"></div>
+            <div class="gid-kpi-icon" style="background:rgba(251,146,60,.12)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div class="gid-kpi-lbl">Dépenses période</div>
+            <div class="gid-kpi-val" id="hd-kpi-depenses" style="color:#fb923c">—</div>
+            <div class="gid-kpi-sub" id="hd-kpi-depenses-sub">—</div>
+          </div>
+          <div class="gid-kpi">
+            <div class="gid-kpi-accent" id="hd-caisse-accent" style="background:#3fb6a8"></div>
+            <div class="gid-kpi-icon" id="hd-caisse-icon" style="background:rgba(63,182,168,.12)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#3fb6a8" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            </div>
+            <div class="gid-kpi-lbl">Caisse Hôtel disponible</div>
+            <div class="gid-kpi-val" id="hd-kpi-caisse" style="color:#3fb6a8">—</div>
+            <div class="gid-kpi-sub" id="hd-kpi-caisse-sub">Revenu − Dépenses</div>
           </div>
         </div>
 
@@ -20815,8 +20856,45 @@ function caisseResetFiltres(){
   loadCaisse();
 }
 
-// ── Renflouement de la Grande Caisse ────────────────────────────
-function renflOpenModal(){
+// ── Renflouement (générique — Grande Caisse, Hôtel, Cuisine, Bar) ──
+const _RENFL_SCOPES = {
+  institution: {
+    endpoint: '/caisse/renflouements',
+    titre:    'Renflouement de la Grande Caisse',
+    note:     "Ce montant sera immédiatement ajouté au Cash disponible de l'institution.",
+    reload:   () => {
+      if(document.getElementById('page-caisse')?.classList.contains('active')) loadCaisse();
+      if(document.getElementById('page-gi-dashboard')?.classList.contains('active')) loadGiDashboard();
+    },
+  },
+  hotel: {
+    endpoint: '/hotel/renflouements',
+    titre:    'Renflouement Caisse Hôtel',
+    note:     "Ce montant sera immédiatement ajouté à la Caisse Hôtel disponible.",
+    reload:   () => { if(typeof hotelDashCharger === 'function') hotelDashCharger(); },
+  },
+  cuisine: {
+    endpoint: '/cuisine/renflouements',
+    titre:    'Renflouement Caisse Cuisine',
+    note:     "Ce montant sera immédiatement ajouté à la Caisse Cuisine disponible.",
+    reload:   () => { if(typeof ckaSyntheseCharger === 'function') ckaSyntheseCharger(); },
+  },
+  bar: {
+    endpoint: '/pos/renflouements',
+    titre:    'Renflouement Caisse Bar',
+    note:     "Ce montant sera immédiatement ajouté à la Caisse Bar disponible.",
+    reload:   () => { if(typeof gcCharger === 'function') gcCharger(); },
+  },
+};
+let _renflScope = 'institution';
+
+function renflOpenModal(scope){
+  _renflScope = _RENFL_SCOPES[scope] ? scope : 'institution';
+  const cfg = _RENFL_SCOPES[_renflScope];
+  const titreEl = document.getElementById('renfl-modal-titre');
+  const noteEl  = document.getElementById('renfl-modal-note');
+  if(titreEl) titreEl.textContent = cfg.titre;
+  if(noteEl)  noteEl.textContent  = cfg.note;
   ['renfl-montant','renfl-source','renfl-notes'].forEach(i=>{ const e=document.getElementById(i); if(e) e.value=''; });
   document.getElementById('renfl-modal').classList.add('open');
 }
@@ -20827,12 +20905,12 @@ async function renflSubmit(){
   const source  = document.getElementById('renfl-source').value.trim()||null;
   const notes   = document.getElementById('renfl-notes').value.trim()||null;
   if(montant<=0){ toast('Le montant doit être positif.','err'); return; }
+  const cfg = _RENFL_SCOPES[_renflScope];
   try{
-    await apiFetch('POST','/caisse/renflouements', {montant, source, notes});
+    await apiFetch('POST', cfg.endpoint, {montant, source, notes});
     toast('Renflouement enregistré.','ok');
     renflCloseModal();
-    if(typeof loadCaisse === 'function' && document.getElementById('page-caisse')?.classList.contains('active')) loadCaisse();
-    if(typeof loadGiDashboard === 'function' && document.getElementById('page-gi-dashboard')?.classList.contains('active')) loadGiDashboard();
+    cfg.reload();
   }catch(e){ toast(e.message,'err'); }
 }
 
@@ -25076,6 +25154,16 @@ function _gcRender(d){
   if(nbA) nbA.textContent = section.nb_achats + ' achat(s)';
   if(nbV) nbV.textContent = section.nb_ventes + ' ligne(s) vente';
 
+  // Caisse Bar disponible (cash réel)
+  const caisse = d.caisse || {ventes_cash:0, achats:0, paie:0, renflouements:0, disponible:0};
+  const caisseEl = document.getElementById('gc-kpi-caisse');
+  if(caisseEl){
+    caisseEl.textContent = posGx(caisse.disponible);
+    caisseEl.style.color = caisse.disponible >= 0 ? '#34d399' : '#f87171';
+  }
+  const btnRenflBar = document.getElementById('gc-btn-renfl');
+  if(btnRenflBar) btnRenflBar.style.display = (_appUser?.role === 'pdg' || _isAdmin()) ? '' : 'none';
+
   // Table par produit
   const tProd = document.getElementById('gc-produits-tbody');
   if(tProd){
@@ -27539,6 +27627,15 @@ async function ckaSyntheseCharger(){
 
     document.getElementById('cka-kpi-qte').textContent = a.qte_vendue.toLocaleString('fr-HT');
 
+    const caisse = d.caisse || {disponible: 0};
+    const caisseEl = document.getElementById('cka-kpi-caisse');
+    if(caisseEl){
+      caisseEl.textContent = posGx(caisse.disponible);
+      caisseEl.style.color = caisse.disponible >= 0 ? '#4ade80' : '#f87171';
+    }
+    const btnRenflCuisine = document.getElementById('cka-btn-renfl');
+    if(btnRenflCuisine) btnRenflCuisine.style.display = (_appUser?.role === 'pdg' || _isAdmin()) ? '' : 'none';
+
     _ckaRenderCharts(d);
     _ckaRenderTopPlats(d.top_plats || []);
   } catch(e){
@@ -27725,6 +27822,9 @@ async function hotelDashCharger(){
     const d = await apiFetch('GET', url);
     const k = d.kpi;
 
+    const btnRenflHotel = document.getElementById('hd-btn-renfl');
+    if(btnRenflHotel) btnRenflHotel.style.display = (_appUser?.role === 'pdg' || _isAdmin()) ? '' : 'none';
+
     document.getElementById('hd-kpi-taux').textContent    = k.taux_occupation.toFixed(1) + '%';
     document.getElementById('hd-kpi-taux-sub').textContent = `${k.chambres_dispo} disponible(s), ${k.chambres_maintenance} en maintenance`;
 
@@ -27739,6 +27839,20 @@ async function hotelDashCharger(){
 
     document.getElementById('hd-kpi-impaye').textContent = posGx(k.solde_impaye);
     document.getElementById('hd-kpi-impaye-sub').textContent = `Facturé : ${posGx(k.montant_facture)}`;
+
+    document.getElementById('hd-kpi-depenses').textContent = posGx(k.depenses_periode);
+
+    const caisseEl  = document.getElementById('hd-kpi-caisse');
+    const caisseNeg = k.caisse_disponible < 0;
+    caisseEl.textContent = posGx(k.caisse_disponible);
+    caisseEl.style.color = caisseNeg ? '#f87171' : '#3fb6a8';
+    const caisseAccent = document.getElementById('hd-caisse-accent');
+    const caisseIcon   = document.getElementById('hd-caisse-icon');
+    if(caisseAccent) caisseAccent.style.background = caisseNeg ? '#f87171' : '#3fb6a8';
+    if(caisseIcon){
+      caisseIcon.style.background = caisseNeg ? 'rgba(248,113,113,.12)' : 'rgba(63,182,168,.12)';
+      caisseIcon.querySelector('svg')?.setAttribute('stroke', caisseNeg ? '#f87171' : '#3fb6a8');
+    }
 
     _hdRenderCharts(d);
     _hdRenderArriveesDeparts(d.arrivees_departs_jour || []);

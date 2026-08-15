@@ -9,13 +9,28 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import CuisinePlat, CuisineDepense, CuisineVente, CuisineLigneVente, CuisineAchat, Utilisateur
+from models import CuisinePlat, CuisineDepense, CuisineVente, CuisineLigneVente, CuisineAchat, RenflouementDepartement, Utilisateur
 
 router = APIRouter(prefix="/api/cuisine", tags=["Cuisine"])
 
 
 def _dec(v) -> Decimal:
     return Decimal(str(v)) if v is not None else Decimal("0")
+
+
+def _require_pdg_ou_admin_cuisine(request: Request, db: Session = Depends(get_db)) -> Utilisateur:
+    """Même logique que main.require_pdg_ou_admin — dupliquée ici pour
+    éviter un import circulaire entre routers."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise HTTPException(403, "Non autorisé")
+    if user.role in ("pdg", "admin"):
+        return user
+    if user.role_id:
+        u = db.get(Utilisateur, user.id)
+        if u and u.role_obj and u.role_obj.permissions.get("admin", False):
+            return u
+    raise HTTPException(403, "Accès réservé au PDG et aux administrateurs")
 
 
 def _est_admin_utilisateur(request: Request, db: Session) -> bool:
@@ -147,6 +162,65 @@ def desactiver_plat(plat_id: int, db: Session = Depends(get_db)):
     p.actif = False
     db.commit()
     return {"message": "Plat retiré du menu"}
+
+
+# ══════════════════════════════════════════════════════════════════
+# RENFLOUEMENT CAISSE CUISINE
+# ══════════════════════════════════════════════════════════════════
+
+def _renflouement_dict_cuisine(r: RenflouementDepartement) -> dict:
+    return {
+        "id":                r.id,
+        "montant":           float(r.montant),
+        "source":            r.source,
+        "date_renflouement": r.date_renflouement.isoformat() if r.date_renflouement else None,
+        "enregistre_par":    r.enregistre_par.nom_complet if r.enregistre_par else None,
+        "notes":             r.notes,
+    }
+
+
+@router.get("/renflouements")
+def lister_renflouements_cuisine(
+    date_debut: Optional[str] = Query(default=None),
+    date_fin:   Optional[str] = Query(default=None),
+    limit: int = Query(50, le=200),
+    db: Session = Depends(get_db),
+):
+    q = db.query(RenflouementDepartement).filter(RenflouementDepartement.departement == "CUISINE")
+    if date_debut:
+        q = q.filter(RenflouementDepartement.date_renflouement >= datetime.strptime(date_debut, "%Y-%m-%d").replace(hour=0,  minute=0,  second=0,  tzinfo=timezone.utc))
+    if date_fin:
+        q = q.filter(RenflouementDepartement.date_renflouement <= datetime.strptime(date_fin,   "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=timezone.utc))
+    rows = q.order_by(RenflouementDepartement.date_renflouement.desc()).limit(limit).all()
+    return {"renflouements": [_renflouement_dict_cuisine(r) for r in rows]}
+
+
+@router.post("/renflouements", status_code=201)
+def creer_renflouement_cuisine(
+    data: dict, db: Session = Depends(get_db),
+    _user: Utilisateur = Depends(_require_pdg_ou_admin_cuisine),
+):
+    montant = float(data.get("montant") or 0)
+    if montant <= 0:
+        raise HTTPException(400, "Le montant doit être positif.")
+    r = RenflouementDepartement(
+        departement="CUISINE",
+        montant=montant,
+        source=(data.get("source") or "").strip() or None,
+        notes=(data.get("notes") or "").strip() or None,
+        enregistre_par_id=_user.id,
+    )
+    db.add(r)
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="cuisine", type_="renflouement_departement",
+        titre=f"Renflouement Caisse Cuisine — {montant:,.2f} G",
+        message=(data.get("source") or "Source non précisée"),
+        lien="cuisine-analyse",
+        dedupe_minutes=None,
+    )
+    db.commit(); db.refresh(r)
+    return _renflouement_dict_cuisine(r)
 
 
 # ══════════════════════════════════════════════════════════════════

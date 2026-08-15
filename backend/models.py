@@ -1260,6 +1260,32 @@ class RenflouementCaisse(Base):
     )
 
 
+class RenflouementDepartement(Base):
+    """Injection manuelle de fonds dans la caisse d'un département
+    opérationnel (Hôtel, Cuisine, Bar) — distinct du renflouement de la
+    Grande Caisse (institution entière, voir RenflouementCaisse). Compte
+    comme entrée dans le calcul de la caisse disponible de ce département.
+    Réservé au PDG/admin."""
+    __tablename__ = "renflouements_departement"
+
+    id                 = Column(Integer, primary_key=True)
+    departement        = Column(String(20), nullable=False)  # HOTEL, CUISINE, BAR
+    montant            = Column(Numeric(14, 2), nullable=False)
+    source             = Column(String(100), nullable=True)
+    date_renflouement  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    enregistre_par_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    notes              = Column(String(300), nullable=True)
+
+    enregistre_par = relationship("Utilisateur")
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_renfl_dept_montant_pos"),
+        CheckConstraint("departement IN ('HOTEL','CUISINE','BAR')", name="chk_renfl_dept_departement"),
+        Index("idx_renfl_dept_date", "date_renflouement"),
+        Index("idx_renfl_dept_departement", "departement"),
+    )
+
+
 class Tache(Base):
     """Tâche planifiée par un employé — individuelle ou collective selon le
     nombre de participants. Statut unique partagé entre tous les participants
