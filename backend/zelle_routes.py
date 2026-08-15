@@ -348,6 +348,70 @@ def get_bilan(db: Session = Depends(get_db)):
     }
 
 
+# ── Évolution (graphique du tableau de bord) ───────────────────────────────────
+
+@router.get("/evolution")
+def evolution_zelle(jours: int = Query(30, ge=7, le=180), db: Session = Depends(get_db)):
+    """Série quotidienne — paiements remis, dépenses approuvées, renflouements
+    reçus — pour le graphique d'évolution du tableau de bord Zelle."""
+    cfg   = _get_or_create_config(db)
+    taux  = float(cfg.taux)
+    fin   = datetime.now(timezone.utc).date()
+    debut = fin - timedelta(days=jours - 1)
+    debut_dt = datetime.combine(debut, datetime.min.time()).replace(tzinfo=timezone.utc)
+
+    txs = (
+        db.query(ZelleTransaction)
+        .filter(ZelleTransaction.statut == "REMIS", ZelleTransaction.date_transaction >= debut_dt)
+        .all()
+    )
+    deps = (
+        db.query(ZelleDepense)
+        .filter(ZelleDepense.statut == "APPROUVEE", ZelleDepense.valide_at >= debut_dt)
+        .all()
+    )
+    fonds = (
+        db.query(ZelleFond)
+        .filter(ZelleFond.date_reception >= debut_dt)
+        .all()
+    )
+
+    par_jour: dict[str, dict] = {}
+    d = debut
+    while d <= fin:
+        par_jour[d.isoformat()] = {"paiements": 0.0, "depenses": 0.0, "renflouements": 0.0}
+        d += timedelta(days=1)
+
+    for t in txs:
+        k = t.date_transaction.date().isoformat()
+        if k in par_jour:
+            par_jour[k]["paiements"] += float(t.montant_usd) - float(t.frais)
+    for dep in deps:
+        if not dep.valide_at:
+            continue
+        k = dep.valide_at.date().isoformat()
+        if k in par_jour:
+            par_jour[k]["depenses"] += float(dep.montant_usd)
+    for f in fonds:
+        k = f.date_reception.date().isoformat()
+        if k in par_jour:
+            par_jour[k]["renflouements"] += float(f.montant_usd)
+
+    serie = []
+    for k in sorted(par_jour.keys()):
+        v = par_jour[k]
+        serie.append({
+            "date":                k,
+            "paiements_usd":       round(v["paiements"], 2),
+            "paiements_ht":        round(v["paiements"] * taux, 2),
+            "depenses_usd":        round(v["depenses"], 2),
+            "depenses_ht":         round(v["depenses"] * taux, 2),
+            "renflouements_usd":   round(v["renflouements"], 2),
+            "renflouements_ht":    round(v["renflouements"] * taux, 2),
+        })
+    return {"serie": serie, "taux": taux}
+
+
 # ── Dépenses Zelle (nécessitent validation PDG/admin avant déduction du solde) ──────
 
 @router.get("/depenses")

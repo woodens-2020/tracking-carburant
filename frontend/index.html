@@ -7856,6 +7856,19 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <!-- injecté par JS -->
         </div>
 
+        <!-- ── Évolution : paiements, dépenses, renflouements ── -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+          <div class="gi-form-lbl">Évolution</div>
+          <div style="display:flex;gap:6px;" id="zevol-period-wrap">
+            <button class="gid-period-btn" data-jours="7"  onclick="zevolSetPeriode(7,this)">7j</button>
+            <button class="gid-period-btn active" data-jours="30" onclick="zevolSetPeriode(30,this)">30j</button>
+            <button class="gid-period-btn" data-jours="90" onclick="zevolSetPeriode(90,this)">90j</button>
+          </div>
+        </div>
+        <div style="position:relative;height:280px;margin-bottom:24px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px;">
+          <canvas id="zevol-chart"></canvas>
+        </div>
+
         <!-- ── Dépenses Zelle (validation PDG requise) ── -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
           <div>
@@ -28170,7 +28183,52 @@ function _zSrc(src){
 
 // ── Dashboard ──────────────────────────────────────────────────
 async function loadZelle(){
-  await Promise.all([_zelleLoadBilan(), _zelleLoadRecent(), _zdepLoad()]);
+  await Promise.all([_zelleLoadBilan(), _zelleLoadRecent(), _zdepLoad(), _zevolLoad()]);
+}
+
+// ── Évolution : paiements, dépenses, renflouements ──────────────
+let _zevolChart = null;
+let _zevolJours = 30;
+
+function zevolSetPeriode(jours, btn){
+  _zevolJours = jours;
+  document.querySelectorAll('#zevol-period-wrap .gid-period-btn').forEach(function(b){ b.classList.remove('active'); });
+  if(btn) btn.classList.add('active');
+  _zevolLoad();
+}
+
+async function _zevolLoad(){
+  const canvas = document.getElementById('zevol-chart');
+  if(!canvas) return;
+  try{
+    const d = await apiFetch('GET', '/zelle/evolution?jours=' + _zevolJours);
+    const serie = d.serie || [];
+    const labels = serie.map(function(s){ return s.date.slice(5).replace('-','/'); });
+    const TICK = 'rgba(255,255,255,.5)', GRID = 'rgba(255,255,255,.05)';
+    if(_zevolChart){ _zevolChart.destroy(); _zevolChart = null; }
+    _zevolChart = new Chart(canvas.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Paiements',    data: serie.map(function(s){return s.paiements_ht;}),     borderColor: '#3fb6a8', backgroundColor: 'rgba(63,182,168,.1)',  fill: true, tension: .35, pointRadius: 2, borderWidth: 2 },
+          { label: 'Dépenses',     data: serie.map(function(s){return s.depenses_ht;}),       borderColor: '#f7a93b', backgroundColor: 'rgba(247,169,59,.08)', fill: true, tension: .35, pointRadius: 2, borderWidth: 2 },
+          { label: 'Renflouements',data: serie.map(function(s){return s.renflouements_ht;}),  borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,.08)',fill: true, tension: .35, pointRadius: 2, borderWidth: 2 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
+        plugins: {
+          legend: { labels: { color: TICK, font: { size: 10 } } },
+          tooltip: { callbacks: { label: function(c){ return c.dataset.label + ' : ' + _zelleHtg(c.parsed.y); } } },
+        },
+        scales: {
+          x: { ticks: { color: TICK, font: { size: 9 }, maxTicksLimit: 12 }, grid: { color: GRID } },
+          y: { ticks: { color: TICK, font: { size: 9 }, callback: function(v){ return _zelleHtg(v); } }, grid: { color: GRID } },
+        },
+      },
+    });
+  }catch(e){ console.error('zelle evolution', e); }
 }
 
 // ── Dépenses Zelle (validation PDG) ─────────────────────────────
