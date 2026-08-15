@@ -1134,7 +1134,14 @@ def liste_achats(
     if station_produit_id:
         q = q.filter(BarAchat.station_produit_id == station_produit_id)
     achats = q.order_by(BarAchat.date_achat.desc()).limit(limit).all()
-    return [_achat_dict(a) for a in achats]
+    from pieces_jointes_routes import compter_pieces_jointes_par_entite
+    nb_pj = compter_pieces_jointes_par_entite(db, "bar_achat", [a.id for a in achats])
+    resultats = []
+    for a in achats:
+        item = _achat_dict(a)
+        item["sans_justificatif"] = nb_pj.get(a.id, 0) == 0
+        resultats.append(item)
+    return resultats
 
 
 @router.get("/achats/en-attente")
@@ -1205,6 +1212,9 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
             description = dep.description.strip(),
             montant     = Decimal(str(dep.montant)),
         ))
+
+    from pieces_jointes_routes import notifier_si_sans_justificatif
+    notifier_si_sans_justificatif(db, "pos", f"Réception {nom_prod}", "pos-achats")
 
     db.commit()
     total_dep  = sum(float(d.montant) for d in data.depenses)

@@ -172,6 +172,8 @@ def liste_depenses(
         .order_by(CuisineDepense.date_depense.desc())
         .all()
     )
+    from pieces_jointes_routes import compter_pieces_jointes_par_entite
+    nb_pj = compter_pieces_jointes_par_entite(db, "cuisine_depense", [d.id for d in deps])
     return [
         {
             "id":          d.id,
@@ -182,6 +184,7 @@ def liste_depenses(
             "jours":       (today - d.date_depense.date()).days,
             "fournisseur": d.fournisseur or "",
             "notes":       d.notes or "",
+            "sans_justificatif": nb_pj.get(d.id, 0) == 0,
         }
         for d in deps
     ]
@@ -207,7 +210,10 @@ def ajouter_depense(data: dict, request: Request, db: Session = Depends(get_db))
         fournisseur  = (data.get("fournisseur") or "").strip() or None,
         notes        = (data.get("notes") or "").strip() or None,
     )
-    db.add(d); db.commit(); db.refresh(d)
+    db.add(d)
+    from pieces_jointes_routes import notifier_si_sans_justificatif
+    notifier_si_sans_justificatif(db, "cuisine", desc, "cuisine-depenses")
+    db.commit(); db.refresh(d)
     return {"id": d.id, "message": "Dépense enregistrée"}
 
 
@@ -490,8 +496,15 @@ def liste_achats(
     achats = q.order_by(CuisineAchat.date_achat.desc()).all()
 
     total = sum(float(_dec(a.total)) for a in achats)
+    from pieces_jointes_routes import compter_pieces_jointes_par_entite
+    nb_pj = compter_pieces_jointes_par_entite(db, "cuisine_achat", [a.id for a in achats])
+    achats_dicts = []
+    for a in achats:
+        item = _achat_dict(a)
+        item["sans_justificatif"] = nb_pj.get(a.id, 0) == 0
+        achats_dicts.append(item)
     return {
-        "achats": [_achat_dict(a) for a in achats],
+        "achats": achats_dicts,
         "total_achats": round(total, 2),
         "nb_achats": len(achats),
     }
@@ -547,7 +560,10 @@ def creer_achat(data: dict, request: Request, db: Session = Depends(get_db)):
         fournisseur   = (data.get("fournisseur") or "").strip() or None,
         notes         = (data.get("notes") or "").strip() or None,
     )
-    db.add(a); db.commit(); db.refresh(a)
+    db.add(a)
+    from pieces_jointes_routes import notifier_si_sans_justificatif
+    notifier_si_sans_justificatif(db, "cuisine", desc, "cuisine-achats")
+    db.commit(); db.refresh(a)
     return {"id": a.id, "message": "Achat enregistré", "total": float(a.total)}
 
 

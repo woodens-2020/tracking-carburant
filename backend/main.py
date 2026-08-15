@@ -3978,6 +3978,8 @@ def lister_depenses(
         q = q.filter(Depense.produit_id == produit_id)
     depenses = q.order_by(Depense.date_depense.desc()).all()
     total = round(sum(float(d.montant) for d in depenses), 2)
+    from pieces_jointes_routes import compter_pieces_jointes_par_entite
+    nb_pj = compter_pieces_jointes_par_entite(db, "depense", [d.id for d in depenses])
     return {
         "total": total,
         "nb": len(depenses),
@@ -3991,6 +3993,7 @@ def lister_depenses(
                 "produit_id": d.produit_id,
                 "produit_nom": d.produit.nom if d.produit else None,
                 "created_at": d.created_at.isoformat() if d.created_at else None,
+                "sans_justificatif": nb_pj.get(d.id, 0) == 0,
             }
             for d in depenses
         ],
@@ -4030,6 +4033,8 @@ def creer_depense(data: DepenseIn, db: Session = Depends(get_db)):
         lien="depenses",
         dedupe_minutes=None,
     )
+    from pieces_jointes_routes import notifier_si_sans_justificatif
+    notifier_si_sans_justificatif(db, "rh", d.description, "depenses")
 
     db.commit()
     db.refresh(d)
@@ -4576,6 +4581,8 @@ def lister_achats(
         q = q.filter(Achat.fournisseur.ilike(f"%{fournisseur}%"))
     achats = q.order_by(Achat.date_achat.desc()).all()
     total = round(sum(float(a.montant) for a in achats), 2)
+    from pieces_jointes_routes import compter_pieces_jointes_par_entite
+    nb_pj = compter_pieces_jointes_par_entite(db, "achat", [a.id for a in achats])
     return {
         "total": total,
         "nb": len(achats),
@@ -4586,6 +4593,7 @@ def lister_achats(
                 "montant": float(a.montant), "date_achat": str(a.date_achat),
                 "reference": a.reference, "notes": a.notes,
                 "created_at": a.created_at.isoformat() if a.created_at else None,
+                "sans_justificatif": nb_pj.get(a.id, 0) == 0,
             }
             for a in achats
         ],
@@ -4617,6 +4625,8 @@ def creer_achat(data: AchatIn, db: Session = Depends(get_db)):
         lien="achats",
         dedupe_minutes=None,
     )
+    from pieces_jointes_routes import notifier_si_sans_justificatif
+    notifier_si_sans_justificatif(db, "rh", a.description, "achats")
 
     db.commit()
     db.refresh(a)

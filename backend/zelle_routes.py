@@ -366,7 +366,14 @@ def lister_zelle_depenses(statut: Optional[str] = None, db: Session = Depends(ge
     if statut:
         q = q.filter(ZelleDepense.statut == statut)
     deps = q.order_by(ZelleDepense.date_depense.desc()).all()
-    return {"depenses": [_zelle_dep_dict(d) for d in deps], "nb": len(deps)}
+    from pieces_jointes_routes import compter_pieces_jointes_par_entite
+    nb_pj = compter_pieces_jointes_par_entite(db, "zelle_depense", [d.id for d in deps])
+    resultats = []
+    for d in deps:
+        item = _zelle_dep_dict(d)
+        item["sans_justificatif"] = nb_pj.get(d.id, 0) == 0
+        resultats.append(item)
+    return {"depenses": resultats, "nb": len(deps)}
 
 
 @router.post("/depenses", status_code=201)
@@ -401,6 +408,8 @@ def creer_zelle_depense(data: ZelleDepenseIn, request: Request, db: Session = De
         lien="zelle-depenses",
         dedupe_minutes=None,
     )
+    from pieces_jointes_routes import notifier_si_sans_justificatif
+    notifier_si_sans_justificatif(db, "zelle", d.description, "zelle-depenses")
     db.commit()
     db.refresh(d)
     return {"id": d.id, "message": "Dépense enregistrée, en attente de validation PDG."}
