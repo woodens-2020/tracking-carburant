@@ -7889,11 +7889,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <th style="text-align:right;">Montant USD</th>
                 <th style="text-align:right;">Montant HTG</th>
                 <th>Demandeur</th><th>Statut</th><th>Date</th>
+                <th style="text-align:center;">Jours</th>
                 <th style="text-align:center;">Actions</th>
               </tr>
             </thead>
             <tbody id="zdep-tbody">
-              <tr><td colspan="8" style="text-align:center;padding:24px;color:rgba(255,255,255,.35);">Chargement…</td></tr>
+              <tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(255,255,255,.35);">Chargement…</td></tr>
             </tbody>
           </table>
         </div>
@@ -7927,6 +7928,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <div class="gi-form-field">
                   <label class="gi-form-lbl">Catégorie</label>
                   <input class="gi-form-input" id="zdep-cat" placeholder="Ex : Frais bancaires"/>
+                </div>
+              </div>
+              <div class="gi-form-row full">
+                <div class="gi-form-field">
+                  <label class="gi-form-lbl">Date de la dépense</label>
+                  <input type="date" class="gi-form-input" id="zdep-date"/>
                 </div>
               </div>
               <div class="gi-form-row full">
@@ -28244,7 +28251,7 @@ async function _zdepLoad(){
     if(cnt) cnt.textContent = bilan.nb_depenses_attente || 0;
     const deps = d.depenses || [];
     if(!deps.length){
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:rgba(255,255,255,.35);">Aucune dépense Zelle</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(255,255,255,.35);">Aucune dépense Zelle</td></tr>';
       return;
     }
     const isPdg     = _appUser?.role === 'pdg';
@@ -28258,6 +28265,7 @@ async function _zdepLoad(){
           ? '<span class="zelle-badge annule">Rejetée</span>'
           : '<span class="zelle-badge en-attente">En attente</span>';
       const dateStr = dep.date_depense ? dep.date_depense.substring(0,10) : '—';
+      const jours = _zdepJours(dep.date_depense);
       let actions = '—';
       if(dep.statut==='EN_ATTENTE'){
         const btns = [];
@@ -28279,6 +28287,7 @@ async function _zdepLoad(){
         <td class="td-muted">${dep.demandeur_nom||'—'}</td>
         <td>${badge}</td>
         <td style="color:var(--text-muted);font-size:.83rem;">${dateStr}</td>
+        <td style="text-align:center;font-size:.83rem;font-variant-numeric:tabular-nums;color:${jours.color};">${jours.label}</td>
         <td style="text-align:center;">
           <div style="display:flex;gap:6px;justify-content:center;align-items:center;">
             <button class="gi-btn-icon${dep.sans_justificatif?' danger':''}" title="${dep.sans_justificatif?'Document manquant — ':''}Pièces jointes" onclick="pjOpenModal('zelle_depense',${dep.id},'${esc((dep.description||'').replace(/'/g,"\\'"))}')">
@@ -28290,7 +28299,21 @@ async function _zdepLoad(){
       </tr>`;
     }
     tbody.innerHTML = html;
-  }catch(e){ tbody.innerHTML = '<tr><td colspan="8" style="padding:24px;color:var(--danger);text-align:center;">Erreur de chargement</td></tr>'; }
+  }catch(e){ tbody.innerHTML = '<tr><td colspan="9" style="padding:24px;color:var(--danger);text-align:center;">Erreur de chargement</td></tr>'; }
+}
+
+function _zdepJours(dateStr){
+  if(!dateStr) return {label:'—', color:'rgba(255,255,255,.4)'};
+  const d = new Date(dateStr);
+  if(isNaN(d)) return {label:'—', color:'rgba(255,255,255,.4)'};
+  const today = new Date();
+  const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const n = Math.round((t0 - d0) / 86400000);
+  if(n <= 0) return {label:"Aujourd'hui", color:'#4ade80'};
+  if(n === 1) return {label:'1 jour', color:'rgba(255,255,255,.6)'};
+  const color = n > 30 ? '#f87171' : n > 7 ? '#f7a93b' : 'rgba(255,255,255,.6)';
+  return {label:n + ' jours', color};
 }
 
 function zdepUpdateConversion(){
@@ -28307,20 +28330,23 @@ function zdepUpdateConversion(){
 function zdepOpenModal(){
   ['zdep-desc','zdep-montant','zdep-cat','zdep-notes'].forEach(i=>{ const e=document.getElementById(i); if(e) e.value=''; });
   document.getElementById('zdep-devise').value='USD';
+  const dateEl = document.getElementById('zdep-date');
+  if(dateEl) dateEl.value = new Date().toISOString().slice(0,10);
   zdepUpdateConversion();
   document.getElementById('zdep-modal').classList.add('open');
 }
 function zdepCloseModal(){ document.getElementById('zdep-modal').classList.remove('open'); }
 
 async function zdepSubmit(){
-  const description = document.getElementById('zdep-desc').value.trim();
-  const montant     = parseFloat(document.getElementById('zdep-montant').value)||0;
-  const devise      = document.getElementById('zdep-devise').value;
-  const categorie   = document.getElementById('zdep-cat').value.trim()||null;
-  const notes       = document.getElementById('zdep-notes').value.trim()||null;
+  const description  = document.getElementById('zdep-desc').value.trim();
+  const montant      = parseFloat(document.getElementById('zdep-montant').value)||0;
+  const devise       = document.getElementById('zdep-devise').value;
+  const categorie    = document.getElementById('zdep-cat').value.trim()||null;
+  const date_depense = document.getElementById('zdep-date').value||null;
+  const notes        = document.getElementById('zdep-notes').value.trim()||null;
   if(!description || montant<=0){ toast('Description et montant requis.','err'); return; }
   try{
-    await apiFetch('POST','/zelle/depenses', {description, montant, devise, categorie, notes});
+    await apiFetch('POST','/zelle/depenses', {description, montant, devise, categorie, date_depense, notes});
     toast('Dépense soumise, en attente de validation PDG/admin.','ok');
     zdepCloseModal();
     _zdepLoad();
