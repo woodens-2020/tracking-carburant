@@ -1113,6 +1113,7 @@ def _achat_dict(a: BarAchat) -> dict:
         "notes":               a.notes,
         "statut":              a.statut,
         "date_achat":          a.date_achat.isoformat(),
+        "jours":               (date_type.today() - a.date_achat.date()).days,
         "depenses": [
             {"id": d.id, "description": d.description, "montant": float(d.montant)}
             for d in a.depenses

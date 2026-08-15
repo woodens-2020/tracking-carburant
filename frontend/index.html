@@ -6772,10 +6772,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-table-wrap">
             <table class="pos-table">
               <thead>
-                <tr><th>Date</th><th>Produit</th><th>Quantité</th><th>Prix marchandise</th><th>Dép. supp.</th><th>Coût total</th><th>Fournisseur</th><th></th></tr>
+                <tr><th>Date</th><th>Jours</th><th>Produit</th><th>Quantité</th><th>Prix marchandise</th><th>Dép. supp.</th><th>Coût total</th><th>Fournisseur</th><th></th></tr>
               </thead>
               <tbody id="pos-achats-tbody">
-                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                <tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -18640,6 +18640,7 @@ function renderDepTable(data){
   const rows=data.map(d=>`
     <tr>
       <td>${d.date_depense}</td>
+      <td>${_ckJoursBadge(d.jours)}</td>
       <td><span class="td-badge ${catColors[d.categorie]||'badge-gray'}">${d.categorie}</span></td>
       <td>${d.produit_nom?`<span class="td-badge ${caisseColors[d.produit_nom]||'badge-gray'}">${d.produit_nom}</span>`:'<span class="td-muted">Générale</span>'}</td>
       <td>${d.description}${d.sans_justificatif?' <span class="td-badge badge-red" title="Aucun document joint">⚠ Inachevée</span>':''}</td>
@@ -18661,7 +18662,7 @@ function renderDepTable(data){
       </td>
     </tr>`).join('');
   wrap.innerHTML=`<table class="gi-table">
-    <thead><tr><th>Date</th><th>Catégorie</th><th>Caisse</th><th>Description</th><th>Bénéficiaire</th><th>Montant</th><th>Référence</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Date</th><th>Jours</th><th>Catégorie</th><th>Caisse</th><th>Description</th><th>Bénéficiaire</th><th>Montant</th><th>Référence</th><th>Actions</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
@@ -18763,6 +18764,7 @@ function renderAchTable(data){
   const rows=data.map(a=>`
     <tr>
       <td>${a.date_achat}</td>
+      <td>${_ckJoursBadge(a.jours)}</td>
       <td><strong>${a.fournisseur}</strong></td>
       <td><span class="td-badge badge-blue">${a.categorie}</span></td>
       <td>${a.description}${a.sans_justificatif?' <span class="td-badge badge-red" title="Aucun document joint">⚠ Inachevé</span>':''}</td>
@@ -18783,7 +18785,7 @@ function renderAchTable(data){
       </td>
     </tr>`).join('');
   wrap.innerHTML=`<table class="gi-table">
-    <thead><tr><th>Date</th><th>Fournisseur</th><th>Catégorie</th><th>Description</th><th>Montant</th><th>Référence</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Date</th><th>Jours</th><th>Fournisseur</th><th>Catégorie</th><th>Description</th><th>Montant</th><th>Référence</th><th>Actions</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
@@ -22612,7 +22614,7 @@ function _paRenderTable(achats){
   if(!tbody) return;
   if(!achats.length){
     const raw = document.getElementById('pa-recherche')?.value || '';
-    tbody.innerHTML = `<tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">${raw ? `Aucun achat ne correspond à « ${esc(raw)} »` : 'Aucun achat enregistré'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">${raw ? `Aucun achat ne correspond à « ${esc(raw)} »` : 'Aucun achat enregistré'}</td></tr>`;
     return;
   }
   const fmt = v=>`G ${parseFloat(v).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -22626,6 +22628,7 @@ function _paRenderTable(achats){
     const hasD = a.total_depenses > 0;
     return `<tr>
       <td style="font-size:14px;white-space:nowrap;color:rgba(255,255,255,.6)">${ds}</td>
+      <td>${_ckJoursBadge(a.jours)}</td>
       <td><span style="font-weight:600">${a.produit_nom}</span>${a.sans_justificatif?' <span style="font-size:11px;font-weight:700;color:#f87171;background:rgba(248,113,113,.12);border-radius:4px;padding:2px 6px">⚠ Inachevé</span>':''}<div style="font-size:13px;color:rgba(255,255,255,.35)">${a.produit_categorie||''}</div></td>
       <td>${parseFloat(a.quantite).toFixed(2)} ${a.produit_unite||'u.'}</td>
       <td>${fmt(a.prix_marchandise)}<div style="font-size:13px;color:rgba(255,255,255,.35)">${parseFloat(a.prix_achat_unitaire).toFixed(2)}/u.</div></td>
