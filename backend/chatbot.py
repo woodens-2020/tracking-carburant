@@ -36,6 +36,7 @@ _TABLES_EXCLUES = {
     "otp_codes", "admin_codes", "audit_logs", "password_reset_tokens",
     "chat_conversations",  # confidentiel — conversations privées des autres utilisateurs
     "taches", "tache_participants",  # confidentiel — assignations interpersonnelles
+    "pieces_jointes",  # contenu base64 volumineux, inutile pour une requete SQL
 }
 
 _TABLES_AUTORISEES = sorted(

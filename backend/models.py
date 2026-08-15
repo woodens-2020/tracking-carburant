@@ -1262,6 +1262,29 @@ class TacheParticipant(Base):
     )
 
 
+class PieceJointe(Base):
+    """Document justificatif (facture, reçu…) attaché à une dépense/achat,
+    quel que soit le département — système générique via (type_entite,
+    entite_id) plutôt qu'une FK par table de dépense."""
+    __tablename__ = "pieces_jointes"
+
+    id              = Column(Integer, primary_key=True)
+    type_entite     = Column(String(30),  nullable=False)  # depense, achat, cuisine_depense, cuisine_achat, zelle_depense, bar_achat
+    entite_id       = Column(Integer,     nullable=False)
+    nom_fichier     = Column(String(255), nullable=False)
+    type_mime       = Column(String(50),  nullable=False)
+    taille_octets   = Column(Integer,     nullable=False)
+    contenu_base64  = Column(Text,        nullable=False)
+    uploaded_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at      = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    uploaded_par = relationship("Utilisateur")
+
+    __table_args__ = (
+        Index("idx_pj_entite", "type_entite", "entite_id"),
+    )
+
+
 class ChatConversation(Base):
     """Conversation avec l'assistant IA — historique persistant par utilisateur."""
     __tablename__ = "chat_conversations"
