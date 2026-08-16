@@ -7445,7 +7445,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
         <div class="pos-modal-footer" style="margin-top:16px">
           <button class="pos-btn ghost" onclick="document.getElementById('pcmd-enc-bg').classList.remove('open')">Annuler</button>
-          <button class="pos-btn primary" onclick="pcmdEncaisser()">✓ Confirmer le paiement</button>
+          <button class="pos-btn primary" id="pcmd-enc-btn" onclick="pcmdEncaisser()">✓ Confirmer le paiement</button>
         </div>
       </div>
     </div>
@@ -20955,6 +20955,19 @@ function _clientAcClearSelection(inputId){
   const inp = document.getElementById(inputId);
   if(inp){ delete inp.dataset.clientId; delete inp.dataset.clientStatut; }
   _clientAcRenderStatut(inputId, null);
+  _clientAcNotifyChange(inputId);
+}
+
+// Le bouton d'encaissement ne doit être cliquable, en mode CRÉDIT, que
+// lorsqu'un client a été explicitement sélectionné (ou ajouté) — pas
+// seulement tapé. Chaque champ client a son propre bouton à synchroniser.
+const _CLIENT_AC_BTN_UPDATERS = {
+  'pos-client-nom':      () => { if(typeof _posEncBtnUpdate === 'function') _posEncBtnUpdate(); },
+  'pcmd-enc-client-nom': () => { if(typeof _pcmdEncBtnUpdate === 'function') _pcmdEncBtnUpdate(); },
+};
+function _clientAcNotifyChange(inputId){
+  const fn = _CLIENT_AC_BTN_UPDATERS[inputId];
+  if(fn) fn();
 }
 
 async function _clientAcSearch(inputId){
@@ -21016,6 +21029,7 @@ function clientAutocompleteSelect(inputId, clientId, nom, statutCredit){
   }
   _clientAcRenderStatut(inputId, statutCredit || 'ELIGIBLE');
   _clientAcClose();
+  _clientAcNotifyChange(inputId);
 }
 
 async function clientAutocompleteAdd(inputId){
@@ -21033,6 +21047,7 @@ async function clientAutocompleteAdd(inputId){
     toast(res.existant ? 'Client déjà dans le répertoire.' : 'Client ajouté au répertoire.', 'ok');
   }catch(e){ toast(e.message||'Erreur','err'); }
   _clientAcClose();
+  _clientAcNotifyChange(inputId);
 }
 
 async function clientToggleStatut(clientId, nouveauStatut, inputId){
@@ -21975,7 +21990,7 @@ function posRenderCart(){
   if(!_posCart.length){
     wrap.innerHTML = `<div class="pos-cart-empty">${t('pos.caisse.cart.empty')}</div>`;
     if(totalEl) totalEl.textContent = 'G 0.00';
-    if(encBtn) encBtn.disabled = true;
+    _posEncBtnUpdate();
     return;
   }
   let total = 0;
@@ -22002,8 +22017,20 @@ function posRenderCart(){
     </div>`;
   }).join('');
   if(totalEl) totalEl.textContent = posGx(total);
-  if(encBtn) encBtn.disabled = false;
+  _posEncBtnUpdate();
   posCalcMonnaie();
+}
+
+// Encaisser n'est cliquable que si le panier n'est pas vide et, en mode
+// CRÉDIT, qu'un client a été explicitement sélectionné/ajouté (pas juste tapé).
+function _posEncBtnUpdate(){
+  const encBtn = document.getElementById('pos-enc-btn');
+  if(!encBtn) return;
+  const hasCart = _posCart.length > 0;
+  const clientInp = document.getElementById('pos-client-nom');
+  const needsClient = _posMode === 'CREDIT';
+  const hasClient = !!(clientInp && clientInp.dataset.clientId);
+  encBtn.disabled = !hasCart || (needsClient && !hasClient);
 }
 
 function posQte(idx, delta){
@@ -22038,6 +22065,7 @@ function posSetMode(mode, btn){
   if(cashRow) cashRow.style.display = mode==='CASH' ? '' : 'none';
   if(mixteRow) mixteRow.style.display = mode==='MIXTE' ? '' : 'none';
   posCalcMonnaie();
+  _posEncBtnUpdate();
 }
 
 // ─── Utilitaires reçu partagés ───────────────────────────────────────────────
@@ -24911,6 +24939,7 @@ function pcmdEncaisserOuvrir(){
   document.getElementById('pcmd-enc-nif').value        = '';
   document.getElementById('pcmd-enc-echeance').value   = '';
   document.getElementById('pcmd-enc-bg').classList.add('open');
+  _pcmdEncBtnUpdate();
 }
 
 function pcmdEncModeChange(){
@@ -24922,6 +24951,19 @@ function pcmdEncModeChange(){
     monnaie.style.display='none';
   }
   if(credit) credit.style.display = (mode==='CREDIT'||mode==='MIXTE') ? 'block' : 'none';
+  _pcmdEncBtnUpdate();
+}
+
+// Confirmer le paiement n'est cliquable que si le mode n'est pas CRÉDIT, ou
+// si un client a été explicitement sélectionné/ajouté pour ce crédit.
+function _pcmdEncBtnUpdate(){
+  const btn = document.getElementById('pcmd-enc-btn');
+  if(!btn) return;
+  const mode = document.getElementById('pcmd-enc-mode')?.value;
+  const clientInp = document.getElementById('pcmd-enc-client-nom');
+  const needsClient = mode === 'CREDIT';
+  const hasClient = !!(clientInp && clientInp.dataset.clientId);
+  btn.disabled = needsClient && !hasClient;
 }
 
 function pcmdEncCalcMonnaie(){
