@@ -258,10 +258,20 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
             .filter(func.lower(Client.nom) == data["client_nom"].strip().lower())
             .first()
         )
-    if mode == "CREDIT" and client and client.statut_credit == "NON_ELIGIBLE":
-        raise ValueError(
-            f"Client « {client.nom} » non éligible au crédit — vente à crédit refusée."
-        )
+    if mode == "CREDIT":
+        # Un client doit être explicitement sélectionné dans le répertoire
+        # (ou ajouté via le bouton +) avant toute vente à crédit — un nom
+        # simplement tapé sans correspondance dans clients ne suffit plus,
+        # pour éviter les variations d'orthographe qui cassent le suivi.
+        if not client:
+            raise ValueError(
+                "Sélectionnez un client dans le répertoire (ou ajoutez-le) avant "
+                "de valider une vente à crédit."
+            )
+        if client.statut_credit == "NON_ELIGIBLE":
+            raise ValueError(
+                f"Client « {client.nom} » non éligible au crédit — vente à crédit refusée."
+            )
 
     raw_paye = data.get("montant_paye")
     if raw_paye is None:

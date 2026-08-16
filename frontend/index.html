@@ -22176,9 +22176,15 @@ async function posEncaisser(){
     const clientInp = document.getElementById('pos-client-nom');
     const clientNom = (clientInp.value||'').trim();
     const clientId  = clientInp.dataset.clientId ? parseInt(clientInp.dataset.clientId) : null;
-    if(_posMode==='CREDIT' && clientInp.dataset.clientStatut === 'NON_ELIGIBLE'){
-      btn.disabled = false; btn.textContent = t('pos.caisse.encaisser');
-      posAlert(`Client « ${clientNom} » non éligible au crédit — vente refusée.`, 'err'); return;
+    if(_posMode==='CREDIT'){
+      if(!clientId){
+        btn.disabled = false; btn.textContent = t('pos.caisse.encaisser');
+        posAlert('Sélectionnez un client dans la liste (ou ajoutez-le avec le bouton +) avant de valider une vente à crédit.', 'warn'); return;
+      }
+      if(clientInp.dataset.clientStatut === 'NON_ELIGIBLE'){
+        btn.disabled = false; btn.textContent = t('pos.caisse.encaisser');
+        posAlert(`Client « ${clientNom} » non éligible au crédit — vente refusée.`, 'err'); return;
+      }
     }
     const caissierNom = caissierSel && caissierSel.selectedIndex > 0 ? caissierSel.options[caissierSel.selectedIndex].text : '';
     const montantRecuVal = parseFloat(document.getElementById('pos-montant-recu')?.value||0);
@@ -24938,7 +24944,11 @@ async function pcmdEncaisser(){
   if(mode==='CREDIT'||mode==='MIXTE'){
     const clientInp = document.getElementById('pcmd-enc-client-nom');
     const nom = clientInp.value.trim();
+    const clientIdVal = clientInp.dataset.clientId ? parseInt(clientInp.dataset.clientId) : null;
     if(!nom){ posAlert('Le nom du client est requis pour un crédit.','warn'); return; }
+    if(mode==='CREDIT' && !clientIdVal){
+      posAlert('Sélectionnez un client dans la liste (ou ajoutez-le avec le bouton +) avant de valider un crédit.', 'warn'); return;
+    }
     if(mode==='CREDIT' && clientInp.dataset.clientStatut === 'NON_ELIGIBLE'){
       posAlert(`Client « ${nom} » non éligible au crédit — vente refusée.`, 'err'); return;
     }
