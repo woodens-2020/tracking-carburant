@@ -57,6 +57,22 @@ _SECURE_COOKIES  = os.getenv("SECURE_COOKIES", "false").lower() in ("1", "true",
 _DEBUG_MODE      = os.getenv("DEBUG", "false").lower() in ("1", "true", "yes")
 _ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 
+# ── Identité de l'institution (personnalisable par déploiement) ─────────────
+# Permet de redéployer le même code pour une autre institution (base de
+# données séparée, même dépôt Git) sans que son nom/adresse n'apparaisse
+# codé en dur sur les tickets et rapports de l'institution d'origine. Les
+# valeurs par défaut sont celles de l'institution actuelle — un déploiement
+# qui ne définit aucune de ces variables se comporte exactement comme avant.
+_BRANDING = {
+    "nom":            os.getenv("BRANDING_NOM", "NATIVITE"),
+    "raison_sociale": os.getenv("BRANDING_RAISON_SOCIALE", "Bon Prix"),
+    "complexe":       os.getenv("BRANDING_COMPLEXE", "Complexe Commercial de Pillatre"),
+    "activites":      os.getenv("BRANDING_ACTIVITES", "Bar · Hôtel · Piscine"),
+    "adresse":        os.getenv("BRANDING_ADRESSE", "Acul du Nord, Nord, Haïti"),
+    "telephone1":     os.getenv("BRANDING_TEL1", "(509) 3625-1100"),
+    "telephone2":     os.getenv("BRANDING_TEL2", "(509) 4821-7700"),
+}
+
 app = FastAPI(
     title="Suivi des Meters - Station",
     docs_url="/docs"        if _DEBUG_MODE else None,
@@ -133,7 +149,7 @@ def _clear_login_failures(ip: str | None) -> None:
 # Chemins accessibles sans être connecté
 _PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code",
                     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify",
-                    "/api/oauth/otp/send"}
+                    "/api/oauth/otp/send", "/api/config/branding"}
 _PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/") if _DEBUG_MODE
                     else ("/api/auth/oauth/", "/shared/"))
 
@@ -552,6 +568,13 @@ def login_meta_save(data: LoginMetaIn, request: Request, db: Session = Depends(g
     db.add(event)
     db.commit()
     return {"ok": True}
+
+
+@app.get("/api/config/branding")
+def config_branding():
+    """Identité de l'institution (nom, adresse, téléphone…) — public, requis
+    dès l'écran de connexion et sur tous les tickets/rapports imprimés."""
+    return _BRANDING
 
 
 @app.get("/api/me")

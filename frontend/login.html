@@ -463,7 +463,7 @@ body{
       </div>
       <div class="brand-name">Konekta</div>
       <div class="brand-sep"></div>
-      <div class="brand-sub"><strong>Bon Prix</strong> · Complexe Commerciale de Pillatre</div>
+      <div class="brand-sub" id="brand-sub"><strong>Bon Prix</strong> · Complexe Commerciale de Pillatre</div>
       <div class="lang-switcher">
         <button type="button" class="lang-btn" id="btn-lang-fr" onclick="setLang('fr')">FR</button>
         <button type="button" class="lang-btn" id="btn-lang-en" onclick="setLang('en')">EN</button>
@@ -859,7 +859,7 @@ body{
 
   <!-- Footer -->
   <div class="login-footer">
-    <span class="c-gold">Bon Prix &middot; Complexe Commerciale de Pillatre</span><br>
+    <span class="c-gold" id="footer-brand">Bon Prix &middot; Complexe Commerciale de Pillatre</span><br>
     <span class="c-dim">Konekta v2.0 &nbsp;&middot;&nbsp; © 2026 &nbsp;&middot;&nbsp; <span data-i18n="footer.rights">Tous droits réservés</span></span>
   </div>
 </div><!-- /login-wrap -->
@@ -1199,6 +1199,24 @@ function setLang(lang){
 }
 
 document.addEventListener('DOMContentLoaded', applyLang);
+
+/* ══════════════════════════════════════════════════════════════
+   IDENTITÉ DE L'INSTITUTION — chargée depuis /api/config/branding
+   pour que le même code serve plusieurs institutions sans changer
+   de nom en dur ici.
+══════════════════════════════════════════════════════════════ */
+async function _loadBranding(){
+  try{
+    const r = await fetch('/api/config/branding');
+    if(!r.ok) return;
+    const b = await r.json();
+    const sub = document.getElementById('brand-sub');
+    if(sub) sub.innerHTML = `<strong>${b.raison_sociale}</strong> · ${b.complexe}`;
+    const foot = document.getElementById('footer-brand');
+    if(foot) foot.textContent = `${b.raison_sociale} · ${b.complexe}`;
+  }catch(e){ /* silencieux — les valeurs par défaut restent affichées */ }
+}
+document.addEventListener('DOMContentLoaded', _loadBranding);
 
 /* ══════════════════════════════════════════════════════════════
    FOND ANIMÉ — carburant / prix
