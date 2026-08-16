@@ -20,6 +20,7 @@ from models import (
     BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande,
     CuisinePlat, CuisineVente, CuisineLigneVente,
+    Client,
 )
 
 
@@ -244,6 +245,24 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     if mode not in _MODES_VALIDES:
         raise ValueError(f"mode_paiement invalide : '{mode}'. Valeurs acceptées : {sorted(_MODES_VALIDES)}")
 
+    # ── Éligibilité crédit — seul un admin peut marquer un client
+    # NON_ELIGIBLE (voir PUT /pos/clients/{id}/statut). Résolution par
+    # client_id (fiable) sinon par nom exact (compat anciens flux). ──
+    client = None
+    client_id_in = data.get("client_id")
+    if client_id_in:
+        client = db.query(Client).filter_by(id=client_id_in).first()
+    if not client and data.get("client_nom"):
+        client = (
+            db.query(Client)
+            .filter(func.lower(Client.nom) == data["client_nom"].strip().lower())
+            .first()
+        )
+    if mode == "CREDIT" and client and client.statut_credit == "NON_ELIGIBLE":
+        raise ValueError(
+            f"Client « {client.nom} » non éligible au crédit — vente à crédit refusée."
+        )
+
     raw_paye = data.get("montant_paye")
     if raw_paye is None:
         # CASH sans montant explicite → client paie l'intégralité
@@ -266,6 +285,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
         mode_paiement   = mode,
         statut          = statut,
         client_nom      = data.get("client_nom"),
+        client_id       = client.id if client else None,
         montant_paye    = montant_paye,
         montant_restant = montant_restant,
     )
@@ -320,6 +340,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
         db.add(BarCredit(
             vente_id          = vente.id,
             client_nom        = data.get("client_nom") or "Client inconnu",
+            client_id         = client.id if client else None,
             client_contact    = data.get("client_contact"),
             client_nif        = data.get("client_nif"),
             montant_du        = montant_restant,
@@ -394,6 +415,7 @@ def encaisser_commande(commande_id: int, data: dict,
         "mode_paiement":  data.get("mode_paiement", "CASH"),
         "montant_paye":   data.get("montant_paye"),
         "client_nom":     data.get("client_nom") or commande.client,
+        "client_id":      data.get("client_id"),
         "client_contact": data.get("client_contact"),
         "client_nif":     data.get("client_nif"),
         "date_echeance":  data.get("date_echeance"),

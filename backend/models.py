@@ -603,6 +603,7 @@ class BarVente(Base):
     mode_paiement    = Column(String(20),  nullable=False, default="CASH")  # CASH, CREDIT, MIXTE
     statut           = Column(String(20),  nullable=False, default="PAYEE") # PAYEE, CREDIT_EN_COURS, ANNULEE
     client_nom       = Column(String(150), nullable=True)
+    client_id        = Column(Integer, ForeignKey("clients.id", ondelete="SET NULL"), nullable=True)
     montant_paye     = Column(Numeric(14, 2), nullable=False, default=0)
     montant_restant  = Column(Numeric(14, 2), nullable=False, default=0)
 
@@ -687,13 +688,19 @@ class Client(Base):
     cassent le suivi d'historique d'un même client)."""
     __tablename__ = "clients"
 
-    id         = Column(Integer, primary_key=True)
-    nom        = Column(String(150), nullable=False)
-    telephone  = Column(String(30),  nullable=True)
-    notes      = Column(String(300), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    id            = Column(Integer, primary_key=True)
+    nom           = Column(String(150), nullable=False)
+    telephone     = Column(String(30),  nullable=True)
+    notes         = Column(String(300), nullable=True)
+    # Éligibilité au crédit — définie uniquement par un administrateur (voir
+    # main.require_admin). Un nouveau client est éligible par défaut pour ne
+    # pas interrompre les habitudes actuelles ; l'admin bloque au cas par cas
+    # les mauvais payeurs.
+    statut_credit = Column(String(20), nullable=False, default="ELIGIBLE")
+    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
+        CheckConstraint("statut_credit IN ('ELIGIBLE','NON_ELIGIBLE')", name="chk_client_statut_credit"),
         Index("idx_clients_nom", "nom"),
     )
 
@@ -705,6 +712,7 @@ class BarCredit(Base):
     id                = Column(Integer, primary_key=True)
     vente_id          = Column(Integer, ForeignKey("bar_ventes.id", ondelete="RESTRICT"), nullable=False)
     client_nom        = Column(String(150), nullable=False)
+    client_id         = Column(Integer, ForeignKey("clients.id", ondelete="SET NULL"), nullable=True)
     client_contact    = Column(String(100), nullable=True)
     client_nif        = Column(String(50),  nullable=True)
     montant_du        = Column(Numeric(14, 2), nullable=False)

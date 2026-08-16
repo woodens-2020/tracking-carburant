@@ -153,6 +153,13 @@ def _migrate_columns():
              "ALTER TABLE notifications ADD COLUMN resolu_par_id INTEGER REFERENCES utilisateurs(id)", None),
             ("notifications", "resolu_at",
              "ALTER TABLE notifications ADD COLUMN resolu_at DATETIME DEFAULT NULL", None),
+            # v15 — éligibilité crédit client + lien client_id sur ventes/crédits bar
+            ("clients", "statut_credit",
+             "ALTER TABLE clients ADD COLUMN statut_credit VARCHAR(20) NOT NULL DEFAULT 'ELIGIBLE'", None),
+            ("bar_ventes", "client_id",
+             "ALTER TABLE bar_ventes ADD COLUMN client_id INTEGER REFERENCES clients(id)", None),
+            ("bar_credits", "client_id",
+             "ALTER TABLE bar_credits ADD COLUMN client_id INTEGER REFERENCES clients(id)", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -217,6 +224,13 @@ def _migrate_columns():
              "ALTER TABLE notifications ADD COLUMN resolu_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
             ("notifications", "resolu_at",
              "ALTER TABLE notifications ADD COLUMN resolu_at TIMESTAMP WITH TIME ZONE", None),
+            # v15 — éligibilité crédit client + lien client_id sur ventes/crédits bar
+            ("clients", "statut_credit",
+             "ALTER TABLE clients ADD COLUMN statut_credit VARCHAR(20) NOT NULL DEFAULT 'ELIGIBLE'", None),
+            ("bar_ventes", "client_id",
+             "ALTER TABLE bar_ventes ADD COLUMN client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL", None),
+            ("bar_credits", "client_id",
+             "ALTER TABLE bar_credits ADD COLUMN client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL", None),
         ]
     else:
         return

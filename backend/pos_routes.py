@@ -56,6 +56,22 @@ def _require_pdg_ou_admin_pos(request: Request, db: Session = Depends(get_db)) -
     raise HTTPException(403, "Accès réservé au PDG et aux administrateurs")
 
 
+def _require_admin_pos(request: Request, db: Session = Depends(get_db)) -> Utilisateur:
+    """Même logique que main.require_admin — dupliquée ici pour éviter un
+    import circulaire. Réservé strictement aux administrateurs (pas le PDG)
+    pour la définition du statut crédit d'un client, à la demande explicite."""
+    user = _user(request)
+    if not user:
+        raise HTTPException(403, "Accès réservé aux administrateurs")
+    if user.role == "admin":
+        return user
+    if user.role_id:
+        u = db.get(Utilisateur, user.id)
+        if u and u.role_obj and u.role_obj.permissions.get("admin", False):
+            return u
+    raise HTTPException(403, "Accès réservé aux administrateurs")
+
+
 # ══════════════════════════════════════════════════════════════════
 # CLIENTS RÉGULIERS — répertoire partagé (recherche + ajout)
 # ══════════════════════════════════════════════════════════════════
@@ -67,7 +83,10 @@ class ClientIn(BaseModel):
 
 
 def _client_dict(c: Client) -> dict:
-    return {"id": c.id, "nom": c.nom, "telephone": c.telephone}
+    return {
+        "id": c.id, "nom": c.nom, "telephone": c.telephone,
+        "statut_credit": c.statut_credit,
+    }
 
 
 @router.get("/clients")
@@ -100,6 +119,28 @@ def creer_client(data: ClientIn, db: Session = Depends(get_db)):
     )
     db.add(c); db.commit(); db.refresh(c)
     return {**_client_dict(c), "existant": False}
+
+
+class ClientStatutIn(BaseModel):
+    statut_credit: str
+
+
+@router.put("/clients/{client_id}/statut")
+def definir_statut_credit_client(
+    client_id: int, data: ClientStatutIn, db: Session = Depends(get_db),
+    _user: Utilisateur = Depends(_require_admin_pos),
+):
+    """Éligibilité au crédit — réservé aux administrateurs. Un client
+    NON_ELIGIBLE bloque toute nouvelle vente à crédit à son nom (voir
+    pos_service.encaisser_vente)."""
+    if data.statut_credit not in ("ELIGIBLE", "NON_ELIGIBLE"):
+        raise HTTPException(400, "statut_credit invalide — 'ELIGIBLE' ou 'NON_ELIGIBLE'.")
+    c = db.query(Client).filter_by(id=client_id).first()
+    if not c:
+        raise HTTPException(404, "Client introuvable.")
+    c.statut_credit = data.statut_credit
+    db.commit(); db.refresh(c)
+    return _client_dict(c)
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -190,6 +231,7 @@ class VenteIn(BaseModel):
     mode_paiement:   str            = "CASH"
     montant_paye:    Optional[float]= None
     client_nom:      Optional[str]  = None
+    client_id:       Optional[int]  = None
     client_contact:  Optional[str]  = None
     date_echeance:   Optional[date_type] = None
 
@@ -222,6 +264,7 @@ class EncaisserCommandeIn(BaseModel):
     mode_paiement:  str            = "CASH"
     montant_paye:   Optional[float]= None
     client_nom:     Optional[str]  = None
+    client_id:      Optional[int]  = None
     client_contact: Optional[str]  = None
     client_nif:     Optional[str]  = None
     date_echeance:  Optional[date_type] = None

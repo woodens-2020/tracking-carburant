@@ -6354,7 +6354,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               </div>
               <div style="margin-bottom:8px">
                 <label class="pos-label" data-i18n="pos.caisse.client.label">Client (pour crédit)</label>
-                <input class="pos-input" id="pos-client-nom" placeholder="Tapez pour rechercher ou ajouter un client…">
+                <div style="display:flex;gap:6px;align-items:center">
+                  <input class="pos-input" id="pos-client-nom" placeholder="Tapez pour rechercher ou ajouter un client…" style="flex:1">
+                  <button type="button" title="Ajouter rapidement comme nouveau client" onclick="clientAutocompleteAdd('pos-client-nom')" style="flex-shrink:0;width:32px;height:32px;border-radius:7px;background:rgba(63,182,168,.15);border:1px solid rgba(63,182,168,.3);color:#3fb6a8;font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">+</button>
+                </div>
+                <div id="pos-client-nom-statut" style="margin-top:5px"></div>
               </div>
               <div class="pos-mode-btns">
                 <button class="pos-mode-btn active" data-mode="CASH" onclick="posSetMode('CASH',this)" data-i18n="pos.caisse.mode.cash">CASH</button>
@@ -7420,7 +7424,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div id="pcmd-enc-credit-section" style="display:none;margin-top:14px;border:1px solid rgba(248,113,113,.25);border-radius:10px;padding:14px;background:rgba(248,113,113,.05)">
           <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#f87171;margin-bottom:12px">⚠ Informations crédit client</div>
           <label class="pos-label">Nom du client *</label>
-          <input class="pos-input" id="pcmd-enc-client-nom" placeholder="Tapez pour rechercher un client existant…" style="margin-bottom:10px">
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:5px">
+            <input class="pos-input" id="pcmd-enc-client-nom" placeholder="Tapez pour rechercher un client existant…" style="flex:1">
+            <button type="button" title="Ajouter rapidement comme nouveau client" onclick="clientAutocompleteAdd('pcmd-enc-client-nom')" style="flex-shrink:0;width:32px;height:32px;border-radius:7px;background:rgba(63,182,168,.15);border:1px solid rgba(63,182,168,.3);color:#3fb6a8;font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">+</button>
+          </div>
+          <div id="pcmd-enc-client-nom-statut" style="margin-bottom:10px"></div>
           <div class="pos-form-row" style="margin-bottom:10px">
             <div style="flex:1">
               <label class="pos-label">Téléphone</label>
@@ -20924,21 +20932,29 @@ function posGx(v){ return 'G '+parseFloat(v||0).toFixed(2).replace(/\B(?=(\d{3}
 /* Alert simple réutilisant _giAlert */
 function posAlert(msg,type){ _giAlert(msg, type||'err'); }
 
-// ── Client régulier : autocomplétion (recherche + ajout au répertoire) ──
+// ── Client régulier : sélection + éligibilité crédit ────────────────────
 // Attachée à un <input> texte existant — évite qu'un même client soit
-// saisi différemment d'une vente/crédit à l'autre.
+// saisi différemment d'une vente/crédit à l'autre. Une fois un client
+// sélectionné, son statut d'éligibilité au crédit s'affiche juste sous le
+// champ (badge #<inputId>-statut) et est mémorisé sur l'input
+// (dataset.clientId / dataset.clientStatut) pour la soumission de la vente.
 let _clientAcBox   = null;
 let _clientAcTimer = null;
-let _clientAcInput = null;
 
 function clientAutocompleteInit(inputId){
   const inp = document.getElementById(inputId);
   if(!inp || inp.dataset.clientAcBound) return;
   inp.dataset.clientAcBound = '1';
   inp.setAttribute('autocomplete','off');
-  inp.addEventListener('input', () => _clientAcSearch(inputId));
+  inp.addEventListener('input', () => { _clientAcClearSelection(inputId); _clientAcSearch(inputId); });
   inp.addEventListener('focus', () => _clientAcSearch(inputId));
   inp.addEventListener('blur', () => setTimeout(_clientAcClose, 180));
+}
+
+function _clientAcClearSelection(inputId){
+  const inp = document.getElementById(inputId);
+  if(inp){ delete inp.dataset.clientId; delete inp.dataset.clientStatut; }
+  _clientAcRenderStatut(inputId, null);
 }
 
 async function _clientAcSearch(inputId){
@@ -20959,17 +20975,23 @@ function _clientAcRender(inputId, results, term){
   _clientAcClose();
   const inp = document.getElementById(inputId);
   if(!inp) return;
-  _clientAcInput = inp;
+  const isAdmin = _isAdmin();
   const rect = inp.getBoundingClientRect();
   const box = document.createElement('div');
-  box.style.cssText = `position:fixed;top:${rect.bottom+4}px;left:${rect.left}px;width:${Math.max(rect.width,220)}px;z-index:9999;background:#1a2035;border:1px solid rgba(255,255,255,.14);border-radius:8px;max-height:220px;overflow-y:auto;box-shadow:0 10px 28px rgba(0,0,0,.45)`;
+  box.style.cssText = `position:fixed;top:${rect.bottom+4}px;left:${rect.left}px;width:${Math.max(rect.width,260)}px;z-index:9999;background:#1a2035;border:1px solid rgba(255,255,255,.14);border-radius:8px;max-height:240px;overflow-y:auto;box-shadow:0 10px 28px rgba(0,0,0,.45)`;
 
-  let html = results.map(c => `
-    <div style="padding:8px 12px;cursor:pointer;font-size:13.5px;color:rgba(255,255,255,.85);border-bottom:1px solid rgba(255,255,255,.05)"
+  let html = results.map(c => {
+    const elig = c.statut_credit !== 'NON_ELIGIBLE';
+    const badge = `<span style="font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;background:${elig?'rgba(74,222,128,.15)':'rgba(248,113,113,.15)'};color:${elig?'#4ade80':'#f87171'}">${elig?'Éligible':'Non éligible'}</span>`;
+    const adminToggle = isAdmin ? `<button type="button" title="Changer le statut (admin)" onmousedown="event.stopPropagation();clientToggleStatut(${c.id},'${elig?'NON_ELIGIBLE':'ELIGIBLE'}','${inputId}')" style="margin-left:6px;background:none;border:1px solid rgba(255,255,255,.15);border-radius:4px;color:rgba(255,255,255,.5);font-size:10px;padding:1px 5px;cursor:pointer">changer</button>` : '';
+    return `
+    <div style="padding:8px 12px;cursor:pointer;font-size:13.5px;color:rgba(255,255,255,.85);border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;align-items:center;gap:8px"
          onmouseenter="this.style.background='rgba(255,255,255,.06)'" onmouseleave="this.style.background='transparent'"
-         onmousedown="clientAutocompleteSelect('${inputId}',${JSON.stringify(c.nom)})">
-      ${esc(c.nom)}${c.telephone?` <span style="color:rgba(255,255,255,.35);font-size:12px">— ${esc(c.telephone)}</span>`:''}
-    </div>`).join('');
+         onmousedown="if(event.target.tagName!=='BUTTON') clientAutocompleteSelect('${inputId}',${c.id},${JSON.stringify(c.nom)},'${c.statut_credit}')">
+      <span>${esc(c.nom)}${c.telephone?` <span style="color:rgba(255,255,255,.35);font-size:12px">— ${esc(c.telephone)}</span>`:''}</span>
+      <span style="white-space:nowrap">${badge}${adminToggle}</span>
+    </div>`;
+  }).join('');
 
   const exactMatch = term && results.some(c => c.nom.toLowerCase() === term.toLowerCase());
   if(term && !exactMatch){
@@ -20985,9 +21007,14 @@ function _clientAcRender(inputId, results, term){
   _clientAcBox = box;
 }
 
-function clientAutocompleteSelect(inputId, nom){
+function clientAutocompleteSelect(inputId, clientId, nom, statutCredit){
   const inp = document.getElementById(inputId);
-  if(inp) inp.value = nom;
+  if(inp){
+    inp.value = nom;
+    inp.dataset.clientId = clientId;
+    inp.dataset.clientStatut = statutCredit || 'ELIGIBLE';
+  }
+  _clientAcRenderStatut(inputId, statutCredit || 'ELIGIBLE');
   _clientAcClose();
 }
 
@@ -20997,10 +21024,36 @@ async function clientAutocompleteAdd(inputId){
   if(!nom) return;
   try{
     const res = await apiFetch('POST','/pos/clients', {nom});
-    if(inp) inp.value = res.nom;
+    if(inp){
+      inp.value = res.nom;
+      inp.dataset.clientId = res.id;
+      inp.dataset.clientStatut = res.statut_credit;
+    }
+    _clientAcRenderStatut(inputId, res.statut_credit);
     toast(res.existant ? 'Client déjà dans le répertoire.' : 'Client ajouté au répertoire.', 'ok');
   }catch(e){ toast(e.message||'Erreur','err'); }
   _clientAcClose();
+}
+
+async function clientToggleStatut(clientId, nouveauStatut, inputId){
+  try{
+    const res = await apiFetch('PUT', `/pos/clients/${clientId}/statut`, {statut_credit: nouveauStatut});
+    toast(`Statut mis à jour : ${res.statut_credit === 'ELIGIBLE' ? 'Éligible' : 'Non éligible'}.`, 'ok');
+    const inp = document.getElementById(inputId);
+    if(inp && inp.dataset.clientId == clientId){
+      inp.dataset.clientStatut = res.statut_credit;
+      _clientAcRenderStatut(inputId, res.statut_credit);
+    }
+    _clientAcSearch(inputId);
+  }catch(e){ toast(e.message||'Erreur','err'); }
+}
+
+function _clientAcRenderStatut(inputId, statutCredit){
+  const badgeEl = document.getElementById(inputId+'-statut');
+  if(!badgeEl) return;
+  if(!statutCredit){ badgeEl.innerHTML = ''; return; }
+  const elig = statutCredit !== 'NON_ELIGIBLE';
+  badgeEl.innerHTML = `<span style="font-size:12px;font-weight:700;padding:2px 8px;border-radius:5px;background:${elig?'rgba(74,222,128,.15)':'rgba(248,113,113,.15)'};color:${elig?'#4ade80':'#f87171'}">${elig?'✓ Client éligible au crédit':'✗ Client NON éligible au crédit'}</span>`;
 }
 
 function _clientAcClose(){
@@ -22120,7 +22173,13 @@ async function posEncaisser(){
   btn.disabled = true; btn.textContent = t('pos.caisse.encaisser.wait');
   try {
     const caissierSel = document.getElementById('pos-caissier-sel');
-    const clientNom = (document.getElementById('pos-client-nom').value||'').trim();
+    const clientInp = document.getElementById('pos-client-nom');
+    const clientNom = (clientInp.value||'').trim();
+    const clientId  = clientInp.dataset.clientId ? parseInt(clientInp.dataset.clientId) : null;
+    if(_posMode==='CREDIT' && clientInp.dataset.clientStatut === 'NON_ELIGIBLE'){
+      btn.disabled = false; btn.textContent = t('pos.caisse.encaisser');
+      posAlert(`Client « ${clientNom} » non éligible au crédit — vente refusée.`, 'err'); return;
+    }
     const caissierNom = caissierSel && caissierSel.selectedIndex > 0 ? caissierSel.options[caissierSel.selectedIndex].text : '';
     const montantRecuVal = parseFloat(document.getElementById('pos-montant-recu')?.value||0);
     if(_posMode==='CASH'){
@@ -22139,12 +22198,14 @@ async function posEncaisser(){
       ),
       mode_paiement: _posMode,
       client_nom: clientNom || null,
+      client_id: clientId,
       montant_paye: montantPaye,
       caissier_id: caissierSel && caissierSel.value ? parseInt(caissierSel.value) : null,
     };
     const result = await apiFetch('POST','/pos/ventes', payload);
     _posCart = [];
     document.getElementById('pos-client-nom').value = '';
+    _clientAcClearSelection('pos-client-nom');
     const recuEl = document.getElementById('pos-montant-recu');
     if(recuEl) recuEl.value = '';
     const mdisplay = document.getElementById('pos-monnaie-display');
@@ -24839,6 +24900,7 @@ function pcmdEncaisserOuvrir(){
   document.getElementById('pcmd-enc-monnaie-row').style.display = 'none';
   document.getElementById('pcmd-enc-credit-section').style.display = 'none';
   document.getElementById('pcmd-enc-client-nom').value = '';
+  _clientAcClearSelection('pcmd-enc-client-nom');
   document.getElementById('pcmd-enc-tel').value        = '';
   document.getElementById('pcmd-enc-nif').value        = '';
   document.getElementById('pcmd-enc-echeance').value   = '';
@@ -24874,9 +24936,14 @@ async function pcmdEncaisser(){
   const paye = parseFloat(document.getElementById('pcmd-enc-paye').value||0)||null;
   const body = { mode_paiement: mode, montant_paye: paye };
   if(mode==='CREDIT'||mode==='MIXTE'){
-    const nom = document.getElementById('pcmd-enc-client-nom').value.trim();
+    const clientInp = document.getElementById('pcmd-enc-client-nom');
+    const nom = clientInp.value.trim();
     if(!nom){ posAlert('Le nom du client est requis pour un crédit.','warn'); return; }
+    if(mode==='CREDIT' && clientInp.dataset.clientStatut === 'NON_ELIGIBLE'){
+      posAlert(`Client « ${nom} » non éligible au crédit — vente refusée.`, 'err'); return;
+    }
     body.client_nom    = nom;
+    body.client_id     = clientInp.dataset.clientId ? parseInt(clientInp.dataset.clientId) : null;
     body.client_contact= document.getElementById('pcmd-enc-tel').value.trim()||null;
     body.client_nif    = document.getElementById('pcmd-enc-nif').value.trim()||null;
     const ech = document.getElementById('pcmd-enc-echeance').value;
