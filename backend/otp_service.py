@@ -36,7 +36,12 @@ EMAIL_HOST      = os.getenv("EMAIL_HOST",      "smtp.gmail.com")
 EMAIL_PORT      = int(os.getenv("EMAIL_PORT",  "587"))
 EMAIL_USER      = os.getenv("EMAIL_HOST_USER",     "")
 EMAIL_PASSWORD  = os.getenv("EMAIL_HOST_PASSWORD", "")
-EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Konekta · Bon Prix")
+
+# Identité de l'institution — même mécanisme que main._BRANDING, dupliqué ici
+# pour éviter un import circulaire (main.py importe déjà depuis ce module).
+_BRANDING_RAISON_SOCIALE = os.getenv("BRANDING_RAISON_SOCIALE", "Bon Prix")
+_BRANDING_COMPLEXE       = os.getenv("BRANDING_COMPLEXE", "Complexe Commercial de Pillatre")
+EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", f"Konekta · {_BRANDING_RAISON_SOCIALE}")
 
 TWILIO_ACCOUNT_SID   = os.getenv("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN    = os.getenv("TWILIO_AUTH_TOKEN", "")
@@ -164,7 +169,7 @@ def _build_email_html(nom: str, code: str) -> str:
           <div style="font-size:32px;font-weight:900;color:#e8c558;line-height:1">K</div>
           <div style="font-size:13px;font-weight:800;color:#e8c558;letter-spacing:3px;margin-top:4px">KONEKTA</div>
           <div style="font-size:10px;color:rgba(232,197,88,.45);margin-top:3px">
-            Bon Prix &middot; Complexe Commerciale de Pillatre
+            {_BRANDING_RAISON_SOCIALE} &middot; {_BRANDING_COMPLEXE}
           </div>
         </td>
       </tr>
@@ -371,7 +376,7 @@ def _build_welcome_html(nom: str, username: str) -> str:
           <div style="font-size:32px;font-weight:900;color:#e8c558;line-height:1">K</div>
           <div style="font-size:13px;font-weight:800;color:#e8c558;letter-spacing:3px;margin-top:4px">KONEKTA</div>
           <div style="font-size:10px;color:rgba(232,197,88,.45);margin-top:3px">
-            Bon Prix &middot; Complexe Commerciale de Pillatre
+            {_BRANDING_RAISON_SOCIALE} &middot; {_BRANDING_COMPLEXE}
           </div>
         </td>
       </tr>
@@ -582,7 +587,7 @@ def _build_admin_code_email_html(nom_employe: str, username_employe: str, code: 
           <div style="font-size:32px;font-weight:900;color:#e8c558;line-height:1">K</div>
           <div style="font-size:13px;font-weight:800;color:#e8c558;letter-spacing:3px;margin-top:4px">KONEKTA</div>
           <div style="font-size:10px;color:rgba(232,197,88,.45);margin-top:3px">
-            Bon Prix &middot; Complexe Commerciale de Pillatre
+            {_BRANDING_RAISON_SOCIALE} &middot; {_BRANDING_COMPLEXE}
           </div>
         </td>
       </tr>
