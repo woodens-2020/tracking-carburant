@@ -21000,7 +21000,7 @@ function _clientAcRender(inputId, results, term){
     return `
     <div style="padding:8px 12px;cursor:pointer;font-size:13.5px;color:rgba(255,255,255,.85);border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;align-items:center;gap:8px"
          onmouseenter="this.style.background='rgba(255,255,255,.06)'" onmouseleave="this.style.background='transparent'"
-         onmousedown="if(event.target.tagName!=='BUTTON') clientAutocompleteSelect('${inputId}',${c.id},${JSON.stringify(c.nom)},'${c.statut_credit}')">
+         onmousedown="if(event.target.tagName!=='BUTTON') clientAutocompleteSelect('${inputId}',${c.id},'${esc(c.nom).replace(/'/g,"\\'")}','${c.statut_credit}')">
       <span>${esc(c.nom)}${c.telephone?` <span style="color:rgba(255,255,255,.35);font-size:12px">— ${esc(c.telephone)}</span>`:''}</span>
       <span style="white-space:nowrap">${badge}${adminToggle}</span>
     </div>`;
