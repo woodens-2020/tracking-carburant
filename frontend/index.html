@@ -6354,7 +6354,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               </div>
               <div style="margin-bottom:8px">
                 <label class="pos-label" data-i18n="pos.caisse.client.label">Client (pour crédit)</label>
-                <input class="pos-input" id="pos-client-nom" placeholder="Nom du client (optionnel)" data-i18n-ph="pos.caisse.client.ph">
+                <input class="pos-input" id="pos-client-nom" placeholder="Tapez pour rechercher ou ajouter un client…">
               </div>
               <div class="pos-mode-btns">
                 <button class="pos-mode-btn active" data-mode="CASH" onclick="posSetMode('CASH',this)" data-i18n="pos.caisse.mode.cash">CASH</button>
@@ -7420,7 +7420,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div id="pcmd-enc-credit-section" style="display:none;margin-top:14px;border:1px solid rgba(248,113,113,.25);border-radius:10px;padding:14px;background:rgba(248,113,113,.05)">
           <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#f87171;margin-bottom:12px">⚠ Informations crédit client</div>
           <label class="pos-label">Nom du client *</label>
-          <input class="pos-input" id="pcmd-enc-client-nom" placeholder="Nom complet" style="margin-bottom:10px">
+          <input class="pos-input" id="pcmd-enc-client-nom" placeholder="Tapez pour rechercher un client existant…" style="margin-bottom:10px">
           <div class="pos-form-row" style="margin-bottom:10px">
             <div style="flex:1">
               <label class="pos-label">Téléphone</label>
@@ -20923,6 +20923,95 @@ function posGx(v){ return 'G '+parseFloat(v||0).toFixed(2).replace(/\B(?=(\d{3}
 
 /* Alert simple réutilisant _giAlert */
 function posAlert(msg,type){ _giAlert(msg, type||'err'); }
+
+// ── Client régulier : autocomplétion (recherche + ajout au répertoire) ──
+// Attachée à un <input> texte existant — évite qu'un même client soit
+// saisi différemment d'une vente/crédit à l'autre.
+let _clientAcBox   = null;
+let _clientAcTimer = null;
+let _clientAcInput = null;
+
+function clientAutocompleteInit(inputId){
+  const inp = document.getElementById(inputId);
+  if(!inp || inp.dataset.clientAcBound) return;
+  inp.dataset.clientAcBound = '1';
+  inp.setAttribute('autocomplete','off');
+  inp.addEventListener('input', () => _clientAcSearch(inputId));
+  inp.addEventListener('focus', () => _clientAcSearch(inputId));
+  inp.addEventListener('blur', () => setTimeout(_clientAcClose, 180));
+}
+
+async function _clientAcSearch(inputId){
+  const inp = document.getElementById(inputId);
+  if(!inp) return;
+  const term = inp.value.trim();
+  clearTimeout(_clientAcTimer);
+  _clientAcTimer = setTimeout(async () => {
+    try{
+      const qs = term ? '?q='+encodeURIComponent(term) : '';
+      const results = await apiFetch('GET', '/pos/clients'+qs);
+      _clientAcRender(inputId, results||[], term);
+    }catch(e){ /* silencieux — ne bloque pas la saisie */ }
+  }, 200);
+}
+
+function _clientAcRender(inputId, results, term){
+  _clientAcClose();
+  const inp = document.getElementById(inputId);
+  if(!inp) return;
+  _clientAcInput = inp;
+  const rect = inp.getBoundingClientRect();
+  const box = document.createElement('div');
+  box.style.cssText = `position:fixed;top:${rect.bottom+4}px;left:${rect.left}px;width:${Math.max(rect.width,220)}px;z-index:9999;background:#1a2035;border:1px solid rgba(255,255,255,.14);border-radius:8px;max-height:220px;overflow-y:auto;box-shadow:0 10px 28px rgba(0,0,0,.45)`;
+
+  let html = results.map(c => `
+    <div style="padding:8px 12px;cursor:pointer;font-size:13.5px;color:rgba(255,255,255,.85);border-bottom:1px solid rgba(255,255,255,.05)"
+         onmouseenter="this.style.background='rgba(255,255,255,.06)'" onmouseleave="this.style.background='transparent'"
+         onmousedown="clientAutocompleteSelect('${inputId}',${JSON.stringify(c.nom)})">
+      ${esc(c.nom)}${c.telephone?` <span style="color:rgba(255,255,255,.35);font-size:12px">— ${esc(c.telephone)}</span>`:''}
+    </div>`).join('');
+
+  const exactMatch = term && results.some(c => c.nom.toLowerCase() === term.toLowerCase());
+  if(term && !exactMatch){
+    html += `<div style="padding:8px 12px;cursor:pointer;font-size:13.5px;color:#3fb6a8;font-weight:600"
+         onmouseenter="this.style.background='rgba(63,182,168,.1)'" onmouseleave="this.style.background='transparent'"
+         onmousedown="clientAutocompleteAdd('${inputId}')">+ Ajouter « ${esc(term)} » comme client régulier</div>`;
+  }
+  if(!html){
+    html = '<div style="padding:8px 12px;font-size:13px;color:rgba(255,255,255,.35)">Tapez un nom pour rechercher…</div>';
+  }
+  box.innerHTML = html;
+  document.body.appendChild(box);
+  _clientAcBox = box;
+}
+
+function clientAutocompleteSelect(inputId, nom){
+  const inp = document.getElementById(inputId);
+  if(inp) inp.value = nom;
+  _clientAcClose();
+}
+
+async function clientAutocompleteAdd(inputId){
+  const inp = document.getElementById(inputId);
+  const nom = (inp?.value||'').trim();
+  if(!nom) return;
+  try{
+    const res = await apiFetch('POST','/pos/clients', {nom});
+    if(inp) inp.value = res.nom;
+    toast(res.existant ? 'Client déjà dans le répertoire.' : 'Client ajouté au répertoire.', 'ok');
+  }catch(e){ toast(e.message||'Erreur','err'); }
+  _clientAcClose();
+}
+
+function _clientAcClose(){
+  if(_clientAcBox){ _clientAcBox.remove(); _clientAcBox = null; }
+}
+
+(function _clientAcBindInputs(){
+  const bind = () => { ['pos-client-nom','pcmd-enc-client-nom'].forEach(clientAutocompleteInit); };
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
+  else bind();
+})();
 
 /* Panier global POS Caisse */
 let _posCart = [];

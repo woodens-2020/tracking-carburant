@@ -20,7 +20,7 @@ from models import (
     BarCategorie, BarProduit, BarPrixHistorique, BarAchat, BarAchatDepense,
     BarMouvementStock, BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande, BarPaiementEmploye, BarSessionCaisse,
-    Employe, Utilisateur, CuisinePlat, RenflouementDepartement,
+    Employe, Utilisateur, CuisinePlat, RenflouementDepartement, Client,
 )
 from pos_service import (
     stock_courant, stock_tous_produits, prix_actif, cmup,
@@ -54,6 +54,52 @@ def _require_pdg_ou_admin_pos(request: Request, db: Session = Depends(get_db)) -
         if u and u.role_obj and u.role_obj.permissions.get("admin", False):
             return u
     raise HTTPException(403, "Accès réservé au PDG et aux administrateurs")
+
+
+# ══════════════════════════════════════════════════════════════════
+# CLIENTS RÉGULIERS — répertoire partagé (recherche + ajout)
+# ══════════════════════════════════════════════════════════════════
+
+class ClientIn(BaseModel):
+    nom:       str
+    telephone: Optional[str] = None
+    notes:     Optional[str] = None
+
+
+def _client_dict(c: Client) -> dict:
+    return {"id": c.id, "nom": c.nom, "telephone": c.telephone}
+
+
+@router.get("/clients")
+def rechercher_clients(
+    q: Optional[str] = Query(default=None),
+    limit: int = Query(20, le=100),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Client)
+    if q and q.strip():
+        query = query.filter(Client.nom.ilike(f"%{q.strip()}%"))
+    rows = query.order_by(Client.nom).limit(limit).all()
+    return [_client_dict(c) for c in rows]
+
+
+@router.post("/clients", status_code=201)
+def creer_client(data: ClientIn, db: Session = Depends(get_db)):
+    nom = data.nom.strip()
+    if not nom:
+        raise HTTPException(400, "Le nom est requis.")
+    # Évite les doublons évidents (même nom, insensible à la casse) — renvoie
+    # le client existant plutôt que d'en créer un second silencieusement.
+    existant = db.query(Client).filter(func.lower(Client.nom) == nom.lower()).first()
+    if existant:
+        return {**_client_dict(existant), "existant": True}
+    c = Client(
+        nom=nom,
+        telephone=(data.telephone or "").strip() or None,
+        notes=(data.notes or "").strip() or None,
+    )
+    db.add(c); db.commit(); db.refresh(c)
+    return {**_client_dict(c), "existant": False}
 
 
 # ══════════════════════════════════════════════════════════════════

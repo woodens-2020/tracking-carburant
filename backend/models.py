@@ -680,6 +680,24 @@ class BarLigneVente(Base):
     )
 
 
+class Client(Base):
+    """Client régulier — registre partagé pour que le nom saisi lors d'une
+    vente ou d'un crédit reste toujours orthographié de la même façon
+    (évite les doublons du type « Jean Pierre » / « Jean-Pierre » qui
+    cassent le suivi d'historique d'un même client)."""
+    __tablename__ = "clients"
+
+    id         = Column(Integer, primary_key=True)
+    nom        = Column(String(150), nullable=False)
+    telephone  = Column(String(30),  nullable=True)
+    notes      = Column(String(300), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_clients_nom", "nom"),
+    )
+
+
 class BarCredit(Base):
     """Crédit accordé à un client (vente partiellement ou non payée)."""
     __tablename__ = "bar_credits"
