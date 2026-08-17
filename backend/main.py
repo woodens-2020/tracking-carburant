@@ -5,6 +5,7 @@ import os
 import time as _time
 from datetime import date as date_type
 from typing import List, Optional
+from tz_utils import today_haiti
 from urllib.parse import quote as url_quote
 
 log = logging.getLogger("main")
@@ -613,7 +614,7 @@ def me(request: Request, db: Session = Depends(get_db)):
             prenom=parts[0],
             nom=parts[1] if len(parts) > 1 else parts[0],
             poste="Caissier" if est_caissier else "Manager",
-            date_embauche=_date.today(),
+            date_embauche=today_haiti(),
             salaire_base=0,
             type_contrat="CDI",
             actif=True,
@@ -1825,7 +1826,7 @@ def serie_endpoint(
     d_fin = (
         datetime.strptime(date_fin, "%Y-%m-%d").date()
         if date_fin
-        else dt.today()
+        else today_haiti()
     )
     d_debut = d_fin - timedelta(days=jours - 1)
 
@@ -2054,7 +2055,7 @@ def journal_endpoint(
 ):
     from datetime import date as dt
 
-    d_fin   = date_fin   or dt.today()
+    d_fin   = date_fin   or today_haiti()
     d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
 
     entries = _build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode)
@@ -2099,7 +2100,7 @@ def journal_pdf(
     from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
     # ── Récupérer les données via la fonction partagée (Bug 4 fix) ───
-    d_fin   = date_fin   or dt.today()
+    d_fin   = date_fin   or today_haiti()
     d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
 
     entries    = _build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode)
@@ -2145,7 +2146,7 @@ def journal_pdf(
     # En-tête
     story.append(Paragraph("Journal des Meters", sTitle))
     periode_txt = f"{d_debut.strftime('%d/%m/%Y')} → {d_fin.strftime('%d/%m/%Y')}"
-    story.append(Paragraph(f"Période : {periode_txt}  ·  Généré le {dt.today().strftime('%d/%m/%Y')}", sSub))
+    story.append(Paragraph(f"Période : {periode_txt}  ·  Généré le {today_haiti().strftime('%d/%m/%Y')}", sSub))
     story.append(HRFlowable(width="100%", thickness=1, color=C_BLUE, spaceAfter=12))
 
     # Cartes résumé
@@ -2373,7 +2374,7 @@ def export_releves_xlsx(
     ws1.cell(1, 1, "PétroSync — Relevés de compteurs").font = Font(name="Calibri", bold=True, size=13, color="F7A93B")
     ws1.merge_cells("A1:J1");  ws1.row_dimensions[1].height = 22
 
-    info = f"Exporté le {date_cls.today().isoformat()}  ·  {len(releves)} relevé(s)"
+    info = f"Exporté le {today_haiti().isoformat()}  ·  {len(releves)} relevé(s)"
     if date_debut or date_fin:
         info += f"  ·  Période : {date_debut or '…'} → {date_fin or '…'}"
     ws1.cell(2, 1, info).font = Font(name="Calibri", size=9, color="7A8CA0")
@@ -2639,7 +2640,7 @@ def rapport_pdf(
     )
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
-    d = date or dt.today()
+    d = date or today_haiti()
     data = _build_rapport_data(db, d)
 
     C_BG    = colors.HexColor("#0f172a")
@@ -2840,7 +2841,7 @@ def rapport_xlsx(
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
 
-    d    = date or dt.today()
+    d    = date or today_haiti()
     data = _build_rapport_data(db, d)
 
     wb = openpyxl.Workbook()
@@ -3479,7 +3480,7 @@ def stock_endpoint(
     else:
         produits = db.query(Produit).filter(Produit.actif == True).all()
 
-    aujourd_hui = date_type.today()
+    aujourd_hui = today_haiti()
     resultats = []
     for p in produits:
         s = stock_restant(db, p.id, seuil_jours=seuil_jours)
@@ -3510,7 +3511,7 @@ def rentabilite_endpoint(
     Bénéfice = Revenu (relevés.prix_gallon × quantité) − COGS (WAC × gallons vendus).
     Retourne None si aucune livraison enregistrée (pas de WAC disponible).
     """
-    aujourd_hui = date_type.today()
+    aujourd_hui = today_haiti()
     try:
         d_debut = date_type.fromisoformat(date_debut) if date_debut else date_type(aujourd_hui.year, aujourd_hui.month, 1)
         d_fin   = date_type.fromisoformat(date_fin)   if date_fin   else aujourd_hui
@@ -3900,7 +3901,7 @@ def _get_param_depense(db: Session) -> ParametreDepense:
 def _total_depenses_mois_courant(db: Session, exclure_id: Optional[int] = None) -> float:
     """Somme des dépenses du mois calendaire en cours."""
     from datetime import date as _date
-    today = _date.today()
+    today = today_haiti()
     debut_mois = today.replace(day=1)
     q = db.query(Depense).filter(
         Depense.date_depense >= debut_mois,
@@ -3932,7 +3933,7 @@ def get_limite_depenses(db: Session = Depends(get_db)):
     """Retourne la configuration de la limite mensuelle."""
     from datetime import date as _date
     p = _get_param_depense(db)
-    today = _date.today()
+    today = today_haiti()
     total_mois = _total_depenses_mois_courant(db)
     return {
         "limite":      float(p.limite) if p.limite is not None else None,
@@ -4027,7 +4028,7 @@ def lister_depenses(
                 "id": d.id, "categorie": d.categorie,
                 "description": d.description, "montant": float(d.montant),
                 "date_depense": str(d.date_depense),
-                "jours": (date_type.today() - d.date_depense).days,
+                "jours": (today_haiti() - d.date_depense).days,
                 "beneficiaire": d.beneficiaire, "reference": d.reference,
                 "notes": d.notes,
                 "produit_id": d.produit_id,
@@ -4241,7 +4242,7 @@ def export_depenses_xlsx(
         periode_txt = f"  ·  Période : {date_debut or '…'} → {date_fin or '…'}"
     if categorie:
         periode_txt += f"  ·  Catégorie : {categorie}"
-    info = f"Exporté le {date_cls.today().strftime('%d/%m/%Y')}  ·  {len(depenses)} dépense(s){periode_txt}"
+    info = f"Exporté le {today_haiti().strftime('%d/%m/%Y')}  ·  {len(depenses)} dépense(s){periode_txt}"
     ws1.merge_cells("A2:H2")
     c2 = ws1.cell(2, 1, info)
     c2.font      = Font(name="Calibri", size=9, color="94A3B8", italic=True)
@@ -4359,7 +4360,7 @@ def export_depenses_xlsx(
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    fname = f"depenses_{date_cls.today().isoformat()}.xlsx"
+    fname = f"depenses_{today_haiti().isoformat()}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -4457,7 +4458,7 @@ def export_depenses_pdf(
         periode_txt = f"Période : {date_debut or '…'} → {date_fin or '…'}  ·  "
     if categorie:
         periode_txt += f"Catégorie : {categorie}  ·  "
-    periode_txt += f"{len(depenses)} dépense(s)  ·  Généré le {date_cls.today().strftime('%d/%m/%Y')}"
+    periode_txt += f"{len(depenses)} dépense(s)  ·  Généré le {today_haiti().strftime('%d/%m/%Y')}"
     story.append(Paragraph(periode_txt, S_SUB))
     story.append(Spacer(1, 0.3*cm))
     story.append(HRFlowable(width=W, thickness=1.5, color=C_RED2, spaceAfter=8))
@@ -4553,13 +4554,13 @@ def export_depenses_pdf(
     story.append(Spacer(1, 0.4*cm))
     story.append(HRFlowable(width=W, thickness=0.5, color=C_BORDER, spaceAfter=4))
     story.append(Paragraph(
-        f"Document généré automatiquement par PétroSync  ·  {date_cls.today().strftime('%d/%m/%Y')}",
+        f"Document généré automatiquement par PétroSync  ·  {today_haiti().strftime('%d/%m/%Y')}",
         S_NOTE
     ))
 
     doc.build(story)
     buf.seek(0)
-    fname = f"depenses_{date_cls.today().isoformat()}.pdf"
+    fname = f"depenses_{today_haiti().isoformat()}.pdf"
     return StreamingResponse(
         buf,
         media_type="application/pdf",
@@ -4631,7 +4632,7 @@ def lister_achats(
                 "id": a.id, "fournisseur": a.fournisseur,
                 "description": a.description, "categorie": a.categorie,
                 "montant": float(a.montant), "date_achat": str(a.date_achat),
-                "jours": (date_type.today() - a.date_achat).days,
+                "jours": (today_haiti() - a.date_achat).days,
                 "reference": a.reference, "notes": a.notes,
                 "created_at": a.created_at.isoformat() if a.created_at else None,
                 "sans_justificatif": nb_pj.get(a.id, 0) == 0,
@@ -5052,7 +5053,7 @@ def gi_dashboard(
     from datetime import date as _date, timedelta
     from collections import defaultdict
 
-    today = _date.today()
+    today = today_haiti()
     if not date_debut:
         date_debut = _date(today.year, today.month, 1)   # début du mois courant
     if not date_fin:
@@ -5217,7 +5218,7 @@ async def get_statistiques(
     from collections import defaultdict
     from datetime import timedelta
 
-    today = date_type.today()
+    today = today_haiti()
     fin   = date_type.fromisoformat(date_fin)   if date_fin   else today
     debut = date_type.fromisoformat(date_debut) if date_debut else fin - timedelta(days=29)
     nb_jours = (fin - debut).days + 1

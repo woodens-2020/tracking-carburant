@@ -20,6 +20,7 @@ from datetime import date
 from typing import Optional
 
 from sqlalchemy.orm import Session
+from tz_utils import today_haiti
 
 from rapport_service import build_report_payload
 from stock_service import cout_moyen_pondere
@@ -381,7 +382,7 @@ RÈGLES ABSOLUES :
 DONNÉES FINANCIÈRES ET OPÉRATIONNELLES COMPLÈTES
 ═══════════════════════════════════════════════════════════════════════
 Période      : {date_debut.strftime("%d/%m/%Y")} — {date_fin.strftime("%d/%m/%Y")} ({nb_jours} jours calendaires)
-Date d'audit : {date.today().strftime("%d/%m/%Y")}
+Date d'audit : {today_haiti().strftime("%d/%m/%Y")}
 Monnaie      : Gourde haïtienne (G) | Volumes : gallons (gal)
 
 {b_global}
@@ -457,7 +458,7 @@ STRUCTURE REQUISE — RESPECTE CES TITRES EXACTEMENT
 [7 recommandations numérotées, concrètes, actionnables, avec un indicateur cible quand possible. Classées par priorité décroissante (1 = urgente). Format : **ACTION** : description → objectif mesurable.]
 
 ---
-*Rapport d'audit généré par PétroSync Intelligence Artificielle · {date.today().strftime("%d/%m/%Y")}*
+*Rapport d'audit généré par PétroSync Intelligence Artificielle · {today_haiti().strftime("%d/%m/%Y")}*
 ═══════════════════════════════════════════════════════════════════════
 
 Rédige maintenant le document COMPLET. Chaque section doit être substantielle et analytique. Met en gras (**) tous les chiffres, ratios, pourcentages et termes comptables clés.

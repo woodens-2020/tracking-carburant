@@ -4,6 +4,7 @@ import json
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from tz_utils import today_haiti
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -818,9 +819,9 @@ def export_audit_log_xlsx(
     buf.seek(0)
 
     from datetime import date as date_type
-    fname = f"journal_activite_{date_type.today().isoformat()}.xlsx"
+    fname = f"journal_activite_{today_haiti().isoformat()}.xlsx"
     if action:
-        fname = f"journal_{action}_{date_type.today().isoformat()}.xlsx"
+        fname = f"journal_{action}_{today_haiti().isoformat()}.xlsx"
 
     return StreamingResponse(
         buf,

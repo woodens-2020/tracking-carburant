@@ -20,6 +20,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session
+from tz_utils import today_haiti
 
 from models import Releve, Pompe, Livraison, PrixVente, Produit
 
@@ -222,7 +223,7 @@ def stock_restant(
     Note : le stock théorique peut être négatif si des ventes sont enregistrées
     sans livraison correspondante (anomalie STOCK_NEGATIF déclenchée ailleurs).
     """
-    aujourd_hui   = date.today()
+    aujourd_hui   = today_haiti()
     total_livre   = gallons_livres(db, produit_id, jusqu_a=aujourd_hui)
     total_vendu   = gallons_vendus(db, produit_id, date(2000, 1, 1), aujourd_hui)
     total_ecarte  = gallons_ecartes(db, produit_id)
@@ -454,7 +455,7 @@ def cout_moyen_pondere(
         q = q.filter(Livraison.date_livraison <= jusqu_a)
     livraisons = q.all()
     if uniquement_ouvertes:
-        borne = jusqu_a if jusqu_a is not None else date.today()
+        borne = jusqu_a if jusqu_a is not None else today_haiti()
         livraisons = [
             l for l in livraisons
             if not (l.terminee and l.date_cloture is not None and l.date_cloture.date() <= borne)

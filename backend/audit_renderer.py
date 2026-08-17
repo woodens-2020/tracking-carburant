@@ -14,6 +14,8 @@ import re
 from datetime import date
 from io import BytesIO
 
+from tz_utils import today_haiti
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Parser Markdown → blocs structurés
@@ -239,7 +241,7 @@ def render_audit_pdf(
     ))
     story.append(Spacer(1, 0.15 * cm))
     story.append(Paragraph(
-        f"Généré le {date.today().strftime('%d/%m/%Y')} par Intelligence Artificielle",
+        f"Généré le {today_haiti().strftime('%d/%m/%Y')} par Intelligence Artificielle",
         s_meta,
     ))
     story.append(HRFlowable(width="100%", thickness=2.5, color=AMBER, spaceAfter=12, spaceBefore=10))
@@ -404,7 +406,7 @@ def render_audit_docx(
 
     p4 = doc.add_paragraph()
     p4.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r4 = p4.add_run(f"Généré le {date.today().strftime('%d/%m/%Y')} par Intelligence Artificielle")
+    r4 = p4.add_run(f"Généré le {today_haiti().strftime('%d/%m/%Y')} par Intelligence Artificielle")
     r4.font.size = Pt(9); r4.italic = True; _set_color(r4, GRAY)
 
     # ── Tableau KPI DOCX ─────────────────────────────────────────────────────

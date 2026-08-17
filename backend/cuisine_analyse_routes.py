@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, date as date_type, time, timedelta
 from decimal import Decimal
 from typing import Optional
+from tz_utils import today_haiti
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func as sqlfunc
@@ -116,7 +117,7 @@ def synthese(
     date_fin:   Optional[date_type] = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    today = date_type.today()
+    today = today_haiti()
     if not date_debut: date_debut = today.replace(day=1)
     if not date_fin:   date_fin   = today
     if date_debut > date_fin:

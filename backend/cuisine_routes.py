@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, date as date_type, time
 from decimal import Decimal
 from typing import Optional
+from tz_utils import today_haiti
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
@@ -56,7 +57,7 @@ def _verifier_permission_date(request: Request, db: Session, nouvelle_date, anci
     corriger un autre champ sur une entree deja antidatee par un admin."""
     if not nouvelle_date:
         return
-    aujourdhui = datetime.now(timezone.utc).date()
+    aujourdhui = today_haiti()
     if nouvelle_date.date() >= aujourdhui:
         return
     if ancienne_date and ancienne_date.date() == nouvelle_date.date():
@@ -233,7 +234,7 @@ def liste_depenses(
     date_fin:   Optional[date_type] = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    today = date_type.today()
+    today = today_haiti()
     if not date_debut: date_debut = today.replace(day=1)
     if not date_fin:   date_fin   = today
     dt_deb = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
@@ -334,7 +335,7 @@ def liste_ventes(
     date_fin:   Optional[date_type] = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    today = date_type.today()
+    today = today_haiti()
     if not date_debut: date_debut = today
     if not date_fin:   date_fin   = today
     dt_deb = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
@@ -446,7 +447,7 @@ def statistiques(
     date_fin:   Optional[date_type] = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    today = date_type.today()
+    today = today_haiti()
     if not date_debut: date_debut = today.replace(day=1)
     if not date_fin:   date_fin   = today
 
@@ -542,7 +543,7 @@ def _achat_dict(a: CuisineAchat) -> dict:
         "cout_unitaire": float(_dec(a.cout_unitaire)),
         "total":         float(_dec(a.total)),
         "date_achat":    a.date_achat.isoformat() if a.date_achat else None,
-        "jours":         (date_type.today() - a.date_achat.date()).days if a.date_achat else None,
+        "jours":         (today_haiti() - a.date_achat.date()).days if a.date_achat else None,
         "fournisseur":   a.fournisseur or "",
         "notes":         a.notes or "",
     }
@@ -555,7 +556,7 @@ def liste_achats(
     date_fin:   Optional[date_type] = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    today = date_type.today()
+    today = today_haiti()
     if not date_debut: date_debut = today.replace(day=1)
     if not date_fin:   date_fin   = today
     dt_deb = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
@@ -786,7 +787,7 @@ def ventes_via_bar(
     db: Session = Depends(get_db),
 ):
     """Ventes cuisine enregistrées via la caisse bar."""
-    today = date_type.today()
+    today = today_haiti()
     if not date_debut: date_debut = today
     if not date_fin:   date_fin   = today
 

@@ -12,3 +12,4 @@ reportlab
 openpyxl
 python-docx
 matplotlib
+tzdata

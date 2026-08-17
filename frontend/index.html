@@ -10720,7 +10720,20 @@ let pendingSave   = null;   // données en attente de confirmation
 // ══════════════════════════════════════════════
 // UTILITAIRES
 // ══════════════════════════════════════════════
-function todayStr(){ return new Date().toISOString().slice(0,10); }
+// x.toISOString().slice(0,10) donne la date UTC — en avance de plusieurs heures sur Haïti,
+// ce qui faisait basculer "aujourd'hui" sur le jour suivant chaque soir pour tout ce qui
+// est calculé à partir de `new Date()` (l'instant présent). On utilise les composantes
+// locales du navigateur à la place (fiables tant que l'appareil est à l'heure d'Haïti).
+// N'utiliser _ymdLocal QUE sur un Date construit depuis "maintenant" — un Date construit
+// depuis une chaîne "AAAA-MM-JJ" (minuit UTC) doit rester formaté via toISOString, qui
+// fait l'aller-retour UTC de façon cohérente.
+function _ymdLocal(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const j = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${j}`;
+}
+function todayStr(){ return _ymdLocal(new Date()); }
 
 function fmtG(n){
   if(n==null||isNaN(n)) return '— G';
@@ -12658,7 +12671,7 @@ function setRaDate(offset){
   else if(offset===-7) setRaPreset('week');
   else {
     const d=new Date(); d.setDate(d.getDate()+offset);
-    const s=d.toISOString().slice(0,10);
+    const s=_ymdLocal(d);
     const el1=document.getElementById('ra-debut'); if(el1) el1.value=s;
     const el2=document.getElementById('ra-fin');   if(el2) el2.value=s;
   }
@@ -18197,7 +18210,7 @@ async function revokeApiKey(){
 // ══════════════════════════════════════════════
 
 function initRapports(){
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayStr();
   const d7 = new Date(Date.now() - 6*864e5).toISOString().split('T')[0];
   const debut = document.getElementById('rpt-date-debut');
   const fin   = document.getElementById('rpt-date-fin');
@@ -18306,7 +18319,7 @@ function _rptMsg(msg, type){
 // ══════════════════════════════════════════════
 
 function initAudit(){
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayStr();
   const d7    = new Date(Date.now() - 6*864e5).toISOString().split('T')[0];
   const debut = document.getElementById('aud-date-debut');
   const fin   = document.getElementById('aud-date-fin');
@@ -18405,7 +18418,7 @@ function _audMsg(msg, type){
    MODULES GESTION INSTITUTIONNELLE — UTILITAIRES
    ══════════════════════════════════════════════════════════════ */
 const _htg = v => new Intl.NumberFormat('fr-HT',{minimumFractionDigits:0,maximumFractionDigits:0}).format(v) + ' HTG';
-const _today = () => new Date().toISOString().slice(0,10);
+const _today = () => todayStr();
 
 function _giAlert(msg, type='error'){
   notify(msg, type==='ok' ? 'ok' : type==='warn' ? 'warn' : 'err');
@@ -20384,14 +20397,14 @@ function _gidDateRange(){
   const today = new Date();
   if(_gidDays === 0) return {debut:'', fin:''};
   if(_gidDays === 1) return {
-    debut: today.toISOString().slice(0,10),
-    fin:   today.toISOString().slice(0,10),
+    debut: _ymdLocal(today),
+    fin:   _ymdLocal(today),
   };
   const debut = new Date(today);
   debut.setDate(today.getDate() - _gidDays + 1);
   return {
-    debut: debut.toISOString().slice(0,10),
-    fin:   today.toISOString().slice(0,10),
+    debut: _ymdLocal(debut),
+    fin:   _ymdLocal(today),
   };
 }
 
@@ -21191,7 +21204,7 @@ async function loadPosDashboardBar(){
   }
 
   // Init date inputs aux 7 derniers jours par défaut
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayStr();
   const deb7  = new Date(); deb7.setDate(deb7.getDate() - 6);
   const deb = document.getElementById('posdb-f-debut');
   const fin = document.getElementById('posdb-f-fin');
@@ -21211,7 +21224,7 @@ async function loadPosDashboardBar(){
   _posDbInterval = setInterval(()=>{
     const deb2 = document.getElementById('posdb-f-debut')?.value || '';
     const fin2 = document.getElementById('posdb-f-fin')?.value   || '';
-    const today2 = new Date().toISOString().split('T')[0];
+    const today2 = todayStr();
     if(deb2 === today2 && fin2 === today2) _posDbDashLoad();
   }, 60000);
 }
@@ -21310,7 +21323,7 @@ function _posDbSetActivePreset(key){
 }
 
 function _posDbReset(){
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayStr();
   const deb = document.getElementById('posdb-f-debut');
   const fin = document.getElementById('posdb-f-fin');
   const cs  = document.getElementById('posdb-f-caissier');
@@ -23488,7 +23501,7 @@ function pftExcelFiche(){
   const csv = rows.map(r => r.map(c=>esc(c)).join(sep)).join('\r\n');
   const a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(csv);
-  a.download = `fiche_technique_bar_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `fiche_technique_bar_${todayStr()}.csv`;
   a.click();
 }
 
@@ -24131,7 +24144,7 @@ function posVentesPreset(range){
 }
 
 function posVentesAujourdhui(){
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayStr();
   const deb = document.getElementById('pos-ventes-debut');
   const fin = document.getElementById('pos-ventes-fin');
   if(deb) deb.value = today;
@@ -25994,7 +26007,7 @@ async function loadPosSessionsCaisse(){
 }
 
 function scAujourdhui(){
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayStr();
   const deb = document.getElementById('sc-debut');
   const fin = document.getElementById('sc-fin');
   if(deb) deb.value = today;
@@ -26174,8 +26187,8 @@ let _perfDetailId    = null;
 let _perfDetailFilters = { mode: '', statut: '', debut: '', fin: '' };
 
 function perfPeriode(mode){
-  const today = new Date().toISOString().slice(0,10);
-  const d = n => { const dt = new Date(); dt.setDate(dt.getDate()-n); return dt.toISOString().slice(0,10); };
+  const today = todayStr();
+  const d = n => { const dt = new Date(); dt.setDate(dt.getDate()-n); return _ymdLocal(dt); };
   const debutEl = document.getElementById('perf-debut');
   const finEl   = document.getElementById('perf-fin');
   if(mode === 'today')     { debutEl.value = today; finEl.value = today; }
@@ -26246,7 +26259,7 @@ function _perfSparkline(parJour, w, h){
 // ── Chargement principal ──────────────────────────────────────────
 async function perfCharger(){
   const debut = document.getElementById('perf-debut')?.value || '';
-  const fin   = document.getElementById('perf-fin')?.value   || new Date().toISOString().slice(0,10);
+  const fin   = document.getElementById('perf-fin')?.value   || todayStr();
   const cards  = document.getElementById('perf-cards');
   const tbody  = document.getElementById('perf-tbody');
   const chart  = document.getElementById('perf-chart');
@@ -26390,7 +26403,7 @@ async function perfOuvrirDetail(employeId, nom){
   _perfDetailFilters = {
     mode: '', statut: '',
     debut: document.getElementById('perf-debut')?.value || '',
-    fin:   document.getElementById('perf-fin')?.value   || new Date().toISOString().slice(0,10),
+    fin:   document.getElementById('perf-fin')?.value   || todayStr(),
   };
   var bg    = document.getElementById('perf-detail-bg');
   var titre = document.getElementById('perf-detail-titre');
@@ -26408,7 +26421,7 @@ async function _perfDetailCharger(){
 
   try {
     var debut = _perfDetailFilters.debut;
-    var fin   = _perfDetailFilters.fin || new Date().toISOString().slice(0,10);
+    var fin   = _perfDetailFilters.fin || todayStr();
     var params = debut ? '?debut='+debut+'&fin='+fin : '?fin='+fin;
     if(_perfDetailFilters.mode)   params += '&mode_paiement='+_perfDetailFilters.mode;
     if(_perfDetailFilters.statut) params += '&statut_filtre='+_perfDetailFilters.statut;
@@ -26544,7 +26557,7 @@ function perfFermerDetail(){
 
 function _initPerfSection(){
   var finEl = document.getElementById('perf-fin');
-  if(finEl && !finEl.value) finEl.value = new Date().toISOString().slice(0,10);
+  if(finEl && !finEl.value) finEl.value = todayStr();
   perfCharger();
 }
 
@@ -26996,7 +27009,7 @@ function ckDepOuvrirModal(depId){
       document.getElementById('ckdep-notes').value       = d.notes || '';
     }
   } else {
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayStr();
     ['ckdep-desc','ckdep-montant','dep-fournisseur','ckdep-notes'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('ckdep-cat').value  = 'INGREDIENTS';
     document.getElementById('ckdep-date').value = today;
@@ -27052,7 +27065,7 @@ async function ckDepSupprimer(id){
 let _ckVentesAll = [];
 
 async function loadCuisineVentes(){
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayStr();
   const dDeb  = document.getElementById('ventes-debut');
   const dFin  = document.getElementById('ventes-fin');
   if(dDeb && !dDeb.value) dDeb.value = today;
@@ -27451,7 +27464,7 @@ function _ckJoursBadge(jours){
 // qu'un avertissement anticipé pour éviter une découverte tardive par erreur.
 function _ckAvertirSiAntidatage(dateChoisie){
   if(!dateChoisie || _appUser?.est_admin) return;
-  const aujourdhui = new Date().toISOString().split('T')[0];
+  const aujourdhui = todayStr();
   if(dateChoisie < aujourdhui){
     posAlert("Date dans le passé : seul un administrateur peut enregistrer une entrée antidatée.", 'warn');
   }
@@ -27549,7 +27562,7 @@ function ckAchatsBilanContinuer(){
   document.getElementById('ckac-cout').value = '';
   document.getElementById('ckac-fournisseur').value = '';
   document.getElementById('ckac-notes').value = '';
-  document.getElementById('ckac-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('ckac-date').value = todayStr();
   document.getElementById('ckac-total-preview').textContent = 'G 0.00';
   if(!_ckAchatsTousPlats.length){
     apiFetch('GET','/cuisine/plats?actif=true').then(d=>{ _ckAchatsTousPlats=d||[]; _ckAchatsRemplirSelects(); }).catch(_=>{});
@@ -27581,7 +27594,7 @@ function ckAchatsBilanExcel(){
   const csv = rows.map(r => r.map(c=>esc(c)).join(sep)).join('\r\n');
   const a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(csv);
-  a.download = `bilan_rentabilite_cuisine_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `bilan_rentabilite_cuisine_${todayStr()}.csv`;
   a.click();
 }
 
@@ -28792,7 +28805,7 @@ function hdepOuvrirModal(depId){
       document.getElementById('hdep-notes').value       = d.notes || '';
     }
   } else {
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayStr();
     ['hdep-desc','hdep-montant','hdep-fournisseur','hdep-notes'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('hdep-cat').value  = 'ENTRETIEN';
     document.getElementById('hdep-date').value = today;
@@ -29097,7 +29110,7 @@ function zdepOpenModal(){
   ['zdep-desc','zdep-montant','zdep-cat','zdep-notes'].forEach(i=>{ const e=document.getElementById(i); if(e) e.value=''; });
   document.getElementById('zdep-devise').value='USD';
   const dateEl = document.getElementById('zdep-date');
-  if(dateEl) dateEl.value = new Date().toISOString().slice(0,10);
+  if(dateEl) dateEl.value = todayStr();
   zdepUpdateConversion();
   document.getElementById('zdep-modal').classList.add('open');
 }
@@ -29484,7 +29497,7 @@ function zelleOpenForm(){
   document.getElementById('zf-frais').value                 = '0';
   document.getElementById('zf-source-fond').value           = '';
   document.getElementById('zf-notes').value                 = '';
-  document.getElementById('zf-date').value                  = new Date().toISOString().substring(0,10);
+  document.getElementById('zf-date').value                  = todayStr();
   const pv = document.getElementById('zf-a-remettre-preview');
   if(pv) pv.style.display = 'none';
   _zelleEditOrigMontant = 0;
@@ -29591,7 +29604,7 @@ function _zelleOpenFondFormDirect(){
   document.getElementById('zff-modal-title').textContent = 'Déclarer réception de fonds';
   document.getElementById('zff-montant').value      = '';
   document.getElementById('zff-source-sel').value   = 'PDG';
-  document.getElementById('zff-date').value         = new Date().toISOString().substring(0,10);
+  document.getElementById('zff-date').value         = todayStr();
   document.getElementById('zff-notes').value        = '';
   const tr = document.getElementById('zff-taux-ref');
   if(tr) tr.textContent = Number(_zelleConfig.taux || 130).toFixed(2) + ' HTG/USD';
@@ -30152,7 +30165,7 @@ async function zelleImprimerFiche(id){
   try{ bilan = await apiFetch('GET','/zelle/bilan'); }catch(e){}
 
   const taux   = _zelleConfig.taux || 130;
-  const rawDate = f.date_reception ? f.date_reception.substring(0,10) : new Date().toISOString().substring(0,10);
+  const rawDate = f.date_reception ? f.date_reception.substring(0,10) : todayStr();
   const parts   = rawDate.split('-');
   const dateAff = parts[2]+'/'+parts[1]+'/'+parts[0];
   const now     = new Date();

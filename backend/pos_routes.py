@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import date as date_type, datetime, timezone, time
 from decimal import Decimal
 from typing import List, Optional
+from tz_utils import today_haiti
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -714,7 +715,7 @@ def export_stock_pdf(
     if disponibilite == "disponible": filtre_txt.append("Disponibles uniquement")
     if disponibilite == "non_disponible": filtre_txt.append("Non disponibles uniquement")
     filtre_txt.append(f"{len(lignes)} produit(s)")
-    filtre_txt.append(f"Généré le {date_cls.today().strftime('%d/%m/%Y')}")
+    filtre_txt.append(f"Généré le {today_haiti().strftime('%d/%m/%Y')}")
     story.append(Paragraph("  ·  ".join(filtre_txt), sub_style))
     story.append(HRFlowable(width="100%", thickness=1.5, color=ORANGE))
     story.append(Spacer(1, 10))
@@ -737,13 +738,13 @@ def export_stock_pdf(
     story.append(Spacer(1, 16))
     story.append(HRFlowable(width="100%", thickness=0.5, color=colors.grey))
     story.append(Paragraph(
-        f"Généré le {date_cls.today().strftime('%Y-%m-%d')} — Konekta · Bon Prix",
+        f"Généré le {today_haiti().strftime('%Y-%m-%d')} — Konekta · Bon Prix",
         ParagraphStyle("footer", fontSize=7, textColor=colors.grey, alignment=TA_CENTER, spaceBefore=4),
     ))
 
     doc.build(story)
     buf.seek(0)
-    fname = f"stock_bar_{date_cls.today().isoformat()}.pdf"
+    fname = f"stock_bar_{today_haiti().isoformat()}.pdf"
     return StreamingResponse(
         buf,
         media_type="application/pdf",
@@ -797,7 +798,7 @@ def bilan_caissiers(
     Inclut : CA total, nb ventes, sessions, crédits en cours, breakdown par mode.
     """
     d_debut = date_type.fromisoformat(debut) if debut else None
-    d_fin   = date_type.fromisoformat(fin)   if fin   else date_type.today()
+    d_fin   = date_type.fromisoformat(fin)   if fin   else today_haiti()
 
     # Tout employé actif : caissier/admin par poste ou rôle,
     # OU ayant au moins une vente enregistrée (couvre les admins qui vendent)
@@ -827,7 +828,7 @@ def bilan_caissiers(
         .all()
     )
 
-    today = date_type.today()
+    today = today_haiti()
     debut_7j  = date_type.fromordinal(today.toordinal() - 7)
     debut_30j = date_type.fromordinal(today.toordinal() - 30)
 
@@ -967,7 +968,7 @@ def detail_ventes_caissier(
         raise HTTPException(status_code=404, detail="Employé introuvable")
 
     d_debut = date_type.fromisoformat(debut) if debut else None
-    d_fin   = date_type.fromisoformat(fin)   if fin   else date_type.today()
+    d_fin   = date_type.fromisoformat(fin)   if fin   else today_haiti()
 
     q = (
         db.query(BarVente)
@@ -1217,7 +1218,7 @@ def _achat_dict(a: BarAchat) -> dict:
         "notes":               a.notes,
         "statut":              a.statut,
         "date_achat":          a.date_achat.isoformat(),
-        "jours":               (date_type.today() - a.date_achat.date()).days,
+        "jours":               (today_haiti() - a.date_achat.date()).days,
         "depenses": [
             {"id": d.id, "description": d.description, "montant": float(d.montant)}
             for d in a.depenses
@@ -2349,7 +2350,7 @@ def statistiques_bar(
 ):
     """CA, bénéfice, COGS, top produits sur la période (données réelles uniquement)."""
     from datetime import date as dt
-    today = dt.today()
+    today = today_haiti()
     if not date_debut:
         date_debut = today.replace(day=1)
     if not date_fin:
@@ -2368,7 +2369,7 @@ def benefices_detail(
 ):
     """Bénéfices détaillés par produit et catégorie, avec CMUP réel."""
     from datetime import date as dt
-    today = dt.today()
+    today = today_haiti()
     if not date_debut:
         date_debut = today.replace(day=1)
     if not date_fin:
@@ -2470,7 +2471,7 @@ def grande_caisse(
     Bénéfice brut = ventes - achats.  Bénéfice net = brut - paie.
     """
     from datetime import date as dt
-    today = dt.today()
+    today = today_haiti()
     if not date_debut:
         date_debut = today.replace(day=1)
     if not date_fin:

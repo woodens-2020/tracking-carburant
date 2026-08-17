@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from datetime import date as date_type, timedelta
 from typing import Optional
+from tz_utils import today_haiti
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -92,7 +93,7 @@ def lister_taches(request: Request, statut: Optional[str] = None, db: Session = 
         q = q.filter(Tache.statut == statut)
     taches = q.order_by(Tache.date_echeance.is_(None), Tache.date_echeance.asc(), Tache.created_at.desc()).all()
 
-    aujourdhui = date_type.today()
+    aujourdhui = today_haiti()
 
     # Rappels d'échéance — vérification opportuniste à chaque chargement
     # (pas de scheduler dédié dans cette appli).
@@ -161,7 +162,7 @@ def creer_tache(data: TacheIn, request: Request, db: Session = Depends(get_db)):
 
     db.commit()
     db.refresh(t)
-    return _tache_dict(t, date_type.today())
+    return _tache_dict(t, today_haiti())
 
 
 @router.put("/{tache_id}")
@@ -198,7 +199,7 @@ def modifier_tache(tache_id: int, data: TachePatch, request: Request, db: Sessio
 
     db.commit()
     db.refresh(t)
-    return _tache_dict(t, date_type.today())
+    return _tache_dict(t, today_haiti())
 
 
 @router.patch("/{tache_id}/statut")

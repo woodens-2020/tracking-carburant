@@ -6,6 +6,7 @@ from __future__ import annotations
 from datetime import date as date_type, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
+from tz_utils import today_haiti
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -356,7 +357,7 @@ def evolution_zelle(jours: int = Query(30, ge=7, le=180), db: Session = Depends(
     reçus — pour le graphique d'évolution du tableau de bord Zelle."""
     cfg   = _get_or_create_config(db)
     taux  = float(cfg.taux)
-    fin   = datetime.now(timezone.utc).date()
+    fin   = today_haiti()
     debut = fin - timedelta(days=jours - 1)
     debut_dt = datetime.combine(debut, datetime.min.time()).replace(tzinfo=timezone.utc)
 

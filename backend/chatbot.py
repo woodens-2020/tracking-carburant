@@ -13,6 +13,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 from sqlalchemy import text as sql_text
+from tz_utils import today_haiti
 from stats import compute_stats, liste_produits_pompes
 from stock_service import (
     stock_restant,
@@ -122,7 +123,7 @@ def _system_prompt(db: Session) -> str:
     contexte_produits = "\n".join(lignes) if lignes else "  (aucun produit configuré)"
 
     from datetime import timedelta
-    today      = date.today()
+    today      = today_haiti()
     debut_mois = today.strftime("%Y-%m-01")
     # Bug 3 fix : utiliser timedelta au lieu de replace(day=...) qui casse en début de mois
     sept_jours_avant = (today - timedelta(days=6)).isoformat()

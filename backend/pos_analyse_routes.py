@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, date as date_type, timedelta, time
 from decimal import Decimal
 from typing import Optional
+from tz_utils import today_haiti
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
@@ -23,7 +24,7 @@ def _dec(v) -> Decimal:
 @router.get("/tableau")
 def tableau_controle(db: Session = Depends(get_db)):
     """Tableau de contrôle complet par article : stock, CMUP, marge, valeur, ventes 30j."""
-    today = date_type.today()
+    today = today_haiti()
     dt_30j = datetime.combine(today - timedelta(days=30), time.min).replace(tzinfo=timezone.utc)
 
     produits = (
@@ -132,7 +133,7 @@ def evolution_ventes(
     db: Session = Depends(get_db),
 ):
     """Évolution temporelle des ventes groupée par jour, semaine ou mois."""
-    today = date_type.today()
+    today = today_haiti()
     if not date_debut:
         date_debut = today - timedelta(days=29)
     if not date_fin:

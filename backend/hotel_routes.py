@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import List, Optional
+from tz_utils import today_haiti
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -608,7 +609,7 @@ def dashboard_hotel(
     if type_chambre not in ("SIMPLE", "DOUBLE", "SUITE", "VIP"):
         type_chambre = None
 
-    today = datetime.now(timezone.utc).date()
+    today = today_haiti()
     try:
         d_debut = datetime.strptime(date_debut, "%Y-%m-%d").date() if date_debut else date_type(today.year, today.month, 1)
     except ValueError:
@@ -809,7 +810,7 @@ def _get_rapport_data(
     if type_sejour not in ("NUIT", "MOMENT"):
         type_sejour = None
 
-    today = datetime.now(timezone.utc).date()
+    today = today_haiti()
     try:
         d_debut = datetime.strptime(date_debut, "%Y-%m-%d").date() if date_debut else date_type(today.year, today.month, 1)
     except ValueError:
@@ -1190,7 +1191,7 @@ def _verifier_permission_date_hotel(request: Request, db: Session, nouvelle_date
     règle que Cuisine, pour éviter les entrées rétroactives non contrôlées."""
     if not nouvelle_date:
         return
-    aujourdhui = datetime.now(timezone.utc).date()
+    aujourdhui = today_haiti()
     if nouvelle_date.date() >= aujourdhui:
         return
     if ancienne_date and ancienne_date.date() == nouvelle_date.date():
@@ -1220,7 +1221,7 @@ def liste_depenses_hotel(
     db: Session = Depends(get_db),
 ):
     from datetime import date as date_type, time as time_type
-    today = date_type.today()
+    today = today_haiti()
     d_debut = date_type.fromisoformat(date_debut) if date_debut else today.replace(day=1)
     d_fin   = date_type.fromisoformat(date_fin)   if date_fin   else today
     dt_deb = datetime.combine(d_debut, time_type.min).replace(tzinfo=timezone.utc)

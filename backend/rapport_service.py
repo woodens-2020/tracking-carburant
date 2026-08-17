@@ -17,6 +17,7 @@ from io import BytesIO
 from typing import Optional
 
 from sqlalchemy.orm import Session
+from tz_utils import today_haiti
 
 from models import Produit, Releve
 from stats import compute_stats
@@ -150,7 +151,7 @@ def build_report_payload(
         "station_nom": "Station Carburant",
         "date_debut": str(date_debut),
         "date_fin": str(date_fin),
-        "date_generation": str(date.today()),
+        "date_generation": str(today_haiti()),
         "nb_jours": nb_jours,
         "stats": stats,
         "stats_prev": stats_prev,
