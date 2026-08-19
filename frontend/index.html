@@ -6827,29 +6827,66 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-kpi"><div class="pos-kpi-label">Coût total</div><div class="pos-kpi-val teal" id="kpi-achats-total">—</div></div>
         </div>
 
-        <div class="pos-card" style="padding:14px 16px">
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-            <select class="pos-select" id="pa-filtre-produit" onchange="loadPosAchats()" style="flex:1;min-width:150px">
-              <option value="">Tous les produits</option>
-            </select>
-            <input class="pos-input" id="pa-recherche" type="text" placeholder="Rechercher : produit, fournisseur, dépense…" style="flex:2;min-width:220px" oninput="_paAppliquerRecherche()">
-            <button class="pos-btn ghost" onclick="loadPosAchats()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:4px"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>Rafraîchir
-            </button>
+        <!-- Bascule Historique / Par produit -->
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button id="pa-vue-btn-historique" class="pos-btn" onclick="paBasculerVue('historique')"
+            style="background:rgba(63,182,168,.18);border:1px solid rgba(63,182,168,.35);color:#3fb6a8">Historique</button>
+          <button id="pa-vue-btn-produit" class="pos-btn ghost" onclick="paBasculerVue('produit')">Par produit</button>
+        </div>
+
+        <!-- ── VUE HISTORIQUE (transactions) ── -->
+        <div id="pa-vue-historique">
+          <div class="pos-card" style="padding:14px 16px">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <select class="pos-select" id="pa-filtre-produit" onchange="loadPosAchats()" style="flex:1;min-width:150px">
+                <option value="">Tous les produits</option>
+              </select>
+              <input class="pos-input" id="pa-recherche" type="text" placeholder="Rechercher : produit, fournisseur, dépense…" style="flex:2;min-width:220px" oninput="_paAppliquerRecherche()">
+              <button class="pos-btn ghost" onclick="loadPosAchats()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:4px"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>Rafraîchir
+              </button>
+            </div>
+          </div>
+
+          <div class="pos-card">
+            <div class="pos-card-hdr">Historique des achats</div>
+            <div class="pos-table-wrap">
+              <table class="pos-table">
+                <thead>
+                  <tr><th>Date</th><th>Jours</th><th>Produit</th><th>Quantité</th><th>Prix marchandise</th><th>Dép. supp.</th><th>Coût total</th><th>Fournisseur</th><th></th></tr>
+                </thead>
+                <tbody id="pos-achats-tbody">
+                  <tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div class="pos-card">
-          <div class="pos-card-hdr">Historique des achats</div>
-          <div class="pos-table-wrap">
-            <table class="pos-table">
-              <thead>
-                <tr><th>Date</th><th>Jours</th><th>Produit</th><th>Quantité</th><th>Prix marchandise</th><th>Dép. supp.</th><th>Coût total</th><th>Fournisseur</th><th></th></tr>
-              </thead>
-              <tbody id="pos-achats-tbody">
-                <tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
-              </tbody>
-            </table>
+        <!-- ── VUE PAR PRODUIT (comparaison achat/stock) ── -->
+        <div id="pa-vue-produit" style="display:none">
+          <div class="pos-card" style="padding:14px 16px">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <input class="pos-input" id="pav-recherche" type="text" placeholder="Rechercher un produit…" style="flex:2;min-width:220px" oninput="_pavRender()">
+              <span id="pav-selection-txt" style="font-size:13px;color:rgba(255,255,255,.4)">0 produit(s) sélectionné(s)</span>
+              <button id="pav-btn-comparer" class="pos-btn teal" disabled onclick="posAchatFicheComparaison()">Comparer</button>
+            </div>
+          </div>
+          <div class="pos-card">
+            <div class="pos-card-hdr">Achats par produit — prix de vente, dernier achat, dernière quantité</div>
+            <div class="pos-table-wrap">
+              <table class="pos-table">
+                <thead>
+                  <tr>
+                    <th style="width:30px"><input type="checkbox" id="pav-select-all" onchange="_pavToggleAll(this.checked)"></th>
+                    <th>Produit</th><th>Prix de vente</th><th>Date dernier achat</th><th>Dernière quantité ajoutée</th>
+                  </tr>
+                </thead>
+                <tbody id="pav-tbody">
+                  <tr><td colspan="5" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -23256,6 +23293,165 @@ function _paGetSelected(){
   const id = parseInt(val);
   const prod = (_paTousProduits.bar||[]).find(p=>p.id===id) || _posProduitsAll.find(p=>p.id===id);
   return { type:'bar', id, prod };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ACHATS BAR — VUE PAR PRODUIT (comparaison achat/stock)
+// ══════════════════════════════════════════════════════════════════
+let _pavData     = [];      // cache des produits (issu de /pos/fiche-technique)
+let _pavSelected = new Set();
+
+function paBasculerVue(vue){
+  const btnH = document.getElementById('pa-vue-btn-historique');
+  const btnP = document.getElementById('pa-vue-btn-produit');
+  const vueH = document.getElementById('pa-vue-historique');
+  const vueP = document.getElementById('pa-vue-produit');
+  const actif   = 'background:rgba(63,182,168,.18);border:1px solid rgba(63,182,168,.35);color:#3fb6a8';
+  if(vue==='produit'){
+    vueH.style.display = 'none'; vueP.style.display = '';
+    btnP.className = 'pos-btn'; btnP.style.cssText = actif;
+    btnH.className = 'pos-btn ghost'; btnH.style.cssText = '';
+    _pavCharger();
+  } else {
+    vueH.style.display = ''; vueP.style.display = 'none';
+    btnH.className = 'pos-btn'; btnH.style.cssText = actif;
+    btnP.className = 'pos-btn ghost'; btnP.style.cssText = '';
+  }
+}
+
+async function _pavCharger(){
+  const tbody = document.getElementById('pav-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="5" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>';
+  try {
+    const d = await apiFetch('GET','/pos/fiche-technique');
+    _pavData = d.produits || [];
+    _pavSelected.clear();
+    _pavUpdateSelectionUI();
+    _pavRender();
+  } catch(e){
+    if(tbody) tbody.innerHTML = '<tr><td colspan="5" style="color:#f87171;text-align:center;padding:20px">Erreur de chargement.</td></tr>';
+  }
+}
+
+function _pavFiltres(){
+  const q = _navNorm(document.getElementById('pav-recherche')?.value || '');
+  return !q ? _pavData : _pavData.filter(p=>_navNorm(p.nom||'').includes(q));
+}
+
+function _pavRender(){
+  const tbody = document.getElementById('pav-tbody');
+  if(!tbody) return;
+  const rows = _pavFiltres();
+  if(!rows.length){
+    tbody.innerHTML = '<tr><td colspan="5" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Aucun produit.</td></tr>';
+    return;
+  }
+  const fmt = v => `G ${parseFloat(v||0).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  tbody.innerHTML = rows.map(p=>{
+    const checked  = _pavSelected.has(p.produit_id) ? 'checked' : '';
+    const dateTxt  = p.dernier_achat ? new Date(p.dernier_achat).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+    const qteTxt   = p.derniere_qte_commandee != null
+      ? `${parseFloat(p.derniere_qte_commandee).toFixed(2)} ${esc(p.unite||'u.')}<div style="font-size:12px;color:rgba(255,255,255,.35)">le ${dateTxt}</div>`
+      : '<span style="color:rgba(255,255,255,.25);font-style:italic">Jamais acheté</span>';
+    return `<tr>
+      <td><input type="checkbox" ${checked} onchange="_pavToggle(${p.produit_id},this.checked)"></td>
+      <td style="font-weight:600">${esc(p.nom)}<div style="font-size:12px;color:rgba(255,255,255,.35)">${esc(p.categorie||'')}</div></td>
+      <td>${fmt(p.prix_vente)}</td>
+      <td>${dateTxt}</td>
+      <td>${qteTxt}</td>
+    </tr>`;
+  }).join('');
+}
+
+function _pavToggle(id, checked){
+  if(checked) _pavSelected.add(id); else _pavSelected.delete(id);
+  _pavUpdateSelectionUI();
+}
+
+function _pavToggleAll(checked){
+  _pavFiltres().forEach(p => checked ? _pavSelected.add(p.produit_id) : _pavSelected.delete(p.produit_id));
+  _pavUpdateSelectionUI();
+  _pavRender();
+}
+
+function _pavUpdateSelectionUI(){
+  const n = _pavSelected.size;
+  const txt = document.getElementById('pav-selection-txt');
+  if(txt) txt.textContent = `${n} produit(s) sélectionné(s)`;
+  const btn = document.getElementById('pav-btn-comparer');
+  if(btn) btn.disabled = n===0;
+}
+
+function posAchatFicheComparaison(){
+  const produits = _pavData.filter(p=>_pavSelected.has(p.produit_id));
+  if(!produits.length) return;
+  const now      = new Date();
+  const dateTxt  = now.toLocaleDateString('fr',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const heureTxt = now.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});
+
+  const lignes = produits.map((p,i)=>{
+    const dateAchat = p.dernier_achat ? new Date(p.dernier_achat).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+    const qteAchat  = p.derniere_qte_commandee != null ? `${parseFloat(p.derniere_qte_commandee).toFixed(2)} ${p.unite||'u.'}` : '—';
+    return `<tr style="${i%2===1?'background:#f8fafc':''}">
+      <td style="padding:8px 10px;font-weight:600">${p.nom}<div style="font-size:7.5pt;color:#64748b;font-weight:400">${p.categorie||''}</div></td>
+      <td style="padding:8px 10px;text-align:center">${dateAchat}</td>
+      <td style="padding:8px 10px;text-align:center;font-weight:700">${qteAchat}</td>
+      <td style="padding:8px 10px;text-align:center;font-weight:700;color:${p.stock_courant<=0?'#dc2626':'#16a34a'}">${parseFloat(p.stock_courant).toFixed(2)} ${p.unite||'u.'}</td>
+    </tr>`;
+  }).join('');
+
+  const doc = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<title>Fiche de Comparaison — Achats Bar</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:9pt;color:#1a1a1a;background:#fff}
+@page{size:A4 portrait;margin:12mm 14mm}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+.hdr{background:#0f2744;color:#fff;padding:16px 20px;text-align:center}
+.hdr-brand{font-size:14pt;font-weight:800;letter-spacing:.04em}
+.hdr-sub{font-size:8pt;opacity:.7;margin-top:2px}
+.hdr-title{font-size:12pt;font-weight:700;margin-top:10px;text-transform:uppercase;letter-spacing:.06em}
+.hdr-date{font-size:20pt;font-weight:800;margin-top:6px}
+.hdr-heure{font-size:9pt;opacity:.75;margin-top:2px}
+.body{padding:16px 20px}
+table{width:100%;border-collapse:collapse;font-size:9pt;margin-top:6px}
+thead tr{background:#0f2744;color:#fff}
+thead th{padding:8px 10px;font-weight:600;text-align:left;font-size:8pt;text-transform:uppercase;letter-spacing:.04em}
+thead th:not(:first-child){text-align:center}
+tbody td{border-bottom:1px solid #edf1f7}
+.legende{margin-top:16px;padding:10px 14px;background:#f8fafc;border-left:3px solid #0f2744;border-radius:4px;font-size:7.5pt;color:#475569;display:flex;justify-content:space-around}
+.footer{margin-top:14px;padding-top:8px;border-top:1px solid #dde5ef;display:flex;justify-content:space-between;font-size:7pt;color:#94a3b8}
+</style></head><body>
+<div class="hdr">
+  <div class="hdr-brand">${_branding.nom}</div>
+  <div class="hdr-sub">${_branding.raison_sociale} · ${_branding.complexe}</div>
+  <div class="hdr-title">Fiche de Comparaison — Achats vs Stock</div>
+  <div class="hdr-date">${dateTxt}</div>
+  <div class="hdr-heure">${heureTxt}</div>
+</div>
+<div class="body">
+  <table>
+    <thead><tr>
+      <th>Produit</th><th>Date dernier achat</th><th>Quantité achetée</th><th>Quantité restante (maintenant)</th>
+    </tr></thead>
+    <tbody>${lignes}</tbody>
+  </table>
+  <div class="legende">
+    <span><strong>Quantité achetée</strong> — Dernière quantité enregistrée lors d'un achat</span>
+    <span><strong>Quantité restante</strong> — Stock disponible calculé au moment de la génération</span>
+  </div>
+  <div class="footer">
+    <span>${_branding.nom}</span>
+    <span>${produits.length} produit(s) comparé(s)</span>
+    <span>Document confidentiel</span>
+  </div>
+</div>
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+
+  const w = window.open('','_blank','width=900,height=1100');
+  w.document.write(doc);
+  w.document.close();
 }
 
 async function posAchatNouveauModal(){
