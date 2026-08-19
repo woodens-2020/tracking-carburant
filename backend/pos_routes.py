@@ -1168,24 +1168,37 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
 
         # Pour affichage : prendre le dernier achat tous statuts (même EN_ATTENTE)
         last = derniers_achats_tous.get(p.id)
+
+        # Quantité disponible « transparente » : reconstruite uniquement à partir du
+        # dernier achat CONFIRMÉ (le seul qui a réellement touché le stock) moins ce
+        # qui a été vendu depuis — plutôt que le stock_courant cumulé depuis toujours,
+        # qui peut porter d'anciennes quantités non fiables. Un achat encore EN_ATTENTE
+        # n'est jamais compté ici : il n'est pas encore entré en stock.
+        confirme       = derniers_achats_confirmes.get(p.id)
+        ecoulement_val = round(sorties_depuis_achat.get(p.id, 0), 3)
+        qte_disponible = round(float(confirme.quantite) - ecoulement_val, 3) if confirme else None
+
         resultats.append({
-            "produit_id":              p.id,
-            "nom":                     p.nom,
-            "categorie":               p.categorie,
-            "unite":                   p.unite,
-            "stock_courant":           round(stock, 3),
-            "prix_vente":              round(prix, 2),
-            "cmup":                    round(cout_moy, 4),
-            "valeur_stock":            valeur_stock,
-            "potentiel_ca":            potentiel_ca,
-            "ecoulement":              round(sorties_depuis_achat.get(p.id, 0), 3),
-            "derniere_qte_commandee":  float(last.quantite) if last else None,
-            "dernier_prix_achat":      float(last.prix_achat_unitaire) if last else None,
-            "dernier_achat":           last.date_achat.isoformat() if last else None,
-            "dernier_achat_statut":    last.statut if last else None,
-            "seuil_alerte":            float(p.seuil_alerte_stock),
-            "en_alerte":               stock <= float(p.seuil_alerte_stock),
-            "rupture":                 stock <= 0,
+            "produit_id":                 p.id,
+            "nom":                        p.nom,
+            "categorie":                  p.categorie,
+            "unite":                      p.unite,
+            "stock_courant":              round(stock, 3),
+            "prix_vente":                 round(prix, 2),
+            "cmup":                       round(cout_moy, 4),
+            "valeur_stock":               valeur_stock,
+            "potentiel_ca":               potentiel_ca,
+            "ecoulement":                 ecoulement_val,
+            "derniere_qte_commandee":     float(last.quantite) if last else None,
+            "dernier_prix_achat":         float(last.prix_achat_unitaire) if last else None,
+            "dernier_achat":              last.date_achat.isoformat() if last else None,
+            "dernier_achat_statut":       last.statut if last else None,
+            "dernier_achat_confirme":     confirme.date_achat.isoformat() if confirme else None,
+            "dernier_achat_confirme_qte": float(confirme.quantite) if confirme else None,
+            "quantite_disponible":        qte_disponible,
+            "seuil_alerte":               float(p.seuil_alerte_stock),
+            "en_alerte":                  stock <= float(p.seuil_alerte_stock),
+            "rupture":                    stock <= 0,
         })
 
     total_potentiel_ca = sum(r["potentiel_ca"]  for r in resultats)

@@ -23389,14 +23389,33 @@ function posAchatFicheComparaison(){
   const dateTxt  = now.toLocaleDateString('fr',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   const heureTxt = now.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});
 
+  // Quantité disponible : reconstruite uniquement à partir du dernier achat
+  // CONFIRMÉ (celui qui a réellement touché le stock) moins ce qui a été vendu
+  // depuis — jamais à partir du stock cumulé depuis toujours, qui peut porter
+  // d'anciennes quantités non fiables. Un achat encore en attente de
+  // confirmation n'entre jamais dans ce calcul (pas encore en stock).
   const lignes = produits.map((p,i)=>{
-    const dateAchat = p.dernier_achat ? new Date(p.dernier_achat).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
-    const qteAchat  = p.derniere_qte_commandee != null ? `${parseFloat(p.derniere_qte_commandee).toFixed(2)} ${p.unite||'u.'}` : '—';
+    const dateAchatConf = p.dernier_achat_confirme ? new Date(p.dernier_achat_confirme).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : null;
+    const qteAchatConf  = p.dernier_achat_confirme_qte;
+    const uniteTxt      = p.unite || 'u.';
+    const achatTxt = dateAchatConf
+      ? `${parseFloat(qteAchatConf).toFixed(2)} ${uniteTxt}<div style="font-size:7pt;color:#64748b">le ${dateAchatConf}</div>`
+      : `<span style="color:#94a3b8;font-style:italic">Aucun achat confirmé</span>`;
+    const ecoulTxt = `${parseFloat(p.ecoulement||0).toFixed(2)} ${uniteTxt}`;
+    const dispoVal = p.quantite_disponible;
+    const dispoTxt = dispoVal != null
+      ? `${parseFloat(dispoVal).toFixed(2)} ${uniteTxt}`
+      : `<span style="color:#94a3b8;font-style:italic">—</span>`;
+    const dispoColor = dispoVal == null ? '#94a3b8' : (dispoVal <= 0 ? '#dc2626' : '#16a34a');
     return `<tr style="${i%2===1?'background:#f8fafc':''}">
       <td style="padding:8px 10px;font-weight:600">${p.nom}<div style="font-size:7.5pt;color:#64748b;font-weight:400">${p.categorie||''}</div></td>
-      <td style="padding:8px 10px;text-align:center">${dateAchat}</td>
-      <td style="padding:8px 10px;text-align:center;font-weight:700">${qteAchat}</td>
-      <td style="padding:8px 10px;text-align:center;font-weight:700;color:${p.stock_courant<=0?'#dc2626':'#16a34a'}">${parseFloat(p.stock_courant).toFixed(2)} ${p.unite||'u.'}</td>
+      <td style="padding:8px 10px;text-align:center">${achatTxt}</td>
+      <td style="padding:8px 10px;text-align:center;color:#64748b">− ${ecoulTxt}</td>
+      <td class="sep-left" style="padding:8px 10px;text-align:center;font-weight:800;color:${dispoColor}">${dispoTxt}</td>
+      <td class="sep-left" style="padding:8px 10px;text-align:center">
+        <div style="font-size:8pt">&#9744; Vérifié</div>
+        <div style="font-size:7pt;color:#64748b;margin-top:4px;white-space:nowrap">Trouvé : <span style="display:inline-block;width:70px;border-bottom:1px solid #1a1a1a">&nbsp;</span> ${uniteTxt}</div>
+      </td>
     </tr>`;
   }).join('');
 
@@ -23405,22 +23424,24 @@ function posAchatFicheComparaison(){
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',Arial,sans-serif;font-size:9pt;color:#1a1a1a;background:#fff}
-@page{size:A4 portrait;margin:12mm 14mm}
+@page{size:A4 landscape;margin:10mm 12mm}
 @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-.hdr{background:#0f2744;color:#fff;padding:16px 20px;text-align:center}
-.hdr-brand{font-size:14pt;font-weight:800;letter-spacing:.04em}
+.hdr{background:#0f2744;color:#fff;padding:14px 20px;text-align:center}
+.hdr-brand{font-size:13pt;font-weight:800;letter-spacing:.04em}
 .hdr-sub{font-size:8pt;opacity:.7;margin-top:2px}
-.hdr-title{font-size:12pt;font-weight:700;margin-top:10px;text-transform:uppercase;letter-spacing:.06em}
-.hdr-date{font-size:20pt;font-weight:800;margin-top:6px}
+.hdr-title{font-size:11pt;font-weight:700;margin-top:8px;text-transform:uppercase;letter-spacing:.06em}
+.hdr-date{font-size:19pt;font-weight:800;margin-top:5px;text-transform:capitalize}
 .hdr-heure{font-size:9pt;opacity:.75;margin-top:2px}
-.body{padding:16px 20px}
+.body{padding:14px 20px}
 table{width:100%;border-collapse:collapse;font-size:9pt;margin-top:6px}
 thead tr{background:#0f2744;color:#fff}
-thead th{padding:8px 10px;font-weight:600;text-align:left;font-size:8pt;text-transform:uppercase;letter-spacing:.04em}
+thead th{padding:7px 10px;font-weight:600;text-align:left;font-size:7.5pt;text-transform:uppercase;letter-spacing:.04em}
 thead th:not(:first-child){text-align:center}
+thead th.sep-left{border-left:2px solid rgba(255,255,255,.3)}
 tbody td{border-bottom:1px solid #edf1f7}
-.legende{margin-top:16px;padding:10px 14px;background:#f8fafc;border-left:3px solid #0f2744;border-radius:4px;font-size:7.5pt;color:#475569;display:flex;justify-content:space-around}
-.footer{margin-top:14px;padding-top:8px;border-top:1px solid #dde5ef;display:flex;justify-content:space-between;font-size:7pt;color:#94a3b8}
+tbody td.sep-left{border-left:2px solid #0f2744}
+.legende{margin-top:14px;padding:10px 14px;background:#f8fafc;border-left:3px solid #0f2744;border-radius:4px;font-size:7.5pt;color:#475569;display:flex;justify-content:space-around;flex-wrap:wrap;gap:6px}
+.footer{margin-top:12px;padding-top:8px;border-top:1px solid #dde5ef;display:flex;justify-content:space-between;font-size:7pt;color:#94a3b8}
 </style></head><body>
 <div class="hdr">
   <div class="hdr-brand">${_branding.nom}</div>
@@ -23432,13 +23453,16 @@ tbody td{border-bottom:1px solid #edf1f7}
 <div class="body">
   <table>
     <thead><tr>
-      <th>Produit</th><th>Date dernier achat</th><th>Quantité achetée</th><th>Quantité restante (maintenant)</th>
+      <th>Produit</th><th>Dernier achat confirmé</th><th>Quantité écoulée depuis</th>
+      <th class="sep-left">Quantité disponible (calculée)</th><th class="sep-left">Vérification physique (inventaire)</th>
     </tr></thead>
     <tbody>${lignes}</tbody>
   </table>
   <div class="legende">
-    <span><strong>Quantité achetée</strong> — Dernière quantité enregistrée lors d'un achat</span>
-    <span><strong>Quantité restante</strong> — Stock disponible calculé au moment de la génération</span>
+    <span><strong>Dernier achat confirmé</strong> — Seul un achat confirmé a réellement touché le stock</span>
+    <span><strong>Quantité écoulée</strong> — Vendue depuis cet achat confirmé</span>
+    <span><strong>Quantité disponible</strong> — Achat confirmé − Écoulée : ce qui devrait rester en théorie</span>
+    <span><strong>Vérification physique</strong> — À remplir à la main lors du comptage réel de l'inventaire</span>
   </div>
   <div class="footer">
     <span>${_branding.nom}</span>
@@ -23449,7 +23473,7 @@ tbody td{border-bottom:1px solid #edf1f7}
 <script>window.onload=function(){window.print();}<\/script>
 </body></html>`;
 
-  const w = window.open('','_blank','width=900,height=1100');
+  const w = window.open('','_blank','width=1200,height=820');
   w.document.write(doc);
   w.document.close();
 }
