@@ -6538,6 +6538,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <input type="hidden" id="pos-appro-produit-id">
         <input type="hidden" id="pos-appro-upc" value="1">
         <input type="hidden" id="pos-appro-is-caisse" value="false">
+        <!-- Historique du dernier approvisionnement -->
+        <div id="pos-appro-historique" style="display:none;background:var(--panel3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--muted)"></div>
         <!-- Section caisses (visible si vendu_par_caisse) -->
         <div id="pos-appro-caisse-section">
           <div class="pos-form-row">
@@ -22703,7 +22705,28 @@ function posApproModal(prodId){
     if(prixLabel) prixLabel.textContent = `Prix d'achat / unité (G)`;
   }
   if(liveDiv) liveDiv.style.display = 'none';
+  posApproChargerHistorique(prodId);
   document.getElementById('pos-appro-modal-bg').classList.add('open');
+}
+
+async function posApproChargerHistorique(prodId){
+  const box = document.getElementById('pos-appro-historique');
+  if(!box) return;
+  box.style.display = 'none';
+  try {
+    const h = await GET(`/pos/produits/${prodId}/dernier-approvisionnement`);
+    if(!h.existe){
+      box.innerHTML = `<em>Aucun approvisionnement enregistré pour ce produit.</em>`;
+      box.style.display = '';
+      return;
+    }
+    const dt = new Date(h.date);
+    const dateTxt = `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()} à ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    box.innerHTML = `<strong style="color:var(--text1)">Dernier approvisionnement</strong> — `
+      + `${h.quantite} ${esc(h.unite||'unité(s)')} le ${dateTxt}`
+      + (h.employe_nom ? ` par <strong style="color:var(--text1)">${esc(h.employe_nom)}</strong>` : '');
+    box.style.display = '';
+  } catch(e){ /* silencieux — l'historique est un rappel, pas un bloquant */ }
 }
 
 function posApproModalClose(){

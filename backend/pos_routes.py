@@ -628,6 +628,30 @@ def approvisionner(produit_id: int, data: ApprovisionnementIn, request: Request,
         utilisateur_id = _uid(request),
     ))
 
+    employe = _user(request)
+    employe_nom = employe.nom_complet if employe else "Utilisateur inconnu"
+    from tz_utils import now_haiti
+    quand = now_haiti().strftime("%d/%m/%Y à %H:%M")
+    detail_qte = (
+        f"{data.nb_caisses} caisse(s) × {upc} u." + (f" + {data.nb_unites_vrac} vrac" if data.nb_unites_vrac else "")
+        if p.vendu_par_caisse
+        else f"{total_unites} unité(s)"
+    )
+    message = f"{employe_nom} · {quand} · {detail_qte} ({total_unites} unités au total)"
+    if data.prix_achat_caisse:
+        message += f" · G{data.prix_achat_caisse:.2f}/caisse"
+    if data.notes:
+        message += f" · {data.notes}"
+
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="pos", type_="approvisionnement",
+        titre=f"Approvisionnement — {p.nom}",
+        message=message,
+        lien="pos-stock",
+        dedupe_minutes=None,
+    )
+
     db.commit()
     stk_apres = stock_courant(produit_id, db)
     return {
@@ -638,6 +662,37 @@ def approvisionner(produit_id: int, data: ApprovisionnementIn, request: Request,
         "stock_apres":      float(stk_apres),
         "caisses_apres":    (int(stk_apres) // upc) if p.vendu_par_caisse else None,
         "unites_restantes": (int(stk_apres) %  upc) if p.vendu_par_caisse else None,
+    }
+
+
+@router.get("/produits/{produit_id}/dernier-approvisionnement")
+def dernier_approvisionnement(produit_id: int, db: Session = Depends(get_db)):
+    """Dernière entrée de stock (réception/appro) pour ce produit — affichée dans
+    le modal d'approvisionnement pour donner un rappel de contexte à l'employé."""
+    p = db.query(BarProduit).filter_by(id=produit_id).first()
+    if not p:
+        raise HTTPException(404, "Produit introuvable")
+
+    m = (
+        db.query(BarMouvementStock)
+        .filter(
+            BarMouvementStock.produit_id == produit_id,
+            BarMouvementStock.type_mouvement == "ENTREE",
+        )
+        .order_by(BarMouvementStock.date_mouvement.desc())
+        .first()
+    )
+    if not m:
+        return {"existe": False}
+
+    employe = db.get(Utilisateur, m.utilisateur_id) if m.utilisateur_id else None
+    return {
+        "existe":       True,
+        "date":         m.date_mouvement.isoformat(),
+        "quantite":     float(m.quantite),
+        "unite":        p.unite,
+        "motif":        m.motif,
+        "employe_nom":  employe.nom_complet if employe else None,
     }
 
 
@@ -1362,6 +1417,25 @@ def confirmer_achat(achat_id: int, request: Request, db: Session = Depends(get_d
     )
     db.add(mouv)
     a.statut = "CONFIRME"
+
+    employe = _user(request)
+    employe_nom = employe.nom_complet if employe else "Utilisateur inconnu"
+    from tz_utils import now_haiti
+    quand = now_haiti().strftime("%d/%m/%Y à %H:%M")
+    message = f"{employe_nom} · {quand} · {float(a.quantite)} {unite}(s)"
+    if a.fournisseur:
+        message += f" · Fournisseur : {a.fournisseur}"
+    message += f" · G{float(a.prix_achat_unitaire):.2f}/{unite}"
+
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="pos", type_="approvisionnement",
+        titre=f"Approvisionnement — {p.nom if p else 'Produit'}",
+        message=message,
+        lien="pos-stock",
+        dedupe_minutes=None,
+    )
+
     db.commit()
 
     stk = float(stock_courant(a.produit_id, db))
