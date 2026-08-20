@@ -1178,13 +1178,15 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
         # Pour affichage : prendre le dernier achat tous statuts (même EN_ATTENTE)
         last = derniers_achats_tous.get(p.id)
 
-        # Quantité disponible « transparente » : reconstruite uniquement à partir du
-        # dernier APPROVISIONNEMENT (le seul évènement qui a réellement touché le
-        # stock) moins ce qui a été vendu depuis — plutôt que le stock_courant cumulé
-        # depuis toujours, qui peut porter d'anciennes quantités non fiables.
+        # Quantité disponible : désormais le stock courant lui-même, qui est
+        # redevenu une source fiable maintenant que la confirmation d'un achat ne
+        # touche plus le stock (seul un approvisionnement explicite le fait) — plus
+        # besoin de reconstruire un chiffre à partir du dernier mouvement. Jamais
+        # négatif à l'affichage : une anomalie de stock négatif est déjà détectée
+        # et remontée ailleurs dans le système, pas ici.
         appro          = derniers_appros.get(p.id)
         ecoulement_val = round(sorties_depuis_appro.get(p.id, 0), 3)
-        qte_disponible = round(float(appro.quantite) - ecoulement_val, 3) if appro else None
+        qte_disponible = round(max(stock, 0), 3)
 
         resultats.append({
             "produit_id":                  p.id,
@@ -1415,57 +1417,51 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
 
 @router.post("/achats/{achat_id}/confirmer", status_code=200)
 def confirmer_achat(achat_id: int, request: Request, db: Session = Depends(get_db)):
-    """Confirme la réception d'un achat bar : crée le mouvement ENTREE et met à jour le stock."""
+    """Confirme un achat bar pour la comptabilité (coût moyen pondéré) — ne touche
+    JAMAIS le stock. Le stock n'est mis à jour que par un approvisionnement
+    explicite (modal « Approvisionner » ou réception physique comptée), jamais
+    automatiquement par l'enregistrement ou la confirmation d'un achat."""
     a = db.query(BarAchat).filter_by(id=achat_id).first()
     if not a:
         raise HTTPException(404, "Achat introuvable")
     if a.statut == "CONFIRME":
-        raise HTTPException(409, "Cet achat est déjà confirmé — stock déjà mis à jour.")
+        raise HTTPException(409, "Cet achat est déjà confirmé.")
     if not a.produit_id:
-        raise HTTPException(422, "Seuls les achats de produits bar peuvent être confirmés (stock bar).")
+        raise HTTPException(422, "Seuls les achats de produits bar peuvent être confirmés.")
 
     p       = db.query(BarProduit).filter_by(id=a.produit_id).first()
     unite   = p.unite if p else "unité"
 
-    mouv = BarMouvementStock(
-        produit_id     = a.produit_id,
-        type_mouvement = "ENTREE",
-        quantite       = a.quantite,
-        motif          = f"Réception confirmée : {float(a.quantite)} {unite}(s)"
-                         + (f" — {a.fournisseur}" if a.fournisseur else ""),
-        achat_id       = a.id,
-        utilisateur_id = _uid(request),
-    )
-    db.add(mouv)
     a.statut = "CONFIRME"
 
     employe = _user(request)
     employe_nom = employe.nom_complet if employe else "Utilisateur inconnu"
     from tz_utils import now_haiti
     quand = now_haiti().strftime("%d/%m/%Y à %H:%M")
-    message = f"{employe_nom} · {quand} · {float(a.quantite)} {unite}(s)"
+    message = (
+        f"{employe_nom} · {quand} · {float(a.quantite)} {unite}(s) confirmé(s) pour la comptabilité"
+        f" — pensez à faire l'approvisionnement séparément pour ajouter au stock."
+    )
     if a.fournisseur:
         message += f" · Fournisseur : {a.fournisseur}"
     message += f" · G{float(a.prix_achat_unitaire):.2f}/{unite}"
 
     from notifications_service import creer_notification
     creer_notification(
-        db, module="pos", type_="approvisionnement",
-        titre=f"Approvisionnement — {p.nom if p else 'Produit'}",
+        db, module="pos", type_="achat_confirme",
+        titre=f"Achat confirmé — {p.nom if p else 'Produit'}",
         message=message,
-        lien="pos-stock",
+        lien="pos-achats",
         dedupe_minutes=None,
     )
 
     db.commit()
 
-    stk = float(stock_courant(a.produit_id, db))
     return {
         "ok":           True,
         "achat_id":     a.id,
-        "mouvement_id": mouv.id,
-        "stock_apres":  stk,
         "produit_nom":  p.nom if p else str(a.produit_id),
+        "stock_inchange": True,
     }
 
 

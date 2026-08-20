@@ -6657,7 +6657,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <span>Réceptions en attente de confirmation</span>
             <span id="pos-attente-badge" style="background:#fbbf24;color:#000;font-size:13px;font-weight:700;border-radius:20px;padding:1px 8px;margin-left:4px"></span>
           </div>
-          <div style="font-size:14px;color:rgba(255,255,255,.45);padding:0 0 12px">Ces achats sont enregistrés mais le stock n'a pas encore été mis à jour. Confirmez chaque réception pour mettre à jour le stock.</div>
+          <div style="font-size:14px;color:rgba(255,255,255,.45);padding:0 0 12px">Ces achats sont enregistrés mais pas encore confirmés pour la comptabilité. Confirmer ici ne touche pas le stock — faites un approvisionnement séparé (Produits Bar) pour ajouter la marchandise au stock.</div>
           <div id="pos-attente-list" style="display:flex;flex-direction:column;gap:10px"></div>
         </div>
 
@@ -23045,11 +23045,10 @@ function _posRenderAttente(achats){
 async function posConfirmerReception(achatId){
   const a = (_paAchatsCache||[]).find(x=>x.id===achatId);
   const nom = a?.produit_nom || `Achat #${achatId}`;
-  if(!confirm(`Confirmer la réception de "${nom}" ?\n\nLe stock sera mis à jour immédiatement.`)) return;
+  if(!confirm(`Confirmer l'achat de "${nom}" pour la comptabilité (coût moyen) ?\n\nLe stock n'est PAS mis à jour ici — faites un approvisionnement séparé (Produits Bar) pour ajouter au stock.`)) return;
   try {
-    const res = await apiFetch('POST',`/pos/achats/${achatId}/confirmer`,{});
-    posAlert(`Stock mis à jour — ${nom} : ${res.stock_apres} unité${res.stock_apres!==1?'s':''} en stock.`,'ok');
-    await loadPosStock();
+    await apiFetch('POST',`/pos/achats/${achatId}/confirmer`,{});
+    posAlert(`Achat confirmé — ${nom}. Pensez à faire l'approvisionnement séparément pour ajouter au stock.`,'ok');
     // Rafraîchir aussi la page achats si elle est visible
     if(typeof _paAchatsCache !== 'undefined') loadPosAchats();
   } catch(e){ posAlert(e.message||'Erreur lors de la confirmation.'); }
@@ -23400,10 +23399,9 @@ function posAchatFicheComparaison(){
   const dateTxt  = now.toLocaleDateString('fr',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   const heureTxt = now.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});
 
-  // Quantité disponible : reconstruite uniquement à partir du dernier
-  // APPROVISIONNEMENT (même source que le rappel du modal "Approvisionner" en
-  // Produits Bar) moins ce qui a été vendu depuis — jamais à partir du stock
-  // cumulé depuis toujours, qui peut porter d'anciennes quantités non fiables.
+  // Quantité disponible = stock courant, plafonné à 0 pour l'affichage — fiable
+  // depuis que la confirmation d'un achat ne touche plus le stock (seul un
+  // approvisionnement explicite le fait).
   const lignes = produits.map((p,i)=>{
     const dateAppro = p.dernier_approvisionnement ? new Date(p.dernier_approvisionnement).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : null;
     const qteAppro   = p.derniere_qte_approvisionnee;
@@ -23471,7 +23469,7 @@ tbody td.sep-left{border-left:2px solid #0f2744}
   <div class="legende">
     <span><strong>Dernier approvisionnement</strong> — Dernière entrée de stock réelle (réception ou appro rapide)</span>
     <span><strong>Quantité écoulée</strong> — Vendue depuis cet approvisionnement</span>
-    <span><strong>Quantité disponible</strong> — Approvisionnement − Écoulée : ce qui devrait rester en théorie</span>
+    <span><strong>Quantité disponible</strong> — Stock actuel calculé (jamais négatif à l'affichage)</span>
     <span><strong>Vérification physique</strong> — À remplir à la main lors du comptage réel de l'inventaire</span>
   </div>
   <div class="footer">
@@ -24262,16 +24260,16 @@ async function posEnregistrerAchat(){
       try {
         await apiFetch('POST', `/pos/achats/${res.achat_id}/confirmer`);
         await loadPosAchats();
-        posAlert(`Achat confirmé — stock mis à jour : ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} de ${label}. Coût total: ${fmt(res.cout_total)}`,'ok');
+        posAlert(`Achat confirmé (comptabilité) — ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} de ${label}. Coût total: ${fmt(res.cout_total)}. Pensez à faire l'approvisionnement séparément pour ajouter au stock.`,'ok');
       } catch(ce){
         await loadPosAchats();
-        posAlert(`Achat enregistré mais confirmation stock échouée : ${ce.message||ce}. Allez dans Stock Bar pour confirmer.`,'warn');
+        posAlert(`Achat enregistré mais confirmation échouée : ${ce.message||ce}. Allez dans Achats Bar pour confirmer.`,'warn');
       }
     } else {
       _paAutoConfirmer = false;
       await loadPosAchats();
       if(res.statut==='EN_ATTENTE'){
-        posAlert(`Achat enregistré (EN ATTENTE) — Allez dans Stock Bar pour confirmer la réception de ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} de ${label}.`,'warn');
+        posAlert(`Achat enregistré (EN ATTENTE) — Allez dans Achats Bar pour le confirmer (comptabilité). Faites un approvisionnement séparé pour ajouter les ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} de ${label} au stock.`,'warn');
       } else {
         posAlert(`Achat enregistré — ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} pour ${label}. Coût total: ${fmt(res.cout_total)}`,'ok');
       }
