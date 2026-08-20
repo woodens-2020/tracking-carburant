@@ -6879,7 +6879,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <thead>
                   <tr>
                     <th style="width:30px"><input type="checkbox" id="pav-select-all" onchange="_pavToggleAll(this.checked)"></th>
-                    <th>Produit</th><th>Prix de vente</th><th>Date dernier achat</th><th>Dernière quantité ajoutée</th>
+                    <th>Produit</th><th>Prix de vente</th><th>Date dernier approvisionnement</th><th>Dernière quantité ajoutée</th>
                   </tr>
                 </thead>
                 <tbody id="pav-tbody">
@@ -23349,10 +23349,10 @@ function _pavRender(){
   const fmt = v => `G ${parseFloat(v||0).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   tbody.innerHTML = rows.map(p=>{
     const checked  = _pavSelected.has(p.produit_id) ? 'checked' : '';
-    const dateTxt  = p.dernier_achat ? new Date(p.dernier_achat).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
-    const qteTxt   = p.derniere_qte_commandee != null
-      ? `${parseFloat(p.derniere_qte_commandee).toFixed(2)} ${esc(p.unite||'u.')}<div style="font-size:12px;color:rgba(255,255,255,.35)">le ${dateTxt}</div>`
-      : '<span style="color:rgba(255,255,255,.25);font-style:italic">Jamais acheté</span>';
+    const dateTxt  = p.dernier_approvisionnement ? new Date(p.dernier_approvisionnement).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+    const qteTxt   = p.derniere_qte_approvisionnee != null
+      ? `${parseFloat(p.derniere_qte_approvisionnee).toFixed(2)} ${esc(p.unite||'u.')}<div style="font-size:12px;color:rgba(255,255,255,.35)">le ${dateTxt}</div>`
+      : '<span style="color:rgba(255,255,255,.25);font-style:italic">Jamais approvisionné</span>';
     return `<tr>
       <td><input type="checkbox" ${checked} onchange="_pavToggle(${p.produit_id},this.checked)"></td>
       <td style="font-weight:600">${esc(p.nom)}<div style="font-size:12px;color:rgba(255,255,255,.35)">${esc(p.categorie||'')}</div></td>
@@ -23389,18 +23389,17 @@ function posAchatFicheComparaison(){
   const dateTxt  = now.toLocaleDateString('fr',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   const heureTxt = now.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});
 
-  // Quantité disponible : reconstruite uniquement à partir du dernier achat
-  // CONFIRMÉ (celui qui a réellement touché le stock) moins ce qui a été vendu
-  // depuis — jamais à partir du stock cumulé depuis toujours, qui peut porter
-  // d'anciennes quantités non fiables. Un achat encore en attente de
-  // confirmation n'entre jamais dans ce calcul (pas encore en stock).
+  // Quantité disponible : reconstruite uniquement à partir du dernier
+  // APPROVISIONNEMENT (même source que le rappel du modal "Approvisionner" en
+  // Produits Bar) moins ce qui a été vendu depuis — jamais à partir du stock
+  // cumulé depuis toujours, qui peut porter d'anciennes quantités non fiables.
   const lignes = produits.map((p,i)=>{
-    const dateAchatConf = p.dernier_achat_confirme ? new Date(p.dernier_achat_confirme).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : null;
-    const qteAchatConf  = p.dernier_achat_confirme_qte;
-    const uniteTxt      = p.unite || 'u.';
-    const achatTxt = dateAchatConf
-      ? `${parseFloat(qteAchatConf).toFixed(2)} ${uniteTxt}<div style="font-size:7pt;color:#64748b">le ${dateAchatConf}</div>`
-      : `<span style="color:#94a3b8;font-style:italic">Aucun achat confirmé</span>`;
+    const dateAppro = p.dernier_approvisionnement ? new Date(p.dernier_approvisionnement).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : null;
+    const qteAppro   = p.derniere_qte_approvisionnee;
+    const uniteTxt   = p.unite || 'u.';
+    const achatTxt = dateAppro
+      ? `${parseFloat(qteAppro).toFixed(2)} ${uniteTxt}<div style="font-size:7pt;color:#64748b">le ${dateAppro}</div>`
+      : `<span style="color:#94a3b8;font-style:italic">Aucun approvisionnement</span>`;
     const ecoulTxt = `${parseFloat(p.ecoulement||0).toFixed(2)} ${uniteTxt}`;
     const dispoVal = p.quantite_disponible;
     const dispoTxt = dispoVal != null
@@ -23453,15 +23452,15 @@ tbody td.sep-left{border-left:2px solid #0f2744}
 <div class="body">
   <table>
     <thead><tr>
-      <th>Produit</th><th>Dernier achat confirmé</th><th>Quantité écoulée depuis</th>
+      <th>Produit</th><th>Dernier approvisionnement</th><th>Quantité écoulée depuis</th>
       <th class="sep-left">Quantité disponible (calculée)</th><th class="sep-left">Vérification physique (inventaire)</th>
     </tr></thead>
     <tbody>${lignes}</tbody>
   </table>
   <div class="legende">
-    <span><strong>Dernier achat confirmé</strong> — Seul un achat confirmé a réellement touché le stock</span>
-    <span><strong>Quantité écoulée</strong> — Vendue depuis cet achat confirmé</span>
-    <span><strong>Quantité disponible</strong> — Achat confirmé − Écoulée : ce qui devrait rester en théorie</span>
+    <span><strong>Dernier approvisionnement</strong> — Dernière entrée de stock réelle (réception ou appro rapide)</span>
+    <span><strong>Quantité écoulée</strong> — Vendue depuis cet approvisionnement</span>
+    <span><strong>Quantité disponible</strong> — Approvisionnement − Écoulée : ce qui devrait rester en théorie</span>
     <span><strong>Vérification physique</strong> — À remplir à la main lors du comptage réel de l'inventaire</span>
   </div>
   <div class="footer">

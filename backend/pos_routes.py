@@ -1112,21 +1112,30 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
     prix_map  = prix_actif_batch(db)
     cmup_map  = cmup_batch(db)
 
-    # Dernier achat CONFIRMÉ par produit — sert au calcul de l'écoulement
-    derniers_achats_confirmes: dict[int, BarAchat] = {}
+    # Dernier APPROVISIONNEMENT (mouvement de stock ENTREE) par produit — même source
+    # que le rappel affiché dans le modal "Approvisionner" (Produits Bar), utilisée ici
+    # pour l'écoulement et la quantité disponible. Contrairement à BarAchat, ça capture
+    # aussi les appros rapides enregistrés sans prix (pas de ligne BarAchat créée dans
+    # ce cas) — et un mouvement de stock n'existe jamais tant qu'un achat n'est pas
+    # confirmé, donc pas besoin de filtrer par statut ici.
+    derniers_appros: dict[int, BarMouvementStock] = {}
     for pid, max_date in (
-        db.query(BarAchat.produit_id, func.max(BarAchat.date_achat))
-        .filter(BarAchat.produit_id.isnot(None), BarAchat.statut == "CONFIRME")
-        .group_by(BarAchat.produit_id)
+        db.query(BarMouvementStock.produit_id, func.max(BarMouvementStock.date_mouvement))
+        .filter(BarMouvementStock.type_mouvement == "ENTREE")
+        .group_by(BarMouvementStock.produit_id)
         .all()
     ):
-        achat = (
-            db.query(BarAchat)
-            .filter(BarAchat.produit_id == pid, BarAchat.date_achat == max_date, BarAchat.statut == "CONFIRME")
+        mvt = (
+            db.query(BarMouvementStock)
+            .filter(
+                BarMouvementStock.produit_id == pid,
+                BarMouvementStock.date_mouvement == max_date,
+                BarMouvementStock.type_mouvement == "ENTREE",
+            )
             .first()
         )
-        if achat:
-            derniers_achats_confirmes[pid] = achat
+        if mvt:
+            derniers_appros[pid] = mvt
 
     # Dernier achat TOUS STATUTS par produit — sert à l'affichage de la date/qté commande
     derniers_achats_tous: dict[int, BarAchat] = {}
@@ -1144,17 +1153,17 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
         if achat:
             derniers_achats_tous[pid] = achat
 
-    # Quantité écoulée (SORTIE_VENTE) depuis dernier achat confirmé
-    sorties_depuis_achat: dict[int, float] = {}
+    # Quantité écoulée (SORTIE_VENTE) depuis le dernier approvisionnement
+    sorties_depuis_appro: dict[int, float] = {}
     for p in produits:
-        achat_ref = derniers_achats_confirmes.get(p.id)
-        if achat_ref:
+        appro_ref = derniers_appros.get(p.id)
+        if appro_ref:
             qte = db.query(func.sum(BarMouvementStock.quantite)).filter(
                 BarMouvementStock.produit_id == p.id,
                 BarMouvementStock.type_mouvement == "SORTIE_VENTE",
-                BarMouvementStock.date_mouvement >= achat_ref.date_achat,
+                BarMouvementStock.date_mouvement >= appro_ref.date_mouvement,
             ).scalar()
-            sorties_depuis_achat[p.id] = abs(float(qte or 0))
+            sorties_depuis_appro[p.id] = abs(float(qte or 0))
 
     resultats = []
     for p in produits:
@@ -1170,32 +1179,31 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
         last = derniers_achats_tous.get(p.id)
 
         # Quantité disponible « transparente » : reconstruite uniquement à partir du
-        # dernier achat CONFIRMÉ (le seul qui a réellement touché le stock) moins ce
-        # qui a été vendu depuis — plutôt que le stock_courant cumulé depuis toujours,
-        # qui peut porter d'anciennes quantités non fiables. Un achat encore EN_ATTENTE
-        # n'est jamais compté ici : il n'est pas encore entré en stock.
-        confirme       = derniers_achats_confirmes.get(p.id)
-        ecoulement_val = round(sorties_depuis_achat.get(p.id, 0), 3)
-        qte_disponible = round(float(confirme.quantite) - ecoulement_val, 3) if confirme else None
+        # dernier APPROVISIONNEMENT (le seul évènement qui a réellement touché le
+        # stock) moins ce qui a été vendu depuis — plutôt que le stock_courant cumulé
+        # depuis toujours, qui peut porter d'anciennes quantités non fiables.
+        appro          = derniers_appros.get(p.id)
+        ecoulement_val = round(sorties_depuis_appro.get(p.id, 0), 3)
+        qte_disponible = round(float(appro.quantite) - ecoulement_val, 3) if appro else None
 
         resultats.append({
-            "produit_id":                 p.id,
-            "nom":                        p.nom,
-            "categorie":                  p.categorie,
-            "unite":                      p.unite,
-            "stock_courant":              round(stock, 3),
-            "prix_vente":                 round(prix, 2),
-            "cmup":                       round(cout_moy, 4),
-            "valeur_stock":               valeur_stock,
-            "potentiel_ca":               potentiel_ca,
-            "ecoulement":                 ecoulement_val,
-            "derniere_qte_commandee":     float(last.quantite) if last else None,
-            "dernier_prix_achat":         float(last.prix_achat_unitaire) if last else None,
-            "dernier_achat":              last.date_achat.isoformat() if last else None,
-            "dernier_achat_statut":       last.statut if last else None,
-            "dernier_achat_confirme":     confirme.date_achat.isoformat() if confirme else None,
-            "dernier_achat_confirme_qte": float(confirme.quantite) if confirme else None,
-            "quantite_disponible":        qte_disponible,
+            "produit_id":                  p.id,
+            "nom":                         p.nom,
+            "categorie":                   p.categorie,
+            "unite":                       p.unite,
+            "stock_courant":               round(stock, 3),
+            "prix_vente":                  round(prix, 2),
+            "cmup":                        round(cout_moy, 4),
+            "valeur_stock":                valeur_stock,
+            "potentiel_ca":                potentiel_ca,
+            "ecoulement":                  ecoulement_val,
+            "derniere_qte_commandee":      float(last.quantite) if last else None,
+            "dernier_prix_achat":          float(last.prix_achat_unitaire) if last else None,
+            "dernier_achat":               last.date_achat.isoformat() if last else None,
+            "dernier_achat_statut":        last.statut if last else None,
+            "dernier_approvisionnement":   appro.date_mouvement.isoformat() if appro else None,
+            "derniere_qte_approvisionnee": float(appro.quantite) if appro else None,
+            "quantite_disponible":         qte_disponible,
             "seuil_alerte":               float(p.seuil_alerte_stock),
             "en_alerte":                  stock <= float(p.seuil_alerte_stock),
             "rupture":                    stock <= 0,
