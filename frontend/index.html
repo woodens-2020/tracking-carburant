@@ -13289,6 +13289,9 @@ function selectPeriode(per){
   renderSaisie();
 }
 
+// Doit rester synchronisé avec MAX_MODIFICATIONS_PAR_RELEVE côté backend (main.py)
+const MAX_MODIFICATIONS_PAR_RELEVE = 4;
+
 function renderSaisie(){
   const el=document.getElementById('saisie-content');
   const p=products.find(x=>x.id===currentProdId);
@@ -13307,7 +13310,7 @@ function renderSaisie(){
       const qte=r?r.quantite:0;
       const mnt=r?r.montant_vente:0;
       const nbMod=r?(r.nb_modifications||0):0;
-      const locked=isEdit&&nbMod>=2;
+      const locked=isEdit&&nbMod>=MAX_MODIFICATIONS_PAR_RELEVE;
       const qcol=qte<0?'c-red':'c-teal';
 
       // Bouton d'activation (ou badge verrouillé)
@@ -13315,7 +13318,7 @@ function renderSaisie(){
       if(locked){
         actionHtml=`<span class="badge badge-locked">&#128274; ${t('saisie.badge.locked')}</span>`;
       } else if(isEdit){
-        const rest=2-nbMod;
+        const rest=MAX_MODIFICATIONS_PAR_RELEVE-nbMod;
         actionHtml=`<button class="btn-row-edit btn-row-mod" onclick="enableRow(this.closest('tr'))" title="${t('saisie.btn.modify.title')}">
           ✎ ${t('saisie.btn.modify')} <span style="opacity:.7">(${t('saisie.btn.modify.remaining',{n:rest})})</span>
         </button>`;
@@ -13368,7 +13371,7 @@ function renderSaisie(){
 
 function enableRow(tr){
   const nbMod=parseInt(tr.dataset.nbMod)||0;
-  if(nbMod>=2) return;
+  if(nbMod>=MAX_MODIFICATIONS_PAR_RELEVE) return;
 
   const inpAv=tr.querySelector('.inp-av');
   const inpAp=tr.querySelector('.inp-ap');
