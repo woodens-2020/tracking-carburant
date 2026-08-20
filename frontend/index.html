@@ -6873,17 +6873,17 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
           </div>
           <div class="pos-card">
-            <div class="pos-card-hdr">Achats par produit — prix de vente, dernier achat, dernière quantité</div>
+            <div class="pos-card-hdr">Achats par produit — prix de vente, dernier approvisionnement, quantité disponible</div>
             <div class="pos-table-wrap">
               <table class="pos-table">
                 <thead>
                   <tr>
                     <th style="width:30px"><input type="checkbox" id="pav-select-all" onchange="_pavToggleAll(this.checked)"></th>
-                    <th>Produit</th><th>Prix de vente</th><th>Date dernier approvisionnement</th><th>Dernière quantité ajoutée</th>
+                    <th>Produit</th><th>Prix de vente</th><th>Date dernier approvisionnement</th><th>Dernière quantité ajoutée</th><th>Quantité disponible en stock</th>
                   </tr>
                 </thead>
                 <tbody id="pav-tbody">
-                  <tr><td colspan="5" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                  <tr><td colspan="6" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -23321,7 +23321,7 @@ function paBasculerVue(vue){
 
 async function _pavCharger(){
   const tbody = document.getElementById('pav-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="5" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>';
   try {
     const d = await apiFetch('GET','/pos/fiche-technique');
     _pavData = d.produits || [];
@@ -23329,7 +23329,7 @@ async function _pavCharger(){
     _pavUpdateSelectionUI();
     _pavRender();
   } catch(e){
-    if(tbody) tbody.innerHTML = '<tr><td colspan="5" style="color:#f87171;text-align:center;padding:20px">Erreur de chargement.</td></tr>';
+    if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="color:#f87171;text-align:center;padding:20px">Erreur de chargement.</td></tr>';
   }
 }
 
@@ -23343,7 +23343,7 @@ function _pavRender(){
   if(!tbody) return;
   const rows = _pavFiltres();
   if(!rows.length){
-    tbody.innerHTML = '<tr><td colspan="5" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Aucun produit.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Aucun produit.</td></tr>';
     return;
   }
   const fmt = v => `G ${parseFloat(v||0).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -23353,12 +23353,18 @@ function _pavRender(){
     const qteTxt   = p.derniere_qte_approvisionnee != null
       ? `${parseFloat(p.derniere_qte_approvisionnee).toFixed(2)} ${esc(p.unite||'u.')}<div style="font-size:12px;color:rgba(255,255,255,.35)">le ${dateTxt}</div>`
       : '<span style="color:rgba(255,255,255,.25);font-style:italic">Jamais approvisionné</span>';
+    const dispoVal = p.quantite_disponible;
+    const dispoTxt = dispoVal != null
+      ? `${parseFloat(dispoVal).toFixed(2)} ${esc(p.unite||'u.')}`
+      : '<span style="color:rgba(255,255,255,.25);font-style:italic">—</span>';
+    const dispoColor = dispoVal == null ? 'rgba(255,255,255,.4)' : (dispoVal <= 0 ? '#f87171' : '#34d399');
     return `<tr>
       <td><input type="checkbox" ${checked} onchange="_pavToggle(${p.produit_id},this.checked)"></td>
       <td style="font-weight:600">${esc(p.nom)}<div style="font-size:12px;color:rgba(255,255,255,.35)">${esc(p.categorie||'')}</div></td>
       <td>${fmt(p.prix_vente)}</td>
       <td>${dateTxt}</td>
       <td>${qteTxt}</td>
+      <td style="font-weight:700;color:${dispoColor}">${dispoTxt}</td>
     </tr>`;
   }).join('');
 }
