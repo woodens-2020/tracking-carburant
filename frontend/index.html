@@ -21012,6 +21012,11 @@ async function renflSubmit(){
 /* Formatage monétaire gourdes */
 function posGx(v){ return 'G '+parseFloat(v||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
 
+/* Formatage quantite/stock : entier si valeur ronde, 2 decimales sinon --
+   evite les ".00" trompeurs sur des quantites qui sont presque toujours des
+   nombres entiers (bouteilles, caisses...). */
+function fmtQ(v){ const n = parseFloat(v||0); return n % 1 === 0 ? n.toFixed(0) : n.toFixed(2); }
+
 /* Alert simple réutilisant _giAlert */
 function posAlert(msg,type){ _giAlert(msg, type||'err'); }
 
@@ -22952,7 +22957,7 @@ function _posStockRenderTable(){
     return `<tr${alerte?' style="background:rgba(248,113,113,.06)"':''}>
       <td><strong>${p.nom||'—'}</strong></td>
       <td>${p.categorie||'—'}</td>
-      <td><strong>${stock.toFixed(3)}</strong></td>
+      <td><strong>${fmtQ(stock)}</strong></td>
       <td>${p.unite||'—'}</td>
       <td>${p.seuil_alerte_stock||'—'}</td>
       <td>${valeur>0?posGx(valeur):'—'}</td>
@@ -22983,14 +22988,14 @@ function posStockExportPdf(){
 
 async function posStockReinitialiser(produitId, produitNom, stockActuel){
   const ok = await showConfirm(
-    `Le stock actuel de « ${produitNom} » (${stockActuel.toFixed(3)}) sera ramené à zéro. ` +
+    `Le stock actuel de « ${produitNom} » (${fmtQ(stockActuel)}) sera ramené à zéro. ` +
     `Cette action est tracée comme un ajustement (irréversible) — à utiliser pour repartir sur un nouvel inventaire authentique, sans le mélanger à l'historique existant.`,
     {title:'Réinitialiser le stock', type:'danger', okLabel:'Réinitialiser à zéro'}
   );
   if(!ok) return;
   try{
     const res = await apiFetch('POST', `/pos/stock/${produitId}/reinitialiser`, {});
-    toast(`Stock de « ${res.produit_nom} » réinitialisé (${res.stock_avant.toFixed(3)} → 0).`,'ok');
+    toast(`Stock de « ${res.produit_nom} » réinitialisé (${fmtQ(res.stock_avant)} → 0).`,'ok');
     loadPosStock();
   }catch(e){ toast(e.message||'Erreur lors de la réinitialisation.','err'); }
 }
@@ -23351,11 +23356,11 @@ function _pavRender(){
     const checked  = _pavSelected.has(p.produit_id) ? 'checked' : '';
     const dateTxt  = p.dernier_approvisionnement ? new Date(p.dernier_approvisionnement).toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
     const qteTxt   = p.derniere_qte_approvisionnee != null
-      ? `${parseFloat(p.derniere_qte_approvisionnee).toFixed(2)} ${esc(p.unite||'u.')}<div style="font-size:12px;color:rgba(255,255,255,.35)">le ${dateTxt}</div>`
+      ? `${fmtQ(p.derniere_qte_approvisionnee)} ${esc(p.unite||'u.')}<div style="font-size:12px;color:rgba(255,255,255,.35)">le ${dateTxt}</div>`
       : '<span style="color:rgba(255,255,255,.25);font-style:italic">Jamais approvisionné</span>';
     const dispoVal = p.quantite_disponible;
     const dispoTxt = dispoVal != null
-      ? `${parseFloat(dispoVal).toFixed(2)} ${esc(p.unite||'u.')}`
+      ? `${fmtQ(dispoVal)} ${esc(p.unite||'u.')}`
       : '<span style="color:rgba(255,255,255,.25);font-style:italic">—</span>';
     const dispoColor = dispoVal == null ? 'rgba(255,255,255,.4)' : (dispoVal <= 0 ? '#f87171' : '#34d399');
     return `<tr>
@@ -23404,12 +23409,12 @@ function posAchatFicheComparaison(){
     const qteAppro   = p.derniere_qte_approvisionnee;
     const uniteTxt   = p.unite || 'u.';
     const achatTxt = dateAppro
-      ? `${parseFloat(qteAppro).toFixed(2)} ${uniteTxt}<div style="font-size:7pt;color:#64748b">le ${dateAppro}</div>`
+      ? `${fmtQ(qteAppro)} ${uniteTxt}<div style="font-size:7pt;color:#64748b">le ${dateAppro}</div>`
       : `<span style="color:#94a3b8;font-style:italic">Aucun approvisionnement</span>`;
-    const ecoulTxt = `${parseFloat(p.ecoulement||0).toFixed(2)} ${uniteTxt}`;
+    const ecoulTxt = `${fmtQ(p.ecoulement)} ${uniteTxt}`;
     const dispoVal = p.quantite_disponible;
     const dispoTxt = dispoVal != null
-      ? `${parseFloat(dispoVal).toFixed(2)} ${uniteTxt}`
+      ? `${fmtQ(dispoVal)} ${uniteTxt}`
       : `<span style="color:#94a3b8;font-style:italic">—</span>`;
     const dispoColor = dispoVal == null ? '#94a3b8' : (dispoVal <= 0 ? '#dc2626' : '#16a34a');
     return `<tr style="${i%2===1?'background:#f8fafc':''}">
