@@ -1384,8 +1384,8 @@ def upsert_releve(data: ReleveIn, db: Session = Depends(get_db)):
     if data.metter_apres < data.metter_avant:
         raise HTTPException(
             400,
-            f"metter_apres ({data.metter_apres:.3f}) doit être ≥ metter_avant "
-            f"({data.metter_avant:.3f}) — un compteur ne peut pas reculer."
+            f"metter_apres ({data.metter_apres:.4f}) doit être ≥ metter_avant "
+            f"({data.metter_avant:.4f}) — un compteur ne peut pas reculer."
         )
 
     r = (db.query(Releve)
@@ -1717,11 +1717,11 @@ def anomalies(date: date_type, db: Session = Depends(get_db)):
                     "produit_id":         pompe_obj.produit_id,
                     "date":               str(r.date),
                     "periode":            r.periode,
-                    "valeur_attendue_min": round(meter_apres_precedent, 3),
+                    "valeur_attendue_min": round(meter_apres_precedent, 4),
                     "valeur_saisie":      float(r.metter_avant),
                     "message": (
                         f"Le meter avant ({r.metter_avant}) est inferieur au "
-                        f"meter apres precedent ({round(meter_apres_precedent, 3)}). "
+                        f"meter apres precedent ({round(meter_apres_precedent, 4)}). "
                         f"Le compteur ne peut pas reculer."
                     ),
                 })
@@ -1951,7 +1951,7 @@ def _build_journal_entries(
         qte  = float(r.quantite)
         mnt  = float(r.montant_vente)
         prec = pompe_last.get(pid)
-        decalage = round(av - prec, 3) if prec is not None else None
+        decalage = round(av - prec, 4) if prec is not None else None
 
         releve_valide = av <= ap  # Bug 2 : flag de validité interne
 
@@ -1959,12 +1959,12 @@ def _build_journal_entries(
             statut        = "erreur"
             type_anomalie = "saisie_invalide"
             commentaire   = (
-                f"Le meter après ({ap:.3f}) est inférieur au meter avant ({av:.3f}). "
+                f"Le meter après ({ap:.4f}) est inférieur au meter avant ({av:.4f}). "
                 "Un compteur ne peut physiquement pas reculer — saisie à corriger immédiatement."
             )
             recommandation = (
                 f"Ouvrez Saisie, activez la modification de cette pompe et corrigez la valeur. "
-                f"La valeur après doit être ≥ {av:.3f}."
+                f"La valeur après doit être ≥ {av:.4f}."
             )
             # Bug 2 fix : NE PAS mettre à jour pompe_last — ap est corrompu.
             # On conserve la dernière référence valide connue.
@@ -1974,12 +1974,12 @@ def _build_journal_entries(
             type_anomalie = "recul_compteur"
             commentaire   = (
                 f"Le compteur a reculé entre les sessions. "
-                f"La session précédente s'est terminée à {prec:.3f} mais cette session "
-                f"démarre à {av:.3f} (recul de {abs(decalage):.3f})."
+                f"La session précédente s'est terminée à {prec:.4f} mais cette session "
+                f"démarre à {av:.4f} (recul de {abs(decalage):.4f})."
             )
             recommandation = (
                 f"Vérifiez si le compteur a été remplacé ou manipulé. "
-                f"En cas d'erreur de saisie, corrigez le meter avant à {prec:.3f}. "
+                f"En cas d'erreur de saisie, corrigez le meter avant à {prec:.4f}. "
                 "En cas de remplacement confirmé, documentez la nouvelle base."
             )
             pompe_last[pid] = ap
@@ -1988,13 +1988,13 @@ def _build_journal_entries(
             statut        = "alerte"
             type_anomalie = "saut_compteur"
             commentaire   = (
-                f"Saut du compteur : attendu {prec:.3f} (fin de la session précédente) "
-                f"mais le meter avant saisi est {av:.3f}. "
-                f"Écart positif de {decalage:.3f} — correspond à {decalage:.3f} gallons non comptabilisés."
+                f"Saut du compteur : attendu {prec:.4f} (fin de la session précédente) "
+                f"mais le meter avant saisi est {av:.4f}. "
+                f"Écart positif de {decalage:.4f} — correspond à {decalage:.4f} gallons non comptabilisés."
             )
             recommandation = (
                 f"Vérifiez si une session (matin ou après-midi) a été omise. "
-                f"Si le compteur a été remplacé, enregistrez la nouvelle base {av:.3f} "
+                f"Si le compteur a été remplacé, enregistrez la nouvelle base {av:.4f} "
                 "et annulez l'alerte en ajoutant une note explicative."
             )
             pompe_last[pid] = ap
@@ -2003,13 +2003,13 @@ def _build_journal_entries(
             statut = "ok"
             if prec is None:
                 type_anomalie  = "premiere_lecture"
-                commentaire    = f"Première lecture enregistrée pour cette pompe. Base de référence : {av:.3f}."
+                commentaire    = f"Première lecture enregistrée pour cette pompe. Base de référence : {av:.4f}."
                 recommandation = "Aucune action requise. Ce relevé servira de base de comparaison."
             else:
                 type_anomalie  = "ok"
                 commentaire    = (
                     f"Continuité parfaite : le compteur reprend exactement là où "
-                    f"la session précédente s'est arrêtée ({prec:.3f} → {av:.3f})."
+                    f"la session précédente s'est arrêtée ({prec:.4f} → {av:.4f})."
                 )
                 recommandation = "Aucune action requise."
             pompe_last[pid] = ap
@@ -2026,8 +2026,8 @@ def _build_journal_entries(
             "metter_apres":     ap,
             "metter_attendu":   prec,
             "decalage":         decalage,
-            "ecart_gallons":    round(abs(decalage), 3) if decalage is not None else None,
-            "quantite":         round(qte, 3),
+            "ecart_gallons":    round(abs(decalage), 4) if decalage is not None else None,
+            "quantite":         round(qte, 4),
             "montant_vente":    round(mnt, 2),
             "nb_modifications": r.nb_modifications,
             "statut":           statut,
@@ -2188,16 +2188,16 @@ def journal_pdf(
             bg_col = colors.HexColor("#fff1f3") if is_err else colors.HexColor("#fffbeb")
             bd_col = C_RED if is_err else C_AMBER
             label  = "ERREUR" if is_err else "ALERTE"
-            dec_str = f"{e['decalage']:+.3f}" if e["decalage"] is not None else "—"
-            att_str = f"{e['metter_attendu']:.3f}" if e["metter_attendu"] is not None else "—"
+            dec_str = f"{e['decalage']:+.4f}" if e["decalage"] is not None else "—"
+            att_str = f"{e['metter_attendu']:.4f}" if e["metter_attendu"] is not None else "—"
 
             al_data = [
                 [Paragraph(f"{label} — {e['pompe_nom']} · {e['produit_nom']} | {e['date']} {e['periode']} | Décalage : {dec_str}", sAlHead)],
                 [Paragraph(
-                    f"<b>Meter avant :</b> {e['metter_avant']:.3f}  |  "
+                    f"<b>Meter avant :</b> {e['metter_avant']:.4f}  |  "
                     f"<b>Attendu :</b> {att_str}  |  "
-                    f"<b>Meter après :</b> {e['metter_apres']:.3f}  |  "
-                    f"<b>Qté :</b> {e['quantite']:.3f} gal  |  "
+                    f"<b>Meter après :</b> {e['metter_apres']:.4f}  |  "
+                    f"<b>Qté :</b> {e['quantite']:.4f} gal  |  "
                     f"<b>Montant :</b> {e['montant_vente']:,.0f} G",
                     sAlBody
                 )],
@@ -2231,17 +2231,17 @@ def journal_pdf(
                "Décalage", "Attendu", "Statut"]
         t_data = [hdr]
         for e in entries:
-            dec = f"{e['decalage']:+.3f}" if e["decalage"] is not None else "—"
-            att = f"{e['metter_attendu']:.3f}" if e["metter_attendu"] is not None else "—"
+            dec = f"{e['decalage']:+.4f}" if e["decalage"] is not None else "—"
+            att = f"{e['metter_attendu']:.4f}" if e["metter_attendu"] is not None else "—"
             per = "Matin" if e["periode"] == "Matin" else "Après-midi"
             t_data.append([
                 e["date"][5:].replace("-", "/") + "/" + e["date"][:4],
                 per,
                 e["pompe_nom"],
                 e["produit_nom"],
-                f"{e['metter_avant']:.3f}",
-                f"{e['metter_apres']:.3f}",
-                f"{e['quantite']:.3f}",
+                f"{e['metter_avant']:.4f}",
+                f"{e['metter_apres']:.4f}",
+                f"{e['quantite']:.4f}",
                 f"{e['montant_vente']:,.0f}",
                 dec,
                 att,
@@ -2347,7 +2347,7 @@ def export_releves_xlsx(
     ODD_FILL  = _fill("FFFDF5");  EVN_FILL  = _fill("FFFFFF")
     GRN_HDR   = _fill("3DB88A");  GRN_FILL  = _fill("F0FBF7")
     BASE_FONT = _font()
-    NUM_FMT   = "#,##0.000"
+    NUM_FMT   = "#,##0.0000"
     MNT_FMT   = "#,##0.00"
     BD        = _border()
 
@@ -2356,7 +2356,7 @@ def export_releves_xlsx(
     by_prod   = defaultdict(lambda: {"nb": 0, "qte": 0.0, "mnt": 0.0})
     by_pump   = defaultdict(lambda: {"produit": "", "nb": 0, "qte": 0.0, "mnt": 0.0})
     for r in releves:
-        qte = round(float(r.metter_apres) - float(r.metter_avant), 3)
+        qte = round(float(r.metter_apres) - float(r.metter_avant), 4)
         mnt = round(qte * float(r.prix_gallon), 2)
         rows_data.append((r, qte, mnt))
         pn = r.pompe.produit.nom
@@ -2409,7 +2409,7 @@ def export_releves_xlsx(
         c = ws1.cell(tr1, col);  c.fill = TOT_FILL;  c.font = TOT_FONT;  c.border = BD
     ws1.cell(tr1, 1, "TOTAL").alignment = _align("left")
     ws1.cell(tr1, 2, f"{len(rows_data)} relevé(s)").alignment = _align("left")
-    ws1.cell(tr1, 9, round(total_qte, 3)).number_format = NUM_FMT;  ws1.cell(tr1, 9).alignment = _align("right")
+    ws1.cell(tr1, 9, round(total_qte, 4)).number_format = NUM_FMT;  ws1.cell(tr1, 9).alignment = _align("right")
     ws1.cell(tr1, 10, round(total_mnt, 2)).number_format = MNT_FMT; ws1.cell(tr1, 10).alignment = _align("right")
     ws1.row_dimensions[tr1].height = 22
     ws1.freeze_panes = "A4"
@@ -2434,7 +2434,7 @@ def export_releves_xlsx(
         rf = GRN_FILL if ri % 2 else EVN_FILL
         pm = round(v["mnt"] / v["qte"], 3) if v["qte"] else 0
         t2_nb += v["nb"];  t2_qte += v["qte"];  t2_mnt += v["mnt"]
-        for col, val in enumerate([pnom, v["nb"], round(v["qte"], 3), round(v["mnt"], 2), pm], 1):
+        for col, val in enumerate([pnom, v["nb"], round(v["qte"], 4), round(v["mnt"], 2), pm], 1):
             c = ws2.cell(ri, col, val);  c.font = BASE_FONT;  c.fill = rf;  c.border = BD
             if col == 1:  c.alignment = _align("left")
             else:
@@ -2447,7 +2447,7 @@ def export_releves_xlsx(
         c = ws2.cell(tr2, col);  c.fill = TOT_FILL;  c.font = TOT_FONT;  c.border = BD
     ws2.cell(tr2, 1, "TOTAL").alignment = _align("left")
     ws2.cell(tr2, 2, t2_nb).alignment = _align("right");  ws2.cell(tr2, 2).number_format = "#,##0"
-    ws2.cell(tr2, 3, round(t2_qte, 3)).number_format = NUM_FMT; ws2.cell(tr2, 3).alignment = _align("right")
+    ws2.cell(tr2, 3, round(t2_qte, 4)).number_format = NUM_FMT; ws2.cell(tr2, 3).alignment = _align("right")
     ws2.cell(tr2, 4, round(t2_mnt, 2)).number_format = MNT_FMT; ws2.cell(tr2, 4).alignment = _align("right")
     ws2.row_dimensions[tr2].height = 22
     ws2.freeze_panes = "A3"
@@ -2470,7 +2470,7 @@ def export_releves_xlsx(
     for ri, (ponom, v) in enumerate(sorted(by_pump.items()), 3):
         rf = ODD_FILL if ri % 2 else EVN_FILL
         t3_nb += v["nb"];  t3_qte += v["qte"];  t3_mnt += v["mnt"]
-        for col, val in enumerate([ponom, v["produit"], v["nb"], round(v["qte"], 3), round(v["mnt"], 2)], 1):
+        for col, val in enumerate([ponom, v["produit"], v["nb"], round(v["qte"], 4), round(v["mnt"], 2)], 1):
             c = ws3.cell(ri, col, val);  c.font = BASE_FONT;  c.fill = rf;  c.border = BD
             if col <= 2: c.alignment = _align("left")
             else:
@@ -2483,7 +2483,7 @@ def export_releves_xlsx(
         c = ws3.cell(tr3, col);  c.fill = TOT_FILL;  c.font = TOT_FONT;  c.border = BD
     ws3.cell(tr3, 1, "TOTAL").alignment = _align("left")
     ws3.cell(tr3, 3, t3_nb).alignment = _align("right");  ws3.cell(tr3, 3).number_format = "#,##0"
-    ws3.cell(tr3, 4, round(t3_qte, 3)).number_format = NUM_FMT; ws3.cell(tr3, 4).alignment = _align("right")
+    ws3.cell(tr3, 4, round(t3_qte, 4)).number_format = NUM_FMT; ws3.cell(tr3, 4).alignment = _align("right")
     ws3.cell(tr3, 5, round(t3_mnt, 2)).number_format = MNT_FMT; ws3.cell(tr3, 5).alignment = _align("right")
     ws3.row_dimensions[tr3].height = 22
     ws3.freeze_panes = "A3"

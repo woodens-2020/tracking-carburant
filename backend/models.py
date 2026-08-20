@@ -59,8 +59,8 @@ class Releve(Base):
     periode      = Column(String(20), nullable=False)          # "Matin" | "Apres-midi"
     pompe_id     = Column(Integer, ForeignKey("pompes.id", ondelete="RESTRICT"), nullable=False)
     prix_gallon  = Column(Numeric(12, 3), nullable=False, default=0)
-    metter_avant     = Column(Numeric(14, 3), nullable=False, default=0)
-    metter_apres     = Column(Numeric(14, 3), nullable=False, default=0)
+    metter_avant     = Column(Numeric(14, 4), nullable=False, default=0)
+    metter_apres     = Column(Numeric(14, 4), nullable=False, default=0)
     nb_modifications = Column(Integer, nullable=False, default=0)
     created_at       = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at   = Column(DateTime(timezone=True), nullable=False, server_default=func.now(),
@@ -86,7 +86,7 @@ class Releve(Base):
     @property
     def quantite(self) -> float:
         """Gallons vendus durant la période."""
-        return round(float(self.metter_apres) - float(self.metter_avant), 3)
+        return round(float(self.metter_apres) - float(self.metter_avant), 4)
 
     @property
     def montant_vente(self) -> float:

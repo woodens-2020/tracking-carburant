@@ -13330,9 +13330,9 @@ function renderSaisie(){
                   data-av="${av}" data-ap="${ap}">
         <td style="font-weight:600">${esc(po.nom)}</td>
         <td class="tr" data-label="${t('saisie.table.px')}"><input class="inp inp-sm inp-px" type="number" step="0.01" value="${px}" oninput="calcRow(this.closest('tr'))"></td>
-        <td class="tr" data-label="${t('saisie.table.av')}"><input class="inp inp-av" type="number" step="0.001" value="" readonly placeholder="${av||'—'}" oninput="calcRow(this.closest('tr'))"></td>
-        <td class="tr" data-label="${t('saisie.table.ap')}"><input class="inp inp-ap" type="number" step="0.001" value="" readonly placeholder="${ap||'—'}" oninput="calcRow(this.closest('tr'))"></td>
-        <td class="tr num ${qcol} val-qte" data-label="${t('saisie.table.qte')}">${isEdit?fmtGal(qte):'—'}</td>
+        <td class="tr" data-label="${t('saisie.table.av')}"><input class="inp inp-av" type="number" step="0.0001" value="" readonly placeholder="${av||'—'}" oninput="calcRow(this.closest('tr'))"></td>
+        <td class="tr" data-label="${t('saisie.table.ap')}"><input class="inp inp-ap" type="number" step="0.0001" value="" readonly placeholder="${ap||'—'}" oninput="calcRow(this.closest('tr'))"></td>
+        <td class="tr num ${qcol} val-qte" data-label="${t('saisie.table.qte')}">${isEdit?fmtGal(qte,4):'—'}</td>
         <td class="tr num c-amber val-mnt" data-label="${t('saisie.table.mnt')}">${isEdit?fmtG(mnt):'—'}</td>
         <td data-label="${t('saisie.table.statut')}"><span class="row-badge">${actionHtml}</span></td>
       </tr>`;
@@ -13398,11 +13398,11 @@ function calcRow(tr){
   const av=parseFloat(tr.querySelector('.inp-av').value)||0;
   const ap=parseFloat(tr.querySelector('.inp-ap').value)||0;
   const px=parseFloat(tr.querySelector('.inp-px').value)||0;
-  const qte=Math.round((ap-av)*1000)/1000;
+  const qte=Math.round((ap-av)*10000)/10000;
   const mnt=Math.round(qte*px*100)/100;
 
   const qEl=tr.querySelector('.val-qte');
-  qEl.textContent=fmtGal(qte);
+  qEl.textContent=fmtGal(qte,4);
   qEl.className='tr num val-qte '+(qte<0?'c-red':'c-teal');
   tr.querySelector('.val-mnt').textContent=fmtG(mnt);
 
@@ -13450,7 +13450,7 @@ function prepareConfirm(periode){
       hasError=true;
       continue;
     }
-    const qte=Math.round((ap-av)*1000)/1000;
+    const qte=Math.round((ap-av)*10000)/10000;
     const mnt=Math.round(qte*px*100)/100;
     data.push({pompeId,pompeNom:pompe?.nom||'?',px,av,ap,qte,mnt});
   }
@@ -13471,14 +13471,14 @@ function prepareConfirm(periode){
   document.getElementById('confirm-rows').innerHTML=
     data.map(r=>`<tr>
       <td style="font-weight:600">${esc(r.pompeNom)}</td>
-      <td class="tr num">${r.av.toFixed(3)}</td>
-      <td class="tr num">${r.ap.toFixed(3)}</td>
-      <td class="tr num c-teal">${fmtGal(r.qte)}</td>
+      <td class="tr num">${r.av.toFixed(4)}</td>
+      <td class="tr num">${r.ap.toFixed(4)}</td>
+      <td class="tr num c-teal">${fmtGal(r.qte,4)}</td>
       <td class="tr num c-amber">${fmtG(r.mnt)}</td>
     </tr>`).join('')+
     `<tr class="recap-total">
       <td colspan="3" style="font-weight:700;letter-spacing:.04em">${t('saisie.recap.total')}</td>
-      <td class="tr num c-teal" style="font-weight:700">${fmtGal(totQte)}</td>
+      <td class="tr num c-teal" style="font-weight:700">${fmtGal(totQte,4)}</td>
       <td class="tr num c-amber" style="font-weight:700">${fmtG(totMnt)}</td>
     </tr>`;
 

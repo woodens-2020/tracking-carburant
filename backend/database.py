@@ -256,6 +256,18 @@ def _migrate_columns():
             except Exception:
                 pass  # contrainte déjà à jour
 
+            # v16 — précision des relevés de compteur élargie de 3 à 4 décimales
+            # (élargissement sans perte : les valeurs existantes restent valides)
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE releves ALTER COLUMN metter_avant TYPE NUMERIC(14,4)"
+                ))
+                conn.execute(sql_text(
+                    "ALTER TABLE releves ALTER COLUMN metter_apres TYPE NUMERIC(14,4)"
+                ))
+            except Exception:
+                pass  # déjà à la bonne précision
+
         conn.commit()
 
 
