@@ -5209,10 +5209,13 @@ def gi_dashboard(
 # ══════════════════════════════════════════════════════════════════
 @app.get("/api/statistiques")
 async def get_statistiques(
-    date_debut:  Optional[str] = None,
-    date_fin:    Optional[str] = None,
-    produit_id:  Optional[int] = None,
-    db:          Session = Depends(get_db),
+    date_debut:   Optional[str] = None,
+    date_fin:     Optional[str] = None,
+    produit_id:   Optional[int] = None,
+    pompe_id:     Optional[int] = None,
+    periode_jour: Optional[str] = None,
+    comparaison:  Optional[str] = "precedente",
+    db:           Session = Depends(get_db),
 ):
     import statistics as _stat
     from collections import defaultdict
@@ -5223,15 +5226,23 @@ async def get_statistiques(
     debut = date_type.fromisoformat(date_debut) if date_debut else fin - timedelta(days=29)
     nb_jours = (fin - debut).days + 1
 
-    prev_fin   = debut - timedelta(days=1)
-    prev_debut = prev_fin - timedelta(days=nb_jours - 1)
+    if comparaison == "annee_derniere":
+        prev_debut = debut - timedelta(days=365)
+        prev_fin   = fin   - timedelta(days=365)
+    else:
+        prev_fin   = debut - timedelta(days=1)
+        prev_debut = prev_fin - timedelta(days=nb_jours - 1)
 
     # ── Requête relevés ──────────────────────────────────────────
     def _q_releves(d0, d1):
         q = db.query(Releve).filter(Releve.date >= d0, Releve.date <= d1)
-        if produit_id:
+        if pompe_id:
+            q = q.filter(Releve.pompe_id == pompe_id)
+        elif produit_id:
             ids = [p.id for p in db.query(Pompe).filter(Pompe.produit_id == produit_id).all()]
             q = q.filter(Releve.pompe_id.in_(ids)) if ids else q.filter(False)
+        if periode_jour:
+            q = q.filter(Releve.periode == periode_jour)
         return q.all()
 
     releves  = _q_releves(debut, fin)

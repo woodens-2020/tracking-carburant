@@ -4054,12 +4054,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <div class="gi-filters">
         <div class="gi-filter-field">
           <span class="gi-filter-lbl">Période rapide</span>
-          <div style="display:flex;gap:5px;flex-wrap:wrap">
-            <button class="gid-period-btn active" data-sp="30j"  onclick="setStPreset('30j' ,this)">30 jours</button>
-            <button class="gid-period-btn"        data-sp="7j"   onclick="setStPreset('7j'  ,this)">7 jours</button>
-            <button class="gid-period-btn"        data-sp="mois" onclick="setStPreset('mois',this)">Ce mois</button>
-            <button class="gid-period-btn"        data-sp="trim" onclick="setStPreset('trim',this)">Trimestre</button>
-            <button class="gid-period-btn"        data-sp="an"   onclick="setStPreset('an'  ,this)">Année</button>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;max-width:420px">
+            <button class="gid-period-btn"        data-sp="hier"   onclick="setStPreset('hier'  ,this)">Hier</button>
+            <button class="gid-period-btn"        data-sp="7j"     onclick="setStPreset('7j'    ,this)">7 jours</button>
+            <button class="gid-period-btn active" data-sp="30j"    onclick="setStPreset('30j'   ,this)">30 jours</button>
+            <button class="gid-period-btn"        data-sp="mois"   onclick="setStPreset('mois'  ,this)">Ce mois</button>
+            <button class="gid-period-btn"        data-sp="semd"   onclick="setStPreset('semd'  ,this)">Semaine dernière</button>
+            <button class="gid-period-btn"        data-sp="moisd"  onclick="setStPreset('moisd' ,this)">Mois dernier</button>
+            <button class="gid-period-btn"        data-sp="trim"   onclick="setStPreset('trim'  ,this)">Trimestre</button>
+            <button class="gid-period-btn"        data-sp="an"     onclick="setStPreset('an'    ,this)">Année</button>
+            <button class="gid-period-btn"        data-sp="and"    onclick="setStPreset('and'   ,this)">Année dernière</button>
           </div>
         </div>
         <div class="gi-filter-field">
@@ -4072,8 +4076,29 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
         <div class="gi-filter-field">
           <span class="gi-filter-lbl">Produit</span>
-          <select id="st-prod" class="gi-filter-select">
+          <select id="st-prod" class="gi-filter-select" onchange="_stFiltrerPompes()">
             <option value="">Tous les produits</option>
+          </select>
+        </div>
+        <div class="gi-filter-field">
+          <span class="gi-filter-lbl">Pompe</span>
+          <select id="st-pompe" class="gi-filter-select">
+            <option value="">Toutes les pompes</option>
+          </select>
+        </div>
+        <div class="gi-filter-field">
+          <span class="gi-filter-lbl">Période du jour</span>
+          <select id="st-periode-jour" class="gi-filter-select">
+            <option value="">Les deux</option>
+            <option value="Matin">Matin</option>
+            <option value="Apres-midi">Après-midi</option>
+          </select>
+        </div>
+        <div class="gi-filter-field">
+          <span class="gi-filter-lbl">Comparer à</span>
+          <select id="st-comparaison" class="gi-filter-select">
+            <option value="precedente">Période précédente</option>
+            <option value="annee_derniere">Même période l'an dernier</option>
           </select>
         </div>
         <div style="margin-top:auto">
@@ -19286,19 +19311,53 @@ function initStatistiques(){
   const sel = document.getElementById('st-prod');
   sel.innerHTML = '<option value="">Tous les produits</option>';
   (products||[]).forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.nom; sel.appendChild(o); });
+  _stFiltrerPompes();
   loadStatistiques();
+}
+
+// Peuple le filtre Pompe avec les pompes du produit sélectionné (ou toutes si aucun produit choisi)
+function _stFiltrerPompes(){
+  const prodId = document.getElementById('st-prod')?.value || '';
+  const sel = document.getElementById('st-pompe');
+  if(!sel) return;
+  const prevVal = sel.value;
+  sel.innerHTML = '<option value="">Toutes les pompes</option>';
+  (products||[]).forEach(p=>{
+    if(prodId && String(p.id)!==prodId) return;
+    (p.pompes||[]).forEach(po=>{
+      const o=document.createElement('option'); o.value=po.id; o.textContent=`${po.nom} (${p.nom})`;
+      sel.appendChild(o);
+    });
+  });
+  // Conserve la sélection si la pompe existe toujours dans la liste filtrée
+  if([...sel.options].some(o=>o.value===prevVal)) sel.value = prevVal;
 }
 
 function setStPreset(preset, btn){
   document.querySelectorAll('[data-sp]').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   const now = new Date(currentDate);
+  const pad = n => String(n).padStart(2,'0');
+  const fmt = dt => `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
   let d1, d2 = currentDate;
-  if(preset==='7j'){ const t=new Date(now); t.setDate(t.getDate()-6); d1=t.toISOString().slice(0,10); }
+  if(preset==='hier'){
+    const t=new Date(now); t.setDate(t.getDate()-1); d1=d2=fmt(t);
+  } else if(preset==='7j'){ const t=new Date(now); t.setDate(t.getDate()-6); d1=t.toISOString().slice(0,10); }
   else if(preset==='30j'){ const t=new Date(now); t.setDate(t.getDate()-29); d1=t.toISOString().slice(0,10); }
   else if(preset==='mois'){ d1=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`; }
-  else if(preset==='trim'){ const t=new Date(now); t.setDate(t.getDate()-89); d1=t.toISOString().slice(0,10); }
+  else if(preset==='semd'){
+    const jourIso = (now.getDay()+6)%7; // 0=lundi
+    const thisMonday = new Date(now); thisMonday.setDate(now.getDate()-jourIso);
+    const lastMonday = new Date(thisMonday); lastMonday.setDate(thisMonday.getDate()-7);
+    const lastSunday = new Date(thisMonday); lastSunday.setDate(thisMonday.getDate()-1);
+    d1=fmt(lastMonday); d2=fmt(lastSunday);
+  } else if(preset==='moisd'){
+    const firstPrev = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    const lastPrev  = new Date(now.getFullYear(), now.getMonth(), 0);
+    d1=fmt(firstPrev); d2=fmt(lastPrev);
+  } else if(preset==='trim'){ const t=new Date(now); t.setDate(t.getDate()-89); d1=t.toISOString().slice(0,10); }
   else if(preset==='an'){ d1=`${now.getFullYear()}-01-01`; }
+  else if(preset==='and'){ d1=`${now.getFullYear()-1}-01-01`; d2=`${now.getFullYear()-1}-12-31`; }
   document.getElementById('st-debut').value = d1;
   document.getElementById('st-fin').value   = d2;
 }
@@ -19309,16 +19368,22 @@ async function loadStatistiques(){
   const debut = document.getElementById('st-debut').value;
   const fin   = document.getElementById('st-fin').value;
   const prod  = document.getElementById('st-prod').value;
+  const pompe = document.getElementById('st-pompe')?.value || '';
+  const perJ  = document.getElementById('st-periode-jour')?.value || '';
+  const comp  = document.getElementById('st-comparaison')?.value || 'precedente';
   const body  = document.getElementById('stats-body');
   body.innerHTML = '<div class="gi-empty"><div style="width:22px;height:22px;border:2px solid rgba(255,255,255,.15);border-top-color:#a78bfa;border-radius:50%;animation:spin .7s linear infinite"></div><span>Analyse en cours…</span></div>';
   try{
-    let url = `/statistiques?date_debut=${debut}&date_fin=${fin}`;
-    if(prod) url += `&produit_id=${prod}`;
+    let url = `/statistiques?date_debut=${debut}&date_fin=${fin}&comparaison=${comp}`;
+    if(prod)  url += `&produit_id=${prod}`;
+    if(pompe) url += `&pompe_id=${pompe}`;
+    if(perJ)  url += `&periode_jour=${encodeURIComponent(perJ)}`;
     _stData = await GET(url);
     document.getElementById('stats-subtitle').textContent =
       `${frDate(debut)} → ${frDate(fin)}  ·  ${_stData.periode.nb_jours_actifs} jours actifs sur ${_stData.periode.nb_jours}`;
     body.innerHTML = _renderStats(_stData);
     _renderStatsChart(_stData.serie||[]);
+    _renderStatsDonut(_stData.pompes||[]);
   }catch(e){
     body.innerHTML = `<div class="gi-empty" style="color:#f87171"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>${esc(e.message)}</span></div>`;
   }
@@ -19371,6 +19436,27 @@ function _renderStatsChart(serie){
   });
 }
 
+let _stDonut = null;
+function _renderStatsDonut(pompes){
+  const canvas = document.getElementById('st-chart-donut');
+  if(_stDonut){ _stDonut.destroy(); _stDonut = null; }
+  if(!canvas || pompes.length<2) return;
+  _stDonut = new Chart(canvas.getContext('2d'), {
+    type:'doughnut',
+    data:{
+      labels: pompes.map(p=>p.nom),
+      datasets:[{data: pompes.map(p=>p.ca), backgroundColor:RPT_COLORS.slice(0,pompes.length), borderWidth:2, hoverOffset:6}],
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'58%', animation:{duration:700},
+      plugins:{
+        legend:{position:'right', labels:{color:'rgba(180,200,230,.8)', font:{size:11}, boxWidth:10, padding:10, usePointStyle:true}},
+        tooltip:{callbacks:{label:c=>`${c.label} : ${fmtG(c.parsed)}`}},
+      },
+    },
+  });
+}
+
 function _renderStats(d){
   const s=d.synthese, r=d.rentabilite, c=d.croissance, v=d.variabilite, pm=d.point_mort;
 
@@ -19399,8 +19485,8 @@ function _renderStats(d){
     </div>`
   ).join('');
 
-  // ── KPI Synthèse (3 cols) ────────────────────────────────
-  const kpi1 = `<div class="gi-kpi-row" style="grid-template-columns:repeat(3,1fr)">
+  // ── KPI principaux (4 cols — CA, Volume, Résultat Net, Marge Brute) ──
+  const kpi1 = `<div class="gi-kpi-row" style="grid-template-columns:repeat(4,1fr)">
     <div class="gi-kpi" style="--gi-kpi-color:#a78bfa">
       <div class="gi-kpi-lbl">Chiffre d'Affaires</div>
       <div class="gi-kpi-val purple">${fmtG(s.ca_total)}</div>
@@ -19414,18 +19500,18 @@ function _renderStats(d){
     <div class="gi-kpi" style="--gi-kpi-color:${r.resultat_net>=0?'#22c55e':'#f87171'}">
       <div class="gi-kpi-lbl">Résultat Net</div>
       <div class="gi-kpi-val ${r.resultat_net>=0?'green':'red'}">${fmtG(r.resultat_net)}</div>
-      <div class="gi-kpi-sub">Marge brute : ${r.marge_brute_pct.toFixed(1)}%${r.roi_pct!=null?' · ROI : '+r.roi_pct.toFixed(1)+'%':''}</div>
+      <div class="gi-kpi-sub">${r.roi_pct!=null?'ROI : '+r.roi_pct.toFixed(1)+'%':'—'}</div>
     </div>
-  </div>`;
-
-  // ── KPI Variabilité (4 cols) ─────────────────────────────
-  const cvColor = v.cv_ca<20?'#22c55e':v.cv_ca<40?'#f7a93b':'#f87171';
-  const kpi2 = `<div class="gi-kpi-row" style="grid-template-columns:repeat(4,1fr)">
     <div class="gi-kpi" style="--gi-kpi-color:#3fb6a8">
       <div class="gi-kpi-lbl">Marge Brute</div>
       <div class="gi-kpi-val teal">${fmtG(r.marge_brute)}</div>
-      <div class="gi-kpi-sub">CA − Coût achats carburant</div>
+      <div class="gi-kpi-sub">${r.marge_brute_pct.toFixed(1)}% du CA</div>
     </div>
+  </div>`;
+
+  // ── KPI secondaires (3 cols — variabilité) ───────────────
+  const cvColor = v.cv_ca<20?'#22c55e':v.cv_ca<40?'#f7a93b':'#f87171';
+  const kpi2 = `<div class="gi-kpi-row" style="grid-template-columns:repeat(3,1fr)">
     <div class="gi-kpi" style="--gi-kpi-color:${cvColor}">
       <div class="gi-kpi-lbl">Coeff. Variation (σ/μ)</div>
       <div class="gi-kpi-val" style="color:${cvColor}">${v.cv_ca.toFixed(1)}%</div>
@@ -19443,23 +19529,34 @@ function _renderStats(d){
     </div>
   </div>`;
 
-  // ── Graphique temporel (Chart.js) ────────────────────────
-  const serie = d.serie||[];
+  // ── Graphique temporel + répartition par pompe (Chart.js) ─
+  const serie  = d.serie||[];
+  const pompesRepartition = d.pompes||[];
   let chartHtml = '';
-  if(serie.length){
-    const moyenne = serie.reduce((a,s)=>a+s.montant,0)/serie.length;
-    chartHtml = `<div class="gi-table-card">
-      <div class="gi-table-hdr">
-        <span class="gi-table-title">Évolution journalière du CA</span>
-        <span style="font-size:12px;color:rgba(255,255,255,.45);display:flex;align-items:center;gap:6px">
-          <span style="display:inline-block;width:14px;height:2px;background:#f7a93b;border-radius:1px"></span>Moyenne journalière (${fmtG(moyenne)})
-        </span>
-      </div>
-      <div style="padding:16px 18px">
-        <div style="position:relative;width:100%;height:230px">
-          <canvas id="st-chart-ca"></canvas>
+  if(serie.length || pompesRepartition.length){
+    const moyenne = serie.length ? serie.reduce((a,s)=>a+s.montant,0)/serie.length : 0;
+    chartHtml = `<div style="display:grid;grid-template-columns:${serie.length&&pompesRepartition.length>1?'1.6fr 1fr':'1fr'};gap:12px">
+      ${serie.length?`<div class="gi-table-card">
+        <div class="gi-table-hdr">
+          <span class="gi-table-title">Évolution journalière du CA</span>
+          <span style="font-size:12px;color:rgba(255,255,255,.45);display:flex;align-items:center;gap:6px">
+            <span style="display:inline-block;width:14px;height:2px;background:#f7a93b;border-radius:1px"></span>Moyenne journalière (${fmtG(moyenne)})
+          </span>
         </div>
-      </div>
+        <div style="padding:16px 18px">
+          <div style="position:relative;width:100%;height:230px">
+            <canvas id="st-chart-ca"></canvas>
+          </div>
+        </div>
+      </div>`:''}
+      ${pompesRepartition.length>1?`<div class="gi-table-card">
+        <div class="gi-table-hdr"><span class="gi-table-title">Répartition du CA par Pompe</span></div>
+        <div style="padding:16px 18px">
+          <div style="position:relative;width:100%;height:230px">
+            <canvas id="st-chart-donut"></canvas>
+          </div>
+        </div>
+      </div>`:''}
     </div>`;
   }
 
