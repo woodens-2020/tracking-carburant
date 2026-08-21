@@ -5547,6 +5547,15 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="gi-kpi"><div class="gi-kpi-lbl">Moyenne par entrée</div><div class="gi-kpi-val" id="dep-kpi-avg">—</div></div>
         </div>
 
+        <div class="gi-table-card">
+          <div class="gi-table-hdr">
+            <span class="gi-table-title">Suivi des Dépenses</span>
+          </div>
+          <div style="position:relative;height:220px;padding:14px">
+            <canvas id="dep-chart-suivi"></canvas>
+          </div>
+        </div>
+
         <div class="gi-filters">
           <div class="gi-filter-field">
             <label class="gi-filter-lbl">Du</label>
@@ -8004,6 +8013,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nouvelle dépense
           </button>
         </div>
+        <div class="gi-form-lbl" style="margin-bottom:10px;">Suivi des Dépenses</div>
+        <div style="position:relative;height:220px;margin-bottom:20px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px;">
+          <canvas id="zdep-chart-suivi"></canvas>
+        </div>
         <div style="overflow-x:auto;margin-bottom:24px;">
           <table class="gi-table">
             <thead>
@@ -8826,6 +8839,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-card" style="padding:12px 14px;border-top:3px solid #60a5fa">
             <div style="font-size:12px;color:rgba(255,255,255,.35)">Nb entrées</div>
             <div id="dep-kpi-nb" style="font-size:22px;font-weight:800;color:#60a5fa">—</div>
+          </div>
+        </div>
+        <div class="pos-card" style="margin-bottom:14px">
+          <div class="pos-card-hdr">Suivi des Dépenses</div>
+          <div style="position:relative;height:220px;padding:14px">
+            <canvas id="ckdep-chart-suivi"></canvas>
           </div>
         </div>
         <div class="pos-card" style="padding:0;overflow:hidden">
@@ -9897,6 +9916,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-card" style="padding:12px 14px;border-top:3px solid #60a5fa">
             <div style="font-size:12px;color:rgba(255,255,255,.35)">Nb entrées</div>
             <div id="hdep-kpi-nb" style="font-size:22px;font-weight:800;color:#60a5fa">—</div>
+          </div>
+        </div>
+        <div class="pos-card" style="margin-bottom:14px">
+          <div class="pos-card-hdr">Suivi des Dépenses</div>
+          <div style="position:relative;height:220px;padding:14px">
+            <canvas id="hdep-chart-suivi"></canvas>
           </div>
         </div>
         <div class="pos-card" style="padding:0;overflow:hidden">
@@ -12609,6 +12634,79 @@ function applyChartDefaults(){
   Chart.defaults.font.size=11;
 }
 applyChartDefaults();
+
+// ══════════════════════════════════════════════════════════════════
+// SUIVI DES DÉPENSES — graphique partagé par tous les départements
+// (Dépenses Opérationnelles, Cuisine, Hôtel, Zelle)
+// ══════════════════════════════════════════════════════════════════
+let _suiviDepCharts = {};
+
+// Regroupe par jour (ou par mois si la période dépasse 45 jours) — même seuil
+// de lisibilité que les regroupements d'évolution déjà utilisés ailleurs dans l'app.
+function _suiviDepenseBuckets(depenses, dateField, montantField){
+  if(!depenses || !depenses.length) return {labels:[], data:[]};
+  let minD=null, maxD=null;
+  const valid = [];
+  depenses.forEach(d=>{
+    const raw = String(d[dateField]||'').slice(0,10);
+    if(!raw) return;
+    const dt = new Date(raw+'T12:00:00');
+    if(isNaN(dt)) return;
+    valid.push({raw, montant: parseFloat(d[montantField])||0});
+    if(!minD||dt<minD) minD=dt;
+    if(!maxD||dt>maxD) maxD=dt;
+  });
+  if(!minD) return {labels:[], data:[]};
+  const nbJours = Math.round((maxD-minD)/86400000)+1;
+  const parMois = nbJours > 45;
+
+  const map = {};
+  valid.forEach(({raw, montant})=>{
+    const key = parMois ? raw.slice(0,7) : raw;
+    map[key] = (map[key]||0) + montant;
+  });
+  const keys = Object.keys(map).sort();
+  const labels = keys.map(k=>{
+    const dt = new Date((parMois ? k+'-01' : k)+'T12:00:00');
+    return parMois
+      ? dt.toLocaleDateString('fr',{month:'short',year:'2-digit'})
+      : dt.toLocaleDateString('fr',{day:'2-digit',month:'2-digit'});
+  });
+  return {labels, data: keys.map(k=>map[k])};
+}
+
+// canvasId : id du <canvas>. depenses : tableau brut (déjà filtré si besoin).
+// dateField/montantField : noms des champs à utiliser (varient selon le module).
+function renderSuiviDepenses(canvasId, depenses, dateField='date_depense', montantField='montant'){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas || typeof Chart==='undefined') return;
+  if(_suiviDepCharts[canvasId]){ _suiviDepCharts[canvasId].destroy(); delete _suiviDepCharts[canvasId]; }
+
+  const {labels, data} = _suiviDepenseBuckets(depenses, dateField, montantField);
+  if(!labels.length) return;
+
+  _suiviDepCharts[canvasId] = new Chart(canvas.getContext('2d'), {
+    type:'line',
+    data:{labels, datasets:[{
+      label:'Dépenses',
+      data,
+      borderColor:'#f87171',
+      backgroundColor:'rgba(248,113,113,.12)',
+      fill:true, tension:.35, pointRadius:4, pointHoverRadius:6, borderWidth:2,
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:{duration:700},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=>`Dépenses : G ${Number(c.parsed.y).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`}},
+      },
+      scales:{
+        x:{ticks:{color:'rgba(180,200,230,.8)',font:{size:10}},grid:{display:false}},
+        y:{ticks:{color:'rgba(150,180,220,.7)',font:{size:10},callback:v=>'G '+Number(v).toLocaleString('fr')},grid:{color:'rgba(255,255,255,.05)'}},
+      }
+    }
+  });
+}
 
 function destroyDbCharts(){
   [dbChartTrend,dbChartProd,dbChartPer,dbChartPmp].forEach(c=>{if(c){c.destroy();}});
@@ -18944,6 +19042,7 @@ function depRechercheFiltrer(){
   });
   _depUpdateKpis(filtered);
   renderDepTable(filtered);
+  renderSuiviDepenses('dep-chart-suivi', filtered);
 }
 
 function renderDepTable(data){
@@ -27209,6 +27308,8 @@ function ckDepAfficher(){
     return hay.includes(q);
   });
 
+  renderSuiviDepenses('ckdep-chart-suivi', deps);
+
   const total    = deps.reduce((s, d) => s + d.montant, 0);
   const ing      = deps.filter(d => d.categorie === 'INGREDIENTS').reduce((s,d)=>s+d.montant,0);
   const equip    = deps.filter(d => d.categorie === 'EQUIPEMENT').reduce((s,d)=>s+d.montant,0);
@@ -29005,6 +29106,8 @@ function hdepAfficher(){
     return hay.includes(q);
   });
 
+  renderSuiviDepenses('hdep-chart-suivi', deps);
+
   const total      = deps.reduce((s, d) => s + d.montant, 0);
   const entretien   = deps.filter(d => d.categorie === 'ENTRETIEN').reduce((s,d)=>s+d.montant,0);
   const maintenance = deps.filter(d => d.categorie === 'MAINTENANCE').reduce((s,d)=>s+d.montant,0);
@@ -29283,6 +29386,7 @@ async function _zdepLoad(){
     const cnt = document.getElementById('zdep-attente-count');
     if(cnt) cnt.textContent = bilan.nb_depenses_attente || 0;
     const deps = d.depenses || [];
+    renderSuiviDepenses('zdep-chart-suivi', deps, 'date_depense', 'montant_htg');
     if(!deps.length){
       tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(255,255,255,.35);">Aucune dépense Zelle</td></tr>';
       return;
