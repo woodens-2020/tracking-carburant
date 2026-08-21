@@ -9077,6 +9077,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
 
+        <!-- Suivi des achats -->
+        <div class="pos-card" style="margin-bottom:14px">
+          <div class="pos-card-hdr">Suivi des Achats</div>
+          <div style="position:relative;height:220px;padding:14px">
+            <canvas id="ckac-chart-suivi"></canvas>
+          </div>
+        </div>
+
         <!-- Table -->
         <div class="pos-card" style="overflow:hidden">
           <table class="gi-table" style="width:100%">
@@ -12677,7 +12685,7 @@ function _suiviDepenseBuckets(depenses, dateField, montantField){
 
 // canvasId : id du <canvas>. depenses : tableau brut (déjà filtré si besoin).
 // dateField/montantField : noms des champs à utiliser (varient selon le module).
-function renderSuiviDepenses(canvasId, depenses, dateField='date_depense', montantField='montant'){
+function renderSuiviDepenses(canvasId, depenses, dateField='date_depense', montantField='montant', opts={}){
   const canvas = document.getElementById(canvasId);
   if(!canvas || typeof Chart==='undefined') return;
   if(_suiviDepCharts[canvasId]){ _suiviDepCharts[canvasId].destroy(); delete _suiviDepCharts[canvasId]; }
@@ -12685,20 +12693,24 @@ function renderSuiviDepenses(canvasId, depenses, dateField='date_depense', monta
   const {labels, data} = _suiviDepenseBuckets(depenses, dateField, montantField);
   if(!labels.length) return;
 
+  const label   = opts.label || 'Dépenses';
+  const color   = opts.color || '#f87171';
+  const bgColor = opts.bgColor || 'rgba(248,113,113,.12)';
+
   _suiviDepCharts[canvasId] = new Chart(canvas.getContext('2d'), {
     type:'line',
     data:{labels, datasets:[{
-      label:'Dépenses',
+      label,
       data,
-      borderColor:'#f87171',
-      backgroundColor:'rgba(248,113,113,.12)',
+      borderColor:color,
+      backgroundColor:bgColor,
       fill:true, tension:.35, pointRadius:4, pointHoverRadius:6, borderWidth:2,
     }]},
     options:{
       responsive:true, maintainAspectRatio:false, animation:{duration:700},
       plugins:{
         legend:{display:false},
-        tooltip:{callbacks:{label:c=>`Dépenses : G ${Number(c.parsed.y).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`}},
+        tooltip:{callbacks:{label:c=>`${label} : G ${Number(c.parsed.y).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`}},
       },
       scales:{
         x:{ticks:{color:'rgba(180,200,230,.8)',font:{size:10}},grid:{display:false}},
@@ -27767,6 +27779,10 @@ function ckAchatsAppliquerRecherche(){
   const achats = !q ? _ckAchatsData : _ckAchatsData.filter(a=>{
     const hay = _navNorm([a.description, a.plat_nom, a.categorie, a.fournisseur].filter(Boolean).join(' '));
     return hay.includes(q);
+  });
+
+  renderSuiviDepenses('ckac-chart-suivi', achats, 'date_achat', 'total', {
+    label:'Achats', color:'#f7a93b', bgColor:'rgba(247,169,59,.12)',
   });
 
   const total = achats.reduce((s,a)=>s+(a.total||0), 0);
