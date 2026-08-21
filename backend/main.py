@@ -2065,6 +2065,13 @@ def journal_endpoint(
     nb_ok      = len(entries) - nb_alertes - nb_erreurs
     taux_conformite = round(nb_ok / len(entries) * 100, 1) if entries else 100.0
 
+    # Total gallons vendus hors sauts de compteur : un "saut" signale un écart
+    # entre sessions (gallons non comptabilisés dans aucun relevé), mais la
+    # quantité propre à la session en saut_compteur reste, elle, une mesure
+    # réelle — seul ce type est exclu ici, tel que demandé.
+    nb_sauts       = sum(1 for e in entries if e["type_anomalie"] == "saut_compteur")
+    total_gallons  = round(sum(e["quantite"] for e in entries if e["type_anomalie"] != "saut_compteur"), 4)
+
     return {
         "date_debut": str(d_debut),
         "date_fin":   str(d_fin),
@@ -2075,6 +2082,8 @@ def journal_endpoint(
             "nb_alertes":       nb_alertes,
             "nb_erreurs":       nb_erreurs,
             "taux_conformite":  taux_conformite,
+            "nb_sauts_compteur": nb_sauts,
+            "total_gallons":     total_gallons,
         },
     }
 

@@ -528,7 +528,7 @@ input[readonly].inp-av,input[readonly].inp-ap{
 .anom-item:hover{filter:brightness(1.07)}
 
 /* ── Journal des meters ──────────────────────── */
-.jres-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+.jres-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
 @media(max-width:700px){.jres-grid{grid-template-columns:repeat(3,1fr)}}
 .jres-card{
   background:linear-gradient(145deg,var(--panel),var(--panel2));
@@ -542,6 +542,7 @@ input[readonly].inp-av,input[readonly].inp-ap{
 .jres-card.c-amber::before{background:linear-gradient(90deg,var(--blue),rgba(59,130,246,.4))}
 .jres-card.c-red::before{background:linear-gradient(90deg,var(--red),rgba(239,68,68,.4))}
 .jres-card.c-conf::before{background:linear-gradient(90deg,var(--green),var(--blue2))}
+.jres-card.c-teal::before{background:linear-gradient(90deg,var(--blue2),rgba(59,130,246,.4))}
 .jres-num{font-family:var(--mono);font-size:22px;font-weight:800;line-height:1;margin-top:5px;font-variant-numeric:tabular-nums;letter-spacing:-.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .jres-lbl{font-size:11.5px;color:var(--muted);margin-top:5px;text-transform:uppercase;letter-spacing:.07em;font-weight:700}
 .jres-bar-wrap{height:3px;background:var(--panel3);border-radius:2px;margin-top:9px;overflow:hidden}
@@ -13897,6 +13898,11 @@ function renderJournal(data){
       <div class="jres-lbl">Conformité</div>
       <div class="jres-num" style="color:${tauxCol}">${taux.toFixed(1)}%</div>
       <div class="jres-bar-wrap"><div class="jres-bar" style="width:${taux}%;background:${tauxCol}"></div></div>
+    </div>
+    <div class="jres-card c-teal">
+      <div class="jres-lbl">Total gallons (hors sauts)</div>
+      <div class="jres-num c-teal">${fmtGal(resume.total_gallons,3)}</div>
+      ${resume.nb_sauts_compteur?`<div style="font-size:11.5px;color:var(--muted);margin-top:2px">${resume.nb_sauts_compteur} saut${resume.nb_sauts_compteur>1?'s':''} de compteur exclu${resume.nb_sauts_compteur>1?'s':''}</div>`:''}
     </div>
   </div>`;
 
