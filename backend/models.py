@@ -490,6 +490,9 @@ class BarProduit(Base):
     # Logique caisse/unité
     vendu_par_caisse   = Column(Boolean,  nullable=False, default=False)
     unites_par_caisse  = Column(Integer,  nullable=True)   # obligatoire si vendu_par_caisse=True
+    # Photo illustrative — même approche que PieceJointe (base64 en base, pas de stockage fichier externe)
+    photo_base64       = Column(Text,        nullable=True)
+    photo_mime         = Column(String(50),  nullable=True)
 
     prix_historique = relationship("BarPrixHistorique", back_populates="produit",
                                    cascade="all, delete-orphan",

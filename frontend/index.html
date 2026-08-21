@@ -6480,13 +6480,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <table class="gi-table">
               <thead>
                 <tr>
-                  <th>Nom</th><th>Catégorie</th><th>Unité</th>
+                  <th></th><th>Nom</th><th>Catégorie</th><th>Unité</th>
                   <th>Prix</th><th>Stock</th><th>Coût en stock</th>
                   <th>Statut</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody id="pos-prod-tbody">
-                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:28px">Chargement…</td></tr>
+                <tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:28px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -6557,6 +6557,21 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
         <div class="pos-form-row">
           <div><label class="pos-label">Code barre</label><input class="pos-input" id="pos-prod-code" placeholder="Optionnel"></div>
+        </div>
+        <!-- Photo illustrative — seulement disponible une fois le produit créé -->
+        <div class="pos-form-row" id="pos-prod-photo-row" style="display:none">
+          <div style="width:100%;display:flex;gap:12px;align-items:center">
+            <div id="pos-prod-photo-preview" style="width:64px;height:64px;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden"></div>
+            <div style="flex:1;min-width:0">
+              <label class="pos-label">Photo illustrative</label>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <input type="file" id="pos-prod-photo-input" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="posProduitPhotoUpload()">
+                <button type="button" class="pos-btn ghost" style="font-size:12.5px;padding:6px 10px" onclick="document.getElementById('pos-prod-photo-input').click()">Choisir une image</button>
+                <button type="button" id="pos-prod-photo-suppr-btn" class="pos-btn ghost" style="font-size:12.5px;padding:6px 10px;color:#f87171;border-color:rgba(248,113,113,.3);display:none" onclick="posProduitPhotoSupprimer()">Supprimer</button>
+              </div>
+              <div style="font-size:11.5px;color:rgba(255,255,255,.3);margin-top:4px">JPG, PNG ou WEBP — 2 Mo max</div>
+            </div>
+          </div>
         </div>
         <div class="pos-modal-footer">
           <button class="pos-btn ghost" onclick="posProduitModalClose()">Annuler</button>
@@ -22702,15 +22717,24 @@ async function posCatCreer(){
 
 async function loadPosProduits(){
   const tbody = document.getElementById('pos-prod-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     await loadPosCategories();
     const data = await apiFetch('GET','/pos/produits');
     _posProduitsAll = data || [];
     _posRenderProduitsTbody(_posProduitsAll, null);
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
+}
+
+function _posProduitPhotoVignette(p){
+  if(p.a_photo){
+    return `<img src="/api/pos/produits/${p.id}/photo" alt="" loading="lazy"
+      style="width:34px;height:34px;border-radius:7px;object-fit:cover;border:1px solid rgba(255,255,255,.1);display:block">`;
+  }
+  const initiale = (p.nom||'?').trim().charAt(0).toUpperCase();
+  return `<div style="width:34px;height:34px;border-radius:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.25);font-size:14px;font-weight:700">${initiale}</div>`;
 }
 
 function _posStockLabel(p){
@@ -22764,6 +22788,7 @@ function _posRenderProduitsTbody(prods, stockMap){
       : '';
     const nomSafe = (p.nom||'').replace(/'/g,"\\'");
     return `<tr>
+      <td>${_posProduitPhotoVignette(p)}</td>
       <td><strong style="color:rgba(255,255,255,.88)">${p.nom||'—'}</strong>${caisseBadge}</td>
       <td>${catBadge}</td>
       <td class="td-muted">${p.unite||'—'}</td>
@@ -22872,6 +22897,7 @@ async function posProduitModal(id){
   // Masquer le formulaire nouvelle catégorie
   posCatAddToggle(false);
   document.getElementById('pos-prod-id').value = id||'';
+  const photoRow = document.getElementById('pos-prod-photo-row');
   if(id){
     const p = _posProduitsAll.find(x=>x.id===id)||{};
     title.textContent = 'Modifier produit';
@@ -22883,6 +22909,8 @@ async function posProduitModal(id){
     document.getElementById('pos-prod-prix').value  = '';
     _posProdSetCaisseUI(!!p.vendu_par_caisse, p.unites_par_caisse);
     if(prixRow) prixRow.style.display = 'none';
+    if(photoRow) photoRow.style.display = '';
+    _posProduitPhotoRafraichir(p);
   } else {
     title.textContent = 'Nouveau produit';
     ['pos-prod-nom','pos-prod-unite','pos-prod-prix','pos-prod-code'].forEach(fid=>{ document.getElementById(fid).value=''; });
@@ -22890,8 +22918,62 @@ async function posProduitModal(id){
     document.getElementById('pos-prod-cat').value   = '';
     _posProdResetCaisseUI();
     if(prixRow) prixRow.style.display = '';
+    if(photoRow) photoRow.style.display = 'none';
   }
   modal.classList.add('open');
+}
+
+function _posProduitPhotoRafraichir(p){
+  const preview   = document.getElementById('pos-prod-photo-preview');
+  const supprBtn  = document.getElementById('pos-prod-photo-suppr-btn');
+  if(!preview) return;
+  if(p.a_photo){
+    preview.innerHTML = `<img src="/api/pos/produits/${p.id}/photo?t=${Date.now()}" alt="" style="width:100%;height:100%;object-fit:cover">`;
+    if(supprBtn) supprBtn.style.display = '';
+  } else {
+    const initiale = (p.nom||'?').trim().charAt(0).toUpperCase();
+    preview.innerHTML = `<span style="color:rgba(255,255,255,.25);font-size:22px;font-weight:700">${initiale}</span>`;
+    if(supprBtn) supprBtn.style.display = 'none';
+  }
+}
+
+async function posProduitPhotoUpload(){
+  const id    = document.getElementById('pos-prod-id').value;
+  const input = document.getElementById('pos-prod-photo-input');
+  const file  = input.files[0];
+  if(!id || !file) return;
+  try{
+    const fd = new FormData();
+    fd.append('fichier', file);
+    const hdrs = {};
+    const apiKey = sessionStorage.getItem('api_key');
+    if(apiKey) hdrs['X-API-Key'] = apiKey;
+    const res = await fetch(`/api/pos/produits/${id}/photo`, {method:'POST', headers:hdrs, credentials:'include', body:fd});
+    if(!res.ok){
+      const err = await res.json().catch(()=>({detail:res.statusText}));
+      throw new Error(Array.isArray(err.detail)?err.detail.map(e=>e.msg).join(', '):(err.detail||res.statusText));
+    }
+    input.value = '';
+    const p = _posProduitsAll.find(x=>String(x.id)===String(id));
+    if(p) p.a_photo = true;
+    _posProduitPhotoRafraichir(p||{id, a_photo:true});
+    posAlert('Photo ajoutée.','ok');
+    _posRenderProduitsTbody(_posProduitsAll, null);
+  }catch(e){ posAlert(e.message||'Erreur lors de l\'envoi.'); }
+}
+
+async function posProduitPhotoSupprimer(){
+  const id = document.getElementById('pos-prod-id').value;
+  if(!id) return;
+  if(!await showConfirm('Supprimer la photo de ce produit ?', {title:'Supprimer la photo', type:'danger', okLabel:'Supprimer'})) return;
+  try{
+    await apiFetch('DELETE', `/pos/produits/${id}/photo`);
+    const p = _posProduitsAll.find(x=>String(x.id)===String(id));
+    if(p) p.a_photo = false;
+    _posProduitPhotoRafraichir(p||{id, a_photo:false});
+    posAlert('Photo supprimée.','ok');
+    _posRenderProduitsTbody(_posProduitsAll, null);
+  }catch(e){ posAlert(e.message||'Erreur lors de la suppression.'); }
 }
 
 function posProduitModalClose(){

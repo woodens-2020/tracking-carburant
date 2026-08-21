@@ -160,6 +160,11 @@ def _migrate_columns():
              "ALTER TABLE bar_ventes ADD COLUMN client_id INTEGER REFERENCES clients(id)", None),
             ("bar_credits", "client_id",
              "ALTER TABLE bar_credits ADD COLUMN client_id INTEGER REFERENCES clients(id)", None),
+            # v16 — photo illustrative d'un produit bar (base64, comme PieceJointe)
+            ("bar_produits", "photo_base64",
+             "ALTER TABLE bar_produits ADD COLUMN photo_base64 TEXT", None),
+            ("bar_produits", "photo_mime",
+             "ALTER TABLE bar_produits ADD COLUMN photo_mime VARCHAR(50)", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -231,6 +236,11 @@ def _migrate_columns():
              "ALTER TABLE bar_ventes ADD COLUMN client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL", None),
             ("bar_credits", "client_id",
              "ALTER TABLE bar_credits ADD COLUMN client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL", None),
+            # v16 — photo illustrative d'un produit bar (base64, comme PieceJointe)
+            ("bar_produits", "photo_base64",
+             "ALTER TABLE bar_produits ADD COLUMN photo_base64 TEXT", None),
+            ("bar_produits", "photo_mime",
+             "ALTER TABLE bar_produits ADD COLUMN photo_mime VARCHAR(50)", None),
         ]
     else:
         return

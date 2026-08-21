@@ -4,13 +4,14 @@ Protégées automatiquement par AuthMiddleware (session cookie ou X-API-Key).
 """
 from __future__ import annotations
 
+import base64
 from datetime import date as date_type, datetime, timezone, time
 from decimal import Decimal
 from typing import List, Optional
 from tz_utils import today_haiti
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
+from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel, Field, validator, model_validator
 from sqlalchemy import func, or_, exists
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -415,6 +416,7 @@ def _produit_dict(p: BarProduit, stk: Decimal, db: Session) -> dict:
         "prix_vente_caisse":   float(prix_u * upc) if (p.vendu_par_caisse and upc > 0) else None,
         "stock_bas":           float(stk) <= float(p.seuil_alerte_stock) and float(p.seuil_alerte_stock) > 0,
         "cmup":                float(cmup(p.id, db)),
+        "a_photo":             bool(p.photo_base64),
         "date_creation":       p.date_creation.isoformat() if p.date_creation else None,
     }
 
@@ -505,6 +507,59 @@ def desactiver_produit(produit_id: int, db: Session = Depends(get_db)):
     p.actif = False
     db.commit()
     return {"id": produit_id, "nom": p.nom, "actif": False}
+
+
+# ── Photo illustrative du produit ────────────────────────────────
+# Même approche que PieceJointe : base64 en base, pas de stockage fichier
+# externe (les conteneurs Railway sont éphémères).
+_PHOTO_MIME_AUTORISES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
+_PHOTO_TAILLE_MAX      = 2 * 1024 * 1024  # 2 Mo — image illustrative, pas un scan HD
+
+
+@router.post("/produits/{produit_id}/photo", status_code=201)
+async def uploader_photo_produit(
+    produit_id: int,
+    fichier: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    p = db.query(BarProduit).filter_by(id=produit_id).first()
+    if not p:
+        raise HTTPException(404, "Produit introuvable")
+
+    mime = (fichier.content_type or "").lower()
+    if mime not in _PHOTO_MIME_AUTORISES:
+        raise HTTPException(400, "Format non supporté — JPG, PNG ou WEBP uniquement.")
+
+    contenu = await fichier.read()
+    if not contenu:
+        raise HTTPException(400, "Fichier vide.")
+    if len(contenu) > _PHOTO_TAILLE_MAX:
+        raise HTTPException(413, "Image trop volumineuse (max 2 Mo).")
+
+    p.photo_base64 = base64.b64encode(contenu).decode("ascii")
+    p.photo_mime   = mime
+    db.commit()
+    return {"ok": True, "produit_id": produit_id}
+
+
+@router.get("/produits/{produit_id}/photo")
+def obtenir_photo_produit(produit_id: int, db: Session = Depends(get_db)):
+    p = db.query(BarProduit).filter_by(id=produit_id).first()
+    if not p or not p.photo_base64:
+        raise HTTPException(404, "Aucune photo pour ce produit.")
+    contenu = base64.b64decode(p.photo_base64)
+    return Response(content=contenu, media_type=p.photo_mime or "image/jpeg")
+
+
+@router.delete("/produits/{produit_id}/photo")
+def supprimer_photo_produit(produit_id: int, db: Session = Depends(get_db)):
+    p = db.query(BarProduit).filter_by(id=produit_id).first()
+    if not p:
+        raise HTTPException(404, "Produit introuvable")
+    p.photo_base64 = None
+    p.photo_mime   = None
+    db.commit()
+    return {"ok": True}
 
 
 @router.post("/produits/{produit_id}/prix", status_code=201)
