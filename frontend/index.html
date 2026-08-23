@@ -21397,6 +21397,9 @@ async function renflSubmit(){
 
 /* Formatage monétaire gourdes */
 function posGx(v){ return 'G '+parseFloat(v||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+function posFormatDate(iso){ if(!iso) return '-'; return new Date(iso).toLocaleDateString('fr-HT', {timeZone:'America/Port-au-Prince', day:'2-digit', month:'2-digit', year:'numeric'}); }
+function posFormatHeure(iso){ if(!iso) return '-'; return new Date(iso).toLocaleTimeString('fr-HT', {timeZone:'America/Port-au-Prince', hour:'2-digit', minute:'2-digit'}); }
+function posFormatJour(isoDate){ if(!isoDate) return '-'; const [y,m,d] = isoDate.split('-'); return `${d}/${m}/${y}`; }
 
 /* Formatage quantite/stock : entier si valeur ronde, 2 decimales sinon --
    evite les ".00" trompeurs sur des quantites qui sont presque toujours des
@@ -22656,9 +22659,8 @@ function _posRecuPiedHTML(){
 // ─────────────────────────────────────────────────────────────────────────────
 
 function posShowReceipt(result, cart, montantRecu, clientNom, mode, caissierNom){
-  const now      = new Date();
-  const dateStr  = now.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
-  const heureStr = now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const dateStr  = posFormatDate(result.date_heure);
+  const heureStr = posFormatHeure(result.date_heure);
   const ticket   = result.numero_ticket||'—';
   const total    = cart.reduce((s,it)=>s+it.prix*it.quantite,0);
 
@@ -25314,7 +25316,7 @@ async function posVentesCharger(){
     }
 
     if(tbody) tbody.innerHTML = ventes.map(v=>{
-      const heureStr = v.date_heure ? v.date_heure.split('T')[1]?.slice(0,5)||'—' : '—';
+      const heureStr = posFormatHeure(v.date_heure);
       const badge = v.statut==='PAYEE'
         ? '<span class="pos-badge teal">Payée</span>'
         : v.statut==='ANNULEE'
@@ -25330,7 +25332,7 @@ async function posVentesCharger(){
         : '<span style="color:rgba(255,255,255,.3);font-size:13px">—</span>';
       return `<tr${v.statut==='ANNULEE'?' style="opacity:.5"':''}>
         <td style="font-size:13px;color:rgba(255,255,255,.5)">${v.numero_ticket||'—'}</td>
-        <td>${posDateFr(v.date_vente)}</td>
+        <td>${posFormatJour(v.date_vente)}</td>
         <td style="font-size:14px;color:rgba(255,255,255,.6)">${heureStr}</td>
         ${empCol}
         <td style="font-size:13px">${v.client_nom||'—'}</td>
@@ -26031,9 +26033,8 @@ function _pcmdAfficherRecu(r){
   const paye    = parseFloat(r.montant_paye||0);
   const restant = parseFloat(r.montant_restant||0);
   const monnaie = (paye>total&&total>0) ? paye-total : 0;
-  const now      = r.date_heure ? new Date(r.date_heure) : new Date();
-  const dateStr  = now.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
-  const heureStr = now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const dateStr  = posFormatDate(r.date_heure);
+  const heureStr = posFormatHeure(r.date_heure);
   const ticket    = r.numero_ticket||'—';
   const mode      = r.mode_paiement||'CASH';
   const tableName = document.getElementById('pcmd-detail-titre')?.textContent||'';
@@ -26948,11 +26949,11 @@ let _ckRecuCourant = null;
 function _ckDateFmt(d){
   if(!d) return '—';
   const dt = new Date(d);
-  return dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  return dt.toLocaleDateString('fr-FR',{timeZone:'America/Port-au-Prince',day:'2-digit',month:'2-digit',year:'numeric'});
 }
 function _ckHeureFmt(d){
   if(!d) return '';
-  return new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  return new Date(d).toLocaleTimeString('fr-FR',{timeZone:'America/Port-au-Prince',hour:'2-digit',minute:'2-digit'});
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -27130,7 +27131,7 @@ async function scResume(session_id){
           <tbody>${(d.ventes||[]).map(v=>`
             <tr>
               <td>${v.numero_ticket}</td>
-              <td>${new Date(v.date_heure).toLocaleTimeString('fr-HT',{hour:'2-digit',minute:'2-digit'})}</td>
+              <td>${posFormatHeure(v.date_heure)}</td>
               <td><span style="color:${modeCols[v.mode_paiement]||'#fff'};font-weight:700">${v.mode_paiement}</span></td>
               <td>${v.client_nom||'—'}</td>
               <td style="font-weight:700">${posGx(v.montant_total)}</td>
@@ -27491,9 +27492,8 @@ async function _perfDetailCharger(){
         +'</div>';
     } else {
       var rows = ventes.map(function(v){
-        var dt = v.date_heure ? new Date(v.date_heure) : null;
-        var dateStr  = dt ? dt.toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
-        var heureStr = dt ? dt.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'}) : '';
+        var dateStr  = posFormatDate(v.date_heure);
+        var heureStr = posFormatHeure(v.date_heure);
         var isCredit = v.statut === 'CREDIT_EN_COURS';
         var creditBadge = isCredit
           ? ' <span style="font-size:12px;background:rgba(248,113,113,.15);color:#f87171;padding:2px 6px;border-radius:4px">Crédit'+(v.credit_solde!=null?' — '+Gx(v.credit_solde)+' restant':'')+'</span>'

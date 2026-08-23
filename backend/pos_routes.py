@@ -8,7 +8,7 @@ import base64
 from datetime import date as date_type, datetime, timezone, time
 from decimal import Decimal
 from typing import List, Optional
-from tz_utils import today_haiti, bounds_haiti
+from tz_utils import today_haiti, bounds_haiti, HAITI_TZ
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
 from fastapi.responses import StreamingResponse, Response
@@ -954,9 +954,11 @@ def bilan_caissiers(
                 )
             )
             if d_start:
-                q = q.filter(func.date(BarVente.date_heure) >= d_start)
+                dt, _ = bounds_haiti(d_start)
+                q     = q.filter(BarVente.date_heure >= dt)
             if d_end:
-                q = q.filter(func.date(BarVente.date_heure) <= d_end)
+                _, dt = bounds_haiti(d_end)
+                q     = q.filter(BarVente.date_heure <= dt)
             return q.all()
 
         ventes_periode = _ventes_q(d_debut, d_fin)
@@ -1004,24 +1006,18 @@ def bilan_caissiers(
         nb_credits    = credits_res[0] or 0
         solde_credits = round(float(credits_res[1] or 0), 2)
 
-        # Ventilation journalière pour sparklines
-        dq = (
-            db.query(
-                func.date(BarVente.date_heure).label("jour"),
-                func.sum(BarVente.montant_total).label("ca"),
-                func.count(BarVente.id).label("nb"),
-            )
-            .filter(
-                BarVente.caissier_id == emp.id,
-                BarVente.statut.in_(["PAYEE", "CREDIT_EN_COURS"]),
-            )
-            .group_by(func.date(BarVente.date_heure))
-            .order_by(func.date(BarVente.date_heure))
-        )
-        if d_debut:
-            dq = dq.filter(func.date(BarVente.date_heure) >= d_debut)
-        dq = dq.filter(func.date(BarVente.date_heure) <= d_fin)
-        par_jour = [{"date": str(r.jour), "ca": float(r.ca), "nb": int(r.nb)} for r in dq.all()]
+        # Ventilation journalière pour sparklines — regroupe les ventes de la
+        # période (déjà récupérées ci-dessus) par jour calendaire Haïti,
+        # plutôt qu'un func.date() SQL qui tronquerait dans le fuseau de la
+        # session Postgres (UTC).
+        par_jour_map: dict = {}
+        for v in ventes_periode:
+            jour = v.date_heure.astimezone(HAITI_TZ).date().isoformat()
+            if jour not in par_jour_map:
+                par_jour_map[jour] = {"date": jour, "ca": 0.0, "nb": 0}
+            par_jour_map[jour]["ca"] += float(v.montant_total)
+            par_jour_map[jour]["nb"] += 1
+        par_jour = [par_jour_map[k] for k in sorted(par_jour_map)]
 
         resultats.append({
             "employe_id":       emp.id,
@@ -1096,8 +1092,10 @@ def detail_ventes_caissier(
     if mode_paiement:
         q = q.filter(BarVente.mode_paiement == mode_paiement)
     if d_debut:
-        q = q.filter(func.date(BarVente.date_heure) >= d_debut)
-    q = q.filter(func.date(BarVente.date_heure) <= d_fin)
+        dt, _ = bounds_haiti(d_debut)
+        q     = q.filter(BarVente.date_heure >= dt)
+    _, dt_fin = bounds_haiti(d_fin)
+    q = q.filter(BarVente.date_heure <= dt_fin)
     ventes = q.all()
 
     rows = []
@@ -1645,6 +1643,7 @@ def creer_vente(data: VenteIn, request: Request, db: Session = Depends(get_db)):
         "numero_ticket": vente.numero_ticket,
         "montant_total": float(vente.montant_total),
         "statut":        vente.statut,
+        "date_heure":    vente.date_heure.isoformat(),
     }
 
 
@@ -1661,14 +1660,13 @@ def liste_ventes(
     limit:         int = Query(50, le=500),
     db: Session = Depends(get_db),
 ):
-    from sqlalchemy import extract
     q = db.query(BarVente)
     if date_debut:
-        dt = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
-        q  = q.filter(BarVente.date_heure >= dt)
+        dt, _ = bounds_haiti(date_debut)
+        q     = q.filter(BarVente.date_heure >= dt)
     if date_fin:
-        dt = datetime.combine(date_fin, time.max).replace(tzinfo=timezone.utc)
-        q  = q.filter(BarVente.date_heure <= dt)
+        _, dt = bounds_haiti(date_fin)
+        q     = q.filter(BarVente.date_heure <= dt)
     if caissier_id:
         q = q.filter(BarVente.caissier_id == caissier_id)
     if mode_paiement:
@@ -1678,28 +1676,8 @@ def liste_ventes(
     if produit_id:
         sub = db.query(BarLigneVente.vente_id).filter(BarLigneVente.produit_id == produit_id)
         q   = q.filter(BarVente.id.in_(sub))
-    if heure_debut:
-        try:
-            h, m = (int(x) for x in heure_debut.split(':'))
-            minutes = h * 60 + m
-            q = q.filter(
-                extract('hour', BarVente.date_heure) * 60 +
-                extract('minute', BarVente.date_heure) >= minutes
-            )
-        except ValueError:
-            pass
-    if heure_fin:
-        try:
-            h, m = (int(x) for x in heure_fin.split(':'))
-            minutes = h * 60 + m
-            q = q.filter(
-                extract('hour', BarVente.date_heure) * 60 +
-                extract('minute', BarVente.date_heure) <= minutes
-            )
-        except ValueError:
-            pass
 
-    ventes = (
+    ventes_query = (
         q.options(
             selectinload(BarVente.lignes)
             .selectinload(BarLigneVente.produit),
@@ -1707,9 +1685,33 @@ def liste_ventes(
             .selectinload(BarLigneVente.cuisine_plat),
         )
         .order_by(BarVente.date_heure.desc())
-        .limit(limit)
-        .all()
     )
+
+    if heure_debut or heure_fin:
+        # Filtre heure appliqué en Python sur l'heure locale Haïti — une
+        # comparaison SQL (extract('hour', ...)) s'exécuterait dans le fuseau
+        # de la session Postgres (UTC), pas celui de l'utilisateur, et le
+        # dialecte diffère entre SQLite (dev) et Postgres (prod). On récupère
+        # donc sans LIMIT SQL, puis on filtre et on tronque nous-mêmes.
+        def _minutes(hm: str) -> Optional[int]:
+            try:
+                h, m = (int(x) for x in hm.split(':'))
+                return h * 60 + m
+            except ValueError:
+                return None
+        deb_min = _minutes(heure_debut) if heure_debut else None
+        fin_min = _minutes(heure_fin)   if heure_fin   else None
+
+        def _dans_plage(v) -> bool:
+            local   = v.date_heure.astimezone(HAITI_TZ)
+            minutes = local.hour * 60 + local.minute
+            if deb_min is not None and minutes < deb_min: return False
+            if fin_min is not None and minutes > fin_min: return False
+            return True
+
+        ventes = [v for v in ventes_query.all() if _dans_plage(v)][:limit]
+    else:
+        ventes = ventes_query.limit(limit).all()
 
     def _ligne_nom(l):
         if l.produit:      return l.produit.nom
@@ -1721,7 +1723,7 @@ def liste_ventes(
             "id":              v.id,
             "numero_ticket":   v.numero_ticket,
             "date_heure":      v.date_heure.isoformat(),
-            "date_vente":      v.date_heure.date().isoformat(),
+            "date_vente":      v.date_heure.astimezone(HAITI_TZ).date().isoformat(),
             "montant_total":   float(v.montant_total),
             "montant_paye":    float(v.montant_paye),
             "montant_restant": float(v.montant_restant),
@@ -1799,7 +1801,7 @@ def dashboard_bar(
     """Dashboard complet bar/restaurant — filtrable par date, employé, mode."""
     from datetime import timedelta
 
-    today = datetime.now(tz=timezone.utc).date()
+    today = today_haiti()
 
     try:    d_debut = date_type.fromisoformat(date_debut) if date_debut else today
     except ValueError: d_debut = today
@@ -1807,15 +1809,15 @@ def dashboard_bar(
     except ValueError: d_fin = today
     if d_fin < d_debut: d_fin = d_debut
 
-    dt_debut = datetime.combine(d_debut, time.min).replace(tzinfo=timezone.utc)
-    dt_fin   = datetime.combine(d_fin,   time.max).replace(tzinfo=timezone.utc)
+    dt_debut, _ = bounds_haiti(d_debut)
+    _, dt_fin   = bounds_haiti(d_fin)
 
     nb_jours    = (d_fin - d_debut).days + 1
     is_single   = (d_debut == d_fin)
     d_prev_fin  = d_debut - timedelta(days=1)
     d_prev_deb  = d_prev_fin - timedelta(days=nb_jours - 1)
-    dt_prev_d   = datetime.combine(d_prev_deb, time.min).replace(tzinfo=timezone.utc)
-    dt_prev_f   = datetime.combine(d_prev_fin, time.max).replace(tzinfo=timezone.utc)
+    dt_prev_d, _ = bounds_haiti(d_prev_deb)
+    _, dt_prev_f = bounds_haiti(d_prev_fin)
 
     def _base_q():
         q = db.query(BarVente).filter(
@@ -1845,11 +1847,11 @@ def dashboard_bar(
     par_periode: dict = {}
     for v in ventes:
         if is_single:
-            key = v.date_heure.astimezone(timezone.utc).strftime("%H")
+            key = v.date_heure.astimezone(HAITI_TZ).strftime("%H")
             lbl = key + "h"
         else:
-            key = v.date_heure.date().isoformat()
-            lbl = v.date_heure.astimezone(timezone.utc).strftime("%d/%m")
+            key = v.date_heure.astimezone(HAITI_TZ).date().isoformat()
+            lbl = v.date_heure.astimezone(HAITI_TZ).strftime("%d/%m")
         if key not in par_periode:
             par_periode[key] = {"label": lbl, "ca": 0.0, "nb": 0}
         par_periode[key]["ca"] += float(v.montant_total)
@@ -1914,7 +1916,7 @@ def dashboard_bar(
 
     rembs_par_jour: dict = {}
     for r in rembs_periode:
-        k = r.date_remb.astimezone(timezone.utc).date().isoformat()
+        k = r.date_remb.astimezone(HAITI_TZ).date().isoformat()
         rembs_par_jour[k] = rembs_par_jour.get(k, 0.0) + float(r.montant)
     rembs_par_jour_list = [{"date": k, "montant": v} for k, v in sorted(rembs_par_jour.items())]
 
@@ -1960,7 +1962,7 @@ def dashboard_bar(
         "par_caissier": sorted(par_caissier.values(), key=lambda x: x["total"], reverse=True),
         "recents": [
             {
-                "heure":    r.date_heure.astimezone(timezone.utc).strftime(heure_fmt),
+                "heure":    r.date_heure.astimezone(HAITI_TZ).strftime(heure_fmt),
                 "caissier": (r.caissier.nom + " " + r.caissier.prenom) if r.caissier else "—",
                 "montant":  float(r.montant_total),
                 "mode":     r.mode_paiement or "—",
@@ -2610,9 +2612,11 @@ def lister_renflouements_bar(
 ):
     q = db.query(RenflouementDepartement).filter(RenflouementDepartement.departement == "BAR")
     if date_debut:
-        q = q.filter(RenflouementDepartement.date_renflouement >= datetime.strptime(date_debut, "%Y-%m-%d").replace(hour=0,  minute=0,  second=0,  tzinfo=timezone.utc))
+        dt, _ = bounds_haiti(date_type.fromisoformat(date_debut))
+        q     = q.filter(RenflouementDepartement.date_renflouement >= dt)
     if date_fin:
-        q = q.filter(RenflouementDepartement.date_renflouement <= datetime.strptime(date_fin,   "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=timezone.utc))
+        _, dt = bounds_haiti(date_type.fromisoformat(date_fin))
+        q     = q.filter(RenflouementDepartement.date_renflouement <= dt)
     rows = q.order_by(RenflouementDepartement.date_renflouement.desc()).limit(limit).all()
     return {"renflouements": [_renflouement_dict_bar(r) for r in rows]}
 
@@ -2662,15 +2666,14 @@ def grande_caisse(
     coût réel des achats confirmés vs CA ventes sur la période.
     Bénéfice brut = ventes - achats.  Bénéfice net = brut - paie.
     """
-    from datetime import date as dt
     today = today_haiti()
     if not date_debut:
         date_debut = today.replace(day=1)
     if not date_fin:
         date_fin = today
 
-    dt_debut = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
-    dt_fin   = datetime.combine(date_fin,   time.max).replace(tzinfo=timezone.utc)
+    dt_debut, _ = bounds_haiti(date_debut)
+    _, dt_fin   = bounds_haiti(date_fin)
 
     def _d(v) -> Decimal:
         return Decimal(str(v)) if v is not None else Decimal("0")

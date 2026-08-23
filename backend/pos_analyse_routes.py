@@ -1,10 +1,10 @@
 """Routes d'analyse et contrôle rigoureux des articles bar."""
 from __future__ import annotations
 
-from datetime import datetime, timezone, date as date_type, timedelta, time
+from datetime import datetime, timezone, date as date_type, timedelta
 from decimal import Decimal
 from typing import Optional
-from tz_utils import today_haiti
+from tz_utils import today_haiti, bounds_haiti, HAITI_TZ
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
@@ -25,7 +25,7 @@ def _dec(v) -> Decimal:
 def tableau_controle(db: Session = Depends(get_db)):
     """Tableau de contrôle complet par article : stock, CMUP, marge, valeur, ventes 30j."""
     today = today_haiti()
-    dt_30j = datetime.combine(today - timedelta(days=30), time.min).replace(tzinfo=timezone.utc)
+    dt_30j, _ = bounds_haiti(today - timedelta(days=30))
 
     produits = (
         db.query(BarProduit)
@@ -139,8 +139,8 @@ def evolution_ventes(
     if not date_fin:
         date_fin = today
 
-    dt_debut = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
-    dt_fin   = datetime.combine(date_fin,   time.max).replace(tzinfo=timezone.utc)
+    dt_debut, _ = bounds_haiti(date_debut)
+    _, dt_fin   = bounds_haiti(date_fin)
 
     q = (
         db.query(BarLigneVente)
@@ -158,7 +158,7 @@ def evolution_ventes(
 
     par_periode: dict[str, dict] = {}
     for l in lignes:
-        d = l.vente.date_heure.date()
+        d = l.vente.date_heure.astimezone(HAITI_TZ).date()
         if granularite == "semaine":
             iso = d.isocalendar()
             k = f"{iso[0]}-S{iso[1]:02d}"

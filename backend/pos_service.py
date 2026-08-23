@@ -9,7 +9,7 @@ Règles fondamentales (non négociables) :
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone, date as date_type
+from datetime import date as date_type
 from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy import func
@@ -22,6 +22,7 @@ from models import (
     CuisinePlat, CuisineVente, CuisineLigneVente,
     Client,
 )
+from tz_utils import today_haiti, bounds_haiti
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -130,7 +131,7 @@ def prix_actif_batch(db: Session) -> dict[int, Decimal]:
 
 def generer_numero_ticket(db: Session) -> str:
     """Génère un numéro de ticket bar unique — SELECT FOR UPDATE évite la race condition."""
-    today  = datetime.now(tz=timezone.utc).strftime("%Y%m%d")
+    today  = today_haiti().strftime("%Y%m%d")
     prefix = f"TK{today}"
     last = (
         db.query(BarVente.numero_ticket)
@@ -145,7 +146,7 @@ def generer_numero_ticket(db: Session) -> str:
 
 def _generer_ticket_cuisine(db: Session) -> str:
     """Génère un numéro de ticket cuisine unique — SELECT FOR UPDATE évite la race condition."""
-    today  = datetime.now(tz=timezone.utc).strftime("%Y%m%d")
+    today  = today_haiti().strftime("%Y%m%d")
     prefix = f"CK{today}"
     last = (
         db.query(CuisineVente.numero_ticket)
@@ -552,10 +553,8 @@ def stats_bar(date_debut: date_type, date_fin: date_type, db: Session) -> dict:
     CA, COGS (coût moyen pondéré), bénéfice, marges par produit.
     Uniquement des données réelles — jamais de valeurs fabriquées.
     """
-    from datetime import datetime, time
-
-    dt_debut = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
-    dt_fin   = datetime.combine(date_fin,   time.max).replace(tzinfo=timezone.utc)
+    dt_debut, _         = bounds_haiti(date_debut)
+    _, dt_fin           = bounds_haiti(date_fin)
 
     # Ventes non annulées sur la période
     lignes = (

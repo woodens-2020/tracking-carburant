@@ -5,7 +5,7 @@ import os
 import time as _time
 from datetime import date as date_type
 from typing import List, Optional
-from tz_utils import today_haiti
+from tz_utils import today_haiti, bounds_haiti
 from urllib.parse import quote as url_quote
 
 log = logging.getLogger("main")
@@ -4802,14 +4802,13 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
 
     Zelle est un fonds séparé en USD, distinct de ce cash HTG — volontairement
     exclu ici (voir /api/zelle/bilan pour son propre solde)."""
-    from datetime import datetime as _dt, time as _dtime, timezone as _tz
     from models import (
         BarVente, BarRemboursement, BarAchat, BarAchatDepense, BarPaiementEmploye,
         CuisineVente, CuisineAchat, CuisineDepense, HotelReservation,
     )
 
-    dt_debut = _dt.combine(date_debut, _dtime.min).replace(tzinfo=_tz.utc) if date_debut else None
-    dt_fin   = _dt.combine(date_fin,   _dtime.max).replace(tzinfo=_tz.utc) if date_fin   else None
+    dt_debut = bounds_haiti(date_debut)[0] if date_debut else None
+    dt_fin   = bounds_haiti(date_fin)[1]   if date_fin   else None
 
     # ── Entrées : Station (carburant) ──────────────────────────
     q_rel = db.query(Releve)
