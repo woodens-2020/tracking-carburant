@@ -1290,6 +1290,7 @@ def tous_les_produits_achetables(db: Session = Depends(get_db)):
                 "unite":            p.unite,
                 "vendu_par_caisse": p.vendu_par_caisse,
                 "unites_par_caisse":p.unites_par_caisse,
+                "prix_vente_unite": float(prix_actif(p.id, db) or 0),
                 "type":             "bar",
             }
             for p in bar

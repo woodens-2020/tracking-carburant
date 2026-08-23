@@ -6903,7 +6903,19 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <select class="pos-select" id="pa-filtre-produit" onchange="loadPosAchats()" style="flex:1;min-width:150px">
                 <option value="">Tous les produits</option>
               </select>
+              <div style="display:flex;gap:6px;align-items:center">
+                <label style="font-size:13px;color:rgba(255,255,255,.4)">Du</label>
+                <input class="pos-input" id="pa-filtre-debut" type="date" style="width:140px" onchange="_paAppliquerRecherche()">
+                <label style="font-size:13px;color:rgba(255,255,255,.4)">au</label>
+                <input class="pos-input" id="pa-filtre-fin" type="date" style="width:140px" onchange="_paAppliquerRecherche()">
+              </div>
+              <select class="pos-select" id="pa-filtre-statut" style="min-width:150px" onchange="_paAppliquerRecherche()">
+                <option value="">Tous les statuts</option>
+                <option value="EN_ATTENTE">En attente</option>
+                <option value="CONFIRME">Confirmé</option>
+              </select>
               <input class="pos-input" id="pa-recherche" type="text" placeholder="Rechercher : produit, fournisseur, dépense…" style="flex:2;min-width:220px" oninput="_paAppliquerRecherche()">
+              <button class="pos-btn ghost" onclick="_paResetFiltres()">Réinitialiser</button>
               <button class="pos-btn ghost" onclick="loadPosAchats()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:4px"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>Rafraîchir
               </button>
@@ -6915,10 +6927,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="pos-table-wrap">
               <table class="pos-table">
                 <thead>
-                  <tr><th>Date</th><th>Jours</th><th>Produit</th><th>Quantité</th><th>Prix marchandise</th><th>Dép. supp.</th><th>Coût total</th><th>Fournisseur</th><th></th></tr>
+                  <tr><th>Date</th><th>Jours</th><th>Produit</th><th>Quantité</th><th>Prix marchandise</th><th>Dép. supp.</th><th>Coût total</th><th>Fournisseur</th><th>Statut</th><th></th></tr>
                 </thead>
                 <tbody id="pos-achats-tbody">
-                  <tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                  <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -7013,6 +7025,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <!-- Récapitulatif -->
         <div style="margin-top:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px">
           <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Récapitulatif</div>
+          <div id="pa-recap-unite-row" style="display:none;justify-content:space-between;font-size:14px;margin-bottom:7px;background:rgba(63,182,168,.08);border-radius:7px;padding:6px 10px">
+            <span style="color:rgba(255,255,255,.5)">→ soit par unité</span>
+            <span id="pa-recap-prix-unite" style="color:#3fb6a8;font-weight:700">G 0.00 / unité</span>
+          </div>
           <div style="display:flex;justify-content:space-between;font-size:15px;margin-bottom:7px">
             <span style="color:rgba(255,255,255,.55)">Prix marchandise</span>
             <span id="pa-recap-marchandise" style="color:#fff;font-weight:600">G 0.00</span>
@@ -7026,11 +7042,79 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <span style="color:#fff;font-weight:700;font-size:16px">Coût total</span>
             <span id="pa-recap-total" style="color:#3fb6a8;font-weight:700;font-size:19px">G 0.00</span>
           </div>
+          <div id="pa-recap-warning" style="display:none;margin-top:12px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:10px 12px;font-size:13.5px;color:#fca5a5"></div>
         </div>
 
         <div class="pos-modal-footer">
           <button class="pos-btn ghost" onclick="document.getElementById('pos-achat-modal-bg').classList.remove('open')">Annuler</button>
           <button class="pos-btn teal" onclick="posEnregistrerAchat()">Enregistrer l'achat</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Modifier un Achat -->
+    <div class="pos-modal-bg" id="pos-achat-edit-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal" style="max-width:600px;max-height:90vh;overflow-y:auto">
+        <h3>Modifier l'achat</h3>
+
+        <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px 14px;margin-bottom:16px">
+          <div id="pae-produit-nom" style="font-weight:600;font-size:15px"></div>
+          <div id="pae-produit-cat" style="font-size:13px;color:rgba(255,255,255,.4)"></div>
+        </div>
+
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Quantité *</label>
+            <input class="pos-input" id="pae-qte" type="number" min="0.001" step="0.001" placeholder="0" oninput="paEditUpdateRecap()">
+          </div>
+          <div style="flex:1">
+            <label class="pos-label">Unité de saisie</label>
+            <select class="pos-select" id="pae-qte-type" onchange="paEditOnQteTypeChange()">
+              <option value="unite">En unités</option>
+              <option value="caisse">En caisses</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="pae-caisse-info" style="display:none;background:rgba(63,182,168,.08);border:1px solid rgba(63,182,168,.2);border-radius:8px;padding:10px 14px;margin:0 0 12px;font-size:14px;color:rgba(255,255,255,.6)">
+          <span id="pae-caisse-info-txt"></span>
+        </div>
+
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label" id="pae-prix-label">Prix d'achat unitaire (G) *</label>
+            <input class="pos-input" id="pae-prix" type="number" min="0" step="0.01" placeholder="0.00" oninput="paEditUpdateRecap()">
+          </div>
+          <div style="flex:1">
+            <label class="pos-label">Fournisseur</label>
+            <input class="pos-input" id="pae-fourn" placeholder="Optionnel">
+          </div>
+        </div>
+
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Notes</label>
+            <input class="pos-input" id="pae-notes" placeholder="Optionnel">
+          </div>
+        </div>
+
+        <!-- Récapitulatif -->
+        <div style="margin-top:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px">
+          <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Récapitulatif</div>
+          <div id="pae-recap-unite-row" style="display:none;justify-content:space-between;font-size:14px;margin-bottom:7px;background:rgba(63,182,168,.08);border-radius:7px;padding:6px 10px">
+            <span style="color:rgba(255,255,255,.5)">→ soit par unité</span>
+            <span id="pae-recap-prix-unite" style="color:#3fb6a8;font-weight:700">G 0.00 / unité</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="color:#fff;font-weight:700;font-size:16px">Coût marchandise</span>
+            <span id="pae-recap-total" style="color:#3fb6a8;font-weight:700;font-size:19px">G 0.00</span>
+          </div>
+          <div id="pae-recap-warning" style="display:none;margin-top:12px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:10px 12px;font-size:13.5px;color:#fca5a5"></div>
+        </div>
+
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="document.getElementById('pos-achat-edit-modal-bg').classList.remove('open')">Annuler</button>
+          <button class="pos-btn teal" onclick="paSaveEditAchat()">Enregistrer les modifications</button>
         </div>
       </div>
     </div>
@@ -23554,17 +23638,44 @@ function _paRenderKpis(achats){
 let _paAchatsCache = []; // cache pour accès rapide lors de la génération PDF
 let _paAllAchats   = []; // liste complète recue du serveur (avant filtre de recherche)
 
-// Filtre en direct (côté client) sur produit/catégorie/fournisseur/dépenses
-// liées — insensible aux accents (_navNorm, partagé avec la recherche sidebar).
+// Filtre en direct (côté client) sur produit/catégorie/fournisseur/dépenses,
+// date et statut — insensible aux accents (_navNorm, partagé avec la
+// recherche sidebar).
 function _paAppliquerRecherche(){
-  const q = _navNorm(document.getElementById('pa-recherche')?.value || '');
-  const achats = !q ? _paAllAchats : _paAllAchats.filter(a=>{
-    const depTxt = (a.depenses||[]).map(dep=>dep.description).join(' ');
-    const hay = _navNorm([a.produit_nom, a.produit_categorie, a.fournisseur, depTxt].filter(Boolean).join(' '));
-    return hay.includes(q);
+  const q      = _navNorm(document.getElementById('pa-recherche')?.value || '');
+  const debut  = document.getElementById('pa-filtre-debut')?.value || '';
+  const fin    = document.getElementById('pa-filtre-fin')?.value || '';
+  const statut = document.getElementById('pa-filtre-statut')?.value || '';
+
+  const achats = _paAllAchats.filter(a=>{
+    if(q){
+      const depTxt = (a.depenses||[]).map(dep=>dep.description).join(' ');
+      const hay = _navNorm([a.produit_nom, a.produit_categorie, a.fournisseur, depTxt].filter(Boolean).join(' '));
+      if(!hay.includes(q)) return false;
+    }
+    if(statut && a.statut !== statut) return false;
+    const dateAchat = (a.date_achat||'').slice(0,10);
+    if(debut && dateAchat < debut) return false;
+    if(fin   && dateAchat > fin)   return false;
+    return true;
   });
   _paRenderTable(achats);
   _paRenderKpis(achats);
+}
+
+function _paResetFiltres(){
+  ['pa-filtre-debut','pa-filtre-fin','pa-filtre-statut','pa-recherche'].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  const sel = document.getElementById('pa-filtre-produit');
+  if(sel) sel.value = '';
+  loadPosAchats();
+}
+
+function _paStatutBadge(statut){
+  return statut === 'CONFIRME'
+    ? '<span style="font-size:12px;font-weight:700;color:#4ade80;background:rgba(74,222,128,.12);border-radius:5px;padding:3px 8px;white-space:nowrap">✓ Confirmé</span>'
+    : '<span style="font-size:12px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.12);border-radius:5px;padding:3px 8px;white-space:nowrap">⏳ En attente</span>';
 }
 
 function _paRenderTable(achats){
@@ -23573,7 +23684,7 @@ function _paRenderTable(achats){
   if(!tbody) return;
   if(!achats.length){
     const raw = document.getElementById('pa-recherche')?.value || '';
-    tbody.innerHTML = `<tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">${raw ? `Aucun achat ne correspond à « ${esc(raw)} »` : 'Aucun achat enregistré'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">${raw ? `Aucun achat ne correspond à « ${esc(raw)} »` : 'Aucun achat ne correspond aux filtres'}</td></tr>`;
     return;
   }
   const fmt = v=>`G ${parseFloat(v).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -23594,7 +23705,12 @@ function _paRenderTable(achats){
       <td>${hasD?`<span style="color:#f87171;font-weight:600">${fmt(a.total_depenses)}</span><div>${depDetail}</div>`:'<span style="color:rgba(255,255,255,.2)">—</span>'}</td>
       <td><span style="color:#3fb6a8;font-weight:700;font-size:16px">${fmt(a.cout_total)}</span></td>
       <td style="color:rgba(255,255,255,.45);font-size:14px">${a.fournisseur||'—'}</td>
+      <td>${_paStatutBadge(a.statut)}</td>
       <td style="white-space:nowrap;display:flex;gap:6px">
+        <button title="Modifier" onclick="paEditModal(${idx})"
+          style="background:rgba(247,169,59,.15);border:1px solid rgba(247,169,59,.3);border-radius:7px;color:#f7a93b;padding:5px 9px;cursor:pointer;display:flex;align-items:center">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
         <button onclick="posAchatFichePDF(${idx})"
           style="background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.3);border-radius:7px;color:#a5b4fc;font-size:13px;font-weight:600;padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -24304,11 +24420,28 @@ function paRenderDepenses(){
     </div>`).join('');
 }
 
+// Détecte et affiche visuellement les cas où le prix par caisse pourrait
+// avoir été confondu avec un prix par unité (la cause exacte du bug de
+// calcul déjà corrigé côté backend) — même heuristique utilisée pour
+// identifier les achats historiques à corriger : prix par unité effectif
+// anormalement plus élevé que le prix de vente du produit.
+function _paCalculTransparence(qte, prix, type, prod){
+  const upc = (prod?.vendu_par_caisse && prod.unites_par_caisse) ? prod.unites_par_caisse : 1;
+  const enCaisse = type === 'caisse' && upc > 1;
+  const prixUnitaireEffectif = enCaisse ? prix / upc : prix;
+  const prixVente = prod?.prix_vente_unite || 0;
+  const suspect = prixUnitaireEffectif > 0 && prixVente > 0 && prixUnitaireEffectif > prixVente * 3;
+  return { enCaisse, upc, prixUnitaireEffectif, prixVente, suspect };
+}
+
 function paUpdateRecap(){
+  const sel  = _paGetSelected();
   const qte  = parseFloat(document.getElementById('pa-qte')?.value)||0;
   const prix = parseFloat(document.getElementById('pa-prix')?.value)||0;
-  // Le récapitulatif est identique quelle que soit la source produit :
-  // qte * prix = coût marchandise (le backend gère la conversion caisse→unités)
+  const type = document.getElementById('pa-qte-type')?.value;
+  // Le récapitulatif de coût total est identique quelle que soit la source
+  // produit : qte * prix = coût marchandise (qte et prix sont saisis dans la
+  // même unité — caisse ou bouteille — donc leur produit reste correct).
   const marchandise = qte * prix;
   const depTotal    = _paDepenses.reduce((s,d)=>s+(parseFloat(d.montant)||0),0);
   const coutTotal   = marchandise + depTotal;
@@ -24317,6 +24450,22 @@ function paUpdateRecap(){
   if(el('pa-recap-marchandise')) el('pa-recap-marchandise').textContent = fmt(marchandise);
   if(el('pa-recap-depenses'))    el('pa-recap-depenses').textContent    = fmt(depTotal);
   if(el('pa-recap-total'))       el('pa-recap-total').textContent       = fmt(coutTotal);
+
+  const { enCaisse, prixUnitaireEffectif, prixVente, suspect } = _paCalculTransparence(qte, prix, type, sel?.prod);
+  const uniteRow = el('pa-recap-unite-row');
+  const warnBox  = el('pa-recap-warning');
+  if(uniteRow) uniteRow.style.display = (enCaisse && prix>0) ? 'flex' : 'none';
+  if(el('pa-recap-prix-unite') && enCaisse){
+    el('pa-recap-prix-unite').textContent = `${prixUnitaireEffectif.toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})} / ${sel?.prod?.unite||'unité'}`;
+  }
+  if(warnBox){
+    if(suspect){
+      warnBox.style.display = '';
+      warnBox.innerHTML = `⚠ Ce prix par unité calculé (G ${prixUnitaireEffectif.toFixed(2)}) est bien plus élevé que le prix de vente actuel (G ${prixVente.toFixed(2)}). Vérifiez que vous n'avez pas saisi un prix par caisse alors que le mode choisi est « ${enCaisse?'En caisses':'En unités'} ».`;
+    } else {
+      warnBox.style.display = 'none';
+    }
+  }
 }
 
 function posAchatFichePDF(idx){
@@ -24598,6 +24747,148 @@ async function posEnregistrerAchat(){
       }
     }
   } catch(e){ _paAutoConfirmer = false; posAlert(e.message||'Erreur enregistrement achat.'); }
+}
+
+// ── Modification d'un achat existant ────────────────────────────────
+let _paEditAchat    = null; // achat en cours d'édition (depuis _paAchatsCache)
+let _paEditPrevType = 'unite';
+
+function _paPrixVenteFor(a){
+  if(!a || a.produit_type!=='bar') return 0;
+  const p = (_paTousProduits.bar||[]).find(pr=>pr.id===a.produit_id);
+  return p?.prix_vente_unite || 0;
+}
+
+function paEditModal(idx){
+  const a = _paAchatsCache[idx];
+  if(!a) return;
+  _paEditAchat = a;
+
+  document.getElementById('pae-produit-nom').textContent = a.produit_nom;
+  document.getElementById('pae-produit-cat').textContent = a.produit_categorie || '';
+
+  const upc     = (a.produit_par_caisse && a.produit_upc) ? a.produit_upc : 1;
+  const typeSel = document.getElementById('pae-qte-type');
+  const typeRow = typeSel?.closest('.pos-form-row');
+
+  // Les valeurs stockées en base sont toujours en unités — on affiche donc
+  // en mode « unité » par défaut, quitte à basculer en caisse pour resaisir
+  // dans l'autre sens (la conversion est faite automatiquement au bascule).
+  typeSel.value = 'unite';
+  _paEditPrevType = 'unite';
+  if(typeRow) typeRow.style.display = (a.produit_type==='station' || upc<=1) ? 'none' : '';
+
+  document.getElementById('pae-qte').value   = a.quantite;
+  document.getElementById('pae-prix').value  = a.prix_achat_unitaire;
+  document.getElementById('pae-fourn').value = a.fournisseur || '';
+  document.getElementById('pae-notes').value = a.notes || '';
+
+  paEditOnQteTypeChange();
+  document.getElementById('pos-achat-edit-modal-bg').classList.add('open');
+}
+
+function paEditOnQteTypeChange(){
+  const a = _paEditAchat;
+  if(!a) return;
+  const upc  = (a.produit_par_caisse && a.produit_upc) ? a.produit_upc : 1;
+  const type = document.getElementById('pae-qte-type').value;
+
+  // Convertit les valeurs affichées pour garder le même achat réel quand on
+  // bascule le mode de saisie — évite justement la confusion caisse/unité
+  // qui causait l'erreur de calcul d'origine.
+  if(type !== _paEditPrevType && upc > 1){
+    const qteEl  = document.getElementById('pae-qte');
+    const prixEl = document.getElementById('pae-prix');
+    const qte    = parseFloat(qteEl.value)  || 0;
+    const prix   = parseFloat(prixEl.value) || 0;
+    if(type === 'caisse'){
+      qteEl.value  = +(qte / upc).toFixed(4);
+      prixEl.value = +(prix * upc).toFixed(2);
+    } else {
+      qteEl.value  = +(qte * upc).toFixed(4);
+      prixEl.value = +(prix / upc).toFixed(2);
+    }
+  }
+  _paEditPrevType = type;
+
+  const lbl  = document.getElementById('pae-prix-label');
+  const info = document.getElementById('pae-caisse-info');
+  if(a.produit_type === 'station'){
+    if(lbl) lbl.textContent = "Prix d'achat par gallon (G) *";
+    if(info) info.style.display = 'none';
+  } else if(type === 'caisse' && upc > 1){
+    if(lbl) lbl.textContent = "Prix d'achat par caisse (G) *";
+    if(info){
+      info.style.display = '';
+      document.getElementById('pae-caisse-info-txt').textContent =
+        `Saisir le prix par caisse — 1 caisse = ${upc} ${a.produit_unite||'unités'}`;
+    }
+  } else {
+    if(lbl) lbl.textContent = "Prix d'achat unitaire (G) *";
+    if(info) info.style.display = 'none';
+  }
+  paEditUpdateRecap();
+}
+
+function paEditUpdateRecap(){
+  const a    = _paEditAchat;
+  const qte  = parseFloat(document.getElementById('pae-qte')?.value)||0;
+  const prix = parseFloat(document.getElementById('pae-prix')?.value)||0;
+  const type = document.getElementById('pae-qte-type')?.value;
+
+  const marchandise = qte * prix;
+  const fmt = v=>`G ${v.toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const el  = id=>document.getElementById(id);
+  if(el('pae-recap-total')) el('pae-recap-total').textContent = fmt(marchandise);
+
+  const prodLike = a ? {
+    vendu_par_caisse:  a.produit_par_caisse,
+    unites_par_caisse: a.produit_upc,
+    unite:             a.produit_unite,
+    prix_vente_unite:  _paPrixVenteFor(a),
+  } : null;
+  const { enCaisse, prixUnitaireEffectif, prixVente, suspect } = _paCalculTransparence(qte, prix, type, prodLike);
+
+  const uniteRow = el('pae-recap-unite-row');
+  const warnBox  = el('pae-recap-warning');
+  if(uniteRow) uniteRow.style.display = (enCaisse && prix>0) ? 'flex' : 'none';
+  if(el('pae-recap-prix-unite') && enCaisse){
+    el('pae-recap-prix-unite').textContent = `${prixUnitaireEffectif.toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})} / ${a?.produit_unite||'unité'}`;
+  }
+  if(warnBox){
+    if(suspect){
+      warnBox.style.display = '';
+      warnBox.innerHTML = `⚠ Ce prix par unité calculé (G ${prixUnitaireEffectif.toFixed(2)}) est bien plus élevé que le prix de vente actuel (G ${prixVente.toFixed(2)}). Vérifiez que vous n'avez pas saisi un prix par caisse alors que le mode choisi est « ${enCaisse?'En caisses':'En unités'} ».`;
+    } else {
+      warnBox.style.display = 'none';
+    }
+  }
+}
+
+async function paSaveEditAchat(){
+  const a = _paEditAchat;
+  if(!a) return;
+  const qte   = parseFloat(document.getElementById('pae-qte').value)||0;
+  const prix  = parseFloat(document.getElementById('pae-prix').value)||0;
+  const type  = document.getElementById('pae-qte-type').value;
+  const fourn = document.getElementById('pae-fourn').value.trim()||null;
+  const notes = document.getElementById('pae-notes').value.trim()||null;
+
+  if(qte<=0)  { posAlert('La quantité doit être > 0.','warn'); return; }
+  if(prix<=0) { posAlert('Le prix doit être > 0.','warn'); return; }
+
+  try {
+    await apiFetch('PUT', `/pos/achats/${a.id}`, {
+      quantite:            qte,
+      quantite_type:       a.produit_type==='station' ? 'unite' : type,
+      prix_achat_unitaire: prix,
+      fournisseur:         fourn,
+      notes,
+    });
+    document.getElementById('pos-achat-edit-modal-bg').classList.remove('open');
+    await loadPosAchats();
+    posAlert('Achat modifié.','ok');
+  } catch(e){ posAlert(e.message||'Erreur lors de la modification.'); }
 }
 
 // ══════════════════════════════════════════════════════════════════════
