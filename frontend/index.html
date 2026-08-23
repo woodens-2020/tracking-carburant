@@ -61,6 +61,30 @@
   --bg2:    #091120;
   --gold:   #fbbf24;
   --accent: #f7a93b;
+
+  /* Alias sémantiques POS — réutilisent les valeurs déjà en usage */
+  --pos-accent:      var(--accent);
+  --pos-accent-d:    rgba(247,169,59,.15);
+  --pos-accent-ink:  #1a1a2e;
+  --pos-money:       #3fb6a8;
+  --pos-money-d:     rgba(63,182,168,.15);
+  --pos-danger:      var(--red2);
+  --pos-danger-d:    rgba(248,113,113,.15);
+  --pos-info:        #a78bfa;
+  --pos-info-d:      rgba(167,139,250,.15);
+
+  /* Échelle de surfaces POS */
+  --pos-surf-0: rgba(255,255,255,.03);
+  --pos-surf-1: rgba(255,255,255,.04);
+  --pos-surf-2: rgba(255,255,255,.05);
+  --pos-surf-hover: rgba(255,255,255,.08);
+  --pos-border: rgba(255,255,255,.08);
+  --pos-border-strong: rgba(255,255,255,.12);
+
+  /* Échelle de texte atténué POS */
+  --pos-text-dim:   rgba(255,255,255,.35);
+  --pos-text-muted: rgba(255,255,255,.45);
+  --pos-text-soft:  rgba(255,255,255,.6);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{height:100%}
@@ -2680,12 +2704,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
 /* ─── Composants communs POS ──────────────────────────────── */
 .pos-page{display:flex;flex-direction:column;gap:14px;padding:16px 20px 28px;box-sizing:border-box}
-.pos-header{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.04);
-  border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:12px 18px}
+.pos-header{display:flex;align-items:center;gap:12px;background:var(--pos-surf-1);
+  border:1px solid var(--pos-border);border-radius:12px;padding:12px 18px}
 .pos-header-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .pos-header-icon svg{width:20px;height:20px}
 .pos-header-title{font-size:19px;font-weight:700;color:#fff}
-.pos-header-sub{font-size:14px;color:rgba(255,255,255,.45);margin-top:1px}
+.pos-header-sub{font-size:14px;color:var(--pos-text-muted);margin-top:1px}
 .pos-header-actions{margin-left:auto;display:flex;gap:8px}
 
 /* ── Barre de recherche articles POS ─────────────────────── */
@@ -2694,10 +2718,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   width:18px;height:18px;stroke:rgba(255,255,255,.35);fill:none;stroke-width:2;pointer-events:none}
 .pos-search-inp{
   width:100%;padding:13px 42px 13px 44px;border-radius:12px;font-size:16px;font-weight:500;
-  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+  background:var(--pos-surf-2);border:1px solid var(--pos-border-strong);
   color:#fff;outline:none;transition:border-color .15s,background .15s,box-shadow .15s;box-sizing:border-box}
 .pos-search-inp::placeholder{color:rgba(255,255,255,.32)}
-.pos-search-inp:focus{border-color:#f7a93b;background:rgba(255,255,255,.09);box-shadow:0 0 0 3px rgba(247,169,59,.14)}
+.pos-search-inp:focus{border-color:var(--pos-accent);background:var(--pos-surf-hover);box-shadow:0 0 0 3px rgba(247,169,59,.14)}
 .pos-search-clear{position:absolute;right:10px;top:50%;transform:translateY(-50%);
   width:26px;height:26px;border-radius:50%;border:none;cursor:pointer;
   background:rgba(255,255,255,.1);color:rgba(255,255,255,.6);font-size:14px;line-height:1;padding:0}
@@ -2705,41 +2729,45 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
 /* ─── Cartes KPI POS ──────────────────────────────────────── */
 .pos-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-.pos-kpi{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+.pos-kpi{background:var(--pos-surf-1);border:1px solid var(--pos-border);
   border-radius:11px;padding:12px 14px;cursor:default}
-.pos-kpi-label{font-size:13px;color:rgba(255,255,255,.45);text-transform:uppercase;
+.pos-kpi.tint-amber{background:var(--pos-accent-d);border-color:rgba(247,169,59,.2)}
+.pos-kpi.tint-teal{background:var(--pos-money-d);border-color:rgba(63,182,168,.2)}
+.pos-kpi.tint-purple{background:var(--pos-info-d);border-color:rgba(167,139,250,.2)}
+.pos-kpi.tint-danger{background:var(--pos-danger-d);border-color:rgba(248,113,113,.2)}
+.pos-kpi-label{font-size:13px;color:var(--pos-text-muted);text-transform:uppercase;
   letter-spacing:.06em;margin-bottom:4px}
-.pos-kpi-val{font-size:21px;font-weight:700;color:#3fb6a8}
-.pos-kpi-val.amber{color:#f7a93b}
-.pos-kpi-val.red{color:#f87171}
+.pos-kpi-val{font-size:21px;font-weight:700;color:var(--pos-money)}
+.pos-kpi-val.amber{color:var(--pos-accent)}
+.pos-kpi-val.red{color:var(--pos-danger)}
 .pos-kpi-sub{font-size:13px;color:rgba(255,255,255,.3);margin-top:2px}
 
 /* ─── Tableaux POS ─────────────────────────────────────────── */
-.pos-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+.pos-card{background:var(--pos-surf-1);border:1px solid var(--pos-border);
   border-radius:12px;overflow:hidden}
 .pos-card-hdr{display:flex;align-items:center;justify-content:space-between;
   padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.06);font-size:15px;
   font-weight:600;color:rgba(255,255,255,.75)}
 .pos-table-wrap{overflow-x:auto}
 .pos-table{width:100%;border-collapse:collapse;font-size:15px}
-.pos-table th{padding:8px 12px;text-align:left;color:rgba(255,255,255,.4);
+.pos-table th{padding:8px 12px;text-align:left;color:var(--pos-text-muted);
   font-weight:600;font-size:13.5px;letter-spacing:.06em;text-transform:uppercase;
   border-bottom:1px solid rgba(255,255,255,.06)}
 .pos-table td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.04);
   color:rgba(255,255,255,.82);vertical-align:middle}
 .pos-table tr:hover td{background:rgba(255,255,255,.03)}
 .pos-table tr:last-child td{border-bottom:none}
-.pos-teal{color:#3fb6a8;font-weight:600}
-.pos-amber{color:#f7a93b;font-weight:600}
-.pos-red{color:#f87171;font-weight:600}
+.pos-teal{color:var(--pos-money);font-weight:600}
+.pos-amber{color:var(--pos-accent);font-weight:600}
+.pos-red{color:var(--pos-danger);font-weight:600}
 
 /* ─── Badges statut ────────────────────────────────────────── */
 .pos-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:13px;
   font-weight:700;letter-spacing:.05em;text-transform:uppercase;
   background:rgba(255,255,255,.08);color:rgba(255,255,255,.45)}
-.pos-badge.ok,.pos-badge.teal{background:rgba(63,182,168,.15);color:#3fb6a8}
-.pos-badge.warn,.pos-badge.amber{background:rgba(247,169,59,.15);color:#f7a93b}
-.pos-badge.err,.pos-badge.danger{background:rgba(248,113,113,.15);color:#f87171}
+.pos-badge.ok,.pos-badge.teal{background:var(--pos-money-d);color:var(--pos-money)}
+.pos-badge.warn,.pos-badge.amber{background:var(--pos-accent-d);color:var(--pos-accent)}
+.pos-badge.err,.pos-badge.danger{background:var(--pos-danger-d);color:var(--pos-danger)}
 .pos-badge.gray{background:rgba(255,255,255,.08);color:rgba(255,255,255,.45)}
 
 /* ─── Formulaires POS ──────────────────────────────────────── */
@@ -2752,22 +2780,22 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
   color:#fff;box-sizing:border-box;outline:none;
   transition:border-color .15s}
-.pos-input:focus,.pos-select:focus{border-color:#f7a93b}
+.pos-input:focus,.pos-select:focus{border-color:var(--pos-accent)}
 .pos-select option{background:#1a1a2e;color:#fff}
 .pos-btn{padding:8px 16px;border-radius:8px;font-size:15px;font-weight:600;
   cursor:pointer;border:none;transition:opacity .15s}
 .pos-btn:hover{opacity:.85}
-.pos-btn.primary{background:#f7a93b;color:#1a1a2e}
-.pos-btn.teal{background:#3fb6a8;color:#fff}
-.pos-btn.ghost{background:rgba(255,255,255,.08);color:rgba(255,255,255,.7)}
-.pos-btn.danger{background:rgba(248,113,113,.2);color:#f87171;border:1px solid rgba(248,113,113,.3)}
+.pos-btn.primary{background:var(--pos-accent);color:var(--pos-accent-ink)}
+.pos-btn.teal{background:var(--pos-money);color:#fff}
+.pos-btn.ghost{background:var(--pos-surf-hover);color:rgba(255,255,255,.7)}
+.pos-btn.danger{background:rgba(248,113,113,.2);color:var(--pos-danger);border:1px solid rgba(248,113,113,.3)}
 .pos-btn:disabled{opacity:.35;cursor:not-allowed}
 
 /* ─── Écran de caisse POS ─────────────────────────────────── */
 .pos-caisse-layout{display:grid;grid-template-columns:1fr 400px;gap:14px;min-height:500px;align-items:start}
 .pos-produit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:14px;
   align-content:start}
-.pos-produit-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+.pos-produit-card{background:var(--pos-surf-2);border:1px solid var(--pos-border);
   border-radius:14px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;
   box-shadow:0 2px 10px rgba(0,0,0,.18);
   transition:background .15s,border-color .15s,transform .15s,box-shadow .15s;user-select:none}
@@ -2786,7 +2814,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .pos-produit-card:active{transform:scale(.97)}
 .pos-produit-nom{font-size:17px;font-weight:700;color:#fff;line-height:1.3;word-break:break-word}
 .pos-produit-cat{font-size:13px;text-transform:uppercase;letter-spacing:.04em;margin-top:3px}
-.pos-produit-prix{font-size:19px;font-weight:800;color:#3fb6a8;margin-top:8px}
+.pos-produit-prix{font-size:19px;font-weight:800;color:var(--pos-money);margin-top:8px}
 .pos-produit-unite{font-size:13.5px;color:rgba(255,255,255,.35);margin-top:1px}
 .pos-produit-stock{font-size:12.5px;color:rgba(255,255,255,.35);margin-top:2px}
 .pos-produit-stock-badge{display:flex;align-items:center;gap:5px;justify-content:center;
@@ -2795,13 +2823,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .pos-produit-card.rupture{opacity:.4;pointer-events:none}
 
 /* ─── Panier de caisse ────────────────────────────────────── */
-.pos-cart-panel{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+.pos-cart-panel{background:var(--pos-surf-1);border:1px solid var(--pos-border);
   border-radius:12px;display:flex;flex-direction:column;
   position:sticky;top:12px;max-height:calc(100vh - 120px);
   box-shadow:0 14px 36px rgba(0,0,0,.4)}
 .pos-cart-hdr{padding:14px 16px;font-size:16px;font-weight:700;color:rgba(255,255,255,.85);
   border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px;flex-shrink:0}
-.pos-cart-count{background:rgba(247,169,59,.18);color:#f7a93b;border-radius:20px;
+.pos-cart-count{background:rgba(247,169,59,.18);color:var(--pos-accent);border-radius:20px;
   font-size:12.5px;font-weight:800;padding:2px 9px;min-width:20px;text-align:center}
 .pos-cart-items{flex:1;overflow-y:auto;padding:8px 0;min-height:0}
 .pos-cart-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;
@@ -2823,10 +2851,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   background:rgba(255,255,255,.1);color:#fff;font-size:16px;display:flex;
   align-items:center;justify-content:center;padding:0}
 .pos-cart-qte-btn:hover{background:rgba(247,169,59,.3)}
-.pos-cart-item-total{font-size:13.5px;color:#3fb6a8;font-weight:600;min-width:60px;text-align:right}
+.pos-cart-item-total{font-size:13.5px;color:var(--pos-money);font-weight:600;min-width:60px;text-align:right}
 .pos-cart-item-del{background:none;border:none;color:rgba(248,113,113,.6);cursor:pointer;
   font-size:18px;padding:0 2px}
-.pos-cart-item-del:hover{color:#f87171}
+.pos-cart-item-del:hover{color:var(--pos-danger)}
 .pos-cart-empty{padding:48px 20px;text-align:center;color:rgba(255,255,255,.28);font-size:14px;line-height:2.2}
 /* ── Gestion catégories ── */
 .cat-panel{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px 18px;margin-bottom:16px}
@@ -2844,23 +2872,27 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .pos-cart-footer{padding:12px 14px;border-top:1px solid rgba(255,255,255,.07)}
 .pos-cart-total-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .pos-cart-total-label{font-size:14px;color:rgba(255,255,255,.6)}
-.pos-cart-total-val{font-size:22px;font-weight:700;color:#f7a93b}
+.pos-cart-total-val{font-size:22px;font-weight:700;color:var(--pos-accent)}
 .pos-mode-btns{display:flex;gap:6px;margin-bottom:8px}
 .pos-mode-btn{flex:1;padding:7px 4px;border-radius:8px;border:1px solid rgba(255,255,255,.12);
-  background:rgba(255,255,255,.05);color:rgba(255,255,255,.7);font-size:13px;
+  background:var(--pos-surf-2);color:rgba(255,255,255,.7);font-size:13px;
   font-weight:600;cursor:pointer;transition:.15s}
-.pos-mode-btn.active{background:#f7a93b;border-color:#f7a93b;color:#1a1a2e}
-.pos-encaisser-btn{width:100%;padding:11px;background:#f7a93b;color:#1a1a2e;border:none;
-  border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;transition:opacity .15s}
+.pos-mode-btn.active{background:var(--pos-accent);border-color:var(--pos-accent);color:var(--pos-accent-ink)}
+.pos-encaisser-btn{width:100%;padding:15px;margin-top:6px;
+  background:var(--pos-accent);color:var(--pos-accent-ink);border:none;
+  border-radius:var(--r);font-size:17px;font-weight:800;letter-spacing:.01em;cursor:pointer;
+  box-shadow:0 8px 20px rgba(247,169,59,.35);
+  transition:opacity .15s, transform .1s}
 .pos-encaisser-btn:hover{opacity:.88}
-.pos-encaisser-btn:disabled{opacity:.35;cursor:not-allowed}
+.pos-encaisser-btn:active{transform:scale(.98)}
+.pos-encaisser-btn:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
 
 /* ─── Catégorie tabs ──────────────────────────────────────── */
 .pos-cat-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .pos-cat-tab{padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600;
   border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);
   color:rgba(255,255,255,.6);cursor:pointer;transition:.15s}
-.pos-cat-tab.active{background:#f7a93b;border-color:#f7a93b;color:#1a1a2e}
+.pos-cat-tab.active{background:var(--pos-accent);border-color:var(--pos-accent);color:var(--pos-accent-ink)}
 .pos-cat-tab:hover:not(.active){background:rgba(255,255,255,.09)}
 
 /* ─── Stock bar ────────────────────────────────────────────── */
@@ -2878,6 +2910,18 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)}
 .pos-modal h3{margin:0 0 16px;font-size:17px;font-weight:700;color:#fff}
 .pos-modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+
+/* ─── Tablette (largeur) — comble le trou entre 768px (empilement
+   mobile complet) et 1440px : sans cette règle, une tablette large et
+   haute (ex. iPad portrait) gardait la grille/panier desktop intacts ── */
+@media(max-width:1200px){
+  .pos-caisse-layout{grid-template-columns:1fr 300px;gap:12px}
+  .pos-produit-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+}
+@media(max-width:900px){
+  .pos-caisse-layout{grid-template-columns:1fr 260px}
+  .pos-produit-grid{grid-template-columns:repeat(auto-fill,minmax(135px,1fr))}
+}
 
 /* ─── Responsive compact ────────────────────────────────────── */
 @media(max-height:800px){
@@ -6257,7 +6301,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <select class="pos-select" id="pos-caissier-sel" style="width:180px" onchange="posCaissierChange(this.value)">
               <option value="" data-i18n="pos.caisse.sanscaissier">Sans caissier</option>
             </select>
-            <button class="pos-btn ghost" id="pos-btn-soumettre" style="display:none;font-size:14px;padding:6px 14px;border-color:rgba(99,210,190,.4);color:#3fb6a8" onclick="posSoumettreSession()">
+            <button class="pos-btn ghost" id="pos-btn-soumettre" style="display:none;font-size:14px;padding:6px 14px;border-color:rgba(99,210,190,.4);color:var(--pos-money)" onclick="posSoumettreSession()">
               <span data-i18n="pos.caisse.soumettre">Soumettre rapport</span>
             </button>
           </div>
@@ -6273,22 +6317,22 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
           </div>
           <!-- KPIs -->
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
-            <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
-              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.mini.nbventes">Nb ventes</div>
-              <div id="pos-dash-nb" style="font-size:22px;font-weight:800;color:#f7a93b">0</div>
+          <div class="pos-kpi-grid" style="margin-bottom:12px">
+            <div class="pos-kpi" style="text-align:center">
+              <div class="pos-kpi-label" style="margin-bottom:4px" data-i18n="pos.caisse.mini.nbventes">Nb ventes</div>
+              <div id="pos-dash-nb" class="pos-amber" style="font-size:22px">0</div>
             </div>
-            <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
-              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.mini.totalca">Total CA</div>
-              <div id="pos-dash-total" style="font-size:18px;font-weight:700;color:#3fb6a8">G 0</div>
+            <div class="pos-kpi" style="text-align:center">
+              <div class="pos-kpi-label" style="margin-bottom:4px" data-i18n="pos.caisse.mini.totalca">Total CA</div>
+              <div id="pos-dash-total" class="pos-teal" style="font-size:18px">G 0</div>
             </div>
-            <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
-              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.mini.cash">Cash encaissé</div>
-              <div id="pos-dash-cash" style="font-size:18px;font-weight:700;color:#a78bfa">G 0</div>
+            <div class="pos-kpi" style="text-align:center">
+              <div class="pos-kpi-label" style="margin-bottom:4px" data-i18n="pos.caisse.mini.cash">Cash encaissé</div>
+              <div id="pos-dash-cash" style="font-size:18px;font-weight:600;color:var(--pos-info)">G 0</div>
             </div>
-            <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
-              <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.mini.credit">Crédit</div>
-              <div id="pos-dash-credit" style="font-size:18px;font-weight:700;color:#f87171">G 0</div>
+            <div class="pos-kpi" style="text-align:center">
+              <div class="pos-kpi-label" style="margin-bottom:4px" data-i18n="pos.caisse.mini.credit">Crédit</div>
+              <div id="pos-dash-credit" class="pos-red" style="font-size:18px">G 0</div>
             </div>
           </div>
           <!-- Évolution + Top produits -->
@@ -6315,22 +6359,22 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               </div>
             </div>
             <!-- KPIs globaux bar -->
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
-              <div style="background:rgba(247,169,59,.08);border:1px solid rgba(247,169,59,.2);border-radius:10px;padding:10px;text-align:center">
-                <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.admin.nbventes">Nb Ventes</div>
-                <div id="pos-caisse-admin-nb" style="font-size:23px;font-weight:800;color:#f7a93b">—</div>
+            <div class="pos-kpi-grid" style="margin-bottom:14px">
+              <div class="pos-kpi tint-amber" style="text-align:center">
+                <div class="pos-kpi-label" style="margin-bottom:4px" data-i18n="pos.caisse.admin.nbventes">Nb Ventes</div>
+                <div id="pos-caisse-admin-nb" class="pos-amber" style="font-size:23px">—</div>
               </div>
-              <div style="background:rgba(63,182,168,.08);border:1px solid rgba(63,182,168,.2);border-radius:10px;padding:10px;text-align:center">
-                <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.admin.ca">CA Total</div>
-                <div id="pos-caisse-admin-ca" style="font-size:18px;font-weight:700;color:#3fb6a8">—</div>
+              <div class="pos-kpi tint-teal" style="text-align:center">
+                <div class="pos-kpi-label" style="margin-bottom:4px" data-i18n="pos.caisse.admin.ca">CA Total</div>
+                <div id="pos-caisse-admin-ca" class="pos-teal" style="font-size:18px">—</div>
               </div>
-              <div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);border-radius:10px;padding:10px;text-align:center">
-                <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.admin.cash">Cash Total</div>
-                <div id="pos-caisse-admin-cash" style="font-size:18px;font-weight:700;color:#a78bfa">—</div>
+              <div class="pos-kpi tint-purple" style="text-align:center">
+                <div class="pos-kpi-label" style="margin-bottom:4px" data-i18n="pos.caisse.admin.cash">Cash Total</div>
+                <div id="pos-caisse-admin-cash" style="font-size:18px;font-weight:600;color:var(--pos-info)">—</div>
               </div>
-              <div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:10px;padding:10px;text-align:center">
-                <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px" data-i18n="pos.caisse.admin.credit">Crédit Total</div>
-                <div id="pos-caisse-admin-credit" style="font-size:18px;font-weight:700;color:#f87171">—</div>
+              <div class="pos-kpi tint-danger" style="text-align:center">
+                <div class="pos-kpi-label" style="margin-bottom:4px" data-i18n="pos.caisse.admin.credit">Crédit Total</div>
+                <div id="pos-caisse-admin-credit" class="pos-red" style="font-size:18px">—</div>
               </div>
             </div>
             <!-- Classement employés -->
@@ -6351,29 +6395,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <button id="pos-search-clear" class="pos-search-clear" style="display:none" title="Effacer la recherche" data-i18n-title="pos.caisse.search.clear.title" onclick="posSearchClear()">✕</button>
         </div>
 
-        <!-- Filtre catégorie + bouton cuisine -->
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1.5" fill="rgba(255,255,255,.35)"/></svg>
-          <select id="pos-cat-select" onchange="posCatFilter(this.value,null)"
-            style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:10px;
-                   color:#fff;font-size:14.5px;font-weight:600;padding:7px 36px 7px 14px;outline:none;
-                   cursor:pointer;min-width:180px;appearance:none;-webkit-appearance:none;
-                   background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22rgba(255,255,255,.5)%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>');
-                   background-repeat:no-repeat;background-position:right 10px center;background-size:14px">
-            <option value="TOUS" data-i18n="pos.caisse.cat.all">Toutes les catégories</option>
-          </select>
-          <button id="pos-btn-cuisine" onclick="posCatFilter('__CUISINE__',null)"
-            style="background:rgba(247,169,59,.18);border:1px solid rgba(247,169,59,.4);border-radius:10px;
-                   color:#f7a93b;font-size:14.5px;font-weight:700;padding:7px 14px;cursor:pointer;
-                   display:none;white-space:nowrap" data-i18n="pos.caisse.btn.cuisine">
-            🍽️ Plats Cuisine
-          </button>
-          <button onclick="posCatFilter('TOUS',null)"
-            style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;
-                   color:rgba(255,255,255,.6);font-size:14px;padding:7px 12px;cursor:pointer;white-space:nowrap" data-i18n="pos.caisse.btn.bar">
-            Bar
-          </button>
-          <span id="pos-cat-count" style="font-size:13px;color:rgba(255,255,255,.35)"></span>
+        <!-- Filtre catégorie -->
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div class="pos-cat-tabs" id="pos-cat-tabs" style="margin-bottom:0"></div>
+          <span id="pos-cat-count" style="font-size:13px;color:rgba(255,255,255,.35);margin-bottom:10px"></span>
         </div>
 
         <div class="pos-caisse-layout">
@@ -6403,7 +6428,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <label class="pos-label" data-i18n="pos.caisse.client.label">Client (pour crédit)</label>
                 <div style="display:flex;gap:6px;align-items:center">
                   <input class="pos-input" id="pos-client-nom" placeholder="Tapez pour rechercher ou ajouter un client…" style="flex:1">
-                  <button type="button" title="Ajouter rapidement comme nouveau client" onclick="clientAutocompleteAdd('pos-client-nom')" style="flex-shrink:0;width:32px;height:32px;border-radius:7px;background:rgba(63,182,168,.15);border:1px solid rgba(63,182,168,.3);color:#3fb6a8;font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">+</button>
+                  <button type="button" title="Ajouter rapidement comme nouveau client" onclick="clientAutocompleteAdd('pos-client-nom')" style="flex-shrink:0;width:32px;height:32px;border-radius:7px;background:var(--pos-money-d);border:1px solid rgba(63,182,168,.3);color:var(--pos-money);font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">+</button>
                 </div>
                 <div id="pos-client-nom-statut" style="margin-top:5px"></div>
               </div>
@@ -6426,7 +6451,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               </button>
               <div id="pos-ticket-result" style="display:none;margin-top:8px;padding:8px 10px;
                 background:rgba(63,182,168,.1);border:1px solid rgba(63,182,168,.3);
-                border-radius:8px;font-size:13px;color:#3fb6a8;text-align:center"></div>
+                border-radius:8px;font-size:13px;color:var(--pos-money);text-align:center"></div>
             </div>
           </div>
         </div>
@@ -21517,8 +21542,6 @@ async function _posLoadCuisinePlatsCache(){
     const data = await apiFetch('GET','/cuisine/plats?actif=true');
     _posCuisinePlats = data || [];
   } catch(e){ _posCuisinePlats = []; }
-  const btn = document.getElementById('pos-btn-cuisine');
-  if(btn) btn.style.display = _posCuisinePlats.length ? '' : 'none';
 }
 
 /* Formater date ISO en local */
@@ -22247,18 +22270,20 @@ async function posSoumettreSession(){
 function posRenderCatTabs(){
   const cats = [...new Set(_posProduits.map(p=>p.categorie).filter(Boolean))].sort();
   const total = _posProduits.length;
-  const sel = document.getElementById('pos-cat-select');
-  if(!sel) return;
-  sel.innerHTML =
-    `<option value="TOUS">${t('pos.caisse.cat.allbar',{n:total})}</option>` +
+  const wrap = document.getElementById('pos-cat-tabs');
+  if(!wrap) return;
+  const tab = (val, label, active) =>
+    `<button type="button" class="pos-cat-tab${active?' active':''}" onclick="posCatFilter('${val}',this)">${label}</button>`;
+  wrap.innerHTML =
+    tab('TOUS', t('pos.caisse.cat.allbar',{n:total}), _posCatActuelle==='TOUS') +
     (_posCuisinePlats.length
-      ? `<option value="__CUISINE__">${t('pos.caisse.cat.cuisine',{n:_posCuisinePlats.length})}</option>`
+      ? tab('__CUISINE__', t('pos.caisse.cat.cuisine',{n:_posCuisinePlats.length}), _posCatActuelle==='__CUISINE__')
       : '') +
     cats.map(c=>{
       const n = _posProduits.filter(p=>p.categorie===c).length;
-      return `<option value="${c}"${c===_posCatActuelle?' selected':''}>${c} (${n})</option>`;
+      const safe = (c||'').replace(/'/g,"\\'");
+      return tab(safe, `${esc(c)} (${n})`, _posCatActuelle===c);
     }).join('');
-  if(_posCatActuelle!=='TOUS') sel.value = _posCatActuelle;
 }
 
 let _posSearchTerm = '';
@@ -22311,8 +22336,10 @@ function _posCardProduitHTML(p){
 
 function posCatFilter(cat, btn){
   _posCatActuelle = cat;
-  const sel = document.getElementById('pos-cat-select');
-  if(sel && sel.value !== cat) sel.value = cat;
+  if(btn){
+    document.querySelectorAll('#pos-cat-tabs .pos-cat-tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  }
   posRenderGrid();
 }
 
