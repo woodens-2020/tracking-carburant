@@ -1414,7 +1414,8 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
     if bool(data.produit_id) == bool(data.station_produit_id):
         raise HTTPException(422, "Fournir soit produit_id (bar) soit station_produit_id (station), pas les deux.")
 
-    qte_unites = Decimal(str(data.quantite))
+    qte_unites    = Decimal(str(data.quantite))
+    prix_unitaire = Decimal(str(data.prix_achat_unitaire))
 
     if data.produit_id:
         p = db.query(BarProduit).filter_by(id=data.produit_id).first()
@@ -1422,7 +1423,12 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
             raise HTTPException(404, "Produit bar introuvable")
         upc = p.unites_par_caisse or 1
         if data.quantite_type == "caisse" and p.vendu_par_caisse and upc > 0:
-            qte_unites = Decimal(str(data.quantite)) * Decimal(str(upc))
+            # Le prix saisi est un prix PAR CAISSE — le convertir en prix par
+            # unité avant stockage, comme le fait déjà l'approvisionnement
+            # rapide. Sans ça, quantite (convertie en unités) × prix (resté
+            # au niveau caisse) surestime le coût d'un facteur upc.
+            qte_unites    = Decimal(str(data.quantite)) * Decimal(str(upc))
+            prix_unitaire = prix_unitaire / Decimal(str(upc))
         nom_prod = p.nom
         statut   = "EN_ATTENTE"
     else:
@@ -1436,7 +1442,7 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
         produit_id          = data.produit_id,
         station_produit_id  = data.station_produit_id,
         quantite            = qte_unites,
-        prix_achat_unitaire = Decimal(str(data.prix_achat_unitaire)),
+        prix_achat_unitaire = prix_unitaire,
         fournisseur         = data.fournisseur,
         utilisateur_id      = _uid(request),
         notes               = data.notes,
@@ -1457,7 +1463,7 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
 
     db.commit()
     total_dep  = sum(float(d.montant) for d in data.depenses)
-    prix_total = float(qte_unites) * float(data.prix_achat_unitaire)
+    prix_total = float(qte_unites) * float(prix_unitaire)
     return {
         "achat_id":         achat.id,
         "statut":           statut,
@@ -1468,6 +1474,46 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
         "total_depenses":   total_dep,
         "cout_total":       prix_total + total_dep,
     }
+
+
+class AchatEditIn(BaseModel):
+    quantite:            float = Field(gt=0)
+    quantite_type:       str   = "unite"   # "unite" ou "caisse" (bar seulement)
+    prix_achat_unitaire: float = Field(gt=0)
+    fournisseur:         Optional[str] = None
+    notes:               Optional[str] = None
+
+
+@router.put("/achats/{achat_id}")
+def modifier_achat(
+    achat_id: int, data: AchatEditIn, db: Session = Depends(get_db),
+    _user: Utilisateur = Depends(_require_pdg_ou_admin_pos),
+):
+    """Corrige un achat déjà enregistré (ex : prix saisi par caisse au lieu
+    de par unité). Réservé au PDG/admin — un achat CONFIRME entre déjà dans
+    le coût moyen pondéré du produit, donc une correction ici le recalcule
+    rétroactivement."""
+    a = db.query(BarAchat).filter_by(id=achat_id).first()
+    if not a:
+        raise HTTPException(404, "Achat introuvable")
+
+    qte_unites    = Decimal(str(data.quantite))
+    prix_unitaire = Decimal(str(data.prix_achat_unitaire))
+
+    if a.produit_id:
+        p   = db.query(BarProduit).filter_by(id=a.produit_id).first()
+        upc = (p.unites_par_caisse or 1) if p else 1
+        if data.quantite_type == "caisse" and p and p.vendu_par_caisse and upc > 0:
+            qte_unites    = Decimal(str(data.quantite)) * Decimal(str(upc))
+            prix_unitaire = prix_unitaire / Decimal(str(upc))
+
+    a.quantite            = qte_unites
+    a.prix_achat_unitaire = prix_unitaire
+    a.fournisseur         = data.fournisseur
+    a.notes               = data.notes
+    db.commit()
+    db.refresh(a)
+    return _achat_dict(a)
 
 
 @router.post("/achats/{achat_id}/confirmer", status_code=200)
