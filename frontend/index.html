@@ -22127,12 +22127,11 @@ async function loadPosCaisse(){
   posCatFilter(_posCatActuelle, null);
   posRenderCart();
 
-  // caisse_employe_id : peuplé pour les vraies caissières ET les managers
-  // (contrairement à employe_id, réservé aux caissières — voir /api/me).
-  // Un manager qui encaisse une vente ici doit être verrouillé sur sa propre
-  // identité, exactement comme une caissière, sans perdre son accès complet
-  // ailleurs dans l'appli.
-  const isCaissiere = !!_appUser?.caisse_employe_id || (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier');
+  // employe_id (pas caisse_employe_id) : seul le premier est réservé aux
+  // vraies caissières — voir /api/me. caisse_employe_id est peuplé aussi
+  // pour les managers (pour verrouiller leur identité de vente plus bas),
+  // donc l'utiliser ici masquerait à tort le dashboard admin aux managers.
+  const isCaissiere = !!_appUser?.employe_id || (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier');
   const adminDash = document.getElementById('pos-caisse-admin-dash');
 
   if(!isCaissiere){

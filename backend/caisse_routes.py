@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import BarVente, BarLigneVente, BarSessionCaisse, Employe, Utilisateur
+from tz_utils import HAITI_TZ, today_haiti, bounds_haiti
 
 router = APIRouter(prefix="/api/pos/caisse", tags=["caisse"])
 
@@ -46,8 +47,7 @@ def _session_ou_404(session_id: int, db: Session) -> BarSessionCaisse:
 
 def _ventes_session(session: BarSessionCaisse, db: Session):
     from sqlalchemy import func as _f
-    today_start = datetime.combine(session.date_session, datetime.min.time()).replace(tzinfo=timezone.utc)
-    today_end   = datetime.combine(session.date_session, datetime.max.time()).replace(tzinfo=timezone.utc)
+    today_start, today_end = bounds_haiti(session.date_session)
     return (
         db.query(BarVente)
         .filter(
@@ -74,8 +74,7 @@ def _cash_remboursements_collectes(employe: Optional[Employe], jour: date, db: S
     from models import BarRemboursement
     if not employe or not employe.utilisateur_id:
         return 0.0
-    jour_start = datetime.combine(jour, datetime.min.time()).replace(tzinfo=timezone.utc)
-    jour_end   = datetime.combine(jour, datetime.max.time()).replace(tzinfo=timezone.utc)
+    jour_start, jour_end = bounds_haiti(jour)
     rembs = (
         db.query(BarRemboursement)
         .filter(
@@ -169,14 +168,13 @@ def dashboard_caissiere(
         except ValueError:
             raise HTTPException(422, "date invalide (YYYY-MM-DD)")
     else:
-        jour = datetime.now(tz=timezone.utc).date()
+        jour = today_haiti()
 
     employe = db.query(Employe).filter_by(id=caissier_id).first()
     if not employe:
         raise HTTPException(404, "Caissier introuvable")
 
-    dt_start = datetime.combine(jour, datetime.min.time()).replace(tzinfo=timezone.utc)
-    dt_end   = datetime.combine(jour, datetime.max.time()).replace(tzinfo=timezone.utc)
+    dt_start, dt_end = bounds_haiti(jour)
 
     ventes = (
         db.query(BarVente)
@@ -202,7 +200,7 @@ def dashboard_caissiere(
     for v in ventes:
         cumul += float(v.montant_total)
         evolution.append({
-            "heure":   v.date_heure.astimezone(timezone.utc).strftime("%H:%M"),
+            "heure":   v.date_heure.astimezone(HAITI_TZ).strftime("%H:%M"),
             "montant": float(v.montant_total),
             "cumul":   cumul,
             "ticket":  v.numero_ticket,
@@ -289,7 +287,7 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
     if not employe:
         raise HTTPException(404, "Caissier introuvable")
 
-    aujourd_hui = datetime.now(tz=timezone.utc).date()
+    aujourd_hui = today_haiti()
     session = (
         db.query(BarSessionCaisse)
         .filter_by(caissier_id=data.caissier_id, date_session=aujourd_hui)
@@ -456,7 +454,7 @@ def export_xlsx(session_id: int, db: Session = Depends(get_db)):
             for l in v.lignes
         )
         data_cell(ws, r, 1, v.numero_ticket)
-        data_cell(ws, r, 2, v.date_heure.astimezone(timezone.utc).strftime("%H:%M"))
+        data_cell(ws, r, 2, v.date_heure.astimezone(HAITI_TZ).strftime("%H:%M"))
         data_cell(ws, r, 3, v.mode_paiement)
         data_cell(ws, r, 4, v.client_nom or "")
         ws.cell(row=r, column=5, value=produits_str).border = thin
@@ -570,7 +568,7 @@ def export_pdf(session_id: int, db: Session = Depends(get_db)):
     for v in ventes:
         vente_data.append([
             v.numero_ticket,
-            v.date_heure.astimezone(timezone.utc).strftime("%H:%M"),
+            v.date_heure.astimezone(HAITI_TZ).strftime("%H:%M"),
             v.mode_paiement,
             (v.client_nom or "")[:20],
             f"G {float(v.montant_total):,.2f}",

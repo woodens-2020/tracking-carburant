@@ -8,7 +8,7 @@ import base64
 from datetime import date as date_type, datetime, timezone, time
 from decimal import Decimal
 from typing import List, Optional
-from tz_utils import today_haiti
+from tz_utils import today_haiti, bounds_haiti
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
 from fastapi.responses import StreamingResponse, Response
@@ -1748,9 +1748,8 @@ def liste_ventes(
 @router.get("/ventes/temps-reel")
 def ventes_temps_reel(db: Session = Depends(get_db)):
     """Ventes du jour en cours, agrégées par caissier."""
-    today     = datetime.now(tz=timezone.utc).date()
-    dt_debut  = datetime.combine(today, time.min).replace(tzinfo=timezone.utc)
-    dt_fin    = datetime.combine(today, time.max).replace(tzinfo=timezone.utc)
+    today            = today_haiti()
+    dt_debut, dt_fin = bounds_haiti(today)
 
     ventes = (
         db.query(BarVente)

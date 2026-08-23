@@ -18,3 +18,13 @@ def now_haiti() -> datetime:
 
 def today_haiti() -> date:
     return now_haiti().date()
+
+
+def bounds_haiti(jour: date) -> tuple[datetime, datetime]:
+    """Bornes [début, fin] du jour calendaire Haïti `jour`, en instants
+    tz-aware corrects pour filtrer une colonne timestamptz (ex. date_heure) —
+    à utiliser à la place de `datetime.combine(jour, ...).replace(tzinfo=timezone.utc)`,
+    qui traite à tort `jour` comme un jour calendaire UTC plutôt qu'Haïti."""
+    debut = datetime.combine(jour, datetime.min.time(), tzinfo=HAITI_TZ)
+    fin   = datetime.combine(jour, datetime.max.time(), tzinfo=HAITI_TZ)
+    return debut, fin
