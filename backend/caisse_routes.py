@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import io
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -61,7 +62,7 @@ def _ventes_session(session: BarSessionCaisse, db: Session):
     )
 
 
-def _cash_remboursements_collectes(employe: Optional[Employe], jour: date, db: Session) -> float:
+def _cash_remboursements_collectes(employe: Optional[Employe], jour: date, db: Session) -> Decimal:
     """Cash physiquement recu ce jour-la par cette caissiere en reglement
     d'un credit — quelle que soit la date de la vente d'origine (un credit
     peut avoir ete vendu un autre jour). Le paiement d'un credit
@@ -73,7 +74,7 @@ def _cash_remboursements_collectes(employe: Optional[Employe], jour: date, db: S
     utilisateur lie (Employe.utilisateur_id)."""
     from models import BarRemboursement
     if not employe or not employe.utilisateur_id:
-        return 0.0
+        return Decimal("0")
     jour_start, jour_end = bounds_haiti(jour)
     rembs = (
         db.query(BarRemboursement)
@@ -84,36 +85,52 @@ def _cash_remboursements_collectes(employe: Optional[Employe], jour: date, db: S
         )
         .all()
     )
-    return sum(float(r.montant) for r in rembs)
+    return sum((Decimal(str(r.montant)) for r in rembs), Decimal("0"))
+
+
+def _cash_ventes_decimal(ventes) -> Decimal:
+    """Cash CASH/MIXTE d'une liste de ventes, en Decimal exact — une somme en
+    flottant binaire ne peut pas représenter exactement la plupart des
+    valeurs décimales (0,10 ; 0,20...) et peut dériver de quelques centimes
+    une fois additionnée sur toutes les ventes d'une journée à fort volume.
+    Utilisé à la fois par _stats_ventes() (affichage) et soumettre_session()
+    (stockage de la réconciliation) pour qu'ils calculent identiquement."""
+    return sum(
+        (Decimal(str(v.montant_paye)) for v in ventes if v.mode_paiement in ("CASH", "MIXTE")),
+        Decimal("0"),
+    )
 
 
 def _stats_ventes(ventes, employe: Optional[Employe] = None, jour: Optional[date] = None, db: Session = None):
-    total      = sum(float(v.montant_total) for v in ventes)
-    cash       = sum(float(v.montant_paye)  for v in ventes if v.mode_paiement in ("CASH", "MIXTE"))
+    total      = sum((Decimal(str(v.montant_total)) for v in ventes), Decimal("0"))
+    cash       = _cash_ventes_decimal(ventes)
     if employe is not None and jour is not None and db is not None:
         cash += _cash_remboursements_collectes(employe, jour, db)
-    credit_tot = sum(float(v.montant_total) for v in ventes if v.mode_paiement == "CREDIT")
-    modes      = {}
+    credit_tot = sum((Decimal(str(v.montant_total)) for v in ventes if v.mode_paiement == "CREDIT"), Decimal("0"))
+    modes: dict = {}
     for v in ventes:
-        modes[v.mode_paiement] = modes.get(v.mode_paiement, 0) + float(v.montant_total)
+        modes[v.mode_paiement] = modes.get(v.mode_paiement, Decimal("0")) + Decimal(str(v.montant_total))
 
     produits: dict = {}
     for v in ventes:
         for l in v.lignes:
             nom = (l.produit.nom if l.produit else None) or (l.cuisine_plat.nom if l.cuisine_plat else "?")
             if nom not in produits:
-                produits[nom] = {"nom": nom, "quantite": 0.0, "total": 0.0}
-            produits[nom]["quantite"] += float(l.quantite)
-            produits[nom]["total"]    += float(l.sous_total)
+                produits[nom] = {"nom": nom, "quantite": Decimal("0"), "total": Decimal("0")}
+            produits[nom]["quantite"] += Decimal(str(l.quantite))
+            produits[nom]["total"]    += Decimal(str(l.sous_total))
 
     top = sorted(produits.values(), key=lambda x: x["total"], reverse=True)[:10]
     return {
         "nb_ventes":  len(ventes),
-        "total":      total,
-        "cash":       cash,
-        "credit":     credit_tot,
-        "par_mode":   modes,
-        "top_produits": top,
+        "total":      float(total),
+        "cash":       float(cash),
+        "credit":     float(credit_tot),
+        "par_mode":   {k: float(v) for k, v in modes.items()},
+        "top_produits": [
+            {"nom": p["nom"], "quantite": float(p["quantite"]), "total": float(p["total"])}
+            for p in top
+        ],
     }
 
 
@@ -343,9 +360,15 @@ def soumettre_session(session_id: int, body: SoumettreIn, db: Session = Depends(
     ventes = _ventes_session(s, db)
     stats  = _stats_ventes(ventes, s.caissier, s.date_session, db)
 
-    s.cash_attendu_soumission = stats["cash"]
-    s.montant_compte          = body.montant_compte
-    s.ecart                   = body.montant_compte - stats["cash"]
+    # Calculé en Decimal exact (jamais via stats["cash"], déjà passé par un
+    # flottant pour l'affichage) : c'est la donnée de réconciliation stockée,
+    # elle ne doit jamais dériver de quelques centimes sur un fort volume.
+    cash_attendu   = _cash_ventes_decimal(ventes) + _cash_remboursements_collectes(s.caissier, s.date_session, db)
+    montant_compte = Decimal(str(body.montant_compte))
+
+    s.cash_attendu_soumission = cash_attendu
+    s.montant_compte          = montant_compte
+    s.ecart                   = montant_compte - cash_attendu
     s.statut                  = "SOUMIS"
     s.soumis_at               = datetime.now(tz=timezone.utc)
     if body.notes:

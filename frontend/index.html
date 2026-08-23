@@ -7122,7 +7122,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="pos-form-row">
           <div style="flex:1">
             <label class="pos-label">Quantité *</label>
-            <input class="pos-input" id="pae-qte" type="number" min="0.001" step="0.001" placeholder="0" oninput="paEditUpdateRecap()">
+            <input class="pos-input" id="pae-qte" type="number" min="0.001" step="0.001" placeholder="0" oninput="_paEditUserModified=true;paEditUpdateRecap()">
           </div>
           <div style="flex:1">
             <label class="pos-label">Unité de saisie</label>
@@ -7140,7 +7140,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="pos-form-row">
           <div style="flex:1">
             <label class="pos-label" id="pae-prix-label">Prix d'achat unitaire (G) *</label>
-            <input class="pos-input" id="pae-prix" type="number" min="0" step="0.01" placeholder="0.00" oninput="paEditUpdateRecap()">
+            <input class="pos-input" id="pae-prix" type="number" min="0" step="0.01" placeholder="0.00" oninput="_paEditUserModified=true;paEditUpdateRecap()">
           </div>
           <div style="flex:1">
             <label class="pos-label">Fournisseur</label>
@@ -24863,6 +24863,7 @@ async function posEnregistrerAchat(){
 // ── Modification d'un achat existant ────────────────────────────────
 let _paEditAchat    = null; // achat en cours d'édition (depuis _paAchatsCache)
 let _paEditPrevType = 'unite';
+let _paEditUserModified = false; // true dès qu'une frappe manuelle a eu lieu dans qte/prix
 
 function _paPrixVenteFor(a){
   if(!a || a.produit_type!=='bar') return 0;
@@ -24887,6 +24888,7 @@ function paEditModal(idx){
   // dans l'autre sens (la conversion est faite automatiquement au bascule).
   typeSel.value = 'unite';
   _paEditPrevType = 'unite';
+  _paEditUserModified = false;
   if(typeRow) typeRow.style.display = (a.produit_type==='station' || upc<=1) ? 'none' : '';
 
   document.getElementById('pae-qte').value   = a.quantite;
@@ -24910,14 +24912,28 @@ function paEditOnQteTypeChange(){
   if(type !== _paEditPrevType && upc > 1){
     const qteEl  = document.getElementById('pae-qte');
     const prixEl = document.getElementById('pae-prix');
-    const qte    = parseFloat(qteEl.value)  || 0;
-    const prix   = parseFloat(prixEl.value) || 0;
-    if(type === 'caisse'){
-      qteEl.value  = +(qte / upc).toFixed(4);
-      prixEl.value = +(prix * upc).toFixed(2);
+    if(!_paEditUserModified){
+      // Aucune frappe manuelle depuis l'ouverture : reconvertit depuis les
+      // valeurs d'origine de l'achat (la source exacte), jamais depuis la
+      // valeur actuellement affichée — un aller-retour répété du bouton ne
+      // doit jamais faire dériver la quantité/le prix par arrondis successifs.
+      if(type === 'caisse'){
+        qteEl.value  = +(Number(a.quantite) / upc).toFixed(4);
+        prixEl.value = +(Number(a.prix_achat_unitaire) * upc).toFixed(2);
+      } else {
+        qteEl.value  = a.quantite;
+        prixEl.value = a.prix_achat_unitaire;
+      }
     } else {
-      qteEl.value  = +(qte * upc).toFixed(4);
-      prixEl.value = +(prix / upc).toFixed(2);
+      const qte    = parseFloat(qteEl.value)  || 0;
+      const prix   = parseFloat(prixEl.value) || 0;
+      if(type === 'caisse'){
+        qteEl.value  = +(qte / upc).toFixed(4);
+        prixEl.value = +(prix * upc).toFixed(2);
+      } else {
+        qteEl.value  = +(qte * upc).toFixed(4);
+        prixEl.value = +(prix / upc).toFixed(2);
+      }
     }
   }
   _paEditPrevType = type;
