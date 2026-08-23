@@ -1108,6 +1108,12 @@ class BarSessionCaisse(Base):
     valide_at     = Column(DateTime(timezone=True), nullable=True)
     valide_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     notes_admin   = Column(String(500), nullable=True)
+    # Réconciliation de caisse, figée au moment de la soumission (jamais
+    # recalculée après coup) — null tant que la session est EN_COURS, et
+    # reste null pour les sessions historiques créées avant cette colonne.
+    cash_attendu_soumission = Column(Numeric(14, 2), nullable=True)
+    montant_compte          = Column(Numeric(14, 2), nullable=True)
+    ecart                   = Column(Numeric(14, 2), nullable=True)
     created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     caissier   = relationship("Employe",      foreign_keys=[caissier_id])

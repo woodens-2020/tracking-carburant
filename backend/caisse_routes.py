@@ -22,7 +22,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -117,6 +117,19 @@ def _stats_ventes(ventes, employe: Optional[Employe] = None, jour: Optional[date
     }
 
 
+def _ecart_couleur(ecart: float, cash_attendu: float) -> str:
+    """Code hex (sans #) selon la gravité de l'écart de caisse — mêmes seuils
+    que le JS _posEcartNiveau() côté frontend, pour que PDF/XLSX/écran
+    affichent toujours la même couleur pour le même écart."""
+    base = max(abs(cash_attendu or 0), 1000)
+    pct  = abs(ecart or 0) / base
+    if pct <= 0.01:
+        return "22C55E"
+    if pct <= 0.03:
+        return "F7A93B"
+    return "F87171"
+
+
 def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
     return {
         "id":            s.id,
@@ -128,6 +141,9 @@ def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
         "valide_at":     s.valide_at.isoformat() if s.valide_at else None,
         "valide_par":    (s.valide_par.nom + " " + s.valide_par.prenom) if s.valide_par else None,
         "notes_admin":   s.notes_admin,
+        "cash_attendu_soumission": float(s.cash_attendu_soumission) if s.cash_attendu_soumission is not None else None,
+        "montant_compte":          float(s.montant_compte) if s.montant_compte is not None else None,
+        "ecart":                   float(s.ecart) if s.ecart is not None else None,
         **(stats or {}),
     }
 
@@ -308,23 +324,34 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
     return _session_dict(session, stats)
 
 
-class NoteIn(BaseModel):
+class SoumettreIn(BaseModel):
+    montant_compte: float = Field(..., ge=0)
     notes: Optional[str] = None
 
 
 @router.post("/sessions/{session_id}/soumettre")
-def soumettre_session(session_id: int, body: NoteIn = NoteIn(), db: Session = Depends(get_db)):
-    """La caissière soumet sa session — passe en SOUMIS."""
+def soumettre_session(session_id: int, body: SoumettreIn, db: Session = Depends(get_db)):
+    """Soumet la session : passe en SOUMIS, fige le cash attendu et l'écart.
+    Une session ne peut être soumise qu'une fois — au-delà, le snapshot doit
+    rester figé pour que la réconciliation ait un sens."""
     s = _session_ou_404(session_id, db)
+    if s.statut == "SOUMIS":
+        raise HTTPException(409, "Session déjà soumise — contactez un administrateur pour toute correction.")
     if s.statut == "VALIDE":
-        raise HTTPException(400, "Session déjà validée par l'admin.")
-    s.statut    = "SOUMIS"
-    s.soumis_at = datetime.now(tz=timezone.utc)
+        raise HTTPException(409, "Session déjà validée par l'admin.")
+
+    ventes = _ventes_session(s, db)
+    stats  = _stats_ventes(ventes, s.caissier, s.date_session, db)
+
+    s.cash_attendu_soumission = stats["cash"]
+    s.montant_compte          = body.montant_compte
+    s.ecart                   = body.montant_compte - stats["cash"]
+    s.statut                  = "SOUMIS"
+    s.soumis_at               = datetime.now(tz=timezone.utc)
     if body.notes:
         s.notes_admin = body.notes
     db.commit()
-    ventes = _ventes_session(s, db)
-    return _session_dict(s, _stats_ventes(ventes, s.caissier, s.date_session, db))
+    return _session_dict(s, stats)
 
 
 class ValiderIn(BaseModel):
@@ -335,6 +362,8 @@ class ValiderIn(BaseModel):
 def valider_session(session_id: int, body: ValiderIn = ValiderIn(), request: Request = None, db: Session = Depends(get_db)):
     """Admin valide la session — passe en VALIDE."""
     s = _session_ou_404(session_id, db)
+    if s.statut == "EN_COURS":
+        raise HTTPException(409, "La session doit d'abord être soumise par la caissière avant validation.")
     s.statut        = "VALIDE"
     s.valide_at     = datetime.now(tz=timezone.utc)
     s.valide_par_id = _uid(request) if request else None
@@ -416,18 +445,25 @@ def export_xlsx(session_id: int, db: Session = Depends(get_db)):
     hdr_cell(ws, r, 1, "Résumé financier", bg=DARK)
     ws.merge_cells(f"A{r}:B{r}")
 
-    for label, val in [
+    resume_rows = [
         ("Total encaissé (G)",   stats["total"]),
         ("Cash / Mixte (G)",     stats["cash"]),
         ("Crédit (G)",           stats["credit"]),
         ("Nombre de ventes",     stats["nb_ventes"]),
-    ]:
+    ]
+    if s.montant_compte is not None:
+        resume_rows.append(("Montant compté (G)", float(s.montant_compte)))
+        resume_rows.append(("Écart (G)",           float(s.ecart)))
+
+    for label, val in resume_rows:
         r += 1
         ws.cell(row=r, column=1, value=label).font = Font(bold=True)
         ws.cell(row=r, column=1).border = thin
         c = ws.cell(row=r, column=2, value=val)
         c.border = thin
         c.number_format = '#,##0.00' if isinstance(val, float) else '0'
+        if label == "Écart (G)":
+            c.font = Font(bold=True, color=_ecart_couleur(float(s.ecart), float(s.cash_attendu_soumission)))
 
     # Top produits
     r += 2
@@ -523,11 +559,17 @@ def export_pdf(session_id: int, db: Session = Depends(get_db)):
         ["Crédit",             f"G {stats['credit']:,.2f}"],
         ["Nombre de ventes",   str(stats["nb_ventes"])],
     ]
+    ecart_row_idx = None
+    if s.montant_compte is not None:
+        resume_data.append(["Montant compté", f"G {float(s.montant_compte):,.2f}"])
+        ecart_row_idx = len(resume_data)
+        signe = '+' if float(s.ecart) >= 0 else ''
+        resume_data.append(["Écart", f"{signe}G {float(s.ecart):,.2f}"])
     for mode, val in stats["par_mode"].items():
         resume_data.append([f"Mode {mode}", f"G {val:,.2f}"])
 
     t_resume = Table(resume_data, colWidths=[8*cm, 5*cm])
-    t_resume.setStyle(TableStyle([
+    resume_style = [
         ("BACKGROUND",   (0,0),(1,0), DARK),
         ("TEXTCOLOR",    (0,0),(1,0), colors.white),
         ("FONTNAME",     (0,0),(1,0), "Helvetica-Bold"),
@@ -537,7 +579,12 @@ def export_pdf(session_id: int, db: Session = Depends(get_db)):
         ("ALIGN",        (1,0),(1,-1), "RIGHT"),
         ("BOTTOMPADDING",(0,0),(-1,-1), 5),
         ("TOPPADDING",   (0,0),(-1,-1), 5),
-    ]))
+    ]
+    if ecart_row_idx is not None:
+        ecart_couleur = colors.HexColor(f"#{_ecart_couleur(float(s.ecart), float(s.cash_attendu_soumission))}")
+        resume_style.append(("TEXTCOLOR", (0,ecart_row_idx),(1,ecart_row_idx), ecart_couleur))
+        resume_style.append(("FONTNAME",  (0,ecart_row_idx),(1,ecart_row_idx), "Helvetica-Bold"))
+    t_resume.setStyle(TableStyle(resume_style))
     story.append(t_resume)
     story.append(Spacer(1, 10))
 

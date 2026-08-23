@@ -6459,6 +6459,38 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div><!-- /page-pos-caisse -->
 
+    <!-- Modal Soumission de session (comptage de caisse) -->
+    <div class="pos-modal-bg" id="pos-soumettre-modal-bg" onclick="if(event.target===this)posFermerModalSoumission()">
+      <div class="pos-modal" style="max-width:480px">
+        <h3>Soumettre la session de caisse</h3>
+
+        <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;justify-content:space-between">
+          <span style="color:rgba(255,255,255,.5)">Cash attendu (calculé en direct)</span>
+          <span id="ps-cash-attendu" style="font-weight:700;color:#a78bfa">G 0.00</span>
+        </div>
+
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Montant compté (G) *</label>
+            <input class="pos-input" id="ps-montant-compte" type="number" min="0" step="0.01" placeholder="0.00" oninput="posEcartPreview()">
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Notes</label>
+            <input class="pos-input" id="ps-notes" placeholder="Optionnel">
+          </div>
+        </div>
+
+        <div id="ps-ecart-banner" style="display:none;margin-top:6px;border-radius:8px;padding:10px 12px;font-size:14px"></div>
+
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="posFermerModalSoumission()">Annuler</button>
+          <button class="pos-btn teal" onclick="posConfirmerSoumission()">Confirmer la soumission</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- PAGE POS — PRODUITS BAR                                 -->
     <!-- ══════════════════════════════════════════════════════ -->
@@ -8075,13 +8107,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                   <th style="text-align:right">Ventes</th>
                   <th style="text-align:right">Total CA</th>
                   <th style="text-align:right">Cash</th>
+                  <th style="text-align:right">Écart</th>
                   <th>Soumis le</th>
                   <th>Validé par</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="sc-tbody">
-                <tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>
+                <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -22247,6 +22280,20 @@ function posDashRefresh(){
   if(v) _posDashLoadData(v);
 }
 
+// Seuil de gravité de l'écart de caisse, en % du cash attendu (pas un
+// montant fixe — le cash quotidien d'un bar varie trop d'un jour à l'autre
+// pour qu'un seuil absolu ait un sens). Plancher à G 1000 pour éviter qu'un
+// petit écart d'arrondi soit lu comme un pourcentage alarmant un jour calme.
+function _posEcartNiveau(ecart, cashAttendu){
+  const base = Math.max(Math.abs(cashAttendu)||0, 1000);
+  const pct  = Math.abs(ecart) / base;
+  if(pct <= 0.01) return {color:'#22c55e', bg:'rgba(34,197,94,.12)',  border:'rgba(34,197,94,.3)'};
+  if(pct <= 0.03) return {color:'#f7a93b', bg:'rgba(247,169,59,.12)', border:'rgba(247,169,59,.3)'};
+  return                 {color:'#f87171', bg:'rgba(248,113,113,.1)', border:'rgba(248,113,113,.3)'};
+}
+
+let _posCashAttendu = 0;
+
 async function posSoumettreSession(){
   if(!_posDashSessionId){
     // Ouvrir d'abord une session
@@ -22257,13 +22304,49 @@ async function posSoumettreSession(){
       _posDashSessionId = s.id;
     } catch(e){ posAlert(e.message||t('pos.caisse.err.ouvertureSession')); return; }
   }
-  if(!await showConfirm(t('pos.caisse.confirm.soumettre.body'), {title:t('pos.caisse.confirm.soumettre.title'), okLabel:t('pos.caisse.confirm.soumettre.ok'), type:'warn'})) return;
+  // Cash attendu rechargé en direct (pas la valeur déjà affichée, potentiellement périmée)
+  const cid = document.getElementById('pos-caissier-sel')?.value;
   try {
-    await apiFetch('POST', `/pos/caisse/sessions/${_posDashSessionId}/soumettre`, {});
+    const d = await apiFetch('GET', `/pos/caisse/dashboard?caissier_id=${cid}`);
+    _posCashAttendu = d.cash||0;
+  } catch(e){ posAlert(e.message||t('pos.caisse.err.soumission')); return; }
+
+  document.getElementById('ps-cash-attendu').textContent = posGx(_posCashAttendu);
+  document.getElementById('ps-montant-compte').value = '';
+  document.getElementById('ps-notes').value = '';
+  document.getElementById('ps-ecart-banner').style.display = 'none';
+  document.getElementById('pos-soumettre-modal-bg').classList.add('open');
+}
+
+function posEcartPreview(){
+  const compte = parseFloat(document.getElementById('ps-montant-compte')?.value);
+  const banner = document.getElementById('ps-ecart-banner');
+  if(!banner) return;
+  if(isNaN(compte)){ banner.style.display = 'none'; return; }
+  const ecart = compte - _posCashAttendu;
+  const {color, bg, border} = _posEcartNiveau(ecart, _posCashAttendu);
+  banner.style.display = '';
+  banner.style.background = bg;
+  banner.style.border = `1px solid ${border}`;
+  banner.style.color = color;
+  banner.innerHTML = `Écart : <strong>${ecart>=0?'+':''}${posGx(ecart)}</strong>`;
+}
+
+async function posConfirmerSoumission(){
+  const compte = parseFloat(document.getElementById('ps-montant-compte')?.value);
+  if(isNaN(compte) || compte < 0){ posAlert('Indiquez le montant compté (≥ 0).', 'warn'); return; }
+  const notes = document.getElementById('ps-notes')?.value.trim() || null;
+  try {
+    await apiFetch('POST', `/pos/caisse/sessions/${_posDashSessionId}/soumettre`, {montant_compte: compte, notes});
+    posFermerModalSoumission();
     const cid = document.getElementById('pos-caissier-sel')?.value;
     if(cid) await _posDashLoadData(cid);
     _giAlert(t('pos.caisse.ok.soumis'), 'ok');
   } catch(e){ posAlert(e.message||t('pos.caisse.err.soumission')); }
+}
+
+function posFermerModalSoumission(){
+  document.getElementById('pos-soumettre-modal-bg')?.classList.remove('open');
 }
 
 function posRenderCatTabs(){
@@ -26908,7 +26991,7 @@ function scAujourdhui(){
 
 async function scCharger(){
   const tbody = document.getElementById('sc-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     const caissier = document.getElementById('sc-filtre-caissier')?.value||'';
     const statut   = document.getElementById('sc-filtre-statut')?.value||'';
@@ -26935,7 +27018,7 @@ async function scCharger(){
     if(lbl) lbl.textContent = `${nb} session${nb!==1?'s':''}`;
 
     if(!nb){
-      if(tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,.3);padding:24px">Aucune session</td></tr>';
+      if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:24px">Aucune session</td></tr>';
       return;
     }
 
@@ -26957,6 +27040,11 @@ async function scCharger(){
       const btnXlsx = !_isReadOnly() ? `<button class="pos-btn ghost" style="font-size:13px;padding:3px 10px" onclick="scExport(${s.id},'xlsx')">XLSX</button>` : '';
       const btnRes  = `<button class="pos-btn primary" style="font-size:13px;padding:3px 10px" onclick="scResume(${s.id})">Résumé</button>`;
 
+      const ecartCell = (s.ecart===null||s.ecart===undefined)
+        ? '<td style="text-align:right;color:rgba(255,255,255,.25)">—</td>'
+        : (()=>{ const {color} = _posEcartNiveau(s.ecart, s.cash_attendu_soumission);
+            return `<td style="text-align:right;font-weight:700;color:${color}">${s.ecart>=0?'+':''}${posGx(s.ecart)}</td>`; })();
+
       return `<tr>
         <td>${s.date_session}</td>
         <td style="font-weight:600">${s.caissier_nom||'—'}</td>
@@ -26964,6 +27052,7 @@ async function scCharger(){
         <td style="text-align:right">${s.nb_ventes||0}</td>
         <td style="text-align:right;font-weight:700;color:#3fb6a8">${posGx(s.total||0)}</td>
         <td style="text-align:right">${posGx(s.cash||0)}</td>
+        ${ecartCell}
         <td>${soumis_at}</td>
         <td>${valide_par}</td>
         <td><div style="display:flex;gap:4px;flex-wrap:wrap">${btnRes}${btnValider}${btnPdf}${btnXlsx}</div></td>
@@ -26972,7 +27061,7 @@ async function scCharger(){
 
   } catch(e){
     const tbody = document.getElementById('sc-tbody');
-    if(tbody) tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur'}</td></tr>`;
   }
 }
 
@@ -27016,6 +27105,15 @@ async function scResume(session_id){
           <div style="font-size:20px;font-weight:700;color:#a78bfa">${posGx(d.cash||0)}</div>
         </div>
       </div>
+      ${d.ecart!==null && d.ecart!==undefined ? (()=>{
+        const {color,bg,border} = _posEcartNiveau(d.ecart, d.cash_attendu_soumission);
+        return `<div style="margin-bottom:14px;background:${bg};border:1px solid ${border};border-radius:10px;padding:12px 14px">
+          <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:6px">Réconciliation de caisse</div>
+          <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px"><span>Cash attendu</span><span>${posGx(d.cash_attendu_soumission)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px"><span>Montant compté</span><span>${posGx(d.montant_compte)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:${color}"><span>Écart</span><span>${d.ecart>=0?'+':''}${posGx(d.ecart)}</span></div>
+        </div>`;
+      })() : ''}
       ${d.top_produits && d.top_produits.length ? `
         <div style="font-size:13px;color:rgba(255,255,255,.4);font-weight:600;margin-bottom:6px">Top produits</div>
         <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:12px">

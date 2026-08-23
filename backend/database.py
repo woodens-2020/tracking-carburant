@@ -165,6 +165,13 @@ def _migrate_columns():
              "ALTER TABLE bar_produits ADD COLUMN photo_base64 TEXT", None),
             ("bar_produits", "photo_mime",
              "ALTER TABLE bar_produits ADD COLUMN photo_mime VARCHAR(50)", None),
+            # v17 — réconciliation cash à la soumission d'une session de caisse
+            ("bar_sessions_caisse", "cash_attendu_soumission",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN cash_attendu_soumission NUMERIC", None),
+            ("bar_sessions_caisse", "montant_compte",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN montant_compte NUMERIC", None),
+            ("bar_sessions_caisse", "ecart",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN ecart NUMERIC", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -241,6 +248,13 @@ def _migrate_columns():
              "ALTER TABLE bar_produits ADD COLUMN photo_base64 TEXT", None),
             ("bar_produits", "photo_mime",
              "ALTER TABLE bar_produits ADD COLUMN photo_mime VARCHAR(50)", None),
+            # v17 — réconciliation cash à la soumission d'une session de caisse
+            ("bar_sessions_caisse", "cash_attendu_soumission",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN cash_attendu_soumission NUMERIC(14,2)", None),
+            ("bar_sessions_caisse", "montant_compte",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN montant_compte NUMERIC(14,2)", None),
+            ("bar_sessions_caisse", "ecart",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN ecart NUMERIC(14,2)", None),
         ]
     else:
         return
