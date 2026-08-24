@@ -120,7 +120,8 @@ def _stats_ventes(ventes, employe: Optional[Employe] = None, jour: Optional[date
             produits[nom]["quantite"] += Decimal(str(l.quantite))
             produits[nom]["total"]    += Decimal(str(l.sous_total))
 
-    top = sorted(produits.values(), key=lambda x: x["total"], reverse=True)[:10]
+    top  = sorted(produits.values(), key=lambda x: x["total"], reverse=True)[:10]
+    tous = sorted(produits.values(), key=lambda x: x["nom"])
     return {
         "nb_ventes":  len(ventes),
         "total":      float(total),
@@ -130,6 +131,13 @@ def _stats_ventes(ventes, employe: Optional[Employe] = None, jour: Optional[date
         "top_produits": [
             {"nom": p["nom"], "quantite": float(p["quantite"]), "total": float(p["total"])}
             for p in top
+        ],
+        # Liste complète (non plafonnée), triée par nom — pour le
+        # récapitulatif de clôture de session que la caissière confirme
+        # article par article, contrairement à top_produits (top 10 par CA).
+        "tous_produits": [
+            {"nom": p["nom"], "quantite": float(p["quantite"]), "total": float(p["total"])}
+            for p in tous
         ],
     }
 
@@ -154,6 +162,7 @@ def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
         "caissier_nom":  (s.caissier.nom + " " + s.caissier.prenom) if s.caissier else None,
         "date_session":  str(s.date_session),
         "statut":        s.statut,
+        "created_at":    s.created_at.isoformat() if s.created_at else None,
         "soumis_at":     s.soumis_at.isoformat() if s.soumis_at else None,
         "valide_at":     s.valide_at.isoformat() if s.valide_at else None,
         "valide_par":    (s.valide_par.nom + " " + s.valide_par.prenom) if s.valide_par else None,

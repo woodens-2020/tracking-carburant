@@ -6302,7 +6302,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option value="" data-i18n="pos.caisse.sanscaissier">Sans caissier</option>
             </select>
             <button class="pos-btn ghost" id="pos-btn-soumettre" style="display:none;font-size:14px;padding:6px 14px;border-color:rgba(99,210,190,.4);color:var(--pos-money)" onclick="posSoumettreSession()">
-              <span data-i18n="pos.caisse.soumettre">Soumettre rapport</span>
+              <span data-i18n="pos.caisse.soumettre">Fin de session</span>
             </button>
           </div>
         </div>
@@ -6385,6 +6385,23 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
 
+        <!-- Portail de démarrage / fin de session -->
+        <div id="pos-gate-demarrer" class="pos-card" style="display:none;padding:36px 24px;text-align:center;margin-bottom:14px">
+          <div style="font-size:38px;margin-bottom:10px">🔒</div>
+          <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:6px">Session de caisse non démarrée</div>
+          <div style="font-size:14px;color:rgba(255,255,255,.5);margin-bottom:18px;max-width:420px;margin-left:auto;margin-right:auto">
+            Démarrez votre session avant d'effectuer la première vente. La date et l'heure de démarrage seront enregistrées officiellement par le système.
+          </div>
+          <button class="pos-encaisser-btn" style="max-width:280px;margin:0 auto" onclick="posOuvrirModalDemarrage()">▶ Démarrer la session</button>
+        </div>
+
+        <div id="pos-gate-termine" class="pos-card" style="display:none;padding:36px 24px;text-align:center;margin-bottom:14px">
+          <div style="font-size:38px;margin-bottom:10px">✅</div>
+          <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:6px">Session terminée pour aujourd'hui</div>
+          <div style="font-size:14px;color:rgba(255,255,255,.5)">Votre rapport a été soumis. Contactez un administrateur si une correction est nécessaire.</div>
+        </div>
+
+        <div id="pos-caisse-vente-zone">
         <!-- Barre de recherche articles -->
         <div class="pos-search-wrap">
           <svg class="pos-search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -6455,9 +6472,36 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
           </div>
         </div>
+        </div><!-- /pos-caisse-vente-zone -->
 
       </div>
     </div><!-- /page-pos-caisse -->
+
+    <!-- Modal Démarrage de session -->
+    <div class="pos-modal-bg" id="pos-demarrer-modal-bg">
+      <div class="pos-modal" style="max-width:460px">
+        <h3>Démarrer la session de caisse</h3>
+
+        <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px">
+            <span style="color:rgba(255,255,255,.5)">Caissier</span>
+            <span id="pd-caissier-nom" style="font-weight:700;color:#fff">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:14px">
+            <span style="color:rgba(255,255,255,.5)">Démarrage officiel</span>
+            <span id="pd-datetime" style="font-weight:700;color:var(--pos-accent)">—</span>
+          </div>
+        </div>
+
+        <div style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13.5px;line-height:1.5;color:#fca5a5">
+          ⚠ En démarrant cette session, vous êtes responsable de la bonne saisie de chaque vente effectuée durant votre service. Toute erreur, omission ou écart de caisse constaté à la clôture engage votre seule responsabilité.
+        </div>
+
+        <div class="pos-modal-footer">
+          <button class="pos-btn teal" style="width:100%" onclick="posConfirmerDemarrage()">J'ai compris, démarrer</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Modal Soumission de session (comptage de caisse) -->
     <div class="pos-modal-bg" id="pos-soumettre-modal-bg" onclick="if(event.target===this)posFermerModalSoumission()">
@@ -6467,6 +6511,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;justify-content:space-between">
           <span style="color:rgba(255,255,255,.5)">Cash attendu (calculé en direct)</span>
           <span id="ps-cash-attendu" style="font-weight:700;color:#a78bfa">G 0.00</span>
+        </div>
+
+        <div style="margin-bottom:16px">
+          <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Résumé des ventes — à comparer avec le relevé papier</div>
+          <div style="max-height:180px;overflow-y:auto;border:1px solid rgba(255,255,255,.07);border-radius:8px">
+            <table class="pos-table" style="font-size:13px">
+              <thead><tr><th>Article</th><th style="text-align:right">Qté</th><th style="text-align:right">Total</th></tr></thead>
+              <tbody id="ps-produits-tbody"></tbody>
+            </table>
+          </div>
         </div>
 
         <div class="pos-form-row">
@@ -11492,7 +11546,7 @@ const LANGS = {
     'pos.caisse.title':     'Caisse POS',
     'pos.caisse.subtitle':  'Encaissement en temps réel — Bar / Restaurant',
     'pos.caisse.sanscaissier':'Sans caissier',
-    'pos.caisse.soumettre': 'Soumettre rapport',
+    'pos.caisse.soumettre': 'Fin de session',
     'pos.caisse.refresh':   '↻ Actualiser',
     'pos.caisse.mini.nbventes':'Nb ventes',
     'pos.caisse.mini.totalca':'Total CA',
@@ -11990,7 +12044,7 @@ const LANGS = {
     'pos.caisse.title':     'POS Register',
     'pos.caisse.subtitle':  'Real-time checkout — Bar / Restaurant',
     'pos.caisse.sanscaissier':'No cashier',
-    'pos.caisse.soumettre': 'Submit report',
+    'pos.caisse.soumettre': 'End session',
     'pos.caisse.refresh':   '↻ Refresh',
     'pos.caisse.mini.nbventes':'Nb sales',
     'pos.caisse.mini.totalca':'Total revenue',
@@ -12488,7 +12542,7 @@ const LANGS = {
     'pos.caisse.title':     'Caja POS',
     'pos.caisse.subtitle':  'Cobro en tiempo real — Bar / Restaurante',
     'pos.caisse.sanscaissier':'Sin cajero',
-    'pos.caisse.soumettre': 'Enviar reporte',
+    'pos.caisse.soumettre': 'Finalizar turno',
     'pos.caisse.refresh':   '↻ Actualizar',
     'pos.caisse.mini.nbventes':'N.° ventas',
     'pos.caisse.mini.totalca':'Ingresos totales',
@@ -22215,13 +22269,48 @@ function posCaissierChange(caissier_id){
     if(btnSoumettre) btnSoumettre.style.display = 'none';
     clearInterval(_posDashCaissierInterval);
     _posDashCaissierInterval = null;
+    _posSetGate(false, null);
     return;
   }
   if(dash) dash.style.display = '';
-  if(btnSoumettre) btnSoumettre.style.display = '';
   _posDashLoadData(caissier_id);
   clearInterval(_posDashCaissierInterval);
   _posDashCaissierInterval = setInterval(()=>{ const v=document.getElementById('pos-caissier-sel')?.value; if(v) _posDashLoadData(v); }, 60000);
+}
+
+// Portail démarrage/fin de session — remplace la zone de vente tant qu'aucun
+// caissier n'est sélectionné, qu'aucune session n'a démarré aujourd'hui, ou
+// que la session du jour est déjà soumise/validée.
+function _posSetGate(hasCaissier, statut){
+  const gd = document.getElementById('pos-gate-demarrer');
+  const gt = document.getElementById('pos-gate-termine');
+  const vz = document.getElementById('pos-caisse-vente-zone');
+  if(!gd || !gt || !vz) return;
+  if(!hasCaissier || statut === 'EN_COURS'){
+    gd.style.display = 'none'; gt.style.display = 'none'; vz.style.display = '';
+  } else if(statut === 'SOUMIS' || statut === 'VALIDE'){
+    gd.style.display = 'none'; gt.style.display = ''; vz.style.display = 'none';
+  } else {
+    gd.style.display = ''; gt.style.display = 'none'; vz.style.display = 'none';
+  }
+}
+
+async function posOuvrirModalDemarrage(){
+  const cid = document.getElementById('pos-caissier-sel')?.value;
+  if(!cid){ posAlert(t('pos.caisse.err.selectcaissier')); return; }
+  try {
+    const s = await apiFetch('POST', '/pos/caisse/sessions/ouvrir', {caissier_id: parseInt(cid)});
+    _posDashSessionId = s.id;
+    document.getElementById('pd-caissier-nom').textContent = s.caissier_nom || '—';
+    document.getElementById('pd-datetime').textContent = `${posFormatDate(s.created_at)} à ${posFormatHeure(s.created_at)}`;
+    document.getElementById('pos-demarrer-modal-bg').classList.add('open');
+  } catch(e){ posAlert(e.message||t('pos.caisse.err.ouvertureSession')); }
+}
+
+function posConfirmerDemarrage(){
+  document.getElementById('pos-demarrer-modal-bg')?.classList.remove('open');
+  const cid = document.getElementById('pos-caissier-sel')?.value;
+  if(cid) _posDashLoadData(cid);
 }
 
 async function _posDashLoadData(caissier_id){
@@ -22234,14 +22323,16 @@ async function _posDashLoadData(caissier_id){
 
     const statutEl = document.getElementById('pos-dash-statut');
     if(statutEl){
-      const s = d.session_statut||'EN_COURS';
+      const s = d.session_statut||null;
       const colors = {EN_COURS:'rgba(247,169,59,.2);color:#f7a93b', SOUMIS:'rgba(99,210,190,.2);color:#3fb6a8', VALIDE:'rgba(63,182,168,.3);color:#3fb6a8'};
-      statutEl.style.cssText = `background:${(colors[s]||'rgba(255,255,255,.1);color:rgba(255,255,255,.5)')};border-radius:20px;font-size:13px;padding:3px 10px;font-weight:700`;
-      statutEl.textContent = {EN_COURS:t('pos.caisse.statut.encours'), SOUMIS:t('pos.caisse.statut.soumis'), VALIDE:t('pos.caisse.statut.valide')}[s]||s;
+      const labels = {EN_COURS:t('pos.caisse.statut.encours'), SOUMIS:t('pos.caisse.statut.soumis'), VALIDE:t('pos.caisse.statut.valide')};
+      statutEl.style.cssText = `background:${(s && colors[s]) || 'rgba(255,255,255,.08);color:rgba(255,255,255,.4)'};border-radius:20px;font-size:13px;padding:3px 10px;font-weight:700`;
+      statutEl.textContent = s ? (labels[s]||s) : 'Non démarrée';
     }
 
     const btnSoumettre = document.getElementById('pos-btn-soumettre');
-    if(btnSoumettre) btnSoumettre.style.display = (d.session_statut==='VALIDE') ? 'none' : '';
+    if(btnSoumettre) btnSoumettre.style.display = (d.session_statut==='EN_COURS') ? '' : 'none';
+    _posSetGate(true, d.session_statut);
 
     const nb    = document.getElementById('pos-dash-nb');
     const total = document.getElementById('pos-dash-total');
@@ -22309,10 +22400,19 @@ async function posSoumettreSession(){
   }
   // Cash attendu rechargé en direct (pas la valeur déjà affichée, potentiellement périmée)
   const cid = document.getElementById('pos-caissier-sel')?.value;
+  let produits = [];
   try {
     const d = await apiFetch('GET', `/pos/caisse/dashboard?caissier_id=${cid}`);
     _posCashAttendu = d.cash||0;
+    produits = d.tous_produits||[];
   } catch(e){ posAlert(e.message||t('pos.caisse.err.soumission')); return; }
+
+  const tbody = document.getElementById('ps-produits-tbody');
+  if(tbody){
+    tbody.innerHTML = produits.length
+      ? produits.map(p=>`<tr><td>${esc(p.nom)}</td><td style="text-align:right">${p.quantite%1===0?p.quantite.toFixed(0):p.quantite.toFixed(1)}</td><td style="text-align:right">${posGx(p.total)}</td></tr>`).join('')
+      : '<tr><td colspan="3" style="text-align:center;color:rgba(255,255,255,.3);padding:12px">Aucune vente</td></tr>';
+  }
 
   document.getElementById('ps-cash-attendu').textContent = posGx(_posCashAttendu);
   document.getElementById('ps-montant-compte').value = '';
