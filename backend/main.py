@@ -595,25 +595,29 @@ def me(request: Request, db: Session = Depends(get_db)):
     role_lower = (role_nom or user.poste or "").lower()
     est_caissier = role_lower.startswith("caissier")
     est_manager  = role_lower == "manager"
+    est_admin    = user.role == "admin" or bool(perms and perms.get("admin", False))
 
-    # Auto-créer un enregistrement Employe pour les comptes caissière ET manager
-    # qui n'en ont pas (ou dont la fiche liée a été désactivée par erreur). Cela
-    # permet au système POS de filtrer/attribuer leurs ventes par caissier_id —
-    # un employe inactif ne doit jamais être renvoyé ici : il n'apparaît pas dans
-    # /pos/caisse/caissieres, donc le menu caissier du POS ne peut pas se
-    # pré-sélectionner et se verrouille sur "Sans caissier", rendant ses ventes
-    # invisibles dans les rapports par caissière.
-    # Les managers font parfois des ventes directement en caisse : elles doivent
-    # s'enregistrer avec un caissier_id, exactement comme une caissière — sans
-    # pour autant les traiter comme des caissières partout ailleurs dans l'appli
-    # (elles gardent leur accès complet — voir caisse_employe_id ci-dessous).
-    if not emp and (est_caissier or est_manager):
+    # Auto-créer un enregistrement Employe pour les comptes caissière, manager
+    # ET administrateur qui n'en ont pas (ou dont la fiche liée a été
+    # désactivée par erreur). Cela permet au système POS de filtrer/attribuer
+    # leurs ventes par caissier_id — un employe inactif ne doit jamais être
+    # renvoyé ici : il n'apparaît pas dans /pos/caisse/caissieres, donc le
+    # menu caissier du POS ne peut pas se pré-sélectionner et se verrouille
+    # sur "Sans caissier", rendant ses ventes invisibles dans les rapports.
+    # Les managers ET les administrateurs font parfois des ventes directement
+    # en caisse : elles doivent s'enregistrer avec un caissier_id, exactement
+    # comme une caissière — et surtout passer par le même portail
+    # démarrage/fin de session (contrôle d'activité), sans pour autant les
+    # traiter comme des caissières partout ailleurs dans l'appli (ils gardent
+    # leur accès complet — voir caisse_employe_id ci-dessous).
+    if not emp and (est_caissier or est_manager or est_admin):
         from datetime import date as _date
         parts = (user.nom_complet or user.username).split(" ", 1)
+        poste = "Caissier" if est_caissier else ("Manager" if est_manager else "Administrateur")
         emp = _Employe(
             prenom=parts[0],
             nom=parts[1] if len(parts) > 1 else parts[0],
-            poste="Caissier" if est_caissier else "Manager",
+            poste=poste,
             date_embauche=today_haiti(),
             salaire_base=0,
             type_contrat="CDI",
@@ -626,8 +630,8 @@ def me(request: Request, db: Session = Depends(get_db)):
 
     # employe_id : réservé aux VRAIES caissières — de nombreux écrans (Ventes Bar,
     # Crédits, sessions caisse...) utilisent sa présence pour restreindre la vue
-    # de l'utilisateur à ses seules données personnelles. Un manager ne doit
-    # jamais perdre sa vue d'ensemble à cause de ça.
+    # de l'utilisateur à ses seules données personnelles. Un manager/admin ne
+    # doit jamais perdre sa vue d'ensemble à cause de ça.
     emp_pour_role = emp if est_caissier else None
     return {
         "id":          user.id,
@@ -639,11 +643,11 @@ def me(request: Request, db: Session = Depends(get_db)):
         "role_id":     user.role_id,
         "role_nom":    role_nom,
         "permissions": perms,
-        "est_admin":   user.role == "admin" or bool(perms and perms.get("admin", False)),
+        "est_admin":   est_admin,
         "employe_id":  emp_pour_role.id if emp_pour_role else None,
         "employe_nom": (emp_pour_role.nom + " " + emp_pour_role.prenom) if emp_pour_role else None,
         # Utilisé uniquement par l'écran Caisse pour auto-attribuer caissier_id à
-        # la vente — peuplé pour les caissières ET les managers.
+        # la vente — peuplé pour les caissières, les managers ET les admins.
         "caisse_employe_id":  emp.id if emp else None,
         "caisse_employe_nom": (emp.nom + " " + emp.prenom) if emp else None,
     }

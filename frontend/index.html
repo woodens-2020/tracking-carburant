@@ -22219,8 +22219,9 @@ async function loadPosCaisse(){
 
   // employe_id (pas caisse_employe_id) : seul le premier est réservé aux
   // vraies caissières — voir /api/me. caisse_employe_id est peuplé aussi
-  // pour les managers (pour verrouiller leur identité de vente plus bas),
-  // donc l'utiliser ici masquerait à tort le dashboard admin aux managers.
+  // pour les managers ET les administrateurs (pour verrouiller leur identité
+  // de vente plus bas, y compris le portail démarrage/fin de session),
+  // donc l'utiliser ici masquerait à tort le dashboard admin à ces rôles.
   const isCaissiere = !!_appUser?.employe_id || (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier');
   const adminDash = document.getElementById('pos-caisse-admin-dash');
 
