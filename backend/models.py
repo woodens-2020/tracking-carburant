@@ -1132,6 +1132,7 @@ class BarSessionCaisse(Base):
     valide_par = relationship("Utilisateur",  foreign_keys=[valide_par_id])
     evalue_par = relationship("Utilisateur",  foreign_keys=[evalue_par_id])
     evaluations = relationship("BarSessionEvaluation", back_populates="session", cascade="all, delete-orphan")
+    comptages   = relationship("BarSessionComptage",   back_populates="session", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("caissier_id", "date_session", "numero_session", name="uq_session_caissier_date_num"),
@@ -1163,6 +1164,38 @@ class BarSessionEvaluation(Base):
         UniqueConstraint("session_id", "produit_nom", name="uq_eval_session_produit"),
         CheckConstraint("statut IN ('CORRECT','NON_CORRECT','INTROUVABLE')", name="chk_eval_statut"),
         Index("idx_eval_session", "session_id"),
+    )
+
+
+class BarSessionComptage(Base):
+    """Comptage physique du stock par article, effectué par la caissière à
+    l'ouverture de sa session — permet de détecter un écart avec le stock
+    théorique (BarMouvementStock) accumulé depuis la session précédente.
+    Le comptage est fait à l'aveugle : la caissière ne voit jamais le stock
+    théorique pendant sa saisie, seul le serveur calcule l'écart après coup."""
+    __tablename__ = "bar_session_comptages"
+
+    id                    = Column(Integer, primary_key=True)
+    session_id            = Column(Integer, ForeignKey("bar_sessions_caisse.id", ondelete="CASCADE"), nullable=False)
+    produit_id            = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
+    quantite_comptee      = Column(Numeric(12, 3), nullable=False)
+    stock_theorique_avant = Column(Numeric(12, 3), nullable=False)
+    ecart                 = Column(Numeric(12, 3), nullable=False)  # comptée - théorique_avant
+    ecart_resolu          = Column(Boolean, nullable=False, default=False)
+    resolu_par_id         = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    resolu_le             = Column(DateTime(timezone=True), nullable=True)
+    resolu_motif          = Column(String(300), nullable=True)
+    resolu_ajustement_id  = Column(Integer, ForeignKey("bar_mouvements_stock.id", ondelete="SET NULL"), nullable=True)
+    created_at            = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    session    = relationship("BarSessionCaisse", back_populates="comptages")
+    produit    = relationship("BarProduit")
+    resolu_par = relationship("Utilisateur", foreign_keys=[resolu_par_id])
+
+    __table_args__ = (
+        UniqueConstraint("session_id", "produit_id", name="uq_comptage_session_produit"),
+        Index("idx_comptage_session", "session_id"),
+        Index("idx_comptage_ecart_non_resolu", "ecart_resolu"),
     )
 
 

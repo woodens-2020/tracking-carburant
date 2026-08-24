@@ -26,6 +26,7 @@ from models import (
     HotelChambre, HotelEmploye, HotelReservation,
     LoginSecurityEvent,  # noqa: F401 — nécessaire pour create_all
     BarSessionEvaluation,  # noqa: F401 — nécessaire pour create_all
+    BarSessionComptage,  # noqa: F401 — nécessaire pour create_all
 )
 
 # ── URL de connexion ──────────────────────────────────────────────

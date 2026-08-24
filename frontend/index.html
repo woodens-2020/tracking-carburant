@@ -3366,6 +3366,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="ecarts-inventaire" onclick="goTo('ecarts-inventaire')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
+      </span>
+      <span>Écarts d'Inventaire</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <!-- ── Section Zelle ── -->
     <div class="nav-section-label">Zelle</div>
     <button class="nav-item" data-page="zelle" onclick="goTo('zelle')">
@@ -6409,6 +6417,28 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div style="font-size:14px;color:rgba(255,255,255,.5)">Votre rapport a été soumis. Contactez un administrateur si une correction est nécessaire.</div>
         </div>
 
+        <!-- Comptage physique du stock — obligatoire avant la première vente -->
+        <div id="pos-gate-inventaire" class="pos-card" style="display:none;padding:20px;margin-bottom:14px">
+          <div style="text-align:center;margin-bottom:14px">
+            <div style="font-size:32px;margin-bottom:8px">📋</div>
+            <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:6px">Comptez le stock avant de vendre</div>
+            <div style="font-size:14px;color:rgba(255,255,255,.5);max-width:480px;margin:0 auto">
+              Comptez physiquement chaque article et entrez la quantité exacte trouvée. Ce comptage sert de référence pour la session — soyez précis, ne devinez pas.
+            </div>
+          </div>
+          <input class="pos-input" id="pi-search" placeholder="Filtrer un article…" oninput="_piFilter(this.value)" style="width:100%;margin-bottom:10px;box-sizing:border-box">
+          <div id="pi-progress" style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">
+            <span id="pi-progress-txt">0 / 0 comptés</span><span id="pi-progress-pct">0%</span>
+          </div>
+          <div style="height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin-bottom:12px">
+            <div id="pi-progress-bar" style="width:0%;height:100%;background:#a78bfa;transition:width .25s"></div>
+          </div>
+          <div id="pi-liste" style="max-height:400px;overflow-y:auto;padding-right:2px">
+            <div style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</div>
+          </div>
+          <button class="pos-encaisser-btn" id="pi-btn-confirmer" style="margin-top:14px" disabled onclick="posConfirmerInventaire()">Confirmer le comptage</button>
+        </div>
+
         <div id="pos-caisse-vente-zone">
         <!-- Barre de recherche articles -->
         <div class="pos-search-wrap">
@@ -6545,6 +6575,25 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="pos-modal-footer">
           <button class="pos-btn ghost" onclick="posFermerModalSoumission()">Annuler</button>
           <button class="pos-btn teal" onclick="posConfirmerSoumission()">✓ Oui, je confirme, tout est correct</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Fiche stock — Départ / Vendu / Restant, après soumission -->
+    <div class="pos-modal-bg" id="pos-fiche-stock-modal-bg" onclick="if(event.target===this)posFermerFicheStock()">
+      <div class="pos-modal" style="max-width:520px;max-height:85vh;overflow-y:auto">
+        <h3>Fiche de stock de la session</h3>
+        <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:14px">
+          À comparer avec le comptage de la prochaine session — un écart révélerait une perte ou une vente non enregistrée.
+        </div>
+        <div style="max-height:400px;overflow-y:auto;border:1px solid rgba(255,255,255,.07);border-radius:8px">
+          <table class="pos-table" style="font-size:13px">
+            <thead><tr><th>Article</th><th style="text-align:right">Départ</th><th style="text-align:right">Vendu</th><th style="text-align:right">Restant</th></tr></thead>
+            <tbody id="pfs-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn teal" onclick="posFermerFicheStock()">Fermer</button>
         </div>
       </div>
     </div>
@@ -8234,6 +8283,89 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
         <div id="rs-eval-body" style="padding:16px"></div>
         <div style="display:flex;gap:8px;padding:0 16px 16px;flex-wrap:wrap" id="rs-eval-actions"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- PAGE ÉCARTS D'INVENTAIRE                                        -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div id="page-ecarts-inventaire" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#f87171,#dc2626)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Écarts d'Inventaire</div>
+            <div class="pos-header-sub">Comptages physiques en écart avec le stock théorique — comprendre les pertes et les fraudes</div>
+          </div>
+          <div class="pos-header-actions" style="flex-wrap:wrap;gap:8px">
+            <select class="pos-select" id="ei-filtre-statut" style="width:150px">
+              <option value="false">Non résolus</option>
+              <option value="true">Résolus</option>
+              <option value="">Tous</option>
+            </select>
+            <input type="date" class="pos-input" id="ei-debut" style="width:130px">
+            <input type="date" class="pos-input" id="ei-fin" style="width:130px">
+            <button class="pos-btn teal" onclick="eiCharger()">Filtrer</button>
+          </div>
+        </div>
+
+        <div class="pos-kpi-grid" style="grid-template-columns:repeat(3,1fr)" id="ei-kpis">
+          <div class="pos-kpi"><div class="pos-kpi-label">Écarts affichés</div><div class="pos-kpi-val amber" id="ei-kpi-total">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Non résolus</div><div class="pos-kpi-val" style="color:#f87171" id="ei-kpi-attente">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Résolus</div><div class="pos-kpi-val" style="color:#3fb6a8" id="ei-kpi-resolus">—</div></div>
+        </div>
+
+        <div class="pos-card" style="margin-top:16px">
+          <div class="pos-card-hdr">
+            <span>Comptages en écart</span>
+            <span id="ei-count-lbl" style="font-size:13px;color:rgba(255,255,255,.4)"></span>
+          </div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Caissier</th>
+                  <th>Produit</th>
+                  <th style="text-align:right">Théorique</th>
+                  <th style="text-align:right">Compté</th>
+                  <th style="text-align:right">Écart</th>
+                  <th>Statut</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="ei-tbody">
+                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-ecarts-inventaire -->
+
+    <!-- Modal résolution d'un écart d'inventaire -->
+    <div class="pos-modal-bg" id="ei-resoudre-modal-bg" onclick="if(event.target===this)eiFermerResoudre()">
+      <div class="pos-modal" style="max-width:460px">
+        <h3>Résoudre l'écart d'inventaire</h3>
+        <div id="ei-resoudre-resume" style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:14px"></div>
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Motif (obligatoire, ≥ 5 caractères)</label>
+            <input class="pos-input" id="ei-motif" placeholder="Ex. : casse constatée, erreur de comptage, vente non enregistrée…">
+          </div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:rgba(255,255,255,.7);margin:10px 0">
+          <input type="checkbox" id="ei-appliquer-ajustement" checked style="width:16px;height:16px">
+          Appliquer un mouvement de stock correctif (ajustement/perte)
+        </label>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="eiFermerResoudre()">Annuler</button>
+          <button class="pos-btn teal" onclick="eiConfirmerResolution()">Résoudre</button>
+        </div>
       </div>
     </div>
 
@@ -12789,6 +12921,7 @@ const PAGE_META={
   'pos-rentabilite':      {title: 'Rentabilité Bar',            sub: 'CA — Bénéfices — Marges — COGS'},
   'pos-sessions-caisse':  {title: 'Sessions Caissières',        sub: 'Suivi · validation · export des rapports de caisse'},
   'rapports-soumis':      {title: 'Rapports Soumis',            sub: 'Évaluation produit par produit des rapports de caisse'},
+  'ecarts-inventaire':    {title: "Écarts d'Inventaire",        sub: 'Comptages physiques en écart avec le stock théorique'},
   'zelle':                {title: 'Tableau de bord — Zelle',      sub: 'Bilan général · Balance HTG · Répartition par source'},
   'zelle-paiements':      {title: 'Paiements Zelle',              sub: 'Toutes les transactions en gourdes (HTG)'},
   'zelle-fonds':          {title: 'Réception de Fonds',           sub: 'Déclaration des fonds reçus en gourdes (HTG)'},
@@ -14978,8 +15111,8 @@ const _AREA_PAGES = {
     lecture: ['dashboard','journal','statistiques','gi-dashboard'],
   },
   bar: {
-    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
-    lecture: ['pos-ventes','pos-credits','pos-commandes','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
+    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','ecarts-inventaire','zelle','zelle-paiements','zelle-fonds'],
+    lecture: ['pos-ventes','pos-credits','pos-commandes','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','ecarts-inventaire','zelle','zelle-paiements','zelle-fonds'],
   },
   cuisine: {
     complet: ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse'],
@@ -15005,7 +15138,7 @@ const _CAISSIER_ALLOWED = new Set([
 // Whitelist stricte pour les comptes Manager — Bar/Restaurant + Hôtel (sans Tables, Grande Caisse, Chambres, Réception) + Cuisine complète.
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
-  'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
+  'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis','ecarts-inventaire',
   'hotel-dashboard','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
 ]);
@@ -15015,7 +15148,7 @@ const _AD_ALLOWED = new Set([
   'home',
   'dashboard','journal','statistiques','gi-dashboard','depenses','achats','caisse',
   'pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes',
-  'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
+  'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','ecarts-inventaire',
   'cuisine-plats','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'employes','payroll',
@@ -15026,11 +15159,11 @@ const _AD_ALLOWED = new Set([
 const _ACCES_POSTE_LEGACY = {
   'Directeur Général': null,
   'Comptable':   ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','ecarts-inventaire','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','ecarts-inventaire','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Pompiste':            ['home','saisie'],
@@ -20034,6 +20167,7 @@ const _giPageLoaders = {
   'pos-analyse':            loadPosAnalyse,
   'pos-sessions-caisse':    loadPosSessionsCaisse,
   'rapports-soumis':        loadRapportsSoumis,
+  'ecarts-inventaire':      loadEcartsInventaire,
   'cuisine-caisse':     loadCuisineCaisse,
   'cuisine-plats':      loadCuisinePlats,
   'cuisine-depenses':   loadCuisineDepenses,
@@ -22365,21 +22499,34 @@ function posCaissierChange(caissier_id){
 // que la session du jour est déjà soumise/validée. Jusqu'à 2 sessions par
 // jour (mesure de sécurité) : tant que peutOuvrir est vrai, on repropose de
 // démarrer (une 2ème session) plutôt que de bloquer jusqu'au lendemain.
-function _posSetGate(hasCaissier, statut, peutOuvrir){
+function _posSetGate(hasCaissier, statut, peutOuvrir, inventaireFait){
   const gd = document.getElementById('pos-gate-demarrer');
   const gt = document.getElementById('pos-gate-termine');
+  const gi = document.getElementById('pos-gate-inventaire');
   const vz = document.getElementById('pos-caisse-vente-zone');
-  if(!gd || !gt || !vz) return;
-  if(!hasCaissier || statut === 'EN_COURS'){
-    gd.style.display = 'none'; gt.style.display = 'none'; vz.style.display = '';
+  if(!gd || !gt || !gi || !vz) return;
+
+  if(!hasCaissier){
+    gd.style.display = 'none'; gt.style.display = 'none'; gi.style.display = 'none'; vz.style.display = '';
+    return;
+  }
+  if(statut === 'EN_COURS' && !inventaireFait){
+    gd.style.display = 'none'; gt.style.display = 'none'; vz.style.display = 'none';
+    gi.style.display = '';
+    _posChargerInventaire();
+    return;
+  }
+  if(statut === 'EN_COURS'){
+    gd.style.display = 'none'; gt.style.display = 'none'; gi.style.display = 'none'; vz.style.display = '';
     return;
   }
   const dejaSoumise = (statut === 'SOUMIS' || statut === 'VALIDE');
   if(dejaSoumise && peutOuvrir === false){
-    gd.style.display = 'none'; gt.style.display = ''; vz.style.display = 'none';
+    gd.style.display = 'none'; gi.style.display = 'none'; gt.style.display = ''; vz.style.display = 'none';
     return;
   }
-  gd.style.display = ''; gt.style.display = 'none'; vz.style.display = 'none';
+  gi.style.display = 'none'; vz.style.display = 'none';
+  gd.style.display = ''; gt.style.display = 'none';
   const titre = document.getElementById('pd-gate-titre');
   const sub   = document.getElementById('pd-gate-sub');
   if(dejaSoumise){
@@ -22389,6 +22536,85 @@ function _posSetGate(hasCaissier, statut, peutOuvrir){
     if(titre) titre.textContent = 'Session de caisse non démarrée';
     if(sub)   sub.textContent   = "Démarrez votre session avant d'effectuer la première vente. La date et l'heure de démarrage seront enregistrées officiellement par le système.";
   }
+}
+
+// ── Comptage physique du stock à l'ouverture de session (à l'aveugle) ──
+let _piProduits  = [];
+let _piValeurs   = {};
+let _piSearchQuery = '';
+let _piSessionId = null;   // session pour laquelle _piProduits/_piValeurs ont été chargés
+
+async function _posChargerInventaire(){
+  if(_piProduits.length && _piSessionId === _posDashSessionId) { _piRenderListe(); return; }  // déjà chargé pour cette session
+  const liste = document.getElementById('pi-liste');
+  try {
+    _piProduits = await apiFetch('GET', '/pos/produits?actif=true');
+    _piValeurs = {};
+    _piSearchQuery = '';
+    _piSessionId = _posDashSessionId;
+    _piRenderListe();
+  } catch(e){
+    if(liste) liste.innerHTML = `<div style="color:#f87171;padding:20px;text-align:center">${e.message||'Erreur de chargement des produits.'}</div>`;
+  }
+}
+
+function _piRenderListe(){
+  const liste = document.getElementById('pi-liste');
+  if(!liste) return;
+  const q = (_piSearchQuery||'').trim().toLowerCase();
+  const produits = _piProduits.filter(p => !q || p.nom.toLowerCase().includes(q));
+  liste.innerHTML = produits.length ? produits.map(p => {
+    const val = _piValeurs[p.id] ?? '';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;background:rgba(255,255,255,.03);border-radius:8px;margin-bottom:5px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;color:rgba(255,255,255,.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(p.nom)}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.35)">${_esc(p.categorie||'')} · ${_esc(p.unite||'unité')}</div>
+      </div>
+      <input type="number" min="0" step="1" placeholder="Qté" class="pos-input" style="width:90px;text-align:right"
+             value="${val}" oninput="_piInputChange(${p.id}, this.value)">
+    </div>`;
+  }).join('') : `<div style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Aucun article ne correspond à « ${_esc(_piSearchQuery)} »</div>`;
+  _piUpdateProgress();
+}
+
+function _piFilter(v){
+  _piSearchQuery = v;
+  _piRenderListe();
+}
+
+function _piInputChange(produit_id, value){
+  if(value === '') delete _piValeurs[produit_id];
+  else _piValeurs[produit_id] = value;
+  _piUpdateProgress();
+}
+
+function _piUpdateProgress(){
+  const total = _piProduits.length;
+  const nb = Object.keys(_piValeurs).filter(k => _piValeurs[k] !== '' && _piValeurs[k] !== null && _piValeurs[k] !== undefined).length;
+  const pct = total ? Math.round(nb/total*100) : 0;
+  const txt = document.getElementById('pi-progress-txt');
+  const pctEl = document.getElementById('pi-progress-pct');
+  const bar = document.getElementById('pi-progress-bar');
+  const btn = document.getElementById('pi-btn-confirmer');
+  if(txt) txt.textContent = `${nb} / ${total} comptés`;
+  if(pctEl) pctEl.textContent = `${pct}%`;
+  if(bar) bar.style.width = `${pct}%`;
+  if(btn) btn.disabled = (total === 0 || nb < total);
+}
+
+async function posConfirmerInventaire(){
+  const total = _piProduits.length;
+  const nb = Object.keys(_piValeurs).length;
+  if(total === 0 || nb < total){ posAlert('Comptez tous les articles avant de confirmer.', 'warn'); return; }
+  const comptages = {};
+  for(const p of _piProduits) comptages[p.id] = parseFloat(_piValeurs[p.id]) || 0;
+  try {
+    await apiFetch('POST', `/pos/caisse/sessions/${_posDashSessionId}/inventaire`, {comptages});
+    _piProduits = []; _piValeurs = {}; _piSearchQuery = ''; _piSessionId = null;
+    posAlert('Comptage enregistré — vous pouvez commencer les ventes.', 'ok');
+    const cid = document.getElementById('pos-caissier-sel')?.value;
+    if(cid) await _posDashLoadData(cid);
+  } catch(e){ posAlert(e.message||"Erreur lors de l'enregistrement du comptage.", 'err'); }
 }
 
 async function posOuvrirModalDemarrage(){
@@ -22437,7 +22663,7 @@ async function _posDashLoadData(caissier_id){
 
     const btnSoumettre = document.getElementById('pos-btn-soumettre');
     if(btnSoumettre) btnSoumettre.style.display = (d.session_statut==='EN_COURS') ? '' : 'none';
-    _posSetGate(true, d.session_statut, d.peut_ouvrir_nouvelle_session);
+    _posSetGate(true, d.session_statut, d.peut_ouvrir_nouvelle_session, d.inventaire_fait);
 
     const nb    = document.getElementById('pos-dash-nb');
     const total = document.getElementById('pos-dash-total');
@@ -22526,17 +22752,41 @@ async function posSoumettreSession(){
 
 async function posConfirmerSoumission(){
   const notes = document.getElementById('ps-notes')?.value.trim() || null;
+  const sessionId = _posDashSessionId;
   try {
-    await apiFetch('POST', `/pos/caisse/sessions/${_posDashSessionId}/soumettre`, {montant_compte: _posCashAttendu, notes});
+    await apiFetch('POST', `/pos/caisse/sessions/${sessionId}/soumettre`, {montant_compte: _posCashAttendu, notes});
     posFermerModalSoumission();
     const cid = document.getElementById('pos-caissier-sel')?.value;
     if(cid) await _posDashLoadData(cid);
     _giAlert(t('pos.caisse.ok.soumis'), 'ok');
+    posAfficherFicheStock(sessionId);
   } catch(e){ posAlert(e.message||t('pos.caisse.err.soumission')); }
 }
 
 function posFermerModalSoumission(){
   document.getElementById('pos-soumettre-modal-bg')?.classList.remove('open');
+}
+
+async function posAfficherFicheStock(sessionId){
+  const bg = document.getElementById('pos-fiche-stock-modal-bg');
+  const tbody = document.getElementById('pfs-tbody');
+  if(!bg || !tbody) return;
+  try {
+    const d = await apiFetch('GET', `/pos/caisse/sessions/${sessionId}`);
+    const fiche = d.fiche_stock || [];
+    tbody.innerHTML = fiche.length ? fiche.map(f => `
+      <tr>
+        <td>${_esc(f.produit_nom)}</td>
+        <td style="text-align:right">${Number(f.quantite_depart).toFixed(0)}</td>
+        <td style="text-align:right">${Number(f.quantite_vendue).toFixed(0)}</td>
+        <td style="text-align:right;font-weight:700;color:#a78bfa">${Number(f.quantite_restante).toFixed(0)}</td>
+      </tr>`).join('') : '<tr><td colspan="4" style="text-align:center;color:rgba(255,255,255,.3);padding:16px">Aucun comptage enregistré pour cette session</td></tr>';
+    bg.classList.add('open');
+  } catch(e){ /* la fiche est informative — une erreur ici ne doit pas bloquer la suite */ }
+}
+
+function posFermerFicheStock(){
+  document.getElementById('pos-fiche-stock-modal-bg')?.classList.remove('open');
 }
 
 function posRenderCatTabs(){
@@ -27712,6 +27962,116 @@ function rsFermerEval(){
 function rsExport(session_id, format){
   const url = `/api/pos/caisse/sessions/${session_id}/rapport.${format}`;
   window.open(url, '_blank');
+}
+
+// ══════════════════════════════════════════════════════════════
+// ÉCARTS D'INVENTAIRE — comptages en écart avec le stock théorique
+// ══════════════════════════════════════════════════════════════
+
+let _eiEcarts    = [];
+let _eiCurrentId = null;
+
+function _eiCouleur(ecart){
+  return ecart < 0 ? '#f87171' : '#f7a93b';
+}
+
+async function loadEcartsInventaire(){
+  const debut = document.getElementById('ei-debut');
+  const fin   = document.getElementById('ei-fin');
+  if(debut && !debut.value){
+    const d = new Date(); d.setDate(d.getDate()-30);
+    debut.value = _ymdLocal(d);
+  }
+  if(fin && !fin.value) fin.value = todayStr();
+  eiCharger();
+}
+
+async function eiCharger(){
+  const tbody = document.getElementById('ei-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try {
+    const statut = document.getElementById('ei-filtre-statut')?.value ?? 'false';
+    const debut  = document.getElementById('ei-debut')?.value || '';
+    const fin    = document.getElementById('ei-fin')?.value || '';
+    let url = '/pos/caisse/comptages/ecarts?';
+    if(statut !== '') url += `resolu=${statut}&`;
+    if(debut)  url += `date_debut=${debut}&`;
+    if(fin)    url += `date_fin=${fin}&`;
+    _eiEcarts = await apiFetch('GET', url.slice(0,-1)||'/pos/caisse/comptages/ecarts');
+
+    const nb      = _eiEcarts.length;
+    const attente = _eiEcarts.filter(e=>!e.ecart_resolu).length;
+    const resolus = nb - attente;
+    document.getElementById('ei-kpi-total').textContent   = nb;
+    document.getElementById('ei-kpi-attente').textContent = attente;
+    document.getElementById('ei-kpi-resolus').textContent = resolus;
+    const lbl = document.getElementById('ei-count-lbl');
+    if(lbl) lbl.textContent = `${nb} écart${nb!==1?'s':''}`;
+
+    if(!nb){
+      if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:24px">Aucun écart sur cette période</td></tr>';
+      return;
+    }
+
+    if(tbody) tbody.innerHTML = _eiEcarts.map(e=>{
+      const color = _eiCouleur(e.ecart);
+      const statutBadge = e.ecart_resolu
+        ? `<span style="background:rgba(63,182,168,.2);color:#3fb6a8;padding:2px 8px;border-radius:12px;font-size:13px;font-weight:700">Résolu</span>`
+        : `<span style="background:rgba(248,113,113,.15);color:#f87171;padding:2px 8px;border-radius:12px;font-size:13px;font-weight:700">Non résolu</span>`;
+      const actionCell = (!e.ecart_resolu && _isAdmin())
+        ? `<button class="pos-btn teal" style="font-size:13px;padding:3px 10px" onclick="eiOuvrirResoudre(${e.id})">Résoudre</button>`
+        : (e.ecart_resolu ? `<span title="${_esc(e.resolu_motif||'')}" style="font-size:12px;color:rgba(255,255,255,.4)">${_esc(e.resolu_par||'')}</span>` : '—');
+      return `<tr>
+        <td>${e.date_session}</td>
+        <td style="font-weight:600">${_esc(e.caissier_nom||'—')}</td>
+        <td>${_esc(e.produit_nom||'—')}</td>
+        <td style="text-align:right">${Number(e.stock_theorique_avant).toFixed(0)}</td>
+        <td style="text-align:right">${Number(e.quantite_comptee).toFixed(0)}</td>
+        <td style="text-align:right;font-weight:700;color:${color}">${e.ecart>=0?'+':''}${Number(e.ecart).toFixed(0)}</td>
+        <td>${statutBadge}</td>
+        <td>${actionCell}</td>
+      </tr>`;
+    }).join('');
+  } catch(e){
+    const tbody2 = document.getElementById('ei-tbody');
+    if(tbody2) tbody2.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur'}</td></tr>`;
+  }
+}
+
+function eiOuvrirResoudre(comptage_id){
+  if(!_isAdmin()) return;
+  const e = _eiEcarts.find(x=>x.id===comptage_id);
+  if(!e) return;
+  _eiCurrentId = comptage_id;
+  const resume = document.getElementById('ei-resoudre-resume');
+  if(resume) resume.innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:rgba(255,255,255,.5)">Produit</span><strong>${_esc(e.produit_nom||'—')}</strong></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:rgba(255,255,255,.5)">Théorique / Compté</span><strong>${Number(e.stock_theorique_avant).toFixed(0)} / ${Number(e.quantite_comptee).toFixed(0)}</strong></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:rgba(255,255,255,.5)">Écart</span><strong style="color:${_eiCouleur(e.ecart)}">${e.ecart>=0?'+':''}${Number(e.ecart).toFixed(0)}</strong></div>
+  `;
+  const motifEl = document.getElementById('ei-motif');
+  if(motifEl) motifEl.value = '';
+  const ajustEl = document.getElementById('ei-appliquer-ajustement');
+  if(ajustEl) ajustEl.checked = true;
+  document.getElementById('ei-resoudre-modal-bg')?.classList.add('open');
+}
+
+function eiFermerResoudre(){
+  document.getElementById('ei-resoudre-modal-bg')?.classList.remove('open');
+  _eiCurrentId = null;
+}
+
+async function eiConfirmerResolution(){
+  if(!_eiCurrentId) return;
+  const motif = document.getElementById('ei-motif')?.value.trim() || '';
+  if(motif.length < 5){ _giAlert('Le motif doit contenir au moins 5 caractères.', 'err'); return; }
+  const appliquer = document.getElementById('ei-appliquer-ajustement')?.checked ?? true;
+  try {
+    await apiFetch('POST', `/pos/caisse/comptages/${_eiCurrentId}/resoudre`, {motif, appliquer_ajustement: appliquer});
+    eiFermerResoudre();
+    _giAlert('Écart résolu.', 'ok');
+    eiCharger();
+  } catch(e){ _giAlert(e.message||'Erreur lors de la résolution.', 'err'); }
 }
 
 // ══════════════════════════════════════════════════════════════

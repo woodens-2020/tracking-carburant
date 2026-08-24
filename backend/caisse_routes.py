@@ -27,7 +27,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import BarVente, BarLigneVente, BarSessionCaisse, BarSessionEvaluation, Employe, Utilisateur
+from models import (
+    BarVente, BarLigneVente, BarSessionCaisse, BarSessionEvaluation, BarSessionComptage,
+    BarProduit, BarMouvementStock, Employe, Utilisateur,
+)
+from pos_service import stock_tous_produits
+from notifications_service import creer_notification
 from tz_utils import HAITI_TZ, today_haiti, bounds_haiti
 
 router = APIRouter(prefix="/api/pos/caisse", tags=["caisse"])
@@ -189,6 +194,7 @@ def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
         "caissier_nom":  (s.caissier.nom + " " + s.caissier.prenom) if s.caissier else None,
         "date_session":  str(s.date_session),
         "numero_session": s.numero_session,
+        "inventaire_fait": bool(s.comptages),
         "statut":        s.statut,
         "created_at":    s.created_at.isoformat() if s.created_at else None,
         "soumis_at":     s.soumis_at.isoformat() if s.soumis_at else None,
@@ -295,6 +301,7 @@ def dashboard_caissiere(
         "numero_session": session.numero_session if session else None,
         "nb_sessions_jour": len(sessions_du_jour),
         "peut_ouvrir_nouvelle_session": len(sessions_du_jour) < 2,
+        "inventaire_fait": bool(session.comptages) if session else None,
         "evolution":     evolution,
         **stats,
     }
@@ -356,6 +363,17 @@ def detail_session(session_id: int, db: Session = Depends(get_db)):
         for v in ventes
     ]
     d["evaluations"] = {e.produit_nom: e.statut for e in s.evaluations}
+
+    vendu_par_nom = {p["nom"]: p["quantite"] for p in stats.get("tous_produits", [])}
+    d["fiche_stock"] = [
+        {
+            "produit_nom":       c.produit.nom if c.produit else "?",
+            "quantite_depart":   float(c.quantite_comptee),
+            "quantite_vendue":   vendu_par_nom.get(c.produit.nom if c.produit else "", 0.0),
+            "quantite_restante": float(c.quantite_comptee) - vendu_par_nom.get(c.produit.nom if c.produit else "", 0.0),
+        }
+        for c in sorted(s.comptages, key=lambda c: c.produit.nom if c.produit else "")
+    ]
     return d
 
 
@@ -396,6 +414,54 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
     ventes = _ventes_session(session, db)
     stats  = _stats_ventes(ventes, session.caissier, session.date_session, db)
     return _session_dict(session, stats)
+
+
+class InventaireIn(BaseModel):
+    comptages: dict[int, float]   # {produit_id: quantite_comptee}
+
+
+@router.post("/sessions/{session_id}/inventaire")
+def soumettre_inventaire(session_id: int, body: InventaireIn, db: Session = Depends(get_db)):
+    """Comptage physique du stock à l'ouverture de session (une seule fois
+    par session) — comparé au stock théorique (BarMouvementStock) pour
+    détecter un écart depuis la session précédente. Comptage à l'aveugle :
+    le stock théorique n'est jamais montré à la caissière avant sa saisie."""
+    s = _session_ou_404(session_id, db)
+    if s.comptages:
+        raise HTTPException(409, "Le comptage d'ouverture a déjà été soumis pour cette session.")
+    if not body.comptages:
+        raise HTTPException(422, "Au moins un produit doit être compté.")
+
+    theoriques = stock_tous_produits(db)
+
+    ecarts_notifies = []
+    for produit_id, qte in body.comptages.items():
+        theorique = theoriques.get(produit_id, Decimal("0"))
+        comptee   = Decimal(str(qte))
+        ecart     = comptee - theorique
+        db.add(BarSessionComptage(
+            session_id=session_id, produit_id=produit_id,
+            quantite_comptee=comptee, stock_theorique_avant=theorique, ecart=ecart,
+        ))
+        if ecart != 0:
+            ecarts_notifies.append((produit_id, comptee, theorique, ecart))
+    db.commit()
+
+    for produit_id, comptee, theorique, ecart in ecarts_notifies:
+        p = db.query(BarProduit).filter_by(id=produit_id).first()
+        nom = p.nom if p else str(produit_id)
+        signe = "+" if ecart > 0 else ""
+        creer_notification(
+            db, module="pos", type_="ecart_inventaire",
+            titre=f"Écart de stock à l'ouverture — {nom} ({signe}{ecart:g})",
+            message=(
+                f"Session #{session_id} ({s.caissier.nom} {s.caissier.prenom}) — "
+                f"compté {comptee:g}, théorique {theorique:g}, écart {signe}{ecart:g}."
+            ),
+            lien="ecarts-inventaire", dedupe_minutes=None,
+        )
+
+    return {"ok": True, "nb_produits": len(body.comptages), "nb_ecarts": len(ecarts_notifies)}
 
 
 class SoumettreIn(BaseModel):
@@ -505,6 +571,95 @@ def evaluer_session(
 
     ventes = _ventes_session(s, db)
     return _session_dict(s, _stats_ventes(ventes, s.caissier, s.date_session, db))
+
+
+# ── Écarts d'inventaire ────────────────────────────────────────────────
+
+@router.get("/comptages/ecarts")
+def liste_ecarts(
+    resolu:     Optional[bool] = Query(None),
+    date_debut: Optional[str]  = Query(None),
+    date_fin:   Optional[str]  = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Liste des comptages d'ouverture ayant révélé un écart avec le stock
+    théorique — page "Écarts d'Inventaire", pour examen par un responsable."""
+    q = (
+        db.query(BarSessionComptage)
+        .join(BarSessionCaisse, BarSessionComptage.session_id == BarSessionCaisse.id)
+        .filter(BarSessionComptage.ecart != 0)
+    )
+    if resolu is not None:
+        q = q.filter(BarSessionComptage.ecart_resolu == resolu)
+    if date_debut:
+        q = q.filter(BarSessionCaisse.date_session >= date.fromisoformat(date_debut))
+    if date_fin:
+        q = q.filter(BarSessionCaisse.date_session <= date.fromisoformat(date_fin))
+
+    comptages = q.order_by(BarSessionComptage.created_at.desc()).all()
+    return [
+        {
+            "id":                    c.id,
+            "session_id":            c.session_id,
+            "caissier_nom":          (c.session.caissier.nom + " " + c.session.caissier.prenom) if c.session and c.session.caissier else None,
+            "date_session":          str(c.session.date_session) if c.session else None,
+            "produit_nom":           c.produit.nom if c.produit else None,
+            "quantite_comptee":      float(c.quantite_comptee),
+            "stock_theorique_avant": float(c.stock_theorique_avant),
+            "ecart":                 float(c.ecart),
+            "ecart_resolu":          c.ecart_resolu,
+            "resolu_par":            c.resolu_par.nom_complet if c.resolu_par else None,
+            "resolu_le":             c.resolu_le.isoformat() if c.resolu_le else None,
+            "resolu_motif":          c.resolu_motif,
+        }
+        for c in comptages
+    ]
+
+
+class ResoudreEcartIn(BaseModel):
+    motif: str
+    appliquer_ajustement: bool = True
+
+
+@router.post("/comptages/{comptage_id}/resoudre")
+def resoudre_ecart(
+    comptage_id: int,
+    body: ResoudreEcartIn,
+    db: Session = Depends(get_db),
+    _user: Utilisateur = Depends(_require_pdg_ou_admin_pos),
+):
+    """Résolution manuelle d'un écart d'inventaire — jamais automatique.
+    Applique éventuellement un mouvement de stock correctif (AJUSTEMENT si
+    excédent, PERTE si manquant), avec le motif fourni par le responsable."""
+    c = db.query(BarSessionComptage).filter_by(id=comptage_id).first()
+    if not c:
+        raise HTTPException(404, "Comptage introuvable")
+    if c.ecart == 0:
+        raise HTTPException(409, "Ce comptage n'a pas d'écart à résoudre.")
+    if c.ecart_resolu:
+        raise HTTPException(409, "Cet écart a déjà été résolu.")
+    if not body.motif or len(body.motif.strip()) < 5:
+        raise HTTPException(422, "Le motif doit contenir au moins 5 caractères.")
+
+    if body.appliquer_ajustement:
+        type_mouvement = "AJUSTEMENT" if c.ecart > 0 else "PERTE"
+        mouv = BarMouvementStock(
+            produit_id     = c.produit_id,
+            type_mouvement = type_mouvement,
+            quantite       = c.ecart,
+            motif          = f"Résolution écart inventaire — {body.motif.strip()}",
+            utilisateur_id = _user.id,
+        )
+        db.add(mouv)
+        db.flush()
+        c.resolu_ajustement_id = mouv.id
+
+    c.ecart_resolu  = True
+    c.resolu_par_id = _user.id
+    c.resolu_le     = datetime.now(tz=timezone.utc)
+    c.resolu_motif  = body.motif.strip()
+    db.commit()
+    return {"ok": True}
 
 
 # ── Exports PDF / XLSX ────────────────────────────────────────────────
