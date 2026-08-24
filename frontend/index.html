@@ -3358,6 +3358,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="rapports-soumis" onclick="goTo('rapports-soumis')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      </span>
+      <span>Rapports Soumis</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <!-- ── Section Zelle ── -->
     <div class="nav-section-label">Zelle</div>
     <button class="nav-item" data-page="zelle" onclick="goTo('zelle')">
@@ -6509,12 +6517,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <h3>Soumettre la session de caisse</h3>
 
         <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;justify-content:space-between">
-          <span style="color:rgba(255,255,255,.5)">Cash attendu (calculé en direct)</span>
+          <span style="color:rgba(255,255,255,.5)">Total calculé par le système</span>
           <span id="ps-cash-attendu" style="font-weight:700;color:#a78bfa">G 0.00</span>
         </div>
 
         <div style="margin-bottom:16px">
-          <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Résumé des ventes — à comparer avec le relevé papier</div>
+          <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Résumé des ventes — vérifiez chaque article</div>
           <div style="max-height:180px;overflow-y:auto;border:1px solid rgba(255,255,255,.07);border-radius:8px">
             <table class="pos-table" style="font-size:13px">
               <thead><tr><th>Article</th><th style="text-align:right">Qté</th><th style="text-align:right">Total</th></tr></thead>
@@ -6525,22 +6533,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
         <div class="pos-form-row">
           <div style="flex:1">
-            <label class="pos-label">Montant compté (G) *</label>
-            <input class="pos-input" id="ps-montant-compte" type="number" min="0" step="0.01" placeholder="0.00" oninput="posEcartPreview()">
+            <label class="pos-label">Notes (optionnel)</label>
+            <input class="pos-input" id="ps-notes" placeholder="Laisser un commentaire ou une information…">
           </div>
         </div>
-        <div class="pos-form-row">
-          <div style="flex:1">
-            <label class="pos-label">Notes</label>
-            <input class="pos-input" id="ps-notes" placeholder="Optionnel">
-          </div>
-        </div>
-
-        <div id="ps-ecart-banner" style="display:none;margin-top:6px;border-radius:8px;padding:10px 12px;font-size:14px"></div>
 
         <div class="pos-modal-footer">
           <button class="pos-btn ghost" onclick="posFermerModalSoumission()">Annuler</button>
-          <button class="pos-btn teal" onclick="posConfirmerSoumission()">Confirmer la soumission</button>
+          <button class="pos-btn teal" onclick="posConfirmerSoumission()">✓ Oui, je confirme, tout est correct</button>
         </div>
       </div>
     </div>
@@ -8176,6 +8176,62 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
       </div>
     </div><!-- /page-pos-sessions-caisse -->
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- PAGE RAPPORTS SOUMIS — évaluation produit par produit           -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div id="page-rapports-soumis" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#a78bfa,#7c5cf0)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Rapports Soumis</div>
+            <div class="pos-header-sub">Évaluez chaque article des rapports de caisse et suivez le score des caissières</div>
+          </div>
+          <div class="pos-header-actions" style="flex-wrap:wrap;gap:8px">
+            <select class="pos-select" id="rs-filtre-caissier" style="width:165px">
+              <option value="">Toutes les caissières</option>
+            </select>
+            <select class="pos-select" id="rs-filtre-eval" style="width:160px">
+              <option value="">Tous les rapports</option>
+              <option value="NON_EVALUE">À évaluer</option>
+              <option value="TERMINEE">Déjà évalués</option>
+            </select>
+            <input type="date" class="pos-input" id="rs-debut" style="width:130px">
+            <input type="date" class="pos-input" id="rs-fin" style="width:130px">
+            <button class="pos-btn teal" onclick="rsCharger()">Filtrer</button>
+            <button class="pos-btn ghost" onclick="rsAujourdhui()">Aujourd'hui</button>
+          </div>
+        </div>
+
+        <div class="pos-kpi-grid" style="grid-template-columns:repeat(4,1fr)" id="rs-kpis">
+          <div class="pos-kpi"><div class="pos-kpi-label">Rapports</div><div class="pos-kpi-val amber" id="rs-kpi-total">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">À évaluer</div><div class="pos-kpi-val" style="color:#f87171" id="rs-kpi-attente">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Évalués</div><div class="pos-kpi-val" style="color:#3fb6a8" id="rs-kpi-evalues">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Score moyen</div><div class="pos-kpi-val" style="color:#a78bfa" id="rs-kpi-score">—</div></div>
+        </div>
+
+        <div id="rs-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:16px">
+          <div style="color:rgba(255,255,255,.3);font-size:15px;padding:32px;text-align:center;grid-column:1/-1">Chargement…</div>
+        </div>
+
+      </div>
+    </div><!-- /page-rapports-soumis -->
+
+    <!-- Modal évaluation d'un rapport soumis -->
+    <div class="pos-modal-bg" id="rs-eval-bg" onclick="if(event.target===this)rsFermerEval()">
+      <div class="pos-modal" style="min-width:560px;max-width:720px;max-height:88vh;overflow-y:auto" id="rs-eval-modal">
+        <div class="pos-modal-hdr">
+          <span id="rs-eval-titre">Évaluation du rapport</span>
+          <button class="pos-modal-close" onclick="rsFermerEval()">✕</button>
+        </div>
+        <div id="rs-eval-body" style="padding:16px"></div>
+        <div style="display:flex;gap:8px;padding:0 16px 16px;flex-wrap:wrap" id="rs-eval-actions"></div>
+      </div>
+    </div>
 
     <!-- ══════════════════════════════════════════════════════════════ -->
     <!-- PAGE ZELLE                                                      -->
@@ -12728,6 +12784,7 @@ const PAGE_META={
   'pos-paie':          {title: 'Paie Bar',                      sub: 'Paiements employés du bar'},
   'pos-rentabilite':      {title: 'Rentabilité Bar',            sub: 'CA — Bénéfices — Marges — COGS'},
   'pos-sessions-caisse':  {title: 'Sessions Caissières',        sub: 'Suivi · validation · export des rapports de caisse'},
+  'rapports-soumis':      {title: 'Rapports Soumis',            sub: 'Évaluation produit par produit des rapports de caisse'},
   'zelle':                {title: 'Tableau de bord — Zelle',      sub: 'Bilan général · Balance HTG · Répartition par source'},
   'zelle-paiements':      {title: 'Paiements Zelle',              sub: 'Toutes les transactions en gourdes (HTG)'},
   'zelle-fonds':          {title: 'Réception de Fonds',           sub: 'Déclaration des fonds reçus en gourdes (HTG)'},
@@ -14917,8 +14974,8 @@ const _AREA_PAGES = {
     lecture: ['dashboard','journal','statistiques','gi-dashboard'],
   },
   bar: {
-    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','zelle','zelle-paiements','zelle-fonds'],
-    lecture: ['pos-ventes','pos-credits','pos-commandes','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','zelle','zelle-paiements','zelle-fonds'],
+    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
+    lecture: ['pos-ventes','pos-credits','pos-commandes','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
   },
   cuisine: {
     complet: ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse'],
@@ -14944,7 +15001,7 @@ const _CAISSIER_ALLOWED = new Set([
 // Whitelist stricte pour les comptes Manager — Bar/Restaurant + Hôtel (sans Tables, Grande Caisse, Chambres, Réception) + Cuisine complète.
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
-  'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse',
+  'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
   'hotel-dashboard','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
 ]);
@@ -14954,7 +15011,7 @@ const _AD_ALLOWED = new Set([
   'home',
   'dashboard','journal','statistiques','gi-dashboard','depenses','achats','caisse',
   'pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes',
-  'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse',
+  'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
   'cuisine-plats','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'employes','payroll',
@@ -14965,11 +15022,11 @@ const _AD_ALLOWED = new Set([
 const _ACCES_POSTE_LEGACY = {
   'Directeur Général': null,
   'Comptable':   ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Pompiste':            ['home','saisie'],
@@ -15211,7 +15268,21 @@ async function loadCurrentUser(){
   }
 }
 async function logout(){
-  try{ await fetch('/api/logout',{method:'POST',credentials:'include'}); }catch(e){}
+  try{
+    const res = await fetch('/api/logout',{method:'POST',credentials:'include'});
+    if(res.status === 409){
+      const data = await res.json().catch(()=>({}));
+      notify(data.detail || 'Vous devez d\'abord mettre fin à votre session de caisse avant de vous déconnecter.', 'err');
+      return;
+    }
+    if(!res.ok){
+      notify('Erreur lors de la déconnexion — réessayez.', 'err');
+      return;
+    }
+  }catch(e){
+    notify('Erreur réseau — impossible de vérifier si une session de caisse est active.', 'err');
+    return;
+  }
   sessionStorage.removeItem('api_key');
   window.location.href='/login';
 }
@@ -18571,10 +18642,15 @@ async function changePassword(){
   btn.disabled = true;
   try{
     await POST('/auth/change-password',{ancien_mot_de_passe:old_, nouveau_mot_de_passe:new_});
-    _admMsg('Mot de passe mis à jour — redirection vers la connexion…','ok');
-    await fetch('/api/logout',{method:'POST',credentials:'include'});
-    sessionStorage.removeItem('api_key');
-    setTimeout(()=>{ window.location.href='/login'; }, 1500);
+    const res = await fetch('/api/logout',{method:'POST',credentials:'include'});
+    if(res.status === 409){
+      const data = await res.json().catch(()=>({}));
+      _admMsg('Mot de passe mis à jour. ' + (data.detail || 'Terminez d\'abord votre session de caisse pour vous déconnecter.'), 'ok');
+    } else {
+      _admMsg('Mot de passe mis à jour — redirection vers la connexion…','ok');
+      sessionStorage.removeItem('api_key');
+      setTimeout(()=>{ window.location.href='/login'; }, 1500);
+    }
   }catch(e){
     _admMsg(e.message || 'Erreur lors de la mise à jour.','err');
   }finally{
@@ -19953,6 +20029,7 @@ const _giPageLoaders = {
   'pos-grande-caisse':      loadPosGrandeCaisse,
   'pos-analyse':            loadPosAnalyse,
   'pos-sessions-caisse':    loadPosSessionsCaisse,
+  'rapports-soumis':        loadRapportsSoumis,
   'cuisine-caisse':     loadCuisineCaisse,
   'cuisine-plats':      loadCuisinePlats,
   'cuisine-depenses':   loadCuisineDepenses,
@@ -22416,32 +22493,14 @@ async function posSoumettreSession(){
   }
 
   document.getElementById('ps-cash-attendu').textContent = posGx(_posCashAttendu);
-  document.getElementById('ps-montant-compte').value = '';
   document.getElementById('ps-notes').value = '';
-  document.getElementById('ps-ecart-banner').style.display = 'none';
   document.getElementById('pos-soumettre-modal-bg').classList.add('open');
 }
 
-function posEcartPreview(){
-  const compte = parseFloat(document.getElementById('ps-montant-compte')?.value);
-  const banner = document.getElementById('ps-ecart-banner');
-  if(!banner) return;
-  if(isNaN(compte)){ banner.style.display = 'none'; return; }
-  const ecart = compte - _posCashAttendu;
-  const {color, bg, border} = _posEcartNiveau(ecart, _posCashAttendu);
-  banner.style.display = '';
-  banner.style.background = bg;
-  banner.style.border = `1px solid ${border}`;
-  banner.style.color = color;
-  banner.innerHTML = `Écart : <strong>${ecart>=0?'+':''}${posGx(ecart)}</strong>`;
-}
-
 async function posConfirmerSoumission(){
-  const compte = parseFloat(document.getElementById('ps-montant-compte')?.value);
-  if(isNaN(compte) || compte < 0){ posAlert('Indiquez le montant compté (≥ 0).', 'warn'); return; }
   const notes = document.getElementById('ps-notes')?.value.trim() || null;
   try {
-    await apiFetch('POST', `/pos/caisse/sessions/${_posDashSessionId}/soumettre`, {montant_compte: compte, notes});
+    await apiFetch('POST', `/pos/caisse/sessions/${_posDashSessionId}/soumettre`, {montant_compte: _posCashAttendu, notes});
     posFermerModalSoumission();
     const cid = document.getElementById('pos-caissier-sel')?.value;
     if(cid) await _posDashLoadData(cid);
@@ -27281,6 +27340,243 @@ function scFermerDetail(){
 }
 
 function scExport(session_id, format){
+  const url = `/api/pos/caisse/sessions/${session_id}/rapport.${format}`;
+  window.open(url, '_blank');
+}
+
+// ══════════════════════════════════════════════════════════════
+// RAPPORTS SOUMIS — évaluation produit par produit par un responsable
+// ══════════════════════════════════════════════════════════════
+
+let _rsSessions  = [];
+let _rsDetail    = null;
+let _rsArticles  = [];
+let _rsEvalLocal = {};
+let _rsCurrentId = null;
+
+function _scoreCouleur(score){
+  if(score===null||score===undefined) return '#888';
+  if(score>=90) return '#22c55e';
+  if(score>=70) return '#f7a93b';
+  return '#f87171';
+}
+
+async function loadRapportsSoumis(){
+  try {
+    const emps = await apiFetch('GET', '/pos/caisse/caissieres');
+    const sel = document.getElementById('rs-filtre-caissier');
+    if(sel) sel.innerHTML = '<option value="">Toutes les caissières</option>' +
+      emps.map(e=>`<option value="${e.id}">${e.nom} ${e.prenom}</option>`).join('');
+  } catch(e){}
+  rsAujourdhui();
+}
+
+function rsAujourdhui(){
+  // Fenêtre par défaut de 30 jours : un rapport en attente d'évaluation ne
+  // doit pas disparaître de la vue le lendemain de sa soumission.
+  const today = todayStr();
+  const d = new Date(); d.setDate(d.getDate()-30);
+  const deb = document.getElementById('rs-debut');
+  const fin = document.getElementById('rs-fin');
+  if(deb) deb.value = _ymdLocal(d);
+  if(fin) fin.value = today;
+  rsCharger();
+}
+
+async function rsCharger(){
+  const grid = document.getElementById('rs-grid');
+  if(grid) grid.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:15px;padding:32px;text-align:center;grid-column:1/-1">Chargement…</div>';
+  try {
+    const caissier = document.getElementById('rs-filtre-caissier')?.value||'';
+    const debut    = document.getElementById('rs-debut')?.value||'';
+    const fin      = document.getElementById('rs-fin')?.value||'';
+    let url = '/pos/caisse/sessions?';
+    if(caissier) url += `caissier_id=${caissier}&`;
+    if(debut)    url += `date_debut=${debut}&`;
+    if(fin)      url += `date_fin=${fin}&`;
+    const all = await apiFetch('GET', url.slice(0,-1)||'/pos/caisse/sessions');
+
+    // Seuls les rapports déjà soumis (SOUMIS ou VALIDE) ont un sens à évaluer.
+    let rapports = all.filter(s=>s.statut==='SOUMIS'||s.statut==='VALIDE');
+    const evalFiltre = document.getElementById('rs-filtre-eval')?.value||'';
+    if(evalFiltre) rapports = rapports.filter(s=>s.evaluation_statut===evalFiltre);
+    _rsSessions = rapports;
+
+    const nb        = rapports.length;
+    const attente    = rapports.filter(s=>s.evaluation_statut!=='TERMINEE').length;
+    const evalues     = rapports.filter(s=>s.evaluation_statut==='TERMINEE');
+    const scoreMoyen  = evalues.length ? (evalues.reduce((a,s)=>a+(s.score||0),0)/evalues.length) : null;
+    document.getElementById('rs-kpi-total').textContent    = nb;
+    document.getElementById('rs-kpi-attente').textContent  = attente;
+    document.getElementById('rs-kpi-evalues').textContent  = evalues.length;
+    document.getElementById('rs-kpi-score').textContent    = scoreMoyen!==null ? `${scoreMoyen.toFixed(0)} %` : '—';
+
+    if(!nb){
+      if(grid) grid.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:15px;padding:32px;text-align:center;grid-column:1/-1">Aucun rapport soumis sur cette période</div>';
+      return;
+    }
+
+    if(grid) grid.innerHTML = rapports.map(s=>{
+      const soumisTxt = s.soumis_at ? new Date(s.soumis_at).toLocaleString('fr-HT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : '—';
+      const estEvalue = s.evaluation_statut === 'TERMINEE';
+      const badge = estEvalue
+        ? `<span style="background:${_scoreCouleur(s.score)}22;color:${_scoreCouleur(s.score)};padding:2px 10px;border-radius:12px;font-size:13px;font-weight:700">${(s.score||0).toFixed(0)} %</span>`
+        : `<span style="background:rgba(248,113,113,.15);color:#f87171;padding:2px 10px;border-radius:12px;font-size:13px;font-weight:700">À évaluer</span>`;
+      const validBadge = s.statut === 'VALIDE' ? `<span style="color:#3fb6a8;font-size:12px;margin-left:6px">✓ Validé</span>` : '';
+      return `<div class="pos-card" style="padding:16px;cursor:pointer" onclick="rsOuvrirEvaluation(${s.id})">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">
+          <div style="min-width:0">
+            <div style="font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(s.caissier_nom||'—')}</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.4)">${s.date_session} · soumis ${soumisTxt}${validBadge}</div>
+          </div>
+          ${badge}
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,.55)">
+          <span>${s.nb_ventes||0} vente${(s.nb_ventes||0)!==1?'s':''}</span>
+          <span style="font-weight:700;color:#3fb6a8">${posGx(s.total||0)}</span>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e){
+    if(grid) grid.innerHTML = `<div style="color:#f87171;padding:20px;grid-column:1/-1">${e.message||'Erreur'}</div>`;
+  }
+}
+
+async function rsOuvrirEvaluation(session_id){
+  const bg    = document.getElementById('rs-eval-bg');
+  const body  = document.getElementById('rs-eval-body');
+  const titre = document.getElementById('rs-eval-titre');
+  if(!bg||!body) return;
+  _rsCurrentId = session_id;
+  body.innerHTML = '<div style="text-align:center;padding:30px;color:rgba(255,255,255,.4)">Chargement…</div>';
+  bg.classList.add('open');
+
+  try {
+    const d = await apiFetch('GET', `/pos/caisse/sessions/${session_id}`);
+    _rsDetail    = d;
+    _rsArticles  = (d.tous_produits||[]).map(p=>p.nom);
+    _rsEvalLocal = Object.assign({}, d.evaluations||{});
+    if(titre) titre.textContent = `${d.caissier_nom||'?'} — ${d.date_session}`;
+    _rsRenderModal();
+  } catch(e){
+    body.innerHTML = `<div style="color:#f87171;padding:20px">${e.message||'Erreur'}</div>`;
+  }
+}
+
+function _rsArticleRow(i, p){
+  const nom = p.nom;
+  const statutActuel = _rsEvalLocal[nom];
+  const opts = [
+    {v:'CORRECT',      label:'Correct',      color:'#22c55e'},
+    {v:'NON_CORRECT',  label:'Non-correct',  color:'#f7a93b'},
+    {v:'INTROUVABLE',  label:'Introuvable',  color:'#f87171'},
+  ];
+  const readOnly = _rsDetail?.evaluation_statut === 'TERMINEE';
+  const btns = opts.map(o=>{
+    const active = statutActuel === o.v;
+    const bg = active ? o.color : 'rgba(255,255,255,.05)';
+    const fg = active ? '#0b0f14' : 'rgba(255,255,255,.6)';
+    const bd = active ? o.color : 'rgba(255,255,255,.14)';
+    const click = readOnly ? '' : `onclick="rsEvaluerArticle(${i},'${o.v}')"`;
+    return `<button type="button" ${click} ${readOnly?'disabled':''} style="flex:1;padding:6px 4px;border-radius:7px;border:1px solid ${bd};background:${bg};color:${fg};font-size:12px;font-weight:700;cursor:${readOnly?'default':'pointer'}">${o.label}</button>`;
+  }).join('');
+  return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(255,255,255,.03);border-radius:8px;margin-bottom:6px">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:14px;color:rgba(255,255,255,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(nom)}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.35)">×${Number(p.quantite||0).toFixed(0)} — ${posGx(p.total||0)}</div>
+    </div>
+    <div style="display:flex;gap:5px;width:230px;flex-shrink:0">${btns}</div>
+  </div>`;
+}
+
+function _rsRenderModal(){
+  const d    = _rsDetail;
+  const body = document.getElementById('rs-eval-body');
+  const acts = document.getElementById('rs-eval-actions');
+  if(!d||!body) return;
+
+  const soumisTxt = d.soumis_at ? new Date(d.soumis_at).toLocaleString('fr-HT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : '—';
+  const produits = d.tous_produits||[];
+
+  const scoreBloc = d.evaluation_statut === 'TERMINEE'
+    ? `<div style="text-align:center;background:${_scoreCouleur(d.score)}18;border:1px solid ${_scoreCouleur(d.score)}55;border-radius:10px;padding:12px;margin-bottom:14px">
+        <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:4px">Score final</div>
+        <div style="font-size:28px;font-weight:800;color:${_scoreCouleur(d.score)}">${(d.score||0).toFixed(0)} %</div>
+        ${d.evalue_par ? `<div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:2px">Évalué par ${_esc(d.evalue_par)}</div>` : ''}
+      </div>`
+    : '';
+
+  body.innerHTML = `
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,.5);margin-bottom:12px">
+      <span>Fin de session : <strong style="color:rgba(255,255,255,.8)">${soumisTxt}</strong></span>
+      <span>Total : <strong style="color:#3fb6a8">${posGx(d.total||0)}</strong></span>
+    </div>
+    ${scoreBloc}
+    <div style="font-size:13px;color:rgba(255,255,255,.4);font-weight:600;margin-bottom:8px">Évaluation par article — ${produits.length} article${produits.length!==1?'s':''}</div>
+    <div id="rs-articles-list">${produits.map((p,i)=>_rsArticleRow(i, p)).join('')}</div>
+  `;
+
+  if(acts){
+    const complet  = produits.length>0 && produits.every(p=>!!_rsEvalLocal[p.nom]);
+    const dejaFait = d.evaluation_statut === 'TERMINEE';
+    const btnFinal = (!dejaFait)
+      ? `<button class="pos-btn teal" ${complet?'':'disabled'} onclick="rsFinaliser()">Finaliser l'évaluation</button>`
+      : '';
+    const btnPdf  = `<button class="pos-btn ghost" onclick="rsExport(${_rsCurrentId},'pdf')">Télécharger PDF</button>`;
+    const btnXlsx = `<button class="pos-btn ghost" onclick="rsExport(${_rsCurrentId},'xlsx')">Télécharger XLSX</button>`;
+    acts.innerHTML = `${btnFinal}${btnPdf}${btnXlsx}<button class="pos-btn ghost" onclick="rsFermerEval()">Fermer</button>`;
+  }
+}
+
+async function rsEvaluerArticle(i, statut){
+  if(_rsDetail?.evaluation_statut === 'TERMINEE') return; // déjà finalisé — lecture seule
+  const nom = _rsArticles[i];
+  if(!nom || !_rsCurrentId) return;
+  const previous = _rsEvalLocal[nom];
+  _rsEvalLocal[nom] = statut;
+  _rsRenderModal(); // mise à jour optimiste
+  try {
+    await apiFetch('POST', `/pos/caisse/sessions/${_rsCurrentId}/evaluer`, {
+      evaluations: {[nom]: statut}, finaliser: false,
+    });
+  } catch(e){
+    if(previous) _rsEvalLocal[nom] = previous; else delete _rsEvalLocal[nom];
+    _rsRenderModal();
+    _giAlert(e.message||"Erreur lors de l'enregistrement.", 'err');
+  }
+}
+
+async function rsFinaliser(){
+  if(!_rsCurrentId) return;
+  const produits = (_rsDetail?.tous_produits||[]);
+  if(!produits.every(p=>!!_rsEvalLocal[p.nom])){
+    _giAlert('Tous les articles doivent être évalués avant de finaliser.', 'err');
+    return;
+  }
+  if(!await showConfirm(
+    "Finaliser l'évaluation de ce rapport ? Le score sera calculé et le rapport sera automatiquement validé.",
+    {title:"Finaliser l'évaluation", okLabel:'Finaliser', type:'ok'}
+  )) return;
+  try {
+    const d = await apiFetch('POST', `/pos/caisse/sessions/${_rsCurrentId}/evaluer`, {
+      evaluations: _rsEvalLocal, finaliser: true,
+    });
+    _rsDetail = d;
+    _giAlert(`Évaluation terminée — score : ${(d.score||0).toFixed(0)} %`, 'ok');
+    _rsRenderModal();
+    rsCharger();
+  } catch(e){
+    _giAlert(e.message||'Erreur lors de la finalisation.', 'err');
+  }
+}
+
+function rsFermerEval(){
+  const bg = document.getElementById('rs-eval-bg');
+  if(bg) bg.classList.remove('open');
+  _rsCurrentId = null; _rsDetail = null; _rsArticles = []; _rsEvalLocal = {};
+}
+
+function rsExport(session_id, format){
   const url = `/api/pos/caisse/sessions/${session_id}/rapport.${format}`;
   window.open(url, '_blank');
 }

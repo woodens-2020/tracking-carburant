@@ -1114,17 +1114,51 @@ class BarSessionCaisse(Base):
     cash_attendu_soumission = Column(Numeric(14, 2), nullable=True)
     montant_compte          = Column(Numeric(14, 2), nullable=True)
     ecart                   = Column(Numeric(14, 2), nullable=True)
+    # Évaluation produit par produit du rapport par un responsable (page
+    # "Rapports Soumis") — distincte de la validation existante (valide_at/
+    # valide_par_id), qui reste utilisable telle quelle pour un accept rapide
+    # sans passer par l'évaluation détaillée.
+    evaluation_statut = Column(String(20), nullable=False, default="NON_EVALUE")  # NON_EVALUE, TERMINEE
+    score              = Column(Numeric(5, 2), nullable=True)
+    evalue_par_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    evalue_le          = Column(DateTime(timezone=True), nullable=True)
     created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     caissier   = relationship("Employe",      foreign_keys=[caissier_id])
     valide_par = relationship("Utilisateur",  foreign_keys=[valide_par_id])
+    evalue_par = relationship("Utilisateur",  foreign_keys=[evalue_par_id])
+    evaluations = relationship("BarSessionEvaluation", back_populates="session", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("caissier_id", "date_session", name="uq_session_caissier_date"),
         CheckConstraint("statut IN ('EN_COURS','SOUMIS','VALIDE')", name="chk_session_statut"),
+        CheckConstraint("evaluation_statut IN ('NON_EVALUE','TERMINEE')", name="chk_session_eval_statut"),
         Index("idx_session_caissier", "caissier_id"),
         Index("idx_session_date",     "date_session"),
         Index("idx_session_statut",   "statut"),
+    )
+
+
+class BarSessionEvaluation(Base):
+    """Évaluation d'un article par le responsable, lors de la ré-évaluation
+    d'un rapport de session déjà soumis (page "Rapports Soumis") — un
+    enregistrement par article distinct de la session."""
+    __tablename__ = "bar_session_evaluations"
+
+    id             = Column(Integer, primary_key=True)
+    session_id     = Column(Integer, ForeignKey("bar_sessions_caisse.id", ondelete="CASCADE"), nullable=False)
+    produit_nom    = Column(String(200), nullable=False)
+    statut         = Column(String(20), nullable=False)  # CORRECT, NON_CORRECT, INTROUVABLE
+    evalue_par_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    evalue_at      = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    session    = relationship("BarSessionCaisse", back_populates="evaluations")
+    evalue_par = relationship("Utilisateur", foreign_keys=[evalue_par_id])
+
+    __table_args__ = (
+        UniqueConstraint("session_id", "produit_nom", name="uq_eval_session_produit"),
+        CheckConstraint("statut IN ('CORRECT','NON_CORRECT','INTROUVABLE')", name="chk_eval_statut"),
+        Index("idx_eval_session", "session_id"),
     )
 
 

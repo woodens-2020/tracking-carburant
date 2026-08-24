@@ -25,6 +25,7 @@ from models import (
     BarCommande, BarLigneCommande, BarPaiementEmploye,
     HotelChambre, HotelEmploye, HotelReservation,
     LoginSecurityEvent,  # noqa: F401 — nécessaire pour create_all
+    BarSessionEvaluation,  # noqa: F401 — nécessaire pour create_all
 )
 
 # ── URL de connexion ──────────────────────────────────────────────
@@ -172,6 +173,15 @@ def _migrate_columns():
              "ALTER TABLE bar_sessions_caisse ADD COLUMN montant_compte NUMERIC", None),
             ("bar_sessions_caisse", "ecart",
              "ALTER TABLE bar_sessions_caisse ADD COLUMN ecart NUMERIC", None),
+            # v18 — évaluation produit par produit du rapport par un responsable
+            ("bar_sessions_caisse", "evaluation_statut",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN evaluation_statut VARCHAR(20) DEFAULT 'NON_EVALUE'", None),
+            ("bar_sessions_caisse", "score",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN score NUMERIC", None),
+            ("bar_sessions_caisse", "evalue_par_id",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN evalue_par_id INTEGER REFERENCES utilisateurs(id)", None),
+            ("bar_sessions_caisse", "evalue_le",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN evalue_le TIMESTAMP", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -255,6 +265,15 @@ def _migrate_columns():
              "ALTER TABLE bar_sessions_caisse ADD COLUMN montant_compte NUMERIC(14,2)", None),
             ("bar_sessions_caisse", "ecart",
              "ALTER TABLE bar_sessions_caisse ADD COLUMN ecart NUMERIC(14,2)", None),
+            # v18 — évaluation produit par produit du rapport par un responsable
+            ("bar_sessions_caisse", "evaluation_statut",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN evaluation_statut VARCHAR(20) DEFAULT 'NON_EVALUE'", None),
+            ("bar_sessions_caisse", "score",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN score NUMERIC(5,2)", None),
+            ("bar_sessions_caisse", "evalue_par_id",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN evalue_par_id INTEGER REFERENCES utilisateurs(id)", None),
+            ("bar_sessions_caisse", "evalue_le",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN evalue_le TIMESTAMP WITH TIME ZONE", None),
         ]
     else:
         return

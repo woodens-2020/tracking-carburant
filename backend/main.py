@@ -482,11 +482,29 @@ def otp_verify_admin_code(
     }
 
 
+def _session_ouverte_pour(db: Session, user: Utilisateur):
+    """Session de caisse EN_COURS du jour pour cet utilisateur, si son compte
+    est lié à un employé (caissier/manager/admin — voir /api/me), sinon None.
+    Utilisée pour empêcher la déconnexion tant qu'une session n'est pas
+    close : voir POST /api/logout."""
+    from models import BarSessionCaisse
+    emp = db.query(Employe).filter_by(utilisateur_id=user.id, actif=True).first()
+    if not emp:
+        return None
+    return (
+        db.query(BarSessionCaisse)
+        .filter_by(caissier_id=emp.id, date_session=today_haiti(), statut="EN_COURS")
+        .first()
+    )
+
+
 @app.post("/api/logout")
 def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     ip    = request.client.host if request.client else None
     token = request.cookies.get(SESSION_COOKIE)
     user  = get_session_user(db, token) if token else None
+    if user and _session_ouverte_pour(db, user):
+        raise HTTPException(409, "Vous devez d'abord mettre fin à votre session de caisse avant de vous déconnecter.")
     delete_session(db, token)
     if user:
         log_event(db, LOGOUT, user_id=user.id, ip_address=ip)

@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import BarVente, BarLigneVente, BarSessionCaisse, Employe, Utilisateur
+from models import BarVente, BarLigneVente, BarSessionCaisse, BarSessionEvaluation, Employe, Utilisateur
 from tz_utils import HAITI_TZ, today_haiti, bounds_haiti
 
 router = APIRouter(prefix="/api/pos/caisse", tags=["caisse"])
@@ -37,6 +37,21 @@ router = APIRouter(prefix="/api/pos/caisse", tags=["caisse"])
 
 def _uid(request: Request) -> Optional[int]:
     return getattr(request.state, "utilisateur_id", None)
+
+
+def _require_pdg_ou_admin_pos(request: Request, db: Session = Depends(get_db)) -> Utilisateur:
+    """Même logique que main.require_pdg_ou_admin — dupliquée ici pour
+    éviter un import circulaire entre routers (voir pos_routes.py)."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise HTTPException(403, "Non autorisé")
+    if user.role in ("pdg", "admin"):
+        return user
+    if user.role_id:
+        u = db.get(Utilisateur, user.id)
+        if u and u.role_obj and u.role_obj.permissions.get("admin", False):
+            return u
+    raise HTTPException(403, "Accès réservé au PDG et aux administrateurs")
 
 
 def _session_ou_404(session_id: int, db: Session) -> BarSessionCaisse:
@@ -155,6 +170,18 @@ def _ecart_couleur(ecart: float, cash_attendu: float) -> str:
     return "F87171"
 
 
+def _score_couleur(score: float | None) -> str:
+    """Code hex (sans #) selon le score d'évaluation d'un rapport — plus le
+    score est élevé, meilleur c'est (contrairement à _ecart_couleur)."""
+    if score is None:
+        return "888888"
+    if score >= 90:
+        return "22C55E"
+    if score >= 70:
+        return "F7A93B"
+    return "F87171"
+
+
 def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
     return {
         "id":            s.id,
@@ -170,6 +197,10 @@ def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
         "cash_attendu_soumission": float(s.cash_attendu_soumission) if s.cash_attendu_soumission is not None else None,
         "montant_compte":          float(s.montant_compte) if s.montant_compte is not None else None,
         "ecart":                   float(s.ecart) if s.ecart is not None else None,
+        "evaluation_statut": s.evaluation_statut,
+        "score":             float(s.score) if s.score is not None else None,
+        "evalue_par":        (s.evalue_par.nom + " " + s.evalue_par.prenom) if s.evalue_par else None,
+        "evalue_le":         s.evalue_le.isoformat() if s.evalue_le else None,
         **(stats or {}),
     }
 
@@ -315,6 +346,7 @@ def detail_session(session_id: int, db: Session = Depends(get_db)):
         }
         for v in ventes
     ]
+    d["evaluations"] = {e.produit_nom: e.statut for e in s.evaluations}
     return d
 
 
@@ -402,6 +434,59 @@ def valider_session(session_id: int, body: ValiderIn = ValiderIn(), request: Req
     if body.notes:
         s.notes_admin = body.notes
     db.commit()
+    ventes = _ventes_session(s, db)
+    return _session_dict(s, _stats_ventes(ventes, s.caissier, s.date_session, db))
+
+
+class EvaluationIn(BaseModel):
+    evaluations: dict[str, str]   # {produit_nom: "CORRECT"|"NON_CORRECT"|"INTROUVABLE"}
+    finaliser: bool = False
+
+
+@router.post("/sessions/{session_id}/evaluer")
+def evaluer_session(
+    session_id: int,
+    body: EvaluationIn,
+    db: Session = Depends(get_db),
+    _user: Utilisateur = Depends(_require_pdg_ou_admin_pos),
+):
+    """Évaluation produit par produit d'un rapport soumis (page Rapports
+    Soumis). Sauvegarde progressive (finaliser=False) puis finalisation
+    (finaliser=True) qui calcule le score et valide directement la session
+    — évite un double clic redondant avec /valider."""
+    s = _session_ou_404(session_id, db)
+    valides = {"CORRECT", "NON_CORRECT", "INTROUVABLE"}
+    for nom, statut in body.evaluations.items():
+        if statut not in valides:
+            raise HTTPException(422, f"Statut invalide pour '{nom}': {statut}")
+        existant = db.query(BarSessionEvaluation).filter_by(session_id=session_id, produit_nom=nom).first()
+        if existant:
+            existant.statut = statut
+            existant.evalue_par_id = _user.id
+        else:
+            db.add(BarSessionEvaluation(session_id=session_id, produit_nom=nom, statut=statut, evalue_par_id=_user.id))
+    db.commit()
+
+    if body.finaliser:
+        ventes = _ventes_session(s, db)
+        stats  = _stats_ventes(ventes, s.caissier, s.date_session, db)
+        articles_attendus = {p["nom"] for p in stats["tous_produits"]}
+        evals = db.query(BarSessionEvaluation).filter_by(session_id=session_id).all()
+        evalues_noms = {e.produit_nom for e in evals}
+        if articles_attendus - evalues_noms:
+            raise HTTPException(422, "Tous les articles doivent être évalués avant de finaliser.")
+        nb_correct = sum(1 for e in evals if e.statut == "CORRECT")
+        score = round(100 * nb_correct / len(evals), 2) if evals else 0.0
+        s.score              = score
+        s.evaluation_statut  = "TERMINEE"
+        s.evalue_par_id      = _user.id
+        s.evalue_le          = datetime.now(tz=timezone.utc)
+        # Finaliser l'évaluation valide directement le rapport.
+        s.statut        = "VALIDE"
+        s.valide_at      = datetime.now(tz=timezone.utc)
+        s.valide_par_id  = _user.id
+        db.commit()
+
     ventes = _ventes_session(s, db)
     return _session_dict(s, _stats_ventes(ventes, s.caissier, s.date_session, db))
 
@@ -528,6 +613,32 @@ def export_xlsx(session_id: int, db: Session = Depends(get_db)):
         ws.cell(row=r, column=5, value=produits_str).border = thin
         data_cell(ws, r, 6, float(v.montant_total), fmt="#,##0.00")
         data_cell(ws, r, 7, float(v.montant_paye),  fmt="#,##0.00")
+
+    # Évaluation du rapport (si terminée)
+    if s.evaluation_statut == "TERMINEE":
+        eval_couleur = {"CORRECT": "22C55E", "NON_CORRECT": "F7A93B", "INTROUVABLE": "F87171"}
+        r += 2
+        hdr_cell(ws, r, 1, "Évaluation du rapport", bg=DARK)
+        ws.merge_cells(f"A{r}:C{r}")
+        r += 1
+        evalue_par_nom = (s.evalue_par.nom + " " + s.evalue_par.prenom) if s.evalue_par else "?"
+        ws.cell(row=r, column=1, value="Score final").font = Font(bold=True)
+        ws.cell(row=r, column=1).border = thin
+        c = ws.cell(row=r, column=2, value=f"{float(s.score):.0f} %" if s.score is not None else "—")
+        c.border = thin
+        c.font = Font(bold=True, color=_score_couleur(float(s.score) if s.score is not None else None))
+        r += 1
+        ws.cell(row=r, column=1, value="Évalué par").font = Font(bold=True)
+        ws.cell(row=r, column=1).border = thin
+        ws.cell(row=r, column=2, value=evalue_par_nom).border = thin
+        r += 2
+        for lbl, col in [("Article", 1), ("Statut", 2)]:
+            hdr_cell(ws, r, col, lbl)
+        for e in sorted(s.evaluations, key=lambda e: e.produit_nom):
+            r += 1
+            data_cell(ws, r, 1, e.produit_nom)
+            sc = data_cell(ws, r, 2, e.statut)
+            sc.font = Font(bold=True, color=eval_couleur.get(e.statut, "555555"))
 
     # Largeurs colonnes
     for col, width in [(1,18),(2,9),(3,10),(4,18),(5,45),(6,14),(7,14)]:
@@ -666,6 +777,41 @@ def export_pdf(session_id: int, db: Session = Depends(get_db)):
         ("TOPPADDING",   (0,0),(-1,-1), 4),
     ]))
     story.append(t_ventes)
+
+    # Évaluation du rapport (si terminée)
+    if s.evaluation_statut == "TERMINEE":
+        eval_couleur = {
+            "CORRECT":      colors.HexColor("#22C55E"),
+            "NON_CORRECT":  colors.HexColor("#F7A93B"),
+            "INTROUVABLE":  colors.HexColor("#F87171"),
+        }
+        story.append(Spacer(1, 14))
+        story.append(Paragraph("Évaluation du rapport", section_style))
+        evalue_par_nom = (s.evalue_par.nom + " " + s.evalue_par.prenom) if s.evalue_par else "?"
+        score_txt = f"{float(s.score):.0f} %" if s.score is not None else "—"
+        story.append(Paragraph(
+            f"Score final : <b>{score_txt}</b> &nbsp;|&nbsp; Évalué par : <b>{evalue_par_nom}</b>",
+            sub_style,
+        ))
+        evals_tries = sorted(s.evaluations, key=lambda e: e.produit_nom)
+        eval_data = [["Article", "Statut"]] + [[e.produit_nom, e.statut] for e in evals_tries]
+        t_eval = Table(eval_data, colWidths=[9*cm, 4*cm])
+        eval_style = [
+            ("BACKGROUND",   (0,0),(-1,0), DARK),
+            ("TEXTCOLOR",    (0,0),(-1,0), colors.white),
+            ("FONTNAME",     (0,0),(-1,0), "Helvetica-Bold"),
+            ("FONTSIZE",     (0,0),(-1,-1), 9),
+            ("ROWBACKGROUNDS",(0,1),(-1,-1), [colors.HexColor("#F5F5F5"), colors.white]),
+            ("GRID",         (0,0),(-1,-1), 0.4, colors.HexColor("#CCCCCC")),
+            ("ALIGN",        (1,0),(-1,-1), "CENTER"),
+            ("BOTTOMPADDING",(0,0),(-1,-1), 5),
+            ("TOPPADDING",   (0,0),(-1,-1), 5),
+        ]
+        for i, e in enumerate(evals_tries, start=1):
+            eval_style.append(("TEXTCOLOR", (1,i),(1,i), eval_couleur.get(e.statut, colors.grey)))
+            eval_style.append(("FONTNAME",  (1,i),(1,i), "Helvetica-Bold"))
+        t_eval.setStyle(TableStyle(eval_style))
+        story.append(t_eval)
 
     # Footer
     story.append(Spacer(1, 16))
