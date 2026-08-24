@@ -192,14 +192,14 @@ def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
         "created_at":    s.created_at.isoformat() if s.created_at else None,
         "soumis_at":     s.soumis_at.isoformat() if s.soumis_at else None,
         "valide_at":     s.valide_at.isoformat() if s.valide_at else None,
-        "valide_par":    (s.valide_par.nom + " " + s.valide_par.prenom) if s.valide_par else None,
+        "valide_par":    s.valide_par.nom_complet if s.valide_par else None,
         "notes_admin":   s.notes_admin,
         "cash_attendu_soumission": float(s.cash_attendu_soumission) if s.cash_attendu_soumission is not None else None,
         "montant_compte":          float(s.montant_compte) if s.montant_compte is not None else None,
         "ecart":                   float(s.ecart) if s.ecart is not None else None,
         "evaluation_statut": s.evaluation_statut,
         "score":             float(s.score) if s.score is not None else None,
-        "evalue_par":        (s.evalue_par.nom + " " + s.evalue_par.prenom) if s.evalue_par else None,
+        "evalue_par":        s.evalue_par.nom_complet if s.evalue_par else None,
         "evalue_le":         s.evalue_le.isoformat() if s.evalue_le else None,
         **(stats or {}),
     }
@@ -621,7 +621,7 @@ def export_xlsx(session_id: int, db: Session = Depends(get_db)):
         hdr_cell(ws, r, 1, "Évaluation du rapport", bg=DARK)
         ws.merge_cells(f"A{r}:C{r}")
         r += 1
-        evalue_par_nom = (s.evalue_par.nom + " " + s.evalue_par.prenom) if s.evalue_par else "?"
+        evalue_par_nom = s.evalue_par.nom_complet if s.evalue_par else "?"
         ws.cell(row=r, column=1, value="Score final").font = Font(bold=True)
         ws.cell(row=r, column=1).border = thin
         c = ws.cell(row=r, column=2, value=f"{float(s.score):.0f} %" if s.score is not None else "—")
@@ -787,7 +787,7 @@ def export_pdf(session_id: int, db: Session = Depends(get_db)):
         }
         story.append(Spacer(1, 14))
         story.append(Paragraph("Évaluation du rapport", section_style))
-        evalue_par_nom = (s.evalue_par.nom + " " + s.evalue_par.prenom) if s.evalue_par else "?"
+        evalue_par_nom = s.evalue_par.nom_complet if s.evalue_par else "?"
         score_txt = f"{float(s.score):.0f} %" if s.score is not None else "—"
         story.append(Paragraph(
             f"Score final : <b>{score_txt}</b> &nbsp;|&nbsp; Évalué par : <b>{evalue_par_nom}</b>",
