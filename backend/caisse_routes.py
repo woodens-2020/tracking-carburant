@@ -427,6 +427,8 @@ def soumettre_inventaire(session_id: int, body: InventaireIn, db: Session = Depe
     détecter un écart depuis la session précédente. Comptage à l'aveugle :
     le stock théorique n'est jamais montré à la caissière avant sa saisie."""
     s = _session_ou_404(session_id, db)
+    if s.statut != "EN_COURS":
+        raise HTTPException(409, "Le comptage d'ouverture ne peut être soumis que pour une session en cours.")
     if s.comptages:
         raise HTTPException(409, "Le comptage d'ouverture a déjà été soumis pour cette session.")
     if not body.comptages:
