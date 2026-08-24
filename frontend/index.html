@@ -6396,8 +6396,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <!-- Portail de démarrage / fin de session -->
         <div id="pos-gate-demarrer" class="pos-card" style="display:none;padding:36px 24px;text-align:center;margin-bottom:14px">
           <div style="font-size:38px;margin-bottom:10px">🔒</div>
-          <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:6px">Session de caisse non démarrée</div>
-          <div style="font-size:14px;color:rgba(255,255,255,.5);margin-bottom:18px;max-width:420px;margin-left:auto;margin-right:auto">
+          <div id="pd-gate-titre" style="font-size:17px;font-weight:700;color:#fff;margin-bottom:6px">Session de caisse non démarrée</div>
+          <div id="pd-gate-sub" style="font-size:14px;color:rgba(255,255,255,.5);margin-bottom:18px;max-width:420px;margin-left:auto;margin-right:auto">
             Démarrez votre session avant d'effectuer la première vente. La date et l'heure de démarrage seront enregistrées officiellement par le système.
           </div>
           <button class="pos-encaisser-btn" style="max-width:280px;margin:0 auto" onclick="posOuvrirModalDemarrage()">▶ Démarrer la session</button>
@@ -6498,6 +6498,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div style="display:flex;justify-content:space-between;font-size:14px">
             <span style="color:rgba(255,255,255,.5)">Démarrage officiel</span>
             <span id="pd-datetime" style="font-weight:700;color:var(--pos-accent)">—</span>
+          </div>
+          <div id="pd-numero-row" style="display:none;justify-content:space-between;font-size:14px;margin-top:6px">
+            <span style="color:rgba(255,255,255,.5)">Session du jour</span>
+            <span id="pd-numero" style="font-weight:700;color:#fff">—</span>
           </div>
         </div>
 
@@ -22358,18 +22362,32 @@ function posCaissierChange(caissier_id){
 
 // Portail démarrage/fin de session — remplace la zone de vente tant qu'aucun
 // caissier n'est sélectionné, qu'aucune session n'a démarré aujourd'hui, ou
-// que la session du jour est déjà soumise/validée.
-function _posSetGate(hasCaissier, statut){
+// que la session du jour est déjà soumise/validée. Jusqu'à 2 sessions par
+// jour (mesure de sécurité) : tant que peutOuvrir est vrai, on repropose de
+// démarrer (une 2ème session) plutôt que de bloquer jusqu'au lendemain.
+function _posSetGate(hasCaissier, statut, peutOuvrir){
   const gd = document.getElementById('pos-gate-demarrer');
   const gt = document.getElementById('pos-gate-termine');
   const vz = document.getElementById('pos-caisse-vente-zone');
   if(!gd || !gt || !vz) return;
   if(!hasCaissier || statut === 'EN_COURS'){
     gd.style.display = 'none'; gt.style.display = 'none'; vz.style.display = '';
-  } else if(statut === 'SOUMIS' || statut === 'VALIDE'){
+    return;
+  }
+  const dejaSoumise = (statut === 'SOUMIS' || statut === 'VALIDE');
+  if(dejaSoumise && peutOuvrir === false){
     gd.style.display = 'none'; gt.style.display = ''; vz.style.display = 'none';
+    return;
+  }
+  gd.style.display = ''; gt.style.display = 'none'; vz.style.display = 'none';
+  const titre = document.getElementById('pd-gate-titre');
+  const sub   = document.getElementById('pd-gate-sub');
+  if(dejaSoumise){
+    if(titre) titre.textContent = 'Démarrer une 2ème session de caisse';
+    if(sub)   sub.textContent   = "Votre première session est terminée. Vous pouvez démarrer une seconde session de caisse pour aujourd'hui si nécessaire.";
   } else {
-    gd.style.display = ''; gt.style.display = 'none'; vz.style.display = 'none';
+    if(titre) titre.textContent = 'Session de caisse non démarrée';
+    if(sub)   sub.textContent   = "Démarrez votre session avant d'effectuer la première vente. La date et l'heure de démarrage seront enregistrées officiellement par le système.";
   }
 }
 
@@ -22381,6 +22399,15 @@ async function posOuvrirModalDemarrage(){
     _posDashSessionId = s.id;
     document.getElementById('pd-caissier-nom').textContent = s.caissier_nom || '—';
     document.getElementById('pd-datetime').textContent = `${posFormatDate(s.created_at)} à ${posFormatHeure(s.created_at)}`;
+    const numRow = document.getElementById('pd-numero-row');
+    if(numRow){
+      if(s.numero_session > 1){
+        numRow.style.display = 'flex';
+        document.getElementById('pd-numero').textContent = `${s.numero_session} / 2`;
+      } else {
+        numRow.style.display = 'none';
+      }
+    }
     document.getElementById('pos-demarrer-modal-bg').classList.add('open');
   } catch(e){ posAlert(e.message||t('pos.caisse.err.ouvertureSession')); }
 }
@@ -22410,7 +22437,7 @@ async function _posDashLoadData(caissier_id){
 
     const btnSoumettre = document.getElementById('pos-btn-soumettre');
     if(btnSoumettre) btnSoumettre.style.display = (d.session_statut==='EN_COURS') ? '' : 'none';
-    _posSetGate(true, d.session_statut);
+    _posSetGate(true, d.session_statut, d.peut_ouvrir_nouvelle_session);
 
     const nb    = document.getElementById('pos-dash-nb');
     const total = document.getElementById('pos-dash-total');
@@ -27222,8 +27249,10 @@ async function scCharger(){
         : (()=>{ const {color} = _posEcartNiveau(s.ecart, s.cash_attendu_soumission);
             return `<td style="text-align:right;font-weight:700;color:${color}">${s.ecart>=0?'+':''}${posGx(s.ecart)}</td>`; })();
 
+      const numBadge = s.numero_session > 1 ? ` <span style="font-size:11px;color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:0 5px">#${s.numero_session}</span>` : '';
+
       return `<tr>
-        <td>${s.date_session}</td>
+        <td>${s.date_session}${numBadge}</td>
         <td style="font-weight:600">${s.caissier_nom||'—'}</td>
         <td>${st}</td>
         <td style="text-align:right">${s.nb_ventes||0}</td>
@@ -27264,7 +27293,7 @@ async function scResume(session_id){
 
   try {
     const d = await apiFetch('GET', `/pos/caisse/sessions/${session_id}`);
-    if(titre) titre.textContent = `Session — ${d.caissier_nom||'?'} · ${d.date_session}`;
+    if(titre) titre.textContent = `Session — ${d.caissier_nom||'?'} · ${d.date_session}${d.numero_session > 1 ? ` (#${d.numero_session})` : ''}`;
 
     const modeCols = {CASH:'#3fb6a8', CREDIT:'#f87171', MIXTE:'#a78bfa'};
     body.innerHTML = `
@@ -27423,11 +27452,16 @@ async function rsCharger(){
         ? `<span style="background:${_scoreCouleur(s.score)}22;color:${_scoreCouleur(s.score)};padding:2px 10px;border-radius:12px;font-size:13px;font-weight:700">${(s.score||0).toFixed(0)} %</span>`
         : `<span style="background:rgba(248,113,113,.15);color:#f87171;padding:2px 10px;border-radius:12px;font-size:13px;font-weight:700">À évaluer</span>`;
       const validBadge = s.statut === 'VALIDE' ? `<span style="color:#3fb6a8;font-size:12px;margin-left:6px">✓ Validé</span>` : '';
+      const numBadge = s.numero_session > 1 ? ` <span style="font-size:11px;color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:0 5px">#${s.numero_session}</span>` : '';
+      const evalInfo = (estEvalue && s.evalue_par)
+        ? `<div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:4px">Évalué par ${_esc(s.evalue_par)}${s.evalue_le ? ' · '+new Date(s.evalue_le).toLocaleString('fr-HT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : ''}</div>`
+        : '';
       return `<div class="pos-card" style="padding:16px;cursor:pointer" onclick="rsOuvrirEvaluation(${s.id})">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">
           <div style="min-width:0">
-            <div style="font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(s.caissier_nom||'—')}</div>
+            <div style="font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(s.caissier_nom||'—')}${numBadge}</div>
             <div style="font-size:12px;color:rgba(255,255,255,.4)">${s.date_session} · soumis ${soumisTxt}${validBadge}</div>
+            ${evalInfo}
           </div>
           ${badge}
         </div>
@@ -27456,7 +27490,7 @@ async function rsOuvrirEvaluation(session_id){
     _rsDetail    = d;
     _rsArticles  = (d.tous_produits||[]).map(p=>p.nom);
     _rsEvalLocal = Object.assign({}, d.evaluations||{});
-    if(titre) titre.textContent = `${d.caissier_nom||'?'} — ${d.date_session}`;
+    if(titre) titre.textContent = `${d.caissier_nom||'?'} — ${d.date_session}${d.numero_session > 1 ? ` (session #${d.numero_session})` : ''}`;
     _rsRenderModal();
   } catch(e){
     body.innerHTML = `<div style="color:#f87171;padding:20px">${e.message||'Erreur'}</div>`;
@@ -27498,11 +27532,12 @@ function _rsRenderModal(){
   const soumisTxt = d.soumis_at ? new Date(d.soumis_at).toLocaleString('fr-HT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : '—';
   const produits = d.tous_produits||[];
 
+  const evalueLeTxt = d.evalue_le ? new Date(d.evalue_le).toLocaleString('fr-HT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit',year:'numeric'}) : '';
   const scoreBloc = d.evaluation_statut === 'TERMINEE'
     ? `<div style="text-align:center;background:${_scoreCouleur(d.score)}18;border:1px solid ${_scoreCouleur(d.score)}55;border-radius:10px;padding:12px;margin-bottom:14px">
         <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:4px">Score final</div>
         <div style="font-size:28px;font-weight:800;color:${_scoreCouleur(d.score)}">${(d.score||0).toFixed(0)} %</div>
-        ${d.evalue_par ? `<div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:2px">Évalué par ${_esc(d.evalue_par)}</div>` : ''}
+        ${d.evalue_par ? `<div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:2px">Évalué par ${_esc(d.evalue_par)}${evalueLeTxt ? ' le '+evalueLeTxt : ''}</div>` : ''}
       </div>`
     : '';
 

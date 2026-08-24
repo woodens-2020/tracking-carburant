@@ -182,6 +182,9 @@ def _migrate_columns():
              "ALTER TABLE bar_sessions_caisse ADD COLUMN evalue_par_id INTEGER REFERENCES utilisateurs(id)", None),
             ("bar_sessions_caisse", "evalue_le",
              "ALTER TABLE bar_sessions_caisse ADD COLUMN evalue_le TIMESTAMP", None),
+            # v19 — jusqu'à 2 sessions de caisse par jour par caissier (mesure de sécurité)
+            ("bar_sessions_caisse", "numero_session",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN numero_session INTEGER NOT NULL DEFAULT 1", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -274,6 +277,9 @@ def _migrate_columns():
              "ALTER TABLE bar_sessions_caisse ADD COLUMN evalue_par_id INTEGER REFERENCES utilisateurs(id)", None),
             ("bar_sessions_caisse", "evalue_le",
              "ALTER TABLE bar_sessions_caisse ADD COLUMN evalue_le TIMESTAMP WITH TIME ZONE", None),
+            # v19 — jusqu'à 2 sessions de caisse par jour par caissier (mesure de sécurité)
+            ("bar_sessions_caisse", "numero_session",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN numero_session INTEGER NOT NULL DEFAULT 1", None),
         ]
     else:
         return
@@ -310,6 +316,20 @@ def _migrate_columns():
                 ))
             except Exception:
                 pass  # déjà à la bonne précision
+
+            # v19 — jusqu'à 2 sessions de caisse par jour par caissier : la
+            # contrainte d'unicité passe de (caissier_id, date_session) à
+            # (caissier_id, date_session, numero_session).
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE bar_sessions_caisse DROP CONSTRAINT IF EXISTS uq_session_caissier_date"
+                ))
+                conn.execute(sql_text(
+                    "ALTER TABLE bar_sessions_caisse ADD CONSTRAINT uq_session_caissier_date_num "
+                    "UNIQUE (caissier_id, date_session, numero_session)"
+                ))
+            except Exception:
+                pass  # contrainte déjà à jour
 
         conn.commit()
 

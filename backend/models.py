@@ -1103,6 +1103,10 @@ class BarSessionCaisse(Base):
     id            = Column(Integer, primary_key=True)
     caissier_id   = Column(Integer, ForeignKey("employes.id",    ondelete="RESTRICT"), nullable=False)
     date_session  = Column(Date, nullable=False)
+    # Jusqu'à 2 sessions par jour par caissier (mesure de sécurité — permet
+    # p. ex. de repartir sur une session propre après un incident, sans
+    # attendre le lendemain) : 1 ou 2, unique avec (caissier_id, date_session).
+    numero_session = Column(Integer, nullable=False, default=1)
     statut        = Column(String(20), nullable=False, default="EN_COURS")  # EN_COURS, SOUMIS, VALIDE
     soumis_at     = Column(DateTime(timezone=True), nullable=True)
     valide_at     = Column(DateTime(timezone=True), nullable=True)
@@ -1130,7 +1134,7 @@ class BarSessionCaisse(Base):
     evaluations = relationship("BarSessionEvaluation", back_populates="session", cascade="all, delete-orphan")
 
     __table_args__ = (
-        UniqueConstraint("caissier_id", "date_session", name="uq_session_caissier_date"),
+        UniqueConstraint("caissier_id", "date_session", "numero_session", name="uq_session_caissier_date_num"),
         CheckConstraint("statut IN ('EN_COURS','SOUMIS','VALIDE')", name="chk_session_statut"),
         CheckConstraint("evaluation_statut IN ('NON_EVALUE','TERMINEE')", name="chk_session_eval_statut"),
         Index("idx_session_caissier", "caissier_id"),

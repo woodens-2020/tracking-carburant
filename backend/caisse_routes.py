@@ -188,6 +188,7 @@ def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
         "caissier_id":   s.caissier_id,
         "caissier_nom":  (s.caissier.nom + " " + s.caissier.prenom) if s.caissier else None,
         "date_session":  str(s.date_session),
+        "numero_session": s.numero_session,
         "statut":        s.statut,
         "created_at":    s.created_at.isoformat() if s.created_at else None,
         "soumis_at":     s.soumis_at.isoformat() if s.soumis_at else None,
@@ -261,11 +262,16 @@ def dashboard_caissiere(
         .all()
     )
 
-    session = (
+    # Jusqu'à 2 sessions par jour : on retient celle EN_COURS si présente,
+    # sinon la plus récente (dernière ouverte) pour refléter l'état du jour.
+    sessions_du_jour = (
         db.query(BarSessionCaisse)
         .filter_by(caissier_id=caissier_id, date_session=jour)
-        .first()
+        .order_by(BarSessionCaisse.numero_session)
+        .all()
     )
+    session = next((s for s in sessions_du_jour if s.statut == "EN_COURS"), None) \
+        or (sessions_du_jour[-1] if sessions_du_jour else None)
 
     # Evolution horaire (pour graphe)
     evolution: list = []
@@ -286,6 +292,9 @@ def dashboard_caissiere(
         "caissier_nom":  employe.nom + " " + employe.prenom,
         "session_id":    session.id if session else None,
         "session_statut": session.statut if session else None,
+        "numero_session": session.numero_session if session else None,
+        "nb_sessions_jour": len(sessions_du_jour),
+        "peut_ouvrir_nouvelle_session": len(sessions_du_jour) < 2,
         "evolution":     evolution,
         **stats,
     }
@@ -356,22 +365,29 @@ class OuvrirIn(BaseModel):
 
 @router.post("/sessions/ouvrir")
 def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
-    """Ouvre (ou retrouve) la session du jour pour une caissière."""
+    """Ouvre (ou retrouve) une session du jour pour une caissière — jusqu'à 2
+    sessions par jour (mesure de sécurité : permet de repartir sur une
+    session propre après un incident, sans attendre le lendemain)."""
     employe = db.query(Employe).filter_by(id=data.caissier_id).first()
     if not employe:
         raise HTTPException(404, "Caissier introuvable")
 
     aujourd_hui = today_haiti()
-    session = (
+    sessions_du_jour = (
         db.query(BarSessionCaisse)
         .filter_by(caissier_id=data.caissier_id, date_session=aujourd_hui)
-        .first()
+        .order_by(BarSessionCaisse.numero_session)
+        .all()
     )
+    session = next((s for s in sessions_du_jour if s.statut == "EN_COURS"), None)
     if not session:
+        if len(sessions_du_jour) >= 2:
+            raise HTTPException(409, "Limite de 2 sessions de caisse par jour atteinte pour ce caissier.")
         session = BarSessionCaisse(
-            caissier_id  = data.caissier_id,
-            date_session = aujourd_hui,
-            statut       = "EN_COURS",
+            caissier_id     = data.caissier_id,
+            date_session    = aujourd_hui,
+            statut          = "EN_COURS",
+            numero_session  = len(sessions_du_jour) + 1,
         )
         db.add(session)
         db.commit()
@@ -622,6 +638,7 @@ def export_xlsx(session_id: int, db: Session = Depends(get_db)):
         ws.merge_cells(f"A{r}:C{r}")
         r += 1
         evalue_par_nom = s.evalue_par.nom_complet if s.evalue_par else "?"
+        evalue_le_txt  = s.evalue_le.astimezone(HAITI_TZ).strftime("%d/%m/%Y %H:%M") if s.evalue_le else "—"
         ws.cell(row=r, column=1, value="Score final").font = Font(bold=True)
         ws.cell(row=r, column=1).border = thin
         c = ws.cell(row=r, column=2, value=f"{float(s.score):.0f} %" if s.score is not None else "—")
@@ -631,6 +648,10 @@ def export_xlsx(session_id: int, db: Session = Depends(get_db)):
         ws.cell(row=r, column=1, value="Évalué par").font = Font(bold=True)
         ws.cell(row=r, column=1).border = thin
         ws.cell(row=r, column=2, value=evalue_par_nom).border = thin
+        r += 1
+        ws.cell(row=r, column=1, value="Évalué le").font = Font(bold=True)
+        ws.cell(row=r, column=1).border = thin
+        ws.cell(row=r, column=2, value=evalue_le_txt).border = thin
         r += 2
         for lbl, col in [("Article", 1), ("Statut", 2)]:
             hdr_cell(ws, r, col, lbl)
@@ -788,9 +809,11 @@ def export_pdf(session_id: int, db: Session = Depends(get_db)):
         story.append(Spacer(1, 14))
         story.append(Paragraph("Évaluation du rapport", section_style))
         evalue_par_nom = s.evalue_par.nom_complet if s.evalue_par else "?"
+        evalue_le_txt  = s.evalue_le.astimezone(HAITI_TZ).strftime("%d/%m/%Y %H:%M") if s.evalue_le else "—"
         score_txt = f"{float(s.score):.0f} %" if s.score is not None else "—"
         story.append(Paragraph(
-            f"Score final : <b>{score_txt}</b> &nbsp;|&nbsp; Évalué par : <b>{evalue_par_nom}</b>",
+            f"Score final : <b>{score_txt}</b> &nbsp;|&nbsp; Évalué par : <b>{evalue_par_nom}</b> "
+            f"&nbsp;|&nbsp; le <b>{evalue_le_txt}</b>",
             sub_style,
         ))
         evals_tries = sorted(s.evaluations, key=lambda e: e.produit_nom)
