@@ -27377,11 +27377,19 @@ function scExport(session_id, format){
 // RAPPORTS SOUMIS — évaluation produit par produit par un responsable
 // ══════════════════════════════════════════════════════════════
 
-let _rsSessions  = [];
-let _rsDetail    = null;
-let _rsArticles  = [];
-let _rsEvalLocal = {};
-let _rsCurrentId = null;
+let _rsSessions   = [];
+let _rsDetail     = null;
+let _rsArticles   = [];
+let _rsProduits   = [];   // parallèle à _rsArticles, triés par valeur décroissante — index stable pour rsEvaluerArticle
+let _rsEvalLocal  = {};
+let _rsCurrentId  = null;
+let _rsSearchQuery = '';
+
+const _RS_STATUTS = {
+  CORRECT:      {label: 'Correct',      icon: '✓', color: '#22c55e'},
+  NON_CORRECT:  {label: 'Non-correct',  icon: '✕', color: '#f7a93b'},
+  INTROUVABLE:  {label: 'Introuvable',  icon: '?', color: '#f87171'},
+};
 
 function _scoreCouleur(score){
   if(score===null||score===undefined) return '#888';
@@ -27488,8 +27496,13 @@ async function rsOuvrirEvaluation(session_id){
   try {
     const d = await apiFetch('GET', `/pos/caisse/sessions/${session_id}`);
     _rsDetail    = d;
-    _rsArticles  = (d.tous_produits||[]).map(p=>p.nom);
+    // Triés par valeur décroissante : les articles à forte valeur — les plus
+    // importants à vérifier — apparaissent en premier. L'index sert de clé
+    // stable pour rsEvaluerArticle, y compris quand la recherche filtre l'affichage.
+    _rsProduits  = (d.tous_produits||[]).slice().sort((a,b)=>(b.total||0)-(a.total||0));
+    _rsArticles  = _rsProduits.map(p=>p.nom);
     _rsEvalLocal = Object.assign({}, d.evaluations||{});
+    _rsSearchQuery = '';
     if(titre) titre.textContent = `${d.caissier_nom||'?'} — ${d.date_session}${d.numero_session > 1 ? ` (session #${d.numero_session})` : ''}`;
     _rsRenderModal();
   } catch(e){
@@ -27497,29 +27510,43 @@ async function rsOuvrirEvaluation(session_id){
   }
 }
 
-function _rsArticleRow(i, p){
+function _rsArticleRow(i, p, maxTotal){
   const nom = p.nom;
   const statutActuel = _rsEvalLocal[nom];
-  const opts = [
-    {v:'CORRECT',      label:'Correct',      color:'#22c55e'},
-    {v:'NON_CORRECT',  label:'Non-correct',  color:'#f7a93b'},
-    {v:'INTROUVABLE',  label:'Introuvable',  color:'#f87171'},
-  ];
+  const info = _RS_STATUTS[statutActuel];
   const readOnly = _rsDetail?.evaluation_statut === 'TERMINEE';
-  const btns = opts.map(o=>{
-    const active = statutActuel === o.v;
+  const pct = maxTotal>0 ? Math.max(3, Math.round((p.total||0)/maxTotal*100)) : 0;
+
+  const btns = Object.entries(_RS_STATUTS).map(([v,o])=>{
+    const active = statutActuel === v;
     const bg = active ? o.color : 'rgba(255,255,255,.05)';
     const fg = active ? '#0b0f14' : 'rgba(255,255,255,.6)';
     const bd = active ? o.color : 'rgba(255,255,255,.14)';
-    const click = readOnly ? '' : `onclick="rsEvaluerArticle(${i},'${o.v}')"`;
-    return `<button type="button" ${click} ${readOnly?'disabled':''} style="flex:1;padding:6px 4px;border-radius:7px;border:1px solid ${bd};background:${bg};color:${fg};font-size:12px;font-weight:700;cursor:${readOnly?'default':'pointer'}">${o.label}</button>`;
+    const click = readOnly ? '' : `onclick="rsEvaluerArticle(${i},'${v}')"`;
+    return `<button type="button" ${click} ${readOnly?'disabled':''} title="${o.label}"
+      style="flex:1;padding:6px 3px;border-radius:7px;border:1px solid ${bd};background:${bg};color:${fg};font-size:11.5px;font-weight:700;cursor:${readOnly?'default':'pointer'};white-space:nowrap">${o.icon} ${o.label}</button>`;
   }).join('');
-  return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(255,255,255,.03);border-radius:8px;margin-bottom:6px">
+
+  // La ligne entière se teinte selon le statut choisi (vert/ambre/rouge) —
+  // un balayage visuel de la liste révèle immédiatement les exceptions
+  // signalées, sans avoir à relire chaque bouton.
+  const rowBg  = info ? `${info.color}16` : 'rgba(255,255,255,.03)';
+  const stripe = info ? info.color : 'rgba(255,255,255,.08)';
+
+  return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px 8px 9px;background:${rowBg};border-left:3px solid ${stripe};border-radius:7px;margin-bottom:5px">
     <div style="flex:1;min-width:0">
-      <div style="font-size:14px;color:rgba(255,255,255,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(nom)}</div>
-      <div style="font-size:11px;color:rgba(255,255,255,.35)">×${Number(p.quantite||0).toFixed(0)} — ${posGx(p.total||0)}</div>
+      <div style="display:flex;align-items:baseline;gap:8px;min-width:0">
+        <span style="font-size:14px;font-weight:600;color:rgba(255,255,255,.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(nom)}</span>
+        ${info ? `<span style="flex-shrink:0;font-size:10px;font-weight:700;color:${info.color};text-transform:uppercase;letter-spacing:.03em">${info.icon} ${info.label}</span>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+        <span style="font-size:11px;color:rgba(255,255,255,.4);white-space:nowrap;flex-shrink:0">×${Number(p.quantite||0).toFixed(0)} — <strong style="color:rgba(255,255,255,.65)">${posGx(p.total||0)}</strong></span>
+        <div style="flex:1;max-width:100px;height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden" title="Part de cet article dans le total du rapport">
+          <div style="width:${pct}%;height:100%;background:rgba(255,255,255,.2)"></div>
+        </div>
+      </div>
     </div>
-    <div style="display:flex;gap:5px;width:230px;flex-shrink:0">${btns}</div>
+    <div style="display:flex;gap:4px;width:250px;flex-shrink:0">${btns}</div>
   </div>`;
 }
 
@@ -27530,10 +27557,17 @@ function _rsRenderModal(){
   if(!d||!body) return;
 
   const soumisTxt = d.soumis_at ? new Date(d.soumis_at).toLocaleString('fr-HT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : '—';
-  const produits = d.tous_produits||[];
+  const produits = _rsProduits;
+  const readOnly = d.evaluation_statut === 'TERMINEE';
+
+  const counts = {CORRECT:0, NON_CORRECT:0, INTROUVABLE:0};
+  produits.forEach(p=>{ const s = _rsEvalLocal[p.nom]; if(s) counts[s] = (counts[s]||0)+1; });
+  const nbEvalues = counts.CORRECT + counts.NON_CORRECT + counts.INTROUVABLE;
+  const total     = produits.length;
+  const pctProgress = total ? Math.round(nbEvalues/total*100) : 0;
 
   const evalueLeTxt = d.evalue_le ? new Date(d.evalue_le).toLocaleString('fr-HT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit',year:'numeric'}) : '';
-  const scoreBloc = d.evaluation_statut === 'TERMINEE'
+  const scoreBloc = readOnly
     ? `<div style="text-align:center;background:${_scoreCouleur(d.score)}18;border:1px solid ${_scoreCouleur(d.score)}55;border-radius:10px;padding:12px;margin-bottom:14px">
         <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:4px">Score final</div>
         <div style="font-size:28px;font-weight:800;color:${_scoreCouleur(d.score)}">${(d.score||0).toFixed(0)} %</div>
@@ -27541,25 +27575,89 @@ function _rsRenderModal(){
       </div>`
     : '';
 
+  const chip = (icon, n, color) => `<span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:${color};background:${color}18;border-radius:10px;padding:2px 8px;white-space:nowrap">${icon} ${n}</span>`;
+
+  const toolbar = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:140px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.4);margin-bottom:3px">
+          <span>${nbEvalues} / ${total} article${total!==1?'s':''} évalué${nbEvalues!==1?'s':''}</span><span>${pctProgress}%</span>
+        </div>
+        <div style="height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
+          <div style="width:${pctProgress}%;height:100%;background:#a78bfa;transition:width .25s"></div>
+        </div>
+      </div>
+      ${chip(_RS_STATUTS.CORRECT.icon, counts.CORRECT, _RS_STATUTS.CORRECT.color)}
+      ${chip(_RS_STATUTS.NON_CORRECT.icon, counts.NON_CORRECT, _RS_STATUTS.NON_CORRECT.color)}
+      ${chip(_RS_STATUTS.INTROUVABLE.icon, counts.INTROUVABLE, _RS_STATUTS.INTROUVABLE.color)}
+      ${!readOnly ? `<button class="pos-btn ghost" style="font-size:12px;padding:4px 10px;white-space:nowrap" onclick="rsMarquerTousCorrect()">Tout marquer Correct</button>` : ''}
+    </div>
+    ${!readOnly ? `<input class="pos-input" id="rs-article-search" placeholder="Filtrer un article…" value="${_esc(_rsSearchQuery)}" oninput="_rsFilterArticles(this.value)" style="width:100%;margin-bottom:10px;box-sizing:border-box">` : ''}
+  `;
+
   body.innerHTML = `
     <div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,.5);margin-bottom:12px">
       <span>Fin de session : <strong style="color:rgba(255,255,255,.8)">${soumisTxt}</strong></span>
       <span>Total : <strong style="color:#3fb6a8">${posGx(d.total||0)}</strong></span>
     </div>
     ${scoreBloc}
-    <div style="font-size:13px;color:rgba(255,255,255,.4);font-weight:600;margin-bottom:8px">Évaluation par article — ${produits.length} article${produits.length!==1?'s':''}</div>
-    <div id="rs-articles-list">${produits.map((p,i)=>_rsArticleRow(i, p)).join('')}</div>
+    ${toolbar}
+    <div id="rs-articles-list" style="max-height:420px;overflow-y:auto;padding-right:2px"></div>
   `;
+  _rsRenderArticlesList();
 
   if(acts){
-    const complet  = produits.length>0 && produits.every(p=>!!_rsEvalLocal[p.nom]);
-    const dejaFait = d.evaluation_statut === 'TERMINEE';
-    const btnFinal = (!dejaFait)
+    const complet  = total>0 && nbEvalues === total;
+    const btnFinal = (!readOnly)
       ? `<button class="pos-btn teal" ${complet?'':'disabled'} onclick="rsFinaliser()">Finaliser l'évaluation</button>`
       : '';
     const btnPdf  = `<button class="pos-btn ghost" onclick="rsExport(${_rsCurrentId},'pdf')">Télécharger PDF</button>`;
     const btnXlsx = `<button class="pos-btn ghost" onclick="rsExport(${_rsCurrentId},'xlsx')">Télécharger XLSX</button>`;
     acts.innerHTML = `${btnFinal}${btnPdf}${btnXlsx}<button class="pos-btn ghost" onclick="rsFermerEval()">Fermer</button>`;
+  }
+}
+
+// Ne redessine que la liste (pas la barre d'outils ni le champ de recherche)
+// pour que la recherche ne perde pas le focus/curseur à chaque frappe.
+function _rsRenderArticlesList(){
+  const listEl = document.getElementById('rs-articles-list');
+  if(!listEl) return;
+  const produits  = _rsProduits;
+  const maxTotal  = produits.reduce((m,p)=>Math.max(m, p.total||0), 0);
+  const q = (_rsSearchQuery||'').trim().toLowerCase();
+  const rows = produits
+    .map((p,i)=>({p,i}))
+    .filter(({p}) => !q || p.nom.toLowerCase().includes(q));
+  listEl.innerHTML = rows.length
+    ? rows.map(({p,i}) => _rsArticleRow(i, p, maxTotal)).join('')
+    : `<div style="text-align:center;color:rgba(255,255,255,.3);padding:16px;font-size:13px">Aucun article ne correspond à « ${_esc(_rsSearchQuery)} »</div>`;
+}
+
+function _rsFilterArticles(v){
+  _rsSearchQuery = v;
+  _rsRenderArticlesList();
+}
+
+async function rsMarquerTousCorrect(){
+  if(_rsDetail?.evaluation_statut === 'TERMINEE' || !_rsCurrentId) return;
+  const manquants = _rsProduits.filter(p=>!_rsEvalLocal[p.nom]).map(p=>p.nom);
+  if(!manquants.length){ _giAlert('Tous les articles sont déjà évalués.', 'warn'); return; }
+  if(!await showConfirm(
+    `Marquer les ${manquants.length} article${manquants.length!==1?'s':''} restant${manquants.length!==1?'s':''} comme « Correct » ? Vous pourrez corriger individuellement les exceptions ensuite.`,
+    {title:'Tout marquer Correct', okLabel:'Marquer', type:'ok'}
+  )) return;
+
+  const backup = Object.assign({}, _rsEvalLocal);
+  manquants.forEach(nom=>{ _rsEvalLocal[nom] = 'CORRECT'; });
+  _rsRenderModal();
+  try {
+    const evalDict = {};
+    manquants.forEach(nom=>{ evalDict[nom] = 'CORRECT'; });
+    await apiFetch('POST', `/pos/caisse/sessions/${_rsCurrentId}/evaluer`, {evaluations: evalDict, finaliser: false});
+  } catch(e){
+    _rsEvalLocal = backup;
+    _rsRenderModal();
+    _giAlert(e.message||"Erreur lors de l'enregistrement.", 'err');
   }
 }
 
@@ -27608,7 +27706,7 @@ async function rsFinaliser(){
 function rsFermerEval(){
   const bg = document.getElementById('rs-eval-bg');
   if(bg) bg.classList.remove('open');
-  _rsCurrentId = null; _rsDetail = null; _rsArticles = []; _rsEvalLocal = {};
+  _rsCurrentId = null; _rsDetail = null; _rsArticles = []; _rsProduits = []; _rsEvalLocal = {}; _rsSearchQuery = '';
 }
 
 function rsExport(session_id, format){
