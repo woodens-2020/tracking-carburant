@@ -228,6 +228,7 @@ def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
         "caissier_nom":  (s.caissier.nom + " " + s.caissier.prenom) if s.caissier else None,
         "date_session":  str(s.date_session),
         "numero_session": s.numero_session,
+        "lieu":          s.lieu,
         "inventaire_fait": bool(s.comptages),
         "comptages_produit_ids": [c.produit_id for c in s.comptages],
         "statut":        s.statut,
@@ -334,6 +335,7 @@ def dashboard_caissiere(
         "session_id":    session.id if session else None,
         "session_statut": session.statut if session else None,
         "numero_session": session.numero_session if session else None,
+        "lieu":          session.lieu if session else None,
         "nb_sessions_jour": len(sessions_du_jour),
         "peut_ouvrir_nouvelle_session": len(sessions_du_jour) < 2,
         "inventaire_fait": bool(session.comptages) if session else None,
@@ -347,6 +349,7 @@ def dashboard_caissiere(
 def liste_sessions(
     caissier_id: Optional[int] = Query(None),
     statut:      Optional[str] = Query(None),
+    lieu:        Optional[str] = Query(None),
     date_debut:  Optional[str] = Query(None),
     date_fin:    Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -356,6 +359,8 @@ def liste_sessions(
         q = q.filter(BarSessionCaisse.caissier_id == caissier_id)
     if statut:
         q = q.filter(BarSessionCaisse.statut == statut.upper())
+    if lieu:
+        q = q.filter(BarSessionCaisse.lieu == lieu.upper())
     if date_debut:
         q = q.filter(BarSessionCaisse.date_session >= date.fromisoformat(date_debut))
     if date_fin:
@@ -403,15 +408,22 @@ def detail_session(session_id: int, db: Session = Depends(get_db)):
     return d
 
 
+_LIEUX_VALIDES = {"DEVANT", "PISCINE"}
+
+
 class OuvrirIn(BaseModel):
     caissier_id: int
+    lieu: Optional[str] = None   # DEVANT ou PISCINE — requis pour une nouvelle session
 
 
 @router.post("/sessions/ouvrir")
 def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
     """Ouvre (ou retrouve) une session du jour pour une caissière — jusqu'à 2
     sessions par jour (mesure de sécurité : permet de repartir sur une
-    session propre après un incident, sans attendre le lendemain)."""
+    session propre après un incident, sans attendre le lendemain). Le lieu
+    (Bar Devant / Bar Piscine) est choisi une fois par session, avant le
+    comptage de stock — requis uniquement à la création (une session déjà
+    EN_COURS a déjà le sien)."""
     employe = db.query(Employe).filter_by(id=data.caissier_id).first()
     if not employe:
         raise HTTPException(404, "Caissier introuvable")
@@ -427,11 +439,14 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
     if not session:
         if len(sessions_du_jour) >= 2:
             raise HTTPException(409, "Limite de 2 sessions de caisse par jour atteinte pour ce caissier.")
+        if not data.lieu or data.lieu.upper() not in _LIEUX_VALIDES:
+            raise HTTPException(422, "Choisissez le bar (Bar Devant ou Bar Piscine) avant de démarrer.")
         session = BarSessionCaisse(
             caissier_id     = data.caissier_id,
             date_session    = aujourd_hui,
             statut          = "EN_COURS",
             numero_session  = len(sessions_du_jour) + 1,
+            lieu            = data.lieu.upper(),
         )
         db.add(session)
         db.commit()
@@ -635,6 +650,7 @@ def evaluer_session(
 @router.get("/comptages/ecarts")
 def liste_ecarts(
     resolu:     Optional[bool] = Query(None),
+    lieu:       Optional[str]  = Query(None),
     date_debut: Optional[str]  = Query(None),
     date_fin:   Optional[str]  = Query(None),
     db: Session = Depends(get_db),
@@ -648,6 +664,8 @@ def liste_ecarts(
     )
     if resolu is not None:
         q = q.filter(BarSessionComptage.ecart_resolu == resolu)
+    if lieu:
+        q = q.filter(BarSessionCaisse.lieu == lieu.upper())
     if date_debut:
         q = q.filter(BarSessionCaisse.date_session >= date.fromisoformat(date_debut))
     if date_fin:
@@ -660,6 +678,7 @@ def liste_ecarts(
             "session_id":            c.session_id,
             "caissier_nom":          (c.session.caissier.nom + " " + c.session.caissier.prenom) if c.session and c.session.caissier else None,
             "date_session":          str(c.session.date_session) if c.session else None,
+            "lieu":                  c.session.lieu if c.session else None,
             "produit_nom":           c.produit.nom if c.produit else None,
             "quantite_comptee":      float(c.quantite_comptee),
             "stock_theorique_avant": float(c.stock_theorique_avant),

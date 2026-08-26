@@ -6328,6 +6328,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
             <div style="font-size:15px;font-weight:700;color:rgba(255,255,255,.9)" id="pos-dash-nom">—</div>
             <div style="display:flex;align-items:center;gap:8px">
+              <span id="pos-dash-lieu"></span>
               <span id="pos-dash-statut" style="font-size:13px;padding:3px 10px;border-radius:20px;font-weight:700"></span>
               <button onclick="posDashRefresh()" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,.4);font-size:13px;padding:2px 6px" data-i18n="pos.caisse.refresh">↻ Actualiser</button>
             </div>
@@ -6531,18 +6532,19 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <h3>Démarrer la session de caisse</h3>
 
         <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 14px;margin-bottom:16px">
-          <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;font-size:14px">
             <span style="color:rgba(255,255,255,.5)">Caissier</span>
             <span id="pd-caissier-nom" style="font-weight:700;color:#fff">—</span>
           </div>
-          <div style="display:flex;justify-content:space-between;font-size:14px">
-            <span style="color:rgba(255,255,255,.5)">Démarrage officiel</span>
-            <span id="pd-datetime" style="font-weight:700;color:var(--pos-accent)">—</span>
-          </div>
-          <div id="pd-numero-row" style="display:none;justify-content:space-between;font-size:14px;margin-top:6px">
-            <span style="color:rgba(255,255,255,.5)">Session du jour</span>
-            <span id="pd-numero" style="font-weight:700;color:#fff">—</span>
-          </div>
+        </div>
+
+        <div style="margin-bottom:16px">
+          <label class="pos-label">Lieu — où travaillez-vous aujourd'hui ?</label>
+          <select class="pos-select" id="pd-lieu-sel" style="width:100%">
+            <option value="">Choisir un bar…</option>
+            <option value="DEVANT">Bar Devant (Accueil)</option>
+            <option value="PISCINE">Bar Piscine</option>
+          </select>
         </div>
 
         <div style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13.5px;line-height:1.5;color:#fca5a5">
@@ -8142,6 +8144,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option value="SOUMIS">Soumis</option>
               <option value="VALIDE">Validé</option>
             </select>
+            <select class="pos-select" id="sc-filtre-lieu" style="width:150px">
+              <option value="">Tous les bars</option>
+              <option value="DEVANT">Bar Devant</option>
+              <option value="PISCINE">Bar Piscine</option>
+            </select>
             <input type="date" class="pos-input" id="sc-debut" style="width:130px">
             <input type="date" class="pos-input" id="sc-fin" style="width:130px">
             <button class="pos-btn teal" onclick="scCharger()">Filtrer</button>
@@ -8282,6 +8289,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option value="NON_EVALUE">À évaluer</option>
               <option value="TERMINEE">Déjà évalués</option>
             </select>
+            <select class="pos-select" id="rs-filtre-lieu" style="width:150px">
+              <option value="">Tous les bars</option>
+              <option value="DEVANT">Bar Devant</option>
+              <option value="PISCINE">Bar Piscine</option>
+            </select>
             <input type="date" class="pos-input" id="rs-debut" style="width:130px">
             <input type="date" class="pos-input" id="rs-fin" style="width:130px">
             <button class="pos-btn teal" onclick="rsCharger()">Filtrer</button>
@@ -8334,6 +8346,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option value="false">Non résolus</option>
               <option value="true">Résolus</option>
               <option value="">Tous</option>
+            </select>
+            <select class="pos-select" id="ei-filtre-lieu" style="width:150px">
+              <option value="">Tous les bars</option>
+              <option value="DEVANT">Bar Devant</option>
+              <option value="PISCINE">Bar Piscine</option>
             </select>
             <input type="date" class="pos-input" id="ei-debut" style="width:130px">
             <input type="date" class="pos-input" id="ei-fin" style="width:130px">
@@ -22693,31 +22710,37 @@ async function posConfirmerInventaire(){
   } catch(e){ posAlert(e.message||"Erreur lors de l'enregistrement du comptage.", 'err'); }
 }
 
-async function posOuvrirModalDemarrage(){
-  const cid = document.getElementById('pos-caissier-sel')?.value;
+// Le lieu (Bar Devant / Bar Piscine) est choisi ici, AVANT que la session
+// ne soit créée côté serveur — contrairement à l'ancien flux qui ouvrait la
+// session dès le clic puis affichait juste un récapitulatif. La session
+// n'est effectivement créée qu'à la confirmation (posConfirmerDemarrage),
+// une fois le lieu connu, puisqu'il est requis à la création.
+function posOuvrirModalDemarrage(){
+  const sel = document.getElementById('pos-caissier-sel');
+  const cid = sel?.value;
   if(!cid){ posAlert(t('pos.caisse.err.selectcaissier')); return; }
-  try {
-    const s = await apiFetch('POST', '/pos/caisse/sessions/ouvrir', {caissier_id: parseInt(cid)});
-    _posDashSessionId = s.id;
-    document.getElementById('pd-caissier-nom').textContent = s.caissier_nom || '—';
-    document.getElementById('pd-datetime').textContent = `${posFormatDate(s.created_at)} à ${posFormatHeure(s.created_at)}`;
-    const numRow = document.getElementById('pd-numero-row');
-    if(numRow){
-      if(s.numero_session > 1){
-        numRow.style.display = 'flex';
-        document.getElementById('pd-numero').textContent = `${s.numero_session} / 2`;
-      } else {
-        numRow.style.display = 'none';
-      }
-    }
-    document.getElementById('pos-demarrer-modal-bg').classList.add('open');
-  } catch(e){ posAlert(e.message||t('pos.caisse.err.ouvertureSession')); }
+  const nomEl = document.getElementById('pd-caissier-nom');
+  if(nomEl) nomEl.textContent = sel.options[sel.selectedIndex]?.textContent?.trim() || '—';
+  const lieuSel = document.getElementById('pd-lieu-sel');
+  if(lieuSel) lieuSel.value = '';
+  document.getElementById('pos-demarrer-modal-bg').classList.add('open');
 }
 
-function posConfirmerDemarrage(){
-  document.getElementById('pos-demarrer-modal-bg')?.classList.remove('open');
+async function posConfirmerDemarrage(){
   const cid = document.getElementById('pos-caissier-sel')?.value;
-  if(cid) _posDashLoadData(cid);
+  if(!cid) return;
+  const lieu = document.getElementById('pd-lieu-sel')?.value;
+  if(!lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine) avant de démarrer.', 'warn'); return; }
+  try {
+    const s = await apiFetch('POST', '/pos/caisse/sessions/ouvrir', {caissier_id: parseInt(cid), lieu});
+    _posDashSessionId = s.id;
+    document.getElementById('pos-demarrer-modal-bg')?.classList.remove('open');
+    const lieuLabel = lieu === 'PISCINE' ? 'Bar Piscine' : 'Bar Devant';
+    const numTxt = s.numero_session > 1 ? `Session #${s.numero_session} ` : '';
+    posAlert(`${numTxt}démarrée — ${lieuLabel}.`, 'ok');
+  } catch(e){ posAlert(e.message||t('pos.caisse.err.ouvertureSession'), 'err'); return; }
+  const cid2 = document.getElementById('pos-caissier-sel')?.value;
+  if(cid2) _posDashLoadData(cid2);
 }
 
 async function _posDashLoadData(caissier_id){
@@ -22728,6 +22751,9 @@ async function _posDashLoadData(caissier_id){
 
     const nomEl = document.getElementById('pos-dash-nom');
     if(nomEl) nomEl.textContent = d.caissier_nom + ' — ' + d.date;
+
+    const lieuEl = document.getElementById('pos-dash-lieu');
+    if(lieuEl) lieuEl.innerHTML = _lieuBadge(d.lieu);
 
     const statutEl = document.getElementById('pos-dash-statut');
     if(statutEl){
@@ -27543,6 +27569,20 @@ function _ckHeureFmt(d){
   return new Date(d).toLocaleTimeString('fr-FR',{timeZone:'America/Port-au-Prince',hour:'2-digit',minute:'2-digit'});
 }
 
+// Lieu (Bar Devant / Bar Piscine) — étiquette partagée par les pages
+// Sessions Caissières, Rapports Soumis et Écarts d'Inventaire.
+function _lieuLabel(lieu){
+  if(lieu === 'PISCINE') return 'Bar Piscine';
+  if(lieu === 'DEVANT')  return 'Bar Devant';
+  return null;
+}
+function _lieuBadge(lieu){
+  const label = _lieuLabel(lieu);
+  if(!label) return '';
+  const color = lieu === 'PISCINE' ? '#38bdf8' : '#a78bfa';
+  return ` <span style="font-size:11px;color:${color};background:${color}18;border-radius:8px;padding:0 6px;white-space:nowrap">${label}</span>`;
+}
+
 // ══════════════════════════════════════════════════════════════════
 // SESSIONS CAISSIÈRES (admin)
 // ══════════════════════════════════════════════════════════════════
@@ -27583,11 +27623,13 @@ async function scCharger(){
   try {
     const caissier = document.getElementById('sc-filtre-caissier')?.value||'';
     const statut   = document.getElementById('sc-filtre-statut')?.value||'';
+    const lieu     = document.getElementById('sc-filtre-lieu')?.value||'';
     const debut    = document.getElementById('sc-debut')?.value||'';
     const fin      = document.getElementById('sc-fin')?.value||'';
     let url = '/pos/caisse/sessions?';
     if(caissier) url += `caissier_id=${caissier}&`;
     if(statut)   url += `statut=${statut}&`;
+    if(lieu)     url += `lieu=${lieu}&`;
     if(debut)    url += `date_debut=${debut}&`;
     if(fin)      url += `date_fin=${fin}&`;
 
@@ -27637,7 +27679,7 @@ async function scCharger(){
 
       return `<tr>
         <td>${s.date_session}${numBadge}</td>
-        <td style="font-weight:600">${s.caissier_nom||'—'}</td>
+        <td style="font-weight:600">${s.caissier_nom||'—'}${_lieuBadge(s.lieu)}</td>
         <td>${st}</td>
         <td style="text-align:right">${s.nb_ventes||0}</td>
         <td style="text-align:right;font-weight:700;color:#3fb6a8">${posGx(s.total||0)}</td>
@@ -27809,10 +27851,12 @@ async function rsCharger(){
   if(grid) grid.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:15px;padding:32px;text-align:center;grid-column:1/-1">Chargement…</div>';
   try {
     const caissier = document.getElementById('rs-filtre-caissier')?.value||'';
+    const lieu     = document.getElementById('rs-filtre-lieu')?.value||'';
     const debut    = document.getElementById('rs-debut')?.value||'';
     const fin      = document.getElementById('rs-fin')?.value||'';
     let url = '/pos/caisse/sessions?';
     if(caissier) url += `caissier_id=${caissier}&`;
+    if(lieu)     url += `lieu=${lieu}&`;
     if(debut)    url += `date_debut=${debut}&`;
     if(fin)      url += `date_fin=${fin}&`;
     const all = await apiFetch('GET', url.slice(0,-1)||'/pos/caisse/sessions');
@@ -27852,7 +27896,7 @@ async function rsCharger(){
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">
           <div style="min-width:0">
             <div style="font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(s.caissier_nom||'—')}${numBadge}</div>
-            <div style="font-size:12px;color:rgba(255,255,255,.4)">${s.date_session} · soumis ${soumisTxt}${validBadge}</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.4)">${s.date_session} · soumis ${soumisTxt}${validBadge}${_lieuBadge(s.lieu)}</div>
             ${evalInfo}
           </div>
           ${badge}
@@ -28125,10 +28169,12 @@ async function eiCharger(){
   if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     const statut = document.getElementById('ei-filtre-statut')?.value ?? 'false';
+    const lieu   = document.getElementById('ei-filtre-lieu')?.value || '';
     const debut  = document.getElementById('ei-debut')?.value || '';
     const fin    = document.getElementById('ei-fin')?.value || '';
     let url = '/pos/caisse/comptages/ecarts?';
     if(statut !== '') url += `resolu=${statut}&`;
+    if(lieu)   url += `lieu=${lieu}&`;
     if(debut)  url += `date_debut=${debut}&`;
     if(fin)    url += `date_fin=${fin}&`;
     _eiEcarts = await apiFetch('GET', url.slice(0,-1)||'/pos/caisse/comptages/ecarts');
@@ -28157,7 +28203,7 @@ async function eiCharger(){
         : (e.ecart_resolu ? `<span title="${_esc(e.resolu_motif||'')}" style="font-size:12px;color:rgba(255,255,255,.4)">${_esc(e.resolu_par||'')}</span>` : '—');
       return `<tr>
         <td>${e.date_session}</td>
-        <td style="font-weight:600">${_esc(e.caissier_nom||'—')}</td>
+        <td style="font-weight:600">${_esc(e.caissier_nom||'—')}${_lieuBadge(e.lieu)}</td>
         <td>${_esc(e.produit_nom||'—')}</td>
         <td style="text-align:right">${Number(e.stock_theorique_avant).toFixed(0)}</td>
         <td style="text-align:right">${Number(e.quantite_comptee).toFixed(0)}</td>

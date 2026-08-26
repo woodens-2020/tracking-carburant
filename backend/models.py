@@ -1107,6 +1107,12 @@ class BarSessionCaisse(Base):
     # p. ex. de repartir sur une session propre après un incident, sans
     # attendre le lendemain) : 1 ou 2, unique avec (caissier_id, date_session).
     numero_session = Column(Integer, nullable=False, default=1)
+    # Lieu physique choisi par l'employé au démarrage, avant le comptage de
+    # stock — DEVANT (bar d'accueil) ou PISCINE (bar piscine). Stock/catalogue
+    # restent communs aux deux bars ; ce champ ne sert qu'à filtrer/regrouper
+    # les rapports par lieu. Nullable : les sessions créées avant l'ajout de
+    # ce champ n'ont pas de lieu connu.
+    lieu          = Column(String(20), nullable=True)  # DEVANT, PISCINE
     statut        = Column(String(20), nullable=False, default="EN_COURS")  # EN_COURS, SOUMIS, VALIDE
     soumis_at     = Column(DateTime(timezone=True), nullable=True)
     valide_at     = Column(DateTime(timezone=True), nullable=True)
@@ -1138,6 +1144,7 @@ class BarSessionCaisse(Base):
         UniqueConstraint("caissier_id", "date_session", "numero_session", name="uq_session_caissier_date_num"),
         CheckConstraint("statut IN ('EN_COURS','SOUMIS','VALIDE')", name="chk_session_statut"),
         CheckConstraint("evaluation_statut IN ('NON_EVALUE','TERMINEE')", name="chk_session_eval_statut"),
+        CheckConstraint("lieu IS NULL OR lieu IN ('DEVANT','PISCINE')", name="chk_session_lieu"),
         Index("idx_session_caissier", "caissier_id"),
         Index("idx_session_date",     "date_session"),
         Index("idx_session_statut",   "statut"),

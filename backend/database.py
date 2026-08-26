@@ -186,6 +186,9 @@ def _migrate_columns():
             # v19 — jusqu'à 2 sessions de caisse par jour par caissier (mesure de sécurité)
             ("bar_sessions_caisse", "numero_session",
              "ALTER TABLE bar_sessions_caisse ADD COLUMN numero_session INTEGER NOT NULL DEFAULT 1", None),
+            # v20 — lieu (Bar Devant / Bar Piscine) choisi au démarrage de session
+            ("bar_sessions_caisse", "lieu",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN lieu VARCHAR(20)", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -281,6 +284,9 @@ def _migrate_columns():
             # v19 — jusqu'à 2 sessions de caisse par jour par caissier (mesure de sécurité)
             ("bar_sessions_caisse", "numero_session",
              "ALTER TABLE bar_sessions_caisse ADD COLUMN numero_session INTEGER NOT NULL DEFAULT 1", None),
+            # v20 — lieu (Bar Devant / Bar Piscine) choisi au démarrage de session
+            ("bar_sessions_caisse", "lieu",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN lieu VARCHAR(20)", None),
         ]
     else:
         return
@@ -331,6 +337,15 @@ def _migrate_columns():
                 ))
             except Exception:
                 pass  # contrainte déjà à jour
+
+            # v20 — lieu (Bar Devant / Bar Piscine) : contrainte de domaine
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE bar_sessions_caisse ADD CONSTRAINT chk_session_lieu "
+                    "CHECK (lieu IS NULL OR lieu IN ('DEVANT','PISCINE'))"
+                ))
+            except Exception:
+                pass  # déjà présente
 
         conn.commit()
 
