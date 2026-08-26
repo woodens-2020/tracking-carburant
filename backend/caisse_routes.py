@@ -187,6 +187,40 @@ def _score_couleur(score: float | None) -> str:
     return "F87171"
 
 
+def _stock_ecart_couleur(ecart: float) -> str:
+    """Code hex (sans #) pour un écart de comptage de stock — 0 = exact
+    (vert), manquant = rouge (le signal de fraude/perte), excédent = ambre
+    (rare depuis que la saisie ne peut plus dépasser le stock théorique)."""
+    if ecart == 0:
+        return "22C55E"
+    return "F87171" if ecart < 0 else "F7A93B"
+
+
+def _fiche_stock(s: BarSessionCaisse, stats: dict) -> list[dict]:
+    """Comptage de départ, ventes de la session et restant théorique, article
+    par article — utilisée à l'écran (détail de session) et dans les exports
+    PDF/XLSX. Inclut aussi l'écart constaté à la déclaration (vs le stock
+    théorique déjà enregistré) et son état de résolution, pour que le
+    responsable ait toute l'information sans devoir consulter une autre page."""
+    vendu_par_nom = {p["nom"]: p["quantite"] for p in stats.get("tous_produits", [])}
+    lignes = []
+    for c in sorted(s.comptages, key=lambda c: c.produit.nom if c.produit else ""):
+        nom = c.produit.nom if c.produit else "?"
+        vendu = vendu_par_nom.get(nom, 0.0)
+        lignes.append({
+            "produit_nom":         nom,
+            "comptee_le":          c.created_at.isoformat() if c.created_at else None,
+            "stock_theorique_avant": float(c.stock_theorique_avant),
+            "quantite_depart":     float(c.quantite_comptee),
+            "ecart":               float(c.ecart),
+            "ecart_resolu":        c.ecart_resolu,
+            "resolu_par":          c.resolu_par.nom_complet if c.resolu_par else None,
+            "quantite_vendue":     vendu,
+            "quantite_restante":   float(c.quantite_comptee) - vendu,
+        })
+    return lignes
+
+
 def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
     return {
         "id":            s.id,
@@ -365,17 +399,7 @@ def detail_session(session_id: int, db: Session = Depends(get_db)):
         for v in ventes
     ]
     d["evaluations"] = {e.produit_nom: e.statut for e in s.evaluations}
-
-    vendu_par_nom = {p["nom"]: p["quantite"] for p in stats.get("tous_produits", [])}
-    d["fiche_stock"] = [
-        {
-            "produit_nom":       c.produit.nom if c.produit else "?",
-            "quantite_depart":   float(c.quantite_comptee),
-            "quantite_vendue":   vendu_par_nom.get(c.produit.nom if c.produit else "", 0.0),
-            "quantite_restante": float(c.quantite_comptee) - vendu_par_nom.get(c.produit.nom if c.produit else "", 0.0),
-        }
-        for c in sorted(s.comptages, key=lambda c: c.produit.nom if c.produit else "")
-    ]
+    d["fiche_stock"] = _fiche_stock(s, stats)
     return d
 
 
@@ -433,7 +457,9 @@ def soumettre_inventaire(session_id: int, body: InventaireIn, db: Session = Depe
     article déjà compté est ignorée silencieusement (idempotent, protège
     contre un double-clic ou un état local désynchronisé). Comptage à
     l'aveugle : le stock théorique n'est jamais montré à la caissière avant
-    sa saisie, seul le serveur calcule l'écart après coup."""
+    sa saisie, seul le serveur calcule l'écart après coup — sauf si la
+    quantité saisie dépasse le stock enregistré, auquel cas elle est rejetée
+    (garde-fou contre une faute de frappe, sans révéler le chiffre exact)."""
     s = _session_ou_404(session_id, db)
     if s.statut != "EN_COURS":
         raise HTTPException(409, "Le comptage ne peut être soumis que pour une session en cours.")
@@ -442,12 +468,30 @@ def soumettre_inventaire(session_id: int, body: InventaireIn, db: Session = Depe
 
     deja_comptes = {c.produit_id for c in s.comptages}
     theoriques = stock_tous_produits(db)
+    a_traiter = {pid: qte for pid, qte in body.comptages.items() if pid not in deja_comptes}
+
+    # Validation d'abord, tout ou rien : une quantité comptée ne peut pas
+    # dépasser le stock déjà enregistré au système — un comptage physique
+    # ne peut logiquement pas révéler PLUS que ce que les livres connaissent
+    # déjà (le cas contraire est presque toujours une faute de frappe, ex.
+    # un zéro de trop). On rejette avant d'écrire quoi que ce soit, pour ne
+    # jamais laisser un comptage partiellement enregistré.
+    depassements = []
+    for produit_id, qte in a_traiter.items():
+        theorique = theoriques.get(produit_id, Decimal("0"))
+        if Decimal(str(qte)) > theorique:
+            p = db.query(BarProduit).filter_by(id=produit_id).first()
+            depassements.append(p.nom if p else str(produit_id))
+    if depassements:
+        raise HTTPException(
+            422,
+            "La quantité saisie dépasse le stock déjà enregistré au système pour : "
+            + ", ".join(depassements) + ". Vérifiez votre comptage avant de continuer.",
+        )
 
     ecarts_notifies = []
     nb_ajoutes = 0
-    for produit_id, qte in body.comptages.items():
-        if produit_id in deja_comptes:
-            continue  # déjà compté pour cette session — on ignore, pas d'erreur
+    for produit_id, qte in a_traiter.items():
         theorique = theoriques.get(produit_id, Decimal("0"))
         comptee   = Decimal(str(qte))
         ecart     = comptee - theorique
@@ -798,6 +842,29 @@ def export_xlsx(session_id: int, db: Session = Depends(get_db)):
         data_cell(ws, r, 6, float(v.montant_total), fmt="#,##0.00")
         data_cell(ws, r, 7, float(v.montant_paye),  fmt="#,##0.00")
 
+    # Comptage de stock (départ / vendu / restant) — la "fiche de départ"
+    fiche = _fiche_stock(s, stats)
+    if fiche:
+        r += 2
+        hdr_cell(ws, r, 1, "Comptage de stock — Départ / Vendu / Restant", bg=DARK)
+        ws.merge_cells(f"A{r}:F{r}")
+        r += 1
+        for lbl, col in [("Article", 1), ("Théorique avant", 2), ("Départ (compté)", 3),
+                          ("Écart", 4), ("Vendu", 5), ("Restant attendu", 6)]:
+            hdr_cell(ws, r, col, lbl)
+        for f in fiche:
+            r += 1
+            data_cell(ws, r, 1, f["produit_nom"])
+            data_cell(ws, r, 2, f["stock_theorique_avant"], fmt="0.##")
+            data_cell(ws, r, 3, f["quantite_depart"],        fmt="0.##")
+            ec = data_cell(ws, r, 4, f["ecart"], fmt="+0.##;-0.##;0.##")
+            ec.font = Font(bold=True, color=_stock_ecart_couleur(f["ecart"]))
+            data_cell(ws, r, 5, f["quantite_vendue"],   fmt="0.##")
+            data_cell(ws, r, 6, f["quantite_restante"], fmt="0.##")
+            if f["ecart"] != 0:
+                note = f"résolu par {f['resolu_par']}" if f["ecart_resolu"] and f["resolu_par"] else "non résolu"
+                ws.cell(row=r, column=7, value=note).font = Font(italic=True, size=8, color="888888")
+
     # Évaluation du rapport (si terminée)
     if s.evaluation_statut == "TERMINEE":
         eval_couleur = {"CORRECT": "22C55E", "NON_CORRECT": "F7A93B", "INTROUVABLE": "F87171"}
@@ -966,6 +1033,45 @@ def export_pdf(session_id: int, db: Session = Depends(get_db)):
         ("TOPPADDING",   (0,0),(-1,-1), 4),
     ]))
     story.append(t_ventes)
+
+    # Comptage de stock (départ / vendu / restant) — la "fiche de départ"
+    fiche = _fiche_stock(s, stats)
+    if fiche:
+        story.append(Spacer(1, 14))
+        story.append(Paragraph("Comptage de stock — Départ / Vendu / Restant", section_style))
+        story.append(Paragraph(
+            "À comparer avec le comptage de la prochaine session — un écart révèle une perte "
+            "ou une vente non enregistrée depuis le dernier point de contrôle.",
+            sub_style,
+        ))
+        fiche_data = [["Article", "Théorique avant", "Départ (compté)", "Écart", "Vendu", "Restant attendu"]]
+        for f in fiche:
+            signe = "+" if f["ecart"] > 0 else ""
+            ecart_txt = f"{signe}{f['ecart']:.0f}"
+            if f["ecart"] != 0:
+                ecart_txt += " (résolu)" if f["ecart_resolu"] else " (non résolu)"
+            fiche_data.append([
+                f["produit_nom"], f"{f['stock_theorique_avant']:.0f}", f"{f['quantite_depart']:.0f}",
+                ecart_txt, f"{f['quantite_vendue']:.0f}", f"{f['quantite_restante']:.0f}",
+            ])
+        t_fiche = Table(fiche_data, colWidths=[4.5*cm, 2.7*cm, 2.7*cm, 3*cm, 2.2*cm, 2.9*cm])
+        fiche_style = [
+            ("BACKGROUND",   (0,0),(-1,0), DARK),
+            ("TEXTCOLOR",    (0,0),(-1,0), colors.white),
+            ("FONTNAME",     (0,0),(-1,0), "Helvetica-Bold"),
+            ("FONTSIZE",     (0,0),(-1,-1), 8),
+            ("ROWBACKGROUNDS",(0,1),(-1,-1), [colors.HexColor("#F5F5F5"), colors.white]),
+            ("GRID",         (0,0),(-1,-1), 0.3, colors.HexColor("#DDDDDD")),
+            ("ALIGN",        (1,0),(-1,-1), "CENTER"),
+            ("BOTTOMPADDING",(0,0),(-1,-1), 4),
+            ("TOPPADDING",   (0,0),(-1,-1), 4),
+        ]
+        for i, f in enumerate(fiche, start=1):
+            if f["ecart"] != 0:
+                fiche_style.append(("TEXTCOLOR", (3,i),(3,i), colors.HexColor(f"#{_stock_ecart_couleur(f['ecart'])}")))
+                fiche_style.append(("FONTNAME",  (3,i),(3,i), "Helvetica-Bold"))
+        t_fiche.setStyle(TableStyle(fiche_style))
+        story.append(t_fiche)
 
     # Évaluation du rapport (si terminée)
     if s.evaluation_statut == "TERMINEE":

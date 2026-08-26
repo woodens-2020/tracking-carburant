@@ -6603,6 +6603,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </table>
         </div>
         <div class="pos-modal-footer">
+          <button class="pos-btn ghost" id="pfs-btn-pdf"  onclick="posExportFicheStock('pdf')">Télécharger PDF</button>
+          <button class="pos-btn ghost" id="pfs-btn-xlsx" onclick="posExportFicheStock('xlsx')">Télécharger XLSX</button>
           <button class="pos-btn teal" onclick="posFermerFicheStock()">Fermer</button>
         </div>
       </div>
@@ -22842,10 +22844,13 @@ function posFermerModalSoumission(){
   document.getElementById('pos-soumettre-modal-bg')?.classList.remove('open');
 }
 
+let _posFicheStockSessionId = null;
+
 async function posAfficherFicheStock(sessionId){
   const bg = document.getElementById('pos-fiche-stock-modal-bg');
   const tbody = document.getElementById('pfs-tbody');
   if(!bg || !tbody) return;
+  _posFicheStockSessionId = sessionId;
   try {
     const d = await apiFetch('GET', `/pos/caisse/sessions/${sessionId}`);
     const fiche = d.fiche_stock || [];
@@ -22860,8 +22865,14 @@ async function posAfficherFicheStock(sessionId){
   } catch(e){ /* la fiche est informative — une erreur ici ne doit pas bloquer la suite */ }
 }
 
+function posExportFicheStock(format){
+  if(!_posFicheStockSessionId) return;
+  window.open(`/api/pos/caisse/sessions/${_posFicheStockSessionId}/rapport.${format}`, '_blank');
+}
+
 function posFermerFicheStock(){
   document.getElementById('pos-fiche-stock-modal-bg')?.classList.remove('open');
+  _posFicheStockSessionId = null;
 }
 
 function posRenderCatTabs(){
