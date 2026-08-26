@@ -6421,17 +6421,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div id="pos-gate-inventaire" class="pos-card" style="display:none;padding:20px;margin-bottom:14px">
           <div style="text-align:center;margin-bottom:14px">
             <div style="font-size:32px;margin-bottom:8px">📋</div>
-            <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:6px">Comptez le stock avant de vendre</div>
+            <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:6px">Comptez les articles disponibles aujourd'hui</div>
             <div style="font-size:14px;color:rgba(255,255,255,.5);max-width:480px;margin:0 auto">
-              Choisissez un article, entrez la quantité trouvée physiquement, puis ajoutez-le. Répétez jusqu'à ce que tous les articles soient comptés — soyez précis, ne devinez pas.
+              Pas besoin de parcourir tout le catalogue — comptez seulement ce qui est réellement dans le frigidaire/l'étalage aujourd'hui. Si vous vendez un article pas encore compté, le système vous le demandera à ce moment-là.
             </div>
           </div>
 
-          <div id="pi-progress" style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">
-            <span id="pi-progress-txt">0 / 0 comptés</span><span id="pi-progress-pct">0%</span>
-          </div>
-          <div style="height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin-bottom:14px">
-            <div id="pi-progress-bar" style="width:0%;height:100%;background:#a78bfa;transition:width .25s"></div>
+          <div id="pi-progress" style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:10px;text-align:center">
+            <span id="pi-progress-txt">0 article compté</span>
           </div>
 
           <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
@@ -6449,7 +6446,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</div>
           </div>
 
-          <button class="pos-encaisser-btn" id="pi-btn-confirmer" style="margin-top:14px" disabled onclick="posConfirmerInventaire()">Confirmer le comptage</button>
+          <button class="pos-encaisser-btn" id="pi-btn-confirmer" style="margin-top:14px" disabled onclick="posConfirmerInventaire()">Confirmer et démarrer les ventes</button>
         </div>
 
         <div id="pos-caisse-vente-zone">
@@ -6607,6 +6604,23 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
         <div class="pos-modal-footer">
           <button class="pos-btn teal" onclick="posFermerFicheStock()">Fermer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal déclaration rapide de quantité de départ (article vendu mais pas encore compté) -->
+    <div class="pos-modal-bg" id="pos-declarer-modal-bg" onclick="if(event.target===this)posFermerDeclarationRapide()">
+      <div class="pos-modal" style="max-width:420px">
+        <h3>Quantité de départ</h3>
+        <div style="font-size:14px;color:rgba(255,255,255,.6);margin-bottom:14px">
+          <strong id="pd-declarer-nom" style="color:#fff">Article</strong> n'a pas encore été compté pour cette session. Entrez la quantité trouvée physiquement avant de continuer la vente.
+        </div>
+        <input type="number" min="0" step="1" class="pos-input" id="pd-declarer-qte" placeholder="Quantité"
+               style="width:100%;box-sizing:border-box"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();posConfirmerDeclarationRapide();}">
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="posFermerDeclarationRapide()">Annuler</button>
+          <button class="pos-btn teal" onclick="posConfirmerDeclarationRapide()">Confirmer et continuer</button>
         </div>
       </div>
     </div>
@@ -22489,6 +22503,7 @@ async function _posChargerCaissiers(){
 // ── Mini-dashboard caissière ──────────────────────────────────────
 let _posDashCaissierInterval = null;
 let _posDashSessionId = null;
+let _posComptesIds = new Set();   // produit_id déjà comptés pour la session en cours — voir posAjouterAuPanier
 
 function posCaissierChange(caissier_id){
   const dash = document.getElementById('pos-dash-caissier');
@@ -22653,25 +22668,20 @@ function piRetirerArticle(produitId){
 }
 
 function _piUpdateProgress(){
-  const total = _piProduits.length;
   const nb = Object.keys(_piValeurs).length;
-  const pct = total ? Math.round(nb/total*100) : 0;
   const txt = document.getElementById('pi-progress-txt');
-  const pctEl = document.getElementById('pi-progress-pct');
-  const bar = document.getElementById('pi-progress-bar');
   const btn = document.getElementById('pi-btn-confirmer');
-  if(txt) txt.textContent = `${nb} / ${total} comptés`;
-  if(pctEl) pctEl.textContent = `${pct}%`;
-  if(bar) bar.style.width = `${pct}%`;
-  if(btn) btn.disabled = (total === 0 || nb < total);
+  if(txt) txt.textContent = nb ? `${nb} article${nb>1?'s':''} compté${nb>1?'s':''}` : '0 article compté';
+  if(btn) btn.disabled = (nb < 1);
 }
 
 async function posConfirmerInventaire(){
-  const total = _piProduits.length;
   const nb = Object.keys(_piValeurs).length;
-  if(total === 0 || nb < total){ posAlert('Comptez tous les articles avant de confirmer.', 'warn'); return; }
+  if(nb < 1){ posAlert('Comptez au moins un article avant de confirmer.', 'warn'); return; }
+  // N'envoie que ce qui a été réellement saisi — jamais de complétion à 0
+  // pour les articles non comptés (ceux-là seront demandés à la vente).
   const comptages = {};
-  for(const p of _piProduits) comptages[p.id] = parseFloat(_piValeurs[p.id]) || 0;
+  for(const [pid, qte] of Object.entries(_piValeurs)) comptages[pid] = parseFloat(qte);
   try {
     await apiFetch('POST', `/pos/caisse/sessions/${_posDashSessionId}/inventaire`, {comptages});
     _piProduits = []; _piValeurs = {}; _piSessionId = null;
@@ -22712,6 +22722,7 @@ async function _posDashLoadData(caissier_id){
   try {
     const d = await apiFetch('GET', `/pos/caisse/dashboard?caissier_id=${caissier_id}`);
     _posDashSessionId = d.session_id;
+    _posComptesIds = new Set(d.comptages_produit_ids||[]);
 
     const nomEl = document.getElementById('pos-dash-nom');
     if(nomEl) nomEl.textContent = d.caissier_nom + ' — ' + d.date;
@@ -23005,7 +23016,21 @@ function posCuisineAjouterAuPanier(platId){
   posRenderCart();
 }
 
+// Vente d'un article jamais compté cette session : on intercepte AVANT
+// l'ajout au panier pour lui demander sa quantité de départ (comptage à
+// l'aveugle, même principe qu'à l'ouverture) — une fois confirmé, l'ajout
+// au panier se poursuit normalement et ne redemandera plus pour cet article.
 function posAjouterAuPanier(prodId){
+  const prod = _posProduits.find(p=>p.id===prodId);
+  if(!prod) return;
+  if(!_posComptesIds.has(prodId)){
+    posDeclarerPuisAjouter(prodId);
+    return;
+  }
+  _posAjouterAuPanierConfirme(prodId);
+}
+
+function _posAjouterAuPanierConfirme(prodId){
   const prod = _posProduits.find(p=>p.id===prodId);
   if(!prod) return;
   const idx = _posCart.findIndex(c=>c.produit_id===prodId);
@@ -23015,6 +23040,40 @@ function posAjouterAuPanier(prodId){
     _posCart.push({ produit_id: prodId, nom: prod.nom, prix: parseFloat(prod.prix_actif||0), quantite: 1, unite: prod.unite||'' });
   }
   posRenderCart();
+}
+
+let _posDeclarerProdId = null;
+
+function posDeclarerPuisAjouter(prodId){
+  const prod = _posProduits.find(p=>p.id===prodId);
+  if(!prod) return;
+  _posDeclarerProdId = prodId;
+  const nomEl = document.getElementById('pd-declarer-nom');
+  if(nomEl) nomEl.textContent = prod.nom;
+  const qteEl = document.getElementById('pd-declarer-qte');
+  if(qteEl) qteEl.value = '';
+  document.getElementById('pos-declarer-modal-bg')?.classList.add('open');
+  setTimeout(()=>qteEl?.focus(), 50);
+}
+
+function posFermerDeclarationRapide(){
+  document.getElementById('pos-declarer-modal-bg')?.classList.remove('open');
+  _posDeclarerProdId = null;
+}
+
+async function posConfirmerDeclarationRapide(){
+  const prodId = _posDeclarerProdId;
+  if(!prodId) return;
+  const qteEl = document.getElementById('pd-declarer-qte');
+  const qteVal = qteEl?.value ?? '';
+  const qte = parseFloat(qteVal);
+  if(qteVal === '' || isNaN(qte) || qte < 0){ posAlert('Entrez une quantité valide (≥ 0).', 'warn'); return; }
+  try {
+    await apiFetch('POST', `/pos/caisse/sessions/${_posDashSessionId}/inventaire`, {comptages: {[prodId]: qte}});
+    _posComptesIds.add(prodId);
+    posFermerDeclarationRapide();
+    _posAjouterAuPanierConfirme(prodId);
+  } catch(e){ posAlert(e.message||"Erreur lors de l'enregistrement du comptage.", 'err'); }
 }
 
 function posRenderCart(){

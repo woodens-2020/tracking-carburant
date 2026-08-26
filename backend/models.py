@@ -1168,9 +1168,12 @@ class BarSessionEvaluation(Base):
 
 
 class BarSessionComptage(Base):
-    """Comptage physique du stock par article, effectué par la caissière à
-    l'ouverture de sa session — permet de détecter un écart avec le stock
-    théorique (BarMouvementStock) accumulé depuis la session précédente.
+    """Comptage physique du stock par article — à l'ouverture de session pour
+    les articles réellement disponibles ce jour-là, puis au fil de l'eau pour
+    tout article vendu qui n'avait pas encore été compté (déclaration rapide
+    déclenchée par le premier ajout au panier). Un seul enregistrement par
+    (session, produit). Permet de détecter un écart avec le stock théorique
+    (BarMouvementStock) accumulé depuis le dernier point de contrôle.
     Le comptage est fait à l'aveugle : la caissière ne voit jamais le stock
     théorique pendant sa saisie, seul le serveur calcule l'écart après coup."""
     __tablename__ = "bar_session_comptages"

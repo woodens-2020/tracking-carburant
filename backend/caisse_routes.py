@@ -195,6 +195,7 @@ def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
         "date_session":  str(s.date_session),
         "numero_session": s.numero_session,
         "inventaire_fait": bool(s.comptages),
+        "comptages_produit_ids": [c.produit_id for c in s.comptages],
         "statut":        s.statut,
         "created_at":    s.created_at.isoformat() if s.created_at else None,
         "soumis_at":     s.soumis_at.isoformat() if s.soumis_at else None,
@@ -302,6 +303,7 @@ def dashboard_caissiere(
         "nb_sessions_jour": len(sessions_du_jour),
         "peut_ouvrir_nouvelle_session": len(sessions_du_jour) < 2,
         "inventaire_fait": bool(session.comptages) if session else None,
+        "comptages_produit_ids": [c.produit_id for c in session.comptages] if session else [],
         "evolution":     evolution,
         **stats,
     }
@@ -422,22 +424,30 @@ class InventaireIn(BaseModel):
 
 @router.post("/sessions/{session_id}/inventaire")
 def soumettre_inventaire(session_id: int, body: InventaireIn, db: Session = Depends(get_db)):
-    """Comptage physique du stock à l'ouverture de session (une seule fois
-    par session) — comparé au stock théorique (BarMouvementStock) pour
-    détecter un écart depuis la session précédente. Comptage à l'aveugle :
-    le stock théorique n'est jamais montré à la caissière avant sa saisie."""
+    """Comptage physique du stock — appelable plusieurs fois pendant une même
+    session EN_COURS : au démarrage pour les quelques articles réellement
+    disponibles ce jour-là (pas besoin de parcourir tout le catalogue), puis
+    au fil de l'eau pour tout article vendu qui n'avait pas encore été compté
+    (déclaration rapide déclenchée par le premier ajout au panier). Chaque
+    article n'est compté qu'une fois par session — une resoumission pour un
+    article déjà compté est ignorée silencieusement (idempotent, protège
+    contre un double-clic ou un état local désynchronisé). Comptage à
+    l'aveugle : le stock théorique n'est jamais montré à la caissière avant
+    sa saisie, seul le serveur calcule l'écart après coup."""
     s = _session_ou_404(session_id, db)
     if s.statut != "EN_COURS":
-        raise HTTPException(409, "Le comptage d'ouverture ne peut être soumis que pour une session en cours.")
-    if s.comptages:
-        raise HTTPException(409, "Le comptage d'ouverture a déjà été soumis pour cette session.")
+        raise HTTPException(409, "Le comptage ne peut être soumis que pour une session en cours.")
     if not body.comptages:
         raise HTTPException(422, "Au moins un produit doit être compté.")
 
+    deja_comptes = {c.produit_id for c in s.comptages}
     theoriques = stock_tous_produits(db)
 
     ecarts_notifies = []
+    nb_ajoutes = 0
     for produit_id, qte in body.comptages.items():
+        if produit_id in deja_comptes:
+            continue  # déjà compté pour cette session — on ignore, pas d'erreur
         theorique = theoriques.get(produit_id, Decimal("0"))
         comptee   = Decimal(str(qte))
         ecart     = comptee - theorique
@@ -445,6 +455,7 @@ def soumettre_inventaire(session_id: int, body: InventaireIn, db: Session = Depe
             session_id=session_id, produit_id=produit_id,
             quantite_comptee=comptee, stock_theorique_avant=theorique, ecart=ecart,
         ))
+        nb_ajoutes += 1
         if ecart != 0:
             ecarts_notifies.append((produit_id, comptee, theorique, ecart))
     db.commit()
@@ -463,7 +474,7 @@ def soumettre_inventaire(session_id: int, body: InventaireIn, db: Session = Depe
             lien="ecarts-inventaire", dedupe_minutes=None,
         )
 
-    return {"ok": True, "nb_produits": len(body.comptages), "nb_ecarts": len(ecarts_notifies)}
+    return {"ok": True, "nb_produits": nb_ajoutes, "nb_ecarts": len(ecarts_notifies)}
 
 
 class SoumettreIn(BaseModel):
