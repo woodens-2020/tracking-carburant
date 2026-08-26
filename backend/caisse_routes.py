@@ -37,6 +37,11 @@ from tz_utils import HAITI_TZ, today_haiti, bounds_haiti
 
 router = APIRouter(prefix="/api/pos/caisse", tags=["caisse"])
 
+# Nombre maximum de sessions de caisse qu'un même caissier peut ouvrir par
+# jour (mesure de sécurité : repartir sur une session propre après un
+# incident, sans attendre le lendemain, tout en gardant une limite).
+MAX_SESSIONS_PAR_JOUR = 3
+
 
 # ── helpers ──────────────────────────────────────────────────────────
 
@@ -304,8 +309,9 @@ def dashboard_caissiere(
         .all()
     )
 
-    # Jusqu'à 2 sessions par jour : on retient celle EN_COURS si présente,
-    # sinon la plus récente (dernière ouverte) pour refléter l'état du jour.
+    # Jusqu'à MAX_SESSIONS_PAR_JOUR sessions par jour : on retient celle
+    # EN_COURS si présente, sinon la plus récente (dernière ouverte) pour
+    # refléter l'état du jour.
     sessions_du_jour = (
         db.query(BarSessionCaisse)
         .filter_by(caissier_id=caissier_id, date_session=jour)
@@ -337,7 +343,7 @@ def dashboard_caissiere(
         "numero_session": session.numero_session if session else None,
         "lieu":          session.lieu if session else None,
         "nb_sessions_jour": len(sessions_du_jour),
-        "peut_ouvrir_nouvelle_session": len(sessions_du_jour) < 2,
+        "peut_ouvrir_nouvelle_session": len(sessions_du_jour) < MAX_SESSIONS_PAR_JOUR,
         "inventaire_fait": bool(session.comptages) if session else None,
         "comptages_produit_ids": [c.produit_id for c in session.comptages] if session else [],
         "evolution":     evolution,
@@ -418,12 +424,12 @@ class OuvrirIn(BaseModel):
 
 @router.post("/sessions/ouvrir")
 def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
-    """Ouvre (ou retrouve) une session du jour pour une caissière — jusqu'à 2
-    sessions par jour (mesure de sécurité : permet de repartir sur une
-    session propre après un incident, sans attendre le lendemain). Le lieu
-    (Bar Devant / Bar Piscine) est choisi une fois par session, avant le
-    comptage de stock — requis uniquement à la création (une session déjà
-    EN_COURS a déjà le sien)."""
+    """Ouvre (ou retrouve) une session du jour pour une caissière — jusqu'à
+    MAX_SESSIONS_PAR_JOUR sessions par jour (mesure de sécurité : permet de
+    repartir sur une session propre après un incident, sans attendre le
+    lendemain). Le lieu (Bar Devant / Bar Piscine) est choisi une fois par
+    session, avant le comptage de stock — requis uniquement à la création
+    (une session déjà EN_COURS a déjà le sien)."""
     employe = db.query(Employe).filter_by(id=data.caissier_id).first()
     if not employe:
         raise HTTPException(404, "Caissier introuvable")
@@ -437,8 +443,8 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
     )
     session = next((s for s in sessions_du_jour if s.statut == "EN_COURS"), None)
     if not session:
-        if len(sessions_du_jour) >= 2:
-            raise HTTPException(409, "Limite de 2 sessions de caisse par jour atteinte pour ce caissier.")
+        if len(sessions_du_jour) >= MAX_SESSIONS_PAR_JOUR:
+            raise HTTPException(409, f"Limite de {MAX_SESSIONS_PAR_JOUR} sessions de caisse par jour atteinte pour ce caissier.")
         if not data.lieu or data.lieu.upper() not in _LIEUX_VALIDES:
             raise HTTPException(422, "Choisissez le bar (Bar Devant ou Bar Piscine) avant de démarrer.")
         session = BarSessionCaisse(

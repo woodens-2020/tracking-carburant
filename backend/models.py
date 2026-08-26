@@ -1103,9 +1103,11 @@ class BarSessionCaisse(Base):
     id            = Column(Integer, primary_key=True)
     caissier_id   = Column(Integer, ForeignKey("employes.id",    ondelete="RESTRICT"), nullable=False)
     date_session  = Column(Date, nullable=False)
-    # Jusqu'à 2 sessions par jour par caissier (mesure de sécurité — permet
+    # Plusieurs sessions par jour par caissier (mesure de sécurité — permet
     # p. ex. de repartir sur une session propre après un incident, sans
-    # attendre le lendemain) : 1 ou 2, unique avec (caissier_id, date_session).
+    # attendre le lendemain) : 1, 2, 3… — limite exacte appliquée côté route
+    # (MAX_SESSIONS_PAR_JOUR dans caisse_routes.py), unique avec
+    # (caissier_id, date_session).
     numero_session = Column(Integer, nullable=False, default=1)
     # Lieu physique choisi par l'employé au démarrage, avant le comptage de
     # stock — DEVANT (bar d'accueil) ou PISCINE (bar piscine). Stock/catalogue

@@ -22523,6 +22523,7 @@ async function _posChargerCaissiers(){
 let _posDashCaissierInterval = null;
 let _posDashSessionId = null;
 let _posComptesIds = new Set();   // produit_id déjà comptés pour la session en cours — voir posAjouterAuPanier
+const MAX_SESSIONS_PAR_JOUR = 3;  // doit rester synchronisé avec caisse_routes.py::MAX_SESSIONS_PAR_JOUR
 
 function posCaissierChange(caissier_id){
   const dash = document.getElementById('pos-dash-caissier');
@@ -22543,10 +22544,11 @@ function posCaissierChange(caissier_id){
 
 // Portail démarrage/fin de session — remplace la zone de vente tant qu'aucun
 // caissier n'est sélectionné, qu'aucune session n'a démarré aujourd'hui, ou
-// que la session du jour est déjà soumise/validée. Jusqu'à 2 sessions par
-// jour (mesure de sécurité) : tant que peutOuvrir est vrai, on repropose de
-// démarrer (une 2ème session) plutôt que de bloquer jusqu'au lendemain.
-function _posSetGate(hasCaissier, statut, peutOuvrir, inventaireFait){
+// que la session du jour est déjà soumise/validée. Jusqu'à MAX_SESSIONS_PAR_JOUR
+// sessions par jour (mesure de sécurité) : tant que peutOuvrir est vrai, on
+// repropose de démarrer une nouvelle session plutôt que de bloquer jusqu'au
+// lendemain.
+function _posSetGate(hasCaissier, statut, peutOuvrir, inventaireFait, nbSessionsJour){
   const gd = document.getElementById('pos-gate-demarrer');
   const gt = document.getElementById('pos-gate-termine');
   const gi = document.getElementById('pos-gate-inventaire');
@@ -22577,8 +22579,9 @@ function _posSetGate(hasCaissier, statut, peutOuvrir, inventaireFait){
   const titre = document.getElementById('pd-gate-titre');
   const sub   = document.getElementById('pd-gate-sub');
   if(dejaSoumise){
-    if(titre) titre.textContent = 'Démarrer une 2ème session de caisse';
-    if(sub)   sub.textContent   = "Votre première session est terminée. Vous pouvez démarrer une seconde session de caisse pour aujourd'hui si nécessaire.";
+    const prochaine = (nbSessionsJour||0) + 1;
+    if(titre) titre.textContent = `Démarrer une nouvelle session de caisse (${prochaine}/${MAX_SESSIONS_PAR_JOUR})`;
+    if(sub)   sub.textContent   = "Votre session précédente est terminée. Vous pouvez démarrer une nouvelle session de caisse pour aujourd'hui si nécessaire.";
   } else {
     if(titre) titre.textContent = 'Session de caisse non démarrée';
     if(sub)   sub.textContent   = "Démarrez votre session avant d'effectuer la première vente. La date et l'heure de démarrage seront enregistrées officiellement par le système.";
@@ -22766,7 +22769,7 @@ async function _posDashLoadData(caissier_id){
 
     const btnSoumettre = document.getElementById('pos-btn-soumettre');
     if(btnSoumettre) btnSoumettre.style.display = (d.session_statut==='EN_COURS') ? '' : 'none';
-    _posSetGate(true, d.session_statut, d.peut_ouvrir_nouvelle_session, d.inventaire_fait);
+    _posSetGate(true, d.session_statut, d.peut_ouvrir_nouvelle_session, d.inventaire_fait, d.nb_sessions_jour);
 
     const nb    = document.getElementById('pos-dash-nb');
     const total = document.getElementById('pos-dash-total');
