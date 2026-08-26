@@ -42,6 +42,12 @@ router = APIRouter(prefix="/api/pos/caisse", tags=["caisse"])
 # incident, sans attendre le lendemain, tout en gardant une limite).
 MAX_SESSIONS_PAR_JOUR = 3
 
+# Seuils de détection d'activité suspecte (page Rapports Soumis) : une
+# caissière est signalée si ses écarts d'inventaire sont répétés sur
+# plusieurs sessions distinctes, OU si un seul écart est de forte ampleur.
+SEUIL_SESSIONS_SUSPECTES = 2
+SEUIL_ECART_ABS_SUSPECT = 5.0
+
 
 # ── helpers ──────────────────────────────────────────────────────────
 
@@ -745,6 +751,72 @@ def resoudre_ecart(
     c.resolu_motif  = body.motif.strip()
     db.commit()
     return {"ok": True}
+
+
+@router.get("/caissieres/activite-suspecte")
+def activite_suspecte(db: Session = Depends(get_db)):
+    """Vue d'ensemble par caissière des écarts d'inventaire dans le temps,
+    pour la page "Rapports Soumis" — signale (`suspect=True`) une caissière
+    dont les écarts sont répétés sur plusieurs sessions distinctes, ou dont
+    un écart isolé est de forte ampleur (voir SEUIL_SESSIONS_SUSPECTES /
+    SEUIL_ECART_ABS_SUSPECT). Ne résout ni ne modifie rien — purement pour
+    attirer l'attention d'un responsable, qui examine ensuite l'historique
+    chronologique de la caissière."""
+    comptages = (
+        db.query(BarSessionComptage)
+        .join(BarSessionCaisse, BarSessionComptage.session_id == BarSessionCaisse.id)
+        .filter(BarSessionComptage.ecart != 0)
+        .all()
+    )
+
+    par_caissier: dict[int, dict] = {}
+    for c in comptages:
+        s = c.session
+        if not s or not s.caissier:
+            continue
+        cid = s.caissier_id
+        e = par_caissier.get(cid)
+        if e is None:
+            e = par_caissier[cid] = {
+                "caissier_id": cid,
+                "caissier_nom": f"{s.caissier.nom} {s.caissier.prenom}",
+                "sessions_avec_ecart": set(),
+                "nb_ecarts": 0,
+                "nb_non_resolus": 0,
+                "ecart_max_abs": 0.0,
+                "dernier_ecart_date": None,
+            }
+        e["sessions_avec_ecart"].add(s.id)
+        e["nb_ecarts"] += 1
+        if not c.ecart_resolu:
+            e["nb_non_resolus"] += 1
+        abs_ecart = abs(float(c.ecart))
+        if abs_ecart > e["ecart_max_abs"]:
+            e["ecart_max_abs"] = abs_ecart
+        d = c.created_at
+        if d and (e["dernier_ecart_date"] is None or d > e["dernier_ecart_date"]):
+            e["dernier_ecart_date"] = d
+
+    resultats = []
+    for e in par_caissier.values():
+        nb_sessions = len(e["sessions_avec_ecart"])
+        suspect = (
+            nb_sessions >= SEUIL_SESSIONS_SUSPECTES
+            or e["ecart_max_abs"] >= SEUIL_ECART_ABS_SUSPECT
+        )
+        resultats.append({
+            "caissier_id":           e["caissier_id"],
+            "caissier_nom":          e["caissier_nom"],
+            "nb_sessions_avec_ecart": nb_sessions,
+            "nb_ecarts":             e["nb_ecarts"],
+            "nb_non_resolus":        e["nb_non_resolus"],
+            "ecart_max_abs":         e["ecart_max_abs"],
+            "dernier_ecart_date":    e["dernier_ecart_date"].isoformat() if e["dernier_ecart_date"] else None,
+            "suspect":               suspect,
+        })
+
+    resultats.sort(key=lambda r: (not r["suspect"], -r["nb_non_resolus"], -r["nb_ecarts"]))
+    return resultats
 
 
 # ── Exports PDF / XLSX ────────────────────────────────────────────────
