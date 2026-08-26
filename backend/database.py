@@ -300,6 +300,18 @@ def _migrate_columns():
                     conn.execute(sql_text(ddl_idx))
 
         # v4 — rôle PDG : mise à jour de la contrainte CHECK sur utilisateurs
+        #
+        # Chaque bloc ci-dessous est idempotent (relancé à chaque démarrage) —
+        # mais dès qu'une des instructions échoue (ex. contrainte déjà
+        # présente, sur un redéploiement), PostgreSQL marque TOUTE la
+        # transaction "aborted" : toute commande suivante sur cette même
+        # connexion échoue à son tour avec InFailedSqlTransaction, MÊME SI
+        # elle n'a rien à voir avec l'échec d'origine — y compris le
+        # conn.commit() final, qui ne fait alors qu'annuler silencieusement
+        # tout ce qui précède (ex. l'ajout d'une colonne plus haut dans la
+        # même fonction). D'où le conn.rollback() dans chaque except : il
+        # ramène la connexion à un état propre pour que les blocs suivants
+        # (et le commit final) puissent s'exécuter normalement.
         if _is_postgres:
             try:
                 conn.execute(sql_text(
@@ -310,7 +322,7 @@ def _migrate_columns():
                     "CHECK (role IN ('admin', 'operateur', 'pdg'))"
                 ))
             except Exception:
-                pass  # contrainte déjà à jour
+                conn.rollback()  # contrainte déjà à jour
 
             # v16 — précision des relevés de compteur élargie de 3 à 4 décimales
             # (élargissement sans perte : les valeurs existantes restent valides)
@@ -322,7 +334,7 @@ def _migrate_columns():
                     "ALTER TABLE releves ALTER COLUMN metter_apres TYPE NUMERIC(14,4)"
                 ))
             except Exception:
-                pass  # déjà à la bonne précision
+                conn.rollback()  # déjà à la bonne précision
 
             # v19 — jusqu'à 2 sessions de caisse par jour par caissier : la
             # contrainte d'unicité passe de (caissier_id, date_session) à
@@ -336,7 +348,7 @@ def _migrate_columns():
                     "UNIQUE (caissier_id, date_session, numero_session)"
                 ))
             except Exception:
-                pass  # contrainte déjà à jour
+                conn.rollback()  # contrainte déjà à jour
 
             # v20 — lieu (Bar Devant / Bar Piscine) : contrainte de domaine
             try:
@@ -345,7 +357,7 @@ def _migrate_columns():
                     "CHECK (lieu IS NULL OR lieu IN ('DEVANT','PISCINE'))"
                 ))
             except Exception:
-                pass  # déjà présente
+                conn.rollback()  # déjà présente
 
         conn.commit()
 
