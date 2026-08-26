@@ -655,10 +655,11 @@ def evaluer_session(
 
 @router.get("/comptages/ecarts")
 def liste_ecarts(
-    resolu:     Optional[bool] = Query(None),
-    lieu:       Optional[str]  = Query(None),
-    date_debut: Optional[str]  = Query(None),
-    date_fin:   Optional[str]  = Query(None),
+    resolu:      Optional[bool] = Query(None),
+    lieu:        Optional[str]  = Query(None),
+    caissier_id: Optional[int]  = Query(None),
+    date_debut:  Optional[str]  = Query(None),
+    date_fin:    Optional[str]  = Query(None),
     db: Session = Depends(get_db),
 ):
     """Liste des comptages d'ouverture ayant révélé un écart avec le stock
@@ -672,6 +673,8 @@ def liste_ecarts(
         q = q.filter(BarSessionComptage.ecart_resolu == resolu)
     if lieu:
         q = q.filter(BarSessionCaisse.lieu == lieu.upper())
+    if caissier_id:
+        q = q.filter(BarSessionCaisse.caissier_id == caissier_id)
     if date_debut:
         q = q.filter(BarSessionCaisse.date_session >= date.fromisoformat(date_debut))
     if date_fin:
