@@ -29,11 +29,9 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import (
-    BarVente, BarLigneVente, BarSessionCaisse, BarSessionEvaluation, BarSessionComptage,
-    BarProduit, BarMouvementStock, Employe, Utilisateur,
+    BarVente, BarLigneVente, BarSessionCaisse, BarSessionEvaluation,
+    Employe, Utilisateur,
 )
-from pos_service import stock_tous_produits
-from notifications_service import creer_notification
 from tz_utils import HAITI_TZ, today_haiti, bounds_haiti
 
 router = APIRouter(prefix="/api/pos/caisse", tags=["caisse"])
@@ -45,12 +43,6 @@ router = APIRouter(prefix="/api/pos/caisse", tags=["caisse"])
 # sur staging (simulations avec les employés) tout en la gardant à 3 en
 # production.
 MAX_SESSIONS_PAR_JOUR = int(os.getenv("MAX_SESSIONS_PAR_JOUR", "3"))
-
-# Seuils de détection d'activité suspecte (page Rapports Soumis) : une
-# caissière est signalée si ses écarts d'inventaire sont répétés sur
-# plusieurs sessions distinctes, OU si un seul écart est de forte ampleur.
-SEUIL_SESSIONS_SUSPECTES = 2
-SEUIL_ECART_ABS_SUSPECT = 5.0
 
 
 # ── helpers ──────────────────────────────────────────────────────────
@@ -202,40 +194,6 @@ def _score_couleur(score: float | None) -> str:
     return "F87171"
 
 
-def _stock_ecart_couleur(ecart: float) -> str:
-    """Code hex (sans #) pour un écart de comptage de stock — 0 = exact
-    (vert), manquant = rouge (le signal de fraude/perte), excédent = ambre
-    (rare depuis que la saisie ne peut plus dépasser le stock théorique)."""
-    if ecart == 0:
-        return "22C55E"
-    return "F87171" if ecart < 0 else "F7A93B"
-
-
-def _fiche_stock(s: BarSessionCaisse, stats: dict) -> list[dict]:
-    """Comptage de départ, ventes de la session et restant théorique, article
-    par article — utilisée à l'écran (détail de session) et dans les exports
-    PDF/XLSX. Inclut aussi l'écart constaté à la déclaration (vs le stock
-    théorique déjà enregistré) et son état de résolution, pour que le
-    responsable ait toute l'information sans devoir consulter une autre page."""
-    vendu_par_nom = {p["nom"]: p["quantite"] for p in stats.get("tous_produits", [])}
-    lignes = []
-    for c in sorted(s.comptages, key=lambda c: c.produit.nom if c.produit else ""):
-        nom = c.produit.nom if c.produit else "?"
-        vendu = vendu_par_nom.get(nom, 0.0)
-        lignes.append({
-            "produit_nom":         nom,
-            "comptee_le":          c.created_at.isoformat() if c.created_at else None,
-            "stock_theorique_avant": float(c.stock_theorique_avant),
-            "quantite_depart":     float(c.quantite_comptee),
-            "ecart":               float(c.ecart),
-            "ecart_resolu":        c.ecart_resolu,
-            "resolu_par":          c.resolu_par.nom_complet if c.resolu_par else None,
-            "quantite_vendue":     vendu,
-            "quantite_restante":   float(c.quantite_comptee) - vendu,
-        })
-    return lignes
-
-
 def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
     return {
         "id":            s.id,
@@ -244,8 +202,6 @@ def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
         "date_session":  str(s.date_session),
         "numero_session": s.numero_session,
         "lieu":          s.lieu,
-        "inventaire_fait": bool(s.comptages),
-        "comptages_produit_ids": [c.produit_id for c in s.comptages],
         "statut":        s.statut,
         "created_at":    s.created_at.isoformat() if s.created_at else None,
         "soumis_at":     s.soumis_at.isoformat() if s.soumis_at else None,
@@ -355,8 +311,6 @@ def dashboard_caissiere(
         "nb_sessions_jour": len(sessions_du_jour),
         "max_sessions_par_jour": MAX_SESSIONS_PAR_JOUR,
         "peut_ouvrir_nouvelle_session": len(sessions_du_jour) < MAX_SESSIONS_PAR_JOUR,
-        "inventaire_fait": bool(session.comptages) if session else None,
-        "comptages_produit_ids": [c.produit_id for c in session.comptages] if session else [],
         "evolution":     evolution,
         **stats,
     }
@@ -421,7 +375,6 @@ def detail_session(session_id: int, db: Session = Depends(get_db)):
         for v in ventes
     ]
     d["evaluations"] = {e.produit_nom: e.statut for e in s.evaluations}
-    d["fiche_stock"] = _fiche_stock(s, stats)
     return d
 
 
@@ -472,85 +425,6 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
     ventes = _ventes_session(session, db)
     stats  = _stats_ventes(ventes, session.caissier, session.date_session, db)
     return _session_dict(session, stats)
-
-
-class InventaireIn(BaseModel):
-    comptages: dict[int, float]   # {produit_id: quantite_comptee}
-
-
-@router.post("/sessions/{session_id}/inventaire")
-def soumettre_inventaire(session_id: int, body: InventaireIn, db: Session = Depends(get_db)):
-    """Comptage physique du stock — appelable plusieurs fois pendant une même
-    session EN_COURS : au démarrage pour les quelques articles réellement
-    disponibles ce jour-là (pas besoin de parcourir tout le catalogue), puis
-    au fil de l'eau pour tout article vendu qui n'avait pas encore été compté
-    (déclaration rapide déclenchée par le premier ajout au panier). Chaque
-    article n'est compté qu'une fois par session — une resoumission pour un
-    article déjà compté est ignorée silencieusement (idempotent, protège
-    contre un double-clic ou un état local désynchronisé). Comptage à
-    l'aveugle : le stock théorique n'est jamais montré à la caissière avant
-    sa saisie, seul le serveur calcule l'écart après coup — sauf si la
-    quantité saisie dépasse le stock enregistré, auquel cas elle est rejetée
-    (garde-fou contre une faute de frappe, sans révéler le chiffre exact)."""
-    s = _session_ou_404(session_id, db)
-    if s.statut != "EN_COURS":
-        raise HTTPException(409, "Le comptage ne peut être soumis que pour une session en cours.")
-    if not body.comptages:
-        raise HTTPException(422, "Au moins un produit doit être compté.")
-
-    deja_comptes = {c.produit_id for c in s.comptages}
-    theoriques = stock_tous_produits(db)
-    a_traiter = {pid: qte for pid, qte in body.comptages.items() if pid not in deja_comptes}
-
-    # Validation d'abord, tout ou rien : une quantité comptée ne peut pas
-    # dépasser le stock déjà enregistré au système — un comptage physique
-    # ne peut logiquement pas révéler PLUS que ce que les livres connaissent
-    # déjà (le cas contraire est presque toujours une faute de frappe, ex.
-    # un zéro de trop). On rejette avant d'écrire quoi que ce soit, pour ne
-    # jamais laisser un comptage partiellement enregistré.
-    depassements = []
-    for produit_id, qte in a_traiter.items():
-        theorique = theoriques.get(produit_id, Decimal("0"))
-        if Decimal(str(qte)) > theorique:
-            p = db.query(BarProduit).filter_by(id=produit_id).first()
-            depassements.append(p.nom if p else str(produit_id))
-    if depassements:
-        raise HTTPException(
-            422,
-            "La quantité saisie dépasse le stock déjà enregistré au système pour : "
-            + ", ".join(depassements) + ". Vérifiez votre comptage avant de continuer.",
-        )
-
-    ecarts_notifies = []
-    nb_ajoutes = 0
-    for produit_id, qte in a_traiter.items():
-        theorique = theoriques.get(produit_id, Decimal("0"))
-        comptee   = Decimal(str(qte))
-        ecart     = comptee - theorique
-        db.add(BarSessionComptage(
-            session_id=session_id, produit_id=produit_id,
-            quantite_comptee=comptee, stock_theorique_avant=theorique, ecart=ecart,
-        ))
-        nb_ajoutes += 1
-        if ecart != 0:
-            ecarts_notifies.append((produit_id, comptee, theorique, ecart))
-    db.commit()
-
-    for produit_id, comptee, theorique, ecart in ecarts_notifies:
-        p = db.query(BarProduit).filter_by(id=produit_id).first()
-        nom = p.nom if p else str(produit_id)
-        signe = "+" if ecart > 0 else ""
-        creer_notification(
-            db, module="pos", type_="ecart_inventaire",
-            titre=f"Écart de stock à l'ouverture — {nom} ({signe}{ecart:g})",
-            message=(
-                f"Session #{session_id} ({s.caissier.nom} {s.caissier.prenom}) — "
-                f"compté {comptee:g}, théorique {theorique:g}, écart {signe}{ecart:g}."
-            ),
-            lien="ecarts-inventaire", dedupe_minutes=None,
-        )
-
-    return {"ok": True, "nb_produits": nb_ajoutes, "nb_ecarts": len(ecarts_notifies)}
 
 
 class SoumettreIn(BaseModel):
@@ -660,168 +534,6 @@ def evaluer_session(
 
     ventes = _ventes_session(s, db)
     return _session_dict(s, _stats_ventes(ventes, s.caissier, s.date_session, db))
-
-
-# ── Écarts d'inventaire ────────────────────────────────────────────────
-
-@router.get("/comptages/ecarts")
-def liste_ecarts(
-    resolu:      Optional[bool] = Query(None),
-    lieu:        Optional[str]  = Query(None),
-    caissier_id: Optional[int]  = Query(None),
-    date_debut:  Optional[str]  = Query(None),
-    date_fin:    Optional[str]  = Query(None),
-    db: Session = Depends(get_db),
-):
-    """Liste des comptages d'ouverture ayant révélé un écart avec le stock
-    théorique — page "Écarts d'Inventaire", pour examen par un responsable."""
-    q = (
-        db.query(BarSessionComptage)
-        .join(BarSessionCaisse, BarSessionComptage.session_id == BarSessionCaisse.id)
-        .filter(BarSessionComptage.ecart != 0)
-    )
-    if resolu is not None:
-        q = q.filter(BarSessionComptage.ecart_resolu == resolu)
-    if lieu:
-        q = q.filter(BarSessionCaisse.lieu == lieu.upper())
-    if caissier_id:
-        q = q.filter(BarSessionCaisse.caissier_id == caissier_id)
-    if date_debut:
-        q = q.filter(BarSessionCaisse.date_session >= date.fromisoformat(date_debut))
-    if date_fin:
-        q = q.filter(BarSessionCaisse.date_session <= date.fromisoformat(date_fin))
-
-    comptages = q.order_by(BarSessionComptage.created_at.desc()).all()
-    return [
-        {
-            "id":                    c.id,
-            "session_id":            c.session_id,
-            "caissier_nom":          (c.session.caissier.nom + " " + c.session.caissier.prenom) if c.session and c.session.caissier else None,
-            "date_session":          str(c.session.date_session) if c.session else None,
-            "lieu":                  c.session.lieu if c.session else None,
-            "produit_nom":           c.produit.nom if c.produit else None,
-            "quantite_comptee":      float(c.quantite_comptee),
-            "stock_theorique_avant": float(c.stock_theorique_avant),
-            "ecart":                 float(c.ecart),
-            "ecart_resolu":          c.ecart_resolu,
-            "resolu_par":            c.resolu_par.nom_complet if c.resolu_par else None,
-            "resolu_le":             c.resolu_le.isoformat() if c.resolu_le else None,
-            "resolu_motif":          c.resolu_motif,
-        }
-        for c in comptages
-    ]
-
-
-class ResoudreEcartIn(BaseModel):
-    motif: str
-    appliquer_ajustement: bool = True
-
-
-@router.post("/comptages/{comptage_id}/resoudre")
-def resoudre_ecart(
-    comptage_id: int,
-    body: ResoudreEcartIn,
-    db: Session = Depends(get_db),
-    _user: Utilisateur = Depends(_require_pdg_ou_admin_pos),
-):
-    """Résolution manuelle d'un écart d'inventaire — jamais automatique.
-    Applique éventuellement un mouvement de stock correctif (AJUSTEMENT si
-    excédent, PERTE si manquant), avec le motif fourni par le responsable."""
-    c = db.query(BarSessionComptage).filter_by(id=comptage_id).first()
-    if not c:
-        raise HTTPException(404, "Comptage introuvable")
-    if c.ecart == 0:
-        raise HTTPException(409, "Ce comptage n'a pas d'écart à résoudre.")
-    if c.ecart_resolu:
-        raise HTTPException(409, "Cet écart a déjà été résolu.")
-    if not body.motif or len(body.motif.strip()) < 5:
-        raise HTTPException(422, "Le motif doit contenir au moins 5 caractères.")
-
-    if body.appliquer_ajustement:
-        type_mouvement = "AJUSTEMENT" if c.ecart > 0 else "PERTE"
-        mouv = BarMouvementStock(
-            produit_id     = c.produit_id,
-            type_mouvement = type_mouvement,
-            quantite       = c.ecart,
-            motif          = f"Résolution écart inventaire — {body.motif.strip()}",
-            utilisateur_id = _user.id,
-        )
-        db.add(mouv)
-        db.flush()
-        c.resolu_ajustement_id = mouv.id
-
-    c.ecart_resolu  = True
-    c.resolu_par_id = _user.id
-    c.resolu_le     = datetime.now(tz=timezone.utc)
-    c.resolu_motif  = body.motif.strip()
-    db.commit()
-    return {"ok": True}
-
-
-@router.get("/caissieres/activite-suspecte")
-def activite_suspecte(db: Session = Depends(get_db)):
-    """Vue d'ensemble par caissière des écarts d'inventaire dans le temps,
-    pour la page "Rapports Soumis" — signale (`suspect=True`) une caissière
-    dont les écarts sont répétés sur plusieurs sessions distinctes, ou dont
-    un écart isolé est de forte ampleur (voir SEUIL_SESSIONS_SUSPECTES /
-    SEUIL_ECART_ABS_SUSPECT). Ne résout ni ne modifie rien — purement pour
-    attirer l'attention d'un responsable, qui examine ensuite l'historique
-    chronologique de la caissière."""
-    comptages = (
-        db.query(BarSessionComptage)
-        .join(BarSessionCaisse, BarSessionComptage.session_id == BarSessionCaisse.id)
-        .filter(BarSessionComptage.ecart != 0)
-        .all()
-    )
-
-    par_caissier: dict[int, dict] = {}
-    for c in comptages:
-        s = c.session
-        if not s or not s.caissier:
-            continue
-        cid = s.caissier_id
-        e = par_caissier.get(cid)
-        if e is None:
-            e = par_caissier[cid] = {
-                "caissier_id": cid,
-                "caissier_nom": f"{s.caissier.nom} {s.caissier.prenom}",
-                "sessions_avec_ecart": set(),
-                "nb_ecarts": 0,
-                "nb_non_resolus": 0,
-                "ecart_max_abs": 0.0,
-                "dernier_ecart_date": None,
-            }
-        e["sessions_avec_ecart"].add(s.id)
-        e["nb_ecarts"] += 1
-        if not c.ecart_resolu:
-            e["nb_non_resolus"] += 1
-        abs_ecart = abs(float(c.ecart))
-        if abs_ecart > e["ecart_max_abs"]:
-            e["ecart_max_abs"] = abs_ecart
-        d = c.created_at
-        if d and (e["dernier_ecart_date"] is None or d > e["dernier_ecart_date"]):
-            e["dernier_ecart_date"] = d
-
-    resultats = []
-    for e in par_caissier.values():
-        nb_sessions = len(e["sessions_avec_ecart"])
-        suspect = (
-            nb_sessions >= SEUIL_SESSIONS_SUSPECTES
-            or e["ecart_max_abs"] >= SEUIL_ECART_ABS_SUSPECT
-        )
-        resultats.append({
-            "caissier_id":           e["caissier_id"],
-            "caissier_nom":          e["caissier_nom"],
-            "nb_sessions_avec_ecart": nb_sessions,
-            "nb_ecarts":             e["nb_ecarts"],
-            "nb_non_resolus":        e["nb_non_resolus"],
-            "ecart_max_abs":         e["ecart_max_abs"],
-            "dernier_ecart_date":    e["dernier_ecart_date"].isoformat() if e["dernier_ecart_date"] else None,
-            "suspect":               suspect,
-        })
-
-    resultats.sort(key=lambda r: (not r["suspect"], -r["nb_non_resolus"], -r["nb_ecarts"]))
-    return resultats
 
 
 # ── Exports PDF / XLSX ────────────────────────────────────────────────
@@ -946,29 +658,6 @@ def export_xlsx(session_id: int, db: Session = Depends(get_db)):
         ws.cell(row=r, column=5, value=produits_str).border = thin
         data_cell(ws, r, 6, float(v.montant_total), fmt="#,##0.00")
         data_cell(ws, r, 7, float(v.montant_paye),  fmt="#,##0.00")
-
-    # Comptage de stock (départ / vendu / restant) — la "fiche de départ"
-    fiche = _fiche_stock(s, stats)
-    if fiche:
-        r += 2
-        hdr_cell(ws, r, 1, "Comptage de stock — Départ / Vendu / Restant", bg=DARK)
-        ws.merge_cells(f"A{r}:F{r}")
-        r += 1
-        for lbl, col in [("Article", 1), ("Théorique avant", 2), ("Départ (compté)", 3),
-                          ("Écart", 4), ("Vendu", 5), ("Restant attendu", 6)]:
-            hdr_cell(ws, r, col, lbl)
-        for f in fiche:
-            r += 1
-            data_cell(ws, r, 1, f["produit_nom"])
-            data_cell(ws, r, 2, f["stock_theorique_avant"], fmt="0.##")
-            data_cell(ws, r, 3, f["quantite_depart"],        fmt="0.##")
-            ec = data_cell(ws, r, 4, f["ecart"], fmt="+0.##;-0.##;0.##")
-            ec.font = Font(bold=True, color=_stock_ecart_couleur(f["ecart"]))
-            data_cell(ws, r, 5, f["quantite_vendue"],   fmt="0.##")
-            data_cell(ws, r, 6, f["quantite_restante"], fmt="0.##")
-            if f["ecart"] != 0:
-                note = f"résolu par {f['resolu_par']}" if f["ecart_resolu"] and f["resolu_par"] else "non résolu"
-                ws.cell(row=r, column=7, value=note).font = Font(italic=True, size=8, color="888888")
 
     # Évaluation du rapport (si terminée)
     if s.evaluation_statut == "TERMINEE":
@@ -1138,45 +827,6 @@ def export_pdf(session_id: int, db: Session = Depends(get_db)):
         ("TOPPADDING",   (0,0),(-1,-1), 4),
     ]))
     story.append(t_ventes)
-
-    # Comptage de stock (départ / vendu / restant) — la "fiche de départ"
-    fiche = _fiche_stock(s, stats)
-    if fiche:
-        story.append(Spacer(1, 14))
-        story.append(Paragraph("Comptage de stock — Départ / Vendu / Restant", section_style))
-        story.append(Paragraph(
-            "À comparer avec le comptage de la prochaine session — un écart révèle une perte "
-            "ou une vente non enregistrée depuis le dernier point de contrôle.",
-            sub_style,
-        ))
-        fiche_data = [["Article", "Théorique avant", "Départ (compté)", "Écart", "Vendu", "Restant attendu"]]
-        for f in fiche:
-            signe = "+" if f["ecart"] > 0 else ""
-            ecart_txt = f"{signe}{f['ecart']:.0f}"
-            if f["ecart"] != 0:
-                ecart_txt += " (résolu)" if f["ecart_resolu"] else " (non résolu)"
-            fiche_data.append([
-                f["produit_nom"], f"{f['stock_theorique_avant']:.0f}", f"{f['quantite_depart']:.0f}",
-                ecart_txt, f"{f['quantite_vendue']:.0f}", f"{f['quantite_restante']:.0f}",
-            ])
-        t_fiche = Table(fiche_data, colWidths=[4.5*cm, 2.7*cm, 2.7*cm, 3*cm, 2.2*cm, 2.9*cm])
-        fiche_style = [
-            ("BACKGROUND",   (0,0),(-1,0), DARK),
-            ("TEXTCOLOR",    (0,0),(-1,0), colors.white),
-            ("FONTNAME",     (0,0),(-1,0), "Helvetica-Bold"),
-            ("FONTSIZE",     (0,0),(-1,-1), 8),
-            ("ROWBACKGROUNDS",(0,1),(-1,-1), [colors.HexColor("#F5F5F5"), colors.white]),
-            ("GRID",         (0,0),(-1,-1), 0.3, colors.HexColor("#DDDDDD")),
-            ("ALIGN",        (1,0),(-1,-1), "CENTER"),
-            ("BOTTOMPADDING",(0,0),(-1,-1), 4),
-            ("TOPPADDING",   (0,0),(-1,-1), 4),
-        ]
-        for i, f in enumerate(fiche, start=1):
-            if f["ecart"] != 0:
-                fiche_style.append(("TEXTCOLOR", (3,i),(3,i), colors.HexColor(f"#{_stock_ecart_couleur(f['ecart'])}")))
-                fiche_style.append(("FONTNAME",  (3,i),(3,i), "Helvetica-Bold"))
-        t_fiche.setStyle(TableStyle(fiche_style))
-        story.append(t_fiche)
 
     # Évaluation du rapport (si terminée)
     if s.evaluation_statut == "TERMINEE":
