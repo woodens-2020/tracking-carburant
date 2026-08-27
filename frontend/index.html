@@ -22542,7 +22542,6 @@ async function _posChargerCaissiers(){
 let _posDashCaissierInterval = null;
 let _posDashSessionId = null;
 let _posComptesIds = new Set();   // produit_id déjà comptés pour la session en cours — voir posAjouterAuPanier
-const MAX_SESSIONS_PAR_JOUR = 3;  // doit rester synchronisé avec caisse_routes.py::MAX_SESSIONS_PAR_JOUR
 
 function posCaissierChange(caissier_id){
   const dash = document.getElementById('pos-dash-caissier');
@@ -22567,7 +22566,7 @@ function posCaissierChange(caissier_id){
 // sessions par jour (mesure de sécurité) : tant que peutOuvrir est vrai, on
 // repropose de démarrer une nouvelle session plutôt que de bloquer jusqu'au
 // lendemain.
-function _posSetGate(hasCaissier, statut, peutOuvrir, inventaireFait, nbSessionsJour){
+function _posSetGate(hasCaissier, statut, peutOuvrir, inventaireFait, nbSessionsJour, maxSessionsJour){
   const gd = document.getElementById('pos-gate-demarrer');
   const gt = document.getElementById('pos-gate-termine');
   const gi = document.getElementById('pos-gate-inventaire');
@@ -22599,7 +22598,7 @@ function _posSetGate(hasCaissier, statut, peutOuvrir, inventaireFait, nbSessions
   const sub   = document.getElementById('pd-gate-sub');
   if(dejaSoumise){
     const prochaine = (nbSessionsJour||0) + 1;
-    if(titre) titre.textContent = `Démarrer une nouvelle session de caisse (${prochaine}/${MAX_SESSIONS_PAR_JOUR})`;
+    if(titre) titre.textContent = `Démarrer une nouvelle session de caisse (${prochaine}/${maxSessionsJour||3})`;
     if(sub)   sub.textContent   = "Votre session précédente est terminée. Vous pouvez démarrer une nouvelle session de caisse pour aujourd'hui si nécessaire.";
   } else {
     if(titre) titre.textContent = 'Session de caisse non démarrée';
@@ -22788,7 +22787,7 @@ async function _posDashLoadData(caissier_id){
 
     const btnSoumettre = document.getElementById('pos-btn-soumettre');
     if(btnSoumettre) btnSoumettre.style.display = (d.session_statut==='EN_COURS') ? '' : 'none';
-    _posSetGate(true, d.session_statut, d.peut_ouvrir_nouvelle_session, d.inventaire_fait, d.nb_sessions_jour);
+    _posSetGate(true, d.session_statut, d.peut_ouvrir_nouvelle_session, d.inventaire_fait, d.nb_sessions_jour, d.max_sessions_par_jour);
 
     const nb    = document.getElementById('pos-dash-nb');
     const total = document.getElementById('pos-dash-total');

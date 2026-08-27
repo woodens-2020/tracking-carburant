@@ -17,6 +17,7 @@ Endpoints caissière :
 from __future__ import annotations
 
 import io
+import os
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
@@ -40,7 +41,10 @@ router = APIRouter(prefix="/api/pos/caisse", tags=["caisse"])
 # Nombre maximum de sessions de caisse qu'un même caissier peut ouvrir par
 # jour (mesure de sécurité : repartir sur une session propre après un
 # incident, sans attendre le lendemain, tout en gardant une limite).
-MAX_SESSIONS_PAR_JOUR = 3
+# Configurable par variable d'environnement — permet de désactiver la limite
+# sur staging (simulations avec les employés) tout en la gardant à 3 en
+# production.
+MAX_SESSIONS_PAR_JOUR = int(os.getenv("MAX_SESSIONS_PAR_JOUR", "3"))
 
 # Seuils de détection d'activité suspecte (page Rapports Soumis) : une
 # caissière est signalée si ses écarts d'inventaire sont répétés sur
@@ -349,6 +353,7 @@ def dashboard_caissiere(
         "numero_session": session.numero_session if session else None,
         "lieu":          session.lieu if session else None,
         "nb_sessions_jour": len(sessions_du_jour),
+        "max_sessions_par_jour": MAX_SESSIONS_PAR_JOUR,
         "peut_ouvrir_nouvelle_session": len(sessions_du_jour) < MAX_SESSIONS_PAR_JOUR,
         "inventaire_fait": bool(session.comptages) if session else None,
         "comptages_produit_ids": [c.produit_id for c in session.comptages] if session else [],
