@@ -601,6 +601,13 @@ class BarVente(Base):
     id               = Column(Integer, primary_key=True)
     numero_ticket    = Column(String(20),  nullable=False, unique=True)
     caissier_id      = Column(Integer, ForeignKey("employes.id", ondelete="RESTRICT"), nullable=True)
+    # Session de caisse à laquelle cette vente est rattachée — renseignée à
+    # l'encaissement (session EN_COURS du caissier ce jour-là). Permet de
+    # distinguer les ventes de sessions successives du même caissier le même
+    # jour (ex. session #1 puis #2) ; nullable pour les ventes antérieures à
+    # l'ajout de cette colonne, rattachées a posteriori par fenêtre temporelle
+    # (voir _ventes_session dans caisse_routes.py).
+    session_id       = Column(Integer, ForeignKey("bar_sessions_caisse.id", ondelete="SET NULL"), nullable=True)
     date_heure       = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     montant_total    = Column(Numeric(14, 2), nullable=False)
     mode_paiement    = Column(String(20),  nullable=False, default="CASH")  # CASH, CREDIT, MIXTE
@@ -611,6 +618,7 @@ class BarVente(Base):
     montant_restant  = Column(Numeric(14, 2), nullable=False, default=0)
 
     caissier  = relationship("Employe")
+    session   = relationship("BarSessionCaisse")
     lignes    = relationship("BarLigneVente",    back_populates="vente", cascade="all, delete-orphan")
     credit    = relationship("BarCredit",        back_populates="vente", uselist=False)
     mouvements = relationship("BarMouvementStock",
@@ -625,6 +633,7 @@ class BarVente(Base):
         Index("idx_bar_ventes_date",     "date_heure"),
         Index("idx_bar_ventes_caissier", "caissier_id"),
         Index("idx_bar_ventes_statut",   "statut"),
+        Index("idx_bar_ventes_session",  "session_id"),
     )
 
 

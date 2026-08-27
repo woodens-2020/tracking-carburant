@@ -73,42 +73,93 @@ def _session_ou_404(session_id: int, db: Session) -> BarSessionCaisse:
     return s
 
 
-def _ventes_session(session: BarSessionCaisse, db: Session):
-    from sqlalchemy import func as _f
-    today_start, today_end = bounds_haiti(session.date_session)
-    return (
-        db.query(BarVente)
+def _fenetre_session(session: BarSessionCaisse, db: Session) -> tuple[datetime, datetime]:
+    """Bornes [début, fin) de la fenêtre temporelle propre à cette session —
+    entre son ouverture et l'ouverture de la session suivante du même
+    caissier ce jour-là (ou la fin de la journée calendaire si c'est la
+    dernière). Sert à rattacher a posteriori, par le temps, des données qui
+    n'ont pas de lien direct vers la session (ventes/remboursements
+    enregistrés avant l'ajout de ce lien)."""
+    _, jour_fin = bounds_haiti(session.date_session)
+    suivante = (
+        db.query(BarSessionCaisse)
         .filter(
-            BarVente.caissier_id == session.caissier_id,
-            BarVente.date_heure  >= today_start,
-            BarVente.date_heure  <= today_end,
-            BarVente.statut      != "ANNULEE",
+            BarSessionCaisse.caissier_id    == session.caissier_id,
+            BarSessionCaisse.date_session   == session.date_session,
+            BarSessionCaisse.numero_session  > session.numero_session,
         )
-        .order_by(BarVente.date_heure)
+        .order_by(BarSessionCaisse.numero_session)
+        .first()
+    )
+    return session.created_at, (suivante.created_at if suivante else jour_fin)
+
+
+def _ventes_session(session: BarSessionCaisse, db: Session):
+    """Ventes appartenant à cette session précise — PAS toutes les ventes du
+    caissier ce jour-là, sinon deux sessions successives du même caissier le
+    même jour (ex. #1 puis #2, désormais possible jusqu'à MAX_SESSIONS_PAR_JOUR)
+    afficheraient exactement le même rapport dupliqué.
+
+    Deux sources combinées :
+      1. Ventes explicitement rattachées via BarVente.session_id (toute vente
+         encaissée depuis l'ajout de cette colonne) — fiable à 100 %.
+      2. Ventes antérieures à cet ajout (session_id NULL) : rattachées a
+         posteriori par fenêtre temporelle (_fenetre_session) — seule méthode
+         possible rétroactivement, faute de lien direct sur ces anciennes
+         lignes."""
+    liees = (
+        db.query(BarVente)
+        .filter(BarVente.session_id == session.id, BarVente.statut != "ANNULEE")
         .all()
     )
 
+    debut, fin = _fenetre_session(session, db)
+    historique = (
+        db.query(BarVente)
+        .filter(
+            BarVente.session_id.is_(None),
+            BarVente.caissier_id == session.caissier_id,
+            BarVente.date_heure  >= debut,
+            BarVente.date_heure  <  fin,
+            BarVente.statut      != "ANNULEE",
+        )
+        .all()
+    )
 
-def _cash_remboursements_collectes(employe: Optional[Employe], jour: date, db: Session) -> Decimal:
-    """Cash physiquement recu ce jour-la par cette caissiere en reglement
-    d'un credit — quelle que soit la date de la vente d'origine (un credit
-    peut avoir ete vendu un autre jour). Le paiement d'un credit
-    (PUT /ventes/{id}/payer ou POST /credits/{id}/remboursement) ne change
-    jamais le mode_paiement ni la date_heure de la vente d'origine, donc ce
-    cash ne peut pas etre retrouve via _ventes_session/mode_paiement — il
-    est traque separement via bar_remboursements (date_remb + utilisateur_id
-    de la personne qui a encaisse), rattache a la caissiere via son compte
-    utilisateur lie (Employe.utilisateur_id)."""
+    return sorted(liees + historique, key=lambda v: v.date_heure)
+
+
+def _cash_remboursements_collectes(
+    employe: Optional[Employe], jour: date, db: Session,
+    session: Optional[BarSessionCaisse] = None,
+) -> Decimal:
+    """Cash physiquement recu par cette caissiere en reglement d'un credit —
+    quelle que soit la date de la vente d'origine (un credit peut avoir ete
+    vendu un autre jour). Le paiement d'un credit (PUT /ventes/{id}/payer ou
+    POST /credits/{id}/remboursement) ne change jamais le mode_paiement ni la
+    date_heure de la vente d'origine, donc ce cash ne peut pas etre retrouve
+    via _ventes_session/mode_paiement — il est traque separement via
+    bar_remboursements (date_remb + utilisateur_id de la personne qui a
+    encaisse), rattache a la caissiere via son compte utilisateur lie
+    (Employe.utilisateur_id).
+
+    Borné à la fenêtre temporelle de `session` (voir _fenetre_session) quand
+    elle est fournie — sinon, comme pour les ventes, deux sessions
+    successives du même caissier le même jour compteraient deux fois le même
+    remboursement dans leur réconciliation respective. Sans session fournie
+    (aucune session ouverte pour l'instant), retourne 0."""
     from models import BarRemboursement
     if not employe or not employe.utilisateur_id:
         return Decimal("0")
-    jour_start, jour_end = bounds_haiti(jour)
+    if session is None:
+        return Decimal("0")
+    debut, fin = _fenetre_session(session, db)
     rembs = (
         db.query(BarRemboursement)
         .filter(
             BarRemboursement.utilisateur_id == employe.utilisateur_id,
-            BarRemboursement.date_remb >= jour_start,
-            BarRemboursement.date_remb <= jour_end,
+            BarRemboursement.date_remb >= debut,
+            BarRemboursement.date_remb <  fin,
         )
         .all()
     )
@@ -128,11 +179,14 @@ def _cash_ventes_decimal(ventes) -> Decimal:
     )
 
 
-def _stats_ventes(ventes, employe: Optional[Employe] = None, jour: Optional[date] = None, db: Session = None):
+def _stats_ventes(
+    ventes, employe: Optional[Employe] = None, jour: Optional[date] = None, db: Session = None,
+    session: Optional[BarSessionCaisse] = None,
+):
     total      = sum((Decimal(str(v.montant_total)) for v in ventes), Decimal("0"))
     cash       = _cash_ventes_decimal(ventes)
     if employe is not None and jour is not None and db is not None:
-        cash += _cash_remboursements_collectes(employe, jour, db)
+        cash += _cash_remboursements_collectes(employe, jour, db, session=session)
     credit_tot = sum((Decimal(str(v.montant_total)) for v in ventes if v.mode_paiement == "CREDIT"), Decimal("0"))
     modes: dict = {}
     for v in ventes:
@@ -261,20 +315,6 @@ def dashboard_caissiere(
     if not employe:
         raise HTTPException(404, "Caissier introuvable")
 
-    dt_start, dt_end = bounds_haiti(jour)
-
-    ventes = (
-        db.query(BarVente)
-        .filter(
-            BarVente.caissier_id == caissier_id,
-            BarVente.date_heure  >= dt_start,
-            BarVente.date_heure  <= dt_end,
-            BarVente.statut      != "ANNULEE",
-        )
-        .order_by(BarVente.date_heure)
-        .all()
-    )
-
     # Jusqu'à MAX_SESSIONS_PAR_JOUR sessions par jour : on retient celle
     # EN_COURS si présente, sinon la plus récente (dernière ouverte) pour
     # refléter l'état du jour.
@@ -286,6 +326,12 @@ def dashboard_caissiere(
     )
     session = next((s for s in sessions_du_jour if s.statut == "EN_COURS"), None) \
         or (sessions_du_jour[-1] if sessions_du_jour else None)
+
+    # Ventes de la session affichée uniquement (pas toutes celles du jour) —
+    # sinon le mini-tableau de bord d'une nouvelle session afficherait encore
+    # les ventes d'une session précédente déjà soumise le même jour (voir
+    # _ventes_session).
+    ventes = _ventes_session(session, db) if session else []
 
     # Evolution horaire (pour graphe)
     evolution: list = []
@@ -299,7 +345,7 @@ def dashboard_caissiere(
             "ticket":  v.numero_ticket,
         })
 
-    stats = _stats_ventes(ventes, employe, jour, db)
+    stats = _stats_ventes(ventes, employe, jour, db, session=session)
     return {
         "date":          str(jour),
         "caissier_id":   caissier_id,
@@ -342,7 +388,7 @@ def liste_sessions(
     result = []
     for s in sessions:
         ventes = _ventes_session(s, db)
-        stats  = _stats_ventes(ventes, s.caissier, s.date_session, db)
+        stats  = _stats_ventes(ventes, s.caissier, s.date_session, db, session=s)
         result.append(_session_dict(s, stats))
     return result
 
@@ -351,7 +397,7 @@ def liste_sessions(
 def detail_session(session_id: int, db: Session = Depends(get_db)):
     s      = _session_ou_404(session_id, db)
     ventes = _ventes_session(s, db)
-    stats  = _stats_ventes(ventes, s.caissier, s.date_session, db)
+    stats  = _stats_ventes(ventes, s.caissier, s.date_session, db, session=s)
     d      = _session_dict(s, stats)
     d["ventes"] = [
         {
@@ -423,7 +469,7 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
         db.refresh(session)
 
     ventes = _ventes_session(session, db)
-    stats  = _stats_ventes(ventes, session.caissier, session.date_session, db)
+    stats  = _stats_ventes(ventes, session.caissier, session.date_session, db, session=session)
     return _session_dict(session, stats)
 
 
@@ -444,7 +490,7 @@ def soumettre_session(session_id: int, body: SoumettreIn, db: Session = Depends(
         raise HTTPException(409, "Session déjà validée par l'admin.")
 
     ventes = _ventes_session(s, db)
-    stats  = _stats_ventes(ventes, s.caissier, s.date_session, db)
+    stats  = _stats_ventes(ventes, s.caissier, s.date_session, db, session=s)
 
     # Calculé en Decimal exact (jamais via stats["cash"], déjà passé par un
     # flottant pour l'affichage) : c'est la donnée de réconciliation stockée,
@@ -480,7 +526,7 @@ def valider_session(session_id: int, body: ValiderIn = ValiderIn(), request: Req
         s.notes_admin = body.notes
     db.commit()
     ventes = _ventes_session(s, db)
-    return _session_dict(s, _stats_ventes(ventes, s.caissier, s.date_session, db))
+    return _session_dict(s, _stats_ventes(ventes, s.caissier, s.date_session, db, session=s))
 
 
 class EvaluationIn(BaseModel):
@@ -514,7 +560,7 @@ def evaluer_session(
 
     if body.finaliser:
         ventes = _ventes_session(s, db)
-        stats  = _stats_ventes(ventes, s.caissier, s.date_session, db)
+        stats  = _stats_ventes(ventes, s.caissier, s.date_session, db, session=s)
         articles_attendus = {p["nom"] for p in stats["tous_produits"]}
         evals = db.query(BarSessionEvaluation).filter_by(session_id=session_id).all()
         evalues_noms = {e.produit_nom for e in evals}
@@ -533,7 +579,7 @@ def evaluer_session(
         db.commit()
 
     ventes = _ventes_session(s, db)
-    return _session_dict(s, _stats_ventes(ventes, s.caissier, s.date_session, db))
+    return _session_dict(s, _stats_ventes(ventes, s.caissier, s.date_session, db, session=s))
 
 
 # ── Exports PDF / XLSX ────────────────────────────────────────────────
@@ -541,7 +587,7 @@ def evaluer_session(
 def _build_rapport_data(session_id: int, db: Session):
     s      = _session_ou_404(session_id, db)
     ventes = _ventes_session(s, db)
-    stats  = _stats_ventes(ventes, s.caissier, s.date_session, db)
+    stats  = _stats_ventes(ventes, s.caissier, s.date_session, db, session=s)
     return s, ventes, stats
 
 

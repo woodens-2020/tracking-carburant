@@ -188,6 +188,12 @@ def _migrate_columns():
             # v20 — lieu (Bar Devant / Bar Piscine) choisi au démarrage de session
             ("bar_sessions_caisse", "lieu",
              "ALTER TABLE bar_sessions_caisse ADD COLUMN lieu VARCHAR(20)", None),
+            # v21 — rattachement direct d'une vente à sa session de caisse
+            # (corrige les rapports dupliqués entre sessions successives du
+            # même jour — voir _ventes_session dans caisse_routes.py)
+            ("bar_ventes", "session_id",
+             "ALTER TABLE bar_ventes ADD COLUMN session_id INTEGER REFERENCES bar_sessions_caisse(id)",
+             "CREATE INDEX IF NOT EXISTS idx_bar_ventes_session ON bar_ventes(session_id)"),
         ]
     elif _is_postgres:
         new_cols = [
@@ -286,6 +292,12 @@ def _migrate_columns():
             # v20 — lieu (Bar Devant / Bar Piscine) choisi au démarrage de session
             ("bar_sessions_caisse", "lieu",
              "ALTER TABLE bar_sessions_caisse ADD COLUMN lieu VARCHAR(20)", None),
+            # v21 — rattachement direct d'une vente à sa session de caisse
+            # (corrige les rapports dupliqués entre sessions successives du
+            # même jour — voir _ventes_session dans caisse_routes.py)
+            ("bar_ventes", "session_id",
+             "ALTER TABLE bar_ventes ADD COLUMN session_id INTEGER REFERENCES bar_sessions_caisse(id) ON DELETE SET NULL",
+             "CREATE INDEX IF NOT EXISTS idx_bar_ventes_session ON bar_ventes(session_id)"),
         ]
     else:
         return

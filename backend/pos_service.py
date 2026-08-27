@@ -20,7 +20,7 @@ from models import (
     BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande,
     CuisinePlat, CuisineVente, CuisineLigneVente,
-    Client,
+    Client, BarSessionCaisse,
 )
 from tz_utils import today_haiti, bounds_haiti
 
@@ -288,10 +288,25 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
 
     statut = "CREDIT_EN_COURS" if montant_restant > 0 else "PAYEE"
 
+    # Rattache la vente à la session de caisse EN_COURS du caissier (s'il en
+    # a une) — indispensable pour distinguer les ventes de sessions
+    # successives du même caissier le même jour (voir _ventes_session dans
+    # caisse_routes.py, qui sinon confondrait les rapports de deux sessions).
+    session_id = None
+    caissier_id = data.get("caissier_id")
+    if caissier_id:
+        session_en_cours = (
+            db.query(BarSessionCaisse)
+            .filter_by(caissier_id=caissier_id, date_session=today_haiti(), statut="EN_COURS")
+            .first()
+        )
+        session_id = session_en_cours.id if session_en_cours else None
+
     # Créer la vente
     vente = BarVente(
         numero_ticket   = generer_numero_ticket(db),
-        caissier_id     = data.get("caissier_id"),
+        caissier_id     = caissier_id,
+        session_id      = session_id,
         montant_total   = montant_total,
         mode_paiement   = mode,
         statut          = statut,
