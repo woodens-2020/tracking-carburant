@@ -302,6 +302,17 @@ def _migrate_columns():
     else:
         return
 
+    # Ajout des colonnes manquantes — commité tout de suite, dans SA PROPRE
+    # connexion/transaction, avant de toucher aux blocs de contraintes
+    # ci-dessous. CRITIQUE : ne jamais partager une connexion/transaction
+    # entre cet ajout de colonnes et les blocs try/except suivants — un
+    # conn.rollback() annule TOUTE la transaction en cours sur cette
+    # connexion, pas seulement l'instruction qui a échoué. Ça a réellement
+    # empêché l'ajout de bar_ventes.session_id (v21) de survivre en
+    # production : le rollback d'un bloc de contrainte plus bas (qui échoue
+    # normalement à chaque redémarrage, la contrainte étant déjà en place)
+    # a silencieusement effacé la colonne pourtant déjà ajoutée avec succès
+    # dans la même connexion, juste avant le commit final.
     with engine.connect() as conn:
         for table, col, ddl_col, ddl_idx in new_cols:
             existing = [c["name"] for c in insp.get_columns(table)]
@@ -309,21 +320,15 @@ def _migrate_columns():
                 conn.execute(sql_text(ddl_col))
                 if ddl_idx:
                     conn.execute(sql_text(ddl_idx))
+        conn.commit()
 
-        # v4 — rôle PDG : mise à jour de la contrainte CHECK sur utilisateurs
-        #
-        # Chaque bloc ci-dessous est idempotent (relancé à chaque démarrage) —
-        # mais dès qu'une des instructions échoue (ex. contrainte déjà
-        # présente, sur un redéploiement), PostgreSQL marque TOUTE la
-        # transaction "aborted" : toute commande suivante sur cette même
-        # connexion échoue à son tour avec InFailedSqlTransaction, MÊME SI
-        # elle n'a rien à voir avec l'échec d'origine — y compris le
-        # conn.commit() final, qui ne fait alors qu'annuler silencieusement
-        # tout ce qui précède (ex. l'ajout d'une colonne plus haut dans la
-        # même fonction). D'où le conn.rollback() dans chaque except : il
-        # ramène la connexion à un état propre pour que les blocs suivants
-        # (et le commit final) puissent s'exécuter normalement.
-        if _is_postgres:
+    # Contraintes Postgres — chaque bloc est idempotent (relancé à chaque
+    # démarrage) mais échoue normalement sur un redéploiement (contrainte
+    # déjà en place) ; il obtient donc SA PROPRE connexion/transaction,
+    # pour qu'un rollback ici ne puisse jamais annuler le commit des
+    # colonnes ci-dessus, ni le travail réussi d'un autre bloc.
+    if _is_postgres:
+        with engine.connect() as conn:
             try:
                 conn.execute(sql_text(
                     "ALTER TABLE utilisateurs DROP CONSTRAINT IF EXISTS chk_utilisateur_role"
@@ -332,11 +337,13 @@ def _migrate_columns():
                     "ALTER TABLE utilisateurs ADD CONSTRAINT chk_utilisateur_role "
                     "CHECK (role IN ('admin', 'operateur', 'pdg'))"
                 ))
+                conn.commit()
             except Exception:
                 conn.rollback()  # contrainte déjà à jour
 
-            # v16 — précision des relevés de compteur élargie de 3 à 4 décimales
-            # (élargissement sans perte : les valeurs existantes restent valides)
+        # v16 — précision des relevés de compteur élargie de 3 à 4 décimales
+        # (élargissement sans perte : les valeurs existantes restent valides)
+        with engine.connect() as conn:
             try:
                 conn.execute(sql_text(
                     "ALTER TABLE releves ALTER COLUMN metter_avant TYPE NUMERIC(14,4)"
@@ -344,12 +351,14 @@ def _migrate_columns():
                 conn.execute(sql_text(
                     "ALTER TABLE releves ALTER COLUMN metter_apres TYPE NUMERIC(14,4)"
                 ))
+                conn.commit()
             except Exception:
                 conn.rollback()  # déjà à la bonne précision
 
-            # v19 — jusqu'à 2 sessions de caisse par jour par caissier : la
-            # contrainte d'unicité passe de (caissier_id, date_session) à
-            # (caissier_id, date_session, numero_session).
+        # v19 — jusqu'à 2 sessions de caisse par jour par caissier : la
+        # contrainte d'unicité passe de (caissier_id, date_session) à
+        # (caissier_id, date_session, numero_session).
+        with engine.connect() as conn:
             try:
                 conn.execute(sql_text(
                     "ALTER TABLE bar_sessions_caisse DROP CONSTRAINT IF EXISTS uq_session_caissier_date"
@@ -358,19 +367,20 @@ def _migrate_columns():
                     "ALTER TABLE bar_sessions_caisse ADD CONSTRAINT uq_session_caissier_date_num "
                     "UNIQUE (caissier_id, date_session, numero_session)"
                 ))
+                conn.commit()
             except Exception:
                 conn.rollback()  # contrainte déjà à jour
 
-            # v20 — lieu (Bar Devant / Bar Piscine) : contrainte de domaine
+        # v20 — lieu (Bar Devant / Bar Piscine) : contrainte de domaine
+        with engine.connect() as conn:
             try:
                 conn.execute(sql_text(
                     "ALTER TABLE bar_sessions_caisse ADD CONSTRAINT chk_session_lieu "
                     "CHECK (lieu IS NULL OR lieu IN ('DEVANT','PISCINE'))"
                 ))
+                conn.commit()
             except Exception:
                 conn.rollback()  # déjà présente
-
-        conn.commit()
 
 
 # ── Initialisation du schéma + données de démarrage ──────────────
