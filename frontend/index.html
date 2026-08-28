@@ -13691,7 +13691,7 @@ function updateExportPompes(){
 async function loadSaisie(){
   try{
     [products,releves]=await Promise.all([
-      GET('/produits'),
+      GET('/produits?date='+currentDate),
       GET('/releves?date='+currentDate),
     ]);
     renderProdTabs();
@@ -13739,7 +13739,12 @@ function renderSaisie(){
       const isEdit=!!r;
       const av=r?r.metter_avant:'';
       const ap=r?r.metter_apres:'';
-      const px=r?r.prix_gallon:p.prix_gallon;
+      // Prix configuré aux Paramètres (Prix de vente) en priorité — sinon la
+      // saisie resterait figée sur le prix de création du produit, même
+      // après un changement de prix officiel. Un relevé déjà existant garde
+      // toujours son propre prix historique (r.prix_gallon), inchangé.
+      const pxDefaut=(p.prix_vente_actif!=null)?p.prix_vente_actif:p.prix_gallon;
+      const px=r?r.prix_gallon:pxDefaut;
       const qte=r?r.quantite:0;
       const mnt=r?r.montant_vente:0;
       const nbMod=r?(r.nb_modifications||0):0;
@@ -13761,7 +13766,7 @@ function renderSaisie(){
         </button>`;
       }
 
-      return `<tr data-pompe="${po.id}" data-per="${per}" data-defpx="${p.prix_gallon}"
+      return `<tr data-pompe="${po.id}" data-per="${per}" data-defpx="${pxDefaut}"
                   data-is-edit="${isEdit?'1':'0'}" data-nb-mod="${nbMod}"
                   data-av="${av}" data-ap="${ap}">
         <td style="font-weight:600">${esc(po.nom)}</td>

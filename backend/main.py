@@ -1355,12 +1355,29 @@ class ReleveIn(BaseModel):
 
 # ---------- Produits & Pompes ----------
 @app.get("/api/produits")
-def list_produits(db: Session = Depends(get_db)):
+def list_produits(date: Optional[date_type] = None, db: Session = Depends(get_db)):
+    """`prix_gallon` reste l'ancien prix figé à la création du produit — il
+    n'est modifiable nulle part dans l'app. `prix_vente_actif` est le prix
+    réellement configuré via la page Paramètres > Prix de vente (historisé,
+    POST /prix-vente) : le plus récent dont la date d'effet est ≤ `date`
+    (aujourd'hui par défaut). L'espace de saisie des relevés doit préremplir
+    le prix à partir de `prix_vente_actif` (repli sur `prix_gallon` si aucun
+    prix n'a jamais été configuré) — sinon un prix configuré aux Paramètres
+    n'apparaît jamais dans la saisie, qui restait figée sur le prix de
+    création du produit."""
+    date_ref = date or today_haiti()
     # Bug 10 fix : ne retourner que les produits et pompes actifs
     out = []
     for p in db.query(Produit).filter_by(actif=True).all():
+        px_actif = (
+            db.query(PrixVente)
+            .filter(PrixVente.produit_id == p.id, PrixVente.date_effet <= date_ref)
+            .order_by(PrixVente.date_effet.desc())
+            .first()
+        )
         out.append({
             "id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon,
+            "prix_vente_actif": float(px_actif.prix_vente_gallon) if px_actif else None,
             "pompes": [{"id": q.id, "nom": q.nom} for q in p.pompes if q.actif],
         })
     return out
