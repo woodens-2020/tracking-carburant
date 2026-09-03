@@ -7237,11 +7237,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div>
 
-    <!-- Modal Fiche Technique Bar (avant nouvel achat) — 2 étapes -->
+    <!-- Modal Fiche Technique Bar (avant nouvel achat) -->
     <div class="pos-modal-bg" id="pos-fiche-tech-modal">
       <div class="pos-modal" style="max-width:860px;max-height:92vh;display:flex;flex-direction:column">
 
-        <!-- Étape 1 : Fiche technique -->
         <div id="pft-step1" style="display:flex;flex-direction:column;overflow:hidden;flex:1">
           <div style="padding:18px 20px 14px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">
             <div style="font-size:17px;font-weight:700;color:#fff">Fiche technique du stock bar</div>
@@ -7294,32 +7293,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
             <div style="display:flex;gap:8px">
               <button class="pos-btn ghost" onclick="document.getElementById('pos-fiche-tech-modal').classList.remove('open')">Fermer</button>
-              <button class="pos-btn teal" onclick="pftPasserInventaire()">Inventaire physique →</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Étape 2 : Inventaire physique -->
-        <div id="pft-step2" style="display:none;flex-direction:column;overflow:hidden;flex:1">
-          <div style="padding:18px 20px 14px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">
-            <div style="font-size:17px;font-weight:700;color:#fff">Inventaire physique</div>
-            <div style="font-size:13px;color:rgba(255,255,255,.4);margin-top:2px">Confirmez le stock réel comptabilisé avant d'ajouter une réception</div>
-          </div>
-
-          <div style="overflow-y:auto;flex:1;padding:14px 20px">
-            <div style="font-size:14px;color:rgba(255,255,255,.4);margin-bottom:12px">
-              Remplissez uniquement les produits que vous avez comptés. Les cases vides seront ignorées.
-            </div>
-            <div id="pft-inventaire-liste" style="display:flex;flex-direction:column;gap:8px"></div>
-          </div>
-
-          <div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
-            <button class="pos-btn ghost" onclick="pftRetourFiche()">← Retour fiche</button>
-            <div style="display:flex;gap:10px">
-              <button class="pos-btn ghost" onclick="document.getElementById('pos-fiche-tech-modal').classList.remove('open')">Annuler</button>
-              <button class="pos-btn teal" onclick="pftConfirmerInventaire()">
-                Confirmer &amp; déclarer achat
-              </button>
+              <button class="pos-btn teal" onclick="pftAllerAchat()">Nouvel achat →</button>
             </div>
           </div>
         </div>
@@ -23920,7 +23894,6 @@ async function posAjusterStock(){
 // ══════════════════════════════════════════════════════════════════════
 let _paDepenses    = [];
 let _paTousProduits = { bar: [], station: [] }; // cache produits pour la modal
-let _paAutoConfirmer = false; // true quand on passe par fiche technique → confirme stock immédiatement
 
 async function loadPosAchats(){
   const sel    = document.getElementById('pa-filtre-produit');
@@ -24269,7 +24242,6 @@ let _pftFicheData = null; // cache la réponse fiche-technique
 async function posFicheTechniqueOuvrir(){
   const modal = document.getElementById('pos-fiche-tech-modal');
   document.getElementById('pft-step1').style.display = 'flex';
-  document.getElementById('pft-step2').style.display = 'none';
   modal.classList.add('open');
 
   const tbody = document.getElementById('pft-tbody');
@@ -24372,75 +24344,8 @@ async function posFicheTechniqueOuvrir(){
   }
 }
 
-function pftPasserInventaire(){
-  const produits = (_pftFicheData && _pftFicheData.produits) || [];
-  const liste = document.getElementById('pft-inventaire-liste');
-  if(!produits.length){
-    liste.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:15px">Aucun produit actif.</div>';
-  } else {
-    const fmt3 = v => parseFloat(v).toFixed(3).replace(/\.?0+$/,'');
-    liste.innerHTML = produits.map(p => `
-      <div style="display:grid;grid-template-columns:1fr 100px 110px;gap:8px;align-items:center;padding:8px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px">
-        <div>
-          <span style="font-weight:700;font-size:15px">${p.nom}</span>
-          <span style="font-size:13px;color:rgba(255,255,255,.35);margin-left:8px">${p.categorie}</span>
-        </div>
-        <div style="font-size:14px;color:rgba(255,255,255,.45);text-align:right">
-          Système&nbsp;:<br><strong style="color:#fff">${fmt3(p.stock_courant)} ${p.unite}</strong>
-        </div>
-        <div>
-          <input class="pos-input" type="number" min="0" step="0.001" placeholder="Comptage réel"
-            id="pft-inv-${p.produit_id}"
-            style="font-size:14px;padding:6px 8px;text-align:right"
-            title="Stock physique compté pour ${p.nom}">
-          <div style="font-size:12px;color:rgba(255,255,255,.25);text-align:right;margin-top:2px">${p.unite}</div>
-        </div>
-      </div>
-    `).join('');
-  }
-  document.getElementById('pft-step1').style.display = 'none';
-  document.getElementById('pft-step2').style.display = 'flex';
-}
-
-function pftRetourFiche(){
-  document.getElementById('pft-step1').style.display = 'flex';
-  document.getElementById('pft-step2').style.display = 'none';
-}
-
-async function pftConfirmerInventaire(){
-  const produits = (_pftFicheData && _pftFicheData.produits) || [];
-  const ajustements = [];
-
-  for(const p of produits){
-    const inp = document.getElementById(`pft-inv-${p.produit_id}`);
-    if(!inp || inp.value === '') continue;
-    const physique  = parseFloat(inp.value);
-    const systeme   = parseFloat(p.stock_courant);
-    const diff      = physique - systeme;
-    if(Math.abs(diff) >= 0.001){
-      ajustements.push({ produit_id: p.produit_id, nom: p.nom, diff: Math.round(diff * 1000) / 1000 });
-    }
-  }
-
-  if(ajustements.length){
-    try {
-      for(const aj of ajustements){
-        await apiFetch('POST', '/pos/stock/ajustement', {
-          produit_id:     aj.produit_id,
-          type_mouvement: 'AJUSTEMENT',
-          quantite:       aj.diff,
-          motif:          `Inventaire physique avant achat (diff: ${aj.diff > 0 ? '+' : ''}${aj.diff} ${(_pftFicheData.produits.find(p=>p.produit_id===aj.produit_id)||{}).unite||'u.'})`,
-        });
-      }
-      posAlert(`${ajustements.length} ajustement(s) de stock enregistré(s).`, 'ok');
-    } catch(e){
-      posAlert(`Erreur lors des ajustements : ${e.message||e}`, 'error');
-      return;
-    }
-  }
-
+async function pftAllerAchat(){
   document.getElementById('pos-fiche-tech-modal').classList.remove('open');
-  _paAutoConfirmer = true; // achat issu d'un inventaire physique → confirmer le stock automatiquement
   await _posOuvrirFormAchat();
 }
 
@@ -25060,27 +24965,13 @@ async function posEnregistrerAchat(){
     const label = res.produit_nom || (sel.prod?.nom||'le produit');
     const unLabel = sel.type==='station' ? 'gallon' : 'unité';
 
-    // Auto-confirmation si l'achat provient du flux fiche technique (inventaire confirmé)
-    if(_paAutoConfirmer && res.statut === 'EN_ATTENTE' && res.achat_id){
-      _paAutoConfirmer = false;
-      try {
-        await apiFetch('POST', `/pos/achats/${res.achat_id}/confirmer`);
-        await loadPosAchats();
-        posAlert(`Achat confirmé (comptabilité) — ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} de ${label}. Coût total: ${fmt(res.cout_total)}. Pensez à faire l'approvisionnement séparément pour ajouter au stock.`,'ok');
-      } catch(ce){
-        await loadPosAchats();
-        posAlert(`Achat enregistré mais confirmation échouée : ${ce.message||ce}. Allez dans Achats Bar pour confirmer.`,'warn');
-      }
+    await loadPosAchats();
+    if(res.statut==='EN_ATTENTE'){
+      posAlert(`Achat enregistré (EN ATTENTE) — Allez dans Achats Bar pour le confirmer (comptabilité). Faites un approvisionnement séparé pour ajouter les ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} de ${label} au stock.`,'warn');
     } else {
-      _paAutoConfirmer = false;
-      await loadPosAchats();
-      if(res.statut==='EN_ATTENTE'){
-        posAlert(`Achat enregistré (EN ATTENTE) — Allez dans Achats Bar pour le confirmer (comptabilité). Faites un approvisionnement séparé pour ajouter les ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} de ${label} au stock.`,'warn');
-      } else {
-        posAlert(`Achat enregistré — ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} pour ${label}. Coût total: ${fmt(res.cout_total)}`,'ok');
-      }
+      posAlert(`Achat enregistré — ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} pour ${label}. Coût total: ${fmt(res.cout_total)}`,'ok');
     }
-  } catch(e){ _paAutoConfirmer = false; posAlert(e.message||'Erreur enregistrement achat.'); }
+  } catch(e){ posAlert(e.message||'Erreur enregistrement achat.'); }
 }
 
 // ── Modification d'un achat existant ────────────────────────────────
