@@ -65,8 +65,15 @@ class Releve(Base):
     created_at       = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at   = Column(DateTime(timezone=True), nullable=False, server_default=func.now(),
                           onupdate=func.now())
+    # Traçabilité : qui a saisi ce relevé, et qui l'a modifié en dernier (les
+    # deux valent la même personne à la création — modifie_par_id n'a d'intérêt
+    # que si le relevé est ensuite corrigé par quelqu'un d'autre).
+    cree_par_id    = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    modifie_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
 
-    pompe = relationship("Pompe")
+    pompe       = relationship("Pompe")
+    cree_par    = relationship("Utilisateur", foreign_keys=[cree_par_id])
+    modifie_par = relationship("Utilisateur", foreign_keys=[modifie_par_id])
 
     __table_args__ = (
         UniqueConstraint("date", "periode", "pompe_id", name="uq_releve"),
@@ -567,7 +574,10 @@ class BarAchat(Base):
         CheckConstraint("quantite > 0",            name="chk_bar_achat_qte_pos"),
         CheckConstraint("prix_achat_unitaire >= 0", name="chk_bar_achat_prix_pos"),
         CheckConstraint(
-            "(produit_id IS NOT NULL)::int + (station_produit_id IS NOT NULL)::int = 1",
+            # Exactement un des deux doit être renseigné (XOR) — écrit sans
+            # cast ::int (invalide sur SQLite, valide seulement sur Postgres)
+            # pour rester portable entre les deux moteurs.
+            "(produit_id IS NULL) != (station_produit_id IS NULL)",
             name="chk_bar_achat_produit_xor",
         ),
         CheckConstraint("statut IN ('EN_ATTENTE','CONFIRME','ANNULE')", name="chk_bar_achat_statut"),

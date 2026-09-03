@@ -13740,10 +13740,17 @@ function renderSaisie(){
         </button>`;
       }
 
+      // Traçabilité : qui a saisi ce relevé (et qui l'a modifié en dernier,
+      // si différent) — affiché en sous-titre discret, pas une colonne à
+      // part, pour ne pas alourdir le tableau ni retoucher les 3 langues.
+      const saisiPar=isEdit&&r.cree_par_nom
+        ?`<div style="font-size:11px;font-weight:400;color:var(--muted);margin-top:2px">Saisi par ${esc(r.cree_par_nom)}${(r.modifie_par_nom&&r.modifie_par_nom!==r.cree_par_nom)?` · modifié par ${esc(r.modifie_par_nom)}`:''}</div>`
+        :'';
+
       return `<tr data-pompe="${po.id}" data-per="${per}" data-defpx="${pxDefaut}"
                   data-is-edit="${isEdit?'1':'0'}" data-nb-mod="${nbMod}"
                   data-av="${av}" data-ap="${ap}">
-        <td style="font-weight:600">${esc(po.nom)}</td>
+        <td style="font-weight:600">${esc(po.nom)}${saisiPar}</td>
         <td class="tr" data-label="${t('saisie.table.px')}"><input class="inp inp-sm inp-px" type="number" step="0.01" value="${px}" oninput="calcRow(this.closest('tr'))"></td>
         <td class="tr" data-label="${t('saisie.table.av')}"><input class="inp inp-av" type="number" step="0.0001" value="" readonly placeholder="${av||'—'}" oninput="calcRow(this.closest('tr'))"></td>
         <td class="tr" data-label="${t('saisie.table.ap')}"><input class="inp inp-ap" type="number" step="0.0001" value="" readonly placeholder="${ap||'—'}" oninput="calcRow(this.closest('tr'))"></td>

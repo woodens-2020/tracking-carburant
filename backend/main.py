@@ -1412,7 +1412,7 @@ def delete_pompe(pompe_id: int, db: Session = Depends(get_db)):
 
 # ---------- Releves ----------
 @app.post("/api/releves")
-def upsert_releve(data: ReleveIn, db: Session = Depends(get_db)):
+def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db)):
     # Bug 7 fix : validations métier à la frontière API (message clair avant la DB)
     if data.periode not in PERIODES:
         raise HTTPException(400, f"Periode invalide — valeurs acceptées : {PERIODES}")
@@ -1432,7 +1432,7 @@ def upsert_releve(data: ReleveIn, db: Session = Depends(get_db)):
          .first())
     if not r:
         r = Releve(date=data.date, periode=data.periode, pompe_id=data.pompe_id,
-                   nb_modifications=0)
+                   nb_modifications=0, cree_par_id=request.state.user.id)
         db.add(r)
     else:
         # Bug 9 fix : utilisation de la constante module
@@ -1443,9 +1443,10 @@ def upsert_releve(data: ReleveIn, db: Session = Depends(get_db)):
                 f"{MAX_MODIFICATIONS_PAR_RELEVE} fois."
             )
         r.nb_modifications += 1
-    r.prix_gallon  = data.prix_gallon
-    r.metter_avant = data.metter_avant
-    r.metter_apres = data.metter_apres
+    r.prix_gallon    = data.prix_gallon
+    r.metter_avant   = data.metter_avant
+    r.metter_apres   = data.metter_apres
+    r.modifie_par_id = request.state.user.id
     db.commit(); db.refresh(r)
 
     pompe = db.query(Pompe).get(r.pompe_id)
@@ -1487,6 +1488,8 @@ def _releve_dict(r: Releve):
         "metter_avant": r.metter_avant, "metter_apres": r.metter_apres,
         "quantite": r.quantite, "montant_vente": r.montant_vente,
         "nb_modifications": r.nb_modifications,
+        "cree_par_nom":    r.cree_par.nom_complet    if r.cree_par    else None,
+        "modifie_par_nom": r.modifie_par.nom_complet if r.modifie_par else None,
     }
 
 

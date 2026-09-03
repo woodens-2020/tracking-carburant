@@ -194,6 +194,11 @@ def _migrate_columns():
             ("bar_ventes", "session_id",
              "ALTER TABLE bar_ventes ADD COLUMN session_id INTEGER REFERENCES bar_sessions_caisse(id)",
              "CREATE INDEX IF NOT EXISTS idx_bar_ventes_session ON bar_ventes(session_id)"),
+            # v22 — traçabilité : qui a saisi / modifié un relevé de compteur
+            ("releves", "cree_par_id",
+             "ALTER TABLE releves ADD COLUMN cree_par_id INTEGER REFERENCES utilisateurs(id)", None),
+            ("releves", "modifie_par_id",
+             "ALTER TABLE releves ADD COLUMN modifie_par_id INTEGER REFERENCES utilisateurs(id)", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -298,6 +303,11 @@ def _migrate_columns():
             ("bar_ventes", "session_id",
              "ALTER TABLE bar_ventes ADD COLUMN session_id INTEGER REFERENCES bar_sessions_caisse(id) ON DELETE SET NULL",
              "CREATE INDEX IF NOT EXISTS idx_bar_ventes_session ON bar_ventes(session_id)"),
+            # v22 — traçabilité : qui a saisi / modifié un relevé de compteur
+            ("releves", "cree_par_id",
+             "ALTER TABLE releves ADD COLUMN cree_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
+            ("releves", "modifie_par_id",
+             "ALTER TABLE releves ADD COLUMN modifie_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
         ]
     else:
         return
