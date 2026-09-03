@@ -14952,18 +14952,54 @@ let _branding = {
   telephone2:     '(509) 4821-7700',
 };
 
+// Modules actifs pour cette institution — tous actifs par défaut (comportement
+// historique) tant que /api/config/branding n'a pas répondu ou si le serveur
+// ne renvoie rien pour un module donné.
+let _modules = { carburant: true, bar: true, hotel: true, cuisine: true, zelle: true };
+
 async function _loadBranding(){
   try{
     const r = await fetch('/api/config/branding');
     if(!r.ok) return;
     const b = await r.json();
-    Object.assign(_branding, b);
+    const { modules, ...brandingFields } = b;
+    Object.assign(_branding, brandingFields);
+    if(modules) Object.assign(_modules, modules);
     document.title = `Konekta · ${_branding.raison_sociale}`;
     const sbSub = document.querySelector('.sb-sub');
     if(sbSub) sbSub.textContent = `${_branding.raison_sociale} · ${_branding.complexe}`;
     const footBrand = document.getElementById('footer-pillatre-txt');
     if(footBrand) footBrand.textContent = `${_branding.raison_sociale} · ${_branding.complexe}`;
   }catch(e){ /* silencieux — les valeurs par défaut restent actives */ }
+}
+
+// ── Pages propres à un module désactivable par institution (voir _modules,
+// /api/config/branding) — distinct de _AREA_PAGES ci-dessous, qui filtre par
+// RÔLE au sein des modules actifs. Une page absente de cette liste (ex.
+// notifications, taches, employes, payroll, achats, caisse, gi-dashboard,
+// admin) est un module toujours partagé entre toutes les institutions, quels
+// que soient les modules métier activés — voir la vérification faite avec
+// l'utilisateur avant de figer cette liste (« Rapport de Caisse », « Tableau
+// de Bord Gestion », « Achats » et « Payroll » agrègent/gèrent tout
+// l'établissement, pas seulement le carburant).
+const _MODULE_PAGES = {
+  carburant: ['home','dashboard','saisie','journal','rapport-analytique','statistiques',
+              'previsions','rapports','stock','gestion','audit','depenses'],
+  bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-stock','pos-achats',
+              'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite',
+              'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis'],
+  hotel:     ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours',
+              'hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
+  zelle:     ['zelle','zelle-paiements','zelle-fonds'],
+  cuisine:   ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes',
+              'cuisine-stats','cuisine-achats','cuisine-analyse'],
+};
+
+function _pageModuleEnabled(page){
+  for(const mod in _MODULE_PAGES){
+    if(_MODULE_PAGES[mod].includes(page)) return _modules[mod] !== false;
+  }
+  return true; // page hors de tout module métier désactivable — toujours visible
 }
 
 // ── Matrice de pages par domaine fonctionnel ─────────────────────
@@ -15094,6 +15130,9 @@ function _canAccess(page){
   if(!_appUser) return false;
   // Notifications et Tâches : accessibles à tous les rôles sans exception
   if(page==='notifications' || page==='taches') return true;
+  // Module métier désactivé pour cette institution — bloqué même pour l'admin,
+  // avant toute vérification de rôle (voir _modules / _MODULE_PAGES).
+  if(!_pageModuleEnabled(page)) return false;
   // Admin vérifié sur les 3 indicateurs (est_admin, role, permissions.admin)
   if(_isAdmin()) return true;
   // Pages admin interdites à tous les non-admins, sans exception
@@ -15118,7 +15157,23 @@ function _applyNavAccess(){
   const allowed = _getAllowedPages();
   const _isManager = (_appUser?.role_nom||_appUser?.poste||'').toLowerCase() === 'manager';
   const isCaissiere = !_isManager && (!!_appUser?.employe_id || (_appUser?.role_nom||_appUser?.poste||'').toLowerCase().startsWith('caissier'));
-  if(allowed === null && !isCaissiere){ _updateNavSectionVisibility(); return; } // accès complet sans restrictions caissière
+  if(allowed === null && !isCaissiere){
+    // Accès complet (pas de restriction de rôle) : seuls les modules métier
+    // désactivés pour cette institution restent masqués.
+    document.querySelectorAll('.nav-item[data-page], .mnav-btn[data-page]').forEach(btn=>{
+      const p = btn.getAttribute('data-page');
+      if(['admin-roles','admin-users','admin-sessions','admin-audit','admin-security'].includes(p)) return;
+      const ok = _pageModuleEnabled(p);
+      btn.style.display = ok ? '' : 'none';
+      btn.dataset.navAllowed = ok ? '1' : '0';
+    });
+    document.querySelectorAll('.nav-card[onclick]').forEach(card=>{
+      const m = card.getAttribute('onclick').match(/goTo\('([^']+)'\)/);
+      if(m) card.style.display = _pageModuleEnabled(m[1]) ? '' : 'none';
+    });
+    _updateNavSectionVisibility();
+    return;
+  }
   // Masquer items de nav interdits (sauf admin qui est géré ci-dessus)
   document.querySelectorAll('.nav-item[data-page], .mnav-btn[data-page]').forEach(btn=>{
     const p = btn.getAttribute('data-page');
@@ -15887,7 +15942,9 @@ document.addEventListener('DOMContentLoaded',async()=>{
   // Thème + langue (avant tout rendu)
   applyTheme();
   applyLang();
-  _loadBranding();
+  // Attendu (pas fire-and-forget) : _modules doit être connu avant la
+  // décision de redirection post-connexion et le filtrage de la nav ci-dessous.
+  await _loadBranding();
 
   // Détection : connexion fraîche (login) vs simple rafraîchissement de page.
   // Sert à la fois pour la charte de responsabilité et pour savoir si on doit
@@ -15964,9 +16021,21 @@ document.addEventListener('DOMContentLoaded',async()=>{
   } else if(!!_appUser?.employe_id || _rlNom.startsWith('caissier')){
     goTo('pos-caisse');
   } else {
-    goTo('home');
+    goTo(_defaultLandingPage());
   }
 });
+
+// Page d'atterrissage par défaut pour un compte sans restriction de rôle —
+// « Accueil » (home) est le tableau de bord du carburant : sans ce module
+// (ex. Carribean), on atterrit plutôt sur le premier module métier actif.
+function _defaultLandingPage(){
+  if(_modules.carburant)  return 'home';
+  if(_modules.bar)        return 'pos-dashboard-bar';
+  if(_modules.hotel)      return 'hotel-dashboard';
+  if(_modules.cuisine)    return 'cuisine-caisse';
+  if(_modules.zelle)      return 'zelle';
+  return 'employes'; // toujours partagé, jamais désactivé
+}
 
 // ══════════════════════════════════════════════
 // RAPPORT ANALYTIQUE

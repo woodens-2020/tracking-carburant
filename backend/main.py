@@ -74,6 +74,19 @@ _BRANDING = {
     "telephone2":     os.getenv("BRANDING_TEL2", "(509) 4821-7700"),
 }
 
+# Modules activables par institution — un déploiement qui ne définit aucune
+# de ces variables garde tous les modules actifs (comportement inchangé pour
+# Pillatre/staging). Permet de désactiver, par exemple, le carburant pour
+# une institution qui ne vend que du bar/hôtel (Carribean), ou l'inverse
+# pour une institution qui ne vend que du carburant (Vertières).
+_MODULES = {
+    "carburant": os.getenv("MODULE_CARBURANT", "true").lower() == "true",
+    "bar":       os.getenv("MODULE_BAR",       "true").lower() == "true",
+    "hotel":     os.getenv("MODULE_HOTEL",     "true").lower() == "true",
+    "cuisine":   os.getenv("MODULE_CUISINE",   "true").lower() == "true",
+    "zelle":     os.getenv("MODULE_ZELLE",     "true").lower() == "true",
+}
+
 app = FastAPI(
     title="Suivi des Meters - Station",
     docs_url="/docs"        if _DEBUG_MODE else None,
@@ -591,9 +604,11 @@ def login_meta_save(data: LoginMetaIn, request: Request, db: Session = Depends(g
 
 @app.get("/api/config/branding")
 def config_branding():
-    """Identité de l'institution (nom, adresse, téléphone…) — public, requis
-    dès l'écran de connexion et sur tous les tickets/rapports imprimés."""
-    return _BRANDING
+    """Identité de l'institution (nom, adresse, téléphone…) et modules actifs
+    (carburant/bar/hôtel/cuisine/zelle) — public, requis dès l'écran de
+    connexion, sur tous les tickets/rapports imprimés, et pour que la barre
+    de navigation n'affiche que les sections pertinentes pour l'institution."""
+    return {**_BRANDING, "modules": _MODULES}
 
 
 @app.get("/api/me")
