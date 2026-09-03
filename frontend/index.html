@@ -10960,6 +10960,34 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   </div>
 </div>
 
+<!-- ══════ MODAL : ATTRIBUER LE POMPISTE (affiché juste après l'enregistrement) ══════ -->
+<div id="modal-pompiste" class="overlay hidden">
+  <div class="modal-box">
+    <div class="card-head">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+        <span data-i18n="saisie.pompiste.title">Attribuer le pompiste</span>
+      </div>
+      <button onclick="closePompisteModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
+      <div style="font-size:14px;color:var(--muted)" data-i18n="saisie.pompiste.lead">Qui a réalisé ces relevés ? (facultatif — vous pourrez le faire plus tard)</div>
+    </div>
+    <div style="padding:14px 18px">
+      <table class="recap-table" style="width:100%">
+        <tbody id="pompiste-rows"></tbody>
+      </table>
+    </div>
+    <div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closePompisteModal()" data-i18n="saisie.pompiste.skip">Ignorer</button>
+      <button class="btn btn-primary" onclick="soumettrePompiste()">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        <span data-i18n="saisie.pompiste.submit">Attribuer</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════ MODAL PLEIN ÉCRAN : CHARTE DE RESPONSABILITÉ (affiché à chaque connexion) ══════ -->
 <div id="modal-responsabilite" class="resp-overlay hidden">
   <div class="resp-stage">
@@ -11160,9 +11188,10 @@ async function apiFetch(method,path,body){
   }
   return res.json();
 }
-const GET  = p    => apiFetch('GET',  p);
-const POST = (p,b)=> apiFetch('POST', p,b);
-const DEL  = p    => apiFetch('DELETE',p);
+const GET   = p    => apiFetch('GET',  p);
+const POST  = (p,b)=> apiFetch('POST', p,b);
+const PATCH = (p,b)=> apiFetch('PATCH',p,b);
+const DEL   = p    => apiFetch('DELETE',p);
 
 // ══════════════════════════════════════════════
 // NAVIGATION
@@ -11425,6 +11454,14 @@ const LANGS = {
     'saisie.load.err':          'Chargement : {msg}',
     'saisie.save.ok':           '✓ {n} relevé(s) enregistré(s)',
     'saisie.save.err':          '{n} erreur(s) : {msg}',
+    'saisie.pompiste.title':    'Attribuer le pompiste',
+    'saisie.pompiste.lead':     'Qui a réalisé ces relevés ? (facultatif — vous pourrez le faire plus tard)',
+    'saisie.pompiste.placeholder': '— Sélectionner —',
+    'saisie.pompiste.none':     'Aucun pompiste actif configuré',
+    'saisie.pompiste.skip':     'Ignorer',
+    'saisie.pompiste.submit':   'Attribuer',
+    'saisie.pompiste.ok':       '✓ Pompiste attribué',
+    'saisie.pompiste.err':      'Attribution : {msg}',
 
     'home.kpi.day':          'Ventes du jour',
     'home.kpi.day.sub':      '{qte} gal · aujourd\'hui',
@@ -11923,6 +11960,14 @@ const LANGS = {
     'saisie.load.err':          'Loading: {msg}',
     'saisie.save.ok':           '✓ {n} reading(s) saved',
     'saisie.save.err':          '{n} error(s): {msg}',
+    'saisie.pompiste.title':    'Assign the pump attendant',
+    'saisie.pompiste.lead':     'Who took these readings? (optional — you can do it later)',
+    'saisie.pompiste.placeholder': '— Select —',
+    'saisie.pompiste.none':     'No active pump attendant configured',
+    'saisie.pompiste.skip':     'Skip',
+    'saisie.pompiste.submit':   'Assign',
+    'saisie.pompiste.ok':       '✓ Attendant assigned',
+    'saisie.pompiste.err':      'Assignment: {msg}',
 
     'home.kpi.day':          "Today's sales",
     'home.kpi.day.sub':      '{qte} gal · today',
@@ -12421,6 +12466,14 @@ const LANGS = {
     'saisie.load.err':          'Carga: {msg}',
     'saisie.save.ok':           '✓ {n} lectura(s) guardada(s)',
     'saisie.save.err':          '{n} error(es): {msg}',
+    'saisie.pompiste.title':    'Asignar el bombero',
+    'saisie.pompiste.lead':     '¿Quién hizo estas lecturas? (opcional — puede hacerlo más tarde)',
+    'saisie.pompiste.placeholder': '— Seleccionar —',
+    'saisie.pompiste.none':     'Ningún bombero activo configurado',
+    'saisie.pompiste.skip':     'Omitir',
+    'saisie.pompiste.submit':   'Asignar',
+    'saisie.pompiste.ok':       '✓ Bombero asignado',
+    'saisie.pompiste.err':      'Asignación: {msg}',
 
     'home.kpi.day':          'Ventas del día',
     'home.kpi.day.sub':      '{qte} gal · hoy',
@@ -13746,11 +13799,14 @@ function renderSaisie(){
       const saisiPar=isEdit&&r.cree_par_nom
         ?`<div style="font-size:11px;font-weight:400;color:var(--muted);margin-top:2px">Saisi par ${esc(r.cree_par_nom)}${(r.modifie_par_nom&&r.modifie_par_nom!==r.cree_par_nom)?` · modifié par ${esc(r.modifie_par_nom)}`:''}</div>`
         :'';
+      const pompisteInfo=!isEdit?'':(r.pompiste_nom
+        ?`<div class="pompiste-badge" data-releve-id="${r.id}" data-pompe-nom="${esc(po.nom)}" data-pompiste-id="${r.pompiste_id}" style="font-size:11px;font-weight:400;color:var(--teal);margin-top:2px;cursor:pointer" onclick="openPompisteModalFromBadge(this)" title="${t('saisie.pompiste.submit')}">⛽ ${esc(r.pompiste_nom)}</div>`
+        :`<div class="pompiste-badge" data-releve-id="${r.id}" data-pompe-nom="${esc(po.nom)}" style="font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;cursor:pointer;text-decoration:underline dotted" onclick="openPompisteModalFromBadge(this)">⛽ ${t('saisie.pompiste.submit')}</div>`);
 
       return `<tr data-pompe="${po.id}" data-per="${per}" data-defpx="${pxDefaut}"
                   data-is-edit="${isEdit?'1':'0'}" data-nb-mod="${nbMod}"
                   data-av="${av}" data-ap="${ap}">
-        <td style="font-weight:600">${esc(po.nom)}${saisiPar}</td>
+        <td style="font-weight:600">${esc(po.nom)}${saisiPar}${pompisteInfo}</td>
         <td class="tr" data-label="${t('saisie.table.px')}"><input class="inp inp-sm inp-px" type="number" step="0.01" value="${px}" oninput="calcRow(this.closest('tr'))"></td>
         <td class="tr" data-label="${t('saisie.table.av')}"><input class="inp inp-av" type="number" step="0.0001" value="" readonly placeholder="${av||'—'}" oninput="calcRow(this.closest('tr'))"></td>
         <td class="tr" data-label="${t('saisie.table.ap')}"><input class="inp inp-ap" type="number" step="0.0001" value="" readonly placeholder="${ap||'—'}" oninput="calcRow(this.closest('tr'))"></td>
@@ -13922,14 +13978,16 @@ async function doSave(){
   pendingSave=null;
   closeConfirm();
   let ok=0,errs=0,lastErrMsg='';
+  const saved=[];   // {releveId, pompeNom} — pour le choix du pompiste juste après
 
   for(const row of rows){
     try{
-      await POST('/releves',{
+      const r=await POST('/releves',{
         date:currentDate,periode,
         pompe_id:row.pompeId,prix_gallon:row.px,
         metter_avant:row.av,metter_apres:row.ap,
       });
+      saved.push({releveId:r.id,pompeNom:row.pompeNom});
       ok++;
     }catch(e){
       errs++;
@@ -13943,7 +14001,76 @@ async function doSave(){
   if(ok){
     await loadSaisie();
     if(currentPage==='home') loadHome();
+    openPompisteModal(saved);
   }
+}
+
+// ══════════════════════════════════════════════
+// ATTRIBUTION DU POMPISTE (après enregistrement)
+// ══════════════════════════════════════════════
+let pompistesActifs=null;   // cache — rechargé à chaque ouverture du modal
+let pompisteRowsData=[];    // [{releveId, pompeNom}] en attente d'attribution
+
+function openPompisteModalFromBadge(el){
+  const pid=el.dataset.pompisteId;
+  openPompisteModal([{
+    releveId: parseInt(el.dataset.releveId),
+    pompeNom: el.dataset.pompeNom,
+    pompisteId: (pid && pid!=='null') ? parseInt(pid) : null,
+  }]);
+}
+
+async function openPompisteModal(saved){
+  if(!saved || !saved.length) return;
+  pompisteRowsData=saved;
+
+  try{
+    const employes=await GET('/employes?actif=true');
+    pompistesActifs=employes.filter(e=>(e.poste||'').trim().toLowerCase()==='pompiste');
+  }catch(e){
+    pompistesActifs=[];
+  }
+
+  document.getElementById('pompiste-rows').innerHTML = saved.map((row,i)=>{
+    const options = pompistesActifs.length
+      ? `<option value="">${t('saisie.pompiste.placeholder')}</option>`+
+        pompistesActifs.map(e=>`<option value="${e.id}" ${row.pompisteId===e.id?'selected':''}>${esc(e.nom_complet)}</option>`).join('')
+      : `<option value="">${t('saisie.pompiste.none')}</option>`;
+    return `
+    <tr>
+      <td style="font-weight:600">${esc(row.pompeNom)}</td>
+      <td class="tr">
+        <select class="inp inp-sm" id="pompiste-sel-${i}" ${pompistesActifs.length?'':'disabled'}>${options}</select>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('modal-pompiste').classList.remove('hidden');
+}
+
+function closePompisteModal(){
+  document.getElementById('modal-pompiste').classList.add('hidden');
+  pompisteRowsData=[];
+}
+
+async function soumettrePompiste(){
+  let ok=0, errs=0, lastErrMsg='';
+  for(let i=0;i<pompisteRowsData.length;i++){
+    const sel=document.getElementById(`pompiste-sel-${i}`);
+    const val=sel && sel.value ? parseInt(sel.value) : null;
+    if(!val) continue;   // ligne laissée vide → pas d'attribution pour ce relevé
+    try{
+      await PATCH(`/releves/${pompisteRowsData[i].releveId}/pompiste`, {pompiste_id:val});
+      ok++;
+    }catch(e){
+      errs++;
+      if(!lastErrMsg) lastErrMsg=e.message;
+    }
+  }
+  closePompisteModal();
+  if(ok)   toast(t('saisie.pompiste.ok'),'ok');
+  if(errs) toast(t('saisie.pompiste.err',{msg:lastErrMsg}),'err');
+  if(ok && currentPage==='saisie') await loadSaisie();
 }
 
 // ══════════════════════════════════════════════

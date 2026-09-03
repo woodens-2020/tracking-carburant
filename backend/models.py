@@ -70,10 +70,18 @@ class Releve(Base):
     # que si le relevé est ensuite corrigé par quelqu'un d'autre).
     cree_par_id    = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     modifie_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    # Pompiste (employé) responsable de ce relevé — distinct de cree_par_id :
+    # un même compte de connexion est souvent partagé par plusieurs pompistes
+    # sur une pompe, donc qui a physiquement fait le relevé n'est pas
+    # forcément déductible de la session. Attribué en un geste séparé APRÈS
+    # l'enregistrement (endpoint dédié, ne consomme jamais nb_modifications :
+    # ce n'est pas une correction de valeur, juste une attribution).
+    pompiste_id    = Column(Integer, ForeignKey("employes.id", ondelete="SET NULL"), nullable=True)
 
     pompe       = relationship("Pompe")
     cree_par    = relationship("Utilisateur", foreign_keys=[cree_par_id])
     modifie_par = relationship("Utilisateur", foreign_keys=[modifie_par_id])
+    pompiste    = relationship("Employe", foreign_keys=[pompiste_id])
 
     __table_args__ = (
         UniqueConstraint("date", "periode", "pompe_id", name="uq_releve"),

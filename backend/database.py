@@ -199,6 +199,10 @@ def _migrate_columns():
              "ALTER TABLE releves ADD COLUMN cree_par_id INTEGER REFERENCES utilisateurs(id)", None),
             ("releves", "modifie_par_id",
              "ALTER TABLE releves ADD COLUMN modifie_par_id INTEGER REFERENCES utilisateurs(id)", None),
+            # v23 — pompiste (employé) attribué à un relevé, indépendamment du
+            # compte de connexion utilisé pour la saisie
+            ("releves", "pompiste_id",
+             "ALTER TABLE releves ADD COLUMN pompiste_id INTEGER REFERENCES employes(id)", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -308,6 +312,10 @@ def _migrate_columns():
              "ALTER TABLE releves ADD COLUMN cree_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
             ("releves", "modifie_par_id",
              "ALTER TABLE releves ADD COLUMN modifie_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
+            # v23 — pompiste (employé) attribué à un relevé, indépendamment du
+            # compte de connexion utilisé pour la saisie
+            ("releves", "pompiste_id",
+             "ALTER TABLE releves ADD COLUMN pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL", None),
         ]
     else:
         return

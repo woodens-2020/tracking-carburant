@@ -1505,7 +1505,38 @@ def _releve_dict(r: Releve):
         "nb_modifications": r.nb_modifications,
         "cree_par_nom":    r.cree_par.nom_complet    if r.cree_par    else None,
         "modifie_par_nom": r.modifie_par.nom_complet if r.modifie_par else None,
+        "pompiste_id":  r.pompiste_id,
+        "pompiste_nom": f"{r.pompiste.prenom} {r.pompiste.nom}" if r.pompiste else None,
     }
+
+
+class ReleveAssignerPompisteIn(BaseModel):
+    pompiste_id: Optional[int] = None   # None = retirer l'attribution
+
+
+@app.patch("/api/releves/{releve_id}/pompiste")
+def assigner_pompiste(releve_id: int, data: ReleveAssignerPompisteIn, db: Session = Depends(get_db)):
+    """Attribue (ou retire) le pompiste responsable d'un relevé — un geste
+    séparé de la saisie elle-même : ne touche ni metter_avant/apres, ni
+    nb_modifications, ni modifie_par_id. Nécessaire car le compte de
+    connexion utilisé pour la saisie n'est pas forcément celui du pompiste
+    qui a physiquement fait le relevé (compte souvent partagé)."""
+    r = db.query(Releve).get(releve_id)
+    if not r:
+        raise HTTPException(404, "Relevé introuvable")
+
+    if data.pompiste_id is not None:
+        emp = db.query(Employe).filter_by(id=data.pompiste_id, actif=True).first()
+        if not emp:
+            raise HTTPException(400, "Employé introuvable ou inactif")
+        if (emp.poste or "").strip().lower() != "pompiste":
+            raise HTTPException(
+                400, f"'{emp.prenom} {emp.nom}' n'a pas le poste Pompiste (poste actuel : {emp.poste or '—'})."
+            )
+
+    r.pompiste_id = data.pompiste_id
+    db.commit(); db.refresh(r)
+    return _releve_dict(r)
 
 
 # ---------- Rapport / Dashboard ----------
