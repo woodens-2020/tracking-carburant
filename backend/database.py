@@ -436,3 +436,65 @@ def init_db():
             db.commit()
     finally:
         db.close()
+
+    _ensure_bootstrap_admin()
+
+
+def _ensure_bootstrap_admin():
+    """
+    Amorce un compte admin depuis des variables d'environnement, sans accès
+    direct à la base. Actif seulement si BOOTSTRAP_ADMIN_EMAIL et
+    BOOTSTRAP_ADMIN_PASSWORD sont définis.
+
+    Idempotent : si un compte porte déjà cet email, on s'assure juste qu'il est
+    admin + actif et on ne recrée rien. Ne logue jamais les secrets.
+
+    Bloc temporaire : retirer les variables (et ce code) une fois l'amorçage
+    terminé.
+    """
+    email    = (os.environ.get("BOOTSTRAP_ADMIN_EMAIL") or "").strip().lower()
+    password =  os.environ.get("BOOTSTRAP_ADMIN_PASSWORD") or ""
+    pin      = (os.environ.get("BOOTSTRAP_ADMIN_PIN") or "").strip()
+    if not email or not password:
+        return
+
+    from auth import hash_password, hash_code_acces
+    db = SessionLocal()
+    try:
+        existing = db.query(Utilisateur).filter(Utilisateur.email.ilike(email)).first()
+        if existing:
+            changed = False
+            if existing.role != "admin":
+                existing.role = "admin"; changed = True
+            if not existing.actif:
+                existing.actif = True;   changed = True
+            if pin and not existing.code_acces_hash:
+                existing.code_acces_hash = hash_code_acces(pin); changed = True
+            if changed:
+                db.commit()
+            print(f"[bootstrap-admin] compte deja present pour {email} — aucune creation", flush=True)
+            return
+
+        base = (os.environ.get("BOOTSTRAP_ADMIN_USERNAME") or email.split("@", 1)[0])[:74] or "admin"
+        username, n = base, 1
+        while db.query(Utilisateur).filter_by(username=username).first():
+            n += 1
+            username = f"{base}-{n}"
+
+        db.add(Utilisateur(
+            username=username,
+            password_hash=hash_password(password),
+            code_acces_hash=hash_code_acces(pin) if pin else None,
+            nom_complet=os.environ.get("BOOTSTRAP_ADMIN_NAME", "Administrateur"),
+            role="admin",
+            email=email,
+            actif=True,
+        ))
+        db.commit()
+        pin_note = "" if pin else " (SANS code PIN — connexion impossible tant qu'un PIN n'est pas defini)"
+        print(f"[bootstrap-admin] compte admin cree : username={username} email={email}{pin_note}", flush=True)
+    except Exception as exc:
+        db.rollback()
+        print(f"[bootstrap-admin] echec : {type(exc).__name__}: {exc}", flush=True)
+    finally:
+        db.close()
