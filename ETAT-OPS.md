@@ -137,3 +137,5 @@ active) et mettre à jour `EMAIL_HOST_PASSWORD` sur chaque projet.
   `{"overwrite":true,"zone":[{"name","type","ttl","records":[{"content"}]}]}`.
   CNAME sur `@` → Hostinger le convertit en `ALIAS` mais **refuse** s'il
   reste un `A` sur `@` (à supprimer d'abord).
+
+<!-- synchro auto (hook post-commit) active le 2026-09-03 -->
