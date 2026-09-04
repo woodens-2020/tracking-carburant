@@ -34,8 +34,11 @@ OTP_RATE_LIMIT       = int(os.getenv("OTP_RATE_LIMIT", "3"))
 
 EMAIL_HOST      = os.getenv("EMAIL_HOST",      "smtp.gmail.com")
 EMAIL_PORT      = int(os.getenv("EMAIL_PORT",  "587"))
-EMAIL_USER      = os.getenv("EMAIL_HOST_USER",     "")
-EMAIL_PASSWORD  = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USER      = os.getenv("EMAIL_HOST_USER",     "").strip()
+# Gmail affiche le mot de passe d'application sous la forme "xxxx xxxx xxxx xxxx".
+# Les espaces (et d'éventuels guillemets collés au copier-coller dans le
+# dashboard Railway) font échouer smtp.login() avec un 535 — on les retire ici.
+EMAIL_PASSWORD  = os.getenv("EMAIL_HOST_PASSWORD", "").strip().strip('"').strip("'").replace(" ", "")
 
 # Identité de l'institution — même mécanisme que main._BRANDING, dupliqué ici
 # pour éviter un import circulaire (main.py importe déjà depuis ce module).
@@ -51,6 +54,22 @@ TWILIO_API_URL       = "https://api.twilio.com/2010-04-01/Accounts/{sid}/Message
 
 OTP_PENDING_COOKIE  = "otp_pending"
 OTP_PENDING_MAX_AGE = 300  # 5 minutes — aligné sur OTP_DURATION_MIN
+
+
+def _smtp_diagnostics() -> str:
+    """
+    Résumé non sensible de la config SMTP, pour les logs d'erreur.
+    Ne révèle jamais le mot de passe — seulement sa longueur et sa forme.
+    """
+    raw_pwd = os.getenv("EMAIL_HOST_PASSWORD", "")
+    had_quotes = raw_pwd[:1] in (chr(34), chr(39))
+    return (
+        f"host={EMAIL_HOST}:{EMAIL_PORT} "
+        f"user={_mask_email(EMAIL_USER) if EMAIL_USER else '(vide)'} "
+        f"pwd_len={len(EMAIL_PASSWORD)} "
+        f"pwd_brut_avait_espaces={' ' in raw_pwd} "
+        f"pwd_brut_avait_guillemets={had_quotes}"
+    )
 
 
 def _smtp_connect() -> smtplib.SMTP:
@@ -261,14 +280,37 @@ def send_otp_email(nom: str, email: str, code: str) -> None:
         with _smtp_connect() as smtp:
             smtp.sendmail(EMAIL_USER, [email], msg.as_string())
         log.info("OTP email envoyé à %s", _mask_email(email))
-    except smtplib.SMTPAuthenticationError:
-        log.error("Échec authentification SMTP Gmail — vérifiez le mot de passe d'application")
+    except smtplib.SMTPAuthenticationError as exc:
+        # Réponse Gmail typique :
+        #   535 5.7.8  Username and Password not accepted  → mot de passe
+        #              d'application faux, révoqué, ou 2FA du compte réinitialisée
+        #   534 5.7.9  Application-specific password required → 2FA absente,
+        #              ou mot de passe normal du compte utilisé
+        smtp_err = (exc.smtp_error or b"").decode("utf-8", "replace")
+        log.error(
+            "Échec authentification SMTP Gmail (code %s : %s) — %s",
+            exc.smtp_code, smtp_err, _smtp_diagnostics(),
+        )
         raise RuntimeError(
             "Impossible d'envoyer l'email de vérification. "
             "Contactez l'administrateur système."
         )
+    except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, OSError) as exc:
+        # Connexion impossible : port SMTP sortant bloqué par l'hébergeur
+        # (fréquent sur le cloud), DNS, ou coupure réseau. Piste : EMAIL_PORT=465.
+        log.error(
+            "Connexion SMTP impossible (%s: %s) — %s",
+            type(exc).__name__, exc, _smtp_diagnostics(),
+        )
+        raise RuntimeError(
+            "L'email de vérification n'a pas pu être envoyé (serveur de messagerie "
+            "injoignable). Contactez l'administrateur système."
+        )
     except Exception as exc:
-        log.error("Erreur envoi email OTP : %s", exc)
+        log.error(
+            "Erreur envoi email OTP (%s: %s) — %s",
+            type(exc).__name__, exc, _smtp_diagnostics(),
+        )
         raise RuntimeError(
             "L'email de vérification n'a pas pu être envoyé. Réessayez dans un moment."
         )
