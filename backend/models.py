@@ -287,6 +287,30 @@ class OTPCode(Base):
     )
 
 
+class OAuthState(Base):
+    """
+    State anti-CSRF du flux OAuth (login → callback), persisté en base.
+
+    Auparavant gardé dans un dict en mémoire du process : un redéploiement ou
+    redémarrage entre le clic « Se connecter avec Google » et le retour du
+    fournisseur vidait ce dict et faisait échouer le callback avec
+    oauth_error=invalid_state. La base survit aux redémarrages et fonctionne
+    même avec plusieurs instances.
+    """
+    __tablename__ = "oauth_states"
+
+    id         = Column(Integer, primary_key=True)
+    state      = Column(String(64), nullable=False, unique=True)
+    provider   = Column(String(32), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        Index("idx_oauth_state_state",   "state"),
+        Index("idx_oauth_state_expires", "expires_at"),
+    )
+
+
 class AdminCode(Base):
     """Code 5 chiffres généré par l'admin pour débloquer un employé sans email OTP."""
     __tablename__ = "admin_codes"

@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
-from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse
+from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse, OAuthState
 from otp_service import (
     OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
     create_otp, send_otp_email, send_otp_whatsapp, verify_otp, cleanup_expired_otps,
@@ -1009,8 +1009,7 @@ import secrets as _secrets
 import time    as _time
 from urllib.parse import urlencode as _urlencode
 
-_OAUTH_STATES: dict = {}   # {state_str: {"provider": str, "exp": float}}
-_STATE_TTL_S  = 600        # 10 minutes
+_STATE_TTL_S  = 600        # 10 minutes — state anti-CSRF OAuth, persisté en base (table oauth_states)
 
 # ── Choix du canal OTP après OAuth (pas de mot de passe à resoumettre —
 # un jeton éphémère fait le pont entre le callback OAuth et l'endpoint qui
@@ -1064,11 +1063,44 @@ def _oauth_callback_url(request: Request, provider: str) -> str:
     return f"{base}/api/auth/oauth/{provider}/callback"
 
 
-def _clean_states():
-    now = _time.time()
-    expired = [k for k, v in _OAUTH_STATES.items() if v["exp"] < now]
-    for k in expired:
-        _OAUTH_STATES.pop(k, None)
+def _clean_oauth_states(db: Session):
+    from datetime import datetime, timezone as _tz
+    db.query(OAuthState).filter(OAuthState.expires_at < datetime.now(_tz.utc)).delete()
+    db.commit()
+
+
+def _create_oauth_state(db: Session, provider: str) -> str:
+    """
+    Génère et persiste un state anti-CSRF pour le flux OAuth. Stocké en base
+    (et non en mémoire du process) pour survivre à un redéploiement ou un
+    redémarrage entre le clic « Se connecter » et le retour du fournisseur.
+    """
+    from datetime import datetime, timedelta, timezone as _tz
+    _clean_oauth_states(db)
+    state = _secrets.token_urlsafe(32)
+    db.add(OAuthState(
+        state=state,
+        provider=provider,
+        expires_at=datetime.now(_tz.utc) + timedelta(seconds=_STATE_TTL_S),
+    ))
+    db.commit()
+    return state
+
+
+def _consume_oauth_state(db: Session, state: str, provider: str) -> bool:
+    """Valide puis invalide (usage unique) un state OAuth. True si valide."""
+    from datetime import datetime, timezone as _tz
+    _clean_oauth_states(db)
+    row = db.query(OAuthState).filter(OAuthState.state == state).first()
+    if not row:
+        return False
+    expires = row.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=_tz.utc)
+    ok = row.provider == provider and expires >= datetime.now(_tz.utc)
+    db.delete(row)
+    db.commit()
+    return ok
 
 
 @app.get("/api/auth/oauth/providers", include_in_schema=True)
@@ -1081,10 +1113,10 @@ def oauth_providers():
 
 
 @app.get("/api/auth/oauth/{provider}/login", include_in_schema=True)
-def oauth_login(provider: str, request: Request):
+def oauth_login(provider: str, request: Request, db: Session = Depends(get_db)):
     """
     Démarre le flux OAuth : redirige vers la page de consentement du fournisseur.
-    Un `state` anti-CSRF est généré et stocké côté serveur.
+    Un `state` anti-CSRF est généré et persisté en base (table oauth_states).
     """
     if provider not in _OAUTH_CFG:
         return RedirectResponse(url="/login?oauth_error=unknown_provider")
@@ -1094,9 +1126,7 @@ def oauth_login(provider: str, request: Request):
         # Redirige vers login avec message d'erreur plutôt que 503 brut
         return RedirectResponse(url="/login?oauth_error=oauth_not_configured")
 
-    _clean_states()
-    state = _secrets.token_urlsafe(32)
-    _OAUTH_STATES[state] = {"provider": provider, "exp": _time.time() + _STATE_TTL_S}
+    state = _create_oauth_state(db, provider)
 
     params = {
         "client_id":     client_id,
@@ -1134,9 +1164,7 @@ def oauth_callback(
         return RedirectResponse(url=f"/login?oauth_error={error}")
 
     # Validation state anti-CSRF
-    _clean_states()
-    stored = _OAUTH_STATES.pop(state or "", None)
-    if not stored or stored.get("provider") != provider:
+    if not state or not _consume_oauth_state(db, state, provider):
         return RedirectResponse(url="/login?oauth_error=invalid_state")
 
     if provider not in _OAUTH_CFG:
