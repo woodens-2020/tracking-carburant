@@ -446,8 +446,10 @@ def _ensure_bootstrap_admin():
     direct à la base. Actif seulement si BOOTSTRAP_ADMIN_EMAIL et
     BOOTSTRAP_ADMIN_PASSWORD sont définis.
 
-    Idempotent : si un compte porte déjà cet email, on s'assure juste qu'il est
-    admin + actif et on ne recrée rien. Ne logue jamais les secrets.
+    Idempotent : si un compte porte déjà cet email, on le met à jour (mot de
+    passe + PIN fournis, rôle admin, actif) plutôt que d'en recréer un — sert
+    aussi à réinitialiser le mot de passe d'un admin existant sans accès
+    direct à la base. Ne logue jamais les secrets.
 
     Bloc temporaire : retirer les variables (et ce code) une fois l'amorçage
     terminé.
@@ -463,16 +465,15 @@ def _ensure_bootstrap_admin():
     try:
         existing = db.query(Utilisateur).filter(Utilisateur.email.ilike(email)).first()
         if existing:
-            changed = False
+            existing.password_hash = hash_password(password)   # réinitialisation demandée
             if existing.role != "admin":
-                existing.role = "admin"; changed = True
+                existing.role = "admin"
             if not existing.actif:
-                existing.actif = True;   changed = True
-            if pin and not existing.code_acces_hash:
-                existing.code_acces_hash = hash_code_acces(pin); changed = True
-            if changed:
-                db.commit()
-            print(f"[bootstrap-admin] compte deja present pour {email} — aucune creation", flush=True)
+                existing.actif = True
+            if pin:
+                existing.code_acces_hash = hash_code_acces(pin)
+            db.commit()
+            print(f"[bootstrap-admin] compte existant mis a jour (mot de passe reinitialise) pour {email}", flush=True)
             return
 
         base = (os.environ.get("BOOTSTRAP_ADMIN_USERNAME") or email.split("@", 1)[0])[:74] or "admin"
