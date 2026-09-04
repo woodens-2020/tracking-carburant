@@ -1,0 +1,5 @@
+# Les scripts shell et les hooks git DOIVENT rester en fins de ligne LF,
+# sinon `#!/usr/bin/env bash\r` casse leur exécution (surtout sous Git for
+# Windows avec core.autocrlf=true).
+*.sh            text eol=lf
+scripts/git-hooks/*  text eol=lf
