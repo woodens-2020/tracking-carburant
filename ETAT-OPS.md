@@ -43,6 +43,22 @@ Deux copies de travail locales à garder synchro :
 
 Procédure : commit sur une copie → `git merge --ff-only` l'autre → push les deux.
 
+### Synchronisation automatique des 3 parties
+
+Un hook `post-commit` synchronise automatiquement, après **chaque commit**
+(n'importe quelle session : Claude, IDE, terminal) :
+`master` distante + `railway-migration` distante + la copie de travail jumelle.
+
+Script : `scripts/sync-all.sh` — pousse `HEAD` sur les deux branches
+(fast-forward only) puis met à jour l'autre copie locale si elle est propre.
+
+**À activer une fois par copie de travail** (déjà fait sur les 2 copies
+existantes ; à refaire sur tout nouveau clone) :
+
+```bash
+git config core.hooksPath scripts/git-hooks
+```
+
 ## Changements de code déjà faits et déployés
 
 1. **`backend/otp_service.py`**

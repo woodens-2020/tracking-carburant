@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Hook post-commit : après chaque commit, synchronise les 3 parties
+# (branche master distante + branche railway-migration distante + copie de
+# travail jumelle). Voir scripts/sync-all.sh.
+#
+# Activé par : git config core.hooksPath scripts/git-hooks
+#
+# Le hook n'échoue jamais le commit (il a déjà eu lieu) : en cas de souci de
+# réseau/auth, un message est affiché et le push reste à faire à la main.
+
+ROOT=$(git rev-parse --show-toplevel) || exit 0
+[ -f "$ROOT/scripts/sync-all.sh" ] || exit 0
+bash "$ROOT/scripts/sync-all.sh" || true
+exit 0
