@@ -6,6 +6,16 @@
 >
 > Dernière mise à jour : 2026-09-03 (soir).
 
+## Vérification pipeline — 2026-09-03
+
+Contrôle de bout en bout (commit → push GitHub → auto-déploiement Railway) :
+
+- `master` et `railway-migration` sur le même commit, synchro avec `origin`.
+- `vertieres`, `victorious-creativity`, `carribean` : déploiement `SUCCESS`,
+  service `Online`, **0 erreur SMTP `535`** dans les logs récents.
+- carribean : `[bootstrap-admin] compte admin cree` confirmé dans les logs.
+- konekta-crb.com + www : HTTPS `307 → /login`, certificats valides.
+
 ## Contexte
 
 Konekta est déployé en **multi-tenant** : un projet Railway par institution.
