@@ -3453,13 +3453,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
     <button class="nav-item" data-page="patisserie-ventes" onclick="goTo('patisserie-ventes')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
-      <span>Ventes</span>
-      <span class="nav-active-dot"></span>
-    </button>
-
-    <button class="nav-item" data-page="patisserie-commandes" onclick="goTo('patisserie-commandes')">
-      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 15l2 2 4-4"/></svg></span>
-      <span>Commandes</span>
+      <span>Ventes &amp; Commandes</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -9961,26 +9955,41 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
 
       <div id="pt-achat-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)ptAchatFermerModal()">
-        <div class="pos-modal" style="max-width:420px;width:95%">
+        <div class="pos-modal" style="max-width:460px;width:95%">
           <div style="font-size:18px;font-weight:700;margin-bottom:16px">Déclarer un achat</div>
           <div style="display:flex;flex-direction:column;gap:10px">
             <div>
               <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Article *</label>
-              <select class="pos-select" id="pt-achat-produit" style="width:100%"></select>
+              <select class="pos-select" id="pt-achat-produit" style="width:100%" onchange="ptAchatArticleChange()"></select>
+              <div id="pt-achat-stock-info" style="font-size:12px;color:rgba(255,255,255,.4);margin-top:5px"></div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Quantité *</label>
-                <input class="pos-input" id="pt-achat-qte" type="number" min="0.01" step="0.01" style="width:100%">
+                <input class="pos-input" id="pt-achat-qte" type="number" min="0.01" step="0.01" oninput="ptAchatRecalculer()" style="width:100%">
               </div>
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Prix unitaire (G) *</label>
-                <input class="pos-input" id="pt-achat-prix" type="number" min="0" step="1" style="width:100%">
+                <input class="pos-input" id="pt-achat-prix" type="number" min="0" step="1" oninput="ptAchatRecalculer()" style="width:100%">
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.2);border-radius:8px;padding:8px 12px">
+              <span style="font-size:13px;color:rgba(255,255,255,.5)">Total de l'achat</span>
+              <span style="font-weight:800;font-size:16px;color:#2dd4bf"><span id="pt-achat-total-live">0</span> G</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Date de l'achat</label>
+                <input class="pos-input" id="pt-achat-date" type="date" style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Fournisseur</label>
+                <input class="pos-input" id="pt-achat-fournisseur" placeholder="Facultatif" style="width:100%">
               </div>
             </div>
             <div>
-              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Fournisseur</label>
-              <input class="pos-input" id="pt-achat-fournisseur" style="width:100%">
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Notes</label>
+              <input class="pos-input" id="pt-achat-notes" placeholder="Facultatif" style="width:100%">
             </div>
           </div>
           <div style="display:flex;gap:8px;margin-top:16px">
@@ -9996,8 +10005,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════════ -->
     <div id="page-patisserie-ventes" class="page page-gi">
       <div class="pos-page gi-page">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
-          <h2 style="margin:0;font-size:22px;font-weight:800">Ventes comptoir — Pâtisserie</h2>
+        <h2 style="margin:0 0 12px;font-size:22px;font-weight:800">Ventes &amp; Commandes — Pâtisserie</h2>
+        <div style="display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid rgba(255,255,255,.08)">
+          <button class="pos-btn ghost" style="border-radius:8px 8px 0 0;border-bottom:2px solid #2dd4bf;color:#2dd4bf" onclick="goTo('patisserie-ventes')">🧾 Vente comptoir</button>
+          <button class="pos-btn ghost" style="border-radius:8px 8px 0 0;border-bottom:2px solid transparent" onclick="goTo('patisserie-commandes')">📦 Commandes</button>
+        </div>
+        <div style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:14px">
           <button class="pos-btn teal" onclick="ptVenteOuvrirModal()">+ Nouvelle vente</button>
         </div>
         <div class="pos-card" style="padding:0;overflow:hidden">
@@ -10057,12 +10070,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════════ -->
     <div id="page-patisserie-commandes" class="page page-gi">
       <div class="pos-page gi-page">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
-          <h2 style="margin:0;font-size:22px;font-weight:800">Commandes — Pâtisserie</h2>
-          <div style="display:flex;gap:8px">
-            <button class="pos-btn ghost" onclick="ptEtapesOuvrirModal()">⚙ Étapes de suivi</button>
-            <button class="pos-btn teal" onclick="ptCommandeOuvrirModal()">+ Nouvelle commande</button>
-          </div>
+        <h2 style="margin:0 0 12px;font-size:22px;font-weight:800">Ventes &amp; Commandes — Pâtisserie</h2>
+        <div style="display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid rgba(255,255,255,.08)">
+          <button class="pos-btn ghost" style="border-radius:8px 8px 0 0;border-bottom:2px solid transparent" onclick="goTo('patisserie-ventes')">🧾 Vente comptoir</button>
+          <button class="pos-btn ghost" style="border-radius:8px 8px 0 0;border-bottom:2px solid #2dd4bf;color:#2dd4bf" onclick="goTo('patisserie-commandes')">📦 Commandes</button>
+        </div>
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:14px">
+          <button class="pos-btn ghost" onclick="ptEtapesOuvrirModal()">⚙ Étapes de suivi</button>
+          <button class="pos-btn teal" onclick="ptCommandeOuvrirModal()">+ Nouvelle commande</button>
         </div>
 
         <!-- Vue par étape (façon kanban simplifié) -->
@@ -10071,18 +10086,26 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
       <!-- Modal nouvelle commande -->
       <div id="pt-commande-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)ptCommandeFermerModal()">
-        <div class="pos-modal" style="max-width:540px;width:95%">
+        <div class="pos-modal" style="max-width:560px;width:95%;max-height:90vh;overflow-y:auto">
           <div style="font-size:18px;font-weight:700;margin-bottom:16px">Nouvelle commande</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+
+          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">1 · Client</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
             <div>
-              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Client *</label>
-              <input class="pos-input" id="pt-cmd-client" style="width:100%">
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Nom du client *</label>
+              <input class="pos-input" id="pt-cmd-client" placeholder="Ex : Marie Joseph" style="width:100%">
             </div>
             <div>
               <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Téléphone</label>
-              <input class="pos-input" id="pt-cmd-telephone" style="width:100%">
+              <input class="pos-input" id="pt-cmd-telephone" placeholder="Facultatif" style="width:100%">
             </div>
           </div>
+
+          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">2 · Articles commandés</div>
+          <div id="pt-cmd-lignes" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+          <button class="pos-btn ghost" style="width:100%;margin-bottom:16px" onclick="ptCommandeAjouterLigne()">+ Ajouter un article</button>
+
+          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">3 · Livraison &amp; paiement</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
             <div>
               <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Livraison prévue</label>
@@ -10090,16 +10113,20 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
             <div>
               <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Acompte versé (G)</label>
-              <input class="pos-input" id="pt-cmd-acompte" type="number" min="0" step="1" value="0" style="width:100%">
+              <input class="pos-input" id="pt-cmd-acompte" type="number" min="0" step="1" value="0" oninput="ptCommandeRecalculer()" style="width:100%">
             </div>
           </div>
-          <div id="pt-cmd-lignes" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
-          <button class="pos-btn ghost" style="width:100%;margin-bottom:8px" onclick="ptCommandeAjouterLigne()">+ Ajouter un article</button>
-          <div>
-            <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Notes</label>
-            <input class="pos-input" id="pt-cmd-notes" style="width:100%">
+          <div style="display:flex;flex-direction:column;gap:4px;background:rgba(255,255,255,.03);border-radius:8px;padding:10px 12px;margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,.5)"><span>Total commande</span><span id="pt-cmd-total">0 G</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,.5)"><span>Acompte versé</span><span id="pt-cmd-acompte-affiche">0 G</span></div>
+            <div style="display:flex;justify-content:space-between;font-weight:800;font-size:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:6px;margin-top:2px"><span>Solde à la commande</span><span id="pt-cmd-solde" style="color:#f59e0b">0 G</span></div>
           </div>
-          <div style="text-align:right;font-weight:800;font-size:16px;margin:12px 0">Total : <span id="pt-cmd-total">0</span> G</div>
+
+          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">4 · Notes</div>
+          <div style="margin-bottom:16px">
+            <input class="pos-input" id="pt-cmd-notes" placeholder="Instructions particulières, décoration, allergie..." style="width:100%">
+          </div>
+
           <div style="display:flex;gap:8px">
             <button class="pos-btn ghost" style="flex:1" onclick="ptCommandeFermerModal()">Annuler</button>
             <button class="pos-btn teal" style="flex:2" onclick="ptCommandeSauvegarder()">Créer la commande</button>
@@ -10150,6 +10177,21 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <h2 style="margin:0;font-size:22px;font-weight:800">Dépenses — Pâtisserie</h2>
           <button class="pos-btn teal" onclick="ptDepenseOuvrirModal()">+ Ajouter une dépense</button>
         </div>
+        <div class="pos-card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <input class="pos-input" type="date" id="ptd-dep-date-debut" style="width:150px">
+          <input class="pos-input" type="date" id="ptd-dep-date-fin" style="width:150px">
+          <select class="pos-select" id="ptd-dep-categorie" style="min-width:160px">
+            <option value="">Toutes catégories</option>
+            <option value="INGREDIENTS">Ingrédients</option>
+            <option value="EQUIPEMENT">Équipement</option>
+            <option value="GAZ">Gaz</option>
+            <option value="EMBALLAGE">Emballage</option>
+            <option value="TRANSPORT">Transport</option>
+            <option value="AUTRE">Autre</option>
+          </select>
+          <button class="pos-btn ghost" onclick="loadPatisserieDepenses()">Filtrer</button>
+          <div style="margin-left:auto;font-weight:700" id="ptd-dep-total">Total : 0 G</div>
+        </div>
         <div class="pos-card" style="padding:0;overflow:hidden">
           <div style="overflow-x:auto">
             <table style="width:100%;border-collapse:collapse;font-size:14px">
@@ -10157,13 +10199,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.08)">
                   <th style="padding:9px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Description</th>
                   <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Catégorie</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Date</th>
                   <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Montant</th>
                   <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Fournisseur</th>
                   <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Actions</th>
                 </tr>
               </thead>
               <tbody id="pt-depenses-tbody">
-                <tr><td colspan="5" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+                <tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -10172,7 +10215,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
       <div id="pt-depense-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)ptDepenseFermerModal()">
         <div class="pos-modal" style="max-width:420px;width:95%">
-          <div style="font-size:18px;font-weight:700;margin-bottom:16px">Ajouter une dépense</div>
+          <div id="pt-depense-modal-titre" style="font-size:18px;font-weight:700;margin-bottom:16px">Ajouter une dépense</div>
+          <input type="hidden" id="pt-dep-id">
           <div style="display:flex;flex-direction:column;gap:10px">
             <div>
               <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Description *</label>
@@ -10181,16 +10225,29 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
-                <input class="pos-input" id="pt-dep-cat" placeholder="INGREDIENTS, GAZ..." style="width:100%">
+                <select class="pos-select" id="pt-dep-cat" style="width:100%">
+                  <option value="INGREDIENTS">Ingrédients</option>
+                  <option value="EQUIPEMENT">Équipement</option>
+                  <option value="GAZ">Gaz</option>
+                  <option value="EMBALLAGE">Emballage</option>
+                  <option value="TRANSPORT">Transport</option>
+                  <option value="AUTRE">Autre</option>
+                </select>
               </div>
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Montant (G) *</label>
                 <input class="pos-input" id="pt-dep-montant" type="number" min="0.01" step="1" style="width:100%">
               </div>
             </div>
-            <div>
-              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Fournisseur</label>
-              <input class="pos-input" id="pt-dep-fournisseur" style="width:100%">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Date</label>
+                <input class="pos-input" id="pt-dep-date" type="date" style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Fournisseur</label>
+                <input class="pos-input" id="pt-dep-fournisseur" placeholder="Facultatif" style="width:100%">
+              </div>
             </div>
           </div>
           <div style="display:flex;gap:8px;margin-top:16px">
@@ -10206,15 +10263,29 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════════════════════════════════════════════════════════ -->
     <div id="page-patisserie-caisse" class="page page-gi">
       <div class="pos-page gi-page">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
-          <h2 style="margin:0;font-size:22px;font-weight:800">Contrôle de Caisse — Pâtisserie</h2>
-        </div>
+        <h2 style="margin:0 0 18px;font-size:22px;font-weight:800">Contrôle de Caisse — Pâtisserie</h2>
+
+        <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Ma session</div>
         <div class="pos-card" style="padding:10px 14px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <select class="pos-select" id="pt-caisse-caissier" style="min-width:200px" onchange="ptCaisseChargerDashboard()"></select>
           <button class="pos-btn teal" id="pt-caisse-btn-ouvrir" onclick="ptCaisseOuvrir()">Ouvrir une session</button>
         </div>
-        <div id="pt-caisse-dashboard" class="pos-card" style="padding:14px;margin-bottom:16px"></div>
+        <div id="pt-caisse-dashboard" class="pos-card" style="padding:14px;margin-bottom:24px"></div>
 
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.06em">Historique des sessions</div>
+        </div>
+        <div class="pos-card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <select class="pos-select" id="pt-caisse-filtre-caissier" style="min-width:200px" onchange="loadPatisserieCaisse()">
+            <option value="">Tous les caissiers</option>
+          </select>
+          <select class="pos-select" id="pt-caisse-filtre-statut" style="min-width:150px" onchange="loadPatisserieCaisse()">
+            <option value="">Tous statuts</option>
+            <option value="EN_COURS">En cours</option>
+            <option value="SOUMIS">Soumis</option>
+            <option value="VALIDE">Validé</option>
+          </select>
+        </div>
         <div class="pos-card" style="padding:0;overflow:hidden">
           <div style="overflow-x:auto">
             <table style="width:100%;border-collapse:collapse;font-size:14px">
@@ -13378,7 +13449,10 @@ function goTo(page){
   const pageEl=document.getElementById('page-'+page);
   if(!pageEl) return;
   pageEl.classList.add('active');
-  document.querySelectorAll(`[data-page="${page}"]`).forEach(navEl=>navEl.classList.add('active'));
+  // "Commandes" n'a pas d'entrée propre dans le menu (accessible via l'onglet
+  // dans Ventes) — on garde le sur-lignage sur "Ventes & Commandes" pour elle.
+  const navPage = page==='patisserie-commandes' ? 'patisserie-ventes' : page;
+  document.querySelectorAll(`[data-page="${navPage}"]`).forEach(navEl=>navEl.classList.add('active'));
   currentPage=page;
   try{ sessionStorage.setItem('konekta_current_page', page); }catch(e){}
   const m=PAGE_META[page]||{title:()=>page,sub:()=>''};
@@ -30358,6 +30432,7 @@ async function ptAjustSauvegarder(){
 // ── Achats ───────────────────────────────────────────────────────────
 
 async function loadPatisserieAchats(){
+  if(!_ptProduits.length) await loadPatisserieProduits();
   const dd = document.getElementById('pta-date-debut').value;
   const df = document.getElementById('pta-date-fin').value;
   let params = [];
@@ -30400,9 +30475,28 @@ function ptAchatOuvrirModal(){
   document.getElementById('pt-achat-qte').value = '';
   document.getElementById('pt-achat-prix').value = '';
   document.getElementById('pt-achat-fournisseur').value = '';
+  document.getElementById('pt-achat-notes').value = '';
+  document.getElementById('pt-achat-date').value = todayStr();
+  ptAchatArticleChange();
   document.getElementById('pt-achat-modal-bg').classList.add('open');
 }
 function ptAchatFermerModal(){ document.getElementById('pt-achat-modal-bg').classList.remove('open'); }
+
+function ptAchatArticleChange(){
+  const id = parseInt(document.getElementById('pt-achat-produit').value);
+  const p = _ptProduits.find(x=>x.id===id);
+  const info = document.getElementById('pt-achat-stock-info');
+  if(!p){ info.textContent = ''; return; }
+  info.textContent = `Stock actuel : ${p.stock_actuel} ${p.unite}`;
+  const prixEl = document.getElementById('pt-achat-prix');
+  if(!prixEl.value && p.cout_unitaire_estime){ prixEl.value = p.cout_unitaire_estime; }
+  ptAchatRecalculer();
+}
+function ptAchatRecalculer(){
+  const qte  = parseFloat(document.getElementById('pt-achat-qte').value)  || 0;
+  const prix = parseFloat(document.getElementById('pt-achat-prix').value) || 0;
+  document.getElementById('pt-achat-total-live').textContent = fmtG(qte*prix).replace(' G','');
+}
 
 async function ptAchatSauvegarder(){
   const produit_id = parseInt(document.getElementById('pt-achat-produit').value);
@@ -30413,7 +30507,9 @@ async function ptAchatSauvegarder(){
   try{
     await apiFetch('POST', '/patisserie/achats', {
       produit_id, quantite, prix_achat_unitaire,
+      date_achat: document.getElementById('pt-achat-date').value || null,
       fournisseur: document.getElementById('pt-achat-fournisseur').value.trim(),
+      notes: document.getElementById('pt-achat-notes').value.trim(),
     });
     ptAchatFermerModal(); posAlert('Achat déclaré.','ok'); loadPatisserieAchats();
   }catch(e){ posAlert(e.message||'Erreur.'); }
@@ -30578,8 +30674,14 @@ function ptCommandeRenderLignes(){
   ptCommandeRecalculer();
 }
 function ptCommandeRecalculer(){
-  const total = _ptCmdLignes.reduce((s,l)=>s+(l.quantite||0)*(l.prix_unitaire||0),0);
-  document.getElementById('pt-cmd-total').textContent = fmtG(total).replace(' G','');
+  const total   = _ptCmdLignes.reduce((s,l)=>s+(l.quantite||0)*(l.prix_unitaire||0),0);
+  const acompte = parseFloat(document.getElementById('pt-cmd-acompte').value) || 0;
+  const solde   = Math.max(total - acompte, 0);
+  document.getElementById('pt-cmd-total').textContent = fmtG(total);
+  document.getElementById('pt-cmd-acompte-affiche').textContent = fmtG(acompte);
+  const soldeEl = document.getElementById('pt-cmd-solde');
+  soldeEl.textContent = fmtG(solde);
+  soldeEl.style.color = solde>0 ? '#f59e0b' : '#34d399';
 }
 
 async function ptCommandeSauvegarder(){
@@ -30689,21 +30791,33 @@ async function ptEtapeSupprimer(id){
 
 // ── Dépenses ─────────────────────────────────────────────────────────
 
+let _ptDepenses = [];
+
 async function loadPatisserieDepenses(){
+  const dd  = document.getElementById('ptd-dep-date-debut').value;
+  const df  = document.getElementById('ptd-dep-date-fin').value;
+  const cat = document.getElementById('ptd-dep-categorie').value;
+  let params = [];
+  if(dd) params.push(`date_debut=${dd}`);
+  if(df) params.push(`date_fin=${df}`);
   try{
-    const deps = await apiFetch('GET', '/patisserie/depenses');
+    const r = await apiFetch('GET', `/patisserie/depenses?${params.join('&')}`);
+    _ptDepenses = cat ? r.depenses.filter(d=>d.categorie===cat) : r.depenses;
+    document.getElementById('ptd-dep-total').textContent = 'Total : ' + fmtG(cat ? _ptDepenses.reduce((s,d)=>s+d.montant,0) : r.total_depenses);
     const tbody = document.getElementById('pt-depenses-tbody');
-    if(!deps.length){
-      tbody.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune dépense</td></tr>';
+    if(!_ptDepenses.length){
+      tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune dépense</td></tr>';
       return;
     }
-    tbody.innerHTML = deps.map(d => `
+    tbody.innerHTML = _ptDepenses.map(d => `
       <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
         <td style="padding:9px 12px;font-weight:700">${esc(d.description)}</td>
         <td style="padding:9px 8px">${esc(d.categorie)}</td>
+        <td style="padding:9px 8px">${ptFmtDate(d.date_depense)}</td>
         <td style="padding:9px 8px;text-align:right">${fmtG(d.montant)}</td>
         <td style="padding:9px 8px">${esc(d.fournisseur||'—')}</td>
-        <td style="padding:9px 8px;text-align:center">
+        <td style="padding:9px 8px;text-align:center;white-space:nowrap">
+          <button class="pos-btn ghost" style="padding:4px 8px;font-size:12px" onclick="ptDepenseModifier(${d.id})">Modifier</button>
           <button class="pos-btn ghost" style="padding:4px 8px;font-size:12px;color:#f87171" onclick="ptDepenseSupprimer(${d.id})">Supprimer</button>
         </td>
       </tr>
@@ -30711,26 +30825,35 @@ async function loadPatisserieDepenses(){
   }catch(e){ posAlert(e.message||'Erreur dépenses.'); }
 }
 
-function ptDepenseOuvrirModal(){
-  document.getElementById('pt-dep-desc').value = '';
-  document.getElementById('pt-dep-cat').value = '';
-  document.getElementById('pt-dep-montant').value = '';
-  document.getElementById('pt-dep-fournisseur').value = '';
+function ptDepenseOuvrirModal(id){
+  const d = id ? _ptDepenses.find(x=>x.id===id) : null;
+  document.getElementById('pt-dep-id').value = id || '';
+  document.getElementById('pt-depense-modal-titre').textContent = id ? 'Modifier la dépense' : 'Ajouter une dépense';
+  document.getElementById('pt-dep-desc').value = d ? d.description : '';
+  document.getElementById('pt-dep-cat').value = d ? d.categorie : 'INGREDIENTS';
+  document.getElementById('pt-dep-montant').value = d ? d.montant : '';
+  document.getElementById('pt-dep-fournisseur').value = d ? d.fournisseur : '';
+  document.getElementById('pt-dep-date').value = d ? d.date_depense.slice(0,10) : todayStr();
   document.getElementById('pt-depense-modal-bg').classList.add('open');
 }
+function ptDepenseModifier(id){ ptDepenseOuvrirModal(id); }
 function ptDepenseFermerModal(){ document.getElementById('pt-depense-modal-bg').classList.remove('open'); }
 
 async function ptDepenseSauvegarder(){
+  const id = document.getElementById('pt-dep-id').value;
   const description = document.getElementById('pt-dep-desc').value.trim();
   const montant = parseFloat(document.getElementById('pt-dep-montant').value);
   if(!description){ posAlert('La description est requise.','warn'); return; }
   if(!montant || montant<=0){ posAlert('Le montant doit être positif.','warn'); return; }
+  const payload = {
+    description, montant,
+    categorie: document.getElementById('pt-dep-cat').value || 'AUTRE',
+    fournisseur: document.getElementById('pt-dep-fournisseur').value.trim(),
+    date_depense: document.getElementById('pt-dep-date').value || null,
+  };
   try{
-    await apiFetch('POST', '/patisserie/depenses', {
-      description, montant,
-      categorie: document.getElementById('pt-dep-cat').value.trim() || 'AUTRE',
-      fournisseur: document.getElementById('pt-dep-fournisseur').value.trim(),
-    });
+    if(id) await apiFetch('PUT', `/patisserie/depenses/${id}`, payload);
+    else   await apiFetch('POST', '/patisserie/depenses', payload);
     ptDepenseFermerModal(); posAlert('Dépense enregistrée.','ok'); loadPatisserieDepenses();
   }catch(e){ posAlert(e.message||'Erreur.'); }
 }
@@ -30741,14 +30864,29 @@ async function ptDepenseSupprimer(id){
 
 // ── Contrôle de caisse ───────────────────────────────────────────────
 
+const _PT_STATUT_LABELS = { EN_COURS: 'En cours', SOUMIS: 'Soumis', VALIDE: 'Validé' };
+const _PT_STATUT_COLORS = { EN_COURS: '#f59e0b', SOUMIS: '#60a5fa', VALIDE: '#34d399' };
+
 async function loadPatisserieCaisse(){
   try{
     const caissiers = await apiFetch('GET', '/patisserie/caisse/caissiers');
     const sel = document.getElementById('pt-caisse-caissier');
-    sel.innerHTML = caissiers.map(c=>`<option value="${c.id}">${esc(c.prenom)} ${esc(c.nom)}</option>`).join('');
+    const filtreSel = document.getElementById('pt-caisse-filtre-caissier');
+    const optionsHtml = caissiers.map(c=>`<option value="${c.id}">${esc(c.prenom)} ${esc(c.nom)}</option>`).join('');
+    sel.innerHTML = optionsHtml;
+    if(!filtreSel.dataset.rempli){
+      filtreSel.innerHTML = '<option value="">Tous les caissiers</option>' + optionsHtml;
+      filtreSel.dataset.rempli = '1';
+    }
     if(sel.value) await ptCaisseChargerDashboard();
 
-    const sessions = await apiFetch('GET', '/patisserie/caisse/sessions');
+    const filtreCaissier = filtreSel.value;
+    const filtreStatut = document.getElementById('pt-caisse-filtre-statut').value;
+    let params = [];
+    if(filtreCaissier) params.push(`caissier_id=${filtreCaissier}`);
+    if(filtreStatut)   params.push(`statut=${filtreStatut}`);
+
+    const sessions = await apiFetch('GET', `/patisserie/caisse/sessions?${params.join('&')}`);
     const tbody = document.getElementById('pt-sessions-tbody');
     tbody.innerHTML = sessions.length ? sessions.map(s => `
       <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
@@ -30756,7 +30894,7 @@ async function loadPatisserieCaisse(){
         <td style="padding:9px 8px">${s.date_session} #${s.numero_session}</td>
         <td style="padding:9px 8px;text-align:right">${fmtG(s.total_ventes)}</td>
         <td style="padding:9px 8px;text-align:right;color:${s.ecart? (Math.abs(s.ecart)<1?'#34d399':'#f87171') : 'inherit'}">${s.ecart!=null?fmtG(s.ecart):'—'}</td>
-        <td style="padding:9px 8px;text-align:center">${s.statut}</td>
+        <td style="padding:9px 8px;text-align:center"><span style="color:${_PT_STATUT_COLORS[s.statut]||'inherit'};font-weight:600">${_PT_STATUT_LABELS[s.statut]||s.statut}</span></td>
         <td style="padding:9px 8px;text-align:center">
           ${s.statut==='SOUMIS' ? `<button class="pos-btn teal" style="padding:4px 8px;font-size:12px" onclick="ptCaisseValider(${s.id})">Valider</button>` : ''}
         </td>
@@ -30777,9 +30915,18 @@ async function ptCaisseChargerDashboard(){
       el.innerHTML = '<div style="color:rgba(255,255,255,.4)">Aucune session ouverte aujourd\'hui pour ce caissier.</div>';
       return;
     }
+    const etapes = ['EN_COURS','SOUMIS','VALIDE'];
+    const idxActuel = etapes.indexOf(d.session_statut);
+    const stepperHtml = etapes.map((e,i) => `
+      <span style="display:flex;align-items:center;gap:6px">
+        <span style="width:9px;height:9px;border-radius:50%;background:${i<=idxActuel?_PT_STATUT_COLORS[e]:'rgba(255,255,255,.15)'}"></span>
+        <span style="font-size:12px;font-weight:${i===idxActuel?'700':'400'};color:${i===idxActuel?_PT_STATUT_COLORS[e]:'rgba(255,255,255,.35)'}">${_PT_STATUT_LABELS[e]}</span>
+      </span>${i<etapes.length-1?'<span style="width:20px;height:1px;background:rgba(255,255,255,.15)"></span>':''}
+    `).join('');
     el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:14px">${stepperHtml}</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:${d.session_statut==='EN_COURS'?'14px':'0'}">
-        <div><div style="font-size:12px;color:rgba(255,255,255,.4)">Session</div><div style="font-weight:700">#${d.numero_session||''} — ${d.session_statut}</div></div>
+        <div><div style="font-size:12px;color:rgba(255,255,255,.4)">Session</div><div style="font-weight:700">#${d.numero_session||''}</div></div>
         <div><div style="font-size:12px;color:rgba(255,255,255,.4)">Ventes</div><div style="font-weight:700">${d.nb_ventes}</div></div>
         <div><div style="font-size:12px;color:rgba(255,255,255,.4)">Cash attendu</div><div style="font-weight:700">${fmtG(d.cash_attendu)}</div></div>
       </div>

@@ -413,7 +413,7 @@ def liste_depenses(
         .order_by(PatisserieDepense.date_depense.desc())
         .all()
     )
-    return [
+    lignes = [
         {
             "id": d.id, "description": d.description, "categorie": d.categorie or "AUTRE",
             "montant": float(_dec(d.montant)), "date_depense": d.date_depense.isoformat(),
@@ -422,6 +422,11 @@ def liste_depenses(
         }
         for d in deps
     ]
+    return {
+        "depenses": lignes,
+        "total_depenses": round(sum(l["montant"] for l in lignes), 2),
+        "nb_depenses": len(lignes),
+    }
 
 
 @router.post("/depenses", status_code=201)
@@ -440,6 +445,29 @@ def ajouter_depense(data: dict, db: Session = Depends(get_db)):
     )
     db.add(d); db.commit(); db.refresh(d)
     return {"id": d.id, "message": "Dépense enregistrée"}
+
+
+@router.put("/depenses/{dep_id}")
+def modifier_depense(dep_id: int, data: dict, db: Session = Depends(get_db)):
+    d = db.query(PatisserieDepense).filter_by(id=dep_id).first()
+    if not d:
+        raise HTTPException(404, "Dépense introuvable")
+    if "description" in data and data["description"]:
+        d.description = data["description"].strip()
+    if "categorie" in data: d.categorie = data["categorie"] or "AUTRE"
+    if "montant" in data:
+        montant = float(data["montant"] or 0)
+        if montant <= 0:
+            raise HTTPException(400, "Le montant doit être positif")
+        d.montant = Decimal(str(montant))
+    if "fournisseur" in data: d.fournisseur = (data["fournisseur"] or "").strip() or None
+    if "notes" in data:       d.notes       = (data["notes"] or "").strip() or None
+    if "date_depense" in data:
+        parsed = _parse_date_saisie(data.get("date_depense"))
+        if parsed:
+            d.date_depense = parsed
+    db.commit()
+    return {"message": "Dépense modifiée"}
 
 
 @router.delete("/depenses/{dep_id}")
