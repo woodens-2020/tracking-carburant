@@ -9809,6 +9809,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
 
+        <div class="pos-card" style="padding:14px;margin-bottom:16px;border-left:3px solid #2dd4bf">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+            <div>
+              <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase">Balance disponible en caisse</div>
+              <div id="ptd-caisse-disponible" style="font-size:26px;font-weight:800;color:#2dd4bf;margin-top:4px">—</div>
+            </div>
+            <div id="ptd-caisse-detail" style="font-size:12px;color:rgba(255,255,255,.4);text-align:right;line-height:1.6">—</div>
+          </div>
+        </div>
+
         <div class="pos-card" style="padding:14px;margin-bottom:16px" id="ptd-stock-bas-card">
           <div style="font-weight:700;margin-bottom:8px">⚠️ Articles en stock bas</div>
           <div id="ptd-stock-bas" style="color:rgba(255,255,255,.4)">—</div>
@@ -30312,8 +30322,8 @@ async function loadPatisserieDashboard(){
   const df = document.getElementById('ptd-date-fin');
   if(!dd.value){
     const today = new Date();
-    df.value = today.toISOString().slice(0,10);
-    dd.value = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0,10);
+    df.value = todayStr();
+    dd.value = _ymdLocal(new Date(today.getFullYear(), today.getMonth(), 1));
   }
   let params = '';
   if(dd.value) params += `date_debut=${dd.value}&`;
@@ -30323,6 +30333,14 @@ async function loadPatisserieDashboard(){
     document.getElementById('ptd-ca-ventes').textContent    = fmtG(d.ca_ventes);
     document.getElementById('ptd-ca-commandes').textContent = fmtG(d.ca_commandes);
     document.getElementById('ptd-couts').textContent        = fmtG(d.total_depenses + d.total_achats);
+    const dispoEl = document.getElementById('ptd-caisse-disponible');
+    dispoEl.textContent = fmtG(d.caisse.disponible);
+    dispoEl.style.color = d.caisse.disponible >= 0 ? '#2dd4bf' : '#f87171';
+    document.getElementById('ptd-caisse-detail').innerHTML =
+      `Ventes cash : ${fmtG(d.caisse.ventes_cash)}<br>`+
+      `Renflouements : ${fmtG(d.caisse.renflouements)}<br>`+
+      `− Achats confirmés : ${fmtG(d.caisse.achats)}<br>`+
+      `− Dépenses : ${fmtG(d.caisse.depenses)}`;
     const benEl = document.getElementById('ptd-benefice');
     benEl.textContent = fmtG(d.benefice) + ` (${d.marge_pct}%)`;
     benEl.style.color = d.benefice >= 0 ? '#34d399' : '#f87171';

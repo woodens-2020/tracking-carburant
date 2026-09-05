@@ -1127,6 +1127,21 @@ def dashboard(
     ca_total = ca_ventes + ca_commandes
     benefice = ca_total - total_depenses - total_achats
 
+    # ── Balance disponible en caisse : cash réellement encaissé (mode CASH
+    # uniquement — une vente CREDIT n'est pas encore du cash) + renflouements
+    # - achats confirmés - dépenses. Même formule que Cuisine/Hôtel/Bar dans
+    # cette appli — distincte de "benefice" ci-dessus, qui est une marge sur
+    # CA total (ventes + commandes, CASH+CREDIT confondus), pas un solde de
+    # caisse réel. Les acomptes de commande ne sont pas inclus : leur mode de
+    # paiement n'est pas tracé, impossible de garantir qu'ils sont en cash.
+    ventes_cash = sum(float(_dec(v.montant_total)) for v in ventes if v.mode_paiement == "CASH")
+    renflouements = db.query(RenflouementDepartement).filter(
+        RenflouementDepartement.departement == "PATISSERIE",
+        RenflouementDepartement.date_renflouement >= dt_deb, RenflouementDepartement.date_renflouement <= dt_fin,
+    ).all()
+    total_renflouements = sum(float(r.montant) for r in renflouements)
+    caisse_disponible = round(ventes_cash + total_renflouements - total_achats - total_depenses, 2)
+
     produits_bas = [
         {"id": p.id, "nom": p.nom, "stock_actuel": float(_dec(p.stock_actuel)), "seuil": float(_dec(p.seuil_alerte_stock))}
         for p in db.query(PatisserieProduit).filter(PatisserieProduit.actif == True).all()
@@ -1160,4 +1175,11 @@ def dashboard(
         "produits_stock_bas": produits_bas,
         "commandes_par_etape": par_etape,
         "evolution": sorted(evo.values(), key=lambda x: x["date"]),
+        "caisse": {
+            "ventes_cash":   round(ventes_cash, 2),
+            "renflouements": round(total_renflouements, 2),
+            "achats":        round(total_achats, 2),
+            "depenses":      round(total_depenses, 2),
+            "disponible":    caisse_disponible,
+        },
     }
