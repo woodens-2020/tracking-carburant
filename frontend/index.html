@@ -3430,6 +3430,51 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <!-- ── Section Pâtisserie ── -->
+    <div class="nav-section-label">Pâtisserie</div>
+
+    <button class="nav-item" data-page="patisserie-dashboard" onclick="goTo('patisserie-dashboard')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 3 5-8"/></svg></span>
+      <span>Tableau de Bord</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="patisserie-produits" onclick="goTo('patisserie-produits')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-3V5a4 4 0 0 0-8 0v2H6a1 1 0 0 0-1 1l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12a1 1 0 0 0-1-1z"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/></svg></span>
+      <span>Articles &amp; Stock</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="patisserie-achats" onclick="goTo('patisserie-achats')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg></span>
+      <span>Achats</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="patisserie-ventes" onclick="goTo('patisserie-ventes')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+      <span>Ventes</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="patisserie-commandes" onclick="goTo('patisserie-commandes')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 15l2 2 4-4"/></svg></span>
+      <span>Commandes</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="patisserie-depenses" onclick="goTo('patisserie-depenses')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg></span>
+      <span>Dépenses</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="patisserie-caisse" onclick="goTo('patisserie-caisse')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg></span>
+      <span>Caisse</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <!-- ── Section Administration (admin seulement) ── -->
     <div class="nav-section-label" id="nav-admin-label" style="display:none">Administration</div>
 
@@ -9730,6 +9775,469 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div><!-- /page-cuisine-analyse -->
 
     <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- PÂTISSERIE — TABLEAU DE BORD                                -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-patisserie-dashboard" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#ec4899,#be185d)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 3 5-8"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Tableau de Bord — Pâtisserie</div>
+            <div class="pos-header-sub">Ventes, commandes, dépenses et marge</div>
+          </div>
+        </div>
+
+        <div class="pos-card" style="padding:10px 14px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <input class="pos-input" type="date" id="ptd-date-debut" style="width:150px">
+          <span style="color:rgba(255,255,255,.4)">→</span>
+          <input class="pos-input" type="date" id="ptd-date-fin" style="width:150px">
+          <button class="pos-btn teal" onclick="loadPatisserieDashboard()">Actualiser</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">
+          <div class="pos-card" style="padding:14px">
+            <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase">CA Ventes comptoir</div>
+            <div id="ptd-ca-ventes" style="font-size:22px;font-weight:800;color:#34d399;margin-top:4px">—</div>
+          </div>
+          <div class="pos-card" style="padding:14px">
+            <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase">CA Commandes</div>
+            <div id="ptd-ca-commandes" style="font-size:22px;font-weight:800;color:#60a5fa;margin-top:4px">—</div>
+          </div>
+          <div class="pos-card" style="padding:14px">
+            <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase">Achats + Dépenses</div>
+            <div id="ptd-couts" style="font-size:22px;font-weight:800;color:#f87171;margin-top:4px">—</div>
+          </div>
+          <div class="pos-card" style="padding:14px">
+            <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase">Bénéfice (marge)</div>
+            <div id="ptd-benefice" style="font-size:22px;font-weight:800;margin-top:4px">—</div>
+          </div>
+        </div>
+
+        <div class="pos-card" style="padding:14px;margin-bottom:16px" id="ptd-stock-bas-card">
+          <div style="font-weight:700;margin-bottom:8px">⚠️ Articles en stock bas</div>
+          <div id="ptd-stock-bas" style="color:rgba(255,255,255,.4)">—</div>
+        </div>
+
+        <div class="pos-card" style="padding:14px">
+          <div style="font-weight:700;margin-bottom:10px">Commandes par étape</div>
+          <div id="ptd-etapes" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+        </div>
+      </div>
+    </div><!-- /page-patisserie-dashboard -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- PÂTISSERIE — ARTICLES & STOCK                               -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-patisserie-produits" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+          <h2 style="margin:0;font-size:22px;font-weight:800">Articles &amp; Stock — Pâtisserie</h2>
+          <button class="pos-btn teal" onclick="ptProduitOuvrirModal()">+ Ajouter un article</button>
+        </div>
+        <div class="pos-card" style="padding:0;overflow:hidden">
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:14px">
+              <thead>
+                <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.08)">
+                  <th style="padding:9px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Article</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Catégorie</th>
+                  <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Prix vente</th>
+                  <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Stock</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Statut</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pt-produits-tbody">
+                <tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal article -->
+      <div id="pt-produit-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)ptProduitFermerModal()">
+        <div class="pos-modal" style="max-width:460px;width:95%">
+          <div id="pt-produit-modal-titre" style="font-size:18px;font-weight:700;margin-bottom:16px">Nouvel article</div>
+          <input type="hidden" id="pt-produit-id">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Nom *</label>
+              <input class="pos-input" id="pt-produit-nom" placeholder="Ex : Gâteau au chocolat" style="width:100%">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
+                <input class="pos-input" id="pt-produit-cat" placeholder="Ex : Gâteaux" style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Unité</label>
+                <input class="pos-input" id="pt-produit-unite" placeholder="piece, boite..." style="width:100%">
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Prix de vente (G) *</label>
+                <input class="pos-input" id="pt-produit-prix" type="number" min="0.01" step="1" style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Coût unitaire estimé (G)</label>
+                <input class="pos-input" id="pt-produit-cout" type="number" min="0" step="1" style="width:100%">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Seuil d'alerte stock</label>
+              <input class="pos-input" id="pt-produit-seuil" type="number" min="0" step="1" value="0" style="width:100%">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="pos-btn ghost" style="flex:1" onclick="ptProduitFermerModal()">Annuler</button>
+            <button class="pos-btn teal" style="flex:2" onclick="ptProduitSauvegarder()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal ajustement stock -->
+      <div id="pt-ajust-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)ptAjustFermerModal()">
+        <div class="pos-modal" style="max-width:380px;width:95%">
+          <div style="font-size:18px;font-weight:700;margin-bottom:16px">Ajuster le stock</div>
+          <input type="hidden" id="pt-ajust-produit-id">
+          <div id="pt-ajust-produit-nom" style="font-weight:600;margin-bottom:10px"></div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Écart (+ entrée / − perte)</label>
+              <input class="pos-input" id="pt-ajust-ecart" type="number" step="0.01" placeholder="Ex : -2 ou 5" style="width:100%">
+            </div>
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Motif *</label>
+              <input class="pos-input" id="pt-ajust-motif" placeholder="Ex : casse, inventaire..." style="width:100%">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="pos-btn ghost" style="flex:1" onclick="ptAjustFermerModal()">Annuler</button>
+            <button class="pos-btn teal" style="flex:2" onclick="ptAjustSauvegarder()">Confirmer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-patisserie-produits -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- PÂTISSERIE — ACHATS                                         -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-patisserie-achats" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+          <h2 style="margin:0;font-size:22px;font-weight:800">Achats — Pâtisserie</h2>
+          <button class="pos-btn teal" onclick="ptAchatOuvrirModal()">+ Déclarer un achat</button>
+        </div>
+        <div class="pos-card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <input class="pos-input" type="date" id="pta-date-debut" style="width:150px">
+          <input class="pos-input" type="date" id="pta-date-fin" style="width:150px">
+          <button class="pos-btn ghost" onclick="loadPatisserieAchats()">Filtrer</button>
+          <div style="margin-left:auto;font-weight:700" id="pta-total">Total : 0 G</div>
+        </div>
+        <div class="pos-card" style="padding:0;overflow:hidden">
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:14px">
+              <thead>
+                <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.08)">
+                  <th style="padding:9px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Article</th>
+                  <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Qté</th>
+                  <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Prix unit.</th>
+                  <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Total</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Fournisseur</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Statut</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pt-achats-tbody">
+                <tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="pt-achat-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)ptAchatFermerModal()">
+        <div class="pos-modal" style="max-width:420px;width:95%">
+          <div style="font-size:18px;font-weight:700;margin-bottom:16px">Déclarer un achat</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Article *</label>
+              <select class="pos-select" id="pt-achat-produit" style="width:100%"></select>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Quantité *</label>
+                <input class="pos-input" id="pt-achat-qte" type="number" min="0.01" step="0.01" style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Prix unitaire (G) *</label>
+                <input class="pos-input" id="pt-achat-prix" type="number" min="0" step="1" style="width:100%">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Fournisseur</label>
+              <input class="pos-input" id="pt-achat-fournisseur" style="width:100%">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="pos-btn ghost" style="flex:1" onclick="ptAchatFermerModal()">Annuler</button>
+            <button class="pos-btn teal" style="flex:2" onclick="ptAchatSauvegarder()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-patisserie-achats -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- PÂTISSERIE — VENTES (COMPTOIR)                              -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-patisserie-ventes" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+          <h2 style="margin:0;font-size:22px;font-weight:800">Ventes comptoir — Pâtisserie</h2>
+          <button class="pos-btn teal" onclick="ptVenteOuvrirModal()">+ Nouvelle vente</button>
+        </div>
+        <div class="pos-card" style="padding:0;overflow:hidden">
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:14px">
+              <thead>
+                <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.08)">
+                  <th style="padding:9px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Ticket</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Heure</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Client</th>
+                  <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Total</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Paiement</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pt-ventes-tbody">
+                <tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="pt-vente-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)ptVenteFermerModal()">
+        <div class="pos-modal" style="max-width:520px;width:95%">
+          <div style="font-size:18px;font-weight:700;margin-bottom:16px">Nouvelle vente</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Caissier</label>
+              <select class="pos-select" id="pt-vente-caissier" style="width:100%"></select>
+            </div>
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Mode de paiement</label>
+              <select class="pos-select" id="pt-vente-mode" style="width:100%">
+                <option value="CASH">Cash</option>
+                <option value="CREDIT">Crédit</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-bottom:10px">
+            <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Client (facultatif)</label>
+            <input class="pos-input" id="pt-vente-client" style="width:100%">
+          </div>
+          <div id="pt-vente-lignes" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+          <button class="pos-btn ghost" style="width:100%;margin-bottom:12px" onclick="ptVenteAjouterLigne()">+ Ajouter un article</button>
+          <div style="text-align:right;font-weight:800;font-size:16px;margin-bottom:12px">Total : <span id="pt-vente-total">0</span> G</div>
+          <div style="display:flex;gap:8px">
+            <button class="pos-btn ghost" style="flex:1" onclick="ptVenteFermerModal()">Annuler</button>
+            <button class="pos-btn teal" style="flex:2" onclick="ptVenteSauvegarder()">Encaisser</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-patisserie-ventes -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- PÂTISSERIE — COMMANDES (suivi configurable)                 -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-patisserie-commandes" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+          <h2 style="margin:0;font-size:22px;font-weight:800">Commandes — Pâtisserie</h2>
+          <div style="display:flex;gap:8px">
+            <button class="pos-btn ghost" onclick="ptEtapesOuvrirModal()">⚙ Étapes de suivi</button>
+            <button class="pos-btn teal" onclick="ptCommandeOuvrirModal()">+ Nouvelle commande</button>
+          </div>
+        </div>
+
+        <!-- Vue par étape (façon kanban simplifié) -->
+        <div id="pt-commandes-colonnes" style="display:grid;grid-auto-flow:column;grid-auto-columns:minmax(240px,1fr);gap:12px;overflow-x:auto;padding-bottom:8px"></div>
+      </div>
+
+      <!-- Modal nouvelle commande -->
+      <div id="pt-commande-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)ptCommandeFermerModal()">
+        <div class="pos-modal" style="max-width:540px;width:95%">
+          <div style="font-size:18px;font-weight:700;margin-bottom:16px">Nouvelle commande</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Client *</label>
+              <input class="pos-input" id="pt-cmd-client" style="width:100%">
+            </div>
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Téléphone</label>
+              <input class="pos-input" id="pt-cmd-telephone" style="width:100%">
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Livraison prévue</label>
+              <input class="pos-input" id="pt-cmd-livraison" type="date" style="width:100%">
+            </div>
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Acompte versé (G)</label>
+              <input class="pos-input" id="pt-cmd-acompte" type="number" min="0" step="1" value="0" style="width:100%">
+            </div>
+          </div>
+          <div id="pt-cmd-lignes" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+          <button class="pos-btn ghost" style="width:100%;margin-bottom:8px" onclick="ptCommandeAjouterLigne()">+ Ajouter un article</button>
+          <div>
+            <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Notes</label>
+            <input class="pos-input" id="pt-cmd-notes" style="width:100%">
+          </div>
+          <div style="text-align:right;font-weight:800;font-size:16px;margin:12px 0">Total : <span id="pt-cmd-total">0</span> G</div>
+          <div style="display:flex;gap:8px">
+            <button class="pos-btn ghost" style="flex:1" onclick="ptCommandeFermerModal()">Annuler</button>
+            <button class="pos-btn teal" style="flex:2" onclick="ptCommandeSauvegarder()">Créer la commande</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal détail commande -->
+      <div id="pt-cmd-detail-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)ptCommandeDetailFermer()">
+        <div class="pos-modal" style="max-width:520px;width:95%">
+          <div id="pt-cmd-detail-corps"></div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="pos-btn ghost" style="flex:1" onclick="ptCommandeDetailFermer()">Fermer</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal configuration des étapes -->
+      <div id="pt-etapes-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)ptEtapesFermerModal()">
+        <div class="pos-modal" style="max-width:480px;width:95%">
+          <div style="font-size:18px;font-weight:700;margin-bottom:6px">Étapes de suivi des commandes</div>
+          <div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:14px">Personnalisez la chaîne d'étapes par laquelle passe une commande, de sa création à sa livraison.</div>
+          <div id="pt-etapes-liste" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+          <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:8px;align-items:end">
+            <div>
+              <label style="font-size:12px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Nouvelle étape</label>
+              <input class="pos-input" id="pt-etape-nouveau-libelle" placeholder="Ex : En cuisson" style="width:100%">
+            </div>
+            <div>
+              <label style="font-size:12px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Couleur</label>
+              <input class="pos-input" id="pt-etape-nouveau-couleur" type="color" value="#8b5cf6" style="width:100%;padding:2px;height:38px">
+            </div>
+            <button class="pos-btn teal" onclick="ptEtapeAjouter()">Ajouter</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="pos-btn ghost" style="flex:1" onclick="ptEtapesFermerModal()">Fermer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-patisserie-commandes -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- PÂTISSERIE — DÉPENSES                                       -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-patisserie-depenses" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+          <h2 style="margin:0;font-size:22px;font-weight:800">Dépenses — Pâtisserie</h2>
+          <button class="pos-btn teal" onclick="ptDepenseOuvrirModal()">+ Ajouter une dépense</button>
+        </div>
+        <div class="pos-card" style="padding:0;overflow:hidden">
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:14px">
+              <thead>
+                <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.08)">
+                  <th style="padding:9px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Description</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Catégorie</th>
+                  <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Montant</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Fournisseur</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pt-depenses-tbody">
+                <tr><td colspan="5" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="pt-depense-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)ptDepenseFermerModal()">
+        <div class="pos-modal" style="max-width:420px;width:95%">
+          <div style="font-size:18px;font-weight:700;margin-bottom:16px">Ajouter une dépense</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Description *</label>
+              <input class="pos-input" id="pt-dep-desc" style="width:100%">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
+                <input class="pos-input" id="pt-dep-cat" placeholder="INGREDIENTS, GAZ..." style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Montant (G) *</label>
+                <input class="pos-input" id="pt-dep-montant" type="number" min="0.01" step="1" style="width:100%">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Fournisseur</label>
+              <input class="pos-input" id="pt-dep-fournisseur" style="width:100%">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="pos-btn ghost" style="flex:1" onclick="ptDepenseFermerModal()">Annuler</button>
+            <button class="pos-btn teal" style="flex:2" onclick="ptDepenseSauvegarder()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-patisserie-depenses -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- PÂTISSERIE — CONTRÔLE DE CAISSE                             -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-patisserie-caisse" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+          <h2 style="margin:0;font-size:22px;font-weight:800">Contrôle de Caisse — Pâtisserie</h2>
+        </div>
+        <div class="pos-card" style="padding:10px 14px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <select class="pos-select" id="pt-caisse-caissier" style="min-width:200px" onchange="ptCaisseChargerDashboard()"></select>
+          <button class="pos-btn teal" id="pt-caisse-btn-ouvrir" onclick="ptCaisseOuvrir()">Ouvrir une session</button>
+        </div>
+        <div id="pt-caisse-dashboard" class="pos-card" style="padding:14px;margin-bottom:16px"></div>
+
+        <div class="pos-card" style="padding:0;overflow:hidden">
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:14px">
+              <thead>
+                <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.08)">
+                  <th style="padding:9px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Caissier</th>
+                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Date</th>
+                  <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Ventes</th>
+                  <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Écart</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Statut</th>
+                  <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pt-sessions-tbody">
+                <tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-patisserie-caisse -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
     <!-- HOTEL — TABLEAU DE BORD                                    -->
     <!-- ══════════════════════════════════════════════════════════ -->
     <div id="page-hotel-dashboard" class="page page-gi">
@@ -11190,6 +11698,7 @@ async function apiFetch(method,path,body){
 }
 const GET   = p    => apiFetch('GET',  p);
 const POST  = (p,b)=> apiFetch('POST', p,b);
+const PUT   = (p,b)=> apiFetch('PUT',  p,b);
 const PATCH = (p,b)=> apiFetch('PATCH',p,b);
 const DEL   = p    => apiFetch('DELETE',p);
 
@@ -15120,6 +15629,8 @@ const _MODULE_PAGES = {
   zelle:     ['zelle','zelle-paiements','zelle-fonds'],
   cuisine:   ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes',
               'cuisine-stats','cuisine-achats','cuisine-analyse'],
+  patisserie: ['patisserie-dashboard','patisserie-produits','patisserie-achats',
+               'patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse'],
 };
 
 function _pageModuleEnabled(page){
@@ -15146,6 +15657,10 @@ const _AREA_PAGES = {
   cuisine: {
     complet: ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse'],
     lecture: ['cuisine-ventes','cuisine-stats'],
+  },
+  patisserie: {
+    complet: ['patisserie-dashboard','patisserie-produits','patisserie-achats','patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse'],
+    lecture: ['patisserie-dashboard','patisserie-ventes','patisserie-commandes'],
   },
   hotel: {
     complet: ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
@@ -20236,6 +20751,13 @@ const _giPageLoaders = {
   'cuisine-stats':      loadCuisineStats,
   'cuisine-achats':     loadCuisineAchats,
   'cuisine-analyse':    loadCuisineAnalyse,
+  'patisserie-dashboard': loadPatisserieDashboard,
+  'patisserie-produits':  loadPatisserieProduits,
+  'patisserie-achats':    loadPatisserieAchats,
+  'patisserie-ventes':    loadPatisserieVentes,
+  'patisserie-commandes': loadPatisserieCommandes,
+  'patisserie-depenses':  loadPatisserieDepenses,
+  'patisserie-caisse':    loadPatisserieCaisse,
   'hotel-dashboard':    loadHotelDashboard,
   'hotel-chambres':     loadHotelChambres,
   'hotel-reception':    loadHotelReception,
@@ -29693,6 +30215,608 @@ async function ckaLotsCharger(){
   } catch(e){
     posAlert(e.message || 'Erreur lors du chargement des lots.');
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PÂTISSERIE
+// ══════════════════════════════════════════════════════════════════════
+let _ptProduits = [];
+let _ptEtapes   = [];
+let _ptVenteLignes = [];
+let _ptCmdLignes   = [];
+
+function ptFmtDate(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+}
+
+// ── Tableau de bord ─────────────────────────────────────────────────
+
+async function loadPatisserieDashboard(){
+  const dd = document.getElementById('ptd-date-debut');
+  const df = document.getElementById('ptd-date-fin');
+  if(!dd.value){
+    const today = new Date();
+    df.value = today.toISOString().slice(0,10);
+    dd.value = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0,10);
+  }
+  let params = '';
+  if(dd.value) params += `date_debut=${dd.value}&`;
+  if(df.value) params += `date_fin=${df.value}`;
+  try{
+    const d = await apiFetch('GET', `/patisserie/dashboard?${params}`);
+    document.getElementById('ptd-ca-ventes').textContent    = fmtG(d.ca_ventes);
+    document.getElementById('ptd-ca-commandes').textContent = fmtG(d.ca_commandes);
+    document.getElementById('ptd-couts').textContent        = fmtG(d.total_depenses + d.total_achats);
+    const benEl = document.getElementById('ptd-benefice');
+    benEl.textContent = fmtG(d.benefice) + ` (${d.marge_pct}%)`;
+    benEl.style.color = d.benefice >= 0 ? '#34d399' : '#f87171';
+
+    const stockEl = document.getElementById('ptd-stock-bas');
+    stockEl.innerHTML = d.produits_stock_bas.length
+      ? d.produits_stock_bas.map(p=>`<span style="display:inline-block;background:rgba(248,113,113,.12);color:#f87171;padding:3px 10px;border-radius:6px;margin:2px;font-size:13px">${esc(p.nom)} — ${p.stock_actuel}</span>`).join('')
+      : '<span style="color:rgba(255,255,255,.3)">Aucun article en stock bas</span>';
+
+    document.getElementById('ptd-etapes').innerHTML = d.commandes_par_etape.map(e => `
+      <div class="pos-card" style="padding:10px 14px;min-width:130px;border-left:3px solid ${e.couleur}">
+        <div style="font-size:12px;color:rgba(255,255,255,.4)">${esc(e.libelle)}</div>
+        <div style="font-size:20px;font-weight:800">${e.nb}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.4)">${fmtG(e.montant)}</div>
+      </div>
+    `).join('');
+  }catch(e){ posAlert(e.message||'Erreur tableau de bord.'); }
+}
+
+// ── Articles & Stock ─────────────────────────────────────────────────
+
+async function loadPatisserieProduits(){
+  try{ _ptProduits = await apiFetch('GET', '/patisserie/produits'); }
+  catch(e){ _ptProduits = []; posAlert('Erreur articles: '+(e.message||e)); return; }
+  const tbody = document.getElementById('pt-produits-tbody');
+  if(!_ptProduits.length){
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucun article</td></tr>';
+    return;
+  }
+  tbody.innerHTML = _ptProduits.map(p => `
+    <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+      <td style="padding:9px 12px;font-weight:700">${esc(p.nom)}</td>
+      <td style="padding:9px 8px">${esc(p.categorie||'—')}</td>
+      <td style="padding:9px 8px;text-align:right">${fmtG(p.prix_vente)}</td>
+      <td style="padding:9px 8px;text-align:right;color:${p.stock_bas?'#f87171':'inherit'};font-weight:${p.stock_bas?'700':'400'}">${p.stock_actuel} ${esc(p.unite)}</td>
+      <td style="padding:9px 8px;text-align:center">${p.actif?'<span style="color:#34d399">Actif</span>':'<span style="color:rgba(255,255,255,.3)">Retiré</span>'}</td>
+      <td style="padding:9px 8px;text-align:center;white-space:nowrap">
+        <button class="pos-btn ghost" style="padding:4px 8px;font-size:12px" onclick="ptProduitOuvrirModal(${p.id})">Modifier</button>
+        <button class="pos-btn ghost" style="padding:4px 8px;font-size:12px" onclick="ptAjustOuvrirModal(${p.id})">Stock</button>
+        ${p.actif ? `<button class="pos-btn ghost" style="padding:4px 8px;font-size:12px;color:#f87171" onclick="ptProduitRetirer(${p.id})">Retirer</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function ptProduitOuvrirModal(id){
+  document.getElementById('pt-produit-id').value = id || '';
+  document.getElementById('pt-produit-modal-titre').textContent = id ? 'Modifier l\'article' : 'Nouvel article';
+  const p = id ? _ptProduits.find(x=>x.id===id) : null;
+  document.getElementById('pt-produit-nom').value   = p ? p.nom : '';
+  document.getElementById('pt-produit-cat').value   = p ? (p.categorie||'') : '';
+  document.getElementById('pt-produit-unite').value = p ? p.unite : 'unite';
+  document.getElementById('pt-produit-prix').value  = p ? p.prix_vente : '';
+  document.getElementById('pt-produit-cout').value  = p && p.cout_unitaire_estime!=null ? p.cout_unitaire_estime : '';
+  document.getElementById('pt-produit-seuil').value = p ? p.seuil_alerte_stock : 0;
+  document.getElementById('pt-produit-modal-bg').classList.add('open');
+}
+function ptProduitFermerModal(){ document.getElementById('pt-produit-modal-bg').classList.remove('open'); }
+
+async function ptProduitSauvegarder(){
+  const id  = document.getElementById('pt-produit-id').value;
+  const nom = document.getElementById('pt-produit-nom').value.trim();
+  const prix = parseFloat(document.getElementById('pt-produit-prix').value);
+  if(!nom){ posAlert('Le nom est requis.','warn'); return; }
+  if(!prix || prix<=0){ posAlert('Le prix doit être positif.','warn'); return; }
+  const payload = {
+    nom, categorie: document.getElementById('pt-produit-cat').value.trim(),
+    unite: document.getElementById('pt-produit-unite').value.trim() || 'unite',
+    prix_vente: prix,
+    cout_unitaire_estime: parseFloat(document.getElementById('pt-produit-cout').value) || null,
+    seuil_alerte_stock: parseFloat(document.getElementById('pt-produit-seuil').value) || 0,
+  };
+  try{
+    if(id) await apiFetch('PUT', `/patisserie/produits/${id}`, payload);
+    else   await apiFetch('POST', '/patisserie/produits', payload);
+    ptProduitFermerModal(); posAlert('Article enregistré.','ok'); loadPatisserieProduits();
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function ptProduitRetirer(id){
+  try{ await apiFetch('DELETE', `/patisserie/produits/${id}`); posAlert('Article retiré.','ok'); loadPatisserieProduits(); }
+  catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+function ptAjustOuvrirModal(id){
+  const p = _ptProduits.find(x=>x.id===id);
+  document.getElementById('pt-ajust-produit-id').value = id;
+  document.getElementById('pt-ajust-produit-nom').textContent = p ? `${p.nom} — stock actuel : ${p.stock_actuel} ${p.unite}` : '';
+  document.getElementById('pt-ajust-ecart').value = '';
+  document.getElementById('pt-ajust-motif').value = '';
+  document.getElementById('pt-ajust-modal-bg').classList.add('open');
+}
+function ptAjustFermerModal(){ document.getElementById('pt-ajust-modal-bg').classList.remove('open'); }
+
+async function ptAjustSauvegarder(){
+  const id    = document.getElementById('pt-ajust-produit-id').value;
+  const ecart = parseFloat(document.getElementById('pt-ajust-ecart').value);
+  const motif = document.getElementById('pt-ajust-motif').value.trim();
+  if(!ecart){ posAlert('L\'écart doit être différent de zéro.','warn'); return; }
+  if(!motif){ posAlert('Le motif est requis.','warn'); return; }
+  try{
+    await apiFetch('POST', `/patisserie/produits/${id}/ajustement`, {ecart, motif});
+    ptAjustFermerModal(); posAlert('Stock ajusté.','ok'); loadPatisserieProduits();
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ── Achats ───────────────────────────────────────────────────────────
+
+async function loadPatisserieAchats(){
+  const dd = document.getElementById('pta-date-debut').value;
+  const df = document.getElementById('pta-date-fin').value;
+  let params = [];
+  if(dd) params.push(`date_debut=${dd}`);
+  if(df) params.push(`date_fin=${df}`);
+  try{
+    const r = await apiFetch('GET', `/patisserie/achats?${params.join('&')}`);
+    document.getElementById('pta-total').textContent = 'Total : ' + fmtG(r.total_achats);
+    const tbody = document.getElementById('pt-achats-tbody');
+    if(!r.achats.length){
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucun achat</td></tr>';
+      return;
+    }
+    tbody.innerHTML = r.achats.map(a => `
+      <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+        <td style="padding:9px 12px;font-weight:700">${esc(a.produit_nom)}</td>
+        <td style="padding:9px 8px;text-align:right">${a.quantite}</td>
+        <td style="padding:9px 8px;text-align:right">${fmtG(a.prix_achat_unitaire)}</td>
+        <td style="padding:9px 8px;text-align:right;font-weight:700">${fmtG(a.total)}</td>
+        <td style="padding:9px 8px">${esc(a.fournisseur||'—')}</td>
+        <td style="padding:9px 8px;text-align:center">
+          ${a.statut==='CONFIRME' ? '<span style="color:#34d399">Confirmé</span>' :
+            a.statut==='ANNULE'   ? '<span style="color:rgba(255,255,255,.3)">Annulé</span>' :
+                                     '<span style="color:#f59e0b">En attente</span>'}
+        </td>
+        <td style="padding:9px 8px;text-align:center;white-space:nowrap">
+          ${a.statut==='EN_ATTENTE' ? `
+            <button class="pos-btn teal" style="padding:4px 8px;font-size:12px" onclick="ptAchatConfirmer(${a.id})">Confirmer</button>
+            <button class="pos-btn ghost" style="padding:4px 8px;font-size:12px;color:#f87171" onclick="ptAchatAnnuler(${a.id})">Annuler</button>
+          ` : ''}
+        </td>
+      </tr>
+    `).join('');
+  }catch(e){ posAlert(e.message||'Erreur achats.'); }
+}
+
+function ptAchatOuvrirModal(){
+  const sel = document.getElementById('pt-achat-produit');
+  sel.innerHTML = _ptProduits.filter(p=>p.actif).map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
+  document.getElementById('pt-achat-qte').value = '';
+  document.getElementById('pt-achat-prix').value = '';
+  document.getElementById('pt-achat-fournisseur').value = '';
+  document.getElementById('pt-achat-modal-bg').classList.add('open');
+}
+function ptAchatFermerModal(){ document.getElementById('pt-achat-modal-bg').classList.remove('open'); }
+
+async function ptAchatSauvegarder(){
+  const produit_id = parseInt(document.getElementById('pt-achat-produit').value);
+  const quantite = parseFloat(document.getElementById('pt-achat-qte').value);
+  const prix_achat_unitaire = parseFloat(document.getElementById('pt-achat-prix').value);
+  if(!quantite || quantite<=0){ posAlert('La quantité doit être positive.','warn'); return; }
+  if(prix_achat_unitaire==null || isNaN(prix_achat_unitaire) || prix_achat_unitaire<0){ posAlert('Le prix unitaire est requis.','warn'); return; }
+  try{
+    await apiFetch('POST', '/patisserie/achats', {
+      produit_id, quantite, prix_achat_unitaire,
+      fournisseur: document.getElementById('pt-achat-fournisseur').value.trim(),
+    });
+    ptAchatFermerModal(); posAlert('Achat déclaré.','ok'); loadPatisserieAchats();
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function ptAchatConfirmer(id){
+  try{ await apiFetch('POST', `/patisserie/achats/${id}/confirmer`); posAlert('Achat confirmé, stock mis à jour.','ok'); loadPatisserieAchats(); loadPatisserieProduits(); }
+  catch(e){ posAlert(e.message||'Erreur.'); }
+}
+async function ptAchatAnnuler(id){
+  try{ await apiFetch('POST', `/patisserie/achats/${id}/annuler`); posAlert('Achat annulé.','ok'); loadPatisserieAchats(); }
+  catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ── Ventes comptoir ──────────────────────────────────────────────────
+
+async function loadPatisserieVentes(){
+  try{
+    if(!_ptProduits.length) await loadPatisserieProduits();
+    const ventes = await apiFetch('GET', '/patisserie/ventes');
+    const tbody = document.getElementById('pt-ventes-tbody');
+    if(!ventes.length){
+      tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune vente aujourd\'hui</td></tr>';
+      return;
+    }
+    tbody.innerHTML = ventes.map(v => `
+      <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+        <td style="padding:9px 12px;font-weight:700">${esc(v.numero_ticket)}</td>
+        <td style="padding:9px 8px">${ptFmtDate(v.date_heure)}</td>
+        <td style="padding:9px 8px">${esc(v.client_nom||'—')}</td>
+        <td style="padding:9px 8px;text-align:right;font-weight:700">${fmtG(v.montant_total)}</td>
+        <td style="padding:9px 8px;text-align:center">${esc(v.mode_paiement)}</td>
+        <td style="padding:9px 8px;text-align:center">
+          <button class="pos-btn ghost" style="padding:4px 8px;font-size:12px;color:#f87171" onclick="ptVenteAnnuler(${v.id})">Annuler</button>
+        </td>
+      </tr>
+    `).join('');
+  }catch(e){ posAlert(e.message||'Erreur ventes.'); }
+}
+
+async function ptVenteOuvrirModal(){
+  if(!_ptProduits.length) await loadPatisserieProduits();
+  try{
+    const caissiers = await apiFetch('GET', '/patisserie/caisse/caissiers');
+    document.getElementById('pt-vente-caissier').innerHTML =
+      '<option value="">— Aucun —</option>' + caissiers.map(c=>`<option value="${c.id}">${esc(c.prenom)} ${esc(c.nom)}</option>`).join('');
+  }catch(e){}
+  _ptVenteLignes = [];
+  document.getElementById('pt-vente-client').value = '';
+  ptVenteAjouterLigne();
+  document.getElementById('pt-vente-modal-bg').classList.add('open');
+}
+function ptVenteFermerModal(){ document.getElementById('pt-vente-modal-bg').classList.remove('open'); }
+
+function ptVenteAjouterLigne(){
+  _ptVenteLignes.push({produit_id:null, quantite:1});
+  ptVenteRenderLignes();
+}
+function ptVenteRetirerLigne(idx){ _ptVenteLignes.splice(idx,1); ptVenteRenderLignes(); }
+
+function ptVenteRenderLignes(){
+  const el = document.getElementById('pt-vente-lignes');
+  el.innerHTML = _ptVenteLignes.map((l,idx) => `
+    <div style="display:grid;grid-template-columns:2fr 90px 30px;gap:8px;align-items:center">
+      <select class="pos-select" onchange="_ptVenteLignes[${idx}].produit_id=parseInt(this.value)||null;ptVenteRecalculer()">
+        <option value="">— Article —</option>
+        ${_ptProduits.filter(p=>p.actif).map(p=>`<option value="${p.id}" ${l.produit_id===p.id?'selected':''}>${esc(p.nom)} (${fmtG(p.prix_vente)})</option>`).join('')}
+      </select>
+      <input class="pos-input" type="number" min="1" step="1" value="${l.quantite}" oninput="_ptVenteLignes[${idx}].quantite=parseFloat(this.value)||0;ptVenteRecalculer()">
+      <button class="pos-btn ghost" style="padding:4px" onclick="ptVenteRetirerLigne(${idx})">✕</button>
+    </div>
+  `).join('');
+  ptVenteRecalculer();
+}
+function ptVenteRecalculer(){
+  let total = 0;
+  for(const l of _ptVenteLignes){
+    const p = _ptProduits.find(x=>x.id===l.produit_id);
+    if(p) total += p.prix_vente * (l.quantite||0);
+  }
+  document.getElementById('pt-vente-total').textContent = fmtG(total).replace(' G','');
+}
+
+async function ptVenteSauvegarder(){
+  const lignes = _ptVenteLignes.filter(l=>l.produit_id && l.quantite>0);
+  if(!lignes.length){ posAlert('Ajoutez au moins un article.','warn'); return; }
+  try{
+    await apiFetch('POST', '/patisserie/ventes', {
+      caissier_id: parseInt(document.getElementById('pt-vente-caissier').value) || null,
+      mode_paiement: document.getElementById('pt-vente-mode').value,
+      client_nom: document.getElementById('pt-vente-client').value.trim(),
+      lignes,
+    });
+    ptVenteFermerModal(); posAlert('Vente enregistrée.','ok'); loadPatisserieVentes(); loadPatisserieProduits();
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+async function ptVenteAnnuler(id){
+  try{ await apiFetch('POST', `/patisserie/ventes/${id}/annuler`); posAlert('Vente annulée, stock restitué.','ok'); loadPatisserieVentes(); loadPatisserieProduits(); }
+  catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ── Commandes (suivi configurable) ──────────────────────────────────
+
+async function loadPatisserieCommandes(){
+  try{
+    if(!_ptProduits.length) await loadPatisserieProduits();
+    _ptEtapes = await apiFetch('GET', '/patisserie/etapes?actif=true');
+    const commandes = await apiFetch('GET', '/patisserie/commandes?statut=ACTIVE');
+    const cols = document.getElementById('pt-commandes-colonnes');
+    cols.innerHTML = _ptEtapes.sort((a,b)=>a.ordre-b.ordre).map(e => {
+      const cmds = commandes.filter(c=>c.etape_id===e.id);
+      return `
+        <div class="pos-card" style="padding:10px;display:flex;flex-direction:column;gap:8px;border-top:3px solid ${e.couleur}">
+          <div style="font-weight:700;display:flex;justify-content:space-between">
+            <span>${esc(e.libelle)}</span><span style="color:rgba(255,255,255,.4)">${cmds.length}</span>
+          </div>
+          ${cmds.map(c => `
+            <div class="pos-card" style="padding:8px 10px;cursor:pointer" onclick="ptCommandeDetailOuvrir(${c.id})">
+              <div style="font-weight:700;font-size:13px">${esc(c.client_nom)}</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.4)">${esc(c.numero)} · ${fmtG(c.montant_total)}</div>
+              ${c.solde_du>0 ? `<div style="font-size:11px;color:#f59e0b">Solde dû : ${fmtG(c.solde_du)}</div>` : ''}
+            </div>
+          `).join('') || '<div style="font-size:12px;color:rgba(255,255,255,.25);padding:8px">Aucune</div>'}
+        </div>
+      `;
+    }).join('');
+  }catch(e){ posAlert(e.message||'Erreur commandes.'); }
+}
+
+function ptCommandeOuvrirModal(){
+  _ptCmdLignes = [];
+  document.getElementById('pt-cmd-client').value = '';
+  document.getElementById('pt-cmd-telephone').value = '';
+  document.getElementById('pt-cmd-livraison').value = '';
+  document.getElementById('pt-cmd-acompte').value = 0;
+  document.getElementById('pt-cmd-notes').value = '';
+  ptCommandeAjouterLigne();
+  document.getElementById('pt-commande-modal-bg').classList.add('open');
+}
+function ptCommandeFermerModal(){ document.getElementById('pt-commande-modal-bg').classList.remove('open'); }
+
+function ptCommandeAjouterLigne(){
+  _ptCmdLignes.push({produit_id:null, description:'', quantite:1, prix_unitaire:0});
+  ptCommandeRenderLignes();
+}
+function ptCommandeRetirerLigne(idx){ _ptCmdLignes.splice(idx,1); ptCommandeRenderLignes(); }
+
+function ptCommandeRenderLignes(){
+  const el = document.getElementById('pt-cmd-lignes');
+  el.innerHTML = _ptCmdLignes.map((l,idx) => `
+    <div style="display:grid;grid-template-columns:1.5fr 1fr 70px 90px 30px;gap:8px;align-items:center">
+      <select class="pos-select" onchange="const p=_ptProduits.find(x=>x.id===parseInt(this.value));_ptCmdLignes[${idx}].produit_id=p?p.id:null;_ptCmdLignes[${idx}].prix_unitaire=p?p.prix_vente:_ptCmdLignes[${idx}].prix_unitaire;ptCommandeRenderLignes()">
+        <option value="">— Catalogue (facultatif) —</option>
+        ${_ptProduits.filter(p=>p.actif).map(p=>`<option value="${p.id}" ${l.produit_id===p.id?'selected':''}>${esc(p.nom)}</option>`).join('')}
+      </select>
+      <input class="pos-input" placeholder="Description" value="${esc(l.description)}" oninput="_ptCmdLignes[${idx}].description=this.value">
+      <input class="pos-input" type="number" min="1" step="1" value="${l.quantite}" oninput="_ptCmdLignes[${idx}].quantite=parseFloat(this.value)||0;ptCommandeRecalculer()">
+      <input class="pos-input" type="number" min="0" step="1" value="${l.prix_unitaire}" oninput="_ptCmdLignes[${idx}].prix_unitaire=parseFloat(this.value)||0;ptCommandeRecalculer()">
+      <button class="pos-btn ghost" style="padding:4px" onclick="ptCommandeRetirerLigne(${idx})">✕</button>
+    </div>
+  `).join('');
+  ptCommandeRecalculer();
+}
+function ptCommandeRecalculer(){
+  const total = _ptCmdLignes.reduce((s,l)=>s+(l.quantite||0)*(l.prix_unitaire||0),0);
+  document.getElementById('pt-cmd-total').textContent = fmtG(total).replace(' G','');
+}
+
+async function ptCommandeSauvegarder(){
+  const client_nom = document.getElementById('pt-cmd-client').value.trim();
+  if(!client_nom){ posAlert('Le nom du client est requis.','warn'); return; }
+  const lignes = _ptCmdLignes.filter(l=>l.quantite>0 && l.prix_unitaire>0);
+  if(!lignes.length){ posAlert('Ajoutez au moins un article avec un prix.','warn'); return; }
+  try{
+    await apiFetch('POST', '/patisserie/commandes', {
+      client_nom,
+      client_telephone: document.getElementById('pt-cmd-telephone').value.trim(),
+      date_livraison_prevue: document.getElementById('pt-cmd-livraison').value || null,
+      acompte_verse: parseFloat(document.getElementById('pt-cmd-acompte').value) || 0,
+      notes: document.getElementById('pt-cmd-notes').value.trim(),
+      lignes,
+    });
+    ptCommandeFermerModal(); posAlert('Commande créée.','ok'); loadPatisserieCommandes();
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function ptCommandeDetailOuvrir(id){
+  try{
+    const c = await apiFetch('GET', `/patisserie/commandes/${id}`);
+    const etapesOptions = _ptEtapes.sort((a,b)=>a.ordre-b.ordre)
+      .map(e=>`<option value="${e.id}" ${e.id===c.etape_id?'selected':''}>${esc(e.libelle)}</option>`).join('');
+    document.getElementById('pt-cmd-detail-corps').innerHTML = `
+      <div style="font-size:18px;font-weight:700">${esc(c.client_nom)} <span style="font-weight:400;color:rgba(255,255,255,.4);font-size:14px">${esc(c.numero)}</span></div>
+      <div style="color:rgba(255,255,255,.5);margin-bottom:10px">${esc(c.client_telephone||'')}</div>
+      <table style="width:100%;font-size:13px;margin-bottom:10px">
+        ${c.lignes.map(l=>`<tr><td style="padding:3px 0">${esc(l.description)} × ${l.quantite}</td><td style="text-align:right">${fmtG(l.sous_total)}</td></tr>`).join('')}
+      </table>
+      <div style="display:flex;justify-content:space-between;font-weight:700;margin-bottom:4px"><span>Total</span><span>${fmtG(c.montant_total)}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Acompte versé</span><span>${fmtG(c.acompte_verse)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-weight:700;color:${c.solde_du>0?'#f59e0b':'#34d399'};margin-bottom:14px"><span>Solde dû</span><span>${fmtG(c.solde_du)}</span></div>
+      <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Étape</label>
+      <select class="pos-select" id="pt-cmd-detail-etape" style="width:100%;margin-bottom:10px">${etapesOptions}</select>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="pos-btn teal" style="flex:1" onclick="ptCommandeChangerEtape(${c.id})">Mettre à jour l'étape</button>
+        <button class="pos-btn ghost" style="color:#f87171" onclick="ptCommandeAnnuler(${c.id})">Annuler la commande</button>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.4);margin-bottom:6px">HISTORIQUE</div>
+      ${c.suivis.map(s=>`<div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:2px">${ptFmtDate(s.date_changement)} — ${esc(s.etape_libelle)}${s.utilisateur?' · '+esc(s.utilisateur):''}</div>`).join('')}
+    `;
+    document.getElementById('pt-cmd-detail-modal-bg').classList.add('open');
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+function ptCommandeDetailFermer(){ document.getElementById('pt-cmd-detail-modal-bg').classList.remove('open'); loadPatisserieCommandes(); }
+
+async function ptCommandeChangerEtape(id){
+  const etape_id = parseInt(document.getElementById('pt-cmd-detail-etape').value);
+  try{
+    await apiFetch('PATCH', `/patisserie/commandes/${id}/etape`, {etape_id});
+    posAlert('Étape mise à jour.','ok');
+    ptCommandeDetailOuvrir(id);
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+async function ptCommandeAnnuler(id){
+  try{
+    await apiFetch('POST', `/patisserie/commandes/${id}/annuler`);
+    posAlert('Commande annulée.','ok');
+    ptCommandeDetailFermer();
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ── Configuration des étapes de suivi ───────────────────────────────
+
+async function ptEtapesOuvrirModal(){
+  await ptEtapesRafraichir();
+  document.getElementById('pt-etapes-modal-bg').classList.add('open');
+}
+function ptEtapesFermerModal(){ document.getElementById('pt-etapes-modal-bg').classList.remove('open'); loadPatisserieCommandes(); }
+
+async function ptEtapesRafraichir(){
+  try{
+    _ptEtapes = await apiFetch('GET', '/patisserie/etapes');
+    document.getElementById('pt-etapes-liste').innerHTML = _ptEtapes.sort((a,b)=>a.ordre-b.ordre).map(e => `
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:8px;border-left:3px solid ${e.couleur}">
+        <span style="flex:1;font-weight:600;${e.actif?'':'text-decoration:line-through;opacity:.5'}">${esc(e.libelle)}</span>
+        <label style="font-size:11px;color:rgba(255,255,255,.4);display:flex;align-items:center;gap:4px">
+          <input type="checkbox" ${e.est_finale?'checked':''} onchange="ptEtapeModifier(${e.id},{est_finale:this.checked})"> Finale (sort le stock)
+        </label>
+        <button class="pos-btn ghost" style="padding:2px 6px;font-size:11px" onclick="ptEtapeModifier(${e.id},{actif:${!e.actif}})">${e.actif?'Désactiver':'Réactiver'}</button>
+        <button class="pos-btn ghost" style="padding:2px 6px;font-size:11px;color:#f87171" onclick="ptEtapeSupprimer(${e.id})">✕</button>
+      </div>
+    `).join('');
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function ptEtapeAjouter(){
+  const libelle = document.getElementById('pt-etape-nouveau-libelle').value.trim();
+  if(!libelle){ posAlert('Le libellé est requis.','warn'); return; }
+  const couleur = document.getElementById('pt-etape-nouveau-couleur').value;
+  try{
+    await apiFetch('POST', '/patisserie/etapes', {libelle, couleur});
+    document.getElementById('pt-etape-nouveau-libelle').value = '';
+    ptEtapesRafraichir();
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+async function ptEtapeModifier(id, payload){
+  try{ await apiFetch('PUT', `/patisserie/etapes/${id}`, payload); ptEtapesRafraichir(); }
+  catch(e){ posAlert(e.message||'Erreur.'); }
+}
+async function ptEtapeSupprimer(id){
+  try{ await apiFetch('DELETE', `/patisserie/etapes/${id}`); ptEtapesRafraichir(); }
+  catch(e){ posAlert(e.message||'Erreur — désactivez-la plutôt si des commandes l\'utilisent.'); }
+}
+
+// ── Dépenses ─────────────────────────────────────────────────────────
+
+async function loadPatisserieDepenses(){
+  try{
+    const deps = await apiFetch('GET', '/patisserie/depenses');
+    const tbody = document.getElementById('pt-depenses-tbody');
+    if(!deps.length){
+      tbody.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune dépense</td></tr>';
+      return;
+    }
+    tbody.innerHTML = deps.map(d => `
+      <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+        <td style="padding:9px 12px;font-weight:700">${esc(d.description)}</td>
+        <td style="padding:9px 8px">${esc(d.categorie)}</td>
+        <td style="padding:9px 8px;text-align:right">${fmtG(d.montant)}</td>
+        <td style="padding:9px 8px">${esc(d.fournisseur||'—')}</td>
+        <td style="padding:9px 8px;text-align:center">
+          <button class="pos-btn ghost" style="padding:4px 8px;font-size:12px;color:#f87171" onclick="ptDepenseSupprimer(${d.id})">Supprimer</button>
+        </td>
+      </tr>
+    `).join('');
+  }catch(e){ posAlert(e.message||'Erreur dépenses.'); }
+}
+
+function ptDepenseOuvrirModal(){
+  document.getElementById('pt-dep-desc').value = '';
+  document.getElementById('pt-dep-cat').value = '';
+  document.getElementById('pt-dep-montant').value = '';
+  document.getElementById('pt-dep-fournisseur').value = '';
+  document.getElementById('pt-depense-modal-bg').classList.add('open');
+}
+function ptDepenseFermerModal(){ document.getElementById('pt-depense-modal-bg').classList.remove('open'); }
+
+async function ptDepenseSauvegarder(){
+  const description = document.getElementById('pt-dep-desc').value.trim();
+  const montant = parseFloat(document.getElementById('pt-dep-montant').value);
+  if(!description){ posAlert('La description est requise.','warn'); return; }
+  if(!montant || montant<=0){ posAlert('Le montant doit être positif.','warn'); return; }
+  try{
+    await apiFetch('POST', '/patisserie/depenses', {
+      description, montant,
+      categorie: document.getElementById('pt-dep-cat').value.trim() || 'AUTRE',
+      fournisseur: document.getElementById('pt-dep-fournisseur').value.trim(),
+    });
+    ptDepenseFermerModal(); posAlert('Dépense enregistrée.','ok'); loadPatisserieDepenses();
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+async function ptDepenseSupprimer(id){
+  try{ await apiFetch('DELETE', `/patisserie/depenses/${id}`); posAlert('Dépense supprimée.','ok'); loadPatisserieDepenses(); }
+  catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ── Contrôle de caisse ───────────────────────────────────────────────
+
+async function loadPatisserieCaisse(){
+  try{
+    const caissiers = await apiFetch('GET', '/patisserie/caisse/caissiers');
+    const sel = document.getElementById('pt-caisse-caissier');
+    sel.innerHTML = caissiers.map(c=>`<option value="${c.id}">${esc(c.prenom)} ${esc(c.nom)}</option>`).join('');
+    if(sel.value) await ptCaisseChargerDashboard();
+
+    const sessions = await apiFetch('GET', '/patisserie/caisse/sessions');
+    const tbody = document.getElementById('pt-sessions-tbody');
+    tbody.innerHTML = sessions.length ? sessions.map(s => `
+      <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
+        <td style="padding:9px 12px;font-weight:700">${esc(s.caissier_nom||'—')}</td>
+        <td style="padding:9px 8px">${s.date_session} #${s.numero_session}</td>
+        <td style="padding:9px 8px;text-align:right">${fmtG(s.total_ventes)}</td>
+        <td style="padding:9px 8px;text-align:right;color:${s.ecart? (Math.abs(s.ecart)<1?'#34d399':'#f87171') : 'inherit'}">${s.ecart!=null?fmtG(s.ecart):'—'}</td>
+        <td style="padding:9px 8px;text-align:center">${s.statut}</td>
+        <td style="padding:9px 8px;text-align:center">
+          ${s.statut==='SOUMIS' ? `<button class="pos-btn teal" style="padding:4px 8px;font-size:12px" onclick="ptCaisseValider(${s.id})">Valider</button>` : ''}
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune session</td></tr>';
+  }catch(e){ posAlert(e.message||'Erreur caisse.'); }
+}
+
+async function ptCaisseChargerDashboard(){
+  const caissier_id = document.getElementById('pt-caisse-caissier').value;
+  if(!caissier_id) return;
+  try{
+    const d = await apiFetch('GET', `/patisserie/caisse/dashboard?caissier_id=${caissier_id}`);
+    const el = document.getElementById('pt-caisse-dashboard');
+    const btn = document.getElementById('pt-caisse-btn-ouvrir');
+    btn.style.display = d.session_id ? 'none' : '';
+    if(!d.session_id){
+      el.innerHTML = '<div style="color:rgba(255,255,255,.4)">Aucune session ouverte aujourd\'hui pour ce caissier.</div>';
+      return;
+    }
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:${d.session_statut==='EN_COURS'?'14px':'0'}">
+        <div><div style="font-size:12px;color:rgba(255,255,255,.4)">Session</div><div style="font-weight:700">#${d.numero_session||''} — ${d.session_statut}</div></div>
+        <div><div style="font-size:12px;color:rgba(255,255,255,.4)">Ventes</div><div style="font-weight:700">${d.nb_ventes}</div></div>
+        <div><div style="font-size:12px;color:rgba(255,255,255,.4)">Cash attendu</div><div style="font-weight:700">${fmtG(d.cash_attendu)}</div></div>
+      </div>
+      ${d.session_statut==='EN_COURS' ? `
+        <div style="display:flex;gap:8px;align-items:end">
+          <div style="flex:1">
+            <label style="font-size:12px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Montant compté en caisse (G)</label>
+            <input class="pos-input" id="pt-caisse-montant-compte" type="number" min="0" step="1" style="width:100%">
+          </div>
+          <button class="pos-btn teal" onclick="ptCaisseSoumettre(${d.session_id})">Soumettre la session</button>
+        </div>
+      ` : ''}
+    `;
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function ptCaisseOuvrir(){
+  const caissier_id = parseInt(document.getElementById('pt-caisse-caissier').value);
+  if(!caissier_id){ posAlert('Sélectionnez un caissier.','warn'); return; }
+  try{
+    await apiFetch('POST', '/patisserie/caisse/sessions/ouvrir', {caissier_id});
+    posAlert('Session ouverte.','ok'); loadPatisserieCaisse();
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+async function ptCaisseSoumettre(sessionId){
+  const montant_compte = parseFloat(document.getElementById('pt-caisse-montant-compte').value);
+  if(isNaN(montant_compte) || montant_compte<0){ posAlert('Indiquez le montant compté.','warn'); return; }
+  try{
+    await apiFetch('POST', `/patisserie/caisse/sessions/${sessionId}/soumettre`, {montant_compte});
+    posAlert('Session soumise.','ok'); loadPatisserieCaisse();
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+async function ptCaisseValider(sessionId){
+  try{
+    await apiFetch('POST', `/patisserie/caisse/sessions/${sessionId}/valider`, {});
+    posAlert('Session validée.','ok'); loadPatisserieCaisse();
+  }catch(e){ posAlert(e.message||'Erreur.'); }
 }
 
 // ══════════════════════════════════════════════════════════════════════

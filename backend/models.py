@@ -1402,7 +1402,7 @@ class RenflouementDepartement(Base):
     __tablename__ = "renflouements_departement"
 
     id                 = Column(Integer, primary_key=True)
-    departement        = Column(String(20), nullable=False)  # HOTEL, CUISINE, BAR
+    departement        = Column(String(20), nullable=False)  # HOTEL, CUISINE, BAR, PATISSERIE
     montant            = Column(Numeric(14, 2), nullable=False)
     source             = Column(String(100), nullable=True)
     date_renflouement  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -1413,7 +1413,7 @@ class RenflouementDepartement(Base):
 
     __table_args__ = (
         CheckConstraint("montant > 0", name="chk_renfl_dept_montant_pos"),
-        CheckConstraint("departement IN ('HOTEL','CUISINE','BAR')", name="chk_renfl_dept_departement"),
+        CheckConstraint("departement IN ('HOTEL','CUISINE','BAR','PATISSERIE')", name="chk_renfl_dept_departement"),
         Index("idx_renfl_dept_date", "date_renflouement"),
         Index("idx_renfl_dept_departement", "departement"),
     )
@@ -1501,4 +1501,339 @@ class ChatConversation(Base):
     __table_args__ = (
         Index("idx_chat_conv_utilisateur", "utilisateur_id"),
         Index("idx_chat_conv_updated", "updated_at"),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PÂTISSERIE — articles, stock, achats, ventes, commandes (suivi configurable),
+# dépenses, contrôle de caisse. Même architecture que le module Bar (source de
+# vérité du stock = ledger de mouvements, jamais un compteur mis à jour à la
+# volée) mais sans historique de prix ni crédit/remboursement (non demandés).
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class PatisserieCategorie(Base):
+    """Catégories d'articles pâtisserie (gâteau, viennoiserie, biscuit…)."""
+    __tablename__ = "patisserie_categories"
+
+    id            = Column(Integer, primary_key=True)
+    nom           = Column(String(80), nullable=False)
+    couleur       = Column(String(20), nullable=True)
+    date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    produits = relationship("PatisserieProduit", back_populates="categorie_obj",
+                            foreign_keys="PatisserieProduit.categorie")
+
+    __table_args__ = (
+        UniqueConstraint("nom", name="uq_patisserie_categories_nom"),
+    )
+
+
+class PatisserieProduit(Base):
+    """Article du catalogue pâtisserie (gâteau, pâtisserie individuelle…).
+
+    `stock_actuel` est un CACHE dénormalisé pour l'affichage rapide (liste
+    d'articles, alertes) — recalculé à chaque mouvement, jamais modifié
+    directement ailleurs. La source de vérité reste le ledger
+    `PatisserieMouvementStock` : en cas de doute, le stock se reconstruit en
+    sommant les mouvements, jamais en relisant ce champ.
+    """
+    __tablename__ = "patisserie_produits"
+
+    id                 = Column(Integer, primary_key=True)
+    nom                = Column(String(150), nullable=False)
+    categorie          = Column(String(80),  ForeignKey("patisserie_categories.nom", onupdate="CASCADE", ondelete="RESTRICT"), nullable=True)
+    unite              = Column(String(30),  nullable=False, default="unite")
+    prix_vente         = Column(Numeric(12, 2), nullable=False)
+    cout_unitaire_estime = Column(Numeric(12, 2), nullable=True)
+    stock_actuel       = Column(Numeric(12, 3), nullable=False, default=0)
+    seuil_alerte_stock = Column(Numeric(12, 3), nullable=False, default=0)
+    actif              = Column(Boolean,     nullable=False, default=True)
+    photo_base64       = Column(Text,        nullable=True)
+    photo_mime         = Column(String(50),  nullable=True)
+    date_creation      = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    categorie_obj = relationship("PatisserieCategorie", back_populates="produits",
+                                 foreign_keys=[categorie])
+    mouvements    = relationship("PatisserieMouvementStock", back_populates="produit")
+    lignes_vente  = relationship("PatisserieLigneVente", back_populates="produit")
+
+    __table_args__ = (
+        UniqueConstraint("nom", name="uq_patisserie_produit_nom"),
+        CheckConstraint("prix_vente > 0", name="chk_patisserie_produit_prix_pos"),
+        Index("idx_patisserie_produits_categorie", "categorie"),
+        Index("idx_patisserie_produits_actif",     "actif"),
+    )
+
+
+class PatisserieAchat(Base):
+    """Réception de marchandises/ingrédients pâtisserie.
+
+    `statut` EN_ATTENTE : achat déclaré, stock pas encore mis à jour.
+    `statut` CONFIRME   : un mouvement ENTREE a été généré (une seule fois —
+    voir services.confirmer_achat_patisserie), le stock reflète l'achat.
+    """
+    __tablename__ = "patisserie_achats"
+
+    id                  = Column(Integer, primary_key=True)
+    produit_id          = Column(Integer, ForeignKey("patisserie_produits.id", ondelete="RESTRICT"), nullable=False)
+    quantite            = Column(Numeric(12, 3), nullable=False)
+    prix_achat_unitaire = Column(Numeric(12, 2), nullable=False)
+    total               = Column(Numeric(14, 2), nullable=False)
+    fournisseur         = Column(String(150), nullable=True)
+    date_achat          = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    utilisateur_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    notes               = Column(String(300), nullable=True)
+    statut              = Column(String(20), nullable=False, default="EN_ATTENTE")
+
+    produit   = relationship("PatisserieProduit")
+    mouvement = relationship("PatisserieMouvementStock", back_populates="achat", uselist=False,
+                             foreign_keys="PatisserieMouvementStock.achat_id")
+
+    __table_args__ = (
+        CheckConstraint("quantite > 0",            name="chk_patisserie_achat_qte_pos"),
+        CheckConstraint("prix_achat_unitaire >= 0", name="chk_patisserie_achat_prix_pos"),
+        CheckConstraint("total >= 0",               name="chk_patisserie_achat_total_pos"),
+        CheckConstraint("statut IN ('EN_ATTENTE','CONFIRME','ANNULE')", name="chk_patisserie_achat_statut"),
+        Index("idx_patisserie_achats_produit", "produit_id"),
+        Index("idx_patisserie_achats_date",    "date_achat"),
+    )
+
+
+class PatisserieMouvementStock(Base):
+    """Mouvement de stock pâtisserie — source unique de vérité pour le stock."""
+    __tablename__ = "patisserie_mouvements_stock"
+
+    id                    = Column(Integer, primary_key=True)
+    produit_id            = Column(Integer, ForeignKey("patisserie_produits.id", ondelete="RESTRICT"), nullable=False)
+    type_mouvement        = Column(String(20), nullable=False)  # ENTREE, SORTIE_VENTE, SORTIE_COMMANDE, AJUSTEMENT, PERTE
+    quantite              = Column(Numeric(12, 3), nullable=False)   # signée : + entrée, - sortie
+    motif                 = Column(String(300), nullable=True)
+    reference_vente_id    = Column(Integer, ForeignKey("patisserie_ventes.id",    ondelete="SET NULL"), nullable=True)
+    reference_commande_id = Column(Integer, ForeignKey("patisserie_commandes.id", ondelete="SET NULL"), nullable=True)
+    achat_id              = Column(Integer, ForeignKey("patisserie_achats.id",    ondelete="SET NULL"), nullable=True)
+    date_mouvement        = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    utilisateur_id        = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    produit = relationship("PatisserieProduit", back_populates="mouvements", foreign_keys=[produit_id])
+    achat   = relationship("PatisserieAchat",   back_populates="mouvement",  foreign_keys=[achat_id])
+
+    __table_args__ = (
+        CheckConstraint(
+            "type_mouvement IN ('ENTREE','SORTIE_VENTE','SORTIE_COMMANDE','AJUSTEMENT','PERTE')",
+            name="chk_patisserie_mouv_type",
+        ),
+        Index("idx_patisserie_mouv_produit", "produit_id"),
+        Index("idx_patisserie_mouv_date",    "date_mouvement"),
+    )
+
+
+class PatisserieSessionCaisse(Base):
+    """Session de caisse pâtisserie — suivi des ventes par caissier par jour.
+    Même logique que BarSessionCaisse (module Bar), en plus simple (pas de
+    notion de « lieu » ni d'évaluation détaillée — non demandées ici)."""
+    __tablename__ = "patisserie_sessions_caisse"
+
+    id             = Column(Integer, primary_key=True)
+    caissier_id    = Column(Integer, ForeignKey("employes.id", ondelete="RESTRICT"), nullable=False)
+    date_session   = Column(Date, nullable=False)
+    numero_session = Column(Integer, nullable=False, default=1)
+    statut         = Column(String(20), nullable=False, default="EN_COURS")  # EN_COURS, SOUMIS, VALIDE
+    soumis_at      = Column(DateTime(timezone=True), nullable=True)
+    valide_at      = Column(DateTime(timezone=True), nullable=True)
+    valide_par_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    notes_admin    = Column(String(500), nullable=True)
+    cash_attendu_soumission = Column(Numeric(14, 2), nullable=True)
+    montant_compte          = Column(Numeric(14, 2), nullable=True)
+    ecart                   = Column(Numeric(14, 2), nullable=True)
+    created_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    caissier   = relationship("Employe",     foreign_keys=[caissier_id])
+    valide_par = relationship("Utilisateur", foreign_keys=[valide_par_id])
+
+    __table_args__ = (
+        UniqueConstraint("caissier_id", "date_session", "numero_session", name="uq_patisserie_session_caissier_date_num"),
+        CheckConstraint("statut IN ('EN_COURS','SOUMIS','VALIDE')", name="chk_patisserie_session_statut"),
+        Index("idx_patisserie_session_caissier", "caissier_id"),
+        Index("idx_patisserie_session_date",     "date_session"),
+    )
+
+
+class PatisserieVente(Base):
+    """Vente directe (comptoir) encaissée en pâtisserie — ticket de caisse."""
+    __tablename__ = "patisserie_ventes"
+
+    id              = Column(Integer, primary_key=True)
+    numero_ticket   = Column(String(20),  nullable=False, unique=True)
+    caissier_id     = Column(Integer, ForeignKey("employes.id", ondelete="RESTRICT"), nullable=True)
+    session_id      = Column(Integer, ForeignKey("patisserie_sessions_caisse.id", ondelete="SET NULL"), nullable=True)
+    date_heure      = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    montant_total   = Column(Numeric(14, 2), nullable=False)
+    mode_paiement   = Column(String(20),  nullable=False, default="CASH")  # CASH, CREDIT
+    statut          = Column(String(20),  nullable=False, default="PAYEE")  # PAYEE, ANNULEE
+    client_nom      = Column(String(150), nullable=True)
+
+    caissier = relationship("Employe")
+    session  = relationship("PatisserieSessionCaisse")
+    lignes   = relationship("PatisserieLigneVente", back_populates="vente", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        CheckConstraint("montant_total >= 0", name="chk_patisserie_vente_total_pos"),
+        CheckConstraint("mode_paiement IN ('CASH','CREDIT')",   name="chk_patisserie_vente_mode"),
+        CheckConstraint("statut IN ('PAYEE','ANNULEE')",        name="chk_patisserie_vente_statut"),
+        Index("idx_patisserie_ventes_date",     "date_heure"),
+        Index("idx_patisserie_ventes_caissier", "caissier_id"),
+        Index("idx_patisserie_ventes_session",  "session_id"),
+    )
+
+
+class PatisserieLigneVente(Base):
+    """Ligne d'une vente pâtisserie (1 article, quantité, prix historisé)."""
+    __tablename__ = "patisserie_lignes_vente"
+
+    id                     = Column(Integer, primary_key=True)
+    vente_id               = Column(Integer, ForeignKey("patisserie_ventes.id",   ondelete="CASCADE"),  nullable=False)
+    produit_id             = Column(Integer, ForeignKey("patisserie_produits.id", ondelete="RESTRICT"), nullable=False)
+    quantite               = Column(Numeric(12, 3), nullable=False)
+    prix_unitaire_applique = Column(Numeric(12, 2), nullable=False)
+    sous_total             = Column(Numeric(14, 2), nullable=False)
+
+    vente   = relationship("PatisserieVente",  back_populates="lignes")
+    produit = relationship("PatisserieProduit", back_populates="lignes_vente")
+
+    __table_args__ = (
+        CheckConstraint("quantite > 0",    name="chk_patisserie_lv_qte_pos"),
+        CheckConstraint("sous_total >= 0", name="chk_patisserie_lv_total_pos"),
+        Index("idx_patisserie_lv_vente",   "vente_id"),
+        Index("idx_patisserie_lv_produit", "produit_id"),
+    )
+
+
+class PatisserieDepense(Base):
+    """Dépense pâtisserie (ingrédients hors achat catalogué, équipement, gaz…)."""
+    __tablename__ = "patisserie_depenses"
+
+    id           = Column(Integer, primary_key=True)
+    description  = Column(String(200), nullable=False)
+    categorie    = Column(String(80),  nullable=True)
+    montant      = Column(Numeric(12, 2), nullable=False)
+    date_depense = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    fournisseur  = Column(String(150), nullable=True)
+    notes        = Column(String(300), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_patisserie_dep_montant_pos"),
+        Index("idx_patisserie_depenses_date", "date_depense"),
+    )
+
+
+class PatisserieEtapeSuivi(Base):
+    """Étape configurable du suivi de commande (ex. Reçue, En préparation,
+    Prête, Livrée) — l'admin définit librement sa propre chaîne d'étapes au
+    lieu d'un statut figé dans le code. `ordre` fixe la position dans la
+    chaîne ; `est_initiale` marque l'étape attribuée à la création d'une
+    commande (une seule doit l'être — appliqué côté service, pas en base,
+    SQLite ne supportant pas d'index partiel portable) ; `est_finale` marque
+    une étape qui déclenche la sortie de stock des articles de la commande
+    (voir PatisserieCommande.stock_deduit)."""
+    __tablename__ = "patisserie_etapes_suivi"
+
+    id            = Column(Integer, primary_key=True)
+    code          = Column(String(50),  nullable=False)
+    libelle       = Column(String(80),  nullable=False)
+    ordre         = Column(Integer,     nullable=False)
+    couleur       = Column(String(20),  nullable=True)
+    est_initiale  = Column(Boolean,     nullable=False, default=False)
+    est_finale    = Column(Boolean,     nullable=False, default=False)
+    actif         = Column(Boolean,     nullable=False, default=True)
+    date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_patisserie_etape_code"),
+        Index("idx_patisserie_etape_ordre", "ordre"),
+    )
+
+
+class PatisserieCommande(Base):
+    """Commande spéciale (gâteau sur mesure, grosse quantité…), distincte
+    d'une vente comptoir directe — parcourt une chaîne d'étapes configurable
+    (PatisserieEtapeSuivi) du dépôt de la commande à la livraison."""
+    __tablename__ = "patisserie_commandes"
+
+    id                    = Column(Integer, primary_key=True)
+    numero                = Column(String(20),  nullable=False, unique=True)
+    client_nom            = Column(String(150), nullable=False)
+    client_telephone      = Column(String(30),  nullable=True)
+    date_commande         = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    date_livraison_prevue = Column(DateTime(timezone=True), nullable=True)
+    montant_total         = Column(Numeric(14, 2), nullable=False, default=0)
+    acompte_verse         = Column(Numeric(14, 2), nullable=False, default=0)
+    etape_id              = Column(Integer, ForeignKey("patisserie_etapes_suivi.id", ondelete="RESTRICT"), nullable=False)
+    # Empêche une double déduction de stock si la commande revient sur une
+    # étape finale plus d'une fois (correction, ré-ouverture après annulation
+    # d'une livraison...). Mis à True la première fois seulement.
+    stock_deduit          = Column(Boolean, nullable=False, default=False)
+    statut                = Column(String(20), nullable=False, default="ACTIVE")  # ACTIVE, ANNULEE
+    notes                 = Column(String(500), nullable=True)
+    cree_par_id           = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at            = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    etape    = relationship("PatisserieEtapeSuivi")
+    lignes   = relationship("PatisserieLigneCommande", back_populates="commande", cascade="all, delete-orphan")
+    suivis   = relationship("PatisserieCommandeSuivi", back_populates="commande",
+                            cascade="all, delete-orphan", order_by="PatisserieCommandeSuivi.date_changement")
+
+    __table_args__ = (
+        CheckConstraint("montant_total >= 0", name="chk_patisserie_cmd_total_pos"),
+        CheckConstraint("acompte_verse >= 0", name="chk_patisserie_cmd_acompte_pos"),
+        CheckConstraint("statut IN ('ACTIVE','ANNULEE')", name="chk_patisserie_cmd_statut"),
+        Index("idx_patisserie_cmd_etape",  "etape_id"),
+        Index("idx_patisserie_cmd_date",   "date_commande"),
+        Index("idx_patisserie_cmd_statut", "statut"),
+    )
+
+
+class PatisserieLigneCommande(Base):
+    """Ligne d'une commande — article du catalogue (produit_id) ou libellé
+    libre (gâteau sur mesure sans référence catalogue, description seule)."""
+    __tablename__ = "patisserie_lignes_commande"
+
+    id          = Column(Integer, primary_key=True)
+    commande_id = Column(Integer, ForeignKey("patisserie_commandes.id", ondelete="CASCADE"), nullable=False)
+    produit_id  = Column(Integer, ForeignKey("patisserie_produits.id", ondelete="SET NULL"), nullable=True)
+    description = Column(String(200), nullable=False)
+    quantite    = Column(Numeric(12, 3), nullable=False)
+    prix_unitaire = Column(Numeric(12, 2), nullable=False)
+    sous_total  = Column(Numeric(14, 2), nullable=False)
+
+    commande = relationship("PatisserieCommande", back_populates="lignes")
+    produit  = relationship("PatisserieProduit")
+
+    __table_args__ = (
+        CheckConstraint("quantite > 0",       name="chk_patisserie_lc_qte_pos"),
+        CheckConstraint("prix_unitaire >= 0", name="chk_patisserie_lc_prix_pos"),
+        CheckConstraint("sous_total >= 0",    name="chk_patisserie_lc_total_pos"),
+        Index("idx_patisserie_lc_commande", "commande_id"),
+    )
+
+
+class PatisserieCommandeSuivi(Base):
+    """Historique append-only des changements d'étape d'une commande — trace
+    qui a fait avancer la commande, quand, et pourquoi (commentaire libre)."""
+    __tablename__ = "patisserie_commande_suivis"
+
+    id             = Column(Integer, primary_key=True)
+    commande_id    = Column(Integer, ForeignKey("patisserie_commandes.id", ondelete="CASCADE"), nullable=False)
+    etape_id       = Column(Integer, ForeignKey("patisserie_etapes_suivi.id", ondelete="RESTRICT"), nullable=False)
+    date_changement = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    commentaire    = Column(String(300), nullable=True)
+
+    commande = relationship("PatisserieCommande", back_populates="suivis")
+    etape    = relationship("PatisserieEtapeSuivi")
+    utilisateur = relationship("Utilisateur")
+
+    __table_args__ = (
+        Index("idx_patisserie_suivi_commande", "commande_id"),
+        Index("idx_patisserie_suivi_date",     "date_changement"),
     )

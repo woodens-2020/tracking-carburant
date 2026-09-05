@@ -26,6 +26,11 @@ from models import (
     HotelChambre, HotelEmploye, HotelReservation,
     LoginSecurityEvent,  # noqa: F401 — nécessaire pour create_all
     BarSessionEvaluation,  # noqa: F401 — nécessaire pour create_all
+    PatisserieCategorie, PatisserieProduit, PatisserieAchat,        # noqa: F401
+    PatisserieMouvementStock, PatisserieSessionCaisse,              # noqa: F401
+    PatisserieVente, PatisserieLigneVente, PatisserieDepense,       # noqa: F401
+    PatisserieEtapeSuivi, PatisserieCommande, PatisserieLigneCommande,  # noqa: F401
+    PatisserieCommandeSuivi,                                        # noqa: F401
 )
 
 # ── URL de connexion ──────────────────────────────────────────────
@@ -400,6 +405,21 @@ def _migrate_columns():
             except Exception:
                 conn.rollback()  # déjà présente
 
+        # v23 — module Pâtisserie ajouté à la liste des départements pouvant
+        # recevoir un renflouement manuel de caisse.
+        with engine.connect() as conn:
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE renflouements_departement DROP CONSTRAINT IF EXISTS chk_renfl_dept_departement"
+                ))
+                conn.execute(sql_text(
+                    "ALTER TABLE renflouements_departement ADD CONSTRAINT chk_renfl_dept_departement "
+                    "CHECK (departement IN ('HOTEL','CUISINE','BAR','PATISSERIE'))"
+                ))
+                conn.commit()
+            except Exception:
+                conn.rollback()  # contrainte déjà à jour
+
 
 # ── Initialisation du schéma + données de démarrage ──────────────
 def init_db():
@@ -433,6 +453,15 @@ def init_db():
                 email="admin@konekta.local",
             )
             db.add(admin)
+            db.commit()
+
+        if db.query(PatisserieEtapeSuivi).count() == 0:
+            db.add_all([
+                PatisserieEtapeSuivi(code="recue",        libelle="Reçue",           ordre=1, couleur="#64748b", est_initiale=True),
+                PatisserieEtapeSuivi(code="preparation",  libelle="En préparation",  ordre=2, couleur="#f59e0b"),
+                PatisserieEtapeSuivi(code="prete",        libelle="Prête",           ordre=3, couleur="#3b82f6"),
+                PatisserieEtapeSuivi(code="livree",       libelle="Livrée",          ordre=4, couleur="#22c55e", est_finale=True),
+            ])
             db.commit()
     finally:
         db.close()

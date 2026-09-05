@@ -38,6 +38,7 @@ from caisse_routes import router as caisse_router
 from hotel_routes import router as hotel_router
 from cuisine_routes import router as cuisine_router
 from cuisine_analyse_routes import router as cuisine_analyse_router
+from patisserie_routes import router as patisserie_router
 from admin_routes import router as admin_router
 from zelle_routes import router as zelle_router
 from taches_routes import router as taches_router
@@ -80,11 +81,12 @@ _BRANDING = {
 # une institution qui ne vend que du bar/hôtel (Carribean), ou l'inverse
 # pour une institution qui ne vend que du carburant (Vertières).
 _MODULES = {
-    "carburant": os.getenv("MODULE_CARBURANT", "true").lower() == "true",
-    "bar":       os.getenv("MODULE_BAR",       "true").lower() == "true",
-    "hotel":     os.getenv("MODULE_HOTEL",     "true").lower() == "true",
-    "cuisine":   os.getenv("MODULE_CUISINE",   "true").lower() == "true",
-    "zelle":     os.getenv("MODULE_ZELLE",     "true").lower() == "true",
+    "carburant":  os.getenv("MODULE_CARBURANT",  "true").lower() == "true",
+    "bar":        os.getenv("MODULE_BAR",        "true").lower() == "true",
+    "hotel":      os.getenv("MODULE_HOTEL",      "true").lower() == "true",
+    "cuisine":    os.getenv("MODULE_CUISINE",    "true").lower() == "true",
+    "zelle":      os.getenv("MODULE_ZELLE",      "true").lower() == "true",
+    "patisserie": os.getenv("MODULE_PATISSERIE", "true").lower() == "true",
 }
 
 app = FastAPI(
@@ -221,6 +223,7 @@ app.include_router(caisse_router)
 app.include_router(hotel_router)
 app.include_router(cuisine_router)
 app.include_router(cuisine_analyse_router)
+app.include_router(patisserie_router)
 app.include_router(admin_router)
 app.include_router(zelle_router)
 app.include_router(taches_router)
