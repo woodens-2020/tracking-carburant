@@ -9824,9 +9824,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div id="ptd-stock-bas" style="color:rgba(255,255,255,.4)">—</div>
         </div>
 
-        <div class="pos-card" style="padding:14px">
-          <div style="font-weight:700;margin-bottom:10px">Commandes par étape</div>
-          <div id="ptd-etapes" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+        <div class="pos-card" style="padding:16px">
+          <div style="font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;color:rgba(255,255,255,.5)"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 15l2 2 4-4"/></svg>
+            Commandes par étape
+          </div>
+          <div id="ptd-etapes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px"></div>
         </div>
       </div>
     </div><!-- /page-patisserie-dashboard -->
@@ -9835,28 +9838,57 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- PÂTISSERIE — ARTICLES & STOCK                               -->
     <!-- ══════════════════════════════════════════════════════════ -->
     <div id="page-patisserie-produits" class="page page-gi">
-      <div class="pos-page gi-page">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
-          <h2 style="margin:0;font-size:22px;font-weight:800">Articles &amp; Stock — Pâtisserie</h2>
-          <button class="pos-btn teal" onclick="ptProduitOuvrirModal()">+ Ajouter un article</button>
+      <div class="gi-page" style="--gi-accent:#ec4899;--gi-bg:rgba(236,72,153,.11);--gi-bd:rgba(236,72,153,.22);--gi-glow:rgba(236,72,153,.15)">
+
+        <div class="gi-page-header">
+          <div class="gi-page-header-left">
+            <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(236,72,153,.25),rgba(236,72,153,.1));border-color:rgba(236,72,153,.3);box-shadow:0 0 18px rgba(236,72,153,.2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M20 7h-3V5a4 4 0 0 0-8 0v2H6a1 1 0 0 0-1 1l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12a1 1 0 0 0-1-1z"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/></svg>
+            </div>
+            <div class="gi-page-header-text">
+              <div class="gi-title">Articles &amp; Stock — Pâtisserie</div>
+              <div class="gi-subtitle">Catalogue articles et niveaux de stock</div>
+            </div>
+          </div>
+          <div class="gi-page-header-actions">
+            <button class="gi-btn-primary" onclick="ptProduitOuvrirModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nouvel article
+            </button>
+          </div>
         </div>
-        <div class="pos-card" style="padding:0;overflow:hidden">
+
+        <div class="gi-table-card">
+          <div class="gi-table-hdr">
+            <span class="gi-table-title">Liste des articles</span>
+            <div style="position:relative">
+              <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2" style="width:13px;height:13px;position:absolute;left:9px;top:50%;transform:translateY(-50%)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input id="pt-produit-search" placeholder="Rechercher…" oninput="ptProduitsFiltrer()" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:rgba(255,255,255,.8);font-size:13.5px;padding:6px 10px 6px 30px;outline:none;width:200px">
+            </div>
+          </div>
           <div style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse;font-size:14px">
+            <table class="gi-table">
               <thead>
-                <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.08)">
-                  <th style="padding:9px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Article</th>
-                  <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Catégorie</th>
-                  <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Prix vente</th>
-                  <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Stock</th>
-                  <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Statut</th>
-                  <th style="padding:9px 8px;text-align:center;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Actions</th>
+                <tr>
+                  <th>Article</th><th>Catégorie</th><th>Unité</th>
+                  <th>Prix</th><th>Stock</th><th>Statut</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody id="pt-produits-tbody">
-                <tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+                <tr><td colspan="7"><div class="gi-empty">Chargement…</div></td></tr>
               </tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal historique des mouvements de stock -->
+      <div id="pt-mouvements-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)ptMouvementsFermerModal()">
+        <div class="pos-modal" style="max-width:480px;width:95%;max-height:80vh;overflow-y:auto">
+          <div id="pt-mouvements-titre" style="font-size:18px;font-weight:700;margin-bottom:16px">Historique des mouvements</div>
+          <div id="pt-mouvements-liste" style="display:flex;flex-direction:column;gap:8px"></div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="pos-btn ghost" style="flex:1" onclick="ptMouvementsFermerModal()">Fermer</button>
           </div>
         </div>
       </div>
@@ -9970,7 +10002,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div style="display:flex;flex-direction:column;gap:10px">
             <div>
               <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Article *</label>
-              <select class="pos-select" id="pt-achat-produit" style="width:100%" onchange="ptAchatArticleChange()"></select>
+              <input class="pos-input" id="pt-achat-produit-nom" list="pt-achat-produit-liste" autocomplete="off"
+                     placeholder="Tapez le nom de l'article…" oninput="ptAchatArticleChange()" style="width:100%">
+              <datalist id="pt-achat-produit-liste"></datalist>
+              <input type="hidden" id="pt-achat-produit">
               <div id="pt-achat-stock-info" style="font-size:12px;color:rgba(255,255,255,.4);margin-top:5px"></div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -30351,10 +30386,15 @@ async function loadPatisserieDashboard(){
       : '<span style="color:rgba(255,255,255,.3)">Aucun article en stock bas</span>';
 
     document.getElementById('ptd-etapes').innerHTML = d.commandes_par_etape.map(e => `
-      <div class="pos-card" style="padding:10px 14px;min-width:130px;border-left:3px solid ${e.couleur}">
-        <div style="font-size:12px;color:rgba(255,255,255,.4)">${esc(e.libelle)}</div>
-        <div style="font-size:20px;font-weight:800">${e.nb}</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.4)">${fmtG(e.montant)}</div>
+      <div class="pos-card" style="padding:14px;cursor:pointer;transition:transform .12s;background:linear-gradient(160deg,${e.couleur}14,transparent);border:1px solid ${e.couleur}33"
+           onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'"
+           onclick="goTo('patisserie-commandes')" title="Voir les commandes ${esc(e.libelle).toLowerCase()}">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">
+          <span style="width:9px;height:9px;border-radius:50%;background:${e.couleur};box-shadow:0 0 8px ${e.couleur}"></span>
+          <span style="font-size:12.5px;font-weight:600;color:rgba(255,255,255,.6)">${esc(e.libelle)}</span>
+        </div>
+        <div style="font-size:26px;font-weight:800;line-height:1;color:#fff">${e.nb}</div>
+        <div style="font-size:12.5px;color:${e.couleur};font-weight:600;margin-top:5px">${fmtG(e.montant)}</div>
       </div>
     `).join('');
   }catch(e){ posAlert(e.message||'Erreur tableau de bord.'); }
@@ -30365,26 +30405,86 @@ async function loadPatisserieDashboard(){
 async function loadPatisserieProduits(){
   try{ _ptProduits = await apiFetch('GET', '/patisserie/produits'); }
   catch(e){ _ptProduits = []; posAlert('Erreur articles: '+(e.message||e)); return; }
+  ptProduitsFiltrer();
+}
+
+function ptProduitsFiltrer(){
+  const q = (document.getElementById('pt-produit-search')?.value || '').toLowerCase();
+  const produits = q ? _ptProduits.filter(p => p.nom.toLowerCase().includes(q) || (p.categorie||'').toLowerCase().includes(q)) : _ptProduits;
+  _ptRenderProduitsTbody(produits);
+}
+
+function _ptRenderProduitsTbody(prods){
   const tbody = document.getElementById('pt-produits-tbody');
-  if(!_ptProduits.length){
-    tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucun article</td></tr>';
+  if(!tbody) return;
+  if(!prods.length){
+    tbody.innerHTML = '<tr><td colspan="7"><div class="gi-empty">Aucun article trouvé</div></td></tr>';
     return;
   }
-  tbody.innerHTML = _ptProduits.map(p => `
-    <tr style="border-bottom:1px solid rgba(255,255,255,.05)">
-      <td style="padding:9px 12px;font-weight:700">${esc(p.nom)}</td>
-      <td style="padding:9px 8px">${esc(p.categorie||'—')}</td>
-      <td style="padding:9px 8px;text-align:right">${fmtG(p.prix_vente)}</td>
-      <td style="padding:9px 8px;text-align:right;color:${p.stock_bas?'#f87171':'inherit'};font-weight:${p.stock_bas?'700':'400'}">${p.stock_actuel} ${esc(p.unite)}</td>
-      <td style="padding:9px 8px;text-align:center">${p.actif?'<span style="color:#34d399">Actif</span>':'<span style="color:rgba(255,255,255,.3)">Retiré</span>'}</td>
-      <td style="padding:9px 8px;text-align:center;white-space:nowrap">
-        <button class="pos-btn ghost" style="padding:4px 8px;font-size:12px" onclick="ptProduitOuvrirModal(${p.id})">Modifier</button>
-        <button class="pos-btn ghost" style="padding:4px 8px;font-size:12px" onclick="ptAjustOuvrirModal(${p.id})">Stock</button>
-        ${p.actif ? `<button class="pos-btn ghost" style="padding:4px 8px;font-size:12px;color:#f87171" onclick="ptProduitRetirer(${p.id})">Retirer</button>` : ''}
+  tbody.innerHTML = prods.map(p => {
+    const catBadge = p.categorie ? `<span class="td-badge badge-teal">${esc(p.categorie)}</span>` : '<span class="td-muted">—</span>';
+    const stockTxt = p.stock_bas
+      ? `<span style="color:#fca5a5;font-weight:700">${p.stock_actuel} ${esc(p.unite)}</span>`
+      : `<span>${p.stock_actuel} ${esc(p.unite)}</span>`;
+    const statBadge = p.actif ? '<span class="td-badge badge-green">Actif</span>' : '<span class="td-badge badge-gray">Retiré</span>';
+    return `<tr>
+      <td><strong style="color:rgba(255,255,255,.88)">${esc(p.nom)}</strong></td>
+      <td>${catBadge}</td>
+      <td class="td-muted">${esc(p.unite)}</td>
+      <td class="td-amount">${fmtG(p.prix_vente)}</td>
+      <td>${stockTxt}</td>
+      <td>${statBadge}</td>
+      <td>
+        <div class="gi-actions">
+          <button class="gi-btn-icon" title="Ajuster le stock" onclick="ptAjustOuvrirModal(${p.id})" style="color:#3fb6a8">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+          </button>
+          <button class="gi-btn-icon" title="Modifier" onclick="ptProduitOuvrirModal(${p.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="gi-btn-icon" title="Historique des mouvements" onclick="ptMouvementsOuvrir(${p.id})" style="color:#a78bfa">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </button>
+          <button class="gi-btn-icon ${p.actif?'danger':''}" title="${p.actif?'Désactiver':'Réactiver'}" onclick="ptProduitToggleActif(${p.id},${p.actif?0:1})">
+            ${p.actif
+              ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>'
+              : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+            }
+          </button>
+        </div>
       </td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 }
+
+async function ptProduitToggleActif(id, actif){
+  try{ await apiFetch('PUT', `/patisserie/produits/${id}`, {actif: !!actif}); posAlert(actif?'Article réactivé.':'Article désactivé.','ok'); loadPatisserieProduits(); }
+  catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function ptMouvementsOuvrir(id){
+  const p = _ptProduits.find(x=>x.id===id);
+  document.getElementById('pt-mouvements-titre').textContent = `Historique — ${p?p.nom:''}`;
+  const el = document.getElementById('pt-mouvements-liste');
+  el.innerHTML = '<div class="gi-empty">Chargement…</div>';
+  document.getElementById('pt-mouvements-modal-bg').classList.add('open');
+  try{
+    const mvts = await apiFetch('GET', `/patisserie/produits/${id}/mouvements`);
+    if(!mvts.length){ el.innerHTML = '<div class="gi-empty">Aucun mouvement</div>'; return; }
+    const labels = {ENTREE:'Entrée',SORTIE_VENTE:'Vente',SORTIE_COMMANDE:'Commande',AJUSTEMENT:'Ajustement',PERTE:'Perte'};
+    const colors = {ENTREE:'#34d399',SORTIE_VENTE:'#60a5fa',SORTIE_COMMANDE:'#a78bfa',AJUSTEMENT:'#f59e0b',PERTE:'#f87171'};
+    el.innerHTML = mvts.map(m => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(255,255,255,.03);border-radius:8px;border-left:3px solid ${colors[m.type]||'#64748b'}">
+        <div>
+          <div style="font-weight:600;font-size:13.5px">${labels[m.type]||m.type}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.4)">${ptFmtDate(m.date)}${m.motif?' · '+esc(m.motif):''}</div>
+        </div>
+        <div style="font-weight:800;color:${m.quantite>=0?'#34d399':'#f87171'}">${m.quantite>=0?'+':''}${m.quantite}</div>
+      </div>
+    `).join('');
+  }catch(e){ el.innerHTML = `<div class="gi-empty">${esc(e.message||'Erreur')}</div>`; }
+}
+function ptMouvementsFermerModal(){ document.getElementById('pt-mouvements-modal-bg').classList.remove('open'); }
 
 function ptProduitOuvrirModal(id){
   document.getElementById('pt-produit-id').value = id || '';
@@ -30418,11 +30518,6 @@ async function ptProduitSauvegarder(){
     else   await apiFetch('POST', '/patisserie/produits', payload);
     ptProduitFermerModal(); posAlert('Article enregistré.','ok'); loadPatisserieProduits();
   }catch(e){ posAlert(e.message||'Erreur.'); }
-}
-
-async function ptProduitRetirer(id){
-  try{ await apiFetch('DELETE', `/patisserie/produits/${id}`); posAlert('Article retiré.','ok'); loadPatisserieProduits(); }
-  catch(e){ posAlert(e.message||'Erreur.'); }
 }
 
 function ptAjustOuvrirModal(id){
@@ -30488,8 +30583,10 @@ async function loadPatisserieAchats(){
 }
 
 function ptAchatOuvrirModal(){
-  const sel = document.getElementById('pt-achat-produit');
-  sel.innerHTML = _ptProduits.filter(p=>p.actif).map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
+  const dl = document.getElementById('pt-achat-produit-liste');
+  dl.innerHTML = _ptProduits.filter(p=>p.actif).map(p=>`<option value="${esc(p.nom)}">`).join('');
+  document.getElementById('pt-achat-produit-nom').value = '';
+  document.getElementById('pt-achat-produit').value = '';
   document.getElementById('pt-achat-qte').value = '';
   document.getElementById('pt-achat-prix').value = '';
   document.getElementById('pt-achat-fournisseur').value = '';
@@ -30501,10 +30598,15 @@ function ptAchatOuvrirModal(){
 function ptAchatFermerModal(){ document.getElementById('pt-achat-modal-bg').classList.remove('open'); }
 
 function ptAchatArticleChange(){
-  const id = parseInt(document.getElementById('pt-achat-produit').value);
-  const p = _ptProduits.find(x=>x.id===id);
+  const nomTape = document.getElementById('pt-achat-produit-nom').value.trim().toLowerCase();
+  const p = _ptProduits.find(x=>x.actif && x.nom.toLowerCase()===nomTape);
   const info = document.getElementById('pt-achat-stock-info');
-  if(!p){ info.textContent = ''; return; }
+  document.getElementById('pt-achat-produit').value = p ? p.id : '';
+  if(!p){
+    info.innerHTML = nomTape ? '<span style="color:#f59e0b">Article introuvable — choisissez-en un dans la liste</span>' : '';
+    ptAchatRecalculer();
+    return;
+  }
   info.textContent = `Stock actuel : ${p.stock_actuel} ${p.unite}`;
   const prixEl = document.getElementById('pt-achat-prix');
   if(!prixEl.value && p.cout_unitaire_estime){ prixEl.value = p.cout_unitaire_estime; }
@@ -30520,6 +30622,7 @@ async function ptAchatSauvegarder(){
   const produit_id = parseInt(document.getElementById('pt-achat-produit').value);
   const quantite = parseFloat(document.getElementById('pt-achat-qte').value);
   const prix_achat_unitaire = parseFloat(document.getElementById('pt-achat-prix').value);
+  if(!produit_id){ posAlert('Choisissez un article existant dans la liste.','warn'); return; }
   if(!quantite || quantite<=0){ posAlert('La quantité doit être positive.','warn'); return; }
   if(prix_achat_unitaire==null || isNaN(prix_achat_unitaire) || prix_achat_unitaire<0){ posAlert('Le prix unitaire est requis.','warn'); return; }
   try{
