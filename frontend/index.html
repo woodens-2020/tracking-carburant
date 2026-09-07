@@ -13474,7 +13474,7 @@ function _startScrollFix(){
 
 function _defaultPage(){
   const rn = (_appUser?.role_nom||_appUser?.poste||'').toLowerCase();
-  if(rn === 'manager') return 'pos-produits';
+  if(rn === 'manager') return 'notifications';
   if(rn === 'assistant directeur') return 'zelle';
   if(rn.startsWith('caissier') || !!_appUser?.employe_id) return 'pos-caisse';
   return 'home';
@@ -15798,12 +15798,13 @@ const _CAISSIER_ALLOWED = new Set([
   'pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite',
 ]);
 
-// Whitelist stricte pour les comptes Manager — Bar/Restaurant + Hôtel (sans Tables, Grande Caisse, Chambres, Réception) + Cuisine complète.
+// Whitelist stricte pour les comptes Manager — Bar/Restaurant + Hôtel (sans Tables, Grande Caisse, Chambres, Réception) + Cuisine complète + Pâtisserie complète.
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
   'hotel-dashboard','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
+  'patisserie-dashboard','patisserie-produits','patisserie-achats','patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse',
 ]);
 
 // Assistant Directeur — tous les rapports en lecture + Zelle complet
@@ -16776,7 +16777,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   if(!_isFreshLogin && _savedPage && _canAccess(_savedPage)){
     goTo(_savedPage);
   } else if(_rlNom === 'manager'){
-    goTo('pos-produits');
+    goTo('notifications');
   } else if(_rlNom === 'assistant directeur'){
     goTo('zelle');
   } else if(!!_appUser?.employe_id || _rlNom.startsWith('caissier')){
