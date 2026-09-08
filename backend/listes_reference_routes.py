@@ -12,6 +12,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -60,21 +61,37 @@ def creer(cle: str, data: _NomIn, request: Request, db: Session = Depends(get_db
     nom = (data.nom or "").strip()
     if not nom:
         raise HTTPException(400, "Le nom est requis.")
-    norm = lref.normaliser(nom)
+    mx = lref._maxlen(modele)
+    norm = lref.normaliser(nom)[:mx]
+    if not norm:
+        raise HTTPException(400, "Nom invalide.")
+
+    def _reponse(row, cree):
+        return {"id": row.id, "nom": row.nom, "actif": row.actif, "cree": cree}
+
     existante = db.query(modele).filter(modele.nom_norm == norm).first()
     if existante:
         # Déduplication : on ne recrée jamais, on réactive si besoin.
         if not existante.actif:
             existante.actif = True
             db.commit()
-        return {"id": existante.id, "nom": existante.nom, "actif": existante.actif, "cree": False}
-    mx = lref._maxlen(modele)
-    e = modele(nom=nom[:mx], nom_norm=norm[:mx], actif=True,
-               cree_par_id=user.id if user else None)
+        return _reponse(existante, False)
+
+    e = modele(nom=nom[:mx], nom_norm=norm, actif=True,
+               cree_par_id=getattr(user, "id", None))
     db.add(e)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Course (deux clics) ou valeur déjà présente sous une casse voisine :
+        # on récupère la ligne gagnante au lieu de renvoyer un 500.
+        db.rollback()
+        gagnante = db.query(modele).filter(modele.nom_norm == norm).first()
+        if gagnante:
+            return _reponse(gagnante, False)
+        raise HTTPException(409, f"Cette {label} existe déjà.")
     db.refresh(e)
-    return {"id": e.id, "nom": e.nom, "actif": e.actif, "cree": True}
+    return _reponse(e, True)
 
 
 @router.patch("/{cle}/{ref_id}")

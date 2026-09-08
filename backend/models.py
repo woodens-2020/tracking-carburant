@@ -507,8 +507,8 @@ class CategorieDepense(Base):
     __tablename__ = "categories_depense"
 
     id            = Column(Integer, primary_key=True)
-    nom           = Column(String(60), nullable=False)
-    nom_norm      = Column(String(60), nullable=False, unique=True)
+    nom           = Column(String(120), nullable=False)
+    nom_norm      = Column(String(120), nullable=False, unique=True)
     actif         = Column(Boolean, nullable=False, default=True)
     date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     cree_par_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
@@ -524,8 +524,8 @@ class CategorieAchat(Base):
     __tablename__ = "categories_achat"
 
     id            = Column(Integer, primary_key=True)
-    nom           = Column(String(50), nullable=False)
-    nom_norm      = Column(String(50), nullable=False, unique=True)
+    nom           = Column(String(120), nullable=False)
+    nom_norm      = Column(String(120), nullable=False, unique=True)
     actif         = Column(Boolean, nullable=False, default=True)
     date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     cree_par_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
@@ -540,8 +540,8 @@ class Poste(Base):
     __tablename__ = "postes"
 
     id            = Column(Integer, primary_key=True)
-    nom           = Column(String(100), nullable=False)
-    nom_norm      = Column(String(100), nullable=False, unique=True)
+    nom           = Column(String(120), nullable=False)
+    nom_norm      = Column(String(120), nullable=False, unique=True)
     actif         = Column(Boolean, nullable=False, default=True)
     date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     cree_par_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)

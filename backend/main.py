@@ -252,14 +252,24 @@ def startup():
         # Note de soumission de la caissière — distincte de notes_admin.
         "ALTER TABLE bar_sessions_caisse ADD COLUMN IF NOT EXISTS note_soumission VARCHAR(500)",
         "ALTER TABLE patisserie_sessions_caisse ADD COLUMN IF NOT EXISTS note_soumission VARCHAR(500)",
+        # Élargir les libellés des listes de référence (évite une troncature
+        # qui pouvait provoquer une collision d'unicité → erreur 500 à l'ajout).
+        "ALTER TABLE categories_depense ALTER COLUMN nom TYPE VARCHAR(120)",
+        "ALTER TABLE categories_depense ALTER COLUMN nom_norm TYPE VARCHAR(120)",
+        "ALTER TABLE categories_achat ALTER COLUMN nom TYPE VARCHAR(120)",
+        "ALTER TABLE categories_achat ALTER COLUMN nom_norm TYPE VARCHAR(120)",
+        "ALTER TABLE postes ALTER COLUMN nom TYPE VARCHAR(120)",
+        "ALTER TABLE postes ALTER COLUMN nom_norm TYPE VARCHAR(120)",
     ]
-    try:
-        with engine.connect() as _c:
-            for _sql in _migrations:
+    # Chaque instruction est isolée : une qui échoue (moteur SQLite en dev,
+    # table absente, type déjà à jour…) n'empêche pas les suivantes.
+    for _sql in _migrations:
+        try:
+            with engine.connect() as _c:
                 _c.execute(_text(_sql))
-            _c.commit()
-    except Exception:
-        pass
+                _c.commit()
+        except Exception:
+            pass
     from datetime import datetime, timezone as _tz
     from models import SessionToken as _ST
     with SessionLocal() as _db:

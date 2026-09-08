@@ -78,7 +78,8 @@ def resoudre(db: Session, modele, valeur: Optional[str], *, request: Request,
         if defaut is None:
             return None
         brut = defaut.strip()
-    norm = normaliser(brut)
+    mx = _maxlen(modele)
+    norm = normaliser(brut)[:mx]
     if not norm:
         return None
 
@@ -86,7 +87,7 @@ def resoudre(db: Session, modele, valeur: Optional[str], *, request: Request,
     if existante:
         return existante.nom
 
-    est_le_defaut = defaut is not None and normaliser(defaut) == norm
+    est_le_defaut = defaut is not None and normaliser(defaut)[:mx] == norm
     user = utilisateur_courant(request, db)
     if not est_le_defaut and not peut_gerer(user):
         raise HTTPException(
@@ -95,12 +96,15 @@ def resoudre(db: Session, modele, valeur: Optional[str], *, request: Request,
             "administrateur peut créer une nouvelle valeur.",
         )
 
-    mx = _maxlen(modele)
-    entree = modele(nom=brut[:mx], nom_norm=norm[:mx], actif=True,
-                    cree_par_id=user.id if user else None)
+    entree = modele(nom=brut[:mx], nom_norm=norm, actif=True,
+                    cree_par_id=getattr(user, "id", None))
+    # SAVEPOINT + flush : l'INSERT est émis ICI, donc une éventuelle collision
+    # (course entre deux enregistrements) est rattrapée sans casser la
+    # transaction de l'appelant ni renvoyer un 500.
     try:
         with db.begin_nested():
             db.add(entree)
+            db.flush()
         return entree.nom
     except IntegrityError:
         gagnante = db.query(modele).filter(modele.nom_norm == norm).first()
