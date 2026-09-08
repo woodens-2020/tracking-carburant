@@ -2126,6 +2126,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 }
 .gi-btn-primary:active{transform:scale(.97);filter:brightness(.96)}
 
+.dep-chart-mode-btn{
+  padding:4px 13px;font-size:12.5px;font-weight:600;border-radius:7px;cursor:pointer;
+  background:var(--panel2);border:1px solid var(--border);color:var(--muted);
+  transition:background .14s,border-color .14s,color .14s;
+}
+.dep-chart-mode-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+
 .gi-btn-secondary{
   display:inline-flex;align-items:center;gap:6px;
   background:rgba(255,255,255,.05);
@@ -5690,10 +5697,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
 
         <div class="gi-table-card">
-          <div class="gi-table-hdr">
-            <span class="gi-table-title">Suivi des Dépenses</span>
+          <div class="gi-table-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <span class="gi-table-title">Suivi des Dépenses — par catégorie</span>
+            <div style="display:inline-flex;gap:4px">
+              <button type="button" class="dep-chart-mode-btn active" data-mode="bar" onclick="setDepChartMode('bar')">Barres</button>
+              <button type="button" class="dep-chart-mode-btn" data-mode="line" onclick="setDepChartMode('line')">Ligne</button>
+            </div>
           </div>
-          <div style="position:relative;height:220px;padding:14px">
+          <div style="position:relative;height:420px;padding:14px 14px 8px">
             <canvas id="dep-chart-suivi"></canvas>
           </div>
         </div>
@@ -13805,6 +13816,114 @@ function destroyDbCharts(){
   dbChartTrend=dbChartProd=dbChartPer=dbChartPmp=null;
 }
 
+// ══════════════════════════════════════════════════════════════════
+// SUIVI DES DÉPENSES — vue « par catégorie » (page Dépenses / carburant)
+// Barres empilées OU courbes, une couleur stable par catégorie.
+// ══════════════════════════════════════════════════════════════════
+let _depChartMode = 'bar';
+try{ const _m = localStorage.getItem('konekta_dep_chart_mode'); if(_m==='bar'||_m==='line') _depChartMode=_m; }catch(e){}
+
+const _DEP_CAT_PALETTE = [
+  '#60a5fa','#f87171','#34d399','#fbbf24','#a78bfa','#f472b6',
+  '#22d3ee','#fb923c','#a3e635','#e879f9','#2dd4bf','#c084fc',
+  '#4ade80','#facc15','#38bdf8','#fca5a5',
+];
+function _depCatColor(nom){
+  let h = 0;
+  for(let i=0;i<nom.length;i++) h = (h*31 + nom.charCodeAt(i)) >>> 0;
+  return _DEP_CAT_PALETTE[h % _DEP_CAT_PALETTE.length];
+}
+
+function setDepChartMode(mode){
+  if(mode!=='bar' && mode!=='line') return;
+  _depChartMode = mode;
+  document.querySelectorAll('.dep-chart-mode-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===mode));
+  try{ localStorage.setItem('konekta_dep_chart_mode', mode); }catch(e){}
+  if(typeof depRechercheFiltrer === 'function') depRechercheFiltrer();
+}
+
+function renderDepChartCategories(canvasId, depenses){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas || typeof Chart==='undefined') return;
+  if(_suiviDepCharts[canvasId]){ _suiviDepCharts[canvasId].destroy(); delete _suiviDepCharts[canvasId]; }
+  document.querySelectorAll('.dep-chart-mode-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===_depChartMode));
+  if(!depenses || !depenses.length) return;
+
+  let minD=null, maxD=null;
+  const rows = [];
+  depenses.forEach(d=>{
+    const raw = String(d.date_depense||'').slice(0,10);
+    if(!raw) return;
+    const dt = new Date(raw+'T12:00:00');
+    if(isNaN(dt)) return;
+    rows.push({ raw, cat: (d.categorie||'—'), montant: parseFloat(d.montant)||0 });
+    if(!minD||dt<minD) minD=dt;
+    if(!maxD||dt>maxD) maxD=dt;
+  });
+  if(!minD) return;
+
+  const parMois = (Math.round((maxD-minD)/86400000)+1) > 45;
+  const keyOf = raw => parMois ? raw.slice(0,7) : raw;
+  const keys  = [...new Set(rows.map(r=>keyOf(r.raw)))].sort();
+  const idx   = {}; keys.forEach((k,i)=>idx[k]=i);
+  const labels = keys.map(k=>{
+    const dt = new Date((parMois ? k+'-01' : k)+'T12:00:00');
+    return parMois
+      ? dt.toLocaleDateString('fr',{month:'short',year:'2-digit'})
+      : dt.toLocaleDateString('fr',{day:'2-digit',month:'2-digit'});
+  });
+
+  // Catégories triées par montant total décroissant (les plus grosses en bas de la pile)
+  const totParCat = {};
+  rows.forEach(r=>{ totParCat[r.cat] = (totParCat[r.cat]||0) + r.montant; });
+  const cats = Object.keys(totParCat).sort((a,b)=>totParCat[b]-totParCat[a]);
+
+  const estBarre = _depChartMode === 'bar';
+  const datasets = cats.map(cat=>{
+    const arr = new Array(keys.length).fill(0);
+    rows.forEach(r=>{ if(r.cat===cat) arr[idx[keyOf(r.raw)]] += r.montant; });
+    const col = _depCatColor(cat);
+    return {
+      label: cat,
+      data: arr.map(v=>Math.round(v*100)/100),
+      backgroundColor: estBarre ? col : (col+'22'),
+      borderColor: col,
+      borderWidth: 2,
+      fill: !estBarre ? false : true,
+      tension: .35,
+      pointRadius: estBarre ? 0 : 3,
+      pointHoverRadius: 5,
+      borderRadius: estBarre ? 4 : 0,
+    };
+  });
+
+  _suiviDepCharts[canvasId] = new Chart(canvas.getContext('2d'), {
+    type: estBarre ? 'bar' : 'line',
+    data: { labels, datasets },
+    options: {
+      responsive:true, maintainAspectRatio:false, animation:{duration:500},
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ display:true, position:'bottom',
+          labels:{ color:'rgba(200,215,240,.85)', boxWidth:12, padding:9, font:{size:11} } },
+        tooltip:{ callbacks:{
+          label:c=>`${c.dataset.label} : G ${Number(c.parsed.y).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`,
+          footer:items=>{
+            const t = items.reduce((s,i)=>s+(i.parsed.y||0),0);
+            return 'Total : G '+Number(t).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2});
+          },
+        } },
+      },
+      scales:{
+        x:{ stacked:estBarre, ticks:{color:'rgba(180,200,230,.8)',font:{size:10}}, grid:{display:false} },
+        y:{ stacked:estBarre, beginAtZero:true,
+            ticks:{color:'rgba(150,180,220,.7)',font:{size:10},callback:v=>'G '+Number(v).toLocaleString('fr')},
+            grid:{color:'rgba(255,255,255,.05)'} },
+      }
+    }
+  });
+}
+
 function setPreset(p){
   const now=new Date();
   let d1,d2;
@@ -20363,7 +20482,7 @@ function depRechercheFiltrer(){
   });
   _depUpdateKpis(filtered);
   renderDepTable(filtered);
-  renderSuiviDepenses('dep-chart-suivi', filtered);
+  renderDepChartCategories('dep-chart-suivi', filtered);
 }
 
 function renderDepTable(data){
