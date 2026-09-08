@@ -248,7 +248,24 @@ def startup():
         # (categories_depense / categories_achat) : on lève les anciennes
         # listes figées pour permettre l'ajout à la volée.
         "ALTER TABLE depenses DROP CONSTRAINT IF EXISTS chk_depense_categorie",
+        "ALTER TABLE depenses DROP CONSTRAINT IF EXISTS depenses_categorie_check",
         "ALTER TABLE achats DROP CONSTRAINT IF EXISTS chk_achat_categorie",
+        "ALTER TABLE achats DROP CONSTRAINT IF EXISTS achats_categorie_check",
+        # Filet de sécurité : supprime TOUTE contrainte CHECK restante sur
+        # depenses/achats dont la définition liste des catégories en dur.
+        """DO $$
+        DECLARE r RECORD;
+        BEGIN
+          FOR r IN
+            SELECT conrelid::regclass AS tbl, conname
+            FROM pg_constraint
+            WHERE contype = 'c'
+              AND conrelid::regclass::text IN ('depenses', 'achats')
+              AND pg_get_constraintdef(oid) ILIKE '%categorie%IN (%'
+          LOOP
+            EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.tbl, r.conname);
+          END LOOP;
+        END $$;""",
         # Note de soumission de la caissière — distincte de notes_admin.
         "ALTER TABLE bar_sessions_caisse ADD COLUMN IF NOT EXISTS note_soumission VARCHAR(500)",
         "ALTER TABLE patisserie_sessions_caisse ADD COLUMN IF NOT EXISTS note_soumission VARCHAR(500)",
@@ -260,6 +277,18 @@ def startup():
         "ALTER TABLE categories_achat ALTER COLUMN nom_norm TYPE VARCHAR(120)",
         "ALTER TABLE postes ALTER COLUMN nom TYPE VARCHAR(120)",
         "ALTER TABLE postes ALTER COLUMN nom_norm TYPE VARCHAR(120)",
+        # Colonnes qui STOCKENT une catégorie / un poste : mêmes 120 caractères
+        # que la liste de référence, sinon un libellé long déborde à
+        # l'enregistrement d'une dépense/achat/employé → erreur 500.
+        "ALTER TABLE depenses            ALTER COLUMN categorie TYPE VARCHAR(120)",
+        "ALTER TABLE achats              ALTER COLUMN categorie TYPE VARCHAR(120)",
+        "ALTER TABLE hotel_depenses      ALTER COLUMN categorie TYPE VARCHAR(120)",
+        "ALTER TABLE cuisine_depenses    ALTER COLUMN categorie TYPE VARCHAR(120)",
+        "ALTER TABLE cuisine_achats      ALTER COLUMN categorie TYPE VARCHAR(120)",
+        "ALTER TABLE zelle_depenses      ALTER COLUMN categorie TYPE VARCHAR(120)",
+        "ALTER TABLE patisserie_depenses ALTER COLUMN categorie TYPE VARCHAR(120)",
+        "ALTER TABLE utilisateurs        ALTER COLUMN poste TYPE VARCHAR(120)",
+        "ALTER TABLE employes            ALTER COLUMN poste TYPE VARCHAR(120)",
     ]
     # Chaque instruction est isolée : une qui échoue (moteur SQLite en dev,
     # table absente, type déjà à jour…) n'empêche pas les suivantes.

@@ -203,7 +203,7 @@ class Utilisateur(Base):
     api_key_hash      = Column(String(64),  unique=True, nullable=True)
     nom_complet       = Column(String(150), nullable=False, default="")
     role              = Column(String(20),  nullable=False, default="operateur")
-    poste             = Column(String(100), nullable=True)
+    poste             = Column(String(120), nullable=True)
     actif             = Column(Boolean,     nullable=False, default=True)
     created_at        = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     email             = Column(String(254), unique=True, nullable=True)
@@ -364,7 +364,7 @@ class Employe(Base):
     id             = Column(Integer, primary_key=True)
     nom            = Column(String(100), nullable=False)
     prenom         = Column(String(100), nullable=False)
-    poste          = Column(String(100), nullable=False)
+    poste          = Column(String(120), nullable=False)
     date_embauche  = Column(Date, nullable=False)
     salaire_base   = Column(Numeric(12, 2), nullable=False)
     type_contrat   = Column(String(30), nullable=False, default="CDI")
@@ -427,7 +427,7 @@ class Depense(Base):
     __tablename__ = "depenses"
 
     id           = Column(Integer, primary_key=True)
-    categorie    = Column(String(50), nullable=False)
+    categorie    = Column(String(120), nullable=False)
     description  = Column(String(300), nullable=False)
     montant      = Column(Numeric(12, 2), nullable=False)
     date_depense = Column(Date, nullable=False)
@@ -443,11 +443,8 @@ class Depense(Base):
 
     __table_args__ = (
         CheckConstraint("montant > 0", name="chk_depense_montant_pos"),
-        CheckConstraint(
-            "categorie IN ('Salaires','Maintenance','Fournitures','Electricite',"
-            "'Eau','Loyer','Transport','Taxes','Assurance','Divers')",
-            name="chk_depense_categorie",
-        ),
+        # NB : plus de liste figée de catégories — elles sont gérées en table
+        # (categories_depense) et ajoutables à la volée. Voir listes_reference.
         Index("idx_depenses_date",      "date_depense"),
         Index("idx_depenses_categorie", "categorie"),
         Index("idx_depenses_produit",   "produit_id"),
@@ -473,7 +470,7 @@ class Achat(Base):
     id           = Column(Integer, primary_key=True)
     fournisseur  = Column(String(150), nullable=False)
     description  = Column(String(300), nullable=False)
-    categorie    = Column(String(50),  nullable=False)
+    categorie    = Column(String(120),  nullable=False)
     montant      = Column(Numeric(12, 2), nullable=False)
     date_achat   = Column(Date, nullable=False)
     reference    = Column(String(100), nullable=True)
@@ -482,11 +479,7 @@ class Achat(Base):
 
     __table_args__ = (
         CheckConstraint("montant > 0", name="chk_achat_montant_pos"),
-        CheckConstraint(
-            "categorie IN ('Equipement','Pieces detachees','Fournitures bureau',"
-            "'Informatique','Securite','Nettoyage','Autre')",
-            name="chk_achat_categorie",
-        ),
+        # Catégories gérées en table (categories_achat) — plus de liste figée.
         Index("idx_achats_date",       "date_achat"),
         Index("idx_achats_categorie",  "categorie"),
         Index("idx_achats_fournisseur","fournisseur"),
@@ -1053,7 +1046,7 @@ class HotelDepense(Base):
 
     id           = Column(Integer,     primary_key=True)
     description  = Column(String(200), nullable=False)
-    categorie    = Column(String(80),  nullable=True)
+    categorie    = Column(String(120),  nullable=True)
     montant      = Column(Numeric(12, 2), nullable=False)
     date_depense = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     fournisseur  = Column(String(150), nullable=True)
@@ -1116,7 +1109,7 @@ class CuisineDepense(Base):
 
     id           = Column(Integer,     primary_key=True)
     description  = Column(String(200), nullable=False)
-    categorie    = Column(String(80),  nullable=True)
+    categorie    = Column(String(120),  nullable=True)
     montant      = Column(Numeric(12, 2), nullable=False)
     date_depense = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     fournisseur  = Column(String(150), nullable=True)
@@ -1184,7 +1177,7 @@ class CuisineAchat(Base):
     id            = Column(Integer,      primary_key=True)
     plat_id       = Column(Integer,      ForeignKey("cuisine_plats.id", ondelete="SET NULL"), nullable=True)
     description   = Column(String(200),  nullable=False)
-    categorie     = Column(String(80),   nullable=True,  default="INGREDIENTS")
+    categorie     = Column(String(120),   nullable=True,  default="INGREDIENTS")
     quantite      = Column(Numeric(10, 3), nullable=False)
     unite         = Column(String(20),   nullable=True,  default="kg")
     cout_unitaire = Column(Numeric(12, 2), nullable=False)
@@ -1433,7 +1426,7 @@ class ZelleDepense(Base):
     # Taux HTG/USD au moment de la saisie — fige la conversion (comme
     # ZelleTransaction.taux_applique) meme si la saisie initiale etait en HTG.
     taux_applique = Column(Numeric(10, 4), nullable=False, default=130)
-    categorie     = Column(String(50), nullable=True)
+    categorie     = Column(String(120), nullable=True)
     date_depense  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     statut        = Column(String(20), nullable=False, default="EN_ATTENTE")  # EN_ATTENTE, APPROUVEE, REJETEE
     demandeur_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
@@ -1799,7 +1792,7 @@ class PatisserieDepense(Base):
 
     id           = Column(Integer, primary_key=True)
     description  = Column(String(200), nullable=False)
-    categorie    = Column(String(80),  nullable=True)
+    categorie    = Column(String(120),  nullable=True)
     montant      = Column(Numeric(12, 2), nullable=False)
     date_depense = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     fournisseur  = Column(String(150), nullable=True)
