@@ -2978,11 +2978,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 <script src="/vendor/html2canvas.min.js"></script>
 <body>
 
-<!-- Listes de référence partagées (suggestions de saisie) -->
-<datalist id="dl-categories-depense"></datalist>
-<datalist id="dl-categories-achat"></datalist>
-<datalist id="dl-postes"></datalist>
-
 <div id="load-overlay"><div class="lo-badge"><div class="lo-ring"></div><span class="lo-k">K</span></div></div>
 <script src="/shared/loading-overlay.js"></script>
 <script src="/shared/i18n-errors.js"></script>
@@ -5427,9 +5422,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Poste *</label>
                 <div style="display:flex;gap:6px;align-items:stretch">
-                  <input class="gi-form-input" id="emp-poste" list="dl-postes" autocomplete="off"
-                         style="flex:1" placeholder="Ex : Caissier, Gérant, Technicien…"/>
-                  <button type="button" class="gi-btn-secondary" title="Ajouter ce poste à la liste"
+                  <select class="gi-form-select" id="emp-poste" style="flex:1">
+                    <option value="">— Sélectionner un poste —</option>
+                  </select>
+                  <button type="button" class="gi-btn-secondary" title="Ajouter un poste"
                           style="padding:0 12px;font-size:18px;line-height:1"
                           onclick="_ajoutRapideRef('postes','emp-poste','emp-filtre-poste','Tous')">+</button>
                 </div>
@@ -5739,9 +5735,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Catégorie *</label>
                 <div style="display:flex;gap:6px;align-items:stretch">
-                  <input class="gi-form-input" id="dep-cat" list="dl-categories-depense" autocomplete="off"
-                         style="flex:1" placeholder="Ex : Électricité, Loyer, Salaires…"/>
-                  <button type="button" class="gi-btn-secondary" title="Ajouter cette catégorie à la liste"
+                  <select class="gi-form-select" id="dep-cat" style="flex:1">
+                    <option value="">— Sélectionner —</option>
+                  </select>
+                  <button type="button" class="gi-btn-secondary" title="Ajouter une catégorie"
                           style="padding:0 12px;font-size:18px;line-height:1"
                           onclick="_ajoutRapideRef('categories-depense','dep-cat','dep-filtre-cat','Toutes')">+</button>
                 </div>
@@ -5905,9 +5902,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Catégorie *</label>
                 <div style="display:flex;gap:6px;align-items:stretch">
-                  <input class="gi-form-input" id="ach-cat" list="dl-categories-achat" autocomplete="off"
-                         style="flex:1" placeholder="Ex : Équipement, Informatique…"/>
-                  <button type="button" class="gi-btn-secondary" title="Ajouter cette catégorie d'achat"
+                  <select class="gi-form-select" id="ach-cat" style="flex:1"><option value="">— Sélectionner —</option></select>
+                  <button type="button" class="gi-btn-secondary" title="Ajouter une catégorie d'achat"
                           style="padding:0 12px;font-size:18px;line-height:1"
                           onclick="_ajoutRapideRef('categories-achat','ach-cat','ach-filtre-cat','Toutes')">+</button>
                 </div>
@@ -8407,8 +8403,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <div class="gi-form-field">
                   <label class="gi-form-lbl">Catégorie</label>
                   <div style="display:flex;gap:6px;align-items:stretch">
-                    <input class="gi-form-input" id="zdep-cat" list="dl-categories-depense" autocomplete="off" style="flex:1" placeholder="Ex : Frais bancaires"/>
-                    <button type="button" class="gi-btn-secondary" title="Ajouter cette catégorie"
+                    <select class="gi-form-select" id="zdep-cat" style="flex:1"><option value="">— Sélectionner —</option></select>
+                    <button type="button" class="gi-btn-secondary" title="Ajouter une catégorie"
                             style="padding:0 12px;font-size:18px;line-height:1"
                             onclick="_ajoutRapideRef('categories-depense','zdep-cat','zdep-filtre-cat','Toutes')">+</button>
                   </div>
@@ -9226,9 +9222,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
                 <div style="display:flex;gap:6px;align-items:stretch">
-                  <input class="pos-input" id="ckdep-cat" list="dl-categories-depense" autocomplete="off"
-                         placeholder="Catégorie" style="flex:1">
-                  <button type="button" class="pos-btn ghost" title="Ajouter cette catégorie"
+                  <select class="pos-select" id="ckdep-cat" style="flex:1"><option value="">— Sélectionner —</option></select>
+                  <button type="button" class="pos-btn ghost" title="Ajouter une catégorie"
                           style="padding:0 12px;font-size:18px;line-height:1"
                           onclick="_ajoutRapideRef('categories-depense','ckdep-cat','ckdep-filtre-cat','Toutes catégories')">+</button>
                 </div>
@@ -9481,9 +9476,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div>
               <label class="pos-label">Catégorie</label>
               <div style="display:flex;gap:6px;align-items:stretch">
-                <input class="pos-input" id="ckac-categorie" list="dl-categories-achat" autocomplete="off"
-                       style="flex:1" placeholder="Catégorie">
-                <button type="button" class="pos-btn ghost" title="Ajouter cette catégorie d'achat"
+                <select class="pos-select" id="ckac-categorie" style="flex:1"><option value="">— Sélectionner —</option></select>
+                <button type="button" class="pos-btn ghost" title="Ajouter une catégorie d'achat"
                         style="padding:0 12px;font-size:18px;line-height:1"
                         onclick="_ajoutRapideRef('categories-achat','ckac-categorie','ckac-filtre-cat','Toutes catégories')">+</button>
               </div>
@@ -10276,9 +10270,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
                 <div style="display:flex;gap:6px;align-items:stretch">
-                  <input class="pos-input" id="pt-dep-cat" list="dl-categories-depense" autocomplete="off"
-                         placeholder="Catégorie" style="flex:1">
-                  <button type="button" class="pos-btn ghost" title="Ajouter cette catégorie"
+                  <select class="pos-select" id="pt-dep-cat" style="flex:1"><option value="">— Sélectionner —</option></select>
+                  <button type="button" class="pos-btn ghost" title="Ajouter une catégorie"
                           style="padding:0 12px;font-size:18px;line-height:1"
                           onclick="_ajoutRapideRef('categories-depense','pt-dep-cat','ptd-dep-categorie','Toutes catégories')">+</button>
                 </div>
@@ -10886,9 +10879,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
                 <div style="display:flex;gap:6px;align-items:stretch">
-                  <input class="pos-input" id="hdep-cat" list="dl-categories-depense" autocomplete="off"
-                         placeholder="Catégorie" style="flex:1">
-                  <button type="button" class="pos-btn ghost" title="Ajouter cette catégorie"
+                  <select class="pos-select" id="hdep-cat" style="flex:1"><option value="">— Sélectionner —</option></select>
+                  <button type="button" class="pos-btn ghost" title="Ajouter une catégorie"
                           style="padding:0 12px;font-size:18px;line-height:1"
                           onclick="_ajoutRapideRef('categories-depense','hdep-cat','hdep-filtre-cat','Toutes catégories')">+</button>
                 </div>
@@ -11845,22 +11837,43 @@ function _remplirFiltreRef(sel, cle, labelTous){
   if(cur){ sel.value = cur; }
 }
 
+// Remplit un <select> de FORMULAIRE avec les valeurs de la liste `cle`,
+// en gardant la valeur courante si elle existe encore. Si `valeurForcee`
+// est fournie et absente de la liste, on l'ajoute (cas d'une fiche dont la
+// catégorie a été désactivée depuis).
+function _remplirSelectRef(sel, cle, placeholder, valeurForcee){
+  if(typeof sel === 'string') sel = document.getElementById(sel);
+  if(!sel) return;
+  const cur = valeurForcee != null ? valeurForcee : sel.value;
+  const noms = (_listesRef[cle]||[]).map(x=>x.nom);
+  if(cur && !noms.includes(cur)) noms.push(cur);
+  sel.innerHTML = ['<option value="">'+(placeholder||'— Sélectionner —')+'</option>']
+    .concat(noms.slice().sort((a,b)=>a.localeCompare(b,'fr')).map(n=>'<option>'+esc(n)+'</option>')).join('');
+  sel.value = cur || '';
+}
+
 // Bouton « + » à côté d'un champ catégorie/poste : ajoute vite une valeur.
 // Prend ce qui est déjà tapé dans le champ ; sinon demande le nom.
 // L'ajout est réservé au manager/admin côté serveur (403 sinon).
-async function _ajoutRapideRef(cle, inputId, filtreSelId, filtreLabel){
-  const inp = document.getElementById(inputId);
-  let nom = ((inp && inp.value) || '').trim();
+async function _ajoutRapideRef(cle, champId, filtreSelId, filtreLabel){
+  const champ = document.getElementById(champId);
+  const estSelect = champ && champ.tagName === 'SELECT';
+  let nom = (!estSelect && champ && champ.value || '').trim();
   if(!nom){
-    nom = (window.prompt(cle === 'postes' ? 'Nouveau poste :' : 'Nouvelle catégorie de dépense :') || '').trim();
+    const libelle = cle === 'postes' ? 'Nouveau poste :'
+                  : cle === 'categories-achat' ? "Nouvelle catégorie d'achat :"
+                  : 'Nouvelle catégorie de dépense :';
+    nom = (window.prompt(libelle) || '').trim();
     if(!nom) return;
   }
   try{
     const r = await POST('/listes/'+cle, { nom });
+    const val = r.nom || nom;
     await _chargerListeRef(cle, true);
-    if(inp) inp.value = r.nom || nom;
+    if(estSelect) _remplirSelectRef(champ, cle, champ.options[0] && champ.options[0].text, val);
+    else if(champ) champ.value = val;
     if(filtreSelId) _remplirFiltreRef(filtreSelId, cle, filtreLabel);
-    toast((r.cree === false ? 'Déjà dans la liste : ' : 'Ajouté : ') + (r.nom || nom), 'ok');
+    toast((r.cree === false ? 'Déjà dans la liste : ' : 'Ajouté : ') + val, 'ok');
   }catch(e){
     toast(e.message || "Ajout impossible.", 'err');
   }
@@ -19800,6 +19813,7 @@ async function loadEmployes(){
   _giLoading('emp-table-wrap');
   await _chargerListeRef('postes');
   _remplirFiltreRef('emp-filtre-poste', 'postes', 'Tous');
+  _remplirSelectRef('emp-poste', 'postes', '— Sélectionner un poste —');
   const actif = document.getElementById('emp-filtre-actif')?.value ?? '';
   const poste = document.getElementById('emp-filtre-poste')?.value ?? '';
   const params = [];
@@ -19883,7 +19897,7 @@ function openEmpModal(id=null){
     if(e){
       document.getElementById('emp-prenom').value   = e.prenom;
       document.getElementById('emp-nom').value      = e.nom;
-      document.getElementById('emp-poste').value    = e.poste;
+      _remplirSelectRef('emp-poste', 'postes', '— Sélectionner un poste —', e.poste);
       document.getElementById('emp-contrat').value  = e.type_contrat;
       document.getElementById('emp-embauche').value = e.date_embauche;
       document.getElementById('emp-salaire').value  = e.salaire_base;
@@ -20110,6 +20124,7 @@ async function loadDepenses(){
   _depPopulateCaisseSelects();
   await _chargerListeRef('categories-depense');
   _remplirFiltreRef('dep-filtre-cat', 'categories-depense', 'Toutes');
+  _remplirSelectRef('dep-cat', 'categories-depense');
 
   // Affichage du bouton PDG et chargement de la limite en parallèle
   if(_appUser?.role === 'pdg'){
@@ -20327,7 +20342,7 @@ function openDepModal(id=null){
   if(id){
     const d=_depData.find(x=>x.id===id);
     if(d){
-      document.getElementById('dep-cat').value     =d.categorie;
+      _remplirSelectRef('dep-cat', 'categories-depense', '— Sélectionner —', d.categorie);
       document.getElementById('dep-date').value    =d.date_depense;
       document.getElementById('dep-caisse').value  =d.produit_id||'';
       document.getElementById('dep-desc').value    =d.description;
@@ -20384,6 +20399,7 @@ async function loadAchats(){
   _giLoading('ach-table-wrap');
   await _chargerListeRef('categories-achat');
   _remplirFiltreRef('ach-filtre-cat', 'categories-achat', 'Toutes');
+  _remplirSelectRef('ach-cat', 'categories-achat');
   const deb = document.getElementById('ach-filtre-debut')?.value ?? '';
   const fin = document.getElementById('ach-filtre-fin')?.value ?? '';
   const cat = document.getElementById('ach-filtre-cat')?.value ?? '';
@@ -20452,7 +20468,7 @@ function openAchatModal(id=null){
     const a=_achData.find(x=>x.id===id);
     if(a){
       document.getElementById('ach-fournis').value =a.fournisseur;
-      document.getElementById('ach-cat').value     =a.categorie;
+      _remplirSelectRef('ach-cat', 'categories-achat', '— Sélectionner —', a.categorie);
       document.getElementById('ach-desc').value    =a.description;
       document.getElementById('ach-montant').value =a.montant;
       document.getElementById('ach-date').value    =a.date_achat;
@@ -29315,6 +29331,7 @@ async function loadCuisineDepenses(){
 async function ckDepCharger(){
   await _chargerListeRef('categories-depense');
   _remplirFiltreRef('ckdep-filtre-cat', 'categories-depense', 'Toutes catégories');
+  _remplirSelectRef('ckdep-cat', 'categories-depense');
   const debut = document.getElementById('dep-debut')?.value;
   const fin   = document.getElementById('dep-fin')?.value;
   const tbody = document.getElementById('dep-tbody');
@@ -29389,7 +29406,7 @@ function ckDepOuvrirModal(depId){
     const d = _ckDepots.find(x => x.id === depId);
     if(d){
       document.getElementById('ckdep-desc').value        = d.description;
-      document.getElementById('ckdep-cat').value         = d.categorie || 'AUTRE';
+      _remplirSelectRef('ckdep-cat', 'categories-depense', '— Sélectionner —', d.categorie || 'AUTRE');
       document.getElementById('ckdep-montant').value     = d.montant;
       document.getElementById('ckdep-date').value        = d.date_depense ? d.date_depense.split('T')[0] : '';
       document.getElementById('dep-fournisseur').value   = d.fournisseur || '';
@@ -29771,6 +29788,7 @@ function _ckAchatsRemplirSelects(){
 async function ckAchatsCharger(){
   await _chargerListeRef('categories-achat');
   _remplirFiltreRef('ckac-filtre-cat', 'categories-achat', 'Toutes catégories');
+  _remplirSelectRef('ckac-categorie', 'categories-achat');
   const deb = document.getElementById('ckac-debut')?.value;
   const fin = document.getElementById('ckac-fin')?.value;
   const plat = document.getElementById('ckac-filtre-plat')?.value;
@@ -30103,7 +30121,7 @@ function ckAchatsEditer(id){
     document.getElementById('ckac-edit-id').value = id;
     document.getElementById('ckac-desc').value = a.description;
     document.getElementById('ckac-plat-id').value = a.plat_id||'';
-    document.getElementById('ckac-categorie').value = a.categorie||'INGREDIENTS';
+    _remplirSelectRef('ckac-categorie', 'categories-achat', '— Sélectionner —', a.categorie || 'INGREDIENTS');
     document.getElementById('ckac-qte').value = a.quantite;
     document.getElementById('ckac-unite').value = a.unite||'kg';
     document.getElementById('ckac-cout').value = a.cout_unitaire;
@@ -30982,6 +31000,7 @@ let _ptDepenses = [];
 async function loadPatisserieDepenses(){
   await _chargerListeRef('categories-depense');
   _remplirFiltreRef('ptd-dep-categorie', 'categories-depense', 'Toutes catégories');
+  _remplirSelectRef('pt-dep-cat', 'categories-depense');
   const dd  = document.getElementById('ptd-dep-date-debut').value;
   const df  = document.getElementById('ptd-dep-date-fin').value;
   const cat = document.getElementById('ptd-dep-categorie').value;
@@ -31019,7 +31038,7 @@ function ptDepenseOuvrirModal(id){
   document.getElementById('pt-dep-id').value = id || '';
   document.getElementById('pt-depense-modal-titre').textContent = id ? 'Modifier la dépense' : 'Ajouter une dépense';
   document.getElementById('pt-dep-desc').value = d ? d.description : '';
-  document.getElementById('pt-dep-cat').value = d ? d.categorie : '';
+  _remplirSelectRef('pt-dep-cat', 'categories-depense', '— Sélectionner —', d ? d.categorie : '');
   document.getElementById('pt-dep-montant').value = d ? d.montant : '';
   document.getElementById('pt-dep-fournisseur').value = d ? d.fournisseur : '';
   document.getElementById('pt-dep-date').value = d ? d.date_depense.slice(0,10) : todayStr();
@@ -31877,6 +31896,7 @@ async function loadHotelDepenses(){
 async function hdepCharger(){
   await _chargerListeRef('categories-depense');
   _remplirFiltreRef('hdep-filtre-cat', 'categories-depense', 'Toutes catégories');
+  _remplirSelectRef('hdep-cat', 'categories-depense');
   const debut = document.getElementById('hdep-debut')?.value;
   const fin   = document.getElementById('hdep-fin')?.value;
   const tbody = document.getElementById('hdep-tbody');
@@ -31951,7 +31971,7 @@ function hdepOuvrirModal(depId){
     const d = _hdepData.find(x => x.id === depId);
     if(d){
       document.getElementById('hdep-desc').value        = d.description;
-      document.getElementById('hdep-cat').value         = d.categorie || 'AUTRE';
+      _remplirSelectRef('hdep-cat', 'categories-depense', '— Sélectionner —', d.categorie || 'AUTRE');
       document.getElementById('hdep-montant').value     = d.montant;
       document.getElementById('hdep-date').value        = d.date_depense ? d.date_depense.split('T')[0] : '';
       document.getElementById('hdep-fournisseur').value = d.fournisseur || '';
@@ -32176,6 +32196,7 @@ async function _zdepLoad(){
   if(!tbody) return;
   await _chargerListeRef('categories-depense');
   _remplirFiltreRef('zdep-filtre-cat', 'categories-depense', 'Toutes');
+  _remplirSelectRef('zdep-cat', 'categories-depense');
   const catF = document.getElementById('zdep-filtre-cat')?.value || '';
   try{
     const [d, bilan] = await Promise.all([
