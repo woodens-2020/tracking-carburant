@@ -77,6 +77,33 @@ _BRANDING = {
     "telephone2":     os.getenv("BRANDING_TEL2", "(509) 4821-7700"),
 }
 
+# Gabarit par défaut (déploiement Pillatre) — sert à savoir si un
+# déploiement a réellement personnalisé son identité. Sur les autres
+# tenants, ces valeurs restent celles-ci tant que les variables
+# BRANDING_* ne sont pas définies : on évite alors d'imprimer une raison
+# sociale qui n'est pas la leur (« NATIVITE », etc.).
+_BRANDING_DEFAUTS = {
+    "nom":            "NATIVITE",
+    "raison_sociale": "Bon Prix",
+    "complexe":       "Complexe Commercial de Pillatre",
+    "activites":      "Bar · Hôtel · Piscine",
+    "adresse":        "Acul du Nord, Nord, Haïti",
+    "telephone1":     "(509) 3625-1100",
+    "telephone2":     "(509) 4821-7700",
+}
+
+def _branding_configure() -> bool:
+    """True si le déploiement a défini au moins une variable BRANDING_*."""
+    return any((_BRANDING.get(k) or "").strip() != v for k, v in _BRANDING_DEFAUTS.items())
+
+def _branding_val(cle: str) -> str:
+    """Valeur de branding uniquement si elle a été personnalisée pour ce
+    déploiement — sinon chaîne vide (rien à imprimer)."""
+    v = (_BRANDING.get(cle) or "").strip()
+    if not _branding_configure():
+        return ""
+    return "" if v == _BRANDING_DEFAUTS.get(cle) else v
+
 # Modules activables par institution — un déploiement qui ne définit aucune
 # de ces variables garde tous les modules actifs (comportement inchangé pour
 # Pillatre/staging). Permet de désactiver, par exemple, le carburant pour
@@ -4197,24 +4224,30 @@ def fiche_paie_pdf(fiche_id: int, db: Session = Depends(get_db)):
                             topMargin=1.6*cm, bottomMargin=1.6*cm,
                             title=f"Fiche de paie — {e.prenom} {e.nom}")
 
-    st_org   = ParagraphStyle("org",   fontSize=13, fontName="Helvetica-Bold", textColor=DARK, spaceAfter=1)
-    st_orgs  = ParagraphStyle("orgs",  fontSize=8.5, textColor=GREY, leading=11)
+    st_org   = ParagraphStyle("org",   fontSize=13.5, fontName="Helvetica-Bold", textColor=DARK,
+                              alignment=TA_CENTER, spaceAfter=2)
+    st_orgs  = ParagraphStyle("orgs",  fontSize=8.5, textColor=GREY, alignment=TA_CENTER, leading=11)
     st_title = ParagraphStyle("title", fontSize=17, fontName="Helvetica-Bold", textColor=DARK,
-                              alignment=TA_CENTER, spaceBefore=10, spaceAfter=2)
+                              alignment=TA_CENTER, spaceBefore=4, spaceAfter=3)
     st_sub   = ParagraphStyle("sub",   fontSize=9.5, textColor=GREY, alignment=TA_CENTER, spaceAfter=6)
     st_sec   = ParagraphStyle("sec",   fontSize=10.5, fontName="Helvetica-Bold", textColor=ACCENT,
                               spaceBefore=13, spaceAfter=5)
     st_body  = ParagraphStyle("body",  fontSize=9.5, textColor=DARK, leading=13)
 
-    story = [Paragraph(_BRANDING.get("nom", ""), st_org)]
-    _org = [x for x in (_BRANDING.get("raison_sociale"), _BRANDING.get("complexe"),
-                        _BRANDING.get("adresse")) if x]
-    _tel = " · ".join(x for x in (_BRANDING.get("telephone1"), _BRANDING.get("telephone2")) if x)
+    # En-tête : uniquement l'identité réellement configurée pour ce tenant.
+    story = []
+    _nom = _branding_val("nom")
+    if _nom:
+        story.append(Paragraph(_nom, st_org))
+    _sous = [x for x in (_branding_val("raison_sociale"), _branding_val("complexe"),
+                         _branding_val("adresse")) if x]
+    _tel = " · ".join(x for x in (_branding_val("telephone1"), _branding_val("telephone2")) if x)
     if _tel:
-        _org.append("Tél : " + _tel)
-    for _l in _org:
+        _sous.append("Tél : " + _tel)
+    for _l in _sous:
         story.append(Paragraph(_l, st_orgs))
-    story.append(HRFlowable(width="100%", thickness=1.4, color=ACCENT, spaceBefore=8, spaceAfter=2))
+    story.append(HRFlowable(width="100%", thickness=1.4, color=ACCENT,
+                            spaceBefore=8 if (story) else 0, spaceAfter=4))
 
     statut_txt = "PAYÉE" if f.statut == "paye" else "À PAYER"
     story.append(Paragraph("FICHE DE PAIE", st_title))
@@ -4311,8 +4344,10 @@ def fiche_paie_pdf(fiche_id: int, db: Session = Depends(get_db)):
 
     story.append(Spacer(1, 22))
     story.append(HRFlowable(width="100%", thickness=0.4, color=colors.grey))
+    _foot_org = _branding_val("nom")
     story.append(Paragraph(
-        f"Fiche générée le {_dtnow.now(tz=_tzutc.utc).strftime('%d/%m/%Y %H:%M')} UTC — {_BRANDING.get('nom', '')}",
+        f"Fiche générée le {_dtnow.now(tz=_tzutc.utc).strftime('%d/%m/%Y %H:%M')} UTC"
+        + (f" — {_foot_org}" if _foot_org else ""),
         ParagraphStyle("foot", fontSize=7, textColor=colors.grey, alignment=TA_CENTER, spaceBefore=4)))
 
     doc.build(story)
