@@ -1641,6 +1641,21 @@ def assigner_pompiste(releve_id: int, data: ReleveAssignerPompisteIn, db: Sessio
     return _releve_dict(r)
 
 
+@app.get("/api/pompistes")
+def lister_pompistes(inclure_inactifs: bool = False, db: Session = Depends(get_db)):
+    """Employés dont le poste est « Pompiste » — alimente le filtre du
+    journal carburant et l'attribution d'un relevé. Même détection que
+    /api/releves/{id}/pompiste (poste comparé sans casse ni espaces)."""
+    q = db.query(Employe)
+    if not inclure_inactifs:
+        q = q.filter(Employe.actif.is_(True))
+    emps = [
+        e for e in q.order_by(Employe.nom, Employe.prenom).all()
+        if (e.poste or "").strip().lower() == "pompiste"
+    ]
+    return [{"id": e.id, "nom": f"{e.prenom} {e.nom}", "actif": e.actif} for e in emps]
+
+
 # ---------- Rapport / Dashboard ----------
 @app.get("/api/rapport")
 def rapport(date: date_type, db: Session = Depends(get_db)):
@@ -2082,6 +2097,7 @@ def _build_journal_entries(
     produit_id: Optional[int] = None,
     pompe_id_filter: Optional[List[int]] = None,
     periode_filter: Optional[str] = None,
+    pompiste_id_filter: Optional[int] = None,
 ) -> list:
     """
     Source unique de vérité pour la construction des entrées du journal.
@@ -2211,6 +2227,8 @@ def _build_journal_entries(
             "pompe_id":         pid,
             "pompe_nom":        r.pompe.nom,
             "produit_nom":      r.pompe.produit.nom,
+            "pompiste_id":      r.pompiste_id,
+            "pompiste_nom":     (f"{r.pompiste.prenom} {r.pompiste.nom}" if r.pompiste else None),
             "prix_gallon":      float(r.prix_gallon),
             "metter_avant":     av,
             "metter_apres":     ap,
@@ -2226,10 +2244,12 @@ def _build_journal_entries(
             "recommandation":   recommandation,
         })
 
-    # Post-filtre période : appliqué APRÈS l'analyse de continuité pour ne pas
+    # Post-filtres : appliqués APRÈS l'analyse de continuité pour ne pas
     # casser la chaîne Matin → Après-midi → Matin suivant.
     if periode_filter:
         entries = [e for e in entries if e["periode"] == periode_filter]
+    if pompiste_id_filter:
+        entries = [e for e in entries if e["pompiste_id"] == pompiste_id_filter]
 
     return entries
 
@@ -2241,6 +2261,7 @@ def journal_endpoint(
     produit_id: Optional[int] = None,
     pompe_id:   List[int] = Query(default=[]),
     periode:    Optional[str] = None,
+    pompiste_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     from datetime import date as dt
@@ -2248,7 +2269,7 @@ def journal_endpoint(
     d_fin   = date_fin   or today_haiti()
     d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
 
-    entries = _build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode)
+    entries = _build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode, pompiste_id)
 
     nb_alertes = sum(1 for e in entries if e["statut"] == "alerte")
     nb_erreurs = sum(1 for e in entries if e["statut"] == "erreur")
@@ -2285,6 +2306,7 @@ def journal_pdf(
     produit_id: Optional[int] = None,
     pompe_id:   List[int] = Query(default=[]),
     periode:    Optional[str] = None,
+    pompiste_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     import io
@@ -2302,7 +2324,7 @@ def journal_pdf(
     d_fin   = date_fin   or today_haiti()
     d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
 
-    entries    = _build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode)
+    entries    = _build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode, pompiste_id)
     nb_alertes = sum(1 for e in entries if e["statut"] == "alerte")
     nb_erreurs = sum(1 for e in entries if e["statut"] == "erreur")
     nb_ok      = len(entries) - nb_alertes - nb_erreurs
@@ -2506,6 +2528,7 @@ def export_releves_xlsx(
     produit_id: Optional[int] = None,
     pompe_id:   List[int] = Query(default=[]),
     periode:    Optional[str] = None,
+    pompiste_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     import io
@@ -2525,6 +2548,7 @@ def export_releves_xlsx(
     if produit_id:  q = q.filter(Pompe.produit_id == produit_id)
     if pompe_id:    q = q.filter(Releve.pompe_id.in_(pompe_id))
     if periode:     q = q.filter(Releve.periode == periode)
+    if pompiste_id: q = q.filter(Releve.pompiste_id == pompiste_id)
     releves = q.order_by(Releve.date.desc(), Releve.periode, Releve.pompe_id).all()
 
     # ── Styles helpers ─────────────────────────────────────────────────

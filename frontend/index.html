@@ -4004,6 +4004,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option value="Apres-midi">🌇 Après-midi</option>
             </select>
           </div>
+          <div class="filter-group">
+            <label class="filter-label">Pompiste</label>
+            <select id="jf-pompiste" class="filter-select" onchange="loadJournal()">
+              <option value="">Tous les pompistes</option>
+            </select>
+          </div>
           <div class="filter-spacer"></div>
           <button class="btn btn-primary db-btn-analyze" onclick="loadJournal()">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -14777,12 +14783,25 @@ function initJournal(){
   sp.innerHTML='<option value="">Tous les produits</option>'+
     products.map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
   updateJournalPompes();
+  _remplirFiltrePompistes();
 
   /* Quand le produit change → reconstruire la liste pompes ET recharger */
   sp.onchange=()=>{ updateJournalPompes(); loadJournal(); };
 
   /* Charger immédiatement les données à l'arrivée sur la page */
   loadJournal();
+}
+
+async function _remplirFiltrePompistes(){
+  const sel=document.getElementById('jf-pompiste');
+  if(!sel) return;
+  const cur=sel.value;
+  try{
+    const list=await GET('/pompistes');
+    sel.innerHTML='<option value="">Tous les pompistes</option>'+
+      (list||[]).map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
+    if(cur) sel.value=cur;
+  }catch(e){ /* liste vide : le filtre reste sur « Tous » */ }
 }
 
 function updateJournalPompes(){
@@ -14873,10 +14892,12 @@ async function loadJournal(){
   document.getElementById('btn-journal-xls').style.display='none';
 
   try{
+    const pompisteId=document.getElementById('jf-pompiste')?.value;
     let url=`/journal?date_debut=${debut}&date_fin=${fin}`;
     if(prodId)    url+=`&produit_id=${prodId}`;
     pompeIds.forEach(id=>{ url+=`&pompe_id=${id}`; });
     if(periodeId) url+=`&periode=${encodeURIComponent(periodeId)}`;
+    if(pompisteId) url+=`&pompiste_id=${pompisteId}`;
     const data=await GET(url);
     renderJournal(data);
     document.getElementById('btn-journal-pdf').style.display='';
@@ -14895,10 +14916,12 @@ function downloadJournalPdf(){
   const pompeIds=getCheckedPompes();
   const periodeId=document.getElementById('jf-periode').value;
   if(!debut||!fin){toast('Sélectionnez une plage de dates','err');return;}
+  const pompisteId=document.getElementById('jf-pompiste')?.value;
   let url=`/api/journal/pdf?date_debut=${debut}&date_fin=${fin}`;
   if(prodId)    url+=`&produit_id=${prodId}`;
   pompeIds.forEach(id=>{ url+=`&pompe_id=${id}`; });
   if(periodeId) url+=`&periode=${encodeURIComponent(periodeId)}`;
+  if(pompisteId) url+=`&pompiste_id=${pompisteId}`;
   window.location.href=url;
 }
 
@@ -14910,10 +14933,12 @@ function downloadJournalXls(){
   const pompeIds=getCheckedPompes();
   const periodeId=document.getElementById('jf-periode').value;
   if(!debut||!fin){toast('Sélectionnez une plage de dates','err');return;}
+  const pompisteId=document.getElementById('jf-pompiste')?.value;
   let url=`/api/releves/export?date_debut=${debut}&date_fin=${fin}`;
   if(prodId)    url+=`&produit_id=${prodId}`;
   pompeIds.forEach(id=>{ url+=`&pompe_id=${id}`; });
   if(periodeId) url+=`&periode=${encodeURIComponent(periodeId)}`;
+  if(pompisteId) url+=`&pompiste_id=${pompisteId}`;
   window.location.href=url;
 }
 
@@ -15089,6 +15114,7 @@ function renderJournal(data){
       <td class="num" style="white-space:nowrap">${frDate(e.date)}</td>
       <td style="font-size:13px">${e.periode==='Matin'?'🌅 Matin':'🌇 Après-midi'}</td>
       <td style="font-weight:600">${esc(e.pompe_nom)}</td>
+      <td style="font-size:13px">${e.pompiste_nom?esc(e.pompiste_nom):'<span class="c-dim">—</span>'}</td>
       <td class="tr num" style="color:var(--blue)">${e.metter_avant.toFixed(3)}</td>
       <td class="tr num" style="color:var(--blue2)">${e.metter_apres.toFixed(3)}</td>
       <td class="tr">${attStr}</td>
@@ -15112,6 +15138,7 @@ function renderJournal(data){
       <table class="dt">
         <thead><tr>
           <th>Date</th><th>Période</th><th style="min-width:90px">Pompe</th>
+          <th style="min-width:90px">Pompiste</th>
           <th class="tr">Meter avant</th><th class="tr">Meter après</th>
           <th class="tr">Attendu</th><th class="tr">Décalage</th>
           <th class="tr">Qté (gal)</th><th class="tr">Montant (G)</th>
@@ -15120,7 +15147,7 @@ function renderJournal(data){
         <tbody>${rows}</tbody>
         <tfoot>
           <tr style="background:var(--panel3);border-top:2px solid var(--border2)">
-            <td colspan="7" style="padding:10px 14px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">
+            <td colspan="8" style="padding:10px 14px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">
               Total filtré &mdash; ${entries.length} relevé${entries.length>1?'s':''}
             </td>
             <td class="tr num c-teal" style="padding:10px 14px;font-size:16px;font-weight:900">
