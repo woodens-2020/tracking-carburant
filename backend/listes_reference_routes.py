@@ -12,7 +12,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -46,10 +46,16 @@ class _MajIn(BaseModel):
 @router.get("/{cle}")
 def lister(cle: str, tous: bool = False, db: Session = Depends(get_db)):
     modele, _ = _resoudre(cle)
-    return [
-        {"id": e.id, "nom": e.nom, "actif": e.actif}
-        for e in lref.lister(db, modele, inclure_inactifs=tous)
-    ]
+    try:
+        return [
+            {"id": e.id, "nom": e.nom, "actif": e.actif}
+            for e in lref.lister(db, modele, inclure_inactifs=tous)
+        ]
+    except (ProgrammingError, OperationalError):
+        # Schéma pas encore réparé (colonne manquante) — on ne casse pas
+        # la page appelante : liste vide, elle se remplira au redémarrage.
+        db.rollback()
+        return []
 
 
 @router.post("/{cle}", status_code=201)

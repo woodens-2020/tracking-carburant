@@ -269,14 +269,36 @@ def startup():
         # Note de soumission de la caissière — distincte de notes_admin.
         "ALTER TABLE bar_sessions_caisse ADD COLUMN IF NOT EXISTS note_soumission VARCHAR(500)",
         "ALTER TABLE patisserie_sessions_caisse ADD COLUMN IF NOT EXISTS note_soumission VARCHAR(500)",
-        # Élargir les libellés des listes de référence (évite une troncature
-        # qui pouvait provoquer une collision d'unicité → erreur 500 à l'ajout).
-        "ALTER TABLE categories_depense ALTER COLUMN nom TYPE VARCHAR(120)",
-        "ALTER TABLE categories_depense ALTER COLUMN nom_norm TYPE VARCHAR(120)",
-        "ALTER TABLE categories_achat ALTER COLUMN nom TYPE VARCHAR(120)",
-        "ALTER TABLE categories_achat ALTER COLUMN nom_norm TYPE VARCHAR(120)",
-        "ALTER TABLE postes ALTER COLUMN nom TYPE VARCHAR(120)",
-        "ALTER TABLE postes ALTER COLUMN nom_norm TYPE VARCHAR(120)",
+        # ── Listes de référence : réparation de schéma ──────────────────
+        # Sur certaines bases, create_all a laissé ces tables incomplètes
+        # (colonne nom_norm absente → 500 sur toute lecture/écriture).
+        # On (re)crée la table si besoin, on ajoute chaque colonne
+        # manquante, on remplit nom_norm, puis on pose l'index d'unicité.
+        *[
+            _sql
+            for _tbl in ("categories_depense", "categories_achat", "postes")
+            for _sql in (
+                f"CREATE TABLE IF NOT EXISTS {_tbl} ("
+                f"  id SERIAL PRIMARY KEY,"
+                f"  nom VARCHAR(120) NOT NULL,"
+                f"  nom_norm VARCHAR(120),"
+                f"  actif BOOLEAN NOT NULL DEFAULT TRUE,"
+                f"  date_creation TIMESTAMPTZ NOT NULL DEFAULT now(),"
+                f"  cree_par_id INTEGER"
+                f")",
+                f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS nom VARCHAR(120)",
+                f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS nom_norm VARCHAR(120)",
+                f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS actif BOOLEAN NOT NULL DEFAULT TRUE",
+                f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS date_creation TIMESTAMPTZ NOT NULL DEFAULT now()",
+                f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS cree_par_id INTEGER",
+                f"ALTER TABLE {_tbl} ALTER COLUMN nom TYPE VARCHAR(120)",
+                f"ALTER TABLE {_tbl} ALTER COLUMN nom_norm TYPE VARCHAR(120)",
+                f"UPDATE {_tbl} SET nom_norm = lower(btrim(regexp_replace(nom, '\\s+', ' ', 'g'))) "
+                f"WHERE nom_norm IS NULL OR nom_norm = ''",
+                f"DELETE FROM {_tbl} a USING {_tbl} b WHERE a.nom_norm = b.nom_norm AND a.id > b.id",
+                f"CREATE UNIQUE INDEX IF NOT EXISTS uq_{_tbl}_nom_norm ON {_tbl} (nom_norm)",
+            )
+        ],
         # Colonnes qui STOCKENT une catégorie / un poste : mêmes 120 caractères
         # que la liste de référence, sinon un libellé long déborde à
         # l'enregistrement d'une dépense/achat/employé → erreur 500.

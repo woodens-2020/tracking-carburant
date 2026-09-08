@@ -15,7 +15,7 @@ import re
 from typing import Optional
 
 from fastapi import HTTPException, Request
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from models import CategorieDepense, CategorieAchat, Poste, Utilisateur  # noqa: F401 (ré-exportés)
@@ -83,7 +83,14 @@ def resoudre(db: Session, modele, valeur: Optional[str], *, request: Request,
     if not norm:
         return None
 
-    existante = db.query(modele).filter(modele.nom_norm == norm).first()
+    try:
+        existante = db.query(modele).filter(modele.nom_norm == norm).first()
+    except (ProgrammingError, OperationalError):
+        # Table de référence pas encore réparée (schéma incomplet) : on ne
+        # bloque pas l'enregistrement de la dépense/achat — on garde la
+        # valeur telle quelle, la liste se resynchronisera au redémarrage.
+        db.rollback()
+        return brut[:mx]
     if existante:
         return existante.nom
 
