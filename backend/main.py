@@ -4166,6 +4166,163 @@ def supprimer_fiche(fiche_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Fiche supprimée."}
 
+@app.get("/api/payroll/{fiche_id}/fiche.pdf")
+def fiche_paie_pdf(fiche_id: int, db: Session = Depends(get_db)):
+    """Fiche de paie imprimable : entête institution, infos employé, détail
+    du calcul, net à payer, reçu + espaces de signature (employé /
+    responsable). À faire signer avant de marquer la fiche « payée »."""
+    from datetime import datetime as _dtnow, timezone as _tzutc
+    f = db.query(FichePaie).filter(FichePaie.id == fiche_id).first()
+    if not f:
+        raise HTTPException(404, "Fiche introuvable.")
+    e = f.employe
+
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+    from reportlab.lib.enums import TA_CENTER
+
+    DARK   = colors.HexColor("#1A1A2E")
+    ACCENT = colors.HexColor("#E8893A")
+    GREY   = colors.HexColor("#6B7280")
+
+    def _g(v):
+        return f"{float(v):,.2f}".replace(",", " ") + " G"
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=1.9*cm, rightMargin=1.9*cm,
+                            topMargin=1.6*cm, bottomMargin=1.6*cm,
+                            title=f"Fiche de paie — {e.prenom} {e.nom}")
+
+    st_org   = ParagraphStyle("org",   fontSize=13, fontName="Helvetica-Bold", textColor=DARK, spaceAfter=1)
+    st_orgs  = ParagraphStyle("orgs",  fontSize=8.5, textColor=GREY, leading=11)
+    st_title = ParagraphStyle("title", fontSize=17, fontName="Helvetica-Bold", textColor=DARK,
+                              alignment=TA_CENTER, spaceBefore=10, spaceAfter=2)
+    st_sub   = ParagraphStyle("sub",   fontSize=9.5, textColor=GREY, alignment=TA_CENTER, spaceAfter=6)
+    st_sec   = ParagraphStyle("sec",   fontSize=10.5, fontName="Helvetica-Bold", textColor=ACCENT,
+                              spaceBefore=13, spaceAfter=5)
+    st_body  = ParagraphStyle("body",  fontSize=9.5, textColor=DARK, leading=13)
+
+    story = [Paragraph(_BRANDING.get("nom", ""), st_org)]
+    _org = [x for x in (_BRANDING.get("raison_sociale"), _BRANDING.get("complexe"),
+                        _BRANDING.get("adresse")) if x]
+    _tel = " · ".join(x for x in (_BRANDING.get("telephone1"), _BRANDING.get("telephone2")) if x)
+    if _tel:
+        _org.append("Tél : " + _tel)
+    for _l in _org:
+        story.append(Paragraph(_l, st_orgs))
+    story.append(HRFlowable(width="100%", thickness=1.4, color=ACCENT, spaceBefore=8, spaceAfter=2))
+
+    statut_txt = "PAYÉE" if f.statut == "paye" else "À PAYER"
+    story.append(Paragraph("FICHE DE PAIE", st_title))
+    story.append(Paragraph(
+        f"Période du {f.periode_debut.strftime('%d/%m/%Y')} au {f.periode_fin.strftime('%d/%m/%Y')}"
+        f" &nbsp;—&nbsp; N&deg; {f.id} &nbsp;—&nbsp; {statut_txt}", st_sub))
+
+    story.append(Paragraph("Employé", st_sec))
+    emp_rows = [
+        ["Nom complet",        f"{e.prenom} {e.nom}"],
+        ["Poste",              e.poste or "—"],
+        ["Type de contrat",    e.type_contrat or "—"],
+        ["Date d'embauche",    e.date_embauche.strftime("%d/%m/%Y") if e.date_embauche else "—"],
+        ["Téléphone",          e.telephone or "—"],
+        ["Référence employé",  f"#{e.id}"],
+    ]
+    t_emp = Table(emp_rows, colWidths=[4.6*cm, 12.6*cm])
+    t_emp.setStyle(TableStyle([
+        ("FONTSIZE",      (0, 0), (-1, -1), 9.5),
+        ("TEXTCOLOR",     (0, 0), (0, -1), GREY),
+        ("FONTNAME",      (1, 0), (1, -1), "Helvetica-Bold"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING",    (0, 0), (-1, -1), 4),
+        ("LINEBELOW",     (0, 0), (-1, -2), 0.3, colors.HexColor("#E5E7EB")),
+    ]))
+    story.append(t_emp)
+
+    story.append(Paragraph("Détail de la rémunération", st_sec))
+    hs_montant = float(f.heures_sup) * float(f.taux_hs)
+    calc_rows = [
+        ["Libellé", "Détail", "Montant"],
+        ["Salaire de base",        "", _g(f.salaire_base)],
+        ["Heures supplémentaires", f"{float(f.heures_sup):g} h x {_g(f.taux_hs)}", _g(hs_montant)],
+        ["Primes",                 "", _g(f.primes)],
+        ["Déductions",             "", "- " + _g(f.deductions)],
+    ]
+    t_calc = Table(calc_rows, colWidths=[5.8*cm, 7.4*cm, 4*cm])
+    t_calc.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, 0), DARK),
+        ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
+        ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE",      (0, 0), (-1, -1), 9.5),
+        ("ALIGN",         (2, 0), (2, -1), "RIGHT"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#F7F7F9"), colors.white]),
+        ("GRID",          (0, 0), (-1, -1), 0.4, colors.HexColor("#D5D5DD")),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+    ]))
+    story.append(t_calc)
+    story.append(Spacer(1, 5))
+
+    net_tbl = Table([["NET À PAYER", _g(f.net_a_payer)]], colWidths=[13.2*cm, 4*cm])
+    net_tbl.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), ACCENT),
+        ("TEXTCOLOR",     (0, 0), (-1, -1), colors.white),
+        ("FONTNAME",      (0, 0), (-1, -1), "Helvetica-Bold"),
+        ("FONTSIZE",      (0, 0), (-1, -1), 12),
+        ("ALIGN",         (1, 0), (1, 0), "RIGHT"),
+        ("LEFTPADDING",   (0, 0), (0, 0), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING",    (0, 0), (-1, -1), 9),
+    ]))
+    story.append(net_tbl)
+
+    if f.notes:
+        story.append(Paragraph("Notes", st_sec))
+        story.append(Paragraph(str(f.notes).replace("\n", "<br/>"), st_body))
+    if f.date_paiement:
+        story.append(Spacer(1, 6))
+        story.append(Paragraph(f"Payée le {f.date_paiement.strftime('%d/%m/%Y')}.", st_body))
+
+    story.append(Spacer(1, 24))
+    story.append(Paragraph(
+        f"Je soussigné(e) <b>{e.prenom} {e.nom}</b> reconnais avoir reçu la somme de "
+        f"<b>{_g(f.net_a_payer)}</b> au titre de la rémunération de la période ci-dessus.",
+        st_body))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph(
+        "Fait à ...................................................   le ......... / ......... / ..............",
+        st_body))
+    story.append(Spacer(1, 46))
+
+    sign = Table([
+        ["______________________________", "", "______________________________"],
+        ["Signature de l'employé", "", "Signature du responsable"],
+    ], colWidths=[7.3*cm, 2.6*cm, 7.3*cm])
+    sign.setStyle(TableStyle([
+        ("ALIGN",      (0, 0), (-1, -1), "CENTER"),
+        ("FONTSIZE",   (0, 0), (-1, -1), 9),
+        ("TEXTCOLOR",  (0, 1), (-1, 1), GREY),
+        ("TOPPADDING", (0, 1), (-1, 1), 3),
+    ]))
+    story.append(sign)
+
+    story.append(Spacer(1, 22))
+    story.append(HRFlowable(width="100%", thickness=0.4, color=colors.grey))
+    story.append(Paragraph(
+        f"Fiche générée le {_dtnow.now(tz=_tzutc.utc).strftime('%d/%m/%Y %H:%M')} UTC — {_BRANDING.get('nom', '')}",
+        ParagraphStyle("foot", fontSize=7, textColor=colors.grey, alignment=TA_CENTER, spaceBefore=4)))
+
+    doc.build(story)
+    buf.seek(0)
+    fname = f"fiche_paie_{e.nom}_{e.prenom}_{f.periode_debut}.pdf".replace(" ", "_")
+    return StreamingResponse(
+        buf, media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{fname}"'},
+    )
+
 @app.get("/api/payroll/stats")
 def stats_payroll(db: Session = Depends(get_db)):
     fiches = db.query(FichePaie).all()

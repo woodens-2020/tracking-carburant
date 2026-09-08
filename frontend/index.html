@@ -20205,6 +20205,10 @@ function renderPayTable(data){
           ${f.date_paiement?`<br><span class="td-muted">${f.date_paiement}</span>`:''}</td>
       <td>
         <div class="gi-actions">
+          <button class="gi-btn-icon" onclick="imprimerFichePaie(${f.id})" title="Fiche de paie à imprimer / faire signer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Fiche
+          </button>
           ${f.statut==='brouillon'?`
           <button class="gi-btn-icon success" onclick="marquerPayee(${f.id})">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><polyline points="20 6 9 17 4 12"/></svg>
@@ -20267,8 +20271,14 @@ async function submitPayroll(){
   if(!body.employe_id||!body.periode_debut||!body.periode_fin){ _giAlert('Veuillez remplir tous les champs obligatoires.'); return; }
   try {
     const d = await apiFetch('POST','/payroll',body);
-    closePayrollModal(); _empList=[]; loadPayroll(); _giAlert(`Fiche créée — Net : ${_htg(d.net_a_payer)}`,'ok');
+    closePayrollModal(); _empList=[]; loadPayroll();
+    _giAlert(`Fiche créée — Net : ${_htg(d.net_a_payer)}`,'ok');
+    if(d.id) imprimerFichePaie(d.id);   // ouvre la fiche à imprimer / faire signer
   } catch(e){ _giAlert(e.message||'Erreur réseau.'); }
+}
+
+function imprimerFichePaie(id){
+  window.open('/api/payroll/'+id+'/fiche.pdf', '_blank');
 }
 
 async function marquerPayee(id){
