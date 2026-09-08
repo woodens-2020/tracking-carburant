@@ -18,7 +18,7 @@ from fastapi import HTTPException, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from models import CategorieDepense, Poste, Utilisateur  # noqa: F401 (ré-exportés)
+from models import CategorieDepense, CategorieAchat, Poste, Utilisateur  # noqa: F401 (ré-exportés)
 
 _ESPACES = re.compile(r"\s+")
 

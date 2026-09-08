@@ -518,6 +518,23 @@ class CategorieDepense(Base):
     )
 
 
+class CategorieAchat(Base):
+    """Catégorie d'achat, commune aux modules concernés (achats général,
+    achats cuisine). Séparée des catégories de dépense."""
+    __tablename__ = "categories_achat"
+
+    id            = Column(Integer, primary_key=True)
+    nom           = Column(String(50), nullable=False)
+    nom_norm      = Column(String(50), nullable=False, unique=True)
+    actif         = Column(Boolean, nullable=False, default=True)
+    date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    cree_par_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    __table_args__ = (
+        Index("idx_categories_achat_actif", "actif"),
+    )
+
+
 class Poste(Base):
     """Intitulé de poste des employés (module Employés principal)."""
     __tablename__ = "postes"

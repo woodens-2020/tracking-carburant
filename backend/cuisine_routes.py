@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import CuisinePlat, CuisineDepense, CuisineVente, CuisineLigneVente, CuisineAchat, RenflouementDepartement, Utilisateur, CategorieDepense
+from models import CuisinePlat, CuisineDepense, CuisineVente, CuisineLigneVente, CuisineAchat, RenflouementDepartement, Utilisateur, CategorieDepense, CategorieAchat
 import listes_reference as lref
 
 router = APIRouter(prefix="/api/cuisine", tags=["Cuisine"])
@@ -561,6 +561,7 @@ def liste_achats(
     plat_id:    Optional[int]       = Query(default=None),
     date_debut: Optional[date_type] = Query(default=None),
     date_fin:   Optional[date_type] = Query(default=None),
+    categorie:  Optional[str]       = Query(default=None),
     db: Session = Depends(get_db),
 ):
     today = today_haiti()
@@ -575,6 +576,8 @@ def liste_achats(
     )
     if plat_id:
         q = q.filter(CuisineAchat.plat_id == plat_id)
+    if categorie:
+        q = q.filter(CuisineAchat.categorie == categorie)
     achats = q.order_by(CuisineAchat.date_achat.desc()).all()
 
     total = sum(float(_dec(a.total)) for a in achats)
@@ -630,10 +633,12 @@ def creer_achat(data: dict, request: Request, db: Session = Depends(get_db)):
     date_achat = _parse_date_saisie(data.get("date_achat")) or datetime.now(timezone.utc)
     _verifier_permission_date(request, db, date_achat)
 
+    categorie = lref.resoudre(db, CategorieAchat, data.get("categorie"),
+                              request=request, defaut="INGREDIENTS", label="catégorie d'achat")
     a = CuisineAchat(
         plat_id       = data.get("plat_id") or None,
         description   = desc,
-        categorie     = data.get("categorie") or "INGREDIENTS",
+        categorie     = categorie,
         quantite      = Decimal(str(qte)),
         unite         = (data.get("unite") or "kg").strip() or "kg",
         cout_unitaire = Decimal(str(cout)),
@@ -657,7 +662,9 @@ def modifier_achat(achat_id: int, data: dict, request: Request, db: Session = De
 
     if "description"   in data and data["description"]:
         a.description   = data["description"].strip()
-    if "categorie"     in data: a.categorie     = data["categorie"] or "INGREDIENTS"
+    if "categorie"     in data:
+        a.categorie = lref.resoudre(db, CategorieAchat, data.get("categorie"),
+                                    request=request, defaut="INGREDIENTS", label="catégorie d'achat")
     if "plat_id"       in data: a.plat_id       = data["plat_id"] or None
     if "fournisseur"   in data: a.fournisseur   = (data["fournisseur"] or "").strip() or None
     if "notes"         in data: a.notes         = (data["notes"] or "").strip() or None

@@ -15,13 +15,14 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import CategorieDepense, Poste
+from models import CategorieDepense, CategorieAchat, Poste
 import listes_reference as lref
 
 router = APIRouter(prefix="/api/listes", tags=["Listes de référence"])
 
 _LISTES = {
     "categories-depense": (CategorieDepense, "catégorie de dépense"),
+    "categories-achat":   (CategorieAchat,   "catégorie d'achat"),
     "postes":             (Poste,            "poste"),
 }
 

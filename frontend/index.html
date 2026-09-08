@@ -94,7 +94,14 @@ button:disabled,input:disabled,select:disabled{opacity:.5;cursor:not-allowed;poi
 input,select,textarea{font-family:var(--font)}
 h1,h2,h3,h4,.sb-name,.main-title,.nav-card h3,.card-title,.page-heading h1{font-family:var(--font);font-weight:700}
 input[type=number]::-webkit-inner-spin-button{opacity:.3}
-input[type=date]{color-scheme:dark}
+input[type=date],input[type=datetime-local],input[type=month],input[type=time]{color-scheme:dark}
+/* ── Menus déroulants : fond sombre cohérent (liste d'options native) ── */
+select,input[list]{color-scheme:dark}
+select option,select optgroup,datalist option{
+  background-color:var(--panel2);
+  color:var(--text);
+}
+select option:checked,select option:hover{background-color:var(--panel3)}
 
 /* ── Sidebar ─────────────────────────────────── */
 /* ═══════ SIDEBAR ════════════════════════════════ */
@@ -2973,6 +2980,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
 <!-- Listes de référence partagées (suggestions de saisie) -->
 <datalist id="dl-categories-depense"></datalist>
+<datalist id="dl-categories-achat"></datalist>
 <datalist id="dl-postes"></datalist>
 
 <div id="load-overlay"><div class="lo-badge"><div class="lo-ring"></div><span class="lo-k">K</span></div></div>
@@ -5867,8 +5875,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <label class="gi-filter-lbl">Catégorie</label>
             <select class="gi-filter-input" id="ach-filtre-cat" onchange="loadAchats()">
               <option value="">Toutes</option>
-              <option value="Equipement">Équipement</option><option value="Pieces detachees">Pièces détachées</option><option>Fournitures bureau</option>
-              <option>Informatique</option><option value="Securite">Sécurité</option><option>Nettoyage</option><option>Autre</option>
             </select>
           </div>
         </div>
@@ -5898,11 +5904,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               </div>
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Catégorie *</label>
-                <select class="gi-form-select" id="ach-cat">
-                  <option value="">— Sélectionner —</option>
-                  <option value="Equipement">Équipement</option><option value="Pieces detachees">Pièces détachées</option><option>Fournitures bureau</option>
-                  <option>Informatique</option><option value="Securite">Sécurité</option><option>Nettoyage</option><option>Autre</option>
-                </select>
+                <div style="display:flex;gap:6px;align-items:stretch">
+                  <input class="gi-form-input" id="ach-cat" list="dl-categories-achat" autocomplete="off"
+                         style="flex:1" placeholder="Ex : Équipement, Informatique…"/>
+                  <button type="button" class="gi-btn-secondary" title="Ajouter cette catégorie d'achat"
+                          style="padding:0 12px;font-size:18px;line-height:1"
+                          onclick="_ajoutRapideRef('categories-achat','ach-cat','ach-filtre-cat','Toutes')">+</button>
+                </div>
               </div>
             </div>
             <div class="gi-form-row full">
@@ -9393,6 +9401,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <select class="pos-select" id="ckac-filtre-plat" style="min-width:160px">
             <option value="">Tous les plats</option>
           </select>
+          <select class="pos-select" id="ckac-filtre-cat" style="min-width:150px" onchange="ckAchatsCharger()">
+            <option value="">Toutes catégories</option>
+          </select>
           <input class="pos-input" id="ckac-recherche" type="text" placeholder="Rechercher : description, fournisseur, plat…" style="flex:1;min-width:200px" oninput="ckAchatsAppliquerRecherche()">
           <button class="pos-btn teal" onclick="ckAchatsCharger()">Actualiser</button>
         </div>
@@ -9469,14 +9480,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
             <div>
               <label class="pos-label">Catégorie</label>
-              <select class="pos-select" id="ckac-categorie">
-                <option value="INGREDIENTS">Ingrédients</option>
-                <option value="EPICES">Épices / Condiments</option>
-                <option value="EMBALLAGE">Emballage</option>
-                <option value="GAZ">Gaz / Énergie</option>
-                <option value="EQUIPEMENT">Équipement</option>
-                <option value="AUTRE">Autre</option>
-              </select>
+              <div style="display:flex;gap:6px;align-items:stretch">
+                <input class="pos-input" id="ckac-categorie" list="dl-categories-achat" autocomplete="off"
+                       style="flex:1" placeholder="Catégorie">
+                <button type="button" class="pos-btn ghost" title="Ajouter cette catégorie d'achat"
+                        style="padding:0 12px;font-size:18px;line-height:1"
+                        onclick="_ajoutRapideRef('categories-achat','ckac-categorie','ckac-filtre-cat','Toutes catégories')">+</button>
+              </div>
             </div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
@@ -11813,7 +11823,7 @@ const DEL   = p    => apiFetch('DELETE',p);
 //   - l'ajout d'une nouvelle valeur est fait côté serveur au moment de
 //     l'enregistrement (réservé manager/admin) — rien de spécial ici.
 // ══════════════════════════════════════════════
-const _listesRef = { 'categories-depense': [], 'postes': [] };
+const _listesRef = { 'categories-depense': [], 'categories-achat': [], 'postes': [] };
 
 async function _chargerListeRef(cle, force){
   if(!force && _listesRef[cle] && _listesRef[cle].length) { _syncDatalistRef(cle); return _listesRef[cle]; }
@@ -20372,6 +20382,8 @@ let _achData = [];
 
 async function loadAchats(){
   _giLoading('ach-table-wrap');
+  await _chargerListeRef('categories-achat');
+  _remplirFiltreRef('ach-filtre-cat', 'categories-achat', 'Toutes');
   const deb = document.getElementById('ach-filtre-debut')?.value ?? '';
   const fin = document.getElementById('ach-filtre-fin')?.value ?? '';
   const cat = document.getElementById('ach-filtre-cat')?.value ?? '';
@@ -29757,14 +29769,18 @@ function _ckAchatsRemplirSelects(){
 }
 
 async function ckAchatsCharger(){
+  await _chargerListeRef('categories-achat');
+  _remplirFiltreRef('ckac-filtre-cat', 'categories-achat', 'Toutes catégories');
   const deb = document.getElementById('ckac-debut')?.value;
   const fin = document.getElementById('ckac-fin')?.value;
   const plat = document.getElementById('ckac-filtre-plat')?.value;
+  const cat = document.getElementById('ckac-filtre-cat')?.value;
   let url = '/cuisine/achats';
   const params = [];
   if(deb) params.push(`date_debut=${deb}`);
   if(fin) params.push(`date_fin=${fin}`);
   if(plat) params.push(`plat_id=${plat}`);
+  if(cat) params.push(`categorie=${encodeURIComponent(cat)}`);
   if(params.length) url += '?' + params.join('&');
 
   const tbody = document.getElementById('ckac-tbody');
@@ -29935,7 +29951,7 @@ function ckAchatsBilanContinuer(){
   document.getElementById('ckac-edit-id').value = '';
   document.getElementById('ckac-desc').value = '';
   document.getElementById('ckac-plat-id').value = '';
-  document.getElementById('ckac-categorie').value = 'INGREDIENTS';
+  document.getElementById('ckac-categorie').value = '';
   document.getElementById('ckac-qte').value = '';
   document.getElementById('ckac-unite').value = 'kg';
   document.getElementById('ckac-cout').value = '';

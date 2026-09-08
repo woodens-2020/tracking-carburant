@@ -20,7 +20,7 @@ except ImportError:
 
 from models import (
     Base, Produit, Pompe, Utilisateur, Employe, FichePaie, Depense, Achat, ParametreDepense,
-    CategorieDepense, Poste,  # noqa: F401 — listes de référence partagées (create_all)
+    CategorieDepense, CategorieAchat, Poste,  # noqa: F401 — listes de référence partagées (create_all)
     BarProduit, BarPrixHistorique, BarAchat, BarMouvementStock,
     BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande, BarPaiementEmploye,

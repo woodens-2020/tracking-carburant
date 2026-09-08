@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
-from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse, OAuthState, CategorieDepense, Poste
+from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse, OAuthState, CategorieDepense, CategorieAchat, Poste
 import listes_reference as lref
 from otp_service import (
     OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
@@ -244,9 +244,11 @@ def startup():
         "ALTER TABLE zelle_transactions ADD COLUMN IF NOT EXISTS expediteur_contact VARCHAR(100)",
         "ALTER TABLE login_security_events ADD COLUMN IF NOT EXISTS distance_km FLOAT",
         "ALTER TABLE login_security_events ADD COLUMN IF NOT EXISTS statut_geoloc VARCHAR(20)",
-        # Catégories de dépense désormais gérées en table (categories_depense) :
-        # on lève l'ancienne liste figée pour permettre l'ajout à la volée.
+        # Catégories de dépense / d'achat désormais gérées en table
+        # (categories_depense / categories_achat) : on lève les anciennes
+        # listes figées pour permettre l'ajout à la volée.
         "ALTER TABLE depenses DROP CONSTRAINT IF EXISTS chk_depense_categorie",
+        "ALTER TABLE achats DROP CONSTRAINT IF EXISTS chk_achat_categorie",
     ]
     try:
         with engine.connect() as _c:
@@ -318,6 +320,15 @@ def startup():
             ]
             _postes_sources = ["SELECT DISTINCT poste FROM employes"]
 
+            _achats_defaut = sorted(_CATEGORIES_ACHAT) + [
+                # anciens codes figés du module cuisine (achats)
+                "AUTRE", "INGREDIENTS", "EPICES", "EMBALLAGE", "GAZ", "EQUIPEMENT",
+            ]
+            _achats_sources = [
+                "SELECT DISTINCT categorie FROM achats",
+                "SELECT DISTINCT categorie FROM cuisine_achats",
+            ]
+
             def _seed_liste(_modele, _defauts, _sources):
                 _mx = lref._maxlen(_modele)
                 _vus = {row.nom_norm for row in _db.query(_modele).all()}
@@ -339,6 +350,7 @@ def startup():
                 _db.commit()
 
             _seed_liste(CategorieDepense, _cats_defaut, _cats_sources)
+            _seed_liste(CategorieAchat, _achats_defaut, _achats_sources)
             _seed_liste(Poste, _postes_defaut, _postes_sources)
         except Exception:
             _db.rollback()
@@ -4834,9 +4846,10 @@ def lister_achats(
     }
 
 @app.post("/api/achats", status_code=201)
-def creer_achat(data: AchatIn, db: Session = Depends(get_db)):
-    if data.categorie not in _CATEGORIES_ACHAT:
-        raise HTTPException(400, f"Catégorie invalide. Valeurs : {sorted(_CATEGORIES_ACHAT)}")
+def creer_achat(data: AchatIn, request: Request, db: Session = Depends(get_db)):
+    if not (data.categorie or "").strip():
+        raise HTTPException(400, "La catégorie est requise.")
+    categorie = lref.resoudre(db, CategorieAchat, data.categorie, request=request, label="catégorie d'achat")
     if data.montant <= 0:
         raise HTTPException(400, "Le montant doit être > 0.")
     try:
@@ -4846,7 +4859,7 @@ def creer_achat(data: AchatIn, db: Session = Depends(get_db)):
         raise HTTPException(400, "Format de date invalide.")
     a = Achat(
         fournisseur=data.fournisseur.strip(), description=data.description.strip(),
-        categorie=data.categorie, montant=data.montant,
+        categorie=categorie, montant=data.montant,
         date_achat=date_a, reference=data.reference, notes=data.notes,
     )
     db.add(a)
@@ -4867,14 +4880,12 @@ def creer_achat(data: AchatIn, db: Session = Depends(get_db)):
     return {"id": a.id, "message": "Achat enregistré."}
 
 @app.put("/api/achats/{achat_id}")
-def modifier_achat(achat_id: int, data: AchatPatch, db: Session = Depends(get_db)):
+def modifier_achat(achat_id: int, data: AchatPatch, request: Request, db: Session = Depends(get_db)):
     a = db.query(Achat).filter(Achat.id == achat_id).first()
     if not a:
         raise HTTPException(404, "Achat introuvable.")
     if data.categorie is not None:
-        if data.categorie not in _CATEGORIES_ACHAT:
-            raise HTTPException(400, "Catégorie invalide.")
-        a.categorie = data.categorie
+        a.categorie = lref.resoudre(db, CategorieAchat, data.categorie, request=request, label="catégorie d'achat")
     if data.fournisseur is not None: a.fournisseur = data.fournisseur.strip()
     if data.description is not None: a.description = data.description.strip()
     if data.montant is not None:
