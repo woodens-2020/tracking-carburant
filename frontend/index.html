@@ -5781,7 +5781,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               </div>
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Bénéficiaire</label>
-                <input class="gi-form-input" id="dep-benef" placeholder="Ex : EDH, fournisseur…"/>
+                <div style="display:flex;gap:6px;align-items:stretch">
+                  <select class="gi-form-select" id="dep-benef" style="flex:1"><option value="">— Aucun —</option></select>
+                  <button type="button" class="gi-btn-secondary" title="Ajouter un bénéficiaire"
+                          style="padding:0 12px;font-size:18px;line-height:1"
+                          onclick="_ajoutRapideRef('beneficiaires','dep-benef')">+</button>
+                </div>
               </div>
             </div>
             <div class="gi-form-row">
@@ -11844,7 +11849,7 @@ const DEL   = p    => apiFetch('DELETE',p);
 //   - l'ajout d'une nouvelle valeur est fait côté serveur au moment de
 //     l'enregistrement (réservé manager/admin) — rien de spécial ici.
 // ══════════════════════════════════════════════
-const _listesRef = { 'categories-depense': [], 'categories-achat': [], 'postes': [] };
+const _listesRef = { 'categories-depense': [], 'categories-achat': [], 'postes': [], 'beneficiaires': [] };
 
 async function _chargerListeRef(cle, force){
   if(!force && _listesRef[cle] && _listesRef[cle].length) { _syncDatalistRef(cle); return _listesRef[cle]; }
@@ -11890,6 +11895,7 @@ async function _ajoutRapideRef(cle, champId, filtreSelId, filtreLabel){
   let nom = (!estSelect && champ && champ.value || '').trim();
   if(!nom){
     const libelle = cle === 'postes' ? 'Nouveau poste :'
+                  : cle === 'beneficiaires' ? 'Nouveau bénéficiaire :'
                   : cle === 'categories-achat' ? "Nouvelle catégorie d'achat :"
                   : 'Nouvelle catégorie de dépense :';
     nom = (window.prompt(libelle) || '').trim();
@@ -20180,6 +20186,8 @@ async function loadDepenses(){
   await _chargerListeRef('categories-depense');
   _remplirFiltreRef('dep-filtre-cat', 'categories-depense', 'Toutes');
   _remplirSelectRef('dep-cat', 'categories-depense');
+  await _chargerListeRef('beneficiaires');
+  _remplirSelectRef('dep-benef', 'beneficiaires', '— Aucun —');
 
   // Affichage du bouton PDG et chargement de la limite en parallèle
   if(_appUser?.role === 'pdg'){
@@ -20402,7 +20410,7 @@ function openDepModal(id=null){
       document.getElementById('dep-caisse').value  =d.produit_id||'';
       document.getElementById('dep-desc').value    =d.description;
       document.getElementById('dep-montant').value =d.montant;
-      document.getElementById('dep-benef').value   =d.beneficiaire||'';
+      _remplirSelectRef('dep-benef', 'beneficiaires', '— Aucun —', d.beneficiaire||'');
       document.getElementById('dep-ref').value     =d.reference||'';
       document.getElementById('dep-notes').value   =d.notes||'';
     }

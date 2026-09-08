@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
-from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse, OAuthState, CategorieDepense, CategorieAchat, Poste
+from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse, OAuthState, CategorieDepense, CategorieAchat, Poste, Beneficiaire
 import listes_reference as lref
 from otp_service import (
     OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
@@ -276,23 +276,24 @@ def startup():
         # manquante, on remplit nom_norm, puis on pose l'index d'unicité.
         *[
             _sql
-            for _tbl in ("categories_depense", "categories_achat", "postes")
+            for _tbl, _len in (("categories_depense", 120), ("categories_achat", 120),
+                               ("postes", 120), ("beneficiaires", 150))
             for _sql in (
                 f"CREATE TABLE IF NOT EXISTS {_tbl} ("
                 f"  id SERIAL PRIMARY KEY,"
-                f"  nom VARCHAR(120) NOT NULL,"
-                f"  nom_norm VARCHAR(120),"
+                f"  nom VARCHAR({_len}) NOT NULL,"
+                f"  nom_norm VARCHAR({_len}),"
                 f"  actif BOOLEAN NOT NULL DEFAULT TRUE,"
                 f"  date_creation TIMESTAMPTZ NOT NULL DEFAULT now(),"
                 f"  cree_par_id INTEGER"
                 f")",
-                f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS nom VARCHAR(120)",
-                f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS nom_norm VARCHAR(120)",
+                f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS nom VARCHAR({_len})",
+                f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS nom_norm VARCHAR({_len})",
                 f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS actif BOOLEAN NOT NULL DEFAULT TRUE",
                 f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS date_creation TIMESTAMPTZ NOT NULL DEFAULT now()",
                 f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS cree_par_id INTEGER",
-                f"ALTER TABLE {_tbl} ALTER COLUMN nom TYPE VARCHAR(120)",
-                f"ALTER TABLE {_tbl} ALTER COLUMN nom_norm TYPE VARCHAR(120)",
+                f"ALTER TABLE {_tbl} ALTER COLUMN nom TYPE VARCHAR({_len})",
+                f"ALTER TABLE {_tbl} ALTER COLUMN nom_norm TYPE VARCHAR({_len})",
                 f"UPDATE {_tbl} SET nom_norm = lower(btrim(regexp_replace(nom, '\\s+', ' ', 'g'))) "
                 f"WHERE nom_norm IS NULL OR nom_norm = ''",
                 f"DELETE FROM {_tbl} a USING {_tbl} b WHERE a.nom_norm = b.nom_norm AND a.id > b.id",
@@ -416,6 +417,10 @@ def startup():
             _seed_liste(CategorieDepense, _cats_defaut, _cats_sources)
             _seed_liste(CategorieAchat, _achats_defaut, _achats_sources)
             _seed_liste(Poste, _postes_defaut, _postes_sources)
+            _seed_liste(Beneficiaire, [], [
+                "SELECT DISTINCT beneficiaire FROM depenses "
+                "WHERE beneficiaire IS NOT NULL AND btrim(beneficiaire) <> ''",
+            ])
         except Exception:
             _db.rollback()
 
@@ -4344,6 +4349,7 @@ def creer_depense(data: DepenseIn, request: Request, db: Session = Depends(get_d
     if not (data.categorie or "").strip():
         raise HTTPException(400, "La catégorie est requise.")
     categorie = lref.resoudre(db, CategorieDepense, data.categorie, request=request, label="catégorie")
+    beneficiaire = lref.resoudre(db, Beneficiaire, data.beneficiaire, request=request, label="bénéficiaire")
     if data.montant <= 0:
         raise HTTPException(400, "Le montant doit être > 0.")
     try:
@@ -4360,7 +4366,7 @@ def creer_depense(data: DepenseIn, request: Request, db: Session = Depends(get_d
     d = Depense(
         categorie=categorie, description=data.description.strip(),
         montant=data.montant, date_depense=date_d,
-        beneficiaire=data.beneficiaire, reference=data.reference, notes=data.notes,
+        beneficiaire=beneficiaire, reference=data.reference, notes=data.notes,
         produit_id=produit.id if produit else None,
     )
     db.add(d)
@@ -4400,7 +4406,8 @@ def modifier_depense(depense_id: int, data: DepensePatch, request: Request, db: 
             d.date_depense = _date.fromisoformat(data.date_depense)
         except ValueError:
             raise HTTPException(400, "Format de date invalide.")
-    if data.beneficiaire is not None: d.beneficiaire = data.beneficiaire
+    if data.beneficiaire is not None:
+        d.beneficiaire = lref.resoudre(db, Beneficiaire, data.beneficiaire, request=request, label="bénéficiaire")
     if data.reference    is not None: d.reference    = data.reference
     if data.notes        is not None: d.notes        = data.notes
     if data.caisse_generale:

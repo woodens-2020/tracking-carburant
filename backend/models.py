@@ -544,6 +544,23 @@ class Poste(Base):
     )
 
 
+class Beneficiaire(Base):
+    """Bénéficiaire d'une dépense (à qui l'argent a été versé) — liste gérée,
+    ajoutable à la volée depuis le formulaire de dépense."""
+    __tablename__ = "beneficiaires"
+
+    id            = Column(Integer, primary_key=True)
+    nom           = Column(String(150), nullable=False)
+    nom_norm      = Column(String(150), nullable=False, unique=True)
+    actif         = Column(Boolean, nullable=False, default=True)
+    date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    cree_par_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    __table_args__ = (
+        Index("idx_beneficiaires_actif", "actif"),
+    )
+
+
 # ══════════════════════════════════════════════════════════════════
 # MODULE BAR / RESTAURANT — POS (Point of Sale)
 # ══════════════════════════════════════════════════════════════════
