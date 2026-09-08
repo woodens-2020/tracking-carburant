@@ -4297,10 +4297,11 @@ class DepensePatch(BaseModel):
 
 @app.get("/api/depenses")
 def lister_depenses(
-    date_debut: Optional[str] = None,
-    date_fin:   Optional[str] = None,
-    categorie:  Optional[str] = None,
-    produit_id: Optional[int] = None,
+    date_debut:  Optional[str] = None,
+    date_fin:    Optional[str] = None,
+    categorie:   Optional[str] = None,
+    beneficiaire: Optional[str] = None,
+    produit_id:  Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     q = db.query(Depense)
@@ -4318,6 +4319,8 @@ def lister_depenses(
             raise HTTPException(400, "date_fin invalide.")
     if categorie:
         q = q.filter(Depense.categorie == categorie)
+    if beneficiaire:
+        q = q.filter(Depense.beneficiaire == beneficiaire)
     if produit_id:
         q = q.filter(Depense.produit_id == produit_id)
     depenses = q.order_by(Depense.date_depense.desc()).all()
@@ -4473,7 +4476,7 @@ def stats_depenses(
 # EXPORTS DÉPENSES — PDF + XLSX
 # ══════════════════════════════════════════════════════════════════
 
-def _query_depenses_filtrees(db, date_debut, date_fin, categorie):
+def _query_depenses_filtrees(db, date_debut, date_fin, categorie, beneficiaire=None):
     """Requête dépenses avec filtres optionnels, triées par date desc."""
     from datetime import date as _date
     q = db.query(Depense)
@@ -4485,14 +4488,17 @@ def _query_depenses_filtrees(db, date_debut, date_fin, categorie):
         except ValueError: pass
     if categorie:
         q = q.filter(Depense.categorie == categorie)
+    if beneficiaire:
+        q = q.filter(Depense.beneficiaire == beneficiaire)
     return q.order_by(Depense.date_depense.desc()).all()
 
 
 @app.get("/api/depenses/export/xlsx")
 def export_depenses_xlsx(
-    date_debut: Optional[str] = None,
-    date_fin:   Optional[str] = None,
-    categorie:  Optional[str] = None,
+    date_debut:  Optional[str] = None,
+    date_fin:    Optional[str] = None,
+    categorie:   Optional[str] = None,
+    beneficiaire: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """Export Excel des dépenses avec feuille détail + feuille récapitulatif par catégorie."""
@@ -4503,7 +4509,7 @@ def export_depenses_xlsx(
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, numbers
     from openpyxl.utils import get_column_letter
 
-    depenses = _query_depenses_filtrees(db, date_debut, date_fin, categorie)
+    depenses = _query_depenses_filtrees(db, date_debut, date_fin, categorie, beneficiaire)
 
     # ── Styles ──────────────────────────────────────────────────
     def _fill(hex_c):
@@ -4675,9 +4681,10 @@ def export_depenses_xlsx(
 
 @app.get("/api/depenses/export/pdf")
 def export_depenses_pdf(
-    date_debut: Optional[str] = None,
-    date_fin:   Optional[str] = None,
-    categorie:  Optional[str] = None,
+    date_debut:  Optional[str] = None,
+    date_fin:    Optional[str] = None,
+    categorie:   Optional[str] = None,
+    beneficiaire: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """Export PDF des dépenses : entête, tableau détaillé, récapitulatif par catégorie."""
@@ -4691,7 +4698,7 @@ def export_depenses_pdf(
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
-    depenses = _query_depenses_filtrees(db, date_debut, date_fin, categorie)
+    depenses = _query_depenses_filtrees(db, date_debut, date_fin, categorie, beneficiaire)
 
     # ── Palette ────────────────────────────────────────────────
     C_RED    = colors.HexColor("#DC2626")

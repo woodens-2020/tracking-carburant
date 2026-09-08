@@ -5714,6 +5714,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </select>
           </div>
           <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Bénéficiaire</label>
+            <select class="gi-filter-input" id="dep-filtre-benef" onchange="loadDepenses()">
+              <option value="">Tous</option>
+            </select>
+          </div>
+          <div class="gi-filter-field">
             <label class="gi-filter-lbl">Caisse</label>
             <select class="gi-filter-input" id="dep-filtre-caisse" onchange="loadDepenses()">
               <option value="">Toutes</option>
@@ -20188,6 +20194,7 @@ async function loadDepenses(){
   _remplirSelectRef('dep-cat', 'categories-depense');
   await _chargerListeRef('beneficiaires');
   _remplirSelectRef('dep-benef', 'beneficiaires', '— Aucun —');
+  _remplirFiltreRef('dep-filtre-benef', 'beneficiaires', 'Tous');
 
   // Affichage du bouton PDG et chargement de la limite en parallèle
   if(_appUser?.role === 'pdg'){
@@ -20198,11 +20205,13 @@ async function loadDepenses(){
   const deb    = document.getElementById('dep-filtre-debut')?.value ?? '';
   const fin    = document.getElementById('dep-filtre-fin')?.value ?? '';
   const cat    = document.getElementById('dep-filtre-cat')?.value ?? '';
+  const benef  = document.getElementById('dep-filtre-benef')?.value ?? '';
   const caisse = document.getElementById('dep-filtre-caisse')?.value ?? '';
   const params=[];
   if(deb) params.push('date_debut='+deb);
   if(fin) params.push('date_fin='+fin);
   if(cat) params.push('categorie='+encodeURIComponent(cat));
+  if(benef) params.push('beneficiaire='+encodeURIComponent(benef));
   if(caisse) params.push('produit_id='+caisse);
   const qs=params.length?'?'+params.join('&'):'';
 
@@ -20315,10 +20324,12 @@ function exportDepenses(fmt){
   const deb = document.getElementById('dep-filtre-debut')?.value ?? '';
   const fin = document.getElementById('dep-filtre-fin')?.value   ?? '';
   const cat = document.getElementById('dep-filtre-cat')?.value   ?? '';
+  const benef = document.getElementById('dep-filtre-benef')?.value ?? '';
   const params = [];
   if(deb) params.push('date_debut='+deb);
   if(fin) params.push('date_fin='+fin);
   if(cat) params.push('categorie='+encodeURIComponent(cat));
+  if(benef) params.push('beneficiaire='+encodeURIComponent(benef));
   const qs = params.length ? '?'+params.join('&') : '';
   const a = document.createElement('a');
   a.href = '/api/depenses/export/'+fmt+qs;
