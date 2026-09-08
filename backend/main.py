@@ -5483,7 +5483,7 @@ def rapport_caisse(
 
     prod_map = {}
     for r in releves:
-        nom = r.pompe.produit.nom
+        nom = r.pompe.produit.nom if (r.pompe and r.pompe.produit) else "Inconnu"
         e = prod_map.setdefault(nom, {"gallons": 0.0, "montant": 0.0})
         e["gallons"]  += float(r.quantite)
         e["montant"]  += float(r.montant_vente)
@@ -5586,7 +5586,7 @@ def gi_dashboard(
     # Ventes par produit
     prod_map: dict = {}
     for r in releves:
-        nom = r.pompe.produit.nom
+        nom = r.pompe.produit.nom if (r.pompe and r.pompe.produit) else "Inconnu"
         e = prod_map.setdefault(nom, {"gallons": 0.0, "montant": 0.0})
         e["gallons"]  += float(r.quantite)
         e["montant"]  += float(r.montant_vente)
