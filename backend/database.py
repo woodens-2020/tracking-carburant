@@ -24,7 +24,7 @@ from models import (
     BarProduit, BarPrixHistorique, BarAchat, BarMouvementStock,
     BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande, BarPaiementEmploye,
-    HotelChambre, HotelEmploye, HotelReservation,
+    HotelChambre, HotelEmploye, HotelReservation, HotelRapportNote,  # noqa: F401
     LoginSecurityEvent,  # noqa: F401 — nécessaire pour create_all
     BarSessionEvaluation,  # noqa: F401 — nécessaire pour create_all
     PatisserieCategorie, PatisserieProduit, PatisserieAchat,        # noqa: F401

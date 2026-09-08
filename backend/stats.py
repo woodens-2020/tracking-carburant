@@ -13,7 +13,8 @@ from models import Produit, Pompe, Releve
 def compute_stats(db: Session, date_debut: date_type, date_fin: date_type,
                   produit_id: Optional[int] = None,
                   periode: Optional[str] = None,
-                  pompe_id: Optional[int] = None) -> dict:
+                  pompe_id: Optional[int] = None,
+                  pompiste_id: Optional[int] = None) -> dict:
     """
     Calcule les totaux de ventes sur l'intervalle [date_debut, date_fin] inclus.
     Filtres optionnels : produit_id et periode ("Matin" / "Apres-midi").
@@ -30,6 +31,8 @@ def compute_stats(db: Session, date_debut: date_type, date_fin: date_type,
         releves = [r for r in releves if r.pompe.produit_id == produit_id]
     if pompe_id:
         releves = [r for r in releves if r.pompe_id == pompe_id]
+    if pompiste_id:
+        releves = [r for r in releves if r.pompiste_id == pompiste_id]
 
     total_quantite = 0.0
     total_montant = 0.0

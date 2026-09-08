@@ -893,6 +893,7 @@ def _session_dict(s: PatisserieSessionCaisse, stats: dict = None) -> dict:
         "montant_compte": float(s.montant_compte) if s.montant_compte is not None else None,
         "ecart": float(s.ecart) if s.ecart is not None else None,
         "notes_admin": s.notes_admin or "",
+        "note_soumission": s.note_soumission or "",
         **(stats or {}),
     }
 
@@ -1027,7 +1028,7 @@ def soumettre_session(session_id: int, body: SoumettreSessionIn, db: Session = D
     s.statut = "SOUMIS"
     s.soumis_at = datetime.now(tz=timezone.utc)
     if body.notes:
-        s.notes_admin = body.notes
+        s.note_soumission = body.notes.strip() or None
     db.commit()
     return _session_dict(s, stats)
 

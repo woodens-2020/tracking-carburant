@@ -249,6 +249,9 @@ def startup():
         # listes figées pour permettre l'ajout à la volée.
         "ALTER TABLE depenses DROP CONSTRAINT IF EXISTS chk_depense_categorie",
         "ALTER TABLE achats DROP CONSTRAINT IF EXISTS chk_achat_categorie",
+        # Note de soumission de la caissière — distincte de notes_admin.
+        "ALTER TABLE bar_sessions_caisse ADD COLUMN IF NOT EXISTS note_soumission VARCHAR(500)",
+        "ALTER TABLE patisserie_sessions_caisse ADD COLUMN IF NOT EXISTS note_soumission VARCHAR(500)",
     ]
     try:
         with engine.connect() as _c:
@@ -1690,9 +1693,10 @@ def stats_endpoint(date_debut: date_type, date_fin: date_type,
                    produit_id: Optional[int] = None,
                    pompe_id: Optional[int] = None,
                    periode: Optional[str] = None,
+                   pompiste_id: Optional[int] = None,
                    db: Session = Depends(get_db)):
     from stats import compute_stats
-    return compute_stats(db, date_debut, date_fin, produit_id, periode, pompe_id)
+    return compute_stats(db, date_debut, date_fin, produit_id, periode, pompe_id, pompiste_id)
 
 
 # ---------- Chatbot de rapports ----------
@@ -2016,6 +2020,7 @@ def serie_endpoint(
     jours: int = 7,
     produit_id: Optional[int] = None,
     periode: Optional[str] = None,
+    pompiste_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     """
@@ -2042,6 +2047,8 @@ def serie_endpoint(
     releves = q.all()
     if produit_id:
         releves = [r for r in releves if r.pompe.produit_id == produit_id]
+    if pompiste_id:
+        releves = [r for r in releves if r.pompiste_id == pompiste_id]
 
     par_date: dict = defaultdict(lambda: {"total_montant": 0.0, "total_quantite": 0.0})
     for r in releves:
@@ -2071,6 +2078,8 @@ def serie_endpoint(
     prev_releves = pq.all()
     if produit_id:
         prev_releves = [r for r in prev_releves if r.pompe.produit_id == produit_id]
+    if pompiste_id:
+        prev_releves = [r for r in prev_releves if r.pompiste_id == pompiste_id]
     prev_total = round(sum(r.montant_vente for r in prev_releves), 2)
 
     variation_pct = None

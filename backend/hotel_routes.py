@@ -16,7 +16,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import HotelChambre, HotelEmploye, HotelReservation, HotelDepense, RenflouementDepartement, Utilisateur, CategorieDepense
+from models import HotelChambre, HotelEmploye, HotelReservation, HotelDepense, HotelRapportNote, RenflouementDepartement, Utilisateur, CategorieDepense
 import listes_reference as lref
 
 router = APIRouter(prefix="/api/hotel", tags=["Hotel"])
@@ -864,8 +864,26 @@ def _get_rapport_data(
     actifs_nb    = _actifs_query.count()
     actifs_solde = float(_actifs_solde_query.scalar() or 0)
 
+    # Commentaires du rapport (une note par jour, saisie par la réception)
+    notes = (
+        db.query(HotelRapportNote)
+        .filter(HotelRapportNote.date_rapport >= d_debut,
+                HotelRapportNote.date_rapport <= d_fin)
+        .order_by(HotelRapportNote.date_rapport.desc())
+        .all()
+    )
+
     return {
         "periode": {"debut": str(d_debut), "fin": str(d_fin)},
+        "notes": [
+            {
+                "date":    str(n.date_rapport),
+                "texte":   n.texte,
+                "auteur":  n.auteur.nom_complet if n.auteur else None,
+                "maj_le":  n.maj_le.isoformat() if n.maj_le else None,
+            }
+            for n in notes
+        ],
         "kpis": {
             "nb_total":              len(reservations),
             "nb_moments":            len(moments),
@@ -901,6 +919,45 @@ def rapport_hotel(
     db: Session = Depends(get_db),
 ):
     return _get_rapport_data(db, date_debut, date_fin, type_sejour)
+
+
+class RapportNoteIn(BaseModel):
+    date_rapport: str
+    texte:        str
+
+
+@router.put("/rapport/note")
+def enregistrer_note_rapport(data: RapportNoteIn, request: Request, db: Session = Depends(get_db)):
+    """Enregistre (ou remplace, ou efface si vide) le commentaire du rapport
+    hôtel d'une journée. Visible par la direction dans le rapport et ses
+    exports."""
+    from datetime import date as _date
+    try:
+        d = _date.fromisoformat(data.date_rapport)
+    except ValueError:
+        raise HTTPException(400, "Date invalide (AAAA-MM-JJ).")
+    texte = (data.texte or "").strip()
+    user  = getattr(request.state, "user", None)
+    n = db.query(HotelRapportNote).filter_by(date_rapport=d).first()
+    if not texte:
+        if n:
+            db.delete(n)
+            db.commit()
+        return {"date": str(d), "texte": "", "supprimee": True}
+    if n:
+        n.texte = texte[:1000]
+        n.auteur_id = user.id if user else None
+    else:
+        n = HotelRapportNote(date_rapport=d, texte=texte[:1000],
+                             auteur_id=user.id if user else None)
+        db.add(n)
+    db.commit(); db.refresh(n)
+    return {
+        "date":   str(n.date_rapport),
+        "texte":  n.texte,
+        "auteur": n.auteur.nom_complet if n.auteur else None,
+        "maj_le": n.maj_le.isoformat() if n.maj_le else None,
+    }
 
 
 @router.get("/rapport/pdf")
@@ -996,6 +1053,15 @@ def rapport_hotel_pdf(
             [3.5*cm, 2.5*cm, 3*cm, 3*cm, 5*cm],
         ))
 
+    if data.get("notes"):
+        elems.append(Paragraph("Commentaires", s_section))
+        for n in data["notes"]:
+            meta = n["date"] + (f" — {n['auteur']}" if n.get("auteur") else "")
+            elems.append(Paragraph(f"<b>{meta}</b>", ParagraphStyle(
+                "noteMeta", parent=styles["Normal"], fontSize=9, textColor=colors.grey, spaceBefore=6)))
+            elems.append(Paragraph(str(n["texte"]).replace("\n", "<br/>"), ParagraphStyle(
+                "noteTxt", parent=styles["Normal"], fontSize=10, spaceAfter=4)))
+
     elems.append(Spacer(1, 0.5*cm))
     elems.append(Paragraph(
         f"Généré le {datetime.now(timezone.utc).strftime('%d/%m/%Y à %H:%M')} UTC",
@@ -1087,6 +1153,13 @@ def rapport_hotel_xlsx(
     ac = data["actifs"]
     ws1.cell(r, 1, "Clients en cours"); ws1.cell(r, 2, ac["nb"]); r += 1
     ws1.cell(r, 1, "Solde en attente"); ws1.cell(r, 2, _gdes(ac["solde_en_attente"])); r += 1
+
+    if data.get("notes"):
+        r += 1
+        ws1.cell(r, 1, "Commentaires").font = BOLD; r += 1
+        for n in data["notes"]:
+            ws1.cell(r, 1, n["date"] + (f" — {n['auteur']}" if n.get("auteur") else "")).font = BOLD
+            ws1.cell(r, 2, n["texte"]); r += 1
 
     # ── Feuille 2 : Par Chambre ───────────────────────────────────
     ws2 = wb.create_sheet("Par Chambre")

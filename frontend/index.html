@@ -3865,6 +3865,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </select>
           </div>
           <div class="filter-group">
+            <label class="filter-label">Pompiste</label>
+            <select id="f-pompiste" class="filter-select">
+              <option value="">Tous les pompistes</option>
+            </select>
+          </div>
+          <div class="filter-group">
             <label class="filter-label" data-i18n="dash.filter.periode">Période journée</label>
             <select id="f-per" class="filter-select">
               <option value="" data-i18n="dash.filter.periode.both">Matin + Après-midi</option>
@@ -6583,8 +6589,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
         <div class="pos-form-row">
           <div style="flex:1">
-            <label class="pos-label">Notes (optionnel)</label>
-            <input class="pos-input" id="ps-notes" placeholder="Laisser un commentaire ou une information…">
+            <label class="pos-label">Note pour la direction (optionnel)</label>
+            <input class="pos-input" id="ps-notes" placeholder="Ex : écart dû à un rendu de monnaie, incident pompe…">
+            <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:4px">Ce commentaire apparaîtra dans le rapport, visible par la direction.</div>
           </div>
         </div>
 
@@ -11017,6 +11024,22 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </table>
           </div>
         </div>
+
+        <!-- Commentaire du rapport (visible par la direction) -->
+        <div class="pos-card">
+          <div class="pos-card-hdr">Commentaire du rapport</div>
+          <div style="padding:12px 14px">
+            <div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:6px">
+              Note pour la journée du <strong id="hrpt-note-date">—</strong> — visible par la direction dans le rapport et ses exports.
+            </div>
+            <textarea id="hrpt-note-txt" rows="3" class="pos-input" style="width:100%;resize:vertical"
+                      placeholder="Ex : Panne d'eau de 14h à 16h, 2 chambres hors service…"></textarea>
+            <div style="margin-top:8px;text-align:right">
+              <button class="pos-btn teal" onclick="hrptEnregistrerNote()">Enregistrer le commentaire</button>
+            </div>
+            <div id="hrpt-notes-list" style="margin-top:12px;display:flex;flex-direction:column;gap:8px"></div>
+          </div>
+        </div>
       </div>
     </div><!-- /page-hotel-rapport -->
 
@@ -13820,6 +13843,7 @@ function initDashboard(){
   sel.innerHTML=`<option value="" data-i18n="dash.filter.product.all">${t('dash.filter.product.all')}</option>`+
     products.map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
   updatePompeFilter();
+  _remplirFiltrePompistes('f-pompiste');
   if(!lastStats) setPreset('mois');
   else renderDashboard(lastStats,lastSerie,document.getElementById('f-debut').value,document.getElementById('f-fin').value);
 }
@@ -13916,6 +13940,7 @@ async function applyFilters(){
   const fin  =document.getElementById('f-fin').value;
   const prodId =document.getElementById('f-prod').value;
   const pompeId=document.getElementById('f-pompe').value;
+  const pompisteId=document.getElementById('f-pompiste')?.value;
   const per    =document.getElementById('f-per').value;
   if(!debut||!fin){toast(t('dash.err.dates'),'err');return;}
 
@@ -13927,6 +13952,7 @@ async function applyFilters(){
     let statsUrl=`/stats?date_debut=${debut}&date_fin=${fin}`;
     if(prodId)  statsUrl+=`&produit_id=${prodId}`;
     if(pompeId) statsUrl+=`&pompe_id=${pompeId}`;
+    if(pompisteId) statsUrl+=`&pompiste_id=${pompisteId}`;
     if(per)     statsUrl+=`&periode=${encodeURIComponent(per)}`;
 
     const d1=new Date(debut+'T12:00:00');
@@ -13934,6 +13960,7 @@ async function applyFilters(){
     const jours=Math.min(90,Math.round((d2-d1)/86400000)+1);
     let serieUrl=`/serie?date_fin=${fin}&jours=${jours}`;
     if(prodId)  serieUrl+=`&produit_id=${prodId}`;
+    if(pompisteId) serieUrl+=`&pompiste_id=${pompisteId}`;
     if(per)     serieUrl+=`&periode=${encodeURIComponent(per)}`;
 
     const [stats,serie]=await Promise.all([GET(statsUrl),GET(serieUrl)]);
@@ -14792,14 +14819,15 @@ function initJournal(){
   loadJournal();
 }
 
-async function _remplirFiltrePompistes(){
-  const sel=document.getElementById('jf-pompiste');
+let _pompistesCache=null;
+async function _remplirFiltrePompistes(selId){
+  const sel=document.getElementById(selId||'jf-pompiste');
   if(!sel) return;
   const cur=sel.value;
   try{
-    const list=await GET('/pompistes');
+    if(!_pompistesCache) _pompistesCache=await GET('/pompistes');
     sel.innerHTML='<option value="">Tous les pompistes</option>'+
-      (list||[]).map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
+      (_pompistesCache||[]).map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
     if(cur) sel.value=cur;
   }catch(e){ /* liste vide : le filtre reste sur « Tous » */ }
 }
@@ -28486,12 +28514,19 @@ function _rsRenderModal(){
     ${!readOnly ? `<input class="pos-input" id="rs-article-search" placeholder="Filtrer un article…" value="${_esc(_rsSearchQuery)}" oninput="_rsFilterArticles(this.value)" style="width:100%;margin-bottom:10px;box-sizing:border-box">` : ''}
   `;
 
+  const noteBloc = (d.note_soumission || d.notes_admin) ? `
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px">
+      ${d.note_soumission ? `<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.4);margin-bottom:2px">Note de la caissière</div><div style="font-size:14px;white-space:pre-wrap">${_esc(d.note_soumission)}</div></div>` : ''}
+      ${d.notes_admin ? `<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.4);margin-bottom:2px">Note du responsable</div><div style="font-size:14px;white-space:pre-wrap">${_esc(d.notes_admin)}</div></div>` : ''}
+    </div>` : '';
+
   body.innerHTML = `
     <div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,.5);margin-bottom:12px">
       <span>Fin de session : <strong style="color:rgba(255,255,255,.8)">${soumisTxt}</strong></span>
       <span>Total : <strong style="color:#3fb6a8">${posGx(d.total||0)}</strong></span>
     </div>
     ${scoreBloc}
+    ${noteBloc}
     ${toolbar}
     <div id="rs-articles-list" style="max-height:420px;overflow-y:auto;padding-right:2px"></div>
   `;
@@ -31134,6 +31169,10 @@ async function loadPatisserieCaisse(){
           ${s.statut==='SOUMIS' ? `<button class="pos-btn teal" style="padding:4px 8px;font-size:12px" onclick="ptCaisseValider(${s.id})">Valider</button>` : ''}
         </td>
       </tr>
+      ${(s.note_soumission || s.notes_admin) ? `<tr><td colspan="6" style="padding:0 12px 9px 12px">
+        ${s.note_soumission ? `<div style="font-size:12px;color:rgba(255,255,255,.55)"><strong style="color:rgba(255,255,255,.4)">Note caissière :</strong> ${esc(s.note_soumission)}</div>` : ''}
+        ${s.notes_admin ? `<div style="font-size:12px;color:rgba(255,255,255,.55)"><strong style="color:rgba(255,255,255,.4)">Note responsable :</strong> ${esc(s.notes_admin)}</div>` : ''}
+      </td></tr>` : ''}
     `).join('') : '<tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune session</td></tr>';
   }catch(e){ posAlert(e.message||'Erreur caisse.'); }
 }
@@ -31166,12 +31205,16 @@ async function ptCaisseChargerDashboard(){
         <div><div style="font-size:12px;color:rgba(255,255,255,.4)">Cash attendu</div><div style="font-weight:700">${fmtG(d.cash_attendu)}</div></div>
       </div>
       ${d.session_statut==='EN_COURS' ? `
-        <div style="display:flex;gap:8px;align-items:end">
-          <div style="flex:1">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div>
             <label style="font-size:12px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Montant compté en caisse (G)</label>
             <input class="pos-input" id="pt-caisse-montant-compte" type="number" min="0" step="1" style="width:100%">
           </div>
-          <button class="pos-btn teal" onclick="ptCaisseSoumettre(${d.session_id})">Soumettre la session</button>
+          <div>
+            <label style="font-size:12px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Note pour la direction (optionnel)</label>
+            <input class="pos-input" id="pt-caisse-note" placeholder="Ex : écart de monnaie, incident…" style="width:100%">
+          </div>
+          <button class="pos-btn teal" style="align-self:flex-start" onclick="ptCaisseSoumettre(${d.session_id})">Soumettre la session</button>
         </div>
       ` : ''}
     `;
@@ -31189,8 +31232,9 @@ async function ptCaisseOuvrir(){
 async function ptCaisseSoumettre(sessionId){
   const montant_compte = parseFloat(document.getElementById('pt-caisse-montant-compte').value);
   if(isNaN(montant_compte) || montant_compte<0){ posAlert('Indiquez le montant compté.','warn'); return; }
+  const notes = document.getElementById('pt-caisse-note')?.value.trim() || null;
   try{
-    await apiFetch('POST', `/patisserie/caisse/sessions/${sessionId}/soumettre`, {montant_compte});
+    await apiFetch('POST', `/patisserie/caisse/sessions/${sessionId}/soumettre`, {montant_compte, notes});
     posAlert('Session soumise.','ok'); loadPatisserieCaisse();
   }catch(e){ posAlert(e.message||'Erreur.'); }
 }
@@ -32139,7 +32183,39 @@ async function loadHotelRapport(){
         </tr>`).join('');
       }
     }
+
+    // Commentaire du rapport (par jour ; l'éditeur cible la date de fin)
+    _hrptNotes = r.notes || [];
+    if(g('hrpt-note-date')) g('hrpt-note-date').textContent = frDate(fin);
+    const noteJour = _hrptNotes.find(n => n.date === fin);
+    if(g('hrpt-note-txt')) g('hrpt-note-txt').value = noteJour ? noteJour.texte : '';
+    _hrptRenderNotes();
   } catch(e){ posAlert(e.message||'Erreur chargement rapport.'); }
+}
+
+let _hrptNotes = [];
+function _hrptRenderNotes(){
+  const box = document.getElementById('hrpt-notes-list');
+  if(!box) return;
+  if(!_hrptNotes.length){ box.innerHTML = ''; return; }
+  box.innerHTML = _hrptNotes.map(n => `
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:9px 12px">
+      <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:3px">
+        ${frDate(n.date)}${n.auteur ? ' · '+esc(n.auteur) : ''}
+      </div>
+      <div style="font-size:14px;white-space:pre-wrap">${esc(n.texte)}</div>
+    </div>`).join('');
+}
+
+async function hrptEnregistrerNote(){
+  const fin = document.getElementById('hrpt-fin')?.value;
+  if(!fin){ posAlert('Sélectionnez d\'abord la date de fin du rapport.'); return; }
+  const texte = document.getElementById('hrpt-note-txt')?.value || '';
+  try{
+    await apiFetch('PUT', '/hotel/rapport/note', { date_rapport: fin, texte });
+    posAlert('Commentaire enregistré.', 'ok');
+    loadHotelRapport();
+  }catch(e){ posAlert(e.message || 'Enregistrement impossible.'); }
 }
 
 function _gcKpi(id, val, color){

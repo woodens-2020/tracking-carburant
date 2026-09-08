@@ -262,6 +262,7 @@ def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
         "valide_at":     s.valide_at.isoformat() if s.valide_at else None,
         "valide_par":    s.valide_par.nom_complet if s.valide_par else None,
         "notes_admin":   s.notes_admin,
+        "note_soumission": s.note_soumission,
         "cash_attendu_soumission": float(s.cash_attendu_soumission) if s.cash_attendu_soumission is not None else None,
         "montant_compte":          float(s.montant_compte) if s.montant_compte is not None else None,
         "ecart":                   float(s.ecart) if s.ecart is not None else None,
@@ -504,7 +505,7 @@ def soumettre_session(session_id: int, body: SoumettreIn, db: Session = Depends(
     s.statut                  = "SOUMIS"
     s.soumis_at               = datetime.now(tz=timezone.utc)
     if body.notes:
-        s.notes_admin = body.notes
+        s.note_soumission = body.notes.strip() or None
     db.commit()
     return _session_dict(s, stats)
 
@@ -910,6 +911,18 @@ def export_pdf(session_id: int, db: Session = Depends(get_db)):
             eval_style.append(("FONTNAME",  (1,i),(1,i), "Helvetica-Bold"))
         t_eval.setStyle(TableStyle(eval_style))
         story.append(t_eval)
+
+    # Note laissée par la caissière à la soumission (visible direction)
+    if s.note_soumission:
+        story.append(Spacer(1, 14))
+        story.append(Paragraph("Note de la caissière", section_style))
+        story.append(Paragraph(str(s.note_soumission).replace("\n", "<br/>"), sub_style))
+
+    # Note du responsable (validation)
+    if s.notes_admin:
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("Note du responsable", section_style))
+        story.append(Paragraph(str(s.notes_admin).replace("\n", "<br/>"), sub_style))
 
     # Footer
     story.append(Spacer(1, 16))
