@@ -5418,8 +5418,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="gi-form-row">
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Poste *</label>
-                <input class="gi-form-input" id="emp-poste" list="dl-postes" autocomplete="off"
-                       placeholder="Ex : Caissier, Gérant, Technicien…"/>
+                <div style="display:flex;gap:6px;align-items:stretch">
+                  <input class="gi-form-input" id="emp-poste" list="dl-postes" autocomplete="off"
+                         style="flex:1" placeholder="Ex : Caissier, Gérant, Technicien…"/>
+                  <button type="button" class="gi-btn-secondary" title="Ajouter ce poste à la liste"
+                          style="padding:0 12px;font-size:18px;line-height:1"
+                          onclick="_ajoutRapideRef('postes','emp-poste','emp-filtre-poste','Tous')">+</button>
+                </div>
               </div>
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Type de contrat *</label>
@@ -5725,8 +5730,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="gi-form-row">
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Catégorie *</label>
-                <input class="gi-form-input" id="dep-cat" list="dl-categories-depense" autocomplete="off"
-                       placeholder="Ex : Électricité, Loyer, Salaires…"/>
+                <div style="display:flex;gap:6px;align-items:stretch">
+                  <input class="gi-form-input" id="dep-cat" list="dl-categories-depense" autocomplete="off"
+                         style="flex:1" placeholder="Ex : Électricité, Loyer, Salaires…"/>
+                  <button type="button" class="gi-btn-secondary" title="Ajouter cette catégorie à la liste"
+                          style="padding:0 12px;font-size:18px;line-height:1"
+                          onclick="_ajoutRapideRef('categories-depense','dep-cat','dep-filtre-cat','Toutes')">+</button>
+                </div>
               </div>
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Date *</label>
@@ -8388,7 +8398,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 </div>
                 <div class="gi-form-field">
                   <label class="gi-form-lbl">Catégorie</label>
-                  <input class="gi-form-input" id="zdep-cat" list="dl-categories-depense" autocomplete="off" placeholder="Ex : Frais bancaires"/>
+                  <div style="display:flex;gap:6px;align-items:stretch">
+                    <input class="gi-form-input" id="zdep-cat" list="dl-categories-depense" autocomplete="off" style="flex:1" placeholder="Ex : Frais bancaires"/>
+                    <button type="button" class="gi-btn-secondary" title="Ajouter cette catégorie"
+                            style="padding:0 12px;font-size:18px;line-height:1"
+                            onclick="_ajoutRapideRef('categories-depense','zdep-cat','zdep-filtre-cat','Toutes')">+</button>
+                  </div>
                 </div>
               </div>
               <div class="gi-form-row full">
@@ -9202,8 +9217,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
-                <input class="pos-input" id="ckdep-cat" list="dl-categories-depense" autocomplete="off"
-                       placeholder="Catégorie" style="width:100%">
+                <div style="display:flex;gap:6px;align-items:stretch">
+                  <input class="pos-input" id="ckdep-cat" list="dl-categories-depense" autocomplete="off"
+                         placeholder="Catégorie" style="flex:1">
+                  <button type="button" class="pos-btn ghost" title="Ajouter cette catégorie"
+                          style="padding:0 12px;font-size:18px;line-height:1"
+                          onclick="_ajoutRapideRef('categories-depense','ckdep-cat','ckdep-filtre-cat','Toutes catégories')">+</button>
+                </div>
 
               </div>
               <div>
@@ -10245,8 +10265,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
-                <input class="pos-input" id="pt-dep-cat" list="dl-categories-depense" autocomplete="off"
-                       placeholder="Catégorie" style="width:100%">
+                <div style="display:flex;gap:6px;align-items:stretch">
+                  <input class="pos-input" id="pt-dep-cat" list="dl-categories-depense" autocomplete="off"
+                         placeholder="Catégorie" style="flex:1">
+                  <button type="button" class="pos-btn ghost" title="Ajouter cette catégorie"
+                          style="padding:0 12px;font-size:18px;line-height:1"
+                          onclick="_ajoutRapideRef('categories-depense','pt-dep-cat','ptd-dep-categorie','Toutes catégories')">+</button>
+                </div>
 
               </div>
               <div>
@@ -10850,8 +10875,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
-                <input class="pos-input" id="hdep-cat" list="dl-categories-depense" autocomplete="off"
-                       placeholder="Catégorie" style="width:100%">
+                <div style="display:flex;gap:6px;align-items:stretch">
+                  <input class="pos-input" id="hdep-cat" list="dl-categories-depense" autocomplete="off"
+                         placeholder="Catégorie" style="flex:1">
+                  <button type="button" class="pos-btn ghost" title="Ajouter cette catégorie"
+                          style="padding:0 12px;font-size:18px;line-height:1"
+                          onclick="_ajoutRapideRef('categories-depense','hdep-cat','hdep-filtre-cat','Toutes catégories')">+</button>
+                </div>
 
               </div>
               <div>
@@ -11803,6 +11833,27 @@ function _remplirFiltreRef(sel, cle, labelTous){
   sel.innerHTML = ['<option value="">'+(labelTous||'Toutes')+'</option>']
     .concat((_listesRef[cle]||[]).map(x=>'<option>'+esc(x.nom)+'</option>')).join('');
   if(cur){ sel.value = cur; }
+}
+
+// Bouton « + » à côté d'un champ catégorie/poste : ajoute vite une valeur.
+// Prend ce qui est déjà tapé dans le champ ; sinon demande le nom.
+// L'ajout est réservé au manager/admin côté serveur (403 sinon).
+async function _ajoutRapideRef(cle, inputId, filtreSelId, filtreLabel){
+  const inp = document.getElementById(inputId);
+  let nom = ((inp && inp.value) || '').trim();
+  if(!nom){
+    nom = (window.prompt(cle === 'postes' ? 'Nouveau poste :' : 'Nouvelle catégorie de dépense :') || '').trim();
+    if(!nom) return;
+  }
+  try{
+    const r = await POST('/listes/'+cle, { nom });
+    await _chargerListeRef(cle, true);
+    if(inp) inp.value = r.nom || nom;
+    if(filtreSelId) _remplirFiltreRef(filtreSelId, cle, filtreLabel);
+    toast((r.cree === false ? 'Déjà dans la liste : ' : 'Ajouté : ') + (r.nom || nom), 'ok');
+  }catch(e){
+    toast(e.message || "Ajout impossible.", 'err');
+  }
 }
 
 // ══════════════════════════════════════════════
