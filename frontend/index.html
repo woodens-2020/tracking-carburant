@@ -5544,6 +5544,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option value="">Tous les employés</option>
             </select>
           </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Période de paie</label>
+            <select class="gi-filter-input" id="pay-filtre-periode" onchange="_payRender()">
+              <option value="">Toutes</option>
+            </select>
+          </div>
         </div>
 
         <div class="gi-table-card">
@@ -5566,7 +5572,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="gi-form-row full">
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Employé *</label>
-                <select class="gi-form-select" id="pay-emp-sel" onchange="payFillSalaire()">
+                <input class="gi-form-input" id="pay-emp-search" placeholder="Rechercher un employé par nom…"
+                       autocomplete="off" oninput="payEmpFilter()" style="margin-bottom:6px"/>
+                <select class="gi-form-select" id="pay-emp-sel" size="1" onchange="payFillSalaire()">
                   <option value="">— Sélectionner —</option>
                 </select>
               </div>
@@ -7839,14 +7847,22 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
 
         <div class="pos-card">
-          <div class="pos-card-hdr">Historique des paiements</div>
+          <div class="pos-card-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <span>Historique des paiements</span>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,.4);font-weight:400">
+              Période de paie
+              <select class="pos-select" id="pospaie-filtre-periode" style="min-width:180px" onchange="_posRenderPaiements()">
+                <option value="">Toutes</option>
+              </select>
+            </label>
+          </div>
           <div class="pos-table-wrap">
             <table class="pos-table">
               <thead>
-                <tr><th>Employé</th><th>Date</th><th>Type</th><th>Mode</th><th>Montant</th><th>Notes</th></tr>
+                <tr><th>Employé</th><th>Date</th><th>Type</th><th>Mode</th><th>Période de paie</th><th>Montant</th><th>Notes</th></tr>
               </thead>
               <tbody id="pos-paie-tbody">
-                <tr><td colspan="6" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                <tr><td colspan="7" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -20163,7 +20179,8 @@ async function loadPayroll(){
       document.getElementById('pay-kpi-pending').textContent = _htg(stats.total_en_attente_htg);
       document.getElementById('pay-kpi-paid').textContent    = _htg(stats.total_paye_htg);
     }
-    renderPayTable(_payData);
+    _payPopulatePeriodes();
+    _payRender();
     await _loadEmpSelectPayroll();
   } catch(e){
     console.error('loadPayroll',e);
@@ -20172,19 +20189,53 @@ async function loadPayroll(){
 }
 
 async function _loadEmpSelectPayroll(){
-  if(_empList.length) return;
-  try {
-    _empList = await apiFetch('GET','/employes?actif=true');
-    const sels = ['pay-filtre-emp','pay-emp-sel'];
-    sels.forEach(selId=>{
-      const sel = document.getElementById(selId);
-      if(!sel) return;
-      const cur = sel.value;
-      while(sel.options.length > 1) sel.remove(1);
-      _empList.forEach(e=>{ const o=document.createElement('option'); o.value=e.id; o.textContent=`${e.prenom} ${e.nom} — ${e.poste}`; sel.appendChild(o); });
-      if(cur) sel.value=cur;
-    });
-  } catch(e){}
+  if(!_empList.length){
+    try { _empList = await apiFetch('GET','/employes?actif=true'); } catch(e){ _empList = []; }
+  }
+  const sf = document.getElementById('pay-filtre-emp');
+  if(sf){
+    const cur = sf.value;
+    sf.innerHTML = '<option value="">Tous les employés</option>' +
+      _empList.map(e=>`<option value="${e.id}">${esc(e.prenom+' '+e.nom)} — ${esc(e.poste||'')}</option>`).join('');
+    if(cur) sf.value = cur;
+  }
+  payEmpFilter();
+}
+
+// Recherche par nom dans la liste déroulante « Employé » du formulaire de fiche.
+function payEmpFilter(){
+  const sel = document.getElementById('pay-emp-sel');
+  if(!sel) return;
+  const q   = _navNorm(document.getElementById('pay-emp-search')?.value || '');
+  const cur = sel.value;
+  const list = !q ? (_empList||[])
+    : (_empList||[]).filter(e=>_navNorm(`${e.prenom} ${e.nom} ${e.poste||''}`).includes(q));
+  sel.innerHTML = '<option value="">— Sélectionner —</option>' +
+    list.map(e=>`<option value="${e.id}">${esc(e.prenom+' '+e.nom)} — ${esc(e.poste||'')}</option>`).join('');
+  if(cur && list.some(e=>String(e.id)===String(cur))) sel.value = cur;
+}
+
+// Options « Période de paie » = paires (début → fin) distinctes des fiches chargées.
+function _payPopulatePeriodes(){
+  const sel = document.getElementById('pay-filtre-periode');
+  if(!sel) return;
+  const cur = sel.value;
+  const seen = new Set(); const pairs = [];
+  (_payData||[]).forEach(f=>{
+    const k = f.periode_debut+'|'+f.periode_fin;
+    if(!seen.has(k)){ seen.add(k); pairs.push({k, d:f.periode_debut, f:f.periode_fin}); }
+  });
+  pairs.sort((a,b)=> String(b.d).localeCompare(String(a.d)));
+  sel.innerHTML = '<option value="">Toutes</option>' +
+    pairs.map(p=>`<option value="${p.k}">${frDate(p.d)} → ${frDate(p.f)}</option>`).join('');
+  if(cur && seen.has(cur)) sel.value = cur;
+}
+
+function _payRender(){
+  const per = document.getElementById('pay-filtre-periode')?.value || '';
+  const rows = !per ? (_payData||[])
+    : (_payData||[]).filter(f=> (f.periode_debut+'|'+f.periode_fin) === per);
+  renderPayTable(rows);
 }
 
 function renderPayTable(data){
@@ -20246,8 +20297,9 @@ function payFillSalaire(){
 
 async function openPayrollModal(){
   await _loadEmpSelectPayroll();
-  ['pay-emp-sel','pay-debut','pay-fin','pay-salaire','pay-hs','pay-taux-hs','pay-primes','pay-deductions','pay-notes']
+  ['pay-emp-search','pay-emp-sel','pay-debut','pay-fin','pay-salaire','pay-hs','pay-taux-hs','pay-primes','pay-deductions','pay-notes']
     .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  payEmpFilter();
   const now=new Date(); const y=now.getFullYear(); const m=String(now.getMonth()+1).padStart(2,'0');
   const db=document.getElementById('pay-debut'); if(db) db.value=`${y}-${m}-01`;
   const df=document.getElementById('pay-fin'); if(df){ const last=new Date(y,now.getMonth()+1,0); df.value=`${y}-${m}-${String(last.getDate()).padStart(2,'0')}`; }
@@ -27348,31 +27400,59 @@ async function _posChargerEmployesPay(){
   } catch(e){}
 }
 
+let _posPaieData = [];
 async function _posChargerPaiements(){
   const tbody = document.getElementById('pos-paie-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     const data = await apiFetch('GET','/pos/paiements-employes');
-    const pays = data.paiements||data||[];
-    let total = 0, nb = 0;
-    pays.forEach(p=>{ total += parseFloat(p.montant||0); nb++; });
-    [['pkpi-total',posGx(total)],['pkpi-nb',nb]]
-      .forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
-    if(!pays.length){
-      if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun paiement</td></tr>';
-      return;
-    }
-    if(tbody) tbody.innerHTML = pays.map(p=>`<tr>
-      <td>${p.employe_nom||'—'}</td>
-      <td>${posDateFr(p.date_paiement||p.created_at)}</td>
-      <td>${p.type_paiement||'—'}</td>
-      <td>${p.mode||'—'}</td>
-      <td>${posGx(p.montant)}</td>
-      <td>${p.notes||'—'}</td>
-    </tr>`).join('');
+    _posPaieData = data.paiements||data||[];
+    _posPopulatePaiePeriodes();
+    _posRenderPaiements();
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
+}
+
+function _posPopulatePaiePeriodes(){
+  const sel = document.getElementById('pospaie-filtre-periode');
+  if(!sel) return;
+  const cur = sel.value;
+  const seen = new Set(); const pairs = [];
+  (_posPaieData||[]).forEach(p=>{
+    if(!p.periode_debut && !p.periode_fin) return;
+    const k = (p.periode_debut||'')+'|'+(p.periode_fin||'');
+    if(!seen.has(k)){ seen.add(k); pairs.push({k, d:p.periode_debut||'', f:p.periode_fin||''}); }
+  });
+  pairs.sort((a,b)=> String(b.d).localeCompare(String(a.d)));
+  sel.innerHTML = '<option value="">Toutes</option>' +
+    pairs.map(p=>`<option value="${p.k}">${p.d?frDate(p.d):'?'} → ${p.f?frDate(p.f):'?'}</option>`).join('');
+  if(cur && seen.has(cur)) sel.value = cur;
+}
+
+function _posRenderPaiements(){
+  const tbody = document.getElementById('pos-paie-tbody');
+  const per = document.getElementById('pospaie-filtre-periode')?.value || '';
+  const pays = !per ? (_posPaieData||[])
+    : (_posPaieData||[]).filter(p=> ((p.periode_debut||'')+'|'+(p.periode_fin||'')) === per);
+  let total = 0;
+  pays.forEach(p=>{ total += parseFloat(p.montant||0); });
+  const kt=document.getElementById('pkpi-total'); if(kt) kt.textContent=posGx(total);
+  const kn=document.getElementById('pkpi-nb');    if(kn) kn.textContent=pays.length;
+  if(!tbody) return;
+  if(!pays.length){
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun paiement</td></tr>';
+    return;
+  }
+  tbody.innerHTML = pays.map(p=>`<tr>
+    <td>${p.employe_nom||'—'}</td>
+    <td>${posDateFr(p.date_paiement||p.created_at)}</td>
+    <td>${p.type_paiement||'—'}</td>
+    <td>${p.mode||'—'}</td>
+    <td>${(p.periode_debut||p.periode_fin) ? (p.periode_debut?frDate(p.periode_debut):'?')+' → '+(p.periode_fin?frDate(p.periode_fin):'?') : '—'}</td>
+    <td>${posGx(p.montant)}</td>
+    <td>${p.notes||'—'}</td>
+  </tr>`).join('');
 }
 
 function posPaymentModal(){
