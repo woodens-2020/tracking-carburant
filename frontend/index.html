@@ -2133,6 +2133,25 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 }
 .dep-chart-mode-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}
 
+/* ── Tableau de bord Dépenses ── */
+.dep-dash-grid{
+  display:grid;gap:14px;margin-top:14px;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+}
+.dep-legend{display:flex;flex-direction:column;gap:5px;padding:4px 14px 14px}
+.dep-legend-row{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.dep-legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.dep-legend-name{flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dep-legend-val{font-variant-numeric:tabular-nums;white-space:nowrap}
+.dep-legend-pct{width:44px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.dep-bar-row{display:flex;flex-direction:column;gap:3px;margin-bottom:9px}
+.dep-bar-row:last-child{margin-bottom:0}
+.dep-bar-head{display:flex;justify-content:space-between;font-size:12.5px;gap:8px}
+.dep-bar-head b{color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dep-bar-head span{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dep-bar-track{height:8px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden}
+.dep-bar-fill{height:100%;border-radius:5px}
+
 .gi-btn-secondary{
   display:inline-flex;align-items:center;gap:6px;
   background:rgba(255,255,255,.05);
@@ -5700,20 +5719,38 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="gi-kpi-row" id="dep-kpis">
           <div class="gi-kpi"><div class="gi-kpi-lbl">Total période (HTG)</div><div class="gi-kpi-val red" id="dep-kpi-total">—</div></div>
           <div class="gi-kpi"><div class="gi-kpi-lbl">Nombre de dépenses</div><div class="gi-kpi-val blue" id="dep-kpi-nb">—</div></div>
-          <div class="gi-kpi"><div class="gi-kpi-lbl">Catégorie principale</div><div class="gi-kpi-val amber" id="dep-kpi-cat">—</div></div>
           <div class="gi-kpi"><div class="gi-kpi-lbl">Moyenne par entrée</div><div class="gi-kpi-val" id="dep-kpi-avg">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Catégorie n&deg;1</div><div class="gi-kpi-val amber" id="dep-kpi-cat" style="font-size:16px">—</div><div class="gi-kpi-sub" id="dep-kpi-cat-val">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">vs période précédente</div><div class="gi-kpi-val" id="dep-kpi-var">—</div><div class="gi-kpi-sub" id="dep-kpi-var-sub">—</div></div>
         </div>
 
         <div class="gi-table-card">
           <div class="gi-table-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-            <span class="gi-table-title">Suivi des Dépenses — par catégorie</span>
+            <span class="gi-table-title">Évolution des dépenses — par catégorie</span>
             <div style="display:inline-flex;gap:4px">
               <button type="button" class="dep-chart-mode-btn active" data-mode="bar" onclick="setDepChartMode('bar')">Barres</button>
               <button type="button" class="dep-chart-mode-btn" data-mode="line" onclick="setDepChartMode('line')">Ligne</button>
             </div>
           </div>
-          <div style="position:relative;height:420px;padding:14px 14px 8px">
+          <div style="position:relative;height:380px;padding:14px 14px 8px">
             <canvas id="dep-chart-suivi"></canvas>
+          </div>
+        </div>
+
+        <div class="dep-dash-grid">
+          <div class="gi-table-card">
+            <div class="gi-table-hdr"><span class="gi-table-title">Répartition par catégorie</span></div>
+            <div style="position:relative;height:280px;padding:12px"><canvas id="dep-chart-cat-donut"></canvas></div>
+            <div id="dep-cat-legend" class="dep-legend"></div>
+          </div>
+          <div class="gi-table-card">
+            <div class="gi-table-hdr"><span class="gi-table-title">Top bénéficiaires</span></div>
+            <div id="dep-top-benef" style="padding:12px 14px 14px"></div>
+          </div>
+          <div class="gi-table-card">
+            <div class="gi-table-hdr"><span class="gi-table-title">Dépenses par caisse d'origine</span></div>
+            <div style="position:relative;height:280px;padding:12px"><canvas id="dep-chart-caisse"></canvas></div>
+            <div id="dep-caisse-legend" class="dep-legend"></div>
           </div>
         </div>
 
@@ -13839,14 +13876,16 @@ function destroyDbCharts(){
 let _depChartMode = 'bar';
 try{ const _m = localStorage.getItem('konekta_dep_chart_mode'); if(_m==='bar'||_m==='line') _depChartMode=_m; }catch(e){}
 
+// Palette catégorielle validée (CVD-safe, contraste OK sur fond sombre) —
+// toujours accompagnée d'une légende + libellés chiffrés (identité jamais
+// portée par la seule couleur).
 const _DEP_CAT_PALETTE = [
-  '#60a5fa','#f87171','#34d399','#fbbf24','#a78bfa','#f472b6',
-  '#22d3ee','#fb923c','#a3e635','#e879f9','#2dd4bf','#c084fc',
-  '#4ade80','#facc15','#38bdf8','#fca5a5',
+  '#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6',
+  '#06b6d4','#ec4899','#84cc16','#f97316','#14b8a6',
 ];
 function _depCatColor(nom){
   let h = 0;
-  for(let i=0;i<nom.length;i++) h = (h*31 + nom.charCodeAt(i)) >>> 0;
+  for(let i=0;i<String(nom).length;i++) h = (h*31 + String(nom).charCodeAt(i)) >>> 0;
   return _DEP_CAT_PALETTE[h % _DEP_CAT_PALETTE.length];
 }
 
@@ -20354,6 +20393,7 @@ async function supprimerFiche(id){
    MODULE DÉPENSES
    ══════════════════════════════════════════════════════════════ */
 let _depData = [];
+let _depPrevTotal = null;
 
 function _depPopulateCaisseSelects(){
   if(!products || !products.length) return;
@@ -20388,22 +20428,37 @@ async function loadDepenses(){
   const cat    = document.getElementById('dep-filtre-cat')?.value ?? '';
   const benef  = document.getElementById('dep-filtre-benef')?.value ?? '';
   const caisse = document.getElementById('dep-filtre-caisse')?.value ?? '';
-  const params=[];
+  const autres = [];
+  if(cat) autres.push('categorie='+encodeURIComponent(cat));
+  if(benef) autres.push('beneficiaire='+encodeURIComponent(benef));
+  if(caisse) autres.push('produit_id='+caisse);
+  const params = [];
   if(deb) params.push('date_debut='+deb);
   if(fin) params.push('date_fin='+fin);
-  if(cat) params.push('categorie='+encodeURIComponent(cat));
-  if(benef) params.push('beneficiaire='+encodeURIComponent(benef));
-  if(caisse) params.push('produit_id='+caisse);
+  params.push(...autres);
   const qs=params.length?'?'+params.join('&'):'';
 
-  const [d, lim] = await Promise.allSettled([
+  // Fenêtre effective (mêmes défauts que le backend : mois en cours) pour
+  // calculer la période précédente de même durée → variation.
+  const _fin = fin ? new Date(fin+'T12:00:00') : new Date();
+  const _deb = deb ? new Date(deb+'T12:00:00') : new Date(_fin.getFullYear(), _fin.getMonth(), 1);
+  const _jours = Math.max(1, Math.round((_fin - _deb)/86400000) + 1);
+  const _fmt = dt => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  const _prevFin = new Date(_deb); _prevFin.setDate(_prevFin.getDate()-1);
+  const _prevDeb = new Date(_prevFin); _prevDeb.setDate(_prevDeb.getDate()-(_jours-1));
+  const _prevQs = '?date_debut='+_fmt(_prevDeb)+'&date_fin='+_fmt(_prevFin) + (autres.length?'&'+autres.join('&'):'');
+
+  const [d, lim, prev] = await Promise.allSettled([
     apiFetch('GET','/depenses'+qs),
     apiFetch('GET','/depenses/limite'),
+    apiFetch('GET','/depenses'+_prevQs),
   ]);
+
+  _depPrevTotal = (prev.status === 'fulfilled') ? (prev.value.total || 0) : null;
 
   if(d.status === 'fulfilled'){
     _depData = d.value.depenses;
-    depRechercheFiltrer(); // applique la recherche en cours (si active) + KPIs + tableau
+    depRechercheFiltrer(); // applique la recherche en cours (si active) + KPIs + tableau + panneaux
   } else {
     _giError('dep-table-wrap', d.reason?.message || 'Erreur de chargement des dépenses.');
   }
@@ -20522,15 +20577,109 @@ function exportDepenses(fmt){
 
 function _depUpdateKpis(data){
   const total = data.reduce((s,x)=>s+x.montant, 0);
-  document.getElementById('dep-count').textContent     = data.length;
-  document.getElementById('dep-kpi-total').textContent = _htg(total);
-  document.getElementById('dep-kpi-nb').textContent    = data.length;
-  const avg = data.length ? Math.round(total/data.length) : 0;
-  document.getElementById('dep-kpi-avg').textContent   = _htg(avg);
+  const g = id => document.getElementById(id);
+  g('dep-count').textContent     = data.length;
+  g('dep-kpi-total').textContent = _htg(total);
+  g('dep-kpi-nb').textContent    = data.length;
+  g('dep-kpi-avg').textContent   = _htg(data.length ? Math.round(total/data.length) : 0);
+
   const catMap={};
-  data.forEach(x=>{ catMap[x.categorie]=(catMap[x.categorie]||0)+x.montant; });
+  data.forEach(x=>{ catMap[x.categorie||'—']=(catMap[x.categorie||'—']||0)+x.montant; });
   const topCat=Object.entries(catMap).sort((a,b)=>b[1]-a[1])[0];
-  document.getElementById('dep-kpi-cat').textContent   = topCat?topCat[0]:'—';
+  g('dep-kpi-cat').textContent = topCat ? topCat[0] : '—';
+  if(g('dep-kpi-cat-val')) g('dep-kpi-cat-val').textContent =
+    topCat ? `${_htg(topCat[1])} · ${total?Math.round(topCat[1]/total*100):0}%` : '—';
+
+  // Variation vs période précédente (même durée) — hausse = rouge (dépense
+  // accrue), baisse = vert.
+  const vv = g('dep-kpi-var'), vs = g('dep-kpi-var-sub');
+  if(vv){
+    if(_depPrevTotal == null || (_depPrevTotal === 0 && total === 0)){
+      vv.textContent = '—'; vv.style.color = ''; if(vs) vs.textContent = 'période préc. indisponible';
+    } else if(_depPrevTotal === 0){
+      vv.textContent = 'nouveau'; vv.style.color = 'var(--red2, #ef4444)';
+      if(vs) vs.textContent = 'aucune dépense avant';
+    } else {
+      const pct = (total - _depPrevTotal) / _depPrevTotal * 100;
+      const up = pct >= 0;
+      vv.textContent = (up?'▲ +':'▼ ') + Math.abs(pct).toFixed(1) + '%';
+      vv.style.color = up ? '#ef4444' : '#22c55e';
+      if(vs) vs.textContent = `préc. : ${_htg(_depPrevTotal)}`;
+    }
+  }
+}
+
+// ── Panneaux du tableau de bord Dépenses ───────────────────────────────
+function _depDonut(canvasId, legendId, entries, opts={}){
+  const cv = document.getElementById(canvasId);
+  if(!cv || typeof Chart==='undefined') return;
+  if(_suiviDepCharts[canvasId]){ _suiviDepCharts[canvasId].destroy(); delete _suiviDepCharts[canvasId]; }
+  const legend = document.getElementById(legendId);
+  const tot = entries.reduce((s,e)=>s+e.value, 0);
+  if(!entries.length || tot<=0){
+    if(legend) legend.innerHTML = '<div class="dep-legend-row" style="opacity:.5">Aucune donnée</div>';
+    return;
+  }
+  _suiviDepCharts[canvasId] = new Chart(cv.getContext('2d'), {
+    type:'doughnut',
+    data:{ labels:entries.map(e=>e.name),
+      datasets:[{ data:entries.map(e=>e.value),
+        backgroundColor:entries.map(e=>e.color),
+        borderColor:'rgba(11,22,40,.9)', borderWidth:2, hoverOffset:6 }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
+      plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label:c=>` ${c.label} : G ${Number(c.parsed).toLocaleString('fr')} (${tot?Math.round(c.parsed/tot*100):0}%)` } } } }
+  });
+  if(legend){
+    legend.innerHTML = entries.map(e=>`
+      <div class="dep-legend-row">
+        <span class="dep-legend-dot" style="background:${e.color}"></span>
+        <span class="dep-legend-name">${esc(e.name)}</span>
+        <span class="dep-legend-val">${_htg(e.value)}</span>
+        <span class="dep-legend-pct">${tot?Math.round(e.value/tot*100):0}%</span>
+      </div>`).join('');
+  }
+}
+
+function _depTopBenef(containerId, data){
+  const box = document.getElementById(containerId);
+  if(!box) return;
+  const map={};
+  data.forEach(d=>{ const k=(d.beneficiaire||'').trim() || '(sans bénéficiaire)'; map[k]=(map[k]||0)+d.montant; });
+  const rows = Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  if(!rows.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px">Aucune donnée</div>'; return; }
+  const max = rows[0][1] || 1;
+  const tot = Object.values(map).reduce((s,v)=>s+v,0);
+  box.innerHTML = rows.map(([nom,val],i)=>{
+    const col = _DEP_CAT_PALETTE[i % _DEP_CAT_PALETTE.length];
+    return `<div class="dep-bar-row">
+      <div class="dep-bar-head"><b>${esc(nom)}</b><span>${_htg(val)} · ${tot?Math.round(val/tot*100):0}%</span></div>
+      <div class="dep-bar-track"><div class="dep-bar-fill" style="width:${Math.max(3,val/max*100)}%;background:${col}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function _renderDepPanels(data){
+  // Répartition par catégorie (top 6 + Autres)
+  const catMap={};
+  data.forEach(d=>{ catMap[d.categorie||'—']=(catMap[d.categorie||'—']||0)+d.montant; });
+  let cats = Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+  let catEntries = cats.slice(0,6).map(([n,v])=>({name:n, value:v, color:_depCatColor(n)}));
+  if(cats.length>6){
+    const autres = cats.slice(6).reduce((s,[,v])=>s+v,0);
+    catEntries.push({name:'Autres', value:autres, color:'#64748b'});
+  }
+  _depDonut('dep-chart-cat-donut','dep-cat-legend', catEntries);
+
+  // Dépenses par caisse d'origine
+  const caisseMap={};
+  data.forEach(d=>{ const k=d.produit_nom || 'Caisse générale'; caisseMap[k]=(caisseMap[k]||0)+d.montant; });
+  const caisseCols={ 'Gazoline':'#3b82f6', 'Diesel':'#f59e0b', 'Caisse générale':'#64748b' };
+  const caisseEntries = Object.entries(caisseMap).sort((a,b)=>b[1]-a[1])
+    .map(([n,v],i)=>({name:n, value:v, color:caisseCols[n] || _DEP_CAT_PALETTE[i % _DEP_CAT_PALETTE.length]}));
+  _depDonut('dep-chart-caisse','dep-caisse-legend', caisseEntries);
+
+  _depTopBenef('dep-top-benef', data);
 }
 
 // Filtre en direct (côté client, sans requête serveur) la liste déjà chargée
@@ -20545,6 +20694,7 @@ function depRechercheFiltrer(){
   _depUpdateKpis(filtered);
   renderDepTable(filtered);
   renderDepChartCategories('dep-chart-suivi', filtered);
+  _renderDepPanels(filtered);
 }
 
 function renderDepTable(data){
