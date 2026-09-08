@@ -28,8 +28,9 @@ from models import (
     PatisserieCategorie, PatisserieProduit, PatisserieAchat, PatisserieMouvementStock,
     PatisserieSessionCaisse, PatisserieVente, PatisserieLigneVente, PatisserieDepense,
     PatisserieEtapeSuivi, PatisserieCommande, PatisserieLigneCommande, PatisserieCommandeSuivi,
-    RenflouementDepartement, Employe, Utilisateur,
+    RenflouementDepartement, Employe, Utilisateur, CategorieDepense,
 )
+import listes_reference as lref
 from tz_utils import today_haiti, bounds_haiti, HAITI_TZ
 
 router = APIRouter(prefix="/api/patisserie", tags=["Patisserie"])
@@ -399,6 +400,7 @@ def annuler_achat(achat_id: int, db: Session = Depends(get_db)):
 def liste_depenses(
     date_debut: Optional[date_type] = Query(default=None),
     date_fin:   Optional[date_type] = Query(default=None),
+    categorie:  Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
 ):
     today = today_haiti()
@@ -407,12 +409,13 @@ def liste_depenses(
     dt_deb, _ = bounds_haiti(date_debut)
     _, dt_fin = bounds_haiti(date_fin)
 
-    deps = (
+    q = (
         db.query(PatisserieDepense)
         .filter(PatisserieDepense.date_depense >= dt_deb, PatisserieDepense.date_depense <= dt_fin)
-        .order_by(PatisserieDepense.date_depense.desc())
-        .all()
     )
+    if categorie:
+        q = q.filter(PatisserieDepense.categorie == categorie)
+    deps = q.order_by(PatisserieDepense.date_depense.desc()).all()
     lignes = [
         {
             "id": d.id, "description": d.description, "categorie": d.categorie or "AUTRE",
@@ -430,15 +433,17 @@ def liste_depenses(
 
 
 @router.post("/depenses", status_code=201)
-def ajouter_depense(data: dict, db: Session = Depends(get_db)):
+def ajouter_depense(data: dict, request: Request, db: Session = Depends(get_db)):
     desc = (data.get("description") or "").strip()
     if not desc:
         raise HTTPException(400, "La description est requise")
     montant = float(data.get("montant") or 0)
     if montant <= 0:
         raise HTTPException(400, "Le montant doit être positif")
+    categorie = lref.resoudre(db, CategorieDepense, data.get("categorie"),
+                              request=request, defaut="AUTRE", label="catégorie")
     d = PatisserieDepense(
-        description=desc, categorie=data.get("categorie") or "AUTRE", montant=Decimal(str(montant)),
+        description=desc, categorie=categorie, montant=Decimal(str(montant)),
         date_depense=_parse_date_saisie(data.get("date_depense")) or datetime.now(timezone.utc),
         fournisseur=(data.get("fournisseur") or "").strip() or None,
         notes=(data.get("notes") or "").strip() or None,
@@ -448,13 +453,15 @@ def ajouter_depense(data: dict, db: Session = Depends(get_db)):
 
 
 @router.put("/depenses/{dep_id}")
-def modifier_depense(dep_id: int, data: dict, db: Session = Depends(get_db)):
+def modifier_depense(dep_id: int, data: dict, request: Request, db: Session = Depends(get_db)):
     d = db.query(PatisserieDepense).filter_by(id=dep_id).first()
     if not d:
         raise HTTPException(404, "Dépense introuvable")
     if "description" in data and data["description"]:
         d.description = data["description"].strip()
-    if "categorie" in data: d.categorie = data["categorie"] or "AUTRE"
+    if "categorie" in data:
+        d.categorie = lref.resoudre(db, CategorieDepense, data.get("categorie"),
+                                    request=request, defaut="AUTRE", label="catégorie")
     if "montant" in data:
         montant = float(data["montant"] or 0)
         if montant <= 0:

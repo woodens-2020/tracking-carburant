@@ -494,6 +494,47 @@ class Achat(Base):
 
 
 # ══════════════════════════════════════════════════════════════════
+# LISTES DE RÉFÉRENCE PARTAGÉES  (voir listes_reference.py)
+#   - categories_depense : catégorie de toutes les dépenses du système
+#   - postes             : intitulé de poste des employés
+# `nom_norm` (casse repliée, espaces réduits) porte la contrainte d'unicité
+# → une même valeur ne peut jamais être créée deux fois.
+# ══════════════════════════════════════════════════════════════════
+
+class CategorieDepense(Base):
+    """Catégorie de dépense, commune à tous les modules (général, pâtisserie,
+    cuisine, hôtel, Zelle)."""
+    __tablename__ = "categories_depense"
+
+    id            = Column(Integer, primary_key=True)
+    nom           = Column(String(60), nullable=False)
+    nom_norm      = Column(String(60), nullable=False, unique=True)
+    actif         = Column(Boolean, nullable=False, default=True)
+    date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    cree_par_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    __table_args__ = (
+        Index("idx_categories_depense_actif", "actif"),
+    )
+
+
+class Poste(Base):
+    """Intitulé de poste des employés (module Employés principal)."""
+    __tablename__ = "postes"
+
+    id            = Column(Integer, primary_key=True)
+    nom           = Column(String(100), nullable=False)
+    nom_norm      = Column(String(100), nullable=False, unique=True)
+    actif         = Column(Boolean, nullable=False, default=True)
+    date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    cree_par_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    __table_args__ = (
+        Index("idx_postes_actif", "actif"),
+    )
+
+
+# ══════════════════════════════════════════════════════════════════
 # MODULE BAR / RESTAURANT — POS (Point of Sale)
 # ══════════════════════════════════════════════════════════════════
 

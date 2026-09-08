@@ -19,7 +19,8 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
-from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse, OAuthState
+from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse, OAuthState, CategorieDepense, Poste
+import listes_reference as lref
 from otp_service import (
     OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
     create_otp, send_otp_email, send_otp_whatsapp, verify_otp, cleanup_expired_otps,
@@ -43,6 +44,7 @@ from admin_routes import router as admin_router
 from zelle_routes import router as zelle_router
 from taches_routes import router as taches_router
 from pieces_jointes_routes import router as pieces_jointes_router
+from listes_reference_routes import router as listes_reference_router
 from auth import (
     SESSION_COOKIE, hash_password, verify_password,
     hash_code_acces, verify_code_acces,
@@ -228,6 +230,7 @@ app.include_router(admin_router)
 app.include_router(zelle_router)
 app.include_router(taches_router)
 app.include_router(pieces_jointes_router)
+app.include_router(listes_reference_router)
 
 
 @app.on_event("startup")
@@ -241,6 +244,9 @@ def startup():
         "ALTER TABLE zelle_transactions ADD COLUMN IF NOT EXISTS expediteur_contact VARCHAR(100)",
         "ALTER TABLE login_security_events ADD COLUMN IF NOT EXISTS distance_km FLOAT",
         "ALTER TABLE login_security_events ADD COLUMN IF NOT EXISTS statut_geoloc VARCHAR(20)",
+        # Catégories de dépense désormais gérées en table (categories_depense) :
+        # on lève l'ancienne liste figée pour permettre l'ajout à la volée.
+        "ALTER TABLE depenses DROP CONSTRAINT IF EXISTS chk_depense_categorie",
     ]
     try:
         with engine.connect() as _c:
@@ -283,6 +289,59 @@ def startup():
             _db.commit()
         except Exception:
             pass
+
+        # ── Seed des listes de référence partagées (idempotent) ──────────
+        # Valeurs par défaut + toutes les valeurs déjà présentes dans les
+        # tables métier, dédupliquées sur la forme normalisée.
+        try:
+            _cats_defaut = sorted(_CATEGORIES_DEPENSE) + [
+                # valeurs historiques codées en dur dans les anciens menus des
+                # modules (pâtisserie / cuisine / hôtel) — seedées pour que les
+                # dépenses déjà enregistrées restent filtrables partout.
+                "AUTRE", "INGREDIENTS", "EQUIPEMENT", "ENERGIE", "PERSONNEL",
+                "GAZ", "EMBALLAGE", "TRANSPORT", "ENTRETIEN", "BLANCHISSERIE",
+                "FOURNITURES", "MAINTENANCE",
+            ]
+            _cats_sources = [
+                "SELECT DISTINCT categorie FROM depenses",
+                "SELECT DISTINCT categorie FROM patisserie_depenses",
+                "SELECT DISTINCT categorie FROM cuisine_depenses",
+                "SELECT DISTINCT categorie FROM hotel_depenses",
+                "SELECT DISTINCT categorie FROM zelle_depenses",
+            ]
+            _postes_defaut = [
+                "Pompiste", "Caissier / Caissière", "Gérant", "Superviseur", "Comptable",
+                "Technicien", "Technicien de maintenance", "Responsable Sécurité",
+                "Agent de sécurité", "Serveuse", "Assistant Directeur",
+                "Responsable Logistique", "DJ", "Chauffeur", "Nettoyeur / Nettoyeuse",
+                "Secrétaire", "Magasinier", "Directeur Général",
+            ]
+            _postes_sources = ["SELECT DISTINCT poste FROM employes"]
+
+            def _seed_liste(_modele, _defauts, _sources):
+                _mx = lref._maxlen(_modele)
+                _vus = {row.nom_norm for row in _db.query(_modele).all()}
+                _valeurs = list(_defauts)
+                for _s in _sources:
+                    try:
+                        for (_v,) in _db.execute(_text(_s)):
+                            if _v:
+                                _valeurs.append(_v)
+                    except Exception:
+                        pass
+                for _v in _valeurs:
+                    _v = (_v or "").strip()
+                    _n = lref.normaliser(_v)
+                    if not _n or _n in _vus:
+                        continue
+                    _vus.add(_n)
+                    _db.add(_modele(nom=_v[:_mx], nom_norm=_n[:_mx], actif=True))
+                _db.commit()
+
+            _seed_liste(CategorieDepense, _cats_defaut, _cats_sources)
+            _seed_liste(Poste, _postes_defaut, _postes_sources)
+        except Exception:
+            _db.rollback()
 
 
 # ---------- Authentification ----------
@@ -3788,10 +3847,13 @@ class EmployePatch(BaseModel):
 _CONTRATS_VALIDES = {"CDI", "CDD", "Temps partiel", "Journalier", "Stage"}
 
 @app.get("/api/employes")
-def lister_employes(actif: Optional[bool] = None, db: Session = Depends(get_db)):
+def lister_employes(actif: Optional[bool] = None, poste: Optional[str] = None,
+                    db: Session = Depends(get_db)):
     q = db.query(Employe)
     if actif is not None:
         q = q.filter(Employe.actif == actif)
+    if poste:
+        q = q.filter(Employe.poste == poste)
     employes = q.order_by(Employe.nom, Employe.prenom).all()
     return [
         {
@@ -3808,11 +3870,14 @@ def lister_employes(actif: Optional[bool] = None, db: Session = Depends(get_db))
     ]
 
 @app.post("/api/employes", status_code=201)
-def creer_employe(data: EmployeIn, db: Session = Depends(get_db)):
+def creer_employe(data: EmployeIn, request: Request, db: Session = Depends(get_db)):
     if data.type_contrat not in _CONTRATS_VALIDES:
         raise HTTPException(400, f"Type de contrat invalide. Valeurs : {sorted(_CONTRATS_VALIDES)}")
     if data.salaire_base < 0:
         raise HTTPException(400, "Le salaire de base doit être ≥ 0.")
+    if not (data.poste or "").strip():
+        raise HTTPException(400, "Le poste est requis.")
+    poste = lref.resoudre(db, Poste, data.poste, request=request, label="poste")
     try:
         from datetime import date as _date
         date_emb = _date.fromisoformat(data.date_embauche)
@@ -3820,7 +3885,7 @@ def creer_employe(data: EmployeIn, db: Session = Depends(get_db)):
         raise HTTPException(400, "Format de date invalide (attendu YYYY-MM-DD).")
     e = Employe(
         nom=data.nom.strip(), prenom=data.prenom.strip(),
-        poste=data.poste.strip(), date_embauche=date_emb,
+        poste=poste, date_embauche=date_emb,
         salaire_base=data.salaire_base, type_contrat=data.type_contrat,
         telephone=data.telephone, email=data.email, notes=data.notes,
     )
@@ -3840,13 +3905,13 @@ def creer_employe(data: EmployeIn, db: Session = Depends(get_db)):
     return {"id": e.id, "message": "Employé créé."}
 
 @app.put("/api/employes/{employe_id}")
-def modifier_employe(employe_id: int, data: EmployePatch, db: Session = Depends(get_db)):
+def modifier_employe(employe_id: int, data: EmployePatch, request: Request, db: Session = Depends(get_db)):
     e = db.query(Employe).filter(Employe.id == employe_id).first()
     if not e:
         raise HTTPException(404, "Employé introuvable.")
     if data.nom          is not None: e.nom          = data.nom.strip()
     if data.prenom       is not None: e.prenom       = data.prenom.strip()
-    if data.poste        is not None: e.poste        = data.poste.strip()
+    if data.poste        is not None: e.poste        = lref.resoudre(db, Poste, data.poste, request=request, label="poste")
     if data.salaire_base is not None:
         if data.salaire_base < 0:
             raise HTTPException(400, "Le salaire doit être ≥ 0.")
@@ -4169,9 +4234,10 @@ def lister_depenses(
     }
 
 @app.post("/api/depenses", status_code=201)
-def creer_depense(data: DepenseIn, db: Session = Depends(get_db)):
-    if data.categorie not in _CATEGORIES_DEPENSE:
-        raise HTTPException(400, f"Catégorie invalide. Valeurs : {sorted(_CATEGORIES_DEPENSE)}")
+def creer_depense(data: DepenseIn, request: Request, db: Session = Depends(get_db)):
+    if not (data.categorie or "").strip():
+        raise HTTPException(400, "La catégorie est requise.")
+    categorie = lref.resoudre(db, CategorieDepense, data.categorie, request=request, label="catégorie")
     if data.montant <= 0:
         raise HTTPException(400, "Le montant doit être > 0.")
     try:
@@ -4186,7 +4252,7 @@ def creer_depense(data: DepenseIn, db: Session = Depends(get_db)):
             raise HTTPException(400, "Produit (caisse) introuvable.")
     _verifier_limite(db, data.montant)
     d = Depense(
-        categorie=data.categorie, description=data.description.strip(),
+        categorie=categorie, description=data.description.strip(),
         montant=data.montant, date_depense=date_d,
         beneficiaire=data.beneficiaire, reference=data.reference, notes=data.notes,
         produit_id=produit.id if produit else None,
@@ -4210,14 +4276,12 @@ def creer_depense(data: DepenseIn, db: Session = Depends(get_db)):
     return {"id": d.id, "message": "Dépense enregistrée."}
 
 @app.put("/api/depenses/{depense_id}")
-def modifier_depense(depense_id: int, data: DepensePatch, db: Session = Depends(get_db)):
+def modifier_depense(depense_id: int, data: DepensePatch, request: Request, db: Session = Depends(get_db)):
     d = db.query(Depense).filter(Depense.id == depense_id).first()
     if not d:
         raise HTTPException(404, "Dépense introuvable.")
     if data.categorie is not None:
-        if data.categorie not in _CATEGORIES_DEPENSE:
-            raise HTTPException(400, "Catégorie invalide.")
-        d.categorie = data.categorie
+        d.categorie = lref.resoudre(db, CategorieDepense, data.categorie, request=request, label="catégorie")
     if data.description  is not None: d.description  = data.description.strip()
     if data.montant is not None:
         if data.montant <= 0:

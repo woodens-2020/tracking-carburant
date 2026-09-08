@@ -16,7 +16,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import HotelChambre, HotelEmploye, HotelReservation, HotelDepense, RenflouementDepartement, Utilisateur
+from models import HotelChambre, HotelEmploye, HotelReservation, HotelDepense, RenflouementDepartement, Utilisateur, CategorieDepense
+import listes_reference as lref
 
 router = APIRouter(prefix="/api/hotel", tags=["Hotel"])
 
@@ -1218,6 +1219,7 @@ def _parse_date_saisie_hotel(raw):
 def liste_depenses_hotel(
     date_debut: Optional[str] = Query(default=None),
     date_fin:   Optional[str] = Query(default=None),
+    categorie:  Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
 ):
     from datetime import date as date_type, time as time_type
@@ -1227,12 +1229,13 @@ def liste_depenses_hotel(
     dt_deb = datetime.combine(d_debut, time_type.min).replace(tzinfo=timezone.utc)
     dt_fin = datetime.combine(d_fin,   time_type.max).replace(tzinfo=timezone.utc)
 
-    deps = (
+    q = (
         db.query(HotelDepense)
         .filter(HotelDepense.date_depense >= dt_deb, HotelDepense.date_depense <= dt_fin)
-        .order_by(HotelDepense.date_depense.desc())
-        .all()
     )
+    if categorie:
+        q = q.filter(HotelDepense.categorie == categorie)
+    deps = q.order_by(HotelDepense.date_depense.desc()).all()
     from pieces_jointes_routes import compter_pieces_jointes_par_entite
     nb_pj = compter_pieces_jointes_par_entite(db, "hotel_depense", [d.id for d in deps])
     return [
@@ -1263,9 +1266,11 @@ def ajouter_depense_hotel(data: dict, request: Request, db: Session = Depends(ge
     date_dep = _parse_date_saisie_hotel(data.get("date_depense")) or datetime.now(timezone.utc)
     _verifier_permission_date_hotel(request, db, date_dep)
 
+    categorie = lref.resoudre(db, CategorieDepense, data.get("categorie"),
+                              request=request, defaut="AUTRE", label="catégorie")
     d = HotelDepense(
         description  = desc,
-        categorie    = data.get("categorie") or "AUTRE",
+        categorie    = categorie,
         montant      = Decimal(str(montant)),
         date_depense = date_dep,
         fournisseur  = (data.get("fournisseur") or "").strip() or None,
@@ -1285,7 +1290,9 @@ def modifier_depense_hotel(dep_id: int, data: dict, request: Request, db: Sessio
         raise HTTPException(404, "Dépense introuvable")
     if "description" in data and data["description"]:
         d.description = data["description"].strip()
-    if "categorie"   in data: d.categorie   = data["categorie"] or "AUTRE"
+    if "categorie"   in data:
+        d.categorie = lref.resoudre(db, CategorieDepense, data.get("categorie"),
+                                    request=request, defaut="AUTRE", label="catégorie")
     if "montant" in data:
         montant = float(data["montant"] or 0)
         if montant <= 0:

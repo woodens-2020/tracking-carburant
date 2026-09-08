@@ -10,7 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import CuisinePlat, CuisineDepense, CuisineVente, CuisineLigneVente, CuisineAchat, RenflouementDepartement, Utilisateur
+from models import CuisinePlat, CuisineDepense, CuisineVente, CuisineLigneVente, CuisineAchat, RenflouementDepartement, Utilisateur, CategorieDepense
+import listes_reference as lref
 
 router = APIRouter(prefix="/api/cuisine", tags=["Cuisine"])
 
@@ -232,6 +233,7 @@ def creer_renflouement_cuisine(
 def liste_depenses(
     date_debut: Optional[date_type] = Query(default=None),
     date_fin:   Optional[date_type] = Query(default=None),
+    categorie:  Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
 ):
     today = today_haiti()
@@ -240,13 +242,14 @@ def liste_depenses(
     dt_deb = datetime.combine(date_debut, time.min).replace(tzinfo=timezone.utc)
     dt_fin = datetime.combine(date_fin,   time.max).replace(tzinfo=timezone.utc)
 
-    deps = (
+    q = (
         db.query(CuisineDepense)
         .filter(CuisineDepense.date_depense >= dt_deb,
                 CuisineDepense.date_depense <= dt_fin)
-        .order_by(CuisineDepense.date_depense.desc())
-        .all()
     )
+    if categorie:
+        q = q.filter(CuisineDepense.categorie == categorie)
+    deps = q.order_by(CuisineDepense.date_depense.desc()).all()
     from pieces_jointes_routes import compter_pieces_jointes_par_entite
     nb_pj = compter_pieces_jointes_par_entite(db, "cuisine_depense", [d.id for d in deps])
     return [
@@ -277,9 +280,11 @@ def ajouter_depense(data: dict, request: Request, db: Session = Depends(get_db))
     date_dep = _parse_date_saisie(data.get("date_depense")) or datetime.now(timezone.utc)
     _verifier_permission_date(request, db, date_dep)
 
+    categorie = lref.resoudre(db, CategorieDepense, data.get("categorie"),
+                              request=request, defaut="AUTRE", label="catégorie")
     d = CuisineDepense(
         description  = desc,
-        categorie    = data.get("categorie") or "AUTRE",
+        categorie    = categorie,
         montant      = Decimal(str(montant)),
         date_depense = date_dep,
         fournisseur  = (data.get("fournisseur") or "").strip() or None,
@@ -299,7 +304,9 @@ def modifier_depense(dep_id: int, data: dict, request: Request, db: Session = De
         raise HTTPException(404, "Dépense introuvable")
     if "description" in data and data["description"]:
         d.description = data["description"].strip()
-    if "categorie"   in data: d.categorie   = data["categorie"] or "AUTRE"
+    if "categorie"   in data:
+        d.categorie = lref.resoudre(db, CategorieDepense, data.get("categorie"),
+                                    request=request, defaut="AUTRE", label="catégorie")
     if "montant" in data:
         montant = float(data["montant"] or 0)
         if montant <= 0:

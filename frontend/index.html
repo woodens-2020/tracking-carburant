@@ -2971,6 +2971,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 <script src="/vendor/html2canvas.min.js"></script>
 <body>
 
+<!-- Listes de référence partagées (suggestions de saisie) -->
+<datalist id="dl-categories-depense"></datalist>
+<datalist id="dl-postes"></datalist>
+
 <div id="load-overlay"><div class="lo-badge"><div class="lo-ring"></div><span class="lo-k">K</span></div></div>
 <script src="/shared/loading-overlay.js"></script>
 <script src="/shared/i18n-errors.js"></script>
@@ -5364,6 +5368,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option value="false">Inactifs</option>
             </select>
           </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Poste</label>
+            <select class="gi-filter-input" id="emp-filtre-poste" onchange="loadEmployes()">
+              <option value="">Tous</option>
+            </select>
+          </div>
           <div style="margin-top:auto">
             <button class="gi-btn-secondary" onclick="document.getElementById('emp-search').value='';filterEmpLocal()" title="Effacer la recherche">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -5408,27 +5418,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="gi-form-row">
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Poste *</label>
-                <select class="gi-form-select" id="emp-poste">
-                  <option value="">— Sélectionner un poste —</option>
-                  <option>Pompiste</option>
-                  <option>Caissier / Caissière</option>
-                  <option>Gérant</option>
-                  <option>Superviseur</option>
-                  <option>Comptable</option>
-                  <option>Technicien</option>
-                  <option>Technicien de maintenance</option>
-                  <option>Responsable Sécurité</option>
-                  <option>Agent de sécurité</option>
-                  <option>Serveuse</option>
-                  <option>Assistant Directeur</option>
-                  <option>Responsable Logistique</option>
-                  <option>DJ</option>
-                  <option>Chauffeur</option>
-                  <option>Nettoyeur / Nettoyeuse</option>
-                  <option>Secrétaire</option>
-                  <option>Magasinier</option>
-                  <option>Directeur Général</option>
-                </select>
+                <input class="gi-form-input" id="emp-poste" list="dl-postes" autocomplete="off"
+                       placeholder="Ex : Caissier, Gérant, Technicien…"/>
               </div>
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Type de contrat *</label>
@@ -5699,9 +5690,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <label class="gi-filter-lbl">Catégorie</label>
             <select class="gi-filter-input" id="dep-filtre-cat" onchange="loadDepenses()">
               <option value="">Toutes</option>
-              <option>Salaires</option><option>Maintenance</option><option>Fournitures</option>
-              <option value="Electricite">Électricité</option><option>Eau</option><option>Loyer</option>
-              <option>Transport</option><option>Taxes</option><option>Assurance</option><option>Divers</option>
             </select>
           </div>
           <div class="gi-filter-field">
@@ -5737,12 +5725,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="gi-form-row">
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Catégorie *</label>
-                <select class="gi-form-select" id="dep-cat">
-                  <option value="">— Sélectionner —</option>
-                  <option>Salaires</option><option>Maintenance</option><option>Fournitures</option>
-                  <option value="Electricite">Électricité</option><option>Eau</option><option>Loyer</option>
-                  <option>Transport</option><option>Taxes</option><option>Assurance</option><option>Divers</option>
-                </select>
+                <input class="gi-form-input" id="dep-cat" list="dl-categories-depense" autocomplete="off"
+                       placeholder="Ex : Électricité, Loyer, Salaires…"/>
               </div>
               <div class="gi-form-field">
                 <label class="gi-form-lbl">Date *</label>
@@ -8352,6 +8336,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div style="position:relative;height:220px;margin-bottom:20px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px;">
           <canvas id="zdep-chart-suivi"></canvas>
         </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+          <label class="gi-filter-lbl">Catégorie</label>
+          <select class="gi-filter-input" id="zdep-filtre-cat" onchange="_zdepLoad()" style="min-width:160px;">
+            <option value="">Toutes</option>
+          </select>
+        </div>
         <div style="overflow-x:auto;margin-bottom:24px;">
           <table class="gi-table">
             <thead>
@@ -8398,7 +8388,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 </div>
                 <div class="gi-form-field">
                   <label class="gi-form-lbl">Catégorie</label>
-                  <input class="gi-form-input" id="zdep-cat" placeholder="Ex : Frais bancaires"/>
+                  <input class="gi-form-input" id="zdep-cat" list="dl-categories-depense" autocomplete="off" placeholder="Ex : Frais bancaires"/>
                 </div>
               </div>
               <div class="gi-form-row full">
@@ -9148,11 +9138,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
           <select class="pos-select" id="ckdep-filtre-cat" onchange="ckDepAfficher()" style="min-width:140px">
             <option value="">Toutes catégories</option>
-            <option value="INGREDIENTS">Ingrédients</option>
-            <option value="EQUIPEMENT">Équipement</option>
-            <option value="ENERGIE">Énergie</option>
-            <option value="PERSONNEL">Personnel</option>
-            <option value="AUTRE">Autre</option>
           </select>
           <input class="pos-input" id="ckdep-recherche" type="text" placeholder="Rechercher : description, fournisseur, notes…" style="flex:1;min-width:200px" oninput="ckDepAfficher()">
           <button class="pos-btn teal" onclick="ckDepCharger()">Filtrer</button>
@@ -9217,13 +9202,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
-                <select class="pos-select" id="ckdep-cat" style="width:100%">
-                  <option value="INGREDIENTS">Ingrédients</option>
-                  <option value="EQUIPEMENT">Équipement</option>
-                  <option value="ENERGIE">Énergie</option>
-                  <option value="PERSONNEL">Personnel</option>
-                  <option value="AUTRE">Autre</option>
-                </select>
+                <input class="pos-input" id="ckdep-cat" list="dl-categories-depense" autocomplete="off"
+                       placeholder="Catégorie" style="width:100%">
+
               </div>
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Montant (G) *</label>
@@ -10227,12 +10208,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <input class="pos-input" type="date" id="ptd-dep-date-fin" style="width:150px">
           <select class="pos-select" id="ptd-dep-categorie" style="min-width:160px">
             <option value="">Toutes catégories</option>
-            <option value="INGREDIENTS">Ingrédients</option>
-            <option value="EQUIPEMENT">Équipement</option>
-            <option value="GAZ">Gaz</option>
-            <option value="EMBALLAGE">Emballage</option>
-            <option value="TRANSPORT">Transport</option>
-            <option value="AUTRE">Autre</option>
           </select>
           <button class="pos-btn ghost" onclick="loadPatisserieDepenses()">Filtrer</button>
           <div style="margin-left:auto;font-weight:700" id="ptd-dep-total">Total : 0 G</div>
@@ -10270,14 +10245,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
-                <select class="pos-select" id="pt-dep-cat" style="width:100%">
-                  <option value="INGREDIENTS">Ingrédients</option>
-                  <option value="EQUIPEMENT">Équipement</option>
-                  <option value="GAZ">Gaz</option>
-                  <option value="EMBALLAGE">Emballage</option>
-                  <option value="TRANSPORT">Transport</option>
-                  <option value="AUTRE">Autre</option>
-                </select>
+                <input class="pos-input" id="pt-dep-cat" list="dl-categories-depense" autocomplete="off"
+                       placeholder="Catégorie" style="width:100%">
+
               </div>
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Montant (G) *</label>
@@ -10816,13 +10786,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
           <select class="pos-select" id="hdep-filtre-cat" onchange="hdepAfficher()" style="min-width:140px">
             <option value="">Toutes catégories</option>
-            <option value="ENTRETIEN">Entretien</option>
-            <option value="BLANCHISSERIE">Blanchisserie</option>
-            <option value="FOURNITURES">Fournitures</option>
-            <option value="MAINTENANCE">Maintenance</option>
-            <option value="ENERGIE">Énergie</option>
-            <option value="PERSONNEL">Personnel</option>
-            <option value="AUTRE">Autre</option>
           </select>
           <input class="pos-input" id="hdep-recherche" type="text" placeholder="Rechercher : description, fournisseur, notes…" style="flex:1;min-width:200px" oninput="hdepAfficher()">
           <button class="pos-btn teal" onclick="hdepCharger()">Filtrer</button>
@@ -10887,15 +10850,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Catégorie</label>
-                <select class="pos-select" id="hdep-cat" style="width:100%">
-                  <option value="ENTRETIEN">Entretien</option>
-                  <option value="BLANCHISSERIE">Blanchisserie</option>
-                  <option value="FOURNITURES">Fournitures</option>
-                  <option value="MAINTENANCE">Maintenance</option>
-                  <option value="ENERGIE">Énergie</option>
-                  <option value="PERSONNEL">Personnel</option>
-                  <option value="AUTRE">Autre</option>
-                </select>
+                <input class="pos-input" id="hdep-cat" list="dl-categories-depense" autocomplete="off"
+                       placeholder="Catégorie" style="width:100%">
+
               </div>
               <div>
                 <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Montant (G) *</label>
@@ -11817,6 +11774,36 @@ const POST  = (p,b)=> apiFetch('POST', p,b);
 const PUT   = (p,b)=> apiFetch('PUT',  p,b);
 const PATCH = (p,b)=> apiFetch('PATCH',p,b);
 const DEL   = p    => apiFetch('DELETE',p);
+
+// ══════════════════════════════════════════════
+// LISTES DE RÉFÉRENCE PARTAGÉES
+//   catégories de dépense · postes
+//   - saisie libre + suggestions (datalist) dans les formulaires
+//   - filtres alimentés dynamiquement
+//   - l'ajout d'une nouvelle valeur est fait côté serveur au moment de
+//     l'enregistrement (réservé manager/admin) — rien de spécial ici.
+// ══════════════════════════════════════════════
+const _listesRef = { 'categories-depense': [], 'postes': [] };
+
+async function _chargerListeRef(cle, force){
+  if(!force && _listesRef[cle] && _listesRef[cle].length) { _syncDatalistRef(cle); return _listesRef[cle]; }
+  try{ _listesRef[cle] = (await GET('/listes/'+cle)) || []; }
+  catch(e){ _listesRef[cle] = _listesRef[cle] || []; }
+  _syncDatalistRef(cle);
+  return _listesRef[cle];
+}
+function _syncDatalistRef(cle){
+  const dl = document.getElementById('dl-'+cle);
+  if(dl) dl.innerHTML = (_listesRef[cle]||[]).map(x=>'<option value="'+esc(x.nom)+'"></option>').join('');
+}
+function _remplirFiltreRef(sel, cle, labelTous){
+  if(typeof sel === 'string') sel = document.getElementById(sel);
+  if(!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = ['<option value="">'+(labelTous||'Toutes')+'</option>']
+    .concat((_listesRef[cle]||[]).map(x=>'<option>'+esc(x.nom)+'</option>')).join('');
+  if(cur){ sel.value = cur; }
+}
 
 // ══════════════════════════════════════════════
 // NAVIGATION
@@ -19750,8 +19737,14 @@ function _giError(wrapId,msg){ const w=document.getElementById(wrapId); if(w) w.
 
 async function loadEmployes(){
   _giLoading('emp-table-wrap');
+  await _chargerListeRef('postes');
+  _remplirFiltreRef('emp-filtre-poste', 'postes', 'Tous');
   const actif = document.getElementById('emp-filtre-actif')?.value ?? '';
-  const qs = actif !== '' ? '?actif='+actif : '';
+  const poste = document.getElementById('emp-filtre-poste')?.value ?? '';
+  const params = [];
+  if(actif !== '') params.push('actif='+actif);
+  if(poste !== '') params.push('poste='+encodeURIComponent(poste));
+  const qs = params.length ? '?'+params.join('&') : '';
   try {
     const [employes, stats] = await Promise.all([
       apiFetch('GET','/employes'+qs),
@@ -20054,6 +20047,8 @@ function _depPopulateCaisseSelects(){
 async function loadDepenses(){
   _giLoading('dep-table-wrap');
   _depPopulateCaisseSelects();
+  await _chargerListeRef('categories-depense');
+  _remplirFiltreRef('dep-filtre-cat', 'categories-depense', 'Toutes');
 
   // Affichage du bouton PDG et chargement de la limite en parallèle
   if(_appUser?.role === 'pdg'){
@@ -29255,6 +29250,8 @@ async function loadCuisineDepenses(){
 }
 
 async function ckDepCharger(){
+  await _chargerListeRef('categories-depense');
+  _remplirFiltreRef('ckdep-filtre-cat', 'categories-depense', 'Toutes catégories');
   const debut = document.getElementById('dep-debut')?.value;
   const fin   = document.getElementById('dep-fin')?.value;
   const tbody = document.getElementById('dep-tbody');
@@ -29338,7 +29335,7 @@ function ckDepOuvrirModal(depId){
   } else {
     const today = todayStr();
     ['ckdep-desc','ckdep-montant','dep-fournisseur','ckdep-notes'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('ckdep-cat').value  = 'INGREDIENTS';
+    document.getElementById('ckdep-cat').value  = '';
     document.getElementById('ckdep-date').value = today;
   }
   modal.classList.add('open');
@@ -30916,16 +30913,19 @@ async function ptEtapeSupprimer(id){
 let _ptDepenses = [];
 
 async function loadPatisserieDepenses(){
+  await _chargerListeRef('categories-depense');
+  _remplirFiltreRef('ptd-dep-categorie', 'categories-depense', 'Toutes catégories');
   const dd  = document.getElementById('ptd-dep-date-debut').value;
   const df  = document.getElementById('ptd-dep-date-fin').value;
   const cat = document.getElementById('ptd-dep-categorie').value;
   let params = [];
   if(dd) params.push(`date_debut=${dd}`);
   if(df) params.push(`date_fin=${df}`);
+  if(cat) params.push(`categorie=${encodeURIComponent(cat)}`);
   try{
     const r = await apiFetch('GET', `/patisserie/depenses?${params.join('&')}`);
-    _ptDepenses = cat ? r.depenses.filter(d=>d.categorie===cat) : r.depenses;
-    document.getElementById('ptd-dep-total').textContent = 'Total : ' + fmtG(cat ? _ptDepenses.reduce((s,d)=>s+d.montant,0) : r.total_depenses);
+    _ptDepenses = r.depenses;
+    document.getElementById('ptd-dep-total').textContent = 'Total : ' + fmtG(r.total_depenses);
     const tbody = document.getElementById('pt-depenses-tbody');
     if(!_ptDepenses.length){
       tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune dépense</td></tr>';
@@ -30952,7 +30952,7 @@ function ptDepenseOuvrirModal(id){
   document.getElementById('pt-dep-id').value = id || '';
   document.getElementById('pt-depense-modal-titre').textContent = id ? 'Modifier la dépense' : 'Ajouter une dépense';
   document.getElementById('pt-dep-desc').value = d ? d.description : '';
-  document.getElementById('pt-dep-cat').value = d ? d.categorie : 'INGREDIENTS';
+  document.getElementById('pt-dep-cat').value = d ? d.categorie : '';
   document.getElementById('pt-dep-montant').value = d ? d.montant : '';
   document.getElementById('pt-dep-fournisseur').value = d ? d.fournisseur : '';
   document.getElementById('pt-dep-date').value = d ? d.date_depense.slice(0,10) : todayStr();
@@ -31808,6 +31808,8 @@ async function loadHotelDepenses(){
 }
 
 async function hdepCharger(){
+  await _chargerListeRef('categories-depense');
+  _remplirFiltreRef('hdep-filtre-cat', 'categories-depense', 'Toutes catégories');
   const debut = document.getElementById('hdep-debut')?.value;
   const fin   = document.getElementById('hdep-fin')?.value;
   const tbody = document.getElementById('hdep-tbody');
@@ -31891,7 +31893,7 @@ function hdepOuvrirModal(depId){
   } else {
     const today = todayStr();
     ['hdep-desc','hdep-montant','hdep-fournisseur','hdep-notes'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('hdep-cat').value  = 'ENTRETIEN';
+    document.getElementById('hdep-cat').value  = '';
     document.getElementById('hdep-date').value = today;
   }
   modal.classList.add('open');
@@ -32105,9 +32107,12 @@ async function _zevolLoad(){
 async function _zdepLoad(){
   const tbody = document.getElementById('zdep-tbody');
   if(!tbody) return;
+  await _chargerListeRef('categories-depense');
+  _remplirFiltreRef('zdep-filtre-cat', 'categories-depense', 'Toutes');
+  const catF = document.getElementById('zdep-filtre-cat')?.value || '';
   try{
     const [d, bilan] = await Promise.all([
-      apiFetch('GET','/zelle/depenses'),
+      apiFetch('GET','/zelle/depenses' + (catF ? '?categorie='+encodeURIComponent(catF) : '')),
       apiFetch('GET','/zelle/bilan'),
     ]);
     const cnt = document.getElementById('zdep-attente-count');

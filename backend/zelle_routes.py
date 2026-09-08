@@ -14,7 +14,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import ZelleConfig, ZelleTransaction, ZelleFond, ZelleDepense, Utilisateur
+from models import ZelleConfig, ZelleTransaction, ZelleFond, ZelleDepense, Utilisateur, CategorieDepense
+import listes_reference as lref
 
 router = APIRouter(prefix="/api/zelle", tags=["zelle"])
 
@@ -416,10 +417,13 @@ def evolution_zelle(jours: int = Query(30, ge=7, le=180), db: Session = Depends(
 # ── Dépenses Zelle (nécessitent validation PDG/admin avant déduction du solde) ──────
 
 @router.get("/depenses")
-def lister_zelle_depenses(statut: Optional[str] = None, db: Session = Depends(get_db)):
+def lister_zelle_depenses(statut: Optional[str] = None, categorie: Optional[str] = None,
+                          db: Session = Depends(get_db)):
     q = db.query(ZelleDepense)
     if statut:
         q = q.filter(ZelleDepense.statut == statut)
+    if categorie:
+        q = q.filter(ZelleDepense.categorie == categorie)
     deps = q.order_by(ZelleDepense.date_depense.desc()).all()
     from pieces_jointes_routes import compter_pieces_jointes_par_entite
     nb_pj = compter_pieces_jointes_par_entite(db, "zelle_depense", [d.id for d in deps])
@@ -440,11 +444,12 @@ def creer_zelle_depense(data: ZelleDepenseIn, request: Request, db: Session = De
     montant_usd = round(data.montant, 2) if data.devise == "USD" else round(data.montant / taux, 2)
 
     user = getattr(request.state, "user", None)
+    categorie = lref.resoudre(db, CategorieDepense, data.categorie, request=request, label="catégorie")
     d = ZelleDepense(
         description=data.description.strip(),
         montant_usd=Decimal(str(montant_usd)),
         taux_applique=Decimal(str(taux)),
-        categorie=data.categorie,
+        categorie=categorie,
         notes=data.notes,
         demandeur_id=user.id if user else None,
     )
