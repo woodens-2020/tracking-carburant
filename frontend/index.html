@@ -282,6 +282,19 @@ select option:checked,select option:hover{background-color:var(--panel3)}
   transition:border-color .15s,box-shadow .15s;
 }
 .date-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.12)}
+.date-nav{display:flex;align-items:center;gap:4px}
+.date-nav .date-input{border-radius:0}
+.date-nav-btn{
+  display:flex;align-items:center;justify-content:center;
+  width:30px;height:32px;flex-shrink:0;
+  background:var(--panel2);border:1px solid var(--border2);color:var(--text2);
+  font-size:19px;font-weight:700;line-height:1;cursor:pointer;
+  transition:background .12s,color .12s,border-color .12s;
+}
+.date-nav-btn:first-child{border-radius:var(--rsm) 0 0 var(--rsm);border-right:none}
+.date-nav-btn:last-child{border-radius:0 var(--rsm) var(--rsm) 0;border-left:none}
+.date-nav-btn:hover{background:var(--blue-d);color:var(--blue);border-color:rgba(59,130,246,.35)}
+.date-nav-btn:active{transform:scale(.93)}
 
 .pages{top:56px;left:0;right:0;bottom:36px;overflow-y:auto;overflow-x:hidden;padding-bottom:24px;overflow-anchor:none;scroll-behavior:auto;touch-action:pan-y}
 .pages::-webkit-scrollbar{width:5px}
@@ -3650,7 +3663,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <button class="toggle-btn" id="btn-lang-en" onclick="setLang('en')">EN</button>
       <button class="toggle-btn" id="btn-lang-es" onclick="setLang('es')">ES</button>
     </div>
-    <input type="date" id="date-picker" class="date-input">
+    <div class="date-nav">
+      <button type="button" class="date-nav-btn" onclick="_shiftGlobalDate(-1)" title="Jour précédent" aria-label="Jour précédent">‹</button>
+      <input type="date" id="date-picker" class="date-input">
+      <button type="button" class="date-nav-btn" onclick="_shiftGlobalDate(1)" title="Jour suivant" aria-label="Jour suivant">›</button>
+    </div>
   </div>
 
   <div class="pages" id="pages-container">
@@ -12059,6 +12076,19 @@ function _ymdLocal(d){
   return `${y}-${m}-${j}`;
 }
 function todayStr(){ return _ymdLocal(new Date()); }
+
+// Flèches ◀ ▶ du sélecteur de date global (en-tête) : décale d'un jour et
+// déclenche le rechargement via l'écouteur 'change' du #date-picker.
+function _shiftGlobalDate(delta){
+  const dp = document.getElementById('date-picker');
+  if(!dp) return;
+  const base = new Date((dp.value || currentDate) + 'T00:00:00');
+  if(isNaN(base)) return;
+  base.setDate(base.getDate() + delta);
+  const p2 = n => String(n).padStart(2,'0');
+  dp.value = `${base.getFullYear()}-${p2(base.getMonth()+1)}-${p2(base.getDate())}`;
+  dp.dispatchEvent(new Event('change'));
+}
 
 function fmtG(n){
   if(n==null||isNaN(n)) return '— G';
