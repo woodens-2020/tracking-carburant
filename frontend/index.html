@@ -5695,6 +5695,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <svg viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" style="width:13px;height:13px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="18" x2="12" y2="18"/></svg>
               PDF
             </button>
+            <button class="gi-btn-secondary" id="dep-btn-image" onclick="downloadDepDashboardImage()" title="Télécharger l'image du résumé (KPIs + répartitions)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" style="width:13px;height:13px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+              Image
+            </button>
             <button class="gi-btn-secondary" id="dep-btn-limite" onclick="openLimiteModal()" style="display:none" title="Définir la limite mensuelle (PDG)">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               Limite budget
@@ -5730,6 +5734,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
 
+        <div id="dep-dash-capture">
         <div class="gi-kpi-row" id="dep-kpis">
           <div class="gi-kpi"><div class="gi-kpi-lbl">Total période (HTG)</div><div class="gi-kpi-val red" id="dep-kpi-total">—</div></div>
           <div class="gi-kpi"><div class="gi-kpi-lbl">Nombre de dépenses</div><div class="gi-kpi-val blue" id="dep-kpi-nb">—</div></div>
@@ -5767,6 +5772,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div id="dep-caisse-legend" class="dep-legend"></div>
           </div>
         </div>
+        </div><!-- /dep-dash-capture -->
 
         <div class="gi-filters">
           <div class="gi-filter-field">
@@ -20679,6 +20685,39 @@ function _depTopBenef(containerId, data){
       <div class="dep-bar-track"><div class="dep-bar-fill" style="width:${Math.max(3,val/max*100)}%;background:${col}"></div></div>
     </div>`;
   }).join('');
+}
+
+// Télécharge une image PNG du résumé Dépenses (KPIs + graphes de
+// répartition) — même principe que l'export PNG du stock carburant.
+async function downloadDepDashboardImage(){
+  const zone = document.getElementById('dep-dash-capture');
+  if(!zone){ toast('Résumé introuvable.','err'); return; }
+  if(typeof html2canvas === 'undefined'){ toast('Module image indisponible.','err'); return; }
+  const btn = document.getElementById('dep-btn-image');
+  const btnHtml = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:13px;height:13px;border-width:2px"></span> …'; }
+  try{
+    const pageBg = getComputedStyle(document.body).backgroundColor || '#060e1c';
+    const canvas = await html2canvas(zone, {
+      scale: 2, backgroundColor: pageBg, useCORS: true, allowTaint: true, logging: false,
+      onclone:(doc)=>{
+        const el = doc.getElementById('dep-dash-capture');
+        if(el){ el.style.backgroundColor = pageBg; el.style.padding = '18px'; el.style.borderRadius = '14px'; }
+      }
+    });
+    const deb = document.getElementById('dep-filtre-debut')?.value || '';
+    const fin = document.getElementById('dep-filtre-fin')?.value || currentDate;
+    const suffixe = deb ? `${deb}_${fin}` : fin;
+    const link = document.createElement('a');
+    link.download = `depenses_repartition_${suffixe}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }catch(e){
+    console.error('Image dépenses:', e);
+    toast("Impossible de générer l'image.", 'err');
+  }finally{
+    if(btn){ btn.disabled = false; btn.innerHTML = btnHtml; }
+  }
 }
 
 function _renderDepPanels(data){
