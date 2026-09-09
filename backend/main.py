@@ -339,6 +339,35 @@ def startup():
         "ALTER TABLE patisserie_depenses ALTER COLUMN categorie TYPE VARCHAR(120)",
         "ALTER TABLE utilisateurs        ALTER COLUMN poste TYPE VARCHAR(120)",
         "ALTER TABLE employes            ALTER COLUMN poste TYPE VARCHAR(120)",
+        # ── Hôtel : pro forma / réservations à venir ────────────────────
+        # Nouvelle table (create_all la crée sur une base vierge ; ce filet
+        # garantit sa présence et le bon type de la colonne JSON `lignes`).
+        """CREATE TABLE IF NOT EXISTS hotel_proformas (
+            id SERIAL PRIMARY KEY,
+            numero VARCHAR(30) NOT NULL,
+            type_doc VARCHAR(12) NOT NULL DEFAULT 'PROFORMA',
+            client_nom VARCHAR(150) NOT NULL,
+            client_contact VARCHAR(100),
+            client_id_piece VARCHAR(80),
+            date_arrivee_prevue TIMESTAMPTZ NOT NULL,
+            date_depart_prevue TIMESTAMPTZ,
+            nb_nuits INTEGER,
+            nb_personnes INTEGER,
+            lignes JSONB NOT NULL DEFAULT '[]'::jsonb,
+            montant_total NUMERIC(12,2) NOT NULL DEFAULT 0,
+            acompte NUMERIC(12,2) NOT NULL DEFAULT 0,
+            statut VARCHAR(12) NOT NULL DEFAULT 'BROUILLON',
+            notes VARCHAR(500),
+            rappel_confirme_notifie BOOLEAN NOT NULL DEFAULT FALSE,
+            rappel_arrivee_notifie BOOLEAN NOT NULL DEFAULT FALSE,
+            reservation_id INTEGER,
+            cree_par_id INTEGER,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            maj_le TIMESTAMPTZ NOT NULL DEFAULT now()
+        )""",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_hotel_proformas_numero ON hotel_proformas (numero)",
+        "CREATE INDEX IF NOT EXISTS idx_hotel_pf_statut ON hotel_proformas (statut)",
+        "CREATE INDEX IF NOT EXISTS idx_hotel_pf_arrivee ON hotel_proformas (date_arrivee_prevue)",
     ]
     # Chaque instruction est isolée : une qui échoue (moteur SQLite en dev,
     # table absente, type déjà à jour…) n'empêche pas les suivantes.

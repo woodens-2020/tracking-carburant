@@ -1095,6 +1095,50 @@ class HotelRapportNote(Base):
     )
 
 
+class HotelProforma(Base):
+    """Pro forma / réservation à venir pour un client futur.
+
+    Sert de devis imprimable ET de réservation planifiée : les chambres
+    ne sont PAS bloquées tant que le client n'est pas arrivé (conversion
+    en séjour à la réception). Les montants saisis (`lignes`, `montant_total`)
+    font foi — ils ne sont jamais recalculés à partir du prix des chambres.
+    À la confirmation, une notification de rappel est émise pour l'arrivée."""
+    __tablename__ = "hotel_proformas"
+
+    id                  = Column(Integer, primary_key=True)
+    numero              = Column(String(30), nullable=False, unique=True)   # PF-2026-0001
+    type_doc            = Column(String(12), nullable=False, default="PROFORMA")  # PROFORMA | RESERVATION
+    client_nom          = Column(String(150), nullable=False)
+    client_contact      = Column(String(100), nullable=True)
+    client_id_piece     = Column(String(80),  nullable=True)
+    date_arrivee_prevue = Column(DateTime(timezone=True), nullable=False)
+    date_depart_prevue  = Column(DateTime(timezone=True), nullable=True)
+    nb_nuits            = Column(Integer, nullable=True)
+    nb_personnes        = Column(Integer, nullable=True)
+    lignes             = Column(JSON, nullable=False, default=list)  # [{designation, chambre_id?, chambre_numero?, qte, prix_unitaire, montant}]
+    montant_total       = Column(Numeric(12, 2), nullable=False, default=0)
+    acompte             = Column(Numeric(12, 2), nullable=False, default=0)
+    statut              = Column(String(12), nullable=False, default="BROUILLON")  # BROUILLON | CONFIRMEE | CONVERTIE | ANNULEE
+    notes              = Column(String(500), nullable=True)
+    rappel_confirme_notifie = Column(Boolean, nullable=False, default=False)
+    rappel_arrivee_notifie  = Column(Boolean, nullable=False, default=False)
+    reservation_id      = Column(Integer, ForeignKey("hotel_reservations.id", ondelete="SET NULL"), nullable=True)
+    cree_par_id         = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at          = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    maj_le              = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    cree_par = relationship("Utilisateur", foreign_keys=[cree_par_id])
+
+    __table_args__ = (
+        CheckConstraint("type_doc IN ('PROFORMA','RESERVATION')", name="chk_hotel_pf_type"),
+        CheckConstraint("statut IN ('BROUILLON','CONFIRMEE','CONVERTIE','ANNULEE')", name="chk_hotel_pf_statut"),
+        CheckConstraint("montant_total >= 0", name="chk_hotel_pf_total_pos"),
+        CheckConstraint("acompte >= 0", name="chk_hotel_pf_acompte_pos"),
+        Index("idx_hotel_pf_statut", "statut"),
+        Index("idx_hotel_pf_arrivee", "date_arrivee_prevue"),
+    )
+
+
 # ══════════════════════════════════════════════════════════════════
 # MODULE CUISINE
 # ══════════════════════════════════════════════════════════════════

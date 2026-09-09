@@ -3260,6 +3260,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="hotel-proforma" onclick="goTo('hotel-proforma')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>
+      <span>Pro forma / Réservations</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <button class="nav-item" data-page="hotel-historique" onclick="goTo('hotel-historique')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
       <span>Historique</span>
@@ -10752,7 +10758,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <!-- Recap prix -->
               <div id="hrec-recap" style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:8px;padding:12px;display:none">
                 <div style="display:flex;justify-content:space-between;font-size:14px;color:rgba(255,255,255,.55)"><span id="hrec-recap-label">Prix / nuit</span><span id="hrec-recap-prix">—</span></div>
-                <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:6px;font-size:17px"><span>Total</span><span id="hrec-recap-total" style="color:#a78bfa">—</span></div>
+                <div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,.4);margin-top:4px"><span>Tarif de référence</span><span id="hrec-recap-total">—</span></div>
+                <div style="margin-top:8px">
+                  <label class="pos-label" style="display:flex;align-items:center;gap:6px">Montant à facturer (G) <span style="font-size:11px;color:rgba(255,255,255,.35)">— rabais PDG possible</span></label>
+                  <input class="pos-input" id="hrec-montant-facture" type="number" min="0" step="any" placeholder="Laisser vide = tarif de référence" oninput="hrecOnFactureInput()">
+                </div>
+                <div id="hrec-remise-row" style="display:none;justify-content:space-between;font-size:13px;margin-top:4px;color:#fbbf24"><span>Rabais accordé</span><span id="hrec-remise-val">—</span></div>
+                <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:8px;font-size:17px"><span>Total facturé</span><span id="hrec-recap-facture" style="color:#a78bfa">—</span></div>
                 <div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,.4);margin-top:2px"><span>Départ prévu</span><span id="hrec-recap-depart">—</span></div>
               </div>
             </div>
@@ -10820,6 +10832,128 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
       </div>
     </div><!-- /page-hotel-sejours -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- HOTEL — PRO FORMA / RÉSERVATIONS À VENIR                  -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="page-hotel-proforma" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#6366f1,#4f46e5)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Pro forma / Réservations à venir</div>
+            <div class="pos-header-sub">Devis imprimable et réservations planifiées — rappel automatique avant l'arrivée</div>
+          </div>
+          <div class="pos-header-actions" style="display:flex;gap:8px">
+            <select class="pos-input" id="hpf-filtre-statut" onchange="loadHotelProforma()" style="width:auto">
+              <option value="">Tous les statuts</option>
+              <option value="BROUILLON">Brouillon</option>
+              <option value="CONFIRMEE">Confirmée</option>
+              <option value="CONVERTIE">Convertie</option>
+              <option value="ANNULEE">Annulée</option>
+            </select>
+            <button class="pos-btn ghost" onclick="loadHotelProforma()">Actualiser</button>
+            <button class="pos-btn teal" id="hpf-btn-nouveau" onclick="hpfOuvrirModal()">+ Nouveau</button>
+          </div>
+        </div>
+        <div id="hpf-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px">
+          <div style="color:rgba(255,255,255,.3);padding:30px;text-align:center;grid-column:1/-1">Chargement…</div>
+        </div>
+      </div>
+
+      <!-- Modal création / édition -->
+      <div id="hpf-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="pos-modal" style="max-width:760px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 16px">
+            <h3 style="margin:0" id="hpf-modal-titre">Nouveau document</h3>
+            <button onclick="document.getElementById('hpf-modal-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:22px;padding:0;line-height:1">✕</button>
+          </div>
+          <input type="hidden" id="hpf-edit-id">
+          <div style="display:flex;flex-direction:column;gap:12px;max-height:70vh;overflow-y:auto;padding-right:4px">
+            <div>
+              <label class="pos-label">Type de document</label>
+              <div style="display:flex;gap:8px;margin-top:6px">
+                <button type="button" id="hpf-type-proforma" class="pos-btn teal" onclick="hpfSetType('PROFORMA')" style="flex:1">Pro forma (devis)</button>
+                <button type="button" id="hpf-type-reservation" class="pos-btn ghost" onclick="hpfSetType('RESERVATION')" style="flex:1">Réservation confirmée</button>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div><label class="pos-label">Nom du client *</label><input class="pos-input" id="hpf-client-nom" placeholder="Prénom Nom"></div>
+              <div><label class="pos-label">Contact</label><input class="pos-input" id="hpf-client-contact" placeholder="+509 …"></div>
+              <div><label class="pos-label">NIF / Pièce</label><input class="pos-input" id="hpf-client-piece" placeholder="Optionnel"></div>
+              <div><label class="pos-label">Nombre de personnes</label><input class="pos-input" id="hpf-nb-personnes" type="number" min="1" placeholder="Optionnel"></div>
+              <div><label class="pos-label">Arrivée prévue *</label><input class="pos-input" id="hpf-arrivee" type="datetime-local"></div>
+              <div><label class="pos-label">Départ prévu</label><input class="pos-input" id="hpf-depart" type="datetime-local"></div>
+              <div><label class="pos-label">Nombre de nuits</label><input class="pos-input" id="hpf-nb-nuits" type="number" min="1" placeholder="Optionnel"></div>
+            </div>
+
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <label class="pos-label" style="margin:0">Lignes (chambres / prestations)</label>
+                <button type="button" class="pos-btn ghost" style="font-size:13px;padding:3px 10px" onclick="hpfAddLigne()">+ Ligne</button>
+              </div>
+              <div style="overflow-x:auto">
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                  <thead><tr style="color:rgba(255,255,255,.4);text-align:left">
+                    <th style="padding:4px 6px;min-width:150px">Désignation</th>
+                    <th style="padding:4px 6px">Chambre</th>
+                    <th style="padding:4px 6px;width:60px">Qté</th>
+                    <th style="padding:4px 6px;width:110px">P.U. (G)</th>
+                    <th style="padding:4px 6px;width:120px">Montant (G)</th>
+                    <th style="padding:4px 6px;width:30px"></th>
+                  </tr></thead>
+                  <tbody id="hpf-lignes-body"></tbody>
+                </table>
+              </div>
+              <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:4px">Le montant saisi fait foi. Laissé vide, il vaut Qté × P.U.</div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end">
+              <div><label class="pos-label">Acompte reçu (G)</label><input class="pos-input" id="hpf-acompte" type="number" min="0" step="any" value="0" oninput="hpfRecalc()"></div>
+              <div style="text-align:right">
+                <div style="font-size:13px;color:rgba(255,255,255,.45)">Total</div>
+                <div style="font-size:22px;font-weight:800;color:#a78bfa" id="hpf-total-aff">G 0.00</div>
+                <div style="font-size:12px;color:rgba(255,255,255,.4)" id="hpf-solde-aff"></div>
+              </div>
+            </div>
+            <div><label class="pos-label">Notes</label><textarea class="pos-input" id="hpf-notes" rows="2" style="resize:vertical" placeholder="Conditions, demandes particulières…"></textarea></div>
+          </div>
+          <div class="pos-modal-footer">
+            <button class="pos-btn ghost" onclick="document.getElementById('hpf-modal-bg').classList.remove('open')">Annuler</button>
+            <button class="pos-btn teal" id="hpf-btn-save" onclick="hpfSauver()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal conversion en séjour -->
+      <div id="hpf-conv-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="pos-modal" style="max-width:400px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 16px">
+            <h3 style="margin:0">Convertir en séjour</h3>
+            <button onclick="document.getElementById('hpf-conv-modal-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:22px;padding:0;line-height:1">✕</button>
+          </div>
+          <input type="hidden" id="hpf-conv-id">
+          <p style="font-size:13px;color:rgba(255,255,255,.55);margin:0 0 12px">Le client est arrivé : ouvre un séjour actif avec les montants de la pro forma (qui font foi) et occupe la chambre.</p>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div><label class="pos-label">Chambre à occuper *</label>
+              <select class="pos-input" id="hpf-conv-chambre"><option value="">— Choisir —</option></select>
+            </div>
+            <div><label class="pos-label">Mode de paiement</label>
+              <select class="pos-input" id="hpf-conv-mode">
+                <option value="">— Mode —</option>
+                <option value="CASH">Cash</option><option value="CARTE">Carte</option><option value="VIREMENT">Virement</option><option value="CREDIT">Crédit</option>
+              </select>
+            </div>
+          </div>
+          <div class="pos-modal-footer">
+            <button class="pos-btn ghost" onclick="document.getElementById('hpf-conv-modal-bg').classList.remove('open')">Annuler</button>
+            <button class="pos-btn teal" onclick="hpfConvertirValider()">Ouvrir le séjour</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-hotel-proforma -->
 
     <!-- ══════════════════════════════════════════════════════════ -->
     <!-- HOTEL — HISTORIQUE                                        -->
@@ -16046,7 +16180,7 @@ async function _loadBranding(){
     // Accès Hôtel complet pour le rôle Manager (Chambres + Réception) —
     // activé par tenant (MANAGER_HOTEL_COMPLET).
     if(roles && roles.manager_hotel_complet){
-      ['hotel-chambres','hotel-reception'].forEach(p=>_MANAGER_ALLOWED.add(p));
+      ['hotel-chambres','hotel-reception','hotel-proforma'].forEach(p=>_MANAGER_ALLOWED.add(p));
       if(_ACCES_POSTE_LEGACY && _ACCES_POSTE_LEGACY['Manager'])
         _ACCES_POSTE_LEGACY['Manager'] = Array.from(_MANAGER_ALLOWED);
     }
@@ -16073,7 +16207,7 @@ const _MODULE_PAGES = {
   bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-stock','pos-achats',
               'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite',
               'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis'],
-  hotel:     ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours',
+  hotel:     ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma',
               'hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   zelle:     ['zelle','zelle-paiements','zelle-fonds'],
   cuisine:   ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes',
@@ -16112,9 +16246,9 @@ const _AREA_PAGES = {
     lecture: ['patisserie-dashboard','patisserie-ventes','patisserie-commandes'],
   },
   hotel: {
-    complet: ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
-    // Accès opérationnel : réception + séjours + historique + rapport, sans gestion des chambres ni du personnel hôtel
-    operationnel: ['hotel-dashboard','hotel-reception','hotel-sejours','hotel-historique','hotel-rapport'],
+    complet: ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
+    // Accès opérationnel : réception + séjours + pro forma + historique + rapport, sans gestion des chambres ni du personnel hôtel
+    operationnel: ['hotel-dashboard','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-rapport'],
     lecture: ['hotel-dashboard','hotel-historique','hotel-rapport'],
   },
   employes: {
@@ -16132,7 +16266,7 @@ const _CAISSIER_ALLOWED = new Set([
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
-  'hotel-dashboard','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
+  'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'patisserie-dashboard','patisserie-produits','patisserie-achats','patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse',
 ]);
@@ -16144,7 +16278,7 @@ const _AD_ALLOWED = new Set([
   'pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes',
   'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
   'cuisine-plats','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
-  'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
+  'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'employes','payroll',
   'zelle','zelle-paiements','zelle-fonds',
 ]);
@@ -16155,11 +16289,11 @@ const _ACCES_POSTE_LEGACY = {
   'Comptable':   ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
-                  'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
+                  'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
-                  'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
+                  'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Pompiste':            ['home','saisie'],
   'Caissier':            Array.from(_CAISSIER_ALLOWED),
   'Manager':             Array.from(_MANAGER_ALLOWED),
@@ -21422,6 +21556,7 @@ const _giPageLoaders = {
   'hotel-chambres':     loadHotelChambres,
   'hotel-reception':    loadHotelReception,
   'hotel-sejours':      loadHotelSejours,
+  'hotel-proforma':     loadHotelProforma,
   'hotel-historique':   loadHotelHistorique,
   'hotel-employes':     loadHotelEmployes,
   'hotel-depenses':     loadHotelDepenses,
@@ -31737,6 +31872,7 @@ async function ptCaisseValider(sessionId){
 let _hotelChambres  = [];
 let _hotelEmployes  = [];
 let _hrecType       = 'NUIT';
+let _hrecRefTotal   = 0;   // tarif de référence calculé (prix chambre × durée)
 let _hcmEditId      = null;
 let _hempEditId     = null;
 let _hotelTimerIv   = null;
@@ -32077,6 +32213,8 @@ async function loadHotelReception(){
     const dt = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
     const arr = document.getElementById('hrec-arrivee');
     if(arr) arr.value = dt;
+    const mf = document.getElementById('hrec-montant-facture'); if(mf) mf.value = '';
+    _hrecRefTotal = 0;
     hrecSetType('NUIT');
   } catch(e){ posAlert(e.message||'Erreur chargement réception.'); }
 }
@@ -32112,17 +32250,41 @@ function hrecCalcTotal(){
     labelPrix = `${posGx(prixMoment)} × ${nbH}h`;
     if(arr){ const d=new Date(arr); d.setTime(d.getTime()+nbH*3600000); depStr=d.toLocaleString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
   }
+  _hrecRefTotal = total;
   document.getElementById('hrec-recap').style.display     = '';
   document.getElementById('hrec-recap-label').textContent = labelPrix;
   document.getElementById('hrec-recap-prix').textContent  = posGx(_hrecType==='NUIT'?prixNuit:prixMoment);
   document.getElementById('hrec-recap-total').textContent = posGx(total);
   document.getElementById('hrec-recap-depart').textContent = depStr;
+  hrecRefreshFacture();
+}
+
+// Montant réellement facturé : la saisie de la réception si > 0, sinon le tarif de référence.
+function hrecEffectiveFacture(){
+  const raw = parseFloat(document.getElementById('hrec-montant-facture')?.value);
+  return (isFinite(raw) && raw > 0) ? raw : _hrecRefTotal;
+}
+
+function hrecRefreshFacture(){
+  const fact  = hrecEffectiveFacture();
+  const remise = Math.max(0, _hrecRefTotal - fact);
+  const rRow = document.getElementById('hrec-remise-row');
+  if(rRow){
+    rRow.style.display = remise > 0 ? 'flex' : 'none';
+    document.getElementById('hrec-remise-val').textContent = '- ' + posGx(remise);
+  }
+  const fEl = document.getElementById('hrec-recap-facture');
+  if(fEl){
+    fEl.textContent = posGx(fact);
+    fEl.style.color = remise > 0 ? '#fbbf24' : (fact > _hrecRefTotal ? '#f87171' : '#a78bfa');
+  }
   hrecCalcSolde();
 }
 
+function hrecOnFactureInput(){ hrecRefreshFacture(); }
+
 function hrecCalcSolde(){
-  const totalEl = document.getElementById('hrec-recap-total');
-  const total   = totalEl ? parseFloat((totalEl.textContent||'0').replace(/[^0-9.]/g,'')) : 0;
+  const total   = hrecEffectiveFacture();
   const paye    = parseFloat(document.getElementById('hrec-montant-paye').value||0);
   const solde   = Math.max(0, total - paye);
   const soldeEl = document.getElementById('hrec-solde');
@@ -32143,6 +32305,8 @@ async function hrecEnregistrer(){
 
   const nbN = parseInt(document.getElementById('hrec-nb-nuits').value||1);
   const nbH = parseFloat(document.getElementById('hrec-nb-heures').value||2);
+  const factRaw = parseFloat(document.getElementById('hrec-montant-facture')?.value);
+  const montantFacture = (isFinite(factRaw) && factRaw > 0) ? factRaw : null;
 
   const body = {
     chambre_id:      parseInt(chambreId),
@@ -32153,23 +32317,28 @@ async function hrecEnregistrer(){
     date_arrivee:    new Date(arrivee).toISOString(),
     nb_nuits:        _hrecType==='NUIT'   ? nbN  : null,
     nb_heures:       _hrecType==='MOMENT' ? nbH  : null,
+    montant_facture: montantFacture,
     montant_paye:    parseFloat(document.getElementById('hrec-montant-paye').value||0),
     mode_paiement:   document.getElementById('hrec-mode').value || null,
     employe_id:      document.getElementById('hrec-employe').value ? parseInt(document.getElementById('hrec-employe').value) : null,
     notes:           g('hrec-notes') || null,
   };
   try {
-    await apiFetch('POST','/hotel/reservations', body);
+    const res = await apiFetch('POST','/hotel/reservations', body);
     // Reset form
-    ['hrec-client-nom','hrec-client-contact','hrec-client-piece','hrec-notes','hrec-montant-paye'].forEach(id=>{
+    ['hrec-client-nom','hrec-client-contact','hrec-client-piece','hrec-notes','hrec-montant-paye','hrec-montant-facture'].forEach(id=>{
       const el=document.getElementById(id); if(el) el.value=id==='hrec-montant-paye'?'0':'';
     });
     document.getElementById('hrec-chambre').value='';
     document.getElementById('hrec-recap').style.display='none';
     posAlert('Client enregistré avec succès.','ok');
+    // Ouvrir le reçu client à imprimer
+    if(res && res.id) window.open('/api/hotel/reservations/'+res.id+'/fiche.pdf','_blank');
     await loadHotelReception();
   } catch(e){ posAlert(e.message||'Erreur enregistrement.'); }
 }
+
+function hotelRecu(resId){ window.open('/api/hotel/reservations/'+resId+'/fiche.pdf','_blank'); }
 
 // ── SÉJOURS ACTIFS ────────────────────────────────────────────────────
 
@@ -32212,10 +32381,11 @@ function _hotelSejourCard(s){
         <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Payé</div><div style="font-weight:700;color:#34d399">${_hFmt(s.montant_paye)}</div></div>
         <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Solde</div><div style="font-weight:700;color:${hasSolde?'#f87171':'#34d399'}">${_hFmt(s.solde)}</div></div>
       </div>
-      ${!_isReadOnly()?`<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-        ${hasSolde?`<button class="pos-btn ghost" style="flex:1;font-size:13px;color:#34d399;border-color:rgba(52,211,153,.3)" onclick="hotelPaiementModal(${s.id})">+ Paiement</button>`:''}
-        <button class="pos-btn teal" style="flex:1;font-size:14px" onclick="hotelTerminer(${s.id})">✓ Marquer terminé</button>
-      </div>`:''}
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+        <button class="pos-btn ghost" style="flex:1;font-size:13px" onclick="hotelRecu(${s.id})">🧾 Reçu</button>
+        ${!_isReadOnly()&&hasSolde?`<button class="pos-btn ghost" style="flex:1;font-size:13px;color:#34d399;border-color:rgba(52,211,153,.3)" onclick="hotelPaiementModal(${s.id})">+ Paiement</button>`:''}
+        ${!_isReadOnly()?`<button class="pos-btn teal" style="flex:1;font-size:14px" onclick="hotelTerminer(${s.id})">✓ Marquer terminé</button>`:''}
+      </div>
     </div>
   </div>`;
 }
@@ -32315,6 +32485,285 @@ async function hotelAnnuler(id, nom){
   } catch(e){ posAlert(e.message||'Erreur.'); }
 }
 
+// ── PRO FORMA / RÉSERVATIONS À VENIR ─────────────────────────────────
+
+let _hpfData     = [];
+let _hpfChambres = [];
+let _hpfType     = 'PROFORMA';
+let _hpfLignes   = [];
+
+const _HPF_STATUT = {
+  BROUILLON: {t:'Brouillon',   c:'#94a3b8'},
+  CONFIRMEE: {t:'Confirmée',   c:'#34d399'},
+  CONVERTIE: {t:'Convertie',   c:'#6366f1'},
+  ANNULEE:   {t:'Annulée',     c:'#f87171'},
+};
+
+function _hpfDtInput(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function _hpfDtFr(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  return isNaN(d) ? '—' : d.toLocaleString('fr-FR',{day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+
+async function loadHotelProforma(){
+  const box = document.getElementById('hpf-list');
+  if(box) box.innerHTML = '<div style="color:rgba(255,255,255,.3);padding:30px;text-align:center;grid-column:1/-1">Chargement…</div>';
+  const st = document.getElementById('hpf-filtre-statut')?.value || '';
+  try {
+    const [list, chambres] = await Promise.all([
+      apiFetch('GET','/hotel/proformas' + (st ? `?statut=${st}` : '')),
+      apiFetch('GET','/hotel/chambres?actif=true'),
+    ]);
+    _hpfData = list || [];
+    _hpfChambres = chambres || [];
+    const btn = document.getElementById('hpf-btn-nouveau');
+    if(btn) btn.style.display = _isReadOnly() ? 'none' : '';
+    if(!_hpfData.length){
+      if(box) box.innerHTML = '<div style="color:rgba(255,255,255,.3);padding:40px;text-align:center;grid-column:1/-1">Aucun document — créez une pro forma ou une réservation.</div>';
+      return;
+    }
+    if(box) box.innerHTML = _hpfData.map(_hpfCard).join('');
+  } catch(e){ if(box) box.innerHTML = `<div style="color:#f87171;padding:30px;text-align:center;grid-column:1/-1">${e.message||'Erreur'}</div>`; }
+}
+
+function _hpfCard(p){
+  const s = _HPF_STATUT[p.statut] || {t:p.statut,c:'#94a3b8'};
+  const isResa = p.type_doc === 'RESERVATION';
+  const chs = (p.lignes||[]).map(l=>l.chambre_numero).filter(Boolean);
+  const ro = _isReadOnly();
+  const modifiable = !ro && (p.statut === 'BROUILLON' || p.statut === 'CONFIRMEE');
+  const btns = [];
+  btns.push(`<button class="pos-btn ghost" style="flex:1;font-size:13px" onclick="hpfImprimer(${p.id})">🖨 Imprimer</button>`);
+  if(modifiable) btns.push(`<button class="pos-btn ghost" style="flex:1;font-size:13px" onclick="hpfOuvrirModal(${p.id})">Modifier</button>`);
+  if(!ro && p.statut === 'BROUILLON') btns.push(`<button class="pos-btn ghost" style="flex:1;font-size:13px;color:#34d399;border-color:rgba(52,211,153,.3)" onclick="hpfConfirmer(${p.id})">✓ Confirmer</button>`);
+  if(!ro && (p.statut === 'BROUILLON' || p.statut === 'CONFIRMEE')) btns.push(`<button class="pos-btn teal" style="flex:1;font-size:13px" onclick="hpfConvertir(${p.id})">→ Séjour</button>`);
+  if(!ro && p.statut !== 'CONVERTIE' && p.statut !== 'ANNULEE') btns.push(`<button class="pos-btn ghost" style="flex:1;font-size:13px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="hpfAnnuler(${p.id})">Annuler</button>`);
+  return `<div class="pos-card" style="border-left:3px solid ${isResa ? '#6366f1' : '#a78bfa'}">
+    <div style="padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:16px;font-weight:700">${p.numero}</span>
+        <span style="font-size:12px;background:rgba(255,255,255,.08);padding:2px 8px;border-radius:12px">${isResa ? 'Réservation' : 'Pro forma'}</span>
+      </div>
+      <div style="font-size:18px;font-weight:700">${p.client_nom}</div>
+      ${p.client_contact ? `<div style="font-size:13px;color:rgba(255,255,255,.4)">${p.client_contact}</div>` : ''}
+      <div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:6px">🗓 Arrivée : <strong>${_hpfDtFr(p.date_arrivee_prevue)}</strong></div>
+      ${p.nb_nuits ? `<div style="font-size:13px;color:rgba(255,255,255,.4)">${p.nb_nuits} nuit(s)</div>` : ''}
+      ${chs.length ? `<div style="font-size:13px;color:rgba(255,255,255,.4)">Chambre(s) : ${chs.join(', ')}</div>` : ''}
+      <div style="margin-top:8px;padding:8px;background:rgba(255,255,255,.04);border-radius:6px;display:flex;justify-content:space-between">
+        <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Total</div><div style="font-weight:700">${posGx(p.montant_total)}</div></div>
+        <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Acompte</div><div style="font-weight:700;color:#34d399">${posGx(p.acompte)}</div></div>
+        <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Solde</div><div style="font-weight:700;color:${p.solde>0?'#fbbf24':'#34d399'}">${posGx(p.solde)}</div></div>
+      </div>
+      <div style="margin-top:8px;font-size:13px;color:${s.c};font-weight:600">● ${s.t}</div>
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">${btns.join('')}</div>
+    </div>
+  </div>`;
+}
+
+function _hpfChambreOptions(selId){
+  return '<option value="">— aucune —</option>' + _hpfChambres.map(c =>
+    `<option value="${c.id}" ${String(c.id)===String(selId)?'selected':''}>Ch. ${c.numero} — ${_TYPE_CHAMBRE_LABEL[c.type_chambre]||c.type_chambre} (${posGx(c.prix_nuit)})</option>`
+  ).join('');
+}
+
+function hpfSetType(t){
+  _hpfType = t;
+  document.getElementById('hpf-type-proforma').className    = t==='PROFORMA'    ? 'pos-btn teal' : 'pos-btn ghost';
+  document.getElementById('hpf-type-reservation').className = t==='RESERVATION' ? 'pos-btn teal' : 'pos-btn ghost';
+}
+
+function hpfRenderLignes(){
+  const tb = document.getElementById('hpf-lignes-body');
+  if(!tb) return;
+  if(!_hpfLignes.length){
+    tb.innerHTML = '<tr><td colspan="6" style="padding:8px;color:rgba(255,255,255,.3);text-align:center">Aucune ligne — cliquez « + Ligne »</td></tr>';
+  } else {
+    tb.innerHTML = _hpfLignes.map((l,i)=>`<tr>
+      <td style="padding:3px 6px"><input class="pos-input" style="font-size:13px;padding:5px" value="${(l.designation||'').replace(/"/g,'&quot;')}" oninput="hpfLigne(${i},'designation',this.value)" placeholder="Ex. Chambre double"></td>
+      <td style="padding:3px 6px"><select class="pos-input" style="font-size:13px;padding:5px" onchange="hpfLigne(${i},'chambre_id',this.value)">${_hpfChambreOptions(l.chambre_id)}</select></td>
+      <td style="padding:3px 6px"><input class="pos-input" type="number" min="0" step="any" style="font-size:13px;padding:5px" value="${l.qte??1}" oninput="hpfLigne(${i},'qte',this.value)"></td>
+      <td style="padding:3px 6px"><input class="pos-input" type="number" min="0" step="any" style="font-size:13px;padding:5px" value="${l.prix_unitaire??0}" oninput="hpfLigne(${i},'prix_unitaire',this.value)"></td>
+      <td style="padding:3px 6px"><input class="pos-input" type="number" min="0" step="any" style="font-size:13px;padding:5px" value="${l.montant??''}" placeholder="auto" oninput="hpfLigne(${i},'montant',this.value)"></td>
+      <td style="padding:3px 6px;text-align:center"><button type="button" onclick="hpfDelLigne(${i})" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:16px">✕</button></td>
+    </tr>`).join('');
+  }
+  hpfRecalc();
+}
+
+function hpfAddLigne(){
+  _hpfLignes.push({designation:'', chambre_id:'', qte:1, prix_unitaire:0, montant:''});
+  hpfRenderLignes();
+}
+function hpfDelLigne(i){ _hpfLignes.splice(i,1); hpfRenderLignes(); }
+function hpfLigne(i,field,val){
+  if(!_hpfLignes[i]) return;
+  _hpfLignes[i][field] = val;
+  if(field === 'chambre_id' && val){
+    const c = _hpfChambres.find(x=>String(x.id)===String(val));
+    if(c){
+      if(!_hpfLignes[i].designation) _hpfLignes[i].designation = `Chambre ${c.numero} — ${_TYPE_CHAMBRE_LABEL[c.type_chambre]||c.type_chambre}`;
+      if(!parseFloat(_hpfLignes[i].prix_unitaire)) _hpfLignes[i].prix_unitaire = c.prix_nuit;
+      const tb = document.getElementById('hpf-lignes-body');
+      if(tb){ const row = tb.children[i]; if(row){ row.children[0].querySelector('input').value = _hpfLignes[i].designation; row.children[3].querySelector('input').value = _hpfLignes[i].prix_unitaire; } }
+    }
+  }
+  hpfRecalc();
+}
+
+function _hpfLigneMontant(l){
+  const m = parseFloat(l.montant);
+  if(isFinite(m) && l.montant !== '' && l.montant !== null) return Math.max(0, m);
+  return Math.max(0, (parseFloat(l.qte)||0) * (parseFloat(l.prix_unitaire)||0));
+}
+
+function hpfRecalc(){
+  const total = _hpfLignes.reduce((s,l)=>s+_hpfLigneMontant(l), 0);
+  const acompte = parseFloat(document.getElementById('hpf-acompte')?.value||0) || 0;
+  document.getElementById('hpf-total-aff').textContent = posGx(total);
+  const solde = Math.max(0, total - acompte);
+  const sEl = document.getElementById('hpf-solde-aff');
+  if(sEl) sEl.textContent = acompte > 0 ? `Solde : ${posGx(solde)}` : '';
+}
+
+function hpfOuvrirModal(id){
+  if(_isReadOnly()){ _giAlert('Accès lecture seule.','err'); return; }
+  document.getElementById('hpf-edit-id').value = id || '';
+  document.getElementById('hpf-modal-titre').textContent = id ? 'Modifier le document' : 'Nouveau document';
+  const g = i => document.getElementById(i);
+  if(id){
+    const p = _hpfData.find(x=>x.id===id);
+    if(!p){ posAlert('Document introuvable.'); return; }
+    hpfSetType(p.type_doc || 'PROFORMA');
+    g('hpf-client-nom').value = p.client_nom || '';
+    g('hpf-client-contact').value = p.client_contact || '';
+    g('hpf-client-piece').value = p.client_id_piece || '';
+    g('hpf-nb-personnes').value = p.nb_personnes || '';
+    g('hpf-arrivee').value = _hpfDtInput(p.date_arrivee_prevue);
+    g('hpf-depart').value = _hpfDtInput(p.date_depart_prevue);
+    g('hpf-nb-nuits').value = p.nb_nuits || '';
+    g('hpf-acompte').value = p.acompte || 0;
+    g('hpf-notes').value = p.notes || '';
+    _hpfLignes = (p.lignes||[]).map(l=>({
+      designation:l.designation||'', chambre_id:l.chambre_id||'',
+      qte:l.qte??1, prix_unitaire:l.prix_unitaire??0,
+      montant:(l.montant!=null?l.montant:''),
+    }));
+  } else {
+    hpfSetType('PROFORMA');
+    ['hpf-client-nom','hpf-client-contact','hpf-client-piece','hpf-nb-personnes','hpf-depart','hpf-nb-nuits','hpf-notes'].forEach(i=>g(i).value='');
+    g('hpf-acompte').value = 0;
+    const now = new Date(); now.setDate(now.getDate()+1); now.setHours(14,0,0,0);
+    g('hpf-arrivee').value = _hpfDtInput(now.toISOString());
+    _hpfLignes = [{designation:'', chambre_id:'', qte:1, prix_unitaire:0, montant:''}];
+  }
+  hpfRenderLignes();
+  document.getElementById('hpf-modal-bg').classList.add('open');
+}
+
+async function hpfSauver(){
+  const g = i => document.getElementById(i);
+  const nom = (g('hpf-client-nom').value||'').trim();
+  const arr = g('hpf-arrivee').value;
+  if(!nom){ posAlert('Nom du client requis.','warn'); return; }
+  if(!arr){ posAlert('Date d\'arrivée prévue requise.','warn'); return; }
+  const lignes = _hpfLignes
+    .filter(l => (l.designation||'').trim())
+    .map(l => ({
+      designation: l.designation.trim(),
+      chambre_id: l.chambre_id ? parseInt(l.chambre_id) : null,
+      qte: parseFloat(l.qte)||1,
+      prix_unitaire: parseFloat(l.prix_unitaire)||0,
+      montant: (l.montant!=='' && l.montant!=null && isFinite(parseFloat(l.montant))) ? parseFloat(l.montant) : null,
+    }));
+  const body = {
+    type_doc: _hpfType,
+    client_nom: nom,
+    client_contact: (g('hpf-client-contact').value||'').trim() || null,
+    client_id_piece: (g('hpf-client-piece').value||'').trim() || null,
+    date_arrivee_prevue: new Date(arr).toISOString(),
+    date_depart_prevue: g('hpf-depart').value ? new Date(g('hpf-depart').value).toISOString() : null,
+    nb_nuits: g('hpf-nb-nuits').value ? parseInt(g('hpf-nb-nuits').value) : null,
+    nb_personnes: g('hpf-nb-personnes').value ? parseInt(g('hpf-nb-personnes').value) : null,
+    lignes,
+    montant_total: null,
+    acompte: parseFloat(g('hpf-acompte').value||0) || 0,
+    notes: (g('hpf-notes').value||'').trim() || null,
+  };
+  const id = g('hpf-edit-id').value;
+  const btn = document.getElementById('hpf-btn-save'); if(btn) btn.disabled = true;
+  try {
+    if(id) await apiFetch('PUT', `/hotel/proformas/${id}`, body);
+    else   await apiFetch('POST', '/hotel/proformas', body);
+    document.getElementById('hpf-modal-bg').classList.remove('open');
+    posAlert('Document enregistré.','ok');
+    await loadHotelProforma();
+  } catch(e){ posAlert(e.message||'Erreur enregistrement.'); }
+  finally { if(btn) btn.disabled = false; }
+}
+
+function hpfImprimer(id){ window.open('/api/hotel/proformas/'+id+'/pdf','_blank'); }
+
+async function hpfConfirmer(id){
+  if(!confirm('Confirmer ce document ? Un rappel de préparation des chambres sera créé.')) return;
+  try {
+    await apiFetch('POST', `/hotel/proformas/${id}/confirmer`);
+    posAlert('Document confirmé — rappel créé.','ok');
+    await loadHotelProforma();
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function hpfAnnuler(id){
+  if(!confirm('Annuler ce document ?')) return;
+  try {
+    await apiFetch('POST', `/hotel/proformas/${id}/annuler`);
+    posAlert('Document annulé.','ok');
+    await loadHotelProforma();
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+async function hpfConvertir(id){
+  const p = _hpfData.find(x=>x.id===id);
+  if(!p) return;
+  document.getElementById('hpf-conv-id').value = id;
+  document.getElementById('hpf-conv-mode').value = '';
+  let dispo = [];
+  try { dispo = await apiFetch('GET','/hotel/chambres/disponibles'); } catch(e){}
+  const prefId = (p.lignes||[]).map(l=>l.chambre_id).find(Boolean) || '';
+  const sel = document.getElementById('hpf-conv-chambre');
+  // La chambre pré-remplie peut ne pas être « disponible » dans la liste : on l'ajoute quand même.
+  const opts = ['<option value="">— Choisir —</option>'];
+  const seen = new Set();
+  (dispo||[]).forEach(c=>{ seen.add(String(c.id)); opts.push(`<option value="${c.id}" ${String(c.id)===String(prefId)?'selected':''}>Ch. ${c.numero} — ${_TYPE_CHAMBRE_LABEL[c.type_chambre]||c.type_chambre}</option>`); });
+  if(prefId && !seen.has(String(prefId))){
+    const c = _hpfChambres.find(x=>String(x.id)===String(prefId));
+    if(c) opts.push(`<option value="${c.id}" selected>Ch. ${c.numero} (actuellement ${c.statut})</option>`);
+  }
+  sel.innerHTML = opts.join('');
+  document.getElementById('hpf-conv-modal-bg').classList.add('open');
+}
+
+async function hpfConvertirValider(){
+  const id = document.getElementById('hpf-conv-id').value;
+  const chambreId = document.getElementById('hpf-conv-chambre').value;
+  if(!chambreId){ posAlert('Choisissez une chambre.','warn'); return; }
+  try {
+    await apiFetch('POST', `/hotel/proformas/${id}/convertir`, {
+      chambre_id: parseInt(chambreId),
+      mode_paiement: document.getElementById('hpf-conv-mode').value || null,
+    });
+    document.getElementById('hpf-conv-modal-bg').classList.remove('open');
+    posAlert('Séjour ouvert — chambre occupée.','ok');
+    await loadHotelProforma();
+  } catch(e){ posAlert(e.message||'Erreur conversion.'); }
+}
+
 // ── HISTORIQUE ────────────────────────────────────────────────────────
 
 async function loadHotelHistorique(){
@@ -32346,7 +32795,8 @@ async function loadHotelHistorique(){
         <td style="text-align:right">${_hFmt(r.montant_total)}</td>
         <td style="text-align:right;color:#34d399">${_hFmt(r.montant_paye)}</td>
         <td style="text-align:right;color:${r.solde>0?'#f87171':'#34d399'}">${_hFmt(r.solde)}</td>
-        <td><span style="font-size:13px;color:${sc};font-weight:600">${r.statut}</span></td>
+        <td><span style="font-size:13px;color:${sc};font-weight:600">${r.statut}</span>
+          <button class="pos-btn ghost" style="font-size:12px;padding:2px 7px;margin-left:6px" onclick="hotelRecu(${r.id})" title="Reçu client">🧾</button></td>
       </tr>`;
     }).join('');
   } catch(e){ if(tbody) tbody.innerHTML = `<tr><td colspan="9" style="color:#f87171;text-align:center;padding:20px">${e.message||'Erreur'}</td></tr>`; }

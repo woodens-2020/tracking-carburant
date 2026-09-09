@@ -16,7 +16,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import HotelChambre, HotelEmploye, HotelReservation, HotelDepense, HotelRapportNote, RenflouementDepartement, Utilisateur, CategorieDepense
+from models import HotelChambre, HotelEmploye, HotelReservation, HotelDepense, HotelRapportNote, HotelProforma, RenflouementDepartement, Utilisateur, CategorieDepense
 import listes_reference as lref
 
 router = APIRouter(prefix="/api/hotel", tags=["Hotel"])
@@ -98,7 +98,9 @@ def _res_dict(r: HotelReservation) -> dict:
         "nb_nuits":           r.nb_nuits,
         "nb_heures":          float(_d(r.nb_heures)) if r.nb_heures else None,
         "prix_unitaire":      float(_d(r.prix_unitaire)),
+        "montant_reference":  float(_d(r.prix_unitaire) * (r.nb_nuits or _d(r.nb_heures) or 1)),
         "montant_total":      float(_d(r.montant_total)),
+        "remise":             max(0.0, float(_d(r.prix_unitaire) * (r.nb_nuits or _d(r.nb_heures) or 1) - _d(r.montant_total))),
         "montant_paye":       float(_d(r.montant_paye)),
         "solde":              float(_d(r.solde)),
         "statut":             r.statut,
@@ -332,6 +334,7 @@ class ReservationIn(BaseModel):
     date_arrivee:    str                         # ISO datetime
     nb_nuits:        Optional[int]  = None       # si NUIT
     nb_heures:       Optional[float] = None      # si MOMENT
+    montant_facture: Optional[float] = None      # montant réellement facturé (rabais PDG) — fait foi
     montant_paye:    float          = 0
     mode_paiement:   Optional[str]  = None
     employe_id:      Optional[int]  = None
@@ -405,7 +408,7 @@ def creer_reservation(data: ReservationIn, request: Request, db: Session = Depen
         nb_nuits  = data.nb_nuits
         nb_heures = None
         date_dep  = date_arr + timedelta(days=nb_nuits)
-        montant   = prix_unit * nb_nuits
+        montant_ref = prix_unit * nb_nuits
     else:  # MOMENT
         if not data.nb_heures or data.nb_heures <= 0:
             raise HTTPException(422, "nb_heures requis (> 0) pour séjour MOMENT.")
@@ -415,9 +418,23 @@ def creer_reservation(data: ReservationIn, request: Request, db: Session = Depen
         nb_nuits  = None
         nb_heures = Decimal(str(data.nb_heures))
         date_dep  = date_arr + timedelta(hours=float(nb_heures))
-        montant   = prix_unit * nb_heures
+        montant_ref = prix_unit * nb_heures
+
+    # Le montant facturé saisi par la réception fait foi (le PDG accorde
+    # parfois un rabais à certains clients). Robuste : une saisie absente /
+    # vide / ≤ 0 / illisible retombe sur le prix de référence calculé.
+    montant = montant_ref
+    if data.montant_facture is not None:
+        try:
+            mf = Decimal(str(data.montant_facture))
+            if mf > 0:
+                montant = mf
+        except (ValueError, ArithmeticError):
+            pass
 
     montant_paye = min(Decimal(str(data.montant_paye)), montant)
+    if montant_paye < 0:
+        montant_paye = Decimal("0")
     solde        = montant - montant_paye
 
     r = HotelReservation(
@@ -444,11 +461,14 @@ def creer_reservation(data: ReservationIn, request: Request, db: Session = Depen
     # Marquer la chambre comme occupée
     chambre.statut = "OCCUPEE"
 
+    _remise_txt = ""
+    if montant < montant_ref:
+        _remise_txt = f" · rabais {montant_ref - montant:g} G (réf. {montant_ref:g} G)"
     from notifications_service import creer_notification
     creer_notification(
         db, module="hotel", type_="nouvelle_reservation",
         titre=f"Nouvelle réservation — {r.client_nom}",
-        message=f"Chambre {chambre.numero} · {r.type_sejour} · {montant} G",
+        message=f"Chambre {chambre.numero} · {r.type_sejour} · {montant:g} G{_remise_txt}",
         lien="hotel-reservation",
         dedupe_minutes=None,
     )
@@ -503,6 +523,213 @@ def annuler_reservation(res_id: int, db: Session = Depends(get_db)):
         r.chambre.statut = "DISPONIBLE"
     db.commit()
     return _res_dict(r)
+
+
+# ══════════════════════════════════════════════════════════════════
+# DOCUMENTS IMPRIMABLES — reçu client / pro forma
+# ══════════════════════════════════════════════════════════════════
+
+def _fmt_g(v) -> str:
+    return f"{float(v or 0):,.2f}".replace(",", " ") + " G"
+
+
+def _dt_fr(dt) -> str:
+    """Datetime → 'JJ/MM/AAAA à HHhMM' en heure d'Haïti."""
+    if not dt:
+        return "—"
+    try:
+        from tz_utils import HAITI_TZ
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.astimezone(HAITI_TZ)
+    except Exception:
+        pass
+    return dt.strftime("%d/%m/%Y à %Hh%M")
+
+
+def _branding_lignes() -> tuple[str, list[str]]:
+    """(nom, [lignes sous-titre]) de l'institution — vide si le tenant n'a
+    pas personnalisé son identité (évite d'imprimer « NATIVITE » ailleurs)."""
+    try:
+        from main import _branding_val
+        nom = _branding_val("nom")
+        sous = [x for x in (_branding_val("raison_sociale"), _branding_val("complexe"),
+                            _branding_val("adresse")) if x]
+        tel = " · ".join(x for x in (_branding_val("telephone1"), _branding_val("telephone2")) if x)
+        if tel:
+            sous.append("Tél : " + tel)
+        return nom, sous
+    except Exception:
+        return "", []
+
+
+def _pdf_entete(story, ACCENT):
+    """Ajoute l'en-tête institution (nom + sous-titres + filet) au `story`."""
+    from reportlab.lib import colors
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import Paragraph, HRFlowable
+    from reportlab.lib.enums import TA_CENTER
+    DARK = colors.HexColor("#1A1A2E")
+    GREY = colors.HexColor("#6B7280")
+    st_org  = ParagraphStyle("org",  fontSize=13.5, fontName="Helvetica-Bold",
+                             textColor=DARK, alignment=TA_CENTER, spaceAfter=2)
+    st_orgs = ParagraphStyle("orgs", fontSize=8.5, textColor=GREY,
+                             alignment=TA_CENTER, leading=11)
+    nom, sous = _branding_lignes()
+    if nom:
+        story.append(Paragraph(nom, st_org))
+    for l in sous:
+        story.append(Paragraph(l, st_orgs))
+    story.append(HRFlowable(width="100%", thickness=1.4, color=ACCENT,
+                            spaceBefore=8 if nom else 0, spaceAfter=4))
+
+
+@router.get("/reservations/{res_id}/fiche.pdf")
+def fiche_reservation_pdf(res_id: int, db: Session = Depends(get_db)):
+    """Reçu client imprimable pour un enregistrement (Moment ou Nuit) :
+    en-tête institution, infos client, séjour, montant facturé (rabais
+    éventuel visible), payé / solde, espace signature."""
+    r = db.query(HotelReservation).filter_by(id=res_id).first()
+    if not r:
+        raise HTTPException(404, "Réservation introuvable.")
+
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+    from reportlab.lib.enums import TA_CENTER
+
+    DARK   = colors.HexColor("#1A1A2E")
+    ACCENT = colors.HexColor("#10b981")
+    GREY   = colors.HexColor("#6B7280")
+
+    d = _res_dict(r)
+    est_moment = r.type_sejour == "MOMENT"
+    duree = f"{r.nb_nuits} nuit(s)" if not est_moment else f"{d['nb_heures'] or 0:g} h"
+    ref   = d["montant_reference"]
+    remise = d["remise"]
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=1.9*cm, rightMargin=1.9*cm,
+                            topMargin=1.6*cm, bottomMargin=1.6*cm,
+                            title=f"Reçu — {r.client_nom}")
+    st_title = ParagraphStyle("title", fontSize=17, fontName="Helvetica-Bold",
+                              textColor=DARK, alignment=TA_CENTER, spaceBefore=4, spaceAfter=3)
+    st_sub   = ParagraphStyle("sub", fontSize=9.5, textColor=GREY, alignment=TA_CENTER, spaceAfter=6)
+    st_sec   = ParagraphStyle("sec", fontSize=10.5, fontName="Helvetica-Bold",
+                              textColor=ACCENT, spaceBefore=13, spaceAfter=5)
+    st_body  = ParagraphStyle("body", fontSize=9.5, textColor=DARK, leading=13)
+
+    story = []
+    _pdf_entete(story, ACCENT)
+    story.append(Paragraph("REÇU CLIENT", st_title))
+    story.append(Paragraph(
+        f"{'Séjour Moment' if est_moment else 'Séjour Nuit'} &nbsp;—&nbsp; N&deg; {r.id} "
+        f"&nbsp;—&nbsp; émis le {_dt_fr(datetime.now(timezone.utc))}", st_sub))
+
+    story.append(Paragraph("Client", st_sec))
+    cli_rows = [
+        ["Nom complet", r.client_nom],
+        ["Contact", r.client_contact or "—"],
+        ["NIF / Pièce", r.client_id_piece or "—"],
+    ]
+    t_cli = Table(cli_rows, colWidths=[4.6*cm, 12.6*cm])
+    t_cli.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 9.5),
+        ("TEXTCOLOR", (0, 0), (0, -1), GREY),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica-Bold"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4), ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("LINEBELOW", (0, 0), (-1, -2), 0.3, colors.HexColor("#E5E7EB")),
+    ]))
+    story.append(t_cli)
+
+    story.append(Paragraph("Séjour", st_sec))
+    sej_rows = [
+        ["Chambre", f"{d['chambre_numero']}  ({d['chambre_type'] or '—'})"],
+        ["Arrivée", _dt_fr(r.date_arrivee)],
+        ["Départ prévu", _dt_fr(r.date_depart_prevue)],
+        ["Durée", duree],
+    ]
+    t_sej = Table(sej_rows, colWidths=[4.6*cm, 12.6*cm])
+    t_sej.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 9.5),
+        ("TEXTCOLOR", (0, 0), (0, -1), GREY),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica-Bold"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4), ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("LINEBELOW", (0, 0), (-1, -2), 0.3, colors.HexColor("#E5E7EB")),
+    ]))
+    story.append(t_sej)
+
+    story.append(Paragraph("Montant", st_sec))
+    mont_rows = [["Libellé", "Montant"]]
+    if remise > 0:
+        mont_rows.append(["Tarif de référence", _fmt_g(ref)])
+        mont_rows.append(["Rabais accordé", "- " + _fmt_g(remise)])
+    mont_rows.append(["Payé", _fmt_g(d["montant_paye"])])
+    mont_rows.append(["Solde restant", _fmt_g(d["solde"])])
+    if r.mode_paiement:
+        mont_rows.append(["Mode de paiement", r.mode_paiement])
+    t_m = Table(mont_rows, colWidths=[11.2*cm, 6*cm])
+    t_m.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), DARK),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9.5),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#F7F7F9"), colors.white]),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#D5D5DD")),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5), ("TOPPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    story.append(t_m)
+    story.append(Spacer(1, 5))
+
+    net_tbl = Table([["MONTANT TOTAL FACTURÉ", _fmt_g(d["montant_total"])]], colWidths=[11.2*cm, 6*cm])
+    net_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), ACCENT),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
+        ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 12),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+        ("LEFTPADDING", (0, 0), (0, 0), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 9), ("TOPPADDING", (0, 0), (-1, -1), 9),
+    ]))
+    story.append(net_tbl)
+
+    if r.notes:
+        story.append(Paragraph("Notes", st_sec))
+        story.append(Paragraph(str(r.notes).replace("\n", "<br/>"), st_body))
+
+    story.append(Spacer(1, 30))
+    story.append(Paragraph(
+        "Fait à ...................................................   le ......... / ......... / ..............",
+        st_body))
+    story.append(Spacer(1, 42))
+    sign = Table([
+        ["______________________________", "", "______________________________"],
+        ["Signature du client", "", "Signature de la réception"],
+    ], colWidths=[7.3*cm, 2.6*cm, 7.3*cm])
+    sign.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TEXTCOLOR", (0, 1), (-1, 1), GREY),
+        ("TOPPADDING", (0, 1), (-1, 1), 3),
+    ]))
+    story.append(sign)
+
+    story.append(Spacer(1, 22))
+    story.append(HRFlowable(width="100%", thickness=0.4, color=colors.grey))
+    _nom, _ = _branding_lignes()
+    story.append(Paragraph(
+        f"Reçu généré le {_dt_fr(datetime.now(timezone.utc))}" + (f" — {_nom}" if _nom else ""),
+        ParagraphStyle("foot", fontSize=7, textColor=colors.grey, alignment=TA_CENTER, spaceBefore=4)))
+
+    doc.build(story)
+    buf.seek(0)
+    fname = f"recu_{r.client_nom}_{r.id}.pdf".replace(" ", "_")
+    return StreamingResponse(buf, media_type="application/pdf",
+                             headers={"Content-Disposition": f'inline; filename="{fname}"'})
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -1389,3 +1616,540 @@ def supprimer_depense_hotel(dep_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Dépense introuvable")
     db.delete(d); db.commit()
     return {"message": "Dépense supprimée"}
+
+
+# ══════════════════════════════════════════════════════════════════
+# PRO FORMA / RÉSERVATIONS À VENIR
+# ──────────────────────────────────────────────────────────────────
+# Devis imprimable ET réservation planifiée pour un client futur. Les
+# chambres ne sont PAS bloquées tant que le client n'est pas arrivé
+# (bouton « Convertir en séjour » à la réception). Les montants saisis
+# font foi. À la confirmation → notification de rappel pour l'arrivée ;
+# à l'approche de la date → 2ᵉ rappel (paresseux, sans planificateur).
+# ══════════════════════════════════════════════════════════════════
+
+class LigneProformaIn(BaseModel):
+    designation:   str
+    chambre_id:    Optional[int]   = None
+    qte:           float           = 1
+    prix_unitaire: float           = 0
+    montant:       Optional[float] = None   # si fourni → fait foi
+
+
+class ProformaIn(BaseModel):
+    type_doc:            str                  = "PROFORMA"   # PROFORMA | RESERVATION
+    client_nom:          str
+    client_contact:      Optional[str]        = None
+    client_id_piece:     Optional[str]        = None
+    date_arrivee_prevue: str
+    date_depart_prevue:  Optional[str]        = None
+    nb_nuits:            Optional[int]        = None
+    nb_personnes:        Optional[int]        = None
+    lignes:             List[LigneProformaIn] = []
+    montant_total:       Optional[float]      = None   # si absent → somme des lignes
+    acompte:             float                = 0
+    notes:              Optional[str]         = None
+
+
+class ConvertirProformaIn(BaseModel):
+    chambre_id:    Optional[int] = None
+    mode_paiement: Optional[str] = None
+
+
+def _parse_dt_hotel(raw: Optional[str], champ: str, obligatoire: bool = True):
+    if not raw:
+        if obligatoire:
+            raise HTTPException(422, f"{champ} requis.")
+        return None
+    try:
+        dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except ValueError:
+        raise HTTPException(422, f"{champ} invalide (ISO 8601).")
+
+
+def _normaliser_lignes(lignes: List[LigneProformaIn], db: Session) -> tuple[list[dict], Decimal]:
+    """Renvoie ([lignes normalisées avec montant + numéro de chambre], total)."""
+    out: list[dict] = []
+    total = Decimal("0")
+    for l in lignes:
+        des = (l.designation or "").strip()
+        if not des:
+            continue
+        qte = Decimal(str(l.qte or 0)) or Decimal("1")
+        pu  = Decimal(str(l.prix_unitaire or 0))
+        if l.montant is not None:
+            try:
+                mt = Decimal(str(l.montant))
+            except (ValueError, ArithmeticError):
+                mt = qte * pu
+        else:
+            mt = qte * pu
+        if mt < 0:
+            mt = Decimal("0")
+        num = None
+        if l.chambre_id:
+            ch = db.get(HotelChambre, l.chambre_id)
+            num = ch.numero if ch else None
+        out.append({
+            "designation":   des,
+            "chambre_id":    l.chambre_id,
+            "chambre_numero": num,
+            "qte":           float(qte),
+            "prix_unitaire": float(pu),
+            "montant":       float(mt),
+        })
+        total += mt
+    return out, total
+
+
+def _pf_numero(db: Session, type_doc: str) -> str:
+    prefixe = "RS" if type_doc == "RESERVATION" else "PF"
+    annee = today_haiti().year
+    base = f"{prefixe}-{annee}-"
+    n = db.query(HotelProforma).filter(HotelProforma.numero.like(base + "%")).count() + 1
+    for _ in range(50):
+        cand = f"{base}{n:04d}"
+        if not db.query(HotelProforma).filter_by(numero=cand).first():
+            return cand
+        n += 1
+    return f"{base}{int(datetime.now().timestamp())}"
+
+
+def _pf_dict(p: HotelProforma) -> dict:
+    return {
+        "id":                  p.id,
+        "numero":              p.numero,
+        "type_doc":            p.type_doc,
+        "client_nom":          p.client_nom,
+        "client_contact":      p.client_contact or "",
+        "client_id_piece":     p.client_id_piece or "",
+        "date_arrivee_prevue": p.date_arrivee_prevue.isoformat() if p.date_arrivee_prevue else None,
+        "date_depart_prevue":  p.date_depart_prevue.isoformat() if p.date_depart_prevue else None,
+        "nb_nuits":            p.nb_nuits,
+        "nb_personnes":        p.nb_personnes,
+        "lignes":              p.lignes or [],
+        "montant_total":       float(_d(p.montant_total)),
+        "acompte":             float(_d(p.acompte)),
+        "solde":               float(_d(p.montant_total) - _d(p.acompte)),
+        "statut":              p.statut,
+        "notes":               p.notes or "",
+        "reservation_id":      p.reservation_id,
+        "created_at":          p.created_at.isoformat() if p.created_at else None,
+        "maj_le":              p.maj_le.isoformat() if p.maj_le else None,
+    }
+
+
+def _pf_rappels_arrivee(db: Session):
+    """Rappel paresseux (pas de planificateur dans l'appli) : pour chaque
+    réservation confirmée dont l'arrivée est dans ≤ 48 h et non encore
+    rappelée, on émet une notification « préparer la chambre »."""
+    from notifications_service import creer_notification
+    limite = datetime.now(timezone.utc) + timedelta(hours=48)
+    a_traiter = (
+        db.query(HotelProforma)
+        .filter(
+            HotelProforma.statut == "CONFIRMEE",
+            HotelProforma.rappel_arrivee_notifie.is_(False),
+            HotelProforma.date_arrivee_prevue <= limite,
+        )
+        .all()
+    )
+    if not a_traiter:
+        return
+    for p in a_traiter:
+        chs = ", ".join(sorted({str(l.get("chambre_numero")) for l in (p.lignes or [])
+                                if l.get("chambre_numero")})) or "à définir"
+        creer_notification(
+            db, module="hotel", type_="reservation_arrivee_proche",
+            titre=f"Arrivée imminente — {p.client_nom}",
+            message=f"{p.numero} · arrivée {_dt_fr(p.date_arrivee_prevue)} · "
+                    f"chambre(s) : {chs} — préparer la/les chambre(s).",
+            lien="hotel-proforma", dedupe_minutes=None,
+        )
+        p.rappel_arrivee_notifie = True
+    db.commit()
+
+
+@router.get("/proformas")
+def liste_proformas(
+    statut:   Optional[str] = Query(default=None),
+    type_doc: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    try:
+        _pf_rappels_arrivee(db)
+    except Exception:
+        db.rollback()
+    q = db.query(HotelProforma).order_by(HotelProforma.date_arrivee_prevue.desc())
+    if statut:
+        q = q.filter(HotelProforma.statut == statut.upper())
+    if type_doc:
+        q = q.filter(HotelProforma.type_doc == type_doc.upper())
+    return [_pf_dict(p) for p in q.limit(300).all()]
+
+
+@router.get("/proformas/{pf_id}")
+def detail_proforma(pf_id: int, db: Session = Depends(get_db)):
+    p = db.get(HotelProforma, pf_id)
+    if not p:
+        raise HTTPException(404, "Pro forma introuvable.")
+    return _pf_dict(p)
+
+
+@router.post("/proformas", status_code=201)
+def creer_proforma(data: ProformaIn, request: Request, db: Session = Depends(get_db)):
+    if not (data.client_nom or "").strip():
+        raise HTTPException(422, "Nom du client requis.")
+    type_doc = (data.type_doc or "PROFORMA").upper()
+    if type_doc not in ("PROFORMA", "RESERVATION"):
+        type_doc = "PROFORMA"
+    date_arr = _parse_dt_hotel(data.date_arrivee_prevue, "Date d'arrivée prévue")
+    date_dep = _parse_dt_hotel(data.date_depart_prevue, "Date de départ prévue", obligatoire=False)
+
+    lignes, total_lignes = _normaliser_lignes(data.lignes, db)
+    montant_total = total_lignes
+    if data.montant_total is not None:
+        try:
+            mt = Decimal(str(data.montant_total))
+            if mt >= 0:
+                montant_total = mt
+        except (ValueError, ArithmeticError):
+            pass
+    acompte = max(Decimal("0"), _d(data.acompte))
+    if acompte > montant_total:
+        acompte = montant_total
+
+    p = HotelProforma(
+        numero              = _pf_numero(db, type_doc),
+        type_doc            = type_doc,
+        client_nom          = data.client_nom.strip(),
+        client_contact      = (data.client_contact or "").strip() or None,
+        client_id_piece     = (data.client_id_piece or "").strip() or None,
+        date_arrivee_prevue = date_arr,
+        date_depart_prevue  = date_dep,
+        nb_nuits            = data.nb_nuits,
+        nb_personnes        = data.nb_personnes,
+        lignes             = lignes,
+        montant_total       = montant_total,
+        acompte             = acompte,
+        statut              = "BROUILLON",
+        notes              = (data.notes or "").strip() or None,
+        cree_par_id         = _uid(request),
+    )
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return _pf_dict(p)
+
+
+@router.put("/proformas/{pf_id}")
+def modifier_proforma(pf_id: int, data: ProformaIn, request: Request, db: Session = Depends(get_db)):
+    p = db.get(HotelProforma, pf_id)
+    if not p:
+        raise HTTPException(404, "Pro forma introuvable.")
+    if p.statut in ("CONVERTIE", "ANNULEE"):
+        raise HTTPException(409, "Ce document ne peut plus être modifié.")
+    if not (data.client_nom or "").strip():
+        raise HTTPException(422, "Nom du client requis.")
+
+    p.client_nom          = data.client_nom.strip()
+    p.client_contact      = (data.client_contact or "").strip() or None
+    p.client_id_piece     = (data.client_id_piece or "").strip() or None
+    p.date_arrivee_prevue = _parse_dt_hotel(data.date_arrivee_prevue, "Date d'arrivée prévue")
+    p.date_depart_prevue  = _parse_dt_hotel(data.date_depart_prevue, "Date de départ prévue", obligatoire=False)
+    p.nb_nuits            = data.nb_nuits
+    p.nb_personnes        = data.nb_personnes
+
+    lignes, total_lignes = _normaliser_lignes(data.lignes, db)
+    p.lignes = lignes
+    montant_total = total_lignes
+    if data.montant_total is not None:
+        try:
+            mt = Decimal(str(data.montant_total))
+            if mt >= 0:
+                montant_total = mt
+        except (ValueError, ArithmeticError):
+            pass
+    p.montant_total = montant_total
+    acompte = max(Decimal("0"), _d(data.acompte))
+    p.acompte = acompte if acompte <= montant_total else montant_total
+    p.notes = (data.notes or "").strip() or None
+    db.commit()
+    db.refresh(p)
+    return _pf_dict(p)
+
+
+@router.post("/proformas/{pf_id}/confirmer", status_code=200)
+def confirmer_proforma(pf_id: int, db: Session = Depends(get_db)):
+    p = db.get(HotelProforma, pf_id)
+    if not p:
+        raise HTTPException(404, "Pro forma introuvable.")
+    if p.statut != "BROUILLON":
+        raise HTTPException(409, "Seul un brouillon peut être confirmé.")
+    p.statut = "CONFIRMEE"
+
+    chs = ", ".join(sorted({str(l.get("chambre_numero")) for l in (p.lignes or [])
+                            if l.get("chambre_numero")})) or "à définir"
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="hotel", type_="reservation_a_preparer",
+        titre=f"Réservation confirmée — {p.client_nom}",
+        message=f"{p.numero} · arrivée {_dt_fr(p.date_arrivee_prevue)} · "
+                f"chambre(s) : {chs} · {_fmt_g(p.montant_total)} — penser à préparer la/les chambre(s).",
+        lien="hotel-proforma", dedupe_minutes=None,
+    )
+    p.rappel_confirme_notifie = True
+    # Si l'arrivée est déjà proche, le rappel J-2 part dans la foulée.
+    if p.date_arrivee_prevue and p.date_arrivee_prevue <= datetime.now(timezone.utc) + timedelta(hours=48):
+        creer_notification(
+            db, module="hotel", type_="reservation_arrivee_proche",
+            titre=f"Arrivée imminente — {p.client_nom}",
+            message=f"{p.numero} · arrivée {_dt_fr(p.date_arrivee_prevue)} · "
+                    f"chambre(s) : {chs} — préparer la/les chambre(s).",
+            lien="hotel-proforma", dedupe_minutes=None,
+        )
+        p.rappel_arrivee_notifie = True
+    db.commit()
+    db.refresh(p)
+    return _pf_dict(p)
+
+
+@router.post("/proformas/{pf_id}/annuler", status_code=200)
+def annuler_proforma(pf_id: int, db: Session = Depends(get_db)):
+    p = db.get(HotelProforma, pf_id)
+    if not p:
+        raise HTTPException(404, "Pro forma introuvable.")
+    if p.statut == "CONVERTIE":
+        raise HTTPException(409, "Un document déjà converti en séjour ne peut être annulé.")
+    p.statut = "ANNULEE"
+    db.commit()
+    return _pf_dict(p)
+
+
+@router.post("/proformas/{pf_id}/convertir", status_code=201)
+def convertir_proforma(pf_id: int, data: ConvertirProformaIn, request: Request, db: Session = Depends(get_db)):
+    """Transforme la pro forma en séjour réel (arrivée du client) : crée
+    une HotelReservation NUIT avec les montants de la pro forma (qui font
+    foi), occupe la chambre, et marque la pro forma CONVERTIE."""
+    p = db.get(HotelProforma, pf_id)
+    if not p:
+        raise HTTPException(404, "Pro forma introuvable.")
+    if p.statut not in ("BROUILLON", "CONFIRMEE"):
+        raise HTTPException(409, "Ce document ne peut pas être converti.")
+
+    chambre_id = data.chambre_id
+    if not chambre_id:
+        for l in (p.lignes or []):
+            if l.get("chambre_id"):
+                chambre_id = l["chambre_id"]
+                break
+    if not chambre_id:
+        raise HTTPException(422, "Aucune chambre associée — précisez la chambre à occuper.")
+    chambre = db.get(HotelChambre, chambre_id)
+    if not chambre:
+        raise HTTPException(404, "Chambre introuvable.")
+    if chambre.statut != "DISPONIBLE":
+        raise HTTPException(409, f"Chambre {chambre.numero} n'est pas disponible (statut : {chambre.statut}).")
+
+    nb_nuits = p.nb_nuits or 1
+    if nb_nuits < 1:
+        nb_nuits = 1
+    date_arr = p.date_arrivee_prevue or datetime.now(timezone.utc)
+    date_dep = p.date_depart_prevue or (date_arr + timedelta(days=nb_nuits))
+    prix_unit = _d(chambre.prix_nuit)
+    montant   = _d(p.montant_total) if _d(p.montant_total) > 0 else prix_unit * nb_nuits
+    montant_paye = min(_d(p.acompte), montant)
+    solde = montant - montant_paye
+
+    r = HotelReservation(
+        chambre_id         = chambre.id,
+        client_nom         = p.client_nom,
+        client_contact     = p.client_contact,
+        client_id_piece    = p.client_id_piece,
+        type_sejour        = "NUIT",
+        date_arrivee       = date_arr,
+        date_depart_prevue = date_dep,
+        nb_nuits           = nb_nuits,
+        nb_heures          = None,
+        prix_unitaire      = prix_unit,
+        montant_total      = montant,
+        montant_paye       = montant_paye,
+        solde              = solde,
+        statut             = "EN_COURS",
+        mode_paiement      = data.mode_paiement,
+        notes              = (f"Issu de {p.numero}" + (f" — {p.notes}" if p.notes else ""))[:300],
+    )
+    db.add(r)
+    db.flush()
+    chambre.statut = "OCCUPEE"
+    p.statut = "CONVERTIE"
+    p.reservation_id = r.id
+
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="hotel", type_="nouvelle_reservation",
+        titre=f"Séjour ouvert — {r.client_nom}",
+        message=f"Chambre {chambre.numero} · issu de {p.numero} · {_fmt_g(montant)}",
+        lien="hotel-reservation", dedupe_minutes=None,
+    )
+    db.commit()
+    db.refresh(r)
+    return {"proforma": _pf_dict(p), "reservation": _res_dict(r)}
+
+
+@router.get("/proformas/{pf_id}/pdf")
+def proforma_pdf(pf_id: int, db: Session = Depends(get_db)):
+    p = db.get(HotelProforma, pf_id)
+    if not p:
+        raise HTTPException(404, "Pro forma introuvable.")
+
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+    from reportlab.lib.enums import TA_CENTER
+
+    DARK   = colors.HexColor("#1A1A2E")
+    ACCENT = colors.HexColor("#6366f1")
+    GREY   = colors.HexColor("#6B7280")
+
+    est_resa = p.type_doc == "RESERVATION"
+    titre_doc = "CONFIRMATION DE RÉSERVATION" if est_resa else "PRO FORMA"
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=1.9*cm, rightMargin=1.9*cm,
+                            topMargin=1.6*cm, bottomMargin=1.6*cm,
+                            title=f"{titre_doc} {p.numero}")
+    st_title = ParagraphStyle("title", fontSize=17, fontName="Helvetica-Bold",
+                              textColor=DARK, alignment=TA_CENTER, spaceBefore=4, spaceAfter=3)
+    st_sub   = ParagraphStyle("sub", fontSize=9.5, textColor=GREY, alignment=TA_CENTER, spaceAfter=6)
+    st_sec   = ParagraphStyle("sec", fontSize=10.5, fontName="Helvetica-Bold",
+                              textColor=ACCENT, spaceBefore=13, spaceAfter=5)
+    st_body  = ParagraphStyle("body", fontSize=9.5, textColor=DARK, leading=13)
+
+    story = []
+    _pdf_entete(story, ACCENT)
+    story.append(Paragraph(titre_doc, st_title))
+    _statut_txt = {"BROUILLON": "Brouillon", "CONFIRMEE": "Confirmée",
+                   "CONVERTIE": "Convertie en séjour", "ANNULEE": "Annulée"}.get(p.statut, p.statut)
+    story.append(Paragraph(
+        f"N&deg; {p.numero} &nbsp;—&nbsp; {_statut_txt} &nbsp;—&nbsp; établi le "
+        f"{_dt_fr(p.created_at or datetime.now(timezone.utc))}", st_sub))
+
+    story.append(Paragraph("Client", st_sec))
+    cli_rows = [
+        ["Nom complet", p.client_nom],
+        ["Contact", p.client_contact or "—"],
+        ["NIF / Pièce", p.client_id_piece or "—"],
+        ["Personnes", str(p.nb_personnes) if p.nb_personnes else "—"],
+    ]
+    t_cli = Table(cli_rows, colWidths=[4.6*cm, 12.6*cm])
+    t_cli.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 9.5),
+        ("TEXTCOLOR", (0, 0), (0, -1), GREY),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica-Bold"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4), ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("LINEBELOW", (0, 0), (-1, -2), 0.3, colors.HexColor("#E5E7EB")),
+    ]))
+    story.append(t_cli)
+
+    story.append(Paragraph("Séjour prévu", st_sec))
+    sej_rows = [
+        ["Arrivée prévue", _dt_fr(p.date_arrivee_prevue)],
+        ["Départ prévu", _dt_fr(p.date_depart_prevue) if p.date_depart_prevue else "—"],
+        ["Nombre de nuits", str(p.nb_nuits) if p.nb_nuits else "—"],
+    ]
+    t_sej = Table(sej_rows, colWidths=[4.6*cm, 12.6*cm])
+    t_sej.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 9.5),
+        ("TEXTCOLOR", (0, 0), (0, -1), GREY),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica-Bold"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4), ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("LINEBELOW", (0, 0), (-1, -2), 0.3, colors.HexColor("#E5E7EB")),
+    ]))
+    story.append(t_sej)
+
+    story.append(Paragraph("Détail", st_sec))
+    det_rows = [["Désignation", "Chambre", "Qté", "P.U.", "Montant"]]
+    for l in (p.lignes or []):
+        det_rows.append([
+            l.get("designation", ""),
+            l.get("chambre_numero") or "—",
+            f"{l.get('qte', 1):g}",
+            _fmt_g(l.get("prix_unitaire", 0)),
+            _fmt_g(l.get("montant", 0)),
+        ])
+    if len(det_rows) == 1:
+        det_rows.append(["—", "—", "—", "—", _fmt_g(0)])
+    t_det = Table(det_rows, colWidths=[6.8*cm, 2.4*cm, 1.4*cm, 3.1*cm, 3.5*cm])
+    t_det.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), DARK),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("ALIGN", (2, 0), (-1, -1), "RIGHT"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#F7F7F9"), colors.white]),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#D5D5DD")),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5), ("TOPPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    story.append(t_det)
+    story.append(Spacer(1, 5))
+
+    rec_rows = [["TOTAL", _fmt_g(p.montant_total)]]
+    if _d(p.acompte) > 0:
+        rec_rows.append(["Acompte reçu", _fmt_g(p.acompte)])
+        rec_rows.append(["Solde à régler", _fmt_g(_d(p.montant_total) - _d(p.acompte))])
+    t_rec = Table(rec_rows, colWidths=[13.2*cm, 4*cm])
+    t_rec.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10.5),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("LEFTPADDING", (0, 0), (0, 0), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7), ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("GRID", (0, 1), (-1, -1), 0.4, colors.HexColor("#D5D5DD")),
+    ]))
+    story.append(t_rec)
+
+    if p.notes:
+        story.append(Paragraph("Notes", st_sec))
+        story.append(Paragraph(str(p.notes).replace("\n", "<br/>"), st_body))
+
+    story.append(Spacer(1, 14))
+    story.append(Paragraph(
+        "Ce document ne vaut pas facture. Les chambres sont garanties à réception de l'acompte "
+        "et jusqu'à l'heure d'arrivée prévue.", ParagraphStyle(
+            "mention", fontSize=8, textColor=GREY, leading=11)))
+
+    story.append(Spacer(1, 30))
+    sign = Table([
+        ["______________________________", "", "______________________________"],
+        ["Signature du client", "", "Signature de la direction"],
+    ], colWidths=[7.3*cm, 2.6*cm, 7.3*cm])
+    sign.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TEXTCOLOR", (0, 1), (-1, 1), GREY),
+        ("TOPPADDING", (0, 1), (-1, 1), 3),
+    ]))
+    story.append(sign)
+
+    story.append(Spacer(1, 20))
+    story.append(HRFlowable(width="100%", thickness=0.4, color=colors.grey))
+    _nom, _ = _branding_lignes()
+    story.append(Paragraph(
+        f"Document généré le {_dt_fr(datetime.now(timezone.utc))}" + (f" — {_nom}" if _nom else ""),
+        ParagraphStyle("foot", fontSize=7, textColor=colors.grey, alignment=TA_CENTER, spaceBefore=4)))
+
+    doc.build(story)
+    buf.seek(0)
+    fname = f"{p.numero}_{p.client_nom}.pdf".replace(" ", "_")
+    return StreamingResponse(buf, media_type="application/pdf",
+                             headers={"Content-Disposition": f'inline; filename="{fname}"'})
