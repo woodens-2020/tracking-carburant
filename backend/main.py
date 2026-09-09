@@ -2581,7 +2581,7 @@ def carburant_synthese(
         "date":        str(d.date_depense),
         "categorie":   d.categorie or "—",
         "description": d.description or "",
-        "beneficiaire": getattr(d, "beneficiaire", None) or "",
+        "source":      (d.produit.nom if d.produit else "Caisse générale"),
         "montant":     float(_D(str(d.montant))),
     } for d in deps]
     total_depenses = float(sum((_D(str(d.montant)) for d in deps), _D("0")))
@@ -2676,7 +2676,7 @@ def carburant_rapport_jour(
     depenses_liste = [{
         "categorie":    x.categorie or "—",
         "description":  x.description or "",
-        "beneficiaire": getattr(x, "beneficiaire", None) or "",
+        "source":       (x.produit.nom if x.produit else "Caisse générale"),
         "reference":    getattr(x, "reference", None) or "",
         "montant":      float(_D(str(x.montant))),
     } for x in deps]

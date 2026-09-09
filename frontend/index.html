@@ -15114,10 +15114,10 @@ function _ficheSyntheseHtml(s){
   const vp   = s.ventes.par_produit||[];
   const st   = s.stock||[];
   const dp   = s.depenses.liste||[];
-  const rowsVentes = vp.map(p=>`<tr><td>${p.produit}</td><td class="r">${gal(p.gallons)}</td><td class="r">${grd(p.montant)}</td><td class="r">${p.nb_releves}</td></tr>`).join('')
-    || `<tr><td colspan="4" class="c muted">Aucune vente sur la période</td></tr>`;
+  const rowsVentes = vp.map(p=>`<tr><td>${p.produit}</td><td class="r">${gal(p.gallons)}</td><td class="r">${grd(p.montant)}</td></tr>`).join('')
+    || `<tr><td colspan="3" class="c muted">Aucune vente sur la période</td></tr>`;
   const rowsStock = st.map(p=>`<tr><td>${p.produit}</td><td class="r">${gal(p.gallons_livres)}</td><td class="r">${gal(p.gallons_vendus)}</td><td class="r">${gal(p.gallons_ecartes)}</td><td class="r b">${gal(p.gallons_restants)}</td></tr>`).join('');
-  const rowsDep = dp.map(x=>`<tr><td>${x.date}</td><td>${x.categorie}</td><td>${(x.description||'').replace(/</g,'&lt;')}</td><td>${x.beneficiaire||''}</td><td class="r">${grd(x.montant)}</td></tr>`).join('')
+  const rowsDep = dp.map(x=>`<tr><td>${x.date}</td><td>${x.categorie}</td><td>${(x.description||'').replace(/</g,'&lt;')}</td><td>${x.source||'Caisse générale'}</td><td class="r">${grd(x.montant)}</td></tr>`).join('')
     || `<tr><td colspan="5" class="c muted">Aucune dépense sur la période</td></tr>`;
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Fiche de synthèse carburant</title><style>
     *{margin:0;padding:0;box-sizing:border-box}
@@ -15163,16 +15163,17 @@ function _ficheSyntheseHtml(s){
     </div>
 
     <h2>Gallons vendus — par produit</h2>
+    <div style="font-size:10px;color:#666;margin:-3px 0 6px">Source : ventes de carburant (relevés de compteurs)</div>
     <table>
-      <thead><tr><th>Produit</th><th class="r">Gallons</th><th class="r">Montant</th><th class="r">Relevés</th></tr></thead>
+      <thead><tr><th>Produit</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead>
       <tbody>${rowsVentes}
-        <tr class="tot"><td>TOTAL</td><td class="r">${gal(s.ventes.total_gallons)}</td><td class="r">${grd(s.ventes.total_montant)}</td><td class="r">—</td></tr>
+        <tr class="tot"><td>TOTAL</td><td class="r">${gal(s.ventes.total_gallons)}</td><td class="r">${grd(s.ventes.total_montant)}</td></tr>
       </tbody>
     </table>
 
     <h2>Dépenses de la période (${s.depenses.nb})</h2>
     <table>
-      <thead><tr><th>Date</th><th>Catégorie</th><th>Description</th><th>Bénéficiaire</th><th class="r">Montant</th></tr></thead>
+      <thead><tr><th>Date</th><th>Catégorie</th><th>Description</th><th>Source (caisse)</th><th class="r">Montant</th></tr></thead>
       <tbody>${rowsDep}
         <tr class="tot"><td colspan="4">TOTAL DÉPENSES</td><td class="r">${grd(s.depenses.total)}</td></tr>
       </tbody>
@@ -15230,13 +15231,12 @@ function _cjrRender(d){
   const rowsEnt = (ent.par_produit||[]).map(p=>`<tr>
       <td style="font-weight:600">${esc(p.produit)}</td>
       <td class="tr">${fmtGalX(p.gallons)}</td>
-      <td class="tr">${p.nb_releves}</td>
       <td class="tr c-teal" style="font-weight:700">${fmtGX(p.montant)}</td>
-    </tr>`).join('') || `<tr><td colspan="4" class="empty" style="padding:14px">Aucune vente ce jour</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="3" class="empty" style="padding:14px">Aucune vente ce jour</td></tr>`;
   const rowsDep = (dep.liste||[]).map(x=>`<tr>
       <td>${esc(x.categorie)}</td>
       <td>${esc(x.description||'')}</td>
-      <td>${esc(x.beneficiaire||'')}</td>
+      <td>${esc(x.source||'Caisse générale')}</td>
       <td class="tr c-amber" style="font-weight:700">${fmtGX(x.montant)}</td>
     </tr>`).join('') || `<tr><td colspan="4" class="empty" style="padding:14px">Aucune dépense ce jour</td></tr>`;
 
@@ -15260,11 +15260,12 @@ function _cjrRender(d){
   </div>
 
   <div class="galrecap-title">Entrées — ventes de carburant</div>
+  <div style="font-size:12px;color:var(--muted);margin:-4px 2px 8px">Source : ventes de carburant (relevés de compteurs)</div>
   <div class="tbl-wrap" style="margin-bottom:20px">
     <table class="dt">
-      <thead><tr><th>Produit</th><th class="tr">Gallons</th><th class="tr">Relevés</th><th class="tr">Montant encaissé</th></tr></thead>
+      <thead><tr><th>Produit</th><th class="tr">Gallons</th><th class="tr">Montant encaissé</th></tr></thead>
       <tbody>${rowsEnt}
-        <tr class="recap-total"><td style="font-weight:800">TOTAL ENTRÉES</td><td class="tr" style="font-weight:700">${fmtGalX(ent.total_gallons)}</td><td></td><td class="tr c-teal" style="font-weight:800">${fmtGX(ent.total)}</td></tr>
+        <tr class="recap-total"><td style="font-weight:800">TOTAL ENTRÉES</td><td class="tr" style="font-weight:700">${fmtGalX(ent.total_gallons)}</td><td class="tr c-teal" style="font-weight:800">${fmtGX(ent.total)}</td></tr>
       </tbody>
     </table>
   </div>
@@ -15272,7 +15273,7 @@ function _cjrRender(d){
   <div class="galrecap-title">Dépenses de la station</div>
   <div class="tbl-wrap" style="margin-bottom:20px">
     <table class="dt">
-      <thead><tr><th>Catégorie</th><th>Description</th><th>Bénéficiaire</th><th class="tr">Montant</th></tr></thead>
+      <thead><tr><th>Catégorie</th><th>Description</th><th>Source (caisse)</th><th class="tr">Montant</th></tr></thead>
       <tbody>${rowsDep}
         <tr class="recap-total"><td colspan="3" style="font-weight:800">TOTAL DÉPENSES</td><td class="tr c-amber" style="font-weight:800">${fmtGX(dep.total)}</td></tr>
       </tbody>
@@ -15297,8 +15298,8 @@ function cjrImprimer(){
   const num = (v,dec)=>{ const x=parseFloat(Number(v||0).toFixed(dec)); return x.toLocaleString('fr-FR',{maximumFractionDigits:dec}); };
   const gal = v=>num(v,4)+' gal';
   const grd = v=>num(v,4)+' G';
-  const rowsE = (s.entrees.par_produit||[]).map(p=>`<tr><td>${p.produit}</td><td class="r">${gal(p.gallons)}</td><td class="r">${p.nb_releves}</td><td class="r">${grd(p.montant)}</td></tr>`).join('') || `<tr><td colspan="4" class="c muted">Aucune vente</td></tr>`;
-  const rowsD = (s.depenses.liste||[]).map(x=>`<tr><td>${x.categorie}</td><td>${(x.description||'').replace(/</g,'&lt;')}</td><td>${x.beneficiaire||''}</td><td class="r">${grd(x.montant)}</td></tr>`).join('') || `<tr><td colspan="4" class="c muted">Aucune dépense</td></tr>`;
+  const rowsE = (s.entrees.par_produit||[]).map(p=>`<tr><td>${p.produit}</td><td class="r">${gal(p.gallons)}</td><td class="r">${grd(p.montant)}</td></tr>`).join('') || `<tr><td colspan="3" class="c muted">Aucune vente</td></tr>`;
+  const rowsD = (s.depenses.liste||[]).map(x=>`<tr><td>${x.categorie}</td><td>${(x.description||'').replace(/</g,'&lt;')}</td><td>${x.source||'Caisse générale'}</td><td class="r">${grd(x.montant)}</td></tr>`).join('') || `<tr><td colspan="4" class="c muted">Aucune dépense</td></tr>`;
   const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Rapport journalier ${s.date}</title><style>
     *{margin:0;padding:0;box-sizing:border-box}
     @page{size:A4;margin:16mm 14mm}
@@ -15341,13 +15342,14 @@ function cjrImprimer(){
       <div class="kpi s"><div class="l">Disponible (solde)</div><div class="v">${grd(s.disponible)}</div></div>
     </div>
     <h2>Entrées — ventes de carburant</h2>
+    <div style="font-size:10px;color:#666;margin:-3px 0 6px">Source : ventes de carburant (relevés de compteurs)</div>
     <table>
-      <thead><tr><th>Produit</th><th class="r">Gallons</th><th class="r">Relevés</th><th class="r">Montant</th></tr></thead>
-      <tbody>${rowsE}<tr class="tot"><td>TOTAL ENTRÉES</td><td class="r">${gal(s.entrees.total_gallons)}</td><td></td><td class="r">${grd(s.entrees.total)}</td></tr></tbody>
+      <thead><tr><th>Produit</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead>
+      <tbody>${rowsE}<tr class="tot"><td>TOTAL ENTRÉES</td><td class="r">${gal(s.entrees.total_gallons)}</td><td class="r">${grd(s.entrees.total)}</td></tr></tbody>
     </table>
     <h2>Dépenses de la station (${s.depenses.nb})</h2>
     <table>
-      <thead><tr><th>Catégorie</th><th>Description</th><th>Bénéficiaire</th><th class="r">Montant</th></tr></thead>
+      <thead><tr><th>Catégorie</th><th>Description</th><th>Source (caisse)</th><th class="r">Montant</th></tr></thead>
       <tbody>${rowsD}<tr class="tot"><td colspan="3">TOTAL DÉPENSES</td><td class="r">${grd(s.depenses.total)}</td></tr></tbody>
     </table>
     <div class="cum">Cumul depuis le début (jusqu'au ${frDate(s.date)} inclus) — Entrées : <b>${grd(s.cumul.entrees)}</b> · Dépenses : <b>${grd(s.cumul.depenses)}</b> · Disponible : <b>${grd(s.cumul.disponible)}</b></div>
