@@ -361,10 +361,12 @@ def startup():
             rappel_confirme_notifie BOOLEAN NOT NULL DEFAULT FALSE,
             rappel_arrivee_notifie BOOLEAN NOT NULL DEFAULT FALSE,
             reservation_id INTEGER,
+            employe_id INTEGER,
             cree_par_id INTEGER,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             maj_le TIMESTAMPTZ NOT NULL DEFAULT now()
         )""",
+        "ALTER TABLE hotel_proformas ADD COLUMN IF NOT EXISTS employe_id INTEGER",
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_hotel_proformas_numero ON hotel_proformas (numero)",
         "CREATE INDEX IF NOT EXISTS idx_hotel_pf_statut ON hotel_proformas (statut)",
         "CREATE INDEX IF NOT EXISTS idx_hotel_pf_arrivee ON hotel_proformas (date_arrivee_prevue)",

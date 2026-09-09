@@ -1123,11 +1123,13 @@ class HotelProforma(Base):
     rappel_confirme_notifie = Column(Boolean, nullable=False, default=False)
     rappel_arrivee_notifie  = Column(Boolean, nullable=False, default=False)
     reservation_id      = Column(Integer, ForeignKey("hotel_reservations.id", ondelete="SET NULL"), nullable=True)
+    employe_id          = Column(Integer, ForeignKey("hotel_employes.id", ondelete="SET NULL"), nullable=True)  # réceptionniste
     cree_par_id         = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     created_at          = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     maj_le              = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
     cree_par = relationship("Utilisateur", foreign_keys=[cree_par_id])
+    employe  = relationship("HotelEmploye", foreign_keys=[employe_id])
 
     __table_args__ = (
         CheckConstraint("type_doc IN ('PROFORMA','RESERVATION')", name="chk_hotel_pf_type"),

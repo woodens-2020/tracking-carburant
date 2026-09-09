@@ -651,6 +651,7 @@ def fiche_reservation_pdf(res_id: int, db: Session = Depends(get_db)):
         ["Arrivée", _dt_fr(r.date_arrivee)],
         ["Départ prévu", _dt_fr(r.date_depart_prevue)],
         ["Durée", duree],
+        ["Réceptionniste", d.get("employe_nom") or "—"],
     ]
     t_sej = Table(sej_rows, colWidths=[4.6*cm, 12.6*cm])
     t_sej.setStyle(TableStyle([
@@ -1648,6 +1649,7 @@ class ProformaIn(BaseModel):
     lignes:             List[LigneProformaIn] = []
     montant_total:       Optional[float]      = None   # si absent → somme des lignes
     acompte:             float                = 0
+    employe_id:          Optional[int]        = None   # réceptionniste
     notes:              Optional[str]         = None
 
 
@@ -1737,6 +1739,9 @@ def _pf_dict(p: HotelProforma) -> dict:
         "statut":              p.statut,
         "notes":               p.notes or "",
         "reservation_id":      p.reservation_id,
+        "employe_id":          p.employe_id,
+        "employe_nom":         (f"{p.employe.prenom} {p.employe.nom}") if p.employe else None,
+        "cree_par_nom":        ((p.cree_par.nom_complet or p.cree_par.username) if p.cree_par else None),
         "created_at":          p.created_at.isoformat() if p.created_at else None,
         "maj_le":              p.maj_le.isoformat() if p.maj_le else None,
     }
@@ -1836,6 +1841,7 @@ def creer_proforma(data: ProformaIn, request: Request, db: Session = Depends(get
         montant_total       = montant_total,
         acompte             = acompte,
         statut              = "BROUILLON",
+        employe_id          = data.employe_id,
         notes              = (data.notes or "").strip() or None,
         cree_par_id         = _uid(request),
     )
@@ -1862,6 +1868,7 @@ def modifier_proforma(pf_id: int, data: ProformaIn, request: Request, db: Sessio
     p.date_depart_prevue  = _parse_dt_hotel(data.date_depart_prevue, "Date de départ prévue", obligatoire=False)
     p.nb_nuits            = data.nb_nuits
     p.nb_personnes        = data.nb_personnes
+    p.employe_id          = data.employe_id
 
     lignes, total_lignes = _normaliser_lignes(data.lignes, db)
     p.lignes = lignes
@@ -1980,6 +1987,7 @@ def convertir_proforma(pf_id: int, data: ConvertirProformaIn, request: Request, 
         solde              = solde,
         statut             = "EN_COURS",
         mode_paiement      = data.mode_paiement,
+        employe_id         = p.employe_id,
         notes              = (f"Issu de {p.numero}" + (f" — {p.notes}" if p.notes else ""))[:300],
     )
     db.add(r)
@@ -2058,11 +2066,16 @@ def proforma_pdf(pf_id: int, db: Session = Depends(get_db)):
     ]))
     story.append(t_cli)
 
+    _recep = (f"{p.employe.prenom} {p.employe.nom}") if p.employe else None
+    if not _recep and p.cree_par:
+        _recep = p.cree_par.nom_complet or p.cree_par.username
+
     story.append(Paragraph("Séjour prévu", st_sec))
     sej_rows = [
         ["Arrivée prévue", _dt_fr(p.date_arrivee_prevue)],
         ["Départ prévu", _dt_fr(p.date_depart_prevue) if p.date_depart_prevue else "—"],
         ["Nombre de nuits", str(p.nb_nuits) if p.nb_nuits else "—"],
+        ["Réceptionniste", _recep or "—"],
     ]
     t_sej = Table(sej_rows, colWidths=[4.6*cm, 12.6*cm])
     t_sej.setStyle(TableStyle([
