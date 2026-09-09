@@ -2684,21 +2684,6 @@ def carburant_rapport_jour(
 
     disponible_jour = tot_ent_m - tot_dep
 
-    # ── CUMUL depuis le début, jusqu'à cette date incluse ────────────
-    rel_cumul = (
-        db.query(Releve).join(Pompe, Releve.pompe_id == Pompe.id)
-        .filter(Releve.date <= d).all()
-    )
-    cum_ent = _D("0")
-    for r in rel_cumul:
-        q = _D(str(r.metter_apres)) - _D(str(r.metter_avant))
-        if q > 0:
-            cum_ent += q * _D(str(r.prix_gallon))
-    cum_dep = sum(
-        (_D(str(x.montant)) for x in db.query(Depense).filter(Depense.date_depense <= d).all()),
-        _D("0"),
-    )
-
     return {
         "date":      str(d),
         "genere_le": _dtn2.now(_tzu2.utc).isoformat(),
@@ -2713,11 +2698,6 @@ def carburant_rapport_jour(
             "total": float(tot_dep),
         },
         "disponible": float(disponible_jour),
-        "cumul": {
-            "entrees":    float(cum_ent),
-            "depenses":   float(cum_dep),
-            "disponible": float(cum_ent - cum_dep),
-        },
     }
 
 

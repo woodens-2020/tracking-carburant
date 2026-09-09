@@ -15279,14 +15279,7 @@ function _cjrRender(d){
       </tbody>
     </table>
   </div>
-
-  <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);border-top:1px solid var(--border);padding-top:12px">
-    <span>Cumul jusqu'au ${frDate(d.date)} —
-      entrées <b style="color:var(--text2)">${fmtGX(d.cumul.entrees)}</b> ·
-      dépenses <b style="color:var(--text2)">${fmtGX(d.cumul.depenses)}</b> ·
-      disponible <b style="color:${d.cumul.disponible>=0?'var(--green)':'var(--red)'}">${fmtGX(d.cumul.disponible)}</b>
-    </span>
-  </div>`;
+`;
 }
 
 function cjrImprimer(){
@@ -15352,7 +15345,6 @@ function cjrImprimer(){
       <thead><tr><th>Catégorie</th><th>Description</th><th>Source (caisse)</th><th class="r">Montant</th></tr></thead>
       <tbody>${rowsD}<tr class="tot"><td colspan="3">TOTAL DÉPENSES</td><td class="r">${grd(s.depenses.total)}</td></tr></tbody>
     </table>
-    <div class="cum">Cumul depuis le début (jusqu'au ${frDate(s.date)} inclus) — Entrées : <b>${grd(s.cumul.entrees)}</b> · Dépenses : <b>${grd(s.cumul.depenses)}</b> · Disponible : <b>${grd(s.cumul.disponible)}</b></div>
     <div class="foot">Généré le ${new Date().toLocaleString('fr-FR')} · Valeurs non arrondies</div>
     <div class="noprint"><button onclick="window.print()">🖨 Imprimer</button></div>
     <script>window.onload=function(){setTimeout(function(){window.print()},250)};<\/script>
