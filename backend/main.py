@@ -2624,6 +2624,103 @@ def carburant_synthese(
     }
 
 
+@app.get("/api/carburant/rapport-jour")
+def carburant_rapport_jour(
+    date: Optional[date_type] = None,
+    db: Session = Depends(get_db),
+):
+    """Rapport de caisse carburant pour UNE journée :
+      - Entrées   = argent encaissé (ventes de carburant, par produit)
+      - Dépenses  = dépenses de la station enregistrées ce jour-là
+      - Disponible = Entrées − Dépenses (solde du jour)
+    Un cumul (depuis le début, jusqu'à cette date incluse) est aussi fourni.
+    Aucune valeur n'est arrondie."""
+    from decimal import Decimal as _D
+    from datetime import datetime as _dtn2, timezone as _tzu2
+
+    d = date or today_haiti()
+
+    # ── ENTRÉES du jour : ventes de carburant (relevés du jour) ──────
+    rel_jour = (
+        db.query(Releve).join(Pompe, Releve.pompe_id == Pompe.id)
+        .filter(Releve.date == d).all()
+    )
+    ent = {}
+    for r in rel_jour:
+        q = _D(str(r.metter_apres)) - _D(str(r.metter_avant))
+        if q < 0:
+            continue
+        pid = r.pompe.produit_id
+        a = ent.setdefault(pid, {"gallons": _D("0"), "montant": _D("0"), "nb": 0})
+        a["gallons"] += q
+        a["montant"] += q * _D(str(r.prix_gallon))
+        a["nb"] += 1
+
+    produits = {p.id: p.nom for p in db.query(Produit).all()}
+    entrees_par_produit, tot_ent_g, tot_ent_m = [], _D("0"), _D("0")
+    for pid, a in sorted(ent.items(), key=lambda kv: float(kv[1]["montant"]), reverse=True):
+        tot_ent_g += a["gallons"]
+        tot_ent_m += a["montant"]
+        entrees_par_produit.append({
+            "produit":    produits.get(pid, "Inconnu"),
+            "gallons":    float(a["gallons"]),
+            "montant":    float(a["montant"]),
+            "nb_releves": a["nb"],
+        })
+
+    # ── DÉPENSES du jour (table Depense = station carburant) ─────────
+    deps = (
+        db.query(Depense).filter(Depense.date_depense == d)
+        .order_by(Depense.id.asc()).all()
+    )
+    depenses_liste = [{
+        "categorie":    x.categorie or "—",
+        "description":  x.description or "",
+        "beneficiaire": getattr(x, "beneficiaire", None) or "",
+        "reference":    getattr(x, "reference", None) or "",
+        "montant":      float(_D(str(x.montant))),
+    } for x in deps]
+    tot_dep = sum((_D(str(x.montant)) for x in deps), _D("0"))
+
+    disponible_jour = tot_ent_m - tot_dep
+
+    # ── CUMUL depuis le début, jusqu'à cette date incluse ────────────
+    rel_cumul = (
+        db.query(Releve).join(Pompe, Releve.pompe_id == Pompe.id)
+        .filter(Releve.date <= d).all()
+    )
+    cum_ent = _D("0")
+    for r in rel_cumul:
+        q = _D(str(r.metter_apres)) - _D(str(r.metter_avant))
+        if q > 0:
+            cum_ent += q * _D(str(r.prix_gallon))
+    cum_dep = sum(
+        (_D(str(x.montant)) for x in db.query(Depense).filter(Depense.date_depense <= d).all()),
+        _D("0"),
+    )
+
+    return {
+        "date":      str(d),
+        "genere_le": _dtn2.now(_tzu2.utc).isoformat(),
+        "entrees": {
+            "par_produit":   entrees_par_produit,
+            "total_gallons": float(tot_ent_g),
+            "total":         float(tot_ent_m),
+        },
+        "depenses": {
+            "liste": depenses_liste,
+            "nb":    len(depenses_liste),
+            "total": float(tot_dep),
+        },
+        "disponible": float(disponible_jour),
+        "cumul": {
+            "entrees":    float(cum_ent),
+            "depenses":   float(cum_dep),
+            "disponible": float(cum_ent - cum_dep),
+        },
+    }
+
+
 @app.get("/api/journal/pdf")
 def journal_pdf(
     date_debut: Optional[date_type] = None,
