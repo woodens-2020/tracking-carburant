@@ -354,6 +354,8 @@ def startup():
             nb_nuits INTEGER,
             nb_personnes INTEGER,
             lignes JSONB NOT NULL DEFAULT '[]'::jsonb,
+            sous_total NUMERIC(12,2) NOT NULL DEFAULT 0,
+            remise NUMERIC(12,2) NOT NULL DEFAULT 0,
             montant_total NUMERIC(12,2) NOT NULL DEFAULT 0,
             acompte NUMERIC(12,2) NOT NULL DEFAULT 0,
             statut VARCHAR(12) NOT NULL DEFAULT 'BROUILLON',
@@ -367,6 +369,8 @@ def startup():
             maj_le TIMESTAMPTZ NOT NULL DEFAULT now()
         )""",
         "ALTER TABLE hotel_proformas ADD COLUMN IF NOT EXISTS employe_id INTEGER",
+        "ALTER TABLE hotel_proformas ADD COLUMN IF NOT EXISTS sous_total NUMERIC(12,2) NOT NULL DEFAULT 0",
+        "ALTER TABLE hotel_proformas ADD COLUMN IF NOT EXISTS remise NUMERIC(12,2) NOT NULL DEFAULT 0",
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_hotel_proformas_numero ON hotel_proformas (numero)",
         "CREATE INDEX IF NOT EXISTS idx_hotel_pf_statut ON hotel_proformas (statut)",
         "CREATE INDEX IF NOT EXISTS idx_hotel_pf_arrivee ON hotel_proformas (date_arrivee_prevue)",

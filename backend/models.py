@@ -1116,7 +1116,9 @@ class HotelProforma(Base):
     nb_nuits            = Column(Integer, nullable=True)
     nb_personnes        = Column(Integer, nullable=True)
     lignes             = Column(JSON, nullable=False, default=list)  # [{designation, chambre_id?, chambre_numero?, qte, prix_unitaire, montant}]
-    montant_total       = Column(Numeric(12, 2), nullable=False, default=0)
+    sous_total          = Column(Numeric(12, 2), nullable=False, default=0)   # somme des lignes (calculée)
+    remise              = Column(Numeric(12, 2), nullable=False, default=0)   # rabais saisi par la réception
+    montant_total       = Column(Numeric(12, 2), nullable=False, default=0)   # sous_total - remise (calculé)
     acompte             = Column(Numeric(12, 2), nullable=False, default=0)
     statut              = Column(String(12), nullable=False, default="BROUILLON")  # BROUILLON | CONFIRMEE | CONVERTIE | ANNULEE
     notes              = Column(String(500), nullable=True)
@@ -1136,6 +1138,7 @@ class HotelProforma(Base):
         CheckConstraint("statut IN ('BROUILLON','CONFIRMEE','CONVERTIE','ANNULEE')", name="chk_hotel_pf_statut"),
         CheckConstraint("montant_total >= 0", name="chk_hotel_pf_total_pos"),
         CheckConstraint("acompte >= 0", name="chk_hotel_pf_acompte_pos"),
+        CheckConstraint("remise >= 0", name="chk_hotel_pf_remise_pos"),
         Index("idx_hotel_pf_statut", "statut"),
         Index("idx_hotel_pf_arrivee", "date_arrivee_prevue"),
     )

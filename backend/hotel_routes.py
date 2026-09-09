@@ -1634,7 +1634,7 @@ class LigneProformaIn(BaseModel):
     chambre_id:    Optional[int]   = None
     qte:           float           = 1
     prix_unitaire: float           = 0
-    montant:       Optional[float] = None   # si fourni → fait foi
+    montant:       Optional[float] = None   # ignoré : toujours recalculé qté × P.U.
 
 
 class ProformaIn(BaseModel):
@@ -1647,9 +1647,8 @@ class ProformaIn(BaseModel):
     nb_nuits:            Optional[int]        = None
     nb_personnes:        Optional[int]        = None
     lignes:             List[LigneProformaIn] = []
-    montant_total:       Optional[float]      = None   # si absent → somme des lignes
+    remise:             float                = 0   # rabais ; total = somme(lignes) − remise
     acompte:             float                = 0
-    employe_id:          Optional[int]        = None   # réceptionniste
     notes:              Optional[str]         = None
 
 
@@ -1680,17 +1679,20 @@ def _normaliser_lignes(lignes: List[LigneProformaIn], db: Session) -> tuple[list
         des = (l.designation or "").strip()
         if not des:
             continue
-        qte = Decimal(str(l.qte or 0)) or Decimal("1")
-        pu  = Decimal(str(l.prix_unitaire or 0))
-        if l.montant is not None:
-            try:
-                mt = Decimal(str(l.montant))
-            except (ValueError, ArithmeticError):
-                mt = qte * pu
-        else:
-            mt = qte * pu
-        if mt < 0:
-            mt = Decimal("0")
+        try:
+            qte = Decimal(str(l.qte if l.qte is not None else 1))
+        except (ValueError, ArithmeticError):
+            qte = Decimal("1")
+        if qte <= 0:
+            qte = Decimal("1")
+        try:
+            pu = Decimal(str(l.prix_unitaire or 0))
+        except (ValueError, ArithmeticError):
+            pu = Decimal("0")
+        if pu < 0:
+            pu = Decimal("0")
+        # Montant toujours calculé : qté × P.U. (aucune saisie manuelle).
+        mt = qte * pu
         num = None
         if l.chambre_id:
             ch = db.get(HotelChambre, l.chambre_id)
@@ -1733,15 +1735,15 @@ def _pf_dict(p: HotelProforma) -> dict:
         "nb_nuits":            p.nb_nuits,
         "nb_personnes":        p.nb_personnes,
         "lignes":              p.lignes or [],
+        "sous_total":          float(_d(p.sous_total)),
+        "remise":              float(_d(p.remise)),
         "montant_total":       float(_d(p.montant_total)),
         "acompte":             float(_d(p.acompte)),
         "solde":               float(_d(p.montant_total) - _d(p.acompte)),
         "statut":              p.statut,
         "notes":               p.notes or "",
         "reservation_id":      p.reservation_id,
-        "employe_id":          p.employe_id,
-        "employe_nom":         (f"{p.employe.prenom} {p.employe.nom}") if p.employe else None,
-        "cree_par_nom":        ((p.cree_par.nom_complet or p.cree_par.username) if p.cree_par else None),
+        "receptionniste":      ((p.cree_par.nom_complet or p.cree_par.username) if p.cree_par else None),
         "created_at":          p.created_at.isoformat() if p.created_at else None,
         "maj_le":              p.maj_le.isoformat() if p.maj_le else None,
     }
@@ -1804,6 +1806,35 @@ def detail_proforma(pf_id: int, db: Session = Depends(get_db)):
     return _pf_dict(p)
 
 
+def _pf_nb_nuits(date_arr, date_dep) -> Optional[int]:
+    """Nombre de nuits calculé à partir des dates (≥ 1 si les deux sont là)."""
+    if not date_arr or not date_dep:
+        return None
+    jours = (date_dep.date() - date_arr.date()).days
+    return jours if jours >= 1 else 1
+
+
+def _pf_montants(total_lignes: Decimal, data: ProformaIn) -> tuple[Decimal, Decimal, Decimal, Decimal]:
+    """(sous_total, remise, montant_total, acompte) — tout calculé, jamais saisi
+    directement : montant_total = somme des lignes − remise (borné à 0)."""
+    sous_total = total_lignes if total_lignes > 0 else Decimal("0")
+    try:
+        remise = Decimal(str(data.remise or 0))
+    except (ValueError, ArithmeticError):
+        remise = Decimal("0")
+    if remise < 0:
+        remise = Decimal("0")
+    if remise > sous_total:
+        remise = sous_total
+    montant_total = sous_total - remise
+    if montant_total < 0:
+        montant_total = Decimal("0")
+    acompte = max(Decimal("0"), _d(data.acompte))
+    if acompte > montant_total:
+        acompte = montant_total
+    return sous_total, remise, montant_total, acompte
+
+
 @router.post("/proformas", status_code=201)
 def creer_proforma(data: ProformaIn, request: Request, db: Session = Depends(get_db)):
     if not (data.client_nom or "").strip():
@@ -1815,17 +1846,8 @@ def creer_proforma(data: ProformaIn, request: Request, db: Session = Depends(get
     date_dep = _parse_dt_hotel(data.date_depart_prevue, "Date de départ prévue", obligatoire=False)
 
     lignes, total_lignes = _normaliser_lignes(data.lignes, db)
-    montant_total = total_lignes
-    if data.montant_total is not None:
-        try:
-            mt = Decimal(str(data.montant_total))
-            if mt >= 0:
-                montant_total = mt
-        except (ValueError, ArithmeticError):
-            pass
-    acompte = max(Decimal("0"), _d(data.acompte))
-    if acompte > montant_total:
-        acompte = montant_total
+    sous_total, remise, montant_total, acompte = _pf_montants(total_lignes, data)
+    nb_nuits = _pf_nb_nuits(date_arr, date_dep) or data.nb_nuits
 
     p = HotelProforma(
         numero              = _pf_numero(db, type_doc),
@@ -1835,13 +1857,14 @@ def creer_proforma(data: ProformaIn, request: Request, db: Session = Depends(get
         client_id_piece     = (data.client_id_piece or "").strip() or None,
         date_arrivee_prevue = date_arr,
         date_depart_prevue  = date_dep,
-        nb_nuits            = data.nb_nuits,
+        nb_nuits            = nb_nuits,
         nb_personnes        = data.nb_personnes,
         lignes             = lignes,
+        sous_total          = sous_total,
+        remise              = remise,
         montant_total       = montant_total,
         acompte             = acompte,
         statut              = "BROUILLON",
-        employe_id          = data.employe_id,
         notes              = (data.notes or "").strip() or None,
         cree_par_id         = _uid(request),
     )
@@ -1866,23 +1889,12 @@ def modifier_proforma(pf_id: int, data: ProformaIn, request: Request, db: Sessio
     p.client_id_piece     = (data.client_id_piece or "").strip() or None
     p.date_arrivee_prevue = _parse_dt_hotel(data.date_arrivee_prevue, "Date d'arrivée prévue")
     p.date_depart_prevue  = _parse_dt_hotel(data.date_depart_prevue, "Date de départ prévue", obligatoire=False)
-    p.nb_nuits            = data.nb_nuits
+    p.nb_nuits            = _pf_nb_nuits(p.date_arrivee_prevue, p.date_depart_prevue) or data.nb_nuits
     p.nb_personnes        = data.nb_personnes
-    p.employe_id          = data.employe_id
 
     lignes, total_lignes = _normaliser_lignes(data.lignes, db)
     p.lignes = lignes
-    montant_total = total_lignes
-    if data.montant_total is not None:
-        try:
-            mt = Decimal(str(data.montant_total))
-            if mt >= 0:
-                montant_total = mt
-        except (ValueError, ArithmeticError):
-            pass
-    p.montant_total = montant_total
-    acompte = max(Decimal("0"), _d(data.acompte))
-    p.acompte = acompte if acompte <= montant_total else montant_total
+    p.sous_total, p.remise, p.montant_total, p.acompte = _pf_montants(total_lignes, data)
     p.notes = (data.notes or "").strip() or None
     db.commit()
     db.refresh(p)
@@ -2066,9 +2078,7 @@ def proforma_pdf(pf_id: int, db: Session = Depends(get_db)):
     ]))
     story.append(t_cli)
 
-    _recep = (f"{p.employe.prenom} {p.employe.nom}") if p.employe else None
-    if not _recep and p.cree_par:
-        _recep = p.cree_par.nom_complet or p.cree_par.username
+    _recep = (p.cree_par.nom_complet or p.cree_par.username) if p.cree_par else None
 
     story.append(Paragraph("Séjour prévu", st_sec))
     sej_rows = [
@@ -2113,21 +2123,26 @@ def proforma_pdf(pf_id: int, db: Session = Depends(get_db)):
     story.append(t_det)
     story.append(Spacer(1, 5))
 
-    rec_rows = [["TOTAL", _fmt_g(p.montant_total)]]
+    rec_rows = []
+    if _d(p.remise) > 0:
+        rec_rows.append(["Sous-total", _fmt_g(p.sous_total)])
+        rec_rows.append(["Remise accordée", "- " + _fmt_g(p.remise)])
+    _total_idx = len(rec_rows)
+    rec_rows.append(["TOTAL", _fmt_g(p.montant_total)])
     if _d(p.acompte) > 0:
         rec_rows.append(["Acompte reçu", _fmt_g(p.acompte)])
         rec_rows.append(["Solde à régler", _fmt_g(_d(p.montant_total) - _d(p.acompte))])
     t_rec = Table(rec_rows, colWidths=[13.2*cm, 4*cm])
     t_rec.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
+        ("BACKGROUND", (0, _total_idx), (-1, _total_idx), ACCENT),
+        ("TEXTCOLOR", (0, _total_idx), (-1, _total_idx), colors.white),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (0, _total_idx), (-1, _total_idx), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, -1), 10.5),
         ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-        ("LEFTPADDING", (0, 0), (0, 0), 10),
+        ("LEFTPADDING", (0, 0), (0, -1), 10),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 7), ("TOPPADDING", (0, 0), (-1, -1), 7),
-        ("GRID", (0, 1), (-1, -1), 0.4, colors.HexColor("#D5D5DD")),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#D5D5DD")),
     ]))
     story.append(t_rec)
 
