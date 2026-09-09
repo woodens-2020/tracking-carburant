@@ -545,16 +545,34 @@ table.dt{width:100%;border-collapse:collapse}
 }
 .btn-row-new{color:var(--blue2);border-color:rgba(59,130,246,.35);}
 .btn-row-new:hover{background:var(--blue-d);}
-.ip-report{display:flex;align-items:flex-start;gap:6px;margin-top:5px;font-size:11px;line-height:1.35;color:var(--muted);cursor:pointer;text-align:left}
-.ip-report input{margin-top:1px;accent-color:var(--teal);cursor:pointer;flex-shrink:0}
-.ip-report b{color:var(--teal);font-family:var(--mono);font-weight:700}
-.ip-report .ip-src{color:var(--muted);opacity:.75}
-.galrecap{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
-.galrecap-card{flex:1;min-width:140px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
-.galrecap-card .grc-lbl{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
-.galrecap-card .grc-gal{font-size:19px;font-weight:800;font-family:var(--mono);color:var(--teal);margin-top:2px}
-.galrecap-card .grc-mnt{font-size:12px;color:var(--muted);font-family:var(--mono);margin-top:1px}
-.galrecap-card.grc-total{background:linear-gradient(135deg,rgba(34,197,94,.12),rgba(34,197,94,.03));border-color:rgba(34,197,94,.3)}
+/* Report d'index de continuité — pilule cliquable sous « mètre avant » */
+.ip-report{
+  display:flex;align-items:flex-start;gap:7px;margin-top:6px;padding:6px 9px;
+  font-size:11px;line-height:1.4;color:var(--text2);cursor:pointer;text-align:left;
+  background:rgba(45,212,191,.06);border:1px solid rgba(45,212,191,.22);
+  border-radius:9px;transition:background .15s,border-color .15s;
+}
+.ip-report:hover{background:rgba(45,212,191,.12);border-color:rgba(45,212,191,.4)}
+.ip-report:has(input:checked){background:rgba(45,212,191,.16);border-color:rgba(45,212,191,.55)}
+.ip-report input{margin-top:1px;width:14px;height:14px;accent-color:var(--teal);cursor:pointer;flex-shrink:0}
+.ip-report b{color:var(--teal);font-family:var(--mono);font-weight:700;font-size:12px}
+.ip-report .ip-src{display:block;color:var(--muted);opacity:.8;margin-top:1px}
+
+/* Récapitulatif gallons vendus par produit */
+.galrecap-title{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:2px 2px 8px}
+.galrecap{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 16px}
+.galrecap-card{
+  flex:1;min-width:150px;background:linear-gradient(160deg,var(--panel2),var(--panel));
+  border:1px solid var(--border);border-radius:14px;padding:13px 16px;
+  box-shadow:0 1px 3px rgba(0,0,0,.18);position:relative;overflow:hidden;
+}
+.galrecap-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--teal);opacity:.55}
+.galrecap-card .grc-lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.galrecap-card .grc-gal{font-size:22px;font-weight:800;font-family:var(--mono);color:var(--teal);margin-top:3px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.galrecap-card .grc-mnt{font-size:12.5px;color:var(--text2);font-family:var(--mono);margin-top:2px;font-variant-numeric:tabular-nums}
+.galrecap-card.grc-total{background:linear-gradient(160deg,rgba(34,197,94,.14),rgba(34,197,94,.03));border-color:rgba(34,197,94,.32)}
+.galrecap-card.grc-total::before{background:var(--green);opacity:.8}
+.galrecap-card.grc-total .grc-gal{color:var(--green)}
 .btn-row-mod{color:var(--orange);border-color:rgba(249,115,22,.35);}
 .btn-row-mod:hover{background:var(--orange-d);}
 .btn-row-active{color:var(--orange);border-color:rgba(249,115,22,.4);background:var(--orange-d);}
@@ -12022,6 +12040,15 @@ function fmtGal(n,d=3){
   if(n==null||isNaN(n)) return '0.000 gal';
   return parseFloat(n).toFixed(d)+' gal';
 }
+// Formatage SANS arrondi : on montre toutes les décimales réelles (jusqu'à
+// maxDec pour neutraliser les poussières flottantes), séparateur de milliers.
+function fmtNum(n, maxDec=4){
+  if(n==null||isNaN(n)) return '0';
+  const x = parseFloat(Number(n).toFixed(maxDec));
+  return x.toLocaleString('fr-FR',{maximumFractionDigits:maxDec});
+}
+function fmtGalX(n){ return fmtNum(n,4)+' gal'; }
+function fmtGX(n){   return fmtNum(n,4)+' G'; }
 function shortNum(n){
   if(n>=1e6) return (n/1e6).toFixed(1)+'M';
   if(n>=1e3) return Math.round(n/1e3)+'K';
@@ -14439,13 +14466,13 @@ function renderDashboard(stats,serie,debut,fin){
     return `<div class="galrecap">
       ${pp.map(([nom,v])=>`<div class="galrecap-card">
         <div class="grc-lbl">${esc(nom)}</div>
-        <div class="grc-gal">${fmtGal(v.quantite||0,3)}</div>
-        <div class="grc-mnt">${fmtG(v.montant||0)}</div>
+        <div class="grc-gal">${fmtGalX(v.quantite||0)}</div>
+        <div class="grc-mnt">${fmtGX(v.montant||0)}</div>
       </div>`).join('')}
       ${pp.length>1?`<div class="galrecap-card grc-total">
         <div class="grc-lbl">Total gallons vendus</div>
-        <div class="grc-gal">${fmtGal(stats.total_quantite||0,3)}</div>
-        <div class="grc-mnt">${fmtG(stats.total_montant||0)}</div>
+        <div class="grc-gal">${fmtGalX(stats.total_quantite||0)}</div>
+        <div class="grc-mnt">${fmtGX(stats.total_montant||0)}</div>
       </div>`:''}
     </div>`; })()}
 
@@ -14924,8 +14951,8 @@ function renderSaisie(){
         <td class="tr" data-label="${t('saisie.table.px')}"><input class="inp inp-sm inp-px" type="number" step="0.01" value="${px}" oninput="calcRow(this.closest('tr'))"></td>
         <td class="tr" data-label="${t('saisie.table.av')}"><input class="inp inp-av" type="number" step="0.0001" value="" readonly placeholder="${av||'—'}" oninput="calcRow(this.closest('tr'))">${ipCheck}</td>
         <td class="tr" data-label="${t('saisie.table.ap')}"><input class="inp inp-ap" type="number" step="0.0001" value="" readonly placeholder="${ap||'—'}" oninput="calcRow(this.closest('tr'))"></td>
-        <td class="tr num ${qcol} val-qte" data-label="${t('saisie.table.qte')}">${isEdit?fmtGal(qte,4):'—'}</td>
-        <td class="tr num c-amber val-mnt" data-label="${t('saisie.table.mnt')}">${isEdit?fmtG(mnt):'—'}</td>
+        <td class="tr num ${qcol} val-qte" data-label="${t('saisie.table.qte')}">${isEdit?fmtGalX(qte):"—"}</td>
+        <td class="tr num c-amber val-mnt" data-label="${t('saisie.table.mnt')}">${isEdit?fmtGX(mnt):"—"}</td>
         <td data-label="${t('saisie.table.statut')}"><span class="row-badge">${actionHtml}</span></td>
       </tr>`;
     }).join('')||`<tr><td colspan="7" class="empty">${t('saisie.nopompe')}</td></tr>`;
@@ -14976,18 +15003,131 @@ function renderGalRecap(){
   if(!rows.length){ box.innerHTML=''; return; }
   const totGal=rows.reduce((s,[,v])=>s+v.gal,0);
   const totMnt=rows.reduce((s,[,v])=>s+v.mnt,0);
-  box.innerHTML=`<div class="galrecap">
+  box.innerHTML=`
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <div class="galrecap-title">Gallons vendus — ${frDate(currentDate)}</div>
+    <button class="btn btn-secondary btn-sm" onclick="ouvrirFicheSynthese()" style="font-size:12.5px">
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Fiche de synthèse
+    </button>
+  </div>
+  <div class="galrecap">
     ${rows.map(([nom,v])=>`<div class="galrecap-card">
       <div class="grc-lbl">${esc(nom)}</div>
-      <div class="grc-gal">${fmtGal(v.gal,3)}</div>
-      <div class="grc-mnt">${fmtG(v.mnt)}</div>
+      <div class="grc-gal">${fmtGalX(v.gal)}</div>
+      <div class="grc-mnt">${fmtGX(v.mnt)}</div>
     </div>`).join('')}
     ${rows.length>1?`<div class="galrecap-card grc-total">
       <div class="grc-lbl">Total gallons</div>
-      <div class="grc-gal">${fmtGal(totGal,3)}</div>
-      <div class="grc-mnt">${fmtG(totMnt)}</div>
+      <div class="grc-gal">${fmtGalX(totGal)}</div>
+      <div class="grc-mnt">${fmtGX(totMnt)}</div>
     </div>`:''}
   </div>`;
+}
+
+// ── FICHE DE SYNTHÈSE CARBURANT (feuille imprimable) ──────────────
+// Gallons vendus par produit · Dépenses · Stock restant. Aucun arrondi.
+async function ouvrirFicheSynthese(debutArg, finArg){
+  let fin = finArg, debut = debutArg;
+  if(!fin){ fin = currentDate; }
+  if(!debut){
+    const d = new Date(fin); d.setDate(d.getDate()-29);
+    const p2 = n=>String(n).padStart(2,'0');
+    debut = `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+  }
+  let s;
+  try { s = await GET(`/carburant/synthese?date_debut=${debut}&date_fin=${fin}`); }
+  catch(e){ toast('Fiche indisponible : '+(e.message||''),'err'); return; }
+  const w = window.open('','_blank','width=900,height=1000,scrollbars=yes');
+  if(!w){ toast('Autorisez les pop-ups pour la fiche.','err'); return; }
+  w.document.write(_ficheSyntheseHtml(s));
+  w.document.close();
+}
+
+function _ficheSyntheseHtml(s){
+  const org  = (typeof _branding!=='undefined' && (_branding.nom||_branding.raison_sociale)) || '';
+  const org2 = (typeof _branding!=='undefined' && _branding.complexe) || '';
+  const act  = (typeof _branding!=='undefined' && _branding.activites) || '';
+  const num  = (v,dec)=>{ const x=parseFloat(Number(v||0).toFixed(dec)); return x.toLocaleString('fr-FR',{maximumFractionDigits:dec}); };
+  const gal  = v=>num(v,4)+' gal';
+  const grd  = v=>num(v,4)+' G';
+  const vp   = s.ventes.par_produit||[];
+  const st   = s.stock||[];
+  const dp   = s.depenses.liste||[];
+  const rowsVentes = vp.map(p=>`<tr><td>${p.produit}</td><td class="r">${gal(p.gallons)}</td><td class="r">${grd(p.montant)}</td><td class="r">${p.nb_releves}</td></tr>`).join('')
+    || `<tr><td colspan="4" class="c muted">Aucune vente sur la période</td></tr>`;
+  const rowsStock = st.map(p=>`<tr><td>${p.produit}</td><td class="r">${gal(p.gallons_livres)}</td><td class="r">${gal(p.gallons_vendus)}</td><td class="r">${gal(p.gallons_ecartes)}</td><td class="r b">${gal(p.gallons_restants)}</td></tr>`).join('');
+  const rowsDep = dp.map(x=>`<tr><td>${x.date}</td><td>${x.categorie}</td><td>${(x.description||'').replace(/</g,'&lt;')}</td><td>${x.beneficiaire||''}</td><td class="r">${grd(x.montant)}</td></tr>`).join('')
+    || `<tr><td colspan="5" class="c muted">Aucune dépense sur la période</td></tr>`;
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Fiche de synthèse carburant</title><style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    @page{size:A4;margin:16mm 14mm}
+    body{font-family:"Segoe UI",Arial,sans-serif;color:#1a1a2e;font-size:12px;line-height:1.45;background:#fff;padding:6mm}
+    .head{text-align:center;border-bottom:2.5px solid #1a1a2e;padding-bottom:10px;margin-bottom:6px}
+    .head .org{font-size:20px;font-weight:800;letter-spacing:.02em}
+    .head .act{font-size:11px;font-weight:700;color:#0d9488;margin-top:2px;letter-spacing:.04em}
+    .head .sub{font-size:10px;color:#666;margin-top:2px}
+    .rule2{border-bottom:.6px solid #0d9488;margin-bottom:16px}
+    h1{font-size:15px;text-align:center;margin:12px 0 3px;letter-spacing:.03em}
+    .period{text-align:center;font-size:11px;color:#555;margin-bottom:16px}
+    h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#0d9488;margin:18px 0 7px;border-bottom:1px solid #e2e8f0;padding-bottom:3px}
+    table{width:100%;border-collapse:collapse;margin-bottom:4px}
+    th{background:#1a1a2e;color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.05em;padding:6px 8px;text-align:left}
+    td{padding:6px 8px;border-bottom:.5px solid #e2e8f0;font-variant-numeric:tabular-nums}
+    tr:nth-child(even) td{background:#f8fafc}
+    .r{text-align:right}.c{text-align:center}.b{font-weight:800}.muted{color:#999}
+    .tot{background:#ecfdf5;font-weight:800}
+    .tot td{border-top:1.5px solid #0d9488}
+    .kpis{display:flex;gap:10px;margin:14px 0}
+    .kpi{flex:1;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;background:#f8fafc}
+    .kpi .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:#666;font-weight:700}
+    .kpi .v{font-size:17px;font-weight:800;color:#0d9488;margin-top:2px}
+    .foot{margin-top:24px;text-align:center;font-size:9px;color:#999;border-top:.5px solid #e2e8f0;padding-top:6px}
+    .noprint{text-align:center;margin:14px 0}
+    .noprint button{padding:8px 24px;font-size:13px;border:1px solid #cbd5e1;border-radius:6px;background:#f1f5f9;cursor:pointer}
+    @media print{.noprint{display:none}}
+  </style></head><body>
+    <div class="head">
+      ${org?`<div class="org">${org}</div>`:''}
+      ${act?`<div class="act">${act.replace(/·/g,' • ')}</div>`:''}
+      ${org2?`<div class="sub">${org2}</div>`:''}
+    </div>
+    <div class="rule2"></div>
+    <h1>FICHE DE SYNTHÈSE CARBURANT</h1>
+    <div class="period">Période : ${frDate(s.date_debut)} → ${frDate(s.date_fin)}</div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="l">Gallons vendus (total)</div><div class="v">${gal(s.ventes.total_gallons)}</div></div>
+      <div class="kpi"><div class="l">Recette carburant</div><div class="v">${grd(s.ventes.total_montant)}</div></div>
+      <div class="kpi"><div class="l">Dépenses</div><div class="v">${grd(s.depenses.total)}</div></div>
+    </div>
+
+    <h2>Gallons vendus — par produit</h2>
+    <table>
+      <thead><tr><th>Produit</th><th class="r">Gallons</th><th class="r">Montant</th><th class="r">Relevés</th></tr></thead>
+      <tbody>${rowsVentes}
+        <tr class="tot"><td>TOTAL</td><td class="r">${gal(s.ventes.total_gallons)}</td><td class="r">${grd(s.ventes.total_montant)}</td><td class="r">—</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Dépenses de la période (${s.depenses.nb})</h2>
+    <table>
+      <thead><tr><th>Date</th><th>Catégorie</th><th>Description</th><th>Bénéficiaire</th><th class="r">Montant</th></tr></thead>
+      <tbody>${rowsDep}
+        <tr class="tot"><td colspan="4">TOTAL DÉPENSES</td><td class="r">${grd(s.depenses.total)}</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Stock restant — par produit</h2>
+    <table>
+      <thead><tr><th>Produit</th><th class="r">Livré (cumul)</th><th class="r">Vendu (cumul)</th><th class="r">Écarté</th><th class="r">Restant</th></tr></thead>
+      <tbody>${rowsStock}</tbody>
+    </table>
+
+    <div class="foot">Généré le ${new Date().toLocaleString('fr-FR')} · Valeurs non arrondies</div>
+    <div class="noprint"><button onclick="window.print()">🖨 Imprimer</button></div>
+    <script>window.onload=function(){setTimeout(function(){window.print()},250)};<\/script>
+  </body></html>`;
 }
 
 // Case « Index attendu » cochée → on reporte la valeur dans « mètre avant »
@@ -15044,9 +15184,9 @@ function calcRow(tr){
   const mnt=Math.round(qte*px*100)/100;
 
   const qEl=tr.querySelector('.val-qte');
-  qEl.textContent=fmtGal(qte,4);
+  qEl.textContent=fmtGalX(qte);
   qEl.className='tr num val-qte '+(qte<0?'c-red':'c-teal');
-  tr.querySelector('.val-mnt').textContent=fmtG(mnt);
+  tr.querySelector(".val-mnt").textContent=fmtGX(mnt);
 
   const apI=tr.querySelector('.inp-ap');
   if(ap>0&&ap<av) apI.classList.add('err');
@@ -15113,15 +15253,15 @@ function prepareConfirm(periode){
   document.getElementById('confirm-rows').innerHTML=
     data.map(r=>`<tr>
       <td style="font-weight:600">${esc(r.pompeNom)}</td>
-      <td class="tr num">${r.av.toFixed(4)}</td>
-      <td class="tr num">${r.ap.toFixed(4)}</td>
-      <td class="tr num c-teal">${fmtGal(r.qte,4)}</td>
-      <td class="tr num c-amber">${fmtG(r.mnt)}</td>
+      <td class="tr num">${fmtNum(r.av,4)}</td>
+      <td class="tr num">${fmtNum(r.ap,4)}</td>
+      <td class="tr num c-teal">${fmtGalX(r.qte)}</td>
+      <td class="tr num c-amber">${fmtGX(r.mnt)}</td>
     </tr>`).join('')+
     `<tr class="recap-total">
       <td colspan="3" style="font-weight:700;letter-spacing:.04em">${t('saisie.recap.total')}</td>
-      <td class="tr num c-teal" style="font-weight:700">${fmtGal(totQte,4)}</td>
-      <td class="tr num c-amber" style="font-weight:700">${fmtG(totMnt)}</td>
+      <td class="tr num c-teal" style="font-weight:700">${fmtGalX(totQte)}</td>
+      <td class="tr num c-amber" style="font-weight:700">${fmtGX(totMnt)}</td>
     </tr>`;
 
   document.getElementById('modal-confirm').classList.remove('hidden');
@@ -15468,21 +15608,28 @@ function renderJournal(data){
     </div>
     <div class="jres-card c-teal">
       <div class="jres-lbl">Total gallons (hors sauts)</div>
-      <div class="jres-num c-teal">${fmtGal(resume.total_gallons,3)}</div>
+      <div class="jres-num c-teal">${fmtGalX(resume.total_gallons)}</div>
       ${resume.nb_sauts_compteur?`<div style="font-size:11.5px;color:var(--muted);margin-top:2px">${resume.nb_sauts_compteur} saut${resume.nb_sauts_compteur>1?'s':''} de compteur exclu${resume.nb_sauts_compteur>1?'s':''}</div>`:''}
     </div>
   </div>
   ${(resume.par_produit&&resume.par_produit.length)?`
-  <div class="galrecap" style="margin-top:12px">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:14px">
+    <div class="galrecap-title" style="margin:0">Gallons vendus par produit</div>
+    <button class="btn btn-secondary btn-sm" style="font-size:12.5px" onclick="ouvrirFicheSynthese(document.getElementById('jf-debut').value,document.getElementById('jf-fin').value)">
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Fiche de synthèse
+    </button>
+  </div>
+  <div class="galrecap" style="margin-top:8px">
     ${resume.par_produit.map(pp=>`<div class="galrecap-card">
       <div class="grc-lbl">${esc(pp.produit)}</div>
-      <div class="grc-gal">${fmtGal(pp.gallons,3)}</div>
-      <div class="grc-mnt">${fmtG(pp.montant)} · ${pp.nb_releves} relevé${pp.nb_releves>1?'s':''}</div>
+      <div class="grc-gal">${fmtGalX(pp.gallons)}</div>
+      <div class="grc-mnt">${fmtGX(pp.montant)} · ${pp.nb_releves} relevé${pp.nb_releves>1?'s':''}</div>
     </div>`).join('')}
     ${resume.par_produit.length>1?`<div class="galrecap-card grc-total">
       <div class="grc-lbl">Total gallons vendus</div>
-      <div class="grc-gal">${fmtGal(resume.total_gallons,3)}</div>
-      <div class="grc-mnt">${fmtG(resume.par_produit.reduce((s,p)=>s+p.montant,0))}</div>
+      <div class="grc-gal">${fmtGalX(resume.total_gallons)}</div>
+      <div class="grc-mnt">${fmtGX(resume.par_produit.reduce((s,p)=>s+p.montant,0))}</div>
     </div>`:''}
   </div>`:''}`;
 

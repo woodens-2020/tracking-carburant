@@ -2522,6 +2522,108 @@ def journal_endpoint(
     }
 
 
+@app.get("/api/carburant/synthese")
+def carburant_synthese(
+    date_debut: Optional[date_type] = None,
+    date_fin:   Optional[date_type] = None,
+    db: Session = Depends(get_db),
+):
+    """Fiche de synthèse carburant : gallons vendus par produit (séparément),
+    dépenses de la période, et stock restant par produit. Aucune valeur
+    n'est arrondie — les sommes gardent la précision des compteurs
+    (4 décimales) et des livraisons (3 décimales)."""
+    from datetime import date as dt, datetime as _dtn, timezone as _tzu
+    from decimal import Decimal as _D
+    from stock_service import gallons_livres, gallons_ecartes
+
+    d_fin   = date_fin   or today_haiti()
+    d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
+
+    produits = db.query(Produit).order_by(Produit.nom).all()
+
+    # ── Ventes par produit (depuis les relevés, non arrondi) ──────────
+    releves_periode = (
+        db.query(Releve).join(Pompe, Releve.pompe_id == Pompe.id)
+        .filter(Releve.date >= d_debut, Releve.date <= d_fin)
+        .all()
+    )
+    ventes: dict = {}
+    for r in releves_periode:
+        q = _D(str(r.metter_apres)) - _D(str(r.metter_avant))
+        if q < 0:
+            continue
+        pid = r.pompe.produit_id
+        agg = ventes.setdefault(pid, {"gallons": _D("0"), "montant": _D("0"), "nb_releves": 0})
+        agg["gallons"]    += q
+        agg["montant"]    += q * _D(str(r.prix_gallon))
+        agg["nb_releves"] += 1
+
+    ventes_par_produit, total_g, total_m = [], _D("0"), _D("0")
+    for p in produits:
+        v = ventes.get(p.id, {"gallons": _D("0"), "montant": _D("0"), "nb_releves": 0})
+        total_g += v["gallons"]
+        total_m += v["montant"]
+        ventes_par_produit.append({
+            "produit":    p.nom,
+            "gallons":    float(v["gallons"]),
+            "montant":    float(v["montant"]),
+            "nb_releves": v["nb_releves"],
+        })
+
+    # ── Dépenses de la période (table Depense = station carburant) ────
+    deps = (
+        db.query(Depense)
+        .filter(Depense.date_depense >= d_debut, Depense.date_depense <= d_fin)
+        .order_by(Depense.date_depense.asc())
+        .all()
+    )
+    depenses_liste = [{
+        "date":        str(d.date_depense),
+        "categorie":   d.categorie or "—",
+        "description": d.description or "",
+        "beneficiaire": getattr(d, "beneficiaire", None) or "",
+        "montant":     float(_D(str(d.montant))),
+    } for d in deps]
+    total_depenses = float(sum((_D(str(d.montant)) for d in deps), _D("0")))
+
+    # ── Stock restant par produit (non arrondi) ──────────────────────
+    stock = []
+    for p in produits:
+        livre = _D(str(gallons_livres(db, p.id, jusqu_a=d_fin)))
+        ecarte = _D(str(gallons_ecartes(db, p.id)))
+        vendu_tot = _D("0")
+        rv = (db.query(Releve).join(Pompe, Releve.pompe_id == Pompe.id)
+              .filter(Pompe.produit_id == p.id, Releve.date <= d_fin).all())
+        for r in rv:
+            q = _D(str(r.metter_apres)) - _D(str(r.metter_avant))
+            if q > 0:
+                vendu_tot += q
+        stock.append({
+            "produit":          p.nom,
+            "gallons_livres":   float(livre),
+            "gallons_vendus":   float(vendu_tot),
+            "gallons_ecartes":  float(ecarte),
+            "gallons_restants": float(livre - vendu_tot - ecarte),
+        })
+
+    return {
+        "date_debut": str(d_debut),
+        "date_fin":   str(d_fin),
+        "genere_le":  _dtn.now(_tzu.utc).isoformat(),
+        "ventes": {
+            "par_produit":   ventes_par_produit,
+            "total_gallons": float(total_g),
+            "total_montant": float(total_m),
+        },
+        "depenses": {
+            "liste": depenses_liste,
+            "total": total_depenses,
+            "nb":    len(depenses_liste),
+        },
+        "stock": stock,
+    }
+
+
 @app.get("/api/journal/pdf")
 def journal_pdf(
     date_debut: Optional[date_type] = None,
