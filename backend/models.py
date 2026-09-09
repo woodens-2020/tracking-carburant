@@ -1120,7 +1120,7 @@ class HotelProforma(Base):
     remise              = Column(Numeric(12, 2), nullable=False, default=0)   # rabais saisi par la réception
     montant_total       = Column(Numeric(12, 2), nullable=False, default=0)   # sous_total - remise (calculé)
     acompte             = Column(Numeric(12, 2), nullable=False, default=0)
-    statut              = Column(String(12), nullable=False, default="BROUILLON")  # BROUILLON | CONFIRMEE | CONVERTIE | ANNULEE
+    statut              = Column(String(12), nullable=False, default="CONFIRMEE")  # CONFIRMEE (enregistrée) | CONVERTIE | ANNULEE  (BROUILLON: hérité)
     notes              = Column(String(500), nullable=True)
     rappel_confirme_notifie = Column(Boolean, nullable=False, default=False)
     rappel_arrivee_notifie  = Column(Boolean, nullable=False, default=False)

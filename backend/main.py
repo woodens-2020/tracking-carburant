@@ -371,6 +371,8 @@ def startup():
         "ALTER TABLE hotel_proformas ADD COLUMN IF NOT EXISTS employe_id INTEGER",
         "ALTER TABLE hotel_proformas ADD COLUMN IF NOT EXISTS sous_total NUMERIC(12,2) NOT NULL DEFAULT 0",
         "ALTER TABLE hotel_proformas ADD COLUMN IF NOT EXISTS remise NUMERIC(12,2) NOT NULL DEFAULT 0",
+        "ALTER TABLE hotel_proformas ALTER COLUMN statut SET DEFAULT 'CONFIRMEE'",
+        "UPDATE hotel_proformas SET statut = 'CONFIRMEE' WHERE statut = 'BROUILLON'",
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_hotel_proformas_numero ON hotel_proformas (numero)",
         "CREATE INDEX IF NOT EXISTS idx_hotel_pf_statut ON hotel_proformas (statut)",
         "CREATE INDEX IF NOT EXISTS idx_hotel_pf_arrivee ON hotel_proformas (date_arrivee_prevue)",

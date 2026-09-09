@@ -10849,9 +10849,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-header-actions" style="display:flex;gap:8px">
             <select class="pos-input" id="hpf-filtre-statut" onchange="loadHotelProforma()" style="width:auto">
               <option value="">Tous les statuts</option>
-              <option value="BROUILLON">Brouillon</option>
-              <option value="CONFIRMEE">Confirmée</option>
-              <option value="CONVERTIE">Convertie</option>
+              <option value="CONFIRMEE">Enregistrée</option>
+              <option value="CONVERTIE">Convertie en séjour</option>
               <option value="ANNULEE">Annulée</option>
             </select>
             <button class="pos-btn ghost" onclick="loadHotelProforma()">Actualiser</button>
@@ -10884,8 +10883,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div><label class="pos-label">Contact</label><input class="pos-input" id="hpf-client-contact" placeholder="+509 …"></div>
               <div><label class="pos-label">NIF / Pièce</label><input class="pos-input" id="hpf-client-piece" placeholder="Optionnel"></div>
               <div><label class="pos-label">Nombre de personnes</label><input class="pos-input" id="hpf-nb-personnes" type="number" min="1" placeholder="Optionnel"></div>
-              <div><label class="pos-label">Arrivée prévue *</label><input class="pos-input" id="hpf-arrivee" type="datetime-local" onchange="hpfSyncNbNuits()"></div>
-              <div><label class="pos-label">Départ prévu</label><input class="pos-input" id="hpf-depart" type="datetime-local" onchange="hpfSyncNbNuits()"></div>
+              <div><label class="pos-label">Jour d'arrivée *</label><input class="pos-input" id="hpf-arrivee" type="datetime-local" onchange="hpfSyncNbNuits()"></div>
+              <div><label class="pos-label">Jour de départ *</label><input class="pos-input" id="hpf-depart" type="datetime-local" onchange="hpfSyncNbNuits()"></div>
               <div><label class="pos-label">Nombre de nuits (auto)</label><input class="pos-input" id="hpf-nb-nuits" type="number" readonly title="Calculé à partir des dates" style="opacity:.7;cursor:not-allowed"></div>
             </div>
 
@@ -10917,10 +10916,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <span id="hpf-remise-row" style="display:none;font-size:14px;color:#fbbf24">− <span id="hpf-remise-aff">G 0.00</span> <button type="button" onclick="hpfRemiseClear()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:14px;padding:0 4px" title="Retirer la remise">✕</button></span>
               </div>
               <div style="display:flex;justify-content:space-between;font-weight:800;font-size:20px;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1)"><span>Total</span><span id="hpf-total-aff" style="color:#a78bfa">G 0.00</span></div>
-              <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-top:10px">
-                <div><label class="pos-label">Acompte reçu (G)</label><input class="pos-input" id="hpf-acompte" type="number" min="0" step="any" value="0" oninput="hpfRecalc()"></div>
-                <div style="text-align:right;font-size:12px;color:rgba(255,255,255,.4)" id="hpf-solde-aff"></div>
-              </div>
             </div>
             <div><label class="pos-label">Notes</label><textarea class="pos-input" id="hpf-notes" rows="2" style="resize:vertical" placeholder="Conditions, demandes particulières…"></textarea></div>
           </div>
@@ -32581,10 +32576,10 @@ let _hpfRemise   = 0;
 let _hpfNbNuits  = 1;
 
 const _HPF_STATUT = {
-  BROUILLON: {t:'Brouillon',   c:'#94a3b8'},
-  CONFIRMEE: {t:'Confirmée',   c:'#34d399'},
-  CONVERTIE: {t:'Convertie',   c:'#6366f1'},
-  ANNULEE:   {t:'Annulée',     c:'#f87171'},
+  BROUILLON: {t:'Enregistrée',        c:'#34d399'},
+  CONFIRMEE: {t:'Enregistrée',        c:'#34d399'},
+  CONVERTIE: {t:'Convertie en séjour', c:'#6366f1'},
+  ANNULEE:   {t:'Annulée',            c:'#f87171'},
 };
 
 function _hpfDtInput(iso){
@@ -32626,13 +32621,12 @@ function _hpfCard(p){
   const isResa = p.type_doc === 'RESERVATION';
   const chs = (p.lignes||[]).map(l=>l.chambre_numero).filter(Boolean);
   const ro = !_hotelPeutEcrire();
-  const modifiable = !ro && (p.statut === 'BROUILLON' || p.statut === 'CONFIRMEE');
+  const active = p.statut === 'BROUILLON' || p.statut === 'CONFIRMEE';
   const btns = [];
   btns.push(`<button class="pos-btn ghost" style="flex:1;font-size:13px" onclick="hpfImprimer(${p.id})">🖨 Imprimer</button>`);
-  if(modifiable) btns.push(`<button class="pos-btn ghost" style="flex:1;font-size:13px" onclick="hpfOuvrirModal(${p.id})">Modifier</button>`);
-  if(!ro && p.statut === 'BROUILLON') btns.push(`<button class="pos-btn ghost" style="flex:1;font-size:13px;color:#34d399;border-color:rgba(52,211,153,.3)" onclick="hpfConfirmer(${p.id})">✓ Confirmer</button>`);
-  if(!ro && (p.statut === 'BROUILLON' || p.statut === 'CONFIRMEE')) btns.push(`<button class="pos-btn teal" style="flex:1;font-size:13px" onclick="hpfConvertir(${p.id})">→ Séjour</button>`);
-  if(!ro && p.statut !== 'CONVERTIE' && p.statut !== 'ANNULEE') btns.push(`<button class="pos-btn ghost" style="flex:1;font-size:13px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="hpfAnnuler(${p.id})">Annuler</button>`);
+  if(!ro && active) btns.push(`<button class="pos-btn ghost" style="flex:1;font-size:13px" onclick="hpfOuvrirModal(${p.id})">Modifier</button>`);
+  if(!ro && active) btns.push(`<button class="pos-btn teal" style="flex:1;font-size:13px" onclick="hpfConvertir(${p.id})">→ Séjour</button>`);
+  if(!ro && active) btns.push(`<button class="pos-btn ghost" style="flex:1;font-size:13px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="hpfAnnuler(${p.id})">Annuler</button>`);
   return `<div class="pos-card" style="border-left:3px solid ${isResa ? '#6366f1' : '#a78bfa'}">
     <div style="padding:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -32645,10 +32639,9 @@ function _hpfCard(p){
       ${p.nb_nuits ? `<div style="font-size:13px;color:rgba(255,255,255,.4)">${p.nb_nuits} nuit(s)</div>` : ''}
       ${chs.length ? `<div style="font-size:13px;color:rgba(255,255,255,.4)">Chambre(s) : ${chs.join(', ')}</div>` : ''}
       ${p.receptionniste ? `<div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:2px">Réceptionniste : ${p.receptionniste}</div>` : ''}
-      <div style="margin-top:8px;padding:8px;background:rgba(255,255,255,.04);border-radius:6px;display:flex;justify-content:space-between">
-        <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Total</div><div style="font-weight:700">${posGx(p.montant_total)}</div></div>
-        <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Acompte</div><div style="font-weight:700;color:#34d399">${posGx(p.acompte)}</div></div>
-        <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Solde</div><div style="font-weight:700;color:${p.solde>0?'#fbbf24':'#34d399'}">${posGx(p.solde)}</div></div>
+      <div style="margin-top:8px;padding:8px;background:rgba(255,255,255,.04);border-radius:6px;display:flex;justify-content:space-between;align-items:center">
+        ${p.remise>0?`<div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Remise</div><div style="font-weight:700;color:#fbbf24">- ${posGx(p.remise)}</div></div>`:''}
+        <div style="text-align:center;flex:1"><div style="font-size:12px;color:rgba(255,255,255,.35)">Total</div><div style="font-weight:800;font-size:16px;color:#a78bfa">${posGx(p.montant_total)}</div></div>
       </div>
       <div style="margin-top:8px;font-size:13px;color:${s.c};font-weight:600">● ${s.t}</div>
       <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">${btns.join('')}</div>
@@ -32746,7 +32739,6 @@ function hpfRecalc(){
   const sousTotal = _hpfLignes.reduce((s,l)=>s+_hpfLigneMontant(l), 0);
   if(_hpfRemise > sousTotal) _hpfRemise = sousTotal;
   const total = Math.max(0, sousTotal - _hpfRemise);
-  const acompte = parseFloat(document.getElementById('hpf-acompte')?.value||0) || 0;
   const stEl = document.getElementById('hpf-soustotal-aff'); if(stEl) stEl.textContent = posGx(sousTotal);
   const rRow = document.getElementById('hpf-remise-row');
   if(rRow){
@@ -32754,9 +32746,6 @@ function hpfRecalc(){
     const rEl = document.getElementById('hpf-remise-aff'); if(rEl) rEl.textContent = posGx(_hpfRemise);
   }
   const tEl = document.getElementById('hpf-total-aff'); if(tEl) tEl.textContent = posGx(total);
-  const solde = Math.max(0, total - acompte);
-  const sEl = document.getElementById('hpf-solde-aff');
-  if(sEl) sEl.textContent = acompte > 0 ? `Solde : ${posGx(solde)}` : '';
 }
 
 function hpfOuvrirModal(id){
@@ -32775,7 +32764,6 @@ function hpfOuvrirModal(id){
     g('hpf-nb-personnes').value = p.nb_personnes || '';
     g('hpf-arrivee').value = _hpfDtInput(p.date_arrivee_prevue);
     g('hpf-depart').value = _hpfDtInput(p.date_depart_prevue);
-    g('hpf-acompte').value = p.acompte || 0;
     g('hpf-notes').value = p.notes || '';
     _hpfRemise = parseFloat(p.remise) || 0;
     _hpfLignes = (p.lignes||[]).map(l=>({
@@ -32785,7 +32773,6 @@ function hpfOuvrirModal(id){
   } else {
     hpfSetType('PROFORMA');
     ['hpf-client-nom','hpf-client-contact','hpf-client-piece','hpf-nb-personnes','hpf-depart','hpf-notes'].forEach(i=>g(i).value='');
-    g('hpf-acompte').value = 0;
     const now = new Date(); now.setDate(now.getDate()+1); now.setHours(14,0,0,0);
     const dep = new Date(now); dep.setDate(dep.getDate()+1); dep.setHours(12,0,0,0);
     g('hpf-arrivee').value = _hpfDtInput(now.toISOString());
@@ -32801,8 +32788,11 @@ async function hpfSauver(){
   const g = i => document.getElementById(i);
   const nom = (g('hpf-client-nom').value||'').trim();
   const arr = g('hpf-arrivee').value;
+  const dep = g('hpf-depart').value;
   if(!nom){ posAlert('Nom du client requis.','warn'); return; }
-  if(!arr){ posAlert('Date d\'arrivée prévue requise.','warn'); return; }
+  if(!arr){ posAlert('Jour d\'arrivée requis.','warn'); return; }
+  if(!dep){ posAlert('Jour de départ requis.','warn'); return; }
+  if(new Date(dep) <= new Date(arr)){ posAlert('Le jour de départ doit être après le jour d\'arrivée.','warn'); return; }
   const lignes = _hpfLignes
     .filter(l => (l.designation||'').trim())
     .map(l => ({
@@ -32817,12 +32807,11 @@ async function hpfSauver(){
     client_contact: (g('hpf-client-contact').value||'').trim() || null,
     client_id_piece: (g('hpf-client-piece').value||'').trim() || null,
     date_arrivee_prevue: new Date(arr).toISOString(),
-    date_depart_prevue: g('hpf-depart').value ? new Date(g('hpf-depart').value).toISOString() : null,
+    date_depart_prevue: new Date(dep).toISOString(),
     nb_nuits: _hpfNbNuits || null,
     nb_personnes: g('hpf-nb-personnes').value ? parseInt(g('hpf-nb-personnes').value) : null,
     lignes,
     remise: _hpfRemise || 0,
-    acompte: parseFloat(g('hpf-acompte').value||0) || 0,
     notes: (g('hpf-notes').value||'').trim() || null,
   };
   const id = g('hpf-edit-id').value;
@@ -32831,23 +32820,13 @@ async function hpfSauver(){
     if(id) await apiFetch('PUT', `/hotel/proformas/${id}`, body);
     else   await apiFetch('POST', '/hotel/proformas', body);
     document.getElementById('hpf-modal-bg').classList.remove('open');
-    posAlert('Document enregistré.','ok');
+    posAlert(_hpfType==='RESERVATION' ? 'Réservation enregistrée.' : 'Pro forma enregistrée.','ok');
     await loadHotelProforma();
   } catch(e){ posAlert(e.message||'Erreur enregistrement.'); }
   finally { if(btn) btn.disabled = false; }
 }
 
 function hpfImprimer(id){ window.open('/api/hotel/proformas/'+id+'/pdf','_blank'); }
-
-async function hpfConfirmer(id){
-  if(!_hotelPeutEcrire()){ _giAlert('Accès lecture seule.','err'); return; }
-  if(!confirm('Confirmer ce document ? Un rappel de préparation des chambres sera créé.')) return;
-  try {
-    await apiFetch('POST', `/hotel/proformas/${id}/confirmer`);
-    posAlert('Document confirmé — rappel créé.','ok');
-    await loadHotelProforma();
-  } catch(e){ posAlert(e.message||'Erreur.'); }
-}
 
 async function hpfAnnuler(id){
   if(!_hotelPeutEcrire()){ _giAlert('Accès lecture seule.','err'); return; }
