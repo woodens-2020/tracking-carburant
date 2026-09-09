@@ -16034,9 +16034,16 @@ async function _loadBranding(){
     const r = await fetch('/api/config/branding');
     if(!r.ok) return;
     const b = await r.json();
-    const { modules, ...brandingFields } = b;
+    const { modules, roles, ...brandingFields } = b;
     Object.assign(_branding, brandingFields);
     if(modules) Object.assign(_modules, modules);
+    // Accès Hôtel complet pour le rôle Manager (Chambres + Réception) —
+    // activé par tenant (MANAGER_HOTEL_COMPLET).
+    if(roles && roles.manager_hotel_complet){
+      ['hotel-chambres','hotel-reception'].forEach(p=>_MANAGER_ALLOWED.add(p));
+      if(_ACCES_POSTE_LEGACY && _ACCES_POSTE_LEGACY['Manager'])
+        _ACCES_POSTE_LEGACY['Manager'] = Array.from(_MANAGER_ALLOWED);
+    }
     document.title = `Konekta · ${_branding.raison_sociale}`;
     const sbSub = document.querySelector('.sb-sub');
     if(sbSub) sbSub.textContent = `${_branding.raison_sociale} · ${_branding.complexe}`;

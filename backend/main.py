@@ -778,7 +778,16 @@ def config_branding():
     (carburant/bar/hôtel/cuisine/zelle) — public, requis dès l'écran de
     connexion, sur tous les tickets/rapports imprimés, et pour que la barre
     de navigation n'affiche que les sections pertinentes pour l'institution."""
-    return {**_BRANDING, "modules": _MODULES}
+    return {
+        **_BRANDING,
+        "modules": _MODULES,
+        "roles": {
+            # Donne au rôle Manager l'accès Hôtel complet (Chambres +
+            # Réception inclus), comme un administrateur. Activé par tenant
+            # via la variable d'env MANAGER_HOTEL_COMPLET.
+            "manager_hotel_complet": os.getenv("MANAGER_HOTEL_COMPLET", "false").lower() == "true",
+        },
+    }
 
 
 @app.get("/api/me")
