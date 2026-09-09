@@ -1738,6 +1738,61 @@ def get_releves(date: date_type, periode: Optional[str] = None,
     return [_releve_dict(r) for r in rows]
 
 
+@app.get("/api/releves/index-precedent")
+def releves_index_precedent(date: date_type, periode: str,
+                            produit_id: Optional[int] = None,
+                            db: Session = Depends(get_db)):
+    """Pour chaque pompe active, l'index (`metter_apres`) du DERNIER relevé
+    strictement antérieur à (date, periode) dans l'ordre chronologique —
+    Matin puis Après-midi. Sert à préremplir « mètre avant » lors de la
+    saisie : la fin d'une période devient le début de la suivante (même
+    jour) ou du lendemain. Renvoie aussi la date/période source pour
+    l'afficher, et si un relevé existe déjà pour (date, periode, pompe)."""
+    if periode not in PERIODES:
+        raise HTTPException(400, f"periode invalide — {PERIODES}")
+    _rang = {"Matin": 0, "Apres-midi": 1}
+    cible = (date, _rang[periode])
+
+    pompes_q = db.query(Pompe).filter(Pompe.actif.is_(True))
+    if produit_id:
+        pompes_q = pompes_q.filter(Pompe.produit_id == produit_id)
+    pompes = pompes_q.all()
+    if not pompes:
+        return []
+    pids = [p.id for p in pompes]
+
+    # Fenêtre bornée : tous les relevés de ces pompes jusqu'à la date cible.
+    releves = (db.query(Releve)
+               .filter(Releve.pompe_id.in_(pids), Releve.date <= date)
+               .all())
+    par_pompe: dict = {}
+    dejadans: dict = {}
+    for r in releves:
+        clef = (r.date, _rang.get(r.periode, 9))
+        if clef == cible:
+            dejadans[r.pompe_id] = float(r.metter_apres)
+            continue
+        if clef < cible:
+            cur = par_pompe.get(r.pompe_id)
+            if cur is None or clef > cur[0]:
+                par_pompe[r.pompe_id] = (clef, r)
+
+    out = []
+    for p in pompes:
+        info = par_pompe.get(p.id)
+        out.append({
+            "pompe_id":        p.id,
+            "pompe_nom":       p.nom,
+            "produit_id":      p.produit_id,
+            "index_precedent": round(float(info[1].metter_apres), 4) if info else None,
+            "source_date":     str(info[1].date) if info else None,
+            "source_periode":  info[1].periode if info else None,
+            "deja_saisi":      p.id in dejadans,
+            "valeur_saisie":   dejadans.get(p.id),
+        })
+    return out
+
+
 def _releve_dict(r: Releve):
     return {
         "id": r.id, "date": str(r.date), "periode": r.periode,
@@ -2431,6 +2486,25 @@ def journal_endpoint(
     nb_sauts       = sum(1 for e in entries if e["type_anomalie"] == "saut_compteur")
     total_gallons  = round(sum(e["quantite"] for e in entries if e["type_anomalie"] != "saut_compteur"), 4)
 
+    # Récapitulatif des gallons vendus par produit (Diesel, Gazoline…) — hors
+    # sauts de compteur, comme total_gallons. Sert au tableau récapitulatif
+    # affiché partout où l'on filtre les gallons vendus.
+    _pp: dict = {}
+    for e in entries:
+        if e["type_anomalie"] == "saut_compteur":
+            continue
+        d = _pp.setdefault(e["produit_nom"] or "Inconnu",
+                           {"gallons": 0.0, "montant": 0.0, "nb_releves": 0})
+        d["gallons"]    += e["quantite"]
+        d["montant"]    += e["montant_vente"]
+        d["nb_releves"] += 1
+    par_produit = sorted(
+        ({"produit": k, "gallons": round(v["gallons"], 4),
+          "montant": round(v["montant"], 2), "nb_releves": v["nb_releves"]}
+         for k, v in _pp.items()),
+        key=lambda x: x["gallons"], reverse=True,
+    )
+
     return {
         "date_debut": str(d_debut),
         "date_fin":   str(d_fin),
@@ -2443,6 +2517,7 @@ def journal_endpoint(
             "taux_conformite":  taux_conformite,
             "nb_sauts_compteur": nb_sauts,
             "total_gallons":     total_gallons,
+            "par_produit":       par_produit,
         },
     }
 

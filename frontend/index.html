@@ -545,6 +545,16 @@ table.dt{width:100%;border-collapse:collapse}
 }
 .btn-row-new{color:var(--blue2);border-color:rgba(59,130,246,.35);}
 .btn-row-new:hover{background:var(--blue-d);}
+.ip-report{display:flex;align-items:flex-start;gap:6px;margin-top:5px;font-size:11px;line-height:1.35;color:var(--muted);cursor:pointer;text-align:left}
+.ip-report input{margin-top:1px;accent-color:var(--teal);cursor:pointer;flex-shrink:0}
+.ip-report b{color:var(--teal);font-family:var(--mono);font-weight:700}
+.ip-report .ip-src{color:var(--muted);opacity:.75}
+.galrecap{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.galrecap-card{flex:1;min-width:140px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.galrecap-card .grc-lbl{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.galrecap-card .grc-gal{font-size:19px;font-weight:800;font-family:var(--mono);color:var(--teal);margin-top:2px}
+.galrecap-card .grc-mnt{font-size:12px;color:var(--muted);font-family:var(--mono);margin-top:1px}
+.galrecap-card.grc-total{background:linear-gradient(135deg,rgba(34,197,94,.12),rgba(34,197,94,.03));border-color:rgba(34,197,94,.3)}
 .btn-row-mod{color:var(--orange);border-color:rgba(249,115,22,.35);}
 .btn-row-mod:hover{background:var(--orange-d);}
 .btn-row-active{color:var(--orange);border-color:rgba(249,115,22,.4);background:var(--orange-d);}
@@ -3989,6 +3999,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <span data-i18n="saisie.period.apresmidi">Après-midi</span>
         </button>
       </div>
+      <div id="saisie-galrecap"></div>
       <div id="saisie-content"></div>
     </div>
 
@@ -11979,6 +11990,7 @@ let products       = [];
 let releves        = [];
 let currentProdId  = null;
 let currentPeriode = 'Matin';
+let indexPrecedents = {};   // pompe_id -> {index_precedent, source_date, source_periode, deja_saisi}
 let histFull      = [];
 let currentConvId = null;
 let lastSerie     = null;
@@ -14422,6 +14434,21 @@ function renderDashboard(stats,serie,debut,fin){
 
   </div>
 
+  ${(()=>{ const pp=Object.entries(stats.par_produit||{}).sort((a,b)=>(b[1].quantite||0)-(a[1].quantite||0));
+    if(!pp.length) return '';
+    return `<div class="galrecap">
+      ${pp.map(([nom,v])=>`<div class="galrecap-card">
+        <div class="grc-lbl">${esc(nom)}</div>
+        <div class="grc-gal">${fmtGal(v.quantite||0,3)}</div>
+        <div class="grc-mnt">${fmtG(v.montant||0)}</div>
+      </div>`).join('')}
+      ${pp.length>1?`<div class="galrecap-card grc-total">
+        <div class="grc-lbl">Total gallons vendus</div>
+        <div class="grc-gal">${fmtGal(stats.total_quantite||0,3)}</div>
+        <div class="grc-mnt">${fmtG(stats.total_montant||0)}</div>
+      </div>`:''}
+    </div>`; })()}
+
   <!-- ── Graphique principal ────────────────────── -->
   <div class="card mb14">
     <div class="card-head">
@@ -14783,10 +14810,21 @@ async function loadSaisie(){
       GET('/produits?date='+currentDate),
       GET('/releves?date='+currentDate),
     ]);
+    await loadIndexPrecedents();
     renderProdTabs();
     renderSaisie();
     initExportSelects();
   }catch(e){ toast(t('saisie.load.err',{msg:e.message}),'err'); }
+}
+
+// Index de continuité : dernier « mètre après » connu pour chaque pompe,
+// avant (currentDate, currentPeriode). Sert à préremplir « mètre avant ».
+async function loadIndexPrecedents(){
+  indexPrecedents = {};
+  try{
+    const rows = await GET('/releves/index-precedent?date='+currentDate+'&periode='+encodeURIComponent(currentPeriode));
+    (rows||[]).forEach(r=>{ indexPrecedents[r.pompe_id] = r; });
+  }catch(e){ /* pas bloquant */ }
 }
 
 function renderProdTabs(){
@@ -14803,11 +14841,12 @@ function renderProdTabs(){
 }
 function selectProd(id){ currentProdId=id; renderProdTabs(); renderSaisie(); }
 
-function selectPeriode(per){
+async function selectPeriode(per){
   currentPeriode=per;
   document.querySelectorAll('.per-sel-btn').forEach(b=>
     b.classList.toggle('active', b.dataset.per===per)
   );
+  await loadIndexPrecedents();
   renderSaisie();
 }
 
@@ -14865,12 +14904,25 @@ function renderSaisie(){
         ?`<div class="pompiste-badge" data-releve-id="${r.id}" data-pompe-nom="${esc(po.nom)}" data-pompiste-id="${r.pompiste_id}" style="font-size:11px;font-weight:400;color:var(--teal);margin-top:2px;cursor:pointer" onclick="openPompisteModalFromBadge(this)" title="${t('saisie.pompiste.submit')}">⛽ ${esc(r.pompiste_nom)}</div>`
         :`<div class="pompiste-badge" data-releve-id="${r.id}" data-pompe-nom="${esc(po.nom)}" style="font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;cursor:pointer;text-decoration:underline dotted" onclick="openPompisteModalFromBadge(this)">⛽ ${t('saisie.pompiste.submit')}</div>`);
 
+      // Report de continuité : dernier « mètre après » connu → proposé comme
+      // « mètre avant ». Case à cocher : cocher = préremplir + activer la ligne.
+      const ip = indexPrecedents[po.id];
+      const ipVal = (ip && ip.index_precedent!=null) ? ip.index_precedent : null;
+      const ipSrc = (ip && ip.source_periode)
+        ? `${ip.source_periode==='Matin'?'Matin':'Après-midi'} ${frDate(ip.source_date)}` : '';
+      const ipCheck = (!isEdit && ipVal!=null)
+        ? `<label class="ip-report" title="Reporter l'index de fin de la période précédente">
+             <input type="checkbox" onchange="applyIndexPrecedent(this)" data-val="${ipVal}">
+             <span>Index attendu : <b>${fmtGal(ipVal,4)}</b>${ipSrc?` <span class="ip-src">(fin ${ipSrc})</span>`:''}</span>
+           </label>`
+        : '';
+
       return `<tr data-pompe="${po.id}" data-per="${per}" data-defpx="${pxDefaut}"
                   data-is-edit="${isEdit?'1':'0'}" data-nb-mod="${nbMod}"
-                  data-av="${av}" data-ap="${ap}">
+                  data-av="${av}" data-ap="${ap}" data-ip="${ipVal!=null?ipVal:''}">
         <td style="font-weight:600">${esc(po.nom)}${saisiPar}${pompisteInfo}</td>
         <td class="tr" data-label="${t('saisie.table.px')}"><input class="inp inp-sm inp-px" type="number" step="0.01" value="${px}" oninput="calcRow(this.closest('tr'))"></td>
-        <td class="tr" data-label="${t('saisie.table.av')}"><input class="inp inp-av" type="number" step="0.0001" value="" readonly placeholder="${av||'—'}" oninput="calcRow(this.closest('tr'))"></td>
+        <td class="tr" data-label="${t('saisie.table.av')}"><input class="inp inp-av" type="number" step="0.0001" value="" readonly placeholder="${av||'—'}" oninput="calcRow(this.closest('tr'))">${ipCheck}</td>
         <td class="tr" data-label="${t('saisie.table.ap')}"><input class="inp inp-ap" type="number" step="0.0001" value="" readonly placeholder="${ap||'—'}" oninput="calcRow(this.closest('tr'))"></td>
         <td class="tr num ${qcol} val-qte" data-label="${t('saisie.table.qte')}">${isEdit?fmtGal(qte,4):'—'}</td>
         <td class="tr num c-amber val-mnt" data-label="${t('saisie.table.mnt')}">${isEdit?fmtG(mnt):'—'}</td>
@@ -14904,6 +14956,56 @@ function renderSaisie(){
   }).join('');
 
   el.innerHTML=html;
+  renderGalRecap();
+}
+
+// Tableau récapitulatif : gallons vendus par produit (Diesel, Gazoline…)
+// pour la journée courante — les deux périodes cumulées. Se met à jour à
+// chaque enregistrement.
+function renderGalRecap(){
+  const box=document.getElementById('saisie-galrecap');
+  if(!box) return;
+  const acc={};
+  (releves||[]).forEach(r=>{
+    const k=r.produit_nom||'—';
+    if(!acc[k]) acc[k]={gal:0,mnt:0};
+    acc[k].gal+=(r.quantite||0);
+    acc[k].mnt+=(r.montant_vente||0);
+  });
+  const rows=Object.entries(acc).sort((a,b)=>b[1].gal-a[1].gal);
+  if(!rows.length){ box.innerHTML=''; return; }
+  const totGal=rows.reduce((s,[,v])=>s+v.gal,0);
+  const totMnt=rows.reduce((s,[,v])=>s+v.mnt,0);
+  box.innerHTML=`<div class="galrecap">
+    ${rows.map(([nom,v])=>`<div class="galrecap-card">
+      <div class="grc-lbl">${esc(nom)}</div>
+      <div class="grc-gal">${fmtGal(v.gal,3)}</div>
+      <div class="grc-mnt">${fmtG(v.mnt)}</div>
+    </div>`).join('')}
+    ${rows.length>1?`<div class="galrecap-card grc-total">
+      <div class="grc-lbl">Total gallons</div>
+      <div class="grc-gal">${fmtGal(totGal,3)}</div>
+      <div class="grc-mnt">${fmtG(totMnt)}</div>
+    </div>`:''}
+  </div>`;
+}
+
+// Case « Index attendu » cochée → on reporte la valeur dans « mètre avant »
+// et on ouvre la ligne à la saisie (le mètre après reste à taper). Décochée
+// → on efface le report ; la ligne reste ouverte pour une saisie manuelle.
+function applyIndexPrecedent(cb){
+  const tr=cb.closest('tr'); if(!tr) return;
+  const inpAv=tr.querySelector('.inp-av');
+  if(cb.checked){
+    if(inpAv.readOnly) enableRow(tr);
+    inpAv.value=cb.dataset.val;
+    const inpAp=tr.querySelector('.inp-ap');
+    if(inpAp){ inpAp.removeAttribute('readonly'); inpAp.focus(); }
+    calcRow(tr);
+  } else {
+    inpAv.value='';
+    calcRow(tr);
+  }
 }
 
 function enableRow(tr){
@@ -15369,7 +15471,20 @@ function renderJournal(data){
       <div class="jres-num c-teal">${fmtGal(resume.total_gallons,3)}</div>
       ${resume.nb_sauts_compteur?`<div style="font-size:11.5px;color:var(--muted);margin-top:2px">${resume.nb_sauts_compteur} saut${resume.nb_sauts_compteur>1?'s':''} de compteur exclu${resume.nb_sauts_compteur>1?'s':''}</div>`:''}
     </div>
-  </div>`;
+  </div>
+  ${(resume.par_produit&&resume.par_produit.length)?`
+  <div class="galrecap" style="margin-top:12px">
+    ${resume.par_produit.map(pp=>`<div class="galrecap-card">
+      <div class="grc-lbl">${esc(pp.produit)}</div>
+      <div class="grc-gal">${fmtGal(pp.gallons,3)}</div>
+      <div class="grc-mnt">${fmtG(pp.montant)} · ${pp.nb_releves} relevé${pp.nb_releves>1?'s':''}</div>
+    </div>`).join('')}
+    ${resume.par_produit.length>1?`<div class="galrecap-card grc-total">
+      <div class="grc-lbl">Total gallons vendus</div>
+      <div class="grc-gal">${fmtGal(resume.total_gallons,3)}</div>
+      <div class="grc-mnt">${fmtG(resume.par_produit.reduce((s,p)=>s+p.montant,0))}</div>
+    </div>`:''}
+  </div>`:''}`;
 
   // ── Analyse : alertes + erreurs ───────────
   const alertDiv=document.getElementById('journal-alertes');
