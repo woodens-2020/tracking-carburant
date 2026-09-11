@@ -6738,6 +6738,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <option value="">Choisir un bar…</option>
             <option value="DEVANT">Bar Devant (Accueil)</option>
             <option value="PISCINE">Bar Piscine</option>
+            <option value="DERRIERE">Bar Derrière</option>
           </select>
         </div>
 
@@ -7047,6 +7048,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="gi-kpi"><div class="gi-kpi-lbl">En vente</div><div class="gi-kpi-val amber" id="pcx-kpi-vente">—</div></div>
           <div class="gi-kpi"><div class="gi-kpi-lbl">Terminées</div><div class="gi-kpi-val teal" id="pcx-kpi-termine">—</div></div>
           <div class="gi-kpi"><div class="gi-kpi-lbl">Total caisses</div><div class="gi-kpi-val" id="pcx-kpi-total">—</div></div>
+        </div>
+
+        <!-- Stock par département — chaque bar a son propre stock, séparé -->
+        <div class="cat-panel">
+          <div class="cat-panel-title">Stock par département</div>
+          <div id="pcx-stock-dept" style="overflow-x:auto">
+            <span style="color:rgba(255,255,255,.25);font-size:13px">Chargement…</span>
+          </div>
         </div>
 
         <!-- Scan / recherche rapide -->
@@ -8562,6 +8571,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option value="">Tous les bars</option>
               <option value="DEVANT">Bar Devant</option>
               <option value="PISCINE">Bar Piscine</option>
+              <option value="DERRIERE">Bar Derrière</option>
             </select>
             <input type="date" class="pos-input" id="sc-debut" style="width:130px">
             <input type="date" class="pos-input" id="sc-fin" style="width:130px">
@@ -8707,6 +8717,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option value="">Tous les bars</option>
               <option value="DEVANT">Bar Devant</option>
               <option value="PISCINE">Bar Piscine</option>
+              <option value="DERRIERE">Bar Derrière</option>
             </select>
             <input type="date" class="pos-input" id="rs-debut" style="width:130px">
             <input type="date" class="pos-input" id="rs-fin" style="width:130px">
@@ -24172,6 +24183,41 @@ async function loadPosCaisses(){
   }catch(e){
     if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
+  _pcxLoadStockDept();
+}
+
+async function _pcxLoadStockDept(){
+  const el = document.getElementById('pcx-stock-dept');
+  if(!el) return;
+  try{
+    const rows = await apiFetch('GET', '/pos/caisses/stock-departements');
+    if(!rows || !rows.length){
+      el.innerHTML = '<div class="gi-empty">Aucun produit géré par caisses pour le moment.</div>';
+      return;
+    }
+    // Colonnes = union des départements présents sur au moins un produit.
+    const depsVus = new Map();
+    rows.forEach(r => r.par_departement.forEach(d => depsVus.set(d.departement_id, d.departement_nom)));
+    const depCols = Array.from(depsVus.entries()).sort((a,b)=>a[1].localeCompare(b[1]));
+    let html = '<table class="gi-table"><thead><tr><th>Produit</th>'
+      + depCols.map(([,nom])=>`<th style="text-align:right">${nom}</th>`).join('')
+      + '<th style="text-align:right">Non affecté</th><th style="text-align:right">Total</th></tr></thead><tbody>';
+    rows.forEach(r => {
+      const parDep = {};
+      r.par_departement.forEach(d => { parDep[d.departement_id] = d.stock; });
+      html += `<tr><td>${r.produit_nom}</td>`
+        + depCols.map(([id])=>`<td style="text-align:right">${(parDep[id]!=null ? parDep[id] : 0)}</td>`).join('')
+        + `<td style="text-align:right;color:${r.non_affecte>0?'#f7a93b':'rgba(255,255,255,.3)'}">${r.non_affecte}</td>`
+        + `<td style="text-align:right;font-weight:700">${r.total}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    if(rows.some(r => r.non_affecte > 0)){
+      html += '<div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:8px">« Non affecté » = stock crédité hors transfert de caisse (approvisionnement classique) — pas encore rattaché à un département précis.</div>';
+    }
+    el.innerHTML = html;
+  }catch(e){
+    el.innerHTML = `<span style="color:#f87171;font-size:13px">${e.message||'Erreur réseau'}</span>`;
+  }
 }
 
 function _pcxBadge(statut){
@@ -25279,12 +25325,12 @@ async function posConfirmerDemarrage(){
   const cid = document.getElementById('pos-caissier-sel')?.value;
   if(!cid) return;
   const lieu = document.getElementById('pd-lieu-sel')?.value;
-  if(!lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine) avant de démarrer.', 'warn'); return; }
+  if(!lieu){ posAlert('Choisissez le bar (Bar Devant, Bar Piscine ou Bar Derrière) avant de démarrer.', 'warn'); return; }
   try {
     const s = await apiFetch('POST', '/pos/caisse/sessions/ouvrir', {caissier_id: parseInt(cid), lieu});
     _posDashSessionId = s.id;
     document.getElementById('pos-demarrer-modal-bg')?.classList.remove('open');
-    const lieuLabel = lieu === 'PISCINE' ? 'Bar Piscine' : 'Bar Devant';
+    const lieuLabel = _lieuLabel(lieu) || 'Bar Devant';
     const numTxt = s.numero_session > 1 ? `Session #${s.numero_session} ` : '';
     posAlert(`${numTxt}démarrée — ${lieuLabel}.`, 'ok');
   } catch(e){ posAlert(e.message||t('pos.caisse.err.ouvertureSession'), 'err'); return; }
@@ -29982,17 +30028,17 @@ function _ckHeureFmt(d){
   return new Date(d).toLocaleTimeString('fr-FR',{timeZone:'America/Port-au-Prince',hour:'2-digit',minute:'2-digit'});
 }
 
-// Lieu (Bar Devant / Bar Piscine) — étiquette partagée par les pages
-// Sessions Caissières, Rapports Soumis et Écarts d'Inventaire.
+// Lieu (Bar Devant / Bar Piscine / Bar Derrière) — étiquette partagée par
+// les pages Sessions Caissières, Rapports Soumis et Écarts d'Inventaire.
+const _LIEU_LABELS = {DEVANT:'Bar Devant', PISCINE:'Bar Piscine', DERRIERE:'Bar Derrière'};
+const _LIEU_COLORS = {DEVANT:'#a78bfa', PISCINE:'#38bdf8', DERRIERE:'#fb923c'};
 function _lieuLabel(lieu){
-  if(lieu === 'PISCINE') return 'Bar Piscine';
-  if(lieu === 'DEVANT')  return 'Bar Devant';
-  return null;
+  return _LIEU_LABELS[lieu] || null;
 }
 function _lieuBadge(lieu){
   const label = _lieuLabel(lieu);
   if(!label) return '';
-  const color = lieu === 'PISCINE' ? '#38bdf8' : '#a78bfa';
+  const color = _LIEU_COLORS[lieu] || '#a78bfa';
   return ` <span style="font-size:11px;color:${color};background:${color}18;border-radius:8px;padding:0 6px;white-space:nowrap">${label}</span>`;
 }
 

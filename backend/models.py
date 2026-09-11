@@ -758,13 +758,22 @@ class BarMouvementStock(Base):
     motif              = Column(String(300), nullable=True)
     reference_vente_id = Column(Integer, ForeignKey("bar_ventes.id", ondelete="SET NULL"), nullable=True)
     achat_id           = Column(Integer, ForeignKey("bar_achats.id", ondelete="SET NULL"), nullable=True)
+    # Département où ce mouvement a physiquement lieu — NULL = mouvement non
+    # rattaché à un département (ex. approvisionnement classique hors caisses
+    # tracées, ou données antérieures à cette colonne) : compté dans le stock
+    # global mais absent de toute ventilation par département. Alimenté par
+    # le transfert d'une caisse (ENTREE) et par les ventes faites depuis une
+    # session de caisse dont le lieu est connu (SORTIE_VENTE) — voir
+    # pos_service.py::_departement_id_pour_lieu.
+    departement_id     = Column(Integer, ForeignKey("bar_departements.id", ondelete="SET NULL"), nullable=True)
     date_mouvement     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     utilisateur_id     = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
 
-    produit = relationship("BarProduit", back_populates="mouvements",
-                           foreign_keys=[produit_id])
-    achat   = relationship("BarAchat",   back_populates="mouvement",
-                           foreign_keys=[achat_id])
+    produit     = relationship("BarProduit", back_populates="mouvements",
+                               foreign_keys=[produit_id])
+    achat       = relationship("BarAchat",   back_populates="mouvement",
+                               foreign_keys=[achat_id])
+    departement = relationship("BarDepartement", foreign_keys=[departement_id])
 
     __table_args__ = (
         CheckConstraint(
@@ -774,6 +783,7 @@ class BarMouvementStock(Base):
         Index("idx_bar_mouv_produit", "produit_id"),
         Index("idx_bar_mouv_date",    "date_mouvement"),
         Index("idx_bar_mouv_vente",   "reference_vente_id"),
+        Index("idx_bar_mouv_departement", "departement_id"),
     )
 
 

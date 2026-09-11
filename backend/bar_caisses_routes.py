@@ -357,6 +357,28 @@ def stats_caisses(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/caisses/stock-departements")
+def stock_departements(produit_id: Optional[int] = Query(default=None), db: Session = Depends(get_db)):
+    """Ventilation du stock par département — un ou tous les produits gérés
+    par caisses. Additif : ne remplace aucun endpoint de stock existant
+    (GET /pos/produits, /pos/stock…), qui continuent de renvoyer le stock
+    global inchangé. Voir pos_service.stock_par_departement()."""
+    from pos_service import stock_par_departement
+    q = db.query(BarProduit).filter(BarProduit.vendu_par_caisse.is_(True))
+    if produit_id:
+        q = q.filter(BarProduit.id == produit_id)
+    produits = q.order_by(BarProduit.nom).all()
+    resultat = []
+    for p in produits:
+        ventilation = stock_par_departement(p.id, db)
+        resultat.append({
+            "produit_id":  p.id,
+            "produit_nom": p.nom,
+            **ventilation,
+        })
+    return resultat
+
+
 @router.get("/caisses/code/{code}")
 def caisse_par_code(code: str, db: Session = Depends(get_db)):
     """Résolution scan → caisse. Le backend est TOUJOURS interrogé (le QR
@@ -516,6 +538,7 @@ def transferer_caisse(caisse_id: int, data: TransfererIn, request: Request, db: 
         quantite       = Decimal(str(c.quantite_restante)),
         type_mouvement = "ENTREE",
         motif          = f"Caisse {c.code_unique} transférée → {dep.nom}",
+        departement_id = dep.id,
         utilisateur_id = uid,
     ))
 
@@ -572,6 +595,7 @@ def ajuster_caisse(caisse_id: int, data: AjusterCaisseIn, request: Request, db: 
         quantite       = Decimal(str(-data.quantite)),
         type_mouvement = "CASSE" if type_mvt == "CASSE" else ("PERTE" if type_mvt == "PERTE" else "AJUSTEMENT"),
         motif          = f"Caisse {c.code_unique} — {data.motif.strip()}",
+        departement_id = c.departement_id,
         utilisateur_id = uid,
     ))
     _finaliser_si_epuisee(db, c, uid)
@@ -620,23 +644,30 @@ def _finaliser_si_epuisee(db: Session, c: BarCaisse, uid: Optional[int]) -> None
 
 
 def decrementer_caisses_fifo(db: Session, produit_id: int, quantite_vendue, vente_id: int,
-                             utilisateur_id: Optional[int]) -> None:
+                             utilisateur_id: Optional[int], departement_id: Optional[int] = None) -> None:
     """Répartit une quantité vendue sur les caisses actives du produit,
     la plus ancienne transférée d'abord (FIFO). Best-effort : si les
     caisses trackées ne couvrent pas toute la quantité (ex. stock ancien
     non tracké), on décrémente ce qui est disponible et on s'arrête —
-    ne doit JAMAIS faire échouer la vente elle-même (voir appelant)."""
+    ne doit JAMAIS faire échouer la vente elle-même (voir appelant).
+
+    Si departement_id est fourni (lieu de la session de caisse connu), la
+    consommation est STRICTEMENT limitée aux caisses de ce département —
+    Bar Devant ne doit jamais consommer une caisse livrée à Bar Derrière,
+    même si le FIFO global aurait choisi celle-ci en premier. Si
+    departement_id est None (lieu inconnu), comportement historique :
+    n'importe quelle caisse active du produit, tous départements confondus."""
     restant_a_decompter = int(round(float(quantite_vendue)))
     if restant_a_decompter <= 0:
         return
-    caisses = (
-        db.query(BarCaisse)
-        .filter(BarCaisse.produit_id == produit_id,
-                BarCaisse.statut.in_(_STATUTS_ACTIFS),
-                BarCaisse.quantite_restante > 0)
-        .order_by(BarCaisse.transferee_at.asc().nullsfirst(), BarCaisse.id.asc())
-        .all()
+    q = db.query(BarCaisse).filter(
+        BarCaisse.produit_id == produit_id,
+        BarCaisse.statut.in_(_STATUTS_ACTIFS),
+        BarCaisse.quantite_restante > 0,
     )
+    if departement_id is not None:
+        q = q.filter(BarCaisse.departement_id == departement_id)
+    caisses = q.order_by(BarCaisse.transferee_at.asc().nullsfirst(), BarCaisse.id.asc()).all()
     for c in caisses:
         if restant_a_decompter <= 0:
             break
@@ -654,3 +685,37 @@ def decrementer_caisses_fifo(db: Session, produit_id: int, quantite_vendue, vent
         _finaliser_si_epuisee(db, c, utilisateur_id)
     # Pas de commit ici : appelé à l'intérieur de la transaction de la vente,
     # c'est l'appelant (encaisser_vente) qui commit.
+
+
+def restaurer_caisses_apres_annulation(db: Session, vente_id: int, utilisateur_id: Optional[int]) -> None:
+    """Symétrique de decrementer_caisses_fifo — appelée depuis
+    pos_service.annuler_vente(). Retrouve tous les mouvements VENTE liés à
+    cette vente (BarCaisseMouvement.reference_vente_id) et restitue la
+    quantité à chaque caisse concernée, en journalisant une ANNULATION.
+    Une caisse TERMINEE redevient EN_VENTE si elle a de nouveau du restant.
+    Best-effort : ne doit jamais empêcher l'annulation de la vente elle-même
+    (voir l'appelant, qui encadre déjà cet appel d'un try/except)."""
+    mouvements = (
+        db.query(BarCaisseMouvement)
+        .filter_by(type_mouvement="VENTE", reference_vente_id=vente_id)
+        .all()
+    )
+    for m in mouvements:
+        c = db.get(BarCaisse, m.caisse_id)
+        if not c:
+            continue
+        restitue = -m.quantite  # m.quantite est négatif (ex. -1) pour une VENTE
+        if restitue <= 0:
+            continue
+        c.quantite_restante = min(c.quantite_restante + restitue, c.quantite_initiale)
+        if c.statut == "TERMINEE" and c.quantite_restante > 0:
+            c.statut          = "EN_VENTE"
+            c.terminee_at     = None
+            c.termine_par_id  = None
+        db.add(BarCaisseMouvement(
+            caisse_id=c.id, type_mouvement="ANNULATION", quantite=restitue,
+            motif=f"Annulation vente #{vente_id}", reference_vente_id=vente_id,
+            utilisateur_id=utilisateur_id,
+        ))
+    # Pas de commit ici : appelé à l'intérieur de la transaction d'annulation,
+    # c'est l'appelant (annuler_vente) qui commit.

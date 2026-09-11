@@ -425,7 +425,7 @@ def detail_session(session_id: int, db: Session = Depends(get_db)):
     return d
 
 
-_LIEUX_VALIDES = {"DEVANT", "PISCINE"}
+_LIEUX_VALIDES = {"DEVANT", "PISCINE", "DERRIERE"}
 
 
 class OuvrirIn(BaseModel):
@@ -438,9 +438,11 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
     """Ouvre (ou retrouve) une session du jour pour une caissière — jusqu'à
     MAX_SESSIONS_PAR_JOUR sessions par jour (mesure de sécurité : permet de
     repartir sur une session propre après un incident, sans attendre le
-    lendemain). Le lieu (Bar Devant / Bar Piscine) est choisi une fois par
-    session, avant le comptage de stock — requis uniquement à la création
-    (une session déjà EN_COURS a déjà le sien)."""
+    lendemain). Le lieu (Bar Devant / Bar Piscine / Bar Derrière) est choisi
+    une fois par session, avant le comptage de stock — requis uniquement à
+    la création (une session déjà EN_COURS a déjà le sien). Ce lieu
+    détermine aussi le département dont le stock est vérifié/décompté à
+    chaque vente (voir pos_service.py::departement_id_pour_lieu)."""
     employe = db.query(Employe).filter_by(id=data.caissier_id).first()
     if not employe:
         raise HTTPException(404, "Caissier introuvable")
@@ -457,7 +459,7 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
         if len(sessions_du_jour) >= MAX_SESSIONS_PAR_JOUR:
             raise HTTPException(409, f"Limite de {MAX_SESSIONS_PAR_JOUR} sessions de caisse par jour atteinte pour ce caissier.")
         if not data.lieu or data.lieu.upper() not in _LIEUX_VALIDES:
-            raise HTTPException(422, "Choisissez le bar (Bar Devant ou Bar Piscine) avant de démarrer.")
+            raise HTTPException(422, "Choisissez le bar (Bar Devant, Bar Piscine ou Bar Derrière) avant de démarrer.")
         session = BarSessionCaisse(
             caissier_id     = data.caissier_id,
             date_session    = aujourd_hui,

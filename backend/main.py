@@ -433,6 +433,11 @@ def startup():
             CONSTRAINT chk_bar_caisse_mouv_type CHECK (type_mouvement IN ('TRANSFERT','VENTE','CASSE','PERTE','CORRECTION','ANNULATION'))
         )""",
         "CREATE INDEX IF NOT EXISTS idx_bar_caisse_mouv_caisse ON bar_caisse_mouvements (caisse_id)",
+        # ── Stock ventilé par département (Bar Devant / Piscine / Derrière) ──
+        # NULL = mouvement non rattaché à un département (compté dans le stock
+        # global uniquement) — voir la note sur la colonne dans models.py.
+        "ALTER TABLE bar_mouvements_stock ADD COLUMN IF NOT EXISTS departement_id INTEGER REFERENCES bar_departements(id) ON DELETE SET NULL",
+        "CREATE INDEX IF NOT EXISTS idx_bar_mouv_departement ON bar_mouvements_stock (departement_id)",
     ]
     # Chaque instruction est isolée : une qui échoue (moteur SQLite en dev,
     # table absente, type déjà à jour…) n'empêche pas les suivantes.
