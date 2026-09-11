@@ -34,6 +34,7 @@ from activity_log import (
     ADMIN_CODE_REQUESTED, ADMIN_CODE_VERIFIED, ADMIN_CODE_FAILED,
 )
 from pos_routes import router as pos_router
+from bar_caisses_routes import router as bar_caisses_router
 from pos_analyse_routes import router as pos_analyse_router
 from caisse_routes import router as caisse_router
 from hotel_routes import router as hotel_router
@@ -247,6 +248,7 @@ app.add_middleware(AuthMiddleware)
 
 # Module POS bar/restaurant
 app.include_router(pos_router)
+app.include_router(bar_caisses_router)
 app.include_router(pos_analyse_router)
 app.include_router(caisse_router)
 app.include_router(hotel_router)
@@ -376,6 +378,56 @@ def startup():
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_hotel_proformas_numero ON hotel_proformas (numero)",
         "CREATE INDEX IF NOT EXISTS idx_hotel_pf_statut ON hotel_proformas (statut)",
         "CREATE INDEX IF NOT EXISTS idx_hotel_pf_arrivee ON hotel_proformas (date_arrivee_prevue)",
+        # ── Gestion des caisses (cartons) bar — QR / traçabilité individuelle ──
+        """CREATE TABLE IF NOT EXISTS bar_departements (
+            id SERIAL PRIMARY KEY,
+            nom VARCHAR(60) NOT NULL,
+            nom_norm VARCHAR(60) NOT NULL,
+            actif BOOLEAN NOT NULL DEFAULT TRUE,
+            date_creation TIMESTAMPTZ NOT NULL DEFAULT now()
+        )""",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_bar_departements_nom_norm ON bar_departements (nom_norm)",
+        "CREATE INDEX IF NOT EXISTS idx_bar_departements_actif ON bar_departements (actif)",
+        """CREATE TABLE IF NOT EXISTS bar_caisses (
+            id SERIAL PRIMARY KEY,
+            code_unique VARCHAR(30) NOT NULL,
+            produit_id INTEGER NOT NULL REFERENCES bar_produits(id) ON DELETE RESTRICT,
+            achat_id INTEGER REFERENCES bar_achats(id) ON DELETE SET NULL,
+            unites_par_caisse INTEGER NOT NULL,
+            quantite_initiale INTEGER NOT NULL,
+            quantite_restante INTEGER NOT NULL,
+            statut VARCHAR(20) NOT NULL DEFAULT 'AU_DEPOT',
+            emplacement_actuel VARCHAR(20) NOT NULL DEFAULT 'DEPOT',
+            departement_id INTEGER REFERENCES bar_departements(id) ON DELETE SET NULL,
+            cree_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL,
+            transfere_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL,
+            termine_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            transferee_at TIMESTAMPTZ,
+            vente_debut_at TIMESTAMPTZ,
+            terminee_at TIMESTAMPTZ,
+            CONSTRAINT uq_bar_caisse_code UNIQUE (code_unique),
+            CONSTRAINT chk_bar_caisse_qte_init CHECK (quantite_initiale > 0),
+            CONSTRAINT chk_bar_caisse_qte_rest CHECK (quantite_restante >= 0),
+            CONSTRAINT chk_bar_caisse_qte_max CHECK (quantite_restante <= quantite_initiale),
+            CONSTRAINT chk_bar_caisse_statut CHECK (statut IN ('AU_DEPOT','TRANSFEREE','EN_VENTE','TERMINEE','ANNULEE')),
+            CONSTRAINT chk_bar_caisse_emplacement CHECK (emplacement_actuel IN ('DEPOT','DEPARTEMENT'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_bar_caisses_produit ON bar_caisses (produit_id)",
+        "CREATE INDEX IF NOT EXISTS idx_bar_caisses_statut ON bar_caisses (statut)",
+        "CREATE INDEX IF NOT EXISTS idx_bar_caisses_departement ON bar_caisses (departement_id)",
+        """CREATE TABLE IF NOT EXISTS bar_caisse_mouvements (
+            id SERIAL PRIMARY KEY,
+            caisse_id INTEGER NOT NULL REFERENCES bar_caisses(id) ON DELETE CASCADE,
+            type_mouvement VARCHAR(20) NOT NULL,
+            quantite INTEGER NOT NULL DEFAULT 0,
+            motif VARCHAR(300),
+            reference_vente_id INTEGER REFERENCES bar_ventes(id) ON DELETE SET NULL,
+            utilisateur_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            CONSTRAINT chk_bar_caisse_mouv_type CHECK (type_mouvement IN ('TRANSFERT','VENTE','CASSE','PERTE','CORRECTION','ANNULATION'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_bar_caisse_mouv_caisse ON bar_caisse_mouvements (caisse_id)",
     ]
     # Chaque instruction est isolée : une qui échoue (moteur SQLite en dev,
     # table absente, type déjà à jour…) n'empêche pas les suivantes.
@@ -420,6 +472,18 @@ def startup():
             _db.commit()
         except Exception:
             pass
+
+        # ── Seed des départements bar (gestion des caisses/QR) ───────────
+        try:
+            from models import BarDepartement as _BD
+            import re as _re
+            for _nom in ("Devant", "Piscine", "Derrière"):
+                _norm = _re.sub(r"\s+", " ", _nom.strip()).casefold()
+                if not _db.query(_BD).filter_by(nom_norm=_norm).first():
+                    _db.add(_BD(nom=_nom, nom_norm=_norm, actif=True))
+            _db.commit()
+        except Exception:
+            _db.rollback()
 
         # ── Seed des listes de référence partagées (idempotent) ──────────
         # Valeurs par défaut + toutes les valeurs déjà présentes dans les

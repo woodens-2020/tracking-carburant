@@ -13,3 +13,4 @@ openpyxl
 python-docx
 matplotlib
 tzdata
+qrcode[pil]

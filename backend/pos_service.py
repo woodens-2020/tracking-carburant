@@ -337,6 +337,14 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
                 reference_vente_id = vente.id,
                 utilisateur_id     = utilisateur_id,
             ))
+            # Traçabilité par caisse (QR) — purement additif, best-effort :
+            # ne doit jamais empêcher la vente si la répartition échoue
+            # (ex. produit non tracké par caisse, aucune caisse active…).
+            try:
+                from bar_caisses_routes import decrementer_caisses_fifo
+                decrementer_caisses_fifo(db, l["produit_id"], l["quantite"], vente.id, utilisateur_id)
+            except Exception:
+                pass
 
     # ── CuisineVente automatique pour les plats cuisine vendus via bar ──
     lignes_cuisine = [l for l in lignes_traitees if l["cuisine_plat_id"]]

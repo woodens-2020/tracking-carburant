@@ -1367,6 +1367,115 @@ class BarSessionEvaluation(Base):
     )
 
 
+# ══════════════════════════════════════════════════════════════════
+# GESTION DES CAISSES (cartons) BAR — QR / traçabilité individuelle
+# ──────────────────────────────────────────────────────────────────
+# Additif, ne touche jamais le stock agrégat (BarMouvementStock, seule
+# source de vérité du stock courant — voir approvisionner() dans
+# pos_routes.py). Une BarCaisse est une déclinaison PHYSIQUE d'un produit
+# déjà vendu_par_caisse=True : elle ne duplique pas le stock, elle donne
+# une identité et une localisation à une partie de ce stock.
+# ══════════════════════════════════════════════════════════════════
+
+class BarDepartement(Base):
+    """Destination de transfert d'une caisse (Devant, Piscine, Derrière…) —
+    liste gérée, extensible par un admin/manager sans migration."""
+    __tablename__ = "bar_departements"
+
+    id            = Column(Integer, primary_key=True)
+    nom           = Column(String(60),  nullable=False)
+    nom_norm      = Column(String(60),  nullable=False)
+    actif         = Column(Boolean,     nullable=False, default=True)
+    date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("nom_norm", name="uq_bar_departements_nom_norm"),
+        Index("idx_bar_departements_actif", "actif"),
+    )
+
+
+class BarCaisse(Base):
+    """Caisse/carton physique d'un produit bar — identifiée par un code
+    unique (support du QR), depuis sa génération jusqu'à son épuisement.
+
+    Le stock agrégat (BarMouvementStock) est crédité séparément, au moment
+    de la génération, via l'approvisionnement existant (voir
+    bar_caisses_routes.generer_caisses, qui appelle pos_routes.approvisionner
+    au lieu de réimplémenter la logique de crédit de stock). Cette table
+    n'ajoute donc jamais de gallons/unités au stock — elle les localise."""
+    __tablename__ = "bar_caisses"
+
+    id                  = Column(Integer, primary_key=True)
+    code_unique         = Column(String(30), nullable=False)
+    produit_id          = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
+    achat_id            = Column(Integer, ForeignKey("bar_achats.id", ondelete="SET NULL"), nullable=True)
+    unites_par_caisse   = Column(Integer, nullable=False)   # figé à la génération
+    quantite_initiale   = Column(Integer, nullable=False)
+    quantite_restante   = Column(Integer, nullable=False)
+    statut              = Column(String(20), nullable=False, default="AU_DEPOT")
+    # AU_DEPOT -> TRANSFEREE -> EN_VENTE -> TERMINEE   (+ ANNULEE)
+    emplacement_actuel  = Column(String(20), nullable=False, default="DEPOT")   # DEPOT | DEPARTEMENT
+    departement_id      = Column(Integer, ForeignKey("bar_departements.id", ondelete="SET NULL"), nullable=True)
+    cree_par_id         = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    transfere_par_id    = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    termine_par_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at          = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    transferee_at       = Column(DateTime(timezone=True), nullable=True)
+    vente_debut_at      = Column(DateTime(timezone=True), nullable=True)
+    terminee_at         = Column(DateTime(timezone=True), nullable=True)
+
+    produit     = relationship("BarProduit")
+    achat       = relationship("BarAchat")
+    departement = relationship("BarDepartement")
+    cree_par    = relationship("Utilisateur", foreign_keys=[cree_par_id])
+    transfere_par = relationship("Utilisateur", foreign_keys=[transfere_par_id])
+    termine_par   = relationship("Utilisateur", foreign_keys=[termine_par_id])
+    mouvements  = relationship("BarCaisseMouvement", back_populates="caisse",
+                               cascade="all, delete-orphan", order_by="BarCaisseMouvement.created_at")
+
+    __table_args__ = (
+        UniqueConstraint("code_unique", name="uq_bar_caisse_code"),
+        CheckConstraint("quantite_initiale > 0", name="chk_bar_caisse_qte_init_pos"),
+        CheckConstraint("quantite_restante >= 0", name="chk_bar_caisse_qte_rest_pos"),
+        CheckConstraint("quantite_restante <= quantite_initiale", name="chk_bar_caisse_qte_rest_max"),
+        CheckConstraint(
+            "statut IN ('AU_DEPOT','TRANSFEREE','EN_VENTE','TERMINEE','ANNULEE')",
+            name="chk_bar_caisse_statut",
+        ),
+        CheckConstraint("emplacement_actuel IN ('DEPOT','DEPARTEMENT')", name="chk_bar_caisse_emplacement"),
+        Index("idx_bar_caisses_produit", "produit_id"),
+        Index("idx_bar_caisses_statut",  "statut"),
+        Index("idx_bar_caisses_departement", "departement_id"),
+    )
+
+
+class BarCaisseMouvement(Base):
+    """Journal d'audit d'une caisse — transfert, vente, casse, perte,
+    correction. Jamais de suppression : toute correction est un nouveau
+    mouvement, la caisse elle-même garde son statut/quantité courants."""
+    __tablename__ = "bar_caisse_mouvements"
+
+    id             = Column(Integer, primary_key=True)
+    caisse_id      = Column(Integer, ForeignKey("bar_caisses.id", ondelete="CASCADE"), nullable=False)
+    type_mouvement = Column(String(20), nullable=False)  # TRANSFERT, VENTE, CASSE, PERTE, CORRECTION, ANNULATION
+    quantite       = Column(Integer, nullable=False, default=0)   # unités affectées (signe selon le type)
+    motif          = Column(String(300), nullable=True)
+    reference_vente_id = Column(Integer, ForeignKey("bar_ventes.id", ondelete="SET NULL"), nullable=True)
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    caisse = relationship("BarCaisse", back_populates="mouvements")
+    utilisateur = relationship("Utilisateur", foreign_keys=[utilisateur_id])
+
+    __table_args__ = (
+        CheckConstraint(
+            "type_mouvement IN ('TRANSFERT','VENTE','CASSE','PERTE','CORRECTION','ANNULATION')",
+            name="chk_bar_caisse_mouv_type",
+        ),
+        Index("idx_bar_caisse_mouv_caisse", "caisse_id"),
+    )
+
+
 class ZelleConfig(Base):
     """Configuration du département Zelle (taux de change, balance initiale)."""
     __tablename__ = "zelle_config"
