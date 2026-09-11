@@ -54,6 +54,33 @@ def _uid(request: Request) -> int | None:
     return u.id if u else None
 
 
+def _require_admin_ou_depot(request: Request, db: Session = Depends(get_db)) -> Utilisateur:
+    """Réservé à l'administrateur (ou PDG) et au responsable de dépôt — un
+    scan de caisse ne prouve jamais l'autorisation à lui seul (voir doctrine
+    sécurité), le backend revérifie toujours l'identité et le rôle avant de
+    livrer/créditer du stock. Le rôle « responsable de dépôt » est reconnu
+    soit via un rôle personnalisé nommé « Responsable Dépôt » (créé depuis
+    Administration → Rôles), soit via un poste Magasinier/Responsable
+    Logistique — mêmes conventions de nommage déjà présentes dans l'appli."""
+    user = _user(request)
+    if not user:
+        raise HTTPException(403, "Non autorisé.")
+    if user.role in ("pdg", "admin"):
+        return user
+    full = db.get(Utilisateur, user.id)
+    if full:
+        if full.role_obj and full.role_obj.permissions.get("admin", False):
+            return user
+        if full.role_obj:
+            nom_role = (full.role_obj.nom or "").strip().lower()
+            if "dépôt" in nom_role or "depot" in nom_role or "dépot" in nom_role:
+                return user
+        poste = (full.poste or "").strip().lower()
+        if poste in ("magasinier", "responsable logistique"):
+            return user
+    raise HTTPException(403, "Réservé à l'administrateur ou au responsable de dépôt.")
+
+
 # ══════════════════════════════════════════════════════════════════
 # DÉPARTEMENTS — liste gérée (Devant, Piscine, Derrière…)
 # ══════════════════════════════════════════════════════════════════
@@ -119,10 +146,22 @@ def _generer_code_unique(db: Session, annee: int) -> str:
     return f"{prefixe}{int(datetime.now().timestamp())}"
 
 
+def _base_url(request: Request) -> str:
+    """Origine publique de la requête (schéma + hôte), en tenant compte du
+    proxy Railway qui termine le TLS en amont (X-Forwarded-Proto/-Host) —
+    sans ça, request.url.scheme renvoie parfois "http" côté applicatif
+    alors que l'utilisateur est bien en https."""
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme) or "https"
+    host   = request.headers.get("x-forwarded-host", request.headers.get("host")) or request.url.netloc
+    return f"{scheme}://{host}"
+
+
 def _qr_png_bytes(texte: str) -> bytes:
-    """QR code encodant uniquement l'identifiant unique — jamais de données
+    """Génère le QR pour le texte fourni. Le texte encodé reste un simple
+    pointeur opaque (code unique, éventuellement dans une URL /?scan=CODE
+    pour qu'un scan caméra ouvre directement Konekta) — jamais de données
     sensibles ni métier dedans (voir doctrine sécurité : le scan interroge
-    toujours le backend, le QR n'est qu'un pointeur)."""
+    toujours le backend, qui revalide tout côté serveur avant d'agir)."""
     import qrcode
     img = qrcode.make(texte, border=2)
     buf = io.BytesIO()
@@ -329,11 +368,18 @@ def caisse_par_code(code: str, db: Session = Depends(get_db)):
 
 
 @router.get("/caisses/etiquettes.pdf")
-def imprimer_etiquettes(ids: str = Query(..., description="IDs séparés par des virgules"),
+def imprimer_etiquettes(request: Request,
+                        ids: str = Query(..., description="IDs séparés par des virgules"),
                         db: Session = Depends(get_db)):
     """Une étiquette par caisse — nom du produit, numéro de caisse, nombre
     d'unités, QR code. Mise en page en grille pour impression multiple
     (5 caisses → 5 étiquettes, 50 caisses → 50 étiquettes).
+
+    Le QR encode {origine}/?scan={code} — l'origine est dérivée de la
+    requête (voir _base_url), donc chaque tenant imprime des étiquettes qui
+    pointent automatiquement vers SON propre domaine (jamais une valeur
+    codée en dur), et un scan caméra ouvre directement Konekta sur la page
+    de livraison, avec le code pré-rempli.
 
     NOTE : ce chemin fixe (/caisses/etiquettes.pdf) doit impérativement être
     déclaré AVANT la route paramétrée /caisses/{caisse_id} ci-dessous —
@@ -347,6 +393,8 @@ def imprimer_etiquettes(ids: str = Query(..., description="IDs séparés par des
     caisses = db.query(BarCaisse).filter(BarCaisse.id.in_(id_list)).order_by(BarCaisse.id).all()
     if not caisses:
         raise HTTPException(404, "Aucune caisse trouvée pour ces identifiants.")
+
+    base_url = _base_url(request)
 
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import cm
@@ -367,7 +415,7 @@ def imprimer_etiquettes(ids: str = Query(..., description="IDs séparés par des
                                textColor=colors.HexColor("#555555"))
 
     def _etiquette(c: BarCaisse):
-        qr_bytes = _qr_png_bytes(c.code_unique)
+        qr_bytes = _qr_png_bytes(f"{base_url}/?scan={c.code_unique}")
         qr_img = Image(io.BytesIO(qr_bytes), width=2.6*cm, height=2.6*cm)
         cell = Table(
             [[Paragraph((c.produit.nom if c.produit else "—"), st_prod)],
@@ -426,11 +474,16 @@ class TransfererIn(BaseModel):
 
 
 @router.post("/caisses/{caisse_id}/transferer", status_code=200)
-def transferer_caisse(caisse_id: int, data: TransfererIn, request: Request, db: Session = Depends(get_db)):
+def transferer_caisse(caisse_id: int, data: TransfererIn, request: Request, db: Session = Depends(get_db),
+                      _autorise: Utilisateur = Depends(_require_admin_ou_depot)):
     """Scan + sélection du département + confirmation. C'est CE moment-là,
     et lui seul, qui crédite le stock agrégat (POS) — voir la note en tête
     de fichier. Avant le transfert, la caisse est au dépôt et n'existe pas
-    du point de vue du stock vendable."""
+    du point de vue du stock vendable.
+
+    Réservé à l'administrateur / au responsable de dépôt (voir
+    _require_admin_ou_depot) — un QR scanné ne suffit jamais à lui seul :
+    le backend revérifie toujours qui fait la demande."""
     c = db.get(BarCaisse, caisse_id)
     if not c:
         raise HTTPException(404, "Caisse introuvable.")

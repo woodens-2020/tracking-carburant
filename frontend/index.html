@@ -18063,7 +18063,10 @@ document.addEventListener('DOMContentLoaded',async()=>{
   const _rlNom     = (_appUser?.role_nom||_appUser?.poste||'').toLowerCase();
   let _savedPage   = null;
   try{ _savedPage = sessionStorage.getItem('konekta_current_page'); }catch(e){}
-  if(!_isFreshLogin && _savedPage && _canAccess(_savedPage)){
+  if(_pslAutoScanFromUrl()){
+    // Scan de caisse pris en charge — court-circuite la restauration/
+    // l'atterrissage normal de page.
+  } else if(!_isFreshLogin && _savedPage && _canAccess(_savedPage)){
     goTo(_savedPage);
   } else if(_rlNom === 'manager'){
     goTo('notifications');
@@ -18075,6 +18078,34 @@ document.addEventListener('DOMContentLoaded',async()=>{
     goTo(_defaultLandingPage());
   }
 });
+
+// Arrivée directe depuis un QR de caisse scanné (voir bar_caisses_routes.py
+// _qr_png_bytes : le QR encode {origine}/?scan=CODE, pas juste le code brut,
+// pour qu'un scan à la caméra du téléphone ouvre directement Konekta).
+// Doit être appelé après loadCurrentUser() (a besoin de _appUser/_modules
+// pour _canAccess). Retourne true si un scan a été pris en charge — dans ce
+// cas la logique normale de restauration/atterrissage de page est court-circuitée.
+function _pslAutoScanFromUrl(){
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('scan');
+  if(!code) return false;
+  // Nettoie l'URL tout de suite pour qu'un simple rafraîchissement ensuite
+  // ne redéclenche pas le même scan en boucle.
+  params.delete('scan');
+  const qs = params.toString();
+  history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+  if(_canAccess('pos-scan-livraison')){
+    goTo('pos-scan-livraison');
+    setTimeout(()=>{
+      const input = document.getElementById('psl-scan-input');
+      if(input){ input.value = code; pslLookup(); }
+    }, 200);
+  } else {
+    toast('Accès non autorisé pour votre poste.','err');
+    goTo(_defaultLandingPage());
+  }
+  return true;
+}
 
 // Page d'atterrissage par défaut pour un compte sans restriction de rôle —
 // « Accueil » (home) est le tableau de bord du carburant : sans ce module
@@ -24176,12 +24207,19 @@ function _pcxRenderTbody(list){
     return;
   }
   const ro = _isReadOnly();
+  const peutLivrer = _pslAutorise();
   tbody.innerHTML = list.map(c=>{
     const actions = [];
     actions.push(`<button class="pos-btn ghost" style="padding:4px 9px;font-size:12px" onclick="posCaisseDetailModal(${c.id})">Voir</button>`);
-    if(!ro && c.statut==='AU_DEPOT'){
-      actions.push(`<button class="pos-btn primary" style="padding:4px 9px;font-size:12px" onclick="posCaisseTransfererModal(${c.id})">Transférer</button>`);
-      actions.push(`<button class="pos-btn ghost" style="padding:4px 9px;font-size:12px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="posCaisseAnnuler(${c.id})">Annuler</button>`);
+    if(c.statut==='AU_DEPOT'){
+      // Livrer (transférer) est réservé à l'administrateur / au responsable
+      // de dépôt — le backend revérifie de toute façon (_require_admin_ou_depot).
+      if(peutLivrer){
+        actions.push(`<button class="pos-btn primary" style="padding:4px 9px;font-size:12px" onclick="posCaisseTransfererModal(${c.id})">Transférer</button>`);
+      }
+      if(!ro){
+        actions.push(`<button class="pos-btn ghost" style="padding:4px 9px;font-size:12px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="posCaisseAnnuler(${c.id})">Annuler</button>`);
+      }
     }
     if(!ro && (c.statut==='TRANSFEREE' || c.statut==='EN_VENTE')){
       actions.push(`<button class="pos-btn ghost" style="padding:4px 9px;font-size:12px" onclick="posCaisseAjusterModal(${c.id})">Ajuster</button>`);
@@ -24206,7 +24244,7 @@ async function posCaisseScanLookup(){
   try{
     const c = await apiFetch('GET', `/pos/caisses/code/${encodeURIComponent(code)}`);
     input.value = '';
-    if(c.statut === 'AU_DEPOT' && !_isReadOnly()){
+    if(c.statut === 'AU_DEPOT' && _pslAutorise()){
       posCaisseTransfererModal(c.id, c);
     } else {
       posCaisseDetailModal(c.id, c);
@@ -24286,7 +24324,7 @@ async function posCaissesGenererSauvegarder(){
 
 // ── Transfert (dépôt → département) ──────────────────────────────────
 function posCaisseTransfererModal(id, cached){
-  if(_isReadOnly()){ posAlert('Accès lecture seule.','err'); return; }
+  if(!_pslAutorise()){ posAlert('Réservé à l\'administrateur ou au responsable de dépôt.','err'); return; }
   const c = cached || _pcxAll.find(x=>x.id===id);
   document.getElementById('pcx-transf-id').value = id;
   document.getElementById('pcx-transf-info').textContent = c
@@ -24412,15 +24450,25 @@ function posCaissesImprimerEtiquettes(ids){
 // Flux voulu : le responsable de dépôt scanne (douchette USB/BT en mode
 // clavier — tape le code + Entrée). Le scan mène DIRECTEMENT à un choix
 // de département puis une confirmation — rien d'autre n'est accessible
-// depuis cette page. Si l'utilisateur n'a pas les droits d'écriture, la
-// page entière est remplacée par un blocage explicite.
+// depuis cette page. Seuls l'administrateur et le responsable de dépôt
+// peuvent livrer (voir _require_admin_ou_depot côté backend, qui revérifie
+// toujours — ce contrôle frontend n'est qu'un confort d'affichage).
 let _pslCaisseCourante = null;
 let _pslDepartements = [];
+
+function _pslAutorise(){
+  if(!_appUser) return false;
+  if(_appUser.est_admin) return true;
+  const poste = (_appUser.poste||'').trim().toLowerCase();
+  if(poste === 'magasinier' || poste === 'responsable logistique') return true;
+  const roleNom = (_appUser.role_nom||'').trim().toLowerCase();
+  return roleNom.includes('dépôt') || roleNom.includes('depot') || roleNom.includes('dépot');
+}
 
 function loadPosScanLivraison(){
   const unauth = document.getElementById('psl-unauthorized');
   const body   = document.getElementById('psl-body');
-  if(_isReadOnly()){
+  if(!_pslAutorise()){
     unauth.style.display = '';
     body.style.display = 'none';
     return;
@@ -24464,7 +24512,13 @@ async function pslLookup(){
   const input = document.getElementById('psl-scan-input');
   const code = (input.value||'').trim();
   if(!code) return;
-  if(_isReadOnly()){ loadPosScanLivraison(); return; }
+  if(!_pslAutorise()){ loadPosScanLivraison(); return; }
+  // Filet de sécurité : si les départements n'ont pas encore fini de charger
+  // (ex. scan automatique juste après un changement de page), on les charge
+  // ici plutôt que d'afficher une liste vide.
+  if(!_pslDepartements.length){
+    try{ _pslDepartements = await apiFetch('GET','/pos/departements'); }catch(e){ _pslDepartements = []; }
+  }
   try{
     const c = await apiFetch('GET', `/pos/caisses/code/${encodeURIComponent(code)}`);
     if(c.statut !== 'AU_DEPOT'){

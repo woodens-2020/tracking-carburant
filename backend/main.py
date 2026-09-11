@@ -225,7 +225,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not user:
             if path.startswith("/api/"):
                 return JSONResponse({"detail": "Non authentifié"}, status_code=401)
-            return RedirectResponse(url="/login")
+            # Préserve ?scan=CODE (arrivée directe depuis un QR de caisse
+            # scanné avant d'être connecté) pour que login.html puisse
+            # reprendre le flux de livraison juste après la connexion.
+            scan = request.query_params.get("scan")
+            login_url = f"/login?scan={url_quote(scan)}" if scan else "/login"
+            return RedirectResponse(url=login_url)
 
         # Stocker les attributs scalaires dans un objet simple avant la fermeture de session
         class _UserProxy:
