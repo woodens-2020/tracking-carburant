@@ -3374,6 +3374,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="pos-scan-livraison" onclick="goTo('pos-scan-livraison')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+      </span>
+      <span>Scan de livraison</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <button class="nav-item" data-page="pos-stock" onclick="goTo('pos-stock')">
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
@@ -7133,6 +7141,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div style="font-size:12px;color:rgba(255,255,255,.35);margin:2px 0 8px">
           Chaque caisse reçoit un identifiant unique (ex. CAISSE-2026-000001) et un QR — jamais plus, jamais moins que le nombre de caisses saisi ci-dessus.
         </div>
+        <div style="font-size:12.5px;color:#f7a93b;background:rgba(247,169,59,.08);border:1px solid rgba(247,169,59,.2);border-radius:8px;padding:9px 12px;margin-bottom:8px">
+          ⚠ Le stock n'est <strong>pas</strong> ajouté au POS maintenant — les caisses entrent au dépôt. Le stock ne montera que lorsqu'une caisse sera <strong>scannée et livrée</strong> à un département.
+        </div>
         <div class="pos-modal-footer">
           <button class="pos-btn ghost" onclick="posCaissesGenererModalClose()">Annuler</button>
           <button class="pos-btn primary" id="pcx-gen-btn" onclick="posCaissesGenererSauvegarder()">Générer les codes</button>
@@ -7205,6 +7216,80 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
       </div>
     </div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — SCAN DE LIVRAISON (dépôt → département)      -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-scan-livraison" class="page page-gi">
+      <div class="gi-page" style="--gi-accent:#38bdf8;--gi-bg:rgba(56,189,248,.11);--gi-bd:rgba(56,189,248,.22);--gi-glow:rgba(56,189,248,.15)">
+
+        <div class="gi-page-header">
+          <div class="gi-page-header-left">
+            <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(56,189,248,.25),rgba(56,189,248,.1));border-color:rgba(56,189,248,.3);box-shadow:0 0 18px rgba(56,189,248,.2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+            </div>
+            <div class="gi-page-header-text">
+              <div class="gi-title">Scan de livraison</div>
+              <div class="gi-subtitle">Dépôt → département — scanner, choisir, confirmer</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bloc « non autorisé » — remplace tout le reste quand l'utilisateur -->
+        <!-- n'a pas les droits d'écriture sur les caisses.                    -->
+        <div id="psl-unauthorized" style="display:none;text-align:center;padding:60px 20px">
+          <div style="font-size:44px;margin-bottom:14px">⛔</div>
+          <div style="font-size:19px;font-weight:700;color:#f87171;margin-bottom:8px">Accès non autorisé</div>
+          <div style="font-size:14.5px;color:rgba(255,255,255,.5);max-width:420px;margin:0 auto">
+            Ou pa otorize pou fè aksyon sa a. Tanpri kite entèfas sa a.<br>
+            <span style="color:rgba(255,255,255,.35);font-size:13px">Vous n'êtes pas autorisé à effectuer cette action. Veuillez quitter cette interface.</span>
+          </div>
+        </div>
+
+        <div id="psl-body">
+          <!-- Champ de scan — toujours visible et focus, reçoit le scanner USB/BT -->
+          <div class="cat-panel">
+            <div class="cat-panel-title">Scanner une caisse</div>
+            <input id="psl-scan-input" class="pos-input" placeholder="Scanner le QR / code-barres de la caisse…"
+              style="width:100%;font-family:monospace;font-size:18px;padding:14px;text-align:center;letter-spacing:.5px"
+              autocomplete="off"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();pslLookup();}">
+          </div>
+
+          <!-- État : rien encore scanné -->
+          <div id="psl-etat-vide" style="text-align:center;padding:50px 20px;color:rgba(255,255,255,.3)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:56px;height:56px;margin-bottom:14px;opacity:.5"><rect x="3" y="9" width="7" height="7"/><rect x="14" y="9" width="7" height="7"/><rect x="3" y="3" width="4" height="4"/><rect x="17" y="3" width="4" height="4"/><rect x="3" y="17" width="4" height="4"/><rect x="17" y="17" width="4" height="4"/></svg>
+            <div style="font-size:14.5px">En attente d'un scan…</div>
+          </div>
+
+          <!-- État : erreur (code introuvable / caisse non transférable) -->
+          <div id="psl-etat-erreur" style="display:none;text-align:center;padding:40px 20px">
+            <div style="font-size:36px;margin-bottom:10px">✕</div>
+            <div id="psl-erreur-msg" style="font-size:15.5px;color:#f87171;font-weight:600;max-width:420px;margin:0 auto"></div>
+          </div>
+
+          <!-- État : caisse trouvée, prête à livrer -->
+          <div id="psl-etat-caisse" style="display:none;max-width:460px;margin:0 auto">
+            <div style="background:var(--panel3);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:16px">
+              <div id="psl-caisse-produit" style="font-size:17px;font-weight:700;margin-bottom:3px"></div>
+              <div id="psl-caisse-code" style="font-family:monospace;font-size:13px;color:rgba(255,255,255,.5);margin-bottom:8px"></div>
+              <div id="psl-caisse-qte" style="font-size:14px;color:#38bdf8;font-weight:600"></div>
+            </div>
+            <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:8px;font-weight:600">Livrer vers :</div>
+            <div id="psl-departements" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px"></div>
+            <button class="pos-btn primary" id="psl-livrer-btn" style="width:100%;padding:14px;font-size:15px" onclick="pslConfirmerLivraison()" disabled>Sélectionnez un département</button>
+          </div>
+
+          <!-- État : succès -->
+          <div id="psl-etat-succes" style="display:none;text-align:center;padding:40px 20px">
+            <div style="font-size:44px;margin-bottom:10px;color:#3fb6a8">✓</div>
+            <div id="psl-succes-msg" style="font-size:16.5px;color:#3fb6a8;font-weight:700"></div>
+            <div style="font-size:12.5px;color:rgba(255,255,255,.35);margin-top:10px">Prêt pour le prochain scan…</div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-scan-livraison -->
 
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- PAGE POS — STOCK BAR                                    -->
@@ -14071,6 +14156,7 @@ const PAGE_META={
   'pos-caisse':        {title: 'Caisse POS',                    sub: 'Bar / Restaurant — Encaissement en temps réel'},
   'pos-produits':      {title: 'Produits Bar',                  sub: 'Catalogue et historique des prix'},
   'pos-caisses':       {title: 'Gestion des caisses',           sub: 'Traçabilité individuelle par QR code — dépôt, transferts, ventes'},
+  'pos-scan-livraison':{title: 'Scan de livraison',             sub: 'Dépôt → département — scanner, choisir, confirmer'},
   'pos-stock':         {title: 'Stock Bar',                     sub: 'Mouvements et niveaux de stock'},
   'pos-ventes':        {title: 'Ventes Bar',                    sub: 'Suivi des ventes et encaissements'},
   'pos-credits':       {title: 'Crédits Bar',                   sub: 'Clients à crédit et remboursements'},
@@ -16932,7 +17018,7 @@ async function _loadBranding(){
 const _MODULE_PAGES = {
   carburant: ['home','dashboard','saisie','journal','carburant-rapport','rapport-analytique','statistiques',
               'previsions','rapports','stock','gestion','audit','depenses'],
-  bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-caisses','pos-stock','pos-achats',
+  bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-achats',
               'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite',
               'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis'],
   hotel:     ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma',
@@ -16962,7 +17048,7 @@ const _AREA_PAGES = {
     lecture: ['dashboard','journal','statistiques','gi-dashboard'],
   },
   bar: {
-    complet: ['pos-caisse','pos-produits','pos-caisses','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
+    complet: ['pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
     lecture: ['pos-ventes','pos-credits','pos-commandes','pos-caisses','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
   },
   cuisine: {
@@ -16992,7 +17078,7 @@ const _CAISSIER_ALLOWED = new Set([
 
 // Whitelist stricte pour les comptes Manager — Bar/Restaurant + Hôtel (sans Tables, Grande Caisse, Chambres, Réception) + Cuisine complète + Pâtisserie complète.
 const _MANAGER_ALLOWED = new Set([
-  'pos-caisse','pos-produits','pos-caisses','pos-achats','pos-ventes','pos-credits',
+  'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
   'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
@@ -17003,7 +17089,7 @@ const _MANAGER_ALLOWED = new Set([
 const _AD_ALLOWED = new Set([
   'home',
   'dashboard','journal','carburant-rapport','statistiques','gi-dashboard','depenses','achats','caisse',
-  'pos-produits','pos-caisses','pos-stock','pos-ventes','pos-credits','pos-commandes',
+  'pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes',
   'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
   'cuisine-plats','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
@@ -17015,11 +17101,11 @@ const _AD_ALLOWED = new Set([
 const _ACCES_POSTE_LEGACY = {
   'Directeur Général': null,
   'Comptable':   ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-caisses','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-caisses','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Pompiste':            ['home','saisie'],
@@ -22267,6 +22353,7 @@ const _giPageLoaders = {
   'pos-caisse':      loadPosCaisse,
   'pos-produits':    loadPosProduits,
   'pos-caisses':     loadPosCaisses,
+  'pos-scan-livraison': loadPosScanLivraison,
   'pos-stock':       loadPosStock,
   'pos-achats':      loadPosAchats,
   'pos-ventes':      loadPosVentes,
@@ -24184,7 +24271,7 @@ async function posCaissesGenererSauvegarder(){
       prix_achat_caisse: prix, fournisseur, notes,
     });
     posCaissesGenererModalClose();
-    posAlert(`${res.nb_caisses_generees} caisse(s) générée(s) — ${res.total_unites} unités au total.`,'ok');
+    posAlert(`${res.nb_caisses_generees} caisse(s) générée(s) — ${res.total_unites} unités au total (au dépôt, stock POS pas encore crédité).`,'ok');
     const ids = res.caisses.map(c=>c.id);
     await loadPosCaisses();
     if(await showConfirm(`Imprimer les ${ids.length} étiquette(s) QR maintenant ?`, {title:'Impression', okLabel:'Imprimer'})){
@@ -24317,6 +24404,128 @@ function posCaisseDetailModalClose(){
 function posCaissesImprimerEtiquettes(ids){
   if(!ids || !ids.length) return;
   window.open('/api/pos/caisses/etiquettes.pdf?ids='+ids.join(','), '_blank');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE POS — SCAN DE LIVRAISON (dépôt → département), interface kiosque
+// ══════════════════════════════════════════════════════════════════════
+// Flux voulu : le responsable de dépôt scanne (douchette USB/BT en mode
+// clavier — tape le code + Entrée). Le scan mène DIRECTEMENT à un choix
+// de département puis une confirmation — rien d'autre n'est accessible
+// depuis cette page. Si l'utilisateur n'a pas les droits d'écriture, la
+// page entière est remplacée par un blocage explicite.
+let _pslCaisseCourante = null;
+let _pslDepartements = [];
+
+function loadPosScanLivraison(){
+  const unauth = document.getElementById('psl-unauthorized');
+  const body   = document.getElementById('psl-body');
+  if(_isReadOnly()){
+    unauth.style.display = '';
+    body.style.display = 'none';
+    return;
+  }
+  unauth.style.display = 'none';
+  body.style.display = '';
+  pslResetEtat();
+  apiFetch('GET','/pos/departements').then(deps=>{ _pslDepartements = deps||[]; }).catch(()=>{ _pslDepartements = []; });
+  pslFocus();
+}
+
+function pslFocus(){
+  const input = document.getElementById('psl-scan-input');
+  if(input) setTimeout(()=>input.focus(), 30);
+}
+
+function pslResetEtat(){
+  document.getElementById('psl-etat-vide').style.display    = '';
+  document.getElementById('psl-etat-erreur').style.display  = 'none';
+  document.getElementById('psl-etat-caisse').style.display  = 'none';
+  document.getElementById('psl-etat-succes').style.display  = 'none';
+  _pslCaisseCourante = null;
+  const input = document.getElementById('psl-scan-input');
+  if(input) input.value = '';
+}
+
+function pslMontrerErreur(msg){
+  document.getElementById('psl-etat-vide').style.display    = 'none';
+  document.getElementById('psl-etat-caisse').style.display  = 'none';
+  document.getElementById('psl-etat-succes').style.display  = 'none';
+  document.getElementById('psl-etat-erreur').style.display  = '';
+  document.getElementById('psl-erreur-msg').textContent = msg;
+  const input = document.getElementById('psl-scan-input');
+  if(input) input.value = '';
+  pslFocus();
+  // Retour automatique à l'attente après quelques secondes
+  setTimeout(()=>{ if(document.getElementById('psl-etat-erreur').style.display!=='none') pslResetEtat(); }, 3500);
+}
+
+async function pslLookup(){
+  const input = document.getElementById('psl-scan-input');
+  const code = (input.value||'').trim();
+  if(!code) return;
+  if(_isReadOnly()){ loadPosScanLivraison(); return; }
+  try{
+    const c = await apiFetch('GET', `/pos/caisses/code/${encodeURIComponent(code)}`);
+    if(c.statut !== 'AU_DEPOT'){
+      const labels = {TRANSFEREE:'déjà transférée', EN_VENTE:'déjà en vente', TERMINEE:'déjà terminée', ANNULEE:'annulée'};
+      pslMontrerErreur(`${c.code_unique} — ${labels[c.statut]||c.statut}. Cette caisse ne peut pas être livrée.`);
+      return;
+    }
+    _pslCaisseCourante = c;
+    document.getElementById('psl-etat-vide').style.display    = 'none';
+    document.getElementById('psl-etat-erreur').style.display  = 'none';
+    document.getElementById('psl-etat-succes').style.display  = 'none';
+    document.getElementById('psl-etat-caisse').style.display  = '';
+    document.getElementById('psl-caisse-produit').textContent = c.produit_nom||'—';
+    document.getElementById('psl-caisse-code').textContent    = c.code_unique;
+    document.getElementById('psl-caisse-qte').textContent     = `${c.quantite_initiale} unités`;
+    const wrap = document.getElementById('psl-departements');
+    wrap.innerHTML = _pslDepartements.map(d=>
+      `<button type="button" class="pos-btn ghost" style="padding:12px 8px;font-size:14px" data-dep="${d.id}" onclick="pslChoisirDepartement(${d.id})">${d.nom}</button>`
+    ).join('') || '<div style="grid-column:1/-1;color:rgba(255,255,255,.3);font-size:13px;text-align:center">Aucun département disponible.</div>';
+    const btn = document.getElementById('psl-livrer-btn');
+    btn.disabled = true;
+    btn.textContent = 'Sélectionnez un département';
+    input.value = '';
+  }catch(e){
+    pslMontrerErreur(e.message || 'Code introuvable.');
+  }
+}
+
+let _pslDepartementChoisi = null;
+function pslChoisirDepartement(depId){
+  _pslDepartementChoisi = depId;
+  document.querySelectorAll('#psl-departements [data-dep]').forEach(b=>{
+    const actif = String(b.getAttribute('data-dep'))===String(depId);
+    b.style.borderColor = actif ? '#38bdf8' : '';
+    b.style.background  = actif ? 'rgba(56,189,248,.15)' : '';
+    b.style.color        = actif ? '#38bdf8' : '';
+  });
+  const dep = _pslDepartements.find(d=>d.id===depId);
+  const btn = document.getElementById('psl-livrer-btn');
+  btn.disabled = false;
+  btn.textContent = `Livrer vers ${dep ? dep.nom : ''}`;
+}
+
+async function pslConfirmerLivraison(){
+  if(!_pslCaisseCourante || !_pslDepartementChoisi) return;
+  const btn = document.getElementById('psl-livrer-btn');
+  btn.disabled = true;
+  try{
+    await apiFetch('POST', `/pos/caisses/${_pslCaisseCourante.id}/transferer`, {departement_id: _pslDepartementChoisi});
+    const dep = _pslDepartements.find(d=>d.id===_pslDepartementChoisi);
+    document.getElementById('psl-etat-caisse').style.display  = 'none';
+    document.getElementById('psl-etat-succes').style.display  = '';
+    document.getElementById('psl-succes-msg').textContent =
+      `${_pslCaisseCourante.code_unique} livrée vers ${dep ? dep.nom : ''}`;
+    _pslDepartementChoisi = null;
+    pslFocus();
+    setTimeout(()=>{ pslResetEtat(); pslFocus(); }, 2200);
+  }catch(e){
+    btn.disabled = false;
+    pslMontrerErreur(e.message || 'Erreur lors de la livraison.');
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════

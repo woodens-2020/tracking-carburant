@@ -8,9 +8,16 @@ voir stock_courant() dans pos_service.py) n'est jamais recalculé ni
 dupliqué ici. Une BarCaisse donne une identité et une localisation
 physique à une partie de ce stock ; elle ne le remplace pas.
 
-Le crédit de stock à la génération réutilise pos_routes.approvisionner()
-tel quel (même logique, mêmes notifications, même écriture BarMouvementStock)
-au lieu de le réimplémenter.
+Moment du crédit de stock (IMPORTANT — décision explicite du 11/09/2026) :
+la déclaration d'achat / génération des codes NE crédite PAS le stock
+agrégat (POS) — les caisses arrivent au dépôt sans être « vendables ».
+Le stock agrégat n'est crédité qu'au moment du TRANSFERT (scan physique
+par le responsable de dépôt + sélection du département de destination +
+confirmation) : c'est cet instant-là qui rend la marchandise disponible
+à la vente. Symétriquement, un ajustement (casse/perte/correction) sur
+une caisse déjà transférée décrémente aussi le stock agrégat, puisque
+ce stock avait été crédité au transfert. Une caisse encore AU_DEPOT n'a
+donc aucun impact sur le stock agrégat, dans un sens comme dans l'autre.
 """
 from __future__ import annotations
 
@@ -180,8 +187,13 @@ def generer_caisses(data: GenererCaissesIn, request: Request, db: Session = Depe
     « vendu par caisse » et génère exactement N identifiants uniques —
     ni plus, ni moins (jamais nb_caisses × unités_par_caisse codes).
 
-    Le crédit du stock agrégat réutilise pos_routes.approvisionner() :
-    aucune double logique de calcul de stock."""
+    NE CRÉDITE PAS le stock agrégat (POS) — les caisses entrent au dépôt,
+    pas encore disponibles à la vente. Si un prix d'achat est fourni, un
+    BarAchat est créé pour la comptabilité (comme les achats existants,
+    ce qui n'a jamais mis à jour le stock) mais aucun BarMouvementStock
+    n'est écrit ici. Le stock n'est crédité qu'au transfert (voir
+    transferer_caisse ci-dessous) — c'est le scan + la sélection du
+    département qui rend la marchandise vendable."""
     produit = db.query(BarProduit).filter_by(id=data.produit_id).first()
     if not produit:
         raise HTTPException(404, "Produit introuvable.")
@@ -197,39 +209,29 @@ def generer_caisses(data: GenererCaissesIn, request: Request, db: Session = Depe
         raise HTTPException(422, f"« {produit.nom} » n'a pas d'unités par caisse définies.")
 
     upc = produit.unites_par_caisse
+    uid = _uid(request)
 
-    # Réutilise l'approvisionnement existant pour créditer le stock agrégat
-    # (BarAchat + BarMouvementStock ENTREE) — même comportement, mêmes
-    # notifications, qu'un approvisionnement fait depuis la page Stock.
-    from pos_routes import approvisionner, ApprovisionnementIn
-    appro = approvisionner(
-        produit.id,
-        ApprovisionnementIn(
-            nb_caisses=data.nb_caisses,
-            nb_unites_vrac=0,
-            prix_achat_caisse=data.prix_achat_caisse,
-            notes=(f"Génération {data.nb_caisses} caisse(s) avec codes QR"
-                   + (f" — {data.notes}" if data.notes else "")),
-        ),
-        request, db,
-    )
-
-    # achat_id le plus récent pour ce produit, s'il a été créé par
-    # l'approvisionnement ci-dessus (uniquement si un prix a été fourni).
+    # Achat = enregistrement comptable seul (prix, fournisseur) — aucun
+    # mouvement de stock. Optionnel : seulement si un prix est fourni.
     achat_id = None
     if data.prix_achat_caisse:
-        dernier = (
-            db.query(BarAchat)
-            .filter_by(produit_id=produit.id)
-            .order_by(BarAchat.id.desc())
-            .first()
+        total_unites_achat = data.nb_caisses * upc
+        prix_unitaire = Decimal(str(data.prix_achat_caisse)) / Decimal(str(upc))
+        achat = BarAchat(
+            produit_id           = produit.id,
+            quantite             = Decimal(str(total_unites_achat)),
+            prix_achat_unitaire  = prix_unitaire,
+            fournisseur          = data.fournisseur,
+            utilisateur_id       = uid,
+            notes = (f"Génération {data.nb_caisses} caisse(s) avec codes QR — "
+                     f"stock crédité au transfert, pas à la déclaration"
+                     + (f" — {data.notes}" if data.notes else "")),
         )
-        achat_id = dernier.id if dernier else None
-        if achat_id and data.fournisseur:
-            dernier.fournisseur = data.fournisseur
+        db.add(achat)
+        db.flush()
+        achat_id = achat.id
 
     annee = today_haiti().year
-    uid = _uid(request)
     caisses = []
     try:
         for _ in range(data.nb_caisses):
@@ -250,26 +252,8 @@ def generer_caisses(data: GenererCaissesIn, request: Request, db: Session = Depe
             caisses.append(c)
         db.commit()
     except Exception:
-        # L'approvisionnement (crédit de stock agrégat) est déjà validé en
-        # base à ce stade — on ne peut pas le "rollback" a posteriori. Pour
-        # ne jamais laisser le stock agrégat et le nombre de caisses se
-        # désynchroniser, on annule ici la partie caisses (rollback) puis on
-        # compense le stock crédité par un mouvement inverse tracé, avant de
-        # remonter l'erreur au client.
         db.rollback()
-        db.add(BarMouvementStock(
-            produit_id     = produit.id,
-            quantite       = Decimal(str(-(data.nb_caisses * upc))),
-            type_mouvement = "AJUSTEMENT",
-            motif          = "Compensation — échec de la génération des caisses après approvisionnement",
-            utilisateur_id = uid,
-        ))
-        db.commit()
-        raise HTTPException(
-            409,
-            "La génération des caisses a échoué après le crédit de stock ; "
-            "le stock a été automatiquement compensé (annulé). Réessayez.",
-        )
+        raise HTTPException(409, "La génération des caisses a échoué. Réessayez.")
     for c in caisses:
         db.refresh(c)
 
@@ -278,7 +262,7 @@ def generer_caisses(data: GenererCaissesIn, request: Request, db: Session = Depe
         "produit_nom":         produit.nom,
         "unites_par_caisse":   upc,
         "total_unites":        len(caisses) * upc,
-        "stock_apres":         appro.get("stock_apres"),
+        "stock_credite":       False,
         "caisses":             [_caisse_dict(c) for c in caisses],
     }
 
@@ -443,6 +427,10 @@ class TransfererIn(BaseModel):
 
 @router.post("/caisses/{caisse_id}/transferer", status_code=200)
 def transferer_caisse(caisse_id: int, data: TransfererIn, request: Request, db: Session = Depends(get_db)):
+    """Scan + sélection du département + confirmation. C'est CE moment-là,
+    et lui seul, qui crédite le stock agrégat (POS) — voir la note en tête
+    de fichier. Avant le transfert, la caisse est au dépôt et n'existe pas
+    du point de vue du stock vendable."""
     c = db.get(BarCaisse, caisse_id)
     if not c:
         raise HTTPException(404, "Caisse introuvable.")
@@ -466,6 +454,16 @@ def transferer_caisse(caisse_id: int, data: TransfererIn, request: Request, db: 
     db.add(BarCaisseMouvement(
         caisse_id=c.id, type_mouvement="TRANSFERT", quantite=c.quantite_restante,
         motif=f"Transfert dépôt → {dep.nom}", utilisateur_id=uid,
+    ))
+
+    # Crédit du stock agrégat — seul point d'entrée du stock POS pour une
+    # caisse trackée (la génération/déclaration d'achat ne crédite rien).
+    db.add(BarMouvementStock(
+        produit_id     = c.produit_id,
+        quantite       = Decimal(str(c.quantite_restante)),
+        type_mouvement = "ENTREE",
+        motif          = f"Caisse {c.code_unique} transférée → {dep.nom}",
+        utilisateur_id = uid,
     ))
 
     from notifications_service import creer_notification
@@ -512,6 +510,17 @@ def ajuster_caisse(caisse_id: int, data: AjusterCaisseIn, request: Request, db: 
         caisse_id=c.id, type_mouvement=type_mvt, quantite=-data.quantite,
         motif=data.motif.strip(), utilisateur_id=uid,
     ))
+    # Cette caisse est TRANSFEREE/EN_VENTE : son stock a déjà été crédité au
+    # stock agrégat lors du transfert — un ajustement ici doit donc aussi
+    # décrémenter ce stock agrégat pour rester cohérent avec la réalité
+    # vendable. (BarMouvementStock n'a pas de type CORRECTION → AJUSTEMENT.)
+    db.add(BarMouvementStock(
+        produit_id     = c.produit_id,
+        quantite       = Decimal(str(-data.quantite)),
+        type_mouvement = "CASSE" if type_mvt == "CASSE" else ("PERTE" if type_mvt == "PERTE" else "AJUSTEMENT"),
+        motif          = f"Caisse {c.code_unique} — {data.motif.strip()}",
+        utilisateur_id = uid,
+    ))
     _finaliser_si_epuisee(db, c, uid)
     db.commit()
     db.refresh(c)
@@ -520,10 +529,9 @@ def ajuster_caisse(caisse_id: int, data: AjusterCaisseIn, request: Request, db: 
 
 @router.post("/caisses/{caisse_id}/annuler", status_code=200)
 def annuler_caisse(caisse_id: int, request: Request, db: Session = Depends(get_db)):
-    """Annule une caisse encore AU DÉPÔT (générée par erreur). N'affecte
-    jamais le stock agrégat déjà crédité — décision commerciale distincte,
-    à traiter séparément (ajustement stock) si le lot n'existe pas
-    physiquement."""
+    """Annule une caisse encore AU DÉPÔT (générée par erreur). Aucun impact
+    sur le stock agrégat : une caisse AU_DEPOT n'a jamais été créditée (le
+    crédit n'a lieu qu'au transfert), donc rien à compenser ici."""
     c = db.get(BarCaisse, caisse_id)
     if not c:
         raise HTTPException(404, "Caisse introuvable.")
