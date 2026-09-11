@@ -3366,6 +3366,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="pos-caisses" onclick="goTo('pos-caisses')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="9" width="7" height="7"/><rect x="14" y="9" width="7" height="7"/><rect x="3" y="3" width="4" height="4"/><rect x="17" y="3" width="4" height="4"/><rect x="3" y="17" width="4" height="4"/><rect x="17" y="17" width="4" height="4"/></svg>
+      </span>
+      <span>Gestion des caisses</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <button class="nav-item" data-page="pos-stock" onclick="goTo('pos-stock')">
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
@@ -6997,6 +7005,204 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <button class="pos-btn primary" onclick="posChangerPrix()">Changer le prix</button>
         </div>
         <input type="hidden" id="pos-prix-produit-id">
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — GESTION DES CAISSES (QR)                     -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-caisses" class="page page-gi">
+      <div class="gi-page" style="--gi-accent:#38bdf8;--gi-bg:rgba(56,189,248,.11);--gi-bd:rgba(56,189,248,.22);--gi-glow:rgba(56,189,248,.15)">
+
+        <div class="gi-page-header">
+          <div class="gi-page-header-left">
+            <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(56,189,248,.25),rgba(56,189,248,.1));border-color:rgba(56,189,248,.3);box-shadow:0 0 18px rgba(56,189,248,.2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><rect x="3" y="9" width="7" height="7"/><rect x="14" y="9" width="7" height="7"/><rect x="3" y="3" width="4" height="4"/><rect x="17" y="3" width="4" height="4"/><rect x="3" y="17" width="4" height="4"/><rect x="17" y="17" width="4" height="4"/></svg>
+            </div>
+            <div class="gi-page-header-text">
+              <div class="gi-title">Gestion des caisses</div>
+              <div class="gi-subtitle">Traçabilité individuelle par QR code — dépôt, transferts, ventes</div>
+            </div>
+          </div>
+          <div class="gi-page-header-actions">
+            <button class="gi-btn-primary" onclick="posCaissesGenererModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Déclarer un achat / Générer les codes
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI -->
+        <div class="gi-kpi-row" id="pcx-kpis">
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Au dépôt</div><div class="gi-kpi-val" id="pcx-kpi-depot">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Transférées</div><div class="gi-kpi-val blue" id="pcx-kpi-transf">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">En vente</div><div class="gi-kpi-val amber" id="pcx-kpi-vente">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Terminées</div><div class="gi-kpi-val teal" id="pcx-kpi-termine">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Total caisses</div><div class="gi-kpi-val" id="pcx-kpi-total">—</div></div>
+        </div>
+
+        <!-- Scan / recherche rapide -->
+        <div class="cat-panel">
+          <div class="cat-panel-title">Scanner ou saisir un code</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="pcx-scan-input" class="pos-input" placeholder="CAISSE-2026-000001 — scanner ou taper le code puis Entrée"
+              style="flex:1;font-family:monospace;font-size:15px"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();posCaisseScanLookup();}">
+            <button class="pos-btn primary" onclick="posCaisseScanLookup()">Rechercher</button>
+          </div>
+          <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:6px">
+            Le backend est toujours interrogé au scan — le code n'est qu'un pointeur, jamais une preuve d'autorisation en lui-même.
+          </div>
+        </div>
+
+        <div class="gi-table-card">
+          <div class="gi-table-hdr">
+            <span class="gi-table-title">Liste des caisses</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <select id="pcx-filter-statut" onchange="posCaissesFiltrer()"
+                style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:10px;color:#fff;font-size:13.5px;font-weight:600;padding:7px 30px 7px 12px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22rgba(255,255,255,.5)%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:13px">
+                <option value="">Tous statuts</option>
+                <option value="AU_DEPOT">Au dépôt</option>
+                <option value="TRANSFEREE">Transférée</option>
+                <option value="EN_VENTE">En vente</option>
+                <option value="TERMINEE">Terminée</option>
+                <option value="ANNULEE">Annulée</option>
+              </select>
+              <select id="pcx-filter-departement" onchange="posCaissesFiltrer()"
+                style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:10px;color:#fff;font-size:13.5px;font-weight:600;padding:7px 30px 7px 12px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22rgba(255,255,255,.5)%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:13px">
+                <option value="">Tous départements</option>
+              </select>
+              <div style="position:relative">
+                <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2" style="width:13px;height:13px;position:absolute;left:9px;top:50%;transform:translateY(-50%)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input id="pcx-search" placeholder="Code ou produit…" oninput="posCaissesFiltrer()" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:rgba(255,255,255,.8);font-size:13.5px;padding:6px 10px 6px 30px;outline:none;width:190px">
+              </div>
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="gi-table">
+              <thead>
+                <tr>
+                  <th>Code</th><th>Produit</th><th>Statut</th><th>Département</th>
+                  <th>Restant / Initial</th><th>Créée le</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pcx-tbody">
+                <tr><td colspan="7" style="color:rgba(255,255,255,.3);text-align:center;padding:28px">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-caisses -->
+
+    <!-- Modal — Déclarer un achat / Générer les codes -->
+    <div class="pos-modal-bg" id="pcx-generer-modal-bg" onclick="if(event.target===this)posCaissesGenererModalClose()">
+      <div class="pos-modal">
+        <h3>Déclarer un achat / Générer les codes</h3>
+        <div class="pos-form-row">
+          <div style="width:100%">
+            <label class="pos-label">Produit *</label>
+            <select class="pos-select" id="pcx-gen-produit" style="width:100%" onchange="posCaissesGenUpdateInfo()">
+              <option value="">— Choisir un produit vendu par caisse —</option>
+            </select>
+            <div id="pcx-gen-produit-hint" style="font-size:12.5px;color:rgba(255,255,255,.4);margin-top:5px"></div>
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Nombre de caisses achetées *</label>
+            <input class="pos-input" id="pcx-gen-nb" type="number" min="1" step="1" placeholder="Ex : 5" oninput="posCaissesGenUpdateInfo()">
+          </div>
+          <div style="flex:1">
+            <label class="pos-label">Prix d'achat / caisse (G) <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
+            <input class="pos-input" id="pcx-gen-prix" type="number" min="0" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+        <div id="pcx-gen-live" style="display:none;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);border-radius:8px;padding:10px 14px;margin:4px 0 8px;font-size:14.5px;color:#38bdf8"></div>
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Fournisseur <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
+            <input class="pos-input" id="pcx-gen-fournisseur" placeholder="Nom du fournisseur">
+          </div>
+          <div style="flex:1">
+            <label class="pos-label">Notes</label>
+            <input class="pos-input" id="pcx-gen-notes" placeholder="Lot, référence…">
+          </div>
+        </div>
+        <div style="font-size:12px;color:rgba(255,255,255,.35);margin:2px 0 8px">
+          Chaque caisse reçoit un identifiant unique (ex. CAISSE-2026-000001) et un QR — jamais plus, jamais moins que le nombre de caisses saisi ci-dessus.
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="posCaissesGenererModalClose()">Annuler</button>
+          <button class="pos-btn primary" id="pcx-gen-btn" onclick="posCaissesGenererSauvegarder()">Générer les codes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal — Transférer (dépôt → département) -->
+    <div class="pos-modal-bg" id="pcx-transferer-modal-bg" onclick="if(event.target===this)posCaisseTransfererModalClose()">
+      <div class="pos-modal">
+        <h3>Transférer vers un département</h3>
+        <input type="hidden" id="pcx-transf-id">
+        <div id="pcx-transf-info" style="background:var(--panel3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13.5px;color:var(--muted)"></div>
+        <div class="pos-form-row">
+          <div style="width:100%">
+            <label class="pos-label">Département de destination *</label>
+            <select class="pos-select" id="pcx-transf-departement" style="width:100%">
+              <option value="">— Choisir —</option>
+            </select>
+          </div>
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="posCaisseTransfererModalClose()">Annuler</button>
+          <button class="pos-btn primary" onclick="posCaisseTransfererConfirmer()">Confirmer le transfert</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal — Ajustement (casse / perte / correction) -->
+    <div class="pos-modal-bg" id="pcx-ajuster-modal-bg" onclick="if(event.target===this)posCaisseAjusterModalClose()">
+      <div class="pos-modal">
+        <h3>Ajuster la quantité</h3>
+        <input type="hidden" id="pcx-adj-id">
+        <div id="pcx-adj-info" style="background:var(--panel3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13.5px;color:var(--muted)"></div>
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Type *</label>
+            <select class="pos-select" id="pcx-adj-type" style="width:100%">
+              <option value="CASSE">Casse</option>
+              <option value="PERTE">Perte</option>
+              <option value="CORRECTION">Correction</option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <label class="pos-label">Quantité *</label>
+            <input class="pos-input" id="pcx-adj-qte" type="number" min="1" step="1" placeholder="0">
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div style="width:100%">
+            <label class="pos-label">Motif * <span style="color:rgba(255,255,255,.4)">(obligatoire, min. 5 caractères)</span></label>
+            <input class="pos-input" id="pcx-adj-motif" placeholder="Ex : carton tombé, 3 bouteilles cassées">
+          </div>
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="posCaisseAjusterModalClose()">Annuler</button>
+          <button class="pos-btn primary" onclick="posCaisseAjusterConfirmer()">Enregistrer l'ajustement</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal — Détail / historique -->
+    <div class="pos-modal-bg" id="pcx-detail-modal-bg" onclick="if(event.target===this)posCaisseDetailModalClose()">
+      <div class="pos-modal" style="max-width:560px">
+        <h3 id="pcx-detail-titre">Détail de la caisse</h3>
+        <div id="pcx-detail-body"></div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="posCaisseDetailModalClose()">Fermer</button>
+          <button class="pos-btn primary" id="pcx-detail-imprimer-btn" onclick="posCaissesImprimerEtiquettes([_pcxDetailId])">Imprimer l'étiquette</button>
+        </div>
       </div>
     </div>
 
@@ -13864,6 +14070,7 @@ const PAGE_META={
   caisse:              {title: 'Rapport de Caisse',              sub: 'Synthèse financière consolidée — Ventes · Achats · Payroll · Dépenses'},
   'pos-caisse':        {title: 'Caisse POS',                    sub: 'Bar / Restaurant — Encaissement en temps réel'},
   'pos-produits':      {title: 'Produits Bar',                  sub: 'Catalogue et historique des prix'},
+  'pos-caisses':       {title: 'Gestion des caisses',           sub: 'Traçabilité individuelle par QR code — dépôt, transferts, ventes'},
   'pos-stock':         {title: 'Stock Bar',                     sub: 'Mouvements et niveaux de stock'},
   'pos-ventes':        {title: 'Ventes Bar',                    sub: 'Suivi des ventes et encaissements'},
   'pos-credits':       {title: 'Crédits Bar',                   sub: 'Clients à crédit et remboursements'},
@@ -16725,7 +16932,7 @@ async function _loadBranding(){
 const _MODULE_PAGES = {
   carburant: ['home','dashboard','saisie','journal','carburant-rapport','rapport-analytique','statistiques',
               'previsions','rapports','stock','gestion','audit','depenses'],
-  bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-stock','pos-achats',
+  bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-caisses','pos-stock','pos-achats',
               'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite',
               'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis'],
   hotel:     ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma',
@@ -16755,8 +16962,8 @@ const _AREA_PAGES = {
     lecture: ['dashboard','journal','statistiques','gi-dashboard'],
   },
   bar: {
-    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
-    lecture: ['pos-ventes','pos-credits','pos-commandes','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
+    complet: ['pos-caisse','pos-produits','pos-caisses','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
+    lecture: ['pos-ventes','pos-credits','pos-commandes','pos-caisses','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
   },
   cuisine: {
     complet: ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse'],
@@ -16785,7 +16992,7 @@ const _CAISSIER_ALLOWED = new Set([
 
 // Whitelist stricte pour les comptes Manager — Bar/Restaurant + Hôtel (sans Tables, Grande Caisse, Chambres, Réception) + Cuisine complète + Pâtisserie complète.
 const _MANAGER_ALLOWED = new Set([
-  'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
+  'pos-caisse','pos-produits','pos-caisses','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
   'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
@@ -16796,7 +17003,7 @@ const _MANAGER_ALLOWED = new Set([
 const _AD_ALLOWED = new Set([
   'home',
   'dashboard','journal','carburant-rapport','statistiques','gi-dashboard','depenses','achats','caisse',
-  'pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes',
+  'pos-produits','pos-caisses','pos-stock','pos-ventes','pos-credits','pos-commandes',
   'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
   'cuisine-plats','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
@@ -16808,11 +17015,11 @@ const _AD_ALLOWED = new Set([
 const _ACCES_POSTE_LEGACY = {
   'Directeur Général': null,
   'Comptable':   ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-caisses','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-caisses','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Pompiste':            ['home','saisie'],
@@ -22059,6 +22266,7 @@ const _giPageLoaders = {
   'pos-dashboard-bar': loadPosDashboardBar,
   'pos-caisse':      loadPosCaisse,
   'pos-produits':    loadPosProduits,
+  'pos-caisses':     loadPosCaisses,
   'pos-stock':       loadPosStock,
   'pos-achats':      loadPosAchats,
   'pos-ventes':      loadPosVentes,
@@ -23811,6 +24019,304 @@ function posDateFr(s){
   if(!s) return '—';
   const d = new Date(s);
   return d.toLocaleDateString('fr-HT')+' '+d.toLocaleTimeString('fr-HT',{hour:'2-digit',minute:'2-digit'});
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE POS — GESTION DES CAISSES (QR) — traçabilité individuelle
+// ══════════════════════════════════════════════════════════════════════
+let _pcxAll = [];
+let _pcxDepartements = [];
+let _pcxProduitsVpc = [];   // produits vendus par caisse (pour le formulaire de génération)
+let _pcxDetailId = null;
+
+async function loadPosCaisses(){
+  const tbody = document.getElementById('pcx-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try{
+    const [stats, deps, caisses] = await Promise.all([
+      apiFetch('GET','/pos/caisses/stats'),
+      apiFetch('GET','/pos/departements'),
+      apiFetch('GET','/pos/caisses'),
+    ]);
+    document.getElementById('pcx-kpi-depot').textContent    = stats.au_depot;
+    document.getElementById('pcx-kpi-transf').textContent   = stats.transferees;
+    document.getElementById('pcx-kpi-vente').textContent    = stats.en_vente;
+    document.getElementById('pcx-kpi-termine').textContent  = stats.terminees;
+    document.getElementById('pcx-kpi-total').textContent    = stats.total;
+    _pcxDepartements = deps || [];
+    const depSel = document.getElementById('pcx-filter-departement');
+    if(depSel){
+      depSel.innerHTML = '<option value="">Tous départements</option>'
+        + _pcxDepartements.map(d=>`<option value="${d.id}">${d.nom}</option>`).join('');
+    }
+    _pcxAll = caisses || [];
+    _pcxRenderTbody(_pcxAll);
+  }catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+  }
+}
+
+function _pcxBadge(statut){
+  const map = {
+    AU_DEPOT:   ['','Au dépôt'],
+    TRANSFEREE: ['amber','Transférée'],
+    EN_VENTE:   ['amber','En vente'],
+    TERMINEE:   ['teal','Terminée'],
+    ANNULEE:    ['danger','Annulée'],
+  };
+  const [cls,label] = map[statut] || ['', statut];
+  return `<span class="pos-badge ${cls}" style="font-size:11px">${label}</span>`;
+}
+
+function posCaissesFiltrer(){
+  const statut = document.getElementById('pcx-filter-statut').value;
+  const depId  = document.getElementById('pcx-filter-departement').value;
+  const q      = (document.getElementById('pcx-search').value||'').trim().toLowerCase();
+  let list = _pcxAll;
+  if(statut) list = list.filter(c=>c.statut===statut);
+  if(depId)  list = list.filter(c=>String(c.departement_id)===String(depId));
+  if(q) list = list.filter(c=>
+    (c.code_unique||'').toLowerCase().includes(q) ||
+    (c.produit_nom||'').toLowerCase().includes(q));
+  _pcxRenderTbody(list);
+}
+
+function _pcxRenderTbody(list){
+  const tbody = document.getElementById('pcx-tbody');
+  if(!tbody) return;
+  if(!list.length){
+    tbody.innerHTML = '<tr><td colspan="7"><div class="gi-empty">Aucune caisse trouvée</div></td></tr>';
+    return;
+  }
+  const ro = _isReadOnly();
+  tbody.innerHTML = list.map(c=>{
+    const actions = [];
+    actions.push(`<button class="pos-btn ghost" style="padding:4px 9px;font-size:12px" onclick="posCaisseDetailModal(${c.id})">Voir</button>`);
+    if(!ro && c.statut==='AU_DEPOT'){
+      actions.push(`<button class="pos-btn primary" style="padding:4px 9px;font-size:12px" onclick="posCaisseTransfererModal(${c.id})">Transférer</button>`);
+      actions.push(`<button class="pos-btn ghost" style="padding:4px 9px;font-size:12px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="posCaisseAnnuler(${c.id})">Annuler</button>`);
+    }
+    if(!ro && (c.statut==='TRANSFEREE' || c.statut==='EN_VENTE')){
+      actions.push(`<button class="pos-btn ghost" style="padding:4px 9px;font-size:12px" onclick="posCaisseAjusterModal(${c.id})">Ajuster</button>`);
+    }
+    return `<tr>
+      <td style="font-family:monospace;font-size:12.5px">${c.code_unique}</td>
+      <td>${c.produit_nom||'—'}</td>
+      <td>${_pcxBadge(c.statut)}</td>
+      <td>${c.departement_nom||'<span class="td-muted">—</span>'}</td>
+      <td>${c.quantite_restante} / ${c.quantite_initiale}</td>
+      <td style="font-size:12.5px;color:rgba(255,255,255,.5)">${posDateFr(c.created_at)}</td>
+      <td><div style="display:flex;gap:5px;flex-wrap:wrap">${actions.join('')}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Scan / recherche par code ────────────────────────────────────────
+async function posCaisseScanLookup(){
+  const input = document.getElementById('pcx-scan-input');
+  const code = (input.value||'').trim();
+  if(!code) return;
+  try{
+    const c = await apiFetch('GET', `/pos/caisses/code/${encodeURIComponent(code)}`);
+    input.value = '';
+    if(c.statut === 'AU_DEPOT' && !_isReadOnly()){
+      posCaisseTransfererModal(c.id, c);
+    } else {
+      posCaisseDetailModal(c.id, c);
+    }
+  }catch(e){
+    posAlert(e.message||'Caisse introuvable pour ce code.','err');
+  }
+}
+
+// ── Générer des caisses ──────────────────────────────────────────────
+async function posCaissesGenererModal(){
+  if(_isReadOnly()){ posAlert('Accès lecture seule.','err'); return; }
+  try{
+    const produits = await apiFetch('GET','/pos/produits');
+    _pcxProduitsVpc = (produits||[]).filter(p=>p.vendu_par_caisse && p.actif);
+  }catch(e){ _pcxProduitsVpc = []; }
+  const sel = document.getElementById('pcx-gen-produit');
+  sel.innerHTML = '<option value="">— Choisir un produit vendu par caisse —</option>'
+    + _pcxProduitsVpc.map(p=>`<option value="${p.id}" data-upc="${p.unites_par_caisse||0}">${p.nom}</option>`).join('');
+  if(!_pcxProduitsVpc.length){
+    document.getElementById('pcx-gen-produit-hint').textContent =
+      'Aucun produit configuré « vendu par caisse ». Activez cette option depuis Produits Bar d\'abord.';
+  } else {
+    document.getElementById('pcx-gen-produit-hint').textContent = '';
+  }
+  document.getElementById('pcx-gen-nb').value = '';
+  document.getElementById('pcx-gen-prix').value = '';
+  document.getElementById('pcx-gen-fournisseur').value = '';
+  document.getElementById('pcx-gen-notes').value = '';
+  document.getElementById('pcx-gen-live').style.display = 'none';
+  document.getElementById('pcx-generer-modal-bg').classList.add('open');
+}
+function posCaissesGenererModalClose(){
+  document.getElementById('pcx-generer-modal-bg').classList.remove('open');
+}
+function posCaissesGenUpdateInfo(){
+  const sel = document.getElementById('pcx-gen-produit');
+  const opt = sel.options[sel.selectedIndex];
+  const upc = opt ? parseInt(opt.getAttribute('data-upc')||'0',10) : 0;
+  const nb  = parseInt(document.getElementById('pcx-gen-nb').value||'0',10);
+  const live = document.getElementById('pcx-gen-live');
+  if(upc>0 && nb>0){
+    live.style.display = '';
+    live.textContent = `${nb} caisse${nb!==1?'s':''} × ${upc} unités = ${nb*upc} unités au total — ${nb} code${nb!==1?'s':''} unique${nb!==1?'s':''} généré${nb!==1?'s':''}.`;
+  } else {
+    live.style.display = 'none';
+  }
+}
+async function posCaissesGenererSauvegarder(){
+  const produitId = parseInt(document.getElementById('pcx-gen-produit').value||'0',10);
+  const nb        = parseInt(document.getElementById('pcx-gen-nb').value||'0',10);
+  const prix      = parseFloat(document.getElementById('pcx-gen-prix').value)||null;
+  const fournisseur = document.getElementById('pcx-gen-fournisseur').value.trim()||null;
+  const notes     = document.getElementById('pcx-gen-notes').value.trim()||null;
+  if(!produitId){ posAlert('Choisissez un produit.','err'); return; }
+  if(!nb || nb<1){ posAlert('Indiquez le nombre de caisses achetées.','err'); return; }
+  const btn = document.getElementById('pcx-gen-btn');
+  btn.disabled = true;
+  try{
+    const res = await apiFetch('POST','/pos/caisses/generer', {
+      produit_id: produitId, nb_caisses: nb,
+      prix_achat_caisse: prix, fournisseur, notes,
+    });
+    posCaissesGenererModalClose();
+    posAlert(`${res.nb_caisses_generees} caisse(s) générée(s) — ${res.total_unites} unités au total.`,'ok');
+    const ids = res.caisses.map(c=>c.id);
+    await loadPosCaisses();
+    if(await showConfirm(`Imprimer les ${ids.length} étiquette(s) QR maintenant ?`, {title:'Impression', okLabel:'Imprimer'})){
+      posCaissesImprimerEtiquettes(ids);
+    }
+  }catch(e){
+    posAlert(e.message||'Erreur lors de la génération.','err');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+// ── Transfert (dépôt → département) ──────────────────────────────────
+function posCaisseTransfererModal(id, cached){
+  if(_isReadOnly()){ posAlert('Accès lecture seule.','err'); return; }
+  const c = cached || _pcxAll.find(x=>x.id===id);
+  document.getElementById('pcx-transf-id').value = id;
+  document.getElementById('pcx-transf-info').textContent = c
+    ? `${c.code_unique} — ${c.produit_nom} — ${c.quantite_restante} unité(s)`
+    : `Caisse #${id}`;
+  const sel = document.getElementById('pcx-transf-departement');
+  sel.innerHTML = '<option value="">— Choisir —</option>'
+    + _pcxDepartements.map(d=>`<option value="${d.id}">${d.nom}</option>`).join('');
+  document.getElementById('pcx-transferer-modal-bg').classList.add('open');
+}
+function posCaisseTransfererModalClose(){
+  document.getElementById('pcx-transferer-modal-bg').classList.remove('open');
+}
+async function posCaisseTransfererConfirmer(){
+  const id = parseInt(document.getElementById('pcx-transf-id').value||'0',10);
+  const depId = parseInt(document.getElementById('pcx-transf-departement').value||'0',10);
+  if(!depId){ posAlert('Choisissez un département de destination.','err'); return; }
+  try{
+    await apiFetch('POST', `/pos/caisses/${id}/transferer`, {departement_id: depId});
+    posCaisseTransfererModalClose();
+    posAlert('Caisse transférée.','ok');
+    loadPosCaisses();
+  }catch(e){ posAlert(e.message||'Erreur lors du transfert.','err'); }
+}
+
+// ── Ajustement (casse / perte / correction) ──────────────────────────
+function posCaisseAjusterModal(id){
+  if(_isReadOnly()){ posAlert('Accès lecture seule.','err'); return; }
+  const c = _pcxAll.find(x=>x.id===id);
+  document.getElementById('pcx-adj-id').value = id;
+  document.getElementById('pcx-adj-info').textContent = c
+    ? `${c.code_unique} — ${c.produit_nom} — restant : ${c.quantite_restante} unité(s)`
+    : `Caisse #${id}`;
+  document.getElementById('pcx-adj-type').value = 'CASSE';
+  document.getElementById('pcx-adj-qte').value = '';
+  document.getElementById('pcx-adj-motif').value = '';
+  document.getElementById('pcx-ajuster-modal-bg').classList.add('open');
+}
+function posCaisseAjusterModalClose(){
+  document.getElementById('pcx-ajuster-modal-bg').classList.remove('open');
+}
+async function posCaisseAjusterConfirmer(){
+  const id     = parseInt(document.getElementById('pcx-adj-id').value||'0',10);
+  const type_mouvement = document.getElementById('pcx-adj-type').value;
+  const quantite = parseInt(document.getElementById('pcx-adj-qte').value||'0',10);
+  const motif  = document.getElementById('pcx-adj-motif').value.trim();
+  if(!quantite || quantite<1){ posAlert('Indiquez une quantité.','err'); return; }
+  if(!motif || motif.length<5){ posAlert('Le motif doit contenir au moins 5 caractères.','err'); return; }
+  try{
+    await apiFetch('POST', `/pos/caisses/${id}/ajuster`, {type_mouvement, quantite, motif});
+    posCaisseAjusterModalClose();
+    posAlert('Ajustement enregistré.','ok');
+    loadPosCaisses();
+  }catch(e){ posAlert(e.message||'Erreur lors de l\'ajustement.','err'); }
+}
+
+async function posCaisseAnnuler(id){
+  if(_isReadOnly()) return;
+  if(!await showConfirm('Annuler cette caisse (encore au dépôt) ?', {title:'Annuler la caisse', type:'danger', okLabel:'Annuler la caisse'})) return;
+  try{
+    await apiFetch('POST', `/pos/caisses/${id}/annuler`);
+    posAlert('Caisse annulée.','ok');
+    loadPosCaisses();
+  }catch(e){ posAlert(e.message||'Erreur.','err'); }
+}
+
+// ── Détail / historique ───────────────────────────────────────────────
+async function posCaisseDetailModal(id, cached){
+  _pcxDetailId = id;
+  document.getElementById('pcx-detail-titre').textContent = 'Détail de la caisse';
+  document.getElementById('pcx-detail-body').innerHTML = '<div style="text-align:center;padding:16px;color:rgba(255,255,255,.3)">Chargement…</div>';
+  document.getElementById('pcx-detail-modal-bg').classList.add('open');
+  try{
+    const c = await apiFetch('GET', `/pos/caisses/${id}`);
+    document.getElementById('pcx-detail-titre').textContent = c.code_unique;
+    const hist = (c.historique||[]).map(h=>`
+      <div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">
+        <div>
+          <strong>${h.type_mouvement}</strong>
+          ${h.motif ? `<div style="color:rgba(255,255,255,.45);font-size:12px">${h.motif}</div>` : ''}
+          ${h.utilisateur_nom ? `<div style="color:rgba(255,255,255,.3);font-size:11.5px">${h.utilisateur_nom}</div>` : ''}
+        </div>
+        <div style="text-align:right;white-space:nowrap">
+          <div style="${h.quantite<0?'color:#f87171':'color:#3fb6a8'}">${h.quantite>0?'+':''}${h.quantite}</div>
+          <div style="color:rgba(255,255,255,.3);font-size:11.5px">${posDateFr(h.created_at)}</div>
+        </div>
+      </div>`).join('') || '<div style="color:rgba(255,255,255,.3);padding:10px 0">Aucun mouvement.</div>';
+    document.getElementById('pcx-detail-body').innerHTML = `
+      <div class="pos-form-row" style="margin-bottom:10px">
+        <div style="flex:1"><div class="pos-label">Produit</div><div>${c.produit_nom||'—'}</div></div>
+        <div style="flex:1"><div class="pos-label">Statut</div><div>${_pcxBadge(c.statut)}</div></div>
+      </div>
+      <div class="pos-form-row" style="margin-bottom:10px">
+        <div style="flex:1"><div class="pos-label">Unités / caisse</div><div>${c.unites_par_caisse}</div></div>
+        <div style="flex:1"><div class="pos-label">Restant / Initial</div><div>${c.quantite_restante} / ${c.quantite_initiale}</div></div>
+      </div>
+      <div class="pos-form-row" style="margin-bottom:14px">
+        <div style="flex:1"><div class="pos-label">Département</div><div>${c.departement_nom||'—'}</div></div>
+        <div style="flex:1"><div class="pos-label">Créée le</div><div>${posDateFr(c.created_at)}</div></div>
+      </div>
+      <hr style="border-color:rgba(255,255,255,.08);margin-bottom:10px">
+      <div class="pos-label" style="margin-bottom:6px">Historique</div>
+      ${hist}
+    `;
+  }catch(e){
+    document.getElementById('pcx-detail-body').innerHTML = `<div style="color:#f87171;padding:14px">${e.message||'Erreur de chargement.'}</div>`;
+  }
+}
+function posCaisseDetailModalClose(){
+  document.getElementById('pcx-detail-modal-bg').classList.remove('open');
+  _pcxDetailId = null;
+}
+
+// ── Impression des étiquettes QR ──────────────────────────────────────
+function posCaissesImprimerEtiquettes(ids){
+  if(!ids || !ids.length) return;
+  window.open('/api/pos/caisses/etiquettes.pdf?ids='+ids.join(','), '_blank');
 }
 
 // ══════════════════════════════════════════════════════════════════════
