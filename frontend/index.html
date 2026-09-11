@@ -6652,6 +6652,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                  placeholder="Scanner le code-barres d'un produit…"
                  autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();posScanCodeBarre();}">
         </div>
+        <!-- Retour immédiat après chaque scan — reste à la même place, ne
+             s'empile pas (contrairement à un toast) : idéal pour scanner
+             plusieurs fois de suite le même article (ex. 4 Prestige = 4
+             scans) sans que l'écran se remplisse de notifications. -->
+        <div id="pos-scan-feedback" style="display:none;margin:-4px 0 10px;padding:9px 14px;border-radius:9px;font-size:14px;font-weight:600;transition:background .15s,color .15s"></div>
         <!-- Barre de recherche articles -->
         <div class="pos-search-wrap">
           <svg class="pos-search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -25709,6 +25714,29 @@ function _posFocusScan(){
    stock, caisse, rapports) passe par le même circuit qu'un ajout manuel :
    rien de spécial à faire pour que ça compte, l'encaissement habituel
    s'en charge. */
+// Affiche le résultat d'un scan juste sous le champ, à la même place à
+// chaque fois (jamais en pile comme les toasts) — pour scanner plusieurs
+// fois de suite (même article ou des articles différents) sans que
+// l'écran se remplisse de notifications empilées.
+let _posScanFeedbackTimer = null;
+function _posScanFeedback(msg, type){
+  const el = document.getElementById('pos-scan-feedback');
+  if(!el) return;
+  clearTimeout(_posScanFeedbackTimer);
+  const styles = {
+    ok:  {bg:'rgba(63,182,168,.15)',  color:'#3fb6a8'},
+    err: {bg:'rgba(248,113,113,.15)', color:'#f87171'},
+  }[type] || {bg:'rgba(255,255,255,.08)', color:'rgba(255,255,255,.7)'};
+  el.style.display = '';
+  el.style.background = styles.bg;
+  el.style.color      = styles.color;
+  el.textContent = msg;
+  // Le message reste affiché — il se remplace tout seul au scan suivant.
+  // On l'efface après un long délai seulement s'il n'y a plus de scan
+  // (évite qu'un vieux message traîne indéfiniment à l'écran).
+  _posScanFeedbackTimer = setTimeout(()=>{ el.style.display = 'none'; }, 6000);
+}
+
 function posScanCodeBarre(){
   const inp = document.getElementById('pos-scan-inp');
   const code = (inp.value||'').trim();
@@ -25716,12 +25744,17 @@ function posScanCodeBarre(){
   inp.value = '';
   const prod = _posProduits.find(p => p.code_barre && p.code_barre.trim() === code);
   if(!prod){
-    posAlert(`Aucun produit trouvé pour le code « ${code} ».`, 'err');
+    _posScanFeedback(`✕ Aucun produit trouvé pour le code « ${code} ».`, 'err');
   } else if(!prod.actif){
-    posAlert(`« ${prod.nom} » est inactif — vente impossible.`, 'err');
+    _posScanFeedback(`✕ « ${prod.nom} » est inactif — vente impossible.`, 'err');
   } else {
     posAjouterAuPanier(prod.id);
-    posAlert(`✓ ${prod.nom} ajouté au panier.`, 'ok');
+    // Quantité désormais dans le panier pour CE produit — permet de
+    // confirmer d'un coup d'œil « 4 » après avoir scanné 4 fois le même
+    // code-barres (ex. 4 Prestige), sans avoir à regarder le panier.
+    const ligne = _posCart.find(c => c.produit_id === prod.id);
+    const qte = ligne ? ligne.quantite : 1;
+    _posScanFeedback(`✓ ${prod.nom} — ${qte} au panier`, 'ok');
   }
   inp.focus();
 }
@@ -25987,6 +26020,8 @@ async function posEncaisser(){
     };
     const result = await apiFetch('POST','/pos/ventes', payload);
     _posCart = [];
+    const scanFb = document.getElementById('pos-scan-feedback');
+    if(scanFb) scanFb.style.display = 'none';
     document.getElementById('pos-client-nom').value = '';
     _clientAcClearSelection('pos-client-nom');
     const recuEl = document.getElementById('pos-montant-recu');
