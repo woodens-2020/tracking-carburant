@@ -15228,11 +15228,35 @@ function _cjrRender(d){
   if(!body) return;
   const ent = d.entrees, dep = d.depenses, dispo = d.disponible;
   const dispoCol = dispo>=0 ? 'var(--green)' : 'var(--red)';
-  const rowsEnt = (ent.par_produit||[]).map(p=>`<tr>
-      <td style="font-weight:600">${esc(p.produit)}</td>
-      <td class="tr">${fmtGalX(p.gallons)}</td>
-      <td class="tr c-teal" style="font-weight:700">${fmtGX(p.montant)}</td>
-    </tr>`).join('') || `<tr><td colspan="3" class="empty" style="padding:14px">Aucune vente ce jour</td></tr>`;
+
+  // Détail des entrées par période (Matin / Après-midi) puis par produit.
+  const periodes = ent.par_periode || [];
+  let rowsEnt = '';
+  if(periodes.length){
+    rowsEnt = periodes.map(pe=>{
+      const lignes = (pe.par_produit||[]);
+      const corps = lignes.length
+        ? lignes.map(p=>`<tr>
+            <td style="padding-left:22px;color:var(--text2)">${esc(p.produit)}</td>
+            <td class="tr">${fmtGalX(p.gallons)}</td>
+            <td class="tr c-teal">${fmtGX(p.montant)}</td>
+          </tr>`).join('')
+        : `<tr><td colspan="3" style="padding-left:22px;color:var(--muted)">Aucune vente</td></tr>`;
+      return `<tr style="background:rgba(255,255,255,.04)">
+          <td style="font-weight:800;letter-spacing:.03em">${esc(pe.libelle)}</td>
+          <td class="tr" style="font-weight:700">${fmtGalX(pe.total_gallons)}</td>
+          <td class="tr c-teal" style="font-weight:800">${fmtGX(pe.total_montant)}</td>
+        </tr>${corps}`;
+    }).join('');
+  } else {
+    rowsEnt = (ent.par_produit||[]).map(p=>`<tr>
+        <td style="font-weight:600">${esc(p.produit)}</td>
+        <td class="tr">${fmtGalX(p.gallons)}</td>
+        <td class="tr c-teal" style="font-weight:700">${fmtGX(p.montant)}</td>
+      </tr>`).join('') || `<tr><td colspan="3" class="empty" style="padding:14px">Aucune vente ce jour</td></tr>`;
+  }
+  const _pm = periodes.find(p=>p.periode==='Matin');
+  const _pa = periodes.find(p=>p.periode==='Apres-midi');
   const rowsDep = (dep.liste||[]).map(x=>`<tr>
       <td>${esc(x.categorie)}</td>
       <td>${esc(x.description||'')}</td>
@@ -15245,7 +15269,7 @@ function _cjrRender(d){
     <div class="galrecap-card">
       <div class="grc-lbl">Entrées du jour</div>
       <div class="grc-gal" style="color:var(--green)">${fmtGX(ent.total)}</div>
-      <div class="grc-mnt">${fmtGalX(ent.total_gallons)} vendus</div>
+      <div class="grc-mnt">${fmtGalX(ent.total_gallons)} vendus${(_pm||_pa)?`<br>Matin ${fmtGX(_pm?_pm.total_montant:0)} · Après-midi ${fmtGX(_pa?_pa.total_montant:0)}`:''}</div>
     </div>
     <div class="galrecap-card">
       <div class="grc-lbl">Dépenses du jour</div>
@@ -15259,13 +15283,13 @@ function _cjrRender(d){
     </div>
   </div>
 
-  <div class="galrecap-title">Entrées — ventes de carburant</div>
-  <div style="font-size:12px;color:var(--muted);margin:-4px 2px 8px">Source : ventes de carburant (relevés de compteurs)</div>
+  <div class="galrecap-title">Entrées — ventes de carburant par période</div>
+  <div style="font-size:12px;color:var(--muted);margin:-4px 2px 8px">Source : ventes de carburant (relevés de compteurs) — détail Matin / Après-midi puis par produit</div>
   <div class="tbl-wrap" style="margin-bottom:20px">
     <table class="dt">
-      <thead><tr><th>Produit</th><th class="tr">Gallons</th><th class="tr">Montant encaissé</th></tr></thead>
+      <thead><tr><th>Période / Produit</th><th class="tr">Gallons</th><th class="tr">Montant encaissé</th></tr></thead>
       <tbody>${rowsEnt}
-        <tr class="recap-total"><td style="font-weight:800">TOTAL ENTRÉES</td><td class="tr" style="font-weight:700">${fmtGalX(ent.total_gallons)}</td><td class="tr c-teal" style="font-weight:800">${fmtGX(ent.total)}</td></tr>
+        <tr class="recap-total"><td style="font-weight:800">TOTAL ENTRÉES (jour)</td><td class="tr" style="font-weight:700">${fmtGalX(ent.total_gallons)}</td><td class="tr c-teal" style="font-weight:800">${fmtGX(ent.total)}</td></tr>
       </tbody>
     </table>
   </div>
@@ -15291,7 +15315,19 @@ function cjrImprimer(){
   const num = (v,dec)=>{ const x=parseFloat(Number(v||0).toFixed(dec)); return x.toLocaleString('fr-FR',{maximumFractionDigits:dec}); };
   const gal = v=>num(v,4)+' gal';
   const grd = v=>num(v,4)+' G';
-  const rowsE = (s.entrees.par_produit||[]).map(p=>`<tr><td>${p.produit}</td><td class="r">${gal(p.gallons)}</td><td class="r">${grd(p.montant)}</td></tr>`).join('') || `<tr><td colspan="3" class="c muted">Aucune vente</td></tr>`;
+  const _per = s.entrees.par_periode || [];
+  let rowsE;
+  if(_per.length){
+    rowsE = _per.map(pe=>{
+      const L = (pe.par_produit||[]);
+      const corps = L.length
+        ? L.map(p=>`<tr><td style="padding-left:20px;color:#444">${p.produit}</td><td class="r">${gal(p.gallons)}</td><td class="r">${grd(p.montant)}</td></tr>`).join('')
+        : `<tr><td style="padding-left:20px;color:#999">Aucune vente</td><td class="r">—</td><td class="r">—</td></tr>`;
+      return `<tr style="background:#eef2ff"><td style="font-weight:800">${pe.libelle}</td><td class="r" style="font-weight:700">${gal(pe.total_gallons)}</td><td class="r" style="font-weight:800">${grd(pe.total_montant)}</td></tr>${corps}`;
+    }).join('');
+  } else {
+    rowsE = (s.entrees.par_produit||[]).map(p=>`<tr><td>${p.produit}</td><td class="r">${gal(p.gallons)}</td><td class="r">${grd(p.montant)}</td></tr>`).join('') || `<tr><td colspan="3" class="c muted">Aucune vente</td></tr>`;
+  }
   const rowsD = (s.depenses.liste||[]).map(x=>`<tr><td>${x.categorie}</td><td>${(x.description||'').replace(/</g,'&lt;')}</td><td>${x.source||'Caisse générale'}</td><td class="r">${grd(x.montant)}</td></tr>`).join('') || `<tr><td colspan="4" class="c muted">Aucune dépense</td></tr>`;
   const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Rapport journalier ${s.date}</title><style>
     *{margin:0;padding:0;box-sizing:border-box}
@@ -15330,15 +15366,15 @@ function cjrImprimer(){
     <h1>RAPPORT JOURNALIER — CAISSE CARBURANT</h1>
     <div class="day">${frDate(s.date)}</div>
     <div class="kpis">
-      <div class="kpi e"><div class="l">Entrées du jour</div><div class="v">${grd(s.entrees.total)}</div></div>
+      <div class="kpi e"><div class="l">Entrées du jour</div><div class="v">${grd(s.entrees.total)}</div>${_per.length?`<div style="font-size:9px;color:#666;margin-top:3px">Matin ${grd((_per.find(p=>p.periode==='Matin')||{}).total_montant||0)}<br>Après-midi ${grd((_per.find(p=>p.periode==='Apres-midi')||{}).total_montant||0)}</div>`:''}</div>
       <div class="kpi d"><div class="l">Dépenses du jour</div><div class="v">${grd(s.depenses.total)}</div></div>
       <div class="kpi s"><div class="l">Disponible (solde)</div><div class="v">${grd(s.disponible)}</div></div>
     </div>
-    <h2>Entrées — ventes de carburant</h2>
-    <div style="font-size:10px;color:#666;margin:-3px 0 6px">Source : ventes de carburant (relevés de compteurs)</div>
+    <h2>Entrées — ventes de carburant par période</h2>
+    <div style="font-size:10px;color:#666;margin:-3px 0 6px">Source : ventes de carburant (relevés de compteurs) — détail Matin / Après-midi puis par produit</div>
     <table>
-      <thead><tr><th>Produit</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead>
-      <tbody>${rowsE}<tr class="tot"><td>TOTAL ENTRÉES</td><td class="r">${gal(s.entrees.total_gallons)}</td><td class="r">${grd(s.entrees.total)}</td></tr></tbody>
+      <thead><tr><th>Période / Produit</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead>
+      <tbody>${rowsE}<tr class="tot"><td>TOTAL ENTRÉES (jour)</td><td class="r">${gal(s.entrees.total_gallons)}</td><td class="r">${grd(s.entrees.total)}</td></tr></tbody>
     </table>
     <h2>Dépenses de la station (${s.depenses.nb})</h2>
     <table>

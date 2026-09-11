@@ -2630,33 +2630,61 @@ def carburant_rapport_jour(
     db: Session = Depends(get_db),
 ):
     """Rapport de caisse carburant pour UNE journée :
-      - Entrées   = argent encaissé (ventes de carburant, par produit)
+      - Entrées   = argent encaissé (ventes de carburant), détaillé par
+                    période (Matin / Après-midi) puis par produit
       - Dépenses  = dépenses de la station enregistrées ce jour-là
       - Disponible = Entrées − Dépenses (solde du jour)
-    Un cumul (depuis le début, jusqu'à cette date incluse) est aussi fourni.
     Aucune valeur n'est arrondie."""
     from decimal import Decimal as _D
     from datetime import datetime as _dtn2, timezone as _tzu2
 
     d = date or today_haiti()
+    produits = {p.id: p.nom for p in db.query(Produit).all()}
 
     # ── ENTRÉES du jour : ventes de carburant (relevés du jour) ──────
     rel_jour = (
         db.query(Releve).join(Pompe, Releve.pompe_id == Pompe.id)
         .filter(Releve.date == d).all()
     )
-    ent = {}
+    # Agrégation par (période, produit) ET par produit (jour entier).
+    par_pp = {}          # (periode, pid) -> {gallons, montant, nb}
+    ent = {}             # pid -> {gallons, montant, nb}   (jour entier)
     for r in rel_jour:
         q = _D(str(r.metter_apres)) - _D(str(r.metter_avant))
         if q < 0:
             continue
         pid = r.pompe.produit_id
-        a = ent.setdefault(pid, {"gallons": _D("0"), "montant": _D("0"), "nb": 0})
-        a["gallons"] += q
-        a["montant"] += q * _D(str(r.prix_gallon))
-        a["nb"] += 1
+        montant = q * _D(str(r.prix_gallon))
+        for bucket, key in ((par_pp, (r.periode, pid)), (ent, pid)):
+            a = bucket.setdefault(key, {"gallons": _D("0"), "montant": _D("0"), "nb": 0})
+            a["gallons"] += q
+            a["montant"] += montant
+            a["nb"] += 1
 
-    produits = {p.id: p.nom for p in db.query(Produit).all()}
+    _LIB_PER = {"Matin": "Matin", "Apres-midi": "Après-midi"}
+    entrees_par_periode = []
+    for per in ("Matin", "Apres-midi"):
+        lignes, sg, sm = [], _D("0"), _D("0")
+        items = sorted(
+            ((pid, a) for (pp, pid), a in par_pp.items() if pp == per),
+            key=lambda kv: float(kv[1]["montant"]), reverse=True,
+        )
+        for pid, a in items:
+            sg += a["gallons"]; sm += a["montant"]
+            lignes.append({
+                "produit":    produits.get(pid, "Inconnu"),
+                "gallons":    float(a["gallons"]),
+                "montant":    float(a["montant"]),
+                "nb_releves": a["nb"],
+            })
+        entrees_par_periode.append({
+            "periode":       per,
+            "libelle":       _LIB_PER.get(per, per),
+            "par_produit":   lignes,
+            "total_gallons": float(sg),
+            "total_montant": float(sm),
+        })
+
     entrees_par_produit, tot_ent_g, tot_ent_m = [], _D("0"), _D("0")
     for pid, a in sorted(ent.items(), key=lambda kv: float(kv[1]["montant"]), reverse=True):
         tot_ent_g += a["gallons"]
@@ -2688,6 +2716,7 @@ def carburant_rapport_jour(
         "date":      str(d),
         "genere_le": _dtn2.now(_tzu2.utc).isoformat(),
         "entrees": {
+            "par_periode":   entrees_par_periode,
             "par_produit":   entrees_par_produit,
             "total_gallons": float(tot_ent_g),
             "total":         float(tot_ent_m),
