@@ -486,6 +486,14 @@ def creer_produit(data: ProduitIn, request: Request, db: Session = Depends(get_d
     ).first()
     if existant:
         raise HTTPException(409, f"Un produit nommé « {existant.nom} » existe déjà dans le catalogue.")
+    # Un code-barres doit identifier un seul produit sans ambiguïté — c'est
+    # ce qui permet à un employé de vendre en scannant (voir POS Caisse).
+    if data.code_barre and data.code_barre.strip():
+        doublon_code = db.query(BarProduit).filter(
+            BarProduit.code_barre == data.code_barre.strip()
+        ).first()
+        if doublon_code:
+            raise HTTPException(409, f"Ce code-barres est déjà utilisé par « {doublon_code.nom} ».")
     _get_or_create_categorie(data.categorie, db)
     p = BarProduit(
         nom                = data.nom.strip(),
@@ -518,6 +526,13 @@ def modifier_produit(produit_id: int, data: ProduitIn, db: Session = Depends(get
         raise HTTPException(404, "Produit introuvable")
     if data.vendu_par_caisse and (not data.unites_par_caisse or data.unites_par_caisse < 1):
         raise HTTPException(422, "unites_par_caisse est obligatoire (≥ 1) pour un produit vendu par caisse.")
+    if data.code_barre and data.code_barre.strip():
+        doublon_code = db.query(BarProduit).filter(
+            BarProduit.code_barre == data.code_barre.strip(),
+            BarProduit.id != produit_id,
+        ).first()
+        if doublon_code:
+            raise HTTPException(409, f"Ce code-barres est déjà utilisé par « {doublon_code.nom} ».")
     _get_or_create_categorie(data.categorie, db)
     p.nom                = data.nom.strip()
     p.categorie          = data.categorie.strip().lower()

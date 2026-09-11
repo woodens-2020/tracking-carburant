@@ -6645,6 +6645,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
 
         <div id="pos-caisse-vente-zone">
+        <!-- Scan code-barres produit — ajoute directement au panier -->
+        <div class="pos-search-wrap" style="margin-bottom:8px">
+          <svg class="pos-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="13" y1="8" x2="13" y2="16"/><line x1="16" y1="8" x2="16" y2="16"/></svg>
+          <input type="text" id="pos-scan-inp" class="pos-search-inp"
+                 placeholder="Scanner le code-barres d'un produit…"
+                 autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();posScanCodeBarre();}">
+        </div>
         <!-- Barre de recherche articles -->
         <div class="pos-search-wrap">
           <svg class="pos-search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -25300,10 +25307,12 @@ function _posSetGate(hasCaissier, statut, peutOuvrir, nbSessionsJour, maxSession
 
   if(!hasCaissier){
     gd.style.display = 'none'; gt.style.display = 'none'; vz.style.display = '';
+    _posFocusScan();
     return;
   }
   if(statut === 'EN_COURS'){
     gd.style.display = 'none'; gt.style.display = 'none'; vz.style.display = '';
+    _posFocusScan();
     return;
   }
   const dejaSoumise = (statut === 'SOUMIS' || statut === 'VALIDE');
@@ -25656,6 +25665,39 @@ function posAjouterAuPanier(prodId){
     _posCart.push({ produit_id: prodId, nom: prod.nom, prix: parseFloat(prod.prix_actif||0), quantite: 1, unite: prod.unite||'' });
   }
   posRenderCart();
+}
+
+/* Focus automatique du champ de scan dès que la zone de vente est visible
+   (session démarrée) — pour qu'une douchette USB/BT puisse scanner sans
+   que la caissière ait besoin de cliquer dans le champ à chaque fois. */
+function _posFocusScan(){
+  setTimeout(()=>{ document.getElementById('pos-scan-inp')?.focus(); }, 50);
+}
+
+/* Scan code-barres produit — ajoute directement au panier (1 unité par
+   scan, comme une caisse physique). Fonctionne avec une douchette
+   USB/BT en mode clavier (tape le code + Entrée) : cherche dans le cache
+   produits déjà chargé (_posProduits, déjà scopé au département de la
+   session en cours — voir _posLoadProduitsCache), donc pas d'aller-retour
+   réseau par scan. La vente elle-même (et donc la comptabilisation —
+   stock, caisse, rapports) passe par le même circuit qu'un ajout manuel :
+   rien de spécial à faire pour que ça compte, l'encaissement habituel
+   s'en charge. */
+function posScanCodeBarre(){
+  const inp = document.getElementById('pos-scan-inp');
+  const code = (inp.value||'').trim();
+  if(!code) return;
+  inp.value = '';
+  const prod = _posProduits.find(p => p.code_barre && p.code_barre.trim() === code);
+  if(!prod){
+    posAlert(`Aucun produit trouvé pour le code « ${code} ».`, 'err');
+  } else if(!prod.actif){
+    posAlert(`« ${prod.nom} » est inactif — vente impossible.`, 'err');
+  } else {
+    posAjouterAuPanier(prod.id);
+    posAlert(`✓ ${prod.nom} ajouté au panier.`, 'ok');
+  }
+  inp.focus();
 }
 
 function posRenderCart(){
