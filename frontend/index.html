@@ -25759,6 +25759,73 @@ function posScanCodeBarre(){
   inp.focus();
 }
 
+// ── Scan depuis N'IMPORTE QUELLE page (une fois connecté) ──────────────
+// Un employé peut scanner un produit sans être déjà sur Caisse POS : le
+// scan est capté globalement, l'app bascule automatiquement sur Caisse
+// POS, ajoute l'article au panier et laisse l'employé confirmer la vente
+// (jamais de confirmation automatique — juste amener jusqu'au panier).
+//
+// Conçu pour ne JAMAIS interférer avec la saisie normale ailleurs dans
+// l'appli :
+//   - ignoré si un champ (input/textarea/select/contenteditable) a le
+//     focus — une douchette qui scanne DANS un champ continue de s'y
+//     comporter comme avant (comportement inchangé) ;
+//   - ignoré si l'utilisateur n'est pas connecté, ou n'a pas accès à
+//     Caisse POS (rôle carburant/hôtel seul, etc.) ;
+//   - le tampon de caractères est réinitialisé si l'écart entre deux
+//     touches dépasse ~100 ms (frappe humaine, jamais aussi rapide
+//     qu'une douchette) ;
+//   - et surtout : SILENCIEUX si le code ne correspond à AUCUN produit
+//     enregistré — aucune navigation surprise pour une simple suite de
+//     touches qui ne serait pas un vrai scan.
+let _globalScanBuffer = '';
+let _globalScanLastTime = 0;
+document.addEventListener('keydown', function(e){
+  if(!_appUser) return;
+  const active = document.activeElement;
+  const tag = active && active.tagName;
+  const dansChamp = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable);
+  if(dansChamp) return;
+
+  const now = Date.now();
+  if(now - _globalScanLastTime > 100) _globalScanBuffer = '';
+  _globalScanLastTime = now;
+
+  if(e.key === 'Enter'){
+    const code = _globalScanBuffer;
+    _globalScanBuffer = '';
+    if(code.length >= 6 && /^[0-9]+$/.test(code)) _globalScanVersPos(code);
+    return;
+  }
+  if(e.key.length === 1) _globalScanBuffer += e.key;
+});
+
+async function _globalScanVersPos(code){
+  if(!_canAccess('pos-caisse')) return;
+  if(!_posProduits.length){ try{ await _posLoadProduitsCache(); }catch(err){} }
+  const prod = _posProduits.find(p => p.code_barre && p.code_barre.trim() === code);
+  if(!prod) return;   // code inconnu — on ne dérange personne pour rien
+
+  const dejaSurPage = currentPage === 'pos-caisse';
+  if(!dejaSurPage) goTo('pos-caisse');
+  setTimeout(()=>{
+    const venteZone = document.getElementById('pos-caisse-vente-zone');
+    const sessionActive = venteZone && venteZone.style.display !== 'none';
+    if(!sessionActive){
+      toast(`« ${prod.nom} » scanné — démarrez d'abord votre session de caisse pour l'ajouter au panier.`, 'warn');
+      return;
+    }
+    if(!prod.actif){
+      _posScanFeedback(`✕ « ${prod.nom} » est inactif — vente impossible.`, 'err');
+      return;
+    }
+    posAjouterAuPanier(prod.id);
+    const ligne = _posCart.find(c => c.produit_id === prod.id);
+    const qte = ligne ? ligne.quantite : 1;
+    _posScanFeedback(`✓ ${prod.nom} — ${qte} au panier`, 'ok');
+  }, dejaSurPage ? 0 : 400);
+}
+
 function posRenderCart(){
   const wrap = document.getElementById('pos-cart-items');
   const totalEl = document.getElementById('pos-cart-total');
