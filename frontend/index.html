@@ -25794,7 +25794,17 @@ document.addEventListener('keydown', function(e){
   if(e.key === 'Enter'){
     const code = _globalScanBuffer;
     _globalScanBuffer = '';
-    if(code.length >= 6 && /^[0-9]+$/.test(code)) _globalScanVersPos(code);
+    // Pas de restriction au numérique ici : un code-barres est un champ
+    // libre (voir posCodeBarreModal / posScanCodeBarre, qui n'imposent
+    // eux non plus aucun format) — un identifiant interne alphanumérique
+    // doit fonctionner de la même façon, où qu'on le scanne. La sécurité
+    // contre les faux positifs vient de la correspondance EXACTE exigée
+    // plus bas contre un produit réellement enregistré (_globalScanVersPos
+    // ne fait jamais rien — ni navigation, ni message — sans ce match),
+    // pas du format du code ; le seuil de longueur reste une précaution
+    // supplémentaire propre à ce capteur global (sans clic préalable dans
+    // un champ, contrairement au scan dédié de Caisse POS).
+    if(code.length >= 6) _globalScanVersPos(code);
     return;
   }
   if(e.key.length === 1) _globalScanBuffer += e.key;
@@ -25807,23 +25817,36 @@ async function _globalScanVersPos(code){
   if(!prod) return;   // code inconnu — on ne dérange personne pour rien
 
   const dejaSurPage = currentPage === 'pos-caisse';
-  if(!dejaSurPage) goTo('pos-caisse');
-  setTimeout(()=>{
-    const venteZone = document.getElementById('pos-caisse-vente-zone');
-    const sessionActive = venteZone && venteZone.style.display !== 'none';
-    if(!sessionActive){
-      toast(`« ${prod.nom} » scanné — démarrez d'abord votre session de caisse pour l'ajouter au panier.`, 'warn');
-      return;
-    }
-    if(!prod.actif){
-      _posScanFeedback(`✕ « ${prod.nom} » est inactif — vente impossible.`, 'err');
-      return;
-    }
-    posAjouterAuPanier(prod.id);
-    const ligne = _posCart.find(c => c.produit_id === prod.id);
-    const qte = ligne ? ligne.quantite : 1;
-    _posScanFeedback(`✓ ${prod.nom} — ${qte} au panier`, 'ok');
-  }, dejaSurPage ? 0 : 400);
+  if(!dejaSurPage){
+    goTo('pos-caisse');
+    // goTo() lance loadPosCaisse() en tâche de fond sans l'attendre — on
+    // l'attend nous-mêmes pour connaître l'état réel de la session avant
+    // de vérifier quoi que ce soit, plutôt que de deviner avec un délai
+    // arbitraire (un délai fixe serait soit trop court sur une connexion
+    // lente, soit une attente inutile sur une rapide).
+    try{ await loadPosCaisse(); }catch(err){}
+  }
+  // Deux conditions, dans cet ordre — la 1re couvre le cas où aucun
+  // caissier n'a jamais été résolu (compte non lié à un employé et
+  // personne n'a encore choisi dans la liste : le "gate" n'a alors jamais
+  // été positionné, on ne peut pas se fier à son affichage) ; la 2e
+  // couvre le cas où un caissier EST sélectionné mais sa session du jour
+  // est déjà soumise/validée (le gate masque alors la zone de vente).
+  const caissierSel = document.getElementById('pos-caissier-sel');
+  const venteZone    = document.getElementById('pos-caisse-vente-zone');
+  const pretAVendre  = !!(caissierSel && caissierSel.value) && !!(venteZone && venteZone.style.display !== 'none');
+  if(!pretAVendre){
+    toast(`« ${prod.nom} » scanné — sélectionnez votre identité de caissier(ère) et démarrez votre session avant de scanner.`, 'warn');
+    return;
+  }
+  if(!prod.actif){
+    _posScanFeedback(`✕ « ${prod.nom} » est inactif — vente impossible.`, 'err');
+    return;
+  }
+  posAjouterAuPanier(prod.id);
+  const ligne = _posCart.find(c => c.produit_id === prod.id);
+  const qte = ligne ? ligne.quantite : 1;
+  _posScanFeedback(`✓ ${prod.nom} — ${qte} au panier`, 'ok');
 }
 
 function posRenderCart(){
