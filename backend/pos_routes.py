@@ -190,6 +190,10 @@ class PrixIn(BaseModel):
     prix: float = Field(gt=0)
 
 
+class CodeBarreIn(BaseModel):
+    code_barre: Optional[str] = None   # None/vide = retire le code-barres
+
+
 class DepenseItem(BaseModel):
     description: str
     montant:     float = Field(gt=0)
@@ -669,6 +673,28 @@ def historique_prix(produit_id: int, db: Session = Depends(get_db)):
         }
         for r in rows
     ]
+
+
+@router.put("/produits/{produit_id}/code-barre")
+def changer_code_barre(produit_id: int, data: CodeBarreIn, db: Session = Depends(get_db)):
+    """Assigner/retirer le code-barres d'un produit — mise à jour ciblée
+    (sans repasser tout le formulaire produit), pensée pour un scan direct
+    depuis Produits Bar : on scanne le code-barres physique du produit dans
+    le champ, on valide, c'est prêt pour la vente par scan (Caisse POS)."""
+    p = db.query(BarProduit).filter_by(id=produit_id).first()
+    if not p:
+        raise HTTPException(404, "Produit introuvable")
+    code = (data.code_barre or "").strip() or None
+    if code:
+        doublon = db.query(BarProduit).filter(
+            BarProduit.code_barre == code,
+            BarProduit.id != produit_id,
+        ).first()
+        if doublon:
+            raise HTTPException(409, f"Ce code-barres est déjà utilisé par « {doublon.nom} ».")
+    p.code_barre = code
+    db.commit()
+    return {"id": p.id, "code_barre": p.code_barre}
 
 
 # ══════════════════════════════════════════════════════════════════

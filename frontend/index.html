@@ -6853,12 +6853,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <thead>
                 <tr>
                   <th></th><th>Nom</th><th>Catégorie</th><th>Unité</th>
+                  <th>Code-barres</th>
                   <th>Prix</th><th>Stock</th><th>Coût en stock</th>
                   <th>Statut</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody id="pos-prod-tbody">
-                <tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:28px">Chargement…</td></tr>
+                <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:28px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -7031,6 +7032,31 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <button class="pos-btn primary" onclick="posChangerPrix()">Changer le prix</button>
         </div>
         <input type="hidden" id="pos-prix-produit-id">
+      </div>
+    </div>
+
+    <!-- Modal code-barres produit — scan-friendly (une douchette USB/BT tape
+         le code puis Entrée, comme n'importe quel champ texte). -->
+    <div class="pos-modal-bg" id="pos-codebarre-modal-bg" onclick="if(event.target===this)posCodeBarreModalClose()">
+      <div class="pos-modal">
+        <h3 id="pos-codebarre-modal-title">Code-barres</h3>
+        <div class="pos-form-row">
+          <div style="width:100%">
+            <label class="pos-label">Code-barres du produit</label>
+            <input class="pos-input" id="pos-codebarre-input" placeholder="Scanner ou saisir le code-barres…"
+              style="font-family:monospace;font-size:15px" autocomplete="off"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();posCodeBarreSauvegarder();}">
+            <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:5px">
+              Une fois enregistré, ce produit pourra être ajouté au panier en scannant ce code depuis l'écran de vente (Caisse POS).
+            </div>
+          </div>
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" style="color:#f87171;border-color:rgba(248,113,113,.3)" onclick="posCodeBarreEffacer()">Retirer le code</button>
+          <button class="pos-btn ghost" onclick="posCodeBarreModalClose()">Annuler</button>
+          <button class="pos-btn primary" onclick="posCodeBarreSauvegarder()">Enregistrer</button>
+        </div>
+        <input type="hidden" id="pos-codebarre-produit-id">
       </div>
     </div>
 
@@ -26126,14 +26152,14 @@ async function posCatCreer(){
 
 async function loadPosProduits(){
   const tbody = document.getElementById('pos-prod-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     await loadPosCategories();
     const data = await apiFetch('GET','/pos/produits');
     _posProduitsAll = data || [];
     _posRenderProduitsTbody(_posProduitsAll, null);
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
 }
 
@@ -26180,7 +26206,7 @@ function _posRenderProduitsTbody(prods, stockMap){
   const tbody = document.getElementById('pos-prod-tbody');
   if(!tbody) return;
   if(!prods.length){
-    tbody.innerHTML = '<tr><td colspan="9"><div class="gi-empty">Aucun produit trouvé</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10"><div class="gi-empty">Aucun produit trouvé</div></td></tr>';
     return;
   }
   tbody.innerHTML = prods.map(p=>{
@@ -26210,11 +26236,15 @@ function _posRenderProduitsTbody(prods, stockMap){
       ? `<br><span style="font-size:12px;color:#3fb6a8">${posGx(p.prix_vente_caisse)}/caisse</span>`
       : '';
     const nomSafe = (p.nom||'').replace(/'/g,"\\'");
+    const codeBarreCell = p.code_barre
+      ? `<span style="font-family:monospace;font-size:12.5px;color:rgba(255,255,255,.75);cursor:pointer" onclick="posCodeBarreModal(${p.id},'${nomSafe}','${(p.code_barre||'').replace(/'/g,"\\'")}')" title="Modifier le code-barres">${p.code_barre}</span>`
+      : `<span style="font-size:12px;color:#f7a93b;cursor:pointer" onclick="posCodeBarreModal(${p.id},'${nomSafe}','')" title="Aucun code-barres — cliquer pour en ajouter un">+ Ajouter</span>`;
     return `<tr>
       <td>${_posProduitPhotoVignette(p)}</td>
       <td><strong style="color:rgba(255,255,255,.88)">${p.nom||'—'}</strong>${caisseBadge}</td>
       <td>${catBadge}</td>
       <td class="td-muted">${p.unite||'—'}</td>
+      <td>${codeBarreCell}</td>
       <td class="td-amount">${prixUnite}${prixCaisse}</td>
       <td>${_posStockLabel(p)}</td>
       <td class="td-muted">${coutStock}</td>
@@ -26230,6 +26260,9 @@ function _posRenderProduitsTbody(prods, stockMap){
           </button>
           <button class="gi-btn-icon" title="Historique prix" onclick="posPrixModal(${p.id},'${nomSafe}')" style="color:#a78bfa">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </button>
+          <button class="gi-btn-icon" title="Code-barres" onclick="posCodeBarreModal(${p.id},'${nomSafe}','${(p.code_barre||'').replace(/'/g,"\\'")}')" style="color:#38bdf8">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="13" y1="8" x2="13" y2="16"/><line x1="16" y1="8" x2="16" y2="16"/></svg>
           </button>
           <button class="gi-btn-icon ${p.actif?'danger':''}" title="${p.actif?'Désactiver':'Activer'}" onclick="posToggleActif(${p.id},${p.actif?0:1})">
             ${p.actif
@@ -26605,6 +26638,41 @@ async function posChangerPrix(){
     await loadPosProduits();
     posAlert('Prix mis à jour.','ok');
   } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ── Code-barres produit — assignation/retrait, scan-friendly ──────────
+function posCodeBarreModal(prodId, nom, codeActuel){
+  if(_isReadOnly()){ posAlert('Accès lecture seule.','err'); return; }
+  document.getElementById('pos-codebarre-produit-id').value = prodId;
+  document.getElementById('pos-codebarre-modal-title').textContent = `Code-barres — ${nom}`;
+  const inp = document.getElementById('pos-codebarre-input');
+  inp.value = codeActuel || '';
+  document.getElementById('pos-codebarre-modal-bg').classList.add('open');
+  setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
+}
+
+function posCodeBarreModalClose(){
+  document.getElementById('pos-codebarre-modal-bg').classList.remove('open');
+}
+
+async function _posCodeBarreEnregistrer(code){
+  const prodId = document.getElementById('pos-codebarre-produit-id').value;
+  try {
+    await apiFetch('PUT', `/pos/produits/${prodId}/code-barre`, { code_barre: code || null });
+    posCodeBarreModalClose();
+    await loadPosProduits();
+    posAlert(code ? 'Code-barres enregistré.' : 'Code-barres retiré.', 'ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+function posCodeBarreSauvegarder(){
+  const code = document.getElementById('pos-codebarre-input').value.trim();
+  _posCodeBarreEnregistrer(code || null);
+}
+
+async function posCodeBarreEffacer(){
+  if(!await showConfirm('Retirer le code-barres de ce produit ?', {title:'Retirer le code-barres', okLabel:'Retirer'})) return;
+  _posCodeBarreEnregistrer(null);
 }
 
 // ══════════════════════════════════════════════════════════════════════
