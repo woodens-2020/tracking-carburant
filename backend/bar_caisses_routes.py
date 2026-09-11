@@ -344,6 +344,85 @@ def caisse_par_code(code: str, db: Session = Depends(get_db)):
     return _caisse_dict(c)
 
 
+@router.get("/caisses/etiquettes.pdf")
+def imprimer_etiquettes(ids: str = Query(..., description="IDs séparés par des virgules"),
+                        db: Session = Depends(get_db)):
+    """Une étiquette par caisse — nom du produit, numéro de caisse, nombre
+    d'unités, QR code. Mise en page en grille pour impression multiple
+    (5 caisses → 5 étiquettes, 50 caisses → 50 étiquettes).
+
+    NOTE : ce chemin fixe (/caisses/etiquettes.pdf) doit impérativement être
+    déclaré AVANT la route paramétrée /caisses/{caisse_id} ci-dessous —
+    FastAPI/Starlette matche les routes dans l'ordre de déclaration, sinon
+    "etiquettes.pdf" est capturé comme valeur de {caisse_id} et le parsing
+    entier échoue (422)."""
+    try:
+        id_list = [int(x) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(422, "Paramètre ids invalide.")
+    caisses = db.query(BarCaisse).filter(BarCaisse.id.in_(id_list)).order_by(BarCaisse.id).all()
+    if not caisses:
+        raise HTTPException(404, "Aucune caisse trouvée pour ces identifiants.")
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Image, Spacer
+    from reportlab.lib.enums import TA_CENTER
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=0.8*cm, rightMargin=0.8*cm,
+                            topMargin=0.8*cm, bottomMargin=0.8*cm,
+                            title="Étiquettes caisses")
+    st_prod = ParagraphStyle("prod", fontSize=11, fontName="Helvetica-Bold",
+                             alignment=TA_CENTER, leading=13)
+    st_code = ParagraphStyle("code", fontSize=9, fontName="Helvetica-Bold",
+                             alignment=TA_CENTER, textColor=colors.HexColor("#1e3a5f"), leading=11)
+    st_unites = ParagraphStyle("unites", fontSize=9.5, alignment=TA_CENTER,
+                               textColor=colors.HexColor("#555555"))
+
+    def _etiquette(c: BarCaisse):
+        qr_bytes = _qr_png_bytes(c.code_unique)
+        qr_img = Image(io.BytesIO(qr_bytes), width=2.6*cm, height=2.6*cm)
+        cell = Table(
+            [[Paragraph((c.produit.nom if c.produit else "—"), st_prod)],
+             [qr_img],
+             [Paragraph(f"Caisse {c.code_unique}", st_code)],
+             [Paragraph(f"{c.unites_par_caisse} unités", st_unites)]],
+            colWidths=[8.6*cm],
+        )
+        cell.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("BOX", (0, 0), (-1, -1), 0.8, colors.HexColor("#999999")),
+        ]))
+        return cell
+
+    cellules = [_etiquette(c) for c in caisses]
+    # Grille 2 colonnes — une étiquette par ligne de tableau, 2 par rangée.
+    lignes = []
+    for i in range(0, len(cellules), 2):
+        paire = cellules[i:i+2]
+        while len(paire) < 2:
+            paire.append("")
+        lignes.append(paire)
+
+    grille = Table(lignes, colWidths=[9.2*cm, 9.2*cm], rowHeights=[6.2*cm] * len(lignes))
+    grille.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN",  (0, 0), (-1, -1), "CENTER"),
+    ]))
+
+    doc.build([grille])
+    buf.seek(0)
+    return StreamingResponse(
+        buf, media_type="application/pdf",
+        headers={"Content-Disposition": 'inline; filename="etiquettes_caisses.pdf"'},
+    )
+
+
 @router.get("/caisses/{caisse_id}")
 def detail_caisse(caisse_id: int, db: Session = Depends(get_db)):
     c = db.get(BarCaisse, caisse_id)
@@ -514,80 +593,3 @@ def decrementer_caisses_fifo(db: Session, produit_id: int, quantite_vendue, vent
         _finaliser_si_epuisee(db, c, utilisateur_id)
     # Pas de commit ici : appelé à l'intérieur de la transaction de la vente,
     # c'est l'appelant (encaisser_vente) qui commit.
-
-
-# ══════════════════════════════════════════════════════════════════
-# IMPRESSION DES ÉTIQUETTES QR
-# ══════════════════════════════════════════════════════════════════
-
-@router.get("/caisses/etiquettes.pdf")
-def imprimer_etiquettes(ids: str = Query(..., description="IDs séparés par des virgules"),
-                        db: Session = Depends(get_db)):
-    """Une étiquette par caisse — nom du produit, numéro de caisse, nombre
-    d'unités, QR code. Mise en page en grille pour impression multiple
-    (5 caisses → 5 étiquettes, 50 caisses → 50 étiquettes)."""
-    try:
-        id_list = [int(x) for x in ids.split(",") if x.strip()]
-    except ValueError:
-        raise HTTPException(422, "Paramètre ids invalide.")
-    caisses = db.query(BarCaisse).filter(BarCaisse.id.in_(id_list)).order_by(BarCaisse.id).all()
-    if not caisses:
-        raise HTTPException(404, "Aucune caisse trouvée pour ces identifiants.")
-
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.units import cm
-    from reportlab.lib import colors
-    from reportlab.lib.styles import ParagraphStyle
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Image, Spacer
-    from reportlab.lib.enums import TA_CENTER
-
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=0.8*cm, rightMargin=0.8*cm,
-                            topMargin=0.8*cm, bottomMargin=0.8*cm,
-                            title="Étiquettes caisses")
-    st_prod = ParagraphStyle("prod", fontSize=11, fontName="Helvetica-Bold",
-                             alignment=TA_CENTER, leading=13)
-    st_code = ParagraphStyle("code", fontSize=9, fontName="Helvetica-Bold",
-                             alignment=TA_CENTER, textColor=colors.HexColor("#1e3a5f"), leading=11)
-    st_unites = ParagraphStyle("unites", fontSize=9.5, alignment=TA_CENTER,
-                               textColor=colors.HexColor("#555555"))
-
-    def _etiquette(c: BarCaisse):
-        qr_bytes = _qr_png_bytes(c.code_unique)
-        qr_img = Image(io.BytesIO(qr_bytes), width=2.6*cm, height=2.6*cm)
-        cell = Table(
-            [[Paragraph((c.produit.nom if c.produit else "—"), st_prod)],
-             [qr_img],
-             [Paragraph(f"Caisse {c.code_unique}", st_code)],
-             [Paragraph(f"{c.unites_par_caisse} unités", st_unites)]],
-            colWidths=[8.6*cm],
-        )
-        cell.setStyle(TableStyle([
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("TOPPADDING", (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ("BOX", (0, 0), (-1, -1), 0.8, colors.HexColor("#999999")),
-        ]))
-        return cell
-
-    cellules = [_etiquette(c) for c in caisses]
-    # Grille 2 colonnes — une étiquette par ligne de tableau, 2 par rangée.
-    lignes = []
-    for i in range(0, len(cellules), 2):
-        paire = cellules[i:i+2]
-        while len(paire) < 2:
-            paire.append("")
-        lignes.append(paire)
-
-    grille = Table(lignes, colWidths=[9.2*cm, 9.2*cm], rowHeights=[6.2*cm] * len(lignes))
-    grille.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN",  (0, 0), (-1, -1), "CENTER"),
-    ]))
-
-    doc.build([grille])
-    buf.seek(0)
-    return StreamingResponse(
-        buf, media_type="application/pdf",
-        headers={"Content-Disposition": 'inline; filename="etiquettes_caisses.pdf"'},
-    )
