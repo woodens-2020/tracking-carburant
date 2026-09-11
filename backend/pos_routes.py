@@ -26,7 +26,7 @@ from models import (
 )
 from pos_service import (
     stock_courant, stock_tous_produits, prix_actif, cmup,
-    cmup_batch, prix_actif_batch,
+    cmup_batch, prix_actif_batch, departement_id_pour_lieu,
     encaisser_vente as _encaisser, annuler_vente as _annuler,
     encaisser_commande as _enc_commande, stats_bar,
 )
@@ -422,13 +422,25 @@ def _produit_dict(p: BarProduit, stk: Decimal, db: Session) -> dict:
 
 
 @router.get("/produits")
-def liste_produits(actif: Optional[bool] = None, db: Session = Depends(get_db)):
-    """Tous les produits du bar, avec stock courant, caisse/unité et prix actif."""
+def liste_produits(actif: Optional[bool] = None, lieu: Optional[str] = None, db: Session = Depends(get_db)):
+    """Tous les produits du bar, avec stock courant, caisse/unité et prix actif.
+
+    Sans `lieu` : stock GLOBAL (comportement historique, inchangé — pages
+    Produits Bar / Stock Bar / rentabilité, qui montrent volontairement le
+    total tous départements confondus).
+
+    Avec `lieu` (DEVANT ou PISCINE — le lieu de la session de caisse en
+    cours) : stock DISPONIBLE À CE DÉPARTEMENT, c'est-à-dire exactement ce
+    que la vente vérifiera/décomptera (voir pos_service.stock_courant) —
+    utilisé par l'écran de vente (Caisse POS) pour que le stock affiché
+    corresponde toujours à ce qui peut réellement être vendu depuis ce bar,
+    au lieu du stock combiné des deux bars."""
     q = db.query(BarProduit)
     if actif is not None:
         q = q.filter(BarProduit.actif == actif)
     produits = q.order_by(BarProduit.categorie, BarProduit.nom).all()
-    stocks   = stock_tous_produits(db)
+    departement_id = departement_id_pour_lieu(lieu, db) if lieu else None
+    stocks   = stock_tous_produits(db, departement_id=departement_id)
     return [_produit_dict(p, stocks.get(p.id, Decimal("0")), db) for p in produits]
 
 

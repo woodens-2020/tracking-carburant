@@ -484,13 +484,22 @@ def startup():
             pass
 
         # ── Seed des départements bar (gestion des caisses/QR) ───────────
+        # Seulement 2 départements (demande explicite du 11/09/2026) : Bar
+        # Devant et Bar Piscine. Un « Derrière » avait été seedé plus tôt
+        # (essai) — désactivé ci-dessous plutôt que supprimé, pour ne
+        # jamais casser une caisse déjà historiquement transférée là-bas
+        # (aucune suppression silencieuse de donnée, voir doctrine du
+        # module) ; il disparaît simplement des listes de choix actives.
         try:
             from models import BarDepartement as _BD
             import re as _re
-            for _nom in ("Devant", "Piscine", "Derrière"):
+            for _nom in ("Devant", "Piscine"):
                 _norm = _re.sub(r"\s+", " ", _nom.strip()).casefold()
                 if not _db.query(_BD).filter_by(nom_norm=_norm).first():
                     _db.add(_BD(nom=_nom, nom_norm=_norm, actif=True))
+            _derriere = _db.query(_BD).filter_by(nom_norm="derrière").first()
+            if _derriere and _derriere.actif:
+                _derriere.actif = False
             _db.commit()
         except Exception:
             _db.rollback()

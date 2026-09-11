@@ -65,10 +65,15 @@ def stock_courant(produit_id: int, db: Session, departement_id: int | None = Non
 
 def stock_tous_produits(db: Session, departement_id: int | None = None) -> dict[int, Decimal]:
     """Stock courant de tous les produits actifs en une seule requête.
-    Voir stock_courant() pour la sémantique de departement_id."""
+    Voir stock_courant() pour la sémantique de departement_id (mêmes règles :
+    ses mouvements + le pot non affecté, pour que les produits non gérés
+    par caisses restent disponibles depuis n'importe quel département)."""
     q = db.query(BarMouvementStock.produit_id, func.sum(BarMouvementStock.quantite))
     if departement_id is not None:
-        q = q.filter(BarMouvementStock.departement_id == departement_id)
+        q = q.filter(
+            (BarMouvementStock.departement_id == departement_id)
+            | (BarMouvementStock.departement_id.is_(None))
+        )
     rows = q.group_by(BarMouvementStock.produit_id).all()
     return {pid: _dec(total) for pid, total in rows}
 

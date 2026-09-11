@@ -6738,7 +6738,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <option value="">Choisir un bar…</option>
             <option value="DEVANT">Bar Devant (Accueil)</option>
             <option value="PISCINE">Bar Piscine</option>
-            <option value="DERRIERE">Bar Derrière</option>
           </select>
         </div>
 
@@ -8571,7 +8570,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option value="">Tous les bars</option>
               <option value="DEVANT">Bar Devant</option>
               <option value="PISCINE">Bar Piscine</option>
-              <option value="DERRIERE">Bar Derrière</option>
             </select>
             <input type="date" class="pos-input" id="sc-debut" style="width:130px">
             <input type="date" class="pos-input" id="sc-fin" style="width:130px">
@@ -8717,7 +8715,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option value="">Tous les bars</option>
               <option value="DEVANT">Bar Devant</option>
               <option value="PISCINE">Bar Piscine</option>
-              <option value="DERRIERE">Bar Derrière</option>
             </select>
             <input type="date" class="pos-input" id="rs-debut" style="width:130px">
             <input type="date" class="pos-input" id="rs-fin" style="width:130px">
@@ -24127,10 +24124,16 @@ let _posMode = 'CASH';
 let _posProduits = [];       // cache des produits bar avec prix actif
 let _posCuisinePlats = [];   // cache des plats cuisine pour vente via bar
 
-/* Charger les produits bar dans le cache */
+/* Charger les produits bar dans le cache — le stock affiché/vendable est
+   scopé au département du bar en cours (_posCaisseLieu, connu via le
+   dashboard de session — voir _posDashLoadData) dès qu'une session avec un
+   lieu est active, pour que Bar Devant et Bar Piscine ne voient jamais le
+   stock combiné des deux. Sans lieu connu (pas de session, admin hors
+   caisse…), comportement historique : stock global. */
 async function _posLoadProduitsCache(){
   try {
-    const data = await apiFetch('GET','/pos/produits?actif=true');
+    const q = _posCaisseLieu ? `&lieu=${encodeURIComponent(_posCaisseLieu)}` : '';
+    const data = await apiFetch('GET', `/pos/produits?actif=true${q}`);
     _posProduits = data || [];
   } catch(e){ _posProduits = []; }
 }
@@ -25248,6 +25251,7 @@ async function _posChargerCaissiers(){
 // ── Mini-dashboard caissière ──────────────────────────────────────
 let _posDashCaissierInterval = null;
 let _posDashSessionId = null;
+let _posCaisseLieu = null;   // lieu (DEVANT/PISCINE) de la session en cours — voir _posDashLoadData
 
 function posCaissierChange(caissier_id){
   const dash = document.getElementById('pos-dash-caissier');
@@ -25325,7 +25329,7 @@ async function posConfirmerDemarrage(){
   const cid = document.getElementById('pos-caissier-sel')?.value;
   if(!cid) return;
   const lieu = document.getElementById('pd-lieu-sel')?.value;
-  if(!lieu){ posAlert('Choisissez le bar (Bar Devant, Bar Piscine ou Bar Derrière) avant de démarrer.', 'warn'); return; }
+  if(!lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine) avant de démarrer.', 'warn'); return; }
   try {
     const s = await apiFetch('POST', '/pos/caisse/sessions/ouvrir', {caissier_id: parseInt(cid), lieu});
     _posDashSessionId = s.id;
@@ -25342,6 +25346,17 @@ async function _posDashLoadData(caissier_id){
   try {
     const d = await apiFetch('GET', `/pos/caisse/dashboard?caissier_id=${caissier_id}`);
     _posDashSessionId = d.session_id;
+
+    // Le stock affiché à l'écran de vente doit toujours correspondre au
+    // département du bar en cours — dès que le lieu de la session change
+    // (première charge, changement de caissier…), on recharge le cache
+    // produits avec le bon stock et on réaffiche la grille.
+    if(d.lieu !== _posCaisseLieu){
+      _posCaisseLieu = d.lieu || null;
+      await _posLoadProduitsCache();
+      posRenderCatTabs();
+      posCatFilter(_posCatActuelle, null);
+    }
 
     const nomEl = document.getElementById('pos-dash-nom');
     if(nomEl) nomEl.textContent = d.caissier_nom + ' — ' + d.date;
@@ -30028,8 +30043,11 @@ function _ckHeureFmt(d){
   return new Date(d).toLocaleTimeString('fr-FR',{timeZone:'America/Port-au-Prince',hour:'2-digit',minute:'2-digit'});
 }
 
-// Lieu (Bar Devant / Bar Piscine / Bar Derrière) — étiquette partagée par
-// les pages Sessions Caissières, Rapports Soumis et Écarts d'Inventaire.
+// Lieu (Bar Devant / Bar Piscine) — étiquette partagée par les pages
+// Sessions Caissières, Rapports Soumis et Écarts d'Inventaire. DERRIERE
+// n'est plus proposé au choix nulle part (seulement 2 bars, demande
+// explicite du 11/09/2026) mais reste résolu ici pour ne pas laisser une
+// étiquette vide sur une session historique déjà ouverte avec ce lieu.
 const _LIEU_LABELS = {DEVANT:'Bar Devant', PISCINE:'Bar Piscine', DERRIERE:'Bar Derrière'};
 const _LIEU_COLORS = {DEVANT:'#a78bfa', PISCINE:'#38bdf8', DERRIERE:'#fb923c'};
 function _lieuLabel(lieu){
