@@ -6981,6 +6981,17 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
         <div class="pos-form-row">
+          <div style="width:100%">
+            <label class="pos-label">Département de destination <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
+            <select class="pos-select" id="pos-appro-departement" style="width:100%">
+              <option value="">— Non affecté (stock partagé) —</option>
+            </select>
+            <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:4px">
+              Laissez sur « Non affecté » si ce stock est partagé entre Bar Devant et Bar Piscine. Choisissez un bar pour que ce stock soit réservé à lui seul.
+            </div>
+          </div>
+        </div>
+        <div class="pos-form-row">
           <div style="flex:1">
             <label class="pos-label">Prix d'achat / caisse (G) <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
             <input class="pos-input" id="pos-appro-prix-caisse" type="number" min="0" step="0.01" placeholder="0.00">
@@ -7486,6 +7497,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="pos-form-row">
           <div><label class="pos-label">Quantité (signée) *</label>
             <input class="pos-input" id="pos-ajust-qte" type="number" step="0.001" placeholder="-2.5 ou +5">
+          </div>
+          <div><label class="pos-label">Département <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
+            <select class="pos-select" id="pos-ajust-departement">
+              <option value="">— Non affecté (stock partagé) —</option>
+            </select>
           </div>
         </div>
         <div><label class="pos-label">Motif (min 5 caractères) *</label>
@@ -26088,20 +26104,34 @@ function _posProduitPhotoVignette(p){
   return `<div style="width:34px;height:34px;border-radius:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.25);font-size:14px;font-weight:700">${initiale}</div>`;
 }
 
+// Ventilation par département — affichée en petit sous le stock total,
+// partout où le stock est montré (Produits Bar, Stock Bar), pour que la
+// séparation Bar Devant / Bar Piscine soit visible directement, pas
+// seulement appliquée en coulisses à la vente.
+function _posDeptBreakdownHtml(p){
+  const parDep = p.stock_par_departement || [];
+  const nonAffecte = p.stock_non_affecte || 0;
+  if(!parDep.length && !nonAffecte) return '';
+  const parts = parDep.map(d => `${d.departement_nom} : <strong>${d.stock}</strong>`);
+  if(nonAffecte > 0) parts.push(`<span style="color:#f7a93b">Non affecté : <strong>${nonAffecte}</strong></span>`);
+  return `<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">${parts.join(' · ')}</div>`;
+}
+
 function _posStockLabel(p){
   const stkRaw = p.stock_unites != null ? p.stock_unites : (p.stock_courant != null ? parseFloat(p.stock_courant) : null);
   if(stkRaw === null) return '<span class="td-muted">—</span>';
   const stk = Math.round(stkRaw);
   const bas = p.stock_bas ? ' style="color:#f7a93b;font-weight:700"' : '';
+  const dept = _posDeptBreakdownHtml(p);
   if(!p.vendu_par_caisse){
-    return `<span${bas}>${stk} <span class="td-muted">${p.unite||'u.'}</span></span>`;
+    return `<span${bas}>${stk} <span class="td-muted">${p.unite||'u.'}</span></span>${dept}`;
   }
   const upc = p.unites_par_caisse||1;
   const caisses = Math.floor(stk / upc);
   const vrac    = stk % upc;
   const caissesTxt = `<span style="color:#3fb6a8;font-weight:600">${caisses} caisse${caisses!==1?'s':''}</span>`;
   const vracTxt = vrac > 0 ? ` <span style="color:#3fb6a8">+ ${vrac}</span>` : '';
-  return `<span${bas}>${stk} u. — ${caissesTxt}${vracTxt}</span>`;
+  return `<span${bas}>${stk} u. — ${caissesTxt}${vracTxt}</span>${dept}`;
 }
 
 function _posRenderProduitsTbody(prods, stockMap){
@@ -26366,7 +26396,7 @@ async function posProduitSauvegarder(){
 
 // ── APPROVISIONNEMENT ────────────────────────────────────────────
 
-function posApproModal(prodId){
+async function posApproModal(prodId){
   const p = _posProduitsAll.find(x=>x.id===prodId)||{};
   document.getElementById('pos-appro-produit-id').value = prodId;
   document.getElementById('pos-appro-upc').value        = p.unites_par_caisse||1;
@@ -26377,6 +26407,14 @@ function posApproModal(prodId){
   document.getElementById('pos-appro-nb-unite-seul').value = '';
   document.getElementById('pos-appro-prix-caisse').value  = '';
   document.getElementById('pos-appro-notes').value        = '';
+  const depSel = document.getElementById('pos-appro-departement');
+  if(depSel){
+    depSel.innerHTML = '<option value="">— Non affecté (stock partagé) —</option>';
+    try{
+      const deps = await apiFetch('GET','/pos/departements');
+      depSel.innerHTML += deps.map(d=>`<option value="${d.id}">${d.nom}</option>`).join('');
+    }catch(e){}
+  }
   const caisseSec  = document.getElementById('pos-appro-caisse-section');
   const uniteSec   = document.getElementById('pos-appro-unite-section');
   const liveDiv    = document.getElementById('pos-appro-live');
@@ -26461,11 +26499,13 @@ async function posApproSauvegarder(){
     nb_unites_vrac = parseInt(document.getElementById('pos-appro-nb-unite-seul').value)||0;
   }
   if(nb_caisses===0 && nb_unites_vrac===0){ posAlert('Saisir au moins 1 caisse ou 1 unité.'); return; }
+  const depVal = document.getElementById('pos-appro-departement')?.value;
+  const departement_id = depVal ? parseInt(depVal) : null;
   try {
     const res = await apiFetch('POST',`/pos/produits/${prodId}/approvisionnement`,{
       nb_caisses, nb_unites_vrac,
       prix_achat_caisse: prixCaisse,
-      notes,
+      notes, departement_id,
     });
     posApproModalClose();
     await loadPosProduits();
@@ -26601,7 +26641,7 @@ function _posStockRenderTable(){
     return `<tr${alerte?' style="background:rgba(248,113,113,.06)"':''}>
       <td><strong>${p.nom||'—'}</strong></td>
       <td>${p.categorie||'—'}</td>
-      <td><strong>${fmtQ(stock)}</strong></td>
+      <td><strong>${fmtQ(stock)}</strong>${_posDeptBreakdownHtml(s)}</td>
       <td>${p.unite||'—'}</td>
       <td>${p.seuil_alerte_stock||'—'}</td>
       <td>${valeur>0?posGx(valeur):'—'}</td>
@@ -26796,10 +26836,18 @@ async function posReceptionnerStock(){
   } catch(e){ posAlert(e.message||'Erreur.'); }
 }
 
-function posStockAjustModal(){
+async function posStockAjustModal(){
   if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   document.getElementById('pos-ajust-qte').value='';
   document.getElementById('pos-ajust-motif').value='';
+  const depSel = document.getElementById('pos-ajust-departement');
+  if(depSel){
+    depSel.innerHTML = '<option value="">— Non affecté (stock partagé) —</option>';
+    try{
+      const deps = await apiFetch('GET','/pos/departements');
+      depSel.innerHTML += deps.map(d=>`<option value="${d.id}">${d.nom}</option>`).join('');
+    }catch(e){}
+  }
   document.getElementById('pos-ajust-modal-bg').classList.add('open');
 }
 
@@ -26808,10 +26856,12 @@ async function posAjusterStock(){
   const type   = document.getElementById('pos-ajust-type').value;
   const qte    = parseFloat(document.getElementById('pos-ajust-qte').value||0);
   const motif  = document.getElementById('pos-ajust-motif').value.trim();
+  const depVal = document.getElementById('pos-ajust-departement')?.value;
+  const departement_id = depVal ? parseInt(depVal) : null;
   if(!prodId||!qte){ posAlert('Produit et quantité requis.'); return; }
   if(motif.length < 5){ posAlert('Motif trop court (min 5 caractères).'); return; }
   try {
-    await apiFetch('POST','/pos/stock/ajustement',{ produit_id:parseInt(prodId), type_mouvement:type, quantite:qte, motif });
+    await apiFetch('POST','/pos/stock/ajustement',{ produit_id:parseInt(prodId), type_mouvement:type, quantite:qte, motif, departement_id });
     document.getElementById('pos-ajust-modal-bg').classList.remove('open');
     await loadPosStock();
     posAlert('Ajustement enregistré.','ok');

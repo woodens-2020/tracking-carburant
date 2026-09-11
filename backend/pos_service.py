@@ -110,6 +110,35 @@ def stock_par_departement(produit_id: int, db: Session) -> dict:
     }
 
 
+def stock_par_departement_tous_produits(db: Session) -> dict[int, dict]:
+    """Version « tous produits en une requête » de stock_par_departement(),
+    pour enrichir GET /pos/produits sans un aller-retour DB par produit
+    (voir _produit_dict dans pos_routes.py — champ stock_par_departement,
+    affiché sur les pages Produits Bar / Stock Bar / Caisse POS)."""
+    rows = (
+        db.query(BarMouvementStock.produit_id, BarMouvementStock.departement_id,
+                 func.sum(BarMouvementStock.quantite))
+        .group_by(BarMouvementStock.produit_id, BarMouvementStock.departement_id)
+        .all()
+    )
+    deps = {d.id: d.nom for d in db.query(BarDepartement).all()}
+    par_produit: dict[int, dict] = {}
+    for pid, dep_id, total in rows:
+        entry = par_produit.setdefault(pid, {"par_departement": [], "non_affecte": Decimal("0")})
+        if dep_id is None:
+            entry["non_affecte"] = _dec(total)
+        else:
+            entry["par_departement"].append({
+                "departement_id":  dep_id,
+                "departement_nom": deps.get(dep_id, f"#{dep_id}"),
+                "stock":           float(_dec(total)),
+            })
+    for entry in par_produit.values():
+        entry["par_departement"].sort(key=lambda d: d["departement_nom"])
+        entry["non_affecte"] = float(entry["non_affecte"])
+    return par_produit
+
+
 # Mapping du champ historique BarSessionCaisse.lieu (chaîne libre DEVANT/
 # PISCINE/DERRIERE, choisie une fois à l'ouverture de session) vers le nom
 # du BarDepartement correspondant, tel que seedé au démarrage (main.py).
