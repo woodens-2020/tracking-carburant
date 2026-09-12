@@ -209,6 +209,11 @@ def _migrate_columns():
             # compte de connexion utilisé pour la saisie
             ("releves", "pompiste_id",
              "ALTER TABLE releves ADD COLUMN pompiste_id INTEGER REFERENCES employes(id)", None),
+            # v24 — lieu (Bar Devant / Bar Piscine) sur les mouvements de stock —
+            # uniquement pour les ajustements manuels (AJUSTEMENT/PERTE/CASSE) ;
+            # les achats/ventes non rattachées à une session restent NULL.
+            ("bar_mouvements_stock", "lieu",
+             "ALTER TABLE bar_mouvements_stock ADD COLUMN lieu VARCHAR(20)", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -322,6 +327,11 @@ def _migrate_columns():
             # compte de connexion utilisé pour la saisie
             ("releves", "pompiste_id",
              "ALTER TABLE releves ADD COLUMN pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL", None),
+            # v24 — lieu (Bar Devant / Bar Piscine) sur les mouvements de stock —
+            # uniquement pour les ajustements manuels (AJUSTEMENT/PERTE/CASSE) ;
+            # les achats/ventes non rattachées à une session restent NULL.
+            ("bar_mouvements_stock", "lieu",
+             "ALTER TABLE bar_mouvements_stock ADD COLUMN lieu VARCHAR(20)", None),
         ]
     else:
         return
@@ -400,6 +410,18 @@ def _migrate_columns():
             try:
                 conn.execute(sql_text(
                     "ALTER TABLE bar_sessions_caisse ADD CONSTRAINT chk_session_lieu "
+                    "CHECK (lieu IS NULL OR lieu IN ('DEVANT','PISCINE'))"
+                ))
+                conn.commit()
+            except Exception:
+                conn.rollback()  # déjà présente
+
+        # v24 — lieu (Bar Devant / Bar Piscine) sur les mouvements de stock :
+        # même contrainte de domaine que chk_session_lieu.
+        with engine.connect() as conn:
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE bar_mouvements_stock ADD CONSTRAINT chk_bar_mouv_lieu "
                     "CHECK (lieu IS NULL OR lieu IN ('DEVANT','PISCINE'))"
                 ))
                 conn.commit()

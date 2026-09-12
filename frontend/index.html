@@ -7064,10 +7064,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-table-wrap">
             <table class="pos-table">
               <thead>
-                <tr><th>Produit</th><th>Catégorie</th><th>Stock</th><th>Unité</th><th>Seuil alerte</th><th>Coût en stock</th><th>État</th><th>Actions</th></tr>
+                <tr><th>Produit</th><th>Catégorie</th><th>Bar Devant</th><th>Bar Piscine</th><th>Total</th><th>Unité</th><th>Seuil alerte</th><th>Coût en stock</th><th>État</th><th>Actions</th></tr>
               </thead>
               <tbody id="pos-stock-tbody">
-                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -7188,6 +7188,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div><label class="pos-label">Quantité (signée) *</label>
             <input class="pos-input" id="pos-ajust-qte" type="number" step="0.001" placeholder="-2.5 ou +5">
           </div>
+          <div><label class="pos-label">Lieu *</label>
+            <select class="pos-select" id="pos-ajust-lieu">
+              <option value="">Choisir un bar…</option>
+              <option value="DEVANT">Bar Devant (Accueil)</option>
+              <option value="PISCINE">Bar Piscine</option>
+            </select>
+          </div>
         </div>
         <div><label class="pos-label">Motif (min 5 caractères) *</label>
           <input class="pos-input" id="pos-ajust-motif" placeholder="Ex : Inventaire physique — manque de 3 bouteilles">
@@ -7195,6 +7202,25 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="pos-modal-footer">
           <button class="pos-btn ghost" onclick="document.getElementById('pos-ajust-modal-bg').classList.remove('open')">Annuler</button>
           <button class="pos-btn danger" onclick="posAjusterStock()">Valider</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal réinitialisation stock (par lieu) -->
+    <div class="pos-modal-bg" id="pos-reinit-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal">
+        <h3>Réinitialiser le stock</h3>
+        <div style="font-size:13.5px;color:rgba(255,255,255,.55);margin-bottom:10px" id="pos-reinit-desc"></div>
+        <div><label class="pos-label">Lieu à réinitialiser *</label>
+          <select class="pos-select" id="pos-reinit-lieu">
+            <option value="">Choisir un bar…</option>
+            <option value="DEVANT">Bar Devant (Accueil)</option>
+            <option value="PISCINE">Bar Piscine</option>
+          </select>
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="document.getElementById('pos-reinit-modal-bg').classList.remove('open')">Annuler</button>
+          <button class="pos-btn danger" onclick="posStockReinitialiserConfirmer()">Réinitialiser à zéro</button>
         </div>
       </div>
     </div>
@@ -25721,7 +25747,7 @@ let _posStockDispoFiltre = ''; // '' | 'disponible' | 'non_disponible'
 
 async function loadPosStock(){
   const tbody = document.getElementById('pos-stock-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     const [prods, stocks, attente] = await Promise.all([
       apiFetch('GET','/pos/produits?actif=true'),
@@ -25757,7 +25783,7 @@ async function loadPosStock(){
     // Peupler les selects produits pour les modals
     _posFillProduitSelects(prods||[]);
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
 }
 
@@ -25777,7 +25803,9 @@ function _posStockRenderTable(){
 
   const rows = filtres.map(p=>{
     const s = stockMap[p.id]||{};
-    const stock = parseFloat(s.stock_courant||0);
+    const stock   = parseFloat(s.stock_courant||0);
+    const devant  = parseFloat(s.stock_devant||0);
+    const piscine = parseFloat(s.stock_piscine||0);
     const cmup  = parseFloat(s.cmup||0);
     const valeur = stock * cmup;
     const alerte = p.seuil_alerte_stock && stock <= p.seuil_alerte_stock;
@@ -25789,15 +25817,17 @@ function _posStockRenderTable(){
     return `<tr${alerte?' style="background:rgba(248,113,113,.06)"':''}>
       <td><strong>${p.nom||'—'}</strong></td>
       <td>${p.categorie||'—'}</td>
+      <td>${fmtQ(devant)}</td>
+      <td>${fmtQ(piscine)}</td>
       <td><strong>${fmtQ(stock)}</strong></td>
       <td>${p.unite||'—'}</td>
       <td>${p.seuil_alerte_stock||'—'}</td>
       <td>${valeur>0?posGx(valeur):'—'}</td>
       <td>${badge}</td>
-      <td>${stock!==0?`<button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posStockReinitialiser(${p.id},'${esc(p.nom||'')}',${stock})">Réinitialiser</button>`:'<span style="color:rgba(255,255,255,.25);font-size:12px">—</span>'}</td>
+      <td>${(devant!==0||piscine!==0)?`<button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posStockReinitialiser(${p.id},'${esc(p.nom||'')}',${devant},${piscine})">Réinitialiser</button>`:'<span style="color:rgba(255,255,255,.25);font-size:12px">—</span>'}</td>
     </tr>`;
   });
-  tbody.innerHTML = rows.join('') || `<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit ${recherche||_posStockDispoFiltre?'ne correspond aux filtres':'actif'}</td></tr>`;
+  tbody.innerHTML = rows.join('') || `<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit ${recherche||_posStockDispoFiltre?'ne correspond aux filtres':'actif'}</td></tr>`;
 }
 
 function posStockFiltrer(){ _posStockRenderTable(); }
@@ -25818,16 +25848,26 @@ function posStockExportPdf(){
   window.open('/api/pos/stock/export/pdf?'+params.toString(), '_blank');
 }
 
-async function posStockReinitialiser(produitId, produitNom, stockActuel){
-  const ok = await showConfirm(
-    `Le stock actuel de « ${produitNom} » (${fmtQ(stockActuel)}) sera ramené à zéro. ` +
-    `Cette action est tracée comme un ajustement (irréversible) — à utiliser pour repartir sur un nouvel inventaire authentique, sans le mélanger à l'historique existant.`,
-    {title:'Réinitialiser le stock', type:'danger', okLabel:'Réinitialiser à zéro'}
-  );
-  if(!ok) return;
+let _posReinitCtx = null;   // {produitId, produitNom}
+
+function posStockReinitialiser(produitId, produitNom, stockDevant, stockPiscine){
+  _posReinitCtx = { produitId, produitNom };
+  document.getElementById('pos-reinit-desc').textContent =
+    `« ${produitNom} » — Bar Devant : ${fmtQ(stockDevant)} · Bar Piscine : ${fmtQ(stockPiscine)}. ` +
+    `Choisissez le lieu à ramener à zéro. Action tracée comme un ajustement (irréversible) — ` +
+    `à utiliser pour repartir sur un nouvel inventaire authentique, sans mélanger les deux bars.`;
+  document.getElementById('pos-reinit-lieu').value = '';
+  document.getElementById('pos-reinit-modal-bg').classList.add('open');
+}
+
+async function posStockReinitialiserConfirmer(){
+  if(!_posReinitCtx) return;
+  const lieu = document.getElementById('pos-reinit-lieu').value;
+  if(!lieu){ toast('Choisissez le bar (Bar Devant ou Bar Piscine).','err'); return; }
   try{
-    const res = await apiFetch('POST', `/pos/stock/${produitId}/reinitialiser`, {});
-    toast(`Stock de « ${res.produit_nom} » réinitialisé (${fmtQ(res.stock_avant)} → 0).`,'ok');
+    const res = await apiFetch('POST', `/pos/stock/${_posReinitCtx.produitId}/reinitialiser?lieu=${lieu}`, {});
+    document.getElementById('pos-reinit-modal-bg').classList.remove('open');
+    toast(`Stock ${lieu==='DEVANT'?'Bar Devant':'Bar Piscine'} de « ${res.produit_nom} » réinitialisé (${fmtQ(res.stock_avant)} → 0).`,'ok');
     loadPosStock();
   }catch(e){ toast(e.message||'Erreur lors de la réinitialisation.','err'); }
 }
@@ -25988,6 +26028,7 @@ function posStockAjustModal(){
   if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   document.getElementById('pos-ajust-qte').value='';
   document.getElementById('pos-ajust-motif').value='';
+  document.getElementById('pos-ajust-lieu').value='';
   document.getElementById('pos-ajust-modal-bg').classList.add('open');
 }
 
@@ -25996,10 +26037,12 @@ async function posAjusterStock(){
   const type   = document.getElementById('pos-ajust-type').value;
   const qte    = parseFloat(document.getElementById('pos-ajust-qte').value||0);
   const motif  = document.getElementById('pos-ajust-motif').value.trim();
+  const lieu   = document.getElementById('pos-ajust-lieu').value;
   if(!prodId||!qte){ posAlert('Produit et quantité requis.'); return; }
   if(motif.length < 5){ posAlert('Motif trop court (min 5 caractères).'); return; }
+  if(!lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine).'); return; }
   try {
-    await apiFetch('POST','/pos/stock/ajustement',{ produit_id:parseInt(prodId), type_mouvement:type, quantite:qte, motif });
+    await apiFetch('POST','/pos/stock/ajustement',{ produit_id:parseInt(prodId), type_mouvement:type, quantite:qte, motif, lieu });
     document.getElementById('pos-ajust-modal-bg').classList.remove('open');
     await loadPosStock();
     posAlert('Ajustement enregistré.','ok');

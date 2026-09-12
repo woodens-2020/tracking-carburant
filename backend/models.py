@@ -760,6 +760,11 @@ class BarMouvementStock(Base):
     achat_id           = Column(Integer, ForeignKey("bar_achats.id", ondelete="SET NULL"), nullable=True)
     date_mouvement     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     utilisateur_id     = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    # Lieu (Bar Devant / Bar Piscine) — uniquement renseigné pour les
+    # ajustements manuels (AJUSTEMENT/PERTE/CASSE) et, en best-effort, pour
+    # les ventes/annulations quand la session caissière connaît son lieu.
+    # Les achats/réceptions restent volontairement NULL (stock pool commun).
+    lieu               = Column(String(20), nullable=True)
 
     produit = relationship("BarProduit", back_populates="mouvements",
                            foreign_keys=[produit_id])
@@ -771,6 +776,7 @@ class BarMouvementStock(Base):
             "type_mouvement IN ('ENTREE','SORTIE_VENTE','AJUSTEMENT','PERTE','CASSE')",
             name="chk_bar_mouv_type",
         ),
+        CheckConstraint("lieu IS NULL OR lieu IN ('DEVANT','PISCINE')", name="chk_bar_mouv_lieu"),
         Index("idx_bar_mouv_produit", "produit_id"),
         Index("idx_bar_mouv_date",    "date_mouvement"),
         Index("idx_bar_mouv_vente",   "reference_vente_id"),

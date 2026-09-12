@@ -25,10 +25,11 @@ from models import (
     Employe, Utilisateur, CuisinePlat, RenflouementDepartement, Client,
 )
 from pos_service import (
-    stock_courant, stock_tous_produits, prix_actif, cmup,
-    cmup_batch, prix_actif_batch,
+    stock_courant, stock_tous_produits, stock_par_lieu_tous_produits,
+    prix_actif, cmup, cmup_batch, prix_actif_batch,
     encaisser_vente as _encaisser, annuler_vente as _annuler,
     encaisser_commande as _enc_commande, stats_bar,
+    LIEUX_VALIDES,
 )
 
 router = APIRouter(prefix="/api/pos", tags=["POS Bar"])
@@ -206,12 +207,19 @@ class AjustementIn(BaseModel):
     quantite:       float   # signée : + pour ajustement positif, - pour perte
     type_mouvement: str = "AJUSTEMENT"   # AJUSTEMENT, PERTE, CASSE
     motif:          str
+    lieu:           str     # DEVANT ou PISCINE — requis pour tout ajustement manuel
 
     @validator("type_mouvement")
     def check_type(cls, v):
         if v not in ("AJUSTEMENT", "PERTE", "CASSE"):
             raise ValueError("type_mouvement doit être AJUSTEMENT, PERTE ou CASSE")
         return v
+
+    @validator("lieu")
+    def check_lieu(cls, v):
+        if not v or v.upper() not in LIEUX_VALIDES:
+            raise ValueError("Choisissez le bar (Bar Devant ou Bar Piscine).")
+        return v.upper()
 
 
 class LigneVenteIn(BaseModel):
@@ -757,18 +765,21 @@ def dernier_approvisionnement(produit_id: int, db: Session = Depends(get_db)):
 
 @router.get("/stock")
 def stock_global(db: Session = Depends(get_db)):
-    """Stock courant calculé pour tous les produits actifs."""
+    """Stock courant calculé pour tous les produits actifs — total (pool
+    commun, inchangé) + répartition Bar Devant / Bar Piscine."""
     produits = db.query(BarProduit).filter_by(actif=True).order_by(BarProduit.categorie, BarProduit.nom).all()
-    stocks   = stock_tous_produits(db)
+    stocks   = stock_par_lieu_tous_produits(db)
     return [
         {
             "produit_id":         p.id,
             "nom":                p.nom,
             "categorie":          p.categorie,
             "unite":              p.unite,
-            "stock_courant":      float(stocks.get(p.id, Decimal("0"))),
+            "stock_courant":      float(stocks.get(p.id, {}).get("total", 0)),
+            "stock_devant":       float(stocks.get(p.id, {}).get("devant", 0)),
+            "stock_piscine":      float(stocks.get(p.id, {}).get("piscine", 0)),
             "seuil_alerte_stock": float(p.seuil_alerte_stock),
-            "alerte":             stocks.get(p.id, Decimal("0")) <= Decimal(str(p.seuil_alerte_stock)),
+            "alerte":             stocks.get(p.id, {}).get("total", Decimal("0")) <= Decimal(str(p.seuil_alerte_stock)),
             "cmup":               float(cmup(p.id, db)),
         }
         for p in produits
@@ -793,13 +804,16 @@ def export_stock_pdf(
     from reportlab.lib.enums import TA_CENTER
 
     produits = db.query(BarProduit).filter_by(actif=True).order_by(BarProduit.categorie, BarProduit.nom).all()
-    stocks   = stock_tous_produits(db)
+    stocks   = stock_par_lieu_tous_produits(db)
 
     lignes = []
     for p in produits:
         if recherche and recherche.strip().lower() not in p.nom.lower():
             continue
-        stock = float(stocks.get(p.id, Decimal("0")))
+        row     = stocks.get(p.id, {})
+        stock   = float(row.get("total", 0))
+        devant  = float(row.get("devant", 0))
+        piscine = float(row.get("piscine", 0))
         dispo = stock > 0
         if disponibilite == "disponible" and not dispo:
             continue
@@ -807,7 +821,7 @@ def export_stock_pdf(
             continue
         alerte = p.seuil_alerte_stock and stock <= float(p.seuil_alerte_stock)
         etat = "Alerte" if alerte else ("Épuisé" if stock <= 0 else "OK")
-        lignes.append([p.nom, p.categorie or "—", f"{stock:.3f}", p.unite or "—", etat])
+        lignes.append([p.nom, p.categorie or "—", f"{devant:.3f}", f"{piscine:.3f}", f"{stock:.3f}", p.unite or "—", etat])
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4,
@@ -830,8 +844,8 @@ def export_stock_pdf(
     story.append(HRFlowable(width="100%", thickness=1.5, color=ORANGE))
     story.append(Spacer(1, 10))
 
-    data = [["Produit", "Catégorie", "Stock", "Unité", "État"]] + lignes
-    t = Table(data, colWidths=[6.5*cm, 3.5*cm, 2.5*cm, 2.5*cm, 2.5*cm])
+    data = [["Produit", "Catégorie", "Bar Devant", "Bar Piscine", "Total", "Unité", "État"]] + lignes
+    t = Table(data, colWidths=[5.0*cm, 2.8*cm, 2.1*cm, 2.1*cm, 2.1*cm, 1.6*cm, 1.7*cm])
     t.setStyle(TableStyle([
         ("BACKGROUND",   (0,0),(-1,0), DARK),
         ("TEXTCOLOR",    (0,0),(-1,0), colors.white),
@@ -839,7 +853,7 @@ def export_stock_pdf(
         ("FONTSIZE",     (0,0),(-1,-1), 9),
         ("ROWBACKGROUNDS",(0,1),(-1,-1), [colors.HexColor("#F5F5F5"), colors.white]),
         ("GRID",         (0,0),(-1,-1), 0.4, colors.HexColor("#CCCCCC")),
-        ("ALIGN",        (2,0),(4,-1), "CENTER"),
+        ("ALIGN",        (2,0),(6,-1), "CENTER"),
         ("BOTTOMPADDING",(0,0),(-1,-1), 5),
         ("TOPPADDING",   (0,0),(-1,-1), 5),
     ]))
@@ -891,6 +905,7 @@ def stock_produit(produit_id: int, db: Session = Depends(get_db)):
                 "date":          m.date_mouvement.isoformat(),
                 "vente_id":      m.reference_vente_id,
                 "achat_id":      m.achat_id,
+                "lieu":          m.lieu,
             }
             for m in mouvements
         ],
@@ -1583,6 +1598,7 @@ def ajuster_stock(data: AjustementIn, request: Request, db: Session = Depends(ge
         type_mouvement = data.type_mouvement,
         quantite       = qte,
         motif          = data.motif.strip(),
+        lieu           = data.lieu,
         utilisateur_id = _uid(request),
     )
     db.add(mouv)
@@ -1595,25 +1611,31 @@ def ajuster_stock(data: AjustementIn, request: Request, db: Session = Depends(ge
 
 
 @router.post("/stock/{produit_id}/reinitialiser", status_code=201)
-def reinitialiser_stock(produit_id: int, request: Request, db: Session = Depends(get_db)):
-    """Ramène le stock calculé d'un produit à exactement 0, via un mouvement
-    d'ajustement compensatoire — pour repartir sur un nouvel inventaire
-    authentique sans le mélanger à l'historique de mouvements existant.
-    Le stock avant/après est calculé côté serveur au moment de l'exécution
-    (jamais côté client) pour éviter tout écart lié à une vente concurrente."""
+def reinitialiser_stock(produit_id: int, lieu: str, request: Request, db: Session = Depends(get_db)):
+    """Ramène le stock calculé d'un produit, POUR UN LIEU DONNÉ, à exactement
+    0, via un mouvement d'ajustement compensatoire — pour repartir sur un
+    nouvel inventaire authentique sans le mélanger à l'historique de
+    mouvements existant. Le stock avant/après est calculé côté serveur au
+    moment de l'exécution (jamais côté client) pour éviter tout écart lié à
+    une vente concurrente."""
     p = db.query(BarProduit).filter_by(id=produit_id).first()
     if not p:
         raise HTTPException(404, "Produit introuvable")
 
-    stock_avant = stock_courant(produit_id, db)
+    lieu = (lieu or "").upper()
+    if lieu not in LIEUX_VALIDES:
+        raise HTTPException(422, "Choisissez le bar (Bar Devant ou Bar Piscine).")
+
+    stock_avant = stock_courant(produit_id, db, lieu=lieu)
     if stock_avant == 0:
-        raise HTTPException(400, "Le stock de ce produit est déjà à zéro.")
+        raise HTTPException(400, "Le stock de ce produit est déjà à zéro pour ce lieu.")
 
     mouv = BarMouvementStock(
         produit_id     = produit_id,
         type_mouvement = "AJUSTEMENT",
         quantite       = -stock_avant,
-        motif          = f"Réinitialisation du stock (nouvel inventaire) — ancien stock : {float(stock_avant):.3f} {p.unite}",
+        motif          = f"Réinitialisation du stock {lieu} (nouvel inventaire) — ancien stock : {float(stock_avant):.3f} {p.unite}",
+        lieu           = lieu,
         utilisateur_id = _uid(request),
     )
     db.add(mouv)
@@ -1622,6 +1644,7 @@ def reinitialiser_stock(produit_id: int, request: Request, db: Session = Depends
     return {
         "ok":          True,
         "produit_nom": p.nom,
+        "lieu":        lieu,
         "stock_avant": float(stock_avant),
         "stock_apres": 0.0,
     }

@@ -33,6 +33,7 @@ from models import (
     Employe, Utilisateur,
 )
 from tz_utils import HAITI_TZ, today_haiti, bounds_haiti
+from pos_service import LIEUX_VALIDES as _LIEUX_VALIDES
 
 router = APIRouter(prefix="/api/pos/caisse", tags=["caisse"])
 
@@ -424,8 +425,6 @@ def detail_session(session_id: int, db: Session = Depends(get_db)):
     d["evaluations"] = {e.produit_nom: e.statut for e in s.evaluations}
     return d
 
-
-_LIEUX_VALIDES = {"DEVANT", "PISCINE"}
 
 
 class OuvrirIn(BaseModel):

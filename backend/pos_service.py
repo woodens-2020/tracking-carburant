@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import date as date_type
 from decimal import Decimal, ROUND_HALF_UP
 
-from sqlalchemy import func
+from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 
 from models import (
@@ -24,6 +24,11 @@ from models import (
 )
 from tz_utils import today_haiti, bounds_haiti
 
+# Lieux valides pour le Bar (sessions de caisse ET, depuis peu, ajustements
+# de stock manuels) — source unique, importée par caisse_routes.py et
+# pos_routes.py pour ne jamais dupliquer cet ensemble.
+LIEUX_VALIDES = {"DEVANT", "PISCINE"}
+
 
 # ──────────────────────────────────────────────────────────────────
 # Helpers de calcul
@@ -34,22 +39,52 @@ def _dec(v) -> Decimal:
     return Decimal(str(v)) if v is not None else Decimal("0")
 
 
-def stock_courant(produit_id: int, db: Session) -> Decimal:
-    """Stock courant = somme algébrique de tous les mouvements (quantité signée)."""
-    result = db.query(func.sum(BarMouvementStock.quantite)).filter(
+def stock_courant(produit_id: int, db: Session, lieu: str | None = None) -> Decimal:
+    """Stock courant = somme algébrique de tous les mouvements (quantité signée).
+
+    `lieu` restreint aux mouvements de ce lieu uniquement (utilisé pour
+    l'ajustement/réinitialisation par lieu) ; par défaut (None), comportement
+    inchangé : somme sur tous les mouvements, quel que soit leur lieu."""
+    q = db.query(func.sum(BarMouvementStock.quantite)).filter(
         BarMouvementStock.produit_id == produit_id
-    ).scalar()
-    return _dec(result)
+    )
+    if lieu is not None:
+        q = q.filter(BarMouvementStock.lieu == lieu)
+    return _dec(q.scalar())
 
 
-def stock_tous_produits(db: Session) -> dict[int, Decimal]:
-    """Stock courant de tous les produits actifs en une seule requête."""
+def stock_tous_produits(db: Session, lieu: str | None = None) -> dict[int, Decimal]:
+    """Stock courant de tous les produits actifs en une seule requête.
+
+    `lieu` restreint aux mouvements de ce lieu ; None = comportement
+    inchangé (pool global, tous lieux confondus)."""
+    q = db.query(BarMouvementStock.produit_id, func.sum(BarMouvementStock.quantite))
+    if lieu is not None:
+        q = q.filter(BarMouvementStock.lieu == lieu)
+    rows = q.group_by(BarMouvementStock.produit_id).all()
+    return {pid: _dec(total) for pid, total in rows}
+
+
+def stock_par_lieu_tous_produits(db: Session) -> dict[int, dict[str, Decimal]]:
+    """Pour chaque produit : {'devant': x, 'piscine': y, 'total': z}, en une
+    seule requête (agrégation conditionnelle, pas de N+1). Les mouvements
+    sans lieu (achats, ventes hors session, historique pré-fonctionnalité)
+    ne comptent que dans 'total' — ils restent dans le pool commun, jamais
+    attribués à un des deux bars."""
     rows = (
-        db.query(BarMouvementStock.produit_id, func.sum(BarMouvementStock.quantite))
+        db.query(
+            BarMouvementStock.produit_id,
+            func.sum(case((BarMouvementStock.lieu == "DEVANT", BarMouvementStock.quantite), else_=0)),
+            func.sum(case((BarMouvementStock.lieu == "PISCINE", BarMouvementStock.quantite), else_=0)),
+            func.sum(BarMouvementStock.quantite),
+        )
         .group_by(BarMouvementStock.produit_id)
         .all()
     )
-    return {pid: _dec(total) for pid, total in rows}
+    return {
+        pid: {"devant": _dec(d), "piscine": _dec(p), "total": _dec(t)}
+        for pid, d, p, t in rows
+    }
 
 
 def prix_actif(produit_id: int, db: Session) -> Decimal | None:
@@ -293,6 +328,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     # successives du même caissier le même jour (voir _ventes_session dans
     # caisse_routes.py, qui sinon confondrait les rapports de deux sessions).
     session_id = None
+    lieu_vente = None   # hérité de la session, best-effort — ne bloque jamais la vente
     caissier_id = data.get("caissier_id")
     if caissier_id:
         session_en_cours = (
@@ -301,6 +337,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
             .first()
         )
         session_id = session_en_cours.id if session_en_cours else None
+        lieu_vente = session_en_cours.lieu if session_en_cours else None
 
     # Créer la vente
     vente = BarVente(
@@ -335,6 +372,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
                 quantite           = -l["quantite"],
                 motif              = f"Vente ticket {vente.numero_ticket}",
                 reference_vente_id = vente.id,
+                lieu               = lieu_vente,
                 utilisateur_id     = utilisateur_id,
             ))
 
@@ -395,12 +433,22 @@ def annuler_vente(vente_id: int, db: Session, utilisateur_id: int | None = None)
 
     for ligne in vente.lignes:
         if ligne.produit_id:   # plats cuisine n'ont pas de stock bar
+            # Hérite le lieu du mouvement SORTIE_VENTE d'origine (pas de la
+            # session courante, qui a pu changer/fermer depuis) — le stock
+            # revient dans le même compartiment d'où il est sorti.
+            mouv_origine = (
+                db.query(BarMouvementStock)
+                .filter_by(reference_vente_id=vente.id, produit_id=ligne.produit_id,
+                           type_mouvement="SORTIE_VENTE")
+                .first()
+            )
             db.add(BarMouvementStock(
                 produit_id         = ligne.produit_id,
                 type_mouvement     = "ENTREE",
                 quantite           = ligne.quantite,
                 motif              = f"Annulation vente {vente.numero_ticket}",
                 reference_vente_id = vente.id,
+                lieu               = mouv_origine.lieu if mouv_origine else None,
                 utilisateur_id     = utilisateur_id,
             ))
 
