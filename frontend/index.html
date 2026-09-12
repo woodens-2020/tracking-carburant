@@ -20811,7 +20811,10 @@ function renderEmpTable(data){
           ${e.actif ? `<button class="gi-btn-icon danger" onclick="desactiverEmp(${e.id},'${e.prenom} ${e.nom}')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             Désactiver
-          </button>` : ''}
+          </button>` : `<button class="gi-btn-icon" onclick="reactiverEmp(${e.id},'${e.prenom} ${e.nom}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><polyline points="20 6 9 17 4 12"/></svg>
+            Réactiver
+          </button>`}
         </div>
       </td>
     </tr>`).join('');
@@ -20883,6 +20886,15 @@ async function desactiverEmp(id, nom){
     await apiFetch('DELETE', `/employes/${id}`);
     loadEmployes();
     _giAlert('Employé désactivé.', 'ok');
+  } catch(e){ _giAlert(e.message||'Erreur réseau.'); }
+}
+
+async function reactiverEmp(id, nom){
+  if(!await showConfirm(`Réactiver ${nom} ?`, {title:'Réactiver l\'employé', okLabel:'Réactiver'})) return;
+  try {
+    await apiFetch('PUT', `/employes/${id}`, {actif:true});
+    loadEmployes();
+    _giAlert('Employé réactivé.', 'ok');
   } catch(e){ _giAlert(e.message||'Erreur réseau.'); }
 }
 
