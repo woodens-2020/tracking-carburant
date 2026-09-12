@@ -3043,6 +3043,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 </head>
 <script src="/vendor/chart.umd.min.js"></script>
 <script src="/vendor/html2canvas.min.js"></script>
+<script src="/vendor/html5-qrcode.min.js"></script>
 <body>
 
 <div id="load-overlay"><div class="lo-badge"><div class="lo-ring"></div><span class="lo-k">K</span></div></div>
@@ -6645,18 +6646,43 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
 
         <div id="pos-caisse-vente-zone">
-        <!-- Scan code-barres produit — ajoute directement au panier -->
-        <div class="pos-search-wrap" style="margin-bottom:8px">
-          <svg class="pos-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="13" y1="8" x2="13" y2="16"/><line x1="16" y1="8" x2="16" y2="16"/></svg>
-          <input type="text" id="pos-scan-inp" class="pos-search-inp"
-                 placeholder="Scanner le code-barres d'un produit…"
-                 autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();posScanCodeBarre();}">
+        <!-- Scan code-barres produit — ajoute directement au panier.
+             Champ texte (douchette USB/BT) + bouton caméra (téléphone sans
+             douchette physique — utilise l'appareil photo du navigateur). -->
+        <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:8px">
+          <div class="pos-search-wrap" style="margin-bottom:0;flex:1">
+            <svg class="pos-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="13" y1="8" x2="13" y2="16"/><line x1="16" y1="8" x2="16" y2="16"/></svg>
+            <input type="text" id="pos-scan-inp" class="pos-search-inp"
+                   placeholder="Scanner le code-barres d'un produit…"
+                   autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();posScanCodeBarre();}">
+          </div>
+          <button type="button" class="pos-btn ghost" style="white-space:nowrap;flex-shrink:0" onclick="posCameraScanOuvrir()" title="Scanner avec la caméra du téléphone">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Caméra
+          </button>
         </div>
         <!-- Retour immédiat après chaque scan — reste à la même place, ne
              s'empile pas (contrairement à un toast) : idéal pour scanner
              plusieurs fois de suite le même article (ex. 4 Prestige = 4
              scans) sans que l'écran se remplisse de notifications. -->
         <div id="pos-scan-feedback" style="display:none;margin:-4px 0 10px;padding:9px 14px;border-radius:9px;font-size:14px;font-weight:600;transition:background .15s,color .15s"></div>
+
+        <!-- Modal scan par caméra — pour un employé connecté sur son
+             téléphone, sans douchette USB/BT physique. -->
+        <div class="pos-modal-bg" id="pos-camera-modal-bg" onclick="if(event.target===this)posCameraScanFermer()">
+          <div class="pos-modal" style="max-width:440px">
+            <h3>Scanner avec la caméra</h3>
+            <div id="pos-camera-reader" style="width:100%;border-radius:10px;overflow:hidden;background:#000"></div>
+            <div id="pos-camera-feedback" style="display:none;margin-top:12px;padding:9px 14px;border-radius:9px;font-size:14px;font-weight:600"></div>
+            <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:10px">
+              Visez le code-barres du produit avec l'appareil photo. Chaque article scanné s'ajoute au panier — laissez la caméra ouverte pour en scanner plusieurs à la suite.
+            </div>
+            <div class="pos-modal-footer">
+              <button class="pos-btn primary" onclick="posCameraScanFermer()">Fermer la caméra</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Barre de recherche articles -->
         <div class="pos-search-wrap">
           <svg class="pos-search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -25757,6 +25783,82 @@ function posScanCodeBarre(){
     _posScanFeedback(`✓ ${prod.nom} — ${qte} au panier`, 'ok');
   }
   inp.focus();
+}
+
+// ── Scan par caméra (téléphone sans douchette USB/BT) ──────────────────
+// Utilise html5-qrcode (vendorisé localement — /vendor/html5-qrcode.min.js —
+// pour respecter la CSP script-src 'self' de l'appli, pas de CDN externe).
+// Même logique métier que posScanCodeBarre() : trouve le produit par
+// code-barres exact dans le cache déjà chargé, l'ajoute au panier, la
+// caméra reste ouverte pour enchaîner plusieurs scans (ex. 4 Prestige).
+let _posCameraScanner = null;
+let _posCameraScanBusy = false;
+
+function _posCameraFeedback(msg, type){
+  const el = document.getElementById('pos-camera-feedback');
+  if(!el) return;
+  el.style.display = '';
+  el.style.background = type==='ok' ? 'rgba(63,182,168,.15)' : 'rgba(248,113,113,.15)';
+  el.style.color      = type==='ok' ? '#3fb6a8' : '#f87171';
+  el.textContent = msg;
+}
+
+function _posChoisirCameraArriere(cameras){
+  if(!cameras || !cameras.length) return null;
+  const arriere = cameras.find(c => /back|rear|environment/i.test(c.label||''));
+  return (arriere || cameras[cameras.length-1]).id;
+}
+
+async function posCameraScanOuvrir(){
+  document.getElementById('pos-camera-modal-bg').classList.add('open');
+  const feedback = document.getElementById('pos-camera-feedback');
+  feedback.style.display = 'none';
+  if(typeof Html5Qrcode === 'undefined'){
+    _posCameraFeedback("La bibliothèque de scan n'a pas pu se charger.", 'err');
+    return;
+  }
+  if(!_posProduits.length){ try{ await _posLoadProduitsCache(); }catch(err){} }
+  try{
+    const cameras = await Html5Qrcode.getCameras();
+    const camId = _posChoisirCameraArriere(cameras);
+    if(!camId){ _posCameraFeedback('Aucune caméra détectée sur cet appareil.', 'err'); return; }
+    _posCameraScanner = new Html5Qrcode('pos-camera-reader');
+    await _posCameraScanner.start(
+      camId,
+      { fps: 10, qrbox: { width: 250, height: 140 } },
+      (decodedText) => _posCameraScanSucces(decodedText),
+      () => { /* échec de décodage sur une frame — normal en continu, on ignore */ },
+    );
+  }catch(err){
+    _posCameraFeedback("Impossible d'accéder à la caméra — vérifiez l'autorisation donnée au navigateur.", 'err');
+  }
+}
+
+async function _posCameraScanSucces(code){
+  if(_posCameraScanBusy) return;   // évite les doublons tant que le même code reste dans le cadre
+  _posCameraScanBusy = true;
+  code = (code||'').trim();
+  const prod = _posProduits.find(p => p.code_barre && p.code_barre.trim() === code);
+  if(!prod){
+    _posCameraFeedback(`✕ Aucun produit trouvé pour le code « ${code} ».`, 'err');
+  } else if(!prod.actif){
+    _posCameraFeedback(`✕ « ${prod.nom} » est inactif — vente impossible.`, 'err');
+  } else {
+    posAjouterAuPanier(prod.id);
+    const ligne = _posCart.find(c => c.produit_id === prod.id);
+    const qte = ligne ? ligne.quantite : 1;
+    _posCameraFeedback(`✓ ${prod.nom} — ${qte} au panier`, 'ok');
+  }
+  setTimeout(()=>{ _posCameraScanBusy = false; }, 1500);   // laisse le temps de retirer l'article du cadre
+}
+
+function posCameraScanFermer(){
+  document.getElementById('pos-camera-modal-bg').classList.remove('open');
+  const scanner = _posCameraScanner;
+  _posCameraScanner = null;
+  if(scanner){
+    scanner.stop().then(()=>scanner.clear()).catch(()=>{});
+  }
 }
 
 // ── Scan depuis N'IMPORTE QUELLE page (une fois connecté) ──────────────
