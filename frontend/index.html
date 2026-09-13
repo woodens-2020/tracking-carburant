@@ -6970,6 +6970,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <input class="pos-input" id="pos-appro-prix-caisse" type="number" min="0" step="0.01" placeholder="0.00">
           </div>
           <div style="flex:1">
+            <label class="pos-label">Lieu *</label>
+            <select class="pos-select" id="pos-appro-lieu">
+              <option value="">Choisir un bar…</option>
+              <option value="DEVANT">Bar Devant (Accueil)</option>
+              <option value="PISCINE">Bar Piscine</option>
+            </select>
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div style="width:100%">
             <label class="pos-label">Notes</label>
             <input class="pos-input" id="pos-appro-notes" placeholder="Fournisseur, lot…">
           </div>
@@ -7034,6 +7044,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <button class="db-preset active" id="pos-stock-dispo-tous" onclick="posStockSetDispo('')">Tous</button>
               <button class="db-preset" id="pos-stock-dispo-oui" onclick="posStockSetDispo('disponible')">Disponible</button>
               <button class="db-preset" id="pos-stock-dispo-non" onclick="posStockSetDispo('non_disponible')">Non disponible</button>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="db-preset active" id="pos-stock-lieu-tous" onclick="posStockSetLieu('')">Tous les bars</button>
+              <button class="db-preset" id="pos-stock-lieu-devant" onclick="posStockSetLieu('DEVANT')">Bar Devant</button>
+              <button class="db-preset" id="pos-stock-lieu-piscine" onclick="posStockSetLieu('PISCINE')">Bar Piscine</button>
             </div>
           </div>
         </div>
@@ -25591,6 +25606,7 @@ function posApproModal(prodId){
   document.getElementById('pos-appro-nb-unite-seul').value = '';
   document.getElementById('pos-appro-prix-caisse').value  = '';
   document.getElementById('pos-appro-notes').value        = '';
+  document.getElementById('pos-appro-lieu').value         = '';
   const caisseSec  = document.getElementById('pos-appro-caisse-section');
   const uniteSec   = document.getElementById('pos-appro-unite-section');
   const liveDiv    = document.getElementById('pos-appro-live');
@@ -25667,6 +25683,7 @@ async function posApproSauvegarder(){
   const isCaisse = document.getElementById('pos-appro-is-caisse')?.value === 'true';
   const prixCaisse = parseFloat(document.getElementById('pos-appro-prix-caisse').value)||null;
   const notes    = document.getElementById('pos-appro-notes').value.trim()||null;
+  const lieu     = document.getElementById('pos-appro-lieu').value;
   let nb_caisses = 0, nb_unites_vrac = 0;
   if(isCaisse){
     nb_caisses     = parseInt(document.getElementById('pos-appro-nb-caisses').value)||0;
@@ -25675,11 +25692,12 @@ async function posApproSauvegarder(){
     nb_unites_vrac = parseInt(document.getElementById('pos-appro-nb-unite-seul').value)||0;
   }
   if(nb_caisses===0 && nb_unites_vrac===0){ posAlert('Saisir au moins 1 caisse ou 1 unité.'); return; }
+  if(!lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine).'); return; }
   try {
     const res = await apiFetch('POST',`/pos/produits/${prodId}/approvisionnement`,{
       nb_caisses, nb_unites_vrac,
       prix_achat_caisse: prixCaisse,
-      notes,
+      notes, lieu,
     });
     posApproModalClose();
     await loadPosProduits();
@@ -25744,6 +25762,7 @@ async function posChangerPrix(){
 // ══════════════════════════════════════════════════════════════════════
 let _posStockCache = { prods: [], stockMap: {} };
 let _posStockDispoFiltre = ''; // '' | 'disponible' | 'non_disponible'
+let _posStockLieuFiltre  = ''; // '' | 'DEVANT' | 'PISCINE'
 
 async function loadPosStock(){
   const tbody = document.getElementById('pos-stock-tbody');
@@ -25795,9 +25814,12 @@ function _posStockRenderTable(){
 
   const filtres = prods.filter(p=>{
     if(recherche && !(p.nom||'').toLowerCase().includes(recherche)) return false;
-    const stock = parseFloat((stockMap[p.id]||{}).stock_courant||0);
+    const s = stockMap[p.id]||{};
+    const stock = parseFloat(s.stock_courant||0);
     if(_posStockDispoFiltre==='disponible' && !(stock>0)) return false;
     if(_posStockDispoFiltre==='non_disponible' && stock>0) return false;
+    if(_posStockLieuFiltre==='DEVANT'  && !(parseFloat(s.stock_devant||0)>0))  return false;
+    if(_posStockLieuFiltre==='PISCINE' && !(parseFloat(s.stock_piscine||0)>0)) return false;
     return true;
   });
 
@@ -25827,7 +25849,7 @@ function _posStockRenderTable(){
       <td>${(devant!==0||piscine!==0)?`<button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posStockReinitialiser(${p.id},'${esc(p.nom||'')}',${devant},${piscine})">Réinitialiser</button>`:'<span style="color:rgba(255,255,255,.25);font-size:12px">—</span>'}</td>
     </tr>`;
   });
-  tbody.innerHTML = rows.join('') || `<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit ${recherche||_posStockDispoFiltre?'ne correspond aux filtres':'actif'}</td></tr>`;
+  tbody.innerHTML = rows.join('') || `<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit ${recherche||_posStockDispoFiltre||_posStockLieuFiltre?'ne correspond aux filtres':'actif'}</td></tr>`;
 }
 
 function posStockFiltrer(){ _posStockRenderTable(); }
@@ -25837,6 +25859,14 @@ function posStockSetDispo(valeur){
   document.getElementById('pos-stock-dispo-tous').classList.toggle('active', valeur==='');
   document.getElementById('pos-stock-dispo-oui').classList.toggle('active', valeur==='disponible');
   document.getElementById('pos-stock-dispo-non').classList.toggle('active', valeur==='non_disponible');
+  _posStockRenderTable();
+}
+
+function posStockSetLieu(valeur){
+  _posStockLieuFiltre = valeur;
+  document.getElementById('pos-stock-lieu-tous').classList.toggle('active', valeur==='');
+  document.getElementById('pos-stock-lieu-devant').classList.toggle('active', valeur==='DEVANT');
+  document.getElementById('pos-stock-lieu-piscine').classList.toggle('active', valeur==='PISCINE');
   _posStockRenderTable();
 }
 

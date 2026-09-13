@@ -173,12 +173,19 @@ class ApprovisionnementIn(BaseModel):
     nb_unites_vrac:    int   = Field(0, ge=0)
     prix_achat_caisse: Optional[float] = Field(None, gt=0)
     notes:             Optional[str]   = None
+    lieu:              str             # DEVANT ou PISCINE — requis, où la marchandise est reçue
 
     @validator('nb_unites_vrac')
     def valider_quantite(cls, v, values):
         if v == 0 and values.get('nb_caisses', 0) == 0:
             raise ValueError('Saisir au moins nb_caisses > 0 ou nb_unites_vrac > 0')
         return v
+
+    @validator('lieu')
+    def check_lieu(cls, v):
+        if not v or v.upper() not in LIEUX_VALIDES:
+            raise ValueError("Choisissez le bar (Bar Devant ou Bar Piscine).")
+        return v.upper()
 
 
 class PrixIn(BaseModel):
@@ -687,6 +694,7 @@ def approvisionner(produit_id: int, data: ApprovisionnementIn, request: Request,
         type_mouvement = "ENTREE",
         motif          = motif,
         achat_id       = achat_id,
+        lieu           = data.lieu,
         date_mouvement = now,
         utilisateur_id = _uid(request),
     ))
