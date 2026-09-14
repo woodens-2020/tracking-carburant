@@ -214,6 +214,12 @@ def _migrate_columns():
             # les achats/ventes non rattachées à une session restent NULL.
             ("bar_mouvements_stock", "lieu",
              "ALTER TABLE bar_mouvements_stock ADD COLUMN lieu VARCHAR(20)", None),
+            # v25 — catalogue d'articles bar séparé par lieu (Bar Devant /
+            # Bar Piscine) : NULL = article créé avant la séparation
+            # (visible aux deux, jusqu'à réaffectation manuelle par
+            # l'admin) ; exigé désormais à la création d'un nouvel article.
+            ("bar_produits", "lieu",
+             "ALTER TABLE bar_produits ADD COLUMN lieu VARCHAR(20)", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -332,6 +338,12 @@ def _migrate_columns():
             # les achats/ventes non rattachées à une session restent NULL.
             ("bar_mouvements_stock", "lieu",
              "ALTER TABLE bar_mouvements_stock ADD COLUMN lieu VARCHAR(20)", None),
+            # v25 — catalogue d'articles bar séparé par lieu (Bar Devant /
+            # Bar Piscine) : NULL = article créé avant la séparation
+            # (visible aux deux, jusqu'à réaffectation manuelle par
+            # l'admin) ; exigé désormais à la création d'un nouvel article.
+            ("bar_produits", "lieu",
+             "ALTER TABLE bar_produits ADD COLUMN lieu VARCHAR(20)", None),
         ]
     else:
         return
@@ -422,6 +434,18 @@ def _migrate_columns():
             try:
                 conn.execute(sql_text(
                     "ALTER TABLE bar_mouvements_stock ADD CONSTRAINT chk_bar_mouv_lieu "
+                    "CHECK (lieu IS NULL OR lieu IN ('DEVANT','PISCINE'))"
+                ))
+                conn.commit()
+            except Exception:
+                conn.rollback()  # déjà présente
+
+        # v25 — lieu (Bar Devant / Bar Piscine) sur le catalogue d'articles bar :
+        # même contrainte de domaine que chk_session_lieu / chk_bar_mouv_lieu.
+        with engine.connect() as conn:
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE bar_produits ADD CONSTRAINT chk_bar_produit_lieu "
                     "CHECK (lieu IS NULL OR lieu IN ('DEVANT','PISCINE'))"
                 ))
                 conn.commit()

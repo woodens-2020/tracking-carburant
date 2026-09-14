@@ -160,12 +160,25 @@ class ProduitIn(BaseModel):
     prix_initial:        Optional[float] = None
     vendu_par_caisse:    bool = False
     unites_par_caisse:   Optional[int] = None
+    # Bar Devant ou Bar Piscine — catalogue exclusif à ce bar. Requis à la
+    # création (voir creer_produit) pour ne plus mélanger les deux
+    # catalogues ; optionnel à la modification (permet de laisser un
+    # article existant "non assigné" ou de le réaffecter).
+    lieu:                Optional[str] = None
 
     @validator('unites_par_caisse')
     def valider_caisse(cls, v, values):
         if values.get('vendu_par_caisse') and (v is None or v < 1):
             raise ValueError('unites_par_caisse est obligatoire et doit être ≥ 1 lorsque vendu_par_caisse=True')
         return v
+
+    @validator('lieu')
+    def check_lieu(cls, v):
+        if v in (None, ""):
+            return None
+        if v.upper() not in LIEUX_VALIDES:
+            raise ValueError("lieu doit être DEVANT ou PISCINE.")
+        return v.upper()
 
 
 class ApprovisionnementIn(BaseModel):
@@ -433,15 +446,26 @@ def _produit_dict(p: BarProduit, stk: Decimal, db: Session) -> dict:
         "cmup":                float(cmup(p.id, db)),
         "a_photo":             bool(p.photo_base64),
         "date_creation":       p.date_creation.isoformat() if p.date_creation else None,
+        "lieu":                p.lieu,
     }
 
 
 @router.get("/produits")
-def liste_produits(actif: Optional[bool] = None, db: Session = Depends(get_db)):
-    """Tous les produits du bar, avec stock courant, caisse/unité et prix actif."""
+def liste_produits(actif: Optional[bool] = None, lieu: Optional[str] = None, db: Session = Depends(get_db)):
+    """Tous les produits du bar, avec stock courant, caisse/unité et prix actif.
+
+    `lieu` filtre sur le catalogue d'un bar précis (DEVANT/PISCINE) tout en
+    gardant visibles les articles pas encore réaffectés (lieu NULL,
+    catalogue créé avant la séparation) — voir BarProduit.lieu.
+    """
     q = db.query(BarProduit)
     if actif is not None:
         q = q.filter(BarProduit.actif == actif)
+    if lieu:
+        lieu_maj = lieu.upper()
+        if lieu_maj not in LIEUX_VALIDES:
+            raise HTTPException(422, "lieu doit être DEVANT ou PISCINE.")
+        q = q.filter(or_(BarProduit.lieu == lieu_maj, BarProduit.lieu.is_(None)))
     produits = q.order_by(BarProduit.categorie, BarProduit.nom).all()
     stocks   = stock_tous_produits(db)
     return [_produit_dict(p, stocks.get(p.id, Decimal("0")), db) for p in produits]
@@ -462,6 +486,8 @@ def creer_produit(data: ProduitIn, request: Request, db: Session = Depends(get_d
         raise HTTPException(422, "Un prix de vente initial valide est requis pour créer un produit.")
     if data.vendu_par_caisse and (not data.unites_par_caisse or data.unites_par_caisse < 1):
         raise HTTPException(422, "unites_par_caisse est obligatoire (≥ 1) pour un produit vendu par caisse.")
+    if not data.lieu:
+        raise HTTPException(422, "Choisissez le bar (Bar Devant ou Bar Piscine) pour ce nouvel article.")
     # Vérification doublon (insensible à la casse)
     from sqlalchemy import func as _func
     existant = db.query(BarProduit).filter(
@@ -479,6 +505,7 @@ def creer_produit(data: ProduitIn, request: Request, db: Session = Depends(get_d
         seuil_alerte_stock = data.seuil_alerte_stock,
         vendu_par_caisse   = data.vendu_par_caisse,
         unites_par_caisse  = data.unites_par_caisse if data.vendu_par_caisse else None,
+        lieu               = data.lieu,
     )
     db.add(p)
     db.flush()
@@ -510,6 +537,7 @@ def modifier_produit(produit_id: int, data: ProduitIn, db: Session = Depends(get
     p.seuil_alerte_stock = data.seuil_alerte_stock
     p.vendu_par_caisse   = data.vendu_par_caisse
     p.unites_par_caisse  = data.unites_par_caisse if data.vendu_par_caisse else None
+    p.lieu               = data.lieu
     db.commit()
     return {"ok": True}
 

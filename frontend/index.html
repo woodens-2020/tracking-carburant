@@ -6811,6 +6811,17 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="gi-table-hdr">
             <span class="gi-table-title">Liste des produits</span>
             <div style="display:flex;align-items:center;gap:8px">
+              <select id="pos-prod-lieu-filter" onchange="posProduitsFiltrer()"
+                style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:10px;
+                       color:#fff;font-size:14px;font-weight:600;padding:7px 36px 7px 14px;outline:none;
+                       cursor:pointer;min-width:150px;appearance:none;-webkit-appearance:none;
+                       background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22rgba(255,255,255,.5)%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>');
+                       background-repeat:no-repeat;background-position:right 10px center;background-size:14px">
+                <option value="">Tous les bars</option>
+                <option value="DEVANT">Bar Devant</option>
+                <option value="PISCINE">Bar Piscine</option>
+                <option value="NON_ASSIGNE">Non assigné</option>
+              </select>
               <select id="pos-cat-filter" onchange="posProduitsFiltrer()"
                 style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:10px;
                        color:#fff;font-size:14px;font-weight:600;padding:7px 36px 7px 14px;outline:none;
@@ -6873,6 +6884,19 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="pos-form-row">
           <div><label class="pos-label">Unité *</label><input class="pos-input" id="pos-prod-unite" placeholder="Ex : bouteille, verre"></div>
           <div><label class="pos-label">Seuil alerte stock</label><input class="pos-input" id="pos-prod-seuil" type="number" min="0" placeholder="0"></div>
+        </div>
+        <div class="pos-form-row">
+          <div style="width:100%">
+            <label class="pos-label" id="pos-prod-lieu-label">Bar *</label>
+            <select class="pos-select" id="pos-prod-lieu" style="width:100%">
+              <option value="">— Choisir —</option>
+              <option value="DEVANT">Bar Devant (Accueil)</option>
+              <option value="PISCINE">Bar Piscine</option>
+            </select>
+            <div style="font-size:12.5px;color:rgba(255,255,255,.4);margin-top:4px">
+              Catalogue exclusif à ce bar — cet article n'apparaîtra pas à l'autre.
+            </div>
+          </div>
         </div>
         <!-- Logique caisse -->
         <div class="pos-form-row" style="align-items:center;gap:12px">
@@ -23848,11 +23872,16 @@ let _posCart = [];
 let _posMode = 'CASH';
 let _posProduits = [];       // cache des produits bar avec prix actif
 let _posCuisinePlats = [];   // cache des plats cuisine pour vente via bar
+let _posSessionLieu = null;  // lieu (DEVANT/PISCINE) de la session de caisse en cours — filtre le catalogue vendu
 
-/* Charger les produits bar dans le cache */
-async function _posLoadProduitsCache(){
+/* Charger les produits bar dans le cache — filtré sur le lieu de la
+   session en cours, quand il est connu (voir _posDashLoadData) : un
+   caissier au Bar Piscine ne doit pas voir le catalogue du Bar Devant. */
+async function _posLoadProduitsCache(lieu){
   try {
-    const data = await apiFetch('GET','/pos/produits?actif=true');
+    let url = '/pos/produits?actif=true';
+    if(lieu) url += `&lieu=${lieu}`;
+    const data = await apiFetch('GET', url);
     _posProduits = data || [];
   } catch(e){ _posProduits = []; }
 }
@@ -24592,6 +24621,16 @@ async function _posDashLoadData(caissier_id){
 
     const lieuEl = document.getElementById('pos-dash-lieu');
     if(lieuEl) lieuEl.innerHTML = _lieuBadge(d.lieu);
+
+    // Le catalogue vendu se filtre sur le lieu de la session dès qu'il est
+    // connu (une session pas encore démarrée n'a pas de lieu) — évite de
+    // recharger à chaque rafraîchissement périodique (60s) si inchangé.
+    if(d.lieu && d.lieu !== _posSessionLieu){
+      _posSessionLieu = d.lieu;
+      await _posLoadProduitsCache(_posSessionLieu);
+      posRenderCatTabs();
+      posRenderGrid();
+    }
 
     const statutEl = document.getElementById('pos-dash-statut');
     if(statutEl){
@@ -25367,9 +25406,12 @@ function _posRenderProduitsTbody(prods, stockMap){
       ? `<br><span style="font-size:12px;color:#3fb6a8">${posGx(p.prix_vente_caisse)}/caisse</span>`
       : '';
     const nomSafe = (p.nom||'').replace(/'/g,"\\'");
+    const lieuBadgeTxt = p.lieu
+      ? _lieuBadge(p.lieu)
+      : '<span style="font-size:11px;font-weight:600;padding:1px 6px;border-radius:9px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.35);margin-left:6px">Non assigné</span>';
     return `<tr>
       <td>${_posProduitPhotoVignette(p)}</td>
-      <td><strong style="color:rgba(255,255,255,.88)">${p.nom||'—'}</strong>${caisseBadge}</td>
+      <td><strong style="color:rgba(255,255,255,.88)">${p.nom||'—'}</strong>${caisseBadge}${lieuBadgeTxt}</td>
       <td>${catBadge}</td>
       <td class="td-muted">${p.unite||'—'}</td>
       <td class="td-amount">${prixUnite}${prixCaisse}</td>
@@ -25401,10 +25443,13 @@ function _posRenderProduitsTbody(prods, stockMap){
 }
 
 function posProduitsFiltrer(){
-  const q   = (document.getElementById('pos-prod-search')?.value||'').toLowerCase();
-  const cat = (document.getElementById('pos-cat-filter')?.value||'').toLowerCase();
+  const q    = (document.getElementById('pos-prod-search')?.value||'').toLowerCase();
+  const cat  = (document.getElementById('pos-cat-filter')?.value||'').toLowerCase();
+  const lieu = document.getElementById('pos-prod-lieu-filter')?.value||'';
   let filtered = _posProduitsAll;
-  if(cat) filtered = filtered.filter(p=>(p.categorie||'').toLowerCase()===cat);
+  if(cat)  filtered = filtered.filter(p=>(p.categorie||'').toLowerCase()===cat);
+  if(lieu === 'NON_ASSIGNE') filtered = filtered.filter(p=>!p.lieu);
+  else if(lieu) filtered = filtered.filter(p=>p.lieu===lieu);
   if(q)   filtered = filtered.filter(p=>(p.nom||'').toLowerCase().includes(q)||(p.categorie||'').toLowerCase().includes(q));
   _posRenderProduitsTbody(filtered, null);
 }
@@ -25487,6 +25532,7 @@ async function posProduitModal(id){
     document.getElementById('pos-prod-seuil').value = p.seuil_alerte_stock||0;
     document.getElementById('pos-prod-code').value  = p.code_barre||'';
     document.getElementById('pos-prod-prix').value  = '';
+    document.getElementById('pos-prod-lieu').value  = p.lieu||'';
     _posProdSetCaisseUI(!!p.vendu_par_caisse, p.unites_par_caisse);
     if(prixRow) prixRow.style.display = 'none';
     if(photoRow) photoRow.style.display = '';
@@ -25496,6 +25542,7 @@ async function posProduitModal(id){
     ['pos-prod-nom','pos-prod-unite','pos-prod-prix','pos-prod-code'].forEach(fid=>{ document.getElementById(fid).value=''; });
     document.getElementById('pos-prod-seuil').value = 0;
     document.getElementById('pos-prod-cat').value   = '';
+    document.getElementById('pos-prod-lieu').value  = '';
     _posProdResetCaisseUI();
     if(prixRow) prixRow.style.display = '';
     if(photoRow) photoRow.style.display = 'none';
@@ -25570,16 +25617,18 @@ async function posProduitSauvegarder(){
   const code  = document.getElementById('pos-prod-code').value.trim()||null;
   const venduCaisse = document.getElementById('pos-prod-vendu-caisse')?.value === 'true';
   const upc   = parseInt(document.getElementById('pos-prod-upc')?.value)||null;
+  const lieu  = document.getElementById('pos-prod-lieu')?.value||'';
   if(!nom){ posAlert('Le nom du produit est requis.'); return; }
   if(!cat){ posAlert('Choisissez une catégorie ou créez-en une avec le bouton +.'); return; }
   if(!unite){ posAlert('L\'unité de vente est requise.'); return; }
   if(venduCaisse && (!upc||upc<1)){ posAlert('Unités par caisse requis (≥ 1) pour un produit vendu par caisse.'); return; }
+  if(!id && !lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine) pour ce nouvel article.'); return; }
   // Vérification doublon côté client
   if(!id){
     const doublon = _posProduitsAll.find(p => p.nom.trim().toLowerCase() === nom.toLowerCase());
     if(doublon){ posAlert(`Un produit nommé « ${doublon.nom} » existe déjà dans le catalogue.`); return; }
   }
-  const payload = { nom, categorie:cat, unite, seuil_alerte_stock:seuil, code_barre:code, vendu_par_caisse:venduCaisse, unites_par_caisse:venduCaisse?upc:null };
+  const payload = { nom, categorie:cat, unite, seuil_alerte_stock:seuil, code_barre:code, vendu_par_caisse:venduCaisse, unites_par_caisse:venduCaisse?upc:null, lieu:lieu||null };
   try {
     if(id){
       await apiFetch('PUT',`/pos/produits/${id}`, payload);

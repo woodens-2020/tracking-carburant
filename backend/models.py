@@ -600,6 +600,12 @@ class BarProduit(Base):
     # Photo illustrative — même approche que PieceJointe (base64 en base, pas de stockage fichier externe)
     photo_base64       = Column(Text,        nullable=True)
     photo_mime         = Column(String(50),  nullable=True)
+    # Lieu (Bar Devant / Bar Piscine) — catalogue exclusif à ce bar. NULL =
+    # article créé avant la séparation des catalogues (visible aux deux,
+    # jusqu'à réaffectation manuelle) ; exigé côté API pour tout nouvel
+    # article (creer_produit dans pos_routes.py) pour ne plus mélanger les
+    # deux catalogues.
+    lieu               = Column(String(20), nullable=True)
 
     prix_historique = relationship("BarPrixHistorique", back_populates="produit",
                                    cascade="all, delete-orphan",
@@ -614,8 +620,10 @@ class BarProduit(Base):
 
     __table_args__ = (
         UniqueConstraint("nom", name="uq_bar_produit_nom"),
+        CheckConstraint("lieu IS NULL OR lieu IN ('DEVANT','PISCINE')", name="chk_bar_produit_lieu"),
         Index("idx_bar_produits_categorie", "categorie"),
         Index("idx_bar_produits_actif",     "actif"),
+        Index("idx_bar_produits_lieu",      "lieu"),
     )
 
 
