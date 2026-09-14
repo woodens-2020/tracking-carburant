@@ -1,4 +1,5 @@
 """Routes d'administration : gestion des rôles, comptes, sessions et journal."""
+import hmac
 import io
 import json
 import os
@@ -886,13 +887,22 @@ _CONFIRMATION_RESET_VENTES = "EFFACER TOUTES LES VENTES"
 
 # Verrou explicite par déploiement : ce code est partagé entre plusieurs
 # projets Railway (même repo/branche) mais cet outil ne doit s'activer que
-# là où la variable est positionnée à "true" — les autres déploiements
-# reçoivent 404 quels que soient les identifiants admin fournis.
-_RESET_VENTES_ARME = os.getenv("ALLOW_RESET_VENTES", "").strip().lower() == "true"
+# là où ALLOW_RESET_VENTES contient un secret — les autres déploiements
+# reçoivent 404 quel que soit l'en-tête fourni. Auth autonome (secret
+# partagé dans l'en-tête X-Reset-Key), indépendante de AuthMiddleware/
+# _require_admin : ces routes sont ajoutées à _PUBLIC_PATHS (main.py) car
+# le compte admin réel de ce déploiement ne s'appelle pas forcément
+# "admin" (le contournement ADMIN_API_KEY de AuthMiddleware suppose ce nom
+# d'utilisateur précis), et on ne veut pas dépendre d'une session/API key
+# de compte pour un outil ponctuel qui doit marcher une seule fois.
+_RESET_VENTES_KEY = os.getenv("ALLOW_RESET_VENTES", "").strip()
 
 
-def _exiger_reset_ventes_arme():
-    if not _RESET_VENTES_ARME:
+def _exiger_reset_ventes_arme(request: Request):
+    if not _RESET_VENTES_KEY:
+        raise HTTPException(404, "Not Found")
+    fourni = request.headers.get("X-Reset-Key", "")
+    if not fourni or not hmac.compare_digest(fourni, _RESET_VENTES_KEY):
         raise HTTPException(404, "Not Found")
 
 
@@ -900,8 +910,7 @@ def _exiger_reset_ventes_arme():
 def apercu_reset_ventes(request: Request, db: Session = Depends(get_db)):
     """Aperçu en lecture seule : compte les lignes que POST /reset-ventes
     supprimerait, sans rien modifier."""
-    _exiger_reset_ventes_arme()
-    _require_admin(request, db)
+    _exiger_reset_ventes_arme(request)
     return {
         "bar_ventes":           db.query(BarVente).count(),
         "bar_credits":          db.query(BarCredit).count(),
@@ -928,8 +937,7 @@ def reset_ventes(data: ResetVentesIn, request: Request, db: Session = Depends(ge
     elles-mêmes (lignes/crédits/remboursements associés supprimés en
     cascade côté base). Irréversible : exige la phrase de confirmation
     exacte."""
-    _exiger_reset_ventes_arme()
-    _require_admin(request, db)
+    _exiger_reset_ventes_arme(request)
     if data.confirmation != _CONFIRMATION_RESET_VENTES:
         raise HTTPException(422, f"Confirmation requise : envoyez exactement « {_CONFIRMATION_RESET_VENTES} ».")
 

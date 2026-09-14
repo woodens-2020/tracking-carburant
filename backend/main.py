@@ -194,7 +194,11 @@ def _clear_login_failures(ip: str | None) -> None:
 # Chemins accessibles sans être connecté
 _PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code",
                     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify",
-                    "/api/oauth/otp/send", "/api/config/branding"}
+                    "/api/oauth/otp/send", "/api/config/branding",
+                    # Outil ponctuel admin_routes.py::reset_ventes — auth autonome
+                    # par secret partagé (en-tête X-Reset-Key vs ALLOW_RESET_VENTES),
+                    # volontairement hors du système de session/compte habituel.
+                    "/api/admin/reset-ventes/apercu", "/api/admin/reset-ventes"}
 _PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/") if _DEBUG_MODE
                     else ("/api/auth/oauth/", "/shared/"))
 
