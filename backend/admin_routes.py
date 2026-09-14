@@ -1,6 +1,7 @@
 """Routes d'administration : gestion des rôles, comptes, sessions et journal."""
 import io
 import json
+import os
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -20,7 +21,11 @@ from activity_log import (
 from auth import hash_code_acces, hash_password, make_api_key
 from otp_service import send_welcome_email, send_otp_sms, send_otp_whatsapp
 from database import get_db
-from models import AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur
+from models import (
+    AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur,
+    BarVente, BarCredit, BarRemboursement, BarCommande,
+    HotelReservation, CuisineVente, PatisserieVente, PatisserieCommande, Releve,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -868,3 +873,81 @@ def get_audit_log(
             "created_at":   created.isoformat(),
         })
     return {"total": total, "page": page, "per_page": per_page, "items": items}
+
+
+# ══════════════════════════════════════════════════════════════════
+# REMISE À ZÉRO DES VENTES — outil ponctuel de bascule test → exploitation
+# réelle. Supprime les transactions de vente de tous les modules, sans
+# toucher aux catalogues, employés, stock ou dépenses. Route destinée à être
+# retirée du code une fois utilisée (pas un outil d'exploitation courant).
+# ══════════════════════════════════════════════════════════════════
+
+_CONFIRMATION_RESET_VENTES = "EFFACER TOUTES LES VENTES"
+
+# Verrou explicite par déploiement : ce code est partagé entre plusieurs
+# projets Railway (même repo/branche) mais cet outil ne doit s'activer que
+# là où la variable est positionnée à "true" — les autres déploiements
+# reçoivent 404 quels que soient les identifiants admin fournis.
+_RESET_VENTES_ARME = os.getenv("ALLOW_RESET_VENTES", "").strip().lower() == "true"
+
+
+def _exiger_reset_ventes_arme():
+    if not _RESET_VENTES_ARME:
+        raise HTTPException(404, "Not Found")
+
+
+@router.get("/reset-ventes/apercu")
+def apercu_reset_ventes(request: Request, db: Session = Depends(get_db)):
+    """Aperçu en lecture seule : compte les lignes que POST /reset-ventes
+    supprimerait, sans rien modifier."""
+    _exiger_reset_ventes_arme()
+    _require_admin(request, db)
+    return {
+        "bar_ventes":           db.query(BarVente).count(),
+        "bar_credits":          db.query(BarCredit).count(),
+        "bar_remboursements":   db.query(BarRemboursement).count(),
+        "bar_commandes":        db.query(BarCommande).count(),
+        "hotel_reservations":   db.query(HotelReservation).count(),
+        "cuisine_ventes":       db.query(CuisineVente).count(),
+        "patisserie_ventes":    db.query(PatisserieVente).count(),
+        "patisserie_commandes": db.query(PatisserieCommande).count(),
+        "releves":              db.query(Releve).count(),
+    }
+
+
+class ResetVentesIn(BaseModel):
+    confirmation: str
+
+
+@router.post("/reset-ventes")
+def reset_ventes(data: ResetVentesIn, request: Request, db: Session = Depends(get_db)):
+    """Supprime TOUTES les ventes de TOUS les modules (bar, hôtel, cuisine,
+    pâtisserie, carburant) — remise à zéro avant le passage en exploitation
+    réelle. Ne touche ni aux catalogues/produits, ni au stock, ni aux
+    employés, ni aux dépenses — uniquement les transactions de vente
+    elles-mêmes (lignes/crédits/remboursements associés supprimés en
+    cascade côté base). Irréversible : exige la phrase de confirmation
+    exacte."""
+    _exiger_reset_ventes_arme()
+    _require_admin(request, db)
+    if data.confirmation != _CONFIRMATION_RESET_VENTES:
+        raise HTTPException(422, f"Confirmation requise : envoyez exactement « {_CONFIRMATION_RESET_VENTES} ».")
+
+    supprime = {}
+    # Bar — bar_credits.vente_id est ON DELETE RESTRICT : crédits (et leurs
+    # remboursements, CASCADE) supprimés avant les ventes elles-mêmes.
+    supprime["bar_remboursements"]   = db.query(BarRemboursement).delete(synchronize_session=False)
+    supprime["bar_credits"]          = db.query(BarCredit).delete(synchronize_session=False)
+    supprime["bar_ventes"]           = db.query(BarVente).delete(synchronize_session=False)
+    supprime["bar_commandes"]        = db.query(BarCommande).delete(synchronize_session=False)
+    supprime["hotel_reservations"]   = db.query(HotelReservation).delete(synchronize_session=False)
+    supprime["cuisine_ventes"]       = db.query(CuisineVente).delete(synchronize_session=False)
+    supprime["patisserie_ventes"]    = db.query(PatisserieVente).delete(synchronize_session=False)
+    supprime["patisserie_commandes"] = db.query(PatisserieCommande).delete(synchronize_session=False)
+    supprime["releves"]              = db.query(Releve).delete(synchronize_session=False)
+    db.commit()
+
+    user = getattr(request.state, "user", None)
+    log_event(db, USER_UPDATED, user_id=getattr(user, "id", None),
+              details={"action": "reset_ventes", "supprime": supprime})
+    return {"ok": True, "supprime": supprime}
