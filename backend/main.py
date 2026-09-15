@@ -2712,6 +2712,32 @@ def carburant_rapport_jour(
 
     disponible_jour = tot_ent_m - tot_dep
 
+    # ── DISPONIBLE PAR PRODUIT (Gazoline / Diesel...) — jamais mélangés :
+    # chaque caisse carburant n'est débitée que de ses propres dépenses
+    # (Depense.produit_id). Les dépenses non attribuées à un produit
+    # précis (Caisse générale) ne sont soustraites d'aucune des deux —
+    # elles restent visibles séparément et n'entament que le total combiné.
+    dep_par_pid = {}
+    dep_generale = _D("0")
+    for x in deps:
+        montant = _D(str(x.montant))
+        if x.produit_id is not None:
+            dep_par_pid[x.produit_id] = dep_par_pid.get(x.produit_id, _D("0")) + montant
+        else:
+            dep_generale += montant
+
+    pids_concernes = set(ent.keys()) | set(dep_par_pid.keys())
+    disponible_par_produit = []
+    for pid in sorted(pids_concernes, key=lambda pid: produits.get(pid, "")):
+        e = ent.get(pid, {"montant": _D("0")})
+        dp = dep_par_pid.get(pid, _D("0"))
+        disponible_par_produit.append({
+            "produit":  produits.get(pid, "Inconnu"),
+            "entrees":  float(e["montant"]),
+            "depenses": float(dp),
+            "disponible": float(e["montant"] - dp),
+        })
+
     return {
         "date":      str(d),
         "genere_le": _dtn2.now(_tzu2.utc).isoformat(),
@@ -2722,11 +2748,13 @@ def carburant_rapport_jour(
             "total":         float(tot_ent_m),
         },
         "depenses": {
-            "liste": depenses_liste,
-            "nb":    len(depenses_liste),
-            "total": float(tot_dep),
+            "liste":            depenses_liste,
+            "nb":               len(depenses_liste),
+            "total":            float(tot_dep),
+            "total_generale":   float(dep_generale),
         },
-        "disponible": float(disponible_jour),
+        "disponible":            float(disponible_jour),
+        "disponible_par_produit": disponible_par_produit,
     }
 
 
