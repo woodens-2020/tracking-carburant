@@ -24,8 +24,9 @@ from otp_service import send_welcome_email, send_otp_sms, send_otp_whatsapp
 from database import get_db
 from models import (
     AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur,
-    BarVente, BarCredit, BarRemboursement, BarCommande,
+    BarVente, BarCredit, BarRemboursement, BarCommande, BarSessionCaisse,
     HotelReservation, CuisineVente, PatisserieVente, PatisserieCommande, Releve,
+    PatisserieSessionCaisse,
 )
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -877,10 +878,12 @@ def get_audit_log(
 
 
 # ══════════════════════════════════════════════════════════════════
-# REMISE À ZÉRO DES VENTES — outil ponctuel de bascule test → exploitation
-# réelle. Supprime les transactions de vente de tous les modules, sans
-# toucher aux catalogues, employés, stock ou dépenses. Route destinée à être
-# retirée du code une fois utilisée (pas un outil d'exploitation courant).
+# REMISE À ZÉRO DES VENTES ET DES SESSIONS DE CAISSE — outil ponctuel de
+# bascule test → exploitation réelle. Supprime les transactions de vente de
+# tous les modules ainsi que les sessions de caisse (montants cash comptés/
+# écarts), sans toucher aux catalogues, employés, stock ou dépenses. Route
+# destinée à être retirée du code une fois utilisée (pas un outil
+# d'exploitation courant).
 # ══════════════════════════════════════════════════════════════════
 
 _CONFIRMATION_RESET_VENTES = "EFFACER TOUTES LES VENTES"
@@ -921,6 +924,8 @@ def apercu_reset_ventes(request: Request, db: Session = Depends(get_db)):
         "patisserie_ventes":    db.query(PatisserieVente).count(),
         "patisserie_commandes": db.query(PatisserieCommande).count(),
         "releves":              db.query(Releve).count(),
+        "bar_sessions_caisse":         db.query(BarSessionCaisse).count(),
+        "patisserie_sessions_caisse":  db.query(PatisserieSessionCaisse).count(),
     }
 
 
@@ -931,10 +936,11 @@ class ResetVentesIn(BaseModel):
 @router.post("/reset-ventes")
 def reset_ventes(data: ResetVentesIn, request: Request, db: Session = Depends(get_db)):
     """Supprime TOUTES les ventes de TOUS les modules (bar, hôtel, cuisine,
-    pâtisserie, carburant) — remise à zéro avant le passage en exploitation
-    réelle. Ne touche ni aux catalogues/produits, ni au stock, ni aux
-    employés, ni aux dépenses — uniquement les transactions de vente
-    elles-mêmes (lignes/crédits/remboursements associés supprimés en
+    pâtisserie, carburant) ainsi que les sessions de caisse (montants cash
+    comptés/écarts) — remise à zéro avant le passage en exploitation réelle.
+    Ne touche ni aux catalogues/produits, ni au stock, ni aux employés, ni
+    aux dépenses — uniquement les ventes et leur réconciliation de caisse
+    (lignes/crédits/remboursements/évaluations associés supprimés en
     cascade côté base). Irréversible : exige la phrase de confirmation
     exacte."""
     _exiger_reset_ventes_arme(request)
@@ -953,6 +959,12 @@ def reset_ventes(data: ResetVentesIn, request: Request, db: Session = Depends(ge
     supprime["patisserie_ventes"]    = db.query(PatisserieVente).delete(synchronize_session=False)
     supprime["patisserie_commandes"] = db.query(PatisserieCommande).delete(synchronize_session=False)
     supprime["releves"]              = db.query(Releve).delete(synchronize_session=False)
+    # Sessions de caisse (montant cash compté, écart) — après les ventes :
+    # bar_ventes.session_id / patisserie_ventes.session_id sont SET NULL,
+    # mais les ventes concernées sont déjà supprimées ci-dessus de toute
+    # façon. BarSessionEvaluation (bar) est CASCADE sur la session.
+    supprime["bar_sessions_caisse"]        = db.query(BarSessionCaisse).delete(synchronize_session=False)
+    supprime["patisserie_sessions_caisse"] = db.query(PatisserieSessionCaisse).delete(synchronize_session=False)
     db.commit()
 
     user = getattr(request.state, "user", None)
