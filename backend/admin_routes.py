@@ -1,8 +1,6 @@
 """Routes d'administration : gestion des rôles, comptes, sessions et journal."""
-import hmac
 import io
 import json
-import os
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -22,12 +20,7 @@ from activity_log import (
 from auth import hash_code_acces, hash_password, make_api_key
 from otp_service import send_welcome_email, send_otp_sms, send_otp_whatsapp
 from database import get_db
-from models import (
-    AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur,
-    BarVente, BarCredit, BarRemboursement, BarCommande, BarSessionCaisse,
-    HotelReservation, CuisineVente, PatisserieVente, PatisserieCommande, Releve,
-    PatisserieSessionCaisse,
-)
+from models import AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -875,99 +868,3 @@ def get_audit_log(
             "created_at":   created.isoformat(),
         })
     return {"total": total, "page": page, "per_page": per_page, "items": items}
-
-
-# ══════════════════════════════════════════════════════════════════
-# REMISE À ZÉRO DES VENTES ET DES SESSIONS DE CAISSE — outil ponctuel de
-# bascule test → exploitation réelle. Supprime les transactions de vente de
-# tous les modules ainsi que les sessions de caisse (montants cash comptés/
-# écarts), sans toucher aux catalogues, employés, stock ou dépenses. Route
-# destinée à être retirée du code une fois utilisée (pas un outil
-# d'exploitation courant).
-# ══════════════════════════════════════════════════════════════════
-
-_CONFIRMATION_RESET_VENTES = "EFFACER TOUTES LES VENTES"
-
-# Verrou explicite par déploiement : ce code est partagé entre plusieurs
-# projets Railway (même repo/branche) mais cet outil ne doit s'activer que
-# là où ALLOW_RESET_VENTES contient un secret — les autres déploiements
-# reçoivent 404 quel que soit l'en-tête fourni. Auth autonome (secret
-# partagé dans l'en-tête X-Reset-Key), indépendante de AuthMiddleware/
-# _require_admin : ces routes sont ajoutées à _PUBLIC_PATHS (main.py) car
-# le compte admin réel de ce déploiement ne s'appelle pas forcément
-# "admin" (le contournement ADMIN_API_KEY de AuthMiddleware suppose ce nom
-# d'utilisateur précis), et on ne veut pas dépendre d'une session/API key
-# de compte pour un outil ponctuel qui doit marcher une seule fois.
-_RESET_VENTES_KEY = os.getenv("ALLOW_RESET_VENTES", "").strip()
-
-
-def _exiger_reset_ventes_arme(request: Request):
-    if not _RESET_VENTES_KEY:
-        raise HTTPException(404, "Not Found")
-    fourni = request.headers.get("X-Reset-Key", "")
-    if not fourni or not hmac.compare_digest(fourni, _RESET_VENTES_KEY):
-        raise HTTPException(404, "Not Found")
-
-
-@router.get("/reset-ventes/apercu")
-def apercu_reset_ventes(request: Request, db: Session = Depends(get_db)):
-    """Aperçu en lecture seule : compte les lignes que POST /reset-ventes
-    supprimerait, sans rien modifier."""
-    _exiger_reset_ventes_arme(request)
-    return {
-        "bar_ventes":           db.query(BarVente).count(),
-        "bar_credits":          db.query(BarCredit).count(),
-        "bar_remboursements":   db.query(BarRemboursement).count(),
-        "bar_commandes":        db.query(BarCommande).count(),
-        "hotel_reservations":   db.query(HotelReservation).count(),
-        "cuisine_ventes":       db.query(CuisineVente).count(),
-        "patisserie_ventes":    db.query(PatisserieVente).count(),
-        "patisserie_commandes": db.query(PatisserieCommande).count(),
-        "releves":              db.query(Releve).count(),
-        "bar_sessions_caisse":         db.query(BarSessionCaisse).count(),
-        "patisserie_sessions_caisse":  db.query(PatisserieSessionCaisse).count(),
-    }
-
-
-class ResetVentesIn(BaseModel):
-    confirmation: str
-
-
-@router.post("/reset-ventes")
-def reset_ventes(data: ResetVentesIn, request: Request, db: Session = Depends(get_db)):
-    """Supprime TOUTES les ventes de TOUS les modules (bar, hôtel, cuisine,
-    pâtisserie, carburant) ainsi que les sessions de caisse (montants cash
-    comptés/écarts) — remise à zéro avant le passage en exploitation réelle.
-    Ne touche ni aux catalogues/produits, ni au stock, ni aux employés, ni
-    aux dépenses — uniquement les ventes et leur réconciliation de caisse
-    (lignes/crédits/remboursements/évaluations associés supprimés en
-    cascade côté base). Irréversible : exige la phrase de confirmation
-    exacte."""
-    _exiger_reset_ventes_arme(request)
-    if data.confirmation != _CONFIRMATION_RESET_VENTES:
-        raise HTTPException(422, f"Confirmation requise : envoyez exactement « {_CONFIRMATION_RESET_VENTES} ».")
-
-    supprime = {}
-    # Bar — bar_credits.vente_id est ON DELETE RESTRICT : crédits (et leurs
-    # remboursements, CASCADE) supprimés avant les ventes elles-mêmes.
-    supprime["bar_remboursements"]   = db.query(BarRemboursement).delete(synchronize_session=False)
-    supprime["bar_credits"]          = db.query(BarCredit).delete(synchronize_session=False)
-    supprime["bar_ventes"]           = db.query(BarVente).delete(synchronize_session=False)
-    supprime["bar_commandes"]        = db.query(BarCommande).delete(synchronize_session=False)
-    supprime["hotel_reservations"]   = db.query(HotelReservation).delete(synchronize_session=False)
-    supprime["cuisine_ventes"]       = db.query(CuisineVente).delete(synchronize_session=False)
-    supprime["patisserie_ventes"]    = db.query(PatisserieVente).delete(synchronize_session=False)
-    supprime["patisserie_commandes"] = db.query(PatisserieCommande).delete(synchronize_session=False)
-    supprime["releves"]              = db.query(Releve).delete(synchronize_session=False)
-    # Sessions de caisse (montant cash compté, écart) — après les ventes :
-    # bar_ventes.session_id / patisserie_ventes.session_id sont SET NULL,
-    # mais les ventes concernées sont déjà supprimées ci-dessus de toute
-    # façon. BarSessionEvaluation (bar) est CASCADE sur la session.
-    supprime["bar_sessions_caisse"]        = db.query(BarSessionCaisse).delete(synchronize_session=False)
-    supprime["patisserie_sessions_caisse"] = db.query(PatisserieSessionCaisse).delete(synchronize_session=False)
-    db.commit()
-
-    user = getattr(request.state, "user", None)
-    log_event(db, USER_UPDATED, user_id=getattr(user, "id", None),
-              details={"action": "reset_ventes", "supprime": supprime})
-    return {"ok": True, "supprime": supprime}
