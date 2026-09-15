@@ -540,6 +540,18 @@ table.dt{width:100%;border-collapse:collapse}
 .inp:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(59,130,246,.1)}
 .inp.err{border-color:var(--red);box-shadow:0 0 0 2px rgba(239,68,68,.1)}
 .inp-sm{width:78px}
+/* Flèches natives des inputs number : rendu incohérent/écrasé selon le
+   navigateur (chiffres collés aux boutons) — masquées, la saisie au
+   clavier reste possible. */
+.inp[type="number"]::-webkit-inner-spin-button,
+.inp[type="number"]::-webkit-outer-spin-button{ -webkit-appearance:none; margin:0; }
+.inp[type="number"]{ -moz-appearance:textfield; }
+/* Meter avant/après vide + case "Index attendu" empilés sans lien visuel
+   avant activation de la ligne : tant que la case est proposée, on masque
+   le champ vide et seule la case (qui remplit le champ en un clic) reste
+   visible — le champ réapparaît dès que la ligne est activée (readonly
+   retiré par enableRow/applyIndexPrecedent). */
+td:has(.ip-report) input.inp-av[readonly]{ display:none; }
 
 /* Row status badges */
 .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:700;font-family:var(--mono);letter-spacing:.03em}
