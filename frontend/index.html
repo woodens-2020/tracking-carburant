@@ -24536,7 +24536,18 @@ function _posDbRenderDettes(dettes, meta){
 let _posCatActuelle = 'TOUS';
 
 async function loadPosCaisse(){
-  await Promise.all([_posLoadProduitsCache(), _posLoadCuisinePlatsCache()]);
+  // Si l'utilisateur connecté est verrouillé sur une identité caissière (ou
+  // manager), on résout d'abord le lieu de sa session en cours — sinon le
+  // catalogue se chargeait sans filtre au tout premier rendu de la grille
+  // (avant que posCaissierChange ne le corrige plus bas, de façon non
+  // synchrone) et affichait les produits des deux bars, même brièvement.
+  if(_appUser?.caisse_employe_id && !_posSessionLieu){
+    try {
+      const d = await apiFetch('GET', `/pos/caisse/dashboard?caissier_id=${_appUser.caisse_employe_id}`);
+      if(d.lieu) _posSessionLieu = d.lieu;
+    } catch(_){}
+  }
+  await Promise.all([_posLoadProduitsCache(_posSessionLieu), _posLoadCuisinePlatsCache()]);
   await _posChargerCaissiers();
   posRenderCatTabs();
   posCatFilter(_posCatActuelle, null);
