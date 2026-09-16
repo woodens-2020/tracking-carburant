@@ -22,6 +22,16 @@ from sqlalchemy import create_engine, text
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
+# Confirmations explicites reçues côté utilisateur pour des articles dont
+# l'historique de mouvements est mélangé (donc non résolubles tout seuls
+# par la logique automatique plus bas) — appliquées en priorité et sans
+# condition, avant le classement par signal. Nom comparé en minuscules
+# (insensible à la casse). Retirer une ligne une fois l'article vraiment
+# stable si cette liste devient inutile.
+_OVERRIDES_CONFIRMES = {
+    "aloe": "PISCINE",
+}
+
 
 def main() -> None:
     if not DATABASE_URL:
@@ -33,6 +43,14 @@ def main() -> None:
 
     engine = create_engine(DATABASE_URL)
     with engine.begin() as conn:
+        for nom_lower, lieu_confirme in _OVERRIDES_CONFIRMES.items():
+            res = conn.execute(text(
+                "UPDATE bar_produits SET lieu = :lieu "
+                "WHERE lower(nom) = :nom AND (lieu IS DISTINCT FROM :lieu)"
+            ), {"lieu": lieu_confirme, "nom": nom_lower})
+            if res.rowcount:
+                print(f"classer_produits_sans_lieu : override confirmé — « {nom_lower} » -> {lieu_confirme} ({res.rowcount} ligne(s)).")
+
         rows = conn.execute(text(
             """
             SELECT p.id, p.nom,
