@@ -215,6 +215,25 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     if not lignes_input:
         raise ValueError("La vente doit comporter au moins une ligne.")
 
+    # Résolu avant la boucle (pas juste avant la création de BarVente plus
+    # bas) pour pouvoir refuser toute ligne dont le produit appartient
+    # exclusivement à l'autre bar que celui de la session — sans ce
+    # contrôle, un produit_id du mauvais catalogue passé au serveur (pour
+    # n'importe quelle raison, y compris hors UI normale) serait vendu et
+    # son mouvement de stock hériterait quand même du lieu de la session,
+    # mélangeant silencieusement les deux catalogues.
+    session_id = None
+    lieu_vente = None
+    caissier_id = data.get("caissier_id")
+    if caissier_id:
+        session_en_cours = (
+            db.query(BarSessionCaisse)
+            .filter_by(caissier_id=caissier_id, date_session=today_haiti(), statut="EN_COURS")
+            .first()
+        )
+        session_id = session_en_cours.id if session_en_cours else None
+        lieu_vente = session_en_cours.lieu if session_en_cours else None
+
     lignes_traitees = []
     erreurs = []
 
@@ -246,6 +265,15 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
         produit = db.query(BarProduit).filter_by(id=pid, actif=True).first()
         if not produit:
             erreurs.append(f"Produit #{pid} introuvable ou inactif.")
+            continue
+
+        if produit.lieu and lieu_vente and produit.lieu != lieu_vente:
+            erreurs.append(
+                f"« {produit.nom} » appartient au catalogue "
+                f"{'Bar Devant' if produit.lieu == 'DEVANT' else 'Bar Piscine'} — "
+                f"impossible de le vendre depuis une session "
+                f"{'Bar Devant' if lieu_vente == 'DEVANT' else 'Bar Piscine'}."
+            )
             continue
 
         prix = prix_actif(pid, db)
@@ -323,21 +351,12 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
 
     statut = "CREDIT_EN_COURS" if montant_restant > 0 else "PAYEE"
 
-    # Rattache la vente à la session de caisse EN_COURS du caissier (s'il en
-    # a une) — indispensable pour distinguer les ventes de sessions
-    # successives du même caissier le même jour (voir _ventes_session dans
+    # session_id/lieu_vente résolus plus haut, avant la boucle des lignes
+    # (voir le contrôle de cohérence lieu juste au-dessus) — rattache la
+    # vente à la session de caisse EN_COURS du caissier (s'il en a une),
+    # indispensable pour distinguer les ventes de sessions successives du
+    # même caissier le même jour (voir _ventes_session dans
     # caisse_routes.py, qui sinon confondrait les rapports de deux sessions).
-    session_id = None
-    lieu_vente = None   # hérité de la session, best-effort — ne bloque jamais la vente
-    caissier_id = data.get("caissier_id")
-    if caissier_id:
-        session_en_cours = (
-            db.query(BarSessionCaisse)
-            .filter_by(caissier_id=caissier_id, date_session=today_haiti(), statut="EN_COURS")
-            .first()
-        )
-        session_id = session_en_cours.id if session_en_cours else None
-        lieu_vente = session_en_cours.lieu if session_en_cours else None
 
     # Créer la vente
     vente = BarVente(
