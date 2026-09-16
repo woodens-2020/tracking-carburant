@@ -1,28 +1,27 @@
 """
-Classe automatiquement, à chaque déploiement, les BarProduit dont `lieu`
-est encore NULL (articles créés avant la séparation Bar Devant/Bar
-Piscine — voir models.py).
+Applique UNIQUEMENT les classifications de bar explicitement confirmées
+par l'utilisateur (_OVERRIDES_CONFIRMES) — jamais de déduction automatique
+à partir de l'historique de mouvements.
 
-Un produit est reclassé quand son historique de mouvements de stock
-(bar_mouvements_stock.lieu — renseigné pour les ajustements/pertes/casses
-et, en best-effort, les ventes ; jamais pour les achats/réceptions,
-volontairement communs aux deux bars) ne pointe que vers UN SEUL bar.
-Les produits avec un signal mixte (mouvements dans les deux bars) ou sans
-aucun signal exploitable restent NULL et sont listés dans la sortie pour
-reclassement manuel (page Produits Bar → Modifier → champ Bar).
+Principe (clarifié après une erreur concrète sur "Jumex") : le fait qu'un
+produit n'ait eu jusqu'ici des mouvements que dans UN SEUL bar ne prouve
+PAS qu'il lui est exclusif — ça peut juste vouloir dire que l'autre bar
+n'a pas encore reçu de stock pour cet article. NULL (visible aux deux
+bars, quantité par bar calculée séparément à partir des mouvements
+lieu-tagués) est l'état NORMAL et PERMANENT pour la grande majorité des
+produits, pas un état temporaire "à résoudre". Seul un produit qu'un
+humain confirme explicitement comme exclusif à un bar doit devenir
+non-NULL.
 
-IMPORTANT — pas de défaut automatique ici : une version précédente de ce
-script forçait tout produit sans signal sur Bar Devant "par défaut", ce
-qui a retiré à tort de vrais produits (Corona, plats Poisson, etc.) du
-catalogue Bar Piscine où ils étaient réellement vendus. NULL (visible aux
-deux bars) est un état sans risque ; un mauvais classement forcé ne l'est
-pas — seul un humain qui connaît le vrai catalogue de chaque bar peut
-trancher ces cas, jamais un deviné automatique.
+Une version précédente de ce script devinait via le signal d'historique
+(ne pointe que vers un seul bar => classé sur ce bar) — ça a produit deux
+erreurs concrètes : "Corona"/"Poisson" etc. (retirés à tort de Piscine)
+et "Jumex" (rendu exclusif à Devant alors qu'il doit rester vendable aux
+deux, avec un stock à 0 côté Piscine tant que rien n'y est reçu). Cette
+logique est retirée définitivement.
 
-Idempotent et sans risque : relancé une fois tous les produits classables
-classés (les cas ambigus/sans signal ne changent pas), il n'a plus rien à
-faire. Complète l'outil GET/POST /api/admin/classer-lieu (page Produits
-Bar) en l'exécutant automatiquement, sans action manuelle.
+Idempotent et sans risque : relancé une fois tous les overrides
+confirmés appliqués, il n'a plus rien à faire.
 """
 import os
 
@@ -30,12 +29,10 @@ from sqlalchemy import create_engine, text
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
-# Confirmations explicites reçues côté utilisateur pour des articles dont
-# l'historique de mouvements est mélangé (donc non résolubles tout seuls
-# par la logique automatique plus bas) — appliquées en priorité et sans
-# condition, avant le classement par signal. Nom comparé en minuscules
-# (insensible à la casse). Retirer une ligne une fois l'article vraiment
-# stable si cette liste devient inutile.
+# Confirmations explicites reçues côté utilisateur — SEULE source de
+# classification automatique. Nom comparé en minuscules (insensible à la
+# casse). Ajouter une ligne uniquement quand l'utilisateur a lui-même
+# confirmé qu'un produit est exclusif à un bar.
 _OVERRIDES_CONFIRMES = {
     "aloe": "PISCINE",
 }
@@ -51,57 +48,17 @@ def main() -> None:
 
     engine = create_engine(DATABASE_URL)
     with engine.begin() as conn:
+        total = 0
         for nom_lower, lieu_confirme in _OVERRIDES_CONFIRMES.items():
             res = conn.execute(text(
                 "UPDATE bar_produits SET lieu = :lieu "
                 "WHERE lower(nom) = :nom AND (lieu IS DISTINCT FROM :lieu)"
             ), {"lieu": lieu_confirme, "nom": nom_lower})
             if res.rowcount:
+                total += res.rowcount
                 print(f"classer_produits_sans_lieu : override confirmé — « {nom_lower} » -> {lieu_confirme} ({res.rowcount} ligne(s)).")
-
-        rows = conn.execute(text(
-            """
-            SELECT p.id, p.nom,
-                   COALESCE(s.n_devant, 0)  AS n_devant,
-                   COALESCE(s.n_piscine, 0) AS n_piscine
-            FROM bar_produits p
-            LEFT JOIN (
-                SELECT produit_id,
-                       COUNT(*) FILTER (WHERE lieu = 'DEVANT')  AS n_devant,
-                       COUNT(*) FILTER (WHERE lieu = 'PISCINE') AS n_piscine
-                FROM bar_mouvements_stock
-                WHERE lieu IS NOT NULL
-                GROUP BY produit_id
-            ) s ON s.produit_id = p.id
-            WHERE p.lieu IS NULL
-            ORDER BY p.nom
-            """
-        )).fetchall()
-
-        if not rows:
-            print("classer_produits_sans_lieu : aucun produit sans bar — rien à faire.")
-            return
-
-        classes, ambigus, sans_signal = [], [], []
-        for produit_id, nom, n_devant, n_piscine in rows:
-            if n_devant > 0 and n_piscine > 0:
-                ambigus.append(nom)
-            elif n_devant > 0:
-                conn.execute(text("UPDATE bar_produits SET lieu = 'DEVANT' WHERE id = :id"), {"id": produit_id})
-                classes.append(f"{nom} -> DEVANT")
-            elif n_piscine > 0:
-                conn.execute(text("UPDATE bar_produits SET lieu = 'PISCINE' WHERE id = :id"), {"id": produit_id})
-                classes.append(f"{nom} -> PISCINE")
-            else:
-                sans_signal.append(nom)
-
-        print(f"classer_produits_sans_lieu : {len(classes)} classé(s) automatiquement.")
-        for ligne in classes:
-            print(f"  - {ligne}")
-        if ambigus:
-            print(f"  {len(ambigus)} ambigu(s) (historique mélangé, à classer manuellement) : {', '.join(ambigus)}")
-        if sans_signal:
-            print(f"  {len(sans_signal)} sans signal (aucun historique lieu-tagué, à classer manuellement) : {', '.join(sans_signal)}")
+        if not total:
+            print("classer_produits_sans_lieu : rien à faire (overrides déjà appliqués).")
 
 
 if __name__ == "__main__":
