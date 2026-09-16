@@ -25953,6 +25953,10 @@ async function loadPosStock(){
     const stockMap = {};
     (stocks||[]).forEach(s=>{ stockMap[s.produit_id] = s; });
     _posStockCache = { prods: prods||[], stockMap };
+    // Garde _posProduitsAll synchronisé meme si la page Produits Bar n'a
+    // jamais ete visitee dans cette session — posAjusterStockDepuisProduit()
+    // (bouton "Ajuster" ci-dessous) en depend pour verrouiller le lieu.
+    _posProduitsAll = prods||[];
 
     let totalValeur = 0, nbAlerte = 0;
     (prods||[]).forEach(p=>{
@@ -26023,7 +26027,10 @@ function _posStockRenderTable(){
       <td>${p.seuil_alerte_stock||'—'}</td>
       <td>${valeur>0?posGx(valeur):'—'}</td>
       <td>${badge}</td>
-      <td>${(devant!==0||piscine!==0)?`<button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posStockReinitialiser(${p.id},'${esc(p.nom||'')}',${devant},${piscine})">Réinitialiser</button>`:'<span style="color:rgba(255,255,255,.25);font-size:12px">—</span>'}</td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posAjusterStockDepuisProduit(${p.id})">Ajuster</button>
+        ${(devant!==0||piscine!==0)?`<button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posStockReinitialiser(${p.id},'${esc(p.nom||'')}',${devant},${piscine})">Réinitialiser</button>`:''}
+      </td>
     </tr>`;
   });
   tbody.innerHTML = rows.join('') || `<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit ${recherche||_posStockDispoFiltre||_posStockLieuFiltre?'ne correspond aux filtres':'actif'}</td></tr>`;
