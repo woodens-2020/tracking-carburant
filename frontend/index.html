@@ -16832,10 +16832,9 @@ async function _loadBranding(){
     Object.assign(_branding, brandingFields);
     if(modules) Object.assign(_modules, modules);
     // Accès Hôtel complet pour le rôle Manager (Chambres + Réception) —
-    // activé par tenant (MANAGER_HOTEL_COMPLET). Pro forma exclu (retiré
-    // sur demande, voir _MANAGER_ALLOWED).
+    // activé par tenant (MANAGER_HOTEL_COMPLET).
     if(roles && roles.manager_hotel_complet){
-      ['hotel-chambres','hotel-reception'].forEach(p=>_MANAGER_ALLOWED.add(p));
+      ['hotel-chambres','hotel-reception','hotel-proforma'].forEach(p=>_MANAGER_ALLOWED.add(p));
       if(_ACCES_POSTE_LEGACY && _ACCES_POSTE_LEGACY['Manager'])
         _ACCES_POSTE_LEGACY['Manager'] = Array.from(_MANAGER_ALLOWED);
     }
@@ -16920,12 +16919,11 @@ const _CAISSIER_ALLOWED = new Set([
 ]);
 
 // Whitelist stricte pour les comptes Manager — Bar/Restaurant + Hôtel (sans
-// Tables, Grande Caisse, Chambres, Réception, Rapports ni Pro forma —
-// retirés sur demande) + Cuisine complète + Pâtisserie complète.
+// Tables, Grande Caisse, Chambres ni Réception) + Cuisine complète + Pâtisserie complète.
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
-  'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse',
-  'hotel-dashboard','hotel-sejours','hotel-historique','hotel-employes','hotel-depenses',
+  'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
+  'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'patisserie-dashboard','patisserie-produits','patisserie-achats','patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse',
   'employes','payroll',
@@ -17029,9 +17027,10 @@ function _getAllowedPages(){
 function _canAccess(page){
   if(!_appUser) return false;
   const _rnCanAccess = (_appUser.role_nom||_appUser.poste||'').toLowerCase();
+  const _isCaissiereAccess = !!_appUser.employe_id || _rnCanAccess.startsWith('caissier');
   // Notifications et Tâches : accessibles à tous les rôles sans exception,
-  // sauf Manager (retiré sur demande).
-  if((page==='notifications' || page==='taches') && _rnCanAccess !== 'manager') return true;
+  // sauf caissière (retiré sur demande).
+  if((page==='notifications' || page==='taches') && !_isCaissiereAccess) return true;
   // Module métier désactivé pour cette institution — bloqué même pour l'admin,
   // avant toute vérification de rôle (voir _modules / _MODULE_PAGES).
   if(!_pageModuleEnabled(page)) return false;
@@ -17042,7 +17041,7 @@ function _canAccess(page){
   // uniquement permissions.admin, vérifié ci-dessus par _isAdmin()).
   if(['admin-roles','admin-users','admin-sessions','admin-audit','admin-security'].includes(page)) return false;
   if(_rnCanAccess === 'manager') return _MANAGER_ALLOWED.has(page);
-  if(_appUser.employe_id || (_appUser.role_nom||_appUser.poste||'').toLowerCase().startsWith('caissier')) return _CAISSIER_ALLOWED.has(page);
+  if(_isCaissiereAccess) return _CAISSIER_ALLOWED.has(page);
   const allowed = _getAllowedPages();
   if(allowed === null) return true;
   return allowed.has(page);
