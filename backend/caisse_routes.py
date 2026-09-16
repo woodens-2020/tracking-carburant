@@ -74,6 +74,23 @@ def _session_ou_404(session_id: int, db: Session) -> BarSessionCaisse:
     return s
 
 
+def _employe_est_admin(employe: Employe, db: Session) -> bool:
+    """Le compte utilisateur lié à cet employé est-il administrateur ?
+    (rôle "admin" natif ou rôle personnalisé avec la permission admin —
+    même définition que _require_pdg_ou_admin_pos ci-dessus.) Utilisé pour
+    exempter les administrateurs de MAX_SESSIONS_PAR_JOUR : contrairement
+    aux caissières, ils démarrent/ferment souvent des sessions de test ou
+    de vérification, sans que ça doive les bloquer pour le reste du jour."""
+    if not employe.utilisateur_id:
+        return False
+    u = db.get(Utilisateur, employe.utilisateur_id)
+    if not u:
+        return False
+    if u.role == "admin":
+        return True
+    return bool(u.role_obj and u.role_obj.permissions.get("admin", False))
+
+
 def _fenetre_session(session: BarSessionCaisse, db: Session) -> tuple[datetime, datetime]:
     """Bornes [début, fin) de la fenêtre temporelle propre à cette session —
     entre son ouverture et l'ouverture de la session suivante du même
@@ -358,7 +375,7 @@ def dashboard_caissiere(
         "lieu":          session.lieu if session else None,
         "nb_sessions_jour": len(sessions_du_jour),
         "max_sessions_par_jour": MAX_SESSIONS_PAR_JOUR,
-        "peut_ouvrir_nouvelle_session": len(sessions_du_jour) < MAX_SESSIONS_PAR_JOUR,
+        "peut_ouvrir_nouvelle_session": len(sessions_du_jour) < MAX_SESSIONS_PAR_JOUR or _employe_est_admin(employe, db),
         "evolution":     evolution,
         **stats,
     }
@@ -437,9 +454,11 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
     """Ouvre (ou retrouve) une session du jour pour une caissière — jusqu'à
     MAX_SESSIONS_PAR_JOUR sessions par jour (mesure de sécurité : permet de
     repartir sur une session propre après un incident, sans attendre le
-    lendemain). Le lieu (Bar Devant / Bar Piscine) est choisi une fois par
-    session, avant le comptage de stock — requis uniquement à la création
-    (une session déjà EN_COURS a déjà le sien)."""
+    lendemain). Les administrateurs sont exemptés de cette limite (voir
+    _employe_est_admin) — ils ouvrent/ferment souvent des sessions de test
+    ou de vérification. Le lieu (Bar Devant / Bar Piscine) est choisi une
+    fois par session, avant le comptage de stock — requis uniquement à la
+    création (une session déjà EN_COURS a déjà le sien)."""
     employe = db.query(Employe).filter_by(id=data.caissier_id).first()
     if not employe:
         raise HTTPException(404, "Caissier introuvable")
@@ -453,7 +472,7 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
     )
     session = next((s for s in sessions_du_jour if s.statut == "EN_COURS"), None)
     if not session:
-        if len(sessions_du_jour) >= MAX_SESSIONS_PAR_JOUR:
+        if len(sessions_du_jour) >= MAX_SESSIONS_PAR_JOUR and not _employe_est_admin(employe, db):
             raise HTTPException(409, f"Limite de {MAX_SESSIONS_PAR_JOUR} sessions de caisse par jour atteinte pour ce caissier.")
         if not data.lieu or data.lieu.upper() not in _LIEUX_VALIDES:
             raise HTTPException(422, "Choisissez le bar (Bar Devant ou Bar Piscine) avant de démarrer.")
