@@ -483,13 +483,19 @@ def liste_produits(actif: Optional[bool] = None, lieu: Optional[str] = None, db:
     q = db.query(BarProduit)
     if actif is not None:
         q = q.filter(BarProduit.actif == actif)
+    lieu_maj = None
     if lieu:
         lieu_maj = lieu.upper()
         if lieu_maj not in LIEUX_VALIDES:
             raise HTTPException(422, "lieu doit être DEVANT ou PISCINE.")
         q = q.filter(or_(BarProduit.lieu == lieu_maj, BarProduit.lieu.is_(None)))
     produits = q.order_by(BarProduit.categorie, BarProduit.nom).all()
-    stocks   = stock_tous_produits(db)
+    # Stock scopé au lieu demandé (celui de la session caissière qui vend) —
+    # sans quoi un produit partagé entre les deux bars afficherait le stock
+    # total des deux (celui de l'autre bar inclus) au lieu du sien propre.
+    # Sans `lieu` (vue catalogue admin, Produits Bar), le total reste le
+    # pool global des deux bars, comme avant.
+    stocks = stock_tous_produits(db, lieu=lieu_maj)
     return [_produit_dict(p, stocks.get(p.id, Decimal("0")), db) for p in produits]
 
 
