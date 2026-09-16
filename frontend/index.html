@@ -6806,6 +6806,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
           </div>
           <div class="gi-page-header-actions">
+            <button id="btn-pos-classer-lieu" class="gi-btn-secondary" onclick="posClasserLieu()" title="Assigner Bar Devant/Bar Piscine aux produits pas encore classés, d'après leur historique">
+              Classer les produits sans bar
+            </button>
             <button id="btn-pos-nouveau-produit" class="gi-btn-primary" onclick="posProduitModal()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Nouveau produit
@@ -25408,6 +25411,44 @@ async function posCatCreer(){
     posCatAddToggle(false);
     posAlert(`Catégorie « ${cat.nom} » créée.`,'ok');
   } catch(e){ posAlert(e.message||'Erreur création catégorie.'); }
+}
+
+async function posClasserLieu(){
+  let apercu;
+  try { apercu = await apiFetch('GET','/admin/classer-lieu/apercu'); }
+  catch(e){ posAlert(e.message||'Erreur.'); return; }
+
+  if(!apercu.total_sans_lieu){
+    posAlert('Tous les produits sont déjà classés Bar Devant / Bar Piscine.','ok');
+    return;
+  }
+
+  let msg = `${apercu.total_sans_lieu} produit(s) sans bar assigné.\n\n`;
+  if(apercu.classables.length){
+    const lieuLabel = l => l==='DEVANT' ? 'Bar Devant' : 'Bar Piscine';
+    msg += `${apercu.classables.length} peuvent être classés automatiquement d'après leur historique :\n`
+         + apercu.classables.map(p=>`  • ${p.nom} → ${lieuLabel(p.candidat)}`).join('\n') + '\n\n';
+  }
+  if(apercu.ambigus.length){
+    msg += `${apercu.ambigus.length} ont un historique mélangé (déjà vendus/ajustés dans les deux bars) — à classer manuellement :\n`
+         + apercu.ambigus.map(p=>`  • ${p.nom}`).join('\n') + '\n\n';
+  }
+  if(apercu.sans_signal.length){
+    msg += `${apercu.sans_signal.length} n'ont aucun historique exploitable — à classer manuellement :\n`
+         + apercu.sans_signal.map(p=>`  • ${p.nom}`).join('\n') + '\n\n';
+  }
+
+  if(!apercu.classables.length){
+    posAlert(msg.trim(),'warn');
+    return;
+  }
+  if(!confirm(msg + 'Appliquer le classement automatique ci-dessus ?')) return;
+
+  try {
+    const res = await apiFetch('POST','/admin/classer-lieu');
+    posAlert(`${res.classes.length} produit(s) classé(s) automatiquement.`,'ok');
+    loadPosProduits();
+  } catch(e){ posAlert(e.message||'Erreur.'); }
 }
 
 async function loadPosProduits(){
