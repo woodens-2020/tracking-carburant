@@ -7046,6 +7046,18 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div>
 
+    <!-- Modal historique des mouvements de stock -->
+    <div class="pos-modal-bg" id="pos-histo-stock-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal" style="max-width:640px">
+        <h3 id="pos-histo-stock-title">Historique des mouvements</h3>
+        <div id="pos-histo-stock-resume" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;font-size:13px;color:rgba(255,255,255,.6)"></div>
+        <div id="pos-histo-stock-liste" style="max-height:60vh;overflow-y:auto"></div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="document.getElementById('pos-histo-stock-modal-bg').classList.remove('open')">Fermer</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- PAGE POS — STOCK BAR                                    -->
     <!-- ══════════════════════════════════════════════════════ -->
@@ -25472,6 +25484,9 @@ function _posRenderProduitsTbody(prods, stockMap){
           <button class="gi-btn-icon" title="Historique prix" onclick="posPrixModal(${p.id},'${nomSafe}')" style="color:#a78bfa">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           </button>
+          <button class="gi-btn-icon" title="Historique des mouvements de stock" onclick="posHistoriqueStockModal(${p.id},'${nomSafe}')" style="color:#60a5fa">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+          </button>
           <button class="gi-btn-icon ${p.actif?'danger':''}" title="${p.actif?'Désactiver':'Activer'}" onclick="posToggleActif(${p.id},${p.actif?0:1})">
             ${p.actif
               ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>'
@@ -25833,6 +25848,56 @@ async function posPrixModal(prodId, nom){
         <td>${posDateFr(h.date_debut)}</td>
         <td>${h.date_fin ? posDateFr(h.date_fin) : '<span class="pos-badge teal">Actif</span>'}</td>
       </tr>`).join('')+'</tbody></table>';
+  } catch(e){ liste.innerHTML = '<div style="color:#f87171;font-size:13px">Erreur chargement</div>'; }
+}
+
+const _POS_MOUV_LABELS = {
+  ENTREE:       { texte: 'Réception',           couleur: '#34d399' },
+  SORTIE_VENTE: { texte: 'Vente',                couleur: '#60a5fa' },
+  AJUSTEMENT:   { texte: 'Ajustement',           couleur: '#f7a93b' },
+  PERTE:        { texte: 'Perte',                couleur: '#f87171' },
+  CASSE:        { texte: 'Casse',                couleur: '#f87171' },
+};
+const _POS_LIEU_LABELS = { DEVANT: 'Bar Devant', PISCINE: 'Bar Piscine' };
+
+async function posHistoriqueStockModal(prodId, nom){
+  const bg = document.getElementById('pos-histo-stock-modal-bg');
+  document.getElementById('pos-histo-stock-title').textContent = `Historique des mouvements — ${nom}`;
+  const resume = document.getElementById('pos-histo-stock-resume');
+  const liste  = document.getElementById('pos-histo-stock-liste');
+  resume.innerHTML = '';
+  liste.innerHTML = '<div style="color:rgba(255,255,255,.4);font-size:13px">Chargement…</div>';
+  bg.classList.add('open');
+  try {
+    const d = await apiFetch('GET', `/pos/stock/${prodId}`);
+    const fmtQte = (n) => n % 1 === 0 ? n.toFixed(0) : n.toFixed(2);
+    resume.innerHTML = `
+      <span><strong style="color:#fff">${fmtQte(d.stock_courant)}</strong> en stock (total)</span>
+      <span>Bar Devant : <strong style="color:#fff">${fmtQte(d.stock_devant)}</strong></span>
+      <span>Bar Piscine : <strong style="color:#fff">${fmtQte(d.stock_piscine)}</strong></span>
+    `;
+    if(!d.mouvements || !d.mouvements.length){
+      liste.innerHTML = '<div style="color:rgba(255,255,255,.4);font-size:13px">Aucun mouvement enregistré.</div>';
+      return;
+    }
+    liste.innerHTML = '<table class="pos-table" style="font-size:12.5px"><thead><tr>'+
+      '<th>Date</th><th>Type</th><th>Quantité</th><th>Lieu</th><th>Motif</th><th>Par</th>'+
+      '</tr></thead><tbody>'+
+      d.mouvements.map(m=>{
+        const lbl = _POS_MOUV_LABELS[m.type] || { texte: m.type, couleur: 'rgba(255,255,255,.5)' };
+        const signe = m.quantite > 0 ? '+' : '';
+        const qteColor = m.quantite > 0 ? '#34d399' : '#f87171';
+        const qteTxt = m.quantite % 1 === 0 ? m.quantite.toFixed(0) : m.quantite.toFixed(2);
+        return `<tr>
+          <td class="td-muted">${posDateFr(m.date)}</td>
+          <td><span style="font-size:11px;font-weight:600;padding:1px 7px;border-radius:9px;background:${lbl.couleur}22;color:${lbl.couleur}">${lbl.texte}</span></td>
+          <td style="color:${qteColor};font-weight:600">${signe}${qteTxt}</td>
+          <td class="td-muted">${_POS_LIEU_LABELS[m.lieu] || '—'}</td>
+          <td class="td-muted">${m.motif || '—'}</td>
+          <td class="td-muted">${m.utilisateur || '—'}</td>
+        </tr>`;
+      }).join('')+
+      '</tbody></table>';
   } catch(e){ liste.innerHTML = '<div style="color:#f87171;font-size:13px">Erreur chargement</div>'; }
 }
 

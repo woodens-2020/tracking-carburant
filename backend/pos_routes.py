@@ -914,7 +914,9 @@ def export_stock_pdf(
 
 @router.get("/stock/{produit_id}")
 def stock_produit(produit_id: int, db: Session = Depends(get_db)):
-    """Détail du stock + historique des mouvements pour un produit."""
+    """Détail du stock + historique des mouvements pour un produit — la
+    traçabilité complète de toute modification de quantité (qui, quand,
+    combien, pourquoi), jamais purgée."""
     p = db.query(BarProduit).filter_by(id=produit_id).first()
     if not p:
         raise HTTPException(404, "Produit introuvable")
@@ -923,13 +925,23 @@ def stock_produit(produit_id: int, db: Session = Depends(get_db)):
         db.query(BarMouvementStock)
         .filter(BarMouvementStock.produit_id == produit_id)
         .order_by(BarMouvementStock.date_mouvement.desc())
-        .limit(100)
+        .limit(200)
         .all()
     )
+    ids_utilisateurs = {m.utilisateur_id for m in mouvements if m.utilisateur_id}
+    noms_par_id = {}
+    if ids_utilisateurs:
+        noms_par_id = {
+            u.id: u.nom_complet
+            for u in db.query(Utilisateur).filter(Utilisateur.id.in_(ids_utilisateurs)).all()
+        }
+
     return {
         "produit_id":    produit_id,
         "nom":           p.nom,
         "stock_courant": float(stock_courant(produit_id, db)),
+        "stock_devant":  float(stock_courant(produit_id, db, lieu="DEVANT")),
+        "stock_piscine": float(stock_courant(produit_id, db, lieu="PISCINE")),
         "prix_actif":    float(prix_actif(produit_id, db) or 0),
         "cmup":          float(cmup(produit_id, db)),
         "mouvements": [
@@ -942,6 +954,7 @@ def stock_produit(produit_id: int, db: Session = Depends(get_db)):
                 "vente_id":      m.reference_vente_id,
                 "achat_id":      m.achat_id,
                 "lieu":          m.lieu,
+                "utilisateur":   noms_par_id.get(m.utilisateur_id),
             }
             for m in mouvements
         ],
@@ -1618,16 +1631,29 @@ def confirmer_achat(achat_id: int, request: Request, db: Session = Depends(get_d
 
 @router.post("/stock/ajustement", status_code=201)
 def ajuster_stock(data: AjustementIn, request: Request, db: Session = Depends(get_db)):
-    """Ajustement manuel de stock (perte, casse, correction inventaire)."""
+    """Ajustement manuel de stock — corrige la quantité d'un produit (perte,
+    casse, ou correction d'inventaire dans n'importe quel sens).
+
+    PERTE/CASSE sont toujours une SORTIE, quel que soit le signe saisi (taper
+    3 ou -3 pour une perte de 3 unités donne le même résultat) — le libellé
+    porte déjà le sens.
+
+    AJUSTEMENT, lui, respecte le signe saisi tel quel : un admin qui compte
+    physiquement le stock et trouve moins que le système doit pouvoir taper
+    une quantité négative pour CORRIGER À LA BAISSE, pas seulement ajouter.
+    (Avant ce correctif, le signe était toujours ignoré ici et remplacé par
+    sa valeur absolue — un « ajustement » ne pouvait donc jamais qu'augmenter
+    le stock, quoi que l'admin saisisse.)"""
     p = db.query(BarProduit).filter_by(id=data.produit_id).first()
     if not p:
         raise HTTPException(404, "Produit introuvable")
     if not data.motif or len(data.motif.strip()) < 5:
         raise HTTPException(422, "Le motif doit contenir au moins 5 caractères.")
 
-    qte = Decimal(str(abs(data.quantite)))
-    if data.type_mouvement in ("PERTE", "CASSE"):
-        qte = -qte
+    qte_saisie = Decimal(str(data.quantite))
+    if qte_saisie == 0:
+        raise HTTPException(422, "La quantité ne peut pas être nulle.")
+    qte = -abs(qte_saisie) if data.type_mouvement in ("PERTE", "CASSE") else qte_saisie
 
     mouv = BarMouvementStock(
         produit_id     = data.produit_id,
@@ -1643,6 +1669,7 @@ def ajuster_stock(data: AjustementIn, request: Request, db: Session = Depends(ge
     return {
         "mouvement_id": mouv.id,
         "stock_apres":  float(stock_courant(data.produit_id, db)),
+        "stock_apres_lieu": float(stock_courant(data.produit_id, db, lieu=data.lieu)),
     }
 
 
