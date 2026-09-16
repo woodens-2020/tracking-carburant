@@ -2877,6 +2877,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .pos-btn.danger{background:rgba(248,113,113,.2);color:var(--pos-danger);border:1px solid rgba(248,113,113,.3)}
 .pos-btn:disabled{opacity:.35;cursor:not-allowed}
 
+/* Onglets de section (ex. Bar Devant / Bar Piscine sur la page Stock) —
+   deux espaces distincts, pas un simple filtre de tableau. */
+.pos-tab{flex:1;padding:12px;border-radius:10px;border:1.5px solid var(--pos-border);
+  background:transparent;color:rgba(255,255,255,.6);font-weight:700;font-size:15px;cursor:pointer;transition:.15s}
+.pos-tab:hover{color:#fff}
+.pos-tab.active{background:rgba(63,182,168,.12);border-color:var(--pos-money);color:#fff}
+
 /* ─── Écran de caisse POS ─────────────────────────────────── */
 .pos-caisse-layout{display:grid;grid-template-columns:1fr 400px;gap:14px;min-height:500px;align-items:start}
 .pos-produit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:14px;
@@ -7081,6 +7088,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
 
+        <!-- ── Deux espaces distincts : Bar Devant / Bar Piscine ── -->
+        <!-- Ce ne sont pas des colonnes d'un meme tableau ni un simple filtre :
+             chaque onglet est son propre espace de gestion (mêmes produits,
+             quantités et KPI propres à ce bar), pour ne jamais laisser croire
+             qu'un chiffre de Bar Piscine "fait partie" du total de Bar Devant. -->
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="pos-tab active" id="pos-stock-lieu-devant" onclick="posStockSetLieu('DEVANT')">Bar Devant (Accueil)</button>
+          <button class="pos-tab" id="pos-stock-lieu-piscine" onclick="posStockSetLieu('PISCINE')">Bar Piscine</button>
+        </div>
+
         <!-- ── Recherche + filtre disponibilité ── -->
         <div class="pos-card" style="padding:12px 16px;margin-bottom:14px">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -7093,18 +7110,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <button class="db-preset" id="pos-stock-dispo-oui" onclick="posStockSetDispo('disponible')">Disponible</button>
               <button class="db-preset" id="pos-stock-dispo-non" onclick="posStockSetDispo('non_disponible')">Non disponible</button>
             </div>
-            <div style="display:flex;gap:6px">
-              <button class="db-preset active" id="pos-stock-lieu-tous" onclick="posStockSetLieu('')">Tous les bars</button>
-              <button class="db-preset" id="pos-stock-lieu-devant" onclick="posStockSetLieu('DEVANT')">Bar Devant</button>
-              <button class="db-preset" id="pos-stock-lieu-piscine" onclick="posStockSetLieu('PISCINE')">Bar Piscine</button>
-            </div>
           </div>
         </div>
 
         <div class="pos-kpi-grid" id="pos-stock-kpis">
           <div class="pos-kpi"><div class="pos-kpi-label">Produits actifs</div><div class="pos-kpi-val amber" id="kpi-nb-produits">—</div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">En alerte stock</div><div class="pos-kpi-val red" id="kpi-en-alerte">—</div></div>
-          <div class="pos-kpi"><div class="pos-kpi-label">Valeur totale du stock</div><div class="pos-kpi-val" id="kpi-val-stock">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label" id="kpi-val-stock-label">Valeur du stock</div><div class="pos-kpi-val" id="kpi-val-stock">—</div></div>
           <div class="pos-kpi" style="cursor:pointer" onclick="document.getElementById('pos-attente-section').scrollIntoView({behavior:'smooth'})">
             <div class="pos-kpi-label">Réceptions en attente</div>
             <div class="pos-kpi-val amber" id="kpi-stock-attente">—</div>
@@ -7123,14 +7135,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
 
         <div class="pos-card">
-          <div class="pos-card-hdr">Stock courant</div>
+          <div class="pos-card-hdr" id="pos-stock-tbl-titre">Stock courant — Bar Devant</div>
           <div class="pos-table-wrap">
             <table class="pos-table">
               <thead>
-                <tr><th>Produit</th><th>Catégorie</th><th>Bar Devant</th><th>Bar Piscine</th><th>Total</th><th>Unité</th><th>Seuil alerte</th><th>Coût en stock</th><th>État</th><th>Actions</th></tr>
+                <tr><th>Produit</th><th>Catégorie</th><th>Quantité</th><th>Unité</th><th>Seuil alerte</th><th>Coût en stock</th><th>État</th><th>Actions</th></tr>
               </thead>
               <tbody id="pos-stock-tbody">
-                <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -25939,11 +25951,11 @@ async function posChangerPrix(){
 // ══════════════════════════════════════════════════════════════════════
 let _posStockCache = { prods: [], stockMap: {} };
 let _posStockDispoFiltre = ''; // '' | 'disponible' | 'non_disponible'
-let _posStockLieuFiltre  = ''; // '' | 'DEVANT' | 'PISCINE'
+let _posStockLieuFiltre  = 'DEVANT'; // 'DEVANT' | 'PISCINE' — deux espaces, jamais "tous"
 
 async function loadPosStock(){
   const tbody = document.getElementById('pos-stock-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     const [prods, stocks, attente] = await Promise.all([
       apiFetch('GET','/pos/produits?actif=true'),
@@ -25958,33 +25970,47 @@ async function loadPosStock(){
     // (bouton "Ajuster" ci-dessous) en depend pour verrouiller le lieu.
     _posProduitsAll = prods||[];
 
-    let totalValeur = 0, nbAlerte = 0;
-    (prods||[]).forEach(p=>{
-      const s = stockMap[p.id]||{};
-      const stock = parseFloat(s.stock_courant||0);
-      const cmup  = parseFloat(s.cmup||0);
-      totalValeur += stock * cmup;
-      if(p.seuil_alerte_stock && stock <= p.seuil_alerte_stock) nbAlerte++;
-    });
-
-    _posStockRenderTable();
-
-    const kpis = [
-      ['kpi-nb-produits', (prods||[]).length],
-      ['kpi-en-alerte',   nbAlerte],
-      ['kpi-val-stock',   posGx(totalValeur)],
-      ['kpi-stock-attente', (attente||[]).length || '0'],
-    ];
-    kpis.forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
-
-    // Section réceptions en attente
+    document.getElementById('kpi-stock-attente').textContent = (attente||[]).length || '0';
     _posRenderAttente(attente||[]);
-
-    // Peupler les selects produits pour les modals
     _posFillProduitSelects(prods||[]);
+
+    _posStockRecalculer();
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
+}
+
+// Quantité pertinente pour un produit dans l'espace (onglet) actif — jamais
+// le total des deux bars, jamais l'autre bar : chaque onglet est étanche.
+function _posStockQteLieu(s){
+  return parseFloat((_posStockLieuFiltre==='PISCINE' ? s.stock_piscine : s.stock_devant) || 0);
+}
+
+// Recalcule KPI + libellés + tableau pour l'onglet actif, à partir du cache
+// déjà chargé — pas de nouvel appel réseau en changeant d'onglet.
+function _posStockRecalculer(){
+  const { prods, stockMap } = _posStockCache;
+  const nomLieu = _posStockLieuFiltre==='PISCINE' ? 'Bar Piscine' : 'Bar Devant';
+
+  let totalValeur = 0, nbAlerte = 0, nbProduits = 0;
+  (prods||[]).forEach(p=>{
+    const s = stockMap[p.id]||{};
+    const stock = _posStockQteLieu(s);
+    const cmup  = parseFloat(s.cmup||0);
+    totalValeur += stock * cmup;
+    if(p.seuil_alerte_stock && stock <= p.seuil_alerte_stock) nbAlerte++;
+    nbProduits++;
+  });
+
+  document.getElementById('kpi-nb-produits').textContent = nbProduits;
+  document.getElementById('kpi-en-alerte').textContent   = nbAlerte;
+  document.getElementById('kpi-val-stock').textContent   = posGx(totalValeur);
+  const lblValeur = document.getElementById('kpi-val-stock-label');
+  if(lblValeur) lblValeur.textContent = `Valeur du stock — ${nomLieu}`;
+  const tblTitre = document.getElementById('pos-stock-tbl-titre');
+  if(tblTitre) tblTitre.textContent = `Stock courant — ${nomLieu}`;
+
+  _posStockRenderTable();
 }
 
 function _posStockRenderTable(){
@@ -25995,20 +26021,15 @@ function _posStockRenderTable(){
 
   const filtres = prods.filter(p=>{
     if(recherche && !(p.nom||'').toLowerCase().includes(recherche)) return false;
-    const s = stockMap[p.id]||{};
-    const stock = parseFloat(s.stock_courant||0);
+    const stock = _posStockQteLieu(stockMap[p.id]||{});
     if(_posStockDispoFiltre==='disponible' && !(stock>0)) return false;
     if(_posStockDispoFiltre==='non_disponible' && stock>0) return false;
-    if(_posStockLieuFiltre==='DEVANT'  && !(parseFloat(s.stock_devant||0)>0))  return false;
-    if(_posStockLieuFiltre==='PISCINE' && !(parseFloat(s.stock_piscine||0)>0)) return false;
     return true;
   });
 
   const rows = filtres.map(p=>{
     const s = stockMap[p.id]||{};
-    const stock   = parseFloat(s.stock_courant||0);
-    const devant  = parseFloat(s.stock_devant||0);
-    const piscine = parseFloat(s.stock_piscine||0);
+    const stock = _posStockQteLieu(s);
     const cmup  = parseFloat(s.cmup||0);
     const valeur = stock * cmup;
     const alerte = p.seuil_alerte_stock && stock <= p.seuil_alerte_stock;
@@ -26020,20 +26041,18 @@ function _posStockRenderTable(){
     return `<tr${alerte?' style="background:rgba(248,113,113,.06)"':''}>
       <td><strong>${p.nom||'—'}</strong></td>
       <td>${p.categorie||'—'}</td>
-      <td>${fmtQ(devant)}</td>
-      <td>${fmtQ(piscine)}</td>
       <td><strong>${fmtQ(stock)}</strong></td>
       <td>${p.unite||'—'}</td>
       <td>${p.seuil_alerte_stock||'—'}</td>
       <td>${valeur>0?posGx(valeur):'—'}</td>
       <td>${badge}</td>
       <td style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posAjusterStockDepuisProduit(${p.id})">Ajuster</button>
-        ${(devant!==0||piscine!==0)?`<button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posStockReinitialiser(${p.id},'${esc(p.nom||'')}',${devant},${piscine})">Réinitialiser</button>`:''}
+        <button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posAjusterStockDepuisProduit(${p.id},'${_posStockLieuFiltre}')">Ajuster</button>
+        ${stock!==0?`<button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posStockReinitialiser(${p.id},'${esc(p.nom||'')}','${_posStockLieuFiltre}',${stock})">Réinitialiser</button>`:''}
       </td>
     </tr>`;
   });
-  tbody.innerHTML = rows.join('') || `<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit ${recherche||_posStockDispoFiltre||_posStockLieuFiltre?'ne correspond aux filtres':'actif'}</td></tr>`;
+  tbody.innerHTML = rows.join('') || `<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit ${recherche||_posStockDispoFiltre?'ne correspond aux filtres':'actif'}</td></tr>`;
 }
 
 function posStockFiltrer(){ _posStockRenderTable(); }
@@ -26048,10 +26067,9 @@ function posStockSetDispo(valeur){
 
 function posStockSetLieu(valeur){
   _posStockLieuFiltre = valeur;
-  document.getElementById('pos-stock-lieu-tous').classList.toggle('active', valeur==='');
   document.getElementById('pos-stock-lieu-devant').classList.toggle('active', valeur==='DEVANT');
   document.getElementById('pos-stock-lieu-piscine').classList.toggle('active', valeur==='PISCINE');
-  _posStockRenderTable();
+  _posStockRecalculer();
 }
 
 function posStockExportPdf(){
@@ -26064,13 +26082,13 @@ function posStockExportPdf(){
 
 let _posReinitCtx = null;   // {produitId, produitNom}
 
-function posStockReinitialiser(produitId, produitNom, stockDevant, stockPiscine){
+function posStockReinitialiser(produitId, produitNom, lieu, stock){
   _posReinitCtx = { produitId, produitNom };
   document.getElementById('pos-reinit-desc').textContent =
-    `« ${produitNom} » — Bar Devant : ${fmtQ(stockDevant)} · Bar Piscine : ${fmtQ(stockPiscine)}. ` +
-    `Choisissez le lieu à ramener à zéro. Action tracée comme un ajustement (irréversible) — ` +
-    `à utiliser pour repartir sur un nouvel inventaire authentique, sans mélanger les deux bars.`;
-  document.getElementById('pos-reinit-lieu').value = '';
+    `« ${produitNom} » — ${_POS_LIEU_LABELS[lieu]||lieu} : ${fmtQ(stock)}. ` +
+    `Action tracée comme un ajustement (irréversible) — à utiliser pour repartir sur un nouvel ` +
+    `inventaire authentique dans cet espace, sans toucher à l'autre bar.`;
+  document.getElementById('pos-reinit-lieu').value = lieu||'';
   document.getElementById('pos-reinit-modal-bg').classList.add('open');
 }
 
@@ -26242,10 +26260,16 @@ async function posReceptionnerStock(){
 // d'ajustement (ouverture générique depuis Stock Bar, ou reselection
 // manuelle) : verrouille le lieu sur le catalogue exclusif du produit,
 // pour ne jamais pouvoir mélanger le stock des deux bars.
-function _posAjustProduitChange(){
+function _posAjustProduitChange(lieuPrefere){
   const id   = parseInt(document.getElementById('pos-ajust-produit').value);
   const prod = _posProduitsAll.find(p=>p.id===id);
   _posVerrouillerLieuSelon(prod, 'pos-ajust-lieu');
+  if(lieuPrefere && !(prod && prod.lieu)){
+    // Pas verrouillé par le catalogue : présélectionne l'espace (onglet)
+    // depuis lequel on a cliqué "Ajuster" — reste modifiable par l'utilisateur.
+    const sel = document.getElementById('pos-ajust-lieu');
+    if(sel) sel.value = lieuPrefere;
+  }
   _posAjustTypeChange();
 }
 
@@ -26286,20 +26310,21 @@ function posStockAjustModal(){
   document.getElementById('pos-ajust-qte').value='';
   document.getElementById('pos-ajust-motif').value='';
   document.getElementById('pos-ajust-modal-bg').classList.add('open');
-  _posAjustProduitChange();
+  _posAjustProduitChange(_posStockLieuFiltre);
 }
 
-// Bouton "Ajuster la quantité" depuis une ligne de la page Produits Bar —
-// même modal que posStockAjustModal(), mais avec le produit déjà choisi
-// (le select est repeuplé depuis _posProduitsAll : cette page ne charge pas
-// forcément la page Stock avant, donc pos-ajust-produit peut être vide).
-function posAjusterStockDepuisProduit(produitId){
+// Bouton "Ajuster la quantité" depuis une ligne de la page Produits Bar ou
+// de la page Stock Bar (un onglet = un lieu, transmis en 2e argument) —
+// même modal, avec le produit déjà choisi (le select est repeuplé depuis
+// _posProduitsAll : la page Produits Bar ne charge pas forcément Stock
+// avant, donc pos-ajust-produit peut être vide).
+function posAjusterStockDepuisProduit(produitId, lieuPrefere){
   if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   _posFillProduitSelects(_posProduitsAll);
   document.getElementById('pos-ajust-qte').value='';
   document.getElementById('pos-ajust-motif').value='';
   document.getElementById('pos-ajust-produit').value = produitId;
-  _posAjustProduitChange();
+  _posAjustProduitChange(lieuPrefere);
   document.getElementById('pos-ajust-modal-bg').classList.add('open');
 }
 
