@@ -7237,13 +7237,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <h3>Ajustement de stock</h3>
         <div class="pos-form-row">
           <div><label class="pos-label">Produit *</label>
-            <select class="pos-select" id="pos-ajust-produit"></select>
+            <select class="pos-select" id="pos-ajust-produit" onchange="_posAjustProduitChange()"></select>
           </div>
           <div><label class="pos-label">Type *</label>
             <select class="pos-select" id="pos-ajust-type">
               <option value="AJUSTEMENT">Ajustement</option>
               <option value="PERTE">Perte</option>
               <option value="CASSE">Casse</option>
+              <option value="VOLONTAIRE">Volontaire (dégustation, offert, usage interne)</option>
             </select>
           </div>
         </div>
@@ -25712,7 +25713,7 @@ function posApproModal(prodId){
   document.getElementById('pos-appro-nb-unite-seul').value = '';
   document.getElementById('pos-appro-prix-caisse').value  = '';
   document.getElementById('pos-appro-notes').value        = '';
-  document.getElementById('pos-appro-lieu').value         = '';
+  _posVerrouillerLieuSelon(p, 'pos-appro-lieu');
   const caisseSec  = document.getElementById('pos-appro-caisse-section');
   const uniteSec   = document.getElementById('pos-appro-unite-section');
   const liveDiv    = document.getElementById('pos-appro-live');
@@ -25857,8 +25858,27 @@ const _POS_MOUV_LABELS = {
   AJUSTEMENT:   { texte: 'Ajustement',           couleur: '#f7a93b' },
   PERTE:        { texte: 'Perte',                couleur: '#f87171' },
   CASSE:        { texte: 'Casse',                couleur: '#f87171' },
+  VOLONTAIRE:   { texte: 'Volontaire',            couleur: '#c084fc' },
 };
 const _POS_LIEU_LABELS = { DEVANT: 'Bar Devant', PISCINE: 'Bar Piscine' };
+
+/* Verrouille le <select> de lieu sur le bar exclusif du produit (catalogue
+   Bar Devant / Bar Piscine, p.lieu) pour ne jamais pouvoir enregistrer un
+   mouvement de stock (réception ou ajustement) sous le mauvais bar — un
+   produit sans lieu (ancien, partagé) laisse le choix libre comme avant. */
+function _posVerrouillerLieuSelon(prod, selectId){
+  const sel = document.getElementById(selectId);
+  if(!sel) return;
+  if(prod && prod.lieu){
+    sel.value = prod.lieu;
+    sel.disabled = true;
+    sel.title = `Catalogue exclusif ${_POS_LIEU_LABELS[prod.lieu]||prod.lieu} — non modifiable.`;
+  } else {
+    sel.value = '';
+    sel.disabled = false;
+    sel.title = '';
+  }
+}
 
 async function posHistoriqueStockModal(prodId, nom){
   const bg = document.getElementById('pos-histo-stock-modal-bg');
@@ -26210,12 +26230,22 @@ async function posReceptionnerStock(){
   } catch(e){ posAlert(e.message||'Erreur.'); }
 }
 
+// Réagit à tout changement du produit sélectionné dans la modal
+// d'ajustement (ouverture générique depuis Stock Bar, ou reselection
+// manuelle) : verrouille le lieu sur le catalogue exclusif du produit,
+// pour ne jamais pouvoir mélanger le stock des deux bars.
+function _posAjustProduitChange(){
+  const id   = parseInt(document.getElementById('pos-ajust-produit').value);
+  const prod = _posProduitsAll.find(p=>p.id===id);
+  _posVerrouillerLieuSelon(prod, 'pos-ajust-lieu');
+}
+
 function posStockAjustModal(){
   if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   document.getElementById('pos-ajust-qte').value='';
   document.getElementById('pos-ajust-motif').value='';
-  document.getElementById('pos-ajust-lieu').value='';
   document.getElementById('pos-ajust-modal-bg').classList.add('open');
+  _posAjustProduitChange();
 }
 
 // Bouton "Ajuster la quantité" depuis une ligne de la page Produits Bar —
@@ -26227,8 +26257,8 @@ function posAjusterStockDepuisProduit(produitId){
   _posFillProduitSelects(_posProduitsAll);
   document.getElementById('pos-ajust-qte').value='';
   document.getElementById('pos-ajust-motif').value='';
-  document.getElementById('pos-ajust-lieu').value='';
   document.getElementById('pos-ajust-produit').value = produitId;
+  _posAjustProduitChange();
   document.getElementById('pos-ajust-modal-bg').classList.add('open');
 }
 

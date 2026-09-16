@@ -2,6 +2,7 @@ fastapi
 python-multipart
 uvicorn[standard]
 sqlalchemy
+alembic
 pydantic
 anthropic
 google-genai

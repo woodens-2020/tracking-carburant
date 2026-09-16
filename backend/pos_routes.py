@@ -44,6 +44,24 @@ def _uid(request: Request) -> int | None:
     return u.id if u else None
 
 
+_LIEU_LABEL = {"DEVANT": "Bar Devant", "PISCINE": "Bar Piscine"}
+
+
+def _valider_lieu_coherent(p: BarProduit, lieu: str) -> None:
+    """Empêche de mélanger le stock des deux bars : un produit dont le
+    catalogue est exclusif à un bar (p.lieu renseigné, voir models.py) ne
+    peut recevoir un mouvement (réception ou ajustement) que pour CE bar —
+    sinon une erreur de sélection contaminerait les chiffres de l'autre bar
+    avec un produit qui n'y appartient même pas. Un produit sans lieu
+    (créé avant la séparation des catalogues, partagé) n'est pas restreint."""
+    if p.lieu and lieu != p.lieu:
+        raise HTTPException(
+            422,
+            f"« {p.nom} » appartient au catalogue {_LIEU_LABEL.get(p.lieu, p.lieu)} — "
+            f"impossible d'enregistrer un mouvement de stock pour {_LIEU_LABEL.get(lieu, lieu)}.",
+        )
+
+
 def _require_pdg_ou_admin_pos(request: Request, db: Session = Depends(get_db)) -> Utilisateur:
     """Même logique que main.require_pdg_ou_admin — dupliquée ici pour
     éviter un import circulaire entre routers."""
@@ -225,14 +243,14 @@ class AchatIn(BaseModel):
 class AjustementIn(BaseModel):
     produit_id:     int
     quantite:       float   # signée : + pour ajustement positif, - pour perte
-    type_mouvement: str = "AJUSTEMENT"   # AJUSTEMENT, PERTE, CASSE
+    type_mouvement: str = "AJUSTEMENT"   # AJUSTEMENT, PERTE, CASSE, VOLONTAIRE
     motif:          str
     lieu:           str     # DEVANT ou PISCINE — requis pour tout ajustement manuel
 
     @validator("type_mouvement")
     def check_type(cls, v):
-        if v not in ("AJUSTEMENT", "PERTE", "CASSE"):
-            raise ValueError("type_mouvement doit être AJUSTEMENT, PERTE ou CASSE")
+        if v not in ("AJUSTEMENT", "PERTE", "CASSE", "VOLONTAIRE"):
+            raise ValueError("type_mouvement doit être AJUSTEMENT, PERTE, CASSE ou VOLONTAIRE")
         return v
 
     @validator("lieu")
@@ -682,6 +700,7 @@ def approvisionner(produit_id: int, data: ApprovisionnementIn, request: Request,
     p = db.query(BarProduit).filter_by(id=produit_id).first()
     if not p:
         raise HTTPException(404, "Produit introuvable")
+    _valider_lieu_coherent(p, data.lieu)
 
     upc = p.unites_par_caisse or 1
     if p.vendu_par_caisse:
@@ -1643,17 +1662,23 @@ def ajuster_stock(data: AjustementIn, request: Request, db: Session = Depends(ge
     une quantité négative pour CORRIGER À LA BAISSE, pas seulement ajouter.
     (Avant ce correctif, le signe était toujours ignoré ici et remplacé par
     sa valeur absolue — un « ajustement » ne pouvait donc jamais qu'augmenter
-    le stock, quoi que l'admin saisisse.)"""
+    le stock, quoi que l'admin saisisse.)
+
+    VOLONTAIRE est une sortie délibérée (dégustation, offert, consommation
+    interne) — toujours une sortie comme PERTE/CASSE, mais distinguée
+    d'elles dans l'historique puisque la cause n'est ni un accident ni de
+    la casse."""
     p = db.query(BarProduit).filter_by(id=data.produit_id).first()
     if not p:
         raise HTTPException(404, "Produit introuvable")
+    _valider_lieu_coherent(p, data.lieu)
     if not data.motif or len(data.motif.strip()) < 5:
         raise HTTPException(422, "Le motif doit contenir au moins 5 caractères.")
 
     qte_saisie = Decimal(str(data.quantite))
     if qte_saisie == 0:
         raise HTTPException(422, "La quantité ne peut pas être nulle.")
-    qte = -abs(qte_saisie) if data.type_mouvement in ("PERTE", "CASSE") else qte_saisie
+    qte = -abs(qte_saisie) if data.type_mouvement in ("PERTE", "CASSE", "VOLONTAIRE") else qte_saisie
 
     mouv = BarMouvementStock(
         produit_id     = data.produit_id,

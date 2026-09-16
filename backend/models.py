@@ -761,7 +761,7 @@ class BarMouvementStock(Base):
 
     id                 = Column(Integer, primary_key=True)
     produit_id         = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
-    type_mouvement     = Column(String(20), nullable=False)  # ENTREE, SORTIE_VENTE, AJUSTEMENT, PERTE, CASSE
+    type_mouvement     = Column(String(20), nullable=False)  # ENTREE, SORTIE_VENTE, AJUSTEMENT, PERTE, CASSE, VOLONTAIRE
     quantite           = Column(Numeric(12, 3), nullable=False)   # signée : + entrée, - sortie
     motif              = Column(String(300), nullable=True)
     reference_vente_id = Column(Integer, ForeignKey("bar_ventes.id", ondelete="SET NULL"), nullable=True)
@@ -781,7 +781,7 @@ class BarMouvementStock(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "type_mouvement IN ('ENTREE','SORTIE_VENTE','AJUSTEMENT','PERTE','CASSE')",
+            "type_mouvement IN ('ENTREE','SORTIE_VENTE','AJUSTEMENT','PERTE','CASSE','VOLONTAIRE')",
             name="chk_bar_mouv_type",
         ),
         CheckConstraint("lieu IS NULL OR lieu IN ('DEVANT','PISCINE')", name="chk_bar_mouv_lieu"),
