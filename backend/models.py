@@ -221,6 +221,21 @@ class Utilisateur(Base):
     )
 
 
+class UtilisateurRole(Base):
+    """Rôles supplémentaires qu'un employé peut choisir d'activer à la
+    connexion (ex. caissière ET pâtisserie) — voir /api/me/roles et
+    /api/me/choisir-role. role_id (sur Utilisateur) reste le rôle
+    ACTUELLEMENT actif ; cette table est le pool de rôles disponibles,
+    role_id actuel inclus ou non selon ce que l'admin a coché."""
+    __tablename__ = "utilisateur_roles"
+
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="CASCADE"), primary_key=True)
+    role_id        = Column(Integer, ForeignKey("roles.id",        ondelete="CASCADE"), primary_key=True)
+
+    utilisateur = relationship("Utilisateur", foreign_keys=[utilisateur_id])
+    role        = relationship("Role",        foreign_keys=[role_id])
+
+
 class SessionToken(Base):
     """Jeton de session émis après une connexion réussie."""
     __tablename__ = "sessions"

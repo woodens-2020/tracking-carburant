@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
-from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse, OAuthState, CategorieDepense, CategorieAchat, Poste, Beneficiaire
+from models import Produit, Pompe, Releve, Utilisateur, Role, UtilisateurRole, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse, OAuthState, CategorieDepense, CategorieAchat, Poste, Beneficiaire
 import listes_reference as lref
 from otp_service import (
     OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
@@ -911,6 +911,58 @@ def me(request: Request, db: Session = Depends(get_db)):
         "caisse_employe_id":  emp.id if emp else None,
         "caisse_employe_nom": (emp.nom + " " + emp.prenom) if emp else None,
     }
+
+
+@app.get("/api/me/roles")
+def mes_roles(request: Request, db: Session = Depends(get_db)):
+    """Rôles que l'utilisateur connecté peut activer (voir choisir-role) —
+    le pool assigné par un administrateur (utilisateur_roles), plus son
+    rôle actuel s'il n'y figure pas déjà (toujours disponible, même s'il
+    a été retiré du pool depuis). Le frontend n'affiche l'écran "choisir
+    votre espace de travail" que si cette liste a plus d'un élément."""
+    user = db.get(Utilisateur, request.state.user.id)
+    if not user:
+        raise HTTPException(401, "Session invalide")
+    roles = (
+        db.query(Role)
+        .join(UtilisateurRole, UtilisateurRole.role_id == Role.id)
+        .filter(UtilisateurRole.utilisateur_id == user.id)
+        .order_by(Role.nom)
+        .all()
+    )
+    if user.role_obj and not any(r.id == user.role_obj.id for r in roles):
+        roles.append(user.role_obj)
+    return [{"id": r.id, "nom": r.nom, "actif": r.id == user.role_id} for r in roles]
+
+
+class ChoisirRoleIn(BaseModel):
+    role_id: int
+
+
+@app.post("/api/me/choisir-role")
+def choisir_role(data: ChoisirRoleIn, request: Request, db: Session = Depends(get_db)):
+    """Active un des rôles disponibles de l'utilisateur (voir GET .../roles)
+    comme rôle courant — met à jour role_id/role/poste exactement comme le
+    ferait un admin en réassignant le rôle, donc tout le système de
+    permissions existant s'applique sans changement ailleurs."""
+    user = db.get(Utilisateur, request.state.user.id)
+    if not user:
+        raise HTTPException(401, "Session invalide")
+    role = db.get(Role, data.role_id)
+    if not role:
+        raise HTTPException(404, "Rôle introuvable")
+    dans_le_pool = (
+        db.query(UtilisateurRole)
+        .filter_by(utilisateur_id=user.id, role_id=role.id)
+        .first()
+    )
+    if not dans_le_pool and role.id != user.role_id:
+        raise HTTPException(403, "Ce rôle ne vous a pas été attribué.")
+    user.role_id = role.id
+    user.role    = "admin" if role.est_admin else ("pdg" if user.role == "pdg" else "operateur")
+    user.poste   = role.nom
+    db.commit()
+    return {"ok": True, "role_id": role.id, "role_nom": role.nom}
 
 
 # ---------- Gestion des clés API ----------

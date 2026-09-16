@@ -23,7 +23,7 @@ from auth import hash_code_acces, hash_password, make_api_key
 from otp_service import send_welcome_email, send_otp_sms, send_otp_whatsapp
 from database import get_db
 from models import (
-    AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur,
+    AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur, UtilisateurRole,
     Releve, Achat, Depense, FichePaie, BarPaiementEmploye,
     CuisineVente, CuisineAchat, CuisineDepense, RenflouementCaisse,
     BarProduit, BarMouvementStock,
@@ -100,9 +100,12 @@ def _role_public(r: Role) -> dict:
 
 def _user_public(u: Utilisateur, db: Session = None) -> dict:
     employe_id = None
+    roles_ids = [u.role_id] if u.role_id else []
     if db:
         emp = db.query(Employe).filter_by(utilisateur_id=u.id).first()
         employe_id = emp.id if emp else None
+        pool = db.query(UtilisateurRole.role_id).filter_by(utilisateur_id=u.id).all()
+        roles_ids = sorted(set(roles_ids) | {rid for (rid,) in pool})
     return {
         "id":             u.id,
         "username":       u.username,
@@ -112,6 +115,7 @@ def _user_public(u: Utilisateur, db: Session = None) -> dict:
         "poste":          u.poste,
         "role_id":        u.role_id,
         "role_nom":       u.role_obj.nom if u.role_obj else u.poste,
+        "roles_ids":      roles_ids,
         "actif":          u.actif,
         "created_at":     u.created_at.isoformat() if u.created_at else None,
         "oauth_provider": u.oauth_provider,
@@ -358,6 +362,49 @@ def modifier_user(
             if not emp:
                 raise HTTPException(404, "Employé introuvable")
             emp.utilisateur_id = uid
+    db.commit()
+    db.refresh(u)
+    return _user_public(u, db)
+
+
+class RolesIn(BaseModel):
+    role_ids: list[int]
+
+
+@router.put("/users/{uid}/roles")
+def definir_roles(
+    uid: int,
+    data: RolesIn,
+    _admin: Utilisateur = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    """Définit l'ensemble complet des rôles qu'un employé peut activer à
+    la connexion (voir GET/POST /api/me/roles, choisir-role) — permet par
+    exemple à une caissière de travailler aussi en pâtisserie. Remplace
+    entièrement le pool précédent. role_id (rôle actif) est laissé
+    intact s'il est toujours dans le nouveau pool ; sinon basculé vers
+    le premier rôle de la liste, comme le ferait un admin en réassignant
+    le rôle normalement."""
+    u = db.get(Utilisateur, uid)
+    if not u:
+        raise HTTPException(404, "Utilisateur introuvable")
+    ids = sorted(set(data.role_ids))
+    if not ids:
+        raise HTTPException(422, "Sélectionnez au moins un rôle.")
+    roles = db.query(Role).filter(Role.id.in_(ids)).all()
+    if len(roles) != len(ids):
+        raise HTTPException(404, "Un ou plusieurs rôles sont introuvables.")
+
+    db.query(UtilisateurRole).filter_by(utilisateur_id=uid).delete()
+    for rid in ids:
+        db.add(UtilisateurRole(utilisateur_id=uid, role_id=rid))
+
+    if u.role_id not in ids:
+        nouveau = next(r for r in roles if r.id == ids[0])
+        u.role_id = nouveau.id
+        u.poste   = nouveau.nom
+        u.role    = "admin" if nouveau.est_admin else ("pdg" if u.role == "pdg" else "operateur")
+
     db.commit()
     db.refresh(u)
     return _user_public(u, db)

@@ -11874,6 +11874,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <option value="">Choisir un rôle…</option>
               </select>
             </div>
+            <div id="aum-roles-multi-row" style="display:none">
+              <label class="pos-label">Rôles supplémentaires <span style="font-size:12px;color:rgba(255,255,255,.4)">(l'employé choisit son espace de travail à la connexion — ex. caissière ET pâtisserie)</span></label>
+              <div id="aum-roles-multi" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px"></div>
+            </div>
             <div id="aum-employe-row">
               <label class="pos-label">Lier à un employé <span style="font-size:12px;color:rgba(255,255,255,.4)">(caissière — accès à ses propres données)</span></label>
               <select class="pos-input" id="aum-employe-id" style="width:100%">
@@ -12040,6 +12044,17 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 </div>
 
 <!-- ══════ MODAL PLEIN ÉCRAN : CHARTE DE RESPONSABILITÉ (affiché à chaque connexion) ══════ -->
+<div id="role-picker-modal-bg" class="pos-modal-bg">
+  <div class="pos-modal" style="max-width:420px">
+    <div class="pos-modal-hdr">
+      <span>Choisissez votre espace de travail</span>
+    </div>
+    <div class="pos-modal-body" style="padding:20px">
+      <div id="role-picker-list" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+  </div>
+</div><!-- /role-picker-modal -->
+
 <div id="modal-responsabilite" class="resp-overlay hidden">
   <div class="resp-stage">
     <div class="resp-icon-wrap">
@@ -17212,6 +17227,31 @@ document.querySelector('.sb-nav')?.addEventListener('click', e=>{
   if(e.target.closest('.nav-item')) closeMobileDrawer();
 });
 
+// ── Choix de l'espace de travail (comptes à plusieurs rôles) ──────────
+// Affiché une fois par connexion fraîche (pas à chaque rafraîchissement)
+// si /api/me/roles renvoie plus d'un rôle — voir DOMContentLoaded plus bas.
+let _resolveRolePicker = null;
+
+function _afficherChoixRole(roles){
+  return new Promise(resolve => {
+    const box = document.getElementById('role-picker-list');
+    box.innerHTML = roles.map(r =>
+      `<button class="pos-btn" style="width:100%;padding:14px;font-size:15px" onclick="_choisirRoleTravail(${r.id})">${esc(r.nom)}</button>`
+    ).join('');
+    document.getElementById('role-picker-modal-bg').classList.add('open');
+    _resolveRolePicker = resolve;
+  });
+}
+
+async function _choisirRoleTravail(roleId){
+  try{
+    await POST('/me/choisir-role', { role_id: roleId });
+  }catch(e){ notify(e.message||'Erreur lors du choix du rôle','err'); return; }
+  document.getElementById('role-picker-modal-bg').classList.remove('open');
+  await loadCurrentUser();
+  if(_resolveRolePicker){ const r = _resolveRolePicker; _resolveRolePicker = null; r(); }
+}
+
 async function loadCurrentUser(){
   try{
     const u = await GET('/me');
@@ -17905,6 +17945,17 @@ document.addEventListener('DOMContentLoaded',async()=>{
   // Logo + utilisateur (await pour que _appUser soit défini avant loadHome)
   initLogo();
   await loadCurrentUser();
+
+  // Compte à plusieurs rôles (ex. caissière ET pâtisserie) : demander
+  // l'espace de travail une fois par connexion fraîche, pas à chaque
+  // rafraîchissement de page. _appUser est réactualisé par le choix
+  // (voir _choisirRoleTravail) avant la décision d'atterrissage plus bas.
+  if(_isFreshLogin){
+    try{
+      const roles = await GET('/me/roles');
+      if(roles && roles.length > 1) await _afficherChoixRole(roles);
+    }catch(e){ /* pas bloquant — un seul rôle ou endpoint indisponible */ }
+  }
 
   // Charger les produits en premier
   try{
@@ -22509,8 +22560,23 @@ function adminUsersNouveauModal(){
   document.getElementById('aum-password-row').style.display = '';
   document.getElementById('aum-pin-row').style.display = '';
   document.getElementById('aum-employe-row').style.display = 'none';
+  document.getElementById('aum-roles-multi-row').style.display = 'none';
   _adminPopulateRoleSelect('aum-role-id', null);
   document.getElementById('admin-user-modal-bg').classList.add('open');
+}
+
+// Rôles supplémentaires qu'un employé peut choisir d'activer à la
+// connexion (voir /api/me/roles) — case à cocher par rôle, le rôle
+// principal (menu déroulant "Rôle *") reste toujours coché/inclus.
+function _adminRenderRolesMulti(selectedIds){
+  const box = document.getElementById('aum-roles-multi');
+  if(!box) return;
+  const ids = new Set(selectedIds||[]);
+  box.innerHTML = _adminRolesList.map(function(r){
+    const checked = ids.has(r.id) ? 'checked' : '';
+    return '<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer">'
+      + '<input type="checkbox" class="aum-role-multi-chk" value="' + r.id + '" ' + checked + '> ' + r.nom + '</label>';
+  }).join('');
 }
 
 async function adminUsersEditer(id){
@@ -22528,7 +22594,9 @@ async function adminUsersEditer(id){
   document.getElementById('aum-password-row').style.display = 'none';
   document.getElementById('aum-pin-row').style.display = 'none';
   document.getElementById('aum-employe-row').style.display = '';
+  document.getElementById('aum-roles-multi-row').style.display = '';
   _adminPopulateRoleSelect('aum-role-id', u.role_id);
+  _adminRenderRolesMulti(u.roles_ids || [u.role_id]);
   await _adminPopulateEmployeSelect(u.employe_id || 0);
   document.getElementById('admin-user-modal-bg').classList.add('open');
 }
@@ -22602,6 +22670,11 @@ async function adminUsersSauvegarder(){
     if(_adminUserEditId){
       const employe_id = parseInt(document.getElementById('aum-employe-id')?.value||0)||0;
       await apiFetch('PUT',`/admin/users/${_adminUserEditId}`, { nom_complet:nom, email, telephone, role_id:roleId, employe_id });
+      // Rôles supplémentaires (espace de travail choisi à la connexion) —
+      // toujours inclure le rôle principal même si sa case n'a pas été cochée.
+      const checkedIds = Array.from(document.querySelectorAll('.aum-role-multi-chk:checked')).map(el=>parseInt(el.value));
+      const roleIds = Array.from(new Set([roleId, ...checkedIds]));
+      await apiFetch('PUT', `/admin/users/${_adminUserEditId}/roles`, { role_ids: roleIds });
       const emailChanged = email && email !== _adminUserEditPrevEmail;
       if(emailChanged){
         try{
