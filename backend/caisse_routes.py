@@ -25,6 +25,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -295,14 +296,19 @@ def _session_dict(s: BarSessionCaisse, stats: dict | None = None) -> dict:
 # ── endpoints ────────────────────────────────────────────────────────
 
 @router.get("/caissieres")
-def liste_caissieres(db: Session = Depends(get_db)):
-    """Tous les employés actifs (peuvent être affectés comme caissier)."""
-    employes = (
-        db.query(Employe)
-        .filter(Employe.actif == True)
-        .order_by(Employe.nom, Employe.prenom)
-        .all()
-    )
+def liste_caissieres(seulement_caissiers: bool = False, db: Session = Depends(get_db)):
+    """Employés actifs pouvant être affectés comme caissier.
+
+    Par défaut : tous les employés actifs (managers/admins inclus — ils
+    opèrent aussi la caisse, voir posCaissierChange côté frontend).
+    `seulement_caissiers=true` restreint au poste "Caissier"/"Caissière" —
+    utilisé par les filtres de RAPPORTS (Ventes, Sessions, Rapports
+    soumis...) pour ne montrer que le vrai personnel de caisse, pas les
+    managers/admins qui y apparaîtraient sinon."""
+    q = db.query(Employe).filter(Employe.actif == True)
+    if seulement_caissiers:
+        q = q.filter(func.lower(Employe.poste).like("caissi%"))
+    employes = q.order_by(Employe.nom, Employe.prenom).all()
     return [
         {
             "id":             e.id,

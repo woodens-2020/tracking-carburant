@@ -24025,11 +24025,12 @@ async function loadPosDashboardBar(){
   if(fin && !fin.value) fin.value = today;
   _posDbSetActivePreset('7j');
 
-  // Peupler le select employé
+  // Peupler le select employé — seulement le personnel de caisse, pas
+  // les managers/admins (voir liste_caissieres, seulement_caissiers)
   try {
-    const emps = await apiFetch('GET', '/pos/caisse/caissieres');
+    const emps = await apiFetch('GET', '/pos/caisse/caissieres?seulement_caissiers=true');
     const sel = document.getElementById('posdb-f-caissier');
-    if(sel) sel.innerHTML = '<option value="">Tous les employés</option>' +
+    if(sel) sel.innerHTML = '<option value="">Tous les caissiers</option>' +
       emps.map(e => `<option value="${e.id}">${e.nom} ${e.prenom}</option>`).join('');
   } catch(e){}
 
@@ -27707,9 +27708,9 @@ async function loadPosVentes(){
     _posVentesClassementInterval = setInterval(posVentesClassementCharger, 60000);
   }
 
-  // Peupler le filtre caissier
+  // Peupler le filtre caissier — seulement le personnel de caisse
   try {
-    const emps = await apiFetch('GET', '/pos/caisse/caissieres');
+    const emps = await apiFetch('GET', '/pos/caisse/caissieres?seulement_caissiers=true');
     const sel = document.getElementById('pos-ventes-caissier-f');
     if(sel) sel.innerHTML = '<option value="">Tous les caissiers</option>' +
       emps.map(e=>`<option value="${e.id}">${e.nom} ${e.prenom}</option>`).join('');
@@ -29669,9 +29670,9 @@ function _lieuBadge(lieu){
 let _scSessions = [];
 
 async function loadPosSessionsCaisse(){
-  // Peupler dropdown caissiers
+  // Peupler dropdown caissiers — seulement le personnel de caisse
   try {
-    const emps = await apiFetch('GET', '/pos/caisse/caissieres');
+    const emps = await apiFetch('GET', '/pos/caisse/caissieres?seulement_caissiers=true');
     const sel = document.getElementById('sc-filtre-caissier');
     if(sel) sel.innerHTML = '<option value="">Tous les caissiers</option>' +
       emps.map(e=>`<option value="${e.id}">${e.nom} ${e.prenom}</option>`).join('');
@@ -29905,8 +29906,9 @@ function _scoreCouleur(score){
 }
 
 async function loadRapportsSoumis(){
+  // Seulement le personnel de caisse — pas les managers/admins
   try {
-    const emps = await apiFetch('GET', '/pos/caisse/caissieres');
+    const emps = await apiFetch('GET', '/pos/caisse/caissieres?seulement_caissiers=true');
     const sel = document.getElementById('rs-filtre-caissier');
     if(sel) sel.innerHTML = '<option value="">Toutes les caissières</option>' +
       emps.map(e=>`<option value="${e.id}">${e.nom} ${e.prenom}</option>`).join('');
