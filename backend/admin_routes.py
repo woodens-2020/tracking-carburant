@@ -26,6 +26,7 @@ from models import (
     AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur,
     Releve, Achat, Depense, FichePaie, BarPaiementEmploye,
     CuisineVente, CuisineAchat, CuisineDepense, RenflouementCaisse,
+    BarProduit, BarMouvementStock,
 )
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -952,3 +953,93 @@ def reset_cash(data: ResetCashIn, request: Request, db: Session = Depends(get_db
     log_event(db, USER_UPDATED, user_id=uid_courant,
               details={"action": "reset_cash", "resultat": supprime})
     return {"ok": True, "resultat": supprime}
+
+
+# ══════════════════════════════════════════════════════════════════
+# CLASSEMENT DES PRODUITS BAR SANS LIEU (4e vague) — outil ponctuel.
+# BarProduit.lieu est resté NULL pour les articles créés avant la
+# séparation Bar Devant/Bar Piscine (voir models.py). Cet outil les
+# reclasse automatiquement quand leur historique de mouvements
+# (BarMouvementStock.lieu — renseigné pour les ajustements/pertes/casses
+# et, en best-effort, les ventes) ne pointe que vers UN SEUL lieu. Les
+# produits sans signal (aucun mouvement lieu-tagué) ou avec un signal
+# mixte (mouvements dans les deux bars) restent NULL — reclassement
+# manuel requis, listés dans la réponse.
+#
+# Non destructif (une seule colonne, actuellement NULL, est renseignée ;
+# aucune suppression) — protégé par la session admin normale (_require_admin),
+# pas besoin du verrou par clé des outils de suppression précédents. Route
+# destinée à être retirée du code après usage.
+# ══════════════════════════════════════════════════════════════════
+
+
+def _signal_lieu_par_produit(db: Session, produit_ids: list) -> dict:
+    """{produit_id: {"DEVANT": n, "PISCINE": n}} à partir des mouvements
+    de stock lieu-tagués (achats/réceptions exclus, toujours NULL)."""
+    if not produit_ids:
+        return {}
+    rows = (
+        db.query(BarMouvementStock.produit_id, BarMouvementStock.lieu)
+        .filter(BarMouvementStock.produit_id.in_(produit_ids), BarMouvementStock.lieu.isnot(None))
+        .all()
+    )
+    out = {}
+    for produit_id, lieu in rows:
+        out.setdefault(produit_id, {"DEVANT": 0, "PISCINE": 0})
+        out[produit_id][lieu] += 1
+    return out
+
+
+@router.get("/classer-lieu/apercu")
+def apercu_classer_lieu(db: Session = Depends(get_db), _admin: Utilisateur = Depends(_require_admin)):
+    """Aperçu en lecture seule : pour chaque produit sans lieu, le signal
+    tiré de son historique de mouvements et le classement qui en découle."""
+    produits = db.query(BarProduit).filter(BarProduit.lieu.is_(None)).order_by(BarProduit.nom).all()
+    signaux = _signal_lieu_par_produit(db, [p.id for p in produits])
+
+    classables, ambigus, sans_signal = [], [], []
+    for p in produits:
+        s = signaux.get(p.id, {"DEVANT": 0, "PISCINE": 0})
+        distincts = [l for l in ("DEVANT", "PISCINE") if s[l] > 0]
+        item = {"id": p.id, "nom": p.nom, "categorie": p.categorie, "signal": s}
+        if len(distincts) == 1:
+            item["candidat"] = distincts[0]
+            classables.append(item)
+        elif len(distincts) == 2:
+            ambigus.append(item)
+        else:
+            sans_signal.append(item)
+
+    return {
+        "total_sans_lieu": len(produits),
+        "classables":  classables,
+        "ambigus":     ambigus,
+        "sans_signal": sans_signal,
+    }
+
+
+@router.post("/classer-lieu")
+def classer_lieu(db: Session = Depends(get_db), _admin: Utilisateur = Depends(_require_admin)):
+    """Assigne BarProduit.lieu pour tout produit sans lieu dont l'historique
+    de mouvements ne pointe que vers un seul bar. Les cas ambigus ou sans
+    signal ne sont pas touchés (voir /classer-lieu/apercu). Réversible
+    (remettre lieu à NULL manuellement si besoin)."""
+    produits = db.query(BarProduit).filter(BarProduit.lieu.is_(None)).all()
+    signaux = _signal_lieu_par_produit(db, [p.id for p in produits])
+
+    classes, ambigus, sans_signal = [], [], []
+    for p in produits:
+        s = signaux.get(p.id, {"DEVANT": 0, "PISCINE": 0})
+        distincts = [l for l in ("DEVANT", "PISCINE") if s[l] > 0]
+        if len(distincts) == 1:
+            p.lieu = distincts[0]
+            classes.append({"id": p.id, "nom": p.nom, "lieu": p.lieu})
+        elif len(distincts) == 2:
+            ambigus.append({"id": p.id, "nom": p.nom, "signal": s})
+        else:
+            sans_signal.append({"id": p.id, "nom": p.nom})
+    db.commit()
+
+    log_event(db, USER_UPDATED, user_id=_admin.id,
+              details={"action": "classer_lieu", "classes": classes, "ambigus": ambigus, "sans_signal": sans_signal})
+    return {"ok": True, "classes": classes, "ambigus": ambigus, "sans_signal": sans_signal}
