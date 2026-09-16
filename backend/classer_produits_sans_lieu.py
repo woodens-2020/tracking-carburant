@@ -1,25 +1,28 @@
 """
-Classe automatiquement, à chaque déploiement, TOUS les BarProduit dont
-`lieu` est encore NULL (articles créés avant la séparation Bar Devant/Bar
-Piscine — voir models.py) — plus aucun ne reste "visible aux deux bars"
-après ce script.
+Classe automatiquement, à chaque déploiement, les BarProduit dont `lieu`
+est encore NULL (articles créés avant la séparation Bar Devant/Bar
+Piscine — voir models.py).
 
-Ordre de résolution, du plus au moins fiable :
-  1. _OVERRIDES_CONFIRMES (confirmations explicites de l'utilisateur pour
-     des cas ambigus qu'on connaît par ailleurs, ex. "Aloe").
-  2. Signal d'historique (bar_mouvements_stock.lieu — renseigné pour les
-     ajustements/pertes/casses et, en best-effort, les ventes ; jamais
-     pour les achats/réceptions, volontairement communs) : reclassé
-     directement s'il ne pointe que vers UN SEUL bar.
-  3. Défaut raisonnable pour tout le reste (signal mixte ou absent) : Bar
-     Piscine si "piscine" apparaît dans le nom, Bar Devant (bar principal)
-     sinon. Chaque application du défaut est journalisée pour révision —
-     à corriger en un clic (Produits Bar → Modifier) si besoin, mais ça
-     n'empêche plus la séparation de fonctionner en attendant.
+Un produit est reclassé quand son historique de mouvements de stock
+(bar_mouvements_stock.lieu — renseigné pour les ajustements/pertes/casses
+et, en best-effort, les ventes ; jamais pour les achats/réceptions,
+volontairement communs aux deux bars) ne pointe que vers UN SEUL bar.
+Les produits avec un signal mixte (mouvements dans les deux bars) ou sans
+aucun signal exploitable restent NULL et sont listés dans la sortie pour
+reclassement manuel (page Produits Bar → Modifier → champ Bar).
 
-Idempotent et sans risque : une fois tous les produits classés, il n'a
-plus rien à faire. Complète l'outil GET/POST /api/admin/classer-lieu
-(page Produits Bar) en l'exécutant automatiquement, sans action manuelle.
+IMPORTANT — pas de défaut automatique ici : une version précédente de ce
+script forçait tout produit sans signal sur Bar Devant "par défaut", ce
+qui a retiré à tort de vrais produits (Corona, plats Poisson, etc.) du
+catalogue Bar Piscine où ils étaient réellement vendus. NULL (visible aux
+deux bars) est un état sans risque ; un mauvais classement forcé ne l'est
+pas — seul un humain qui connaît le vrai catalogue de chaque bar peut
+trancher ces cas, jamais un deviné automatique.
+
+Idempotent et sans risque : relancé une fois tous les produits classables
+classés (les cas ambigus/sans signal ne changent pas), il n'a plus rien à
+faire. Complète l'outil GET/POST /api/admin/classer-lieu (page Produits
+Bar) en l'exécutant automatiquement, sans action manuelle.
 """
 import os
 
@@ -79,29 +82,26 @@ def main() -> None:
             print("classer_produits_sans_lieu : aucun produit sans bar — rien à faire.")
             return
 
-        classes, a_defaut = [], []
+        classes, ambigus, sans_signal = [], [], []
         for produit_id, nom, n_devant, n_piscine in rows:
-            if n_devant > 0 and not n_piscine:
+            if n_devant > 0 and n_piscine > 0:
+                ambigus.append(nom)
+            elif n_devant > 0:
                 conn.execute(text("UPDATE bar_produits SET lieu = 'DEVANT' WHERE id = :id"), {"id": produit_id})
-                classes.append(f"{nom} -> DEVANT (signal)")
-            elif n_piscine > 0 and not n_devant:
+                classes.append(f"{nom} -> DEVANT")
+            elif n_piscine > 0:
                 conn.execute(text("UPDATE bar_produits SET lieu = 'PISCINE' WHERE id = :id"), {"id": produit_id})
-                classes.append(f"{nom} -> PISCINE (signal)")
+                classes.append(f"{nom} -> PISCINE")
             else:
-                # Ni signal exploitable, ni override confirmé : plutôt que de
-                # laisser l'article visible aux deux bars indéfiniment (ce qui
-                # entretient le symptôme "mélangé" tant que personne ne le
-                # reclasse à la main), on applique un défaut raisonnable —
-                # Bar Piscine si le nom le mentionne explicitement, Bar Devant
-                # (bar principal) sinon. Réversible en un clic (Produits Bar →
-                # Modifier) si le défaut ne convient pas pour un article donné.
-                defaut = "PISCINE" if "piscine" in nom.lower() else "DEVANT"
-                conn.execute(text("UPDATE bar_produits SET lieu = :lieu WHERE id = :id"), {"lieu": defaut, "id": produit_id})
-                a_defaut.append(f"{nom} -> {defaut} (défaut, à vérifier)")
+                sans_signal.append(nom)
 
-        print(f"classer_produits_sans_lieu : {len(classes)} classé(s) par signal, {len(a_defaut)} classé(s) par défaut.")
-        for ligne in classes + a_defaut:
+        print(f"classer_produits_sans_lieu : {len(classes)} classé(s) automatiquement.")
+        for ligne in classes:
             print(f"  - {ligne}")
+        if ambigus:
+            print(f"  {len(ambigus)} ambigu(s) (historique mélangé, à classer manuellement) : {', '.join(ambigus)}")
+        if sans_signal:
+            print(f"  {len(sans_signal)} sans signal (aucun historique lieu-tagué, à classer manuellement) : {', '.join(sans_signal)}")
 
 
 if __name__ == "__main__":
