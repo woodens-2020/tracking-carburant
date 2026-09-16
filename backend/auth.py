@@ -15,7 +15,8 @@ from sqlalchemy.orm import Session
 from models import Utilisateur, SessionToken
 
 SESSION_COOKIE         = "session_token"
-SESSION_DURATION_HOURS = 24 * 7   # 7 jours
+SESSION_DURATION_HOURS = 24 * 7          # 7 jours — durée normale
+SESSION_DURATION_ADMIN_HOURS = 24 * 365 * 10   # 10 ans — "illimitée" en pratique, administrateurs uniquement
 PBKDF2_ITERATIONS      = 200_000
 API_KEY_PREFIX         = "knt_"   # Konekta — identifiable dans les logs
 
@@ -64,9 +65,10 @@ def create_session(
     user_id: int,
     ip_address: str | None = None,
     user_agent: str | None = None,
+    duree_heures: int | None = None,
 ) -> str:
     token   = secrets.token_urlsafe(32)
-    expires = datetime.now(timezone.utc) + timedelta(hours=SESSION_DURATION_HOURS)
+    expires = datetime.now(timezone.utc) + timedelta(hours=duree_heures or SESSION_DURATION_HOURS)
     db.add(SessionToken(
         token=token, user_id=user_id, expires_at=expires,
         ip_address=ip_address,

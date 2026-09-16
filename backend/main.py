@@ -46,7 +46,7 @@ from taches_routes import router as taches_router
 from pieces_jointes_routes import router as pieces_jointes_router
 from listes_reference_routes import router as listes_reference_router
 from auth import (
-    SESSION_COOKIE, hash_password, verify_password,
+    SESSION_COOKIE, SESSION_DURATION_ADMIN_HOURS, hash_password, verify_password,
     hash_code_acces, verify_code_acces,
     create_session, get_session_user, delete_session,
     make_api_key, verify_api_key, revoke_api_key,
@@ -60,6 +60,13 @@ from password_reset import request_reset, verify_reset_token, consume_reset_toke
 _SECURE_COOKIES  = os.getenv("SECURE_COOKIES", "false").lower() in ("1", "true", "yes")
 _DEBUG_MODE      = os.getenv("DEBUG", "false").lower() in ("1", "true", "yes")
 _ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+
+
+def _est_admin_pour_session(user: Utilisateur) -> bool:
+    """Session illimitée (SESSION_DURATION_ADMIN_HOURS) réservée aux
+    administrateurs — rôle "admin" natif ou rôle personnalisé avec la
+    permission admin (même définition que _require_admin dans admin_routes.py)."""
+    return user.role == "admin" or bool(user.role_obj and user.role_obj.permissions.get("admin", False))
 
 # ── Identité de l'institution (personnalisable par déploiement) ─────────────
 # Permet de redéployer le même code pour une autre institution (base de
@@ -571,12 +578,13 @@ def login(data: LoginIn, request: Request, response: Response, db: Session = Dep
 
     # ── Connexion directe (OTP désactivé) ────────────────────────────
     _clear_login_failures(ip)
-    token = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    duree_h = SESSION_DURATION_ADMIN_HOURS if _est_admin_pour_session(user) else None
+    token = create_session(db, user.id, ip_address=ip, user_agent=ua, duree_heures=duree_h)
     log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     response.set_cookie(
         SESSION_COOKIE, token,
         httponly=True, samesite="lax", secure=_SECURE_COOKIES,
-        max_age=7 * 24 * 3600, path="/",
+        max_age=(duree_h or 7 * 24) * 3600, path="/",
     )
     raw_key = make_api_key(db, user.id)
     return {
@@ -606,12 +614,13 @@ def otp_verify(data: OTPVerifyIn, request: Request, response: Response, db: Sess
     _clear_login_failures(ip)
     response.delete_cookie(OTP_PENDING_COOKIE, path="/")
 
-    token = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    duree_h = SESSION_DURATION_ADMIN_HOURS if _est_admin_pour_session(user) else None
+    token = create_session(db, user.id, ip_address=ip, user_agent=ua, duree_heures=duree_h)
     log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     response.set_cookie(
         SESSION_COOKIE, token,
         httponly=True, samesite="lax", secure=_SECURE_COOKIES,
-        max_age=7 * 24 * 3600, path="/",
+        max_age=(duree_h or 7 * 24) * 3600, path="/",
     )
     raw_key = make_api_key(db, user.id)
     return {
@@ -688,12 +697,13 @@ def otp_verify_admin_code(
     _clear_login_failures(ip)
     response.delete_cookie(OTP_PENDING_COOKIE, path="/")
 
-    token = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    duree_h = SESSION_DURATION_ADMIN_HOURS if _est_admin_pour_session(user) else None
+    token = create_session(db, user.id, ip_address=ip, user_agent=ua, duree_heures=duree_h)
     log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     response.set_cookie(
         SESSION_COOKIE, token,
         httponly=True, samesite="lax", secure=_SECURE_COOKIES,
-        max_age=7 * 24 * 3600, path="/",
+        max_age=(duree_h or 7 * 24) * 3600, path="/",
     )
     raw_key = make_api_key(db, user.id)
     return {
@@ -1497,12 +1507,13 @@ def oauth_callback(
     # ── Connexion directe (OTP désactivé) ────────────────────────────
     ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent", "")
-    session_token = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    duree_h = SESSION_DURATION_ADMIN_HOURS if _est_admin_pour_session(user) else None
+    session_token = create_session(db, user.id, ip_address=ip, user_agent=ua, duree_heures=duree_h)
     log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     redir = RedirectResponse(url="/?just_logged_in=1", status_code=302)
     redir.set_cookie(
         SESSION_COOKIE, session_token,
-        httponly=True, samesite="lax", max_age=7 * 24 * 3600, path="/",
+        httponly=True, samesite="lax", max_age=(duree_h or 7 * 24) * 3600, path="/",
     )
     return redir
 
