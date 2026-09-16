@@ -242,9 +242,12 @@ class AchatIn(BaseModel):
 
 class AjustementIn(BaseModel):
     produit_id:     int
-    quantite:       float   # signée : + pour ajustement positif, - pour perte
+    # AJUSTEMENT : quantité RÉELLE comptée (valeur cible, jamais négative) —
+    # le serveur calcule lui-même l'écart avec le stock enregistré.
+    # PERTE/CASSE/VOLONTAIRE : taille de l'événement (toujours positive).
+    quantite:       float
     type_mouvement: str = "AJUSTEMENT"   # AJUSTEMENT, PERTE, CASSE, VOLONTAIRE
-    motif:          str
+    motif:          Optional[str] = None   # optionnel — un motif par défaut est généré si absent
     lieu:           str     # DEVANT ou PISCINE — requis pour tout ajustement manuel
 
     @validator("type_mouvement")
@@ -1648,43 +1651,69 @@ def confirmer_achat(achat_id: int, request: Request, db: Session = Depends(get_d
     }
 
 
+_MOTIF_DEFAUT_SORTIE = {
+    "PERTE": "Perte",
+    "CASSE": "Casse",
+    "VOLONTAIRE": "Sortie volontaire (dégustation, offert, usage interne)",
+}
+
+
 @router.post("/stock/ajustement", status_code=201)
 def ajuster_stock(data: AjustementIn, request: Request, db: Session = Depends(get_db)):
-    """Ajustement manuel de stock — corrige la quantité d'un produit (perte,
-    casse, ou correction d'inventaire dans n'importe quel sens).
+    """Ajustement manuel de stock.
 
-    PERTE/CASSE sont toujours une SORTIE, quel que soit le signe saisi (taper
-    3 ou -3 pour une perte de 3 unités donne le même résultat) — le libellé
-    porte déjà le sens.
+    AJUSTEMENT : `quantite` est la QUANTITÉ RÉELLE comptée physiquement pour
+    ce lieu — pas un écart. Le serveur calcule lui-même la différence avec
+    le stock actuellement enregistré et l'applique (dans un sens comme dans
+    l'autre). Compter 3 alors que le système en affichait 2 crée un mouvement
+    de +1 ; compter 3 alors qu'il en affichait 5 crée un mouvement de -2.
+    Recompter la même quantité déjà en place ne crée aucun mouvement (rien à
+    corriger). (Avant ce correctif, `quantite` était un écart signé saisi à
+    la main — peu intuitif pour un inventaire physique : l'utilisateur pense
+    en « il y en a 3 », pas en « il faut ajouter 1 ».)
 
-    AJUSTEMENT, lui, respecte le signe saisi tel quel : un admin qui compte
-    physiquement le stock et trouve moins que le système doit pouvoir taper
-    une quantité négative pour CORRIGER À LA BAISSE, pas seulement ajouter.
-    (Avant ce correctif, le signe était toujours ignoré ici et remplacé par
-    sa valeur absolue — un « ajustement » ne pouvait donc jamais qu'augmenter
-    le stock, quoi que l'admin saisisse.)
+    PERTE/CASSE/VOLONTAIRE : `quantite` reste la taille de l'événement
+    (combien perdu/cassé/prélevé), toujours une SORTIE quel que soit le
+    signe saisi.
 
-    VOLONTAIRE est une sortie délibérée (dégustation, offert, consommation
-    interne) — toujours une sortie comme PERTE/CASSE, mais distinguée
-    d'elles dans l'historique puisque la cause n'est ni un accident ni de
-    la casse."""
+    `motif` est optionnel : un motif par défaut est généré (ex. « Ajustement
+    d'inventaire : 2.000 → 3.000 bouteille ») pour que l'historique reste
+    lisible même sans saisie manuelle — l'important est de garder une trace
+    de CHAQUE modification, jamais de bloquer la saisie sur ce champ."""
     p = db.query(BarProduit).filter_by(id=data.produit_id).first()
     if not p:
         raise HTTPException(404, "Produit introuvable")
     _valider_lieu_coherent(p, data.lieu)
-    if not data.motif or len(data.motif.strip()) < 5:
-        raise HTTPException(422, "Le motif doit contenir au moins 5 caractères.")
+    motif = (data.motif or "").strip()
 
-    qte_saisie = Decimal(str(data.quantite))
-    if qte_saisie == 0:
-        raise HTTPException(422, "La quantité ne peut pas être nulle.")
-    qte = -abs(qte_saisie) if data.type_mouvement in ("PERTE", "CASSE", "VOLONTAIRE") else qte_saisie
+    if data.type_mouvement == "AJUSTEMENT":
+        quantite_cible = Decimal(str(data.quantite))
+        if quantite_cible < 0:
+            raise HTTPException(422, "La quantité comptée ne peut pas être négative.")
+        stock_avant = stock_courant(data.produit_id, db, lieu=data.lieu)
+        qte = quantite_cible - stock_avant
+        if qte == 0:
+            return {
+                "mouvement_id": None,
+                "stock_avant": float(stock_avant),
+                "stock_apres": float(stock_avant),
+                "message": f"Stock déjà à {quantite_cible:.3f} {p.unite} — aucun ajustement nécessaire.",
+            }
+        if not motif:
+            motif = f"Ajustement d'inventaire : {stock_avant:.3f} → {quantite_cible:.3f} {p.unite}"
+    else:
+        qte_saisie = Decimal(str(data.quantite))
+        if qte_saisie == 0:
+            raise HTTPException(422, "La quantité ne peut pas être nulle.")
+        qte = -abs(qte_saisie)
+        if not motif:
+            motif = _MOTIF_DEFAUT_SORTIE[data.type_mouvement]
 
     mouv = BarMouvementStock(
         produit_id     = data.produit_id,
         type_mouvement = data.type_mouvement,
         quantite       = qte,
-        motif          = data.motif.strip(),
+        motif          = motif,
         lieu           = data.lieu,
         utilisateur_id = _uid(request),
     )

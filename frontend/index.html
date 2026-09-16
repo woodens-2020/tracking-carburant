@@ -7240,8 +7240,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <select class="pos-select" id="pos-ajust-produit" onchange="_posAjustProduitChange()"></select>
           </div>
           <div><label class="pos-label">Type *</label>
-            <select class="pos-select" id="pos-ajust-type">
-              <option value="AJUSTEMENT">Ajustement</option>
+            <select class="pos-select" id="pos-ajust-type" onchange="_posAjustTypeChange()">
+              <option value="AJUSTEMENT">Ajustement (recomptage)</option>
               <option value="PERTE">Perte</option>
               <option value="CASSE">Casse</option>
               <option value="VOLONTAIRE">Volontaire (dégustation, offert, usage interne)</option>
@@ -7249,19 +7249,20 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
         <div class="pos-form-row">
-          <div><label class="pos-label">Quantité (signée) *</label>
-            <input class="pos-input" id="pos-ajust-qte" type="number" step="0.001" placeholder="-2.5 ou +5">
+          <div><label class="pos-label" id="pos-ajust-qte-label">Quantité réelle comptée *</label>
+            <input class="pos-input" id="pos-ajust-qte" type="number" step="0.001" min="0" placeholder="Ex : 3">
+            <div id="pos-ajust-stock-actuel" style="font-size:12px;color:rgba(255,255,255,.45);margin-top:3px"></div>
           </div>
           <div><label class="pos-label">Lieu *</label>
-            <select class="pos-select" id="pos-ajust-lieu">
+            <select class="pos-select" id="pos-ajust-lieu" onchange="_posAjustTypeChange()">
               <option value="">Choisir un bar…</option>
               <option value="DEVANT">Bar Devant (Accueil)</option>
               <option value="PISCINE">Bar Piscine</option>
             </select>
           </div>
         </div>
-        <div><label class="pos-label">Motif (min 5 caractères) *</label>
-          <input class="pos-input" id="pos-ajust-motif" placeholder="Ex : Inventaire physique — manque de 3 bouteilles">
+        <div><label class="pos-label">Motif (optionnel)</label>
+          <input class="pos-input" id="pos-ajust-motif" placeholder="Ex : Inventaire physique du 16/09 — laisser vide pour un motif automatique">
         </div>
         <div class="pos-modal-footer">
           <button class="pos-btn ghost" onclick="document.getElementById('pos-ajust-modal-bg').classList.remove('open')">Annuler</button>
@@ -26238,6 +26239,39 @@ function _posAjustProduitChange(){
   const id   = parseInt(document.getElementById('pos-ajust-produit').value);
   const prod = _posProduitsAll.find(p=>p.id===id);
   _posVerrouillerLieuSelon(prod, 'pos-ajust-lieu');
+  _posAjustTypeChange();
+}
+
+// Met a jour le libelle du champ quantite et affiche le stock actuellement
+// enregistre pour le lieu choisi — AJUSTEMENT attend desormais la quantite
+// REELLE comptee (pas un ecart), donc l'utilisateur doit voir ce que le
+// systeme pense avoir avant de taper ce qu'il a vraiment trouve.
+async function _posAjustTypeChange(){
+  const type  = document.getElementById('pos-ajust-type')?.value;
+  const label = document.getElementById('pos-ajust-qte-label');
+  const input = document.getElementById('pos-ajust-qte');
+  const hint  = document.getElementById('pos-ajust-stock-actuel');
+  if(!type || !label || !input) return;
+  if(type === 'AJUSTEMENT'){
+    label.textContent = 'Quantité réelle comptée *';
+    input.placeholder = 'Ex : 3';
+  } else {
+    const mot = {PERTE:'perdue', CASSE:'cassée', VOLONTAIRE:'prélevée'}[type] || '';
+    label.textContent = `Quantité ${mot} *`;
+    input.placeholder = 'Ex : 2';
+  }
+  if(!hint) return;
+  const prodId = parseInt(document.getElementById('pos-ajust-produit')?.value);
+  const lieu   = document.getElementById('pos-ajust-lieu')?.value;
+  if(!prodId || !lieu){ hint.textContent = ''; return; }
+  try {
+    const d = await apiFetch('GET', `/pos/stock/${prodId}`);
+    const stockLieu = lieu === 'DEVANT' ? d.stock_devant : d.stock_piscine;
+    const fmt = stockLieu % 1 === 0 ? stockLieu.toFixed(0) : stockLieu.toFixed(2);
+    hint.textContent = type === 'AJUSTEMENT'
+      ? `Stock actuellement enregistré (${_POS_LIEU_LABELS[lieu]}) : ${fmt} — entrez ce que vous avez vraiment compté.`
+      : `Stock actuellement enregistré (${_POS_LIEU_LABELS[lieu]}) : ${fmt}`;
+  } catch(e){ hint.textContent = ''; }
 }
 
 function posStockAjustModal(){
@@ -26265,17 +26299,21 @@ function posAjusterStockDepuisProduit(produitId){
 async function posAjusterStock(){
   const prodId = document.getElementById('pos-ajust-produit').value;
   const type   = document.getElementById('pos-ajust-type').value;
-  const qte    = parseFloat(document.getElementById('pos-ajust-qte').value||0);
+  const qteRaw = document.getElementById('pos-ajust-qte').value;
+  const qte    = parseFloat(qteRaw);
   const motif  = document.getElementById('pos-ajust-motif').value.trim();
   const lieu   = document.getElementById('pos-ajust-lieu').value;
-  if(!prodId||!qte){ posAlert('Produit et quantité requis.'); return; }
-  if(motif.length < 5){ posAlert('Motif trop court (min 5 caractères).'); return; }
+  if(!prodId || qteRaw === '' || isNaN(qte) || qte < 0){ posAlert('Produit et quantité requis (0 ou plus).'); return; }
+  if(type !== 'AJUSTEMENT' && qte === 0){ posAlert('La quantité doit être supérieure à 0 pour une perte, une casse ou une sortie volontaire.'); return; }
   if(!lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine).'); return; }
   try {
-    await apiFetch('POST','/pos/stock/ajustement',{ produit_id:parseInt(prodId), type_mouvement:type, quantite:qte, motif, lieu });
+    const res = await apiFetch('POST','/pos/stock/ajustement',{
+      produit_id: parseInt(prodId), type_mouvement: type, quantite: qte,
+      motif: motif || null, lieu,
+    });
     document.getElementById('pos-ajust-modal-bg').classList.remove('open');
     await loadPosStock();
-    posAlert('Ajustement enregistré.','ok');
+    posAlert(res && res.mouvement_id === null ? (res.message || 'Stock déjà à ce niveau.') : 'Ajustement enregistré.', 'ok');
   } catch(e){ posAlert(e.message||'Erreur.'); }
 }
 
