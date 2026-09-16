@@ -28309,8 +28309,18 @@ async function loadPosCommandes(){
   _pcmdCurrentId = null; _pcmdCurrentTotal = 0;
   document.getElementById('pcmd-detail').style.display = 'none';
   document.getElementById('pcmd-grille').style.display  = 'block';
+  // Le catalogue vendu doit rester filtré par bar (voir _posLoadProduitsCache).
+  // Si la page Commandes est visitée avant le Dashboard caisse, _posSessionLieu
+  // n'est pas encore connu — on le résout ici via le même endpoint dashboard,
+  // sinon le catalogue des deux bars se mélangerait pour une caissière.
+  if(!_posSessionLieu && _appUser?.caisse_employe_id){
+    try {
+      const d = await apiFetch('GET', `/pos/caisse/dashboard?caissier_id=${_appUser.caisse_employe_id}`);
+      if(d.lieu) _posSessionLieu = d.lieu;
+    } catch(_){}
+  }
   if(!_posProduits.length){
-    try { const d = await apiFetch('GET','/pos/produits?actif=true'); _posProduits = d||[]; } catch(_){}
+    await _posLoadProduitsCache(_posSessionLieu);
   }
   await _pcmdGrilleCharger();
 }
