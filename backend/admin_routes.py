@@ -1,6 +1,8 @@
 """Routes d'administration : gestion des rôles, comptes, sessions et journal."""
+import hmac
 import io
 import json
+import os
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -20,7 +22,11 @@ from activity_log import (
 from auth import hash_code_acces, hash_password, make_api_key
 from otp_service import send_welcome_email, send_otp_sms, send_otp_whatsapp
 from database import get_db
-from models import AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur
+from models import (
+    AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur,
+    Releve, Achat, Depense, FichePaie, BarPaiementEmploye,
+    CuisineVente, CuisineAchat, CuisineDepense, RenflouementCaisse,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -868,3 +874,81 @@ def get_audit_log(
             "created_at":   created.isoformat(),
         })
     return {"total": total, "page": page, "per_page": per_page, "items": items}
+
+
+# ══════════════════════════════════════════════════════════════════
+# REMISE À ZÉRO DE "CASH DISPONIBLE" (3e vague, suite à reset-exploitation) —
+# outil ponctuel. Vide toutes les sources restantes qui alimentent
+# _synthese_cash_institution (page "Rapport de Caisse") : Station (Relevé +
+# Achat + Dépense), Cuisine (Vente + Achat + Dépense), Renflouements de la
+# Grande Caisse, Payroll (FichePaie + BarPaiementEmploye). Bar/Hôtel/
+# Pâtisserie étaient déjà à zéro (reset-exploitation, 2e vague). Ne touche
+# ni au catalogue produits/pompes, ni aux employés, ni aux livraisons de
+# carburant (stock, hors formule "cash disponible").
+#
+# Même verrou que les outils précédents (voir historique git) —
+# ALLOW_RESET_CASH doit contenir un secret. Route destinée à être retirée
+# du code après utilisation.
+# ══════════════════════════════════════════════════════════════════
+
+_CONFIRMATION_RESET_CASH = "REMISE A ZERO CASH"
+_RESET_CASH_KEY = os.getenv("ALLOW_RESET_CASH", "").strip()
+
+
+def _exiger_reset_cash_arme(request: Request):
+    if not _RESET_CASH_KEY:
+        raise HTTPException(404, "Not Found")
+    fourni = request.headers.get("X-Reset-Key", "")
+    if not fourni or not hmac.compare_digest(fourni, _RESET_CASH_KEY):
+        raise HTTPException(404, "Not Found")
+
+
+@router.get("/reset-cash/apercu")
+def apercu_reset_cash(request: Request, db: Session = Depends(get_db)):
+    """Aperçu en lecture seule : compte tout ce que POST /reset-cash
+    supprimerait, sans rien modifier."""
+    _exiger_reset_cash_arme(request)
+    return {
+        "releves":              db.query(Releve).count(),
+        "achats_station":       db.query(Achat).count(),
+        "depenses_station":     db.query(Depense).count(),
+        "cuisine_ventes":       db.query(CuisineVente).count(),
+        "cuisine_achats":       db.query(CuisineAchat).count(),
+        "cuisine_depenses":     db.query(CuisineDepense).count(),
+        "renflouements_caisse": db.query(RenflouementCaisse).count(),
+        "fiches_paie":          db.query(FichePaie).count(),
+        "bar_paiements_employes": db.query(BarPaiementEmploye).count(),
+    }
+
+
+class ResetCashIn(BaseModel):
+    confirmation: str
+
+
+@router.post("/reset-cash")
+def reset_cash(data: ResetCashIn, request: Request, db: Session = Depends(get_db)):
+    """Supprime toutes les sources restantes de la synthèse "Cash disponible"
+    (Station, Cuisine, Renflouements, Payroll). Catalogues, employés,
+    pompes, chambres et livraisons de carburant (stock) restent intacts.
+    Irréversible. Exige la phrase de confirmation exacte."""
+    _exiger_reset_cash_arme(request)
+    if data.confirmation != _CONFIRMATION_RESET_CASH:
+        raise HTTPException(422, f"Confirmation requise : envoyez exactement « {_CONFIRMATION_RESET_CASH} ».")
+
+    supprime = {
+        "releves":                db.query(Releve).delete(synchronize_session=False),
+        "achats_station":         db.query(Achat).delete(synchronize_session=False),
+        "depenses_station":       db.query(Depense).delete(synchronize_session=False),
+        "cuisine_ventes":         db.query(CuisineVente).delete(synchronize_session=False),
+        "cuisine_achats":         db.query(CuisineAchat).delete(synchronize_session=False),
+        "cuisine_depenses":       db.query(CuisineDepense).delete(synchronize_session=False),
+        "renflouements_caisse":   db.query(RenflouementCaisse).delete(synchronize_session=False),
+        "fiches_paie":            db.query(FichePaie).delete(synchronize_session=False),
+        "bar_paiements_employes": db.query(BarPaiementEmploye).delete(synchronize_session=False),
+    }
+    db.commit()
+
+    uid_courant = getattr(getattr(request.state, "user", None), "id", None)
+    log_event(db, USER_UPDATED, user_id=uid_courant,
+              details={"action": "reset_cash", "resultat": supprime})
+    return {"ok": True, "resultat": supprime}
