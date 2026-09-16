@@ -26024,7 +26024,7 @@ async function loadPosStock(){
 
     document.getElementById('kpi-stock-attente').textContent = (attente||[]).length || '0';
     _posRenderAttente(attente||[]);
-    _posFillProduitSelects(prods||[]);
+    _posFillProduitSelects(_posStockProduitsEligibles());
 
     _posStockRecalculer();
   } catch(e){
@@ -26038,10 +26038,20 @@ function _posStockQteLieu(s){
   return parseFloat((_posStockLieuFiltre==='PISCINE' ? s.stock_piscine : s.stock_devant) || 0);
 }
 
+// Produits du catalogue de l'onglet actif — un article exclusif à l'autre
+// bar (p.lieu renseigné et différent) ne doit jamais apparaître ici, même
+// avec un stock à 0 (voir liste_produits côté serveur pour la même règle :
+// lieu NULL = article pas encore réaffecté, visible aux deux en attendant).
+function _posStockProduitsEligibles(){
+  const { prods } = _posStockCache;
+  return (prods||[]).filter(p => !p.lieu || p.lieu === _posStockLieuFiltre);
+}
+
 // Recalcule KPI + libellés + tableau pour l'onglet actif, à partir du cache
 // déjà chargé — pas de nouvel appel réseau en changeant d'onglet.
 function _posStockRecalculer(){
-  const { prods, stockMap } = _posStockCache;
+  const { stockMap } = _posStockCache;
+  const prods = _posStockProduitsEligibles();
   const nomLieu = _posStockLieuFiltre==='PISCINE' ? 'Bar Piscine' : 'Bar Devant';
 
   let totalValeur = 0, nbAlerte = 0, nbProduits = 0;
@@ -26068,7 +26078,8 @@ function _posStockRecalculer(){
 function _posStockRenderTable(){
   const tbody = document.getElementById('pos-stock-tbody');
   if(!tbody) return;
-  const { prods, stockMap } = _posStockCache;
+  const { stockMap } = _posStockCache;
+  const prods = _posStockProduitsEligibles();
   const recherche = (document.getElementById('pos-stock-recherche')?.value||'').trim().toLowerCase();
 
   const filtres = prods.filter(p=>{
@@ -26121,6 +26132,7 @@ function posStockSetLieu(valeur){
   _posStockLieuFiltre = valeur;
   document.getElementById('pos-stock-lieu-devant').classList.toggle('active', valeur==='DEVANT');
   document.getElementById('pos-stock-lieu-piscine').classList.toggle('active', valeur==='PISCINE');
+  _posFillProduitSelects(_posStockProduitsEligibles());
   _posStockRecalculer();
 }
 
