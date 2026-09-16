@@ -194,7 +194,8 @@ def _clear_login_failures(ip: str | None) -> None:
 # Chemins accessibles sans être connecté
 _PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code",
                     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify",
-                    "/api/oauth/otp/send", "/api/config/branding"}
+                    "/api/oauth/otp/send", "/api/config/branding",
+                    "/api/admin/reset-exploitation/apercu", "/api/admin/reset-exploitation"}
 _PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/") if _DEBUG_MODE
                     else ("/api/auth/oauth/", "/shared/"))
 

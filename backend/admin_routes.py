@@ -1,8 +1,11 @@
 """Routes d'administration : gestion des rôles, comptes, sessions et journal."""
+import hmac
 import io
 import json
+import os
 import re
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Optional
 from tz_utils import today_haiti
 
@@ -20,7 +23,15 @@ from activity_log import (
 from auth import hash_code_acces, hash_password, make_api_key
 from otp_service import send_welcome_email, send_otp_sms, send_otp_whatsapp
 from database import get_db
-from models import AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur
+from models import (
+    AuditLog, Employe, LoginSecurityEvent, Role, SessionToken, Utilisateur,
+    BarVente, BarCredit, BarRemboursement, BarCommande, BarSessionCaisse,
+    BarAchat, BarMouvementStock, BarProduit,
+    HotelReservation, HotelDepense, HotelProforma,
+    PatisserieVente, PatisserieCommande, PatisserieAchat, PatisserieSessionCaisse,
+    PatisserieProduit, PatisserieMouvementStock,
+)
+from pos_service import stock_courant
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -868,3 +879,141 @@ def get_audit_log(
             "created_at":   created.isoformat(),
         })
     return {"total": total, "page": page, "per_page": per_page, "items": items}
+
+
+# ══════════════════════════════════════════════════════════════════
+# BASCULE TEST → EXPLOITATION RÉELLE (2e vague) — outil ponctuel. Efface
+# les transactions bar (ventes/crédits/commandes/sessions/achats), hôtel
+# (réservations/dépenses/proformas) et pâtisserie (ventes/commandes/
+# sessions/achats), PUIS remet le stock (bar + pâtisserie) à zéro par
+# ajustement compensatoire — l'historique des mouvements de stock n'est
+# JAMAIS supprimé, seulement complété d'une ligne qui ramène chaque
+# produit/lieu à 0, restant visible dans "Historique des mouvements".
+#
+# Même verrou que le précédent outil reset-ventes (voir historique git,
+# commits f8d705f/201190a/ce9e922) : ALLOW_RESET_EXPLOITATION doit
+# contenir un secret pour que ces deux routes répondent autrement que
+# 404, quels que soient les identifiants fournis — ce code est partagé
+# entre plusieurs projets Railway (même repo/branche). Route destinée à
+# être retirée du code après utilisation, comme la précédente.
+# ══════════════════════════════════════════════════════════════════
+
+_CONFIRMATION_RESET_EXPLOITATION = "REMISE A ZERO EXPLOITATION"
+_RESET_EXPLOITATION_KEY = os.getenv("ALLOW_RESET_EXPLOITATION", "").strip()
+_LIEUX_BAR = ("DEVANT", "PISCINE")
+_MOTIF_RESET_STOCK = "Remise à zéro du stock — bascule vers l'exploitation réelle"
+
+
+def _exiger_reset_exploitation_arme(request: Request):
+    if not _RESET_EXPLOITATION_KEY:
+        raise HTTPException(404, "Not Found")
+    fourni = request.headers.get("X-Reset-Key", "")
+    if not fourni or not hmac.compare_digest(fourni, _RESET_EXPLOITATION_KEY):
+        raise HTTPException(404, "Not Found")
+
+
+@router.get("/reset-exploitation/apercu")
+def apercu_reset_exploitation(request: Request, db: Session = Depends(get_db)):
+    """Aperçu en lecture seule : compte tout ce que POST /reset-exploitation
+    supprimerait ou remettrait à zéro, sans rien modifier."""
+    _exiger_reset_exploitation_arme(request)
+
+    bar_a_zeroter = sum(
+        1 for p in db.query(BarProduit).all()
+        for lieu in _LIEUX_BAR
+        if stock_courant(p.id, db, lieu=lieu) != 0
+    )
+    patisserie_a_zeroter = db.query(PatisserieProduit).filter(PatisserieProduit.stock_actuel != 0).count()
+
+    return {
+        "bar_ventes":            db.query(BarVente).count(),
+        "bar_credits":           db.query(BarCredit).count(),
+        "bar_commandes":         db.query(BarCommande).count(),
+        "bar_sessions_caisse":   db.query(BarSessionCaisse).count(),
+        "bar_achats":            db.query(BarAchat).count(),
+        "hotel_reservations":    db.query(HotelReservation).count(),
+        "hotel_depenses":        db.query(HotelDepense).count(),
+        "hotel_proformas":       db.query(HotelProforma).count(),
+        "patisserie_ventes":       db.query(PatisserieVente).count(),
+        "patisserie_commandes":    db.query(PatisserieCommande).count(),
+        "patisserie_sessions_caisse": db.query(PatisserieSessionCaisse).count(),
+        "patisserie_achats":       db.query(PatisserieAchat).count(),
+        "bar_produit_lieu_a_remettre_a_zero":  bar_a_zeroter,
+        "patisserie_produits_a_remettre_a_zero": patisserie_a_zeroter,
+    }
+
+
+class ResetExploitationIn(BaseModel):
+    confirmation: str
+
+
+@router.post("/reset-exploitation")
+def reset_exploitation(data: ResetExploitationIn, request: Request, db: Session = Depends(get_db)):
+    """Supprime les transactions bar/hôtel/pâtisserie et remet tout le stock
+    (bar + pâtisserie) à zéro. Catalogues/produits, employés, chambres et
+    dépenses (hors hôtel) restent intacts. Irréversible pour les
+    suppressions ; le stock, lui, garde son historique complet — voir
+    docstring du bloc ci-dessus. Exige la phrase de confirmation exacte."""
+    _exiger_reset_exploitation_arme(request)
+    if data.confirmation != _CONFIRMATION_RESET_EXPLOITATION:
+        raise HTTPException(422, f"Confirmation requise : envoyez exactement « {_CONFIRMATION_RESET_EXPLOITATION} ».")
+
+    uid_courant = getattr(getattr(request.state, "user", None), "id", None)
+    supprime = {}
+    # Bar — bar_credits.vente_id est ON DELETE RESTRICT : crédits (et leurs
+    # remboursements, CASCADE) supprimés avant les ventes elles-mêmes.
+    supprime["bar_remboursements"]  = db.query(BarRemboursement).delete(synchronize_session=False)
+    supprime["bar_credits"]         = db.query(BarCredit).delete(synchronize_session=False)
+    supprime["bar_ventes"]          = db.query(BarVente).delete(synchronize_session=False)
+    supprime["bar_commandes"]       = db.query(BarCommande).delete(synchronize_session=False)
+    supprime["bar_sessions_caisse"] = db.query(BarSessionCaisse).delete(synchronize_session=False)
+    # bar_mouvements_stock.achat_id est ON DELETE SET NULL : l'historique de
+    # stock survit, seule la fiche d'achat/réception disparaît.
+    supprime["bar_achats"] = db.query(BarAchat).delete(synchronize_session=False)
+
+    supprime["hotel_reservations"] = db.query(HotelReservation).delete(synchronize_session=False)
+    supprime["hotel_depenses"]     = db.query(HotelDepense).delete(synchronize_session=False)
+    supprime["hotel_proformas"]    = db.query(HotelProforma).delete(synchronize_session=False)
+
+    supprime["patisserie_ventes"]          = db.query(PatisserieVente).delete(synchronize_session=False)
+    supprime["patisserie_commandes"]       = db.query(PatisserieCommande).delete(synchronize_session=False)
+    supprime["patisserie_sessions_caisse"] = db.query(PatisserieSessionCaisse).delete(synchronize_session=False)
+    supprime["patisserie_achats"]          = db.query(PatisserieAchat).delete(synchronize_session=False)
+    db.flush()
+
+    # Remise à zéro du stock — AJOUT d'un mouvement compensatoire par
+    # produit/lieu non nul, jamais de suppression : l'historique complet
+    # reste consultable (bouton "Historique des mouvements").
+    bar_remis_a_zero = 0
+    for p in db.query(BarProduit).all():
+        for lieu in _LIEUX_BAR:
+            actuel = stock_courant(p.id, db, lieu=lieu)
+            if actuel != 0:
+                db.add(BarMouvementStock(
+                    produit_id=p.id, type_mouvement="AJUSTEMENT", quantite=-actuel,
+                    motif=_MOTIF_RESET_STOCK, lieu=lieu, utilisateur_id=uid_courant,
+                ))
+                bar_remis_a_zero += 1
+
+    patisserie_remis_a_zero = 0
+    for p in db.query(PatisserieProduit).all():
+        actuel = Decimal(str(p.stock_actuel or 0))
+        if actuel != 0:
+            db.add(PatisserieMouvementStock(
+                produit_id=p.id, type_mouvement="AJUSTEMENT", quantite=-actuel,
+                motif=_MOTIF_RESET_STOCK, utilisateur_id=uid_courant,
+            ))
+            # PatisserieProduit.stock_actuel est un cache dénormalisé (pas
+            # calculé à la volée comme le stock bar) — même règle que
+            # _appliquer_mouvement_stock (patisserie_routes.py) : jamais
+            # l'un sans l'autre.
+            p.stock_actuel = Decimal("0")
+            patisserie_remis_a_zero += 1
+
+    supprime["bar_produit_lieu_remis_a_zero"]    = bar_remis_a_zero
+    supprime["patisserie_produits_remis_a_zero"] = patisserie_remis_a_zero
+    db.commit()
+
+    log_event(db, USER_UPDATED, user_id=uid_courant,
+              details={"action": "reset_exploitation", "resultat": supprime})
+    return {"ok": True, "resultat": supprime}
