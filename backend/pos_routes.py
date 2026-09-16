@@ -178,10 +178,11 @@ class ProduitIn(BaseModel):
     prix_initial:        Optional[float] = None
     vendu_par_caisse:    bool = False
     unites_par_caisse:   Optional[int] = None
-    # Bar Devant ou Bar Piscine — catalogue exclusif à ce bar. Requis à la
-    # création (voir creer_produit) pour ne plus mélanger les deux
-    # catalogues ; optionnel à la modification (permet de laisser un
-    # article existant "non assigné" ou de le réaffecter).
+    # Bar Devant ou Bar Piscine — catalogue exclusif à ce bar. Optionnel :
+    # NULL (comportement par défaut, création ou modification) = vendable
+    # aux deux bars, stock compté séparément pour chacun. Ne choisir un bar
+    # que pour un article vraiment exclusif à ce bar — pas juste parce
+    # qu'il n'a pour l'instant de stock que d'un côté.
     lieu:                Optional[str] = None
 
     @validator('unites_par_caisse')
@@ -507,8 +508,9 @@ def creer_produit(data: ProduitIn, request: Request, db: Session = Depends(get_d
         raise HTTPException(422, "Un prix de vente initial valide est requis pour créer un produit.")
     if data.vendu_par_caisse and (not data.unites_par_caisse or data.unites_par_caisse < 1):
         raise HTTPException(422, "unites_par_caisse est obligatoire (≥ 1) pour un produit vendu par caisse.")
-    if not data.lieu:
-        raise HTTPException(422, "Choisissez le bar (Bar Devant ou Bar Piscine) pour ce nouvel article.")
+    # data.lieu optionnel : NULL = vendable aux deux bars (comportement par
+    # défaut — voir BarProduit.lieu) ; un bar n'est choisi que pour un
+    # article vraiment exclusif à ce bar.
     # Vérification doublon (insensible à la casse)
     from sqlalchemy import func as _func
     existant = db.query(BarProduit).filter(

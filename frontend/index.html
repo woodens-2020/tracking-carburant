@@ -6909,14 +6909,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
         <div class="pos-form-row">
           <div style="width:100%">
-            <label class="pos-label" id="pos-prod-lieu-label">Bar *</label>
+            <label class="pos-label" id="pos-prod-lieu-label">Bar (optionnel)</label>
             <select class="pos-select" id="pos-prod-lieu" style="width:100%">
-              <option value="">— Choisir —</option>
-              <option value="DEVANT">Bar Devant (Accueil)</option>
-              <option value="PISCINE">Bar Piscine</option>
+              <option value="">— Vendu aux deux bars (par défaut) —</option>
+              <option value="DEVANT">Bar Devant uniquement (Accueil)</option>
+              <option value="PISCINE">Bar Piscine uniquement</option>
             </select>
             <div style="font-size:12.5px;color:rgba(255,255,255,.4);margin-top:4px">
-              Catalogue exclusif à ce bar — cet article n'apparaîtra pas à l'autre.
+              Par défaut, l'article est vendable aux deux bars (le stock reste compté séparément pour chacun). Ne choisir un bar que si cet article lui est vraiment exclusif — il n'apparaîtra alors plus du tout à l'autre.
             </div>
           </div>
         </div>
@@ -25745,7 +25745,8 @@ async function posProduitSauvegarder(){
   if(!cat){ posAlert('Choisissez une catégorie ou créez-en une avec le bouton +.'); return; }
   if(!unite){ posAlert('L\'unité de vente est requise.'); return; }
   if(venduCaisse && (!upc||upc<1)){ posAlert('Unités par caisse requis (≥ 1) pour un produit vendu par caisse.'); return; }
-  if(!id && !lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine) pour ce nouvel article.'); return; }
+  // Bar optionnel : laisser vide = vendu aux deux bars (comportement par
+  // défaut). Ne choisir un bar que pour un article vraiment exclusif.
   // Vérification doublon côté client
   if(!id){
     const doublon = _posProduitsAll.find(p => p.nom.trim().toLowerCase() === nom.toLowerCase());
