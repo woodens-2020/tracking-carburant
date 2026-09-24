@@ -3402,6 +3402,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="pos-fournisseurs" onclick="goTo('pos-fournisseurs')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1"/></svg>
+      </span>
+      <span>Entrepôts &amp; Fournisseurs</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <button class="nav-item" data-page="pos-credits" onclick="goTo('pos-credits')">
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
@@ -7726,6 +7734,77 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div>
     <!-- Zone d'impression (masquée à l'écran) -->
     <div id="pos-print-zone"></div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — ENTREPÔTS & FOURNISSEURS (module Commerce)   -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-fournisseurs" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <div class="pos-header">
+          <div class="pos-header-title">Entrepôts</div>
+        </div>
+        <div class="card" style="margin-bottom:18px">
+          <div class="card-head">
+            <div class="per-head"><div class="per-dot"></div><div class="per-title">Emplacements de stock</div></div>
+          </div>
+          <div style="padding:16px">
+            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:16px;align-items:end">
+              <div class="admin-field">
+                <label class="admin-lbl">Nom</label>
+                <input type="text" id="ent-nom" class="admin-input" placeholder="ex : Dépôt Principal">
+              </div>
+              <div class="admin-field">
+                <label class="admin-lbl">Adresse</label>
+                <input type="text" id="ent-adresse" class="admin-input" placeholder="facultatif">
+              </div>
+              <button class="admin-btn-primary" onclick="posCreerEntrepot()">+ Ajouter</button>
+            </div>
+            <div id="ent-msg" class="admin-msg" style="display:none;margin-bottom:10px"></div>
+            <div class="tbl-wrap">
+              <table class="dt">
+                <thead><tr><th>Nom</th><th>Adresse</th><th>Statut</th></tr></thead>
+                <tbody id="ent-tbody"><tr><td colspan="3" class="empty">Chargement…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="pos-header">
+          <div class="pos-header-title">Fournisseurs</div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div class="per-head"><div class="per-dot"></div><div class="per-title">Répertoire fournisseurs</div></div>
+          </div>
+          <div style="padding:16px">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;margin-bottom:16px;align-items:end">
+              <div class="admin-field">
+                <label class="admin-lbl">Nom</label>
+                <input type="text" id="four-nom" class="admin-input" placeholder="ex : Distributeur ABC">
+              </div>
+              <div class="admin-field">
+                <label class="admin-lbl">Contact</label>
+                <input type="text" id="four-contact" class="admin-input" placeholder="facultatif">
+              </div>
+              <div class="admin-field">
+                <label class="admin-lbl">Téléphone</label>
+                <input type="text" id="four-telephone" class="admin-input" placeholder="facultatif">
+              </div>
+              <button class="admin-btn-primary" onclick="posCreerFournisseur()">+ Ajouter</button>
+            </div>
+            <div id="four-msg" class="admin-msg" style="display:none;margin-bottom:10px"></div>
+            <div class="tbl-wrap">
+              <table class="dt">
+                <thead><tr><th>Nom</th><th>Contact</th><th>Téléphone</th><th class="tr">Solde dû</th><th>Statut</th></tr></thead>
+                <tbody id="four-tbody"><tr><td colspan="5" class="empty">Chargement…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
 
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- PAGE POS — CRÉDITS                                      -->
@@ -13943,6 +14022,7 @@ const PAGE_META={
   'pos-produits':      {title: 'Produits Bar',                  sub: 'Catalogue et historique des prix'},
   'pos-stock':         {title: 'Stock Bar',                     sub: 'Mouvements et niveaux de stock'},
   'pos-ventes':        {title: 'Ventes Bar',                    sub: 'Suivi des ventes et encaissements'},
+  'pos-fournisseurs':  {title: 'Entrepôts & Fournisseurs',      sub: 'Emplacements de stock et fournisseurs (module Commerce)'},
   'pos-credits':       {title: 'Crédits Bar',                   sub: 'Clients à crédit et remboursements'},
   'pos-commandes':     {title: 'Tables Bar',                    sub: 'Gestion des tables en cours'},
   'pos-paie':          {title: 'Paie Bar',                      sub: 'Paiements employés du bar'},
@@ -16831,7 +16911,8 @@ const _MODULE_PAGES = {
               'previsions','rapports','stock','gestion','audit','depenses'],
   bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-stock','pos-achats',
               'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite',
-              'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis'],
+              'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis',
+              'pos-fournisseurs'],
   hotel:     ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma',
               'hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   zelle:     ['zelle','zelle-paiements','zelle-fonds'],
@@ -16859,7 +16940,7 @@ const _AREA_PAGES = {
     lecture: ['dashboard','journal','statistiques','gi-dashboard'],
   },
   bar: {
-    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
+    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds','pos-fournisseurs'],
     lecture: ['pos-ventes','pos-credits','pos-commandes','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
   },
   cuisine: {
@@ -16891,6 +16972,7 @@ const _CAISSIER_ALLOWED = new Set([
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
+  'pos-fournisseurs',
   'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'patisserie-dashboard','patisserie-produits','patisserie-achats','patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse',
@@ -22184,6 +22266,7 @@ const _giPageLoaders = {
   'pos-stock':       loadPosStock,
   'pos-achats':      loadPosAchats,
   'pos-ventes':      loadPosVentes,
+  'pos-fournisseurs': loadPosFournisseurs,
   'pos-credits':     loadPosCredits,
   'pos-commandes':   loadPosCommandes,
   'pos-paie':        loadPosPaie,
@@ -27838,6 +27921,78 @@ async function posPayerCredit(venteId, montantRestant, clientNom){
     await posVentesCharger();
     posAlert(`Vente soldée — ${posGx(montant)} encaissés.`, 'ok');
   } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE ENTREPÔTS & FOURNISSEURS (module Commerce)
+// ══════════════════════════════════════════════════════════════════════
+
+function _posFourMsg(elId, msg, type){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  el.textContent = msg;
+  el.className   = 'admin-msg ' + type;
+  el.style.display = 'block';
+  if(type === 'ok') setTimeout(()=>{ el.style.display='none'; }, 4000);
+}
+
+async function loadPosFournisseurs(){
+  const entBody = document.getElementById('ent-tbody');
+  const fourBody = document.getElementById('four-tbody');
+  try{
+    const entrepots = await GET('/pos/entrepots');
+    entBody.innerHTML = entrepots.length
+      ? entrepots.map(e=>`<tr>
+          <td style="font-weight:600">${esc(e.nom)}</td>
+          <td class="td-muted">${esc(e.adresse||'—')}</td>
+          <td><span class="td-badge ${e.actif?'badge-green':'badge-gray'}">${e.actif?'Actif':'Inactif'}</span></td>
+        </tr>`).join('')
+      : '<tr><td colspan="3" class="empty">Aucun entrepôt — ajoutez-en un ci-dessus.</td></tr>';
+  }catch(e){
+    entBody.innerHTML = `<tr><td colspan="3" class="empty" style="color:var(--red)">Erreur : ${esc(e.message||'')}</td></tr>`;
+  }
+  try{
+    const fournisseurs = await GET('/pos/fournisseurs');
+    fourBody.innerHTML = fournisseurs.length
+      ? fournisseurs.map(f=>`<tr>
+          <td style="font-weight:600">${esc(f.nom)}</td>
+          <td class="td-muted">${esc(f.contact||'—')}</td>
+          <td class="td-muted">${esc(f.telephone||'—')}</td>
+          <td class="tr num ${f.solde_du>0?'c-amber':''}">${fmtGX(f.solde_du)}</td>
+          <td><span class="td-badge ${f.actif?'badge-green':'badge-gray'}">${f.actif?'Actif':'Inactif'}</span></td>
+        </tr>`).join('')
+      : '<tr><td colspan="5" class="empty">Aucun fournisseur — ajoutez-en un ci-dessus.</td></tr>';
+  }catch(e){
+    fourBody.innerHTML = `<tr><td colspan="5" class="empty" style="color:var(--red)">Erreur : ${esc(e.message||'')}</td></tr>`;
+  }
+}
+
+async function posCreerEntrepot(){
+  const nom     = document.getElementById('ent-nom').value.trim();
+  const adresse = document.getElementById('ent-adresse').value.trim();
+  if(!nom){ _posFourMsg('ent-msg','Le nom est requis.','err'); return; }
+  try{
+    await POST('/pos/entrepots', {nom, adresse: adresse || null});
+    document.getElementById('ent-nom').value = '';
+    document.getElementById('ent-adresse').value = '';
+    _posFourMsg('ent-msg','Entrepôt ajouté.','ok');
+    await loadPosFournisseurs();
+  }catch(e){ _posFourMsg('ent-msg', e.message||'Erreur réseau.','err'); }
+}
+
+async function posCreerFournisseur(){
+  const nom       = document.getElementById('four-nom').value.trim();
+  const contact   = document.getElementById('four-contact').value.trim();
+  const telephone = document.getElementById('four-telephone').value.trim();
+  if(!nom){ _posFourMsg('four-msg','Le nom est requis.','err'); return; }
+  try{
+    await POST('/pos/fournisseurs', {nom, contact: contact || null, telephone: telephone || null});
+    document.getElementById('four-nom').value = '';
+    document.getElementById('four-contact').value = '';
+    document.getElementById('four-telephone').value = '';
+    _posFourMsg('four-msg','Fournisseur ajouté.','ok');
+    await loadPosFournisseurs();
+  }catch(e){ _posFourMsg('four-msg', e.message||'Erreur réseau.','err'); }
 }
 
 // ══════════════════════════════════════════════════════════════════════
