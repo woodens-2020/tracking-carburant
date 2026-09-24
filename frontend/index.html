@@ -16872,7 +16872,7 @@ let _branding = {
 // Modules actifs pour cette institution — tous actifs par défaut (comportement
 // historique) tant que /api/config/branding n'a pas répondu ou si le serveur
 // ne renvoie rien pour un module donné.
-let _modules = { carburant: true, bar: true, hotel: true, cuisine: true, zelle: true };
+let _modules = { carburant: true, bar: true, hotel: true, cuisine: true, zelle: true, commerce: false };
 
 async function _loadBranding(){
   try{
@@ -16911,8 +16911,11 @@ const _MODULE_PAGES = {
               'previsions','rapports','stock','gestion','audit','depenses'],
   bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-stock','pos-achats',
               'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite',
-              'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis',
-              'pos-fournisseurs'],
+              'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis'],
+  // Commerce & Distribution — indépendant de MODULE_BAR (voir MODULE_COMMERCE
+  // dans main.py) : une institution carburant-only peut avoir Bar désactivé
+  // tout en utilisant Commerce (ex. Vertières).
+  commerce:  ['pos-fournisseurs'],
   hotel:     ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma',
               'hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   zelle:     ['zelle','zelle-paiements','zelle-fonds'],

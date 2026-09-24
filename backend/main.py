@@ -116,6 +116,13 @@ _MODULES = {
     "cuisine":    os.getenv("MODULE_CUISINE",    "true").lower() == "true",
     "zelle":      os.getenv("MODULE_ZELLE",      "true").lower() == "true",
     "patisserie": os.getenv("MODULE_PATISSERIE", "true").lower() == "true",
+    # Commerce & Distribution (entrepôts, fournisseurs...) — indépendant de
+    # MODULE_BAR : une institution carburant-only comme Vertières peut avoir
+    # Bar désactivé tout en utilisant Commerce. Défaut FALSE (module tout
+    # nouveau, opt-in explicite par institution, contrairement aux autres
+    # modules ci-dessus qui existaient déjà avant l'ajout du système de
+    # toggles et restent donc actifs par défaut pour ne rien casser).
+    "commerce":   os.getenv("MODULE_COMMERCE",   "false").lower() == "true",
 }
 
 app = FastAPI(
