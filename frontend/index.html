@@ -3055,6 +3055,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 </head>
 <script src="/vendor/chart.umd.min.js"></script>
 <script src="/vendor/html2canvas.min.js"></script>
+<script src="/vendor/html5-qrcode.min.js"></script>
 <body>
 
 <div id="load-overlay"><div class="lo-badge"><div class="lo-ring"></div><span class="lo-k">K</span></div></div>
@@ -3375,6 +3376,22 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/></svg>
       </span>
       <span>Produits Bar</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="pos-caisses" onclick="goTo('pos-caisses')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="9" width="7" height="7"/><rect x="14" y="9" width="7" height="7"/><rect x="3" y="3" width="4" height="4"/><rect x="17" y="3" width="4" height="4"/><rect x="3" y="17" width="4" height="4"/><rect x="17" y="17" width="4" height="4"/></svg>
+      </span>
+      <span>Gestion des caisses</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="pos-scan-livraison" onclick="goTo('pos-scan-livraison')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+      </span>
+      <span>Scan de livraison</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -6649,6 +6666,43 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
 
         <div id="pos-caisse-vente-zone">
+        <!-- Scan code-barres produit — ajoute directement au panier.
+             Champ texte (douchette USB/BT) + bouton caméra (téléphone sans
+             douchette physique — utilise l'appareil photo du navigateur). -->
+        <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:8px">
+          <div class="pos-search-wrap" style="margin-bottom:0;flex:1">
+            <svg class="pos-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="13" y1="8" x2="13" y2="16"/><line x1="16" y1="8" x2="16" y2="16"/></svg>
+            <input type="text" id="pos-scan-inp" class="pos-search-inp"
+                   placeholder="Scanner le code-barres d'un produit…"
+                   autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();posScanCodeBarre();}">
+          </div>
+          <button type="button" class="pos-btn ghost" style="white-space:nowrap;flex-shrink:0" onclick="posCameraScanOuvrir()" title="Scanner avec la caméra du téléphone">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Caméra
+          </button>
+        </div>
+        <!-- Retour immédiat après chaque scan — reste à la même place, ne
+             s'empile pas (contrairement à un toast) : idéal pour scanner
+             plusieurs fois de suite le même article (ex. 4 Prestige = 4
+             scans) sans que l'écran se remplisse de notifications. -->
+        <div id="pos-scan-feedback" style="display:none;margin:-4px 0 10px;padding:9px 14px;border-radius:9px;font-size:14px;font-weight:600;transition:background .15s,color .15s"></div>
+
+        <!-- Modal scan par caméra — pour un employé connecté sur son
+             téléphone, sans douchette USB/BT physique. -->
+        <div class="pos-modal-bg" id="pos-camera-modal-bg" onclick="if(event.target===this)posCameraScanFermer()">
+          <div class="pos-modal" style="max-width:440px">
+            <h3>Scanner avec la caméra</h3>
+            <div id="pos-camera-reader" style="width:100%;border-radius:10px;overflow:hidden;background:#000"></div>
+            <div id="pos-camera-feedback" style="display:none;margin-top:12px;padding:9px 14px;border-radius:9px;font-size:14px;font-weight:600"></div>
+            <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:10px">
+              Visez le code-barres du produit avec l'appareil photo. Chaque article scanné s'ajoute au panier — laissez la caméra ouverte pour en scanner plusieurs à la suite.
+            </div>
+            <div class="pos-modal-footer">
+              <button class="pos-btn primary" onclick="posCameraScanFermer()">Fermer la caméra</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Barre de recherche articles -->
         <div class="pos-search-wrap">
           <svg class="pos-search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -6861,12 +6915,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <thead>
                 <tr>
                   <th></th><th>Nom</th><th>Catégorie</th><th>Unité</th>
+                  <th>Code-barres</th>
                   <th>Prix</th><th>Stock</th><th>Coût en stock</th>
                   <th>Statut</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody id="pos-prod-tbody">
-                <tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:28px">Chargement…</td></tr>
+                <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:28px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -7009,6 +7064,17 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
         <div class="pos-form-row">
+          <div style="width:100%">
+            <label class="pos-label">Département de destination <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
+            <select class="pos-select" id="pos-appro-departement" style="width:100%">
+              <option value="">— Non affecté (stock partagé) —</option>
+            </select>
+            <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:4px">
+              Laissez sur « Non affecté » si ce stock est partagé entre Bar Devant et Bar Piscine. Choisissez un bar pour que ce stock soit réservé à lui seul.
+            </div>
+          </div>
+        </div>
+        <div class="pos-form-row">
           <div style="flex:1">
             <label class="pos-label">Prix d'achat / caisse (G) <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
             <input class="pos-input" id="pos-appro-prix-caisse" type="number" min="0" step="0.01" placeholder="0.00">
@@ -7053,6 +7119,314 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <input type="hidden" id="pos-prix-produit-id">
       </div>
     </div>
+
+    <!-- Modal code-barres produit — scan-friendly (une douchette USB/BT tape
+         le code puis Entrée, comme n'importe quel champ texte). -->
+    <div class="pos-modal-bg" id="pos-codebarre-modal-bg" onclick="if(event.target===this)posCodeBarreModalClose()">
+      <div class="pos-modal">
+        <h3 id="pos-codebarre-modal-title">Code-barres</h3>
+        <div class="pos-form-row">
+          <div style="width:100%">
+            <label class="pos-label">Code-barres du produit</label>
+            <input class="pos-input" id="pos-codebarre-input" placeholder="Scanner ou saisir le code-barres…"
+              style="font-family:monospace;font-size:15px" autocomplete="off"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();posCodeBarreSauvegarder();}">
+            <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:5px">
+              Une fois enregistré, ce produit pourra être ajouté au panier en scannant ce code depuis l'écran de vente (Caisse POS).
+            </div>
+          </div>
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" style="color:#f87171;border-color:rgba(248,113,113,.3)" onclick="posCodeBarreEffacer()">Retirer le code</button>
+          <button class="pos-btn ghost" onclick="posCodeBarreModalClose()">Annuler</button>
+          <button class="pos-btn primary" onclick="posCodeBarreSauvegarder()">Enregistrer</button>
+        </div>
+        <input type="hidden" id="pos-codebarre-produit-id">
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — GESTION DES CAISSES (QR)                     -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-caisses" class="page page-gi">
+      <div class="gi-page" style="--gi-accent:#38bdf8;--gi-bg:rgba(56,189,248,.11);--gi-bd:rgba(56,189,248,.22);--gi-glow:rgba(56,189,248,.15)">
+
+        <div class="gi-page-header">
+          <div class="gi-page-header-left">
+            <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(56,189,248,.25),rgba(56,189,248,.1));border-color:rgba(56,189,248,.3);box-shadow:0 0 18px rgba(56,189,248,.2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><rect x="3" y="9" width="7" height="7"/><rect x="14" y="9" width="7" height="7"/><rect x="3" y="3" width="4" height="4"/><rect x="17" y="3" width="4" height="4"/><rect x="3" y="17" width="4" height="4"/><rect x="17" y="17" width="4" height="4"/></svg>
+            </div>
+            <div class="gi-page-header-text">
+              <div class="gi-title">Gestion des caisses</div>
+              <div class="gi-subtitle">Traçabilité individuelle par QR code — dépôt, transferts, ventes</div>
+            </div>
+          </div>
+          <div class="gi-page-header-actions">
+            <button class="gi-btn-primary" onclick="posCaissesGenererModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Déclarer un achat / Générer les codes
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI -->
+        <div class="gi-kpi-row" id="pcx-kpis">
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Au dépôt</div><div class="gi-kpi-val" id="pcx-kpi-depot">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Transférées</div><div class="gi-kpi-val blue" id="pcx-kpi-transf">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">En vente</div><div class="gi-kpi-val amber" id="pcx-kpi-vente">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Terminées</div><div class="gi-kpi-val teal" id="pcx-kpi-termine">—</div></div>
+          <div class="gi-kpi"><div class="gi-kpi-lbl">Total caisses</div><div class="gi-kpi-val" id="pcx-kpi-total">—</div></div>
+        </div>
+
+        <!-- Stock par département — chaque bar a son propre stock, séparé -->
+        <div class="cat-panel">
+          <div class="cat-panel-title">Stock par département</div>
+          <div id="pcx-stock-dept" style="overflow-x:auto">
+            <span style="color:rgba(255,255,255,.25);font-size:13px">Chargement…</span>
+          </div>
+        </div>
+
+        <!-- Scan / recherche rapide -->
+        <div class="cat-panel">
+          <div class="cat-panel-title">Scanner ou saisir un code</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="pcx-scan-input" class="pos-input" placeholder="CAISSE-2026-000001 — scanner ou taper le code puis Entrée"
+              style="flex:1;font-family:monospace;font-size:15px"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();posCaisseScanLookup();}">
+            <button class="pos-btn primary" onclick="posCaisseScanLookup()">Rechercher</button>
+          </div>
+          <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:6px">
+            Le backend est toujours interrogé au scan — le code n'est qu'un pointeur, jamais une preuve d'autorisation en lui-même.
+          </div>
+        </div>
+
+        <div class="gi-table-card">
+          <div class="gi-table-hdr">
+            <span class="gi-table-title">Liste des caisses</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <select id="pcx-filter-statut" onchange="posCaissesFiltrer()"
+                style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:10px;color:#fff;font-size:13.5px;font-weight:600;padding:7px 30px 7px 12px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22rgba(255,255,255,.5)%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:13px">
+                <option value="">Tous statuts</option>
+                <option value="AU_DEPOT">Au dépôt</option>
+                <option value="TRANSFEREE">Transférée</option>
+                <option value="EN_VENTE">En vente</option>
+                <option value="TERMINEE">Terminée</option>
+                <option value="ANNULEE">Annulée</option>
+              </select>
+              <select id="pcx-filter-departement" onchange="posCaissesFiltrer()"
+                style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:10px;color:#fff;font-size:13.5px;font-weight:600;padding:7px 30px 7px 12px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22rgba(255,255,255,.5)%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:13px">
+                <option value="">Tous départements</option>
+              </select>
+              <div style="position:relative">
+                <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2" style="width:13px;height:13px;position:absolute;left:9px;top:50%;transform:translateY(-50%)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input id="pcx-search" placeholder="Code ou produit…" oninput="posCaissesFiltrer()" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:rgba(255,255,255,.8);font-size:13.5px;padding:6px 10px 6px 30px;outline:none;width:190px">
+              </div>
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="gi-table">
+              <thead>
+                <tr>
+                  <th>Code</th><th>Produit</th><th>Statut</th><th>Département</th>
+                  <th>Restant / Initial</th><th>Créée le</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pcx-tbody">
+                <tr><td colspan="7" style="color:rgba(255,255,255,.3);text-align:center;padding:28px">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-caisses -->
+
+    <!-- Modal — Déclarer un achat / Générer les codes -->
+    <div class="pos-modal-bg" id="pcx-generer-modal-bg" onclick="if(event.target===this)posCaissesGenererModalClose()">
+      <div class="pos-modal">
+        <h3>Déclarer un achat / Générer les codes</h3>
+        <div class="pos-form-row">
+          <div style="width:100%">
+            <label class="pos-label">Produit *</label>
+            <select class="pos-select" id="pcx-gen-produit" style="width:100%" onchange="posCaissesGenUpdateInfo()">
+              <option value="">— Choisir un produit vendu par caisse —</option>
+            </select>
+            <div id="pcx-gen-produit-hint" style="font-size:12.5px;color:rgba(255,255,255,.4);margin-top:5px"></div>
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Nombre de caisses achetées *</label>
+            <input class="pos-input" id="pcx-gen-nb" type="number" min="1" step="1" placeholder="Ex : 5" oninput="posCaissesGenUpdateInfo()">
+          </div>
+          <div style="flex:1">
+            <label class="pos-label">Prix d'achat / caisse (G) <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
+            <input class="pos-input" id="pcx-gen-prix" type="number" min="0" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+        <div id="pcx-gen-live" style="display:none;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);border-radius:8px;padding:10px 14px;margin:4px 0 8px;font-size:14.5px;color:#38bdf8"></div>
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Fournisseur <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
+            <input class="pos-input" id="pcx-gen-fournisseur" placeholder="Nom du fournisseur">
+          </div>
+          <div style="flex:1">
+            <label class="pos-label">Notes</label>
+            <input class="pos-input" id="pcx-gen-notes" placeholder="Lot, référence…">
+          </div>
+        </div>
+        <div style="font-size:12px;color:rgba(255,255,255,.35);margin:2px 0 8px">
+          Chaque caisse reçoit un identifiant unique (ex. CAISSE-2026-000001) et un QR — jamais plus, jamais moins que le nombre de caisses saisi ci-dessus.
+        </div>
+        <div style="font-size:12.5px;color:#f7a93b;background:rgba(247,169,59,.08);border:1px solid rgba(247,169,59,.2);border-radius:8px;padding:9px 12px;margin-bottom:8px">
+          ⚠ Le stock n'est <strong>pas</strong> ajouté au POS maintenant — les caisses entrent au dépôt. Le stock ne montera que lorsqu'une caisse sera <strong>scannée et livrée</strong> à un département.
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="posCaissesGenererModalClose()">Annuler</button>
+          <button class="pos-btn primary" id="pcx-gen-btn" onclick="posCaissesGenererSauvegarder()">Générer les codes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal — Transférer (dépôt → département) -->
+    <div class="pos-modal-bg" id="pcx-transferer-modal-bg" onclick="if(event.target===this)posCaisseTransfererModalClose()">
+      <div class="pos-modal">
+        <h3>Transférer vers un département</h3>
+        <input type="hidden" id="pcx-transf-id">
+        <div id="pcx-transf-info" style="background:var(--panel3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13.5px;color:var(--muted)"></div>
+        <div class="pos-form-row">
+          <div style="width:100%">
+            <label class="pos-label">Département de destination *</label>
+            <select class="pos-select" id="pcx-transf-departement" style="width:100%">
+              <option value="">— Choisir —</option>
+            </select>
+          </div>
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="posCaisseTransfererModalClose()">Annuler</button>
+          <button class="pos-btn primary" onclick="posCaisseTransfererConfirmer()">Confirmer le transfert</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal — Ajustement (casse / perte / correction) -->
+    <div class="pos-modal-bg" id="pcx-ajuster-modal-bg" onclick="if(event.target===this)posCaisseAjusterModalClose()">
+      <div class="pos-modal">
+        <h3>Ajuster la quantité</h3>
+        <input type="hidden" id="pcx-adj-id">
+        <div id="pcx-adj-info" style="background:var(--panel3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13.5px;color:var(--muted)"></div>
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Type *</label>
+            <select class="pos-select" id="pcx-adj-type" style="width:100%">
+              <option value="CASSE">Casse</option>
+              <option value="PERTE">Perte</option>
+              <option value="CORRECTION">Correction</option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <label class="pos-label">Quantité *</label>
+            <input class="pos-input" id="pcx-adj-qte" type="number" min="1" step="1" placeholder="0">
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div style="width:100%">
+            <label class="pos-label">Motif * <span style="color:rgba(255,255,255,.4)">(obligatoire, min. 5 caractères)</span></label>
+            <input class="pos-input" id="pcx-adj-motif" placeholder="Ex : carton tombé, 3 bouteilles cassées">
+          </div>
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="posCaisseAjusterModalClose()">Annuler</button>
+          <button class="pos-btn primary" onclick="posCaisseAjusterConfirmer()">Enregistrer l'ajustement</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal — Détail / historique -->
+    <div class="pos-modal-bg" id="pcx-detail-modal-bg" onclick="if(event.target===this)posCaisseDetailModalClose()">
+      <div class="pos-modal" style="max-width:560px">
+        <h3 id="pcx-detail-titre">Détail de la caisse</h3>
+        <div id="pcx-detail-body"></div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="posCaisseDetailModalClose()">Fermer</button>
+          <button class="pos-btn primary" id="pcx-detail-imprimer-btn" onclick="posCaissesImprimerEtiquettes([_pcxDetailId])">Imprimer l'étiquette</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — SCAN DE LIVRAISON (dépôt → département)      -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-scan-livraison" class="page page-gi">
+      <div class="gi-page" style="--gi-accent:#38bdf8;--gi-bg:rgba(56,189,248,.11);--gi-bd:rgba(56,189,248,.22);--gi-glow:rgba(56,189,248,.15)">
+
+        <div class="gi-page-header">
+          <div class="gi-page-header-left">
+            <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(56,189,248,.25),rgba(56,189,248,.1));border-color:rgba(56,189,248,.3);box-shadow:0 0 18px rgba(56,189,248,.2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+            </div>
+            <div class="gi-page-header-text">
+              <div class="gi-title">Scan de livraison</div>
+              <div class="gi-subtitle">Dépôt → département — scanner, choisir, confirmer</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bloc « non autorisé » — remplace tout le reste quand l'utilisateur -->
+        <!-- n'a pas les droits d'écriture sur les caisses.                    -->
+        <div id="psl-unauthorized" style="display:none;text-align:center;padding:60px 20px">
+          <div style="font-size:44px;margin-bottom:14px">⛔</div>
+          <div style="font-size:19px;font-weight:700;color:#f87171;margin-bottom:8px">Accès non autorisé</div>
+          <div style="font-size:14.5px;color:rgba(255,255,255,.5);max-width:420px;margin:0 auto">
+            Ou pa otorize pou fè aksyon sa a. Tanpri kite entèfas sa a.<br>
+            <span style="color:rgba(255,255,255,.35);font-size:13px">Vous n'êtes pas autorisé à effectuer cette action. Veuillez quitter cette interface.</span>
+          </div>
+        </div>
+
+        <div id="psl-body">
+          <!-- Champ de scan — toujours visible et focus, reçoit le scanner USB/BT -->
+          <div class="cat-panel">
+            <div class="cat-panel-title">Scanner une caisse</div>
+            <input id="psl-scan-input" class="pos-input" placeholder="Scanner le QR / code-barres de la caisse…"
+              style="width:100%;font-family:monospace;font-size:18px;padding:14px;text-align:center;letter-spacing:.5px"
+              autocomplete="off"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();pslLookup();}">
+          </div>
+
+          <!-- État : rien encore scanné -->
+          <div id="psl-etat-vide" style="text-align:center;padding:50px 20px;color:rgba(255,255,255,.3)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:56px;height:56px;margin-bottom:14px;opacity:.5"><rect x="3" y="9" width="7" height="7"/><rect x="14" y="9" width="7" height="7"/><rect x="3" y="3" width="4" height="4"/><rect x="17" y="3" width="4" height="4"/><rect x="3" y="17" width="4" height="4"/><rect x="17" y="17" width="4" height="4"/></svg>
+            <div style="font-size:14.5px">En attente d'un scan…</div>
+          </div>
+
+          <!-- État : erreur (code introuvable / caisse non transférable) -->
+          <div id="psl-etat-erreur" style="display:none;text-align:center;padding:40px 20px">
+            <div style="font-size:36px;margin-bottom:10px">✕</div>
+            <div id="psl-erreur-msg" style="font-size:15.5px;color:#f87171;font-weight:600;max-width:420px;margin:0 auto"></div>
+          </div>
+
+          <!-- État : caisse trouvée, prête à livrer -->
+          <div id="psl-etat-caisse" style="display:none;max-width:460px;margin:0 auto">
+            <div style="background:var(--panel3);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:16px">
+              <div id="psl-caisse-produit" style="font-size:17px;font-weight:700;margin-bottom:3px"></div>
+              <div id="psl-caisse-code" style="font-family:monospace;font-size:13px;color:rgba(255,255,255,.5);margin-bottom:8px"></div>
+              <div id="psl-caisse-qte" style="font-size:14px;color:#38bdf8;font-weight:600"></div>
+            </div>
+            <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:8px;font-weight:600">Livrer vers :</div>
+            <div id="psl-departements" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px"></div>
+            <button class="pos-btn primary" id="psl-livrer-btn" style="width:100%;padding:14px;font-size:15px" onclick="pslConfirmerLivraison()" disabled>Sélectionnez un département</button>
+          </div>
+
+          <!-- État : succès -->
+          <div id="psl-etat-succes" style="display:none;text-align:center;padding:40px 20px">
+            <div style="font-size:44px;margin-bottom:10px;color:#3fb6a8">✓</div>
+            <div id="psl-succes-msg" style="font-size:16.5px;color:#3fb6a8;font-weight:700"></div>
+            <div style="font-size:12.5px;color:rgba(255,255,255,.35);margin-top:10px">Prêt pour le prochain scan…</div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-scan-livraison -->
 
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- PAGE POS — STOCK BAR                                    -->
@@ -7252,6 +7626,11 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <option value="">Choisir un bar…</option>
               <option value="DEVANT">Bar Devant (Accueil)</option>
               <option value="PISCINE">Bar Piscine</option>
+            </select>
+          </div>
+          <div><label class="pos-label">Département <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
+            <select class="pos-select" id="pos-ajust-departement">
+              <option value="">— Non affecté (stock partagé) —</option>
             </select>
           </div>
         </div>
@@ -14020,6 +14399,8 @@ const PAGE_META={
   caisse:              {title: 'Rapport de Caisse',              sub: 'Synthèse financière consolidée — Ventes · Achats · Payroll · Dépenses'},
   'pos-caisse':        {title: 'Caisse POS',                    sub: 'Bar / Restaurant — Encaissement en temps réel'},
   'pos-produits':      {title: 'Produits Bar',                  sub: 'Catalogue et historique des prix'},
+  'pos-caisses':       {title: 'Gestion des caisses',           sub: 'Traçabilité individuelle par QR code — dépôt, transferts, ventes'},
+  'pos-scan-livraison':{title: 'Scan de livraison',             sub: 'Dépôt → département — scanner, choisir, confirmer'},
   'pos-stock':         {title: 'Stock Bar',                     sub: 'Mouvements et niveaux de stock'},
   'pos-ventes':        {title: 'Ventes Bar',                    sub: 'Suivi des ventes et encaissements'},
   'pos-fournisseurs':  {title: 'Entrepôts & Fournisseurs',      sub: 'Emplacements de stock et fournisseurs (module Commerce)'},
@@ -16914,8 +17295,10 @@ const _MODULE_PAGES = {
               'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis'],
   // Commerce & Distribution — indépendant de MODULE_BAR (voir MODULE_COMMERCE
   // dans main.py) : une institution carburant-only peut avoir Bar désactivé
-  // tout en utilisant Commerce (ex. Vertières).
-  commerce:  ['pos-fournisseurs'],
+  // tout en utilisant Commerce (ex. Vertières). Inclut la gestion des
+  // caisses/QR et le scan de livraison, récupérés de feature/gestion-
+  // caisses-qr (même raison : dépôt/transfert n'a pas besoin de Bar actif).
+  commerce:  ['pos-fournisseurs', 'pos-caisses', 'pos-scan-livraison'],
   hotel:     ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma',
               'hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   zelle:     ['zelle','zelle-paiements','zelle-fonds'],
@@ -16943,8 +17326,8 @@ const _AREA_PAGES = {
     lecture: ['dashboard','journal','statistiques','gi-dashboard'],
   },
   bar: {
-    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds','pos-fournisseurs'],
-    lecture: ['pos-ventes','pos-credits','pos-commandes','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
+    complet: ['pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds','pos-fournisseurs'],
+    lecture: ['pos-ventes','pos-credits','pos-commandes','pos-caisses','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
   },
   cuisine: {
     complet: ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse'],
@@ -16973,7 +17356,7 @@ const _CAISSIER_ALLOWED = new Set([
 
 // Whitelist stricte pour les comptes Manager — Bar/Restaurant + Hôtel (sans Tables, Grande Caisse, Chambres, Réception) + Cuisine complète + Pâtisserie complète.
 const _MANAGER_ALLOWED = new Set([
-  'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
+  'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
   'pos-fournisseurs',
   'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
@@ -16987,7 +17370,7 @@ const _MANAGER_ALLOWED = new Set([
 const _AD_ALLOWED = new Set([
   'home',
   'dashboard','journal','carburant-rapport','statistiques','gi-dashboard','depenses','achats','caisse',
-  'pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes',
+  'pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes',
   'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
   'cuisine-plats','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
@@ -16999,11 +17382,11 @@ const _AD_ALLOWED = new Set([
 const _ACCES_POSTE_LEGACY = {
   'Directeur Général': null,
   'Comptable':   ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Pompiste':            ['home','saisie'],
@@ -17965,7 +18348,10 @@ document.addEventListener('DOMContentLoaded',async()=>{
   const _rlNom     = (_appUser?.role_nom||_appUser?.poste||'').toLowerCase();
   let _savedPage   = null;
   try{ _savedPage = sessionStorage.getItem('konekta_current_page'); }catch(e){}
-  if(!_isFreshLogin && _savedPage && _canAccess(_savedPage)){
+  if(_pslAutoScanFromUrl()){
+    // Scan de caisse pris en charge — court-circuite la restauration/
+    // l'atterrissage normal de page.
+  } else if(!_isFreshLogin && _savedPage && _canAccess(_savedPage)){
     goTo(_savedPage);
   } else if(_rlNom === 'manager'){
     goTo('notifications');
@@ -17977,6 +18363,34 @@ document.addEventListener('DOMContentLoaded',async()=>{
     goTo(_defaultLandingPage());
   }
 });
+
+// Arrivée directe depuis un QR de caisse scanné (voir bar_caisses_routes.py
+// _qr_png_bytes : le QR encode {origine}/?scan=CODE, pas juste le code brut,
+// pour qu'un scan à la caméra du téléphone ouvre directement Konekta).
+// Doit être appelé après loadCurrentUser() (a besoin de _appUser/_modules
+// pour _canAccess). Retourne true si un scan a été pris en charge — dans ce
+// cas la logique normale de restauration/atterrissage de page est court-circuitée.
+function _pslAutoScanFromUrl(){
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('scan');
+  if(!code) return false;
+  // Nettoie l'URL tout de suite pour qu'un simple rafraîchissement ensuite
+  // ne redéclenche pas le même scan en boucle.
+  params.delete('scan');
+  const qs = params.toString();
+  history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+  if(_canAccess('pos-scan-livraison')){
+    goTo('pos-scan-livraison');
+    setTimeout(()=>{
+      const input = document.getElementById('psl-scan-input');
+      if(input){ input.value = code; pslLookup(); }
+    }, 200);
+  } else {
+    toast('Accès non autorisé pour votre poste.','err');
+    goTo(_defaultLandingPage());
+  }
+  return true;
+}
 
 // Page d'atterrissage par défaut pour un compte sans restriction de rôle —
 // « Accueil » (home) est le tableau de bord du carburant : sans ce module
@@ -22266,6 +22680,8 @@ const _giPageLoaders = {
   'pos-dashboard-bar': loadPosDashboardBar,
   'pos-caisse':      loadPosCaisse,
   'pos-produits':    loadPosProduits,
+  'pos-caisses':     loadPosCaisses,
+  'pos-scan-livraison': loadPosScanLivraison,
   'pos-stock':       loadPosStock,
   'pos-achats':      loadPosAchats,
   'pos-ventes':      loadPosVentes,
@@ -23997,16 +24413,16 @@ let _posCart = [];
 let _posMode = 'CASH';
 let _posProduits = [];       // cache des produits bar avec prix actif
 let _posCuisinePlats = [];   // cache des plats cuisine pour vente via bar
-let _posSessionLieu = null;  // lieu (DEVANT/PISCINE) de la session de caisse en cours — filtre le catalogue vendu
-
-/* Charger les produits bar dans le cache — filtré sur le lieu de la
-   session en cours, quand il est connu (voir _posDashLoadData) : un
-   caissier au Bar Piscine ne doit pas voir le catalogue du Bar Devant. */
-async function _posLoadProduitsCache(lieu){
+/* Charger les produits bar dans le cache — le stock affiché/vendable est
+   scopé au département du bar en cours (_posCaisseLieu, connu via le
+   dashboard de session — voir _posDashLoadData) dès qu'une session avec un
+   lieu est active, pour que Bar Devant et Bar Piscine ne voient jamais le
+   stock combiné des deux. Sans lieu connu (pas de session, admin hors
+   caisse…), comportement historique : stock global. */
+async function _posLoadProduitsCache(){
   try {
-    let url = '/pos/produits?actif=true';
-    if(lieu) url += `&lieu=${lieu}`;
-    const data = await apiFetch('GET', url);
+    const q = _posCaisseLieu ? `&lieu=${encodeURIComponent(_posCaisseLieu)}` : '';
+    const data = await apiFetch('GET', `/pos/produits?actif=true${q}`);
     _posProduits = data || [];
   } catch(e){ _posProduits = []; }
 }
@@ -24024,6 +24440,484 @@ function posDateFr(s){
   if(!s) return '—';
   const d = new Date(s);
   return d.toLocaleDateString('fr-HT')+' '+d.toLocaleTimeString('fr-HT',{hour:'2-digit',minute:'2-digit'});
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE POS — GESTION DES CAISSES (QR) — traçabilité individuelle
+// ══════════════════════════════════════════════════════════════════════
+let _pcxAll = [];
+let _pcxDepartements = [];
+let _pcxProduitsVpc = [];   // produits vendus par caisse (pour le formulaire de génération)
+let _pcxDetailId = null;
+
+async function loadPosCaisses(){
+  const tbody = document.getElementById('pcx-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  try{
+    const [stats, deps, caisses] = await Promise.all([
+      apiFetch('GET','/pos/caisses/stats'),
+      apiFetch('GET','/pos/departements'),
+      apiFetch('GET','/pos/caisses'),
+    ]);
+    document.getElementById('pcx-kpi-depot').textContent    = stats.au_depot;
+    document.getElementById('pcx-kpi-transf').textContent   = stats.transferees;
+    document.getElementById('pcx-kpi-vente').textContent    = stats.en_vente;
+    document.getElementById('pcx-kpi-termine').textContent  = stats.terminees;
+    document.getElementById('pcx-kpi-total').textContent    = stats.total;
+    _pcxDepartements = deps || [];
+    const depSel = document.getElementById('pcx-filter-departement');
+    if(depSel){
+      depSel.innerHTML = '<option value="">Tous départements</option>'
+        + _pcxDepartements.map(d=>`<option value="${d.id}">${d.nom}</option>`).join('');
+    }
+    _pcxAll = caisses || [];
+    _pcxRenderTbody(_pcxAll);
+  }catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+  }
+  _pcxLoadStockDept();
+}
+
+async function _pcxLoadStockDept(){
+  const el = document.getElementById('pcx-stock-dept');
+  if(!el) return;
+  try{
+    const rows = await apiFetch('GET', '/pos/caisses/stock-departements');
+    if(!rows || !rows.length){
+      el.innerHTML = '<div class="gi-empty">Aucun produit géré par caisses pour le moment.</div>';
+      return;
+    }
+    // Colonnes = union des départements présents sur au moins un produit.
+    const depsVus = new Map();
+    rows.forEach(r => r.par_departement.forEach(d => depsVus.set(d.departement_id, d.departement_nom)));
+    const depCols = Array.from(depsVus.entries()).sort((a,b)=>a[1].localeCompare(b[1]));
+    let html = '<table class="gi-table"><thead><tr><th>Produit</th>'
+      + depCols.map(([,nom])=>`<th style="text-align:right">${nom}</th>`).join('')
+      + '<th style="text-align:right">Non affecté</th><th style="text-align:right">Total</th></tr></thead><tbody>';
+    rows.forEach(r => {
+      const parDep = {};
+      r.par_departement.forEach(d => { parDep[d.departement_id] = d.stock; });
+      html += `<tr><td>${r.produit_nom}</td>`
+        + depCols.map(([id])=>`<td style="text-align:right">${(parDep[id]!=null ? parDep[id] : 0)}</td>`).join('')
+        + `<td style="text-align:right;color:${r.non_affecte>0?'#f7a93b':'rgba(255,255,255,.3)'}">${r.non_affecte}</td>`
+        + `<td style="text-align:right;font-weight:700">${r.total}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    if(rows.some(r => r.non_affecte > 0)){
+      html += '<div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:8px">« Non affecté » = stock crédité hors transfert de caisse (approvisionnement classique) — pas encore rattaché à un département précis.</div>';
+    }
+    el.innerHTML = html;
+  }catch(e){
+    el.innerHTML = `<span style="color:#f87171;font-size:13px">${e.message||'Erreur réseau'}</span>`;
+  }
+}
+
+function _pcxBadge(statut){
+  const map = {
+    AU_DEPOT:   ['','Au dépôt'],
+    TRANSFEREE: ['amber','Transférée'],
+    EN_VENTE:   ['amber','En vente'],
+    TERMINEE:   ['teal','Terminée'],
+    ANNULEE:    ['danger','Annulée'],
+  };
+  const [cls,label] = map[statut] || ['', statut];
+  return `<span class="pos-badge ${cls}" style="font-size:11px">${label}</span>`;
+}
+
+function posCaissesFiltrer(){
+  const statut = document.getElementById('pcx-filter-statut').value;
+  const depId  = document.getElementById('pcx-filter-departement').value;
+  const q      = (document.getElementById('pcx-search').value||'').trim().toLowerCase();
+  let list = _pcxAll;
+  if(statut) list = list.filter(c=>c.statut===statut);
+  if(depId)  list = list.filter(c=>String(c.departement_id)===String(depId));
+  if(q) list = list.filter(c=>
+    (c.code_unique||'').toLowerCase().includes(q) ||
+    (c.produit_nom||'').toLowerCase().includes(q));
+  _pcxRenderTbody(list);
+}
+
+function _pcxRenderTbody(list){
+  const tbody = document.getElementById('pcx-tbody');
+  if(!tbody) return;
+  if(!list.length){
+    tbody.innerHTML = '<tr><td colspan="7"><div class="gi-empty">Aucune caisse trouvée</div></td></tr>';
+    return;
+  }
+  const ro = _isReadOnly();
+  const peutLivrer = _pslAutorise();
+  tbody.innerHTML = list.map(c=>{
+    const actions = [];
+    actions.push(`<button class="pos-btn ghost" style="padding:4px 9px;font-size:12px" onclick="posCaisseDetailModal(${c.id})">Voir</button>`);
+    if(c.statut==='AU_DEPOT'){
+      // Livrer (transférer) est réservé à l'administrateur / au responsable
+      // de dépôt — le backend revérifie de toute façon (_require_admin_ou_depot).
+      if(peutLivrer){
+        actions.push(`<button class="pos-btn primary" style="padding:4px 9px;font-size:12px" onclick="posCaisseTransfererModal(${c.id})">Transférer</button>`);
+      }
+      if(!ro){
+        actions.push(`<button class="pos-btn ghost" style="padding:4px 9px;font-size:12px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="posCaisseAnnuler(${c.id})">Annuler</button>`);
+      }
+    }
+    if(!ro && (c.statut==='TRANSFEREE' || c.statut==='EN_VENTE')){
+      actions.push(`<button class="pos-btn ghost" style="padding:4px 9px;font-size:12px" onclick="posCaisseAjusterModal(${c.id})">Ajuster</button>`);
+    }
+    return `<tr>
+      <td style="font-family:monospace;font-size:12.5px">${c.code_unique}</td>
+      <td>${c.produit_nom||'—'}</td>
+      <td>${_pcxBadge(c.statut)}</td>
+      <td>${c.departement_nom||'<span class="td-muted">—</span>'}</td>
+      <td>${c.quantite_restante} / ${c.quantite_initiale}</td>
+      <td style="font-size:12.5px;color:rgba(255,255,255,.5)">${posDateFr(c.created_at)}</td>
+      <td><div style="display:flex;gap:5px;flex-wrap:wrap">${actions.join('')}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Scan / recherche par code ────────────────────────────────────────
+async function posCaisseScanLookup(){
+  const input = document.getElementById('pcx-scan-input');
+  const code = (input.value||'').trim();
+  if(!code) return;
+  try{
+    const c = await apiFetch('GET', `/pos/caisses/code/${encodeURIComponent(code)}`);
+    input.value = '';
+    if(c.statut === 'AU_DEPOT' && _pslAutorise()){
+      posCaisseTransfererModal(c.id, c);
+    } else {
+      posCaisseDetailModal(c.id, c);
+    }
+  }catch(e){
+    posAlert(e.message||'Caisse introuvable pour ce code.','err');
+  }
+}
+
+// ── Générer des caisses ──────────────────────────────────────────────
+async function posCaissesGenererModal(){
+  if(_isReadOnly()){ posAlert('Accès lecture seule.','err'); return; }
+  try{
+    const produits = await apiFetch('GET','/pos/produits');
+    _pcxProduitsVpc = (produits||[]).filter(p=>p.vendu_par_caisse && p.actif);
+  }catch(e){ _pcxProduitsVpc = []; }
+  const sel = document.getElementById('pcx-gen-produit');
+  sel.innerHTML = '<option value="">— Choisir un produit vendu par caisse —</option>'
+    + _pcxProduitsVpc.map(p=>`<option value="${p.id}" data-upc="${p.unites_par_caisse||0}">${p.nom}</option>`).join('');
+  if(!_pcxProduitsVpc.length){
+    document.getElementById('pcx-gen-produit-hint').textContent =
+      'Aucun produit configuré « vendu par caisse ». Activez cette option depuis Produits Bar d\'abord.';
+  } else {
+    document.getElementById('pcx-gen-produit-hint').textContent = '';
+  }
+  document.getElementById('pcx-gen-nb').value = '';
+  document.getElementById('pcx-gen-prix').value = '';
+  document.getElementById('pcx-gen-fournisseur').value = '';
+  document.getElementById('pcx-gen-notes').value = '';
+  document.getElementById('pcx-gen-live').style.display = 'none';
+  document.getElementById('pcx-generer-modal-bg').classList.add('open');
+}
+function posCaissesGenererModalClose(){
+  document.getElementById('pcx-generer-modal-bg').classList.remove('open');
+}
+function posCaissesGenUpdateInfo(){
+  const sel = document.getElementById('pcx-gen-produit');
+  const opt = sel.options[sel.selectedIndex];
+  const upc = opt ? parseInt(opt.getAttribute('data-upc')||'0',10) : 0;
+  const nb  = parseInt(document.getElementById('pcx-gen-nb').value||'0',10);
+  const live = document.getElementById('pcx-gen-live');
+  if(upc>0 && nb>0){
+    live.style.display = '';
+    live.textContent = `${nb} caisse${nb!==1?'s':''} × ${upc} unités = ${nb*upc} unités au total — ${nb} code${nb!==1?'s':''} unique${nb!==1?'s':''} généré${nb!==1?'s':''}.`;
+  } else {
+    live.style.display = 'none';
+  }
+}
+async function posCaissesGenererSauvegarder(){
+  const produitId = parseInt(document.getElementById('pcx-gen-produit').value||'0',10);
+  const nb        = parseInt(document.getElementById('pcx-gen-nb').value||'0',10);
+  const prix      = parseFloat(document.getElementById('pcx-gen-prix').value)||null;
+  const fournisseur = document.getElementById('pcx-gen-fournisseur').value.trim()||null;
+  const notes     = document.getElementById('pcx-gen-notes').value.trim()||null;
+  if(!produitId){ posAlert('Choisissez un produit.','err'); return; }
+  if(!nb || nb<1){ posAlert('Indiquez le nombre de caisses achetées.','err'); return; }
+  const btn = document.getElementById('pcx-gen-btn');
+  btn.disabled = true;
+  try{
+    const res = await apiFetch('POST','/pos/caisses/generer', {
+      produit_id: produitId, nb_caisses: nb,
+      prix_achat_caisse: prix, fournisseur, notes,
+    });
+    posCaissesGenererModalClose();
+    posAlert(`${res.nb_caisses_generees} caisse(s) générée(s) — ${res.total_unites} unités au total (au dépôt, stock POS pas encore crédité).`,'ok');
+    const ids = res.caisses.map(c=>c.id);
+    await loadPosCaisses();
+    if(await showConfirm(`Imprimer les ${ids.length} étiquette(s) QR maintenant ?`, {title:'Impression', okLabel:'Imprimer'})){
+      posCaissesImprimerEtiquettes(ids);
+    }
+  }catch(e){
+    posAlert(e.message||'Erreur lors de la génération.','err');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+// ── Transfert (dépôt → département) ──────────────────────────────────
+function posCaisseTransfererModal(id, cached){
+  if(!_pslAutorise()){ posAlert('Réservé à l\'administrateur ou au responsable de dépôt.','err'); return; }
+  const c = cached || _pcxAll.find(x=>x.id===id);
+  document.getElementById('pcx-transf-id').value = id;
+  document.getElementById('pcx-transf-info').textContent = c
+    ? `${c.code_unique} — ${c.produit_nom} — ${c.quantite_restante} unité(s)`
+    : `Caisse #${id}`;
+  const sel = document.getElementById('pcx-transf-departement');
+  sel.innerHTML = '<option value="">— Choisir —</option>'
+    + _pcxDepartements.map(d=>`<option value="${d.id}">${d.nom}</option>`).join('');
+  document.getElementById('pcx-transferer-modal-bg').classList.add('open');
+}
+function posCaisseTransfererModalClose(){
+  document.getElementById('pcx-transferer-modal-bg').classList.remove('open');
+}
+async function posCaisseTransfererConfirmer(){
+  const id = parseInt(document.getElementById('pcx-transf-id').value||'0',10);
+  const depId = parseInt(document.getElementById('pcx-transf-departement').value||'0',10);
+  if(!depId){ posAlert('Choisissez un département de destination.','err'); return; }
+  try{
+    await apiFetch('POST', `/pos/caisses/${id}/transferer`, {departement_id: depId});
+    posCaisseTransfererModalClose();
+    posAlert('Caisse transférée.','ok');
+    loadPosCaisses();
+  }catch(e){ posAlert(e.message||'Erreur lors du transfert.','err'); }
+}
+
+// ── Ajustement (casse / perte / correction) ──────────────────────────
+function posCaisseAjusterModal(id){
+  if(_isReadOnly()){ posAlert('Accès lecture seule.','err'); return; }
+  const c = _pcxAll.find(x=>x.id===id);
+  document.getElementById('pcx-adj-id').value = id;
+  document.getElementById('pcx-adj-info').textContent = c
+    ? `${c.code_unique} — ${c.produit_nom} — restant : ${c.quantite_restante} unité(s)`
+    : `Caisse #${id}`;
+  document.getElementById('pcx-adj-type').value = 'CASSE';
+  document.getElementById('pcx-adj-qte').value = '';
+  document.getElementById('pcx-adj-motif').value = '';
+  document.getElementById('pcx-ajuster-modal-bg').classList.add('open');
+}
+function posCaisseAjusterModalClose(){
+  document.getElementById('pcx-ajuster-modal-bg').classList.remove('open');
+}
+async function posCaisseAjusterConfirmer(){
+  const id     = parseInt(document.getElementById('pcx-adj-id').value||'0',10);
+  const type_mouvement = document.getElementById('pcx-adj-type').value;
+  const quantite = parseInt(document.getElementById('pcx-adj-qte').value||'0',10);
+  const motif  = document.getElementById('pcx-adj-motif').value.trim();
+  if(!quantite || quantite<1){ posAlert('Indiquez une quantité.','err'); return; }
+  if(!motif || motif.length<5){ posAlert('Le motif doit contenir au moins 5 caractères.','err'); return; }
+  try{
+    await apiFetch('POST', `/pos/caisses/${id}/ajuster`, {type_mouvement, quantite, motif});
+    posCaisseAjusterModalClose();
+    posAlert('Ajustement enregistré.','ok');
+    loadPosCaisses();
+  }catch(e){ posAlert(e.message||'Erreur lors de l\'ajustement.','err'); }
+}
+
+async function posCaisseAnnuler(id){
+  if(_isReadOnly()) return;
+  if(!await showConfirm('Annuler cette caisse (encore au dépôt) ?', {title:'Annuler la caisse', type:'danger', okLabel:'Annuler la caisse'})) return;
+  try{
+    await apiFetch('POST', `/pos/caisses/${id}/annuler`);
+    posAlert('Caisse annulée.','ok');
+    loadPosCaisses();
+  }catch(e){ posAlert(e.message||'Erreur.','err'); }
+}
+
+// ── Détail / historique ───────────────────────────────────────────────
+async function posCaisseDetailModal(id, cached){
+  _pcxDetailId = id;
+  document.getElementById('pcx-detail-titre').textContent = 'Détail de la caisse';
+  document.getElementById('pcx-detail-body').innerHTML = '<div style="text-align:center;padding:16px;color:rgba(255,255,255,.3)">Chargement…</div>';
+  document.getElementById('pcx-detail-modal-bg').classList.add('open');
+  try{
+    const c = await apiFetch('GET', `/pos/caisses/${id}`);
+    document.getElementById('pcx-detail-titre').textContent = c.code_unique;
+    const hist = (c.historique||[]).map(h=>`
+      <div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">
+        <div>
+          <strong>${h.type_mouvement}</strong>
+          ${h.motif ? `<div style="color:rgba(255,255,255,.45);font-size:12px">${h.motif}</div>` : ''}
+          ${h.utilisateur_nom ? `<div style="color:rgba(255,255,255,.3);font-size:11.5px">${h.utilisateur_nom}</div>` : ''}
+        </div>
+        <div style="text-align:right;white-space:nowrap">
+          <div style="${h.quantite<0?'color:#f87171':'color:#3fb6a8'}">${h.quantite>0?'+':''}${h.quantite}</div>
+          <div style="color:rgba(255,255,255,.3);font-size:11.5px">${posDateFr(h.created_at)}</div>
+        </div>
+      </div>`).join('') || '<div style="color:rgba(255,255,255,.3);padding:10px 0">Aucun mouvement.</div>';
+    document.getElementById('pcx-detail-body').innerHTML = `
+      <div class="pos-form-row" style="margin-bottom:10px">
+        <div style="flex:1"><div class="pos-label">Produit</div><div>${c.produit_nom||'—'}</div></div>
+        <div style="flex:1"><div class="pos-label">Statut</div><div>${_pcxBadge(c.statut)}</div></div>
+      </div>
+      <div class="pos-form-row" style="margin-bottom:10px">
+        <div style="flex:1"><div class="pos-label">Unités / caisse</div><div>${c.unites_par_caisse}</div></div>
+        <div style="flex:1"><div class="pos-label">Restant / Initial</div><div>${c.quantite_restante} / ${c.quantite_initiale}</div></div>
+      </div>
+      <div class="pos-form-row" style="margin-bottom:14px">
+        <div style="flex:1"><div class="pos-label">Département</div><div>${c.departement_nom||'—'}</div></div>
+        <div style="flex:1"><div class="pos-label">Créée le</div><div>${posDateFr(c.created_at)}</div></div>
+      </div>
+      <hr style="border-color:rgba(255,255,255,.08);margin-bottom:10px">
+      <div class="pos-label" style="margin-bottom:6px">Historique</div>
+      ${hist}
+    `;
+  }catch(e){
+    document.getElementById('pcx-detail-body').innerHTML = `<div style="color:#f87171;padding:14px">${e.message||'Erreur de chargement.'}</div>`;
+  }
+}
+function posCaisseDetailModalClose(){
+  document.getElementById('pcx-detail-modal-bg').classList.remove('open');
+  _pcxDetailId = null;
+}
+
+// ── Impression des étiquettes QR ──────────────────────────────────────
+function posCaissesImprimerEtiquettes(ids){
+  if(!ids || !ids.length) return;
+  window.open('/api/pos/caisses/etiquettes.pdf?ids='+ids.join(','), '_blank');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PAGE POS — SCAN DE LIVRAISON (dépôt → département), interface kiosque
+// ══════════════════════════════════════════════════════════════════════
+// Flux voulu : le responsable de dépôt scanne (douchette USB/BT en mode
+// clavier — tape le code + Entrée). Le scan mène DIRECTEMENT à un choix
+// de département puis une confirmation — rien d'autre n'est accessible
+// depuis cette page. Seuls l'administrateur et le responsable de dépôt
+// peuvent livrer (voir _require_admin_ou_depot côté backend, qui revérifie
+// toujours — ce contrôle frontend n'est qu'un confort d'affichage).
+let _pslCaisseCourante = null;
+let _pslDepartements = [];
+
+function _pslAutorise(){
+  if(!_appUser) return false;
+  if(_appUser.est_admin) return true;
+  const poste = (_appUser.poste||'').trim().toLowerCase();
+  if(poste === 'magasinier' || poste === 'responsable logistique') return true;
+  const roleNom = (_appUser.role_nom||'').trim().toLowerCase();
+  return roleNom.includes('dépôt') || roleNom.includes('depot') || roleNom.includes('dépot');
+}
+
+function loadPosScanLivraison(){
+  const unauth = document.getElementById('psl-unauthorized');
+  const body   = document.getElementById('psl-body');
+  if(!_pslAutorise()){
+    unauth.style.display = '';
+    body.style.display = 'none';
+    return;
+  }
+  unauth.style.display = 'none';
+  body.style.display = '';
+  pslResetEtat();
+  apiFetch('GET','/pos/departements').then(deps=>{ _pslDepartements = deps||[]; }).catch(()=>{ _pslDepartements = []; });
+  pslFocus();
+}
+
+function pslFocus(){
+  const input = document.getElementById('psl-scan-input');
+  if(input) setTimeout(()=>input.focus(), 30);
+}
+
+function pslResetEtat(){
+  document.getElementById('psl-etat-vide').style.display    = '';
+  document.getElementById('psl-etat-erreur').style.display  = 'none';
+  document.getElementById('psl-etat-caisse').style.display  = 'none';
+  document.getElementById('psl-etat-succes').style.display  = 'none';
+  _pslCaisseCourante = null;
+  const input = document.getElementById('psl-scan-input');
+  if(input) input.value = '';
+}
+
+function pslMontrerErreur(msg){
+  document.getElementById('psl-etat-vide').style.display    = 'none';
+  document.getElementById('psl-etat-caisse').style.display  = 'none';
+  document.getElementById('psl-etat-succes').style.display  = 'none';
+  document.getElementById('psl-etat-erreur').style.display  = '';
+  document.getElementById('psl-erreur-msg').textContent = msg;
+  const input = document.getElementById('psl-scan-input');
+  if(input) input.value = '';
+  pslFocus();
+  // Retour automatique à l'attente après quelques secondes
+  setTimeout(()=>{ if(document.getElementById('psl-etat-erreur').style.display!=='none') pslResetEtat(); }, 3500);
+}
+
+async function pslLookup(){
+  const input = document.getElementById('psl-scan-input');
+  const code = (input.value||'').trim();
+  if(!code) return;
+  if(!_pslAutorise()){ loadPosScanLivraison(); return; }
+  // Filet de sécurité : si les départements n'ont pas encore fini de charger
+  // (ex. scan automatique juste après un changement de page), on les charge
+  // ici plutôt que d'afficher une liste vide.
+  if(!_pslDepartements.length){
+    try{ _pslDepartements = await apiFetch('GET','/pos/departements'); }catch(e){ _pslDepartements = []; }
+  }
+  try{
+    const c = await apiFetch('GET', `/pos/caisses/code/${encodeURIComponent(code)}`);
+    if(c.statut !== 'AU_DEPOT'){
+      const labels = {TRANSFEREE:'déjà transférée', EN_VENTE:'déjà en vente', TERMINEE:'déjà terminée', ANNULEE:'annulée'};
+      pslMontrerErreur(`${c.code_unique} — ${labels[c.statut]||c.statut}. Cette caisse ne peut pas être livrée.`);
+      return;
+    }
+    _pslCaisseCourante = c;
+    document.getElementById('psl-etat-vide').style.display    = 'none';
+    document.getElementById('psl-etat-erreur').style.display  = 'none';
+    document.getElementById('psl-etat-succes').style.display  = 'none';
+    document.getElementById('psl-etat-caisse').style.display  = '';
+    document.getElementById('psl-caisse-produit').textContent = c.produit_nom||'—';
+    document.getElementById('psl-caisse-code').textContent    = c.code_unique;
+    document.getElementById('psl-caisse-qte').textContent     = `${c.quantite_initiale} unités`;
+    const wrap = document.getElementById('psl-departements');
+    wrap.innerHTML = _pslDepartements.map(d=>
+      `<button type="button" class="pos-btn ghost" style="padding:12px 8px;font-size:14px" data-dep="${d.id}" onclick="pslChoisirDepartement(${d.id})">${d.nom}</button>`
+    ).join('') || '<div style="grid-column:1/-1;color:rgba(255,255,255,.3);font-size:13px;text-align:center">Aucun département disponible.</div>';
+    const btn = document.getElementById('psl-livrer-btn');
+    btn.disabled = true;
+    btn.textContent = 'Sélectionnez un département';
+    input.value = '';
+  }catch(e){
+    pslMontrerErreur(e.message || 'Code introuvable.');
+  }
+}
+
+let _pslDepartementChoisi = null;
+function pslChoisirDepartement(depId){
+  _pslDepartementChoisi = depId;
+  document.querySelectorAll('#psl-departements [data-dep]').forEach(b=>{
+    const actif = String(b.getAttribute('data-dep'))===String(depId);
+    b.style.borderColor = actif ? '#38bdf8' : '';
+    b.style.background  = actif ? 'rgba(56,189,248,.15)' : '';
+    b.style.color        = actif ? '#38bdf8' : '';
+  });
+  const dep = _pslDepartements.find(d=>d.id===depId);
+  const btn = document.getElementById('psl-livrer-btn');
+  btn.disabled = false;
+  btn.textContent = `Livrer vers ${dep ? dep.nom : ''}`;
+}
+
+async function pslConfirmerLivraison(){
+  if(!_pslCaisseCourante || !_pslDepartementChoisi) return;
+  const btn = document.getElementById('psl-livrer-btn');
+  btn.disabled = true;
+  try{
+    await apiFetch('POST', `/pos/caisses/${_pslCaisseCourante.id}/transferer`, {departement_id: _pslDepartementChoisi});
+    const dep = _pslDepartements.find(d=>d.id===_pslDepartementChoisi);
+    document.getElementById('psl-etat-caisse').style.display  = 'none';
+    document.getElementById('psl-etat-succes').style.display  = '';
+    document.getElementById('psl-succes-msg').textContent =
+      `${_pslCaisseCourante.code_unique} livrée vers ${dep ? dep.nom : ''}`;
+    _pslDepartementChoisi = null;
+    pslFocus();
+    setTimeout(()=>{ pslResetEtat(); pslFocus(); }, 2200);
+  }catch(e){
+    btn.disabled = false;
+    pslMontrerErreur(e.message || 'Erreur lors de la livraison.');
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -24646,6 +25540,7 @@ async function _posChargerCaissiers(){
 // ── Mini-dashboard caissière ──────────────────────────────────────
 let _posDashCaissierInterval = null;
 let _posDashSessionId = null;
+let _posCaisseLieu = null;   // lieu (DEVANT/PISCINE) de la session en cours — voir _posDashLoadData
 
 function posCaissierChange(caissier_id){
   const dash = document.getElementById('pos-dash-caissier');
@@ -24678,10 +25573,12 @@ function _posSetGate(hasCaissier, statut, peutOuvrir, nbSessionsJour, maxSession
 
   if(!hasCaissier){
     gd.style.display = 'none'; gt.style.display = 'none'; vz.style.display = '';
+    _posFocusScan();
     return;
   }
   if(statut === 'EN_COURS'){
     gd.style.display = 'none'; gt.style.display = 'none'; vz.style.display = '';
+    _posFocusScan();
     return;
   }
   const dejaSoumise = (statut === 'SOUMIS' || statut === 'VALIDE');
@@ -24728,7 +25625,7 @@ async function posConfirmerDemarrage(){
     const s = await apiFetch('POST', '/pos/caisse/sessions/ouvrir', {caissier_id: parseInt(cid), lieu});
     _posDashSessionId = s.id;
     document.getElementById('pos-demarrer-modal-bg')?.classList.remove('open');
-    const lieuLabel = lieu === 'PISCINE' ? 'Bar Piscine' : 'Bar Devant';
+    const lieuLabel = _lieuLabel(lieu) || 'Bar Devant';
     const numTxt = s.numero_session > 1 ? `Session #${s.numero_session} ` : '';
     posAlert(`${numTxt}démarrée — ${lieuLabel}.`, 'ok');
   } catch(e){ posAlert(e.message||t('pos.caisse.err.ouvertureSession'), 'err'); return; }
@@ -24741,21 +25638,22 @@ async function _posDashLoadData(caissier_id){
     const d = await apiFetch('GET', `/pos/caisse/dashboard?caissier_id=${caissier_id}`);
     _posDashSessionId = d.session_id;
 
+    // Le stock affiché à l'écran de vente doit toujours correspondre au
+    // département du bar en cours — dès que le lieu de la session change
+    // (première charge, changement de caissier…), on recharge le cache
+    // produits avec le bon stock et on réaffiche la grille.
+    if(d.lieu !== _posCaisseLieu){
+      _posCaisseLieu = d.lieu || null;
+      await _posLoadProduitsCache();
+      posRenderCatTabs();
+      posCatFilter(_posCatActuelle, null);
+    }
+
     const nomEl = document.getElementById('pos-dash-nom');
     if(nomEl) nomEl.textContent = d.caissier_nom + ' — ' + d.date;
 
     const lieuEl = document.getElementById('pos-dash-lieu');
     if(lieuEl) lieuEl.innerHTML = _lieuBadge(d.lieu);
-
-    // Le catalogue vendu se filtre sur le lieu de la session dès qu'il est
-    // connu (une session pas encore démarrée n'a pas de lieu) — évite de
-    // recharger à chaque rafraîchissement périodique (60s) si inchangé.
-    if(d.lieu && d.lieu !== _posSessionLieu){
-      _posSessionLieu = d.lieu;
-      await _posLoadProduitsCache(_posSessionLieu);
-      posRenderCatTabs();
-      posRenderGrid();
-    }
 
     const statutEl = document.getElementById('pos-dash-statut');
     if(statutEl){
@@ -25035,6 +25933,233 @@ function posAjouterAuPanier(prodId){
   posRenderCart();
 }
 
+/* Focus automatique du champ de scan dès que la zone de vente est visible
+   (session démarrée) — pour qu'une douchette USB/BT puisse scanner sans
+   que la caissière ait besoin de cliquer dans le champ à chaque fois. */
+function _posFocusScan(){
+  setTimeout(()=>{ document.getElementById('pos-scan-inp')?.focus(); }, 50);
+}
+
+/* Scan code-barres produit — ajoute directement au panier (1 unité par
+   scan, comme une caisse physique). Fonctionne avec une douchette
+   USB/BT en mode clavier (tape le code + Entrée) : cherche dans le cache
+   produits déjà chargé (_posProduits, déjà scopé au département de la
+   session en cours — voir _posLoadProduitsCache), donc pas d'aller-retour
+   réseau par scan. La vente elle-même (et donc la comptabilisation —
+   stock, caisse, rapports) passe par le même circuit qu'un ajout manuel :
+   rien de spécial à faire pour que ça compte, l'encaissement habituel
+   s'en charge. */
+// Affiche le résultat d'un scan juste sous le champ, à la même place à
+// chaque fois (jamais en pile comme les toasts) — pour scanner plusieurs
+// fois de suite (même article ou des articles différents) sans que
+// l'écran se remplisse de notifications empilées.
+let _posScanFeedbackTimer = null;
+function _posScanFeedback(msg, type){
+  const el = document.getElementById('pos-scan-feedback');
+  if(!el) return;
+  clearTimeout(_posScanFeedbackTimer);
+  const styles = {
+    ok:  {bg:'rgba(63,182,168,.15)',  color:'#3fb6a8'},
+    err: {bg:'rgba(248,113,113,.15)', color:'#f87171'},
+  }[type] || {bg:'rgba(255,255,255,.08)', color:'rgba(255,255,255,.7)'};
+  el.style.display = '';
+  el.style.background = styles.bg;
+  el.style.color      = styles.color;
+  el.textContent = msg;
+  // Le message reste affiché — il se remplace tout seul au scan suivant.
+  // On l'efface après un long délai seulement s'il n'y a plus de scan
+  // (évite qu'un vieux message traîne indéfiniment à l'écran).
+  _posScanFeedbackTimer = setTimeout(()=>{ el.style.display = 'none'; }, 6000);
+}
+
+function posScanCodeBarre(){
+  const inp = document.getElementById('pos-scan-inp');
+  const code = (inp.value||'').trim();
+  if(!code) return;
+  inp.value = '';
+  const prod = _posProduits.find(p => p.code_barre && p.code_barre.trim() === code);
+  if(!prod){
+    _posScanFeedback(`✕ Aucun produit trouvé pour le code « ${code} ».`, 'err');
+  } else if(!prod.actif){
+    _posScanFeedback(`✕ « ${prod.nom} » est inactif — vente impossible.`, 'err');
+  } else {
+    posAjouterAuPanier(prod.id);
+    // Quantité désormais dans le panier pour CE produit — permet de
+    // confirmer d'un coup d'œil « 4 » après avoir scanné 4 fois le même
+    // code-barres (ex. 4 Prestige), sans avoir à regarder le panier.
+    const ligne = _posCart.find(c => c.produit_id === prod.id);
+    const qte = ligne ? ligne.quantite : 1;
+    _posScanFeedback(`✓ ${prod.nom} — ${qte} au panier`, 'ok');
+  }
+  inp.focus();
+}
+
+// ── Scan par caméra (téléphone sans douchette USB/BT) ──────────────────
+// Utilise html5-qrcode (vendorisé localement — /vendor/html5-qrcode.min.js —
+// pour respecter la CSP script-src 'self' de l'appli, pas de CDN externe).
+// Même logique métier que posScanCodeBarre() : trouve le produit par
+// code-barres exact dans le cache déjà chargé, l'ajoute au panier, la
+// caméra reste ouverte pour enchaîner plusieurs scans (ex. 4 Prestige).
+let _posCameraScanner = null;
+let _posCameraScanBusy = false;
+
+function _posCameraFeedback(msg, type){
+  const el = document.getElementById('pos-camera-feedback');
+  if(!el) return;
+  el.style.display = '';
+  el.style.background = type==='ok' ? 'rgba(63,182,168,.15)' : 'rgba(248,113,113,.15)';
+  el.style.color      = type==='ok' ? '#3fb6a8' : '#f87171';
+  el.textContent = msg;
+}
+
+function _posChoisirCameraArriere(cameras){
+  if(!cameras || !cameras.length) return null;
+  const arriere = cameras.find(c => /back|rear|environment/i.test(c.label||''));
+  return (arriere || cameras[cameras.length-1]).id;
+}
+
+async function posCameraScanOuvrir(){
+  document.getElementById('pos-camera-modal-bg').classList.add('open');
+  const feedback = document.getElementById('pos-camera-feedback');
+  feedback.style.display = 'none';
+  if(typeof Html5Qrcode === 'undefined'){
+    _posCameraFeedback("La bibliothèque de scan n'a pas pu se charger.", 'err');
+    return;
+  }
+  if(!_posProduits.length){ try{ await _posLoadProduitsCache(); }catch(err){} }
+  try{
+    const cameras = await Html5Qrcode.getCameras();
+    const camId = _posChoisirCameraArriere(cameras);
+    if(!camId){ _posCameraFeedback('Aucune caméra détectée sur cet appareil.', 'err'); return; }
+    _posCameraScanner = new Html5Qrcode('pos-camera-reader');
+    await _posCameraScanner.start(
+      camId,
+      { fps: 10, qrbox: { width: 250, height: 140 } },
+      (decodedText) => _posCameraScanSucces(decodedText),
+      () => { /* échec de décodage sur une frame — normal en continu, on ignore */ },
+    );
+  }catch(err){
+    _posCameraFeedback("Impossible d'accéder à la caméra — vérifiez l'autorisation donnée au navigateur.", 'err');
+  }
+}
+
+async function _posCameraScanSucces(code){
+  if(_posCameraScanBusy) return;   // évite les doublons tant que le même code reste dans le cadre
+  _posCameraScanBusy = true;
+  code = (code||'').trim();
+  const prod = _posProduits.find(p => p.code_barre && p.code_barre.trim() === code);
+  if(!prod){
+    _posCameraFeedback(`✕ Aucun produit trouvé pour le code « ${code} ».`, 'err');
+  } else if(!prod.actif){
+    _posCameraFeedback(`✕ « ${prod.nom} » est inactif — vente impossible.`, 'err');
+  } else {
+    posAjouterAuPanier(prod.id);
+    const ligne = _posCart.find(c => c.produit_id === prod.id);
+    const qte = ligne ? ligne.quantite : 1;
+    _posCameraFeedback(`✓ ${prod.nom} — ${qte} au panier`, 'ok');
+  }
+  setTimeout(()=>{ _posCameraScanBusy = false; }, 1500);   // laisse le temps de retirer l'article du cadre
+}
+
+function posCameraScanFermer(){
+  document.getElementById('pos-camera-modal-bg').classList.remove('open');
+  const scanner = _posCameraScanner;
+  _posCameraScanner = null;
+  if(scanner){
+    scanner.stop().then(()=>scanner.clear()).catch(()=>{});
+  }
+}
+
+// ── Scan depuis N'IMPORTE QUELLE page (une fois connecté) ──────────────
+// Un employé peut scanner un produit sans être déjà sur Caisse POS : le
+// scan est capté globalement, l'app bascule automatiquement sur Caisse
+// POS, ajoute l'article au panier et laisse l'employé confirmer la vente
+// (jamais de confirmation automatique — juste amener jusqu'au panier).
+//
+// Conçu pour ne JAMAIS interférer avec la saisie normale ailleurs dans
+// l'appli :
+//   - ignoré si un champ (input/textarea/select/contenteditable) a le
+//     focus — une douchette qui scanne DANS un champ continue de s'y
+//     comporter comme avant (comportement inchangé) ;
+//   - ignoré si l'utilisateur n'est pas connecté, ou n'a pas accès à
+//     Caisse POS (rôle carburant/hôtel seul, etc.) ;
+//   - le tampon de caractères est réinitialisé si l'écart entre deux
+//     touches dépasse ~100 ms (frappe humaine, jamais aussi rapide
+//     qu'une douchette) ;
+//   - et surtout : SILENCIEUX si le code ne correspond à AUCUN produit
+//     enregistré — aucune navigation surprise pour une simple suite de
+//     touches qui ne serait pas un vrai scan.
+let _globalScanBuffer = '';
+let _globalScanLastTime = 0;
+document.addEventListener('keydown', function(e){
+  if(!_appUser) return;
+  const active = document.activeElement;
+  const tag = active && active.tagName;
+  const dansChamp = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (active && active.isContentEditable);
+  if(dansChamp) return;
+
+  const now = Date.now();
+  if(now - _globalScanLastTime > 100) _globalScanBuffer = '';
+  _globalScanLastTime = now;
+
+  if(e.key === 'Enter'){
+    const code = _globalScanBuffer;
+    _globalScanBuffer = '';
+    // Pas de restriction au numérique ici : un code-barres est un champ
+    // libre (voir posCodeBarreModal / posScanCodeBarre, qui n'imposent
+    // eux non plus aucun format) — un identifiant interne alphanumérique
+    // doit fonctionner de la même façon, où qu'on le scanne. La sécurité
+    // contre les faux positifs vient de la correspondance EXACTE exigée
+    // plus bas contre un produit réellement enregistré (_globalScanVersPos
+    // ne fait jamais rien — ni navigation, ni message — sans ce match),
+    // pas du format du code ; le seuil de longueur reste une précaution
+    // supplémentaire propre à ce capteur global (sans clic préalable dans
+    // un champ, contrairement au scan dédié de Caisse POS).
+    if(code.length >= 6) _globalScanVersPos(code);
+    return;
+  }
+  if(e.key.length === 1) _globalScanBuffer += e.key;
+});
+
+async function _globalScanVersPos(code){
+  if(!_canAccess('pos-caisse')) return;
+  if(!_posProduits.length){ try{ await _posLoadProduitsCache(); }catch(err){} }
+  const prod = _posProduits.find(p => p.code_barre && p.code_barre.trim() === code);
+  if(!prod) return;   // code inconnu — on ne dérange personne pour rien
+
+  const dejaSurPage = currentPage === 'pos-caisse';
+  if(!dejaSurPage){
+    goTo('pos-caisse');
+    // goTo() lance loadPosCaisse() en tâche de fond sans l'attendre — on
+    // l'attend nous-mêmes pour connaître l'état réel de la session avant
+    // de vérifier quoi que ce soit, plutôt que de deviner avec un délai
+    // arbitraire (un délai fixe serait soit trop court sur une connexion
+    // lente, soit une attente inutile sur une rapide).
+    try{ await loadPosCaisse(); }catch(err){}
+  }
+  // Deux conditions, dans cet ordre — la 1re couvre le cas où aucun
+  // caissier n'a jamais été résolu (compte non lié à un employé et
+  // personne n'a encore choisi dans la liste : le "gate" n'a alors jamais
+  // été positionné, on ne peut pas se fier à son affichage) ; la 2e
+  // couvre le cas où un caissier EST sélectionné mais sa session du jour
+  // est déjà soumise/validée (le gate masque alors la zone de vente).
+  const caissierSel = document.getElementById('pos-caissier-sel');
+  const venteZone    = document.getElementById('pos-caisse-vente-zone');
+  const pretAVendre  = !!(caissierSel && caissierSel.value) && !!(venteZone && venteZone.style.display !== 'none');
+  if(!pretAVendre){
+    toast(`« ${prod.nom} » scanné — sélectionnez votre identité de caissier(ère) et démarrez votre session avant de scanner.`, 'warn');
+    return;
+  }
+  if(!prod.actif){
+    _posScanFeedback(`✕ « ${prod.nom} » est inactif — vente impossible.`, 'err');
+    return;
+  }
+  posAjouterAuPanier(prod.id);
+  const ligne = _posCart.find(c => c.produit_id === prod.id);
+  const qte = ligne ? ligne.quantite : 1;
+  _posScanFeedback(`✓ ${prod.nom} — ${qte} au panier`, 'ok');
+}
+
 function posRenderCart(){
   const wrap = document.getElementById('pos-cart-items');
   const totalEl = document.getElementById('pos-cart-total');
@@ -25296,6 +26421,8 @@ async function posEncaisser(){
     };
     const result = await apiFetch('POST','/pos/ventes', payload);
     _posCart = [];
+    const scanFb = document.getElementById('pos-scan-feedback');
+    if(scanFb) scanFb.style.display = 'none';
     document.getElementById('pos-client-nom').value = '';
     _clientAcClearSelection('pos-client-nom');
     const recuEl = document.getElementById('pos-montant-recu');
@@ -25461,14 +26588,14 @@ async function posCatCreer(){
 
 async function loadPosProduits(){
   const tbody = document.getElementById('pos-prod-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     await loadPosCategories();
     const data = await apiFetch('GET','/pos/produits');
     _posProduitsAll = data || [];
     _posRenderProduitsTbody(_posProduitsAll, null);
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
 }
 
@@ -25481,27 +26608,41 @@ function _posProduitPhotoVignette(p){
   return `<div style="width:34px;height:34px;border-radius:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.25);font-size:14px;font-weight:700">${initiale}</div>`;
 }
 
+// Ventilation par département — affichée en petit sous le stock total,
+// partout où le stock est montré (Produits Bar, Stock Bar), pour que la
+// séparation Bar Devant / Bar Piscine soit visible directement, pas
+// seulement appliquée en coulisses à la vente.
+function _posDeptBreakdownHtml(p){
+  const parDep = p.stock_par_departement || [];
+  const nonAffecte = p.stock_non_affecte || 0;
+  if(!parDep.length && !nonAffecte) return '';
+  const parts = parDep.map(d => `${d.departement_nom} : <strong>${d.stock}</strong>`);
+  if(nonAffecte > 0) parts.push(`<span style="color:#f7a93b">Non affecté : <strong>${nonAffecte}</strong></span>`);
+  return `<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">${parts.join(' · ')}</div>`;
+}
+
 function _posStockLabel(p){
   const stkRaw = p.stock_unites != null ? p.stock_unites : (p.stock_courant != null ? parseFloat(p.stock_courant) : null);
   if(stkRaw === null) return '<span class="td-muted">—</span>';
   const stk = Math.round(stkRaw);
   const bas = p.stock_bas ? ' style="color:#f7a93b;font-weight:700"' : '';
+  const dept = _posDeptBreakdownHtml(p);
   if(!p.vendu_par_caisse){
-    return `<span${bas}>${stk} <span class="td-muted">${p.unite||'u.'}</span></span>`;
+    return `<span${bas}>${stk} <span class="td-muted">${p.unite||'u.'}</span></span>${dept}`;
   }
   const upc = p.unites_par_caisse||1;
   const caisses = Math.floor(stk / upc);
   const vrac    = stk % upc;
   const caissesTxt = `<span style="color:#3fb6a8;font-weight:600">${caisses} caisse${caisses!==1?'s':''}</span>`;
   const vracTxt = vrac > 0 ? ` <span style="color:#3fb6a8">+ ${vrac}</span>` : '';
-  return `<span${bas}>${stk} u. — ${caissesTxt}${vracTxt}</span>`;
+  return `<span${bas}>${stk} u. — ${caissesTxt}${vracTxt}</span>${dept}`;
 }
 
 function _posRenderProduitsTbody(prods, stockMap){
   const tbody = document.getElementById('pos-prod-tbody');
   if(!tbody) return;
   if(!prods.length){
-    tbody.innerHTML = '<tr><td colspan="9"><div class="gi-empty">Aucun produit trouvé</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10"><div class="gi-empty">Aucun produit trouvé</div></td></tr>';
     return;
   }
   tbody.innerHTML = prods.map(p=>{
@@ -25534,11 +26675,15 @@ function _posRenderProduitsTbody(prods, stockMap){
     const lieuBadgeTxt = p.lieu
       ? _lieuBadge(p.lieu)
       : '<span style="font-size:11px;font-weight:600;padding:1px 6px;border-radius:9px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.35);margin-left:6px">Non assigné</span>';
+    const codeBarreCell = p.code_barre
+      ? `<span style="font-family:monospace;font-size:12.5px;color:rgba(255,255,255,.75);cursor:pointer" onclick="posCodeBarreModal(${p.id},'${nomSafe}','${(p.code_barre||'').replace(/'/g,"\\'")}')" title="Modifier le code-barres">${p.code_barre}</span>`
+      : `<span style="font-size:12px;color:#f7a93b;cursor:pointer" onclick="posCodeBarreModal(${p.id},'${nomSafe}','')" title="Aucun code-barres — cliquer pour en ajouter un">+ Ajouter</span>`;
     return `<tr>
       <td>${_posProduitPhotoVignette(p)}</td>
       <td><strong style="color:rgba(255,255,255,.88)">${p.nom||'—'}</strong>${caisseBadge}${lieuBadgeTxt}</td>
       <td>${catBadge}</td>
       <td class="td-muted">${p.unite||'—'}</td>
+      <td>${codeBarreCell}</td>
       <td class="td-amount">${prixUnite}${prixCaisse}</td>
       <td>${_posStockLabel(p)}</td>
       <td class="td-muted">${coutStock}</td>
@@ -25557,6 +26702,9 @@ function _posRenderProduitsTbody(prods, stockMap){
           </button>
           <button class="gi-btn-icon" title="Historique prix" onclick="posPrixModal(${p.id},'${nomSafe}')" style="color:#a78bfa">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </button>
+          <button class="gi-btn-icon" title="Code-barres" onclick="posCodeBarreModal(${p.id},'${nomSafe}','${(p.code_barre||'').replace(/'/g,"\\'")}')" style="color:#38bdf8">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="13" y1="8" x2="13" y2="16"/><line x1="16" y1="8" x2="16" y2="16"/></svg>
           </button>
           <button class="gi-btn-icon ${p.actif?'danger':''}" title="${p.actif?'Désactiver':'Activer'}" onclick="posToggleActif(${p.id},${p.actif?0:1})">
             ${p.actif
@@ -25772,7 +26920,7 @@ async function posProduitSauvegarder(){
 
 // ── APPROVISIONNEMENT ────────────────────────────────────────────
 
-function posApproModal(prodId){
+async function posApproModal(prodId){
   const p = _posProduitsAll.find(x=>x.id===prodId)||{};
   document.getElementById('pos-appro-produit-id').value = prodId;
   document.getElementById('pos-appro-upc').value        = p.unites_par_caisse||1;
@@ -25784,6 +26932,14 @@ function posApproModal(prodId){
   document.getElementById('pos-appro-prix-caisse').value  = '';
   document.getElementById('pos-appro-notes').value        = '';
   document.getElementById('pos-appro-lieu').value         = '';
+  const depSel = document.getElementById('pos-appro-departement');
+  if(depSel){
+    depSel.innerHTML = '<option value="">— Non affecté (stock partagé) —</option>';
+    try{
+      const deps = await apiFetch('GET','/pos/departements');
+      depSel.innerHTML += deps.map(d=>`<option value="${d.id}">${d.nom}</option>`).join('');
+    }catch(e){}
+  }
   const caisseSec  = document.getElementById('pos-appro-caisse-section');
   const uniteSec   = document.getElementById('pos-appro-unite-section');
   const liveDiv    = document.getElementById('pos-appro-live');
@@ -25870,11 +27026,13 @@ async function posApproSauvegarder(){
   }
   if(nb_caisses===0 && nb_unites_vrac===0){ posAlert('Saisir au moins 1 caisse ou 1 unité.'); return; }
   if(!lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine).'); return; }
+  const depVal = document.getElementById('pos-appro-departement')?.value;
+  const departement_id = depVal ? parseInt(depVal) : null;
   try {
     const res = await apiFetch('POST',`/pos/produits/${prodId}/approvisionnement`,{
       nb_caisses, nb_unites_vrac,
       prix_achat_caisse: prixCaisse,
-      notes, lieu,
+      notes, lieu, departement_id,
     });
     posApproModalClose();
     await loadPosProduits();
@@ -25932,6 +27090,41 @@ async function posChangerPrix(){
     await loadPosProduits();
     posAlert('Prix mis à jour.','ok');
   } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ── Code-barres produit — assignation/retrait, scan-friendly ──────────
+function posCodeBarreModal(prodId, nom, codeActuel){
+  if(_isReadOnly()){ posAlert('Accès lecture seule.','err'); return; }
+  document.getElementById('pos-codebarre-produit-id').value = prodId;
+  document.getElementById('pos-codebarre-modal-title').textContent = `Code-barres — ${nom}`;
+  const inp = document.getElementById('pos-codebarre-input');
+  inp.value = codeActuel || '';
+  document.getElementById('pos-codebarre-modal-bg').classList.add('open');
+  setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
+}
+
+function posCodeBarreModalClose(){
+  document.getElementById('pos-codebarre-modal-bg').classList.remove('open');
+}
+
+async function _posCodeBarreEnregistrer(code){
+  const prodId = document.getElementById('pos-codebarre-produit-id').value;
+  try {
+    await apiFetch('PUT', `/pos/produits/${prodId}/code-barre`, { code_barre: code || null });
+    posCodeBarreModalClose();
+    await loadPosProduits();
+    posAlert(code ? 'Code-barres enregistré.' : 'Code-barres retiré.', 'ok');
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+function posCodeBarreSauvegarder(){
+  const code = document.getElementById('pos-codebarre-input').value.trim();
+  _posCodeBarreEnregistrer(code || null);
+}
+
+async function posCodeBarreEffacer(){
+  if(!await showConfirm('Retirer le code-barres de ce produit ?', {title:'Retirer le code-barres', okLabel:'Retirer'})) return;
+  _posCodeBarreEnregistrer(null);
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -26018,7 +27211,7 @@ function _posStockRenderTable(){
       <td>${p.categorie||'—'}</td>
       <td>${fmtQ(devant)}</td>
       <td>${fmtQ(piscine)}</td>
-      <td><strong>${fmtQ(stock)}</strong></td>
+      <td><strong>${fmtQ(stock)}</strong>${_posDeptBreakdownHtml(s)}</td>
       <td>${p.unite||'—'}</td>
       <td>${p.seuil_alerte_stock||'—'}</td>
       <td>${valeur>0?posGx(valeur):'—'}</td>
@@ -26231,11 +27424,19 @@ async function posReceptionnerStock(){
   } catch(e){ posAlert(e.message||'Erreur.'); }
 }
 
-function posStockAjustModal(){
+async function posStockAjustModal(){
   if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   document.getElementById('pos-ajust-qte').value='';
   document.getElementById('pos-ajust-motif').value='';
   document.getElementById('pos-ajust-lieu').value='';
+  const depSel = document.getElementById('pos-ajust-departement');
+  if(depSel){
+    depSel.innerHTML = '<option value="">— Non affecté (stock partagé) —</option>';
+    try{
+      const deps = await apiFetch('GET','/pos/departements');
+      depSel.innerHTML += deps.map(d=>`<option value="${d.id}">${d.nom}</option>`).join('');
+    }catch(e){}
+  }
   document.getElementById('pos-ajust-modal-bg').classList.add('open');
 }
 
@@ -26243,12 +27444,20 @@ function posStockAjustModal(){
 // même modal que posStockAjustModal(), mais avec le produit déjà choisi
 // (le select est repeuplé depuis _posProduitsAll : cette page ne charge pas
 // forcément la page Stock avant, donc pos-ajust-produit peut être vide).
-function posAjusterStockDepuisProduit(produitId){
+async function posAjusterStockDepuisProduit(produitId){
   if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
   _posFillProduitSelects(_posProduitsAll);
   document.getElementById('pos-ajust-qte').value='';
   document.getElementById('pos-ajust-motif').value='';
   document.getElementById('pos-ajust-lieu').value='';
+  const depSel2 = document.getElementById('pos-ajust-departement');
+  if(depSel2){
+    depSel2.innerHTML = '<option value="">— Non affecté (stock partagé) —</option>';
+    try{
+      const deps = await apiFetch('GET','/pos/departements');
+      depSel2.innerHTML += deps.map(d=>`<option value="${d.id}">${d.nom}</option>`).join('');
+    }catch(e){}
+  }
   document.getElementById('pos-ajust-produit').value = produitId;
   document.getElementById('pos-ajust-modal-bg').classList.add('open');
 }
@@ -26259,11 +27468,13 @@ async function posAjusterStock(){
   const qte    = parseFloat(document.getElementById('pos-ajust-qte').value||0);
   const motif  = document.getElementById('pos-ajust-motif').value.trim();
   const lieu   = document.getElementById('pos-ajust-lieu').value;
+  const depVal = document.getElementById('pos-ajust-departement')?.value;
+  const departement_id = depVal ? parseInt(depVal) : null;
   if(!prodId||!qte){ posAlert('Produit et quantité requis.'); return; }
   if(motif.length < 5){ posAlert('Motif trop court (min 5 caractères).'); return; }
   if(!lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine).'); return; }
   try {
-    await apiFetch('POST','/pos/stock/ajustement',{ produit_id:parseInt(prodId), type_mouvement:type, quantite:qte, motif, lieu });
+    await apiFetch('POST','/pos/stock/ajustement',{ produit_id:parseInt(prodId), type_mouvement:type, quantite:qte, motif, lieu, departement_id });
     document.getElementById('pos-ajust-modal-bg').classList.remove('open');
     await loadPosStock();
     posAlert('Ajustement enregistré.','ok');
@@ -29568,16 +30779,19 @@ function _ckHeureFmt(d){
 }
 
 // Lieu (Bar Devant / Bar Piscine) — étiquette partagée par les pages
-// Sessions Caissières, Rapports Soumis et Écarts d'Inventaire.
+// Sessions Caissières, Rapports Soumis et Écarts d'Inventaire. DERRIERE
+// n'est plus proposé au choix nulle part (seulement 2 bars, demande
+// explicite du 11/09/2026) mais reste résolu ici pour ne pas laisser une
+// étiquette vide sur une session historique déjà ouverte avec ce lieu.
+const _LIEU_LABELS = {DEVANT:'Bar Devant', PISCINE:'Bar Piscine', DERRIERE:'Bar Derrière'};
+const _LIEU_COLORS = {DEVANT:'#a78bfa', PISCINE:'#38bdf8', DERRIERE:'#fb923c'};
 function _lieuLabel(lieu){
-  if(lieu === 'PISCINE') return 'Bar Piscine';
-  if(lieu === 'DEVANT')  return 'Bar Devant';
-  return null;
+  return _LIEU_LABELS[lieu] || null;
 }
 function _lieuBadge(lieu){
   const label = _lieuLabel(lieu);
   if(!label) return '';
-  const color = lieu === 'PISCINE' ? '#38bdf8' : '#a78bfa';
+  const color = _LIEU_COLORS[lieu] || '#a78bfa';
   return ` <span style="font-size:11px;color:${color};background:${color}18;border-radius:8px;padding:0 6px;white-space:nowrap">${label}</span>`;
 }
 

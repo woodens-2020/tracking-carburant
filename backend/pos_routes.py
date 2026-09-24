@@ -28,6 +28,8 @@ from models import (
 from pos_service import (
     stock_courant, stock_tous_produits, stock_par_lieu_tous_produits,
     prix_actif, cmup, cmup_batch, prix_actif_batch,
+    departement_id_pour_lieu,
+    stock_par_departement, stock_par_departement_tous_produits,
     encaisser_vente as _encaisser, annuler_vente as _annuler,
     encaisser_commande as _enc_commande, stats_bar,
     solde_client,
@@ -189,6 +191,11 @@ class ApprovisionnementIn(BaseModel):
     prix_achat_caisse: Optional[float] = Field(None, gt=0)
     notes:             Optional[str]   = None
     lieu:              str             # DEVANT ou PISCINE — requis, où la marchandise est reçue
+    # Département où ce stock arrive (Bar Devant / Bar Piscine) — optionnel :
+    # laissé vide, le stock reste « non affecté » (partagé, comportement
+    # historique). Permet de séparer le stock dès la déclaration, sans
+    # passer par le circuit caisses/QR (achat direct au comptoir, etc.).
+    departement_id:    Optional[int] = None
 
     @validator('nb_unites_vrac')
     def valider_quantite(cls, v, values):
@@ -205,6 +212,10 @@ class ApprovisionnementIn(BaseModel):
 
 class PrixIn(BaseModel):
     prix: float = Field(gt=0)
+
+
+class CodeBarreIn(BaseModel):
+    code_barre: Optional[str] = None   # None/vide = retire le code-barres
 
 
 class DepenseItem(BaseModel):
@@ -230,6 +241,8 @@ class AjustementIn(BaseModel):
     type_mouvement: str = "AJUSTEMENT"   # AJUSTEMENT, PERTE, CASSE
     motif:          str
     lieu:           str     # DEVANT ou PISCINE — requis pour tout ajustement manuel
+    # Département concerné (optionnel) — voir ApprovisionnementIn.departement_id.
+    departement_id: Optional[int] = None
 
     @validator("type_mouvement")
     def check_type(cls, v):
@@ -556,11 +569,20 @@ def solde_credit_client(client_id: int, db: Session = Depends(get_db)):
 # PRODUITS & PRIX
 # ══════════════════════════════════════════════════════════════════
 
-def _produit_dict(p: BarProduit, stk: Decimal, db: Session) -> dict:
-    """Sérialise un BarProduit avec tous les champs calculés."""
+def _produit_dict(p: BarProduit, stk: Decimal, db: Session, dept_info: dict | None = None) -> dict:
+    """Sérialise un BarProduit avec tous les champs calculés.
+
+    `stock_courant`/`stock_unites` restent le total GLOBAL (ou scopé à un
+    seul département si l'appelant a filtré par `lieu` — voir
+    liste_produits) — inchangé, pour ne rien casser côté appelants
+    existants. `stock_par_departement`/`stock_non_affecte` sont un champ
+    additif à part : la ventilation COMPLÈTE, toujours tous départements
+    confondus, pour affichage (Produits Bar, Stock Bar, Caisse POS) — voir
+    pos_service.stock_par_departement()."""
     prix_u  = prix_actif(p.id, db) or Decimal("0")
     stk_int = int(stk)
     upc     = p.unites_par_caisse or 0
+    dept_info = dept_info or {"par_departement": [], "non_affecte": 0.0}
     return {
         "id":                  p.id,
         "nom":                 p.nom,
@@ -571,6 +593,8 @@ def _produit_dict(p: BarProduit, stk: Decimal, db: Session) -> dict:
         "seuil_alerte_stock":  float(p.seuil_alerte_stock),
         "stock_courant":       float(stk),
         "stock_unites":        stk_int,
+        "stock_par_departement": dept_info["par_departement"],
+        "stock_non_affecte":     dept_info["non_affecte"],
         "vendu_par_caisse":    p.vendu_par_caisse,
         "unites_par_caisse":   upc if p.vendu_par_caisse else None,
         "caisses_completes":   (stk_int // upc) if (p.vendu_par_caisse and upc > 0) else None,
@@ -593,7 +617,18 @@ def liste_produits(actif: Optional[bool] = None, lieu: Optional[str] = None, db:
     `lieu` filtre sur le catalogue d'un bar précis (DEVANT/PISCINE) tout en
     gardant visibles les articles pas encore réaffectés (lieu NULL,
     catalogue créé avant la séparation) — voir BarProduit.lieu.
-    """
+
+    Sans `lieu` : stock GLOBAL (comportement historique, inchangé — pages
+    Produits Bar / Stock Bar / rentabilité, qui montrent volontairement le
+    total tous départements confondus).
+
+    Avec `lieu` (DEVANT ou PISCINE — le lieu de la session de caisse en
+    cours) : stock DISPONIBLE À CE DÉPARTEMENT (résolu via
+    departement_id_pour_lieu), c'est-à-dire exactement ce que la vente
+    vérifiera/décomptera (voir pos_service.stock_courant) — utilisé par
+    l'écran de vente (Caisse POS) pour que le stock affiché corresponde
+    toujours à ce qui peut réellement être vendu depuis ce bar, au lieu du
+    stock combiné des deux bars."""
     q = db.query(BarProduit)
     if actif is not None:
         q = q.filter(BarProduit.actif == actif)
@@ -603,8 +638,10 @@ def liste_produits(actif: Optional[bool] = None, lieu: Optional[str] = None, db:
             raise HTTPException(422, "lieu doit être DEVANT ou PISCINE.")
         q = q.filter(or_(BarProduit.lieu == lieu_maj, BarProduit.lieu.is_(None)))
     produits = q.order_by(BarProduit.categorie, BarProduit.nom).all()
-    stocks   = stock_tous_produits(db)
-    return [_produit_dict(p, stocks.get(p.id, Decimal("0")), db) for p in produits]
+    departement_id = departement_id_pour_lieu(lieu, db) if lieu else None
+    stocks     = stock_tous_produits(db, departement_id=departement_id)
+    deps_info  = stock_par_departement_tous_produits(db)
+    return [_produit_dict(p, stocks.get(p.id, Decimal("0")), db, deps_info.get(p.id)) for p in produits]
 
 
 @router.get("/produits/{produit_id}")
@@ -613,7 +650,7 @@ def detail_produit(produit_id: int, db: Session = Depends(get_db)):
     p = db.query(BarProduit).filter_by(id=produit_id).first()
     if not p:
         raise HTTPException(404, "Produit introuvable")
-    return _produit_dict(p, stock_courant(produit_id, db), db)
+    return _produit_dict(p, stock_courant(produit_id, db), db, stock_par_departement(produit_id, db))
 
 
 @router.post("/produits", status_code=201)
@@ -631,6 +668,14 @@ def creer_produit(data: ProduitIn, request: Request, db: Session = Depends(get_d
     ).first()
     if existant:
         raise HTTPException(409, f"Un produit nommé « {existant.nom} » existe déjà dans le catalogue.")
+    # Un code-barres doit identifier un seul produit sans ambiguïté — c'est
+    # ce qui permet à un employé de vendre en scannant (voir POS Caisse).
+    if data.code_barre and data.code_barre.strip():
+        doublon_code = db.query(BarProduit).filter(
+            BarProduit.code_barre == data.code_barre.strip()
+        ).first()
+        if doublon_code:
+            raise HTTPException(409, f"Ce code-barres est déjà utilisé par « {doublon_code.nom} ».")
     _get_or_create_categorie(data.categorie, db)
     p = BarProduit(
         nom                = data.nom.strip(),
@@ -664,6 +709,13 @@ def modifier_produit(produit_id: int, data: ProduitIn, db: Session = Depends(get
         raise HTTPException(404, "Produit introuvable")
     if data.vendu_par_caisse and (not data.unites_par_caisse or data.unites_par_caisse < 1):
         raise HTTPException(422, "unites_par_caisse est obligatoire (≥ 1) pour un produit vendu par caisse.")
+    if data.code_barre and data.code_barre.strip():
+        doublon_code = db.query(BarProduit).filter(
+            BarProduit.code_barre == data.code_barre.strip(),
+            BarProduit.id != produit_id,
+        ).first()
+        if doublon_code:
+            raise HTTPException(409, f"Ce code-barres est déjà utilisé par « {doublon_code.nom} ».")
     _get_or_create_categorie(data.categorie, db)
     p.nom                = data.nom.strip()
     p.categorie          = data.categorie.strip().lower()
@@ -803,6 +855,28 @@ def historique_prix(produit_id: int, db: Session = Depends(get_db)):
     ]
 
 
+@router.put("/produits/{produit_id}/code-barre")
+def changer_code_barre(produit_id: int, data: CodeBarreIn, db: Session = Depends(get_db)):
+    """Assigner/retirer le code-barres d'un produit — mise à jour ciblée
+    (sans repasser tout le formulaire produit), pensée pour un scan direct
+    depuis Produits Bar : on scanne le code-barres physique du produit dans
+    le champ, on valide, c'est prêt pour la vente par scan (Caisse POS)."""
+    p = db.query(BarProduit).filter_by(id=produit_id).first()
+    if not p:
+        raise HTTPException(404, "Produit introuvable")
+    code = (data.code_barre or "").strip() or None
+    if code:
+        doublon = db.query(BarProduit).filter(
+            BarProduit.code_barre == code,
+            BarProduit.id != produit_id,
+        ).first()
+        if doublon:
+            raise HTTPException(409, f"Ce code-barres est déjà utilisé par « {doublon.nom} ».")
+    p.code_barre = code
+    db.commit()
+    return {"id": p.id, "code_barre": p.code_barre}
+
+
 # ══════════════════════════════════════════════════════════════════
 # APPROVISIONNEMENT (logique caisse/unité)
 # ══════════════════════════════════════════════════════════════════
@@ -860,6 +934,7 @@ def approvisionner(produit_id: int, data: ApprovisionnementIn, request: Request,
         achat_id       = achat_id,
         lieu           = data.lieu,
         date_mouvement = now,
+        departement_id = data.departement_id,
         utilisateur_id = _uid(request),
     ))
 
@@ -938,9 +1013,11 @@ def dernier_approvisionnement(produit_id: int, db: Session = Depends(get_db)):
 @router.get("/stock")
 def stock_global(db: Session = Depends(get_db)):
     """Stock courant calculé pour tous les produits actifs — total (pool
-    commun, inchangé) + répartition Bar Devant / Bar Piscine."""
-    produits = db.query(BarProduit).filter_by(actif=True).order_by(BarProduit.categorie, BarProduit.nom).all()
-    stocks   = stock_par_lieu_tous_produits(db)
+    commun, inchangé) + répartition Bar Devant / Bar Piscine (lieu) +
+    répartition par département (departement_id, système caisses/QR)."""
+    produits  = db.query(BarProduit).filter_by(actif=True).order_by(BarProduit.categorie, BarProduit.nom).all()
+    stocks    = stock_par_lieu_tous_produits(db)
+    deps_info = stock_par_departement_tous_produits(db)
     return [
         {
             "produit_id":         p.id,
@@ -953,6 +1030,8 @@ def stock_global(db: Session = Depends(get_db)):
             "seuil_alerte_stock": float(p.seuil_alerte_stock),
             "alerte":             stocks.get(p.id, {}).get("total", Decimal("0")) <= Decimal(str(p.seuil_alerte_stock)),
             "cmup":               float(cmup(p.id, db)),
+            "stock_par_departement": deps_info.get(p.id, {}).get("par_departement", []),
+            "stock_non_affecte":     deps_info.get(p.id, {}).get("non_affecte", 0.0),
         }
         for p in produits
     ]
@@ -1771,6 +1850,7 @@ def ajuster_stock(data: AjustementIn, request: Request, db: Session = Depends(ge
         quantite       = qte,
         motif          = data.motif.strip(),
         lieu           = data.lieu,
+        departement_id = data.departement_id,
         utilisateur_id = _uid(request),
     )
     db.add(mouv)
@@ -1778,7 +1858,7 @@ def ajuster_stock(data: AjustementIn, request: Request, db: Session = Depends(ge
 
     return {
         "mouvement_id": mouv.id,
-        "stock_apres":  float(stock_courant(data.produit_id, db)),
+        "stock_apres":  float(stock_courant(data.produit_id, db, departement_id=data.departement_id)),
     }
 
 

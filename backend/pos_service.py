@@ -20,7 +20,7 @@ from models import (
     BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande,
     CuisinePlat, CuisineVente, CuisineLigneVente,
-    Client, BarSessionCaisse,
+    Client, BarSessionCaisse, BarDepartement, BarCaisseMouvement,
 )
 from tz_utils import today_haiti, bounds_haiti
 
@@ -39,30 +39,139 @@ def _dec(v) -> Decimal:
     return Decimal(str(v)) if v is not None else Decimal("0")
 
 
-def stock_courant(produit_id: int, db: Session, lieu: str | None = None) -> Decimal:
+def stock_courant(
+    produit_id: int, db: Session,
+    lieu: str | None = None, departement_id: int | None = None,
+) -> Decimal:
     """Stock courant = somme algébrique de tous les mouvements (quantité signée).
 
-    `lieu` restreint aux mouvements de ce lieu uniquement (utilisé pour
-    l'ajustement/réinitialisation par lieu) ; par défaut (None), comportement
-    inchangé : somme sur tous les mouvements, quel que soit leur lieu."""
+    Deux filtres optionnels indépendants, coexistant pendant la transition
+    entre les deux systèmes de séparation par emplacement :
+
+    `lieu` (String DEVANT/PISCINE, historique — ajustements manuels) :
+    restreint STRICTEMENT aux mouvements de ce lieu.
+
+    `departement_id` (FK BarDepartement, système caisses/QR) : stock
+    disponible pour CE département = ses mouvements à lui + les mouvements
+    NON rattachés à un département (departement_id IS NULL). Ce filet est
+    indispensable : un produit qui n'est pas géré par caisses
+    (vendu_par_caisse=False) n'a jamais de mouvement rattaché à un
+    département (son stock reste tout entier dans le pot « non affecté »)
+    — sans ce filet, une vente de ce produit échouerait faussement dès
+    qu'elle a lieu depuis une session dont le lieu est connu. Un produit
+    géré par caisses, lui, a ses ENTREE/SORTIE correctement rattachés à
+    leur département dès le transfert (voir transferer_caisse).
+
+    Par défaut (aucun des deux) : stock GLOBAL, comportement historique
+    inchangé — c'est ce que tout le code existant continue d'obtenir."""
     q = db.query(func.sum(BarMouvementStock.quantite)).filter(
         BarMouvementStock.produit_id == produit_id
     )
     if lieu is not None:
         q = q.filter(BarMouvementStock.lieu == lieu)
+    if departement_id is not None:
+        q = q.filter(
+            (BarMouvementStock.departement_id == departement_id)
+            | (BarMouvementStock.departement_id.is_(None))
+        )
     return _dec(q.scalar())
 
 
-def stock_tous_produits(db: Session, lieu: str | None = None) -> dict[int, Decimal]:
+def stock_tous_produits(
+    db: Session, lieu: str | None = None, departement_id: int | None = None,
+) -> dict[int, Decimal]:
     """Stock courant de tous les produits actifs en une seule requête.
-
-    `lieu` restreint aux mouvements de ce lieu ; None = comportement
-    inchangé (pool global, tous lieux confondus)."""
+    Voir stock_courant() pour la sémantique de `lieu`/`departement_id`."""
     q = db.query(BarMouvementStock.produit_id, func.sum(BarMouvementStock.quantite))
     if lieu is not None:
         q = q.filter(BarMouvementStock.lieu == lieu)
+    if departement_id is not None:
+        q = q.filter(
+            (BarMouvementStock.departement_id == departement_id)
+            | (BarMouvementStock.departement_id.is_(None))
+        )
     rows = q.group_by(BarMouvementStock.produit_id).all()
     return {pid: _dec(total) for pid, total in rows}
+
+
+def stock_par_departement(produit_id: int, db: Session) -> dict:
+    """Ventilation du stock d'un produit par département, pour affichage
+    (page Gestion des caisses). Inclut aussi la part « non affectée » —
+    mouvements sans departement_id (ex. approvisionnement classique hors
+    caisses tracées) — pour que la somme des parts égale toujours le
+    stock global renvoyé par stock_courant(produit_id, db)."""
+    rows = (
+        db.query(BarMouvementStock.departement_id, func.sum(BarMouvementStock.quantite))
+        .filter(BarMouvementStock.produit_id == produit_id)
+        .group_by(BarMouvementStock.departement_id)
+        .all()
+    )
+    deps = {d.id: d.nom for d in db.query(BarDepartement).all()}
+    par_departement = []
+    non_affecte = Decimal("0")
+    for dep_id, total in rows:
+        if dep_id is None:
+            non_affecte = _dec(total)
+        else:
+            par_departement.append({
+                "departement_id":   dep_id,
+                "departement_nom":  deps.get(dep_id, f"#{dep_id}"),
+                "stock":            float(_dec(total)),
+            })
+    par_departement.sort(key=lambda d: d["departement_nom"])
+    return {
+        "par_departement": par_departement,
+        "non_affecte":     float(non_affecte),
+        "total":           float(sum((_dec(t) for _, t in rows), Decimal("0"))),
+    }
+
+
+def stock_par_departement_tous_produits(db: Session) -> dict[int, dict]:
+    """Version « tous produits en une requête » de stock_par_departement(),
+    pour enrichir GET /pos/produits sans un aller-retour DB par produit
+    (voir _produit_dict dans pos_routes.py — champ stock_par_departement,
+    affiché sur les pages Produits Bar / Stock Bar / Caisse POS)."""
+    rows = (
+        db.query(BarMouvementStock.produit_id, BarMouvementStock.departement_id,
+                 func.sum(BarMouvementStock.quantite))
+        .group_by(BarMouvementStock.produit_id, BarMouvementStock.departement_id)
+        .all()
+    )
+    deps = {d.id: d.nom for d in db.query(BarDepartement).all()}
+    par_produit: dict[int, dict] = {}
+    for pid, dep_id, total in rows:
+        entry = par_produit.setdefault(pid, {"par_departement": [], "non_affecte": Decimal("0")})
+        if dep_id is None:
+            entry["non_affecte"] = _dec(total)
+        else:
+            entry["par_departement"].append({
+                "departement_id":  dep_id,
+                "departement_nom": deps.get(dep_id, f"#{dep_id}"),
+                "stock":           float(_dec(total)),
+            })
+    for entry in par_produit.values():
+        entry["par_departement"].sort(key=lambda d: d["departement_nom"])
+        entry["non_affecte"] = float(entry["non_affecte"])
+    return par_produit
+
+
+# Mapping du champ historique BarSessionCaisse.lieu (chaîne libre DEVANT/
+# PISCINE/DERRIERE, choisie une fois à l'ouverture de session) vers le nom
+# du BarDepartement correspondant, tel que seedé au démarrage (main.py).
+# Si l'institution renomme/désactive ces départements, la résolution
+# retombe simplement sur None (stock global, comportement historique) —
+# jamais d'erreur.
+_LIEU_VERS_NOM_DEPARTEMENT = {"DEVANT": "Devant", "PISCINE": "Piscine", "DERRIERE": "Derrière"}
+
+
+def departement_id_pour_lieu(lieu: str | None, db: Session) -> int | None:
+    if not lieu:
+        return None
+    nom = _LIEU_VERS_NOM_DEPARTEMENT.get(lieu.strip().upper())
+    if not nom:
+        return None
+    dep = db.query(BarDepartement).filter_by(nom=nom, actif=True).first()
+    return dep.id if dep else None
 
 
 def stock_par_lieu_tous_produits(db: Session) -> dict[int, dict[str, Decimal]]:
@@ -261,6 +370,25 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     if not lignes_input:
         raise ValueError("La vente doit comporter au moins une ligne.")
 
+    # Rattache la vente à la session de caisse EN_COURS du caissier (s'il en
+    # a une) — indispensable pour distinguer les ventes de sessions
+    # successives du même caissier le même jour (voir _ventes_session dans
+    # caisse_routes.py, qui sinon confondrait les rapports de deux sessions).
+    # Résolu ICI, avant la validation des lignes, car le lieu de la session
+    # détermine aussi le département dont le stock doit être vérifié/décompté
+    # (voir stock_courant() et departement_id_pour_lieu() plus haut).
+    session_id = None
+    session_en_cours = None
+    caissier_id = data.get("caissier_id")
+    if caissier_id:
+        session_en_cours = (
+            db.query(BarSessionCaisse)
+            .filter_by(caissier_id=caissier_id, date_session=today_haiti(), statut="EN_COURS")
+            .first()
+        )
+        session_id = session_en_cours.id if session_en_cours else None
+    departement_id = departement_id_pour_lieu(session_en_cours.lieu, db) if session_en_cours else None
+
     lignes_traitees = []
     erreurs = []
 
@@ -312,7 +440,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
             erreurs.append(f"Aucun prix défini pour « {produit.nom} ».")
             continue
 
-        stk = stock_courant(pid, db)
+        stk = stock_courant(pid, db, departement_id=departement_id)
         if stk < qte:
             erreurs.append(
                 f"Stock insuffisant pour « {produit.nom} » "
@@ -325,6 +453,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
             "cuisine_plat_id": None,
             "produit_id":      pid,
             "produit_nom":     produit.nom,
+            "vendu_par_caisse": produit.vendu_par_caisse,
             "quantite":        qte,
             "prix":            prix,
             "sous_total":      sous_total,
@@ -386,6 +515,10 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     # a une) — indispensable pour distinguer les ventes de sessions
     # successives du même caissier le même jour (voir _ventes_session dans
     # caisse_routes.py, qui sinon confondrait les rapports de deux sessions).
+    # Note : departement_id a déjà été résolu plus haut (avant la boucle de
+    # vérification de stock) à partir de la même session — cette 2e requête
+    # ne sert qu'à obtenir lieu_vente (String, pour l'étiquetage `lieu`
+    # historique du mouvement), redondante mais sans risque.
     session_id = None
     lieu_vente = None   # hérité de la session, best-effort — ne bloque jamais la vente
     caissier_id = data.get("caissier_id")
@@ -425,6 +558,11 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
         ))
         # Mouvement stock uniquement pour les produits bar (pas les plats cuisine)
         if l["produit_id"]:
+            # Le mouvement n'est rattaché à un département QUE pour un produit
+            # géré par caisses — sinon (produit classique, jamais délivré via
+            # un transfert de caisse) il reste dans le pot « non affecté »,
+            # exactement comme avant cette fonctionnalité (voir stock_courant).
+            dep_mouvement = departement_id if l.get("vendu_par_caisse") else None
             db.add(BarMouvementStock(
                 produit_id         = l["produit_id"],
                 type_mouvement     = "SORTIE_VENTE",
@@ -432,8 +570,21 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
                 motif              = f"Vente ticket {vente.numero_ticket}",
                 reference_vente_id = vente.id,
                 lieu               = lieu_vente,
+                departement_id     = dep_mouvement,
                 utilisateur_id     = utilisateur_id,
             ))
+            # Traçabilité par caisse (QR) — purement additif, best-effort :
+            # ne doit jamais empêcher la vente si la répartition échoue
+            # (ex. produit non tracké par caisse, aucune caisse active…).
+            # Le FIFO est scopé au département de la session quand il est
+            # connu, pour que Bar Devant ne consomme jamais une caisse livrée
+            # à Bar Derrière (et inversement) — voir decrementer_caisses_fifo.
+            try:
+                from bar_caisses_routes import decrementer_caisses_fifo
+                decrementer_caisses_fifo(db, l["produit_id"], l["quantite"], vente.id, utilisateur_id,
+                                         departement_id=departement_id)
+            except Exception:
+                pass
 
     # ── CuisineVente automatique pour les plats cuisine vendus via bar ──
     lignes_cuisine = [l for l in lignes_traitees if l["cuisine_plat_id"]]
@@ -492,9 +643,10 @@ def annuler_vente(vente_id: int, db: Session, utilisateur_id: int | None = None)
 
     for ligne in vente.lignes:
         if ligne.produit_id:   # plats cuisine n'ont pas de stock bar
-            # Hérite le lieu du mouvement SORTIE_VENTE d'origine (pas de la
-            # session courante, qui a pu changer/fermer depuis) — le stock
-            # revient dans le même compartiment d'où il est sorti.
+            # Hérite lieu ET departement_id du mouvement SORTIE_VENTE
+            # d'origine (pas de la session courante, qui a pu changer/fermer
+            # depuis) — le stock revient dans le même compartiment d'où il
+            # est sorti, dans les deux systèmes de séparation à la fois.
             mouv_origine = (
                 db.query(BarMouvementStock)
                 .filter_by(reference_vente_id=vente.id, produit_id=ligne.produit_id,
@@ -508,8 +660,17 @@ def annuler_vente(vente_id: int, db: Session, utilisateur_id: int | None = None)
                 motif              = f"Annulation vente {vente.numero_ticket}",
                 reference_vente_id = vente.id,
                 lieu               = mouv_origine.lieu if mouv_origine else None,
+                departement_id     = mouv_origine.departement_id if mouv_origine else None,
                 utilisateur_id     = utilisateur_id,
             ))
+
+    # Restaure les caisses (QR) consommées par cette vente — purement
+    # additif, best-effort : ne doit jamais empêcher l'annulation.
+    try:
+        from bar_caisses_routes import restaurer_caisses_apres_annulation
+        restaurer_caisses_apres_annulation(db, vente.id, utilisateur_id)
+    except Exception:
+        pass
 
     # Annuler la CuisineVente liée (si des plats cuisine étaient dans ce ticket)
     cv_ref = f"Via Bar — {vente.numero_ticket}"

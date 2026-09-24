@@ -1496,6 +1496,15 @@ async function _sendLoginMeta(){
   }catch(e){ console.warn('[sécurité] Envoi métadonnées:', e); }
 }
 
+/* Cible de redirection post-connexion — préserve le paramètre ?scan=CODE
+   (arrivée directe depuis un QR de caisse scanné avant d'être connecté :
+   AuthMiddleware ré-injecte scan= dans l'URL de /login) pour reprendre
+   automatiquement le flux de livraison une fois connecté. */
+function _postLoginRedirect(){
+  var scan = new URLSearchParams(window.location.search).get('scan');
+  return scan ? ('/?scan=' + encodeURIComponent(scan)) : '/';
+}
+
 /* ══ FORMULAIRE ══ */
 (function(){
   const form   = document.getElementById('login-form');
@@ -1564,7 +1573,7 @@ async function _sendLoginMeta(){
       // Connexion directe (sans OTP) — capturer photo + localisation
       _capturePhoto();
       sessionStorage.setItem('konekta_just_logged_in','1');
-      _sendLoginMeta().finally(function(){ window.location.href='/'; });
+      _sendLoginMeta().finally(function(){ window.location.href=_postLoginRedirect(); });
     }catch(err){
       showErr(err.message);
       btn.disabled = false;
@@ -1829,7 +1838,7 @@ async function _sendLoginMeta(){
       btnVerify.classList.add('success');
       btnVerify.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + t('login.success');
       sessionStorage.setItem('konekta_just_logged_in','1');
-      _sendLoginMeta().finally(function(){ window.location.href='/'; });
+      _sendLoginMeta().finally(function(){ window.location.href=_postLoginRedirect(); });
     }catch(err){
       setOtpErr(t('otp.err.network.retry'));
       btnVerify.disabled  = false;
@@ -1994,7 +2003,7 @@ async function _sendLoginMeta(){
       btnV.classList.add('success');
       btnV.innerHTML='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + t('login.success');
       sessionStorage.setItem('konekta_just_logged_in','1');
-      _sendLoginMeta().finally(function(){ window.location.href='/'; });
+      _sendLoginMeta().finally(function(){ window.location.href=_postLoginRedirect(); });
     }catch(err){
       if(window._setAdminErr) window._setAdminErr(t('admincode.err.network.retry'));
       btnV.disabled=false;
@@ -2006,7 +2015,7 @@ async function _sendLoginMeta(){
 /* ══ REDIRECTION SI DÉJÀ CONNECTÉ ══ */
 /* Skip si on est en étape OTP (vient d'un redirect OAuth avec ?otp=1) */
 if(new URLSearchParams(window.location.search).get('otp') !== '1'){
-  fetch('/api/me',{credentials:'include'}).then(r=>{ if(r.ok) window.location.href='/'; }).catch(()=>{});
+  fetch('/api/me',{credentials:'include'}).then(r=>{ if(r.ok) window.location.href=_postLoginRedirect(); }).catch(()=>{});
 }
 
 /* ══ AFFICHAGE CONDITIONNEL GOOGLE ══ */
