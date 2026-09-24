@@ -1,7 +1,7 @@
 fastapi
 python-multipart
 uvicorn[standard]
-sqlalchemy
+sqlalchemy<2.1
 alembic
 pydantic
 anthropic
