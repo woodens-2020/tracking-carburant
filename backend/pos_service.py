@@ -87,13 +87,19 @@ def stock_par_lieu_tous_produits(db: Session) -> dict[int, dict[str, Decimal]]:
     }
 
 
-def prix_actif(produit_id: int, db: Session) -> Decimal | None:
-    """Prix de vente actif (date_fin IS NULL) pour un produit donné."""
+def prix_actif(produit_id: int, db: Session, type_prix: str = "DETAIL") -> Decimal | None:
+    """Prix de vente actif (date_fin IS NULL) pour un produit donné.
+
+    `type_prix` (DETAIL par défaut) sélectionne le tarif détail ou gros —
+    tous les prix existants avant l'ajout de cette colonne sont DETAIL,
+    donc le comportement des appelants qui ne passent pas ce paramètre est
+    inchangé."""
     row = (
         db.query(BarPrixHistorique)
         .filter(
             BarPrixHistorique.produit_id == produit_id,
             BarPrixHistorique.date_fin.is_(None),
+            BarPrixHistorique.type_prix == type_prix,
         )
         .order_by(BarPrixHistorique.date_debut.desc())
         .first()
@@ -149,11 +155,15 @@ def cmup_batch(db: Session) -> dict[int, Decimal]:
     return result
 
 
-def prix_actif_batch(db: Session) -> dict[int, Decimal]:
-    """Prix de vente actif (date_fin IS NULL) de tous les produits en une requête."""
+def prix_actif_batch(db: Session, type_prix: str = "DETAIL") -> dict[int, Decimal]:
+    """Prix de vente actif (date_fin IS NULL) de tous les produits en une requête.
+    Même paramètre `type_prix` que prix_actif() ci-dessus."""
     rows = (
         db.query(BarPrixHistorique)
-        .filter(BarPrixHistorique.date_fin.is_(None))
+        .filter(
+            BarPrixHistorique.date_fin.is_(None),
+            BarPrixHistorique.type_prix == type_prix,
+        )
         .order_by(BarPrixHistorique.produit_id, BarPrixHistorique.date_debut.desc())
         .all()
     )
@@ -162,6 +172,42 @@ def prix_actif_batch(db: Session) -> dict[int, Decimal]:
         if r.produit_id not in result:
             result[r.produit_id] = _dec(r.prix)
     return result
+
+
+def resoudre_quantite_vente(produit: BarProduit, quantite: Decimal, unite_vendue: str = "UNITE") -> Decimal:
+    """Convertit une quantité vendue en unités de base (celles du grand-livre
+    de stock), miroir de la conversion déjà faite côté réception
+    (pos_routes.approvisionner : nb_caisses * unites_par_caisse). Le stock
+    (BarMouvementStock) est toujours en unités de base — cette fonction est
+    le seul point de conversion côté vente, pour que l'écriture du mouvement
+    et la ligne de vente restent cohérentes.
+
+    `unite_vendue` = "UNITE" (défaut, inchangé) ou "CAISSE" (exige que le
+    produit soit vendu_par_caisse avec unites_par_caisse défini)."""
+    if unite_vendue == "CAISSE":
+        if not produit.vendu_par_caisse or not produit.unites_par_caisse:
+            raise ValueError(
+                f"'{produit.nom}' n'est pas configuré comme vendu par caisse "
+                "(vendu_par_caisse/unites_par_caisse manquant)."
+            )
+        return _dec(quantite) * Decimal(produit.unites_par_caisse)
+    return _dec(quantite)
+
+
+def solde_client(client_id: int, db: Session) -> Decimal:
+    """Solde dû par un client = somme des BarCredit.solde encore ouverts
+    (statut OUVERT ou EN_RETARD). Jamais stocké sur Client — calculé à la
+    demande, comme le stock, pour rester source unique de vérité (aucun
+    champ dupliqué qui pourrait diverger)."""
+    total = (
+        db.query(func.sum(BarCredit.solde))
+        .filter(
+            BarCredit.client_id == client_id,
+            BarCredit.statut.in_(("OUVERT", "EN_RETARD")),
+        )
+        .scalar()
+    )
+    return _dec(total)
 
 
 def generer_numero_ticket(db: Session) -> str:
@@ -247,6 +293,19 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
         if not produit:
             erreurs.append(f"Produit #{pid} introuvable ou inactif.")
             continue
+
+        # Vente par caisse (Commerce) : `quantite` est alors le nombre de
+        # caisses saisi par le caissier — converti ici en unités de base
+        # (celles du grand-livre de stock) une fois pour toutes ; tout le
+        # reste de la fonction continue de raisonner en unités de base,
+        # inchangé. Défaut "UNITE" = comportement historique exact.
+        unite_vendue = (l.get("unite_vendue") or "UNITE").upper()
+        if unite_vendue == "CAISSE":
+            try:
+                qte = resoudre_quantite_vente(produit, qte, unite_vendue)
+            except ValueError as e:
+                erreurs.append(str(e))
+                continue
 
         prix = prix_actif(pid, db)
         if prix is None:

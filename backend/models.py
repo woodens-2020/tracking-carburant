@@ -565,6 +565,50 @@ class Beneficiaire(Base):
 # MODULE BAR / RESTAURANT — POS (Point of Sale)
 # ══════════════════════════════════════════════════════════════════
 
+class Entrepot(Base):
+    """Emplacement physique de stock (dépôt, magasin, bar…) — généralise le
+    champ `lieu` (DEVANT/PISCINE, String libre) en une vraie entité avec id,
+    adresse, actif. Coexiste avec `lieu` sur les tables existantes plutôt
+    que de le remplacer, pour ne rien casser côté tenants Bar déjà en
+    production (voir `entrepot_id` sur BarMouvementStock/BarSessionCaisse)."""
+    __tablename__ = "entrepots"
+
+    id            = Column(Integer, primary_key=True)
+    nom           = Column(String(150), nullable=False, unique=True)
+    adresse       = Column(String(300), nullable=True)
+    actif         = Column(Boolean, nullable=False, default=True)
+    date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_entrepots_actif", "actif"),
+    )
+
+
+class Fournisseur(Base):
+    """Fournisseur structuré — remplace progressivement le champ texte libre
+    `fournisseur` (String) dupliqué sur BarAchat et d'autres tables d'achat.
+    L'ancien champ texte n'est pas supprimé (compat descendante) ; les deux
+    coexistent le temps de la migration."""
+    __tablename__ = "fournisseurs"
+
+    id              = Column(Integer, primary_key=True)
+    nom             = Column(String(150), nullable=False, unique=True)
+    contact         = Column(String(150), nullable=True)
+    telephone       = Column(String(30),  nullable=True)
+    email           = Column(String(150), nullable=True)
+    adresse         = Column(String(300), nullable=True)
+    delai_livraison_jours = Column(Integer, nullable=True)
+    solde_du        = Column(Numeric(14, 2), nullable=False, default=0)
+    actif           = Column(Boolean, nullable=False, default=True)
+    notes           = Column(String(500), nullable=True)
+    date_creation   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("solde_du >= 0", name="chk_fournisseur_solde_pos"),
+        Index("idx_fournisseurs_actif", "actif"),
+    )
+
+
 class BarCategorie(Base):
     """Catégories d'articles du bar (boisson, alcool, plat…)."""
     __tablename__ = "bar_categories"
@@ -634,6 +678,11 @@ class BarPrixHistorique(Base):
     id             = Column(Integer, primary_key=True)
     produit_id     = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
     prix           = Column(Numeric(12, 2), nullable=False)
+    # DETAIL (par défaut) ou GROS — permet un 2e prix actif simultané par
+    # produit, résolu selon le type de client au moment de la vente (voir
+    # prix_actif(..., type_prix=...) dans pos_service.py). Un produit sans
+    # tarif gros dédié continue de n'avoir qu'un prix DETAIL, comme avant.
+    type_prix      = Column(String(10), nullable=False, default="DETAIL")
     date_debut     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     date_fin       = Column(DateTime(timezone=True), nullable=True)   # NULL = prix actuel
     utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
@@ -642,6 +691,7 @@ class BarPrixHistorique(Base):
 
     __table_args__ = (
         CheckConstraint("prix > 0", name="chk_bar_prix_pos"),
+        CheckConstraint("type_prix IN ('DETAIL','GROS')", name="chk_bar_prix_type"),
         Index("idx_bar_prix_produit", "produit_id", "date_debut"),
     )
 
@@ -661,6 +711,9 @@ class BarAchat(Base):
     quantite             = Column(Numeric(12, 3), nullable=False)
     prix_achat_unitaire  = Column(Numeric(12, 2), nullable=False)
     fournisseur          = Column(String(150), nullable=True)
+    # Fournisseur structuré (Entrepot/Commerce) — coexiste avec le champ
+    # texte `fournisseur` ci-dessus, jamais supprimé (compat descendante).
+    fournisseur_id       = Column(Integer, ForeignKey("fournisseurs.id", ondelete="SET NULL"), nullable=True)
     date_achat           = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     utilisateur_id       = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     notes                = Column(String(300), nullable=True)
@@ -673,6 +726,7 @@ class BarAchat(Base):
                                     foreign_keys=[produit_id])
     station_produit  = relationship("Produit", back_populates="bar_achats",
                                     foreign_keys=[station_produit_id])
+    fournisseur_obj  = relationship("Fournisseur", foreign_keys=[fournisseur_id])
     mouvement = relationship("BarMouvementStock", back_populates="achat", uselist=False,
                              foreign_keys="BarMouvementStock.achat_id")
     depenses  = relationship("BarAchatDepense", back_populates="achat",
@@ -773,11 +827,16 @@ class BarMouvementStock(Base):
     # les ventes/annulations quand la session caissière connaît son lieu.
     # Les achats/réceptions restent volontairement NULL (stock pool commun).
     lieu               = Column(String(20), nullable=True)
+    # Entrepôt structuré (Commerce) — coexiste avec `lieu` ci-dessus, ne le
+    # remplace pas. Nullable partout, aucun impact sur les tenants Bar
+    # existants tant que `entrepot_id` n'est pas renseigné.
+    entrepot_id        = Column(Integer, ForeignKey("entrepots.id", ondelete="SET NULL"), nullable=True)
 
-    produit = relationship("BarProduit", back_populates="mouvements",
-                           foreign_keys=[produit_id])
-    achat   = relationship("BarAchat",   back_populates="mouvement",
-                           foreign_keys=[achat_id])
+    produit  = relationship("BarProduit", back_populates="mouvements",
+                            foreign_keys=[produit_id])
+    achat    = relationship("BarAchat",   back_populates="mouvement",
+                            foreign_keys=[achat_id])
+    entrepot = relationship("Entrepot", foreign_keys=[entrepot_id])
 
     __table_args__ = (
         CheckConstraint(
@@ -833,10 +892,17 @@ class Client(Base):
     # pas interrompre les habitudes actuelles ; l'admin bloque au cas par cas
     # les mauvais payeurs.
     statut_credit = Column(String(20), nullable=False, default="ELIGIBLE")
+    # Limite de crédit (Commerce) — plafond au-delà duquel une nouvelle vente
+    # à crédit doit être refusée. NULL = pas de plafond (comportement actuel
+    # inchangé pour les clients existants). Le solde réel n'est jamais stocké
+    # ici : voir solde_client() dans pos_service.py, qui l'agrège depuis
+    # BarCredit.solde — source unique de vérité, jamais de champ dupliqué.
+    limite_credit = Column(Numeric(14, 2), nullable=True)
     created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
         CheckConstraint("statut_credit IN ('ELIGIBLE','NON_ELIGIBLE')", name="chk_client_statut_credit"),
+        CheckConstraint("limite_credit IS NULL OR limite_credit >= 0", name="chk_client_limite_credit_pos"),
         Index("idx_clients_nom", "nom"),
     )
 
@@ -888,6 +954,60 @@ class BarRemboursement(Base):
     __table_args__ = (
         CheckConstraint("montant > 0", name="chk_bar_remb_montant_pos"),
         Index("idx_bar_remb_credit", "credit_id"),
+    )
+
+
+class BottleMovement(Base):
+    """Consigne bouteilles pleines/vides par client — grand-livre, même
+    principe que BarMouvementStock : le solde détenu par un client n'est
+    jamais stocké, toujours recalculé (quantite_sortie - quantite_retournee
+    sommées), pour rester source unique de vérité."""
+    __tablename__ = "bottle_movements"
+
+    id                  = Column(Integer, primary_key=True)
+    client_id           = Column(Integer, ForeignKey("clients.id",      ondelete="RESTRICT"), nullable=False)
+    produit_id          = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
+    vente_id            = Column(Integer, ForeignKey("bar_ventes.id",   ondelete="SET NULL"),  nullable=True)
+    quantite_sortie     = Column(Integer, nullable=False, default=0)
+    quantite_retournee  = Column(Integer, nullable=False, default=0)
+    date_mouvement      = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    utilisateur_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    notes               = Column(String(300), nullable=True)
+
+    client  = relationship("Client",     foreign_keys=[client_id])
+    produit = relationship("BarProduit", foreign_keys=[produit_id])
+    vente   = relationship("BarVente",   foreign_keys=[vente_id])
+
+    __table_args__ = (
+        CheckConstraint("quantite_sortie >= 0",    name="chk_bottle_mouv_sortie_pos"),
+        CheckConstraint("quantite_retournee >= 0", name="chk_bottle_mouv_retour_pos"),
+        Index("idx_bottle_mouv_client",  "client_id"),
+        Index("idx_bottle_mouv_produit", "produit_id"),
+    )
+
+
+class CrateMovement(Base):
+    """Consigne casiers pleins/vides par client — même structure que
+    BottleMovement, entité séparée car un casier n'est pas un produit vendu
+    (pas de BarProduit associé), juste un contenant réutilisable."""
+    __tablename__ = "crate_movements"
+
+    id                  = Column(Integer, primary_key=True)
+    client_id           = Column(Integer, ForeignKey("clients.id",    ondelete="RESTRICT"), nullable=False)
+    vente_id            = Column(Integer, ForeignKey("bar_ventes.id", ondelete="SET NULL"),  nullable=True)
+    quantite_sortie     = Column(Integer, nullable=False, default=0)
+    quantite_retournee  = Column(Integer, nullable=False, default=0)
+    date_mouvement      = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    utilisateur_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    notes               = Column(String(300), nullable=True)
+
+    client = relationship("Client",   foreign_keys=[client_id])
+    vente  = relationship("BarVente", foreign_keys=[vente_id])
+
+    __table_args__ = (
+        CheckConstraint("quantite_sortie >= 0",    name="chk_crate_mouv_sortie_pos"),
+        CheckConstraint("quantite_retournee >= 0", name="chk_crate_mouv_retour_pos"),
+        Index("idx_crate_mouv_client", "client_id"),
     )
 
 
@@ -1317,6 +1437,9 @@ class BarSessionCaisse(Base):
     # les rapports par lieu. Nullable : les sessions créées avant l'ajout de
     # ce champ n'ont pas de lieu connu.
     lieu          = Column(String(20), nullable=True)  # DEVANT, PISCINE
+    # Entrepôt structuré (Commerce) — coexiste avec `lieu`, ne le remplace
+    # pas. Voir le même champ sur BarMouvementStock.
+    entrepot_id   = Column(Integer, ForeignKey("entrepots.id", ondelete="SET NULL"), nullable=True)
     statut        = Column(String(20), nullable=False, default="EN_COURS")  # EN_COURS, SOUMIS, VALIDE
     soumis_at     = Column(DateTime(timezone=True), nullable=True)
     valide_at     = Column(DateTime(timezone=True), nullable=True)
@@ -1345,6 +1468,7 @@ class BarSessionCaisse(Base):
     caissier   = relationship("Employe",      foreign_keys=[caissier_id])
     valide_par = relationship("Utilisateur",  foreign_keys=[valide_par_id])
     evalue_par = relationship("Utilisateur",  foreign_keys=[evalue_par_id])
+    entrepot   = relationship("Entrepot",     foreign_keys=[entrepot_id])
     evaluations = relationship("BarSessionEvaluation", back_populates="session", cascade="all, delete-orphan")
 
     __table_args__ = (

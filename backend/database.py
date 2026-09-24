@@ -220,6 +220,21 @@ def _migrate_columns():
             # l'admin) ; exigé désormais à la création d'un nouvel article.
             ("bar_produits", "lieu",
              "ALTER TABLE bar_produits ADD COLUMN lieu VARCHAR(20)", None),
+            # v26 — fondations module Commerce & Distribution (généralisation
+            # du module Bar) : entrepôt structuré, fournisseur structuré,
+            # limite de crédit client, prix gros/détail. Toutes nullable /
+            # avec défaut inoffensif — aucun impact sur les tenants Bar
+            # existants tant que ces colonnes ne sont pas renseignées.
+            ("bar_achats", "fournisseur_id",
+             "ALTER TABLE bar_achats ADD COLUMN fournisseur_id INTEGER REFERENCES fournisseurs(id)", None),
+            ("bar_mouvements_stock", "entrepot_id",
+             "ALTER TABLE bar_mouvements_stock ADD COLUMN entrepot_id INTEGER REFERENCES entrepots(id)", None),
+            ("bar_sessions_caisse", "entrepot_id",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN entrepot_id INTEGER REFERENCES entrepots(id)", None),
+            ("clients", "limite_credit",
+             "ALTER TABLE clients ADD COLUMN limite_credit NUMERIC", None),
+            ("bar_prix_historique", "type_prix",
+             "ALTER TABLE bar_prix_historique ADD COLUMN type_prix VARCHAR(10) NOT NULL DEFAULT 'DETAIL'", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -344,6 +359,21 @@ def _migrate_columns():
             # l'admin) ; exigé désormais à la création d'un nouvel article.
             ("bar_produits", "lieu",
              "ALTER TABLE bar_produits ADD COLUMN lieu VARCHAR(20)", None),
+            # v26 — fondations module Commerce & Distribution (généralisation
+            # du module Bar) : entrepôt structuré, fournisseur structuré,
+            # limite de crédit client, prix gros/détail. Toutes nullable /
+            # avec défaut inoffensif — aucun impact sur les tenants Bar
+            # existants tant que ces colonnes ne sont pas renseignées.
+            ("bar_achats", "fournisseur_id",
+             "ALTER TABLE bar_achats ADD COLUMN fournisseur_id INTEGER REFERENCES fournisseurs(id) ON DELETE SET NULL", None),
+            ("bar_mouvements_stock", "entrepot_id",
+             "ALTER TABLE bar_mouvements_stock ADD COLUMN entrepot_id INTEGER REFERENCES entrepots(id) ON DELETE SET NULL", None),
+            ("bar_sessions_caisse", "entrepot_id",
+             "ALTER TABLE bar_sessions_caisse ADD COLUMN entrepot_id INTEGER REFERENCES entrepots(id) ON DELETE SET NULL", None),
+            ("clients", "limite_credit",
+             "ALTER TABLE clients ADD COLUMN limite_credit NUMERIC", None),
+            ("bar_prix_historique", "type_prix",
+             "ALTER TABLE bar_prix_historique ADD COLUMN type_prix VARCHAR(10) NOT NULL DEFAULT 'DETAIL'", None),
         ]
     else:
         return
@@ -447,6 +477,30 @@ def _migrate_columns():
                 conn.execute(sql_text(
                     "ALTER TABLE bar_produits ADD CONSTRAINT chk_bar_produit_lieu "
                     "CHECK (lieu IS NULL OR lieu IN ('DEVANT','PISCINE'))"
+                ))
+                conn.commit()
+            except Exception:
+                conn.rollback()  # déjà présente
+
+        # v26 — module Commerce & Distribution : contraintes sur les colonnes
+        # ajoutées à des tables existantes (entrepots/fournisseurs/
+        # bottle_movements/crate_movements sont neuves — leurs contraintes
+        # sont déjà posées par create_all(), pas besoin d'ALTER ici).
+        with engine.connect() as conn:
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE bar_prix_historique ADD CONSTRAINT chk_bar_prix_type "
+                    "CHECK (type_prix IN ('DETAIL','GROS'))"
+                ))
+                conn.commit()
+            except Exception:
+                conn.rollback()  # déjà présente
+
+        with engine.connect() as conn:
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE clients ADD CONSTRAINT chk_client_limite_credit_pos "
+                    "CHECK (limite_credit IS NULL OR limite_credit >= 0)"
                 ))
                 conn.commit()
             except Exception:

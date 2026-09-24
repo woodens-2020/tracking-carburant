@@ -23,12 +23,14 @@ from models import (
     BarMouvementStock, BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande, BarPaiementEmploye, BarSessionCaisse,
     Employe, Utilisateur, CuisinePlat, RenflouementDepartement, Client,
+    Entrepot, Fournisseur,
 )
 from pos_service import (
     stock_courant, stock_tous_produits, stock_par_lieu_tous_produits,
     prix_actif, cmup, cmup_batch, prix_actif_batch,
     encaisser_vente as _encaisser, annuler_vente as _annuler,
     encaisser_commande as _enc_commande, stats_bar,
+    solde_client,
     LIEUX_VALIDES,
 )
 
@@ -247,6 +249,10 @@ class LigneVenteIn(BaseModel):
     cuisine_plat_id: Optional[int]   = None
     prix_unitaire:   Optional[float] = None   # requis si cuisine_plat_id
     quantite:        float = Field(gt=0)
+    # UNITE (défaut, inchangé) ou CAISSE — dans ce dernier cas `quantite`
+    # est un nombre de caisses, converti en unités de base côté service
+    # (resoudre_quantite_vente) avant tout calcul de stock/prix.
+    unite_vendue:    str = "UNITE"
 
     @model_validator(mode="after")
     def check_produit_ou_plat(self):
@@ -414,6 +420,136 @@ def supprimer_categorie(cat_id: int, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(409, "Catégorie utilisée par des produits — impossible de supprimer.")
     return {"ok": True}
+
+
+# ══════════════════════════════════════════════════════════════════
+# MODULE COMMERCE — Entrepôts & Fournisseurs (fondations, phase 1)
+# ══════════════════════════════════════════════════════════════════
+
+@router.get("/entrepots")
+def liste_entrepots(actif: Optional[bool] = None, db: Session = Depends(get_db)):
+    q = db.query(Entrepot)
+    if actif is not None:
+        q = q.filter(Entrepot.actif == actif)
+    return [
+        {"id": e.id, "nom": e.nom, "adresse": e.adresse, "actif": e.actif}
+        for e in q.order_by(Entrepot.nom).all()
+    ]
+
+
+class EntrepotIn(BaseModel):
+    nom: str
+    adresse: Optional[str] = None
+    actif: bool = True
+
+
+@router.post("/entrepots", status_code=201)
+def creer_entrepot(data: EntrepotIn, db: Session = Depends(get_db)):
+    nom = data.nom.strip()
+    if not nom:
+        raise HTTPException(422, "Le nom est requis.")
+    if db.query(Entrepot).filter(func.lower(Entrepot.nom) == nom.lower()).first():
+        raise HTTPException(409, f"Un entrepôt nommé '{nom}' existe déjà.")
+    e = Entrepot(nom=nom, adresse=data.adresse, actif=data.actif)
+    db.add(e)
+    db.commit()
+    db.refresh(e)
+    return {"id": e.id, "nom": e.nom, "adresse": e.adresse, "actif": e.actif}
+
+
+@router.put("/entrepots/{entrepot_id}")
+def modifier_entrepot(entrepot_id: int, data: EntrepotIn, db: Session = Depends(get_db)):
+    e = db.query(Entrepot).filter_by(id=entrepot_id).first()
+    if not e:
+        raise HTTPException(404, "Entrepôt introuvable.")
+    nom = data.nom.strip()
+    if not nom:
+        raise HTTPException(422, "Le nom est requis.")
+    if db.query(Entrepot).filter(func.lower(Entrepot.nom) == nom.lower(), Entrepot.id != entrepot_id).first():
+        raise HTTPException(409, f"Un entrepôt nommé '{nom}' existe déjà.")
+    e.nom, e.adresse, e.actif = nom, data.adresse, data.actif
+    db.commit()
+    return {"id": e.id, "nom": e.nom, "adresse": e.adresse, "actif": e.actif}
+
+
+@router.get("/fournisseurs")
+def liste_fournisseurs(actif: Optional[bool] = None, db: Session = Depends(get_db)):
+    q = db.query(Fournisseur)
+    if actif is not None:
+        q = q.filter(Fournisseur.actif == actif)
+    return [
+        {
+            "id": f.id, "nom": f.nom, "contact": f.contact, "telephone": f.telephone,
+            "email": f.email, "adresse": f.adresse,
+            "delai_livraison_jours": f.delai_livraison_jours,
+            "solde_du": float(f.solde_du), "actif": f.actif, "notes": f.notes,
+        }
+        for f in q.order_by(Fournisseur.nom).all()
+    ]
+
+
+class FournisseurIn(BaseModel):
+    nom: str
+    contact: Optional[str] = None
+    telephone: Optional[str] = None
+    email: Optional[str] = None
+    adresse: Optional[str] = None
+    delai_livraison_jours: Optional[int] = None
+    actif: bool = True
+    notes: Optional[str] = None
+
+
+@router.post("/fournisseurs", status_code=201)
+def creer_fournisseur(data: FournisseurIn, db: Session = Depends(get_db)):
+    nom = data.nom.strip()
+    if not nom:
+        raise HTTPException(422, "Le nom est requis.")
+    if db.query(Fournisseur).filter(func.lower(Fournisseur.nom) == nom.lower()).first():
+        raise HTTPException(409, f"Un fournisseur nommé '{nom}' existe déjà.")
+    f = Fournisseur(
+        nom=nom, contact=data.contact, telephone=data.telephone, email=data.email,
+        adresse=data.adresse, delai_livraison_jours=data.delai_livraison_jours,
+        actif=data.actif, notes=data.notes,
+    )
+    db.add(f)
+    db.commit()
+    db.refresh(f)
+    return {"id": f.id, "nom": f.nom, "actif": f.actif}
+
+
+@router.put("/fournisseurs/{fournisseur_id}")
+def modifier_fournisseur(fournisseur_id: int, data: FournisseurIn, db: Session = Depends(get_db)):
+    f = db.query(Fournisseur).filter_by(id=fournisseur_id).first()
+    if not f:
+        raise HTTPException(404, "Fournisseur introuvable.")
+    nom = data.nom.strip()
+    if not nom:
+        raise HTTPException(422, "Le nom est requis.")
+    if db.query(Fournisseur).filter(func.lower(Fournisseur.nom) == nom.lower(), Fournisseur.id != fournisseur_id).first():
+        raise HTTPException(409, f"Un fournisseur nommé '{nom}' existe déjà.")
+    f.nom, f.contact, f.telephone = nom, data.contact, data.telephone
+    f.email, f.adresse = data.email, data.adresse
+    f.delai_livraison_jours, f.actif, f.notes = data.delai_livraison_jours, data.actif, data.notes
+    db.commit()
+    return {"id": f.id, "nom": f.nom, "actif": f.actif}
+
+
+@router.get("/clients/{client_id}/solde")
+def solde_credit_client(client_id: int, db: Session = Depends(get_db)):
+    """Solde dû agrégé (BarCredit.solde ouverts) + limite de crédit du
+    client — jamais un champ stocké, toujours recalculé (voir
+    pos_service.solde_client)."""
+    c = db.query(Client).filter_by(id=client_id).first()
+    if not c:
+        raise HTTPException(404, "Client introuvable.")
+    solde = solde_client(client_id, db)
+    limite = c.limite_credit
+    return {
+        "client_id": client_id,
+        "solde_du": float(solde),
+        "limite_credit": float(limite) if limite is not None else None,
+        "depassement": bool(limite is not None and solde > limite),
+    }
 
 
 # ══════════════════════════════════════════════════════════════════
