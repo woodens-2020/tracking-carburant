@@ -90,6 +90,11 @@ class DepartementIn(BaseModel):
     nom: str
 
 
+class DepartementUpdateIn(BaseModel):
+    nom:   Optional[str]  = None
+    actif: Optional[bool] = None
+
+
 def _dep_norm(nom: str) -> str:
     import re
     return re.sub(r"\s+", " ", (nom or "").strip()).casefold()
@@ -128,6 +133,30 @@ def creer_departement(data: DepartementIn, db: Session = Depends(get_db)):
         raise HTTPException(409, "Ce département existe déjà.")
     db.refresh(d)
     return {"id": d.id, "nom": d.nom, "actif": d.actif, "cree": True}
+
+
+@router.put("/departements/{departement_id}", status_code=200)
+def modifier_departement(departement_id: int, data: DepartementUpdateIn, db: Session = Depends(get_db)):
+    """Renomme et/ou active/désactive un département. Désactiver ne touche
+    à rien d'existant (caisses déjà transférées vers ce département
+    restent inchangées) — retire seulement le département des listes de
+    destination proposées pour de nouveaux transferts."""
+    d = db.get(BarDepartement, departement_id)
+    if not d:
+        raise HTTPException(404, "Département introuvable.")
+    if data.nom is not None:
+        nom = data.nom.strip()
+        if not nom:
+            raise HTTPException(400, "Le nom est requis.")
+        norm = _dep_norm(nom)[:60]
+        autre = db.query(BarDepartement).filter(BarDepartement.nom_norm == norm, BarDepartement.id != departement_id).first()
+        if autre:
+            raise HTTPException(409, f"Un département nommé « {autre.nom} » existe déjà.")
+        d.nom, d.nom_norm = nom[:60], norm
+    if data.actif is not None:
+        d.actif = data.actif
+    db.commit()
+    return {"id": d.id, "nom": d.nom, "actif": d.actif}
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -489,6 +518,107 @@ def detail_declaration_achat(declaration_id: int, db: Session = Depends(get_db))
         for c in caisses
     ]
     return out
+
+
+@router.get("/declarations-achat/{declaration_id}/pdf")
+def pdf_declaration_achat(declaration_id: int, db: Session = Depends(get_db)):
+    """Document PDF récapitulatif d'une déclaration d'achat — conservé comme
+    pièce de registre : fournisseur, notes, chaque ligne (produit/quantité/
+    prix), total général, liste des codes caisses générés, et l'état de
+    vérification au moment du téléchargement."""
+    from pieces_jointes_routes import compter_pieces_jointes_par_entite
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+
+    d = db.get(BarDeclarationAchat, declaration_id)
+    if not d:
+        raise HTTPException(404, "Déclaration introuvable.")
+    nb_photos = compter_pieces_jointes_par_entite(db, "bar_declaration_achat", [declaration_id]).get(declaration_id, 0)
+    lignes = db.query(BarLigneDeclarationAchat).filter_by(declaration_id=declaration_id).all()
+    caisses = db.query(BarCaisse).filter_by(declaration_id=declaration_id).order_by(BarCaisse.id).all()
+    complete = d.nb_caisses_confirmees >= d.nb_caisses_total and nb_photos >= 2
+
+    st_titre = ParagraphStyle("titre", fontSize=16, fontName="Helvetica-Bold", alignment=TA_CENTER)
+    st_info  = ParagraphStyle("info", fontSize=10, alignment=TA_LEFT, leading=14)
+    st_h     = ParagraphStyle("h", fontSize=9, fontName="Helvetica-Bold", textColor=colors.white)
+    st_cell  = ParagraphStyle("cell", fontSize=9, leading=12)
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=1.5*cm, rightMargin=1.5*cm,
+                            topMargin=1.2*cm, bottomMargin=1.2*cm,
+                            title=f"Déclaration d'achat #{declaration_id}")
+    elements = [
+        Paragraph(f"Déclaration d'achat #{declaration_id}", st_titre),
+        Spacer(1, 10),
+        Paragraph(
+            f"Fournisseur : {d.fournisseur.nom if d.fournisseur else (d.fournisseur_nom or '—')}<br/>"
+            f"Date : {d.created_at.strftime('%d/%m/%Y %H:%M') if d.created_at else '—'}<br/>"
+            f"Enregistré par : {d.utilisateur.nom_complet if d.utilisateur else '—'}<br/>"
+            f"Notes : {d.notes or '—'}",
+            st_info,
+        ),
+        Spacer(1, 14),
+    ]
+
+    lignes_data = [[Paragraph("Produit", st_h), Paragraph("Nb caisses", st_h),
+                    Paragraph("Prix/caisse", st_h), Paragraph("Total ligne", st_h)]]
+    total_general = Decimal("0")
+    for l in lignes:
+        total_ligne = (l.prix_achat_caisse * l.nb_caisses) if l.prix_achat_caisse else None
+        if total_ligne:
+            total_general += total_ligne
+        lignes_data.append([
+            Paragraph(l.produit.nom if l.produit else "—", st_cell),
+            Paragraph(str(l.nb_caisses), st_cell),
+            Paragraph(f"{l.prix_achat_caisse:,.2f} G" if l.prix_achat_caisse else "—", st_cell),
+            Paragraph(f"{total_ligne:,.2f} G" if total_ligne else "—", st_cell),
+        ])
+    lignes_data.append(["", "", Paragraph("<b>Total général</b>", st_cell),
+                        Paragraph(f"<b>{total_general:,.2f} G</b>", st_cell)])
+    table_lignes = Table(lignes_data, colWidths=[7*cm, 3*cm, 3.5*cm, 3.5*cm])
+    table_lignes.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
+        ("GRID", (0, 0), (-1, -2), 0.5, colors.HexColor("#cccccc")),
+        ("LINEABOVE", (0, -1), (-1, -1), 1, colors.HexColor("#333333")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    elements += [table_lignes, Spacer(1, 16)]
+
+    elements.append(Paragraph(f"Caisses générées ({len(caisses)})", st_info))
+    codes_data = [[Paragraph("Code", st_h), Paragraph("Produit", st_h), Paragraph("Confirmée", st_h)]]
+    for c in caisses:
+        codes_data.append([
+            Paragraph(c.code_unique, st_cell),
+            Paragraph(c.produit.nom if c.produit else "—", st_cell),
+            Paragraph("✓" if c.confirmee else "—", st_cell),
+        ])
+    table_codes = Table(codes_data, colWidths=[5*cm, 8*cm, 3*cm])
+    table_codes.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    elements += [Spacer(1, 6), table_codes, Spacer(1, 16)]
+
+    statut_txt = (
+        f"Vérification de réception : {d.nb_caisses_confirmees}/{d.nb_caisses_total} caisses confirmées, "
+        f"{nb_photos}/2 photos jointes — "
+        + ("<b>complète</b>." if complete else "<b>en attente</b> (rappel non bloquant).")
+    )
+    elements.append(Paragraph(statut_txt, st_info))
+
+    doc.build(elements)
+    buf.seek(0)
+    return StreamingResponse(
+        buf, media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="declaration_achat_{declaration_id}.pdf"'},
+    )
 
 
 class ConfirmerCaisseIn(BaseModel):

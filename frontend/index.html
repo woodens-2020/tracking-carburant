@@ -7162,7 +7162,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div class="gi-subtitle">Traçabilité individuelle par QR code — dépôt, transferts, ventes</div>
             </div>
           </div>
-          <div class="gi-page-header-actions">
+          <div class="gi-page-header-actions" style="align-items:center">
+            <span style="font-size:12px;color:rgba(255,255,255,.4);margin-right:2px">Étiquettes :</span>
+            <button type="button" class="db-preset pcx-largeur-btn" data-mm="80" onclick="pcxDefinirLargeurEtiquette(80)">80mm</button>
+            <button type="button" class="db-preset pcx-largeur-btn" data-mm="58" onclick="pcxDefinirLargeurEtiquette(58)">58mm</button>
             <button class="gi-btn-primary" onclick="posCaissesGenererModal()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Déclarer un achat / Générer les codes
@@ -7188,6 +7191,35 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="cat-panel-title">Stock par département</div>
           <div id="pcx-stock-dept" style="overflow-x:auto">
             <span style="color:rgba(255,255,255,.25);font-size:13px">Chargement…</span>
+          </div>
+        </div>
+
+        <!-- Gérer départements — les kotes/lieux où une caisse peut être transférée -->
+        <div class="cat-panel">
+          <div class="cat-panel-title">Départements (lieux de transfert)</div>
+          <div class="cat-chips" id="pcx-dep-chips-wrap">
+            <span style="color:rgba(255,255,255,.25);font-size:13px">Chargement…</span>
+          </div>
+          <div class="cat-add-row">
+            <input id="pcx-dep-new-input" placeholder="Ajouter un département…" maxlength="60"
+              onkeydown="if(event.key==='Enter')pcxDepartementCreer()">
+            <button class="cat-add-btn" onclick="pcxDepartementCreer()">+ Ajouter</button>
+          </div>
+        </div>
+
+        <!-- Registre des déclarations d'achat — historique conservé, chacune
+             avec son document PDF récapitulatif. -->
+        <div class="gi-table-card" style="margin-bottom:16px">
+          <div class="gi-table-hdr">
+            <span class="gi-table-title">Registre des déclarations d'achat</span>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="gi-table">
+              <thead><tr><th>Date</th><th>Fournisseur</th><th>Articles</th><th>Caisses</th><th>Vérification</th><th>Actions</th></tr></thead>
+              <tbody id="pcx-registre-tbody">
+                <tr><td colspan="6" style="text-align:center;padding:16px;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -24590,6 +24622,9 @@ async function loadPosCaisses(){
   }
   _pcxLoadStockDept();
   _pcxLoadRappelVerification();
+  _pcxLoadDepartementsGeres();
+  _pcxLoadRegistreDeclarations();
+  pcxDefinirLargeurEtiquette(pcxLargeurEtiquette());
 }
 
 async function _pcxLoadRappelVerification(){
@@ -24700,6 +24735,94 @@ async function pcxChargerRapport(){
     }
   }catch(e){
     corps.innerHTML = `<span style="color:#f87171;font-size:13px">${e.message||'Erreur réseau'}</span>`;
+  }
+}
+
+// ── Gérer départements (lieux de transfert) ───────────────────────────
+let _pcxDepartementsToutes = [];
+
+async function _pcxLoadDepartementsGeres(){
+  try{
+    _pcxDepartementsToutes = await apiFetch('GET', '/pos/departements?inclure_inactifs=true');
+  }catch(e){ _pcxDepartementsToutes = []; }
+  _pcxRenderDepartementsChips();
+}
+function _pcxRenderDepartementsChips(){
+  const wrap = document.getElementById('pcx-dep-chips-wrap');
+  if(!wrap) return;
+  if(!_pcxDepartementsToutes.length){
+    wrap.innerHTML = '<span style="color:rgba(255,255,255,.25);font-size:13px">Aucun département — ajoutez-en un ci-dessous.</span>';
+    return;
+  }
+  wrap.innerHTML = _pcxDepartementsToutes.map(d=>{
+    const clr = d.actif ? '#3fb6a8' : 'rgba(255,255,255,.3)';
+    const safNom = (d.nom||'').replace(/'/g,"\\'");
+    return `<span class="cat-chip" style="background:${clr}1a;color:${clr};border:1px solid ${clr}44;gap:6px">
+      <span>${d.nom}${!d.actif?' (inactif)':''}</span>
+      <button class="cat-chip-del" style="background:${clr}22;color:${clr};border:none;border-radius:4px;padding:1px 5px;cursor:pointer;font-size:13px" onclick="pcxDepartementRenommer(${d.id},'${safNom}')" title="Renommer">✎</button>
+      <button class="cat-chip-del" onclick="pcxDepartementToggleActif(${d.id},${d.actif?'false':'true'})" title="${d.actif?'Désactiver':'Réactiver'}">${d.actif?'✕':'↺'}</button>
+    </span>`;
+  }).join('');
+}
+async function pcxDepartementCreer(){
+  const inp = document.getElementById('pcx-dep-new-input');
+  const nom = (inp?.value||'').trim();
+  if(!nom){ posAlert('Entrez un nom de département.','warn'); return; }
+  try{
+    await apiFetch('POST','/pos/departements',{nom});
+    if(inp) inp.value = '';
+    await _pcxLoadDepartementsGeres();
+    posAlert(`Département « ${nom} » ajouté.`,'ok');
+  }catch(e){ posAlert(e.message||'Erreur.','err'); }
+}
+async function pcxDepartementRenommer(id, nomActuel){
+  const nouveau = prompt(`Renommer « ${nomActuel} » en :`, nomActuel);
+  if(!nouveau || nouveau.trim()===nomActuel) return;
+  try{
+    await apiFetch('PUT',`/pos/departements/${id}`,{nom: nouveau.trim()});
+    await _pcxLoadDepartementsGeres();
+    posAlert('Département renommé.','ok');
+  }catch(e){ posAlert(e.message||'Erreur lors du renommage.','err'); }
+}
+async function pcxDepartementToggleActif(id, actif){
+  try{
+    await apiFetch('PUT',`/pos/departements/${id}`,{actif});
+    await _pcxLoadDepartementsGeres();
+  }catch(e){ posAlert(e.message||'Erreur.','err'); }
+}
+
+// ── Registre des déclarations d'achat ─────────────────────────────────
+async function _pcxLoadRegistreDeclarations(){
+  const tbody = document.getElementById('pcx-registre-tbody');
+  if(!tbody) return;
+  try{
+    const rows = await apiFetch('GET', '/pos/declarations-achat?limit=50');
+    if(!rows || !rows.length){
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:rgba(255,255,255,.3)">Aucune déclaration pour le moment.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(d=>`
+      <tr>
+        <td style="font-size:12.5px;color:rgba(255,255,255,.5)">${posDateFr(d.created_at)}</td>
+        <td>${d.fournisseur_nom||'<span class="td-muted">—</span>'}</td>
+        <td>${d.notes||'<span class="td-muted">—</span>'}</td>
+        <td>${d.nb_caisses_total}</td>
+        <td>${d.complete
+          ? '<span class="pos-badge teal" style="font-size:11px">✓ Complète</span>'
+          : `<span class="pos-badge amber" style="font-size:11px">${d.nb_caisses_confirmees}/${d.nb_caisses_total} · ${d.nb_photos}/2 photos</span>`}</td>
+        <td>
+          <div class="gi-actions">
+            <button class="gi-btn-icon" title="Vérification" onclick="posVerifDeclarationModalOpen(${d.id})">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            </button>
+            <button class="gi-btn-icon" title="Télécharger le PDF" onclick="window.open('/api/pos/declarations-achat/${d.id}/pdf','_blank')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }catch(e){
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#f87171;padding:16px">${e.message||'Erreur réseau'}</td></tr>`;
   }
 }
 
@@ -24844,7 +24967,7 @@ function _pcxGenLigneRowHTML(){
     + _pcxProduitsVpc.map(p=>`<option value="${p.id}" data-upc="${p.unites_par_caisse||0}">${p.nom}</option>`).join('');
   return `<div class="pos-form-row pcx-gen-ligne" style="align-items:flex-end;margin-bottom:8px">
     <div style="flex:2;min-width:0">
-      <select class="pos-select" style="width:100%" onchange="pcxGenUpdateLive()">${opts}</select>
+      <select class="pos-select" style="width:100%" onchange="pcxGenUpdateLive();pcxGenAjouterLigneSiDerniere(this)">${opts}</select>
     </div>
     <div style="flex:1">
       <input class="pos-input" type="number" min="1" step="1" placeholder="Nb caisses" oninput="pcxGenUpdateLive()">
@@ -24858,6 +24981,15 @@ function _pcxGenLigneRowHTML(){
 }
 function pcxGenAjouterLigne(){
   document.getElementById('pcx-gen-lignes').insertAdjacentHTML('beforeend', _pcxGenLigneRowHTML());
+}
+// Ergonomie : dès qu'un produit est choisi sur la DERNIÈRE ligne, une
+// nouvelle ligne vide s'ajoute automatiquement — évite de cliquer
+// "+ Ajouter un article" après chaque produit pour un achat multi-lignes.
+function pcxGenAjouterLigneSiDerniere(selectEl){
+  const ligne = selectEl.closest('.pcx-gen-ligne');
+  if(selectEl.value && ligne === document.querySelector('#pcx-gen-lignes .pcx-gen-ligne:last-child')){
+    pcxGenAjouterLigne();
+  }
 }
 function _pcxGenCollecterLignes(){
   const lignes = [];
@@ -24898,11 +25030,8 @@ async function posCaissesGenererSauvegarder(){
     });
     posCaissesGenererModalClose();
     posAlert(`${res.nb_caisses_generees} caisse(s) générée(s) sur ${lignes.length} article(s) (au dépôt, stock POS pas encore crédité).`,'ok');
-    const ids = res.caisses.map(c=>c.id);
     await loadPosCaisses();
-    if(await showConfirm(`Imprimer les ${ids.length} étiquette(s) QR maintenant ?`, {title:'Impression', okLabel:'Imprimer'})){
-      posCaissesImprimerEtiquettes(ids);
-    }
+    posImprimerEtiquettesPOSAuto(res.caisses);   // impression automatique, sans confirmation
     posVerifDeclarationModalOpen(res.declaration.id);
   }catch(e){
     posAlert(e.message||'Erreur lors de la déclaration.','err');
@@ -25179,6 +25308,38 @@ async function posCaisseImprimerEtiquette80mm(id){
       <div style="display:flex;justify-content:center">${barcodeSVG}</div>
     </div>`;
   _posOuvrirImprimer(html, `Étiquette ${c.code_unique}`);
+}
+
+// ── Étiquettes POS en série — imprimées automatiquement juste après une
+// déclaration d'achat (aucune confirmation demandée), une étiquette par
+// caisse générée, dans l'ordre, séparées par un saut de page (impression
+// continue sur rouleau thermique). Largeur (80mm/58mm) mémorisée par
+// appareil dans localStorage — jamais redemandée à chaque impression.
+function pcxLargeurEtiquette(){
+  return parseInt(localStorage.getItem('pcx_etiquette_largeur') || '80', 10);
+}
+function pcxDefinirLargeurEtiquette(mm){
+  localStorage.setItem('pcx_etiquette_largeur', String(mm));
+  document.querySelectorAll('.pcx-largeur-btn').forEach(b=>{
+    b.classList.toggle('active', parseInt(b.getAttribute('data-mm'),10)===mm);
+  });
+}
+function _pcxEtiquettePOSBlocHTML(c, index){
+  const prod = _pcxProduitsVpc.find(p=>p.id===c.produit_id);
+  const prix = prod ? (prod.prix_vente_unite ?? prod.prix_actif) : null;
+  let barcodeSVG = '';
+  try{ barcodeSVG = _renderCode128SVGString(c.code_unique); }catch(e){}
+  return `<div style="text-align:center;${index>0?'page-break-before:always;padding-top:2mm':''}">
+    <div style="font-size:15px;font-weight:800;margin-bottom:2px">${c.produit_nom||''}</div>
+    <div style="font-size:11px;color:#555;margin-bottom:6px">${new Date().toLocaleDateString('fr-HT')}</div>
+    ${prix != null ? `<div style="font-size:13px;font-weight:700;margin-bottom:6px">${posGx(prix)}</div>` : ''}
+    <div style="display:flex;justify-content:center">${barcodeSVG}</div>
+  </div>`;
+}
+function posImprimerEtiquettesPOSAuto(caisses){
+  if(!caisses || !caisses.length) return;
+  const html = caisses.map((c,i)=>_pcxEtiquettePOSBlocHTML(c,i)).join('');
+  _posOuvrirImprimer(html, `Étiquettes (${caisses.length})`, pcxLargeurEtiquette());
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -26693,25 +26854,29 @@ function posSetMode(mode, btn){
 }
 
 // ─── Utilitaires reçu partagés ───────────────────────────────────────────────
-const _POS_PRINT_CSS = [
-  '*{margin:0;padding:0;box-sizing:border-box}',
-  'body{font-family:Arial,sans-serif;width:80mm;margin:0 auto;padding:5mm 4mm;color:#111;background:#fff}',
-  '@page{size:80mm auto;margin:3mm}',
-  '@media print{.no-print{display:none!important}}',
-  'hr{border:none}',
-  '.sep{border-top:1px dashed #bbb;margin:8px 0}',
-  '.sep-bold{border-top:2px solid #333;margin:9px 0}',
-  'table{width:100%;border-collapse:collapse}',
-  'th,td{vertical-align:top}',
-].join('');
+function _posPrintCSS(largeurMm){
+  const mm = largeurMm || 80;
+  return [
+    '*{margin:0;padding:0;box-sizing:border-box}',
+    `body{font-family:Arial,sans-serif;width:${mm}mm;margin:0 auto;padding:5mm 4mm;color:#111;background:#fff}`,
+    `@page{size:${mm}mm auto;margin:3mm}`,
+    '@media print{.no-print{display:none!important}}',
+    'hr{border:none}',
+    '.sep{border-top:1px dashed #bbb;margin:8px 0}',
+    '.sep-bold{border-top:2px solid #333;margin:9px 0}',
+    'table{width:100%;border-collapse:collapse}',
+    'th,td{vertical-align:top}',
+  ].join('');
+}
+const _POS_PRINT_CSS = _posPrintCSS(80);   // conservée pour compat (reçus existants, 80mm)
 
-function _posOuvrirImprimer(htmlContent, title){
+function _posOuvrirImprimer(htmlContent, title, largeurMm){
   const w = window.open('','_blank','width=370,height=720,menubar=no,toolbar=no,scrollbars=yes');
   if(!w) return;
   const printBtn = `<div class="no-print" style="text-align:center;margin-top:10mm">
     <button onclick="window.print()" style="padding:7px 22px;font-size:14px;cursor:pointer;border:1px solid #bbb;border-radius:5px;background:#f0f0f0">🖨 Imprimer</button></div>`;
   w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
-    <title>${title}</title><style>${_POS_PRINT_CSS}</style></head>
+    <title>${title}</title><style>${_posPrintCSS(largeurMm)}</style></head>
     <body>${htmlContent}${printBtn}</body></html>`);
   w.document.close();
   w.addEventListener('load',()=>{ try{ w.print(); }catch(_){} });
