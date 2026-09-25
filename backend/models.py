@@ -717,6 +717,11 @@ class BarAchat(Base):
     date_achat           = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     utilisateur_id       = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     notes                = Column(String(300), nullable=True)
+    # Renseigné uniquement quand cet achat provient d'une ligne d'une
+    # déclaration d'achat multi-articles (voir BarDeclarationAchat) — NULL
+    # pour tous les achats existants et pour les achats à un seul produit
+    # (recevoir_marchandises, generer_caisses).
+    declaration_id       = Column(Integer, ForeignKey("bar_declarations_achat.id", ondelete="SET NULL"), nullable=True)
 
     statut           = Column(String(20), nullable=False, default='EN_ATTENTE')
     # EN_ATTENTE  → achat enregistré, stock pas encore mis à jour
@@ -1571,6 +1576,19 @@ class BarCaisse(Base):
     transferee_at       = Column(DateTime(timezone=True), nullable=True)
     vente_debut_at      = Column(DateTime(timezone=True), nullable=True)
     terminee_at         = Column(DateTime(timezone=True), nullable=True)
+    # Confirmation de réception (scan physique de la caisse après une
+    # déclaration d'achat multi-articles) — rappel non bloquant, voir
+    # BarDeclarationAchat : ne conditionne jamais transfert/vente/ajustement.
+    confirmee           = Column(Boolean, nullable=False, default=False)
+    confirmee_le         = Column(DateTime(timezone=True), nullable=True)
+    confirmee_par_id     = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    # Rattachement direct à une déclaration d'achat multi-articles — NULL
+    # pour les caisses générées via generer_caisses (une ligne, pas de
+    # déclaration). Renseigné inconditionnellement par declarer_achat_multi,
+    # y compris pour les lignes sans prix (donc sans BarAchat/achat_id) —
+    # achat_id seul ne suffit pas à retrouver "toutes les caisses de cette
+    # déclaration" quand une ligne n'a pas de prix.
+    declaration_id      = Column(Integer, ForeignKey("bar_declarations_achat.id", ondelete="SET NULL"), nullable=True)
 
     produit     = relationship("BarProduit")
     achat       = relationship("BarAchat")
@@ -1594,6 +1612,7 @@ class BarCaisse(Base):
         Index("idx_bar_caisses_produit", "produit_id"),
         Index("idx_bar_caisses_statut",  "statut"),
         Index("idx_bar_caisses_departement", "departement_id"),
+        Index("idx_bar_caisses_declaration", "declaration_id"),
     )
 
 
@@ -1617,10 +1636,66 @@ class BarCaisseMouvement(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "type_mouvement IN ('TRANSFERT','VENTE','CASSE','PERTE','CORRECTION','ANNULATION')",
+            "type_mouvement IN ('TRANSFERT','VENTE','CASSE','PERTE','CORRECTION','ANNULATION','CONFIRMATION')",
             name="chk_bar_caisse_mouv_type",
         ),
         Index("idx_bar_caisse_mouv_caisse", "caisse_id"),
+    )
+
+
+class BarDeclarationAchat(Base):
+    """En-tête d'une déclaration d'achat multi-articles (plusieurs produits
+    différents en une fois, même fournisseur/voyage) — chaque ligne
+    (BarLigneDeclarationAchat) génère son propre BarAchat + ses BarCaisse,
+    exactement comme l'ancien generer_caisses à un seul produit.
+
+    Pas de colonne "statut" : la complétude (toutes les caisses scannées
+    pour confirmer la réception physique + 2 pièces jointes) se calcule à
+    la lecture (voir bar_caisses_routes.py) pour éviter un flag qui
+    pourrait se désynchroniser des compteurs réels. C'est un rappel non
+    bloquant — aucune caisse générée ici n'est empêchée d'être transférée
+    ou vendue tant que la vérification n'est pas terminée."""
+    __tablename__ = "bar_declarations_achat"
+
+    id                    = Column(Integer, primary_key=True)
+    fournisseur_id        = Column(Integer, ForeignKey("fournisseurs.id", ondelete="SET NULL"), nullable=True)
+    fournisseur_nom       = Column(String(150), nullable=True)  # repli texte libre si pas de fournisseur structuré
+    notes                 = Column(String(300), nullable=True)
+    nb_caisses_total      = Column(Integer, nullable=False, default=0)   # figé à la création
+    nb_caisses_confirmees = Column(Integer, nullable=False, default=0)   # incrémenté à chaque scan de confirmation
+    utilisateur_id        = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at            = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    fournisseur = relationship("Fournisseur")
+    utilisateur = relationship("Utilisateur", foreign_keys=[utilisateur_id])
+    lignes      = relationship("BarLigneDeclarationAchat", back_populates="declaration",
+                               cascade="all, delete-orphan")
+
+    __table_args__ = (
+        CheckConstraint("nb_caisses_total >= 0",      name="chk_bar_decl_achat_total_pos"),
+        CheckConstraint("nb_caisses_confirmees >= 0", name="chk_bar_decl_achat_confirmees_pos"),
+        Index("idx_bar_decl_achat_date", "created_at"),
+    )
+
+
+class BarLigneDeclarationAchat(Base):
+    """Une ligne (un produit) d'une déclaration d'achat multi-articles."""
+    __tablename__ = "bar_lignes_declaration_achat"
+
+    id                 = Column(Integer, primary_key=True)
+    declaration_id     = Column(Integer, ForeignKey("bar_declarations_achat.id", ondelete="CASCADE"), nullable=False)
+    produit_id         = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
+    nb_caisses         = Column(Integer, nullable=False)
+    prix_achat_caisse  = Column(Numeric(12, 2), nullable=True)
+    achat_id           = Column(Integer, ForeignKey("bar_achats.id", ondelete="SET NULL"), nullable=True)
+
+    declaration = relationship("BarDeclarationAchat", back_populates="lignes")
+    produit     = relationship("BarProduit")
+    achat       = relationship("BarAchat")
+
+    __table_args__ = (
+        CheckConstraint("nb_caisses > 0", name="chk_bar_ligne_decl_nb_pos"),
+        Index("idx_bar_ligne_decl_declaration", "declaration_id"),
     )
 
 

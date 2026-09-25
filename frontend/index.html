@@ -7179,6 +7179,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="gi-kpi"><div class="gi-kpi-lbl">Total caisses</div><div class="gi-kpi-val" id="pcx-kpi-total">—</div></div>
         </div>
 
+        <!-- Rappel non bloquant — déclarations d'achat pas encore vérifiées
+             (caisses scannées + 2 photos). N'empêche jamais transfert/vente. -->
+        <div id="pcx-verif-rappel" style="display:none;background:rgba(247,169,59,.08);border:1px solid rgba(247,169,59,.25);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;color:#f7a93b"></div>
+
         <!-- Stock par département — chaque bar a son propre stock, séparé -->
         <div class="cat-panel">
           <div class="cat-panel-title">Stock par département</div>
@@ -7260,47 +7264,74 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
     <!-- Modal — Déclarer un achat / Générer les codes -->
     <div class="pos-modal-bg" id="pcx-generer-modal-bg" onclick="if(event.target===this)posCaissesGenererModalClose()">
-      <div class="pos-modal">
+      <div class="pos-modal" style="max-width:680px">
         <h3>Déclarer un achat / Générer les codes</h3>
-        <div class="pos-form-row">
-          <div style="width:100%">
-            <label class="pos-label">Produit *</label>
-            <select class="pos-select" id="pcx-gen-produit" style="width:100%" onchange="posCaissesGenUpdateInfo()">
-              <option value="">— Choisir un produit vendu par caisse —</option>
-            </select>
-            <div id="pcx-gen-produit-hint" style="font-size:12.5px;color:rgba(255,255,255,.4);margin-top:5px"></div>
-          </div>
-        </div>
-        <div class="pos-form-row">
-          <div style="flex:1">
-            <label class="pos-label">Nombre de caisses achetées *</label>
-            <input class="pos-input" id="pcx-gen-nb" type="number" min="1" step="1" placeholder="Ex : 5" oninput="posCaissesGenUpdateInfo()">
-          </div>
-          <div style="flex:1">
-            <label class="pos-label">Prix d'achat / caisse (G) <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
-            <input class="pos-input" id="pcx-gen-prix" type="number" min="0" step="0.01" placeholder="0.00">
-          </div>
-        </div>
-        <div id="pcx-gen-live" style="display:none;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);border-radius:8px;padding:10px 14px;margin:4px 0 8px;font-size:14.5px;color:#38bdf8"></div>
         <div class="pos-form-row">
           <div style="flex:1">
             <label class="pos-label">Fournisseur <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
-            <input class="pos-input" id="pcx-gen-fournisseur" placeholder="Nom du fournisseur">
+            <div style="display:flex;gap:6px;align-items:center">
+              <select class="pos-select" id="pcx-gen-fournisseur-sel" style="flex:1;min-width:0">
+                <option value="">— Aucun / non précisé —</option>
+              </select>
+              <button type="button" onclick="pcxFournisseurAddToggle()" title="Nouveau fournisseur"
+                style="flex-shrink:0;width:30px;height:30px;border-radius:7px;border:1px dashed rgba(63,182,168,.5);background:rgba(63,182,168,.08);color:#3fb6a8;cursor:pointer;font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center">+</button>
+            </div>
+            <div id="pcx-gen-fournisseur-new-row" style="display:none;margin-top:7px">
+              <div style="display:flex;gap:6px;align-items:center">
+                <input class="pos-input" id="pcx-gen-fournisseur-new-nom" placeholder="Nom du nouveau fournisseur…" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')pcxFournisseurCreer();if(event.key==='Escape')pcxFournisseurAddToggle(false)">
+                <button type="button" onclick="pcxFournisseurCreer()" title="Confirmer"
+                  style="flex-shrink:0;width:28px;height:28px;border-radius:6px;border:none;background:rgba(63,182,168,.2);color:#3fb6a8;cursor:pointer;font-size:17px;display:flex;align-items:center;justify-content:center">✓</button>
+                <button type="button" onclick="pcxFournisseurAddToggle(false)" title="Annuler"
+                  style="flex-shrink:0;width:28px;height:28px;border-radius:6px;border:none;background:rgba(248,113,113,.12);color:#f87171;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center">✕</button>
+              </div>
+            </div>
           </div>
           <div style="flex:1">
             <label class="pos-label">Notes</label>
-            <input class="pos-input" id="pcx-gen-notes" placeholder="Lot, référence…">
+            <input class="pos-input" id="pcx-gen-notes" placeholder="Référence, numéro de bon…">
           </div>
         </div>
+
+        <div class="pos-label" style="margin-top:8px">Articles achetés *</div>
+        <div id="pcx-gen-lignes"></div>
+        <button type="button" class="pos-btn ghost" style="margin:6px 0 10px" onclick="pcxGenAjouterLigne()">+ Ajouter un article</button>
+
+        <div id="pcx-gen-live" style="display:none;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);border-radius:8px;padding:10px 14px;margin:4px 0 8px;font-size:14.5px;color:#38bdf8"></div>
         <div style="font-size:12px;color:rgba(255,255,255,.35);margin:2px 0 8px">
-          Chaque caisse reçoit un identifiant unique (ex. CAISSE-2026-000001) et un QR — jamais plus, jamais moins que le nombre de caisses saisi ci-dessus.
+          Chaque caisse reçoit un identifiant unique (ex. CAISSE-2026-000001) et un QR — jamais plus, jamais moins que le nombre saisi pour chaque article.
         </div>
         <div style="font-size:12.5px;color:#f7a93b;background:rgba(247,169,59,.08);border:1px solid rgba(247,169,59,.2);border-radius:8px;padding:9px 12px;margin-bottom:8px">
-          ⚠ Le stock n'est <strong>pas</strong> ajouté au POS maintenant — les caisses entrent au dépôt. Le stock ne montera que lorsqu'une caisse sera <strong>scannée et livrée</strong> à un département.
+          ⚠ Le stock n'est <strong>pas</strong> ajouté au POS maintenant — les caisses entrent au dépôt. Le stock ne montera que lorsqu'une caisse sera <strong>scannée et livrée</strong> à un département. Après la déclaration, il faudra <strong>scanner chaque caisse</strong> et joindre <strong>2 photos</strong> pour confirmer la réception (rappel, non bloquant).
         </div>
         <div class="pos-modal-footer">
           <button class="pos-btn ghost" onclick="posCaissesGenererModalClose()">Annuler</button>
-          <button class="pos-btn primary" id="pcx-gen-btn" onclick="posCaissesGenererSauvegarder()">Générer les codes</button>
+          <button class="pos-btn primary" id="pcx-gen-btn" onclick="posCaissesGenererSauvegarder()">Déclarer l'achat</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal — Vérification de réception (scan chaque caisse + 2 photos) -->
+    <div class="pos-modal-bg" id="pcx-verif-modal-bg" onclick="if(event.target===this)posVerifDeclarationModalClose()">
+      <div class="pos-modal" style="max-width:520px">
+        <h3>Vérification de réception</h3>
+        <input type="hidden" id="pcx-verif-declaration-id">
+        <div id="pcx-verif-fournisseur" style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:10px"></div>
+        <div style="background:var(--panel3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px">
+          <div id="pcx-verif-compteur-caisses" style="font-size:15px;font-weight:700"></div>
+          <div id="pcx-verif-compteur-photos" style="font-size:13.5px;color:rgba(255,255,255,.6);margin-top:3px"></div>
+        </div>
+        <input id="pcx-verif-scan-input" class="pos-input" placeholder="Scanner ou taper le code de la caisse…"
+          style="width:100%;font-family:monospace;margin-bottom:10px" autocomplete="off"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();pcxVerifScanner();}">
+        <div id="pcx-verif-liste-caisses" style="max-height:200px;overflow-y:auto;margin-bottom:12px"></div>
+        <div style="display:flex;gap:8px;margin-bottom:6px">
+          <input type="file" id="pcx-verif-photo-input-1" accept="image/*" capture="environment" style="display:none" onchange="pcxVerifPhotoUpload(1)">
+          <button type="button" class="pos-btn ghost" style="flex:1" id="pcx-verif-photo-btn-1" onclick="document.getElementById('pcx-verif-photo-input-1').click()">📷 Photo 1</button>
+          <input type="file" id="pcx-verif-photo-input-2" accept="image/*" capture="environment" style="display:none" onchange="pcxVerifPhotoUpload(2)">
+          <button type="button" class="pos-btn ghost" style="flex:1" id="pcx-verif-photo-btn-2" onclick="document.getElementById('pcx-verif-photo-input-2').click()">📷 Photo 2</button>
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="posVerifDeclarationModalClose()">Continuer plus tard</button>
         </div>
       </div>
     </div>
@@ -24558,6 +24589,19 @@ async function loadPosCaisses(){
     if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
   _pcxLoadStockDept();
+  _pcxLoadRappelVerification();
+}
+
+async function _pcxLoadRappelVerification(){
+  const el = document.getElementById('pcx-verif-rappel');
+  if(!el) return;
+  try{
+    const incompletes = await apiFetch('GET', '/pos/declarations-achat?incompletes_seulement=true');
+    if(!incompletes || !incompletes.length){ el.style.display = 'none'; return; }
+    el.style.display = '';
+    el.innerHTML = `⚠ ${incompletes.length} déclaration${incompletes.length!==1?'s':''} d'achat en attente de vérification (caisses à scanner + photos) — `
+      + incompletes.map(d=>`<a href="#" onclick="posVerifDeclarationModalOpen(${d.id});return false" style="color:#f7a93b;text-decoration:underline;margin-right:8px">#${d.id} (${d.nb_caisses_confirmees}/${d.nb_caisses_total}, ${d.nb_photos}/2 photos)</a>`).join('');
+  }catch(e){ el.style.display = 'none'; }
 }
 
 async function _pcxLoadStockDept(){
@@ -24740,71 +24784,212 @@ async function posCaisseScanLookup(){
 }
 
 // ── Générer des caisses ──────────────────────────────────────────────
+let _pcxFournisseurs = [];
+
 async function posCaissesGenererModal(){
   if(_isReadOnly()){ posAlert('Accès lecture seule.','err'); return; }
   try{
     const produits = await apiFetch('GET','/pos/produits');
     _pcxProduitsVpc = (produits||[]).filter(p=>p.vendu_par_caisse && p.actif);
   }catch(e){ _pcxProduitsVpc = []; }
-  const sel = document.getElementById('pcx-gen-produit');
-  sel.innerHTML = '<option value="">— Choisir un produit vendu par caisse —</option>'
-    + _pcxProduitsVpc.map(p=>`<option value="${p.id}" data-upc="${p.unites_par_caisse||0}">${p.nom}</option>`).join('');
-  if(!_pcxProduitsVpc.length){
-    document.getElementById('pcx-gen-produit-hint').textContent =
-      'Aucun produit configuré « vendu par caisse ». Activez cette option depuis Produits Bar d\'abord.';
-  } else {
-    document.getElementById('pcx-gen-produit-hint').textContent = '';
-  }
-  document.getElementById('pcx-gen-nb').value = '';
-  document.getElementById('pcx-gen-prix').value = '';
-  document.getElementById('pcx-gen-fournisseur').value = '';
+  try{ _pcxFournisseurs = await apiFetch('GET','/pos/fournisseurs?actif=true'); }catch(e){ _pcxFournisseurs = []; }
+  _pcxFillFournisseurSelect();
+  pcxFournisseurAddToggle(false);
   document.getElementById('pcx-gen-notes').value = '';
   document.getElementById('pcx-gen-live').style.display = 'none';
+  document.getElementById('pcx-gen-lignes').innerHTML = '';
+  if(!_pcxProduitsVpc.length){
+    posAlert('Aucun produit configuré « vendu par caisse ». Activez cette option depuis Produits Bar d\'abord.','warn');
+  }
+  pcxGenAjouterLigne();
   document.getElementById('pcx-generer-modal-bg').classList.add('open');
 }
 function posCaissesGenererModalClose(){
   document.getElementById('pcx-generer-modal-bg').classList.remove('open');
 }
-function posCaissesGenUpdateInfo(){
-  const sel = document.getElementById('pcx-gen-produit');
-  const opt = sel.options[sel.selectedIndex];
-  const upc = opt ? parseInt(opt.getAttribute('data-upc')||'0',10) : 0;
-  const nb  = parseInt(document.getElementById('pcx-gen-nb').value||'0',10);
-  const live = document.getElementById('pcx-gen-live');
-  if(upc>0 && nb>0){
-    live.style.display = '';
-    live.textContent = `${nb} caisse${nb!==1?'s':''} × ${upc} unités = ${nb*upc} unités au total — ${nb} code${nb!==1?'s':''} unique${nb!==1?'s':''} généré${nb!==1?'s':''}.`;
-  } else {
-    live.style.display = 'none';
-  }
+
+function _pcxFillFournisseurSelect(){
+  const sel = document.getElementById('pcx-gen-fournisseur-sel');
+  if(!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Aucun / non précisé —</option>'
+    + _pcxFournisseurs.map(f=>`<option value="${f.id}">${f.nom}</option>`).join('');
+  if(cur) sel.value = cur;
 }
+function pcxFournisseurAddToggle(show){
+  const row = document.getElementById('pcx-gen-fournisseur-new-row');
+  const inp = document.getElementById('pcx-gen-fournisseur-new-nom');
+  if(!row) return;
+  const visible = show === undefined ? row.style.display === 'none' : show;
+  row.style.display = visible ? '' : 'none';
+  if(visible && inp){ inp.value=''; inp.focus(); }
+}
+async function pcxFournisseurCreer(){
+  const inp = document.getElementById('pcx-gen-fournisseur-new-nom');
+  const nom = (inp?.value||'').trim();
+  if(!nom){ posAlert('Entrez un nom de fournisseur.','warn'); return; }
+  try{
+    const f = await apiFetch('POST','/pos/fournisseurs',{nom});
+    _pcxFournisseurs.push({id:f.id, nom:f.nom});
+    _pcxFillFournisseurSelect();
+    document.getElementById('pcx-gen-fournisseur-sel').value = f.id;
+    pcxFournisseurAddToggle(false);
+    posAlert(`Fournisseur « ${f.nom} » ajouté.`,'ok');
+  }catch(e){ posAlert(e.message||'Erreur lors de la création du fournisseur.','err'); }
+}
+
+// ── Lignes d'articles (répétables) ────────────────────────────────────
+function _pcxGenLigneRowHTML(){
+  const opts = '<option value="">— Produit —</option>'
+    + _pcxProduitsVpc.map(p=>`<option value="${p.id}" data-upc="${p.unites_par_caisse||0}">${p.nom}</option>`).join('');
+  return `<div class="pos-form-row pcx-gen-ligne" style="align-items:flex-end;margin-bottom:8px">
+    <div style="flex:2;min-width:0">
+      <select class="pos-select" style="width:100%" onchange="pcxGenUpdateLive()">${opts}</select>
+    </div>
+    <div style="flex:1">
+      <input class="pos-input" type="number" min="1" step="1" placeholder="Nb caisses" oninput="pcxGenUpdateLive()">
+    </div>
+    <div style="flex:1">
+      <input class="pos-input" type="number" min="0" step="0.01" placeholder="Prix/caisse (optionnel)">
+    </div>
+    <button type="button" class="gi-btn-icon" style="color:#f87171;flex-shrink:0" title="Retirer"
+      onclick="this.closest('.pcx-gen-ligne').remove();pcxGenUpdateLive()">✕</button>
+  </div>`;
+}
+function pcxGenAjouterLigne(){
+  document.getElementById('pcx-gen-lignes').insertAdjacentHTML('beforeend', _pcxGenLigneRowHTML());
+}
+function _pcxGenCollecterLignes(){
+  const lignes = [];
+  document.querySelectorAll('#pcx-gen-lignes .pcx-gen-ligne').forEach(row=>{
+    const sel = row.querySelector('select');
+    const inputs = row.querySelectorAll('input');
+    const produitId = parseInt(sel?.value||'0',10);
+    const nb = parseInt(inputs[0]?.value||'0',10);
+    const prix = parseFloat(inputs[1]?.value)||null;
+    if(produitId && nb>0) lignes.push({produit_id:produitId, nb_caisses:nb, prix_achat_caisse:prix});
+  });
+  return lignes;
+}
+function pcxGenUpdateLive(){
+  const lignes = _pcxGenCollecterLignes();
+  const live = document.getElementById('pcx-gen-live');
+  if(!lignes.length){ live.style.display = 'none'; return; }
+  let totalCaisses = 0, totalUnites = 0;
+  lignes.forEach(l=>{
+    const p = _pcxProduitsVpc.find(x=>x.id===l.produit_id);
+    totalCaisses += l.nb_caisses;
+    totalUnites  += l.nb_caisses * (p?.unites_par_caisse||0);
+  });
+  live.style.display = '';
+  live.textContent = `${lignes.length} article${lignes.length!==1?'s':''} · ${totalCaisses} caisse${totalCaisses!==1?'s':''} · ${totalUnites} unités au total — autant de codes uniques générés.`;
+}
+
 async function posCaissesGenererSauvegarder(){
-  const produitId = parseInt(document.getElementById('pcx-gen-produit').value||'0',10);
-  const nb        = parseInt(document.getElementById('pcx-gen-nb').value||'0',10);
-  const prix      = parseFloat(document.getElementById('pcx-gen-prix').value)||null;
-  const fournisseur = document.getElementById('pcx-gen-fournisseur').value.trim()||null;
-  const notes     = document.getElementById('pcx-gen-notes').value.trim()||null;
-  if(!produitId){ posAlert('Choisissez un produit.','err'); return; }
-  if(!nb || nb<1){ posAlert('Indiquez le nombre de caisses achetées.','err'); return; }
+  const lignes = _pcxGenCollecterLignes();
+  if(!lignes.length){ posAlert('Ajoutez au moins un article (produit + nombre de caisses).','err'); return; }
+  const fournisseur_id = parseInt(document.getElementById('pcx-gen-fournisseur-sel').value||'0',10) || null;
+  const notes = document.getElementById('pcx-gen-notes').value.trim()||null;
   const btn = document.getElementById('pcx-gen-btn');
   btn.disabled = true;
   try{
-    const res = await apiFetch('POST','/pos/caisses/generer', {
-      produit_id: produitId, nb_caisses: nb,
-      prix_achat_caisse: prix, fournisseur, notes,
+    const res = await apiFetch('POST','/pos/declarations-achat', {
+      fournisseur_id, notes, lignes,
     });
     posCaissesGenererModalClose();
-    posAlert(`${res.nb_caisses_generees} caisse(s) générée(s) — ${res.total_unites} unités au total (au dépôt, stock POS pas encore crédité).`,'ok');
+    posAlert(`${res.nb_caisses_generees} caisse(s) générée(s) sur ${lignes.length} article(s) (au dépôt, stock POS pas encore crédité).`,'ok');
     const ids = res.caisses.map(c=>c.id);
     await loadPosCaisses();
     if(await showConfirm(`Imprimer les ${ids.length} étiquette(s) QR maintenant ?`, {title:'Impression', okLabel:'Imprimer'})){
       posCaissesImprimerEtiquettes(ids);
     }
+    posVerifDeclarationModalOpen(res.declaration.id);
   }catch(e){
-    posAlert(e.message||'Erreur lors de la génération.','err');
+    posAlert(e.message||'Erreur lors de la déclaration.','err');
   }finally{
     btn.disabled = false;
   }
+}
+
+// ── Vérification de réception (scan chaque caisse + 2 photos) ────────
+// Rappel non bloquant : aucune action ici n'empêche de transférer/vendre
+// une caisse, confirmée ou pas — voir doctrine bar_caisses_routes.py.
+let _pcxVerifDeclaration = null;
+
+async function posVerifDeclarationModalOpen(declarationId){
+  try{
+    _pcxVerifDeclaration = await apiFetch('GET', `/pos/declarations-achat/${declarationId}`);
+  }catch(e){ posAlert(e.message||'Déclaration introuvable.','err'); return; }
+  document.getElementById('pcx-verif-declaration-id').value = declarationId;
+  document.getElementById('pcx-verif-fournisseur').textContent =
+    _pcxVerifDeclaration.fournisseur_nom ? `Fournisseur : ${_pcxVerifDeclaration.fournisseur_nom}` : '';
+  document.getElementById('pcx-verif-scan-input').value = '';
+  _pcxVerifRender();
+  document.getElementById('pcx-verif-modal-bg').classList.add('open');
+  setTimeout(()=>document.getElementById('pcx-verif-scan-input')?.focus(), 50);
+}
+function posVerifDeclarationModalClose(){
+  document.getElementById('pcx-verif-modal-bg').classList.remove('open');
+  _pcxVerifDeclaration = null;
+  loadPosCaisses();  // rafraîchit le panneau de rappel "en attente de vérification"
+}
+function _pcxVerifRender(){
+  const d = _pcxVerifDeclaration;
+  if(!d) return;
+  document.getElementById('pcx-verif-compteur-caisses').textContent =
+    `${d.nb_caisses_confirmees} / ${d.nb_caisses_total} caisses confirmées`;
+  document.getElementById('pcx-verif-compteur-photos').textContent =
+    `${d.nb_photos} / 2 photos jointes` + (d.complete ? ' — ✓ Vérification complète' : '');
+  const liste = document.getElementById('pcx-verif-liste-caisses');
+  liste.innerHTML = (d.caisses||[]).map(c=>`
+    <div style="display:flex;justify-content:space-between;padding:5px 8px;border-radius:6px;font-size:13px;font-family:monospace;
+      background:${c.confirmee?'rgba(74,222,128,.1)':'rgba(255,255,255,.04)'};color:${c.confirmee?'#4ade80':'rgba(255,255,255,.6)'};margin-bottom:3px">
+      <span>${c.confirmee?'✓ ':'○ '}${c.code_unique} — ${c.produit_nom||''}</span>
+    </div>`).join('');
+  ['1','2'].forEach(n=>{
+    const btn = document.getElementById(`pcx-verif-photo-btn-${n}`);
+    if(btn && d.nb_photos >= parseInt(n,10)){ btn.textContent = `✓ Photo ${n}`; btn.style.color = '#4ade80'; }
+  });
+}
+async function pcxVerifScanner(){
+  const input = document.getElementById('pcx-verif-scan-input');
+  const code = (input.value||'').trim();
+  if(!code || !_pcxVerifDeclaration) return;
+  const declId = _pcxVerifDeclaration.id;
+  try{
+    const res = await apiFetch('POST', `/pos/declarations-achat/${declId}/confirmer-caisse`, {code_unique: code});
+    input.value = '';
+    _pcxVerifDeclaration = await apiFetch('GET', `/pos/declarations-achat/${declId}`);
+    _pcxVerifRender();
+    posAlert(`${res.caisse_confirmee} confirmée.`,'ok');
+  }catch(e){
+    posAlert(e.message||'Code introuvable ou caisse déjà confirmée.','err');
+    input.value = '';
+  }
+  input.focus();
+}
+async function pcxVerifPhotoUpload(n){
+  const input = document.getElementById(`pcx-verif-photo-input-${n}`);
+  const file = input.files[0];
+  if(!file || !_pcxVerifDeclaration) return;
+  try{
+    const fd = new FormData();
+    fd.append('type_entite', 'bar_declaration_achat');
+    fd.append('entite_id', String(_pcxVerifDeclaration.id));
+    fd.append('fichier', file);
+    const hdrs = {};
+    const apiKey = sessionStorage.getItem('api_key');
+    if(apiKey) hdrs['X-API-Key'] = apiKey;
+    const res = await fetch('/api/pieces-jointes', {method:'POST', headers:hdrs, credentials:'include', body:fd});
+    if(!res.ok){
+      const err = await res.json().catch(()=>({detail:res.statusText}));
+      throw new Error(Array.isArray(err.detail)?err.detail.map(e=>e.msg).join(', '):(err.detail||res.statusText));
+    }
+    input.value = '';
+    _pcxVerifDeclaration = await apiFetch('GET', `/pos/declarations-achat/${_pcxVerifDeclaration.id}`);
+    _pcxVerifRender();
+    posAlert(`Photo ${n} ajoutée.`,'ok');
+  }catch(e){ posAlert(e.message||'Erreur lors de l\'envoi de la photo.','err'); }
 }
 
 // ── Transfert (dépôt → département) ──────────────────────────────────

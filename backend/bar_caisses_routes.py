@@ -37,6 +37,7 @@ from database import get_db
 from models import (
     BarProduit, BarAchat, BarDepartement, BarCaisse, BarCaisseMouvement,
     BarMouvementStock, Utilisateur, BarVente, BarLigneVente,
+    BarDeclarationAchat, BarLigneDeclarationAchat, Fournisseur,
 )
 from tz_utils import today_haiti
 
@@ -220,20 +221,10 @@ class GenererCaissesIn(BaseModel):
     notes:             Optional[str]   = None
 
 
-@router.post("/caisses/generer", status_code=201)
-def generer_caisses(data: GenererCaissesIn, request: Request, db: Session = Depends(get_db)):
-    """Déclare un achat de N caisses d'un produit déjà configuré
-    « vendu par caisse » et génère exactement N identifiants uniques —
-    ni plus, ni moins (jamais nb_caisses × unités_par_caisse codes).
-
-    NE CRÉDITE PAS le stock agrégat (POS) — les caisses entrent au dépôt,
-    pas encore disponibles à la vente. Si un prix d'achat est fourni, un
-    BarAchat est créé pour la comptabilité (comme les achats existants,
-    ce qui n'a jamais mis à jour le stock) mais aucun BarMouvementStock
-    n'est écrit ici. Le stock n'est crédité qu'au transfert (voir
-    transferer_caisse ci-dessous) — c'est le scan + la sélection du
-    département qui rend la marchandise vendable."""
-    produit = db.query(BarProduit).filter_by(id=data.produit_id).first()
+def _valider_produit_vendu_par_caisse(produit: Optional[BarProduit]) -> BarProduit:
+    """Validations communes à toute génération de caisses pour un produit —
+    partagées par generer_caisses (une ligne) et declarer_achat_multi
+    (plusieurs lignes)."""
     if not produit:
         raise HTTPException(404, "Produit introuvable.")
     if not produit.actif:
@@ -246,7 +237,63 @@ def generer_caisses(data: GenererCaissesIn, request: Request, db: Session = Depe
         )
     if not produit.unites_par_caisse or produit.unites_par_caisse < 1:
         raise HTTPException(422, f"« {produit.nom} » n'a pas d'unités par caisse définies.")
+    return produit
 
+
+def _generer_caisses_pour_produit(db: Session, produit: BarProduit, nb_caisses: int,
+                                  achat_id: Optional[int], uid: Optional[int], annee: int,
+                                  declaration_id: Optional[int] = None) -> list[BarCaisse]:
+    """Génère nb_caisses BarCaisse (AU_DEPOT) pour ce produit — factorisé
+    hors de generer_caisses pour être réutilisé ligne par ligne par
+    declarer_achat_multi. N'écrit jamais de BarMouvementStock (voir
+    doctrine en tête de fichier) ; ne commit pas — à la charge de
+    l'appelant (transaction partagée entre plusieurs produits pour
+    declarer_achat_multi).
+
+    declaration_id est renseigné INCONDITIONNELLEMENT par
+    declarer_achat_multi (même si la ligne n'a pas de prix, donc pas de
+    BarAchat/achat_id) — c'est le seul moyen fiable de retrouver toutes
+    les caisses d'une déclaration, achat_id pouvant être NULL."""
+    upc = produit.unites_par_caisse
+    caisses = []
+    for _ in range(nb_caisses):
+        code = _generer_code_unique(db, annee)
+        c = BarCaisse(
+            code_unique        = code,
+            produit_id         = produit.id,
+            achat_id           = achat_id,
+            declaration_id     = declaration_id,
+            unites_par_caisse  = upc,
+            quantite_initiale  = upc,
+            quantite_restante  = upc,
+            statut             = "AU_DEPOT",
+            emplacement_actuel = "DEPOT",
+            cree_par_id        = uid,
+        )
+        db.add(c)
+        db.flush()
+        caisses.append(c)
+    return caisses
+
+
+@router.post("/caisses/generer", status_code=201)
+def generer_caisses(data: GenererCaissesIn, request: Request, db: Session = Depends(get_db)):
+    """Déclare un achat de N caisses d'un produit déjà configuré
+    « vendu par caisse » et génère exactement N identifiants uniques —
+    ni plus, ni moins (jamais nb_caisses × unités_par_caisse codes).
+
+    NE CRÉDITE PAS le stock agrégat (POS) — les caisses entrent au dépôt,
+    pas encore disponibles à la vente. Si un prix d'achat est fourni, un
+    BarAchat est créé pour la comptabilité (comme les achats existants,
+    ce qui n'a jamais mis à jour le stock) mais aucun BarMouvementStock
+    n'est écrit ici. Le stock n'est crédité qu'au transfert (voir
+    transferer_caisse ci-dessous) — c'est le scan + la sélection du
+    département qui rend la marchandise vendable.
+
+    Pour déclarer un achat avec PLUSIEURS produits différents en une
+    fois, voir POST /declarations-achat ci-dessous — cette route reste
+    pour la déclaration à un seul produit (compatibilité)."""
+    produit = _valider_produit_vendu_par_caisse(db.query(BarProduit).filter_by(id=data.produit_id).first())
     upc = produit.unites_par_caisse
     uid = _uid(request)
 
@@ -271,24 +318,8 @@ def generer_caisses(data: GenererCaissesIn, request: Request, db: Session = Depe
         achat_id = achat.id
 
     annee = today_haiti().year
-    caisses = []
     try:
-        for _ in range(data.nb_caisses):
-            code = _generer_code_unique(db, annee)
-            c = BarCaisse(
-                code_unique        = code,
-                produit_id         = produit.id,
-                achat_id           = achat_id,
-                unites_par_caisse  = upc,
-                quantite_initiale  = upc,
-                quantite_restante  = upc,
-                statut             = "AU_DEPOT",
-                emplacement_actuel = "DEPOT",
-                cree_par_id        = uid,
-            )
-            db.add(c)
-            db.flush()
-            caisses.append(c)
+        caisses = _generer_caisses_pour_produit(db, produit, data.nb_caisses, achat_id, uid, annee)
         db.commit()
     except Exception:
         db.rollback()
@@ -304,6 +335,202 @@ def generer_caisses(data: GenererCaissesIn, request: Request, db: Session = Depe
         "stock_credite":       False,
         "caisses":             [_caisse_dict(c) for c in caisses],
     }
+
+
+# ══════════════════════════════════════════════════════════════════
+# DÉCLARATION D'ACHAT MULTI-ARTICLES — plusieurs produits différents en
+# une seule déclaration (même fournisseur/voyage), puis vérification par
+# scan (rappel non bloquant, jamais un blocage sur transfert/vente/
+# ajustement — voir doctrine plus haut et decision utilisateur 2026-09-26).
+# ══════════════════════════════════════════════════════════════════
+
+class LigneDeclarationIn(BaseModel):
+    produit_id:        int
+    nb_caisses:        int             = Field(gt=0, le=1000)
+    prix_achat_caisse: Optional[float] = Field(None, gt=0)
+
+
+class DeclarerAchatMultiIn(BaseModel):
+    fournisseur_id:  Optional[int] = None
+    fournisseur_nom: Optional[str] = None
+    notes:           Optional[str] = None
+    lignes:          List[LigneDeclarationIn] = Field(min_length=1, max_length=100)
+
+
+def _declaration_dict(d: BarDeclarationAchat, nb_photos: int) -> dict:
+    return {
+        "id":                    d.id,
+        "fournisseur_id":        d.fournisseur_id,
+        "fournisseur_nom":       d.fournisseur.nom if d.fournisseur else d.fournisseur_nom,
+        "notes":                 d.notes,
+        "nb_caisses_total":      d.nb_caisses_total,
+        "nb_caisses_confirmees": d.nb_caisses_confirmees,
+        "nb_photos":             nb_photos,
+        "complete":              d.nb_caisses_confirmees >= d.nb_caisses_total and nb_photos >= 2,
+        "created_at":            d.created_at.isoformat() if d.created_at else None,
+    }
+
+
+@router.post("/declarations-achat", status_code=201)
+def declarer_achat_multi(data: DeclarerAchatMultiIn, request: Request, db: Session = Depends(get_db)):
+    """Déclare un achat couvrant PLUSIEURS produits différents en une seule
+    fois (même fournisseur, même livraison) — chaque ligne génère son
+    propre BarAchat (comptabilité/CMUP inchangés) et ses propres BarCaisse,
+    exactement comme generer_caisses, mais regroupés sous un même en-tête
+    BarDeclarationAchat pour l'impression groupée des étiquettes et le
+    suivi de la vérification de réception (scan + 2 photos, non bloquant)."""
+    uid = _uid(request)
+    fournisseur_nom = data.fournisseur_nom
+    if data.fournisseur_id:
+        fournisseur = db.query(Fournisseur).filter_by(id=data.fournisseur_id, actif=True).first()
+        if not fournisseur:
+            raise HTTPException(404, "Fournisseur introuvable ou inactif.")
+
+    # Valider TOUTES les lignes avant d'écrire quoi que ce soit — une
+    # déclaration multi-articles est tout-ou-rien.
+    produits = []
+    for ligne in data.lignes:
+        produit = _valider_produit_vendu_par_caisse(
+            db.query(BarProduit).filter_by(id=ligne.produit_id).first()
+        )
+        produits.append(produit)
+
+    annee = today_haiti().year
+    declaration = BarDeclarationAchat(
+        fournisseur_id  = data.fournisseur_id,
+        fournisseur_nom = fournisseur_nom,
+        notes           = data.notes,
+        nb_caisses_total = sum(l.nb_caisses for l in data.lignes),
+        utilisateur_id  = uid,
+    )
+    db.add(declaration)
+    db.flush()
+
+    toutes_caisses = []
+    try:
+        for ligne, produit in zip(data.lignes, produits):
+            upc = produit.unites_par_caisse
+            achat_id = None
+            if ligne.prix_achat_caisse:
+                total_unites_achat = ligne.nb_caisses * upc
+                prix_unitaire = Decimal(str(ligne.prix_achat_caisse)) / Decimal(str(upc))
+                achat = BarAchat(
+                    produit_id          = produit.id,
+                    quantite            = Decimal(str(total_unites_achat)),
+                    prix_achat_unitaire = prix_unitaire,
+                    fournisseur         = fournisseur_nom,
+                    fournisseur_id      = data.fournisseur_id,
+                    utilisateur_id      = uid,
+                    declaration_id      = declaration.id,
+                    notes = (f"Déclaration multi-articles #{declaration.id} — "
+                             f"stock crédité au transfert, pas à la déclaration"),
+                )
+                db.add(achat)
+                db.flush()
+                achat_id = achat.id
+
+            caisses = _generer_caisses_pour_produit(db, produit, ligne.nb_caisses, achat_id, uid, annee,
+                                                     declaration_id=declaration.id)
+            db.add(BarLigneDeclarationAchat(
+                declaration_id    = declaration.id,
+                produit_id        = produit.id,
+                nb_caisses        = ligne.nb_caisses,
+                prix_achat_caisse = Decimal(str(ligne.prix_achat_caisse)) if ligne.prix_achat_caisse else None,
+                achat_id          = achat_id,
+            ))
+            toutes_caisses.extend(caisses)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(409, "La déclaration d'achat a échoué. Réessayez.")
+    for c in toutes_caisses:
+        db.refresh(c)
+    db.refresh(declaration)
+
+    return {
+        "declaration":  _declaration_dict(declaration, nb_photos=0),
+        "nb_caisses_generees": len(toutes_caisses),
+        "caisses":      [_caisse_dict(c) for c in toutes_caisses],
+    }
+
+
+@router.get("/declarations-achat")
+def lister_declarations_achat(incompletes_seulement: bool = Query(default=False),
+                              limit: int = Query(50, le=200), db: Session = Depends(get_db)):
+    """Liste des déclarations, plus récentes d'abord — utilisée par le
+    panneau de rappel non bloquant « en attente de vérification »."""
+    from pieces_jointes_routes import compter_pieces_jointes_par_entite
+    rows = db.query(BarDeclarationAchat).order_by(BarDeclarationAchat.created_at.desc()).limit(limit).all()
+    nb_photos_par_decl = compter_pieces_jointes_par_entite(db, "bar_declaration_achat", [d.id for d in rows])
+    resultat = [_declaration_dict(d, nb_photos_par_decl.get(d.id, 0)) for d in rows]
+    if incompletes_seulement:
+        resultat = [d for d in resultat if not d["complete"]]
+    return resultat
+
+
+@router.get("/declarations-achat/{declaration_id}")
+def detail_declaration_achat(declaration_id: int, db: Session = Depends(get_db)):
+    from pieces_jointes_routes import compter_pieces_jointes_par_entite
+    d = db.get(BarDeclarationAchat, declaration_id)
+    if not d:
+        raise HTTPException(404, "Déclaration introuvable.")
+    nb_photos = compter_pieces_jointes_par_entite(db, "bar_declaration_achat", [declaration_id]).get(declaration_id, 0)
+    lignes = db.query(BarLigneDeclarationAchat).filter_by(declaration_id=declaration_id).all()
+    caisses = db.query(BarCaisse).filter_by(declaration_id=declaration_id).order_by(BarCaisse.id).all()
+    out = _declaration_dict(d, nb_photos)
+    out["lignes"] = [
+        {"produit_id": l.produit_id, "produit_nom": l.produit.nom if l.produit else None,
+         "nb_caisses": l.nb_caisses, "prix_achat_caisse": float(l.prix_achat_caisse) if l.prix_achat_caisse else None}
+        for l in lignes
+    ]
+    out["caisses"] = [
+        {"id": c.id, "code_unique": c.code_unique, "produit_nom": c.produit.nom if c.produit else None,
+         "confirmee": c.confirmee}
+        for c in caisses
+    ]
+    return out
+
+
+class ConfirmerCaisseIn(BaseModel):
+    code_unique: str
+
+
+@router.post("/declarations-achat/{declaration_id}/confirmer-caisse", status_code=200)
+def confirmer_caisse_declaration(declaration_id: int, data: ConfirmerCaisseIn, request: Request,
+                                 db: Session = Depends(get_db)):
+    """Scan de confirmation de réception physique d'UNE caisse de cette
+    déclaration — rappel non bloquant : ne vérifie et ne modifie jamais le
+    statut AU_DEPOT/TRANSFEREE/... de la caisse, seulement son drapeau
+    confirmee. Une caisse reste transférable/vendable qu'elle soit
+    confirmée ou pas."""
+    declaration = db.get(BarDeclarationAchat, declaration_id)
+    if not declaration:
+        raise HTTPException(404, "Déclaration introuvable.")
+    code = (data.code_unique or "").strip().upper()
+    c = db.query(BarCaisse).filter_by(code_unique=code).first()
+    if not c:
+        raise HTTPException(404, "Caisse introuvable pour ce code.")
+    if c.declaration_id != declaration_id:
+        raise HTTPException(409, f"{c.code_unique} n'appartient pas à cette déclaration.")
+    if c.confirmee:
+        raise HTTPException(409, f"{c.code_unique} est déjà confirmée.")
+
+    uid = _uid(request)
+    c.confirmee         = True
+    c.confirmee_le       = datetime.now(timezone.utc)
+    c.confirmee_par_id   = uid
+    db.add(BarCaisseMouvement(
+        caisse_id=c.id, type_mouvement="CONFIRMATION", quantite=0,
+        motif=f"Confirmation de réception — déclaration #{declaration_id}",
+        utilisateur_id=uid,
+    ))
+    declaration.nb_caisses_confirmees += 1
+    db.commit()
+    db.refresh(declaration)
+
+    from pieces_jointes_routes import compter_pieces_jointes_par_entite
+    nb_photos = compter_pieces_jointes_par_entite(db, "bar_declaration_achat", [declaration_id]).get(declaration_id, 0)
+    return {"caisse_confirmee": c.code_unique, "declaration": _declaration_dict(declaration, nb_photos)}
 
 
 # ══════════════════════════════════════════════════════════════════

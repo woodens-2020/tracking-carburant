@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import (
     PieceJointe, Depense, Achat, CuisineDepense, CuisineAchat, ZelleDepense, BarAchat, HotelDepense,
+    BarDeclarationAchat,
 )
 
 router = APIRouter(prefix="/api/pieces-jointes", tags=["pieces-jointes"])
@@ -30,6 +31,9 @@ _TYPES_AUTORISES = {
     "zelle_depense":   ZelleDepense,
     "bar_achat":       BarAchat,
     "hotel_depense":   HotelDepense,
+    # Photos obligatoires (2) de confirmation de réception d'une déclaration
+    # d'achat multi-articles — voir bar_caisses_routes.py.
+    "bar_declaration_achat": BarDeclarationAchat,
 }
 
 _MIME_AUTORISES     = {"application/pdf", "image/jpeg", "image/jpg", "image/png"}

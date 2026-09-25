@@ -235,6 +235,19 @@ def _migrate_columns():
              "ALTER TABLE clients ADD COLUMN limite_credit NUMERIC", None),
             ("bar_prix_historique", "type_prix",
              "ALTER TABLE bar_prix_historique ADD COLUMN type_prix VARCHAR(10) NOT NULL DEFAULT 'DETAIL'", None),
+            # v27 — déclaration d'achat multi-articles (BarDeclarationAchat/
+            # BarLigneDeclarationAchat, nouvelles tables via create_all) +
+            # confirmation de réception par scan (rappel non bloquant).
+            ("bar_achats", "declaration_id",
+             "ALTER TABLE bar_achats ADD COLUMN declaration_id INTEGER REFERENCES bar_declarations_achat(id) ON DELETE SET NULL", None),
+            ("bar_caisses", "confirmee",
+             "ALTER TABLE bar_caisses ADD COLUMN confirmee INTEGER NOT NULL DEFAULT 0", None),
+            ("bar_caisses", "confirmee_le",
+             "ALTER TABLE bar_caisses ADD COLUMN confirmee_le DATETIME", None),
+            ("bar_caisses", "confirmee_par_id",
+             "ALTER TABLE bar_caisses ADD COLUMN confirmee_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
+            ("bar_caisses", "declaration_id",
+             "ALTER TABLE bar_caisses ADD COLUMN declaration_id INTEGER REFERENCES bar_declarations_achat(id) ON DELETE SET NULL", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -374,6 +387,19 @@ def _migrate_columns():
              "ALTER TABLE clients ADD COLUMN limite_credit NUMERIC", None),
             ("bar_prix_historique", "type_prix",
              "ALTER TABLE bar_prix_historique ADD COLUMN type_prix VARCHAR(10) NOT NULL DEFAULT 'DETAIL'", None),
+            # v27 — déclaration d'achat multi-articles (BarDeclarationAchat/
+            # BarLigneDeclarationAchat, nouvelles tables via create_all) +
+            # confirmation de réception par scan (rappel non bloquant).
+            ("bar_achats", "declaration_id",
+             "ALTER TABLE bar_achats ADD COLUMN declaration_id INTEGER REFERENCES bar_declarations_achat(id) ON DELETE SET NULL", None),
+            ("bar_caisses", "confirmee",
+             "ALTER TABLE bar_caisses ADD COLUMN confirmee BOOLEAN NOT NULL DEFAULT FALSE", None),
+            ("bar_caisses", "confirmee_le",
+             "ALTER TABLE bar_caisses ADD COLUMN confirmee_le TIMESTAMP WITH TIME ZONE", None),
+            ("bar_caisses", "confirmee_par_id",
+             "ALTER TABLE bar_caisses ADD COLUMN confirmee_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
+            ("bar_caisses", "declaration_id",
+             "ALTER TABLE bar_caisses ADD COLUMN declaration_id INTEGER REFERENCES bar_declarations_achat(id) ON DELETE SET NULL", None),
         ]
     else:
         return
@@ -516,6 +542,23 @@ def _migrate_columns():
                 conn.execute(sql_text(
                     "ALTER TABLE renflouements_departement ADD CONSTRAINT chk_renfl_dept_departement "
                     "CHECK (departement IN ('HOTEL','CUISINE','BAR','PATISSERIE'))"
+                ))
+                conn.commit()
+            except Exception:
+                conn.rollback()  # contrainte déjà à jour
+
+        # v27 — CONFIRMATION ajoutée aux types de mouvement de caisse
+        # autorisés (scan de confirmation de réception, déclaration d'achat
+        # multi-articles) — élargissement sans perte, mêmes valeurs existantes
+        # restent valides.
+        with engine.connect() as conn:
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE bar_caisse_mouvements DROP CONSTRAINT IF EXISTS chk_bar_caisse_mouv_type"
+                ))
+                conn.execute(sql_text(
+                    "ALTER TABLE bar_caisse_mouvements ADD CONSTRAINT chk_bar_caisse_mouv_type "
+                    "CHECK (type_mouvement IN ('TRANSFERT','VENTE','CASSE','PERTE','CORRECTION','ANNULATION','CONFIRMATION'))"
                 ))
                 conn.commit()
             except Exception:
