@@ -5,6 +5,7 @@ Protégées automatiquement par AuthMiddleware (session cookie ou X-API-Key).
 from __future__ import annotations
 
 import base64
+import os
 from datetime import date as date_type, datetime, timezone, time
 from decimal import Decimal
 from typing import List, Optional
@@ -37,6 +38,13 @@ from pos_service import (
 )
 
 router = APIRouter(prefix="/api/pos", tags=["POS Bar"])
+
+# Même lecture que _MODULES["commerce"] dans main.py (indépendant, pour
+# éviter un import circulaire) — quand le module commerce est actif sur ce
+# tenant, un produit "vendu par caisse" ne doit plus entrer en stock que
+# via le circuit déclaration → caisse → transfert au dépôt (voir
+# bar_caisses_routes.py) : voir approvisionner() ci-dessous.
+_MODULE_COMMERCE_ACTIF = os.getenv("MODULE_COMMERCE", "false").lower() == "true"
 
 
 def _user(request: Request):
@@ -892,6 +900,15 @@ def approvisionner(produit_id: int, data: ApprovisionnementIn, request: Request,
     p = db.query(BarProduit).filter_by(id=produit_id).first()
     if not p:
         raise HTTPException(404, "Produit introuvable")
+
+    if p.vendu_par_caisse and _MODULE_COMMERCE_ACTIF:
+        raise HTTPException(
+            422,
+            f"« {p.nom} » est géré par caisses/dépôt (module Commerce) — impossible "
+            "d'ajouter du stock directement ici. Passez par « Déclarer un achat / "
+            "Générer les codes », puis transférez la caisse depuis le dépôt pour "
+            "créditer le stock.",
+        )
 
     upc = p.unites_par_caisse or 1
     if p.vendu_par_caisse:
@@ -1837,6 +1854,14 @@ def ajuster_stock(data: AjustementIn, request: Request, db: Session = Depends(ge
     p = db.query(BarProduit).filter_by(id=data.produit_id).first()
     if not p:
         raise HTTPException(404, "Produit introuvable")
+    if p.vendu_par_caisse and _MODULE_COMMERCE_ACTIF:
+        raise HTTPException(
+            422,
+            f"« {p.nom} » est géré par caisses/dépôt (module Commerce) — utilisez "
+            "l'ajustement (casse/perte/correction) sur la caisse concernée, "
+            "depuis Gestion des caisses, pour que la quantité restante de la "
+            "caisse et le stock agrégat restent synchronisés.",
+        )
     if not data.motif or len(data.motif.strip()) < 5:
         raise HTTPException(422, "Le motif doit contenir au moins 5 caractères.")
 
