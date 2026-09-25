@@ -3056,6 +3056,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 <script src="/vendor/chart.umd.min.js"></script>
 <script src="/vendor/html2canvas.min.js"></script>
 <script src="/vendor/html5-qrcode.min.js"></script>
+<script src="/vendor/JsBarcode.min.js"></script>
 <body>
 
 <div id="load-overlay"><div class="lo-badge"><div class="lo-ring"></div><span class="lo-k">K</span></div></div>
@@ -7186,6 +7187,22 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
 
+        <!-- Reporting — filtré par période, additif au statut courant ci-dessus -->
+        <div class="cat-panel">
+          <div class="cat-panel-title">Reporting par période</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+            <input type="date" id="pcx-rap-debut" class="pos-input" style="width:auto" onchange="pcxChargerRapport()">
+            <span style="color:rgba(255,255,255,.4)">→</span>
+            <input type="date" id="pcx-rap-fin" class="pos-input" style="width:auto" onchange="pcxChargerRapport()">
+            <button class="db-preset" onclick="pcxRapportPreset('jour')">Aujourd'hui</button>
+            <button class="db-preset" onclick="pcxRapportPreset('semaine')">7 jours</button>
+            <button class="db-preset" onclick="pcxRapportPreset('mois')">30 jours</button>
+          </div>
+          <div id="pcx-rap-corps">
+            <span style="color:rgba(255,255,255,.25);font-size:13px">Choisissez une période.</span>
+          </div>
+        </div>
+
         <!-- Scan / recherche rapide -->
         <div class="cat-panel">
           <div class="cat-panel-title">Scanner ou saisir un code</div>
@@ -7309,6 +7326,42 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div>
 
+    <!-- Modal — Vendre directement depuis le dépôt (toute la caisse, en gros) -->
+    <div class="pos-modal-bg" id="pcx-vendre-modal-bg" onclick="if(event.target===this)posCaisseVendreModalClose()">
+      <div class="pos-modal">
+        <h3>Vendre directement (dépôt)</h3>
+        <input type="hidden" id="pcx-vd-id">
+        <div id="pcx-vd-info" style="background:var(--panel3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13.5px;color:var(--muted)"></div>
+        <div style="font-size:12.5px;color:#f7a93b;background:rgba(247,169,59,.08);border:1px solid rgba(247,169,59,.2);border-radius:8px;padding:9px 12px;margin-bottom:8px">
+          ⚠ Toute la caisse est vendue en gros d'un coup — elle ne passe jamais par un département et n'entre jamais dans le stock détail.
+        </div>
+        <div class="pos-form-row">
+          <div style="flex:1">
+            <label class="pos-label">Mode de paiement *</label>
+            <select class="pos-select" id="pcx-vd-mode" style="width:100%">
+              <option value="CASH">Cash</option>
+              <option value="CREDIT">Crédit</option>
+              <option value="MIXTE">Mixte</option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <label class="pos-label">Montant payé <span style="color:rgba(255,255,255,.4)">(optionnel — défaut : montant total)</span></label>
+            <input class="pos-input" id="pcx-vd-paye" type="number" min="0" step="0.01" placeholder="">
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div style="width:100%">
+            <label class="pos-label">Client <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
+            <input class="pos-input" id="pcx-vd-client" placeholder="Nom du client">
+          </div>
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="posCaisseVendreModalClose()">Annuler</button>
+          <button class="pos-btn primary" onclick="posCaisseVendreConfirmer()">Confirmer la vente</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal — Ajustement (casse / perte / correction) -->
     <div class="pos-modal-bg" id="pcx-ajuster-modal-bg" onclick="if(event.target===this)posCaisseAjusterModalClose()">
       <div class="pos-modal">
@@ -7349,7 +7402,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div id="pcx-detail-body"></div>
         <div class="pos-modal-footer">
           <button class="pos-btn ghost" onclick="posCaisseDetailModalClose()">Fermer</button>
-          <button class="pos-btn primary" id="pcx-detail-imprimer-btn" onclick="posCaissesImprimerEtiquettes([_pcxDetailId])">Imprimer l'étiquette</button>
+          <button class="pos-btn ghost" onclick="posCaisseImprimerEtiquette80mm(_pcxDetailId)">Étiquette 80mm (code-barres)</button>
+          <button class="pos-btn primary" id="pcx-detail-imprimer-btn" onclick="posCaissesImprimerEtiquettes([_pcxDetailId])">Imprimer l'étiquette QR (PDF)</button>
         </div>
       </div>
     </div>
@@ -7412,9 +7466,37 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div id="psl-caisse-code" style="font-family:monospace;font-size:13px;color:rgba(255,255,255,.5);margin-bottom:8px"></div>
               <div id="psl-caisse-qte" style="font-size:14px;color:#38bdf8;font-weight:600"></div>
             </div>
-            <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:8px;font-weight:600">Livrer vers :</div>
-            <div id="psl-departements" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px"></div>
-            <button class="pos-btn primary" id="psl-livrer-btn" style="width:100%;padding:14px;font-size:15px" onclick="pslConfirmerLivraison()" disabled>Sélectionnez un département</button>
+            <!-- Choix de l'action — d'abord Transférer au Frizè ou Vendre Directement -->
+            <div id="psl-choix-action" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+              <button type="button" class="pos-btn ghost" style="padding:16px 10px;font-size:14.5px" onclick="pslChoisirAction('transferer')">📦 Transférer au Frizè</button>
+              <button type="button" class="pos-btn ghost" style="padding:16px 10px;font-size:14.5px" onclick="pslChoisirAction('vendre')">💰 Vendre Directement</button>
+            </div>
+
+            <div id="psl-bloc-transferer" style="display:none">
+              <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:8px;font-weight:600">Livrer vers :</div>
+              <div id="psl-departements" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px"></div>
+              <button class="pos-btn primary" id="psl-livrer-btn" style="width:100%;padding:14px;font-size:15px" onclick="pslConfirmerLivraison()" disabled>Sélectionnez un département</button>
+              <button type="button" class="pos-btn ghost" style="width:100%;margin-top:8px" onclick="pslRetourChoix()">← Retour</button>
+            </div>
+
+            <div id="psl-bloc-vendre" style="display:none">
+              <div class="pos-form-row">
+                <div style="flex:1">
+                  <label class="pos-label">Mode de paiement</label>
+                  <select class="pos-select" id="psl-vd-mode" style="width:100%">
+                    <option value="CASH">Cash</option>
+                    <option value="CREDIT">Crédit</option>
+                    <option value="MIXTE">Mixte</option>
+                  </select>
+                </div>
+                <div style="flex:1">
+                  <label class="pos-label">Client (optionnel)</label>
+                  <input class="pos-input" id="psl-vd-client" placeholder="Nom">
+                </div>
+              </div>
+              <button class="pos-btn primary" id="psl-vendre-btn" style="width:100%;padding:14px;font-size:15px;margin-top:8px" onclick="pslVendreConfirmer()">Confirmer la vente</button>
+              <button type="button" class="pos-btn ghost" style="width:100%;margin-top:8px" onclick="pslRetourChoix()">← Retour</button>
+            </div>
           </div>
 
           <!-- État : succès -->
@@ -24512,6 +24594,71 @@ async function _pcxLoadStockDept(){
   }
 }
 
+// ── Reporting par période (GET /pos/caisses/rapport) ──────────────────
+function _pcxDateISO(d){ return d.toISOString().slice(0,10); }
+
+function pcxRapportPreset(type){
+  const fin = new Date();
+  const deb = new Date();
+  if(type === 'semaine') deb.setDate(deb.getDate() - 6);
+  else if(type === 'mois') deb.setDate(deb.getDate() - 29);
+  document.getElementById('pcx-rap-debut').value = _pcxDateISO(deb);
+  document.getElementById('pcx-rap-fin').value    = _pcxDateISO(fin);
+  pcxChargerRapport();
+}
+
+let _pcxRapChart = null;
+
+async function pcxChargerRapport(){
+  const deb = document.getElementById('pcx-rap-debut').value;
+  const fin = document.getElementById('pcx-rap-fin').value;
+  const corps = document.getElementById('pcx-rap-corps');
+  if(!deb || !fin){ return; }
+  corps.innerHTML = '<span style="color:rgba(255,255,255,.25);font-size:13px">Chargement…</span>';
+  try{
+    const r = await apiFetch('GET', `/pos/caisses/rapport?date_debut=${deb}&date_fin=${fin}`);
+    corps.innerHTML = `
+      <div class="gi-kpi-row" style="margin-bottom:12px">
+        <div class="gi-kpi"><div class="gi-kpi-lbl">Caisses reçues</div><div class="gi-kpi-val">${r.entrees_periode.nb_caisses}</div></div>
+        <div class="gi-kpi"><div class="gi-kpi-lbl">Transferts</div><div class="gi-kpi-val blue">${r.transferts_periode.nb}</div></div>
+        <div class="gi-kpi"><div class="gi-kpi-lbl">Unités vendues</div><div class="gi-kpi-val teal">${r.ventes_periode.unites_vendues_total}</div></div>
+        <div class="gi-kpi"><div class="gi-kpi-lbl">Ventes directes</div><div class="gi-kpi-val amber">${r.ventes_periode.nb_ventes_directes} · ${posGx(r.ventes_periode.montant_ventes_directes)}</div></div>
+        <div class="gi-kpi"><div class="gi-kpi-lbl">Casse / Perte</div><div class="gi-kpi-val red">${r.casse_perte_periode.casse.unites + r.casse_perte_periode.perte.unites}</div></div>
+      </div>
+      <canvas id="pcx-rap-canvas" height="90"></canvas>`;
+    const ctx = document.getElementById('pcx-rap-canvas');
+    if(_pcxRapChart){ _pcxRapChart.destroy(); _pcxRapChart = null; }
+    if(ctx && window.Chart){
+      _pcxRapChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Reçues', 'Transférées', 'Vendues (total)', 'Casse', 'Perte'],
+          datasets: [{
+            label: 'Unités',
+            data: [
+              r.entrees_periode.unites, r.transferts_periode.unites,
+              r.ventes_periode.unites_vendues_total,
+              r.casse_perte_periode.casse.unites, r.casse_perte_periode.perte.unites,
+            ],
+            backgroundColor: ['#3fb6a8', '#38bdf8', '#f7a93b', '#f87171', '#f87171'],
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: 'rgba(255,255,255,.5)' }, grid: { display: false } },
+            y: { ticks: { color: 'rgba(255,255,255,.5)' }, grid: { color: 'rgba(255,255,255,.05)' }, beginAtZero: true },
+          },
+        },
+      });
+    }
+  }catch(e){
+    corps.innerHTML = `<span style="color:#f87171;font-size:13px">${e.message||'Erreur réseau'}</span>`;
+  }
+}
+
 function _pcxBadge(statut){
   const map = {
     AU_DEPOT:   ['','Au dépôt'],
@@ -24554,6 +24701,7 @@ function _pcxRenderTbody(list){
       // de dépôt — le backend revérifie de toute façon (_require_admin_ou_depot).
       if(peutLivrer){
         actions.push(`<button class="pos-btn primary" style="padding:4px 9px;font-size:12px" onclick="posCaisseTransfererModal(${c.id})">Transférer</button>`);
+        actions.push(`<button class="pos-btn ghost" style="padding:4px 9px;font-size:12px" onclick="posCaisseVendreModal(${c.id})">Vendre</button>`);
       }
       if(!ro){
         actions.push(`<button class="pos-btn ghost" style="padding:4px 9px;font-size:12px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="posCaisseAnnuler(${c.id})">Annuler</button>`);
@@ -24582,11 +24730,10 @@ async function posCaisseScanLookup(){
   try{
     const c = await apiFetch('GET', `/pos/caisses/code/${encodeURIComponent(code)}`);
     input.value = '';
-    if(c.statut === 'AU_DEPOT' && _pslAutorise()){
-      posCaisseTransfererModal(c.id, c);
-    } else {
-      posCaisseDetailModal(c.id, c);
-    }
+    // AU_DEPOT : ouvre la fiche détail (boutons Transférer/Vendre déjà
+    // disponibles dedans et dans le tableau) plutôt que de présumer laquelle
+    // des deux actions l'utilisateur veut.
+    posCaisseDetailModal(c.id, c);
   }catch(e){
     posAlert(e.message||'Caisse introuvable pour ce code.','err');
   }
@@ -24688,6 +24835,36 @@ async function posCaisseTransfererConfirmer(){
   }catch(e){ posAlert(e.message||'Erreur lors du transfert.','err'); }
 }
 
+// ── Vente directe depuis le dépôt (toute la caisse, en gros) ─────────
+function posCaisseVendreModal(id, cached){
+  if(!_pslAutorise()){ posAlert('Réservé à l\'administrateur ou au responsable de dépôt.','err'); return; }
+  const c = cached || _pcxAll.find(x=>x.id===id);
+  document.getElementById('pcx-vd-id').value = id;
+  document.getElementById('pcx-vd-info').textContent = c
+    ? `${c.code_unique} — ${c.produit_nom} — ${c.quantite_restante} unité(s)`
+    : `Caisse #${id}`;
+  document.getElementById('pcx-vd-mode').value = 'CASH';
+  document.getElementById('pcx-vd-paye').value = '';
+  document.getElementById('pcx-vd-client').value = '';
+  document.getElementById('pcx-vendre-modal-bg').classList.add('open');
+}
+function posCaisseVendreModalClose(){
+  document.getElementById('pcx-vendre-modal-bg').classList.remove('open');
+}
+async function posCaisseVendreConfirmer(){
+  const id = parseInt(document.getElementById('pcx-vd-id').value||'0',10);
+  const mode_paiement = document.getElementById('pcx-vd-mode').value;
+  const payeRaw = document.getElementById('pcx-vd-paye').value;
+  const montant_paye = payeRaw ? parseFloat(payeRaw) : undefined;
+  const client_nom = document.getElementById('pcx-vd-client').value.trim() || undefined;
+  try{
+    const res = await apiFetch('POST', `/pos/caisses/${id}/vendre-directement`, {mode_paiement, montant_paye, client_nom});
+    posCaisseVendreModalClose();
+    posAlert(`Vente directe enregistrée — ${res.numero_ticket} — ${posGx(res.montant_total)}.`,'ok');
+    loadPosCaisses();
+  }catch(e){ posAlert(e.message||'Erreur lors de la vente directe.','err'); }
+}
+
 // ── Ajustement (casse / perte / correction) ──────────────────────────
 function posCaisseAjusterModal(id){
   if(_isReadOnly()){ posAlert('Accès lecture seule.','err'); return; }
@@ -24763,6 +24940,11 @@ async function posCaisseDetailModal(id, cached){
         <div style="flex:1"><div class="pos-label">Département</div><div>${c.departement_nom||'—'}</div></div>
         <div style="flex:1"><div class="pos-label">Créée le</div><div>${posDateFr(c.created_at)}</div></div>
       </div>
+      ${c.statut === 'AU_DEPOT' && _pslAutorise() ? `
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="pos-btn primary" style="flex:1" onclick="posCaisseDetailModalClose();posCaisseTransfererModal(${c.id})">Transférer</button>
+        <button class="pos-btn ghost" style="flex:1" onclick="posCaisseDetailModalClose();posCaisseVendreModal(${c.id})">Vendre directement</button>
+      </div>` : ''}
       <hr style="border-color:rgba(255,255,255,.08);margin-bottom:10px">
       <div class="pos-label" style="margin-bottom:6px">Historique</div>
       ${hist}
@@ -24780,6 +24962,38 @@ function posCaisseDetailModalClose(){
 function posCaissesImprimerEtiquettes(ids){
   if(!ids || !ids.length) return;
   window.open('/api/pos/caisses/etiquettes.pdf?ids='+ids.join(','), '_blank');
+}
+
+// ── Étiquette 80mm (CODE128) — alternative à l'étiquette QR PDF ci-dessus.
+// Le code-barres est rendu en SVG dans CETTE page (JsBarcode, vendorisé
+// localement — /vendor/JsBarcode.min.js) puis injecté comme markup statique
+// dans la fenêtre d'impression : la popup ouverte par _posOuvrirImprimer()
+// est une fenêtre vierge (document.write) qui ne charge aucun script, donc
+// le rendu doit être fait AVANT, ici, pas dans la popup.
+function _renderCode128SVGString(code){
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  window.JsBarcode(svg, code, {format: 'CODE128', displayValue: true, fontSize: 14, height: 50, margin: 6});
+  return svg.outerHTML;
+}
+
+async function posCaisseImprimerEtiquette80mm(id){
+  if(!id) return;
+  let c, prod;
+  try{ c = await apiFetch('GET', `/pos/caisses/${id}`); }
+  catch(e){ posAlert(e.message||'Caisse introuvable.','err'); return; }
+  try{ prod = await apiFetch('GET', `/pos/produits/${c.produit_id}`); }catch(e){ prod = null; }
+  let barcodeSVG;
+  try{ barcodeSVG = _renderCode128SVGString(c.code_unique); }
+  catch(e){ posAlert('Impossible de générer le code-barres.','err'); return; }
+  const prix = prod ? (prod.prix_vente_unite ?? prod.prix_actif) : null;
+  const html = `
+    <div style="text-align:center">
+      <div style="font-size:15px;font-weight:800;margin-bottom:2px">${c.produit_nom||'—'}</div>
+      <div style="font-size:11px;color:#555;margin-bottom:6px">Entrée : ${posDateFr(c.created_at)}</div>
+      ${prix != null ? `<div style="font-size:13px;font-weight:700;margin-bottom:6px">${posGx(prix)}</div>` : ''}
+      <div style="display:flex;justify-content:center">${barcodeSVG}</div>
+    </div>`;
+  _posOuvrirImprimer(html, `Étiquette ${c.code_unique}`);
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -24829,8 +25043,28 @@ function pslResetEtat(){
   document.getElementById('psl-etat-caisse').style.display  = 'none';
   document.getElementById('psl-etat-succes').style.display  = 'none';
   _pslCaisseCourante = null;
+  pslRetourChoix();
   const input = document.getElementById('psl-scan-input');
   if(input) input.value = '';
+}
+
+// Réaffiche l'écran de choix (Transférer / Vendre) et masque les deux
+// formulaires — utilisé au reset ET par le bouton « ← Retour » de chacun.
+function pslRetourChoix(){
+  document.getElementById('psl-choix-action').style.display    = 'grid';
+  document.getElementById('psl-bloc-transferer').style.display = 'none';
+  document.getElementById('psl-bloc-vendre').style.display     = 'none';
+}
+
+function pslChoisirAction(action){
+  document.getElementById('psl-choix-action').style.display = 'none';
+  if(action === 'transferer'){
+    document.getElementById('psl-bloc-transferer').style.display = '';
+  } else {
+    document.getElementById('psl-vd-mode').value = 'CASH';
+    document.getElementById('psl-vd-client').value = '';
+    document.getElementById('psl-bloc-vendre').style.display = '';
+  }
 }
 
 function pslMontrerErreur(msg){
@@ -24872,6 +25106,7 @@ async function pslLookup(){
     document.getElementById('psl-caisse-produit').textContent = c.produit_nom||'—';
     document.getElementById('psl-caisse-code').textContent    = c.code_unique;
     document.getElementById('psl-caisse-qte').textContent     = `${c.quantite_initiale} unités`;
+    pslRetourChoix();   // montre d'abord le choix Transférer / Vendre
     const wrap = document.getElementById('psl-departements');
     wrap.innerHTML = _pslDepartements.map(d=>
       `<button type="button" class="pos-btn ghost" style="padding:12px 8px;font-size:14px" data-dep="${d.id}" onclick="pslChoisirDepartement(${d.id})">${d.nom}</button>`
@@ -24917,6 +25152,26 @@ async function pslConfirmerLivraison(){
   }catch(e){
     btn.disabled = false;
     pslMontrerErreur(e.message || 'Erreur lors de la livraison.');
+  }
+}
+
+async function pslVendreConfirmer(){
+  if(!_pslCaisseCourante) return;
+  const btn = document.getElementById('psl-vendre-btn');
+  btn.disabled = true;
+  const mode_paiement = document.getElementById('psl-vd-mode').value;
+  const client_nom = document.getElementById('psl-vd-client').value.trim() || undefined;
+  try{
+    const res = await apiFetch('POST', `/pos/caisses/${_pslCaisseCourante.id}/vendre-directement`, {mode_paiement, client_nom});
+    document.getElementById('psl-etat-caisse').style.display  = 'none';
+    document.getElementById('psl-etat-succes').style.display  = '';
+    document.getElementById('psl-succes-msg').textContent =
+      `${_pslCaisseCourante.code_unique} vendue directement — ${res.numero_ticket} — ${posGx(res.montant_total)}`;
+    pslFocus();
+    setTimeout(()=>{ pslResetEtat(); pslFocus(); }, 2200);
+  }catch(e){
+    btn.disabled = false;
+    pslMontrerErreur(e.message || 'Erreur lors de la vente directe.');
   }
 }
 

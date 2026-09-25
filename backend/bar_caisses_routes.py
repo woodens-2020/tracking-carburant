@@ -36,7 +36,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import (
     BarProduit, BarAchat, BarDepartement, BarCaisse, BarCaisseMouvement,
-    BarMouvementStock, Utilisateur,
+    BarMouvementStock, Utilisateur, BarVente, BarLigneVente,
 )
 from tz_utils import today_haiti
 
@@ -357,6 +357,104 @@ def stats_caisses(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/caisses/rapport")
+def rapport_caisses(
+    date_debut: Optional[str] = Query(default=None, description="AAAA-MM-JJ"),
+    date_fin:   Optional[str] = Query(default=None, description="AAAA-MM-JJ"),
+    departement_id: Optional[int] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """Reporting filtré par période : additif à /caisses/stats (qui reste
+    un instantané du statut courant, sans date). Ici, chaque métrique est
+    filtrée sur SA PROPRE date pertinente (entrées sur created_at,
+    transferts/ventes/ajustements sur leur BarCaisseMouvement.created_at) —
+    « combien de caisses REÇUES cette semaine » et « combien VENDUES cette
+    semaine » sont deux questions différentes, chacune sur sa propre
+    chronologie.
+
+    La « performance des ventes » distingue volontairement deux niveaux de
+    précision : les ventes directes (une BarVente par caisse, montant exact
+    connu) et les ventes normales via le panier POS (FIFO, potentiellement
+    partagées entre plusieurs produits/caisses dans un même ticket) — pour
+    ces dernières on ne reconstruit PAS un montant par caisse (imprécis),
+    seulement les unités écoulées, honnêtement."""
+    from sqlalchemy import func as _func, and_
+
+    def _bounds():
+        deb = fin = None
+        if date_debut:
+            deb = datetime.strptime(date_debut, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        if date_fin:
+            fin = datetime.strptime(date_fin, "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+        return deb, fin
+
+    try:
+        deb, fin = _bounds()
+    except ValueError:
+        raise HTTPException(422, "date_debut/date_fin doivent être au format AAAA-MM-JJ.")
+
+    # ── Instantané courant (indépendant de la période) ──────────────────
+    q_statut = db.query(BarCaisse.statut, _func.count(BarCaisse.id))
+    if departement_id:
+        q_statut = q_statut.filter(BarCaisse.departement_id == departement_id)
+    par_statut = {s: n for s, n in q_statut.group_by(BarCaisse.statut).all()}
+
+    # ── Entrées (générées) dans la période ───────────────────────────────
+    q_entrees = db.query(_func.count(BarCaisse.id), _func.coalesce(_func.sum(BarCaisse.quantite_initiale), 0))
+    if deb: q_entrees = q_entrees.filter(BarCaisse.created_at >= deb)
+    if fin: q_entrees = q_entrees.filter(BarCaisse.created_at <= fin)
+    if departement_id: q_entrees = q_entrees.filter(BarCaisse.departement_id == departement_id)
+    nb_entrees, unites_entrees = q_entrees.first()
+
+    # ── Mouvements (transferts/ventes/casse/perte) dans la période ───────
+    def _mouv_periode(type_mvt: str):
+        q = (db.query(_func.count(BarCaisseMouvement.id), _func.coalesce(_func.sum(_func.abs(BarCaisseMouvement.quantite)), 0))
+             .join(BarCaisse, BarCaisse.id == BarCaisseMouvement.caisse_id)
+             .filter(BarCaisseMouvement.type_mouvement == type_mvt))
+        if deb: q = q.filter(BarCaisseMouvement.created_at >= deb)
+        if fin: q = q.filter(BarCaisseMouvement.created_at <= fin)
+        if departement_id: q = q.filter(BarCaisse.departement_id == departement_id)
+        return q.first()
+
+    nb_transferts, unites_transferees = _mouv_periode("TRANSFERT")
+    nb_ventes_mvt, unites_vendues     = _mouv_periode("VENTE")
+    nb_casse, unites_casse            = _mouv_periode("CASSE")
+    nb_perte, unites_perte            = _mouv_periode("PERTE")
+
+    # ── Ventes directes (montant exact, une BarVente = une caisse) ───────
+    q_vd = (db.query(_func.count(BarCaisseMouvement.id),
+                     _func.coalesce(_func.sum(BarLigneVente.sous_total), 0))
+            .join(BarVente, BarVente.id == BarCaisseMouvement.reference_vente_id)
+            .join(BarLigneVente, BarLigneVente.vente_id == BarVente.id)
+            .filter(BarCaisseMouvement.type_mouvement == "VENTE",
+                    BarCaisseMouvement.motif.ilike("Vente directe depuis le dépôt%")))
+    if deb: q_vd = q_vd.filter(BarCaisseMouvement.created_at >= deb)
+    if fin: q_vd = q_vd.filter(BarCaisseMouvement.created_at <= fin)
+    nb_ventes_directes, montant_ventes_directes = q_vd.first()
+
+    return {
+        "periode": {"date_debut": date_debut, "date_fin": date_fin},
+        "par_statut_actuel": {
+            "au_depot":    par_statut.get("AU_DEPOT", 0),
+            "transferees": par_statut.get("TRANSFEREE", 0),
+            "en_vente":    par_statut.get("EN_VENTE", 0),
+            "terminees":   par_statut.get("TERMINEE", 0),
+            "annulees":    par_statut.get("ANNULEE", 0),
+        },
+        "entrees_periode":     {"nb_caisses": nb_entrees, "unites": int(unites_entrees)},
+        "transferts_periode":  {"nb": nb_transferts, "unites": int(unites_transferees)},
+        "ventes_periode": {
+            "unites_vendues_total":   int(unites_vendues),
+            "nb_ventes_directes":     nb_ventes_directes,
+            "montant_ventes_directes": float(montant_ventes_directes),
+        },
+        "casse_perte_periode": {
+            "casse": {"nb": nb_casse, "unites": int(unites_casse)},
+            "perte": {"nb": nb_perte, "unites": int(unites_perte)},
+        },
+    }
+
+
 @router.get("/caisses/stock-departements")
 def stock_departements(produit_id: Optional[int] = Query(default=None), db: Session = Depends(get_db)):
     """Ventilation du stock par département — un ou tous les produits gérés
@@ -506,7 +604,10 @@ def transferer_caisse(caisse_id: int, data: TransfererIn, request: Request, db: 
     Réservé à l'administrateur / au responsable de dépôt (voir
     _require_admin_ou_depot) — un QR scanné ne suffit jamais à lui seul :
     le backend revérifie toujours qui fait la demande."""
-    c = db.get(BarCaisse, caisse_id)
+    # Verrou de ligne (SELECT ... FOR UPDATE, tenu jusqu'au commit) : ferme
+    # la fenêtre de course où deux scans concurrents du même code liraient
+    # tous les deux statut="AU_DEPOT" avant que l'un des deux n'écrive.
+    c = db.query(BarCaisse).filter_by(id=caisse_id).with_for_update().first()
     if not c:
         raise HTTPException(404, "Caisse introuvable.")
     if c.statut != "AU_DEPOT":
@@ -556,6 +657,106 @@ def transferer_caisse(caisse_id: int, data: TransfererIn, request: Request, db: 
 
 
 # ══════════════════════════════════════════════════════════════════
+# VENTE DIRECTE DEPUIS LE DÉPÔT — alternative au transfert : toute la
+# caisse est vendue en gros d'un coup, sans passer par un département ni
+# par le panier de caisse habituel.
+# ══════════════════════════════════════════════════════════════════
+
+class VendreDirectementIn(BaseModel):
+    mode_paiement: str            = "CASH"
+    montant_paye:  Optional[float] = None
+    client_nom:    Optional[str]   = None
+
+
+@router.post("/caisses/{caisse_id}/vendre-directement", status_code=200)
+def vendre_caisse_directement(caisse_id: int, data: VendreDirectementIn, request: Request,
+                              db: Session = Depends(get_db),
+                              _autorise: Utilisateur = Depends(_require_admin_ou_depot)):
+    """Alternative au transfert : la caisse entière est vendue en gros
+    directement depuis le dépôt (ex. un client achète 5 caisses d'eau en
+    bloc), sans jamais passer par le département/pool agrégé de vente au
+    détail. Même garde d'autorisation que le transfert — c'est aussi une
+    décision de disposition du stock au dépôt.
+
+    N'écrit AUCUN BarMouvementStock : une caisse AU_DEPOT n'a jamais été
+    créditée au stock agrégat (voir doctrine en tête de fichier et
+    generer_caisses ci-dessus) — la vendre directement du dépôt reste hors
+    de ce pool, symétrique de sa non-entrée. La BarVente créée sert la
+    comptabilité/les rapports normalement.
+
+    Prix : tarif GROS s'il est configuré pour ce produit, sinon repli sur
+    le tarif DETAIL (voir pos_service.prix_actif)."""
+    c = db.query(BarCaisse).filter_by(id=caisse_id).with_for_update().first()
+    if not c:
+        raise HTTPException(404, "Caisse introuvable.")
+    if c.statut != "AU_DEPOT":
+        raise HTTPException(
+            409,
+            f"Cette caisse ne peut pas être vendue directement (statut actuel : {c.statut}).",
+        )
+    mode = (data.mode_paiement or "CASH").upper()
+    if mode not in ("CASH", "CREDIT", "MIXTE"):
+        raise HTTPException(422, "mode_paiement doit être CASH, CREDIT ou MIXTE.")
+
+    from pos_service import prix_actif, generer_numero_ticket
+    prix_unitaire = prix_actif(c.produit_id, db, type_prix="GROS") or prix_actif(c.produit_id, db, type_prix="DETAIL")
+    if not prix_unitaire:
+        raise HTTPException(
+            422,
+            "Aucun prix de vente (gros ou détail) configuré pour ce produit — "
+            "impossible de vendre directement.",
+        )
+
+    qte = c.quantite_restante
+    montant_total = (prix_unitaire * Decimal(qte)).quantize(Decimal("0.01"))
+    montant_paye = Decimal(str(data.montant_paye)) if data.montant_paye is not None else montant_total
+    uid = _uid(request)
+
+    vente = BarVente(
+        numero_ticket   = generer_numero_ticket(db),
+        montant_total   = montant_total,
+        mode_paiement   = mode,
+        statut          = "PAYEE",
+        client_nom      = data.client_nom,
+        montant_paye    = montant_paye,
+        montant_restant = max(montant_total - montant_paye, Decimal("0")),
+    )
+    db.add(vente)
+    db.flush()
+    db.add(BarLigneVente(
+        vente_id               = vente.id,
+        produit_id             = c.produit_id,
+        quantite                = Decimal(qte),
+        prix_unitaire_applique = prix_unitaire,
+        sous_total             = montant_total,
+    ))
+
+    now = datetime.now(timezone.utc)
+    c.statut            = "TERMINEE"
+    c.quantite_restante = 0
+    c.terminee_at        = now
+    c.termine_par_id     = uid
+    db.add(BarCaisseMouvement(
+        caisse_id=c.id, type_mouvement="VENTE", quantite=-qte,
+        motif=f"Vente directe depuis le dépôt — {c.code_unique}",
+        reference_vente_id=vente.id, utilisateur_id=uid,
+    ))
+
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="pos", type_="caisse_vendue_directement",
+        titre=f"Caisse vendue directement — {c.produit.nom}",
+        message=f"{c.code_unique} · {qte} unités · {montant_total} G",
+        lien="pos-caisses", dedupe_minutes=None,
+    )
+
+    db.commit()
+    db.refresh(c)
+    return {"caisse": _caisse_dict(c), "vente_id": vente.id, "numero_ticket": vente.numero_ticket,
+            "montant_total": float(montant_total)}
+
+
+# ══════════════════════════════════════════════════════════════════
 # AJUSTEMENTS — casse, perte, correction (jamais confondu avec une vente)
 # ══════════════════════════════════════════════════════════════════
 
@@ -567,7 +768,7 @@ class AjusterCaisseIn(BaseModel):
 
 @router.post("/caisses/{caisse_id}/ajuster", status_code=200)
 def ajuster_caisse(caisse_id: int, data: AjusterCaisseIn, request: Request, db: Session = Depends(get_db)):
-    c = db.get(BarCaisse, caisse_id)
+    c = db.query(BarCaisse).filter_by(id=caisse_id).with_for_update().first()
     if not c:
         raise HTTPException(404, "Caisse introuvable.")
     if c.statut not in ("TRANSFEREE", "EN_VENTE"):
@@ -609,7 +810,7 @@ def annuler_caisse(caisse_id: int, request: Request, db: Session = Depends(get_d
     """Annule une caisse encore AU DÉPÔT (générée par erreur). Aucun impact
     sur le stock agrégat : une caisse AU_DEPOT n'a jamais été créditée (le
     crédit n'a lieu qu'au transfert), donc rien à compenser ici."""
-    c = db.get(BarCaisse, caisse_id)
+    c = db.query(BarCaisse).filter_by(id=caisse_id).with_for_update().first()
     if not c:
         raise HTTPException(404, "Caisse introuvable.")
     if c.statut != "AU_DEPOT":
