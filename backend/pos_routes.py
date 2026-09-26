@@ -18,6 +18,7 @@ from sqlalchemy import func, or_, exists
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from database import get_db
+from scope_guard import require_depot_scope
 from models import (
     Produit,
     BarCategorie, BarProduit, BarPrixHistorique, BarAchat, BarAchatDepense,
@@ -447,7 +448,7 @@ def supprimer_categorie(cat_id: int, db: Session = Depends(get_db)):
 # MODULE COMMERCE — Entrepôts & Fournisseurs (fondations, phase 1)
 # ══════════════════════════════════════════════════════════════════
 
-@router.get("/entrepots")
+@router.get("/entrepots", dependencies=[Depends(require_depot_scope)])
 def liste_entrepots(actif: Optional[bool] = None, db: Session = Depends(get_db)):
     q = db.query(Entrepot)
     if actif is not None:
@@ -464,7 +465,7 @@ class EntrepotIn(BaseModel):
     actif: bool = True
 
 
-@router.post("/entrepots", status_code=201)
+@router.post("/entrepots", status_code=201, dependencies=[Depends(require_depot_scope)])
 def creer_entrepot(data: EntrepotIn, db: Session = Depends(get_db)):
     nom = data.nom.strip()
     if not nom:
@@ -478,7 +479,7 @@ def creer_entrepot(data: EntrepotIn, db: Session = Depends(get_db)):
     return {"id": e.id, "nom": e.nom, "adresse": e.adresse, "actif": e.actif}
 
 
-@router.put("/entrepots/{entrepot_id}")
+@router.put("/entrepots/{entrepot_id}", dependencies=[Depends(require_depot_scope)])
 def modifier_entrepot(entrepot_id: int, data: EntrepotIn, db: Session = Depends(get_db)):
     e = db.query(Entrepot).filter_by(id=entrepot_id).first()
     if not e:
@@ -493,7 +494,7 @@ def modifier_entrepot(entrepot_id: int, data: EntrepotIn, db: Session = Depends(
     return {"id": e.id, "nom": e.nom, "adresse": e.adresse, "actif": e.actif}
 
 
-@router.get("/fournisseurs")
+@router.get("/fournisseurs", dependencies=[Depends(require_depot_scope)])
 def liste_fournisseurs(actif: Optional[bool] = None, db: Session = Depends(get_db)):
     q = db.query(Fournisseur)
     if actif is not None:
@@ -520,7 +521,7 @@ class FournisseurIn(BaseModel):
     notes: Optional[str] = None
 
 
-@router.post("/fournisseurs", status_code=201)
+@router.post("/fournisseurs", status_code=201, dependencies=[Depends(require_depot_scope)])
 def creer_fournisseur(data: FournisseurIn, db: Session = Depends(get_db)):
     nom = data.nom.strip()
     if not nom:
@@ -538,7 +539,7 @@ def creer_fournisseur(data: FournisseurIn, db: Session = Depends(get_db)):
     return {"id": f.id, "nom": f.nom, "actif": f.actif}
 
 
-@router.put("/fournisseurs/{fournisseur_id}")
+@router.put("/fournisseurs/{fournisseur_id}", dependencies=[Depends(require_depot_scope)])
 def modifier_fournisseur(fournisseur_id: int, data: FournisseurIn, db: Session = Depends(get_db)):
     f = db.query(Fournisseur).filter_by(id=fournisseur_id).first()
     if not f:

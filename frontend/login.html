@@ -519,45 +519,6 @@ body{
           </div>
         </div>
 
-        <!-- Code PIN -->
-        <div class="field">
-          <div class="field-label">
-            <span data-i18n="login.pin">Code PIN</span>
-            <span id="pin-count" class="pin-count">0 / 9</span>
-          </div>
-          <div class="input-wrap">
-            <span class="input-icon">
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                <circle cx="12" cy="16" r="1.2" fill="currentColor" stroke="none"/>
-              </svg>
-            </span>
-            <input type="password" id="code_acces" name="code_acces"
-              autocomplete="one-time-code"
-              placeholder="9 chiffres" data-i18n-ph="login.pin.ph"
-              maxlength="9" pattern="\d{9}"
-              inputmode="numeric" required>
-            <button type="button" class="pw-toggle" id="pin-toggle" tabindex="-1" aria-label="Afficher le code PIN">
-              <svg id="pin-eye-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-              </svg>
-            </button>
-          </div>
-          <!-- Visualisation 9 cases ─────────────────────── -->
-          <div class="pin-visual" id="pin-visual" aria-hidden="true">
-            <div class="pin-dot" id="pd0"></div>
-            <div class="pin-dot" id="pd1"></div>
-            <div class="pin-dot" id="pd2"></div>
-            <div class="pin-dot" id="pd3"></div>
-            <div class="pin-dot" id="pd4"></div>
-            <div class="pin-dot" id="pd5"></div>
-            <div class="pin-dot" id="pd6"></div>
-            <div class="pin-dot" id="pd7"></div>
-            <div class="pin-dot" id="pd8"></div>
-          </div>
-        </div>
-
       </div><!-- /fields -->
 
       <button type="submit" class="btn-login" id="btn-submit" style="margin-top:20px" data-i18n="login.submit">
@@ -727,6 +688,70 @@ body{
         </button>
       </div>
       <div class="otp-err" id="channel-err"></div>
+      <button type="button" class="otp-back" onclick="otpBack()" data-i18n="otp.back">← Retour à la connexion</button>
+    </div>
+
+    <!-- ── Étape 2 : code PIN (+ choix d'espace GAZ/DEPO si le compte y a accès) ──
+         Le champ Code PIN (avec sa visualisation 9 cases) vit UNIQUEMENT ici —
+         plus dans le formulaire principal (Étape 1 = email + mot de passe
+         seulement, pour tous les comptes). ── -->
+    <div class="otp-step" id="pin-step">
+      <div class="otp-icon">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#e8c558" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </div>
+      <div class="otp-title" id="pin-step-title" data-i18n="pinstep.title">Code de sécurité</div>
+      <div class="otp-hint" id="pin-step-hint" data-i18n="pinstep.hint">Entrez votre code PIN pour continuer.</div>
+
+      <div class="field" style="width:100%;margin-top:14px">
+        <div class="field-label">
+          <span data-i18n="login.pin">Code PIN</span>
+          <span id="pin-count" class="pin-count">0 / 9</span>
+        </div>
+        <div class="input-wrap">
+          <span class="input-icon">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              <circle cx="12" cy="16" r="1.2" fill="currentColor" stroke="none"/>
+            </svg>
+          </span>
+          <input type="password" id="code_acces" name="code_acces"
+            autocomplete="one-time-code"
+            placeholder="9 chiffres" data-i18n-ph="login.pin.ph"
+            maxlength="9" pattern="\d{9}"
+            inputmode="numeric">
+          <button type="button" class="pw-toggle" id="pin-toggle" tabindex="-1" aria-label="Afficher le code PIN">
+            <svg id="pin-eye-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+        <!-- Visualisation 9 cases ─────────────────────── -->
+        <div class="pin-visual" id="pin-visual" aria-hidden="true">
+          <div class="pin-dot" id="pd0"></div>
+          <div class="pin-dot" id="pd1"></div>
+          <div class="pin-dot" id="pd2"></div>
+          <div class="pin-dot" id="pd3"></div>
+          <div class="pin-dot" id="pd4"></div>
+          <div class="pin-dot" id="pd5"></div>
+          <div class="pin-dot" id="pd6"></div>
+          <div class="pin-dot" id="pd7"></div>
+          <div class="pin-dot" id="pd8"></div>
+        </div>
+      </div>
+
+      <!-- Choix d'espace — visible seulement pour un compte GAZ/DEPO/TOULEDE -->
+      <div style="display:none;flex-direction:column;gap:10px;width:100%;margin-top:14px" id="pin-step-module-buttons">
+        <button type="button" class="btn-login" id="btn-module-gaz" onclick="confirmPinStep('GAZ')" data-i18n="module.gaz">⛽ Carburant (GAZ)</button>
+        <button type="button" class="btn-login" id="btn-module-depo" onclick="confirmPinStep('DEPO')" style="background:linear-gradient(135deg,#0ea5e9,#0369a1)" data-i18n="module.depo">📦 Dépôt (DEPO)</button>
+      </div>
+      <!-- Compte hors périmètre GAZ/DEPO — un simple bouton Continuer -->
+      <button type="button" class="btn-login" id="btn-pin-continue" onclick="confirmPinStep(null)" style="display:none;margin-top:14px" data-i18n="pinstep.continue">Continuer</button>
+
+      <div class="otp-err" id="pin-step-err"></div>
       <button type="button" class="otp-back" onclick="otpBack()" data-i18n="otp.back">← Retour à la connexion</button>
     </div>
 
@@ -938,6 +963,18 @@ const LANGS = {
     'otp.expire.timer':    'Code valide {time}',
     'otp.useadmincode':    'Utiliser un code administrateur →',
 
+    'module.title':  'Choisissez votre espace',
+    'module.hint':   'Ce compte a accès à plusieurs espaces — lequel voulez-vous ouvrir ?',
+    'module.hint.fixed': 'Vous allez ouvrir l\'espace {mod} — confirmez avec votre code PIN.',
+    'module.name.gaz':  'Carburant',
+    'module.name.depo': 'Dépôt',
+    'module.gaz':    '⛽ Carburant (GAZ)',
+    'module.depo':   '📦 Dépôt (DEPO)',
+    'module.err':    'Erreur',
+    'pinstep.title':    'Code de sécurité',
+    'pinstep.hint':     'Entrez votre code PIN pour continuer.',
+    'pinstep.continue': 'Continuer',
+
     'admincode.info':       "L'administrateur recevra un email avec un code.",
     'admincode.info.sub':   'Demandez-lui verbalement ce code à 9 caractères.',
     'admincode.request':    "Envoyer la demande à l'admin",
@@ -1036,6 +1073,18 @@ const LANGS = {
     'otp.expire.timer':    'Code valid {time}',
     'otp.useadmincode':    'Use an administrator code →',
 
+    'module.title':  'Choose your workspace',
+    'module.hint':   'This account has access to multiple workspaces — which one do you want to open?',
+    'module.hint.fixed': 'You are about to open the {mod} workspace — confirm with your PIN code.',
+    'module.name.gaz':  'Fuel',
+    'module.name.depo': 'Warehouse',
+    'module.gaz':    '⛽ Fuel (GAZ)',
+    'module.depo':   '📦 Warehouse (DEPO)',
+    'module.err':    'Error',
+    'pinstep.title':    'Security code',
+    'pinstep.hint':     'Enter your PIN code to continue.',
+    'pinstep.continue': 'Continue',
+
     'admincode.info':       'The administrator will receive an email with a code.',
     'admincode.info.sub':   'Ask them to tell you this 9-character code verbally.',
     'admincode.request':    'Send request to admin',
@@ -1133,6 +1182,18 @@ const LANGS = {
     'otp.back':            '← Volver al inicio de sesión',
     'otp.expire.timer':    'Código válido {time}',
     'otp.useadmincode':    'Usar un código de administrador →',
+
+    'module.title':  'Elija su espacio',
+    'module.hint':   'Esta cuenta tiene acceso a varios espacios — ¿cuál desea abrir?',
+    'module.hint.fixed': 'Va a abrir el espacio {mod} — confirme con su código PIN.',
+    'module.name.gaz':  'Combustible',
+    'module.name.depo': 'Depósito',
+    'module.gaz':    '⛽ Combustible (GAZ)',
+    'module.depo':   '📦 Depósito (DEPO)',
+    'module.err':    'Error',
+    'pinstep.title':    'Código de seguridad',
+    'pinstep.hint':     'Ingrese su código PIN para continuar.',
+    'pinstep.continue': 'Continuar',
 
     'admincode.info':       'El administrador recibirá un correo con un código.',
     'admincode.info.sub':   'Pídele que te diga verbalmente este código de 9 caracteres.',
@@ -1529,12 +1590,12 @@ function _postLoginRedirect(){
 
     const email      = document.getElementById('email').value.trim();
     const password   = document.getElementById('password').value;
-    const code_acces = document.getElementById('code_acces').value.trim();
 
-    // Validations côté client
+    // Validations côté client — Étape 1 = email + mot de passe SEULEMENT,
+    // pour tous les comptes. Le code PIN se saisit à l'étape suivante
+    // (pin-step), jamais ici.
     if(!email)      { showErr(t('login.err.email')); return; }
     if(!password)   { showErr(t('login.err.password')); return; }
-    if(!/^\d{9}$/.test(code_acces)){ showErr(t('login.err.pin')); return; }
 
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>' + t('login.submit.wait');
@@ -1543,10 +1604,26 @@ function _postLoginRedirect(){
       const res = await fetch('/api/login',{
         method:'POST',headers:{'Content-Type':'application/json'},
         credentials:'include',
-        body:JSON.stringify({email, password, code_acces}),
+        body:JSON.stringify({email, password}),
       });
       const d = await res.json().catch(()=>({}));
       if(!res.ok) throw new Error((d.detail && window.translateApiError ? window.translateApiError(d.detail) : d.detail) || t('login.err.default'));
+
+      // Compte GAZ/DEPO/TOULEDE — choix d'espace + PIN sur la même étape.
+      if(d.module_choice_required){
+        btn.disabled = false;
+        btn.innerHTML = t('login.submit');
+        showPinStep({fixedModule: d.fixed_module || null, hasChoice: !d.fixed_module});
+        return;
+      }
+
+      // Compte hors périmètre GAZ/DEPO (ou admin/pdg) — juste le PIN, sans choix d'espace.
+      if(d.pin_required){
+        btn.disabled = false;
+        btn.innerHTML = t('login.submit');
+        showPinStep({fixedModule: null, hasChoice: false});
+        return;
+      }
 
       // Vérification en deux étapes activée côté serveur
       if(d.otp_required){
@@ -1675,11 +1752,18 @@ function _postLoginRedirect(){
       } else {
         const email      = document.getElementById('email').value.trim();
         const password   = document.getElementById('password').value;
+        // Le PIN vit désormais uniquement dans #pin-step (jamais dans le
+        // formulaire initial) — sa valeur y reste disponible tel quel pour
+        // toute resoumission, que le compte soit GAZ/DEPO/TOULEDE ou hors
+        // périmètre (le même champ #code_acces sert aux deux cas).
         const code_acces = document.getElementById('code_acces').value.trim();
-        res = await fetch('/api/login',{
+        const endpoint = window._selectedModule ? '/api/auth/select-module' : '/api/login';
+        const body = {email, password, code_acces, channel};
+        if(window._selectedModule) body.target_module = window._selectedModule;
+        res = await fetch(endpoint,{
           method:'POST',headers:{'Content-Type':'application/json'},
           credentials:'include',
-          body:JSON.stringify({email, password, code_acces, channel}),
+          body:JSON.stringify(body),
         });
       }
       const d = await res.json().catch(()=>({}));
@@ -1691,6 +1775,100 @@ function _postLoginRedirect(){
       errEl2.textContent = err.message;
     }finally{
       btnE.disabled = false; btnW.disabled = false;
+    }
+  };
+
+  // ── Étape 2 : code PIN (+ choix d'espace GAZ/DEPO si applicable) ──────
+  // opts: {fixedModule: 'GAZ'|'DEPO'|null, hasChoice: bool}
+  //   hasChoice=true  (TOULEDE)       -> les deux boutons GAZ/DEPO
+  //   fixedModule set (GAZ ou DEPO)   -> un seul bouton, module déjà déterminé
+  //   ni l'un ni l'autre (hors périmètre GAZ/DEPO, admin/pdg) -> bouton "Continuer" seul
+  window.showPinStep = function(opts){
+    opts = opts || {};
+    document.getElementById('pin-step-err').textContent = '';
+    document.getElementById('code_acces').value = '';
+    document.getElementById('code_acces').dispatchEvent(new Event('input'));   // reset compteur/points
+
+    window._pinStepFixed = opts.fixedModule || null;
+    const wrap = document.getElementById('pin-step-module-buttons');
+    const btnG = document.getElementById('btn-module-gaz');
+    const btnD = document.getElementById('btn-module-depo');
+    const btnContinue = document.getElementById('btn-pin-continue');
+    const hint = document.getElementById('pin-step-hint');
+
+    if(opts.hasChoice || opts.fixedModule){
+      wrap.style.display = 'flex';
+      btnContinue.style.display = 'none';
+      if(opts.fixedModule === 'GAZ'){
+        btnD.style.display = 'none'; btnG.style.display = '';
+        hint.textContent = t('module.hint.fixed', {mod: t('module.name.gaz')});
+      } else if(opts.fixedModule === 'DEPO'){
+        btnG.style.display = 'none'; btnD.style.display = '';
+        hint.textContent = t('module.hint.fixed', {mod: t('module.name.depo')});
+      } else {
+        btnG.style.display = ''; btnD.style.display = '';
+        hint.textContent = t('module.hint');
+      }
+    } else {
+      wrap.style.display = 'none';
+      btnContinue.style.display = '';
+      hint.textContent = t('pinstep.hint');
+    }
+
+    document.getElementById('login-form').style.display = 'none';
+    var ow = document.getElementById('oauth-wrap');
+    if(ow) ow.style.display = 'none';
+    document.getElementById('err-box').classList.add('hidden');
+    document.getElementById('pin-step').classList.add('show');
+    document.getElementById('code_acces').focus();
+  };
+
+  // mod: 'GAZ'|'DEPO' (bouton d'espace cliqué) ou null (bouton "Continuer",
+  // compte hors périmètre GAZ/DEPO).
+  window.confirmPinStep = async function(mod){
+    const btnG = document.getElementById('btn-module-gaz');
+    const btnD = document.getElementById('btn-module-depo');
+    const btnContinue = document.getElementById('btn-pin-continue');
+    const errEl3 = document.getElementById('pin-step-err');
+    const pin = document.getElementById('code_acces').value.trim();
+    if(!/^\d{9}$/.test(pin)){ errEl3.textContent = t('login.err.pin'); return; }
+    btnG.disabled = true; btnD.disabled = true; btnContinue.disabled = true;
+    errEl3.textContent = '';
+    try{
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const endpoint = mod ? '/api/auth/select-module' : '/api/login';
+      const body = {email, password, code_acces: pin};
+      if(mod) body.target_module = mod;
+      const res = await fetch(endpoint,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        credentials:'include',
+        body:JSON.stringify(body),
+      });
+      const d = await res.json().catch(()=>({}));
+      if(!res.ok) throw new Error((d.detail && window.translateApiError ? window.translateApiError(d.detail) : d.detail) || t('module.err'));
+      document.getElementById('pin-step').classList.remove('show');
+      window._selectedModule = mod || null;
+
+      if(d.channel_choice_required){
+        _capturePhoto();
+        showChannelStep(d.email_hint, d.phone_hint);
+        return;
+      }
+      if(d.otp_required){
+        _capturePhoto();
+        showOtpStep(d.channel || 'email', d.channel === 'whatsapp' ? d.phone_hint : (d.email_hint || t('otp.hint.email.default')));
+        return;
+      }
+      // Connexion directe (OTP désactivé)
+      if(d.api_key) sessionStorage.setItem('api_key', d.api_key);
+      _capturePhoto();
+      sessionStorage.setItem('konekta_just_logged_in','1');
+      _sendLoginMeta().finally(function(){ window.location.href=_postLoginRedirect(); });
+    }catch(err){
+      errEl3.textContent = err.message;
+    }finally{
+      btnG.disabled = false; btnD.disabled = false; btnContinue.disabled = false;
     }
   };
 
@@ -1720,6 +1898,12 @@ function _postLoginRedirect(){
   window.otpBack = function(){
     document.getElementById('otp-step').classList.remove('show');
     document.getElementById('channel-step').classList.remove('show');
+    document.getElementById('pin-step').classList.remove('show');
+    window._selectedModule = null;
+    window._pinStepFixed = null;
+    var _cpin = document.getElementById('code_acces'); if(_cpin){ _cpin.value=''; _cpin.dispatchEvent(new Event('input')); }
+    var _bg = document.getElementById('btn-module-gaz'); if(_bg) _bg.style.display = '';
+    var _bd = document.getElementById('btn-module-depo'); if(_bd) _bd.style.display = '';
     window._oauthPendingMode = false;
     document.cookie = 'oauth_pending=;path=/;max-age=0';
     document.getElementById('login-form').style.display = '';
@@ -1779,10 +1963,13 @@ function _postLoginRedirect(){
         const email = document.getElementById('email').value.trim();
         const pwd   = document.getElementById('password').value;
         const pin   = document.getElementById('code_acces').value.trim();
-        res = await fetch('/api/login',{
+        const endpoint = window._selectedModule ? '/api/auth/select-module' : '/api/login';
+        const body = {email,password:pwd,code_acces:pin,channel:window._otpChannel||'email'};
+        if(window._selectedModule) body.target_module = window._selectedModule;
+        res = await fetch(endpoint,{
           method:'POST',headers:{'Content-Type':'application/json'},
           credentials:'include',
-          body:JSON.stringify({email,password:pwd,code_acces:pin,channel:window._otpChannel||'email'}),
+          body:JSON.stringify(body),
         });
       }
       const d = await res.json().catch(()=>({}));
@@ -2081,7 +2268,7 @@ if(new URLSearchParams(window.location.search).get('otp') !== '1'){
 
   // ── Helpers visibilité des étapes ──────────────────────────────
   function _hideAll(){
-    var ids=['login-form','oauth-wrap','otp-step','forgot-step','reset-step','reset-success-step'];
+    var ids=['login-form','oauth-wrap','otp-step','pin-step','forgot-step','reset-step','reset-success-step'];
     ids.forEach(function(id){ var el=document.getElementById(id); if(el){ el.style.display='none'; el.classList.remove('show'); } });
   }
   function _showLoginForm(){

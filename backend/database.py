@@ -248,6 +248,15 @@ def _migrate_columns():
              "ALTER TABLE bar_caisses ADD COLUMN confirmee_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
             ("bar_caisses", "declaration_id",
              "ALTER TABLE bar_caisses ADD COLUMN declaration_id INTEGER REFERENCES bar_declarations_achat(id) ON DELETE SET NULL", None),
+            # v28 — cloisonnement de connexion GAZ / DEPO (choix d'espace à la
+            # connexion) : voir Utilisateur.espace_autorise / SessionToken.scope /
+            # OTPCode.target_module dans models.py.
+            ("utilisateurs", "espace_autorise",
+             "ALTER TABLE utilisateurs ADD COLUMN espace_autorise VARCHAR(10)", None),
+            ("sessions", "scope",
+             "ALTER TABLE sessions ADD COLUMN scope VARCHAR(10)", None),
+            ("otp_codes", "target_module",
+             "ALTER TABLE otp_codes ADD COLUMN target_module VARCHAR(10)", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -400,6 +409,13 @@ def _migrate_columns():
              "ALTER TABLE bar_caisses ADD COLUMN confirmee_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
             ("bar_caisses", "declaration_id",
              "ALTER TABLE bar_caisses ADD COLUMN declaration_id INTEGER REFERENCES bar_declarations_achat(id) ON DELETE SET NULL", None),
+            # v28 — cloisonnement de connexion GAZ / DEPO
+            ("utilisateurs", "espace_autorise",
+             "ALTER TABLE utilisateurs ADD COLUMN espace_autorise VARCHAR(10)", None),
+            ("sessions", "scope",
+             "ALTER TABLE sessions ADD COLUMN scope VARCHAR(10)", None),
+            ("otp_codes", "target_module",
+             "ALTER TABLE otp_codes ADD COLUMN target_module VARCHAR(10)", None),
         ]
     else:
         return
@@ -563,6 +579,37 @@ def _migrate_columns():
                 conn.commit()
             except Exception:
                 conn.rollback()  # contrainte déjà à jour
+
+        # v28 — cloisonnement GAZ / DEPO : contraintes de domaine.
+        with engine.connect() as conn:
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE utilisateurs ADD CONSTRAINT chk_utilisateur_espace "
+                    "CHECK (espace_autorise IS NULL OR espace_autorise IN ('GAZ','DEPO','TOULEDE'))"
+                ))
+                conn.commit()
+            except Exception:
+                conn.rollback()  # déjà présente
+
+        with engine.connect() as conn:
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE sessions ADD CONSTRAINT chk_session_scope "
+                    "CHECK (scope IS NULL OR scope IN ('GAZ','DEPO'))"
+                ))
+                conn.commit()
+            except Exception:
+                conn.rollback()  # déjà présente
+
+        with engine.connect() as conn:
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE otp_codes ADD CONSTRAINT chk_otp_target_module "
+                    "CHECK (target_module IS NULL OR target_module IN ('GAZ','DEPO'))"
+                ))
+                conn.commit()
+            except Exception:
+                conn.rollback()  # déjà présente
 
 
 # ── Initialisation du schéma + données de démarrage ──────────────

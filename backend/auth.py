@@ -64,6 +64,7 @@ def create_session(
     user_id: int,
     ip_address: str | None = None,
     user_agent: str | None = None,
+    scope: str | None = None,
 ) -> str:
     token   = secrets.token_urlsafe(32)
     expires = datetime.now(timezone.utc) + timedelta(hours=SESSION_DURATION_HOURS)
@@ -71,6 +72,7 @@ def create_session(
         token=token, user_id=user_id, expires_at=expires,
         ip_address=ip_address,
         user_agent=(user_agent or "")[:255] if user_agent else None,
+        scope=scope,
     ))
     db.commit()
     return token
@@ -95,6 +97,7 @@ def get_session_user(db: Session, token: str):
     s.last_activity_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)  # recharge les attributs expirés par commit avant fermeture de session
+    user.session_scope = s.scope  # attribut transitoire (non mappé) — voir scope_guard.py
     return user
 
 

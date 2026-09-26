@@ -46,6 +46,7 @@ from zelle_routes import router as zelle_router
 from taches_routes import router as taches_router
 from pieces_jointes_routes import router as pieces_jointes_router
 from listes_reference_routes import router as listes_reference_router
+from scope_guard import require_gaz_scope, require_depot_scope
 from auth import (
     SESSION_COOKIE, hash_password, verify_password,
     hash_code_acces, verify_code_acces,
@@ -200,7 +201,7 @@ def _clear_login_failures(ip: str | None) -> None:
         _LOGIN_ATTEMPTS.pop(ip, None)
 
 # Chemins accessibles sans être connecté
-_PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code",
+_PUBLIC_PATHS    = {"/login", "/api/login", "/api/auth/select-module", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code",
                     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify",
                     "/api/oauth/otp/send", "/api/config/branding"}
 _PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/") if _DEBUG_MODE
@@ -241,7 +242,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         # Stocker les attributs scalaires dans un objet simple avant la fermeture de session
         class _UserProxy:
-            __slots__ = ("id","role","role_id","actif","nom_complet","username","poste","email","api_key_hash")
+            __slots__ = ("id","role","role_id","actif","nom_complet","username","poste","email","api_key_hash","scope")
         proxy = _UserProxy()
         proxy.id           = user.id
         proxy.role         = user.role
@@ -252,6 +253,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         proxy.poste        = user.poste
         proxy.email        = user.email
         proxy.api_key_hash = user.api_key_hash
+        proxy.scope        = getattr(user, "session_scope", None)   # None pour le chemin X-API-Key (jamais scopé)
         request.state.user = proxy
         return await call_next(request)
 
@@ -586,30 +588,63 @@ _CODE_RE = __import__("re").compile(r"^\d{9}$")
 class LoginIn(BaseModel):
     email:      str
     password:   str
-    code_acces: str
+    # Optionnel : le PIN n'est plus envoyé avec la première soumission
+    # (email+mot de passe seuls) — voir _check_password_only. Il est
+    # fourni lors d'une resoumission (une fois server-side qu'on sait s'il
+    # faut ou non un choix d'espace), à /api/login ou /api/auth/select-module.
+    code_acces: Optional[str] = None
     channel:    Optional[str] = None   # "email" | "whatsapp" — choix du canal OTP
+    target_module: Optional[str] = None   # "GAZ" | "DEPO" — choix d'espace (comptes TOULEDE)
 
 
-@app.post("/api/login")
-def login(data: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
-    ip    = request.client.host if request.client else None
-    ua    = request.headers.get("user-agent", "")
-    _check_login_rate(ip)   # bloquer les IPs en brute-force
-    email = data.email.strip().lower()
+def _check_password_only(db: Session, email: str, password: str, ip: Optional[str]) -> Utilisateur:
+    """Vérifie email/mot de passe SEULEMENT — pour les comptes GAZ/DEPO/
+    TOULEDE, le PIN n'est plus exigé à cette étape : il est demandé et
+    validé explicitement à l'étape de choix d'espace (voir _check_pin,
+    utilisé par /api/auth/select-module), associé au clic GAZ/DEPO. Pour
+    les comptes hors périmètre (espace_autorise NULL) et admin/pdg,
+    /api/login valide encore le PIN dans la même requête, juste après —
+    comportement de connexion inchangé pour eux."""
+    email = email.strip().lower()
     user  = db.query(Utilisateur).filter_by(email=email, actif=True).first()
-    _err  = "Email, mot de passe ou code d'accès incorrect"
+    _err  = "Email ou mot de passe incorrect"
     if not user:
         _record_login_failure(ip)
         log_event(db, LOGIN_FAILED, ip_address=ip, details={"email": email, "raison": "utilisateur_inconnu"})
         raise HTTPException(401, _err)
-    if not verify_password(data.password, user.password_hash):
+    if not verify_password(password, user.password_hash):
         _record_login_failure(ip)
         log_event(db, LOGIN_FAILED, user_id=user.id, ip_address=ip, details={"raison": "mot_de_passe_incorrect"})
         raise HTTPException(401, _err)
-    if not user.code_acces_hash or not verify_code_acces(data.code_acces, user.code_acces_hash):
+    return user
+
+
+def _check_pin(db: Session, user: Utilisateur, code_acces: str, ip: Optional[str]) -> None:
+    if not user.code_acces_hash or not verify_code_acces(code_acces, user.code_acces_hash):
         _record_login_failure(ip)
         log_event(db, LOGIN_FAILED, user_id=user.id, ip_address=ip, details={"raison": "pin_incorrect"})
-        raise HTTPException(401, _err)
+        raise HTTPException(401, "Code PIN incorrect")
+
+
+def _scope_for_login(user: Utilisateur) -> Optional[str]:
+    """Espace effectif pour la connexion : admin/pdg ne sont JAMAIS
+    restreints par le cloisonnement GAZ/DEPO, quelle que soit la valeur de
+    espace_autorise sur leur compte — traités comme un compte hors périmètre."""
+    if user.role in ("admin", "pdg"):
+        return None
+    return user.espace_autorise
+
+
+def _continue_after_credentials(
+    db: Session, request: Request, response: Response,
+    user: Utilisateur, channel: Optional[str], selected_module: Optional[str],
+) -> dict:
+    """Suite commune à /api/login et /api/auth/select-module, une fois
+    l'identité vérifiée et le module (selected_module: 'GAZ'|'DEPO'|None)
+    déterminé — choix de canal OTP puis envoi, ou connexion directe si
+    OTP_ENABLED=False."""
+    ip = request.client.host if request.client else None
+    ua = request.headers.get("user-agent", "")
 
     # ── Vérification en deux étapes (OTP) ────────────────────────────
     if OTP_ENABLED:
@@ -624,7 +659,7 @@ def login(data: LoginIn, request: Request, response: Response, db: Session = Dep
         # Si un téléphone est disponible et qu'aucun canal n'a encore été
         # choisi, proposer le choix avant d'envoyer quoi que ce soit — pas
         # d'envoi silencieux, l'utilisateur décide explicitement.
-        if user.telephone and data.channel not in ("email", "whatsapp"):
+        if user.telephone and channel not in ("email", "whatsapp"):
             return {
                 "otp_required":           True,
                 "channel_choice_required": True,
@@ -632,11 +667,11 @@ def login(data: LoginIn, request: Request, response: Response, db: Session = Dep
                 "phone_hint": _mask_telephone(user.telephone),
             }
 
-        channel = "whatsapp" if (user.telephone and data.channel == "whatsapp") else "email"
+        ch = "whatsapp" if (user.telephone and channel == "whatsapp") else "email"
 
         try:
-            code, pending_token = create_otp(db, user.id)
-            if channel == "whatsapp":
+            code, pending_token = create_otp(db, user.id, target_module=selected_module)
+            if ch == "whatsapp":
                 send_otp_whatsapp(user.telephone, code)
             else:
                 send_otp_email(user.nom_complet or user.username, user.email, code)
@@ -645,7 +680,7 @@ def login(data: LoginIn, request: Request, response: Response, db: Session = Dep
         except RuntimeError as e:
             raise HTTPException(503, str(e))
 
-        log_event(db, OTP_SENT, user_id=user.id, ip_address=ip, details={"canal": channel})
+        log_event(db, OTP_SENT, user_id=user.id, ip_address=ip, details={"canal": ch})
         response.set_cookie(
             OTP_PENDING_COOKIE, pending_token,
             httponly=True, samesite="lax", secure=_SECURE_COOKIES,
@@ -653,14 +688,14 @@ def login(data: LoginIn, request: Request, response: Response, db: Session = Dep
         )
         return {
             "otp_required": True,
-            "channel":      channel,
-            "email_hint":   _mask_email(user.email) if channel == "email" else None,
-            "phone_hint":   _mask_telephone(user.telephone) if channel == "whatsapp" else None,
+            "channel":      ch,
+            "email_hint":   _mask_email(user.email) if ch == "email" else None,
+            "phone_hint":   _mask_telephone(user.telephone) if ch == "whatsapp" else None,
         }
 
     # ── Connexion directe (OTP désactivé) ────────────────────────────
     _clear_login_failures(ip)
-    token = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    token = create_session(db, user.id, ip_address=ip, user_agent=ua, scope=selected_module)
     log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     response.set_cookie(
         SESSION_COOKIE, token,
@@ -675,6 +710,62 @@ def login(data: LoginIn, request: Request, response: Response, db: Session = Dep
     }
 
 
+@app.post("/api/login")
+def login(data: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
+    ip = request.client.host if request.client else None
+    _check_login_rate(ip)   # bloquer les IPs en brute-force
+    user  = _check_password_only(db, data.email, data.password, ip)
+    scope = _scope_for_login(user)
+
+    if scope in ("GAZ", "DEPO", "TOULEDE"):
+        # Compte concerné par le cloisonnement GAZ/DEPO : le PIN n'est PAS
+        # vérifié ici — il sera exigé à l'étape de choix d'espace
+        # (/api/auth/select-module), même pour un compte à un seul espace
+        # (fixed_module) : le clic de confirmation + le PIN vont toujours
+        # ensemble.
+        resp = {"module_choice_required": True}
+        if scope in ("GAZ", "DEPO"):
+            resp["fixed_module"] = scope
+        return resp
+
+    # Compte hors périmètre (espace_autorise NULL) ou admin/pdg — le PIN
+    # n'est plus envoyé avec l'email+mot de passe : le formulaire principal
+    # ne le demande plus du tout, il est resoumis dans un second appel une
+    # fois cette première réponse reçue (voir showPinStep côté login.html).
+    if not data.code_acces:
+        return {"pin_required": True}
+    _check_pin(db, user, data.code_acces, ip)
+    return _continue_after_credentials(db, request, response, user, data.channel, None)
+
+
+@app.post("/api/auth/select-module")
+def select_module(data: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
+    """Étape 2 (comptes GAZ/DEPO/TOULEDE) — ré-authentifie le mot de passe,
+    vérifie le droit sur le module choisi, PUIS valide le PIN (c'est ici,
+    et seulement ici, que le PIN est contrôlé pour ces comptes) avant de
+    poursuivre vers le choix de canal / OTP."""
+    ip = request.client.host if request.client else None
+    _check_login_rate(ip)
+    user  = _check_password_only(db, data.email, data.password, ip)
+    scope = _scope_for_login(user)
+    if scope not in ("GAZ", "DEPO", "TOULEDE"):
+        raise HTTPException(403, "Ce compte n'a pas de choix d'espace à faire.")
+    if scope in ("GAZ", "DEPO"):
+        # Compte à un seul espace : le module est déjà déterminé — un
+        # target_module différent (falsifié côté client) est refusé.
+        if data.target_module and data.target_module != scope:
+            raise HTTPException(403, "Espace non autorisé pour ce compte.")
+        target_module = scope
+    else:
+        if data.target_module not in ("GAZ", "DEPO"):
+            raise HTTPException(400, "target_module requis ('GAZ' ou 'DEPO').")
+        target_module = data.target_module
+    if not data.code_acces:
+        raise HTTPException(400, "code_acces requis.")
+    _check_pin(db, user, data.code_acces, ip)
+    return _continue_after_credentials(db, request, response, user, data.channel, target_module)
+
+
 class OTPVerifyIn(BaseModel):
     code: str
 
@@ -686,7 +777,7 @@ def otp_verify(data: OTPVerifyIn, request: Request, response: Response, db: Sess
     ua            = request.headers.get("user-agent", "")
     pending_token = request.cookies.get(OTP_PENDING_COOKIE, "")
     try:
-        user = verify_otp(db, pending_token, data.code)
+        user, target_module = verify_otp(db, pending_token, data.code)
     except ValueError as e:
         log_event(db, OTP_FAILED, ip_address=ip, details={"raison": str(e)})
         raise HTTPException(401, str(e))
@@ -695,7 +786,7 @@ def otp_verify(data: OTPVerifyIn, request: Request, response: Response, db: Sess
     _clear_login_failures(ip)
     response.delete_cookie(OTP_PENDING_COOKIE, path="/")
 
-    token = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    token = create_session(db, user.id, ip_address=ip, user_agent=ua, scope=target_module)
     log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     response.set_cookie(
         SESSION_COOKIE, token,
@@ -768,7 +859,7 @@ def otp_verify_admin_code(
     pending_token = request.cookies.get(OTP_PENDING_COOKIE, "")
 
     try:
-        user = verify_admin_code(db, pending_token, data.code)
+        user, target_module = verify_admin_code(db, pending_token, data.code)
     except ValueError as e:
         log_event(db, ADMIN_CODE_FAILED, ip_address=ip, details={"raison": str(e)})
         raise HTTPException(401, str(e))
@@ -777,7 +868,7 @@ def otp_verify_admin_code(
     _clear_login_failures(ip)
     response.delete_cookie(OTP_PENDING_COOKIE, path="/")
 
-    token = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    token = create_session(db, user.id, ip_address=ip, user_agent=ua, scope=target_module)
     log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     response.set_cookie(
         SESSION_COOKIE, token,
@@ -983,6 +1074,8 @@ def me(request: Request, db: Session = Depends(get_db)):
         "role_nom":    role_nom,
         "permissions": perms,
         "est_admin":   est_admin,
+        "espace_autorise": user.espace_autorise,
+        "scope":           getattr(state_user, "scope", None),
         "employe_id":  emp_pour_role.id if emp_pour_role else None,
         "employe_nom": (emp_pour_role.nom + " " + emp_pour_role.prenom) if emp_pour_role else None,
         # Utilisé uniquement par l'écran Caisse pour auto-attribuer caissier_id à
@@ -1540,6 +1633,14 @@ def oauth_callback(
     if not user.actif:
         return RedirectResponse(url="/login?oauth_error=account_disabled")
 
+    # Cloisonnement GAZ/DEPO : comptes simples (un seul espace) auto-scopés
+    # silencieusement. Un compte TOULEDE non-admin via OAuth n'a pas encore
+    # d'écran de choix ici (pas de mot de passe à resoumettre pour un pont
+    # de choix comme /api/auth/select-module) — session non restreinte pour
+    # ce cas, à traiter dans un suivi si besoin.
+    _oauth_scope = _scope_for_login(user)
+    oauth_module = _oauth_scope if _oauth_scope in ("GAZ", "DEPO") else None
+
     # ── Vérification en deux étapes (OTP) après OAuth ────────────────
     if OTP_ENABLED and user.email:
         # Un numéro est disponible — laisser choisir le canal avant tout
@@ -1562,7 +1663,7 @@ def oauth_callback(
             return redir
 
         try:
-            code, pending_token = create_otp(db, user.id)
+            code, pending_token = create_otp(db, user.id, target_module=oauth_module)
             send_otp_email(user.nom_complet or user.email, user.email, code)
         except (ValueError, RuntimeError) as exc:
             import traceback; traceback.print_exc()
@@ -1586,7 +1687,7 @@ def oauth_callback(
     # ── Connexion directe (OTP désactivé) ────────────────────────────
     ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent", "")
-    session_token = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    session_token = create_session(db, user.id, ip_address=ip, user_agent=ua, scope=oauth_module)
     log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip)
     redir = RedirectResponse(url="/?just_logged_in=1", status_code=302)
     redir.set_cookie(
@@ -1624,9 +1725,11 @@ def oauth_otp_send(
         raise HTTPException(400, "Canal invalide.")
 
     channel = "whatsapp" if (data.channel == "whatsapp" and user.telephone) else "email"
+    _oauth_scope = _scope_for_login(user)
+    oauth_module = _oauth_scope if _oauth_scope in ("GAZ", "DEPO") else None
 
     try:
-        code, pending_token = create_otp(db, user.id)
+        code, pending_token = create_otp(db, user.id, target_module=oauth_module)
         if channel == "whatsapp":
             send_otp_whatsapp(user.telephone, code)
         else:
@@ -1703,7 +1806,7 @@ class ReleveIn(BaseModel):
 
 
 # ---------- Produits & Pompes ----------
-@app.get("/api/produits")
+@app.get("/api/produits", dependencies=[Depends(require_gaz_scope)])
 def list_produits(date: Optional[date_type] = None, db: Session = Depends(get_db)):
     """`prix_gallon` reste l'ancien prix figé à la création du produit — il
     n'est modifiable nulle part dans l'app. `prix_vente_actif` est le prix
@@ -1732,7 +1835,7 @@ def list_produits(date: Optional[date_type] = None, db: Session = Depends(get_db
     return out
 
 
-@app.post("/api/produits")
+@app.post("/api/produits", dependencies=[Depends(require_gaz_scope)])
 def create_produit(data: ProduitIn, db: Session = Depends(get_db)):
     if db.query(Produit).filter_by(nom=data.nom).first():
         raise HTTPException(400, "Produit existe deja")
@@ -1741,7 +1844,7 @@ def create_produit(data: ProduitIn, db: Session = Depends(get_db)):
     return {"id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon}
 
 
-@app.post("/api/produits/{produit_id}/pompes")
+@app.post("/api/produits/{produit_id}/pompes", dependencies=[Depends(require_gaz_scope)])
 def add_pompe(produit_id: int, data: PompeIn, db: Session = Depends(get_db)):
     if not db.query(Produit).get(produit_id):
         raise HTTPException(404, "Produit introuvable")
@@ -1750,7 +1853,7 @@ def add_pompe(produit_id: int, data: PompeIn, db: Session = Depends(get_db)):
     return {"id": pompe.id, "nom": pompe.nom}
 
 
-@app.delete("/api/pompes/{pompe_id}")
+@app.delete("/api/pompes/{pompe_id}", dependencies=[Depends(require_gaz_scope)])
 def delete_pompe(pompe_id: int, db: Session = Depends(get_db)):
     pompe = db.query(Pompe).get(pompe_id)
     if not pompe:
@@ -1760,7 +1863,7 @@ def delete_pompe(pompe_id: int, db: Session = Depends(get_db)):
 
 
 # ---------- Releves ----------
-@app.post("/api/releves")
+@app.post("/api/releves", dependencies=[Depends(require_gaz_scope)])
 def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db)):
     # Bug 7 fix : validations métier à la frontière API (message clair avant la DB)
     if data.periode not in PERIODES:
@@ -1816,7 +1919,7 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
     return _releve_dict(r)
 
 
-@app.get("/api/releves")
+@app.get("/api/releves", dependencies=[Depends(require_gaz_scope)])
 def get_releves(date: date_type, periode: Optional[str] = None,
                 produit_id: Optional[int] = None, db: Session = Depends(get_db)):
     q = db.query(Releve).filter(Releve.date == date)
@@ -1828,7 +1931,7 @@ def get_releves(date: date_type, periode: Optional[str] = None,
     return [_releve_dict(r) for r in rows]
 
 
-@app.get("/api/releves/index-precedent")
+@app.get("/api/releves/index-precedent", dependencies=[Depends(require_gaz_scope)])
 def releves_index_precedent(date: date_type, periode: str,
                             produit_id: Optional[int] = None,
                             db: Session = Depends(get_db)):
@@ -1903,7 +2006,7 @@ class ReleveAssignerPompisteIn(BaseModel):
     pompiste_id: Optional[int] = None   # None = retirer l'attribution
 
 
-@app.patch("/api/releves/{releve_id}/pompiste")
+@app.patch("/api/releves/{releve_id}/pompiste", dependencies=[Depends(require_gaz_scope)])
 def assigner_pompiste(releve_id: int, data: ReleveAssignerPompisteIn, db: Session = Depends(get_db)):
     """Attribue (ou retire) le pompiste responsable d'un relevé — un geste
     séparé de la saisie elle-même : ne touche ni metter_avant/apres, ni
@@ -1928,7 +2031,7 @@ def assigner_pompiste(releve_id: int, data: ReleveAssignerPompisteIn, db: Sessio
     return _releve_dict(r)
 
 
-@app.get("/api/pompistes")
+@app.get("/api/pompistes", dependencies=[Depends(require_gaz_scope)])
 def lister_pompistes(inclure_inactifs: bool = False, db: Session = Depends(get_db)):
     """Employés dont le poste est « Pompiste » — alimente le filtre du
     journal carburant et l'attribution d'un relevé. Même détection que
@@ -1944,7 +2047,7 @@ def lister_pompistes(inclure_inactifs: bool = False, db: Session = Depends(get_d
 
 
 # ---------- Rapport / Dashboard ----------
-@app.get("/api/rapport")
+@app.get("/api/rapport", dependencies=[Depends(require_gaz_scope)])
 def rapport(date: date_type, db: Session = Depends(get_db)):
     """Synthese d'une journee : par produit, par periode."""
     produits = db.query(Produit).all()
@@ -1972,7 +2075,7 @@ def rapport(date: date_type, db: Session = Depends(get_db)):
 
 
 # ---------- Stats (source de verite pour le chatbot) ----------
-@app.get("/api/stats")
+@app.get("/api/stats", dependencies=[Depends(require_gaz_scope)])
 def stats_endpoint(date_debut: date_type, date_fin: date_type,
                    produit_id: Optional[int] = None,
                    pompe_id: Optional[int] = None,
@@ -2134,7 +2237,7 @@ SEUIL_SAUT = 5
 SEUIL_MIN_RELEVES_POUR_SAUT = 5
 
 
-@app.get("/api/anomalies")
+@app.get("/api/anomalies", dependencies=[Depends(require_gaz_scope)])
 def anomalies(date: date_type, db: Session = Depends(get_db)):
     """
     Moteur d'anomalies unifié : analyse les compteurs ET la cohérence stock.
@@ -2298,7 +2401,7 @@ def anomalies(date: date_type, db: Session = Depends(get_db)):
 
 
 # ---------- Série temporelle (7 jours) ----------
-@app.get("/api/serie")
+@app.get("/api/serie", dependencies=[Depends(require_gaz_scope)])
 def serie_endpoint(
     date_fin: Optional[str] = None,
     jours: int = 7,
@@ -2547,7 +2650,7 @@ def _build_journal_entries(
     return entries
 
 
-@app.get("/api/journal")
+@app.get("/api/journal", dependencies=[Depends(require_gaz_scope)])
 def journal_endpoint(
     date_debut: Optional[date_type] = None,
     date_fin:   Optional[date_type] = None,
@@ -2612,7 +2715,7 @@ def journal_endpoint(
     }
 
 
-@app.get("/api/carburant/synthese")
+@app.get("/api/carburant/synthese", dependencies=[Depends(require_gaz_scope)])
 def carburant_synthese(
     date_debut: Optional[date_type] = None,
     date_fin:   Optional[date_type] = None,
@@ -2714,7 +2817,7 @@ def carburant_synthese(
     }
 
 
-@app.get("/api/carburant/rapport-jour")
+@app.get("/api/carburant/rapport-jour", dependencies=[Depends(require_gaz_scope)])
 def carburant_rapport_jour(
     date: Optional[date_type] = None,
     db: Session = Depends(get_db),
@@ -2848,7 +2951,7 @@ def carburant_rapport_jour(
     }
 
 
-@app.get("/api/journal/pdf")
+@app.get("/api/journal/pdf", dependencies=[Depends(require_gaz_scope)])
 def journal_pdf(
     date_debut: Optional[date_type] = None,
     date_fin:   Optional[date_type] = None,
@@ -3070,7 +3173,7 @@ def journal_pdf(
 
 
 # ---------- Export Excel ----------
-@app.get("/api/releves/export")
+@app.get("/api/releves/export", dependencies=[Depends(require_gaz_scope)])
 def export_releves_xlsx(
     date_debut: Optional[date_type] = None,
     date_fin:   Optional[date_type] = None,
@@ -3394,7 +3497,7 @@ def _build_rapport_data(db: Session, date_rapport: date_type) -> dict:
     }
 
 
-@app.get("/api/rapport/pdf")
+@app.get("/api/rapport/pdf", dependencies=[Depends(require_gaz_scope)])
 def rapport_pdf(
     date: Optional[date_type] = None,
     db: Session = Depends(get_db),
@@ -3600,7 +3703,7 @@ def rapport_pdf(
                              headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 
-@app.get("/api/rapport/xlsx")
+@app.get("/api/rapport/xlsx", dependencies=[Depends(require_gaz_scope)])
 def rapport_xlsx(
     date: Optional[date_type] = None,
     db: Session = Depends(get_db),
@@ -3879,7 +3982,7 @@ def rapport_xlsx(
 # PRÉVISION DES VENTES
 # ══════════════════════════════════════════════════════════════════
 
-@app.get("/api/forecast")
+@app.get("/api/forecast", dependencies=[Depends(require_gaz_scope)])
 def forecast_endpoint(
     horizon:    int            = 14,
     metric:     str            = "montant",
@@ -3990,7 +4093,7 @@ def _livraison_dict(l: Livraison, fifo: Optional[dict] = None) -> dict:
 
 
 # ---------- Livraisons ----------
-@app.post("/api/livraisons", status_code=201)
+@app.post("/api/livraisons", status_code=201, dependencies=[Depends(require_gaz_scope)])
 def create_livraison(payload: LivraisonIn, db: Session = Depends(get_db)):
     try:
         d = date_type.fromisoformat(payload.date_livraison)
@@ -4026,7 +4129,7 @@ def create_livraison(payload: LivraisonIn, db: Session = Depends(get_db)):
     return _livraison_dict(lv)
 
 
-@app.get("/api/livraisons")
+@app.get("/api/livraisons", dependencies=[Depends(require_gaz_scope)])
 def list_livraisons(
     produit_id: Optional[int]  = None,
     date_debut: Optional[str]  = None,
@@ -4067,7 +4170,7 @@ def list_livraisons(
     }
 
 
-@app.delete("/api/livraisons/{livraison_id}", status_code=200)
+@app.delete("/api/livraisons/{livraison_id}", status_code=200, dependencies=[Depends(require_gaz_scope)])
 def delete_livraison(livraison_id: int, db: Session = Depends(get_db)):
     lv = db.query(Livraison).filter(Livraison.id == livraison_id).first()
     if not lv:
@@ -4081,7 +4184,7 @@ def delete_livraison(livraison_id: int, db: Session = Depends(get_db)):
     return {"detail": "Livraison supprimée"}
 
 
-@app.post("/api/livraisons/{livraison_id}/cloturer")
+@app.post("/api/livraisons/{livraison_id}/cloturer", dependencies=[Depends(require_gaz_scope)])
 def cloturer_livraison(
     livraison_id: int,
     payload: ClotureLivraisonIn,
@@ -4148,7 +4251,7 @@ def cloturer_livraison(
     return out
 
 
-@app.post("/api/livraisons/{livraison_id}/reouvrir")
+@app.post("/api/livraisons/{livraison_id}/reouvrir", dependencies=[Depends(require_gaz_scope)])
 def reouvrir_livraison(livraison_id: int, db: Session = Depends(get_db)):
     """Annule la clôture d'une livraison — corrige une clôture faite par erreur."""
     lv = db.query(Livraison).get(livraison_id)
@@ -4178,7 +4281,7 @@ def reouvrir_livraison(livraison_id: int, db: Session = Depends(get_db)):
 
 
 # ---------- Prix de vente ----------
-@app.post("/api/prix-vente", status_code=201)
+@app.post("/api/prix-vente", status_code=201, dependencies=[Depends(require_gaz_scope)])
 def create_prix_vente(payload: PrixVenteIn, db: Session = Depends(get_db)):
     try:
         d = date_type.fromisoformat(payload.date_effet)
@@ -4211,7 +4314,7 @@ def create_prix_vente(payload: PrixVenteIn, db: Session = Depends(get_db)):
     }
 
 
-@app.get("/api/prix-vente")
+@app.get("/api/prix-vente", dependencies=[Depends(require_gaz_scope)])
 def list_prix_vente(
     produit_id: Optional[int] = None,
     db: Session = Depends(get_db),
@@ -4237,7 +4340,7 @@ def list_prix_vente(
 
 
 # ---------- Stock ----------
-@app.get("/api/stock")
+@app.get("/api/stock", dependencies=[Depends(require_gaz_scope)])
 def stock_endpoint(
     seuil_jours: int           = SEUIL_ALERTE_JOURS_PAR_DEFAUT,
     produit_id:  Optional[int] = None,
@@ -4272,7 +4375,7 @@ def stock_endpoint(
 
 
 # ---------- Rentabilité ----------
-@app.get("/api/rentabilite")
+@app.get("/api/rentabilite", dependencies=[Depends(require_gaz_scope)])
 def rentabilite_endpoint(
     date_debut: Optional[str] = None,
     date_fin:   Optional[str] = None,
@@ -4296,7 +4399,7 @@ def rentabilite_endpoint(
 
 
 # ---------- Rapport complet multi-période ----------
-@app.get("/api/rapport/export")
+@app.get("/api/rapport/export", dependencies=[Depends(require_gaz_scope)])
 def rapport_export(
     date_debut: str,
     date_fin: str,
@@ -6156,7 +6259,7 @@ def gi_dashboard(
 # ══════════════════════════════════════════════════════════════════
 # STATISTIQUES AVANCÉES
 # ══════════════════════════════════════════════════════════════════
-@app.get("/api/statistiques")
+@app.get("/api/statistiques", dependencies=[Depends(require_gaz_scope)])
 async def get_statistiques(
     date_debut:   Optional[str] = None,
     date_fin:     Optional[str] = None,

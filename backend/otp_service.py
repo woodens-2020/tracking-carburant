@@ -137,9 +137,13 @@ def _check_rate_limit(db: Session, user_id: int) -> None:
 
 # ── Création ──────────────────────────────────────────────────────────────────
 
-def create_otp(db: Session, user_id: int) -> tuple[str, str]:
+def create_otp(db: Session, user_id: int, target_module: str | None = None) -> tuple[str, str]:
     """
     Génère un OTP pour l'utilisateur donné.
+
+    target_module ('GAZ'|'DEPO'|None) : espace choisi (ou auto-sélectionné)
+    à l'étape 1 de connexion — relayé jusqu'à la création de la session par
+    verify_otp()/verify_admin_code().
 
     Retourne (code_clair, pending_token).
     Le code_clair doit être envoyé par email et jamais logué.
@@ -164,6 +168,7 @@ def create_otp(db: Session, user_id: int) -> tuple[str, str]:
         expires_at    = expires_at,
         attempts      = 0,
         used          = False,
+        target_module = target_module,
     )
     db.add(otp)
     db.commit()
@@ -495,11 +500,13 @@ def send_welcome_email(nom: str, email: str, username: str) -> None:
 
 # ── Vérification ──────────────────────────────────────────────────────────────
 
-def verify_otp(db: Session, pending_token: str, submitted_code: str) -> Utilisateur:
+def verify_otp(db: Session, pending_token: str, submitted_code: str) -> tuple[Utilisateur, str | None]:
     """
     Vérifie le code soumis par l'utilisateur.
 
-    Retourne l'objet Utilisateur si le code est correct.
+    Retourne (Utilisateur, target_module) si le code est correct — target_module
+    ('GAZ'|'DEPO'|None) est celui choisi/auto-sélectionné à l'étape 1, à
+    passer à create_session(..., scope=target_module).
     Lève ValueError avec un message lisible en cas d'échec.
     Ne logue jamais le code soumis.
     """
@@ -549,13 +556,14 @@ def verify_otp(db: Session, pending_token: str, submitted_code: str) -> Utilisat
 
     # Succès : invalider l'OTP immédiatement
     otp.used = True
+    target_module = otp.target_module
     db.commit()
 
     user = db.get(Utilisateur, otp.user_id)
     if not user or not user.actif:
         raise ValueError("Compte introuvable ou désactivé.")
 
-    return user
+    return user, target_module
 
 
 # ── Maintenance ───────────────────────────────────────────────────────────────
@@ -750,10 +758,11 @@ def send_admin_code_email(nom_employe: str, username_employe: str, code: str) ->
         raise RuntimeError(f"L'email admin n'a pas pu être envoyé : {exc}")
 
 
-def verify_admin_code(db: Session, pending_token: str, submitted_code: str) -> Utilisateur:
+def verify_admin_code(db: Session, pending_token: str, submitted_code: str) -> tuple[Utilisateur, str | None]:
     """
     Vérifie le code admin 5 chiffres soumis par l'employé.
     Identifie l'utilisateur via le pending_token OTP (même cookie que l'étape 1).
+    Retourne (Utilisateur, target_module) — voir verify_otp().
     """
     if not pending_token:
         raise ValueError("Session expirée — recommencez la connexion.")
@@ -762,8 +771,9 @@ def verify_admin_code(db: Session, pending_token: str, submitted_code: str) -> U
     if not otp:
         raise ValueError("Session invalide — recommencez la connexion.")
 
-    user_id = otp.user_id
-    now     = datetime.now(timezone.utc)
+    user_id       = otp.user_id
+    target_module = otp.target_module
+    now           = datetime.now(timezone.utc)
 
     ac = (
         db.query(AdminCode)
@@ -806,4 +816,4 @@ def verify_admin_code(db: Session, pending_token: str, submitted_code: str) -> U
     if not user or not user.actif:
         raise ValueError("Compte introuvable ou désactivé.")
 
-    return user
+    return user, target_module

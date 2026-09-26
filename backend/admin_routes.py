@@ -110,6 +110,7 @@ def _user_public(u: Utilisateur, db: Session = None) -> dict:
         "oauth_provider": u.oauth_provider,
         "employe_id":     employe_id,
         "telephone":      u.telephone,
+        "espace_autorise": u.espace_autorise,
     }
 
 
@@ -203,6 +204,9 @@ def supprimer_role(
 # UTILISATEURS — CRUD
 # ═══════════════════════════════════════
 
+_ESPACES_VALIDES = ("GAZ", "DEPO", "TOULEDE")
+
+
 class CreateUserIn(BaseModel):
     nom_complet: str
     email:       str
@@ -211,6 +215,7 @@ class CreateUserIn(BaseModel):
     password:    str
     code_acces:  str
     role_id:     int
+    espace_autorise: Optional[str] = None   # 'GAZ' | 'DEPO' | 'TOULEDE' | None (hors périmètre)
 
 
 class UpdateUserIn(BaseModel):
@@ -220,6 +225,7 @@ class UpdateUserIn(BaseModel):
     role_id:     Optional[int] = None
     actif:       Optional[bool] = None
     employe_id:  Optional[int] = None  # 0 = délier ; N = lier à cet employé
+    espace_autorise: Optional[str] = None   # 'GAZ' | 'DEPO' | 'TOULEDE' | '' (retirer) — même convention que telephone
 
 
 class ResetPasswordIn(BaseModel):
@@ -259,6 +265,9 @@ def creer_user(
         raise HTTPException(400, "Le mot de passe doit contenir au moins 8 caractères")
     if not _CODE_RE.match(data.code_acces):
         raise HTTPException(400, "Le code PIN doit contenir exactement 9 chiffres")
+    espace_autorise = (data.espace_autorise or "").strip().upper() or None
+    if espace_autorise and espace_autorise not in _ESPACES_VALIDES:
+        raise HTTPException(400, "espace_autorise invalide — 'GAZ', 'DEPO', 'TOULEDE' ou vide.")
     if db.query(Utilisateur).filter_by(username=username).first():
         raise HTTPException(409, f"L'identifiant '{username}' est déjà utilisé")
     if db.query(Utilisateur).filter_by(email=email).first():
@@ -281,6 +290,7 @@ def creer_user(
         role_id=role.id,
         poste=role.nom,
         actif=True,
+        espace_autorise=espace_autorise,
     )
     db.add(u)
     db.commit()
@@ -351,6 +361,11 @@ def modifier_user(
             if not emp:
                 raise HTTPException(404, "Employé introuvable")
             emp.utilisateur_id = uid
+    if data.espace_autorise is not None:
+        espace = data.espace_autorise.strip().upper()
+        if espace and espace not in _ESPACES_VALIDES:
+            raise HTTPException(400, "espace_autorise invalide — 'GAZ', 'DEPO', 'TOULEDE' ou vide.")
+        u.espace_autorise = espace or None
     db.commit()
     db.refresh(u)
     return _user_public(u, db)

@@ -212,11 +212,18 @@ class Utilisateur(Base):
     oauth_sub         = Column(String(255), unique=True, nullable=True)
     role_id           = Column(Integer, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True)
     telephone         = Column(String(20),  nullable=True)  # format E.164 (+509XXXXXXXX) — second canal OTP (SMS)
+    espace_autorise   = Column(String(10),  nullable=True)
+    # 'GAZ' | 'DEPO' | 'TOULEDE' | NULL — NULL = compte hors périmètre du
+    # cloisonnement GAZ/DEPO (connexion inchangée). Ignoré pour role IN
+    # ('admin','pdg') — voir _scope_for_login() dans main.py : ces comptes
+    # ne sont jamais restreints par cette fonctionnalité.
 
     role_obj = relationship("Role", back_populates="utilisateurs")
 
     __table_args__ = (
         CheckConstraint("role IN ('admin', 'operateur', 'pdg')", name="chk_utilisateur_role"),
+        CheckConstraint("espace_autorise IS NULL OR espace_autorise IN ('GAZ', 'DEPO', 'TOULEDE')",
+                         name="chk_utilisateur_espace"),
         Index("idx_utilisateurs_role_id", "role_id"),
     )
 
@@ -233,11 +240,17 @@ class SessionToken(Base):
     created_at       = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     expires_at       = Column(DateTime(timezone=True), nullable=False)
     last_activity_at = Column(DateTime(timezone=True), nullable=True)
+    scope            = Column(String(10), nullable=True)
+    # 'GAZ' | 'DEPO' | NULL — figé à la création de la session (jamais
+    # 'TOULEDE' : un compte TOULEDE choisit GAZ ou DEPO avant que la session
+    # existe). NULL = session non restreinte (compte hors périmètre,
+    # admin/pdg, ou OTP désactivé sans espace_autorise renseigné).
 
     user = relationship("Utilisateur")
 
     __table_args__ = (
         Index("idx_sessions_user", "user_id"),
+        CheckConstraint("scope IS NULL OR scope IN ('GAZ', 'DEPO')", name="chk_session_scope"),
     )
 
 
@@ -277,6 +290,10 @@ class OTPCode(Base):
     expires_at    = Column(DateTime(timezone=True), nullable=False)
     attempts      = Column(Integer,     nullable=False, default=0)
     used          = Column(Boolean,     nullable=False, default=False)
+    target_module = Column(String(10),  nullable=True)
+    # 'GAZ' | 'DEPO' | NULL — module choisi (ou auto-sélectionné) à l'étape 1
+    # de connexion ; propagé à la session par verify_otp()/verify_admin_code()
+    # dans otp_service.py.
 
     user = relationship("Utilisateur")
 
@@ -284,6 +301,8 @@ class OTPCode(Base):
         Index("idx_otp_user_id", "user_id"),
         Index("idx_otp_pending", "pending_token"),
         Index("idx_otp_expires", "expires_at"),
+        CheckConstraint("target_module IS NULL OR target_module IN ('GAZ', 'DEPO')",
+                         name="chk_otp_target_module"),
     )
 
 

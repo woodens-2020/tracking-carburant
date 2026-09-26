@@ -12448,6 +12448,15 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <option value="">Choisir un rôle…</option>
               </select>
             </div>
+            <div>
+              <label class="pos-label">Espace de travail <span style="font-size:12px;color:rgba(255,255,255,.4)">(à la connexion — cloisonne l'accès entre Baz/Dépôt et Station Gaz)</span></label>
+              <select class="pos-input" id="aum-espace" style="width:100%">
+                <option value="">— Pa gen restriksyon —</option>
+                <option value="DEPO">📦 Baz (Dépôt)</option>
+                <option value="GAZ">⛽ Estasyon Gaz</option>
+                <option value="TOULEDE">Tou de yo (Baz + Estasyon Gaz)</option>
+              </select>
+            </div>
             <div id="aum-employe-row">
               <label class="pos-label">Lier à un employé <span style="font-size:12px;color:rgba(255,255,255,.4)">(caissière — accès à ses propres données)</span></label>
               <select class="pos-input" id="aum-employe-id" style="width:100%">
@@ -17460,6 +17469,26 @@ function _pageModuleEnabled(page){
   return true; // page hors de tout module métier désactivable — toujours visible
 }
 
+// ── Isolation de session GAZ / DEPO (Utilisateur.espace_autorise) — distinct
+// de _MODULE_PAGES/_pageModuleEnabled ci-dessus, qui filtre par institution
+// (même liste pour tous les comptes du tenant). _appUser.scope est NULL pour
+// tout compte non concerné (comportement inchangé). Listes volontairement
+// plus étroites que _MODULE_PAGES.carburant (qui inclut aussi depenses/audit/
+// gestion, des pages institutionnelles partagées, pas exclusives au
+// carburant) — alignées exactement sur les routes backend cloisonnées par
+// require_gaz_scope/require_depot_scope (scope_guard.py).
+const _SCOPE_GAZ_PAGES  = ['home','dashboard','saisie','journal','carburant-rapport',
+                            'rapport-analytique','statistiques','previsions','rapports','stock'];
+const _SCOPE_DEPO_PAGES = _MODULE_PAGES.commerce; // ['pos-fournisseurs','pos-caisses','pos-scan-livraison']
+
+function _scopeBlocksPage(page){
+  const scope = _appUser && _appUser.scope;
+  if(!scope) return false;
+  if(scope === 'GAZ'  && _SCOPE_DEPO_PAGES.includes(page)) return true;
+  if(scope === 'DEPO' && _SCOPE_GAZ_PAGES.includes(page))  return true;
+  return false;
+}
+
 // ── Matrice de pages par domaine fonctionnel ─────────────────────
 const _AREA_PAGES = {
   carburant: {
@@ -17610,6 +17639,10 @@ function _canAccess(page){
   // Module métier désactivé pour cette institution — bloqué même pour l'admin,
   // avant toute vérification de rôle (voir _modules / _MODULE_PAGES).
   if(!_pageModuleEnabled(page)) return false;
+  // Cloisonnement de session GAZ/DEPO (voir _scopeBlocksPage ci-dessus) —
+  // scope est toujours NULL pour admin/pdg (jamais restreints), donc ce
+  // blocage ne les concerne jamais en pratique.
+  if(_scopeBlocksPage(page)) return false;
   // Admin vérifié sur les 3 indicateurs (est_admin, role, permissions.admin)
   if(_isAdmin()) return true;
   const _rnCanAccess = (_appUser.role_nom||_appUser.poste||'').toLowerCase();
@@ -18541,12 +18574,12 @@ function _pslAutoScanFromUrl(){
 // « Accueil » (home) est le tableau de bord du carburant : sans ce module
 // (ex. Carribean), on atterrit plutôt sur le premier module métier actif.
 function _defaultLandingPage(){
-  if(_modules.carburant)  return 'home';
-  if(_modules.bar)        return 'pos-dashboard-bar';
-  if(_modules.hotel)      return 'hotel-dashboard';
-  if(_modules.cuisine)    return 'cuisine-caisse';
-  if(_modules.zelle)      return 'zelle';
-  return 'employes'; // toujours partagé, jamais désactivé
+  if(_modules.carburant && !_scopeBlocksPage('home'))              return 'home';
+  if(_modules.bar        && !_scopeBlocksPage('pos-dashboard-bar')) return 'pos-dashboard-bar';
+  if(_modules.hotel      && !_scopeBlocksPage('hotel-dashboard'))   return 'hotel-dashboard';
+  if(_modules.cuisine    && !_scopeBlocksPage('cuisine-caisse'))    return 'cuisine-caisse';
+  if(_modules.zelle      && !_scopeBlocksPage('zelle'))             return 'zelle';
+  return 'employes'; // toujours partagé, jamais désactivé, jamais bloqué par le scope
 }
 
 // ══════════════════════════════════════════════
@@ -23068,7 +23101,11 @@ function adminUsersRender(){
         const telHtml = u.telephone ? `<div style="font-size:12px;color:rgba(255,255,255,.4)">📱 ${u.telephone}</div>` : '';
         return emailHtml + telHtml;
       })()}</td>
-      <td><span style="font-size:14px;background:rgba(255,255,255,.08);padding:2px 8px;border-radius:4px">${u.role_nom||u.poste||u.role||'—'}</span></td>
+      <td><span style="font-size:14px;background:rgba(255,255,255,.08);padding:2px 8px;border-radius:4px">${u.role_nom||u.poste||u.role||'—'}</span>${(()=>{
+        if(!u.espace_autorise) return '';
+        const lbl = {GAZ:'⛽ Estasyon Gaz', DEPO:'📦 Baz', TOULEDE:'⛽📦 Baz + Estasyon Gaz'}[u.espace_autorise] || u.espace_autorise;
+        return `<div style="font-size:11px;color:rgba(232,197,88,.75);margin-top:3px">${lbl}</div>`;
+      })()}</td>
       <td style="text-align:center">${statut}</td>
       <td style="text-align:right">
         <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
@@ -23115,6 +23152,7 @@ function adminUsersNouveauModal(){
   document.getElementById('aum-username').value = '';
   document.getElementById('aum-password').value = '';
   document.getElementById('aum-pin').value = '';
+  document.getElementById('aum-espace').value = '';
   document.getElementById('aum-username-row').style.display = '';
   document.getElementById('aum-password-row').style.display = '';
   document.getElementById('aum-pin-row').style.display = '';
@@ -23133,6 +23171,7 @@ async function adminUsersEditer(id){
   document.getElementById('aum-nom').value = u.nom_complet || '';
   document.getElementById('aum-email').value = u.email || '';
   document.getElementById('aum-telephone').value = u.telephone || '';
+  document.getElementById('aum-espace').value = u.espace_autorise || '';
   document.getElementById('aum-username').value = u.username || '';
   document.getElementById('aum-username-row').style.display = 'none';
   document.getElementById('aum-password-row').style.display = 'none';
@@ -23204,6 +23243,7 @@ async function adminUsersSauvegarder(){
   const nom  = document.getElementById('aum-nom').value.trim();
   const email = document.getElementById('aum-email').value.trim();
   const telephone = document.getElementById('aum-telephone').value.trim();
+  const espace_autorise = document.getElementById('aum-espace').value;
   const roleId = parseInt(document.getElementById('aum-role-id').value);
   if(!nom)  { posAlert('Le nom complet est requis','err'); return; }
   if(!email){ posAlert('L\'email est requis','err'); return; }
@@ -23211,7 +23251,7 @@ async function adminUsersSauvegarder(){
   try{
     if(_adminUserEditId){
       const employe_id = parseInt(document.getElementById('aum-employe-id')?.value||0)||0;
-      await apiFetch('PUT',`/admin/users/${_adminUserEditId}`, { nom_complet:nom, email, telephone, role_id:roleId, employe_id });
+      await apiFetch('PUT',`/admin/users/${_adminUserEditId}`, { nom_complet:nom, email, telephone, role_id:roleId, employe_id, espace_autorise });
       const emailChanged = email && email !== _adminUserEditPrevEmail;
       if(emailChanged){
         try{
@@ -23230,7 +23270,7 @@ async function adminUsersSauvegarder(){
       if(!username){ posAlert('Le nom d\'utilisateur est requis','err'); return; }
       if(!password){ posAlert('Le mot de passe est requis','err'); return; }
       if(!code_acces){ posAlert('Le code PIN est requis','err'); return; }
-      const created = await apiFetch('POST','/admin/users', { nom_complet:nom, email, telephone, username, password, code_acces, role_id:roleId });
+      const created = await apiFetch('POST','/admin/users', { nom_complet:nom, email, telephone, username, password, code_acces, role_id:roleId, espace_autorise });
       posAlert(created.welcome_email_sent
         ? `Compte créé ✓ — email de bienvenue envoyé à ${email}`
         : `Compte créé ✓ — vérifiez l'adresse email (envoi échoué)`

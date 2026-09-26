@@ -39,9 +39,11 @@ from models import (
     BarMouvementStock, Utilisateur, BarVente, BarLigneVente,
     BarDeclarationAchat, BarLigneDeclarationAchat, Fournisseur,
 )
+from scope_guard import require_depot_scope
 from tz_utils import today_haiti
 
-router = APIRouter(prefix="/api/pos", tags=["POS Bar — Caisses"])
+router = APIRouter(prefix="/api/pos", tags=["POS Bar — Caisses"],
+                    dependencies=[Depends(require_depot_scope)])
 
 _STATUTS_ACTIFS = ("TRANSFEREE", "EN_VENTE")
 
