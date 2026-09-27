@@ -30,6 +30,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -38,6 +39,7 @@ from models import (
     BarProduit, BarAchat, BarDepartement, BarCaisse, BarCaisseMouvement,
     BarMouvementStock, Utilisateur, BarVente, BarLigneVente,
     BarDeclarationAchat, BarLigneDeclarationAchat, Fournisseur,
+    Client, BarCredit,
 )
 from scope_guard import require_depot_scope
 from tz_utils import today_haiti
@@ -1022,9 +1024,12 @@ def transferer_caisse(caisse_id: int, data: TransfererIn, request: Request, db: 
 # ══════════════════════════════════════════════════════════════════
 
 class VendreDirectementIn(BaseModel):
-    mode_paiement: str            = "CASH"
-    montant_paye:  Optional[float] = None
-    client_nom:    Optional[str]   = None
+    mode_paiement:  str             = "CASH"
+    montant_paye:   Optional[float] = None
+    client_nom:     Optional[str]   = None
+    client_id:      Optional[int]   = None   # client du répertoire (/pos/clients) — priorité sur client_nom
+    client_contact: Optional[str]   = None
+    date_echeance:  Optional[str]   = None   # AAAA-MM-JJ — échéance du crédit, le cas échéant
 
 
 @router.post("/caisses/{caisse_id}/vendre-directement", status_code=200)
@@ -1044,7 +1049,14 @@ def vendre_caisse_directement(caisse_id: int, data: VendreDirectementIn, request
     comptabilité/les rapports normalement.
 
     Prix : tarif GROS s'il est configuré pour ce produit, sinon repli sur
-    le tarif DETAIL (voir pos_service.prix_actif)."""
+    le tarif DETAIL (voir pos_service.prix_actif).
+
+    Client/crédit : même logique que pos_service.encaisser_vente (vente au
+    détail) — un mode CREDIT exige un client du répertoire (client_id, ou
+    client_nom résolu contre la table clients), ne défaute jamais le
+    paiement au montant total, et crée un BarCredit quand un solde reste dû.
+    Un client NON_ELIGIBLE au crédit ne peut pas recevoir de vente en gros
+    à crédit."""
     c = db.query(BarCaisse).filter_by(id=caisse_id).with_for_update().first()
     if not c:
         raise HTTPException(404, "Caisse introuvable.")
@@ -1068,17 +1080,49 @@ def vendre_caisse_directement(caisse_id: int, data: VendreDirectementIn, request
 
     qte = c.quantite_restante
     montant_total = (prix_unitaire * Decimal(qte)).quantize(Decimal("0.01"))
-    montant_paye = Decimal(str(data.montant_paye)) if data.montant_paye is not None else montant_total
+
+    # ── Résolution client + éligibilité crédit (même règle que la vente au
+    # détail — voir pos_service.encaisser_vente) ─────────────────────────
+    client = None
+    if data.client_id:
+        client = db.query(Client).filter_by(id=data.client_id).first()
+    if not client and data.client_nom:
+        client = (
+            db.query(Client)
+            .filter(func.lower(Client.nom) == data.client_nom.strip().lower())
+            .first()
+        )
+    if mode == "CREDIT":
+        if not client:
+            raise HTTPException(
+                422,
+                "Sélectionnez un client du répertoire (ou ajoutez-le) avant de "
+                "valider une vente en gros à crédit.",
+            )
+        if client.statut_credit == "NON_ELIGIBLE":
+            raise HTTPException(422, f"Client « {client.nom} » non éligible au crédit.")
+
+    if data.montant_paye is not None:
+        montant_paye = Decimal(str(data.montant_paye))
+    else:
+        # CASH sans montant explicite → paiement intégral ; CREDIT → rien
+        # payé d'avance — jamais l'inverse (voir encaisser_vente).
+        montant_paye = montant_total if mode == "CASH" else Decimal("0")
+    montant_restant = (montant_total - montant_paye).quantize(Decimal("0.01"))
+    if montant_restant < 0:
+        montant_restant = Decimal("0")
+    statut_vente = "CREDIT_EN_COURS" if montant_restant > 0 else "PAYEE"
     uid = _uid(request)
 
     vente = BarVente(
         numero_ticket   = generer_numero_ticket(db),
         montant_total   = montant_total,
         mode_paiement   = mode,
-        statut          = "PAYEE",
+        statut          = statut_vente,
         client_nom      = data.client_nom,
+        client_id       = client.id if client else None,
         montant_paye    = montant_paye,
-        montant_restant = max(montant_total - montant_paye, Decimal("0")),
+        montant_restant = montant_restant,
     )
     db.add(vente)
     db.flush()
@@ -1089,6 +1133,17 @@ def vendre_caisse_directement(caisse_id: int, data: VendreDirectementIn, request
         prix_unitaire_applique = prix_unitaire,
         sous_total             = montant_total,
     ))
+    if statut_vente == "CREDIT_EN_COURS":
+        db.add(BarCredit(
+            vente_id          = vente.id,
+            client_nom        = data.client_nom or (client.nom if client else "Client inconnu"),
+            client_id         = client.id if client else None,
+            client_contact    = data.client_contact,
+            montant_du        = montant_restant,
+            montant_rembourse = Decimal("0"),
+            solde             = montant_restant,
+            date_echeance     = data.date_echeance,
+        ))
 
     now = datetime.now(timezone.utc)
     c.statut            = "TERMINEE"

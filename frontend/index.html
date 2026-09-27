@@ -7401,26 +7401,27 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="pos-form-row">
           <div style="flex:1">
             <label class="pos-label">Mode de paiement *</label>
-            <select class="pos-select" id="pcx-vd-mode" style="width:100%">
+            <select class="pos-select" id="pcx-vd-mode" style="width:100%" onchange="_pcxVdModeChange()">
               <option value="CASH">Cash</option>
               <option value="CREDIT">Crédit</option>
               <option value="MIXTE">Mixte</option>
             </select>
           </div>
           <div style="flex:1">
-            <label class="pos-label">Montant payé <span style="color:rgba(255,255,255,.4)">(optionnel — défaut : montant total)</span></label>
+            <label class="pos-label">Montant payé <span id="pcx-vd-paye-hint" style="color:rgba(255,255,255,.4)">(optionnel — défaut : montant total)</span></label>
             <input class="pos-input" id="pcx-vd-paye" type="number" min="0" step="0.01" placeholder="">
           </div>
         </div>
         <div class="pos-form-row">
           <div style="width:100%">
-            <label class="pos-label">Client <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
+            <label class="pos-label">Client <span id="pcx-vd-client-req" style="display:none;color:#f87171">* requis (crédit)</span></label>
             <input class="pos-input" id="pcx-vd-client" placeholder="Nom du client">
+            <div id="pcx-vd-client-statut" style="margin-top:4px"></div>
           </div>
         </div>
         <div class="pos-modal-footer">
           <button class="pos-btn ghost" onclick="posCaisseVendreModalClose()">Annuler</button>
-          <button class="pos-btn primary" onclick="posCaisseVendreConfirmer()">Confirmer la vente</button>
+          <button class="pos-btn primary" id="pcx-vd-confirmer-btn" onclick="posCaisseVendreConfirmer()">Confirmer la vente</button>
         </div>
       </div>
     </div>
@@ -7546,15 +7547,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <div class="pos-form-row">
                 <div style="flex:1">
                   <label class="pos-label">Mode de paiement</label>
-                  <select class="pos-select" id="psl-vd-mode" style="width:100%">
+                  <select class="pos-select" id="psl-vd-mode" style="width:100%" onchange="_pslVdModeChange()">
                     <option value="CASH">Cash</option>
                     <option value="CREDIT">Crédit</option>
                     <option value="MIXTE">Mixte</option>
                   </select>
                 </div>
                 <div style="flex:1">
-                  <label class="pos-label">Client (optionnel)</label>
-                  <input class="pos-input" id="psl-vd-client" placeholder="Nom">
+                  <label class="pos-label">Client <span id="psl-vd-client-req" style="display:none;color:#f87171">* requis (crédit)</span></label>
+                  <input class="pos-input" id="psl-vd-client" placeholder="Nom du client">
+                  <div id="psl-vd-client-statut" style="margin-top:4px"></div>
                 </div>
               </div>
               <button class="pos-btn primary" id="psl-vendre-btn" style="width:100%;padding:14px;font-size:15px;margin-top:8px" onclick="pslVendreConfirmer()">Confirmer la vente</button>
@@ -24487,6 +24489,8 @@ function _clientAcClearSelection(inputId){
 const _CLIENT_AC_BTN_UPDATERS = {
   'pos-client-nom':      () => { if(typeof _posEncBtnUpdate === 'function') _posEncBtnUpdate(); },
   'pcmd-enc-client-nom': () => { if(typeof _pcmdEncBtnUpdate === 'function') _pcmdEncBtnUpdate(); },
+  'psl-vd-client':       () => { if(typeof _pslVdModeChange === 'function') _pslVdModeChange(); },
+  'pcx-vd-client':       () => { if(typeof _pcxVdModeChange === 'function') _pcxVdModeChange(); },
 };
 function _clientAcNotifyChange(inputId){
   const fn = _CLIENT_AC_BTN_UPDATERS[inputId];
@@ -24599,7 +24603,7 @@ function _clientAcClose(){
 }
 
 (function _clientAcBindInputs(){
-  const bind = () => { ['pos-client-nom','pcmd-enc-client-nom'].forEach(clientAutocompleteInit); };
+  const bind = () => { ['pos-client-nom','pcmd-enc-client-nom','psl-vd-client','pcx-vd-client'].forEach(clientAutocompleteInit); };
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
   else bind();
 })();
@@ -25211,19 +25215,46 @@ function posCaisseVendreModal(id, cached){
   document.getElementById('pcx-vd-mode').value = 'CASH';
   document.getElementById('pcx-vd-paye').value = '';
   document.getElementById('pcx-vd-client').value = '';
+  _clientAcClearSelection('pcx-vd-client');
   document.getElementById('pcx-vendre-modal-bg').classList.add('open');
+  _pcxVdModeChange();
 }
 function posCaisseVendreModalClose(){
   document.getElementById('pcx-vendre-modal-bg').classList.remove('open');
 }
+
+// Le mode CRÉDIT exige un client réellement sélectionné (dataset.clientId) —
+// même règle que pslVendreConfirmer et que encaisser_vente côté backend.
+// Le montant payé ne défaute JAMAIS au total en mode CRÉDIT (voir
+// vendre_caisse_directement) — l'indication ci-dessous ne s'applique qu'au CASH.
+function _pcxVdModeChange(){
+  const mode = document.getElementById('pcx-vd-mode')?.value;
+  const clientInp = document.getElementById('pcx-vd-client');
+  const req = document.getElementById('pcx-vd-client-req');
+  const btn = document.getElementById('pcx-vd-confirmer-btn');
+  const payeHint = document.getElementById('pcx-vd-paye-hint');
+  const needsClient = mode === 'CREDIT';
+  if(req) req.style.display = needsClient ? '' : 'none';
+  if(btn) btn.disabled = !!(needsClient && !clientInp?.dataset.clientId);
+  if(payeHint) payeHint.textContent = mode === 'CASH'
+    ? '(optionnel — défaut : montant total)'
+    : '(optionnel — défaut : rien payé d\'avance)';
+}
+
 async function posCaisseVendreConfirmer(){
   const id = parseInt(document.getElementById('pcx-vd-id').value||'0',10);
   const mode_paiement = document.getElementById('pcx-vd-mode').value;
   const payeRaw = document.getElementById('pcx-vd-paye').value;
   const montant_paye = payeRaw ? parseFloat(payeRaw) : undefined;
-  const client_nom = document.getElementById('pcx-vd-client').value.trim() || undefined;
+  const clientInp = document.getElementById('pcx-vd-client');
+  const client_nom = clientInp.value.trim() || undefined;
+  const client_id = clientInp.dataset.clientId ? parseInt(clientInp.dataset.clientId) : undefined;
+  if(mode_paiement === 'CREDIT' && !client_id){
+    posAlert('Sélectionnez un client du répertoire (ou ajoutez-le) avant de valider une vente en gros à crédit.','err');
+    return;
+  }
   try{
-    const res = await apiFetch('POST', `/pos/caisses/${id}/vendre-directement`, {mode_paiement, montant_paye, client_nom});
+    const res = await apiFetch('POST', `/pos/caisses/${id}/vendre-directement`, {mode_paiement, montant_paye, client_nom, client_id});
     posCaisseVendreModalClose();
     posAlert(`Vente directe enregistrée — ${res.numero_ticket} — ${posGx(res.montant_total)}.`,'ok');
     loadPosCaisses();
@@ -25460,8 +25491,23 @@ function pslChoisirAction(action){
   } else {
     document.getElementById('psl-vd-mode').value = 'CASH';
     document.getElementById('psl-vd-client').value = '';
+    _clientAcClearSelection('psl-vd-client');
     document.getElementById('psl-bloc-vendre').style.display = '';
+    _pslVdModeChange();
   }
+}
+
+// Le mode CRÉDIT exige un client réellement sélectionné (dataset.clientId,
+// pas seulement du texte tapé) — même règle que la vente au détail
+// (encaisser_vente) et que la vente en gros côté backend (vendre_caisse_directement).
+function _pslVdModeChange(){
+  const mode = document.getElementById('psl-vd-mode')?.value;
+  const clientInp = document.getElementById('psl-vd-client');
+  const req = document.getElementById('psl-vd-client-req');
+  const btn = document.getElementById('psl-vendre-btn');
+  const needsClient = mode === 'CREDIT';
+  if(req) req.style.display = needsClient ? '' : 'none';
+  if(btn) btn.disabled = !!(needsClient && !clientInp?.dataset.clientId);
 }
 
 function pslMontrerErreur(msg){
@@ -25568,11 +25614,17 @@ async function pslConfirmerLivraison(){
 async function pslVendreConfirmer(){
   if(!_pslCaisseCourante) return;
   const btn = document.getElementById('psl-vendre-btn');
-  btn.disabled = true;
   const mode_paiement = document.getElementById('psl-vd-mode').value;
-  const client_nom = document.getElementById('psl-vd-client').value.trim() || undefined;
+  const clientInp = document.getElementById('psl-vd-client');
+  const client_nom = clientInp.value.trim() || undefined;
+  const client_id = clientInp.dataset.clientId ? parseInt(clientInp.dataset.clientId) : undefined;
+  if(mode_paiement === 'CREDIT' && !client_id){
+    pslMontrerErreur('Sélectionnez un client du répertoire (ou ajoutez-le) avant de valider une vente en gros à crédit.');
+    return;
+  }
+  btn.disabled = true;
   try{
-    const res = await apiFetch('POST', `/pos/caisses/${_pslCaisseCourante.id}/vendre-directement`, {mode_paiement, client_nom});
+    const res = await apiFetch('POST', `/pos/caisses/${_pslCaisseCourante.id}/vendre-directement`, {mode_paiement, client_nom, client_id});
     document.getElementById('psl-etat-caisse').style.display  = 'none';
     document.getElementById('psl-etat-succes').style.display  = '';
     document.getElementById('psl-succes-msg').textContent =
