@@ -12422,6 +12422,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <label class="pos-label">Nom complet *</label>
               <input class="pos-input" id="aum-nom" placeholder="Jean Pierre Dupont" style="width:100%">
             </div>
+            <div id="aum-espace-row">
+              <label class="pos-label">Espace de travail * <span style="font-size:12px;color:rgba(255,255,255,.4)">(où cette personne va travailler — cloisonne son accès à la connexion)</span></label>
+              <select class="pos-input" id="aum-espace" style="width:100%">
+                <option value="" id="aum-espace-placeholder" disabled selected>— Chwazi kote moun nan ap travay —</option>
+                <option value="DEPO">📦 Baz (Dépôt)</option>
+                <option value="GAZ">⛽ Estasyon Gaz</option>
+                <option value="TOULEDE">Tou de yo (Baz + Estasyon Gaz)</option>
+                <option value="ADMIN">🔓 Administrateur — pa gen restriksyon</option>
+              </select>
+            </div>
             <div>
               <label class="pos-label">Email *</label>
               <input class="pos-input" id="aum-email" type="email" placeholder="jean@exemple.com" style="width:100%">
@@ -12446,15 +12456,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <label class="pos-label">Rôle *</label>
               <select class="pos-input" id="aum-role-id" style="width:100%">
                 <option value="">Choisir un rôle…</option>
-              </select>
-            </div>
-            <div>
-              <label class="pos-label">Espace de travail <span style="font-size:12px;color:rgba(255,255,255,.4)">(à la connexion — cloisonne l'accès entre Baz/Dépôt et Station Gaz)</span></label>
-              <select class="pos-input" id="aum-espace" style="width:100%">
-                <option value="">— Pa gen restriksyon —</option>
-                <option value="DEPO">📦 Baz (Dépôt)</option>
-                <option value="GAZ">⛽ Estasyon Gaz</option>
-                <option value="TOULEDE">Tou de yo (Baz + Estasyon Gaz)</option>
               </select>
             </div>
             <div id="aum-employe-row">
@@ -23176,7 +23177,7 @@ async function adminUsersEditer(id){
   document.getElementById('aum-nom').value = u.nom_complet || '';
   document.getElementById('aum-email').value = u.email || '';
   document.getElementById('aum-telephone').value = u.telephone || '';
-  document.getElementById('aum-espace').value = u.espace_autorise || '';
+  document.getElementById('aum-espace').value = u.espace_autorise || 'ADMIN';
   document.getElementById('aum-username').value = u.username || '';
   document.getElementById('aum-username-row').style.display = 'none';
   document.getElementById('aum-password-row').style.display = 'none';
@@ -23248,11 +23249,16 @@ async function adminUsersSauvegarder(){
   const nom  = document.getElementById('aum-nom').value.trim();
   const email = document.getElementById('aum-email').value.trim();
   const telephone = document.getElementById('aum-telephone').value.trim();
-  const espace_autorise = document.getElementById('aum-espace').value;
+  const espaceRaw = document.getElementById('aum-espace').value;
+  // "ADMIN" est un choix explicite côté UI ("pas de restriction") — le
+  // backend n'accepte que GAZ/DEPO/TOULEDE/vide (voir _ESPACES_VALIDES,
+  // admin_routes.py).
+  const espace_autorise = espaceRaw === 'ADMIN' ? '' : espaceRaw;
   const roleId = parseInt(document.getElementById('aum-role-id').value);
   if(!nom)  { posAlert('Le nom complet est requis','err'); return; }
   if(!email){ posAlert('L\'email est requis','err'); return; }
   if(!roleId){ posAlert('Le rôle est requis','err'); return; }
+  if(!_adminUserEditId && !espaceRaw){ posAlert('Choisissez l\'espace de travail de cette personne (Baz, Estasyon Gaz, ou Administrateur)','err'); return; }
   try{
     if(_adminUserEditId){
       const employe_id = parseInt(document.getElementById('aum-employe-id')?.value||0)||0;
