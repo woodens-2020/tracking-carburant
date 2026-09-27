@@ -13,8 +13,10 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import BarProduit, BarAchat, BarMouvementStock, BarVente, BarLigneVente
 from pos_service import stock_tous_produits, cmup as _cmup, prix_actif as _prix_actif, stock_courant
+from scope_guard import require_depot_scope
 
-router = APIRouter(prefix="/api/pos/analyse", tags=["Analyse Bar"])
+router = APIRouter(prefix="/api/pos/analyse", tags=["Analyse Bar"],
+                    dependencies=[Depends(require_depot_scope)])
 
 
 def _dec(v) -> Decimal:

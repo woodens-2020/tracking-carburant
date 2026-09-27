@@ -17472,14 +17472,19 @@ function _pageModuleEnabled(page){
 // ── Isolation de session GAZ / DEPO (Utilisateur.espace_autorise) — distinct
 // de _MODULE_PAGES/_pageModuleEnabled ci-dessus, qui filtre par institution
 // (même liste pour tous les comptes du tenant). _appUser.scope est NULL pour
-// tout compte non concerné (comportement inchangé). Listes volontairement
-// plus étroites que _MODULE_PAGES.carburant (qui inclut aussi depenses/audit/
-// gestion, des pages institutionnelles partagées, pas exclusives au
-// carburant) — alignées exactement sur les routes backend cloisonnées par
-// require_gaz_scope/require_depot_scope (scope_guard.py).
-const _SCOPE_GAZ_PAGES  = ['home','dashboard','saisie','journal','carburant-rapport',
-                            'rapport-analytique','statistiques','previsions','rapports','stock'];
-const _SCOPE_DEPO_PAGES = _MODULE_PAGES.commerce; // ['pos-fournisseurs','pos-caisses','pos-scan-livraison']
+// tout compte non concerné (comportement inchangé) — inerte par construction.
+//
+// Séparation complète navigation/gestion/configuration demandée entre
+// l'espace GAZ (carburant) et l'espace Bar/Dépôt : GAZ reprend tout
+// _MODULE_PAGES.carburant SAUF depenses/audit (pages institutionnelles
+// partagées — Depense n'est pas exclusive au carburant, produit_id y est
+// optionnel ; les gater aurait retiré aux comptes Bar/Dépôt une page dont
+// ils ont un usage légitime). Bar/Dépôt reprend tout _MODULE_PAGES.bar +
+// _MODULE_PAGES.commerce (le dépôt est une extension du module Bar dans ce
+// projet — mêmes tables BarXxx). employes/payroll/achats/caisse/gi-dashboard/
+// admin/audit/depenses restent partagés entre les deux espaces.
+const _SCOPE_GAZ_PAGES  = _MODULE_PAGES.carburant.filter(p => p !== 'depenses' && p !== 'audit');
+const _SCOPE_DEPO_PAGES = _MODULE_PAGES.bar.concat(_MODULE_PAGES.commerce);
 
 function _scopeBlocksPage(page){
   const scope = _appUser && _appUser.scope;

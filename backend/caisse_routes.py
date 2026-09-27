@@ -34,8 +34,10 @@ from models import (
 )
 from tz_utils import HAITI_TZ, today_haiti, bounds_haiti
 from pos_service import LIEUX_VALIDES as _LIEUX_VALIDES
+from scope_guard import require_depot_scope
 
-router = APIRouter(prefix="/api/pos/caisse", tags=["caisse"])
+router = APIRouter(prefix="/api/pos/caisse", tags=["caisse"],
+                    dependencies=[Depends(require_depot_scope)])
 
 # Nombre maximum de sessions de caisse qu'un même caissier peut ouvrir par
 # jour (mesure de sécurité : repartir sur une session propre après un
