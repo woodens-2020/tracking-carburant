@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import io
 from datetime import date as date_type, datetime, timezone, time
 from decimal import Decimal
 from typing import List, Optional
@@ -558,10 +559,48 @@ def desactiver_produit(produit_id: int, db: Session = Depends(get_db)):
 # externe (les conteneurs Railway sont éphémères).
 _PHOTO_MIME_AUTORISES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 _PHOTO_TAILLE_MAX      = 2 * 1024 * 1024  # 2 Mo — image illustrative, pas un scan HD
+# Une vignette de caisse n'a pas besoin de plus : les photos sont réduites à
+# l'upload (et celles déjà en base, à leur première lecture) pour que la
+# grille de ~50 produits se charge vite même sur une connexion lente.
+_PHOTO_COTE_MAX        = 600
+_PHOTO_SEUIL_REDUCTION = 150 * 1024  # base64 au-delà duquel une photo existante est réduite
 
 
+def _reduire_photo(contenu: bytes, mime: str, strict: bool = False) -> tuple[bytes, str]:
+    """Redimensionne à _PHOTO_COTE_MAX px max. Renvoie l'original si l'image
+    est déjà assez petite (résultat stable : une photo réduite ne l'est
+    jamais deux fois), si le résultat n'est pas plus léger, ou si Pillow
+    échoue — sauf en mode strict (upload), où un fichier illisible → 400."""
+    try:
+        from PIL import Image, ImageOps
+        img = Image.open(io.BytesIO(contenu))
+        img.load()
+    except Exception:
+        if strict:
+            raise HTTPException(400, "Fichier image illisible ou corrompu.")
+        return contenu, mime
+    if max(img.size) <= _PHOTO_COTE_MAX:
+        return contenu, mime
+    try:
+        img = ImageOps.exif_transpose(img)
+        img.thumbnail((_PHOTO_COTE_MAX, _PHOTO_COTE_MAX))
+        out = io.BytesIO()
+        transparente = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
+        if transparente:
+            img.convert("RGBA").save(out, "WEBP", quality=80)
+            nouveau, nouveau_mime = out.getvalue(), "image/webp"
+        else:
+            img.convert("RGB").save(out, "JPEG", quality=80, optimize=True, progressive=True)
+            nouveau, nouveau_mime = out.getvalue(), "image/jpeg"
+    except Exception:
+        return contenu, mime
+    return (nouveau, nouveau_mime) if len(nouveau) < len(contenu) else (contenu, mime)
+
+
+# def (pas async) : lecture DB + redimensionnement synchrones, qui
+# bloquaient toute la boucle async en async def.
 @router.post("/produits/{produit_id}/photo", status_code=201)
-async def uploader_photo_produit(
+def uploader_photo_produit(
     produit_id: int,
     fichier: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -574,12 +613,13 @@ async def uploader_photo_produit(
     if mime not in _PHOTO_MIME_AUTORISES:
         raise HTTPException(400, "Format non supporté — JPG, PNG ou WEBP uniquement.")
 
-    contenu = await fichier.read()
+    contenu = fichier.file.read()
     if not contenu:
         raise HTTPException(400, "Fichier vide.")
     if len(contenu) > _PHOTO_TAILLE_MAX:
         raise HTTPException(413, "Image trop volumineuse (max 2 Mo).")
 
+    contenu, mime = _reduire_photo(contenu, mime, strict=True)
     p.photo_base64 = base64.b64encode(contenu).decode("ascii")
     p.photo_mime   = mime
     db.commit()
@@ -598,14 +638,28 @@ def obtenir_photo_produit(produit_id: int, request: Request):
                  .filter(BarProduit.id == produit_id).first())
     if not row or not row.photo_base64:
         raise HTTPException(404, "Aucune photo pour ce produit.")
-    etag = '"' + hashlib.md5(row.photo_base64.encode("ascii")).hexdigest() + '"'
+    b64, mime = row.photo_base64, row.photo_mime or "image/jpeg"
+
+    # Photo enregistrée avant la réduction à l'upload : réduite une fois pour
+    # toutes, puis réécrite en base.
+    if len(b64) > _PHOTO_SEUIL_REDUCTION:
+        contenu, mime = _reduire_photo(base64.b64decode(b64), mime)
+        nouveau_b64 = base64.b64encode(contenu).decode("ascii")
+        if len(nouveau_b64) < len(b64):
+            b64 = nouveau_b64
+            with SessionLocal() as db:
+                db.query(BarProduit).filter(BarProduit.id == produit_id).update(
+                    {BarProduit.photo_base64: b64, BarProduit.photo_mime: mime},
+                    synchronize_session=False)
+                db.commit()
+
+    etag = '"' + hashlib.md5(b64.encode("ascii")).hexdigest() + '"'
     # no-cache = le navigateur garde l'image mais revalide : une photo
     # inchangée coûte un 304 vide au lieu de re-télécharger l'image entière.
     headers = {"ETag": etag, "Cache-Control": "private, no-cache"}
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers=headers)
-    contenu = base64.b64decode(row.photo_base64)
-    return Response(content=contenu, media_type=row.photo_mime or "image/jpeg", headers=headers)
+    return Response(content=base64.b64decode(b64), media_type=mime, headers=headers)
 
 
 @router.delete("/produits/{produit_id}/photo")
