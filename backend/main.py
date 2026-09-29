@@ -3985,6 +3985,26 @@ def delete_livraison(livraison_id: int, db: Session = Depends(get_db)):
     lv = db.query(Livraison).filter(Livraison.id == livraison_id).first()
     if not lv:
         raise HTTPException(404, "Livraison introuvable")
+
+    # Reste reçu d'une cargaison clôturée : supprimer ici ferait passer ce
+    # reste pour "perdu" (report_vers → NULL par la FK) sans que personne
+    # l'ait décidé. On exige de réouvrir la cargaison source d'abord.
+    sources = db.query(Livraison).filter(Livraison.report_vers_livraison_id == lv.id).all()
+    if sources:
+        dates = ", ".join(s.date_livraison.strftime("%d/%m/%Y") for s in sources)
+        raise HTTPException(
+            409,
+            f"Cette livraison a reçu le reste de la cargaison du {dates}. "
+            "Réouvrez d'abord cette cargaison, puis supprimez celle-ci.",
+        )
+    # Cargaison clôturée avec report : on retire le reste reporté de la
+    # cible, sinon elle garderait des gallons qui n'existent plus.
+    if lv.terminee and lv.report_vers_livraison_id:
+        cible = db.query(Livraison).get(lv.report_vers_livraison_id)
+        if cible:
+            cible.gallons_report_recu = max(
+                0.0, float(cible.gallons_report_recu or 0) - float(lv.gallons_restants_cloture or 0)
+            )
     try:
         db.delete(lv)
         db.commit()
