@@ -5,6 +5,7 @@ Protégées automatiquement par AuthMiddleware (session cookie ou X-API-Key).
 from __future__ import annotations
 
 import base64
+import hashlib
 from datetime import date as date_type, datetime, timezone, time
 from decimal import Decimal
 from typing import List, Optional
@@ -16,7 +17,7 @@ from pydantic import BaseModel, Field, validator, model_validator
 from sqlalchemy import func, or_, exists
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from database import get_db
+from database import SessionLocal, get_db
 from models import (
     Produit,
     BarCategorie, BarProduit, BarPrixHistorique, BarAchat, BarAchatDepense,
@@ -444,7 +445,7 @@ def _produit_dict(p: BarProduit, stk: Decimal, db: Session) -> dict:
         "prix_vente_caisse":   float(prix_u * upc) if (p.vendu_par_caisse and upc > 0) else None,
         "stock_bas":           float(stk) <= float(p.seuil_alerte_stock) and float(p.seuil_alerte_stock) > 0,
         "cmup":                float(cmup(p.id, db)),
-        "a_photo":             bool(p.photo_base64),
+        "a_photo":             bool(p.photo_mime),  # photo_base64 est deferred — ne pas le charger ici
         "date_creation":       p.date_creation.isoformat() if p.date_creation else None,
         "lieu":                p.lieu,
     }
@@ -586,12 +587,25 @@ async def uploader_photo_produit(
 
 
 @router.get("/produits/{produit_id}/photo")
-def obtenir_photo_produit(produit_id: int, db: Session = Depends(get_db)):
-    p = db.query(BarProduit).filter_by(id=produit_id).first()
-    if not p or not p.photo_base64:
+def obtenir_photo_produit(produit_id: int, request: Request):
+    # Session ouverte et fermée ICI, pas via Depends(get_db) : FastAPI ne
+    # libère une dépendance yield qu'après l'envoi complet de la réponse. Sur
+    # une connexion lente, chaque image gardait une connexion du pool pendant
+    # tout le téléchargement (1–5 min) — une grille de ~50 photos épuisait le
+    # pool (5+10) et faisait tomber tout le site en 500 (QueuePool timeout).
+    with SessionLocal() as db:
+        row = (db.query(BarProduit.photo_base64, BarProduit.photo_mime)
+                 .filter(BarProduit.id == produit_id).first())
+    if not row or not row.photo_base64:
         raise HTTPException(404, "Aucune photo pour ce produit.")
-    contenu = base64.b64decode(p.photo_base64)
-    return Response(content=contenu, media_type=p.photo_mime or "image/jpeg")
+    etag = '"' + hashlib.md5(row.photo_base64.encode("ascii")).hexdigest() + '"'
+    # no-cache = le navigateur garde l'image mais revalide : une photo
+    # inchangée coûte un 304 vide au lieu de re-télécharger l'image entière.
+    headers = {"ETag": etag, "Cache-Control": "private, no-cache"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    contenu = base64.b64decode(row.photo_base64)
+    return Response(content=contenu, media_type=row.photo_mime or "image/jpeg", headers=headers)
 
 
 @router.delete("/produits/{produit_id}/photo")

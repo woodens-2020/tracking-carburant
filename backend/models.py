@@ -3,7 +3,7 @@ from sqlalchemy import (
     ForeignKey, DateTime, UniqueConstraint, CheckConstraint,
     Index, func, text, JSON,
 )
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import declarative_base, deferred, relationship
 
 Base = declarative_base()
 
@@ -598,7 +598,10 @@ class BarProduit(Base):
     vendu_par_caisse   = Column(Boolean,  nullable=False, default=False)
     unites_par_caisse  = Column(Integer,  nullable=True)   # obligatoire si vendu_par_caisse=True
     # Photo illustrative — même approche que PieceJointe (base64 en base, pas de stockage fichier externe)
-    photo_base64       = Column(Text,        nullable=True)
+    # Chargée à la demande (deferred) : sans ça, chaque db.query(BarProduit)
+    # rapatriait toutes les photos (jusqu'à ~2,7 Mo chacune) juste pour lister
+    # le catalogue. Seule la route GET /pos/produits/{id}/photo la lit.
+    photo_base64       = deferred(Column(Text, nullable=True))
     photo_mime         = Column(String(50),  nullable=True)
     # Lieu (Bar Devant / Bar Piscine) — catalogue exclusif à ce bar. NULL =
     # article créé avant la séparation des catalogues (visible aux deux,

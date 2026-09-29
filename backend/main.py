@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, Red
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
@@ -208,39 +209,41 @@ class AuthMiddleware(BaseHTTPMiddleware):
         token      = request.cookies.get(SESSION_COOKIE)
         api_key_hdr = request.headers.get("X-API-Key", "")
 
-        db = SessionLocal()
-        user = None
-        try:
-            user = get_session_user(db, token)
-            if not user and api_key_hdr:
-                # Clé statique admin depuis .env (timing-safe)
-                if _ADMIN_API_KEY and hmac.compare_digest(api_key_hdr, _ADMIN_API_KEY):
-                    user = db.query(Utilisateur).filter_by(username="admin", actif=True).first()
-                else:
-                    user = verify_api_key(db, api_key_hdr)
-        finally:
-            db.close()
+        # Accès DB synchrone → exécuté dans le threadpool. Appelé directement
+        # ici (dans la boucle async), il gelait TOUT le serveur jusqu'à 30 s
+        # dès que le pool de connexions était plein — y compris les réponses
+        # en cours qui auraient justement rendu leur connexion au pool.
+        proxy = await run_in_threadpool(_resoudre_utilisateur, token, api_key_hdr)
 
-        if not user:
+        if not proxy:
             if path.startswith("/api/"):
                 return JSONResponse({"detail": "Non authentifié"}, status_code=401)
             return RedirectResponse(url="/login")
 
-        # Stocker les attributs scalaires dans un objet simple avant la fermeture de session
-        class _UserProxy:
-            __slots__ = ("id","role","role_id","actif","nom_complet","username","poste","email","api_key_hash")
-        proxy = _UserProxy()
-        proxy.id           = user.id
-        proxy.role         = user.role
-        proxy.role_id      = user.role_id
-        proxy.actif        = user.actif
-        proxy.nom_complet  = user.nom_complet
-        proxy.username     = user.username
-        proxy.poste        = user.poste
-        proxy.email        = user.email
-        proxy.api_key_hash = user.api_key_hash
         request.state.user = proxy
         return await call_next(request)
+
+
+class _UserProxy:
+    """Attributs scalaires de l'utilisateur, copiés avant la fermeture de session."""
+    __slots__ = ("id","role","role_id","actif","nom_complet","username","poste","email","api_key_hash")
+
+
+def _resoudre_utilisateur(token, api_key_hdr):
+    with SessionLocal() as db:
+        user = get_session_user(db, token)
+        if not user and api_key_hdr:
+            # Clé statique admin depuis .env (timing-safe)
+            if _ADMIN_API_KEY and hmac.compare_digest(api_key_hdr, _ADMIN_API_KEY):
+                user = db.query(Utilisateur).filter_by(username="admin", actif=True).first()
+            else:
+                user = verify_api_key(db, api_key_hdr)
+        if not user:
+            return None
+        proxy = _UserProxy()
+        for attr in _UserProxy.__slots__:
+            setattr(proxy, attr, getattr(user, attr))
+        return proxy
 
 
 app.add_middleware(AuthMiddleware)
@@ -6067,7 +6070,8 @@ def gi_dashboard(
 # STATISTIQUES AVANCÉES
 # ══════════════════════════════════════════════════════════════════
 @app.get("/api/statistiques")
-async def get_statistiques(
+# def (pas async) : le calcul est synchrone et bloquait toute la boucle async.
+def get_statistiques(
     date_debut:   Optional[str] = None,
     date_fin:     Optional[str] = None,
     produit_id:   Optional[int] = None,
