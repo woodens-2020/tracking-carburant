@@ -22560,7 +22560,11 @@ function adminUsersNouveauModal(){
   document.getElementById('aum-password-row').style.display = '';
   document.getElementById('aum-pin-row').style.display = '';
   document.getElementById('aum-employe-row').style.display = 'none';
-  document.getElementById('aum-roles-multi-row').style.display = 'none';
+  // Rôles supplémentaires (espace de travail choisi à la connexion, ex.
+  // caissière ET pâtisserie) disponible dès la création — pas besoin de
+  // créer le compte puis rouvrir "Modifier" juste pour ça.
+  document.getElementById('aum-roles-multi-row').style.display = '';
+  _adminRenderRolesMulti([]);
   _adminPopulateRoleSelect('aum-role-id', null);
   document.getElementById('admin-user-modal-bg').classList.add('open');
 }
@@ -22666,14 +22670,16 @@ async function adminUsersSauvegarder(){
   if(!nom)  { posAlert('Le nom complet est requis','err'); return; }
   if(!email){ posAlert('L\'email est requis','err'); return; }
   if(!roleId){ posAlert('Le rôle est requis','err'); return; }
+  // Rôles supplémentaires (espace de travail choisi à la connexion, ex.
+  // caissière ET pâtisserie) — toujours inclure le rôle principal même si
+  // sa case n'a pas été cochée. Calculé une fois, utilisé en création ET
+  // en modification.
+  const checkedIds = Array.from(document.querySelectorAll('.aum-role-multi-chk:checked')).map(el=>parseInt(el.value));
+  const roleIds = Array.from(new Set([roleId, ...checkedIds]));
   try{
     if(_adminUserEditId){
       const employe_id = parseInt(document.getElementById('aum-employe-id')?.value||0)||0;
       await apiFetch('PUT',`/admin/users/${_adminUserEditId}`, { nom_complet:nom, email, telephone, role_id:roleId, employe_id });
-      // Rôles supplémentaires (espace de travail choisi à la connexion) —
-      // toujours inclure le rôle principal même si sa case n'a pas été cochée.
-      const checkedIds = Array.from(document.querySelectorAll('.aum-role-multi-chk:checked')).map(el=>parseInt(el.value));
-      const roleIds = Array.from(new Set([roleId, ...checkedIds]));
       await apiFetch('PUT', `/admin/users/${_adminUserEditId}/roles`, { role_ids: roleIds });
       const emailChanged = email && email !== _adminUserEditPrevEmail;
       if(emailChanged){
@@ -22694,6 +22700,9 @@ async function adminUsersSauvegarder(){
       if(!password){ posAlert('Le mot de passe est requis','err'); return; }
       if(!code_acces){ posAlert('Le code PIN est requis','err'); return; }
       const created = await apiFetch('POST','/admin/users', { nom_complet:nom, email, telephone, username, password, code_acces, role_id:roleId });
+      if(roleIds.length > 1){
+        await apiFetch('PUT', `/admin/users/${created.id}/roles`, { role_ids: roleIds });
+      }
       posAlert(created.welcome_email_sent
         ? `Compte créé ✓ — email de bienvenue envoyé à ${email}`
         : `Compte créé ✓ — vérifiez l'adresse email (envoi échoué)`
