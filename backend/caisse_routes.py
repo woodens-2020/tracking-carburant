@@ -951,9 +951,9 @@ def export_pdf(session_id: int, db: Session = Depends(get_db)):
     # Footer
     story.append(Spacer(1, 16))
     story.append(HRFlowable(width="100%", thickness=0.5, color=colors.grey))
-    _raison_sociale = os.getenv("BRANDING_RAISON_SOCIALE", "Bon Prix")
+    _nom_institution = os.getenv("BRANDING_NOM", "NATIVITE")
     story.append(Paragraph(
-        f"Généré le {datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M')} UTC — Konekta · {_raison_sociale}",
+        f"Généré le {datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M')} UTC — Konekta · {_nom_institution}",
         ParagraphStyle("footer", fontSize=7, textColor=colors.grey, alignment=TA_CENTER, spaceBefore=4),
     ))
 
