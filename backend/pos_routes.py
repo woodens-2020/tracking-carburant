@@ -1789,11 +1789,18 @@ def creer_vente(data: VenteIn, request: Request, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(422, str(e))
     return {
-        "vente_id":      vente.id,
-        "numero_ticket": vente.numero_ticket,
-        "montant_total": float(vente.montant_total),
-        "statut":        vente.statut,
-        "date_heure":    vente.date_heure.isoformat(),
+        "vente_id":        vente.id,
+        "numero_ticket":   vente.numero_ticket,
+        "montant_total":   float(vente.montant_total),
+        # Manquaient ici (présents sur BarVente/dans GET /ventes, jamais
+        # renvoyés à la création) — sans eux le reçu ne peut pas afficher le
+        # montant réellement payé ni le solde dû sur une vente MIXTE/CRÉDIT,
+        # même si le calcul backend est correct (voir pos_service.encaisser_vente).
+        "montant_paye":    float(vente.montant_paye),
+        "montant_restant": float(vente.montant_restant),
+        "mode_paiement":   vente.mode_paiement,
+        "statut":          vente.statut,
+        "date_heure":      vente.date_heure.isoformat(),
     }
 
 

@@ -25260,6 +25260,12 @@ function posShowReceipt(result, cart, montantRecu, clientNom, mode, caissierNom)
       <tr><td style="font-size:13px;color:#555;padding:2px 0">Montant reçu</td><td style="font-size:13px;text-align:right;padding:2px 0">G ${montantRecu.toFixed(2)}</td></tr>
       <tr><td style="font-size:14px;font-weight:700;padding:3px 0">Monnaie</td><td style="font-size:14px;font-weight:700;text-align:right;padding:3px 0">G ${(montantRecu-total).toFixed(2)}</td></tr>`:''
     }
+    ${(mode==='MIXTE'||mode==='CREDIT')&&(parseFloat(result.montant_paye||0)>0)?`
+      <tr><td style="font-size:13px;color:#555;padding:2px 0">Montant payé (cash)</td><td style="font-size:13px;text-align:right;padding:2px 0">G ${parseFloat(result.montant_paye).toFixed(2)}</td></tr>`:''
+    }
+    ${(mode==='MIXTE'||mode==='CREDIT')&&(parseFloat(result.montant_restant||0)>0)?`
+      <tr><td style="font-size:14px;font-weight:700;color:#dc2626;padding:3px 0">Balance (reste à payer)</td><td style="font-size:14px;font-weight:700;color:#dc2626;text-align:right;padding:3px 0">G ${parseFloat(result.montant_restant).toFixed(2)}</td></tr>`:''
+    }
     ${mode==='CREDIT'?`<tr><td colspan="2" style="font-size:13px;color:#dc2626;text-align:center;padding:6px 0;font-weight:600">Mode : CRÉDIT</td></tr>`:''}
     ${mode==='MIXTE'?`<tr><td colspan="2" style="font-size:13px;color:#d97706;text-align:center;padding:6px 0;font-weight:600">Mode : MIXTE</td></tr>`:''}
   </table>
