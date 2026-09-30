@@ -281,7 +281,13 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
             erreurs.append(f"Aucun prix défini pour « {produit.nom} ».")
             continue
 
-        stk = stock_courant(pid, db)
+        # Scopé au lieu de la session qui vend — sans quoi un produit partagé
+        # (la grande majorité, lieu=NULL, voir 006d3d1) validerait contre le
+        # pool combiné des deux bars au lieu du stock réellement disponible
+        # CE bar-ci : Piscine pourrait survendre en s'appuyant sur du stock
+        # que Devant a reçu, et inversement (même bug déjà corrigé pour
+        # l'affichage — voir 391e515 — mais pas pour la validation ici).
+        stk = stock_courant(pid, db, lieu=lieu_vente)
         if stk < qte:
             erreurs.append(
                 f"Stock insuffisant pour « {produit.nom} » "

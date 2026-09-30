@@ -4413,6 +4413,21 @@ def lister_employes(actif: Optional[bool] = None, poste: Optional[str] = None,
         q = q.filter(Employe.actif == actif)
     if poste:
         q = q.filter(Employe.poste == poste)
+    # Exclut la fiche technique auto-créée pour un compte admin (voir /api/me,
+    # poste="Administrateur" — sert uniquement à attribuer un caissier_id aux
+    # ventes qu'un admin encaisse lui-même, ce n'est pas un vrai employé RH).
+    # Ciblé précisément (poste + utilisateur_id lié à un compte role='admin')
+    # pour ne jamais masquer un vrai employé "Caissier"/"Manager" lié à son
+    # compte, ni un employé réel qui porterait par coïncidence ce même poste
+    # sans être lié à un compte admin.
+    ids_admin_techniques = {
+        uid for (uid,) in db.query(Utilisateur.id).filter(Utilisateur.role == "admin")
+    }
+    if ids_admin_techniques:
+        q = q.filter(~(
+            (Employe.poste == "Administrateur") &
+            (Employe.utilisateur_id.in_(ids_admin_techniques))
+        ))
     employes = q.order_by(Employe.nom, Employe.prenom).all()
     return [
         {
