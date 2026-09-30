@@ -6909,14 +6909,17 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
         <div class="pos-form-row">
           <div style="width:100%">
-            <label class="pos-label" id="pos-prod-lieu-label">Bar (optionnel)</label>
-            <select class="pos-select" id="pos-prod-lieu" style="width:100%">
-              <option value="">— Vendu aux deux bars (par défaut) —</option>
-              <option value="DEVANT">Bar Devant uniquement (Accueil)</option>
-              <option value="PISCINE">Bar Piscine uniquement</option>
-            </select>
+            <label class="pos-label" id="pos-prod-lieu-label">Zone(s) de disponibilité</label>
+            <div style="display:flex;gap:18px;padding:8px 0">
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px">
+                <input type="checkbox" id="pos-prod-lieu-devant" checked style="width:16px;height:16px;accent-color:#60a5fa"> Bar Devant (Accueil)
+              </label>
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px">
+                <input type="checkbox" id="pos-prod-lieu-piscine" checked style="width:16px;height:16px;accent-color:#38bdf8"> Bar Piscine
+              </label>
+            </div>
             <div style="font-size:12.5px;color:rgba(255,255,255,.4);margin-top:4px">
-              Par défaut, l'article est vendable aux deux bars (le stock reste compté séparément pour chacun). Ne choisir un bar que si cet article lui est vraiment exclusif — il n'apparaîtra alors plus du tout à l'autre.
+              Cochez les deux (par défaut) si l'article se vend aux deux bars — le stock reste compté séparément pour chacun. Décochez-en un si cet article est réellement exclusif à l'autre bar (il n'apparaîtra alors plus du tout côté décoché).
             </div>
           </div>
         </div>
@@ -22324,6 +22327,7 @@ const _ARM_DOMAINES = [
   { key:'finance',   label:'💰 Finance',     color:'#34d399' },
   { key:'bar',       label:'🍺 Bar & POS',   color:'#60a5fa' },
   { key:'cuisine',   label:'🍽️ Cuisine',     color:'#fb923c' },
+  { key:'patisserie',label:'🍰 Pâtisserie',  color:'#f9a8d4' },
   { key:'hotel',     label:'🏨 Hôtel',       color:'#a78bfa' },
   { key:'employes',  label:'👥 Employés',    color:'#f472b6' },
 ];
@@ -25718,6 +25722,28 @@ function _posProdResetCaisseUI(){
   if(upcEl) upcEl.value = '';
 }
 
+// Zone(s) de disponibilité (Bar Devant / Bar Piscine) — deux cases à cocher
+// plutôt qu'un menu déroulant à 3 options, pour que "vendu aux deux bars"
+// (lieu=null) soit un choix explicite (les deux cochées) et non un état
+// implicite obtenu en ne choisissant rien. Voir ProduitIn.lieu (backend).
+function _posProdSetLieuUI(lieu){
+  const devant  = document.getElementById('pos-prod-lieu-devant');
+  const piscine = document.getElementById('pos-prod-lieu-piscine');
+  if(!devant || !piscine) return;
+  devant.checked  = lieu !== 'PISCINE';
+  piscine.checked = lieu !== 'DEVANT';
+}
+
+// Retourne 'DEVANT' | 'PISCINE' | '' (les deux/null) | false (aucune case
+// cochée — invalide, l'appelant doit bloquer l'enregistrement).
+function _posProdGetLieuUI(){
+  const devant  = document.getElementById('pos-prod-lieu-devant')?.checked;
+  const piscine = document.getElementById('pos-prod-lieu-piscine')?.checked;
+  if(!devant && !piscine) return false;
+  if(devant && piscine)   return '';
+  return devant ? 'DEVANT' : 'PISCINE';
+}
+
 function _posProdSetCaisseUI(venduParCaisse, unites){
   const hidden    = document.getElementById('pos-prod-vendu-caisse');
   const chkBox    = document.getElementById('pos-prod-caisse-chk');
@@ -25752,7 +25778,7 @@ async function posProduitModal(id){
     document.getElementById('pos-prod-seuil').value = p.seuil_alerte_stock||0;
     document.getElementById('pos-prod-code').value  = p.code_barre||'';
     document.getElementById('pos-prod-prix').value  = '';
-    document.getElementById('pos-prod-lieu').value  = p.lieu||'';
+    _posProdSetLieuUI(p.lieu||'');
     _posProdSetCaisseUI(!!p.vendu_par_caisse, p.unites_par_caisse);
     if(prixRow) prixRow.style.display = 'none';
     if(photoRow) photoRow.style.display = '';
@@ -25762,7 +25788,7 @@ async function posProduitModal(id){
     ['pos-prod-nom','pos-prod-unite','pos-prod-prix','pos-prod-code'].forEach(fid=>{ document.getElementById(fid).value=''; });
     document.getElementById('pos-prod-seuil').value = 0;
     document.getElementById('pos-prod-cat').value   = '';
-    document.getElementById('pos-prod-lieu').value  = '';
+    _posProdSetLieuUI('');
     _posProdResetCaisseUI();
     if(prixRow) prixRow.style.display = '';
     if(photoRow) photoRow.style.display = 'none';
@@ -25837,13 +25863,14 @@ async function posProduitSauvegarder(){
   const code  = document.getElementById('pos-prod-code').value.trim()||null;
   const venduCaisse = document.getElementById('pos-prod-vendu-caisse')?.value === 'true';
   const upc   = parseInt(document.getElementById('pos-prod-upc')?.value)||null;
-  const lieu  = document.getElementById('pos-prod-lieu')?.value||'';
+  const lieu  = _posProdGetLieuUI();
   if(!nom){ posAlert('Le nom du produit est requis.'); return; }
   if(!cat){ posAlert('Choisissez une catégorie ou créez-en une avec le bouton +.'); return; }
   if(!unite){ posAlert('L\'unité de vente est requise.'); return; }
   if(venduCaisse && (!upc||upc<1)){ posAlert('Unités par caisse requis (≥ 1) pour un produit vendu par caisse.'); return; }
-  // Bar optionnel : laisser vide = vendu aux deux bars (comportement par
-  // défaut). Ne choisir un bar que pour un article vraiment exclusif.
+  if(lieu===false){ posAlert('Cochez au moins une zone de disponibilité (Bar Devant et/ou Bar Piscine).'); return; }
+  // Deux cases cochées (ou aucune touchée, par défaut) : lieu=null, vendu
+  // aux deux bars. Une seule case cochée : exclusif à ce bar-là.
   // Vérification doublon côté client
   if(!id){
     const doublon = _posProduitsAll.find(p => p.nom.trim().toLowerCase() === nom.toLowerCase());

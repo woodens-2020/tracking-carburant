@@ -54,7 +54,7 @@ def _normaliser_telephone(brut: str) -> str:
         )
     return nettoye
 
-DOMAINES = ["finance", "bar", "cuisine", "hotel", "employes", "carburant"]
+DOMAINES = ["finance", "bar", "cuisine", "patisserie", "hotel", "employes", "carburant"]
 NIVEAUX  = ["aucun", "lecture", "operationnel", "complet"]
 
 _PERMS_VIDES: dict = {d: "aucun" for d in DOMAINES}
