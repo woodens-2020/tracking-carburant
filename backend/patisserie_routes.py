@@ -14,19 +14,21 @@ le code — l'admin définit sa propre chaîne (Paramètres > Pâtisserie > Éta
 """
 from __future__ import annotations
 
+import io
 import os
 from datetime import datetime, timezone, date as date_type, time
 from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import (
     PatisserieCategorie, PatisserieProduit, PatisserieAchat, PatisserieMouvementStock,
-    PatisserieSessionCaisse, PatisserieVente, PatisserieLigneVente, PatisserieDepense,
+    PatisserieSessionCaisse, PatisserieSessionEvaluation, PatisserieVente, PatisserieLigneVente, PatisserieDepense,
     PatisserieEtapeSuivi, PatisserieCommande, PatisserieLigneCommande, PatisserieCommandeSuivi,
     RenflouementDepartement, Employe, Utilisateur, CategorieDepense,
 )
@@ -65,6 +67,20 @@ def _require_pdg_ou_admin_patisserie(request: Request, db: Session = Depends(get
         if u and u.role_obj and u.role_obj.permissions.get("admin", False):
             return u
     raise HTTPException(403, "Accès réservé au PDG et aux administrateurs")
+
+
+def _employe_est_admin(employe: Employe, db: Session) -> bool:
+    """Le compte utilisateur lié à cet employé est-il administrateur ?
+    Utilisé pour exempter les administrateurs de MAX_SESSIONS_PAR_JOUR (même
+    logique que caisse_routes.py — voir son commentaire pour la justification)."""
+    if not employe.utilisateur_id:
+        return False
+    u = db.get(Utilisateur, employe.utilisateur_id)
+    if not u:
+        return False
+    if u.role == "admin":
+        return True
+    return bool(u.role_obj and u.role_obj.permissions.get("admin", False))
 
 
 def _parse_date_saisie(raw):
@@ -894,11 +910,19 @@ def _session_dict(s: PatisserieSessionCaisse, stats: dict = None) -> dict:
         "ecart": float(s.ecart) if s.ecart is not None else None,
         "notes_admin": s.notes_admin or "",
         "note_soumission": s.note_soumission or "",
+        "evaluation_statut": s.evaluation_statut,
+        "score": float(s.score) if s.score is not None else None,
+        "evalue_par": s.evalue_par.nom_complet if s.evalue_par else None,
+        "evalue_le": s.evalue_le.isoformat() if s.evalue_le else None,
         **(stats or {}),
     }
 
 
-def _ventes_session(session: PatisserieSessionCaisse, db: Session):
+def _fenetre_session(session: PatisserieSessionCaisse, db: Session) -> tuple[datetime, datetime]:
+    """Bornes [début, fin) de la fenêtre temporelle propre à cette session —
+    entre son ouverture et l'ouverture de la session suivante du même
+    caissier ce jour-là (ou la fin de la journée calendaire si c'est la
+    dernière). Voir caisse_routes.py::_fenetre_session (module Bar)."""
     _, jour_fin = bounds_haiti(session.date_session)
     suivante = (
         db.query(PatisserieSessionCaisse)
@@ -910,24 +934,90 @@ def _ventes_session(session: PatisserieSessionCaisse, db: Session):
         .order_by(PatisserieSessionCaisse.numero_session)
         .first()
     )
-    fin = suivante.created_at if suivante else jour_fin
-    return (
+    return session.created_at, (suivante.created_at if suivante else jour_fin)
+
+
+def _ventes_session(session: PatisserieSessionCaisse, db: Session):
+    """Ventes appartenant à cette session précise — deux sources combinées,
+    comme caisse_routes.py::_ventes_session (module Bar) :
+      1. Ventes explicitement rattachées via PatisserieVente.session_id.
+      2. Ventes antérieures à l'ajout de cette colonne (session_id NULL) —
+         rattachées a posteriori par fenêtre temporelle."""
+    liees = (
         db.query(PatisserieVente)
-        .filter(
-            PatisserieVente.caissier_id == session.caissier_id,
-            PatisserieVente.statut != "ANNULEE",
-            PatisserieVente.date_heure >= session.created_at,
-            PatisserieVente.date_heure < fin,
-        )
-        .order_by(PatisserieVente.date_heure)
+        .filter(PatisserieVente.session_id == session.id, PatisserieVente.statut != "ANNULEE")
         .all()
     )
+    debut, fin = _fenetre_session(session, db)
+    historique = (
+        db.query(PatisserieVente)
+        .filter(
+            PatisserieVente.session_id.is_(None),
+            PatisserieVente.caissier_id == session.caissier_id,
+            PatisserieVente.date_heure  >= debut,
+            PatisserieVente.date_heure  <  fin,
+            PatisserieVente.statut      != "ANNULEE",
+        )
+        .all()
+    )
+    return sorted(liees + historique, key=lambda v: v.date_heure)
 
 
 def _stats_session(ventes: list[PatisserieVente]) -> dict:
-    cash = sum(float(_dec(v.montant_total)) for v in ventes if v.mode_paiement == "CASH")
-    total = sum(float(_dec(v.montant_total)) for v in ventes)
-    return {"nb_ventes": len(ventes), "total_ventes": round(total, 2), "cash_attendu": round(cash, 2)}
+    cash  = sum((Decimal(str(v.montant_total)) for v in ventes if v.mode_paiement == "CASH"), Decimal("0"))
+    total = sum((Decimal(str(v.montant_total)) for v in ventes), Decimal("0"))
+    credit_tot = sum((Decimal(str(v.montant_total)) for v in ventes if v.mode_paiement == "CREDIT"), Decimal("0"))
+    modes: dict = {}
+    for v in ventes:
+        modes[v.mode_paiement] = modes.get(v.mode_paiement, Decimal("0")) + Decimal(str(v.montant_total))
+
+    produits: dict = {}
+    for v in ventes:
+        for l in v.lignes:
+            nom = l.produit.nom if l.produit else "?"
+            if nom not in produits:
+                produits[nom] = {"nom": nom, "quantite": Decimal("0"), "total": Decimal("0")}
+            produits[nom]["quantite"] += Decimal(str(l.quantite))
+            produits[nom]["total"]    += Decimal(str(l.sous_total))
+
+    top  = sorted(produits.values(), key=lambda x: x["total"], reverse=True)[:10]
+    tous = sorted(produits.values(), key=lambda x: x["nom"])
+    return {
+        "nb_ventes": len(ventes),
+        "total_ventes": float(total),
+        "cash_attendu": float(cash),
+        "credit": float(credit_tot),
+        "par_mode": {k: float(v) for k, v in modes.items()},
+        "top_produits": [
+            {"nom": p["nom"], "quantite": float(p["quantite"]), "total": float(p["total"])}
+            for p in top
+        ],
+        "tous_produits": [
+            {"nom": p["nom"], "quantite": float(p["quantite"]), "total": float(p["total"])}
+            for p in tous
+        ],
+    }
+
+
+def _ecart_couleur(ecart: float, cash_attendu: float) -> str:
+    """Mêmes seuils que caisse_routes.py::_ecart_couleur (module Bar)."""
+    base = max(abs(cash_attendu or 0), 1000)
+    pct  = abs(ecart or 0) / base
+    if pct <= 0.01:
+        return "22C55E"
+    if pct <= 0.03:
+        return "F7A93B"
+    return "F87171"
+
+
+def _score_couleur(score: float | None) -> str:
+    if score is None:
+        return "888888"
+    if score >= 90:
+        return "22C55E"
+    if score >= 70:
+        return "F7A93B"
+    return "F87171"
 
 
 @router.get("/caisse/caissiers")
@@ -958,7 +1048,7 @@ def dashboard_caissier(caissier_id: int = Query(...), db: Session = Depends(get_
         "session_statut": session.statut if session else None,
         "nb_sessions_jour": len(sessions_du_jour),
         "max_sessions_par_jour": MAX_SESSIONS_PAR_JOUR,
-        "peut_ouvrir_nouvelle_session": len(sessions_du_jour) < MAX_SESSIONS_PAR_JOUR,
+        "peut_ouvrir_nouvelle_session": len(sessions_du_jour) < MAX_SESSIONS_PAR_JOUR or _employe_est_admin(employe, db),
         **stats,
     }
 
@@ -976,6 +1066,35 @@ def liste_sessions(
         q = q.filter(PatisserieSessionCaisse.statut == statut.upper())
     sessions = q.order_by(PatisserieSessionCaisse.date_session.desc(), PatisserieSessionCaisse.id.desc()).all()
     return [_session_dict(s, _stats_session(_ventes_session(s, db))) for s in sessions]
+
+
+@router.get("/caisse/sessions/{session_id}")
+def detail_session(session_id: int, db: Session = Depends(get_db)):
+    s = db.query(PatisserieSessionCaisse).filter_by(id=session_id).first()
+    if not s:
+        raise HTTPException(404, "Session introuvable")
+    ventes = _ventes_session(s, db)
+    stats  = _stats_session(ventes)
+    d = _session_dict(s, stats)
+    d["ventes"] = [
+        {
+            "id": v.id, "numero_ticket": v.numero_ticket, "date_heure": v.date_heure.isoformat(),
+            "montant_total": float(_dec(v.montant_total)), "mode_paiement": v.mode_paiement,
+            "client_nom": v.client_nom,
+            "lignes": [
+                {
+                    "produit": l.produit.nom if l.produit else "?",
+                    "quantite": float(_dec(l.quantite)),
+                    "prix_unit": float(_dec(l.prix_unitaire_applique)),
+                    "sous_total": float(_dec(l.sous_total)),
+                }
+                for l in v.lignes
+            ],
+        }
+        for v in ventes
+    ]
+    d["evaluations"] = {e.produit_nom: e.statut for e in s.evaluations}
+    return d
 
 
 class OuvrirSessionIn(BaseModel):
@@ -996,7 +1115,7 @@ def ouvrir_session(data: OuvrirSessionIn, db: Session = Depends(get_db)):
     )
     session = next((s for s in sessions_du_jour if s.statut == "EN_COURS"), None)
     if not session:
-        if len(sessions_du_jour) >= MAX_SESSIONS_PAR_JOUR:
+        if len(sessions_du_jour) >= MAX_SESSIONS_PAR_JOUR and not _employe_est_admin(employe, db):
             raise HTTPException(409, f"Limite de {MAX_SESSIONS_PAR_JOUR} sessions de caisse par jour atteinte.")
         session = PatisserieSessionCaisse(
             caissier_id=data.caissier_id, date_session=aujourd_hui, statut="EN_COURS",
@@ -1052,6 +1171,396 @@ def valider_session(session_id: int, body: ValiderSessionIn, request: Request,
         s.notes_admin = body.notes
     db.commit()
     return _session_dict(s, _stats_session(_ventes_session(s, db)))
+
+
+class EvaluationSessionIn(BaseModel):
+    evaluations: dict[str, str]   # {produit_nom: "CORRECT"|"NON_CORRECT"|"INTROUVABLE"}
+    finaliser: bool = False
+
+
+@router.post("/caisse/sessions/{session_id}/evaluer")
+def evaluer_session(
+    session_id: int,
+    body: EvaluationSessionIn,
+    db: Session = Depends(get_db),
+    _user: Utilisateur = Depends(_require_pdg_ou_admin_patisserie),
+):
+    """Évaluation produit par produit d'un rapport soumis. Sauvegarde
+    progressive (finaliser=False) puis finalisation (finaliser=True) qui
+    calcule le score et valide directement la session — voir
+    caisse_routes.py::evaluer_session (module Bar)."""
+    s = db.query(PatisserieSessionCaisse).filter_by(id=session_id).first()
+    if not s:
+        raise HTTPException(404, "Session introuvable")
+    valides = {"CORRECT", "NON_CORRECT", "INTROUVABLE"}
+    for nom, statut in body.evaluations.items():
+        if statut not in valides:
+            raise HTTPException(422, f"Statut invalide pour '{nom}': {statut}")
+        existant = db.query(PatisserieSessionEvaluation).filter_by(session_id=session_id, produit_nom=nom).first()
+        if existant:
+            existant.statut = statut
+            existant.evalue_par_id = _user.id
+        else:
+            db.add(PatisserieSessionEvaluation(session_id=session_id, produit_nom=nom, statut=statut, evalue_par_id=_user.id))
+    db.commit()
+
+    if body.finaliser:
+        ventes = _ventes_session(s, db)
+        stats  = _stats_session(ventes)
+        articles_attendus = {p["nom"] for p in stats["tous_produits"]}
+        evals = db.query(PatisserieSessionEvaluation).filter_by(session_id=session_id).all()
+        evalues_noms = {e.produit_nom for e in evals}
+        if articles_attendus - evalues_noms:
+            raise HTTPException(422, "Tous les articles doivent être évalués avant de finaliser.")
+        nb_correct = sum(1 for e in evals if e.statut == "CORRECT")
+        score = round(100 * nb_correct / len(evals), 2) if evals else 0.0
+        s.score             = score
+        s.evaluation_statut = "TERMINEE"
+        s.evalue_par_id     = _user.id
+        s.evalue_le         = datetime.now(tz=timezone.utc)
+        s.statut        = "VALIDE"
+        s.valide_at     = datetime.now(tz=timezone.utc)
+        s.valide_par_id = _user.id
+        db.commit()
+
+    ventes = _ventes_session(s, db)
+    return _session_dict(s, _stats_session(ventes))
+
+
+# ── Exports PDF / XLSX ────────────────────────────────────────────────
+
+def _build_rapport_data(session_id: int, db: Session):
+    s = db.query(PatisserieSessionCaisse).filter_by(id=session_id).first()
+    if not s:
+        raise HTTPException(404, "Session introuvable")
+    ventes = _ventes_session(s, db)
+    stats  = _stats_session(ventes)
+    return s, ventes, stats
+
+
+@router.get("/caisse/sessions/{session_id}/rapport.xlsx")
+def export_xlsx(session_id: int, db: Session = Depends(get_db)):
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        raise HTTPException(500, "openpyxl non installé")
+
+    s, ventes, stats = _build_rapport_data(session_id, db)
+    caissier_nom = (s.caissier.nom + " " + s.caissier.prenom) if s.caissier else "Inconnu"
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Rapport de caisse"
+
+    ORANGE = "E8893A"
+    DARK   = "1A1A2E"
+    BORDER = Side(style="thin", color="CCCCCC")
+    thin   = Border(left=BORDER, right=BORDER, top=BORDER, bottom=BORDER)
+
+    def hdr_cell(ws, row, col, val, bg=ORANGE, fg="FFFFFF", bold=True, center=True):
+        c = ws.cell(row=row, column=col, value=val)
+        c.font = Font(bold=bold, color=fg, size=11)
+        c.fill = PatternFill("solid", fgColor=bg)
+        c.border = thin
+        if center:
+            c.alignment = Alignment(horizontal="center", vertical="center")
+        return c
+
+    def data_cell(ws, row, col, val, bold=False, fmt=None):
+        c = ws.cell(row=row, column=col, value=val)
+        c.font = Font(bold=bold, size=10)
+        c.border = thin
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        if fmt:
+            c.number_format = fmt
+        return c
+
+    ws.merge_cells("A1:G1")
+    t = ws.cell(row=1, column=1, value=f"Rapport de Caisse Pâtisserie — {caissier_nom}")
+    t.font = Font(bold=True, size=14, color="FFFFFF")
+    t.fill = PatternFill("solid", fgColor=DARK)
+    t.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 30
+
+    ws.merge_cells("A2:G2")
+    d = ws.cell(row=2, column=1,
+                value=f"Date : {s.date_session}  |  Statut : {s.statut}  |  Ventes : {stats['nb_ventes']}  |  Total : G {stats['total_ventes']:,.2f}")
+    d.font = Font(size=10, color="555555")
+    d.alignment = Alignment(horizontal="center")
+    ws.row_dimensions[2].height = 22
+
+    r = 4
+    hdr_cell(ws, r, 1, "Résumé financier", bg=DARK)
+    ws.merge_cells(f"A{r}:B{r}")
+
+    resume_rows = [
+        ("Total encaissé (G)", stats["total_ventes"]),
+        ("Cash (G)",           stats["cash_attendu"]),
+        ("Crédit (G)",         stats["credit"]),
+        ("Nombre de ventes",   stats["nb_ventes"]),
+    ]
+    if s.montant_compte is not None:
+        resume_rows.append(("Montant compté (G)", float(s.montant_compte)))
+        resume_rows.append(("Écart (G)",           float(s.ecart)))
+
+    for label, val in resume_rows:
+        r += 1
+        ws.cell(row=r, column=1, value=label).font = Font(bold=True)
+        ws.cell(row=r, column=1).border = thin
+        c = ws.cell(row=r, column=2, value=val)
+        c.border = thin
+        c.number_format = '#,##0.00' if isinstance(val, float) else '0'
+        if label == "Écart (G)":
+            c.font = Font(bold=True, color=_ecart_couleur(float(s.ecart), float(s.cash_attendu_soumission)))
+
+    r += 2
+    hdr_cell(ws, r, 1, "Top produits", bg=DARK)
+    ws.merge_cells(f"A{r}:C{r}")
+    r += 1
+    for lbl, col in [("Produit", 1), ("Qté", 2), ("Total G", 3)]:
+        hdr_cell(ws, r, col, lbl)
+    for prod in stats["top_produits"]:
+        r += 1
+        data_cell(ws, r, 1, prod["nom"])
+        data_cell(ws, r, 2, prod["quantite"], fmt="0.##")
+        data_cell(ws, r, 3, prod["total"],    fmt="#,##0.00")
+
+    r += 2
+    headers = ["Ticket", "Heure", "Mode", "Client", "Produits", "Total G"]
+    for ci, h in enumerate(headers, 1):
+        hdr_cell(ws, r, ci, h)
+    for v in ventes:
+        r += 1
+        produits_str = " / ".join(f"{l.produit.nom if l.produit else '?'} x{float(l.quantite):.0f}" for l in v.lignes)
+        data_cell(ws, r, 1, v.numero_ticket)
+        data_cell(ws, r, 2, v.date_heure.astimezone(HAITI_TZ).strftime("%H:%M"))
+        data_cell(ws, r, 3, v.mode_paiement)
+        data_cell(ws, r, 4, v.client_nom or "")
+        ws.cell(row=r, column=5, value=produits_str).border = thin
+        data_cell(ws, r, 6, float(v.montant_total), fmt="#,##0.00")
+
+    if s.evaluation_statut == "TERMINEE":
+        eval_couleur = {"CORRECT": "22C55E", "NON_CORRECT": "F7A93B", "INTROUVABLE": "F87171"}
+        r += 2
+        hdr_cell(ws, r, 1, "Évaluation du rapport", bg=DARK)
+        ws.merge_cells(f"A{r}:C{r}")
+        r += 1
+        evalue_par_nom = s.evalue_par.nom_complet if s.evalue_par else "?"
+        evalue_le_txt  = s.evalue_le.astimezone(HAITI_TZ).strftime("%d/%m/%Y %H:%M") if s.evalue_le else "—"
+        ws.cell(row=r, column=1, value="Score final").font = Font(bold=True)
+        ws.cell(row=r, column=1).border = thin
+        c = ws.cell(row=r, column=2, value=f"{float(s.score):.0f} %" if s.score is not None else "—")
+        c.border = thin
+        c.font = Font(bold=True, color=_score_couleur(float(s.score) if s.score is not None else None))
+        r += 1
+        ws.cell(row=r, column=1, value="Évalué par").font = Font(bold=True)
+        ws.cell(row=r, column=1).border = thin
+        ws.cell(row=r, column=2, value=evalue_par_nom).border = thin
+        r += 1
+        ws.cell(row=r, column=1, value="Évalué le").font = Font(bold=True)
+        ws.cell(row=r, column=1).border = thin
+        ws.cell(row=r, column=2, value=evalue_le_txt).border = thin
+        r += 2
+        for lbl, col in [("Article", 1), ("Statut", 2)]:
+            hdr_cell(ws, r, col, lbl)
+        for e in sorted(s.evaluations, key=lambda e: e.produit_nom):
+            r += 1
+            data_cell(ws, r, 1, e.produit_nom)
+            sc = data_cell(ws, r, 2, e.statut)
+            sc.font = Font(bold=True, color=eval_couleur.get(e.statut, "555555"))
+
+    for col, width in [(1,18),(2,9),(3,10),(4,18),(5,45),(6,14)]:
+        ws.column_dimensions[get_column_letter(col)].width = width
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = f"rapport_caisse_patisserie_{caissier_nom.replace(' ','_')}_{s.date_session}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/caisse/sessions/{session_id}/rapport.pdf")
+def export_pdf(session_id: int, db: Session = Depends(get_db)):
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import (
+            SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable,
+        )
+        from reportlab.lib.enums import TA_CENTER
+    except ImportError:
+        raise HTTPException(500, "reportlab non installé")
+
+    s, ventes, stats = _build_rapport_data(session_id, db)
+    caissier_nom = (s.caissier.nom + " " + s.caissier.prenom) if s.caissier else "Inconnu"
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                             leftMargin=1.8*cm, rightMargin=1.8*cm,
+                             topMargin=1.8*cm, bottomMargin=1.8*cm)
+    styles = getSampleStyleSheet()
+    ORANGE = colors.HexColor("#E8893A")
+    DARK   = colors.HexColor("#1A1A2E")
+
+    title_style   = ParagraphStyle("title", fontSize=16, textColor=DARK, fontName="Helvetica-Bold", spaceAfter=4)
+    sub_style     = ParagraphStyle("sub", fontSize=10, textColor=colors.grey, spaceAfter=12)
+    section_style = ParagraphStyle("sect", fontSize=12, textColor=DARK, fontName="Helvetica-Bold", spaceBefore=14, spaceAfter=6)
+
+    story = []
+    story.append(Paragraph(f"Rapport de Caisse Pâtisserie — {caissier_nom}", title_style))
+    story.append(Paragraph(f"Date : <b>{s.date_session}</b> &nbsp;|&nbsp; Statut : <b>{s.statut}</b>", sub_style))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=ORANGE))
+    story.append(Spacer(1, 10))
+
+    story.append(Paragraph("Résumé financier", section_style))
+    resume_data = [
+        ["Indicateur", "Valeur"],
+        ["Total encaissé", f"G {stats['total_ventes']:,.2f}"],
+        ["Cash", f"G {stats['cash_attendu']:,.2f}"],
+        ["Crédit", f"G {stats['credit']:,.2f}"],
+        ["Nombre de ventes", str(stats["nb_ventes"])],
+    ]
+    ecart_row_idx = None
+    if s.montant_compte is not None:
+        resume_data.append(["Montant compté", f"G {float(s.montant_compte):,.2f}"])
+        ecart_row_idx = len(resume_data)
+        signe = '+' if float(s.ecart) >= 0 else ''
+        resume_data.append(["Écart", f"{signe}G {float(s.ecart):,.2f}"])
+
+    t_resume = Table(resume_data, colWidths=[8*cm, 5*cm])
+    resume_style = [
+        ("BACKGROUND", (0,0),(1,0), DARK),
+        ("TEXTCOLOR", (0,0),(1,0), colors.white),
+        ("FONTNAME", (0,0),(1,0), "Helvetica-Bold"),
+        ("FONTSIZE", (0,0),(-1,-1), 9),
+        ("ROWBACKGROUNDS", (0,1),(-1,-1), [colors.HexColor("#F5F5F5"), colors.white]),
+        ("GRID", (0,0),(-1,-1), 0.4, colors.HexColor("#CCCCCC")),
+        ("ALIGN", (1,0),(1,-1), "RIGHT"),
+        ("BOTTOMPADDING", (0,0),(-1,-1), 5),
+        ("TOPPADDING", (0,0),(-1,-1), 5),
+    ]
+    if ecart_row_idx is not None:
+        ecart_couleur = colors.HexColor(f"#{_ecart_couleur(float(s.ecart), float(s.cash_attendu_soumission))}")
+        resume_style.append(("TEXTCOLOR", (0,ecart_row_idx),(1,ecart_row_idx), ecart_couleur))
+        resume_style.append(("FONTNAME", (0,ecart_row_idx),(1,ecart_row_idx), "Helvetica-Bold"))
+    t_resume.setStyle(TableStyle(resume_style))
+    story.append(t_resume)
+    story.append(Spacer(1, 10))
+
+    if stats["top_produits"]:
+        story.append(Paragraph("Top produits", section_style))
+        prod_data = [["Produit", "Qté", "Total G"]]
+        for p in stats["top_produits"]:
+            prod_data.append([p["nom"], f"{p['quantite']:.1f}", f"G {p['total']:,.2f}"])
+        t_prod = Table(prod_data, colWidths=[9*cm, 3*cm, 4*cm])
+        t_prod.setStyle(TableStyle([
+            ("BACKGROUND", (0,0),(-1,0), ORANGE),
+            ("TEXTCOLOR", (0,0),(-1,0), colors.white),
+            ("FONTNAME", (0,0),(-1,0), "Helvetica-Bold"),
+            ("FONTSIZE", (0,0),(-1,-1), 9),
+            ("ROWBACKGROUNDS", (0,1),(-1,-1), [colors.HexColor("#FFF8F0"), colors.white]),
+            ("GRID", (0,0),(-1,-1), 0.4, colors.HexColor("#CCCCCC")),
+            ("ALIGN", (1,0),(-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0),(-1,-1), 5),
+            ("TOPPADDING", (0,0),(-1,-1), 5),
+        ]))
+        story.append(t_prod)
+        story.append(Spacer(1, 10))
+
+    story.append(Paragraph("Détail des ventes", section_style))
+    vente_data = [["Ticket", "Heure", "Mode", "Client", "Total G"]]
+    for v in ventes:
+        vente_data.append([
+            v.numero_ticket,
+            v.date_heure.astimezone(HAITI_TZ).strftime("%H:%M"),
+            v.mode_paiement,
+            (v.client_nom or "")[:20],
+            f"G {float(v.montant_total):,.2f}",
+        ])
+    t_ventes = Table(vente_data, colWidths=[3.5*cm, 2.5*cm, 3*cm, 4.5*cm, 4*cm])
+    t_ventes.setStyle(TableStyle([
+        ("BACKGROUND", (0,0),(-1,0), DARK),
+        ("TEXTCOLOR", (0,0),(-1,0), colors.white),
+        ("FONTNAME", (0,0),(-1,0), "Helvetica-Bold"),
+        ("FONTSIZE", (0,0),(-1,-1), 8),
+        ("ROWBACKGROUNDS", (0,1),(-1,-1), [colors.HexColor("#F5F5F5"), colors.white]),
+        ("GRID", (0,0),(-1,-1), 0.3, colors.HexColor("#DDDDDD")),
+        ("ALIGN", (1,0),(-1,-1), "CENTER"),
+        ("BOTTOMPADDING", (0,0),(-1,-1), 4),
+        ("TOPPADDING", (0,0),(-1,-1), 4),
+    ]))
+    story.append(t_ventes)
+
+    if s.evaluation_statut == "TERMINEE":
+        eval_couleur = {
+            "CORRECT": colors.HexColor("#22C55E"),
+            "NON_CORRECT": colors.HexColor("#F7A93B"),
+            "INTROUVABLE": colors.HexColor("#F87171"),
+        }
+        story.append(Spacer(1, 14))
+        story.append(Paragraph("Évaluation du rapport", section_style))
+        evalue_par_nom = s.evalue_par.nom_complet if s.evalue_par else "?"
+        evalue_le_txt  = s.evalue_le.astimezone(HAITI_TZ).strftime("%d/%m/%Y %H:%M") if s.evalue_le else "—"
+        score_txt = f"{float(s.score):.0f} %" if s.score is not None else "—"
+        story.append(Paragraph(
+            f"Score final : <b>{score_txt}</b> &nbsp;|&nbsp; Évalué par : <b>{evalue_par_nom}</b> "
+            f"&nbsp;|&nbsp; le <b>{evalue_le_txt}</b>",
+            sub_style,
+        ))
+        evals_tries = sorted(s.evaluations, key=lambda e: e.produit_nom)
+        eval_data = [["Article", "Statut"]] + [[e.produit_nom, e.statut] for e in evals_tries]
+        t_eval = Table(eval_data, colWidths=[9*cm, 4*cm])
+        eval_style = [
+            ("BACKGROUND", (0,0),(-1,0), DARK),
+            ("TEXTCOLOR", (0,0),(-1,0), colors.white),
+            ("FONTNAME", (0,0),(-1,0), "Helvetica-Bold"),
+            ("FONTSIZE", (0,0),(-1,-1), 9),
+            ("ROWBACKGROUNDS", (0,1),(-1,-1), [colors.HexColor("#F5F5F5"), colors.white]),
+            ("GRID", (0,0),(-1,-1), 0.4, colors.HexColor("#CCCCCC")),
+            ("ALIGN", (1,0),(-1,-1), "CENTER"),
+            ("BOTTOMPADDING", (0,0),(-1,-1), 5),
+            ("TOPPADDING", (0,0),(-1,-1), 5),
+        ]
+        for i, e in enumerate(evals_tries, start=1):
+            eval_style.append(("TEXTCOLOR", (1,i),(1,i), eval_couleur.get(e.statut, colors.grey)))
+            eval_style.append(("FONTNAME", (1,i),(1,i), "Helvetica-Bold"))
+        t_eval.setStyle(TableStyle(eval_style))
+        story.append(t_eval)
+
+    if s.note_soumission:
+        story.append(Spacer(1, 14))
+        story.append(Paragraph("Note de la caissière", section_style))
+        story.append(Paragraph(str(s.note_soumission).replace("\n", "<br/>"), sub_style))
+
+    if s.notes_admin:
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("Note du responsable", section_style))
+        story.append(Paragraph(str(s.notes_admin).replace("\n", "<br/>"), sub_style))
+
+    story.append(Spacer(1, 16))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.grey))
+    _nom_institution = os.getenv("BRANDING_NOM", "NATIVITE")
+    story.append(Paragraph(
+        f"Généré le {datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M')} UTC — Konekta · {_nom_institution}",
+        ParagraphStyle("footer", fontSize=7, textColor=colors.grey, alignment=TA_CENTER, spaceBefore=4),
+    ))
+
+    doc.build(story)
+    buf.seek(0)
+    filename = f"rapport_caisse_patisserie_{caissier_nom.replace(' ','_')}_{s.date_session}.pdf"
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ══════════════════════════════════════════════════════════════════

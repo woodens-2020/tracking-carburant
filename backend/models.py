@@ -1801,7 +1801,8 @@ class PatisserieMouvementStock(Base):
 class PatisserieSessionCaisse(Base):
     """Session de caisse pâtisserie — suivi des ventes par caissier par jour.
     Même logique que BarSessionCaisse (module Bar), en plus simple (pas de
-    notion de « lieu » ni d'évaluation détaillée — non demandées ici)."""
+    notion de « lieu » — non demandée ici : la pâtisserie n'a qu'un seul
+    point de vente, contrairement au bar qui se répartit sur Devant/Piscine)."""
     __tablename__ = "patisserie_sessions_caisse"
 
     id             = Column(Integer, primary_key=True)
@@ -1818,16 +1819,48 @@ class PatisserieSessionCaisse(Base):
     cash_attendu_soumission = Column(Numeric(14, 2), nullable=True)
     montant_compte          = Column(Numeric(14, 2), nullable=True)
     ecart                   = Column(Numeric(14, 2), nullable=True)
+    # Évaluation produit par produit du rapport par un responsable — même
+    # mécanique que BarSessionCaisse.evaluation_statut/score/evalue_*.
+    evaluation_statut = Column(String(20), nullable=False, default="NON_EVALUE")  # NON_EVALUE, TERMINEE
+    score              = Column(Numeric(5, 2), nullable=True)
+    evalue_par_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    evalue_le          = Column(DateTime(timezone=True), nullable=True)
     created_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     caissier   = relationship("Employe",     foreign_keys=[caissier_id])
     valide_par = relationship("Utilisateur", foreign_keys=[valide_par_id])
+    evalue_par = relationship("Utilisateur", foreign_keys=[evalue_par_id])
+    evaluations = relationship("PatisserieSessionEvaluation", back_populates="session", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("caissier_id", "date_session", "numero_session", name="uq_patisserie_session_caissier_date_num"),
         CheckConstraint("statut IN ('EN_COURS','SOUMIS','VALIDE')", name="chk_patisserie_session_statut"),
+        CheckConstraint("evaluation_statut IN ('NON_EVALUE','TERMINEE')", name="chk_patisserie_session_eval_statut"),
         Index("idx_patisserie_session_caissier", "caissier_id"),
         Index("idx_patisserie_session_date",     "date_session"),
+    )
+
+
+class PatisserieSessionEvaluation(Base):
+    """Évaluation d'un article par le responsable, lors de la ré-évaluation
+    d'un rapport de session déjà soumis — un enregistrement par article
+    distinct de la session (voir BarSessionEvaluation)."""
+    __tablename__ = "patisserie_session_evaluations"
+
+    id             = Column(Integer, primary_key=True)
+    session_id     = Column(Integer, ForeignKey("patisserie_sessions_caisse.id", ondelete="CASCADE"), nullable=False)
+    produit_nom    = Column(String(200), nullable=False)
+    statut         = Column(String(20), nullable=False)  # CORRECT, NON_CORRECT, INTROUVABLE
+    evalue_par_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    evalue_at      = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    session    = relationship("PatisserieSessionCaisse", back_populates="evaluations")
+    evalue_par = relationship("Utilisateur", foreign_keys=[evalue_par_id])
+
+    __table_args__ = (
+        UniqueConstraint("session_id", "produit_nom", name="uq_patisserie_eval_session_produit"),
+        CheckConstraint("statut IN ('CORRECT','NON_CORRECT','INTROUVABLE')", name="chk_patisserie_eval_statut"),
+        Index("idx_patisserie_eval_session", "session_id"),
     )
 
 

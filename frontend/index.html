@@ -9105,6 +9105,18 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div>
 
+    <!-- Modal détail / évaluation session de caisse Pâtisserie -->
+    <div class="pos-modal-bg" id="pt-detail-bg" onclick="if(event.target===this)ptDetailFermer()">
+      <div class="pos-modal" style="min-width:540px;max-width:700px" id="pt-detail-modal">
+        <div class="pos-modal-hdr">
+          <span id="pt-detail-titre">Rapport de session</span>
+          <button class="pos-modal-close" onclick="ptDetailFermer()">✕</button>
+        </div>
+        <div id="pt-detail-body" style="padding:16px"></div>
+        <div style="display:flex;gap:8px;padding:0 16px 16px;flex-wrap:wrap" id="pt-detail-actions"></div>
+      </div>
+    </div>
+
     <!-- Modal détail ventes caissière -->
     <div class="pos-modal-bg" id="perf-detail-bg" onclick="if(event.target===this)perfFermerDetail()">
       <div class="pos-modal" style="min-width:640px;max-width:860px;max-height:88vh;overflow-y:auto" id="perf-detail-modal">
@@ -10388,7 +10400,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
             <div>
               <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Caissier</label>
-              <select class="pos-select" id="pt-vente-caissier" style="width:100%"></select>
+              <select class="pos-select" id="pt-vente-caissier" style="width:100%" onchange="ptVenteCaissierChange(this.value)"></select>
             </div>
             <div>
               <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Mode de paiement</label>
@@ -10397,6 +10409,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <option value="CREDIT">Crédit</option>
               </select>
             </div>
+          </div>
+          <div id="pt-vente-gate-session" class="pos-card" style="display:none;padding:14px;text-align:center;margin-bottom:12px;background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.3)">
+            <div style="font-size:13px;color:#f87171;font-weight:700;margin-bottom:8px">🔒 Ce caissier n'a pas de session de caisse ouverte aujourd'hui</div>
+            <button class="pos-btn teal" style="padding:6px 14px;font-size:13px" onclick="ptVenteOuvrirSessionDepuisModal()">▶ Ouvrir sa session</button>
           </div>
           <div style="margin-bottom:10px">
             <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Client (facultatif)</label>
@@ -10407,7 +10423,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div style="text-align:right;font-weight:800;font-size:16px;margin-bottom:12px">Total : <span id="pt-vente-total">0</span> G</div>
           <div style="display:flex;gap:8px">
             <button class="pos-btn ghost" style="flex:1" onclick="ptVenteFermerModal()">Annuler</button>
-            <button class="pos-btn teal" style="flex:2" onclick="ptVenteSauvegarder()">Encaisser</button>
+            <button class="pos-btn teal" id="pt-vente-btn-encaisser" style="flex:2" onclick="ptVenteSauvegarder()">Encaisser</button>
           </div>
         </div>
       </div>
@@ -32530,19 +32546,53 @@ async function loadPatisserieVentes(){
   }catch(e){ posAlert(e.message||'Erreur ventes.'); }
 }
 
+let _ptVenteSessionOuverte = false;
+
 async function ptVenteOuvrirModal(){
   if(!_ptProduits.length) await loadPatisserieProduits();
   try{
     const caissiers = await apiFetch('GET', '/patisserie/caisse/caissiers');
     document.getElementById('pt-vente-caissier').innerHTML =
-      '<option value="">— Aucun —</option>' + caissiers.map(c=>`<option value="${c.id}">${esc(c.prenom)} ${esc(c.nom)}</option>`).join('');
+      '<option value="">— Choisir —</option>' + caissiers.map(c=>`<option value="${c.id}">${esc(c.prenom)} ${esc(c.nom)}</option>`).join('');
   }catch(e){}
   _ptVenteLignes = [];
   document.getElementById('pt-vente-client').value = '';
   ptVenteAjouterLigne();
+  ptVenteCaissierChange('');
   document.getElementById('pt-vente-modal-bg').classList.add('open');
 }
 function ptVenteFermerModal(){ document.getElementById('pt-vente-modal-bg').classList.remove('open'); }
+
+// Vérifie que le caissier choisi a une session EN_COURS avant d'autoriser
+// l'encaissement — même discipline que le portail de démarrage du module
+// Bar (#pos-gate-demarrer), adaptée à la vente en modale de la Pâtisserie.
+async function ptVenteCaissierChange(caissierId){
+  const gate = document.getElementById('pt-vente-gate-session');
+  const btn  = document.getElementById('pt-vente-btn-encaisser');
+  if(!caissierId){
+    _ptVenteSessionOuverte = false;
+    gate.style.display = 'none';
+    btn.disabled = true; btn.style.opacity = '.5';
+    return;
+  }
+  try{
+    const d = await apiFetch('GET', `/patisserie/caisse/dashboard?caissier_id=${caissierId}`);
+    _ptVenteSessionOuverte = d.session_statut === 'EN_COURS';
+  }catch(e){ _ptVenteSessionOuverte = false; }
+  gate.style.display = _ptVenteSessionOuverte ? 'none' : '';
+  btn.disabled = !_ptVenteSessionOuverte;
+  btn.style.opacity = _ptVenteSessionOuverte ? '1' : '.5';
+}
+
+async function ptVenteOuvrirSessionDepuisModal(){
+  const caissierId = document.getElementById('pt-vente-caissier').value;
+  if(!caissierId){ posAlert('Choisissez d\'abord un caissier.','warn'); return; }
+  try{
+    await apiFetch('POST', '/patisserie/caisse/sessions/ouvrir', { caissier_id: parseInt(caissierId) });
+    posAlert('Session ouverte.','ok');
+    ptVenteCaissierChange(caissierId);
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
 
 function ptVenteAjouterLigne(){
   _ptVenteLignes.push({produit_id:null, quantite:1});
@@ -32574,11 +32624,14 @@ function ptVenteRecalculer(){
 }
 
 async function ptVenteSauvegarder(){
+  const caissierId = parseInt(document.getElementById('pt-vente-caissier').value) || null;
+  if(!caissierId){ posAlert('Choisissez un caissier.','warn'); return; }
+  if(!_ptVenteSessionOuverte){ posAlert('Ce caissier doit d\'abord ouvrir sa session de caisse.','warn'); return; }
   const lignes = _ptVenteLignes.filter(l=>l.produit_id && l.quantite>0);
   if(!lignes.length){ posAlert('Ajoutez au moins un article.','warn'); return; }
   try{
     await apiFetch('POST', '/patisserie/ventes', {
-      caissier_id: parseInt(document.getElementById('pt-vente-caissier').value) || null,
+      caissier_id: caissierId,
       mode_paiement: document.getElementById('pt-vente-mode').value,
       client_nom: document.getElementById('pt-vente-client').value.trim(),
       lignes,
@@ -32879,7 +32932,8 @@ async function loadPatisserieCaisse(){
         <td style="padding:9px 8px;text-align:right">${fmtG(s.total_ventes)}</td>
         <td style="padding:9px 8px;text-align:right;color:${s.ecart? (Math.abs(s.ecart)<1?'#34d399':'#f87171') : 'inherit'}">${s.ecart!=null?fmtG(s.ecart):'—'}</td>
         <td style="padding:9px 8px;text-align:center"><span style="color:${_PT_STATUT_COLORS[s.statut]||'inherit'};font-weight:600">${_PT_STATUT_LABELS[s.statut]||s.statut}</span></td>
-        <td style="padding:9px 8px;text-align:center">
+        <td style="padding:9px 8px;text-align:center;white-space:nowrap">
+          <button class="pos-btn ghost" style="padding:4px 8px;font-size:12px" onclick="ptCaisseResume(${s.id})">Résumé</button>
           ${s.statut==='SOUMIS' ? `<button class="pos-btn teal" style="padding:4px 8px;font-size:12px" onclick="ptCaisseValider(${s.id})">Valider</button>` : ''}
         </td>
       </tr>
@@ -32957,6 +33011,199 @@ async function ptCaisseValider(sessionId){
     await apiFetch('POST', `/patisserie/caisse/sessions/${sessionId}/valider`, {});
     posAlert('Session validée.','ok'); loadPatisserieCaisse();
   }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// ── Résumé + évaluation produit par produit (parité avec le module Bar,
+// voir scResume()/rsEvaluerArticle() — condensés ici dans une seule modale
+// puisque la Pâtisserie combine déjà caissier + responsable sur une page). ──
+let _ptDetailId    = null;
+let _ptDetailData  = null;
+let _ptEvalLocal   = {};
+
+async function ptCaisseResume(sessionId){
+  const bg    = document.getElementById('pt-detail-bg');
+  const body  = document.getElementById('pt-detail-body');
+  const titre = document.getElementById('pt-detail-titre');
+  if(!bg||!body) return;
+
+  _ptDetailId = sessionId;
+  body.innerHTML = '<div style="text-align:center;padding:30px;color:rgba(255,255,255,.4)">Chargement…</div>';
+  bg.classList.add('open');
+
+  try{
+    const d = await apiFetch('GET', `/patisserie/caisse/sessions/${sessionId}`);
+    _ptDetailData = d;
+    _ptEvalLocal  = Object.assign({}, d.evaluations||{});
+    if(titre) titre.textContent = `Session — ${d.caissier_nom||'?'} · ${d.date_session}${d.numero_session>1?` (#${d.numero_session})`:''}`;
+    _ptDetailRender();
+  }catch(e){
+    body.innerHTML = `<div style="color:#f87171;padding:20px">${e.message||'Erreur'}</div>`;
+  }
+}
+
+function _ptDetailRender(){
+  const d = _ptDetailData;
+  const body = document.getElementById('pt-detail-body');
+  const acts = document.getElementById('pt-detail-actions');
+  if(!d||!body) return;
+
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">Nb ventes</div>
+        <div style="font-size:23px;font-weight:800;color:#f7a93b">${d.nb_ventes||0}</div>
+      </div>
+      <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">Total CA</div>
+        <div style="font-size:20px;font-weight:700;color:#3fb6a8">${posGx(d.total_ventes||0)}</div>
+      </div>
+      <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:4px">Cash</div>
+        <div style="font-size:20px;font-weight:700;color:#a78bfa">${posGx(d.cash_attendu||0)}</div>
+      </div>
+    </div>
+    ${d.ecart!==null && d.ecart!==undefined ? (()=>{
+      const {color,bg,border} = _posEcartNiveau(d.ecart, d.cash_attendu_soumission);
+      return `<div style="margin-bottom:14px;background:${bg};border:1px solid ${border};border-radius:10px;padding:12px 14px">
+        <div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:6px">Réconciliation de caisse</div>
+        <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px"><span>Cash attendu</span><span>${posGx(d.cash_attendu_soumission)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px"><span>Montant compté</span><span>${posGx(d.montant_compte)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:${color}"><span>Écart</span><span>${d.ecart>=0?'+':''}${posGx(d.ecart)}</span></div>
+      </div>`;
+    })() : ''}
+    ${d.top_produits && d.top_produits.length ? `
+      <div style="font-size:13px;color:rgba(255,255,255,.4);font-weight:600;margin-bottom:6px">Top produits</div>
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:12px">
+        ${d.top_produits.slice(0,5).map((p,i)=>`
+          <div style="display:flex;justify-content:space-between;font-size:14px;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:6px">
+            <span style="color:rgba(255,255,255,.7)">${i+1}. <strong style="color:rgba(255,255,255,.9)">${esc(p.nom)}</strong></span>
+            <span style="font-weight:700;color:#f7a93b">×${p.quantite.toFixed(0)} — ${posGx(p.total)}</span>
+          </div>`).join('')}
+      </div>` : ''}
+    <div style="font-size:13px;color:rgba(255,255,255,.4);font-weight:600;margin-bottom:6px">Détail ventes (${(d.ventes||[]).length})</div>
+    <div style="max-height:180px;overflow-y:auto;margin-bottom:14px">
+      <table class="pos-table" style="font-size:13px">
+        <thead><tr><th>Ticket</th><th>Heure</th><th>Mode</th><th>Client</th><th>Total</th></tr></thead>
+        <tbody>${(d.ventes||[]).map(v=>`
+          <tr>
+            <td>${esc(v.numero_ticket)}</td>
+            <td>${posFormatHeure(v.date_heure)}</td>
+            <td><span style="color:${v.mode_paiement==='CREDIT'?'#f87171':'#3fb6a8'};font-weight:700">${v.mode_paiement}</span></td>
+            <td>${esc(v.client_nom||'—')}</td>
+            <td style="font-weight:700">${posGx(v.montant_total)}</td>
+          </tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:rgba(255,255,255,.3)">Aucune vente</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+    ${_ptEvaluationHtml(d)}
+  `;
+
+  if(acts){
+    const estAdmin = _isAdmin();
+    const btnVal = (d.statut === 'SOUMIS' && estAdmin)
+      ? `<button class="pos-btn teal" onclick="ptCaisseValider(${_ptDetailId});ptDetailFermer()">Accepter</button>`
+      : '';
+    acts.innerHTML = `
+      ${btnVal}
+      <button class="pos-btn ghost" onclick="ptDetailExport('pdf')">Télécharger PDF</button>
+      <button class="pos-btn ghost" onclick="ptDetailExport('xlsx')">Télécharger XLSX</button>
+      <button class="pos-btn ghost" onclick="ptDetailFermer()">Fermer</button>
+    `;
+  }
+}
+
+function _ptEvaluationHtml(d){
+  // Évaluation produit par produit — seulement pertinente une fois le
+  // rapport soumis (sinon la liste des articles vendus n'est pas encore
+  // figée), et seulement pour un responsable (contrôle déjà fait côté
+  // serveur — masqué ici pour éviter un bouton qui échouerait en 403).
+  if(!_isAdmin() || d.statut === 'EN_COURS' || !(d.tous_produits||[]).length) return '';
+
+  const readOnly = d.evaluation_statut === 'TERMINEE';
+  const produits = d.tous_produits;
+  const counts = {CORRECT:0, NON_CORRECT:0, INTROUVABLE:0};
+  produits.forEach(p=>{ const s = _ptEvalLocal[p.nom]; if(s) counts[s] = (counts[s]||0)+1; });
+  const nbEvalues = counts.CORRECT + counts.NON_CORRECT + counts.INTROUVABLE;
+
+  const scoreBloc = readOnly
+    ? `<div style="text-align:center;background:${_scoreCouleur(d.score)}18;border:1px solid ${_scoreCouleur(d.score)}55;border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:4px">Score final</div>
+        <div style="font-size:28px;font-weight:800;color:${_scoreCouleur(d.score)}">${(d.score||0).toFixed(0)} %</div>
+        ${d.evalue_par ? `<div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:2px">Évalué par ${esc(d.evalue_par)}</div>` : ''}
+      </div>`
+    : `<div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:8px">${nbEvalues}/${produits.length} articles évalués</div>`;
+
+  const rows = produits.map((p,i)=>{
+    const statutActuel = _ptEvalLocal[p.nom];
+    const info = _RS_STATUTS[statutActuel];
+    const btns = Object.entries(_RS_STATUTS).map(([v,o])=>{
+      const active = statutActuel === v;
+      const bg = active ? o.color : 'rgba(255,255,255,.05)';
+      const fg = active ? '#0b0f14' : 'rgba(255,255,255,.6)';
+      const bd = active ? o.color : 'rgba(255,255,255,.14)';
+      const click = readOnly ? '' : `onclick="ptEvaluerArticle(${i},'${v}')"`;
+      return `<button type="button" ${click} ${readOnly?'disabled':''} title="${o.label}"
+        style="flex:1;padding:5px 3px;border-radius:7px;border:1px solid ${bd};background:${bg};color:${fg};font-size:11px;font-weight:700;cursor:${readOnly?'default':'pointer'};white-space:nowrap">${o.icon} ${o.label}</button>`;
+    }).join('');
+    const rowBg  = info ? `${info.color}16` : 'rgba(255,255,255,.03)';
+    const stripe = info ? info.color : 'rgba(255,255,255,.08)';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 9px;background:${rowBg};border-left:3px solid ${stripe};border-radius:7px;margin-bottom:4px">
+      <div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:rgba(255,255,255,.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.nom)}</div>
+      <div style="display:flex;gap:4px;width:210px;flex-shrink:0">${btns}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div style="border-top:1px solid rgba(255,255,255,.08);padding-top:12px">
+      <div style="font-size:13px;color:rgba(255,255,255,.4);font-weight:600;margin-bottom:8px">Évaluation du rapport</div>
+      ${scoreBloc}
+      <div style="max-height:220px;overflow-y:auto;margin-bottom:${readOnly?'0':'10px'}">${rows}</div>
+      ${!readOnly ? `<button class="pos-btn teal" style="width:100%" onclick="ptFinaliserEvaluation()">Finaliser l'évaluation</button>` : ''}
+    </div>
+  `;
+}
+
+async function ptEvaluerArticle(idx, statut){
+  const nom = (_ptDetailData?.tous_produits||[])[idx]?.nom;
+  if(!nom) return;
+  const previous = _ptEvalLocal[nom];
+  _ptEvalLocal[nom] = statut;
+  _ptDetailRender();
+  try{
+    await apiFetch('POST', `/patisserie/caisse/sessions/${_ptDetailId}/evaluer`, {
+      evaluations: {[nom]: statut}, finaliser: false,
+    });
+  }catch(e){
+    if(previous) _ptEvalLocal[nom] = previous; else delete _ptEvalLocal[nom];
+    _ptDetailRender();
+    posAlert(e.message||'Erreur.');
+  }
+}
+
+async function ptFinaliserEvaluation(){
+  const produits = _ptDetailData?.tous_produits || [];
+  if(!produits.every(p=>!!_ptEvalLocal[p.nom])){
+    posAlert('Évaluez tous les articles avant de finaliser.','warn'); return;
+  }
+  if(!await showConfirm('Finaliser cette évaluation ? Le rapport sera aussi validé.', {title:'Finaliser', okLabel:'Finaliser', type:'ok'})) return;
+  try{
+    await apiFetch('POST', `/patisserie/caisse/sessions/${_ptDetailId}/evaluer`, {
+      evaluations: _ptEvalLocal, finaliser: true,
+    });
+    posAlert('Évaluation finalisée, rapport validé.','ok');
+    await ptCaisseResume(_ptDetailId);
+    loadPatisserieCaisse();
+  }catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+function ptDetailExport(format){
+  window.open(`/api/patisserie/caisse/sessions/${_ptDetailId}/rapport.${format}`, '_blank');
+}
+
+function ptDetailFermer(){
+  const bg = document.getElementById('pt-detail-bg');
+  if(bg) bg.classList.remove('open');
+  _ptDetailId = null; _ptDetailData = null; _ptEvalLocal = {};
 }
 
 // ══════════════════════════════════════════════════════════════════════

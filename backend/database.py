@@ -29,6 +29,7 @@ from models import (
     BarSessionEvaluation,  # noqa: F401 — nécessaire pour create_all
     PatisserieCategorie, PatisserieProduit, PatisserieAchat,        # noqa: F401
     PatisserieMouvementStock, PatisserieSessionCaisse,              # noqa: F401
+    PatisserieSessionEvaluation,                                    # noqa: F401 — nécessaire pour create_all
     PatisserieVente, PatisserieLigneVente, PatisserieDepense,       # noqa: F401
     PatisserieEtapeSuivi, PatisserieCommande, PatisserieLigneCommande,  # noqa: F401
     PatisserieCommandeSuivi,                                        # noqa: F401
@@ -220,6 +221,16 @@ def _migrate_columns():
             # l'admin) ; exigé désormais à la création d'un nouvel article.
             ("bar_produits", "lieu",
              "ALTER TABLE bar_produits ADD COLUMN lieu VARCHAR(20)", None),
+            # v26 — évaluation de rapport (parité avec Bar) sur les sessions
+            # de caisse pâtisserie : mêmes colonnes que bar_sessions_caisse.
+            ("patisserie_sessions_caisse", "evaluation_statut",
+             "ALTER TABLE patisserie_sessions_caisse ADD COLUMN evaluation_statut VARCHAR(20) NOT NULL DEFAULT 'NON_EVALUE'", None),
+            ("patisserie_sessions_caisse", "score",
+             "ALTER TABLE patisserie_sessions_caisse ADD COLUMN score NUMERIC(5,2)", None),
+            ("patisserie_sessions_caisse", "evalue_par_id",
+             "ALTER TABLE patisserie_sessions_caisse ADD COLUMN evalue_par_id INTEGER REFERENCES utilisateurs(id)", None),
+            ("patisserie_sessions_caisse", "evalue_le",
+             "ALTER TABLE patisserie_sessions_caisse ADD COLUMN evalue_le TIMESTAMP", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -344,6 +355,16 @@ def _migrate_columns():
             # l'admin) ; exigé désormais à la création d'un nouvel article.
             ("bar_produits", "lieu",
              "ALTER TABLE bar_produits ADD COLUMN lieu VARCHAR(20)", None),
+            # v26 — évaluation de rapport (parité avec Bar) sur les sessions
+            # de caisse pâtisserie : mêmes colonnes que bar_sessions_caisse.
+            ("patisserie_sessions_caisse", "evaluation_statut",
+             "ALTER TABLE patisserie_sessions_caisse ADD COLUMN evaluation_statut VARCHAR(20) NOT NULL DEFAULT 'NON_EVALUE'", None),
+            ("patisserie_sessions_caisse", "score",
+             "ALTER TABLE patisserie_sessions_caisse ADD COLUMN score NUMERIC(5,2)", None),
+            ("patisserie_sessions_caisse", "evalue_par_id",
+             "ALTER TABLE patisserie_sessions_caisse ADD COLUMN evalue_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
+            ("patisserie_sessions_caisse", "evalue_le",
+             "ALTER TABLE patisserie_sessions_caisse ADD COLUMN evalue_le TIMESTAMP WITH TIME ZONE", None),
         ]
     else:
         return
@@ -447,6 +468,18 @@ def _migrate_columns():
                 conn.execute(sql_text(
                     "ALTER TABLE bar_produits ADD CONSTRAINT chk_bar_produit_lieu "
                     "CHECK (lieu IS NULL OR lieu IN ('DEVANT','PISCINE'))"
+                ))
+                conn.commit()
+            except Exception:
+                conn.rollback()  # déjà présente
+
+        # v26 — évaluation de rapport sur les sessions de caisse pâtisserie :
+        # même contrainte de domaine que chk_session_eval_statut (Bar).
+        with engine.connect() as conn:
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE patisserie_sessions_caisse ADD CONSTRAINT chk_patisserie_session_eval_statut "
+                    "CHECK (evaluation_statut IN ('NON_EVALUE','TERMINEE'))"
                 ))
                 conn.commit()
             except Exception:
