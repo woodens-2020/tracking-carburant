@@ -3446,7 +3446,7 @@ def rapport_pdf(
     header_tbl = Table([[
         Paragraph("PétroSync", title_style),
         Paragraph(f"Rapport Analytique · {d.strftime('%d %B %Y')}", sub_style),
-        Paragraph("Complexe Commercial Pillatre", sub_style),
+        Paragraph(_BRANDING["complexe"], sub_style),
     ]], colWidths=[5*cm, 9*cm, 5*cm])
     header_tbl.setStyle(TableStyle([
         ("BACKGROUND",    (0, 0), (-1, -1), C_BG),
@@ -3563,7 +3563,7 @@ def rapport_pdf(
     story.append(Spacer(1, 0.5*cm))
     story.append(HRFlowable(width="100%", thickness=0.5, color=C_GRAY))
     story.append(Paragraph(
-        f"Généré automatiquement par PétroSync · {d.strftime('%d/%m/%Y')} · Complexe Commercial Pillatre",
+        f"Généré automatiquement par PétroSync · {d.strftime('%d/%m/%Y')} · {_BRANDING['complexe']}",
         ParagraphStyle("footer", fontName="Helvetica", fontSize=7, textColor=C_GRAY, alignment=TA_CENTER)
     ))
 
@@ -3638,7 +3638,7 @@ def rapport_xlsx(
     # Titre
     ws1.merge_cells("A1:E1")
     c = ws1["A1"]
-    c.value     = f"RAPPORT ANALYTIQUE · {d.strftime('%d/%m/%Y')} · Complexe Commercial Pillatre"
+    c.value     = f"RAPPORT ANALYTIQUE · {d.strftime('%d/%m/%Y')} · {_BRANDING['complexe']}"
     c.font      = Font(bold=True, color=WHITE, name="Calibri", size=13)
     c.fill      = fill(NAVY)
     c.alignment = center()
