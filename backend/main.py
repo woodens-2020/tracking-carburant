@@ -372,6 +372,12 @@ def startup():
             maj_le TIMESTAMPTZ NOT NULL DEFAULT now()
         )""",
         "ALTER TABLE hotel_proformas ADD COLUMN IF NOT EXISTS employe_id INTEGER",
+        # ── Hôtel : annulation d'un séjour par un admin (traçabilité) ──
+        "ALTER TABLE hotel_reservations ADD COLUMN IF NOT EXISTS annule_motif VARCHAR(300)",
+        "ALTER TABLE hotel_reservations ADD COLUMN IF NOT EXISTS annule_le TIMESTAMPTZ",
+        "ALTER TABLE hotel_reservations ADD COLUMN IF NOT EXISTS annule_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
+        "ALTER TABLE hotel_reservations ADD COLUMN IF NOT EXISTS montant_total_annule NUMERIC(12,2)",
+        "ALTER TABLE hotel_reservations ADD COLUMN IF NOT EXISTS montant_paye_annule NUMERIC(12,2)",
         "ALTER TABLE hotel_proformas ADD COLUMN IF NOT EXISTS sous_total NUMERIC(12,2) NOT NULL DEFAULT 0",
         "ALTER TABLE hotel_proformas ADD COLUMN IF NOT EXISTS remise NUMERIC(12,2) NOT NULL DEFAULT 0",
         "ALTER TABLE hotel_proformas ALTER COLUMN statut SET DEFAULT 'CONFIRMEE'",

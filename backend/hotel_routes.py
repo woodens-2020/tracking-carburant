@@ -100,7 +100,8 @@ def _res_dict(r: HotelReservation) -> dict:
         "prix_unitaire":      float(_d(r.prix_unitaire)),
         "montant_reference":  float(_d(r.prix_unitaire) * (r.nb_nuits or _d(r.nb_heures) or 1)),
         "montant_total":      float(_d(r.montant_total)),
-        "remise":             max(0.0, float(_d(r.prix_unitaire) * (r.nb_nuits or _d(r.nb_heures) or 1) - _d(r.montant_total))),
+        # Séjour annulé : montant_total remis à 0 — ce n'est pas un rabais.
+        "remise":             0.0 if r.statut == "ANNULEE" else max(0.0, float(_d(r.prix_unitaire) * (r.nb_nuits or _d(r.nb_heures) or 1) - _d(r.montant_total))),
         "montant_paye":       float(_d(r.montant_paye)),
         "solde":              float(_d(r.solde)),
         "statut":             r.statut,
@@ -109,6 +110,11 @@ def _res_dict(r: HotelReservation) -> dict:
         "employe_id":         r.employe_id,
         "employe_nom":        (f"{r.employe.prenom} {r.employe.nom}") if r.employe else None,
         "created_at":         r.created_at.isoformat(),
+        "annule_motif":         r.annule_motif,
+        "annule_le":            r.annule_le.isoformat() if r.annule_le else None,
+        "annule_par_nom":       r.annule_par.nom_complet if r.annule_par else None,
+        "montant_total_annule": float(_d(r.montant_total_annule)) if r.montant_total_annule is not None else None,
+        "montant_paye_annule":  float(_d(r.montant_paye_annule)) if r.montant_paye_annule is not None else None,
     }
 
 
@@ -510,18 +516,59 @@ def terminer_reservation(res_id: int, db: Session = Depends(get_db)):
     return _res_dict(r)
 
 
+class AnnulationIn(BaseModel):
+    motif: str = ""
+
+
 @router.post("/reservations/{res_id}/annuler", status_code=200)
-def annuler_reservation(res_id: int, db: Session = Depends(get_db)):
+def annuler_reservation(
+    res_id: int,
+    request: Request,
+    data: Optional[AnnulationIn] = None,
+    db: Session = Depends(get_db),
+):
+    """Annule un séjour (en cours OU déjà terminé) — réservé au PDG / admin,
+    pour corriger une erreur de saisie d'un employé. L'argent du séjour est
+    retiré de tous les totaux : montant_total / montant_paye / solde passent
+    à 0, les montants d'origine sont conservés (montant_*_annule) avec le
+    motif, la date et l'auteur de l'annulation."""
+    admin = _require_pdg_ou_admin_hotel(request, db)
     r = db.query(HotelReservation).filter_by(id=res_id).first()
     if not r:
         raise HTTPException(404, "Réservation introuvable.")
-    if r.statut != "EN_COURS":
-        raise HTTPException(409, "Réservation déjà terminée ou annulée.")
-    r.statut = "ANNULEE"
-    r.date_depart_reel = datetime.now(tz=timezone.utc)
-    if r.chambre:
-        r.chambre.statut = "DISPONIBLE"
+    if r.statut == "ANNULEE":
+        raise HTTPException(409, "Ce séjour est déjà annulé.")
+    motif = ((data.motif if data else "") or "").strip()
+    if not motif:
+        raise HTTPException(422, "Motif d'annulation requis.")
+
+    maintenant = datetime.now(tz=timezone.utc)
+    if r.statut == "EN_COURS":
+        r.date_depart_reel = maintenant
+        if r.chambre:
+            r.chambre.statut = "DISPONIBLE"
+    montant_total, montant_paye = r.montant_total, r.montant_paye
+    r.montant_total_annule = montant_total
+    r.montant_paye_annule  = montant_paye
+    r.montant_total = Decimal("0")
+    r.montant_paye  = Decimal("0")
+    r.solde         = Decimal("0")
+    r.statut        = "ANNULEE"
+    r.annule_motif  = motif[:300]
+    r.annule_le     = maintenant
+    r.annule_par_id = admin.id
+
+    from notifications_service import creer_notification
+    creer_notification(
+        db, module="hotel", type_="reservation_annulee",
+        titre=f"Séjour annulé — {r.client_nom}",
+        message=(f"Chambre {r.chambre.numero if r.chambre else r.chambre_id} · "
+                 f"{float(montant_paye):g} G retirés de la caisse · motif : {motif[:120]}"),
+        lien="hotel-historique",
+        dedupe_minutes=None,
+    )
     db.commit()
+    db.refresh(r)
     return _res_dict(r)
 
 

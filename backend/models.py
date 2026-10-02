@@ -1057,8 +1057,18 @@ class HotelReservation(Base):
     notes              = Column(String(300), nullable=True)
     employe_id         = Column(Integer, ForeignKey("hotel_employes.id", ondelete="SET NULL"), nullable=True)
     created_at         = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    # Annulation par un admin (erreur de saisie) : montant_total / montant_paye
+    # / solde sont remis à 0 pour que l'argent sorte de TOUS les totaux
+    # (dashboard, rapport, grande caisse) ; les montants d'origine sont gardés
+    # ici pour la traçabilité.
+    annule_motif         = Column(String(300), nullable=True)
+    annule_le            = Column(DateTime(timezone=True), nullable=True)
+    annule_par_id        = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    montant_total_annule = Column(Numeric(12,2), nullable=True)
+    montant_paye_annule  = Column(Numeric(12,2), nullable=True)
 
     chambre = relationship("HotelChambre", back_populates="reservations")
+    annule_par = relationship("Utilisateur", foreign_keys=[annule_par_id])
     employe = relationship("HotelEmploye", back_populates="reservations")
 
     __table_args__ = (

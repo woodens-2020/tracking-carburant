@@ -11135,6 +11135,22 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div><!-- /page-hotel-historique -->
 
+      <div id="hhist-annul-modal-bg" class="pos-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="pos-modal" style="max-width:460px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 14px">
+            <h3 style="margin:0">Annuler ce séjour</h3>
+            <button onclick="document.getElementById('hhist-annul-modal-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:22px;padding:0;line-height:1">✕</button>
+          </div>
+          <div id="hhist-annul-info" style="font-size:14px;line-height:1.55;margin-bottom:14px"></div>
+          <label class="pos-label">Motif de l'annulation *</label>
+          <textarea class="pos-input" id="hhist-annul-motif" rows="3" maxlength="300" placeholder="Ex. : erreur de saisie — mauvaise chambre, client enregistré deux fois…" style="resize:vertical"></textarea>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+            <button class="pos-btn ghost" onclick="document.getElementById('hhist-annul-modal-bg').classList.remove('open')">Retour</button>
+            <button class="pos-btn" id="hhist-annul-ok" style="background:#dc2626" onclick="hotelHistAnnulerConfirmer()">Annuler le séjour</button>
+          </div>
+        </div>
+      </div>
+
     <!-- ══════════════════════════════════════════════════════════ -->
     <!-- HOTEL — EMPLOYÉS                                          -->
     <!-- ══════════════════════════════════════════════════════════ -->
@@ -33638,10 +33654,44 @@ async function loadHotelHistorique(){
         <td style="text-align:right;color:#34d399">${_hFmt(r.montant_paye)}</td>
         <td style="text-align:right;color:${r.solde>0?'#f87171':'#34d399'}">${_hFmt(r.solde)}</td>
         <td><span style="font-size:13px;color:${sc};font-weight:600">${r.statut}</span>
-          <button class="pos-btn ghost" style="font-size:12px;padding:2px 7px;margin-left:6px" onclick="hotelRecu(${r.id})" title="Reçu client">🧾</button></td>
+          <button class="pos-btn ghost" style="font-size:12px;padding:2px 7px;margin-left:6px" onclick="hotelRecu(${r.id})" title="Reçu client">🧾</button>
+          ${r.statut!=='ANNULEE' && _isAdmin() ? `<button class="pos-btn ghost" style="font-size:12px;padding:2px 8px;margin-left:4px;color:#f87171" onclick="hotelHistAnnulerOuvrir(${r.id})" title="Annuler ce séjour (erreur de saisie)">Annuler</button>` : ''}
+          ${r.statut==='ANNULEE' && r.annule_motif ? `<div style="font-size:12px;color:rgba(255,255,255,.45);margin-top:3px;max-width:260px">Annulé${r.annule_par_nom?` par ${esc(r.annule_par_nom)}`:''}${r.montant_paye_annule?` · ${_hFmt(r.montant_paye_annule)} retirés`:''}<br>Motif : ${esc(r.annule_motif)}</div>` : ''}</td>
       </tr>`;
     }).join('');
   } catch(e){ if(tbody) tbody.innerHTML = `<tr><td colspan="9" style="color:#f87171;text-align:center;padding:20px">${e.message||'Erreur'}</td></tr>`; }
+}
+
+// Annulation d'un séjour par l'admin (erreur de saisie d'un employé) :
+// l'argent du séjour est retiré de tous les totaux (côté serveur).
+let _hhistAnnulId = null;
+function hotelHistAnnulerOuvrir(id){
+  if(!_isAdmin()){ _giAlert('Réservé à l\'administrateur.','err'); return; }
+  const r = _hotelHistData.find(x=>x.id===id);
+  if(!r) return;
+  _hhistAnnulId = id;
+  const dt = new Date(r.date_arrivee).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'});
+  document.getElementById('hhist-annul-info').innerHTML =
+    `<b>${esc(r.client_nom)}</b> · Ch. ${esc(r.chambre_numero)} · ${r.type_sejour} · ${dt}<br>
+     Total ${_hFmt(r.montant_total)} · Payé <b style="color:#f87171">${_hFmt(r.montant_paye)}</b>
+     <div style="margin-top:8px;color:rgba(255,255,255,.55)">Le montant payé sera retiré de la caisse et des rapports.${r.statut==='EN_COURS'?' La chambre sera libérée.':''}</div>`;
+  document.getElementById('hhist-annul-motif').value = '';
+  document.getElementById('hhist-annul-modal-bg').classList.add('open');
+  setTimeout(()=>document.getElementById('hhist-annul-motif').focus(), 50);
+}
+
+async function hotelHistAnnulerConfirmer(){
+  const motif = document.getElementById('hhist-annul-motif').value.trim();
+  if(!motif){ posAlert('Indiquez le motif de l\'annulation.'); return; }
+  const btn = document.getElementById('hhist-annul-ok');
+  btn.disabled = true;
+  try {
+    const r = await apiFetch('POST', `/hotel/reservations/${_hhistAnnulId}/annuler`, {motif});
+    document.getElementById('hhist-annul-modal-bg').classList.remove('open');
+    posAlert(`Séjour annulé — ${_hFmt(r.montant_paye_annule||0)} retirés de la caisse.`,'ok');
+    await loadHotelHistorique();
+  } catch(e){ posAlert(e.message||'Erreur.'); }
+  finally { btn.disabled = false; }
 }
 
 // ── EMPLOYÉS HÔTEL ────────────────────────────────────────────────────
