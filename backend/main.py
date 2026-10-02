@@ -4243,6 +4243,8 @@ def stock_endpoint(
         cmp = cout_moyen_pondere(db, p.id, uniquement_ouvertes=True)
         s["cout_moyen_pondere"] = cmp
         s["valeur_stock_gourdes"] = round(float(s["gallons_restants"]) * cmp, 2) if cmp and s["gallons_restants"] > 0 else None
+        ra = float(s["gallons_restants_cargaison_active"])
+        s["valeur_stock_cargaison_active"] = round(ra * cmp, 2) if cmp and ra > 0 else None
         resultats.append(s)
 
     nb_alertes = sum(1 for r in resultats if r["alerte_bas"])

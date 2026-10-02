@@ -18888,8 +18888,18 @@ async function loadStock(){
       GET(`/anomalies?date=${currentDate}`),
     ]);
 
-    // Stocker pour filtrage client
-    _allStocksData = stockData.stocks || [];
+    // Stocker pour filtrage client. Quand une cargaison est ouverte, la page
+    // Stock décrit CETTE cargaison : restant/autonomie/valeur/statut sont
+    // remplacés par leurs équivalents « cargaison active », sinon Restant
+    // (cumul depuis le début des temps) ne serait pas égal à Livré − Vendu
+    // affichés juste à côté. Sans cargaison ouverte, on garde le cumul (ex.
+    // ventes sans aucune livraison déclarée → NÉGATIF reste visible).
+    _allStocksData = (stockData.stocks || []).map(s => s.cargaison_active ? Object.assign({}, s, {
+      gallons_restants:     s.gallons_restants_cargaison_active,
+      jours_de_stock:       s.jours_de_stock_cargaison_active,
+      alerte_bas:           s.alerte_bas_cargaison_active,
+      valeur_stock_gourdes: s.valeur_stock_cargaison_active,
+    }) : s);
 
     // Peupler le sélecteur de produits
     const fltProd = document.getElementById('sk-flt-prod');

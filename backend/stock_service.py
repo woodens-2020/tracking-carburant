@@ -243,17 +243,36 @@ def stock_restant(
         jours_de_stock is not None and jours_de_stock < seuil_jours
     ) or restant < 0
 
+    # Cargaison(s) ouverte(s) : livré / vendu / restant tirés d'UN SEUL
+    # calcul (fifo_allocation_livraisons) pour qu'ils soient toujours
+    # cohérents entre eux (livré − vendu = restant). Le `restant` cumulé
+    # ci-dessus (depuis le début des temps) n'est PAS comparable à
+    # livré/vendu d'une cargaison — il inclut les surventes passées des
+    # cargaisons clôturées — et ne doit pas être affiché à côté d'eux.
+    ouvertes = [a for a in fifo_allocation_livraisons(db, produit_id) if not a["terminee"]]
+    livre_actif   = round(sum(a["gallons_disponibles"] for a in ouvertes), 3)
+    vendu_actif   = round(sum(a["gallons_consommes"]   for a in ouvertes), 3)
+    restant_actif = round(sum(a["gallons_restants"]    for a in ouvertes), 3)
+    jours_actif: Optional[float] = None
+    if moy_jour > 0 and ouvertes:
+        jours_actif = round(restant_actif / moy_jour, 1)
+    alerte_actif = jours_actif is not None and jours_actif < seuil_jours
+
     return {
         "produit_id":       produit_id,
         "gallons_restants": restant,
         "gallons_livres":   total_livre,
-        "gallons_livres_cargaison_active": gallons_livres_cargaisons_ouvertes(db, produit_id),
+        "gallons_livres_cargaison_active":   livre_actif,
         "gallons_vendus":   total_vendu,
-        "gallons_vendus_cargaison_active": gallons_vendus_cargaisons_ouvertes(db, produit_id),
+        "gallons_vendus_cargaison_active":   vendu_actif,
+        "gallons_restants_cargaison_active": restant_actif,
+        "cargaison_active":                  bool(ouvertes),
         "gallons_ecartes":  total_ecarte,
         "moyenne_jour":     moy_jour,
         "jours_de_stock":   jours_de_stock,
+        "jours_de_stock_cargaison_active":   jours_actif,
         "alerte_bas":       alerte_bas,
+        "alerte_bas_cargaison_active":       alerte_actif,
         "seuil_jours":      seuil_jours,
     }
 
