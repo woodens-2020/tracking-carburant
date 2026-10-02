@@ -19081,24 +19081,26 @@ function ouvrirClotureLivraison(id){
     return;
   }
 
-  // Décision explicite requise à chaque clôture : mettre le stock à zéro
-  // (la nouvelle livraison démarre alors complètement neuve, sans mélange
-  // avec cette cargaison), ou reporter le reste sur la cargaison suivante.
+  // Décision explicite requise à chaque clôture — les deux choix ont un
+  // effet réel (aucun n'est un "annuler" déguisé) : ils sont donc stylés
+  // à égalité (aucun en gris btn-secondary, pour ne jamais laisser croire
+  // qu'un des deux est l'option neutre/sûre) et un vrai bouton Annuler,
+  // qui ne fait rien, est toujours présent séparément.
   question.style.display='block';
-  question.innerHTML = `Voulez-vous mettre ce stock à zéro (${reste.toFixed(3)} gal) ?<br>
-    <span style="font-weight:400;font-size:12.5px;color:var(--muted)">La nouvelle livraison sera alors comptée tout neuve, sans mélanger ses données avec celles de cette cargaison.</span>`;
+  question.innerHTML = `Cette cargaison a un reste de <strong>${reste.toFixed(3)} gal</strong>. Que voulez-vous en faire ?`;
 
   if(cible){
     noCible.style.display='none';
     actions.innerHTML = `
-      <button class="btn btn-secondary" onclick="confirmerClotureLivraison(true)">Non, additionner à la cargaison du ${frDate(cible.date_livraison)}</button>
-      <button class="btn btn-primary" onclick="confirmerClotureLivraison(false)">Oui, mettre le stock à zéro</button>`;
+      <button class="btn btn-secondary" onclick="fermerClotureLivraison()">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmerClotureLivraison(true)">Additionner à la cargaison du ${frDate(cible.date_livraison)}</button>
+      <button class="btn btn-danger" onclick="confirmerClotureLivraison(false)">Mettre ce reste à zéro</button>`;
   } else {
     noCible.style.display='block';
     noCible.textContent = `Aucune cargaison plus récente n'est disponible pour ce produit — le reste sera mis à zéro si vous confirmez.`;
     actions.innerHTML = `
       <button class="btn btn-secondary" onclick="fermerClotureLivraison()">Annuler</button>
-      <button class="btn btn-primary" onclick="confirmerClotureLivraison(false)">Oui, mettre le stock à zéro</button>`;
+      <button class="btn btn-danger" onclick="confirmerClotureLivraison(false)">Mettre ce reste à zéro</button>`;
   }
   document.getElementById('modal-cloture-livraison').classList.remove('hidden');
 }
