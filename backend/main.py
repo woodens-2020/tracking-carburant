@@ -3856,6 +3856,15 @@ class ClotureLivraisonIn(BaseModel):
     reporter_reste: bool = False   # additionner le reste sur la cargaison plus récente ?
 
 
+class LivraisonPatch(BaseModel):
+    date_livraison:    Optional[str]   = None   # YYYY-MM-DD
+    gallons_recus:     Optional[float] = None
+    prix_achat_gallon: Optional[float] = None
+    fournisseur:       Optional[str]   = None
+    reference_camion:  Optional[str]   = None
+    notes:             Optional[str]   = None
+
+
 def _livraison_dict(l: Livraison, fifo: Optional[dict] = None) -> dict:
     d = {
         "id":                       l.id,
@@ -3937,6 +3946,47 @@ def create_livraison(payload: LivraisonIn, db: Session = Depends(get_db)):
         db.rollback()
         raise
     return _livraison_dict(lv)
+
+
+@app.put("/api/livraisons/{livraison_id}")
+def modifier_livraison(livraison_id: int, payload: LivraisonPatch, db: Session = Depends(get_db)):
+    """Corrige une cargaison déjà saisie — ex. date antidatée par erreur,
+    qui a fait chevaucher sa période d'allocation FIFO avec une cargaison
+    déjà clôturée (double-comptage des ventes sur la période commune).
+
+    Volontairement interdit sur une cargaison terminée (terminee=True) :
+    sa consommation est figée pour toujours (voir fifo_allocation_livraisons),
+    la corriger reviendrait à changer un rapport déjà clôturé/audité — pour
+    ça, il faut d'abord la rouvrir (POST .../reouvrir)."""
+    lv = db.query(Livraison).filter(Livraison.id == livraison_id).first()
+    if not lv:
+        raise HTTPException(404, "Livraison introuvable")
+    if lv.terminee:
+        raise HTTPException(
+            400,
+            "Cette cargaison est clôturée — rouvrez-la d'abord (reste figé, "
+            "jamais recalculé) avant de la corriger.",
+        )
+    if payload.date_livraison is not None:
+        try:
+            lv.date_livraison = date_type.fromisoformat(payload.date_livraison)
+        except ValueError:
+            raise HTTPException(400, "date_livraison invalide (format YYYY-MM-DD)")
+    if payload.gallons_recus is not None:
+        if payload.gallons_recus <= 0:
+            raise HTTPException(400, "gallons_recus doit être > 0")
+        lv.gallons_recus = payload.gallons_recus
+    if payload.prix_achat_gallon is not None:
+        if payload.prix_achat_gallon < 0:
+            raise HTTPException(400, "prix_achat_gallon doit être >= 0")
+        lv.prix_achat_gallon = payload.prix_achat_gallon
+    if payload.fournisseur is not None:      lv.fournisseur      = payload.fournisseur
+    if payload.reference_camion is not None: lv.reference_camion = payload.reference_camion
+    if payload.notes is not None:            lv.notes            = payload.notes
+    db.commit()
+    db.refresh(lv)
+    alloc = {a["livraison_id"]: a for a in fifo_allocation_livraisons(db, lv.produit_id)}
+    return _livraison_dict(lv, alloc.get(lv.id))
 
 
 @app.get("/api/livraisons")
