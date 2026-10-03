@@ -16935,10 +16935,10 @@ const _AREA_PAGES = {
   },
   hotel: {
     complet: ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
-    // Accès opérationnel (réceptionniste) : réception + séjours + historique
-    // + rapport, sans gestion des chambres ni du personnel hôtel, ni des
-    // pro forma (retiré — accès réservé au niveau complet).
-    operationnel: ['hotel-dashboard','hotel-reception','hotel-sejours','hotel-historique','hotel-rapport'],
+    // Accès opérationnel (réceptionniste) : réception + séjours + historique,
+    // sans gestion des chambres, du personnel hôtel, des dépenses, des pro
+    // forma, ni du rapport (retirés — accès réservé au niveau complet).
+    operationnel: ['hotel-dashboard','hotel-reception','hotel-sejours','hotel-historique'],
     lecture: ['hotel-dashboard','hotel-historique','hotel-rapport'],
   },
   employes: {
