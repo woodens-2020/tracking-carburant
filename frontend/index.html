@@ -17058,6 +17058,21 @@ function _getAllowedPages(){
   return new Set(pages);
 }
 
+// Pages toujours interdites aux réceptionnistes, quel que soit le niveau
+// "hotel" de leur rôle (même "complet") — même règle que
+// _bloquer_receptionniste côté serveur (hotel_routes.py). Reconnu par le
+// nom du rôle OU le poste, accents ignorés.
+const _PAGES_INTERDITES_RECEPTIONNISTE = new Set(['hotel-depenses','hotel-employes','hotel-rapport']);
+function _estReceptionniste(){
+  if(!_appUser) return false;
+  const norm = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+  return [_appUser.role_nom, _appUser.poste].some(n => norm(n).startsWith('receptionnist'));
+}
+function _pageInterditeRole(page){
+  if(_isAdmin()) return false;
+  return _estReceptionniste() && _PAGES_INTERDITES_RECEPTIONNISTE.has(page);
+}
+
 function _canAccess(page){
   if(!_appUser) return false;
   const _rnCanAccess = (_appUser.role_nom||_appUser.poste||'').toLowerCase();
@@ -17070,6 +17085,7 @@ function _canAccess(page){
   if(!_pageModuleEnabled(page)) return false;
   // Admin vérifié sur les 3 indicateurs (est_admin, role, permissions.admin)
   if(_isAdmin()) return true;
+  if(_pageInterditeRole(page)) return false;
   // Pages admin interdites à tous les non-admins — y compris Manager
   // (l'accès complet demandé plus tôt a été retiré ; suit désormais
   // uniquement permissions.admin, vérifié ci-dessus par _isAdmin()).
@@ -17102,13 +17118,13 @@ function _applyNavAccess(){
     document.querySelectorAll('.nav-item[data-page], .mnav-btn[data-page]').forEach(btn=>{
       const p = btn.getAttribute('data-page');
       if(['admin-roles','admin-users','admin-sessions','admin-audit','admin-security'].includes(p)) return;
-      const ok = _pageModuleEnabled(p);
+      const ok = _pageModuleEnabled(p) && !_pageInterditeRole(p);
       btn.style.display = ok ? '' : 'none';
       btn.dataset.navAllowed = ok ? '1' : '0';
     });
     document.querySelectorAll('.nav-card[onclick]').forEach(card=>{
       const m = card.getAttribute('onclick').match(/goTo\('([^']+)'\)/);
-      if(m) card.style.display = _pageModuleEnabled(m[1]) ? '' : 'none';
+      if(m) card.style.display = (_pageModuleEnabled(m[1]) && !_pageInterditeRole(m[1])) ? '' : 'none';
     });
     _updateNavSectionVisibility();
     return;

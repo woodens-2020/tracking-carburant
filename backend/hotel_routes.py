@@ -46,6 +46,30 @@ def _require_pdg_ou_admin_hotel(request: Request, db: Session = Depends(get_db))
     raise HTTPException(403, "Accès réservé au PDG et aux administrateurs")
 
 
+def _sans_accents(s: str) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFKD", s or "") if not unicodedata.combining(c)).lower()
+
+
+def _bloquer_receptionniste(request: Request, db: Session = Depends(get_db)) -> None:
+    """Dépenses, rapport et gestion du personnel hôtel sont interdits aux
+    réceptionnistes, quel que soit le niveau "hotel" de leur rôle (même
+    "complet") — identifiés par le nom de leur rôle OU leur poste, pour
+    couvrir aussi un réceptionniste ayant activé un autre espace de travail.
+    Les administrateurs ne sont jamais bloqués."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        return
+    u = db.get(Utilisateur, user.id)
+    if not u or u.role in ("admin", "pdg"):
+        return
+    if u.role_obj and u.role_obj.permissions.get("admin", False):
+        return
+    noms = [u.role_obj.nom if u.role_obj else "", u.poste or ""]
+    if any(_sans_accents(n).startswith("receptionnist") for n in noms):
+        raise HTTPException(403, "Section non accessible aux réceptionnistes.")
+
+
 # ══════════════════════════════════════════════════════════════════
 # HELPERS
 # ══════════════════════════════════════════════════════════════════
@@ -257,7 +281,7 @@ def liste_employes(actif: Optional[bool] = Query(default=None), db: Session = De
     return [_employe_dict(e) for e in q.order_by(HotelEmploye.nom).all()]
 
 
-@router.post("/employes", status_code=201)
+@router.post("/employes", status_code=201, dependencies=[Depends(_bloquer_receptionniste)])
 def creer_employe(data: EmployeHotelIn, db: Session = Depends(get_db)):
     postes_valides = ("RECEPTIONNISTE", "FEMME_DE_CHAMBRE", "GERANT", "SECURITE", "AUTRE")
     if data.poste not in postes_valides:
@@ -286,7 +310,7 @@ def creer_employe(data: EmployeHotelIn, db: Session = Depends(get_db)):
     return _employe_dict(e)
 
 
-@router.put("/employes/{employe_id}")
+@router.put("/employes/{employe_id}", dependencies=[Depends(_bloquer_receptionniste)])
 def modifier_employe(employe_id: int, data: EmployeHotelIn, db: Session = Depends(get_db)):
     e = db.query(HotelEmploye).filter_by(id=employe_id).first()
     if not e:
@@ -311,7 +335,7 @@ def modifier_employe(employe_id: int, data: EmployeHotelIn, db: Session = Depend
     return _employe_dict(e)
 
 
-@router.delete("/employes/{employe_id}", status_code=200)
+@router.delete("/employes/{employe_id}", status_code=200, dependencies=[Depends(_bloquer_receptionniste)])
 def supprimer_employe(employe_id: int, db: Session = Depends(get_db)):
     e = db.query(HotelEmploye).filter_by(id=employe_id).first()
     if not e:
@@ -1184,7 +1208,7 @@ def _get_rapport_data(
     }
 
 
-@router.get("/rapport")
+@router.get("/rapport", dependencies=[Depends(_bloquer_receptionniste)])
 def rapport_hotel(
     date_debut:  Optional[str] = Query(default=None),
     date_fin:    Optional[str] = Query(default=None),
@@ -1199,7 +1223,7 @@ class RapportNoteIn(BaseModel):
     texte:        str
 
 
-@router.put("/rapport/note")
+@router.put("/rapport/note", dependencies=[Depends(_bloquer_receptionniste)])
 def enregistrer_note_rapport(data: RapportNoteIn, request: Request, db: Session = Depends(get_db)):
     """Enregistre (ou remplace, ou efface si vide) le commentaire du rapport
     hôtel d'une journée. Visible par la direction dans le rapport et ses
@@ -1233,7 +1257,7 @@ def enregistrer_note_rapport(data: RapportNoteIn, request: Request, db: Session 
     }
 
 
-@router.get("/rapport/pdf")
+@router.get("/rapport/pdf", dependencies=[Depends(_bloquer_receptionniste)])
 def rapport_hotel_pdf(
     date_debut:  Optional[str] = Query(default=None),
     date_fin:    Optional[str] = Query(default=None),
@@ -1351,7 +1375,7 @@ def rapport_hotel_pdf(
     )
 
 
-@router.get("/rapport/xlsx")
+@router.get("/rapport/xlsx", dependencies=[Depends(_bloquer_receptionniste)])
 def rapport_hotel_xlsx(
     date_debut:  Optional[str] = Query(default=None),
     date_fin:    Optional[str] = Query(default=None),
@@ -1561,7 +1585,7 @@ def _parse_date_saisie_hotel(raw):
         return None
 
 
-@router.get("/depenses")
+@router.get("/depenses", dependencies=[Depends(_bloquer_receptionniste)])
 def liste_depenses_hotel(
     date_debut: Optional[str] = Query(default=None),
     date_fin:   Optional[str] = Query(default=None),
@@ -1600,7 +1624,7 @@ def liste_depenses_hotel(
     ]
 
 
-@router.post("/depenses")
+@router.post("/depenses", dependencies=[Depends(_bloquer_receptionniste)])
 def ajouter_depense_hotel(data: dict, request: Request, db: Session = Depends(get_db)):
     desc = (data.get("description") or "").strip()
     if not desc:
@@ -1629,7 +1653,7 @@ def ajouter_depense_hotel(data: dict, request: Request, db: Session = Depends(ge
     return {"id": d.id, "message": "Dépense enregistrée"}
 
 
-@router.put("/depenses/{dep_id}")
+@router.put("/depenses/{dep_id}", dependencies=[Depends(_bloquer_receptionniste)])
 def modifier_depense_hotel(dep_id: int, data: dict, request: Request, db: Session = Depends(get_db)):
     d = db.query(HotelDepense).filter_by(id=dep_id).first()
     if not d:
@@ -1655,7 +1679,7 @@ def modifier_depense_hotel(dep_id: int, data: dict, request: Request, db: Sessio
     return {"message": "Dépense modifiée"}
 
 
-@router.delete("/depenses/{dep_id}")
+@router.delete("/depenses/{dep_id}", dependencies=[Depends(_bloquer_receptionniste)])
 def supprimer_depense_hotel(dep_id: int, db: Session = Depends(get_db)):
     d = db.query(HotelDepense).filter_by(id=dep_id).first()
     if not d:
