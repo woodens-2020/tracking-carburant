@@ -279,7 +279,7 @@ def _idem_supprimer(ligne_id: int) -> None:
     from models import IdempotencyKey
     db = SessionLocal()
     try:
-        db.query(IdempotencyKey).filter_by(id=ligne_id).delete()
+        db.query(IdempotencyKey).filter_by(id=ligne_id).delete(synchronize_session=False)
         db.commit()
     finally:
         db.close()
@@ -293,9 +293,26 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 
         cle  = (request.headers.get("Idempotency-Key") or "").strip()
         path = request.url.path
-        if (not cle or len(cle) > 80 or request.method not in _IDEMP_METHODES
-                or not path.startswith("/api/") or path.startswith(_IDEMP_EXCLUS)):
+        if (request.method not in _IDEMP_METHODES or not path.startswith("/api/")
+                or path.startswith(_IDEMP_EXCLUS)):
             return await call_next(request)
+        if not cle:
+            # Toute écriture faite depuis le navigateur (cookie de session)
+            # doit porter une clé : l'application l'ajoute toujours. Une
+            # écriture sans clé vient donc d'un onglet resté ouvert sur une
+            # ancienne version de la page, sans protection anti-doublon — on
+            # la refuse plutôt que de risquer un doublon. Les intégrations
+            # par clé API (sans cookie) ne sont pas concernées.
+            if request.cookies.get(SESSION_COOKIE):
+                return JSONResponse(
+                    {"detail": "L'application a été mise à jour : rechargez la page (touche F5) "
+                               "puis refaites l'opération. Rien n'a été enregistré.",
+                     "code": "RECHARGEMENT_REQUIS"},
+                    status_code=428,
+                )
+            return await call_next(request)
+        if len(cle) > 80:
+            return JSONResponse({"detail": "Clé anti-doublon invalide."}, status_code=422)
 
         user = getattr(request.state, "user", None)
         uid  = user.id if user else None
@@ -334,10 +351,15 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             ligne_id = ligne.id
 
             if random.random() < 0.02:
-                from datetime import datetime as _dt, timezone as _tz, timedelta as _td
-                limite = _dt.now(_tz.utc) - _td(seconds=_IDEMP_DUREE)
-                db.query(IdempotencyKey).filter(IdempotencyKey.created_at < limite).delete()
-                db.commit()
+                # Purge des vieilles clés — jamais bloquante : une erreur ici
+                # ne doit en aucun cas empêcher l'opération de l'utilisateur.
+                try:
+                    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+                    limite = _dt.now(_tz.utc) - _td(seconds=_IDEMP_DUREE)
+                    db.query(IdempotencyKey).filter(IdempotencyKey.created_at < limite).delete(synchronize_session=False)
+                    db.commit()
+                except Exception:
+                    db.rollback()
         finally:
             db.close()
 

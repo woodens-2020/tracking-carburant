@@ -12290,7 +12290,29 @@ const _MUTATIONS = new Set(['POST','PUT','PATCH','DELETE']);
 const _idemOps = new Map();          // signature -> {cle, promesse, expire}
 const _IDEM_GARDE_APRES_SUCCES = 4000;    // ms : absorbe un clic tardif juste après le succès
 const _IDEM_GARDE_APRES_COUPURE = 600000; // ms : garde la clé pour un nouvel essai manuel
+const _IDEM_STOCKAGE = 'konekta_idem_v1';
 let _dernierClic = null;
+
+// Les clés survivent à un rechargement de la page (F5 par panique pendant
+// une coupure) : si l'utilisateur refait exactement la même saisie, la
+// même clé repart et le serveur ne réenregistre pas.
+function _idemSauver(){
+  try{
+    const now = Date.now(), obj = {};
+    let n = 0;
+    for(const [s,op] of _idemOps){
+      if(op.expire > now && s.length < 20000 && n < 100){ obj[s] = {cle:op.cle, expire:op.expire}; n++; }
+    }
+    sessionStorage.setItem(_IDEM_STOCKAGE, JSON.stringify(obj));
+  }catch(e){}
+}
+(function _idemRestaurer(){
+  try{
+    const obj = JSON.parse(sessionStorage.getItem(_IDEM_STOCKAGE) || '{}');
+    const now = Date.now();
+    for(const s in obj) if(obj[s].expire > now) _idemOps.set(s, {cle:obj[s].cle, promesse:null, expire:obj[s].expire});
+  }catch(e){}
+})();
 
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('button, .pos-btn, [role="button"]');
@@ -12336,7 +12358,7 @@ async function _envoyerMutation(method, path, opts){
     let res;
     try{
       const ctrl = new AbortController();
-      const minuteur = setTimeout(()=>ctrl.abort(), 30000);
+      const minuteur = setTimeout(()=>ctrl.abort(), 60000);
       try{ res = await fetch('/api'+path, {...opts, signal:ctrl.signal}); }
       finally{ clearTimeout(minuteur); }
     }catch(errReseau){
@@ -12348,7 +12370,7 @@ async function _envoyerMutation(method, path, opts){
     if([502,503,504].includes(res.status) && essaisReseau < 3){
       essaisReseau++; await _attendre(1000*Math.pow(2,essaisReseau-1)); continue;
     }
-    if(res.status===409 && attentesEnCours < 20){
+    if(res.status===409 && attentesEnCours < 40){
       const corps = await res.clone().json().catch(()=>null);
       if(corps && corps.code==='IDEMPOTENCE_EN_COURS'){ attentesEnCours++; await _attendre(1500); continue; }
     }
@@ -12368,6 +12390,7 @@ async function apiFetch(method,path,body){
     promesse: null, expire: maintenant + _IDEM_GARDE_APRES_COUPURE,
   };
   _idemOps.set(signature, op);
+  _idemSauver();
   const bouton = _verrouillerBouton();
   op.promesse = (async()=>{
     try{
@@ -12380,6 +12403,7 @@ async function apiFetch(method,path,body){
       throw e;
     }finally{
       op.promesse = null;
+      _idemSauver();
       _deverrouillerBouton(bouton);
     }
   })();
