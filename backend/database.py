@@ -26,6 +26,7 @@ from models import (
     BarCommande, BarLigneCommande, BarPaiementEmploye,
     HotelChambre, HotelEmploye, HotelReservation, HotelRapportNote,  # noqa: F401
     LoginSecurityEvent,  # noqa: F401 — nécessaire pour create_all
+    IdempotencyKey,      # noqa: F401 — nécessaire pour create_all
     BarSessionEvaluation,  # noqa: F401 — nécessaire pour create_all
     PatisserieCategorie, PatisserieProduit, PatisserieAchat,        # noqa: F401
     PatisserieMouvementStock, PatisserieSessionCaisse,              # noqa: F401

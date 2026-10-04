@@ -256,6 +256,31 @@ class SessionToken(Base):
     )
 
 
+class IdempotencyKey(Base):
+    """Garde anti-doublon : une ligne par opération d'écriture (POST/PUT/
+    PATCH/DELETE) envoyée avec un en-tête Idempotency-Key. Si la même clé
+    revient (double clic, ou nouvel essai après une coupure internet alors
+    que le serveur avait déjà enregistré), la réponse d'origine est rejouée
+    au lieu de réexécuter l'opération. Voir IdempotencyMiddleware (main.py)."""
+    __tablename__ = "idempotency_keys"
+
+    id             = Column(Integer, primary_key=True)
+    cle            = Column(String(80), nullable=False)
+    utilisateur_id = Column(Integer, nullable=True)
+    methode        = Column(String(10), nullable=False)
+    chemin         = Column(String(300), nullable=False)
+    statut         = Column(String(12), nullable=False, default="EN_COURS")  # EN_COURS, TERMINE
+    code_http      = Column(Integer, nullable=True)
+    reponse        = Column(Text, nullable=True)
+    content_type   = Column(String(100), nullable=True)
+    created_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("cle", name="uq_idempotency_cle"),
+        Index("idx_idempotency_created", "created_at"),
+    )
+
+
 class LoginSecurityEvent(Base):
     """Photo + géolocalisation capturées à chaque connexion."""
     __tablename__ = "login_security_events"

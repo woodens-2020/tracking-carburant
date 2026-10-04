@@ -251,6 +251,135 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+# ── Anti-doublon (idempotence) ──────────────────────────────────────
+# Une connexion internet instable provoquait des enregistrements en double :
+# le serveur enregistre l'opération, la réponse se perd en route, l'écran
+# affiche une erreur, l'utilisateur reclique — et le serveur enregistre une
+# seconde fois. Chaque écriture envoyée par l'application porte désormais un
+# en-tête Idempotency-Key (voir apiFetch dans index.html) : une clé déjà
+# traitée renvoie la réponse d'origine sans rien réexécuter ; une clé encore
+# en cours de traitement renvoie 409 (l'écran patiente puis redemande).
+_IDEMP_METHODES = {"POST", "PUT", "PATCH", "DELETE"}
+_IDEMP_EXCLUS   = ("/api/login", "/api/logout", "/api/otp/", "/api/auth/", "/api/oauth/")
+_IDEMP_DUREE    = 24 * 3600   # rétention des clés (secondes)
+_IDEMP_ABANDON  = 120         # clé "en cours" plus vieille = requête morte (secondes)
+_IDEMP_MAX_CORPS = 1_000_000
+
+
+def _idem_age(created_at) -> float:
+    from datetime import datetime as _dt, timezone as _tz
+    if created_at is None:
+        return 0.0
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=_tz.utc)
+    return (_dt.now(_tz.utc) - created_at).total_seconds()
+
+
+def _idem_supprimer(ligne_id: int) -> None:
+    from models import IdempotencyKey
+    db = SessionLocal()
+    try:
+        db.query(IdempotencyKey).filter_by(id=ligne_id).delete()
+        db.commit()
+    finally:
+        db.close()
+
+
+class IdempotencyMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        from models import IdempotencyKey
+        from sqlalchemy.exc import IntegrityError
+        import random
+
+        cle  = (request.headers.get("Idempotency-Key") or "").strip()
+        path = request.url.path
+        if (not cle or len(cle) > 80 or request.method not in _IDEMP_METHODES
+                or not path.startswith("/api/") or path.startswith(_IDEMP_EXCLUS)):
+            return await call_next(request)
+
+        user = getattr(request.state, "user", None)
+        uid  = user.id if user else None
+
+        db = SessionLocal()
+        try:
+            existant = db.query(IdempotencyKey).filter_by(cle=cle).first()
+            if existant:
+                if (existant.utilisateur_id != uid or existant.methode != request.method
+                        or existant.chemin != path):
+                    return JSONResponse({"detail": "Clé anti-doublon déjà utilisée pour une autre opération."}, status_code=422)
+                if existant.statut == "TERMINE":
+                    return Response(
+                        content=existant.reponse or "", status_code=existant.code_http or 200,
+                        media_type=existant.content_type or "application/json",
+                        headers={"Idempotent-Replay": "true"},
+                    )
+                if _idem_age(existant.created_at) < _IDEMP_ABANDON:
+                    return JSONResponse(
+                        {"detail": "Cette opération est déjà en cours de traitement.", "code": "IDEMPOTENCE_EN_COURS"},
+                        status_code=409,
+                    )
+                db.delete(existant)
+                db.commit()
+
+            ligne = IdempotencyKey(cle=cle, utilisateur_id=uid, methode=request.method, chemin=path, statut="EN_COURS")
+            db.add(ligne)
+            try:
+                db.commit()
+            except IntegrityError:
+                db.rollback()
+                return JSONResponse(
+                    {"detail": "Cette opération est déjà en cours de traitement.", "code": "IDEMPOTENCE_EN_COURS"},
+                    status_code=409,
+                )
+            ligne_id = ligne.id
+
+            if random.random() < 0.02:
+                from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+                limite = _dt.now(_tz.utc) - _td(seconds=_IDEMP_DUREE)
+                db.query(IdempotencyKey).filter(IdempotencyKey.created_at < limite).delete()
+                db.commit()
+        finally:
+            db.close()
+
+        try:
+            response = await call_next(request)
+        except Exception:
+            _idem_supprimer(ligne_id)
+            raise
+
+        ctype = response.headers.get("content-type", "")
+        if not (200 <= response.status_code < 300 and ctype.startswith("application/json")):
+            # Échec ou réponse non-JSON : on libère la clé — un nouvel essai
+            # réexécutera l'opération (rien n'a été enregistré, ou la réponse
+            # ne peut pas être rejouée telle quelle).
+            _idem_supprimer(ligne_id)
+            return response
+
+        corps = b"".join([morceau async for morceau in response.body_iterator])
+        db = SessionLocal()
+        try:
+            ligne = db.query(IdempotencyKey).filter_by(id=ligne_id).first()
+            if ligne:
+                if len(corps) <= _IDEMP_MAX_CORPS:
+                    ligne.statut       = "TERMINE"
+                    ligne.code_http    = response.status_code
+                    ligne.reponse      = corps.decode("utf-8", errors="replace")
+                    ligne.content_type = ctype
+                else:
+                    db.delete(ligne)
+                db.commit()
+        finally:
+            db.close()
+
+        nouvelle = Response(content=corps, status_code=response.status_code)
+        nouvelle.raw_headers = response.raw_headers
+        return nouvelle
+
+
+# Ajouté AVANT AuthMiddleware : Starlette exécute en premier le middleware
+# ajouté en dernier, donc l'authentification passe d'abord et
+# request.state.user est déjà renseigné ici.
+app.add_middleware(IdempotencyMiddleware)
 app.add_middleware(AuthMiddleware)
 
 # Module POS bar/restaurant

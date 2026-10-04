@@ -2871,6 +2871,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .pos-btn{padding:8px 16px;border-radius:8px;font-size:15px;font-weight:600;
   cursor:pointer;border:none;transition:opacity .15s}
 .pos-btn:hover{opacity:.85}
+/* Bouton verrouillé pendant qu'une opération est en cours (anti-doublon, voir apiFetch) */
+.is-busy{pointer-events:none!important;opacity:.55!important;cursor:progress!important}
 .pos-btn.primary{background:var(--pos-accent);color:var(--pos-accent-ink)}
 .pos-btn.teal{background:var(--pos-money);color:#fff}
 .pos-btn.ghost{background:var(--pos-surf-hover);color:rgba(255,255,255,.7)}
@@ -12272,13 +12274,126 @@ function frDate(str){
 // ══════════════════════════════════════════════
 // API
 // ══════════════════════════════════════════════
+// ── Anti-doublon ─────────────────────────────────────────────────────
+// Toute écriture (POST/PUT/PATCH/DELETE) passe par ici, ce qui protège
+// d'un coup tous les écrans de l'application :
+//  1. Double clic : une requête identique déjà en cours n'est pas renvoyée,
+//     le second clic reçoit le même résultat que le premier.
+//  2. Coupure internet : chaque opération porte une clé unique
+//     (Idempotency-Key). Si la réponse se perd en route, le nouvel essai
+//     réutilise la même clé et le serveur renvoie le résultat déjà
+//     enregistré au lieu d'enregistrer une seconde fois (voir
+//     IdempotencyMiddleware, backend/main.py). Les essais réseau sont donc
+//     relancés automatiquement, sans risque.
+//  3. Le bouton cliqué est verrouillé tant que l'opération n'est pas finie.
+const _MUTATIONS = new Set(['POST','PUT','PATCH','DELETE']);
+const _idemOps = new Map();          // signature -> {cle, promesse, expire}
+const _IDEM_GARDE_APRES_SUCCES = 4000;    // ms : absorbe un clic tardif juste après le succès
+const _IDEM_GARDE_APRES_COUPURE = 600000; // ms : garde la clé pour un nouvel essai manuel
+let _dernierClic = null;
+
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button, .pos-btn, [role="button"]');
+  if(b) _dernierClic = {el:b, t:Date.now()};
+}, true);
+
+function _nouvelleCleIdem(){
+  if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);
+}
+
+function _verrouillerBouton(){
+  if(!_dernierClic || Date.now()-_dernierClic.t > 1500) return null;
+  const el = _dernierClic.el;
+  if(!el.isConnected) return null;
+  const n = parseInt(el.dataset.occupe||'0',10)+1;
+  el.dataset.occupe = String(n);
+  if(n===1){
+    el.classList.add('is-busy');
+    el.setAttribute('aria-busy','true');
+    if('disabled' in el){ el.dataset.etaitDesactive = el.disabled ? '1' : '0'; el.disabled = true; }
+  }
+  return el;
+}
+function _deverrouillerBouton(el){
+  if(!el) return;
+  const n = Math.max(0, parseInt(el.dataset.occupe||'1',10)-1);
+  el.dataset.occupe = String(n);
+  if(n===0){
+    el.classList.remove('is-busy');
+    el.removeAttribute('aria-busy');
+    if('disabled' in el && el.dataset.etaitDesactive==='0') el.disabled = false;
+  }
+}
+
+const _attendre = ms => new Promise(r=>setTimeout(r,ms));
+
+async function _envoyerMutation(method, path, opts){
+  // Jusqu'à 4 essais sur coupure réseau / redémarrage serveur (502-504),
+  // et attente patiente tant que le serveur signale "déjà en cours" (409).
+  let essaisReseau = 0, attentesEnCours = 0;
+  while(true){
+    let res;
+    try{
+      const ctrl = new AbortController();
+      const minuteur = setTimeout(()=>ctrl.abort(), 30000);
+      try{ res = await fetch('/api'+path, {...opts, signal:ctrl.signal}); }
+      finally{ clearTimeout(minuteur); }
+    }catch(errReseau){
+      if(essaisReseau < 3){ essaisReseau++; await _attendre(1000*Math.pow(2,essaisReseau-1)); continue; }
+      const e = new Error("Connexion internet instable : l'opération n'a pas pu être confirmée. Réessayez — elle ne sera pas enregistrée deux fois.");
+      e.reseau = true; e.status = 0;
+      throw e;
+    }
+    if([502,503,504].includes(res.status) && essaisReseau < 3){
+      essaisReseau++; await _attendre(1000*Math.pow(2,essaisReseau-1)); continue;
+    }
+    if(res.status===409 && attentesEnCours < 20){
+      const corps = await res.clone().json().catch(()=>null);
+      if(corps && corps.code==='IDEMPOTENCE_EN_COURS'){ attentesEnCours++; await _attendre(1500); continue; }
+    }
+    return res;
+  }
+}
+
 async function apiFetch(method,path,body){
+  if(!_MUTATIONS.has(method)) return _apiFetchExec(method,path,body,null);
+  const signature = method+' '+path+' '+(body ? JSON.stringify(body) : '');
+  const maintenant = Date.now();
+  for(const [s,op] of _idemOps) if(!op.promesse && op.expire < maintenant) _idemOps.delete(s);
+  const existant = _idemOps.get(signature);
+  if(existant && existant.promesse) return existant.promesse;
+  const op = {
+    cle: (existant && existant.expire > maintenant) ? existant.cle : _nouvelleCleIdem(),
+    promesse: null, expire: maintenant + _IDEM_GARDE_APRES_COUPURE,
+  };
+  _idemOps.set(signature, op);
+  const bouton = _verrouillerBouton();
+  op.promesse = (async()=>{
+    try{
+      const r = await _apiFetchExec(method,path,body,op.cle);
+      op.expire = Date.now() + _IDEM_GARDE_APRES_SUCCES;
+      return r;
+    }catch(e){
+      if(e.reseau) op.expire = Date.now() + _IDEM_GARDE_APRES_COUPURE;
+      else _idemOps.delete(signature);
+      throw e;
+    }finally{
+      op.promesse = null;
+      _deverrouillerBouton(bouton);
+    }
+  })();
+  return op.promesse;
+}
+
+async function _apiFetchExec(method,path,body,cleIdem){
   const hdrs={'Content-Type':'application/json'};
   const apiKey=sessionStorage.getItem('api_key');
   if(apiKey) hdrs['X-API-Key']=apiKey;
+  if(cleIdem) hdrs['Idempotency-Key']=cleIdem;
   const opts={method,headers:hdrs,credentials:'include'};
   if(body) opts.body=JSON.stringify(body);
-  const res=await fetch('/api'+path,opts);
+  const res = cleIdem ? await _envoyerMutation(method,path,opts) : await fetch('/api'+path,opts);
   if(res.status===401){
     sessionStorage.removeItem('api_key');
     window.location.href='/login';
@@ -16781,12 +16896,20 @@ async function pjUpload(){
     const hdrs = {};
     const apiKey = sessionStorage.getItem('api_key');
     if(apiKey) hdrs['X-API-Key'] = apiKey;
-    const res = await fetch('/api/pieces-jointes', {method:'POST', headers:hdrs, credentials:'include', body:fd});
+    // Même fichier pour la même fiche = même clé anti-doublon pendant 10 min :
+    // un nouvel essai après une coupure ne crée pas une seconde pièce jointe.
+    const sigPj = [_pjTypeEntite,_pjEntiteId,file.name,file.size,file.lastModified].join('|');
+    if(!window._pjCleIdem || _pjCleIdem.sig!==sigPj || _pjCleIdem.expire<Date.now())
+      window._pjCleIdem = {sig:sigPj, cle:_nouvelleCleIdem()};
+    _pjCleIdem.expire = Date.now()+_IDEM_GARDE_APRES_COUPURE;
+    hdrs['Idempotency-Key'] = _pjCleIdem.cle;
+    const res = await _envoyerMutation('POST','/pieces-jointes',{method:'POST', headers:hdrs, credentials:'include', body:fd});
     if(!res.ok){
       const err = await res.json().catch(()=>({detail:res.statusText}));
       throw new Error(Array.isArray(err.detail)?err.detail.map(e=>e.msg).join(', '):(err.detail||res.statusText));
     }
     input.value = '';
+    _pjCleIdem.expire = Date.now()+_IDEM_GARDE_APRES_SUCCES;
     toast('Document ajouté.','ok');
     pjRenderList();
   }catch(e){ toast(e.message||'Erreur lors de l\'envoi.','err'); }
@@ -25853,7 +25976,8 @@ async function posProduitPhotoUpload(){
     const hdrs = {};
     const apiKey = sessionStorage.getItem('api_key');
     if(apiKey) hdrs['X-API-Key'] = apiKey;
-    const res = await fetch(`/api/pos/produits/${id}/photo`, {method:'POST', headers:hdrs, credentials:'include', body:fd});
+    hdrs['Idempotency-Key'] = _nouvelleCleIdem();
+    const res = await _envoyerMutation('POST',`/pos/produits/${id}/photo`,{method:'POST', headers:hdrs, credentials:'include', body:fd});
     if(!res.ok){
       const err = await res.json().catch(()=>({detail:res.statusText}));
       throw new Error(Array.isArray(err.detail)?err.detail.map(e=>e.msg).join(', '):(err.detail||res.statusText));
