@@ -1225,7 +1225,6 @@ tr.row-err td:first-child,tr.row-alerte td:first-child{border-left-width:3px}
   .sk-gauge-pct{font-size:26px}
   .rpt-fmt-icon{font-size:22px}
   .aud-fmt-icon{font-size:24px}
-  #pcmd-enc-total-display{font-size:24px!important}
   #hrpt-actifs-nb{font-size:36px!important}
 
   .mnav-btn span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -2982,6 +2981,22 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .pos-cat-tab:hover:not(.active){background:rgba(255,255,255,.09)}
 
 /* ─── Stock bar ────────────────────────────────────────────── */
+.dep-steps{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.dep-steps span{font-size:12px;padding:4px 10px;border-radius:999px;background:rgba(96,165,250,.1);color:#93c5fd;border:1px solid rgba(96,165,250,.2)}
+.dep-scan-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+.dep-scan-row .pos-input{flex:1;min-width:220px}
+.dep-mode{display:flex;gap:6px}
+.dep-retour{margin-top:8px;font-size:14px;min-height:20px}
+.dep-retour.ok{color:#34d399}.dep-retour.err{color:#f87171}
+.dep-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.dep-grid>*{min-width:0}
+.dep-note{font-size:13px;color:rgba(255,255,255,.45);margin:0 0 10px}
+.dep-badge{background:#fbbf24;color:#000;font-size:12px;font-weight:700;border-radius:20px;padding:1px 8px;margin-left:6px}
+.dep-ligne{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.dep-sous{font-size:12px;color:rgba(255,255,255,.4)}
+.dep-vide{font-size:13px;color:rgba(255,255,255,.35);padding:10px 0}
+.dep-code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;background:rgba(255,255,255,.06);padding:1px 6px;border-radius:4px}
+.dep-livr-tete{margin:4px 0 10px;font-size:15px}
 .pos-stock-alert{color:#f87171}
 .pos-stock-ok{color:#3fb6a8}
 .pos-stock-warn{color:#f7a93b}
@@ -3386,6 +3401,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="pos-depot" onclick="goTo('pos-depot')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-6 9 6v11a1 1 0 01-1 1H4a1 1 0 01-1-1z"/><path d="M9 21V12h6v9"/></svg>
+      </span>
+      <span>Dépôt Bar</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <button class="nav-item" data-page="pos-achats" onclick="goTo('pos-achats')">
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
@@ -3410,21 +3433,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
-    <button class="nav-item" data-page="pos-commandes" onclick="goTo('pos-commandes')">
-      <span class="nav-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
-      </span>
-      <span>Tables</span>
-      <span class="nav-active-dot"></span>
-    </button>
 
-    <button class="nav-item" data-page="pos-paie" onclick="goTo('pos-paie')">
-      <span class="nav-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0112 0v2"/><path d="M16 12v4M14 14h4"/></svg>
-      </span>
-      <span>Paie Bar</span>
-      <span class="nav-active-dot"></span>
-    </button>
 
     <button class="nav-item" data-page="pos-rentabilite" onclick="goTo('pos-rentabilite')">
       <span class="nav-icon">
@@ -6969,68 +6978,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div>
 
-    <!-- Modal approvisionnement caisse/unité -->
-    <div class="pos-modal-bg" id="pos-appro-modal-bg" onclick="if(event.target===this)posApproModalClose()">
-      <div class="pos-modal">
-        <h3 id="pos-appro-modal-title">Approvisionnement</h3>
-        <input type="hidden" id="pos-appro-produit-id">
-        <input type="hidden" id="pos-appro-upc" value="1">
-        <input type="hidden" id="pos-appro-is-caisse" value="false">
-        <!-- Historique du dernier approvisionnement -->
-        <div id="pos-appro-historique" style="display:none;background:var(--panel3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--muted)"></div>
-        <!-- Section caisses (visible si vendu_par_caisse) -->
-        <div id="pos-appro-caisse-section">
-          <div class="pos-form-row">
-            <div style="flex:1">
-              <label class="pos-label">Nombre de caisses</label>
-              <input class="pos-input" id="pos-appro-nb-caisses" type="number" min="0" step="1" placeholder="0" value="0" oninput="posApproUpdateLive()">
-            </div>
-            <div style="flex:1">
-              <label class="pos-label">Unités en vrac</label>
-              <input class="pos-input" id="pos-appro-nb-vrac" type="number" min="0" step="1" placeholder="0" value="0" oninput="posApproUpdateLive()">
-            </div>
-          </div>
-          <!-- Compteur live -->
-          <div id="pos-appro-live" style="background:rgba(63,182,168,.1);border:1px solid rgba(63,182,168,.25);border-radius:8px;padding:10px 14px;margin:4px 0 8px;font-size:15px;color:#3fb6a8;display:none">
-            <span id="pos-appro-live-txt"></span>
-          </div>
-        </div>
-        <!-- Section unités seulement (produit normal) -->
-        <div id="pos-appro-unite-section" style="display:none">
-          <div class="pos-form-row">
-            <div style="width:100%">
-              <label class="pos-label">Quantité à ajouter (unités)</label>
-              <input class="pos-input" id="pos-appro-nb-unite-seul" type="number" min="1" step="1" placeholder="0" value="" oninput="posApproUpdateLive()">
-            </div>
-          </div>
-        </div>
-        <div class="pos-form-row">
-          <div style="flex:1">
-            <label class="pos-label">Prix d'achat / caisse (G) <span style="color:rgba(255,255,255,.4)">(optionnel)</span></label>
-            <input class="pos-input" id="pos-appro-prix-caisse" type="number" min="0" step="0.01" placeholder="0.00">
-          </div>
-          <div style="flex:1">
-            <label class="pos-label">Lieu *</label>
-            <select class="pos-select" id="pos-appro-lieu">
-              <option value="">Choisir un bar…</option>
-              <option value="DEVANT">Bar Devant (Accueil)</option>
-              <option value="PISCINE">Bar Piscine</option>
-            </select>
-          </div>
-        </div>
-        <div class="pos-form-row">
-          <div style="width:100%">
-            <label class="pos-label">Notes</label>
-            <input class="pos-input" id="pos-appro-notes" placeholder="Fournisseur, lot…">
-          </div>
-        </div>
-        <div class="pos-modal-footer">
-          <button class="pos-btn ghost" onclick="posApproModalClose()">Annuler</button>
-          <button class="pos-btn primary" onclick="posApproSauvegarder()">Enregistrer</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Modal historique prix -->
     <div class="pos-modal-bg" id="pos-prix-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
       <div class="pos-modal">
@@ -7066,6 +7013,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
           <div class="pos-header-actions">
             <button id="btn-pos-stock-reception" class="pos-btn teal" onclick="posStockReceptionModal()">+ Réception</button>
+            <button class="pos-btn ghost" onclick="goTo('pos-depot')">Dépôt & livraisons</button>
             <button id="btn-pos-stock-ajust" class="pos-btn ghost" onclick="posStockAjustModal()">Ajustement</button>
             <button id="btn-pos-stock-pdf" class="pos-btn ghost" onclick="posStockExportPdf()">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:5px;vertical-align:middle"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>PDF
@@ -7110,7 +7058,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <span>Réceptions en attente de confirmation</span>
             <span id="pos-attente-badge" style="background:#fbbf24;color:#000;font-size:13px;font-weight:700;border-radius:20px;padding:1px 8px;margin-left:4px"></span>
           </div>
-          <div style="font-size:14px;color:rgba(255,255,255,.45);padding:0 0 12px">Ces achats sont enregistrés mais pas encore confirmés pour la comptabilité. Confirmer ici ne touche pas le stock — faites un approvisionnement séparé (Produits Bar) pour ajouter la marchandise au stock.</div>
+          <div style="font-size:14px;color:rgba(255,255,255,.45);padding:0 0 12px">Ces achats sont enregistrés mais pas encore réceptionnés. Réceptionner crée les colis et leurs étiquettes ; le stock entre au dépôt quand chaque colis est scanné (page Dépôt Bar), puis passe au bar par une livraison.</div>
           <div id="pos-attente-list" style="display:flex;flex-direction:column;gap:10px"></div>
         </div>
 
@@ -7119,10 +7067,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-table-wrap">
             <table class="pos-table">
               <thead>
-                <tr><th>Produit</th><th>Catégorie</th><th>Bar Devant</th><th>Bar Piscine</th><th>Total</th><th>Unité</th><th>Seuil alerte</th><th>Coût en stock</th><th>État</th><th>Actions</th></tr>
+                <tr><th>Produit</th><th>Catégorie</th><th>Dépôt</th><th>Bar Devant</th><th>Bar Piscine</th><th>Total</th><th>Unité</th><th>Seuil alerte</th><th>Coût en stock</th><th>État</th><th>Actions</th></tr>
               </thead>
               <tbody id="pos-stock-tbody">
-                <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                <tr><td colspan="11" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -7130,6 +7078,124 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
       </div>
     </div><!-- /page-pos-stock -->
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- PAGE POS — DÉPÔT BAR (réception → dépôt → livraison)    -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="page-pos-depot" class="page page-gi">
+      <div class="pos-page gi-page">
+
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#60a5fa,#2563eb)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M3 9l9-6 9 6v11a1 1 0 01-1 1H4a1 1 0 01-1-1z"/><path d="M9 21V12h6v9"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Dépôt Bar</div>
+            <div class="pos-header-sub">Réception → étiquettes → vérification au dépôt → livraison au Bar avant / Bar piscine</div>
+          </div>
+          <div class="pos-header-actions">
+            <button class="pos-btn ghost" onclick="loadPosDepot()" title="Actualiser">↺</button>
+          </div>
+        </div>
+
+        <!-- Étapes du circuit -->
+        <div class="dep-steps" aria-label="Circuit de la marchandise">
+          <span>1 · Réception</span><span>2 · Étiquettes</span><span>3 · Vérification au dépôt</span>
+          <span>4 · Livraison</span><span>5 · Scan des colis</span><span>6 · Bar avant / piscine</span><span>7 · Stocks à jour</span>
+        </div>
+
+        <!-- Scanner (douchette, saisie clavier ou caméra) -->
+        <div class="pos-card dep-scan-card">
+          <div class="pos-card-hdr">Scanner un colis</div>
+          <div class="dep-scan-row">
+            <div class="dep-mode" role="group" aria-label="Que faire du colis scanné">
+              <button class="db-preset active" id="dep-mode-verif" onclick="depSetMode('verif')">Vérifier au dépôt</button>
+              <button class="db-preset" id="dep-mode-livr" onclick="depSetMode('livr')">Ajouter à la livraison</button>
+            </div>
+            <input id="dep-scan-input" class="pos-input" placeholder="Scannez ou tapez le code du colis (ex. BC26000123) puis Entrée"
+                   autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();depScanner(this.value)}">
+            <button class="pos-btn teal" onclick="depScanner(document.getElementById('dep-scan-input').value)">Valider</button>
+            <button class="pos-btn ghost" onclick="depCamera()">📷 Caméra</button>
+          </div>
+          <div id="dep-camera" style="display:none;max-width:360px;margin-top:10px"></div>
+          <div id="dep-scan-retour" class="dep-retour" aria-live="polite"></div>
+        </div>
+
+        <div class="dep-grid">
+          <!-- 1-2. Réceptions -->
+          <div class="pos-card">
+            <div class="pos-card-hdr">Achats à réceptionner <span class="dep-badge" id="dep-nb-achats">0</span></div>
+            <div class="dep-note">Réceptionner un achat crée ses colis (un par caisse) et leurs étiquettes à coller. Le stock n'entre au dépôt qu'au scan de chaque colis.</div>
+            <div id="dep-achats"></div>
+          </div>
+
+          <!-- 3. Colis à vérifier -->
+          <div class="pos-card">
+            <div class="pos-card-hdr">Colis à vérifier au dépôt <span class="dep-badge" id="dep-nb-verif">0</span>
+              <button class="pos-btn ghost" style="margin-left:auto;padding:4px 10px;font-size:12px" onclick="depEtiquettes()">🖨 Étiquettes</button>
+            </div>
+            <div id="dep-colis-verif"></div>
+          </div>
+        </div>
+
+        <!-- 4-7. Livraisons -->
+        <div class="pos-card">
+          <div class="pos-card-hdr">Livraison vers un bar</div>
+          <div id="dep-livr-nouvelle" class="dep-scan-row">
+            <span class="dep-note" style="margin:0">Nouvelle livraison vers :</span>
+            <button class="pos-btn teal" onclick="depNouvelleLivraison('DEVANT')">Bar avant</button>
+            <button class="pos-btn teal" onclick="depNouvelleLivraison('PISCINE')">Bar piscine</button>
+          </div>
+          <div id="dep-livr-courante"></div>
+        </div>
+
+        <!-- Stock par lieu -->
+        <div class="pos-card">
+          <div class="pos-card-hdr">Stock par lieu
+            <input id="dep-stock-recherche" class="pos-input" placeholder="Rechercher…" style="margin-left:auto;max-width:220px;padding:6px 10px" oninput="depRenderStock()">
+          </div>
+          <div class="dep-note">Dépôt + Bar avant + Bar piscine = Total. Un chiffre négatif veut dire qu'un bar a vendu plus que ce qu'il a reçu : faites un inventaire.</div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead><tr><th>Produit</th><th class="tr">Dépôt</th><th class="tr">Bar avant</th><th class="tr">Bar piscine</th><th class="tr">Total</th><th class="tr">À vérifier</th></tr></thead>
+              <tbody id="dep-stock-tbody"><tr><td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Inventaire -->
+        <div class="pos-card">
+          <div class="pos-card-hdr">Inventaire physique</div>
+          <div class="dep-note">Comptez ce qui est réellement présent. Seuls les produits saisis sont ajustés ; l'écart est enregistré avec le motif.</div>
+          <div class="dep-scan-row">
+            <select id="dep-inv-lieu" class="pos-input" style="max-width:200px" onchange="depRenderInventaire()">
+              <option value="DEPOT">Dépôt</option><option value="DEVANT">Bar avant</option><option value="PISCINE">Bar piscine</option>
+            </select>
+            <input id="dep-inv-motif" class="pos-input" placeholder="Motif (ex. inventaire d'ouverture du 20/10)" style="flex:1;min-width:200px">
+            <button class="pos-btn teal" onclick="depEnregistrerInventaire()">Enregistrer l'inventaire</button>
+          </div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead><tr><th>Produit</th><th class="tr">Stock calculé</th><th class="tr">Compté</th></tr></thead>
+              <tbody id="dep-inv-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Historique -->
+        <div class="pos-card">
+          <div class="pos-card-hdr">Livraisons récentes</div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead><tr><th>N°</th><th>Destination</th><th>Statut</th><th class="tr">Lignes</th><th class="tr">Unités</th><th>Validée par</th><th>Date</th></tr></thead>
+              <tbody id="dep-livr-histo"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-pos-depot -->
+
 
     <!-- Modal réception stock -->
     <div class="pos-modal-bg" id="pos-recept-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
@@ -7347,7 +7413,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                   <tr><th>Date</th><th>Jours</th><th>Produit</th><th>Quantité</th><th>Prix marchandise</th><th>Dép. supp.</th><th>Coût total</th><th>Fournisseur</th><th>Statut</th><th></th></tr>
                 </thead>
                 <tbody id="pos-achats-tbody">
-                  <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                  <tr><td colspan="11" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -7854,284 +7920,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div>
 
     <!-- ══════════════════════════════════════════════════════ -->
-    <!-- PAGE POS — COMMANDES                                    -->
-    <!-- ══════════════════════════════════════════════════════ -->
-    <div id="page-pos-commandes" class="page page-gi">
-      <div class="pos-page gi-page">
-
-        <!-- ── Vue Grille ──────────────────────────────────────── -->
-        <div id="pcmd-grille">
-          <div class="pos-header">
-            <div class="pos-header-icon" style="background:linear-gradient(135deg,#60a5fa,#2563eb)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2M8 7V5a2 2 0 0 0-4 0v2"/></svg>
-            </div>
-            <div>
-              <div class="pos-header-title">Tables Bar</div>
-              <div class="pos-header-sub">Gestion des tables en cours</div>
-            </div>
-            <div class="pos-header-actions">
-              <button id="btn-cuisine-new-table" class="pos-btn primary" onclick="pcmdNouvelleTable()">+ Ouvrir une table</button>
-              <button class="pos-btn ghost" onclick="loadPosCommandes()" title="Actualiser">↺</button>
-            </div>
-          </div>
-          <div id="pcmd-empty" style="display:none;text-align:center;padding:60px 20px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="width:52px;height:52px;margin:0 auto 14px;display:block;opacity:.2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2M8 7V5a2 2 0 0 0-4 0v2"/></svg>
-            <div style="font-size:16px;font-weight:600;color:rgba(255,255,255,.3)">Aucune table ouverte</div>
-            <div style="font-size:14px;color:rgba(255,255,255,.18);margin-top:6px">Cliquez sur <b style="color:rgba(255,255,255,.35)">+ Ouvrir une table</b> pour commencer</div>
-          </div>
-          <div id="pcmd-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:4px"></div>
-        </div>
-
-        <!-- ── Vue Détail Table ─────────────────────────────────── -->
-        <div id="pcmd-detail" style="display:none">
-          <div class="pos-header" style="flex-wrap:wrap;gap:10px">
-            <button class="pos-btn ghost" style="padding:6px 14px;font-size:15px" onclick="pcmdRetour()">← Retour</button>
-            <div style="flex:1;min-width:0">
-              <div class="pos-header-title" id="pcmd-detail-titre">Table —</div>
-              <div class="pos-header-sub" id="pcmd-detail-sub">—</div>
-            </div>
-            <div class="pos-header-actions" style="gap:8px">
-              <button class="pos-btn ghost" onclick="pcmdDetailCharger(_pcmdCurrentId)" title="Actualiser">↺</button>
-              <button class="pos-btn" style="background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.2);font-size:14px" onclick="pcmdLiberer()">✗ Libérer</button>
-              <button class="pos-btn primary" onclick="pcmdEncaisserOuvrir()">💳 Encaisser</button>
-            </div>
-          </div>
-          <div class="pos-card" style="margin-bottom:0;overflow:hidden">
-            <div class="pos-card-hdr" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px">
-              <span>Articles de la table</span>
-              <button class="pos-btn ghost" style="font-size:13px;padding:5px 12px" onclick="pcmdAjoutModal()">+ Ajouter un article</button>
-            </div>
-            <div id="pcmd-detail-lignes" style="min-height:60px"></div>
-            <div style="border-top:1px solid rgba(255,255,255,.08);padding:14px 20px;display:flex;justify-content:flex-end;align-items:center;gap:16px">
-              <span style="font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.3)">Total</span>
-              <span style="font-size:25px;font-weight:800;color:#60a5fa" id="pcmd-detail-total">G 0.00</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div><!-- /page-pos-commandes -->
-
-    <!-- ── Modal : Ouvrir une table ──────────────────────────────── -->
-    <div class="pos-modal-bg" id="pcmd-new-bg" onclick="if(event.target===this)this.classList.remove('open')">
-      <div class="pos-modal" style="max-width:400px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 18px">
-          <h3 style="margin:0">Ouvrir une table</h3>
-          <button onclick="document.getElementById('pcmd-new-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:22px;padding:0;line-height:1">✕</button>
-        </div>
-        <label class="pos-label">Numéro / Nom de la table *</label>
-        <input class="pos-input" id="pcmd-new-table" placeholder="Ex : Table 3, Terrasse 1, Bar…" style="margin-bottom:14px"
-          onkeydown="if(event.key==='Enter')pcmdCreerTable()">
-        <label class="pos-label">Responsable (optionnel)</label>
-        <input class="pos-input" id="pcmd-new-client" placeholder="Nom de l'employé ou du client"
-          onkeydown="if(event.key==='Enter')pcmdCreerTable()">
-        <div class="pos-modal-footer" style="margin-top:18px">
-          <button class="pos-btn ghost" onclick="document.getElementById('pcmd-new-bg').classList.remove('open')">Annuler</button>
-          <button class="pos-btn primary" onclick="pcmdCreerTable()">Ouvrir la table</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Modal : Ajouter un article ────────────────────────────── -->
-    <div class="pos-modal-bg" id="pcmd-ajout-bg" onclick="if(event.target===this)this.classList.remove('open')">
-      <div class="pos-modal" style="max-width:540px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 14px">
-          <h3 style="margin:0">Ajouter un article</h3>
-          <button onclick="document.getElementById('pcmd-ajout-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:22px;padding:0;line-height:1">✕</button>
-        </div>
-        <input class="pos-input" id="pcmd-ajout-search" placeholder="Rechercher un produit…"
-          oninput="pcmdAjoutFiltrer(this.value)" style="margin-bottom:12px">
-        <div id="pcmd-ajout-grille" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;max-height:240px;overflow-y:auto;margin-bottom:12px;padding-right:2px"></div>
-        <div id="pcmd-ajout-selbox" style="display:none;background:rgba(96,165,250,.07);border:1px solid rgba(96,165,250,.2);border-radius:10px;padding:12px 14px;margin-bottom:12px">
-          <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Article sélectionné</div>
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-            <div>
-              <div id="pcmd-ajout-nom" style="font-size:16px;font-weight:600">—</div>
-              <div id="pcmd-ajout-prix" style="font-size:14px;color:rgba(255,255,255,.4);margin-top:2px">—</div>
-            </div>
-            <div style="display:flex;align-items:center;gap:10px">
-              <button class="pos-btn ghost" style="width:32px;height:32px;padding:0;font-size:20px;line-height:1;text-align:center" onclick="pcmdAjoutQte(-1)">−</button>
-              <span id="pcmd-ajout-qte" style="min-width:28px;text-align:center;font-size:22px;font-weight:700">1</span>
-              <button class="pos-btn ghost" style="width:32px;height:32px;padding:0;font-size:20px;line-height:1;text-align:center" onclick="pcmdAjoutQte(+1)">+</button>
-            </div>
-          </div>
-        </div>
-        <div class="pos-modal-footer">
-          <button class="pos-btn ghost" onclick="document.getElementById('pcmd-ajout-bg').classList.remove('open')">Annuler</button>
-          <button class="pos-btn primary" id="pcmd-ajout-btn" disabled onclick="pcmdAjouterArticle()">Ajouter à la table</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Modal : Encaisser ─────────────────────────────────────── -->
-    <div class="pos-modal-bg" id="pcmd-enc-bg" onclick="if(event.target===this)this.classList.remove('open')">
-      <div class="pos-modal" style="max-width:400px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 16px">
-          <h3 style="margin:0">Encaisser</h3>
-          <button onclick="document.getElementById('pcmd-enc-bg').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:22px;padding:0;line-height:1">✕</button>
-        </div>
-        <div style="background:rgba(96,165,250,.07);border:1px solid rgba(96,165,250,.18);border-radius:10px;padding:14px;margin-bottom:16px;text-align:center">
-          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.3);margin-bottom:4px">Montant total</div>
-          <div id="pcmd-enc-total-display" style="font-size:31px;font-weight:800;color:#60a5fa">G 0.00</div>
-        </div>
-        <div class="pos-form-row">
-          <div style="flex:1">
-            <label class="pos-label">Mode de paiement</label>
-            <select class="pos-select" id="pcmd-enc-mode" onchange="pcmdEncModeChange()">
-              <option value="CASH">CASH</option>
-              <option value="CREDIT">CRÉDIT</option>
-              <option value="MIXTE">MIXTE</option>
-            </select>
-          </div>
-          <div style="flex:1">
-            <label class="pos-label">Montant remis (G)</label>
-            <input class="pos-input" id="pcmd-enc-paye" type="number" min="0" step="0.01"
-              placeholder="Laisser vide = total exact" oninput="pcmdEncCalcMonnaie()">
-          </div>
-        </div>
-        <div id="pcmd-enc-monnaie-row" style="display:none;margin-top:10px;background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.2);border-radius:8px;padding:10px 14px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:14px;color:rgba(255,255,255,.45)">Monnaie à rendre</span>
-            <span id="pcmd-enc-monnaie" style="font-size:20px;font-weight:700;color:#34d399">G 0.00</span>
-          </div>
-        </div>
-
-        <!-- Section info crédit (visible mode CRÉDIT / MIXTE) -->
-        <div id="pcmd-enc-credit-section" style="display:none;margin-top:14px;border:1px solid rgba(248,113,113,.25);border-radius:10px;padding:14px;background:rgba(248,113,113,.05)">
-          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#f87171;margin-bottom:12px">⚠ Informations crédit client</div>
-          <label class="pos-label">Nom du client *</label>
-          <div style="display:flex;gap:6px;align-items:center;margin-bottom:5px">
-            <input class="pos-input" id="pcmd-enc-client-nom" placeholder="Tapez pour rechercher un client existant…" style="flex:1">
-            <button type="button" title="Ajouter rapidement comme nouveau client" onclick="clientAutocompleteAdd('pcmd-enc-client-nom')" style="flex-shrink:0;width:32px;height:32px;border-radius:7px;background:rgba(63,182,168,.15);border:1px solid rgba(63,182,168,.3);color:#3fb6a8;font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">+</button>
-          </div>
-          <div id="pcmd-enc-client-nom-statut" style="margin-bottom:10px"></div>
-          <div class="pos-form-row" style="margin-bottom:10px">
-            <div style="flex:1">
-              <label class="pos-label">Téléphone</label>
-              <input class="pos-input" id="pcmd-enc-tel" placeholder="Ex : 509-XXXX-XXXX">
-            </div>
-            <div style="flex:1">
-              <label class="pos-label">NIF / Pièce d'identité</label>
-              <input class="pos-input" id="pcmd-enc-nif" placeholder="Numéro d'identité">
-            </div>
-          </div>
-          <label class="pos-label">Date d'échéance (optionnel)</label>
-          <input class="pos-input" id="pcmd-enc-echeance" type="date">
-        </div>
-
-        <div class="pos-modal-footer" style="margin-top:16px">
-          <button class="pos-btn ghost" onclick="document.getElementById('pcmd-enc-bg').classList.remove('open')">Annuler</button>
-          <button class="pos-btn primary" id="pcmd-enc-btn" onclick="pcmdEncaisser()">✓ Confirmer le paiement</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Modal : Reçu ──────────────────────────────────────────── -->
-    <div class="pos-modal-bg" id="pcmd-recu-bg">
-      <div class="pos-modal" style="max-width:400px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 14px">
-          <h3 style="margin:0;color:#34d399">✓ Paiement confirmé</h3>
-          <button onclick="document.getElementById('pcmd-recu-bg').classList.remove('open');pcmdRetour()" style="background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:22px;padding:0;line-height:1">✕</button>
-        </div>
-        <div id="pcmd-recu-body" style="background:#fff;color:#111;border-radius:8px;padding:16px 18px;max-height:420px;overflow-y:auto"></div>
-        <div class="pos-modal-footer" style="margin-top:14px">
-          <button class="pos-btn ghost" onclick="pcmdImprimerRecu()">🖨 Imprimer</button>
-          <button class="pos-btn primary" onclick="document.getElementById('pcmd-recu-bg').classList.remove('open');pcmdRetour()">Fermer &amp; libérer table</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══════════════════════════════════════════════════════ -->
-    <!-- PAGE POS — PAIE BAR                                     -->
-    <!-- ══════════════════════════════════════════════════════ -->
-    <div id="page-pos-paie" class="page page-gi">
-      <div class="pos-page gi-page">
-
-        <div class="pos-header">
-          <div class="pos-header-icon" style="background:linear-gradient(135deg,#fb923c,#ea580c)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0112 0v2"/></svg>
-          </div>
-          <div>
-            <div class="pos-header-title">Paie Bar</div>
-            <div class="pos-header-sub">Paiements employés — Salaires, Avances, Commissions</div>
-          </div>
-          <div class="pos-header-actions">
-            <button class="pos-btn primary" onclick="posPaymentModal()">+ Enregistrer paiement</button>
-          </div>
-        </div>
-
-        <div class="pos-kpi-grid">
-          <div class="pos-kpi"><div class="pos-kpi-label">Total versé (mois)</div><div class="pos-kpi-val" id="pkpi-total">—</div></div>
-          <div class="pos-kpi"><div class="pos-kpi-label">Nb paiements</div><div class="pos-kpi-val amber" id="pkpi-nb">—</div></div>
-        </div>
-
-        <div class="pos-card">
-          <div class="pos-card-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-            <span>Historique des paiements</span>
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,.4);font-weight:400">
-              Période de paie
-              <select class="pos-select" id="pospaie-filtre-periode" style="min-width:180px" onchange="_posRenderPaiements()">
-                <option value="">Toutes</option>
-              </select>
-            </label>
-          </div>
-          <div class="pos-table-wrap">
-            <table class="pos-table">
-              <thead>
-                <tr><th>Employé</th><th>Date</th><th>Type</th><th>Mode</th><th>Période de paie</th><th>Montant</th><th>Notes</th></tr>
-              </thead>
-              <tbody id="pos-paie-tbody">
-                <tr><td colspan="7" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </div>
-    </div><!-- /page-pos-paie -->
-
-    <!-- Modal paiement employé -->
-    <div class="pos-modal-bg" id="pos-pay-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
-      <div class="pos-modal">
-        <h3>Enregistrer un paiement</h3>
-        <div class="pos-form-row">
-          <div><label class="pos-label">Employé *</label>
-            <select class="pos-select" id="pos-pay-emp"></select>
-          </div>
-          <div><label class="pos-label">Type *</label>
-            <select class="pos-select" id="pos-pay-type">
-              <option value="SALAIRE">Salaire</option>
-              <option value="AVANCE">Avance</option>
-              <option value="BONUS">Bonus</option>
-              <option value="COMMISSION">Commission</option>
-            </select>
-          </div>
-        </div>
-        <div class="pos-form-row">
-          <div><label class="pos-label">Montant (G) *</label>
-            <input class="pos-input" id="pos-pay-montant" type="number" min="0.01" step="0.01" placeholder="0.00">
-          </div>
-          <div><label class="pos-label">Mode</label>
-            <select class="pos-select" id="pos-pay-mode">
-              <option value="CASH">Cash</option>
-              <option value="VIREMENT">Virement</option>
-              <option value="CHEQUE">Chèque</option>
-            </select>
-          </div>
-        </div>
-        <div class="pos-form-row">
-          <div><label class="pos-label">Période début</label><input class="pos-input" id="pos-pay-debut" type="date"></div>
-          <div><label class="pos-label">Période fin</label><input class="pos-input" id="pos-pay-fin" type="date"></div>
-        </div>
-        <div><label class="pos-label">Notes</label><input class="pos-input" id="pos-pay-notes" placeholder="Optionnel"></div>
-        <div class="pos-modal-footer">
-          <button class="pos-btn ghost" onclick="document.getElementById('pos-pay-modal-bg').classList.remove('open')">Annuler</button>
-          <button class="pos-btn primary" onclick="posPaymentSauvegarder()">Enregistrer</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══════════════════════════════════════════════════════ -->
     <!-- PAGE POS — RENTABILITÉ                                  -->
     <!-- ══════════════════════════════════════════════════════ -->
     <div id="page-pos-rentabilite" class="page page-gi">
@@ -8432,7 +8220,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 </tr>
               </thead>
               <tbody id="perf-tbody">
-                <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>
+                <tr><td colspan="11" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -8461,7 +8249,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 </tr>
               </thead>
               <tbody id="sc-tbody">
-                <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>
+                <tr><td colspan="11" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -9167,7 +8955,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                   </tr>
                 </thead>
                 <tbody id="ana-tbl-body">
-                  <tr><td colspan="10" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+                  <tr><td colspan="11" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -9715,7 +9503,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               </tr>
             </thead>
             <tbody id="ckac-tbody">
-              <tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">Chargement…</td></tr>
+              <tr><td colspan="11" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">Chargement…</td></tr>
             </tbody>
           </table>
         </div>
@@ -13967,10 +13755,9 @@ const PAGE_META={
   'pos-caisse':        {title: 'Caisse POS',                    sub: 'Bar / Restaurant — Encaissement en temps réel'},
   'pos-produits':      {title: 'Produits Bar',                  sub: 'Catalogue et historique des prix'},
   'pos-stock':         {title: 'Stock Bar',                     sub: 'Mouvements et niveaux de stock'},
+  'pos-depot':         {title: 'Dépôt Bar',                     sub: 'Réception, étiquettes, vérification et livraisons vers les bars'},
   'pos-ventes':        {title: 'Ventes Bar',                    sub: 'Suivi des ventes et encaissements'},
   'pos-credits':       {title: 'Crédits Bar',                   sub: 'Clients à crédit et remboursements'},
-  'pos-commandes':     {title: 'Tables Bar',                    sub: 'Gestion des tables en cours'},
-  'pos-paie':          {title: 'Paie Bar',                      sub: 'Paiements employés du bar'},
   'pos-rentabilite':      {title: 'Rentabilité Bar',            sub: 'CA — Bénéfices — Marges — COGS'},
   'pos-sessions-caisse':  {title: 'Sessions Caissières',        sub: 'Suivi · validation · export des rapports de caisse'},
   'rapports-soumis':      {title: 'Rapports Soumis',            sub: 'Évaluation produit par produit des rapports de caisse'},
@@ -16912,8 +16699,8 @@ function _bandeauEnvironnement(env){
 const _MODULE_PAGES = {
   carburant: ['home','dashboard','saisie','journal','carburant-rapport','rapport-analytique','statistiques',
               'previsions','rapports','stock','gestion','audit','depenses'],
-  bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-stock','pos-achats',
-              'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite',
+  bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-stock','pos-depot','pos-achats',
+              'pos-ventes','pos-credits','pos-rentabilite',
               'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis'],
   hotel:     ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma',
               'hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
@@ -16942,8 +16729,8 @@ const _AREA_PAGES = {
     lecture: ['dashboard','journal','statistiques','gi-dashboard'],
   },
   bar: {
-    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
-    lecture: ['pos-ventes','pos-credits','pos-commandes','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
+    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-stock','pos-depot','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
+    lecture: ['pos-ventes','pos-credits','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
   },
   cuisine: {
     complet: ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse'],
@@ -16973,7 +16760,7 @@ const _CAISSIER_ALLOWED = new Set([
 // Whitelist stricte pour les comptes Manager — Bar/Restaurant + Hôtel (sans Tables, Grande Caisse, Chambres, Réception) + Cuisine complète + Pâtisserie complète.
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
-  'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
+  'pos-stock','pos-depot','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
   'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'patisserie-dashboard','patisserie-produits','patisserie-achats','patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse',
@@ -16985,7 +16772,7 @@ const _MANAGER_ALLOWED = new Set([
 const _AD_ALLOWED = new Set([
   'home',
   'dashboard','journal','carburant-rapport','statistiques','gi-dashboard','depenses','achats','caisse',
-  'pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes',
+  'pos-produits','pos-stock','pos-depot','pos-ventes','pos-credits',
   'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
   'cuisine-plats','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
@@ -16997,11 +16784,11 @@ const _AD_ALLOWED = new Set([
 const _ACCES_POSTE_LEGACY = {
   'Directeur Général': null,
   'Comptable':   ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-stock','pos-depot','pos-ventes','pos-credits','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-stock','pos-depot','pos-ventes','pos-credits','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Pompiste':            ['home','saisie'],
@@ -22314,11 +22101,10 @@ const _giPageLoaders = {
   'pos-caisse':      loadPosCaisse,
   'pos-produits':    loadPosProduits,
   'pos-stock':       loadPosStock,
+  'pos-depot':       loadPosDepot,
   'pos-achats':      loadPosAchats,
   'pos-ventes':      loadPosVentes,
   'pos-credits':     loadPosCredits,
-  'pos-commandes':   loadPosCommandes,
-  'pos-paie':        loadPosPaie,
   'pos-rentabilite':    loadPosRentabilite,
   'pos-grande-caisse':      loadPosGrandeCaisse,
   'pos-analyse':            loadPosAnalyse,
@@ -23938,7 +23724,6 @@ function _clientAcClearSelection(inputId){
 // seulement tapé. Chaque champ client a son propre bouton à synchroniser.
 const _CLIENT_AC_BTN_UPDATERS = {
   'pos-client-nom':      () => { if(typeof _posEncBtnUpdate === 'function') _posEncBtnUpdate(); },
-  'pcmd-enc-client-nom': () => { if(typeof _pcmdEncBtnUpdate === 'function') _pcmdEncBtnUpdate(); },
 };
 function _clientAcNotifyChange(inputId){
   const fn = _CLIENT_AC_BTN_UPDATERS[inputId];
@@ -24051,7 +23836,7 @@ function _clientAcClose(){
 }
 
 (function _clientAcBindInputs(){
-  const bind = () => { ['pos-client-nom','pcmd-enc-client-nom'].forEach(clientAutocompleteInit); };
+  const bind = () => { ['pos-client-nom'].forEach(clientAutocompleteInit); };
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
   else bind();
 })();
@@ -25610,9 +25395,6 @@ function _posRenderProduitsTbody(prods, stockMap){
       <td>
         <div class="gi-actions">
           ${!_isReadOnly() ? `
-          <button class="gi-btn-icon" title="Approvisionner" onclick="posApproModal(${p.id})" style="color:#3fb6a8">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
-          </button>
           <button class="gi-btn-icon" title="Ajuster la quantité en stock (+/-)" onclick="posAjusterStockDepuisProduit(${p.id})" style="color:#f7a93b">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
@@ -25834,120 +25616,6 @@ async function posProduitSauvegarder(){
   } catch(e){ posAlert(e.message||'Erreur.'); }
 }
 
-// ── APPROVISIONNEMENT ────────────────────────────────────────────
-
-function posApproModal(prodId){
-  const p = _posProduitsAll.find(x=>x.id===prodId)||{};
-  document.getElementById('pos-appro-produit-id').value = prodId;
-  document.getElementById('pos-appro-upc').value        = p.unites_par_caisse||1;
-  document.getElementById('pos-appro-is-caisse').value  = p.vendu_par_caisse ? 'true' : 'false';
-  document.getElementById('pos-appro-modal-title').textContent = `Approvisionner — ${p.nom||''}`;
-  document.getElementById('pos-appro-nb-caisses').value  = '0';
-  document.getElementById('pos-appro-nb-vrac').value     = '0';
-  document.getElementById('pos-appro-nb-unite-seul').value = '';
-  document.getElementById('pos-appro-prix-caisse').value  = '';
-  document.getElementById('pos-appro-notes').value        = '';
-  document.getElementById('pos-appro-lieu').value         = '';
-  const caisseSec  = document.getElementById('pos-appro-caisse-section');
-  const uniteSec   = document.getElementById('pos-appro-unite-section');
-  const liveDiv    = document.getElementById('pos-appro-live');
-  const prixLabel  = document.querySelector('#pos-appro-prix-caisse')?.previousElementSibling;
-  if(p.vendu_par_caisse){
-    if(caisseSec) caisseSec.style.display = '';
-    if(uniteSec)  uniteSec.style.display  = 'none';
-    if(prixLabel) prixLabel.textContent = `Prix d'achat / caisse (G)`;
-  } else {
-    if(caisseSec) caisseSec.style.display = 'none';
-    if(uniteSec)  uniteSec.style.display  = '';
-    if(prixLabel) prixLabel.textContent = `Prix d'achat / unité (G)`;
-  }
-  if(liveDiv) liveDiv.style.display = 'none';
-  posApproChargerHistorique(prodId);
-  document.getElementById('pos-appro-modal-bg').classList.add('open');
-}
-
-async function posApproChargerHistorique(prodId){
-  const box = document.getElementById('pos-appro-historique');
-  if(!box) return;
-  box.style.display = 'none';
-  try {
-    const h = await GET(`/pos/produits/${prodId}/dernier-approvisionnement`);
-    if(!h.existe){
-      box.innerHTML = `<em>Aucun approvisionnement enregistré pour ce produit.</em>`;
-      box.style.display = '';
-      return;
-    }
-    const dt = new Date(h.date);
-    const dateTxt = `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()} à ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
-    box.innerHTML = `<strong style="color:var(--text1)">Dernier approvisionnement</strong> — `
-      + `${h.quantite} ${esc(h.unite||'unité(s)')} le ${dateTxt}`
-      + (h.employe_nom ? ` par <strong style="color:var(--text1)">${esc(h.employe_nom)}</strong>` : '');
-    box.style.display = '';
-  } catch(e){ /* silencieux — l'historique est un rappel, pas un bloquant */ }
-}
-
-function posApproModalClose(){
-  document.getElementById('pos-appro-modal-bg').classList.remove('open');
-}
-
-function posApproUpdateLive(){
-  const isCaisse = document.getElementById('pos-appro-is-caisse')?.value === 'true';
-  const liveDiv  = document.getElementById('pos-appro-live');
-  const liveTxt  = document.getElementById('pos-appro-live-txt');
-  if(!liveDiv || !liveTxt) return;
-  if(isCaisse){
-    const upc     = parseInt(document.getElementById('pos-appro-upc')?.value)||1;
-    const caisses = parseInt(document.getElementById('pos-appro-nb-caisses')?.value)||0;
-    const vrac    = parseInt(document.getElementById('pos-appro-nb-vrac')?.value)||0;
-    const total   = caisses * upc + vrac;
-    if(total > 0){
-      liveDiv.style.display = '';
-      const detailCaisse = caisses > 0 ? `${caisses} × ${upc}` : '';
-      const detailVrac   = vrac > 0 ? (caisses > 0 ? ` + ${vrac}` : vrac) : '';
-      liveTxt.innerHTML = `${detailCaisse}${detailVrac} = <strong>${total} unités</strong> seront ajoutées`;
-    } else {
-      liveDiv.style.display = 'none';
-    }
-  } else {
-    const unite = parseInt(document.getElementById('pos-appro-nb-unite-seul')?.value)||0;
-    if(unite > 0){
-      liveDiv.style.display = '';
-      liveTxt.innerHTML = `<strong>${unite} unité${unite>1?'s':''}</strong> seront ajoutées`;
-    } else {
-      liveDiv.style.display = 'none';
-    }
-  }
-}
-
-async function posApproSauvegarder(){
-  const prodId   = parseInt(document.getElementById('pos-appro-produit-id').value);
-  const isCaisse = document.getElementById('pos-appro-is-caisse')?.value === 'true';
-  const prixCaisse = parseFloat(document.getElementById('pos-appro-prix-caisse').value)||null;
-  const notes    = document.getElementById('pos-appro-notes').value.trim()||null;
-  const lieu     = document.getElementById('pos-appro-lieu').value;
-  let nb_caisses = 0, nb_unites_vrac = 0;
-  if(isCaisse){
-    nb_caisses     = parseInt(document.getElementById('pos-appro-nb-caisses').value)||0;
-    nb_unites_vrac = parseInt(document.getElementById('pos-appro-nb-vrac').value)||0;
-  } else {
-    nb_unites_vrac = parseInt(document.getElementById('pos-appro-nb-unite-seul').value)||0;
-  }
-  if(nb_caisses===0 && nb_unites_vrac===0){ posAlert('Saisir au moins 1 caisse ou 1 unité.'); return; }
-  if(!lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine).'); return; }
-  try {
-    const res = await apiFetch('POST',`/pos/produits/${prodId}/approvisionnement`,{
-      nb_caisses, nb_unites_vrac,
-      prix_achat_caisse: prixCaisse,
-      notes, lieu,
-    });
-    posApproModalClose();
-    await loadPosProduits();
-    let msg = `Stock mis à jour : ${res.total_unites_ajoutes} unités ajoutées.`;
-    if(res.caisses_apres != null) msg += ` Nouveau stock : ${res.caisses_apres} caisse(s) + ${res.unites_restantes} u.`;
-    posAlert(msg, 'ok');
-  } catch(e){ posAlert(e.message||'Erreur.'); }
-}
-
 async function posToggleActif(id, actif){
   const p = _posProduitsAll.find(x=>x.id===id)||{};
   try {
@@ -26007,7 +25675,7 @@ let _posStockLieuFiltre  = ''; // '' | 'DEVANT' | 'PISCINE'
 
 async function loadPosStock(){
   const tbody = document.getElementById('pos-stock-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     const [prods, stocks, attente] = await Promise.all([
       apiFetch('GET','/pos/produits?actif=true'),
@@ -26043,7 +25711,7 @@ async function loadPosStock(){
     // Peupler les selects produits pour les modals
     _posFillProduitSelects(prods||[]);
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
 }
 
@@ -26069,6 +25737,7 @@ function _posStockRenderTable(){
     const stock   = parseFloat(s.stock_courant||0);
     const devant  = parseFloat(s.stock_devant||0);
     const piscine = parseFloat(s.stock_piscine||0);
+    const depot   = parseFloat(s.stock_depot||0);
     const cmup  = parseFloat(s.cmup||0);
     const valeur = stock * cmup;
     const alerte = p.seuil_alerte_stock && stock <= p.seuil_alerte_stock;
@@ -26080,6 +25749,7 @@ function _posStockRenderTable(){
     return `<tr${alerte?' style="background:rgba(248,113,113,.06)"':''}>
       <td><strong>${p.nom||'—'}</strong></td>
       <td>${p.categorie||'—'}</td>
+      <td>${fmtQ(depot)}</td>
       <td>${fmtQ(devant)}</td>
       <td>${fmtQ(piscine)}</td>
       <td><strong>${fmtQ(stock)}</strong></td>
@@ -26090,7 +25760,7 @@ function _posStockRenderTable(){
       <td>${(devant!==0||piscine!==0)?`<button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posStockReinitialiser(${p.id},'${esc(p.nom||'')}',${devant},${piscine})">Réinitialiser</button>`:'<span style="color:rgba(255,255,255,.25);font-size:12px">—</span>'}</td>
     </tr>`;
   });
-  tbody.innerHTML = rows.join('') || `<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit ${recherche||_posStockDispoFiltre||_posStockLieuFiltre?'ne correspond aux filtres':'actif'}</td></tr>`;
+  tbody.innerHTML = rows.join('') || `<tr><td colspan="11" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit ${recherche||_posStockDispoFiltre||_posStockLieuFiltre?'ne correspond aux filtres':'actif'}</td></tr>`;
 }
 
 function posStockFiltrer(){ _posStockRenderTable(); }
@@ -26179,7 +25849,7 @@ function _posRenderAttente(achats){
       </div>
       <button onclick="posConfirmerReception(${a.id})"
         style="background:linear-gradient(135deg,#34d399,#059669);border:none;border-radius:9px;color:#fff;font-size:14px;font-weight:700;padding:9px 18px;cursor:pointer;white-space:nowrap;flex-shrink:0">
-        ✓ Confirmer la réception
+        ✓ Réceptionner
       </button>
     </div>`;
   }).join('');
@@ -26188,10 +25858,11 @@ function _posRenderAttente(achats){
 async function posConfirmerReception(achatId){
   const a = (_paAchatsCache||[]).find(x=>x.id===achatId);
   const nom = a?.produit_nom || `Achat #${achatId}`;
-  if(!confirm(`Confirmer l'achat de "${nom}" pour la comptabilité (coût moyen) ?\n\nLe stock n'est PAS mis à jour ici — faites un approvisionnement séparé (Produits Bar) pour ajouter au stock.`)) return;
+  if(!await showConfirm(`Réceptionner l'achat de « ${nom} » ? Les colis et leurs étiquettes seront créés ; le stock entrera au dépôt au scan de chaque colis.`, {title:'Réception', okLabel:'Réceptionner'})) return;
   try {
-    await apiFetch('POST',`/pos/achats/${achatId}/confirmer`,{});
-    posAlert(`Achat confirmé — ${nom}. Pensez à faire l'approvisionnement séparément pour ajouter au stock.`,'ok');
+    const r = await apiFetch('POST',`/pos/achats/${achatId}/confirmer`,{});
+    posAlert(`${nom} réceptionné — ${r.nb_colis} colis à étiqueter et scanner (page Dépôt Bar).`,'ok');
+    if(typeof depEtiquettes === 'function') depEtiquettes(achatId);
     // Rafraîchir aussi la page achats si elle est visible
     if(typeof _paAchatsCache !== 'undefined') loadPosAchats();
   } catch(e){ posAlert(e.message||'Erreur lors de la confirmation.'); }
@@ -26436,7 +26107,7 @@ function _paRenderTable(achats){
   if(!tbody) return;
   if(!achats.length){
     const raw = document.getElementById('pa-recherche')?.value || '';
-    tbody.innerHTML = `<tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">${raw ? `Aucun achat ne correspond à « ${esc(raw)} »` : 'Aucun achat ne correspond aux filtres'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">${raw ? `Aucun achat ne correspond à « ${esc(raw)} »` : 'Aucun achat ne correspond aux filtres'}</td></tr>`;
     return;
   }
   const fmt = v=>`G ${parseFloat(v).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -28282,473 +27953,252 @@ function posHistoVoirRecu(creditId, idx){
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// PAGE POS COMMANDES — GESTION DES TABLES BAR
+// PAGE DÉPÔT BAR — Réception → étiquettes → vérification au dépôt →
+// livraison (scan) → Bar avant / Bar piscine → stocks à jour.
+// API : /api/pos/depot (bar_depot_routes.py)
 // ══════════════════════════════════════════════════════════════════════
-let _pcmdCurrentId    = null;
-let _pcmdCurrentTotal = 0;
-let _pcmdAddProdId    = null;
-let _pcmdAddQte       = 1;
+const _DEP_LIEUX = {DEVANT:'Bar avant', PISCINE:'Bar piscine'};
+let _depMode = 'verif';          // 'verif' (contrôle au dépôt) | 'livr' (ajout à la livraison)
+let _depLivraison = null;        // livraison en préparation affichée
+let _depStock = [];
+let _depCamera = null;
 
-async function loadPosCommandes(){
-  // Toujours revenir à la grille au chargement de la page
-  _pcmdCurrentId = null; _pcmdCurrentTotal = 0;
-  document.getElementById('pcmd-detail').style.display = 'none';
-  document.getElementById('pcmd-grille').style.display  = 'block';
-  if(!_posProduits.length){
-    try { const d = await apiFetch('GET','/pos/produits?actif=true'); _posProduits = d||[]; } catch(_){}
-  }
-  await _pcmdGrilleCharger();
+async function loadPosDepot(){
+  try{
+    const [rec, stock, livs] = await Promise.all([
+      apiFetch('GET','/pos/depot/receptions'),
+      apiFetch('GET','/pos/depot/stock'),
+      apiFetch('GET','/pos/depot/livraisons'),
+    ]);
+    _depStock = stock || [];
+    depRenderReceptions(rec);
+    depRenderStock();
+    depRenderInventaire();
+    depRenderHistorique(livs || []);
+    const enCours = (livs||[]).find(l=>l.statut==='PREPARATION');
+    if(enCours){ _depLivraison = await apiFetch('GET',`/pos/depot/livraisons/${enCours.id}`); }
+    else _depLivraison = null;
+    depRenderLivraison();
+  }catch(e){ posAlert(e.message||'Erreur de chargement du dépôt.'); }
+  setTimeout(()=>document.getElementById('dep-scan-input')?.focus(), 50);
 }
 
-async function _pcmdGrilleCharger(){
-  const cards = document.getElementById('pcmd-cards');
-  const empty = document.getElementById('pcmd-empty');
-  if(cards) cards.innerHTML = '<div style="color:rgba(255,255,255,.28);font-size:15px;padding:24px 0">Chargement…</div>';
-  try {
-    const data = await apiFetch('GET','/pos/commandes');
-    const list = data.commandes||data||[];
-    if(!list.length){
-      if(cards) cards.innerHTML = '';
-      if(empty) empty.style.display = 'block';
-      return;
+function depSetMode(m){
+  _depMode = m;
+  document.getElementById('dep-mode-verif').classList.toggle('active', m==='verif');
+  document.getElementById('dep-mode-livr').classList.toggle('active', m==='livr');
+  document.getElementById('dep-scan-input').focus();
+}
+
+function _depRetour(msg, ok){
+  const el = document.getElementById('dep-scan-retour');
+  el.className = 'dep-retour ' + (ok ? 'ok' : 'err');
+  el.textContent = msg;
+}
+
+async function depScanner(valeur){
+  const inp = document.getElementById('dep-scan-input');
+  const code = (valeur||'').trim();
+  if(!code) return;
+  inp.value = '';
+  try{
+    if(_depMode === 'verif'){
+      const c = await apiFetch('POST','/pos/depot/colis/verifier',{code});
+      _depRetour(`✓ ${c.code} — ${c.produit_nom} : ${c.quantite} ${c.unite||'u.'} entrés au dépôt`
+        + (c.restants_achat ? ` · encore ${c.restants_achat} colis de cet achat à scanner` : ''), true);
+    } else {
+      if(!_depLivraison){ _depRetour('Créez d\'abord une livraison (Bar avant ou Bar piscine).', false); return; }
+      const r = await apiFetch('POST',`/pos/depot/livraisons/${_depLivraison.id}/scan`,{code});
+      _depLivraison = r;
+      _depRetour(`✓ ${r.colis_scanne.code} — ${r.colis_scanne.produit_nom} ajouté à la livraison ${r.numero}`, true);
     }
-    if(empty) empty.style.display = 'none';
-    if(cards) cards.innerHTML = list.map(c=>_pcmdCard(c)).join('');
-  } catch(e){
-    if(cards) cards.innerHTML = `<div style="color:#f87171;padding:20px">${e.message||'Erreur réseau'}</div>`;
-  }
+    await loadPosDepot();
+  }catch(e){ _depRetour('✗ ' + (e.message||'Scan refusé'), false); }
+  inp.focus();
 }
 
-function _pcmdCard(c){
-  const total  = parseFloat(c.total_estime||0);
-  const depuis = _pcmdDepuis(c.date_ouverture);
-  return `
-    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(96,165,250,.2);border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color .15s"
-         onmouseenter="this.style.borderColor='rgba(96,165,250,.5)'"
-         onmouseleave="this.style.borderColor='rgba(96,165,250,.2)'"
-         onclick="pcmdOuvrir(${c.id})">
-      <div style="background:rgba(96,165,250,.07);padding:14px 16px 12px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div style="font-size:22px;font-weight:800;color:#60a5fa">${c.numero_table||'Table'}</div>
-          <span class="pos-badge amber" style="font-size:12px">ACTIVE</span>
-        </div>
-        <div style="font-size:14px;color:rgba(255,255,255,.4);margin-top:3px">${c.client||'—'}</div>
-      </div>
-      <div style="padding:12px 16px 10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-size:14px;color:rgba(255,255,255,.4)">${c.nb_lignes||0} article(s)</span>
-          <span style="font-size:18px;font-weight:700;color:#f0f4ff">${posGx(total)}</span>
-        </div>
-        <div style="font-size:13px;color:rgba(255,255,255,.25)">⏱ Ouverte ${depuis}</div>
-      </div>
-      <div style="padding:8px 12px;background:rgba(96,165,250,.04);border-top:1px solid rgba(255,255,255,.05)">
-        <button class="pos-btn ghost" style="width:100%;font-size:14px" onclick="event.stopPropagation();pcmdOuvrir(${c.id})">Voir / Gérer →</button>
-      </div>
+async function depCamera(){
+  const box = document.getElementById('dep-camera');
+  if(_depCamera){ try{ await _depCamera.stop(); }catch(_){} _depCamera=null; box.style.display='none'; return; }
+  if(typeof Html5Qrcode === 'undefined'){
+    await new Promise((ok, ko)=>{
+      const s = document.createElement('script');
+      s.src = '/vendor/html5-qrcode.min.js'; s.onload = ok; s.onerror = ko;
+      document.head.appendChild(s);
+    }).catch(()=>null);
+  }
+  if(typeof Html5Qrcode === 'undefined'){ posAlert('Lecteur caméra indisponible.'); return; }
+  box.style.display = 'block';
+  _depCamera = new Html5Qrcode('dep-camera');
+  let dernier = '', quand = 0;
+  try{
+    await _depCamera.start({facingMode:'environment'}, {fps:10, qrbox:220}, txt=>{
+      const t = Date.now();
+      if(txt===dernier && t-quand<2500) return;   // évite le double scan du même colis
+      dernier = txt; quand = t;
+      depScanner(txt);
+    });
+  }catch(e){ posAlert('Caméra refusée ou absente : utilisez la douchette ou tapez le code.'); box.style.display='none'; _depCamera=null; }
+}
+
+function depRenderReceptions(rec){
+  const achats = rec.achats_a_receptionner || [];
+  const colis  = rec.colis_a_verifier || [];
+  document.getElementById('dep-nb-achats').textContent = achats.length;
+  document.getElementById('dep-nb-verif').textContent  = colis.length;
+  document.getElementById('dep-achats').innerHTML = achats.length ? achats.map(a=>`
+    <div class="dep-ligne">
+      <div><strong>${esc(a.produit_nom||'?')}</strong> · ${a.quantite} u.
+        <div class="dep-sous">Achat #${a.achat_id} · ${esc(a.fournisseur||'fournisseur non précisé')} · ${(a.date_achat||'').slice(0,10)}
+        ${a.unites_par_caisse ? ` · ${Math.ceil(a.quantite/a.unites_par_caisse)} colis de ${a.unites_par_caisse}` : ' · 1 colis'}</div></div>
+      <button class="pos-btn teal" style="padding:5px 12px;font-size:13px" onclick="depReceptionner(${a.achat_id})">Réceptionner</button>
+    </div>`).join('') : '<div class="dep-vide">Aucun achat en attente.</div>';
+  document.getElementById('dep-colis-verif').innerHTML = colis.length ? colis.slice(0,60).map(c=>`
+    <div class="dep-ligne">
+      <div><span class="dep-code">${esc(c.code)}</span> ${esc(c.produit_nom||'')} · ${c.quantite} ${esc(c.unite||'u.')}
+        <div class="dep-sous">Achat #${c.achat_id||'—'}</div></div>
+      <button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="depAnnulerColis(${c.id},'${esc(c.code)}')">Retirer</button>
+    </div>`).join('') + (colis.length>60?`<div class="dep-sous">… et ${colis.length-60} autres</div>`:'')
+    : '<div class="dep-vide">Tout est vérifié.</div>';
+}
+
+async function depReceptionner(achatId){
+  try{
+    const r = await apiFetch('POST',`/pos/depot/receptions/${achatId}`,{});
+    posAlert(`${r.nb_colis} colis créés — imprimez les étiquettes et collez-les.`,'ok');
+    depEtiquettes(achatId);
+    await loadPosDepot();
+  }catch(e){ posAlert(e.message||'Réception impossible.'); }
+}
+
+async function depEtiquettes(achatId){
+  const url = '/api/pos/depot/etiquettes.pdf' + (achatId ? `?achat_id=${achatId}` : '');
+  const hdrs = {}; const k = sessionStorage.getItem('api_key'); if(k) hdrs['X-API-Key'] = k;
+  try{
+    const res = await fetch(url, {headers:hdrs, credentials:'include'});
+    if(!res.ok){ const e = await res.json().catch(()=>({})); throw new Error(e.detail||'Aucune étiquette'); }
+    const blob = await res.blob();
+    window.open(URL.createObjectURL(blob), '_blank');
+  }catch(e){ posAlert(e.message||'Impression impossible.'); }
+}
+
+async function depAnnulerColis(id, code){
+  if(!await showConfirm(`Retirer le colis ${code} ? (erreur de réception — il ne sera jamais compté)`, {title:'Retirer un colis', type:'danger', okLabel:'Retirer'})) return;
+  try{ await apiFetch('POST',`/pos/depot/colis/${id}/annuler`,{}); await loadPosDepot(); }
+  catch(e){ posAlert(e.message); }
+}
+
+function depRenderStock(){
+  const q = (document.getElementById('dep-stock-recherche')?.value||'').trim().toLowerCase();
+  const f = n => { const v = parseFloat(n||0); return `<span class="${v<0?'c-red':''}">${v.toLocaleString('fr',{maximumFractionDigits:3})}</span>`; };
+  const rows = _depStock.filter(s=>!q || (s.nom||'').toLowerCase().includes(q));
+  document.getElementById('dep-stock-tbody').innerHTML = rows.map(s=>`
+    <tr><td><strong>${esc(s.nom)}</strong> <span class="dep-sous">${esc(s.unite||'')}</span></td>
+      <td class="tr">${f(s.depot)}</td><td class="tr">${f(s.devant)}</td><td class="tr">${f(s.piscine)}</td>
+      <td class="tr"><strong>${f(s.total)}</strong></td><td class="tr">${s.a_verifier?f(s.a_verifier):'—'}</td></tr>`).join('')
+    || '<tr><td colspan="6" style="text-align:center;padding:16px;color:rgba(255,255,255,.3)">Aucun produit</td></tr>';
+}
+
+function depRenderInventaire(){
+  const lieu = document.getElementById('dep-inv-lieu')?.value || 'DEPOT';
+  const cle = {DEPOT:'depot', DEVANT:'devant', PISCINE:'piscine'}[lieu];
+  document.getElementById('dep-inv-tbody').innerHTML = _depStock.map(s=>`
+    <tr><td>${esc(s.nom)}</td><td class="tr">${parseFloat(s[cle]||0).toLocaleString('fr',{maximumFractionDigits:3})}</td>
+      <td class="tr"><input type="number" min="0" step="1" class="pos-input dep-inv-qte" data-pid="${s.produit_id}" style="max-width:110px;text-align:right" placeholder="—"></td></tr>`).join('');
+}
+
+async function depEnregistrerInventaire(){
+  const lieu = document.getElementById('dep-inv-lieu').value;
+  const motif = document.getElementById('dep-inv-motif').value.trim();
+  const lignes = [...document.querySelectorAll('.dep-inv-qte')]
+    .filter(i=>i.value!=='').map(i=>({produit_id:parseInt(i.dataset.pid), quantite:parseFloat(i.value)}));
+  if(!lignes.length){ posAlert('Saisissez au moins une quantité comptée.'); return; }
+  if(motif.length<5){ posAlert('Indiquez le motif de l\'inventaire (5 caractères minimum).'); return; }
+  const nomLieu = lieu==='DEPOT' ? 'du dépôt' : 'du '+_DEP_LIEUX[lieu];
+  if(!await showConfirm(`Enregistrer l'inventaire ${nomLieu} pour ${lignes.length} produit(s) ? Les écarts seront enregistrés comme ajustements.`, {title:'Inventaire', okLabel:'Enregistrer'})) return;
+  try{
+    const r = await apiFetch('POST','/pos/depot/inventaire',{lieu, motif, lignes});
+    posAlert(`Inventaire enregistré — ${r.nb_ajustes} produit(s) ajusté(s).`,'ok');
+    document.getElementById('dep-inv-motif').value = '';
+    await loadPosDepot();
+  }catch(e){ posAlert(e.message); }
+}
+
+async function depNouvelleLivraison(lieu){
+  if(_depLivraison){ posAlert(`La livraison ${_depLivraison.numero} est déjà en préparation : validez-la ou annulez-la d'abord.`); return; }
+  try{
+    _depLivraison = await apiFetch('POST','/pos/depot/livraisons',{lieu});
+    depSetMode('livr');
+    depRenderLivraison();
+    _depRetour(`Livraison ${_depLivraison.numero} vers le ${_DEP_LIEUX[lieu]} : scannez les colis.`, true);
+  }catch(e){ posAlert(e.message); }
+}
+
+function depRenderLivraison(){
+  const box = document.getElementById('dep-livr-courante');
+  document.getElementById('dep-livr-nouvelle').style.display = _depLivraison ? 'none' : '';
+  if(!_depLivraison){ box.innerHTML = ''; return; }
+  const l = _depLivraison;
+  const options = _depStock.filter(s=>s.depot>0).map(s=>`<option value="${s.produit_id}">${esc(s.nom)} (dépôt : ${s.depot})</option>`).join('');
+  box.innerHTML = `
+    <div class="dep-livr-tete"><strong>${esc(l.numero)}</strong> → <strong>${esc(l.lieu_nom)}</strong>
+      · ${l.nb_lignes} ligne(s) · ${l.total_unites} unité(s)</div>
+    <div class="pos-table-wrap"><table class="pos-table">
+      <thead><tr><th>Produit</th><th>Colis</th><th class="tr">Quantité</th><th></th></tr></thead>
+      <tbody>${(l.lignes||[]).map(x=>`<tr><td>${esc(x.produit_nom||'')}</td><td>${x.colis_code?`<span class="dep-code">${esc(x.colis_code)}</span>`:'<em>vrac</em>'}</td>
+        <td class="tr">${x.quantite}</td><td class="tr"><button class="pos-btn ghost" style="padding:2px 8px;font-size:12px" onclick="depRetirerLigne(${x.id})">✕</button></td></tr>`).join('')
+        || '<tr><td colspan="4" style="text-align:center;padding:14px;color:rgba(255,255,255,.35)">Scannez les colis à livrer (mode « Ajouter à la livraison »).</td></tr>'}</tbody>
+    </table></div>
+    <div class="dep-scan-row">
+      <span class="dep-note" style="margin:0">Sans étiquette :</span>
+      <select id="dep-vrac-produit" class="pos-input" style="max-width:260px">${options||'<option value="">Aucun stock en vrac au dépôt</option>'}</select>
+      <input id="dep-vrac-qte" type="number" min="1" step="1" class="pos-input" style="max-width:100px" placeholder="Qté">
+      <button class="pos-btn ghost" onclick="depAjouterVrac()">Ajouter</button>
+    </div>
+    <div class="dep-scan-row" style="justify-content:flex-end">
+      <button class="pos-btn ghost" onclick="depAnnulerLivraison()">Annuler la livraison</button>
+      <button class="pos-btn teal" onclick="depValiderLivraison()">✓ Valider — mettre à jour les stocks</button>
     </div>`;
 }
 
-function _pcmdDepuis(iso){
-  if(!iso) return '—';
-  const m = Math.floor((Date.now()-new Date(iso).getTime())/60000);
-  if(m<1)  return 'à l\'instant';
-  if(m<60) return `il y a ${m} min`;
-  const h=Math.floor(m/60), r=m%60;
-  return r ? `il y a ${h}h${String(r).padStart(2,'0')}` : `il y a ${h}h`;
+async function depAjouterVrac(){
+  const pid = parseInt(document.getElementById('dep-vrac-produit').value);
+  const qte = parseFloat(document.getElementById('dep-vrac-qte').value);
+  if(!pid || !(qte>0)){ posAlert('Choisissez un produit et une quantité.'); return; }
+  try{ _depLivraison = await apiFetch('POST',`/pos/depot/livraisons/${_depLivraison.id}/vrac`,{produit_id:pid, quantite:qte}); depRenderLivraison(); }
+  catch(e){ posAlert(e.message); }
 }
 
-async function pcmdOuvrir(id){
-  _pcmdCurrentId = id;
-  document.getElementById('pcmd-grille').style.display = 'none';
-  document.getElementById('pcmd-detail').style.display = 'block';
-  await pcmdDetailCharger(id);
+async function depRetirerLigne(ligneId){
+  try{ _depLivraison = await apiFetch('DELETE',`/pos/depot/livraisons/${_depLivraison.id}/lignes/${ligneId}`); await loadPosDepot(); }
+  catch(e){ posAlert(e.message); }
 }
 
-function pcmdRetour(){
-  _pcmdCurrentId = null;
-  document.getElementById('pcmd-detail').style.display = 'none';
-  document.getElementById('pcmd-grille').style.display  = 'block';
-  _pcmdGrilleCharger();
+async function depValiderLivraison(){
+  const l = _depLivraison;
+  if(!await showConfirm(`Valider la livraison ${l.numero} vers le ${l.lieu_nom} (${l.total_unites} unités) ? Le stock passe du dépôt au bar.`, {title:'Valider la livraison', okLabel:'Valider'})) return;
+  try{
+    await apiFetch('POST',`/pos/depot/livraisons/${l.id}/valider`,{});
+    posAlert(`Livraison ${l.numero} validée — stocks mis à jour.`,'ok');
+    _depLivraison = null; depSetMode('verif');
+    await loadPosDepot();
+  }catch(e){ posAlert(e.message); }
 }
 
-async function pcmdDetailCharger(id){
-  const lignesDiv = document.getElementById('pcmd-detail-lignes');
-  if(lignesDiv) lignesDiv.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</div>';
-  try {
-    const c = await apiFetch('GET',`/pos/commandes/${id}`);
-    document.getElementById('pcmd-detail-titre').textContent = c.numero_table||'Table';
-    document.getElementById('pcmd-detail-sub').textContent   =
-      `${c.client||'Sans responsable'}  •  Ouverte ${_pcmdDepuis(c.date_ouverture)}`;
-    const total = (c.lignes||[]).reduce((s,l)=>s+parseFloat(l.sous_total||0),0);
-    _pcmdCurrentTotal = total;
-    document.getElementById('pcmd-detail-total').textContent = posGx(total);
-    if(!(c.lignes||[]).length){
-      lignesDiv.innerHTML = '<div style="padding:20px;color:rgba(255,255,255,.3);font-size:15px;text-align:center">Aucun article — Cliquez sur <b>+ Ajouter un article</b></div>';
-    } else {
-      lignesDiv.innerHTML = `<div style="overflow-x:auto"><table class="pos-table" style="margin:0">
-        <thead><tr>
-          <th style="text-align:left;padding-left:16px">Article</th>
-          <th style="text-align:center">Qté</th>
-          <th style="text-align:right">Prix unit.</th>
-          <th style="text-align:right">Sous-total</th>
-          <th></th>
-        </tr></thead>
-        <tbody>
-          ${(c.lignes||[]).map(l=>`<tr>
-            <td style="padding-left:16px;font-weight:500">${l.produit_nom||'—'}</td>
-            <td style="text-align:center">×${Math.round(l.quantite)}</td>
-            <td style="text-align:right;color:rgba(255,255,255,.5)">${posGx(l.prix_unitaire||0)}</td>
-            <td style="text-align:right;font-weight:600">${posGx(l.sous_total||0)}</td>
-            <td style="text-align:center;padding-right:12px">
-              <button class="pos-btn danger" style="padding:2px 8px;font-size:13px;opacity:.65" onclick="pcmdRetirerArticle(${l.id})">✕</button>
-            </td>
-          </tr>`).join('')}
-        </tbody>
-      </table></div>`;
-    }
-  } catch(e){
-    if(lignesDiv) lignesDiv.innerHTML = `<div style="padding:20px;color:#f87171;font-size:15px">${e.message||'Erreur.'}</div>`;
-  }
+async function depAnnulerLivraison(){
+  const l = _depLivraison;
+  if(!await showConfirm(`Annuler la livraison ${l.numero} ? Les colis scannés retournent au dépôt.`, {title:'Annuler la livraison', type:'danger', okLabel:'Annuler la livraison'})) return;
+  try{ await apiFetch('POST',`/pos/depot/livraisons/${l.id}/annuler`,{}); _depLivraison=null; depSetMode('verif'); await loadPosDepot(); }
+  catch(e){ posAlert(e.message); }
 }
 
-// ── Nouvelle table ────────────────────────────────────────────────────
-function pcmdNouvelleTable(){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
-  document.getElementById('pcmd-new-table').value  = '';
-  document.getElementById('pcmd-new-client').value = '';
-  document.getElementById('pcmd-new-bg').classList.add('open');
-  setTimeout(()=>document.getElementById('pcmd-new-table')?.focus(),120);
-}
-
-async function pcmdCreerTable(){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
-  const table  = document.getElementById('pcmd-new-table').value.trim();
-  const client = document.getElementById('pcmd-new-client').value.trim()||null;
-  if(!table){ posAlert('Entrez un numéro ou nom de table.','warn'); return; }
-  try {
-    const r = await apiFetch('POST','/pos/commandes',{ numero_table:table, client, lignes:[] });
-    document.getElementById('pcmd-new-bg').classList.remove('open');
-    posAlert(`Table "${table}" ouverte.`,'ok');
-    await pcmdOuvrir(r.id);
-  } catch(e){ posAlert(e.message||'Erreur.'); }
-}
-
-// ── Ajouter article ───────────────────────────────────────────────────
-function pcmdAjoutModal(){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
-  _pcmdAddProdId = null; _pcmdAddQte = 1;
-  const searchEl = document.getElementById('pcmd-ajout-search');
-  if(searchEl) searchEl.value = '';
-  document.getElementById('pcmd-ajout-selbox').style.display = 'none';
-  const btn = document.getElementById('pcmd-ajout-btn');
-  if(btn) btn.disabled = true;
-  pcmdAjoutFiltrer('');
-  document.getElementById('pcmd-ajout-bg').classList.add('open');
-  setTimeout(()=>searchEl?.focus(),120);
-}
-
-function pcmdAjoutFiltrer(q){
-  const grille = document.getElementById('pcmd-ajout-grille');
-  if(!grille) return;
-  const filtre = q.toLowerCase().trim();
-  const prods  = _posProduits.filter(p=>!filtre||p.nom.toLowerCase().includes(filtre));
-  if(!prods.length){
-    grille.innerHTML = '<div style="padding:16px;color:rgba(255,255,255,.3);font-size:14px;grid-column:1/-1;text-align:center">Aucun produit trouvé</div>';
-    return;
-  }
-  grille.innerHTML = prods.map(p=>`
-    <div id="pap-${p.id}"
-         data-nom="${(p.nom||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')}"
-         onclick="pcmdAjoutSelectionner(${p.id},this.dataset.nom,${p.prix_actif||0})"
-         style="background:rgba(255,255,255,.04);border:2px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 8px;cursor:pointer;text-align:center;transition:border-color .12s"
-         onmouseenter="this.style.borderColor='rgba(96,165,250,.4)'"
-         onmouseleave="this.style.borderColor=(_pcmdAddProdId===${p.id}?'rgba(96,165,250,.55)':'rgba(255,255,255,.07)')">
-      <div style="font-size:14px;font-weight:700;line-height:1.3;margin-bottom:4px">${p.nom}</div>
-      <div style="font-size:13px;color:rgba(255,255,255,.4)">${posGx(p.prix_actif||0)}</div>
-    </div>`).join('');
-}
-
-function pcmdAjoutSelectionner(id, nom, prix){
-  _pcmdAddProdId = id; _pcmdAddQte = 1;
-  document.getElementById('pcmd-ajout-qte').textContent  = '1';
-  document.getElementById('pcmd-ajout-nom').textContent  = nom;
-  document.getElementById('pcmd-ajout-prix').textContent = posGx(prix)+' / unité';
-  document.getElementById('pcmd-ajout-selbox').style.display = 'block';
-  document.getElementById('pcmd-ajout-btn').disabled = false;
-  document.querySelectorAll('[id^="pap-"]').forEach(el=>el.style.borderColor='rgba(255,255,255,.07)');
-  const el = document.getElementById(`pap-${id}`);
-  if(el) el.style.borderColor = 'rgba(96,165,250,.55)';
-}
-
-function pcmdAjoutQte(delta){
-  _pcmdAddQte = Math.max(1,(_pcmdAddQte||1)+delta);
-  document.getElementById('pcmd-ajout-qte').textContent = _pcmdAddQte;
-}
-
-async function pcmdAjouterArticle(){
-  if(!_pcmdAddProdId||!_pcmdCurrentId){ posAlert('Sélectionnez un article.','warn'); return; }
-  try {
-    await apiFetch('POST',`/pos/commandes/${_pcmdCurrentId}/lignes`,{ produit_id:_pcmdAddProdId, quantite:_pcmdAddQte });
-    document.getElementById('pcmd-ajout-bg').classList.remove('open');
-    await pcmdDetailCharger(_pcmdCurrentId);
-    posAlert('Article ajouté à la table.','ok');
-  } catch(e){ posAlert(e.message||'Erreur.'); }
-}
-
-async function pcmdRetirerArticle(ligneId){
-  if(!_pcmdCurrentId) return;
-  try {
-    await apiFetch('DELETE',`/pos/commandes/${_pcmdCurrentId}/lignes/${ligneId}`);
-    await pcmdDetailCharger(_pcmdCurrentId);
-  } catch(e){ posAlert(e.message||'Erreur.'); }
-}
-
-// ── Libérer table ─────────────────────────────────────────────────────
-async function pcmdLiberer(){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
-  if(!_pcmdCurrentId) return;
-  if(_pcmdCurrentTotal > 0){
-    posAlert('Cette table a des articles non encaissés. Veuillez encaisser avant de libérer.','warn');
-    return;
-  }
-  if(!confirm('Aucun article sur cette table. Confirmer la libération ?')) return;
-  try {
-    await apiFetch('DELETE',`/pos/commandes/${_pcmdCurrentId}`);
-    posAlert('Table libérée.','ok');
-    pcmdRetour();
-  } catch(e){ posAlert(e.message||'Erreur.'); }
-}
-
-// ── Encaisser ─────────────────────────────────────────────────────────
-function pcmdEncaisserOuvrir(){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
-  if(!_pcmdCurrentId){ posAlert('Aucune table sélectionnée.'); return; }
-  if(_pcmdCurrentTotal<=0){ posAlert('Ajoutez des articles avant d\'encaisser.','warn'); return; }
-  document.getElementById('pcmd-enc-total-display').textContent = posGx(_pcmdCurrentTotal);
-  document.getElementById('pcmd-enc-paye').value  = '';
-  document.getElementById('pcmd-enc-mode').value  = 'CASH';
-  document.getElementById('pcmd-enc-monnaie-row').style.display = 'none';
-  document.getElementById('pcmd-enc-credit-section').style.display = 'none';
-  document.getElementById('pcmd-enc-client-nom').value = '';
-  _clientAcClearSelection('pcmd-enc-client-nom');
-  document.getElementById('pcmd-enc-tel').value        = '';
-  document.getElementById('pcmd-enc-nif').value        = '';
-  document.getElementById('pcmd-enc-echeance').value   = '';
-  document.getElementById('pcmd-enc-bg').classList.add('open');
-  _pcmdEncBtnUpdate();
-}
-
-function pcmdEncModeChange(){
-  const mode    = document.getElementById('pcmd-enc-mode').value;
-  const credit  = document.getElementById('pcmd-enc-credit-section');
-  const monnaie = document.getElementById('pcmd-enc-monnaie-row');
-  if(mode==='CREDIT'){
-    document.getElementById('pcmd-enc-paye').value = '0';
-    monnaie.style.display='none';
-  }
-  if(credit) credit.style.display = (mode==='CREDIT'||mode==='MIXTE') ? 'block' : 'none';
-  _pcmdEncBtnUpdate();
-}
-
-// Confirmer le paiement n'est cliquable que si le mode n'est pas CRÉDIT, ou
-// si un client a été explicitement sélectionné/ajouté pour ce crédit.
-function _pcmdEncBtnUpdate(){
-  const btn = document.getElementById('pcmd-enc-btn');
-  if(!btn) return;
-  const mode = document.getElementById('pcmd-enc-mode')?.value;
-  const clientInp = document.getElementById('pcmd-enc-client-nom');
-  const needsClient = mode === 'CREDIT';
-  const hasClient = !!(clientInp && clientInp.dataset.clientId);
-  btn.disabled = needsClient && !hasClient;
-}
-
-function pcmdEncCalcMonnaie(){
-  const paye = parseFloat(document.getElementById('pcmd-enc-paye').value||0)||0;
-  const row  = document.getElementById('pcmd-enc-monnaie-row');
-  const mEl  = document.getElementById('pcmd-enc-monnaie');
-  if(paye>_pcmdCurrentTotal&&_pcmdCurrentTotal>0){
-    row.style.display='block';
-    mEl.textContent = posGx(paye-_pcmdCurrentTotal);
-  } else {
-    row.style.display='none';
-  }
-}
-
-async function pcmdEncaisser(){
-  if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
-  const mode = document.getElementById('pcmd-enc-mode').value;
-  const paye = parseFloat(document.getElementById('pcmd-enc-paye').value||0)||null;
-  const body = { mode_paiement: mode, montant_paye: paye };
-  if(mode==='CREDIT'||mode==='MIXTE'){
-    const clientInp = document.getElementById('pcmd-enc-client-nom');
-    const nom = clientInp.value.trim();
-    const clientIdVal = clientInp.dataset.clientId ? parseInt(clientInp.dataset.clientId) : null;
-    if(!nom){ posAlert('Le nom du client est requis pour un crédit.','warn'); return; }
-    if(mode==='CREDIT' && !clientIdVal){
-      posAlert('Sélectionnez un client dans la liste (ou ajoutez-le avec le bouton +) avant de valider un crédit.', 'warn'); return;
-    }
-    if(mode==='CREDIT' && clientInp.dataset.clientStatut === 'NON_ELIGIBLE'){
-      posAlert(`Client « ${nom} » non éligible au crédit — vente refusée.`, 'err'); return;
-    }
-    body.client_nom    = nom;
-    body.client_id     = clientInp.dataset.clientId ? parseInt(clientInp.dataset.clientId) : null;
-    body.client_contact= document.getElementById('pcmd-enc-tel').value.trim()||null;
-    body.client_nif    = document.getElementById('pcmd-enc-nif').value.trim()||null;
-    const ech = document.getElementById('pcmd-enc-echeance').value;
-    if(ech) body.date_echeance = ech;
-  }
-  try {
-    const r = await apiFetch('PUT',`/pos/commandes/${_pcmdCurrentId}/encaisser`, body);
-    document.getElementById('pcmd-enc-bg').classList.remove('open');
-    _pcmdAfficherRecu(r);
-  } catch(e){ posAlert(e.message||'Erreur.'); }
-}
-
-function _pcmdAfficherRecu(r){
-  const total   = parseFloat(r.montant_total||0);
-  const paye    = parseFloat(r.montant_paye||0);
-  const restant = parseFloat(r.montant_restant||0);
-  const monnaie = (paye>total&&total>0) ? paye-total : 0;
-  const dateStr  = posFormatDate(r.date_heure);
-  const heureStr = posFormatHeure(r.date_heure);
-  const ticket    = r.numero_ticket||'—';
-  const mode      = r.mode_paiement||'CASH';
-  const tableName = document.getElementById('pcmd-detail-titre')?.textContent||'';
-
-  const extras = tableName ? [['Table', tableName]] : [];
-
-  const lignesHTML = (r.lignes||[]).map(l=>`
-    <tr>
-      <td style="padding:3px 2px;font-size:13px">${l.produit_nom||'—'}</td>
-      <td style="padding:3px 2px;text-align:center;font-size:13px;white-space:nowrap">×${Math.round(l.quantite||1)}</td>
-      <td style="padding:3px 2px;text-align:right;font-size:13px;white-space:nowrap">${posGx(l.sous_total||0)}</td>
-    </tr>`).join('');
-
-  const html = `
-  ${_posRecuHeaderHTML(ticket, dateStr, heureStr, extras)}
-  <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:4px">Articles commandés</div>
-  <table>
-    <thead><tr>
-      <th style="font-size:12px;text-align:left;color:#aaa;font-weight:600;padding:2px">Article</th>
-      <th style="font-size:12px;text-align:center;color:#aaa;font-weight:600;padding:2px">Qté</th>
-      <th style="font-size:12px;text-align:right;color:#aaa;font-weight:600;padding:2px">Montant</th>
-    </tr></thead>
-    <tbody>${lignesHTML||'<tr><td colspan="3" style="color:#bbb;padding:4px 2px">—</td></tr>'}</tbody>
-  </table>
-  <hr class="sep">
-  <table>
-    <tr><td style="font-size:15px;font-weight:700;padding:2px 0">TOTAL</td><td style="font-size:15px;font-weight:700;text-align:right;padding:2px 0">${posGx(total)}</td></tr>
-    ${mode!=='CREDIT'?`<tr><td style="font-size:13px;color:#555;padding:2px 0">Montant reçu</td><td style="font-size:13px;text-align:right;padding:2px 0">${posGx(paye||total)}</td></tr>`:''}
-    ${monnaie>0?`<tr><td style="font-size:14px;font-weight:700;color:#16a34a;padding:3px 0">Monnaie rendue</td><td style="font-size:14px;font-weight:700;color:#16a34a;text-align:right;padding:3px 0">${posGx(monnaie)}</td></tr>`:''}
-    ${restant>0?`<tr><td style="font-size:14px;font-weight:600;color:#dc2626;padding:2px 0">Reste à payer</td><td style="font-size:14px;font-weight:600;color:#dc2626;text-align:right;padding:2px 0">${posGx(restant)}</td></tr>`:''}
-    ${mode==='CREDIT'?`<tr><td colspan="2" style="font-size:13px;color:#dc2626;text-align:center;padding:6px 0;font-weight:600">Mode : CRÉDIT</td></tr>`:''}
-    ${mode==='MIXTE'?`<tr><td colspan="2" style="font-size:13px;color:#d97706;text-align:center;padding:6px 0;font-weight:600">Mode : MIXTE</td></tr>`:''}
-  </table>
-  ${_posRecuPiedHTML()}`;
-
-  document.getElementById('pcmd-recu-body').innerHTML = html;
-  document.getElementById('pcmd-recu-bg').classList.add('open');
-}
-
-function pcmdImprimerRecu(){
-  const html = document.getElementById('pcmd-recu-body')?.innerHTML||'';
-  _posOuvrirImprimer(html, `Ticket ${_branding.nom}`);
-}
-
-// ══════════════════════════════════════════════════════════════════════
-// PAGE POS PAIE BAR
-// ══════════════════════════════════════════════════════════════════════
-async function loadPosPaie(){
-  await _posChargerEmployesPay();
-  await _posChargerPaiements();
-}
-
-async function _posChargerEmployesPay(){
-  try {
-    const data = await apiFetch('GET','/employes');
-    const emps = data.employes||data||[];
-    const sel = document.getElementById('pos-pay-emp');
-    if(sel) sel.innerHTML = emps.map(e=>`<option value="${e.id}">${e.nom_complet||e.nom||'Employé '+e.id}</option>`).join('');
-  } catch(e){}
-}
-
-let _posPaieData = [];
-async function _posChargerPaiements(){
-  const tbody = document.getElementById('pos-paie-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
-  try {
-    const data = await apiFetch('GET','/pos/paiements-employes');
-    _posPaieData = data.paiements||data||[];
-    _posPopulatePaiePeriodes();
-    _posRenderPaiements();
-  } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
-  }
-}
-
-function _posPopulatePaiePeriodes(){
-  const sel = document.getElementById('pospaie-filtre-periode');
-  if(!sel) return;
-  const cur = sel.value;
-  const seen = new Set(); const pairs = [];
-  (_posPaieData||[]).forEach(p=>{
-    if(!p.periode_debut && !p.periode_fin) return;
-    const k = (p.periode_debut||'')+'|'+(p.periode_fin||'');
-    if(!seen.has(k)){ seen.add(k); pairs.push({k, d:p.periode_debut||'', f:p.periode_fin||''}); }
-  });
-  pairs.sort((a,b)=> String(b.d).localeCompare(String(a.d)));
-  sel.innerHTML = '<option value="">Toutes</option>' +
-    pairs.map(p=>`<option value="${p.k}">${p.d?frDate(p.d):'?'} → ${p.f?frDate(p.f):'?'}</option>`).join('');
-  if(cur && seen.has(cur)) sel.value = cur;
-}
-
-function _posRenderPaiements(){
-  const tbody = document.getElementById('pos-paie-tbody');
-  const per = document.getElementById('pospaie-filtre-periode')?.value || '';
-  const pays = !per ? (_posPaieData||[])
-    : (_posPaieData||[]).filter(p=> ((p.periode_debut||'')+'|'+(p.periode_fin||'')) === per);
-  let total = 0;
-  pays.forEach(p=>{ total += parseFloat(p.montant||0); });
-  const kt=document.getElementById('pkpi-total'); if(kt) kt.textContent=posGx(total);
-  const kn=document.getElementById('pkpi-nb');    if(kn) kn.textContent=pays.length;
-  if(!tbody) return;
-  if(!pays.length){
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun paiement</td></tr>';
-    return;
-  }
-  tbody.innerHTML = pays.map(p=>`<tr>
-    <td>${p.employe_nom||'—'}</td>
-    <td>${posDateFr(p.date_paiement||p.created_at)}</td>
-    <td>${p.type_paiement||'—'}</td>
-    <td>${p.mode||'—'}</td>
-    <td>${(p.periode_debut||p.periode_fin) ? (p.periode_debut?frDate(p.periode_debut):'?')+' → '+(p.periode_fin?frDate(p.periode_fin):'?') : '—'}</td>
-    <td>${posGx(p.montant)}</td>
-    <td>${p.notes||'—'}</td>
-  </tr>`).join('');
-}
-
-function posPaymentModal(){
-  document.getElementById('pos-pay-montant').value='';
-  document.getElementById('pos-pay-notes').value='';
-  document.getElementById('pos-pay-debut').value='';
-  document.getElementById('pos-pay-fin').value='';
-  document.getElementById('pos-pay-modal-bg').classList.add('open');
-}
-
-async function posPaymentSauvegarder(){
-  const empId  = document.getElementById('pos-pay-emp').value;
-  const type   = document.getElementById('pos-pay-type').value;
-  const mode   = document.getElementById('pos-pay-mode').value;
-  const montant= parseFloat(document.getElementById('pos-pay-montant').value||0);
-  const debut  = document.getElementById('pos-pay-debut').value||null;
-  const fin    = document.getElementById('pos-pay-fin').value||null;
-  const notes  = document.getElementById('pos-pay-notes').value.trim()||null;
-  if(!empId||montant<=0){ posAlert('Employé et montant requis.'); return; }
-  try {
-    await apiFetch('POST','/pos/paiements-employes',{ employe_id:parseInt(empId), type_paiement:type, mode, montant, periode_debut:debut, periode_fin:fin, notes });
-    document.getElementById('pos-pay-modal-bg').classList.remove('open');
-    await _posChargerPaiements();
-    posAlert('Paiement enregistré.','ok');
-  } catch(e){ posAlert(e.message||'Erreur.'); }
+function depRenderHistorique(livs){
+  const st = {PREPARATION:'En préparation', VALIDEE:'Validée', ANNULEE:'Annulée'};
+  document.getElementById('dep-livr-histo').innerHTML = livs.slice(0,30).map(l=>`
+    <tr><td>${esc(l.numero)}</td><td>${esc(l.lieu_nom)}</td><td>${st[l.statut]||l.statut}</td>
+      <td class="tr">${l.nb_lignes}</td><td class="tr">${l.total_unites}</td><td>${esc(l.valide_par||'—')}</td>
+      <td>${(l.valide_le||l.cree_le||'').slice(0,16).replace('T',' ')}</td></tr>`).join('')
+    || '<tr><td colspan="7" style="text-align:center;padding:14px;color:rgba(255,255,255,.3)">Aucune livraison</td></tr>';
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -29073,7 +28523,7 @@ async function loadPosAnalyse(){
 
 async function anaChargerTableau(){
   const tbody = document.getElementById('ana-tbl-body');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
 
   try {
     const data = await apiFetch('GET', '/pos/analyse/tableau');
@@ -29103,7 +28553,7 @@ async function anaChargerTableau(){
 
     anaTblAfficher();
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="10" style="padding:24px;text-align:center;color:#f87171">${e.message || 'Erreur réseau'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="11" style="padding:24px;text-align:center;color:#f87171">${e.message || 'Erreur réseau'}</td></tr>`;
   }
 }
 
@@ -29141,7 +28591,7 @@ function anaTblAfficher(){
   });
 
   if(!arts.length){
-    tbody.innerHTML = '<tr><td colspan="10" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucun article trouvé</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucun article trouvé</td></tr>';
     return;
   }
 
@@ -29609,7 +29059,7 @@ function scAujourdhui(){
 
 async function scCharger(){
   const tbody = document.getElementById('sc-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     const caissier = document.getElementById('sc-filtre-caissier')?.value||'';
     const statut   = document.getElementById('sc-filtre-statut')?.value||'';
@@ -29638,7 +29088,7 @@ async function scCharger(){
     if(lbl) lbl.textContent = `${nb} session${nb!==1?'s':''}`;
 
     if(!nb){
-      if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:24px">Aucune session</td></tr>';
+      if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:rgba(255,255,255,.3);padding:24px">Aucune session</td></tr>';
       return;
     }
 
@@ -29683,7 +29133,7 @@ async function scCharger(){
 
   } catch(e){
     const tbody = document.getElementById('sc-tbody');
-    if(tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur'}</td></tr>`;
   }
 }
 
@@ -30226,7 +29676,7 @@ async function perfCharger(){
   const chart  = document.getElementById('perf-chart');
   const Gx = v => posGx(v);
   if(cards) cards.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:15px;padding:32px;text-align:center;grid-column:1/-1">Chargement…</div>';
-  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>';
   if(chart) chart.innerHTML = '<div style="color:rgba(255,255,255,.2);font-size:14px;padding:16px;text-align:center">Chargement…</div>';
 
   try {
@@ -30248,7 +29698,7 @@ async function perfCharger(){
 
     if(!caissiers.length){
       if(cards) cards.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:15px;padding:32px;text-align:center;grid-column:1/-1">Aucune caissière ou administrateur actif.</div>';
-      if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Aucune donnée</td></tr>';
+      if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Aucune donnée</td></tr>';
       if(chart) chart.innerHTML = '';
       return;
     }
@@ -30353,7 +29803,7 @@ async function perfCharger(){
   } catch(e){
     var errMsg = (e && e.message) || 'Erreur chargement';
     if(cards) cards.innerHTML = '<div style="color:#f87171;padding:24px;text-align:center;grid-column:1/-1">'+errMsg+'</div>';
-    if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="color:#f87171;text-align:center;padding:24px">'+errMsg+'</td></tr>';
+    if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="color:#f87171;text-align:center;padding:24px">'+errMsg+'</td></tr>';
     if(chart) chart.innerHTML = '';
   }
 }
@@ -31368,7 +30818,7 @@ async function ckAchatsCharger(){
     _ckAchatsData = d.achats || [];
     ckAchatsAppliquerRecherche();
   } catch(e){
-    tbody.innerHTML = `<tr><td colspan="10" style="color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" style="color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
 }
 
@@ -31396,7 +30846,7 @@ function ckAchatsAppliquerRecherche(){
 
   if(!achats.length){
     const raw = document.getElementById('ckac-recherche')?.value || '';
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">${raw ? `Aucun achat ne correspond à « ${esc(raw)} »` : 'Aucun achat sur cette période'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">${raw ? `Aucun achat ne correspond à « ${esc(raw)} »` : 'Aucun achat sur cette période'}</td></tr>`;
     return;
   }
   tbody.innerHTML = achats.map(a=>`

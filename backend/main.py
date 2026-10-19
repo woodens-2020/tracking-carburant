@@ -35,6 +35,7 @@ from activity_log import (
     ADMIN_CODE_REQUESTED, ADMIN_CODE_VERIFIED, ADMIN_CODE_FAILED,
 )
 from pos_routes import router as pos_router
+from bar_depot_routes import router as bar_depot_router
 from pos_analyse_routes import router as pos_analyse_router
 from caisse_routes import router as caisse_router
 from hotel_routes import router as hotel_router
@@ -250,6 +251,7 @@ app.add_middleware(AuthMiddleware)
 
 # Module POS bar/restaurant
 app.include_router(pos_router)
+app.include_router(bar_depot_router)
 app.include_router(pos_analyse_router)
 app.include_router(caisse_router)
 app.include_router(hotel_router)

@@ -468,6 +468,20 @@ def _migrate_columns():
             except Exception:
                 conn.rollback()  # déjà présente
 
+        # v27 — dépôt bar : nouveau type de mouvement TRANSFERT (dépôt → bar).
+        with engine.connect() as conn:
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE bar_mouvements_stock DROP CONSTRAINT IF EXISTS chk_bar_mouv_type"
+                ))
+                conn.execute(sql_text(
+                    "ALTER TABLE bar_mouvements_stock ADD CONSTRAINT chk_bar_mouv_type CHECK "
+                    "(type_mouvement IN ('ENTREE','SORTIE_VENTE','AJUSTEMENT','PERTE','CASSE','TRANSFERT'))"
+                ))
+                conn.commit()
+            except Exception:
+                conn.rollback()  # SQLite : contrainte définie par le modèle
+
         # v25 — lieu (Bar Devant / Bar Piscine) sur le catalogue d'articles bar :
         # même contrainte de domaine que chk_session_lieu / chk_bar_mouv_lieu.
         with engine.connect() as conn:

@@ -9,6 +9,8 @@ Règles fondamentales (non négociables) :
 """
 from __future__ import annotations
 
+import os
+
 from datetime import date as date_type
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -218,6 +220,16 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     lignes_traitees = []
     erreurs = []
 
+    # Contrôle du stock au bar de la session (Bar avant / Bar piscine) :
+    # actif seulement si BAR_STOCK_PAR_LIEU=true, après l'inventaire
+    # d'ouverture des bars — sinon le stock global est contrôlé (historique).
+    lieu_controle = None
+    if os.getenv("BAR_STOCK_PAR_LIEU", "false").lower() == "true" and data.get("caissier_id"):
+        sess = (db.query(BarSessionCaisse)
+                .filter_by(caissier_id=data["caissier_id"], date_session=today_haiti(), statut="EN_COURS")
+                .first())
+        lieu_controle = sess.lieu if sess else None
+
     for l in lignes_input:
         qte = _dec(l["quantite"])
 
@@ -253,11 +265,17 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
             erreurs.append(f"Aucun prix défini pour « {produit.nom} ».")
             continue
 
-        stk = stock_courant(pid, db)
+        if lieu_controle:
+            stk = stock_courant(pid, db, lieu=lieu_controle)
+            ou = " au Bar avant" if lieu_controle == "DEVANT" else " au Bar piscine"
+        else:
+            stk = stock_courant(pid, db)
+            ou = ""
         if stk < qte:
             erreurs.append(
-                f"Stock insuffisant pour « {produit.nom} » "
+                f"Stock insuffisant{ou} pour « {produit.nom} » "
                 f"(disponible : {float(stk):.3f}, demandé : {float(qte):.3f})."
+                + (" Faites livrer ce produit depuis le dépôt." if lieu_controle else "")
             )
             continue
 
@@ -468,39 +486,6 @@ def annuler_vente(vente_id: int, db: Session, utilisateur_id: int | None = None)
     return vente
 
 
-def encaisser_commande(commande_id: int, data: dict,
-                       db: Session, utilisateur_id: int | None = None) -> BarVente:
-    """
-    Transforme une commande ouverte en vente encaissée.
-    Les lignes de la commande deviennent les lignes de la vente.
-    """
-    commande = db.query(BarCommande).filter_by(id=commande_id).first()
-    if not commande:
-        raise ValueError(f"Commande #{commande_id} introuvable.")
-    if commande.statut in ("ENCAISSEE", "ANNULEE"):
-        raise ValueError(f"Commande #{commande_id} déjà {commande.statut.lower()}.")
-
-    vente_data = {
-        "lignes": [
-            {"produit_id": l.produit_id, "quantite": float(l.quantite)}
-            for l in commande.lignes
-        ],
-        "caissier_id":    commande.caissier_id,
-        "mode_paiement":  data.get("mode_paiement", "CASH"),
-        "montant_paye":   data.get("montant_paye"),
-        "client_nom":     data.get("client_nom") or commande.client,
-        "client_id":      data.get("client_id"),
-        "client_contact": data.get("client_contact"),
-        "client_nif":     data.get("client_nif"),
-        "date_echeance":  data.get("date_echeance"),
-    }
-    vente = encaisser_vente(vente_data, db, utilisateur_id)
-
-    commande.statut = "ENCAISSEE"
-    db.commit()
-    return vente
-
-
 # ──────────────────────────────────────────────────────────────────
 # Détection d'anomalies bar
 # ──────────────────────────────────────────────────────────────────
@@ -602,6 +587,26 @@ def detecter_anomalies_bar(date_cible: date_type, db: Session) -> list[dict]:
 
     if credits_retard:
         db.commit()
+
+    # Stock négatif dans un bar : il a vendu plus que ce que le dépôt lui a
+    # livré (livraison oubliée ou inventaire à refaire). Un message par bar.
+    noms = {p.id: p.nom for p in db.query(BarProduit).filter(BarProduit.actif.is_(True)).all()}
+    par_lieu = stock_par_lieu_tous_produits(db)
+    for cle, lieu_nom in (("devant", "Bar avant"), ("piscine", "Bar piscine")):
+        negatifs = sorted(noms[pid] for pid, st in par_lieu.items() if pid in noms and st[cle] < 0)
+        if negatifs:
+            anomalies.append({
+                "type":     "STOCK_NEGATIF_BAR",
+                "gravite":  "erreur",
+                "nom":      lieu_nom,
+                "date":     str(date_cible),
+                "nb_produits": len(negatifs),
+                "message": (
+                    f"{lieu_nom} : {len(negatifs)} produit(s) en stock négatif ("
+                    + ", ".join(negatifs[:8]) + ("…" if len(negatifs) > 8 else "")
+                    + "). Livrez-les depuis le dépôt ou faites l'inventaire du bar."
+                ),
+            })
 
     return anomalies
 

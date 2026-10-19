@@ -30,7 +30,7 @@ from pos_service import (
     stock_courant, stock_tous_produits, stock_par_lieu_tous_produits,
     prix_actif, cmup, cmup_batch, prix_actif_batch,
     encaisser_vente as _encaisser, annuler_vente as _annuler,
-    encaisser_commande as _enc_commande, stats_bar,
+    stats_bar,
     LIEUX_VALIDES,
 )
 
@@ -741,95 +741,14 @@ def historique_prix(produit_id: int, db: Session = Depends(get_db)):
 
 @router.post("/produits/{produit_id}/approvisionnement", status_code=201)
 def approvisionner(produit_id: int, data: ApprovisionnementIn, request: Request, db: Session = Depends(get_db)):
-    """
-    Ajoute du stock pour un produit.
-    - Si vendu_par_caisse : nb_caisses × unites_par_caisse + nb_unites_vrac
-    - Sinon : nb_unites_vrac uniquement (nb_caisses ignoré)
-    Stock toujours stocké en UNITÉS dans BarMouvementStock.
-    """
-    p = db.query(BarProduit).filter_by(id=produit_id).first()
-    if not p:
-        raise HTTPException(404, "Produit introuvable")
-
-    upc = p.unites_par_caisse or 1
-    if p.vendu_par_caisse:
-        if p.unites_par_caisse is None or p.unites_par_caisse < 1:
-            raise HTTPException(422, "CONFIG_CAISSE_INVALIDE : unites_par_caisse non défini pour ce produit.")
-        total_unites = data.nb_caisses * upc + data.nb_unites_vrac
-    else:
-        total_unites = data.nb_unites_vrac
-
-    if total_unites <= 0:
-        raise HTTPException(422, "Le total d'unités à ajouter doit être > 0.")
-
-    now = datetime.now(tz=timezone.utc)
-    motif = (
-        f"Appro {data.nb_caisses} caisse(s) × {upc} u."
-        + (f" + {data.nb_unites_vrac} vrac" if data.nb_unites_vrac else "")
-        if p.vendu_par_caisse
-        else f"Appro {total_unites} unités"
-    ) + (f" — {data.notes}" if data.notes else "")
-
-    achat_id = None
-    if data.prix_achat_caisse and data.nb_caisses > 0 and p.vendu_par_caisse:
-        prix_unitaire = Decimal(str(data.prix_achat_caisse)) / Decimal(str(upc))
-        achat = BarAchat(
-            produit_id          = produit_id,
-            quantite            = Decimal(str(total_unites)),
-            prix_achat_unitaire = prix_unitaire,
-            utilisateur_id      = _uid(request),
-            notes               = f"Caisse G{data.prix_achat_caisse:.2f} / {upc} u.",
-        )
-        db.add(achat)
-        db.flush()
-        achat_id = achat.id
-
-    db.add(BarMouvementStock(
-        produit_id     = produit_id,
-        quantite       = Decimal(str(total_unites)),
-        type_mouvement = "ENTREE",
-        motif          = motif,
-        achat_id       = achat_id,
-        lieu           = data.lieu,
-        date_mouvement = now,
-        utilisateur_id = _uid(request),
-    ))
-
-    employe = _user(request)
-    employe_nom = employe.nom_complet if employe else "Utilisateur inconnu"
-    from tz_utils import now_haiti
-    quand = now_haiti().strftime("%d/%m/%Y à %H:%M")
-    detail_qte = (
-        f"{data.nb_caisses} caisse(s) × {upc} u." + (f" + {data.nb_unites_vrac} vrac" if data.nb_unites_vrac else "")
-        if p.vendu_par_caisse
-        else f"{total_unites} unité(s)"
+    """Retiré (audit Bar du 19/10/2026) : le stock bar entre uniquement par
+    Réception → vérification au dépôt → livraison vers un bar
+    (voir bar_depot_routes.py)."""
+    raise HTTPException(
+        410,
+        "L'approvisionnement direct n'existe plus : enregistrez l'achat, "
+        "réceptionnez-le (Dépôt Bar), puis livrez-le au bar.",
     )
-    message = f"{employe_nom} · {quand} · {detail_qte} ({total_unites} unités au total)"
-    if data.prix_achat_caisse:
-        message += f" · G{data.prix_achat_caisse:.2f}/caisse"
-    if data.notes:
-        message += f" · {data.notes}"
-
-    from notifications_service import creer_notification
-    creer_notification(
-        db, module="pos", type_="approvisionnement",
-        titre=f"Approvisionnement — {p.nom}",
-        message=message,
-        lien="pos-stock",
-        dedupe_minutes=None,
-    )
-
-    db.commit()
-    stk_apres = stock_courant(produit_id, db)
-    return {
-        "ok":               True,
-        "total_unites_ajoutes": total_unites,
-        "nb_caisses":       data.nb_caisses,
-        "nb_unites_vrac":   data.nb_unites_vrac,
-        "stock_apres":      float(stk_apres),
-        "caisses_apres":    (int(stk_apres) // upc) if p.vendu_par_caisse else None,
-        "unites_restantes": (int(stk_apres) %  upc) if p.vendu_par_caisse else None,
-    }
 
 
 @router.get("/produits/{produit_id}/dernier-approvisionnement")
@@ -882,6 +801,10 @@ def stock_global(db: Session = Depends(get_db)):
             "stock_courant":      float(stocks.get(p.id, {}).get("total", 0)),
             "stock_devant":       float(stocks.get(p.id, {}).get("devant", 0)),
             "stock_piscine":      float(stocks.get(p.id, {}).get("piscine", 0)),
+            # Dépôt = mouvements sans lieu (réceptions vérifiées − livraisons)
+            "stock_depot":        float(stocks.get(p.id, {}).get("total", 0)
+                                        - stocks.get(p.id, {}).get("devant", 0)
+                                        - stocks.get(p.id, {}).get("piscine", 0)),
             "seuil_alerte_stock": float(p.seuil_alerte_stock),
             "alerte":             stocks.get(p.id, {}).get("total", Decimal("0")) <= Decimal(str(p.seuil_alerte_stock)),
             "cmup":               float(cmup(p.id, db)),
@@ -1636,10 +1559,9 @@ def modifier_achat(
 
 @router.post("/achats/{achat_id}/confirmer", status_code=200)
 def confirmer_achat(achat_id: int, request: Request, db: Session = Depends(get_db)):
-    """Confirme un achat bar pour la comptabilité (coût moyen pondéré) — ne touche
-    JAMAIS le stock. Le stock n'est mis à jour que par un approvisionnement
-    explicite (modal « Approvisionner » ou réception physique comptée), jamais
-    automatiquement par l'enregistrement ou la confirmation d'un achat."""
+    """Réceptionne un achat bar : le confirme (coût moyen pondéré) et génère
+    ses colis étiquetés, à vérifier au dépôt. Le stock n'entre au dépôt qu'au
+    scan de chaque colis (bar_depot_routes.verifier_colis)."""
     a = db.query(BarAchat).filter_by(id=achat_id).first()
     if not a:
         raise HTTPException(404, "Achat introuvable")
@@ -1651,15 +1573,16 @@ def confirmer_achat(achat_id: int, request: Request, db: Session = Depends(get_d
     p       = db.query(BarProduit).filter_by(id=a.produit_id).first()
     unite   = p.unite if p else "unité"
 
-    a.statut = "CONFIRME"
+    from bar_depot_routes import receptionner_achat
+    colis = receptionner_achat(db, a, None, _uid(request))
 
     employe = _user(request)
     employe_nom = employe.nom_complet if employe else "Utilisateur inconnu"
     from tz_utils import now_haiti
     quand = now_haiti().strftime("%d/%m/%Y à %H:%M")
     message = (
-        f"{employe_nom} · {quand} · {float(a.quantite)} {unite}(s) confirmé(s) pour la comptabilité"
-        f" — pensez à faire l'approvisionnement séparément pour ajouter au stock."
+        f"{employe_nom} · {quand} · {float(a.quantite)} {unite}(s) réceptionné(s) — "
+        f"{len(colis)} colis à étiqueter et à scanner au dépôt."
     )
     if a.fournisseur:
         message += f" · Fournisseur : {a.fournisseur}"
@@ -1680,7 +1603,8 @@ def confirmer_achat(achat_id: int, request: Request, db: Session = Depends(get_d
         "ok":           True,
         "achat_id":     a.id,
         "produit_nom":  p.nom if p else str(a.produit_id),
-        "stock_inchange": True,
+        "nb_colis":     len(colis),
+        "stock_inchange": True,   # le stock entre au dépôt au scan des colis
     }
 
 
@@ -2194,203 +2118,9 @@ def payer_vente_credit(vente_id: int, request: Request, db: Session = Depends(ge
     }
 
 
-# ══════════════════════════════════════════════════════════════════
-# COMMANDES
-# ══════════════════════════════════════════════════════════════════
-
-@router.get("/commandes/{commande_id}")
-def get_commande(commande_id: int, db: Session = Depends(get_db)):
-    cmd = db.query(BarCommande).filter_by(id=commande_id).first()
-    if not cmd:
-        raise HTTPException(404, "Commande introuvable")
-    return {
-        "id":             cmd.id,
-        "numero_table":   cmd.numero_table,
-        "client":         cmd.client,
-        "statut":         cmd.statut,
-        "date_ouverture": cmd.date_ouverture.isoformat(),
-        "lignes": [
-            {
-                "id":            l.id,
-                "produit_id":    l.produit_id,
-                "produit_nom":   l.produit.nom if l.produit else f"Produit#{l.produit_id}",
-                "quantite":      float(l.quantite),
-                "notes":         l.notes,
-                "prix_unitaire": float(prix_actif(l.produit_id, db) or 0),
-                "sous_total":    float(l.quantite) * float(prix_actif(l.produit_id, db) or 0),
-            }
-            for l in cmd.lignes
-        ],
-    }
-
-
-@router.get("/commandes")
-def liste_commandes(
-    statut: Optional[str] = None,
-    db: Session = Depends(get_db),
-):
-    q = db.query(BarCommande)
-    if statut:
-        q = q.filter(BarCommande.statut == statut.upper())
-    else:
-        q = q.filter(BarCommande.statut.notin_(["ENCAISSEE", "ANNULEE"]))
-    cmds = q.order_by(BarCommande.date_ouverture.desc()).all()
-
-    return [
-        {
-            "id":             c.id,
-            "numero_table":   c.numero_table,
-            "client":         c.client,
-            "statut":         c.statut,
-            "caissier_id":    c.caissier_id,
-            "date_ouverture": c.date_ouverture.isoformat(),
-            "nb_lignes":      len(c.lignes),
-            "total_estime":   sum(
-                float(l.quantite) * float(prix_actif(l.produit_id, db) or 0)
-                for l in c.lignes
-            ),
-        }
-        for c in cmds
-    ]
-
-
-@router.post("/commandes", status_code=201)
-def creer_commande(data: CommandeIn, request: Request, db: Session = Depends(get_db)):
-    cmd = BarCommande(
-        numero_table = data.numero_table,
-        client       = data.client,
-        caissier_id  = data.caissier_id,
-    )
-    db.add(cmd)
-    db.flush()
-
-    for l in data.lignes:
-        p = db.query(BarProduit).filter_by(id=l.produit_id, actif=True).first()
-        if not p:
-            db.rollback()
-            raise HTTPException(404, f"Produit #{l.produit_id} introuvable")
-        db.add(BarLigneCommande(
-            commande_id = cmd.id,
-            produit_id  = l.produit_id,
-            quantite    = l.quantite,
-            notes       = l.notes,
-        ))
-
-    db.commit()
-    db.refresh(cmd)
-    return {"id": cmd.id, "statut": cmd.statut}
-
-
-@router.put("/commandes/{commande_id}")
-def modifier_commande(commande_id: int, data: CommandeIn, db: Session = Depends(get_db)):
-    cmd = db.query(BarCommande).filter_by(id=commande_id).first()
-    if not cmd:
-        raise HTTPException(404, "Commande introuvable")
-    if cmd.statut in ("ENCAISSEE", "ANNULEE"):
-        raise HTTPException(422, f"Commande déjà {cmd.statut.lower()}")
-
-    cmd.numero_table = data.numero_table
-    cmd.client       = data.client
-
-    # Remplace les lignes
-    for l in cmd.lignes:
-        db.delete(l)
-    db.flush()
-
-    for l in data.lignes:
-        db.add(BarLigneCommande(
-            commande_id = cmd.id,
-            produit_id  = l.produit_id,
-            quantite    = l.quantite,
-            notes       = l.notes,
-        ))
-
-    from datetime import datetime, timezone
-    cmd.date_modification = datetime.now(tz=timezone.utc)
-    db.commit()
-    return {"ok": True}
-
-
-@router.post("/commandes/{commande_id}/lignes", status_code=201)
-def ajouter_ligne_commande(commande_id: int, data: AjoutLigneIn, db: Session = Depends(get_db)):
-    cmd = db.query(BarCommande).filter_by(id=commande_id).first()
-    if not cmd:
-        raise HTTPException(404, "Commande introuvable")
-    if cmd.statut in ("ENCAISSEE", "ANNULEE"):
-        raise HTTPException(422, f"Commande déjà {cmd.statut.lower()}")
-    p = db.query(BarProduit).filter_by(id=data.produit_id, actif=True).first()
-    if not p:
-        raise HTTPException(404, f"Produit #{data.produit_id} introuvable")
-    existing = next((l for l in cmd.lignes if l.produit_id == data.produit_id), None)
-    if existing:
-        existing.quantite = float(existing.quantite) + data.quantite
-    else:
-        db.add(BarLigneCommande(commande_id=cmd.id, produit_id=data.produit_id, quantite=data.quantite))
-    cmd.date_modification = datetime.now(tz=timezone.utc)
-    db.commit()
-    return {"ok": True}
-
-
-@router.delete("/commandes/{commande_id}/lignes/{ligne_id}")
-def retirer_ligne_commande(commande_id: int, ligne_id: int, db: Session = Depends(get_db)):
-    cmd = db.query(BarCommande).filter_by(id=commande_id).first()
-    if not cmd:
-        raise HTTPException(404, "Commande introuvable")
-    if cmd.statut in ("ENCAISSEE", "ANNULEE"):
-        raise HTTPException(422, f"Commande déjà {cmd.statut.lower()}")
-    ligne = db.query(BarLigneCommande).filter_by(id=ligne_id, commande_id=commande_id).first()
-    if not ligne:
-        raise HTTPException(404, "Article introuvable")
-    db.delete(ligne)
-    cmd.date_modification = datetime.now(tz=timezone.utc)
-    db.commit()
-    return {"ok": True}
-
-
-@router.delete("/commandes/{commande_id}")
-def liberer_commande(commande_id: int, db: Session = Depends(get_db)):
-    cmd = db.query(BarCommande).filter_by(id=commande_id).first()
-    if not cmd:
-        raise HTTPException(404, "Commande introuvable")
-    if cmd.statut in ("ENCAISSEE", "ANNULEE"):
-        raise HTTPException(422, f"Table déjà {cmd.statut.lower()}")
-    cmd.statut = "ANNULEE"
-    db.commit()
-    return {"ok": True}
-
-
-@router.put("/commandes/{commande_id}/encaisser")
-def encaisser_commande_route(
-    commande_id: int,
-    data: EncaisserCommandeIn,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    try:
-        vente = _enc_commande(commande_id, data.dict(), db, utilisateur_id=_uid(request))
-    except ValueError as e:
-        raise HTTPException(422, str(e))
-    return {
-        "vente_id":        vente.id,
-        "numero_ticket":   vente.numero_ticket,
-        "montant_total":   float(vente.montant_total),
-        "montant_paye":    float(vente.montant_paye),
-        "montant_restant": float(vente.montant_restant),
-        "mode_paiement":   vente.mode_paiement,
-        "statut":          vente.statut,
-        "client_nom":      vente.client_nom,
-        "date_heure":      vente.date_heure.isoformat() if vente.date_heure else None,
-        "lignes": [
-            {
-                "produit_nom":   l.produit.nom if l.produit else f"#{l.produit_id}",
-                "quantite":      float(l.quantite),
-                "prix_unitaire": float(l.prix_unitaire_applique),
-                "sous_total":    float(l.sous_total),
-            }
-            for l in vente.lignes
-        ],
-    }
-
+# Tables / commandes : fonction retirée (audit Bar du 19/10/2026 — aucune
+# commande enregistrée en production). Les tables bar_commandes et
+# bar_lignes_commande restent en base, sans route.
 
 # ══════════════════════════════════════════════════════════════════
 # CRÉDITS
@@ -2588,6 +2318,9 @@ def liste_paiements_employes(db: Session = Depends(get_db)):
 
 @router.post("/paiements-employes", status_code=201)
 def creer_paiement_employe(data: PaiementEmployeIn, request: Request, db: Session = Depends(get_db)):
+    """Retiré (audit Bar du 19/10/2026) : doublon du module Payroll, plus
+    utilisé depuis le 10/08. L'historique reste consultable (GET)."""
+    raise HTTPException(410, "La paie se fait dans le module Payroll (Employés › Payroll).")
     emp = db.query(Employe).filter_by(id=data.employe_id, actif=True).first()
     if not emp:
         raise HTTPException(404, "Employé introuvable ou inactif")

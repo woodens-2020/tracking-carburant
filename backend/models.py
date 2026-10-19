@@ -778,17 +778,19 @@ class BarMouvementStock(Base):
 
     id                 = Column(Integer, primary_key=True)
     produit_id         = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
-    type_mouvement     = Column(String(20), nullable=False)  # ENTREE, SORTIE_VENTE, AJUSTEMENT, PERTE, CASSE
+    type_mouvement     = Column(String(20), nullable=False)  # ENTREE, SORTIE_VENTE, AJUSTEMENT, PERTE, CASSE, TRANSFERT
     quantite           = Column(Numeric(12, 3), nullable=False)   # signée : + entrée, - sortie
     motif              = Column(String(300), nullable=True)
     reference_vente_id = Column(Integer, ForeignKey("bar_ventes.id", ondelete="SET NULL"), nullable=True)
     achat_id           = Column(Integer, ForeignKey("bar_achats.id", ondelete="SET NULL"), nullable=True)
     date_mouvement     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     utilisateur_id     = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
-    # Lieu (Bar Devant / Bar Piscine) — uniquement renseigné pour les
-    # ajustements manuels (AJUSTEMENT/PERTE/CASSE) et, en best-effort, pour
-    # les ventes/annulations quand la session caissière connaît son lieu.
-    # Les achats/réceptions restent volontairement NULL (stock pool commun).
+    # Lieu du stock concerné :
+    #   NULL     → DÉPÔT (réception vérifiée, sortie vers un bar, inventaire du dépôt)
+    #   DEVANT   → Bar avant
+    #   PISCINE  → Bar piscine
+    # Une livraison dépôt → bar = deux mouvements TRANSFERT de même quantité
+    # (−q au dépôt, +q au bar) : le stock total ne change pas.
     lieu               = Column(String(20), nullable=True)
 
     produit = relationship("BarProduit", back_populates="mouvements",
@@ -798,7 +800,7 @@ class BarMouvementStock(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "type_mouvement IN ('ENTREE','SORTIE_VENTE','AJUSTEMENT','PERTE','CASSE')",
+            "type_mouvement IN ('ENTREE','SORTIE_VENTE','AJUSTEMENT','PERTE','CASSE','TRANSFERT')",
             name="chk_bar_mouv_type",
         ),
         CheckConstraint("lieu IS NULL OR lieu IN ('DEVANT','PISCINE')", name="chk_bar_mouv_lieu"),
@@ -2037,3 +2039,102 @@ class AnomalieTraitee(Base):
     traite_le     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     traite_par = relationship("Utilisateur")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# DÉPÔT BAR — réception, colis étiquetés, livraisons vers les bars
+#   Réception (achat) → génération des codes → vérification au dépôt (scan)
+#   → préparation de la livraison → scan des colis → Bar avant / Bar piscine
+#   → mise à jour des stocks (dépôt et bar).
+# ══════════════════════════════════════════════════════════════════════════
+
+class BarColis(Base):
+    """Colis physique (caisse, carton, pack ou lot) issu d'une réception,
+    identifié par un code imprimé en étiquette QR.
+
+    Statuts :
+      A_VERIFIER      → généré à la réception, pas encore contrôlé au dépôt
+      AU_DEPOT        → scanné au dépôt : son contenu est dans le stock du dépôt
+      EN_PREPARATION  → scanné dans une livraison en cours de préparation
+      LIVRE           → livraison validée : son contenu est dans le stock du bar
+      ANNULE          → colis retiré (erreur de réception)
+    """
+    __tablename__ = "bar_colis"
+
+    id           = Column(Integer, primary_key=True)
+    code         = Column(String(30), nullable=False, unique=True)
+    produit_id   = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
+    achat_id     = Column(Integer, ForeignKey("bar_achats.id", ondelete="SET NULL"), nullable=True)
+    quantite     = Column(Numeric(12, 3), nullable=False)          # unités de vente contenues
+    statut       = Column(String(20), nullable=False, default="A_VERIFIER")
+    lieu         = Column(String(20), nullable=True)               # bar de destination une fois livré
+    livraison_id = Column(Integer, ForeignKey("bar_livraisons_internes.id", ondelete="SET NULL"), nullable=True)
+    cree_le      = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    verifie_le   = Column(DateTime(timezone=True), nullable=True)
+    verifie_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    produit     = relationship("BarProduit")
+    achat       = relationship("BarAchat")
+    livraison   = relationship("BarLivraisonInterne", back_populates="colis", foreign_keys=[livraison_id])
+    verifie_par = relationship("Utilisateur", foreign_keys=[verifie_par_id])
+
+    __table_args__ = (
+        CheckConstraint("quantite > 0", name="chk_bar_colis_qte"),
+        CheckConstraint(
+            "statut IN ('A_VERIFIER','AU_DEPOT','EN_PREPARATION','LIVRE','ANNULE')",
+            name="chk_bar_colis_statut",
+        ),
+        CheckConstraint("lieu IS NULL OR lieu IN ('DEVANT','PISCINE')", name="chk_bar_colis_lieu"),
+        Index("idx_bar_colis_statut", "statut"),
+        Index("idx_bar_colis_achat", "achat_id"),
+        Index("idx_bar_colis_livraison", "livraison_id"),
+    )
+
+
+class BarLivraisonInterne(Base):
+    """Bon de livraison du dépôt vers un bar (Bar avant ou Bar piscine)."""
+    __tablename__ = "bar_livraisons_internes"
+
+    id             = Column(Integer, primary_key=True)
+    numero         = Column(String(30), nullable=False, unique=True)
+    lieu           = Column(String(20), nullable=False)             # DEVANT | PISCINE
+    statut         = Column(String(20), nullable=False, default="PREPARATION")
+    notes          = Column(String(300), nullable=True)
+    cree_le        = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    cree_par_id    = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    valide_le      = Column(DateTime(timezone=True), nullable=True)
+    valide_par_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    colis      = relationship("BarColis", back_populates="livraison", foreign_keys="BarColis.livraison_id")
+    lignes     = relationship("BarLivraisonLigne", back_populates="livraison",
+                              cascade="all, delete-orphan", order_by="BarLivraisonLigne.id")
+    cree_par   = relationship("Utilisateur", foreign_keys=[cree_par_id])
+    valide_par = relationship("Utilisateur", foreign_keys=[valide_par_id])
+
+    __table_args__ = (
+        CheckConstraint("lieu IN ('DEVANT','PISCINE')", name="chk_bar_livr_lieu"),
+        CheckConstraint("statut IN ('PREPARATION','VALIDEE','ANNULEE')", name="chk_bar_livr_statut"),
+        Index("idx_bar_livr_statut", "statut"),
+    )
+
+
+class BarLivraisonLigne(Base):
+    """Ligne d'une livraison : un colis scanné (colis_id renseigné) ou une
+    quantité en vrac prise dans le stock du dépôt (colis_id NULL — pour le
+    stock déjà présent sans étiquette)."""
+    __tablename__ = "bar_livraison_lignes"
+
+    id           = Column(Integer, primary_key=True)
+    livraison_id = Column(Integer, ForeignKey("bar_livraisons_internes.id", ondelete="CASCADE"), nullable=False)
+    produit_id   = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
+    colis_id     = Column(Integer, ForeignKey("bar_colis.id", ondelete="SET NULL"), nullable=True)
+    quantite     = Column(Numeric(12, 3), nullable=False)
+
+    livraison = relationship("BarLivraisonInterne", back_populates="lignes")
+    produit   = relationship("BarProduit")
+    colis     = relationship("BarColis")
+
+    __table_args__ = (
+        CheckConstraint("quantite > 0", name="chk_bar_livr_ligne_qte"),
+        Index("idx_bar_livr_ligne_livraison", "livraison_id"),
+    )
