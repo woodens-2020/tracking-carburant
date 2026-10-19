@@ -546,6 +546,8 @@ canvas{display:block}
 .sx-inp.err{box-shadow:inset 0 0 0 2px var(--red)!important}
 .sx-hint{font-size:12px;color:var(--muted);margin-top:5px;min-height:16px;line-height:1.35}
 .sx-hint-err{color:var(--red2)}
+.sx-field label.sx-report{margin-top:6px;width:100%;text-transform:none;letter-spacing:0;font-size:12px;font-weight:400;color:var(--text2);cursor:pointer}
+.sx-inp.err{box-shadow:inset 0 0 0 2px var(--red)!important}
 .sx-warn{color:var(--orange)}
 .sx-link{background:none;border:none;color:var(--blue2);cursor:pointer;padding:0;font:inherit;text-decoration:underline}
 .sx-result{text-align:right;padding-top:20px}
@@ -15851,14 +15853,20 @@ function renderSaisie(){
     const ipSrc=(ip&&ip.source_periode)
       ?`${ip.source_periode==='Matin'?'Matin':'Après-midi'} ${frDate(ip.source_date)}`:'';
 
+    // Nouvelle saisie : mètre avant ET mètre après saisissables. La case
+    // « Index attendu » reporte le mètre après de la période précédente
+    // dans le mètre avant (cocher = reporter, décocher = effacer).
     let avVal='', avRo=true, apRo=true, hintAv='';
     if(isEdit){
       avVal=av; hintAv=r.ecart_compteur?`<span class="sx-warn">Écart ${fmtNum(r.ecart_compteur,3)} gal · ${esc(r.motif_ecart_compteur||'')}</span>`:'';
-    } else if(ipVal!=null){
-      avVal=ipVal; apRo=false;
-      hintAv=`Repris de la fin ${esc(ipSrc)} · <button type="button" class="sx-link" onclick="sxDeverrouillerAvant(this)">modifier</button>`;
     } else {
-      avRo=false; apRo=false; hintAv='Premier relevé de cette pompe : saisissez le mètre avant';
+      avRo=false; apRo=false;
+      hintAv = ipVal!=null
+        ? `<label class="ip-report sx-report" title="Reporter l'index de fin de la période précédente">
+             <input type="checkbox" onchange="applyIndexPrecedent(this)" data-val="${ipVal}">
+             <span>Index attendu : <b>${fmtGal(ipVal,4)}</b>${ipSrc?` <span class="ip-src">(fin ${esc(ipSrc)})</span>`:''}</span>
+           </label>`
+        : 'Premier relevé de cette pompe';
     }
 
     let statut, action='';
@@ -15886,7 +15894,8 @@ function renderSaisie(){
       </div>
       <div class="sx-field">
         <label for="sx-av-${po.id}">Mètre avant</label>
-        <input id="sx-av-${po.id}" class="inp inp-av sx-inp" type="number" step="0.0001" inputmode="decimal" value="${avVal}" ${avRo?'readonly':''} oninput="calcRow(this.closest('.sx-pompe'))">
+        <input id="sx-av-${po.id}" class="inp inp-av sx-inp" type="number" step="0.0001" inputmode="decimal" value="${avVal}" ${avRo?'readonly':''}
+               placeholder="${avRo?'':'Index du compteur'}" oninput="sxAvantSaisi(this)" onkeydown="sxEntree(event,this)">
         <div class="sx-hint">${hintAv}</div>
       </div>
       <div class="sx-field sx-field-main">
@@ -15924,28 +15933,46 @@ function renderSaisie(){
   renderGalRecap();
   sxMajTotaux();
   // Curseur directement sur le premier mètre après à saisir
-  const premier=el.querySelector('.sx-pompe:not(.sx-done) .inp-ap:not([readonly])');
+  const premier=[...el.querySelectorAll('.sx-pompe:not(.sx-done) .sx-inp:not([readonly])')].find(i=>i.value==='');
   if(premier && document.getElementById('page-saisie')?.classList.contains('active')) premier.focus();
 }
 
-// Entrée dans un « mètre après » → pompe suivante ; sur la dernière → enregistrer.
+// Entrée : mètre avant → mètre après de la même pompe → mètre avant de la
+// pompe suivante ; sur le dernier champ → enregistrer.
 function sxEntree(ev, inp){
   if(ev.key!=='Enter') return;
   ev.preventDefault();
-  const tous=[...document.querySelectorAll('#saisie-content .inp-ap:not([readonly])')];
+  const tous=[...document.querySelectorAll('#saisie-content .sx-pompe .sx-inp:not([readonly])')];
   const k=tous.indexOf(inp);
   if(k>=0 && k<tous.length-1){ tous[k+1].focus(); tous[k+1].select(); }
   else prepareConfirm(currentPeriode);
 }
 
-// « modifier » sous le mètre avant repris : le déverrouille. Un écart avec
-// l'index attendu demandera un motif à l'enregistrement.
-function sxDeverrouillerAvant(btn){
-  const carte=btn.closest('.sx-pompe');
-  const inp=carte.querySelector('.inp-av');
-  inp.removeAttribute('readonly');
-  inp.focus(); inp.select();
-  btn.closest('.sx-hint').innerHTML='Mètre avant modifié : un motif sera demandé s\'il diffère de l\'index attendu';
+// Saisie manuelle du mètre avant : la case de report se décoche si la
+// valeur tapée n'est plus l'index attendu.
+function sxAvantSaisi(inp){
+  const carte=inp.closest('.sx-pompe');
+  const cb=carte.querySelector('.sx-report input[type=checkbox]');
+  if(cb) cb.checked = inp.value!=='' && Math.abs(parseFloat(inp.value)-parseFloat(cb.dataset.val))<0.00005;
+  calcRow(carte);
+}
+
+// Case « Index attendu » : cochée → reporte la valeur dans le mètre avant et
+// place le curseur sur le mètre après ; décochée → efface le mètre avant.
+function applyIndexPrecedent(cb){
+  const carte=cb.closest('.sx-pompe'); if(!carte) return;
+  const inpAv=carte.querySelector('.inp-av');
+  const inpAp=carte.querySelector('.inp-ap');
+  if(inpAv.readOnly) enableRow(carte);
+  if(cb.checked){
+    inpAv.value=cb.dataset.val;
+    inpAp.removeAttribute('readonly');
+    inpAp.focus();
+  } else {
+    inpAv.value='';
+    inpAv.focus();
+  }
+  calcRow(carte);
 }
 
 // Totaux de ce qui va être enregistré (cartes en saisie avec un mètre après)
@@ -15953,7 +15980,7 @@ function sxMajTotaux(){
   let n=0, g=0, m=0;
   document.querySelectorAll('#saisie-content .sx-pompe').forEach(c=>{
     const ap=c.querySelector('.inp-ap');
-    if(!ap || ap.readOnly || ap.value==='') return;
+    if(!ap || ap.readOnly || ap.value==='' || c.querySelector('.inp-av').value==='') return;
     const av=parseFloat(c.querySelector('.inp-av').value)||0;
     const q=Math.round((parseFloat(ap.value)-av)*10000)/10000;
     const px=parseFloat(c.querySelector('.inp-px').value)||0;
@@ -16433,7 +16460,7 @@ function enableRow(tr){
   if(!inpAv.value && tr.dataset.av) inpAv.value=tr.dataset.av;
   if(!inpAp.value && tr.dataset.ap) inpAp.value=tr.dataset.ap;
 
-  inpAp.focus();
+  inpAv.focus();
   calcRow(tr);
   tr.classList.remove('sx-done');
   const act=tr.querySelector('.sx-act'); if(act) act.innerHTML='';
@@ -16456,7 +16483,9 @@ function calcRow(tr){
   const mnt=Math.round(qte*px*100)/100;
 
   const apI=tr.querySelector('.inp-ap');
-  const vide=apI.value==='';
+  const avI=tr.querySelector('.inp-av');
+  if(avI.value!=='') avI.classList.remove('err');
+  const vide=apI.value===''||avI.value==='';
   const qEl=tr.querySelector('.val-qte');
   qEl.textContent=vide?'—':fmtGalX(qte);
   qEl.className='num val-qte '+(qte<0?'c-red':'c-teal');
@@ -16505,7 +16534,13 @@ function prepareConfirm(periode){
     const ap=parseFloat(inpAp.value);
     const px=parseFloat(tr.querySelector('.inp-px').value)||parseFloat(tr.dataset.defpx)||0;
 
-    if(isNaN(av)||isNaN(ap)) continue;   // ligne vide → ignorer
+    if(isNaN(ap)) continue;   // pas de mètre après → pompe non saisie, ignorée
+    if(isNaN(av)){
+      toast(`${pompe?.nom||'Pompe'} : saisissez le mètre avant (ou cochez l'index attendu).`,'err');
+      inpAv.classList.add('err'); inpAv.focus();
+      hasError=true;
+      continue;
+    }
     if(ap<av){
       toast(t('saisie.err.rowError',{pompe:pompe?.nom||t('saisie.table.pompe'),ap,av}),'err');
       tr.querySelector('.inp-ap').classList.add('err');
