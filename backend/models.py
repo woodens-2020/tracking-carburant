@@ -2138,3 +2138,43 @@ class BarLivraisonLigne(Base):
         CheckConstraint("quantite > 0", name="chk_bar_livr_ligne_qte"),
         Index("idx_bar_livr_ligne_livraison", "livraison_id"),
     )
+
+
+class BarColisEvenement(Base):
+    """Journal de traçabilité du dépôt bar : une ligne par étape de la vie
+    d'un colis (création, vérification, livraison…), horodatée par le
+    serveur de base de données, avec l'utilisateur et le lieu. Les scans
+    rejetés (code inconnu ou falsifié) y sont aussi consignés, sans colis.
+    Jamais modifié ni supprimé par l'application."""
+    __tablename__ = "bar_colis_evenements"
+
+    id             = Column(Integer, primary_key=True)
+    colis_id       = Column(Integer, ForeignKey("bar_colis.id", ondelete="CASCADE"), nullable=True)
+    type           = Column(String(30), nullable=False)
+    lieu           = Column(String(20), nullable=True)      # NULL = dépôt
+    livraison_id   = Column(Integer, ForeignKey("bar_livraisons_internes.id", ondelete="SET NULL"), nullable=True)
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    horodatage     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    code_saisi     = Column(String(40), nullable=True)      # texte scanné (rejets), tronqué
+    details        = Column(String(300), nullable=True)
+
+    colis       = relationship("BarColis")
+    livraison   = relationship("BarLivraisonInterne")
+    utilisateur = relationship("Utilisateur")
+
+    __table_args__ = (
+        Index("idx_bar_colis_evt_colis", "colis_id"),
+        Index("idx_bar_colis_evt_date", "horodatage"),
+        Index("idx_bar_colis_evt_type", "type"),
+    )
+
+
+class SecretApplication(Base):
+    """Secrets générés par l'application et conservés en base (ex. clé de
+    signature des codes de colis). Jamais exposés par l'API."""
+    __tablename__ = "secrets_application"
+
+    id     = Column(Integer, primary_key=True)
+    cle    = Column(String(60), nullable=False, unique=True)
+    valeur = Column(String(200), nullable=False)
+    cree_le = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

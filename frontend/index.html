@@ -3138,6 +3138,36 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .dep-vide{font-size:13px;color:rgba(255,255,255,.35);padding:10px 0}
 .dep-code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;background:rgba(255,255,255,.06);padding:1px 6px;border-radius:4px}
 .dep-livr-tete{margin:4px 0 10px;font-size:15px}
+.dep-code-btn{border:none;color:#93c5fd;cursor:pointer;white-space:nowrap}
+.dep-code{white-space:nowrap}
+.dep-code-btn:hover{text-decoration:underline}
+.dep-j-alerte td{background:rgba(248,113,113,.06)}
+.dep-fiche{max-width:760px;width:calc(100vw - 32px);max-height:calc(100vh - 40px);overflow-y:auto}
+.df-tete{display:flex;justify-content:space-between;align-items:center;margin:0 0 14px}
+.df-tete h3{margin:0;font-size:18px}
+.df-fermer{background:none;border:none;color:rgba(255,255,255,.5);font-size:22px;cursor:pointer;line-height:1}
+.df-statut{border-radius:12px;padding:14px 18px;margin-bottom:14px;border:1px solid}
+.df-statut-l{font-size:22px;font-weight:900;letter-spacing:.08em}
+.df-statut-s{font-size:14px;margin-top:4px;opacity:.9}
+.df-ok{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.45);color:#86efac}
+.df-info{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.45);color:#93c5fd}
+.df-warn{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.45);color:#fcd34d}
+.df-err{background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.45);color:#fca5a5}
+.df-grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.df-bloc{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px}
+.df-titre{font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:8px}
+.df-l{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13.5px}
+.df-l span{color:rgba(255,255,255,.55)}
+.df-l strong{text-align:right;font-weight:600}
+.df-vide{font-size:13px;color:rgba(255,255,255,.4)}
+.df-histo{list-style:none;margin:0;padding:0;border-left:2px solid rgba(255,255,255,.12);margin-left:10px}
+.df-histo li{display:flex;gap:10px;padding:7px 0 7px 0;position:relative}
+.df-h-ico{flex-shrink:0;width:24px;height:24px;margin-left:-13px;border-radius:50%;background:#1e293b;border:1px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:12px}
+.df-h-LIVRE .df-h-ico{background:#166534;border-color:#22c55e}
+.df-h-VERIFIE .df-h-ico{background:#1e3a8a;border-color:#3b82f6}
+.df-h-SCAN_REFUSE .df-h-ico{background:#7f1d1d;border-color:#f87171}
+.df-h-l{font-size:13.5px;font-weight:600}
+.df-h-s{font-size:12px;color:rgba(255,255,255,.5);margin-top:1px}
 .pos-stock-alert{color:#f87171}
 .cr-sous{font-size:11.5px;color:rgba(255,255,255,.42);margin-top:2px}
 .cr-date{white-space:nowrap}
@@ -7331,6 +7361,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="dep-mode" role="group" aria-label="Que faire du colis scanné">
               <button class="db-preset active" id="dep-mode-verif" onclick="depSetMode('verif')">Vérifier au dépôt</button>
               <button class="db-preset" id="dep-mode-livr" onclick="depSetMode('livr')">Ajouter à la livraison</button>
+              <button class="db-preset" id="dep-mode-fiche" onclick="depSetMode('fiche')">Consulter la fiche</button>
             </div>
             <input id="dep-scan-input" class="pos-input" placeholder="Scannez ou tapez le code du colis (ex. BC26000123) puis Entrée"
                    autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();depScanner(this.value)}">
@@ -7413,8 +7444,40 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
 
+        <!-- Journal de traçabilité -->
+        <div class="pos-card">
+          <div class="pos-card-hdr">Journal de traçabilité
+            <select id="dep-journal-type" class="pos-input" style="margin-left:auto;max-width:220px;padding:6px 10px" onchange="depChargerJournal()">
+              <option value="">Tous les événements</option>
+              <option value="LIVRE">Livraisons</option>
+              <option value="VERIFIE">Vérifications au dépôt</option>
+              <option value="REJET">Codes rejetés (sécurité)</option>
+              <option value="SCAN_REFUSE">Scans refusés</option>
+            </select>
+          </div>
+          <div class="dep-note">Chaque étape de chaque colis est enregistrée avec la date, l'heure, le lieu et la personne. Les codes rejetés (inconnus ou falsifiés) apparaissent aussi.</div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead><tr><th>Date et heure</th><th>Événement</th><th>Colis</th><th>Produit</th><th>Lieu</th><th>Par</th><th>Détail</th></tr></thead>
+              <tbody id="dep-journal-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </div><!-- /page-pos-depot -->
+
+    <!-- Fiche de livraison / traçabilité d'un colis -->
+    <div class="pos-modal-bg" id="dep-fiche-bg" onclick="if(event.target===this)depFermerFiche()">
+      <div class="pos-modal dep-fiche" role="dialog" aria-labelledby="dep-fiche-titre">
+        <div class="df-tete">
+          <h3 id="dep-fiche-titre">Fiche du colis</h3>
+          <button type="button" onclick="depFermerFiche()" aria-label="Fermer" class="df-fermer">✕</button>
+        </div>
+        <div id="dep-fiche-corps"></div>
+        <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermerFiche()">Fermer</button></div>
+      </div>
+    </div>
 
 
     <!-- Modal réception stock -->
@@ -12258,10 +12321,13 @@ async function apiFetch(method,path,body){
     const err=await res.json().catch(()=>({detail:res.statusText}));
     let msg = Array.isArray(err.detail)
       ? err.detail.map(e=>e.msg||JSON.stringify(e)).join(', ')
-      : (err.detail || res.statusText);
+      : (err.detail && typeof err.detail === 'object')
+        ? (err.detail.message || JSON.stringify(err.detail))
+        : (err.detail || res.statusText);
     if(typeof window.translateApiError === 'function') msg = window.translateApiError(msg);
     const e = new Error(`[${res.status}] ${msg}`);
     e.status = res.status;
+    e.detail = err.detail;      // détail structuré (ex. dépôt : {deja_livre, colis_id})
     throw e;
   }
   return res.json();
@@ -28509,6 +28575,7 @@ async function loadPosDepot(){
     depRenderStock();
     depRenderInventaire();
     depRenderHistorique(livs || []);
+    depChargerJournal();
     const enCours = (livs||[]).find(l=>l.statut==='PREPARATION');
     if(enCours){ _depLivraison = await apiFetch('GET',`/pos/depot/livraisons/${enCours.id}`); }
     else _depLivraison = null;
@@ -28521,6 +28588,7 @@ function depSetMode(m){
   _depMode = m;
   document.getElementById('dep-mode-verif').classList.toggle('active', m==='verif');
   document.getElementById('dep-mode-livr').classList.toggle('active', m==='livr');
+  document.getElementById('dep-mode-fiche').classList.toggle('active', m==='fiche');
   document.getElementById('dep-scan-input').focus();
 }
 
@@ -28536,18 +28604,29 @@ async function depScanner(valeur){
   if(!code) return;
   inp.value = '';
   try{
+    if(_depMode === 'fiche'){
+      const f = await apiFetch('POST','/pos/depot/colis/consulter',{code});
+      _depRetour(`Fiche du colis ${f.colis.code_lisible} — ${f.colis.statut_libelle}`, true);
+      depAfficherFiche(f);
+      inp.focus();
+      return;
+    }
     if(_depMode === 'verif'){
       const c = await apiFetch('POST','/pos/depot/colis/verifier',{code});
-      _depRetour(`✓ ${c.code} — ${c.produit_nom} : ${c.quantite} ${c.unite||'u.'} entrés au dépôt`
+      _depRetour(`✓ ${c.code_lisible} — ${c.produit_nom} : ${c.quantite} ${c.unite||'u.'} entrés au dépôt`
         + (c.restants_achat ? ` · encore ${c.restants_achat} colis de cet achat à scanner` : ''), true);
     } else {
       if(!_depLivraison){ _depRetour('Créez d\'abord une livraison (Bar avant ou Bar piscine).', false); return; }
       const r = await apiFetch('POST',`/pos/depot/livraisons/${_depLivraison.id}/scan`,{code});
       _depLivraison = r;
-      _depRetour(`✓ ${r.colis_scanne.code} — ${r.colis_scanne.produit_nom} ajouté à la livraison ${r.numero}`, true);
+      _depRetour(`✓ ${r.colis_scanne.code_lisible} — ${r.colis_scanne.produit_nom} ajouté à la livraison ${r.numero}`, true);
     }
     await loadPosDepot();
-  }catch(e){ _depRetour('✗ ' + (e.message||'Scan refusé'), false); }
+  }catch(e){
+    _depRetour('✗ ' + String(e.message||'Scan refusé').replace(/^\[\d+\]\s*/,''), false);
+    // Colis déjà livré : afficher directement sa fiche de livraison
+    if(e.detail && e.detail.deja_livre && e.detail.colis_id) depOuvrirFiche(e.detail.colis_id);
+  }
   inp.focus();
 }
 
@@ -28577,6 +28656,69 @@ async function depCamera(){
   }catch(e){ posAlert('Caméra refusée ou absente : utilisez la douchette ou tapez le code.'); box.style.display='none'; _depCamera=null; }
 }
 
+// Fiche de livraison / traçabilité d'un colis
+async function depOuvrirFiche(colisId){
+  try{ depAfficherFiche(await apiFetch('GET',`/pos/depot/colis/${colisId}/fiche`)); }
+  catch(e){ posAlert(e.message||'Fiche indisponible.'); }
+}
+
+function _depDateHeure(iso){
+  if(!iso) return '—';
+  const d=new Date(iso);
+  return `${d.toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})} à ${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
+}
+
+function depAfficherFiche(f){
+  const c=f.colis, l=f.livraison, a=f.achat;
+  const couleur={LIVRE:'ok', AU_DEPOT:'info', EN_PREPARATION:'warn', A_VERIFIER:'warn', ANNULE:'err'}[c.statut]||'info';
+  const ico={CREE:'＋', VERIFIE:'✓', AJOUTE_LIVRAISON:'⇢', RETIRE_LIVRAISON:'↩', LIVRE:'⛟', RETOUR_DEPOT:'↩', ANNULE:'✕', CONSULTATION:'👁', SCAN_REFUSE:'⚠'};
+  const ligne=(lbl,val)=>`<div class="df-l"><span>${lbl}</span><strong>${val}</strong></div>`;
+  const livre = f.deja_livre && l;
+  document.getElementById('dep-fiche-corps').innerHTML = `
+    <div class="df-statut df-${couleur}">
+      <div class="df-statut-l">${esc(c.statut_libelle).toUpperCase()}</div>
+      ${livre?`<div class="df-statut-s">Livré au <b>${esc(l.lieu_nom)}</b> le ${_depDateHeure(l.valide_le)}</div>`
+             :`<div class="df-statut-s">${c.lieu_nom?`Lieu : ${esc(c.lieu_nom)}`:'Au dépôt ou en attente'}</div>`}
+    </div>
+    <div class="df-grille">
+      <div class="df-bloc">
+        <div class="df-titre">Colis</div>
+        ${ligne('Code', `<span class="dep-code">${esc(c.code_lisible)}</span>`)}
+        ${ligne('Produit', esc(c.produit_nom||'—'))}
+        ${ligne('Quantité', `${c.quantite} ${esc(c.unite||'u.')}`)}
+        ${a?ligne('Achat', `#${a.id}${a.fournisseur?' · '+esc(a.fournisseur):''}`):''}
+        ${ligne('Créé le', _depDateHeure(c.cree_le))}
+        ${c.verifie_le?ligne('Vérifié au dépôt', `${_depDateHeure(c.verifie_le)}${c.verifie_par?' · '+esc(c.verifie_par):''}`):''}
+      </div>
+      <div class="df-bloc">
+        <div class="df-titre">Livraison</div>
+        ${l?`
+          ${ligne('N° de livraison', esc(l.numero))}
+          ${ligne('Point de livraison', esc(l.lieu_nom))}
+          ${ligne('Statut', esc({PREPARATION:'En préparation',VALIDEE:'Validée',ANNULEE:'Annulée'}[l.statut]||l.statut))}
+          ${ligne('Préparée par', esc(l.cree_par||'—'))}
+          ${ligne('Validée par', esc(l.valide_par||'—'))}
+          ${ligne('Date et heure', _depDateHeure(l.valide_le))}`
+        :'<div class="df-vide">Ce colis n\'a pas encore été livré.</div>'}
+      </div>
+    </div>
+    <div class="df-titre" style="margin-top:14px">Historique complet</div>
+    <ol class="df-histo">
+      ${(f.historique||[]).map(e=>`<li class="df-h-${esc(e.type)}">
+        <span class="df-h-ico">${ico[e.type]||'•'}</span>
+        <div><div class="df-h-l">${esc(e.libelle)}${e.type!=='CREE'&&e.type!=='CONSULTATION'?` · ${esc(e.lieu_nom)}`:''}${e.livraison?` · ${esc(e.livraison)}`:''}</div>
+        <div class="df-h-s">${_depDateHeure(e.horodatage)}${e.par?' · '+esc(e.par):''}${e.details&&e.type!=='LIVRE'?' · '+esc(e.details):''}</div></div>
+      </li>`).join('') || '<li class="df-vide">Aucun événement enregistré.</li>'}
+    </ol>`;
+  document.getElementById('dep-fiche-titre').textContent = `Fiche ${livre?'de livraison':'du colis'} — ${c.code_lisible}`;
+  document.getElementById('dep-fiche-bg').classList.add('open');
+}
+
+function depFermerFiche(){
+  document.getElementById('dep-fiche-bg').classList.remove('open');
+  document.getElementById('dep-scan-input')?.focus();
+}
+
 function depRenderReceptions(rec){
   const achats = rec.achats_a_receptionner || [];
   const colis  = rec.colis_a_verifier || [];
@@ -28591,7 +28733,7 @@ function depRenderReceptions(rec){
     </div>`).join('') : '<div class="dep-vide">Aucun achat en attente.</div>';
   document.getElementById('dep-colis-verif').innerHTML = colis.length ? colis.slice(0,60).map(c=>`
     <div class="dep-ligne">
-      <div><span class="dep-code">${esc(c.code)}</span> ${esc(c.produit_nom||'')} · ${c.quantite} ${esc(c.unite||'u.')}
+      <div><button type="button" class="dep-code dep-code-btn" onclick="depOuvrirFiche(${c.id})" title="Voir la fiche">${esc(c.code_lisible||c.code)}</button> ${esc(c.produit_nom||'')} · ${c.quantite} ${esc(c.unite||'u.')}
         <div class="dep-sous">Achat #${c.achat_id||'—'}</div></div>
       <button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="depAnnulerColis(${c.id},'${esc(c.code)}')">Retirer</button>
     </div>`).join('') + (colis.length>60?`<div class="dep-sous">… et ${colis.length-60} autres</div>`:'')
@@ -28681,7 +28823,7 @@ function depRenderLivraison(){
       · ${l.nb_lignes} ligne(s) · ${l.total_unites} unité(s)</div>
     <div class="pos-table-wrap"><table class="pos-table">
       <thead><tr><th>Produit</th><th>Colis</th><th class="tr">Quantité</th><th></th></tr></thead>
-      <tbody>${(l.lignes||[]).map(x=>`<tr><td>${esc(x.produit_nom||'')}</td><td>${x.colis_code?`<span class="dep-code">${esc(x.colis_code)}</span>`:'<em>vrac</em>'}</td>
+      <tbody>${(l.lignes||[]).map(x=>`<tr><td>${esc(x.produit_nom||'')}</td><td>${x.colis_code?`<button type="button" class="dep-code dep-code-btn" onclick="depOuvrirFiche(${x.colis_id})">${esc(x.colis_code)}</button>`:'<em>vrac</em>'}</td>
         <td class="tr">${x.quantite}</td><td class="tr"><button class="pos-btn ghost" style="padding:2px 8px;font-size:12px" onclick="depRetirerLigne(${x.id})">✕</button></td></tr>`).join('')
         || '<tr><td colspan="4" style="text-align:center;padding:14px;color:rgba(255,255,255,.35)">Scannez les colis à livrer (mode « Ajouter à la livraison »).</td></tr>'}</tbody>
     </table></div>
@@ -28726,6 +28868,21 @@ async function depAnnulerLivraison(){
   if(!await showConfirm(`Annuler la livraison ${l.numero} ? Les colis scannés retournent au dépôt.`, {title:'Annuler la livraison', type:'danger', okLabel:'Annuler la livraison'})) return;
   try{ await apiFetch('POST',`/pos/depot/livraisons/${l.id}/annuler`,{}); _depLivraison=null; depSetMode('verif'); await loadPosDepot(); }
   catch(e){ posAlert(e.message); }
+}
+
+async function depChargerJournal(){
+  const tbody=document.getElementById('dep-journal-tbody'); if(!tbody) return;
+  const type=document.getElementById('dep-journal-type')?.value||'';
+  try{
+    const rows=await apiFetch('GET','/pos/depot/journal?limite=100'+(type?`&type=${encodeURIComponent(type)}`:''));
+    tbody.innerHTML = rows.map(e=>`<tr class="${e.type==='REJET'||e.type==='SCAN_REFUSE'?'dep-j-alerte':''}">
+      <td class="num" style="white-space:nowrap">${new Date(e.horodatage).toLocaleString('fr-FR')}</td>
+      <td>${esc(e.libelle)}</td>
+      <td>${e.colis_id?`<button type="button" class="dep-code dep-code-btn" onclick="depOuvrirFiche(${e.colis_id})">${esc(e.code||'')}</button>`:`<span class="dep-code">${esc(e.code||'—')}</span>`}</td>
+      <td>${esc(e.produit_nom||'—')}</td><td>${esc(e.lieu_nom||'')}${e.livraison?` · ${esc(e.livraison)}`:''}</td>
+      <td>${esc(e.par||'—')}</td><td>${esc(e.details||'')}</td></tr>`).join('')
+      || '<tr><td colspan="7" style="text-align:center;padding:14px;color:rgba(255,255,255,.3)">Aucun événement</td></tr>';
+  }catch(e){ tbody.innerHTML=`<tr><td colspan="7" style="color:#f87171;padding:12px">${esc(e.message||'')}</td></tr>`; }
 }
 
 function depRenderHistorique(livs){

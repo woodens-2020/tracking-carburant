@@ -94,7 +94,7 @@ def test_colis_non_verifie_ne_peut_pas_partir(client, db):
     code = client.post(f"/api/pos/depot/receptions/{a.id}", headers=H, json={}).json()["colis"][0]["code"]
     liv = client.post("/api/pos/depot/livraisons", headers=H, json={"lieu": "DEVANT"}).json()
     r = client.post(f"/api/pos/depot/livraisons/{liv['id']}/scan", headers=H, json={"code": code})
-    assert r.status_code == 409 and "vérifié" in r.json()["detail"]
+    assert r.status_code == 409 and "vérifié" in r.json()["detail"]["message"]
 
 
 def test_annuler_livraison_remet_au_depot(client, db):
@@ -147,3 +147,81 @@ def test_fonctions_retirees(client, db):
                     json={"nb_caisses": 1, "nb_unites_vrac": 0})
     assert r.status_code in (410, 422)
     assert client.get("/api/pos/commandes", headers=H).status_code in (404, 405)
+
+
+# ── Traçabilité et sécurité des codes ────────────────────────────────────
+
+def _colis_livre(client, db, lieu="DEVANT"):
+    p = _produit(db)
+    a = _achat(db, p, 24)
+    code = client.post(f"/api/pos/depot/receptions/{a.id}", headers=H, json={}).json()["colis"][0]["code"]
+    client.post("/api/pos/depot/colis/verifier", headers=H, json={"code": code})
+    liv = client.post("/api/pos/depot/livraisons", headers=H, json={"lieu": lieu}).json()
+    client.post(f"/api/pos/depot/livraisons/{liv['id']}/scan", headers=H, json={"code": code})
+    client.post(f"/api/pos/depot/livraisons/{liv['id']}/valider", headers=H)
+    return p, code, liv
+
+
+def test_code_signe_et_cle_de_controle(client, db):
+    p = _produit(db)
+    a = _achat(db, p, 24)
+    code = client.post(f"/api/pos/depot/receptions/{a.id}", headers=H, json={}).json()["colis"][0]["code"]
+    assert len(code) == 14 and code[:2] == "BC" and code[2:].isdigit()
+    # Un chiffre de la clé modifié → rejeté avant toute lecture, et journalisé
+    faux = code[:-1] + str((int(code[-1]) + 1) % 10)
+    r = client.post("/api/pos/depot/colis/verifier", headers=H, json={"code": faux})
+    assert r.status_code == 400 and "falsifié" in r.json()["detail"]
+    # Un numéro de colis inventé avec une clé au hasard → rejeté aussi
+    r = client.post("/api/pos/depot/colis/verifier", headers=H, json={"code": code[:4] + "999999" + code[-4:]})
+    assert r.status_code == 400
+    rejets = client.get("/api/pos/depot/journal?type=REJET", headers=H).json()
+    assert any("Clé de contrôle" in (e["details"] or "") for e in rejets)
+    # Le vrai code (avec tirets, tel qu'imprimé) est accepté
+    lisible = f"{code[:4]}-{code[4:10]}-{code[10:]}"
+    assert client.post("/api/pos/depot/colis/verifier", headers=H, json={"code": lisible}).status_code == 200
+
+
+def test_entrees_dangereuses_rejetees(client, db):
+    for texte in ["' OR 1=1 --", "<script>alert(1)</script>", "BC26000001; DROP TABLE bar_colis", "x" * 500, ""]:
+        r = client.post("/api/pos/depot/colis/verifier", headers=H, json={"code": texte[:200]})
+        assert r.status_code in (400, 422), (texte, r.status_code)
+    # La table est intacte et le journal a gardé une trace neutralisée
+    assert client.get("/api/pos/depot/colis", headers=H).status_code == 200
+    for e in client.get("/api/pos/depot/journal?type=REJET", headers=H).json():
+        assert "<" not in (e["code"] or "") and "'" not in (e["code"] or "")
+
+
+def test_double_scan_un_seul_effet(client, db):
+    """Deux vérifications du même colis : une seule entrée de stock."""
+    p = _produit(db)
+    a = _achat(db, p, 24)
+    code = client.post(f"/api/pos/depot/receptions/{a.id}", headers=H, json={}).json()["colis"][0]["code"]
+    r1 = client.post("/api/pos/depot/colis/verifier", headers=H, json={"code": code})
+    r2 = client.post("/api/pos/depot/colis/verifier", headers=H, json={"code": code})
+    assert (r1.status_code, r2.status_code) == (200, 409)
+    assert _stock(client, p.id)["depot"] == 24
+    # Double validation d'une livraison : un seul transfert
+    liv = client.post("/api/pos/depot/livraisons", headers=H, json={"lieu": "PISCINE"}).json()
+    client.post(f"/api/pos/depot/livraisons/{liv['id']}/scan", headers=H, json={"code": code})
+    v1 = client.post(f"/api/pos/depot/livraisons/{liv['id']}/valider", headers=H)
+    v2 = client.post(f"/api/pos/depot/livraisons/{liv['id']}/valider", headers=H)
+    assert (v1.status_code, v2.status_code) == (200, 409)
+    s = _stock(client, p.id)
+    assert (s["depot"], s["piscine"], s["total"]) == (0, 24, 24)
+
+
+def test_rescan_colis_livre_donne_la_fiche(client, db):
+    p, code, liv = _colis_livre(client, db, lieu="PISCINE")
+    # Rescanné en livraison : refusé, avec l'indication « déjà livré »
+    liv2 = client.post("/api/pos/depot/livraisons", headers=H, json={"lieu": "DEVANT"}).json()
+    r = client.post(f"/api/pos/depot/livraisons/{liv2['id']}/scan", headers=H, json={"code": code})
+    assert r.status_code == 409 and r.json()["detail"]["deja_livre"] is True
+    # Fiche de livraison
+    f = client.post("/api/pos/depot/colis/consulter", headers=H, json={"code": code}).json()
+    assert f["deja_livre"] is True
+    assert f["colis"]["statut_libelle"] == "Déjà livré" and f["colis"]["lieu_nom"] == "Bar piscine"
+    assert f["livraison"]["numero"] == liv["numero"] and f["livraison"]["valide_le"]
+    types = [e["type"] for e in f["historique"]]
+    assert types[:4] == ["CREE", "VERIFIE", "AJOUTE_LIVRAISON", "LIVRE"]
+    assert "SCAN_REFUSE" in types and types[-1] == "CONSULTATION"
+    assert all(e["horodatage"] for e in f["historique"])

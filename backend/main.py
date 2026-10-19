@@ -268,6 +268,9 @@ app.include_router(listes_reference_router)
 @app.on_event("startup")
 def startup():
     init_db()
+    # Clé de signature des codes de colis du dépôt bar (créée une seule fois)
+    from bar_depot_routes import initialiser_secret_codes
+    initialiser_secret_codes()
     # Migrations douces — colonnes ajoutées progressivement
     from sqlalchemy import text as _text
     _migrations = [

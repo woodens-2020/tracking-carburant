@@ -14,6 +14,25 @@ Préfixe /api/pos/depot.
     7. Mise à jour des stocks       → POST /livraisons/{id}/valider
                                       (stock DÉPÔT −, stock du bar +)
 
+Traçabilité : chaque étape d'un colis est inscrite dans
+bar_colis_evenements (horodatage du serveur de base, utilisateur, lieu,
+livraison). Rescanner un colis déjà livré renvoie sa fiche de livraison
+(POST /colis/consulter, GET /colis/{id}/fiche).
+
+Sécurité des codes :
+  - Format : BC + année (2 chiffres) + n° du colis (6 chiffres) + clé de
+    contrôle (4 chiffres) = HMAC-SHA256 du début avec un secret propre à
+    l'installation (table secrets_application). Un code inventé ou dont un
+    chiffre est modifié est rejeté avant toute lecture en base, et le rejet
+    est journalisé. Les codes générés avant la clé (BC + 8 chiffres)
+    restent acceptés uniquement s'ils existent en base.
+  - Le texte lu par le scanner est validé par liste blanche (lettres BC et
+    chiffres uniquement, longueur bornée) : rien d'autre n'atteint la base,
+    et les requêtes sont paramétrées (SQLAlchemy).
+  - Concurrence : chaque changement d'état est un UPDATE conditionnel sur
+    l'état attendu (« seulement si encore A_VERIFIER ») ; le premier scan
+    gagne, le second reçoit 409 — jamais de double entrée de stock.
+
 Le stock reste calculé à partir de BarMouvementStock (source unique) :
 lieu NULL = dépôt, DEVANT = Bar avant, PISCINE = Bar piscine. Une
 livraison crée deux mouvements TRANSFERT de même quantité : le stock total
@@ -21,7 +40,11 @@ ne change pas, seule sa localisation change.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import io
+import re
+import secrets
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_DOWN
@@ -30,12 +53,13 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import (
-    BarAchat, BarColis, BarLivraisonInterne, BarLivraisonLigne,
-    BarMouvementStock, BarProduit, Utilisateur,
+    BarAchat, BarColis, BarColisEvenement, BarLivraisonInterne, BarLivraisonLigne,
+    BarMouvementStock, BarProduit, SecretApplication, Utilisateur,
 )
 from pos_service import stock_par_lieu_tous_produits
 from tz_utils import now_haiti
@@ -44,6 +68,26 @@ router = APIRouter(prefix="/api/pos/depot", tags=["Dépôt Bar"])
 
 LIEUX = {"DEVANT": "Bar avant", "PISCINE": "Bar piscine"}
 MAX_COLIS_PAR_RECEPTION = 500
+
+STATUTS = {
+    "A_VERIFIER":     "À vérifier au dépôt",
+    "AU_DEPOT":       "Au dépôt",
+    "EN_PREPARATION": "En préparation de livraison",
+    "LIVRE":          "Déjà livré",
+    "ANNULE":         "Annulé",
+}
+EVENEMENTS = {
+    "CREE":              "Colis créé à la réception",
+    "VERIFIE":           "Vérifié au dépôt — entré en stock",
+    "AJOUTE_LIVRAISON":  "Scanné dans une livraison",
+    "RETIRE_LIVRAISON":  "Retiré de la livraison",
+    "LIVRE":             "Livré",
+    "RETOUR_DEPOT":      "Livraison annulée — retour au dépôt",
+    "ANNULE":            "Colis annulé",
+    "CONSULTATION":      "Fiche consultée",
+    "SCAN_REFUSE":       "Scan refusé",
+    "REJET":             "Code rejeté",
+}
 
 
 # ── Droits ────────────────────────────────────────────────────────────────
@@ -72,30 +116,187 @@ def _require_depot(request: Request, db: Session = Depends(get_db)) -> Utilisate
     raise HTTPException(403, "Réservé au dépôt (administrateur, manager ou responsable de dépôt).")
 
 
-# ── Utilitaires ───────────────────────────────────────────────────────────
+def _require_connecte(request: Request):
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise HTTPException(403, "Non autorisé.")
+    return user
 
-def _code_saisi(texte: str) -> str:
-    """Accepte le code seul ou une URL contenant le code (scan de QR)."""
-    t = (texte or "").strip()
+
+# ── Codes : génération signée et validation stricte ──────────────────────
+
+_RE_CODE_SIGNE = re.compile(r"^BC(\d{2})(\d{6})(\d{4})$")
+_RE_CODE_ANCIEN = re.compile(r"^BC\d{8}$")
+_SECRET_CLE = "bar_colis_hmac"
+_secret_cache: dict = {}
+
+
+def _secret_codes(db: Session) -> bytes:
+    """Clé de signature des codes, créée une fois par installation et
+    conservée en base (jamais renvoyée par l'API). Créée dans sa PROPRE
+    transaction, validée immédiatement : l'annulation de la requête en
+    cours ne peut jamais l'effacer après qu'elle a servi à signer un code."""
+    if "v" in _secret_cache:
+        return _secret_cache["v"]
+    from database import SessionLocal
+    with SessionLocal() as s:
+        row = s.query(SecretApplication).filter_by(cle=_SECRET_CLE).first()
+        if not row:
+            try:
+                s.add(SecretApplication(cle=_SECRET_CLE, valeur=secrets.token_hex(32)))
+                s.commit()
+            except IntegrityError:
+                s.rollback()        # créée au même moment par une autre requête
+            row = s.query(SecretApplication).filter_by(cle=_SECRET_CLE).first()
+        _secret_cache["v"] = row.valeur.encode()
+    return _secret_cache["v"]
+
+
+def initialiser_secret_codes() -> None:
+    """Appelé au démarrage de l'application : crée la clé de signature si
+    elle n'existe pas encore, avant toute requête (évite qu'elle soit créée
+    pendant une transaction d'écriture)."""
+    _secret_cache.pop("v", None)
+    _secret_codes(None)
+
+
+def _cle_controle(db: Session, base: str) -> str:
+    mac = hmac.new(_secret_codes(db), base.encode(), hashlib.sha256).hexdigest()
+    return f"{int(mac, 16) % 10000:04d}"
+
+
+def generer_code(db: Session, colis_id: int) -> str:
+    base = f"BC{now_haiti():%y}{colis_id:06d}"
+    return base + _cle_controle(db, base)
+
+
+def code_lisible(code: str) -> str:
+    """BC26000123 4817 → « BC26-000123-4817 » pour la lecture humaine."""
+    m = _RE_CODE_SIGNE.match(code or "")
+    return f"BC{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else (code or "")
+
+
+class CodeRejete(Exception):
+    def __init__(self, message: str, motif: str):
+        super().__init__(message)
+        self.message, self.motif = message, motif
+
+
+def normaliser_code(db: Session, texte: str) -> str:
+    """Valide le texte lu par le scanner (liste blanche stricte) et vérifie
+    la clé de contrôle. Lève CodeRejete sinon. Accepte le code seul, avec
+    tirets ou espaces, ou une URL qui se termine par le code."""
+    brut = (texte or "")[:200]
+    t = brut.strip()
     if "/" in t:
         t = t.rstrip("/").rsplit("/", 1)[-1]
-    return t.upper()
+    t = re.sub(r"[\s\-]", "", t).upper()
+    if not t:
+        raise CodeRejete("Aucun code lu.", "vide")
+    if len(t) > 20 or not re.fullmatch(r"[A-Z0-9]+", t):
+        raise CodeRejete("Ce code n'est pas un code de colis du dépôt.", "format")
+    m = _RE_CODE_SIGNE.match(t)
+    if m:
+        base = t[:-4]
+        if not hmac.compare_digest(_cle_controle(db, base), m.group(3)):
+            raise CodeRejete("Code invalide ou falsifié : la clé de contrôle ne correspond pas.", "cle")
+        return t
+    if _RE_CODE_ANCIEN.match(t):
+        return t        # ancien format : accepté seulement s'il existe en base
+    raise CodeRejete("Ce code n'est pas un code de colis du dépôt.", "format")
 
+
+def _journaliser(db: Session, type_: str, colis: Optional[BarColis] = None, *, lieu: Optional[str] = None,
+                 livraison_id: Optional[int] = None, utilisateur_id: Optional[int] = None,
+                 details: Optional[str] = None, code_saisi: Optional[str] = None) -> None:
+    db.add(BarColisEvenement(
+        colis_id=colis.id if colis else None, type=type_, lieu=lieu, livraison_id=livraison_id,
+        utilisateur_id=utilisateur_id, details=(details or None) and details[:300],
+        code_saisi=(code_saisi or None) and re.sub(r"[^A-Za-z0-9\-]", "?", code_saisi)[:40],
+    ))
+
+
+def _trouver_colis(db: Session, texte: str, user_id: Optional[int]) -> BarColis:
+    """Code validé puis colis existant ; tout rejet est journalisé."""
+    try:
+        code = normaliser_code(db, texte)
+    except CodeRejete as e:
+        _journaliser(db, "REJET", utilisateur_id=user_id, code_saisi=texte, details=e.motif)
+        db.commit()
+        raise HTTPException(400, e.message)
+    c = db.query(BarColis).filter(BarColis.code == code).first()
+    if not c:
+        _journaliser(db, "REJET", utilisateur_id=user_id, code_saisi=code, details="inconnu")
+        db.commit()
+        raise HTTPException(404, f"Colis {code_lisible(code)} inconnu.")
+    return c
+
+
+def _transition(db: Session, colis_id: int, de: tuple, valeurs: dict) -> bool:
+    """Change l'état d'un colis seulement s'il est encore dans un des états
+    attendus (UPDATE conditionnel, atomique) : de deux scans simultanés,
+    un seul réussit."""
+    n = (db.query(BarColis)
+         .filter(BarColis.id == colis_id, BarColis.statut.in_(de))
+         .update(valeurs, synchronize_session=False))
+    return n == 1
+
+
+def _refus(db: Session, c: BarColis, user_id: Optional[int], message: str, code_http: int = 409):
+    """Refus d'une action sur un colis : journalisé, et la réponse indique
+    si une fiche de livraison existe (colis déjà livré)."""
+    db.rollback()
+    db.refresh(c)
+    _journaliser(db, "SCAN_REFUSE", c, lieu=c.lieu, livraison_id=c.livraison_id,
+                 utilisateur_id=user_id, details=message)
+    db.commit()
+    raise HTTPException(code_http, {"message": message, "colis_id": c.id, "statut": c.statut,
+                                    "deja_livre": c.statut == "LIVRE"})
+
+
+def _etat_texte(c: BarColis) -> str:
+    if c.statut == "LIVRE":
+        return f"déjà livré au {LIEUX.get(c.lieu, c.lieu)}"
+    return {"AU_DEPOT": "déjà vérifié au dépôt", "EN_PREPARATION": "dans une livraison en préparation",
+            "A_VERIFIER": "pas encore vérifié au dépôt", "ANNULE": "annulé"}.get(c.statut, c.statut)
+
+
+# ── Représentations ───────────────────────────────────────────────────────
+
+def _iso(dt) -> Optional[str]:
+    """Date-heure ISO toujours avec fuseau (UTC si la base n'en donne pas),
+    pour un affichage exact à l'heure locale dans le navigateur."""
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
+
+
+_MOTIFS_REJET = {
+    "cle": "Clé de contrôle invalide (code falsifié ou mal lu)",
+    "format": "Format non reconnu",
+    "inconnu": "Code inexistant",
+    "vide": "Aucun code lu",
+}
 
 def _colis_dict(c: BarColis) -> dict:
     return {
         "id":           c.id,
         "code":         c.code,
+        "code_lisible": code_lisible(c.code),
         "produit_id":   c.produit_id,
         "produit_nom":  c.produit.nom if c.produit else None,
         "unite":        c.produit.unite if c.produit else None,
         "achat_id":     c.achat_id,
         "quantite":     float(c.quantite),
         "statut":       c.statut,
+        "statut_libelle": STATUTS.get(c.statut, c.statut),
         "lieu":         c.lieu,
+        "lieu_nom":     LIEUX.get(c.lieu) if c.lieu else None,
         "livraison_id": c.livraison_id,
-        "cree_le":      c.cree_le.isoformat() if c.cree_le else None,
-        "verifie_le":   c.verifie_le.isoformat() if c.verifie_le else None,
+        "cree_le":      _iso(c.cree_le),
+        "verifie_le":   _iso(c.verifie_le),
         "verifie_par":  c.verifie_par.nom_complet if c.verifie_par else None,
     }
 
@@ -108,9 +309,9 @@ def _livraison_dict(l: BarLivraisonInterne, details: bool = True) -> dict:
         "lieu_nom":    LIEUX.get(l.lieu, l.lieu),
         "statut":      l.statut,
         "notes":       l.notes,
-        "cree_le":     l.cree_le.isoformat() if l.cree_le else None,
+        "cree_le":     _iso(l.cree_le),
         "cree_par":    l.cree_par.nom_complet if l.cree_par else None,
-        "valide_le":   l.valide_le.isoformat() if l.valide_le else None,
+        "valide_le":   _iso(l.valide_le),
         "valide_par":  l.valide_par.nom_complet if l.valide_par else None,
         "nb_lignes":   len(l.lignes),
         "total_unites": float(sum(Decimal(str(x.quantite)) for x in l.lignes)),
@@ -120,10 +321,40 @@ def _livraison_dict(l: BarLivraisonInterne, details: bool = True) -> dict:
             "id":          x.id,
             "produit_id":  x.produit_id,
             "produit_nom": x.produit.nom if x.produit else None,
-            "colis_code":  x.colis.code if x.colis else None,
+            "colis_id":    x.colis_id,
+            "colis_code":  code_lisible(x.colis.code) if x.colis else None,
             "quantite":    float(x.quantite),
         } for x in l.lignes]
     return d
+
+
+def _fiche(db: Session, c: BarColis) -> dict:
+    """Fiche de livraison / traçabilité complète d'un colis."""
+    evts = (db.query(BarColisEvenement)
+            .filter(BarColisEvenement.colis_id == c.id)
+            .order_by(BarColisEvenement.horodatage, BarColisEvenement.id).all())
+    liv = db.get(BarLivraisonInterne, c.livraison_id) if c.livraison_id else None
+    achat = c.achat
+    return {
+        "colis": _colis_dict(c),
+        "deja_livre": c.statut == "LIVRE",
+        "livraison": _livraison_dict(liv, details=False) if liv else None,
+        "achat": {
+            "id": achat.id,
+            "fournisseur": achat.fournisseur,
+            "date_achat": _iso(achat.date_achat),
+        } if achat else None,
+        "historique": [{
+            "horodatage": _iso(e.horodatage),
+            "type": e.type,
+            "libelle": EVENEMENTS.get(e.type, e.type),
+            "lieu": e.lieu,
+            "lieu_nom": LIEUX.get(e.lieu) if e.lieu else "Dépôt",
+            "livraison": e.livraison.numero if e.livraison else None,
+            "par": e.utilisateur.nom_complet if e.utilisateur else None,
+            "details": e.details,
+        } for e in evts],
+    }
 
 
 def _stock_depot(db: Session, produit_id: int) -> Decimal:
@@ -143,6 +374,14 @@ def _quantite_reservee(db: Session, produit_id: int, sauf_livraison: Optional[in
     if sauf_livraison:
         q = q.filter(BarLivraisonInterne.id != sauf_livraison)
     return sum((Decimal(str(x.quantite)) for x in q.all()), Decimal("0"))
+
+
+def _colis_au_depot(db: Session, produit_id: int) -> Decimal:
+    """Unités au dépôt déjà rattachées à un colis étiqueté (AU_DEPOT ou en
+    préparation) : elles se livrent par scan, pas en vrac."""
+    rows = db.query(BarColis).filter(BarColis.produit_id == produit_id,
+                                     BarColis.statut.in_(("AU_DEPOT", "EN_PREPARATION"))).all()
+    return sum((Decimal(str(c.quantite)) for c in rows), Decimal("0"))
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -188,7 +427,9 @@ def receptionner_achat(db: Session, achat: BarAchat, unites_par_colis: Optional[
                      achat_id=achat.id, quantite=t, statut="A_VERIFIER")
         db.add(c)
         db.flush()
-        c.code = f"BC{now_haiti():%y}{c.id:06d}"
+        c.code = generer_code(db, c.id)
+        _journaliser(db, "CREE", c, utilisateur_id=utilisateur_id,
+                     details=f"Achat #{achat.id} · {float(t):g} {produit.unite if produit else 'u.'}")
         colis.append(c)
     return colis
 
@@ -220,7 +461,7 @@ def receptions_a_traiter(db: Session = Depends(get_db)):
         "quantite":    float(a.quantite),
         "unites_par_caisse": a.bar_produit.unites_par_caisse if a.bar_produit and a.bar_produit.vendu_par_caisse else None,
         "fournisseur": a.fournisseur,
-        "date_achat":  a.date_achat.isoformat() if a.date_achat else None,
+        "date_achat":  _iso(a.date_achat),
         "statut":      a.statut,
     } for a in achats if a.id not in avec_colis and a.statut == "EN_ATTENTE"]
     a_verifier = db.query(BarColis).filter(BarColis.statut == "A_VERIFIER").order_by(BarColis.id).all()
@@ -272,7 +513,7 @@ def _dessiner_etiquette(pdf, c: BarColis) -> None:
 
     # Code en clair, centré, sous le code-barres
     pdf.setFont("Helvetica-Bold", 9.5)
-    pdf.drawCentredString(ETIQ_LARGEUR / 2, 24.5, c.code)
+    pdf.drawCentredString(ETIQ_LARGEUR / 2, 24.5, code_lisible(c.code))
 
     # Produit
     nom = (c.produit.nom if c.produit else "") or ""
@@ -300,7 +541,7 @@ def etiquettes(achat_id: Optional[int] = None, ids: Optional[str] = None,
         q = q.filter(BarColis.achat_id == achat_id)
     elif ids:
         try:
-            liste = [int(x) for x in ids.split(",") if x.strip()]
+            liste = [int(x) for x in ids.split(",") if x.strip()][:MAX_COLIS_PAR_RECEPTION]
         except ValueError:
             raise HTTPException(400, "ids invalide.")
         q = q.filter(BarColis.id.in_(liste))
@@ -324,11 +565,11 @@ def etiquettes(achat_id: Optional[int] = None, ids: Optional[str] = None,
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# 3. Mise en dépôt et vérification (scan)
+# 3. Mise en dépôt et vérification (scan) · fiche de livraison
 # ══════════════════════════════════════════════════════════════════════════
 
 class ScanIn(BaseModel):
-    code: str
+    code: str = Field(max_length=200)
 
 
 @router.get("/colis")
@@ -336,6 +577,8 @@ def lister_colis(statut: Optional[str] = None, achat_id: Optional[int] = None,
                  db: Session = Depends(get_db)):
     q = db.query(BarColis)
     if statut:
+        if statut.upper() not in STATUTS:
+            raise HTTPException(400, "Statut inconnu.")
         q = q.filter(BarColis.statut == statut.upper())
     if achat_id:
         q = q.filter(BarColis.achat_id == achat_id)
@@ -343,35 +586,50 @@ def lister_colis(statut: Optional[str] = None, achat_id: Optional[int] = None,
 
 
 @router.get("/colis/code/{code}")
-def colis_par_code(code: str, db: Session = Depends(get_db)):
-    c = db.query(BarColis).filter(BarColis.code == _code_saisi(code)).first()
+def colis_par_code(code: str, request: Request, db: Session = Depends(get_db)):
+    u = _require_connecte(request)
+    return _colis_dict(_trouver_colis(db, code, u.id))
+
+
+@router.post("/colis/consulter")
+def consulter_colis(data: ScanIn, request: Request, db: Session = Depends(get_db)):
+    """Scan en mode consultation : renvoie la fiche du colis (fiche de
+    livraison s'il est déjà livré) et inscrit la consultation au journal."""
+    u = _require_connecte(request)
+    c = _trouver_colis(db, data.code, u.id)
+    _journaliser(db, "CONSULTATION", c, lieu=c.lieu, livraison_id=c.livraison_id, utilisateur_id=u.id)
+    db.commit()
+    return _fiche(db, c)
+
+
+@router.get("/colis/{colis_id}/fiche")
+def fiche_colis(colis_id: int, request: Request, db: Session = Depends(get_db)):
+    _require_connecte(request)
+    c = db.get(BarColis, colis_id)
     if not c:
-        raise HTTPException(404, f"Colis « {_code_saisi(code)} » inconnu.")
-    return _colis_dict(c)
+        raise HTTPException(404, "Colis introuvable.")
+    return _fiche(db, c)
 
 
 @router.post("/colis/verifier")
 def verifier_colis(data: ScanIn, request: Request, db: Session = Depends(get_db),
                    user=Depends(_require_depot)):
     """Scan au dépôt : le colis est physiquement présent → son contenu entre
-    dans le stock du dépôt."""
-    code = _code_saisi(data.code)
-    c = db.query(BarColis).filter(BarColis.code == code).first()
-    if not c:
-        raise HTTPException(404, f"Colis « {code} » inconnu.")
-    if c.statut != "A_VERIFIER":
-        etats = {"AU_DEPOT": "déjà vérifié au dépôt", "EN_PREPARATION": "dans une livraison en préparation",
-                 "LIVRE": f"déjà livré au {LIEUX.get(c.lieu, c.lieu)}", "ANNULE": "annulé"}
-        raise HTTPException(409, f"Colis {code} {etats.get(c.statut, c.statut)}.")
-    c.statut = "AU_DEPOT"
-    c.verifie_le = datetime.now(timezone.utc)
-    c.verifie_par_id = user.id
+    dans le stock du dépôt. Atomique : un seul des scans simultanés réussit."""
+    c = _trouver_colis(db, data.code, user.id)
+    maintenant = datetime.now(timezone.utc)
+    if not _transition(db, c.id, ("A_VERIFIER",),
+                       {"statut": "AU_DEPOT", "verifie_le": maintenant, "verifie_par_id": user.id}):
+        db.refresh(c)
+        _refus(db, c, user.id, f"Colis {code_lisible(c.code)} {_etat_texte(c)}.")
     db.add(BarMouvementStock(
         produit_id=c.produit_id, type_mouvement="ENTREE", quantite=c.quantite, lieu=None,
-        motif=f"Colis {c.code} vérifié au dépôt" + (f" (achat #{c.achat_id})" if c.achat_id else ""),
+        motif=f"Colis {code_lisible(c.code)} vérifié au dépôt" + (f" (achat #{c.achat_id})" if c.achat_id else ""),
         utilisateur_id=user.id,
     ))
+    _journaliser(db, "VERIFIE", c, utilisateur_id=user.id)
     db.commit()
+    db.refresh(c)
     restants = (db.query(BarColis).filter(BarColis.achat_id == c.achat_id,
                                           BarColis.statut == "A_VERIFIER").count()
                 if c.achat_id else 0)
@@ -384,11 +642,33 @@ def annuler_colis(colis_id: int, db: Session = Depends(get_db), user=Depends(_re
     c = db.get(BarColis, colis_id)
     if not c:
         raise HTTPException(404, "Colis introuvable.")
-    if c.statut != "A_VERIFIER":
-        raise HTTPException(409, "Seul un colis pas encore vérifié peut être annulé.")
-    c.statut = "ANNULE"
+    if not _transition(db, c.id, ("A_VERIFIER",), {"statut": "ANNULE"}):
+        db.refresh(c)
+        _refus(db, c, user.id, "Seul un colis pas encore vérifié peut être annulé.")
+    _journaliser(db, "ANNULE", c, utilisateur_id=user.id)
     db.commit()
+    db.refresh(c)
     return _colis_dict(c)
+
+
+@router.get("/journal")
+def journal(limite: int = 200, type: Optional[str] = None, db: Session = Depends(get_db),
+            user=Depends(_require_depot)):
+    """Derniers événements de traçabilité (dont les scans rejetés)."""
+    q = db.query(BarColisEvenement)
+    if type:
+        q = q.filter(BarColisEvenement.type == type.upper())
+    rows = q.order_by(BarColisEvenement.horodatage.desc(), BarColisEvenement.id.desc()).limit(min(limite, 1000)).all()
+    return [{
+        "horodatage": _iso(e.horodatage),
+        "type": e.type, "libelle": EVENEMENTS.get(e.type, e.type),
+        "colis_id": e.colis_id, "code": code_lisible(e.colis.code) if e.colis else (e.code_saisi or None),
+        "produit_nom": e.colis.produit.nom if e.colis and e.colis.produit else None,
+        "lieu_nom": LIEUX.get(e.lieu) if e.lieu else "Dépôt",
+        "livraison": e.livraison.numero if e.livraison else None,
+        "par": e.utilisateur.nom_complet if e.utilisateur else None,
+        "details": _MOTIFS_REJET.get(e.details, e.details) if e.type == "REJET" else e.details,
+    } for e in rows]
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -426,13 +706,13 @@ def stock_par_lieu(db: Session = Depends(get_db)):
 # ══════════════════════════════════════════════════════════════════════════
 
 class LivraisonIn(BaseModel):
-    lieu:  str
-    notes: Optional[str] = None
+    lieu:  str = Field(max_length=20)
+    notes: Optional[str] = Field(default=None, max_length=300)
 
 
 class VracIn(BaseModel):
     produit_id: int
-    quantite:   float = Field(gt=0)
+    quantite:   float = Field(gt=0, le=100000)
 
 
 def _livraison_en_preparation(db: Session, livraison_id: int) -> BarLivraisonInterne:
@@ -480,22 +760,20 @@ def detail_livraison(livraison_id: int, db: Session = Depends(get_db)):
 def scanner_colis_livraison(livraison_id: int, data: ScanIn, db: Session = Depends(get_db),
                             user=Depends(_require_depot)):
     l = _livraison_en_preparation(db, livraison_id)
-    code = _code_saisi(data.code)
-    c = db.query(BarColis).filter(BarColis.code == code).first()
-    if not c:
-        raise HTTPException(404, f"Colis « {code} » inconnu.")
-    if c.statut == "A_VERIFIER":
-        raise HTTPException(409, f"Colis {code} pas encore vérifié au dépôt : scannez-le d'abord en réception.")
-    if c.statut == "EN_PREPARATION":
-        ou = "cette livraison" if c.livraison_id == l.id else "une autre livraison"
-        raise HTTPException(409, f"Colis {code} déjà scanné dans {ou}.")
-    if c.statut != "AU_DEPOT":
-        raise HTTPException(409, f"Colis {code} n'est pas au dépôt (statut {c.statut}).")
-    c.statut = "EN_PREPARATION"
-    c.livraison_id = l.id
+    c = _trouver_colis(db, data.code, user.id)
+    if not _transition(db, c.id, ("AU_DEPOT",), {"statut": "EN_PREPARATION", "livraison_id": l.id}):
+        db.refresh(c)
+        if c.statut == "EN_PREPARATION":
+            ou = "cette livraison" if c.livraison_id == l.id else "une autre livraison"
+            _refus(db, c, user.id, f"Colis {code_lisible(c.code)} déjà scanné dans {ou}.")
+        if c.statut == "A_VERIFIER":
+            _refus(db, c, user.id, f"Colis {code_lisible(c.code)} pas encore vérifié au dépôt : scannez-le d'abord en réception.")
+        _refus(db, c, user.id, f"Colis {code_lisible(c.code)} {_etat_texte(c)}.")
     db.add(BarLivraisonLigne(livraison_id=l.id, produit_id=c.produit_id, colis_id=c.id, quantite=c.quantite))
+    _journaliser(db, "AJOUTE_LIVRAISON", c, lieu=l.lieu, livraison_id=l.id, utilisateur_id=user.id)
     db.commit()
     db.refresh(l)
+    db.refresh(c)
     return {**_livraison_dict(l), "colis_scanne": _colis_dict(c)}
 
 
@@ -519,14 +797,6 @@ def ajouter_vrac(livraison_id: int, data: VracIn, db: Session = Depends(get_db),
     return _livraison_dict(l)
 
 
-def _colis_au_depot(db: Session, produit_id: int) -> Decimal:
-    """Unités au dépôt déjà rattachées à un colis étiqueté (AU_DEPOT ou en
-    préparation) : elles se livrent par scan, pas en vrac."""
-    rows = db.query(BarColis).filter(BarColis.produit_id == produit_id,
-                                     BarColis.statut.in_(("AU_DEPOT", "EN_PREPARATION"))).all()
-    return sum((Decimal(str(c.quantite)) for c in rows), Decimal("0"))
-
-
 @router.delete("/livraisons/{livraison_id}/lignes/{ligne_id}")
 def retirer_ligne(livraison_id: int, ligne_id: int, db: Session = Depends(get_db),
                   user=Depends(_require_depot)):
@@ -534,9 +804,9 @@ def retirer_ligne(livraison_id: int, ligne_id: int, db: Session = Depends(get_db
     ligne = db.get(BarLivraisonLigne, ligne_id)
     if not ligne or ligne.livraison_id != l.id:
         raise HTTPException(404, "Ligne introuvable.")
-    if ligne.colis:
-        ligne.colis.statut = "AU_DEPOT"
-        ligne.colis.livraison_id = None
+    if ligne.colis_id:
+        _transition(db, ligne.colis_id, ("EN_PREPARATION",), {"statut": "AU_DEPOT", "livraison_id": None})
+        _journaliser(db, "RETIRE_LIVRAISON", ligne.colis, livraison_id=l.id, utilisateur_id=user.id)
     db.delete(ligne)
     db.commit()
     db.refresh(l)
@@ -545,7 +815,9 @@ def retirer_ligne(livraison_id: int, ligne_id: int, db: Session = Depends(get_db
 
 @router.post("/livraisons/{livraison_id}/valider")
 def valider_livraison(livraison_id: int, db: Session = Depends(get_db), user=Depends(_require_depot)):
-    """Mise à jour des stocks : chaque ligne sort du dépôt et entre au bar."""
+    """Mise à jour des stocks : chaque ligne sort du dépôt et entre au bar.
+    Le passage PREPARATION → VALIDEE est conditionnel : une double
+    validation (deux clics, deux postes) ne crée jamais deux transferts."""
     l = _livraison_en_preparation(db, livraison_id)
     if not l.lignes:
         raise HTTPException(422, "La livraison est vide : scannez au moins un colis.")
@@ -561,9 +833,17 @@ def valider_livraison(livraison_id: int, db: Session = Depends(get_db), user=Dep
             nom = db.get(BarProduit, pid).nom
             raise HTTPException(409, f"Stock en vrac insuffisant au dépôt pour « {nom} » "
                                      f"(disponible : {float(max(dispo, 0)):g}, demandé : {float(qte):g}).")
+    maintenant = datetime.now(timezone.utc)
+    n = (db.query(BarLivraisonInterne)
+         .filter(BarLivraisonInterne.id == l.id, BarLivraisonInterne.statut == "PREPARATION")
+         .update({"statut": "VALIDEE", "valide_le": maintenant, "valide_par_id": user.id},
+                 synchronize_session=False))
+    if n != 1:
+        db.rollback()
+        raise HTTPException(409, f"Livraison {l.numero} déjà validée ou annulée.")
     dest = LIEUX[l.lieu]
     for x in l.lignes:
-        ref = f"colis {x.colis.code}" if x.colis else "vrac"
+        ref = f"colis {code_lisible(x.colis.code)}" if x.colis else "vrac"
         motif = f"Livraison {l.numero} — {ref} → {dest}"
         db.add(BarMouvementStock(produit_id=x.produit_id, type_mouvement="TRANSFERT",
                                  quantite=-Decimal(str(x.quantite)), lieu=None,
@@ -571,12 +851,10 @@ def valider_livraison(livraison_id: int, db: Session = Depends(get_db), user=Dep
         db.add(BarMouvementStock(produit_id=x.produit_id, type_mouvement="TRANSFERT",
                                  quantite=Decimal(str(x.quantite)), lieu=l.lieu,
                                  motif=motif, utilisateur_id=user.id))
-        if x.colis:
-            x.colis.statut = "LIVRE"
-            x.colis.lieu = l.lieu
-    l.statut = "VALIDEE"
-    l.valide_le = datetime.now(timezone.utc)
-    l.valide_par_id = user.id
+        if x.colis_id:
+            _transition(db, x.colis_id, ("EN_PREPARATION",), {"statut": "LIVRE", "lieu": l.lieu})
+            _journaliser(db, "LIVRE", x.colis, lieu=l.lieu, livraison_id=l.id, utilisateur_id=user.id,
+                         details=f"Livraison {l.numero} vers le {dest}")
     db.commit()
     db.refresh(l)
     return _livraison_dict(l)
@@ -585,12 +863,18 @@ def valider_livraison(livraison_id: int, db: Session = Depends(get_db), user=Dep
 @router.post("/livraisons/{livraison_id}/annuler")
 def annuler_livraison(livraison_id: int, db: Session = Depends(get_db), user=Depends(_require_depot)):
     l = _livraison_en_preparation(db, livraison_id)
+    n = (db.query(BarLivraisonInterne)
+         .filter(BarLivraisonInterne.id == l.id, BarLivraisonInterne.statut == "PREPARATION")
+         .update({"statut": "ANNULEE"}, synchronize_session=False))
+    if n != 1:
+        db.rollback()
+        raise HTTPException(409, f"Livraison {l.numero} déjà validée ou annulée.")
     for x in l.lignes:
-        if x.colis:
-            x.colis.statut = "AU_DEPOT"
-            x.colis.livraison_id = None
-    l.statut = "ANNULEE"
+        if x.colis_id:
+            _transition(db, x.colis_id, ("EN_PREPARATION",), {"statut": "AU_DEPOT", "livraison_id": None})
+            _journaliser(db, "RETOUR_DEPOT", x.colis, livraison_id=l.id, utilisateur_id=user.id)
     db.commit()
+    db.refresh(l)
     return _livraison_dict(l)
 
 
@@ -600,13 +884,13 @@ def annuler_livraison(livraison_id: int, db: Session = Depends(get_db), user=Dep
 
 class LigneInventaireIn(BaseModel):
     produit_id: int
-    quantite:   float = Field(ge=0)
+    quantite:   float = Field(ge=0, le=1000000)
 
 
 class InventaireIn(BaseModel):
-    lieu:   str                      # DEPOT | DEVANT | PISCINE
-    motif:  str
-    lignes: List[LigneInventaireIn]
+    lieu:   str = Field(max_length=20)       # DEPOT | DEVANT | PISCINE
+    motif:  str = Field(max_length=250)
+    lignes: List[LigneInventaireIn] = Field(max_length=2000)
 
 
 @router.post("/inventaire")
