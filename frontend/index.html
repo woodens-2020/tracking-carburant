@@ -523,6 +523,34 @@ canvas{display:block}
 .cjr-table .tc{text-align:center}
 .cjr-vide td{opacity:.5}
 .cjr-ventes{max-width:900px}
+.cjr-periodes{display:flex;flex-direction:column;gap:14px;max-width:960px}
+.cjr-per{border-radius:var(--r);border:1px solid var(--border);border-left-width:5px;background:var(--panel);overflow:hidden}
+.cjr-per-matin{border-left-color:#f59e0b}
+.cjr-per-am{border-left-color:#818cf8}
+.cjr-per-tete{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)}
+.cjr-per-matin .cjr-per-tete{background:rgba(245,158,11,.10)}
+.cjr-per-am .cjr-per-tete{background:rgba(129,140,248,.12)}
+.cjr-per-ico{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;flex-shrink:0}
+.cjr-per-matin .cjr-per-ico{background:rgba(245,158,11,.2);color:#fbbf24}
+.cjr-per-am .cjr-per-ico{background:rgba(129,140,248,.22);color:#a5b4fc}
+.cjr-per-nom{font-size:17px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;display:flex;flex-direction:column;line-height:1.15}
+.cjr-per-matin .cjr-per-nom{color:#fbbf24}
+.cjr-per-am .cjr-per-nom{color:#a5b4fc}
+.cjr-per-nom small,.cjr-per-total-l small{font-size:11.5px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted);margin-top:2px}
+.cjr-per-res{margin-left:auto;display:flex;align-items:baseline;gap:14px;font-family:var(--mono)}
+.cjr-per-res span{color:var(--text2);font-size:13.5px}
+.cjr-per-res strong{font-size:19px;color:var(--text)}
+.cjr-per .cjr-table{margin:0}
+.cjr-per .cjr-table td:first-child,.cjr-per .cjr-table th:first-child{padding-left:20px}
+.cjr-per-sous td{font-weight:800;background:var(--panel2);border-top:1px solid var(--border2)}
+.cjr-per-total{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:var(--r);background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.35)}
+.cjr-per-total-l{font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--green2);display:flex;flex-direction:column}
+.cjr-per-total .cjr-per-res strong{color:var(--green2);font-size:21px}
+@media(max-width:620px){.cjr-per-tete,.cjr-per-total{flex-wrap:wrap}.cjr-per-res{margin-left:0;width:100%;justify-content:space-between}
+  .cjr-per .cjr-table th:nth-child(3),.cjr-per .cjr-table td:nth-child(3){display:none}
+  .cjr-per .cjr-table{min-width:0!important;width:100%;table-layout:auto}
+  .cjr-per .cjr-table th,.cjr-per .cjr-table td{padding:8px 8px!important;font-size:12.5px}
+  .cjr-per .cjr-table td:first-child,.cjr-per .cjr-table th:first-child{padding-left:12px!important;white-space:normal}}
 .cjr-ventes .cjr-grp td{background:var(--blue-d);color:var(--blue2);font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:12.5px;border-top:1px solid var(--border3)}
 .cjr-ventes .cjr-ind{padding-left:28px}
 .cjr-ventes .cjr-sous-total td{font-weight:800;background:var(--panel2);border-bottom:2px solid var(--border2)}
@@ -15505,25 +15533,51 @@ function _cjrPeriodeTexte(m){
   return m.unJour ? frDate(m.debut) : `du ${frDate(m.debut)} au ${frDate(m.fin)} (${m.jours.length} jours)`;
 }
 
-// Tableau des ventes : section Matin, section Après-midi, total général
+// Ventes : un bloc par période, bien séparés (couleur, icône, en-tête avec
+// sous-total), puis un bloc « Total » à part. Même structure à l'impression.
+const _CJR_ICONES = {
+  'Matin': '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>',
+  'Apres-midi': '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="1" y1="18" x2="3" y2="18"/><line x1="21" y1="18" x2="23" y2="18"/><line x1="18.36" y1="11.64" x2="19.78" y2="10.22"/><line x1="23" y1="22" x2="1" y2="22"/></svg>',
+};
+const _CJR_HORAIRES = {'Matin':'1re période de la journée', 'Apres-midi':'2e période de la journée'};
+
 function _cjrTableVentesHtml(m, impression){
   const t=m.totaux;
-  const cls = impression ? {num:'r', groupe:'grp', sous:'sub', tot:'tot'} : {num:'tr num', groupe:'cjr-grp', sous:'cjr-sous-total', tot:'recap-total'};
-  let corps='';
-  for(const s of m.sections){
-    corps+=`<tr class="${cls.groupe}"><td colspan="4">${s.libelle}</td></tr>`;
-    corps+= s.lignes.length
-      ? s.lignes.map(l=>`<tr><td class="cjr-ind">${esc(l.nom)}</td><td class="${cls.num}">${cjrGal(l.g)}</td><td class="${cls.num}">${cjrPx(l.prix)}</td><td class="${cls.num}">${cjrG(l.m)}</td></tr>`).join('')
-      : `<tr><td class="cjr-ind" colspan="4" style="opacity:.6">Aucune vente</td></tr>`;
-    corps+=`<tr class="${cls.sous}"><td>Sous-total ${s.libelle}</td><td class="${cls.num}">${cjrGal(s.g)}</td><td class="${cls.num}">${cjrPx(s.prix)}</td><td class="${cls.num}">${cjrG(s.m)}</td></tr>`;
+  const blocs=m.sections.map(s=>{
+    const lignes = s.lignes.length
+      ? s.lignes.map(l=>`<tr><td>${esc(l.nom)}</td><td class="${impression?'r':'tr num'}">${cjrGal(l.g)}</td><td class="${impression?'r':'tr num'}">${cjrPx(l.prix)}</td><td class="${impression?'r':'tr num'}">${cjrG(l.m)}</td></tr>`).join('')
+      : `<tr><td colspan="4" style="opacity:.6">Aucune vente sur cette période</td></tr>`;
+    const cle = s.cle==='Matin' ? 'matin' : 'am';
+    if(impression){
+      return `<div class="pv pv-${cle}">
+        <div class="pv-tete"><span class="pv-nom">${s.libelle.toUpperCase()}</span><span class="pv-res">${cjrGal(s.g)} · <b>${cjrG(s.m)}</b></span></div>
+        <table><thead><tr><th>Produit</th><th class="r">Gallons</th><th class="r">Prix moyen / gal</th><th class="r">Montant</th></tr></thead>
+        <tbody>${lignes}<tr class="pv-sous"><td>Sous-total ${s.libelle}</td><td class="r">${cjrGal(s.g)}</td><td class="r">${cjrPx(s.prix)}</td><td class="r">${cjrG(s.m)}</td></tr></tbody></table>
+      </div>`;
+    }
+    return `<div class="cjr-per cjr-per-${cle}">
+      <div class="cjr-per-tete">
+        <span class="cjr-per-ico">${_CJR_ICONES[s.cle]||''}</span>
+        <span class="cjr-per-nom">${s.libelle}<small>${_CJR_HORAIRES[s.cle]||''}</small></span>
+        <span class="cjr-per-res"><span class="num">${cjrGal(s.g)}</span><strong class="num">${cjrG(s.m)}</strong></span>
+      </div>
+      <div class="tbl-wrap"><table class="dt cjr-table">
+        <thead><tr><th>Produit</th><th class="tr">Gallons</th><th class="tr">Prix moyen / gal</th><th class="tr">Montant</th></tr></thead>
+        <tbody>${lignes}</tbody>
+        <tfoot><tr class="cjr-per-sous"><td>Sous-total ${s.libelle}</td><td class="tr num">${cjrGal(s.g)}</td><td class="tr num">${cjrPx(s.prix)}</td><td class="tr num">${cjrG(s.m)}</td></tr></tfoot>
+      </table></div>
+    </div>`;
+  }).join('');
+  if(m.sections.length<2) return blocs;
+  const libTot = m.unJour ? 'Total de la journée' : 'Total de la période';
+  const detail = m.sections.map(s=>`${s.libelle} ${cjrG(s.m)}`).join(' + ');
+  if(impression){
+    return blocs + `<div class="pv-total"><span>${libTot.toUpperCase()}</span><span class="pv-total-det">${detail}</span><span>${cjrGal(t.gallons)} · <b>${cjrG(t.ventes)}</b></span></div>`;
   }
-  if(m.sections.length>1){
-    corps+=`<tr class="${cls.tot}"><td>TOTAL ${m.unJour?'DE LA JOURNÉE':'DE LA PÉRIODE'}</td><td class="${cls.num}">${cjrGal(t.gallons)}</td><td class="${cls.num}">${cjrPx(t.gallons>0?t.ventes/t.gallons:0)}</td><td class="${cls.num}">${cjrG(t.ventes)}</td></tr>`;
-  }
-  const th = impression
-    ? '<tr><th>Période / produit</th><th class="r">Gallons</th><th class="r">Prix moyen / gal</th><th class="r">Montant</th></tr>'
-    : '<tr><th>Période / produit</th><th class="tr">Gallons</th><th class="tr">Prix moyen / gal</th><th class="tr">Montant</th></tr>';
-  return `<table class="${impression?'':'dt cjr-table cjr-ventes'}"><thead>${th}</thead><tbody>${corps}</tbody></table>`;
+  return blocs + `<div class="cjr-per-total">
+      <span class="cjr-per-total-l">${libTot}<small>${detail}</small></span>
+      <span class="cjr-per-res"><span class="num">${cjrGal(t.gallons)}</span><strong class="num">${cjrG(t.ventes)}</strong></span>
+    </div>`;
 }
 
 function cjrAfficher(){
@@ -15592,8 +15646,8 @@ function cjrAfficher(){
     </div>
     ${tableJours}
     <h3 class="cjr-h">Ventes de carburant</h3>
-    <div class="cjr-note">Source : relevés de compteurs · Matin puis Après-midi, chacun avec son sous-total.</div>
-    <div class="tbl-wrap">${_cjrTableVentesHtml(m,false)}</div>
+    <div class="cjr-note">Source : relevés de compteurs.</div>
+    <div class="cjr-periodes">${_cjrTableVentesHtml(m,false)}</div>
     <h3 class="cjr-h">Dépenses</h3>
     <div class="cjr-note">« Caisse générale » = non attribuée à la Gazoline ni au Diesel. Les transferts (dépôt en banque, Zelle) sortent de la caisse mais ne sont pas des charges.</div>
     ${tableDep}`;
@@ -15638,6 +15692,16 @@ function cjrImprimer(){
     td{padding:4px 6px;border-bottom:.5px solid #e5e7eb;font-variant-numeric:tabular-nums;vertical-align:top}
     .r{text-align:right}.c{text-align:center}.b{font-weight:700}.muted{color:#9ca3af}.nw{white-space:nowrap}
     .cjr-ind{padding-left:18px}
+    .pv{border:1px solid #d1d5db;border-left:4px solid;border-radius:5px;margin:0 0 8px;page-break-inside:avoid;overflow:hidden}
+    .pv-matin{border-left-color:#d97706}.pv-am{border-left-color:#4f46e5}
+    .pv-tete{display:flex;justify-content:space-between;align-items:center;padding:5px 8px}
+    .pv-matin .pv-tete{background:#fef3c7;color:#92400e}.pv-am .pv-tete{background:#e0e7ff;color:#3730a3}
+    .pv-nom{font-weight:800;letter-spacing:.1em;font-size:10px}
+    .pv-res{font-size:10px;font-variant-numeric:tabular-nums}
+    .pv table th{background:#f3f4f6;color:#374151}
+    .pv-sous td{font-weight:800;background:#f9fafb;border-top:1px solid #9ca3af}
+    .pv-total{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 10px;margin:0 0 4px;border:1.5px solid #0d9488;border-radius:5px;background:#ecfdf5;font-weight:800;font-size:11px;page-break-inside:avoid}
+    .pv-total-det{font-weight:500;font-size:9px;color:#374151}
     .grp td{background:#e0e7ff;font-weight:800;text-transform:uppercase;letter-spacing:.06em;font-size:9px;color:#1e3a8a;border-top:1px solid #6366f1}
     .sub td{background:#f3f4f6;font-weight:700;color:#111827;border-bottom:1px solid #9ca3af}
     .tot td{background:#ecfdf5;font-weight:800;border-top:1.5px solid #0d9488}
