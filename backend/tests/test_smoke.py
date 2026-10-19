@@ -8,33 +8,12 @@ démarrage comprises) et que les routes principales répondent sans erreur
 Lancer depuis backend/ :
     pytest tests/test_smoke.py -v
 """
-import os
-import sys
-import tempfile
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-_TMP = tempfile.mkdtemp(prefix="konekta-smoke-")
-os.environ["DATABASE_URL"] = "sqlite:///" + os.path.join(_TMP, "smoke.db").replace("\\", "/")
-os.environ["ADMIN_API_KEY"] = "smoke-test-key"
-os.environ["OTP_ENABLED"] = "false"
-os.environ["SECURE_COOKIES"] = "false"
-os.environ["APP_ENV"] = "test"
-for _k in ("EMAIL_HOST_PASSWORD", "TWILIO_AUTH_TOKEN", "GEMINI_API_KEY"):
-    os.environ.pop(_k, None)
-
 import pytest
 from fastapi.testclient import TestClient
 
-import main
+import main  # environnement de test préparé par conftest.py
 
 H = {"X-API-Key": "smoke-test-key"}
-
-
-@pytest.fixture(scope="module")
-def client():
-    with TestClient(main.app) as c:   # déclenche l'événement startup
-        yield c
 
 
 # ── Pages et configuration publiques ─────────────────────────────────────────

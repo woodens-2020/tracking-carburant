@@ -34,9 +34,9 @@ jobs:
       - name: Syntaxe Python
         run: python -m compileall -q backend
 
-      - name: Démarrage et routes principales (tests de fumée)
+      - name: Démarrage, routes principales et logique métier
         working-directory: backend
-        run: python -m pytest tests/test_smoke.py -v
+        run: python -m pytest tests/test_smoke.py tests/test_logique_stock.py tests/test_logique_metier.py -v
 
       - uses: actions/setup-node@v4
         with:

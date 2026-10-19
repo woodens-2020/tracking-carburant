@@ -220,6 +220,20 @@ def _migrate_columns():
             # l'admin) ; exigé désormais à la création d'un nouvel article.
             ("bar_produits", "lieu",
              "ALTER TABLE bar_produits ADD COLUMN lieu VARCHAR(20)", None),
+            # v26 — logique métier carburant : continuité des compteurs
+            ("releves", "ecart_compteur",
+             "ALTER TABLE releves ADD COLUMN ecart_compteur NUMERIC DEFAULT NULL", None),
+            ("releves", "motif_ecart_compteur",
+             "ALTER TABLE releves ADD COLUMN motif_ecart_compteur VARCHAR(255) DEFAULT NULL", None),
+            ("livraisons", "motif_reste_manuel",
+             "ALTER TABLE livraisons ADD COLUMN motif_reste_manuel VARCHAR(255) DEFAULT NULL", None),
+            ("livraisons", "motif_cloture",
+             "ALTER TABLE livraisons ADD COLUMN motif_cloture VARCHAR(255) DEFAULT NULL", None),
+            # Amorçage unique (exécuté seulement à l'ajout de la colonne) des
+            # catégories qui sont des transferts d'argent, pas des charges.
+            ("categories_depense", "est_transfert",
+             "ALTER TABLE categories_depense ADD COLUMN est_transfert INTEGER NOT NULL DEFAULT 0",
+             "UPDATE categories_depense SET est_transfert = 1 WHERE nom_norm LIKE '%banque%' OR nom_norm LIKE '%zelle%' OR nom_norm LIKE '%transfert%' OR nom_norm LIKE '%virement%'"),
         ]
     elif _is_postgres:
         new_cols = [
@@ -344,6 +358,20 @@ def _migrate_columns():
             # l'admin) ; exigé désormais à la création d'un nouvel article.
             ("bar_produits", "lieu",
              "ALTER TABLE bar_produits ADD COLUMN lieu VARCHAR(20)", None),
+            # v26 — logique métier carburant : continuité des compteurs
+            ("releves", "ecart_compteur",
+             "ALTER TABLE releves ADD COLUMN ecart_compteur NUMERIC(14,4)", None),
+            ("releves", "motif_ecart_compteur",
+             "ALTER TABLE releves ADD COLUMN motif_ecart_compteur VARCHAR(255)", None),
+            ("livraisons", "motif_reste_manuel",
+             "ALTER TABLE livraisons ADD COLUMN motif_reste_manuel VARCHAR(255)", None),
+            ("livraisons", "motif_cloture",
+             "ALTER TABLE livraisons ADD COLUMN motif_cloture VARCHAR(255)", None),
+            # Amorçage unique (exécuté seulement à l'ajout de la colonne) des
+            # catégories qui sont des transferts d'argent, pas des charges.
+            ("categories_depense", "est_transfert",
+             "ALTER TABLE categories_depense ADD COLUMN est_transfert BOOLEAN NOT NULL DEFAULT FALSE",
+             "UPDATE categories_depense SET est_transfert = TRUE WHERE nom_norm LIKE '%banque%' OR nom_norm LIKE '%zelle%' OR nom_norm LIKE '%transfert%' OR nom_norm LIKE '%virement%'"),
         ]
     else:
         return

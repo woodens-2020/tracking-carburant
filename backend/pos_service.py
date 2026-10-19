@@ -561,7 +561,7 @@ def detecter_anomalies_bar(date_cible: date_type, db: Session) -> list[dict]:
 
         if p.seuil_alerte_stock and stk <= _dec(p.seuil_alerte_stock):
             anomalies.append({
-                "type":          "DECALAGE_STOCK_BAR",
+                "type":          "STOCK_BAS_BAR",
                 "gravite":       "avertissement",
                 "produit_id":    p.id,
                 "produit_nom":   p.nom,

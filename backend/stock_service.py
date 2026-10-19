@@ -311,30 +311,52 @@ def _releve_apres_livraison(r: Releve, l: Livraison) -> bool:
     return r_cree >= l_cree
 
 
+_RANG_PERIODE = {"Matin": 0, "Apres-midi": 1}
+
+
+def _cle_chrono(r: Releve):
+    """Ordre chronologique d'un relevé : date, puis Matin avant Après-midi,
+    puis ordre de saisie."""
+    cree = r.created_at
+    if cree is not None and cree.tzinfo is None:
+        cree = cree.replace(tzinfo=timezone.utc)
+    return (
+        r.date,
+        _RANG_PERIODE.get(r.periode, 9),
+        cree or datetime.min.replace(tzinfo=timezone.utc),
+        r.id or 0,
+    )
+
+
 def fifo_allocation_livraisons(db: Session, produit_id: int) -> list[dict]:
     """
-    Attribue les ventes (relevés) du produit aux livraisons (cargaisons)
-    selon la DATE DE LIVRAISON : une cargaison reçoit les relevés datés à
-    partir de sa date de livraison, jusqu'à la date de la cargaison
-    suivante (exclue) — voir _releve_apres_livraison pour le jour même.
-    Une livraison saisie en retard avec une date passée récupère donc bien
-    les ventes faites depuis cette date.
+    Répartit les ventes (relevés) du produit entre les cargaisons — en FLUX,
+    pour qu'un même gallon vendu ne soit jamais compté deux fois.
 
-    Si une cargaison n'a pas assez de gallons pour couvrir ce qui a été
-    vendu pendant sa période, l'écart reste sur elle (reste à 0,
-    consommation plafonnée à son disponible) plutôt que de « déborder »
-    silencieusement sur la suivante.
+    Règles :
 
-    Une livraison "terminée" (clôturée) garde sa consommation figée au
-    moment de la clôture (gallons_restants_cloture) — jamais recalculée.
+    1. Une cargaison CLÔTURÉE garde sa consommation figée au moment de la
+       clôture (disponible − gallons_restants_cloture), jamais recalculée.
+    2. Les ventes sont prises dans l'ordre chronologique. Les premiers
+       gallons vendus, à hauteur du total figé des cargaisons clôturées, leur
+       appartiennent déjà : ils sont sautés.
+    3. Le reste remplit les cargaisons OUVERTES de la plus ancienne à la plus
+       récente, chacune jusqu'à son disponible. Une vente ne peut jamais être
+       attribuée à une cargaison arrivée APRÈS elle (voir
+       _releve_apres_livraison) : si la cargaison arrivée est pleine, le
+       surplus reste sur elle comme survente (vendu > disponible, reste 0).
 
-    N'affecte PAS gallons_livres() ni gallons_vendus(). Affecte
-    stock_restant() via gallons_ecartes().
+    Conséquence : Σ consommé (clôturées + ouvertes) + survente = total vendu,
+    et le reste des cargaisons ouvertes est toujours égal à
+    total livré − total vendu − écarts déclarés. Avant, l'attribution se
+    faisait par dates : une cargaison ouverte datée avant la clôture de la
+    précédente recomptait les ventes déjà figées dans celle-ci
+    (cas #43/#50 chez bpccp : 99,822 gal comptés deux fois).
 
     Retourne une liste ordonnée (du plus ancien au plus récent) de dicts :
     livraison_id, terminee, gallons_disponibles, gallons_consommes,
-    gallons_restants, vendu_periode, revenu_periode, periode_debut,
-    periode_fin (dates de livraison bornant la période ; None = ouverte).
+    gallons_restants, vendu_periode (consommé + survente), revenu_periode,
+    survente, periode_debut, periode_fin (dates de livraison ; None = ouverte).
     """
     livraisons = (
         db.query(Livraison)
@@ -342,57 +364,103 @@ def fifo_allocation_livraisons(db: Session, produit_id: int) -> list[dict]:
         .order_by(Livraison.date_livraison, Livraison.created_at, Livraison.id)
         .all()
     )
-    releves = [
-        r for r in (
-            db.query(Releve).join(Pompe, Releve.pompe_id == Pompe.id)
-            .filter(Pompe.produit_id == produit_id).all()
-        ) if r.quantite >= 0
-    ]
+    releves = sorted(
+        (
+            r for r in (
+                db.query(Releve).join(Pompe, Releve.pompe_id == Pompe.id)
+                .filter(Pompe.produit_id == produit_id).all()
+            ) if r.quantite > 0
+        ),
+        key=_cle_chrono,
+    )
 
-    out = []
-    for i, l in enumerate(livraisons):
-        dispo = round(
+    def _dispo(l: Livraison) -> float:
+        return round(
             float(l.gallons_recus)
             + float(l.gallons_report_recu or 0)
             + float(l.gallons_reste_manuel or 0),
             3,
         )
-        suivante = livraisons[i + 1] if i + 1 < len(livraisons) else None
 
+    # 1-2. Total figé par les cargaisons clôturées → gallons à sauter.
+    a_sauter = sum(
+        _dispo(l) - float(l.gallons_restants_cloture or 0)
+        for l in livraisons if l.terminee
+    )
+
+    # 3. Remplissage des cargaisons ouvertes.
+    ouvertes = [l for l in livraisons if not l.terminee]
+    etat = {
+        l.id: {"dispo": _dispo(l), "consomme": 0.0, "survente": 0.0, "revenu": 0.0}
+        for l in ouvertes
+    }
+    for r in releves:
+        qte = float(r.quantite)
+        mnt = float(r.montant_vente)
+        if a_sauter > 0:
+            pris = min(qte, a_sauter)
+            a_sauter -= pris
+            if pris >= qte:
+                continue
+            mnt = mnt * (qte - pris) / qte
+            qte = qte - pris
+        if not ouvertes:
+            continue
+        # Dernière cargaison ouverte déjà arrivée au moment de cette vente
+        # (la plus ancienne si la vente est antérieure à toutes).
+        arrivee = 0
+        for j, l in enumerate(ouvertes):
+            if _releve_apres_livraison(r, l):
+                arrivee = j
+        prix_unitaire = mnt / qte if qte > 0 else 0.0
+        for j in range(arrivee + 1):
+            if qte <= 1e-9:
+                break
+            e = etat[ouvertes[j].id]
+            place = e["dispo"] - e["consomme"]
+            if place <= 1e-9:
+                continue
+            pris = min(place, qte)
+            e["consomme"] += pris
+            e["revenu"]   += pris * prix_unitaire
+            qte -= pris
+        if qte > 1e-9:
+            e = etat[ouvertes[arrivee].id]
+            e["survente"] += qte
+            e["revenu"]   += qte * prix_unitaire
+
+    out = []
+    for i, l in enumerate(livraisons):
+        dispo = _dispo(l)
+        suivante = livraisons[i + 1] if i + 1 < len(livraisons) else None
+        commun = {
+            "livraison_id":  l.id,
+            "periode_debut": str(l.date_livraison),
+            "periode_fin":   str(suivante.date_livraison) if suivante else None,
+        }
         if l.terminee:
-            consomme = round(dispo - float(l.gallons_restants_cloture or 0), 3)
             out.append({
-                "livraison_id":        l.id,
+                **commun,
                 "terminee":            True,
                 "gallons_disponibles": dispo,
-                "gallons_consommes":   consomme,
+                "gallons_consommes":   round(dispo - float(l.gallons_restants_cloture or 0), 3),
                 "gallons_restants":    0.0,
                 "vendu_periode":       None,
                 "revenu_periode":      None,
-                "periode_debut":       str(l.date_livraison),
-                "periode_fin":         str(suivante.date_livraison) if suivante else None,
+                "survente":            0.0,
             })
             continue
-
-        # La toute première cargaison absorbe aussi les relevés antérieurs.
-        periode = [
-            r for r in releves
-            if (i == 0 or _releve_apres_livraison(r, l))
-            and (suivante is None or not _releve_apres_livraison(r, suivante))
-        ]
-        vendu    = round(sum(r.quantite for r in periode), 3)
-        revenu   = round(sum(r.montant_vente for r in periode), 2)
-        consomme = round(min(dispo, vendu), 3)
+        e = etat[l.id]
+        consomme = round(e["consomme"], 3)
         out.append({
-            "livraison_id":        l.id,
+            **commun,
             "terminee":            False,
             "gallons_disponibles": dispo,
             "gallons_consommes":   consomme,
             "gallons_restants":    round(dispo - consomme, 3),
-            "vendu_periode":       vendu,
-            "revenu_periode":      revenu,
-            "periode_debut":       str(l.date_livraison),
-            "periode_fin":         str(suivante.date_livraison) if suivante else None,
+            "vendu_periode":       round(e["consomme"] + e["survente"], 3),
+            "revenu_periode":      round(e["revenu"], 2),
+            "survente":            round(e["survente"], 3),
         })
     return out
 

@@ -4551,8 +4551,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               </div>
               <div class="sk-field">
                 <label class="sk-label">Reste avant (gal) <span class="sk-opt">(optionnel)</span></label>
-                <input id="sk-livr-reste" type="number" min="0" step="0.001" class="sk-input" placeholder="0.000">
-                <div class="c-dim" style="font-size:11.5px;margin-top:3px">Gallons restants de l'ancienne cargaison à additionner à cette nouvelle livraison.</div>
+                <input id="sk-livr-reste" type="number" min="0" step="0.001" class="sk-input" placeholder="0.000" oninput="document.getElementById('sk-livr-motif-wrap').style.display=(parseFloat(this.value)>0)?'':'none'">
+                <div class="c-dim" style="font-size:11.5px;margin-top:3px">Seulement pour du carburant présent dans la cuve sans cargaison ouverte (ex. jauge mesurée). Si l'ancienne cargaison est encore ouverte, clôture-la avec « Additionner à la cargaison… ».</div>
+              </div>
+              <div class="sk-field" id="sk-livr-motif-wrap" style="display:none">
+                <label class="sk-label" for="sk-livr-motif">Origine du reste avant <span class="c-dim">(obligatoire)</span></label>
+                <input id="sk-livr-motif" class="sk-input" maxlength="255" placeholder="Ex. jauge mesurée le 10/10 au matin">
               </div>
               <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="saveLivraison()">
                 <svg viewBox="0 0 24 24" width="13" height="13"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -11988,6 +11992,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <tbody id="confirm-rows"></tbody>
       </table>
     </div>
+    <div id="confirm-ecarts" hidden style="padding:14px 18px;border-top:1px solid var(--border)"></div>
     <div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-secondary" onclick="closeConfirm()" data-i18n="saisie.confirm.cancel">Annuler</button>
       <button class="btn btn-primary" onclick="doSave()">
@@ -12107,6 +12112,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <div id="cl-info" class="c-dim" style="font-size:13.5px;line-height:1.6;margin-bottom:14px"></div>
       <div id="cl-report-question" style="display:none;font-size:13.5px;font-weight:600;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:4px"></div>
       <div id="cl-no-cible" style="display:none;color:var(--muted);font-size:12.5px;line-height:1.5;margin-top:6px"></div>
+      <div id="cl-motif-wrap" style="display:none;margin-top:12px">
+        <label for="cl-motif" class="sk-label">Motif si le reste est mis à zéro <span class="c-dim">(obligatoire dans ce cas)</span></label>
+        <input id="cl-motif" class="sk-input" maxlength="255" placeholder="Ex. perte constatée à la jauge, évaporation, erreur de saisie…" style="width:100%">
+      </div>
       <div id="cl-actions" style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end"></div>
     </div>
   </div>
@@ -14107,6 +14116,7 @@ function renderHomeAnom(data){
       <div>
         <div class="anom-title" style="color:${c}">${esc(a.pompe_nom||a.produit_nom||a.utilisateur_nom||'')} — ${esc(a.type.replace(/_/g,' '))}</div>
         <div class="anom-meta">${esc(a.date)}${a.periode?' · '+esc(a.periode):''} · ${esc(a.message.slice(0,80))}…</div>
+        ${_btnTraiterAnomalie(a)}
       </div>
     </div>`;
   }).join('');
@@ -15614,7 +15624,16 @@ function prepareConfirm(periode){
     }
     const qte=Math.round((ap-av)*10000)/10000;
     const mnt=Math.round(qte*px*100)/100;
-    data.push({pompeId,pompeNom:pompe?.nom||'?',px,av,ap,qte,mnt});
+    // Continuité : « mètre avant » ≠ « mètre après » du relevé précédent →
+    // gallons sortis sans vente enregistrée ; le serveur exige un motif.
+    const prec=indexPrecedents[pompeId];
+    let ecart=null;
+    if(prec && prec.index_precedent!=null){
+      const e=Math.round((av-prec.index_precedent)*10000)/10000;
+      if(Math.abs(e)>0.001) ecart={valeur:e,precedent:prec.index_precedent,
+        source:`${prec.source_periode==='Matin'?t('saisie.period.matin'):t('saisie.period.apresmidi')} ${frDate(prec.source_date)}`};
+    }
+    data.push({pompeId,pompeNom:pompe?.nom||'?',px,av,ap,qte,mnt,ecart});
   }
 
   if(hasError) return;
@@ -15644,6 +15663,20 @@ function prepareConfirm(periode){
       <td class="tr num c-amber" style="font-weight:700">${fmtGX(totMnt)}</td>
     </tr>`;
 
+  // Écarts de compteur : un motif par pompe concernée, obligatoire.
+  const ecarts=data.filter(r=>r.ecart);
+  const boxEc=document.getElementById('confirm-ecarts');
+  boxEc.hidden=!ecarts.length;
+  boxEc.innerHTML=ecarts.length?`
+    <div style="font-weight:700;color:var(--amber,#b45309);margin-bottom:6px">⚠ Compteur non continu</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Le mètre avant doit être égal au mètre après du relevé précédent. Sinon, des gallons sont sortis de la pompe sans être vendus dans le système. Explique l'écart (essai, panne, vente non saisie, erreur de lecture…).</div>
+    ${ecarts.map(r=>`
+      <label for="motif-ecart-${r.pompeId}" style="display:block;font-size:13px;margin:8px 0 4px">
+        <strong>${esc(r.pompeNom)}</strong> — avant ${fmtNum(r.av,3)} · précédent ${fmtNum(r.ecart.precedent,3)} (${esc(r.ecart.source)}) ·
+        <span class="${r.ecart.valeur>0?'c-red':'c-amber'}">écart ${r.ecart.valeur>0?'+':''}${fmtNum(r.ecart.valeur,3)} gal</span>
+      </label>
+      <input class="inp" id="motif-ecart-${r.pompeId}" maxlength="255" placeholder="Motif de l'écart (5 caractères minimum)" style="width:100%">`).join('')}`:'';
+
   document.getElementById('modal-confirm').classList.remove('hidden');
 }
 
@@ -15659,10 +15692,23 @@ function closeResponsabiliteModal(){
 async function doSave(){
   if(!pendingSave) return;
   const {periode,produitId,rows}=pendingSave;
+  // Motifs d'écart de compteur : lus avant de fermer la fenêtre, qui reste
+  // ouverte tant qu'un motif manque.
+  for(const row of rows){
+    if(!row.ecart) continue;
+    const inp=document.getElementById('motif-ecart-'+row.pompeId);
+    row.motif=(inp?.value||'').trim();
+    if(row.motif.length<5){
+      toast(`${row.pompeNom} : indique le motif de l'écart de compteur (5 caractères minimum).`,'err');
+      inp?.focus();
+      return;
+    }
+  }
   pendingSave=null;
   closeConfirm();
   let ok=0,errs=0,lastErrMsg='';
   const saved=[];   // {releveId, pompeNom} — pour le choix du pompiste juste après
+  const avertissements=new Set();
 
   for(const row of rows){
     try{
@@ -15670,7 +15716,9 @@ async function doSave(){
         date:currentDate,periode,
         pompe_id:row.pompeId,prix_gallon:row.px,
         metter_avant:row.av,metter_apres:row.ap,
+        motif_ecart_compteur:row.motif||null,
       });
+      (r.avertissements||[]).forEach(a=>avertissements.add(a));
       saved.push({releveId:r.id,pompeNom:row.pompeNom});
       ok++;
     }catch(e){
@@ -15681,6 +15729,7 @@ async function doSave(){
 
   if(ok)   toast(t('saisie.save.ok',{n:ok}),'ok');
   if(errs) toast(t('saisie.save.err',{n:errs,msg:lastErrMsg}),'err');
+  avertissements.forEach(a=>toast(a,'inf'));
 
   if(ok){
     await loadSaisie();
@@ -18949,7 +18998,7 @@ async function loadStock(){
 
     // Panneau d'anomalies unifié
     const allAnom = anomData.anomalies || [];
-    const anomC = allAnom.filter(a=>['QUANTITE_NEGATIVE','REGRESSION_METER','SAUT_ANORMAL'].includes(a.type));
+    const anomC = allAnom.filter(a=>['QUANTITE_NEGATIVE','REGRESSION_METER','SAUT_ANORMAL','COMPTEUR_DISCONTINU'].includes(a.type));
     const anomS = allAnom.filter(a=>['STOCK_NEGATIF','VENTE_SANS_STOCK','PRIX_MANQUANT','DECALAGE_STOCK'].includes(a.type));
     const anomG = allAnom.filter(a=>['CONNEXION_HORS_PERIMETRE','GEOLOCALISATION_REFUSEE'].includes(a.type));
 
@@ -18982,12 +19031,34 @@ async function loadStock(){
   }
 }
 
+// Manager, admin ou PDG : peut marquer une anomalie comme traitée.
+function _peutTraiterAnomalie(){
+  const rn=(_appUser?.role_nom||_appUser?.poste||'').toLowerCase();
+  return _isAdmin() || _appUser?.role==='pdg' || rn==='manager';
+}
+function _btnTraiterAnomalie(a){
+  if(!a.cle || !_peutTraiterAnomalie()) return '';
+  return `<button class="btn btn-secondary" style="padding:2px 8px;font-size:12px;margin-top:6px"
+    data-cle="${esc(a.cle)}" onclick="traiterAnomalie(this.dataset.cle,this)">✓ Marquer traitée</button>`;
+}
+async function traiterAnomalie(cle, btn){
+  if(!await showConfirm("Marquer cette anomalie comme traitée ? Elle ne s'affichera plus dans la liste.", {title:'Anomalie traitée', okLabel:'Marquer traitée'})) return;
+  if(btn) btn.disabled=true;
+  try{
+    await POST('/anomalies/traiter',{cle});
+    notify('Anomalie marquée traitée','ok');
+    const item = btn && btn.closest('.sk-anom-item, .anom-item');
+    if(item) item.remove();
+  }catch(e){ notify('Erreur : '+(e.message||e),'err'); if(btn) btn.disabled=false; }
+}
+
 function _anomItem(a){
   const cls = a.gravite==='erreur' ? 'err' : 'warn';
-  const linked = a.incident_lie ? `<span class="sk-anom-linked">${a.incident_lie}</span>` : '';
+  const linked = a.incident_lie ? `<span class="sk-anom-linked">${esc(a.incident_lie)}</span>` : '';
   return `<div class="sk-anom-item ${cls}">
-    <b>${a.type}</b>${linked} · ${a.pompe_nom||a.produit_nom||a.utilisateur_nom||''} · ${a.date||''}
-    <div style="color:var(--muted);margin-top:2px">${a.message||''}</div>
+    <b>${esc(a.type)}</b>${linked} · ${esc(a.pompe_nom||a.produit_nom||a.utilisateur_nom||'')} · ${esc(a.date||'')}${a.periode?' · '+esc(a.periode):''}
+    <div style="color:var(--muted);margin-top:2px">${esc(a.message||'')}</div>
+    ${_btnTraiterAnomalie(a)}
   </div>`;
 }
 
@@ -19001,12 +19072,14 @@ async function saveLivraison(){
   const fourn = document.getElementById('sk-livr-fourn').value.trim();
   const camion= document.getElementById('sk-livr-camion').value.trim();
   const reste = parseFloat(document.getElementById('sk-livr-reste').value) || 0;
+  const motifReste = document.getElementById('sk-livr-motif').value.trim();
 
   if(!pid){ msg.textContent='Sélectionner un produit.'; msg.style.color='var(--red)'; return; }
   if(!date){ msg.textContent='Saisir une date.'; msg.style.color='var(--red)'; return; }
   if(!gal||gal<=0){ msg.textContent='Gallons reçus doit être > 0.'; msg.style.color='var(--red)'; return; }
   if(isNaN(prix)||prix<0){ msg.textContent='Prix achat invalide.'; msg.style.color='var(--red)'; return; }
   if(reste<0){ msg.textContent='Reste avant doit être >= 0.'; msg.style.color='var(--red)'; return; }
+  if(reste>0 && motifReste.length<5){ msg.textContent="Indique l'origine du reste avant (5 caractères minimum)."; msg.style.color='var(--red)'; return; }
 
   msg.textContent='Enregistrement…'; msg.style.color='var(--muted)';
   try{
@@ -19015,6 +19088,7 @@ async function saveLivraison(){
       gallons_recus: gal, prix_achat_gallon: prix,
       fournisseur: fourn||null, reference_camion: camion||null,
       reste_avant: reste,
+      motif_reste: reste>0 ? motifReste : null,
     });
     msg.textContent='✓ Livraison enregistrée.'; msg.style.color='var(--green2)';
     // Réinitialiser les champs
@@ -19023,6 +19097,8 @@ async function saveLivraison(){
     document.getElementById('sk-livr-fourn').value='';
     document.getElementById('sk-livr-camion').value='';
     document.getElementById('sk-livr-reste').value='';
+    document.getElementById('sk-livr-motif').value='';
+    document.getElementById('sk-livr-motif-wrap').style.display='none';
     loadLivraisons();
     // Mettre à jour le stock en fond
     if(document.getElementById('sk-stock').style.display!=='none') loadStock();
@@ -19113,6 +19189,8 @@ function ouvrirClotureLivraison(id){
   const question = document.getElementById('cl-report-question');
   const noCible   = document.getElementById('cl-no-cible');
   const actions   = document.getElementById('cl-actions');
+  document.getElementById('cl-motif').value='';
+  document.getElementById('cl-motif-wrap').style.display = reste>0 ? 'block' : 'none';
 
   if(reste<=0){
     // Rien à mettre à zéro ni à reporter — simple confirmation de clôture
@@ -19154,8 +19232,16 @@ function fermerClotureLivraison(){
 }
 async function confirmerClotureLivraison(reporter){
   if(!_clLivraisonId) return;
+  const lv = _skLivraisons.find(x=>x.id===_clLivraisonId);
+  const reste = lv && lv.gallons_restants!=null ? parseFloat(lv.gallons_restants) : 0;
+  const motif = document.getElementById('cl-motif').value.trim();
+  if(!reporter && reste>0 && motif.length<5){
+    notify('Indique le motif avant de mettre ce reste à zéro (5 caractères minimum).','err');
+    document.getElementById('cl-motif').focus();
+    return;
+  }
   try{
-    const res = await POST(`/livraisons/${_clLivraisonId}/cloturer`,{reporter_reste:reporter});
+    const res = await POST(`/livraisons/${_clLivraisonId}/cloturer`,{reporter_reste:reporter, motif: motif||null});
     fermerClotureLivraison();
     notify(res.reste_reporte
       ? `Cargaison clôturée — reste reporté vers la cargaison du ${frDate(res.reporte_vers_date)}`
@@ -23600,8 +23686,10 @@ async function loadCaisse(){
 
     const entreesLabel = _htg(d.synthese.total_entrees);
     const sortiesLabel = _htg(d.synthese.total_sorties);
+    const transfertsTot = (d.transferts && d.transferts.total) || 0;
     document.getElementById('caisse-cash-sub').textContent =
-      `Entrées ${entreesLabel}  ·  Sorties ${sortiesLabel}`;
+      `Entrées ${entreesLabel}  ·  Sorties ${sortiesLabel}`
+      + (transfertsTot ? `  (dont transferts ${_htg(transfertsTot)})` : '');
 
     const btnRenfl = document.getElementById('caisse-btn-renfl');
     if(btnRenfl) btnRenfl.style.display = (_appUser?.role === 'pdg' || _isAdmin()) ? '' : 'none';
@@ -23699,8 +23787,24 @@ async function loadCaisse(){
     } else {
       catWrap.innerHTML = d.depenses.par_categorie.map(c=>`
         <div class="caisse-bar-row">
-          <div class="caisse-bar-label">${c.categorie}</div>
+          <div class="caisse-bar-label">${esc(c.categorie)}</div>
           <div class="caisse-bar-track"><div class="caisse-bar-fill" style="width:${Math.round(c.montant/maxDep*100)}%;background:#f87171"></div></div>
+          <div class="caisse-bar-val">${_htg(c.montant)}</div>
+        </div>`).join('');
+    }
+    // Transferts (dépôt en banque, Zelle…) : l'argent sort de la caisse,
+    // mais ce ne sont pas des charges — affichés à part.
+    const tr = d.transferts || {total:0, par_categorie:[]};
+    if(tr.par_categorie && tr.par_categorie.length){
+      catWrap.innerHTML += `
+        <div class="caisse-bar-row" style="border-top:1px solid rgba(255,255,255,.1);margin-top:8px;padding-top:8px">
+          <div class="caisse-bar-label" style="font-weight:700">Transferts <div style="font-size:11px;color:rgba(255,255,255,.35)">Argent sorti de la caisse, pas une charge</div></div>
+          <div class="caisse-bar-track"></div>
+          <div class="caisse-bar-val" style="font-weight:800;color:#60a5fa">${_htg(tr.total)}</div>
+        </div>` + tr.par_categorie.map(c=>`
+        <div class="caisse-bar-row">
+          <div class="caisse-bar-label">${esc(c.categorie)}</div>
+          <div class="caisse-bar-track"><div class="caisse-bar-fill" style="width:${Math.round(c.montant/Math.max(1,tr.total)*100)}%;background:#60a5fa"></div></div>
           <div class="caisse-bar-val">${_htg(c.montant)}</div>
         </div>`).join('');
     }
