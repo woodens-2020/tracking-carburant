@@ -3139,6 +3139,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .dep-code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;background:rgba(255,255,255,.06);padding:1px 6px;border-radius:4px}
 .dep-livr-tete{margin:4px 0 10px;font-size:15px}
 .pos-stock-alert{color:#f87171}
+.cr-sous{font-size:11.5px;color:rgba(255,255,255,.42);margin-top:2px}
+.cr-date{white-space:nowrap}
+.cr-heure{font-size:11.5px;color:rgba(255,255,255,.45)}
 .pos-stock-ok{color:#3fb6a8}
 .pos-stock-warn{color:#f7a93b}
 
@@ -8050,10 +8053,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-table-wrap">
             <table class="pos-table">
               <thead>
-                <tr><th>Client</th><th>Téléphone</th><th>NIF / ID</th><th>Montant dû</th><th>Remboursé</th><th>Solde</th><th>Échéance</th><th>Statut</th><th>Actions</th></tr>
+                <tr><th>Client</th><th>Date du crédit</th><th>Montant dû</th><th>Remboursé</th><th>Dernier paiement</th><th>Solde</th><th>Échéance</th><th>Statut</th><th>Actions</th></tr>
               </thead>
               <tbody id="pos-credits-tbody">
-                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                <tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -28182,6 +28185,25 @@ async function loadPosCredits(){
 }
 
 
+// Date courte (jour/mois/année + heure) et ancienneté lisible pour la liste des crédits
+function _crDate(iso){
+  if(!iso) return '—';
+  const d=new Date(iso);
+  return `<span class="num">${d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>`
+       + ` <span class="cr-heure">${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span>`;
+}
+function _crAnciennete(iso){
+  if(!iso) return '';
+  // Écart en jours de calendrier (pas en tranches de 24 h)
+  const d=new Date(iso), auj=new Date();
+  const jours=Math.round((new Date(auj.getFullYear(),auj.getMonth(),auj.getDate()) - new Date(d.getFullYear(),d.getMonth(),d.getDate()))/86400000);
+  if(jours<=0) return "aujourd'hui";
+  if(jours===1) return 'hier';
+  if(jours<31) return `il y a ${jours} jours`;
+  const mois=Math.floor(jours/30);
+  return `il y a ${mois} mois`;
+}
+
 async function posCreditsCharger(){
   const tbody = document.getElementById('pos-credits-tbody');
   if(tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
@@ -28214,14 +28236,18 @@ async function posCreditsCharger(){
         : c.statut==='EN_RETARD'
           ? '<span class="pos-badge danger">En retard</span>'
           : '<span class="pos-badge amber">Ouvert</span>';
+      // Dates : quand le crédit a été pris, et quand le client a payé pour la dernière fois
+      const contact = [c.client_contact, c.client_nif].filter(Boolean).map(v=>esc(v)).join(' · ');
       return `<tr>
-        <td>${c.client_nom||'—'}</td>
-        <td>${c.client_contact||'—'}</td>
-        <td>${c.client_nif||'—'}</td>
+        <td><strong>${esc(c.client_nom||'—')}</strong>${contact?`<div class="cr-sous">${contact}</div>`:''}</td>
+        <td class="cr-date">${_crDate(c.date_creation)}<div class="cr-sous">${_crAnciennete(c.date_creation)}</div></td>
         <td>${posGx(c.montant_du)}</td>
         <td>${posGx(c.montant_rembourse)}</td>
+        <td class="cr-date">${c.date_dernier_paiement
+            ? `${_crDate(c.date_dernier_paiement)}<div class="cr-sous">${c.nb_remboursements} paiement(s) · ${_crAnciennete(c.date_dernier_paiement)}</div>`
+            : '<span class="cr-sous">Aucun paiement</span>'}</td>
         <td><strong>${posGx(c.solde)}</strong></td>
-        <td>${c.date_echeance ? posDateFr(c.date_echeance).split(' ')[0] : '—'}</td>
+        <td>${c.date_echeance ? String(c.date_echeance).slice(0,10).split('-').reverse().join('/') : '—'}</td>
         <td>${badge}</td>
         <td style="white-space:nowrap">
           ${c.statut!=='SOLDE'&&_canPayerCredit()?`<button class="pos-btn teal" style="font-size:12px;padding:3px 7px;margin-right:3px" onclick="posRembModal(${c.id})">Payer</button>`:''}

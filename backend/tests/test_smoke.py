@@ -62,6 +62,8 @@ ROUTES = [
     "/api/depenses/stats",
     "/api/caisse/rapport?date_debut=2026-10-01&date_fin=2026-10-18",
     "/api/journal?date=2026-10-01",
+    "/api/pos/credits",
+    "/api/pos/depot/stock",
 ]
 
 

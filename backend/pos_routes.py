@@ -2153,6 +2153,11 @@ def liste_credits(
             "date_creation":    c.date_creation.isoformat(),
             "date_echeance":    str(c.date_echeance) if c.date_echeance else None,
             "nb_remboursements": len(c.remboursements),
+            # Date du dernier paiement (remboursement) — None si jamais payé
+            "date_dernier_paiement": (
+                max(r.date_remb for r in c.remboursements if r.date_remb).isoformat()
+                if any(r.date_remb for r in c.remboursements) else None
+            ),
             "caissier_id":      c.vente.caissier_id if c.vente else None,
         }
         for c in credits
