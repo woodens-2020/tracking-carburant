@@ -1,0 +1,46 @@
+name: Vérification avant déploiement — bpccp
+
+# Tourne à chaque push sur le staging et la production de bpccp.
+# Railway attend le résultat (« Wait for CI ») avant de déployer :
+# si une étape échoue, rien n'est mis en ligne.
+on:
+  push:
+    branches: [staging-bpccp, railway-migration]
+  pull_request:
+    branches: [railway-migration]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt pytest httpx
+
+      - name: Syntaxe Python
+        run: python -m compileall -q backend
+
+      - name: Démarrage, routes principales et logique métier
+        working-directory: backend
+        run: python -m pytest tests/test_smoke.py tests/test_logique_stock.py tests/test_logique_metier.py -v
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Syntaxe JavaScript de l'interface
+        run: node scripts/verifier_frontend.js

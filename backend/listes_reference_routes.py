@@ -42,16 +42,21 @@ class _NomIn(BaseModel):
 class _MajIn(BaseModel):
     nom:   Optional[str]  = None
     actif: Optional[bool] = None
+    est_transfert: Optional[bool] = None   # catégories de dépense uniquement
+
+
+def _dict(e) -> dict:
+    d = {"id": e.id, "nom": e.nom, "actif": e.actif}
+    if hasattr(e, "est_transfert"):
+        d["est_transfert"] = bool(e.est_transfert)
+    return d
 
 
 @router.get("/{cle}")
 def lister(cle: str, tous: bool = False, db: Session = Depends(get_db)):
     modele, _ = _resoudre(cle)
     try:
-        return [
-            {"id": e.id, "nom": e.nom, "actif": e.actif}
-            for e in lref.lister(db, modele, inclure_inactifs=tous)
-        ]
+        return [_dict(e) for e in lref.lister(db, modele, inclure_inactifs=tous)]
     except (ProgrammingError, OperationalError):
         # Schéma pas encore réparé (colonne manquante) — on ne casse pas
         # la page appelante : liste vide, elle se remplira au redémarrage.
@@ -86,6 +91,7 @@ def creer(cle: str, data: _NomIn, request: Request, db: Session = Depends(get_db
 
     e = modele(nom=nom[:mx], nom_norm=norm, actif=True,
                cree_par_id=getattr(user, "id", None))
+    lref.appliquer_type_par_defaut(e)
     db.add(e)
     try:
         db.commit()
@@ -122,5 +128,9 @@ def maj(cle: str, ref_id: int, data: _MajIn, request: Request, db: Session = Dep
         e.nom, e.nom_norm = nom[:mx], norm[:mx]
     if data.actif is not None:
         e.actif = data.actif
+    if data.est_transfert is not None:
+        if not hasattr(e, "est_transfert"):
+            raise HTTPException(400, "Seules les catégories de dépense peuvent être des transferts.")
+        e.est_transfert = data.est_transfert
     db.commit()
-    return {"id": e.id, "nom": e.nom, "actif": e.actif}
+    return _dict(e)

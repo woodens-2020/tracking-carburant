@@ -23,6 +23,17 @@ from models import CategorieDepense, CategorieAchat, Poste, Beneficiaire, Utilis
 _ESPACES = re.compile(r"\s+")
 
 
+# Une catégorie de dépense dont le nom contient l'un de ces mots est créée
+# comme « transfert » (argent qui quitte la caisse sans être une charge).
+MOTS_TRANSFERT = ("banque", "zelle", "transfert", "virement")
+
+
+def appliquer_type_par_defaut(entree) -> None:
+    if hasattr(entree, "est_transfert"):
+        n = " ".join((entree.nom or "").replace("_", " ").split()).casefold()
+        entree.est_transfert = any(m in n for m in MOTS_TRANSFERT)
+
+
 def normaliser(valeur: Optional[str]) -> str:
     """Forme canonique servant à la comparaison / contrainte d'unicité :
     espaces réduits, sans espace de bord, casse repliée."""
@@ -105,6 +116,7 @@ def resoudre(db: Session, modele, valeur: Optional[str], *, request: Request,
 
     entree = modele(nom=brut[:mx], nom_norm=norm, actif=True,
                     cree_par_id=getattr(user, "id", None))
+    appliquer_type_par_defaut(entree)
     # SAVEPOINT + flush : l'INSERT est émis ICI, donc une éventuelle collision
     # (course entre deux enregistrements) est rattrapée sans casser la
     # transaction de l'appelant ni renvoyer un 500.

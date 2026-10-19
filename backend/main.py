@@ -1706,9 +1706,40 @@ class ReleveIn(BaseModel):
     date: date_type
     periode: str
     pompe_id: int
-    prix_gallon: float
+    prix_gallon: float          # ignoré si un prix de vente est configuré à cette date
     metter_avant: float
     metter_apres: float
+    # Obligatoire si metter_avant ≠ « mètre après » du relevé précédent de la pompe
+    motif_ecart_compteur: Optional[str] = None
+
+
+# Tolérance d'arrondi sur la continuité des compteurs (gallons)
+TOLERANCE_ECART_COMPTEUR = 0.001
+MOTIF_ECART_MIN_CARACTERES = 5
+
+
+def _releve_precedent(db: Session, pompe_id: int, d: date_type, periode: str) -> Optional[Releve]:
+    """Dernier relevé de la pompe strictement avant (d, periode), dans l'ordre
+    chronologique Matin puis Après-midi."""
+    rang = {"Matin": 0, "Apres-midi": 1}
+    cible = (d, rang.get(periode, 9))
+    meilleur, cle_meilleure = None, None
+    for r in (db.query(Releve)
+              .filter(Releve.pompe_id == pompe_id, Releve.date <= d)
+              .order_by(Releve.date.desc())
+              .limit(10).all()):
+        cle = (r.date, rang.get(r.periode, 9))
+        if cle < cible and (cle_meilleure is None or cle > cle_meilleure):
+            meilleur, cle_meilleure = r, cle
+    return meilleur
+
+
+def _prix_vente_a_date(db: Session, produit_id: int, d: date_type) -> Optional[float]:
+    pv = (db.query(PrixVente)
+          .filter(PrixVente.produit_id == produit_id, PrixVente.date_effet <= d)
+          .order_by(PrixVente.date_effet.desc(), PrixVente.id.desc())
+          .first())
+    return float(pv.prix_vente_gallon) if pv else None
 
 
 # ---------- Produits & Pompes ----------
@@ -1785,9 +1816,43 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
             f"({data.metter_avant:.4f}) — un compteur ne peut pas reculer."
         )
 
+    pompe = db.query(Pompe).get(data.pompe_id)
+    if not pompe:
+        raise HTTPException(404, "Pompe introuvable")
+
     r = (db.query(Releve)
          .filter_by(date=data.date, periode=data.periode, pompe_id=data.pompe_id)
          .first())
+
+    # Règle 1 — le prix vient de l'historique des prix de vente (Paramètres),
+    # jamais du navigateur : le chiffre d'affaires doit toujours pouvoir être
+    # reconstitué à partir de cet historique. Repli sur le prix envoyé
+    # seulement si aucun prix n'a jamais été configuré pour ce produit.
+    prix_officiel = _prix_vente_a_date(db, pompe.produit_id, data.date)
+    prix = prix_officiel if prix_officiel is not None else data.prix_gallon
+
+    # Règle 2 — continuité des compteurs : le « mètre avant » doit être le
+    # « mètre après » du relevé précédent. Sinon, des gallons sont sortis de
+    # la pompe sans être vendus dans le système : un motif écrit est exigé.
+    prec = _releve_precedent(db, data.pompe_id, data.date, data.periode)
+    ecart = round(data.metter_avant - float(prec.metter_apres), 4) if prec else 0.0
+    motif = (data.motif_ecart_compteur or "").strip()
+    if abs(ecart) > TOLERANCE_ECART_COMPTEUR:
+        if (not motif and r is not None and r.motif_ecart_compteur
+                and abs(float(r.metter_avant) - data.metter_avant) <= TOLERANCE_ECART_COMPTEUR):
+            motif = r.motif_ecart_compteur          # correction sans toucher au mètre avant
+        if len(motif) < MOTIF_ECART_MIN_CARACTERES:
+            sens = "plus haut" if ecart > 0 else "plus bas"
+            raise HTTPException(
+                409,
+                f"{pompe.nom} : le mètre avant ({data.metter_avant:.3f}) est {sens} que le "
+                f"mètre après du relevé précédent ({float(prec.metter_apres):.3f}, "
+                f"{prec.periode} du {prec.date.strftime('%d/%m/%Y')}) — écart de "
+                f"{abs(ecart):.3f} gal. Indiquez le motif de cet écart pour enregistrer.",
+            )
+    else:
+        motif = ""
+
     if not r:
         r = Releve(date=data.date, periode=data.periode, pompe_id=data.pompe_id,
                    nb_modifications=0, cree_par_id=request.state.user.id)
@@ -1801,13 +1866,31 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
                 f"{MAX_MODIFICATIONS_PAR_RELEVE} fois."
             )
         r.nb_modifications += 1
-    r.prix_gallon    = data.prix_gallon
+    r.prix_gallon    = prix
     r.metter_avant   = data.metter_avant
     r.metter_apres   = data.metter_apres
+    r.ecart_compteur       = ecart if motif else None
+    r.motif_ecart_compteur = motif[:255] if motif else None
     r.modifie_par_id = request.state.user.id
     db.commit(); db.refresh(r)
 
-    pompe = db.query(Pompe).get(r.pompe_id)
+    avertissements = []
+    if prix_officiel is not None and abs(prix_officiel - data.prix_gallon) > 0.0005:
+        avertissements.append(
+            f"Prix appliqué : {prix_officiel:g} G/gal (prix en vigueur le "
+            f"{data.date.strftime('%d/%m/%Y')}), au lieu de {data.prix_gallon:g} saisi. "
+            "Si le prix à la pompe a changé, enregistrez-le dans Paramètres › Prix de vente."
+        )
+    # Règle 3 — une vente doit sortir d'un stock : sans cargaison ouverte,
+    # le stock devient négatif et la marge est incalculable.
+    if r.quantite > 0 and not db.query(Livraison).filter(
+            Livraison.produit_id == pompe.produit_id,
+            Livraison.terminee == False).first():  # noqa: E712
+        avertissements.append(
+            f"Aucune cargaison ouverte pour {pompe.produit.nom} : cette vente n'est "
+            "rattachée à aucun stock. Enregistrez la livraison dans Stock › Livraisons."
+        )
+
     if pompe:
         from stock_service import stock_restant
         from notifications_service import creer_notification
@@ -1822,7 +1905,9 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
             )
             db.commit()
 
-    return _releve_dict(r)
+    out = _releve_dict(r)
+    out["avertissements"] = avertissements
+    return out
 
 
 @app.get("/api/releves")
@@ -1900,6 +1985,8 @@ def _releve_dict(r: Releve):
         "prix_gallon": r.prix_gallon,
         "metter_avant": r.metter_avant, "metter_apres": r.metter_apres,
         "quantite": r.quantite, "montant_vente": r.montant_vente,
+        "ecart_compteur": float(r.ecart_compteur) if r.ecart_compteur is not None else None,
+        "motif_ecart_compteur": r.motif_ecart_compteur,
         "nb_modifications": r.nb_modifications,
         "cree_par_nom":    r.cree_par.nom_complet    if r.cree_par    else None,
         "modifie_par_nom": r.modifie_par.nom_complet if r.modifie_par else None,
@@ -2143,8 +2230,53 @@ SEUIL_SAUT = 5
 SEUIL_MIN_RELEVES_POUR_SAUT = 5
 
 
+def _cle_anomalie(a: dict) -> str:
+    """Identifiant stable d'une anomalie : type | objet | date | période."""
+    objet = (a.get("pompe_nom") or a.get("produit_nom") or a.get("utilisateur_nom")
+             or a.get("nom") or a.get("produit_id") or "")
+    return f"{a.get('type','')}|{objet}|{a.get('date','')}|{a.get('periode','')}"[:300]
+
+
+class AnomalieTraiterIn(BaseModel):
+    cle:         str
+    commentaire: Optional[str] = None
+
+
+@app.post("/api/anomalies/traiter", status_code=201)
+def traiter_anomalie(data: AnomalieTraiterIn, request: Request, db: Session = Depends(get_db)):
+    """Marque une anomalie comme traitée (manager, admin, PDG)."""
+    from models import AnomalieTraitee
+    import listes_reference as lref
+    user = lref.utilisateur_courant(request, db)
+    if not lref.peut_gerer(user):
+        raise HTTPException(403, "Seul un manager ou un administrateur peut traiter une anomalie.")
+    cle = (data.cle or "").strip()[:300]
+    if not cle or "|" not in cle:
+        raise HTTPException(400, "Clé d'anomalie invalide.")
+    t = db.query(AnomalieTraitee).filter_by(cle=cle).first()
+    if not t:
+        t = AnomalieTraitee(cle=cle, type=cle.split("|", 1)[0][:60])
+        db.add(t)
+    t.commentaire   = (data.commentaire or "").strip()[:500] or None
+    t.traite_par_id = getattr(user, "id", None)
+    db.commit()
+    return {"cle": cle, "traitee": True}
+
+
+@app.delete("/api/anomalies/traiter")
+def rouvrir_anomalie(cle: str, request: Request, db: Session = Depends(get_db)):
+    from models import AnomalieTraitee
+    import listes_reference as lref
+    if not lref.peut_gerer(lref.utilisateur_courant(request, db)):
+        raise HTTPException(403, "Seul un manager ou un administrateur peut rouvrir une anomalie.")
+    db.query(AnomalieTraitee).filter_by(cle=cle[:300]).delete()
+    db.commit()
+    return {"cle": cle, "traitee": False}
+
+
 @app.get("/api/anomalies")
-def anomalies(date: date_type, db: Session = Depends(get_db)):
+def anomalies(date: date_type, historique: bool = False, inclure_traitees: bool = False,
+              db: Session = Depends(get_db)):
     """
     Moteur d'anomalies unifié : analyse les compteurs ET la cohérence stock.
 
@@ -2160,6 +2292,11 @@ def anomalies(date: date_type, db: Session = Depends(get_db)):
     Anomalies géolocalisation connexions (visibilité uniquement, jamais de
     blocage automatique) :
       CONNEXION_HORS_PERIMETRE, GEOLOCALISATION_REFUSEE
+
+    Par défaut, seules les anomalies de compteur DATÉES du jour demandé sont
+    renvoyées (historique=true pour tout l'historique jusqu'à cette date), et
+    les anomalies marquées « traitées » sont retirées (inclure_traitees=true
+    pour les voir, avec le champ traitee).
     """
     # ── 1. Relevés compteurs ──────────────────────────────────────────
     releves = db.query(Releve).filter(Releve.date <= date).all()
@@ -2210,6 +2347,30 @@ def anomalies(date: date_type, db: Session = Depends(get_db)):
             else:
                 releve_courant_valide = True
 
+            # Compteur qui avance entre deux relevés : des gallons sont sortis
+            # de la pompe sans être vendus dans le système.
+            if (meter_apres_precedent is not None
+                    and float(r.metter_avant) > float(meter_apres_precedent) + TOLERANCE_ECART_COMPTEUR):
+                ecart = round(float(r.metter_avant) - float(meter_apres_precedent), 3)
+                motif = r.motif_ecart_compteur
+                anom_compteurs.append({
+                    "type":          "COMPTEUR_DISCONTINU",
+                    "gravite":       "avertissement" if motif else "erreur",
+                    "pompe_nom":     nom,
+                    "produit_id":    pompe_obj.produit_id,
+                    "date":          str(r.date),
+                    "periode":       r.periode,
+                    "valeur_attendue": round(float(meter_apres_precedent), 4),
+                    "valeur_saisie": float(r.metter_avant),
+                    "ecart":         ecart,
+                    "message": (
+                        f"Le mètre avant ({float(r.metter_avant):.3f}) dépasse le mètre après "
+                        f"précédent ({float(meter_apres_precedent):.3f}) : {ecart:.3f} gal sortis "
+                        "sans vente enregistrée. "
+                        + (f"Motif donné : « {motif} »." if motif else "Aucun motif donné.")
+                    ),
+                })
+
             if (meter_apres_precedent is not None
                     and r.metter_avant < meter_apres_precedent):
                 anom_compteurs.append({
@@ -2248,6 +2409,10 @@ def anomalies(date: date_type, db: Session = Depends(get_db)):
             if releve_courant_valide:
                 meter_apres_precedent = r.metter_apres
 
+    if not historique:
+        jour = str(date)
+        anom_compteurs = [a for a in anom_compteurs if a.get("date") == jour]
+
     # ── 2. Anomalies stock ────────────────────────────────────────────
     anom_stk = anomalies_stock(db, date)
 
@@ -2271,14 +2436,39 @@ def anomalies(date: date_type, db: Session = Depends(get_db)):
     toutes = anom_compteurs + anom_stk + anom_bar + anom_geo
     toutes.sort(key=lambda a: (gravite_ordre.get(a["gravite"], 2), a.get("date", "")))
 
+    # ── 7. Anomalies déjà traitées ────────────────────────────────────
+    from models import AnomalieTraitee
+    traitees = {t.cle: t for t in db.query(AnomalieTraitee).all()}
+    nb_traitees = 0
+    visibles = []
+    for a in toutes:
+        a["cle"] = _cle_anomalie(a)
+        t = traitees.get(a["cle"])
+        a["traitee"] = bool(t)
+        if t:
+            nb_traitees += 1
+            a["traitee_par"] = t.traite_par.nom_complet if t.traite_par else None
+            a["traitee_commentaire"] = t.commentaire
+            if not inclure_traitees:
+                continue
+        visibles.append(a)
+    toutes = visibles
+    anom_compteurs = [a for a in anom_compteurs if a in toutes]
+    anom_stk = [a for a in anom_stk if a in toutes]
+    anom_bar = [a for a in anom_bar if a in toutes]
+    anom_geo = [a for a in anom_geo if a in toutes]
+
     if toutes:
         from notifications_service import creer_notification
         _MODULE_PAR_TYPE = {
             "QUANTITE_NEGATIVE": "carburant", "REGRESSION_METER": "carburant", "SAUT_ANORMAL": "carburant",
+            "COMPTEUR_DISCONTINU": "carburant",
             "STOCK_NEGATIF": "carburant", "VENTE_SANS_STOCK": "carburant",
             "PRIX_MANQUANT": "carburant", "DECALAGE_STOCK": "carburant",
         }
         for a in toutes:
+            if a.get("traitee"):
+                continue
             typ = a.get("type", "ANOMALIE")
             if typ.endswith("_BAR") or "bar" in typ.lower():
                 module = "pos"
@@ -2302,6 +2492,7 @@ def anomalies(date: date_type, db: Session = Depends(get_db)):
         "nb_stock":       len(anom_stk),
         "nb_bar":         len(anom_bar),
         "nb_geoloc":      len(anom_geo),
+        "nb_traitees":    nb_traitees,
         "anomalies":      toutes,
     }
 
@@ -3940,6 +4131,7 @@ class LivraisonIn(BaseModel):
     reference_camion:  Optional[str] = None
     notes:             Optional[str] = None
     reste_avant:       float = 0     # reste (gal) de l'ancienne cargaison, saisi manuellement
+    motif_reste:       Optional[str] = None   # obligatoire si reste_avant > 0
 
 
 class PrixVenteIn(BaseModel):
@@ -3950,6 +4142,10 @@ class PrixVenteIn(BaseModel):
 
 class ClotureLivraisonIn(BaseModel):
     reporter_reste: bool = False   # additionner le reste sur la cargaison plus récente ?
+    motif:          Optional[str] = None   # obligatoire si un reste est mis à zéro
+
+
+MOTIF_MIN_CARACTERES = 5
 
 
 class LivraisonPatch(BaseModel):
@@ -3980,11 +4176,14 @@ def _livraison_dict(l: Livraison, fifo: Optional[dict] = None) -> dict:
         "date_cloture":             l.date_cloture.isoformat() if l.date_cloture else None,
         "utilisateur_cloture_nom":  l.utilisateur_cloture.nom_complet if l.utilisateur_cloture else None,
         "report_vers_livraison_id": l.report_vers_livraison_id,
+        "motif_reste_manuel":       l.motif_reste_manuel,
+        "motif_cloture":            l.motif_cloture,
     }
     if fifo:
         d["gallons_disponibles"] = fifo["gallons_disponibles"]
         d["gallons_consommes"]   = fifo["gallons_consommes"]
         d["gallons_restants"]    = fifo["gallons_restants"]
+        d["survente"]            = fifo.get("survente", 0.0)
 
     # Rapport de vente figé à la clôture — jamais recalculé, protège cette
     # cargaison des effets rétroactifs d'un nouveau prix d'achat ailleurs.
@@ -4020,6 +4219,26 @@ def create_livraison(payload: LivraisonIn, db: Session = Depends(get_db)):
         raise HTTPException(400, "prix_achat_gallon doit être >= 0")
     if payload.reste_avant < 0:
         raise HTTPException(400, "reste_avant doit être >= 0")
+    motif_reste = (payload.motif_reste or "").strip()
+    if payload.reste_avant > 0 and len(motif_reste) < MOTIF_MIN_CARACTERES:
+        raise HTTPException(
+            400,
+            "Un « reste avant » saisi à la main ajoute des gallons au stock sans "
+            "livraison : indiquez d'où il vient (ex. « jauge mesurée le 10/10 »).",
+        )
+    # Un reste d'une cargaison clôturée doit passer par le report à la
+    # clôture, pas par une ressaisie manuelle : sinon il est compté deux fois.
+    ouverte = (db.query(Livraison)
+               .filter(Livraison.produit_id == payload.produit_id,
+                       Livraison.terminee == False)  # noqa: E712
+               .first())
+    if payload.reste_avant > 0 and ouverte:
+        raise HTTPException(
+            409,
+            f"La cargaison du {ouverte.date_livraison.strftime('%d/%m/%Y')} est encore "
+            "ouverte : clôturez-la en choisissant « Additionner à la cargaison… » "
+            "au lieu de ressaisir son reste ici.",
+        )
     produit = db.query(Produit).filter(Produit.id == payload.produit_id).first()
     if not produit:
         raise HTTPException(404, "Produit introuvable")
@@ -4033,6 +4252,7 @@ def create_livraison(payload: LivraisonIn, db: Session = Depends(get_db)):
         reference_camion     = payload.reference_camion,
         notes                = payload.notes,
         gallons_reste_manuel = payload.reste_avant,
+        motif_reste_manuel   = motif_reste[:255] if payload.reste_avant > 0 else None,
     )
     try:
         db.add(lv)
@@ -4181,6 +4401,7 @@ def cloturer_livraison(
         raise HTTPException(400, "Cette cargaison est déjà terminée")
 
     reste = reste_livraison(db, lv)
+    motif = (payload.motif or "").strip()
 
     # Rapport de vente figé pour CETTE cargaison — calculé avant le
     # changement de terminee (donc à partir de l'allocation FIFO courante,
@@ -4208,6 +4429,15 @@ def cloturer_livraison(
             cible.gallons_report_recu = float(cible.gallons_report_recu or 0) + reste
             lv.report_vers_livraison_id = cible.id
 
+    # Un reste non reporté est déclaré perdu (sort du stock) : jamais sans
+    # explication écrite (perte, évaporation, erreur de jauge…).
+    if reste > 0 and not cible and len(motif) < MOTIF_MIN_CARACTERES:
+        raise HTTPException(
+            400,
+            f"Mettre {reste:.3f} gal à zéro les retire définitivement du stock : "
+            "indiquez le motif (perte constatée, jauge, erreur de saisie…).",
+        )
+
     from datetime import datetime as _dt, timezone as _tz
     user = getattr(request.state, "user", None)
     lv.terminee                  = True
@@ -4216,6 +4446,7 @@ def cloturer_livraison(
     lv.utilisateur_cloture_id    = user.id if user else None
     lv.rapport_gallons_vendus    = info_rev["gallons_consommes"]
     lv.rapport_revenu            = info_rev["revenu_consomme"]
+    lv.motif_cloture             = motif[:255] if (reste > 0 and not cible) else None
 
     db.commit(); db.refresh(lv)
 
@@ -4250,6 +4481,7 @@ def reouvrir_livraison(livraison_id: int, db: Session = Depends(get_db)):
     lv.utilisateur_cloture_id    = None
     lv.rapport_gallons_vendus    = None
     lv.rapport_revenu            = None
+    lv.motif_cloture             = None
 
     db.commit(); db.refresh(lv)
     alloc = {a["livraison_id"]: a for a in fifo_allocation_livraisons(db, lv.produit_id)}
@@ -5808,6 +6040,32 @@ def creer_renflouement(
 # ══════════════════════════════════════════════════════════
 # SYNTHÈSE CASH CONSOLIDÉE — toute l'institution
 # ══════════════════════════════════════════════════════════
+def _normaliser_categorie(nom: Optional[str]) -> str:
+    return " ".join((nom or "").replace("_", " ").split()).casefold()
+
+
+from listes_reference import MOTS_TRANSFERT as _MOTS_TRANSFERT
+
+
+def _est_categorie_transfert(db: Session, nom: Optional[str]) -> bool:
+    """Vrai si la catégorie de dépense est un transfert d'argent (réglage
+    « Transfert » de la catégorie, Paramètres › Catégories de dépense). Une
+    catégorie absente de la liste de référence est reconnue par son nom."""
+    cache = getattr(db, "_cache_categories_transfert", None)
+    if cache is None:
+        cache = {}
+        try:
+            for c in db.query(CategorieDepense).all():
+                cache[_normaliser_categorie(c.nom)] = bool(c.est_transfert)
+        except Exception:
+            db.rollback()
+        db._cache_categories_transfert = cache
+    n = _normaliser_categorie(nom)
+    if n in cache:
+        return cache[n]
+    return any(m in n for m in _MOTS_TRANSFERT)
+
+
 def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], date_fin: Optional[date_type]) -> dict:
     """Entrées = cash réellement encaissé (Station + Bar + Cuisine + Hôtel).
     Sorties  = Achats (Station + Bar confirmés + Cuisine) + Dépenses (Station +
@@ -5909,12 +6167,21 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     q_dep = db.query(Depense)
     if date_debut: q_dep = q_dep.filter(Depense.date_depense >= date_debut)
     if date_fin:   q_dep = q_dep.filter(Depense.date_depense <= date_fin)
-    depenses = q_dep.all()
+    toutes_depenses = q_dep.all()
+    # Transferts (dépôt en banque, Zelle…) : l'argent sort de la caisse mais
+    # ce n'est pas une charge — séparés des dépenses, comptés dans les sorties.
+    depenses   = [d for d in toutes_depenses if not _est_categorie_transfert(db, d.categorie)]
+    transferts = [d for d in toutes_depenses if _est_categorie_transfert(db, d.categorie)]
     depenses_station = round(sum(float(d.montant) for d in depenses), 2)
-    cat_map = {}
-    for d in depenses:
-        cat_map[d.categorie] = round(cat_map.get(d.categorie, 0.0) + float(d.montant), 2)
-    depenses_par_cat = [{"categorie": k, "montant": v} for k, v in sorted(cat_map.items(), key=lambda x: -x[1])]
+    total_transferts = round(sum(float(d.montant) for d in transferts), 2)
+
+    def _par_categorie(rows):
+        m = {}
+        for d in rows:
+            m[d.categorie] = round(m.get(d.categorie, 0.0) + float(d.montant), 2)
+        return [{"categorie": k, "montant": v} for k, v in sorted(m.items(), key=lambda x: -x[1])]
+    depenses_par_cat   = _par_categorie(depenses)
+    transferts_par_cat = _par_categorie(transferts)
 
     # ── Sorties : Dépenses Hôtel ──────────────────────────────────
     from models import HotelDepense
@@ -5945,7 +6212,8 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
 
     total_payroll_paye = round(total_payroll_rh + total_payroll_bar, 2)
 
-    total_sorties     = round(total_achats + total_payroll_paye + total_depenses, 2)
+    total_charges     = round(total_achats + total_payroll_paye + total_depenses, 2)
+    total_sorties     = round(total_charges + total_transferts, 2)
     cash_disponible   = round(total_entrees - total_sorties, 2)
     cash_apres_engage = round(cash_disponible - total_payroll_engage, 2)
 
@@ -5971,9 +6239,12 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
             "total_achats":     total_achats,
             "total_depenses":   total_depenses,
             "total_payroll":    total_payroll_paye,
+            "transferts":       total_transferts,
             "total":            total_sorties,
         },
         "depenses_par_categorie": depenses_par_cat,
+        "transferts_par_categorie": transferts_par_cat,
+        "nb_transferts":  len(transferts),
         "nb_achats":     len(achats_station_rows),
         "nb_depenses":   len(depenses),
         "nb_fiches_payees": len(fiches_payees),
@@ -5982,6 +6253,8 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
         "synthese": {
             "total_entrees":     total_entrees,
             "total_sorties":     total_sorties,
+            "total_charges":     total_charges,
+            "total_transferts":  total_transferts,
             "cash_disponible":   cash_disponible,
             "cash_apres_engage": cash_apres_engage,
         },
@@ -6061,6 +6334,11 @@ def rapport_caisse(
             "total": synth["sorties"]["depenses_station"],
             "nb":    synth["nb_depenses"],
             "par_categorie": synth["depenses_par_categorie"],
+        },
+        "transferts": {
+            "total": synth["sorties"]["transferts"],
+            "nb":    synth["nb_transferts"],
+            "par_categorie": synth["transferts_par_categorie"],
         },
         "synthese": synth["synthese"],
     }

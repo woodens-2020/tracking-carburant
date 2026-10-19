@@ -77,6 +77,12 @@ class Releve(Base):
     # l'enregistrement (endpoint dédié, ne consomme jamais nb_modifications :
     # ce n'est pas une correction de valeur, juste une attribution).
     pompiste_id    = Column(Integer, ForeignKey("employes.id", ondelete="SET NULL"), nullable=True)
+    # Continuité des compteurs : écart entre ce « mètre avant » et le « mètre
+    # après » du relevé précédent de la même pompe (0/NULL = continu). Tout
+    # écart exige un motif écrit à la saisie — sinon des gallons sortent de
+    # la pompe sans être vendus nulle part dans le système.
+    ecart_compteur       = Column(Numeric(14, 4), nullable=True)
+    motif_ecart_compteur = Column(String(255), nullable=True)
 
     pompe       = relationship("Pompe")
     cree_par    = relationship("Utilisateur", foreign_keys=[cree_par_id])
@@ -131,6 +137,10 @@ class Livraison(Base):
     terminee                = Column(Boolean, nullable=False, default=False)
     gallons_report_recu     = Column(Numeric(14, 3), nullable=False, default=0)   # reçu d'une cargaison clôturée (transfert interne, déjà compté dans gallons_livres via la cargaison source)
     gallons_reste_manuel    = Column(Numeric(14, 3), nullable=False, default=0)   # "reste avant" saisi manuellement à la création — pas un transfert, compté en plus dans gallons_livres
+    # Justifications obligatoires (logique métier v26) : un « reste avant »
+    # saisi à la main, et un reste mis à zéro (perdu) à la clôture.
+    motif_reste_manuel      = Column(String(255), nullable=True)
+    motif_cloture           = Column(String(255), nullable=True)
     gallons_restants_cloture = Column(Numeric(14, 3), nullable=True)              # figé au moment de la clôture
     date_cloture             = Column(DateTime(timezone=True), nullable=True)
     utilisateur_cloture_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
@@ -503,6 +513,10 @@ class CategorieDepense(Base):
     nom           = Column(String(120), nullable=False)
     nom_norm      = Column(String(120), nullable=False, unique=True)
     actif         = Column(Boolean, nullable=False, default=True)
+    # Transfert d'argent (dépôt en banque, envoi Zelle, virement) : l'argent
+    # quitte la caisse sans être une charge. Affiché à part dans le rapport
+    # de caisse pour ne pas gonfler les dépenses.
+    est_transfert = Column(Boolean, nullable=False, default=False)
     date_creation = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     cree_par_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
 
@@ -2325,3 +2339,19 @@ class PatisserieCommandeSuivi(Base):
         Index("idx_patisserie_suivi_commande", "commande_id"),
         Index("idx_patisserie_suivi_date",     "date_changement"),
     )
+
+
+class AnomalieTraitee(Base):
+    """Anomalie marquée « traitée » par un responsable. Une anomalie est
+    identifiée par sa clé (type|objet|date|période) — elle disparaît alors de
+    la liste par défaut, mais reste consultable (?inclure_traitees=true)."""
+    __tablename__ = "anomalies_traitees"
+
+    id            = Column(Integer, primary_key=True)
+    cle           = Column(String(300), nullable=False, unique=True)
+    type          = Column(String(60), nullable=False)
+    commentaire   = Column(String(500), nullable=True)
+    traite_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    traite_le     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    traite_par = relationship("Utilisateur")
