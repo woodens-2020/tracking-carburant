@@ -827,6 +827,9 @@ def config_branding():
     return {
         **_BRANDING,
         "modules": _MODULES,
+        # « production » par défaut ; « staging » sur l'environnement de test
+        # (variable APP_ENV) — l'interface affiche alors un bandeau d'alerte.
+        "environnement": os.getenv("APP_ENV", "production").strip().lower() or "production",
         "roles": {
             # Donne au rôle Manager l'accès Hôtel complet (Chambres +
             # Réception inclus), comme un administrateur. Activé par tenant

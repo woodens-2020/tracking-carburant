@@ -1214,7 +1214,25 @@ async function _loadBranding(){
     if(sub) sub.innerHTML = `<strong>${b.raison_sociale}</strong> · ${b.complexe}`;
     const foot = document.getElementById('footer-brand');
     if(foot) foot.textContent = `${b.raison_sociale} · ${b.complexe}`;
+    _bandeauEnvironnement(b.environnement);
   }catch(e){ /* silencieux — les valeurs par défaut restent affichées */ }
+}
+
+// Bandeau « STAGING » : visible sur tous les environnements autres que la
+// production (variable APP_ENV côté serveur), pour ne jamais confondre le
+// test avec le vrai système.
+function _bandeauEnvironnement(env){
+  if(!env || env === 'production' || document.getElementById('env-banner')) return;
+  const d = document.createElement('div');
+  d.id = 'env-banner';
+  d.setAttribute('role', 'status');
+  d.textContent = `${String(env).toUpperCase()} · environnement de test, rien ici n'est en production`;
+  d.style.cssText = 'position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:2147483000;'
+    + 'background:repeating-linear-gradient(45deg,#b45309 0 12px,#92400e 12px 24px);color:#fff;'
+    + 'font:700 12px/1.2 system-ui,sans-serif;letter-spacing:.06em;padding:8px 16px;border-radius:999px;'
+    + 'box-shadow:0 4px 14px rgba(0,0,0,.35);pointer-events:none;max-width:calc(100vw - 32px);text-align:center';
+  document.body.appendChild(d);
+  if(!document.title.startsWith('[')) document.title = `[${String(env).toUpperCase()}] ${document.title}`;
 }
 document.addEventListener('DOMContentLoaded', _loadBranding);
 
