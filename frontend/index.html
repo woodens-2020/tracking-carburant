@@ -482,6 +482,112 @@ canvas{display:block}
 
 /* ── SAISIE ──────────────────────────────────── */
 .saisie-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:10px}
+/* ── Saisie des dépenses ───────────────────────────────────────── */
+.dep-body{display:flex;flex-direction:column;gap:12px}
+.dep-ctx{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:12px;padding:12px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07)}
+.dep-date-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.dep-date-row input{flex:1;min-width:140px}
+.dep-caisses{display:flex;gap:6px;flex-wrap:wrap}
+.dep-chip{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.75);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.dep-chip.active{background:rgba(59,130,246,.18);border-color:#3b82f6;color:#93c5fd}
+.dep-chip:focus-visible{outline:2px solid #3b82f6;outline-offset:2px}
+.dep-montant{font-size:20px!important;font-weight:800;text-align:right}
+.dep-montant::-webkit-outer-spin-button,.dep-montant::-webkit-inner-spin-button,.sx-inp::-webkit-outer-spin-button,.sx-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.dep-montant,.sx-inp{-moz-appearance:textfield;appearance:textfield}
+.dep-opt{font-weight:400;text-transform:none;letter-spacing:0;opacity:.6}
+.dep-plus summary{cursor:pointer;font-size:13.5px;font-weight:600;color:rgba(255,255,255,.65);padding:4px 0}
+.dep-serie{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac;border-radius:8px;padding:8px 12px;font-size:13.5px}
+.dep-aide{font-size:12px;color:rgba(255,255,255,.4)}
+@media(max-width:600px){.dep-ctx{grid-template-columns:1fr}}
+
+/* ── Rapport de caisse carburant ───────────────────────────────── */
+.cjr-filtres{padding:14px 16px}
+.cjr-filtres-ligne{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.cjr-filtres-champs{justify-content:flex-start;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.cjr-sous{font-size:13px;color:var(--muted);margin-top:4px}
+.cjr-presets{display:flex;gap:6px;flex-wrap:wrap;align-self:flex-end}
+.cjr-filtres-actifs{font-size:13px;color:var(--text2);background:var(--blue-d);border:1px solid var(--border2);border-radius:var(--rsm);padding:7px 12px;margin-bottom:12px}
+.cjr-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.cjr-kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+.cjr-kpi-solde{border-color:var(--border3);background:var(--panel2)}
+.cjr-kpi-l{font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.cjr-kpi-v{font-family:var(--mono);font-size:24px;font-weight:800;margin-top:6px}
+.cjr-kpi-s{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.5}
+.cjr-h{font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);margin:20px 0 4px}
+.cjr-note{font-size:12.5px;color:var(--muted);margin-bottom:8px}
+.cjr-table td.num,.cjr-table .num{font-family:var(--mono);white-space:nowrap}
+.cjr-table tfoot td{font-weight:800}
+.cjr-table th.tr,.cjr-table td.tr{text-align:right}
+.cjr-table td.c-amber{color:var(--orange)}
+.cjr-th-groupe th{border-bottom:none;padding-bottom:0;color:var(--text2)}
+.cjr-table .tc{text-align:center}
+.cjr-vide td{opacity:.5}
+.cjr-tag{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--orange-d);color:var(--orange)}
+.cjr-tag-tr{background:var(--blue-d);color:var(--blue2)}
+@media(max-width:820px){.cjr-kpis{grid-template-columns:1fr}}
+
+/* ── Espace de saisie : une carte par pompe ───────────────────────── */
+.sx-ctx{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin:4px 0 12px}
+.sx-ctx-titre{font-size:19px;font-weight:800;color:var(--text)}
+.sx-ctx-sous{font-size:13px;color:var(--muted);margin-top:2px}
+.sx-liste{display:flex;flex-direction:column;gap:10px}
+.sx-pompe{display:grid;grid-template-columns:minmax(150px,1fr) minmax(180px,1.2fr) minmax(200px,1.4fr) minmax(140px,1fr) 190px;gap:16px;align-items:start;
+  background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--blue);border-radius:var(--r);padding:14px 16px}
+.sx-pompe.sx-done{border-left-color:var(--green);opacity:.92}
+.sx-nom{font-size:17px;font-weight:800;color:var(--text);margin-bottom:6px}
+.sx-meta{font-size:12px;color:var(--muted);margin-top:4px}
+.sx-pompiste{cursor:pointer;color:var(--teal,#2dd4bf)}
+.sx-pompiste-vide{color:var(--muted);text-decoration:underline dotted}
+.sx-field label{display:block;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.sx-pompe .sx-inp{width:100%;max-width:none;min-width:0;box-sizing:border-box;font-family:var(--mono);font-size:16px;padding:10px 12px;text-align:right}
+.sx-field-main .sx-inp{font-size:18px;font-weight:700;border-color:var(--border3)}
+.sx-field-main .sx-inp:not([readonly]){background:var(--panel3);box-shadow:inset 0 0 0 1px var(--blue)}
+.sx-inp[readonly]{opacity:.75;cursor:default}
+.sx-inp.err{box-shadow:inset 0 0 0 2px var(--red)!important}
+.sx-hint{font-size:12px;color:var(--muted);margin-top:5px;min-height:16px;line-height:1.35}
+.sx-hint-err{color:var(--red2)}
+.sx-warn{color:var(--orange)}
+.sx-link{background:none;border:none;color:var(--blue2);cursor:pointer;padding:0;font:inherit;text-decoration:underline}
+.sx-result{text-align:right;padding-top:20px}
+.sx-result .val-qte{font-size:20px;font-weight:800}
+.sx-result .val-mnt{font-size:15px;font-weight:700;color:var(--orange);margin-top:2px}
+.sx-prix{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--mono)}
+.sx-act{padding-top:20px;text-align:right}
+.sx-btn-mod{background:var(--panel3);border:1px solid var(--border2);color:var(--text2);border-radius:var(--rsm);padding:7px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+.sx-btn-mod span{opacity:.65}
+.sx-chip{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px}
+.sx-chip-todo{background:var(--blue-d);color:var(--blue2)}
+.sx-chip-ok{background:var(--green-d);color:var(--green2)}
+.sx-chip-edit{background:var(--orange-d);color:var(--orange)}
+.sx-chip-lock{background:var(--red-d);color:var(--red2)}
+.sx-tab-cpt{margin-left:6px;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--panel3);color:var(--muted)}
+.sx-tab-cpt.ok{background:var(--green-d);color:var(--green2)}
+.sx-barre{position:sticky;bottom:0;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+  margin:14px 0 16px;padding:12px 16px;background:var(--panel2);border:1px solid var(--border2);border-radius:var(--r);box-shadow:var(--shadow-md)}
+.sx-barre-tot{font-size:15px;color:var(--muted)}
+.sx-barre-tot strong{color:var(--text);font-family:var(--mono)}
+.sx-barre-active{border-color:var(--blue)}
+.sx-btn-save{padding:10px 20px;font-size:15px}
+.sx-export{margin-top:18px;background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px}
+.sx-export summary{cursor:pointer;font-weight:700;color:var(--text2)}
+@media(max-width:900px){
+  .sx-pompe{grid-template-columns:1fr 1fr;gap:12px}
+  .sx-act{text-align:left}
+  .sx-id{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+  .sx-nom{margin:0}
+  .sx-result{text-align:left;padding-top:0}
+  .sx-act{grid-column:1/-1;padding-top:0}
+}
+@media(max-width:520px){
+  .sx-pompe{grid-template-columns:1fr}
+  .sx-barre{flex-direction:column;align-items:stretch}
+}
+/* Téléphone : la barre d'enregistrement reste au-dessus de la barre de navigation du bas */
+@media(max-width:768px){
+  .sx-barre{bottom:calc(58px + env(safe-area-inset-bottom,0px))}
+  #env-banner{top:calc(env(safe-area-inset-top,0px) + 2px)!important;bottom:auto!important;font-size:10px!important;padding:3px 10px!important}
+}
+
 .prod-tabs{display:flex;gap:8px;flex-wrap:wrap}
 .prod-tab{
   padding:5px 15px;border-radius:20px;font-size:13.5px;font-weight:500;
@@ -4003,8 +4109,30 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════ PAGE : SAISIE ══════ -->
     <div id="page-saisie" class="page">
 
-      <!-- Export Excel -->
-      <div class="db-filters-card" style="margin-bottom:14px">
+      <div class="saisie-top">
+        <div class="prod-tabs" id="prod-tabs"></div>
+        <button class="btn btn-secondary" onclick="openGestion()">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+          <span data-i18n="saisie.manage">Gérer produits / pompes</span>
+        </button>
+      </div>
+      <!-- Sélecteur Matin / Après-midi -->
+      <div class="per-selector">
+        <button class="per-sel-btn active" data-per="Matin" onclick="selectPeriode('Matin')">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+          <span data-i18n="saisie.period.matin">Matin</span>
+        </button>
+        <button class="per-sel-btn" data-per="Apres-midi" onclick="selectPeriode('Apres-midi')">
+          <svg viewBox="0 0 24 24"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="1" y1="18" x2="3" y2="18"/><line x1="21" y1="18" x2="23" y2="18"/><line x1="18.36" y1="11.64" x2="19.78" y2="10.22"/></svg>
+          <span data-i18n="saisie.period.apresmidi">Après-midi</span>
+        </button>
+      </div>
+      <div id="saisie-content"></div>
+      <div id="saisie-galrecap"></div>
+      <!-- Export Excel (replié : outil secondaire, pas la tâche principale de la page) -->
+      <details class="sx-export">
+        <summary>Exporter les relevés (.xlsx)</summary>
+      <div class="db-filters-card" style="margin:10px 0 0">
         <div class="db-preset-bar">
           <div style="display:flex;align-items:center;gap:10px">
             <div style="width:34px;height:34px;border-radius:9px;background:rgba(34,197,94,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0">
@@ -4044,27 +4172,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </button>
         </div>
       </div>
-
-      <div class="saisie-top">
-        <div class="prod-tabs" id="prod-tabs"></div>
-        <button class="btn btn-secondary" onclick="openGestion()">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-          <span data-i18n="saisie.manage">Gérer produits / pompes</span>
-        </button>
-      </div>
-      <!-- Sélecteur Matin / Après-midi -->
-      <div class="per-selector">
-        <button class="per-sel-btn active" data-per="Matin" onclick="selectPeriode('Matin')">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
-          <span data-i18n="saisie.period.matin">Matin</span>
-        </button>
-        <button class="per-sel-btn" data-per="Apres-midi" onclick="selectPeriode('Apres-midi')">
-          <svg viewBox="0 0 24 24"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="1" y1="18" x2="3" y2="18"/><line x1="21" y1="18" x2="23" y2="18"/><line x1="18.36" y1="11.64" x2="19.78" y2="10.22"/></svg>
-          <span data-i18n="saisie.period.apresmidi">Après-midi</span>
-        </button>
-      </div>
-      <div id="saisie-galrecap"></div>
-      <div id="saisie-content"></div>
+      </details>
     </div>
 
     <!-- ══════ PAGE : JOURNAL DES METERS ══════ -->
@@ -4194,24 +4302,67 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div>
 
-    <!-- ══ RAPPORT JOURNALIER CARBURANT (caisse du jour) ══ -->
+    <!-- ══ RAPPORT JOURNALIER CARBURANT (caisse du jour ou d'une période) ══ -->
     <div id="page-carburant-rapport" class="page">
-      <div class="card" style="margin-bottom:14px">
-        <div class="card-head" style="justify-content:space-between;flex-wrap:wrap;gap:10px">
-          <div class="per-head"><div class="per-dot" style="background:var(--green)"></div><div class="per-title">Rapport journalier — caisse carburant</div></div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-secondary btn-sm" onclick="cjrDecalerJour(-1)" title="Jour précédent">◀</button>
-            <input type="date" id="cjr-date" class="rpt-input" style="width:auto" onchange="loadCarburantRapport()">
-            <button class="btn btn-secondary btn-sm" onclick="cjrDecalerJour(1)" title="Jour suivant">▶</button>
-            <button class="btn btn-primary btn-sm" onclick="loadCarburantRapport()">Actualiser</button>
+      <div class="card cjr-filtres" style="margin-bottom:14px">
+        <div class="cjr-filtres-ligne">
+          <div class="cjr-titre">
+            <div class="per-head"><div class="per-dot" style="background:var(--green)"></div><div class="per-title">Rapport de caisse carburant</div></div>
+            <div class="cjr-sous" id="cjr-sous">Ventes, dépenses et solde</div>
+          </div>
+          <div class="cjr-actions">
             <button class="btn btn-secondary btn-sm" onclick="cjrImprimer()">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
               Imprimer
             </button>
           </div>
         </div>
-        <div id="cjr-body" style="padding:16px"></div>
+        <div class="cjr-filtres-ligne cjr-filtres-champs">
+          <div class="cjr-presets" role="group" aria-label="Période rapide">
+            <button class="db-preset" data-cjr="jour" onclick="cjrPreset('jour')">Aujourd'hui</button>
+            <button class="db-preset" data-cjr="hier" onclick="cjrPreset('hier')">Hier</button>
+            <button class="db-preset" data-cjr="7j" onclick="cjrPreset('7j')">7 derniers jours</button>
+            <button class="db-preset" data-cjr="mois" onclick="cjrPreset('mois')">Ce mois</button>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label" for="cjr-date">Du</label>
+            <div style="display:flex;gap:4px;align-items:center">
+              <button class="btn btn-secondary btn-sm" onclick="cjrDecalerJour(-1)" title="Jour précédent" aria-label="Jour précédent">◀</button>
+              <input type="date" id="cjr-date" class="filter-input" onchange="cjrDatesChangees()">
+            </div>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label" for="cjr-fin">Au</label>
+            <div style="display:flex;gap:4px;align-items:center">
+              <input type="date" id="cjr-fin" class="filter-input" onchange="cjrDatesChangees()">
+              <button class="btn btn-secondary btn-sm" onclick="cjrDecalerJour(1)" title="Jour suivant" aria-label="Jour suivant">▶</button>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label" for="cjr-produit">Caisse / produit</label>
+            <select id="cjr-produit" class="filter-select" onchange="cjrAfficher()">
+              <option value="">Toutes les caisses</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label" for="cjr-periode">Période de vente</label>
+            <select id="cjr-periode" class="filter-select" onchange="cjrAfficher()">
+              <option value="">Journée entière</option>
+              <option value="Matin">Matin</option>
+              <option value="Apres-midi">Après-midi</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label" for="cjr-type">Dépenses</label>
+            <select id="cjr-type" class="filter-select" onchange="cjrAfficher()">
+              <option value="">Charges et transferts</option>
+              <option value="charges">Charges seulement</option>
+              <option value="transferts">Transferts seulement</option>
+            </select>
+          </div>
+        </div>
       </div>
+      <div id="cjr-body"></div>
     </div>
 
     <!-- ══ RAPPORT ANALYTIQUE ══ -->
@@ -5928,13 +6079,35 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <h3 id="dep-modal-title">Nouvelle Dépense</h3>
             <button class="gi-modal-close" onclick="closeDepModal()">×</button>
           </div>
-          <div class="gi-modal-body">
+          <div class="gi-modal-body dep-body">
             <input type="hidden" id="dep-edit-id"/>
+            <div class="dep-serie" id="dep-serie" hidden></div>
+
+            <!-- Contexte : reste en place d'une dépense à l'autre -->
+            <div class="dep-ctx">
+              <div class="gi-form-field">
+                <label class="gi-form-lbl" for="dep-date">Date *</label>
+                <div class="dep-date-row">
+                  <input type="date" class="gi-form-input" id="dep-date"/>
+                  <button type="button" class="dep-chip" onclick="depDate(0)">Aujourd'hui</button>
+                  <button type="button" class="dep-chip" onclick="depDate(-1)">Hier</button>
+                </div>
+              </div>
+              <div class="gi-form-field">
+                <label class="gi-form-lbl">Payée par la caisse</label>
+                <select class="gi-form-select" id="dep-caisse" hidden>
+                  <option value="">— Générale (aucune caisse spécifique) —</option>
+                </select>
+                <div class="dep-caisses" id="dep-caisses" role="group" aria-label="Caisse d'origine"></div>
+              </div>
+            </div>
+
+            <!-- L'essentiel -->
             <div class="gi-form-row">
               <div class="gi-form-field">
-                <label class="gi-form-lbl">Catégorie *</label>
+                <label class="gi-form-lbl" for="dep-cat">Catégorie *</label>
                 <div style="display:flex;gap:6px;align-items:stretch">
-                  <select class="gi-form-select" id="dep-cat" style="flex:1">
+                  <select class="gi-form-select" id="dep-cat" style="flex:1" onchange="depCategorieChoisie()">
                     <option value="">— Sélectionner —</option>
                   </select>
                   <button type="button" class="gi-btn-secondary" title="Ajouter une catégorie"
@@ -5943,53 +6116,50 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 </div>
               </div>
               <div class="gi-form-field">
-                <label class="gi-form-lbl">Date *</label>
-                <input type="date" class="gi-form-input" id="dep-date"/>
+                <label class="gi-form-lbl" for="dep-montant">Montant (HTG) *</label>
+                <input type="number" class="gi-form-input dep-montant" id="dep-montant" placeholder="0,00" min="0.01" step="0.01" inputmode="decimal"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();submitDep(true)}"/>
               </div>
             </div>
             <div class="gi-form-row full">
               <div class="gi-form-field">
-                <label class="gi-form-lbl">Caisse d'origine</label>
-                <select class="gi-form-select" id="dep-caisse">
-                  <option value="">— Générale (aucune caisse spécifique) —</option>
-                </select>
+                <label class="gi-form-lbl" for="dep-desc">Description <span class="dep-opt">(reprend la catégorie si vide)</span></label>
+                <input class="gi-form-input" id="dep-desc" placeholder="Ex : Facture électricité octobre"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();submitDep(true)}"/>
               </div>
             </div>
-            <div class="gi-form-row full">
-              <div class="gi-form-field">
-                <label class="gi-form-lbl">Description *</label>
-                <input class="gi-form-input" id="dep-desc" placeholder="Ex : Facture électricité mois de juin"/>
-              </div>
-            </div>
-            <div class="gi-form-row">
-              <div class="gi-form-field">
-                <label class="gi-form-lbl">Montant (HTG) *</label>
-                <input type="number" class="gi-form-input" id="dep-montant" placeholder="0" min="0.01" step="0.01"/>
-              </div>
-              <div class="gi-form-field">
-                <label class="gi-form-lbl">Bénéficiaire</label>
-                <div style="display:flex;gap:6px;align-items:stretch">
-                  <select class="gi-form-select" id="dep-benef" style="flex:1"><option value="">— Aucun —</option></select>
-                  <button type="button" class="gi-btn-secondary" title="Ajouter un bénéficiaire"
-                          style="padding:0 12px;font-size:18px;line-height:1"
-                          onclick="_ajoutRapideRef('beneficiaires','dep-benef')">+</button>
+
+            <!-- Facultatif -->
+            <details class="dep-plus" id="dep-plus">
+              <summary>Bénéficiaire, référence, notes <span class="dep-opt">(facultatif)</span></summary>
+              <div class="gi-form-row" style="margin-top:10px">
+                <div class="gi-form-field">
+                  <label class="gi-form-lbl" for="dep-benef">Bénéficiaire</label>
+                  <div style="display:flex;gap:6px;align-items:stretch">
+                    <select class="gi-form-select" id="dep-benef" style="flex:1"><option value="">— Aucun —</option></select>
+                    <button type="button" class="gi-btn-secondary" title="Ajouter un bénéficiaire"
+                            style="padding:0 12px;font-size:18px;line-height:1"
+                            onclick="_ajoutRapideRef('beneficiaires','dep-benef')">+</button>
+                  </div>
+                </div>
+                <div class="gi-form-field">
+                  <label class="gi-form-lbl" for="dep-ref">Référence / N° facture</label>
+                  <input class="gi-form-input" id="dep-ref" placeholder="FAC-2026-001"/>
                 </div>
               </div>
-            </div>
-            <div class="gi-form-row">
-              <div class="gi-form-field">
-                <label class="gi-form-lbl">Référence / N° facture</label>
-                <input class="gi-form-input" id="dep-ref" placeholder="FAC-2026-001"/>
+              <div class="gi-form-row full">
+                <div class="gi-form-field">
+                  <label class="gi-form-lbl" for="dep-notes">Notes</label>
+                  <input class="gi-form-input" id="dep-notes" placeholder="Informations complémentaires"/>
+                </div>
               </div>
-              <div class="gi-form-field">
-                <label class="gi-form-lbl">Notes</label>
-                <input class="gi-form-input" id="dep-notes" placeholder="Informations complémentaires"/>
-              </div>
-            </div>
+            </details>
+            <div class="dep-aide">Entrée = enregistrer et saisir la suivante (date et caisse conservées).</div>
           </div>
           <div class="gi-modal-foot">
-            <button class="gi-btn-secondary" onclick="closeDepModal()">Annuler</button>
-            <button class="gi-btn-primary" onclick="submitDep()">Enregistrer</button>
+            <button class="gi-btn-secondary" onclick="closeDepModal()">Fermer</button>
+            <button class="gi-btn-secondary" id="dep-btn-suite" onclick="submitDep(true)">Enregistrer et nouvelle</button>
+            <button class="gi-btn-primary" onclick="submitDep(false)">Enregistrer</button>
           </div>
         </div>
       </div>
@@ -14810,11 +14980,15 @@ function renderProdTabs(){
     el.innerHTML=`<span class="c-muted" style="font-size:14px">${t('saisie.noproduct.empty')}</span>`;
     return;
   }
-  if(!currentProdId||!products.find(p=>p.id===currentProdId))
-    currentProdId=products[0].id;
-  el.innerHTML=products.map(p=>
-    `<button class="prod-tab ${p.id===currentProdId?'active':''}" onclick="selectProd(${p.id})">${esc(p.nom)}</button>`
-  ).join('');
+  const avecPompes=products.filter(p=>(p.pompes||[]).length);
+  if(!currentProdId||!avecPompes.find(p=>p.id===currentProdId))
+    currentProdId=(avecPompes[0]||products[0]).id;
+  el.innerHTML=products.filter(p=>(p.pompes||[]).length).map(p=>{
+    const faits=p.pompes.filter(po=>releves.some(r=>r.pompe_id===po.id&&r.periode===currentPeriode)).length;
+    const complet=faits===p.pompes.length;
+    return `<button class="prod-tab ${p.id===currentProdId?'active':''}" onclick="selectProd(${p.id})">${esc(p.nom)}
+      <span class="sx-tab-cpt${complet?' ok':''}">${complet?'✓':faits+'/'+p.pompes.length}</span></button>`;
+  }).join('');
 }
 function selectProd(id){ currentProdId=id; renderProdTabs(); renderSaisie(); }
 
@@ -14824,6 +14998,7 @@ async function selectPeriode(per){
     b.classList.toggle('active', b.dataset.per===per)
   );
   await loadIndexPrecedents();
+  renderProdTabs();
   renderSaisie();
 }
 
@@ -14835,105 +15010,141 @@ function renderSaisie(){
   const p=products.find(x=>x.id===currentProdId);
   if(!p){ el.innerHTML=`<div class="empty">${t('saisie.noproduct')}</div>`; return; }
 
-  const html=[currentPeriode].map(per=>{
-    const label=per==='Matin'?t('saisie.period.matin'):t('saisie.period.apresmidi');
-    const perRel=releves.filter(r=>r.periode===per&&r.produit_id===p.id);
+  const per=currentPeriode;
+  const label=per==='Matin'?t('saisie.period.matin'):t('saisie.period.apresmidi');
+  const perRel=releves.filter(r=>r.periode===per&&r.produit_id===p.id);
+  const pxDefaut=(p.prix_vente_actif!=null)?p.prix_vente_actif:p.prix_gallon;
+  const nbFaits=p.pompes.filter(po=>perRel.some(r=>r.pompe_id===po.id)).length;
 
-    const rows=p.pompes.map(po=>{
-      const r=perRel.find(x=>x.pompe_id===po.id);
-      const isEdit=!!r;
-      const av=r?r.metter_avant:'';
-      const ap=r?r.metter_apres:'';
-      // Prix configuré aux Paramètres (Prix de vente) en priorité — sinon la
-      // saisie resterait figée sur le prix de création du produit, même
-      // après un changement de prix officiel. Un relevé déjà existant garde
-      // toujours son propre prix historique (r.prix_gallon), inchangé.
-      const pxDefaut=(p.prix_vente_actif!=null)?p.prix_vente_actif:p.prix_gallon;
-      const px=r?r.prix_gallon:pxDefaut;
-      const qte=r?r.quantite:0;
-      const mnt=r?r.montant_vente:0;
-      const nbMod=r?(r.nb_modifications||0):0;
-      const locked=isEdit&&nbMod>=MAX_MODIFICATIONS_PAR_RELEVE;
-      const qcol=qte<0?'c-red':'c-teal';
+  const cartes=p.pompes.map((po,idx)=>{
+    const r=perRel.find(x=>x.pompe_id===po.id);
+    const isEdit=!!r;
+    const av=r?r.metter_avant:'';
+    const ap=r?r.metter_apres:'';
+    // Prix fixé par le serveur (Paramètres › Prix de vente) : affiché, pas saisi.
+    const px=r?r.prix_gallon:pxDefaut;
+    const nbMod=r?(r.nb_modifications||0):0;
+    const locked=isEdit&&nbMod>=MAX_MODIFICATIONS_PAR_RELEVE;
 
-      // Bouton d'activation (ou badge verrouillé)
-      let actionHtml;
-      if(locked){
-        actionHtml=`<span class="badge badge-locked">&#128274; ${t('saisie.badge.locked')}</span>`;
-      } else if(isEdit){
-        const rest=MAX_MODIFICATIONS_PAR_RELEVE-nbMod;
-        actionHtml=`<button class="btn-row-edit btn-row-mod" onclick="enableRow(this.closest('tr'))" title="${t('saisie.btn.modify.title')}">
-          ✎ ${t('saisie.btn.modify')} <span style="opacity:.7">(${t('saisie.btn.modify.remaining',{n:rest})})</span>
-        </button>`;
-      } else {
-        actionHtml=`<button class="btn-row-edit btn-row-new" onclick="enableRow(this.closest('tr'))" title="${t('saisie.btn.create.title')}">
-          ${t('saisie.btn.create')}
-        </button>`;
-      }
+    // Index de continuité : le mètre après précédent devient le mètre avant.
+    const ip=indexPrecedents[po.id];
+    const ipVal=(ip&&ip.index_precedent!=null)?ip.index_precedent:null;
+    const ipSrc=(ip&&ip.source_periode)
+      ?`${ip.source_periode==='Matin'?'Matin':'Après-midi'} ${frDate(ip.source_date)}`:'';
 
-      // Traçabilité : qui a saisi ce relevé (et qui l'a modifié en dernier,
-      // si différent) — affiché en sous-titre discret, pas une colonne à
-      // part, pour ne pas alourdir le tableau ni retoucher les 3 langues.
-      const saisiPar=isEdit&&r.cree_par_nom
-        ?`<div style="font-size:11px;font-weight:400;color:var(--muted);margin-top:2px">Saisi par ${esc(r.cree_par_nom)}${(r.modifie_par_nom&&r.modifie_par_nom!==r.cree_par_nom)?` · modifié par ${esc(r.modifie_par_nom)}`:''}</div>`
-        :'';
-      const pompisteInfo=!isEdit?'':(r.pompiste_nom
-        ?`<div class="pompiste-badge" data-releve-id="${r.id}" data-pompe-nom="${esc(po.nom)}" data-pompiste-id="${r.pompiste_id}" style="font-size:11px;font-weight:400;color:var(--teal);margin-top:2px;cursor:pointer" onclick="openPompisteModalFromBadge(this)" title="${t('saisie.pompiste.submit')}">⛽ ${esc(r.pompiste_nom)}</div>`
-        :`<div class="pompiste-badge" data-releve-id="${r.id}" data-pompe-nom="${esc(po.nom)}" style="font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;cursor:pointer;text-decoration:underline dotted" onclick="openPompisteModalFromBadge(this)">⛽ ${t('saisie.pompiste.submit')}</div>`);
+    let avVal='', avRo=true, apRo=true, hintAv='';
+    if(isEdit){
+      avVal=av; hintAv=r.ecart_compteur?`<span class="sx-warn">Écart ${fmtNum(r.ecart_compteur,3)} gal · ${esc(r.motif_ecart_compteur||'')}</span>`:'';
+    } else if(ipVal!=null){
+      avVal=ipVal; apRo=false;
+      hintAv=`Repris de la fin ${esc(ipSrc)} · <button type="button" class="sx-link" onclick="sxDeverrouillerAvant(this)">modifier</button>`;
+    } else {
+      avRo=false; apRo=false; hintAv='Premier relevé de cette pompe : saisissez le mètre avant';
+    }
 
-      // Report de continuité : dernier « mètre après » connu → proposé comme
-      // « mètre avant ». Case à cocher : cocher = préremplir + activer la ligne.
-      const ip = indexPrecedents[po.id];
-      const ipVal = (ip && ip.index_precedent!=null) ? ip.index_precedent : null;
-      const ipSrc = (ip && ip.source_periode)
-        ? `${ip.source_periode==='Matin'?'Matin':'Après-midi'} ${frDate(ip.source_date)}` : '';
-      const ipCheck = (!isEdit && ipVal!=null)
-        ? `<label class="ip-report" title="Reporter l'index de fin de la période précédente">
-             <input type="checkbox" onchange="applyIndexPrecedent(this)" data-val="${ipVal}">
-             <span>Index attendu : <b>${fmtGal(ipVal,4)}</b>${ipSrc?` <span class="ip-src">(fin ${ipSrc})</span>`:''}</span>
-           </label>`
-        : '';
+    let statut, action='';
+    if(locked){
+      statut=`<span class="sx-chip sx-chip-lock">🔒 ${t('saisie.badge.locked')}</span>`;
+    } else if(isEdit){
+      statut=`<span class="sx-chip sx-chip-ok">✓ Enregistré</span>`;
+      action=`<button type="button" class="sx-btn-mod" onclick="enableRow(this.closest('.sx-pompe'))">✎ ${t('saisie.btn.modify')} <span>(${t('saisie.btn.modify.remaining',{n:MAX_MODIFICATIONS_PAR_RELEVE-nbMod})})</span></button>`;
+    } else {
+      statut=`<span class="sx-chip sx-chip-todo">À saisir</span>`;
+    }
 
-      return `<tr data-pompe="${po.id}" data-per="${per}" data-defpx="${pxDefaut}"
-                  data-is-edit="${isEdit?'1':'0'}" data-nb-mod="${nbMod}"
-                  data-av="${av}" data-ap="${ap}" data-ip="${ipVal!=null?ipVal:''}">
-        <td style="font-weight:600">${esc(po.nom)}${saisiPar}${pompisteInfo}</td>
-        <td class="tr" data-label="${t('saisie.table.px')}"><input class="inp inp-sm inp-px" type="number" step="0.01" value="${px}" oninput="calcRow(this.closest('tr'))"></td>
-        <td class="tr" data-label="${t('saisie.table.av')}"><input class="inp inp-av" type="number" step="0.0001" value="" readonly placeholder="${av||'—'}" oninput="calcRow(this.closest('tr'))">${ipCheck}</td>
-        <td class="tr" data-label="${t('saisie.table.ap')}"><input class="inp inp-ap" type="number" step="0.0001" value="" readonly placeholder="${ap||'—'}" oninput="calcRow(this.closest('tr'))"></td>
-        <td class="tr num ${qcol} val-qte" data-label="${t('saisie.table.qte')}">${isEdit?fmtGalX(qte):"—"}</td>
-        <td class="tr num c-amber val-mnt" data-label="${t('saisie.table.mnt')}">${isEdit?fmtGX(mnt):"—"}</td>
-        <td data-label="${t('saisie.table.statut')}"><span class="row-badge">${actionHtml}</span></td>
-      </tr>`;
-    }).join('')||`<tr><td colspan="7" class="empty">${t('saisie.nopompe')}</td></tr>`;
+    const saisiPar=isEdit&&r.cree_par_nom
+      ?`<div class="sx-meta">Saisi par ${esc(r.cree_par_nom)}${(r.modifie_par_nom&&r.modifie_par_nom!==r.cree_par_nom)?` · modifié par ${esc(r.modifie_par_nom)}`:''}</div>`:'';
+    const pompisteInfo=!isEdit?'':(r.pompiste_nom
+      ?`<div class="pompiste-badge sx-meta sx-pompiste" data-releve-id="${r.id}" data-pompe-nom="${esc(po.nom)}" data-pompiste-id="${r.pompiste_id}" onclick="openPompisteModalFromBadge(this)" title="${t('saisie.pompiste.submit')}">⛽ ${esc(r.pompiste_nom)}</div>`
+      :`<div class="pompiste-badge sx-meta sx-pompiste sx-pompiste-vide" data-releve-id="${r.id}" data-pompe-nom="${esc(po.nom)}" onclick="openPompisteModalFromBadge(this)">⛽ ${t('saisie.pompiste.submit')}</div>`);
 
-    return `<div class="card mb14">
-      <div class="card-head">
-        <div class="per-head"><div class="per-dot"></div><div class="per-title">${label}</div></div>
-        <button class="btn btn-primary" style="padding:5px 14px;font-size:14px" onclick="prepareConfirm('${per}')">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          ${t('saisie.btn.save')}
-        </button>
+    return `<div class="sx-pompe${isEdit?' sx-done':''}" data-pompe="${po.id}" data-per="${per}" data-defpx="${pxDefaut}"
+                data-is-edit="${isEdit?'1':'0'}" data-nb-mod="${nbMod}" data-av="${av}" data-ap="${ap}" data-ip="${ipVal!=null?ipVal:''}">
+      <div class="sx-id">
+        <div class="sx-nom">${esc(po.nom)}</div>
+        <div class="row-badge">${statut}</div>
+        ${saisiPar}${pompisteInfo}
       </div>
-      <div class="tbl-wrap">
-        <table class="dt">
-          <thead><tr>
-            <th>${t('saisie.table.pompe')}</th>
-            <th class="tr">${t('saisie.table.px')}</th>
-            <th class="tr">${t('saisie.table.av')}</th>
-            <th class="tr">${t('saisie.table.ap')}</th>
-            <th class="tr">${t('saisie.table.qte')}</th>
-            <th class="tr">${t('saisie.table.mnt')}</th>
-            <th>${t('saisie.table.statut')}</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
+      <div class="sx-field">
+        <label for="sx-av-${po.id}">Mètre avant</label>
+        <input id="sx-av-${po.id}" class="inp inp-av sx-inp" type="number" step="0.0001" inputmode="decimal" value="${avVal}" ${avRo?'readonly':''} oninput="calcRow(this.closest('.sx-pompe'))">
+        <div class="sx-hint">${hintAv}</div>
       </div>
+      <div class="sx-field sx-field-main">
+        <label for="sx-ap-${po.id}">Mètre après</label>
+        <input id="sx-ap-${po.id}" class="inp inp-ap sx-inp" type="number" step="0.0001" inputmode="decimal" value="${isEdit?ap:''}" ${apRo?'readonly':''}
+               placeholder="${apRo?'':'Index du compteur'}" data-idx="${idx}"
+               oninput="calcRow(this.closest('.sx-pompe'))" onkeydown="sxEntree(event,this)">
+        <div class="sx-hint sx-hint-err" aria-live="polite"></div>
+      </div>
+      <div class="sx-result">
+        <div class="val-qte num">${isEdit?fmtGalX(r.quantite):'—'}</div>
+        <div class="val-mnt num">${isEdit?fmtGX(r.montant_vente):''}</div>
+        <div class="sx-prix">× ${fmtNum(px,2)} G/gal</div>
+        <input type="hidden" class="inp-px" value="${px}">
+      </div>
+      <div class="sx-act">${action}</div>
     </div>`;
-  }).join('');
+  }).join('')||`<div class="empty">${t('saisie.nopompe')}</div>`;
 
-  el.innerHTML=html;
+  el.innerHTML=`
+    <div class="sx-ctx">
+      <div>
+        <div class="sx-ctx-titre">${esc(p.nom)} · ${label}</div>
+        <div class="sx-ctx-sous">${frDate(currentDate)} · ${nbFaits}/${p.pompes.length} pompe(s) enregistrée(s) · prix ${fmtNum(pxDefaut,2)} G/gal (Paramètres › Prix de vente)</div>
+      </div>
+    </div>
+    <div class="sx-liste">${cartes}</div>
+    <div class="sx-barre" id="sx-barre">
+      <div class="sx-barre-tot"><span id="sx-tot-nb">Aucune saisie en cours</span><strong id="sx-tot-val"></strong></div>
+      <button class="btn btn-primary sx-btn-save" onclick="prepareConfirm('${per}')">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        ${t('saisie.btn.save')} — ${label}
+      </button>
+    </div>`;
   renderGalRecap();
+  sxMajTotaux();
+  // Curseur directement sur le premier mètre après à saisir
+  const premier=el.querySelector('.sx-pompe:not(.sx-done) .inp-ap:not([readonly])');
+  if(premier && document.getElementById('page-saisie')?.classList.contains('active')) premier.focus();
+}
+
+// Entrée dans un « mètre après » → pompe suivante ; sur la dernière → enregistrer.
+function sxEntree(ev, inp){
+  if(ev.key!=='Enter') return;
+  ev.preventDefault();
+  const tous=[...document.querySelectorAll('#saisie-content .inp-ap:not([readonly])')];
+  const k=tous.indexOf(inp);
+  if(k>=0 && k<tous.length-1){ tous[k+1].focus(); tous[k+1].select(); }
+  else prepareConfirm(currentPeriode);
+}
+
+// « modifier » sous le mètre avant repris : le déverrouille. Un écart avec
+// l'index attendu demandera un motif à l'enregistrement.
+function sxDeverrouillerAvant(btn){
+  const carte=btn.closest('.sx-pompe');
+  const inp=carte.querySelector('.inp-av');
+  inp.removeAttribute('readonly');
+  inp.focus(); inp.select();
+  btn.closest('.sx-hint').innerHTML='Mètre avant modifié : un motif sera demandé s\'il diffère de l\'index attendu';
+}
+
+// Totaux de ce qui va être enregistré (cartes en saisie avec un mètre après)
+function sxMajTotaux(){
+  let n=0, g=0, m=0;
+  document.querySelectorAll('#saisie-content .sx-pompe').forEach(c=>{
+    const ap=c.querySelector('.inp-ap');
+    if(!ap || ap.readOnly || ap.value==='') return;
+    const av=parseFloat(c.querySelector('.inp-av').value)||0;
+    const q=Math.round((parseFloat(ap.value)-av)*10000)/10000;
+    const px=parseFloat(c.querySelector('.inp-px').value)||0;
+    n++; g+=q; m+=q*px;
+  });
+  const nb=document.getElementById('sx-tot-nb'), val=document.getElementById('sx-tot-val');
+  if(!nb) return;
+  nb.textContent = n ? `${n} pompe(s) à enregistrer` : 'Aucune saisie en cours';
+  val.textContent = n ? ` · ${fmtGalX(g)} · ${fmtGX(Math.round(m*100)/100)}` : '';
+  document.getElementById('sx-barre').classList.toggle('sx-barre-active', n>0);
 }
 
 // Tableau récapitulatif : gallons vendus par produit (Diesel, Gazoline…)
@@ -15082,247 +15293,310 @@ function _ficheSyntheseHtml(s){
 }
 
 // ══════════════════════════════════════════════════════════════════
-// RAPPORT JOURNALIER CARBURANT — caisse du jour
-//   Entrées (ventes carburant) · Dépenses (station) · Disponible
+// RAPPORT DE CAISSE CARBURANT — un jour ou une période
+//   Ventes (relevés) · Dépenses (charges / transferts) · Solde
+//   Filtres : dates, caisse/produit, période de vente, type de dépense.
+//   Montants à 2 décimales, gallons à 3 décimales.
 // ══════════════════════════════════════════════════════════════════
-let _cjrData = null;
+let _cjrJours = [];          // réponses /carburant/rapport-jour, une par jour
+let _cjrModele = null;       // données filtrées affichées (réutilisées pour l'impression)
+const _CJR_MAX_JOURS = 62;
 
-function _cjrDateInput(){
-  const el = document.getElementById('cjr-date');
-  return (el && el.value) ? el.value : currentDate;
+const cjrG   = v => (Number(v)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' G';
+const cjrGal = v => (Number(v)||0).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3})+' gal';
+const cjrPx  = v => (Number(v)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+function _cjrIso(d){ const p2=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`; }
+function _cjrDateInput(){ const el=document.getElementById('cjr-date'); return (el&&el.value)?el.value:currentDate; }
+
+function cjrPreset(k){
+  const ref=new Date(currentDate+'T12:00:00');
+  let deb=new Date(ref), fin=new Date(ref);
+  if(k==='hier'){ deb.setDate(deb.getDate()-1); fin=new Date(deb); }
+  if(k==='7j'){ deb.setDate(deb.getDate()-6); }
+  if(k==='mois'){ deb=new Date(ref.getFullYear(), ref.getMonth(), 1, 12); }
+  document.getElementById('cjr-date').value=_cjrIso(deb);
+  document.getElementById('cjr-fin').value=_cjrIso(fin);
+  document.querySelectorAll('[data-cjr]').forEach(b=>b.classList.toggle('active', b.dataset.cjr===k));
+  loadCarburantRapport();
 }
+
+// ◀ ▶ : décale toute la plage d'un jour (une seule journée → jour précédent / suivant)
 function cjrDecalerJour(delta){
-  const el = document.getElementById('cjr-date');
-  const base = (el && el.value) ? new Date(el.value) : new Date(currentDate);
-  base.setDate(base.getDate()+delta);
-  const p2 = n=>String(n).padStart(2,'0');
-  el.value = `${base.getFullYear()}-${p2(base.getMonth()+1)}-${p2(base.getDate())}`;
+  const d1=document.getElementById('cjr-date'), d2=document.getElementById('cjr-fin');
+  const a=new Date((d1.value||currentDate)+'T12:00:00'), b=new Date((d2.value||d1.value||currentDate)+'T12:00:00');
+  a.setDate(a.getDate()+delta); b.setDate(b.getDate()+delta);
+  d1.value=_cjrIso(a); d2.value=_cjrIso(b);
+  document.querySelectorAll('[data-cjr]').forEach(x=>x.classList.remove('active'));
+  loadCarburantRapport();
+}
+
+function cjrDatesChangees(){
+  const d1=document.getElementById('cjr-date'), d2=document.getElementById('cjr-fin');
+  if(d1.value && (!d2.value || d2.value<d1.value)) d2.value=d1.value;
+  document.querySelectorAll('[data-cjr]').forEach(x=>x.classList.remove('active'));
   loadCarburantRapport();
 }
 
 async function loadCarburantRapport(){
-  const el = document.getElementById('cjr-date');
-  if(el && !el.value) el.value = currentDate;
-  const body = document.getElementById('cjr-body');
-  if(body) body.innerHTML = '<div class="loading-row" style="padding:30px"><span class="spinner"></span>Chargement…</div>';
+  const d1=document.getElementById('cjr-date'), d2=document.getElementById('cjr-fin');
+  if(d1 && !d1.value){ d1.value=currentDate; document.querySelector('[data-cjr="jour"]')?.classList.add('active'); }
+  if(d2 && !d2.value) d2.value=d1.value;
+  const body=document.getElementById('cjr-body');
+  const jours=[];
+  for(let d=new Date(d1.value+'T12:00:00'), f=new Date(d2.value+'T12:00:00'); d<=f; d.setDate(d.getDate()+1)) jours.push(_cjrIso(d));
+  if(jours.length>_CJR_MAX_JOURS){
+    body.innerHTML=`<div class="empty" style="color:var(--red)">Période trop longue (${jours.length} jours) : ${_CJR_MAX_JOURS} jours maximum. Utilisez le Rapport Analytique pour une période plus longue.</div>`;
+    return;
+  }
+  body.innerHTML='<div class="loading-row" style="padding:30px"><span class="spinner"></span>Chargement…</div>';
   try{
-    _cjrData = await GET('/carburant/rapport-jour?date='+_cjrDateInput());
-    _cjrRender(_cjrData);
+    _cjrJours=await Promise.all(jours.map(j=>GET('/carburant/rapport-jour?date='+j)));
+    // Liste des caisses (produits) rencontrées, pour le filtre
+    const sel=document.getElementById('cjr-produit'), garde=sel.value;
+    const noms=new Set();
+    _cjrJours.forEach(d=>{
+      (d.entrees.par_produit||[]).forEach(p=>noms.add(p.produit));
+      (d.depenses.liste||[]).forEach(x=>{ if(x.source && x.source!=='Caisse générale') noms.add(x.source); });
+    });
+    sel.innerHTML='<option value="">Toutes les caisses</option>'
+      +[...noms].sort().map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')
+      +'<option value="__generale">Caisse générale (dépenses non attribuées)</option>';
+    if([...sel.options].some(o=>o.value===garde)) sel.value=garde;
+    cjrAfficher();
   }catch(e){
-    if(body) body.innerHTML = `<div class="empty" style="color:var(--red)">Erreur : ${esc(e.message||'')}</div>`;
+    body.innerHTML=`<div class="empty" style="color:var(--red)">Erreur : ${esc(e.message||'')}</div>`;
   }
 }
 
-function _cjrRender(d){
-  const body = document.getElementById('cjr-body');
-  if(!body) return;
-  const ent = d.entrees, dep = d.depenses, dispo = d.disponible;
-  const dispoCol = dispo>=0 ? 'var(--green)' : 'var(--red)';
-  const dispoParProduit = d.disponible_par_produit || [];
-
-  // Détail des entrées par période (Matin / Après-midi) puis par produit.
-  const periodes = ent.par_periode || [];
-  let rowsEnt = '';
-  if(periodes.length){
-    rowsEnt = periodes.map(pe=>{
-      const lignes = (pe.par_produit||[]);
-      const corps = lignes.length
-        ? lignes.map(p=>`<tr>
-            <td style="padding-left:22px;color:var(--text2)">${esc(p.produit)}</td>
-            <td class="tr">${fmtGalX(p.gallons)}</td>
-            <td class="tr c-teal">${fmtGX(p.montant)}</td>
-          </tr>`).join('')
-        : `<tr><td colspan="3" style="padding-left:22px;color:var(--muted)">Aucune vente</td></tr>`;
-      return `<tr style="background:rgba(255,255,255,.04)">
-          <td style="font-weight:800;letter-spacing:.03em">${esc(pe.libelle)}</td>
-          <td class="tr" style="font-weight:700">${fmtGalX(pe.total_gallons)}</td>
-          <td class="tr c-teal" style="font-weight:800">${fmtGX(pe.total_montant)}</td>
-        </tr>${corps}`;
-    }).join('');
-  } else {
-    rowsEnt = (ent.par_produit||[]).map(p=>`<tr>
-        <td style="font-weight:600">${esc(p.produit)}</td>
-        <td class="tr">${fmtGalX(p.gallons)}</td>
-        <td class="tr c-teal" style="font-weight:700">${fmtGX(p.montant)}</td>
-      </tr>`).join('') || `<tr><td colspan="3" class="empty" style="padding:14px">Aucune vente ce jour</td></tr>`;
+// Construit les données affichées à partir des jours chargés et des filtres
+function _cjrConstruire(){
+  const fProd=document.getElementById('cjr-produit').value;
+  const fPer=document.getElementById('cjr-periode').value;
+  const fType=document.getElementById('cjr-type').value;
+  const produits={};       // nom -> {Matin:{g,m}, Apres-midi:{g,m}}
+  const jours=[];
+  const depenses=[];
+  let tg=0, tm=0, tdc=0, tdt=0;
+  for(const d of _cjrJours){
+    let jg=0, jm=0, jdc=0, jdt=0;
+    for(const pe of (d.entrees.par_periode||[])){
+      if(fPer && pe.periode!==fPer) continue;
+      for(const p of (pe.par_produit||[])){
+        if(fProd && fProd!==p.produit) continue;
+        const e=produits[p.produit] ||= {'Matin':{g:0,m:0},'Apres-midi':{g:0,m:0}};
+        e[pe.periode].g+=p.gallons; e[pe.periode].m+=p.montant;
+        jg+=p.gallons; jm+=p.montant;
+      }
+    }
+    for(const x of (d.depenses.liste||[])){
+      const src=x.source||'Caisse générale';
+      if(fProd==='__generale' && src!=='Caisse générale') continue;
+      if(fProd && fProd!=='__generale' && src!==fProd) continue;
+      if(fType==='charges' && x.est_transfert) continue;
+      if(fType==='transferts' && !x.est_transfert) continue;
+      depenses.push({...x, date:d.date});
+      if(x.est_transfert) jdt+=x.montant; else jdc+=x.montant;
+    }
+    jours.push({date:d.date, gallons:jg, ventes:jm, charges:jdc, transferts:jdt, solde:jm-jdc-jdt});
+    tg+=jg; tm+=jm; tdc+=jdc; tdt+=jdt;
   }
-  const _pm = periodes.find(p=>p.periode==='Matin');
-  const _pa = periodes.find(p=>p.periode==='Apres-midi');
-  const rowsDep = (dep.liste||[]).map(x=>`<tr>
-      <td>${esc(x.categorie)}</td>
-      <td>${esc(x.description||'')}</td>
-      <td>${esc(x.source||'Caisse générale')}</td>
-      <td class="tr c-amber" style="font-weight:700">${fmtGX(x.montant)}</td>
-    </tr>`).join('') || `<tr><td colspan="4" class="empty" style="padding:14px">Aucune dépense ce jour</td></tr>`;
+  const lignesProduits=Object.entries(produits).map(([nom,e])=>{
+    const g=e['Matin'].g+e['Apres-midi'].g, m=e['Matin'].m+e['Apres-midi'].m;
+    return {nom, matin:e['Matin'], am:e['Apres-midi'], g, m, prix:g>0?m/g:0};
+  }).sort((a,b)=>b.m-a.m);
+  const matin=lignesProduits.reduce((s,p)=>({g:s.g+p.matin.g,m:s.m+p.matin.m}),{g:0,m:0});
+  const am=lignesProduits.reduce((s,p)=>({g:s.g+p.am.g,m:s.m+p.am.m}),{g:0,m:0});
+  const libProd = !fProd ? 'Toutes les caisses' : (fProd==='__generale' ? 'Caisse générale' : fProd);
+  const libPer = !fPer ? 'Journée entière' : (fPer==='Matin'?'Matin':'Après-midi');
+  const libType = !fType ? 'Charges et transferts' : (fType==='charges'?'Charges seulement':'Transferts seulement');
+  return {
+    debut:_cjrJours[0]?.date, fin:_cjrJours[_cjrJours.length-1]?.date, unJour:_cjrJours.length===1,
+    jours, lignesProduits, matin, am, depenses,
+    totaux:{gallons:tg, ventes:tm, charges:tdc, transferts:tdt, depenses:tdc+tdt, solde:tm-tdc-tdt},
+    filtres:{produit:libProd, periode:libPer, type:libType, actif:!!(fProd||fPer||fType)},
+  };
+}
 
-  const rowsDispoProduit = dispoParProduit.map(p=>{
-    const c = p.disponible>=0 ? 'var(--green)' : 'var(--red)';
-    return `<div class="galrecap-card">
-      <div class="grc-lbl">Disponible ${esc(p.produit)}</div>
-      <div class="grc-gal" style="color:${c}">${fmtGX(p.disponible)}</div>
-      <div class="grc-mnt">${fmtGX(p.entrees)} entrées − ${fmtGX(p.depenses)} dépenses</div>
-    </div>`;
-  }).join('');
-  const depGenerale = dep.total_generale || 0;
+function _cjrPeriodeTexte(m){
+  return m.unJour ? frDate(m.debut) : `du ${frDate(m.debut)} au ${frDate(m.fin)} (${m.jours.length} jours)`;
+}
+
+function cjrAfficher(){
+  const body=document.getElementById('cjr-body');
+  if(!_cjrJours.length){ body.innerHTML=''; return; }
+  const m=_cjrModele=_cjrConstruire();
+  const t=m.totaux;
+  document.getElementById('cjr-sous').textContent = 'Rapport ' + _cjrPeriodeTexte(m);
+  const soldeCol = t.solde>=0 ? 'var(--green)' : 'var(--red)';
+  const filtres = m.filtres.actif
+    ? `<div class="cjr-filtres-actifs">Filtres : <b>${esc(m.filtres.produit)}</b> · <b>${esc(m.filtres.periode)}</b> · <b>${esc(m.filtres.type)}</b></div>` : '';
+
+  // Tableau des ventes : un produit par ligne, Matin / Après-midi / Total côte à côte
+  const montrerPer = document.getElementById('cjr-periode').value==='';
+  const lignesV = m.lignesProduits.map(p=>`<tr>
+      <td><strong>${esc(p.nom)}</strong></td>
+      ${montrerPer?`<td class="tr num">${cjrGal(p.matin.g)}</td><td class="tr num">${cjrG(p.matin.m)}</td>
+      <td class="tr num">${cjrGal(p.am.g)}</td><td class="tr num">${cjrG(p.am.m)}</td>`:''}
+      <td class="tr num"><strong>${cjrGal(p.g)}</strong></td>
+      <td class="tr num c-teal"><strong>${cjrG(p.m)}</strong></td>
+      <td class="tr num c-muted">${cjrPx(p.prix)}</td>
+    </tr>`).join('');
+  const nbCol = montrerPer ? 8 : 4;
+  const tableVentes = `
+    <div class="tbl-wrap"><table class="dt cjr-table">
+      <thead>
+        ${montrerPer?`<tr class="cjr-th-groupe"><th></th><th colspan="2" class="tc">Matin</th><th colspan="2" class="tc">Après-midi</th><th colspan="3" class="tc">Total</th></tr>`:''}
+        <tr><th>Produit</th>
+          ${montrerPer?'<th class="tr">Gallons</th><th class="tr">Montant</th><th class="tr">Gallons</th><th class="tr">Montant</th>':''}
+          <th class="tr">Gallons</th><th class="tr">Montant</th><th class="tr">Prix moyen / gal</th></tr>
+      </thead>
+      <tbody>${lignesV || `<tr><td colspan="${nbCol}" class="empty" style="padding:14px">Aucune vente sur cette sélection</td></tr>`}</tbody>
+      ${lignesV?`<tfoot><tr class="recap-total"><td>TOTAL VENTES</td>
+        ${montrerPer?`<td class="tr num">${cjrGal(m.matin.g)}</td><td class="tr num">${cjrG(m.matin.m)}</td><td class="tr num">${cjrGal(m.am.g)}</td><td class="tr num">${cjrG(m.am.m)}</td>`:''}
+        <td class="tr num">${cjrGal(t.gallons)}</td><td class="tr num c-teal">${cjrG(t.ventes)}</td><td class="tr num c-muted">${cjrPx(t.gallons>0?t.ventes/t.gallons:0)}</td></tr></tfoot>`:''}
+    </table></div>`;
+
+  const lignesD = m.depenses.map((x,i)=>`<tr>
+      ${m.unJour?'':`<td class="num">${frDate(x.date)}</td>`}
+      <td>${esc(x.categorie)}</td>
+      <td>${esc(x.description||'')}${x.reference?` <span class="c-muted">· ${esc(x.reference)}</span>`:''}</td>
+      <td>${esc(x.source||'Caisse générale')}</td>
+      <td>${x.est_transfert?'<span class="cjr-tag cjr-tag-tr">Transfert</span>':'<span class="cjr-tag">Charge</span>'}</td>
+      <td class="tr num c-amber"><strong>${cjrG(x.montant)}</strong></td>
+    </tr>`).join('');
+  const nbColD = m.unJour ? 5 : 6;
+  const tableDep = `
+    <div class="tbl-wrap"><table class="dt cjr-table">
+      <thead><tr>${m.unJour?'':'<th>Date</th>'}<th>Catégorie</th><th>Description</th><th>Caisse</th><th>Type</th><th class="tr">Montant</th></tr></thead>
+      <tbody>${lignesD || `<tr><td colspan="${nbColD}" class="empty" style="padding:14px">Aucune dépense sur cette sélection</td></tr>`}</tbody>
+      ${lignesD?`<tfoot>
+        ${t.transferts&&t.charges?`<tr><td colspan="${nbColD-1}">Charges</td><td class="tr num">${cjrG(t.charges)}</td></tr>
+        <tr><td colspan="${nbColD-1}">Transferts (dépôt en banque, Zelle…)</td><td class="tr num">${cjrG(t.transferts)}</td></tr>`:''}
+        <tr class="recap-total"><td colspan="${nbColD-1}">TOTAL DÉPENSES</td><td class="tr num c-amber">${cjrG(t.depenses)}</td></tr></tfoot>`:''}
+    </table></div>`;
+
+  // Plusieurs jours : une ligne par jour
+  const tableJours = m.unJour ? '' : `
+    <h3 class="cjr-h">Jour par jour</h3>
+    <div class="tbl-wrap"><table class="dt cjr-table">
+      <thead><tr><th>Date</th><th class="tr">Gallons</th><th class="tr">Ventes</th><th class="tr">Charges</th><th class="tr">Transferts</th><th class="tr">Solde</th></tr></thead>
+      <tbody>${m.jours.map(j=>`<tr${(j.ventes===0&&j.charges===0&&j.transferts===0)?' class="cjr-vide"':''}>
+        <td class="num">${frDate(j.date)}</td><td class="tr num">${cjrGal(j.gallons)}</td><td class="tr num c-teal">${cjrG(j.ventes)}</td>
+        <td class="tr num">${cjrG(j.charges)}</td><td class="tr num">${cjrG(j.transferts)}</td>
+        <td class="tr num" style="color:${j.solde>=0?'var(--green)':'var(--red)'}"><strong>${cjrG(j.solde)}</strong></td></tr>`).join('')}</tbody>
+      <tfoot><tr class="recap-total"><td>TOTAL</td><td class="tr num">${cjrGal(t.gallons)}</td><td class="tr num c-teal">${cjrG(t.ventes)}</td>
+        <td class="tr num">${cjrG(t.charges)}</td><td class="tr num">${cjrG(t.transferts)}</td>
+        <td class="tr num" style="color:${soldeCol}">${cjrG(t.solde)}</td></tr></tfoot>
+    </table></div>`;
 
   body.innerHTML = `
-  <div class="galrecap" style="margin-bottom:18px">
-    <div class="galrecap-card">
-      <div class="grc-lbl">Entrées du jour</div>
-      <div class="grc-gal" style="color:var(--green)">${fmtGX(ent.total)}</div>
-      <div class="grc-mnt">${fmtGalX(ent.total_gallons)} vendus${(_pm||_pa)?`<br>Matin ${fmtGX(_pm?_pm.total_montant:0)} · Après-midi ${fmtGX(_pa?_pa.total_montant:0)}`:''}</div>
+    ${filtres}
+    <div class="cjr-kpis">
+      <div class="cjr-kpi">
+        <div class="cjr-kpi-l">Ventes</div>
+        <div class="cjr-kpi-v" style="color:var(--green)">${cjrG(t.ventes)}</div>
+        <div class="cjr-kpi-s">${cjrGal(t.gallons)} vendus${document.getElementById('cjr-periode').value===''?`<br>Matin ${cjrG(m.matin.m)} · Après-midi ${cjrG(m.am.m)}`:''}</div>
+      </div>
+      <div class="cjr-kpi">
+        <div class="cjr-kpi-l">Dépenses</div>
+        <div class="cjr-kpi-v" style="color:var(--orange)">${cjrG(t.depenses)}</div>
+        <div class="cjr-kpi-s">${m.depenses.length} dépense(s)${t.transferts?`<br>dont transferts ${cjrG(t.transferts)}`:''}</div>
+      </div>
+      <div class="cjr-kpi cjr-kpi-solde">
+        <div class="cjr-kpi-l">Solde (ventes − dépenses)</div>
+        <div class="cjr-kpi-v" style="color:${soldeCol}">${cjrG(t.solde)}</div>
+        <div class="cjr-kpi-s">${t.solde>=0?'Argent restant en caisse sur la sélection':'Plus de dépenses que de ventes'}</div>
+      </div>
     </div>
-    <div class="galrecap-card">
-      <div class="grc-lbl">Dépenses du jour</div>
-      <div class="grc-gal" style="color:var(--orange)">${fmtGX(dep.total)}</div>
-      <div class="grc-mnt">${dep.nb} dépense${dep.nb>1?'s':''}</div>
-    </div>
-  </div>
-
-  <div class="galrecap-title">Disponible par caisse — Gazoline et Diesel jamais mélangés</div>
-  <div class="galrecap" style="margin-bottom:6px">
-    ${rowsDispoProduit || '<div class="galrecap-card"><div class="grc-lbl">Disponible</div><div class="grc-mnt">Aucune entrée/dépense attribuée à une caisse ce jour</div></div>'}
-    <div class="galrecap-card grc-total">
-      <div class="grc-lbl">Total combiné (référence)</div>
-      <div class="grc-gal" style="color:${dispoCol}">${fmtGX(dispo)}</div>
-      <div class="grc-mnt">Toutes caisses confondues</div>
-    </div>
-  </div>
-  ${depGenerale>0?`<div style="font-size:12px;color:var(--muted);margin:0 2px 18px">+ ${fmtGX(depGenerale)} de dépenses de caisse générale (non attribuées à Gazoline ou Diesel) — déduites uniquement du total combiné ci-dessus, jamais d'une caisse spécifique.</div>`:'<div style="margin-bottom:18px"></div>'}
-
-  <div class="galrecap-title">Entrées — ventes de carburant par période</div>
-  <div style="font-size:12px;color:var(--muted);margin:-4px 2px 8px">Source : ventes de carburant (relevés de compteurs) — détail Matin / Après-midi puis par produit</div>
-  <div class="tbl-wrap" style="margin-bottom:20px">
-    <table class="dt">
-      <thead><tr><th>Période / Produit</th><th class="tr">Gallons</th><th class="tr">Montant encaissé</th></tr></thead>
-      <tbody>${rowsEnt}
-        <tr class="recap-total"><td style="font-weight:800">TOTAL ENTRÉES (jour)</td><td class="tr" style="font-weight:700">${fmtGalX(ent.total_gallons)}</td><td class="tr c-teal" style="font-weight:800">${fmtGX(ent.total)}</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="galrecap-title">Dépenses de la station</div>
-  <div class="tbl-wrap" style="margin-bottom:20px">
-    <table class="dt">
-      <thead><tr><th>Catégorie</th><th>Description</th><th>Source (caisse)</th><th class="tr">Montant</th></tr></thead>
-      <tbody>${rowsDep}
-        <tr class="recap-total"><td colspan="3" style="font-weight:800">TOTAL DÉPENSES</td><td class="tr c-amber" style="font-weight:800">${fmtGX(dep.total)}</td></tr>
-      </tbody>
-    </table>
-  </div>
-`;
+    ${tableJours}
+    <h3 class="cjr-h">Ventes de carburant</h3>
+    <div class="cjr-note">Source : relevés de compteurs. Montant = gallons × prix du jour.</div>
+    ${tableVentes}
+    <h3 class="cjr-h">Dépenses</h3>
+    <div class="cjr-note">Une dépense de « Caisse générale » n'est attribuée ni à la Gazoline ni au Diesel. Les transferts (dépôt en banque, Zelle) sortent de la caisse mais ne sont pas des charges.</div>
+    ${tableDep}`;
 }
 
 function cjrImprimer(){
-  if(!_cjrData){ toast('Chargez d\'abord le rapport.','inf'); return; }
-  const s = _cjrData;
+  if(!_cjrModele){ toast('Chargez d\'abord le rapport.','inf'); return; }
+  const m=_cjrModele, t=m.totaux;
   const org  = (typeof _branding!=='undefined' && (_branding.nom||_branding.raison_sociale)) || '';
   const org2 = (typeof _branding!=='undefined' && _branding.complexe) || '';
   const act  = (typeof _branding!=='undefined' && _branding.activites) || '';
-  const num = (v,dec)=>{ const x=parseFloat(Number(v||0).toFixed(dec)); return x.toLocaleString('fr-FR',{maximumFractionDigits:dec}); };
-  const gal = v=>num(v,4)+' gal';
-  const grd = v=>num(v,4)+' G';
-  const _per = s.entrees.par_periode || [];
-  let rowsE;
-  if(_per.length){
-    rowsE = _per.map(pe=>{
-      const L = (pe.par_produit||[]);
-      const corps = L.length
-        ? L.map(p=>`<tr><td style="padding-left:20px;color:#444">${p.produit}</td><td class="r">${gal(p.gallons)}</td><td class="r">${grd(p.montant)}</td></tr>`).join('')
-        : `<tr><td style="padding-left:20px;color:#999">Aucune vente</td><td class="r">—</td><td class="r">—</td></tr>`;
-      return `<tr style="background:#eef2ff"><td style="font-weight:800">${pe.libelle}</td><td class="r" style="font-weight:700">${gal(pe.total_gallons)}</td><td class="r" style="font-weight:800">${grd(pe.total_montant)}</td></tr>${corps}`;
-    }).join('');
-  } else {
-    rowsE = (s.entrees.par_produit||[]).map(p=>`<tr><td>${p.produit}</td><td class="r">${gal(p.gallons)}</td><td class="r">${grd(p.montant)}</td></tr>`).join('') || `<tr><td colspan="3" class="c muted">Aucune vente</td></tr>`;
-  }
-  const rowsD = (s.depenses.liste||[]).map(x=>`<tr><td>${x.categorie}</td><td>${(x.description||'').replace(/</g,'&lt;')}</td><td>${x.source||'Caisse générale'}</td><td class="r">${grd(x.montant)}</td></tr>`).join('') || `<tr><td colspan="4" class="c muted">Aucune dépense</td></tr>`;
-  const dispoPP = s.disponible_par_produit || [];
-  const depGeneraleImp = s.depenses.total_generale || 0;
-  const kpisDispo = dispoPP.map(p=>
-    `<div class="kpi${p.disponible>=0?' e':' neg'}"><div class="l">Disponible ${p.produit}</div><div class="v">${grd(p.disponible)}</div></div>`
-  ).join('');
-  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Rapport journalier ${s.date}</title><style>
+  const e = v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const montrerPer = document.getElementById('cjr-periode').value==='';
+  const vent = m.lignesProduits.map(p=>`<tr><td>${e(p.nom)}</td>
+      ${montrerPer?`<td class="r">${cjrGal(p.matin.g)}</td><td class="r">${cjrG(p.matin.m)}</td><td class="r">${cjrGal(p.am.g)}</td><td class="r">${cjrG(p.am.m)}</td>`:''}
+      <td class="r b">${cjrGal(p.g)}</td><td class="r b">${cjrG(p.m)}</td><td class="r">${cjrPx(p.prix)}</td></tr>`).join('')
+    || `<tr><td colspan="${montrerPer?8:4}" class="c muted">Aucune vente</td></tr>`;
+  const dep = m.depenses.map(x=>`<tr>${m.unJour?'':`<td>${frDate(x.date)}</td>`}<td>${e(x.categorie)}</td><td>${e(x.description)}${x.reference?' · '+e(x.reference):''}</td>
+      <td>${e(x.source||'Caisse générale')}</td><td>${x.est_transfert?'Transfert':'Charge'}</td><td class="r b">${cjrG(x.montant)}</td></tr>`).join('')
+    || `<tr><td colspan="${m.unJour?5:6}" class="c muted">Aucune dépense</td></tr>`;
+  const jours = m.unJour ? '' : `<h2>Jour par jour</h2><table>
+      <thead><tr><th>Date</th><th class="r">Gallons</th><th class="r">Ventes</th><th class="r">Charges</th><th class="r">Transferts</th><th class="r">Solde</th></tr></thead>
+      <tbody>${m.jours.map(j=>`<tr><td>${frDate(j.date)}</td><td class="r">${cjrGal(j.gallons)}</td><td class="r">${cjrG(j.ventes)}</td><td class="r">${cjrG(j.charges)}</td><td class="r">${cjrG(j.transferts)}</td><td class="r b">${cjrG(j.solde)}</td></tr>`).join('')}
+      <tr class="tot"><td>TOTAL</td><td class="r">${cjrGal(t.gallons)}</td><td class="r">${cjrG(t.ventes)}</td><td class="r">${cjrG(t.charges)}</td><td class="r">${cjrG(t.transferts)}</td><td class="r">${cjrG(t.solde)}</td></tr></tbody></table>`;
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Rapport caisse carburant ${m.debut}${m.unJour?'':' — '+m.fin}</title><style>
     *{margin:0;padding:0;box-sizing:border-box}
-    @page{size:A4;margin:16mm 14mm}
-    body{font-family:"Segoe UI",Arial,sans-serif;color:#1a1a2e;font-size:12px;line-height:1.45;padding:6mm;background:#fff}
-    .head{text-align:center;border-bottom:2.5px solid #1a1a2e;padding-bottom:10px;margin-bottom:4px}
-    .head .org{font-size:20px;font-weight:800}
-    .head .act{font-size:11px;font-weight:700;color:#0d9488;margin-top:2px}
-    .head .sub{font-size:10px;color:#666;margin-top:2px}
-    .rule2{border-bottom:.6px solid #0d9488;margin-bottom:16px}
-    h1{font-size:15px;text-align:center;margin:12px 0 3px}
-    .day{text-align:center;font-size:12px;color:#333;font-weight:700;margin-bottom:16px}
-    .kpis{display:flex;gap:10px;margin:14px 0}
-    .kpi{flex:1;border:1px solid #e2e8f0;border-radius:10px;padding:11px 13px;background:#f8fafc;text-align:center}
-    .kpi .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:#666;font-weight:700}
-    .kpi .v{font-size:18px;font-weight:800;margin-top:3px}
-    .kpi.e .v{color:#059669}.kpi.d .v{color:#d97706}.kpi.s{background:#ecfdf5;border-color:#0d9488}.kpi.s .v{color:#0d9488}.kpi.neg .v{color:#dc2626}
-    h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#0d9488;margin:18px 0 7px;border-bottom:1px solid #e2e8f0;padding-bottom:3px}
-    table{width:100%;border-collapse:collapse;margin-bottom:4px}
-    th{background:#1a1a2e;color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.05em;padding:6px 8px;text-align:left}
-    td{padding:6px 8px;border-bottom:.5px solid #e2e8f0;font-variant-numeric:tabular-nums}
-    tr:nth-child(even) td{background:#f8fafc}
-    .r{text-align:right}.c{text-align:center}.muted{color:#999}
-    .tot{background:#ecfdf5;font-weight:800}.tot td{border-top:1.5px solid #0d9488}
-    .cum{margin-top:18px;font-size:10.5px;color:#555;border-top:.5px solid #e2e8f0;padding-top:8px}
-    .foot{margin-top:22px;text-align:center;font-size:9px;color:#999}
-    .noprint{text-align:center;margin:14px 0}.noprint button{padding:8px 24px;font-size:13px;border:1px solid #cbd5e1;border-radius:6px;background:#f1f5f9;cursor:pointer}
+    @page{size:A4 ${m.unJour&&!montrerPer?'portrait':'landscape'};margin:12mm 12mm 14mm}
+    body{font-family:"Segoe UI",Arial,sans-serif;color:#111827;font-size:11px;line-height:1.4;background:#fff}
+    .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111827;padding-bottom:8px}
+    .org{font-size:17px;font-weight:800}.act{font-size:10px;color:#0d9488;font-weight:700}.sub{font-size:9.5px;color:#6b7280}
+    .doc{text-align:right}.doc h1{font-size:14px;letter-spacing:.02em}.doc .per{font-size:11px;font-weight:700;margin-top:2px}
+    .filtres{margin:8px 0 0;font-size:9.5px;color:#374151;background:#f3f4f6;padding:5px 8px;border-radius:4px}
+    .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 4px}
+    .kpi{border:1px solid #d1d5db;border-radius:6px;padding:8px 10px}
+    .kpi .l{font-size:8.5px;text-transform:uppercase;letter-spacing:.07em;color:#6b7280;font-weight:700}
+    .kpi .v{font-size:16px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
+    .kpi .s{font-size:9px;color:#6b7280;margin-top:2px}
+    .v.ok{color:#047857}.v.neg{color:#b91c1c}.v.dep{color:#b45309}
+    h2{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:#0d9488;margin:14px 0 5px}
+    table{width:100%;border-collapse:collapse;page-break-inside:auto}
+    tr{page-break-inside:avoid}
+    thead{display:table-header-group}
+    th{background:#111827;color:#fff;font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;padding:5px 6px;text-align:left}
+    th.r{text-align:right}
+    td{padding:4px 6px;border-bottom:.5px solid #e5e7eb;font-variant-numeric:tabular-nums;vertical-align:top}
+    tr:nth-child(even) td{background:#f9fafb}
+    .r{text-align:right}.c{text-align:center}.b{font-weight:700}.muted{color:#9ca3af}
+    .tot td{background:#ecfdf5!important;font-weight:800;border-top:1.5px solid #0d9488}
+    .sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:28px;font-size:9.5px;color:#374151}
+    .sign div{border-top:1px solid #9ca3af;padding-top:4px}
+    .foot{margin-top:14px;font-size:8.5px;color:#9ca3af;text-align:center}
+    .noprint{text-align:center;margin:12px 0}.noprint button{padding:7px 20px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px;background:#f1f5f9;cursor:pointer}
     @media print{.noprint{display:none}}
   </style></head><body>
     <div class="head">
-      ${org?`<div class="org">${org}</div>`:''}
-      ${act?`<div class="act">${act.replace(/·/g,' • ')}</div>`:''}
-      ${org2?`<div class="sub">${org2}</div>`:''}
+      <div>${org?`<div class="org">${e(org)}</div>`:''}${act?`<div class="act">${e(act).replace(/·/g,' • ')}</div>`:''}${org2?`<div class="sub">${e(org2)}</div>`:''}</div>
+      <div class="doc"><h1>RAPPORT DE CAISSE CARBURANT</h1><div class="per">${_cjrPeriodeTexte(m)}</div></div>
     </div>
-    <div class="rule2"></div>
-    <h1>RAPPORT JOURNALIER — CAISSE CARBURANT</h1>
-    <div class="day">${frDate(s.date)}</div>
+    ${m.filtres.actif?`<div class="filtres">Filtres : ${e(m.filtres.produit)} · ${e(m.filtres.periode)} · ${e(m.filtres.type)}</div>`:''}
     <div class="kpis">
-      <div class="kpi e"><div class="l">Entrées du jour</div><div class="v">${grd(s.entrees.total)}</div>${_per.length?`<div style="font-size:9px;color:#666;margin-top:3px">Matin ${grd((_per.find(p=>p.periode==='Matin')||{}).total_montant||0)}<br>Après-midi ${grd((_per.find(p=>p.periode==='Apres-midi')||{}).total_montant||0)}</div>`:''}</div>
-      <div class="kpi d"><div class="l">Dépenses du jour</div><div class="v">${grd(s.depenses.total)}</div></div>
+      <div class="kpi"><div class="l">Ventes</div><div class="v ok">${cjrG(t.ventes)}</div><div class="s">${cjrGal(t.gallons)}${montrerPer?` · Matin ${cjrG(m.matin.m)} · Après-midi ${cjrG(m.am.m)}`:''}</div></div>
+      <div class="kpi"><div class="l">Dépenses</div><div class="v dep">${cjrG(t.depenses)}</div><div class="s">${m.depenses.length} dépense(s)${t.transferts?` · dont transferts ${cjrG(t.transferts)}`:''}</div></div>
+      <div class="kpi"><div class="l">Solde (ventes − dépenses)</div><div class="v ${t.solde>=0?'ok':'neg'}">${cjrG(t.solde)}</div></div>
     </div>
-    <div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#0d9488;margin:12px 0 6px">Disponible par caisse — Gazoline et Diesel jamais mélangés</div>
-    <div class="kpis">
-      ${kpisDispo || '<div class="kpi"><div class="l">Disponible</div><div class="v" style="font-size:11px;color:#999">Aucune caisse concernée</div></div>'}
-      <div class="kpi s"><div class="l">Total combiné (référence)</div><div class="v">${grd(s.disponible)}</div></div>
-    </div>
-    ${depGeneraleImp>0?`<div style="font-size:9.5px;color:#777;margin:-2px 0 10px">+ ${grd(depGeneraleImp)} de dépenses de caisse générale (non attribuées à Gazoline ou Diesel) — déduites uniquement du total combiné, jamais d'une caisse spécifique.</div>`:''}
-    <h2>Entrées — ventes de carburant par période</h2>
-    <div style="font-size:10px;color:#666;margin:-3px 0 6px">Source : ventes de carburant (relevés de compteurs) — détail Matin / Après-midi puis par produit</div>
-    <table>
-      <thead><tr><th>Période / Produit</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead>
-      <tbody>${rowsE}<tr class="tot"><td>TOTAL ENTRÉES (jour)</td><td class="r">${gal(s.entrees.total_gallons)}</td><td class="r">${grd(s.entrees.total)}</td></tr></tbody>
-    </table>
-    <h2>Dépenses de la station (${s.depenses.nb})</h2>
-    <table>
-      <thead><tr><th>Catégorie</th><th>Description</th><th>Source (caisse)</th><th class="r">Montant</th></tr></thead>
-      <tbody>${rowsD}<tr class="tot"><td colspan="3">TOTAL DÉPENSES</td><td class="r">${grd(s.depenses.total)}</td></tr></tbody>
-    </table>
-    <div class="foot">Généré le ${new Date().toLocaleString('fr-FR')} · Valeurs non arrondies</div>
+    ${jours}
+    <h2>Ventes de carburant</h2>
+    <table><thead>
+      ${montrerPer?'<tr><th></th><th colspan="2" style="text-align:center">Matin</th><th colspan="2" style="text-align:center">Après-midi</th><th colspan="3" style="text-align:center">Total</th></tr>':''}
+      <tr><th>Produit</th>${montrerPer?'<th class="r">Gallons</th><th class="r">Montant</th><th class="r">Gallons</th><th class="r">Montant</th>':''}<th class="r">Gallons</th><th class="r">Montant</th><th class="r">Prix moy./gal</th></tr></thead>
+      <tbody>${vent}
+      <tr class="tot"><td>TOTAL VENTES</td>${montrerPer?`<td class="r">${cjrGal(m.matin.g)}</td><td class="r">${cjrG(m.matin.m)}</td><td class="r">${cjrGal(m.am.g)}</td><td class="r">${cjrG(m.am.m)}</td>`:''}<td class="r">${cjrGal(t.gallons)}</td><td class="r">${cjrG(t.ventes)}</td><td class="r">${cjrPx(t.gallons>0?t.ventes/t.gallons:0)}</td></tr></tbody></table>
+    <h2>Dépenses (${m.depenses.length})</h2>
+    <table><thead><tr>${m.unJour?'':'<th>Date</th>'}<th>Catégorie</th><th>Description</th><th>Caisse</th><th>Type</th><th class="r">Montant</th></tr></thead>
+      <tbody>${dep}
+      ${t.charges&&t.transferts?`<tr><td colspan="${m.unJour?4:5}">Charges</td><td class="r">${cjrG(t.charges)}</td></tr><tr><td colspan="${m.unJour?4:5}">Transferts</td><td class="r">${cjrG(t.transferts)}</td></tr>`:''}
+      <tr class="tot"><td colspan="${m.unJour?4:5}">TOTAL DÉPENSES</td><td class="r">${cjrG(t.depenses)}</td></tr></tbody></table>
+    <div class="sign"><div>Préparé par</div><div>Vérifié par</div></div>
+    <div class="foot">Imprimé le ${new Date().toLocaleString('fr-FR')} · montants en gourdes (2 décimales), gallons (3 décimales)</div>
     <div class="noprint"><button onclick="window.print()">🖨 Imprimer</button></div>
-    <script>window.onload=function(){setTimeout(function(){window.print()},250)};<\/script>
+    <script>window.onload=function(){setTimeout(function(){window.print()},300)};<\/script>
   </body></html>`;
-  const w = window.open('','_blank','width=900,height=1000,scrollbars=yes');
-  if(!w){ toast('Autorisez les pop-ups.','err'); return; }
+  const w = window.open('','_blank','width=1100,height=900,scrollbars=yes');
+  if(!w){ toast('Autorisez les fenêtres pop-up pour imprimer.','err'); return; }
   w.document.write(html); w.document.close();
-}
-
-// Case « Index attendu » cochée → on reporte la valeur dans « mètre avant »
-// et on ouvre la ligne à la saisie (le mètre après reste à taper). Décochée
-// → on efface le report ; la ligne reste ouverte pour une saisie manuelle.
-function applyIndexPrecedent(cb){
-  const tr=cb.closest('tr'); if(!tr) return;
-  const inpAv=tr.querySelector('.inp-av');
-  if(cb.checked){
-    if(inpAv.readOnly) enableRow(tr);
-    inpAv.value=cb.dataset.val;
-    const inpAp=tr.querySelector('.inp-ap');
-    if(inpAp){ inpAp.removeAttribute('readonly'); inpAp.focus(); }
-    calcRow(tr);
-  } else {
-    inpAv.value='';
-    calcRow(tr);
-  }
 }
 
 function enableRow(tr){
@@ -15340,16 +15614,18 @@ function enableRow(tr){
   if(!inpAv.value && tr.dataset.av) inpAv.value=tr.dataset.av;
   if(!inpAp.value && tr.dataset.ap) inpAp.value=tr.dataset.ap;
 
-  inpAv.focus();
+  inpAp.focus();
   calcRow(tr);
+  tr.classList.remove('sx-done');
+  const act=tr.querySelector('.sx-act'); if(act) act.innerHTML='';
 
   // Remplacer le bouton par un badge "En saisie"
   const isEdit=tr.dataset.isEdit==='1';
   const badge=tr.querySelector('.row-badge');
   if(badge){
     badge.innerHTML=isEdit
-      ?`<span class="badge badge-mod">${t('saisie.badge.editing.mod')}</span>`
-      :`<span class="badge badge-new">${t('saisie.badge.editing.new')}</span>`;
+      ?`<span class="sx-chip sx-chip-edit">${t('saisie.badge.editing.mod')}</span>`
+      :`<span class="sx-chip sx-chip-edit">${t('saisie.badge.editing.new')}</span>`;
   }
 }
 
@@ -15360,23 +15636,31 @@ function calcRow(tr){
   const qte=Math.round((ap-av)*10000)/10000;
   const mnt=Math.round(qte*px*100)/100;
 
-  const qEl=tr.querySelector('.val-qte');
-  qEl.textContent=fmtGalX(qte);
-  qEl.className='tr num val-qte '+(qte<0?'c-red':'c-teal');
-  tr.querySelector(".val-mnt").textContent=fmtGX(mnt);
-
   const apI=tr.querySelector('.inp-ap');
-  if(ap>0&&ap<av) apI.classList.add('err');
-  else             apI.classList.remove('err');
+  const vide=apI.value==='';
+  const qEl=tr.querySelector('.val-qte');
+  qEl.textContent=vide?'—':fmtGalX(qte);
+  qEl.className='num val-qte '+(qte<0?'c-red':'c-teal');
+  tr.querySelector(".val-mnt").textContent=vide?'':fmtGX(mnt);
 
-  // Badge => "Modifié" si la valeur a changé
+  const err=tr.querySelector('.sx-hint-err');
+  if(!vide&&ap<av){
+    apI.classList.add('err');
+    if(err) err.textContent='Le mètre après doit être plus grand que le mètre avant';
+  } else {
+    apI.classList.remove('err');
+    if(err) err.textContent='';
+  }
+
+  // Badge => "Modifié" / "Nouveau" dès qu'une valeur est saisie
   const isEdit=tr.dataset.isEdit==='1';
   const badge=tr.querySelector('.row-badge');
-  if(badge){
+  if(badge && !vide){
     badge.innerHTML=isEdit
-      ?`<span class="badge badge-mod">${t('saisie.badge.modified')}</span>`
-      :`<span class="badge badge-new">${t('saisie.badge.new')}</span>`;
+      ?`<span class="sx-chip sx-chip-edit">${t('saisie.badge.modified')}</span>`
+      :`<span class="sx-chip sx-chip-edit">${t('saisie.badge.new')}</span>`;
   }
+  sxMajTotaux();
 }
 
 // ══════════════════════════════════════════════
@@ -15386,7 +15670,7 @@ function prepareConfirm(periode){
   const p=products.find(x=>x.id===currentProdId);
   if(!p) return;
 
-  const rows=document.querySelectorAll(`tr[data-per="${periode}"]`);
+  const rows=document.querySelectorAll(`#saisie-content .sx-pompe[data-per="${periode}"]`);
   const data=[];
   let hasError=false;
 
@@ -15396,7 +15680,7 @@ function prepareConfirm(periode){
     const inpAv=tr.querySelector('.inp-av');
     const inpAp=tr.querySelector('.inp-ap');
 
-    if(inpAv.readOnly||inpAp.readOnly) continue;  // pas encore activée → ignorer
+    if(inpAp.readOnly) continue;  // carte non ouverte à la saisie → ignorer
 
     const av=parseFloat(inpAv.value);
     const ap=parseFloat(inpAp.value);
@@ -21508,10 +21792,64 @@ function renderDepTable(data){
   </table>`;
 }
 
+// Saisie en série : date et caisse conservées d'une dépense à l'autre
+// (mémorisées pour la session), compteur des dépenses enregistrées.
+let _depSerie = {nb:0, total:0};
+function _depMemo(){ try{ return JSON.parse(sessionStorage.getItem('dep-ctx')||'{}'); }catch(e){ return {}; } }
+function _depMemoriser(date, caisse){ try{ sessionStorage.setItem('dep-ctx', JSON.stringify({date, caisse})); }catch(e){} }
+
+// Dates relatives au jour de l'application (fuseau d'Haïti), pas à l'horloge du poste
+function _depIso(decalage){
+  const d=new Date(_today()+'T12:00:00'); d.setDate(d.getDate()+decalage);
+  const p2=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+}
+function depDate(decalage){
+  document.getElementById('dep-date').value=_depIso(decalage);
+  _depMajChipsDate();
+}
+function _depMajChipsDate(){
+  const v=document.getElementById('dep-date').value;
+  const iso=_depIso;
+  const chips=document.querySelectorAll('.dep-date-row .dep-chip');
+  if(chips[0]) chips[0].classList.toggle('active', v===iso(0));
+  if(chips[1]) chips[1].classList.toggle('active', v===iso(-1));
+}
+
+// Boutons de caisse (plus rapides qu'une liste) : seulement les produits qui ont des pompes
+function _depRenderCaisses(){
+  const sel=document.getElementById('dep-caisse');
+  const box=document.getElementById('dep-caisses');
+  const avecPompes=new Set((products||[]).filter(p=>(p.pompes||[]).length).map(p=>String(p.id)));
+  const opts=[...sel.options].filter(o=>o.value==='' || avecPompes.has(o.value));
+  box.innerHTML=opts.map(o=>`<button type="button" class="dep-chip${sel.value===o.value?' active':''}" data-v="${esc(o.value)}"
+      onclick="document.getElementById('dep-caisse').value=this.dataset.v;_depRenderCaisses()">${o.value===''?'Générale':esc(o.textContent)}</button>`).join('');
+}
+
+function depCategorieChoisie(){
+  const desc=document.getElementById('dep-desc');
+  desc.placeholder = document.getElementById('dep-cat').value || 'Ex : Facture électricité octobre';
+  document.getElementById('dep-montant').focus();
+}
+
+function _depMajSerie(){
+  const el=document.getElementById('dep-serie');
+  el.hidden=!_depSerie.nb;
+  el.innerHTML=`✓ ${_depSerie.nb} dépense(s) enregistrée(s) dans cette série · <strong>${fmtNum(_depSerie.total,2)} G</strong>`;
+}
+
+function _depViderSaisie(){
+  ['dep-cat','dep-desc','dep-montant','dep-benef','dep-ref','dep-notes'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('dep-desc').placeholder='Ex : Facture électricité octobre';
+  document.getElementById('dep-plus').open=false;
+}
+
 function openDepModal(id=null){
   _depPopulateCaisseSelects();
   document.getElementById('dep-edit-id').value=id||'';
-  document.getElementById('dep-modal-title').textContent=id?'Modifier la Dépense':'Nouvelle Dépense';
+  document.getElementById('dep-modal-title').textContent=id?'Modifier la dépense':'Nouvelle dépense';
+  document.getElementById('dep-btn-suite').hidden=!!id;
+  _depSerie={nb:0,total:0}; _depMajSerie();
   if(id){
     const d=_depData.find(x=>x.id===id);
     if(d){
@@ -21523,21 +21861,34 @@ function openDepModal(id=null){
       _remplirSelectRef('dep-benef', 'beneficiaires', '— Aucun —', d.beneficiaire||'');
       document.getElementById('dep-ref').value     =d.reference||'';
       document.getElementById('dep-notes').value   =d.notes||'';
+      document.getElementById('dep-plus').open = !!(d.beneficiaire||d.reference||d.notes);
     }
   } else {
-    ['dep-cat','dep-caisse','dep-desc','dep-montant','dep-benef','dep-ref','dep-notes'].forEach(i=>document.getElementById(i).value='');
-    document.getElementById('dep-date').value=_today();
+    _depViderSaisie();
+    const memo=_depMemo();
+    document.getElementById('dep-date').value=memo.date||_today();
+    document.getElementById('dep-caisse').value=memo.caisse||'';
   }
+  _depRenderCaisses();
+  _depMajChipsDate();
+  document.getElementById('dep-date').onchange=_depMajChipsDate;
   document.getElementById('dep-modal').classList.add('open');
+  setTimeout(()=>document.getElementById(id?'dep-montant':'dep-cat').focus(), 60);
 }
-function closeDepModal(){ document.getElementById('dep-modal').classList.remove('open'); }
+function closeDepModal(){
+  document.getElementById('dep-modal').classList.remove('open');
+  if(_depSerie.nb) loadDepenses();
+}
 
-async function submitDep(){
+// continuer=true : enregistre puis vide la saisie pour la dépense suivante
+// (date, caisse conservées) ; false : enregistre et ferme.
+async function submitDep(continuer=false){
   const id=document.getElementById('dep-edit-id').value;
   const caisseVal=document.getElementById('dep-caisse').value;
+  const categorie=document.getElementById('dep-cat').value;
   const body={
-    categorie: document.getElementById('dep-cat').value,
-    description: document.getElementById('dep-desc').value.trim(),
+    categorie,
+    description: document.getElementById('dep-desc').value.trim() || categorie,
     montant: parseFloat(document.getElementById('dep-montant').value)||0,
     date_depense: document.getElementById('dep-date').value,
     beneficiaire: document.getElementById('dep-benef').value.trim()||null,
@@ -21546,12 +21897,23 @@ async function submitDep(){
     produit_id: caisseVal?parseInt(caisseVal,10):null,
   };
   if(id && !caisseVal) body.caisse_generale=true;
-  if(!body.categorie||!body.description||!body.date_depense||body.montant<=0){ _giAlert('Veuillez remplir tous les champs obligatoires.'); return; }
+  if(!body.categorie){ _giAlert('Choisissez la catégorie.'); document.getElementById('dep-cat').focus(); return; }
+  if(!body.date_depense){ _giAlert('Indiquez la date.'); document.getElementById('dep-date').focus(); return; }
+  if(body.montant<=0){ _giAlert('Indiquez le montant.'); document.getElementById('dep-montant').focus(); return; }
   try {
     const method = id ? 'PUT' : 'POST';
     const path   = id ? `/depenses/${id}` : '/depenses';
     await apiFetch(method, path, body);
-    closeDepModal(); loadDepenses(); _giAlert(id?'Dépense mise à jour.':'Dépense enregistrée.','ok');
+    if(!id) _depMemoriser(body.date_depense, caisseVal);
+    if(continuer && !id){
+      _depSerie.nb++; _depSerie.total+=body.montant; _depMajSerie();
+      _depViderSaisie();
+      document.getElementById('dep-cat').focus();
+      _giAlert(`Dépense enregistrée : ${body.categorie} · ${fmtNum(body.montant,2)} G`,'ok');
+    } else {
+      document.getElementById('dep-modal').classList.remove('open');
+      loadDepenses(); _giAlert(id?'Dépense mise à jour.':'Dépense enregistrée.','ok');
+    }
   } catch(e){ _giAlert(e.message||'Erreur réseau.'); }
 }
 
