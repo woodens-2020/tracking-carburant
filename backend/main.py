@@ -2997,6 +2997,8 @@ def carburant_rapport_jour(
         "source":       (x.produit.nom if x.produit else "Caisse générale"),
         "reference":    getattr(x, "reference", None) or "",
         "montant":      float(_D(str(x.montant))),
+        "produit_id":   x.produit_id,
+        "est_transfert": _est_categorie_transfert(db, x.categorie),
     } for x in deps]
     tot_dep = sum((_D(str(x.montant)) for x in deps), _D("0"))
 
