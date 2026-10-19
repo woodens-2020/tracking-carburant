@@ -167,3 +167,9 @@ def test_anomalie_compteur_discontinu_et_traitement(client):
     d3 = client.get("/api/anomalies?date=2026-08-01", headers=H).json()
     assert not [x for x in d3["anomalies"] if x["cle"] == a[0]["cle"]]
     assert d3["nb_traitees"] >= 1
+
+
+def test_description_de_depense_obligatoire(client):
+    r = client.post("/api/depenses", headers=H, json={
+        "categorie": "Electricite", "description": "   ", "montant": 100, "date_depense": "2026-07-16"})
+    assert r.status_code == 400 and "description" in r.json()["detail"].lower()

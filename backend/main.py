@@ -2998,6 +2998,7 @@ def carburant_rapport_jour(
         "reference":    getattr(x, "reference", None) or "",
         "montant":      float(_D(str(x.montant))),
         "produit_id":   x.produit_id,
+        "beneficiaire": x.beneficiaire or "",
         "est_transfert": _est_categorie_transfert(db, x.categorie),
     } for x in deps]
     tot_dep = sum((_D(str(x.montant)) for x in deps), _D("0"))
@@ -5305,6 +5306,8 @@ def lister_depenses(
 def creer_depense(data: DepenseIn, request: Request, db: Session = Depends(get_db)):
     if not (data.categorie or "").strip():
         raise HTTPException(400, "La catégorie est requise.")
+    if not (data.description or "").strip():
+        raise HTTPException(400, "La description est obligatoire : précisez à quoi correspond la dépense.")
     categorie = lref.resoudre(db, CategorieDepense, data.categorie, request=request, label="catégorie")
     beneficiaire = lref.resoudre(db, Beneficiaire, data.beneficiaire, request=request, label="bénéficiaire")
     if data.montant <= 0:
@@ -5351,7 +5354,10 @@ def modifier_depense(depense_id: int, data: DepensePatch, request: Request, db: 
         raise HTTPException(404, "Dépense introuvable.")
     if data.categorie is not None:
         d.categorie = lref.resoudre(db, CategorieDepense, data.categorie, request=request, label="catégorie")
-    if data.description  is not None: d.description  = data.description.strip()
+    if data.description  is not None:
+        if not data.description.strip():
+            raise HTTPException(400, "La description est obligatoire : précisez à quoi correspond la dépense.")
+        d.description  = data.description.strip()
     if data.montant is not None:
         if data.montant <= 0:
             raise HTTPException(400, "Le montant doit être > 0.")
