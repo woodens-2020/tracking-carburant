@@ -231,17 +231,68 @@ def receptions_a_traiter(db: Session = Depends(get_db)):
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# Étiquettes (QR + code lisible)
+# Étiquettes — format 2 × 1 pouce (50,8 × 25,4 mm), une étiquette par page
 # ══════════════════════════════════════════════════════════════════════════
+
+ETIQ_LARGEUR = 2 * 72      # points (1 pouce = 72 pt)
+ETIQ_HAUTEUR = 1 * 72
+
+
+def _texte_ajuste(pdf, texte: str, police: str, taille: float, largeur_max: float) -> str:
+    """Raccourcit le texte (avec …) pour qu'il tienne dans la largeur."""
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    if stringWidth(texte, police, taille) <= largeur_max:
+        return texte
+    while texte and stringWidth(texte + "…", police, taille) > largeur_max:
+        texte = texte[:-1]
+    return texte.rstrip() + "…"
+
+
+def _dessiner_etiquette(pdf, c: BarColis) -> None:
+    """Une étiquette 2 × 1 po : code-barres Code 128 sur toute la largeur
+    (lisible par une douchette 1D comme par la caméra), puis le code en
+    clair, le produit, la quantité et le n° d'achat."""
+    from reportlab.graphics.barcode.code128 import Code128
+
+    marge = 5                                   # ≈ 1,8 mm, zone non imprimable des imprimantes thermiques
+    largeur_utile = ETIQ_LARGEUR - 2 * marge
+
+    # Code-barres : module de 3 points d'impression à 203 dpi (résolution
+    # standard des imprimantes d'étiquettes 2 × 1) pour des barres nettes ;
+    # zones blanches de 10 modules de chaque côté (exigées par les lecteurs).
+    # Si le code est plus long que prévu, le module est réduit pour tenir.
+    module = 3 * 72 / 203
+    essai = Code128(c.code, barWidth=module, humanReadable=False, quiet=False)
+    if essai.width + 20 * module > largeur_utile + 2 * marge:
+        module = (largeur_utile + 2 * marge) / (essai.width / module + 20)
+    code_barres = Code128(c.code, barWidth=module, barHeight=31, humanReadable=False,
+                          quiet=True, lquiet=10 * module, rquiet=10 * module)
+    x_cb = (ETIQ_LARGEUR - code_barres.width) / 2
+    code_barres.drawOn(pdf, x_cb, ETIQ_HAUTEUR - marge - 31)
+
+    # Code en clair, centré, sous le code-barres
+    pdf.setFont("Helvetica-Bold", 9.5)
+    pdf.drawCentredString(ETIQ_LARGEUR / 2, 24.5, c.code)
+
+    # Produit
+    nom = (c.produit.nom if c.produit else "") or ""
+    pdf.setFont("Helvetica-Bold", 7.5)
+    pdf.drawString(marge, 14.5, _texte_ajuste(pdf, nom, "Helvetica-Bold", 7.5, largeur_utile))
+
+    # Quantité (gauche) et achat (droite)
+    unite = (c.produit.unite if c.produit else "") or "u."
+    pdf.setFont("Helvetica", 7)
+    pdf.drawString(marge, 5.5, f"{float(c.quantite):g} {unite}")
+    if c.achat_id:
+        pdf.drawRightString(ETIQ_LARGEUR - marge, 5.5, f"Achat #{c.achat_id}")
+
 
 @router.get("/etiquettes.pdf")
 def etiquettes(achat_id: Optional[int] = None, ids: Optional[str] = None,
                db: Session = Depends(get_db)):
-    from reportlab.graphics import renderPDF
-    from reportlab.graphics.barcode.qr import QrCodeWidget
-    from reportlab.graphics.shapes import Drawing
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.units import mm
+    """PDF d'étiquettes 2 × 1 pouce, une par page, dans l'ordre des colis.
+    À imprimer sur une imprimante d'étiquettes, à l'échelle 100 % (taille
+    réelle), sans « ajuster à la page »."""
     from reportlab.pdfgen import canvas
 
     q = db.query(BarColis)
@@ -260,41 +311,16 @@ def etiquettes(achat_id: Optional[int] = None, ids: Optional[str] = None,
         raise HTTPException(404, "Aucun colis à imprimer.")
 
     buf = io.BytesIO()
-    pdf = canvas.Canvas(buf, pagesize=A4)
-    larg_page, haut_page = A4
-    cols, rangs = 3, 8
-    marge_x, marge_y = 8 * mm, 10 * mm
-    lw = (larg_page - 2 * marge_x) / cols
-    lh = (haut_page - 2 * marge_y) / rangs
-    qr_taille = lh - 6 * mm
+    pdf = canvas.Canvas(buf, pagesize=(ETIQ_LARGEUR, ETIQ_HAUTEUR))
+    pdf.setTitle("Étiquettes colis 2x1")
     for i, c in enumerate(colis):
-        pos = i % (cols * rangs)
-        if i and pos == 0:
+        if i:
             pdf.showPage()
-        x = marge_x + (pos % cols) * lw
-        y = haut_page - marge_y - (pos // cols + 1) * lh
-        pdf.setLineWidth(0.3)
-        pdf.rect(x + 1 * mm, y + 1 * mm, lw - 2 * mm, lh - 2 * mm)
-        w = QrCodeWidget(c.code)
-        b = w.getBounds()
-        d = Drawing(qr_taille, qr_taille, transform=[qr_taille / (b[2] - b[0]), 0, 0,
-                                                     qr_taille / (b[3] - b[1]), 0, 0])
-        d.add(w)
-        renderPDF.draw(d, pdf, x + 2 * mm, y + 3 * mm)
-        tx = x + qr_taille + 4 * mm
-        pdf.setFont("Helvetica-Bold", 10)
-        pdf.drawString(tx, y + lh - 9 * mm, c.code)
-        pdf.setFont("Helvetica", 8)
-        nom = (c.produit.nom if c.produit else "")[:24]
-        pdf.drawString(tx, y + lh - 14 * mm, nom)
-        unite = (c.produit.unite if c.produit else "u.") or "u."
-        pdf.drawString(tx, y + lh - 18 * mm, f"{float(c.quantite):g} {unite}")
-        if c.achat_id:
-            pdf.drawString(tx, y + lh - 22 * mm, f"Achat #{c.achat_id}")
+        _dessiner_etiquette(pdf, c)
     pdf.save()
     buf.seek(0)
     return StreamingResponse(buf, media_type="application/pdf",
-                             headers={"Content-Disposition": 'inline; filename="etiquettes-colis.pdf"'})
+                             headers={"Content-Disposition": 'inline; filename="etiquettes-colis-2x1.pdf"'})
 
 
 # ══════════════════════════════════════════════════════════════════════════

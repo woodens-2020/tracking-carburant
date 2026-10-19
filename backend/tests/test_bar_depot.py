@@ -52,6 +52,8 @@ def test_circuit_complet(client, db):
     # Étiquettes imprimables
     r = client.get(f"/api/pos/depot/etiquettes.pdf?achat_id={a.id}", headers=H)
     assert r.status_code == 200 and r.content[:4] == b"%PDF"
+    assert b"/MediaBox [ 0 0 144 72 ]" in r.content          # 2 × 1 pouce
+    assert b"/Count 3" in r.content                            # une étiquette par colis
 
     # 3. Vérification au dépôt (scan) → stock du dépôt
     for c in colis:

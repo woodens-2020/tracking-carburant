@@ -7125,14 +7125,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <!-- 1-2. Réceptions -->
           <div class="pos-card">
             <div class="pos-card-hdr">Achats à réceptionner <span class="dep-badge" id="dep-nb-achats">0</span></div>
-            <div class="dep-note">Réceptionner un achat crée ses colis (un par caisse) et leurs étiquettes à coller. Le stock n'entre au dépôt qu'au scan de chaque colis.</div>
+            <div class="dep-note">Réceptionner un achat crée ses colis (un par caisse) et leurs étiquettes 2 × 1 po à coller. Le stock n'entre au dépôt qu'au scan de chaque colis.</div>
             <div id="dep-achats"></div>
           </div>
 
           <!-- 3. Colis à vérifier -->
           <div class="pos-card">
             <div class="pos-card-hdr">Colis à vérifier au dépôt <span class="dep-badge" id="dep-nb-verif">0</span>
-              <button class="pos-btn ghost" style="margin-left:auto;padding:4px 10px;font-size:12px" onclick="depEtiquettes()">🖨 Étiquettes</button>
+              <button class="pos-btn ghost" style="margin-left:auto;padding:4px 10px;font-size:12px" onclick="depEtiquettes()">🖨 Étiquettes 2 × 1</button>
             </div>
             <div id="dep-colis-verif"></div>
           </div>
@@ -28029,10 +28029,12 @@ async function depCamera(){
   }
   if(typeof Html5Qrcode === 'undefined'){ posAlert('Lecteur caméra indisponible.'); return; }
   box.style.display = 'block';
-  _depCamera = new Html5Qrcode('dep-camera');
+  // Code 128 (étiquettes 2 × 1) et QR : cadre de lecture large, adapté aux codes-barres linéaires
+  const F = (typeof Html5QrcodeSupportedFormats !== 'undefined') ? Html5QrcodeSupportedFormats : null;
+  _depCamera = new Html5Qrcode('dep-camera', F ? {formatsToSupport:[F.CODE_128, F.QR_CODE], verbose:false} : undefined);
   let dernier = '', quand = 0;
   try{
-    await _depCamera.start({facingMode:'environment'}, {fps:10, qrbox:220}, txt=>{
+    await _depCamera.start({facingMode:'environment'}, {fps:10, qrbox:{width:300, height:120}}, txt=>{
       const t = Date.now();
       if(txt===dernier && t-quand<2500) return;   // évite le double scan du même colis
       dernier = txt; quand = t;
@@ -28065,7 +28067,7 @@ function depRenderReceptions(rec){
 async function depReceptionner(achatId){
   try{
     const r = await apiFetch('POST',`/pos/depot/receptions/${achatId}`,{});
-    posAlert(`${r.nb_colis} colis créés — imprimez les étiquettes et collez-les.`,'ok');
+    posAlert(`${r.nb_colis} colis créés — imprimez les étiquettes 2 × 1 à l'échelle 100 % (taille réelle) et collez-les.`,'ok');
     depEtiquettes(achatId);
     await loadPosDepot();
   }catch(e){ posAlert(e.message||'Réception impossible.'); }
