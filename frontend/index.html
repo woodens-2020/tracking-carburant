@@ -17914,7 +17914,7 @@ async function _loadBranding(){
     const r = await fetch('/api/config/branding');
     if(!r.ok) return;
     const b = await r.json();
-    const { modules, roles, ...brandingFields } = b;
+    const { modules, roles, environnement, ...brandingFields } = b;
     Object.assign(_branding, brandingFields);
     if(modules) Object.assign(_modules, modules);
     // Accès Hôtel complet pour le rôle Manager (Chambres + Réception) —
@@ -17929,7 +17929,25 @@ async function _loadBranding(){
     if(sbSub) sbSub.textContent = `${_branding.raison_sociale} · ${_branding.complexe}`;
     const footBrand = document.getElementById('footer-pillatre-txt');
     if(footBrand) footBrand.textContent = `${_branding.raison_sociale} · ${_branding.complexe}`;
+    _bandeauEnvironnement(environnement);
   }catch(e){ /* silencieux — les valeurs par défaut restent actives */ }
+}
+
+// Bandeau « STAGING » : visible sur tous les environnements autres que la
+// production (variable APP_ENV côté serveur), pour ne jamais confondre le
+// test avec le vrai système.
+function _bandeauEnvironnement(env){
+  if(!env || env === 'production' || document.getElementById('env-banner')) return;
+  const d = document.createElement('div');
+  d.id = 'env-banner';
+  d.setAttribute('role', 'status');
+  d.textContent = `${String(env).toUpperCase()} · environnement de test, rien ici n'est en production`;
+  d.style.cssText = 'position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:2147483000;'
+    + 'background:repeating-linear-gradient(45deg,#b45309 0 12px,#92400e 12px 24px);color:#fff;'
+    + 'font:700 12px/1.2 system-ui,sans-serif;letter-spacing:.06em;padding:8px 16px;border-radius:999px;'
+    + 'box-shadow:0 4px 14px rgba(0,0,0,.35);pointer-events:none;max-width:calc(100vw - 32px);text-align:center';
+  document.body.appendChild(d);
+  if(!document.title.startsWith('[')) document.title = `[${String(env).toUpperCase()}] ${document.title}`;
 }
 
 // ── Pages propres à un module désactivable par institution (voir _modules,
