@@ -3696,13 +3696,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
-    <button class="nav-item" data-page="pos-grande-caisse" onclick="goTo('pos-grande-caisse')">
-      <span class="nav-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><circle cx="12" cy="15" r="2"/><path d="M6 15h.01M18 15h.01"/></svg>
-      </span>
-      <span>Grande Caisse</span>
-      <span class="nav-active-dot"></span>
-    </button>
 
     <button class="nav-item" data-page="pos-analyse" onclick="goTo('pos-analyse')">
       <span class="nav-icon">
@@ -7374,21 +7367,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-kpi"><div class="pos-kpi-label">Produits actifs</div><div class="pos-kpi-val amber" id="kpi-nb-produits">—</div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">En alerte stock</div><div class="pos-kpi-val red" id="kpi-en-alerte">—</div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">Valeur totale du stock</div><div class="pos-kpi-val" id="kpi-val-stock">—</div></div>
-          <div class="pos-kpi" style="cursor:pointer" onclick="document.getElementById('pos-attente-section').scrollIntoView({behavior:'smooth'})">
-            <div class="pos-kpi-label">Réceptions en attente</div>
+          <div class="pos-kpi" style="cursor:pointer" onclick="goTo('pos-depot')" title="Ouvrir le Dépôt Bar">
+            <div class="pos-kpi-label">À réceptionner au dépôt</div>
             <div class="pos-kpi-val amber" id="kpi-stock-attente">—</div>
           </div>
-        </div>
-
-        <!-- ── Réceptions en attente de confirmation ── -->
-        <div id="pos-attente-section" class="pos-card" style="border:1.5px solid rgba(251,191,36,.25);display:none">
-          <div class="pos-card-hdr" style="display:flex;align-items:center;gap:10px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span>Réceptions en attente de confirmation</span>
-            <span id="pos-attente-badge" style="background:#fbbf24;color:#000;font-size:13px;font-weight:700;border-radius:20px;padding:1px 8px;margin-left:4px"></span>
-          </div>
-          <div style="font-size:14px;color:rgba(255,255,255,.45);padding:0 0 12px">Ces achats sont enregistrés mais pas encore réceptionnés. Réceptionner crée les colis et leurs étiquettes ; le stock entre au dépôt quand chaque colis est scanné (page Dépôt Bar), puis passe au bar par une livraison.</div>
-          <div id="pos-attente-list" style="display:flex;flex-direction:column;gap:10px"></div>
         </div>
 
         <div class="pos-card">
@@ -7396,10 +7378,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-table-wrap">
             <table class="pos-table">
               <thead>
-                <tr><th>Produit</th><th>Catégorie</th><th>Dépôt</th><th>Bar Devant</th><th>Bar Piscine</th><th>Total</th><th>Unité</th><th>Seuil alerte</th><th>Coût en stock</th><th>État</th><th>Actions</th></tr>
+                <tr><th>Produit</th><th>Catégorie</th><th>Dépôt</th><th>Bar Devant</th><th>Bar Piscine</th><th>Total</th><th>Unité</th><th>Seuil alerte</th><th>Coût en stock</th><th>État</th></tr>
               </thead>
               <tbody id="pos-stock-tbody">
-                <tr><td colspan="11" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -7490,7 +7472,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div class="dep-onglets" role="tablist" aria-label="Parties du dépôt">
           <button type="button" role="tab" class="dep-onglet" data-t="reception" onclick="depOnglet('reception')">1 · Réception <span class="dep-cpt" id="dep-o-reception"></span></button>
           <button type="button" role="tab" class="dep-onglet" data-t="livraison" onclick="depOnglet('livraison')">2 · Livraison vers un bar <span class="dep-cpt" id="dep-o-livraison"></span></button>
-          <button type="button" role="tab" class="dep-onglet" data-t="stock" onclick="depOnglet('stock')">3 · Stock et inventaire</button>
+          <button type="button" role="tab" class="dep-onglet" data-t="stock" onclick="depOnglet('stock')">3 · Inventaire</button>
           <button type="button" role="tab" class="dep-onglet" data-t="journal" onclick="depOnglet('journal')">Journal</button>
         </div>
 
@@ -7544,19 +7526,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
         <!-- 3 · Stock et inventaire -->
         <section class="dep-section" data-onglet="stock" hidden>
-          <div class="dep-intro"><b>À quoi sert cette partie :</b> voir combien il reste de chaque produit au dépôt et dans chaque bar, et corriger après un comptage réel (inventaire).</div>
-          <div class="pos-card">
-            <div class="pos-card-hdr">Stock par lieu
-              <input id="dep-stock-recherche" class="pos-input" placeholder="Rechercher un produit…" style="margin-left:auto;max-width:240px;padding:6px 10px" oninput="depRenderStock()">
-            </div>
-            <div class="dep-note">Dépôt + Bar avant + Bar piscine = Total. Un chiffre rouge (négatif) veut dire qu'un bar a vendu plus que ce qu'il a reçu : livraison oubliée ou inventaire à faire. « À vérifier » = colis reçus mais pas encore scannés au dépôt.</div>
-            <div class="pos-table-wrap">
-              <table class="pos-table">
-                <thead><tr><th>Produit</th><th class="tr">Dépôt</th><th class="tr">Bar avant</th><th class="tr">Bar piscine</th><th class="tr">Total</th><th class="tr">À vérifier</th></tr></thead>
-                <tbody id="dep-stock-tbody"><tr><td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody>
-              </table>
-            </div>
-          </div>
+          <div class="dep-intro"><b>À quoi sert cette partie :</b> corriger le stock après un comptage réel (inventaire). Le tableau ci-dessous montre, pour le lieu choisi, le stock calculé. Pour voir le stock complet de tous les lieux avec sa valeur et les alertes :
+            <button type="button" class="sx-link" onclick="goTo('pos-stock')">ouvrir Stock Bar</button></div>
           <div class="pos-card">
             <div class="pos-card-hdr">Inventaire physique</div>
             <div class="dep-note">1. Choisissez le lieu compté. 2. Saisissez la quantité réellement comptée pour chaque produit vérifié (laissez vide les autres). 3. Indiquez le motif, puis enregistrez : l'écart avec le stock calculé est corrigé et gardé.</div>
@@ -7744,25 +7715,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div>
 
-    <!-- Modal réinitialisation stock (par lieu) -->
-    <div class="pos-modal-bg" id="pos-reinit-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
-      <div class="pos-modal">
-        <h3>Réinitialiser le stock</h3>
-        <div style="font-size:13.5px;color:rgba(255,255,255,.55);margin-bottom:10px" id="pos-reinit-desc"></div>
-        <div><label class="pos-label">Lieu à réinitialiser *</label>
-          <select class="pos-select" id="pos-reinit-lieu">
-            <option value="">Choisir un bar…</option>
-            <option value="DEVANT">Bar Devant (Accueil)</option>
-            <option value="PISCINE">Bar Piscine</option>
-          </select>
-        </div>
-        <div class="pos-modal-footer">
-          <button class="pos-btn ghost" onclick="document.getElementById('pos-reinit-modal-bg').classList.remove('open')">Annuler</button>
-          <button class="pos-btn danger" onclick="posStockReinitialiserConfirmer()">Réinitialiser à zéro</button>
-        </div>
-      </div>
-    </div>
-
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- PAGE POS — ACHATS BAR                                  -->
     <!-- ══════════════════════════════════════════════════════ -->
@@ -7830,7 +7782,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                   <tr><th>Date</th><th>Jours</th><th>Produit</th><th>Quantité</th><th>Prix marchandise</th><th>Dép. supp.</th><th>Coût total</th><th>Fournisseur</th><th>Statut</th><th></th></tr>
                 </thead>
                 <tbody id="pos-achats-tbody">
-                  <tr><td colspan="11" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
+                  <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -8409,136 +8361,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div><!-- /page-pos-rentabilite -->
 
     <!-- ══════════════════════════════════════════════════════════════ -->
-    <!-- PAGE : GRANDE CAISSE                                          -->
-    <!-- ══════════════════════════════════════════════════════════════ -->
-    <div id="page-pos-grande-caisse" class="page page-gi">
-      <div class="pos-page gi-page">
-
-        <!-- Header -->
-        <div class="pos-header">
-          <div class="pos-header-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><circle cx="12" cy="15" r="2"/><path d="M6 15h.01M18 15h.01"/></svg>
-          </div>
-          <div>
-            <div class="pos-header-title">Grande Caisse</div>
-            <div class="pos-header-sub">Vue consolidée Achats · Ventes · Bénéfice par section</div>
-          </div>
-          <div class="pos-header-actions" style="gap:8px;flex-wrap:wrap">
-            <input type="date" class="pos-input" id="gc-debut" style="width:130px">
-            <input type="date" class="pos-input" id="gc-fin" style="width:130px">
-            <select class="pos-input" id="gc-filtre-produit" style="width:160px">
-              <option value="">Tous les produits</option>
-            </select>
-            <select class="pos-input" id="gc-filtre-cat" style="width:140px">
-              <option value="">Toutes catégories</option>
-            </select>
-            <button class="pos-btn teal" onclick="gcCharger()">Analyser</button>
-            <button class="pos-btn ghost" onclick="gcResetFiltres()">Reset</button>
-            <button class="pos-btn" id="gc-btn-renfl" onclick="renflOpenModal('bar')" style="display:none;background:#3fb6a8;color:#0b1628">+ Renflouement Caisse Bar</button>
-          </div>
-        </div>
-
-        <!-- Tabs petites caisses -->
-        <div style="display:flex;gap:8px;margin-bottom:14px">
-          <button id="gc-tab-bar" class="pos-btn teal" onclick="gcSetTab('bar')" style="font-size:15px;padding:6px 18px">Bar / Restaurant</button>
-          <button id="gc-tab-hotel" class="pos-btn ghost" onclick="gcSetTab('hotel')" style="font-size:15px;padding:6px 18px;opacity:.5;cursor:not-allowed" disabled title="Bientôt disponible">Hotel</button>
-          <button id="gc-tab-piscine" class="pos-btn ghost" onclick="gcSetTab('piscine')" style="font-size:15px;padding:6px 18px;opacity:.5;cursor:not-allowed" disabled title="Bientôt disponible">Piscine</button>
-        </div>
-
-        <!-- KPIs -->
-        <div class="pos-kpi-grid" style="grid-template-columns:repeat(5,1fr)">
-          <div class="pos-kpi">
-            <div class="pos-kpi-label">Coût Achats</div>
-            <div class="pos-kpi-val amber" id="gc-kpi-achats">—</div>
-            <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:2px" id="gc-kpi-nb-achats"></div>
-          </div>
-          <div class="pos-kpi">
-            <div class="pos-kpi-label">CA Ventes</div>
-            <div class="pos-kpi-val" id="gc-kpi-ventes">—</div>
-            <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:2px" id="gc-kpi-nb-ventes"></div>
-          </div>
-          <div class="pos-kpi">
-            <div class="pos-kpi-label">Bénéfice Brut</div>
-            <div class="pos-kpi-val" id="gc-kpi-benef-brut">—</div>
-          </div>
-          <div class="pos-kpi">
-            <div class="pos-kpi-label">Paie Employés</div>
-            <div class="pos-kpi-val amber" id="gc-kpi-paie">—</div>
-          </div>
-          <div class="pos-kpi">
-            <div class="pos-kpi-label">Bénéfice Net</div>
-            <div class="pos-kpi-val" id="gc-kpi-benef-net">—</div>
-          </div>
-        </div>
-
-        <!-- Caisse Bar disponible (cash réel) -->
-        <div class="pos-card" style="padding:14px 18px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-          <div>
-            <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em">Caisse Bar disponible (cash réel)</div>
-            <div style="font-size:26px;font-weight:800" id="gc-kpi-caisse">—</div>
-            <div style="font-size:12.5px;color:rgba(255,255,255,.4)" id="gc-kpi-caisse-sub">Ventes cash + remboursements + renflouements − achats − paie</div>
-          </div>
-        </div>
-
-        <!-- Vue par produit -->
-        <div class="pos-card">
-          <div class="pos-card-hdr" style="display:flex;justify-content:space-between;align-items:center">
-            <span>Analyse par produit</span>
-            <span style="font-size:13px;color:rgba(255,255,255,.4)">Achats coût réel · CA ventes · Bénéfice</span>
-          </div>
-          <div class="pos-table-wrap">
-            <table class="pos-table">
-              <thead>
-                <tr>
-                  <th>Produit</th>
-                  <th>Catégorie</th>
-                  <th style="text-align:right">Qté achetée</th>
-                  <th style="text-align:right">Coût achats</th>
-                  <th style="text-align:right">Qté vendue</th>
-                  <th style="text-align:right">CA ventes</th>
-                  <th style="text-align:right">Bénéfice</th>
-                  <th style="text-align:right">Marge %</th>
-                </tr>
-              </thead>
-              <tbody id="gc-produits-tbody">
-                <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Sélectionnez une période et cliquez sur Analyser</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Détail des achats -->
-        <div class="pos-card">
-          <div class="pos-card-hdr" style="display:flex;justify-content:space-between;align-items:center">
-            <span>Détail des achats (période)</span>
-            <span style="font-size:13px;color:rgba(255,255,255,.4)">Uniquement achats confirmés</span>
-          </div>
-          <div class="pos-table-wrap">
-            <table class="pos-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Produit</th>
-                  <th>Catégorie</th>
-                  <th>Fournisseur</th>
-                  <th style="text-align:right">Qté</th>
-                  <th style="text-align:right">Prix unit.</th>
-                  <th style="text-align:right">Marchandise</th>
-                  <th style="text-align:right">Dépenses</th>
-                  <th style="text-align:right">Coût total</th>
-                </tr>
-              </thead>
-              <tbody id="gc-achats-tbody">
-                <tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">—</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </div>
-    </div><!-- /page-pos-grande-caisse -->
-
-    <!-- ══════════════════════════════════════════════════════════════ -->
     <!-- PAGE SESSIONS CAISSIÈRES                                       -->
     <!-- ══════════════════════════════════════════════════════════════ -->
     <div id="page-pos-sessions-caisse" class="page page-gi">
@@ -8646,7 +8468,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 </tr>
               </thead>
               <tbody id="perf-tbody">
-                <tr><td colspan="11" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>
+                <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -8675,7 +8497,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 </tr>
               </thead>
               <tbody id="sc-tbody">
-                <tr><td colspan="11" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>
+                <tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -9016,7 +8838,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 </tr>
               </thead>
               <tbody id="zpay-tbody">
-                <tr><td colspan="11" style="text-align:center;padding:40px;color:rgba(255,255,255,.3);">Chargement…</td></tr>
+                <tr><td colspan="10" style="text-align:center;padding:40px;color:rgba(255,255,255,.3);">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -9346,7 +9168,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <button id="ana-tab-controle"    onclick="anaSetTab('controle')"    class="pos-btn ghost" style="font-size:14px;border-radius:8px 8px 0 0;padding:8px 14px;border-bottom:2px solid #3fb6a8;color:#3fb6a8">Tableau de contrôle</button>
           <button id="ana-tab-evolution"   onclick="anaSetTab('evolution')"   class="pos-btn ghost" style="font-size:14px;border-radius:8px 8px 0 0;padding:8px 14px;border-bottom:2px solid transparent">Évolution ventes</button>
           <button id="ana-tab-lots"        onclick="anaSetTab('lots')"        class="pos-btn ghost" style="font-size:14px;border-radius:8px 8px 0 0;padding:8px 14px;border-bottom:2px solid transparent">Suivi par lot</button>
-          <button id="ana-tab-rentabilite" onclick="anaSetTab('rentabilite')" class="pos-btn ghost" style="font-size:14px;border-radius:8px 8px 0 0;padding:8px 14px;border-bottom:2px solid transparent">Rentabilité</button>
         </div>
 
         <!-- Panel : Tableau de contrôle -->
@@ -9381,7 +9202,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                   </tr>
                 </thead>
                 <tbody id="ana-tbl-body">
-                  <tr><td colspan="11" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
+                  <tr><td colspan="10" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -9427,27 +9248,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
           <div id="ana-lots-body">
             <div style="text-align:center;padding:40px;color:rgba(255,255,255,.3)">Sélectionnez un article pour analyser ses lots d'achat</div>
-          </div>
-        </div>
-
-        <!-- Panel : Rentabilité -->
-        <div id="ana-panel-rentabilite" style="display:none;padding-top:14px">
-          <div class="pos-card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-            <div style="display:flex;gap:6px;align-items:center">
-              <label style="font-size:13px;color:rgba(255,255,255,.4)">Du</label>
-              <input class="pos-input" id="ana-rent-debut" type="date" style="width:140px">
-              <label style="font-size:13px;color:rgba(255,255,255,.4)">au</label>
-              <input class="pos-input" id="ana-rent-fin" type="date" style="width:140px">
-            </div>
-            <button class="pos-btn teal" onclick="anaChargerRentabilite()">Calculer</button>
-            <div style="display:flex;gap:6px;margin-left:auto">
-              <button class="pos-btn ghost" style="font-size:13px" onclick="anaRentPeriode('mois')">Ce mois</button>
-              <button class="pos-btn ghost" style="font-size:13px" onclick="anaRentPeriode('trim')">3 mois</button>
-              <button class="pos-btn ghost" style="font-size:13px" onclick="anaRentPeriode('an')">12 mois</button>
-            </div>
-          </div>
-          <div id="ana-rent-body">
-            <div style="text-align:center;padding:40px;color:rgba(255,255,255,.3)">Sélectionnez une période et cliquez Calculer</div>
           </div>
         </div>
 
@@ -9929,7 +9729,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               </tr>
             </thead>
             <tbody id="ckac-tbody">
-              <tr><td colspan="11" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">Chargement…</td></tr>
+              <tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">Chargement…</td></tr>
             </tbody>
           </table>
         </div>
@@ -17345,7 +17145,7 @@ const _MODULE_PAGES = {
               'previsions','rapports','stock','gestion','audit','depenses'],
   bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-stock','pos-depot','pos-achats',
               'pos-ventes','pos-credits','pos-rentabilite',
-              'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis'],
+              'pos-analyse','pos-sessions-caisse','rapports-soumis'],
   hotel:     ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma',
               'hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   zelle:     ['zelle','zelle-paiements','zelle-fonds'],
@@ -17373,8 +17173,8 @@ const _AREA_PAGES = {
     lecture: ['dashboard','journal','statistiques','gi-dashboard'],
   },
   bar: {
-    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-stock','pos-depot','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
-    lecture: ['pos-ventes','pos-credits','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
+    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-stock','pos-depot','pos-analyse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
+    lecture: ['pos-ventes','pos-credits','pos-analyse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
   },
   cuisine: {
     complet: ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse'],
@@ -17417,7 +17217,7 @@ const _AD_ALLOWED = new Set([
   'home',
   'dashboard','journal','carburant-rapport','statistiques','gi-dashboard','depenses','achats','caisse',
   'pos-produits','pos-stock','pos-depot','pos-ventes','pos-credits',
-  'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
+  'pos-analyse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
   'cuisine-plats','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'employes','payroll',
@@ -17428,11 +17228,11 @@ const _AD_ALLOWED = new Set([
 const _ACCES_POSTE_LEGACY = {
   'Directeur Général': null,
   'Comptable':   ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-depot','pos-ventes','pos-credits','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-stock','pos-depot','pos-ventes','pos-credits','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-depot','pos-ventes','pos-credits','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-stock','pos-depot','pos-ventes','pos-credits','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Pompiste':            ['home','saisie'],
@@ -22826,7 +22626,6 @@ const _giPageLoaders = {
   'pos-ventes':      loadPosVentes,
   'pos-credits':     loadPosCredits,
   'pos-rentabilite':    loadPosRentabilite,
-  'pos-grande-caisse':      loadPosGrandeCaisse,
   'pos-analyse':            loadPosAnalyse,
   'pos-sessions-caisse':    loadPosSessionsCaisse,
   'rapports-soumis':        loadRapportsSoumis,
@@ -24359,12 +24158,6 @@ const _RENFL_SCOPES = {
     titre:    'Renflouement Caisse Cuisine',
     note:     "Ce montant sera immédiatement ajouté à la Caisse Cuisine disponible.",
     reload:   () => { if(typeof ckaSyntheseCharger === 'function') ckaSyntheseCharger(); },
-  },
-  bar: {
-    endpoint: '/pos/renflouements',
-    titre:    'Renflouement Caisse Bar',
-    note:     "Ce montant sera immédiatement ajouté à la Caisse Bar disponible.",
-    reload:   () => { if(typeof gcCharger === 'function') gcCharger(); },
   },
 };
 let _renflScope = 'institution';
@@ -26395,12 +26188,12 @@ let _posStockLieuFiltre  = ''; // '' | 'DEVANT' | 'PISCINE'
 
 async function loadPosStock(){
   const tbody = document.getElementById('pos-stock-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
-    const [prods, stocks, attente] = await Promise.all([
+    const [prods, stocks, rec] = await Promise.all([
       apiFetch('GET','/pos/produits?actif=true'),
       apiFetch('GET','/pos/stock'),
-      apiFetch('GET','/pos/achats/en-attente'),
+      apiFetch('GET','/pos/depot/receptions').catch(()=>null),
     ]);
     const stockMap = {};
     (stocks||[]).forEach(s=>{ stockMap[s.produit_id] = s; });
@@ -26421,17 +26214,14 @@ async function loadPosStock(){
       ['kpi-nb-produits', (prods||[]).length],
       ['kpi-en-alerte',   nbAlerte],
       ['kpi-val-stock',   posGx(totalValeur)],
-      ['kpi-stock-attente', (attente||[]).length || '0'],
+      ['kpi-stock-attente', rec ? (rec.achats_a_receptionner||[]).length + (rec.colis_a_verifier||[]).length : '—'],
     ];
     kpis.forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
-
-    // Section réceptions en attente
-    _posRenderAttente(attente||[]);
 
     // Peupler les selects produits pour les modals
     _posFillProduitSelects(prods||[]);
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
 }
 
@@ -26477,10 +26267,9 @@ function _posStockRenderTable(){
       <td>${p.seuil_alerte_stock||'—'}</td>
       <td>${valeur>0?posGx(valeur):'—'}</td>
       <td>${badge}</td>
-      <td>${(devant!==0||piscine!==0)?`<button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posStockReinitialiser(${p.id},'${esc(p.nom||'')}',${devant},${piscine})">Réinitialiser</button>`:'<span style="color:rgba(255,255,255,.25);font-size:12px">—</span>'}</td>
     </tr>`;
   });
-  tbody.innerHTML = rows.join('') || `<tr><td colspan="11" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit ${recherche||_posStockDispoFiltre||_posStockLieuFiltre?'ne correspond aux filtres':'actif'}</td></tr>`;
+  tbody.innerHTML = rows.join('') || `<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:20px">Aucun produit ${recherche||_posStockDispoFiltre||_posStockLieuFiltre?'ne correspond aux filtres':'actif'}</td></tr>`;
 }
 
 function posStockFiltrer(){ _posStockRenderTable(); }
@@ -26511,82 +26300,6 @@ function posStockExportPdf(){
 
 let _posReinitCtx = null;   // {produitId, produitNom}
 
-function posStockReinitialiser(produitId, produitNom, stockDevant, stockPiscine){
-  _posReinitCtx = { produitId, produitNom };
-  document.getElementById('pos-reinit-desc').textContent =
-    `« ${produitNom} » — Bar Devant : ${fmtQ(stockDevant)} · Bar Piscine : ${fmtQ(stockPiscine)}. ` +
-    `Choisissez le lieu à ramener à zéro. Action tracée comme un ajustement (irréversible) — ` +
-    `à utiliser pour repartir sur un nouvel inventaire authentique, sans mélanger les deux bars.`;
-  document.getElementById('pos-reinit-lieu').value = '';
-  document.getElementById('pos-reinit-modal-bg').classList.add('open');
-}
-
-async function posStockReinitialiserConfirmer(){
-  if(!_posReinitCtx) return;
-  const lieu = document.getElementById('pos-reinit-lieu').value;
-  if(!lieu){ toast('Choisissez le bar (Bar Devant ou Bar Piscine).','err'); return; }
-  try{
-    const res = await apiFetch('POST', `/pos/stock/${_posReinitCtx.produitId}/reinitialiser?lieu=${lieu}`, {});
-    document.getElementById('pos-reinit-modal-bg').classList.remove('open');
-    toast(`Stock ${lieu==='DEVANT'?'Bar Devant':'Bar Piscine'} de « ${res.produit_nom} » réinitialisé (${fmtQ(res.stock_avant)} → 0).`,'ok');
-    loadPosStock();
-  }catch(e){ toast(e.message||'Erreur lors de la réinitialisation.','err'); }
-}
-
-function _posRenderAttente(achats){
-  const section = document.getElementById('pos-attente-section');
-  const list    = document.getElementById('pos-attente-list');
-  const badge   = document.getElementById('pos-attente-badge');
-  if(!section||!list) return;
-
-  if(!achats.length){
-    section.style.display='none';
-    if(badge) badge.textContent='';
-    return;
-  }
-  section.style.display='';
-  if(badge) badge.textContent = achats.length;
-
-  const fmt = v=>`G ${parseFloat(v).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-  list.innerHTML = achats.map(a=>{
-    const d = new Date(a.date_achat);
-    const ds = d.toLocaleDateString('fr',{day:'2-digit',month:'2-digit',year:'numeric'})
-             + ' ' + d.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'});
-    const depInfo = a.total_depenses>0
-      ? `<span style="color:#f87171;font-size:13px"> + ${fmt(a.total_depenses)} dép.</span>`:'';
-    return `<div style="display:flex;align-items:center;gap:14px;padding:12px 14px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.18);border-radius:10px;flex-wrap:wrap">
-      <div style="flex:2;min-width:140px">
-        <div style="font-weight:700;font-size:15px">${a.produit_nom}</div>
-        <div style="font-size:13px;color:rgba(255,255,255,.4);margin-top:2px">${ds}${a.fournisseur?' · '+a.fournisseur:''}</div>
-      </div>
-      <div style="text-align:center;min-width:80px">
-        <div style="font-size:15px;font-weight:600">${parseFloat(a.quantite).toFixed(2)} ${a.produit_unite||'u.'}</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.35)">à recevoir</div>
-      </div>
-      <div style="text-align:right;min-width:110px">
-        <div style="font-size:15px;font-weight:700;color:#3fb6a8">${fmt(a.cout_total)}</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.35)">${fmt(a.prix_marchandise)} march.${depInfo}</div>
-      </div>
-      <button onclick="posConfirmerReception(${a.id})"
-        style="background:linear-gradient(135deg,#34d399,#059669);border:none;border-radius:9px;color:#fff;font-size:14px;font-weight:700;padding:9px 18px;cursor:pointer;white-space:nowrap;flex-shrink:0">
-        ✓ Réceptionner
-      </button>
-    </div>`;
-  }).join('');
-}
-
-async function posConfirmerReception(achatId){
-  const a = (_paAchatsCache||[]).find(x=>x.id===achatId);
-  const nom = a?.produit_nom || `Achat #${achatId}`;
-  if(!await showConfirm(`Réceptionner l'achat de « ${nom} » ? Les colis et leurs étiquettes seront créés ; le stock entrera au dépôt au scan de chaque colis.`, {title:'Réception', okLabel:'Réceptionner'})) return;
-  try {
-    const r = await apiFetch('POST',`/pos/achats/${achatId}/confirmer`,{});
-    posAlert(`${nom} réceptionné — ${r.nb_colis} colis à étiqueter et scanner (page Dépôt Bar).`,'ok');
-    if(typeof depEtiquettes === 'function') depEtiquettes(achatId);
-    // Rafraîchir aussi la page achats si elle est visible
-    if(typeof _paAchatsCache !== 'undefined') loadPosAchats();
-  } catch(e){ posAlert(e.message||'Erreur lors de la confirmation.'); }
-}
 
 function _posFillProduitSelects(prods){
   ['pos-recept-produit','pos-ajust-produit'].forEach(selId=>{
@@ -26743,7 +26456,7 @@ function _paRenderTable(achats){
   if(!tbody) return;
   if(!achats.length){
     const raw = document.getElementById('pa-recherche')?.value || '';
-    tbody.innerHTML = `<tr><td colspan="11" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">${raw ? `Aucun achat ne correspond à « ${esc(raw)} »` : 'Aucun achat ne correspond aux filtres'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">${raw ? `Aucun achat ne correspond à « ${esc(raw)} »` : 'Aucun achat ne correspond aux filtres'}</td></tr>`;
     return;
   }
   const fmt = v=>`G ${parseFloat(v).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -28704,7 +28417,6 @@ async function loadPosDepot(){
     _depStock = stock || [];
     _depKpis(rec, livs||[], auDepot||[]);
     depRenderReceptions(rec);
-    depRenderStock();
     depRenderInventaire();
     depRenderHistorique(livs || []);
     depChargerJournal();
@@ -28958,17 +28670,6 @@ async function depAnnulerColis(id, code){
   if(!await showConfirm(`Retirer le colis ${code} ? (erreur de réception — il ne sera jamais compté)`, {title:'Retirer un colis', type:'danger', okLabel:'Retirer'})) return;
   try{ await apiFetch('POST',`/pos/depot/colis/${id}/annuler`,{}); await loadPosDepot(); }
   catch(e){ posAlert(e.message); }
-}
-
-function depRenderStock(){
-  const q = (document.getElementById('dep-stock-recherche')?.value||'').trim().toLowerCase();
-  const f = n => { const v = parseFloat(n||0); return `<span class="${v<0?'c-red':''}">${v.toLocaleString('fr',{maximumFractionDigits:3})}</span>`; };
-  const rows = _depStock.filter(s=>!q || (s.nom||'').toLowerCase().includes(q));
-  document.getElementById('dep-stock-tbody').innerHTML = rows.map(s=>`
-    <tr><td><strong>${esc(s.nom)}</strong> <span class="dep-sous">${esc(s.unite||'')}</span></td>
-      <td class="tr">${f(s.depot)}</td><td class="tr">${f(s.devant)}</td><td class="tr">${f(s.piscine)}</td>
-      <td class="tr"><strong>${f(s.total)}</strong></td><td class="tr">${s.a_verifier?f(s.a_verifier):'—'}</td></tr>`).join('')
-    || '<tr><td colspan="6" style="text-align:center;padding:16px;color:rgba(255,255,255,.3)">Aucun produit</td></tr>';
 }
 
 function depRenderInventaire(){
@@ -29375,169 +29076,6 @@ function _posRentChartTop(tops){
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// PAGE GRANDE CAISSE
-// ══════════════════════════════════════════════════════════════════════
-let _gcTab = 'bar';
-let _gcData = null;
-
-function gcSetTab(tab){
-  _gcTab = tab;
-  ['bar','hotel','piscine'].forEach(t=>{
-    const btn = document.getElementById('gc-tab-'+t);
-    if(btn) btn.className = t===tab ? 'pos-btn teal' : 'pos-btn ghost';
-  });
-  if(_gcData) _gcRender(_gcData);
-}
-
-function gcResetFiltres(){
-  const today = new Date();
-  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-  document.getElementById('gc-debut').value = first;
-  document.getElementById('gc-fin').value   = today.toISOString().split('T')[0];
-  document.getElementById('gc-filtre-produit').value = '';
-  document.getElementById('gc-filtre-cat').value     = '';
-  gcCharger();
-}
-
-async function loadPosGrandeCaisse(){
-  const today = new Date();
-  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-  const deb = document.getElementById('gc-debut');
-  const fin = document.getElementById('gc-fin');
-  if(deb && !deb.value) deb.value = first;
-  if(fin && !fin.value) fin.value = today.toISOString().split('T')[0];
-
-  // Charger les produits bar pour le filtre
-  try {
-    const prods = await apiFetch('GET','/pos/produits?actif=true');
-    const sel = document.getElementById('gc-filtre-produit');
-    if(sel){
-      const existing = [...sel.options].map(o=>o.value).filter(v=>v);
-      if(!existing.length){
-        (prods||[]).forEach(p=>{
-          const o = document.createElement('option');
-          o.value = p.id; o.textContent = p.nom;
-          sel.appendChild(o);
-        });
-      }
-      // Catégories
-      const cats = [...new Set((prods||[]).map(p=>p.categorie).filter(Boolean))].sort();
-      const selCat = document.getElementById('gc-filtre-cat');
-      if(selCat && selCat.options.length<=1){
-        cats.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; selCat.appendChild(o); });
-      }
-    }
-  } catch(_){}
-
-  await gcCharger();
-}
-
-async function gcCharger(){
-  const deb    = document.getElementById('gc-debut').value;
-  const fin    = document.getElementById('gc-fin').value;
-  const prodId = document.getElementById('gc-filtre-produit').value;
-  const cat    = document.getElementById('gc-filtre-cat').value;
-
-  let qs = `/pos/grande-caisse?date_debut=${deb}&date_fin=${fin}`;
-  if(prodId) qs += `&produit_id=${prodId}`;
-  if(cat)    qs += `&categorie=${encodeURIComponent(cat)}`;
-
-  const tProd = document.getElementById('gc-produits-tbody');
-  const tAch  = document.getElementById('gc-achats-tbody');
-  if(tProd) tProd.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
-  if(tAch)  tAch.innerHTML  = '<tr><td colspan="9" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
-
-  try {
-    _gcData = await apiFetch('GET', qs);
-    _gcRender(_gcData);
-  } catch(e){
-    if(tProd) tProd.innerHTML = `<tr><td colspan="8" style="color:#f87171;text-align:center;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
-  }
-}
-
-function _gcRender(d){
-  if(!d) return;
-  const section = d.bar; // seul tab disponible pour l'instant
-
-  const benBrut = section.benefice_brut || 0;
-  const benNet  = section.benefice_net  || 0;
-  const colorBrut = benBrut >= 0 ? '#34d399' : '#f87171';
-  const colorNet  = benNet  >= 0 ? '#34d399' : '#f87171';
-
-  // KPIs
-  _gcKpi('gc-kpi-achats',    posGx(section.achats_cout));
-  _gcKpi('gc-kpi-ventes',    posGx(section.ventes_ca));
-  _gcKpi('gc-kpi-benef-brut', posGx(benBrut), colorBrut);
-  _gcKpi('gc-kpi-paie',      posGx(section.paie));
-  _gcKpi('gc-kpi-benef-net', posGx(benNet), colorNet);
-
-  const nbA = document.getElementById('gc-kpi-nb-achats');
-  const nbV = document.getElementById('gc-kpi-nb-ventes');
-  if(nbA) nbA.textContent = section.nb_achats + ' achat(s)';
-  if(nbV) nbV.textContent = section.nb_ventes + ' ligne(s) vente';
-
-  // Caisse Bar disponible (cash réel)
-  const caisse = d.caisse || {ventes_cash:0, achats:0, paie:0, renflouements:0, disponible:0};
-  const caisseEl = document.getElementById('gc-kpi-caisse');
-  if(caisseEl){
-    caisseEl.textContent = posGx(caisse.disponible);
-    caisseEl.style.color = caisse.disponible >= 0 ? '#34d399' : '#f87171';
-  }
-  const btnRenflBar = document.getElementById('gc-btn-renfl');
-  if(btnRenflBar) btnRenflBar.style.display = (_appUser?.role === 'pdg' || _isAdmin()) ? '' : 'none';
-
-  // Table par produit
-  const tProd = document.getElementById('gc-produits-tbody');
-  if(tProd){
-    if(!d.par_produit.length){
-      tProd.innerHTML = '<tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Aucune donnée sur cette période</td></tr>';
-    } else {
-      tProd.innerHTML = d.par_produit.map(p=>{
-        const ben   = p.benefice || 0;
-        const colBen = ben >= 0 ? '#34d399' : '#f87171';
-        const marge  = p.marge_pct || 0;
-        const colMarge = marge>=30?'#34d399':marge>=10?'#fbbf24':'#f87171';
-        return `<tr>
-          <td style="font-weight:500">${p.produit_nom}</td>
-          <td><span style="font-size:13px;padding:2px 7px;background:rgba(255,255,255,.07);border-radius:4px">${p.categorie||'—'}</span></td>
-          <td style="text-align:right;color:rgba(255,255,255,.6)">${p.qte_achetee>0?p.qte_achetee.toFixed(2):'—'}</td>
-          <td style="text-align:right;color:#fbbf24">${p.achats_cout>0?posGx(p.achats_cout):'—'}</td>
-          <td style="text-align:right;color:rgba(255,255,255,.6)">${p.qte_vendue>0?p.qte_vendue.toFixed(2):'—'}</td>
-          <td style="text-align:right">${p.ventes_ca>0?posGx(p.ventes_ca):'—'}</td>
-          <td style="text-align:right;font-weight:600;color:${colBen}">${posGx(ben)}</td>
-          <td style="text-align:right"><span style="color:${colMarge};font-weight:600">${marge.toFixed(1)}%</span></td>
-        </tr>`;
-      }).join('');
-    }
-  }
-
-  // Table détail achats
-  const tAch = document.getElementById('gc-achats-tbody');
-  if(tAch){
-    if(!d.achats_detail.length){
-      tAch.innerHTML = '<tr><td colspan="9" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Aucun achat confirmé sur cette période</td></tr>';
-    } else {
-      tAch.innerHTML = d.achats_detail.map(a=>{
-        const dt = new Date(a.date_achat);
-        const dateStr = dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'2-digit'});
-        const hasDep = a.total_depenses > 0;
-        return `<tr>
-          <td style="color:rgba(255,255,255,.55);font-size:14px">${dateStr}</td>
-          <td style="font-weight:500">${a.produit_nom}</td>
-          <td><span style="font-size:13px;padding:2px 7px;background:rgba(255,255,255,.07);border-radius:4px">${a.categorie||'—'}</span></td>
-          <td style="color:rgba(255,255,255,.55)">${a.fournisseur}</td>
-          <td style="text-align:right">${a.quantite.toFixed(2)}</td>
-          <td style="text-align:right;color:rgba(255,255,255,.55)">${posGx(a.prix_achat_unitaire)}</td>
-          <td style="text-align:right">${posGx(a.cout_marchandise)}</td>
-          <td style="text-align:right;color:${hasDep?'#f87171':'rgba(255,255,255,.3)'}">${hasDep?posGx(a.total_depenses):'—'}</td>
-          <td style="text-align:right;font-weight:600;color:#fbbf24">${posGx(a.cout_total)}</td>
-        </tr>`;
-      }).join('');
-    }
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════
 // PAGE POS — ANALYSE & CONTRÔLE
 // ══════════════════════════════════════════════════════════════════════
 
@@ -29555,17 +29093,13 @@ async function loadPosAnalyse(){
   if(eDeb && !eDeb.value) eDeb.value = fmt(il30);
   if(eFin && !eFin.value) eFin.value = fmt(today);
 
-  const rDeb = document.getElementById('ana-rent-debut');
-  const rFin = document.getElementById('ana-rent-fin');
-  if(rDeb && !rDeb.value) rDeb.value = fmt(new Date(today.getFullYear(), today.getMonth(), 1));
-  if(rFin && !rFin.value) rFin.value = fmt(today);
 
   await anaChargerTableau();
 }
 
 async function anaChargerTableau(){
   const tbody = document.getElementById('ana-tbl-body');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
 
   try {
     const data = await apiFetch('GET', '/pos/analyse/tableau');
@@ -29595,7 +29129,7 @@ async function anaChargerTableau(){
 
     anaTblAfficher();
   } catch(e){
-    if(tbody) tbody.innerHTML = `<tr><td colspan="11" style="padding:24px;text-align:center;color:#f87171">${e.message || 'Erreur réseau'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="10" style="padding:24px;text-align:center;color:#f87171">${e.message || 'Erreur réseau'}</td></tr>`;
   }
 }
 
@@ -29633,7 +29167,7 @@ function anaTblAfficher(){
   });
 
   if(!arts.length){
-    tbody.innerHTML = '<tr><td colspan="11" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucun article trouvé</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucun article trouvé</td></tr>';
     return;
   }
 
@@ -29671,7 +29205,7 @@ function anaTblAfficher(){
 }
 
 function anaSetTab(tab){
-  ['controle','evolution','lots','rentabilite'].forEach(t => {
+  ['controle','evolution','lots'].forEach(t => {
     const btn   = document.getElementById(`ana-tab-${t}`);
     const panel = document.getElementById(`ana-panel-${t}`);
     const active = t === tab;
@@ -29904,131 +29438,6 @@ async function anaChargerLots(){
   }
 }
 
-// ── Tab Rentabilité ────────────────────────────────────────────────
-
-function anaRentPeriode(periode){
-  const today = new Date();
-  let debut;
-  if(periode === 'mois')     debut = new Date(today.getFullYear(), today.getMonth(), 1);
-  else if(periode === 'trim'){ debut = new Date(today); debut.setMonth(debut.getMonth() - 3); }
-  else                       { debut = new Date(today); debut.setFullYear(debut.getFullYear() - 1); }
-  const fmt = d => d.toISOString().split('T')[0];
-  document.getElementById('ana-rent-debut').value = fmt(debut);
-  document.getElementById('ana-rent-fin').value   = fmt(today);
-  anaChargerRentabilite();
-}
-
-async function anaChargerRentabilite(){
-  const debut = document.getElementById('ana-rent-debut')?.value;
-  const fin   = document.getElementById('ana-rent-fin')?.value;
-  if(!debut || !fin){ posAlert('Sélectionnez une période.', 'warn'); return; }
-
-  const body = document.getElementById('ana-rent-body');
-  body.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</div>';
-
-  try {
-    const data    = await apiFetch('GET', `/pos/benefices?date_debut=${debut}&date_fin=${fin}`);
-    const prods   = (data.par_produit || []).sort((a, b) => b.benefice - a.benefice);
-    const cats    = (data.par_categorie || []).sort((a, b) => b.benefice - a.benefice);
-
-    const prev = data.precedent || {};
-    const badge = (cur, prv) => {
-      if(typeof prv !== 'number' || prv === 0) return '';
-      const pct = (cur - prv) / Math.abs(prv) * 100;
-      const col = pct>=0 ? '#22c55e' : '#ef4444', icon = pct>=0 ? '▲' : '▼';
-      return `<div style="font-size:12px;font-weight:700;color:${col};margin-top:3px">${icon} ${Math.abs(pct).toFixed(1)}% vs précédent</div>`;
-    };
-    const kpis = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
-      <div class="pos-card" style="padding:12px 14px;border-top:3px solid #3fb6a8">
-        <div style="font-size:12px;color:rgba(255,255,255,.35);margin-bottom:3px">CA période</div>
-        <div style="font-size:22px;font-weight:800;color:#3fb6a8">${posGx(data.ca_total)}</div>
-        ${badge(data.ca_total, prev.ca_total)}
-      </div>
-      <div class="pos-card" style="padding:12px 14px;border-top:3px solid #f59e0b">
-        <div style="font-size:12px;color:rgba(255,255,255,.35);margin-bottom:3px">Coût des ventes</div>
-        <div style="font-size:22px;font-weight:800;color:#f59e0b">${posGx(data.cogs_total)}</div>
-        ${badge(data.cogs_total, prev.cogs_total)}
-      </div>
-      <div class="pos-card" style="padding:12px 14px;border-top:3px solid #34d399">
-        <div style="font-size:12px;color:rgba(255,255,255,.35);margin-bottom:3px">Bénéfice brut</div>
-        <div style="font-size:22px;font-weight:800;color:#34d399">${posGx(data.benefice_net)}</div>
-        ${badge(data.benefice_net, prev.benefice_net)}
-      </div>
-      <div class="pos-card" style="padding:12px 14px;border-top:3px solid #818cf8">
-        <div style="font-size:12px;color:rgba(255,255,255,.35);margin-bottom:3px">Marge globale</div>
-        <div style="font-size:22px;font-weight:800;color:#818cf8">${(data.marge_globale || 0).toFixed(1)}%</div>
-      </div>
-    </div>`;
-
-    const catHTML = cats.length ? `<div class="pos-card" style="padding:14px 16px;margin-bottom:14px">
-      <div style="font-size:13px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Par catégorie</div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        ${cats.map(c => {
-          const mc = c.marge_pct >= 30 ? '#34d399' : c.marge_pct >= 10 ? '#f59e0b' : '#f87171';
-          return `<div style="display:flex;align-items:center;gap:10px">
-            <div style="width:110px;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.categorie}</div>
-            <div style="flex:1;height:6px;background:rgba(255,255,255,.07);border-radius:3px">
-              <div style="height:100%;width:${Math.min(100, Math.max(0, c.marge_pct))}%;background:${mc};border-radius:3px"></div>
-            </div>
-            <div style="font-size:13px;font-weight:700;color:${mc};width:42px;text-align:right">${c.marge_pct !== undefined ? c.marge_pct.toFixed(1) : '—'}%</div>
-            <div style="font-size:13px;color:#3fb6a8;width:90px;text-align:right">${posGx(c.ca)}</div>
-            <div style="font-size:13px;color:#34d399;width:90px;text-align:right">${posGx(c.benefice)}</div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>` : '';
-
-    if(!prods.length){
-      body.innerHTML = kpis + catHTML + '<div class="pos-card" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune vente sur cette période</div>';
-      return;
-    }
-
-    const table = `<div class="pos-card" style="padding:0;overflow:hidden">
-      <div style="overflow-x:auto;max-height:380px;overflow-y:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:14px">
-          <thead style="position:sticky;top:0;background:#1a1f2e;z-index:1">
-            <tr style="border-bottom:1px solid rgba(255,255,255,.08)">
-              <th style="padding:9px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Produit</th>
-              <th style="padding:9px 8px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Catégorie</th>
-              <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35);white-space:nowrap">Qté vendue</th>
-              <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">CA</th>
-              <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">COGS</th>
-              <th style="padding:9px 8px;text-align:right;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35)">Bénéfice</th>
-              <th style="padding:9px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:rgba(255,255,255,.35);min-width:110px">Marge</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${prods.map(p => {
-              const mc = p.marge_pct >= 30 ? '#34d399' : p.marge_pct >= 10 ? '#f59e0b' : '#f87171';
-              const bc = p.benefice >= 0 ? '#34d399' : '#f87171';
-              return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
-                <td style="padding:8px 12px;font-weight:600">${p.produit_nom}</td>
-                <td style="padding:8px 8px;font-size:13px;color:rgba(255,255,255,.4)">${p.categorie || '—'}</td>
-                <td style="padding:8px 8px;text-align:right">${p.quantite.toFixed(1)}</td>
-                <td style="padding:8px 8px;text-align:right;font-weight:600;color:#60a5fa">${posGx(p.ca)}</td>
-                <td style="padding:8px 8px;text-align:right;color:rgba(255,255,255,.5)">${posGx(p.cogs)}</td>
-                <td style="padding:8px 8px;text-align:right;font-weight:700;color:${bc}">${posGx(p.benefice)}</td>
-                <td style="padding:8px 12px">
-                  <div style="display:flex;align-items:center;gap:5px">
-                    <div style="width:50px;height:4px;background:rgba(255,255,255,.08);border-radius:2px">
-                      <div style="height:100%;width:${Math.min(100, Math.max(0, p.marge_pct))}%;background:${mc};border-radius:2px"></div>
-                    </div>
-                    <span style="font-size:13px;font-weight:700;color:${mc}">${p.marge_pct.toFixed(1)}%</span>
-                  </div>
-                </td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>`;
-
-    body.innerHTML = kpis + catHTML + table;
-  } catch(e){
-    body.innerHTML = `<div style="color:#f87171;padding:16px">${e.message || 'Erreur réseau'}</div>`;
-  }
-}
-
 // ══════════════════════════════════════════════════════════════════════
 // MODULE CUISINE
 // ══════════════════════════════════════════════════════════════════════
@@ -30101,7 +29510,7 @@ function scAujourdhui(){
 
 async function scCharger(){
   const tbody = document.getElementById('sc-tbody');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
   try {
     const caissier = document.getElementById('sc-filtre-caissier')?.value||'';
     const statut   = document.getElementById('sc-filtre-statut')?.value||'';
@@ -30130,7 +29539,7 @@ async function scCharger(){
     if(lbl) lbl.textContent = `${nb} session${nb!==1?'s':''}`;
 
     if(!nb){
-      if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:rgba(255,255,255,.3);padding:24px">Aucune session</td></tr>';
+      if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:24px">Aucune session</td></tr>';
       return;
     }
 
@@ -30175,7 +29584,7 @@ async function scCharger(){
 
   } catch(e){
     const tbody = document.getElementById('sc-tbody');
-    if(tbody) tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur'}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#f87171;padding:20px">${e.message||'Erreur'}</td></tr>`;
   }
 }
 
@@ -30718,7 +30127,7 @@ async function perfCharger(){
   const chart  = document.getElementById('perf-chart');
   const Gx = v => posGx(v);
   if(cards) cards.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:15px;padding:32px;text-align:center;grid-column:1/-1">Chargement…</div>';
-  if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Chargement…</td></tr>';
   if(chart) chart.innerHTML = '<div style="color:rgba(255,255,255,.2);font-size:14px;padding:16px;text-align:center">Chargement…</div>';
 
   try {
@@ -30740,7 +30149,7 @@ async function perfCharger(){
 
     if(!caissiers.length){
       if(cards) cards.innerHTML = '<div style="color:rgba(255,255,255,.3);font-size:15px;padding:32px;text-align:center;grid-column:1/-1">Aucune caissière ou administrateur actif.</div>';
-      if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Aucune donnée</td></tr>';
+      if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="color:rgba(255,255,255,.3);text-align:center;padding:24px">Aucune donnée</td></tr>';
       if(chart) chart.innerHTML = '';
       return;
     }
@@ -30845,7 +30254,7 @@ async function perfCharger(){
   } catch(e){
     var errMsg = (e && e.message) || 'Erreur chargement';
     if(cards) cards.innerHTML = '<div style="color:#f87171;padding:24px;text-align:center;grid-column:1/-1">'+errMsg+'</div>';
-    if(tbody) tbody.innerHTML = '<tr><td colspan="11" style="color:#f87171;text-align:center;padding:24px">'+errMsg+'</td></tr>';
+    if(tbody) tbody.innerHTML = '<tr><td colspan="10" style="color:#f87171;text-align:center;padding:24px">'+errMsg+'</td></tr>';
     if(chart) chart.innerHTML = '';
   }
 }
@@ -31860,7 +31269,7 @@ async function ckAchatsCharger(){
     _ckAchatsData = d.achats || [];
     ckAchatsAppliquerRecherche();
   } catch(e){
-    tbody.innerHTML = `<tr><td colspan="11" style="color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="color:#f87171;padding:20px">${e.message||'Erreur réseau'}</td></tr>`;
   }
 }
 
@@ -31888,7 +31297,7 @@ function ckAchatsAppliquerRecherche(){
 
   if(!achats.length){
     const raw = document.getElementById('ckac-recherche')?.value || '';
-    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">${raw ? `Aucun achat ne correspond à « ${esc(raw)} »` : 'Aucun achat sur cette période'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:rgba(255,255,255,.3);padding:30px">${raw ? `Aucun achat ne correspond à « ${esc(raw)} »` : 'Aucun achat sur cette période'}</td></tr>`;
     return;
   }
   tbody.innerHTML = achats.map(a=>`
@@ -34950,7 +34359,7 @@ async function loadZellePaiements(){
   await _zelleLoadBilan();
   const tbody = document.getElementById('zpay-tbody');
   if(!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:32px;">Chargement…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:32px;">Chargement…</td></tr>';
   try{
     const parts = [];
     const st  = (document.getElementById('zpay-statut')||{}).value || '';
@@ -34996,7 +34405,7 @@ async function loadZellePaiements(){
     }
 
     if(!_zelleData.length){
-      tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:40px;">Aucune transaction trouvée</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:40px;">Aucune transaction trouvée</td></tr>';
       return;
     }
 
@@ -35041,7 +34450,7 @@ async function loadZellePaiements(){
     }
     tbody.innerHTML = html;
   }catch(e){
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--danger);padding:24px;">Erreur : ' + (e.message||'inconnue') + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--danger);padding:24px;">Erreur : ' + (e.message||'inconnue') + '</td></tr>';
   }
 }
 
