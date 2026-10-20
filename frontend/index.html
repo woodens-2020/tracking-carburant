@@ -3262,6 +3262,38 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 .dep-trf-vrac summary{cursor:pointer;padding:4px 0}
 .dep-lecteur{font-size:12px;color:rgba(255,255,255,.45);white-space:nowrap}
 .dep-lecteur.actif{color:#5eead4}
+.dep-station{background:linear-gradient(180deg,rgba(45,212,191,.07),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px 16px;margin:0 0 18px;display:flex;flex-direction:column;gap:10px}
+.dep-station-haut{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.dep-seg{display:inline-flex;flex-wrap:wrap;gap:4px;background:rgba(255,255,255,.05);border-radius:12px;padding:4px}
+.dep-seg button{background:none;border:0;color:rgba(255,255,255,.62);font-weight:700;font-size:13.5px;padding:8px 14px;border-radius:9px;cursor:pointer;transition:background .15s,color .15s}
+.dep-seg button:hover{color:#fff}
+.dep-seg button.active{background:#2dd4bf;color:#03231f}
+.dep-lecteur-txt{margin-left:auto;font-size:12px;color:rgba(255,255,255,.4)}
+.dep-lecteur-txt.actif{color:#5eead4}
+.dep-champ{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:6px 6px 6px 14px;transition:border-color .15s,box-shadow .15s}
+.dep-champ:focus-within{border-color:#2dd4bf;box-shadow:0 0 0 3px rgba(45,212,191,.15)}
+.dep-champ input{flex:1;min-width:0;background:none;border:0;outline:0;color:#fff;font-size:17px;padding:9px 0;font-family:inherit}
+.dep-champ input::placeholder{color:rgba(255,255,255,.35)}
+.dep-voyant{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.22);flex-shrink:0}
+.dep-voyant.actif{background:#2dd4bf;box-shadow:0 0 0 4px rgba(45,212,191,.2)}
+.dep-champ .dep-dest{background:rgba(45,212,191,.12);border:1px solid rgba(45,212,191,.4);color:#5eead4;border-radius:9px;padding:9px 10px;font-weight:700;font-size:14px;margin:0;min-width:0}
+.dep-ico{background:rgba(255,255,255,.06);border:0;color:#fff;border-radius:9px;width:40px;height:40px;cursor:pointer;font-size:16px;flex-shrink:0}
+.dep-ico:hover{background:rgba(255,255,255,.12)}
+.dep-ok{background:#2dd4bf;color:#03231f;border:0;border-radius:9px;height:40px;padding:0 18px;font-weight:800;cursor:pointer;flex-shrink:0}
+.dep-station .dep-retour{margin:0;font-size:14px;font-weight:600;min-height:0}
+.dep-station .dep-retour:empty{display:none}
+#page-pos-depot .dep-onglets{margin:0 0 14px}
+.dep-cpt-n{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+.dep-vide-bloc{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;padding:36px 16px;border:1px dashed rgba(255,255,255,.12);border-radius:14px;color:rgba(255,255,255,.55);font-size:13.5px;margin-bottom:14px}
+.dep-vide-bloc b{color:#fff;font-size:15px}
+.dep-vide-ico{width:40px;height:40px;border-radius:50%;background:rgba(45,212,191,.12);color:#5eead4;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:6px}
+#page-pos-depot .dep-bars{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;padding:14px}
+.dep-bar-carte{display:flex;flex-direction:column;gap:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:14px 16px}
+.dep-bar-carte.encours{border-color:rgba(45,212,191,.45);background:rgba(45,212,191,.06)}
+.dep-bar-nom{font-size:16px;font-weight:800}
+.dep-bar-etat{font-size:13px;color:rgba(255,255,255,.55)}
+.dep-bar-carte .pos-btn{align-self:flex-start}
+@media(max-width:600px){.dep-champ{flex-wrap:wrap;padding:8px}.dep-champ input{flex-basis:calc(100% - 24px)}.dep-lecteur-txt{margin-left:0}}
 .dep-guide-modal{max-width:980px;width:calc(100vw - 32px);max-height:calc(100vh - 40px);overflow-y:auto}
 .dep-vide-l td{text-align:center;padding:16px!important;color:rgba(255,255,255,.35)}
 /* ── Formulaire d'achat ─────────────────────────────────────────── */
@@ -7457,69 +7489,64 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           </div>
           <div>
             <div class="pos-header-title">Dépôt Bar</div>
-            <div class="pos-header-sub">Stock central : réception des achats, mise en stock, transferts vers le Bar devant et le Bar piscine — chaque colis est suivi par son code-barres</div>
+            <div class="pos-header-sub">Stock central · transferts vers le Bar devant et le Bar piscine</div>
           </div>
           <div class="pos-header-actions">
-            <button class="pos-btn ghost" onclick="depGuide()">❔ Comment ça marche</button>
+            <button class="pos-btn ghost" onclick="depGuide()">❔ Guide</button>
             <button class="pos-btn ghost" onclick="loadPosDepot()" title="Actualiser" aria-label="Actualiser">↺</button>
           </div>
         </div>
 
-        <!-- Chiffres clés : ce qui attend une action -->
-        <div class="dep-kpis">
-          <button type="button" class="dep-kpi" onclick="depOnglet('reception')"><span class="dep-kpi-v" id="dep-k-achats">—</span><span class="dep-kpi-l">Achats à réceptionner</span></button>
-          <button type="button" class="dep-kpi" onclick="depOnglet('reception')"><span class="dep-kpi-v" id="dep-k-verif">—</span><span class="dep-kpi-l">Colis à vérifier</span></button>
-          <button type="button" class="dep-kpi" onclick="depOnglet('livraison')"><span class="dep-kpi-v" id="dep-k-depot">—</span><span class="dep-kpi-l">Colis en stock au dépôt</span></button>
-          <button type="button" class="dep-kpi" onclick="depOnglet('livraison')"><span class="dep-kpi-v dep-kpi-txt" id="dep-k-livr">—</span><span class="dep-kpi-l">Transferts en préparation</span></button>
-          <button type="button" class="dep-kpi" onclick="depOnglet('journal')"><span class="dep-kpi-v" id="dep-k-livres">—</span><span class="dep-kpi-l">Transferts validés aujourd'hui</span></button>
-        </div>
-
-        <!-- Scanner (douchette, saisie clavier ou caméra) -->
-        <div class="pos-card dep-scan-card" aria-label="Scanner un colis">
-          <div class="dep-scan-row">
-            <div class="dep-mode" role="group" aria-label="Que faire du colis scanné">
-              <button class="db-preset active" id="dep-mode-verif" onclick="depSetMode('verif')">Vérifier au dépôt</button>
-              <button class="db-preset" id="dep-mode-livr" onclick="depSetMode('livr')">Transférer vers un bar</button>
-              <button class="db-preset" id="dep-mode-fiche" onclick="depSetMode('fiche')">Consulter la fiche</button>
+        <!-- Station de scan : douchette, clavier ou caméra -->
+        <div class="dep-station" aria-label="Scanner un colis">
+          <div class="dep-station-haut">
+            <div class="dep-seg" role="group" aria-label="Que faire du colis scanné">
+              <button type="button" id="dep-mode-verif" class="active" onclick="depSetMode('verif')">✓ Vérifier au dépôt</button>
+              <button type="button" id="dep-mode-livr" onclick="depSetMode('livr')">→ Transférer vers un bar</button>
+              <button type="button" id="dep-mode-fiche" onclick="depSetMode('fiche')">🔍 Consulter la fiche</button>
             </div>
-            <select id="dep-dest-scan" class="pos-input dep-dest dep-dest-scan" hidden aria-label="Bar de destination" onchange="depChoisirDest(this.value)">
-              <option value="DEVANT">→ Bar devant</option><option value="PISCINE">→ Bar piscine</option>
-            </select>
-            <input id="dep-scan-input" class="pos-input" placeholder="Scannez ou tapez le code du colis puis Entrée"
+            <span class="dep-lecteur-txt" id="dep-lecteur-txt">Scanner externe en attente</span>
+          </div>
+          <div class="dep-champ">
+            <span class="dep-voyant" id="dep-lecteur" title="Douchette USB ou Bluetooth en mode clavier, suffixe Entrée"></span>
+            <input id="dep-scan-input" placeholder="Scannez un colis arrivé au dépôt…"
                    aria-label="Code du colis" autocomplete="off" maxlength="60" onkeydown="if(event.key==='Enter'){event.preventDefault();depScanner(this.value)}">
-            <button class="pos-btn teal" onclick="depScanner(document.getElementById('dep-scan-input').value)">Valider</button>
-            <button class="pos-btn ghost" onclick="depCamera()">📷 Caméra</button>
-            <button class="pos-btn ghost" onclick="depTesterScanner()" title="Vérifier la douchette : la prochaine lecture est affichée, rien n'est modifié">Tester le scanner</button>
+            <select id="dep-dest-scan" class="dep-dest dep-dest-scan" hidden aria-label="Bar de destination" onchange="depChoisirDest(this.value)">
+              <option value="DEVANT">Bar devant</option><option value="PISCINE">Bar piscine</option>
+            </select>
+            <button type="button" class="dep-ico" onclick="depCamera()" title="Scanner avec la caméra" aria-label="Caméra">📷</button>
+            <button type="button" class="dep-ico" onclick="depTesterScanner()" title="Tester le scanner : la prochaine lecture est affichée, rien n'est modifié" aria-label="Tester le scanner">🧪</button>
+            <button type="button" class="dep-ok" onclick="depScanner(document.getElementById('dep-scan-input').value)">Valider</button>
           </div>
-          <div class="dep-scan-pied">
-            <span class="dep-lecteur" id="dep-lecteur" title="Douchette USB ou Bluetooth en mode clavier, suffixe Entrée">⌨ Scanner externe : en attente d'une lecture</span>
-            <span id="dep-scan-retour" class="dep-retour" aria-live="polite"></span>
-            <span class="dep-mode-aide" id="dep-mode-aide"></span>
-          </div>
-          <div id="dep-camera" style="display:none;max-width:360px;margin-top:10px"></div>
+          <div id="dep-scan-retour" class="dep-retour" aria-live="polite"></div>
+          <div id="dep-camera" style="display:none;max-width:360px"></div>
         </div>
 
         <!-- Onglets -->
         <div class="dep-onglets" role="tablist" aria-label="Parties du dépôt">
-          <button type="button" role="tab" class="dep-onglet" data-t="reception" onclick="depOnglet('reception')">1 · Réception <span class="dep-cpt" id="dep-o-reception"></span></button>
-          <button type="button" role="tab" class="dep-onglet" data-t="livraison" onclick="depOnglet('livraison')">2 · Transferts vers les bars <span class="dep-cpt" id="dep-o-livraison"></span></button>
-          <button type="button" role="tab" class="dep-onglet" data-t="colis" onclick="depOnglet('colis')">3 · Colis et codes-barres</button>
-          <button type="button" role="tab" class="dep-onglet" data-t="stock" onclick="depOnglet('stock')">4 · Inventaire</button>
+          <button type="button" role="tab" class="dep-onglet" data-t="reception" onclick="depOnglet('reception')">Réception <span class="dep-cpt" id="dep-o-reception"></span></button>
+          <button type="button" role="tab" class="dep-onglet" data-t="livraison" onclick="depOnglet('livraison')">Transferts <span class="dep-cpt" id="dep-o-livraison"></span></button>
+          <button type="button" role="tab" class="dep-onglet" data-t="colis" onclick="depOnglet('colis')">Colis <span class="dep-cpt dep-cpt-n" id="dep-o-colis"></span></button>
+          <button type="button" role="tab" class="dep-onglet" data-t="stock" onclick="depOnglet('stock')">Inventaire</button>
           <button type="button" role="tab" class="dep-onglet" data-t="journal" onclick="depOnglet('journal')">Journal</button>
         </div>
 
         <!-- 1 · Réception -->
         <section class="dep-section" data-onglet="reception">
-          <div class="dep-intro">Achat arrivé → <b>Réceptionner</b> (un colis et une étiquette 2 × 1 par caisse) → scanner chaque colis en mode <b>Vérifier au dépôt</b>. Un colis non vérifié ne compte pas dans le stock.</div>
+          <div class="dep-vide-bloc" id="dep-rec-vide" hidden>
+            <div class="dep-vide-ico">✓</div>
+            <b>Rien à réceptionner</b>
+            <span>Les achats enregistrés et les colis à vérifier apparaîtront ici.</span>
+          </div>
           <div class="dep-pile">
-            <div class="pos-card">
+            <div class="pos-card" id="dep-carte-achats">
               <div class="pos-card-hdr">Achats à réceptionner <span class="dep-badge" id="dep-nb-achats">0</span></div>
               <div class="pos-table-wrap"><table class="pos-table">
                 <thead><tr><th>Achat</th><th>Produit</th><th class="tr">Quantité</th><th class="tr">Colis prévus</th><th>Fournisseur</th><th>Date</th><th></th></tr></thead>
                 <tbody id="dep-achats"></tbody>
               </table></div>
             </div>
-            <div class="pos-card">
+            <div class="pos-card" id="dep-carte-verif">
               <div class="pos-card-hdr">Colis à vérifier au dépôt <span class="dep-badge" id="dep-nb-verif">0</span>
                 <div class="dep-filtres">
                   <input id="dep-verif-cherche" class="pos-input" placeholder="Filtrer : produit ou code…" oninput="depRenderColisVerif()">
@@ -7536,12 +7563,8 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 
         <!-- 2 · Transferts dépôt → bars -->
         <section class="dep-section" data-onglet="livraison" hidden>
-          <div class="dep-intro">Sortie de stock du dépôt vers un bar : choisir le bar (<b>Bar devant</b> ou <b>Bar piscine</b>) → scanner les colis → le <b>bon de transfert</b> s'ouvre au premier scan → <b>Valider</b> : le stock passe du dépôt à ce bar. Chaque bar a son propre bon en préparation.</div>
           <div class="pos-card">
-            <div class="pos-card-hdr">Transfert vers
-              <select id="dep-dest-livr" class="pos-input dep-dest" aria-label="Bar de destination" onchange="depChoisirDest(this.value)">
-                <option value="DEVANT">Bar devant</option><option value="PISCINE">Bar piscine</option>
-              </select>
+            <div class="pos-card-hdr">Bons de transfert
               <button class="pos-btn ghost dep-btn-s" style="margin-left:auto" onclick="depManuelOuvrir()"
                 title="Seulement si des colis sont sortis du dépôt sans pouvoir être scannés (internet, scanner en panne, étiquette illisible). Motif et heure réelle obligatoires ; le code-barres devient ensuite invalide.">✍ Transfert sans scan</button>
             </div>
@@ -7561,7 +7584,6 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 
         <!-- 3 · Colis et codes-barres -->
         <section class="dep-section" data-onglet="colis" hidden>
-          <div class="dep-intro">Tous les colis. Cherchez un produit ou un code ; « Voir » affiche le code-barres, un clic sur le code ouvre la fiche.</div>
           <div class="pos-card">
             <div class="pos-card-hdr">Colis et codes-barres <span class="dep-badge" id="dep-nb-colis">0</span>
               <div class="dep-filtres">
@@ -7586,11 +7608,10 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 
         <!-- 4 · Inventaire -->
         <section class="dep-section" data-onglet="stock" hidden>
-          <div class="dep-intro">Corriger le stock après un comptage réel. Stock complet de tous les lieux avec valeurs et alertes :
-            <button type="button" class="sx-link" onclick="goTo('pos-stock')">ouvrir Stock Bar</button></div>
           <div class="pos-card">
-            <div class="pos-card-hdr">Inventaire physique</div>
-            <div class="dep-note">1. Choisissez le lieu compté. 2. Saisissez la quantité réellement comptée pour chaque produit vérifié (laissez vide les autres). 3. Indiquez le motif, puis enregistrez : l'écart avec le stock calculé est corrigé et gardé.</div>
+            <div class="pos-card-hdr">Inventaire physique
+              <button type="button" class="sx-link" style="margin-left:auto" onclick="goTo('pos-stock')">Stock de tous les lieux →</button></div>
+            <div class="dep-note">Choisissez le lieu, saisissez seulement les quantités comptées, puis le motif : l'écart est corrigé et gardé.</div>
             <div class="dep-inv-barre">
               <div class="dep-inv-champ">
                 <label class="pos-label" for="dep-inv-lieu">Lieu compté</label>
@@ -7624,7 +7645,6 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 
         <!-- Journal de traçabilité -->
         <section class="dep-section" data-onglet="journal" hidden>
-          <div class="dep-intro">Qui a fait quoi, quand et où. Les codes rejetés (inconnus ou falsifiés) sont en rouge ; cliquez sur un code pour ouvrir sa fiche.</div>
           <div class="pos-card">
             <div class="pos-card-hdr">Journal de traçabilité
               <select id="dep-journal-type" class="pos-input" style="margin-left:auto;max-width:240px;padding:6px 10px" onchange="depChargerJournal()">
@@ -28677,9 +28697,9 @@ document.addEventListener('keydown', e=>{
 
 function _depLecteurVu(){
   _depLecteur.nb++;
-  const v=document.getElementById('dep-lecteur'); if(!v) return;
-  v.classList.add('actif');
-  v.textContent=`⌨ Scanner externe : connecté · ${_depLecteur.nb} lecture(s) · dernière à ${new Date().toLocaleTimeString('fr-FR')}`;
+  const h=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const v=document.getElementById('dep-lecteur'); if(v){ v.classList.add('actif'); v.title=`Scanner externe connecté · ${_depLecteur.nb} lecture(s)`; }
+  const t=document.getElementById('dep-lecteur-txt'); if(t){ t.classList.add('actif'); t.textContent=`Scanner externe connecté · dernière lecture ${h}`; }
 }
 
 // Test du scanner : la prochaine lecture est seulement affichée
@@ -28754,6 +28774,7 @@ function _depKpis(rec, livs, auDepot){
   const auj=new Date().toDateString();
   set('dep-k-livres', livs.filter(l=>l.statut==='VALIDEE' && l.valide_le && new Date(l.valide_le).toDateString()===auj).length);
   set('dep-o-reception', (nA+nV) ? `${nA+nV} à traiter` : '');
+  set('dep-o-colis', auDepot.length ? `${auDepot.length} en stock` : '');
   document.querySelectorAll('.dep-kpi').forEach(k=>{
     const v=parseInt(k.querySelector('.dep-kpi-v')?.textContent)||0;
     k.classList.toggle('dep-kpi-alerte', v>0 && /vérifier|réceptionner/.test(k.textContent));
@@ -28785,15 +28806,15 @@ const _DEP_AIDE_MODE = {
 };
 function depSetMode(m, sansFocus){
   _depMode = m;
-  const aide=document.getElementById('dep-mode-aide');
-  if(aide) aide.textContent = m==='livr'
-    ? `Scannez les colis qui sortent du dépôt vers le ${_DEP_LIEUX[_depDest]} : le bon de transfert s'ouvre au premier scan.`
-    : (_DEP_AIDE_MODE[m]||'');
-  document.getElementById('dep-mode-verif').classList.toggle('active', m==='verif');
-  document.getElementById('dep-mode-livr').classList.toggle('active', m==='livr');
-  document.getElementById('dep-mode-fiche').classList.toggle('active', m==='fiche');
+  const inp=document.getElementById('dep-scan-input');
+  if(inp) inp.placeholder = {
+    verif: 'Scannez un colis arrivé au dépôt…',
+    livr:  `Scannez un colis à sortir vers le ${_DEP_LIEUX[_depDest]}…`,
+    fiche: 'Scannez un colis pour voir sa fiche…',
+  }[m] || '';
+  ['verif','livr','fiche'].forEach(k=>document.getElementById('dep-mode-'+k).classList.toggle('active', m===k));
   const ds=document.getElementById('dep-dest-scan'); if(ds){ ds.hidden = m!=='livr'; ds.value=_depDest; }
-  if(!sansFocus) document.getElementById('dep-scan-input').focus();
+  if(!sansFocus) inp.focus();
 }
 
 let _depAudio = null;
@@ -29000,6 +29021,9 @@ function depRenderReceptions(rec){
       <td class="dep-actions"><button class="pos-btn teal dep-btn-s" onclick="depReceptionner(${a.achat_id})">Réceptionner</button></td></tr>`;
   }).join('') || '<tr class="dep-vide-l"><td colspan="7">Aucun achat en attente.</td></tr>';
   depRenderColisVerif();
+  document.getElementById('dep-carte-achats').hidden = !achats.length;
+  document.getElementById('dep-carte-verif').hidden = !_depColisVerif.length;
+  document.getElementById('dep-rec-vide').hidden = !!(achats.length || _depColisVerif.length);
 }
 
 function depRenderColisVerif(){
@@ -29154,19 +29178,14 @@ async function depChangerDestination(){
 }
 
 function depRenderLivraison(){
-  const box = document.getElementById('dep-livr-courante'); if(!box) return;
-  const bars = document.getElementById('dep-bars');
-  if(bars) bars.innerHTML = ['DEVANT','PISCINE'].map(k=>{ const x=_depLivraisons[k];
-    return `<button type="button" class="dep-bar-chip ${k===_depDest?'active':''}" onclick="depChoisirDest('${k}')">
-      <b>${_DEP_LIEUX[k]}</b><span>${x?`Bon ${esc(x.numero)} · ${x.nb_lignes} colis · ${x.total_unites} unités`:'aucun transfert en préparation'}</span></button>`; }).join('');
-  const l = _depLivraison, dest = _DEP_LIEUX[_depDest];
-  box.innerHTML = !l
-    ? `<div class="dep-livr-vide">Aucun transfert en préparation vers le <b>${dest}</b>. En mode « Transférer vers un bar », le premier colis scanné ouvre le bon de transfert.
-        <div style="margin-top:10px"><button class="pos-btn teal" onclick="depNouvelleLivraison('${_depDest}')">Commencer un transfert vers le ${dest}</button></div></div>`
-    : `<div class="dep-livr-vide">Bon <b>${esc(l.numero)}</b> → <b>${esc(l.lieu_nom)}</b> · ${l.nb_lignes} colis · ${l.total_unites} unités, en préparation.
-        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="pos-btn teal" onclick="depTransfertOuvrir()">Ouvrir le bon de transfert</button>
-        </div></div>`;
+  const bars = document.getElementById('dep-bars'); if(!bars) return;
+  bars.innerHTML = ['DEVANT','PISCINE'].map(k=>{ const x=_depLivraisons[k], nom=_DEP_LIEUX[k];
+    return `<div class="dep-bar-carte ${x?'encours':''}">
+      <div><div class="dep-bar-nom">${nom}</div>
+        <div class="dep-bar-etat">${x?`Bon ${esc(x.numero)} en préparation · ${x.nb_lignes} colis · ${x.total_unites} unités`:'Aucun transfert en préparation'}</div></div>
+      <button class="pos-btn ${x?'teal':'ghost'}" onclick="depChoisirDest('${k}',true);depNouvelleLivraison('${k}')">${x?'Reprendre le bon':'Nouveau transfert'}</button>
+    </div>`; }).join('');
+  const box = document.getElementById('dep-livr-courante'); if(box) box.innerHTML = '';
 }
 
 // ── Bon de transfert (fenêtre ouverte au premier scan, remplie à chaque scan)
