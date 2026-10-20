@@ -72,19 +72,19 @@ MAX_COLIS_PAR_RECEPTION = 500
 STATUTS = {
     "A_VERIFIER":     "À vérifier au dépôt",
     "AU_DEPOT":       "Au dépôt",
-    "EN_PREPARATION": "En préparation de livraison",
-    "LIVRE":          "Déjà livré",
+    "EN_PREPARATION": "En préparation de transfert",
+    "LIVRE":          "Transféré au bar",
     "ANNULE":         "Annulé",
 }
 EVENEMENTS = {
     "CREE":              "Colis créé à la réception",
     "VERIFIE":           "Vérifié au dépôt — entré en stock",
-    "AJOUTE_LIVRAISON":  "Scanné dans une livraison",
-    "RETIRE_LIVRAISON":  "Retiré de la livraison",
-    "LIVRE":             "Livré",
-    "LIVRE_MANUEL":      "Livré sans scan (livraison manuelle)",
-    "DESTINATION":       "Destination de la livraison changée",
-    "RETOUR_DEPOT":      "Livraison annulée — retour au dépôt",
+    "AJOUTE_LIVRAISON":  "Scanné dans un bon de transfert",
+    "RETIRE_LIVRAISON":  "Retiré du bon de transfert",
+    "LIVRE":             "Transféré au bar (sortie du dépôt)",
+    "LIVRE_MANUEL":      "Transféré sans scan (transfert manuel)",
+    "DESTINATION":       "Bar de destination du transfert changé",
+    "RETOUR_DEPOT":      "Transfert annulé — remis en stock au dépôt",
     "ANNULE":            "Colis annulé",
     "CONSULTATION":      "Fiche consultée",
     "SCAN_REFUSE":       "Scan refusé",
@@ -260,15 +260,15 @@ def _etat_texte(c: BarColis) -> str:
     if c.statut == "LIVRE":
         liv = c.livraison
         quand = liv.date_reelle or liv.valide_le if liv else None
-        txt = f"déjà livré au {LIEUX.get(c.lieu, c.lieu)}"
+        txt = f"déjà transféré au {LIEUX.get(c.lieu, c.lieu)}"
         if quand:
             q = quand if quand.tzinfo else quand.replace(tzinfo=timezone.utc)
             from tz_utils import HAITI_TZ
             txt += f" le {q.astimezone(HAITI_TZ):%d/%m/%Y à %H:%M}"
         if liv and liv.mode == "MANUELLE":
-            txt += " (livraison manuelle, sans scan) — ce code n'est plus valable"
+            txt += " (transfert manuel, sans scan) — ce code n'est plus valable"
         return txt
-    return {"AU_DEPOT": "déjà vérifié au dépôt", "EN_PREPARATION": "dans une livraison en préparation",
+    return {"AU_DEPOT": "déjà vérifié au dépôt", "EN_PREPARATION": "dans un bon de transfert en préparation",
             "A_VERIFIER": "pas encore vérifié au dépôt", "ANNULE": "annulé"}.get(c.statut, c.statut)
 
 
@@ -344,7 +344,7 @@ def _livraison_dict(l: BarLivraisonInterne, details: bool = True) -> dict:
 
 
 def _fiche(db: Session, c: BarColis) -> dict:
-    """Fiche de livraison / traçabilité complète d'un colis."""
+    """Fiche de traçabilité complète d'un colis."""
     evts = (db.query(BarColisEvenement)
             .filter(BarColisEvenement.colis_id == c.id)
             .order_by(BarColisEvenement.horodatage, BarColisEvenement.id).all())
@@ -735,9 +735,9 @@ class VracIn(BaseModel):
 def _livraison_en_preparation(db: Session, livraison_id: int) -> BarLivraisonInterne:
     l = db.get(BarLivraisonInterne, livraison_id)
     if not l:
-        raise HTTPException(404, "Livraison introuvable.")
+        raise HTTPException(404, "Bon de transfert introuvable.")
     if l.statut != "PREPARATION":
-        raise HTTPException(409, f"Livraison {l.numero} déjà {l.statut.lower()}.")
+        raise HTTPException(409, f"Bon de transfert {l.numero} déjà {l.statut.lower()}.")
     return l
 
 
@@ -767,7 +767,7 @@ def creer_livraison(data: LivraisonIn, request: Request, db: Session = Depends(g
                             notes=(data.notes or "").strip()[:300] or None, cree_par_id=user.id)
     db.add(l)
     db.flush()
-    l.numero = f"LIV{now_haiti():%y%m%d}-{l.id:04d}"
+    l.numero = f"TRF{now_haiti():%y%m%d}-{l.id:04d}"
     db.commit()
     return _livraison_dict(l)
 
@@ -785,7 +785,7 @@ def lister_livraisons(statut: Optional[str] = None, db: Session = Depends(get_db
 def detail_livraison(livraison_id: int, db: Session = Depends(get_db)):
     l = db.get(BarLivraisonInterne, livraison_id)
     if not l:
-        raise HTTPException(404, "Livraison introuvable.")
+        raise HTTPException(404, "Bon de transfert introuvable.")
     return _livraison_dict(l)
 
 
@@ -797,7 +797,7 @@ def scanner_colis_livraison(livraison_id: int, data: ScanIn, db: Session = Depen
     if not _transition(db, c.id, ("AU_DEPOT",), {"statut": "EN_PREPARATION", "livraison_id": l.id}):
         db.refresh(c)
         if c.statut == "EN_PREPARATION":
-            ou = "cette livraison" if c.livraison_id == l.id else "une autre livraison"
+            ou = "ce bon de transfert" if c.livraison_id == l.id else "un autre bon de transfert"
             _refus(db, c, user.id, f"Colis {code_lisible(c.code)} déjà scanné dans {ou}.")
         if c.statut == "A_VERIFIER":
             _refus(db, c, user.id, f"Colis {code_lisible(c.code)} pas encore vérifié au dépôt : scannez-le d'abord en réception.")
@@ -824,7 +824,7 @@ def changer_destination(livraison_id: int, data: DestinationIn, db: Session = De
         return _livraison_dict(l)
     autre = _livraison_ouverte(db, lieu)
     if autre:
-        raise HTTPException(409, f"Une livraison vers le {LIEUX[lieu]} est déjà en préparation ({autre.numero}) : "
+        raise HTTPException(409, f"Un transfert vers le {LIEUX[lieu]} est déjà en préparation ({autre.numero}) : "
                                  "validez-la ou annulez-la d'abord.")
     ancien = LIEUX.get(l.lieu, l.lieu)
     l.lieu = lieu
@@ -880,7 +880,7 @@ def valider_livraison(livraison_id: int, db: Session = Depends(get_db), user=Dep
     validation (deux clics, deux postes) ne crée jamais deux transferts."""
     l = _livraison_en_preparation(db, livraison_id)
     if not l.lignes:
-        raise HTTPException(422, "La livraison est vide : scannez au moins un colis.")
+        raise HTTPException(422, "Le bon de transfert est vide : scannez au moins un colis.")
     # Contrôle du vrac : le dépôt doit encore l'avoir (hors colis étiquetés)
     besoins: dict[int, Decimal] = {}
     for x in l.lignes:
@@ -904,7 +904,7 @@ def valider_livraison(livraison_id: int, db: Session = Depends(get_db), user=Dep
     dest = LIEUX[l.lieu]
     for x in l.lignes:
         ref = f"colis {code_lisible(x.colis.code)}" if x.colis else "vrac"
-        motif = f"Livraison {l.numero} — {ref} → {dest}"
+        motif = f"Transfert {l.numero} — {ref} → {dest}"
         db.add(BarMouvementStock(produit_id=x.produit_id, type_mouvement="TRANSFERT",
                                  quantite=-Decimal(str(x.quantite)), lieu=None,
                                  motif=motif, utilisateur_id=user.id))
@@ -914,7 +914,7 @@ def valider_livraison(livraison_id: int, db: Session = Depends(get_db), user=Dep
         if x.colis_id:
             _transition(db, x.colis_id, ("EN_PREPARATION",), {"statut": "LIVRE", "lieu": l.lieu})
             _journaliser(db, "LIVRE", x.colis, lieu=l.lieu, livraison_id=l.id, utilisateur_id=user.id,
-                         details=f"Livraison {l.numero} vers le {dest}")
+                         details=f"Transfert {l.numero} vers le {dest}")
     db.commit()
     db.refresh(l)
     return _livraison_dict(l)
@@ -970,22 +970,22 @@ def livraison_manuelle(data: LivraisonManuelleIn, db: Session = Depends(get_db),
         raise HTTPException(422, "Destination invalide : DEVANT (Bar devant) ou PISCINE (Bar piscine).")
     motif = " ".join((data.motif or "").split())
     if len(motif) < MOTIF_MANUEL_MIN:
-        raise HTTPException(422, f"Expliquez pourquoi la livraison n'a pas été scannée ({MOTIF_MANUEL_MIN} caractères minimum).")
+        raise HTTPException(422, f"Expliquez pourquoi le transfert n'a pas été scanné ({MOTIF_MANUEL_MIN} caractères minimum).")
     reelle = data.date_reelle if data.date_reelle.tzinfo else data.date_reelle.replace(tzinfo=now_haiti().tzinfo)
     maintenant = datetime.now(timezone.utc)
     if reelle > maintenant.replace(microsecond=0) + __import__("datetime").timedelta(minutes=5):
-        raise HTTPException(422, "La date de livraison ne peut pas être dans le futur.")
+        raise HTTPException(422, "La date du transfert ne peut pas être dans le futur.")
     if (maintenant - reelle).days >= DELAI_MAX_REGULARISATION_JOURS:
-        raise HTTPException(422, f"Livraison trop ancienne : régularisation possible sur {DELAI_MAX_REGULARISATION_JOURS} jours seulement. Faites un inventaire.")
+        raise HTTPException(422, f"Transfert trop ancien : régularisation possible sur {DELAI_MAX_REGULARISATION_JOURS} jours seulement. Faites un inventaire.")
     ids = list(dict.fromkeys(data.colis_ids))          # sans doublon
 
     l = BarLivraisonInterne(numero="TMP-" + uuid.uuid4().hex[:20], lieu=lieu, statut="VALIDEE",
                             cree_par_id=user.id, valide_par_id=user.id, valide_le=maintenant,
                             mode="MANUELLE", motif_manuel=motif[:255], date_reelle=reelle,
-                            notes="Livraison manuelle (sans scan)")
+                            notes="Transfert manuel (sans scan)")
     db.add(l)
     db.flush()
-    l.numero = f"LIV{now_haiti():%y%m%d}-{l.id:04d}"
+    l.numero = f"TRF{now_haiti():%y%m%d}-{l.id:04d}"
     dest = LIEUX[lieu]
     refuses = []
     for cid in ids:
@@ -999,23 +999,23 @@ def livraison_manuelle(data: LivraisonManuelleIn, db: Session = Depends(get_db),
             db.refresh(c)
             refuses.append(f"{code_lisible(c.code)} {_etat_texte(c)}")
             continue
-        motif_mv = f"Livraison manuelle {l.numero} — colis {code_lisible(c.code)} → {dest}"
+        motif_mv = f"Transfert manuel {l.numero} — colis {code_lisible(c.code)} → {dest}"
         if etait_a_verifier:
             # Jamais vérifié au dépôt : il y entre puis en ressort aussitôt
             db.add(BarMouvementStock(produit_id=c.produit_id, type_mouvement="ENTREE", quantite=c.quantite,
                                      lieu=None, motif=f"Colis {code_lisible(c.code)} reçu sans scan ({motif[:120]})",
                                      utilisateur_id=user.id))
-            _journaliser(db, "VERIFIE", c, utilisateur_id=user.id, details="Sans scan — livraison manuelle")
+            _journaliser(db, "VERIFIE", c, utilisateur_id=user.id, details="Sans scan — transfert manuel")
         db.add(BarMouvementStock(produit_id=c.produit_id, type_mouvement="TRANSFERT",
                                  quantite=-Decimal(str(c.quantite)), lieu=None, motif=motif_mv, utilisateur_id=user.id))
         db.add(BarMouvementStock(produit_id=c.produit_id, type_mouvement="TRANSFERT",
                                  quantite=Decimal(str(c.quantite)), lieu=lieu, motif=motif_mv, utilisateur_id=user.id))
         db.add(BarLivraisonLigne(livraison_id=l.id, produit_id=c.produit_id, colis_id=c.id, quantite=c.quantite))
         _journaliser(db, "LIVRE_MANUEL", c, lieu=lieu, livraison_id=l.id, utilisateur_id=user.id,
-                     details=f"Livré le {reelle.astimezone(now_haiti().tzinfo):%d/%m/%Y %H:%M} · motif : {motif}"[:300])
+                     details=f"Transféré le {reelle.astimezone(now_haiti().tzinfo):%d/%m/%Y %H:%M} · motif : {motif}"[:300])
     if refuses:
         db.rollback()          # tout ou rien : aucune livraison partielle
-        raise HTTPException(409, "Livraison manuelle refusée, aucun colis n'a été livré : " + " ; ".join(refuses[:10]))
+        raise HTTPException(409, "Transfert manuel refusé, aucun colis n'a quitté le dépôt : " + " ; ".join(refuses[:10]))
     db.commit()
     db.refresh(l)
     return _livraison_dict(l)

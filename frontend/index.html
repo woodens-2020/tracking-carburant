@@ -3250,6 +3250,18 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 .dep-cb-grand .dep-cb{height:110px;width:100%;max-width:460px;margin:0 auto;border-radius:0}
 .dep-cb-grand .dep-cb-txt{color:#000;font:700 18px ui-monospace,Consolas,monospace;letter-spacing:.06em;margin-top:6px}
 .dep-cb-info{font-size:14px;color:rgba(255,255,255,.75)}
+.dep-trf-num{font-size:13px;font-weight:600;color:rgba(255,255,255,.5);margin-left:6px}
+.dep-trf-etat{border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:15px;font-weight:700;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35);color:#bfdbfe}
+.dep-trf-etat.ok{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.5);color:#86efac}
+.dep-trf-etat.err{background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.5);color:#fca5a5}
+.dep-trf-etat.flash{animation:depFlash .45s ease-out}
+@keyframes depFlash{from{transform:scale(1.02);filter:brightness(1.5)}to{transform:none;filter:none}}
+.dep-trf-liste{max-height:300px;overflow-y:auto}
+.dep-trf-liste tr.nouveau td{background:rgba(34,197,94,.1)}
+.dep-trf-vrac{margin-top:8px;font-size:13px;color:rgba(255,255,255,.6)}
+.dep-trf-vrac summary{cursor:pointer;padding:4px 0}
+.dep-lecteur{font-size:12px;color:rgba(255,255,255,.45);white-space:nowrap}
+.dep-lecteur.actif{color:#5eead4}
 .dep-guide-modal{max-width:980px;width:calc(100vw - 32px);max-height:calc(100vh - 40px);overflow-y:auto}
 .dep-vide-l td{text-align:center;padding:16px!important;color:rgba(255,255,255,.35)}
 /* ── Formulaire d'achat ─────────────────────────────────────────── */
@@ -7434,7 +7446,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
     </div><!-- /page-pos-stock -->
 
     <!-- ══════════════════════════════════════════════════════ -->
-    <!-- PAGE POS — DÉPÔT BAR (réception → dépôt → livraison)    -->
+    <!-- PAGE POS — DÉPÔT BAR (réception → dépôt → transfert vers les bars)    -->
     <!-- ══════════════════════════════════════════════════════ -->
     <div id="page-pos-depot" class="page page-gi">
       <div class="pos-page gi-page">
@@ -7445,7 +7457,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           </div>
           <div>
             <div class="pos-header-title">Dépôt Bar</div>
-            <div class="pos-header-sub">La marchandise arrive au dépôt, puis part vers le Bar devant ou le Bar piscine — chaque colis est suivi par son code-barres</div>
+            <div class="pos-header-sub">Stock central : réception des achats, mise en stock, transferts vers le Bar devant et le Bar piscine — chaque colis est suivi par son code-barres</div>
           </div>
           <div class="pos-header-actions">
             <button class="pos-btn ghost" onclick="depGuide()">❔ Comment ça marche</button>
@@ -7457,9 +7469,9 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
         <div class="dep-kpis">
           <button type="button" class="dep-kpi" onclick="depOnglet('reception')"><span class="dep-kpi-v" id="dep-k-achats">—</span><span class="dep-kpi-l">Achats à réceptionner</span></button>
           <button type="button" class="dep-kpi" onclick="depOnglet('reception')"><span class="dep-kpi-v" id="dep-k-verif">—</span><span class="dep-kpi-l">Colis à vérifier</span></button>
-          <button type="button" class="dep-kpi" onclick="depOnglet('livraison')"><span class="dep-kpi-v" id="dep-k-depot">—</span><span class="dep-kpi-l">Colis au dépôt, prêts à livrer</span></button>
-          <button type="button" class="dep-kpi" onclick="depOnglet('livraison')"><span class="dep-kpi-v dep-kpi-txt" id="dep-k-livr">—</span><span class="dep-kpi-l">Livraison en cours</span></button>
-          <button type="button" class="dep-kpi" onclick="depOnglet('journal')"><span class="dep-kpi-v" id="dep-k-livres">—</span><span class="dep-kpi-l">Livraisons validées aujourd'hui</span></button>
+          <button type="button" class="dep-kpi" onclick="depOnglet('livraison')"><span class="dep-kpi-v" id="dep-k-depot">—</span><span class="dep-kpi-l">Colis en stock au dépôt</span></button>
+          <button type="button" class="dep-kpi" onclick="depOnglet('livraison')"><span class="dep-kpi-v dep-kpi-txt" id="dep-k-livr">—</span><span class="dep-kpi-l">Transferts en préparation</span></button>
+          <button type="button" class="dep-kpi" onclick="depOnglet('journal')"><span class="dep-kpi-v" id="dep-k-livres">—</span><span class="dep-kpi-l">Transferts validés aujourd'hui</span></button>
         </div>
 
         <!-- Scanner (douchette, saisie clavier ou caméra) -->
@@ -7467,7 +7479,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           <div class="dep-scan-row">
             <div class="dep-mode" role="group" aria-label="Que faire du colis scanné">
               <button class="db-preset active" id="dep-mode-verif" onclick="depSetMode('verif')">Vérifier au dépôt</button>
-              <button class="db-preset" id="dep-mode-livr" onclick="depSetMode('livr')">Ajouter à la livraison</button>
+              <button class="db-preset" id="dep-mode-livr" onclick="depSetMode('livr')">Transférer vers un bar</button>
               <button class="db-preset" id="dep-mode-fiche" onclick="depSetMode('fiche')">Consulter la fiche</button>
             </div>
             <select id="dep-dest-scan" class="pos-input dep-dest dep-dest-scan" hidden aria-label="Bar de destination" onchange="depChoisirDest(this.value)">
@@ -7477,8 +7489,10 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
                    aria-label="Code du colis" autocomplete="off" maxlength="60" onkeydown="if(event.key==='Enter'){event.preventDefault();depScanner(this.value)}">
             <button class="pos-btn teal" onclick="depScanner(document.getElementById('dep-scan-input').value)">Valider</button>
             <button class="pos-btn ghost" onclick="depCamera()">📷 Caméra</button>
+            <button class="pos-btn ghost" onclick="depTesterScanner()" title="Vérifier la douchette : la prochaine lecture est affichée, rien n'est modifié">Tester le scanner</button>
           </div>
           <div class="dep-scan-pied">
+            <span class="dep-lecteur" id="dep-lecteur" title="Douchette USB ou Bluetooth en mode clavier, suffixe Entrée">⌨ Scanner externe : en attente d'une lecture</span>
             <span id="dep-scan-retour" class="dep-retour" aria-live="polite"></span>
             <span class="dep-mode-aide" id="dep-mode-aide"></span>
           </div>
@@ -7488,7 +7502,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
         <!-- Onglets -->
         <div class="dep-onglets" role="tablist" aria-label="Parties du dépôt">
           <button type="button" role="tab" class="dep-onglet" data-t="reception" onclick="depOnglet('reception')">1 · Réception <span class="dep-cpt" id="dep-o-reception"></span></button>
-          <button type="button" role="tab" class="dep-onglet" data-t="livraison" onclick="depOnglet('livraison')">2 · Livraison vers un bar <span class="dep-cpt" id="dep-o-livraison"></span></button>
+          <button type="button" role="tab" class="dep-onglet" data-t="livraison" onclick="depOnglet('livraison')">2 · Transferts vers les bars <span class="dep-cpt" id="dep-o-livraison"></span></button>
           <button type="button" role="tab" class="dep-onglet" data-t="colis" onclick="depOnglet('colis')">3 · Colis et codes-barres</button>
           <button type="button" role="tab" class="dep-onglet" data-t="stock" onclick="depOnglet('stock')">4 · Inventaire</button>
           <button type="button" role="tab" class="dep-onglet" data-t="journal" onclick="depOnglet('journal')">Journal</button>
@@ -7520,22 +7534,22 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           </div>
         </section>
 
-        <!-- 2 · Livraison -->
+        <!-- 2 · Transferts dépôt → bars -->
         <section class="dep-section" data-onglet="livraison" hidden>
-          <div class="dep-intro">Choisir le bar (<b>Bar devant</b> ou <b>Bar piscine</b>) → scanner les colis chargés (la livraison s'ouvre au premier scan) → <b>Valider</b> : le stock passe du dépôt à ce bar. Chaque bar a sa propre livraison en cours.</div>
+          <div class="dep-intro">Sortie de stock du dépôt vers un bar : choisir le bar (<b>Bar devant</b> ou <b>Bar piscine</b>) → scanner les colis → le <b>bon de transfert</b> s'ouvre au premier scan → <b>Valider</b> : le stock passe du dépôt à ce bar. Chaque bar a son propre bon en préparation.</div>
           <div class="pos-card">
-            <div class="pos-card-hdr">Livraison vers
+            <div class="pos-card-hdr">Transfert vers
               <select id="dep-dest-livr" class="pos-input dep-dest" aria-label="Bar de destination" onchange="depChoisirDest(this.value)">
                 <option value="DEVANT">Bar devant</option><option value="PISCINE">Bar piscine</option>
               </select>
               <button class="pos-btn ghost dep-btn-s" style="margin-left:auto" onclick="depManuelOuvrir()"
-                title="Seulement si les colis ont été livrés sans pouvoir être scannés (internet, scanner en panne, étiquette illisible). Motif et heure réelle obligatoires ; le code-barres devient ensuite invalide.">✍ Livraison sans scan</button>
+                title="Seulement si des colis sont sortis du dépôt sans pouvoir être scannés (internet, scanner en panne, étiquette illisible). Motif et heure réelle obligatoires ; le code-barres devient ensuite invalide.">✍ Transfert sans scan</button>
             </div>
             <div class="dep-bars" id="dep-bars"></div>
             <div id="dep-livr-courante"></div>
           </div>
           <div class="pos-card">
-            <div class="pos-card-hdr">Livraisons récentes</div>
+            <div class="pos-card-hdr">Historique des transferts</div>
             <div class="pos-table-wrap">
               <table class="pos-table">
                 <thead><tr><th>N°</th><th>Destination</th><th>Statut</th><th class="tr">Lignes</th><th class="tr">Unités</th><th>Validée par</th><th>Date</th></tr></thead>
@@ -7557,10 +7571,10 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
                   <option value="A_VERIFIER">À vérifier</option>
                   <option value="AU_DEPOT">Au dépôt</option>
                   <option value="EN_PREPARATION">En préparation</option>
-                  <option value="LIVRE">Livrés</option>
+                  <option value="LIVRE">Transférés aux bars</option>
                   <option value="ANNULE">Retirés</option>
                 </select>
-                <button class="pos-btn ghost dep-btn-s" onclick="depImprimerAffiches()" title="Étiquettes 2 × 1 des colis affichés (hors livrés et retirés)">🖨 Imprimer la sélection</button>
+                <button class="pos-btn ghost dep-btn-s" onclick="depImprimerAffiches()" title="Étiquettes 2 × 1 des colis affichés (hors transférés et retirés)">🖨 Imprimer la sélection</button>
               </div>
             </div>
             <div class="pos-table-wrap"><table class="pos-table">
@@ -7615,8 +7629,8 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
             <div class="pos-card-hdr">Journal de traçabilité
               <select id="dep-journal-type" class="pos-input" style="margin-left:auto;max-width:240px;padding:6px 10px" onchange="depChargerJournal()">
                 <option value="">Tous les événements</option>
-                <option value="LIVRE">Livraisons par scan</option>
-                <option value="LIVRE_MANUEL">Livraisons manuelles (sans scan)</option>
+                <option value="LIVRE">Transferts par scan</option>
+                <option value="LIVRE_MANUEL">Transferts manuels (sans scan)</option>
                 <option value="VERIFIE">Vérifications au dépôt</option>
                 <option value="REJET">Codes rejetés (sécurité)</option>
                 <option value="SCAN_REFUSE">Scans refusés</option>
@@ -7635,11 +7649,58 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
     </div><!-- /page-pos-depot -->
 
 
-    <!-- Livraison manuelle (sans scan) -->
+    <!-- Bon de transfert dépôt → bar (rempli par les scans) -->
+    <div class="pos-modal-bg" id="dep-trf-bg" onclick="if(event.target===this)depTransfertFermer()">
+      <div class="pos-modal dep-manuel dep-trf" role="dialog" aria-labelledby="dep-trf-titre">
+        <div class="df-tete">
+          <h3 id="dep-trf-titre">Bon de transfert dépôt → bar <span class="dep-trf-num" id="dep-trf-num"></span></h3>
+          <button type="button" onclick="depTransfertFermer()" aria-label="Fermer" class="df-fermer">✕</button>
+        </div>
+        <div class="dep-trf-etat" id="dep-trf-etat" aria-live="polite">⌨ Scanner prêt : scannez les colis qui sortent du dépôt.</div>
+
+        <div class="pa-etape">
+          <div class="pa-etape-t"><span>1</span> Bar de destination</div>
+          <div class="pa-modes" role="group" aria-label="Bar de destination">
+            <button type="button" class="pa-mode" data-lieu="DEVANT" onclick="depChoisirDest('DEVANT',true);depTransfertRender()">Bar devant</button>
+            <button type="button" class="pa-mode" data-lieu="PISCINE" onclick="depChoisirDest('PISCINE',true);depTransfertRender()">Bar piscine</button>
+          </div>
+          <div class="pa-aide" id="dep-trf-dest-aide"></div>
+        </div>
+
+        <div class="pa-etape">
+          <div class="pa-etape-t"><span>2</span> Colis scannés <span class="dep-badge" id="dep-trf-nb">0</span></div>
+          <div class="dep-scan-row">
+            <input id="dep-trf-code" class="pos-input" placeholder="Code illisible au scanner ? Tapez-le ici puis Entrée" maxlength="60" autocomplete="off"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();const v=this.value;this.value='';depScanner(v)}">
+          </div>
+          <div class="pos-table-wrap dep-trf-liste"><table class="pos-table">
+            <thead><tr><th>#</th><th>Code</th><th>Produit</th><th class="tr">Quantité</th><th></th></tr></thead>
+            <tbody id="dep-trf-lignes"></tbody>
+          </table></div>
+          <details class="dep-trf-vrac">
+            <summary>Ajouter du stock sans étiquette (vrac)</summary>
+            <div class="dep-scan-row">
+              <select id="dep-vrac-produit" class="pos-input" style="max-width:300px"></select>
+              <input id="dep-vrac-qte" type="number" min="1" step="1" class="pos-input" style="max-width:110px" placeholder="Qté">
+              <button class="pos-btn ghost" onclick="depAjouterVrac()">Ajouter</button>
+            </div>
+          </details>
+        </div>
+
+        <div class="pa-recap" id="dep-trf-recap"></div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" id="dep-trf-annuler" onclick="depAnnulerLivraison()">Annuler le transfert</button>
+          <button class="pos-btn ghost" onclick="depTransfertFermer()" title="Le bon reste en préparation ; vous pourrez le reprendre">Garder en attente</button>
+          <button class="pos-btn teal" id="dep-trf-valider" onclick="depValiderLivraison()">Valider le transfert</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transfert manuel (sans scan) -->
     <div class="pos-modal-bg" id="dep-manuel-bg" onclick="if(event.target===this)depManuelFermer()">
       <div class="pos-modal dep-manuel" role="dialog" aria-labelledby="dep-manuel-titre">
         <div class="df-tete">
-          <h3 id="dep-manuel-titre">Livraison manuelle (sans scan)</h3>
+          <h3 id="dep-manuel-titre">Transfert manuel (sans scan)</h3>
           <button type="button" onclick="depManuelFermer()" aria-label="Fermer" class="df-fermer">✕</button>
         </div>
         <div class="dep-manuel-alerte">Cette procédure remplace le scan. Elle est enregistrée à votre nom avec le motif. Les codes des colis choisis ne seront plus valables.</div>
@@ -7648,14 +7709,14 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           <div class="pa-etape-t"><span>1</span> Où et quand</div>
           <div class="pos-form-row">
             <div style="flex:1">
-              <label class="pos-label">Livré au *</label>
+              <label class="pos-label">Transféré au *</label>
               <div class="pa-modes" role="group" aria-label="Destination">
                 <button type="button" class="pa-mode" data-lieu="DEVANT" onclick="depManuelLieu('DEVANT')">Bar devant</button>
                 <button type="button" class="pa-mode" data-lieu="PISCINE" onclick="depManuelLieu('PISCINE')">Bar piscine</button>
               </div>
             </div>
             <div style="flex:1">
-              <label class="pos-label" for="dep-manuel-date">Date et heure réelles de la livraison *</label>
+              <label class="pos-label" for="dep-manuel-date">Date et heure réelles du transfert *</label>
               <input type="datetime-local" class="pos-input" id="dep-manuel-date">
               <div class="pa-aide">Pas dans le futur, 7 jours au plus.</div>
             </div>
@@ -7672,7 +7733,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
                 <option>Coupure internet</option>
                 <option>Scanner ou téléphone en panne</option>
                 <option>Étiquette illisible ou abîmée</option>
-                <option>Livraison urgente au bar</option>
+                <option>Réapprovisionnement urgent du bar</option>
                 <option>Autre</option>
               </select>
             </div>
@@ -7684,7 +7745,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
         </div>
 
         <div class="pa-etape">
-          <div class="pa-etape-t"><span>3</span> Colis livrés</div>
+          <div class="pa-etape-t"><span>3</span> Colis sortis du dépôt</div>
           <div class="pos-form-row">
             <div style="flex:2">
               <input class="pos-input" id="dep-manuel-cherche" placeholder="Rechercher un produit ou un code…" oninput="depManuelRender()">
@@ -7701,7 +7762,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
         <div class="pa-recap" id="dep-manuel-recap"></div>
         <div class="pos-modal-footer">
           <button class="pos-btn ghost" onclick="depManuelFermer()">Annuler</button>
-          <button class="pos-btn teal" onclick="depManuelValider()">Enregistrer la livraison manuelle</button>
+          <button class="pos-btn teal" onclick="depManuelValider()">Enregistrer le transfert manuel</button>
         </div>
       </div>
     </div>
@@ -7736,9 +7797,12 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
             <div class="dep-guide-c"><b>2 · Vérification au dépôt</b>
               <p>On scanne chaque colis rangé au dépôt. Ce scan prouve qu'il est bien arrivé : son contenu entre alors dans le <em>stock du dépôt</em>. Un colis non scanné n'est pas en stock.</p>
               <p class="dep-guide-qui">Scanner en mode « Vérifier au dépôt »</p></div>
-            <div class="dep-guide-c"><b>3 · Livraison vers un bar</b>
-              <p>On choisit le bar (Bar devant ou Bar piscine) dans la liste, on scanne les colis chargés, puis on <em>valide</em> : le stock passe du dépôt à ce bar. Chaque bar a sa propre livraison en cours. C'est la seule façon d'alimenter un bar.</p>
-              <p class="dep-guide-qui">Onglet Livraison · scanner en mode « Ajouter à la livraison »</p></div>
+            <div class="dep-guide-c"><b>3 · Transfert vers un bar</b>
+              <p>Sortie de stock du dépôt vers le Bar devant ou le Bar piscine. On choisit le bar, on scanne les colis : le <em>bon de transfert</em> s'ouvre au premier scan et se remplit à chaque scan. On <em>valide</em> : le stock passe du dépôt au bar. C'est la seule façon d'approvisionner un bar.</p>
+              <p class="dep-guide-qui">Mode « Transférer vers un bar » · onglet Transferts</p></div>
+            <div class="dep-guide-c"><b>Scanner externe (douchette)</b>
+              <p>Brancher la douchette en USB ou Bluetooth, en mode <em>clavier</em> (HID), avec le suffixe <em>Entrée</em> et le Code 128 activé. Sur cette page, elle fonctionne partout : inutile de cliquer dans le champ. Le bouton « Tester le scanner » vérifie la lecture sans rien modifier.</p>
+              <p class="dep-guide-qui">Voyant « Scanner externe » sous le champ de scan</p></div>
             <div class="dep-guide-c"><b>4 · Inventaire</b>
               <p>Le stock de chaque lieu se calcule tout seul. Si le comptage réel diffère (casse, erreur), on fait un <em>inventaire</em> : l'écart est corrigé et gardé avec son motif.</p>
               <p class="dep-guide-qui">Onglet Inventaire</p></div>
@@ -7746,20 +7810,20 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
               <p>La liste de tous les colis avec leur code-barres : cherchez un produit ou un code, ouvrez sa fiche ou réimprimez son étiquette.</p>
               <p class="dep-guide-qui">Onglet Colis et codes-barres</p></div>
             <div class="dep-guide-c"><b>Fiche et journal</b>
-              <p>Scanner un colis en mode « Consulter la fiche » montre où il est, qui l'a livré et quand. Le journal garde chaque étape, avec date, heure et personne, ainsi que les codes rejetés.</p>
+              <p>Scanner un colis en mode « Consulter la fiche » montre où il est, vers quel bar il a été transféré, par qui et quand. Le journal garde chaque étape, avec date, heure et personne, ainsi que les codes rejetés.</p>
               <p class="dep-guide-qui">Mode « Consulter la fiche » · onglet Journal</p></div>
             <div class="dep-guide-c"><b>États d'un colis</b>
               <p><span class="dep-st st-verif">À vérifier</span> créé, pas encore scanné au dépôt<br>
                  <span class="dep-st st-depot">Au dépôt</span> en stock au dépôt<br>
-                 <span class="dep-st st-prep">En préparation</span> dans une livraison pas encore validée<br>
-                 <span class="dep-st st-livre">Livré</span> en stock au bar de destination</p></div>
+                 <span class="dep-st st-prep">En préparation</span> dans un bon de transfert pas encore validé<br>
+                 <span class="dep-st st-livre">Transféré</span> sorti du dépôt, en stock au bar</p></div>
           </div>
           <div class="dep-note" style="margin:10px 0 0">Sécurité : chaque code se termine par une clé de contrôle (ex. BC26-000123-<b>4817</b>). Un code inventé ou modifié est refusé et inscrit au journal.</div>
         <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depGuide(false)">Fermer</button></div>
       </div>
     </div>
 
-    <!-- Fiche de livraison / traçabilité d'un colis -->
+    <!-- Fiche de traçabilité d'un colis -->
     <div class="pos-modal-bg" id="dep-fiche-bg" onclick="if(event.target===this)depFermerFiche()">
       <div class="pos-modal dep-fiche" role="dialog" aria-labelledby="dep-fiche-titre">
         <div class="df-tete">
@@ -28581,6 +28645,57 @@ let _depLivraison = null;        // livraison en préparation du bar choisi
 let _depLivraisons = {DEVANT:null, PISCINE:null};   // une livraison en préparation par bar
 let _depDest = (()=>{ try{ return localStorage.getItem('dep-dest')==='PISCINE' ? 'PISCINE' : 'DEVANT'; }catch(_){ return 'DEVANT'; } })();
 let _depFile = Promise.resolve();  // scans traités un par un, dans l'ordre
+
+// Douchette USB/Bluetooth en mode clavier : elle « tape » le code très vite
+// puis Entrée (ou Tab). On reconnaît cette rafale sur toute la page Dépôt,
+// quel que soit le champ actif : le code ne s'écrit pas dans un autre champ
+// et Entrée ne déclenche pas le bouton qui a le focus.
+const _depLecteur = {buf:'', debut:0, dernier:0, el:null, val:null, nb:0};
+const _depPageDepotVisible = () => { const p=document.getElementById('page-pos-depot'); return !!(p && p.offsetParent!==null); };
+document.addEventListener('keydown', e=>{
+  if(!_depPageDepotVisible() || e.ctrlKey || e.altKey || e.metaKey) return;
+  const L=_depLecteur, t=performance.now();
+  if(e.key==='Enter' || e.key==='Tab'){
+    const b=L.buf, n=b.length; L.buf='';
+    // Rafale rapide (douchette : < 50 ms entre les caractères), ou un peu plus
+    // lente (douchette Bluetooth) mais au format d'un code colis.
+    const moy=(L.dernier-L.debut)/Math.max(n-1,1), estCode=/^(BC[\d-]{8,}|.*\/colis\/.+)$/i.test(b);
+    if(n>=6 && t-L.dernier < 150 && (moy < 50 || (moy < 90 && estCode))){
+      e.preventDefault(); e.stopPropagation();
+      const el=L.el;
+      if(el && el.tagName==='SELECT'){ if(el.value!==L.val){ el.value=L.val; } }
+      else if(el && typeof el.value==='string' && el.value.endsWith(b)) el.value=el.value.slice(0,-n);
+      L.duree=Math.round(L.dernier-L.debut);
+      depScanner(b, true);
+    }
+    return;
+  }
+  if(e.key.length!==1) return;
+  if(t-L.dernier > 150 || !L.buf){ L.buf=''; L.debut=t; L.el=document.activeElement; L.val=L.el && L.el.value; }
+  L.buf+=e.key; L.dernier=t;
+}, true);
+
+function _depLecteurVu(){
+  _depLecteur.nb++;
+  const v=document.getElementById('dep-lecteur'); if(!v) return;
+  v.classList.add('actif');
+  v.textContent=`⌨ Scanner externe : connecté · ${_depLecteur.nb} lecture(s) · dernière à ${new Date().toLocaleTimeString('fr-FR')}`;
+}
+
+// Test du scanner : la prochaine lecture est seulement affichée
+let _depTest = false;
+function depTesterScanner(){
+  _depTest = true;
+  _depRetour('Test du scanner : scannez une étiquette (rien ne sera modifié)…', true);
+  document.getElementById('dep-scan-input').focus();
+}
+function _depResultatTest(code, externe){
+  _depTest = false;
+  const formatOk = /^BC\d{8}(\d{4})?$/i.test(code.replace(/[\s-]/g,'')) || /\/colis\//i.test(code);
+  _depRetour(`Test : lu « ${code} » (${code.length} caractères${externe?`, en ${_depLecteur.duree||0} ms — scanner externe reconnu ✓`:' — saisie au clavier ou caméra'}) · `
+    + (formatOk ? 'format de code colis ✓' : 'ce n\'est pas un code colis du dépôt ✗ (vérifiez que le Code 128 est activé et le suffixe Entrée)'), formatOk);
+  _depBip(formatOk);
+}
 let _depStock = [];
 let _depCamera = null;
 
@@ -28614,8 +28729,9 @@ async function _depCharger(){
     }
     _depLivraison = _depLivraisons[_depDest];
     depRenderLivraison();
+    if(_depTrfOuvert()) depTransfertRender();
     const resume = ['DEVANT','PISCINE'].filter(k=>_depLivraisons[k]).map(k=>`${k==='DEVANT'?'Devant':'Piscine'} : ${_depLivraisons[k].nb_lignes} colis`);
-    const nl=document.getElementById('dep-k-livr'); if(nl) nl.textContent = resume.length ? resume.join(' · ') : 'Aucune';
+    const nl=document.getElementById('dep-k-livr'); if(nl) nl.textContent = resume.length ? resume.join(' · ') : 'Aucun';
     const ol=document.getElementById('dep-o-livraison'); if(ol) ol.textContent = resume.length ? `${resume.length} en cours` : '';
   }catch(e){ posAlert(e.message||'Erreur de chargement du dépôt.'); }
 }
@@ -28664,14 +28780,14 @@ function depGuide(afficher){
 
 const _DEP_AIDE_MODE = {
   verif: "Scannez chaque colis qui arrive au dépôt : son contenu entre dans le stock du dépôt.",
-  livr:  "Scannez les colis à charger : ils s'ajoutent à la livraison vers le bar choisi dans la liste.",
-  fiche: "Scannez un colis pour voir sa fiche : où il est, qui l'a livré et quand. Rien n'est modifié.",
+  livr:  "Scannez les colis qui sortent du dépôt : ils s'ajoutent au bon de transfert du bar choisi.",
+  fiche: "Scannez un colis pour voir sa fiche : où il est, vers quel bar il a été transféré, par qui et quand. Rien n'est modifié.",
 };
 function depSetMode(m, sansFocus){
   _depMode = m;
   const aide=document.getElementById('dep-mode-aide');
   if(aide) aide.textContent = m==='livr'
-    ? `Scannez les colis à charger pour le ${_DEP_LIEUX[_depDest]} (changez de bar dans la liste).`
+    ? `Scannez les colis qui sortent du dépôt vers le ${_DEP_LIEUX[_depDest]} : le bon de transfert s'ouvre au premier scan.`
     : (_DEP_AIDE_MODE[m]||'');
   document.getElementById('dep-mode-verif').classList.toggle('active', m==='verif');
   document.getElementById('dep-mode-livr').classList.toggle('active', m==='livr');
@@ -28694,16 +28810,32 @@ function _depRetour(msg, ok){
   const el = document.getElementById('dep-scan-retour');
   el.className = 'dep-retour ' + (ok ? 'ok' : 'err');
   el.textContent = msg;
+  const t = document.getElementById('dep-trf-etat');
+  if(t && _depTrfOuvert()){
+    t.className = 'dep-trf-etat ' + (ok ? 'ok' : 'err');
+    void t.offsetWidth; t.classList.add('flash');
+    t.textContent = msg;
+  }
 }
 
-function depScanner(valeur){
+function depScanner(valeur, externe){
   const inp = document.getElementById('dep-scan-input');
   const code = (valeur||'').trim();
   if(!code) return;
   inp.value = '';
-  inp.focus();
+  if(externe) _depLecteurVu();
+  if(_depTest){ _depResultatTest(code, externe); return; }
+  // Fenêtre de transfert manuel ouverte : le scan ajoute le colis à la liste
+  if(_depManuelOuvert()){
+    document.getElementById('dep-manuel-code').value = code;
+    depManuelAjouterCode();
+    return;
+  }
+  // Bon de transfert ouvert : tout scan va dans ce bon
+  const mode = _depTrfOuvert() ? 'livr' : _depMode;
+  if(!_depTrfOuvert()) inp.focus();
   // Une douchette peut envoyer plusieurs codes très vite : traitement un par un, dans l'ordre
-  _depFile = _depFile.then(()=>_depTraiterScan(code, _depMode, _depDest)).catch(()=>{});
+  _depFile = _depFile.then(()=>_depTraiterScan(code, mode, _depDest)).catch(()=>{});
 }
 
 async function _depTraiterScan(code, mode, dest){
@@ -28725,8 +28857,11 @@ async function _depTraiterScan(code, mode, dest){
       const r = await apiFetch('POST',`/pos/depot/livraisons/${l.id}/scan`,{code});
       _depLivraisons[dest] = r;
       if(dest===_depDest) _depLivraison = r;
-      _depRetour(`✓ ${r.colis_scanne.code_lisible} — ${r.colis_scanne.produit_nom} → ${r.lieu_nom} (livraison ${r.numero} : ${r.nb_lignes} colis)`, true);
+      _depDernierScan = r.colis_scanne.id;
+      if(!_depTrfOuvert()) depTransfertOuvrir();
+      _depRetour(`✓ ${r.colis_scanne.code_lisible} — ${r.colis_scanne.produit_nom} (${r.colis_scanne.quantite} ${r.colis_scanne.unite||'u.'}) ajouté au bon ${r.numero} → ${r.lieu_nom}`, true);
       depRenderLivraison();
+      depTransfertRender();
     }
     _depBip(true);
     await _depCharger();
@@ -28734,9 +28869,9 @@ async function _depTraiterScan(code, mode, dest){
     _depBip(false);
     let msg = String(e.message||'Scan refusé').replace(/^\[\d+\]\s*/,'').replace(/\.\s*$/,'');
     if(mode==='verif' && e.detail && e.detail.statut==='AU_DEPOT')
-      msg += ' — pour le livrer, passez en mode « Ajouter à la livraison ».';
+      msg += ' — pour le sortir vers un bar, passez en mode « Transférer vers un bar ».';
     if(mode==='livr' && e.detail && e.detail.statut==='A_VERIFIER')
-      msg += ' — passez en mode « Vérifier au dépôt », scannez-le, puis revenez à la livraison.';
+      msg += ' — passez en mode « Vérifier au dépôt », scannez-le, puis revenez au transfert.';
     _depRetour('✗ ' + msg, false);
     // Colis déjà livré : afficher directement sa fiche de livraison
     if(e.detail && e.detail.deja_livre && e.detail.colis_id) depOuvrirFiche(e.detail.colis_id);
@@ -28790,8 +28925,8 @@ function depAfficherFiche(f){
   document.getElementById('dep-fiche-corps').innerHTML = `
     <div class="df-statut df-${couleur}">
       <div class="df-statut-l">${esc(c.statut_libelle).toUpperCase()}</div>
-      ${livre?`<div class="df-statut-s">Livré au <b>${esc(l.lieu_nom)}</b> le ${_depDateHeure(l.date_reelle||l.valide_le)}</div>
-        ${l.mode==='MANUELLE'?`<div class="df-manuel">Livré SANS SCAN (livraison manuelle) · motif : ${esc(l.motif_manuel||'—')}<br>Enregistré le ${_depDateHeure(l.valide_le)} par ${esc(l.valide_par||'—')} · ce code n'est plus valable</div>`:''}`
+      ${livre?`<div class="df-statut-s">Transféré au <b>${esc(l.lieu_nom)}</b> le ${_depDateHeure(l.date_reelle||l.valide_le)}</div>
+        ${l.mode==='MANUELLE'?`<div class="df-manuel">Transféré SANS SCAN (transfert manuel) · motif : ${esc(l.motif_manuel||'—')}<br>Enregistré le ${_depDateHeure(l.valide_le)} par ${esc(l.valide_par||'—')} · ce code n'est plus valable</div>`:''}`
              :`<div class="df-statut-s">${c.lieu_nom?`Lieu : ${esc(c.lieu_nom)}`:'Au dépôt ou en attente'}</div>`}
     </div>
     <div class="df-grille">
@@ -28805,18 +28940,18 @@ function depAfficherFiche(f){
         ${c.verifie_le?ligne('Vérifié au dépôt', `${_depDateHeure(c.verifie_le)}${c.verifie_par?' · '+esc(c.verifie_par):''}`):''}
       </div>
       <div class="df-bloc">
-        <div class="df-titre">Livraison</div>
+        <div class="df-titre">Transfert</div>
         ${l?`
-          ${ligne('N° de livraison', esc(l.numero))}
-          ${ligne('Point de livraison', esc(l.lieu_nom))}
+          ${ligne('N° de bon de transfert', esc(l.numero))}
+          ${ligne('Bar de destination', esc(l.lieu_nom))}
           ${ligne('Statut', esc({PREPARATION:'En préparation',VALIDEE:'Validée',ANNULEE:'Annulée'}[l.statut]||l.statut))}
           ${ligne('Préparée par', esc(l.cree_par||'—'))}
           ${ligne('Mode', l.mode==='MANUELLE'?'Manuelle (sans scan)':'Par scan')}
           ${ligne('Validée par', esc(l.valide_par||'—'))}
           ${l.mode==='MANUELLE'
-            ? ligne('Livrée réellement le', _depDateHeure(l.date_reelle)) + ligne('Enregistrée le', _depDateHeure(l.valide_le)) + ligne('Motif', esc(l.motif_manuel||'—'))
+            ? ligne('Transféré réellement le', _depDateHeure(l.date_reelle)) + ligne('Enregistrée le', _depDateHeure(l.valide_le)) + ligne('Motif', esc(l.motif_manuel||'—'))
             : ligne('Date et heure', _depDateHeure(l.valide_le))}`
-        :'<div class="df-vide">Ce colis n\'a pas encore été livré.</div>'}
+        :'<div class="df-vide">Ce colis n\'est pas encore sorti du dépôt.</div>'}
       </div>
     </div>
     <div class="df-titre" style="margin-top:14px">Historique complet</div>
@@ -28827,7 +28962,7 @@ function depAfficherFiche(f){
         <div class="df-h-s">${_depDateHeure(e.horodatage)}${e.par?' · '+esc(e.par):''}${e.details&&e.type!=='LIVRE'?' · '+esc(e.details):''}</div></div>
       </li>`).join('') || '<li class="df-vide">Aucun événement enregistré.</li>'}
     </ol>`;
-  document.getElementById('dep-fiche-titre').textContent = `Fiche ${livre?'de livraison':'du colis'} — ${c.code_lisible}`;
+  document.getElementById('dep-fiche-titre').textContent = `Fiche ${livre?'de transfert':'du colis'} — ${c.code_lisible}`;
   _depFicheColisId = c.id;
   document.getElementById('dep-fiche-etiq').hidden = ['ANNULE','LIVRE'].includes(c.statut);
   document.getElementById('dep-fiche-bg').classList.add('open');
@@ -28907,7 +29042,7 @@ function depRenderColis(){
 function depImprimerAffiches(){
   const ids = _depFiltre(_depColis, document.getElementById('dep-colis-cherche')?.value)
     .filter(c=>!['LIVRE','ANNULE'].includes(c.statut)).map(c=>c.id).slice(0,500);
-  if(!ids.length){ posAlert("Aucune étiquette à imprimer (les colis livrés ou retirés n'en ont plus besoin).",'warn'); return; }
+  if(!ids.length){ posAlert("Aucune étiquette à imprimer (les colis transférés ou retirés n'en ont plus besoin).",'warn'); return; }
   _depOuvrirPdf('/api/pos/depot/etiquettes.pdf?ids='+ids.join(','));
 }
 
@@ -28997,27 +29132,24 @@ async function depEnregistrerInventaire(){
 }
 
 async function depNouvelleLivraison(lieu){
-  try{
-    const l = await apiFetch('POST','/pos/depot/livraisons',{lieu});
-    _depLivraisons[lieu] = l;
-    depOnglet('livraison');
-    depChoisirDest(lieu, true);
-    depSetMode('livr');
-    _depRetour(`Livraison ${l.numero} vers le ${_DEP_LIEUX[lieu]} : scannez les colis.`, true);
-  }catch(e){ posAlert(e.message); }
+  // Ouvre le bon de transfert du bar (créé côté serveur au premier scan s'il n'existe pas)
+  depOnglet('livraison');
+  depChoisirDest(lieu, true);
+  depSetMode('livr', true);
+  depTransfertOuvrir();
 }
 
 async function depChangerDestination(){
   const l = _depLivraison; if(!l) return;
   const autre = l.lieu==='DEVANT' ? 'PISCINE' : 'DEVANT';
-  if(!await showConfirm(`Envoyer la livraison ${l.numero} (${l.nb_lignes} colis) au ${_DEP_LIEUX[autre]} au lieu du ${l.lieu_nom} ?`,
+  if(!await showConfirm(`Envoyer le bon de transfert ${l.numero} (${l.nb_lignes} colis) au ${_DEP_LIEUX[autre]} au lieu du ${l.lieu_nom} ?`,
       {title:'Changer de bar', okLabel:`Vers le ${_DEP_LIEUX[autre]}`})) return;
   try{
     const r = await apiFetch('POST',`/pos/depot/livraisons/${l.id}/destination`,{lieu:autre});
     _depLivraisons[l.lieu] = null; _depLivraisons[autre] = r;
     depChoisirDest(autre, true);
     await _depCharger();
-    _depRetour(`Livraison ${r.numero} envoyée au ${r.lieu_nom}.`, true);
+    _depRetour(`Bon de transfert ${r.numero} : destination ${r.lieu_nom}.`, true);
   }catch(e){ posAlert(e.message); }
 }
 
@@ -29026,58 +29158,89 @@ function depRenderLivraison(){
   const bars = document.getElementById('dep-bars');
   if(bars) bars.innerHTML = ['DEVANT','PISCINE'].map(k=>{ const x=_depLivraisons[k];
     return `<button type="button" class="dep-bar-chip ${k===_depDest?'active':''}" onclick="depChoisirDest('${k}')">
-      <b>${_DEP_LIEUX[k]}</b><span>${x?`${esc(x.numero)} · ${x.nb_lignes} colis · ${x.total_unites} unités`:'aucune livraison en cours'}</span></button>`; }).join('');
+      <b>${_DEP_LIEUX[k]}</b><span>${x?`Bon ${esc(x.numero)} · ${x.nb_lignes} colis · ${x.total_unites} unités`:'aucun transfert en préparation'}</span></button>`; }).join('');
   const l = _depLivraison, dest = _DEP_LIEUX[_depDest];
-  if(!l){
-    box.innerHTML = `<div class="dep-livr-vide">Aucune livraison en cours vers le <b>${dest}</b>. En mode « Ajouter à la livraison », le premier colis scanné l'ouvre automatiquement.
-      <div style="margin-top:10px"><button class="pos-btn teal" onclick="depNouvelleLivraison('${_depDest}')">Ouvrir une livraison vers le ${dest}</button></div></div>`;
-    return;
-  }
-  const autre = _DEP_LIEUX[l.lieu==='DEVANT' ? 'PISCINE' : 'DEVANT'];
-  const options = _depStock.filter(s=>s.depot>0).map(s=>`<option value="${s.produit_id}">${esc(s.nom)} (dépôt : ${s.depot})</option>`).join('');
-  box.innerHTML = `
-    <div class="dep-livr-tete"><strong>${esc(l.numero)}</strong> → <strong>${esc(l.lieu_nom)}</strong>
-      · ${l.nb_lignes} colis · ${l.total_unites} unité(s)
-      <button type="button" class="sx-link" style="margin-left:8px" onclick="depChangerDestination()">envoyer plutôt au ${autre}</button></div>
-    <div class="pos-table-wrap"><table class="pos-table">
-      <thead><tr><th>Code</th><th>Code-barres</th><th>Produit</th><th class="tr">Quantité</th><th></th></tr></thead>
-      <tbody>${(l.lignes||[]).map(x=>`<tr>${x.colis_id
-          ? _depCellulesCode({id:x.colis_id, code:x.colis_code_brut||x.colis_code, code_lisible:x.colis_code, produit_nom:x.produit_nom, quantite:x.quantite, statut:'EN_PREPARATION', statut_libelle:'En préparation de livraison'})
-          : '<td><em>vrac</em></td><td>—</td>'}<td><strong>${esc(x.produit_nom||'')}</strong></td>
-        <td class="tr num">${x.quantite}</td><td class="tr"><button class="pos-btn ghost dep-btn-s" title="Retirer de la livraison" onclick="depRetirerLigne(${x.id})">✕</button></td></tr>`).join('')
-        || `<tr class="dep-vide-l"><td colspan="5">Scannez les colis à livrer au ${esc(l.lieu_nom)} (mode « Ajouter à la livraison »).</td></tr>`}</tbody>
-    </table></div>
-    <div class="dep-scan-row">
-      <span class="dep-note" style="margin:0">Sans étiquette :</span>
-      <select id="dep-vrac-produit" class="pos-input" style="max-width:260px">${options||'<option value="">Aucun stock en vrac au dépôt</option>'}</select>
-      <input id="dep-vrac-qte" type="number" min="1" step="1" class="pos-input" style="max-width:100px" placeholder="Qté">
-      <button class="pos-btn ghost" onclick="depAjouterVrac()">Ajouter</button>
-    </div>
-    <div class="dep-scan-row" style="justify-content:flex-end">
-      <button class="pos-btn ghost" onclick="depAnnulerLivraison()">Annuler la livraison</button>
-      <button class="pos-btn teal" onclick="depValiderLivraison()">✓ Valider — livrer au ${esc(l.lieu_nom)}</button>
-    </div>`;
+  box.innerHTML = !l
+    ? `<div class="dep-livr-vide">Aucun transfert en préparation vers le <b>${dest}</b>. En mode « Transférer vers un bar », le premier colis scanné ouvre le bon de transfert.
+        <div style="margin-top:10px"><button class="pos-btn teal" onclick="depNouvelleLivraison('${_depDest}')">Commencer un transfert vers le ${dest}</button></div></div>`
+    : `<div class="dep-livr-vide">Bon <b>${esc(l.numero)}</b> → <b>${esc(l.lieu_nom)}</b> · ${l.nb_lignes} colis · ${l.total_unites} unités, en préparation.
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="pos-btn teal" onclick="depTransfertOuvrir()">Ouvrir le bon de transfert</button>
+        </div></div>`;
+}
+
+// ── Bon de transfert (fenêtre ouverte au premier scan, remplie à chaque scan)
+let _depDernierScan = null;
+const _depTrfOuvert = () => document.getElementById('dep-trf-bg')?.classList.contains('open');
+function depTransfertOuvrir(){
+  document.getElementById('dep-trf-bg').classList.add('open');
+  const t=document.getElementById('dep-trf-etat');
+  if(t){ t.className='dep-trf-etat'; t.textContent='⌨ Scanner prêt : scannez les colis qui sortent du dépôt.'; }
+  document.activeElement?.blur?.();
+  depTransfertRender();
+}
+function depTransfertFermer(){
+  document.getElementById('dep-trf-bg').classList.remove('open');
+  document.getElementById('dep-scan-input')?.focus();
+}
+function depTransfertRender(){
+  if(!document.getElementById('dep-trf-bg')) return;
+  const l = _depLivraisons[_depDest], dest = _DEP_LIEUX[_depDest];
+  document.querySelectorAll('#dep-trf-bg .pa-mode').forEach(b=>b.classList.toggle('active', b.dataset.lieu===_depDest));
+  document.getElementById('dep-trf-num').textContent = l ? `· ${l.numero}` : '· nouveau';
+  const autreK = _depDest==='DEVANT' ? 'PISCINE' : 'DEVANT';
+  document.getElementById('dep-trf-dest-aide').innerHTML = (l && l.nb_lignes && !_depLivraisons[autreK])
+    ? `Mauvais bar ? <button type="button" class="sx-link" onclick="depChangerDestination()">envoyer ce bon au ${_DEP_LIEUX[autreK]}</button>`
+    : (_depLivraisons[autreK] ? `Le ${_DEP_LIEUX[autreK]} a aussi un bon en préparation (${esc(_depLivraisons[autreK].numero)}).` : '');
+  const lignes = (l && l.lignes) ? [...l.lignes].reverse() : [];
+  document.getElementById('dep-trf-nb').textContent = lignes.length;
+  document.getElementById('dep-trf-lignes').innerHTML = lignes.map((x,i)=>`<tr class="${x.colis_id && x.colis_id===_depDernierScan?'nouveau':''}">
+      <td class="num">${lignes.length-i}</td>
+      <td>${x.colis_id?`<button type="button" class="dep-code dep-code-btn" onclick="depOuvrirFiche(${x.colis_id})">${esc(x.colis_code)}</button>`:'<em>vrac</em>'}</td>
+      <td><strong>${esc(x.produit_nom||'')}</strong></td><td class="tr num">${x.quantite}</td>
+      <td class="tr"><button class="pos-btn ghost dep-btn-s" title="Retirer du bon (le colis reste au dépôt)" onclick="depRetirerLigne(${x.id})">✕</button></td></tr>`).join('')
+    || `<tr class="dep-vide-l"><td colspan="5">Scannez le premier colis à sortir vers le ${dest}.</td></tr>`;
+  const vr = document.getElementById('dep-vrac-produit');
+  if(vr) vr.innerHTML = _depStock.filter(x=>x.depot>0).map(x=>`<option value="${x.produit_id}">${esc(x.nom)} (dépôt : ${x.depot})</option>`).join('')
+    || '<option value="">Aucun stock en vrac au dépôt</option>';
+  const parProduit = {};
+  lignes.forEach(x=>{ parProduit[x.produit_nom] = (parProduit[x.produit_nom]||0) + x.quantite; });
+  document.getElementById('dep-trf-recap').innerHTML = lignes.length
+    ? `<div class="pa-recap-l pa-recap-tot"><span>${lignes.length} colis : dépôt → ${esc(dest)}</span><span>${l.total_unites} unités</span></div>`
+      + Object.entries(parProduit).map(([n,q])=>`<div class="pa-recap-l"><span>${esc(n)}</span><span>${q}</span></div>`).join('')
+    : '<div class="pa-recap-l"><span>Bon vide</span><span></span></div>';
+  const v = document.getElementById('dep-trf-valider');
+  v.disabled = !lignes.length;
+  v.textContent = `✓ Valider le transfert vers le ${dest}`;
+  document.getElementById('dep-trf-annuler').hidden = !l;
 }
 
 async function depAjouterVrac(){
   const pid = parseInt(document.getElementById('dep-vrac-produit').value);
   const qte = parseFloat(document.getElementById('dep-vrac-qte').value);
   if(!pid || !(qte>0)){ posAlert('Choisissez un produit et une quantité.'); return; }
-  try{ _depLivraison = _depLivraisons[_depDest] = await apiFetch('POST',`/pos/depot/livraisons/${_depLivraison.id}/vrac`,{produit_id:pid, quantite:qte}); depRenderLivraison(); }
+  try{
+    if(!_depLivraisons[_depDest]) _depLivraisons[_depDest] = await apiFetch('POST','/pos/depot/livraisons',{lieu:_depDest});
+    _depLivraison = _depLivraisons[_depDest] = await apiFetch('POST',`/pos/depot/livraisons/${_depLivraisons[_depDest].id}/vrac`,{produit_id:pid, quantite:qte});
+    document.getElementById('dep-vrac-qte').value='';
+    depRenderLivraison(); depTransfertRender();
+  }
   catch(e){ posAlert(e.message); }
 }
 
 async function depRetirerLigne(ligneId){
-  try{ _depLivraison = _depLivraisons[_depDest] = await apiFetch('DELETE',`/pos/depot/livraisons/${_depLivraison.id}/lignes/${ligneId}`); await _depCharger(); }
+  try{ _depLivraison = _depLivraisons[_depDest] = await apiFetch('DELETE',`/pos/depot/livraisons/${_depLivraison.id}/lignes/${ligneId}`); depTransfertRender(); await _depCharger(); }
   catch(e){ posAlert(e.message); }
 }
 
 async function depValiderLivraison(){
   const l = _depLivraison;
-  if(!await showConfirm(`Valider la livraison ${l.numero} vers le ${l.lieu_nom} (${l.total_unites} unités) ? Le stock passe du dépôt au bar.`, {title:'Valider la livraison', okLabel:'Valider'})) return;
+  if(!l) return;
+  if(!await showConfirm(`Valider le transfert ${l.numero} vers le ${l.lieu_nom} : ${l.nb_lignes} colis, ${l.total_unites} unités ? Le stock sort du dépôt et entre au bar.`, {title:'Valider le transfert', okLabel:'Valider'})) return;
   try{
     await apiFetch('POST',`/pos/depot/livraisons/${l.id}/valider`,{});
-    posAlert(`Livraison ${l.numero} validée — stocks mis à jour.`,'ok');
+    posAlert(`Transfert ${l.numero} validé : ${l.total_unites} unités sorties du dépôt vers le ${l.lieu_nom}.`,'ok');
+    depTransfertFermer();
     _depLivraisons[l.lieu] = null; _depLivraison = null;
     await _depCharger();
   }catch(e){ posAlert(e.message); }
@@ -29085,8 +29248,9 @@ async function depValiderLivraison(){
 
 async function depAnnulerLivraison(){
   const l = _depLivraison;
-  if(!await showConfirm(`Annuler la livraison ${l.numero} ? Les colis scannés retournent au dépôt.`, {title:'Annuler la livraison', type:'danger', okLabel:'Annuler la livraison'})) return;
-  try{ await apiFetch('POST',`/pos/depot/livraisons/${l.id}/annuler`,{}); _depLivraisons[l.lieu]=null; _depLivraison=null; await _depCharger(); }
+  if(!l) return;
+  if(!await showConfirm(`Annuler le bon de transfert ${l.numero} ? Les colis scannés restent en stock au dépôt.`, {title:'Annuler le transfert', type:'danger', okLabel:'Annuler le transfert'})) return;
+  try{ await apiFetch('POST',`/pos/depot/livraisons/${l.id}/annuler`,{}); _depLivraisons[l.lieu]=null; _depLivraison=null; depTransfertFermer(); await _depCharger(); }
   catch(e){ posAlert(e.message); }
 }
 
@@ -29135,6 +29299,7 @@ async function depManuelOuvrir(){
 }
 
 function depManuelFermer(){ document.getElementById('dep-manuel-bg').classList.remove('open'); }
+const _depManuelOuvert = () => document.getElementById('dep-manuel-bg')?.classList.contains('open');
 
 function depManuelLieu(l){
   _depManuel.lieu=l;
@@ -29161,7 +29326,7 @@ function depManuelRender(){
         <span>${c.quantite} ${esc(c.unite||'u.')}</span>
         <span class="dep-st ${c.statut==='AU_DEPOT'?'st-depot':'st-verif'}">${c.statut==='AU_DEPOT'?'Au dépôt':'À vérifier'}</span>
       </label>`).join('')}`).join('')
-    || '<div class="pa-res-vide">Aucun colis au dépôt ne correspond. Seuls les colis au dépôt ou en attente de vérification peuvent être livrés.</div>';
+    || '<div class="pa-res-vide">Aucun colis au dépôt ne correspond. Seuls les colis au dépôt ou en attente de vérification peuvent sortir.</div>';
   depManuelRecap();
 }
 
@@ -29172,7 +29337,7 @@ async function depManuelAjouterCode(){
   try{
     const c=await apiFetch('GET',`/pos/depot/colis/code/${encodeURIComponent(code)}`);
     if(!['AU_DEPOT','A_VERIFIER'].includes(c.statut)){
-      posAlert(`Colis ${c.code_lisible} : ${c.statut_libelle.toLowerCase()} — il ne peut pas être livré.`);
+      posAlert(`Colis ${c.code_lisible} : ${c.statut_libelle.toLowerCase()} — il ne peut pas sortir du dépôt.`);
       if(c.statut==='LIVRE') depOuvrirFiche(c.id);
       return;
     }
@@ -29204,7 +29369,7 @@ async function depManuelValider(){
   const motif=_depManuelMotif();
   const dateVal=document.getElementById('dep-manuel-date').value;
   if(!_depManuel.lieu){ posAlert('Choisissez le bar de destination.'); return; }
-  if(!dateVal){ posAlert('Indiquez la date et l\'heure réelles de la livraison.'); return; }
+  if(!dateVal){ posAlert('Indiquez la date et l\'heure réelles du transfert.'); return; }
   if(!motif){ posAlert('Choisissez le motif.'); document.getElementById('dep-manuel-raison').focus(); return; }
   if(document.getElementById('dep-manuel-raison').value==='Autre' && !document.getElementById('dep-manuel-precision').value.trim()){
     posAlert('Précisez le motif « Autre ».'); document.getElementById('dep-manuel-precision').focus(); return;
@@ -29213,16 +29378,16 @@ async function depManuelValider(){
   if(!choisis.length){ posAlert('Choisissez au moins un colis.'); return; }
   const quand=new Date(dateVal);
   const ok=await showConfirm(
-    `Livraison manuelle de ${choisis.length} colis au ${_DEP_LIEUX[_depManuel.lieu]}, le ${quand.toLocaleDateString('fr-FR')} à ${quand.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}.\n\nMotif : ${motif}\n\nLes codes de ces colis ne seront plus valables. Confirmer ?`,
-    {title:'Livraison manuelle', type:'warn', okLabel:'Confirmer la livraison'});
+    `Transfert manuel de ${choisis.length} colis au ${_DEP_LIEUX[_depManuel.lieu]}, le ${quand.toLocaleDateString('fr-FR')} à ${quand.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}.\n\nMotif : ${motif}\n\nLes codes de ces colis ne seront plus valables. Confirmer ?`,
+    {title:'Transfert manuel', type:'warn', okLabel:'Confirmer le transfert'});
   if(!ok) return;
   try{
     const l=await apiFetch('POST','/pos/depot/livraisons/manuelle',{
       lieu:_depManuel.lieu, colis_ids:choisis.map(c=>c.id), motif, date_reelle:quand.toISOString()});
     depManuelFermer();
-    posAlert(`Livraison manuelle ${l.numero} enregistrée : ${l.nb_lignes} colis au ${l.lieu_nom}. Leurs codes ne sont plus valables.`,'ok');
+    posAlert(`Transfert manuel ${l.numero} enregistré : ${l.nb_lignes} colis au ${l.lieu_nom}. Leurs codes ne sont plus valables.`,'ok');
     await _depCharger();
-  }catch(e){ posAlert(String(e.message||'Livraison refusée').replace(/^\[\d+\]\s*/,'')); }
+  }catch(e){ posAlert(String(e.message||'Transfert refusé').replace(/^\[\d+\]\s*/,'')); }
 }
 
 function depRenderHistorique(livs){
@@ -29231,7 +29396,7 @@ function depRenderHistorique(livs){
     <tr><td>${esc(l.numero)}${l.mode==='MANUELLE'?' <span class="dep-st st-prep" title="'+esc(l.motif_manuel||'')+'">Sans scan</span>':''}</td><td>${esc(l.lieu_nom)}</td><td>${st[l.statut]||l.statut}</td>
       <td class="tr">${l.nb_lignes}</td><td class="tr">${l.total_unites}</td><td>${esc(l.valide_par||'—')}</td>
       <td>${(l.valide_le||l.cree_le||'').slice(0,16).replace('T',' ')}</td></tr>`).join('')
-    || '<tr><td colspan="7" style="text-align:center;padding:14px;color:rgba(255,255,255,.3)">Aucune livraison</td></tr>';
+    || '<tr><td colspan="7" style="text-align:center;padding:14px;color:rgba(255,255,255,.3)">Aucun transfert</td></tr>';
 }
 
 // ══════════════════════════════════════════════════════════════════════

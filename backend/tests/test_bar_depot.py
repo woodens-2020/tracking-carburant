@@ -219,7 +219,7 @@ def test_rescan_colis_livre_donne_la_fiche(client, db):
     # Fiche de livraison
     f = client.post("/api/pos/depot/colis/consulter", headers=H, json={"code": code}).json()
     assert f["deja_livre"] is True
-    assert f["colis"]["statut_libelle"] == "Déjà livré" and f["colis"]["lieu_nom"] == "Bar piscine"
+    assert f["colis"]["statut_libelle"] == "Transféré au bar" and f["colis"]["lieu_nom"] == "Bar piscine"
     assert f["livraison"]["numero"] == liv["numero"] and f["livraison"]["valide_le"]
     types = [e["type"] for e in f["historique"]]
     assert types[:4] == ["CREE", "VERIFIE", "AJOUTE_LIVRAISON", "LIVRE"]
