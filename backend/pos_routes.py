@@ -1318,10 +1318,30 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
 
 @router.get("/achats/produits-tous")
 def tous_les_produits_achetables(db: Session = Depends(get_db)):
-    """Retourne tous les produits disponibles pour un achat (bar + station)."""
+    """Retourne tous les produits disponibles pour un achat (bar + station),
+    avec le dernier achat de chacun (date, prix par unité, fournisseur) et
+    la liste des fournisseurs déjà utilisés — pour préremplir le formulaire."""
     bar   = db.query(BarProduit).filter_by(actif=True).order_by(BarProduit.categorie, BarProduit.nom).all()
     stati = db.query(Produit).filter_by(actif=True).order_by(Produit.nom).all()
+
+    dernier_bar, dernier_station, fournisseurs = {}, {}, {}
+    for a in (db.query(BarAchat).filter(BarAchat.statut != "ANNULE")
+              .order_by(BarAchat.date_achat.desc()).limit(3000).all()):
+        info = {
+            "date": a.date_achat.isoformat() if a.date_achat else None,
+            "prix_unitaire": float(a.prix_achat_unitaire),
+            "quantite": float(a.quantite),
+            "fournisseur": a.fournisseur,
+        }
+        if a.produit_id and a.produit_id not in dernier_bar:
+            dernier_bar[a.produit_id] = info
+        if a.station_produit_id and a.station_produit_id not in dernier_station:
+            dernier_station[a.station_produit_id] = info
+        f = (a.fournisseur or "").strip()
+        if f and f.casefold() not in fournisseurs:
+            fournisseurs[f.casefold()] = f
     return {
+        "fournisseurs": sorted(fournisseurs.values(), key=str.casefold)[:200],
         "bar": [
             {
                 "id":               p.id,
@@ -1331,6 +1351,7 @@ def tous_les_produits_achetables(db: Session = Depends(get_db)):
                 "vendu_par_caisse": p.vendu_par_caisse,
                 "unites_par_caisse":p.unites_par_caisse,
                 "prix_vente_unite": float(prix_actif(p.id, db) or 0),
+                "dernier_achat":    dernier_bar.get(p.id),
                 "type":             "bar",
             }
             for p in bar
@@ -1343,6 +1364,7 @@ def tous_les_produits_achetables(db: Session = Depends(get_db)):
                 "unite":            "gallon",
                 "vendu_par_caisse": False,
                 "unites_par_caisse":None,
+                "dernier_achat":    dernier_station.get(p.id),
                 "type":             "station",
             }
             for p in stati

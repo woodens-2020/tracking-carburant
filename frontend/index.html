@@ -3138,6 +3138,36 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .dep-vide{font-size:13px;color:rgba(255,255,255,.35);padding:10px 0}
 .dep-code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;background:rgba(255,255,255,.06);padding:1px 6px;border-radius:4px}
 .dep-livr-tete{margin:4px 0 10px;font-size:15px}
+.dep-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:0 0 14px}
+.dep-kpi{display:flex;flex-direction:column;gap:2px;text-align:left;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 14px;color:#fff;cursor:pointer}
+.dep-kpi:hover{border-color:rgba(96,165,250,.5)}
+.dep-kpi-v{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+.dep-kpi-txt{font-size:15px;line-height:1.6}
+.dep-kpi-l{font-size:12px;color:rgba(255,255,255,.5)}
+.dep-kpi-alerte{border-color:rgba(251,191,36,.5);background:rgba(251,191,36,.07)}
+.dep-kpi-alerte .dep-kpi-v{color:#fbbf24}
+.dep-guide-grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.dep-guide-c{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5;color:rgba(255,255,255,.75)}
+.dep-guide-c b{color:#93c5fd;font-size:14px}
+.dep-guide-c p{margin:6px 0 0}
+.dep-guide-c em{color:#fff;font-style:normal;font-weight:600}
+.dep-guide-qui{font-size:12px;color:rgba(255,255,255,.45)}
+.dep-st{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 8px;margin:2px 4px 2px 0}
+.st-verif{background:rgba(251,191,36,.15);color:#fcd34d}.st-depot{background:rgba(59,130,246,.15);color:#93c5fd}
+.st-prep{background:rgba(249,115,22,.15);color:#fdba74}.st-livre{background:rgba(34,197,94,.15);color:#86efac}
+.dep-mode-aide{font-size:13px;color:rgba(255,255,255,.55);margin-top:2px}
+.dep-onglets{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 12px;border-bottom:1px solid rgba(255,255,255,.1)}
+.dep-onglet{background:none;border:none;border-bottom:3px solid transparent;color:rgba(255,255,255,.6);font-weight:700;font-size:14px;padding:10px 14px;cursor:pointer}
+.dep-onglet.active{color:#fff;border-bottom-color:#3b82f6}
+.dep-onglet:focus-visible{outline:2px solid #3b82f6;outline-offset:2px}
+.dep-cpt{font-size:11px;font-weight:700;background:rgba(251,191,36,.18);color:#fcd34d;border-radius:999px;padding:1px 7px;margin-left:4px}
+.dep-cpt:empty{display:none}
+.dep-intro{background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.22);border-radius:10px;padding:10px 14px;font-size:13.5px;color:rgba(255,255,255,.75);margin-bottom:12px;line-height:1.5}
+.dep-intro b{color:#93c5fd}
+.dep-inv-barre{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.dep-inv-champ{display:flex;flex-direction:column;min-width:180px}
+.dep-inv-table{max-height:460px;overflow-y:auto;margin-top:10px}
+
 .dep-code-btn{border:none;color:#93c5fd;cursor:pointer;white-space:nowrap}
 .dep-code{white-space:nowrap}
 .dep-code-btn:hover{text-decoration:underline}
@@ -3169,6 +3199,45 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .df-h-l{font-size:13.5px;font-weight:600}
 .df-h-s{font-size:12px;color:rgba(255,255,255,.5);margin-top:1px}
 .pos-stock-alert{color:#f87171}
+/* ── Formulaire d'achat ─────────────────────────────────────────── */
+.pa-modal [hidden],#page-pos-depot [hidden]{display:none!important}
+.pa-gros::-webkit-outer-spin-button,.pa-gros::-webkit-inner-spin-button,.dep-inv-qte::-webkit-outer-spin-button,.dep-inv-qte::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.pa-gros,.dep-inv-qte{-moz-appearance:textfield;appearance:textfield}
+#page-pos-depot .pos-table th.tr,#page-pos-depot .pos-table td.tr{text-align:right}
+.pa-modal{max-width:640px;width:calc(100vw - 32px);max-height:92vh;overflow-y:auto}
+.pa-tete{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.pa-tete-act{display:flex;gap:8px;align-items:center}
+.pa-serie{font-size:12.5px;color:#86efac;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:999px;padding:3px 10px}
+.pa-etape{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.pa-etape-t{font-size:12.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.pa-etape-t span{display:inline-flex;width:20px;height:20px;border-radius:50%;background:#0d9488;color:#fff;align-items:center;justify-content:center;font-size:11px}
+.pa-resultats{max-height:220px;overflow-y:auto;margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.pa-res{display:grid;grid-template-columns:1fr auto;gap:2px 10px;text-align:left;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:8px 10px;color:#fff;cursor:pointer}
+.pa-res:hover,.pa-res:focus-visible{border-color:#3fb6a8;background:rgba(63,182,168,.08);outline:none}
+.pa-res-nom{font-weight:700}
+.pa-res-sous{font-size:12px;color:rgba(255,255,255,.45);grid-column:1}
+.pa-res-der{font-size:12px;color:#5eead4;grid-column:2;grid-row:1/3;align-self:center;text-align:right}
+.pa-res-grp{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);margin:6px 2px 2px}
+.pa-res-vide{font-size:13px;color:rgba(255,255,255,.4);padding:8px}
+.pa-choix-l{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.pa-choix-nom{font-size:18px;font-weight:800}
+.pa-der{margin-top:8px;font-size:13px;color:rgba(255,255,255,.65);display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pa-reprendre{padding:4px 10px!important;font-size:12px!important}
+.pa-modes{display:flex;gap:6px;margin-bottom:10px}
+.pa-mode{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);border-radius:8px;padding:8px;font-weight:700;cursor:pointer}
+.pa-mode.active{background:rgba(63,182,168,.16);border-color:#3fb6a8;color:#5eead4}
+.pa-gros{font-size:19px!important;font-weight:800;text-align:right}
+.pa-aide{font-size:12.5px;color:#5eead4;margin-top:4px;min-height:16px}
+.pa-frais summary{cursor:pointer;font-size:13.5px;font-weight:600;color:rgba(255,255,255,.65);margin-top:4px}
+.pa-recep{display:flex;gap:10px;align-items:flex-start;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.3);border-radius:10px;padding:10px 12px;margin-bottom:12px;cursor:pointer;font-size:13.5px}
+.pa-recep input{margin-top:3px;width:18px;height:18px;accent-color:#3b82f6;flex-shrink:0}
+.pa-recep small{color:rgba(255,255,255,.5);font-size:12px}
+.pa-recap{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 16px}
+.pa-recap-l{display:flex;justify-content:space-between;font-size:14px;padding:3px 0;color:rgba(255,255,255,.6)}
+.pa-recap-l span:last-child{color:#fff;font-weight:600;font-variant-numeric:tabular-nums}
+.pa-recap-tot{border-top:1px solid rgba(255,255,255,.1);margin-top:6px;padding-top:8px;font-size:16px;color:#fff;font-weight:700}
+.pa-recap-tot span:last-child{color:#3fb6a8;font-size:19px}
+
 .cr-sous{font-size:11.5px;color:rgba(255,255,255,.42);margin-top:2px}
 .cr-date{white-space:nowrap}
 .cr-heure{font-size:11.5px;color:rgba(255,255,255,.45)}
@@ -7341,17 +7410,51 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
           <div>
             <div class="pos-header-title">Dépôt Bar</div>
-            <div class="pos-header-sub">Réception → étiquettes → vérification au dépôt → livraison au Bar avant / Bar piscine</div>
+            <div class="pos-header-sub">La marchandise arrive au dépôt, puis part vers le Bar avant ou le Bar piscine — chaque colis est suivi par son code-barres</div>
           </div>
           <div class="pos-header-actions">
-            <button class="pos-btn ghost" onclick="loadPosDepot()" title="Actualiser">↺</button>
+            <button class="pos-btn ghost" onclick="depGuide()">❔ Comment ça marche</button>
+            <button class="pos-btn ghost" onclick="loadPosDepot()" title="Actualiser" aria-label="Actualiser">↺</button>
           </div>
         </div>
 
-        <!-- Étapes du circuit -->
-        <div class="dep-steps" aria-label="Circuit de la marchandise">
-          <span>1 · Réception</span><span>2 · Étiquettes</span><span>3 · Vérification au dépôt</span>
-          <span>4 · Livraison</span><span>5 · Scan des colis</span><span>6 · Bar avant / piscine</span><span>7 · Stocks à jour</span>
+        <!-- Chiffres clés : ce qui attend une action -->
+        <div class="dep-kpis">
+          <button type="button" class="dep-kpi" onclick="depOnglet('reception')"><span class="dep-kpi-v" id="dep-k-achats">—</span><span class="dep-kpi-l">Achats à réceptionner</span></button>
+          <button type="button" class="dep-kpi" onclick="depOnglet('reception')"><span class="dep-kpi-v" id="dep-k-verif">—</span><span class="dep-kpi-l">Colis à vérifier</span></button>
+          <button type="button" class="dep-kpi" onclick="depOnglet('livraison')"><span class="dep-kpi-v" id="dep-k-depot">—</span><span class="dep-kpi-l">Colis au dépôt, prêts à livrer</span></button>
+          <button type="button" class="dep-kpi" onclick="depOnglet('livraison')"><span class="dep-kpi-v dep-kpi-txt" id="dep-k-livr">—</span><span class="dep-kpi-l">Livraison en cours</span></button>
+          <button type="button" class="dep-kpi" onclick="depOnglet('journal')"><span class="dep-kpi-v" id="dep-k-livres">—</span><span class="dep-kpi-l">Livraisons validées aujourd'hui</span></button>
+        </div>
+
+        <!-- Guide : rôle de chaque partie -->
+        <div class="pos-card dep-guide" id="dep-guide" hidden>
+          <div class="pos-card-hdr">Comment fonctionne le Dépôt Bar
+            <button type="button" class="pos-btn ghost" style="margin-left:auto;padding:3px 10px;font-size:12px" onclick="depGuide(false)">Masquer</button>
+          </div>
+          <div class="dep-guide-grille">
+            <div class="dep-guide-c"><b>1 · Réception</b>
+              <p>Quand la marchandise d'un achat arrive, on la <em>réceptionne</em> : le système crée un <em>colis</em> par caisse, chacun avec son étiquette 2 × 1 à coller.</p>
+              <p class="dep-guide-qui">Onglet Réception · bouton « Réceptionner »</p></div>
+            <div class="dep-guide-c"><b>2 · Vérification au dépôt</b>
+              <p>On scanne chaque colis rangé au dépôt. Ce scan prouve qu'il est bien arrivé : son contenu entre alors dans le <em>stock du dépôt</em>. Un colis non scanné n'est pas en stock.</p>
+              <p class="dep-guide-qui">Scanner en mode « Vérifier au dépôt »</p></div>
+            <div class="dep-guide-c"><b>3 · Livraison vers un bar</b>
+              <p>On ouvre une livraison pour le Bar avant ou le Bar piscine, on scanne les colis chargés, puis on <em>valide</em> : le stock passe du dépôt au bar. C'est la seule façon d'alimenter un bar.</p>
+              <p class="dep-guide-qui">Onglet Livraison · scanner en mode « Ajouter à la livraison »</p></div>
+            <div class="dep-guide-c"><b>4 · Stock et inventaire</b>
+              <p>Le stock de chaque lieu se calcule tout seul. Si le comptage réel diffère (casse, erreur), on fait un <em>inventaire</em> : l'écart est corrigé et gardé avec son motif.</p>
+              <p class="dep-guide-qui">Onglet Stock et inventaire</p></div>
+            <div class="dep-guide-c"><b>Fiche et journal</b>
+              <p>Scanner un colis en mode « Consulter la fiche » montre où il est, qui l'a livré et quand. Le journal garde chaque étape, avec date, heure et personne, ainsi que les codes rejetés.</p>
+              <p class="dep-guide-qui">Mode « Consulter la fiche » · onglet Journal</p></div>
+            <div class="dep-guide-c"><b>États d'un colis</b>
+              <p><span class="dep-st st-verif">À vérifier</span> créé, pas encore scanné au dépôt<br>
+                 <span class="dep-st st-depot">Au dépôt</span> en stock au dépôt<br>
+                 <span class="dep-st st-prep">En préparation</span> dans une livraison pas encore validée<br>
+                 <span class="dep-st st-livre">Livré</span> en stock au bar de destination</p></div>
+          </div>
+          <div class="dep-note" style="margin:10px 0 0">Sécurité : chaque code se termine par une clé de contrôle (ex. BC26-000123-<b>4817</b>). Un code inventé ou modifié est refusé et inscrit au journal.</div>
         </div>
 
         <!-- Scanner (douchette, saisie clavier ou caméra) -->
@@ -7363,106 +7466,136 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <button class="db-preset" id="dep-mode-livr" onclick="depSetMode('livr')">Ajouter à la livraison</button>
               <button class="db-preset" id="dep-mode-fiche" onclick="depSetMode('fiche')">Consulter la fiche</button>
             </div>
-            <input id="dep-scan-input" class="pos-input" placeholder="Scannez ou tapez le code du colis (ex. BC26000123) puis Entrée"
-                   autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();depScanner(this.value)}">
+            <input id="dep-scan-input" class="pos-input" placeholder="Scannez ou tapez le code (ex. BC26-000123-4817) puis Entrée"
+                   autocomplete="off" maxlength="60" onkeydown="if(event.key==='Enter'){event.preventDefault();depScanner(this.value)}">
             <button class="pos-btn teal" onclick="depScanner(document.getElementById('dep-scan-input').value)">Valider</button>
             <button class="pos-btn ghost" onclick="depCamera()">📷 Caméra</button>
           </div>
+          <div class="dep-mode-aide" id="dep-mode-aide"></div>
           <div id="dep-camera" style="display:none;max-width:360px;margin-top:10px"></div>
           <div id="dep-scan-retour" class="dep-retour" aria-live="polite"></div>
         </div>
 
-        <div class="dep-grid">
-          <!-- 1-2. Réceptions -->
-          <div class="pos-card">
-            <div class="pos-card-hdr">Achats à réceptionner <span class="dep-badge" id="dep-nb-achats">0</span></div>
-            <div class="dep-note">Réceptionner un achat crée ses colis (un par caisse) et leurs étiquettes 2 × 1 po à coller. Le stock n'entre au dépôt qu'au scan de chaque colis.</div>
-            <div id="dep-achats"></div>
-          </div>
+        <!-- Onglets -->
+        <div class="dep-onglets" role="tablist" aria-label="Parties du dépôt">
+          <button type="button" role="tab" class="dep-onglet" data-t="reception" onclick="depOnglet('reception')">1 · Réception <span class="dep-cpt" id="dep-o-reception"></span></button>
+          <button type="button" role="tab" class="dep-onglet" data-t="livraison" onclick="depOnglet('livraison')">2 · Livraison vers un bar <span class="dep-cpt" id="dep-o-livraison"></span></button>
+          <button type="button" role="tab" class="dep-onglet" data-t="stock" onclick="depOnglet('stock')">3 · Stock et inventaire</button>
+          <button type="button" role="tab" class="dep-onglet" data-t="journal" onclick="depOnglet('journal')">Journal</button>
+        </div>
 
-          <!-- 3. Colis à vérifier -->
-          <div class="pos-card">
-            <div class="pos-card-hdr">Colis à vérifier au dépôt <span class="dep-badge" id="dep-nb-verif">0</span>
-              <button class="pos-btn ghost" style="margin-left:auto;padding:4px 10px;font-size:12px" onclick="depEtiquettes()">🖨 Étiquettes 2 × 1</button>
+        <!-- 1 · Réception -->
+        <section class="dep-section" data-onglet="reception">
+          <div class="dep-intro"><b>À quoi sert cette partie :</b> transformer un achat arrivé en colis étiquetés, puis confirmer par un scan que chaque colis est bien au dépôt. Tant qu'un colis n'est pas vérifié, il ne compte pas dans le stock.</div>
+          <div class="dep-grid">
+            <div class="pos-card">
+              <div class="pos-card-hdr">Achats à réceptionner <span class="dep-badge" id="dep-nb-achats">0</span></div>
+              <div class="dep-note">Achats enregistrés dont la marchandise n'a pas encore été réceptionnée. « Réceptionner » crée un colis par caisse et ouvre les étiquettes.</div>
+              <div id="dep-achats"></div>
             </div>
-            <div id="dep-colis-verif"></div>
+            <div class="pos-card">
+              <div class="pos-card-hdr">Colis à vérifier au dépôt <span class="dep-badge" id="dep-nb-verif">0</span>
+                <button class="pos-btn ghost" style="margin-left:auto;padding:4px 10px;font-size:12px" onclick="depEtiquettes()">🖨 Étiquettes 2 × 1</button>
+              </div>
+              <div class="dep-note">Scannez chacun en mode « Vérifier au dépôt ». « Retirer » annule un colis créé par erreur (avant vérification seulement).</div>
+              <div id="dep-colis-verif"></div>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <!-- 4-7. Livraisons -->
-        <div class="pos-card">
-          <div class="pos-card-hdr">Livraison vers un bar</div>
-          <div id="dep-livr-nouvelle" class="dep-scan-row">
-            <span class="dep-note" style="margin:0">Nouvelle livraison vers :</span>
-            <button class="pos-btn teal" onclick="depNouvelleLivraison('DEVANT')">Bar avant</button>
-            <button class="pos-btn teal" onclick="depNouvelleLivraison('PISCINE')">Bar piscine</button>
+        <!-- 2 · Livraison -->
+        <section class="dep-section" data-onglet="livraison" hidden>
+          <div class="dep-intro"><b>À quoi sert cette partie :</b> envoyer de la marchandise du dépôt vers un bar. On ouvre une livraison, on scanne les colis chargés, puis on valide : le stock du dépôt baisse et celui du bar augmente du même nombre.</div>
+          <div class="pos-card">
+            <div class="pos-card-hdr">Livraison en cours</div>
+            <div id="dep-livr-nouvelle" class="dep-scan-row">
+              <span class="dep-note" style="margin:0">Nouvelle livraison vers :</span>
+              <button class="pos-btn teal" onclick="depNouvelleLivraison('DEVANT')">Bar avant</button>
+              <button class="pos-btn teal" onclick="depNouvelleLivraison('PISCINE')">Bar piscine</button>
+            </div>
+            <div id="dep-livr-courante"></div>
           </div>
-          <div id="dep-livr-courante"></div>
-        </div>
+          <div class="pos-card">
+            <div class="pos-card-hdr">Livraisons récentes</div>
+            <div class="pos-table-wrap">
+              <table class="pos-table">
+                <thead><tr><th>N°</th><th>Destination</th><th>Statut</th><th class="tr">Lignes</th><th class="tr">Unités</th><th>Validée par</th><th>Date</th></tr></thead>
+                <tbody id="dep-livr-histo"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
 
-        <!-- Stock par lieu -->
-        <div class="pos-card">
-          <div class="pos-card-hdr">Stock par lieu
-            <input id="dep-stock-recherche" class="pos-input" placeholder="Rechercher…" style="margin-left:auto;max-width:220px;padding:6px 10px" oninput="depRenderStock()">
+        <!-- 3 · Stock et inventaire -->
+        <section class="dep-section" data-onglet="stock" hidden>
+          <div class="dep-intro"><b>À quoi sert cette partie :</b> voir combien il reste de chaque produit au dépôt et dans chaque bar, et corriger après un comptage réel (inventaire).</div>
+          <div class="pos-card">
+            <div class="pos-card-hdr">Stock par lieu
+              <input id="dep-stock-recherche" class="pos-input" placeholder="Rechercher un produit…" style="margin-left:auto;max-width:240px;padding:6px 10px" oninput="depRenderStock()">
+            </div>
+            <div class="dep-note">Dépôt + Bar avant + Bar piscine = Total. Un chiffre rouge (négatif) veut dire qu'un bar a vendu plus que ce qu'il a reçu : livraison oubliée ou inventaire à faire. « À vérifier » = colis reçus mais pas encore scannés au dépôt.</div>
+            <div class="pos-table-wrap">
+              <table class="pos-table">
+                <thead><tr><th>Produit</th><th class="tr">Dépôt</th><th class="tr">Bar avant</th><th class="tr">Bar piscine</th><th class="tr">Total</th><th class="tr">À vérifier</th></tr></thead>
+                <tbody id="dep-stock-tbody"><tr><td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody>
+              </table>
+            </div>
           </div>
-          <div class="dep-note">Dépôt + Bar avant + Bar piscine = Total. Un chiffre négatif veut dire qu'un bar a vendu plus que ce qu'il a reçu : faites un inventaire.</div>
-          <div class="pos-table-wrap">
-            <table class="pos-table">
-              <thead><tr><th>Produit</th><th class="tr">Dépôt</th><th class="tr">Bar avant</th><th class="tr">Bar piscine</th><th class="tr">Total</th><th class="tr">À vérifier</th></tr></thead>
-              <tbody id="dep-stock-tbody"><tr><td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody>
-            </table>
+          <div class="pos-card">
+            <div class="pos-card-hdr">Inventaire physique</div>
+            <div class="dep-note">1. Choisissez le lieu compté. 2. Saisissez la quantité réellement comptée pour chaque produit vérifié (laissez vide les autres). 3. Indiquez le motif, puis enregistrez : l'écart avec le stock calculé est corrigé et gardé.</div>
+            <div class="dep-inv-barre">
+              <div class="dep-inv-champ">
+                <label class="pos-label" for="dep-inv-lieu">Lieu compté</label>
+                <select id="dep-inv-lieu" class="pos-input" onchange="depRenderInventaire()">
+                  <option value="DEPOT">Dépôt</option><option value="DEVANT">Bar avant</option><option value="PISCINE">Bar piscine</option>
+                </select>
+              </div>
+              <div class="dep-inv-champ" style="flex:1">
+                <label class="pos-label" for="dep-inv-recherche">Rechercher un produit</label>
+                <input id="dep-inv-recherche" class="pos-input" placeholder="Nom du produit…" oninput="depFiltrerInventaire()">
+              </div>
+            </div>
+            <div class="pos-table-wrap dep-inv-table">
+              <table class="pos-table">
+                <thead><tr><th>Produit</th><th class="tr">Stock calculé</th><th class="tr">Compté</th><th class="tr">Écart</th></tr></thead>
+                <tbody id="dep-inv-tbody"></tbody>
+              </table>
+            </div>
+            <div class="dep-inv-barre" style="margin-top:12px">
+              <div class="dep-inv-champ" style="flex:1">
+                <label class="pos-label" for="dep-inv-motif">Motif de l'inventaire *</label>
+                <input id="dep-inv-motif" class="pos-input" placeholder="Ex. inventaire d'ouverture du 20/10, casse constatée…">
+              </div>
+              <div class="dep-inv-champ" style="align-self:flex-end">
+                <span class="dep-note" id="dep-inv-nb" style="display:block;margin:0 0 6px">Aucun produit compté</span>
+                <button class="pos-btn teal" onclick="depEnregistrerInventaire()">Enregistrer l'inventaire</button>
+              </div>
+            </div>
           </div>
-        </div>
-
-        <!-- Inventaire -->
-        <div class="pos-card">
-          <div class="pos-card-hdr">Inventaire physique</div>
-          <div class="dep-note">Comptez ce qui est réellement présent. Seuls les produits saisis sont ajustés ; l'écart est enregistré avec le motif.</div>
-          <div class="dep-scan-row">
-            <select id="dep-inv-lieu" class="pos-input" style="max-width:200px" onchange="depRenderInventaire()">
-              <option value="DEPOT">Dépôt</option><option value="DEVANT">Bar avant</option><option value="PISCINE">Bar piscine</option>
-            </select>
-            <input id="dep-inv-motif" class="pos-input" placeholder="Motif (ex. inventaire d'ouverture du 20/10)" style="flex:1;min-width:200px">
-            <button class="pos-btn teal" onclick="depEnregistrerInventaire()">Enregistrer l'inventaire</button>
-          </div>
-          <div class="pos-table-wrap">
-            <table class="pos-table">
-              <thead><tr><th>Produit</th><th class="tr">Stock calculé</th><th class="tr">Compté</th></tr></thead>
-              <tbody id="dep-inv-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Historique -->
-        <div class="pos-card">
-          <div class="pos-card-hdr">Livraisons récentes</div>
-          <div class="pos-table-wrap">
-            <table class="pos-table">
-              <thead><tr><th>N°</th><th>Destination</th><th>Statut</th><th class="tr">Lignes</th><th class="tr">Unités</th><th>Validée par</th><th>Date</th></tr></thead>
-              <tbody id="dep-livr-histo"></tbody>
-            </table>
-          </div>
-        </div>
+        </section>
 
         <!-- Journal de traçabilité -->
-        <div class="pos-card">
-          <div class="pos-card-hdr">Journal de traçabilité
-            <select id="dep-journal-type" class="pos-input" style="margin-left:auto;max-width:220px;padding:6px 10px" onchange="depChargerJournal()">
-              <option value="">Tous les événements</option>
-              <option value="LIVRE">Livraisons</option>
-              <option value="VERIFIE">Vérifications au dépôt</option>
-              <option value="REJET">Codes rejetés (sécurité)</option>
-              <option value="SCAN_REFUSE">Scans refusés</option>
-            </select>
+        <section class="dep-section" data-onglet="journal" hidden>
+          <div class="dep-intro"><b>À quoi sert cette partie :</b> retrouver qui a fait quoi, quand et où, pour chaque colis. Les codes rejetés (inconnus ou falsifiés) apparaissent en rouge. Cliquez sur un code pour ouvrir sa fiche.</div>
+          <div class="pos-card">
+            <div class="pos-card-hdr">Journal de traçabilité
+              <select id="dep-journal-type" class="pos-input" style="margin-left:auto;max-width:240px;padding:6px 10px" onchange="depChargerJournal()">
+                <option value="">Tous les événements</option>
+                <option value="LIVRE">Livraisons</option>
+                <option value="VERIFIE">Vérifications au dépôt</option>
+                <option value="REJET">Codes rejetés (sécurité)</option>
+                <option value="SCAN_REFUSE">Scans refusés</option>
+              </select>
+            </div>
+            <div class="pos-table-wrap">
+              <table class="pos-table">
+                <thead><tr><th>Date et heure</th><th>Événement</th><th>Colis</th><th>Produit</th><th>Lieu</th><th>Par</th><th>Détail</th></tr></thead>
+                <tbody id="dep-journal-tbody"></tbody>
+              </table>
+            </div>
           </div>
-          <div class="dep-note">Chaque étape de chaque colis est enregistrée avec la date, l'heure, le lieu et la personne. Les codes rejetés (inconnus ou falsifiés) apparaissent aussi.</div>
-          <div class="pos-table-wrap">
-            <table class="pos-table">
-              <thead><tr><th>Date et heure</th><th>Événement</th><th>Colis</th><th>Produit</th><th>Lieu</th><th>Par</th><th>Détail</th></tr></thead>
-              <tbody id="dep-journal-tbody"></tbody>
-            </table>
-          </div>
-        </div>
+        </section>
 
       </div>
     </div><!-- /page-pos-depot -->
@@ -7479,98 +7612,6 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div>
 
-
-    <!-- Modal réception stock -->
-    <div class="pos-modal-bg" id="pos-recept-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
-      <div class="pos-modal" style="max-width:520px">
-        <h3>Réception de marchandises</h3>
-
-        <!-- Produit + Fournisseur -->
-        <div class="pos-form-row">
-          <div style="flex:2">
-            <label class="pos-label">Produit *</label>
-            <select class="pos-select" id="pos-recept-produit" onchange="posReceptOnProdChange()"></select>
-          </div>
-          <div style="flex:1">
-            <label class="pos-label">Fournisseur</label>
-            <input class="pos-input" id="pos-recept-fourn" placeholder="Optionnel">
-          </div>
-        </div>
-
-        <!-- Toggle mode caisse -->
-        <div style="display:flex;align-items:center;gap:12px;margin:4px 0 14px;padding:10px 14px;background:rgba(255,255,255,.04);border-radius:10px;border:1px solid rgba(255,255,255,.07)">
-          <label class="pos-label" style="margin:0;flex:1;cursor:pointer" for="pos-recept-par-caisse">
-            <span style="font-size:15px">Réception par caisse ?</span>
-            <span style="display:block;font-size:13px;color:rgba(255,255,255,.4);font-weight:400">Activer pour saisir le nombre de caisses et la contenance</span>
-          </label>
-          <div style="position:relative;width:40px;height:22px;flex-shrink:0">
-            <input type="checkbox" id="pos-recept-par-caisse" onchange="posReceptToggleCaisse()"
-              style="opacity:0;width:0;height:0;position:absolute">
-            <span id="pos-recept-toggle-track"
-              onclick="document.getElementById('pos-recept-par-caisse').click()"
-              style="position:absolute;inset:0;border-radius:11px;background:rgba(255,255,255,.12);cursor:pointer;transition:background .2s">
-              <span id="pos-recept-toggle-thumb"
-                style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;opacity:.5;transition:transform .2s,opacity .2s"></span>
-            </span>
-          </div>
-        </div>
-
-        <!-- ── Section CAISSE ── -->
-        <div id="pos-recept-caisse-section" style="display:none">
-          <div class="pos-form-row" style="align-items:flex-end">
-            <div style="flex:1">
-              <label class="pos-label">Unités par caisse *</label>
-              <input class="pos-input" id="pos-recept-upc" type="number" min="1" step="1" placeholder="ex. 24" oninput="posReceptUpdateLive()">
-            </div>
-            <div style="flex:1">
-              <label class="pos-label">Nombre de caisses</label>
-              <input class="pos-input" id="pos-recept-nb-caisses" type="number" min="0" step="1" placeholder="0" value="0" oninput="posReceptUpdateLive()">
-            </div>
-            <div style="flex:1">
-              <label class="pos-label">Unités en vrac</label>
-              <input class="pos-input" id="pos-recept-nb-vrac" type="number" min="0" step="1" placeholder="0" value="0" oninput="posReceptUpdateLive()">
-            </div>
-          </div>
-          <!-- Compteur live -->
-          <div id="pos-recept-live" style="display:none;background:rgba(63,182,168,.1);border:1px solid rgba(63,182,168,.25);border-radius:8px;padding:10px 14px;margin:4px 0 10px;font-size:15px;color:#3fb6a8">
-            <span id="pos-recept-live-txt"></span>
-          </div>
-          <div class="pos-form-row">
-            <div style="flex:1">
-              <label class="pos-label">Prix d'achat par caisse (G) *</label>
-              <input class="pos-input" id="pos-recept-prix-caisse" type="number" min="0" step="0.01" placeholder="0.00">
-            </div>
-            <div style="flex:1">
-              <label class="pos-label">Notes</label>
-              <input class="pos-input" id="pos-recept-notes-caisse" placeholder="Lot, date…">
-            </div>
-          </div>
-        </div>
-
-        <!-- ── Section UNITÉS ── -->
-        <div id="pos-recept-unite-section">
-          <div class="pos-form-row">
-            <div style="flex:1">
-              <label class="pos-label">Quantité *</label>
-              <input class="pos-input" id="pos-recept-qte" type="number" min="1" step="1" placeholder="0">
-            </div>
-            <div style="flex:1">
-              <label class="pos-label">Prix achat unitaire (G) *</label>
-              <input class="pos-input" id="pos-recept-prix" type="number" min="0" step="0.01" placeholder="0.00">
-            </div>
-          </div>
-          <div>
-            <label class="pos-label">Notes</label>
-            <input class="pos-input" id="pos-recept-notes" placeholder="Optionnel">
-          </div>
-        </div>
-
-        <div class="pos-modal-footer">
-          <button class="pos-btn ghost" onclick="document.getElementById('pos-recept-modal-bg').classList.remove('open')">Annuler</button>
-          <button class="pos-btn teal" onclick="posReceptionnerStock()">Enregistrer</button>
-        </div>
-      </div>
-    </div>
 
     <!-- Modal ajustement stock -->
     <div class="pos-modal-bg" id="pos-ajust-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
@@ -7733,87 +7774,96 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div><!-- /page-pos-achats -->
 
-    <!-- Modal Nouvel Achat -->
+    <!-- Modal Nouvel Achat : produit → quantité et prix → enregistrer (et réceptionner) -->
     <div class="pos-modal-bg" id="pos-achat-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
-      <div class="pos-modal" style="max-width:600px;max-height:90vh;overflow-y:auto">
-        <h3>Nouvel achat / Réception</h3>
-
-        <div class="pos-form-row">
-          <div style="flex:2">
-            <label class="pos-label">Produit *</label>
-            <select class="pos-select" id="pa-produit" onchange="paOnProdChange()"></select>
-          </div>
-          <div style="flex:1">
-            <label class="pos-label">Fournisseur</label>
-            <input class="pos-input" id="pa-fourn" placeholder="Optionnel">
+      <div class="pos-modal pa-modal">
+        <div class="pa-tete">
+          <h3 style="margin:0">Nouvel achat</h3>
+          <div class="pa-tete-act">
+            <span class="pa-serie" id="pa-serie" hidden></span>
+            <button type="button" class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posFicheTechniqueOuvrir()">Fiche stock</button>
           </div>
         </div>
 
-        <div class="pos-form-row">
-          <div style="flex:1">
-            <label class="pos-label">Quantité *</label>
-            <input class="pos-input" id="pa-qte" type="number" min="0.001" step="0.001" placeholder="0" oninput="paUpdateRecap()">
+        <!-- 1 · Produit -->
+        <div class="pa-etape">
+          <div class="pa-etape-t"><span>1</span> Produit acheté</div>
+          <select class="pos-select" id="pa-produit" hidden onchange="paOnProdChange()"></select>
+          <div id="pa-recherche-zone">
+            <input class="pos-input" id="pa-produit-cherche" placeholder="Tapez le nom du produit (ex. Prestige, Gazoline…)" autocomplete="off"
+                   oninput="paRechercher()" onkeydown="if(event.key==='Enter'){event.preventDefault();paChoisirPremier()}">
+            <div class="pa-resultats" id="pa-resultats" role="listbox" aria-label="Produits"></div>
           </div>
-          <div style="flex:1">
-            <label class="pos-label">Unité de saisie</label>
-            <select class="pos-select" id="pa-qte-type" onchange="paOnQteTypeChange()">
-              <option value="unite">En unités</option>
-              <option value="caisse">En caisses</option>
-            </select>
-          </div>
+          <div class="pa-choix" id="pa-choix" hidden></div>
         </div>
 
-        <div id="pa-caisse-info" style="display:none;background:rgba(63,182,168,.08);border:1px solid rgba(63,182,168,.2);border-radius:8px;padding:10px 14px;margin:0 0 12px;font-size:14px;color:rgba(255,255,255,.6)">
-          <span id="pa-caisse-info-txt"></span>
+        <!-- 2 · Quantité et prix -->
+        <div class="pa-etape" id="pa-etape2">
+          <div class="pa-etape-t"><span>2</span> Quantité et prix</div>
+          <select class="pos-select" id="pa-qte-type" hidden onchange="paOnQteTypeChange()">
+            <option value="unite">En unités</option>
+            <option value="caisse">En caisses</option>
+          </select>
+          <div class="pa-modes" id="pa-modes" role="group" aria-label="Saisir en">
+            <button type="button" class="pa-mode" data-m="caisse" onclick="paSetMode('caisse')">En caisses</button>
+            <button type="button" class="pa-mode" data-m="unite" onclick="paSetMode('unite')">En unités</button>
+          </div>
+          <div class="pos-form-row">
+            <div style="flex:1">
+              <label class="pos-label" for="pa-qte" id="pa-qte-label">Quantité *</label>
+              <input class="pos-input pa-gros" id="pa-qte" type="number" min="0.001" step="0.001" placeholder="0" inputmode="decimal" oninput="paUpdateRecap()"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('pa-prix').focus()}">
+              <div class="pa-aide" id="pa-conv"></div>
+            </div>
+            <div style="flex:1">
+              <label class="pos-label" id="pa-prix-label" for="pa-prix">Prix d'achat unitaire (G) *</label>
+              <input class="pos-input pa-gros" id="pa-prix" type="number" min="0" step="0.01" placeholder="0,00" inputmode="decimal" oninput="paUpdateRecap()"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();posEnregistrerAchat(true)}">
+              <div class="pa-aide" id="pa-prix-aide"></div>
+            </div>
+          </div>
+          <div id="pa-caisse-info" hidden><span id="pa-caisse-info-txt"></span></div>
+          <div class="pos-form-row">
+            <div style="flex:1">
+              <label class="pos-label" for="pa-fourn">Fournisseur</label>
+              <input class="pos-input" id="pa-fourn" placeholder="Choisir ou taper" list="pa-fourn-liste" autocomplete="off">
+              <datalist id="pa-fourn-liste"></datalist>
+            </div>
+            <div style="flex:1">
+              <label class="pos-label" for="pa-notes">Notes</label>
+              <input class="pos-input" id="pa-notes" placeholder="Facture, lot… (facultatif)">
+            </div>
+          </div>
+          <details class="pa-frais" id="pa-frais">
+            <summary>Frais en plus (transport, manutention…) <span id="pa-frais-nb"></span></summary>
+            <div style="display:flex;justify-content:flex-end;margin:8px 0">
+              <button type="button" class="pos-btn ghost" style="padding:5px 12px;font-size:13px" onclick="paAjouterDepense()">+ Ajouter un frais</button>
+            </div>
+            <div id="pa-depenses-list" style="display:flex;flex-direction:column;gap:8px"></div>
+            <div id="pa-depenses-empty" style="font-size:13px;color:rgba(255,255,255,.35);padding:4px 0">Aucun frais</div>
+          </details>
         </div>
 
-        <div class="pos-form-row">
-          <div style="flex:1">
-            <label class="pos-label" id="pa-prix-label">Prix d'achat unitaire (G) *</label>
-            <input class="pos-input" id="pa-prix" type="number" min="0" step="0.01" placeholder="0.00" oninput="paUpdateRecap()">
-          </div>
-          <div style="flex:1">
-            <label class="pos-label">Notes</label>
-            <input class="pos-input" id="pa-notes" placeholder="Optionnel">
-          </div>
-        </div>
-
-        <!-- Dépenses supplémentaires -->
-        <div style="margin-top:16px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <div style="font-size:15px;font-weight:600;color:rgba(255,255,255,.75)">Dépenses supplémentaires</div>
-            <button type="button" class="pos-btn ghost" style="padding:5px 12px;font-size:14px" onclick="paAjouterDepense()">+ Ajouter</button>
-          </div>
-          <div id="pa-depenses-list" style="display:flex;flex-direction:column;gap:8px"></div>
-          <div id="pa-depenses-empty" style="font-size:14px;color:rgba(255,255,255,.3);text-align:center;padding:8px 0">Aucune dépense supplémentaire</div>
-        </div>
+        <!-- Réception immédiate (produits bar) -->
+        <label class="pa-recep" id="pa-recep-zone" hidden>
+          <input type="checkbox" id="pa-receptionner" checked>
+          <span><strong>La marchandise est arrivée : réceptionner tout de suite</strong><br>
+          <small>Crée les colis et ouvre les étiquettes 2 × 1 à coller. Le stock entre au dépôt quand chaque colis est scanné (page Dépôt Bar).</small></span>
+        </label>
 
         <!-- Récapitulatif -->
-        <div style="margin-top:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px">
-          <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Récapitulatif</div>
-          <div id="pa-recap-unite-row" style="display:none;justify-content:space-between;font-size:14px;margin-bottom:7px;background:rgba(63,182,168,.08);border-radius:7px;padding:6px 10px">
-            <span style="color:rgba(255,255,255,.5)">→ soit par unité</span>
-            <span id="pa-recap-prix-unite" style="color:#3fb6a8;font-weight:700">G 0.00 / unité</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:15px;margin-bottom:7px">
-            <span style="color:rgba(255,255,255,.55)">Prix marchandise</span>
-            <span id="pa-recap-marchandise" style="color:#fff;font-weight:600">G 0.00</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:15px;margin-bottom:7px">
-            <span style="color:rgba(255,255,255,.55)">Dépenses supplémentaires</span>
-            <span id="pa-recap-depenses" style="color:#f87171;font-weight:600">G 0.00</span>
-          </div>
-          <div style="height:1px;background:rgba(255,255,255,.08);margin:10px 0"></div>
-          <div style="display:flex;justify-content:space-between">
-            <span style="color:#fff;font-weight:700;font-size:16px">Coût total</span>
-            <span id="pa-recap-total" style="color:#3fb6a8;font-weight:700;font-size:19px">G 0.00</span>
-          </div>
-          <div id="pa-recap-warning" style="display:none;margin-top:12px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:10px 12px;font-size:13.5px;color:#fca5a5"></div>
+        <div class="pa-recap">
+          <div class="pa-recap-l" id="pa-recap-unite-row" style="display:none"><span>Soit par unité</span><span id="pa-recap-prix-unite">G 0.00 / unité</span></div>
+          <div class="pa-recap-l"><span>Marchandise</span><span id="pa-recap-marchandise">G 0.00</span></div>
+          <div class="pa-recap-l"><span>Frais en plus</span><span id="pa-recap-depenses">G 0.00</span></div>
+          <div class="pa-recap-l pa-recap-tot"><span>Coût total</span><span id="pa-recap-total">G 0.00</span></div>
+          <div id="pa-recap-warning" style="display:none;margin-top:10px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:10px 12px;font-size:13.5px;color:#fca5a5"></div>
         </div>
 
         <div class="pos-modal-footer">
-          <button class="pos-btn ghost" onclick="document.getElementById('pos-achat-modal-bg').classList.remove('open')">Annuler</button>
-          <button class="pos-btn teal" onclick="posEnregistrerAchat()">Enregistrer l'achat</button>
+          <button class="pos-btn ghost" onclick="paFermer()">Fermer</button>
+          <button class="pos-btn ghost" onclick="posEnregistrerAchat(true)">Enregistrer et nouvel achat</button>
+          <button class="pos-btn teal" onclick="posEnregistrerAchat(false)">Enregistrer</button>
         </div>
       </div>
     </div>
@@ -26453,94 +26503,10 @@ function _posFillProduitSelects(prods){
   });
 }
 
+// « + Réception » (page Stock) : même formulaire que « Nouvel achat »
 function posStockReceptionModal(){
   if(_isReadOnly()){ _giAlert('Accès lecture seule — modification réservée à l\'administrateur.','err'); return; }
-  document.getElementById('pos-recept-qte').value         = '';
-  document.getElementById('pos-recept-prix').value        = '';
-  document.getElementById('pos-recept-notes').value       = '';
-  document.getElementById('pos-recept-upc').value         = '';
-  document.getElementById('pos-recept-nb-caisses').value  = '0';
-  document.getElementById('pos-recept-nb-vrac').value     = '0';
-  document.getElementById('pos-recept-prix-caisse').value = '';
-  document.getElementById('pos-recept-notes-caisse').value= '';
-  document.getElementById('pos-recept-fourn').value       = '';
-  const cb = document.getElementById('pos-recept-par-caisse');
-  cb.checked = false;
-  posReceptOnProdChange();
-  document.getElementById('pos-recept-modal-bg').classList.add('open');
-}
-
-function posReceptOnProdChange(){
-  const prodId = parseInt(document.getElementById('pos-recept-produit').value);
-  const prod   = _posProduitsAll.find(p=>p.id===prodId);
-  const cb     = document.getElementById('pos-recept-par-caisse');
-  if(prod && prod.vendu_par_caisse){
-    cb.checked = true;
-    if(prod.unites_par_caisse) document.getElementById('pos-recept-upc').value = prod.unites_par_caisse;
-  } else {
-    cb.checked = false;
-  }
-  posReceptToggleCaisse();
-}
-
-function posReceptToggleCaisse(){
-  const on    = document.getElementById('pos-recept-par-caisse').checked;
-  const track = document.getElementById('pos-recept-toggle-track');
-  const thumb = document.getElementById('pos-recept-toggle-thumb');
-  if(track){ track.style.background = on ? '#3fb6a8' : 'rgba(255,255,255,.12)'; }
-  if(thumb){ thumb.style.transform  = on ? 'translateX(18px)' : 'translateX(0)'; thumb.style.opacity = on ? '1' : '.5'; }
-  document.getElementById('pos-recept-caisse-section').style.display = on ? '' : 'none';
-  document.getElementById('pos-recept-unite-section').style.display  = on ? 'none' : '';
-  document.getElementById('pos-recept-live').style.display           = 'none';
-}
-
-function posReceptUpdateLive(){
-  const upc     = parseInt(document.getElementById('pos-recept-upc').value)||0;
-  const caisses = parseInt(document.getElementById('pos-recept-nb-caisses').value)||0;
-  const vrac    = parseInt(document.getElementById('pos-recept-nb-vrac').value)||0;
-  const liveDiv = document.getElementById('pos-recept-live');
-  const liveTxt = document.getElementById('pos-recept-live-txt');
-  if(!liveDiv) return;
-  if(upc < 1){ liveDiv.style.display='none'; return; }
-  const total = caisses * upc + vrac;
-  liveDiv.style.display = total > 0 ? '' : 'none';
-  if(liveTxt) liveTxt.textContent = `Total : ${total} unité${total>1?'s':''} — ${caisses} caisse${caisses!==1?'s':''} × ${upc} + ${vrac} u. vrac`;
-}
-
-async function posReceptionnerStock(){
-  const prodId    = parseInt(document.getElementById('pos-recept-produit').value);
-  const fourn     = document.getElementById('pos-recept-fourn').value.trim()||null;
-  const parCaisse = document.getElementById('pos-recept-par-caisse').checked;
-
-  let quantite, prix_achat_unitaire, notes;
-
-  if(parCaisse){
-    const upc        = parseInt(document.getElementById('pos-recept-upc').value)||0;
-    const caisses    = parseInt(document.getElementById('pos-recept-nb-caisses').value)||0;
-    const vrac       = parseInt(document.getElementById('pos-recept-nb-vrac').value)||0;
-    const prixCaisse = parseFloat(document.getElementById('pos-recept-prix-caisse').value)||0;
-    notes            = document.getElementById('pos-recept-notes-caisse').value.trim()||null;
-    if(upc < 1)              { posAlert("Saisir le nombre d'unités par caisse.",'warn'); return; }
-    if(caisses===0 && vrac===0){ posAlert('Saisir au moins 1 caisse ou 1 unité en vrac.','warn'); return; }
-    if(prixCaisse <= 0)      { posAlert('Le prix par caisse est obligatoire.','warn'); return; }
-    quantite            = caisses * upc + vrac;
-    prix_achat_unitaire = prixCaisse / upc;
-  } else {
-    quantite            = parseInt(document.getElementById('pos-recept-qte').value)||0;
-    prix_achat_unitaire = parseFloat(document.getElementById('pos-recept-prix').value)||0;
-    notes               = document.getElementById('pos-recept-notes').value.trim()||null;
-    if(quantite <= 0)           { posAlert('La quantité est obligatoire.','warn'); return; }
-    if(prix_achat_unitaire <= 0){ posAlert('Le prix unitaire est obligatoire.','warn'); return; }
-  }
-
-  if(!prodId){ posAlert('Sélectionner un produit.','warn'); return; }
-  try {
-    await apiFetch('POST','/pos/achats',{ produit_id:prodId, quantite, prix_achat_unitaire, fournisseur:fourn, notes });
-    document.getElementById('pos-recept-modal-bg').classList.remove('open');
-    await loadPosStock();
-    const prod = _posProduitsAll.find(p=>p.id===prodId);
-    posAlert(`Réception enregistrée — ${quantite} unité${quantite>1?'s':''} ajoutée${quantite>1?'s':''} pour ${prod?.nom||'le produit'}.`,'ok');
-  } catch(e){ posAlert(e.message||'Erreur.'); }
+  _posOuvrirFormAchat();
 }
 
 function posStockAjustModal(){
@@ -26925,11 +26891,6 @@ tbody td.sep-left{border-left:2px solid #0f2744}
   w.document.close();
 }
 
-async function posAchatNouveauModal(){
-  // Affiche la fiche technique avant d'ouvrir le formulaire d'achat
-  await posFicheTechniqueOuvrir();
-}
-
 let _pftFicheData = null; // cache la réponse fiche-technique
 
 async function posFicheTechniqueOuvrir(){
@@ -27039,47 +27000,7 @@ async function posFicheTechniqueOuvrir(){
 
 async function pftAllerAchat(){
   document.getElementById('pos-fiche-tech-modal').classList.remove('open');
-  await _posOuvrirFormAchat();
-}
-
-async function _posOuvrirFormAchat(){
-  _paDepenses = [];
-  const fields = ['pa-fourn','pa-qte','pa-prix','pa-notes'];
-  fields.forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-  document.getElementById('pa-qte-type').value = 'unite';
-
-  if(!_paTousProduits.bar.length && !_paTousProduits.station.length){
-    try { _paTousProduits = await apiFetch('GET','/pos/achats/produits-tous'); } catch(e){}
-  }
-
-  const sel = document.getElementById('pa-produit');
-  if(sel){
-    sel.innerHTML = '<option value="">— Choisir un produit —</option>';
-    if((_paTousProduits.bar||[]).length){
-      const grp = document.createElement('optgroup');
-      grp.label = 'Produits Bar';
-      _paTousProduits.bar.forEach(p=>{
-        const o=document.createElement('option'); o.value=p.id;
-        o.textContent=`${p.nom}${p.categorie?' ('+p.categorie+')':''}`;
-        grp.appendChild(o);
-      });
-      sel.appendChild(grp);
-    }
-    if((_paTousProduits.station||[]).length){
-      const grp = document.createElement('optgroup');
-      grp.label = 'Carburants';
-      _paTousProduits.station.forEach(p=>{
-        const o=document.createElement('option'); o.value=`s_${p.id}`;
-        o.textContent=p.nom;
-        grp.appendChild(o);
-      });
-      sel.appendChild(grp);
-    }
-  }
-  paOnProdChange();
-  paRenderDepenses();
-  paUpdateRecap();
-  document.getElementById('pos-achat-modal-bg').classList.add('open');
+  if(!document.getElementById('pos-achat-modal-bg').classList.contains('open')) await _posOuvrirFormAchat();
 }
 
 function pftExcelFiche(){
@@ -27255,29 +27176,131 @@ tbody td{border-bottom:1px solid #edf1f7}
   w.document.close();
 }
 
+async function posAchatNouveauModal(){
+  // Ouvre directement le formulaire ; la fiche stock reste accessible depuis
+  // son en-tête (bouton « Fiche stock »).
+  await _posOuvrirFormAchat();
+}
+
+let _paSerie = {nb:0, total:0};
+
+async function _posOuvrirFormAchat(){
+  _paDepenses = [];
+  _paSerie = {nb:0, total:0};
+  ['pa-fourn','pa-qte','pa-prix','pa-notes','pa-produit-cherche'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('pa-qte-type').value = 'unite';
+  // Toujours recharger : le dernier achat de chaque produit change à chaque saisie
+  try { _paTousProduits = await apiFetch('GET','/pos/achats/produits-tous'); }
+  catch(e){ if(!_paTousProduits) _paTousProduits={bar:[],station:[]}; }
+
+  const sel = document.getElementById('pa-produit');
+  sel.innerHTML = '<option value=""></option>'
+    + (_paTousProduits.bar||[]).map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('')
+    + (_paTousProduits.station||[]).map(p=>`<option value="s_${p.id}">${esc(p.nom)}</option>`).join('');
+  sel.value='';
+  document.getElementById('pa-fourn-liste').innerHTML =
+    (_paTousProduits.fournisseurs||[]).map(f=>`<option value="${esc(f)}"></option>`).join('');
+  document.getElementById('pa-frais').open=false;
+  _paMajSerie();
+  paOnProdChange();
+  paRenderDepenses();
+  paRechercher();
+  document.getElementById('pos-achat-modal-bg').classList.add('open');
+  setTimeout(()=>document.getElementById('pa-produit-cherche')?.focus(), 60);
+}
+
+function paFermer(){
+  document.getElementById('pos-achat-modal-bg').classList.remove('open');
+  if(_paSerie.nb && typeof loadPosAchats==='function') loadPosAchats();
+}
+
+function _paMajSerie(){
+  const el=document.getElementById('pa-serie'); if(!el) return;
+  el.hidden=!_paSerie.nb;
+  el.textContent=`✓ ${_paSerie.nb} achat(s) enregistré(s) · ${posGx(_paSerie.total)}`;
+}
+
+// Recherche du produit : nom ou catégorie, Bar puis Carburant
+function paRechercher(){
+  const q=(document.getElementById('pa-produit-cherche').value||'').trim().toLowerCase();
+  const filtre=p=>!q || (p.nom||'').toLowerCase().includes(q) || (p.categorie||'').toLowerCase().includes(q);
+  const bar=(_paTousProduits.bar||[]).filter(filtre).slice(0,40);
+  const st=(_paTousProduits.station||[]).filter(filtre).slice(0,10);
+  const item=(val,p,type)=>{
+    const d=p.dernier_achat;
+    const sous = type==='station' ? 'Carburant · au gallon'
+      : `${esc(p.categorie||'')}${p.vendu_par_caisse&&p.unites_par_caisse?` · caisse de ${p.unites_par_caisse}`:''}`;
+    return `<button type="button" class="pa-res" role="option" onclick="paChoisir('${val}')">
+      <span class="pa-res-nom">${esc(p.nom)}</span><span class="pa-res-sous">${sous}</span>
+      ${d?`<span class="pa-res-der">dernier : ${posGx(d.prix_unitaire)}/${esc(type==='station'?'gal':(p.unite||'u.'))} · ${new Date(d.date).toLocaleDateString('fr-FR')}</span>`:''}
+    </button>`;
+  };
+  document.getElementById('pa-resultats').innerHTML =
+    (bar.length?`<div class="pa-res-grp">Produits Bar</div>`+bar.map(p=>item(p.id,p,'bar')).join(''):'')
+    +(st.length?`<div class="pa-res-grp">Carburants</div>`+st.map(p=>item('s_'+p.id,p,'station')).join(''):'')
+    || '<div class="pa-res-vide">Aucun produit ne correspond.</div>';
+}
+function paChoisirPremier(){
+  const b=document.querySelector('#pa-resultats .pa-res');
+  if(b) b.click();
+}
+function paChoisir(val){
+  document.getElementById('pa-produit').value=String(val);
+  paOnProdChange();
+  setTimeout(()=>document.getElementById('pa-qte').focus(), 30);
+}
+function paChangerProduit(){
+  document.getElementById('pa-produit').value='';
+  paOnProdChange();
+  const r=document.getElementById('pa-produit-cherche'); r.value=''; paRechercher(); r.focus();
+}
+
+// Fiche du produit choisi, avec son dernier achat
+function _paRenderChoix(sel){
+  const box=document.getElementById('pa-choix'), zone=document.getElementById('pa-recherche-zone');
+  if(!sel){ box.hidden=true; zone.hidden=false; return; }
+  const p=sel.prod||{}, d=p.dernier_achat;
+  const unite = sel.type==='station' ? 'gallon' : (p.unite||'unité');
+  box.innerHTML = `
+    <div class="pa-choix-l">
+      <div><div class="pa-choix-nom">${esc(p.nom||'')}</div>
+        <div class="pa-res-sous">${sel.type==='station'?'Carburant · acheté au gallon':`${esc(p.categorie||'')} · vendu à l'unité (${esc(unite)})${p.vendu_par_caisse&&p.unites_par_caisse?` · caisse de ${p.unites_par_caisse}`:''}`}</div></div>
+      <button type="button" class="sx-link" onclick="paChangerProduit()">changer</button>
+    </div>
+    ${d?`<div class="pa-der">Dernier achat le <b>${new Date(d.date).toLocaleDateString('fr-FR')}</b> : ${posGx(d.prix_unitaire)} par ${esc(unite)}${d.fournisseur?` chez <b>${esc(d.fournisseur)}</b>`:''}
+      <button type="button" class="pos-btn ghost pa-reprendre" onclick="paReprendreDernier()">Reprendre ce prix${d.fournisseur?' et ce fournisseur':''}</button></div>`
+       :'<div class="pa-der">Premier achat de ce produit.</div>'}`;
+  box.hidden=false; zone.hidden=true;
+}
+
+function paReprendreDernier(){
+  const sel=_paGetSelected(); const d=sel?.prod?.dernier_achat; if(!d) return;
+  const caisse = document.getElementById('pa-qte-type').value==='caisse' && sel.prod.unites_par_caisse;
+  document.getElementById('pa-prix').value = (caisse ? d.prix_unitaire*sel.prod.unites_par_caisse : d.prix_unitaire).toFixed(2);
+  if(d.fournisseur && !document.getElementById('pa-fourn').value) document.getElementById('pa-fourn').value=d.fournisseur;
+  paUpdateRecap();
+  document.getElementById('pa-qte').focus();
+}
+
+function paSetMode(m){
+  document.getElementById('pa-qte-type').value=m;
+  paOnQteTypeChange();
+  document.getElementById('pa-qte').focus();
+}
+
 function paOnProdChange(){
   const sel  = _paGetSelected();
   const type = document.getElementById('pa-qte-type');
-  const info = document.getElementById('pa-caisse-info');
-  const qteRow = document.getElementById('pa-qte-type')?.closest('.pos-form-row');
-
-  if(!sel){ if(info) info.style.display='none'; paUpdateRecap(); return; }
-
+  const modes= document.getElementById('pa-modes');
+  _paRenderChoix(sel);
+  document.getElementById('pa-recep-zone').hidden = !(sel && sel.type==='bar');
+  if(!sel){ modes.hidden=true; paOnQteTypeChange(); return; }
   if(sel.type==='station'){
-    // Carburant : toujours en unités (gallon), pas de mode caisse
-    type.value = 'unite';
-    if(type.parentElement) type.parentElement.style.display='none'; // cacher le sélecteur de mode
-    if(info) info.style.display='none';
-    const lbl = document.getElementById('pa-prix-label');
-    if(lbl) lbl.textContent="Prix d'achat par gallon (G) *";
+    type.value='unite'; modes.hidden=true;           // carburant : toujours au gallon
   } else if(sel.prod && sel.prod.vendu_par_caisse && sel.prod.unites_par_caisse){
-    type.value='caisse';
-    if(type.parentElement) type.parentElement.style.display='';
-    if(info){ info.style.display=''; document.getElementById('pa-caisse-info-txt').textContent=`1 caisse = ${sel.prod.unites_par_caisse} ${sel.prod.unite||'unités'}`; }
+    type.value='caisse'; modes.hidden=false;
   } else {
-    type.value='unite';
-    if(type.parentElement) type.parentElement.style.display='';
-    if(info) info.style.display='none';
+    type.value='unite'; modes.hidden=true;           // pas de notion de caisse pour ce produit
   }
   paOnQteTypeChange();
 }
@@ -27285,21 +27308,15 @@ function paOnProdChange(){
 function paOnQteTypeChange(){
   const sel  = _paGetSelected();
   const type = document.getElementById('pa-qte-type')?.value;
-  const lbl  = document.getElementById('pa-prix-label');
-  const info = document.getElementById('pa-caisse-info');
+  document.querySelectorAll('#pa-modes .pa-mode').forEach(b=>b.classList.toggle('active', b.dataset.m===type));
+  const unite = sel?.type==='station' ? 'gallon' : (sel?.prod?.unite||'unité');
+  const lbl = document.getElementById('pa-prix-label'), lq=document.getElementById('pa-qte-label');
   if(sel?.type==='station'){
-    if(lbl) lbl.textContent="Prix d'achat par gallon (G) *";
-    if(info) info.style.display='none';
+    lq.textContent='Nombre de gallons *'; lbl.textContent="Prix d'achat par gallon (G) *";
   } else if(type==='caisse' && sel?.prod){
-    if(lbl) lbl.textContent="Prix d'achat par caisse (G) *";
-    if(info && sel.prod.vendu_par_caisse && sel.prod.unites_par_caisse){
-      info.style.display='';
-      document.getElementById('pa-caisse-info-txt').textContent=
-        `Saisir le prix par caisse — converti en ${sel.prod.unites_par_caisse} ${sel.prod.unite||'unités'}`;
-    }
+    lq.textContent='Nombre de caisses *'; lbl.textContent="Prix d'achat par caisse (G) *";
   } else {
-    if(lbl) lbl.textContent="Prix d'achat unitaire (G) *";
-    if(info) info.style.display='none';
+    lq.textContent=`Quantité (${unite}) *`; lbl.textContent=`Prix d'achat par ${unite} (G) *`;
   }
   paUpdateRecap();
 }
@@ -27307,7 +27324,6 @@ function paOnQteTypeChange(){
 function paAjouterDepense(){
   _paDepenses.push({description:'',montant:0});
   paRenderDepenses();
-  // focus last description input
   setTimeout(()=>{
     const inputs = document.querySelectorAll('#pa-depenses-list input[type="text"],#pa-depenses-list input:not([type])');
     if(inputs.length) inputs[inputs.length-1].focus();
@@ -27330,22 +27346,20 @@ function paDepenseChanged(idx,field,val){
 function paRenderDepenses(){
   const list  = document.getElementById('pa-depenses-list');
   const empty = document.getElementById('pa-depenses-empty');
+  const nb = document.getElementById('pa-frais-nb');
+  if(nb) nb.textContent = _paDepenses.length ? `(${_paDepenses.length})` : '';
   if(!list) return;
-  if(!_paDepenses.length){
-    list.innerHTML='';
-    if(empty) empty.style.display='';
-    return;
-  }
+  if(!_paDepenses.length){ list.innerHTML=''; if(empty) empty.style.display=''; return; }
   if(empty) empty.style.display='none';
   list.innerHTML = _paDepenses.map((d,i)=>`
     <div style="display:flex;gap:8px;align-items:center">
       <input class="pos-input" placeholder="Description (transport, manutention…)" style="flex:2"
-        value="${(d.description||'').replace(/"/g,'&quot;')}"
+        value="${esc(d.description||'')}"
         oninput="paDepenseChanged(${i},'description',this.value)">
       <input class="pos-input" type="number" min="0" step="0.01" placeholder="Montant G" style="flex:1"
         value="${d.montant||''}"
         oninput="paDepenseChanged(${i},'montant',this.value)">
-      <button type="button" onclick="paSupprimerDepense(${i})"
+      <button type="button" onclick="paSupprimerDepense(${i})" aria-label="Retirer ce frais"
         style="background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.25);border-radius:8px;color:#f87171;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;padding:0">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
@@ -27353,9 +27367,7 @@ function paRenderDepenses(){
 }
 
 // Détecte et affiche visuellement les cas où le prix par caisse pourrait
-// avoir été confondu avec un prix par unité (la cause exacte du bug de
-// calcul déjà corrigé côté backend) — même heuristique utilisée pour
-// identifier les achats historiques à corriger : prix par unité effectif
+// avoir été confondu avec un prix par unité : prix par unité effectif
 // anormalement plus élevé que le prix de vente du produit.
 function _paCalculTransparence(qte, prix, type, prod){
   const upc = (prod?.vendu_par_caisse && prod.unites_par_caisse) ? prod.unites_par_caisse : 1;
@@ -27371,32 +27383,37 @@ function paUpdateRecap(){
   const qte  = parseFloat(document.getElementById('pa-qte')?.value)||0;
   const prix = parseFloat(document.getElementById('pa-prix')?.value)||0;
   const type = document.getElementById('pa-qte-type')?.value;
-  // Le récapitulatif de coût total est identique quelle que soit la source
-  // produit : qte * prix = coût marchandise (qte et prix sont saisis dans la
-  // même unité — caisse ou bouteille — donc leur produit reste correct).
   const marchandise = qte * prix;
   const depTotal    = _paDepenses.reduce((s,d)=>s+(parseFloat(d.montant)||0),0);
   const coutTotal   = marchandise + depTotal;
   const fmt = v=>`G ${v.toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const el  = id=>document.getElementById(id);
-  if(el('pa-recap-marchandise')) el('pa-recap-marchandise').textContent = fmt(marchandise);
-  if(el('pa-recap-depenses'))    el('pa-recap-depenses').textContent    = fmt(depTotal);
-  if(el('pa-recap-total'))       el('pa-recap-total').textContent       = fmt(coutTotal);
+  el('pa-recap-marchandise').textContent = fmt(marchandise);
+  el('pa-recap-depenses').textContent    = fmt(depTotal);
+  el('pa-recap-total').textContent       = fmt(coutTotal);
 
-  const { enCaisse, prixUnitaireEffectif, prixVente, suspect } = _paCalculTransparence(qte, prix, type, sel?.prod);
-  const uniteRow = el('pa-recap-unite-row');
-  const warnBox  = el('pa-recap-warning');
-  if(uniteRow) uniteRow.style.display = (enCaisse && prix>0) ? 'flex' : 'none';
-  if(el('pa-recap-prix-unite') && enCaisse){
-    el('pa-recap-prix-unite').textContent = `${prixUnitaireEffectif.toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})} / ${sel?.prod?.unite||'unité'}`;
+  const { enCaisse, upc, prixUnitaireEffectif, prixVente, suspect } = _paCalculTransparence(qte, prix, type, sel?.prod);
+  const unite = sel?.type==='station' ? 'gallon' : (sel?.prod?.unite||'unité');
+  // Conversion caisses → unités, en direct
+  el('pa-conv').textContent = (enCaisse && qte>0) ? `= ${(qte*upc).toLocaleString('fr')} ${unite} (${upc} par caisse)` : '';
+  // Aide sur le prix : prix par unité et comparaison avec le dernier achat
+  const d = sel?.prod?.dernier_achat;
+  let aide = '';
+  if(enCaisse && prix>0) aide = `soit ${fmt(prixUnitaireEffectif)} par ${unite}`;
+  if(d && prix>0){
+    const ecart = prixUnitaireEffectif - d.prix_unitaire;
+    if(Math.abs(ecart) > 0.004) aide += `${aide?' · ':''}${ecart>0?'+':''}${fmt(ecart)} par rapport au dernier achat`;
+    else aide += `${aide?' · ':''}même prix que le dernier achat`;
   }
-  if(warnBox){
-    if(suspect){
-      warnBox.style.display = '';
-      warnBox.innerHTML = `⚠ Ce prix par unité calculé (G ${prixUnitaireEffectif.toFixed(2)}) est bien plus élevé que le prix de vente actuel (G ${prixVente.toFixed(2)}). Vérifiez que vous n'avez pas saisi un prix par caisse alors que le mode choisi est « ${enCaisse?'En caisses':'En unités'} ».`;
-    } else {
-      warnBox.style.display = 'none';
-    }
+  el('pa-prix-aide').textContent = aide;
+  el('pa-recap-unite-row').style.display = (enCaisse && prix>0) ? 'flex' : 'none';
+  if(enCaisse) el('pa-recap-prix-unite').textContent = `${fmt(prixUnitaireEffectif)} / ${unite}`;
+  const warnBox = el('pa-recap-warning');
+  if(suspect){
+    warnBox.style.display = '';
+    warnBox.innerHTML = `⚠ Le prix par ${esc(unite)} calculé (G ${prixUnitaireEffectif.toFixed(2)}) est bien plus élevé que le prix de vente actuel (G ${prixVente.toFixed(2)}). Vérifiez que vous n'avez pas saisi un prix par caisse alors que le mode choisi est « ${enCaisse?'En caisses':'En unités'} ».`;
+  } else {
+    warnBox.style.display = 'none';
   }
 }
 
@@ -27617,7 +27634,7 @@ function posAchatFichePDF(idx){
   w.document.close();
 }
 
-async function posEnregistrerAchat(){
+async function posEnregistrerAchat(continuer=false){
   const sel   = _paGetSelected();
   const qte   = parseFloat(document.getElementById('pa-qte').value)||0;
   const prix  = parseFloat(document.getElementById('pa-prix').value)||0;
@@ -27627,7 +27644,7 @@ async function posEnregistrerAchat(){
 
   if(!sel)    { posAlert('Sélectionner un produit.','warn'); return; }
   if(qte<=0)  { posAlert('La quantité doit être > 0.','warn'); return; }
-  if(prix<=0) { posAlert('Le prix d\'achat unitaire doit être > 0.','warn'); return; }
+  if(prix<=0) { posAlert('Indiquez le prix d\'achat.','warn'); document.getElementById('pa-prix').focus(); return; }
 
   for(const d of _paDepenses){
     if(!d.description.trim()){ posAlert('Saisir une description pour chaque dépense.','warn'); return; }
@@ -27650,19 +27667,39 @@ async function posEnregistrerAchat(){
   if(sel.type==='bar')     body.produit_id         = sel.id;
   else                     body.station_produit_id  = sel.id;
 
+  const receptionner = sel.type==='bar' && document.getElementById('pa-receptionner')?.checked;
   try {
     const res = await apiFetch('POST','/pos/achats', body);
-    document.getElementById('pos-achat-modal-bg').classList.remove('open');
-
     const fmt = v=>`G ${parseFloat(v).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
     const label = res.produit_nom || (sel.prod?.nom||'le produit');
-    const unLabel = sel.type==='station' ? 'gallon' : 'unité';
+    const unLabel = sel.type==='station' ? 'gallon' : (sel.prod?.unite||'unité');
+    let message = `Achat enregistré — ${res.quantite_unites} ${unLabel} de ${label} · ${fmt(res.cout_total)}.`;
 
-    await loadPosAchats();
-    if(res.statut==='EN_ATTENTE'){
-      posAlert(`Achat enregistré (EN ATTENTE) — Allez dans Achats Bar pour le confirmer (comptabilité). Faites un approvisionnement séparé pour ajouter les ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} de ${label} au stock.`,'warn');
+    // Réception immédiate : colis + étiquettes (le stock entre au dépôt au scan)
+    if(receptionner && res.achat_id){
+      try{
+        const r = await apiFetch('POST', `/pos/depot/receptions/${res.achat_id}`, {});
+        message += ` ${r.nb_colis} colis créé(s) : collez les étiquettes puis scannez-les au Dépôt Bar.`;
+        if(typeof depEtiquettes==='function') depEtiquettes(res.achat_id);
+      }catch(e){
+        message += ` Réception non faite (${String(e.message||'').replace(/^\[\d+\]\s*/,'')}) : réceptionnez-le depuis le Dépôt Bar.`;
+      }
+    } else if(res.statut==='EN_ATTENTE'){
+      message += ' À réceptionner depuis le Dépôt Bar quand la marchandise arrive.';
+    }
+
+    _paSerie.nb++; _paSerie.total += parseFloat(res.cout_total)||0; _paMajSerie();
+    posAlert(message,'ok');
+    if(continuer){
+      // Achat suivant : on garde le fournisseur, on vide le reste
+      _paDepenses=[]; paRenderDepenses();
+      ['pa-qte','pa-prix','pa-notes'].forEach(id=>document.getElementById(id).value='');
+      paChangerProduit();
+      try { _paTousProduits = await apiFetch('GET','/pos/achats/produits-tous'); } catch(_){}
+      paRechercher();
     } else {
-      posAlert(`Achat enregistré — ${res.quantite_unites} ${unLabel}${res.quantite_unites>1?'s':''} pour ${label}. Coût total: ${fmt(res.cout_total)}`,'ok');
+      document.getElementById('pos-achat-modal-bg').classList.remove('open');
+      await loadPosAchats();
     }
   } catch(e){ posAlert(e.message||'Erreur enregistrement achat.'); }
 }
@@ -28565,12 +28602,14 @@ let _depCamera = null;
 
 async function loadPosDepot(){
   try{
-    const [rec, stock, livs] = await Promise.all([
+    const [rec, stock, livs, auDepot] = await Promise.all([
       apiFetch('GET','/pos/depot/receptions'),
       apiFetch('GET','/pos/depot/stock'),
       apiFetch('GET','/pos/depot/livraisons'),
+      apiFetch('GET','/pos/depot/colis?statut=AU_DEPOT'),
     ]);
     _depStock = stock || [];
+    _depKpis(rec, livs||[], auDepot||[]);
     depRenderReceptions(rec);
     depRenderStock();
     depRenderInventaire();
@@ -28580,16 +28619,61 @@ async function loadPosDepot(){
     if(enCours){ _depLivraison = await apiFetch('GET',`/pos/depot/livraisons/${enCours.id}`); }
     else _depLivraison = null;
     depRenderLivraison();
+    const nl=document.getElementById('dep-k-livr');
+    if(nl) nl.textContent = _depLivraison ? `${_depLivraison.numero.replace(/^LIV\d{6}-/,'N° ')} → ${_depLivraison.lieu_nom}` : 'Aucune';
+    const ol=document.getElementById('dep-o-livraison');
+    if(ol) ol.textContent = _depLivraison ? '1 en cours' : '';
   }catch(e){ posAlert(e.message||'Erreur de chargement du dépôt.'); }
+  let o='reception'; try{ o=localStorage.getItem('dep-onglet')||'reception'; }catch(_){}
+  depOnglet(o, true);
+  try{ if(!localStorage.getItem('dep-guide-vu')){ depGuide(true); localStorage.setItem('dep-guide-vu','1'); } }catch(_){}
   setTimeout(()=>document.getElementById('dep-scan-input')?.focus(), 50);
 }
 
-function depSetMode(m){
+function _depKpis(rec, livs, auDepot){
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  const nA=(rec.achats_a_receptionner||[]).length, nV=(rec.colis_a_verifier||[]).length;
+  set('dep-k-achats', nA); set('dep-k-verif', nV); set('dep-k-depot', auDepot.length);
+  const auj=new Date().toDateString();
+  set('dep-k-livres', livs.filter(l=>l.statut==='VALIDEE' && l.valide_le && new Date(l.valide_le).toDateString()===auj).length);
+  set('dep-o-reception', (nA+nV) ? `${nA+nV} à traiter` : '');
+  document.querySelectorAll('.dep-kpi').forEach(k=>{
+    const v=parseInt(k.querySelector('.dep-kpi-v')?.textContent)||0;
+    k.classList.toggle('dep-kpi-alerte', v>0 && /vérifier|réceptionner/.test(k.textContent));
+  });
+}
+
+// Onglets : chaque partie a son rôle ; le scanner passe dans le mode adapté
+function depOnglet(t, silencieux){
+  document.querySelectorAll('#page-pos-depot .dep-section').forEach(sct=>sct.hidden = sct.dataset.onglet!==t);
+  document.querySelectorAll('#page-pos-depot .dep-onglet').forEach(b=>{
+    const actif=b.dataset.t===t; b.classList.toggle('active',actif); b.setAttribute('aria-selected',actif);
+  });
+  try{ localStorage.setItem('dep-onglet', t); }catch(_){}
+  if(t==='reception' && _depMode!=='fiche') depSetMode('verif', silencieux);
+  if(t==='livraison' && _depMode!=='fiche') depSetMode('livr', silencieux);
+  if(t==='journal') depChargerJournal();
+}
+
+function depGuide(afficher){
+  const g=document.getElementById('dep-guide'); if(!g) return;
+  g.hidden = (afficher===undefined) ? !g.hidden : !afficher;
+  if(!g.hidden) g.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+const _DEP_AIDE_MODE = {
+  verif: "Scannez chaque colis qui arrive au dépôt : son contenu entre dans le stock du dépôt.",
+  livr:  "Scannez les colis à charger : ils s'ajoutent à la livraison en cours (onglet Livraison).",
+  fiche: "Scannez un colis pour voir sa fiche : où il est, qui l'a livré et quand. Rien n'est modifié.",
+};
+function depSetMode(m, sansFocus){
   _depMode = m;
+  const aide=document.getElementById('dep-mode-aide');
+  if(aide) aide.textContent=_DEP_AIDE_MODE[m]||'';
   document.getElementById('dep-mode-verif').classList.toggle('active', m==='verif');
   document.getElementById('dep-mode-livr').classList.toggle('active', m==='livr');
   document.getElementById('dep-mode-fiche').classList.toggle('active', m==='fiche');
-  document.getElementById('dep-scan-input').focus();
+  if(!sansFocus) document.getElementById('dep-scan-input').focus();
 }
 
 function _depRetour(msg, ok){
@@ -28780,9 +28864,43 @@ function depRenderStock(){
 function depRenderInventaire(){
   const lieu = document.getElementById('dep-inv-lieu')?.value || 'DEPOT';
   const cle = {DEPOT:'depot', DEVANT:'devant', PISCINE:'piscine'}[lieu];
-  document.getElementById('dep-inv-tbody').innerHTML = _depStock.map(s=>`
-    <tr><td>${esc(s.nom)}</td><td class="tr">${parseFloat(s[cle]||0).toLocaleString('fr',{maximumFractionDigits:3})}</td>
-      <td class="tr"><input type="number" min="0" step="1" class="pos-input dep-inv-qte" data-pid="${s.produit_id}" style="max-width:110px;text-align:right" placeholder="—"></td></tr>`).join('');
+  // Conserve les quantités déjà saisies si on change de lieu par erreur
+  document.getElementById('dep-inv-tbody').innerHTML = _depStock.map(s=>{
+    const calc=parseFloat(s[cle]||0);
+    return `<tr data-nom="${esc((s.nom||'').toLowerCase())}">
+      <td>${esc(s.nom)} <span class="dep-sous">${esc(s.unite||'')}</span></td>
+      <td class="tr num ${calc<0?'c-red':''}">${calc.toLocaleString('fr',{maximumFractionDigits:3})}</td>
+      <td class="tr"><input type="number" min="0" step="1" inputmode="decimal" class="pos-input dep-inv-qte" data-pid="${s.produit_id}" data-calc="${calc}"
+        style="max-width:110px;text-align:right" placeholder="—" oninput="depInvEcart(this)" aria-label="Quantité comptée ${esc(s.nom)}"></td>
+      <td class="tr num dep-inv-ecart"></td></tr>`;
+  }).join('');
+  depFiltrerInventaire();
+  depInvCompter();
+}
+
+function depFiltrerInventaire(){
+  const q=(document.getElementById('dep-inv-recherche')?.value||'').trim().toLowerCase();
+  document.querySelectorAll('#dep-inv-tbody tr').forEach(tr=>{
+    const saisi=tr.querySelector('.dep-inv-qte')?.value!=='';
+    tr.hidden = !!q && !tr.dataset.nom.includes(q) && !saisi;
+  });
+}
+
+function depInvEcart(inp){
+  const td=inp.closest('tr').querySelector('.dep-inv-ecart');
+  if(inp.value===''){ td.textContent=''; }
+  else{
+    const e=parseFloat(inp.value)-parseFloat(inp.dataset.calc);
+    td.textContent = e===0 ? '=' : (e>0?'+':'')+e.toLocaleString('fr',{maximumFractionDigits:3});
+    td.className='tr num dep-inv-ecart '+(e<0?'c-red':e>0?'c-teal':'');
+  }
+  depInvCompter();
+}
+
+function depInvCompter(){
+  const n=[...document.querySelectorAll('.dep-inv-qte')].filter(i=>i.value!=='').length;
+  const el=document.getElementById('dep-inv-nb');
+  if(el) el.textContent = n ? `${n} produit(s) compté(s)` : 'Aucun produit compté';
 }
 
 async function depEnregistrerInventaire(){
@@ -28806,6 +28924,7 @@ async function depNouvelleLivraison(lieu){
   if(_depLivraison){ posAlert(`La livraison ${_depLivraison.numero} est déjà en préparation : validez-la ou annulez-la d'abord.`); return; }
   try{
     _depLivraison = await apiFetch('POST','/pos/depot/livraisons',{lieu});
+    depOnglet('livraison');
     depSetMode('livr');
     depRenderLivraison();
     _depRetour(`Livraison ${_depLivraison.numero} vers le ${_DEP_LIEUX[lieu]} : scannez les colis.`, true);
