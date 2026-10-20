@@ -27462,6 +27462,19 @@ async function posEnregistrerAchat(continuer=false){
   if(qte<=0)  { posAlert('La quantité doit être > 0.','warn'); return; }
   if(prix<=0) { posAlert('Indiquez le prix d\'achat.','warn'); document.getElementById('pa-prix').focus(); return; }
 
+  // Garde-fou : une quantité aberrante (faute de frappe) créerait des
+  // centaines d'étiquettes ; le dépôt accepte au plus 500 colis par achat.
+  if(sel.type==='bar'){
+    const upc = sel.prod?.unites_par_caisse || 0;
+    const unites = (type==='caisse' && upc) ? qte*upc : qte;
+    const nbColis = (upc && sel.prod?.vendu_par_caisse) ? Math.ceil(unites/upc) : 1;
+    if(nbColis > 500){
+      posAlert(`Quantité trop élevée : ${unites.toLocaleString('fr')} ${sel.prod?.unite||'unités'} = ${nbColis} caisses (maximum 500 par achat). Vérifiez la quantité et l'unité choisie (unités ou caisses).`,'warn');
+      document.getElementById('pa-qte').focus(); return;
+    }
+    if(nbColis > 100 && !confirm(`Confirmer : ${unites.toLocaleString('fr')} ${sel.prod?.unite||'unités'}, soit ${nbColis} caisses et ${nbColis} étiquettes ?`)) return;
+  }
+
   for(const d of _paDepenses){
     if(!d.description.trim()){ posAlert('Saisir une description pour chaque dépense.','warn'); return; }
     if(!d.montant || d.montant<=0){ posAlert('Le montant de chaque dépense doit être supérieur à 0.','warn'); return; }

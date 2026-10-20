@@ -431,7 +431,9 @@ def receptionner_achat(db: Session, achat: BarAchat, unites_par_colis: Optional[
     else:
         tailles = [qte]
     if len(tailles) > MAX_COLIS_PAR_RECEPTION:
-        raise HTTPException(422, f"Trop de colis ({len(tailles)}) — augmentez le nombre d'unités par colis.")
+        raise HTTPException(422, f"Quantité trop élevée : {float(qte):g} unités = {len(tailles)} colis "
+                                 f"(maximum {MAX_COLIS_PAR_RECEPTION} par achat). Probable faute de saisie : "
+                                 f"annulez cet achat et ressaisissez-le avec la bonne quantité.")
 
     achat.statut = "CONFIRME"
     colis = []
