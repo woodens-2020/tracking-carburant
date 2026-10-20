@@ -2371,13 +2371,33 @@ def _periode_precedente(date_debut: date_type, date_fin: date_type, db: Session)
     }
 
 
+def est_employe_caisse(request: Request, db: Session) -> bool:
+    """Vrai pour un compte d'employé de caisse (caissière, barman) : rôle ou
+    poste « Caissier/Caissière » ou « Barman », sans droit administrateur.
+    La direction (Manager, Gérant, Comptable, Directeur…) n'est pas concernée."""
+    user = _user(request)
+    if not user or user.role in ("admin", "pdg"):
+        return False
+    u = db.get(Utilisateur, user.id)
+    if not u:
+        return False
+    if u.role_obj and (u.role_obj.permissions or {}).get("admin"):
+        return False
+    nom = ((u.role_obj.nom if u.role_obj else "") or u.poste or "").strip().lower()
+    return nom.startswith("caissi") or nom.startswith("barman")
+
+
 @router.get("/stats")
 def statistiques_bar(
+    request: Request,
     date_debut: date_type = Query(default=None),
     date_fin:   date_type = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    """CA, bénéfice, COGS, top produits sur la période (données réelles uniquement)."""
+    """CA, bénéfice, COGS, top produits sur la période (données réelles uniquement).
+    Réservé à la direction : refusé aux employés de caisse (marges et coûts)."""
+    if est_employe_caisse(request, db):
+        raise HTTPException(403, "La rentabilité est réservée à la direction.")
     from datetime import date as dt
     today = today_haiti()
     if not date_debut:

@@ -17198,8 +17198,17 @@ const _AREA_PAGES = {
 
 // Whitelist stricte des pages accessibles aux comptes caissière (employe_id défini).
 const _CAISSIER_ALLOWED = new Set([
-  'pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite',
+  'pos-caisse','pos-stock','pos-ventes','pos-credits',
 ]);
+
+// Employé de caisse (caissière, barman) : pas d'accès à la rentabilité
+// (marges, coûts d'achat) — réservée à la direction. Le serveur refuse aussi.
+const _PAGES_DIRECTION = new Set(['pos-rentabilite']);
+function _estEmployeCaisse(){
+  if(!_appUser || _isAdmin()) return false;
+  const rn=(_appUser.role_nom||_appUser.poste||'').trim().toLowerCase();
+  return !!_appUser.employe_id || rn.startsWith('caissi') || rn.startsWith('barman');
+}
 
 // Whitelist stricte pour les comptes Manager — Bar/Restaurant + Hôtel (sans Tables, Grande Caisse, Chambres, Réception) + Cuisine complète + Pâtisserie complète.
 const _MANAGER_ALLOWED = new Set([
@@ -17318,6 +17327,7 @@ function _canAccess(page){
   // le backend (_require_admin) reste la vraie barrière pour les actions sensibles.
   if(_rnCanAccess !== 'manager' && ['admin-roles','admin-users','admin-sessions','admin-audit','admin-security'].includes(page)) return false;
   if(_rnCanAccess === 'manager') return _MANAGER_ALLOWED.has(page);
+  if(_PAGES_DIRECTION.has(page) && _estEmployeCaisse()) return false;
   if(_appUser.employe_id || (_appUser.role_nom||_appUser.poste||'').toLowerCase().startsWith('caissier')) return _CAISSIER_ALLOWED.has(page);
   const allowed = _getAllowedPages();
   if(allowed === null) return true;

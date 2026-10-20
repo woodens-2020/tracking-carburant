@@ -173,3 +173,34 @@ def test_description_de_depense_obligatoire(client):
     r = client.post("/api/depenses", headers=H, json={
         "categorie": "Electricite", "description": "   ", "montant": 100, "date_depense": "2026-07-16"})
     assert r.status_code == 400 and "description" in r.json()["detail"].lower()
+
+
+# ── Accès : la rentabilité du Bar est réservée à la direction ─────────────
+
+def _compte(client, role_nom):
+    roles = client.get("/api/admin/roles", headers=H).json()
+    role = next((r for r in roles if r["nom"].lower() == role_nom.lower()), None)
+    if not role:
+        role = client.post("/api/admin/roles", headers=H, json={"nom": role_nom, "permissions": {"bar": "complet"}}).json()
+    n = time.time_ns()
+    email, mdp, pin = f"t{n}@konekta.test", "MotDePasse123!", f"{n % 10**9:09d}"
+    r = client.post("/api/admin/users", headers=H, json={
+        "nom_complet": f"Test {role_nom}", "email": email, "username": f"u{n}",
+        "password": mdp, "code_acces": pin, "role_id": role["id"]})
+    assert r.status_code == 201, r.text
+    return email, mdp, pin
+
+
+def _stats_en_tant_que(email, mdp, pin):
+    import main
+    from fastapi.testclient import TestClient
+    with TestClient(main.app) as c:          # client séparé : sa propre session
+        assert c.post("/api/login", json={"email": email, "password": mdp, "code_acces": pin}).status_code == 200
+        return c.get("/api/pos/stats").status_code
+
+
+def test_rentabilite_refusee_aux_employes_de_caisse(client):
+    for role in ("Caissiere", "Barman / Caissier Bar"):
+        assert _stats_en_tant_que(*_compte(client, role)) == 403, role
+    assert _stats_en_tant_que(*_compte(client, "Comptable")) == 200
+    assert client.get("/api/pos/stats", headers=H).status_code == 200      # administrateur
