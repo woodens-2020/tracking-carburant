@@ -220,7 +220,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     lignes_traitees = []
     erreurs = []
 
-    # Contrôle du stock au bar de la session (Bar avant / Bar piscine) :
+    # Contrôle du stock au bar de la session (Bar devant / Bar piscine) :
     # actif seulement si BAR_STOCK_PAR_LIEU=true, après l'inventaire
     # d'ouverture des bars — sinon le stock global est contrôlé (historique).
     lieu_controle = None
@@ -267,7 +267,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
 
         if lieu_controle:
             stk = stock_courant(pid, db, lieu=lieu_controle)
-            ou = " au Bar avant" if lieu_controle == "DEVANT" else " au Bar piscine"
+            ou = " au Bar devant" if lieu_controle == "DEVANT" else " au Bar piscine"
         else:
             stk = stock_courant(pid, db)
             ou = ""
@@ -292,7 +292,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     if erreurs:
         raise ValueError("; ".join(erreurs))
 
-    # Une vente de produit bar sort du stock d'un bar (Bar avant / Bar piscine),
+    # Une vente de produit bar sort du stock d'un bar (Bar devant / Bar piscine),
     # jamais du dépôt : il faut une session de caisse ouverte qui donne le bar.
     if any(l.get("produit_id") for l in lignes_traitees):
         caissier = data.get("caissier_id")
@@ -301,7 +301,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
                 .first()) if caissier else None
         if not sess or not sess.lieu:
             raise ValueError(
-                "Choisissez la caissière et ouvrez sa session de caisse (Bar avant ou Bar piscine) : "
+                "Choisissez la caissière et ouvrez sa session de caisse (Bar devant ou Bar piscine) : "
                 "une vente doit sortir du stock d'un bar, pas du dépôt."
             )
 
@@ -605,7 +605,7 @@ def detecter_anomalies_bar(date_cible: date_type, db: Session) -> list[dict]:
     # livré (livraison oubliée ou inventaire à refaire). Un message par bar.
     noms = {p.id: p.nom for p in db.query(BarProduit).filter(BarProduit.actif.is_(True)).all()}
     par_lieu = stock_par_lieu_tous_produits(db)
-    for cle, lieu_nom in (("devant", "Bar avant"), ("piscine", "Bar piscine")):
+    for cle, lieu_nom in (("devant", "Bar devant"), ("piscine", "Bar piscine")):
         negatifs = sorted(noms[pid] for pid, st in par_lieu.items() if pid in noms and st[cle] < 0)
         if negatifs:
             anomalies.append({

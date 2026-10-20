@@ -10,7 +10,7 @@ Préfixe /api/pos/depot.
                                       POST /colis/verifier   (stock DÉPÔT +)
     4. Préparation de la livraison  → POST /livraisons {lieu}
     5. Lecture / scan des colis     → POST /livraisons/{id}/scan
-    6. Bar avant / Bar piscine      → destination choisie à l'étape 4
+    6. Bar devant / Bar piscine      → destination choisie à l'étape 4
     7. Mise à jour des stocks       → POST /livraisons/{id}/valider
                                       (stock DÉPÔT −, stock du bar +)
 
@@ -34,7 +34,7 @@ Sécurité des codes :
     gagne, le second reçoit 409 — jamais de double entrée de stock.
 
 Le stock reste calculé à partir de BarMouvementStock (source unique) :
-lieu NULL = dépôt, DEVANT = Bar avant, PISCINE = Bar piscine. Une
+lieu NULL = dépôt, DEVANT = Bar devant, PISCINE = Bar piscine. Une
 livraison crée deux mouvements TRANSFERT de même quantité : le stock total
 ne change pas, seule sa localisation change.
 """
@@ -66,7 +66,7 @@ from tz_utils import now_haiti
 
 router = APIRouter(prefix="/api/pos/depot", tags=["Dépôt Bar"])
 
-LIEUX = {"DEVANT": "Bar avant", "PISCINE": "Bar piscine"}
+LIEUX = {"DEVANT": "Bar devant", "PISCINE": "Bar piscine"}
 MAX_COLIS_PAR_RECEPTION = 500
 
 STATUTS = {
@@ -83,6 +83,7 @@ EVENEMENTS = {
     "RETIRE_LIVRAISON":  "Retiré de la livraison",
     "LIVRE":             "Livré",
     "LIVRE_MANUEL":      "Livré sans scan (livraison manuelle)",
+    "DESTINATION":       "Destination de la livraison changée",
     "RETOUR_DEPOT":      "Livraison annulée — retour au dépôt",
     "ANNULE":            "Colis annulé",
     "CONSULTATION":      "Fiche consultée",
@@ -693,8 +694,8 @@ def journal(limite: int = 200, type: Optional[str] = None, db: Session = Depends
 
 @router.get("/stock")
 def stock_par_lieu(db: Session = Depends(get_db)):
-    """Stock de chaque produit au dépôt, au Bar avant et au Bar piscine
-    (dépôt + Bar avant + Bar piscine = total)."""
+    """Stock de chaque produit au dépôt, au Bar devant et au Bar piscine
+    (dépôt + Bar devant + Bar piscine = total)."""
     st = stock_par_lieu_tous_produits(db)
     produits = db.query(BarProduit).filter(BarProduit.actif.is_(True)).order_by(BarProduit.nom).all()
     a_verifier = {}
@@ -740,12 +741,28 @@ def _livraison_en_preparation(db: Session, livraison_id: int) -> BarLivraisonInt
     return l
 
 
+def _livraison_ouverte(db: Session, lieu: str) -> Optional[BarLivraisonInterne]:
+    return (db.query(BarLivraisonInterne)
+            .filter(BarLivraisonInterne.lieu == lieu, BarLivraisonInterne.statut == "PREPARATION")
+            .order_by(BarLivraisonInterne.id.desc()).first())
+
+
+class DestinationIn(BaseModel):
+    lieu: str = Field(max_length=20)
+
+
 @router.post("/livraisons", status_code=201)
 def creer_livraison(data: LivraisonIn, request: Request, db: Session = Depends(get_db),
                     user=Depends(_require_depot)):
+    """Ouvre la livraison en préparation d'un bar. Une seule à la fois par
+    bar (Bar devant et Bar piscine peuvent être préparées en parallèle) : si
+    elle existe déjà, elle est renvoyée telle quelle (double clic, deux postes)."""
     lieu = (data.lieu or "").upper()
     if lieu not in LIEUX:
-        raise HTTPException(422, "Destination invalide : DEVANT (Bar avant) ou PISCINE (Bar piscine).")
+        raise HTTPException(422, "Destination invalide : DEVANT (Bar devant) ou PISCINE (Bar piscine).")
+    existante = _livraison_ouverte(db, lieu)
+    if existante:
+        return _livraison_dict(existante)
     l = BarLivraisonInterne(numero="TMP-" + uuid.uuid4().hex[:20], lieu=lieu, statut="PREPARATION",
                             notes=(data.notes or "").strip()[:300] or None, cree_par_id=user.id)
     db.add(l)
@@ -791,6 +808,33 @@ def scanner_colis_livraison(livraison_id: int, data: ScanIn, db: Session = Depen
     db.refresh(l)
     db.refresh(c)
     return {**_livraison_dict(l), "colis_scanne": _colis_dict(c)}
+
+
+@router.post("/livraisons/{livraison_id}/destination")
+def changer_destination(livraison_id: int, data: DestinationIn, db: Session = Depends(get_db),
+                        user=Depends(_require_depot)):
+    """Corrige le bar de destination d'une livraison encore en préparation
+    (colis scannés pour le mauvais bar). Rien n'a encore bougé dans les
+    stocks : seule la destination change, et le changement est journalisé."""
+    l = _livraison_en_preparation(db, livraison_id)
+    lieu = (data.lieu or "").upper()
+    if lieu not in LIEUX:
+        raise HTTPException(422, "Destination invalide : DEVANT (Bar devant) ou PISCINE (Bar piscine).")
+    if lieu == l.lieu:
+        return _livraison_dict(l)
+    autre = _livraison_ouverte(db, lieu)
+    if autre:
+        raise HTTPException(409, f"Une livraison vers le {LIEUX[lieu]} est déjà en préparation ({autre.numero}) : "
+                                 "validez-la ou annulez-la d'abord.")
+    ancien = LIEUX.get(l.lieu, l.lieu)
+    l.lieu = lieu
+    for x in l.lignes:
+        if x.colis:
+            _journaliser(db, "DESTINATION", x.colis, lieu=lieu, livraison_id=l.id, utilisateur_id=user.id,
+                         details=f"{ancien} → {LIEUX[lieu]}")
+    db.commit()
+    db.refresh(l)
+    return _livraison_dict(l)
 
 
 @router.post("/livraisons/{livraison_id}/vrac")
@@ -923,7 +967,7 @@ def livraison_manuelle(data: LivraisonManuelleIn, db: Session = Depends(get_db),
         où, par qui, pourquoi)."""
     lieu = (data.lieu or "").upper()
     if lieu not in LIEUX:
-        raise HTTPException(422, "Destination invalide : DEVANT (Bar avant) ou PISCINE (Bar piscine).")
+        raise HTTPException(422, "Destination invalide : DEVANT (Bar devant) ou PISCINE (Bar piscine).")
     motif = " ".join((data.motif or "").split())
     if len(motif) < MOTIF_MANUEL_MIN:
         raise HTTPException(422, f"Expliquez pourquoi la livraison n'a pas été scannée ({MOTIF_MANUEL_MIN} caractères minimum).")

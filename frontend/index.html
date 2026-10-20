@@ -3236,6 +3236,20 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 .dep-cb-fiche{display:inline-flex;flex-direction:column;align-items:flex-end}
 .dep-cb-fiche .dep-cb{height:46px;margin:0 0 4px}
 #page-pos-depot .pos-table td{vertical-align:middle}
+.dep-dest{margin-left:8px;width:auto!important;min-width:170px;font-weight:700;padding:8px 12px!important}
+.dep-scan-row .dep-dest{margin-left:0}
+.dep-dest-scan{border-color:rgba(45,212,191,.55)!important}
+.dep-bars{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;padding:12px 14px 4px}
+.dep-bar-chip{display:flex;flex-direction:column;gap:2px;text-align:left;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:9px 12px;color:#fff;cursor:pointer}
+.dep-bar-chip span{font-size:12.5px;color:rgba(255,255,255,.55)}
+.dep-bar-chip.active{border-color:#2dd4bf;background:rgba(45,212,191,.08)}
+.dep-bar-chip.active b{color:#5eead4}
+.dep-livr-vide{padding:14px;color:rgba(255,255,255,.6);font-size:13.5px}
+.dep-cb-modal{max-width:560px;width:calc(100vw - 32px);text-align:center}
+.dep-cb-grand{background:#fff;border-radius:8px;padding:18px 12px 10px;margin:4px 0 12px}
+.dep-cb-grand .dep-cb{height:110px;width:100%;max-width:460px;margin:0 auto;border-radius:0}
+.dep-cb-grand .dep-cb-txt{color:#000;font:700 18px ui-monospace,Consolas,monospace;letter-spacing:.06em;margin-top:6px}
+.dep-cb-info{font-size:14px;color:rgba(255,255,255,.75)}
 .dep-guide-modal{max-width:980px;width:calc(100vw - 32px);max-height:calc(100vh - 40px);overflow-y:auto}
 .dep-vide-l td{text-align:center;padding:16px!important;color:rgba(255,255,255,.35)}
 /* ── Formulaire d'achat ─────────────────────────────────────────── */
@@ -7431,7 +7445,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           </div>
           <div>
             <div class="pos-header-title">Dépôt Bar</div>
-            <div class="pos-header-sub">La marchandise arrive au dépôt, puis part vers le Bar avant ou le Bar piscine — chaque colis est suivi par son code-barres</div>
+            <div class="pos-header-sub">La marchandise arrive au dépôt, puis part vers le Bar devant ou le Bar piscine — chaque colis est suivi par son code-barres</div>
           </div>
           <div class="pos-header-actions">
             <button class="pos-btn ghost" onclick="depGuide()">❔ Comment ça marche</button>
@@ -7456,6 +7470,9 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
               <button class="db-preset" id="dep-mode-livr" onclick="depSetMode('livr')">Ajouter à la livraison</button>
               <button class="db-preset" id="dep-mode-fiche" onclick="depSetMode('fiche')">Consulter la fiche</button>
             </div>
+            <select id="dep-dest-scan" class="pos-input dep-dest dep-dest-scan" hidden aria-label="Bar de destination" onchange="depChoisirDest(this.value)">
+              <option value="DEVANT">→ Bar devant</option><option value="PISCINE">→ Bar piscine</option>
+            </select>
             <input id="dep-scan-input" class="pos-input" placeholder="Scannez ou tapez le code du colis puis Entrée"
                    aria-label="Code du colis" autocomplete="off" maxlength="60" onkeydown="if(event.key==='Enter'){event.preventDefault();depScanner(this.value)}">
             <button class="pos-btn teal" onclick="depScanner(document.getElementById('dep-scan-input').value)">Valider</button>
@@ -7496,7 +7513,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
                 </div>
               </div>
               <div class="pos-table-wrap"><table class="pos-table">
-                <thead><tr><th>Code-barres</th><th>Produit</th><th class="tr">Quantité</th><th>Achat</th><th>Créé le</th><th></th></tr></thead>
+                <thead><tr><th>Code</th><th>Code-barres</th><th>Produit</th><th class="tr">Quantité</th><th>Achat</th><th>Créé le</th><th></th></tr></thead>
                 <tbody id="dep-colis-verif"></tbody>
               </table></div>
             </div>
@@ -7505,17 +7522,16 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 
         <!-- 2 · Livraison -->
         <section class="dep-section" data-onglet="livraison" hidden>
-          <div class="dep-intro">Ouvrir une livraison → scanner les colis chargés → <b>Valider</b> : le stock passe du dépôt au bar.</div>
+          <div class="dep-intro">Choisir le bar (<b>Bar devant</b> ou <b>Bar piscine</b>) → scanner les colis chargés (la livraison s'ouvre au premier scan) → <b>Valider</b> : le stock passe du dépôt à ce bar. Chaque bar a sa propre livraison en cours.</div>
           <div class="pos-card">
-            <div class="pos-card-hdr">Livraison en cours
+            <div class="pos-card-hdr">Livraison vers
+              <select id="dep-dest-livr" class="pos-input dep-dest" aria-label="Bar de destination" onchange="depChoisirDest(this.value)">
+                <option value="DEVANT">Bar devant</option><option value="PISCINE">Bar piscine</option>
+              </select>
               <button class="pos-btn ghost dep-btn-s" style="margin-left:auto" onclick="depManuelOuvrir()"
                 title="Seulement si les colis ont été livrés sans pouvoir être scannés (internet, scanner en panne, étiquette illisible). Motif et heure réelle obligatoires ; le code-barres devient ensuite invalide.">✍ Livraison sans scan</button>
             </div>
-            <div id="dep-livr-nouvelle" class="dep-scan-row">
-              <span class="dep-note" style="margin:0">Nouvelle livraison vers :</span>
-              <button class="pos-btn teal" onclick="depNouvelleLivraison('DEVANT')">Bar avant</button>
-              <button class="pos-btn teal" onclick="depNouvelleLivraison('PISCINE')">Bar piscine</button>
-            </div>
+            <div class="dep-bars" id="dep-bars"></div>
             <div id="dep-livr-courante"></div>
           </div>
           <div class="pos-card">
@@ -7531,7 +7547,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 
         <!-- 3 · Colis et codes-barres -->
         <section class="dep-section" data-onglet="colis" hidden>
-          <div class="dep-intro">Tous les colis avec leur code-barres. Cherchez un produit ou un code ; cliquez sur un code-barres pour ouvrir la fiche.</div>
+          <div class="dep-intro">Tous les colis. Cherchez un produit ou un code ; « Voir » affiche le code-barres, un clic sur le code ouvre la fiche.</div>
           <div class="pos-card">
             <div class="pos-card-hdr">Colis et codes-barres <span class="dep-badge" id="dep-nb-colis">0</span>
               <div class="dep-filtres">
@@ -7548,7 +7564,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
               </div>
             </div>
             <div class="pos-table-wrap"><table class="pos-table">
-              <thead><tr><th>Code-barres</th><th>Produit</th><th class="tr">Quantité</th><th>État</th><th>Lieu</th><th>Achat</th><th>Créé le</th><th></th></tr></thead>
+              <thead><tr><th>Code</th><th>Code-barres</th><th>Produit</th><th class="tr">Quantité</th><th>État</th><th>Lieu</th><th>Achat</th><th>Créé le</th><th></th></tr></thead>
               <tbody id="dep-colis-tbody"></tbody>
             </table></div>
           </div>
@@ -7565,7 +7581,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
               <div class="dep-inv-champ">
                 <label class="pos-label" for="dep-inv-lieu">Lieu compté</label>
                 <select id="dep-inv-lieu" class="pos-input" onchange="depRenderInventaire()">
-                  <option value="DEPOT">Dépôt</option><option value="DEVANT">Bar avant</option><option value="PISCINE">Bar piscine</option>
+                  <option value="DEPOT">Dépôt</option><option value="DEVANT">Bar devant</option><option value="PISCINE">Bar piscine</option>
                 </select>
               </div>
               <div class="dep-inv-champ" style="flex:1">
@@ -7634,7 +7650,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
             <div style="flex:1">
               <label class="pos-label">Livré au *</label>
               <div class="pa-modes" role="group" aria-label="Destination">
-                <button type="button" class="pa-mode" data-lieu="DEVANT" onclick="depManuelLieu('DEVANT')">Bar avant</button>
+                <button type="button" class="pa-mode" data-lieu="DEVANT" onclick="depManuelLieu('DEVANT')">Bar devant</button>
                 <button type="button" class="pa-mode" data-lieu="PISCINE" onclick="depManuelLieu('PISCINE')">Bar piscine</button>
               </div>
             </div>
@@ -7690,6 +7706,22 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
       </div>
     </div>
 
+    <!-- Code-barres d'un colis -->
+    <div class="pos-modal-bg" id="dep-cb-bg" onclick="if(event.target===this)depFermerCode()">
+      <div class="pos-modal dep-cb-modal" role="dialog" aria-labelledby="dep-cb-titre">
+        <div class="df-tete">
+          <h3 id="dep-cb-titre">Code-barres du colis</h3>
+          <button type="button" onclick="depFermerCode()" aria-label="Fermer" class="df-fermer">✕</button>
+        </div>
+        <div id="dep-cb-corps"></div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" id="dep-cb-fiche" onclick="depFermerCode();depOuvrirFiche(_depCodeVu)">Ouvrir la fiche</button>
+          <button class="pos-btn ghost" id="dep-cb-etiq" onclick="depImprimerColis(_depCodeVu)">🖨 Imprimer l'étiquette</button>
+          <button class="pos-btn ghost" onclick="depFermerCode()">Fermer</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Guide : rôle de chaque partie du dépôt -->
     <div class="pos-modal-bg" id="dep-guide-bg" onclick="if(event.target===this)depGuide(false)">
       <div class="pos-modal dep-guide-modal" role="dialog" aria-labelledby="dep-guide-titre">
@@ -7705,7 +7737,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
               <p>On scanne chaque colis rangé au dépôt. Ce scan prouve qu'il est bien arrivé : son contenu entre alors dans le <em>stock du dépôt</em>. Un colis non scanné n'est pas en stock.</p>
               <p class="dep-guide-qui">Scanner en mode « Vérifier au dépôt »</p></div>
             <div class="dep-guide-c"><b>3 · Livraison vers un bar</b>
-              <p>On ouvre une livraison pour le Bar avant ou le Bar piscine, on scanne les colis chargés, puis on <em>valide</em> : le stock passe du dépôt au bar. C'est la seule façon d'alimenter un bar.</p>
+              <p>On choisit le bar (Bar devant ou Bar piscine) dans la liste, on scanne les colis chargés, puis on <em>valide</em> : le stock passe du dépôt à ce bar. Chaque bar a sa propre livraison en cours. C'est la seule façon d'alimenter un bar.</p>
               <p class="dep-guide-qui">Onglet Livraison · scanner en mode « Ajouter à la livraison »</p></div>
             <div class="dep-guide-c"><b>4 · Inventaire</b>
               <p>Le stock de chaque lieu se calcule tout seul. Si le comptage réel diffère (casse, erreur), on fait un <em>inventaire</em> : l'écart est corrigé et gardé avec son motif.</p>
@@ -28487,7 +28519,7 @@ function posHistoVoirRecu(creditId, idx){
 
 // ══════════════════════════════════════════════════════════════════════
 // PAGE DÉPÔT BAR — Réception → étiquettes → vérification au dépôt →
-// livraison (scan) → Bar avant / Bar piscine → stocks à jour.
+// livraison (scan) → Bar devant / Bar piscine → stocks à jour.
 // API : /api/pos/depot (bar_depot_routes.py)
 // ══════════════════════════════════════════════════════════════════════
 // Code 128 (jeux B et C) → largeurs de modules ; rendu SVG à l'écran
@@ -28517,22 +28549,50 @@ function depCodeBarres(code, hauteur){
   return `<svg class="dep-cb" viewBox="0 0 ${W} ${h}" width="${W}" height="${h}" shape-rendering="crispEdges" role="img" aria-label="Code-barres ${esc(code)}"><rect width="${W}" height="${h}" fill="#fff"/><g fill="#000">${r}</g></svg>`;
 }
 
-const _DEP_LIEUX = {DEVANT:'Bar avant', PISCINE:'Bar piscine'};
+const _DEP_LIEUX = {DEVANT:'Bar devant', PISCINE:'Bar piscine'};
 const _DEP_ST_CLASSE = {A_VERIFIER:'st-verif', AU_DEPOT:'st-depot', EN_PREPARATION:'st-prep', LIVRE:'st-livre', ANNULE:''};
 let _depColisVerif = [], _depColis = [];
 const _depJour = iso => iso ? new Date(iso).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
 // Cellule « code-barres » : le code-barres (identique à l'étiquette) et le code lisible ; clic = fiche
-function _depCelluleCode(id, code, lisible){
-  return `<button type="button" class="dep-cb-btn" onclick="depOuvrirFiche(${id})" title="Ouvrir la fiche du colis">${depCodeBarres(code)}<span class="dep-code">${esc(lisible||code)}</span></button>`;
+// Colonnes « Code » (texte, clic = fiche) et « Code-barres » (bouton Voir)
+let _depCodes = {}, _depCodeVu = null;
+function _depCellulesCode(c){
+  _depCodes[c.id] = c;
+  return `<td><button type="button" class="dep-code dep-code-btn" onclick="depOuvrirFiche(${c.id})" title="Ouvrir la fiche du colis">${esc(c.code_lisible||c.code)}</button></td>
+      <td><button type="button" class="pos-btn ghost dep-btn-s" onclick="depVoirCode(${c.id})">Voir</button></td>`;
+}
+function depVoirCode(id){
+  const c = _depCodes[id]; if(!c) return;
+  _depCodeVu = id;
+  document.getElementById('dep-cb-corps').innerHTML = `
+    <div class="dep-cb-grand">${depCodeBarres(c.code, 80)}<div class="dep-cb-txt">${esc(c.code_lisible||c.code)}</div></div>
+    <div class="dep-cb-info"><b>${esc(c.produit_nom||'')}</b> · ${c.quantite} ${esc(c.unite||'u.')}${c.statut_libelle?' · '+esc(c.statut_libelle):''}</div>`;
+  document.getElementById('dep-cb-etiq').hidden = ['LIVRE','ANNULE'].includes(c.statut);
+  document.getElementById('dep-cb-bg').classList.add('open');
+}
+function depFermerCode(){
+  document.getElementById('dep-cb-bg').classList.remove('open');
+  document.getElementById('dep-scan-input')?.focus();
 }
 const _depFiltre = (liste, q) => { q=(q||'').trim().toLowerCase().replace(/[\s-]/g,'');
   return q ? liste.filter(c=>((c.produit_nom||'')+' '+(c.code||'')).toLowerCase().replace(/[\s-]/g,'').includes(q)) : liste; };
 let _depMode = 'verif';          // 'verif' (contrôle au dépôt) | 'livr' (ajout à la livraison)
-let _depLivraison = null;        // livraison en préparation affichée
+let _depLivraison = null;        // livraison en préparation du bar choisi
+let _depLivraisons = {DEVANT:null, PISCINE:null};   // une livraison en préparation par bar
+let _depDest = (()=>{ try{ return localStorage.getItem('dep-dest')==='PISCINE' ? 'PISCINE' : 'DEVANT'; }catch(_){ return 'DEVANT'; } })();
+let _depFile = Promise.resolve();  // scans traités un par un, dans l'ordre
 let _depStock = [];
 let _depCamera = null;
 
 async function loadPosDepot(){
+  await _depCharger();
+  let o='reception'; try{ o=localStorage.getItem('dep-onglet')||'reception'; }catch(_){}
+  depOnglet(o, true);
+  depChoisirDest(_depDest, true);
+  setTimeout(()=>document.getElementById('dep-scan-input')?.focus(), 50);
+}
+
+async function _depCharger(){
   try{
     const [rec, stock, livs, auDepot] = await Promise.all([
       apiFetch('GET','/pos/depot/receptions'),
@@ -28545,19 +28605,30 @@ async function loadPosDepot(){
     depRenderReceptions(rec);
     depRenderInventaire();
     depRenderHistorique(livs || []);
-    depChargerJournal();
-    const enCours = (livs||[]).find(l=>l.statut==='PREPARATION');
-    if(enCours){ _depLivraison = await apiFetch('GET',`/pos/depot/livraisons/${enCours.id}`); }
-    else _depLivraison = null;
+    if(!document.querySelector('#page-pos-depot section[data-onglet="journal"]')?.hidden) depChargerJournal();
+    if(!document.querySelector('#page-pos-depot section[data-onglet="colis"]')?.hidden) depChargerColis();
+    const ouvertes = (livs||[]).filter(l=>l.statut==='PREPARATION');
+    for(const lieu of ['DEVANT','PISCINE']){
+      const l = ouvertes.find(x=>x.lieu===lieu);
+      _depLivraisons[lieu] = l ? await apiFetch('GET',`/pos/depot/livraisons/${l.id}`) : null;
+    }
+    _depLivraison = _depLivraisons[_depDest];
     depRenderLivraison();
-    const nl=document.getElementById('dep-k-livr');
-    if(nl) nl.textContent = _depLivraison ? `${_depLivraison.numero.replace(/^LIV\d{6}-/,'N° ')} → ${_depLivraison.lieu_nom}` : 'Aucune';
-    const ol=document.getElementById('dep-o-livraison');
-    if(ol) ol.textContent = _depLivraison ? '1 en cours' : '';
+    const resume = ['DEVANT','PISCINE'].filter(k=>_depLivraisons[k]).map(k=>`${k==='DEVANT'?'Devant':'Piscine'} : ${_depLivraisons[k].nb_lignes} colis`);
+    const nl=document.getElementById('dep-k-livr'); if(nl) nl.textContent = resume.length ? resume.join(' · ') : 'Aucune';
+    const ol=document.getElementById('dep-o-livraison'); if(ol) ol.textContent = resume.length ? `${resume.length} en cours` : '';
   }catch(e){ posAlert(e.message||'Erreur de chargement du dépôt.'); }
-  let o='reception'; try{ o=localStorage.getItem('dep-onglet')||'reception'; }catch(_){}
-  depOnglet(o, true);
-  setTimeout(()=>document.getElementById('dep-scan-input')?.focus(), 50);
+}
+
+// Bar de destination des livraisons (liste déroulante) : chaque bar a sa livraison
+function depChoisirDest(lieu, silencieux){
+  _depDest = lieu==='PISCINE' ? 'PISCINE' : 'DEVANT';
+  try{ localStorage.setItem('dep-dest', _depDest); }catch(_){}
+  ['dep-dest-scan','dep-dest-livr'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=_depDest; });
+  _depLivraison = _depLivraisons[_depDest];
+  depRenderLivraison();
+  if(_depMode==='livr') depSetMode('livr', true);
+  if(!silencieux) document.getElementById('dep-scan-input')?.focus();
 }
 
 function _depKpis(rec, livs, auDepot){
@@ -28593,55 +28664,83 @@ function depGuide(afficher){
 
 const _DEP_AIDE_MODE = {
   verif: "Scannez chaque colis qui arrive au dépôt : son contenu entre dans le stock du dépôt.",
-  livr:  "Scannez les colis à charger : ils s'ajoutent à la livraison en cours (onglet Livraison).",
+  livr:  "Scannez les colis à charger : ils s'ajoutent à la livraison vers le bar choisi dans la liste.",
   fiche: "Scannez un colis pour voir sa fiche : où il est, qui l'a livré et quand. Rien n'est modifié.",
 };
 function depSetMode(m, sansFocus){
   _depMode = m;
   const aide=document.getElementById('dep-mode-aide');
-  if(aide) aide.textContent=_DEP_AIDE_MODE[m]||'';
+  if(aide) aide.textContent = m==='livr'
+    ? `Scannez les colis à charger pour le ${_DEP_LIEUX[_depDest]} (changez de bar dans la liste).`
+    : (_DEP_AIDE_MODE[m]||'');
   document.getElementById('dep-mode-verif').classList.toggle('active', m==='verif');
   document.getElementById('dep-mode-livr').classList.toggle('active', m==='livr');
   document.getElementById('dep-mode-fiche').classList.toggle('active', m==='fiche');
+  const ds=document.getElementById('dep-dest-scan'); if(ds){ ds.hidden = m!=='livr'; ds.value=_depDest; }
   if(!sansFocus) document.getElementById('dep-scan-input').focus();
 }
 
+let _depAudio = null;
+function _depBip(ok){
+  try{
+    _depAudio = _depAudio || new (window.AudioContext||window.webkitAudioContext)();
+    const o=_depAudio.createOscillator(), g=_depAudio.createGain();
+    o.frequency.value = ok ? 1200 : 300; o.type = ok ? 'sine' : 'square';
+    g.gain.value = .08; o.connect(g); g.connect(_depAudio.destination);
+    o.start(); o.stop(_depAudio.currentTime + (ok ? .09 : .35));
+  }catch(_){}
+}
 function _depRetour(msg, ok){
   const el = document.getElementById('dep-scan-retour');
   el.className = 'dep-retour ' + (ok ? 'ok' : 'err');
   el.textContent = msg;
 }
 
-async function depScanner(valeur){
+function depScanner(valeur){
   const inp = document.getElementById('dep-scan-input');
   const code = (valeur||'').trim();
   if(!code) return;
   inp.value = '';
+  inp.focus();
+  // Une douchette peut envoyer plusieurs codes très vite : traitement un par un, dans l'ordre
+  _depFile = _depFile.then(()=>_depTraiterScan(code, _depMode, _depDest)).catch(()=>{});
+}
+
+async function _depTraiterScan(code, mode, dest){
   try{
-    if(_depMode === 'fiche'){
+    if(mode === 'fiche'){
       const f = await apiFetch('POST','/pos/depot/colis/consulter',{code});
       _depRetour(`Fiche du colis ${f.colis.code_lisible} — ${f.colis.statut_libelle}`, true);
+      _depBip(true);
       depAfficherFiche(f);
-      inp.focus();
       return;
     }
-    if(_depMode === 'verif'){
+    if(mode === 'verif'){
       const c = await apiFetch('POST','/pos/depot/colis/verifier',{code});
       _depRetour(`✓ ${c.code_lisible} — ${c.produit_nom} : ${c.quantite} ${c.unite||'u.'} entrés au dépôt`
         + (c.restants_achat ? ` · encore ${c.restants_achat} colis de cet achat à scanner` : ''), true);
     } else {
-      if(!_depLivraison){ _depRetour('Créez d\'abord une livraison (Bar avant ou Bar piscine).', false); return; }
-      const r = await apiFetch('POST',`/pos/depot/livraisons/${_depLivraison.id}/scan`,{code});
-      _depLivraison = r;
-      _depRetour(`✓ ${r.colis_scanne.code_lisible} — ${r.colis_scanne.produit_nom} ajouté à la livraison ${r.numero}`, true);
+      let l = _depLivraisons[dest];
+      if(!l){ l = await apiFetch('POST','/pos/depot/livraisons',{lieu:dest}); _depLivraisons[dest] = l; }
+      const r = await apiFetch('POST',`/pos/depot/livraisons/${l.id}/scan`,{code});
+      _depLivraisons[dest] = r;
+      if(dest===_depDest) _depLivraison = r;
+      _depRetour(`✓ ${r.colis_scanne.code_lisible} — ${r.colis_scanne.produit_nom} → ${r.lieu_nom} (livraison ${r.numero} : ${r.nb_lignes} colis)`, true);
+      depRenderLivraison();
     }
-    await loadPosDepot();
+    _depBip(true);
+    await _depCharger();
   }catch(e){
-    _depRetour('✗ ' + String(e.message||'Scan refusé').replace(/^\[\d+\]\s*/,''), false);
+    _depBip(false);
+    let msg = String(e.message||'Scan refusé').replace(/^\[\d+\]\s*/,'').replace(/\.\s*$/,'');
+    if(mode==='verif' && e.detail && e.detail.statut==='AU_DEPOT')
+      msg += ' — pour le livrer, passez en mode « Ajouter à la livraison ».';
+    if(mode==='livr' && e.detail && e.detail.statut==='A_VERIFIER')
+      msg += ' — passez en mode « Vérifier au dépôt », scannez-le, puis revenez à la livraison.';
+    _depRetour('✗ ' + msg, false);
     // Colis déjà livré : afficher directement sa fiche de livraison
     if(e.detail && e.detail.deja_livre && e.detail.colis_id) depOuvrirFiche(e.detail.colis_id);
   }
-  inp.focus();
 }
 
 async function depCamera(){
@@ -28772,14 +28871,14 @@ function depRenderColisVerif(){
   const liste = _depFiltre(_depColisVerif, document.getElementById('dep-verif-cherche')?.value);
   const max = 100;
   document.getElementById('dep-colis-verif').innerHTML = liste.slice(0,max).map(c=>`<tr>
-      <td>${_depCelluleCode(c.id, c.code, c.code_lisible)}</td>
+      ${_depCellulesCode(c)}
       <td><strong>${esc(c.produit_nom||'')}</strong></td>
       <td class="tr num">${c.quantite} ${esc(c.unite||'u.')}</td>
       <td>#${c.achat_id||'—'}</td><td class="num">${_depJour(c.cree_le)}</td>
       <td class="dep-actions"><button class="pos-btn ghost dep-btn-s" onclick="depImprimerColis(${c.id})" title="Réimprimer l'étiquette">🖨</button>
         <button class="pos-btn ghost dep-btn-s" onclick="depAnnulerColis(${c.id},'${esc(c.code_lisible||c.code)}')" title="Colis créé par erreur (avant vérification)">Retirer</button></td></tr>`).join('')
-    + (liste.length>max?`<tr class="dep-vide-l"><td colspan="6">… et ${liste.length-max} autres — affinez le filtre</td></tr>`:'')
-    || `<tr class="dep-vide-l"><td colspan="6">${_depColisVerif.length?'Aucun colis ne correspond au filtre.':'Tout est vérifié.'}</td></tr>`;
+    + (liste.length>max?`<tr class="dep-vide-l"><td colspan="7">… et ${liste.length-max} autres — affinez le filtre</td></tr>`:'')
+    || `<tr class="dep-vide-l"><td colspan="7">${_depColisVerif.length?'Aucun colis ne correspond au filtre.':'Tout est vérifié.'}</td></tr>`;
 }
 
 // Onglet « Colis et codes-barres »
@@ -28794,7 +28893,7 @@ function depRenderColis(){
   const max = 200;
   document.getElementById('dep-nb-colis').textContent = liste.length;
   document.getElementById('dep-colis-tbody').innerHTML = liste.slice(0,max).map(c=>`<tr>
-      <td>${_depCelluleCode(c.id, c.code, c.code_lisible)}</td>
+      ${_depCellulesCode(c)}
       <td><strong>${esc(c.produit_nom||'')}</strong></td>
       <td class="tr num">${c.quantite} ${esc(c.unite||'u.')}</td>
       <td><span class="dep-st ${_DEP_ST_CLASSE[c.statut]||''}">${esc(c.statut_libelle||c.statut)}</span></td>
@@ -28802,8 +28901,8 @@ function depRenderColis(){
       <td>${c.achat_id?'#'+c.achat_id:'—'}</td><td class="num">${_depJour(c.cree_le)}</td>
       <td class="dep-actions"><button class="pos-btn ghost dep-btn-s" onclick="depOuvrirFiche(${c.id})">Fiche</button>
         ${['LIVRE','ANNULE'].includes(c.statut)?'':`<button class="pos-btn ghost dep-btn-s" onclick="depImprimerColis(${c.id})" title="Réimprimer l'étiquette">🖨</button>`}</td></tr>`).join('')
-    + (liste.length>max?`<tr class="dep-vide-l"><td colspan="8">… et ${liste.length-max} autres — affinez la recherche</td></tr>`:'')
-    || '<tr class="dep-vide-l"><td colspan="8">Aucun colis.</td></tr>';
+    + (liste.length>max?`<tr class="dep-vide-l"><td colspan="9">… et ${liste.length-max} autres — affinez la recherche</td></tr>`:'')
+    || '<tr class="dep-vide-l"><td colspan="9">Aucun colis.</td></tr>';
 }
 function depImprimerAffiches(){
   const ids = _depFiltre(_depColis, document.getElementById('dep-colis-cherche')?.value)
@@ -28817,7 +28916,7 @@ async function depReceptionner(achatId){
     const r = await apiFetch('POST',`/pos/depot/receptions/${achatId}`,{});
     posAlert(`${r.nb_colis} colis créés — imprimez les étiquettes 2 × 1 à l'échelle 100 % (taille réelle) et collez-les.`,'ok');
     depEtiquettes(achatId);
-    await loadPosDepot();
+    await _depCharger();
   }catch(e){ posAlert(e.message||'Réception impossible.'); }
 }
 
@@ -28834,7 +28933,7 @@ async function depEtiquettes(achatId){
 
 async function depAnnulerColis(id, code){
   if(!await showConfirm(`Retirer le colis ${code} ? (erreur de réception — il ne sera jamais compté)`, {title:'Retirer un colis', type:'danger', okLabel:'Retirer'})) return;
-  try{ await apiFetch('POST',`/pos/depot/colis/${id}/annuler`,{}); await loadPosDepot(); }
+  try{ await apiFetch('POST',`/pos/depot/colis/${id}/annuler`,{}); await _depCharger(); }
   catch(e){ posAlert(e.message); }
 }
 
@@ -28893,35 +28992,60 @@ async function depEnregistrerInventaire(){
     const r = await apiFetch('POST','/pos/depot/inventaire',{lieu, motif, lignes});
     posAlert(`Inventaire enregistré — ${r.nb_ajustes} produit(s) ajusté(s).`,'ok');
     document.getElementById('dep-inv-motif').value = '';
-    await loadPosDepot();
+    await _depCharger();
   }catch(e){ posAlert(e.message); }
 }
 
 async function depNouvelleLivraison(lieu){
-  if(_depLivraison){ posAlert(`La livraison ${_depLivraison.numero} est déjà en préparation : validez-la ou annulez-la d'abord.`); return; }
   try{
-    _depLivraison = await apiFetch('POST','/pos/depot/livraisons',{lieu});
+    const l = await apiFetch('POST','/pos/depot/livraisons',{lieu});
+    _depLivraisons[lieu] = l;
     depOnglet('livraison');
+    depChoisirDest(lieu, true);
     depSetMode('livr');
-    depRenderLivraison();
-    _depRetour(`Livraison ${_depLivraison.numero} vers le ${_DEP_LIEUX[lieu]} : scannez les colis.`, true);
+    _depRetour(`Livraison ${l.numero} vers le ${_DEP_LIEUX[lieu]} : scannez les colis.`, true);
+  }catch(e){ posAlert(e.message); }
+}
+
+async function depChangerDestination(){
+  const l = _depLivraison; if(!l) return;
+  const autre = l.lieu==='DEVANT' ? 'PISCINE' : 'DEVANT';
+  if(!await showConfirm(`Envoyer la livraison ${l.numero} (${l.nb_lignes} colis) au ${_DEP_LIEUX[autre]} au lieu du ${l.lieu_nom} ?`,
+      {title:'Changer de bar', okLabel:`Vers le ${_DEP_LIEUX[autre]}`})) return;
+  try{
+    const r = await apiFetch('POST',`/pos/depot/livraisons/${l.id}/destination`,{lieu:autre});
+    _depLivraisons[l.lieu] = null; _depLivraisons[autre] = r;
+    depChoisirDest(autre, true);
+    await _depCharger();
+    _depRetour(`Livraison ${r.numero} envoyée au ${r.lieu_nom}.`, true);
   }catch(e){ posAlert(e.message); }
 }
 
 function depRenderLivraison(){
-  const box = document.getElementById('dep-livr-courante');
-  document.getElementById('dep-livr-nouvelle').style.display = _depLivraison ? 'none' : '';
-  if(!_depLivraison){ box.innerHTML = ''; return; }
-  const l = _depLivraison;
+  const box = document.getElementById('dep-livr-courante'); if(!box) return;
+  const bars = document.getElementById('dep-bars');
+  if(bars) bars.innerHTML = ['DEVANT','PISCINE'].map(k=>{ const x=_depLivraisons[k];
+    return `<button type="button" class="dep-bar-chip ${k===_depDest?'active':''}" onclick="depChoisirDest('${k}')">
+      <b>${_DEP_LIEUX[k]}</b><span>${x?`${esc(x.numero)} · ${x.nb_lignes} colis · ${x.total_unites} unités`:'aucune livraison en cours'}</span></button>`; }).join('');
+  const l = _depLivraison, dest = _DEP_LIEUX[_depDest];
+  if(!l){
+    box.innerHTML = `<div class="dep-livr-vide">Aucune livraison en cours vers le <b>${dest}</b>. En mode « Ajouter à la livraison », le premier colis scanné l'ouvre automatiquement.
+      <div style="margin-top:10px"><button class="pos-btn teal" onclick="depNouvelleLivraison('${_depDest}')">Ouvrir une livraison vers le ${dest}</button></div></div>`;
+    return;
+  }
+  const autre = _DEP_LIEUX[l.lieu==='DEVANT' ? 'PISCINE' : 'DEVANT'];
   const options = _depStock.filter(s=>s.depot>0).map(s=>`<option value="${s.produit_id}">${esc(s.nom)} (dépôt : ${s.depot})</option>`).join('');
   box.innerHTML = `
     <div class="dep-livr-tete"><strong>${esc(l.numero)}</strong> → <strong>${esc(l.lieu_nom)}</strong>
-      · ${l.nb_lignes} ligne(s) · ${l.total_unites} unité(s)</div>
+      · ${l.nb_lignes} colis · ${l.total_unites} unité(s)
+      <button type="button" class="sx-link" style="margin-left:8px" onclick="depChangerDestination()">envoyer plutôt au ${autre}</button></div>
     <div class="pos-table-wrap"><table class="pos-table">
-      <thead><tr><th>Code-barres</th><th>Produit</th><th class="tr">Quantité</th><th></th></tr></thead>
-      <tbody>${(l.lignes||[]).map(x=>`<tr><td>${x.colis_id?_depCelluleCode(x.colis_id, x.colis_code_brut||x.colis_code, x.colis_code):'<em>vrac (sans étiquette)</em>'}</td><td><strong>${esc(x.produit_nom||'')}</strong></td>
-        <td class="tr">${x.quantite}</td><td class="tr"><button class="pos-btn ghost" style="padding:2px 8px;font-size:12px" onclick="depRetirerLigne(${x.id})">✕</button></td></tr>`).join('')
-        || '<tr><td colspan="4" style="text-align:center;padding:14px;color:rgba(255,255,255,.35)">Scannez les colis à livrer (mode « Ajouter à la livraison »).</td></tr>'}</tbody>
+      <thead><tr><th>Code</th><th>Code-barres</th><th>Produit</th><th class="tr">Quantité</th><th></th></tr></thead>
+      <tbody>${(l.lignes||[]).map(x=>`<tr>${x.colis_id
+          ? _depCellulesCode({id:x.colis_id, code:x.colis_code_brut||x.colis_code, code_lisible:x.colis_code, produit_nom:x.produit_nom, quantite:x.quantite, statut:'EN_PREPARATION', statut_libelle:'En préparation de livraison'})
+          : '<td><em>vrac</em></td><td>—</td>'}<td><strong>${esc(x.produit_nom||'')}</strong></td>
+        <td class="tr num">${x.quantite}</td><td class="tr"><button class="pos-btn ghost dep-btn-s" title="Retirer de la livraison" onclick="depRetirerLigne(${x.id})">✕</button></td></tr>`).join('')
+        || `<tr class="dep-vide-l"><td colspan="5">Scannez les colis à livrer au ${esc(l.lieu_nom)} (mode « Ajouter à la livraison »).</td></tr>`}</tbody>
     </table></div>
     <div class="dep-scan-row">
       <span class="dep-note" style="margin:0">Sans étiquette :</span>
@@ -28931,7 +29055,7 @@ function depRenderLivraison(){
     </div>
     <div class="dep-scan-row" style="justify-content:flex-end">
       <button class="pos-btn ghost" onclick="depAnnulerLivraison()">Annuler la livraison</button>
-      <button class="pos-btn teal" onclick="depValiderLivraison()">✓ Valider — mettre à jour les stocks</button>
+      <button class="pos-btn teal" onclick="depValiderLivraison()">✓ Valider — livrer au ${esc(l.lieu_nom)}</button>
     </div>`;
 }
 
@@ -28939,12 +29063,12 @@ async function depAjouterVrac(){
   const pid = parseInt(document.getElementById('dep-vrac-produit').value);
   const qte = parseFloat(document.getElementById('dep-vrac-qte').value);
   if(!pid || !(qte>0)){ posAlert('Choisissez un produit et une quantité.'); return; }
-  try{ _depLivraison = await apiFetch('POST',`/pos/depot/livraisons/${_depLivraison.id}/vrac`,{produit_id:pid, quantite:qte}); depRenderLivraison(); }
+  try{ _depLivraison = _depLivraisons[_depDest] = await apiFetch('POST',`/pos/depot/livraisons/${_depLivraison.id}/vrac`,{produit_id:pid, quantite:qte}); depRenderLivraison(); }
   catch(e){ posAlert(e.message); }
 }
 
 async function depRetirerLigne(ligneId){
-  try{ _depLivraison = await apiFetch('DELETE',`/pos/depot/livraisons/${_depLivraison.id}/lignes/${ligneId}`); await loadPosDepot(); }
+  try{ _depLivraison = _depLivraisons[_depDest] = await apiFetch('DELETE',`/pos/depot/livraisons/${_depLivraison.id}/lignes/${ligneId}`); await _depCharger(); }
   catch(e){ posAlert(e.message); }
 }
 
@@ -28954,15 +29078,15 @@ async function depValiderLivraison(){
   try{
     await apiFetch('POST',`/pos/depot/livraisons/${l.id}/valider`,{});
     posAlert(`Livraison ${l.numero} validée — stocks mis à jour.`,'ok');
-    _depLivraison = null; depSetMode('verif');
-    await loadPosDepot();
+    _depLivraisons[l.lieu] = null; _depLivraison = null;
+    await _depCharger();
   }catch(e){ posAlert(e.message); }
 }
 
 async function depAnnulerLivraison(){
   const l = _depLivraison;
   if(!await showConfirm(`Annuler la livraison ${l.numero} ? Les colis scannés retournent au dépôt.`, {title:'Annuler la livraison', type:'danger', okLabel:'Annuler la livraison'})) return;
-  try{ await apiFetch('POST',`/pos/depot/livraisons/${l.id}/annuler`,{}); _depLivraison=null; depSetMode('verif'); await loadPosDepot(); }
+  try{ await apiFetch('POST',`/pos/depot/livraisons/${l.id}/annuler`,{}); _depLivraisons[l.lieu]=null; _depLivraison=null; await _depCharger(); }
   catch(e){ posAlert(e.message); }
 }
 
@@ -29097,7 +29221,7 @@ async function depManuelValider(){
       lieu:_depManuel.lieu, colis_ids:choisis.map(c=>c.id), motif, date_reelle:quand.toISOString()});
     depManuelFermer();
     posAlert(`Livraison manuelle ${l.numero} enregistrée : ${l.nb_lignes} colis au ${l.lieu_nom}. Leurs codes ne sont plus valables.`,'ok');
-    await loadPosDepot();
+    await _depCharger();
   }catch(e){ posAlert(String(e.message||'Livraison refusée').replace(/^\[\d+\]\s*/,'')); }
 }
 

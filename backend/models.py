@@ -787,7 +787,7 @@ class BarMouvementStock(Base):
     utilisateur_id     = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     # Lieu du stock concerné :
     #   NULL     → DÉPÔT (réception vérifiée, sortie vers un bar, inventaire du dépôt)
-    #   DEVANT   → Bar avant
+    #   DEVANT   → Bar devant
     #   PISCINE  → Bar piscine
     # Une livraison dépôt → bar = deux mouvements TRANSFERT de même quantité
     # (−q au dépôt, +q au bar) : le stock total ne change pas.
@@ -2044,7 +2044,7 @@ class AnomalieTraitee(Base):
 # ══════════════════════════════════════════════════════════════════════════
 # DÉPÔT BAR — réception, colis étiquetés, livraisons vers les bars
 #   Réception (achat) → génération des codes → vérification au dépôt (scan)
-#   → préparation de la livraison → scan des colis → Bar avant / Bar piscine
+#   → préparation de la livraison → scan des colis → Bar devant / Bar piscine
 #   → mise à jour des stocks (dépôt et bar).
 # ══════════════════════════════════════════════════════════════════════════
 
@@ -2092,7 +2092,7 @@ class BarColis(Base):
 
 
 class BarLivraisonInterne(Base):
-    """Bon de livraison du dépôt vers un bar (Bar avant ou Bar piscine)."""
+    """Bon de livraison du dépôt vers un bar (Bar devant ou Bar piscine)."""
     __tablename__ = "bar_livraisons_internes"
 
     id             = Column(Integer, primary_key=True)

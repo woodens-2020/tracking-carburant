@@ -1,7 +1,7 @@
 """
 Circuit Bar du schéma UML : réception → génération des codes → mise en dépôt
 et vérification (scan) → préparation de la livraison → scan des colis →
-Bar avant / Bar piscine → mise à jour des stocks (dépôt et bar).
+Bar devant / Bar piscine → mise à jour des stocks (dépôt et bar).
 """
 import time
 from decimal import Decimal
@@ -124,7 +124,7 @@ def test_inventaire_et_livraison_en_vrac(client, db):
     assert client.post(f"/api/pos/depot/livraisons/{liv['id']}/valider", headers=H).status_code == 200
     s = _stock(client, p.id)
     assert (s["depot"], s["devant"], s["total"]) == (12, 18, 30)
-    # Inventaire du Bar avant : 15 comptés au lieu de 18 → ajustement −3
+    # Inventaire du Bar devant : 15 comptés au lieu de 18 → ajustement −3
     r = client.post("/api/pos/depot/inventaire", headers=H, json={
         "lieu": "DEVANT", "motif": "Comptage du soir", "lignes": [{"produit_id": p.id, "quantite": 15}]})
     assert r.json()["ajustements"][0]["ecart"] == -3
@@ -239,7 +239,7 @@ def _caissiere(client):
 
 def test_schema_complet_reception_a_vente(client, db):
     """Réception → codes → dépôt et vérification → livraison → scan →
-    Bar avant / Bar piscine → mise à jour des quantités (stock et dépôt),
+    Bar devant / Bar piscine → mise à jour des quantités (stock et dépôt),
     puis vente au bar : seul le stock du bar baisse."""
     p = _produit(db, unites_par_caisse=12)
     assert client.post(f"/api/pos/produits/{p.id}/prix", headers=H, json={"prix": 150}).status_code in (200, 201)
@@ -256,7 +256,7 @@ def test_schema_complet_reception_a_vente(client, db):
         assert client.post("/api/pos/depot/colis/verifier", headers=H, json={"code": c["code"]}).status_code == 200
     assert _stock(client, p.id)["depot"] == 48
 
-    # 4-5-6. Livraison, scan : 3 colis au Bar avant, 1 au Bar piscine
+    # 4-5-6. Livraison, scan : 3 colis au Bar devant, 1 au Bar piscine
     for lieu, lot in (("DEVANT", colis[:3]), ("PISCINE", colis[3:])):
         liv = client.post("/api/pos/depot/livraisons", headers=H, json={"lieu": lieu}).json()
         for c in lot:
@@ -271,7 +271,7 @@ def test_schema_complet_reception_a_vente(client, db):
     r = client.post("/api/pos/ventes", headers=H, json={"lignes": [{"produit_id": p.id, "quantite": 2}]})
     assert r.status_code == 422 and "session" in r.json()["detail"]
 
-    # Vente au Bar avant : seul le Bar avant baisse
+    # Vente au Bar devant : seul le Bar devant baisse
     cid = _caissiere(client)
     assert client.post("/api/pos/caisse/sessions/ouvrir", headers=H, json={"caissier_id": cid, "lieu": "DEVANT"}).status_code in (200, 201)
     r = client.post("/api/pos/ventes", headers=H, json={"lignes": [{"produit_id": p.id, "quantite": 5}], "caissier_id": cid})
@@ -318,7 +318,7 @@ def test_livraison_manuelle_rend_le_code_invalide(client, db):
     r = client.post(f"/api/pos/depot/livraisons/{liv2['id']}/scan", headers=H, json={"code": colis[0]["code"]})
     d = r.json()["detail"]
     assert r.status_code == 409 and d["deja_livre"] is True
-    assert "sans scan" in d["message"] and "Bar avant" in d["message"]
+    assert "sans scan" in d["message"] and "Bar devant" in d["message"]
     assert client.post("/api/pos/depot/colis/verifier", headers=H, json={"code": colis[0]["code"]}).status_code == 409
 
     # La fiche dit quand, où, comment et pourquoi
@@ -356,3 +356,38 @@ def test_livraison_manuelle_regles_strictes(client, db):
     st = client.get(f"/api/pos/depot/colis/{ids[1]}/fiche", headers=H).json()["colis"]["statut"]
     assert st == "AU_DEPOT"
     assert _stock(client, p.id)["devant"] == 12
+
+
+def test_une_livraison_par_bar_et_changement_de_destination(client, db):
+    """Bar devant et Bar piscine ont chacun leur livraison en préparation ;
+    une livraison scannée pour le mauvais bar peut être réorientée avant
+    validation, et le stock arrive bien au bar choisi."""
+    p = _produit(db)
+    a = _achat(db, p, 48)
+    colis = client.post(f"/api/pos/depot/receptions/{a.id}", headers=H, json={}).json()["colis"]
+    for c in colis:
+        assert client.post("/api/pos/depot/colis/verifier", headers=H, json={"code": c["code"]}).status_code == 200
+
+    # Livraisons ouvertes d'éventuels tests précédents : on repart de zéro
+    for l in client.get("/api/pos/depot/livraisons?statut=PREPARATION", headers=H).json():
+        client.post(f"/api/pos/depot/livraisons/{l['id']}/annuler", headers=H)
+
+    devant = client.post("/api/pos/depot/livraisons", headers=H, json={"lieu": "DEVANT"}).json()
+    encore = client.post("/api/pos/depot/livraisons", headers=H, json={"lieu": "DEVANT"}).json()
+    piscine = client.post("/api/pos/depot/livraisons", headers=H, json={"lieu": "PISCINE"}).json()
+    assert encore["id"] == devant["id"]                      # pas de doublon pour un même bar
+    assert piscine["id"] != devant["id"]                     # les deux bars en parallèle
+
+    assert client.post(f"/api/pos/depot/livraisons/{devant['id']}/scan", headers=H,
+                       json={"code": colis[0]["code"]}).status_code == 200
+    # Vers le Bar piscine alors qu'il a déjà sa livraison : refusé
+    r = client.post(f"/api/pos/depot/livraisons/{devant['id']}/destination", headers=H, json={"lieu": "PISCINE"})
+    assert r.status_code == 409 and "Bar piscine" in r.json()["detail"]
+    client.post(f"/api/pos/depot/livraisons/{piscine['id']}/annuler", headers=H)
+    r = client.post(f"/api/pos/depot/livraisons/{devant['id']}/destination", headers=H, json={"lieu": "PISCINE"})
+    assert r.status_code == 200 and r.json()["lieu"] == "PISCINE"
+    assert client.post(f"/api/pos/depot/livraisons/{devant['id']}/valider", headers=H).status_code == 200
+    s = _stock(client, p.id)
+    assert (s["depot"], s["devant"], s["piscine"]) == (24, 0, 24)
+    j = client.get("/api/pos/depot/journal?type=DESTINATION", headers=H).json()
+    assert any("Bar devant → Bar piscine" in (e["details"] or "") for e in j)
