@@ -2104,6 +2104,13 @@ class BarLivraisonInterne(Base):
     cree_par_id    = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     valide_le      = Column(DateTime(timezone=True), nullable=True)
     valide_par_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    # SCAN = colis scannés un par un ; MANUELLE = livrés sans scan (internet
+    # ou scanner en panne), enregistrés après coup avec un motif obligatoire
+    # et la date-heure réelle de la livraison (date_reelle), distincte de
+    # l'heure d'enregistrement (valide_le).
+    mode           = Column(String(20), nullable=False, default="SCAN")
+    motif_manuel   = Column(String(255), nullable=True)
+    date_reelle    = Column(DateTime(timezone=True), nullable=True)
 
     colis      = relationship("BarColis", back_populates="livraison", foreign_keys="BarColis.livraison_id")
     lignes     = relationship("BarLivraisonLigne", back_populates="livraison",

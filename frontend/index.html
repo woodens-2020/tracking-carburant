@@ -3138,6 +3138,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .dep-vide{font-size:13px;color:rgba(255,255,255,.35);padding:10px 0}
 .dep-code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;background:rgba(255,255,255,.06);padding:1px 6px;border-radius:4px}
 .dep-livr-tete{margin:4px 0 10px;font-size:15px}
+.dep-manuel{max-width:720px;width:calc(100vw - 32px);max-height:92vh;overflow-y:auto}
+.dep-manuel-alerte{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.4);color:#fcd34d;border-radius:10px;padding:10px 14px;font-size:13.5px;margin-bottom:12px}
+.dep-manuel-carte{border-color:rgba(251,191,36,.3)}
+.dep-manuel-liste{max-height:260px;overflow-y:auto;margin-top:8px;display:flex;flex-direction:column;gap:3px}
+.dep-manuel-grp{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.45);margin:8px 2px 2px}
+.dep-manuel-l{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,.03);cursor:pointer;font-size:13.5px}
+.dep-manuel-l:hover{background:rgba(255,255,255,.06)}
+.dep-manuel-l input{width:17px;height:17px;accent-color:#3fb6a8}
+.df-manuel{margin-top:8px;font-size:13px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);color:#fcd34d;border-radius:8px;padding:8px 10px}
+.df-h-LIVRE_MANUEL .df-h-ico{background:#78350f;border-color:#f59e0b}
 .dep-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:0 0 14px}
 .dep-kpi{display:flex;flex-direction:column;gap:2px;text-align:left;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 14px;color:#fff;cursor:pointer}
 .dep-kpi:hover{border-color:rgba(96,165,250,.5)}
@@ -7515,6 +7525,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </div>
             <div id="dep-livr-courante"></div>
           </div>
+          <div class="pos-card dep-manuel-carte">
+            <div class="pos-card-hdr">Livraison manuelle (sans scan)
+              <button class="pos-btn ghost" style="margin-left:auto;padding:5px 12px;font-size:13px" onclick="depManuelOuvrir()">Enregistrer une livraison sans scan</button>
+            </div>
+            <div class="dep-note" style="margin:0">À utiliser seulement si les colis ont été livrés sans pouvoir les scanner (coupure internet, scanner en panne, étiquette illisible). Il faut indiquer le motif et l'heure réelle de la livraison. Ensuite, le code-barres de ces colis n'est plus valable : un nouveau scan affichera qu'ils ont déjà été livrés, quand et où.</div>
+          </div>
           <div class="pos-card">
             <div class="pos-card-hdr">Livraisons récentes</div>
             <div class="pos-table-wrap">
@@ -7582,7 +7598,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="pos-card-hdr">Journal de traçabilité
               <select id="dep-journal-type" class="pos-input" style="margin-left:auto;max-width:240px;padding:6px 10px" onchange="depChargerJournal()">
                 <option value="">Tous les événements</option>
-                <option value="LIVRE">Livraisons</option>
+                <option value="LIVRE">Livraisons par scan</option>
+                <option value="LIVRE_MANUEL">Livraisons manuelles (sans scan)</option>
                 <option value="VERIFIE">Vérifications au dépôt</option>
                 <option value="REJET">Codes rejetés (sécurité)</option>
                 <option value="SCAN_REFUSE">Scans refusés</option>
@@ -7599,6 +7616,78 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
       </div>
     </div><!-- /page-pos-depot -->
+
+
+    <!-- Livraison manuelle (sans scan) -->
+    <div class="pos-modal-bg" id="dep-manuel-bg" onclick="if(event.target===this)depManuelFermer()">
+      <div class="pos-modal dep-manuel" role="dialog" aria-labelledby="dep-manuel-titre">
+        <div class="df-tete">
+          <h3 id="dep-manuel-titre">Livraison manuelle (sans scan)</h3>
+          <button type="button" onclick="depManuelFermer()" aria-label="Fermer" class="df-fermer">✕</button>
+        </div>
+        <div class="dep-manuel-alerte">Cette procédure remplace le scan. Elle est enregistrée à votre nom avec le motif. Les codes des colis choisis ne seront plus valables.</div>
+
+        <div class="pa-etape">
+          <div class="pa-etape-t"><span>1</span> Où et quand</div>
+          <div class="pos-form-row">
+            <div style="flex:1">
+              <label class="pos-label">Livré au *</label>
+              <div class="pa-modes" role="group" aria-label="Destination">
+                <button type="button" class="pa-mode" data-lieu="DEVANT" onclick="depManuelLieu('DEVANT')">Bar avant</button>
+                <button type="button" class="pa-mode" data-lieu="PISCINE" onclick="depManuelLieu('PISCINE')">Bar piscine</button>
+              </div>
+            </div>
+            <div style="flex:1">
+              <label class="pos-label" for="dep-manuel-date">Date et heure réelles de la livraison *</label>
+              <input type="datetime-local" class="pos-input" id="dep-manuel-date">
+              <div class="pa-aide">Pas dans le futur, 7 jours au plus.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pa-etape">
+          <div class="pa-etape-t"><span>2</span> Pourquoi sans scan</div>
+          <div class="pos-form-row">
+            <div style="flex:1">
+              <label class="pos-label" for="dep-manuel-raison">Motif *</label>
+              <select class="pos-input" id="dep-manuel-raison">
+                <option value="">— Choisir —</option>
+                <option>Coupure internet</option>
+                <option>Scanner ou téléphone en panne</option>
+                <option>Étiquette illisible ou abîmée</option>
+                <option>Livraison urgente au bar</option>
+                <option>Autre</option>
+              </select>
+            </div>
+            <div style="flex:2">
+              <label class="pos-label" for="dep-manuel-precision">Précision</label>
+              <input class="pos-input" id="dep-manuel-precision" maxlength="180" placeholder="Ex. internet coupé de 14 h à 16 h">
+            </div>
+          </div>
+        </div>
+
+        <div class="pa-etape">
+          <div class="pa-etape-t"><span>3</span> Colis livrés</div>
+          <div class="pos-form-row">
+            <div style="flex:2">
+              <input class="pos-input" id="dep-manuel-cherche" placeholder="Rechercher un produit ou un code…" oninput="depManuelRender()">
+            </div>
+            <div style="flex:2;display:flex;gap:6px">
+              <input class="pos-input" id="dep-manuel-code" placeholder="ou taper le code d'une étiquette" maxlength="40"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();depManuelAjouterCode()}">
+              <button type="button" class="pos-btn ghost" onclick="depManuelAjouterCode()">Ajouter</button>
+            </div>
+          </div>
+          <div class="dep-manuel-liste" id="dep-manuel-liste"></div>
+        </div>
+
+        <div class="pa-recap" id="dep-manuel-recap"></div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="depManuelFermer()">Annuler</button>
+          <button class="pos-btn teal" onclick="depManuelValider()">Enregistrer la livraison manuelle</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Fiche de livraison / traçabilité d'un colis -->
     <div class="pos-modal-bg" id="dep-fiche-bg" onclick="if(event.target===this)depFermerFiche()">
@@ -28759,13 +28848,14 @@ function _depDateHeure(iso){
 function depAfficherFiche(f){
   const c=f.colis, l=f.livraison, a=f.achat;
   const couleur={LIVRE:'ok', AU_DEPOT:'info', EN_PREPARATION:'warn', A_VERIFIER:'warn', ANNULE:'err'}[c.statut]||'info';
-  const ico={CREE:'＋', VERIFIE:'✓', AJOUTE_LIVRAISON:'⇢', RETIRE_LIVRAISON:'↩', LIVRE:'⛟', RETOUR_DEPOT:'↩', ANNULE:'✕', CONSULTATION:'👁', SCAN_REFUSE:'⚠'};
+  const ico={CREE:'＋', VERIFIE:'✓', AJOUTE_LIVRAISON:'⇢', RETIRE_LIVRAISON:'↩', LIVRE:'⛟', LIVRE_MANUEL:'✍', RETOUR_DEPOT:'↩', ANNULE:'✕', CONSULTATION:'👁', SCAN_REFUSE:'⚠'};
   const ligne=(lbl,val)=>`<div class="df-l"><span>${lbl}</span><strong>${val}</strong></div>`;
   const livre = f.deja_livre && l;
   document.getElementById('dep-fiche-corps').innerHTML = `
     <div class="df-statut df-${couleur}">
       <div class="df-statut-l">${esc(c.statut_libelle).toUpperCase()}</div>
-      ${livre?`<div class="df-statut-s">Livré au <b>${esc(l.lieu_nom)}</b> le ${_depDateHeure(l.valide_le)}</div>`
+      ${livre?`<div class="df-statut-s">Livré au <b>${esc(l.lieu_nom)}</b> le ${_depDateHeure(l.date_reelle||l.valide_le)}</div>
+        ${l.mode==='MANUELLE'?`<div class="df-manuel">Livré SANS SCAN (livraison manuelle) · motif : ${esc(l.motif_manuel||'—')}<br>Enregistré le ${_depDateHeure(l.valide_le)} par ${esc(l.valide_par||'—')} · ce code n'est plus valable</div>`:''}`
              :`<div class="df-statut-s">${c.lieu_nom?`Lieu : ${esc(c.lieu_nom)}`:'Au dépôt ou en attente'}</div>`}
     </div>
     <div class="df-grille">
@@ -28785,8 +28875,11 @@ function depAfficherFiche(f){
           ${ligne('Point de livraison', esc(l.lieu_nom))}
           ${ligne('Statut', esc({PREPARATION:'En préparation',VALIDEE:'Validée',ANNULEE:'Annulée'}[l.statut]||l.statut))}
           ${ligne('Préparée par', esc(l.cree_par||'—'))}
+          ${ligne('Mode', l.mode==='MANUELLE'?'Manuelle (sans scan)':'Par scan')}
           ${ligne('Validée par', esc(l.valide_par||'—'))}
-          ${ligne('Date et heure', _depDateHeure(l.valide_le))}`
+          ${l.mode==='MANUELLE'
+            ? ligne('Livrée réellement le', _depDateHeure(l.date_reelle)) + ligne('Enregistrée le', _depDateHeure(l.valide_le)) + ligne('Motif', esc(l.motif_manuel||'—'))
+            : ligne('Date et heure', _depDateHeure(l.valide_le))}`
         :'<div class="df-vide">Ce colis n\'a pas encore été livré.</div>'}
       </div>
     </div>
@@ -28800,7 +28893,7 @@ function depAfficherFiche(f){
     </ol>`;
   document.getElementById('dep-fiche-titre').textContent = `Fiche ${livre?'de livraison':'du colis'} — ${c.code_lisible}`;
   _depFicheColisId = c.id;
-  document.getElementById('dep-fiche-etiq').hidden = c.statut==='ANNULE';
+  document.getElementById('dep-fiche-etiq').hidden = ['ANNULE','LIVRE'].includes(c.statut);
   document.getElementById('dep-fiche-bg').classList.add('open');
 }
 
@@ -29021,10 +29114,130 @@ async function depChargerJournal(){
   }catch(e){ tbody.innerHTML=`<tr><td colspan="7" style="color:#f87171;padding:12px">${esc(e.message||'')}</td></tr>`; }
 }
 
+// ── Livraison manuelle (sans scan) ─────────────────────────────────────
+let _depManuel = {lieu:null, colis:[], choisis:new Set()};
+
+function _depLocalIso(d){
+  const p2=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+
+async function depManuelOuvrir(){
+  _depManuel = {lieu:null, colis:[], choisis:new Set()};
+  const maintenant=new Date();
+  const dt=document.getElementById('dep-manuel-date');
+  dt.value=_depLocalIso(maintenant);
+  dt.max=_depLocalIso(maintenant);
+  const min=new Date(maintenant); min.setDate(min.getDate()-6); dt.min=_depLocalIso(min);
+  ['dep-manuel-raison','dep-manuel-precision','dep-manuel-cherche','dep-manuel-code'].forEach(id=>document.getElementById(id).value='');
+  document.querySelectorAll('#dep-manuel-bg .pa-mode').forEach(b=>b.classList.remove('active'));
+  document.getElementById('dep-manuel-liste').innerHTML='<div class="pa-res-vide">Chargement…</div>';
+  document.getElementById('dep-manuel-bg').classList.add('open');
+  try{
+    const [auDepot, aVerifier] = await Promise.all([
+      apiFetch('GET','/pos/depot/colis?statut=AU_DEPOT'),
+      apiFetch('GET','/pos/depot/colis?statut=A_VERIFIER'),
+    ]);
+    _depManuel.colis=[...(auDepot||[]), ...(aVerifier||[])];
+  }catch(e){ posAlert(e.message||'Colis indisponibles.'); }
+  depManuelRender();
+}
+
+function depManuelFermer(){ document.getElementById('dep-manuel-bg').classList.remove('open'); }
+
+function depManuelLieu(l){
+  _depManuel.lieu=l;
+  document.querySelectorAll('#dep-manuel-bg .pa-mode').forEach(b=>b.classList.toggle('active', b.dataset.lieu===l));
+  depManuelRender();
+}
+
+function depManuelBasculer(id, coche){
+  if(coche) _depManuel.choisis.add(id); else _depManuel.choisis.delete(id);
+  depManuelRecap();
+}
+
+function depManuelRender(){
+  const q=(document.getElementById('dep-manuel-cherche').value||'').trim().toLowerCase().replace(/[\s-]/g,'');
+  const liste=_depManuel.colis.filter(c=>!q || (c.produit_nom||'').toLowerCase().replace(/\s/g,'').includes(q) || (c.code||'').toLowerCase().includes(q));
+  // Groupés par produit, cochés d'abord
+  const parProduit={};
+  liste.forEach(c=>{ (parProduit[c.produit_nom||'—'] ||= []).push(c); });
+  document.getElementById('dep-manuel-liste').innerHTML = Object.keys(parProduit).sort().map(nom=>`
+    <div class="dep-manuel-grp">${esc(nom)}</div>
+    ${parProduit[nom].map(c=>`<label class="dep-manuel-l">
+        <input type="checkbox" ${_depManuel.choisis.has(c.id)?'checked':''} onchange="depManuelBasculer(${c.id}, this.checked)">
+        <span class="dep-code">${esc(c.code_lisible||c.code)}</span>
+        <span>${c.quantite} ${esc(c.unite||'u.')}</span>
+        <span class="dep-st ${c.statut==='AU_DEPOT'?'st-depot':'st-verif'}">${c.statut==='AU_DEPOT'?'Au dépôt':'À vérifier'}</span>
+      </label>`).join('')}`).join('')
+    || '<div class="pa-res-vide">Aucun colis au dépôt ne correspond. Seuls les colis au dépôt ou en attente de vérification peuvent être livrés.</div>';
+  depManuelRecap();
+}
+
+// Ajout par code tapé (étiquette lisible) : le code est validé par le serveur
+async function depManuelAjouterCode(){
+  const inp=document.getElementById('dep-manuel-code');
+  const code=inp.value.trim(); if(!code) return;
+  try{
+    const c=await apiFetch('GET',`/pos/depot/colis/code/${encodeURIComponent(code)}`);
+    if(!['AU_DEPOT','A_VERIFIER'].includes(c.statut)){
+      posAlert(`Colis ${c.code_lisible} : ${c.statut_libelle.toLowerCase()} — il ne peut pas être livré.`);
+      if(c.statut==='LIVRE') depOuvrirFiche(c.id);
+      return;
+    }
+    if(!_depManuel.colis.some(x=>x.id===c.id)) _depManuel.colis.push(c);
+    _depManuel.choisis.add(c.id);
+    inp.value='';
+    depManuelRender();
+  }catch(e){ posAlert(String(e.message||'Code refusé').replace(/^\[\d+\]\s*/,'')); }
+}
+
+function _depManuelMotif(){
+  const r=document.getElementById('dep-manuel-raison').value;
+  const p=document.getElementById('dep-manuel-precision').value.trim();
+  return r ? (p ? `${r} — ${p}` : r) : '';
+}
+
+function depManuelRecap(){
+  const choisis=_depManuel.colis.filter(c=>_depManuel.choisis.has(c.id));
+  const parProduit={};
+  choisis.forEach(c=>{ parProduit[c.produit_nom] = (parProduit[c.produit_nom]||0) + c.quantite; });
+  document.getElementById('dep-manuel-recap').innerHTML = choisis.length
+    ? `<div class="pa-recap-l pa-recap-tot"><span>${choisis.length} colis vers ${_depManuel.lieu?esc(_DEP_LIEUX[_depManuel.lieu]):'— choisissez le bar —'}</span><span>${choisis.reduce((t,c)=>t+c.quantite,0)} unités</span></div>`
+      + Object.entries(parProduit).map(([n,q])=>`<div class="pa-recap-l"><span>${esc(n)}</span><span>${q}</span></div>`).join('')
+    : '<div class="pa-recap-l"><span>Aucun colis choisi</span><span></span></div>';
+}
+
+async function depManuelValider(){
+  const choisis=_depManuel.colis.filter(c=>_depManuel.choisis.has(c.id));
+  const motif=_depManuelMotif();
+  const dateVal=document.getElementById('dep-manuel-date').value;
+  if(!_depManuel.lieu){ posAlert('Choisissez le bar de destination.'); return; }
+  if(!dateVal){ posAlert('Indiquez la date et l\'heure réelles de la livraison.'); return; }
+  if(!motif){ posAlert('Choisissez le motif.'); document.getElementById('dep-manuel-raison').focus(); return; }
+  if(document.getElementById('dep-manuel-raison').value==='Autre' && !document.getElementById('dep-manuel-precision').value.trim()){
+    posAlert('Précisez le motif « Autre ».'); document.getElementById('dep-manuel-precision').focus(); return;
+  }
+  if(motif.length<10){ posAlert('Ajoutez une précision au motif (10 caractères minimum).'); document.getElementById('dep-manuel-precision').focus(); return; }
+  if(!choisis.length){ posAlert('Choisissez au moins un colis.'); return; }
+  const quand=new Date(dateVal);
+  const ok=await showConfirm(
+    `Livraison manuelle de ${choisis.length} colis au ${_DEP_LIEUX[_depManuel.lieu]}, le ${quand.toLocaleDateString('fr-FR')} à ${quand.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}.\n\nMotif : ${motif}\n\nLes codes de ces colis ne seront plus valables. Confirmer ?`,
+    {title:'Livraison manuelle', type:'warn', okLabel:'Confirmer la livraison'});
+  if(!ok) return;
+  try{
+    const l=await apiFetch('POST','/pos/depot/livraisons/manuelle',{
+      lieu:_depManuel.lieu, colis_ids:choisis.map(c=>c.id), motif, date_reelle:quand.toISOString()});
+    depManuelFermer();
+    posAlert(`Livraison manuelle ${l.numero} enregistrée : ${l.nb_lignes} colis au ${l.lieu_nom}. Leurs codes ne sont plus valables.`,'ok');
+    await loadPosDepot();
+  }catch(e){ posAlert(String(e.message||'Livraison refusée').replace(/^\[\d+\]\s*/,'')); }
+}
+
 function depRenderHistorique(livs){
   const st = {PREPARATION:'En préparation', VALIDEE:'Validée', ANNULEE:'Annulée'};
   document.getElementById('dep-livr-histo').innerHTML = livs.slice(0,30).map(l=>`
-    <tr><td>${esc(l.numero)}</td><td>${esc(l.lieu_nom)}</td><td>${st[l.statut]||l.statut}</td>
+    <tr><td>${esc(l.numero)}${l.mode==='MANUELLE'?' <span class="dep-st st-prep" title="'+esc(l.motif_manuel||'')+'">Sans scan</span>':''}</td><td>${esc(l.lieu_nom)}</td><td>${st[l.statut]||l.statut}</td>
       <td class="tr">${l.nb_lignes}</td><td class="tr">${l.total_unites}</td><td>${esc(l.valide_par||'—')}</td>
       <td>${(l.valide_le||l.cree_le||'').slice(0,16).replace('T',' ')}</td></tr>`).join('')
     || '<tr><td colspan="7" style="text-align:center;padding:14px;color:rgba(255,255,255,.3)">Aucune livraison</td></tr>';

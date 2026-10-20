@@ -82,6 +82,7 @@ EVENEMENTS = {
     "AJOUTE_LIVRAISON":  "Scanné dans une livraison",
     "RETIRE_LIVRAISON":  "Retiré de la livraison",
     "LIVRE":             "Livré",
+    "LIVRE_MANUEL":      "Livré sans scan (livraison manuelle)",
     "RETOUR_DEPOT":      "Livraison annulée — retour au dépôt",
     "ANNULE":            "Colis annulé",
     "CONSULTATION":      "Fiche consultée",
@@ -256,7 +257,16 @@ def _refus(db: Session, c: BarColis, user_id: Optional[int], message: str, code_
 
 def _etat_texte(c: BarColis) -> str:
     if c.statut == "LIVRE":
-        return f"déjà livré au {LIEUX.get(c.lieu, c.lieu)}"
+        liv = c.livraison
+        quand = liv.date_reelle or liv.valide_le if liv else None
+        txt = f"déjà livré au {LIEUX.get(c.lieu, c.lieu)}"
+        if quand:
+            q = quand if quand.tzinfo else quand.replace(tzinfo=timezone.utc)
+            from tz_utils import HAITI_TZ
+            txt += f" le {q.astimezone(HAITI_TZ):%d/%m/%Y à %H:%M}"
+        if liv and liv.mode == "MANUELLE":
+            txt += " (livraison manuelle, sans scan) — ce code n'est plus valable"
+        return txt
     return {"AU_DEPOT": "déjà vérifié au dépôt", "EN_PREPARATION": "dans une livraison en préparation",
             "A_VERIFIER": "pas encore vérifié au dépôt", "ANNULE": "annulé"}.get(c.statut, c.statut)
 
@@ -313,6 +323,9 @@ def _livraison_dict(l: BarLivraisonInterne, details: bool = True) -> dict:
         "cree_par":    l.cree_par.nom_complet if l.cree_par else None,
         "valide_le":   _iso(l.valide_le),
         "valide_par":  l.valide_par.nom_complet if l.valide_par else None,
+        "mode":        l.mode or "SCAN",
+        "motif_manuel": l.motif_manuel,
+        "date_reelle": _iso(l.date_reelle),
         "nb_lignes":   len(l.lignes),
         "total_unites": float(sum(Decimal(str(x.quantite)) for x in l.lignes)),
     }
@@ -873,6 +886,89 @@ def annuler_livraison(livraison_id: int, db: Session = Depends(get_db), user=Dep
         if x.colis_id:
             _transition(db, x.colis_id, ("EN_PREPARATION",), {"statut": "AU_DEPOT", "livraison_id": None})
             _journaliser(db, "RETOUR_DEPOT", x.colis, livraison_id=l.id, utilisateur_id=user.id)
+    db.commit()
+    db.refresh(l)
+    return _livraison_dict(l)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Livraison manuelle (sans scan) — internet ou scanner en panne
+# ══════════════════════════════════════════════════════════════════════════
+
+DELAI_MAX_REGULARISATION_JOURS = 7
+MOTIF_MANUEL_MIN = 10
+
+
+class LivraisonManuelleIn(BaseModel):
+    lieu:          str = Field(max_length=20)
+    colis_ids:     List[int] = Field(min_length=1, max_length=MAX_COLIS_PAR_RECEPTION)
+    motif:         str = Field(max_length=250)
+    date_reelle:   datetime                  # date et heure réelles de la livraison
+
+
+@router.post("/livraisons/manuelle", status_code=201)
+def livraison_manuelle(data: LivraisonManuelleIn, db: Session = Depends(get_db), user=Depends(_require_depot)):
+    """Enregistre une livraison faite sans scanner (internet ou scanner en
+    panne). Règles strictes :
+      - réservé au dépôt (mêmes droits que la livraison par scan) ;
+      - motif écrit obligatoire ; date-heure réelle déclarée, ni dans le
+        futur ni de plus de 7 jours ;
+      - seuls des colis encore au dépôt (ou reçus mais pas encore vérifiés)
+        peuvent être livrés ; chacun change d'état de façon atomique ;
+      - les colis deviennent LIVRE : leur code n'est plus utilisable, tout
+        scan ultérieur est refusé et renvoie la fiche (livré sans scan, quand,
+        où, par qui, pourquoi)."""
+    lieu = (data.lieu or "").upper()
+    if lieu not in LIEUX:
+        raise HTTPException(422, "Destination invalide : DEVANT (Bar avant) ou PISCINE (Bar piscine).")
+    motif = " ".join((data.motif or "").split())
+    if len(motif) < MOTIF_MANUEL_MIN:
+        raise HTTPException(422, f"Expliquez pourquoi la livraison n'a pas été scannée ({MOTIF_MANUEL_MIN} caractères minimum).")
+    reelle = data.date_reelle if data.date_reelle.tzinfo else data.date_reelle.replace(tzinfo=now_haiti().tzinfo)
+    maintenant = datetime.now(timezone.utc)
+    if reelle > maintenant.replace(microsecond=0) + __import__("datetime").timedelta(minutes=5):
+        raise HTTPException(422, "La date de livraison ne peut pas être dans le futur.")
+    if (maintenant - reelle).days >= DELAI_MAX_REGULARISATION_JOURS:
+        raise HTTPException(422, f"Livraison trop ancienne : régularisation possible sur {DELAI_MAX_REGULARISATION_JOURS} jours seulement. Faites un inventaire.")
+    ids = list(dict.fromkeys(data.colis_ids))          # sans doublon
+
+    l = BarLivraisonInterne(numero="TMP-" + uuid.uuid4().hex[:20], lieu=lieu, statut="VALIDEE",
+                            cree_par_id=user.id, valide_par_id=user.id, valide_le=maintenant,
+                            mode="MANUELLE", motif_manuel=motif[:255], date_reelle=reelle,
+                            notes="Livraison manuelle (sans scan)")
+    db.add(l)
+    db.flush()
+    l.numero = f"LIV{now_haiti():%y%m%d}-{l.id:04d}"
+    dest = LIEUX[lieu]
+    refuses = []
+    for cid in ids:
+        c = db.get(BarColis, cid)
+        if not c:
+            refuses.append(f"#{cid} inconnu")
+            continue
+        etait_a_verifier = c.statut == "A_VERIFIER"
+        if not _transition(db, c.id, ("AU_DEPOT", "A_VERIFIER"),
+                           {"statut": "LIVRE", "lieu": lieu, "livraison_id": l.id}):
+            db.refresh(c)
+            refuses.append(f"{code_lisible(c.code)} {_etat_texte(c)}")
+            continue
+        motif_mv = f"Livraison manuelle {l.numero} — colis {code_lisible(c.code)} → {dest}"
+        if etait_a_verifier:
+            # Jamais vérifié au dépôt : il y entre puis en ressort aussitôt
+            db.add(BarMouvementStock(produit_id=c.produit_id, type_mouvement="ENTREE", quantite=c.quantite,
+                                     lieu=None, motif=f"Colis {code_lisible(c.code)} reçu sans scan ({motif[:120]})",
+                                     utilisateur_id=user.id))
+            _journaliser(db, "VERIFIE", c, utilisateur_id=user.id, details="Sans scan — livraison manuelle")
+        db.add(BarMouvementStock(produit_id=c.produit_id, type_mouvement="TRANSFERT",
+                                 quantite=-Decimal(str(c.quantite)), lieu=None, motif=motif_mv, utilisateur_id=user.id))
+        db.add(BarMouvementStock(produit_id=c.produit_id, type_mouvement="TRANSFERT",
+                                 quantite=Decimal(str(c.quantite)), lieu=lieu, motif=motif_mv, utilisateur_id=user.id))
+        db.add(BarLivraisonLigne(livraison_id=l.id, produit_id=c.produit_id, colis_id=c.id, quantite=c.quantite))
+        _journaliser(db, "LIVRE_MANUEL", c, lieu=lieu, livraison_id=l.id, utilisateur_id=user.id,
+                     details=f"Livré le {reelle.astimezone(now_haiti().tzinfo):%d/%m/%Y %H:%M} · motif : {motif}"[:300])
+    if refuses:
+        db.rollback()          # tout ou rien : aucune livraison partielle
+        raise HTTPException(409, "Livraison manuelle refusée, aucun colis n'a été livré : " + " ; ".join(refuses[:10]))
     db.commit()
     db.refresh(l)
     return _livraison_dict(l)

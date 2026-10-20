@@ -283,3 +283,76 @@ def test_schema_complet_reception_a_vente(client, db):
     assert client.post("/api/pos/stock/ajustement", headers=H, json={
         "produit_id": p.id, "quantite": 1, "type_mouvement": "CASSE", "motif": "Bouteille cassée au bar", "lieu": "PISCINE"}).status_code == 201
     assert _stock(client, p.id)["piscine"] == 11
+
+
+# ── Livraison manuelle (sans scan) ───────────────────────────────────────
+
+def _colis_recus(client, db, n_caisses=2, verifier=True):
+    p = _produit(db, unites_par_caisse=12)
+    a = _achat(db, p, 12 * n_caisses)
+    colis = client.post(f"/api/pos/depot/receptions/{a.id}", headers=H, json={}).json()["colis"]
+    if verifier:
+        for c in colis:
+            client.post("/api/pos/depot/colis/verifier", headers=H, json={"code": c["code"]})
+    return p, colis
+
+
+def _maintenant(delta_h=0):
+    from datetime import datetime, timedelta, timezone
+    return (datetime.now(timezone.utc) + timedelta(hours=delta_h)).isoformat()
+
+
+def test_livraison_manuelle_rend_le_code_invalide(client, db):
+    p, colis = _colis_recus(client, db, 2)
+    r = client.post("/api/pos/depot/livraisons/manuelle", headers=H, json={
+        "lieu": "DEVANT", "colis_ids": [c["id"] for c in colis],
+        "motif": "Coupure internet, scanner hors ligne", "date_reelle": _maintenant(-2)})
+    assert r.status_code == 201, r.text
+    liv = r.json()
+    assert liv["mode"] == "MANUELLE" and liv["statut"] == "VALIDEE" and liv["date_reelle"]
+    s = _stock(client, p.id)
+    assert (s["depot"], s["devant"], s["total"]) == (0, 24, 24)
+
+    # Le code n'est plus utilisable : tout scan est refusé, avec « déjà livré »
+    liv2 = client.post("/api/pos/depot/livraisons", headers=H, json={"lieu": "PISCINE"}).json()
+    r = client.post(f"/api/pos/depot/livraisons/{liv2['id']}/scan", headers=H, json={"code": colis[0]["code"]})
+    d = r.json()["detail"]
+    assert r.status_code == 409 and d["deja_livre"] is True
+    assert "sans scan" in d["message"] and "Bar avant" in d["message"]
+    assert client.post("/api/pos/depot/colis/verifier", headers=H, json={"code": colis[0]["code"]}).status_code == 409
+
+    # La fiche dit quand, où, comment et pourquoi
+    f = client.post("/api/pos/depot/colis/consulter", headers=H, json={"code": colis[0]["code"]}).json()
+    assert f["deja_livre"] and f["livraison"]["mode"] == "MANUELLE"
+    assert "Coupure internet" in f["livraison"]["motif_manuel"]
+    assert "LIVRE_MANUEL" in [e["type"] for e in f["historique"]]
+
+
+def test_livraison_manuelle_colis_non_verifie(client, db):
+    """Colis reçu mais jamais scanné au dépôt : il passe par le dépôt puis au bar."""
+    p, colis = _colis_recus(client, db, 1, verifier=False)
+    r = client.post("/api/pos/depot/livraisons/manuelle", headers=H, json={
+        "lieu": "PISCINE", "colis_ids": [colis[0]["id"]],
+        "motif": "Scanner en panne au dépôt", "date_reelle": _maintenant(-1)})
+    assert r.status_code == 201, r.text
+    s = _stock(client, p.id)
+    assert (s["depot"], s["piscine"], s["a_verifier"]) == (0, 12, 0)
+
+
+def test_livraison_manuelle_regles_strictes(client, db):
+    p, colis = _colis_recus(client, db, 2)
+    ids = [c["id"] for c in colis]
+    base = {"lieu": "DEVANT", "colis_ids": ids, "date_reelle": _maintenant(-1)}
+    assert client.post("/api/pos/depot/livraisons/manuelle", headers=H, json={**base, "motif": "panne"}).status_code == 422
+    assert client.post("/api/pos/depot/livraisons/manuelle", headers=H,
+                       json={**base, "motif": "Coupure internet", "date_reelle": _maintenant(+3)}).status_code == 422
+    assert client.post("/api/pos/depot/livraisons/manuelle", headers=H,
+                       json={**base, "motif": "Coupure internet", "date_reelle": _maintenant(-24 * 10)}).status_code == 422
+    # Tout ou rien : si un colis est déjà livré, aucun colis ne part
+    client.post("/api/pos/depot/livraisons/manuelle", headers=H,
+                json={**base, "colis_ids": ids[:1], "motif": "Coupure internet"})
+    r = client.post("/api/pos/depot/livraisons/manuelle", headers=H, json={**base, "motif": "Coupure internet encore"})
+    assert r.status_code == 409 and "aucun colis" in r.json()["detail"]
+    st = client.get(f"/api/pos/depot/colis/{ids[1]}/fiche", headers=H).json()["colis"]["statut"]
+    assert st == "AU_DEPOT"
+    assert _stock(client, p.id)["devant"] == 12

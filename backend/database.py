@@ -234,6 +234,13 @@ def _migrate_columns():
             ("categories_depense", "est_transfert",
              "ALTER TABLE categories_depense ADD COLUMN est_transfert INTEGER NOT NULL DEFAULT 0",
              "UPDATE categories_depense SET est_transfert = 1 WHERE nom_norm LIKE '%banque%' OR nom_norm LIKE '%zelle%' OR nom_norm LIKE '%transfert%' OR nom_norm LIKE '%virement%'"),
+            # v28 — dépôt bar : livraison manuelle (sans scan)
+            ("bar_livraisons_internes", "mode",
+             "ALTER TABLE bar_livraisons_internes ADD COLUMN mode VARCHAR(20) NOT NULL DEFAULT 'SCAN'", None),
+            ("bar_livraisons_internes", "motif_manuel",
+             "ALTER TABLE bar_livraisons_internes ADD COLUMN motif_manuel VARCHAR(255)", None),
+            ("bar_livraisons_internes", "date_reelle",
+             "ALTER TABLE bar_livraisons_internes ADD COLUMN date_reelle DATETIME", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -372,6 +379,13 @@ def _migrate_columns():
             ("categories_depense", "est_transfert",
              "ALTER TABLE categories_depense ADD COLUMN est_transfert BOOLEAN NOT NULL DEFAULT FALSE",
              "UPDATE categories_depense SET est_transfert = TRUE WHERE nom_norm LIKE '%banque%' OR nom_norm LIKE '%zelle%' OR nom_norm LIKE '%transfert%' OR nom_norm LIKE '%virement%'"),
+            # v28 — dépôt bar : livraison manuelle (sans scan)
+            ("bar_livraisons_internes", "mode",
+             "ALTER TABLE bar_livraisons_internes ADD COLUMN mode VARCHAR(20) NOT NULL DEFAULT 'SCAN'", None),
+            ("bar_livraisons_internes", "motif_manuel",
+             "ALTER TABLE bar_livraisons_internes ADD COLUMN motif_manuel VARCHAR(255)", None),
+            ("bar_livraisons_internes", "date_reelle",
+             "ALTER TABLE bar_livraisons_internes ADD COLUMN date_reelle TIMESTAMP WITH TIME ZONE", None),
         ]
     else:
         return
