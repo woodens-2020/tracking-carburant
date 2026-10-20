@@ -225,3 +225,61 @@ def test_rescan_colis_livre_donne_la_fiche(client, db):
     assert types[:4] == ["CREE", "VERIFIE", "AJOUTE_LIVRAISON", "LIVRE"]
     assert "SCAN_REFUSE" in types and types[-1] == "CONSULTATION"
     assert all(e["horodatage"] for e in f["historique"])
+
+
+# ── Schéma complet de l'utilisateur, de la réception à la vente au bar ────
+
+def _caissiere(client):
+    r = client.post("/api/employes", headers=H, json={
+        "nom": f"Caisse{time.time_ns()}", "prenom": "Test", "poste": "Caissiere",
+        "date_embauche": "2026-01-01", "salaire_base": 1000})
+    assert r.status_code in (200, 201), r.text
+    return r.json()["id"]
+
+
+def test_schema_complet_reception_a_vente(client, db):
+    """Réception → codes → dépôt et vérification → livraison → scan →
+    Bar avant / Bar piscine → mise à jour des quantités (stock et dépôt),
+    puis vente au bar : seul le stock du bar baisse."""
+    p = _produit(db, unites_par_caisse=12)
+    assert client.post(f"/api/pos/produits/{p.id}/prix", headers=H, json={"prix": 150}).status_code in (200, 201)
+
+    # 1. Réception et enregistrement (achat de 4 caisses) + 2. génération des codes
+    r = client.post("/api/pos/achats", headers=H, json={"produit_id": p.id, "quantite": 4, "quantite_type": "caisse",
+                                                       "prix_achat_unitaire": 1200, "fournisseur": "Test"})
+    achat_id = r.json()["achat_id"]
+    colis = client.post(f"/api/pos/depot/receptions/{achat_id}", headers=H, json={}).json()["colis"]
+    assert len(colis) == 4
+
+    # 3. Mise en dépôt et vérification
+    for c in colis:
+        assert client.post("/api/pos/depot/colis/verifier", headers=H, json={"code": c["code"]}).status_code == 200
+    assert _stock(client, p.id)["depot"] == 48
+
+    # 4-5-6. Livraison, scan : 3 colis au Bar avant, 1 au Bar piscine
+    for lieu, lot in (("DEVANT", colis[:3]), ("PISCINE", colis[3:])):
+        liv = client.post("/api/pos/depot/livraisons", headers=H, json={"lieu": lieu}).json()
+        for c in lot:
+            assert client.post(f"/api/pos/depot/livraisons/{liv['id']}/scan", headers=H, json={"code": c["code"]}).status_code == 200
+        assert client.post(f"/api/pos/depot/livraisons/{liv['id']}/valider", headers=H).status_code == 200
+
+    # 7. Mise à jour des quantités (stock et dépôt)
+    s = _stock(client, p.id)
+    assert (s["depot"], s["devant"], s["piscine"], s["total"]) == (0, 36, 12, 48)
+
+    # Vente sans session de caisse : refusée (elle sortirait du dépôt)
+    r = client.post("/api/pos/ventes", headers=H, json={"lignes": [{"produit_id": p.id, "quantite": 2}]})
+    assert r.status_code == 422 and "session" in r.json()["detail"]
+
+    # Vente au Bar avant : seul le Bar avant baisse
+    cid = _caissiere(client)
+    assert client.post("/api/pos/caisse/sessions/ouvrir", headers=H, json={"caissier_id": cid, "lieu": "DEVANT"}).status_code in (200, 201)
+    r = client.post("/api/pos/ventes", headers=H, json={"lignes": [{"produit_id": p.id, "quantite": 5}], "caissier_id": cid})
+    assert r.status_code == 201, r.text
+    s = _stock(client, p.id)
+    assert (s["depot"], s["devant"], s["piscine"], s["total"]) == (0, 31, 12, 43)
+
+    # Casse constatée au dépôt / au bar : ajustement sur le bon lieu
+    assert client.post("/api/pos/stock/ajustement", headers=H, json={
+        "produit_id": p.id, "quantite": 1, "type_mouvement": "CASSE", "motif": "Bouteille cassée au bar", "lieu": "PISCINE"}).status_code == 201
+    assert _stock(client, p.id)["piscine"] == 11

@@ -229,7 +229,7 @@ class AjustementIn(BaseModel):
     quantite:       float   # signée : + pour ajustement positif, - pour perte
     type_mouvement: str = "AJUSTEMENT"   # AJUSTEMENT, PERTE, CASSE
     motif:          str
-    lieu:           str     # DEVANT ou PISCINE — requis pour tout ajustement manuel
+    lieu:           str     # DEPOT, DEVANT ou PISCINE — requis pour tout ajustement manuel
 
     @validator("type_mouvement")
     def check_type(cls, v):
@@ -239,8 +239,8 @@ class AjustementIn(BaseModel):
 
     @validator("lieu")
     def check_lieu(cls, v):
-        if not v or v.upper() not in LIEUX_VALIDES:
-            raise ValueError("Choisissez le bar (Bar Devant ou Bar Piscine).")
+        if not v or (v.upper() not in LIEUX_VALIDES and v.upper() != "DEPOT"):
+            raise ValueError("Choisissez le lieu : Dépôt, Bar Devant ou Bar Piscine.")
         return v.upper()
 
 
@@ -1648,7 +1648,7 @@ def ajuster_stock(data: AjustementIn, request: Request, db: Session = Depends(ge
         type_mouvement = data.type_mouvement,
         quantite       = qte,
         motif          = data.motif.strip(),
-        lieu           = data.lieu,
+        lieu           = None if data.lieu == "DEPOT" else data.lieu,   # NULL = dépôt
         utilisateur_id = _uid(request),
     )
     db.add(mouv)

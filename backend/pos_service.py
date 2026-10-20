@@ -292,6 +292,19 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     if erreurs:
         raise ValueError("; ".join(erreurs))
 
+    # Une vente de produit bar sort du stock d'un bar (Bar avant / Bar piscine),
+    # jamais du dépôt : il faut une session de caisse ouverte qui donne le bar.
+    if any(l.get("produit_id") for l in lignes_traitees):
+        caissier = data.get("caissier_id")
+        sess = (db.query(BarSessionCaisse)
+                .filter_by(caissier_id=caissier, date_session=today_haiti(), statut="EN_COURS")
+                .first()) if caissier else None
+        if not sess or not sess.lieu:
+            raise ValueError(
+                "Choisissez la caissière et ouvrez sa session de caisse (Bar avant ou Bar piscine) : "
+                "une vente doit sortir du stock d'un bar, pas du dépôt."
+            )
+
     montant_total = sum(l["sous_total"] for l in lignes_traitees)
 
     _MODES_VALIDES = {"CASH", "CREDIT", "MIXTE"}

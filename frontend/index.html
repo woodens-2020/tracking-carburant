@@ -7608,7 +7608,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <button type="button" onclick="depFermerFiche()" aria-label="Fermer" class="df-fermer">✕</button>
         </div>
         <div id="dep-fiche-corps"></div>
-        <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermerFiche()">Fermer</button></div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" id="dep-fiche-etiq" onclick="depReimprimer()">🖨 Réimprimer l'étiquette</button>
+          <button class="pos-btn ghost" onclick="depFermerFiche()">Fermer</button>
+        </div>
       </div>
     </div>
 
@@ -7635,7 +7638,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
           <div><label class="pos-label">Lieu *</label>
             <select class="pos-select" id="pos-ajust-lieu">
-              <option value="">Choisir un bar…</option>
+              <option value="">Choisir le lieu…</option>
+              <option value="DEPOT">Dépôt</option>
               <option value="DEVANT">Bar Devant (Accueil)</option>
               <option value="PISCINE">Bar Piscine</option>
             </select>
@@ -26539,7 +26543,7 @@ async function posAjusterStock(){
   const lieu   = document.getElementById('pos-ajust-lieu').value;
   if(!prodId||!qte){ posAlert('Produit et quantité requis.'); return; }
   if(motif.length < 5){ posAlert('Motif trop court (min 5 caractères).'); return; }
-  if(!lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine).'); return; }
+  if(!lieu){ posAlert('Choisissez le lieu (Dépôt, Bar Devant ou Bar Piscine).'); return; }
   try {
     await apiFetch('POST','/pos/stock/ajustement',{ produit_id:parseInt(prodId), type_mouvement:type, quantite:qte, motif, lieu });
     document.getElementById('pos-ajust-modal-bg').classList.remove('open');
@@ -28795,7 +28799,20 @@ function depAfficherFiche(f){
       </li>`).join('') || '<li class="df-vide">Aucun événement enregistré.</li>'}
     </ol>`;
   document.getElementById('dep-fiche-titre').textContent = `Fiche ${livre?'de livraison':'du colis'} — ${c.code_lisible}`;
+  _depFicheColisId = c.id;
+  document.getElementById('dep-fiche-etiq').hidden = c.statut==='ANNULE';
   document.getElementById('dep-fiche-bg').classList.add('open');
+}
+
+let _depFicheColisId = null;
+async function depReimprimer(){
+  if(!_depFicheColisId) return;
+  const hdrs = {}; const k = sessionStorage.getItem('api_key'); if(k) hdrs['X-API-Key'] = k;
+  try{
+    const res = await fetch(`/api/pos/depot/etiquettes.pdf?ids=${_depFicheColisId}`, {headers:hdrs, credentials:'include'});
+    if(!res.ok){ const e = await res.json().catch(()=>({})); throw new Error(e.detail||'Étiquette indisponible'); }
+    window.open(URL.createObjectURL(await res.blob()), '_blank');
+  }catch(e){ posAlert(e.message||'Impression impossible.'); }
 }
 
 function depFermerFiche(){
