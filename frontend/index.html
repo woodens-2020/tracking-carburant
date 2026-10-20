@@ -3209,6 +3209,35 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .df-h-l{font-size:13.5px;font-weight:600}
 .df-h-s{font-size:12px;color:rgba(255,255,255,.5);margin-top:1px}
 .pos-stock-alert{color:#f87171}
+/* Dépôt Bar — mise en page compacte, colonne code-barres */
+#page-pos-depot .dep-kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:0 0 12px}
+#page-pos-depot .dep-kpi{flex-direction:row;align-items:baseline;gap:8px;padding:9px 12px}
+#page-pos-depot .dep-kpi-v{font-size:20px}
+#page-pos-depot .dep-kpi-txt{font-size:13.5px}
+.dep-scan-card{padding:12px 14px!important}
+.dep-scan-card .dep-scan-row{margin:0}
+.dep-scan-pied{display:flex;flex-wrap:wrap;gap:2px 16px;align-items:baseline;margin-top:6px;min-height:20px}
+.dep-scan-pied .dep-retour{margin:0;font-weight:600}
+.dep-scan-pied .dep-mode-aide{margin:0;font-size:12.5px}
+#page-pos-depot .dep-intro{padding:7px 12px;font-size:13px;margin-bottom:10px}
+.dep-pile{display:flex;flex-direction:column;gap:14px}
+.dep-filtres{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end;margin-left:auto;flex:1}
+.dep-filtres .pos-input{padding:6px 10px;width:210px;font-size:13px}
+td.dep-actions{text-align:right;white-space:nowrap}
+#dep-livr-courante .dep-livr-tete,#dep-livr-courante .dep-scan-row{padding:0 14px}
+#dep-livr-courante .dep-scan-row:last-child{padding-bottom:12px}
+td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
+#page-pos-depot .dep-kpi{flex-wrap:wrap}
+.dep-btn-s{padding:4px 10px!important;font-size:12px!important}
+.dep-cb{display:block;height:30px;width:auto;border-radius:3px}
+.dep-cb-btn{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;background:none;border:none;padding:0;cursor:pointer;color:inherit}
+.dep-cb-btn:hover .dep-code{text-decoration:underline}
+.dep-cb-btn .dep-code{font-size:11.5px;color:#93c5fd}
+.dep-cb-fiche{display:inline-flex;flex-direction:column;align-items:flex-end}
+.dep-cb-fiche .dep-cb{height:46px;margin:0 0 4px}
+#page-pos-depot .pos-table td{vertical-align:middle}
+.dep-guide-modal{max-width:980px;width:calc(100vw - 32px);max-height:calc(100vh - 40px);overflow-y:auto}
+.dep-vide-l td{text-align:center;padding:16px!important;color:rgba(255,255,255,.35)}
 /* ── Formulaire d'achat ─────────────────────────────────────────── */
 .pa-modal [hidden],#page-pos-depot [hidden]{display:none!important}
 .pa-gros::-webkit-outer-spin-button,.pa-gros::-webkit-inner-spin-button,.dep-inv-qte::-webkit-outer-spin-button,.dep-inv-qte::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
@@ -7419,99 +7448,75 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <button type="button" class="dep-kpi" onclick="depOnglet('journal')"><span class="dep-kpi-v" id="dep-k-livres">—</span><span class="dep-kpi-l">Livraisons validées aujourd'hui</span></button>
         </div>
 
-        <!-- Guide : rôle de chaque partie -->
-        <div class="pos-card dep-guide" id="dep-guide" hidden>
-          <div class="pos-card-hdr">Comment fonctionne le Dépôt Bar
-            <button type="button" class="pos-btn ghost" style="margin-left:auto;padding:3px 10px;font-size:12px" onclick="depGuide(false)">Masquer</button>
-          </div>
-          <div class="dep-guide-grille">
-            <div class="dep-guide-c"><b>1 · Réception</b>
-              <p>Quand la marchandise d'un achat arrive, on la <em>réceptionne</em> : le système crée un <em>colis</em> par caisse, chacun avec son étiquette 2 × 1 à coller.</p>
-              <p class="dep-guide-qui">Onglet Réception · bouton « Réceptionner »</p></div>
-            <div class="dep-guide-c"><b>2 · Vérification au dépôt</b>
-              <p>On scanne chaque colis rangé au dépôt. Ce scan prouve qu'il est bien arrivé : son contenu entre alors dans le <em>stock du dépôt</em>. Un colis non scanné n'est pas en stock.</p>
-              <p class="dep-guide-qui">Scanner en mode « Vérifier au dépôt »</p></div>
-            <div class="dep-guide-c"><b>3 · Livraison vers un bar</b>
-              <p>On ouvre une livraison pour le Bar avant ou le Bar piscine, on scanne les colis chargés, puis on <em>valide</em> : le stock passe du dépôt au bar. C'est la seule façon d'alimenter un bar.</p>
-              <p class="dep-guide-qui">Onglet Livraison · scanner en mode « Ajouter à la livraison »</p></div>
-            <div class="dep-guide-c"><b>4 · Stock et inventaire</b>
-              <p>Le stock de chaque lieu se calcule tout seul. Si le comptage réel diffère (casse, erreur), on fait un <em>inventaire</em> : l'écart est corrigé et gardé avec son motif.</p>
-              <p class="dep-guide-qui">Onglet Stock et inventaire</p></div>
-            <div class="dep-guide-c"><b>Fiche et journal</b>
-              <p>Scanner un colis en mode « Consulter la fiche » montre où il est, qui l'a livré et quand. Le journal garde chaque étape, avec date, heure et personne, ainsi que les codes rejetés.</p>
-              <p class="dep-guide-qui">Mode « Consulter la fiche » · onglet Journal</p></div>
-            <div class="dep-guide-c"><b>États d'un colis</b>
-              <p><span class="dep-st st-verif">À vérifier</span> créé, pas encore scanné au dépôt<br>
-                 <span class="dep-st st-depot">Au dépôt</span> en stock au dépôt<br>
-                 <span class="dep-st st-prep">En préparation</span> dans une livraison pas encore validée<br>
-                 <span class="dep-st st-livre">Livré</span> en stock au bar de destination</p></div>
-          </div>
-          <div class="dep-note" style="margin:10px 0 0">Sécurité : chaque code se termine par une clé de contrôle (ex. BC26-000123-<b>4817</b>). Un code inventé ou modifié est refusé et inscrit au journal.</div>
-        </div>
-
         <!-- Scanner (douchette, saisie clavier ou caméra) -->
-        <div class="pos-card dep-scan-card">
-          <div class="pos-card-hdr">Scanner un colis</div>
+        <div class="pos-card dep-scan-card" aria-label="Scanner un colis">
           <div class="dep-scan-row">
             <div class="dep-mode" role="group" aria-label="Que faire du colis scanné">
               <button class="db-preset active" id="dep-mode-verif" onclick="depSetMode('verif')">Vérifier au dépôt</button>
               <button class="db-preset" id="dep-mode-livr" onclick="depSetMode('livr')">Ajouter à la livraison</button>
               <button class="db-preset" id="dep-mode-fiche" onclick="depSetMode('fiche')">Consulter la fiche</button>
             </div>
-            <input id="dep-scan-input" class="pos-input" placeholder="Scannez ou tapez le code (ex. BC26-000123-4817) puis Entrée"
-                   autocomplete="off" maxlength="60" onkeydown="if(event.key==='Enter'){event.preventDefault();depScanner(this.value)}">
+            <input id="dep-scan-input" class="pos-input" placeholder="Scannez ou tapez le code du colis puis Entrée"
+                   aria-label="Code du colis" autocomplete="off" maxlength="60" onkeydown="if(event.key==='Enter'){event.preventDefault();depScanner(this.value)}">
             <button class="pos-btn teal" onclick="depScanner(document.getElementById('dep-scan-input').value)">Valider</button>
             <button class="pos-btn ghost" onclick="depCamera()">📷 Caméra</button>
           </div>
-          <div class="dep-mode-aide" id="dep-mode-aide"></div>
+          <div class="dep-scan-pied">
+            <span id="dep-scan-retour" class="dep-retour" aria-live="polite"></span>
+            <span class="dep-mode-aide" id="dep-mode-aide"></span>
+          </div>
           <div id="dep-camera" style="display:none;max-width:360px;margin-top:10px"></div>
-          <div id="dep-scan-retour" class="dep-retour" aria-live="polite"></div>
         </div>
 
         <!-- Onglets -->
         <div class="dep-onglets" role="tablist" aria-label="Parties du dépôt">
           <button type="button" role="tab" class="dep-onglet" data-t="reception" onclick="depOnglet('reception')">1 · Réception <span class="dep-cpt" id="dep-o-reception"></span></button>
           <button type="button" role="tab" class="dep-onglet" data-t="livraison" onclick="depOnglet('livraison')">2 · Livraison vers un bar <span class="dep-cpt" id="dep-o-livraison"></span></button>
-          <button type="button" role="tab" class="dep-onglet" data-t="stock" onclick="depOnglet('stock')">3 · Inventaire</button>
+          <button type="button" role="tab" class="dep-onglet" data-t="colis" onclick="depOnglet('colis')">3 · Colis et codes-barres</button>
+          <button type="button" role="tab" class="dep-onglet" data-t="stock" onclick="depOnglet('stock')">4 · Inventaire</button>
           <button type="button" role="tab" class="dep-onglet" data-t="journal" onclick="depOnglet('journal')">Journal</button>
         </div>
 
         <!-- 1 · Réception -->
         <section class="dep-section" data-onglet="reception">
-          <div class="dep-intro"><b>À quoi sert cette partie :</b> transformer un achat arrivé en colis étiquetés, puis confirmer par un scan que chaque colis est bien au dépôt. Tant qu'un colis n'est pas vérifié, il ne compte pas dans le stock.</div>
-          <div class="dep-grid">
+          <div class="dep-intro">Achat arrivé → <b>Réceptionner</b> (un colis et une étiquette 2 × 1 par caisse) → scanner chaque colis en mode <b>Vérifier au dépôt</b>. Un colis non vérifié ne compte pas dans le stock.</div>
+          <div class="dep-pile">
             <div class="pos-card">
               <div class="pos-card-hdr">Achats à réceptionner <span class="dep-badge" id="dep-nb-achats">0</span></div>
-              <div class="dep-note">Achats enregistrés dont la marchandise n'a pas encore été réceptionnée. « Réceptionner » crée un colis par caisse et ouvre les étiquettes.</div>
-              <div id="dep-achats"></div>
+              <div class="pos-table-wrap"><table class="pos-table">
+                <thead><tr><th>Achat</th><th>Produit</th><th class="tr">Quantité</th><th class="tr">Colis prévus</th><th>Fournisseur</th><th>Date</th><th></th></tr></thead>
+                <tbody id="dep-achats"></tbody>
+              </table></div>
             </div>
             <div class="pos-card">
               <div class="pos-card-hdr">Colis à vérifier au dépôt <span class="dep-badge" id="dep-nb-verif">0</span>
-                <button class="pos-btn ghost" style="margin-left:auto;padding:4px 10px;font-size:12px" onclick="depEtiquettes()">🖨 Étiquettes 2 × 1</button>
+                <div class="dep-filtres">
+                  <input id="dep-verif-cherche" class="pos-input" placeholder="Filtrer : produit ou code…" oninput="depRenderColisVerif()">
+                  <button class="pos-btn ghost dep-btn-s" onclick="depEtiquettes()">🖨 Étiquettes 2 × 1</button>
+                </div>
               </div>
-              <div class="dep-note">Scannez chacun en mode « Vérifier au dépôt ». « Retirer » annule un colis créé par erreur (avant vérification seulement).</div>
-              <div id="dep-colis-verif"></div>
+              <div class="pos-table-wrap"><table class="pos-table">
+                <thead><tr><th>Code-barres</th><th>Produit</th><th class="tr">Quantité</th><th>Achat</th><th>Créé le</th><th></th></tr></thead>
+                <tbody id="dep-colis-verif"></tbody>
+              </table></div>
             </div>
           </div>
         </section>
 
         <!-- 2 · Livraison -->
         <section class="dep-section" data-onglet="livraison" hidden>
-          <div class="dep-intro"><b>À quoi sert cette partie :</b> envoyer de la marchandise du dépôt vers un bar. On ouvre une livraison, on scanne les colis chargés, puis on valide : le stock du dépôt baisse et celui du bar augmente du même nombre.</div>
+          <div class="dep-intro">Ouvrir une livraison → scanner les colis chargés → <b>Valider</b> : le stock passe du dépôt au bar.</div>
           <div class="pos-card">
-            <div class="pos-card-hdr">Livraison en cours</div>
+            <div class="pos-card-hdr">Livraison en cours
+              <button class="pos-btn ghost dep-btn-s" style="margin-left:auto" onclick="depManuelOuvrir()"
+                title="Seulement si les colis ont été livrés sans pouvoir être scannés (internet, scanner en panne, étiquette illisible). Motif et heure réelle obligatoires ; le code-barres devient ensuite invalide.">✍ Livraison sans scan</button>
+            </div>
             <div id="dep-livr-nouvelle" class="dep-scan-row">
               <span class="dep-note" style="margin:0">Nouvelle livraison vers :</span>
               <button class="pos-btn teal" onclick="depNouvelleLivraison('DEVANT')">Bar avant</button>
               <button class="pos-btn teal" onclick="depNouvelleLivraison('PISCINE')">Bar piscine</button>
             </div>
             <div id="dep-livr-courante"></div>
-          </div>
-          <div class="pos-card dep-manuel-carte">
-            <div class="pos-card-hdr">Livraison manuelle (sans scan)
-              <button class="pos-btn ghost" style="margin-left:auto;padding:5px 12px;font-size:13px" onclick="depManuelOuvrir()">Enregistrer une livraison sans scan</button>
-            </div>
-            <div class="dep-note" style="margin:0">À utiliser seulement si les colis ont été livrés sans pouvoir les scanner (coupure internet, scanner en panne, étiquette illisible). Il faut indiquer le motif et l'heure réelle de la livraison. Ensuite, le code-barres de ces colis n'est plus valable : un nouveau scan affichera qu'ils ont déjà été livrés, quand et où.</div>
           </div>
           <div class="pos-card">
             <div class="pos-card-hdr">Livraisons récentes</div>
@@ -7524,9 +7529,34 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </section>
 
-        <!-- 3 · Stock et inventaire -->
+        <!-- 3 · Colis et codes-barres -->
+        <section class="dep-section" data-onglet="colis" hidden>
+          <div class="dep-intro">Tous les colis avec leur code-barres. Cherchez un produit ou un code ; cliquez sur un code-barres pour ouvrir la fiche.</div>
+          <div class="pos-card">
+            <div class="pos-card-hdr">Colis et codes-barres <span class="dep-badge" id="dep-nb-colis">0</span>
+              <div class="dep-filtres">
+                <input id="dep-colis-cherche" class="pos-input" placeholder="Produit ou code…" oninput="depRenderColis()">
+                <select id="dep-colis-statut" class="pos-input" onchange="depChargerColis()" aria-label="État des colis">
+                  <option value="">Tous les états</option>
+                  <option value="A_VERIFIER">À vérifier</option>
+                  <option value="AU_DEPOT">Au dépôt</option>
+                  <option value="EN_PREPARATION">En préparation</option>
+                  <option value="LIVRE">Livrés</option>
+                  <option value="ANNULE">Retirés</option>
+                </select>
+                <button class="pos-btn ghost dep-btn-s" onclick="depImprimerAffiches()" title="Étiquettes 2 × 1 des colis affichés (hors livrés et retirés)">🖨 Imprimer la sélection</button>
+              </div>
+            </div>
+            <div class="pos-table-wrap"><table class="pos-table">
+              <thead><tr><th>Code-barres</th><th>Produit</th><th class="tr">Quantité</th><th>État</th><th>Lieu</th><th>Achat</th><th>Créé le</th><th></th></tr></thead>
+              <tbody id="dep-colis-tbody"></tbody>
+            </table></div>
+          </div>
+        </section>
+
+        <!-- 4 · Inventaire -->
         <section class="dep-section" data-onglet="stock" hidden>
-          <div class="dep-intro"><b>À quoi sert cette partie :</b> corriger le stock après un comptage réel (inventaire). Le tableau ci-dessous montre, pour le lieu choisi, le stock calculé. Pour voir le stock complet de tous les lieux avec sa valeur et les alertes :
+          <div class="dep-intro">Corriger le stock après un comptage réel. Stock complet de tous les lieux avec valeurs et alertes :
             <button type="button" class="sx-link" onclick="goTo('pos-stock')">ouvrir Stock Bar</button></div>
           <div class="pos-card">
             <div class="pos-card-hdr">Inventaire physique</div>
@@ -7564,7 +7594,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
         <!-- Journal de traçabilité -->
         <section class="dep-section" data-onglet="journal" hidden>
-          <div class="dep-intro"><b>À quoi sert cette partie :</b> retrouver qui a fait quoi, quand et où, pour chaque colis. Les codes rejetés (inconnus ou falsifiés) apparaissent en rouge. Cliquez sur un code pour ouvrir sa fiche.</div>
+          <div class="dep-intro">Qui a fait quoi, quand et où. Les codes rejetés (inconnus ou falsifiés) sont en rouge ; cliquez sur un code pour ouvrir sa fiche.</div>
           <div class="pos-card">
             <div class="pos-card-hdr">Journal de traçabilité
               <select id="dep-journal-type" class="pos-input" style="margin-left:auto;max-width:240px;padding:6px 10px" onchange="depChargerJournal()">
@@ -7657,6 +7687,43 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <button class="pos-btn ghost" onclick="depManuelFermer()">Annuler</button>
           <button class="pos-btn teal" onclick="depManuelValider()">Enregistrer la livraison manuelle</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Guide : rôle de chaque partie du dépôt -->
+    <div class="pos-modal-bg" id="dep-guide-bg" onclick="if(event.target===this)depGuide(false)">
+      <div class="pos-modal dep-guide-modal" role="dialog" aria-labelledby="dep-guide-titre">
+        <div class="df-tete">
+          <h3 id="dep-guide-titre">Comment fonctionne le Dépôt Bar</h3>
+          <button type="button" onclick="depGuide(false)" aria-label="Fermer" class="df-fermer">✕</button>
+        </div>
+          <div class="dep-guide-grille">
+            <div class="dep-guide-c"><b>1 · Réception</b>
+              <p>Quand la marchandise d'un achat arrive, on la <em>réceptionne</em> : le système crée un <em>colis</em> par caisse, chacun avec son étiquette 2 × 1 à coller.</p>
+              <p class="dep-guide-qui">Onglet Réception · bouton « Réceptionner »</p></div>
+            <div class="dep-guide-c"><b>2 · Vérification au dépôt</b>
+              <p>On scanne chaque colis rangé au dépôt. Ce scan prouve qu'il est bien arrivé : son contenu entre alors dans le <em>stock du dépôt</em>. Un colis non scanné n'est pas en stock.</p>
+              <p class="dep-guide-qui">Scanner en mode « Vérifier au dépôt »</p></div>
+            <div class="dep-guide-c"><b>3 · Livraison vers un bar</b>
+              <p>On ouvre une livraison pour le Bar avant ou le Bar piscine, on scanne les colis chargés, puis on <em>valide</em> : le stock passe du dépôt au bar. C'est la seule façon d'alimenter un bar.</p>
+              <p class="dep-guide-qui">Onglet Livraison · scanner en mode « Ajouter à la livraison »</p></div>
+            <div class="dep-guide-c"><b>4 · Inventaire</b>
+              <p>Le stock de chaque lieu se calcule tout seul. Si le comptage réel diffère (casse, erreur), on fait un <em>inventaire</em> : l'écart est corrigé et gardé avec son motif.</p>
+              <p class="dep-guide-qui">Onglet Inventaire</p></div>
+            <div class="dep-guide-c"><b>Colis et codes-barres</b>
+              <p>La liste de tous les colis avec leur code-barres : cherchez un produit ou un code, ouvrez sa fiche ou réimprimez son étiquette.</p>
+              <p class="dep-guide-qui">Onglet Colis et codes-barres</p></div>
+            <div class="dep-guide-c"><b>Fiche et journal</b>
+              <p>Scanner un colis en mode « Consulter la fiche » montre où il est, qui l'a livré et quand. Le journal garde chaque étape, avec date, heure et personne, ainsi que les codes rejetés.</p>
+              <p class="dep-guide-qui">Mode « Consulter la fiche » · onglet Journal</p></div>
+            <div class="dep-guide-c"><b>États d'un colis</b>
+              <p><span class="dep-st st-verif">À vérifier</span> créé, pas encore scanné au dépôt<br>
+                 <span class="dep-st st-depot">Au dépôt</span> en stock au dépôt<br>
+                 <span class="dep-st st-prep">En préparation</span> dans une livraison pas encore validée<br>
+                 <span class="dep-st st-livre">Livré</span> en stock au bar de destination</p></div>
+          </div>
+          <div class="dep-note" style="margin:10px 0 0">Sécurité : chaque code se termine par une clé de contrôle (ex. BC26-000123-<b>4817</b>). Un code inventé ou modifié est refusé et inscrit au journal.</div>
+        <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depGuide(false)">Fermer</button></div>
       </div>
     </div>
 
@@ -28423,7 +28490,43 @@ function posHistoVoirRecu(creditId, idx){
 // livraison (scan) → Bar avant / Bar piscine → stocks à jour.
 // API : /api/pos/depot (bar_depot_routes.py)
 // ══════════════════════════════════════════════════════════════════════
+// Code 128 (jeux B et C) → largeurs de modules ; rendu SVG à l'écran
+const _C128 = ('212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 132311 211313 231113 231311 112133 112331 132131 113123 113321 133121 313121 211331 231131 213113 213311 213131 311123 311321 331121 312113 312311 332111 314111 221411 431111 111224 111422 121124 121421 141122 141221 112214 112412 122114 122411 142112 142211 241211 221114 413111 241112 134111 111242 121142 121241 114212 124112 124211 411212 421112 421211 212141 214121 412121 111143 111341 131141 114113 114311 411113 411311 113141 114131 311141 411131 211412 211214 211232 2331112').split(' ');
+function _c128Modules(txt){
+  if(!txt || !/^[\x20-\x7e]+$/.test(txt)) return null;
+  const v=[]; let jeu=null, i=0;
+  const chiffres=j=>{ let k=j; while(k<txt.length && txt[k]>='0' && txt[k]<='9') k++; return k-j; };
+  const passer=j=>{ if(jeu!==j){ v.push(jeu===null ? (j==='B'?104:105) : (j==='B'?100:99)); jeu=j; } };
+  while(i<txt.length){
+    let n=chiffres(i);
+    if(n>=4){
+      if(n%2){ passer('B'); v.push(txt.charCodeAt(i)-32); i++; n--; }
+      passer('C');
+      for(const fin=i+n; i<fin; i+=2) v.push(+txt.substr(i,2));
+    } else { passer('B'); v.push(txt.charCodeAt(i)-32); i++; }
+  }
+  let s=v[0]; for(let k=1;k<v.length;k++) s+=v[k]*k;
+  v.push(s%103, 106);
+  return v.map(x=>_C128[x]).join('');
+}
+function depCodeBarres(code, hauteur){
+  const m=_c128Modules(code); if(!m) return '';
+  const h=hauteur||34, q=10; let x=q, r='';
+  for(let k=0;k<m.length;k++){ const w=+m[k]; if(k%2===0) r+=`<rect x="${x}" y="0" width="${w}" height="${h}"/>`; x+=w; }
+  const W=x+q;
+  return `<svg class="dep-cb" viewBox="0 0 ${W} ${h}" width="${W}" height="${h}" shape-rendering="crispEdges" role="img" aria-label="Code-barres ${esc(code)}"><rect width="${W}" height="${h}" fill="#fff"/><g fill="#000">${r}</g></svg>`;
+}
+
 const _DEP_LIEUX = {DEVANT:'Bar avant', PISCINE:'Bar piscine'};
+const _DEP_ST_CLASSE = {A_VERIFIER:'st-verif', AU_DEPOT:'st-depot', EN_PREPARATION:'st-prep', LIVRE:'st-livre', ANNULE:''};
+let _depColisVerif = [], _depColis = [];
+const _depJour = iso => iso ? new Date(iso).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+// Cellule « code-barres » : le code-barres (identique à l'étiquette) et le code lisible ; clic = fiche
+function _depCelluleCode(id, code, lisible){
+  return `<button type="button" class="dep-cb-btn" onclick="depOuvrirFiche(${id})" title="Ouvrir la fiche du colis">${depCodeBarres(code)}<span class="dep-code">${esc(lisible||code)}</span></button>`;
+}
+const _depFiltre = (liste, q) => { q=(q||'').trim().toLowerCase().replace(/[\s-]/g,'');
+  return q ? liste.filter(c=>((c.produit_nom||'')+' '+(c.code||'')).toLowerCase().replace(/[\s-]/g,'').includes(q)) : liste; };
 let _depMode = 'verif';          // 'verif' (contrôle au dépôt) | 'livr' (ajout à la livraison)
 let _depLivraison = null;        // livraison en préparation affichée
 let _depStock = [];
@@ -28454,7 +28557,6 @@ async function loadPosDepot(){
   }catch(e){ posAlert(e.message||'Erreur de chargement du dépôt.'); }
   let o='reception'; try{ o=localStorage.getItem('dep-onglet')||'reception'; }catch(_){}
   depOnglet(o, true);
-  try{ if(!localStorage.getItem('dep-guide-vu')){ depGuide(true); localStorage.setItem('dep-guide-vu','1'); } }catch(_){}
   setTimeout(()=>document.getElementById('dep-scan-input')?.focus(), 50);
 }
 
@@ -28481,12 +28583,12 @@ function depOnglet(t, silencieux){
   if(t==='reception' && _depMode!=='fiche') depSetMode('verif', silencieux);
   if(t==='livraison' && _depMode!=='fiche') depSetMode('livr', silencieux);
   if(t==='journal') depChargerJournal();
+  if(t==='colis') depChargerColis();
 }
 
 function depGuide(afficher){
-  const g=document.getElementById('dep-guide'); if(!g) return;
-  g.hidden = (afficher===undefined) ? !g.hidden : !afficher;
-  if(!g.hidden) g.scrollIntoView({behavior:'smooth', block:'nearest'});
+  const g=document.getElementById('dep-guide-bg'); if(!g) return;
+  g.classList.toggle('open', afficher===undefined ? !g.classList.contains('open') : !!afficher);
 }
 
 const _DEP_AIDE_MODE = {
@@ -28596,7 +28698,7 @@ function depAfficherFiche(f){
     <div class="df-grille">
       <div class="df-bloc">
         <div class="df-titre">Colis</div>
-        ${ligne('Code', `<span class="dep-code">${esc(c.code_lisible)}</span>`)}
+        ${ligne('Code', `<span class="dep-cb-fiche">${depCodeBarres(c.code, 46)}<span class="dep-code">${esc(c.code_lisible)}</span></span>`)}
         ${ligne('Produit', esc(c.produit_nom||'—'))}
         ${ligne('Quantité', `${c.quantite} ${esc(c.unite||'u.')}`)}
         ${a?ligne('Achat', `#${a.id}${a.fournisseur?' · '+esc(a.fournisseur):''}`):''}
@@ -28633,15 +28735,16 @@ function depAfficherFiche(f){
 }
 
 let _depFicheColisId = null;
-async function depReimprimer(){
-  if(!_depFicheColisId) return;
+async function _depOuvrirPdf(url){
   const hdrs = {}; const k = sessionStorage.getItem('api_key'); if(k) hdrs['X-API-Key'] = k;
   try{
-    const res = await fetch(`/api/pos/depot/etiquettes.pdf?ids=${_depFicheColisId}`, {headers:hdrs, credentials:'include'});
+    const res = await fetch(url, {headers:hdrs, credentials:'include'});
     if(!res.ok){ const e = await res.json().catch(()=>({})); throw new Error(e.detail||'Étiquette indisponible'); }
     window.open(URL.createObjectURL(await res.blob()), '_blank');
   }catch(e){ posAlert(e.message||'Impression impossible.'); }
 }
+function depImprimerColis(id){ return _depOuvrirPdf(`/api/pos/depot/etiquettes.pdf?ids=${id}`); }
+function depReimprimer(){ if(_depFicheColisId) return depImprimerColis(_depFicheColisId); }
 
 function depFermerFiche(){
   document.getElementById('dep-fiche-bg').classList.remove('open');
@@ -28650,23 +28753,63 @@ function depFermerFiche(){
 
 function depRenderReceptions(rec){
   const achats = rec.achats_a_receptionner || [];
-  const colis  = rec.colis_a_verifier || [];
+  _depColisVerif = rec.colis_a_verifier || [];
   document.getElementById('dep-nb-achats').textContent = achats.length;
-  document.getElementById('dep-nb-verif').textContent  = colis.length;
-  document.getElementById('dep-achats').innerHTML = achats.length ? achats.map(a=>`
-    <div class="dep-ligne">
-      <div><strong>${esc(a.produit_nom||'?')}</strong> · ${a.quantite} u.
-        <div class="dep-sous">Achat #${a.achat_id} · ${esc(a.fournisseur||'fournisseur non précisé')} · ${(a.date_achat||'').slice(0,10)}
-        ${a.unites_par_caisse ? ` · ${Math.ceil(a.quantite/a.unites_par_caisse)} colis de ${a.unites_par_caisse}` : ' · 1 colis'}</div></div>
-      <button class="pos-btn teal" style="padding:5px 12px;font-size:13px" onclick="depReceptionner(${a.achat_id})">Réceptionner</button>
-    </div>`).join('') : '<div class="dep-vide">Aucun achat en attente.</div>';
-  document.getElementById('dep-colis-verif').innerHTML = colis.length ? colis.slice(0,60).map(c=>`
-    <div class="dep-ligne">
-      <div><button type="button" class="dep-code dep-code-btn" onclick="depOuvrirFiche(${c.id})" title="Voir la fiche">${esc(c.code_lisible||c.code)}</button> ${esc(c.produit_nom||'')} · ${c.quantite} ${esc(c.unite||'u.')}
-        <div class="dep-sous">Achat #${c.achat_id||'—'}</div></div>
-      <button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="depAnnulerColis(${c.id},'${esc(c.code)}')">Retirer</button>
-    </div>`).join('') + (colis.length>60?`<div class="dep-sous">… et ${colis.length-60} autres</div>`:'')
-    : '<div class="dep-vide">Tout est vérifié.</div>';
+  document.getElementById('dep-nb-verif').textContent  = _depColisVerif.length;
+  document.getElementById('dep-achats').innerHTML = achats.map(a=>{
+    const nb = a.unites_par_caisse ? Math.ceil(a.quantite/a.unites_par_caisse) : 1;
+    return `<tr>
+      <td>#${a.achat_id}</td><td><strong>${esc(a.produit_nom||'?')}</strong></td>
+      <td class="tr num">${Number(a.quantite).toLocaleString('fr-FR')}</td>
+      <td class="tr num">${nb}${a.unites_par_caisse?` <span class="dep-sous">× ${a.unites_par_caisse}</span>`:''}${nb>500?' <span class="dep-st st-prep" title="Maximum 500 colis par achat : quantité probablement mal saisie">trop</span>':''}</td>
+      <td>${esc(a.fournisseur||'—')}</td><td class="num">${_depJour(a.date_achat).slice(0,10)}</td>
+      <td class="dep-actions"><button class="pos-btn teal dep-btn-s" onclick="depReceptionner(${a.achat_id})">Réceptionner</button></td></tr>`;
+  }).join('') || '<tr class="dep-vide-l"><td colspan="7">Aucun achat en attente.</td></tr>';
+  depRenderColisVerif();
+}
+
+function depRenderColisVerif(){
+  const liste = _depFiltre(_depColisVerif, document.getElementById('dep-verif-cherche')?.value);
+  const max = 100;
+  document.getElementById('dep-colis-verif').innerHTML = liste.slice(0,max).map(c=>`<tr>
+      <td>${_depCelluleCode(c.id, c.code, c.code_lisible)}</td>
+      <td><strong>${esc(c.produit_nom||'')}</strong></td>
+      <td class="tr num">${c.quantite} ${esc(c.unite||'u.')}</td>
+      <td>#${c.achat_id||'—'}</td><td class="num">${_depJour(c.cree_le)}</td>
+      <td class="dep-actions"><button class="pos-btn ghost dep-btn-s" onclick="depImprimerColis(${c.id})" title="Réimprimer l'étiquette">🖨</button>
+        <button class="pos-btn ghost dep-btn-s" onclick="depAnnulerColis(${c.id},'${esc(c.code_lisible||c.code)}')" title="Colis créé par erreur (avant vérification)">Retirer</button></td></tr>`).join('')
+    + (liste.length>max?`<tr class="dep-vide-l"><td colspan="6">… et ${liste.length-max} autres — affinez le filtre</td></tr>`:'')
+    || `<tr class="dep-vide-l"><td colspan="6">${_depColisVerif.length?'Aucun colis ne correspond au filtre.':'Tout est vérifié.'}</td></tr>`;
+}
+
+// Onglet « Colis et codes-barres »
+async function depChargerColis(){
+  const tb=document.getElementById('dep-colis-tbody'); if(!tb) return;
+  const st=document.getElementById('dep-colis-statut')?.value||'';
+  try{ _depColis = await apiFetch('GET','/pos/depot/colis'+(st?`?statut=${st}`:'')) || []; depRenderColis(); }
+  catch(e){ tb.innerHTML=`<tr><td colspan="8" style="color:#f87171;padding:12px">${esc(e.message||'')}</td></tr>`; }
+}
+function depRenderColis(){
+  const liste = _depFiltre(_depColis, document.getElementById('dep-colis-cherche')?.value);
+  const max = 200;
+  document.getElementById('dep-nb-colis').textContent = liste.length;
+  document.getElementById('dep-colis-tbody').innerHTML = liste.slice(0,max).map(c=>`<tr>
+      <td>${_depCelluleCode(c.id, c.code, c.code_lisible)}</td>
+      <td><strong>${esc(c.produit_nom||'')}</strong></td>
+      <td class="tr num">${c.quantite} ${esc(c.unite||'u.')}</td>
+      <td><span class="dep-st ${_DEP_ST_CLASSE[c.statut]||''}">${esc(c.statut_libelle||c.statut)}</span></td>
+      <td>${esc(c.lieu_nom||(['A_VERIFIER','AU_DEPOT','EN_PREPARATION'].includes(c.statut)?'Dépôt':'—'))}</td>
+      <td>${c.achat_id?'#'+c.achat_id:'—'}</td><td class="num">${_depJour(c.cree_le)}</td>
+      <td class="dep-actions"><button class="pos-btn ghost dep-btn-s" onclick="depOuvrirFiche(${c.id})">Fiche</button>
+        ${['LIVRE','ANNULE'].includes(c.statut)?'':`<button class="pos-btn ghost dep-btn-s" onclick="depImprimerColis(${c.id})" title="Réimprimer l'étiquette">🖨</button>`}</td></tr>`).join('')
+    + (liste.length>max?`<tr class="dep-vide-l"><td colspan="8">… et ${liste.length-max} autres — affinez la recherche</td></tr>`:'')
+    || '<tr class="dep-vide-l"><td colspan="8">Aucun colis.</td></tr>';
+}
+function depImprimerAffiches(){
+  const ids = _depFiltre(_depColis, document.getElementById('dep-colis-cherche')?.value)
+    .filter(c=>!['LIVRE','ANNULE'].includes(c.statut)).map(c=>c.id).slice(0,500);
+  if(!ids.length){ posAlert("Aucune étiquette à imprimer (les colis livrés ou retirés n'en ont plus besoin).",'warn'); return; }
+  _depOuvrirPdf('/api/pos/depot/etiquettes.pdf?ids='+ids.join(','));
 }
 
 async function depReceptionner(achatId){
@@ -28775,8 +28918,8 @@ function depRenderLivraison(){
     <div class="dep-livr-tete"><strong>${esc(l.numero)}</strong> → <strong>${esc(l.lieu_nom)}</strong>
       · ${l.nb_lignes} ligne(s) · ${l.total_unites} unité(s)</div>
     <div class="pos-table-wrap"><table class="pos-table">
-      <thead><tr><th>Produit</th><th>Colis</th><th class="tr">Quantité</th><th></th></tr></thead>
-      <tbody>${(l.lignes||[]).map(x=>`<tr><td>${esc(x.produit_nom||'')}</td><td>${x.colis_code?`<button type="button" class="dep-code dep-code-btn" onclick="depOuvrirFiche(${x.colis_id})">${esc(x.colis_code)}</button>`:'<em>vrac</em>'}</td>
+      <thead><tr><th>Code-barres</th><th>Produit</th><th class="tr">Quantité</th><th></th></tr></thead>
+      <tbody>${(l.lignes||[]).map(x=>`<tr><td>${x.colis_id?_depCelluleCode(x.colis_id, x.colis_code_brut||x.colis_code, x.colis_code):'<em>vrac (sans étiquette)</em>'}</td><td><strong>${esc(x.produit_nom||'')}</strong></td>
         <td class="tr">${x.quantite}</td><td class="tr"><button class="pos-btn ghost" style="padding:2px 8px;font-size:12px" onclick="depRetirerLigne(${x.id})">✕</button></td></tr>`).join('')
         || '<tr><td colspan="4" style="text-align:center;padding:14px;color:rgba(255,255,255,.35)">Scannez les colis à livrer (mode « Ajouter à la livraison »).</td></tr>'}</tbody>
     </table></div>

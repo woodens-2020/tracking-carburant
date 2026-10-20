@@ -336,6 +336,7 @@ def _livraison_dict(l: BarLivraisonInterne, details: bool = True) -> dict:
             "produit_nom": x.produit.nom if x.produit else None,
             "colis_id":    x.colis_id,
             "colis_code":  code_lisible(x.colis.code) if x.colis else None,
+            "colis_code_brut": x.colis.code if x.colis else None,
             "quantite":    float(x.quantite),
         } for x in l.lignes]
     return d
