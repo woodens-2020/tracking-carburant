@@ -458,7 +458,7 @@ def supprimer_categorie(cat_id: int, db: Session = Depends(get_db)):
 # PRODUITS & PRIX
 # ══════════════════════════════════════════════════════════════════
 
-def _produit_dict(p: BarProduit, stk: Decimal, db: Session) -> dict:
+def _produit_dict(p: BarProduit, stk: Decimal, db: Session, cmup_val: Optional[Decimal] = None) -> dict:
     """Sérialise un BarProduit avec tous les champs calculés."""
     prix_u  = prix_actif(p.id, db) or Decimal("0")
     stk_int = int(stk)
@@ -483,7 +483,7 @@ def _produit_dict(p: BarProduit, stk: Decimal, db: Session) -> dict:
         "prix_vente_unite":    float(prix_u),
         "prix_vente_caisse":   float(prix_u * upc) if (p.vendu_par_caisse and upc > 0) else None,
         "stock_bas":           float(stk) <= float(p.seuil_alerte_stock) and float(p.seuil_alerte_stock) > 0,
-        "cmup":                float(cmup(p.id, db)),
+        "cmup":                float(cmup_val if cmup_val is not None else cmup(p.id, db)),
         "a_photo":             bool(p.photo_mime),  # photo_base64 est deferred — ne pas le charger ici
         "date_creation":       p.date_creation.isoformat() if p.date_creation else None,
         "lieu":                p.lieu,
@@ -507,8 +507,20 @@ def liste_produits(actif: Optional[bool] = None, lieu: Optional[str] = None, db:
             raise HTTPException(422, "lieu doit être DEVANT ou PISCINE.")
         q = q.filter(or_(BarProduit.lieu == lieu_maj, BarProduit.lieu.is_(None)))
     produits = q.order_by(BarProduit.categorie, BarProduit.nom).all()
-    stocks   = stock_tous_produits(db)
-    return [_produit_dict(p, stocks.get(p.id, Decimal("0")), db) for p in produits]
+    totaux   = stock_tous_produits(db)
+    cmups    = cmup_batch(db)
+    if not lieu:
+        return [_produit_dict(p, totaux.get(p.id, Decimal("0")), db, cmups.get(p.id, Decimal("0"))) for p in produits]
+    # Caisse d'un bar : le stock affiché et contrôlé est celui de CE bar
+    # (le dépôt et l'autre bar ne sont pas vendables ici) ; le total reste fourni.
+    du_bar = stock_tous_produits(db, lieu=lieu_maj)
+    out = []
+    for p in produits:
+        d = _produit_dict(p, du_bar.get(p.id, Decimal("0")), db, cmups.get(p.id, Decimal("0")))
+        d["stock_lieu"]  = lieu_maj
+        d["stock_total"] = float(totaux.get(p.id, Decimal("0")))
+        out.append(d)
+    return out
 
 
 @router.get("/produits/{produit_id}")

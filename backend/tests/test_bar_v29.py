@@ -338,3 +338,20 @@ def test_colis_d_un_bar_ne_bloque_pas_le_vrac_du_depot(client, db):
     l = client.post("/api/pos/depot/livraisons", headers=H, json={"lieu": "DEVANT"}).json()
     assert client.post(f"/api/pos/depot/livraisons/{l['id']}/vrac", headers=H, json={"produit_id": p.id, "quantite": 12}).status_code == 200
     _annuler_bons_ouverts(client)
+
+
+def test_caisse_d_un_bar_voit_le_stock_de_ce_bar(client, db):
+    """Après un transfert dépôt → Bar piscine, la caisse du Bar piscine voit
+    les unités arrivées ; celle du Bar devant ne les voit pas."""
+    _annuler_bons_ouverts(client)
+    p = _produit(db, upc=12)
+    colis = _recevoir(client, _achat_api(client, p, 36))
+    _transferer(client, "PISCINE", colis[:2])
+    par_lieu = {}
+    for lieu in ("PISCINE", "DEVANT"):
+        prods = client.get(f"/api/pos/produits?actif=true&lieu={lieu}", headers=H).json()
+        par_lieu[lieu] = next(x for x in prods if x["id"] == p.id)
+    assert par_lieu["PISCINE"]["stock_courant"] == 24 and par_lieu["PISCINE"]["stock_total"] == 36
+    assert par_lieu["DEVANT"]["stock_courant"] == 0
+    tous = next(x for x in client.get("/api/pos/produits?actif=true", headers=H).json() if x["id"] == p.id)
+    assert tous["stock_courant"] == 36

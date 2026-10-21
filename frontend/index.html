@@ -25306,7 +25306,8 @@ function _posDbRenderDettes(dettes, meta){
 let _posCatActuelle = 'TOUS';
 
 async function loadPosCaisse(){
-  await Promise.all([_posLoadProduitsCache(), _posLoadCuisinePlatsCache()]);
+  // Catalogue et stock du bar de la session en cours (s'il est déjà connu)
+  await Promise.all([_posLoadProduitsCache(_posSessionLieu), _posLoadCuisinePlatsCache()]);
   await _posChargerCaissiers();
   posRenderCatTabs();
   posCatFilter(_posCatActuelle, null);
@@ -25464,6 +25465,10 @@ async function _posDashLoadData(caissier_id){
       _posSessionLieu = d.lieu;
       await _posLoadProduitsCache(_posSessionLieu);
       posRenderCatTabs();
+      posRenderGrid();
+    } else if(d.lieu){
+      // Rafraîchissement périodique : le stock du bar suit les transferts du dépôt
+      await _posLoadProduitsCache(_posSessionLieu);
       posRenderGrid();
     }
 
@@ -25634,7 +25639,8 @@ function _posCardProduitHTML(p){
   const stkClr = rupture ? '#f87171' : (p.stock_bas ? '#fb923c' : '#4ade80');
   const stkTxt = rupture ? t('pos.caisse.stock.rupture') : (p.stock_bas ? t('pos.caisse.stock.bas') : t('pos.caisse.stock.ok'));
   const stkQte = stk % 1 === 0 ? stk.toFixed(0) : stk.toFixed(1);
-  const stkBadge = `<div class="pos-produit-stock-badge" style="background:${stkClr}22;color:${stkClr};border:1px solid ${stkClr}44"><span class="pos-produit-stock-dot" style="background:${stkClr}"></span>${stkTxt} · ${stkQte}</div>`;
+  const ouStk = p.stock_lieu ? (p.stock_lieu==='PISCINE' ? 'au Bar piscine' : 'au Bar devant') : 'tous lieux confondus';
+  const stkBadge = `<div class="pos-produit-stock-badge" title="Stock ${ouStk}${p.stock_total!=null?` · total (dépôt + bars) : ${p.stock_total}`:''}" style="background:${stkClr}22;color:${stkClr};border:1px solid ${stkClr}44"><span class="pos-produit-stock-dot" style="background:${stkClr}"></span>${stkTxt} · ${stkQte}</div>`;
   return `<div class="pos-produit-card${rupture?' rupture':''}" onclick="posAjouterAuPanier(${p.id})">
     ${_posProduitVignetteHTML(p.id, p.nom, !!p.a_photo, catClr, 'pos/produits')}
     <div class="pos-produit-accent" style="background:${catClr}"></div>
@@ -26014,6 +26020,7 @@ async function posEncaisser(){
     if(mdisplay) mdisplay.style.display='none';
     posRenderCart();
     posShowReceipt(result, cartSnapshot, montantRecuVal, clientNom, _posMode, caissierNom);
+    _posLoadProduitsCache(_posSessionLieu).then(()=>posRenderGrid()).catch(()=>{});
   } catch(e){
     posAlert(e.message||t('pos.caisse.err.encaissement'));
   } finally {
