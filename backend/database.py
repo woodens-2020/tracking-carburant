@@ -241,6 +241,21 @@ def _migrate_columns():
              "ALTER TABLE bar_livraisons_internes ADD COLUMN motif_manuel VARCHAR(255)", None),
             ("bar_livraisons_internes", "date_reelle",
              "ALTER TABLE bar_livraisons_internes ADD COLUMN date_reelle DATETIME", None),
+            # v29 — achats bar (fournisseur, facture, règlement, annulation,
+            # réception partielle), seuils par bar, bons retour / entre bars
+            ("bar_achats", "fournisseur_id", "ALTER TABLE bar_achats ADD COLUMN fournisseur_id INTEGER", None),
+            ("bar_achats", "numero_facture", "ALTER TABLE bar_achats ADD COLUMN numero_facture VARCHAR(60)", None),
+            ("bar_achats", "mode_reglement", "ALTER TABLE bar_achats ADD COLUMN mode_reglement VARCHAR(20) NOT NULL DEFAULT 'COMPTANT'", None),
+            ("bar_achats", "date_echeance", "ALTER TABLE bar_achats ADD COLUMN date_echeance DATE", None),
+            ("bar_achats", "annule_le", "ALTER TABLE bar_achats ADD COLUMN annule_le DATETIME", None),
+            ("bar_achats", "annule_par_id", "ALTER TABLE bar_achats ADD COLUMN annule_par_id INTEGER", None),
+            ("bar_achats", "motif_annulation", "ALTER TABLE bar_achats ADD COLUMN motif_annulation VARCHAR(255)", None),
+            ("bar_achats", "quantite_recue", "ALTER TABLE bar_achats ADD COLUMN quantite_recue NUMERIC(12,3)", None),
+            ("bar_achats", "motif_ecart_reception", "ALTER TABLE bar_achats ADD COLUMN motif_ecart_reception VARCHAR(255)", None),
+            ("bar_produits", "seuil_devant", "ALTER TABLE bar_produits ADD COLUMN seuil_devant NUMERIC(12,3)", None),
+            ("bar_produits", "seuil_piscine", "ALTER TABLE bar_produits ADD COLUMN seuil_piscine NUMERIC(12,3)", None),
+            ("bar_livraisons_internes", "type_bon", "ALTER TABLE bar_livraisons_internes ADD COLUMN type_bon VARCHAR(20) NOT NULL DEFAULT 'TRANSFERT'", None),
+            ("bar_livraisons_internes", "origine", "ALTER TABLE bar_livraisons_internes ADD COLUMN origine VARCHAR(20)", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -386,6 +401,21 @@ def _migrate_columns():
              "ALTER TABLE bar_livraisons_internes ADD COLUMN motif_manuel VARCHAR(255)", None),
             ("bar_livraisons_internes", "date_reelle",
              "ALTER TABLE bar_livraisons_internes ADD COLUMN date_reelle TIMESTAMP WITH TIME ZONE", None),
+            # v29 — achats bar (fournisseur, facture, règlement, annulation,
+            # réception partielle), seuils par bar, bons retour / entre bars
+            ("bar_achats", "fournisseur_id", "ALTER TABLE bar_achats ADD COLUMN fournisseur_id INTEGER REFERENCES fournisseurs(id) ON DELETE SET NULL", None),
+            ("bar_achats", "numero_facture", "ALTER TABLE bar_achats ADD COLUMN numero_facture VARCHAR(60)", None),
+            ("bar_achats", "mode_reglement", "ALTER TABLE bar_achats ADD COLUMN mode_reglement VARCHAR(20) NOT NULL DEFAULT 'COMPTANT'", None),
+            ("bar_achats", "date_echeance", "ALTER TABLE bar_achats ADD COLUMN date_echeance DATE", None),
+            ("bar_achats", "annule_le", "ALTER TABLE bar_achats ADD COLUMN annule_le TIMESTAMP WITH TIME ZONE", None),
+            ("bar_achats", "annule_par_id", "ALTER TABLE bar_achats ADD COLUMN annule_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
+            ("bar_achats", "motif_annulation", "ALTER TABLE bar_achats ADD COLUMN motif_annulation VARCHAR(255)", None),
+            ("bar_achats", "quantite_recue", "ALTER TABLE bar_achats ADD COLUMN quantite_recue NUMERIC(12,3)", None),
+            ("bar_achats", "motif_ecart_reception", "ALTER TABLE bar_achats ADD COLUMN motif_ecart_reception VARCHAR(255)", None),
+            ("bar_produits", "seuil_devant", "ALTER TABLE bar_produits ADD COLUMN seuil_devant NUMERIC(12,3)", None),
+            ("bar_produits", "seuil_piscine", "ALTER TABLE bar_produits ADD COLUMN seuil_piscine NUMERIC(12,3)", None),
+            ("bar_livraisons_internes", "type_bon", "ALTER TABLE bar_livraisons_internes ADD COLUMN type_bon VARCHAR(20) NOT NULL DEFAULT 'TRANSFERT'", None),
+            ("bar_livraisons_internes", "origine", "ALTER TABLE bar_livraisons_internes ADD COLUMN origine VARCHAR(20)", None),
         ]
     else:
         return
@@ -490,11 +520,25 @@ def _migrate_columns():
                 ))
                 conn.execute(sql_text(
                     "ALTER TABLE bar_mouvements_stock ADD CONSTRAINT chk_bar_mouv_type CHECK "
-                    "(type_mouvement IN ('ENTREE','SORTIE_VENTE','AJUSTEMENT','PERTE','CASSE','TRANSFERT'))"
+                    "(type_mouvement IN ('ENTREE','SORTIE_VENTE','AJUSTEMENT','PERTE','CASSE','TRANSFERT','RETOUR_FOURNISSEUR'))"
                 ))
                 conn.commit()
             except Exception:
                 conn.rollback()  # SQLite : contrainte définie par le modèle
+
+        # v29 — colis : états OUVERT (vrac au dépôt) et RETOURNE (au fournisseur)
+        with engine.connect() as conn:
+            try:
+                conn.execute(sql_text(
+                    "ALTER TABLE bar_colis DROP CONSTRAINT IF EXISTS chk_bar_colis_statut"
+                ))
+                conn.execute(sql_text(
+                    "ALTER TABLE bar_colis ADD CONSTRAINT chk_bar_colis_statut CHECK "
+                    "(statut IN ('A_VERIFIER','AU_DEPOT','EN_PREPARATION','LIVRE','ANNULE','OUVERT','RETOURNE'))"
+                ))
+                conn.commit()
+            except Exception:
+                conn.rollback()
 
         # v25 — lieu (Bar Devant / Bar Piscine) sur le catalogue d'articles bar :
         # même contrainte de domaine que chk_session_lieu / chk_bar_mouv_lieu.

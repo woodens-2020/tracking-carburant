@@ -623,6 +623,10 @@ class BarProduit(Base):
     # article (creer_produit dans pos_routes.py) pour ne plus mélanger les
     # deux catalogues.
     lieu               = Column(String(20), nullable=True)
+    # Seuils d'alerte par bar (NULL = seuil_alerte_stock) : sous ce niveau,
+    # le produit apparaît dans « À transférer aujourd'hui » au dépôt.
+    seuil_devant       = Column(Numeric(12, 3), nullable=True)
+    seuil_piscine      = Column(Numeric(12, 3), nullable=True)
 
     prix_historique = relationship("BarPrixHistorique", back_populates="produit",
                                    cascade="all, delete-orphan",
@@ -684,7 +688,28 @@ class BarAchat(Base):
 
     statut           = Column(String(20), nullable=False, default='EN_ATTENTE')
     # EN_ATTENTE  → achat enregistré, stock pas encore mis à jour
-    # CONFIRME    → stock mis à jour (ou non applicable pour carburants)
+    # CONFIRME    → réceptionné (colis créés) ou carburant
+    # ANNULE      → annulé avec motif, avant toute vérification de colis
+
+    # Fournisseur (fiche) et facture
+    fournisseur_id   = Column(Integer, ForeignKey("fournisseurs.id", ondelete="SET NULL"), nullable=True)
+    numero_facture   = Column(String(60), nullable=True)
+    # Règlement : COMPTANT = payé à l'achat ; CREDIT = dette fournisseur,
+    # soldée par les paiements (bar_achat_paiements) avant date_echeance.
+    mode_reglement   = Column(String(20), nullable=False, default="COMPTANT")
+    date_echeance    = Column(Date, nullable=True)
+    # Annulation
+    annule_le        = Column(DateTime(timezone=True), nullable=True)
+    annule_par_id    = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    motif_annulation = Column(String(255), nullable=True)
+    # Réception partielle : quantité réellement reçue (NULL = tout reçu).
+    # Les colis sont créés sur la quantité reçue ; l'écart est gardé.
+    quantite_recue   = Column(Numeric(12, 3), nullable=True)
+    motif_ecart_reception = Column(String(255), nullable=True)
+
+    fournisseur_obj  = relationship("Fournisseur", foreign_keys=[fournisseur_id])
+    paiements        = relationship("BarAchatPaiement", back_populates="achat",
+                                    cascade="all, delete-orphan", order_by="BarAchatPaiement.id")
 
     bar_produit      = relationship("BarProduit", back_populates="bar_achats",
                                     foreign_keys=[produit_id])
@@ -706,9 +731,48 @@ class BarAchat(Base):
             name="chk_bar_achat_produit_xor",
         ),
         CheckConstraint("statut IN ('EN_ATTENTE','CONFIRME','ANNULE')", name="chk_bar_achat_statut"),
+        CheckConstraint("mode_reglement IN ('COMPTANT','CREDIT')", name="chk_bar_achat_reglement"),
         Index("idx_bar_achats_produit",         "produit_id"),
         Index("idx_bar_achats_station_produit",  "station_produit_id"),
         Index("idx_bar_achats_date",             "date_achat"),
+    )
+
+
+class Fournisseur(Base):
+    """Fiche fournisseur, commune aux achats (bar aujourd'hui, cuisine et
+    pâtisserie ensuite). nom_norm (minuscules, espaces réduits) empêche les
+    doublons « Brana » / « BRANA » / « brana »."""
+    __tablename__ = "fournisseurs"
+
+    id         = Column(Integer, primary_key=True)
+    nom        = Column(String(150), nullable=False)
+    nom_norm   = Column(String(150), nullable=False, unique=True)
+    telephone  = Column(String(40), nullable=True)
+    adresse    = Column(String(200), nullable=True)
+    conditions = Column(String(200), nullable=True)      # ex. paiement à 30 jours
+    notes      = Column(String(300), nullable=True)
+    actif      = Column(Boolean, nullable=False, default=True)
+    cree_le    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class BarAchatPaiement(Base):
+    """Paiement d'un achat à crédit (dette fournisseur)."""
+    __tablename__ = "bar_achat_paiements"
+
+    id             = Column(Integer, primary_key=True)
+    achat_id       = Column(Integer, ForeignKey("bar_achats.id", ondelete="CASCADE"), nullable=False)
+    montant        = Column(Numeric(14, 2), nullable=False)
+    date_paiement  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    mode           = Column(String(20), nullable=False, default="CASH")
+    reference      = Column(String(80), nullable=True)
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    achat       = relationship("BarAchat", back_populates="paiements")
+    utilisateur = relationship("Utilisateur")
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_bar_achat_paie_montant"),
+        Index("idx_bar_achat_paie_achat", "achat_id"),
     )
 
 
@@ -800,7 +864,7 @@ class BarMouvementStock(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "type_mouvement IN ('ENTREE','SORTIE_VENTE','AJUSTEMENT','PERTE','CASSE','TRANSFERT')",
+            "type_mouvement IN ('ENTREE','SORTIE_VENTE','AJUSTEMENT','PERTE','CASSE','TRANSFERT','RETOUR_FOURNISSEUR')",
             name="chk_bar_mouv_type",
         ),
         CheckConstraint("lieu IS NULL OR lieu IN ('DEVANT','PISCINE')", name="chk_bar_mouv_lieu"),
@@ -2058,6 +2122,8 @@ class BarColis(Base):
       EN_PREPARATION  → scanné dans une livraison en cours de préparation
       LIVRE           → livraison validée : son contenu est dans le stock du bar
       ANNULE          → colis retiré (erreur de réception)
+      OUVERT          → ouvert au dépôt : son contenu devient du vrac au dépôt
+      RETOURNE        → rendu au fournisseur (sorti du stock du dépôt)
     """
     __tablename__ = "bar_colis"
 
@@ -2081,7 +2147,7 @@ class BarColis(Base):
     __table_args__ = (
         CheckConstraint("quantite > 0", name="chk_bar_colis_qte"),
         CheckConstraint(
-            "statut IN ('A_VERIFIER','AU_DEPOT','EN_PREPARATION','LIVRE','ANNULE')",
+            "statut IN ('A_VERIFIER','AU_DEPOT','EN_PREPARATION','LIVRE','ANNULE','OUVERT','RETOURNE')",
             name="chk_bar_colis_statut",
         ),
         CheckConstraint("lieu IS NULL OR lieu IN ('DEVANT','PISCINE')", name="chk_bar_colis_lieu"),
@@ -2111,6 +2177,12 @@ class BarLivraisonInterne(Base):
     mode           = Column(String(20), nullable=False, default="SCAN")
     motif_manuel   = Column(String(255), nullable=True)
     date_reelle    = Column(DateTime(timezone=True), nullable=True)
+    # Sens du bon :
+    #   TRANSFERT → dépôt vers le bar `lieu` (origine NULL)
+    #   RETOUR    → du bar `origine` vers le dépôt (lieu = origine, pour la contrainte)
+    #   INTERBAR  → du bar `origine` vers le bar `lieu`
+    type_bon       = Column(String(20), nullable=False, default="TRANSFERT")
+    origine        = Column(String(20), nullable=True)
 
     colis      = relationship("BarColis", back_populates="livraison", foreign_keys="BarColis.livraison_id")
     lignes     = relationship("BarLivraisonLigne", back_populates="livraison",
@@ -2174,6 +2246,21 @@ class BarColisEvenement(Base):
         Index("idx_bar_colis_evt_date", "horodatage"),
         Index("idx_bar_colis_evt_type", "type"),
     )
+
+
+class BarCodeRevoque(Base):
+    """Ancien code d'un colis dont l'étiquette a été remplacée : refusé au
+    scan avec un message clair (le colis a un nouveau code)."""
+    __tablename__ = "bar_codes_revoques"
+
+    id          = Column(Integer, primary_key=True)
+    code        = Column(String(30), nullable=False, unique=True)
+    colis_id    = Column(Integer, ForeignKey("bar_colis.id", ondelete="CASCADE"), nullable=False)
+    revoque_le  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    revoque_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    motif       = Column(String(200), nullable=True)
+
+    colis = relationship("BarColis")
 
 
 class SecretApplication(Base):

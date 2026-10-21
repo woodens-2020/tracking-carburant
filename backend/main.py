@@ -263,6 +263,8 @@ app.include_router(zelle_router)
 app.include_router(taches_router)
 app.include_router(pieces_jointes_router)
 app.include_router(listes_reference_router)
+from bar_achats_routes import router as bar_achats_router
+app.include_router(bar_achats_router)
 
 
 @app.on_event("startup")
@@ -271,6 +273,16 @@ def startup():
     # Clé de signature des codes de colis du dépôt bar (créée une seule fois)
     from bar_depot_routes import initialiser_secret_codes
     initialiser_secret_codes()
+    # Achats saisis avec un fournisseur en texte libre → fiche fournisseur
+    try:
+        from bar_achats_routes import rattacher_fournisseurs
+        _db_f = SessionLocal()
+        try:
+            rattacher_fournisseurs(_db_f)
+        finally:
+            _db_f.close()
+    except Exception as _e:
+        log.warning("Rattachement des fournisseurs ignoré : %s", _e)
     # Migrations douces — colonnes ajoutées progressivement
     from sqlalchemy import text as _text
     _migrations = [

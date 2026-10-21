@@ -36,7 +36,7 @@ jobs:
 
       - name: Démarrage, routes principales et logique métier
         working-directory: backend
-        run: python -m pytest tests/test_smoke.py tests/test_logique_stock.py tests/test_logique_metier.py tests/test_bar_depot.py -v
+        run: python -m pytest tests/test_smoke.py tests/test_logique_stock.py tests/test_logique_metier.py tests/test_bar_depot.py tests/test_bar_v29.py -v
 
       - uses: actions/setup-node@v4
         with:

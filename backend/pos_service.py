@@ -103,52 +103,52 @@ def prix_actif(produit_id: int, db: Session) -> Decimal | None:
     return _dec(row.prix) if row else None
 
 
+def _base_cout_achats(db: Session, produit_id: int | None = None) -> dict[int, tuple[Decimal, Decimal]]:
+    """Par produit : (coût de revient total, quantité nette) des achats
+    réceptionnés. Coût de revient = marchandise réellement reçue + frais
+    annexes (transport, manutention…). Quantité nette = quantité reçue
+    moins les colis retirés (erreur de réception) ou rendus au fournisseur."""
+    from models import BarAchatDepense, BarColis
+    q = db.query(BarAchat).filter(BarAchat.produit_id.isnot(None), BarAchat.quantite > 0,
+                                  BarAchat.statut == 'CONFIRME')
+    if produit_id is not None:
+        q = q.filter(BarAchat.produit_id == produit_id)
+    achats = q.all()
+    if not achats:
+        return {}
+    frais = dict(db.query(BarAchatDepense.achat_id, func.sum(BarAchatDepense.montant))
+                 .group_by(BarAchatDepense.achat_id).all())
+    retires = dict(db.query(BarColis.achat_id, func.sum(BarColis.quantite))
+                   .filter(BarColis.achat_id.isnot(None), BarColis.statut.in_(("ANNULE", "RETOURNE")))
+                   .group_by(BarColis.achat_id).all())
+    out: dict[int, tuple[Decimal, Decimal]] = {}
+    for a in achats:
+        recue = _dec(a.quantite_recue if a.quantite_recue is not None else a.quantite)
+        nette = recue - _dec(retires.get(a.id))
+        if nette <= 0:
+            continue
+        montant = nette * _dec(a.prix_achat_unitaire) + _dec(frais.get(a.id))
+        m, n = out.get(a.produit_id, (Decimal("0"), Decimal("0")))
+        out[a.produit_id] = (m + montant, n + nette)
+    return out
+
+
 def cmup(produit_id: int, db: Session) -> Decimal:
     """
-    Coût moyen pondéré (CMUP) basé sur les achats CONFIRMÉS uniquement.
-    Retourne 0 si aucun achat confirmé.
+    Coût moyen pondéré (CMUP) = coût de revient : achats réceptionnés,
+    frais annexes compris, colis retirés ou rendus déduits.
+    Retourne 0 si aucun achat réceptionné.
     """
-    achats = (
-        db.query(BarAchat)
-        .filter(
-            BarAchat.produit_id == produit_id,
-            BarAchat.quantite > 0,
-            BarAchat.statut == 'CONFIRME',
-        )
-        .all()
-    )
-    total_qte     = sum(_dec(a.quantite) for a in achats)
-    total_montant = sum(_dec(a.quantite) * _dec(a.prix_achat_unitaire) for a in achats)
-    if total_qte == 0:
+    m, n = _base_cout_achats(db, produit_id).get(produit_id, (Decimal("0"), Decimal("0")))
+    if n <= 0:
         return Decimal("0")
-    return (total_montant / total_qte).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+    return (m / n).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
 
 def cmup_batch(db: Session) -> dict[int, Decimal]:
-    """CMUP de tous les produits bar en une seule requête GROUP BY (évite N+1)."""
-    rows = (
-        db.query(
-            BarAchat.produit_id,
-            func.sum(BarAchat.quantite * BarAchat.prix_achat_unitaire),
-            func.sum(BarAchat.quantite),
-        )
-        .filter(
-            BarAchat.produit_id.isnot(None),
-            BarAchat.quantite > 0,
-            BarAchat.statut == 'CONFIRME',
-        )
-        .group_by(BarAchat.produit_id)
-        .all()
-    )
-    result: dict[int, Decimal] = {}
-    for pid, total_montant, total_qte in rows:
-        if total_qte and _dec(total_qte) > 0:
-            result[pid] = (
-                _dec(total_montant) / _dec(total_qte)
-            ).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
-        else:
-            result[pid] = Decimal("0")
-    return result
+    """CMUP (coût de revient) de tous les produits bar."""
+    return {pid: ((m / n).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP) if n > 0 else Decimal("0"))
+            for pid, (m, n) in _base_cout_achats(db).items()}
 
 
 def prix_actif_batch(db: Session) -> dict[int, Decimal]:
@@ -224,7 +224,8 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     # actif seulement si BAR_STOCK_PAR_LIEU=true, après l'inventaire
     # d'ouverture des bars — sinon le stock global est contrôlé (historique).
     lieu_controle = None
-    if os.getenv("BAR_STOCK_PAR_LIEU", "false").lower() == "true" and data.get("caissier_id"):
+    from bar_depot_routes import controle_par_bar_actif
+    if controle_par_bar_actif(db) and data.get("caissier_id"):
         sess = (db.query(BarSessionCaisse)
                 .filter_by(caissier_id=data["caissier_id"], date_session=today_haiti(), statut="EN_COURS")
                 .first())
@@ -628,7 +629,7 @@ def detecter_anomalies_bar(date_cible: date_type, db: Session) -> list[dict]:
 # Calcul de rentabilité
 # ──────────────────────────────────────────────────────────────────
 
-def stats_bar(date_debut: date_type, date_fin: date_type, db: Session) -> dict:
+def stats_bar(date_debut: date_type, date_fin: date_type, db: Session, lieu: str | None = None) -> dict:
     """
     Calcule les statistiques de rentabilité pour une période donnée.
     CA, COGS (coût moyen pondéré), bénéfice, marges par produit.
@@ -638,7 +639,7 @@ def stats_bar(date_debut: date_type, date_fin: date_type, db: Session) -> dict:
     _, dt_fin           = bounds_haiti(date_fin)
 
     # Ventes non annulées sur la période
-    lignes = (
+    q_lignes = (
         db.query(BarLigneVente)
         .join(BarVente)
         .filter(
@@ -646,8 +647,12 @@ def stats_bar(date_debut: date_type, date_fin: date_type, db: Session) -> dict:
             BarVente.date_heure >= dt_debut,
             BarVente.date_heure <= dt_fin,
         )
-        .all()
     )
+    # Filtre par bar : ventes des sessions de caisse de ce bar
+    if lieu:
+        q_lignes = q_lignes.join(BarSessionCaisse, BarVente.session_id == BarSessionCaisse.id) \
+                           .filter(BarSessionCaisse.lieu == lieu)
+    lignes = q_lignes.all()
 
     cmup_map: dict[int, Decimal] = cmup_batch(db)
 
@@ -718,11 +723,48 @@ def stats_bar(date_debut: date_type, date_fin: date_type, db: Session) -> dict:
             (benefice_net / ca_total * 100).quantize(Decimal("0.01"))
             if ca_total > 0 else Decimal("0")
         ),
-        "nb_ventes":     db.query(BarVente).filter(
-            BarVente.statut != "ANNULEE",
-            BarVente.date_heure >= dt_debut,
-            BarVente.date_heure <= dt_fin,
-        ).count(),
+        "nb_ventes":     len({l.vente_id for l in lignes}),
+        "lieu":          lieu,
+        "par_lieu":      _rentabilite_par_lieu(db, dt_debut, dt_fin, cmup_map),
         "top_produits":  top_produits,
         "par_produit":   list(par_produit.values()),
     }
+
+
+def _rentabilite_par_lieu(db: Session, dt_debut, dt_fin, cmup_map: dict) -> list:
+    """Bar devant / Bar piscine / sans bar : CA, coût, marge, et pertes
+    d'inventaire (ajustements négatifs) valorisées au coût de revient."""
+    from models import BarSessionCaisse as _S
+    out = {}
+    rows = (db.query(_S.lieu, BarLigneVente)
+            .select_from(BarLigneVente).join(BarVente)
+            .outerjoin(_S, BarVente.session_id == _S.id)
+            .filter(BarVente.statut != "ANNULEE", BarVente.date_heure >= dt_debut, BarVente.date_heure <= dt_fin)
+            .all())
+    for lieu, l in rows:
+        k = lieu or "SANS"
+        d = out.setdefault(k, {"lieu": k, "ca": Decimal(0), "cogs": Decimal(0), "pertes": Decimal(0)})
+        d["ca"] += _dec(l.sous_total)
+        if l.produit_id:
+            d["cogs"] += (_dec(l.quantite) * cmup_map.get(l.produit_id, Decimal(0))).quantize(Decimal("0.01"))
+        elif l.cuisine_plat and l.cuisine_plat.cout_estime:
+            d["cogs"] += (_dec(l.quantite) * _dec(l.cuisine_plat.cout_estime)).quantize(Decimal("0.01"))
+    for lieu, pid, q in (db.query(BarMouvementStock.lieu, BarMouvementStock.produit_id, func.sum(BarMouvementStock.quantite))
+                         .filter(BarMouvementStock.type_mouvement.in_(("AJUSTEMENT", "PERTE", "CASSE")),
+                                 BarMouvementStock.quantite < 0,
+                                 BarMouvementStock.date_mouvement >= dt_debut, BarMouvementStock.date_mouvement <= dt_fin)
+                         .group_by(BarMouvementStock.lieu, BarMouvementStock.produit_id).all()):
+        k = lieu or "DEPOT"
+        d = out.setdefault(k, {"lieu": k, "ca": Decimal(0), "cogs": Decimal(0), "pertes": Decimal(0)})
+        d["pertes"] += (-_dec(q) * cmup_map.get(pid, Decimal(0))).quantize(Decimal("0.01"))
+    noms = {"DEVANT": "Bar devant", "PISCINE": "Bar piscine", "SANS": "Sans bar (ancienne vente)", "DEPOT": "Dépôt"}
+    res = []
+    for k in ("DEVANT", "PISCINE", "SANS", "DEPOT"):
+        if k not in out:
+            continue
+        d = out[k]
+        marge = d["ca"] - d["cogs"]
+        res.append({"lieu": k, "nom": noms[k], "ca": float(d["ca"]), "cogs": float(d["cogs"]),
+                    "benefice": float(marge), "pertes_inventaire": float(d["pertes"]),
+                    "marge_pct": float((marge / d["ca"] * 100).quantize(Decimal("0.01"))) if d["ca"] > 0 else 0.0})
+    return res

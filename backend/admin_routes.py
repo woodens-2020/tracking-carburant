@@ -47,10 +47,12 @@ def _normaliser_telephone(brut: str) -> str:
         )
     return nettoye
 
-DOMAINES = ["finance", "bar", "cuisine", "hotel", "employes", "carburant"]
+DOMAINES = ["finance", "bar", "cuisine", "hotel", "employes", "carburant", "depot"]
 NIVEAUX  = ["aucun", "lecture", "operationnel", "complet"]
 
-_PERMS_VIDES: dict = {d: "aucun" for d in DOMAINES}
+# « depot » (Dépôt Bar) n'est écrit que s'il est réglé : un rôle sans ce
+# réglage garde l'accès historique au dépôt (Manager, Magasinier…).
+_PERMS_VIDES: dict = {d: "aucun" for d in DOMAINES if d != "depot"}
 _PERMS_VIDES["admin"] = False
 
 
@@ -70,6 +72,8 @@ def _require_admin(request: Request, db: Session = Depends(get_db)) -> Utilisate
 def _validate_permissions(perms: dict) -> dict:
     out = dict(_PERMS_VIDES)
     for d in DOMAINES:
+        if d == "depot" and "depot" not in perms:
+            continue
         v = perms.get(d, "aucun")
         if v not in NIVEAUX:
             raise HTTPException(400, f"Niveau invalide '{v}' pour '{d}'. Valeurs: {NIVEAUX}")

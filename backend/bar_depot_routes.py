@@ -53,6 +53,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -75,6 +76,8 @@ STATUTS = {
     "EN_PREPARATION": "En préparation de transfert",
     "LIVRE":          "Transféré au bar",
     "ANNULE":         "Annulé",
+    "OUVERT":         "Ouvert au dépôt (vrac)",
+    "RETOURNE":       "Rendu au fournisseur",
 }
 EVENEMENTS = {
     "CREE":              "Colis créé à la réception",
@@ -89,14 +92,22 @@ EVENEMENTS = {
     "CONSULTATION":      "Fiche consultée",
     "SCAN_REFUSE":       "Scan refusé",
     "REJET":             "Code rejeté",
+    "OUVERT":            "Colis ouvert au dépôt — contenu en vrac",
+    "RETOUR_FOURNISSEUR": "Rendu au fournisseur",
+    "ETIQUETTE_REMPLACEE": "Étiquette remplacée — nouveau code",
+    "ETIQUETE_STOCK":    "Étiqueté à partir du stock existant du dépôt",
+    "RETOUR_BAR":        "Retourné du bar au dépôt",
+    "TRANSFERT_INTERBAR": "Transféré d'un bar à l'autre",
 }
 
 
 # ── Droits ────────────────────────────────────────────────────────────────
 
 def _require_depot(request: Request, db: Session = Depends(get_db)) -> Utilisateur:
-    """Administrateur, PDG, manager, ou responsable de dépôt (rôle dont le
-    nom contient « dépôt », ou poste Magasinier / Gestionnaire de stock)."""
+    """Administrateur, PDG, ou rôle avec la permission « Dépôt Bar »
+    (opérationnel ou complet). Pour un rôle qui n'a pas encore cette
+    permission réglée, repli sur l'ancien usage : Manager, rôle contenant
+    « dépôt », poste Magasinier / Gestionnaire de stock."""
     user = getattr(request.state, "user", None)
     if not user:
         raise HTTPException(403, "Non autorisé.")
@@ -107,6 +118,10 @@ def _require_depot(request: Request, db: Session = Depends(get_db)) -> Utilisate
         perms = (u.role_obj.permissions or {}) if u.role_obj else {}
         if perms.get("admin"):
             return u
+        if "depot" in perms:                     # permission explicite : elle seule décide
+            if perms.get("depot") in ("operationnel", "complet"):
+                return u
+            raise HTTPException(403, "Votre rôle n'a pas accès aux opérations du Dépôt Bar.")
         nom_role = ((u.role_obj.nom if u.role_obj else "") or "").strip().lower()
         poste = (u.poste or "").strip().lower()
         if nom_role == "manager" or poste == "manager":
@@ -228,6 +243,15 @@ def _trouver_colis(db: Session, texte: str, user_id: Optional[int]) -> BarColis:
         raise HTTPException(400, e.message)
     c = db.query(BarColis).filter(BarColis.code == code).first()
     if not c:
+        from models import BarCodeRevoque
+        r = db.query(BarCodeRevoque).filter(BarCodeRevoque.code == code).first()
+        if r:
+            _journaliser(db, "REJET", r.colis, utilisateur_id=user_id, code_saisi=code, details="revoque")
+            db.commit()
+            raise HTTPException(409, {"message": f"Ancienne étiquette {code_lisible(code)} : remplacée le "
+                                                 f"{_iso(r.revoque_le)[:10]} par {code_lisible(r.colis.code)}. "
+                                                 "Utilisez la nouvelle étiquette.",
+                                      "colis_id": r.colis_id, "statut": r.colis.statut, "deja_livre": False})
         _journaliser(db, "REJET", utilisateur_id=user_id, code_saisi=code, details="inconnu")
         db.commit()
         raise HTTPException(404, f"Colis {code_lisible(code)} inconnu.")
@@ -269,7 +293,9 @@ def _etat_texte(c: BarColis) -> str:
             txt += " (transfert manuel, sans scan) — ce code n'est plus valable"
         return txt
     return {"AU_DEPOT": "déjà vérifié au dépôt", "EN_PREPARATION": "dans un bon de transfert en préparation",
-            "A_VERIFIER": "pas encore vérifié au dépôt", "ANNULE": "annulé"}.get(c.statut, c.statut)
+            "A_VERIFIER": "pas encore vérifié au dépôt", "ANNULE": "annulé",
+            "OUVERT": "ouvert au dépôt — son contenu est en vrac, ce code n'est plus utilisable",
+            "RETOURNE": "rendu au fournisseur — ce code n'est plus valable"}.get(c.statut, c.statut)
 
 
 # ── Représentations ───────────────────────────────────────────────────────
@@ -289,6 +315,7 @@ _MOTIFS_REJET = {
     "format": "Format non reconnu",
     "inconnu": "Code inexistant",
     "vide": "Aucun code lu",
+    "revoque": "Ancienne étiquette (remplacée)",
 }
 
 def _colis_dict(c: BarColis) -> dict:
@@ -318,6 +345,10 @@ def _livraison_dict(l: BarLivraisonInterne, details: bool = True) -> dict:
         "numero":      l.numero,
         "lieu":        l.lieu,
         "lieu_nom":    LIEUX.get(l.lieu, l.lieu),
+        "type_bon":    l.type_bon or "TRANSFERT",
+        "origine":     l.origine,
+        "origine_nom": ("Dépôt" if (l.type_bon or "TRANSFERT") == "TRANSFERT" else LIEUX.get(l.origine, l.origine)),
+        "destination_nom": ("Dépôt" if l.type_bon == "RETOUR" else LIEUX.get(l.lieu, l.lieu)),
         "statut":      l.statut,
         "notes":       l.notes,
         "cree_le":     _iso(l.cree_le),
@@ -379,13 +410,21 @@ def _stock_depot(db: Session, produit_id: int) -> Decimal:
     return st["total"] - st["devant"] - st["piscine"]
 
 
-def _quantite_reservee(db: Session, produit_id: int, sauf_livraison: Optional[int] = None) -> Decimal:
-    """Unités en vrac déjà réservées par des livraisons en préparation."""
+def _quantite_reservee(db: Session, produit_id: int, sauf_livraison: Optional[int] = None,
+                       origine: Optional[str] = None, avec_colis: bool = False) -> Decimal:
+    """Unités déjà réservées par des bons en préparation qui prennent dans le
+    stock d'origine donné (None = dépôt : bons dépôt → bar ; sinon bons de
+    retour / entre bars partant de ce bar). Vrac seulement, sauf avec_colis."""
     q = (db.query(BarLivraisonLigne)
          .join(BarLivraisonInterne, BarLivraisonLigne.livraison_id == BarLivraisonInterne.id)
          .filter(BarLivraisonInterne.statut == "PREPARATION",
-                 BarLivraisonLigne.produit_id == produit_id,
-                 BarLivraisonLigne.colis_id.is_(None)))
+                 BarLivraisonLigne.produit_id == produit_id))
+    if not avec_colis:
+        q = q.filter(BarLivraisonLigne.colis_id.is_(None))
+    if origine is None:
+        q = q.filter((BarLivraisonInterne.type_bon == "TRANSFERT") | BarLivraisonInterne.type_bon.is_(None))
+    else:
+        q = q.filter(BarLivraisonInterne.type_bon.in_(("RETOUR", "INTERBAR")), BarLivraisonInterne.origine == origine)
     if sauf_livraison:
         q = q.filter(BarLivraisonInterne.id != sauf_livraison)
     return sum((Decimal(str(x.quantite)) for x in q.all()), Decimal("0"))
@@ -394,8 +433,11 @@ def _quantite_reservee(db: Session, produit_id: int, sauf_livraison: Optional[in
 def _colis_au_depot(db: Session, produit_id: int) -> Decimal:
     """Unités au dépôt déjà rattachées à un colis étiqueté (AU_DEPOT ou en
     préparation) : elles se livrent par scan, pas en vrac."""
+    # En préparation : seulement les colis encore au dépôt (lieu vide) — un
+    # colis d'un bon de retour ou entre bars est physiquement dans un bar.
     rows = db.query(BarColis).filter(BarColis.produit_id == produit_id,
-                                     BarColis.statut.in_(("AU_DEPOT", "EN_PREPARATION"))).all()
+                                     (BarColis.statut == "AU_DEPOT") |
+                                     ((BarColis.statut == "EN_PREPARATION") & BarColis.lieu.is_(None))).all()
     return sum((Decimal(str(c.quantite)) for c in rows), Decimal("0"))
 
 
@@ -407,10 +449,14 @@ class ReceptionIn(BaseModel):
     # Unités par colis. Par défaut : unités par caisse du produit (une
     # étiquette par caisse), sinon un seul colis pour toute la quantité.
     unites_par_colis: Optional[int] = Field(default=None, gt=0)
+    # Réception partielle : unités réellement arrivées (vide = tout l'achat)
+    quantite_recue:   Optional[float] = Field(default=None, gt=0)
+    motif_ecart:      Optional[str] = Field(default=None, max_length=250)
 
 
 def receptionner_achat(db: Session, achat: BarAchat, unites_par_colis: Optional[int],
-                       utilisateur_id: Optional[int]) -> List[BarColis]:
+                       utilisateur_id: Optional[int], quantite_recue: Optional[float] = None,
+                       motif_ecart: Optional[str] = None) -> List[BarColis]:
     """Confirme l'achat et génère ses colis (statut A_VERIFIER). Idempotent :
     un achat déjà réceptionné renvoie ses colis existants. Ne touche PAS au
     stock : il n'entre au dépôt qu'à la vérification (scan) de chaque colis."""
@@ -421,6 +467,15 @@ def receptionner_achat(db: Session, achat: BarAchat, unites_par_colis: Optional[
         raise HTTPException(422, "Seuls les achats de produits bar passent par le dépôt.")
     produit = db.get(BarProduit, achat.produit_id)
     qte = Decimal(str(achat.quantite))
+    if quantite_recue is not None and Decimal(str(quantite_recue)) != qte:
+        recue = Decimal(str(quantite_recue))
+        if recue > qte:
+            raise HTTPException(422, f"Reçu plus que l'achat ({float(qte):g}) : enregistrez un autre achat pour le surplus.")
+        if len((motif_ecart or "").strip()) < 5:
+            raise HTTPException(422, "Indiquez la raison de l'écart de réception (5 caractères minimum).")
+        achat.quantite_recue = recue
+        achat.motif_ecart_reception = motif_ecart.strip()[:255]
+        qte = recue
     taille = unites_par_colis or (produit.unites_par_caisse if produit and produit.vendu_par_caisse else None)
     tailles: List[Decimal] = []
     if taille:
@@ -459,9 +514,10 @@ def receptionner(achat_id: int, data: ReceptionIn, request: Request,
         raise HTTPException(404, "Achat introuvable.")
     if achat.statut == "ANNULE":
         raise HTTPException(409, "Cet achat est annulé.")
-    colis = receptionner_achat(db, achat, data.unites_par_colis, user.id)
+    colis = receptionner_achat(db, achat, data.unites_par_colis, user.id, data.quantite_recue, data.motif_ecart)
     db.commit()
-    return {"achat_id": achat.id, "nb_colis": len(colis), "colis": [_colis_dict(c) for c in colis]}
+    return {"achat_id": achat.id, "nb_colis": len(colis), "colis": [_colis_dict(c) for c in colis],
+            "quantite_recue": float(achat.quantite_recue) if achat.quantite_recue is not None else float(achat.quantite)}
 
 
 @router.get("/receptions")
@@ -587,6 +643,15 @@ def etiquettes(achat_id: Optional[int] = None, ids: Optional[str] = None,
 
 class ScanIn(BaseModel):
     code: str = Field(max_length=200)
+    # Scan fait sans réseau, envoyé au retour d'internet : heure réelle du scan
+    hors_ligne_le: Optional[datetime] = None
+
+
+def _details_hors_ligne(data: "ScanIn") -> Optional[str]:
+    if not data.hors_ligne_le:
+        return None
+    h = data.hors_ligne_le if data.hors_ligne_le.tzinfo else data.hors_ligne_le.replace(tzinfo=timezone.utc)
+    return f"Scanné hors ligne le {h.astimezone(now_haiti().tzinfo):%d/%m/%Y à %H:%M}, envoyé au retour du réseau"
 
 
 @router.get("/colis")
@@ -644,7 +709,7 @@ def verifier_colis(data: ScanIn, request: Request, db: Session = Depends(get_db)
         motif=f"Colis {code_lisible(c.code)} vérifié au dépôt" + (f" (achat #{c.achat_id})" if c.achat_id else ""),
         utilisateur_id=user.id,
     ))
-    _journaliser(db, "VERIFIE", c, utilisateur_id=user.id)
+    _journaliser(db, "VERIFIE", c, utilisateur_id=user.id, details=_details_hors_ligne(data))
     db.commit()
     db.refresh(c)
     restants = (db.query(BarColis).filter(BarColis.achat_id == c.achat_id,
@@ -723,13 +788,40 @@ def stock_par_lieu(db: Session = Depends(get_db)):
 # ══════════════════════════════════════════════════════════════════════════
 
 class LivraisonIn(BaseModel):
-    lieu:  str = Field(max_length=20)
-    notes: Optional[str] = Field(default=None, max_length=300)
+    lieu:     str = Field(max_length=20)              # bar de destination (ou bar d'origine d'un RETOUR)
+    notes:    Optional[str] = Field(default=None, max_length=300)
+    type_bon: str = Field(default="TRANSFERT", max_length=20)   # TRANSFERT | RETOUR | INTERBAR
+    origine:  Optional[str] = Field(default=None, max_length=20)  # bar d'origine (RETOUR, INTERBAR)
 
 
 class VracIn(BaseModel):
     produit_id: int
     quantite:   float = Field(gt=0, le=100000)
+
+
+TYPES_BON = {
+    "TRANSFERT": "Transfert dépôt → bar",
+    "RETOUR":    "Retour bar → dépôt",
+    "INTERBAR":  "Transfert entre bars",
+}
+
+
+def _type_bon(l: BarLivraisonInterne) -> str:
+    return l.type_bon or "TRANSFERT"
+
+
+def _origine_stock(l: BarLivraisonInterne) -> Optional[str]:
+    """Lieu dont le stock sort (None = dépôt)."""
+    return None if _type_bon(l) == "TRANSFERT" else l.origine
+
+
+def _destination_stock(l: BarLivraisonInterne) -> Optional[str]:
+    """Lieu dont le stock entre (None = dépôt)."""
+    return None if _type_bon(l) == "RETOUR" else l.lieu
+
+
+def _nom_lieu(lieu: Optional[str]) -> str:
+    return LIEUX.get(lieu, "Dépôt") if lieu else "Dépôt"
 
 
 def _livraison_en_preparation(db: Session, livraison_id: int) -> BarLivraisonInterne:
@@ -741,10 +833,39 @@ def _livraison_en_preparation(db: Session, livraison_id: int) -> BarLivraisonInt
     return l
 
 
-def _livraison_ouverte(db: Session, lieu: str) -> Optional[BarLivraisonInterne]:
-    return (db.query(BarLivraisonInterne)
-            .filter(BarLivraisonInterne.lieu == lieu, BarLivraisonInterne.statut == "PREPARATION")
-            .order_by(BarLivraisonInterne.id.desc()).first())
+def _livraison_ouverte(db: Session, lieu: str, type_bon: str = "TRANSFERT",
+                       origine: Optional[str] = None) -> Optional[BarLivraisonInterne]:
+    q = (db.query(BarLivraisonInterne)
+         .filter(BarLivraisonInterne.lieu == lieu, BarLivraisonInterne.statut == "PREPARATION"))
+    if type_bon == "TRANSFERT":
+        q = q.filter((BarLivraisonInterne.type_bon == "TRANSFERT") | BarLivraisonInterne.type_bon.is_(None))
+    else:
+        q = q.filter(BarLivraisonInterne.type_bon == type_bon, BarLivraisonInterne.origine == origine)
+    return q.order_by(BarLivraisonInterne.id.desc()).first()
+
+
+def _dernier_bon_valide(db: Session, colis_id: int) -> Optional[int]:
+    """Dernier bon validé contenant ce colis (pour remettre sa fiche à jour
+    quand un retour ou un transfert entre bars est annulé)."""
+    row = (db.query(BarLivraisonInterne.id)
+           .join(BarLivraisonLigne, BarLivraisonLigne.livraison_id == BarLivraisonInterne.id)
+           .filter(BarLivraisonLigne.colis_id == colis_id, BarLivraisonInterne.statut == "VALIDEE")
+           .order_by(BarLivraisonInterne.id.desc()).first())
+    return row[0] if row else None
+
+
+def _vrac_disponible(db: Session, produit_id: int, origine: Optional[str],
+                     sauf_livraison: Optional[int] = None) -> Decimal:
+    """Unités en vrac qu'un bon peut encore prendre dans le stock d'origine.
+    Dépôt : stock du dépôt − colis fermés au dépôt − vrac réservé par les bons
+    dépôt → bar. Bar : stock du bar − ce que ses bons de retour / entre bars
+    ont déjà réservé (colis et vrac)."""
+    if origine is None:
+        return _stock_depot(db, produit_id) - _colis_au_depot(db, produit_id) \
+            - _quantite_reservee(db, produit_id, sauf_livraison=sauf_livraison)
+    from pos_service import stock_courant
+    return stock_courant(produit_id, db, lieu=origine) \
+        - _quantite_reservee(db, produit_id, sauf_livraison=sauf_livraison, origine=origine, avec_colis=True)
 
 
 class DestinationIn(BaseModel):
@@ -754,20 +875,36 @@ class DestinationIn(BaseModel):
 @router.post("/livraisons", status_code=201)
 def creer_livraison(data: LivraisonIn, request: Request, db: Session = Depends(get_db),
                     user=Depends(_require_depot)):
-    """Ouvre la livraison en préparation d'un bar. Une seule à la fois par
-    bar (Bar devant et Bar piscine peuvent être préparées en parallèle) : si
-    elle existe déjà, elle est renvoyée telle quelle (double clic, deux postes)."""
+    """Ouvre un bon en préparation :
+      - TRANSFERT (dépôt → bar) : un seul ouvert par bar, les deux bars en parallèle ;
+      - RETOUR (bar → dépôt) : `origine` = bar qui rend la marchandise ;
+      - INTERBAR (bar → bar) : `origine` → `lieu`.
+    Si le même bon est déjà ouvert, il est renvoyé tel quel (double clic, deux postes)."""
+    type_bon = (data.type_bon or "TRANSFERT").upper()
+    if type_bon not in TYPES_BON:
+        raise HTTPException(422, "Type de bon invalide : TRANSFERT, RETOUR ou INTERBAR.")
     lieu = (data.lieu or "").upper()
+    origine = (data.origine or "").upper() or None
+    if type_bon == "RETOUR":
+        lieu = origine or lieu
+        origine = lieu
     if lieu not in LIEUX:
-        raise HTTPException(422, "Destination invalide : DEVANT (Bar devant) ou PISCINE (Bar piscine).")
-    existante = _livraison_ouverte(db, lieu)
+        raise HTTPException(422, "Bar invalide : DEVANT (Bar devant) ou PISCINE (Bar piscine).")
+    if type_bon == "INTERBAR":
+        if origine not in LIEUX or origine == lieu:
+            raise HTTPException(422, "Transfert entre bars : choisissez deux bars différents.")
+    elif type_bon == "TRANSFERT":
+        origine = None
+    existante = _livraison_ouverte(db, lieu, type_bon, origine)
     if existante:
         return _livraison_dict(existante)
     l = BarLivraisonInterne(numero="TMP-" + uuid.uuid4().hex[:20], lieu=lieu, statut="PREPARATION",
-                            notes=(data.notes or "").strip()[:300] or None, cree_par_id=user.id)
+                            notes=(data.notes or "").strip()[:300] or None, cree_par_id=user.id,
+                            type_bon=type_bon, origine=origine)
     db.add(l)
     db.flush()
-    l.numero = f"TRF{now_haiti():%y%m%d}-{l.id:04d}"
+    prefixe = {"TRANSFERT": "TRF", "RETOUR": "RET", "INTERBAR": "TIB"}[type_bon]
+    l.numero = f"{prefixe}{now_haiti():%y%m%d}-{l.id:04d}"
     db.commit()
     return _livraison_dict(l)
 
@@ -794,16 +931,30 @@ def scanner_colis_livraison(livraison_id: int, data: ScanIn, db: Session = Depen
                             user=Depends(_require_depot)):
     l = _livraison_en_preparation(db, livraison_id)
     c = _trouver_colis(db, data.code, user.id)
-    if not _transition(db, c.id, ("AU_DEPOT",), {"statut": "EN_PREPARATION", "livraison_id": l.id}):
-        db.refresh(c)
-        if c.statut == "EN_PREPARATION":
-            ou = "ce bon de transfert" if c.livraison_id == l.id else "un autre bon de transfert"
-            _refus(db, c, user.id, f"Colis {code_lisible(c.code)} déjà scanné dans {ou}.")
-        if c.statut == "A_VERIFIER":
-            _refus(db, c, user.id, f"Colis {code_lisible(c.code)} pas encore vérifié au dépôt : scannez-le d'abord en réception.")
-        _refus(db, c, user.id, f"Colis {code_lisible(c.code)} {_etat_texte(c)}.")
+    tb = _type_bon(l)
+    if tb == "TRANSFERT":
+        if not _transition(db, c.id, ("AU_DEPOT",), {"statut": "EN_PREPARATION", "livraison_id": l.id}):
+            db.refresh(c)
+            if c.statut == "EN_PREPARATION":
+                ou = "ce bon de transfert" if c.livraison_id == l.id else "un autre bon de transfert"
+                _refus(db, c, user.id, f"Colis {code_lisible(c.code)} déjà scanné dans {ou}.")
+            if c.statut == "A_VERIFIER":
+                _refus(db, c, user.id, f"Colis {code_lisible(c.code)} pas encore vérifié au dépôt : scannez-le d'abord en réception.")
+            _refus(db, c, user.id, f"Colis {code_lisible(c.code)} {_etat_texte(c)}.")
+    else:
+        # Retour ou transfert entre bars : colis fermé, encore au bar d'origine
+        if c.statut != "LIVRE" or c.lieu != l.origine or \
+                not _transition(db, c.id, ("LIVRE",), {"statut": "EN_PREPARATION", "livraison_id": l.id}):
+            db.refresh(c)
+            if c.statut == "EN_PREPARATION":
+                _refus(db, c, user.id, f"Colis {code_lisible(c.code)} déjà scanné dans un bon en préparation.")
+            if c.statut == "LIVRE":
+                _refus(db, c, user.id, f"Colis {code_lisible(c.code)} est au {_nom_lieu(c.lieu)}, pas au {_nom_lieu(l.origine)}.")
+            _refus(db, c, user.id, f"Colis {code_lisible(c.code)} n'est pas dans un bar ({_etat_texte(c)}) : "
+                                   "seul un colis fermé, déjà transféré à ce bar, peut repartir.")
     db.add(BarLivraisonLigne(livraison_id=l.id, produit_id=c.produit_id, colis_id=c.id, quantite=c.quantite))
-    _journaliser(db, "AJOUTE_LIVRAISON", c, lieu=l.lieu, livraison_id=l.id, utilisateur_id=user.id)
+    _journaliser(db, "AJOUTE_LIVRAISON", c, lieu=l.lieu, livraison_id=l.id, utilisateur_id=user.id,
+                 details=_details_hors_ligne(data))
     db.commit()
     db.refresh(l)
     db.refresh(c)
@@ -813,10 +964,12 @@ def scanner_colis_livraison(livraison_id: int, data: ScanIn, db: Session = Depen
 @router.post("/livraisons/{livraison_id}/destination")
 def changer_destination(livraison_id: int, data: DestinationIn, db: Session = Depends(get_db),
                         user=Depends(_require_depot)):
-    """Corrige le bar de destination d'une livraison encore en préparation
-    (colis scannés pour le mauvais bar). Rien n'a encore bougé dans les
-    stocks : seule la destination change, et le changement est journalisé."""
+    """Corrige le bar de destination d'un bon dépôt → bar encore en
+    préparation. Rien n'a encore bougé dans les stocks : seule la destination
+    change, et le changement est journalisé."""
     l = _livraison_en_preparation(db, livraison_id)
+    if _type_bon(l) != "TRANSFERT":
+        raise HTTPException(409, "Seul un bon dépôt → bar peut changer de destination.")
     lieu = (data.lieu or "").upper()
     if lieu not in LIEUX:
         raise HTTPException(422, "Destination invalide : DEVANT (Bar devant) ou PISCINE (Bar piscine).")
@@ -825,7 +978,7 @@ def changer_destination(livraison_id: int, data: DestinationIn, db: Session = De
     autre = _livraison_ouverte(db, lieu)
     if autre:
         raise HTTPException(409, f"Un transfert vers le {LIEUX[lieu]} est déjà en préparation ({autre.numero}) : "
-                                 "validez-la ou annulez-la d'abord.")
+                                 "validez-le ou annulez-le d'abord.")
     ancien = LIEUX.get(l.lieu, l.lieu)
     l.lieu = lieu
     for x in l.lignes:
@@ -840,21 +993,30 @@ def changer_destination(livraison_id: int, data: DestinationIn, db: Session = De
 @router.post("/livraisons/{livraison_id}/vrac")
 def ajouter_vrac(livraison_id: int, data: VracIn, db: Session = Depends(get_db),
                  user=Depends(_require_depot)):
-    """Ajoute une quantité sans étiquette, prise dans le stock du dépôt
-    (stock présent avant la mise en place des étiquettes, unités au détail)."""
+    """Ajoute une quantité sans étiquette, prise dans le stock d'origine du
+    bon (dépôt pour un transfert, bar pour un retour ou un transfert entre bars)."""
     l = _livraison_en_preparation(db, livraison_id)
     p = db.get(BarProduit, data.produit_id)
     if not p:
         raise HTTPException(404, "Produit introuvable.")
     qte = Decimal(str(data.quantite))
-    dispo = _stock_depot(db, p.id) - _quantite_reservee(db, p.id) - _colis_au_depot(db, p.id)
+    dispo = _vrac_disponible(db, p.id, _origine_stock(l))
     if qte > dispo:
-        raise HTTPException(409, f"Stock en vrac insuffisant au dépôt pour « {p.nom} » "
+        raise HTTPException(409, f"Stock en vrac insuffisant au {_nom_lieu(_origine_stock(l))} pour « {p.nom} » "
                                  f"(disponible : {float(max(dispo, 0)):g}).")
     db.add(BarLivraisonLigne(livraison_id=l.id, produit_id=p.id, quantite=qte))
     db.commit()
     db.refresh(l)
     return _livraison_dict(l)
+
+
+def _remettre_colis(db: Session, l: BarLivraisonInterne, colis_id: int) -> None:
+    """Colis retiré d'un bon ou bon annulé : il revient là où il était."""
+    if _type_bon(l) == "TRANSFERT":
+        _transition(db, colis_id, ("EN_PREPARATION",), {"statut": "AU_DEPOT", "livraison_id": None})
+    else:
+        _transition(db, colis_id, ("EN_PREPARATION",),
+                    {"statut": "LIVRE", "lieu": l.origine, "livraison_id": _dernier_bon_valide(db, colis_id)})
 
 
 @router.delete("/livraisons/{livraison_id}/lignes/{ligne_id}")
@@ -865,7 +1027,7 @@ def retirer_ligne(livraison_id: int, ligne_id: int, db: Session = Depends(get_db
     if not ligne or ligne.livraison_id != l.id:
         raise HTTPException(404, "Ligne introuvable.")
     if ligne.colis_id:
-        _transition(db, ligne.colis_id, ("EN_PREPARATION",), {"statut": "AU_DEPOT", "livraison_id": None})
+        _remettre_colis(db, l, ligne.colis_id)
         _journaliser(db, "RETIRE_LIVRAISON", ligne.colis, livraison_id=l.id, utilisateur_id=user.id)
     db.delete(ligne)
     db.commit()
@@ -875,23 +1037,24 @@ def retirer_ligne(livraison_id: int, ligne_id: int, db: Session = Depends(get_db
 
 @router.post("/livraisons/{livraison_id}/valider")
 def valider_livraison(livraison_id: int, db: Session = Depends(get_db), user=Depends(_require_depot)):
-    """Mise à jour des stocks : chaque ligne sort du dépôt et entre au bar.
-    Le passage PREPARATION → VALIDEE est conditionnel : une double
-    validation (deux clics, deux postes) ne crée jamais deux transferts."""
+    """Mise à jour des stocks : chaque ligne sort du lieu d'origine et entre
+    au lieu de destination (deux mouvements TRANSFERT de même quantité). Le
+    passage PREPARATION → VALIDEE est conditionnel : une double validation
+    ne crée jamais deux transferts."""
     l = _livraison_en_preparation(db, livraison_id)
     if not l.lignes:
-        raise HTTPException(422, "Le bon de transfert est vide : scannez au moins un colis.")
-    # Contrôle du vrac : le dépôt doit encore l'avoir (hors colis étiquetés)
+        raise HTTPException(422, "Le bon est vide : scannez au moins un colis.")
+    origine, destination, tb = _origine_stock(l), _destination_stock(l), _type_bon(l)
+    # Contrôle du vrac : le lieu d'origine doit encore l'avoir
     besoins: dict[int, Decimal] = {}
     for x in l.lignes:
         if x.colis_id is None:
             besoins[x.produit_id] = besoins.get(x.produit_id, Decimal(0)) + Decimal(str(x.quantite))
     for pid, qte in besoins.items():
-        dispo = (_stock_depot(db, pid) - _colis_au_depot(db, pid)
-                 - _quantite_reservee(db, pid, sauf_livraison=l.id))
+        dispo = _vrac_disponible(db, pid, origine, sauf_livraison=l.id)
         if qte > dispo:
             nom = db.get(BarProduit, pid).nom
-            raise HTTPException(409, f"Stock en vrac insuffisant au dépôt pour « {nom} » "
+            raise HTTPException(409, f"Stock en vrac insuffisant au {_nom_lieu(origine)} pour « {nom} » "
                                      f"(disponible : {float(max(dispo, 0)):g}, demandé : {float(qte):g}).")
     maintenant = datetime.now(timezone.utc)
     n = (db.query(BarLivraisonInterne)
@@ -900,21 +1063,25 @@ def valider_livraison(livraison_id: int, db: Session = Depends(get_db), user=Dep
                  synchronize_session=False))
     if n != 1:
         db.rollback()
-        raise HTTPException(409, f"Livraison {l.numero} déjà validée ou annulée.")
-    dest = LIEUX[l.lieu]
+        raise HTTPException(409, f"Bon {l.numero} déjà validé ou annulé.")
+    sens = f"{_nom_lieu(origine)} → {_nom_lieu(destination)}"
+    evt = {"TRANSFERT": "LIVRE", "RETOUR": "RETOUR_BAR", "INTERBAR": "TRANSFERT_INTERBAR"}[tb]
     for x in l.lignes:
         ref = f"colis {code_lisible(x.colis.code)}" if x.colis else "vrac"
-        motif = f"Transfert {l.numero} — {ref} → {dest}"
+        motif = f"{TYPES_BON[tb]} {l.numero} — {ref} — {sens}"
         db.add(BarMouvementStock(produit_id=x.produit_id, type_mouvement="TRANSFERT",
-                                 quantite=-Decimal(str(x.quantite)), lieu=None,
-                                 motif=motif, utilisateur_id=user.id))
+                                 quantite=-Decimal(str(x.quantite)), lieu=origine,
+                                 motif=motif[:300], utilisateur_id=user.id))
         db.add(BarMouvementStock(produit_id=x.produit_id, type_mouvement="TRANSFERT",
-                                 quantite=Decimal(str(x.quantite)), lieu=l.lieu,
-                                 motif=motif, utilisateur_id=user.id))
+                                 quantite=Decimal(str(x.quantite)), lieu=destination,
+                                 motif=motif[:300], utilisateur_id=user.id))
         if x.colis_id:
-            _transition(db, x.colis_id, ("EN_PREPARATION",), {"statut": "LIVRE", "lieu": l.lieu})
-            _journaliser(db, "LIVRE", x.colis, lieu=l.lieu, livraison_id=l.id, utilisateur_id=user.id,
-                         details=f"Transfert {l.numero} vers le {dest}")
+            if tb == "RETOUR":
+                _transition(db, x.colis_id, ("EN_PREPARATION",), {"statut": "AU_DEPOT", "lieu": None})
+            else:
+                _transition(db, x.colis_id, ("EN_PREPARATION",), {"statut": "LIVRE", "lieu": destination})
+            _journaliser(db, evt, x.colis, lieu=destination, livraison_id=l.id, utilisateur_id=user.id,
+                         details=f"{TYPES_BON[tb]} {l.numero} : {sens}")
     db.commit()
     db.refresh(l)
     return _livraison_dict(l)
@@ -928,14 +1095,287 @@ def annuler_livraison(livraison_id: int, db: Session = Depends(get_db), user=Dep
          .update({"statut": "ANNULEE"}, synchronize_session=False))
     if n != 1:
         db.rollback()
-        raise HTTPException(409, f"Livraison {l.numero} déjà validée ou annulée.")
+        raise HTTPException(409, f"Bon {l.numero} déjà validé ou annulé.")
     for x in l.lignes:
         if x.colis_id:
-            _transition(db, x.colis_id, ("EN_PREPARATION",), {"statut": "AU_DEPOT", "livraison_id": None})
-            _journaliser(db, "RETOUR_DEPOT", x.colis, livraison_id=l.id, utilisateur_id=user.id)
+            _remettre_colis(db, l, x.colis_id)
+            _journaliser(db, "RETOUR_DEPOT" if _type_bon(l) == "TRANSFERT" else "RETIRE_LIVRAISON",
+                         x.colis, livraison_id=l.id, utilisateur_id=user.id,
+                         details=None if _type_bon(l) == "TRANSFERT" else f"Bon {l.numero} annulé — colis resté au {_nom_lieu(l.origine)}")
     db.commit()
     db.refresh(l)
     return _livraison_dict(l)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Opérations sur un colis au dépôt : ouvrir, rendre au fournisseur,
+# remplacer l'étiquette ; étiqueter le stock déjà présent
+# ══════════════════════════════════════════════════════════════════════════
+
+class MotifIn(BaseModel):
+    motif: Optional[str] = Field(default=None, max_length=250)
+
+
+@router.post("/colis/{colis_id}/ouvrir")
+def ouvrir_colis(colis_id: int, data: MotifIn, db: Session = Depends(get_db), user=Depends(_require_depot)):
+    """Ouvre un colis fermé au dépôt : son contenu reste au dépôt mais devient
+    du vrac, transférable par quantité (ex. 6 bouteilles d'une caisse de 24).
+    Le code du colis n'est plus utilisable."""
+    c = db.get(BarColis, colis_id)
+    if not c:
+        raise HTTPException(404, "Colis introuvable.")
+    if not _transition(db, c.id, ("AU_DEPOT",), {"statut": "OUVERT"}):
+        db.refresh(c)
+        _refus(db, c, user.id, f"Seul un colis fermé au dépôt peut être ouvert (ce colis est {_etat_texte(c)}).")
+    _journaliser(db, "OUVERT", c, utilisateur_id=user.id,
+                 details=(data.motif or "").strip()[:250] or f"{float(c.quantite):g} unités passées en vrac au dépôt")
+    db.commit()
+    db.refresh(c)
+    return _colis_dict(c)
+
+
+class RetourFournisseurIn(BaseModel):
+    colis_ids: List[int] = Field(default_factory=list, max_length=MAX_COLIS_PAR_RECEPTION)
+    vrac:      List[VracIn] = Field(default_factory=list, max_length=200)
+    motif:     str = Field(min_length=5, max_length=250)
+
+
+@router.post("/retour-fournisseur", status_code=201)
+def retour_fournisseur(data: RetourFournisseurIn, db: Session = Depends(get_db), user=Depends(_require_depot)):
+    """Rend de la marchandise au fournisseur (casse à la livraison, produit
+    périmé, erreur de commande). Colis fermés au dépôt et/ou vrac du dépôt.
+    Tout ou rien. Les colis rendus sont déduits du coût moyen de leur achat."""
+    if not data.colis_ids and not data.vrac:
+        raise HTTPException(422, "Choisissez au moins un colis ou une quantité en vrac.")
+    motif = " ".join(data.motif.split())
+    refuses, total = [], Decimal("0")
+    for cid in dict.fromkeys(data.colis_ids):
+        c = db.get(BarColis, cid)
+        if not c:
+            refuses.append(f"#{cid} inconnu")
+            continue
+        if not _transition(db, c.id, ("AU_DEPOT",), {"statut": "RETOURNE"}):
+            db.refresh(c)
+            refuses.append(f"{code_lisible(c.code)} {_etat_texte(c)}")
+            continue
+        q = Decimal(str(c.quantite))
+        db.add(BarMouvementStock(produit_id=c.produit_id, type_mouvement="RETOUR_FOURNISSEUR", quantite=-q,
+                                 lieu=None, achat_id=c.achat_id, utilisateur_id=user.id,
+                                 motif=f"Retour fournisseur — colis {code_lisible(c.code)} — {motif}"[:300]))
+        _journaliser(db, "RETOUR_FOURNISSEUR", c, utilisateur_id=user.id, details=motif)
+        total += q
+    for v in data.vrac:
+        p = db.get(BarProduit, v.produit_id)
+        if not p:
+            refuses.append(f"produit #{v.produit_id} inconnu")
+            continue
+        q = Decimal(str(v.quantite))
+        dispo = _vrac_disponible(db, p.id, None)
+        if q > dispo:
+            refuses.append(f"{p.nom} : vrac disponible {float(max(dispo, 0)):g}")
+            continue
+        db.add(BarMouvementStock(produit_id=p.id, type_mouvement="RETOUR_FOURNISSEUR", quantite=-q, lieu=None,
+                                 utilisateur_id=user.id, motif=f"Retour fournisseur — vrac — {motif}"[:300]))
+        total += q
+    if refuses:
+        db.rollback()
+        raise HTTPException(409, "Retour refusé, rien n'a été rendu : " + " ; ".join(refuses[:10]))
+    db.commit()
+    return {"unites_rendues": float(total), "colis": len(set(data.colis_ids)), "motif": motif}
+
+
+def _nouveau_code(db: Session, revoque_id: int) -> str:
+    """Nouveau code signé pour un colis dont l'étiquette est remplacée :
+    numéro pris en partant de 999999 vers le bas (jamais celui d'un colis)."""
+    num = 999999 - revoque_id
+    while True:
+        base = f"BC{now_haiti():%y}{num:06d}"
+        code = base + _cle_controle(db, base)
+        if not db.query(BarColis.id).filter(BarColis.code == code).first():
+            return code
+        num -= 1
+
+
+@router.post("/colis/{colis_id}/remplacer-etiquette")
+def remplacer_etiquette(colis_id: int, data: MotifIn, db: Session = Depends(get_db), user=Depends(_require_depot)):
+    """Étiquette perdue ou abîmée : le colis reçoit un nouveau code et
+    l'ancien est révoqué (refusé au scan avec un message clair)."""
+    from models import BarCodeRevoque
+    c = db.get(BarColis, colis_id)
+    if not c:
+        raise HTTPException(404, "Colis introuvable.")
+    if c.statut not in ("A_VERIFIER", "AU_DEPOT"):
+        raise HTTPException(409, f"Seul un colis au dépôt peut recevoir une nouvelle étiquette (ce colis est {_etat_texte(c)}).")
+    ancien = c.code
+    r = BarCodeRevoque(code=ancien, colis_id=c.id, revoque_par_id=user.id,
+                       motif=(data.motif or "").strip()[:200] or "Étiquette remplacée")
+    db.add(r)
+    db.flush()
+    c.code = _nouveau_code(db, r.id)
+    _journaliser(db, "ETIQUETTE_REMPLACEE", c, utilisateur_id=user.id,
+                 details=f"{code_lisible(ancien)} → {code_lisible(c.code)} · {r.motif}"[:300])
+    db.commit()
+    db.refresh(c)
+    return {**_colis_dict(c), "ancien_code": code_lisible(ancien)}
+
+
+class EtiquetageIn(BaseModel):
+    produit_id:       int
+    nb_colis:         int = Field(gt=0, le=MAX_COLIS_PAR_RECEPTION)
+    unites_par_colis: float = Field(gt=0, le=10000)
+
+
+@router.post("/etiqueter-stock", status_code=201)
+def etiqueter_stock(data: EtiquetageIn, db: Session = Depends(get_db), user=Depends(_require_depot)):
+    """Étiquette des caisses déjà présentes au dépôt sans code (stock
+    d'avant les étiquettes, inventaire d'ouverture) : crée des colis « au
+    dépôt » sans mouvement de stock, dans la limite du vrac disponible."""
+    p = db.get(BarProduit, data.produit_id)
+    if not p:
+        raise HTTPException(404, "Produit introuvable.")
+    taille = Decimal(str(data.unites_par_colis))
+    total = taille * data.nb_colis
+    dispo = _vrac_disponible(db, p.id, None)
+    if total > dispo:
+        raise HTTPException(409, f"Le dépôt n'a que {float(max(dispo, 0)):g} {p.unite or 'unités'} de « {p.nom} » "
+                                 f"sans étiquette ; impossible d'en étiqueter {float(total):g}. Faites d'abord l'inventaire du dépôt.")
+    maintenant = datetime.now(timezone.utc)
+    colis = []
+    for _ in range(data.nb_colis):
+        c = BarColis(code="TMP-" + uuid.uuid4().hex[:20], produit_id=p.id, quantite=taille, statut="AU_DEPOT",
+                     verifie_le=maintenant, verifie_par_id=user.id)
+        db.add(c)
+        db.flush()
+        c.code = generer_code(db, c.id)
+        _journaliser(db, "ETIQUETE_STOCK", c, utilisateur_id=user.id,
+                     details=f"{float(taille):g} {p.unite or 'u.'} du stock existant du dépôt")
+        colis.append(c)
+    db.commit()
+    return {"nb_colis": len(colis), "colis": [_colis_dict(c) for c in colis]}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# À transférer aujourd'hui : seuils par bar
+# ══════════════════════════════════════════════════════════════════════════
+
+@router.get("/a-transferer")
+def a_transferer(db: Session = Depends(get_db)):
+    """Pour chaque bar, les produits sous leur seuil (seuil du bar, sinon
+    seuil général) et ce qu'il faut sortir du dépôt pour remonter à deux
+    fois le seuil : d'abord des caisses fermées (à scanner), puis du vrac
+    s'il n'y a plus de caisse. « À racheter » si le dépôt n'a plus rien."""
+    import math
+    st = stock_par_lieu_tous_produits(db)
+    caisses: dict[int, int] = {}
+    fermes: dict[int, Decimal] = {}
+    for c in db.query(BarColis).filter((BarColis.statut == "AU_DEPOT") |
+                                       ((BarColis.statut == "EN_PREPARATION") & BarColis.lieu.is_(None))).all():
+        fermes[c.produit_id] = fermes.get(c.produit_id, Decimal(0)) + Decimal(str(c.quantite))
+        if c.statut == "AU_DEPOT":
+            caisses[c.produit_id] = caisses.get(c.produit_id, 0) + 1
+    en_cours: dict[tuple, Decimal] = {}
+    vrac_reserve: dict[int, Decimal] = {}
+    for x in (db.query(BarLivraisonLigne).join(BarLivraisonInterne, BarLivraisonLigne.livraison_id == BarLivraisonInterne.id)
+              .filter(BarLivraisonInterne.statut == "PREPARATION",
+                      (BarLivraisonInterne.type_bon == "TRANSFERT") | BarLivraisonInterne.type_bon.is_(None)).all()):
+        k = (x.livraison.lieu, x.produit_id)
+        en_cours[k] = en_cours.get(k, Decimal(0)) + Decimal(str(x.quantite))
+        if x.colis_id is None:
+            vrac_reserve[x.produit_id] = vrac_reserve.get(x.produit_id, Decimal(0)) + Decimal(str(x.quantite))
+    out = {k: [] for k in LIEUX}
+    for p in db.query(BarProduit).filter(BarProduit.actif.is_(True)).order_by(BarProduit.nom).all():
+        s = st.get(p.id, {"devant": Decimal(0), "piscine": Decimal(0), "total": Decimal(0)})
+        depot = s["total"] - s["devant"] - s["piscine"]
+        vrac = max(depot - fermes.get(p.id, Decimal(0)) - vrac_reserve.get(p.id, Decimal(0)), Decimal(0))
+        upc = p.unites_par_caisse if p.vendu_par_caisse and p.unites_par_caisse else None
+        for lieu in LIEUX:
+            seuil = p.seuil_devant if lieu == "DEVANT" else p.seuil_piscine
+            seuil = Decimal(str(seuil if seuil is not None else (p.seuil_alerte_stock or 0)))
+            if seuil <= 0:
+                continue
+            prepare = en_cours.get((lieu, p.id), Decimal(0))
+            stock_bar = s[lieu.lower()] + prepare
+            if stock_bar >= seuil:
+                continue
+            besoin = seuil * 2 - stock_bar
+            nb_caisses = min(math.ceil(float(besoin) / upc), caisses.get(p.id, 0)) if upc else 0
+            reste = max(besoin - Decimal(nb_caisses * (upc or 0)), Decimal(0))
+            nb_vrac = min(reste, vrac) if reste > 0 else Decimal(0)
+            out[lieu].append({
+                "produit_id": p.id, "nom": p.nom, "unite": p.unite,
+                "stock_bar": float(s[lieu.lower()]), "en_preparation": float(prepare),
+                "seuil": float(seuil), "besoin": float(besoin),
+                "propose_caisses": nb_caisses, "propose_vrac": float(nb_vrac),
+                "propose_unites": float(Decimal(nb_caisses * (upc or 0)) + nb_vrac),
+                "unites_par_caisse": upc, "stock_depot": float(depot), "colis_au_depot": caisses.get(p.id, 0),
+                "vrac_depot": float(vrac),
+                "a_racheter": nb_caisses == 0 and nb_vrac <= 0,
+            })
+    return {lieu: sorted(v, key=lambda x: (x["a_racheter"], x["stock_bar"] - x["seuil"])) for lieu, v in out.items()}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Inventaire d'ouverture et contrôle du stock par bar
+# ══════════════════════════════════════════════════════════════════════════
+
+_CLE_CONTROLE_BAR = "bar_stock_par_lieu"
+
+
+def controle_par_bar_actif(db: Session) -> bool:
+    """Contrôle du stock par bar à la vente : variable BAR_STOCK_PAR_LIEU,
+    ou réglage enregistré depuis la page Dépôt Bar."""
+    import os
+    if os.getenv("BAR_STOCK_PAR_LIEU", "false").lower() == "true":
+        return True
+    row = db.query(SecretApplication).filter_by(cle=_CLE_CONTROLE_BAR).first()
+    return bool(row and row.valeur == "true")
+
+
+def _dernier_inventaire(db: Session, lieu: Optional[str]):
+    q = db.query(func.max(BarMouvementStock.date_mouvement)).filter(
+        BarMouvementStock.type_mouvement == "AJUSTEMENT", BarMouvementStock.motif.like("Inventaire%"))
+    q = q.filter(BarMouvementStock.lieu.is_(None)) if lieu is None else q.filter(BarMouvementStock.lieu == lieu)
+    return q.scalar()
+
+
+@router.get("/ouverture")
+def etat_ouverture(db: Session = Depends(get_db)):
+    """Où en est l'inventaire d'ouverture : produits en stock négatif et
+    dernier inventaire pour le dépôt et chaque bar, contrôle par bar actif ou non."""
+    st = stock_par_lieu_tous_produits(db)
+    lieux = []
+    for code, nom in (("DEPOT", "Dépôt"), ("DEVANT", "Bar devant"), ("PISCINE", "Bar piscine")):
+        negatifs = 0
+        for s in st.values():
+            v = (s["total"] - s["devant"] - s["piscine"]) if code == "DEPOT" else s[code.lower()]
+            negatifs += 1 if v < 0 else 0
+        der = _dernier_inventaire(db, None if code == "DEPOT" else code)
+        lieux.append({"lieu": code, "nom": nom, "negatifs": negatifs, "dernier_inventaire": _iso(der)})
+    pret = all(x["negatifs"] == 0 and x["dernier_inventaire"] for x in lieux if x["lieu"] != "DEPOT")
+    return {"lieux": lieux, "controle_par_bar": controle_par_bar_actif(db), "pret": pret}
+
+
+class ControleIn(BaseModel):
+    actif: bool
+
+
+@router.post("/ouverture/controle")
+def regler_controle(data: ControleIn, db: Session = Depends(get_db), user=Depends(_require_depot)):
+    """Active (ou coupe) le contrôle du stock par bar à la vente. Activation
+    refusée tant qu'un bar n'a pas eu son inventaire ou garde un stock négatif."""
+    if data.actif:
+        etat = etat_ouverture(db)
+        manque = [x["nom"] for x in etat["lieux"] if x["lieu"] != "DEPOT" and (x["negatifs"] or not x["dernier_inventaire"])]
+        if manque:
+            raise HTTPException(409, "Faites d'abord l'inventaire de : " + ", ".join(manque) +
+                                     " (aucun produit ne doit rester en stock négatif).")
+    row = db.query(SecretApplication).filter_by(cle=_CLE_CONTROLE_BAR).first()
+    if not row:
+        row = SecretApplication(cle=_CLE_CONTROLE_BAR, valeur="false")
+        db.add(row)
+    row.valeur = "true" if data.actif else "false"
+    db.commit()
+    return {"controle_par_bar": controle_par_bar_actif(db)}
 
 
 # ══════════════════════════════════════════════════════════════════════════

@@ -25,6 +25,7 @@ from models import (
     BarMouvementStock, BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande, BarPaiementEmploye, BarSessionCaisse,
     Employe, Utilisateur, CuisinePlat, RenflouementDepartement, Client,
+    BarColis,
 )
 from pos_service import (
     stock_courant, stock_tous_produits, stock_par_lieu_tous_produits,
@@ -159,6 +160,9 @@ class ProduitIn(BaseModel):
     code_barre:          Optional[str] = None
     actif:               bool = True
     seuil_alerte_stock:  float = 0.0
+    # Seuils par bar (vide = seuil général) : « À transférer aujourd'hui »
+    seuil_devant:        Optional[float] = Field(default=None, ge=0)
+    seuil_piscine:       Optional[float] = Field(default=None, ge=0)
     prix_initial:        Optional[float] = None
     vendu_par_caisse:    bool = False
     unites_par_caisse:   Optional[int] = None
@@ -220,8 +224,40 @@ class AchatIn(BaseModel):
     quantite_type:       str   = "unite"         # "unite" ou "caisse" (bar seulement)
     prix_achat_unitaire: float = Field(gt=0)
     fournisseur:         Optional[str] = None
+    fournisseur_id:      Optional[int] = None
+    numero_facture:      Optional[str] = Field(default=None, max_length=60)
+    mode_reglement:      str = "COMPTANT"        # COMPTANT ou CREDIT (dette fournisseur)
+    date_echeance:       Optional[date_type] = None
     notes:               Optional[str] = None
     depenses:            List[DepenseItem] = []
+
+
+def _resoudre_fournisseur(db: Session, fournisseur_id: Optional[int], nom: Optional[str]):
+    """Fiche fournisseur choisie, ou créée à partir du nom tapé."""
+    from bar_achats_routes import fournisseur_par_nom
+    from models import Fournisseur
+    if fournisseur_id:
+        f = db.get(Fournisseur, fournisseur_id)
+        if not f:
+            raise HTTPException(404, "Fournisseur introuvable.")
+        return f
+    return fournisseur_par_nom(db, nom)
+
+
+def _controler_facture(db: Session, fournisseur_id: Optional[int], numero: Optional[str], sauf_achat: Optional[int] = None):
+    """Une même facture d'un même fournisseur ne s'enregistre qu'une fois."""
+    numero = (numero or "").strip()
+    if not numero or not fournisseur_id:
+        return None
+    q = db.query(BarAchat).filter(BarAchat.fournisseur_id == fournisseur_id,
+                                  func.lower(BarAchat.numero_facture) == numero.lower(),
+                                  BarAchat.statut != "ANNULE")
+    if sauf_achat:
+        q = q.filter(BarAchat.id != sauf_achat)
+    deja = q.first()
+    if deja:
+        raise HTTPException(409, f"La facture {numero} de ce fournisseur est déjà enregistrée (achat #{deja.id}).")
+    return numero[:60]
 
 
 class AjustementIn(BaseModel):
@@ -435,6 +471,8 @@ def _produit_dict(p: BarProduit, stk: Decimal, db: Session) -> dict:
         "code_barre":          p.code_barre,
         "actif":               p.actif,
         "seuil_alerte_stock":  float(p.seuil_alerte_stock),
+        "seuil_devant":        float(p.seuil_devant) if p.seuil_devant is not None else None,
+        "seuil_piscine":       float(p.seuil_piscine) if p.seuil_piscine is not None else None,
         "stock_courant":       float(stk),
         "stock_unites":        stk_int,
         "vendu_par_caisse":    p.vendu_par_caisse,
@@ -505,6 +543,8 @@ def creer_produit(data: ProduitIn, request: Request, db: Session = Depends(get_d
         code_barre         = data.code_barre,
         actif              = data.actif,
         seuil_alerte_stock = data.seuil_alerte_stock,
+        seuil_devant       = data.seuil_devant,
+        seuil_piscine      = data.seuil_piscine,
         vendu_par_caisse   = data.vendu_par_caisse,
         unites_par_caisse  = data.unites_par_caisse if data.vendu_par_caisse else None,
         lieu               = data.lieu,
@@ -537,6 +577,12 @@ def modifier_produit(produit_id: int, data: ProduitIn, db: Session = Depends(get
     p.code_barre         = data.code_barre
     p.actif              = data.actif
     p.seuil_alerte_stock = data.seuil_alerte_stock
+    # Seuils par bar : modifiés seulement s'ils sont envoyés
+    fournis = getattr(data, "model_fields_set", None) or data.__fields_set__
+    if "seuil_devant" in fournis:
+        p.seuil_devant = data.seuil_devant
+    if "seuil_piscine" in fournis:
+        p.seuil_piscine = data.seuil_piscine
     p.vendu_par_caisse   = data.vendu_par_caisse
     p.unites_par_caisse  = data.unites_par_caisse if data.vendu_par_caisse else None
     p.lieu               = data.lieu
@@ -1340,8 +1386,11 @@ def tous_les_produits_achetables(db: Session = Depends(get_db)):
         f = (a.fournisseur or "").strip()
         if f and f.casefold() not in fournisseurs:
             fournisseurs[f.casefold()] = f
+    from models import Fournisseur
+    fiches = db.query(Fournisseur).filter(Fournisseur.actif.is_(True)).order_by(Fournisseur.nom).all()
     return {
-        "fournisseurs": sorted(fournisseurs.values(), key=str.casefold)[:200],
+        "fournisseurs": [f.nom for f in fiches][:300] or sorted(fournisseurs.values(), key=str.casefold)[:200],
+        "fournisseurs_fiches": [{"id": f.id, "nom": f.nom, "conditions": f.conditions} for f in fiches][:300],
         "bar": [
             {
                 "id":               p.id,
@@ -1372,8 +1421,15 @@ def tous_les_produits_achetables(db: Session = Depends(get_db)):
     }
 
 
-def _achat_dict(a: BarAchat) -> dict:
-    """Sérialise un BarAchat en résolvant le produit (bar ou station)."""
+def _db_session_de(obj):
+    from sqlalchemy.orm import object_session
+    return object_session(obj)
+
+
+def _achat_dict(a: BarAchat, colis_entres: Optional[int] = None) -> dict:
+    """Sérialise un BarAchat en résolvant le produit (bar ou station).
+    colis_entres : nombre de colis déjà entrés en stock (décide si l'achat
+    peut encore être annulé ; calculé ici s'il n'est pas fourni)."""
     if a.produit_id and a.bar_produit:
         p = a.bar_produit
         nom      = p.nom
@@ -1393,8 +1449,14 @@ def _achat_dict(a: BarAchat) -> dict:
     else:
         nom = "Produit inconnu"; cat = None; unite = None; par_caise = False; upc = None; ptype = "?"
 
+    from bar_achats_routes import reglement_achat
     total_dep  = sum(float(d.montant) for d in a.depenses)
-    prix_total = float(a.quantite) * float(a.prix_achat_unitaire)
+    qte_facturee = float(a.quantite_recue if a.quantite_recue is not None else a.quantite)
+    prix_total = qte_facturee * float(a.prix_achat_unitaire)
+    if colis_entres is None:
+        colis_entres = (_db_session_de(a).query(BarColis)
+                        .filter(BarColis.achat_id == a.id, BarColis.statut.notin_(("A_VERIFIER", "ANNULE"))).count()
+                        if a.produit_id else 0)
     return {
         "id":                  a.id,
         "produit_id":          a.produit_id,
@@ -1406,15 +1468,37 @@ def _achat_dict(a: BarAchat) -> dict:
         "produit_par_caisse":  par_caise,
         "produit_upc":         upc,
         "quantite":            float(a.quantite),
+        "quantite_recue":      float(a.quantite_recue) if a.quantite_recue is not None else None,
+        "motif_ecart_reception": a.motif_ecart_reception,
         "prix_achat_unitaire": float(a.prix_achat_unitaire),
         "prix_marchandise":    prix_total,
         "total_depenses":      total_dep,
         "cout_total":          prix_total + total_dep,
+        # Coût de revient : ce que coûte réellement une unité en stock
+        "cout_revient_unitaire": round((prix_total + total_dep) / qte_facturee, 4) if qte_facturee else None,
         "fournisseur":         a.fournisseur,
+        "fournisseur_id":      a.fournisseur_id,
+        "numero_facture":      a.numero_facture,
+        "mode_reglement":      a.mode_reglement or "COMPTANT",
+        "date_echeance":       a.date_echeance.isoformat() if a.date_echeance else None,
+        "reglement":           reglement_achat(a),
+        "paiements": [
+            {"id": p.id, "montant": float(p.montant), "mode": p.mode, "reference": p.reference,
+             "date": p.date_paiement.isoformat() if p.date_paiement else None,
+             "par": p.utilisateur.nom_complet if p.utilisateur else None}
+            for p in a.paiements
+        ],
         "notes":               a.notes,
         "statut":              a.statut,
+        "annule_le":           a.annule_le.isoformat() if a.annule_le else None,
+        "motif_annulation":    a.motif_annulation,
+        "colis_entres":        colis_entres,
+        # Annulable : pas encore annulé, aucun colis entré en stock, aucun paiement
+        "annulable":           a.statut != "ANNULE" and not colis_entres and not a.paiements,
+        # Quantité modifiable : seulement avant la réception (pas de colis)
+        "quantite_modifiable": a.statut == "EN_ATTENTE" or not a.produit_id,
         "date_achat":          a.date_achat.isoformat(),
-        "jours":               (today_haiti() - a.date_achat.date()).days,
+        "jours":               (today_haiti() - (a.date_achat if a.date_achat.tzinfo else a.date_achat.replace(tzinfo=timezone.utc)).astimezone(HAITI_TZ).date()).days,
         "depenses": [
             {"id": d.id, "description": d.description, "montant": float(d.montant)}
             for d in a.depenses
@@ -1438,9 +1522,12 @@ def liste_achats(
     achats = q.order_by(BarAchat.date_achat.desc()).limit(limit).all()
     from pieces_jointes_routes import compter_pieces_jointes_par_entite
     nb_pj = compter_pieces_jointes_par_entite(db, "bar_achat", [a.id for a in achats])
+    entres = dict(db.query(BarColis.achat_id, func.count(BarColis.id))
+                  .filter(BarColis.achat_id.isnot(None), BarColis.statut.notin_(("A_VERIFIER", "ANNULE")))
+                  .group_by(BarColis.achat_id).all())
     resultats = []
     for a in achats:
-        item = _achat_dict(a)
+        item = _achat_dict(a, entres.get(a.id, 0))
         item["sans_justificatif"] = nb_pj.get(a.id, 0) == 0
         resultats.append(item)
     return resultats
@@ -1454,7 +1541,27 @@ def detail_achat(achat_id: int, db: Session = Depends(get_db)):
     result = _achat_dict(a)
     if a.produit_id:
         result["stock_apres"] = float(stock_courant(a.produit_id, db))
+    result["corrections"] = _corrections_achat(db, a.id)
     return result
+
+
+def _corrections_achat(db: Session, achat_id: int) -> list:
+    """Historique des corrections d'un achat (journal d'activité)."""
+    import json
+    from models import AuditLog
+    rows = (db.query(AuditLog).filter(AuditLog.action == "bar_achat_corrige",
+                                      AuditLog.details.like(f'{{"achat_id": {achat_id},%'))
+            .order_by(AuditLog.id.desc()).limit(50).all())
+    out = []
+    for r in rows:
+        try:
+            d = json.loads(r.details or "{}")
+        except ValueError:
+            continue
+        out.append({"date": r.created_at.isoformat() if r.created_at else None,
+                    "par": r.user.nom_complet if getattr(r, "user", None) else None,
+                    "avant": d.get("avant"), "apres": d.get("apres")})
+    return out
 
 
 @router.post("/achats", status_code=201)
@@ -1489,12 +1596,26 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
         nom_prod = s.nom
         statut   = "CONFIRME"  # carburants : pas de stock bar
 
+    mode_reglement = (data.mode_reglement or "COMPTANT").upper()
+    if mode_reglement not in ("COMPTANT", "CREDIT"):
+        raise HTTPException(422, "Règlement invalide : COMPTANT ou CREDIT.")
+    fourn = _resoudre_fournisseur(db, data.fournisseur_id, data.fournisseur)
+    if mode_reglement == "CREDIT" and not fourn:
+        raise HTTPException(422, "Un achat à crédit doit avoir un fournisseur.")
+    if data.date_echeance and data.date_echeance < today_haiti():
+        raise HTTPException(422, "La date d'échéance est déjà passée.")
+    facture = _controler_facture(db, fourn.id if fourn else None, data.numero_facture)
+
     achat = BarAchat(
         produit_id          = data.produit_id,
         station_produit_id  = data.station_produit_id,
         quantite            = qte_unites,
         prix_achat_unitaire = prix_unitaire,
-        fournisseur         = data.fournisseur,
+        fournisseur         = fourn.nom if fourn else None,
+        fournisseur_id      = fourn.id if fourn else None,
+        numero_facture      = facture or ((data.numero_facture or "").strip()[:60] or None),
+        mode_reglement      = mode_reglement,
+        date_echeance       = data.date_echeance if mode_reglement == "CREDIT" else None,
         utilisateur_id      = _uid(request),
         notes               = data.notes,
         statut              = statut,
@@ -1532,6 +1653,8 @@ class AchatEditIn(BaseModel):
     quantite_type:       str   = "unite"   # "unite" ou "caisse" (bar seulement)
     prix_achat_unitaire: float = Field(gt=0)
     fournisseur:         Optional[str] = None
+    fournisseur_id:      Optional[int] = None
+    numero_facture:      Optional[str] = Field(default=None, max_length=60)
     notes:               Optional[str] = None
 
 
@@ -1547,6 +1670,8 @@ def modifier_achat(
     a = db.query(BarAchat).filter_by(id=achat_id).first()
     if not a:
         raise HTTPException(404, "Achat introuvable")
+    if a.statut == "ANNULE":
+        raise HTTPException(409, "Cet achat est annulé : il ne peut plus être modifié.")
 
     qte_unites    = Decimal(str(data.quantite))
     prix_unitaire = Decimal(str(data.prix_achat_unitaire))
@@ -1558,12 +1683,31 @@ def modifier_achat(
             qte_unites    = Decimal(str(data.quantite)) * Decimal(str(upc))
             prix_unitaire = prix_unitaire / Decimal(str(upc))
 
+    # Après la réception, les colis existent : la quantité ne peut plus
+    # changer (l'achat et ses colis doivent rester d'accord).
+    if a.produit_id and a.statut == "CONFIRME" and qte_unites != Decimal(str(a.quantite)):
+        raise HTTPException(409, "Achat déjà réceptionné : la quantité ne peut plus être modifiée. "
+                                 "Annulez l'achat (s'il n'est pas encore entré en stock) et ressaisissez-le, "
+                                 "ou faites un retour fournisseur au Dépôt Bar.")
+
+    fourn = _resoudre_fournisseur(db, data.fournisseur_id, data.fournisseur)
+    facture = _controler_facture(db, fourn.id if fourn else None, data.numero_facture, sauf_achat=a.id)
+    avant = {"quantite": float(a.quantite), "prix_achat_unitaire": float(a.prix_achat_unitaire),
+             "fournisseur": a.fournisseur, "numero_facture": a.numero_facture}
     a.quantite            = qte_unites
     a.prix_achat_unitaire = prix_unitaire
-    a.fournisseur         = data.fournisseur
+    a.fournisseur         = fourn.nom if fourn else None
+    a.fournisseur_id      = fourn.id if fourn else None
+    a.numero_facture      = facture or ((data.numero_facture or "").strip()[:60] or None)
     a.notes               = data.notes
     db.commit()
     db.refresh(a)
+    apres = {"quantite": float(a.quantite), "prix_achat_unitaire": float(a.prix_achat_unitaire),
+             "fournisseur": a.fournisseur, "numero_facture": a.numero_facture}
+    if avant != apres:
+        from activity_log import log_event
+        log_event(db, "bar_achat_corrige", user_id=_user.id,
+                  details={"achat_id": a.id, "avant": avant, "apres": apres})
     return _achat_dict(a)
 
 
@@ -1577,6 +1721,8 @@ def confirmer_achat(achat_id: int, request: Request, db: Session = Depends(get_d
         raise HTTPException(404, "Achat introuvable")
     if a.statut == "CONFIRME":
         raise HTTPException(409, "Cet achat est déjà confirmé.")
+    if a.statut == "ANNULE":
+        raise HTTPException(409, "Cet achat est annulé.")
     if not a.produit_id:
         raise HTTPException(422, "Seuls les achats de produits bar peuvent être confirmés.")
 
@@ -2392,9 +2538,11 @@ def statistiques_bar(
     request: Request,
     date_debut: date_type = Query(default=None),
     date_fin:   date_type = Query(default=None),
+    lieu:       Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
 ):
     """CA, bénéfice, COGS, top produits sur la période (données réelles uniquement).
+    lieu = DEVANT ou PISCINE pour un seul bar ; « par_lieu » compare les bars.
     Réservé à la direction : refusé aux employés de caisse (marges et coûts)."""
     if est_employe_caisse(request, db):
         raise HTTPException(403, "La rentabilité est réservée à la direction.")
@@ -2405,7 +2553,10 @@ def statistiques_bar(
     if not date_fin:
         date_fin = today
 
-    data = stats_bar(date_debut, date_fin, db)
+    lieu = (lieu or "").upper() or None
+    if lieu and lieu not in ("DEVANT", "PISCINE"):
+        raise HTTPException(422, "Bar invalide : DEVANT ou PISCINE.")
+    data = stats_bar(date_debut, date_fin, db, lieu)
     data["precedent"] = _periode_precedente(date_debut, date_fin, db)
     return data
 

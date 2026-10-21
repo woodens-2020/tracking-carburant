@@ -3294,6 +3294,28 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 .dep-bar-etat{font-size:13px;color:rgba(255,255,255,.55)}
 .dep-bar-carte .pos-btn{align-self:flex-start}
 @media(max-width:600px){.dep-champ{flex-wrap:wrap;padding:8px}.dep-champ input{flex-basis:calc(100% - 24px)}.dep-lecteur-txt{margin-left:0}}
+.ui-dem{max-width:520px;width:calc(100vw - 32px)}
+.ui-dem-msg{font-size:14px;color:rgba(255,255,255,.7);margin:0 0 12px;line-height:1.5;white-space:pre-line}
+.ui-dem-champs{display:flex;flex-direction:column;gap:12px}
+.ui-dem-champs label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:rgba(255,255,255,.6)}
+.ui-dem-err{color:#f87171;font-size:13.5px;min-height:18px;margin-top:8px}
+.dep-file-hl{background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.5);color:#fcd34d;border-radius:999px;padding:4px 12px;font-weight:700;font-size:12.5px;cursor:pointer}
+.dep-bar-act{display:flex;gap:6px;flex-wrap:wrap}
+.dep-speciaux{display:flex;flex-direction:column;gap:6px;padding:0 14px 14px}
+.dep-special{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.35);border-radius:10px;padding:9px 12px;font-size:13.5px}
+.dep-special .pos-btn{margin-left:auto}
+.dep-atr{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;padding:12px 14px}
+.dep-atr-bar{border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow:hidden}
+.dep-atr-bar h4{margin:0;padding:9px 12px;font-size:14px;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03)}
+.dep-atr-bar h4 .pos-btn{margin-left:auto}
+.dep-atr-l{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:7px 12px;border-top:1px solid rgba(255,255,255,.05);font-size:13.5px}
+.dep-atr-l .q{font-weight:800;color:#5eead4;text-align:right;white-space:nowrap}
+.dep-atr-l .s{grid-column:1/-1;font-size:12px;color:rgba(255,255,255,.45)}
+.dep-ouv{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;padding:12px 14px}
+.dep-ouv-l{border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:3px;font-size:13px}
+.dep-ouv-l b{font-size:15px}
+.dep-ouv-l.ok{border-color:rgba(34,197,94,.4)} .dep-ouv-l.ko{border-color:rgba(251,191,36,.45)}
+.dep-ouv-ctl{grid-column:1/-1;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.06);padding-top:10px;font-size:13.5px}
 .dep-guide-modal{max-width:980px;width:calc(100vw - 32px);max-height:calc(100vh - 40px);overflow-y:auto}
 .dep-vide-l td{text-align:center;padding:16px!important;color:rgba(255,255,255,.35)}
 /* ── Formulaire d'achat ─────────────────────────────────────────── */
@@ -7320,6 +7342,11 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           <div><label class="pos-label">Seuil alerte stock</label><input class="pos-input" id="pos-prod-seuil" type="number" min="0" placeholder="0"></div>
         </div>
         <div class="pos-form-row">
+          <div><label class="pos-label" for="pos-prod-seuil-devant">Seuil au Bar devant</label><input class="pos-input" id="pos-prod-seuil-devant" type="number" min="0" placeholder="= seuil général"></div>
+          <div><label class="pos-label" for="pos-prod-seuil-piscine">Seuil au Bar piscine</label><input class="pos-input" id="pos-prod-seuil-piscine" type="number" min="0" placeholder="= seuil général"></div>
+        </div>
+        <div class="pa-aide" style="margin:-6px 0 10px">Sous ce seuil, le produit apparaît dans « À transférer aujourd'hui » au Dépôt Bar.</div>
+        <div class="pos-form-row">
           <div style="width:100%">
             <label class="pos-label" id="pos-prod-lieu-label">Bar *</label>
             <select class="pos-select" id="pos-prod-lieu" style="width:100%">
@@ -7505,6 +7532,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
               <button type="button" id="dep-mode-livr" onclick="depSetMode('livr')">→ Transférer vers un bar</button>
               <button type="button" id="dep-mode-fiche" onclick="depSetMode('fiche')">🔍 Consulter la fiche</button>
             </div>
+            <button type="button" class="dep-file-hl" id="dep-file-hl" hidden onclick="depEnvoyerFile()" title="Scans faits sans internet, envoyés au retour du réseau"></button>
             <span class="dep-lecteur-txt" id="dep-lecteur-txt">Scanner externe en attente</span>
           </div>
           <div class="dep-champ">
@@ -7569,13 +7597,19 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
                 title="Seulement si des colis sont sortis du dépôt sans pouvoir être scannés (internet, scanner en panne, étiquette illisible). Motif et heure réelle obligatoires ; le code-barres devient ensuite invalide.">✍ Transfert sans scan</button>
             </div>
             <div class="dep-bars" id="dep-bars"></div>
+            <div id="dep-bons-speciaux"></div>
             <div id="dep-livr-courante"></div>
+          </div>
+          <div class="pos-card">
+            <div class="pos-card-hdr">À transférer aujourd'hui
+              <span class="dep-sous" style="margin-left:8px;font-weight:400">produits sous leur seuil dans chaque bar · proposé : remonter à deux fois le seuil</span></div>
+            <div class="dep-atr" id="dep-a-transferer"></div>
           </div>
           <div class="pos-card">
             <div class="pos-card-hdr">Historique des transferts</div>
             <div class="pos-table-wrap">
               <table class="pos-table">
-                <thead><tr><th>N°</th><th>Destination</th><th>Statut</th><th class="tr">Lignes</th><th class="tr">Unités</th><th>Validée par</th><th>Date</th></tr></thead>
+                <thead><tr><th>N°</th><th>Sens</th><th>Statut</th><th class="tr">Lignes</th><th class="tr">Unités</th><th>Validée par</th><th>Date</th></tr></thead>
                 <tbody id="dep-livr-histo"></tbody>
               </table>
             </div>
@@ -7595,12 +7629,15 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
                   <option value="EN_PREPARATION">En préparation</option>
                   <option value="LIVRE">Transférés aux bars</option>
                   <option value="ANNULE">Retirés</option>
+                  <option value="OUVERT">Ouverts (vrac)</option>
+                  <option value="RETOURNE">Rendus au fournisseur</option>
                 </select>
+                <button class="pos-btn ghost dep-btn-s" id="dep-btn-retour-f" disabled onclick="depRetourFournisseur()" title="Rendre au fournisseur les colis cochés (fermés, au dépôt)">↩ Rendre au fournisseur</button>
                 <button class="pos-btn ghost dep-btn-s" onclick="depImprimerAffiches()" title="Étiquettes 2 × 1 des colis affichés (hors transférés et retirés)">🖨 Imprimer la sélection</button>
               </div>
             </div>
             <div class="pos-table-wrap"><table class="pos-table">
-              <thead><tr><th>Code</th><th>Code-barres</th><th>Produit</th><th class="tr">Quantité</th><th>État</th><th>Lieu</th><th>Achat</th><th>Créé le</th><th></th></tr></thead>
+              <thead><tr><th aria-label="Sélection"></th><th>Code</th><th>Code-barres</th><th>Produit</th><th class="tr">Quantité</th><th>État</th><th>Lieu</th><th>Achat</th><th>Créé le</th><th></th></tr></thead>
               <tbody id="dep-colis-tbody"></tbody>
             </table></div>
           </div>
@@ -7608,6 +7645,24 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 
         <!-- 4 · Inventaire -->
         <section class="dep-section" data-onglet="stock" hidden>
+          <div class="pos-card">
+            <div class="pos-card-hdr">Inventaire d'ouverture et contrôle par bar</div>
+            <div class="dep-ouv" id="dep-ouverture"><div class="dep-vide">Chargement…</div></div>
+          </div>
+          <div class="pos-card">
+            <div class="pos-card-hdr">Étiqueter le stock existant</div>
+            <div class="dep-note">Pour les caisses déjà au dépôt sans étiquette (stock d'avant le système) : comptez d'abord le dépôt ci-dessous, puis créez leurs étiquettes. Aucun mouvement de stock : elles deviennent des colis « au dépôt ».</div>
+            <div class="dep-inv-barre">
+              <div class="dep-inv-champ" style="flex:2"><label class="pos-label" for="dep-etq-produit">Produit</label>
+                <select id="dep-etq-produit" class="pos-input" onchange="depEtqProduit()"></select></div>
+              <div class="dep-inv-champ"><label class="pos-label" for="dep-etq-nb">Nombre de caisses</label>
+                <input id="dep-etq-nb" class="pos-input" type="number" min="1" step="1" placeholder="0"></div>
+              <div class="dep-inv-champ"><label class="pos-label" for="dep-etq-upc">Unités par caisse</label>
+                <input id="dep-etq-upc" class="pos-input" type="number" min="1" step="1" placeholder="24"></div>
+              <div class="dep-inv-champ" style="align-self:flex-end"><button class="pos-btn teal" onclick="depEtiqueterStock()">Créer les étiquettes</button></div>
+            </div>
+            <div class="pa-aide" id="dep-etq-aide"></div>
+          </div>
           <div class="pos-card">
             <div class="pos-card-hdr">Inventaire physique
               <button type="button" class="sx-link" style="margin-left:auto" onclick="goTo('pos-stock')">Stock de tous les lieux →</button></div>
@@ -7652,6 +7707,11 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
                 <option value="LIVRE">Transferts par scan</option>
                 <option value="LIVRE_MANUEL">Transferts manuels (sans scan)</option>
                 <option value="VERIFIE">Vérifications au dépôt</option>
+                <option value="RETOUR_BAR">Retours bar → dépôt</option>
+                <option value="TRANSFERT_INTERBAR">Transferts entre bars</option>
+                <option value="OUVERT">Colis ouverts</option>
+                <option value="RETOUR_FOURNISSEUR">Rendus au fournisseur</option>
+                <option value="ETIQUETTE_REMPLACEE">Étiquettes remplacées</option>
                 <option value="REJET">Codes rejetés (sécurité)</option>
                 <option value="SCAN_REFUSE">Scans refusés</option>
               </select>
@@ -7673,12 +7733,12 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
     <div class="pos-modal-bg" id="dep-trf-bg" onclick="if(event.target===this)depTransfertFermer()">
       <div class="pos-modal dep-manuel dep-trf" role="dialog" aria-labelledby="dep-trf-titre">
         <div class="df-tete">
-          <h3 id="dep-trf-titre">Bon de transfert dépôt → bar <span class="dep-trf-num" id="dep-trf-num"></span></h3>
+          <h3 id="dep-trf-titre"><span id="dep-trf-sens">Bon de transfert dépôt → bar</span> <span class="dep-trf-num" id="dep-trf-num"></span></h3>
           <button type="button" onclick="depTransfertFermer()" aria-label="Fermer" class="df-fermer">✕</button>
         </div>
         <div class="dep-trf-etat" id="dep-trf-etat" aria-live="polite">⌨ Scanner prêt : scannez les colis qui sortent du dépôt.</div>
 
-        <div class="pa-etape">
+        <div class="pa-etape" id="dep-trf-etape-dest">
           <div class="pa-etape-t"><span>1</span> Bar de destination</div>
           <div class="pa-modes" role="group" aria-label="Bar de destination">
             <button type="button" class="pa-mode" data-lieu="DEVANT" onclick="depChoisirDest('DEVANT',true);depTransfertRender()">Bar devant</button>
@@ -7787,6 +7847,21 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
       </div>
     </div>
 
+    <!-- Saisie courte (motif, montant…) -->
+    <div class="pos-modal-bg" id="ui-dem-bg" onclick="if(event.target===this)_uiDemFin(null)">
+      <div class="pos-modal ui-dem" role="dialog" aria-labelledby="ui-dem-titre">
+        <div class="df-tete"><h3 id="ui-dem-titre"></h3>
+          <button type="button" onclick="_uiDemFin(null)" aria-label="Fermer" class="df-fermer">✕</button></div>
+        <div class="ui-dem-msg" id="ui-dem-msg"></div>
+        <form id="ui-dem-form" onsubmit="event.preventDefault();_uiDemValider()"><div id="ui-dem-champs" class="ui-dem-champs"></div>
+          <div class="ui-dem-err" id="ui-dem-err" aria-live="polite"></div>
+          <div class="pos-modal-footer">
+            <button type="button" class="pos-btn ghost" onclick="_uiDemFin(null)">Annuler</button>
+            <button type="submit" class="pos-btn teal" id="ui-dem-ok">Valider</button>
+          </div></form>
+      </div>
+    </div>
+
     <!-- Code-barres d'un colis -->
     <div class="pos-modal-bg" id="dep-cb-bg" onclick="if(event.target===this)depFermerCode()">
       <div class="pos-modal dep-cb-modal" role="dialog" aria-labelledby="dep-cb-titre">
@@ -7820,6 +7895,15 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
             <div class="dep-guide-c"><b>3 · Transfert vers un bar</b>
               <p>Sortie de stock du dépôt vers le Bar devant ou le Bar piscine. On choisit le bar, on scanne les colis : le <em>bon de transfert</em> s'ouvre au premier scan et se remplit à chaque scan. On <em>valide</em> : le stock passe du dépôt au bar. C'est la seule façon d'approvisionner un bar.</p>
               <p class="dep-guide-qui">Mode « Transférer vers un bar » · onglet Transferts</p></div>
+            <div class="dep-guide-c"><b>Retours et transferts entre bars</b>
+              <p>Un bar rend des caisses fermées ou du vrac au dépôt (« ↩ Retour au dépôt »), ou les passe à l'autre bar (« ⇄ Vers… »). Même bon, même scan, même validation : le stock passe d'un lieu à l'autre avec sa trace.</p>
+              <p class="dep-guide-qui">Onglet Transferts · boutons sous chaque bar</p></div>
+            <div class="dep-guide-c"><b>Opérations sur un colis</b>
+              <p><em>Ouvrir</em> une caisse au dépôt pour en sortir une partie (son contenu devient du vrac) ; <em>Nouvelle étiquette</em> si elle est abîmée (l'ancien code est refusé) ; <em>Rendre au fournisseur</em> (casse, périmé), déduit du coût d'achat.</p>
+              <p class="dep-guide-qui">Onglet Colis · fiche du colis</p></div>
+            <div class="dep-guide-c"><b>Inventaire d'ouverture</b>
+              <p>Compter le dépôt et les deux bars le même jour, étiqueter les caisses déjà présentes, puis activer le contrôle par bar : la caisse refuse alors de vendre ce que le bar n'a pas.</p>
+              <p class="dep-guide-qui">Onglet Inventaire</p></div>
             <div class="dep-guide-c"><b>Scanner externe (douchette)</b>
               <p>Brancher la douchette en USB ou Bluetooth, en mode <em>clavier</em> (HID), avec le suffixe <em>Entrée</em> et le Code 128 activé. Sur cette page, elle fonctionne partout : inutile de cliquer dans le champ. Le bouton « Tester le scanner » vérifie la lecture sans rien modifier.</p>
               <p class="dep-guide-qui">Voyant « Scanner externe » sous le champ de scan</p></div>
@@ -7852,6 +7936,8 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
         </div>
         <div id="dep-fiche-corps"></div>
         <div class="pos-modal-footer">
+          <button class="pos-btn ghost" id="dep-fiche-ouvrir" onclick="depOuvrirColis(_depFicheColisId)" title="Le contenu devient du vrac au dépôt">Ouvrir le colis</button>
+          <button class="pos-btn ghost" id="dep-fiche-nouv" onclick="depNouvelleEtiquette(_depFicheColisId)" title="Nouveau code, l'ancien est refusé">Nouvelle étiquette</button>
           <button class="pos-btn ghost" id="dep-fiche-etiq" onclick="depReimprimer()">🖨 Réimprimer l'étiquette</button>
           <button class="pos-btn ghost" onclick="depFermerFiche()">Fermer</button>
         </div>
@@ -7922,6 +8008,9 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           <div class="pos-kpi"><div class="pos-kpi-label">Coût marchandises</div><div class="pos-kpi-val" id="kpi-achats-marchandise">—</div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">Dépenses supp.</div><div class="pos-kpi-val red" id="kpi-achats-depenses">—</div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">Coût total</div><div class="pos-kpi-val teal" id="kpi-achats-total">—</div></div>
+          <div class="pos-kpi" style="cursor:pointer" onclick="paBasculerVue('fournisseurs')" title="Voir les dettes fournisseurs">
+            <div class="pos-kpi-label">Dettes fournisseurs</div><div class="pos-kpi-val red" id="kpi-achats-dettes">—</div>
+            <div id="kpi-achats-retard" style="font-size:12px;font-weight:700;color:#f87171;margin-top:2px"></div></div>
         </div>
 
         <!-- Bascule Historique / Par produit -->
@@ -7929,6 +8018,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           <button id="pa-vue-btn-historique" class="pos-btn" onclick="paBasculerVue('historique')"
             style="background:rgba(63,182,168,.18);border:1px solid rgba(63,182,168,.35);color:#3fb6a8">Historique</button>
           <button id="pa-vue-btn-produit" class="pos-btn ghost" onclick="paBasculerVue('produit')">Par produit</button>
+          <button id="pa-vue-btn-fournisseurs" class="pos-btn ghost" onclick="paBasculerVue('fournisseurs')">Fournisseurs et dettes</button>
         </div>
 
         <!-- ── VUE HISTORIQUE (transactions) ── -->
@@ -7947,7 +8037,9 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
               <select class="pos-select" id="pa-filtre-statut" style="min-width:150px" onchange="_paAppliquerRecherche()">
                 <option value="">Tous les statuts</option>
                 <option value="EN_ATTENTE">En attente</option>
-                <option value="CONFIRME">Confirmé</option>
+                <option value="CONFIRME">Réceptionné</option>
+                <option value="ANNULE">Annulé</option>
+                <option value="CREDIT">À crédit non soldé</option>
               </select>
               <input class="pos-input" id="pa-recherche" type="text" placeholder="Rechercher : produit, fournisseur, dépense…" style="flex:2;min-width:220px" oninput="_paAppliquerRecherche()">
               <button class="pos-btn ghost" onclick="_paResetFiltres()">Réinitialiser</button>
@@ -7969,6 +8061,25 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+
+        <!-- ── VUE FOURNISSEURS ET DETTES ── -->
+        <div id="pa-vue-fournisseurs" style="display:none">
+          <div class="pos-card">
+            <div class="pos-card-hdr">Dettes fournisseurs <span class="dep-badge" id="pa-dettes-total">—</span></div>
+            <div class="pos-table-wrap"><table class="pos-table">
+              <thead><tr><th>Échéance</th><th>Fournisseur</th><th>Facture</th><th>Achat</th><th class="tr">Coût total</th><th class="tr">Payé</th><th class="tr">Reste</th><th></th></tr></thead>
+              <tbody id="pa-dettes-tbody"></tbody>
+            </table></div>
+          </div>
+          <div class="pos-card">
+            <div class="pos-card-hdr">Fournisseurs
+              <button class="pos-btn teal dep-btn-s" style="margin-left:auto" onclick="paFournisseurModal()">+ Fournisseur</button></div>
+            <div class="pos-table-wrap"><table class="pos-table">
+              <thead><tr><th>Fournisseur</th><th>Téléphone</th><th>Conditions</th><th class="tr">Achats</th><th class="tr">Total acheté</th><th class="tr">Reste à payer</th><th>Dernier achat</th><th></th></tr></thead>
+              <tbody id="pa-fourn-tbody"></tbody>
+            </table></div>
           </div>
         </div>
 
@@ -8058,8 +8169,27 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
               <datalist id="pa-fourn-liste"></datalist>
             </div>
             <div style="flex:1">
+              <label class="pos-label" for="pa-facture">N° de facture</label>
+              <input class="pos-input" id="pa-facture" maxlength="60" placeholder="Facultatif — évite une double saisie">
+            </div>
+          </div>
+          <div class="pos-form-row">
+            <div style="flex:1">
+              <span class="pos-label">Règlement</span>
+              <div class="pa-modes" id="pa-reglement" role="group" aria-label="Règlement">
+                <button type="button" class="pa-mode active" data-r="COMPTANT" onclick="paSetReglement('COMPTANT')">Payé comptant</button>
+                <button type="button" class="pa-mode" data-r="CREDIT" onclick="paSetReglement('CREDIT')" title="Dette fournisseur, à payer plus tard">À crédit</button>
+              </div>
+            </div>
+            <div style="flex:1" id="pa-echeance-zone" hidden>
+              <label class="pos-label" for="pa-echeance">À payer avant le</label>
+              <input class="pos-input" id="pa-echeance" type="date">
+            </div>
+          </div>
+          <div class="pos-form-row">
+            <div style="flex:1">
               <label class="pos-label" for="pa-notes">Notes</label>
-              <input class="pos-input" id="pa-notes" placeholder="Facture, lot… (facultatif)">
+              <input class="pos-input" id="pa-notes" placeholder="Lot, remarque… (facultatif)">
             </div>
           </div>
           <details class="pa-frais" id="pa-frais">
@@ -8137,10 +8267,16 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 
         <div class="pos-form-row">
           <div style="flex:1">
+            <label class="pos-label" for="pae-facture">N° de facture</label>
+            <input class="pos-input" id="pae-facture" maxlength="60" placeholder="Optionnel">
+          </div>
+          <div style="flex:1">
             <label class="pos-label">Notes</label>
             <input class="pos-input" id="pae-notes" placeholder="Optionnel">
           </div>
         </div>
+        <div class="pa-aide" id="pae-verrou" hidden>Achat déjà réceptionné : la quantité ne peut plus changer (elle doit rester égale à celle des colis). Pour la corriger, annulez l'achat s'il n'est pas encore entré en stock, ou faites un retour fournisseur au Dépôt Bar.</div>
+        <div class="pa-aide" id="pae-corrections"></div>
 
         <!-- Récapitulatif -->
         <div style="margin-top:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px">
@@ -8497,6 +8633,9 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           <div class="pos-header-actions">
             <input type="date" class="pos-input" id="pos-rent-debut" style="width:130px">
             <input type="date" class="pos-input" id="pos-rent-fin" style="width:130px">
+            <select class="pos-input" id="pos-rent-lieu" style="width:150px" aria-label="Bar">
+              <option value="">Les deux bars</option><option value="DEVANT">Bar devant</option><option value="PISCINE">Bar piscine</option>
+            </select>
             <button class="pos-btn teal" onclick="posRentCharger()">Analyser</button>
           </div>
         </div>
@@ -8507,6 +8646,15 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           <div class="pos-kpi"><div class="pos-kpi-label">Bénéfice net</div><div class="pos-kpi-val" id="rkpi-benef">—</div><div id="rkpi-benef-badge" style="font-size:12px;font-weight:700;margin-top:2px"></div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">Marge globale</div><div class="pos-kpi-val" id="rkpi-marge">—</div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">Nb ventes</div><div class="pos-kpi-val amber" id="rkpi-nbv">—</div></div>
+        </div>
+
+        <div class="pos-card">
+          <div class="pos-card-hdr">Comparaison des bars</div>
+          <div class="pos-table-wrap"><table class="pos-table">
+            <thead><tr><th>Lieu</th><th class="tr">CA</th><th class="tr">Coût des ventes</th><th class="tr">Bénéfice</th><th class="tr">Marge</th><th class="tr">Pertes d'inventaire</th></tr></thead>
+            <tbody id="pos-rent-lieux"><tr><td colspan="6" style="color:rgba(255,255,255,.3);text-align:center;padding:14px">—</td></tr></tbody>
+          </table></div>
+          <div class="pa-aide" style="padding:0 14px 12px">Coût des ventes au coût de revient (achat + frais). Pertes d'inventaire : écarts négatifs, casse et pertes de la période, au coût de revient.</div>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
@@ -17377,6 +17525,11 @@ const _AREA_PAGES = {
     complet: ['employes','payroll'],
     lecture: ['employes'],
   },
+  // Dépôt Bar : complet = opérations (réception, transferts, inventaire) ; lecture = consultation
+  depot: {
+    complet: ['pos-depot'],
+    lecture: ['pos-depot'],
+  },
 };
 
 // Whitelist stricte des pages accessibles aux comptes caissière (employe_id défini).
@@ -22868,6 +23021,7 @@ const _ARM_DOMAINES = [
   { key:'cuisine',   label:'🍽️ Cuisine',     color:'#fb923c' },
   { key:'hotel',     label:'🏨 Hôtel',       color:'#a78bfa' },
   { key:'employes',  label:'👥 Employés',    color:'#f472b6' },
+  { key:'depot',     label:'📦 Dépôt Bar',   color:'#2dd4bf' },
 ];
 
 async function loadAdminRoles(){
@@ -22923,7 +23077,8 @@ function _armBuildMatrix(perms){
   const matrix = document.getElementById('arm-perms-matrix');
   if(!matrix) return;
   matrix.innerHTML = _ARM_DOMAINES.map(d => {
-    const cur = (perms||{})[d.key] || 'aucun';
+    // Dépôt Bar non réglé : même accès qu'avant (domaine Bar complet = opérations du dépôt)
+    const cur = (perms||{})[d.key] || (d.key==='depot' ? ((perms||{}).bar==='complet' ? 'complet' : 'aucun') : 'aucun');
     const opts = ['complet','lecture','aucun'].map(v =>
       `<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:14px">
         <input type="radio" name="arm-${d.key}" value="${v}" ${cur===v?'checked':''} style="accent-color:${d.color}"> ${v.charAt(0).toUpperCase()+v.slice(1)}
@@ -26210,6 +26365,8 @@ async function posProduitModal(id){
     document.getElementById('pos-prod-cat').value   = p.categorie||'';
     document.getElementById('pos-prod-unite').value = p.unite||'';
     document.getElementById('pos-prod-seuil').value = p.seuil_alerte_stock||0;
+    document.getElementById('pos-prod-seuil-devant').value  = p.seuil_devant ?? '';
+    document.getElementById('pos-prod-seuil-piscine').value = p.seuil_piscine ?? '';
     document.getElementById('pos-prod-code').value  = p.code_barre||'';
     document.getElementById('pos-prod-prix').value  = '';
     document.getElementById('pos-prod-lieu').value  = p.lieu||'';
@@ -26221,6 +26378,8 @@ async function posProduitModal(id){
     title.textContent = 'Nouveau produit';
     ['pos-prod-nom','pos-prod-unite','pos-prod-prix','pos-prod-code'].forEach(fid=>{ document.getElementById(fid).value=''; });
     document.getElementById('pos-prod-seuil').value = 0;
+    document.getElementById('pos-prod-seuil-devant').value  = '';
+    document.getElementById('pos-prod-seuil-piscine').value = '';
     document.getElementById('pos-prod-cat').value   = '';
     document.getElementById('pos-prod-lieu').value  = '';
     _posProdResetCaisseUI();
@@ -26308,7 +26467,9 @@ async function posProduitSauvegarder(){
     const doublon = _posProduitsAll.find(p => p.nom.trim().toLowerCase() === nom.toLowerCase());
     if(doublon){ posAlert(`Un produit nommé « ${doublon.nom} » existe déjà dans le catalogue.`); return; }
   }
-  const payload = { nom, categorie:cat, unite, seuil_alerte_stock:seuil, code_barre:code, vendu_par_caisse:venduCaisse, unites_par_caisse:venduCaisse?upc:null, lieu:lieu||null };
+  const _sb = id => { const v=document.getElementById(id).value; return v==='' ? null : Math.max(0, parseFloat(v)||0); };
+  const payload = { nom, categorie:cat, unite, seuil_alerte_stock:seuil, seuil_devant:_sb('pos-prod-seuil-devant'), seuil_piscine:_sb('pos-prod-seuil-piscine'),
+                    code_barre:code, vendu_par_caisse:venduCaisse, unites_par_caisse:venduCaisse?upc:null, lieu:lieu||null };
   try {
     if(id){
       await apiFetch('PUT',`/pos/produits/${id}`, payload);
@@ -26588,7 +26749,7 @@ async function loadPosAchats(){
 function _paRenderKpis(achats){
   const now   = new Date();
   const debut = new Date(now.getFullYear(), now.getMonth(), 1);
-  const mois  = achats.filter(a=>new Date(a.date_achat)>=debut);
+  const mois  = achats.filter(a=>new Date(a.date_achat)>=debut && a.statut!=='ANNULE');
   const totalM = mois.reduce((s,a)=>s+a.prix_marchandise,0);
   const totalD = mois.reduce((s,a)=>s+a.total_depenses,0);
   const totalT = mois.reduce((s,a)=>s+a.cout_total,0);
@@ -26618,7 +26779,8 @@ function _paAppliquerRecherche(){
       const hay = _navNorm([a.produit_nom, a.produit_categorie, a.fournisseur, depTxt].filter(Boolean).join(' '));
       if(!hay.includes(q)) return false;
     }
-    if(statut && a.statut !== statut) return false;
+    if(statut === 'CREDIT'){ if(!(a.reglement && a.reglement.reste > 0)) return false; }
+    else if(statut && a.statut !== statut) return false;
     const dateAchat = (a.date_achat||'').slice(0,10);
     if(debut && dateAchat < debut) return false;
     if(fin   && dateAchat > fin)   return false;
@@ -26626,6 +26788,10 @@ function _paAppliquerRecherche(){
   });
   _paRenderTable(achats);
   _paRenderKpis(achats);
+  const dettes = _paAllAchats.filter(a=>a.reglement && a.reglement.reste>0);
+  const kd=document.getElementById('kpi-achats-dettes'), kr=document.getElementById('kpi-achats-retard');
+  if(kd) kd.textContent = `G ${dettes.reduce((t,a)=>t+a.reglement.reste,0).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  if(kr){ const n=dettes.filter(a=>a.reglement.en_retard).length; kr.textContent = n ? `${n} en retard` : ''; }
 }
 
 function _paResetFiltres(){
@@ -26638,9 +26804,17 @@ function _paResetFiltres(){
 }
 
 function _paStatutBadge(statut){
-  return statut === 'CONFIRME'
-    ? '<span style="font-size:12px;font-weight:700;color:#4ade80;background:rgba(74,222,128,.12);border-radius:5px;padding:3px 8px;white-space:nowrap">✓ Confirmé</span>'
-    : '<span style="font-size:12px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.12);border-radius:5px;padding:3px 8px;white-space:nowrap">⏳ En attente</span>';
+  const b = (c,bg,t)=>`<span style="font-size:12px;font-weight:700;color:${c};background:${bg};border-radius:5px;padding:3px 8px;white-space:nowrap">${t}</span>`;
+  if(statut === 'CONFIRME') return b('#4ade80','rgba(74,222,128,.12)','✓ Réceptionné');
+  if(statut === 'ANNULE')   return b('#f87171','rgba(248,113,113,.12)','✕ Annulé');
+  return b('#fbbf24','rgba(251,191,36,.12)','⏳ En attente');
+}
+function _paReglementBadge(a){
+  const r = a.reglement || {};
+  if(a.statut==='ANNULE' || (a.mode_reglement||'COMPTANT')==='COMPTANT') return '';
+  const t = r.etat==='PAYE' ? '✓ Crédit soldé' : r.en_retard ? `⚠ En retard · reste ${posGx(r.reste)}` : `À crédit · reste ${posGx(r.reste)}`;
+  const c = r.etat==='PAYE' ? '#4ade80' : r.en_retard ? '#f87171' : '#fbbf24';
+  return `<div style="font-size:12px;font-weight:700;color:${c};margin-top:4px;white-space:nowrap">${t}${a.date_echeance&&r.etat!=='PAYE'?` · avant le ${new Date(a.date_echeance).toLocaleDateString('fr-FR')}`:''}</div>`;
 }
 
 function _paRenderTable(achats){
@@ -26661,21 +26835,23 @@ function _paRenderTable(achats){
       `<div style="color:rgba(255,255,255,.4);font-size:13px;line-height:1.4">${dep.description}: G ${parseFloat(dep.montant).toFixed(2)}</div>`
     ).join('');
     const hasD = a.total_depenses > 0;
-    return `<tr>
+    return `<tr${a.statut==='ANNULE'?' style="opacity:.55" title="Annulé : '+esc(a.motif_annulation||'')+'"':''}>
       <td style="font-size:14px;white-space:nowrap;color:rgba(255,255,255,.6)">${ds}</td>
       <td>${_ckJoursBadge(a.jours)}</td>
       <td><span style="font-weight:600">${a.produit_nom}</span>${a.sans_justificatif?' <span style="font-size:11px;font-weight:700;color:#f87171;background:rgba(248,113,113,.12);border-radius:4px;padding:2px 6px">⚠ Inachevé</span>':''}<div style="font-size:13px;color:rgba(255,255,255,.35)">${a.produit_categorie||''}</div></td>
-      <td>${parseFloat(a.quantite).toFixed(2)} ${a.produit_unite||'u.'}</td>
+      <td>${parseFloat(a.quantite).toFixed(2)} ${a.produit_unite||'u.'}${a.quantite_recue!=null&&a.quantite_recue!==a.quantite?`<div style="font-size:12px;color:#fbbf24" title="${esc(a.motif_ecart_reception||'')}">reçu : ${a.quantite_recue}</div>`:''}</td>
       <td>${fmt(a.prix_marchandise)}<div style="font-size:13px;color:rgba(255,255,255,.35)">${parseFloat(a.prix_achat_unitaire).toFixed(2)}/u.</div></td>
       <td>${hasD?`<span style="color:#f87171;font-weight:600">${fmt(a.total_depenses)}</span><div>${depDetail}</div>`:'<span style="color:rgba(255,255,255,.2)">—</span>'}</td>
-      <td><span style="color:#3fb6a8;font-weight:700;font-size:16px">${fmt(a.cout_total)}</span></td>
-      <td style="color:rgba(255,255,255,.45);font-size:14px">${a.fournisseur||'—'}</td>
-      <td>${_paStatutBadge(a.statut)}</td>
+      <td><span style="color:#3fb6a8;font-weight:700;font-size:16px">${fmt(a.cout_total)}</span>${a.cout_revient_unitaire&&a.total_depenses>0?`<div style="font-size:12px;color:rgba(255,255,255,.4)" title="Coût de revient : achat + frais">revient ${fmt(a.cout_revient_unitaire)}/u.</div>`:''}</td>
+      <td style="color:rgba(255,255,255,.45);font-size:14px">${a.fournisseur||'—'}${a.numero_facture?`<div style="font-size:12px">Fact. ${esc(a.numero_facture)}</div>`:''}</td>
+      <td>${_paStatutBadge(a.statut)}${_paReglementBadge(a)}</td>
       <td style="white-space:nowrap;display:flex;gap:6px">
         <button title="Modifier" onclick="paEditModal(${idx})"
           style="background:rgba(247,169,59,.15);border:1px solid rgba(247,169,59,.3);border-radius:7px;color:#f7a93b;padding:5px 9px;cursor:pointer;display:flex;align-items:center">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
+        ${a.reglement&&a.reglement.reste>0?`<button class="pos-btn teal dep-btn-s" onclick="paPayer(${a.id})" title="Enregistrer un paiement au fournisseur">Payer</button>`:''}
+        ${a.annulable&&a.produit_type==='bar'?`<button class="pos-btn ghost dep-btn-s" style="color:#f87171" onclick="paAnnuler(${a.id})" title="Annuler cet achat (avant l'entrée en stock)">Annuler</button>`:''}
         <button onclick="posAchatFichePDF(${idx})"
           style="background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.3);border-radius:7px;color:#a5b4fc;font-size:13px;font-weight:600;padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -26710,21 +26886,101 @@ let _pavData     = [];      // cache des produits (issu de /pos/fiche-technique)
 let _pavSelected = new Set();
 
 function paBasculerVue(vue){
-  const btnH = document.getElementById('pa-vue-btn-historique');
-  const btnP = document.getElementById('pa-vue-btn-produit');
-  const vueH = document.getElementById('pa-vue-historique');
-  const vueP = document.getElementById('pa-vue-produit');
-  const actif   = 'background:rgba(63,182,168,.18);border:1px solid rgba(63,182,168,.35);color:#3fb6a8';
-  if(vue==='produit'){
-    vueH.style.display = 'none'; vueP.style.display = '';
-    btnP.className = 'pos-btn'; btnP.style.cssText = actif;
-    btnH.className = 'pos-btn ghost'; btnH.style.cssText = '';
-    _pavCharger();
-  } else {
-    vueH.style.display = ''; vueP.style.display = 'none';
-    btnH.className = 'pos-btn'; btnH.style.cssText = actif;
-    btnP.className = 'pos-btn ghost'; btnP.style.cssText = '';
-  }
+  const actif = 'background:rgba(63,182,168,.18);border:1px solid rgba(63,182,168,.35);color:#3fb6a8';
+  ['historique','produit','fournisseurs'].forEach(v=>{
+    const btn=document.getElementById(`pa-vue-btn-${v}`), box=document.getElementById(`pa-vue-${v}`);
+    if(!btn||!box) return;
+    const on = v===vue;
+    box.style.display = on ? '' : 'none';
+    btn.className = on ? 'pos-btn' : 'pos-btn ghost'; btn.style.cssText = on ? actif : '';
+  });
+  if(vue==='produit') _pavCharger();
+  if(vue==='fournisseurs') paChargerFournisseurs();
+}
+
+let _paFournisseurs = [];
+async function paChargerFournisseurs(){
+  try{
+    const [f, d] = await Promise.all([apiFetch('GET','/pos/fournisseurs'), apiFetch('GET','/pos/dettes-fournisseurs')]);
+    _paFournisseurs = f || [];
+    document.getElementById('pa-dettes-total').textContent = posGx(d.total_du||0) + (d.en_retard?` · ${d.en_retard} en retard`:'');
+    document.getElementById('pa-dettes-tbody').innerHTML = (d.achats||[]).map(x=>`<tr${x.en_retard?' class="dep-j-alerte"':''}>
+        <td class="num">${x.date_echeance?new Date(x.date_echeance).toLocaleDateString('fr-FR'):'—'}${x.en_retard?' <span class="dep-st st-prep">En retard</span>':''}</td>
+        <td><strong>${esc(x.fournisseur||'—')}</strong></td><td>${esc(x.numero_facture||'—')}</td>
+        <td>#${x.achat_id} · ${esc(x.produit_nom||'')}<div class="dep-sous">${x.date_achat?new Date(x.date_achat).toLocaleDateString('fr-FR'):''}</div></td>
+        <td class="tr num">${posGx(x.cout_total)}</td><td class="tr num">${posGx(x.paye)}</td><td class="tr num"><strong>${posGx(x.reste)}</strong></td>
+        <td class="tr"><button class="pos-btn teal dep-btn-s" onclick="paPayer(${x.achat_id})">Payer</button></td></tr>`).join('')
+      || '<tr class="dep-vide-l"><td colspan="8">Aucune dette fournisseur.</td></tr>';
+    document.getElementById('pa-fourn-tbody').innerHTML = _paFournisseurs.map(x=>`<tr${x.actif?'':' style="opacity:.5"'}>
+        <td><strong>${esc(x.nom)}</strong>${x.notes?`<div class="dep-sous">${esc(x.notes)}</div>`:''}</td>
+        <td>${esc(x.telephone||'—')}</td><td>${esc(x.conditions||'—')}</td>
+        <td class="tr num">${x.nb_achats}</td><td class="tr num">${posGx(x.total_achete)}</td>
+        <td class="tr num" style="color:${x.reste_a_payer>0?'#fbbf24':'inherit'}">${x.reste_a_payer?posGx(x.reste_a_payer):'—'}${x.en_retard?` <span class="dep-st st-prep">${x.en_retard} en retard</span>`:''}</td>
+        <td class="num">${x.dernier_achat?new Date(x.dernier_achat).toLocaleDateString('fr-FR'):'—'}</td>
+        <td class="tr"><button class="pos-btn ghost dep-btn-s" onclick="paFournisseurModal(${x.id})">Modifier</button></td></tr>`).join('')
+      || '<tr class="dep-vide-l"><td colspan="8">Aucun fournisseur. Ils sont créés automatiquement à la saisie d\'un achat, ou avec « + Fournisseur ».</td></tr>';
+  }catch(e){ posAlert(_errTxt(e)); }
+}
+
+async function paFournisseurModal(id){
+  const f = id ? _paFournisseurs.find(x=>x.id===id) : null;
+  const v = await uiDemander({
+    titre: f ? `Fournisseur — ${f.nom}` : 'Nouveau fournisseur', ok: 'Enregistrer',
+    champs: [
+      {id:'nom', label:'Nom', requis:true, valeur:f?.nom||''},
+      {id:'telephone', label:'Téléphone', valeur:f?.telephone||''},
+      {id:'adresse', label:'Adresse', valeur:f?.adresse||''},
+      {id:'conditions', label:'Conditions', valeur:f?.conditions||'', placeholder:'Ex. paiement à 30 jours'},
+      {id:'notes', label:'Notes', valeur:f?.notes||''},
+      {id:'actif', label:'État', type:'select', valeur:f && !f.actif ? '0' : '1', options:[{v:'1',l:'Actif'},{v:'0',l:'Inactif (masqué à la saisie)'}]},
+    ],
+    verifier: null,
+  });
+  if(!v) return;
+  const corps = {nom:v.nom, telephone:v.telephone||null, adresse:v.adresse||null, conditions:v.conditions||null, notes:v.notes||null, actif:v.actif==='1'};
+  try{
+    await apiFetch(f?'PUT':'POST', f?`/pos/fournisseurs/${f.id}`:'/pos/fournisseurs', corps);
+    posAlert('Fournisseur enregistré.','ok');
+    paChargerFournisseurs();
+  }catch(e){ posAlert(_errTxt(e)); }
+}
+
+async function paPayer(achatId){
+  let a; try{ a = await apiFetch('GET',`/pos/achats/${achatId}`); }catch(e){ posAlert(_errTxt(e)); return; }
+  const r = a.reglement||{};
+  const v = await uiDemander({
+    titre: `Payer ${a.fournisseur||'le fournisseur'}`, ok: 'Enregistrer le paiement',
+    message: `Achat #${a.id} · ${a.produit_nom}${a.numero_facture?` · facture ${a.numero_facture}`:''}\nCoût total ${posGx(a.cout_total)} · déjà payé ${posGx(r.paye||0)} · reste ${posGx(r.reste||0)}`,
+    champs: [
+      {id:'montant', label:'Montant payé (G)', type:'number', requis:true, min:0.01, max:r.reste, valeur:r.reste},
+      {id:'mode', label:'Mode', type:'select', valeur:'CASH', options:[{v:'CASH',l:'Espèces'},{v:'VIREMENT',l:'Virement'},{v:'CHEQUE',l:'Chèque'},{v:'ZELLE',l:'Zelle'},{v:'MONCASH',l:'MonCash'},{v:'AUTRE',l:'Autre'}]},
+      {id:'reference', label:'Référence', placeholder:'N° de chèque, de reçu…'},
+    ],
+  });
+  if(!v) return;
+  try{
+    const res = await apiFetch('POST',`/pos/achats/${achatId}/paiements`,{montant:v.montant, mode:v.mode, reference:v.reference||null});
+    posAlert(res.reste>0 ? `Paiement enregistré. Reste à payer : ${posGx(res.reste)}.` : 'Paiement enregistré : achat soldé.','ok');
+    await loadPosAchats();
+    if(document.getElementById('pa-vue-fournisseurs')?.style.display!=='none') paChargerFournisseurs();
+  }catch(e){ posAlert(_errTxt(e)); }
+}
+
+async function paAnnuler(achatId){
+  const a = _paAllAchats.find(x=>x.id===achatId) || {};
+  const v = await uiDemander({
+    titre: `Annuler l'achat #${achatId}`, ok: "Annuler l'achat",
+    message: `${a.produit_nom||''} · ${a.quantite} ${a.produit_unite||'u.'} · ${posGx(a.cout_total||0)}\nSes colis pas encore vérifiés seront retirés (étiquettes invalides) et l'achat sortira du coût moyen.`,
+    champs: [{id:'motif', label:"Motif de l'annulation", requis:true, placeholder:'Ex. quantité mal saisie (48 000 au lieu de 48)',
+              verifier:x=>x.length<5?'Motif : 5 caractères minimum.':null}],
+  });
+  if(!v) return;
+  try{
+    const r = await apiFetch('POST',`/pos/achats/${achatId}/annuler`,{motif:v.motif});
+    posAlert(`Achat #${achatId} annulé${r.colis_retires?` · ${r.colis_retires} colis retiré(s)`:''}.`,'ok');
+    if(typeof loadPosAchats==='function' && document.getElementById('page-pos-achats')?.offsetParent) await loadPosAchats();
+    if(typeof _depCharger==='function' && document.getElementById('page-pos-depot')?.offsetParent) await _depCharger();
+  }catch(e){ posAlert(_errTxt(e)); }
 }
 
 async function _pavCharger(){
@@ -27186,7 +27442,8 @@ let _paSerie = {nb:0, total:0};
 async function _posOuvrirFormAchat(){
   _paDepenses = [];
   _paSerie = {nb:0, total:0};
-  ['pa-fourn','pa-qte','pa-prix','pa-notes','pa-produit-cherche'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['pa-fourn','pa-qte','pa-prix','pa-notes','pa-produit-cherche','pa-facture','pa-echeance'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  paSetReglement('COMPTANT');
   document.getElementById('pa-qte-type').value = 'unite';
   // Toujours recharger : le dernier achat de chaque produit change à chaque saisie
   try { _paTousProduits = await apiFetch('GET','/pos/achats/produits-tous'); }
@@ -27279,6 +27536,13 @@ function paReprendreDernier(){
   if(d.fournisseur && !document.getElementById('pa-fourn').value) document.getElementById('pa-fourn').value=d.fournisseur;
   paUpdateRecap();
   document.getElementById('pa-qte').focus();
+}
+
+let _paReglement = 'COMPTANT';
+function paSetReglement(r){
+  _paReglement = r==='CREDIT' ? 'CREDIT' : 'COMPTANT';
+  document.querySelectorAll('#pa-reglement .pa-mode').forEach(b=>b.classList.toggle('active', b.dataset.r===_paReglement));
+  const z=document.getElementById('pa-echeance-zone'); if(z) z.hidden = _paReglement!=='CREDIT';
 }
 
 function paSetMode(m){
@@ -27640,8 +27904,11 @@ async function posEnregistrerAchat(continuer=false){
   const type  = document.getElementById('pa-qte-type').value;
   const fourn = document.getElementById('pa-fourn').value.trim()||null;
   const notes = document.getElementById('pa-notes').value.trim()||null;
+  const facture = document.getElementById('pa-facture')?.value.trim()||null;
+  const echeance = document.getElementById('pa-echeance')?.value||null;
 
   if(!sel)    { posAlert('Sélectionner un produit.','warn'); return; }
+  if(_paReglement==='CREDIT' && !fourn){ posAlert('Un achat à crédit doit avoir un fournisseur.','warn'); document.getElementById('pa-fourn').focus(); return; }
   if(qte<=0)  { posAlert('La quantité doit être > 0.','warn'); return; }
   if(prix<=0) { posAlert('Indiquez le prix d\'achat.','warn'); document.getElementById('pa-prix').focus(); return; }
 
@@ -27673,6 +27940,9 @@ async function posEnregistrerAchat(continuer=false){
     quantite_type:       sel.type==='station' ? 'unite' : type,
     prix_achat_unitaire: prix,
     fournisseur:         fourn,
+    numero_facture:      facture,
+    mode_reglement:      _paReglement,
+    date_echeance:       _paReglement==='CREDIT' ? echeance : null,
     notes,
     depenses,
   };
@@ -27705,7 +27975,7 @@ async function posEnregistrerAchat(continuer=false){
     if(continuer){
       // Achat suivant : on garde le fournisseur, on vide le reste
       _paDepenses=[]; paRenderDepenses();
-      ['pa-qte','pa-prix','pa-notes'].forEach(id=>document.getElementById(id).value='');
+      ['pa-qte','pa-prix','pa-notes','pa-facture'].forEach(id=>document.getElementById(id).value='');
       paChangerProduit();
       try { _paTousProduits = await apiFetch('GET','/pos/achats/produits-tous'); } catch(_){}
       paRechercher();
@@ -27751,6 +28021,16 @@ function paEditModal(idx){
   document.getElementById('pae-prix').value  = a.prix_achat_unitaire;
   document.getElementById('pae-fourn').value = a.fournisseur || '';
   document.getElementById('pae-notes').value = a.notes || '';
+  document.getElementById('pae-facture').value = a.numero_facture || '';
+  const verrou = a.quantite_modifiable === false;
+  document.getElementById('pae-qte').disabled = verrou;
+  document.getElementById('pae-qte-type').disabled = verrou;
+  document.getElementById('pae-verrou').hidden = !verrou;
+  const pc = document.getElementById('pae-corrections'); pc.textContent = '';
+  apiFetch('GET',`/pos/achats/${a.id}`).then(d=>{
+    if(d.corrections && d.corrections.length) pc.textContent = 'Corrections : ' + d.corrections.map(c=>
+      `${new Date(c.date).toLocaleDateString('fr-FR')} par ${c.par||'—'} (prix ${c.avant.prix_achat_unitaire} → ${c.apres.prix_achat_unitaire}${c.avant.quantite!==c.apres.quantite?`, quantité ${c.avant.quantite} → ${c.apres.quantite}`:''})`).join(' · ');
+  }).catch(()=>{});
 
   paEditOnQteTypeChange();
   document.getElementById('pos-achat-edit-modal-bg').classList.add('open');
@@ -27866,6 +28146,7 @@ async function paSaveEditAchat(){
       quantite_type:       a.produit_type==='station' ? 'unite' : type,
       prix_achat_unitaire: prix,
       fournisseur:         fourn,
+      numero_facture:      document.getElementById('pae-facture').value.trim()||null,
       notes,
     });
     document.getElementById('pos-achat-edit-modal-bg').classList.remove('open');
@@ -28634,7 +28915,11 @@ function depCodeBarres(code, hauteur){
 }
 
 const _DEP_LIEUX = {DEVANT:'Bar devant', PISCINE:'Bar piscine'};
-const _DEP_ST_CLASSE = {A_VERIFIER:'st-verif', AU_DEPOT:'st-depot', EN_PREPARATION:'st-prep', LIVRE:'st-livre', ANNULE:''};
+const _DEP_ST_CLASSE = {A_VERIFIER:'st-verif', AU_DEPOT:'st-depot', EN_PREPARATION:'st-prep', LIVRE:'st-livre', ANNULE:'', OUVERT:'st-prep', RETOURNE:''};
+let _depBonSpecial = null;       // bon de retour ou entre bars affiché dans la fenêtre
+let _depBonsSpeciaux = [];       // bons de retour / entre bars en préparation
+let _depSelRetour = new Set();   // colis cochés pour un retour fournisseur
+let _depAchatsRec = [];
 let _depColisVerif = [], _depColis = [];
 const _depJour = iso => iso ? new Date(iso).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
 // Cellule « code-barres » : le code-barres (identique à l'étiquette) et le code lisible ; clic = fiche
@@ -28743,11 +29028,20 @@ async function _depCharger(){
     if(!document.querySelector('#page-pos-depot section[data-onglet="journal"]')?.hidden) depChargerJournal();
     if(!document.querySelector('#page-pos-depot section[data-onglet="colis"]')?.hidden) depChargerColis();
     const ouvertes = (livs||[]).filter(l=>l.statut==='PREPARATION');
+    const transferts = ouvertes.filter(l=>(l.type_bon||'TRANSFERT')==='TRANSFERT');
     for(const lieu of ['DEVANT','PISCINE']){
-      const l = ouvertes.find(x=>x.lieu===lieu);
+      const l = transferts.find(x=>x.lieu===lieu);
       _depLivraisons[lieu] = l ? await apiFetch('GET',`/pos/depot/livraisons/${l.id}`) : null;
     }
+    _depBonsSpeciaux = ouvertes.filter(l=>(l.type_bon||'TRANSFERT')!=='TRANSFERT');
+    if(_depBonSpecial){
+      _depBonSpecial = _depBonsSpeciaux.some(x=>x.id===_depBonSpecial.id)
+        ? await apiFetch('GET',`/pos/depot/livraisons/${_depBonSpecial.id}`) : null;
+    }
     _depLivraison = _depLivraisons[_depDest];
+    depChargerATransferer();
+    if(!document.querySelector('#page-pos-depot section[data-onglet="stock"]')?.hidden) depChargerOuverture();
+    _depFileAfficher();
     depRenderLivraison();
     if(_depTrfOuvert()) depTransfertRender();
     const resume = ['DEVANT','PISCINE'].filter(k=>_depLivraisons[k]).map(k=>`${k==='DEVANT'?'Devant':'Piscine'} : ${_depLivraisons[k].nb_lignes} colis`);
@@ -28792,6 +29086,7 @@ function depOnglet(t, silencieux){
   if(t==='livraison' && _depMode!=='fiche') depSetMode('livr', silencieux);
   if(t==='journal') depChargerJournal();
   if(t==='colis') depChargerColis();
+  if(t==='stock') depChargerOuverture();
 }
 
 function depGuide(afficher){
@@ -28839,6 +29134,50 @@ function _depRetour(msg, ok){
   }
 }
 
+// ── Scans hors ligne : gardés dans ce navigateur, envoyés au retour du réseau
+const _DEP_FILE_CLE = 'dep-scans-hors-ligne';
+function _depEstHorsLigne(e){ return !navigator.onLine || (e && !e.status && /fetch|network|réseau|load failed/i.test(String(e.message||''))); }
+function _depFileLire(){ try{ return JSON.parse(localStorage.getItem(_DEP_FILE_CLE)||'[]'); }catch(_){ return []; } }
+function _depFileEcrire(l){ try{ localStorage.setItem(_DEP_FILE_CLE, JSON.stringify(l)); }catch(_){} _depFileAfficher(); }
+function _depFileAjouter(x){ const l=_depFileLire(); l.push(x); _depFileEcrire(l); }
+function _depFileAfficher(){
+  const b=document.getElementById('dep-file-hl'); if(!b) return;
+  const n=_depFileLire().length;
+  b.hidden = !n;
+  b.textContent = `⏸ ${n} scan(s) hors ligne en attente — Envoyer`;
+}
+let _depEnvoiEnCours = false;
+async function depEnvoyerFile(){
+  if(_depEnvoiEnCours) return;
+  const file = _depFileLire(); if(!file.length) return;
+  _depEnvoiEnCours = true;
+  let ok = 0; const refus = []; let reste = [];
+  for(let i=0;i<file.length;i++){
+    const x = file[i];
+    try{
+      if(x.mode==='verif'){
+        await apiFetch('POST','/pos/depot/colis/verifier',{code:x.code, hors_ligne_le:x.le});
+      } else {
+        let id = x.special;
+        if(!id){ const l = await apiFetch('POST','/pos/depot/livraisons',{lieu:x.dest}); id = l.id; }
+        await apiFetch('POST',`/pos/depot/livraisons/${id}/scan`,{code:x.code, hors_ligne_le:x.le});
+      }
+      ok++;
+    }catch(e){
+      if(_depEstHorsLigne(e)){ reste = file.slice(i); break; }
+      refus.push(`${x.code} : ${_errTxt(e)}`);
+    }
+  }
+  _depFileEcrire(reste);
+  _depEnvoiEnCours = false;
+  if(ok || refus.length){
+    _depRetour(`Scans hors ligne envoyés : ${ok} accepté(s)${refus.length?`, ${refus.length} refusé(s) — ${refus.slice(0,3).join(' ; ')}`:''}${reste.length?` · ${reste.length} encore en attente`:''}.`, !refus.length);
+    await _depCharger();
+  }
+}
+window.addEventListener('online', ()=>{ if(_depFileLire().length) depEnvoyerFile(); });
+setInterval(()=>{ if(navigator.onLine && _depFileLire().length) depEnvoyerFile(); }, 30000);
+
 function depScanner(valeur, externe){
   const inp = document.getElementById('dep-scan-input');
   const code = (valeur||'').trim();
@@ -28854,12 +29193,13 @@ function depScanner(valeur, externe){
   }
   // Bon de transfert ouvert : tout scan va dans ce bon
   const mode = _depTrfOuvert() ? 'livr' : _depMode;
+  const special = _depTrfOuvert() && _depBonSpecial ? _depBonSpecial.id : null;
   if(!_depTrfOuvert()) inp.focus();
   // Une douchette peut envoyer plusieurs codes très vite : traitement un par un, dans l'ordre
-  _depFile = _depFile.then(()=>_depTraiterScan(code, mode, _depDest)).catch(()=>{});
+  _depFile = _depFile.then(()=>_depTraiterScan(code, mode, _depDest, special)).catch(()=>{});
 }
 
-async function _depTraiterScan(code, mode, dest){
+async function _depTraiterScan(code, mode, dest, special){
   try{
     if(mode === 'fiche'){
       const f = await apiFetch('POST','/pos/depot/colis/consulter',{code});
@@ -28873,20 +29213,27 @@ async function _depTraiterScan(code, mode, dest){
       _depRetour(`✓ ${c.code_lisible} — ${c.produit_nom} : ${c.quantite} ${c.unite||'u.'} entrés au dépôt`
         + (c.restants_achat ? ` · encore ${c.restants_achat} colis de cet achat à scanner` : ''), true);
     } else {
-      let l = _depLivraisons[dest];
+      let l = special ? {id:special} : _depLivraisons[dest];
       if(!l){ l = await apiFetch('POST','/pos/depot/livraisons',{lieu:dest}); _depLivraisons[dest] = l; }
       const r = await apiFetch('POST',`/pos/depot/livraisons/${l.id}/scan`,{code});
-      _depLivraisons[dest] = r;
-      if(dest===_depDest) _depLivraison = r;
+      if(special){ _depBonSpecial = r; }
+      else { _depLivraisons[dest] = r; if(dest===_depDest) _depLivraison = r; }
       _depDernierScan = r.colis_scanne.id;
       if(!_depTrfOuvert()) depTransfertOuvrir();
-      _depRetour(`✓ ${r.colis_scanne.code_lisible} — ${r.colis_scanne.produit_nom} (${r.colis_scanne.quantite} ${r.colis_scanne.unite||'u.'}) ajouté au bon ${r.numero} → ${r.lieu_nom}`, true);
+      _depRetour(`✓ ${r.colis_scanne.code_lisible} — ${r.colis_scanne.produit_nom} (${r.colis_scanne.quantite} ${r.colis_scanne.unite||'u.'}) ajouté au bon ${r.numero} : ${r.origine_nom} → ${r.destination_nom}`, true);
       depRenderLivraison();
       depTransfertRender();
     }
     _depBip(true);
     await _depCharger();
   }catch(e){
+    // Pas de réseau : le scan est gardé et envoyé au retour d'internet
+    if((mode==='verif' || mode==='livr') && _depEstHorsLigne(e)){
+      _depFileAjouter({code, mode, dest, special, le:new Date().toISOString()});
+      _depBip(true);
+      _depRetour(`⏸ Hors ligne : scan de ${code} gardé (${_depFileLire().length} en attente). Il sera envoyé dès le retour d'internet.`, true);
+      return;
+    }
     _depBip(false);
     let msg = String(e.message||'Scan refusé').replace(/^\[\d+\]\s*/,'').replace(/\.\s*$/,'');
     if(mode==='verif' && e.detail && e.detail.statut==='AU_DEPOT')
@@ -28985,7 +29332,10 @@ function depAfficherFiche(f){
     </ol>`;
   document.getElementById('dep-fiche-titre').textContent = `Fiche ${livre?'de transfert':'du colis'} — ${c.code_lisible}`;
   _depFicheColisId = c.id;
-  document.getElementById('dep-fiche-etiq').hidden = ['ANNULE','LIVRE'].includes(c.statut);
+  document.getElementById('dep-fiche-etiq').hidden = !['A_VERIFIER','AU_DEPOT','EN_PREPARATION'].includes(c.statut);
+  document.getElementById('dep-fiche-ouvrir').hidden = c.statut!=='AU_DEPOT';
+  document.getElementById('dep-fiche-nouv').hidden = !['A_VERIFIER','AU_DEPOT'].includes(c.statut);
+  if(!_depColis.some(x=>x.id===c.id)) _depColis.push(c);
   document.getElementById('dep-fiche-bg').classList.add('open');
 }
 
@@ -29008,6 +29358,7 @@ function depFermerFiche(){
 
 function depRenderReceptions(rec){
   const achats = rec.achats_a_receptionner || [];
+  _depAchatsRec = achats;
   _depColisVerif = rec.colis_a_verifier || [];
   document.getElementById('dep-nb-achats').textContent = achats.length;
   document.getElementById('dep-nb-verif').textContent  = _depColisVerif.length;
@@ -29018,7 +29369,8 @@ function depRenderReceptions(rec){
       <td class="tr num">${Number(a.quantite).toLocaleString('fr-FR')}</td>
       <td class="tr num">${nb}${a.unites_par_caisse?` <span class="dep-sous">× ${a.unites_par_caisse}</span>`:''}${nb>500?' <span class="dep-st st-prep" title="Maximum 500 colis par achat : quantité probablement mal saisie">trop</span>':''}</td>
       <td>${esc(a.fournisseur||'—')}</td><td class="num">${_depJour(a.date_achat).slice(0,10)}</td>
-      <td class="dep-actions"><button class="pos-btn teal dep-btn-s" onclick="depReceptionner(${a.achat_id})">Réceptionner</button></td></tr>`;
+      <td class="dep-actions"><button class="pos-btn ghost dep-btn-s" style="color:#f87171" onclick="paAnnuler(${a.achat_id})" title="Achat saisi par erreur">Annuler</button>
+        <button class="pos-btn teal dep-btn-s" onclick="depReceptionner(${a.achat_id})">Réceptionner</button></td></tr>`;
   }).join('') || '<tr class="dep-vide-l"><td colspan="7">Aucun achat en attente.</td></tr>';
   depRenderColisVerif();
   document.getElementById('dep-carte-achats').hidden = !achats.length;
@@ -29052,16 +29404,63 @@ function depRenderColis(){
   const max = 200;
   document.getElementById('dep-nb-colis').textContent = liste.length;
   document.getElementById('dep-colis-tbody').innerHTML = liste.slice(0,max).map(c=>`<tr>
+      <td>${c.statut==='AU_DEPOT'?`<input type="checkbox" ${_depSelRetour.has(c.id)?'checked':''} onchange="depSelRetour(${c.id},this.checked)" aria-label="Choisir ${esc(c.code_lisible)}">`:''}</td>
       ${_depCellulesCode(c)}
       <td><strong>${esc(c.produit_nom||'')}</strong></td>
       <td class="tr num">${c.quantite} ${esc(c.unite||'u.')}</td>
       <td><span class="dep-st ${_DEP_ST_CLASSE[c.statut]||''}">${esc(c.statut_libelle||c.statut)}</span></td>
-      <td>${esc(c.lieu_nom||(['A_VERIFIER','AU_DEPOT','EN_PREPARATION'].includes(c.statut)?'Dépôt':'—'))}</td>
+      <td>${esc(c.lieu_nom||(['A_VERIFIER','AU_DEPOT','EN_PREPARATION','OUVERT'].includes(c.statut)?'Dépôt':'—'))}</td>
       <td>${c.achat_id?'#'+c.achat_id:'—'}</td><td class="num">${_depJour(c.cree_le)}</td>
       <td class="dep-actions"><button class="pos-btn ghost dep-btn-s" onclick="depOuvrirFiche(${c.id})">Fiche</button>
-        ${['LIVRE','ANNULE'].includes(c.statut)?'':`<button class="pos-btn ghost dep-btn-s" onclick="depImprimerColis(${c.id})" title="Réimprimer l'étiquette">🖨</button>`}</td></tr>`).join('')
-    + (liste.length>max?`<tr class="dep-vide-l"><td colspan="9">… et ${liste.length-max} autres — affinez la recherche</td></tr>`:'')
-    || '<tr class="dep-vide-l"><td colspan="9">Aucun colis.</td></tr>';
+        ${c.statut==='AU_DEPOT'?`<button class="pos-btn ghost dep-btn-s" onclick="depOuvrirColis(${c.id})" title="Ouvrir la caisse : son contenu devient du vrac au dépôt">Ouvrir</button>`:''}
+        ${['A_VERIFIER','AU_DEPOT'].includes(c.statut)?`<button class="pos-btn ghost dep-btn-s" onclick="depNouvelleEtiquette(${c.id})" title="Étiquette perdue ou abîmée : nouveau code">Nouv. étiquette</button>
+          <button class="pos-btn ghost dep-btn-s" onclick="depImprimerColis(${c.id})" title="Réimprimer l'étiquette">🖨</button>`:''}</td></tr>`).join('')
+    + (liste.length>max?`<tr class="dep-vide-l"><td colspan="10">… et ${liste.length-max} autres — affinez la recherche</td></tr>`:'')
+    || '<tr class="dep-vide-l"><td colspan="10">Aucun colis.</td></tr>';
+  _depMajRetour();
+}
+function depSelRetour(id, coche){ if(coche) _depSelRetour.add(id); else _depSelRetour.delete(id); _depMajRetour(); }
+function _depMajRetour(){
+  const b=document.getElementById('dep-btn-retour-f'); if(!b) return;
+  b.disabled = !_depSelRetour.size;
+  b.textContent = _depSelRetour.size ? `↩ Rendre au fournisseur (${_depSelRetour.size})` : '↩ Rendre au fournisseur';
+}
+async function depRetourFournisseur(){
+  const ids=[..._depSelRetour]; if(!ids.length) return;
+  const choisis=_depColis.filter(c=>_depSelRetour.has(c.id));
+  const v = await uiDemander({
+    titre:'Rendre au fournisseur', ok:'Rendre ces colis',
+    message:`${ids.length} colis · ${choisis.reduce((t,c)=>t+c.quantite,0)} unités : ${[...new Set(choisis.map(c=>c.produit_nom))].join(', ')}\nIls sortent du stock du dépôt et de leur coût d'achat. Leurs codes deviennent invalides.`,
+    champs:[{id:'motif', label:'Motif', requis:true, placeholder:'Ex. produit périmé, casse à la livraison', verifier:x=>x.length<5?'Motif : 5 caractères minimum.':null}],
+  });
+  if(!v) return;
+  try{
+    const r = await apiFetch('POST','/pos/depot/retour-fournisseur',{colis_ids:ids, motif:v.motif});
+    posAlert(`${r.colis} colis rendus au fournisseur (${r.unites_rendues} unités).`,'ok');
+    _depSelRetour.clear(); await _depCharger(); depChargerColis();
+  }catch(e){ posAlert(_errTxt(e)); }
+}
+async function depOuvrirColis(id){
+  const c = _depColis.find(x=>x.id===id) || {};
+  if(!await showConfirm(`Ouvrir le colis ${c.code_lisible||'#'+id} (${c.quantite||''} ${c.unite||''}) ? Son contenu reste au dépôt mais devient du vrac : vous pourrez en transférer une partie. Son code ne sera plus utilisable.`,
+      {title:'Ouvrir le colis', type:'warn', okLabel:'Ouvrir'})) return;
+  try{
+    await apiFetch('POST',`/pos/depot/colis/${id}/ouvrir`,{});
+    posAlert('Colis ouvert : son contenu est en vrac au dépôt.','ok');
+    depFermerFiche?.(); await _depCharger(); depChargerColis();
+  }catch(e){ posAlert(_errTxt(e)); }
+}
+async function depNouvelleEtiquette(id){
+  const v = await uiDemander({titre:'Nouvelle étiquette', ok:'Créer la nouvelle étiquette',
+    message:"Le colis reçoit un nouveau code. L'ancienne étiquette sera refusée au scan (avec un message clair).",
+    champs:[{id:'motif', label:'Motif', requis:true, placeholder:'Ex. étiquette mouillée, arrachée'}]});
+  if(!v) return;
+  try{
+    const r = await apiFetch('POST',`/pos/depot/colis/${id}/remplacer-etiquette`,{motif:v.motif});
+    posAlert(`Nouvelle étiquette ${r.code_lisible} (l'ancienne ${r.ancien_code} est révoquée). Imprimez-la et collez-la.`,'ok');
+    depImprimerColis(id);
+    depFermerFiche?.(); await _depCharger(); depChargerColis();
+  }catch(e){ posAlert(_errTxt(e)); }
 }
 function depImprimerAffiches(){
   const ids = _depFiltre(_depColis, document.getElementById('dep-colis-cherche')?.value)
@@ -29071,12 +29470,24 @@ function depImprimerAffiches(){
 }
 
 async function depReceptionner(achatId){
+  const a = _depAchatsRec.find(x=>x.achat_id===achatId) || {};
+  const v = await uiDemander({
+    titre: `Réceptionner l'achat #${achatId}`, ok: 'Créer les colis et les étiquettes',
+    message: `${a.produit_nom||''} · commandé : ${a.quantite} unités${a.unites_par_caisse?` (${Math.ceil(a.quantite/a.unites_par_caisse)} caisses de ${a.unites_par_caisse})`:''}\nComptez ce qui est réellement arrivé. S'il manque quelque chose, l'écart est gardé avec sa raison.`,
+    champs: [
+      {id:'recue', label:'Unités réellement reçues', type:'number', requis:true, min:0.001, max:a.quantite, valeur:a.quantite},
+      {id:'motif', label:"Raison de l'écart (si moins que commandé)", placeholder:'Ex. 2 bouteilles cassées à la livraison',
+       verifier:(m, tout)=> (tout.recue!==null && tout.recue < a.quantite && m.length<5) ? "Indiquez la raison de l'écart (5 caractères minimum)." : null},
+    ],
+  });
+  if(!v) return;
+  const corps = v.recue < a.quantite ? {quantite_recue:v.recue, motif_ecart:v.motif} : {};
   try{
-    const r = await apiFetch('POST',`/pos/depot/receptions/${achatId}`,{});
-    posAlert(`${r.nb_colis} colis créés — imprimez les étiquettes 2 × 1 à l'échelle 100 % (taille réelle) et collez-les.`,'ok');
+    const r = await apiFetch('POST',`/pos/depot/receptions/${achatId}`,corps);
+    posAlert(`${r.nb_colis} colis créés${corps.quantite_recue?` pour ${r.quantite_recue} unités reçues`:''} — imprimez les étiquettes 2 × 1 à l'échelle 100 % (taille réelle) et collez-les.`,'ok');
     depEtiquettes(achatId);
     await _depCharger();
-  }catch(e){ posAlert(e.message||'Réception impossible.'); }
+  }catch(e){ posAlert(_errTxt(e)||'Réception impossible.'); }
 }
 
 async function depEtiquettes(achatId){
@@ -29179,14 +29590,98 @@ async function depChangerDestination(){
 
 function depRenderLivraison(){
   const bars = document.getElementById('dep-bars'); if(!bars) return;
-  bars.innerHTML = ['DEVANT','PISCINE'].map(k=>{ const x=_depLivraisons[k], nom=_DEP_LIEUX[k];
+  bars.innerHTML = ['DEVANT','PISCINE'].map(k=>{ const x=_depLivraisons[k], nom=_DEP_LIEUX[k], autre=k==='DEVANT'?'PISCINE':'DEVANT';
     return `<div class="dep-bar-carte ${x?'encours':''}">
       <div><div class="dep-bar-nom">${nom}</div>
         <div class="dep-bar-etat">${x?`Bon ${esc(x.numero)} en préparation · ${x.nb_lignes} colis · ${x.total_unites} unités`:'Aucun transfert en préparation'}</div></div>
-      <button class="pos-btn ${x?'teal':'ghost'}" onclick="depChoisirDest('${k}',true);depNouvelleLivraison('${k}')">${x?'Reprendre le bon':'Nouveau transfert'}</button>
+      <div class="dep-bar-act">
+        <button class="pos-btn ${x?'teal':'ghost'}" onclick="depChoisirDest('${k}',true);depNouvelleLivraison('${k}')">${x?'Reprendre le bon':'Nouveau transfert'}</button>
+        <button class="pos-btn ghost dep-btn-s" onclick="depOuvrirBonSpecial('RETOUR','${k}','${k}')" title="Marchandise rendue par le ${nom} au dépôt">↩ Retour au dépôt</button>
+        <button class="pos-btn ghost dep-btn-s" onclick="depOuvrirBonSpecial('INTERBAR','${k}','${autre}')" title="Déplacer du ${nom} vers le ${_DEP_LIEUX[autre]}">⇄ Vers ${_DEP_LIEUX[autre]}</button>
+      </div>
     </div>`; }).join('');
+  const sp = document.getElementById('dep-bons-speciaux');
+  if(sp) sp.innerHTML = _depBonsSpeciaux.length ? `<div class="dep-speciaux">${_depBonsSpeciaux.map(b=>`
+      <div class="dep-special"><b>${esc(b.numero)}</b> ${esc(b.origine_nom)} → ${esc(b.destination_nom)} · ${b.nb_lignes} ligne(s) · ${b.total_unites} unités
+        <button class="pos-btn ghost dep-btn-s" onclick="depReprendreBonSpecial(${b.id})">Reprendre</button></div>`).join('')}</div>` : '';
   const box = document.getElementById('dep-livr-courante'); if(box) box.innerHTML = '';
 }
+
+async function depChargerATransferer(){
+  const box = document.getElementById('dep-a-transferer'); if(!box) return;
+  try{
+    const d = await apiFetch('GET','/pos/depot/a-transferer');
+    box.innerHTML = ['DEVANT','PISCINE'].map(k=>{
+      const l = d[k]||[];
+      return `<div class="dep-atr-bar"><h4>${_DEP_LIEUX[k]} <span class="dep-cpt dep-cpt-n">${l.length}</span>
+          ${l.length?`<button class="pos-btn teal dep-btn-s" onclick="depChoisirDest('${k}',true);depNouvelleLivraison('${k}')">Préparer</button>`:''}</h4>
+        ${l.map(x=>`<div class="dep-atr-l"><span><strong>${esc(x.nom)}</strong></span>
+            <span class="q" ${x.a_racheter?'style="color:#f87171"':''}>${x.a_racheter ? 'À racheter'
+              : [x.propose_caisses?`${x.propose_caisses} caisse(s)`:'', x.propose_vrac?`${x.propose_vrac} ${esc(x.unite||'u.')} en vrac`:''].filter(Boolean).join(' + ')}</span>
+            <span class="s">Au bar : ${x.stock_bar}${x.en_preparation?` (+${x.en_preparation} en préparation)`:''} · seuil ${x.seuil} · dépôt : ${x.colis_au_depot} caisse(s) fermée(s), ${x.vrac_depot} en vrac${x.a_racheter?' · <b style="color:#f87171">plus rien au dépôt</b>':''}</span></div>`).join('')
+          || '<div class="dep-atr-l"><span class="s">Rien à transférer : tous les produits sont au-dessus de leur seuil.</span></div>'}
+      </div>`;
+    }).join('');
+  }catch(e){ box.innerHTML = `<div class="dep-vide">${esc(_errTxt(e))}</div>`; }
+}
+
+async function depChargerOuverture(){
+  const box=document.getElementById('dep-ouverture'); if(!box) return;
+  try{
+    const d = await apiFetch('GET','/pos/depot/ouverture');
+    box.innerHTML = d.lieux.map(x=>{ const ok = !x.negatifs && !!x.dernier_inventaire;
+      return `<div class="dep-ouv-l ${ok?'ok':'ko'}"><b>${esc(x.nom)}</b>
+        <span>${x.dernier_inventaire?`Dernier inventaire : ${new Date(x.dernier_inventaire).toLocaleDateString('fr-FR')}`:'Aucun inventaire'}</span>
+        <span style="color:${x.negatifs?'#fbbf24':'#86efac'}">${x.negatifs?`${x.negatifs} produit(s) en stock négatif`:'Aucun stock négatif'}</span>
+        <button type="button" class="sx-link" style="align-self:flex-start" onclick="document.getElementById('dep-inv-lieu').value='${x.lieu}';depRenderInventaire();document.getElementById('dep-inv-lieu').scrollIntoView({behavior:'smooth'})">Compter ce lieu</button></div>`; }).join('')
+      + `<div class="dep-ouv-ctl"><span>Contrôle du stock par bar à la vente : <b style="color:${d.controle_par_bar?'#86efac':'#fbbf24'}">${d.controle_par_bar?'activé':'désactivé'}</b>.
+          ${d.controle_par_bar?'La caisse refuse de vendre ce que le bar n\'a pas.':'La caisse vérifie seulement le stock total.'}</span>
+          ${d.controle_par_bar
+            ? `<button class="pos-btn ghost dep-btn-s" onclick="depReglerControle(false)">Désactiver</button>`
+            : `<button class="pos-btn teal dep-btn-s" ${d.pret?'':'disabled title="Faites d\'abord l\'inventaire des deux bars (aucun stock négatif)"'} onclick="depReglerControle(true)">Activer</button>`}</div>`;
+  }catch(e){ box.innerHTML = `<div class="dep-vide">${esc(_errTxt(e))}</div>`; }
+  const sel=document.getElementById('dep-etq-produit');
+  if(sel && !sel.options.length) sel.innerHTML = '<option value="">— Choisir —</option>' + _depStock.map(x=>`<option value="${x.produit_id}">${esc(x.nom)}</option>`).join('');
+}
+async function depReglerControle(actif){
+  if(actif && !await showConfirm("Activer le contrôle par bar ? Une vente sera refusée si le bar de la caissière n'a pas le produit (il faudra le transférer depuis le dépôt).", {title:'Contrôle par bar', type:'warn', okLabel:'Activer'})) return;
+  try{ await apiFetch('POST','/pos/depot/ouverture/controle',{actif}); posAlert(actif?'Contrôle par bar activé.':'Contrôle par bar désactivé.','ok'); depChargerOuverture(); }
+  catch(e){ posAlert(_errTxt(e)); }
+}
+function depEtqProduit(){
+  const pid=parseInt(document.getElementById('dep-etq-produit').value);
+  const s=_depStock.find(x=>x.produit_id===pid);
+  if(s && s.unites_par_caisse) document.getElementById('dep-etq-upc').value = s.unites_par_caisse;
+  document.getElementById('dep-etq-aide').textContent = s ? `Stock calculé au dépôt : ${s.depot} ${s.unite||''}` : '';
+}
+async function depEtiqueterStock(){
+  const pid=parseInt(document.getElementById('dep-etq-produit').value);
+  const nb=parseInt(document.getElementById('dep-etq-nb').value);
+  const upc=parseFloat(document.getElementById('dep-etq-upc').value);
+  if(!pid || !(nb>0) || !(upc>0)){ posAlert('Choisissez le produit, le nombre de caisses et les unités par caisse.'); return; }
+  try{
+    const r = await apiFetch('POST','/pos/depot/etiqueter-stock',{produit_id:pid, nb_colis:nb, unites_par_colis:upc});
+    posAlert(`${r.nb_colis} étiquette(s) créée(s) : imprimez-les et collez-les sur les caisses.`,'ok');
+    _depOuvrirPdf('/api/pos/depot/etiquettes.pdf?ids='+r.colis.map(c=>c.id).join(','));
+    document.getElementById('dep-etq-nb').value='';
+    await _depCharger();
+  }catch(e){ posAlert(_errTxt(e)); }
+}
+
+async function depOuvrirBonSpecial(type_bon, origine, lieu){
+  try{
+    const b = await apiFetch('POST','/pos/depot/livraisons',{type_bon, origine, lieu});
+    _depBonSpecial = b;
+    depOnglet('livraison', true);
+    depSetMode('livr', true);
+    depTransfertOuvrir();
+  }catch(e){ posAlert(_errTxt(e)); }
+}
+async function depReprendreBonSpecial(id){
+  try{ _depBonSpecial = await apiFetch('GET',`/pos/depot/livraisons/${id}`); depTransfertOuvrir(); }
+  catch(e){ posAlert(_errTxt(e)); }
+}
+const _depBonActif = () => _depBonSpecial || _depLivraisons[_depDest];
 
 // ── Bon de transfert (fenêtre ouverte au premier scan, remplie à chaque scan)
 let _depDernierScan = null;
@@ -29194,17 +29689,26 @@ const _depTrfOuvert = () => document.getElementById('dep-trf-bg')?.classList.con
 function depTransfertOuvrir(){
   document.getElementById('dep-trf-bg').classList.add('open');
   const t=document.getElementById('dep-trf-etat');
-  if(t){ t.className='dep-trf-etat'; t.textContent='⌨ Scanner prêt : scannez les colis qui sortent du dépôt.'; }
+  if(t){ t.className='dep-trf-etat'; t.textContent = _depBonSpecial
+    ? `⌨ Scanner prêt : scannez les colis fermés qui quittent le ${_depBonSpecial.origine_nom}.`
+    : '⌨ Scanner prêt : scannez les colis qui sortent du dépôt.'; }
   document.activeElement?.blur?.();
   depTransfertRender();
 }
 function depTransfertFermer(){
   document.getElementById('dep-trf-bg').classList.remove('open');
+  _depBonSpecial = null;
   document.getElementById('dep-scan-input')?.focus();
 }
 function depTransfertRender(){
   if(!document.getElementById('dep-trf-bg')) return;
-  const l = _depLivraisons[_depDest], dest = _DEP_LIEUX[_depDest];
+  const sp = _depBonSpecial;
+  const l = sp || _depLivraisons[_depDest], dest = sp ? sp.destination_nom : _DEP_LIEUX[_depDest];
+  const origineNom = sp ? sp.origine_nom : 'Dépôt';
+  document.getElementById('dep-trf-sens').textContent = sp
+    ? (sp.type_bon==='RETOUR' ? `Bon de retour ${sp.origine_nom} → dépôt` : `Transfert ${sp.origine_nom} → ${sp.destination_nom}`)
+    : 'Bon de transfert dépôt → bar';
+  document.getElementById('dep-trf-etape-dest').hidden = !!sp;
   document.querySelectorAll('#dep-trf-bg .pa-mode').forEach(b=>b.classList.toggle('active', b.dataset.lieu===_depDest));
   document.getElementById('dep-trf-num').textContent = l ? `· ${l.numero}` : '· nouveau';
   const autreK = _depDest==='DEVANT' ? 'PISCINE' : 'DEVANT';
@@ -29217,20 +29721,21 @@ function depTransfertRender(){
       <td class="num">${lignes.length-i}</td>
       <td>${x.colis_id?`<button type="button" class="dep-code dep-code-btn" onclick="depOuvrirFiche(${x.colis_id})">${esc(x.colis_code)}</button>`:'<em>vrac</em>'}</td>
       <td><strong>${esc(x.produit_nom||'')}</strong></td><td class="tr num">${x.quantite}</td>
-      <td class="tr"><button class="pos-btn ghost dep-btn-s" title="Retirer du bon (le colis reste au dépôt)" onclick="depRetirerLigne(${x.id})">✕</button></td></tr>`).join('')
-    || `<tr class="dep-vide-l"><td colspan="5">Scannez le premier colis à sortir vers le ${dest}.</td></tr>`;
+      <td class="tr"><button class="pos-btn ghost dep-btn-s" title="Retirer du bon (le colis reste au ${esc(origineNom)})" onclick="depRetirerLigne(${x.id})">✕</button></td></tr>`).join('')
+    || `<tr class="dep-vide-l"><td colspan="5">${sp?`Scannez le premier colis fermé du ${esc(origineNom)}, ou ajoutez du vrac.`:`Scannez le premier colis à sortir vers le ${dest}.`}</td></tr>`;
   const vr = document.getElementById('dep-vrac-produit');
-  if(vr) vr.innerHTML = _depStock.filter(x=>x.depot>0).map(x=>`<option value="${x.produit_id}">${esc(x.nom)} (dépôt : ${x.depot})</option>`).join('')
-    || '<option value="">Aucun stock en vrac au dépôt</option>';
+  const cleStock = sp ? (sp.origine||'').toLowerCase() : 'depot';
+  if(vr) vr.innerHTML = _depStock.filter(x=>x[cleStock]>0).map(x=>`<option value="${x.produit_id}">${esc(x.nom)} (${esc(origineNom)} : ${x[cleStock]})</option>`).join('')
+    || `<option value="">Aucun stock au ${esc(origineNom)}</option>`;
   const parProduit = {};
   lignes.forEach(x=>{ parProduit[x.produit_nom] = (parProduit[x.produit_nom]||0) + x.quantite; });
   document.getElementById('dep-trf-recap').innerHTML = lignes.length
-    ? `<div class="pa-recap-l pa-recap-tot"><span>${lignes.length} colis : dépôt → ${esc(dest)}</span><span>${l.total_unites} unités</span></div>`
+    ? `<div class="pa-recap-l pa-recap-tot"><span>${lignes.length} ligne(s) : ${esc(origineNom)} → ${esc(dest)}</span><span>${l.total_unites} unités</span></div>`
       + Object.entries(parProduit).map(([n,q])=>`<div class="pa-recap-l"><span>${esc(n)}</span><span>${q}</span></div>`).join('')
     : '<div class="pa-recap-l"><span>Bon vide</span><span></span></div>';
   const v = document.getElementById('dep-trf-valider');
   v.disabled = !lignes.length;
-  v.textContent = `✓ Valider le transfert vers le ${dest}`;
+  v.textContent = sp && sp.type_bon==='RETOUR' ? `✓ Valider le retour au dépôt` : `✓ Valider le transfert vers le ${dest}`;
   document.getElementById('dep-trf-annuler').hidden = !l;
 }
 
@@ -29239,38 +29744,51 @@ async function depAjouterVrac(){
   const qte = parseFloat(document.getElementById('dep-vrac-qte').value);
   if(!pid || !(qte>0)){ posAlert('Choisissez un produit et une quantité.'); return; }
   try{
-    if(!_depLivraisons[_depDest]) _depLivraisons[_depDest] = await apiFetch('POST','/pos/depot/livraisons',{lieu:_depDest});
-    _depLivraison = _depLivraisons[_depDest] = await apiFetch('POST',`/pos/depot/livraisons/${_depLivraisons[_depDest].id}/vrac`,{produit_id:pid, quantite:qte});
+    if(_depBonSpecial){
+      _depBonSpecial = await apiFetch('POST',`/pos/depot/livraisons/${_depBonSpecial.id}/vrac`,{produit_id:pid, quantite:qte});
+    } else {
+      if(!_depLivraisons[_depDest]) _depLivraisons[_depDest] = await apiFetch('POST','/pos/depot/livraisons',{lieu:_depDest});
+      _depLivraison = _depLivraisons[_depDest] = await apiFetch('POST',`/pos/depot/livraisons/${_depLivraisons[_depDest].id}/vrac`,{produit_id:pid, quantite:qte});
+    }
     document.getElementById('dep-vrac-qte').value='';
     depRenderLivraison(); depTransfertRender();
   }
-  catch(e){ posAlert(e.message); }
+  catch(e){ posAlert(_errTxt(e)); }
 }
 
 async function depRetirerLigne(ligneId){
-  try{ _depLivraison = _depLivraisons[_depDest] = await apiFetch('DELETE',`/pos/depot/livraisons/${_depLivraison.id}/lignes/${ligneId}`); depTransfertRender(); await _depCharger(); }
-  catch(e){ posAlert(e.message); }
+  const b = _depBonActif(); if(!b) return;
+  try{
+    const r = await apiFetch('DELETE',`/pos/depot/livraisons/${b.id}/lignes/${ligneId}`);
+    if(_depBonSpecial) _depBonSpecial = r; else _depLivraison = _depLivraisons[_depDest] = r;
+    depTransfertRender(); await _depCharger();
+  }catch(e){ posAlert(_errTxt(e)); }
 }
 
 async function depValiderLivraison(){
-  const l = _depLivraison;
+  const l = _depBonActif();
   if(!l) return;
-  if(!await showConfirm(`Valider le transfert ${l.numero} vers le ${l.lieu_nom} : ${l.nb_lignes} colis, ${l.total_unites} unités ? Le stock sort du dépôt et entre au bar.`, {title:'Valider le transfert', okLabel:'Valider'})) return;
+  const sens = `${l.origine_nom||'Dépôt'} → ${l.destination_nom||l.lieu_nom}`;
+  if(!await showConfirm(`Valider le bon ${l.numero} (${sens}) : ${l.nb_lignes} ligne(s), ${l.total_unites} unités ? Le stock sort du ${l.origine_nom||'dépôt'} et entre au ${l.destination_nom||l.lieu_nom}.`, {title:'Valider le bon', okLabel:'Valider'})) return;
   try{
     await apiFetch('POST',`/pos/depot/livraisons/${l.id}/valider`,{});
-    posAlert(`Transfert ${l.numero} validé : ${l.total_unites} unités sorties du dépôt vers le ${l.lieu_nom}.`,'ok');
+    posAlert(`Bon ${l.numero} validé : ${l.total_unites} unités, ${sens}.`,'ok');
+    if(!_depBonSpecial){ _depLivraisons[l.lieu] = null; _depLivraison = null; }
     depTransfertFermer();
-    _depLivraisons[l.lieu] = null; _depLivraison = null;
     await _depCharger();
-  }catch(e){ posAlert(e.message); }
+  }catch(e){ posAlert(_errTxt(e)); }
 }
 
 async function depAnnulerLivraison(){
-  const l = _depLivraison;
+  const l = _depBonActif();
   if(!l) return;
-  if(!await showConfirm(`Annuler le bon de transfert ${l.numero} ? Les colis scannés restent en stock au dépôt.`, {title:'Annuler le transfert', type:'danger', okLabel:'Annuler le transfert'})) return;
-  try{ await apiFetch('POST',`/pos/depot/livraisons/${l.id}/annuler`,{}); _depLivraisons[l.lieu]=null; _depLivraison=null; depTransfertFermer(); await _depCharger(); }
-  catch(e){ posAlert(e.message); }
+  const ici = (l.type_bon||'TRANSFERT')==='TRANSFERT' ? 'au dépôt' : `au ${l.origine_nom}`;
+  if(!await showConfirm(`Annuler le bon ${l.numero} ? Les colis scannés restent ${ici}.`, {title:'Annuler le bon', type:'danger', okLabel:'Annuler le bon'})) return;
+  try{
+    await apiFetch('POST',`/pos/depot/livraisons/${l.id}/annuler`,{});
+    if(!_depBonSpecial){ _depLivraisons[l.lieu]=null; _depLivraison=null; }
+    depTransfertFermer(); await _depCharger();
+  }catch(e){ posAlert(_errTxt(e)); }
 }
 
 async function depChargerJournal(){
@@ -29412,11 +29930,57 @@ async function depManuelValider(){
 function depRenderHistorique(livs){
   const st = {PREPARATION:'En préparation', VALIDEE:'Validée', ANNULEE:'Annulée'};
   document.getElementById('dep-livr-histo').innerHTML = livs.slice(0,30).map(l=>`
-    <tr><td>${esc(l.numero)}${l.mode==='MANUELLE'?' <span class="dep-st st-prep" title="'+esc(l.motif_manuel||'')+'">Sans scan</span>':''}</td><td>${esc(l.lieu_nom)}</td><td>${st[l.statut]||l.statut}</td>
+    <tr><td>${esc(l.numero)}${l.mode==='MANUELLE'?' <span class="dep-st st-prep" title="'+esc(l.motif_manuel||'')+'">Sans scan</span>':''}</td><td>${esc(l.origine_nom||'Dépôt')} → ${esc(l.destination_nom||l.lieu_nom)}</td><td>${st[l.statut]||l.statut}</td>
       <td class="tr">${l.nb_lignes}</td><td class="tr">${l.total_unites}</td><td>${esc(l.valide_par||'—')}</td>
       <td>${(l.valide_le||l.cree_le||'').slice(0,16).replace('T',' ')}</td></tr>`).join('')
     || '<tr><td colspan="7" style="text-align:center;padding:14px;color:rgba(255,255,255,.3)">Aucun transfert</td></tr>';
 }
+
+// ── Fenêtre de saisie courte : uiDemander({titre, message, champs, ok}) ──
+// champs : [{id, label, type:'text'|'number'|'date'|'select', valeur, requis,
+//            min, max, options:[{v,l}], aide, verifier:(v, tout)=>message|null}]
+let _uiDem = null;
+function uiDemander(o){
+  return new Promise(resolve=>{
+    _uiDem = {o, resolve};
+    document.getElementById('ui-dem-titre').textContent = o.titre || 'Confirmation';
+    document.getElementById('ui-dem-msg').textContent = o.message || '';
+    document.getElementById('ui-dem-err').textContent = '';
+    document.getElementById('ui-dem-ok').textContent = o.ok || 'Valider';
+    document.getElementById('ui-dem-champs').innerHTML = (o.champs||[]).map(c=>{
+      const id = 'ui-dem-'+c.id, val = c.valeur ?? '';
+      const ctl = c.type==='select'
+        ? `<select class="pos-input" id="${id}">${(c.options||[]).map(x=>`<option value="${esc(String(x.v))}" ${String(x.v)===String(val)?'selected':''}>${esc(x.l)}</option>`).join('')}</select>`
+        : `<input class="pos-input" id="${id}" type="${c.type||'text'}" value="${esc(String(val))}" ${c.min!=null?`min="${c.min}"`:''} ${c.max!=null?`max="${c.max}"`:''} ${c.type==='number'?'step="any" inputmode="decimal"':''} placeholder="${esc(c.placeholder||'')}" autocomplete="off">`;
+      return `<label for="${id}">${esc(c.label)}${c.requis?' *':''}${ctl}${c.aide?`<span class="pa-aide">${esc(c.aide)}</span>`:''}</label>`;
+    }).join('');
+    document.getElementById('ui-dem-bg').classList.add('open');
+    setTimeout(()=>document.querySelector('#ui-dem-champs input,#ui-dem-champs select')?.focus(), 40);
+  });
+}
+function _uiDemValider(){
+  const o = _uiDem?.o; if(!o) return;
+  const v = {};
+  for(const c of (o.champs||[])){
+    const el = document.getElementById('ui-dem-'+c.id);
+    v[c.id] = c.type==='number' ? (el.value==='' ? null : parseFloat(el.value)) : el.value.trim();
+  }
+  for(const c of (o.champs||[])){
+    const x = v[c.id];
+    let err = (c.requis && (x===null || x==='')) ? `${c.label} : obligatoire.` : null;
+    if(!err && c.type==='number' && x!==null && c.min!=null && x < c.min) err = `${c.label} : au moins ${c.min}.`;
+    if(!err && c.type==='number' && x!==null && c.max!=null && x > c.max) err = `${c.label} : au plus ${c.max}.`;
+    if(!err && c.verifier) err = c.verifier(x, v);
+    if(err){ document.getElementById('ui-dem-err').textContent = err; document.getElementById('ui-dem-'+c.id).focus(); return; }
+  }
+  _uiDemFin(v);
+}
+function _uiDemFin(v){
+  document.getElementById('ui-dem-bg').classList.remove('open');
+  const r = _uiDem?.resolve; _uiDem = null;
+  if(r) r(v);
+}
+const _errTxt = e => String(e?.message||e||'Erreur').replace(/^\[\d+\]\s*/,'');
 
 // ══════════════════════════════════════════════════════════════════════
 // PAGE POS RENTABILITÉ
@@ -29443,8 +30007,16 @@ async function posRentCharger(){
     let url = '/pos/stats?';
     if(debut) url += `date_debut=${debut}&`;
     if(fin)   url += `date_fin=${fin}&`;
+    const lieuR = document.getElementById('pos-rent-lieu')?.value||'';
+    if(lieuR) url += `lieu=${lieuR}&`;
 
     const data = await apiFetch('GET', url.replace(/[&?]$/,''));
+    const tl = document.getElementById('pos-rent-lieux');
+    if(tl) tl.innerHTML = (data.par_lieu||[]).map(x=>`<tr${lieuR && x.lieu!==lieuR?' style="opacity:.45"':''}>
+        <td><strong>${esc(x.nom)}</strong></td><td class="tr num">${posGx(x.ca)}</td><td class="tr num">${posGx(x.cogs)}</td>
+        <td class="tr num" style="color:${x.benefice>=0?'#34d399':'#f87171'}">${posGx(x.benefice)}</td><td class="tr num">${x.ca?x.marge_pct.toFixed(1)+' %':'—'}</td>
+        <td class="tr num" style="color:${x.pertes_inventaire>0?'#fbbf24':'inherit'}">${x.pertes_inventaire?posGx(x.pertes_inventaire):'—'}</td></tr>`).join('')
+      || '<tr><td colspan="6" style="color:rgba(255,255,255,.3);text-align:center;padding:14px">Aucune vente sur la période</td></tr>';
 
     // KPIs
     [
