@@ -645,6 +645,8 @@ class ScanIn(BaseModel):
     code: str = Field(max_length=200)
     # Scan fait sans réseau, envoyé au retour d'internet : heure réelle du scan
     hors_ligne_le: Optional[datetime] = None
+    # Bon de transfert : un colis pas encore vérifié est vérifié puis ajouté
+    verifier_si_besoin: bool = False
 
 
 def _details_hors_ligne(data: "ScanIn") -> Optional[str]:
@@ -693,29 +695,60 @@ def fiche_colis(colis_id: int, request: Request, db: Session = Depends(get_db)):
     return _fiche(db, c)
 
 
+def _verifier(db: Session, c: BarColis, user_id: int, details: Optional[str] = None) -> bool:
+    """Le colis entre dans le stock du dépôt (A_VERIFIER → AU_DEPOT, mouvement
+    ENTREE, journal). Atomique ; False s'il n'était plus « à vérifier »."""
+    maintenant = datetime.now(timezone.utc)
+    if not _transition(db, c.id, ("A_VERIFIER",),
+                       {"statut": "AU_DEPOT", "verifie_le": maintenant, "verifie_par_id": user_id}):
+        return False
+    db.add(BarMouvementStock(
+        produit_id=c.produit_id, type_mouvement="ENTREE", quantite=c.quantite, lieu=None,
+        motif=f"Colis {code_lisible(c.code)} vérifié au dépôt" + (f" (achat #{c.achat_id})" if c.achat_id else ""),
+        utilisateur_id=user_id,
+    ))
+    _journaliser(db, "VERIFIE", c, utilisateur_id=user_id, details=details)
+    return True
+
+
 @router.post("/colis/verifier")
 def verifier_colis(data: ScanIn, request: Request, db: Session = Depends(get_db),
                    user=Depends(_require_depot)):
     """Scan au dépôt : le colis est physiquement présent → son contenu entre
     dans le stock du dépôt. Atomique : un seul des scans simultanés réussit."""
     c = _trouver_colis(db, data.code, user.id)
-    maintenant = datetime.now(timezone.utc)
-    if not _transition(db, c.id, ("A_VERIFIER",),
-                       {"statut": "AU_DEPOT", "verifie_le": maintenant, "verifie_par_id": user.id}):
+    if not _verifier(db, c, user.id, _details_hors_ligne(data)):
         db.refresh(c)
         _refus(db, c, user.id, f"Colis {code_lisible(c.code)} {_etat_texte(c)}.")
-    db.add(BarMouvementStock(
-        produit_id=c.produit_id, type_mouvement="ENTREE", quantite=c.quantite, lieu=None,
-        motif=f"Colis {code_lisible(c.code)} vérifié au dépôt" + (f" (achat #{c.achat_id})" if c.achat_id else ""),
-        utilisateur_id=user.id,
-    ))
-    _journaliser(db, "VERIFIE", c, utilisateur_id=user.id, details=_details_hors_ligne(data))
     db.commit()
     db.refresh(c)
     restants = (db.query(BarColis).filter(BarColis.achat_id == c.achat_id,
                                           BarColis.statut == "A_VERIFIER").count()
                 if c.achat_id else 0)
     return {**_colis_dict(c), "restants_achat": restants}
+
+
+class VerificationManuelleIn(BaseModel):
+    colis_ids: List[int] = Field(min_length=1, max_length=MAX_COLIS_PAR_RECEPTION)
+    motif:     Optional[str] = Field(default=None, max_length=200)
+
+
+@router.post("/colis/verifier-manuel")
+def verifier_manuel(data: VerificationManuelleIn, db: Session = Depends(get_db), user=Depends(_require_depot)):
+    """Vérification à la main (sans scanner) : la personne confirme que ces
+    colis sont bien au dépôt. Même effet que le scan, inscrit au journal comme
+    « vérifié à la main ». Les colis qui ne sont plus « à vérifier » sont ignorés."""
+    detail = "Vérifié à la main (sans scan)" + (f" — {data.motif.strip()}" if (data.motif or "").strip() else "")
+    faits, ignores = [], []
+    for cid in dict.fromkeys(data.colis_ids):
+        c = db.get(BarColis, cid)
+        if c and _verifier(db, c, user.id, detail[:300]):
+            faits.append(c)
+        else:
+            ignores.append(cid)
+    db.commit()
+    return {"verifies": len(faits), "ignores": len(ignores),
+            "unites": float(sum(Decimal(str(c.quantite)) for c in faits))}
 
 
 @router.post("/colis/{colis_id}/annuler")
@@ -933,6 +966,11 @@ def scanner_colis_livraison(livraison_id: int, data: ScanIn, db: Session = Depen
     c = _trouver_colis(db, data.code, user.id)
     tb = _type_bon(l)
     if tb == "TRANSFERT":
+        verifie_ici = False
+        if c.statut == "A_VERIFIER" and data.verifier_si_besoin:
+            verifie_ici = _verifier(db, c, user.id, f"Vérifié au moment du transfert {l.numero}")
+            if verifie_ici:
+                db.flush()
         if not _transition(db, c.id, ("AU_DEPOT",), {"statut": "EN_PREPARATION", "livraison_id": l.id}):
             db.refresh(c)
             if c.statut == "EN_PREPARATION":

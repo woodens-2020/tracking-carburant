@@ -355,3 +355,26 @@ def test_caisse_d_un_bar_voit_le_stock_de_ce_bar(client, db):
     assert par_lieu["DEVANT"]["stock_courant"] == 0
     tous = next(x for x in client.get("/api/pos/produits?actif=true", headers=H).json() if x["id"] == p.id)
     assert tous["stock_courant"] == 36
+
+
+def test_verification_a_la_main_et_pendant_le_transfert(client, db):
+    _annuler_bons_ouverts(client)
+    p = _produit(db, upc=12)
+    colis = _recevoir(client, _achat_api(client, p, 36), verifier=False)
+    # À la main : deux colis, un troisième ignoré s'il est déjà vérifié
+    r = client.post("/api/pos/depot/colis/verifier-manuel", headers=H, json={"colis_ids": [colis[0]["id"], colis[1]["id"]]})
+    assert r.status_code == 200 and r.json()["verifies"] == 2 and r.json()["unites"] == 24
+    r = client.post("/api/pos/depot/colis/verifier-manuel", headers=H, json={"colis_ids": [colis[0]["id"]]})
+    assert r.json()["verifies"] == 0 and r.json()["ignores"] == 1
+    assert _stock(client, p.id)["depot"] == 24
+    f = client.get(f"/api/pos/depot/colis/{colis[0]['id']}/fiche", headers=H).json()
+    assert any("à la main" in (e["details"] or "") for e in f["historique"])
+    # Pendant le transfert : refusé sans l'option, vérifié + ajouté avec
+    l = client.post("/api/pos/depot/livraisons", headers=H, json={"lieu": "PISCINE"}).json()
+    r = client.post(f"/api/pos/depot/livraisons/{l['id']}/scan", headers=H, json={"code": colis[2]["code"]})
+    assert r.status_code == 409 and r.json()["detail"]["statut"] == "A_VERIFIER"
+    r = client.post(f"/api/pos/depot/livraisons/{l['id']}/scan", headers=H, json={"code": colis[2]["code"], "verifier_si_besoin": True})
+    assert r.status_code == 200, r.text
+    assert client.post(f"/api/pos/depot/livraisons/{l['id']}/valider", headers=H).status_code == 200
+    s = _stock(client, p.id)
+    assert (s["depot"], s["piscine"]) == (24, 12)

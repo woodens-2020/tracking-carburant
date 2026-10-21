@@ -3316,6 +3316,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 .dep-ouv-l b{font-size:15px}
 .dep-ouv-l.ok{border-color:rgba(34,197,94,.4)} .dep-ouv-l.ko{border-color:rgba(251,191,36,.45)}
 .dep-ouv-ctl{grid-column:1/-1;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.06);padding-top:10px;font-size:13.5px}
+.dep-trf-auto{display:flex;gap:8px;align-items:center;font-size:13px;color:rgba(255,255,255,.7);margin-top:8px;cursor:pointer}
 .dep-guide-modal{max-width:980px;width:calc(100vw - 32px);max-height:calc(100vh - 40px);overflow-y:auto}
 .dep-vide-l td{text-align:center;padding:16px!important;color:rgba(255,255,255,.35)}
 /* ── Formulaire d'achat ─────────────────────────────────────────── */
@@ -7578,6 +7579,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
               <div class="pos-card-hdr">Colis à vérifier au dépôt <span class="dep-badge" id="dep-nb-verif">0</span>
                 <div class="dep-filtres">
                   <input id="dep-verif-cherche" class="pos-input" placeholder="Filtrer : produit ou code…" oninput="depRenderColisVerif()">
+                  <button class="pos-btn teal dep-btn-s" id="dep-verif-tout" onclick="depVerifierTout()" title="Confirmer à la main que les colis affichés sont au dépôt">✓ Tout vérifier</button>
                   <button class="pos-btn ghost dep-btn-s" onclick="depEtiquettes()">🖨 Étiquettes 2 × 1</button>
                 </div>
               </div>
@@ -7757,6 +7759,8 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
             <thead><tr><th>#</th><th>Code</th><th>Produit</th><th class="tr">Quantité</th><th></th></tr></thead>
             <tbody id="dep-trf-lignes"></tbody>
           </table></div>
+          <label class="dep-trf-auto"><input type="checkbox" id="dep-trf-auto" onchange="depAutoVerif(this.checked)">
+            Vérifier automatiquement les colis pas encore vérifiés au dépôt (ils sont vérifiés puis ajoutés)</label>
           <details class="dep-trf-vrac">
             <summary>Ajouter du stock sans étiquette (vrac)</summary>
             <div class="dep-scan-row">
@@ -29141,6 +29145,10 @@ function _depRetour(msg, ok){
   }
 }
 
+// Bon de transfert : vérifier en même temps les colis encore « à vérifier »
+let _depAutoVerif = (()=>{ try{ return localStorage.getItem('dep-auto-verif')==='1'; }catch(_){ return false; } })();
+function depAutoVerif(v){ _depAutoVerif = !!v; try{ localStorage.setItem('dep-auto-verif', v?'1':'0'); }catch(_){} }
+
 // ── Scans hors ligne : gardés dans ce navigateur, envoyés au retour du réseau
 const _DEP_FILE_CLE = 'dep-scans-hors-ligne';
 function _depEstHorsLigne(e){ return !navigator.onLine || (e && !e.status && /fetch|network|réseau|load failed/i.test(String(e.message||''))); }
@@ -29206,7 +29214,7 @@ function depScanner(valeur, externe){
   _depFile = _depFile.then(()=>_depTraiterScan(code, mode, _depDest, special)).catch(()=>{});
 }
 
-async function _depTraiterScan(code, mode, dest, special){
+async function _depTraiterScan(code, mode, dest, special, forcerVerif){
   try{
     if(mode === 'fiche'){
       const f = await apiFetch('POST','/pos/depot/colis/consulter',{code});
@@ -29222,7 +29230,7 @@ async function _depTraiterScan(code, mode, dest, special){
     } else {
       let l = special ? {id:special} : _depLivraisons[dest];
       if(!l){ l = await apiFetch('POST','/pos/depot/livraisons',{lieu:dest}); _depLivraisons[dest] = l; }
-      const r = await apiFetch('POST',`/pos/depot/livraisons/${l.id}/scan`,{code});
+      const r = await apiFetch('POST',`/pos/depot/livraisons/${l.id}/scan`,{code, verifier_si_besoin: !special && (_depAutoVerif || !!forcerVerif)});
       if(special){ _depBonSpecial = r; }
       else { _depLivraisons[dest] = r; if(dest===_depDest) _depLivraison = r; }
       _depDernierScan = r.colis_scanne.id;
@@ -29245,8 +29253,15 @@ async function _depTraiterScan(code, mode, dest, special){
     let msg = String(e.message||'Scan refusé').replace(/^\[\d+\]\s*/,'').replace(/\.\s*$/,'');
     if(mode==='verif' && e.detail && e.detail.statut==='AU_DEPOT')
       msg += ' — pour le sortir vers un bar, passez en mode « Transférer vers un bar ».';
-    if(mode==='livr' && e.detail && e.detail.statut==='A_VERIFIER')
-      msg += ' — passez en mode « Vérifier au dépôt », scannez-le, puis revenez au transfert.';
+    if(mode==='livr' && e.detail && e.detail.statut==='A_VERIFIER' && !special){
+      _depRetour('⚠ ' + msg, false);
+      // Proposer de le vérifier tout de suite et de l'ajouter
+      if(await showConfirm(`Le colis ${code} n'a pas encore été vérifié au dépôt. Confirmez-vous qu'il est bien là ? Il sera vérifié puis ajouté au bon.\n\nAstuce : cochez « Vérifier automatiquement » dans le bon pour ne plus avoir cette question.`,
+          {title:'Colis pas encore vérifié', type:'warn', okLabel:'Vérifier et ajouter'})){
+        return _depTraiterScan(code, mode, dest, special, true);
+      }
+      return;
+    }
     _depRetour('✗ ' + msg, false);
     // Colis déjà livré : afficher directement sa fiche de livraison
     if(e.detail && e.detail.deja_livre && e.detail.colis_id) depOuvrirFiche(e.detail.colis_id);
@@ -29393,10 +29408,32 @@ function depRenderColisVerif(){
       <td><strong>${esc(c.produit_nom||'')}</strong></td>
       <td class="tr num">${c.quantite} ${esc(c.unite||'u.')}</td>
       <td>#${c.achat_id||'—'}</td><td class="num">${_depJour(c.cree_le)}</td>
-      <td class="dep-actions"><button class="pos-btn ghost dep-btn-s" onclick="depImprimerColis(${c.id})" title="Réimprimer l'étiquette">🖨</button>
+      <td class="dep-actions"><button class="pos-btn teal dep-btn-s" onclick="depVerifierMain([${c.id}])" title="Vérifier à la main, sans scanner">✓ Vérifier</button>
+        <button class="pos-btn ghost dep-btn-s" onclick="depImprimerColis(${c.id})" title="Réimprimer l'étiquette">🖨</button>
         <button class="pos-btn ghost dep-btn-s" onclick="depAnnulerColis(${c.id},'${esc(c.code_lisible||c.code)}')" title="Colis créé par erreur (avant vérification)">Retirer</button></td></tr>`).join('')
     + (liste.length>max?`<tr class="dep-vide-l"><td colspan="7">… et ${liste.length-max} autres — affinez le filtre</td></tr>`:'')
     || `<tr class="dep-vide-l"><td colspan="7">${_depColisVerif.length?'Aucun colis ne correspond au filtre.':'Tout est vérifié.'}</td></tr>`;
+}
+
+// Vérification à la main (sans scanner)
+async function depVerifierMain(ids, sansConfirmer){
+  const choisis = _depColisVerif.filter(c=>ids.includes(c.id));
+  const unites = choisis.reduce((t,c)=>t+c.quantite,0);
+  if(!sansConfirmer && !await showConfirm(
+      ids.length===1 ? `Confirmer que le colis ${choisis[0]?.code_lisible||''} (${choisis[0]?.produit_nom||''}, ${unites} unités) est bien arrivé au dépôt ?`
+                     : `Confirmer que ces ${ids.length} colis (${unites} unités) sont bien arrivés au dépôt ?`,
+      {title:'Vérifier à la main', type:'ok', okLabel:'Oui, ils sont au dépôt'})) return;
+  try{
+    const r = await apiFetch('POST','/pos/depot/colis/verifier-manuel',{colis_ids:ids});
+    _depRetour(`✓ ${r.verifies} colis vérifié(s) à la main : ${r.unites} unités entrées au dépôt${r.ignores?` · ${r.ignores} déjà vérifié(s)`:''}.`, true);
+    _depBip(true);
+    await _depCharger();
+  }catch(e){ posAlert(_errTxt(e)); }
+}
+function depVerifierTout(){
+  const liste = _depFiltre(_depColisVerif, document.getElementById('dep-verif-cherche')?.value);
+  if(!liste.length) return;
+  depVerifierMain(liste.map(c=>c.id));
 }
 
 // Onglet « Colis et codes-barres »
@@ -29744,6 +29781,7 @@ function depTransfertRender(){
   v.disabled = !lignes.length;
   v.textContent = sp && sp.type_bon==='RETOUR' ? `✓ Valider le retour au dépôt` : `✓ Valider le transfert vers le ${dest}`;
   document.getElementById('dep-trf-annuler').hidden = !l;
+  const au = document.getElementById('dep-trf-auto'); if(au){ au.checked = _depAutoVerif; au.parentElement.hidden = !!sp; }
 }
 
 async function depAjouterVrac(){
