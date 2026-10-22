@@ -29565,8 +29565,37 @@ function depAfficherFiche(f){
 }
 
 let _depFicheColisId = null;
+// Format d'impression des étiquettes (mémorisé) : rouleau 2 × 1 (paysage ou
+// portrait) ou planche Letter ; première case libre d'une planche entamée.
+const _ETQ_FORMATS = [
+  {v:'rouleau',          l:"Rouleau 2 × 1 po — imprimante d'étiquettes (paysage)"},
+  {v:'rouleau_portrait', l:'Rouleau 2 × 1 po — chargé en long (portrait)'},
+  {v:'planche40',        l:'Planche Letter 2 × 1 po — 40 étiquettes (4 × 10)'},
+  {v:'avery5160',        l:'Planche Letter Avery 5160 — 30 étiquettes (3 × 10)'},
+];
+async function _depChoixEtiquettes(){
+  let fmt='rouleau'; try{ fmt = localStorage.getItem('etq-format') || 'rouleau'; }catch(_){}
+  const v = await uiDemander({
+    titre: 'Imprimer les étiquettes', ok: 'Créer le PDF',
+    message: "Dans la fenêtre d'impression : échelle 100 % (« Taille réelle »), sans « Ajuster à la page ».\nRouleau : choisissez le papier 2 × 1 po (50 × 25 mm) dans les préférences de l'imprimante d'étiquettes.\nSi l'étiquette sort tournée ou coupée, essayez « chargé en long (portrait) ».",
+    champs: [
+      {id:'format', label:"Support d'étiquettes", type:'select', valeur:fmt, options:_ETQ_FORMATS},
+      {id:'debut', label:'Planche entamée : commencer à la case n°', type:'number', min:1, max:40, valeur:1,
+       aide:'Cases comptées de gauche à droite, ligne par ligne. Ignoré pour le rouleau.'},
+    ],
+  });
+  if(!v) return null;
+  try{ localStorage.setItem('etq-format', v.format); }catch(_){}
+  return `format=${encodeURIComponent(v.format)}&debut=${Math.max(1, parseInt(v.debut)||1)}`;
+}
+
 async function _depOuvrirPdf(url){
   const hdrs = {}; const k = sessionStorage.getItem('api_key'); if(k) hdrs['X-API-Key'] = k;
+  if(url.includes('/etiquettes.pdf') && !/[?&]format=/.test(url)){
+    const params = await _depChoixEtiquettes();
+    if(!params) return;
+    url += (url.includes('?') ? '&' : '?') + params;
+  }
   try{
     const res = await fetch(url, {headers:hdrs, credentials:'include'});
     if(!res.ok){ const e = await res.json().catch(()=>({})); throw new Error(e.detail||'Étiquette indisponible'); }
@@ -29738,14 +29767,7 @@ async function depReceptionner(achatId){
 }
 
 async function depEtiquettes(achatId){
-  const url = '/api/pos/depot/etiquettes.pdf' + (achatId ? `?achat_id=${achatId}` : '');
-  const hdrs = {}; const k = sessionStorage.getItem('api_key'); if(k) hdrs['X-API-Key'] = k;
-  try{
-    const res = await fetch(url, {headers:hdrs, credentials:'include'});
-    if(!res.ok){ const e = await res.json().catch(()=>({})); throw new Error(e.detail||'Aucune étiquette'); }
-    const blob = await res.blob();
-    window.open(URL.createObjectURL(blob), '_blank');
-  }catch(e){ posAlert(e.message||'Impression impossible.'); }
+  return _depOuvrirPdf('/api/pos/depot/etiquettes.pdf' + (achatId ? `?achat_id=${achatId}` : ''));
 }
 
 async function depAnnulerColis(id, code){

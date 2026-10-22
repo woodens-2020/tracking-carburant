@@ -568,53 +568,89 @@ def _texte_ajuste(pdf, texte: str, police: str, taille: float, largeur_max: floa
     return texte.rstrip() + "…"
 
 
-def _dessiner_etiquette(pdf, c: BarColis) -> None:
-    """Une étiquette 2 × 1 po : code-barres Code 128 sur toute la largeur
-    (lisible par une douchette 1D comme par la caméra), puis le code en
-    clair, le produit, la quantité et le n° d'achat."""
+# Formats d'impression : (largeur page, hauteur page, liste des cases)
+#   rouleau           : imprimante d'étiquettes, rouleau 2 × 1 po, une par page
+#   rouleau_portrait  : même rouleau chargé en long (page 1 × 2 po, contenu tourné)
+#   planche40         : planche Letter de 40 étiquettes 2 × 1 po (4 × 10)
+#   avery5160         : planche Letter Avery 5160 / 8160, 30 étiquettes 2⅝ × 1 po (3 × 10)
+POUCE = 72
+FORMATS_ETIQUETTES = {
+    "rouleau":          {"nom": "Rouleau 2 × 1 po (imprimante d'étiquettes)"},
+    "rouleau_portrait": {"nom": "Rouleau 2 × 1 po chargé en long (portrait)"},
+    "planche40":        {"nom": "Planche Letter 2 × 1 po (40 par page)"},
+    "avery5160":        {"nom": "Planche Letter Avery 5160 (30 par page)"},
+}
+
+
+def _cases_planche(fmt: str) -> tuple:
+    """(taille de page, [(x, y, largeur, hauteur) des étiquettes, de haut en bas])."""
+    if fmt == "planche40":
+        larg, haut, cols, rangs = 2 * POUCE, 1 * POUCE, 4, 10
+        g, h_marge, pas_x = 0.25 * POUCE, 0.5 * POUCE, 2 * POUCE
+    else:   # avery5160
+        larg, haut, cols, rangs = 2.625 * POUCE, 1 * POUCE, 3, 10
+        g, h_marge, pas_x = 0.1875 * POUCE, 0.5 * POUCE, 2.75 * POUCE
+    page = (8.5 * POUCE, 11 * POUCE)
+    cases = [(g + col * pas_x, page[1] - h_marge - (rang + 1) * haut, larg, haut)
+             for rang in range(rangs) for col in range(cols)]
+    return page, cases
+
+
+def _dessiner_etiquette(pdf, c: BarColis, x0: float = 0, y0: float = 0,
+                        larg: float = 2 * POUCE, haut: float = 1 * POUCE) -> None:
+    """Une étiquette dans la case (x0, y0, larg, haut) : code-barres Code 128
+    (lisible par une douchette 1D comme par la caméra), code en clair,
+    produit, quantité et n° d'achat. Marges de sécurité de 2,8 mm sur les
+    côtés et 2 mm en haut et en bas : rien n'est coupé par l'imprimante."""
     from reportlab.graphics.barcode.code128 import Code128
 
-    marge = 5                                   # ≈ 1,8 mm, zone non imprimable des imprimantes thermiques
-    largeur_utile = ETIQ_LARGEUR - 2 * marge
+    mx, my = 8, 6                                  # marges de sécurité (points)
+    utile = larg - 2 * mx
 
-    # Code-barres : module de 3 points d'impression à 203 dpi (résolution
-    # standard des imprimantes d'étiquettes 2 × 1) pour des barres nettes ;
-    # zones blanches de 10 modules de chaque côté (exigées par les lecteurs).
-    # Si le code est plus long que prévu, le module est réduit pour tenir.
-    module = 3 * 72 / 203
+    # Barres : module de 3 points à 203 dpi (imprimantes d'étiquettes) pour
+    # des barres nettes, réduit si le code ne tient pas dans la largeur utile.
+    module = 3 * POUCE / 203
     essai = Code128(c.code, barWidth=module, humanReadable=False, quiet=False)
-    if essai.width + 20 * module > largeur_utile + 2 * marge:
-        module = (largeur_utile + 2 * marge) / (essai.width / module + 20)
-    code_barres = Code128(c.code, barWidth=module, barHeight=31, humanReadable=False,
-                          quiet=True, lquiet=10 * module, rquiet=10 * module)
-    x_cb = (ETIQ_LARGEUR - code_barres.width) / 2
-    code_barres.drawOn(pdf, x_cb, ETIQ_HAUTEUR - marge - 31)
+    if essai.width > utile - 12 * module:
+        module = utile / (essai.width / module + 12)
+    h_barres = 27
+    cb = Code128(c.code, barWidth=module, barHeight=h_barres, humanReadable=False,
+                 quiet=True, lquiet=6 * module, rquiet=6 * module)
+    cb.drawOn(pdf, x0 + (larg - cb.width) / 2, y0 + haut - my - h_barres)
 
-    # Code en clair, centré, sous le code-barres
-    pdf.setFont("Helvetica-Bold", 9.5)
-    pdf.drawCentredString(ETIQ_LARGEUR / 2, 24.5, code_lisible(c.code))
+    # Code en clair, centré, sous les barres
+    pdf.setFont("Helvetica-Bold", 9)
+    pdf.drawCentredString(x0 + larg / 2, y0 + 29, code_lisible(c.code))
 
     # Produit
     nom = (c.produit.nom if c.produit else "") or ""
     pdf.setFont("Helvetica-Bold", 7.5)
-    pdf.drawString(marge, 14.5, _texte_ajuste(pdf, nom, "Helvetica-Bold", 7.5, largeur_utile))
+    pdf.drawString(x0 + mx, y0 + 18, _texte_ajuste(pdf, nom, "Helvetica-Bold", 7.5, utile))
 
     # Quantité (gauche) et achat (droite)
     unite = (c.produit.unite if c.produit else "") or "u."
-    pdf.setFont("Helvetica", 7)
-    pdf.drawString(marge, 5.5, f"{float(c.quantite):g} {unite}")
+    pdf.setFont("Helvetica", 6.8)
+    pdf.drawString(x0 + mx, y0 + my + 2, f"{float(c.quantite):g} {unite}")
     if c.achat_id:
-        pdf.drawRightString(ETIQ_LARGEUR - marge, 5.5, f"Achat #{c.achat_id}")
+        pdf.drawRightString(x0 + larg - mx, y0 + my + 2, f"Achat #{c.achat_id}")
+
+
+@router.get("/etiquettes/formats")
+def formats_etiquettes():
+    return [{"code": k, "nom": v["nom"]} for k, v in FORMATS_ETIQUETTES.items()]
 
 
 @router.get("/etiquettes.pdf")
 def etiquettes(achat_id: Optional[int] = None, ids: Optional[str] = None,
-               db: Session = Depends(get_db)):
-    """PDF d'étiquettes 2 × 1 pouce, une par page, dans l'ordre des UL.
-    À imprimer sur une imprimante d'étiquettes, à l'échelle 100 % (taille
-    réelle), sans « ajuster à la page »."""
+               format: str = "rouleau", debut: int = 1, db: Session = Depends(get_db)):
+    """PDF d'étiquettes, dans l'ordre des UL, au format choisi :
+    rouleau 2 × 1 po (paysage ou portrait) ou planche Letter (40 × 2 × 1 po,
+    ou Avery 5160). `debut` : première case libre d'une planche déjà entamée.
+    À imprimer à l'échelle 100 % (taille réelle), sans « ajuster à la page »."""
     from reportlab.pdfgen import canvas
 
+    if format not in FORMATS_ETIQUETTES:
+        raise HTTPException(422, "Format inconnu : " + ", ".join(FORMATS_ETIQUETTES))
     q = db.query(BarColis)
     if achat_id:
         q = q.filter(BarColis.achat_id == achat_id)
@@ -631,16 +667,38 @@ def etiquettes(achat_id: Optional[int] = None, ids: Optional[str] = None,
         raise HTTPException(404, "Aucune UL à imprimer.")
 
     buf = io.BytesIO()
-    pdf = canvas.Canvas(buf, pagesize=(ETIQ_LARGEUR, ETIQ_HAUTEUR))
-    pdf.setTitle("Étiquettes UL 2x1")
-    for i, c in enumerate(colis):
-        if i:
-            pdf.showPage()
-        _dessiner_etiquette(pdf, c)
+    if format == "rouleau":
+        pdf = canvas.Canvas(buf, pagesize=(2 * POUCE, 1 * POUCE))
+        for n, c in enumerate(colis):
+            if n:
+                pdf.showPage()
+            _dessiner_etiquette(pdf, c)
+    elif format == "rouleau_portrait":
+        pdf = canvas.Canvas(buf, pagesize=(1 * POUCE, 2 * POUCE))
+        for n, c in enumerate(colis):
+            if n:
+                pdf.showPage()
+            pdf.saveState()
+            pdf.translate(1 * POUCE, 0)
+            pdf.rotate(90)
+            _dessiner_etiquette(pdf, c)
+            pdf.restoreState()
+    else:
+        page, cases = _cases_planche(format)
+        pdf = canvas.Canvas(buf, pagesize=page)
+        pos = max(1, min(debut, len(cases))) - 1
+        for c in colis:
+            if pos >= len(cases):
+                pdf.showPage()
+                pos = 0
+            x, y, w, h = cases[pos]
+            _dessiner_etiquette(pdf, c, x, y, w, h)
+            pos += 1
+    pdf.setTitle(f"Étiquettes UL — {FORMATS_ETIQUETTES[format]['nom']}")
     pdf.save()
     buf.seek(0)
     return StreamingResponse(buf, media_type="application/pdf",
-                             headers={"Content-Disposition": 'inline; filename="etiquettes-colis-2x1.pdf"'})
+                             headers={"Content-Disposition": f'inline; filename="etiquettes-ul-{format}.pdf"'})
 
 
 # ══════════════════════════════════════════════════════════════════════════

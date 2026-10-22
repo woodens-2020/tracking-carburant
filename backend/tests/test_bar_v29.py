@@ -420,3 +420,28 @@ def test_code_lu_en_azerty(client, db):
     azerty = code[:2] + code[2:].translate(str.maketrans("1234567890", "&é\"'(-è_çà"))
     r = client.post("/api/pos/depot/colis/scan", headers=H, json={"code": azerty})
     assert r.status_code == 200 and r.json()["colis"]["code"] == code
+
+
+def test_formats_d_etiquettes(client, db):
+    """Rouleau 2 × 1 (paysage / portrait) et planches Letter : bonnes tailles,
+    bon nombre de pages, code-barres lisible (si les outils de lecture sont là)."""
+    import re
+    p = _produit(db, upc=12)
+    colis = _recevoir(client, _achat_api(client, p, 60), verifier=False)       # 5 UL
+    ids = ",".join(str(c["id"]) for c in colis)
+    attendus = {"rouleau": ("144 72", 5), "rouleau_portrait": ("72 144", 5), "planche40": ("612 792", 1), "avery5160": ("612 792", 1)}
+    for fmt, (taille, pages) in attendus.items():
+        r = client.get(f"/api/pos/depot/etiquettes.pdf?ids={ids}&format={fmt}&debut=3", headers=H)
+        assert r.status_code == 200, (fmt, r.text)
+        assert re.search(rb"/MediaBox \[ 0 0 " + taille.encode() + rb" \]", r.content), fmt
+        assert f"/Count {pages}".encode() in r.content, fmt
+        try:
+            import fitz, zxingcpp
+            from PIL import Image
+        except ImportError:
+            continue
+        d = fitz.open(stream=r.content, filetype="pdf")
+        img = d[0].get_pixmap(dpi=300)
+        lus = {x.text for x in zxingcpp.read_barcodes(Image.frombytes("RGB", (img.width, img.height), img.samples))}
+        assert colis[0]["code"] in lus, (fmt, lus)
+    assert client.get(f"/api/pos/depot/etiquettes.pdf?ids={ids}&format=A4", headers=H).status_code == 422
