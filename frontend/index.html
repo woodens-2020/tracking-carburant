@@ -3317,6 +3317,32 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 .dep-ouv-l.ok{border-color:rgba(34,197,94,.4)} .dep-ouv-l.ko{border-color:rgba(251,191,36,.45)}
 .dep-ouv-ctl{grid-column:1/-1;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.06);padding-top:10px;font-size:13.5px}
 .dep-trf-auto{display:flex;gap:8px;align-items:center;font-size:13px;color:rgba(255,255,255,.7);margin-top:8px;cursor:pointer}
+.dep-act{max-width:640px;width:calc(100vw - 32px);max-height:calc(100vh - 40px);overflow-y:auto}
+.act-tete{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.act-prod{font-size:22px;font-weight:800;line-height:1.2}
+.act-sous{font-size:13.5px;color:rgba(255,255,255,.6)}
+.act-etat{font-size:13.5px;color:rgba(255,255,255,.75)}
+.act-stock{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 14px}
+.act-stock div{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.act-stock span{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5)}
+.act-stock b{font-size:20px;font-variant-numeric:tabular-nums}
+.act-stock .ici{border-color:rgba(45,212,191,.5);background:rgba(45,212,191,.07)}
+.act-stock em{font-style:normal;font-size:12.5px;font-weight:800;margin-left:6px}
+.act-stock em.plus{color:#34d399} .act-stock em.moins{color:#fbbf24}
+.act-q{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.5);margin:0 0 8px}
+.act-btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.act-btn{display:flex;align-items:center;justify-content:center;gap:10px;min-height:64px;border-radius:12px;border:1px solid rgba(45,212,191,.45);background:rgba(45,212,191,.12);color:#5eead4;font-size:16px;font-weight:800;cursor:pointer;padding:10px 14px;text-align:center}
+.act-btn:hover,.act-btn:focus-visible{background:rgba(45,212,191,.22);outline:none}
+.act-btn.sec{border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:#fff;font-weight:700;font-size:14px;min-height:48px}
+.act-btn.ret{border-color:rgba(167,139,250,.5);background:rgba(167,139,250,.12);color:#c4b5fd}
+.act-btn kbd{font:800 12px ui-monospace,Consolas,monospace;background:rgba(0,0,0,.35);border-radius:5px;padding:2px 7px;color:#fff}
+.act-btn[disabled]{opacity:.5;cursor:wait}
+.act-res{margin-top:12px;border-radius:10px;padding:12px 14px;font-size:15px;font-weight:700}
+.act-res.ok{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.5);color:#86efac}
+.act-res.err{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.5);color:#fca5a5}
+.act-res:empty{display:none}
+.dep-act-pied{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:14px;font-size:12.5px;color:rgba(255,255,255,.45)}
+@media(max-width:520px){.act-stock b{font-size:16px}}
 .dep-guide-modal{max-width:980px;width:calc(100vw - 32px);max-height:calc(100vh - 40px);overflow-y:auto}
 .dep-vide-l td{text-align:center;padding:16px!important;color:rgba(255,255,255,.35)}
 /* ── Formulaire d'achat ─────────────────────────────────────────── */
@@ -7529,7 +7555,8 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
         <div class="dep-station" aria-label="Scanner un colis">
           <div class="dep-station-haut">
             <div class="dep-seg" role="group" aria-label="Que faire du colis scanné">
-              <button type="button" id="dep-mode-verif" class="active" onclick="depSetMode('verif')">✓ Vérifier au dépôt</button>
+              <button type="button" id="dep-mode-auto" class="active" onclick="depSetMode('auto')" title="Scannez un colis : le système reconnaît son état et propose quoi en faire">⚡ Scan intelligent</button>
+              <button type="button" id="dep-mode-verif" onclick="depSetMode('verif')">✓ Vérifier au dépôt</button>
               <button type="button" id="dep-mode-livr" onclick="depSetMode('livr')">→ Transférer vers un bar</button>
               <button type="button" id="dep-mode-fiche" onclick="depSetMode('fiche')">🔍 Consulter la fiche</button>
             </div>
@@ -7851,6 +7878,19 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
       </div>
     </div>
 
+    <!-- Scan intelligent : que faire de ce colis ? -->
+    <div class="pos-modal-bg" id="dep-act-bg" onclick="if(event.target===this)depActFermer()">
+      <div class="pos-modal dep-act" role="dialog" aria-labelledby="dep-act-titre">
+        <div class="df-tete"><h3 id="dep-act-titre">Colis scanné</h3>
+          <button type="button" onclick="depActFermer()" aria-label="Fermer" class="df-fermer">✕</button></div>
+        <div id="dep-act-corps"></div>
+        <div class="dep-act-pied">
+          <span>⌨ Scannez le colis suivant à tout moment · Échap pour fermer</span>
+          <button class="pos-btn ghost dep-btn-s" id="dep-act-fiche" onclick="depActFiche()">Voir la fiche</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Saisie courte (motif, montant…) -->
     <div class="pos-modal-bg" id="ui-dem-bg" onclick="if(event.target===this)_uiDemFin(null)">
       <div class="pos-modal ui-dem" role="dialog" aria-labelledby="ui-dem-titre">
@@ -7899,6 +7939,9 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
             <div class="dep-guide-c"><b>3 · Transfert vers un bar</b>
               <p>Sortie de stock du dépôt vers le Bar devant ou le Bar piscine. On choisit le bar, on scanne les colis : le <em>bon de transfert</em> s'ouvre au premier scan et se remplit à chaque scan. On <em>valide</em> : le stock passe du dépôt au bar. C'est la seule façon d'approvisionner un bar.</p>
               <p class="dep-guide-qui">Mode « Transférer vers un bar » · onglet Transferts</p></div>
+            <div class="dep-guide-c"><b>⚡ Scan intelligent</b>
+              <p>Scannez n'importe quel colis : le système reconnaît où il en est et propose la suite. Au dépôt : <em>Bar devant [1]</em> ou <em>Bar piscine [2]</em>. À vérifier : <em>vérifier [0]</em> ou vérifier et envoyer. Dans un bar : <em>retour au dépôt [3]</em> ou vers l'autre bar. Un clic (ou une touche) et les stocks sont à jour.</p>
+              <p class="dep-guide-qui">Mode par défaut · fenêtre ouverte à chaque scan</p></div>
             <div class="dep-guide-c"><b>Retours et transferts entre bars</b>
               <p>Un bar rend des caisses fermées ou du vrac au dépôt (« ↩ Retour au dépôt »), ou les passe à l'autre bar (« ⇄ Vers… »). Même bon, même scan, même validation : le stock passe d'un lieu à l'autre avec sa trace.</p>
               <p class="dep-guide-qui">Onglet Transferts · boutons sous chaque bar</p></div>
@@ -28956,7 +28999,8 @@ function depFermerCode(){
 }
 const _depFiltre = (liste, q) => { q=(q||'').trim().toLowerCase().replace(/[\s-]/g,'');
   return q ? liste.filter(c=>((c.produit_nom||'')+' '+(c.code||'')).toLowerCase().replace(/[\s-]/g,'').includes(q)) : liste; };
-let _depMode = 'verif';          // 'verif' (contrôle au dépôt) | 'livr' (ajout à la livraison)
+// Mode du scanner : 'auto' (scan intelligent, par défaut) | 'verif' | 'livr' (bon de transfert) | 'fiche'
+let _depMode = (()=>{ try{ return localStorage.getItem('dep-mode') || 'auto'; }catch(_){ return 'auto'; } })();
 let _depLivraison = null;        // livraison en préparation du bar choisi
 let _depLivraisons = {DEVANT:null, PISCINE:null};   // une livraison en préparation par bar
 let _depDest = (()=>{ try{ return localStorage.getItem('dep-dest')==='PISCINE' ? 'PISCINE' : 'DEVANT'; }catch(_){ return 'DEVANT'; } })();
@@ -28982,8 +29026,10 @@ document.addEventListener('keydown', e=>{
       if(el && el.tagName==='SELECT'){ if(el.value!==L.val){ el.value=L.val; } }
       else if(el && typeof el.value==='string' && el.value.endsWith(b)) el.value=el.value.slice(0,-n);
       L.duree=Math.round(L.dernier-L.debut);
+      L.dernier=t;                       // annule un raccourci déclenché par le dernier chiffre du code
       depScanner(b, true);
     }
+    L.dernier=t;
     return;
   }
   if(e.key.length!==1) return;
@@ -29020,6 +29066,7 @@ async function loadPosDepot(){
   let o='reception'; try{ o=localStorage.getItem('dep-onglet')||'reception'; }catch(_){}
   depOnglet(o, true);
   depChoisirDest(_depDest, true);
+  depSetMode(_depMode, true);
   setTimeout(()=>document.getElementById('dep-scan-input')?.focus(), 50);
 }
 
@@ -29093,8 +29140,9 @@ function depOnglet(t, silencieux){
     const actif=b.dataset.t===t; b.classList.toggle('active',actif); b.setAttribute('aria-selected',actif);
   });
   try{ localStorage.setItem('dep-onglet', t); }catch(_){}
-  if(t==='reception' && _depMode!=='fiche') depSetMode('verif', silencieux);
-  if(t==='livraison' && _depMode!=='fiche') depSetMode('livr', silencieux);
+  // Le scan intelligent reste actif quel que soit l'onglet
+  if(t==='reception' && _depMode!=='fiche' && _depMode!=='auto') depSetMode('verif', silencieux);
+  if(t==='livraison' && _depMode!=='fiche' && _depMode!=='auto') depSetMode('livr', silencieux);
   if(t==='journal') depChargerJournal();
   if(t==='colis') depChargerColis();
   if(t==='stock') depChargerOuverture();
@@ -29113,12 +29161,14 @@ const _DEP_AIDE_MODE = {
 function depSetMode(m, sansFocus){
   _depMode = m;
   const inp=document.getElementById('dep-scan-input');
+  try{ localStorage.setItem('dep-mode', m); }catch(_){}
   if(inp) inp.placeholder = {
+    auto:  'Scannez un colis : le système propose quoi en faire (vérifier, envoyer à un bar, retour…)',
     verif: 'Scannez un colis arrivé au dépôt…',
     livr:  `Scannez un colis à sortir vers le ${_DEP_LIEUX[_depDest]}…`,
     fiche: 'Scannez un colis pour voir sa fiche…',
   }[m] || '';
-  ['verif','livr','fiche'].forEach(k=>document.getElementById('dep-mode-'+k).classList.toggle('active', m===k));
+  ['auto','verif','livr','fiche'].forEach(k=>document.getElementById('dep-mode-'+k)?.classList.toggle('active', m===k));
   const ds=document.getElementById('dep-dest-scan'); if(ds){ ds.hidden = m!=='livr'; ds.value=_depDest; }
   if(!sansFocus) inp.focus();
 }
@@ -29148,6 +29198,119 @@ function _depRetour(msg, ok){
 // Bon de transfert : vérifier en même temps les colis encore « à vérifier »
 let _depAutoVerif = (()=>{ try{ return localStorage.getItem('dep-auto-verif')==='1'; }catch(_){ return false; } })();
 function depAutoVerif(v){ _depAutoVerif = !!v; try{ localStorage.setItem('dep-auto-verif', v?'1':'0'); }catch(_){} }
+
+// ══ Scan intelligent : un scan → l'état du colis → l'action en un clic ══
+let _depAct = null;                 // {code, info, avant}
+const _depActOuvert = () => document.getElementById('dep-act-bg')?.classList.contains('open');
+const _DEP_ACT = {
+  VERIFIER: {lbl:'✓ Vérifier au dépôt', touche:'0', cls:'sec'},
+  DEVANT:   {lbl:'→ Bar devant', touche:'1', cls:''},
+  PISCINE:  {lbl:'→ Bar piscine', touche:'2', cls:''},
+  DEPOT:    {lbl:'↩ Retour au dépôt', touche:'3', cls:'ret'},
+  OUVRIR:   {lbl:'Ouvrir le colis (vrac)', touche:null, cls:'sec'},
+};
+
+async function _depScanIntel(code){
+  try{
+    const info = await apiFetch('POST','/pos/depot/colis/scan',{code});
+    _depAct = {code, info, avant:null, res:null};
+    _depBip(true);
+    depActRender();
+  }catch(e){
+    _depBip(false);
+    const msg = _errTxt(e);
+    _depRetour('✗ ' + msg, false);
+    _depAct = {code, info:null, res:{ok:false, txt:msg}};
+    depActRender();
+    if(e.detail && e.detail.deja_livre && e.detail.colis_id) depOuvrirFiche(e.detail.colis_id);
+  }
+}
+
+function depActRender(){
+  const bg = document.getElementById('dep-act-bg'); if(!bg || !_depAct) return;
+  const {info, res, avant} = _depAct;
+  const corps = document.getElementById('dep-act-corps');
+  document.getElementById('dep-act-fiche').hidden = !info;
+  if(!info){
+    document.getElementById('dep-act-titre').textContent = 'Code refusé';
+    corps.innerHTML = `<div class="act-res err">✗ ${esc(res?.txt||'')}</div>`;
+  } else {
+    const c = info.colis, st = info.stock;
+    const tuile = (k, nom) => {
+      const d = avant ? st[k] - avant[k] : 0;
+      const ici = (k==='DEPOT' && ['AU_DEPOT','A_VERIFIER','EN_PREPARATION','OUVERT'].includes(c.statut) && !c.lieu) || c.lieu===k;
+      return `<div class="${ici?'ici':''}"><span>${nom}</span><b>${st[k]}${d?`<em class="${d>0?'plus':'moins'}">${d>0?'+':''}${d}</em>`:''}</b></div>`;
+    };
+    const libelleAction = a => {
+      const x = _DEP_ACT[a];
+      let lbl = x.lbl;
+      if(c.statut==='A_VERIFIER' && (a==='DEVANT'||a==='PISCINE')) lbl = `✓ Vérifier et envoyer ${a==='DEVANT'?'au Bar devant':'au Bar piscine'}`;
+      if(c.statut==='LIVRE' && (a==='DEVANT'||a==='PISCINE')) lbl = `⇄ Vers le ${a==='DEVANT'?'Bar devant':'Bar piscine'}`;
+      return `<button type="button" class="act-btn ${x.cls}" data-act="${a}" onclick="depActExec('${a}')">${lbl}${x.touche?` <kbd>${x.touche}</kbd>`:''}</button>`;
+    };
+    document.getElementById('dep-act-titre').textContent = `Colis ${c.code_lisible}`;
+    corps.innerHTML = `
+      <div class="act-tete">
+        <div class="act-prod">${esc(c.produit_nom||'')}</div>
+        <div class="act-sous">${c.quantite} ${esc(c.unite||'u.')} · ${c.achat_id?'achat #'+c.achat_id+' · ':''}<span class="dep-st ${_DEP_ST_CLASSE[c.statut]||''}">${esc(c.statut_libelle)}</span>${c.lieu_nom?' · '+esc(c.lieu_nom):''}</div>
+        ${info.bon?`<div class="act-etat">Dans le bon ${esc(info.bon.numero)} (${esc(info.bon.origine_nom)} → ${esc(info.bon.destination_nom)}), pas encore validé.</div>`:''}
+        ${!info.actions.length && !info.bon?`<div class="act-etat">Ce colis est ${esc(info.etat)}.</div>`:''}
+      </div>
+      <div class="act-stock">${tuile('DEPOT','Dépôt')}${tuile('DEVANT','Bar devant')}${tuile('PISCINE','Bar piscine')}</div>
+      ${info.actions.length?`<div class="act-q">${res&&res.ok?'Et maintenant ?':'Que faire de ce colis ?'}</div><div class="act-btns">${info.actions.map(libelleAction).join('')}</div>`
+        : `<div class="act-q">Aucune action possible pour ce colis</div>`}
+      <div class="act-res ${res?(res.ok?'ok':'err'):''}" aria-live="polite">${res?esc(res.txt):''}</div>`;
+  }
+  if(!bg.classList.contains('open')){ bg.classList.add('open'); document.activeElement?.blur?.(); }
+}
+
+async function depActExec(action){
+  if(!_depAct || !_depAct.info) return;
+  const {code, info} = _depAct, c = info.colis;
+  document.querySelectorAll('#dep-act-corps .act-btn').forEach(b=>b.disabled=true);
+  try{
+    if(action==='OUVRIR'){ await depOuvrirColis(c.id); return _depScanIntel(code); }
+    const avant = {...info.stock};
+    let txt;
+    if(action==='VERIFIER'){
+      await apiFetch('POST','/pos/depot/colis/verifier',{code});
+      txt = `✓ Vérifié : ${c.quantite} ${c.unite||'u.'} entrés au dépôt.`;
+    } else {
+      const r = await apiFetch('POST','/pos/depot/colis/transferer',{code, destination:action, verifier_si_besoin: c.statut==='A_VERIFIER'});
+      txt = `✓ ${r.sens} — ${c.quantite} ${c.unite||'u.'} de ${c.produit_nom} · bon ${r.bon.numero}. Stocks à jour.`;
+    }
+    const nouv = await apiFetch('POST','/pos/depot/colis/scan',{code});
+    _depAct = {code, info:nouv, avant, res:{ok:true, txt}};
+    _depBip(true);
+    _depRetour(txt, true);
+    depActRender();
+    _depCharger();
+  }catch(e){
+    _depBip(false);
+    _depAct.res = {ok:false, txt:_errTxt(e)};
+    depActRender();
+  }
+}
+
+function depActFermer(){
+  document.getElementById('dep-act-bg')?.classList.remove('open');
+  _depAct = null;
+  document.getElementById('dep-scan-input')?.focus();
+}
+function depActFiche(){ const id=_depAct?.info?.colis?.id; if(id) depOuvrirFiche(id); }
+
+// Raccourcis 0 / 1 / 2 / 3 dans la fenêtre d'action. Une douchette tape
+// aussi des chiffres : la touche n'agit que si aucune autre ne suit (90 ms).
+document.addEventListener('keydown', e=>{
+  if(!_depActOuvert() || e.ctrlKey || e.altKey || e.metaKey) return;
+  if(e.key==='Escape'){ depActFermer(); return; }
+  const a = Object.keys(_DEP_ACT).find(k=>_DEP_ACT[k].touche===e.key);
+  if(!a || !_depAct?.info?.actions.includes(a)) return;
+  const el = document.activeElement;
+  if(el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA' || el.tagName==='SELECT')) return;
+  const t0 = _depLecteur.dernier;
+  setTimeout(()=>{ if(_depLecteur.dernier===t0) depActExec(a); }, 90);
+});
 
 // ── Scans hors ligne : gardés dans ce navigateur, envoyés au retour du réseau
 const _DEP_FILE_CLE = 'dep-scans-hors-ligne';
@@ -29200,10 +29363,19 @@ function depScanner(valeur, externe){
   inp.value = '';
   if(externe) _depLecteurVu();
   if(_depTest){ _depResultatTest(code, externe); return; }
+  if(_depActOuvert() && _depMode==='auto'){
+    _depFile = _depFile.then(()=>_depScanIntel(code)).catch(()=>{});
+    return;
+  }
   // Fenêtre de transfert manuel ouverte : le scan ajoute le colis à la liste
   if(_depManuelOuvert()){
     document.getElementById('dep-manuel-code').value = code;
     depManuelAjouterCode();
+    return;
+  }
+  // Scan intelligent (hors bon de transfert ouvert) : fenêtre d'action
+  if(_depMode==='auto' && !_depTrfOuvert()){
+    _depFile = _depFile.then(()=>_depScanIntel(code)).catch(()=>{});
     return;
   }
   // Bon de transfert ouvert : tout scan va dans ce bon

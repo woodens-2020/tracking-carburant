@@ -675,6 +675,46 @@ def colis_par_code(code: str, request: Request, db: Session = Depends(get_db)):
     return _colis_dict(_trouver_colis(db, code, u.id))
 
 
+def _stock_produit_lieux(db: Session, produit_id: int) -> dict:
+    st = stock_par_lieu_tous_produits(db).get(produit_id, {"devant": Decimal(0), "piscine": Decimal(0), "total": Decimal(0)})
+    return {"DEPOT": float(st["total"] - st["devant"] - st["piscine"]),
+            "DEVANT": float(st["devant"]), "PISCINE": float(st["piscine"])}
+
+
+def _actions_possibles(c: BarColis) -> list:
+    """Actions proposées au scan selon l'état du colis (scan intelligent)."""
+    if c.statut == "A_VERIFIER":
+        return ["VERIFIER", "DEVANT", "PISCINE"]
+    if c.statut == "AU_DEPOT":
+        return ["DEVANT", "PISCINE", "OUVRIR"]
+    if c.statut == "LIVRE" and c.lieu in LIEUX:
+        autre = "PISCINE" if c.lieu == "DEVANT" else "DEVANT"
+        return ["DEPOT", autre]
+    return []
+
+
+class ScanIntelIn(BaseModel):
+    code: str = Field(max_length=200)
+
+
+@router.post("/colis/scan")
+def scan_intelligent(data: ScanIntelIn, request: Request, db: Session = Depends(get_db)):
+    """Scan intelligent : reconnaît le colis et dit ce qu'on peut en faire
+    (vérifier, envoyer au Bar devant / Bar piscine, retour au dépôt, vers
+    l'autre bar), avec le stock du produit dans chaque lieu. Ne modifie rien."""
+    u = _require_connecte(request)
+    c = _trouver_colis(db, data.code, u.id)
+    liv = db.get(BarLivraisonInterne, c.livraison_id) if c.livraison_id else None
+    return {
+        "colis": _colis_dict(c),
+        "etat": _etat_texte(c),
+        "actions": _actions_possibles(c),
+        "stock": _stock_produit_lieux(db, c.produit_id),
+        "bon": _livraison_dict(liv, details=False) if liv and c.statut == "EN_PREPARATION" else None,
+        "livraison": _livraison_dict(liv, details=False) if liv and c.statut == "LIVRE" else None,
+    }
+
+
 @router.post("/colis/consulter")
 def consulter_colis(data: ScanIn, request: Request, db: Session = Depends(get_db)):
     """Scan en mode consultation : renvoie la fiche du colis (fiche de
@@ -1143,6 +1183,84 @@ def annuler_livraison(livraison_id: int, db: Session = Depends(get_db), user=Dep
     db.commit()
     db.refresh(l)
     return _livraison_dict(l)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Transfert direct d'un colis scanné (scan intelligent)
+# ══════════════════════════════════════════════════════════════════════════
+
+class TransfertDirectIn(BaseModel):
+    code:        str = Field(max_length=200)
+    destination: str = Field(max_length=20)        # DEPOT | DEVANT | PISCINE
+    verifier_si_besoin: bool = False                # colis « à vérifier » : vérifié puis envoyé
+
+
+@router.post("/colis/transferer")
+def transferer_colis(data: TransfertDirectIn, db: Session = Depends(get_db), user=Depends(_require_depot)):
+    """Un scan, un choix, c'est fait : le colis part vers la destination
+    choisie et les stocks sont à jour immédiatement.
+      - colis au dépôt (ou à vérifier, avec verifier_si_besoin) → Bar devant / Bar piscine ;
+      - colis dans un bar → retour au dépôt, ou vers l'autre bar.
+    Un bon d'une ligne est créé et validé dans la même transaction (numéro et
+    journal comme un transfert normal). Atomique : deux scans simultanés du
+    même colis ne peuvent pas réussir tous les deux."""
+    dest = (data.destination or "").upper()
+    if dest not in ("DEPOT", *LIEUX):
+        raise HTTPException(422, "Destination invalide : DEPOT, DEVANT ou PISCINE.")
+    c = _trouver_colis(db, data.code, user.id)
+    if c.statut == "A_VERIFIER" and dest != "DEPOT":
+        if not data.verifier_si_besoin:
+            _refus(db, c, user.id, f"Colis {code_lisible(c.code)} pas encore vérifié au dépôt.")
+        if not _verifier(db, c, user.id, "Vérifié au scan, avant envoi direct"):
+            db.refresh(c)
+            _refus(db, c, user.id, f"Colis {code_lisible(c.code)} {_etat_texte(c)}.")
+        db.flush()
+        db.refresh(c)
+    if c.statut == "AU_DEPOT":
+        if dest == "DEPOT":
+            _refus(db, c, user.id, f"Colis {code_lisible(c.code)} déjà au dépôt.")
+        type_bon, origine, lieu_bon, de = "TRANSFERT", None, dest, ("AU_DEPOT",)
+    elif c.statut == "LIVRE" and c.lieu in LIEUX:
+        if dest == c.lieu:
+            _refus(db, c, user.id, f"Colis {code_lisible(c.code)} déjà au {LIEUX[c.lieu]}.")
+        if dest == "DEPOT":
+            type_bon, origine, lieu_bon = "RETOUR", c.lieu, c.lieu
+        else:
+            type_bon, origine, lieu_bon = "INTERBAR", c.lieu, dest
+        de = ("LIVRE",)
+    else:
+        _refus(db, c, user.id, f"Colis {code_lisible(c.code)} {_etat_texte(c)} : il ne peut pas être déplacé.")
+
+    maintenant = datetime.now(timezone.utc)
+    l = BarLivraisonInterne(numero="TMP-" + uuid.uuid4().hex[:20], lieu=lieu_bon, statut="VALIDEE",
+                            type_bon=type_bon, origine=origine, cree_par_id=user.id,
+                            valide_par_id=user.id, valide_le=maintenant, notes="Transfert direct par scan")
+    db.add(l)
+    db.flush()
+    prefixe = {"TRANSFERT": "TRF", "RETOUR": "RET", "INTERBAR": "TIB"}[type_bon]
+    l.numero = f"{prefixe}{now_haiti():%y%m%d}-{l.id:04d}"
+    src = None if type_bon == "TRANSFERT" else origine
+    dst = None if type_bon == "RETOUR" else lieu_bon
+    nouveau = {"statut": "AU_DEPOT", "lieu": None, "livraison_id": l.id} if type_bon == "RETOUR" \
+        else {"statut": "LIVRE", "lieu": dst, "livraison_id": l.id}
+    if not _transition(db, c.id, de, nouveau):
+        db.refresh(c)
+        _refus(db, c, user.id, f"Colis {code_lisible(c.code)} vient de changer d'état ({_etat_texte(c)}).")
+    sens = f"{_nom_lieu(src)} → {_nom_lieu(dst)}"
+    motif = f"{TYPES_BON[type_bon]} {l.numero} — colis {code_lisible(c.code)} — {sens}"
+    db.add(BarLivraisonLigne(livraison_id=l.id, produit_id=c.produit_id, colis_id=c.id, quantite=c.quantite))
+    q = Decimal(str(c.quantite))
+    db.add(BarMouvementStock(produit_id=c.produit_id, type_mouvement="TRANSFERT", quantite=-q, lieu=src,
+                             motif=motif[:300], utilisateur_id=user.id))
+    db.add(BarMouvementStock(produit_id=c.produit_id, type_mouvement="TRANSFERT", quantite=q, lieu=dst,
+                             motif=motif[:300], utilisateur_id=user.id))
+    evt = {"TRANSFERT": "LIVRE", "RETOUR": "RETOUR_BAR", "INTERBAR": "TRANSFERT_INTERBAR"}[type_bon]
+    _journaliser(db, evt, c, lieu=dst, livraison_id=l.id, utilisateur_id=user.id,
+                 details=f"Transfert direct par scan {l.numero} : {sens}")
+    db.commit()
+    db.refresh(c)
+    return {"colis": _colis_dict(c), "bon": _livraison_dict(l, details=False), "sens": sens,
+            "stock": _stock_produit_lieux(db, c.produit_id), "actions": _actions_possibles(c)}
 
 
 # ══════════════════════════════════════════════════════════════════════════

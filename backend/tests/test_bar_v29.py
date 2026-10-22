@@ -378,3 +378,34 @@ def test_verification_a_la_main_et_pendant_le_transfert(client, db):
     assert client.post(f"/api/pos/depot/livraisons/{l['id']}/valider", headers=H).status_code == 200
     s = _stock(client, p.id)
     assert (s["depot"], s["piscine"]) == (24, 12)
+
+
+def test_scan_intelligent_et_transfert_direct(client, db):
+    """Un scan, un choix : le colis part et les stocks sont à jour."""
+    p = _produit(db, upc=12)
+    colis = _recevoir(client, _achat_api(client, p, 36), verifier=False)
+    _recevoir_verif = lambda c: client.post("/api/pos/depot/colis/verifier", headers=H, json={"code": c["code"]})
+    _recevoir_verif(colis[0]); _recevoir_verif(colis[1])
+
+    info = client.post("/api/pos/depot/colis/scan", headers=H, json={"code": colis[0]["code"]}).json()
+    assert info["actions"] == ["DEVANT", "PISCINE", "OUVRIR"] and info["stock"]["DEPOT"] == 24
+    assert client.post("/api/pos/depot/colis/scan", headers=H, json={"code": colis[2]["code"]}).json()["actions"][0] == "VERIFIER"
+
+    # Dépôt → Bar piscine
+    r = client.post("/api/pos/depot/colis/transferer", headers=H, json={"code": colis[0]["code"], "destination": "PISCINE"})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["stock"] == {"DEPOT": 12, "DEVANT": 0, "PISCINE": 12} and d["bon"]["statut"] == "VALIDEE"
+    assert d["actions"] == ["DEPOT", "DEVANT"]
+    # Rescan du même colis vers le même bar : refusé
+    assert client.post("/api/pos/depot/colis/transferer", headers=H, json={"code": colis[0]["code"], "destination": "PISCINE"}).status_code == 409
+    # Bar piscine → Bar devant, puis retour au dépôt
+    assert client.post("/api/pos/depot/colis/transferer", headers=H, json={"code": colis[0]["code"], "destination": "DEVANT"}).json()["stock"]["DEVANT"] == 12
+    r = client.post("/api/pos/depot/colis/transferer", headers=H, json={"code": colis[0]["code"], "destination": "DEPOT"}).json()
+    assert r["stock"] == {"DEPOT": 24, "DEVANT": 0, "PISCINE": 0} and r["colis"]["statut"] == "AU_DEPOT"
+    # Colis à vérifier : refusé sans l'option, vérifié et envoyé avec
+    assert client.post("/api/pos/depot/colis/transferer", headers=H, json={"code": colis[2]["code"], "destination": "DEVANT"}).status_code == 409
+    r = client.post("/api/pos/depot/colis/transferer", headers=H, json={"code": colis[2]["code"], "destination": "DEVANT", "verifier_si_besoin": True})
+    assert r.status_code == 200 and r.json()["stock"]["DEVANT"] == 12
+    f = client.get(f"/api/pos/depot/colis/{colis[2]['id']}/fiche", headers=H).json()
+    assert [e["type"] for e in f["historique"]][-2:] == ["VERIFIE", "LIVRE"]
