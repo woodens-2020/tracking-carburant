@@ -8,7 +8,7 @@ Complète les routes d'achat de pos_routes.py :
   - Règlement : COMPTANT (payé à l'achat) ou CREDIT (dette fournisseur,
     soldée par des paiements). Liste des dettes fournisseurs.
   - Annulation d'un achat avec motif, permise seulement tant qu'aucun de
-    ses colis n'a été vérifié au dépôt (sinon : retour fournisseur).
+    ses UL n'a été contrôlé à la réception (sinon : retour fournisseur).
 """
 from __future__ import annotations
 
@@ -254,8 +254,8 @@ class AnnulationIn(BaseModel):
 @router.post("/achats/{achat_id}/annuler")
 def annuler_achat(achat_id: int, data: AnnulationIn, db: Session = Depends(get_db),
                   user=Depends(_require_gestion_achats)):
-    """Annule un achat saisi par erreur. Permis tant qu'aucun colis n'est
-    entré en stock (vérifié au dépôt) : ses colis encore « à vérifier » sont
+    """Annule un achat saisi par erreur. Permis tant qu'aucune UL n'est
+    entré en stock (contrôlé à la réception) : ses UL encore « à contrôler » sont
     retirés et l'achat sort du coût moyen. Un achat payé à crédit dont un
     paiement est déjà enregistré ne peut pas être annulé (rembourser d'abord)."""
     from bar_depot_routes import _journaliser
@@ -268,7 +268,7 @@ def annuler_achat(achat_id: int, data: AnnulationIn, db: Session = Depends(get_d
     colis = db.query(BarColis).filter(BarColis.achat_id == a.id).all()
     entres = [c for c in colis if c.statut not in ("A_VERIFIER", "ANNULE")]
     if entres:
-        raise HTTPException(409, f"{len(entres)} colis de cet achat sont déjà entrés en stock : "
+        raise HTTPException(409, f"{len(entres)} UL de cet achat sont déjà entrées en stock : "
                                  "l'achat ne peut plus être annulé. Faites un retour fournisseur au Dépôt Bar.")
     if a.paiements:
         raise HTTPException(409, "Un paiement est déjà enregistré sur cet achat : il ne peut pas être annulé.")

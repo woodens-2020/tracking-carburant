@@ -165,7 +165,7 @@ def test_ouvrir_un_colis(client, db):
     assert (s["depot"], s["piscine"]) == (18, 6)
     r = client.post(f"/api/pos/depot/livraisons", headers=H, json={"lieu": "PISCINE"}).json()
     r = client.post(f"/api/pos/depot/livraisons/{r['id']}/scan", headers=H, json={"code": colis[0]["code"]})
-    assert r.status_code == 409 and "ouvert" in r.json()["detail"]["message"]
+    assert r.status_code == 409 and "déconditionnée" in r.json()["detail"]["message"]
     _annuler_bons_ouverts(client)
 
 

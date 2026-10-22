@@ -7552,11 +7552,11 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
         </div>
 
         <!-- Station de scan : douchette, clavier ou caméra -->
-        <div class="dep-station" aria-label="Scanner un colis">
+        <div class="dep-station" aria-label="Scanner une UL">
           <div class="dep-station-haut">
-            <div class="dep-seg" role="group" aria-label="Que faire du colis scanné">
-              <button type="button" id="dep-mode-auto" class="active" onclick="depSetMode('auto')" title="Scannez un colis : le système reconnaît son état et propose quoi en faire">⚡ Scan intelligent</button>
-              <button type="button" id="dep-mode-verif" onclick="depSetMode('verif')">✓ Vérifier au dépôt</button>
+            <div class="dep-seg" role="group" aria-label="Que faire de l'UL scannée">
+              <button type="button" id="dep-mode-auto" class="active" onclick="depSetMode('auto')" title="Scannez une UL : le système reconnaît son état et propose quoi en faire">⚡ Scan intelligent</button>
+              <button type="button" id="dep-mode-verif" onclick="depSetMode('verif')">✓ Contrôle réception</button>
               <button type="button" id="dep-mode-livr" onclick="depSetMode('livr')">→ Transférer vers un bar</button>
               <button type="button" id="dep-mode-fiche" onclick="depSetMode('fiche')">🔍 Consulter la fiche</button>
             </div>
@@ -7565,8 +7565,8 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           </div>
           <div class="dep-champ">
             <span class="dep-voyant" id="dep-lecteur" title="Douchette USB ou Bluetooth en mode clavier, suffixe Entrée"></span>
-            <input id="dep-scan-input" placeholder="Scannez un colis arrivé au dépôt…"
-                   aria-label="Code du colis" autocomplete="off" maxlength="60" onkeydown="if(event.key==='Enter'){event.preventDefault();depScanner(this.value)}">
+            <input id="dep-scan-input" placeholder="Scannez une UL arrivée au dépôt…"
+                   aria-label="Code de l'UL" autocomplete="off" maxlength="60" onkeydown="if(event.key==='Enter'){event.preventDefault();depScanner(this.value)}">
             <select id="dep-dest-scan" class="dep-dest dep-dest-scan" hidden aria-label="Bar de destination" onchange="depChoisirDest(this.value)">
               <option value="DEVANT">Bar devant</option><option value="PISCINE">Bar piscine</option>
             </select>
@@ -7582,7 +7582,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
         <div class="dep-onglets" role="tablist" aria-label="Parties du dépôt">
           <button type="button" role="tab" class="dep-onglet" data-t="reception" onclick="depOnglet('reception')">Réception <span class="dep-cpt" id="dep-o-reception"></span></button>
           <button type="button" role="tab" class="dep-onglet" data-t="livraison" onclick="depOnglet('livraison')">Transferts <span class="dep-cpt" id="dep-o-livraison"></span></button>
-          <button type="button" role="tab" class="dep-onglet" data-t="colis" onclick="depOnglet('colis')">Colis <span class="dep-cpt dep-cpt-n" id="dep-o-colis"></span></button>
+          <button type="button" role="tab" class="dep-onglet" data-t="colis" onclick="depOnglet('colis')">Unités logistiques <span class="dep-cpt dep-cpt-n" id="dep-o-colis"></span></button>
           <button type="button" role="tab" class="dep-onglet" data-t="stock" onclick="depOnglet('stock')">Inventaire</button>
           <button type="button" role="tab" class="dep-onglet" data-t="journal" onclick="depOnglet('journal')">Journal</button>
         </div>
@@ -7592,21 +7592,21 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           <div class="dep-vide-bloc" id="dep-rec-vide" hidden>
             <div class="dep-vide-ico">✓</div>
             <b>Rien à réceptionner</b>
-            <span>Les achats enregistrés et les colis à vérifier apparaîtront ici.</span>
+            <span>Les achats enregistrés et les UL à contrôler apparaîtront ici.</span>
           </div>
           <div class="dep-pile">
             <div class="pos-card" id="dep-carte-achats">
               <div class="pos-card-hdr">Achats à réceptionner <span class="dep-badge" id="dep-nb-achats">0</span></div>
               <div class="pos-table-wrap"><table class="pos-table">
-                <thead><tr><th>Achat</th><th>Produit</th><th class="tr">Quantité</th><th class="tr">Colis prévus</th><th>Fournisseur</th><th>Date</th><th></th></tr></thead>
+                <thead><tr><th>Achat</th><th>Produit</th><th class="tr">Quantité</th><th class="tr">UL prévues</th><th>Fournisseur</th><th>Date</th><th></th></tr></thead>
                 <tbody id="dep-achats"></tbody>
               </table></div>
             </div>
             <div class="pos-card" id="dep-carte-verif">
-              <div class="pos-card-hdr">Colis à vérifier au dépôt <span class="dep-badge" id="dep-nb-verif">0</span>
+              <div class="pos-card-hdr">UL à contrôler (réception) <span class="dep-badge" id="dep-nb-verif">0</span>
                 <div class="dep-filtres">
                   <input id="dep-verif-cherche" class="pos-input" placeholder="Filtrer : produit ou code…" oninput="depRenderColisVerif()">
-                  <button class="pos-btn teal dep-btn-s" id="dep-verif-tout" onclick="depVerifierTout()" title="Confirmer à la main que les colis affichés sont au dépôt">✓ Tout vérifier</button>
+                  <button class="pos-btn teal dep-btn-s" id="dep-verif-tout" onclick="depVerifierTout()" title="Confirmer à la main que les UL affichées sont au dépôt">✓ Tout contrôler</button>
                   <button class="pos-btn ghost dep-btn-s" onclick="depEtiquettes()">🖨 Étiquettes 2 × 1</button>
                 </div>
               </div>
@@ -7623,7 +7623,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           <div class="pos-card">
             <div class="pos-card-hdr">Bons de transfert
               <button class="pos-btn ghost dep-btn-s" style="margin-left:auto" onclick="depManuelOuvrir()"
-                title="Seulement si des colis sont sortis du dépôt sans pouvoir être scannés (internet, scanner en panne, étiquette illisible). Motif et heure réelle obligatoires ; le code-barres devient ensuite invalide.">✍ Transfert sans scan</button>
+                title="Seulement si des UL sont sorties du dépôt sans pouvoir être scannés (internet, scanner en panne, étiquette illisible). Motif et heure réelle obligatoires ; le code-barres devient ensuite invalide.">✍ Transfert sans scan</button>
             </div>
             <div class="dep-bars" id="dep-bars"></div>
             <div id="dep-bons-speciaux"></div>
@@ -7645,24 +7645,24 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           </div>
         </section>
 
-        <!-- 3 · Colis et codes-barres -->
+        <!-- 3 · Unités logistiques (UL) et codes-barres -->
         <section class="dep-section" data-onglet="colis" hidden>
           <div class="pos-card">
-            <div class="pos-card-hdr">Colis et codes-barres <span class="dep-badge" id="dep-nb-colis">0</span>
+            <div class="pos-card-hdr">Unités logistiques (UL) et codes-barres <span class="dep-badge" id="dep-nb-colis">0</span>
               <div class="dep-filtres">
                 <input id="dep-colis-cherche" class="pos-input" placeholder="Produit ou code…" oninput="depRenderColis()">
-                <select id="dep-colis-statut" class="pos-input" onchange="depChargerColis()" aria-label="État des colis">
+                <select id="dep-colis-statut" class="pos-input" onchange="depChargerColis()" aria-label="État des UL">
                   <option value="">Tous les états</option>
-                  <option value="A_VERIFIER">À vérifier</option>
-                  <option value="AU_DEPOT">Au dépôt</option>
+                  <option value="A_VERIFIER">À contrôler</option>
+                  <option value="AU_DEPOT">En stock au dépôt</option>
                   <option value="EN_PREPARATION">En préparation</option>
-                  <option value="LIVRE">Transférés aux bars</option>
-                  <option value="ANNULE">Retirés</option>
-                  <option value="OUVERT">Ouverts (vrac)</option>
-                  <option value="RETOURNE">Rendus au fournisseur</option>
+                  <option value="LIVRE">Transférées aux bars</option>
+                  <option value="ANNULE">Retirées</option>
+                  <option value="OUVERT">Déconditionnées (vrac)</option>
+                  <option value="RETOURNE">Retournées au fournisseur</option>
                 </select>
-                <button class="pos-btn ghost dep-btn-s" id="dep-btn-retour-f" disabled onclick="depRetourFournisseur()" title="Rendre au fournisseur les colis cochés (fermés, au dépôt)">↩ Rendre au fournisseur</button>
-                <button class="pos-btn ghost dep-btn-s" onclick="depImprimerAffiches()" title="Étiquettes 2 × 1 des colis affichés (hors transférés et retirés)">🖨 Imprimer la sélection</button>
+                <button class="pos-btn ghost dep-btn-s" id="dep-btn-retour-f" disabled onclick="depRetourFournisseur()" title="Rendre au fournisseur les UL cochées (fermées, au dépôt)">↩ Rendre au fournisseur</button>
+                <button class="pos-btn ghost dep-btn-s" onclick="depImprimerAffiches()" title="Étiquettes 2 × 1 des UL affichées (hors transférées et retirées)">🖨 Imprimer la sélection</button>
               </div>
             </div>
             <div class="pos-table-wrap"><table class="pos-table">
@@ -7680,7 +7680,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           </div>
           <div class="pos-card">
             <div class="pos-card-hdr">Étiqueter le stock existant</div>
-            <div class="dep-note">Pour les caisses déjà au dépôt sans étiquette (stock d'avant le système) : comptez d'abord le dépôt ci-dessous, puis créez leurs étiquettes. Aucun mouvement de stock : elles deviennent des colis « au dépôt ».</div>
+            <div class="dep-note">Pour les caisses déjà au dépôt sans étiquette (stock d'avant le système) : comptez d'abord le dépôt ci-dessous, puis créez leurs étiquettes. Aucun mouvement de stock : elles deviennent des UL « au dépôt ».</div>
             <div class="dep-inv-barre">
               <div class="dep-inv-champ" style="flex:2"><label class="pos-label" for="dep-etq-produit">Produit</label>
                 <select id="dep-etq-produit" class="pos-input" onchange="depEtqProduit()"></select></div>
@@ -7735,10 +7735,10 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
                 <option value="">Tous les événements</option>
                 <option value="LIVRE">Transferts par scan</option>
                 <option value="LIVRE_MANUEL">Transferts manuels (sans scan)</option>
-                <option value="VERIFIE">Vérifications au dépôt</option>
+                <option value="VERIFIE">Contrôles de réception</option>
                 <option value="RETOUR_BAR">Retours bar → dépôt</option>
                 <option value="TRANSFERT_INTERBAR">Transferts entre bars</option>
-                <option value="OUVERT">Colis ouverts</option>
+                <option value="OUVERT">UL déconditionnées</option>
                 <option value="RETOUR_FOURNISSEUR">Rendus au fournisseur</option>
                 <option value="ETIQUETTE_REMPLACEE">Étiquettes remplacées</option>
                 <option value="REJET">Codes rejetés (sécurité)</option>
@@ -7747,7 +7747,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
             </div>
             <div class="pos-table-wrap">
               <table class="pos-table">
-                <thead><tr><th>Date et heure</th><th>Événement</th><th>Colis</th><th>Produit</th><th>Lieu</th><th>Par</th><th>Détail</th></tr></thead>
+                <thead><tr><th>Date et heure</th><th>Événement</th><th>UL</th><th>Produit</th><th>Lieu</th><th>Par</th><th>Détail</th></tr></thead>
                 <tbody id="dep-journal-tbody"></tbody>
               </table>
             </div>
@@ -7765,7 +7765,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           <h3 id="dep-trf-titre"><span id="dep-trf-sens">Bon de transfert dépôt → bar</span> <span class="dep-trf-num" id="dep-trf-num"></span></h3>
           <button type="button" onclick="depTransfertFermer()" aria-label="Fermer" class="df-fermer">✕</button>
         </div>
-        <div class="dep-trf-etat" id="dep-trf-etat" aria-live="polite">⌨ Scanner prêt : scannez les colis qui sortent du dépôt.</div>
+        <div class="dep-trf-etat" id="dep-trf-etat" aria-live="polite">⌨ Scanner prêt : scannez les UL qui sortent du dépôt.</div>
 
         <div class="pa-etape" id="dep-trf-etape-dest">
           <div class="pa-etape-t"><span>1</span> Bar de destination</div>
@@ -7777,7 +7777,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
         </div>
 
         <div class="pa-etape">
-          <div class="pa-etape-t"><span>2</span> Colis scannés <span class="dep-badge" id="dep-trf-nb">0</span></div>
+          <div class="pa-etape-t"><span>2</span> UL scannées <span class="dep-badge" id="dep-trf-nb">0</span></div>
           <div class="dep-scan-row">
             <input id="dep-trf-code" class="pos-input" placeholder="Code illisible au scanner ? Tapez-le ici puis Entrée" maxlength="60" autocomplete="off"
                    onkeydown="if(event.key==='Enter'){event.preventDefault();const v=this.value;this.value='';depScanner(v)}">
@@ -7787,7 +7787,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
             <tbody id="dep-trf-lignes"></tbody>
           </table></div>
           <label class="dep-trf-auto"><input type="checkbox" id="dep-trf-auto" onchange="depAutoVerif(this.checked)">
-            Vérifier automatiquement les colis pas encore vérifiés au dépôt (ils sont vérifiés puis ajoutés)</label>
+            Contrôler automatiquement les UL pas encore contrôlées à la réception (elles sont contrôlées puis ajoutées)</label>
           <details class="dep-trf-vrac">
             <summary>Ajouter du stock sans étiquette (vrac)</summary>
             <div class="dep-scan-row">
@@ -7814,7 +7814,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           <h3 id="dep-manuel-titre">Transfert manuel (sans scan)</h3>
           <button type="button" onclick="depManuelFermer()" aria-label="Fermer" class="df-fermer">✕</button>
         </div>
-        <div class="dep-manuel-alerte">Cette procédure remplace le scan. Elle est enregistrée à votre nom avec le motif. Les codes des colis choisis ne seront plus valables.</div>
+        <div class="dep-manuel-alerte">Cette procédure remplace le scan. Elle est enregistrée à votre nom avec le motif. Les codes des UL choisies ne seront plus valables.</div>
 
         <div class="pa-etape">
           <div class="pa-etape-t"><span>1</span> Où et quand</div>
@@ -7856,7 +7856,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
         </div>
 
         <div class="pa-etape">
-          <div class="pa-etape-t"><span>3</span> Colis sortis du dépôt</div>
+          <div class="pa-etape-t"><span>3</span> UL sorties du dépôt</div>
           <div class="pos-form-row">
             <div style="flex:2">
               <input class="pos-input" id="dep-manuel-cherche" placeholder="Rechercher un produit ou un code…" oninput="depManuelRender()">
@@ -7878,14 +7878,14 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
       </div>
     </div>
 
-    <!-- Scan intelligent : que faire de ce colis ? -->
+    <!-- Scan intelligent : que faire de cette UL ? -->
     <div class="pos-modal-bg" id="dep-act-bg" onclick="if(event.target===this)depActFermer()">
       <div class="pos-modal dep-act" role="dialog" aria-labelledby="dep-act-titre">
-        <div class="df-tete"><h3 id="dep-act-titre">Colis scanné</h3>
+        <div class="df-tete"><h3 id="dep-act-titre">UL scannée</h3>
           <button type="button" onclick="depActFermer()" aria-label="Fermer" class="df-fermer">✕</button></div>
         <div id="dep-act-corps"></div>
         <div class="dep-act-pied">
-          <span>⌨ Scannez le colis suivant à tout moment · Échap pour fermer</span>
+          <span>⌨ Scannez l'UL suivante à tout moment · Échap pour fermer</span>
           <button class="pos-btn ghost dep-btn-s" id="dep-act-fiche" onclick="depActFiche()">Voir la fiche</button>
         </div>
       </div>
@@ -7906,11 +7906,11 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
       </div>
     </div>
 
-    <!-- Code-barres d'un colis -->
+    <!-- Code-barres d'une UL -->
     <div class="pos-modal-bg" id="dep-cb-bg" onclick="if(event.target===this)depFermerCode()">
       <div class="pos-modal dep-cb-modal" role="dialog" aria-labelledby="dep-cb-titre">
         <div class="df-tete">
-          <h3 id="dep-cb-titre">Code-barres du colis</h3>
+          <h3 id="dep-cb-titre">Code-barres de l'UL</h3>
           <button type="button" onclick="depFermerCode()" aria-label="Fermer" class="df-fermer">✕</button>
         </div>
         <div id="dep-cb-corps"></div>
@@ -7929,25 +7929,26 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
           <h3 id="dep-guide-titre">Comment fonctionne le Dépôt Bar</h3>
           <button type="button" onclick="depGuide(false)" aria-label="Fermer" class="df-fermer">✕</button>
         </div>
+          <div class="dep-note" style="margin:0 0 10px"><b>UL = unité logistique</b> : une caisse, un carton ou un pack étiqueté, suivi de bout en bout par son code-barres (réception, contrôle, stock, transfert, bar).</div>
           <div class="dep-guide-grille">
             <div class="dep-guide-c"><b>1 · Réception</b>
-              <p>Quand la marchandise d'un achat arrive, on la <em>réceptionne</em> : le système crée un <em>colis</em> par caisse, chacun avec son étiquette 2 × 1 à coller.</p>
+              <p>Quand la marchandise d'un achat arrive, on la <em>réceptionne</em> : le système crée une <em>UL</em> par caisse, chacune avec son étiquette 2 × 1 à coller.</p>
               <p class="dep-guide-qui">Onglet Réception · bouton « Réceptionner »</p></div>
-            <div class="dep-guide-c"><b>2 · Vérification au dépôt</b>
-              <p>On scanne chaque colis rangé au dépôt. Ce scan prouve qu'il est bien arrivé : son contenu entre alors dans le <em>stock du dépôt</em>. Un colis non scanné n'est pas en stock.</p>
-              <p class="dep-guide-qui">Scanner en mode « Vérifier au dépôt »</p></div>
+            <div class="dep-guide-c"><b>2 · Contrôle au dépôt</b>
+              <p>On scanne chaque UL rangée au dépôt. Ce scan prouve qu'elle est bien arrivée : son contenu entre alors dans le <em>stock du dépôt</em>. Une UL non scannée n'est pas en stock.</p>
+              <p class="dep-guide-qui">Scanner en mode « Contrôle réception »</p></div>
             <div class="dep-guide-c"><b>3 · Transfert vers un bar</b>
-              <p>Sortie de stock du dépôt vers le Bar devant ou le Bar piscine. On choisit le bar, on scanne les colis : le <em>bon de transfert</em> s'ouvre au premier scan et se remplit à chaque scan. On <em>valide</em> : le stock passe du dépôt au bar. C'est la seule façon d'approvisionner un bar.</p>
+              <p>Sortie de stock du dépôt vers le Bar devant ou le Bar piscine. On choisit le bar, on scanne les UL : le <em>bon de transfert</em> s'ouvre au premier scan et se remplit à chaque scan. On <em>valide</em> : le stock passe du dépôt au bar. C'est la seule façon d'approvisionner un bar.</p>
               <p class="dep-guide-qui">Mode « Transférer vers un bar » · onglet Transferts</p></div>
             <div class="dep-guide-c"><b>⚡ Scan intelligent</b>
-              <p>Scannez n'importe quel colis : le système reconnaît où il en est et propose la suite. Au dépôt : <em>Bar devant [1]</em> ou <em>Bar piscine [2]</em>. À vérifier : <em>vérifier [0]</em> ou vérifier et envoyer. Dans un bar : <em>retour au dépôt [3]</em> ou vers l'autre bar. Un clic (ou une touche) et les stocks sont à jour.</p>
+              <p>Scannez n'importe quelle UL : le système reconnaît où elle en est et propose la suite. Au dépôt : <em>Bar devant [1]</em> ou <em>Bar piscine [2]</em>. À contrôler : <em>contrôler [0]</em> ou contrôler et envoyer. Dans un bar : <em>retour au dépôt [3]</em> ou vers l'autre bar. Un clic (ou une touche) et les stocks sont à jour.</p>
               <p class="dep-guide-qui">Mode par défaut · fenêtre ouverte à chaque scan</p></div>
             <div class="dep-guide-c"><b>Retours et transferts entre bars</b>
               <p>Un bar rend des caisses fermées ou du vrac au dépôt (« ↩ Retour au dépôt »), ou les passe à l'autre bar (« ⇄ Vers… »). Même bon, même scan, même validation : le stock passe d'un lieu à l'autre avec sa trace.</p>
               <p class="dep-guide-qui">Onglet Transferts · boutons sous chaque bar</p></div>
-            <div class="dep-guide-c"><b>Opérations sur un colis</b>
-              <p><em>Ouvrir</em> une caisse au dépôt pour en sortir une partie (son contenu devient du vrac) ; <em>Nouvelle étiquette</em> si elle est abîmée (l'ancien code est refusé) ; <em>Rendre au fournisseur</em> (casse, périmé), déduit du coût d'achat.</p>
-              <p class="dep-guide-qui">Onglet Colis · fiche du colis</p></div>
+            <div class="dep-guide-c"><b>Opérations sur une UL</b>
+              <p><em>Déconditionner</em> une UL au dépôt pour en sortir une partie (son contenu passe en vrac) ; <em>Ré-étiqueter</em> si elle est abîmée (l'ancien code est refusé) ; <em>Rendre au fournisseur</em> (casse, périmé), déduit du coût d'achat.</p>
+              <p class="dep-guide-qui">Onglet UL · fiche de traçabilité</p></div>
             <div class="dep-guide-c"><b>Inventaire d'ouverture</b>
               <p>Compter le dépôt et les deux bars le même jour, étiqueter les caisses déjà présentes, puis activer le contrôle par bar : la caisse refuse alors de vendre ce que le bar n'a pas.</p>
               <p class="dep-guide-qui">Onglet Inventaire</p></div>
@@ -7957,14 +7958,14 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
             <div class="dep-guide-c"><b>4 · Inventaire</b>
               <p>Le stock de chaque lieu se calcule tout seul. Si le comptage réel diffère (casse, erreur), on fait un <em>inventaire</em> : l'écart est corrigé et gardé avec son motif.</p>
               <p class="dep-guide-qui">Onglet Inventaire</p></div>
-            <div class="dep-guide-c"><b>Colis et codes-barres</b>
-              <p>La liste de tous les colis avec leur code-barres : cherchez un produit ou un code, ouvrez sa fiche ou réimprimez son étiquette.</p>
-              <p class="dep-guide-qui">Onglet Colis et codes-barres</p></div>
+            <div class="dep-guide-c"><b>Unités logistiques (UL) et codes-barres</b>
+              <p>La liste de toutes les UL avec leur code-barres : cherchez un produit ou un code, ouvrez sa fiche ou réimprimez son étiquette.</p>
+              <p class="dep-guide-qui">Onglet Unités logistiques (UL) et codes-barres</p></div>
             <div class="dep-guide-c"><b>Fiche et journal</b>
-              <p>Scanner un colis en mode « Consulter la fiche » montre où il est, vers quel bar il a été transféré, par qui et quand. Le journal garde chaque étape, avec date, heure et personne, ainsi que les codes rejetés.</p>
+              <p>Scanner une UL en mode « Consulter la fiche » montre où elle est, vers quel bar elle a été transférée, par qui et quand. Le journal garde chaque étape, avec date, heure et personne, ainsi que les codes rejetés.</p>
               <p class="dep-guide-qui">Mode « Consulter la fiche » · onglet Journal</p></div>
-            <div class="dep-guide-c"><b>États d'un colis</b>
-              <p><span class="dep-st st-verif">À vérifier</span> créé, pas encore scanné au dépôt<br>
+            <div class="dep-guide-c"><b>États d'une UL</b>
+              <p><span class="dep-st st-verif">À contrôler</span> créé, pas encore scanné au dépôt<br>
                  <span class="dep-st st-depot">Au dépôt</span> en stock au dépôt<br>
                  <span class="dep-st st-prep">En préparation</span> dans un bon de transfert pas encore validé<br>
                  <span class="dep-st st-livre">Transféré</span> sorti du dépôt, en stock au bar</p></div>
@@ -7974,17 +7975,17 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
       </div>
     </div>
 
-    <!-- Fiche de traçabilité d'un colis -->
+    <!-- Fiche de traçabilité d'une UL -->
     <div class="pos-modal-bg" id="dep-fiche-bg" onclick="if(event.target===this)depFermerFiche()">
       <div class="pos-modal dep-fiche" role="dialog" aria-labelledby="dep-fiche-titre">
         <div class="df-tete">
-          <h3 id="dep-fiche-titre">Fiche du colis</h3>
+          <h3 id="dep-fiche-titre">Fiche de traçabilité</h3>
           <button type="button" onclick="depFermerFiche()" aria-label="Fermer" class="df-fermer">✕</button>
         </div>
         <div id="dep-fiche-corps"></div>
         <div class="pos-modal-footer">
-          <button class="pos-btn ghost" id="dep-fiche-ouvrir" onclick="depOuvrirColis(_depFicheColisId)" title="Le contenu devient du vrac au dépôt">Ouvrir le colis</button>
-          <button class="pos-btn ghost" id="dep-fiche-nouv" onclick="depNouvelleEtiquette(_depFicheColisId)" title="Nouveau code, l'ancien est refusé">Nouvelle étiquette</button>
+          <button class="pos-btn ghost" id="dep-fiche-ouvrir" onclick="depOuvrirColis(_depFicheColisId)" title="Le contenu devient du vrac au dépôt">Déconditionner</button>
+          <button class="pos-btn ghost" id="dep-fiche-nouv" onclick="depNouvelleEtiquette(_depFicheColisId)" title="Nouveau code, l'ancien est refusé">Ré-étiqueter</button>
           <button class="pos-btn ghost" id="dep-fiche-etiq" onclick="depReimprimer()">🖨 Réimprimer l'étiquette</button>
           <button class="pos-btn ghost" onclick="depFermerFiche()">Fermer</button>
         </div>
@@ -8253,7 +8254,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
         <label class="pa-recep" id="pa-recep-zone" hidden>
           <input type="checkbox" id="pa-receptionner" checked>
           <span><strong>La marchandise est arrivée : réceptionner tout de suite</strong><br>
-          <small>Crée les colis et ouvre les étiquettes 2 × 1 à coller. Le stock entre au dépôt quand chaque colis est scanné (page Dépôt Bar).</small></span>
+          <small>Crée les unités logistiques (UL) et ouvre leurs étiquettes 2 × 1 à coller. Le stock entre au dépôt au contrôle réception de chaque UL (page Dépôt Bar).</small></span>
         </label>
 
         <!-- Récapitulatif -->
@@ -27024,14 +27025,14 @@ async function paAnnuler(achatId){
   const a = _paAllAchats.find(x=>x.id===achatId) || {};
   const v = await uiDemander({
     titre: `Annuler l'achat #${achatId}`, ok: "Annuler l'achat",
-    message: `${a.produit_nom||''} · ${a.quantite} ${a.produit_unite||'u.'} · ${posGx(a.cout_total||0)}\nSes colis pas encore vérifiés seront retirés (étiquettes invalides) et l'achat sortira du coût moyen.`,
+    message: `${a.produit_nom||''} · ${a.quantite} ${a.produit_unite||'u.'} · ${posGx(a.cout_total||0)}\nSes UL pas encore contrôlées seront retirées (étiquettes invalides) et l'achat sortira du coût moyen.`,
     champs: [{id:'motif', label:"Motif de l'annulation", requis:true, placeholder:'Ex. quantité mal saisie (48 000 au lieu de 48)',
               verifier:x=>x.length<5?'Motif : 5 caractères minimum.':null}],
   });
   if(!v) return;
   try{
     const r = await apiFetch('POST',`/pos/achats/${achatId}/annuler`,{motif:v.motif});
-    posAlert(`Achat #${achatId} annulé${r.colis_retires?` · ${r.colis_retires} colis retiré(s)`:''}.`,'ok');
+    posAlert(`Achat #${achatId} annulé${r.colis_retires?` · ${r.colis_retires} UL retirée(s)`:''}.`,'ok');
     if(typeof loadPosAchats==='function' && document.getElementById('page-pos-achats')?.offsetParent) await loadPosAchats();
     if(typeof _depCharger==='function' && document.getElementById('page-pos-depot')?.offsetParent) await _depCharger();
   }catch(e){ posAlert(_errTxt(e)); }
@@ -27967,7 +27968,7 @@ async function posEnregistrerAchat(continuer=false){
   if(prix<=0) { posAlert('Indiquez le prix d\'achat.','warn'); document.getElementById('pa-prix').focus(); return; }
 
   // Garde-fou : une quantité aberrante (faute de frappe) créerait des
-  // centaines d'étiquettes ; le dépôt accepte au plus 500 colis par achat.
+  // centaines d'étiquettes ; le dépôt accepte au plus 500 UL par achat.
   if(sel.type==='bar'){
     const upc = sel.prod?.unites_par_caisse || 0;
     const unites = (type==='caisse' && upc) ? qte*upc : qte;
@@ -28015,7 +28016,7 @@ async function posEnregistrerAchat(continuer=false){
     if(receptionner && res.achat_id){
       try{
         const r = await apiFetch('POST', `/pos/depot/receptions/${res.achat_id}`, {});
-        message += ` ${r.nb_colis} colis créé(s) : collez les étiquettes puis scannez-les au Dépôt Bar.`;
+        message += ` ${r.nb_colis} UL créée(s) : collez les étiquettes puis contrôlez-les au Dépôt Bar.`;
         if(typeof depEtiquettes==='function') depEtiquettes(res.achat_id);
       }catch(e){
         message += ` Réception non faite (${String(e.message||'').replace(/^\[\d+\]\s*/,'')}) : réceptionnez-le depuis le Dépôt Bar.`;
@@ -28972,7 +28973,7 @@ const _DEP_LIEUX = {DEVANT:'Bar devant', PISCINE:'Bar piscine'};
 const _DEP_ST_CLASSE = {A_VERIFIER:'st-verif', AU_DEPOT:'st-depot', EN_PREPARATION:'st-prep', LIVRE:'st-livre', ANNULE:'', OUVERT:'st-prep', RETOURNE:''};
 let _depBonSpecial = null;       // bon de retour ou entre bars affiché dans la fenêtre
 let _depBonsSpeciaux = [];       // bons de retour / entre bars en préparation
-let _depSelRetour = new Set();   // colis cochés pour un retour fournisseur
+let _depSelRetour = new Set();   // UL cochées pour un retour fournisseur
 let _depAchatsRec = [];
 let _depColisVerif = [], _depColis = [];
 const _depJour = iso => iso ? new Date(iso).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
@@ -28981,7 +28982,7 @@ const _depJour = iso => iso ? new Date(iso).toLocaleString('fr-FR',{day:'2-digit
 let _depCodes = {}, _depCodeVu = null;
 function _depCellulesCode(c){
   _depCodes[c.id] = c;
-  return `<td><button type="button" class="dep-code dep-code-btn" onclick="depOuvrirFiche(${c.id})" title="Ouvrir la fiche du colis">${esc(c.code_lisible||c.code)}</button></td>
+  return `<td><button type="button" class="dep-code dep-code-btn" onclick="depOuvrirFiche(${c.id})" title="Ouvrir la fiche de traçabilité">${esc(c.code_lisible||c.code)}</button></td>
       <td><button type="button" class="pos-btn ghost dep-btn-s" onclick="depVoirCode(${c.id})">Voir</button></td>`;
 }
 function depVoirCode(id){
@@ -29033,10 +29034,10 @@ document.addEventListener('keydown', e=>{
     const b=L.buf, n=b.length, code=L.norm.toUpperCase().replace(/-/g,'');
     L.buf=''; L.norm='';
     // Rafale rapide (douchette : < 50 ms entre les caractères), ou un peu plus
-    // lente (douchette Bluetooth) mais au format d'un code colis.
+    // lente (douchette Bluetooth) mais au format d'un code UL.
     const moy=(L.dernier-L.debut)/Math.max(n-1,1), estCode=_RE_CODE_COLIS.test(code);
     const rafale = n>=6 && t-L.dernier < 150 && (moy < 50 || (moy < 90 && estCode));
-    // Hors de la page Dépôt : seulement un vrai code colis (ne gêne aucune autre saisie)
+    // Hors de la page Dépôt : seulement un vrai code UL (ne gêne aucune autre saisie)
     if(rafale && (surDepot || estCode)){
       e.preventDefault(); e.stopPropagation();
       const el=L.el;
@@ -29073,7 +29074,7 @@ function _depResultatTest(code, externe){
   _depTest = false;
   const formatOk = /^BC\d{8}(\d{4})?$/i.test(code.replace(/[\s-]/g,'')) || /\/colis\//i.test(code);
   _depRetour(`Test : lu « ${code} » (${code.length} caractères${externe?`, en ${_depLecteur.duree||0} ms — scanner externe reconnu ✓`:' — saisie au clavier ou caméra'}) · `
-    + (formatOk ? 'format de code colis ✓' : 'ce n\'est pas un code colis du dépôt ✗ (vérifiez que le Code 128 est activé et le suffixe Entrée)'), formatOk);
+    + (formatOk ? 'format de code UL ✓' : 'ce n\'est pas un code UL du dépôt ✗ (vérifiez que le Code 128 est activé et le suffixe Entrée)'), formatOk);
   _depBip(formatOk);
 }
 let _depStock = [];
@@ -29120,7 +29121,7 @@ async function _depCharger(){
     _depFileAfficher();
     depRenderLivraison();
     if(_depTrfOuvert()) depTransfertRender();
-    const resume = ['DEVANT','PISCINE'].filter(k=>_depLivraisons[k]).map(k=>`${k==='DEVANT'?'Devant':'Piscine'} : ${_depLivraisons[k].nb_lignes} colis`);
+    const resume = ['DEVANT','PISCINE'].filter(k=>_depLivraisons[k]).map(k=>`${k==='DEVANT'?'Devant':'Piscine'} : ${_depLivraisons[k].nb_lignes} UL`);
     const nl=document.getElementById('dep-k-livr'); if(nl) nl.textContent = resume.length ? resume.join(' · ') : 'Aucun';
     const ol=document.getElementById('dep-o-livraison'); if(ol) ol.textContent = resume.length ? `${resume.length} en cours` : '';
   }catch(e){ posAlert(e.message||'Erreur de chargement du dépôt.'); }
@@ -29147,7 +29148,7 @@ function _depKpis(rec, livs, auDepot){
   set('dep-o-colis', auDepot.length ? `${auDepot.length} en stock` : '');
   document.querySelectorAll('.dep-kpi').forEach(k=>{
     const v=parseInt(k.querySelector('.dep-kpi-v')?.textContent)||0;
-    k.classList.toggle('dep-kpi-alerte', v>0 && /vérifier|réceptionner/.test(k.textContent));
+    k.classList.toggle('dep-kpi-alerte', v>0 && /contrôler|réceptionner/.test(k.textContent));
   });
 }
 
@@ -29172,19 +29173,19 @@ function depGuide(afficher){
 }
 
 const _DEP_AIDE_MODE = {
-  verif: "Scannez chaque colis qui arrive au dépôt : son contenu entre dans le stock du dépôt.",
-  livr:  "Scannez les colis qui sortent du dépôt : ils s'ajoutent au bon de transfert du bar choisi.",
-  fiche: "Scannez un colis pour voir sa fiche : où il est, vers quel bar il a été transféré, par qui et quand. Rien n'est modifié.",
+  verif: "Scannez chaque UL qui arrive au dépôt : son contenu entre dans le stock du dépôt.",
+  livr:  "Scannez les UL qui sortent du dépôt : elles s'ajoutent au bon de transfert du bar choisi.",
+  fiche: "Scannez une UL pour voir sa fiche : où elle est, vers quel bar elle a été transférée, par qui et quand. Rien n'est modifié.",
 };
 function depSetMode(m, sansFocus){
   _depMode = m;
   const inp=document.getElementById('dep-scan-input');
   try{ localStorage.setItem('dep-mode', m); }catch(_){}
   if(inp) inp.placeholder = {
-    auto:  'Scannez un colis : le système propose quoi en faire (vérifier, envoyer à un bar, retour…)',
-    verif: 'Scannez un colis arrivé au dépôt…',
-    livr:  `Scannez un colis à sortir vers le ${_DEP_LIEUX[_depDest]}…`,
-    fiche: 'Scannez un colis pour voir sa fiche…',
+    auto:  'Scannez une UL : le système propose quoi en faire (contrôler, envoyer à un bar, retour…)',
+    verif: 'Scannez une UL arrivée au dépôt…',
+    livr:  `Scannez une UL à sortir vers le ${_DEP_LIEUX[_depDest]}…`,
+    fiche: 'Scannez une UL pour voir sa fiche…',
   }[m] || '';
   ['auto','verif','livr','fiche'].forEach(k=>document.getElementById('dep-mode-'+k)?.classList.toggle('active', m===k));
   const ds=document.getElementById('dep-dest-scan'); if(ds){ ds.hidden = m!=='livr'; ds.value=_depDest; }
@@ -29213,19 +29214,19 @@ function _depRetour(msg, ok){
   }
 }
 
-// Bon de transfert : vérifier en même temps les colis encore « à vérifier »
+// Bon de transfert : contrôler en même temps les UL encore « à contrôler »
 let _depAutoVerif = (()=>{ try{ return localStorage.getItem('dep-auto-verif')==='1'; }catch(_){ return false; } })();
 function depAutoVerif(v){ _depAutoVerif = !!v; try{ localStorage.setItem('dep-auto-verif', v?'1':'0'); }catch(_){} }
 
-// ══ Scan intelligent : un scan → l'état du colis → l'action en un clic ══
+// ══ Scan intelligent : un scan → l'état de l'UL → l'action en un clic ══
 let _depAct = null;                 // {code, info, avant}
 const _depActOuvert = () => document.getElementById('dep-act-bg')?.classList.contains('open');
 const _DEP_ACT = {
-  VERIFIER: {lbl:'✓ Vérifier au dépôt', touche:'0', cls:'sec'},
+  VERIFIER: {lbl:'✓ Contrôle réception', touche:'0', cls:'sec'},
   DEVANT:   {lbl:'→ Bar devant', touche:'1', cls:''},
   PISCINE:  {lbl:'→ Bar piscine', touche:'2', cls:''},
   DEPOT:    {lbl:'↩ Retour au dépôt', touche:'3', cls:'ret'},
-  OUVRIR:   {lbl:'Ouvrir le colis (vrac)', touche:null, cls:'sec'},
+  OUVRIR:   {lbl:'Déconditionner (vrac)', touche:null, cls:'sec'},
 };
 
 async function _depScanIntel(code){
@@ -29262,21 +29263,21 @@ function depActRender(){
     const libelleAction = a => {
       const x = _DEP_ACT[a];
       let lbl = x.lbl;
-      if(c.statut==='A_VERIFIER' && (a==='DEVANT'||a==='PISCINE')) lbl = `✓ Vérifier et envoyer ${a==='DEVANT'?'au Bar devant':'au Bar piscine'}`;
+      if(c.statut==='A_VERIFIER' && (a==='DEVANT'||a==='PISCINE')) lbl = `✓ Contrôler et envoyer ${a==='DEVANT'?'au Bar devant':'au Bar piscine'}`;
       if(c.statut==='LIVRE' && (a==='DEVANT'||a==='PISCINE')) lbl = `⇄ Vers le ${a==='DEVANT'?'Bar devant':'Bar piscine'}`;
       return `<button type="button" class="act-btn ${x.cls}" data-act="${a}" onclick="depActExec('${a}')">${lbl}${x.touche?` <kbd>${x.touche}</kbd>`:''}</button>`;
     };
-    document.getElementById('dep-act-titre').textContent = `Colis ${c.code_lisible}`;
+    document.getElementById('dep-act-titre').textContent = `UL ${c.code_lisible}`;
     corps.innerHTML = `
       <div class="act-tete">
         <div class="act-prod">${esc(c.produit_nom||'')}</div>
         <div class="act-sous">${c.quantite} ${esc(c.unite||'u.')} · ${c.achat_id?'achat #'+c.achat_id+' · ':''}<span class="dep-st ${_DEP_ST_CLASSE[c.statut]||''}">${esc(c.statut_libelle)}</span>${c.lieu_nom?' · '+esc(c.lieu_nom):''}</div>
         ${info.bon?`<div class="act-etat">Dans le bon ${esc(info.bon.numero)} (${esc(info.bon.origine_nom)} → ${esc(info.bon.destination_nom)}), pas encore validé.</div>`:''}
-        ${!info.actions.length && !info.bon?`<div class="act-etat">Ce colis est ${esc(info.etat)}.</div>`:''}
+        ${!info.actions.length && !info.bon?`<div class="act-etat">Cette UL est ${esc(info.etat)}.</div>`:''}
       </div>
       <div class="act-stock">${tuile('DEPOT','Dépôt')}${tuile('DEVANT','Bar devant')}${tuile('PISCINE','Bar piscine')}</div>
-      ${info.actions.length?`<div class="act-q">${res&&res.ok?'Et maintenant ?':'Que faire de ce colis ?'}</div><div class="act-btns">${info.actions.map(libelleAction).join('')}</div>`
-        : `<div class="act-q">Aucune action possible pour ce colis</div>`}
+      ${info.actions.length?`<div class="act-q">${res&&res.ok?'Et maintenant ?':'Que faire de cette UL ?'}</div><div class="act-btns">${info.actions.map(libelleAction).join('')}</div>`
+        : `<div class="act-q">Aucune action possible pour cette UL</div>`}
       <div class="act-res ${res?(res.ok?'ok':'err'):''}" aria-live="polite">${res?esc(res.txt):''}</div>`;
   }
   if(!bg.classList.contains('open')){ bg.classList.add('open'); document.activeElement?.blur?.(); }
@@ -29292,7 +29293,7 @@ async function depActExec(action){
     let txt;
     if(action==='VERIFIER'){
       await apiFetch('POST','/pos/depot/colis/verifier',{code});
-      txt = `✓ Vérifié : ${c.quantite} ${c.unite||'u.'} entrés au dépôt.`;
+      txt = `✓ Contrôlé : ${c.quantite} ${c.unite||'u.'} entrés au dépôt.`;
     } else {
       const r = await apiFetch('POST','/pos/depot/colis/transferer',{code, destination:action, verifier_si_besoin: c.statut==='A_VERIFIER'});
       txt = `✓ ${r.sens} — ${c.quantite} ${c.unite||'u.'} de ${c.produit_nom} · bon ${r.bon.numero}. Stocks à jour.`;
@@ -29385,7 +29386,7 @@ function depScanner(valeur, externe){
     _depFile = _depFile.then(()=>_depScanIntel(code)).catch(()=>{});
     return;
   }
-  // Fenêtre de transfert manuel ouverte : le scan ajoute le colis à la liste
+  // Fenêtre de transfert manuel ouverte : le scan ajoute l'UL à la liste
   if(_depManuelOuvert()){
     document.getElementById('dep-manuel-code').value = code;
     depManuelAjouterCode();
@@ -29408,7 +29409,7 @@ async function _depTraiterScan(code, mode, dest, special, forcerVerif){
   try{
     if(mode === 'fiche'){
       const f = await apiFetch('POST','/pos/depot/colis/consulter',{code});
-      _depRetour(`Fiche du colis ${f.colis.code_lisible} — ${f.colis.statut_libelle}`, true);
+      _depRetour(`Fiche de traçabilité ${f.colis.code_lisible} — ${f.colis.statut_libelle}`, true);
       _depBip(true);
       depAfficherFiche(f);
       return;
@@ -29416,7 +29417,7 @@ async function _depTraiterScan(code, mode, dest, special, forcerVerif){
     if(mode === 'verif'){
       const c = await apiFetch('POST','/pos/depot/colis/verifier',{code});
       _depRetour(`✓ ${c.code_lisible} — ${c.produit_nom} : ${c.quantite} ${c.unite||'u.'} entrés au dépôt`
-        + (c.restants_achat ? ` · encore ${c.restants_achat} colis de cet achat à scanner` : ''), true);
+        + (c.restants_achat ? ` · encore ${c.restants_achat} UL de cet achat à scanner` : ''), true);
     } else {
       let l = special ? {id:special} : _depLivraisons[dest];
       if(!l){ l = await apiFetch('POST','/pos/depot/livraisons',{lieu:dest}); _depLivraisons[dest] = l; }
@@ -29445,15 +29446,15 @@ async function _depTraiterScan(code, mode, dest, special, forcerVerif){
       msg += ' — pour le sortir vers un bar, passez en mode « Transférer vers un bar ».';
     if(mode==='livr' && e.detail && e.detail.statut==='A_VERIFIER' && !special){
       _depRetour('⚠ ' + msg, false);
-      // Proposer de le vérifier tout de suite et de l'ajouter
-      if(await showConfirm(`Le colis ${code} n'a pas encore été vérifié au dépôt. Confirmez-vous qu'il est bien là ? Il sera vérifié puis ajouté au bon.\n\nAstuce : cochez « Vérifier automatiquement » dans le bon pour ne plus avoir cette question.`,
-          {title:'Colis pas encore vérifié', type:'warn', okLabel:'Vérifier et ajouter'})){
+      // Proposer de le contrôler tout de suite et de l'ajouter
+      if(await showConfirm(`L'UL ${code} n'a pas encore été contrôlée à la réception. Confirmez-vous qu'elle est bien là ? Elle sera contrôlée puis ajoutée au bon.\n\nAstuce : cochez « Contrôler automatiquement » dans le bon pour ne plus avoir cette question.`,
+          {title:'UL pas encore contrôlée', type:'warn', okLabel:'Contrôler et ajouter'})){
         return _depTraiterScan(code, mode, dest, special, true);
       }
       return;
     }
     _depRetour('✗ ' + msg, false);
-    // Colis déjà livré : afficher directement sa fiche de livraison
+    // UL déjà livré : afficher directement sa fiche de livraison
     if(e.detail && e.detail.deja_livre && e.detail.colis_id) depOuvrirFiche(e.detail.colis_id);
   }
 }
@@ -29477,14 +29478,14 @@ async function depCamera(){
   try{
     await _depCamera.start({facingMode:'environment'}, {fps:10, qrbox:{width:300, height:120}}, txt=>{
       const t = Date.now();
-      if(txt===dernier && t-quand<2500) return;   // évite le double scan du même colis
+      if(txt===dernier && t-quand<2500) return;   // évite le double scan du même UL
       dernier = txt; quand = t;
       depScanner(txt);
     });
   }catch(e){ posAlert('Caméra refusée ou absente : utilisez la douchette ou tapez le code.'); box.style.display='none'; _depCamera=null; }
 }
 
-// Fiche de livraison / traçabilité d'un colis
+// Fiche de livraison / traçabilité d'une UL
 async function depOuvrirFiche(colisId){
   try{ depAfficherFiche(await apiFetch('GET',`/pos/depot/colis/${colisId}/fiche`)); }
   catch(e){ posAlert(e.message||'Fiche indisponible.'); }
@@ -29511,13 +29512,13 @@ function depAfficherFiche(f){
     </div>
     <div class="df-grille">
       <div class="df-bloc">
-        <div class="df-titre">Colis</div>
+        <div class="df-titre">UL</div>
         ${ligne('Code', `<span class="dep-cb-fiche">${depCodeBarres(c.code, 46)}<span class="dep-code">${esc(c.code_lisible)}</span></span>`)}
         ${ligne('Produit', esc(c.produit_nom||'—'))}
         ${ligne('Quantité', `${c.quantite} ${esc(c.unite||'u.')}`)}
         ${a?ligne('Achat', `#${a.id}${a.fournisseur?' · '+esc(a.fournisseur):''}`):''}
         ${ligne('Créé le', _depDateHeure(c.cree_le))}
-        ${c.verifie_le?ligne('Vérifié au dépôt', `${_depDateHeure(c.verifie_le)}${c.verifie_par?' · '+esc(c.verifie_par):''}`):''}
+        ${c.verifie_le?ligne('Contrôlé au dépôt', `${_depDateHeure(c.verifie_le)}${c.verifie_par?' · '+esc(c.verifie_par):''}`):''}
       </div>
       <div class="df-bloc">
         <div class="df-titre">Transfert</div>
@@ -29531,7 +29532,7 @@ function depAfficherFiche(f){
           ${l.mode==='MANUELLE'
             ? ligne('Transféré réellement le', _depDateHeure(l.date_reelle)) + ligne('Enregistrée le', _depDateHeure(l.valide_le)) + ligne('Motif', esc(l.motif_manuel||'—'))
             : ligne('Date et heure', _depDateHeure(l.valide_le))}`
-        :'<div class="df-vide">Ce colis n\'est pas encore sorti du dépôt.</div>'}
+        :'<div class="df-vide">Cette UL n\'est pas encore sortie du dépôt.</div>'}
       </div>
     </div>
     <div class="df-titre" style="margin-top:14px">Historique complet</div>
@@ -29542,7 +29543,7 @@ function depAfficherFiche(f){
         <div class="df-h-s">${_depDateHeure(e.horodatage)}${e.par?' · '+esc(e.par):''}${e.details&&e.type!=='LIVRE'?' · '+esc(e.details):''}</div></div>
       </li>`).join('') || '<li class="df-vide">Aucun événement enregistré.</li>'}
     </ol>`;
-  document.getElementById('dep-fiche-titre').textContent = `Fiche ${livre?'de transfert':'du colis'} — ${c.code_lisible}`;
+  document.getElementById('dep-fiche-titre').textContent = `Fiche ${livre?'de transfert':'du UL'} — ${c.code_lisible}`;
   _depFicheColisId = c.id;
   document.getElementById('dep-fiche-etiq').hidden = !['A_VERIFIER','AU_DEPOT','EN_PREPARATION'].includes(c.statut);
   document.getElementById('dep-fiche-ouvrir').hidden = c.statut!=='AU_DEPOT';
@@ -29579,7 +29580,7 @@ function depRenderReceptions(rec){
     return `<tr>
       <td>#${a.achat_id}</td><td><strong>${esc(a.produit_nom||'?')}</strong></td>
       <td class="tr num">${Number(a.quantite).toLocaleString('fr-FR')}</td>
-      <td class="tr num">${nb}${a.unites_par_caisse?` <span class="dep-sous">× ${a.unites_par_caisse}</span>`:''}${nb>500?' <span class="dep-st st-prep" title="Maximum 500 colis par achat : quantité probablement mal saisie">trop</span>':''}</td>
+      <td class="tr num">${nb}${a.unites_par_caisse?` <span class="dep-sous">× ${a.unites_par_caisse}</span>`:''}${nb>500?' <span class="dep-st st-prep" title="Maximum 500 UL par achat : quantité probablement mal saisie">trop</span>':''}</td>
       <td>${esc(a.fournisseur||'—')}</td><td class="num">${_depJour(a.date_achat).slice(0,10)}</td>
       <td class="dep-actions"><button class="pos-btn ghost dep-btn-s" style="color:#f87171" onclick="paAnnuler(${a.achat_id})" title="Achat saisi par erreur">Annuler</button>
         <button class="pos-btn teal dep-btn-s" onclick="depReceptionner(${a.achat_id})">Réceptionner</button></td></tr>`;
@@ -29598,24 +29599,24 @@ function depRenderColisVerif(){
       <td><strong>${esc(c.produit_nom||'')}</strong></td>
       <td class="tr num">${c.quantite} ${esc(c.unite||'u.')}</td>
       <td>#${c.achat_id||'—'}</td><td class="num">${_depJour(c.cree_le)}</td>
-      <td class="dep-actions"><button class="pos-btn teal dep-btn-s" onclick="depVerifierMain([${c.id}])" title="Vérifier à la main, sans scanner">✓ Vérifier</button>
+      <td class="dep-actions"><button class="pos-btn teal dep-btn-s" onclick="depVerifierMain([${c.id}])" title="Contrôler à la main, sans scanner">✓ Contrôler</button>
         <button class="pos-btn ghost dep-btn-s" onclick="depImprimerColis(${c.id})" title="Réimprimer l'étiquette">🖨</button>
-        <button class="pos-btn ghost dep-btn-s" onclick="depAnnulerColis(${c.id},'${esc(c.code_lisible||c.code)}')" title="Colis créé par erreur (avant vérification)">Retirer</button></td></tr>`).join('')
+        <button class="pos-btn ghost dep-btn-s" onclick="depAnnulerColis(${c.id},'${esc(c.code_lisible||c.code)}')" title="UL créée par erreur (avant contrôle)">Retirer</button></td></tr>`).join('')
     + (liste.length>max?`<tr class="dep-vide-l"><td colspan="7">… et ${liste.length-max} autres — affinez le filtre</td></tr>`:'')
-    || `<tr class="dep-vide-l"><td colspan="7">${_depColisVerif.length?'Aucun colis ne correspond au filtre.':'Tout est vérifié.'}</td></tr>`;
+    || `<tr class="dep-vide-l"><td colspan="7">${_depColisVerif.length?'Aucune UL ne correspond au filtre.':'Tout est contrôlé.'}</td></tr>`;
 }
 
-// Vérification à la main (sans scanner)
+// Contrôle à la main (sans scanner)
 async function depVerifierMain(ids, sansConfirmer){
   const choisis = _depColisVerif.filter(c=>ids.includes(c.id));
   const unites = choisis.reduce((t,c)=>t+c.quantite,0);
   if(!sansConfirmer && !await showConfirm(
-      ids.length===1 ? `Confirmer que le colis ${choisis[0]?.code_lisible||''} (${choisis[0]?.produit_nom||''}, ${unites} unités) est bien arrivé au dépôt ?`
-                     : `Confirmer que ces ${ids.length} colis (${unites} unités) sont bien arrivés au dépôt ?`,
-      {title:'Vérifier à la main', type:'ok', okLabel:'Oui, ils sont au dépôt'})) return;
+      ids.length===1 ? `Confirmer que l'UL ${choisis[0]?.code_lisible||''} (${choisis[0]?.produit_nom||''}, ${unites} unités) est bien arrivé au dépôt ?`
+                     : `Confirmer que ces ${ids.length} UL (${unites} unités) sont bien arrivés au dépôt ?`,
+      {title:'Contrôler à la main', type:'ok', okLabel:'Oui, ils sont au dépôt'})) return;
   try{
     const r = await apiFetch('POST','/pos/depot/colis/verifier-manuel',{colis_ids:ids});
-    _depRetour(`✓ ${r.verifies} colis vérifié(s) à la main : ${r.unites} unités entrées au dépôt${r.ignores?` · ${r.ignores} déjà vérifié(s)`:''}.`, true);
+    _depRetour(`✓ ${r.verifies} UL contrôlée(s) à la main : ${r.unites} unités entrées au dépôt${r.ignores?` · ${r.ignores} déjà contrôlée(s)`:''}.`, true);
     _depBip(true);
     await _depCharger();
   }catch(e){ posAlert(_errTxt(e)); }
@@ -29626,7 +29627,7 @@ function depVerifierTout(){
   depVerifierMain(liste.map(c=>c.id));
 }
 
-// Onglet « Colis et codes-barres »
+// Onglet « Unités logistiques (UL) et codes-barres »
 async function depChargerColis(){
   const tb=document.getElementById('dep-colis-tbody'); if(!tb) return;
   const st=document.getElementById('dep-colis-statut')?.value||'';
@@ -29646,11 +29647,11 @@ function depRenderColis(){
       <td>${esc(c.lieu_nom||(['A_VERIFIER','AU_DEPOT','EN_PREPARATION','OUVERT'].includes(c.statut)?'Dépôt':'—'))}</td>
       <td>${c.achat_id?'#'+c.achat_id:'—'}</td><td class="num">${_depJour(c.cree_le)}</td>
       <td class="dep-actions"><button class="pos-btn ghost dep-btn-s" onclick="depOuvrirFiche(${c.id})">Fiche</button>
-        ${c.statut==='AU_DEPOT'?`<button class="pos-btn ghost dep-btn-s" onclick="depOuvrirColis(${c.id})" title="Ouvrir la caisse : son contenu devient du vrac au dépôt">Ouvrir</button>`:''}
-        ${['A_VERIFIER','AU_DEPOT'].includes(c.statut)?`<button class="pos-btn ghost dep-btn-s" onclick="depNouvelleEtiquette(${c.id})" title="Étiquette perdue ou abîmée : nouveau code">Nouv. étiquette</button>
+        ${c.statut==='AU_DEPOT'?`<button class="pos-btn ghost dep-btn-s" onclick="depOuvrirColis(${c.id})" title="Déconditionner : le contenu de l'UL passe en vrac au dépôt">Déconditionner</button>`:''}
+        ${['A_VERIFIER','AU_DEPOT'].includes(c.statut)?`<button class="pos-btn ghost dep-btn-s" onclick="depNouvelleEtiquette(${c.id})" title="Étiquette perdue ou abîmée : nouveau code">Ré-étiqueter</button>
           <button class="pos-btn ghost dep-btn-s" onclick="depImprimerColis(${c.id})" title="Réimprimer l'étiquette">🖨</button>`:''}</td></tr>`).join('')
     + (liste.length>max?`<tr class="dep-vide-l"><td colspan="10">… et ${liste.length-max} autres — affinez la recherche</td></tr>`:'')
-    || '<tr class="dep-vide-l"><td colspan="10">Aucun colis.</td></tr>';
+    || '<tr class="dep-vide-l"><td colspan="10">Aucune UL.</td></tr>';
   _depMajRetour();
 }
 function depSelRetour(id, coche){ if(coche) _depSelRetour.add(id); else _depSelRetour.delete(id); _depMajRetour(); }
@@ -29663,35 +29664,35 @@ async function depRetourFournisseur(){
   const ids=[..._depSelRetour]; if(!ids.length) return;
   const choisis=_depColis.filter(c=>_depSelRetour.has(c.id));
   const v = await uiDemander({
-    titre:'Rendre au fournisseur', ok:'Rendre ces colis',
-    message:`${ids.length} colis · ${choisis.reduce((t,c)=>t+c.quantite,0)} unités : ${[...new Set(choisis.map(c=>c.produit_nom))].join(', ')}\nIls sortent du stock du dépôt et de leur coût d'achat. Leurs codes deviennent invalides.`,
+    titre:'Rendre au fournisseur', ok:'Rendre ces UL',
+    message:`${ids.length} UL · ${choisis.reduce((t,c)=>t+c.quantite,0)} unités : ${[...new Set(choisis.map(c=>c.produit_nom))].join(', ')}\nIls sortent du stock du dépôt et de leur coût d'achat. Leurs codes deviennent invalides.`,
     champs:[{id:'motif', label:'Motif', requis:true, placeholder:'Ex. produit périmé, casse à la livraison', verifier:x=>x.length<5?'Motif : 5 caractères minimum.':null}],
   });
   if(!v) return;
   try{
     const r = await apiFetch('POST','/pos/depot/retour-fournisseur',{colis_ids:ids, motif:v.motif});
-    posAlert(`${r.colis} colis rendus au fournisseur (${r.unites_rendues} unités).`,'ok');
+    posAlert(`${r.colis} UL rendues au fournisseur (${r.unites_rendues} unités).`,'ok');
     _depSelRetour.clear(); await _depCharger(); depChargerColis();
   }catch(e){ posAlert(_errTxt(e)); }
 }
 async function depOuvrirColis(id){
   const c = _depColis.find(x=>x.id===id) || {};
-  if(!await showConfirm(`Ouvrir le colis ${c.code_lisible||'#'+id} (${c.quantite||''} ${c.unite||''}) ? Son contenu reste au dépôt mais devient du vrac : vous pourrez en transférer une partie. Son code ne sera plus utilisable.`,
-      {title:'Ouvrir le colis', type:'warn', okLabel:'Ouvrir'})) return;
+  if(!await showConfirm(`Déconditionner ${c.code_lisible||'#'+id} (${c.quantite||''} ${c.unite||''}) ? Son contenu reste au dépôt mais devient du vrac : vous pourrez en transférer une partie. Son code ne sera plus utilisable.`,
+      {title:'Déconditionner', type:'warn', okLabel:'Déconditionner'})) return;
   try{
     await apiFetch('POST',`/pos/depot/colis/${id}/ouvrir`,{});
-    posAlert('Colis ouvert : son contenu est en vrac au dépôt.','ok');
+    posAlert('UL déconditionnée : son contenu est en vrac au dépôt.','ok');
     depFermerFiche?.(); await _depCharger(); depChargerColis();
   }catch(e){ posAlert(_errTxt(e)); }
 }
 async function depNouvelleEtiquette(id){
-  const v = await uiDemander({titre:'Nouvelle étiquette', ok:'Créer la nouvelle étiquette',
-    message:"Le colis reçoit un nouveau code. L'ancienne étiquette sera refusée au scan (avec un message clair).",
+  const v = await uiDemander({titre:'Ré-étiqueter', ok:'Créer la nouvelle étiquette',
+    message:"Le UL reçoit un nouveau code. L'ancienne étiquette sera refusée au scan (avec un message clair).",
     champs:[{id:'motif', label:'Motif', requis:true, placeholder:'Ex. étiquette mouillée, arrachée'}]});
   if(!v) return;
   try{
     const r = await apiFetch('POST',`/pos/depot/colis/${id}/remplacer-etiquette`,{motif:v.motif});
-    posAlert(`Nouvelle étiquette ${r.code_lisible} (l'ancienne ${r.ancien_code} est révoquée). Imprimez-la et collez-la.`,'ok');
+    posAlert(`Ré-étiqueter ${r.code_lisible} (l'ancienne ${r.ancien_code} est révoquée). Imprimez-la et collez-la.`,'ok');
     depImprimerColis(id);
     depFermerFiche?.(); await _depCharger(); depChargerColis();
   }catch(e){ posAlert(_errTxt(e)); }
@@ -29699,14 +29700,14 @@ async function depNouvelleEtiquette(id){
 function depImprimerAffiches(){
   const ids = _depFiltre(_depColis, document.getElementById('dep-colis-cherche')?.value)
     .filter(c=>!['LIVRE','ANNULE'].includes(c.statut)).map(c=>c.id).slice(0,500);
-  if(!ids.length){ posAlert("Aucune étiquette à imprimer (les colis transférés ou retirés n'en ont plus besoin).",'warn'); return; }
+  if(!ids.length){ posAlert("Aucune étiquette à imprimer (les UL transférées ou retirées n'en ont plus besoin).",'warn'); return; }
   _depOuvrirPdf('/api/pos/depot/etiquettes.pdf?ids='+ids.join(','));
 }
 
 async function depReceptionner(achatId){
   const a = _depAchatsRec.find(x=>x.achat_id===achatId) || {};
   const v = await uiDemander({
-    titre: `Réceptionner l'achat #${achatId}`, ok: 'Créer les colis et les étiquettes',
+    titre: `Réceptionner l'achat #${achatId}`, ok: 'Créer les UL et les étiquettes',
     message: `${a.produit_nom||''} · commandé : ${a.quantite} unités${a.unites_par_caisse?` (${Math.ceil(a.quantite/a.unites_par_caisse)} caisses de ${a.unites_par_caisse})`:''}\nComptez ce qui est réellement arrivé. S'il manque quelque chose, l'écart est gardé avec sa raison.`,
     champs: [
       {id:'recue', label:'Unités réellement reçues', type:'number', requis:true, min:0.001, max:a.quantite, valeur:a.quantite},
@@ -29718,7 +29719,7 @@ async function depReceptionner(achatId){
   const corps = v.recue < a.quantite ? {quantite_recue:v.recue, motif_ecart:v.motif} : {};
   try{
     const r = await apiFetch('POST',`/pos/depot/receptions/${achatId}`,corps);
-    posAlert(`${r.nb_colis} colis créés${corps.quantite_recue?` pour ${r.quantite_recue} unités reçues`:''} — imprimez les étiquettes 2 × 1 à l'échelle 100 % (taille réelle) et collez-les.`,'ok');
+    posAlert(`${r.nb_colis} UL créées${corps.quantite_recue?` pour ${r.quantite_recue} unités reçues`:''} — imprimez les étiquettes 2 × 1 à l'échelle 100 % (taille réelle) et collez-les.`,'ok');
     depEtiquettes(achatId);
     await _depCharger();
   }catch(e){ posAlert(_errTxt(e)||'Réception impossible.'); }
@@ -29736,7 +29737,7 @@ async function depEtiquettes(achatId){
 }
 
 async function depAnnulerColis(id, code){
-  if(!await showConfirm(`Retirer le colis ${code} ? (erreur de réception — il ne sera jamais compté)`, {title:'Retirer un colis', type:'danger', okLabel:'Retirer'})) return;
+  if(!await showConfirm(`Retirer l'UL ${code} ? (erreur de réception — elle ne sera jamais comptée)`, {title:'Retirer une UL', type:'danger', okLabel:'Retirer'})) return;
   try{ await apiFetch('POST',`/pos/depot/colis/${id}/annuler`,{}); await _depCharger(); }
   catch(e){ posAlert(e.message); }
 }
@@ -29811,7 +29812,7 @@ async function depNouvelleLivraison(lieu){
 async function depChangerDestination(){
   const l = _depLivraison; if(!l) return;
   const autre = l.lieu==='DEVANT' ? 'PISCINE' : 'DEVANT';
-  if(!await showConfirm(`Envoyer le bon de transfert ${l.numero} (${l.nb_lignes} colis) au ${_DEP_LIEUX[autre]} au lieu du ${l.lieu_nom} ?`,
+  if(!await showConfirm(`Envoyer le bon de transfert ${l.numero} (${l.nb_lignes} UL) au ${_DEP_LIEUX[autre]} au lieu du ${l.lieu_nom} ?`,
       {title:'Changer de bar', okLabel:`Vers le ${_DEP_LIEUX[autre]}`})) return;
   try{
     const r = await apiFetch('POST',`/pos/depot/livraisons/${l.id}/destination`,{lieu:autre});
@@ -29827,7 +29828,7 @@ function depRenderLivraison(){
   bars.innerHTML = ['DEVANT','PISCINE'].map(k=>{ const x=_depLivraisons[k], nom=_DEP_LIEUX[k], autre=k==='DEVANT'?'PISCINE':'DEVANT';
     return `<div class="dep-bar-carte ${x?'encours':''}">
       <div><div class="dep-bar-nom">${nom}</div>
-        <div class="dep-bar-etat">${x?`Bon ${esc(x.numero)} en préparation · ${x.nb_lignes} colis · ${x.total_unites} unités`:'Aucun transfert en préparation'}</div></div>
+        <div class="dep-bar-etat">${x?`Bon ${esc(x.numero)} en préparation · ${x.nb_lignes} UL · ${x.total_unites} unités`:'Aucun transfert en préparation'}</div></div>
       <div class="dep-bar-act">
         <button class="pos-btn ${x?'teal':'ghost'}" onclick="depChoisirDest('${k}',true);depNouvelleLivraison('${k}')">${x?'Reprendre le bon':'Nouveau transfert'}</button>
         <button class="pos-btn ghost dep-btn-s" onclick="depOuvrirBonSpecial('RETOUR','${k}','${k}')" title="Marchandise rendue par le ${nom} au dépôt">↩ Retour au dépôt</button>
@@ -29924,8 +29925,8 @@ function depTransfertOuvrir(){
   document.getElementById('dep-trf-bg').classList.add('open');
   const t=document.getElementById('dep-trf-etat');
   if(t){ t.className='dep-trf-etat'; t.textContent = _depBonSpecial
-    ? `⌨ Scanner prêt : scannez les colis fermés qui quittent le ${_depBonSpecial.origine_nom}.`
-    : '⌨ Scanner prêt : scannez les colis qui sortent du dépôt.'; }
+    ? `⌨ Scanner prêt : scannez les UL fermées qui quittent le ${_depBonSpecial.origine_nom}.`
+    : '⌨ Scanner prêt : scannez les UL qui sortent du dépôt.'; }
   document.activeElement?.blur?.();
   depTransfertRender();
 }
@@ -29955,8 +29956,8 @@ function depTransfertRender(){
       <td class="num">${lignes.length-i}</td>
       <td>${x.colis_id?`<button type="button" class="dep-code dep-code-btn" onclick="depOuvrirFiche(${x.colis_id})">${esc(x.colis_code)}</button>`:'<em>vrac</em>'}</td>
       <td><strong>${esc(x.produit_nom||'')}</strong></td><td class="tr num">${x.quantite}</td>
-      <td class="tr"><button class="pos-btn ghost dep-btn-s" title="Retirer du bon (le colis reste au ${esc(origineNom)})" onclick="depRetirerLigne(${x.id})">✕</button></td></tr>`).join('')
-    || `<tr class="dep-vide-l"><td colspan="5">${sp?`Scannez le premier colis fermé du ${esc(origineNom)}, ou ajoutez du vrac.`:`Scannez le premier colis à sortir vers le ${dest}.`}</td></tr>`;
+      <td class="tr"><button class="pos-btn ghost dep-btn-s" title="Retirer du bon (l'UL reste au ${esc(origineNom)})" onclick="depRetirerLigne(${x.id})">✕</button></td></tr>`).join('')
+    || `<tr class="dep-vide-l"><td colspan="5">${sp?`Scannez le premier UL fermée du ${esc(origineNom)}, ou ajoutez du vrac.`:`Scannez le premier UL à sortir vers le ${dest}.`}</td></tr>`;
   const vr = document.getElementById('dep-vrac-produit');
   const cleStock = sp ? (sp.origine||'').toLowerCase() : 'depot';
   if(vr) vr.innerHTML = _depStock.filter(x=>x[cleStock]>0).map(x=>`<option value="${x.produit_id}">${esc(x.nom)} (${esc(origineNom)} : ${x[cleStock]})</option>`).join('')
@@ -30018,7 +30019,7 @@ async function depAnnulerLivraison(){
   const l = _depBonActif();
   if(!l) return;
   const ici = (l.type_bon||'TRANSFERT')==='TRANSFERT' ? 'au dépôt' : `au ${l.origine_nom}`;
-  if(!await showConfirm(`Annuler le bon ${l.numero} ? Les colis scannés restent ${ici}.`, {title:'Annuler le bon', type:'danger', okLabel:'Annuler le bon'})) return;
+  if(!await showConfirm(`Annuler le bon ${l.numero} ? Les UL scannées restent ${ici}.`, {title:'Annuler le bon', type:'danger', okLabel:'Annuler le bon'})) return;
   try{
     await apiFetch('POST',`/pos/depot/livraisons/${l.id}/annuler`,{});
     if(!_depBonSpecial){ _depLivraisons[l.lieu]=null; _depLivraison=null; }
@@ -30066,7 +30067,7 @@ async function depManuelOuvrir(){
       apiFetch('GET','/pos/depot/colis?statut=A_VERIFIER'),
     ]);
     _depManuel.colis=[...(auDepot||[]), ...(aVerifier||[])];
-  }catch(e){ posAlert(e.message||'Colis indisponibles.'); }
+  }catch(e){ posAlert(e.message||'UL indisponibles.'); }
   depManuelRender();
 }
 
@@ -30096,9 +30097,9 @@ function depManuelRender(){
         <input type="checkbox" ${_depManuel.choisis.has(c.id)?'checked':''} onchange="depManuelBasculer(${c.id}, this.checked)">
         <span class="dep-code">${esc(c.code_lisible||c.code)}</span>
         <span>${c.quantite} ${esc(c.unite||'u.')}</span>
-        <span class="dep-st ${c.statut==='AU_DEPOT'?'st-depot':'st-verif'}">${c.statut==='AU_DEPOT'?'Au dépôt':'À vérifier'}</span>
+        <span class="dep-st ${c.statut==='AU_DEPOT'?'st-depot':'st-verif'}">${c.statut==='AU_DEPOT'?'Au dépôt':'À contrôler'}</span>
       </label>`).join('')}`).join('')
-    || '<div class="pa-res-vide">Aucun colis au dépôt ne correspond. Seuls les colis au dépôt ou en attente de vérification peuvent sortir.</div>';
+    || '<div class="pa-res-vide">Aucune UL au dépôt ne correspond. Seules les UL au dépôt ou en attente de contrôle peuvent sortir.</div>';
   depManuelRecap();
 }
 
@@ -30109,7 +30110,7 @@ async function depManuelAjouterCode(){
   try{
     const c=await apiFetch('GET',`/pos/depot/colis/code/${encodeURIComponent(code)}`);
     if(!['AU_DEPOT','A_VERIFIER'].includes(c.statut)){
-      posAlert(`Colis ${c.code_lisible} : ${c.statut_libelle.toLowerCase()} — il ne peut pas sortir du dépôt.`);
+      posAlert(`UL ${c.code_lisible} : ${c.statut_libelle.toLowerCase()} — il ne peut pas sortir du dépôt.`);
       if(c.statut==='LIVRE') depOuvrirFiche(c.id);
       return;
     }
@@ -30131,9 +30132,9 @@ function depManuelRecap(){
   const parProduit={};
   choisis.forEach(c=>{ parProduit[c.produit_nom] = (parProduit[c.produit_nom]||0) + c.quantite; });
   document.getElementById('dep-manuel-recap').innerHTML = choisis.length
-    ? `<div class="pa-recap-l pa-recap-tot"><span>${choisis.length} colis vers ${_depManuel.lieu?esc(_DEP_LIEUX[_depManuel.lieu]):'— choisissez le bar —'}</span><span>${choisis.reduce((t,c)=>t+c.quantite,0)} unités</span></div>`
+    ? `<div class="pa-recap-l pa-recap-tot"><span>${choisis.length} UL vers ${_depManuel.lieu?esc(_DEP_LIEUX[_depManuel.lieu]):'— choisissez le bar —'}</span><span>${choisis.reduce((t,c)=>t+c.quantite,0)} unités</span></div>`
       + Object.entries(parProduit).map(([n,q])=>`<div class="pa-recap-l"><span>${esc(n)}</span><span>${q}</span></div>`).join('')
-    : '<div class="pa-recap-l"><span>Aucun colis choisi</span><span></span></div>';
+    : '<div class="pa-recap-l"><span>Aucune UL choisie</span><span></span></div>';
 }
 
 async function depManuelValider(){
@@ -30147,17 +30148,17 @@ async function depManuelValider(){
     posAlert('Précisez le motif « Autre ».'); document.getElementById('dep-manuel-precision').focus(); return;
   }
   if(motif.length<10){ posAlert('Ajoutez une précision au motif (10 caractères minimum).'); document.getElementById('dep-manuel-precision').focus(); return; }
-  if(!choisis.length){ posAlert('Choisissez au moins un colis.'); return; }
+  if(!choisis.length){ posAlert('Choisissez au moins une UL.'); return; }
   const quand=new Date(dateVal);
   const ok=await showConfirm(
-    `Transfert manuel de ${choisis.length} colis au ${_DEP_LIEUX[_depManuel.lieu]}, le ${quand.toLocaleDateString('fr-FR')} à ${quand.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}.\n\nMotif : ${motif}\n\nLes codes de ces colis ne seront plus valables. Confirmer ?`,
+    `Transfert manuel de ${choisis.length} UL au ${_DEP_LIEUX[_depManuel.lieu]}, le ${quand.toLocaleDateString('fr-FR')} à ${quand.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}.\n\nMotif : ${motif}\n\nLes codes de ces UL ne seront plus valables. Confirmer ?`,
     {title:'Transfert manuel', type:'warn', okLabel:'Confirmer le transfert'});
   if(!ok) return;
   try{
     const l=await apiFetch('POST','/pos/depot/livraisons/manuelle',{
       lieu:_depManuel.lieu, colis_ids:choisis.map(c=>c.id), motif, date_reelle:quand.toISOString()});
     depManuelFermer();
-    posAlert(`Transfert manuel ${l.numero} enregistré : ${l.nb_lignes} colis au ${l.lieu_nom}. Leurs codes ne sont plus valables.`,'ok');
+    posAlert(`Transfert manuel ${l.numero} enregistré : ${l.nb_lignes} UL au ${l.lieu_nom}. Leurs codes ne sont plus valables.`,'ok');
     await _depCharger();
   }catch(e){ posAlert(String(e.message||'Transfert refusé').replace(/^\[\d+\]\s*/,'')); }
 }

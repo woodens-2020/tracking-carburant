@@ -94,7 +94,7 @@ def test_colis_non_verifie_ne_peut_pas_partir(client, db):
     code = client.post(f"/api/pos/depot/receptions/{a.id}", headers=H, json={}).json()["colis"][0]["code"]
     liv = client.post("/api/pos/depot/livraisons", headers=H, json={"lieu": "DEVANT"}).json()
     r = client.post(f"/api/pos/depot/livraisons/{liv['id']}/scan", headers=H, json={"code": code})
-    assert r.status_code == 409 and "vérifié" in r.json()["detail"]["message"]
+    assert r.status_code == 409 and "contrôlée" in r.json()["detail"]["message"]
 
 
 def test_annuler_livraison_remet_au_depot(client, db):
@@ -219,7 +219,7 @@ def test_rescan_colis_livre_donne_la_fiche(client, db):
     # Fiche de livraison
     f = client.post("/api/pos/depot/colis/consulter", headers=H, json={"code": code}).json()
     assert f["deja_livre"] is True
-    assert f["colis"]["statut_libelle"] == "Transféré au bar" and f["colis"]["lieu_nom"] == "Bar piscine"
+    assert f["colis"]["statut_libelle"] == "Transférée au bar" and f["colis"]["lieu_nom"] == "Bar piscine"
     assert f["livraison"]["numero"] == liv["numero"] and f["livraison"]["valide_le"]
     types = [e["type"] for e in f["historique"]]
     assert types[:4] == ["CREE", "VERIFIE", "AJOUTE_LIVRAISON", "LIVRE"]
@@ -352,7 +352,7 @@ def test_livraison_manuelle_regles_strictes(client, db):
     client.post("/api/pos/depot/livraisons/manuelle", headers=H,
                 json={**base, "colis_ids": ids[:1], "motif": "Coupure internet"})
     r = client.post("/api/pos/depot/livraisons/manuelle", headers=H, json={**base, "motif": "Coupure internet encore"})
-    assert r.status_code == 409 and "aucun colis" in r.json()["detail"]
+    assert r.status_code == 409 and "aucune UL" in r.json()["detail"]
     st = client.get(f"/api/pos/depot/colis/{ids[1]}/fiche", headers=H).json()["colis"]["statut"]
     assert st == "AU_DEPOT"
     assert _stock(client, p.id)["devant"] == 12

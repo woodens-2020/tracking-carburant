@@ -1750,7 +1750,7 @@ def confirmer_achat(achat_id: int, request: Request, db: Session = Depends(get_d
     quand = now_haiti().strftime("%d/%m/%Y à %H:%M")
     message = (
         f"{employe_nom} · {quand} · {float(a.quantite)} {unite}(s) réceptionné(s) — "
-        f"{len(colis)} colis à étiqueter et à scanner au dépôt."
+        f"{len(colis)} UL à étiqueter et à contrôler au dépôt."
     )
     if a.fournisseur:
         message += f" · Fournisseur : {a.fournisseur}"
