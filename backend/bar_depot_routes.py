@@ -199,12 +199,18 @@ class CodeRejete(Exception):
         self.message, self.motif = message, motif
 
 
+_AZERTY_CHIFFRES = str.maketrans("&é\"'(-è_çà", "1234567890")
+
+
 def normaliser_code(db: Session, texte: str) -> str:
     """Valide le texte lu par le scanner (liste blanche stricte) et vérifie
     la clé de contrôle. Lève CodeRejete sinon. Accepte le code seul, avec
     tirets ou espaces, ou une URL qui se termine par le code."""
     brut = (texte or "")[:200]
     t = brut.strip()
+    # Douchette QWERTY sur clavier AZERTY : « &é"'(-è_çà » au lieu de « 1234567890 »
+    if any(ch in t for ch in "&é\"'(è_çà"):
+        t = t.translate(_AZERTY_CHIFFRES)
     if "/" in t:
         t = t.rstrip("/").rsplit("/", 1)[-1]
     t = re.sub(r"[\s\-]", "", t).upper()

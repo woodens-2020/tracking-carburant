@@ -29010,31 +29010,49 @@ let _depFile = Promise.resolve();  // scans traités un par un, dans l'ordre
 // puis Entrée (ou Tab). On reconnaît cette rafale sur toute la page Dépôt,
 // quel que soit le champ actif : le code ne s'écrit pas dans un autre champ
 // et Entrée ne déclenche pas le bouton qui a le focus.
-const _depLecteur = {buf:'', debut:0, dernier:0, el:null, val:null, nb:0};
+const _depLecteur = {buf:'', norm:'', debut:0, dernier:0, el:null, val:null, nb:0};
 const _depPageDepotVisible = () => { const p=document.getElementById('page-pos-depot'); return !!(p && p.offsetParent!==null); };
+// Scan possible depuis n'importe quelle page pour qui a accès au Dépôt Bar
+const _depScanGlobalPermis = () => { try{ return !!_appUser && _canAccess('pos-depot'); }catch(_){ return false; } };
+// Caractère de la touche PHYSIQUE : une douchette réglée en QWERTY sur un
+// clavier AZERTY tape « &é"'( » au lieu de « 12345 » ; e.code donne toujours
+// la bonne touche (Digit1 → 1, KeyB → B), quel que soit le clavier.
+function _depCarPhysique(e){
+  const c = e.code || '';
+  let m = c.match(/^(?:Digit|Numpad)(\d)$/); if(m) return m[1];
+  m = c.match(/^Key([A-Z])$/); if(m) return m[1];
+  return e.key;
+}
+const _RE_CODE_COLIS = /^BC\d{8}(\d{4})?$/;
 document.addEventListener('keydown', e=>{
-  if(!_depPageDepotVisible() || e.ctrlKey || e.altKey || e.metaKey) return;
+  if(e.ctrlKey || e.altKey || e.metaKey) return;
+  const surDepot = _depPageDepotVisible();
+  if(!surDepot && !_depScanGlobalPermis()) return;
   const L=_depLecteur, t=performance.now();
   if(e.key==='Enter' || e.key==='Tab'){
-    const b=L.buf, n=b.length; L.buf='';
+    const b=L.buf, n=b.length, code=L.norm.toUpperCase().replace(/-/g,'');
+    L.buf=''; L.norm='';
     // Rafale rapide (douchette : < 50 ms entre les caractères), ou un peu plus
     // lente (douchette Bluetooth) mais au format d'un code colis.
-    const moy=(L.dernier-L.debut)/Math.max(n-1,1), estCode=/^(BC[\d-]{8,}|.*\/colis\/.+)$/i.test(b);
-    if(n>=6 && t-L.dernier < 150 && (moy < 50 || (moy < 90 && estCode))){
+    const moy=(L.dernier-L.debut)/Math.max(n-1,1), estCode=_RE_CODE_COLIS.test(code);
+    const rafale = n>=6 && t-L.dernier < 150 && (moy < 50 || (moy < 90 && estCode));
+    // Hors de la page Dépôt : seulement un vrai code colis (ne gêne aucune autre saisie)
+    if(rafale && (surDepot || estCode)){
       e.preventDefault(); e.stopPropagation();
       const el=L.el;
       if(el && el.tagName==='SELECT'){ if(el.value!==L.val){ el.value=L.val; } }
       else if(el && typeof el.value==='string' && el.value.endsWith(b)) el.value=el.value.slice(0,-n);
       L.duree=Math.round(L.dernier-L.debut);
       L.dernier=t;                       // annule un raccourci déclenché par le dernier chiffre du code
-      depScanner(b, true);
+      if(surDepot) depScanner(estCode ? code : b, true);
+      else { _depLecteurVu(); _depFile = _depFile.then(()=>_depScanIntel(code)).catch(()=>{}); }
     }
     L.dernier=t;
     return;
   }
   if(e.key.length!==1) return;
-  if(t-L.dernier > 150 || !L.buf){ L.buf=''; L.debut=t; L.el=document.activeElement; L.val=L.el && L.el.value; }
-  L.buf+=e.key; L.dernier=t;
+  if(t-L.dernier > 150 || !L.buf){ L.buf=''; L.norm=''; L.debut=t; L.el=document.activeElement; L.val=L.el && L.el.value; }
+  L.buf+=e.key; L.norm+=_depCarPhysique(e); L.dernier=t;
 }, true);
 
 function _depLecteurVu(){

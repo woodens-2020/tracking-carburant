@@ -409,3 +409,14 @@ def test_scan_intelligent_et_transfert_direct(client, db):
     assert r.status_code == 200 and r.json()["stock"]["DEVANT"] == 12
     f = client.get(f"/api/pos/depot/colis/{colis[2]['id']}/fiche", headers=H).json()
     assert [e["type"] for e in f["historique"]][-2:] == ["VERIFIE", "LIVRE"]
+
+
+def test_code_lu_en_azerty(client, db):
+    """Douchette QWERTY branchée sur un clavier AZERTY : les chiffres arrivent
+    en « &é"'(-è_çà » ; le code doit quand même être reconnu."""
+    p = _produit(db)
+    colis = _recevoir(client, _achat_api(client, p, 24), verifier=False)
+    code = colis[0]["code"]
+    azerty = code[:2] + code[2:].translate(str.maketrans("1234567890", "&é\"'(-è_çà"))
+    r = client.post("/api/pos/depot/colis/scan", headers=H, json={"code": azerty})
+    assert r.status_code == 200 and r.json()["colis"]["code"] == code
