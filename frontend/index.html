@@ -522,8 +522,16 @@ canvas{display:block}
 .cjr-th-groupe th{border-bottom:none;padding-bottom:0;color:var(--text2)}
 .cjr-table .tc{text-align:center}
 .cjr-vide td{opacity:.5}
-.cjr-ventes{max-width:900px}
-.cjr-periodes{display:flex;flex-direction:column;gap:14px;max-width:960px}
+.cjr-ventes{width:100%}
+.cjr-periodes{display:flex;flex-direction:column;gap:16px;width:100%}
+/* Matin et Après-midi : mêmes largeurs de colonnes, alignées d'un bloc à l'autre */
+.cjr-per .cjr-table{width:100%;table-layout:fixed}
+.cjr-per .cjr-table col.c-prod{width:40%}
+.cjr-per .cjr-table col.c-num{width:20%}
+.cjr-per .cjr-table th,.cjr-per .cjr-table td{padding:12px 20px}
+.cjr-per .cjr-table td.tr,.cjr-per .cjr-table th.tr{padding-right:24px}
+.cjr-per-vide td{text-align:center;font-style:italic;color:var(--muted);padding:18px 20px!important}
+.cjr-per-tete{padding:14px 20px!important}
 .cjr-per{border-radius:var(--r);border:1px solid var(--border);border-left-width:5px;background:var(--panel);overflow:hidden}
 .cjr-per-matin{border-left-color:#f59e0b}
 .cjr-per-am{border-left-color:#818cf8}
@@ -549,6 +557,9 @@ canvas{display:block}
 @media(max-width:620px){.cjr-per-tete,.cjr-per-total{flex-wrap:wrap}.cjr-per-res{margin-left:0;width:100%;justify-content:space-between}
   .cjr-per .cjr-table th:nth-child(3),.cjr-per .cjr-table td:nth-child(3){display:none}
   .cjr-per .cjr-table{min-width:0!important;width:100%;table-layout:auto}
+  .cjr-per .cjr-table{display:table!important}
+  .cjr-per .cjr-table col{width:auto!important}
+  .cjr-per .cjr-table col:nth-child(3){display:none}
   .cjr-per .cjr-table th,.cjr-per .cjr-table td{padding:8px 8px!important;font-size:12.5px}
   .cjr-per .cjr-table td:first-child,.cjr-per .cjr-table th:first-child{padding-left:12px!important;white-space:normal}}
 .cjr-ventes .cjr-grp td{background:var(--blue-d);color:var(--blue2);font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:12.5px;border-top:1px solid var(--border3)}
@@ -15937,7 +15948,7 @@ function _cjrTableVentesHtml(m, impression){
   const blocs=m.sections.map(s=>{
     const lignes = s.lignes.length
       ? s.lignes.map(l=>`<tr><td>${esc(l.nom)}</td><td class="${impression?'r':'tr num'}">${cjrGal(l.g)}</td><td class="${impression?'r':'tr num'}">${cjrPx(l.prix)}</td><td class="${impression?'r':'tr num'}">${cjrG(l.m)}</td></tr>`).join('')
-      : `<tr><td colspan="4" style="opacity:.6">Aucune vente sur cette période</td></tr>`;
+      : `<tr class="cjr-per-vide"><td colspan="4">Aucune vente sur cette période</td></tr>`;
     const cle = s.cle==='Matin' ? 'matin' : 'am';
     if(impression){
       return `<div class="pv pv-${cle}">
@@ -15953,6 +15964,7 @@ function _cjrTableVentesHtml(m, impression){
         <span class="cjr-per-res"><span class="num">${cjrGal(s.g)}</span><strong class="num">${cjrG(s.m)}</strong></span>
       </div>
       <div class="tbl-wrap"><table class="dt cjr-table">
+        <colgroup><col class="c-prod"><col class="c-num"><col class="c-num"><col class="c-num"></colgroup>
         <thead><tr><th>Produit</th><th class="tr">Gallons</th><th class="tr">Prix moyen / gal</th><th class="tr">Montant</th></tr></thead>
         <tbody>${lignes}</tbody>
         <tfoot><tr class="cjr-per-sous"><td>Sous-total ${s.libelle}</td><td class="tr num">${cjrGal(s.g)}</td><td class="tr num">${cjrPx(s.prix)}</td><td class="tr num">${cjrG(s.m)}</td></tr></tfoot>
