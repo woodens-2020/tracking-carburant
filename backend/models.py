@@ -115,6 +115,72 @@ class Releve(Base):
         return round(self.quantite * float(self.prix_gallon), 2)
 
 
+class RapportPompiste(Base):
+    """Rapport de fin de période soumis par un pompiste depuis son espace
+    dédié (/pompiste) : index de ses pompes + billetterie. Reste en dehors du
+    journal des compteurs (`releves`) tant qu'un superviseur ne l'a pas
+    confirmé — la confirmation écrit (ou corrige) les relevés officiels.
+    Un rapport refusé reste en historique ; le pompiste en soumet un nouveau."""
+    __tablename__ = "rapports_pompiste"
+
+    id                 = Column(Integer, primary_key=True)
+    date               = Column(Date, nullable=False)
+    periode            = Column(String(20), nullable=False)
+    utilisateur_id     = Column(Integer, ForeignKey("utilisateurs.id", ondelete="RESTRICT"), nullable=False)
+    statut             = Column(String(20), nullable=False, default="SOUMIS")  # SOUMIS, CONFIRME, REJETE
+    charte_acceptee_at = Column(DateTime(timezone=True), nullable=False)
+    # [{"coupure": 1000, "liasses": 2, "billets": 13}, ...] + monnaie (pièces)
+    billetterie        = Column(JSON, nullable=False, default=list)
+    monnaie            = Column(Numeric(14, 2), nullable=False, default=0)
+    # Rapprochement figé à la soumission : Σ gallons × prix vs argent compté
+    montant_attendu    = Column(Numeric(14, 2), nullable=False, default=0)
+    montant_compte     = Column(Numeric(14, 2), nullable=False, default=0)
+    ecart              = Column(Numeric(14, 2), nullable=False, default=0)
+    note_pompiste      = Column(String(500), nullable=True)
+    soumis_at          = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    traite_par_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    traite_at          = Column(DateTime(timezone=True), nullable=True)
+    commentaire_superviseur = Column(String(1000), nullable=True)
+
+    utilisateur = relationship("Utilisateur", foreign_keys=[utilisateur_id])
+    traite_par  = relationship("Utilisateur", foreign_keys=[traite_par_id])
+    lignes      = relationship("RapportPompisteLigne", back_populates="rapport",
+                               cascade="all, delete-orphan", order_by="RapportPompisteLigne.id")
+
+    __table_args__ = (
+        CheckConstraint("periode IN ('Matin', 'Apres-midi')", name="chk_rpomp_periode"),
+        CheckConstraint("statut IN ('SOUMIS','CONFIRME','REJETE')", name="chk_rpomp_statut"),
+        Index("idx_rpomp_date", "date"),
+        Index("idx_rpomp_statut", "statut"),
+        Index("idx_rpomp_user", "utilisateur_id"),
+    )
+
+
+class RapportPompisteLigne(Base):
+    """Index d'une pompe dans un rapport pompiste. Les colonnes *_corrige
+    sont remplies par le superviseur s'il modifie les index à la confirmation
+    (les valeurs du pompiste restent conservées pour l'historique)."""
+    __tablename__ = "rapports_pompiste_lignes"
+
+    id                  = Column(Integer, primary_key=True)
+    rapport_id          = Column(Integer, ForeignKey("rapports_pompiste.id", ondelete="CASCADE"), nullable=False)
+    pompe_id            = Column(Integer, ForeignKey("pompes.id", ondelete="RESTRICT"), nullable=False)
+    prix_gallon         = Column(Numeric(12, 3), nullable=False, default=0)
+    metter_avant        = Column(Numeric(14, 4), nullable=False)
+    metter_apres        = Column(Numeric(14, 4), nullable=False)
+    metter_avant_corrige = Column(Numeric(14, 4), nullable=True)
+    metter_apres_corrige = Column(Numeric(14, 4), nullable=True)
+
+    rapport = relationship("RapportPompiste", back_populates="lignes")
+    pompe   = relationship("Pompe")
+
+    __table_args__ = (
+        UniqueConstraint("rapport_id", "pompe_id", name="uq_rpomp_ligne"),
+        CheckConstraint("metter_apres >= metter_avant", name="chk_rpomp_ligne_ordre"),
+        Index("idx_rpomp_ligne_rapport", "rapport_id"),
+    )
+
+
 class Livraison(Base):
     """Livraison de carburant : approvisionnement en gallons pour un produit."""
     __tablename__ = "livraisons"

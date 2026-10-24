@@ -3203,6 +3203,36 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .zelle-src-pdg{background:rgba(74,222,128,.12);color:#4ade80;}
 .zelle-src-gaz{background:rgba(96,165,250,.12);color:#60a5fa;}
 .zelle-src-autre{background:rgba(167,139,250,.12);color:#a78bfa;}
+
+/* ── Rapports pompistes (supervision) ─────────────────────────────── */
+.psp-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.psp-tab{font:inherit;font-weight:600;font-size:13px;padding:8px 14px;border-radius:9px;cursor:pointer;
+  border:1px solid var(--border);background:var(--panel);color:var(--muted)}
+.psp-tab.on{background:var(--orange);border-color:var(--orange);color:#fff}
+.psp-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px}
+.psp-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;margin-bottom:10px}
+.psp-head b{font-size:15px}
+.psp-muted{color:var(--muted);font-size:12.5px}
+.psp-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.psp-tbl th{font-size:11.5px;color:var(--muted);font-weight:600;text-align:left;padding:6px;border-bottom:1px solid var(--border)}
+.psp-tbl td{padding:6px;border-bottom:1px solid var(--border);vertical-align:middle}
+.psp-tbl .r{text-align:right;font-family:var(--mono)}
+.psp-tbl input{width:110px;font-family:var(--mono);text-align:right}
+.psp-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.psp-kpi{background:var(--bg);border-radius:10px;padding:9px 11px}
+.psp-kpi > span{display:block;font-size:11.5px;color:var(--muted)}
+.psp-kpi b{font-family:var(--mono);font-size:15px}
+.psp-neg{color:var(--red)} .psp-pos{color:var(--orange)} .psp-ok{color:var(--green)}
+.psp-warn{background:rgba(249,115,22,.1);color:var(--orange);border-radius:9px;padding:8px 10px;font-size:12.5px;margin-top:8px}
+.psp-err{background:rgba(239,68,68,.1);color:var(--red);border-radius:9px;padding:8px 10px;font-size:13px;margin-top:8px;font-weight:600}
+.psp-okbox{background:rgba(34,197,94,.1);color:var(--green);border-radius:9px;padding:10px 12px;font-size:13.5px;margin-bottom:12px}
+.psp-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.psp-badge{font-size:11.5px;font-weight:700;border-radius:20px;padding:2px 9px}
+.psp-badge.SOUMIS{background:rgba(249,115,22,.12);color:var(--orange)}
+.psp-badge.CONFIRME{background:rgba(34,197,94,.12);color:var(--green)}
+.psp-badge.REJETE{background:rgba(239,68,68,.12);color:var(--red)}
+.psp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+@media (max-width:640px){.psp-kpis{grid-template-columns:1fr 1fr}.psp-tbl input{width:84px}}
 </style>
 </head>
 <script src="/vendor/chart.umd.min.js"></script>
@@ -3314,6 +3344,15 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       </span>
       <span data-i18n="nav.saisie">Saisie</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="pompistes-rapports" onclick="goTo('pompistes-rapports')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24"><path d="M3 22V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v17"/><path d="M3 22h12"/><path d="M15 9h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V8l-3-3"/><rect x="6" y="6" width="6" height="5" rx="1"/></svg>
+      </span>
+      <span>Rapports pompistes</span>
+      <span class="nav-badge" id="psp-nav-badge" style="display:none;margin-left:auto;background:var(--orange);color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px"></span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -4170,6 +4209,15 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div>
 
     <!-- ══════ PAGE : SAISIE ══════ -->
+    <div id="page-pompistes-rapports" class="page">
+      <div class="psp-tabs">
+        <button class="psp-tab on" data-t="attente" onclick="pspOnglet('attente')">À confirmer <span id="psp-nb"></span></button>
+        <button class="psp-tab" data-t="historique" onclick="pspOnglet('historique')">Historique</button>
+        <button class="psp-tab" data-t="comptes" onclick="pspOnglet('comptes')">Comptes pompistes</button>
+      </div>
+      <div id="psp-contenu"></div>
+    </div>
+
     <div id="page-saisie" class="page">
 
       <div class="saisie-top">
@@ -14779,6 +14827,7 @@ const PAGE_META={
   home:                {title: ()=>t('page.home.title'),        sub: ()=>t('page.home.sub')},
   dashboard:           {title: ()=>t('page.dashboard.title'),   sub: ()=>t('page.dashboard.sub')},
   saisie:              {title: ()=>t('page.saisie.title'),      sub: ()=>t('page.saisie.sub')},
+  'pompistes-rapports':{title: 'Rapports pompistes',            sub: 'Confirmer, corriger ou refuser les compteurs soumis par les pompistes'},
   journal:             {title: ()=>t('page.journal.title'),     sub: ()=>t('page.journal.sub')},
   'carburant-rapport': {title: 'Rapport Journalier',            sub: 'Caisse carburant — entrées, dépenses, disponible du jour'},
   'rapport-analytique':{title: ()=>t('page.rapport.title'),    sub: ()=>t('page.rapport.sub')},
@@ -14873,6 +14922,7 @@ function goTo(page){
   if(page==='home')               loadHome();
   if(page==='dashboard')          initDashboard();
   if(page==='saisie')             loadSaisie();
+  if(page==='pompistes-rapports') loadPompistesRapports();
   if(page==='journal')            initJournal();
   if(page==='carburant-rapport')  loadCarburantRapport();
   if(page==='rapport-analytique') initRapportAnalytique();
@@ -17960,7 +18010,7 @@ function _bandeauEnvironnement(env){
 // de Bord Gestion », « Achats » et « Payroll » agrègent/gèrent tout
 // l'établissement, pas seulement le carburant).
 const _MODULE_PAGES = {
-  carburant: ['home','dashboard','saisie','journal','carburant-rapport','rapport-analytique','statistiques',
+  carburant: ['home','dashboard','saisie','pompistes-rapports','journal','carburant-rapport','rapport-analytique','statistiques',
               'previsions','rapports','stock','gestion','audit','depenses'],
   bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-stock','pos-achats',
               'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite',
@@ -17990,7 +18040,7 @@ function _pageModuleEnabled(page){
 // ── Matrice de pages par domaine fonctionnel ─────────────────────
 const _AREA_PAGES = {
   carburant: {
-    complet: ['home','saisie'],
+    complet: ['home','saisie','pompistes-rapports'],
     lecture: ['home'],
   },
   finance: {
@@ -18030,7 +18080,7 @@ const _CAISSIER_ALLOWED = new Set([
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
-  'pos-fournisseurs',
+  'pos-fournisseurs','pompistes-rapports',
   'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'patisserie-dashboard','patisserie-produits','patisserie-achats','patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse',
@@ -18040,7 +18090,7 @@ const _MANAGER_ALLOWED = new Set([
 
 // Assistant Directeur — tous les rapports en lecture + Zelle complet
 const _AD_ALLOWED = new Set([
-  'home',
+  'home','pompistes-rapports',
   'dashboard','journal','carburant-rapport','statistiques','gi-dashboard','depenses','achats','caisse',
   'pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes',
   'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
@@ -19008,6 +19058,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   // Logo + utilisateur (await pour que _appUser soit défini avant loadHome)
   initLogo();
   await loadCurrentUser();
+  pspMajBadge();
 
   // Charger les produits en premier
   try{
@@ -19035,6 +19086,211 @@ document.addEventListener('DOMContentLoaded',async()=>{
     goTo(_defaultLandingPage());
   }
 });
+
+// ══════════════════════════════════════════════
+// RAPPORTS POMPISTES — supervision (voir backend/pompiste_routes.py)
+// ══════════════════════════════════════════════
+const PSP = {onglet:'attente', rapports:[], comptes:null, pin:null};
+const _pspPer = p => p === 'Apres-midi' ? 'Après-midi' : p;
+const _pspDate = d => new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', {weekday:'short', day:'2-digit', month:'2-digit'});
+const _pspG = n => Number(n||0).toLocaleString('fr-FR', {maximumFractionDigits:0}) + ' G';
+const _pspN = (n,d=3) => n == null ? '—' : Number(n).toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d});
+const _pspE = n => `<span class="${Math.abs(n)<1?'psp-ok':(n<0?'psp-neg':'psp-pos')}">${n>=0?'+':''}${_pspG(n)}</span>`;
+
+async function _pspApi(method, path, body){
+  const h = {'Content-Type':'application/json'};
+  const k = sessionStorage.getItem('api_key'); if(k) h['X-API-Key'] = k;
+  const r = await fetch('/api/pompiste-supervision' + path, {method, headers:h, credentials:'include',
+                                                            body: body ? JSON.stringify(body) : undefined});
+  const d = await r.json().catch(()=>null);
+  if(!r.ok){
+    const det = d?.detail;
+    const e = new Error(typeof det === 'string' ? det : (det?.message || ('Erreur ' + r.status)));
+    e.status = r.status; e.detail = det; throw e;
+  }
+  return d;
+}
+
+async function pspMajBadge(){
+  const b = document.getElementById('psp-nav-badge'); if(!b || !_canAccess('pompistes-rapports')) return;
+  try{ const r = await _pspApi('GET','/resume'); b.textContent = r.a_confirmer; b.style.display = r.a_confirmer ? '' : 'none'; }catch(e){}
+}
+
+function loadPompistesRapports(){ pspOnglet(PSP.onglet); }
+
+async function pspOnglet(t){
+  PSP.onglet = t;
+  document.querySelectorAll('.psp-tab').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  const c = document.getElementById('psp-contenu');
+  c.innerHTML = '<div class="psp-muted">Chargement…</div>';
+  try{
+    if(t === 'attente'){ PSP.rapports = await _pspApi('GET','/rapports?statut=SOUMIS'); pspRendreAttente(); }
+    else if(t === 'historique') await pspHistorique();
+    else { PSP.comptes = await _pspApi('GET','/comptes'); pspRendreComptes(); }
+  }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
+  pspMajBadge();
+}
+
+function pspRendreAttente(){
+  const c = document.getElementById('psp-contenu');
+  document.getElementById('psp-nb').textContent = PSP.rapports.length ? `(${PSP.rapports.length})` : '';
+  if(!PSP.rapports.length){
+    c.innerHTML = `<div class="psp-card"><b>Aucun rapport en attente.</b>
+      <div class="psp-muted" style="margin-top:4px">Les pompistes saisissent leurs compteurs sur <b>${esc(location.origin)}/pompiste</b>.</div></div>`;
+    return;
+  }
+  c.innerHTML = `<div class="psp-muted" style="margin-bottom:10px">Du plus ancien au plus récent : confirmez le Matin avant l'Après-midi (continuité des compteurs).</div>`
+    + PSP.rapports.map(pspCarte).join('');
+}
+
+function _pspBillets(r){
+  const l = (r.billetterie||[]).map(b => `${b.liasses ? b.liasses + ' liasse(s) + ' : ''}${b.billets||0} × ${Number(b.coupure).toLocaleString('fr-FR')} G`);
+  if(r.monnaie) l.push('monnaie ' + _pspG(r.monnaie));
+  return l.length ? l.join(' · ') : 'aucun billet déclaré';
+}
+
+function pspCarte(r){
+  const lignes = r.lignes.map(l => {
+    const prec = l.index_precedent;
+    const rupt = prec != null && Math.abs(prec - l.metter_avant) > 0.001;
+    const j = l.journal;
+    const diffJ = j && (Math.abs(j.metter_avant - l.metter_avant) > 0.001 || Math.abs(j.metter_apres - l.metter_apres) > 0.001);
+    return `<tr>
+      <td><b>${esc(l.pompe_nom)}</b><div class="psp-muted">${esc(l.produit_nom)}</div></td>
+      <td class="r">${_pspN(prec)}${rupt ? '<div class="psp-neg" style="font-size:11px">≠ début</div>' : ''}</td>
+      <td class="r"><input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="avant" value="${l.metter_avant}"></td>
+      <td class="r"><input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="apres" value="${l.metter_apres}"></td>
+      <td class="r">${_pspN(l.gallons)}</td>
+      <td class="r">${_pspG(l.montant)}</td>
+    </tr>${j ? `<tr><td colspan="6"><div class="${diffJ?'psp-warn':'psp-muted'}">${diffJ ? '⚠ ' : ''}Journal déjà saisi par ${esc(j.saisi_par||'l\'administration')} :
+       ${_pspN(j.metter_avant)} → ${_pspN(j.metter_apres)}${diffJ ? ' — la confirmation remplacera ces valeurs.' : ' (identique)'}</div></td></tr>` : ''}`;
+  }).join('');
+  return `<div class="psp-card" id="psp-r-${r.id}">
+    <div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspPer(r.periode)} ${_pspDate(r.date)}</div>
+      <div class="psp-muted">soumis ${new Date(r.soumis_at).toLocaleString('fr-FR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})} · charte acceptée</div></div>
+    <div style="overflow-x:auto"><table class="psp-tbl"><thead><tr><th>Pompe</th><th class="r">Index précédent</th><th class="r">Début</th><th class="r">Fin</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead>
+      <tbody>${lignes}</tbody></table></div>
+    <div class="psp-kpis">
+      <div class="psp-kpi"><span>Ventes attendues</span><b>${_pspG(r.montant_attendu)}</b></div>
+      <div class="psp-kpi"><span>Argent compté</span><b>${_pspG(r.montant_compte)}</b></div>
+      <div class="psp-kpi"><span>Écart</span><b>${_pspE(r.ecart)}</b></div>
+    </div>
+    <div class="psp-muted">Billetterie : ${esc(_pspBillets(r))}</div>
+    ${r.note_pompiste ? `<div class="psp-warn" style="color:var(--text)"><b>Note du pompiste :</b> ${esc(r.note_pompiste)}</div>` : ''}
+    <textarea class="filter-input" id="psp-com-${r.id}" rows="2" style="width:100%;margin-top:10px;height:auto;padding:8px"
+      placeholder="Commentaire (obligatoire pour refuser ou si vous corrigez un index)"></textarea>
+    <input class="filter-input" id="psp-motif-${r.id}" style="width:100%;margin-top:8px;display:none"
+      placeholder="Motif de l'écart de compteur (ex. remise à zéro, panne…)">
+    <div id="psp-msg-${r.id}"></div>
+    <div class="psp-actions">
+      <button class="btn btn-primary" onclick="pspConfirmer(${r.id})">✓ Confirmer</button>
+      <button class="btn btn-danger" onclick="pspRejeter(${r.id})">✕ Refuser</button>
+    </div></div>`;
+}
+
+function _pspMsg(id, html){ const el = document.getElementById('psp-msg-' + id); if(el) el.innerHTML = html; }
+
+async function pspConfirmer(id){
+  const r = PSP.rapports.find(x => x.id === id); if(!r) return;
+  const lignes = [];
+  for(const l of r.lignes){
+    const v = k => parseFloat(String(document.querySelector(`input[data-r="${id}"][data-p="${l.pompe_id}"][data-k="${k}"]`).value).replace(',', '.'));
+    const av = v('avant'), ap = v('apres');
+    if(isNaN(av) || isNaN(ap)) return _pspMsg(id, `<div class="psp-err">${esc(l.pompe_nom)} : index invalide.</div>`);
+    if(Math.abs(av - l.metter_avant) > 0.0005 || Math.abs(ap - l.metter_apres) > 0.0005)
+      lignes.push({pompe_id:l.pompe_id, metter_avant:av, metter_apres:ap});
+  }
+  const motifEl = document.getElementById('psp-motif-' + id);
+  try{
+    const out = await _pspApi('POST', `/rapports/${id}/confirmer`, {
+      lignes, commentaire: document.getElementById('psp-com-' + id).value,
+      motif_ecart_compteur: motifEl.style.display === 'none' ? null : motifEl.value});
+    notify(`Rapport de ${out.pompiste_nom} confirmé — journal des compteurs mis à jour.`, 'ok');
+    (out.avertissements||[]).forEach(a => notify(a, 'warn'));
+    pspOnglet('attente');
+  }catch(e){
+    if(e.detail?.motif_requis){ motifEl.style.display = ''; motifEl.focus(); }
+    _pspMsg(id, `<div class="psp-err">${esc(e.message)}</div>`);
+  }
+}
+
+async function pspRejeter(id){
+  const com = document.getElementById('psp-com-' + id).value.trim();
+  if(com.length < 5){ _pspMsg(id, '<div class="psp-err">Écrivez au pompiste ce qui ne va pas avant de refuser.</div>');
+    document.getElementById('psp-com-' + id).focus(); return; }
+  try{
+    await _pspApi('POST', `/rapports/${id}/rejeter`, {commentaire: com});
+    notify('Rapport refusé — le pompiste voit votre commentaire et doit en soumettre un nouveau.', 'ok');
+    pspOnglet('attente');
+  }catch(e){ _pspMsg(id, `<div class="psp-err">${esc(e.message)}</div>`); }
+}
+
+async function pspHistorique(){
+  const c = document.getElementById('psp-contenu');
+  const fin = new Date(), deb = new Date(); deb.setDate(deb.getDate() - 30);
+  const iso = d => d.toISOString().slice(0,10);
+  const rs = (await _pspApi('GET', `/rapports?date_debut=${iso(deb)}&date_fin=${iso(fin)}`)).filter(r => r.statut !== 'SOUMIS');
+  const lib = {CONFIRME:'Confirmé', REJETE:'Refusé'};
+  c.innerHTML = `<div class="psp-card"><div class="psp-muted" style="margin-bottom:8px">30 derniers jours</div>
+    ${rs.length ? `<div style="overflow-x:auto"><table class="psp-tbl"><thead><tr><th>Créneau</th><th>Pompiste</th><th class="r">Gallons</th>
+      <th class="r">Attendu</th><th class="r">Compté</th><th class="r">Écart</th><th>Statut</th><th>Superviseur</th></tr></thead><tbody>
+      ${rs.map(r => `<tr><td>${_pspPer(r.periode)} ${_pspDate(r.date)}</td><td>${esc(r.pompiste_nom)}</td>
+        <td class="r">${_pspN(r.total_gallons)}</td><td class="r">${_pspG(r.montant_attendu)}</td><td class="r">${_pspG(r.montant_compte)}</td>
+        <td class="r">${_pspE(r.ecart)}</td><td><span class="psp-badge ${r.statut}">${lib[r.statut]}</span>
+          ${r.lignes.some(l => l.metter_apres_corrige != null) ? '<div class="psp-muted">index corrigés</div>' : ''}</td>
+        <td>${esc(r.traite_par_nom||'')}${r.commentaire_superviseur ? `<div class="psp-muted">${esc(r.commentaire_superviseur)}</div>` : ''}</td></tr>`).join('')}
+      </tbody></table></div>` : '<div class="psp-muted">Aucun rapport traité sur la période.</div>'}</div>`;
+}
+
+function pspRendreComptes(){
+  const c = document.getElementById('psp-contenu'), d = PSP.comptes;
+  const emps = d.employes.filter(e => !e.lie);
+  c.innerHTML = `${PSP.pin ? `<div class="psp-okbox">${PSP.pin}</div>` : ''}
+    <div class="psp-card"><b>Nouveau compte pompiste</b>
+      <div class="psp-muted" style="margin:4px 0 10px">Le pompiste se connecte sur <b>${esc(location.origin)}/pompiste</b> avec son identifiant et son PIN. Il n'a accès qu'à la saisie de ses compteurs.</div>
+      <div class="psp-grid">
+        <input class="filter-input" id="psp-c-nom" placeholder="Nom complet">
+        <input class="filter-input" id="psp-c-user" placeholder="Identifiant (ex. jean.pierre)" autocapitalize="none">
+        <input class="filter-input" id="psp-c-pin" placeholder="PIN 9 chiffres (vide = généré)" inputmode="numeric" maxlength="9">
+        <select class="filter-input" id="psp-c-emp"><option value="">Lier à un employé (facultatif)</option>
+          ${emps.map(e => `<option value="${e.id}">${esc(e.nom)} — ${esc(e.poste)}</option>`).join('')}</select>
+      </div>
+      <div id="psp-c-msg"></div>
+      <div class="psp-actions"><button class="btn btn-primary" onclick="pspCreerCompte()">+ Créer le compte</button></div></div>
+    <div class="psp-card"><b>Comptes (${d.comptes.length})</b>
+      ${d.comptes.length ? `<div style="overflow-x:auto;margin-top:8px"><table class="psp-tbl"><thead><tr><th>Nom</th><th>Identifiant</th><th>Employé lié</th><th>Dernier rapport</th><th>Statut</th><th></th></tr></thead><tbody>
+      ${d.comptes.map(u => `<tr><td><b>${esc(u.nom_complet)}</b></td><td style="font-family:var(--mono)">${esc(u.username)}</td>
+        <td>${esc(u.employe_nom||'—')}</td><td>${u.dernier_rapport ? _pspDate(u.dernier_rapport) : '—'}</td>
+        <td>${u.actif ? '<span class="psp-badge CONFIRME">Actif</span>' : '<span class="psp-badge REJETE">Désactivé</span>'}</td>
+        <td style="white-space:nowrap"><button class="btn btn-secondary" style="height:30px;padding:0 10px" onclick="pspCompte(${u.id},{nouveau_pin:true})">Nouveau PIN</button>
+          <button class="btn ${u.actif?'btn-danger':'btn-secondary'}" style="height:30px;padding:0 10px" onclick="pspCompte(${u.id},{actif:${!u.actif}})">${u.actif?'Désactiver':'Réactiver'}</button></td></tr>`).join('')}
+      </tbody></table></div>` : '<div class="psp-muted" style="margin-top:6px">Aucun compte pompiste pour l\'instant.</div>'}</div>`;
+  PSP.pin = null;
+}
+
+function _pspPinMsg(u){
+  return `PIN de <b>${esc(u.nom_complet)}</b> (identifiant <b style="font-family:var(--mono)">${esc(u.username)}</b>) :
+    <b style="font-family:var(--mono);font-size:16px;letter-spacing:.08em">${esc(u.code_acces)}</b>
+    — notez-le et remettez-le au pompiste, il ne sera plus affiché.`;
+}
+
+async function pspCreerCompte(){
+  const v = id => document.getElementById(id).value.trim();
+  try{
+    const u = await _pspApi('POST', '/comptes', {nom_complet:v('psp-c-nom'), username:v('psp-c-user'),
+      code_acces: v('psp-c-pin') || null, employe_id: v('psp-c-emp') ? parseInt(v('psp-c-emp'), 10) : null});
+    PSP.pin = _pspPinMsg(u);
+    PSP.comptes = await _pspApi('GET', '/comptes'); pspRendreComptes();
+  }catch(e){ document.getElementById('psp-c-msg').innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
+}
+
+async function pspCompte(id, body){
+  try{
+    const u = await _pspApi('PATCH', `/comptes/${id}`, body);
+    if(u.code_acces) PSP.pin = _pspPinMsg(u);
+    PSP.comptes = await _pspApi('GET', '/comptes'); pspRendreComptes();
+  }catch(e){ notify(e.message, 'err'); }
+}
 
 // Arrivée directe depuis un QR de caisse scanné (voir bar_caisses_routes.py
 // _qr_png_bytes : le QR encode {origine}/?scan=CODE, pas juste le code brut,

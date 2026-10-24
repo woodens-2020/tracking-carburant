@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Espace pompiste</title>
+<style>
+:root{
+  --bg:#f3f5f9; --panel:#fff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0;
+  --accent:#ea580c; --accent-soft:#fff1e8; --ok:#16a34a; --ok-soft:#e8f7ee;
+  --err:#dc2626; --err-soft:#fdecec; --warn:#b45309; --warn-soft:#fff6e0;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0b1220; --panel:#111a2e; --text:#e5e9f2; --muted:#94a3b8; --border:#24314d;
+    --accent:#fb923c; --accent-soft:#2a1c10; --ok:#4ade80; --ok-soft:#10261a;
+    --err:#f87171; --err-soft:#2c1414; --warn:#fbbf24; --warn-soft:#2a2210;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.env{background:#b91c1c;color:#fff;text-align:center;font-size:12px;font-weight:700;
+  letter-spacing:.08em;padding:4px}
+header{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--panel);
+  border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
+header .marque{font-weight:800;letter-spacing:.02em}
+header .qui{margin-left:auto;font-size:13px;color:var(--muted);text-align:right}
+header button{margin-left:8px}
+main{max-width:640px;margin:0 auto;padding:16px 16px 120px}
+h1{font-size:20px;margin:6px 0 4px}
+h2{font-size:16px;margin:18px 0 8px}
+p.sub{color:var(--muted);margin:0 0 14px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px}
+label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:10px 0 4px}
+input,textarea,select{width:100%;font:inherit;color:var(--text);background:var(--bg);
+  border:1px solid var(--border);border-radius:10px;padding:11px 12px}
+input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+input[readonly]{opacity:.75}
+.num{font-family:var(--mono);text-align:right}
+.btn{font:inherit;font-weight:700;border:0;border-radius:12px;padding:13px 16px;cursor:pointer;
+  background:var(--accent);color:#fff;width:100%}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.sec{background:transparent;color:var(--text);border:1px solid var(--border)}
+.btn.petit{width:auto;padding:7px 12px;font-size:13px;border-radius:9px}
+.ligne-btns{display:flex;gap:10px;margin-top:14px}
+.ligne-btns .btn{flex:1}
+.etapes{display:flex;gap:6px;margin:4px 0 16px}
+.etapes span{flex:1;height:5px;border-radius:3px;background:var(--border)}
+.etapes span.fait{background:var(--accent)}
+.seg{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:3px;gap:3px}
+.seg button{flex:1;font:inherit;font-weight:600;border:0;border-radius:8px;padding:9px;background:transparent;
+  color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.grille2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pompe{border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px}
+.pompe.erreur{border-color:var(--err);background:var(--err-soft)}
+.pompe.prise{opacity:.55}
+.pompe .tete{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.pompe .nom{font-weight:700}
+.pompe .calc{font-family:var(--mono);font-size:13px;color:var(--muted);text-align:right}
+.pompe .msg{color:var(--err);font-size:13px;margin-top:6px;font-weight:600}
+.pompe .src{font-size:12px;color:var(--muted);margin-top:3px}
+.produit{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin:16px 0 8px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px 6px;border-bottom:1px solid var(--border);text-align:left}
+th{font-size:12px;color:var(--muted);font-weight:600}
+td.r,th.r{text-align:right;white-space:nowrap}
+td b{white-space:nowrap}
+td input{padding:8px;text-align:center;font-family:var(--mono)}
+.total{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;font-weight:700}
+.total .v{font-family:var(--mono);font-size:18px}
+.ecart{border-radius:12px;padding:12px 14px;font-weight:700;display:flex;justify-content:space-between}
+.ecart.ok{background:var(--ok-soft);color:var(--ok)}
+.ecart.neg{background:var(--err-soft);color:var(--err)}
+.ecart.pos{background:var(--warn-soft);color:var(--warn)}
+.alerte{border-radius:12px;padding:12px 14px;margin-bottom:12px;font-weight:600}
+.alerte.err{background:var(--err-soft);color:var(--err)}
+.alerte.ok{background:var(--ok-soft);color:var(--ok)}
+.charte li{margin-bottom:10px}
+.case{display:flex;gap:10px;align-items:flex-start;margin:14px 0;font-weight:600}
+.case input{width:22px;height:22px;flex:none;margin-top:1px}
+.badge{display:inline-block;font-size:12px;font-weight:700;border-radius:20px;padding:2px 9px}
+.badge.SOUMIS{background:var(--warn-soft);color:var(--warn)}
+.badge.CONFIRME{background:var(--ok-soft);color:var(--ok)}
+.badge.REJETE{background:var(--err-soft);color:var(--err)}
+.hist{border-bottom:1px solid var(--border);padding:10px 0}
+.hist:last-child{border:0}
+.com{margin-top:6px;font-size:14px;background:var(--bg);border-radius:9px;padding:8px 10px}
+.barre-bas{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--border);
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+.barre-bas .in{max-width:640px;margin:0 auto;display:flex;gap:10px;align-items:center}
+.barre-bas .info{flex:1;font-size:13px;color:var(--muted)}
+.barre-bas .info b{display:block;color:var(--text);font-family:var(--mono);font-size:16px}
+.barre-bas .btn{width:auto;flex:none;min-width:140px}
+.cache{display:none!important}
+.connexion{max-width:380px;margin:8vh auto 0}
+</style>
+</head>
+<body>
+<div class="env cache" id="env"></div>
+<header>
+  <div class="marque" id="marque">KONEKTA</div>
+  <div class="qui cache" id="qui"></div>
+  <button class="btn sec petit cache" id="btn-sortir" onclick="deconnexion()">Sortir</button>
+</header>
+
+<main id="app"></main>
+<div class="barre-bas cache" id="barre"><div class="in">
+  <div class="info" id="barre-info"></div>
+  <button class="btn" id="barre-btn"></button>
+</div></div>
+
+<script>
+'use strict';
+const S = {ctx:null, etape:'charte', charte:false, saisie:{}, billets:{}, monnaie:'', note:'',
+           erreurs:{}, date:null, periode:null};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const nf = (n,d=0) => Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const G = n => nf(n) + ' G';
+const per = p => p === 'Apres-midi' ? 'Après-midi' : p;
+const num = v => { const x = parseFloat(String(v).replace(',', '.').replace(/\s/g,'')); return isNaN(x) ? null : x; };
+const ent = v => { const x = parseInt(v,10); return isNaN(x) || x < 0 ? 0 : x; };
+
+async function api(method, url, body){
+  const r = await fetch(url, {method, credentials:'include',
+    headers: body ? {'Content-Type':'application/json'} : {}, body: body ? JSON.stringify(body) : undefined});
+  let d = null; try{ d = await r.json(); }catch(e){}
+  if(!r.ok){ const e = new Error(typeof d?.detail === 'string' ? d.detail : (d?.detail?.message || 'Erreur ' + r.status));
+    e.status = r.status; e.detail = d?.detail; throw e; }
+  return d;
+}
+
+async function demarrer(){
+  try{
+    const b = await api('GET','/api/config/branding');
+    if(b?.nom) $('marque').textContent = b.nom;
+    if(b?.environnement && b.environnement !== 'production'){
+      $('env').textContent = String(b.environnement).toUpperCase() + ' — environnement de test';
+      $('env').classList.remove('cache');
+    }
+  }catch(e){}
+  await chargerContexte();
+}
+
+async function chargerContexte(){
+  try{
+    const q = S.date ? `?date=${S.date}&periode=${S.periode}` : '';
+    S.ctx = await api('GET','/api/pompiste/contexte' + q);
+    S.date = S.ctx.date; S.periode = S.ctx.periode;
+    $('qui').innerHTML = `<b>${esc(S.ctx.pompiste.nom)}</b><br>${esc(S.ctx.pompiste.username)}`;
+    $('qui').classList.remove('cache'); $('btn-sortir').classList.remove('cache');
+    rendre();
+  }catch(e){
+    if(e.status === 401) return ecranConnexion();
+    if(e.status === 403) return ecranPasPompiste();
+    $('app').innerHTML = `<div class="alerte err">${esc(e.message)}</div>`;
+  }
+}
+
+// ── Connexion ───────────────────────────────────────────────────────
+function ecranConnexion(msg){
+  $('barre').classList.add('cache'); $('qui').classList.add('cache'); $('btn-sortir').classList.add('cache');
+  $('app').innerHTML = `<div class="connexion">
+    <h1>Espace pompiste</h1><p class="sub">Connectez-vous pour saisir vos compteurs.</p>
+    ${msg ? `<div class="alerte err">${esc(msg)}</div>` : ''}
+    <form class="card" id="f-login" autocomplete="on">
+      <label for="l-user">Nom d'utilisateur</label>
+      <input id="l-user" autocomplete="username" autocapitalize="none" required>
+      <label for="l-pin">Code PIN (9 chiffres)</label>
+      <input id="l-pin" type="password" inputmode="numeric" maxlength="9" autocomplete="current-password" required>
+      <div style="height:14px"></div>
+      <button class="btn" id="l-btn">Se connecter</button>
+    </form></div>`;
+  $('l-user').focus();
+  $('f-login').onsubmit = async ev => {
+    ev.preventDefault();
+    const pin = $('l-pin').value.trim();
+    if(!/^\d{9}$/.test(pin)) return ecranConnexion('Le code PIN contient 9 chiffres.');
+    $('l-btn').disabled = true;
+    try{
+      await api('POST','/api/login/pompiste',{username:$('l-user').value.trim(), code_acces:pin});
+      S.charte = false; S.etape = 'charte'; S.date = null;
+      await chargerContexte();
+    }catch(e){ ecranConnexion(e.message); }
+  };
+}
+
+function ecranPasPompiste(){
+  $('app').innerHTML = `<div class="connexion card"><h1>Compte non pompiste</h1>
+    <p class="sub">Vous êtes connecté avec un compte qui n'est pas un compte pompiste.</p>
+    <button class="btn" onclick="location.href='/'">Aller à l'application</button></div>`;
+}
+
+async function deconnexion(){
+  try{ await api('POST','/api/logout'); }catch(e){}
+  S.saisie = {}; S.billets = {}; S.monnaie = ''; S.note = ''; S.charte = false;
+  ecranConnexion();
+}
+
+// ── Rendu par étape ─────────────────────────────────────────────────
+const ORDRE = ['charte','saisie','billetterie','recap'];
+function barreEtapes(){
+  const i = ORDRE.indexOf(S.etape);
+  return `<div class="etapes">${ORDRE.map((_,k)=>`<span class="${k<=i?'fait':''}"></span>`).join('')}</div>`;
+}
+function barre(info, libelle, action, actif=true){
+  $('barre').classList.remove('cache');
+  $('barre-info').innerHTML = info;
+  const b = $('barre-btn'); b.textContent = libelle; b.onclick = action; b.disabled = !actif;
+}
+
+function rendre(){
+  if(!S.charte) S.etape = 'charte';
+  ({charte:rCharte, saisie:rSaisie, billetterie:rBilletterie, recap:rRecap, fin:rFin})[S.etape]();
+  window.scrollTo(0,0);
+}
+
+function rCharte(){
+  $('app').innerHTML = barreEtapes() + `
+    <h1>Charte de responsabilité</h1>
+    <p class="sub">À accepter avant chaque rapport.</p>
+    <div class="card charte"><ul>
+      <li><b>Je saisis moi-même les index réels</b> lus sur chaque pompe dont j'ai la charge, sans les arrondir ni les recopier.</li>
+      <li><b>Je compte l'argent billet par billet</b> et je déclare exactement ce que je remets.</li>
+      <li>Tout ce qui est saisi sous mon compte m'engage personnellement : le rapport est enregistré avec mon nom, la date et l'heure.</li>
+      <li>Mon rapport est vérifié par un superviseur. En cas de doute ou d'anomalie, je préviens immédiatement mon responsable.</li>
+    </ul>
+    <label class="case"><input type="checkbox" id="c-ok" ${S.charte?'checked':''}> J'ai lu la charte et je l'accepte.</label></div>
+    ${historique()}`;
+  const maj = () => barre('Étape 1 sur 4', 'Continuer', ()=>{ S.charte = true; S.etape = 'saisie'; rendre(); }, $('c-ok').checked);
+  $('c-ok').onchange = maj; maj();
+  chargerHistorique();
+}
+
+function pompesSaisies(){
+  const out = [];
+  for(const p of S.ctx.produits) for(const q of p.pompes){
+    const s = S.saisie[q.id] || {};
+    const av = q.index_precedent != null ? q.index_precedent : num(s.avant);
+    const ap = num(s.apres);
+    if(q.deja_rapportee || ap == null) continue;
+    out.push({pompe:q, produit:p, avant:av, apres:ap, gallons: av != null ? ap - av : null,
+              montant: av != null ? (ap - av) * p.prix_gallon : null});
+  }
+  return out;
+}
+
+function rSaisie(){
+  const c = S.ctx;
+  let h = barreEtapes() + `<h1>Saisie des compteurs</h1>
+    <p class="sub">Index de fin de chaque pompe que vous avez servie. Laissez vide une pompe que vous n'avez pas tenue.</p>
+    <div class="card"><div class="grille2">
+      <div><label>Jour</label><div class="seg" id="seg-date">
+        <button data-v="${c.aujourd_hui}" class="${S.date===c.aujourd_hui?'on':''}">Aujourd'hui</button>
+        <button data-v="${hier(c.aujourd_hui)}" class="${S.date!==c.aujourd_hui?'on':''}">Hier</button></div></div>
+      <div><label>Période</label><div class="seg" id="seg-per">
+        <button data-v="Matin" class="${S.periode==='Matin'?'on':''}">Matin</button>
+        <button data-v="Apres-midi" class="${S.periode==='Apres-midi'?'on':''}">Après-midi</button></div></div>
+    </div></div>`;
+  for(const p of c.produits){
+    h += `<div class="produit">${esc(p.nom)} · ${nf(p.prix_gallon,2)} G/gal</div>`;
+    for(const q of p.pompes){
+      const s = S.saisie[q.id] || {}, err = S.erreurs[q.id];
+      if(q.deja_rapportee){
+        h += `<div class="pompe prise"><div class="tete"><span class="nom">${esc(q.nom)}</span>
+          <span class="calc">déjà rapportée par ${esc(q.deja_rapportee.moi ? 'vous' : q.deja_rapportee.par)}</span></div></div>`;
+        continue;
+      }
+      const connu = q.index_precedent != null;
+      h += `<div class="pompe ${err?'erreur':''}" id="pm-${q.id}"><div class="tete">
+          <span class="nom">${esc(q.nom)}</span><span class="calc" id="calc-${q.id}"></span></div>
+        <div class="grille2">
+          <div><label>Index début</label><input class="num" inputmode="decimal" data-p="${q.id}" data-k="avant"
+            value="${connu ? q.index_precedent : esc(s.avant||'')}" ${connu?'readonly':''} placeholder="0.000"></div>
+          <div><label>Index fin</label><input class="num" inputmode="decimal" data-p="${q.id}" data-k="apres"
+            value="${esc(s.apres||'')}" placeholder="0.000"></div>
+        </div>
+        ${connu ? `<div class="src">Début repris du ${esc(q.index_precedent_source)}</div>` : '<div class="src">Aucun index précédent : saisissez aussi l\'index de début.</div>'}
+        ${err ? `<div class="msg">${esc(err)}</div>` : ''}</div>`;
+    }
+  }
+  $('app').innerHTML = h;
+  document.querySelectorAll('#seg-date button,#seg-per button').forEach(b => b.onclick = async () => {
+    if(b.parentElement.id === 'seg-date') S.date = b.dataset.v; else S.periode = b.dataset.v;
+    S.saisie = {}; S.erreurs = {};
+    await chargerContexte();
+  });
+  document.querySelectorAll('input[data-p]').forEach(i => i.oninput = () => {
+    (S.saisie[i.dataset.p] ||= {})[i.dataset.k] = i.value;
+    delete S.erreurs[i.dataset.p];
+    majSaisie();
+  });
+  majSaisie();
+}
+
+function majSaisie(){
+  for(const p of S.ctx.produits) for(const q of p.pompes){
+    const el = $('calc-' + q.id); if(!el) continue;
+    const s = S.saisie[q.id] || {};
+    const av = q.index_precedent != null ? q.index_precedent : num(s.avant), ap = num(s.apres);
+    if(ap == null || av == null){ el.textContent = ''; continue; }
+    const g = ap - av;
+    el.innerHTML = g < 0 ? '<span style="color:var(--err)">fin &lt; début</span>'
+      : `${nf(g,3)} gal<br>${G(g * p.prix_gallon)}`;
+  }
+  const l = pompesSaisies();
+  const ok = l.length > 0 && l.every(x => x.avant != null && x.gallons >= 0);
+  const tot = l.reduce((a,x)=>a+(x.montant||0),0);
+  barre(`${l.length} pompe(s) · attendu<b>${G(tot)}</b>`, 'Billetterie →',
+        ()=>{ S.etape = 'billetterie'; rendre(); }, ok);
+}
+
+function hier(iso){ const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); }
+
+function totalCompte(){
+  let t = 0;
+  for(const c of S.ctx.coupures){ const b = S.billets[c] || {}; t += c * (ent(b.liasses) * S.ctx.taille_liasse + ent(b.billets)); }
+  return t + (num(S.monnaie) || 0);
+}
+
+function rBilletterie(){
+  const c = S.ctx;
+  let rows = '';
+  for(const k of c.coupures){
+    const b = S.billets[k] || {};
+    rows += `<tr><td><b>${nf(k)} G</b></td>
+      <td><input inputmode="numeric" data-c="${k}" data-k="liasses" value="${esc(b.liasses||'')}" placeholder="0"></td>
+      <td><input inputmode="numeric" data-c="${k}" data-k="billets" value="${esc(b.billets||'')}" placeholder="0"></td>
+      <td class="r num" id="st-${k}"></td></tr>`;
+  }
+  $('app').innerHTML = barreEtapes() + `<h1>Billetterie</h1>
+    <p class="sub">Comptez l'argent par coupure. Une liasse = ${c.taille_liasse} billets.</p>
+    <div class="card"><table><thead><tr><th>Coupure</th><th>Liasses</th><th>Billets</th><th class="r">Montant</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <label for="b-monnaie">Monnaie (pièces), en gourdes</label>
+      <input id="b-monnaie" class="num" inputmode="decimal" value="${esc(S.monnaie)}" placeholder="0">
+      <div class="total"><span>Total compté</span><span class="v" id="b-total"></span></div></div>
+    <button class="btn sec" onclick="S.etape='saisie';rendre()">← Retour aux compteurs</button>`;
+  document.querySelectorAll('input[data-c]').forEach(i => i.oninput = () => {
+    (S.billets[i.dataset.c] ||= {})[i.dataset.k] = i.value.replace(/\D/g,''); majBillets(); });
+  $('b-monnaie').oninput = e => { S.monnaie = e.target.value; majBillets(); };
+  majBillets();
+}
+
+function majBillets(){
+  for(const k of S.ctx.coupures){
+    const b = S.billets[k] || {}, n = ent(b.liasses) * S.ctx.taille_liasse + ent(b.billets);
+    $('st-' + k).textContent = n ? G(n * k) : '';
+  }
+  const t = totalCompte();
+  $('b-total').textContent = G(t);
+  barre(`Total compté<b>${G(t)}</b>`, 'Récapitulatif →', ()=>{ S.etape = 'recap'; rendre(); });
+}
+
+function rRecap(){
+  const l = pompesSaisies(), att = l.reduce((a,x)=>a+x.montant,0), cpt = totalCompte(), ec = cpt - att;
+  const cls = Math.abs(ec) < 1 ? 'ok' : (ec < 0 ? 'neg' : 'pos');
+  const txt = Math.abs(ec) < 1 ? 'Caisse juste' : (ec < 0 ? 'Manquant' : 'Surplus');
+  $('app').innerHTML = barreEtapes() + `<h1>Confirmation</h1>
+    <p class="sub">${per(S.periode)} du ${new Date(S.date+'T12:00:00').toLocaleDateString('fr-FR')} — vérifiez avant d'envoyer.</p>
+    <div class="card"><table><thead><tr><th>Pompe</th><th class="r">Début → Fin</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead><tbody>
+      ${l.map(x=>`<tr><td>${esc(x.pompe.nom)}<br><small style="color:var(--muted)">${esc(x.produit.nom)}</small></td>
+        <td class="r num">${nf(x.avant,3)}<br>${nf(x.apres,3)}</td><td class="r num">${nf(x.gallons,3)}</td><td class="r num">${G(x.montant)}</td></tr>`).join('')}
+    </tbody></table>
+    <div class="total"><span>Ventes attendues</span><span class="v">${G(att)}</span></div>
+    <div class="total" style="padding-top:0"><span>Argent compté</span><span class="v">${G(cpt)}</span></div>
+    <div class="ecart ${cls}"><span>${txt}</span><span>${ec>=0?'+':''}${G(ec)}</span></div>
+    <label for="r-note">Note pour le superviseur (facultatif)</label>
+    <textarea id="r-note" rows="3" maxlength="500" placeholder="Ex. : client parti sans payer, billet abîmé…">${esc(S.note)}</textarea></div>
+    <div class="ligne-btns"><button class="btn sec" onclick="S.etape='saisie';rendre()">Modifier les index</button>
+      <button class="btn sec" onclick="S.etape='billetterie';rendre()">Modifier l'argent</button></div>`;
+  $('r-note').oninput = e => S.note = e.target.value;
+  barre(`Écart<b>${ec>=0?'+':''}${G(ec)}</b>`, 'Soumettre le rapport', soumettre);
+}
+
+async function soumettre(){
+  const b = $('barre-btn'); b.disabled = true; b.textContent = 'Envoi…';
+  const l = pompesSaisies();
+  try{
+    const r = await api('POST','/api/pompiste/rapports',{
+      date:S.date, periode:S.periode, charte_acceptee:S.charte,
+      lignes: l.map(x=>({pompe_id:x.pompe.id, metter_avant:x.avant, metter_apres:x.apres})),
+      billetterie: S.ctx.coupures.map(c=>({coupure:c, liasses:ent(S.billets[c]?.liasses), billets:ent(S.billets[c]?.billets)}))
+                     .filter(x=>x.liasses||x.billets),
+      monnaie: num(S.monnaie) || 0, note: S.note || null});
+    S.dernier = r; S.etape = 'fin';
+    S.saisie = {}; S.billets = {}; S.monnaie = ''; S.note = ''; S.erreurs = {};
+    rendre();
+  }catch(e){
+    if(e.status === 422 && e.detail?.erreurs){
+      // Index invalide : retour à la saisie, pompes fautives signalées
+      S.erreurs = {}; for(const x of e.detail.erreurs) S.erreurs[x.pompe_id] = x.message;
+      S.etape = 'saisie'; await chargerContexte();
+      $('app').insertAdjacentHTML('afterbegin', `<div class="alerte err">Index invalide : corrigez les pompes en rouge.</div>`);
+      return;
+    }
+    if(e.status === 401) return ecranConnexion('Session expirée — reconnectez-vous.');
+    b.disabled = false; b.textContent = 'Soumettre le rapport';
+    $('app').insertAdjacentHTML('afterbegin', `<div class="alerte err">${esc(e.message)}</div>`);
+    window.scrollTo(0,0);
+  }
+}
+
+function rFin(){
+  const r = S.dernier;
+  $('barre').classList.add('cache');
+  $('app').innerHTML = `<div class="alerte ok">Rapport envoyé. Il attend la confirmation du superviseur.</div>
+    <div class="card"><h2 style="margin-top:0">${per(r.periode)} du ${new Date(r.date+'T12:00:00').toLocaleDateString('fr-FR')}</h2>
+      <div class="total"><span>Gallons</span><span class="v">${nf(r.total_gallons,3)}</span></div>
+      <div class="total"><span>Attendu</span><span class="v">${G(r.montant_attendu)}</span></div>
+      <div class="total"><span>Compté</span><span class="v">${G(r.montant_compte)}</span></div>
+      <div class="total"><span>Écart</span><span class="v">${r.ecart>=0?'+':''}${G(r.ecart)}</span></div></div>
+    <button class="btn" onclick="S.charte=false;S.date=null;chargerContexte()">Nouveau rapport</button>
+    <div style="height:10px"></div>
+    <button class="btn sec" onclick="deconnexion()">Me déconnecter</button>
+    ${historique()}`;
+  chargerHistorique();
+}
+
+function historique(){ return `<h2>Mes derniers rapports</h2><div class="card" id="hist"><p class="sub" style="margin:0">Chargement…</p></div>`; }
+async function chargerHistorique(){
+  try{
+    const rs = await api('GET','/api/pompiste/rapports');
+    const lib = {SOUMIS:'En attente', CONFIRME:'Confirmé', REJETE:'Refusé'};
+    $('hist').innerHTML = rs.length ? rs.map(r=>`<div class="hist">
+      <div style="display:flex;justify-content:space-between;gap:8px"><b>${per(r.periode)} · ${new Date(r.date+'T12:00:00').toLocaleDateString('fr-FR')}</b>
+        <span class="badge ${r.statut}">${lib[r.statut]}</span></div>
+      <div style="font-size:13px;color:var(--muted)">${nf(r.total_gallons,3)} gal · écart ${r.ecart>=0?'+':''}${G(r.ecart)}</div>
+      ${r.commentaire_superviseur ? `<div class="com"><b>${esc(r.traite_par_nom||'Superviseur')} :</b> ${esc(r.commentaire_superviseur)}</div>` : ''}
+      ${r.statut==='REJETE' ? '<div style="font-size:13px;margin-top:6px">Corrigez et soumettez un nouveau rapport pour ce créneau.</div>' : ''}
+    </div>`).join('') : '<p class="sub" style="margin:0">Aucun rapport pour l\'instant.</p>';
+  }catch(e){ const h = $('hist'); if(h) h.innerHTML = ''; }
+}
+
+demarrer();
+</script>
+</body>
+</html>

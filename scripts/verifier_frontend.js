@@ -6,7 +6,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const pages = ["frontend/index.html", "frontend/login.html"];
+const pages = ["frontend/index.html", "frontend/login.html", "frontend/pompiste.html"];
 let erreurs = 0;
 
 for (const page of pages) {

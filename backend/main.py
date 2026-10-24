@@ -47,6 +47,7 @@ from zelle_routes import router as zelle_router
 from taches_routes import router as taches_router
 from pieces_jointes_routes import router as pieces_jointes_router
 from listes_reference_routes import router as listes_reference_router
+from pompiste_routes import router as pompiste_router, assurer_role_pompiste, est_role_pompiste
 from auth import (
     SESSION_COOKIE, hash_password, verify_password,
     hash_code_acces, verify_code_acces,
@@ -203,7 +204,7 @@ def _clear_login_failures(ip: str | None) -> None:
 # Chemins accessibles sans être connecté
 _PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code",
                     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify",
-                    "/api/oauth/otp/send", "/api/config/branding"}
+                    "/api/oauth/otp/send", "/api/config/branding", "/api/login/pompiste", "/pompiste"}
 _PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/") if _DEBUG_MODE
                     else ("/api/auth/oauth/", "/shared/"))
 
@@ -234,12 +235,23 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return RedirectResponse(url=login_url)
 
         request.state.user = proxy
+        # Compte pompiste : uniquement son espace de saisie, rien d'autre.
+        if proxy.est_pompiste and not (path in _POMPISTE_PATHS or path.startswith("/api/pompiste/")):
+            if path.startswith("/api/"):
+                return JSONResponse({"detail": "Espace réservé : saisie des compteurs uniquement"},
+                                    status_code=403)
+            return RedirectResponse(url="/pompiste")
         return await call_next(request)
+
+
+# Seuls chemins ouverts à un compte pompiste (en plus de /api/pompiste/…)
+_POMPISTE_PATHS = {"/pompiste", "/api/logout", "/api/auth/me", "/api/auth/login-meta"}
 
 
 class _UserProxy:
     """Attributs scalaires de l'utilisateur, copiés avant la fermeture de session."""
-    __slots__ = ("id","role","role_id","actif","nom_complet","username","poste","email","api_key_hash")
+    __slots__ = ("id","role","role_id","actif","nom_complet","username","poste","email","api_key_hash",
+                 "est_pompiste")
 
 
 def _resoudre_utilisateur(token, api_key_hdr):
@@ -254,8 +266,9 @@ def _resoudre_utilisateur(token, api_key_hdr):
         if not user:
             return None
         proxy = _UserProxy()
-        for attr in _UserProxy.__slots__:
+        for attr in _UserProxy.__slots__[:-1]:
             setattr(proxy, attr, getattr(user, attr))
+        proxy.est_pompiste = est_role_pompiste(user.role_obj)
         return proxy
 
 
@@ -275,11 +288,14 @@ app.include_router(zelle_router)
 app.include_router(taches_router)
 app.include_router(pieces_jointes_router)
 app.include_router(listes_reference_router)
+app.include_router(pompiste_router)
 
 
 @app.on_event("startup")
 def startup():
     init_db()
+    with SessionLocal() as _db:
+        assurer_role_pompiste(_db)
     # Migrations douces — colonnes ajoutées progressivement
     from sqlalchemy import text as _text
     _migrations = [
@@ -815,6 +831,40 @@ def _session_ouverte_pour(db: Session, user: Utilisateur):
         .filter_by(caissier_id=emp.id, date_session=today_haiti(), statut="EN_COURS")
         .first()
     )
+
+
+class LoginPompisteIn(BaseModel):
+    username:   str
+    code_acces: str
+
+
+@app.post("/api/login/pompiste")
+def login_pompiste(data: LoginPompisteIn, request: Request, response: Response,
+                   db: Session = Depends(get_db)):
+    """Connexion de l'espace pompiste : identifiant + PIN, réservée aux
+    comptes de rôle « Pompiste » (qui n'ont accès qu'à /pompiste)."""
+    ip = request.client.host if request.client else None
+    ua = request.headers.get("user-agent", "")
+    _check_login_rate(ip)
+    username = data.username.strip().lower()
+    user = (db.query(Utilisateur)
+            .filter(Utilisateur.username.ilike(username), Utilisateur.actif.is_(True)).first())
+    _err = "Identifiant ou code PIN incorrect"
+    if (not user or not est_role_pompiste(user.role_obj) or not user.code_acces_hash
+            or not verify_code_acces(data.code_acces.strip(), user.code_acces_hash)):
+        _record_login_failure(ip)
+        log_event(db, LOGIN_FAILED, user_id=user.id if user else None, ip_address=ip,
+                  details={"username": username, "espace": "pompiste"})
+        raise HTTPException(401, _err)
+    _clear_login_failures(ip)
+    token = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip, details={"espace": "pompiste"})
+    response.set_cookie(
+        SESSION_COOKIE, token,
+        httponly=True, samesite="lax", secure=_SECURE_COOKIES,
+        max_age=12 * 3600, path="/",
+    )
+    return {"id": user.id, "username": user.username, "nom_complet": user.nom_complet}
 
 
 @app.post("/api/logout")
@@ -1662,6 +1712,15 @@ def oauth_otp_send(
         "email_hint":   _mask_email(user.email) if channel == "email" else None,
         "phone_hint":   _mask_telephone(user.telephone) if channel == "whatsapp" else None,
     }
+
+
+@app.get("/pompiste", include_in_schema=False)
+def serve_pompiste():
+    html_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "pompiste.html"
+    )
+    return FileResponse(html_path, media_type="text/html",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @app.get("/login", include_in_schema=False)
