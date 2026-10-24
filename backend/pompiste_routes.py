@@ -133,7 +133,7 @@ def _index_precedent(db: Session, pompe_id: int, d: date_type, periode: str,
     q = (db.query(RapportPompisteLigne, RapportPompiste)
          .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
          .filter(RapportPompisteLigne.pompe_id == pompe_id,
-                 RapportPompiste.statut == "SOUMIS",
+                 RapportPompiste.statut.in_(("EN_COURS", "SOUMIS")),
                  RapportPompiste.date <= d, RapportPompiste.date >= d - timedelta(days=3)))
     if exclure_rapport_id:
         q = q.filter(RapportPompiste.id != exclure_rapport_id)
@@ -141,7 +141,7 @@ def _index_precedent(db: Session, pompe_id: int, d: date_type, periode: str,
         cle = (rap.date, _RANG.get(rap.periode, 9))
         if cle < cible and (cle_m is None or cle > cle_m):
             meilleur, cle_m = float(ligne.metter_apres), cle
-            src = f"rapport pompiste en attente — {_per(rap.periode)} du {rap.date.strftime('%d/%m')}"
+            src = f"rapport pompiste — {_per(rap.periode)} du {rap.date.strftime('%d/%m')}"
     return meilleur, src
 
 
@@ -215,21 +215,36 @@ def _valider_date(d: date_type) -> None:
         raise HTTPException(400, "Date invalide : seuls aujourd'hui et hier sont acceptés.")
 
 
+def _en_cours(db: Session, u: Utilisateur) -> Optional[RapportPompiste]:
+    """Rapport du pompiste dont les compteurs sont envoyés mais pas encore
+    terminé (billetterie à faire). Un seul à la fois."""
+    return (db.query(RapportPompiste)
+            .filter_by(utilisateur_id=u.id, statut="EN_COURS")
+            .order_by(RapportPompiste.id.desc()).first())
+
+
+_ACTIFS = ("EN_COURS", "SOUMIS", "CONFIRME")
+
+
 @router.get("/api/pompiste/contexte")
 def contexte(date: Optional[date_type] = None, periode: Optional[str] = None,
              u: Utilisateur = Depends(_require_pompiste), db: Session = Depends(get_db)):
-    d = date or today_haiti()
-    _valider_date(d)
-    if periode is None:
-        periode = "Matin" if now_haiti().hour < 13 else "Apres-midi"
+    ouvert = _en_cours(db, u)
+    if ouvert:                       # le rapport ouvert impose son créneau
+        d, periode = ouvert.date, ouvert.periode
+    else:
+        d = date or today_haiti()
+        _valider_date(d)
+        if periode is None:
+            periode = "Matin" if now_haiti().hour < 13 else "Apres-midi"
     if periode not in PERIODES:
         raise HTTPException(400, "Période invalide")
-    # Pompes déjà couvertes par un rapport soumis ou confirmé sur ce créneau
+    # Pompes déjà couvertes sur ce créneau (par ce pompiste ou un collègue)
     prises = {}
     for l, rap in (db.query(RapportPompisteLigne, RapportPompiste)
                    .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
                    .filter(RapportPompiste.date == d, RapportPompiste.periode == periode,
-                           RapportPompiste.statut.in_(("SOUMIS", "CONFIRME"))).all()):
+                           RapportPompiste.statut.in_(_ACTIFS)).all()):
         prises[l.pompe_id] = {"par": _nom(rap.utilisateur), "statut": rap.statut,
                               "moi": rap.utilisateur_id == u.id}
     produits = []
@@ -249,6 +264,7 @@ def contexte(date: Optional[date_type] = None, periode: Optional[str] = None,
         "pompiste": {"id": u.id, "nom": _nom(u), "username": u.username},
         "date": str(d), "periode": periode, "aujourd_hui": str(today_haiti()),
         "produits": produits, "coupures": list(COUPURES), "taille_liasse": TAILLE_LIASSE,
+        "en_cours": _rapport_dict(db, ouvert) if ouvert else None,
     }
 
 
@@ -264,11 +280,14 @@ class BilletIn(BaseModel):
     billets: int = 0
 
 
-class RapportIn(BaseModel):
+class CompteursIn(BaseModel):
     date: date_type
     periode: str
     charte_acceptee: bool
     lignes: list[LigneIn]
+
+
+class TerminerIn(BaseModel):
     billetterie: list[BilletIn] = []
     monnaie: float = 0
     note: Optional[str] = None
@@ -313,15 +332,83 @@ def _controler_lignes(db: Session, d: date_type, periode: str, lignes: list,
     return sortie
 
 
-@router.post("/api/pompiste/rapports", status_code=201)
-def soumettre(data: RapportIn, u: Utilisateur = Depends(_require_pompiste), db: Session = Depends(get_db)):
+def _recalculer_attendu(rap: RapportPompiste) -> None:
+    rap.montant_attendu = round(sum((float(l.metter_apres) - float(l.metter_avant)) * float(l.prix_gallon)
+                                    for l in rap.lignes), 2)
+
+
+@router.post("/api/pompiste/compteurs", status_code=201)
+def envoyer_compteurs(data: CompteursIn, u: Utilisateur = Depends(_require_pompiste),
+                      db: Session = Depends(get_db)):
+    """Étape 1 : envoi des compteurs d'un carburant. S'ajoute au rapport en
+    cours du créneau (créé au premier envoi). L'argent se compte ensuite,
+    une seule fois, au « Terminer »."""
     if not data.charte_acceptee:
         raise HTTPException(400, "La charte de responsabilité doit être acceptée.")
-    _valider_date(data.date)
     if data.periode not in PERIODES:
         raise HTTPException(400, "Période invalide")
     if not data.lignes:
         raise HTTPException(400, "Saisissez l'index d'au moins une pompe.")
+    rap = _en_cours(db, u)
+    if rap and (rap.date != data.date or rap.periode != data.periode):
+        raise HTTPException(409, f"Terminez d'abord votre rapport du {_per(rap.periode)} "
+                                 f"{rap.date.strftime('%d/%m')} (bouton « Terminer »).")
+    if not rap:
+        _valider_date(data.date)
+    lignes = _controler_lignes(db, data.date, data.periode, data.lignes)
+
+    # Une pompe = un seul rapport actif par créneau
+    deja = (db.query(RapportPompisteLigne, RapportPompiste)
+            .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
+            .filter(RapportPompiste.date == data.date, RapportPompiste.periode == data.periode,
+                    RapportPompiste.statut.in_(_ACTIFS),
+                    RapportPompisteLigne.pompe_id.in_([x["pompe"].id for x in lignes])).all())
+    if deja:
+        noms = ", ".join(sorted({f"{l.pompe.nom} ({_nom(r.utilisateur)})" for l, r in deja}))
+        raise HTTPException(409, f"Déjà rapporté sur ce créneau : {noms}.")
+
+    if not rap:
+        rap = RapportPompiste(date=data.date, periode=data.periode, utilisateur_id=u.id,
+                              statut="EN_COURS", charte_acceptee_at=now_haiti(), billetterie=[])
+        db.add(rap)
+    for x in lignes:
+        rap.lignes.append(RapportPompisteLigne(pompe_id=x["pompe"].id, prix_gallon=_prix(db, x["pompe"], data.date),
+                                               metter_avant=x["avant"], metter_apres=x["apres"]))
+    db.flush()
+    _recalculer_attendu(rap)
+    db.commit()
+    db.refresh(rap)
+    return _rapport_dict(db, rap)
+
+
+@router.delete("/api/pompiste/compteurs/{pompe_id}")
+def retirer_compteur(pompe_id: int, u: Utilisateur = Depends(_require_pompiste),
+                     db: Session = Depends(get_db)):
+    """Retire une pompe du rapport en cours (erreur de saisie) ; un rapport
+    vidé de toutes ses pompes est supprimé."""
+    rap = _en_cours(db, u)
+    ligne = next((l for l in (rap.lignes if rap else []) if l.pompe_id == pompe_id), None)
+    if not ligne:
+        raise HTTPException(404, "Cette pompe n'est pas dans votre rapport en cours.")
+    rap.lignes.remove(ligne)
+    db.flush()
+    if not rap.lignes:
+        db.delete(rap)
+        db.commit()
+        return {"en_cours": None}
+    _recalculer_attendu(rap)
+    db.commit()
+    db.refresh(rap)
+    return {"en_cours": _rapport_dict(db, rap)}
+
+
+@router.post("/api/pompiste/terminer")
+def terminer(data: TerminerIn, u: Utilisateur = Depends(_require_pompiste), db: Session = Depends(get_db)):
+    """Étape 2 : « Terminer » — billetterie de toute la période, rapprochement
+    avec l'ensemble des compteurs envoyés, puis envoi au superviseur."""
+    rap = _en_cours(db, u)
+    if not rap or not rap.lignes:
+        raise HTTPException(409, "Aucun compteur envoyé : saisissez d'abord vos pompes.")
     for b in data.billetterie:
         if b.coupure not in COUPURES:
             raise HTTPException(400, f"Coupure inconnue : {b.coupure}")
@@ -329,38 +416,16 @@ def soumettre(data: RapportIn, u: Utilisateur = Depends(_require_pompiste), db: 
             raise HTTPException(400, "Les quantités de billets ne peuvent pas être négatives.")
     if data.monnaie < 0:
         raise HTTPException(400, "La monnaie ne peut pas être négative.")
-
-    lignes = _controler_lignes(db, data.date, data.periode, data.lignes)
-
-    # Une pompe = un seul rapport actif par créneau
-    deja = (db.query(RapportPompisteLigne, RapportPompiste)
-            .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
-            .filter(RapportPompiste.date == data.date, RapportPompiste.periode == data.periode,
-                    RapportPompiste.statut.in_(("SOUMIS", "CONFIRME")),
-                    RapportPompisteLigne.pompe_id.in_([x["pompe"].id for x in lignes])).all())
-    if deja:
-        noms = ", ".join(sorted({f"{l.pompe.nom} ({_nom(r.utilisateur)})" for l, r in deja}))
-        raise HTTPException(409, f"Déjà rapporté sur ce créneau : {noms}.")
-
     billetterie = [b.model_dump() if hasattr(b, "model_dump") else b.dict()
                    for b in data.billetterie if (b.liasses or b.billets)]
-    rap = RapportPompiste(
-        date=data.date, periode=data.periode, utilisateur_id=u.id, statut="SOUMIS",
-        charte_acceptee_at=now_haiti(), billetterie=billetterie,
-        monnaie=round(data.monnaie, 2),
-        note_pompiste=(data.note or "").strip()[:500] or None,
-    )
-    attendu = 0.0
-    for x in lignes:
-        prix = _prix(db, x["pompe"], data.date)
-        attendu += (x["apres"] - x["avant"]) * prix
-        rap.lignes.append(RapportPompisteLigne(pompe_id=x["pompe"].id, prix_gallon=prix,
-                                               metter_avant=x["avant"], metter_apres=x["apres"]))
-    compte = _total_billetterie(billetterie, data.monnaie)
-    rap.montant_attendu = round(attendu, 2)
-    rap.montant_compte = compte
-    rap.ecart = round(compte - attendu, 2)
-    db.add(rap)
+    _recalculer_attendu(rap)
+    rap.billetterie = billetterie
+    rap.monnaie = round(data.monnaie, 2)
+    rap.montant_compte = _total_billetterie(billetterie, data.monnaie)
+    rap.ecart = round(float(rap.montant_compte) - float(rap.montant_attendu), 2)
+    rap.note_pompiste = (data.note or "").strip()[:500] or None
+    rap.statut = "SOUMIS"
+    rap.soumis_at = now_haiti()
     db.commit()
     db.refresh(rap)
 
@@ -369,8 +434,7 @@ def soumettre(data: RapportIn, u: Utilisateur = Depends(_require_pompiste), db: 
         creer_notification(
             db, module="carburant", type_="rapport_pompiste",
             titre=f"Rapport pompiste à confirmer — {_nom(u)}",
-            message=(f"{rap.periode.replace('Apres-midi', 'Après-midi')} du {rap.date.strftime('%d/%m')} · "
-                     f"écart {float(rap.ecart):+,.0f} G"),
+            message=f"{_per(rap.periode)} du {rap.date.strftime('%d/%m')} · écart {float(rap.ecart):+,.0f} G",
             lien="pompistes-rapports", dedupe_minutes=None,
         )
         db.commit()
@@ -381,7 +445,8 @@ def soumettre(data: RapportIn, u: Utilisateur = Depends(_require_pompiste), db: 
 
 @router.get("/api/pompiste/rapports")
 def mes_rapports(u: Utilisateur = Depends(_require_pompiste), db: Session = Depends(get_db)):
-    rows = (db.query(RapportPompiste).filter_by(utilisateur_id=u.id)
+    rows = (db.query(RapportPompiste)
+            .filter(RapportPompiste.utilisateur_id == u.id, RapportPompiste.statut != "EN_COURS")
             .order_by(RapportPompiste.id.desc()).limit(20).all())
     return [_rapport_dict(db, r) for r in rows]
 
@@ -394,7 +459,7 @@ def mes_rapports(u: Utilisateur = Depends(_require_pompiste), db: Session = Depe
 def lister(statut: Optional[str] = None, date_debut: Optional[date_type] = None,
            date_fin: Optional[date_type] = None,
            _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
-    q = db.query(RapportPompiste)
+    q = db.query(RapportPompiste).filter(RapportPompiste.statut != "EN_COURS")
     if statut:
         q = q.filter(RapportPompiste.statut == statut)
     if date_debut:

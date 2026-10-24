@@ -116,8 +116,9 @@ class Releve(Base):
 
 
 class RapportPompiste(Base):
-    """Rapport de fin de période soumis par un pompiste depuis son espace
-    dédié (/pompiste) : index de ses pompes + billetterie. Reste en dehors du
+    """Rapport de fin de période d'un pompiste (espace /pompiste) : index de
+    ses pompes, envoyés carburant par carburant (statut EN_COURS), puis
+    billetterie unique au « Terminer » (statut SOUMIS). Reste en dehors du
     journal des compteurs (`releves`) tant qu'un superviseur ne l'a pas
     confirmé — la confirmation écrit (ou corrige) les relevés officiels.
     Un rapport refusé reste en historique ; le pompiste en soumet un nouveau."""
@@ -127,7 +128,7 @@ class RapportPompiste(Base):
     date               = Column(Date, nullable=False)
     periode            = Column(String(20), nullable=False)
     utilisateur_id     = Column(Integer, ForeignKey("utilisateurs.id", ondelete="RESTRICT"), nullable=False)
-    statut             = Column(String(20), nullable=False, default="SOUMIS")  # SOUMIS, CONFIRME, REJETE
+    statut             = Column(String(20), nullable=False, default="EN_COURS")  # EN_COURS, SOUMIS, CONFIRME, REJETE
     charte_acceptee_at = Column(DateTime(timezone=True), nullable=False)
     # [{"coupure": 1000, "liasses": 2, "billets": 13}, ...] + monnaie (pièces)
     billetterie        = Column(JSON, nullable=False, default=list)
@@ -137,7 +138,7 @@ class RapportPompiste(Base):
     montant_compte     = Column(Numeric(14, 2), nullable=False, default=0)
     ecart              = Column(Numeric(14, 2), nullable=False, default=0)
     note_pompiste      = Column(String(500), nullable=True)
-    soumis_at          = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    soumis_at          = Column(DateTime(timezone=True), nullable=True)   # au « Terminer »
     traite_par_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     traite_at          = Column(DateTime(timezone=True), nullable=True)
     commentaire_superviseur = Column(String(1000), nullable=True)
@@ -149,7 +150,7 @@ class RapportPompiste(Base):
 
     __table_args__ = (
         CheckConstraint("periode IN ('Matin', 'Apres-midi')", name="chk_rpomp_periode"),
-        CheckConstraint("statut IN ('SOUMIS','CONFIRME','REJETE')", name="chk_rpomp_statut"),
+        CheckConstraint("statut IN ('EN_COURS','SOUMIS','CONFIRME','REJETE')", name="chk_rpomp_statut"),
         Index("idx_rpomp_date", "date"),
         Index("idx_rpomp_statut", "statut"),
         Index("idx_rpomp_user", "utilisateur_id"),

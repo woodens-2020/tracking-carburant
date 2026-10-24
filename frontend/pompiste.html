@@ -124,6 +124,12 @@ td.r,th.r{text-align:right;white-space:nowrap}
 .barre-bas .info{flex:1;font-size:14px;color:var(--muted)}
 .barre-bas .info b{display:block;color:var(--text);font-family:var(--mono);font-size:18px}
 .barre-bas .btn{width:auto;flex:none;min-width:170px}
+.produit-tete{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin:4px 0 2px}
+.ligne-hub{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.ligne-hub > div:first-child{flex:1}
+.ligne-hub .r{text-align:right;white-space:nowrap}
+.retirer{flex:none;width:40px;height:40px;border-radius:12px;border:2px solid var(--border);background:transparent;
+  color:var(--muted);font-size:16px;cursor:pointer}
 .cache{display:none!important}
 .connexion{max-width:420px;margin:6vh auto 0}
 </style>
@@ -144,9 +150,13 @@ td.r,th.r{text-align:right;white-space:nowrap}
 
 <script>
 'use strict';
-/* Parcours guidé, une question par écran :
-   charte → période → carburant → pompes → index (une pompe par écran)
-   → billetterie → confirmation → envoyé. */
+/* Parcours guidé, une question par écran.
+   1. Compteurs, carburant par carburant :
+      charte → période → carburant → pompes → index (une pompe par écran)
+      → vérification → « Envoyer les compteurs » → mon rapport
+      (« Ajouter un autre carburant » ou « Terminer »)
+   2. Au « Terminer » seulement : billetterie de toute la période
+      → vérification de la caisse → envoi au superviseur. */
 const S = {};
 function reinit(){
   Object.assign(S, {ctx:null, etape:'charte', charte:false, date:null, periode:null, produitId:null,
@@ -191,6 +201,10 @@ async function chargerContexte(){
   try{
     const q = S.date && S.periode ? `?date=${S.date}&periode=${S.periode}` : '';
     S.ctx = await api('GET','/api/pompiste/contexte' + q);
+    if(S.ctx.en_cours){            // un rapport commencé impose son jour et sa période
+      S.date = S.ctx.date; S.periode = S.ctx.periode;
+      if(S.charte && ['charte','periode'].includes(S.etape)) S.etape = 'rapport';
+    }
     if(!S.date) S.date = S.ctx.aujourd_hui;
     $('qui').innerHTML = `<b>${esc(S.ctx.pompiste.nom)}</b><br>${esc(S.ctx.pompiste.username)}`;
     $('qui').classList.remove('cache'); $('btn-sortir').classList.remove('cache');
@@ -245,27 +259,31 @@ async function deconnexion(){
 }
 
 // ── Navigation ──────────────────────────────────────────────────────
-const ORDRE = ['charte','periode','produit','pompes','index','billetterie','recap'];
+const enCours = () => S.ctx?.en_cours;
 const produit = () => S.ctx.produits.find(p => p.id === S.produitId);
 const pompeCtx = id => { for(const p of S.ctx.produits) for(const q of p.pompes) if(q.id === id) return q; return null; };
+const PHASE_ARGENT = ['billetterie','caisse'];
 
 function aller(etape){ S.etape = etape; rendre(); }
 function precedent(){
-  if(S.etape === 'index' && S.pos > 0){ S.pos--; return rendre(); }
-  if(S.etape === 'billetterie'){ S.pos = S.choisies.length - 1; return aller('index'); }
-  const i = ORDRE.indexOf(S.etape);
-  aller(ORDRE[Math.max(0, i - 1)]);
+  const e = S.etape;
+  if(e === 'index' && S.pos > 0){ S.pos--; return rendre(); }
+  const retour = {periode:'charte', produit: enCours() ? 'rapport' : 'periode', pompes:'produit', index:'pompes',
+                  compteurs:'index', billetterie:'rapport', caisse:'billetterie'}[e];
+  if(e === 'compteurs') S.pos = S.choisies.length - 1;
+  aller(retour || 'charte');
 }
 
-function entete(){
-  const i = ORDRE.indexOf(S.etape);
+function entete(titrePhase){
   const puces = [];
-  if(S.periode && i > 1) puces.push(per(S.periode) + (S.date !== S.ctx.aujourd_hui ? ' (hier)' : ''));
-  if(S.produitId && i > 2) puces.push(produit()?.nom || '');
-  if(S.choisies.length && i > 3) puces.push(S.choisies.length + ' pompe' + (S.choisies.length > 1 ? 's' : ''));
-  return `<div class="fil">${i > 0 ? '<button class="retour" onclick="precedent()">← Retour</button>' : ''}
-      <span class="pas">Étape ${i+1} sur ${ORDRE.length}</span></div>
-    <div class="etapes">${ORDRE.map((_,k)=>`<span class="${k<=i?'fait':''}"></span>`).join('')}</div>
+  if(S.periode && S.etape !== 'periode') puces.push(per(S.periode) + (S.date !== S.ctx.aujourd_hui ? ' (hier)' : ''));
+  if(S.produitId && ['pompes','index','compteurs'].includes(S.etape)) puces.push(produit()?.nom || '');
+  if(S.choisies.length && ['index','compteurs'].includes(S.etape))
+    puces.push(S.choisies.length + ' pompe' + (S.choisies.length > 1 ? 's' : ''));
+  const phase = titrePhase || (PHASE_ARGENT.includes(S.etape) ? '2 · Argent' : '1 · Compteurs');
+  const avecRetour = !['charte','rapport'].includes(S.etape);
+  return `<div class="fil">${avecRetour ? '<button class="retour" onclick="precedent()">← Retour</button>' : ''}
+      <span class="pas">${phase}</span></div>
     ${puces.length ? `<div class="resume">${puces.map(p=>`<span>${esc(p)}</span>`).join('')}</div>` : ''}`;
 }
 
@@ -278,14 +296,14 @@ const sansBarre = () => $('barre').classList.add('cache');
 
 function rendre(){
   if(!S.charte && S.etape !== 'fin') S.etape = 'charte';
-  ({charte:rCharte, periode:rPeriode, produit:rProduit, pompes:rPompes, index:rIndex,
-    billetterie:rBilletterie, recap:rRecap, fin:rFin})[S.etape]();
+  ({charte:rCharte, periode:rPeriode, produit:rProduit, pompes:rPompes, index:rIndex, compteurs:rCompteurs,
+    rapport:rRapport, billetterie:rBilletterie, caisse:rCaisse, fin:rFin})[S.etape]();
   window.scrollTo(0,0);
 }
 
-// 1. Charte
+// Charte
 function rCharte(){
-  $('app').innerHTML = entete() + `
+  $('app').innerHTML = entete(' ') + `
     <h1>Charte de responsabilité</h1>
     <div class="card charte"><ul style="padding-left:20px;margin:0">
       <li>Je lis moi-même les <b>vrais index</b> sur chaque pompe.</li>
@@ -294,13 +312,16 @@ function rCharte(){
       <li>Mon rapport est vérifié par le superviseur. En cas de doute, je préviens mon responsable.</li>
     </ul>
     <label class="case"><input type="checkbox" id="c-ok" ${S.charte?'checked':''}> J'accepte</label></div>
+    ${enCours() ? `<div class="alerte" style="background:var(--warn-soft);color:var(--warn)">Vous avez un rapport commencé
+      (${per(enCours().periode)}, ${esc(jourTxt(enCours().date))}) : vous allez le reprendre.</div>` : ''}
     <h2>Mes derniers rapports</h2><div class="card" id="hist"><span class="sub">Chargement…</span></div>`;
-  const maj = () => barre('', 'Commencer', ()=>{ S.charte = true; aller('periode'); }, $('c-ok').checked);
+  const maj = () => barre('', enCours() ? 'Reprendre' : 'Commencer',
+    ()=>{ S.charte = true; aller(enCours() ? 'rapport' : 'periode'); }, $('c-ok').checked);
   $('c-ok').onchange = maj; maj();
   chargerHistorique();
 }
 
-// 2. Période
+// 1. Période
 function rPeriode(){
   sansBarre();
   const auj = S.date === S.ctx.aujourd_hui;
@@ -320,23 +341,23 @@ function basculerJour(){
   S.periode = null; rPeriode();
 }
 async function choisirPeriode(p){
-  if(p !== S.periode){ S.choisies = []; S.index = {}; S.erreurs = {}; }
+  if(p !== S.periode){ S.produitId = null; S.choisies = []; S.index = {}; S.erreurs = {}; }
   S.periode = p; S.etape = 'produit';
   await chargerContexte();          // index précédents et pompes déjà rapportées de ce créneau
 }
 
-// 3. Carburant
+// 2. Carburant
 function rProduit(){
   sansBarre();
   const cls = n => /diesel/i.test(n) ? 'die' : (/gaz|essence/i.test(n) ? 'gaz' : '');
   $('app').innerHTML = entete() + `
-    <h1>Quel carburant ?</h1>
+    <h1>${enCours() ? 'Quel autre carburant ?' : 'Quel carburant ?'}</h1>
     <p class="sub">Choisissez le carburant de vos pompes.</p>
     <div class="choix">${S.ctx.produits.map(p => {
       const libres = p.pompes.filter(q => !q.deja_rapportee).length;
       return `<button class="gros ${cls(p.nom)} ${S.produitId===p.id?'on':''}" onclick="choisirProduit(${p.id})" ${libres?'':'disabled'}>
         <span class="ico">⛽</span><span>${esc(p.nom)}<small>${libres ? `${p.pompes.length} pompe${p.pompes.length>1?'s':''} · ${nf(p.prix_gallon,2)} G/gal`
-          : 'Toutes les pompes sont déjà rapportées'}</small></span></button>`;
+          : 'Toutes les pompes sont déjà saisies'}</small></span></button>`;
     }).join('')}</div>`;
 }
 function choisirProduit(id){
@@ -344,7 +365,7 @@ function choisirProduit(id){
   S.produitId = id; aller('pompes');
 }
 
-// 4. Pompes
+// 3. Pompes
 function rPompes(){
   const p = produit();
   $('app').innerHTML = entete() + `
@@ -353,7 +374,7 @@ function rPompes(){
     <div class="choix">${p.pompes.map(q => {
       const on = S.choisies.includes(q.id), prise = q.deja_rapportee;
       return `<button class="gros ${on?'on':''} ${S.erreurs[q.id]?'erreur':''}" onclick="basculerPompe(${q.id})" ${prise?'disabled':''}>
-        <span>${esc(q.nom)}<small>${prise ? 'Déjà rapportée par ' + esc(prise.moi ? 'vous' : prise.par)
+        <span>${esc(q.nom)}<small>${prise ? (prise.moi ? 'Déjà dans votre rapport' : 'Déjà saisie par ' + esc(prise.par))
           : (q.index_precedent != null ? 'Dernier index : ' + nf(q.index_precedent,3) : 'Aucun index précédent')}</small></span>
         <span class="coche">✓</span></button>`;
     }).join('')}</div>`;
@@ -368,7 +389,7 @@ function basculerPompe(id){
   rPompes();
 }
 
-// 5. Index — une pompe par écran
+// 4. Index — une pompe par écran
 function valeurs(id){
   const q = pompeCtx(id), s = S.index[id] || {};
   const av = q.index_precedent != null ? q.index_precedent : num(s.avant);
@@ -391,12 +412,12 @@ function rIndex(){
       <div id="i-calc"></div></div>`;
   const maj = () => {
     const v = valeurs(id), el = $('i-calc');
-    let ok = v.av != null && v.ap != null && v.g >= 0;
+    const ok = v.av != null && v.ap != null && v.g >= 0;
     if(v.g == null) el.innerHTML = '';
     else if(v.g < 0) el.innerHTML = `<div class="msg-err">L'index de fin doit être plus grand que l'index de début.</div>`;
     else el.innerHTML = `<div class="calcul"><span>${nf(v.g,3)} gal</span><span>${G(v.g * produit().prix_gallon)}</span></div>`;
-    barre(v.g != null && v.g >= 0 ? `<b>${nf(v.g,3)} gal</b>vendus` : '', dernier ? 'Compter l\'argent' : 'Pompe suivante',
-      ()=>{ delete S.erreurs[id]; if(dernier) aller('billetterie'); else { S.pos++; rendre(); } }, ok);
+    barre(v.g != null && v.g >= 0 ? `<b>${nf(v.g,3)} gal</b>vendus` : '', dernier ? 'Vérifier' : 'Pompe suivante',
+      ()=>{ delete S.erreurs[id]; if(dernier) aller('compteurs'); else { S.pos++; rendre(); } }, ok);
   };
   for(const k of ['avant','apres']){
     const el = $('i-' + k); if(!el) continue;
@@ -407,16 +428,92 @@ function rIndex(){
   ($('i-avant') && !s.avant ? $('i-avant') : $('i-apres')).focus();
 }
 
-// 6. Billetterie
+// 5. Vérification des compteurs de ce carburant, puis envoi
+function lignes(){
+  return S.choisies.map(id => { const v = valeurs(id); return {...v, montant: v.g * produit().prix_gallon}; });
+}
+function rCompteurs(){
+  const l = lignes(), tot = l.reduce((a,x)=>a+x.montant,0), gal = l.reduce((a,x)=>a+x.g,0);
+  $('app').innerHTML = entete() + `<h1>Vérifiez vos compteurs</h1>
+    <p class="sub">${esc(produit().nom)} · ${per(S.periode)}, ${esc(jourTxt(S.date))}</p>
+    <div class="card"><table><thead><tr><th>Pompe</th><th class="r">Début → Fin</th><th class="r">Gallons</th></tr></thead><tbody>
+      ${l.map(x=>`<tr><td><b>${esc(x.q.nom)}</b></td><td class="r num">${nf(x.av,3)}<br>${nf(x.ap,3)}</td>
+        <td class="r num">${nf(x.g,3)}</td></tr>`).join('')}
+    </tbody></table>
+    <div class="total"><span>Total</span><span class="v">${nf(gal,3)} gal</span></div>
+    <div class="total" style="padding-top:0"><span>Montant</span><span class="v">${G(tot)}</span></div></div>
+    <p class="sub">L'argent se compte à la fin, quand vous appuierez sur « Terminer ».</p>`;
+  barre(`<b>${G(tot)}</b>${esc(produit().nom)}`, 'Envoyer les compteurs', envoyerCompteurs);
+}
+
+async function envoyerCompteurs(){
+  const b = $('barre-btn'); b.disabled = true; b.textContent = 'Envoi…';
+  try{
+    await api('POST','/api/pompiste/compteurs',{
+      date:S.date, periode:S.periode, charte_acceptee:S.charte,
+      lignes: lignes().map(x=>({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap}))});
+    S.produitId = null; S.choisies = []; S.index = {}; S.erreurs = {};
+    S.etape = 'rapport';
+    await chargerContexte();
+  }catch(e){
+    if(e.status === 422 && e.detail?.erreurs){
+      // Index invalide : retour à l'écran de la première pompe en erreur
+      S.erreurs = {}; for(const x of e.detail.erreurs) S.erreurs[x.pompe_id] = x.message;
+      const premiere = S.choisies.findIndex(id => S.erreurs[id]);
+      S.pos = Math.max(0, premiere); S.etape = 'index';
+      await chargerContexte();
+      return;
+    }
+    if(e.status === 401) return ecranConnexion('Session expirée — reconnectez-vous.');
+    b.disabled = false; b.textContent = 'Envoyer les compteurs';
+    $('app').insertAdjacentHTML('afterbegin', `<div class="alerte err">${esc(e.message)}</div>`);
+    window.scrollTo(0,0);
+  }
+}
+
+// 6. Mon rapport : ajouter un autre carburant ou terminer
+function rRapport(){
+  const r = enCours();
+  if(!r){ S.etape = 'periode'; return rPeriode(); }
+  const parProduit = {};
+  for(const l of r.lignes) (parProduit[l.produit_nom] ||= []).push(l);
+  const reste = S.ctx.produits.some(p => p.pompes.some(q => !q.deja_rapportee));
+  sansBarre();
+  $('app').innerHTML = entete('1 · Compteurs envoyés') + `
+    <h1>Mon rapport</h1>
+    <p class="sub">${per(r.periode)}, ${esc(jourTxt(r.date))}</p>
+    <div class="card">${Object.entries(parProduit).map(([nom, ls]) => `
+      <div class="produit-tete">${esc(nom)}</div>
+      ${ls.map(l => `<div class="ligne-hub"><div><b>${esc(l.pompe_nom)}</b>
+          <div class="sub" style="margin:0;font-size:14px">${nf(l.metter_avant,3)} → ${nf(l.metter_apres,3)}</div></div>
+        <div class="r num">${nf(l.gallons,3)} gal<br><span class="sub" style="font-size:14px">${G(l.montant)}</span></div>
+        <button class="retirer" onclick="retirerPompe(${l.pompe_id}, '${esc(l.pompe_nom).replace(/'/g,'')}')" title="Retirer">✕</button></div>`).join('')}
+    `).join('')}
+      <div class="total"><span>Ventes attendues</span><span class="v">${G(r.montant_attendu)}</span></div></div>
+    <div class="choix">
+      ${reste ? `<button class="gros" onclick="aller('produit')"><span class="ico">＋</span>
+        <span>Ajouter un autre carburant<small>Si vous avez tenu d'autres pompes</small></span></button>` : ''}
+      <button class="gros on" onclick="aller('billetterie')"><span class="ico">✔</span>
+        <span>Terminer<small>Toutes mes pompes sont envoyées : je compte l'argent</small></span></button>
+    </div>`;
+}
+async function retirerPompe(id, nom){
+  if(!confirm(`Retirer ${nom} de votre rapport ? Vous pourrez la saisir à nouveau.`)) return;
+  try{ await api('DELETE', `/api/pompiste/compteurs/${id}`); }catch(e){ alert(e.message); }
+  await chargerContexte();
+}
+
+// 7. Billetterie — seulement après « Terminer »
 function totalCompte(){
   let t = 0;
   for(const c of S.ctx.coupures){ const b = S.billets[c] || {}; t += c * (ent(b.liasses) * S.ctx.taille_liasse + ent(b.billets)); }
   return t + (num(S.monnaie) || 0);
 }
 function rBilletterie(){
+  if(!enCours()) return aller('periode');
   const c = S.ctx;
   $('app').innerHTML = entete() + `<h1>Comptez l'argent</h1>
-    <p class="sub">Pour chaque billet, le nombre de liasses (paquets de ${c.taille_liasse}) et de billets en plus.</p>
+    <p class="sub">Tout l'argent de la période. Pour chaque billet : le nombre de liasses (paquets de ${c.taille_liasse}) et de billets en plus.</p>
     <div class="card">${c.coupures.map(k => { const b = S.billets[k] || {}; return `
       <div class="billet"><div class="coup">${nf(k)} G<small id="st-${k}"></small></div>
         <div><label>Liasses</label><input inputmode="numeric" data-c="${k}" data-k="liasses" value="${esc(b.liasses||'')}" placeholder="0"></div>
@@ -435,51 +532,35 @@ function majBillets(){
     const b = S.billets[k] || {}, n = ent(b.liasses) * S.ctx.taille_liasse + ent(b.billets);
     $('st-' + k).textContent = n ? G(n * k) : '';
   }
-  barre(`Total compté<b>${G(totalCompte())}</b>`, 'Voir le résumé', ()=>aller('recap'));
+  barre(`Total compté<b>${G(totalCompte())}</b>`, 'Vérifier', ()=>aller('caisse'));
 }
 
-// 7. Confirmation
-function lignes(){
-  return S.choisies.map(id => { const v = valeurs(id); return {...v, montant: v.g * produit().prix_gallon}; });
-}
-function rRecap(){
-  const l = lignes(), att = l.reduce((a,x)=>a+x.montant,0), cpt = totalCompte(), ec = cpt - att;
+// 8. Vérification de la caisse et envoi au superviseur
+function rCaisse(){
+  const r = enCours(), att = r.montant_attendu, cpt = totalCompte(), ec = cpt - att;
   const cls = Math.abs(ec) < 1 ? 'ok' : (ec < 0 ? 'neg' : 'pos');
   const txt = Math.abs(ec) < 1 ? 'Caisse juste' : (ec < 0 ? 'Il manque' : 'En plus');
   $('app').innerHTML = entete() + `<h1>Vérifiez et envoyez</h1>
-    <p class="sub">${per(S.periode)}, ${esc(jourTxt(S.date))} · ${esc(produit().nom)}</p>
-    <div class="card"><table><thead><tr><th>Pompe</th><th class="r">Début → Fin</th><th class="r">Gallons</th></tr></thead><tbody>
-      ${l.map(x=>`<tr><td><b>${esc(x.q.nom)}</b></td><td class="r num">${nf(x.av,3)}<br>${nf(x.ap,3)}</td>
-        <td class="r num">${nf(x.g,3)}</td></tr>`).join('')}
-    </tbody></table>
-    <div class="total"><span>Ventes attendues</span><span class="v">${G(att)}</span></div>
-    <div class="total" style="padding-top:0"><span>Argent compté</span><span class="v">${G(cpt)}</span></div>
-    <div class="ecart ${cls}"><span>${txt}</span><span>${ec>0?'+':''}${G(ec)}</span></div>
-    <label for="r-note">Un mot pour le superviseur ? (facultatif)</label>
-    <textarea id="r-note" rows="3" maxlength="500" placeholder="Ex. : client parti sans payer…">${esc(S.note)}</textarea></div>`;
+    <p class="sub">${per(r.periode)}, ${esc(jourTxt(r.date))} · ${r.lignes.length} pompe${r.lignes.length>1?'s':''} · ${nf(r.total_gallons,3)} gal</p>
+    <div class="card">
+      <div class="total"><span>Ventes attendues</span><span class="v">${G(att)}</span></div>
+      <div class="total" style="padding-top:0"><span>Argent compté</span><span class="v">${G(cpt)}</span></div>
+      <div class="ecart ${cls}"><span>${txt}</span><span>${ec>0?'+':''}${G(ec)}</span></div>
+      <label for="r-note">Un mot pour le superviseur ? (facultatif)</label>
+      <textarea id="r-note" rows="3" maxlength="500" placeholder="Ex. : client parti sans payer…">${esc(S.note)}</textarea></div>`;
   $('r-note').oninput = e => S.note = e.target.value;
-  barre(`Écart<b>${ec>0?'+':''}${G(ec)}</b>`, 'Envoyer', soumettre);
+  barre(`Écart<b>${ec>0?'+':''}${G(ec)}</b>`, 'Envoyer', terminer);
 }
 
-async function soumettre(){
+async function terminer(){
   const b = $('barre-btn'); b.disabled = true; b.textContent = 'Envoi…';
   try{
-    S.dernier = await api('POST','/api/pompiste/rapports',{
-      date:S.date, periode:S.periode, charte_acceptee:S.charte,
-      lignes: lignes().map(x=>({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap})),
+    S.dernier = await api('POST','/api/pompiste/terminer',{
       billetterie: S.ctx.coupures.map(c=>({coupure:c, liasses:ent(S.billets[c]?.liasses), billets:ent(S.billets[c]?.billets)}))
                      .filter(x=>x.liasses||x.billets),
       monnaie: num(S.monnaie) || 0, note: S.note || null});
     aller('fin');
   }catch(e){
-    if(e.status === 422 && e.detail?.erreurs){
-      // Index invalide : retour à l'écran de la première pompe en erreur
-      S.erreurs = {}; for(const x of e.detail.erreurs) S.erreurs[x.pompe_id] = x.message;
-      const premiere = S.choisies.findIndex(id => S.erreurs[id]);
-      await chargerContexte();
-      S.pos = Math.max(0, premiere); aller('index');
-      return;
-    }
     if(e.status === 401) return ecranConnexion('Session expirée — reconnectez-vous.');
     b.disabled = false; b.textContent = 'Envoyer';
     $('app').insertAdjacentHTML('afterbegin', `<div class="alerte err">${esc(e.message)}</div>`);
@@ -487,7 +568,7 @@ async function soumettre(){
   }
 }
 
-// 8. Envoyé
+// Envoyé
 function rFin(){
   const r = S.dernier;
   sansBarre();
@@ -500,9 +581,9 @@ function rFin(){
       <div class="total"><span>Attendu</span><span class="v">${G(r.montant_attendu)}</span></div>
       <div class="total"><span>Compté</span><span class="v">${G(r.montant_compte)}</span></div>
       <div class="total"><span>Écart</span><span class="v">${r.ecart>0?'+':''}${G(r.ecart)}</span></div></div>
-    <button class="btn" onclick="nouveauRapport()">Faire un autre rapport</button>
+    <button class="btn" onclick="deconnexion()">Me déconnecter</button>
     <div style="height:12px"></div>
-    <button class="btn sec" onclick="deconnexion()">Me déconnecter</button>
+    <button class="btn sec" onclick="nouveauRapport()">Faire un autre rapport</button>
     <h2>Mes derniers rapports</h2><div class="card" id="hist"></div>`;
   chargerHistorique();
 }

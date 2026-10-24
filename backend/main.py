@@ -470,6 +470,10 @@ def startup():
         # global uniquement) — voir la note sur la colonne dans models.py.
         "ALTER TABLE bar_mouvements_stock ADD COLUMN IF NOT EXISTS departement_id INTEGER REFERENCES bar_departements(id) ON DELETE SET NULL",
         "CREATE INDEX IF NOT EXISTS idx_bar_mouv_departement ON bar_mouvements_stock (departement_id)",
+        # Espace pompiste : rapport EN_COURS (compteurs envoyés, billetterie pas encore faite)
+        "ALTER TABLE rapports_pompiste DROP CONSTRAINT IF EXISTS chk_rpomp_statut",
+        "ALTER TABLE rapports_pompiste ADD CONSTRAINT chk_rpomp_statut CHECK (statut IN ('EN_COURS','SOUMIS','CONFIRME','REJETE'))",
+        "ALTER TABLE rapports_pompiste ALTER COLUMN soumis_at DROP NOT NULL",
     ]
     # Chaque instruction est isolée : une qui échoue (moteur SQLite en dev,
     # table absente, type déjà à jour…) n'empêche pas les suivantes.
