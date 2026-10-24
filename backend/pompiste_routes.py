@@ -129,7 +129,7 @@ def _index_precedent(db: Session, pompe_id: int, d: date_type, periode: str,
               .order_by(Releve.date.desc()).limit(6).all()):
         cle = (r.date, _RANG.get(r.periode, 9))
         if cle < cible and (cle_m is None or cle > cle_m):
-            meilleur, cle_m, src = float(r.metter_apres), cle, f"journal — {r.periode} du {r.date.strftime('%d/%m')}"
+            meilleur, cle_m, src = float(r.metter_apres), cle, f"journal — {_per(r.periode)} du {r.date.strftime('%d/%m')}"
     q = (db.query(RapportPompisteLigne, RapportPompiste)
          .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
          .filter(RapportPompisteLigne.pompe_id == pompe_id,
@@ -141,8 +141,12 @@ def _index_precedent(db: Session, pompe_id: int, d: date_type, periode: str,
         cle = (rap.date, _RANG.get(rap.periode, 9))
         if cle < cible and (cle_m is None or cle > cle_m):
             meilleur, cle_m = float(ligne.metter_apres), cle
-            src = f"rapport pompiste en attente — {rap.periode} du {rap.date.strftime('%d/%m')}"
+            src = f"rapport pompiste en attente — {_per(rap.periode)} du {rap.date.strftime('%d/%m')}"
     return meilleur, src
+
+
+def _per(p: str) -> str:
+    return "Après-midi" if p == "Apres-midi" else p
 
 
 def _prix(db: Session, pompe: Pompe, d: date_type) -> float:

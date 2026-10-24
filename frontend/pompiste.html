@@ -7,9 +7,10 @@
 <title>Espace pompiste</title>
 <style>
 :root{
-  --bg:#f3f5f9; --panel:#fff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0;
+  --bg:#f3f5f9; --panel:#fff; --text:#0f172a; --muted:#64748b; --border:#dbe2ea;
   --accent:#ea580c; --accent-soft:#fff1e8; --ok:#16a34a; --ok-soft:#e8f7ee;
   --err:#dc2626; --err-soft:#fdecec; --warn:#b45309; --warn-soft:#fff6e0;
+  --gaz:#16a34a; --gaz-soft:#e8f7ee; --die:#2563eb; --die-soft:#e9f0fe;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){
@@ -17,86 +18,114 @@
     --bg:#0b1220; --panel:#111a2e; --text:#e5e9f2; --muted:#94a3b8; --border:#24314d;
     --accent:#fb923c; --accent-soft:#2a1c10; --ok:#4ade80; --ok-soft:#10261a;
     --err:#f87171; --err-soft:#2c1414; --warn:#fbbf24; --warn-soft:#2a2210;
+    --gaz:#4ade80; --gaz-soft:#10261a; --die:#60a5fa; --die-soft:#101d33;
   }
 }
-*{box-sizing:border-box}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--text);
-  font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.env{background:#b91c1c;color:#fff;text-align:center;font-size:12px;font-weight:700;
-  letter-spacing:.08em;padding:4px}
+  font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.env{background:#b91c1c;color:#fff;text-align:center;font-size:12px;font-weight:700;letter-spacing:.08em;padding:4px}
 header{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--panel);
   border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
 header .marque{font-weight:800;letter-spacing:.02em}
-header .qui{margin-left:auto;font-size:13px;color:var(--muted);text-align:right}
-header button{margin-left:8px}
-main{max-width:640px;margin:0 auto;padding:16px 16px 120px}
-h1{font-size:20px;margin:6px 0 4px}
-h2{font-size:16px;margin:18px 0 8px}
-p.sub{color:var(--muted);margin:0 0 14px}
-.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px}
-label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:10px 0 4px}
-input,textarea,select{width:100%;font:inherit;color:var(--text);background:var(--bg);
-  border:1px solid var(--border);border-radius:10px;padding:11px 12px}
-input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
-input[readonly]{opacity:.75}
-.num{font-family:var(--mono);text-align:right}
-.btn{font:inherit;font-weight:700;border:0;border-radius:12px;padding:13px 16px;cursor:pointer;
-  background:var(--accent);color:#fff;width:100%}
-.btn:disabled{opacity:.5;cursor:default}
-.btn.sec{background:transparent;color:var(--text);border:1px solid var(--border)}
-.btn.petit{width:auto;padding:7px 12px;font-size:13px;border-radius:9px}
-.ligne-btns{display:flex;gap:10px;margin-top:14px}
-.ligne-btns .btn{flex:1}
-.etapes{display:flex;gap:6px;margin:4px 0 16px}
-.etapes span{flex:1;height:5px;border-radius:3px;background:var(--border)}
+header .qui{margin-left:auto;font-size:14px;color:var(--muted);text-align:right;line-height:1.25}
+main{max-width:560px;margin:0 auto;padding:16px 16px 130px}
+h1{font-size:26px;line-height:1.2;margin:4px 0 6px}
+h2{font-size:18px;margin:22px 0 8px}
+p.sub{color:var(--muted);margin:0 0 18px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px}
+label{display:block;font-size:14px;font-weight:600;color:var(--muted);margin:10px 0 6px}
+input,textarea{width:100%;font:inherit;color:var(--text);background:var(--bg);
+  border:2px solid var(--border);border-radius:12px;padding:13px 14px}
+input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+.btn{font:inherit;font-weight:800;border:0;border-radius:14px;padding:16px;cursor:pointer;
+  background:var(--accent);color:#fff;width:100%;min-height:58px}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.sec{background:transparent;color:var(--text);border:2px solid var(--border)}
+.btn.petit{width:auto;min-height:0;padding:8px 14px;font-size:14px;border-radius:10px}
+.lien{background:none;border:0;color:var(--muted);font:inherit;font-size:15px;text-decoration:underline;
+  cursor:pointer;padding:12px 0;display:block;margin:6px auto 0}
+
+/* Fil d'étapes */
+.fil{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+.fil .retour{font:inherit;font-weight:700;font-size:15px;background:var(--panel);border:2px solid var(--border);
+  color:var(--text);border-radius:12px;padding:8px 14px;cursor:pointer}
+.fil .pas{margin-left:auto;font-size:14px;color:var(--muted);font-weight:600}
+.etapes{display:flex;gap:5px;margin:0 0 18px}
+.etapes span{flex:1;height:6px;border-radius:3px;background:var(--border)}
 .etapes span.fait{background:var(--accent)}
-.seg{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:3px;gap:3px}
-.seg button{flex:1;font:inherit;font-weight:600;border:0;border-radius:8px;padding:9px;background:transparent;
-  color:var(--muted);cursor:pointer}
-.seg button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
-.grille2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.pompe{border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px}
-.pompe.erreur{border-color:var(--err);background:var(--err-soft)}
-.pompe.prise{opacity:.55}
-.pompe .tete{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.pompe .nom{font-weight:700}
-.pompe .calc{font-family:var(--mono);font-size:13px;color:var(--muted);text-align:right}
-.pompe .msg{color:var(--err);font-size:13px;margin-top:6px;font-weight:600}
-.pompe .src{font-size:12px;color:var(--muted);margin-top:3px}
-.produit{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin:16px 0 8px}
+.resume{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.resume span{font-size:14px;font-weight:700;background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:4px 12px}
+
+/* Gros boutons de choix */
+.choix{display:grid;gap:14px}
+.gros{display:flex;align-items:center;gap:16px;width:100%;min-height:92px;padding:18px 20px;cursor:pointer;
+  font:inherit;font-size:24px;font-weight:800;text-align:left;color:var(--text);
+  background:var(--panel);border:3px solid var(--border);border-radius:20px}
+.gros:active{transform:scale(.98)}
+.gros .ico{flex:none;width:56px;height:56px;border-radius:16px;display:grid;place-items:center;font-size:30px;background:var(--bg)}
+.gros small{display:block;font-size:15px;font-weight:500;color:var(--muted);margin-top:2px}
+.gros.gaz .ico{background:var(--gaz-soft);color:var(--gaz)}
+.gros.die .ico{background:var(--die-soft);color:var(--die)}
+.gros.on{border-color:var(--accent);background:var(--accent-soft)}
+.gros.on .coche{background:var(--accent);border-color:var(--accent);color:#fff}
+.gros .coche{margin-left:auto;flex:none;width:38px;height:38px;border-radius:50%;border:3px solid var(--border);
+  display:grid;place-items:center;font-size:22px;color:transparent}
+.gros:disabled{opacity:.5;cursor:default}
+.gros.erreur{border-color:var(--err)}
+
+/* Écran d'index */
+.pompe-titre{font-size:30px;font-weight:900;margin:0}
+.bloc-index{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:18px;margin:14px 0}
+.bloc-index .lib{font-size:15px;font-weight:700;color:var(--muted);margin-bottom:6px}
+.bloc-index .val{font-family:var(--mono);font-size:30px;font-weight:700}
+.bloc-index .src{font-size:13px;color:var(--muted);margin-top:4px}
+.grand{font-family:var(--mono);font-size:34px;font-weight:700;text-align:center;padding:16px;border-width:3px}
+.calcul{display:flex;justify-content:space-between;font-family:var(--mono);font-size:18px;font-weight:700;
+  background:var(--bg);border-radius:12px;padding:12px 14px;margin-top:12px}
+.msg-err{color:var(--err);font-weight:700;margin-top:10px}
+
+/* Billetterie */
+.billet{display:grid;grid-template-columns:96px 1fr 1fr;gap:10px;align-items:end;padding:12px 0;border-bottom:1px solid var(--border)}
+.billet:last-of-type{border:0}
+.billet .coup{font-size:20px;font-weight:900;padding-bottom:12px;white-space:nowrap}
+.billet .coup small{display:block;font-size:13px;font-weight:600;color:var(--muted);font-family:var(--mono)}
+.billet label{margin:0 0 4px;font-size:13px}
+.billet input{font-family:var(--mono);font-size:22px;text-align:center;padding:10px}
+
 table{width:100%;border-collapse:collapse}
-th,td{padding:8px 6px;border-bottom:1px solid var(--border);text-align:left}
-th{font-size:12px;color:var(--muted);font-weight:600}
+th,td{padding:9px 6px;border-bottom:1px solid var(--border);text-align:left}
+th{font-size:13px;color:var(--muted);font-weight:600}
 td.r,th.r{text-align:right;white-space:nowrap}
-td b{white-space:nowrap}
-td input{padding:8px;text-align:center;font-family:var(--mono)}
+.num{font-family:var(--mono)}
 .total{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;font-weight:700}
-.total .v{font-family:var(--mono);font-size:18px}
-.ecart{border-radius:12px;padding:12px 14px;font-weight:700;display:flex;justify-content:space-between}
+.total .v{font-family:var(--mono);font-size:20px}
+.ecart{border-radius:14px;padding:14px 16px;font-weight:800;font-size:19px;display:flex;justify-content:space-between}
 .ecart.ok{background:var(--ok-soft);color:var(--ok)}
 .ecart.neg{background:var(--err-soft);color:var(--err)}
 .ecart.pos{background:var(--warn-soft);color:var(--warn)}
-.alerte{border-radius:12px;padding:12px 14px;margin-bottom:12px;font-weight:600}
+.alerte{border-radius:14px;padding:14px 16px;margin-bottom:14px;font-weight:700}
 .alerte.err{background:var(--err-soft);color:var(--err)}
 .alerte.ok{background:var(--ok-soft);color:var(--ok)}
-.charte li{margin-bottom:10px}
-.case{display:flex;gap:10px;align-items:flex-start;margin:14px 0;font-weight:600}
-.case input{width:22px;height:22px;flex:none;margin-top:1px}
-.badge{display:inline-block;font-size:12px;font-weight:700;border-radius:20px;padding:2px 9px}
+.charte li{margin-bottom:12px}
+.case{display:flex;gap:12px;align-items:center;margin:16px 0 4px;font-weight:800;font-size:18px;
+  background:var(--accent-soft);border-radius:14px;padding:14px;cursor:pointer}
+.case input{width:30px;height:30px;flex:none;margin:0;accent-color:var(--accent)}
+.badge{display:inline-block;font-size:13px;font-weight:700;border-radius:20px;padding:2px 10px}
 .badge.SOUMIS{background:var(--warn-soft);color:var(--warn)}
 .badge.CONFIRME{background:var(--ok-soft);color:var(--ok)}
 .badge.REJETE{background:var(--err-soft);color:var(--err)}
 .hist{border-bottom:1px solid var(--border);padding:10px 0}
 .hist:last-child{border:0}
-.com{margin-top:6px;font-size:14px;background:var(--bg);border-radius:9px;padding:8px 10px}
+.com{margin-top:6px;font-size:15px;background:var(--bg);border-radius:10px;padding:8px 10px}
 .barre-bas{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--border);
-  padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
-.barre-bas .in{max-width:640px;margin:0 auto;display:flex;gap:10px;align-items:center}
-.barre-bas .info{flex:1;font-size:13px;color:var(--muted)}
-.barre-bas .info b{display:block;color:var(--text);font-family:var(--mono);font-size:16px}
-.barre-bas .btn{width:auto;flex:none;min-width:140px}
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom));z-index:6}
+.barre-bas .in{max-width:560px;margin:0 auto;display:flex;gap:12px;align-items:center}
+.barre-bas .info{flex:1;font-size:14px;color:var(--muted)}
+.barre-bas .info b{display:block;color:var(--text);font-family:var(--mono);font-size:18px}
+.barre-bas .btn{width:auto;flex:none;min-width:170px}
 .cache{display:none!important}
-.connexion{max-width:380px;margin:8vh auto 0}
+.connexion{max-width:420px;margin:6vh auto 0}
 </style>
 </head>
 <body>
@@ -115,15 +144,27 @@ td input{padding:8px;text-align:center;font-family:var(--mono)}
 
 <script>
 'use strict';
-const S = {ctx:null, etape:'charte', charte:false, saisie:{}, billets:{}, monnaie:'', note:'',
-           erreurs:{}, date:null, periode:null};
+/* Parcours guidé, une question par écran :
+   charte → période → carburant → pompes → index (une pompe par écran)
+   → billetterie → confirmation → envoyé. */
+const S = {};
+function reinit(){
+  Object.assign(S, {ctx:null, etape:'charte', charte:false, date:null, periode:null, produitId:null,
+    choisies:[], pos:0, index:{}, billets:{}, monnaie:'', note:'', erreurs:{}, dernier:null});
+}
+reinit();
+
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const nf = (n,d=0) => Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const G = n => nf(n) + ' G';
 const per = p => p === 'Apres-midi' ? 'Après-midi' : p;
-const num = v => { const x = parseFloat(String(v).replace(',', '.').replace(/\s/g,'')); return isNaN(x) ? null : x; };
+const num = v => { if(v == null || String(v).trim() === '') return null;
+  const x = parseFloat(String(v).replace(',', '.').replace(/\s/g,'')); return isNaN(x) ? null : x; };
 const ent = v => { const x = parseInt(v,10); return isNaN(x) || x < 0 ? 0 : x; };
+const jourTxt = iso => new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long', day:'numeric', month:'long'});
+const hier = iso => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate()-1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
 async function api(method, url, body){
   const r = await fetch(url, {method, credentials:'include',
@@ -148,16 +189,17 @@ async function demarrer(){
 
 async function chargerContexte(){
   try{
-    const q = S.date ? `?date=${S.date}&periode=${S.periode}` : '';
+    const q = S.date && S.periode ? `?date=${S.date}&periode=${S.periode}` : '';
     S.ctx = await api('GET','/api/pompiste/contexte' + q);
-    S.date = S.ctx.date; S.periode = S.ctx.periode;
+    if(!S.date) S.date = S.ctx.aujourd_hui;
     $('qui').innerHTML = `<b>${esc(S.ctx.pompiste.nom)}</b><br>${esc(S.ctx.pompiste.username)}`;
     $('qui').classList.remove('cache'); $('btn-sortir').classList.remove('cache');
     rendre();
   }catch(e){
     if(e.status === 401) return ecranConnexion();
     if(e.status === 403) return ecranPasPompiste();
-    $('app').innerHTML = `<div class="alerte err">${esc(e.message)}</div>`;
+    $('app').innerHTML = `<div class="alerte err">${esc(e.message)}</div>
+      <button class="btn" onclick="chargerContexte()">Réessayer</button>`;
   }
 }
 
@@ -169,10 +211,11 @@ function ecranConnexion(msg){
     ${msg ? `<div class="alerte err">${esc(msg)}</div>` : ''}
     <form class="card" id="f-login" autocomplete="on">
       <label for="l-user">Nom d'utilisateur</label>
-      <input id="l-user" autocomplete="username" autocapitalize="none" required>
+      <input id="l-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
       <label for="l-pin">Code PIN (9 chiffres)</label>
-      <input id="l-pin" type="password" inputmode="numeric" maxlength="9" autocomplete="current-password" required>
-      <div style="height:14px"></div>
+      <input id="l-pin" type="password" inputmode="numeric" maxlength="9" autocomplete="current-password" required
+        style="font-family:var(--mono);font-size:24px;letter-spacing:.2em;text-align:center">
+      <div style="height:16px"></div>
       <button class="btn" id="l-btn">Se connecter</button>
     </form></div>`;
   $('l-user').focus();
@@ -183,7 +226,7 @@ function ecranConnexion(msg){
     $('l-btn').disabled = true;
     try{
       await api('POST','/api/login/pompiste',{username:$('l-user').value.trim(), code_acces:pin});
-      S.charte = false; S.etape = 'charte'; S.date = null;
+      reinit();
       await chargerContexte();
     }catch(e){ ecranConnexion(e.message); }
   };
@@ -197,242 +240,288 @@ function ecranPasPompiste(){
 
 async function deconnexion(){
   try{ await api('POST','/api/logout'); }catch(e){}
-  S.saisie = {}; S.billets = {}; S.monnaie = ''; S.note = ''; S.charte = false;
+  reinit();
   ecranConnexion();
 }
 
-// ── Rendu par étape ─────────────────────────────────────────────────
-const ORDRE = ['charte','saisie','billetterie','recap'];
-function barreEtapes(){
+// ── Navigation ──────────────────────────────────────────────────────
+const ORDRE = ['charte','periode','produit','pompes','index','billetterie','recap'];
+const produit = () => S.ctx.produits.find(p => p.id === S.produitId);
+const pompeCtx = id => { for(const p of S.ctx.produits) for(const q of p.pompes) if(q.id === id) return q; return null; };
+
+function aller(etape){ S.etape = etape; rendre(); }
+function precedent(){
+  if(S.etape === 'index' && S.pos > 0){ S.pos--; return rendre(); }
+  if(S.etape === 'billetterie'){ S.pos = S.choisies.length - 1; return aller('index'); }
   const i = ORDRE.indexOf(S.etape);
-  return `<div class="etapes">${ORDRE.map((_,k)=>`<span class="${k<=i?'fait':''}"></span>`).join('')}</div>`;
+  aller(ORDRE[Math.max(0, i - 1)]);
 }
+
+function entete(){
+  const i = ORDRE.indexOf(S.etape);
+  const puces = [];
+  if(S.periode && i > 1) puces.push(per(S.periode) + (S.date !== S.ctx.aujourd_hui ? ' (hier)' : ''));
+  if(S.produitId && i > 2) puces.push(produit()?.nom || '');
+  if(S.choisies.length && i > 3) puces.push(S.choisies.length + ' pompe' + (S.choisies.length > 1 ? 's' : ''));
+  return `<div class="fil">${i > 0 ? '<button class="retour" onclick="precedent()">← Retour</button>' : ''}
+      <span class="pas">Étape ${i+1} sur ${ORDRE.length}</span></div>
+    <div class="etapes">${ORDRE.map((_,k)=>`<span class="${k<=i?'fait':''}"></span>`).join('')}</div>
+    ${puces.length ? `<div class="resume">${puces.map(p=>`<span>${esc(p)}</span>`).join('')}</div>` : ''}`;
+}
+
 function barre(info, libelle, action, actif=true){
   $('barre').classList.remove('cache');
   $('barre-info').innerHTML = info;
   const b = $('barre-btn'); b.textContent = libelle; b.onclick = action; b.disabled = !actif;
 }
+const sansBarre = () => $('barre').classList.add('cache');
 
 function rendre(){
-  if(!S.charte) S.etape = 'charte';
-  ({charte:rCharte, saisie:rSaisie, billetterie:rBilletterie, recap:rRecap, fin:rFin})[S.etape]();
+  if(!S.charte && S.etape !== 'fin') S.etape = 'charte';
+  ({charte:rCharte, periode:rPeriode, produit:rProduit, pompes:rPompes, index:rIndex,
+    billetterie:rBilletterie, recap:rRecap, fin:rFin})[S.etape]();
   window.scrollTo(0,0);
 }
 
+// 1. Charte
 function rCharte(){
-  $('app').innerHTML = barreEtapes() + `
+  $('app').innerHTML = entete() + `
     <h1>Charte de responsabilité</h1>
-    <p class="sub">À accepter avant chaque rapport.</p>
-    <div class="card charte"><ul>
-      <li><b>Je saisis moi-même les index réels</b> lus sur chaque pompe dont j'ai la charge, sans les arrondir ni les recopier.</li>
-      <li><b>Je compte l'argent billet par billet</b> et je déclare exactement ce que je remets.</li>
-      <li>Tout ce qui est saisi sous mon compte m'engage personnellement : le rapport est enregistré avec mon nom, la date et l'heure.</li>
-      <li>Mon rapport est vérifié par un superviseur. En cas de doute ou d'anomalie, je préviens immédiatement mon responsable.</li>
+    <div class="card charte"><ul style="padding-left:20px;margin:0">
+      <li>Je lis moi-même les <b>vrais index</b> sur chaque pompe.</li>
+      <li>Je compte l'argent <b>billet par billet</b> et je déclare exactement ce que je remets.</li>
+      <li>Ce que je saisis avec mon compte <b>m'engage</b> : mon nom, la date et l'heure sont enregistrés.</li>
+      <li>Mon rapport est vérifié par le superviseur. En cas de doute, je préviens mon responsable.</li>
     </ul>
-    <label class="case"><input type="checkbox" id="c-ok" ${S.charte?'checked':''}> J'ai lu la charte et je l'accepte.</label></div>
-    ${historique()}`;
-  const maj = () => barre('Étape 1 sur 4', 'Continuer', ()=>{ S.charte = true; S.etape = 'saisie'; rendre(); }, $('c-ok').checked);
+    <label class="case"><input type="checkbox" id="c-ok" ${S.charte?'checked':''}> J'accepte</label></div>
+    <h2>Mes derniers rapports</h2><div class="card" id="hist"><span class="sub">Chargement…</span></div>`;
+  const maj = () => barre('', 'Commencer', ()=>{ S.charte = true; aller('periode'); }, $('c-ok').checked);
   $('c-ok').onchange = maj; maj();
   chargerHistorique();
 }
 
-function pompesSaisies(){
-  const out = [];
-  for(const p of S.ctx.produits) for(const q of p.pompes){
-    const s = S.saisie[q.id] || {};
-    const av = q.index_precedent != null ? q.index_precedent : num(s.avant);
-    const ap = num(s.apres);
-    if(q.deja_rapportee || ap == null) continue;
-    out.push({pompe:q, produit:p, avant:av, apres:ap, gallons: av != null ? ap - av : null,
-              montant: av != null ? (ap - av) * p.prix_gallon : null});
-  }
-  return out;
+// 2. Période
+function rPeriode(){
+  sansBarre();
+  const auj = S.date === S.ctx.aujourd_hui;
+  $('app').innerHTML = entete() + `
+    <h1>Quelle période ?</h1>
+    <p class="sub">${auj ? "Aujourd'hui" : 'Hier'}, ${esc(jourTxt(S.date))}</p>
+    <div class="choix">
+      <button class="gros ${S.periode==='Matin'?'on':''}" onclick="choisirPeriode('Matin')">
+        <span class="ico">☀️</span><span>Matin</span></button>
+      <button class="gros ${S.periode==='Apres-midi'?'on':''}" onclick="choisirPeriode('Apres-midi')">
+        <span class="ico">🌇</span><span>Après-midi</span></button>
+    </div>
+    <button class="lien" onclick="basculerJour()">${auj ? 'Le rapport est pour hier ?' : "Revenir à aujourd'hui"}</button>`;
+}
+function basculerJour(){
+  S.date = S.date === S.ctx.aujourd_hui ? hier(S.ctx.aujourd_hui) : S.ctx.aujourd_hui;
+  S.periode = null; rPeriode();
+}
+async function choisirPeriode(p){
+  if(p !== S.periode){ S.choisies = []; S.index = {}; S.erreurs = {}; }
+  S.periode = p; S.etape = 'produit';
+  await chargerContexte();          // index précédents et pompes déjà rapportées de ce créneau
 }
 
-function rSaisie(){
-  const c = S.ctx;
-  let h = barreEtapes() + `<h1>Saisie des compteurs</h1>
-    <p class="sub">Index de fin de chaque pompe que vous avez servie. Laissez vide une pompe que vous n'avez pas tenue.</p>
-    <div class="card"><div class="grille2">
-      <div><label>Jour</label><div class="seg" id="seg-date">
-        <button data-v="${c.aujourd_hui}" class="${S.date===c.aujourd_hui?'on':''}">Aujourd'hui</button>
-        <button data-v="${hier(c.aujourd_hui)}" class="${S.date!==c.aujourd_hui?'on':''}">Hier</button></div></div>
-      <div><label>Période</label><div class="seg" id="seg-per">
-        <button data-v="Matin" class="${S.periode==='Matin'?'on':''}">Matin</button>
-        <button data-v="Apres-midi" class="${S.periode==='Apres-midi'?'on':''}">Après-midi</button></div></div>
-    </div></div>`;
-  for(const p of c.produits){
-    h += `<div class="produit">${esc(p.nom)} · ${nf(p.prix_gallon,2)} G/gal</div>`;
-    for(const q of p.pompes){
-      const s = S.saisie[q.id] || {}, err = S.erreurs[q.id];
-      if(q.deja_rapportee){
-        h += `<div class="pompe prise"><div class="tete"><span class="nom">${esc(q.nom)}</span>
-          <span class="calc">déjà rapportée par ${esc(q.deja_rapportee.moi ? 'vous' : q.deja_rapportee.par)}</span></div></div>`;
-        continue;
-      }
-      const connu = q.index_precedent != null;
-      h += `<div class="pompe ${err?'erreur':''}" id="pm-${q.id}"><div class="tete">
-          <span class="nom">${esc(q.nom)}</span><span class="calc" id="calc-${q.id}"></span></div>
-        <div class="grille2">
-          <div><label>Index début</label><input class="num" inputmode="decimal" data-p="${q.id}" data-k="avant"
-            value="${connu ? q.index_precedent : esc(s.avant||'')}" ${connu?'readonly':''} placeholder="0.000"></div>
-          <div><label>Index fin</label><input class="num" inputmode="decimal" data-p="${q.id}" data-k="apres"
-            value="${esc(s.apres||'')}" placeholder="0.000"></div>
-        </div>
-        ${connu ? `<div class="src">Début repris du ${esc(q.index_precedent_source)}</div>` : '<div class="src">Aucun index précédent : saisissez aussi l\'index de début.</div>'}
-        ${err ? `<div class="msg">${esc(err)}</div>` : ''}</div>`;
-    }
-  }
-  $('app').innerHTML = h;
-  document.querySelectorAll('#seg-date button,#seg-per button').forEach(b => b.onclick = async () => {
-    if(b.parentElement.id === 'seg-date') S.date = b.dataset.v; else S.periode = b.dataset.v;
-    S.saisie = {}; S.erreurs = {};
-    await chargerContexte();
-  });
-  document.querySelectorAll('input[data-p]').forEach(i => i.oninput = () => {
-    (S.saisie[i.dataset.p] ||= {})[i.dataset.k] = i.value;
-    delete S.erreurs[i.dataset.p];
-    majSaisie();
-  });
-  majSaisie();
+// 3. Carburant
+function rProduit(){
+  sansBarre();
+  const cls = n => /diesel/i.test(n) ? 'die' : (/gaz|essence/i.test(n) ? 'gaz' : '');
+  $('app').innerHTML = entete() + `
+    <h1>Quel carburant ?</h1>
+    <p class="sub">Choisissez le carburant de vos pompes.</p>
+    <div class="choix">${S.ctx.produits.map(p => {
+      const libres = p.pompes.filter(q => !q.deja_rapportee).length;
+      return `<button class="gros ${cls(p.nom)} ${S.produitId===p.id?'on':''}" onclick="choisirProduit(${p.id})" ${libres?'':'disabled'}>
+        <span class="ico">⛽</span><span>${esc(p.nom)}<small>${libres ? `${p.pompes.length} pompe${p.pompes.length>1?'s':''} · ${nf(p.prix_gallon,2)} G/gal`
+          : 'Toutes les pompes sont déjà rapportées'}</small></span></button>`;
+    }).join('')}</div>`;
+}
+function choisirProduit(id){
+  if(id !== S.produitId){ S.choisies = []; S.index = {}; S.erreurs = {}; }
+  S.produitId = id; aller('pompes');
 }
 
-function majSaisie(){
-  for(const p of S.ctx.produits) for(const q of p.pompes){
-    const el = $('calc-' + q.id); if(!el) continue;
-    const s = S.saisie[q.id] || {};
-    const av = q.index_precedent != null ? q.index_precedent : num(s.avant), ap = num(s.apres);
-    if(ap == null || av == null){ el.textContent = ''; continue; }
-    const g = ap - av;
-    el.innerHTML = g < 0 ? '<span style="color:var(--err)">fin &lt; début</span>'
-      : `${nf(g,3)} gal<br>${G(g * p.prix_gallon)}`;
-  }
-  const l = pompesSaisies();
-  const ok = l.length > 0 && l.every(x => x.avant != null && x.gallons >= 0);
-  const tot = l.reduce((a,x)=>a+(x.montant||0),0);
-  barre(`${l.length} pompe(s) · attendu<b>${G(tot)}</b>`, 'Billetterie →',
-        ()=>{ S.etape = 'billetterie'; rendre(); }, ok);
+// 4. Pompes
+function rPompes(){
+  const p = produit();
+  $('app').innerHTML = entete() + `
+    <h1>Quelles pompes ?</h1>
+    <p class="sub">Touchez chaque pompe que vous avez tenue.</p>
+    <div class="choix">${p.pompes.map(q => {
+      const on = S.choisies.includes(q.id), prise = q.deja_rapportee;
+      return `<button class="gros ${on?'on':''} ${S.erreurs[q.id]?'erreur':''}" onclick="basculerPompe(${q.id})" ${prise?'disabled':''}>
+        <span>${esc(q.nom)}<small>${prise ? 'Déjà rapportée par ' + esc(prise.moi ? 'vous' : prise.par)
+          : (q.index_precedent != null ? 'Dernier index : ' + nf(q.index_precedent,3) : 'Aucun index précédent')}</small></span>
+        <span class="coche">✓</span></button>`;
+    }).join('')}</div>`;
+  const n = S.choisies.length;
+  barre(n ? `<b>${n} pompe${n>1?'s':''}</b>choisie${n>1?'s':''}` : 'Aucune pompe choisie', 'Continuer',
+        ()=>{ S.pos = 0; aller('index'); }, n > 0);
+}
+function basculerPompe(id){
+  const p = produit();
+  S.choisies = S.choisies.includes(id) ? S.choisies.filter(x => x !== id) : [...S.choisies, id];
+  S.choisies.sort((a,b) => p.pompes.findIndex(q=>q.id===a) - p.pompes.findIndex(q=>q.id===b));
+  rPompes();
 }
 
-function hier(iso){ const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); }
+// 5. Index — une pompe par écran
+function valeurs(id){
+  const q = pompeCtx(id), s = S.index[id] || {};
+  const av = q.index_precedent != null ? q.index_precedent : num(s.avant);
+  const ap = num(s.apres);
+  return {q, av, ap, g: av != null && ap != null ? ap - av : null};
+}
+function rIndex(){
+  const id = S.choisies[S.pos], {q} = valeurs(id), s = S.index[id] || {}, connu = q.index_precedent != null;
+  const dernier = S.pos === S.choisies.length - 1;
+  $('app').innerHTML = entete() + `
+    <p class="sub" style="margin:0">Pompe ${S.pos+1} sur ${S.choisies.length}</p>
+    <h1 class="pompe-titre">${esc(q.nom)}</h1>
+    ${S.erreurs[id] ? `<div class="alerte err" style="margin-top:12px">${esc(S.erreurs[id])}</div>` : ''}
+    <div class="bloc-index"><div class="lib">Index de début</div>
+      ${connu ? `<div class="val">${nf(q.index_precedent,3)}</div><div class="src">Repris du ${esc(q.index_precedent_source)}</div>`
+              : `<input class="grand" id="i-avant" inputmode="decimal" value="${esc(s.avant||'')}" placeholder="0">
+                 <div class="src">Pas d'index précédent : lisez aussi l'index de début.</div>`}</div>
+    <div class="bloc-index"><div class="lib">Index de fin (lu sur la pompe)</div>
+      <input class="grand" id="i-apres" inputmode="decimal" value="${esc(s.apres||'')}" placeholder="0">
+      <div id="i-calc"></div></div>`;
+  const maj = () => {
+    const v = valeurs(id), el = $('i-calc');
+    let ok = v.av != null && v.ap != null && v.g >= 0;
+    if(v.g == null) el.innerHTML = '';
+    else if(v.g < 0) el.innerHTML = `<div class="msg-err">L'index de fin doit être plus grand que l'index de début.</div>`;
+    else el.innerHTML = `<div class="calcul"><span>${nf(v.g,3)} gal</span><span>${G(v.g * produit().prix_gallon)}</span></div>`;
+    barre(v.g != null && v.g >= 0 ? `<b>${nf(v.g,3)} gal</b>vendus` : '', dernier ? 'Compter l\'argent' : 'Pompe suivante',
+      ()=>{ delete S.erreurs[id]; if(dernier) aller('billetterie'); else { S.pos++; rendre(); } }, ok);
+  };
+  for(const k of ['avant','apres']){
+    const el = $('i-' + k); if(!el) continue;
+    el.oninput = () => { (S.index[id] ||= {})[k] = el.value; maj(); };
+    el.onkeydown = e => { if(e.key === 'Enter' && !$('barre-btn').disabled) $('barre-btn').click(); };
+  }
+  maj();
+  ($('i-avant') && !s.avant ? $('i-avant') : $('i-apres')).focus();
+}
 
+// 6. Billetterie
 function totalCompte(){
   let t = 0;
   for(const c of S.ctx.coupures){ const b = S.billets[c] || {}; t += c * (ent(b.liasses) * S.ctx.taille_liasse + ent(b.billets)); }
   return t + (num(S.monnaie) || 0);
 }
-
 function rBilletterie(){
   const c = S.ctx;
-  let rows = '';
-  for(const k of c.coupures){
-    const b = S.billets[k] || {};
-    rows += `<tr><td><b>${nf(k)} G</b></td>
-      <td><input inputmode="numeric" data-c="${k}" data-k="liasses" value="${esc(b.liasses||'')}" placeholder="0"></td>
-      <td><input inputmode="numeric" data-c="${k}" data-k="billets" value="${esc(b.billets||'')}" placeholder="0"></td>
-      <td class="r num" id="st-${k}"></td></tr>`;
-  }
-  $('app').innerHTML = barreEtapes() + `<h1>Billetterie</h1>
-    <p class="sub">Comptez l'argent par coupure. Une liasse = ${c.taille_liasse} billets.</p>
-    <div class="card"><table><thead><tr><th>Coupure</th><th>Liasses</th><th>Billets</th><th class="r">Montant</th></tr></thead>
-      <tbody>${rows}</tbody></table>
-      <label for="b-monnaie">Monnaie (pièces), en gourdes</label>
-      <input id="b-monnaie" class="num" inputmode="decimal" value="${esc(S.monnaie)}" placeholder="0">
-      <div class="total"><span>Total compté</span><span class="v" id="b-total"></span></div></div>
-    <button class="btn sec" onclick="S.etape='saisie';rendre()">← Retour aux compteurs</button>`;
+  $('app').innerHTML = entete() + `<h1>Comptez l'argent</h1>
+    <p class="sub">Pour chaque billet, le nombre de liasses (paquets de ${c.taille_liasse}) et de billets en plus.</p>
+    <div class="card">${c.coupures.map(k => { const b = S.billets[k] || {}; return `
+      <div class="billet"><div class="coup">${nf(k)} G<small id="st-${k}"></small></div>
+        <div><label>Liasses</label><input inputmode="numeric" data-c="${k}" data-k="liasses" value="${esc(b.liasses||'')}" placeholder="0"></div>
+        <div><label>Billets</label><input inputmode="numeric" data-c="${k}" data-k="billets" value="${esc(b.billets||'')}" placeholder="0"></div>
+      </div>`; }).join('')}
+      <label for="b-monnaie" style="margin-top:14px">Monnaie (pièces), en gourdes</label>
+      <input id="b-monnaie" inputmode="decimal" value="${esc(S.monnaie)}" placeholder="0"
+        style="font-family:var(--mono);font-size:22px;text-align:center"></div>`;
   document.querySelectorAll('input[data-c]').forEach(i => i.oninput = () => {
-    (S.billets[i.dataset.c] ||= {})[i.dataset.k] = i.value.replace(/\D/g,''); majBillets(); });
+    i.value = i.value.replace(/\D/g,''); (S.billets[i.dataset.c] ||= {})[i.dataset.k] = i.value; majBillets(); });
   $('b-monnaie').oninput = e => { S.monnaie = e.target.value; majBillets(); };
   majBillets();
 }
-
 function majBillets(){
   for(const k of S.ctx.coupures){
     const b = S.billets[k] || {}, n = ent(b.liasses) * S.ctx.taille_liasse + ent(b.billets);
     $('st-' + k).textContent = n ? G(n * k) : '';
   }
-  const t = totalCompte();
-  $('b-total').textContent = G(t);
-  barre(`Total compté<b>${G(t)}</b>`, 'Récapitulatif →', ()=>{ S.etape = 'recap'; rendre(); });
+  barre(`Total compté<b>${G(totalCompte())}</b>`, 'Voir le résumé', ()=>aller('recap'));
 }
 
+// 7. Confirmation
+function lignes(){
+  return S.choisies.map(id => { const v = valeurs(id); return {...v, montant: v.g * produit().prix_gallon}; });
+}
 function rRecap(){
-  const l = pompesSaisies(), att = l.reduce((a,x)=>a+x.montant,0), cpt = totalCompte(), ec = cpt - att;
+  const l = lignes(), att = l.reduce((a,x)=>a+x.montant,0), cpt = totalCompte(), ec = cpt - att;
   const cls = Math.abs(ec) < 1 ? 'ok' : (ec < 0 ? 'neg' : 'pos');
-  const txt = Math.abs(ec) < 1 ? 'Caisse juste' : (ec < 0 ? 'Manquant' : 'Surplus');
-  $('app').innerHTML = barreEtapes() + `<h1>Confirmation</h1>
-    <p class="sub">${per(S.periode)} du ${new Date(S.date+'T12:00:00').toLocaleDateString('fr-FR')} — vérifiez avant d'envoyer.</p>
-    <div class="card"><table><thead><tr><th>Pompe</th><th class="r">Début → Fin</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead><tbody>
-      ${l.map(x=>`<tr><td>${esc(x.pompe.nom)}<br><small style="color:var(--muted)">${esc(x.produit.nom)}</small></td>
-        <td class="r num">${nf(x.avant,3)}<br>${nf(x.apres,3)}</td><td class="r num">${nf(x.gallons,3)}</td><td class="r num">${G(x.montant)}</td></tr>`).join('')}
+  const txt = Math.abs(ec) < 1 ? 'Caisse juste' : (ec < 0 ? 'Il manque' : 'En plus');
+  $('app').innerHTML = entete() + `<h1>Vérifiez et envoyez</h1>
+    <p class="sub">${per(S.periode)}, ${esc(jourTxt(S.date))} · ${esc(produit().nom)}</p>
+    <div class="card"><table><thead><tr><th>Pompe</th><th class="r">Début → Fin</th><th class="r">Gallons</th></tr></thead><tbody>
+      ${l.map(x=>`<tr><td><b>${esc(x.q.nom)}</b></td><td class="r num">${nf(x.av,3)}<br>${nf(x.ap,3)}</td>
+        <td class="r num">${nf(x.g,3)}</td></tr>`).join('')}
     </tbody></table>
     <div class="total"><span>Ventes attendues</span><span class="v">${G(att)}</span></div>
     <div class="total" style="padding-top:0"><span>Argent compté</span><span class="v">${G(cpt)}</span></div>
-    <div class="ecart ${cls}"><span>${txt}</span><span>${ec>=0?'+':''}${G(ec)}</span></div>
-    <label for="r-note">Note pour le superviseur (facultatif)</label>
-    <textarea id="r-note" rows="3" maxlength="500" placeholder="Ex. : client parti sans payer, billet abîmé…">${esc(S.note)}</textarea></div>
-    <div class="ligne-btns"><button class="btn sec" onclick="S.etape='saisie';rendre()">Modifier les index</button>
-      <button class="btn sec" onclick="S.etape='billetterie';rendre()">Modifier l'argent</button></div>`;
+    <div class="ecart ${cls}"><span>${txt}</span><span>${ec>0?'+':''}${G(ec)}</span></div>
+    <label for="r-note">Un mot pour le superviseur ? (facultatif)</label>
+    <textarea id="r-note" rows="3" maxlength="500" placeholder="Ex. : client parti sans payer…">${esc(S.note)}</textarea></div>`;
   $('r-note').oninput = e => S.note = e.target.value;
-  barre(`Écart<b>${ec>=0?'+':''}${G(ec)}</b>`, 'Soumettre le rapport', soumettre);
+  barre(`Écart<b>${ec>0?'+':''}${G(ec)}</b>`, 'Envoyer', soumettre);
 }
 
 async function soumettre(){
   const b = $('barre-btn'); b.disabled = true; b.textContent = 'Envoi…';
-  const l = pompesSaisies();
   try{
-    const r = await api('POST','/api/pompiste/rapports',{
+    S.dernier = await api('POST','/api/pompiste/rapports',{
       date:S.date, periode:S.periode, charte_acceptee:S.charte,
-      lignes: l.map(x=>({pompe_id:x.pompe.id, metter_avant:x.avant, metter_apres:x.apres})),
+      lignes: lignes().map(x=>({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap})),
       billetterie: S.ctx.coupures.map(c=>({coupure:c, liasses:ent(S.billets[c]?.liasses), billets:ent(S.billets[c]?.billets)}))
                      .filter(x=>x.liasses||x.billets),
       monnaie: num(S.monnaie) || 0, note: S.note || null});
-    S.dernier = r; S.etape = 'fin';
-    S.saisie = {}; S.billets = {}; S.monnaie = ''; S.note = ''; S.erreurs = {};
-    rendre();
+    aller('fin');
   }catch(e){
     if(e.status === 422 && e.detail?.erreurs){
-      // Index invalide : retour à la saisie, pompes fautives signalées
+      // Index invalide : retour à l'écran de la première pompe en erreur
       S.erreurs = {}; for(const x of e.detail.erreurs) S.erreurs[x.pompe_id] = x.message;
-      S.etape = 'saisie'; await chargerContexte();
-      $('app').insertAdjacentHTML('afterbegin', `<div class="alerte err">Index invalide : corrigez les pompes en rouge.</div>`);
+      const premiere = S.choisies.findIndex(id => S.erreurs[id]);
+      await chargerContexte();
+      S.pos = Math.max(0, premiere); aller('index');
       return;
     }
     if(e.status === 401) return ecranConnexion('Session expirée — reconnectez-vous.');
-    b.disabled = false; b.textContent = 'Soumettre le rapport';
+    b.disabled = false; b.textContent = 'Envoyer';
     $('app').insertAdjacentHTML('afterbegin', `<div class="alerte err">${esc(e.message)}</div>`);
     window.scrollTo(0,0);
   }
 }
 
+// 8. Envoyé
 function rFin(){
   const r = S.dernier;
-  $('barre').classList.add('cache');
-  $('app').innerHTML = `<div class="alerte ok">Rapport envoyé. Il attend la confirmation du superviseur.</div>
-    <div class="card"><h2 style="margin-top:0">${per(r.periode)} du ${new Date(r.date+'T12:00:00').toLocaleDateString('fr-FR')}</h2>
+  sansBarre();
+  $('app').innerHTML = `<div style="text-align:center;font-size:64px;margin-top:10px">✅</div>
+    <h1 style="text-align:center">Rapport envoyé</h1>
+    <p class="sub" style="text-align:center">Le superviseur va le vérifier.</p>
+    <div class="card">
+      <div class="total"><span>${per(r.periode)}</span><span>${esc(jourTxt(r.date))}</span></div>
       <div class="total"><span>Gallons</span><span class="v">${nf(r.total_gallons,3)}</span></div>
       <div class="total"><span>Attendu</span><span class="v">${G(r.montant_attendu)}</span></div>
       <div class="total"><span>Compté</span><span class="v">${G(r.montant_compte)}</span></div>
-      <div class="total"><span>Écart</span><span class="v">${r.ecart>=0?'+':''}${G(r.ecart)}</span></div></div>
-    <button class="btn" onclick="S.charte=false;S.date=null;chargerContexte()">Nouveau rapport</button>
-    <div style="height:10px"></div>
+      <div class="total"><span>Écart</span><span class="v">${r.ecart>0?'+':''}${G(r.ecart)}</span></div></div>
+    <button class="btn" onclick="nouveauRapport()">Faire un autre rapport</button>
+    <div style="height:12px"></div>
     <button class="btn sec" onclick="deconnexion()">Me déconnecter</button>
-    ${historique()}`;
+    <h2>Mes derniers rapports</h2><div class="card" id="hist"></div>`;
   chargerHistorique();
 }
+function nouveauRapport(){
+  const charte = S.charte; reinit(); S.charte = charte;
+  S.etape = 'periode'; chargerContexte();
+}
 
-function historique(){ return `<h2>Mes derniers rapports</h2><div class="card" id="hist"><p class="sub" style="margin:0">Chargement…</p></div>`; }
 async function chargerHistorique(){
   try{
     const rs = await api('GET','/api/pompiste/rapports');
     const lib = {SOUMIS:'En attente', CONFIRME:'Confirmé', REJETE:'Refusé'};
-    $('hist').innerHTML = rs.length ? rs.map(r=>`<div class="hist">
+    $('hist').innerHTML = rs.length ? rs.slice(0,8).map(r=>`<div class="hist">
       <div style="display:flex;justify-content:space-between;gap:8px"><b>${per(r.periode)} · ${new Date(r.date+'T12:00:00').toLocaleDateString('fr-FR')}</b>
         <span class="badge ${r.statut}">${lib[r.statut]}</span></div>
-      <div style="font-size:13px;color:var(--muted)">${nf(r.total_gallons,3)} gal · écart ${r.ecart>=0?'+':''}${G(r.ecart)}</div>
+      <div style="font-size:14px;color:var(--muted)">${esc([...new Set(r.lignes.map(l=>l.produit_nom))].join(', '))} · ${nf(r.total_gallons,3)} gal · écart ${r.ecart>0?'+':''}${G(r.ecart)}</div>
       ${r.commentaire_superviseur ? `<div class="com"><b>${esc(r.traite_par_nom||'Superviseur')} :</b> ${esc(r.commentaire_superviseur)}</div>` : ''}
-      ${r.statut==='REJETE' ? '<div style="font-size:13px;margin-top:6px">Corrigez et soumettez un nouveau rapport pour ce créneau.</div>' : ''}
-    </div>`).join('') : '<p class="sub" style="margin:0">Aucun rapport pour l\'instant.</p>';
+      ${r.statut==='REJETE' ? '<div style="font-size:14px;margin-top:6px;font-weight:600">Refaites ce rapport après correction.</div>' : ''}
+    </div>`).join('') : '<span class="sub">Aucun rapport pour l\'instant.</span>';
   }catch(e){ const h = $('hist'); if(h) h.innerHTML = ''; }
 }
 
