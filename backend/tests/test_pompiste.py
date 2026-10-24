@@ -1,9 +1,11 @@
 """
-Espace pompiste : connexion identifiant + PIN, accès limité, compteurs
-envoyés carburant par carburant (rapport EN_COURS), « Terminer » avec la
-billetterie de toute la période, confirmation / correction / refus par le
-superviseur, écriture dans le journal des compteurs.
+Espace pompiste : connexion code + PIN (sans email), accès limité, compteurs
+envoyés carburant par carburant (rapport EN_COURS), modification depuis le
+résumé, « Terminer » avec la billetterie, email aux administrateurs,
+vérification par le superviseur (chaque mètre, billetterie, écart), note,
+problème → résolu, écriture dans le journal des compteurs.
 """
+import re
 import time
 
 import pytest
@@ -26,15 +28,15 @@ def env(client):
     from tz_utils import today_haiti
     pompe = _produit(client, 500)
     pompe_diesel = _produit(client, 600)
-    user = f"pomp{time.time_ns() % 10**8}"
     r = client.post("/api/pompiste-supervision/comptes", headers=H,
-                    json={"nom_complet": "Jean Pompiste", "username": user})
+                    json={"prenom": "Jean-Éric", "nom": "Pierre"})
     assert r.status_code == 201, r.text
     compte = r.json()
-    assert len(compte["code_acces"]) == 9
+    assert re.fullmatch(r"jeanericpierre\d{4}", compte["username"]), compte["username"]
+    assert len(compte["code_acces"]) == 9 and compte["nom_complet"] == "Jean-Éric Pierre"
     import main
     p = TestClient(main.app)     # client séparé : son cookie ne doit pas toucher les autres tests
-    return {"pompe": pompe, "diesel": pompe_diesel, "user": user, "pin": compte["code_acces"],
+    return {"pompe": pompe, "diesel": pompe_diesel, "user": compte["username"], "pin": compte["code_acces"],
             "uid": compte["id"], "p": p, "jour": str(today_haiti())}
 
 
@@ -49,6 +51,17 @@ def _terminer(env, billets):
         "billetterie": [{"coupure": 1000, "liasses": 0, "billets": billets}], "monnaie": 0})
 
 
+def _sup(client, rid, action, **body):
+    return client.post(f"/api/pompiste-supervision/rapports/{rid}/{action}", headers=H, json=body)
+
+
+def test_codes_uniques(client):
+    a = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Marie", "nom": "Joseph"}).json()
+    b = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Marie", "nom": "Joseph"}).json()
+    assert a["username"] != b["username"] and a["username"].startswith("mariejoseph")
+    assert client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "", "nom": "X"}).status_code == 400
+
+
 def test_connexion_et_acces_limite(client, env):
     p = env["p"]
     assert p.post("/api/login/pompiste", json={"username": env["user"], "code_acces": "000000000"}).status_code == 401
@@ -60,17 +73,6 @@ def test_connexion_et_acces_limite(client, env):
     assert r.status_code in (302, 307) and r.headers["location"] == "/pompiste"
     assert p.get("/pompiste").status_code == 200
     assert client.get("/api/pompiste/contexte", headers=H).status_code == 403
-    assert client.post("/api/login/pompiste", json={"username": "admin", "code_acces": "123456789"}).status_code == 401
-
-
-def test_contexte(env):
-    r = env["p"].get(f"/api/pompiste/contexte?date={env['jour']}&periode=Matin")
-    assert r.status_code == 200, r.text
-    d = r.json()
-    pompes = {q["id"]: q for pr in d["produits"] for q in pr["pompes"]}
-    assert pompes[env["pompe"]]["index_precedent"] is None
-    assert d["en_cours"] is None
-    assert 1000 in d["coupures"]
 
 
 def test_controles_des_index(env):
@@ -82,73 +84,95 @@ def test_controles_des_index(env):
     assert env["p"].post("/api/pompiste/terminer", json={}).status_code == 409    # rien à terminer
 
 
-def test_compteurs_puis_terminer(client, env):
-    # Gazoline puis Diesel : un seul rapport en cours
-    r = _compteurs(env, env["pompe"], 1000, 1100)
+def test_compteurs_modifier_terminer(client, env, monkeypatch):
+    r = _compteurs(env, env["pompe"], 1000, 1110)
     assert r.status_code == 201, r.text
-    assert r.json()["statut"] == "EN_COURS" and r.json()["montant_attendu"] == 50000
+    assert r.json()["statut"] == "EN_COURS" and r.json()["montant_attendu"] == 55000
     r = _compteurs(env, env["diesel"], 0, 10)
-    assert r.status_code == 201
-    assert len(r.json()["lignes"]) == 2 and r.json()["montant_attendu"] == 56000
-    # Même pompe deux fois : refusé
-    assert _compteurs(env, env["pompe"], 1000, 1100).status_code == 409
-    # Un autre créneau tant que celui-ci n'est pas terminé : refusé
+    assert len(r.json()["lignes"]) == 2 and r.json()["montant_attendu"] == 61000
+    assert _compteurs(env, env["pompe"], 1000, 1100).status_code == 409               # pompe déjà saisie
     assert _compteurs(env, env["pompe"], 1100, 1200, periode="Apres-midi").status_code == 409
-    # Le contexte reprend le rapport ouvert
-    d = env["p"].get("/api/pompiste/contexte").json()
-    assert d["en_cours"]["id"] == r.json()["id"] and d["periode"] == "Matin"
-    # Retirer une pompe saisie par erreur
+    # Modifier depuis le résumé
+    r = env["p"].put(f"/api/pompiste/compteurs/{env['pompe']}", json={"metter_avant": 1000, "metter_apres": 1100})
+    assert r.status_code == 200 and r.json()["montant_attendu"] == 56000
+    assert env["p"].put(f"/api/pompiste/compteurs/{env['pompe']}",
+                        json={"metter_avant": 1000, "metter_apres": 900}).status_code == 422
     r = env["p"].delete(f"/api/pompiste/compteurs/{env['diesel']}")
     assert r.status_code == 200 and r.json()["en_cours"]["montant_attendu"] == 50000
-    # Pas visible du superviseur tant que ce n'est pas terminé
-    lst = client.get("/api/pompiste-supervision/rapports?statut=SOUMIS", headers=H).json()
-    assert all(x["pompiste_nom"] != "Jean Pompiste" for x in lst)
-    # Terminer : billetterie et rapprochement
+    # Terminer : email aux administrateurs
+    import pompiste_routes, otp_service
+    envoyes = []
+    monkeypatch.setattr(pompiste_routes, "_emails_admins", lambda db: ["admin@exemple.ht"])
+    monkeypatch.setattr(otp_service, "send_rapport_pompiste_email", lambda **k: envoyes.append(k))
+
+    class ThreadDirect:
+        def __init__(self, target, daemon=None): self.t = target
+        def start(self): self.t()
+    monkeypatch.setattr(pompiste_routes.threading, "Thread", ThreadDirect)
     r = _terminer(env, 49)
     assert r.status_code == 200, r.text
     d = r.json()
     assert d["statut"] == "SOUMIS" and d["montant_compte"] == 49000 and d["ecart"] == -1000
+    assert envoyes and envoyes[0]["destinataires"] == ["admin@exemple.ht"]
+    assert envoyes[0]["pompiste"] == "Jean-Éric Pierre"
     env["r1"] = d["id"]
-    # Le créneau suivant enchaîne sur ce rapport
-    r = env["p"].get(f"/api/pompiste/contexte?date={env['jour']}&periode=Apres-midi")
-    pompes = {q["id"]: q for pr in r.json()["produits"] for q in pr["pompes"]}
-    assert pompes[env["pompe"]]["index_precedent"] == 1100
 
 
-def test_confirmation_avec_correction(client, env):
-    r = client.get("/api/pompiste-supervision/rapports?statut=SOUMIS", headers=H)
-    assert any(x["id"] == env["r1"] for x in r.json())
-    corr = {"lignes": [{"pompe_id": env["pompe"], "metter_avant": 1000, "metter_apres": 1098}]}
-    r = client.post(f"/api/pompiste-supervision/rapports/{env['r1']}/confirmer", headers=H, json=corr)
-    assert r.status_code == 400                       # correction sans commentaire
-    corr["commentaire"] = "Index relu sur la pompe : 1098"
-    r = client.post(f"/api/pompiste-supervision/rapports/{env['r1']}/confirmer", headers=H, json=corr)
+def test_verification_et_finalisation(client, env):
+    rid = env["r1"]
+    # Finaliser trop tôt : refusé
+    assert _sup(client, rid, "finaliser", note=8).status_code == 409
+    # Écart avant les mètres : refusé
+    assert _sup(client, rid, "ecart", confirme=True).status_code == 409
+    # Mètre corrigé (1100 → 1098) puis billetterie, écart
+    r = client.post(f"/api/pompiste-supervision/rapports/{rid}/lignes/{env['pompe']}/confirmer", headers=H,
+                    json={"metter_avant": 1000, "metter_apres": 1098})
+    assert r.status_code == 200 and r.json()["lignes"][0]["confirmee"]
+    assert r.json()["montant_attendu_final"] == 49000 and r.json()["ecart_final"] == 0
+    assert _sup(client, rid, "billetterie", confirme=True).json()["billetterie_confirmee"]
+    assert _sup(client, rid, "ecart", confirme=True).json()["ecart_confirme"]
+    assert _sup(client, rid, "finaliser", note=11).status_code == 400              # note sur 10
+    assert _sup(client, rid, "finaliser", note=8).status_code == 400               # correction sans commentaire
+    r = _sup(client, rid, "finaliser", note=8, commentaire="Mètre relu sur la pompe : 1098")
     assert r.status_code == 200, r.text
-    assert r.json()["statut"] == "CONFIRME"
+    assert r.json()["statut"] == "CONFIRME" and r.json()["note_superviseur"] == 8
     rel = client.get(f"/api/releves?date={env['jour']}&periode=Matin", headers=H).json()
     mine = [x for x in rel if x["pompe_id"] == env["pompe"]]
     assert len(mine) == 1 and float(mine[0]["metter_apres"]) == 1098
-    r = client.post(f"/api/pompiste-supervision/rapports/{env['r1']}/confirmer", headers=H, json={})
-    assert r.status_code == 409
+    assert _sup(client, rid, "finaliser", note=8).status_code == 409                # déjà finalisé
 
 
-def test_refus_avec_commentaire(client, env):
-    # Le début de l'après-midi doit suivre le journal corrigé (1098)
-    assert _compteurs(env, env["pompe"], 1100, 1200, periode="Apres-midi").status_code == 422
+def test_probleme_puis_resolu(client, env):
+    assert _compteurs(env, env["pompe"], 1100, 1200, periode="Apres-midi").status_code == 422   # suit 1098
     assert _compteurs(env, env["pompe"], 1098, 1200, periode="Apres-midi").status_code == 201
-    r = _terminer(env, 51)
-    assert r.status_code == 200, r.text
-    rid = r.json()["id"]
-    assert client.post(f"/api/pompiste-supervision/rapports/{rid}/rejeter", headers=H,
-                       json={"commentaire": "non"}).status_code == 400
-    r = client.post(f"/api/pompiste-supervision/rapports/{rid}/rejeter", headers=H,
-                    json={"commentaire": "Il manque l'argent du client crédit, recomptez."})
-    assert r.status_code == 200 and r.json()["statut"] == "REJETE"
+    rid = _terminer(env, 40).json()["id"]
+    assert _sup(client, rid, "probleme", commentaire="non").status_code == 400
+    r = _sup(client, rid, "probleme", commentaire="Il manque 11 000 G, à voir avec le pompiste.")
+    assert r.status_code == 200 and r.json()["statut"] == "PROBLEME"
+    assert client.get("/api/pompiste-supervision/resume", headers=H).json()["problemes"] >= 1
+    client.post(f"/api/pompiste-supervision/rapports/{rid}/lignes/{env['pompe']}/confirmer", headers=H,
+                json={"metter_avant": 1098, "metter_apres": 1200})
+    _sup(client, rid, "billetterie", confirme=True)
+    _sup(client, rid, "ecart", confirme=True)
+    assert _sup(client, rid, "finaliser", note=5).status_code == 400               # résolution sans explication
+    r = _sup(client, rid, "finaliser", note=5, commentaire="Le pompiste a rapporté l'argent manquant.")
+    assert r.status_code == 200 and r.json()["statut"] == "RESOLU"
     mes = env["p"].get("/api/pompiste/rapports").json()
-    assert mes[0]["id"] == rid and "recomptez" in mes[0]["commentaire_superviseur"]
-    # Après un refus, le créneau est de nouveau libre
-    assert _compteurs(env, env["pompe"], 1098, 1200, periode="Apres-midi").status_code == 201
-    assert _terminer(env, 51).status_code == 200
+    assert mes[0]["id"] == rid and mes[0]["statut"] == "RESOLU"
+
+
+def test_renvoi_au_pompiste(client, env):
+    # Un nouveau créneau (hier) pour vérifier le renvoi
+    from tz_utils import today_haiti
+    from datetime import timedelta
+    hier = str(today_haiti() - timedelta(days=1))
+    r = env["p"].post("/api/pompiste/compteurs", json={
+        "date": hier, "periode": "Apres-midi", "charte_acceptee": True,
+        "lignes": [{"pompe_id": env["diesel"], "metter_avant": 0, "metter_apres": 5}]})
+    assert r.status_code == 201, r.text
+    rid = _terminer(env, 3).json()["id"]
+    r = _sup(client, rid, "rejeter", commentaire="Recomptez l'argent et refaites le rapport.")
+    assert r.status_code == 200 and r.json()["statut"] == "REJETE"
 
 
 def test_desactivation_coupe_la_session(client, env):

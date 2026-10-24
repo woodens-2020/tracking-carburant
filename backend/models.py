@@ -128,7 +128,10 @@ class RapportPompiste(Base):
     date               = Column(Date, nullable=False)
     periode            = Column(String(20), nullable=False)
     utilisateur_id     = Column(Integer, ForeignKey("utilisateurs.id", ondelete="RESTRICT"), nullable=False)
-    statut             = Column(String(20), nullable=False, default="EN_COURS")  # EN_COURS, SOUMIS, CONFIRME, REJETE
+    statut             = Column(String(20), nullable=False, default="EN_COURS")
+    # EN_COURS (compteurs envoyés) → SOUMIS (« Terminer ») → CONFIRME (finalisé, correct)
+    #                                       ↘ PROBLEME → RESOLU (finalisé après résolution)
+    # REJETE = renvoyé au pompiste, qui refait un rapport.
     charte_acceptee_at = Column(DateTime(timezone=True), nullable=False)
     # [{"coupure": 1000, "liasses": 2, "billets": 13}, ...] + monnaie (pièces)
     billetterie        = Column(JSON, nullable=False, default=list)
@@ -142,15 +145,24 @@ class RapportPompiste(Base):
     traite_par_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     traite_at          = Column(DateTime(timezone=True), nullable=True)
     commentaire_superviseur = Column(String(1000), nullable=True)
+    # Vérification par le superviseur, élément par élément
+    billetterie_confirmee = Column(Boolean, nullable=False, default=False)
+    ecart_confirme        = Column(Boolean, nullable=False, default=False)
+    note_superviseur      = Column(Integer, nullable=True)          # note du rapport, sur 10
+    probleme_commentaire  = Column(String(1000), nullable=True)
+    probleme_at           = Column(DateTime(timezone=True), nullable=True)
+    probleme_par_id       = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
 
     utilisateur = relationship("Utilisateur", foreign_keys=[utilisateur_id])
+    probleme_par = relationship("Utilisateur", foreign_keys=[probleme_par_id])
     traite_par  = relationship("Utilisateur", foreign_keys=[traite_par_id])
     lignes      = relationship("RapportPompisteLigne", back_populates="rapport",
                                cascade="all, delete-orphan", order_by="RapportPompisteLigne.id")
 
     __table_args__ = (
         CheckConstraint("periode IN ('Matin', 'Apres-midi')", name="chk_rpomp_periode"),
-        CheckConstraint("statut IN ('EN_COURS','SOUMIS','CONFIRME','REJETE')", name="chk_rpomp_statut"),
+        CheckConstraint("statut IN ('EN_COURS','SOUMIS','PROBLEME','CONFIRME','RESOLU','REJETE')", name="chk_rpomp_statut"),
+        CheckConstraint("note_superviseur IS NULL OR (note_superviseur BETWEEN 0 AND 10)", name="chk_rpomp_note"),
         Index("idx_rpomp_date", "date"),
         Index("idx_rpomp_statut", "statut"),
         Index("idx_rpomp_user", "utilisateur_id"),
@@ -171,6 +183,8 @@ class RapportPompisteLigne(Base):
     metter_apres        = Column(Numeric(14, 4), nullable=False)
     metter_avant_corrige = Column(Numeric(14, 4), nullable=True)
     metter_apres_corrige = Column(Numeric(14, 4), nullable=True)
+    confirmee            = Column(Boolean, nullable=False, default=False)   # mètre vérifié par le superviseur
+    confirmee_at         = Column(DateTime(timezone=True), nullable=True)
 
     rapport = relationship("RapportPompiste", back_populates="lignes")
     pompe   = relationship("Pompe")

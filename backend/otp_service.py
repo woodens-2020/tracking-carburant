@@ -493,6 +493,36 @@ def send_welcome_email(nom: str, email: str, username: str) -> None:
         raise RuntimeError(f"L'email n'a pas pu être envoyé : {exc}")
 
 
+def send_rapport_pompiste_email(destinataires: list[str], pompiste: str, creneau: str,
+                                gallons: str, attendu: str, compte: str, ecart: str, lien: str) -> None:
+    """Prévient les administrateurs qu'un pompiste a soumis un rapport à vérifier."""
+    if not EMAIL_USER or not EMAIL_PASSWORD:
+        raise RuntimeError("Email non configuré")
+    if not destinataires:
+        return
+    lignes = "".join(
+        f'<tr><td style="padding:6px 0;color:#64748b">{k}</td>'
+        f'<td style="padding:6px 0;text-align:right;font-weight:700">{v}</td></tr>'
+        for k, v in (("Pompiste", pompiste), ("Période", creneau), ("Gallons", gallons),
+                     ("Ventes attendues", attendu), ("Argent compté", compte), ("Écart", ecart)))
+    html = f"""<div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:auto;color:#0f172a">
+      <h2 style="margin:0 0 6px">Rapport pompiste à vérifier</h2>
+      <p style="color:#475569;margin:0 0 16px">{pompiste} vient de soumettre son rapport. Connectez-vous à
+      Konekta pour vérifier les mètres, la billetterie et l'écart, puis finaliser ou corriger le rapport.</p>
+      <table style="width:100%;border-collapse:collapse;border-top:1px solid #e2e8f0">{lignes}</table>
+      <p style="margin:22px 0"><a href="{lien}" style="background:#ea580c;color:#fff;text-decoration:none;
+      padding:12px 20px;border-radius:10px;font-weight:700">Ouvrir les rapports pompistes</a></p>
+      <p style="color:#94a3b8;font-size:12px">{EMAIL_FROM_NAME}</p></div>"""
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"[KONEKTA] Rapport pompiste à vérifier — {pompiste} ({creneau})"
+    msg["From"] = f"{EMAIL_FROM_NAME} <{EMAIL_USER}>"
+    msg["To"] = EMAIL_USER
+    msg.attach(MIMEText(html, "html", "utf-8"))
+    with _smtp_connect() as smtp:
+        smtp.sendmail(EMAIL_USER, destinataires, msg.as_string())
+    log.info("Rapport pompiste signalé à %d administrateur(s)", len(destinataires))
+
+
 # ── Vérification ──────────────────────────────────────────────────────────────
 
 def verify_otp(db: Session, pending_token: str, submitted_code: str) -> Utilisateur:

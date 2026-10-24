@@ -3233,6 +3233,22 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .psp-badge.REJETE{background:rgba(239,68,68,.12);color:var(--red)}
 .psp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 @media (max-width:640px){.psp-kpis{grid-template-columns:1fr 1fr}.psp-tbl input{width:84px}}
+.psp-badge.PROBLEME{background:rgba(239,68,68,.12);color:var(--red)}
+.psp-badge.RESOLU{background:rgba(34,197,94,.12);color:var(--green)}
+.psp-etape{border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-top:10px}
+.psp-etape.fait{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.04)}
+.psp-etape-tete{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.psp-pastille{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;
+  background:var(--border);color:var(--text);flex:none}
+.psp-etape.fait .psp-pastille{background:var(--green);color:#fff}
+.psp-ligne-ok td{background:rgba(34,197,94,.05)}
+.psp-mini{height:30px;padding:0 12px;font-size:12.5px}
+.psp-lien{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font:inherit;font-size:12px}
+.psp-notes{display:flex;gap:6px;flex-wrap:wrap}
+.psp-note{width:38px;height:38px;border-radius:9px;border:1px solid var(--border);background:var(--panel);color:var(--text);
+  font:inherit;font-weight:700;cursor:pointer}
+.psp-note.on{background:var(--orange);border-color:var(--orange);color:#fff}
+.psp-actions .btn:disabled{opacity:.45;cursor:not-allowed}
 </style>
 </head>
 <script src="/vendor/chart.umd.min.js"></script>
@@ -4211,7 +4227,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════ PAGE : SAISIE ══════ -->
     <div id="page-pompistes-rapports" class="page">
       <div class="psp-tabs">
-        <button class="psp-tab on" data-t="attente" onclick="pspOnglet('attente')">À confirmer <span id="psp-nb"></span></button>
+        <button class="psp-tab on" data-t="attente" onclick="pspOnglet('attente')">À vérifier <span id="psp-nb"></span></button>
+        <button class="psp-tab" data-t="problemes" onclick="pspOnglet('problemes')">Problèmes <span id="psp-nb-pb"></span></button>
         <button class="psp-tab" data-t="historique" onclick="pspOnglet('historique')">Historique</button>
         <button class="psp-tab" data-t="comptes" onclick="pspOnglet('comptes')">Comptes pompistes</button>
       </div>
@@ -19089,13 +19106,18 @@ document.addEventListener('DOMContentLoaded',async()=>{
 
 // ══════════════════════════════════════════════
 // RAPPORTS POMPISTES — supervision (voir backend/pompiste_routes.py)
+// Vérification élément par élément : chaque mètre, la billetterie, l'écart ;
+// puis « Finaliser » avec une note sur 10, ou « Signaler un problème » puis
+// « Résolu et finalisé ». La finalisation écrit le journal des compteurs.
 // ══════════════════════════════════════════════
-const PSP = {onglet:'attente', rapports:[], comptes:null, pin:null};
+const PSP = {onglet:'attente', rapports:[], comptes:null, pin:null, saisie:{}};
+const _PSP_LIB = {SOUMIS:'À vérifier', PROBLEME:'Problème', CONFIRME:'Finalisé · correct', RESOLU:'Résolu · finalisé', REJETE:'Renvoyé au pompiste'};
 const _pspPer = p => p === 'Apres-midi' ? 'Après-midi' : p;
 const _pspDate = d => new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', {weekday:'short', day:'2-digit', month:'2-digit'});
 const _pspG = n => Number(n||0).toLocaleString('fr-FR', {maximumFractionDigits:0}) + ' G';
 const _pspN = (n,d=3) => n == null ? '—' : Number(n).toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d});
-const _pspE = n => `<span class="${Math.abs(n)<1?'psp-ok':(n<0?'psp-neg':'psp-pos')}">${n>=0?'+':''}${_pspG(n)}</span>`;
+const _pspE = n => `<span class="${Math.abs(n)<1?'psp-ok':(n<0?'psp-neg':'psp-pos')}">${n>0?'+':''}${_pspG(n)}</span>`;
+const _pspS = id => (PSP.saisie[id] ||= {note:null, com:'', motif:'', motifVisible:false});
 
 async function _pspApi(method, path, body){
   const h = {'Content-Type':'application/json'};
@@ -19113,7 +19135,13 @@ async function _pspApi(method, path, body){
 
 async function pspMajBadge(){
   const b = document.getElementById('psp-nav-badge'); if(!b || !_canAccess('pompistes-rapports')) return;
-  try{ const r = await _pspApi('GET','/resume'); b.textContent = r.a_confirmer; b.style.display = r.a_confirmer ? '' : 'none'; }catch(e){}
+  try{
+    const r = await _pspApi('GET','/resume');
+    b.textContent = r.a_confirmer; b.style.display = r.a_confirmer ? '' : 'none';
+    const n1 = document.getElementById('psp-nb'), n2 = document.getElementById('psp-nb-pb');
+    if(n1) n1.textContent = r.a_verifier ? `(${r.a_verifier})` : '';
+    if(n2) n2.textContent = r.problemes ? `(${r.problemes})` : '';
+  }catch(e){}
 }
 
 function loadPompistesRapports(){ pspOnglet(PSP.onglet); }
@@ -19124,122 +19152,188 @@ async function pspOnglet(t){
   const c = document.getElementById('psp-contenu');
   c.innerHTML = '<div class="psp-muted">Chargement…</div>';
   try{
-    if(t === 'attente'){ PSP.rapports = await _pspApi('GET','/rapports?statut=SOUMIS'); pspRendreAttente(); }
+    if(t === 'attente' || t === 'problemes'){
+      PSP.rapports = await _pspApi('GET', '/rapports?statut=' + (t === 'attente' ? 'SOUMIS' : 'PROBLEME'));
+      pspRendreListe();
+    }
     else if(t === 'historique') await pspHistorique();
     else { PSP.comptes = await _pspApi('GET','/comptes'); pspRendreComptes(); }
   }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
   pspMajBadge();
 }
 
-function pspRendreAttente(){
+function pspRendreListe(){
   const c = document.getElementById('psp-contenu');
-  document.getElementById('psp-nb').textContent = PSP.rapports.length ? `(${PSP.rapports.length})` : '';
   if(!PSP.rapports.length){
-    c.innerHTML = `<div class="psp-card"><b>Aucun rapport en attente.</b>
+    c.innerHTML = `<div class="psp-card"><b>${PSP.onglet === 'attente' ? 'Aucun rapport à vérifier.' : 'Aucun rapport en problème.'}</b>
       <div class="psp-muted" style="margin-top:4px">Les pompistes saisissent leurs compteurs sur <b>${esc(location.origin)}/pompiste</b>.</div></div>`;
     return;
   }
-  c.innerHTML = `<div class="psp-muted" style="margin-bottom:10px">Du plus ancien au plus récent : confirmez le Matin avant l'Après-midi (continuité des compteurs).</div>`
-    + PSP.rapports.map(pspCarte).join('');
+  c.innerHTML = `<div class="psp-muted" style="margin-bottom:10px">Du plus ancien au plus récent : finalisez le Matin avant l'Après-midi (continuité des compteurs).</div>`
+    + PSP.rapports.map(r => `<div id="psp-r-${r.id}">${pspCarte(r)}</div>`).join('');
 }
 
-function _pspBillets(r){
-  const l = (r.billetterie||[]).map(b => `${b.liasses ? b.liasses + ' liasse(s) + ' : ''}${b.billets||0} × ${Number(b.coupure).toLocaleString('fr-FR')} G`);
-  if(r.monnaie) l.push('monnaie ' + _pspG(r.monnaie));
-  return l.length ? l.join(' · ') : 'aucun billet déclaré';
+function _pspMaj(r){
+  const i = PSP.rapports.findIndex(x => x.id === r.id);
+  if(i >= 0) PSP.rapports[i] = r;
+  const el = document.getElementById('psp-r-' + r.id);
+  if(el) el.innerHTML = pspCarte(r);
+}
+
+function _pspEtape(n, titre, fait, contenu){
+  return `<div class="psp-etape ${fait?'fait':''}"><div class="psp-etape-tete"><span class="psp-pastille">${fait?'✓':n}</span><b>${titre}</b></div>${contenu}</div>`;
 }
 
 function pspCarte(r){
+  const s = _pspS(r.id), toutesLignes = r.lignes.every(l => l.confirmee);
   const lignes = r.lignes.map(l => {
-    const prec = l.index_precedent;
-    const rupt = prec != null && Math.abs(prec - l.metter_avant) > 0.001;
+    const prec = l.index_precedent, av = l.metter_avant_corrige ?? l.metter_avant, ap = l.metter_apres_corrige ?? l.metter_apres;
+    const rupt = prec != null && Math.abs(prec - av) > 0.001;
+    const corrige = l.metter_avant_corrige != null;
     const j = l.journal;
-    const diffJ = j && (Math.abs(j.metter_avant - l.metter_avant) > 0.001 || Math.abs(j.metter_apres - l.metter_apres) > 0.001);
-    return `<tr>
+    const diffJ = j && (Math.abs(j.metter_avant - av) > 0.001 || Math.abs(j.metter_apres - ap) > 0.001);
+    return `<tr class="${l.confirmee?'psp-ligne-ok':''}">
       <td><b>${esc(l.pompe_nom)}</b><div class="psp-muted">${esc(l.produit_nom)}</div></td>
       <td class="r">${_pspN(prec)}${rupt ? '<div class="psp-neg" style="font-size:11px">≠ début</div>' : ''}</td>
-      <td class="r"><input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="avant" value="${l.metter_avant}"></td>
-      <td class="r"><input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="apres" value="${l.metter_apres}"></td>
+      <td class="r">${l.confirmee ? _pspN(av) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="avant" value="${av}">`}</td>
+      <td class="r">${l.confirmee ? _pspN(ap) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="apres" value="${ap}">`}</td>
       <td class="r">${_pspN(l.gallons)}</td>
       <td class="r">${_pspG(l.montant)}</td>
-    </tr>${j ? `<tr><td colspan="6"><div class="${diffJ?'psp-warn':'psp-muted'}">${diffJ ? '⚠ ' : ''}Journal déjà saisi par ${esc(j.saisi_par||'l\'administration')} :
-       ${_pspN(j.metter_avant)} → ${_pspN(j.metter_apres)}${diffJ ? ' — la confirmation remplacera ces valeurs.' : ' (identique)'}</div></td></tr>` : ''}`;
+      <td class="r" style="white-space:nowrap">${l.confirmee
+        ? `<span class="psp-ok" style="font-weight:700">✓ Confirmé${corrige?' (corrigé)':''}</span> <button class="psp-lien" onclick="pspLigne(${r.id},${l.pompe_id},false)">reprendre</button>`
+        : `<button class="btn btn-primary psp-mini" onclick="pspLigne(${r.id},${l.pompe_id},true)">Confirmer</button>`}</td>
+    </tr>${corrige ? `<tr><td colspan="7"><div class="psp-muted">Saisi par le pompiste : ${_pspN(l.metter_avant)} → ${_pspN(l.metter_apres)}</div></td></tr>` : ''}
+    ${j ? `<tr><td colspan="7"><div class="${diffJ?'psp-warn':'psp-muted'}">${diffJ ? '⚠ ' : ''}Journal déjà saisi par ${esc(j.saisi_par||'l\'administration')} :
+       ${_pspN(j.metter_avant)} → ${_pspN(j.metter_apres)}${diffJ ? ' — la finalisation remplacera ces valeurs.' : ' (identique)'}</div></td></tr>` : ''}`;
   }).join('');
-  return `<div class="psp-card" id="psp-r-${r.id}">
-    <div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspPer(r.periode)} ${_pspDate(r.date)}</div>
-      <div class="psp-muted">soumis ${new Date(r.soumis_at).toLocaleString('fr-FR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})} · charte acceptée</div></div>
-    <div style="overflow-x:auto"><table class="psp-tbl"><thead><tr><th>Pompe</th><th class="r">Index précédent</th><th class="r">Début</th><th class="r">Fin</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead>
-      <tbody>${lignes}</tbody></table></div>
-    <div class="psp-kpis">
-      <div class="psp-kpi"><span>Ventes attendues</span><b>${_pspG(r.montant_attendu)}</b></div>
-      <div class="psp-kpi"><span>Argent compté</span><b>${_pspG(r.montant_compte)}</b></div>
-      <div class="psp-kpi"><span>Écart</span><b>${_pspE(r.ecart)}</b></div>
-    </div>
-    <div class="psp-muted">Billetterie : ${esc(_pspBillets(r))}</div>
-    ${r.note_pompiste ? `<div class="psp-warn" style="color:var(--text)"><b>Note du pompiste :</b> ${esc(r.note_pompiste)}</div>` : ''}
-    <textarea class="filter-input" id="psp-com-${r.id}" rows="2" style="width:100%;margin-top:10px;height:auto;padding:8px"
-      placeholder="Commentaire (obligatoire pour refuser ou si vous corrigez un index)"></textarea>
-    <input class="filter-input" id="psp-motif-${r.id}" style="width:100%;margin-top:8px;display:none"
-      placeholder="Motif de l'écart de compteur (ex. remise à zéro, panne…)">
-    <div id="psp-msg-${r.id}"></div>
-    <div class="psp-actions">
-      <button class="btn btn-primary" onclick="pspConfirmer(${r.id})">✓ Confirmer</button>
-      <button class="btn btn-danger" onclick="pspRejeter(${r.id})">✕ Refuser</button>
-    </div></div>`;
+  const billets = (r.billetterie||[]).map(b => `<tr><td><b>${Number(b.coupure).toLocaleString('fr-FR')} G</b></td>
+      <td class="r">${b.liasses||0}</td><td class="r">${b.billets||0}</td>
+      <td class="r">${_pspG(b.coupure * ((b.liasses||0) * 100 + (b.billets||0)))}</td></tr>`).join('')
+    + (r.monnaie ? `<tr><td><b>Monnaie</b></td><td></td><td></td><td class="r">${_pspG(r.monnaie)}</td></tr>` : '');
+  const pb = r.statut === 'PROBLEME';
+  const peutFinaliser = toutesLignes && r.billetterie_confirmee && r.ecart_confirme;
+  return `<div class="psp-card">
+    <div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspPer(r.periode)} ${_pspDate(r.date)}
+        <span class="psp-badge ${r.statut}" style="margin-left:6px">${_PSP_LIB[r.statut]}</span></div>
+      <div class="psp-muted">soumis ${r.soumis_at ? new Date(r.soumis_at).toLocaleString('fr-FR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : ''} · charte acceptée</div></div>
+    ${pb ? `<div class="psp-err" style="margin:0 0 10px">Problème signalé par ${esc(r.probleme_par_nom||'')} : ${esc(r.probleme_commentaire||'')}</div>` : ''}
+    ${r.note_pompiste ? `<div class="psp-warn" style="color:var(--text);margin:0 0 10px"><b>Note du pompiste :</b> ${esc(r.note_pompiste)}</div>` : ''}
+
+    ${_pspEtape(1, `Mètres — confirmez chaque pompe (${r.lignes.filter(l=>l.confirmee).length}/${r.lignes.length})`, toutesLignes,
+      `<div style="overflow-x:auto"><table class="psp-tbl"><thead><tr><th>Pompe</th><th class="r">Index précédent</th><th class="r">Début</th><th class="r">Fin</th>
+        <th class="r">Gallons</th><th class="r">Montant</th><th></th></tr></thead><tbody>${lignes}</tbody></table></div>
+       <div class="psp-muted" style="margin-top:4px">Modifiez un index avant de confirmer pour le corriger ; la saisie du pompiste reste conservée.</div>`)}
+
+    ${_pspEtape(2, 'Billetterie', r.billetterie_confirmee,
+      `<div style="overflow-x:auto"><table class="psp-tbl" style="max-width:520px"><thead><tr><th>Coupure</th><th class="r">Liasses</th><th class="r">Billets</th><th class="r">Montant</th></tr></thead>
+        <tbody>${billets || '<tr><td colspan="4" class="psp-muted">Aucun billet déclaré</td></tr>'}
+        <tr><td><b>Total compté</b></td><td></td><td></td><td class="r"><b>${_pspG(r.montant_compte)}</b></td></tr></tbody></table></div>
+       <div class="psp-actions">${r.billetterie_confirmee
+         ? `<span class="psp-ok" style="font-weight:700">✓ Billetterie confirmée</span> <button class="psp-lien" onclick="pspBillets(${r.id},false)">reprendre</button>`
+         : `<button class="btn btn-primary" onclick="pspBillets(${r.id},true)">Confirmer la billetterie</button>`}</div>`)}
+
+    ${_pspEtape(3, 'Écart de caisse', r.ecart_confirme,
+      `<div class="psp-kpis">
+        <div class="psp-kpi"><span>Ventes attendues</span><b>${_pspG(r.montant_attendu_final)}</b></div>
+        <div class="psp-kpi"><span>Argent compté</span><b>${_pspG(r.montant_compte)}</b></div>
+        <div class="psp-kpi"><span>Écart</span><b>${_pspE(r.ecart_final)}</b></div></div>
+       ${Math.abs(r.ecart_final - r.ecart) > 0.5 ? `<div class="psp-muted">Écart déclaré par le pompiste : ${_pspE(r.ecart)} — recalculé avec les mètres corrigés.</div>` : ''}
+       <div class="psp-actions">${r.ecart_confirme
+         ? `<span class="psp-ok" style="font-weight:700">✓ Écart confirmé</span> <button class="psp-lien" onclick="pspEcart(${r.id},false)">reprendre</button>`
+         : `<button class="btn btn-primary" onclick="pspEcart(${r.id},true)" ${toutesLignes && r.billetterie_confirmee ? '' : 'disabled title="Confirmez d\'abord les mètres et la billetterie"'}>Confirmer l'écart</button>`}</div>`)}
+
+    ${_pspEtape(4, pb ? 'Résolution et finalisation' : 'Finalisation', false,
+      `<div class="psp-muted" style="margin-bottom:6px">Note du rapport (sur 10)</div>
+       <div class="psp-notes">${[...Array(11).keys()].map(n => `<button class="psp-note ${s.note===n?'on':''}" onclick="pspNote(${r.id},${n})">${n}</button>`).join('')}</div>
+       <textarea class="filter-input" id="psp-com-${r.id}" rows="2" style="width:100%;margin-top:10px;height:auto;padding:8px"
+         oninput="_pspS(${r.id}).com=this.value"
+         placeholder="${pb ? 'Comment le problème a-t-il été résolu ? (obligatoire)' : 'Commentaire (obligatoire si un mètre a été corrigé, pour signaler un problème ou renvoyer)'}">${esc(s.com)}</textarea>
+       <input class="filter-input" id="psp-motif-${r.id}" style="width:100%;margin-top:8px;${s.motifVisible?'':'display:none'}"
+         oninput="_pspS(${r.id}).motif=this.value" value="${esc(s.motif)}"
+         placeholder="Motif de l'écart de compteur (ex. remise à zéro, panne…)">
+       <div id="psp-msg-${r.id}"></div>
+       <div class="psp-actions">
+         <button class="btn btn-primary" onclick="pspFinaliser(${r.id})" ${peutFinaliser ? '' : 'disabled title="Confirmez d\'abord les mètres, la billetterie et l\'écart"'}>
+           ${pb ? '✓ Marquer résolu et finaliser' : '✓ Finaliser — rapport correct'}</button>
+         ${pb ? '' : `<button class="btn btn-danger" onclick="pspProbleme(${r.id})">⚠ Signaler un problème</button>`}
+         <button class="btn btn-secondary" onclick="pspRenvoyer(${r.id})">Renvoyer au pompiste</button>
+       </div>`)}
+  </div>`;
 }
 
 function _pspMsg(id, html){ const el = document.getElementById('psp-msg-' + id); if(el) el.innerHTML = html; }
+function _pspCom(id){ return (_pspS(id).com || '').trim(); }
 
-async function pspConfirmer(id){
-  const r = PSP.rapports.find(x => x.id === id); if(!r) return;
-  const lignes = [];
-  for(const l of r.lignes){
-    const v = k => parseFloat(String(document.querySelector(`input[data-r="${id}"][data-p="${l.pompe_id}"][data-k="${k}"]`).value).replace(',', '.'));
-    const av = v('avant'), ap = v('apres');
-    if(isNaN(av) || isNaN(ap)) return _pspMsg(id, `<div class="psp-err">${esc(l.pompe_nom)} : index invalide.</div>`);
-    if(Math.abs(av - l.metter_avant) > 0.0005 || Math.abs(ap - l.metter_apres) > 0.0005)
-      lignes.push({pompe_id:l.pompe_id, metter_avant:av, metter_apres:ap});
-  }
-  const motifEl = document.getElementById('psp-motif-' + id);
+async function _pspAction(id, path, body){
+  try{ const r = await _pspApi('POST', `/rapports/${id}/${path}`, body); _pspMaj(r); pspMajBadge(); return r; }
+  catch(e){ _pspMsg(id, `<div class="psp-err">${esc(e.message)}</div>`); notify(e.message, 'err'); throw e; }
+}
+
+async function pspLigne(id, pompe, confirmer){
+  if(!confirmer) return _pspAction(id, `lignes/${pompe}/reprendre`).catch(()=>{});
+  const v = k => parseFloat(String(document.querySelector(`input[data-r="${id}"][data-p="${pompe}"][data-k="${k}"]`).value).replace(',', '.'));
+  const av = v('avant'), ap = v('apres');
+  if(isNaN(av) || isNaN(ap)) return notify('Index invalide.', 'err');
+  _pspAction(id, `lignes/${pompe}/confirmer`, {metter_avant:av, metter_apres:ap}).catch(()=>{});
+}
+const pspBillets = (id, ok) => _pspAction(id, 'billetterie', {confirme: ok}).catch(()=>{});
+const pspEcart   = (id, ok) => _pspAction(id, 'ecart', {confirme: ok}).catch(()=>{});
+function pspNote(id, n){ _pspS(id).note = n; _pspMaj(PSP.rapports.find(x => x.id === id)); }
+
+async function pspFinaliser(id){
+  const s = _pspS(id);
+  if(s.note == null) return _pspMsg(id, '<div class="psp-err">Choisissez la note du rapport (0 à 10).</div>');
   try{
-    const out = await _pspApi('POST', `/rapports/${id}/confirmer`, {
-      lignes, commentaire: document.getElementById('psp-com-' + id).value,
-      motif_ecart_compteur: motifEl.style.display === 'none' ? null : motifEl.value});
-    notify(`Rapport de ${out.pompiste_nom} confirmé — journal des compteurs mis à jour.`, 'ok');
+    const out = await _pspApi('POST', `/rapports/${id}/finaliser`, {note:s.note, commentaire:_pspCom(id),
+      motif_ecart_compteur: s.motifVisible ? s.motif : null});
+    notify(`Rapport de ${out.pompiste_nom} finalisé (${_PSP_LIB[out.statut]}) — journal des compteurs mis à jour.`, 'ok');
     (out.avertissements||[]).forEach(a => notify(a, 'warn'));
-    pspOnglet('attente');
+    delete PSP.saisie[id];
+    pspOnglet(PSP.onglet);
   }catch(e){
-    if(e.detail?.motif_requis){ motifEl.style.display = ''; motifEl.focus(); }
+    if(e.detail?.motif_requis){ s.motifVisible = true; _pspMaj(PSP.rapports.find(x => x.id === id)); }
     _pspMsg(id, `<div class="psp-err">${esc(e.message)}</div>`);
   }
 }
 
-async function pspRejeter(id){
-  const com = document.getElementById('psp-com-' + id).value.trim();
-  if(com.length < 5){ _pspMsg(id, '<div class="psp-err">Écrivez au pompiste ce qui ne va pas avant de refuser.</div>');
+async function pspProbleme(id){
+  if(_pspCom(id).length < 5){ _pspMsg(id, '<div class="psp-err">Décrivez le problème dans le commentaire.</div>');
     document.getElementById('psp-com-' + id).focus(); return; }
   try{
-    await _pspApi('POST', `/rapports/${id}/rejeter`, {commentaire: com});
-    notify('Rapport refusé — le pompiste voit votre commentaire et doit en soumettre un nouveau.', 'ok');
-    pspOnglet('attente');
-  }catch(e){ _pspMsg(id, `<div class="psp-err">${esc(e.message)}</div>`); }
+    await _pspAction(id, 'probleme', {commentaire:_pspCom(id)});
+    _pspS(id).com = '';
+    notify('Problème signalé — le rapport est dans l\'onglet « Problèmes » jusqu\'à sa résolution.', 'ok');
+    pspOnglet(PSP.onglet);
+  }catch(e){}
+}
+
+async function pspRenvoyer(id){
+  if(_pspCom(id).length < 5){ _pspMsg(id, '<div class="psp-err">Écrivez au pompiste ce qui ne va pas avant de renvoyer.</div>');
+    document.getElementById('psp-com-' + id).focus(); return; }
+  try{
+    await _pspAction(id, 'rejeter', {commentaire:_pspCom(id)});
+    delete PSP.saisie[id];
+    notify('Rapport renvoyé — le pompiste voit votre commentaire et doit en faire un nouveau.', 'ok');
+    pspOnglet(PSP.onglet);
+  }catch(e){}
 }
 
 async function pspHistorique(){
   const c = document.getElementById('psp-contenu');
   const fin = new Date(), deb = new Date(); deb.setDate(deb.getDate() - 30);
   const iso = d => d.toISOString().slice(0,10);
-  const rs = (await _pspApi('GET', `/rapports?date_debut=${iso(deb)}&date_fin=${iso(fin)}`)).filter(r => r.statut !== 'SOUMIS');
-  const lib = {CONFIRME:'Confirmé', REJETE:'Refusé'};
+  const rs = await _pspApi('GET', `/rapports?statut=CONFIRME,RESOLU,REJETE&date_debut=${iso(deb)}&date_fin=${iso(fin)}`);
   c.innerHTML = `<div class="psp-card"><div class="psp-muted" style="margin-bottom:8px">30 derniers jours</div>
-    ${rs.length ? `<div style="overflow-x:auto"><table class="psp-tbl"><thead><tr><th>Créneau</th><th>Pompiste</th><th class="r">Gallons</th>
-      <th class="r">Attendu</th><th class="r">Compté</th><th class="r">Écart</th><th>Statut</th><th>Superviseur</th></tr></thead><tbody>
+    ${rs.length ? `<div style="overflow-x:auto"><table class="psp-tbl"><thead><tr><th>Période</th><th>Pompiste</th><th class="r">Gallons</th>
+      <th class="r">Attendu</th><th class="r">Compté</th><th class="r">Écart</th><th class="r">Note</th><th>Statut</th><th>Direction</th></tr></thead><tbody>
       ${rs.map(r => `<tr><td>${_pspPer(r.periode)} ${_pspDate(r.date)}</td><td>${esc(r.pompiste_nom)}</td>
-        <td class="r">${_pspN(r.total_gallons)}</td><td class="r">${_pspG(r.montant_attendu)}</td><td class="r">${_pspG(r.montant_compte)}</td>
-        <td class="r">${_pspE(r.ecart)}</td><td><span class="psp-badge ${r.statut}">${lib[r.statut]}</span>
-          ${r.lignes.some(l => l.metter_apres_corrige != null) ? '<div class="psp-muted">index corrigés</div>' : ''}</td>
-        <td>${esc(r.traite_par_nom||'')}${r.commentaire_superviseur ? `<div class="psp-muted">${esc(r.commentaire_superviseur)}</div>` : ''}</td></tr>`).join('')}
-      </tbody></table></div>` : '<div class="psp-muted">Aucun rapport traité sur la période.</div>'}</div>`;
+        <td class="r">${_pspN(r.total_gallons)}</td><td class="r">${_pspG(r.montant_attendu_final)}</td><td class="r">${_pspG(r.montant_compte)}</td>
+        <td class="r">${_pspE(r.ecart_final)}</td><td class="r"><b>${r.note_superviseur != null ? r.note_superviseur + '/10' : '—'}</b></td>
+        <td><span class="psp-badge ${r.statut}">${_PSP_LIB[r.statut]}</span>
+          ${r.lignes.some(l => l.metter_apres_corrige != null) ? '<div class="psp-muted">mètres corrigés</div>' : ''}</td>
+        <td>${esc(r.traite_par_nom||'')}${r.probleme_commentaire ? `<div class="psp-muted">Problème : ${esc(r.probleme_commentaire)}</div>` : ''}
+          ${r.commentaire_superviseur ? `<div class="psp-muted">${esc(r.commentaire_superviseur)}</div>` : ''}</td></tr>`).join('')}
+      </tbody></table></div>` : '<div class="psp-muted">Aucun rapport finalisé sur la période.</div>'}</div>`;
 }
 
 function pspRendreComptes(){
@@ -19247,10 +19341,11 @@ function pspRendreComptes(){
   const emps = d.employes.filter(e => !e.lie);
   c.innerHTML = `${PSP.pin ? `<div class="psp-okbox">${PSP.pin}</div>` : ''}
     <div class="psp-card"><b>Nouveau compte pompiste</b>
-      <div class="psp-muted" style="margin:4px 0 10px">Le pompiste se connecte sur <b>${esc(location.origin)}/pompiste</b> avec son identifiant et son PIN. Il n'a accès qu'à la saisie de ses compteurs.</div>
+      <div class="psp-muted" style="margin:4px 0 10px">Pas besoin d'email : le système crée un <b>code unique</b> (prénom + nom + 4 chiffres)
+        et un <b>PIN de 9 chiffres</b>. Le pompiste se connecte sur <b>${esc(location.origin)}/pompiste</b> et n'a accès qu'à la saisie de ses compteurs.</div>
       <div class="psp-grid">
-        <input class="filter-input" id="psp-c-nom" placeholder="Nom complet">
-        <input class="filter-input" id="psp-c-user" placeholder="Identifiant (ex. jean.pierre)" autocapitalize="none">
+        <input class="filter-input" id="psp-c-prenom" placeholder="Prénom">
+        <input class="filter-input" id="psp-c-nom" placeholder="Nom">
         <input class="filter-input" id="psp-c-pin" placeholder="PIN 9 chiffres (vide = généré)" inputmode="numeric" maxlength="9">
         <select class="filter-input" id="psp-c-emp"><option value="">Lier à un employé (facultatif)</option>
           ${emps.map(e => `<option value="${e.id}">${esc(e.nom)} — ${esc(e.poste)}</option>`).join('')}</select>
@@ -19258,8 +19353,8 @@ function pspRendreComptes(){
       <div id="psp-c-msg"></div>
       <div class="psp-actions"><button class="btn btn-primary" onclick="pspCreerCompte()">+ Créer le compte</button></div></div>
     <div class="psp-card"><b>Comptes (${d.comptes.length})</b>
-      ${d.comptes.length ? `<div style="overflow-x:auto;margin-top:8px"><table class="psp-tbl"><thead><tr><th>Nom</th><th>Identifiant</th><th>Employé lié</th><th>Dernier rapport</th><th>Statut</th><th></th></tr></thead><tbody>
-      ${d.comptes.map(u => `<tr><td><b>${esc(u.nom_complet)}</b></td><td style="font-family:var(--mono)">${esc(u.username)}</td>
+      ${d.comptes.length ? `<div style="overflow-x:auto;margin-top:8px"><table class="psp-tbl"><thead><tr><th>Nom</th><th>Code de connexion</th><th>Employé lié</th><th>Dernier rapport</th><th>Statut</th><th></th></tr></thead><tbody>
+      ${d.comptes.map(u => `<tr><td><b>${esc(u.nom_complet)}</b></td><td style="font-family:var(--mono);font-size:14px"><b>${esc(u.username)}</b></td>
         <td>${esc(u.employe_nom||'—')}</td><td>${u.dernier_rapport ? _pspDate(u.dernier_rapport) : '—'}</td>
         <td>${u.actif ? '<span class="psp-badge CONFIRME">Actif</span>' : '<span class="psp-badge REJETE">Désactivé</span>'}</td>
         <td style="white-space:nowrap"><button class="btn btn-secondary" style="height:30px;padding:0 10px" onclick="pspCompte(${u.id},{nouveau_pin:true})">Nouveau PIN</button>
@@ -19269,15 +19364,16 @@ function pspRendreComptes(){
 }
 
 function _pspPinMsg(u){
-  return `PIN de <b>${esc(u.nom_complet)}</b> (identifiant <b style="font-family:var(--mono)">${esc(u.username)}</b>) :
-    <b style="font-family:var(--mono);font-size:16px;letter-spacing:.08em">${esc(u.code_acces)}</b>
-    — notez-le et remettez-le au pompiste, il ne sera plus affiché.`;
+  return `<div style="font-size:15px;margin-bottom:6px">Accès de <b>${esc(u.nom_complet)}</b> — notez-les et remettez-les au pompiste, le PIN ne sera plus affiché :</div>
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div>Code : <b style="font-family:var(--mono);font-size:20px">${esc(u.username)}</b></div>
+      <div>PIN : <b style="font-family:var(--mono);font-size:20px;letter-spacing:.08em">${esc(u.code_acces)}</b></div></div>`;
 }
 
 async function pspCreerCompte(){
   const v = id => document.getElementById(id).value.trim();
   try{
-    const u = await _pspApi('POST', '/comptes', {nom_complet:v('psp-c-nom'), username:v('psp-c-user'),
+    const u = await _pspApi('POST', '/comptes', {prenom:v('psp-c-prenom'), nom:v('psp-c-nom'),
       code_acces: v('psp-c-pin') || null, employe_id: v('psp-c-emp') ? parseInt(v('psp-c-emp'), 10) : null});
     PSP.pin = _pspPinMsg(u);
     PSP.comptes = await _pspApi('GET', '/comptes'); pspRendreComptes();

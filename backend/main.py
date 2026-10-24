@@ -472,7 +472,15 @@ def startup():
         "CREATE INDEX IF NOT EXISTS idx_bar_mouv_departement ON bar_mouvements_stock (departement_id)",
         # Espace pompiste : rapport EN_COURS (compteurs envoyés, billetterie pas encore faite)
         "ALTER TABLE rapports_pompiste DROP CONSTRAINT IF EXISTS chk_rpomp_statut",
-        "ALTER TABLE rapports_pompiste ADD CONSTRAINT chk_rpomp_statut CHECK (statut IN ('EN_COURS','SOUMIS','CONFIRME','REJETE'))",
+        "ALTER TABLE rapports_pompiste ADD CONSTRAINT chk_rpomp_statut CHECK (statut IN ('EN_COURS','SOUMIS','PROBLEME','CONFIRME','RESOLU','REJETE'))",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS billetterie_confirmee BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS ecart_confirme BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS note_superviseur INTEGER",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS probleme_commentaire VARCHAR(1000)",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS probleme_at TIMESTAMPTZ",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS probleme_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS confirmee BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS confirmee_at TIMESTAMPTZ",
         "ALTER TABLE rapports_pompiste ALTER COLUMN soumis_at DROP NOT NULL",
     ]
     # Chaque instruction est isolée : une qui échoue (moteur SQLite en dev,

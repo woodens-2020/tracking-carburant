@@ -15,7 +15,11 @@ Deux préfixes :
 """
 from __future__ import annotations
 
+import logging
+import re
 import secrets
+import threading
+import unicodedata
 from datetime import timedelta
 from datetime import date as date_type
 from typing import Optional
@@ -33,6 +37,7 @@ from models import (
 from tz_utils import now_haiti, today_haiti
 
 router = APIRouter(tags=["pompiste"])
+log = logging.getLogger("pompiste")
 
 ROLE_POMPISTE = "Pompiste"
 PERIODES = ("Matin", "Apres-midi")
@@ -180,6 +185,7 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
             "metter_apres_corrige": float(l.metter_apres_corrige) if l.metter_apres_corrige is not None else None,
             "gallons": round(ap - av, 3),
             "montant": round((ap - av) * float(l.prix_gallon), 2),
+            "confirmee": bool(l.confirmee),
         }
         if avec_journal:
             j = (db.query(Releve).filter_by(date=r.date, periode=r.periode, pompe_id=l.pompe_id).first())
@@ -202,6 +208,15 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
         "commentaire_superviseur": r.commentaire_superviseur,
         "lignes": lignes,
         "total_gallons": round(sum(x["gallons"] for x in lignes), 3),
+        # Après corrections éventuelles du superviseur
+        "montant_attendu_final": round(sum(x["montant"] for x in lignes), 2),
+        "ecart_final": round(float(r.montant_compte) - sum(x["montant"] for x in lignes), 2),
+        "billetterie_confirmee": bool(r.billetterie_confirmee),
+        "ecart_confirme": bool(r.ecart_confirme),
+        "note_superviseur": r.note_superviseur,
+        "probleme_commentaire": r.probleme_commentaire,
+        "probleme_par_nom": _nom(r.probleme_par),
+        "probleme_at": r.probleme_at.isoformat() if r.probleme_at else None,
     }
 
 
@@ -402,8 +417,65 @@ def retirer_compteur(pompe_id: int, u: Utilisateur = Depends(_require_pompiste),
     return {"en_cours": _rapport_dict(db, rap)}
 
 
+class ModifLigneIn(BaseModel):
+    metter_avant: float
+    metter_apres: float
+
+
+@router.put("/api/pompiste/compteurs/{pompe_id}")
+def modifier_compteur(pompe_id: int, data: ModifLigneIn, u: Utilisateur = Depends(_require_pompiste),
+                      db: Session = Depends(get_db)):
+    """Corrige l'index d'une pompe du rapport en cours, depuis le résumé
+    affiché avant l'envoi final."""
+    rap = _en_cours(db, u)
+    ligne = next((l for l in (rap.lignes if rap else []) if l.pompe_id == pompe_id), None)
+    if not ligne:
+        raise HTTPException(404, "Cette pompe n'est pas dans votre rapport en cours.")
+    _controler_lignes(db, rap.date, rap.periode,
+                      [LigneIn(pompe_id=pompe_id, metter_avant=data.metter_avant, metter_apres=data.metter_apres)])
+    ligne.metter_avant, ligne.metter_apres = data.metter_avant, data.metter_apres
+    db.flush()
+    _recalculer_attendu(rap)
+    db.commit()
+    db.refresh(rap)
+    return _rapport_dict(db, rap)
+
+
+def _emails_admins(db: Session) -> list[str]:
+    out = set()
+    for x in db.query(Utilisateur).filter(Utilisateur.actif.is_(True), Utilisateur.email.isnot(None)).all():
+        r = x.role_obj
+        if x.role in ("admin", "pdg") or (r and (r.est_admin or (r.permissions or {}).get("admin"))):
+            out.add(x.email.strip().lower())
+    return sorted(out)
+
+
+def _prevenir_admins(db: Session, rap: RapportPompiste, request: Request) -> None:
+    """Email aux administrateurs, envoyé en arrière-plan (la soumission du
+    pompiste ne doit jamais attendre ni échouer à cause du serveur mail)."""
+    dest = _emails_admins(db)
+    if not dest:
+        return
+    fmt = lambda v: f"{v:,.0f} G".replace(",", " ")
+    args = dict(destinataires=dest, pompiste=_nom(rap.utilisateur) or "",
+                creneau=f"{_per(rap.periode)} du {rap.date.strftime('%d/%m/%Y')}",
+                gallons=f"{sum(float(l.metter_apres) - float(l.metter_avant) for l in rap.lignes):,.3f} gal".replace(",", " "),
+                attendu=fmt(float(rap.montant_attendu)), compte=fmt(float(rap.montant_compte)),
+                ecart=("+" if float(rap.ecart) > 0 else "") + fmt(float(rap.ecart)),
+                lien=str(request.base_url).rstrip("/") + "/")
+
+    def envoyer():
+        try:
+            from otp_service import send_rapport_pompiste_email
+            send_rapport_pompiste_email(**args)
+        except Exception as exc:
+            log.warning("Email rapport pompiste non envoyé : %s", exc)
+    threading.Thread(target=envoyer, daemon=True).start()
+
+
 @router.post("/api/pompiste/terminer")
-def terminer(data: TerminerIn, u: Utilisateur = Depends(_require_pompiste), db: Session = Depends(get_db)):
+def terminer(data: TerminerIn, request: Request, u: Utilisateur = Depends(_require_pompiste),
+             db: Session = Depends(get_db)):
     """Étape 2 : « Terminer » — billetterie de toute la période, rapprochement
     avec l'ensemble des compteurs envoyés, puis envoi au superviseur."""
     rap = _en_cours(db, u)
@@ -433,13 +505,14 @@ def terminer(data: TerminerIn, u: Utilisateur = Depends(_require_pompiste), db: 
         from notifications_service import creer_notification
         creer_notification(
             db, module="carburant", type_="rapport_pompiste",
-            titre=f"Rapport pompiste à confirmer — {_nom(u)}",
+            titre=f"Rapport pompiste à vérifier — {_nom(u)}",
             message=f"{_per(rap.periode)} du {rap.date.strftime('%d/%m')} · écart {float(rap.ecart):+,.0f} G",
             lien="pompistes-rapports", dedupe_minutes=None,
         )
         db.commit()
     except Exception:
         db.rollback()
+    _prevenir_admins(db, rap, request)
     return _rapport_dict(db, rap)
 
 
@@ -453,66 +526,176 @@ def mes_rapports(u: Utilisateur = Depends(_require_pompiste), db: Session = Depe
 
 # ═════════════════════════════════════════════════════════════════════
 # SUPERVISION
+# Vérification élément par élément : chaque mètre, la billetterie, l'écart.
+# Puis « Finaliser » avec une note (CONFIRME), ou « Signaler un problème »
+# (PROBLEME) puis, une fois réglé, « Résolu et finalisé » (RESOLU).
+# La finalisation écrit le journal des compteurs.
 # ═════════════════════════════════════════════════════════════════════
+
+_A_TRAITER = ("SOUMIS", "PROBLEME")
+
+
+def _rapport_a_traiter(db: Session, rid: int) -> RapportPompiste:
+    rap = db.get(RapportPompiste, rid)
+    if not rap:
+        raise HTTPException(404, "Rapport introuvable")
+    if rap.statut not in _A_TRAITER:
+        raise HTTPException(409, "Ce rapport est déjà finalisé.")
+    return rap
+
 
 @router.get("/api/pompiste-supervision/rapports")
 def lister(statut: Optional[str] = None, date_debut: Optional[date_type] = None,
            date_fin: Optional[date_type] = None,
            _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """`statut` accepte une liste séparée par des virgules (ex. SOUMIS,PROBLEME)."""
     q = db.query(RapportPompiste).filter(RapportPompiste.statut != "EN_COURS")
-    if statut:
-        q = q.filter(RapportPompiste.statut == statut)
+    statuts = [x for x in (statut or "").split(",") if x]
+    if statuts:
+        q = q.filter(RapportPompiste.statut.in_(statuts))
     if date_debut:
         q = q.filter(RapportPompiste.date >= date_debut)
     if date_fin:
         q = q.filter(RapportPompiste.date <= date_fin)
     rows = q.all()
-    # À confirmer : ordre chronologique (la continuité des compteurs impose de
-    # confirmer le Matin avant l'Après-midi). Historique : plus récents d'abord.
-    cle = lambda r: (r.date, _RANG.get(r.periode, 9), r.id)
-    rows.sort(key=cle, reverse=(statut != "SOUMIS"))
-    return [_rapport_dict(db, r, avec_journal=(r.statut == "SOUMIS")) for r in rows[:200]]
+    # À traiter : ordre chronologique (la continuité des compteurs impose de
+    # finaliser le Matin avant l'Après-midi). Historique : plus récents d'abord.
+    a_traiter = bool(statuts) and set(statuts) <= set(_A_TRAITER)
+    rows.sort(key=lambda r: (r.date, _RANG.get(r.periode, 9), r.id), reverse=not a_traiter)
+    return [_rapport_dict(db, r, avec_journal=(r.statut in _A_TRAITER)) for r in rows[:200]]
 
 
 @router.get("/api/pompiste-supervision/resume")
 def resume(_s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
-    return {"a_confirmer": db.query(RapportPompiste).filter_by(statut="SOUMIS").count()}
+    a_verifier = db.query(RapportPompiste).filter_by(statut="SOUMIS").count()
+    problemes = db.query(RapportPompiste).filter_by(statut="PROBLEME").count()
+    return {"a_verifier": a_verifier, "problemes": problemes, "a_confirmer": a_verifier + problemes}
 
 
-class ConfirmerIn(BaseModel):
-    lignes: list[LigneIn] = []          # vide = index du pompiste acceptés tels quels
+class LigneConfIn(BaseModel):
+    metter_avant: float
+    metter_apres: float
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/lignes/{pompe_id}/confirmer")
+def confirmer_ligne(rid: int, pompe_id: int, data: LigneConfIn,
+                    _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Confirme un mètre, en le corrigeant si les valeurs envoyées diffèrent
+    de celles du pompiste (qui restent conservées)."""
+    rap = _rapport_a_traiter(db, rid)
+    l = next((x for x in rap.lignes if x.pompe_id == pompe_id), None)
+    if not l:
+        raise HTTPException(404, "Pompe absente du rapport")
+    av, ap = float(data.metter_avant), float(data.metter_apres)
+    if av < 0 or ap < av - TOLERANCE:
+        raise HTTPException(400, f"{l.pompe.nom} : l'index de fin doit être supérieur ou égal au début.")
+    if abs(av - float(l.metter_avant)) > TOLERANCE or abs(ap - float(l.metter_apres)) > TOLERANCE:
+        l.metter_avant_corrige, l.metter_apres_corrige = av, ap
+    else:
+        l.metter_avant_corrige = l.metter_apres_corrige = None
+    l.confirmee, l.confirmee_at = True, now_haiti()
+    rap.ecart_confirme = False          # l'écart dépend des mètres : à revoir après une correction
+    db.commit()
+    db.refresh(rap)
+    return _rapport_dict(db, rap, avec_journal=True)
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/lignes/{pompe_id}/reprendre")
+def reprendre_ligne(rid: int, pompe_id: int, _s: Utilisateur = Depends(_require_superviseur),
+                    db: Session = Depends(get_db)):
+    rap = _rapport_a_traiter(db, rid)
+    l = next((x for x in rap.lignes if x.pompe_id == pompe_id), None)
+    if not l:
+        raise HTTPException(404, "Pompe absente du rapport")
+    l.confirmee, l.confirmee_at = False, None
+    db.commit()
+    db.refresh(rap)
+    return _rapport_dict(db, rap, avec_journal=True)
+
+
+class ConfirmeIn(BaseModel):
+    confirme: bool = True
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/billetterie")
+def confirmer_billetterie(rid: int, data: ConfirmeIn, _s: Utilisateur = Depends(_require_superviseur),
+                          db: Session = Depends(get_db)):
+    rap = _rapport_a_traiter(db, rid)
+    rap.billetterie_confirmee = data.confirme
+    db.commit()
+    db.refresh(rap)
+    return _rapport_dict(db, rap, avec_journal=True)
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/ecart")
+def confirmer_ecart(rid: int, data: ConfirmeIn, _s: Utilisateur = Depends(_require_superviseur),
+                    db: Session = Depends(get_db)):
+    rap = _rapport_a_traiter(db, rid)
+    if data.confirme and not (all(l.confirmee for l in rap.lignes) and rap.billetterie_confirmee):
+        raise HTTPException(409, "Confirmez d'abord chaque mètre et la billetterie.")
+    rap.ecart_confirme = data.confirme
+    db.commit()
+    db.refresh(rap)
+    return _rapport_dict(db, rap, avec_journal=True)
+
+
+class CommentaireIn(BaseModel):
+    commentaire: str
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/probleme")
+def signaler_probleme(rid: int, data: CommentaireIn, s: Utilisateur = Depends(_require_superviseur),
+                      db: Session = Depends(get_db)):
+    rap = _rapport_a_traiter(db, rid)
+    commentaire = (data.commentaire or "").strip()
+    if len(commentaire) < _COMMENTAIRE_MIN:
+        raise HTTPException(400, "Décrivez le problème (commentaire obligatoire).")
+    rap.statut = "PROBLEME"
+    rap.probleme_commentaire = commentaire[:1000]
+    rap.probleme_at = now_haiti()
+    rap.probleme_par_id = s.id
+    db.commit()
+    db.refresh(rap)
+    return _rapport_dict(db, rap, avec_journal=True)
+
+
+class FinaliserIn(BaseModel):
+    note: int
     commentaire: Optional[str] = None
     motif_ecart_compteur: Optional[str] = None
 
 
-@router.post("/api/pompiste-supervision/rapports/{rid}/confirmer")
-def confirmer(rid: int, data: ConfirmerIn, request: Request,
+@router.post("/api/pompiste-supervision/rapports/{rid}/finaliser")
+def finaliser(rid: int, data: FinaliserIn, request: Request,
               s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Finalise le rapport : CONFIRME (correct) ou RESOLU (après un problème).
+    Écrit le journal des compteurs avec les valeurs confirmées."""
     import main
-    rap = db.get(RapportPompiste, rid)
-    if not rap:
-        raise HTTPException(404, "Rapport introuvable")
-    if rap.statut != "SOUMIS":
-        raise HTTPException(409, "Ce rapport a déjà été traité.")
-
-    corr = {l.pompe_id: l for l in data.lignes}
-    inconnues = set(corr) - {l.pompe_id for l in rap.lignes}
-    if inconnues:
-        raise HTTPException(400, "Correction sur une pompe absente du rapport.")
+    rap = _rapport_a_traiter(db, rid)
+    manquants = [l.pompe.nom for l in rap.lignes if not l.confirmee]
+    if manquants:
+        raise HTTPException(409, "Mètres pas encore confirmés : " + ", ".join(manquants) + ".")
+    if not rap.billetterie_confirmee:
+        raise HTTPException(409, "Confirmez d'abord la billetterie.")
+    if not rap.ecart_confirme:
+        raise HTTPException(409, "Confirmez d'abord l'écart de caisse.")
+    if data.note < 0 or data.note > 10:
+        raise HTTPException(400, "La note du rapport va de 0 à 10.")
     commentaire = (data.commentaire or "").strip()
     motif = (data.motif_ecart_compteur or "").strip()
+    corrige = any(l.metter_avant_corrige is not None for l in rap.lignes)
+    resolution = rap.statut == "PROBLEME"
+    if resolution and len(commentaire) < _COMMENTAIRE_MIN:
+        raise HTTPException(400, "Expliquez comment le problème a été résolu.")
+    if corrige and len(commentaire) < _COMMENTAIRE_MIN:
+        raise HTTPException(400, "Expliquez la correction des mètres dans le commentaire.")
 
-    # 1. Valeurs finales + contrôles AVANT toute écriture (le journal est
-    #    écrit pompe par pompe : on refuse tout plutôt que d'en écrire la moitié).
-    finales, corrige = [], False
+    # 1. Contrôles AVANT toute écriture (le journal est écrit pompe par pompe :
+    #    on refuse tout plutôt que d'en écrire la moitié).
+    finales = []
     for l in rap.lignes:
-        c = corr.get(l.pompe_id)
-        av = float(c.metter_avant) if c else float(l.metter_avant)
-        ap = float(c.metter_apres) if c else float(l.metter_apres)
-        change = abs(av - float(l.metter_avant)) > TOLERANCE or abs(ap - float(l.metter_apres)) > TOLERANCE
-        corrige = corrige or change
-        if av < 0 or ap < av - TOLERANCE:
-            raise HTTPException(400, f"{l.pompe.nom} : index incohérents (fin < début).")
+        av = float(l.metter_avant_corrige if l.metter_avant_corrige is not None else l.metter_avant)
+        ap = float(l.metter_apres_corrige if l.metter_apres_corrige is not None else l.metter_apres)
         prec = main._releve_precedent(db, l.pompe_id, rap.date, rap.periode)
         ecart = round(av - float(prec.metter_apres), 4) if prec else 0.0
         existant = db.query(Releve).filter_by(date=rap.date, periode=rap.periode, pompe_id=l.pompe_id).first()
@@ -521,25 +704,20 @@ def confirmer(rid: int, data: ConfirmerIn, request: Request,
                 and not (motif_existant and existant and abs(float(existant.metter_avant) - av) <= TOLERANCE):
             raise HTTPException(409, {
                 "message": (f"{l.pompe.nom} : l'index de début ({av:.3f}) ne suit pas le journal "
-                            f"({float(prec.metter_apres):.3f}, {prec.periode} du {prec.date.strftime('%d/%m/%Y')}). "
-                            "Corrigez l'index, confirmez d'abord le rapport précédent, "
+                            f"({float(prec.metter_apres):.3f}, {_per(prec.periode)} du {prec.date.strftime('%d/%m/%Y')}). "
+                            "Corrigez le mètre, finalisez d'abord le rapport précédent, "
                             "ou indiquez le motif de l'écart."),
                 "motif_requis": True, "pompe_id": l.pompe_id})
         identique = existant and abs(float(existant.metter_avant) - av) <= TOLERANCE \
             and abs(float(existant.metter_apres) - ap) <= TOLERANCE
         if existant and not identique and existant.nb_modifications >= main.MAX_MODIFICATIONS_PAR_RELEVE:
             raise HTTPException(403, f"{l.pompe.nom} : le relevé du journal a atteint sa limite de modifications.")
-        finales.append((l, av, ap, change, identique))
-    if corrige and len(commentaire) < _COMMENTAIRE_MIN:
-        raise HTTPException(400, "Expliquez la correction des index dans le commentaire.")
+        finales.append((l, av, ap, identique))
 
-    # 2. Écriture dans le journal des compteurs — mêmes règles que la saisie
-    #    normale (prix officiel, continuité, alertes de stock).
+    # 2. Journal des compteurs — mêmes règles que la saisie normale
     employe = db.query(Employe).filter_by(utilisateur_id=rap.utilisateur_id).first()
     avertissements = []
-    for l, av, ap, change, identique in finales:
-        if change:
-            l.metter_avant_corrige, l.metter_apres_corrige = av, ap
+    for l, av, ap, identique in finales:
         if not identique:
             out = main.upsert_releve(main.ReleveIn(
                 date=rap.date, periode=rap.periode, pompe_id=l.pompe_id,
@@ -551,7 +729,8 @@ def confirmer(rid: int, data: ConfirmerIn, request: Request,
             if r:
                 r.pompiste_id = employe.id
 
-    rap.statut = "CONFIRME"
+    rap.statut = "RESOLU" if resolution else "CONFIRME"
+    rap.note_superviseur = data.note
     rap.traite_par_id = s.id
     rap.traite_at = now_haiti()
     rap.commentaire_superviseur = commentaire[:1000] or None
@@ -562,18 +741,11 @@ def confirmer(rid: int, data: ConfirmerIn, request: Request,
     return out
 
 
-class RejeterIn(BaseModel):
-    commentaire: str
-
-
 @router.post("/api/pompiste-supervision/rapports/{rid}/rejeter")
-def rejeter(rid: int, data: RejeterIn, s: Utilisateur = Depends(_require_superviseur),
+def rejeter(rid: int, data: CommentaireIn, s: Utilisateur = Depends(_require_superviseur),
             db: Session = Depends(get_db)):
-    rap = db.get(RapportPompiste, rid)
-    if not rap:
-        raise HTTPException(404, "Rapport introuvable")
-    if rap.statut != "SOUMIS":
-        raise HTTPException(409, "Ce rapport a déjà été traité.")
+    """Renvoie le rapport au pompiste, qui en refait un nouveau."""
+    rap = _rapport_a_traiter(db, rid)
     commentaire = (data.commentaire or "").strip()
     if len(commentaire) < _COMMENTAIRE_MIN:
         raise HTTPException(400, "Indiquez au pompiste ce qui ne va pas (commentaire obligatoire).")
@@ -612,10 +784,25 @@ def lister_comptes(_s: Utilisateur = Depends(_require_superviseur), db: Session 
 
 
 class CompteIn(BaseModel):
-    nom_complet: str
-    username: str
+    prenom: str
+    nom: str
     code_acces: Optional[str] = None     # vide = généré
     employe_id: Optional[int] = None
+
+
+def _slug(txt: str, n: int = 12) -> str:
+    t = unicodedata.normalize("NFKD", txt).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]", "", t)[:n]
+
+
+def _identifiant_unique(db: Session, prenom: str, nom: str) -> str:
+    """Code de connexion : prénom + nom + 4 chiffres aléatoires (ex. jeanpierre4821)."""
+    base = (_slug(prenom) + _slug(nom)) or "pompiste"
+    for _ in range(50):
+        code = f"{base}{secrets.randbelow(10000):04d}"
+        if not db.query(Utilisateur).filter(Utilisateur.username.ilike(code)).first():
+            return code
+    raise HTTPException(500, "Impossible de générer un code unique, réessayez.")
 
 
 def _nouveau_pin() -> str:
@@ -625,18 +812,15 @@ def _nouveau_pin() -> str:
 @router.post("/api/pompiste-supervision/comptes", status_code=201)
 def creer_compte(data: CompteIn, _s: Utilisateur = Depends(_require_superviseur),
                  db: Session = Depends(get_db)):
-    from admin_routes import _CODE_RE, _USERNAME_RE
-    nom = data.nom_complet.strip()
-    username = data.username.strip().lower()
-    if not nom:
-        raise HTTPException(400, "Le nom complet est requis.")
-    if not _USERNAME_RE.match(username):
-        raise HTTPException(400, "Identifiant invalide (3 à 60 caractères : lettres, chiffres, . _ -).")
+    from admin_routes import _CODE_RE
+    prenom, nom_famille = data.prenom.strip(), data.nom.strip()
+    if not prenom or not nom_famille:
+        raise HTTPException(400, "Le prénom et le nom sont requis.")
+    nom = f"{prenom} {nom_famille}"
     pin = (data.code_acces or "").strip() or _nouveau_pin()
     if not _CODE_RE.match(pin):
         raise HTTPException(400, "Le code PIN doit contenir exactement 9 chiffres.")
-    if db.query(Utilisateur).filter(Utilisateur.username.ilike(username)).first():
-        raise HTTPException(409, f"L'identifiant « {username} » est déjà utilisé.")
+    username = _identifiant_unique(db, prenom, nom_famille)
     emp = None
     if data.employe_id:
         emp = db.get(Employe, data.employe_id)
