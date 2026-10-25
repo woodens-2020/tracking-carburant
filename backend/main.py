@@ -48,6 +48,7 @@ from taches_routes import router as taches_router
 from pieces_jointes_routes import router as pieces_jointes_router
 from listes_reference_routes import router as listes_reference_router
 from pompiste_routes import router as pompiste_router, assurer_role_pompiste, est_role_pompiste
+from caisse_principale_routes import router as caisse_principale_router
 from auth import (
     SESSION_COOKIE, hash_password, verify_password,
     hash_code_acces, verify_code_acces,
@@ -289,6 +290,7 @@ app.include_router(taches_router)
 app.include_router(pieces_jointes_router)
 app.include_router(listes_reference_router)
 app.include_router(pompiste_router)
+app.include_router(caisse_principale_router)
 
 
 @app.on_event("startup")

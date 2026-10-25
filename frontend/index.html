@@ -3264,6 +3264,29 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .jr-src{display:inline-block;margin-top:3px;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 7px;
   background:rgba(249,115,22,.12);color:var(--orange);white-space:nowrap}
 .jr-src.ok{background:rgba(34,197,94,.12);color:var(--green)}
+/* Caisse principale */
+.cp-total{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--border);
+  border-left:4px solid var(--green);border-radius:14px;padding:16px 18px;margin-bottom:12px}
+.cp-total > div:first-child{flex:1;min-width:200px}
+.cp-total-l{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.cp-total-p{font-size:13px;color:var(--muted);margin-top:2px}
+.cp-total-v{font-family:var(--mono);font-size:28px;font-weight:800;color:var(--green)}
+.cp-sources{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.cp-src{display:flex;flex-direction:column;gap:2px;text-align:left;font:inherit;cursor:pointer;padding:12px 14px;border-radius:12px;
+  border:1px solid var(--border);background:var(--panel);color:var(--text)}
+.cp-src.on{border-color:var(--orange);background:rgba(249,115,22,.08)}
+.cp-src-n{font-weight:800}
+.cp-src-v{font-family:var(--mono);font-size:17px;font-weight:800}
+.cp-src-s{font-size:12px;color:var(--muted)}
+.cp-form{border-color:var(--orange)}
+.cp-champ{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+.cp-case{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.cp-annulee td{opacity:.55;text-decoration:line-through}
+.cp-annulee td:nth-child(4), .cp-annulee td:last-child{text-decoration:none}
+.cp-annul{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+.cp-annul input{width:200px}
+@media (max-width:720px){ .cp-total-v{font-size:22px} .cp-annul{flex-wrap:wrap} .cp-annul input{width:100%} }
+
 /* En-tête de l'application sur petit écran : titre sur une ligne, réglages
    et date en dessous (le sélecteur de date ne déborde plus) */
 @media (max-width:720px){
@@ -3418,6 +3441,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </span>
       <span>Rapports pompistes</span>
       <span class="nav-badge" id="psp-nav-badge" style="display:none;margin-left:auto;background:var(--orange);color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px"></span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="caisse-principale" onclick="goTo('caisse-principale')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/><circle cx="12" cy="14.5" r="2"/><path d="M6 3h12"/></svg>
+      </span>
+      <span>Caisse principale</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -4274,6 +4305,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </div>
 
     <!-- ══════ PAGE : SAISIE ══════ -->
+    <div id="page-caisse-principale" class="page">
+      <div class="psp-tabs">
+        <button class="psp-tab on" data-cp="entrees" onclick="cpOnglet('entrees')">Entrées</button>
+        <button class="psp-tab" data-cp="sources" onclick="cpOnglet('sources')">Sources</button>
+      </div>
+      <div id="cp-contenu"></div>
+    </div>
+
     <div id="page-pompistes-rapports" class="page">
       <div class="psp-tabs">
         <button class="psp-tab on" data-t="rapports" onclick="pspOnglet('rapports')">Rapports <span id="psp-nb"></span></button>
@@ -14907,6 +14946,7 @@ const PAGE_META={
   home:                {title: ()=>t('page.home.title'),        sub: ()=>t('page.home.sub')},
   dashboard:           {title: ()=>t('page.dashboard.title'),   sub: ()=>t('page.dashboard.sub')},
   saisie:              {title: ()=>t('page.saisie.title'),      sub: ()=>t('page.saisie.sub')},
+  'caisse-principale': {title: 'Caisse principale',             sub: 'Entrées d\'argent par source (stations, autres) et total de la caisse'},
   'pompistes-rapports':{title: 'Rapports pompistes',            sub: 'Confirmer, corriger ou refuser les compteurs soumis par les pompistes'},
   journal:             {title: ()=>t('page.journal.title'),     sub: ()=>t('page.journal.sub')},
   'carburant-rapport': {title: 'Rapport Journalier',            sub: 'Caisse carburant — entrées, dépenses, disponible du jour'},
@@ -15003,6 +15043,7 @@ function goTo(page){
   if(page==='dashboard')          initDashboard();
   if(page==='saisie')             loadSaisie();
   if(page==='pompistes-rapports') loadPompistesRapports();
+  if(page==='caisse-principale')  loadCaissePrincipale();
   if(page==='journal')            initJournal();
   if(page==='carburant-rapport')  loadCarburantRapport();
   if(page==='rapport-analytique') initRapportAnalytique();
@@ -18196,7 +18237,7 @@ function _bandeauEnvironnement(env){
 // de Bord Gestion », « Achats » et « Payroll » agrègent/gèrent tout
 // l'établissement, pas seulement le carburant).
 const _MODULE_PAGES = {
-  carburant: ['home','dashboard','saisie','pompistes-rapports','journal','carburant-rapport','rapport-analytique','statistiques',
+  carburant: ['home','dashboard','saisie','pompistes-rapports','caisse-principale','journal','carburant-rapport','rapport-analytique','statistiques',
               'previsions','rapports','stock','gestion','audit','depenses'],
   bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-stock','pos-achats',
               'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite',
@@ -18226,7 +18267,7 @@ function _pageModuleEnabled(page){
 // ── Matrice de pages par domaine fonctionnel ─────────────────────
 const _AREA_PAGES = {
   carburant: {
-    complet: ['home','saisie','pompistes-rapports'],
+    complet: ['home','saisie','pompistes-rapports','caisse-principale'],
     lecture: ['home'],
   },
   finance: {
@@ -18266,7 +18307,7 @@ const _CAISSIER_ALLOWED = new Set([
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
-  'pos-fournisseurs','pompistes-rapports',
+  'pos-fournisseurs','pompistes-rapports','caisse-principale',
   'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'patisserie-dashboard','patisserie-produits','patisserie-achats','patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse',
@@ -18276,7 +18317,7 @@ const _MANAGER_ALLOWED = new Set([
 
 // Assistant Directeur — tous les rapports en lecture + Zelle complet
 const _AD_ALLOWED = new Set([
-  'home','pompistes-rapports',
+  'home','pompistes-rapports','caisse-principale',
   'dashboard','journal','carburant-rapport','statistiques','gi-dashboard','depenses','achats','caisse',
   'pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes',
   'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
@@ -19657,6 +19698,202 @@ async function pspCompte(id, body){
     if(u.code_acces) PSP.pin = _pspPinMsg(u);
     PSP.comptes = await _pspApi('GET', '/comptes'); pspRendreComptes();
   }catch(e){ notify(e.message, 'err'); }
+}
+
+// ══════════════════════════════════════════════
+// CAISSE PRINCIPALE (voir backend/caisse_principale_routes.py)
+// Sources (Zo Vincent, Champin, autres…) → entrées (source, montant, date)
+// → total de la caisse principale. Sources configurables.
+// ══════════════════════════════════════════════
+const CP = {onglet:'entrees', sources:[], donnees:null, form:false, annuler:null,
+            filtre:{debut:'', fin:'', source:'', annulees:false, preset:'mois'}};
+const _cpG = n => Number(n||0).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' G';
+
+async function _cpApi(method, path, body){
+  const h = {'Content-Type':'application/json'};
+  const k = sessionStorage.getItem('api_key'); if(k) h['X-API-Key'] = k;
+  const r = await fetch('/api/caisse-principale' + path, {method, headers:h, credentials:'include',
+                                                          body: body ? JSON.stringify(body) : undefined});
+  const d = await r.json().catch(()=>null);
+  if(!r.ok){ const det = d?.detail; throw new Error(typeof det === 'string' ? det : (det?.message || ('Erreur ' + r.status))); }
+  return d;
+}
+
+function _cpPreset(k){
+  const auj = new Date(currentDate + 'T12:00:00'), f = CP.filtre;
+  f.preset = k;
+  if(k === 'jour'){ f.debut = f.fin = currentDate; }
+  else if(k === '7j'){ const d = new Date(auj); d.setDate(d.getDate() - 6); f.debut = _ymd(d); f.fin = currentDate; }
+  else if(k === 'mois'){ f.debut = currentDate.slice(0, 8) + '01'; f.fin = currentDate; }
+  else if(k === 'prec'){ const d1 = new Date(auj.getFullYear(), auj.getMonth() - 1, 1), d2 = new Date(auj.getFullYear(), auj.getMonth(), 0);
+    f.debut = _ymd(d1); f.fin = _ymd(d2); }
+}
+
+function loadCaissePrincipale(){
+  if(!CP.filtre.debut) _cpPreset('mois');
+  cpOnglet(CP.onglet);
+}
+
+async function cpOnglet(t){
+  CP.onglet = t;
+  document.querySelectorAll('[data-cp]').forEach(b => b.classList.toggle('on', b.dataset.cp === t));
+  const c = document.getElementById('cp-contenu');
+  c.innerHTML = '<div class="psp-muted">Chargement…</div>';
+  try{
+    CP.sources = await _cpApi('GET', '/sources');
+    if(t === 'entrees') await cpCharger(); else cpRendreSources();
+  }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
+}
+
+async function cpCharger(){
+  const f = CP.filtre;
+  let q = `/entrees?date_debut=${f.debut}&date_fin=${f.fin}`;
+  if(f.source) q += `&source_id=${f.source}`;
+  if(f.annulees) q += '&inclure_annulees=true';
+  CP.donnees = await _cpApi('GET', q);
+  cpRendreEntrees();
+}
+function cpFiltre(cle, val){
+  CP.filtre[cle] = val;
+  if(cle === 'debut' || cle === 'fin') CP.filtre.preset = '';
+  cpCharger().catch(e => notify(e.message, 'err'));
+}
+function cpPreset(k){ _cpPreset(k); cpCharger().catch(e => notify(e.message, 'err')); }
+
+function cpRendreEntrees(){
+  const c = document.getElementById('cp-contenu'), d = CP.donnees, f = CP.filtre;
+  const actives = CP.sources.filter(x => x.actif);
+  const periode = d.date_debut === d.date_fin ? frDate(d.date_debut) : `du ${frDate(d.date_debut)} au ${frDate(d.date_fin)}`;
+  const jours = {};
+  for(const e of d.entrees) (jours[e.date] ||= []).push(e);
+  const totJour = Object.fromEntries(d.par_jour.map(j => [j.date, j]));
+  c.innerHTML = `
+    <div class="psp-card psp-filtres">
+      <div class="psp-chips">${[['jour',"Aujourd'hui"],['7j','7 jours'],['mois','Ce mois'],['prec','Mois précédent']]
+        .map(([k,l]) => `<button class="psp-chip ${f.preset===k?'on':''}" onclick="cpPreset('${k}')">${l}</button>`).join('')}</div>
+      <div class="psp-grid" style="margin-top:10px">
+        <input type="date" class="filter-input" value="${f.debut}" max="${currentDate}" onchange="cpFiltre('debut', this.value)" title="Du">
+        <input type="date" class="filter-input" value="${f.fin}" max="${currentDate}" onchange="cpFiltre('fin', this.value)" title="Au">
+        <select class="filter-input" onchange="cpFiltre('source', this.value)"><option value="">Toutes les sources</option>
+          ${CP.sources.map(x => `<option value="${x.id}" ${String(f.source)===String(x.id)?'selected':''}>${esc(x.nom)}${x.actif?'':' (désactivée)'}</option>`).join('')}</select>
+        <label class="cp-case"><input type="checkbox" ${f.annulees?'checked':''} onchange="cpFiltre('annulees', this.checked)"> Afficher les entrées annulées${d.nb_annulees?` (${d.nb_annulees})`:''}</label>
+      </div></div>
+
+    <div class="cp-total">
+      <div><div class="cp-total-l">Total des entrées — caisse principale</div><div class="cp-total-p">${esc(periode)} · ${d.nb} entrée${d.nb>1?'s':''}</div></div>
+      <div class="cp-total-v">${_cpG(d.total)}</div>
+      <button class="btn btn-primary" onclick="cpOuvrirForm()" ${actives.length?'':'disabled title="Aucune source active"'}>+ Nouvelle entrée</button>
+    </div>
+
+    <div class="cp-sources">${d.par_source.map(x => `
+      <button class="cp-src ${String(f.source)===String(x.source_id)?'on':''}" onclick="cpFiltre('source', '${String(f.source)===String(x.source_id)?'':x.source_id}')">
+        <span class="cp-src-n">${esc(x.source_nom)}${x.actif?'':' <small>(désactivée)</small>'}</span>
+        <span class="cp-src-v">${_cpG(x.montant)}</span>
+        <span class="cp-src-s">${x.nb} entrée${x.nb>1?'s':''}${d.total>0?` · ${Math.round(x.montant/d.total*100)} %`:''}</span>
+      </button>`).join('')}</div>
+
+    <div id="cp-form">${CP.form ? cpFormHtml() : ''}</div>
+
+    ${d.entrees.length ? Object.entries(jours).map(([j, l]) => `
+      <div class="psp-jour" style="display:flex;justify-content:space-between"><span>${_pspJour(j)}</span>
+        <span>${totJour[j] ? _cpG(totJour[j].montant) : ''}</span></div>
+      <div class="psp-card" style="padding:0;overflow-x:auto"><table class="psp-tbl cp-tbl"><thead><tr>
+        <th>Source</th><th class="r">Montant</th><th>Référence</th><th>Note</th><th>Saisi par</th><th></th></tr></thead><tbody>
+        ${l.map(e => `<tr class="${e.annulee?'cp-annulee':''}">
+          <td><b>${esc(e.source_nom)}</b></td>
+          <td class="r"><b>${_cpG(e.montant)}</b></td>
+          <td>${esc(e.reference||'—')}</td>
+          <td>${esc(e.note||'')}${e.annulee?`<div class="psp-neg" style="font-size:11.5px">Annulée par ${esc(e.annulee_par_nom||'')} : ${esc(e.motif_annulation||'')}</div>`:''}</td>
+          <td class="psp-muted">${esc(e.saisi_par_nom||'')}${e.saisi_le?`<br>${new Date(e.saisi_le).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}`:''}</td>
+          <td class="r">${e.annulee ? '<span class="psp-badge REJETE">Annulée</span>'
+            : (CP.annuler === e.id
+              ? `<div class="cp-annul"><input class="filter-input" id="cp-motif" placeholder="Motif de l'annulation">
+                  <button class="btn btn-danger psp-mini" onclick="cpAnnuler(${e.id})">Confirmer</button>
+                  <button class="psp-lien" onclick="CP.annuler=null;cpRendreEntrees()">retour</button></div>`
+              : `<button class="psp-lien" onclick="CP.annuler=${e.id};cpRendreEntrees();setTimeout(()=>document.getElementById('cp-motif')?.focus(),0)">annuler</button>`)}</td>
+        </tr>`).join('')}</tbody></table></div>`).join('')
+    : `<div class="psp-card"><b>Aucune entrée sur cette période.</b>
+        <div class="psp-muted" style="margin-top:4px">Utilisez « + Nouvelle entrée » pour enregistrer l'argent reçu d'une source.</div></div>`}`;
+}
+
+function cpFormHtml(){
+  const actives = CP.sources.filter(x => x.actif);
+  if(!CP.formSource || !actives.some(x => x.id === CP.formSource)) CP.formSource = actives[0]?.id;
+  return `<div class="psp-card cp-form">
+    <div class="psp-head"><b>Nouvelle entrée</b><button class="psp-lien" onclick="CP.form=false;cpRendreEntrees()">fermer</button></div>
+    <div class="psp-muted" style="margin-bottom:6px">Source</div>
+    <div class="psp-chips">${actives.map(x => `<button class="psp-chip ${CP.formSource===x.id?'on':''}" onclick="CP.formSource=${x.id};document.getElementById('cp-form').innerHTML=cpFormHtml()">${esc(x.nom)}</button>`).join('')}</div>
+    <div class="psp-grid" style="margin-top:12px">
+      <label class="cp-champ">Montant (G)<input class="filter-input" id="cp-montant" inputmode="decimal" placeholder="0,00"></label>
+      <label class="cp-champ">Date<input class="filter-input" id="cp-date" type="date" value="${currentDate}" max="${currentDate}"></label>
+      <label class="cp-champ">Référence (facultatif)<input class="filter-input" id="cp-ref" placeholder="ex. bordereau, dépôt n°…"></label>
+      <label class="cp-champ">Note (facultatif)<input class="filter-input" id="cp-note"></label>
+    </div>
+    <div id="cp-form-msg"></div>
+    <div class="psp-actions"><button class="btn btn-primary" onclick="cpEnregistrer()">Enregistrer l'entrée</button></div></div>`;
+}
+function cpOuvrirForm(){
+  CP.form = true;
+  document.getElementById('cp-form').innerHTML = cpFormHtml();
+  document.getElementById('cp-form').scrollIntoView({behavior:'smooth', block:'center'});
+  setTimeout(() => document.getElementById('cp-montant')?.focus(), 50);
+}
+
+async function cpEnregistrer(){
+  const v = id => document.getElementById(id).value.trim();
+  const montant = parseFloat(v('cp-montant').replace(/\s/g, '').replace(',', '.'));
+  const msg = t => document.getElementById('cp-form-msg').innerHTML = `<div class="psp-err">${esc(t)}</div>`;
+  if(!(montant > 0)) return msg('Indiquez un montant supérieur à 0.');
+  if(!v('cp-date')) return msg('Indiquez la date.');
+  try{
+    const e = await _cpApi('POST', '/entrees', {source_id: CP.formSource, montant, date_entree: v('cp-date'),
+                                                reference: v('cp-ref') || null, note: v('cp-note') || null});
+    notify(`Entrée enregistrée : ${e.source_nom} — ${_cpG(e.montant)}`, 'ok');
+    CP.form = false;
+    if(e.date < CP.filtre.debut || e.date > CP.filtre.fin){ _cpPreset('mois'); if(e.date < CP.filtre.debut){ CP.filtre.debut = e.date; CP.filtre.preset = ''; } }
+    await cpCharger();
+  }catch(err){ msg(err.message); }
+}
+
+async function cpAnnuler(id){
+  const motif = (document.getElementById('cp-motif')?.value || '').trim();
+  if(motif.length < 5) return notify('Indiquez le motif de l\'annulation (5 caractères au moins).', 'err');
+  try{ await _cpApi('POST', `/entrees/${id}/annuler`, {motif}); CP.annuler = null; notify('Entrée annulée.', 'ok'); await cpCharger(); }
+  catch(e){ notify(e.message, 'err'); }
+}
+
+function cpRendreSources(){
+  const c = document.getElementById('cp-contenu');
+  c.innerHTML = `<div class="psp-card"><b>Ajouter une source</b>
+      <div class="psp-muted" style="margin:4px 0 10px">Une source est un lieu ou une personne qui apporte de l'argent à la caisse principale (station, autre activité…).</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><input class="filter-input" id="cp-src-nom" placeholder="Nom de la source" style="flex:1;min-width:200px">
+        <button class="btn btn-primary" onclick="cpAjouterSource()">+ Ajouter</button></div>
+      <div id="cp-src-msg"></div></div>
+    <div class="psp-card" style="padding:0;overflow-x:auto"><table class="psp-tbl"><thead><tr><th>Source</th><th class="r">Entrées</th><th>Statut</th><th></th></tr></thead><tbody>
+      ${CP.sources.map(x => `<tr>
+        <td>${CP.renommer === x.id
+          ? `<div style="display:flex;gap:6px"><input class="filter-input" id="cp-ren" value="${esc(x.nom)}"><button class="btn btn-primary psp-mini" onclick="cpRenommer(${x.id})">OK</button><button class="psp-lien" onclick="CP.renommer=null;cpRendreSources()">retour</button></div>`
+          : `<b>${esc(x.nom)}</b>`}</td>
+        <td class="r">${x.nb_entrees}</td>
+        <td>${x.actif ? '<span class="psp-badge CONFIRME">Active</span>' : '<span class="psp-badge REJETE">Désactivée</span>'}</td>
+        <td class="r" style="white-space:nowrap"><button class="btn btn-secondary psp-mini" onclick="CP.renommer=${x.id};cpRendreSources()">Renommer</button>
+          <button class="btn ${x.actif?'btn-danger':'btn-secondary'} psp-mini" onclick="cpBasculerSource(${x.id}, ${!x.actif})">${x.actif?'Désactiver':'Réactiver'}</button></td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="psp-muted">Une source désactivée n'est plus proposée pour les nouvelles entrées ; son historique reste dans les totaux des périodes passées.</div>`;
+}
+async function cpAjouterSource(){
+  const nom = document.getElementById('cp-src-nom').value.trim();
+  try{ await _cpApi('POST', '/sources', {nom}); notify(`Source « ${nom} » ajoutée.`, 'ok'); cpOnglet('sources'); }
+  catch(e){ document.getElementById('cp-src-msg').innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
+}
+async function cpRenommer(id){
+  const nom = document.getElementById('cp-ren').value.trim();
+  try{ await _cpApi('PATCH', `/sources/${id}`, {nom}); CP.renommer = null; cpOnglet('sources'); }
+  catch(e){ notify(e.message, 'err'); }
+}
+async function cpBasculerSource(id, actif){
+  try{ await _cpApi('PATCH', `/sources/${id}`, {actif}); cpOnglet('sources'); }
+  catch(e){ notify(e.message, 'err'); }
 }
 
 // Arrivée directe depuis un QR de caisse scanné (voir bar_caisses_routes.py

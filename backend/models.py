@@ -2441,3 +2441,46 @@ class AnomalieTraitee(Base):
     traite_le     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     traite_par = relationship("Utilisateur")
+
+
+class SourceEntree(Base):
+    """Source d'argent qui alimente la caisse principale (station Zo Vincent,
+    station Champin, autres…). Configurable : ajout, renommage, désactivation
+    (une source désactivée garde son historique mais n'est plus proposée)."""
+    __tablename__ = "sources_entree"
+
+    id         = Column(Integer, primary_key=True)
+    nom        = Column(String(120), nullable=False)
+    nom_norm   = Column(String(120), nullable=False, unique=True)
+    actif      = Column(Boolean, nullable=False, default=True)
+    ordre      = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class EntreeCaisse(Base):
+    """Entrée d'argent dans la caisse principale : source, montant, date.
+    Jamais supprimée : une erreur s'annule avec un motif (trace conservée)."""
+    __tablename__ = "entrees_caisse"
+
+    id            = Column(Integer, primary_key=True)
+    source_id     = Column(Integer, ForeignKey("sources_entree.id", ondelete="RESTRICT"), nullable=False)
+    montant       = Column(Numeric(14, 2), nullable=False)
+    date_entree   = Column(Date, nullable=False)
+    reference     = Column(String(120), nullable=True)
+    note          = Column(String(500), nullable=True)
+    saisi_par_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    annulee       = Column(Boolean, nullable=False, default=False)
+    annulee_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    annulee_at    = Column(DateTime(timezone=True), nullable=True)
+    motif_annulation = Column(String(300), nullable=True)
+
+    source     = relationship("SourceEntree")
+    saisi_par  = relationship("Utilisateur", foreign_keys=[saisi_par_id])
+    annulee_par = relationship("Utilisateur", foreign_keys=[annulee_par_id])
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_entree_caisse_montant"),
+        Index("idx_entree_caisse_date", "date_entree"),
+        Index("idx_entree_caisse_source", "source_id"),
+    )
