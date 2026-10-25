@@ -174,6 +174,15 @@ td.r,th.r{text-align:right;white-space:nowrap}
 .cache{display:none!important}
 .connexion{max-width:520px;margin:5vh auto 0}
 
+/* Billetterie au clavier de l'appareil */
+.billets-card{max-width:640px}
+.billets-card .billet{padding:4px 0;border-radius:14px;cursor:text}
+.saisie-n{font-family:var(--mono);font-size:30px;font-weight:800;text-align:center;padding:10px 12px;border-width:3px;
+  background:var(--panel);min-width:0}
+.saisie-n::placeholder{color:var(--border)}
+.billet.actif .coup{color:var(--accent-2)}
+@media (max-width:480px){ .saisie-n{font-size:24px;padding:8px 10px} }
+
 /* Date du rapport et calendrier */
 .date-rapport{display:flex;align-items:center;gap:14px;width:100%;margin:0 0 16px;padding:14px 18px;cursor:pointer;
   font:inherit;font-size:20px;font-weight:800;text-align:left;color:var(--text);
@@ -374,6 +383,7 @@ const TXT = {
     autre_q:'Avez-vous d\'autres pompes pour cette période ?', autre_sub:'Vos compteurs {p} sont enregistrés.',
     oui:'Oui', oui_sub:'J\'ai aussi tenu des pompes {p}', non_fini:'Non, j\'ai fini', non_fini_sub:'Je compte l\'argent',
     mon_rapport:'Mon rapport', attendu:'Ventes attendues', retirer_q:'Retirer {p} de votre rapport ?',
+    compter_sub_clavier:'Tout l\'argent de la période. Tapez le nombre de billets avec le clavier de l\'appareil ; « Entrée » passe au billet suivant.',
     compter:'Comptez l\'argent', compter_sub:'Tout l\'argent de la période. Touchez un billet, puis tapez combien vous en avez.',
     billet:'Billet', nb_billets:'Nombre de billets', monnaie:'Monnaie', monnaie_sub:'pièces, en gourdes', montant_g:'Montant (G)',
     total_compte:'Total compté', voir_resume:'Voir le résumé →',
@@ -438,6 +448,7 @@ const TXT = {
     autre_q:'Èske w gen lòt ponp pou peryòd sa a ?', autre_sub:'Kontè {p} ou yo anrejistre.',
     oui:'Wi', oui_sub:'Mwen te kenbe ponp {p} tou', non_fini:'Non, mwen fini', non_fini_sub:'M ap konte lajan an',
     mon_rapport:'Rapò mwen', attendu:'Lajan ki dwe antre', retirer_q:'Retire {p} nan rapò ou ?',
+    compter_sub_clavier:'Tout lajan peryòd la. Tape kantite biyè yo ak klavye aparèy la ; « Antre » fè w pase nan biyè swivan an.',
     compter:'Konte lajan an', compter_sub:'Tout lajan peryòd la. Touche yon biyè, epi tape konbyen ou genyen.',
     billet:'Biyè', nb_billets:'Kantite biyè', monnaie:'Monnen', monnaie_sub:'pyès, an goud', montant_g:'Kantite (G)',
     total_compte:'Total ou konte', voir_resume:'Wè rezime a →',
@@ -985,39 +996,55 @@ function totalCompte(){
 function rBilletterie(){
   if(!enCours()) return aller('periode');
   const c = S.ctx;
-  if(!S.caseActive) S.caseActive = c.coupures[0];
-  $('app').innerHTML = entete() + `<div class="deux-col"><div>
-      <h1>${t('compter')}</h1>
-      <p class="sub">${t('compter_sub')}</p>
-      <div class="card"><div class="entete-billets"><span>${t('billet')}</span><span>${t('nb_billets')}</span></div>
-      <div class="billets">${c.coupures.map(k => `
-        <div class="billet"><div class="coup">${nf(k)} G<small id="st-${k}"></small></div>
-          <div class="case-n" data-c="${k}" id="cs-${k}"><div class="val"></div></div></div>`).join('')}
-        <div class="billet"><div class="coup">${t('monnaie')}<small>${t('monnaie_sub')}</small></div>
-          <div class="case-n" data-c="monnaie" id="cs-monnaie"><div class="val"></div></div></div>
-      </div></div></div>
-    <div class="cote">${pave(false)}
-      <div class="calcul" style="margin-top:14px"><span>${t('total')}</span><span id="b-total"></span></div></div></div>`;
-  const dessin = () => {
-    for(const k of [...c.coupures, 'monnaie']){
-      const el = $('cs-' + k), v = k === 'monnaie' ? S.monnaie : (S.billets[k] || ''), act = S.caseActive === k;
-      el.className = 'case-n' + (act ? ' actif' : '') + (v ? '' : ' zero');
-      el.querySelector('.val').innerHTML = affiche(v, act) || '0';
-      if(k !== 'monnaie') $('st-' + k).textContent = ent(v) ? G(ent(v) * k) : '';
-    }
+  // Saisie au clavier de l'appareil (touches du terminal ou clavier du système) :
+  // de vraies cases de saisie, sans le clavier à l'écran. « Entrée » passe à la
+  // case suivante ; après la monnaie, elle ouvre le résumé.
+  $('app').innerHTML = entete() + `
+    <h1>${t('compter')}</h1>
+    <p class="sub">${t('compter_sub_clavier')}</p>
+    <div class="card billets-card"><div class="entete-billets"><span>${t('billet')}</span><span>${t('nb_billets')}</span></div>
+    <div class="billets">${c.coupures.map(k => `
+      <label class="billet" for="in-${k}"><span class="coup">${nf(k)} G<small id="st-${k}"></small></span>
+        <input class="saisie-n" id="in-${k}" data-c="${k}" type="text" inputmode="numeric" pattern="[0-9]*"
+          autocomplete="off" enterkeyhint="next" maxlength="5" placeholder="0" value="${esc(S.billets[k] || '')}"></label>`).join('')}
+      <label class="billet" for="in-monnaie"><span class="coup">${t('monnaie')}<small>${t('monnaie_sub')}</small></span>
+        <input class="saisie-n" id="in-monnaie" data-c="monnaie" type="text" inputmode="decimal"
+          autocomplete="off" enterkeyhint="done" maxlength="10" placeholder="0" value="${esc((S.monnaie || '').replace('.', ','))}"></label>
+    </div>
+    <div class="total" style="margin-top:10px"><span>${t('total')}</span><span class="v" id="b-total"></span></div></div>`;
+  const champs = [...document.querySelectorAll('.saisie-n')];
+  const maj = () => {
+    for(const k of c.coupures){ const n = ent(S.billets[k]); $('st-' + k).textContent = n ? G(n * k) : ''; }
     $('b-total').textContent = G(totalCompte());
-    barre(`${t('total_compte')}<b>${G(totalCompte())}</b>`, t('voir_resume'), ()=>{ S.caseActive = null; aller('resume'); });
+    $('barre-info').innerHTML = `${t('total_compte')}<b>${G(totalCompte())}</b>`;
   };
-  const activer = k => {
-    S.caseActive = k;
-    S.champ = k === 'monnaie'
-      ? {decimal:true, max:9, get:()=>S.monnaie, set:v=>{ S.monnaie = v; }, apres:dessin}
-      : {decimal:false, max:5, get:()=>S.billets[k] || '', set:v=>{ S.billets[k] = v; }, apres:dessin};
-    dessin();
-  };
-  document.querySelectorAll('.case-n').forEach(el => el.onclick = () =>
-    activer(el.dataset.c === 'monnaie' ? 'monnaie' : Number(el.dataset.c)));
-  activer(S.caseActive);
+  champs.forEach((el, i) => {
+    el.addEventListener('input', () => {
+      if(el.dataset.c === 'monnaie'){
+        let v = el.value.replace(',', '.').replace(/[^0-9.]/g, '');
+        const p = v.indexOf('.'); if(p >= 0) v = v.slice(0, p + 1) + v.slice(p + 1).replace(/\./g, '').slice(0, 2);
+        const vu = v.replace('.', ',');           // affichage à la française, valeur enregistrée avec un point
+        if(vu !== el.value) el.value = vu;
+        S.monnaie = v;
+      } else {
+        const v = el.value.replace(/\D/g, '');
+        if(v !== el.value) el.value = v;
+        S.billets[Number(el.dataset.c)] = v;
+      }
+      maj();
+    });
+    el.addEventListener('focus', () => { el.select(); el.closest('.billet').classList.add('actif'); });
+    el.addEventListener('blur', () => el.closest('.billet').classList.remove('actif'));
+    el.addEventListener('keydown', e => {
+      if(e.key !== 'Enter') return;
+      e.preventDefault();
+      if(i < champs.length - 1) champs[i + 1].focus();
+      else { el.blur(); $('barre-btn').click(); }
+    });
+  });
+  barre(`${t('total_compte')}<b>${G(totalCompte())}</b>`, t('voir_resume'), () => aller('resume'));
+  maj();
+  champs[0].focus();
 }
 
 // ── 8. Résumé complet avant l'envoi, tout est modifiable ────────────
