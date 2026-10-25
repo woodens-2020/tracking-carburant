@@ -249,7 +249,7 @@ const TXT = {
     SOUMIS:'En vérification', PROBLEME:'Problème signalé', CONFIRME:'Validé', RESOLU:'Résolu', REJETE:'À refaire',
     refaire:'Refaites ce rapport après correction.', direction:'Direction', ecart_court:'écart',
     session:'Session expirée — reconnectez-vous.', reessayer:'Réessayer',
-    pas_pompiste:'Compte non pompiste', pas_pompiste_sub:'Ce compte n\'est pas un compte pompiste.', aller_app:'Aller à l\'application',
+    autre_compte:'Cette tablette était connectée avec un compte qui n\'est pas un compte pompiste : il a été déconnecté. Entrez votre code pompiste.',
     debut_diff:'L\'index de début ne correspond pas au dernier index enregistré pour cette pompe.',
     debut_diff_action:'Relisez le compteur sur la pompe. Corrigez-le, ou confirmez s\'il est juste.',
     je_confirme:'Le compteur est juste, je confirme', confirme_ok:'Index de début confirmé.',
@@ -303,7 +303,7 @@ const TXT = {
     SOUMIS:'Y ap verifye l', PROBLEME:'Gen yon pwoblèm', CONFIRME:'Valide', RESOLU:'Rezoud', REJETE:'Pou refè',
     refaire:'Refè rapò sa a apre ou fin korije l.', direction:'Direksyon', ecart_court:'diferans',
     session:'Sesyon an fini — konekte ankò.', reessayer:'Eseye ankò',
-    pas_pompiste:'Se pa yon kont ponpis', pas_pompiste_sub:'Kont sa a se pa yon kont ponpis.', aller_app:'Ale nan aplikasyon an',
+    autre_compte:'Tablèt la te konekte ak yon kont ki pa kont ponpis : nou dekonekte l. Antre kòd ponpis ou.',
     debut_diff:'Endèks kòmansman an pa menm ak dènye endèks ki anrejistre pou ponp sa a.',
     debut_diff_action:'Li kontè a ankò sou ponp lan. Korije l, oswa konfime si li bon.',
     je_confirme:'Kontè a bon, mwen konfime', confirme_ok:'Endèks kòmansman an konfime.',
@@ -471,10 +471,13 @@ function ecranConnexion(msg){
   };
 }
 
-function ecranPasPompiste(){
-  $('app').innerHTML = `<div class="connexion card"><h1>${t('pas_pompiste')}</h1>
-    <p class="sub">${t('pas_pompiste_sub')}</p>
-    <button class="btn" onclick="location.href='/'">${t('aller_app')}</button></div>`;
+/* La tablette était connectée avec un autre compte (administration…) :
+   l'espace pompiste ne mène jamais vers le système principal — on ferme
+   cette session et on affiche la connexion pompiste. */
+async function ecranPasPompiste(){
+  try{ await api('POST','/api/logout'); }catch(e){}
+  reinit();
+  ecranConnexion(t('autre_compte'));
 }
 
 async function deconnexion(){
