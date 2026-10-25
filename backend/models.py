@@ -2105,6 +2105,27 @@ class AnomalieTraitee(Base):
     traite_par = relationship("Utilisateur")
 
 
+class ResolutionMetter(Base):
+    """Écart de compteur (saut, recul, saisie invalide) d'un relevé du
+    journal, justifié par la direction. La résolution vaut pour les valeurs
+    constatées : si le relevé ou la session précédente change ensuite (écart
+    différent), l'anomalie réapparaît."""
+    __tablename__ = "resolutions_metter"
+
+    id            = Column(Integer, primary_key=True)
+    releve_id     = Column(Integer, ForeignKey("releves.id", ondelete="CASCADE"), nullable=False, unique=True)
+    type_anomalie = Column(String(40), nullable=False)
+    metter_avant  = Column(Numeric(14, 4), nullable=False)
+    metter_apres  = Column(Numeric(14, 4), nullable=False)
+    decalage      = Column(Numeric(14, 4), nullable=True)
+    description   = Column(Text, nullable=False)
+    resolu_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    resolu_le     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    resolu_par = relationship("Utilisateur")
+
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # DÉPÔT BAR — réception, colis étiquetés, livraisons vers les bars
 #   Réception (achat) → génération des codes → vérification au dépôt (scan)
