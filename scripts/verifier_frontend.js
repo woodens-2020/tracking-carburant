@@ -6,7 +6,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const pages = ["frontend/index.html", "frontend/login.html", "frontend/pompiste.html"];
+const pages = ["frontend/index.html", "frontend/login.html", "frontend/pompiste.html", "frontend/pompiste-app/installer.html"];
 let erreurs = 0;
 
 for (const page of pages) {

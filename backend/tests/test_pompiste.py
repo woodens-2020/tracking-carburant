@@ -298,3 +298,23 @@ def test_date_choisie_dans_le_calendrier(client):
     r = envoi(auj - timedelta(days=10))
     assert r.status_code == 201, r.text
     assert r.json()["date"] == str(auj - timedelta(days=10))
+
+
+def test_application_installable(client):
+    """L'espace pompiste s'installe comme une application (PWA), sans connexion préalable."""
+    from fastapi.testclient import TestClient
+    import main as _m
+    anonyme = TestClient(_m.app)
+    r = anonyme.get("/pompiste/manifest.webmanifest")
+    assert r.status_code == 200 and "manifest+json" in r.headers["content-type"]
+    m = r.json()
+    assert m["start_url"] == "/pompiste" and m["display"] == "standalone"
+    assert {i["sizes"] for i in m["icons"]} >= {"192x192", "512x512"} and any(i["purpose"] == "maskable" for i in m["icons"])
+    for i in m["icons"]:
+        assert anonyme.get(i["src"]).status_code == 200
+    r = anonyme.get("/pompiste-sw.js")
+    assert r.status_code == 200 and "javascript" in r.headers["content-type"]
+    assert "worker-src 'self'" in r.headers["content-security-policy"]
+    r = anonyme.get("/pompiste/qr.png")
+    assert r.status_code == 200 and r.content[:4] == b"\x89PNG"
+    assert anonyme.get("/pompiste/installer").status_code == 200

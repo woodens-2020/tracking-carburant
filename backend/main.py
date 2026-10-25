@@ -154,7 +154,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "img-src 'self' data: blob:; "
             "font-src 'self' data:; "
             "connect-src 'self'; "
-            "worker-src blob:; "
+            "worker-src 'self' blob:; "
             "frame-ancestors 'none';"
         )
         if _SECURE_COOKIES:
@@ -205,9 +205,10 @@ def _clear_login_failures(ip: str | None) -> None:
 # Chemins accessibles sans être connecté
 _PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code",
                     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify",
-                    "/api/oauth/otp/send", "/api/config/branding", "/api/login/pompiste", "/pompiste"}
-_PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/") if _DEBUG_MODE
-                    else ("/api/auth/oauth/", "/shared/"))
+                    "/api/oauth/otp/send", "/api/config/branding", "/api/login/pompiste", "/pompiste",
+                    "/pompiste/manifest.webmanifest", "/pompiste-sw.js", "/pompiste/installer", "/pompiste/qr.png"}
+_PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/", "/pompiste-app/") if _DEBUG_MODE
+                    else ("/api/auth/oauth/", "/shared/", "/pompiste-app/"))
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -1748,6 +1749,67 @@ def serve_pompiste():
     )
     return FileResponse(html_path, media_type="text/html",
                         headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+# ---------- Application pompiste installable (PWA « Konekta Ponpis ») ----------
+# L'espace /pompiste s'installe sur l'appareil Android depuis Chrome : icône
+# sur l'écran, ouverture en plein écran, connecté en direct au système.
+_POMPISTE_APP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "pompiste-app")
+
+
+def _url_publique_site(request: Request) -> str:
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    hote = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+    return f"{proto}://{hote}"
+
+
+@app.get("/pompiste/manifest.webmanifest", include_in_schema=False)
+def pompiste_manifest():
+    nom = os.getenv("BRANDING_NOM", "").strip()
+    return JSONResponse({
+        "id": "/pompiste",
+        "name": "Konekta Ponpis" + (f" · {nom}" if nom else ""),
+        "short_name": "Konekta Ponpis",
+        "description": "Espace pompiste : compteurs, argent et rapport de période.",
+        "lang": "ht",
+        "start_url": "/pompiste",
+        "scope": "/pompiste",
+        "display": "standalone",
+        "orientation": "any",
+        "background_color": "#eef2f7",
+        "theme_color": "#ea580c",
+        "icons": [
+            {"src": "/pompiste-app/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": "/pompiste-app/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+            {"src": "/pompiste-app/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+        ],
+    }, media_type="application/manifest+json", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/pompiste-sw.js", include_in_schema=False)
+def pompiste_service_worker():
+    return FileResponse(os.path.join(_POMPISTE_APP_DIR, "sw.js"), media_type="application/javascript",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+@app.get("/pompiste/installer", include_in_schema=False)
+def pompiste_installer():
+    return FileResponse(os.path.join(_POMPISTE_APP_DIR, "installer.html"), media_type="text/html",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+@app.get("/pompiste/qr.png", include_in_schema=False)
+def pompiste_qr(request: Request):
+    """QR code du lien d'installation, à scanner avec l'appareil du pompiste."""
+    import io
+    import qrcode
+    img = qrcode.make(_url_publique_site(request) + "/pompiste/installer", box_size=10, border=2)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(buf.getvalue(), media_type="image/png", headers={"Cache-Control": "no-cache"})
+
+
+app.mount("/pompiste-app", StaticFiles(directory=_POMPISTE_APP_DIR), name="pompiste-app")
 
 
 @app.get("/login", include_in_schema=False)

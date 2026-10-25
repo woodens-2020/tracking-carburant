@@ -19652,6 +19652,13 @@ function pspRendreComptes(){
   const c = document.getElementById('psp-contenu'), d = PSP.comptes;
   const emps = d.employes.filter(e => !e.lie);
   c.innerHTML = `${PSP.pin ? `<div class="psp-okbox">${PSP.pin}</div>` : ''}
+    <div class="psp-card" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+      <img src="/pompiste/qr.png" alt="QR" style="width:110px;height:110px;background:#fff;border-radius:8px;padding:4px">
+      <div style="flex:1;min-width:220px"><b>Installer l'application « Konekta Ponpis » sur un appareil</b>
+        <div class="psp-muted" style="margin-top:4px">Scannez ce QR code avec l'appareil du pompiste (ou ouvrez le lien dans Chrome),
+          puis « Enstale aplikasyon an » : une icône apparaît sur l'écran de l'appareil.</div>
+        <div style="margin-top:6px"><a href="/pompiste/installer" target="_blank" style="font-family:var(--mono)">${esc(location.origin)}/pompiste/installer</a></div></div>
+    </div>
     <div class="psp-card"><b>Nouveau compte pompiste</b>
       <div class="psp-muted" style="margin:4px 0 10px">Pas besoin d'email : le système crée un <b>code unique</b> (prénom + nom + 4 chiffres)
         et un <b>PIN de 9 chiffres</b>. Le pompiste se connecte sur <b>${esc(location.origin)}/pompiste</b> et n'a accès qu'à la saisie de ses compteurs.</div>

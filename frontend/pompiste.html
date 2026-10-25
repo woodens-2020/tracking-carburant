@@ -4,7 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f172a">
-<title>Espace pompiste</title>
+<title>Konekta Ponpis</title>
+<link rel="manifest" href="/pompiste/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/pompiste-app/favicon-64.png">
+<link rel="apple-touch-icon" href="/pompiste-app/icone-apple-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Konekta Ponpis">
 <style>
 :root{
   --bg:#eef2f7; --panel:#fff; --text:#0f172a; --muted:#64748b; --border:#d7dee8;
@@ -410,6 +416,7 @@ const TXT = {
     date_regle:'Touchez le jour. Pas de date dans le futur ; au plus {n} jours en arrière.',
     jours_courts:['Lu','Ma','Me','Je','Ve','Sa','Di'],
     e_date_future:'Un rapport ne peut pas être daté dans le futur.', e_date_ancienne:'Cette date est trop ancienne.',
+    installer_app:'Installer l\'application sur cet appareil',
     imprimer:'Imprimer la fiche', reimprimer:'Réimprimer', papier:'Papier',
     tk_titre:'RAPPORT POMPISTE', tk_no:'Rapport n°', tk_pompiste:'Pompiste', tk_code:'Code', tk_periode:'Période',
     tk_soumis:'Soumis le', tk_compteurs:'COMPTEURS', tk_prix:'Prix', tk_ventes:'VENTES', tk_argent:'ARGENT REMIS',
@@ -475,6 +482,7 @@ const TXT = {
     date_regle:'Touche jou a. Pa gen dat nan lavni ; pa plis pase {n} jou annaryè.',
     jours_courts:['Le','Ma','Mè','Je','Va','Sa','Di'],
     e_date_future:'Yon rapò pa ka gen yon dat nan lavni.', e_date_ancienne:'Dat sa a twò lontan.',
+    installer_app:'Enstale aplikasyon an sou aparèy sa a',
     imprimer:'Enprime fich la', reimprimer:'Re-enprime', papier:'Papye',
     tk_titre:'RAPÒ PONPIS', tk_no:'Rapò nimewo', tk_pompiste:'Ponpis', tk_code:'Kòd', tk_periode:'Peryòd',
     tk_soumis:'Soumèt le', tk_compteurs:'KONTÈ', tk_prix:'Pri', tk_ventes:'VANT', tk_argent:'LAJAN REMÈT',
@@ -631,7 +639,9 @@ function ecranConnexion(msg){
         style="font-family:var(--mono);font-size:30px;letter-spacing:.3em;text-align:center">
       <div style="height:18px"></div>
       <button class="btn" id="l-btn">${t('se_connecter')}</button>
-    </form></div>`;
+    </form>
+    ${!enModeApp() ? `<button class="btn sec" id="btn-installer" type="button" onclick="installerApp()" style="margin-top:6px">📲 ${t('installer_app')}</button>` : ''}
+    </div>`;
   $('f-login').onsubmit = async ev => {
     ev.preventDefault();
     const pin = $('l-pin').value.trim();
@@ -1238,6 +1248,18 @@ function reveil(){
   _veille = setTimeout(deconnexion, S.etape === 'fin' ? 120_000 : 10 * 60_000);
 }
 ['pointerdown','keydown'].forEach(ev => document.addEventListener(ev, reveil, {passive:true}));
+
+// ── Application installable (icône sur l'écran de l'appareil) ───────
+// Voir /pompiste/installer et frontend/pompiste-app/sw.js.
+let _inviteInstall = null;
+const enModeApp = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/pompiste-sw.js', {scope: '/pompiste'}).catch(() => {});
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); _inviteInstall = e; });
+window.addEventListener('appinstalled', () => { _inviteInstall = null; const b = $('btn-installer'); if(b) b.remove(); });
+async function installerApp(){
+  if(_inviteInstall){ _inviteInstall.prompt(); await _inviteInstall.userChoice; _inviteInstall = null; return; }
+  location.href = '/pompiste/installer';      // instructions + QR code
+}
 
 demarrer();
 </script>
