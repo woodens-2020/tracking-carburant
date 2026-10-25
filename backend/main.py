@@ -503,7 +503,8 @@ def startup():
         from pompiste_routes import rattacher_employes_pompistes
         with SessionLocal() as _db:
             rattacher_employes_pompistes(_db)
-            from pompiste_routes import rattraper_journal
+            from pompiste_routes import rattraper_journal, nettoyer_journal_anticipe
+            nettoyer_journal_anticipe(_db)
             rattraper_journal(_db)
     except Exception as _exc:
         print(f"[pompiste] rattachement des fiches employé impossible : {_exc}", flush=True)
@@ -2749,6 +2750,7 @@ def _build_journal_entries(
     pompe_id_filter: Optional[List[int]] = None,
     periode_filter: Optional[str] = None,
     pompiste_id_filter: Optional[int] = None,
+    inclure_en_attente: bool = False,
 ) -> list:
     """
     Source unique de vérité pour la construction des entrées du journal.
@@ -2769,6 +2771,14 @@ def _build_journal_entries(
     # dans l'ordre chronologique pour que l'analyse de continuité (pompe_last)
     # soit correcte. Le filtre est appliqué en post-traitement ci-dessous.
     releves = q.all()
+    if inclure_en_attente:
+        # Rapports pompistes pas encore finalisés : affichés « en attente de
+        # validation », placés dans la chaîne des compteurs, jamais totalisés
+        from pompiste_routes import lignes_en_attente
+        att = lignes_en_attente(db, d_debut, d_fin)
+        if pompe_id_filter:
+            att = [x for x in att if x.pompe_id in pompe_id_filter]
+        releves = releves + att
     if produit_id:
         releves = [r for r in releves if r.pompe.produit_id == produit_id]
 
@@ -2881,6 +2891,7 @@ def _build_journal_entries(
             "pompiste_id":      r.pompiste_id,
             "pompiste_nom":     (f"{r.pompiste.prenom} {r.pompiste.nom}" if r.pompiste else None),
             "source":           "pompiste" if r.rapport_pompiste_id else "saisie",
+            "en_attente":       bool(getattr(r, "en_attente", False)),
             "rapport_pompiste_id": r.rapport_pompiste_id,
             "rapport_statut":   r.rapport_pompiste.statut if r.rapport_pompiste else None,
             "saisi_par":        r.cree_par.nom_complet if r.cree_par else None,
@@ -2924,7 +2935,12 @@ def journal_endpoint(
     d_fin   = date_fin   or today_haiti()
     d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
 
-    entries = _build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode, pompiste_id)
+    tous = _build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode, pompiste_id,
+                                  inclure_en_attente=True)
+    # Les rapports pompistes pas encore finalisés sont listés mais ne comptent
+    # dans aucun total (ni gallons, ni montant, ni conformité)
+    en_attente = [e for e in tous if e["en_attente"]]
+    entries = [e for e in tous if not e["en_attente"]]
 
     nb_alertes = sum(1 for e in entries if e["statut"] == "alerte")
     nb_erreurs = sum(1 for e in entries if e["statut"] == "erreur")
@@ -2960,8 +2976,11 @@ def journal_endpoint(
     return {
         "date_debut": str(d_debut),
         "date_fin":   str(d_fin),
-        "entries":    entries,
+        "entries":    tous,
         "resume": {
+            "nb_en_attente":     len(en_attente),
+            "gallons_en_attente": round(sum(e["quantite"] for e in en_attente), 4),
+            "montant_en_attente": round(sum(e["montant_vente"] for e in en_attente), 2),
             "total_entrees":    len(entries),
             "nb_ok":            nb_ok,
             "nb_alertes":       nb_alertes,

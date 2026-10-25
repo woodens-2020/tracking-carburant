@@ -144,7 +144,7 @@ def rattraper_journal(db: Session) -> int:
     créneau n'est pas touchée (saisie parallèle du module Saisie gardée)."""
     n = 0
     rapports = (db.query(RapportPompiste)
-                .filter(RapportPompiste.statut.in_(("SOUMIS", "PROBLEME", "CONFIRME", "RESOLU")))
+                .filter(RapportPompiste.statut.in_(("CONFIRME", "RESOLU")))
                 .order_by(RapportPompiste.date, RapportPompiste.id).all())
     rapports.sort(key=lambda r: (r.date, _RANG.get(r.periode, 9), r.id))     # Matin avant Après-midi
     for rap in rapports:
@@ -156,6 +156,77 @@ def rattraper_journal(db: Session) -> int:
     if n:
         log.info("Journal des compteurs : %d mètre(s) de rapports pompistes rattrapé(s)", n)
     return n
+
+
+def _valeurs_finales(l: RapportPompisteLigne):
+    av = float(l.metter_avant_corrige if l.metter_avant_corrige is not None else l.metter_avant)
+    ap = float(l.metter_apres_corrige if l.metter_apres_corrige is not None else l.metter_apres)
+    return av, ap
+
+
+def nettoyer_journal_anticipe(db: Session) -> int:
+    """Démarrage : un rapport pas encore finalisé (soumis, en problème) ne
+    doit rien avoir dans le journal officiel. Les relevés écrits par l'ancien
+    fonctionnement (au « Terminer ») sont retirés s'ils sont identiques au
+    rapport ; s'ils ont été modifiés ensuite à la main (module Saisie), ils
+    deviennent une saisie ordinaire et sont gardés."""
+    n = 0
+    for rap in db.query(RapportPompiste).filter(RapportPompiste.statut.in_(("EN_COURS", "SOUMIS", "PROBLEME"))).all():
+        lignes = {l.pompe_id: l for l in rap.lignes}
+        for r in db.query(Releve).filter_by(rapport_pompiste_id=rap.id).all():
+            l = lignes.get(r.pompe_id)
+            av, ap = _valeurs_finales(l) if l else (None, None)
+            if l is not None and abs(float(r.metter_avant) - av) <= TOLERANCE and abs(float(r.metter_apres) - ap) <= TOLERANCE:
+                db.delete(r)
+            else:
+                r.rapport_pompiste_id = None
+            n += 1
+    db.commit()
+    if n:
+        log.info("Journal officiel : %d relevé(s) de rapports non finalisés retirés", n)
+    return n
+
+
+class LignePendante:
+    """Mètre d'un rapport pompiste pas encore finalisé, présenté au Journal
+    Meters comme un relevé (mêmes attributs que Releve) mais marqué
+    « en attente » : il n'est compté dans aucun total, ni caisse, ni stock."""
+    en_attente = True
+    nb_modifications = 0
+
+    def __init__(self, rap: RapportPompiste, l: RapportPompisteLigne, employe: Optional[Employe]):
+        self.id = f"R{rap.id}-{l.pompe_id}"
+        self.date, self.periode = rap.date, rap.periode
+        self.pompe_id, self.pompe = l.pompe_id, l.pompe
+        self.metter_avant, self.metter_apres = _valeurs_finales(l)
+        self.prix_gallon = float(l.prix_gallon)
+        self.pompiste, self.pompiste_id = employe, (employe.id if employe else None)
+        self.rapport_pompiste, self.rapport_pompiste_id = rap, rap.id
+        self.cree_par = rap.utilisateur
+
+    @property
+    def quantite(self) -> float:
+        return round(self.metter_apres - self.metter_avant, 4)
+
+    @property
+    def montant_vente(self) -> float:
+        return round(self.quantite * self.prix_gallon, 2)
+
+
+def lignes_en_attente(db: Session, d_debut: date_type, d_fin: date_type) -> list:
+    """Mètres des rapports soumis / en problème de la période. Une pompe déjà
+    présente au journal officiel pour le même créneau (saisie du module
+    Saisie) n'est pas doublée."""
+    out = []
+    for rap in (db.query(RapportPompiste)
+                .filter(RapportPompiste.statut.in_(("SOUMIS", "PROBLEME")),
+                        RapportPompiste.date >= d_debut, RapportPompiste.date <= d_fin).all()):
+        employe = db.query(Employe).filter_by(utilisateur_id=rap.utilisateur_id).first()
+        for l in rap.lignes:
+            if db.query(Releve).filter_by(date=rap.date, periode=rap.periode, pompe_id=l.pompe_id).first():
+                continue
+            out.append(LignePendante(rap, l, employe))
+    return out
 
 
 def ids_employes_pompistes(db: Session) -> set:
@@ -689,17 +760,13 @@ def terminer(data: TerminerIn, request: Request, u: Utilisateur = Depends(_requi
         db.commit()
     except Exception:
         db.rollback()
-    # Le journal des compteurs reçoit les mètres tout de suite, comme une saisie
-    try:
-        avert = _ecrire_journal(db, rap, request, remplacer_saisie=False)
-    except Exception as exc:          # la soumission du pompiste ne doit jamais échouer ici
-        db.rollback()
-        log.warning("Rapport pompiste %s : écriture du journal impossible : %s", rap.id, exc)
-        avert = []
+    # Les chiffres n'entrent dans le système (journal officiel, caisse, stock)
+    # qu'à la finalisation par la direction ; d'ici là le Journal Meters
+    # affiche le rapport « en attente de validation » (lignes_en_attente).
     _prevenir_admins(db, rap, request)
     db.refresh(rap)
     out = _rapport_dict(db, rap)
-    out["avertissements"] = avert
+    out["avertissements"] = []
     return out
 
 
@@ -804,11 +871,8 @@ def confirmer_ligne(rid: int, pompe_id: int, data: LigneConfIn, request: Request
     l.confirmee, l.confirmee_at = True, now_haiti()
     rap.ecart_confirme = False          # l'écart dépend des mètres : à revoir après une correction
     db.commit()
-    avert = _ecrire_journal(db, rap, request, remplacer_saisie=False, seulement=pompe_id)
     db.refresh(rap)
-    out = _rapport_dict(db, rap, avec_journal=True)
-    out["avertissements"] = avert
-    return out
+    return _rapport_dict(db, rap, avec_journal=True)
 
 
 @router.post("/api/pompiste-supervision/rapports/{rid}/lignes/{pompe_id}/reprendre")

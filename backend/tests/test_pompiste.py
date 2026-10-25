@@ -216,45 +216,73 @@ def test_debut_different_confirme_et_annulation(client, env):
 
 
 def test_journal_comme_le_module_saisie(client):
-    """Les mètres du pompiste entrent dans le journal dès le « Terminer »,
-    comme une saisie : pompiste attribué (fiche employé créée avec le compte,
-    visible dans le filtre), correction du superviseur répercutée, retrait
-    si le rapport est renvoyé."""
+    """Tant que la direction n'a pas finalisé, les mètres du pompiste sont
+    visibles au Journal Meters (« en attente ») mais ne comptent nulle part :
+    ni totaux du journal, ni rapport du jour (caisse), ni stock. À la
+    finalisation, ils entrent dans le système comme une saisie. Fiche
+    employé créée avec le compte, visible dans le filtre ; renvoi = retrait."""
     from tz_utils import today_haiti
     import main as _m
     jour = str(today_haiti())
     pompe = _produit(client, 400)
     c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Rose", "nom": "Saint-Fleur"}).json()
     assert c["employe_nom"] == "Rose Saint-Fleur"
-    filtre = client.get("/api/pompistes", headers=H).json()
-    emp_id = next(x["id"] for x in filtre if x["nom"] == "Rose Saint-Fleur")
+    emp_id = next(x["id"] for x in client.get("/api/pompistes", headers=H).json() if x["nom"] == "Rose Saint-Fleur")
     p = TestClient(_m.app)
     assert p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]}).status_code == 200
+
+    def journal(**f):
+        q = "&".join(f"{k}={v}" for k, v in f.items())
+        return client.get(f"/api/journal?date_debut={jour}&date_fin={jour}&{q}", headers=H).json()
+
+    def gallons_du_jour():
+        d = client.get(f"/api/carburant/rapport-jour?date={jour}", headers=H).json()
+        return sum(x["gallons"] for x in d["entrees"]["par_produit"] if any(True for _ in [0]))
+
+    avant = gallons_du_jour()
     r = p.post("/api/pompiste/compteurs", json={"date": jour, "periode": "Matin", "charte_acceptee": True,
               "lignes": [{"pompe_id": pompe, "metter_avant": 10, "metter_apres": 60}]})
     assert r.status_code == 201, r.text
-    # Pas encore dans le journal : le rapport n'est pas terminé
-    j = client.get(f"/api/journal?date_debut={jour}&date_fin={jour}&pompe_id={pompe}", headers=H).json()
-    assert j["entries"] == []
+    assert journal(pompe_id=pompe)["entries"] == []                  # rapport pas encore terminé
     rid = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 20}]}).json()["id"]
-    j = client.get(f"/api/journal?date_debut={jour}&date_fin={jour}&pompe_id={pompe}", headers=H).json()["entries"]
-    assert len(j) == 1 and j[0]["source"] == "pompiste" and j[0]["pompiste_nom"] == "Rose Saint-Fleur"
-    assert j[0]["metter_apres"] == 60 and j[0]["rapport_statut"] == "SOUMIS" and j[0]["saisi_par"] == "Rose Saint-Fleur"
-    j = client.get(f"/api/journal?date_debut={jour}&date_fin={jour}&pompiste_id={emp_id}", headers=H).json()["entries"]
-    assert [e["pompe_id"] for e in j] == [pompe]
-    # Correction du superviseur → journal à jour
-    client.post(f"/api/pompiste-supervision/rapports/{rid}/lignes/{pompe}/confirmer", headers=H,
-                json={"metter_avant": 10, "metter_apres": 58})
-    j = client.get(f"/api/journal?date_debut={jour}&date_fin={jour}&pompe_id={pompe}", headers=H).json()["entries"]
-    assert j[0]["metter_apres"] == 58
-    # Filtre de la liste des rapports par pompiste
-    lst = client.get(f"/api/pompiste-supervision/rapports?statut=SOUMIS&utilisateur_id={c['id']}", headers=H).json()
+    # Soumis : visible « en attente », compté nulle part
+    j = journal(pompe_id=pompe)
+    assert len(j["entries"]) == 1 and j["entries"][0]["en_attente"] is True
+    assert j["entries"][0]["pompiste_nom"] == "Rose Saint-Fleur" and j["entries"][0]["metter_apres"] == 60
+    assert j["resume"]["total_gallons"] == 0 and j["resume"]["nb_en_attente"] == 1 and j["resume"]["gallons_en_attente"] == 50
+    assert [e["pompe_id"] for e in journal(pompiste_id=emp_id)["entries"]] == [pompe]
+    assert gallons_du_jour() == avant                                 # rapport du jour / caisse inchangés
+    # Correction d'un mètre : toujours en attente, valeur corrigée affichée
+    _sup(client, rid, f"lignes/{pompe}/confirmer", metter_avant=10, metter_apres=58)
+    j = journal(pompe_id=pompe)
+    assert j["entries"][0]["en_attente"] and j["entries"][0]["metter_apres"] == 58 and gallons_du_jour() == avant
+    # Finalisation : les chiffres entrent dans le système
+    _sup(client, rid, "billetterie", confirme=True)
+    _sup(client, rid, "ecart", confirme=True)
+    r = _sup(client, rid, "finaliser", note=9, commentaire="Index relu : 58")
+    assert r.status_code == 200, r.text
+    j = journal(pompe_id=pompe)
+    assert len(j["entries"]) == 1 and j["entries"][0]["en_attente"] is False and j["entries"][0]["rapport_statut"] == "CONFIRME"
+    assert j["resume"]["total_gallons"] == 48 and j["resume"]["nb_en_attente"] == 0
+    assert abs(gallons_du_jour() - avant - 48) < 1e-6
+    lst = client.get(f"/api/pompiste-supervision/rapports?statut=CONFIRME&utilisateur_id={c['id']}", headers=H).json()
     assert [x["id"] for x in lst] == [rid]
-    # Renvoi au pompiste → retiré du journal
-    _sup(client, rid, "rejeter", commentaire="Recomptez s'il vous plaît.")
-    j = client.get(f"/api/journal?date_debut={jour}&date_fin={jour}&pompe_id={pompe}", headers=H).json()["entries"]
-    assert j == []
 
+
+def test_renvoi_retire_du_journal_en_attente(client):
+    from tz_utils import today_haiti
+    import main as _m
+    jour = str(today_haiti())
+    pompe = _produit(client, 450)
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Ren", "nom": "Voi"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    p.post("/api/pompiste/compteurs", json={"date": jour, "periode": "Matin", "charte_acceptee": True,
+           "lignes": [{"pompe_id": pompe, "metter_avant": 0, "metter_apres": 30}]})
+    rid = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 13}]}).json()["id"]
+    assert len(client.get(f"/api/journal?date_debut={jour}&date_fin={jour}&pompe_id={pompe}", headers=H).json()["entries"]) == 1
+    _sup(client, rid, "rejeter", commentaire="Recomptez s'il vous plaît.")
+    assert client.get(f"/api/journal?date_debut={jour}&date_fin={jour}&pompe_id={pompe}", headers=H).json()["entries"] == []
 
 def test_desactivation_coupe_la_session(client, env):
     r = client.patch(f"/api/pompiste-supervision/comptes/{env['uid']}", headers=H, json={"actif": False})
@@ -320,17 +348,17 @@ def test_application_installable(client):
     assert anonyme.get("/pompiste/installer").status_code == 200
 
 
-def test_rattrapage_du_journal(client, db):
-    """Un rapport soumis avant l'écriture automatique du journal (mètres
-    absents du journal) est rattrapé au démarrage, toutes ses pompes."""
+def test_rattrapage_et_nettoyage_du_journal(client, db):
+    """Démarrage : un rapport finalisé dont un mètre manque au journal est
+    rattrapé ; un rapport pas encore finalisé n'a rien au journal officiel
+    (écritures anticipées de l'ancien fonctionnement retirées)."""
     from tz_utils import today_haiti
     import main as _m
     import pompiste_routes
     from models import Releve
     jour = str(today_haiti())
-    p1, p2 = _produit(client, 700), None
-    pid_produit = client.get("/api/produits", headers=H).json()
-    prod = next(p for p in pid_produit if any(q["id"] == p1 for q in p["pompes"]))
+    p1 = _produit(client, 700)
+    prod = next(p for p in client.get("/api/produits", headers=H).json() if any(q["id"] == p1 for q in p["pompes"]))
     p2 = client.post(f"/api/produits/{prod['id']}/pompes", headers=H, json={"nom": f"{prod['nom']} P2"}).json()["id"]
     c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Rat", "nom": "Trapage"}).json()
     p = TestClient(_m.app)
@@ -339,12 +367,24 @@ def test_rattrapage_du_journal(client, db):
               "lignes": [{"pompe_id": p1, "metter_avant": 0, "metter_apres": 40}, {"pompe_id": p2, "metter_avant": 0, "metter_apres": 25}]})
     assert r.status_code == 201, r.text
     rid = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 45}]}).json()["id"]
-    # Simule un rapport d'avant : ses mètres ne sont pas dans le journal
+    # Pas encore finalisé : rien au journal officiel ; une écriture anticipée est nettoyée
+    assert db.query(Releve).filter(Releve.pompe_id.in_([p1, p2])).count() == 0
+    db.add(Releve(date=today_haiti(), periode="Apres-midi", pompe_id=p1, prix_gallon=700, metter_avant=0, metter_apres=40,
+                  rapport_pompiste_id=rid))
+    db.commit()
+    assert pompiste_routes.nettoyer_journal_anticipe(db) == 1
+    assert db.query(Releve).filter(Releve.pompe_id.in_([p1, p2])).count() == 0
+    # Finalisé, puis mètres absents (rapport d'avant) : rattrapés, toutes les pompes
+    for pid in (p1, p2):
+        _sup(client, rid, f"lignes/{pid}/confirmer", metter_avant=0, metter_apres=40 if pid == p1 else 25)
+    _sup(client, rid, "billetterie", confirme=True)
+    _sup(client, rid, "ecart", confirme=True)
+    assert _sup(client, rid, "finaliser", note=8).status_code == 200
+    db.expire_all()
     db.query(Releve).filter(Releve.rapport_pompiste_id == rid).delete()
     db.commit()
-    assert db.query(Releve).filter(Releve.pompe_id.in_([p1, p2])).count() == 0
     assert pompiste_routes.rattraper_journal(db) >= 2
     rel = db.query(Releve).filter(Releve.pompe_id.in_([p1, p2])).all()
     assert sorted(float(x.metter_apres) for x in rel) == [25.0, 40.0]
     assert all(x.rapport_pompiste_id == rid and x.pompiste_id for x in rel)
-    assert pompiste_routes.rattraper_journal(db) == 0          # idempotent
+    assert pompiste_routes.rattraper_journal(db) == 0

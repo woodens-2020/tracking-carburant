@@ -3264,6 +3264,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .jr-src{display:inline-block;margin-top:3px;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 7px;
   background:rgba(249,115,22,.12);color:var(--orange);white-space:nowrap}
 .jr-src.ok{background:rgba(34,197,94,.12);color:var(--green)}
+.jr-src.attente{background:rgba(249,115,22,.16);color:var(--orange)}
+tr.jr-attente td{opacity:.62;font-style:italic}
+tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 /* Caisse principale */
 .cp-total{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--border);
   border-left:4px solid var(--green);border-radius:14px;padding:16px 18px;margin-bottom:12px}
@@ -17359,6 +17362,11 @@ function renderJournal(data){
       <div class="jres-num" style="color:${tauxCol}">${taux.toFixed(1)}%</div>
       <div class="jres-bar-wrap"><div class="jres-bar" style="width:${taux}%;background:${tauxCol}"></div></div>
     </div>
+    ${resume.nb_en_attente?`<div class="jres-card c-amber">
+      <div class="jres-lbl">En attente de validation</div>
+      <div class="jres-num" style="color:var(--orange)">${fmtGalX(resume.gallons_en_attente)}</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${resume.nb_en_attente} mètre${resume.nb_en_attente>1?'s':''} · ${fmtGX(resume.montant_en_attente)} — non compté tant que la direction n'a pas finalisé</div>
+    </div>`:''}
     <div class="jres-card c-teal">
       <div class="jres-lbl">Total gallons (hors sauts)</div>
       <div class="jres-num c-teal">${fmtGalX(resume.total_gallons)}</div>
@@ -17465,8 +17473,10 @@ function renderJournal(data){
     return;
   }
 
-  const totalQte    = entries.reduce((s,e)=>s+(e.quantite||0),0);
-  const totalMontant= entries.reduce((s,e)=>s+(e.montant_vente||0),0);
+  // Les rapports pompistes pas encore finalisés sont affichés mais jamais totalisés
+  const valides     = entries.filter(e=>!e.en_attente), attente = entries.filter(e=>e.en_attente);
+  const totalQte    = valides.reduce((s,e)=>s+(e.quantite||0),0);
+  const totalMontant= valides.reduce((s,e)=>s+(e.montant_vente||0),0);
 
   const rows=entries.map(e=>{
     const isErr=e.statut==='erreur';
@@ -17493,11 +17503,13 @@ function renderJournal(data){
         ?'<span style="color:var(--blue);font-weight:700">⚠ Alerte</span>'
         :'<span style="color:var(--green)">✓ OK</span>';
 
-    return `<tr class="${rowCls}">
+    return `<tr class="${rowCls}${e.en_attente?' jr-attente':''}">
       <td class="num" style="white-space:nowrap">${frDate(e.date)}</td>
       <td style="font-size:13px">${e.periode==='Matin'?'🌅 Matin':'🌇 Après-midi'}</td>
       <td style="font-weight:600">${esc(e.pompe_nom)}</td>
-      <td style="font-size:13px">${e.pompiste_nom?esc(e.pompiste_nom):'<span class="c-dim">—</span>'}${e.source==='pompiste'
+      <td style="font-size:13px">${e.pompiste_nom?esc(e.pompiste_nom):'<span class="c-dim">—</span>'}${e.en_attente
+        ?`<div><span class="jr-src attente" title="Rapport pompiste pas encore finalisé : ni caisse, ni stock, ni totaux">⏳ En attente de validation — non compté</span></div>`
+        : e.source==='pompiste'
         ?`<div><span class="jr-src ${['CONFIRME','RESOLU'].includes(e.rapport_statut)?'ok':''}" title="Saisi par le pompiste sur sa tablette">⛽ Espace pompiste · ${
           {SOUMIS:'à vérifier',PROBLEME:'problème',CONFIRME:'validé',RESOLU:'résolu'}[e.rapport_statut]||'—'}</span></div>`:''}</td>
       <td class="tr num" style="color:var(--blue)">${e.metter_avant.toFixed(3)}</td>
@@ -17533,7 +17545,7 @@ function renderJournal(data){
         <tfoot>
           <tr style="background:var(--panel3);border-top:2px solid var(--border2)">
             <td colspan="8" style="padding:10px 14px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">
-              Total filtré &mdash; ${entries.length} relevé${entries.length>1?'s':''}
+              Total validé &mdash; ${valides.length} relevé${valides.length>1?'s':''}
             </td>
             <td class="tr num c-teal" style="padding:10px 14px;font-size:16px;font-weight:900">
               ${fmtGal(totalQte)}
@@ -17543,6 +17555,11 @@ function renderJournal(data){
             </td>
             <td colspan="2"></td>
           </tr>
+          ${attente.length?`<tr class="jr-attente-pied"><td colspan="8" style="padding:8px 14px;font-size:12.5px;color:var(--orange)">
+              ⏳ En attente de validation (non compté) &mdash; ${attente.length} mètre${attente.length>1?'s':''} de rapports pompistes</td>
+            <td class="tr num" style="padding:8px 14px;color:var(--orange)">${fmtGal(attente.reduce((s,e)=>s+(e.quantite||0),0))}</td>
+            <td class="tr num" style="padding:8px 14px;color:var(--orange)">${fmtG(attente.reduce((s,e)=>s+(e.montant_vente||0),0))}</td>
+            <td colspan="2"></td></tr>`:''}
         </tfoot>
       </table>
     </div>
