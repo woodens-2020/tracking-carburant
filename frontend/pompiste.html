@@ -173,6 +173,29 @@ td.r,th.r{text-align:right;white-space:nowrap}
 .barre-bas .btn{width:auto;flex:none;min-width:260px}
 .cache{display:none!important}
 .connexion{max-width:520px;margin:5vh auto 0}
+
+/* Fiche imprimée (terminal à imprimante thermique) */
+#ticket{display:none}
+.papier{display:flex;gap:6px;justify-content:center;margin:10px 0 0}
+.papier button{font:inherit;font-weight:700;font-size:15px;border-radius:10px;padding:8px 14px;cursor:pointer;
+  border:2px solid var(--border);background:var(--panel);color:var(--muted)}
+.papier button.on{border-color:var(--accent);color:var(--text)}
+.btn-print{background:var(--text);color:var(--bg)}
+@media print{
+  body{background:#fff!important}
+  body > *:not(#ticket){display:none!important}
+  #ticket{display:block!important;color:#000;background:#fff;font:12px/1.35 "Courier New",ui-monospace,monospace;margin:0;padding:0}
+  #ticket.l58{width:48mm;font-size:11px} #ticket.l80{width:72mm}
+  #ticket .i,#ticket .b{overflow-wrap:anywhere}
+  #ticket .c{text-align:center} #ticket .b{font-weight:700}
+  #ticket .gr{font-size:15px;font-weight:700}
+  #ticket .sep{border-top:1px dashed #000;margin:5px 0}
+  #ticket .sep2{border-top:2px solid #000;margin:5px 0}
+  #ticket .l{display:flex;justify-content:space-between;gap:6px}
+  #ticket .l span:last-child{text-align:right;white-space:nowrap}
+  #ticket .pompe{margin:3px 0}
+  #ticket .sig{margin-top:18px;border-top:1px solid #000;padding-top:2px;text-align:center;font-size:10px}
+}
 .langues .court{display:none}
 
 /* Lignes de pompe (vérification, rapport, résumé) */
@@ -280,6 +303,7 @@ main,.card,.deux-col > *{min-width:0}
 </header>
 
 <main id="app"></main>
+<div id="ticket" aria-hidden="true"></div>
 <div class="barre-bas cache" id="barre"><div class="in">
   <div class="info" id="barre-info"></div>
   <button class="btn" id="barre-btn"></button>
@@ -349,6 +373,12 @@ const TXT = {
     e_fin_inferieure:'L\'index de fin est plus petit que l\'index de début : un compteur ne recule pas.',
     e_deja:'Déjà saisie pour cette période : {p}.', e_terminer:'Terminez d\'abord votre rapport en cours (bouton « Non, j\'ai fini »).',
     e_rien:'Aucun compteur envoyé : saisissez d\'abord vos pompes.',
+    imprimer:'Imprimer la fiche', reimprimer:'Réimprimer', papier:'Papier',
+    tk_titre:'RAPPORT POMPISTE', tk_no:'Rapport n°', tk_pompiste:'Pompiste', tk_code:'Code', tk_periode:'Période',
+    tk_soumis:'Soumis le', tk_compteurs:'COMPTEURS', tk_prix:'Prix', tk_ventes:'VENTES', tk_argent:'ARGENT REMIS',
+    tk_total_gal:'Total gallons', tk_attendu:'Ventes attendues', tk_compte:'Argent compté', tk_ecart:'Écart',
+    tk_note:'Note', tk_sig_pompiste:'Signature pompiste', tk_sig_resp:'Signature responsable',
+    tk_imprime:'Imprimé le', tk_verif:'À vérifier par la direction',
     jours:['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'],
     mois:['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'],
   },
@@ -403,6 +433,12 @@ const TXT = {
     e_fin_inferieure:'Endèks fen an pi piti pase endèks kòmansman an : yon kontè pa ka fè bak.',
     e_deja:'Deja antre pou peryòd sa a : {p}.', e_terminer:'Fini rapò ou kòmanse a anvan (bouton « Non, mwen fini »).',
     e_rien:'Ou poko voye okenn kontè : antre ponp ou yo anvan.',
+    imprimer:'Enprime fich la', reimprimer:'Re-enprime', papier:'Papye',
+    tk_titre:'RAPÒ PONPIS', tk_no:'Rapò nimewo', tk_pompiste:'Ponpis', tk_code:'Kòd', tk_periode:'Peryòd',
+    tk_soumis:'Soumèt le', tk_compteurs:'KONTÈ', tk_prix:'Pri', tk_ventes:'VANT', tk_argent:'LAJAN REMÈT',
+    tk_total_gal:'Total galon', tk_attendu:'Lajan ki dwe antre', tk_compte:'Lajan konte', tk_ecart:'Diferans',
+    tk_note:'Nòt', tk_sig_pompiste:'Siyati ponpis', tk_sig_resp:'Siyati responsab',
+    tk_imprime:'Enprime le', tk_verif:'Direksyon an ap verifye l',
     jours:['dimanch','lendi','madi','mèkredi','jedi','vandredi','samdi'],
     mois:['janvye','fevriye','mas','avril','me','jen','jiyè','out','septanm','oktòb','novanm','desanm'],
   },
@@ -500,6 +536,7 @@ async function demarrer(){
   try{
     const b = await api('GET','/api/config/branding');
     if(b?.nom) $('marque').textContent = b.nom;
+    S.marque = b || {};
     if(b?.environnement && b.environnement !== 'production'){
       $('env').textContent = String(b.environnement).toUpperCase() + ' — environnement de test';
       $('env').classList.remove('cache');
@@ -987,12 +1024,91 @@ function rFin(){
       <div class="total"><span>${t('attendu')}</span><span class="v">${G(r.montant_attendu)}</span></div>
       <div class="total"><span>${t('compte')}</span><span class="v">${G(r.montant_compte)}</span></div>
       <div class="total"><span>${t('ecart')}</span><span class="v">${signe(r.ecart)}</span></div></div>
+    <button class="btn btn-print" onclick="imprimerTicket(S.dernier)">🖨 ${t('imprimer')}</button>
+    <div class="papier">${t('papier')} : ${['58','80'].map(l => `<button data-l="${l}" class="${PAPIER===l?'on':''}" onclick="choisirPapier('${l}')">${l} mm</button>`).join('')}</div>
+    <div style="height:12px"></div>
     <button class="btn" onclick="deconnexion()">${t('deconnecter')}</button>
     <div style="height:12px"></div>
     <button class="btn sec" onclick="nouveauRapport()">${t('autre_rapport')}</button>
     <h2>${t('derniers')}</h2><div class="card" id="hist"></div></div>`;
   chargerHistorique();
+  // Fiche imprimée automatiquement dès la soumission
+  if(!r._imprime){ r._imprime = true; setTimeout(() => imprimerTicket(r), 400); }
 }
+// ── Fiche du rapport, format ticket (imprimante thermique du terminal) ──
+let PAPIER = (() => { try{ return localStorage.getItem('pompiste-papier') || '58'; }catch(e){ return '58'; } })();
+function choisirPapier(l){ PAPIER = l; try{ localStorage.setItem('pompiste-papier', l); }catch(e){}
+  document.querySelectorAll('.papier button').forEach(b => b.classList.toggle('on', b.dataset.l === l)); }
+
+function ticketHtml(r){
+  const m = S.marque || {}, L = (a, b) => `<div class="l"><span>${a}</span><span>${b}</span></div>`;
+  const pomp = S.ctx?.pompiste || {};
+  const parProduit = {};
+  for(const l of r.lignes) (parProduit[l.produit_nom] ||= []).push(l);
+  const quand = d => { const x = new Date(d); return `${String(x.getDate()).padStart(2,'0')}/${String(x.getMonth()+1).padStart(2,'0')}/${x.getFullYear()} `
+    + `${String(x.getHours()).padStart(2,'0')}:${String(x.getMinutes()).padStart(2,'0')}`; };
+  const billets = (r.billetterie || []).map(b => ({c: b.coupure, n: (b.liasses||0) * 100 + (b.billets||0)})).filter(x => x.n);
+  return `<div class="c gr">${esc(m.nom || 'KONEKTA')}</div>
+    ${m.raison_sociale || m.complexe ? `<div class="c">${esc([m.raison_sociale, m.complexe].filter(Boolean).join(' · '))}</div>` : ''}
+    ${m.adresse ? `<div class="c">${esc(m.adresse)}</div>` : ''}
+    ${m.telephone1 ? `<div class="c">${esc(m.telephone1)}</div>` : ''}
+    <div class="sep2"></div>
+    <div class="c b">${t('tk_titre')}</div>
+    <div class="c">${t('tk_no')} ${r.id}</div>
+    <div class="sep"></div>
+    <div class="b">${t('tk_pompiste')} : ${esc(r.pompiste_nom || pomp.nom || '')}</div>
+    <div class="i">${t('tk_code')} : ${esc(pomp.username || '')}</div>
+    <div class="i">${t('tk_periode')} : ${per(r.periode)}, ${esc(jourTxt(r.date))}</div>
+    ${r.soumis_at ? `<div class="i">${t('tk_soumis')} : ${quand(r.soumis_at)}</div>` : ''}
+    <div class="sep"></div>
+    <div class="b">${t('tk_compteurs')}</div>
+    ${Object.entries(parProduit).map(([nom, ls]) => `<div class="b">${esc(nom).toUpperCase()}</div>
+      ${ls.map(l => `<div class="pompe"><div class="b">${esc(l.pompe_nom)}</div>
+        ${L(t('debut'), nf(l.metter_avant,3))}${L(t('fin'), nf(l.metter_apres,3))}
+        ${L(`${nf(l.gallons,3)} gal × ${nf(l.prix_gallon,2)}`, G(l.montant))}</div>`).join('')}
+      ${L(`<b>${t('total')} ${esc(nom)}</b>`, `<b>${nf(ls.reduce((a,x)=>a+x.gallons,0),3)} gal</b>`)}
+      ${L('', `<b>${G(ls.reduce((a,x)=>a+x.montant,0))}</b>`)}`).join('<div class="sep"></div>')}
+    <div class="sep2"></div>
+    <div class="b">${t('tk_ventes')}</div>
+    ${L(t('tk_total_gal'), nf(r.total_gallons,3))}
+    ${L(`<b>${t('tk_attendu')}</b>`, `<b>${G(r.montant_attendu)}</b>`)}
+    <div class="sep"></div>
+    <div class="b">${t('tk_argent')}</div>
+    ${billets.map(x => L(`${nf(x.c)} G × ${x.n}`, G(x.c * x.n))).join('')}
+    ${r.monnaie ? L(t('monnaie'), G(r.monnaie)) : ''}
+    ${L(`<b>${t('tk_compte')}</b>`, `<b>${G(r.montant_compte)}</b>`)}
+    <div class="sep2"></div>
+    <div class="l gr"><span>${t('tk_ecart')}</span><span>${signe(r.ecart)}</span></div>
+    <div class="c">${Math.abs(r.ecart) < 1 ? t('juste') : (r.ecart < 0 ? t('manque') : t('plus'))}</div>
+    ${r.note_pompiste ? `<div class="sep"></div><div>${t('tk_note')} : ${esc(r.note_pompiste)}</div>` : ''}
+    <div class="sig">${t('tk_sig_pompiste')}</div>
+    <div class="sig">${t('tk_sig_resp')}</div>
+    <div class="sep"></div>
+    <div class="c">${t('tk_verif')}</div>
+    <div class="c">${t('tk_imprime')} ${quand(new Date())}</div>
+    <div style="height:14mm"></div>`;
+}
+
+function imprimerTicket(r){
+  const tk = $('ticket');
+  tk.className = 'l' + PAPIER;
+  tk.innerHTML = ticketHtml(r);
+  let st = document.getElementById('format-page');
+  if(!st){ st = document.createElement('style'); st.id = 'format-page'; document.head.appendChild(st); }
+  st.textContent = `@page{size:${PAPIER}mm auto;margin:2mm 3mm}`;
+  clearTimeout(_veille);                 // pas de déconnexion pendant la fenêtre d'impression
+  setTimeout(() => window.print(), 50);
+}
+window.addEventListener('afterprint', () => reveil());
+
+async function reimprimer(id){
+  try{
+    const rs = await api('GET','/api/pompiste/rapports');
+    const r = rs.find(x => x.id === id);
+    if(r) imprimerTicket(r);
+  }catch(e){}
+}
+
 function nouveauRapport(){
   const charte = S.charte; reinit(); S.charte = charte;
   S.etape = 'periode'; chargerContexte();
@@ -1007,18 +1123,19 @@ async function chargerHistorique(){
       <div style="font-size:15px;color:var(--muted)">${esc([...new Set(r.lignes.map(l=>l.produit_nom))].join(', '))} · ${nf(r.total_gallons,3)} gal · ${t('ecart_court')} ${signe(r.ecart)}</div>
       ${r.commentaire_superviseur ? `<div class="com"><b>${esc(r.traite_par_nom||t('direction'))} :</b> ${esc(r.commentaire_superviseur)}</div>` : ''}
       ${r.statut==='REJETE' ? `<div style="font-size:15px;margin-top:6px;font-weight:700">${t('refaire')}</div>` : ''}
+      <button class="btn-mod" style="margin-top:8px" onclick="reimprimer(${r.id})">🖨 ${t('reimprimer')}</button>
     </div>`).join('') : `<span class="sub">${t('aucun_rapport')}</span>`;
   }catch(e){ const h = $('hist'); if(h) h.innerHTML = ''; }
 }
 
 // Tablette partagée : déconnexion automatique après 10 min sans toucher
 // l'écran (le rapport commencé est gardé et repris à la reconnexion), et
-// 60 s après l'écran « Rapport envoyé ».
+// 2 min après l'écran « Rapport envoyé » (le temps d'imprimer la fiche).
 let _veille = null;
 function reveil(){
   clearTimeout(_veille);
   if(!S.ctx && S.etape !== 'fin') return;
-  _veille = setTimeout(deconnexion, S.etape === 'fin' ? 60_000 : 10 * 60_000);
+  _veille = setTimeout(deconnexion, S.etape === 'fin' ? 120_000 : 10 * 60_000);
 }
 ['pointerdown','keydown'].forEach(ev => document.addEventListener(ev, reveil, {passive:true}));
 
