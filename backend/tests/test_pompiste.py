@@ -215,6 +215,47 @@ def test_debut_different_confirme_et_annulation(client, env):
     assert env["p"].get("/api/pompiste/contexte").json()["en_cours"] is None
 
 
+def test_journal_comme_le_module_saisie(client):
+    """Les mètres du pompiste entrent dans le journal dès le « Terminer »,
+    comme une saisie : pompiste attribué (fiche employé créée avec le compte,
+    visible dans le filtre), correction du superviseur répercutée, retrait
+    si le rapport est renvoyé."""
+    from tz_utils import today_haiti
+    import main as _m
+    jour = str(today_haiti())
+    pompe = _produit(client, 400)
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Rose", "nom": "Saint-Fleur"}).json()
+    assert c["employe_nom"] == "Rose Saint-Fleur"
+    filtre = client.get("/api/pompistes", headers=H).json()
+    emp_id = next(x["id"] for x in filtre if x["nom"] == "Rose Saint-Fleur")
+    p = TestClient(_m.app)
+    assert p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]}).status_code == 200
+    r = p.post("/api/pompiste/compteurs", json={"date": jour, "periode": "Matin", "charte_acceptee": True,
+              "lignes": [{"pompe_id": pompe, "metter_avant": 10, "metter_apres": 60}]})
+    assert r.status_code == 201, r.text
+    # Pas encore dans le journal : le rapport n'est pas terminé
+    j = client.get(f"/api/journal?date_debut={jour}&date_fin={jour}&pompe_id={pompe}", headers=H).json()
+    assert j["entries"] == []
+    rid = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 20}]}).json()["id"]
+    j = client.get(f"/api/journal?date_debut={jour}&date_fin={jour}&pompe_id={pompe}", headers=H).json()["entries"]
+    assert len(j) == 1 and j[0]["source"] == "pompiste" and j[0]["pompiste_nom"] == "Rose Saint-Fleur"
+    assert j[0]["metter_apres"] == 60 and j[0]["rapport_statut"] == "SOUMIS" and j[0]["saisi_par"] == "Rose Saint-Fleur"
+    j = client.get(f"/api/journal?date_debut={jour}&date_fin={jour}&pompiste_id={emp_id}", headers=H).json()["entries"]
+    assert [e["pompe_id"] for e in j] == [pompe]
+    # Correction du superviseur → journal à jour
+    client.post(f"/api/pompiste-supervision/rapports/{rid}/lignes/{pompe}/confirmer", headers=H,
+                json={"metter_avant": 10, "metter_apres": 58})
+    j = client.get(f"/api/journal?date_debut={jour}&date_fin={jour}&pompe_id={pompe}", headers=H).json()["entries"]
+    assert j[0]["metter_apres"] == 58
+    # Filtre de la liste des rapports par pompiste
+    lst = client.get(f"/api/pompiste-supervision/rapports?statut=SOUMIS&utilisateur_id={c['id']}", headers=H).json()
+    assert [x["id"] for x in lst] == [rid]
+    # Renvoi au pompiste → retiré du journal
+    _sup(client, rid, "rejeter", commentaire="Recomptez s'il vous plaît.")
+    j = client.get(f"/api/journal?date_debut={jour}&date_fin={jour}&pompe_id={pompe}", headers=H).json()["entries"]
+    assert j == []
+
+
 def test_desactivation_coupe_la_session(client, env):
     r = client.patch(f"/api/pompiste-supervision/comptes/{env['uid']}", headers=H, json={"actif": False})
     assert r.status_code == 200

@@ -82,6 +82,60 @@ def assurer_role_pompiste(db: Session) -> Role:
     return r
 
 
+def _norm(txt: str) -> str:
+    t = unicodedata.normalize("NFKD", txt or "").encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]", "", t)
+
+
+def employe_du_compte(db: Session, u: Utilisateur, prenom: Optional[str] = None,
+                      nom: Optional[str] = None) -> Employe:
+    """Fiche employé du compte pompiste (créée au besoin). C'est elle qui
+    apparaît dans le filtre « Pompiste » du journal et dans les relevés
+    (`releves.pompiste_id`), comme pour une saisie dans le module Saisie.
+    Réutilise un employé « Pompiste » existant de même nom s'il n'est lié à
+    aucun compte."""
+    emp = db.query(Employe).filter_by(utilisateur_id=u.id).first()
+    if emp:
+        return emp
+    if prenom is None:
+        morceaux = (u.nom_complet or u.username).split()
+        prenom, nom = morceaux[0], " ".join(morceaux[1:]) or morceaux[0]
+    cle = _norm(prenom) + _norm(nom)
+    for e in db.query(Employe).filter(Employe.utilisateur_id.is_(None), Employe.actif.is_(True)).all():
+        if (e.poste or "").strip().lower() == "pompiste" and _norm(e.prenom) + _norm(e.nom) == cle:
+            e.utilisateur_id = u.id
+            return e
+    emp = Employe(prenom=prenom.strip()[:100], nom=(nom or "").strip()[:100] or prenom.strip()[:100],
+                  poste="Pompiste", date_embauche=today_haiti(), salaire_base=0, type_contrat="CDI",
+                  actif=u.actif, utilisateur_id=u.id,
+                  notes="Fiche créée avec le compte pompiste (espace /pompiste).")
+    db.add(emp)
+    db.flush()
+    return emp
+
+
+def rattacher_employes_pompistes(db: Session) -> None:
+    """Démarrage : comptes pompistes sans fiche employé (créés avant ce
+    rattachement) et relevés de l'espace pompiste sans pompiste attribué."""
+    role = assurer_role_pompiste(db)
+    for u in db.query(Utilisateur).filter_by(role_id=role.id).all():
+        employe_du_compte(db, u)
+    for r in db.query(Releve).filter(Releve.rapport_pompiste_id.isnot(None), Releve.pompiste_id.is_(None)).all():
+        rap = db.get(RapportPompiste, r.rapport_pompiste_id)
+        emp = db.query(Employe).filter_by(utilisateur_id=rap.utilisateur_id).first() if rap else None
+        if emp:
+            r.pompiste_id = emp.id
+    db.commit()
+
+
+def ids_employes_pompistes(db: Session) -> set:
+    role = next((x for x in db.query(Role).all() if est_role_pompiste(x)), None)
+    if not role:
+        return set()
+    return {e.id for e in db.query(Employe).join(Utilisateur, Employe.utilisateur_id == Utilisateur.id)
+            .filter(Utilisateur.role_id == role.id).all()}
+
+
 def _user(request: Request, db: Session) -> Utilisateur:
     proxy = getattr(request.state, "user", None)
     if not proxy:
@@ -190,7 +244,8 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
         if avec_journal:
             j = (db.query(Releve).filter_by(date=r.date, periode=r.periode, pompe_id=l.pompe_id).first())
             d["journal"] = ({"metter_avant": float(j.metter_avant), "metter_apres": float(j.metter_apres),
-                             "saisi_par": _nom(j.cree_par)} if j else None)
+                             "saisi_par": _nom(j.cree_par), "de_ce_rapport": j.rapport_pompiste_id == r.id}
+                            if j else None)
             prec, src = _index_precedent(db, l.pompe_id, r.date, r.periode, exclure_rapport_id=r.id)
             d["index_precedent"] = prec
             d["index_precedent_source"] = src
@@ -458,6 +513,62 @@ def modifier_compteur(pompe_id: int, data: ModifLigneIn, u: Utilisateur = Depend
     return _rapport_dict(db, rap)
 
 
+def _ecrire_journal(db: Session, rap: RapportPompiste, request: Request, *, remplacer_saisie: bool,
+                    motif: Optional[str] = None, seulement: Optional[int] = None) -> list[str]:
+    """Écrit les mètres du rapport dans le journal des compteurs (`releves`),
+    avec exactement les règles du module Saisie (prix officiel à la date,
+    continuité des compteurs, alertes de stock) via `upsert_releve`.
+
+    - au « Terminer » du pompiste : le journal reçoit ses mètres tout de suite
+      (statut du rapport : à vérifier) ; une saisie déjà faite dans le module
+      Saisie pour la même pompe n'est pas écrasée — le superviseur tranche ;
+    - à chaque correction / à la finalisation : mise à jour des mêmes relevés ;
+      la finalisation (`remplacer_saisie=True`) remplace aussi une saisie
+      faite en parallèle.
+    Retourne les avertissements (prix, stock, conflit…)."""
+    import main
+    employe = employe_du_compte(db, rap.utilisateur)
+    avertissements = []
+    for l in rap.lignes:
+        if seulement is not None and l.pompe_id != seulement:
+            continue
+        av = float(l.metter_avant_corrige if l.metter_avant_corrige is not None else l.metter_avant)
+        ap = float(l.metter_apres_corrige if l.metter_apres_corrige is not None else l.metter_apres)
+        existant = db.query(Releve).filter_by(date=rap.date, periode=rap.periode, pompe_id=l.pompe_id).first()
+        if existant and existant.rapport_pompiste_id != rap.id and not remplacer_saisie:
+            avertissements.append(f"{l.pompe.nom} : déjà saisie dans le module Saisie — "
+                                  "le journal garde cette saisie jusqu'à la finalisation du rapport.")
+            continue
+        identique = existant and abs(float(existant.metter_avant) - av) <= TOLERANCE \
+            and abs(float(existant.metter_apres) - ap) <= TOLERANCE
+        if not identique:
+            try:
+                out = main.upsert_releve(main.ReleveIn(
+                    date=rap.date, periode=rap.periode, pompe_id=l.pompe_id,
+                    prix_gallon=float(l.prix_gallon), metter_avant=av, metter_apres=ap,
+                    motif_ecart_compteur=motif or f"Rapport pompiste n°{rap.id} — début lu par le pompiste"),
+                    request, db)
+                avertissements += out.get("avertissements", [])
+            except HTTPException as exc:
+                det = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+                avertissements.append(f"{l.pompe.nom} : non écrit dans le journal — {det}")
+                continue
+        r = db.query(Releve).filter_by(date=rap.date, periode=rap.periode, pompe_id=l.pompe_id).first()
+        if r:
+            r.rapport_pompiste_id = rap.id
+            r.pompiste_id = employe.id
+    db.commit()
+    return avertissements
+
+
+def _retirer_du_journal(db: Session, rap: RapportPompiste) -> int:
+    n = 0
+    for r in db.query(Releve).filter_by(rapport_pompiste_id=rap.id).all():
+        db.delete(r)
+        n += 1
+    return n
+
+
 def _url_publique(request: Request) -> str:
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme
     hote = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
@@ -538,8 +649,18 @@ def terminer(data: TerminerIn, request: Request, u: Utilisateur = Depends(_requi
         db.commit()
     except Exception:
         db.rollback()
+    # Le journal des compteurs reçoit les mètres tout de suite, comme une saisie
+    try:
+        avert = _ecrire_journal(db, rap, request, remplacer_saisie=False)
+    except Exception as exc:          # la soumission du pompiste ne doit jamais échouer ici
+        db.rollback()
+        log.warning("Rapport pompiste %s : écriture du journal impossible : %s", rap.id, exc)
+        avert = []
     _prevenir_admins(db, rap, request)
-    return _rapport_dict(db, rap)
+    db.refresh(rap)
+    out = _rapport_dict(db, rap)
+    out["avertissements"] = avert
+    return out
 
 
 @router.get("/api/pompiste/rapports")
@@ -572,7 +693,7 @@ def _rapport_a_traiter(db: Session, rid: int) -> RapportPompiste:
 
 @router.get("/api/pompiste-supervision/rapports")
 def lister(statut: Optional[str] = None, date_debut: Optional[date_type] = None,
-           date_fin: Optional[date_type] = None,
+           date_fin: Optional[date_type] = None, utilisateur_id: Optional[int] = None,
            _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     """`statut` accepte une liste séparée par des virgules (ex. SOUMIS,PROBLEME)."""
     statuts = [x for x in (statut or "").split(",") if x]
@@ -585,6 +706,8 @@ def lister(statut: Optional[str] = None, date_debut: Optional[date_type] = None,
         q = q.filter(RapportPompiste.date >= date_debut)
     if date_fin:
         q = q.filter(RapportPompiste.date <= date_fin)
+    if utilisateur_id:
+        q = q.filter(RapportPompiste.utilisateur_id == utilisateur_id)
     rows = q.all()
     # À traiter : ordre chronologique (la continuité des compteurs impose de
     # finaliser le Matin avant l'Après-midi). Historique : plus récents d'abord.
@@ -623,7 +746,7 @@ class LigneConfIn(BaseModel):
 
 
 @router.post("/api/pompiste-supervision/rapports/{rid}/lignes/{pompe_id}/confirmer")
-def confirmer_ligne(rid: int, pompe_id: int, data: LigneConfIn,
+def confirmer_ligne(rid: int, pompe_id: int, data: LigneConfIn, request: Request,
                     _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     """Confirme un mètre, en le corrigeant si les valeurs envoyées diffèrent
     de celles du pompiste (qui restent conservées)."""
@@ -641,8 +764,11 @@ def confirmer_ligne(rid: int, pompe_id: int, data: LigneConfIn,
     l.confirmee, l.confirmee_at = True, now_haiti()
     rap.ecart_confirme = False          # l'écart dépend des mètres : à revoir après une correction
     db.commit()
+    avert = _ecrire_journal(db, rap, request, remplacer_saisie=False, seulement=pompe_id)
     db.refresh(rap)
-    return _rapport_dict(db, rap, avec_journal=True)
+    out = _rapport_dict(db, rap, avec_journal=True)
+    out["avertissements"] = avert
+    return out
 
 
 @router.post("/api/pompiste-supervision/rapports/{rid}/lignes/{pompe_id}/reprendre")
@@ -759,20 +885,8 @@ def finaliser(rid: int, data: FinaliserIn, request: Request,
             raise HTTPException(403, f"{l.pompe.nom} : le relevé du journal a atteint sa limite de modifications.")
         finales.append((l, av, ap, identique))
 
-    # 2. Journal des compteurs — mêmes règles que la saisie normale
-    employe = db.query(Employe).filter_by(utilisateur_id=rap.utilisateur_id).first()
-    avertissements = []
-    for l, av, ap, identique in finales:
-        if not identique:
-            out = main.upsert_releve(main.ReleveIn(
-                date=rap.date, periode=rap.periode, pompe_id=l.pompe_id,
-                prix_gallon=float(l.prix_gallon), metter_avant=av, metter_apres=ap,
-                motif_ecart_compteur=motif or None), request, db)
-            avertissements += out.get("avertissements", [])
-        if employe:
-            r = db.query(Releve).filter_by(date=rap.date, periode=rap.periode, pompe_id=l.pompe_id).first()
-            if r:
-                r.pompiste_id = employe.id
+    # 2. Journal des compteurs — mêmes règles que le module Saisie
+    avertissements = _ecrire_journal(db, rap, request, remplacer_saisie=True, motif=motif or None)
 
     rap.statut = "RESOLU" if resolution else "CONFIRME"
     rap.note_superviseur = data.note
@@ -794,6 +908,7 @@ def rejeter(rid: int, data: CommentaireIn, s: Utilisateur = Depends(_require_sup
     commentaire = (data.commentaire or "").strip()
     if len(commentaire) < _COMMENTAIRE_MIN:
         raise HTTPException(400, "Indiquez au pompiste ce qui ne va pas (commentaire obligatoire).")
+    _retirer_du_journal(db, rap)       # il refera un rapport : pas de doublon dans le journal
     rap.statut = "REJETE"
     rap.traite_par_id = s.id
     rap.traite_at = now_haiti()
@@ -886,6 +1001,8 @@ def creer_compte(data: CompteIn, _s: Utilisateur = Depends(_require_superviseur)
     db.flush()
     if emp:
         emp.utilisateur_id = u.id
+    else:
+        employe_du_compte(db, u, prenom, nom_famille)   # apparaît dans les filtres « Pompiste »
     db.commit()
     db.refresh(u)
     out = _compte_dict(db, u)
@@ -907,6 +1024,9 @@ def modifier_compte(uid: int, data: ComptePatch, _s: Utilisateur = Depends(_requ
     pin = None
     if data.actif is not None:
         u.actif = data.actif
+        emp = db.query(Employe).filter_by(utilisateur_id=u.id).first()
+        if emp:
+            emp.actif = data.actif
         if not data.actif:
             from models import SessionToken
             db.query(SessionToken).filter_by(user_id=u.id).delete()

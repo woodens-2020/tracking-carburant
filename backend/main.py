@@ -296,6 +296,11 @@ def startup():
     init_db()
     with SessionLocal() as _db:
         assurer_role_pompiste(_db)
+        try:
+            from pompiste_routes import rattacher_employes_pompistes
+            rattacher_employes_pompistes(_db)
+        except Exception as _exc:
+            logging.getLogger("pompiste").warning("Rattachement employés pompistes : %s", _exc)
     # Migrations douces — colonnes ajoutées progressivement
     from sqlalchemy import text as _text
     _migrations = [
@@ -482,6 +487,8 @@ def startup():
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS confirmee BOOLEAN NOT NULL DEFAULT FALSE",
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS confirmee_at TIMESTAMPTZ",
         "ALTER TABLE rapports_pompiste ALTER COLUMN soumis_at DROP NOT NULL",
+        "ALTER TABLE releves ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
+        "CREATE INDEX IF NOT EXISTS idx_releves_rapport_pompiste ON releves (rapport_pompiste_id)",
     ]
     # Chaque instruction est isolée : une qui échoue (moteur SQLite en dev,
     # table absente, type déjà à jour…) n'empêche pas les suivantes.
@@ -2069,6 +2076,9 @@ def _releve_dict(r: Releve):
         "modifie_par_nom": r.modifie_par.nom_complet if r.modifie_par else None,
         "pompiste_id":  r.pompiste_id,
         "pompiste_nom": f"{r.pompiste.prenom} {r.pompiste.nom}" if r.pompiste else None,
+        "source":       "pompiste" if r.rapport_pompiste_id else "saisie",
+        "rapport_pompiste_id": r.rapport_pompiste_id,
+        "rapport_statut": r.rapport_pompiste.statut if r.rapport_pompiste else None,
     }
 
 
@@ -2109,9 +2119,11 @@ def lister_pompistes(inclure_inactifs: bool = False, db: Session = Depends(get_d
     q = db.query(Employe)
     if not inclure_inactifs:
         q = q.filter(Employe.actif.is_(True))
+    from pompiste_routes import ids_employes_pompistes
+    lies = ids_employes_pompistes(db)
     emps = [
         e for e in q.order_by(Employe.nom, Employe.prenom).all()
-        if (e.poste or "").strip().lower() == "pompiste"
+        if (e.poste or "").strip().lower() == "pompiste" or e.id in lies
     ]
     return [{"id": e.id, "nom": f"{e.prenom} {e.nom}", "actif": e.actif} for e in emps]
 
@@ -2799,6 +2811,10 @@ def _build_journal_entries(
             "produit_nom":      r.pompe.produit.nom,
             "pompiste_id":      r.pompiste_id,
             "pompiste_nom":     (f"{r.pompiste.prenom} {r.pompiste.nom}" if r.pompiste else None),
+            "source":           "pompiste" if r.rapport_pompiste_id else "saisie",
+            "rapport_pompiste_id": r.rapport_pompiste_id,
+            "rapport_statut":   r.rapport_pompiste.statut if r.rapport_pompiste else None,
+            "saisi_par":        r.cree_par.nom_complet if r.cree_par else None,
             "prix_gallon":      float(r.prix_gallon),
             "metter_avant":     av,
             "metter_apres":     ap,

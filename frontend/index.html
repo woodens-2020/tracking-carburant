@@ -3249,6 +3249,20 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   font:inherit;font-weight:700;cursor:pointer}
 .psp-note.on{background:var(--orange);border-color:var(--orange);color:#fff}
 .psp-actions .btn:disabled{opacity:.45;cursor:not-allowed}
+.psp-chips{display:flex;gap:6px;flex-wrap:wrap}
+.psp-chip{font:inherit;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer;
+  border:1px solid var(--border);background:var(--panel);color:var(--muted)}
+.psp-chip b{background:var(--orange);color:#fff;border-radius:10px;padding:0 6px;margin-left:2px;font-size:11px}
+.psp-chip.on{background:rgba(249,115,22,.12);border-color:var(--orange);color:var(--text)}
+.psp-jour{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--orange);margin:16px 0 6px}
+.psp-liste td{vertical-align:middle}
+.psp-ligne-clic{cursor:pointer}
+.psp-ligne-clic:hover td{background:rgba(249,115,22,.06)}
+.psp-detail-barre{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.psp-badge.EN_COURS{background:rgba(148,163,184,.15);color:var(--muted)}
+.jr-src{display:inline-block;margin-top:3px;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 7px;
+  background:rgba(249,115,22,.12);color:var(--orange);white-space:nowrap}
+.jr-src.ok{background:rgba(34,197,94,.12);color:var(--green)}
 </style>
 </head>
 <script src="/vendor/chart.umd.min.js"></script>
@@ -4227,9 +4241,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <!-- ══════ PAGE : SAISIE ══════ -->
     <div id="page-pompistes-rapports" class="page">
       <div class="psp-tabs">
-        <button class="psp-tab on" data-t="attente" onclick="pspOnglet('attente')">À vérifier <span id="psp-nb"></span></button>
-        <button class="psp-tab" data-t="problemes" onclick="pspOnglet('problemes')">Problèmes <span id="psp-nb-pb"></span></button>
-        <button class="psp-tab" data-t="historique" onclick="pspOnglet('historique')">Historique</button>
+        <button class="psp-tab on" data-t="rapports" onclick="pspOnglet('rapports')">Rapports <span id="psp-nb"></span></button>
         <button class="psp-tab" data-t="comptes" onclick="pspOnglet('comptes')">Comptes pompistes</button>
       </div>
       <div id="psp-contenu"></div>
@@ -17290,7 +17302,9 @@ function renderJournal(data){
       <td class="num" style="white-space:nowrap">${frDate(e.date)}</td>
       <td style="font-size:13px">${e.periode==='Matin'?'🌅 Matin':'🌇 Après-midi'}</td>
       <td style="font-weight:600">${esc(e.pompe_nom)}</td>
-      <td style="font-size:13px">${e.pompiste_nom?esc(e.pompiste_nom):'<span class="c-dim">—</span>'}</td>
+      <td style="font-size:13px">${e.pompiste_nom?esc(e.pompiste_nom):'<span class="c-dim">—</span>'}${e.source==='pompiste'
+        ?`<div><span class="jr-src ${['CONFIRME','RESOLU'].includes(e.rapport_statut)?'ok':''}" title="Saisi par le pompiste sur sa tablette">⛽ Espace pompiste · ${
+          {SOUMIS:'à vérifier',PROBLEME:'problème',CONFIRME:'validé',RESOLU:'résolu'}[e.rapport_statut]||'—'}</span></div>`:''}</td>
       <td class="tr num" style="color:var(--blue)">${e.metter_avant.toFixed(3)}</td>
       <td class="tr num" style="color:var(--blue2)">${e.metter_apres.toFixed(3)}</td>
       <td class="tr">${attStr}</td>
@@ -19110,14 +19124,21 @@ document.addEventListener('DOMContentLoaded',async()=>{
 // puis « Finaliser » avec une note sur 10, ou « Signaler un problème » puis
 // « Résolu et finalisé ». La finalisation écrit le journal des compteurs.
 // ══════════════════════════════════════════════
-const PSP = {onglet:'attente', rapports:[], comptes:null, pin:null, saisie:{}};
-const _PSP_LIB = {SOUMIS:'À vérifier', PROBLEME:'Problème', CONFIRME:'Finalisé · correct', RESOLU:'Résolu · finalisé', REJETE:'Renvoyé au pompiste'};
+const PSP = {onglet:'rapports', rapports:[], comptes:null, pin:null, saisie:{}, ouvert:null,
+             filtre:{statut:'A_TRAITER', debut:'', fin:'', pompiste:''}};
+const _PSP_LIB = {EN_COURS:'Non terminé', SOUMIS:'À vérifier', PROBLEME:'Problème', CONFIRME:'Finalisé · correct', RESOLU:'Résolu · finalisé', REJETE:'Renvoyé au pompiste'};
+const _PSP_FILTRES = [
+  ['A_TRAITER','À traiter','SOUMIS,PROBLEME'], ['SOUMIS','À vérifier','SOUMIS'], ['PROBLEME','Problèmes','PROBLEME'],
+  ['EN_COURS','Non terminés','EN_COURS'], ['FINALISE','Finalisés','CONFIRME,RESOLU'], ['REJETE','Renvoyés','REJETE'],
+  ['TOUS','Tous','EN_COURS,SOUMIS,PROBLEME,CONFIRME,RESOLU,REJETE']];
 const _pspPer = p => p === 'Apres-midi' ? 'Après-midi' : p;
 const _pspDate = d => new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', {weekday:'short', day:'2-digit', month:'2-digit'});
+const _pspJour = d => new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
 const _pspG = n => Number(n||0).toLocaleString('fr-FR', {maximumFractionDigits:0}) + ' G';
 const _pspN = (n,d=3) => n == null ? '—' : Number(n).toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d});
 const _pspE = n => `<span class="${Math.abs(n)<1?'psp-ok':(n<0?'psp-neg':'psp-pos')}">${n>0?'+':''}${_pspG(n)}</span>`;
 const _pspS = id => (PSP.saisie[id] ||= {note:null, com:'', motif:'', motifVisible:false});
+const _pspIso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
 async function _pspApi(method, path, body){
   const h = {'Content-Type':'application/json'};
@@ -19137,14 +19158,13 @@ async function pspMajBadge(){
   const b = document.getElementById('psp-nav-badge'); if(!b || !_canAccess('pompistes-rapports')) return;
   try{
     const r = await _pspApi('GET','/resume');
+    PSP.resume = r;
     b.textContent = r.a_confirmer; b.style.display = r.a_confirmer ? '' : 'none';
-    const n1 = document.getElementById('psp-nb'), n2 = document.getElementById('psp-nb-pb');
-    if(n1) n1.textContent = r.a_verifier ? `(${r.a_verifier})` : '';
-    if(n2) n2.textContent = r.problemes ? `(${r.problemes})` : '';
+    const n1 = document.getElementById('psp-nb'); if(n1) n1.textContent = r.a_confirmer ? `(${r.a_confirmer})` : '';
   }catch(e){}
 }
 
-function loadPompistesRapports(){ pspOnglet(PSP.onglet); }
+function loadPompistesRapports(){ PSP.ouvert = null; pspOnglet(PSP.onglet); }
 
 async function pspOnglet(t){
   PSP.onglet = t;
@@ -19152,52 +19172,146 @@ async function pspOnglet(t){
   const c = document.getElementById('psp-contenu');
   c.innerHTML = '<div class="psp-muted">Chargement…</div>';
   try{
-    if(t === 'attente' || t === 'problemes'){
-      PSP.rapports = await _pspApi('GET', '/rapports?statut=' + (t === 'attente' ? 'SOUMIS' : 'PROBLEME'));
-      PSP.nonTermines = t === 'attente' ? await _pspApi('GET', '/rapports?statut=EN_COURS') : [];
-      pspRendreListe();
-    }
-    else if(t === 'historique') await pspHistorique();
-    else { PSP.comptes = await _pspApi('GET','/comptes'); pspRendreComptes(); }
+    if(t === 'rapports'){
+      if(!PSP.comptes) PSP.comptes = await _pspApi('GET','/comptes');
+      await pspChargerListe();
+    } else { PSP.comptes = await _pspApi('GET','/comptes'); pspRendreComptes(); }
   }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
   pspMajBadge();
 }
 
-function _pspNonTermines(){
-  const l = PSP.nonTermines || [];
-  if(!l.length) return '';
-  return `<div class="psp-card" style="border-color:rgba(249,115,22,.4)"><b>Rapports commencés, pas encore terminés (${l.length})</b>
-    <div class="psp-muted" style="margin:2px 0 8px">Le pompiste a envoyé des compteurs mais n'a pas compté l'argent. Ses pompes restent bloquées
-      pour cette période tant que le rapport n'est pas terminé ou annulé.</div>
-    <table class="psp-tbl"><tbody>${l.map(r => `<tr><td><b>${esc(r.pompiste_nom)}</b></td><td>${_pspPer(r.periode)} ${_pspDate(r.date)}</td>
-      <td>${r.lignes.map(x => esc(x.pompe_nom)).join(', ')}</td><td class="r">${_pspN(r.total_gallons)} gal</td>
-      <td class="r"><button class="btn btn-danger psp-mini" onclick="pspAnnuler(${r.id})">Annuler ce rapport</button></td></tr>`).join('')}
-    </tbody></table></div>`;
-}
-
-async function pspAnnuler(id){
-  const r = (PSP.nonTermines || []).find(x => x.id === id);
-  if(!r || !confirm(`Annuler le rapport non terminé de ${r.pompiste_nom} (${_pspPer(r.periode)} ${_pspDate(r.date)}) ? Ses compteurs seront effacés et ses pompes libérées.`)) return;
-  try{ await _pspApi('DELETE', `/rapports/${id}`); notify('Rapport non terminé annulé.', 'ok'); pspOnglet(PSP.onglet); }
-  catch(e){ notify(e.message, 'err'); }
-}
-
-function pspRendreListe(){
-  const c = document.getElementById('psp-contenu');
-  if(!PSP.rapports.length){
-    c.innerHTML = _pspNonTermines() + `<div class="psp-card"><b>${PSP.onglet === 'attente' ? 'Aucun rapport à vérifier.' : 'Aucun rapport en problème.'}</b>
-      <div class="psp-muted" style="margin-top:4px">Les pompistes saisissent leurs compteurs sur <b>${esc(location.origin)}/pompiste</b>.</div></div>`;
-    return;
+async function pspChargerListe(){
+  const f = PSP.filtre, statuts = _PSP_FILTRES.find(x => x[0] === f.statut)[2];
+  let q = `/rapports?statut=${statuts}`;
+  if(f.debut) q += `&date_debut=${f.debut}`;
+  if(f.fin) q += `&date_fin=${f.fin}`;
+  if(f.pompiste) q += `&utilisateur_id=${f.pompiste}`;
+  PSP.rapports = await _pspApi('GET', q);
+  if(PSP.ouvert){
+    const r = PSP.rapports.find(x => x.id === PSP.ouvert);
+    if(r) return pspRendreDetail(r);
+    PSP.ouvert = null;
   }
-  c.innerHTML = _pspNonTermines() + `<div class="psp-muted" style="margin-bottom:10px">Du plus ancien au plus récent : finalisez le Matin avant l'Après-midi (continuité des compteurs).</div>`
-    + PSP.rapports.map(r => `<div id="psp-r-${r.id}">${pspCarte(r)}</div>`).join('');
+  pspRendreListe();
+}
+
+function pspFiltre(cle, val){ PSP.filtre[cle] = val; pspChargerListe().catch(e => notify(e.message, 'err')); }
+function pspPeriodeRapide(jours){
+  const fin = new Date(), deb = new Date(); deb.setDate(deb.getDate() - jours + 1);
+  PSP.filtre.debut = jours ? _pspIso(deb) : ''; PSP.filtre.fin = jours ? _pspIso(fin) : '';
+  pspChargerListe().catch(e => notify(e.message, 'err'));
+}
+
+/* Liste rangée par jour (le plus récent en haut), puis Matin → Après-midi.
+   Rien n'est ouvert : on clique sur un rapport pour le vérifier / corriger. */
+function pspRendreListe(){
+  const c = document.getElementById('psp-contenu'), f = PSP.filtre;
+  const comptes = PSP.comptes?.comptes || [];
+  const rs = [...PSP.rapports].sort((a,b) => a.date < b.date ? 1 : a.date > b.date ? -1
+    : (a.periode === b.periode ? a.id - b.id : (a.periode === 'Matin' ? -1 : 1)));
+  const jours = {}; for(const r of rs) (jours[r.date] ||= []).push(r);
+  const n = PSP.resume || {};
+  const compte = k => ({A_TRAITER: n.a_confirmer, SOUMIS: n.a_verifier, PROBLEME: n.problemes, EN_COURS: n.non_termines})[k];
+  const tot = (k) => rs.reduce((a, r) => a + (r[k] || 0), 0);
+  c.innerHTML = `<div class="psp-card psp-filtres">
+      <div class="psp-chips">${_PSP_FILTRES.map(([k, lib]) => `<button class="psp-chip ${f.statut===k?'on':''}" onclick="pspFiltre('statut','${k}')">${lib}${compte(k) ? ` <b>${compte(k)}</b>` : ''}</button>`).join('')}</div>
+      <div class="psp-grid" style="margin-top:10px">
+        <select class="filter-input" onchange="pspFiltre('pompiste', this.value)"><option value="">Tous les pompistes</option>
+          ${comptes.map(u => `<option value="${u.id}" ${String(f.pompiste)===String(u.id)?'selected':''}>${esc(u.nom_complet)}</option>`).join('')}</select>
+        <input type="date" class="filter-input" value="${f.debut}" onchange="pspFiltre('debut', this.value)" title="Du">
+        <input type="date" class="filter-input" value="${f.fin}" onchange="pspFiltre('fin', this.value)" title="Au">
+        <div style="display:flex;gap:6px"><button class="btn btn-secondary psp-mini" onclick="pspPeriodeRapide(1)">Aujourd'hui</button>
+          <button class="btn btn-secondary psp-mini" onclick="pspPeriodeRapide(7)">7 jours</button>
+          <button class="btn btn-secondary psp-mini" onclick="pspPeriodeRapide(30)">30 jours</button>
+          <button class="btn btn-secondary psp-mini" onclick="pspPeriodeRapide(0)">Tout</button></div>
+      </div></div>
+    ${rs.length ? `<div class="psp-muted" style="margin:0 0 8px">${rs.length} rapport${rs.length>1?'s':''} · ${_pspN(tot('total_gallons'))} gal ·
+        attendu ${_pspG(tot('montant_attendu_final'))} · compté ${_pspG(tot('montant_compte'))}.
+        Cliquez sur un rapport pour l'ouvrir. ${['A_TRAITER','SOUMIS'].includes(f.statut) ? 'Finalisez le Matin avant l\'Après-midi (continuité des compteurs).' : ''}</div>
+      ${Object.entries(jours).map(([d, l]) => `<div class="psp-jour">${_pspJour(d)}</div>
+        <div class="psp-card" style="padding:0;overflow-x:auto"><table class="psp-tbl psp-liste"><thead><tr>
+          <th>Période</th><th>Pompiste</th><th>Pompes</th><th class="r">Gallons</th><th class="r">Attendu</th><th class="r">Compté</th>
+          <th class="r">Écart</th><th>Vérification</th><th>Statut</th><th></th></tr></thead><tbody>
+          ${l.map(r => {
+            const nc = r.lignes.filter(x => x.confirmee).length;
+            const verif = ['SOUMIS','PROBLEME'].includes(r.statut)
+              ? `${nc}/${r.lignes.length} mètres${r.billetterie_confirmee?' · billets ✓':''}${r.ecart_confirme?' · écart ✓':''}`
+              : (r.note_superviseur != null ? `note ${r.note_superviseur}/10` : '—');
+            return `<tr class="psp-ligne-clic" onclick="pspOuvrir(${r.id})">
+              <td><b>${_pspPer(r.periode)}</b></td><td>${esc(r.pompiste_nom)}</td>
+              <td><span class="psp-muted">${[...new Set(r.lignes.map(x => x.produit_nom))].map(esc).join(', ')}</span><br>${r.lignes.map(x => esc(x.pompe_nom)).join(', ')}</td>
+              <td class="r">${_pspN(r.total_gallons)}</td><td class="r">${_pspG(r.montant_attendu_final)}</td>
+              <td class="r">${r.statut === 'EN_COURS' ? '—' : _pspG(r.montant_compte)}</td>
+              <td class="r">${r.statut === 'EN_COURS' ? '—' : _pspE(r.ecart_final)}</td>
+              <td class="psp-muted">${verif}</td>
+              <td><span class="psp-badge ${r.statut}">${_PSP_LIB[r.statut]}</span></td>
+              <td class="r"><button class="btn ${['SOUMIS','PROBLEME'].includes(r.statut)?'btn-primary':'btn-secondary'} psp-mini">${['SOUMIS','PROBLEME'].includes(r.statut)?'Ouvrir et corriger':'Ouvrir'}</button></td></tr>`;
+          }).join('')}</tbody></table></div>`).join('')}`
+    : `<div class="psp-card"><b>Aucun rapport pour ce filtre.</b>
+        <div class="psp-muted" style="margin-top:4px">Les pompistes saisissent leurs compteurs sur <b>${esc(location.origin)}/pompiste</b>.</div></div>`}`;
+}
+
+function pspOuvrir(id){
+  const r = PSP.rapports.find(x => x.id === id); if(!r) return;
+  PSP.ouvert = id; pspRendreDetail(r); window.scrollTo(0, 0);
+}
+function pspFermer(){ PSP.ouvert = null; pspChargerListe().catch(e => notify(e.message, 'err')); }
+
+function pspRendreDetail(r){
+  const c = document.getElementById('psp-contenu');
+  const i = PSP.rapports.findIndex(x => x.id === r.id);
+  const prec = PSP.rapports[i-1], suiv = PSP.rapports[i+1];
+  c.innerHTML = `<div class="psp-detail-barre">
+      <button class="btn btn-secondary" onclick="pspFermer()">← Retour à la liste</button>
+      <span class="psp-muted">Rapport n°${r.id}</span></div>
+    <div id="psp-r-${r.id}">${r.statut === 'EN_COURS' ? pspCarteNonTermine(r)
+      : (['SOUMIS','PROBLEME'].includes(r.statut) ? pspCarte(r) : pspCarteLecture(r))}</div>`;
 }
 
 function _pspMaj(r){
   const i = PSP.rapports.findIndex(x => x.id === r.id);
   if(i >= 0) PSP.rapports[i] = r;
   const el = document.getElementById('psp-r-' + r.id);
-  if(el) el.innerHTML = pspCarte(r);
+  if(el) el.innerHTML = ['SOUMIS','PROBLEME'].includes(r.statut) ? pspCarte(r) : pspCarteLecture(r);
+}
+
+async function pspAnnuler(id){
+  const r = PSP.rapports.find(x => x.id === id);
+  if(!r || !confirm(`Annuler le rapport non terminé de ${r.pompiste_nom} (${_pspPer(r.periode)} ${_pspDate(r.date)}) ? Ses compteurs seront effacés et ses pompes libérées.`)) return;
+  try{ await _pspApi('DELETE', `/rapports/${id}`); notify('Rapport non terminé annulé.', 'ok'); PSP.ouvert = null; pspChargerListe(); pspMajBadge(); }
+  catch(e){ notify(e.message, 'err'); }
+}
+
+function pspCarteNonTermine(r){
+  return `<div class="psp-card"><div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspPer(r.periode)} ${_pspDate(r.date)}
+      <span class="psp-badge EN_COURS" style="margin-left:6px">Non terminé</span></div></div>
+    <div class="psp-muted" style="margin-bottom:8px">Le pompiste a envoyé ces compteurs mais n'a pas encore compté l'argent (« Non, mwen fini »).
+      Rien n'est encore dans le journal. Ses pompes restent bloquées pour cette période tant que le rapport n'est pas terminé ou annulé.</div>
+    <table class="psp-tbl"><thead><tr><th>Pompe</th><th class="r">Début</th><th class="r">Fin</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead><tbody>
+      ${r.lignes.map(l => `<tr><td><b>${esc(l.pompe_nom)}</b><div class="psp-muted">${esc(l.produit_nom)}</div></td><td class="r">${_pspN(l.metter_avant)}</td>
+        <td class="r">${_pspN(l.metter_apres)}</td><td class="r">${_pspN(l.gallons)}</td><td class="r">${_pspG(l.montant)}</td></tr>`).join('')}</tbody></table>
+    <div class="psp-actions"><button class="btn btn-danger" onclick="pspAnnuler(${r.id})">Annuler ce rapport</button></div></div>`;
+}
+
+function pspCarteLecture(r){
+  const billets = (r.billetterie||[]).map(b => { const n = (b.liasses||0) * 100 + (b.billets||0);
+    return `<tr><td>${Number(b.coupure).toLocaleString('fr-FR')} G</td><td class="r">${n}</td><td class="r">${_pspG(b.coupure*n)}</td></tr>`; }).join('');
+  return `<div class="psp-card"><div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspPer(r.periode)} ${_pspDate(r.date)}
+      <span class="psp-badge ${r.statut}" style="margin-left:6px">${_PSP_LIB[r.statut]}</span></div>
+      <div class="psp-muted">${r.traite_par_nom ? 'par ' + esc(r.traite_par_nom) : ''}${r.traite_at ? ' · ' + new Date(r.traite_at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : ''}</div></div>
+    ${r.note_superviseur != null ? `<div class="psp-kpi" style="display:inline-block;margin-bottom:10px"><span>Note du rapport</span><b>${r.note_superviseur}/10</b></div>` : ''}
+    ${r.probleme_commentaire ? `<div class="psp-err" style="margin:0 0 8px">Problème : ${esc(r.probleme_commentaire)}</div>` : ''}
+    ${r.commentaire_superviseur ? `<div class="psp-warn" style="color:var(--text);margin:0 0 8px"><b>Commentaire :</b> ${esc(r.commentaire_superviseur)}</div>` : ''}
+    <table class="psp-tbl"><thead><tr><th>Pompe</th><th class="r">Début</th><th class="r">Fin</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead><tbody>
+      ${r.lignes.map(l => `<tr><td><b>${esc(l.pompe_nom)}</b><div class="psp-muted">${esc(l.produit_nom)}</div></td>
+        <td class="r">${_pspN(l.metter_avant_corrige ?? l.metter_avant)}</td><td class="r">${_pspN(l.metter_apres_corrige ?? l.metter_apres)}</td>
+        <td class="r">${_pspN(l.gallons)}</td><td class="r">${_pspG(l.montant)}</td></tr>
+        ${l.metter_avant_corrige != null ? `<tr><td colspan="5" class="psp-muted">Saisi par le pompiste : ${_pspN(l.metter_avant)} → ${_pspN(l.metter_apres)}</td></tr>` : ''}`).join('')}</tbody></table>
+    <div class="psp-kpis"><div class="psp-kpi"><span>Ventes attendues</span><b>${_pspG(r.montant_attendu_final)}</b></div>
+      <div class="psp-kpi"><span>Argent compté</span><b>${_pspG(r.montant_compte)}</b></div>
+      <div class="psp-kpi"><span>Écart</span><b>${_pspE(r.ecart_final)}</b></div></div>
+    ${billets ? `<table class="psp-tbl" style="max-width:420px"><thead><tr><th>Coupure</th><th class="r">Billets</th><th class="r">Montant</th></tr></thead><tbody>${billets}
+      ${r.monnaie ? `<tr><td>Monnaie</td><td></td><td class="r">${_pspG(r.monnaie)}</td></tr>` : ''}</tbody></table>` : ''}</div>`;
 }
 
 function _pspEtape(n, titre, fait, contenu){
@@ -19211,7 +19325,7 @@ function pspCarte(r){
     const rupt = prec != null && Math.abs(prec - av) > 0.001;
     const corrige = l.metter_avant_corrige != null;
     const j = l.journal;
-    const diffJ = j && (Math.abs(j.metter_avant - av) > 0.001 || Math.abs(j.metter_apres - ap) > 0.001);
+    const diffJ = j && !j.de_ce_rapport && (Math.abs(j.metter_avant - av) > 0.001 || Math.abs(j.metter_apres - ap) > 0.001);
     return `<tr class="${l.confirmee?'psp-ligne-ok':''}">
       <td><b>${esc(l.pompe_nom)}</b><div class="psp-muted">${esc(l.produit_nom)}</div></td>
       <td class="r">${_pspN(prec)}${rupt ? `<div class="psp-neg" style="font-size:11px;font-weight:700">≠ début saisi (${av - prec > 0 ? '+' : ''}${_pspN(av - prec)})</div>` : ''}</td>
@@ -19223,7 +19337,7 @@ function pspCarte(r){
         ? `<span class="psp-ok" style="font-weight:700">✓ Confirmé${corrige?' (corrigé)':''}</span> <button class="psp-lien" onclick="pspLigne(${r.id},${l.pompe_id},false)">reprendre</button>`
         : `<button class="btn btn-primary psp-mini" onclick="pspLigne(${r.id},${l.pompe_id},true)">Confirmer</button>`}</td>
     </tr>${corrige ? `<tr><td colspan="7"><div class="psp-muted">Saisi par le pompiste : ${_pspN(l.metter_avant)} → ${_pspN(l.metter_apres)}</div></td></tr>` : ''}
-    ${j ? `<tr><td colspan="7"><div class="${diffJ?'psp-warn':'psp-muted'}">${diffJ ? '⚠ ' : ''}Journal déjà saisi par ${esc(j.saisi_par||'l\'administration')} :
+    ${j && !j.de_ce_rapport ? `<tr><td colspan="7"><div class="${diffJ?'psp-warn':'psp-muted'}">${diffJ ? '⚠ ' : ''}Saisi aussi dans le module Saisie par ${esc(j.saisi_par||'l\'administration')} :
        ${_pspN(j.metter_avant)} → ${_pspN(j.metter_apres)}${diffJ ? ' — la finalisation remplacera ces valeurs.' : ' (identique)'}</div></td></tr>` : ''}`;
   }).join('');
   const billets = (r.billetterie||[]).map(b => { const n = (b.liasses||0) * 100 + (b.billets||0);
@@ -19285,7 +19399,8 @@ function _pspMsg(id, html){ const el = document.getElementById('psp-msg-' + id);
 function _pspCom(id){ return (_pspS(id).com || '').trim(); }
 
 async function _pspAction(id, path, body){
-  try{ const r = await _pspApi('POST', `/rapports/${id}/${path}`, body); _pspMaj(r); pspMajBadge(); return r; }
+  try{ const r = await _pspApi('POST', `/rapports/${id}/${path}`, body); _pspMaj(r); pspMajBadge();
+       (r.avertissements||[]).forEach(a => notify(a, 'warn')); return r; }
   catch(e){ _pspMsg(id, `<div class="psp-err">${esc(e.message)}</div>`); notify(e.message, 'err'); throw e; }
 }
 
@@ -19309,7 +19424,7 @@ async function pspFinaliser(id){
     notify(`Rapport de ${out.pompiste_nom} finalisé (${_PSP_LIB[out.statut]}) — journal des compteurs mis à jour.`, 'ok');
     (out.avertissements||[]).forEach(a => notify(a, 'warn'));
     delete PSP.saisie[id];
-    pspOnglet(PSP.onglet);
+    PSP.ouvert = null; pspChargerListe();
   }catch(e){
     if(e.detail?.motif_requis){ s.motifVisible = true; _pspMaj(PSP.rapports.find(x => x.id === id)); }
     _pspMsg(id, `<div class="psp-err">${esc(e.message)}</div>`);
@@ -19322,8 +19437,7 @@ async function pspProbleme(id){
   try{
     await _pspAction(id, 'probleme', {commentaire:_pspCom(id)});
     _pspS(id).com = '';
-    notify('Problème signalé — le rapport est dans l\'onglet « Problèmes » jusqu\'à sa résolution.', 'ok');
-    pspOnglet(PSP.onglet);
+    notify('Problème signalé — le rapport reste dans « À traiter » (filtre « Problèmes ») jusqu\'à sa résolution.', 'ok');
   }catch(e){}
 }
 
@@ -19333,27 +19447,9 @@ async function pspRenvoyer(id){
   try{
     await _pspAction(id, 'rejeter', {commentaire:_pspCom(id)});
     delete PSP.saisie[id];
-    notify('Rapport renvoyé — le pompiste voit votre commentaire et doit en faire un nouveau.', 'ok');
-    pspOnglet(PSP.onglet);
+    notify('Rapport renvoyé — retiré du journal ; le pompiste voit votre commentaire et doit en faire un nouveau.', 'ok');
+    PSP.ouvert = null; pspChargerListe();
   }catch(e){}
-}
-
-async function pspHistorique(){
-  const c = document.getElementById('psp-contenu');
-  const fin = new Date(), deb = new Date(); deb.setDate(deb.getDate() - 30);
-  const iso = d => d.toISOString().slice(0,10);
-  const rs = await _pspApi('GET', `/rapports?statut=CONFIRME,RESOLU,REJETE&date_debut=${iso(deb)}&date_fin=${iso(fin)}`);
-  c.innerHTML = `<div class="psp-card"><div class="psp-muted" style="margin-bottom:8px">30 derniers jours</div>
-    ${rs.length ? `<div style="overflow-x:auto"><table class="psp-tbl"><thead><tr><th>Période</th><th>Pompiste</th><th class="r">Gallons</th>
-      <th class="r">Attendu</th><th class="r">Compté</th><th class="r">Écart</th><th class="r">Note</th><th>Statut</th><th>Direction</th></tr></thead><tbody>
-      ${rs.map(r => `<tr><td>${_pspPer(r.periode)} ${_pspDate(r.date)}</td><td>${esc(r.pompiste_nom)}</td>
-        <td class="r">${_pspN(r.total_gallons)}</td><td class="r">${_pspG(r.montant_attendu_final)}</td><td class="r">${_pspG(r.montant_compte)}</td>
-        <td class="r">${_pspE(r.ecart_final)}</td><td class="r"><b>${r.note_superviseur != null ? r.note_superviseur + '/10' : '—'}</b></td>
-        <td><span class="psp-badge ${r.statut}">${_PSP_LIB[r.statut]}</span>
-          ${r.lignes.some(l => l.metter_apres_corrige != null) ? '<div class="psp-muted">mètres corrigés</div>' : ''}</td>
-        <td>${esc(r.traite_par_nom||'')}${r.probleme_commentaire ? `<div class="psp-muted">Problème : ${esc(r.probleme_commentaire)}</div>` : ''}
-          ${r.commentaire_superviseur ? `<div class="psp-muted">${esc(r.commentaire_superviseur)}</div>` : ''}</td></tr>`).join('')}
-      </tbody></table></div>` : '<div class="psp-muted">Aucun rapport finalisé sur la période.</div>'}</div>`;
 }
 
 function pspRendreComptes(){

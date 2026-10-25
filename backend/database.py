@@ -262,6 +262,8 @@ def _migrate_columns():
             ("categories_depense", "est_transfert",
              "ALTER TABLE categories_depense ADD COLUMN est_transfert INTEGER NOT NULL DEFAULT 0",
              "UPDATE categories_depense SET est_transfert = 1 WHERE nom_norm LIKE '%banque%' OR nom_norm LIKE '%zelle%' OR nom_norm LIKE '%transfert%' OR nom_norm LIKE '%virement%'"),
+            ("releves", "rapport_pompiste_id",
+             "ALTER TABLE releves ADD COLUMN rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL", None),
         ]
     elif _is_postgres:
         new_cols = [

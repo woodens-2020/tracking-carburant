@@ -83,8 +83,13 @@ class Releve(Base):
     # la pompe sans être vendus nulle part dans le système.
     ecart_compteur       = Column(Numeric(14, 4), nullable=True)
     motif_ecart_compteur = Column(String(255), nullable=True)
+    # Relevé venu de l'espace pompiste (NULL = saisi dans le module Saisie).
+    # Écrit dès que le pompiste termine son rapport, mis à jour par les
+    # corrections du superviseur, retiré si le rapport est renvoyé.
+    rapport_pompiste_id  = Column(Integer, ForeignKey("rapports_pompiste.id", ondelete="SET NULL"), nullable=True)
 
     pompe       = relationship("Pompe")
+    rapport_pompiste = relationship("RapportPompiste", foreign_keys=[rapport_pompiste_id])
     cree_par    = relationship("Utilisateur", foreign_keys=[cree_par_id])
     modifie_par = relationship("Utilisateur", foreign_keys=[modifie_par_id])
     pompiste    = relationship("Employe", foreign_keys=[pompiste_id])
