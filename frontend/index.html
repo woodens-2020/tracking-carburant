@@ -4486,9 +4486,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="cjr-sous" id="cjr-sous">Ventes, dépenses et solde</div>
           </div>
           <div class="cjr-actions">
-            <button class="btn btn-secondary btn-sm" onclick="cjrImprimer()">
+            <button class="btn btn-secondary btn-sm" onclick="cjrImprimer()" title="Format du formulaire papier de la station">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
               Imprimer
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="cjrImprimerDetaille()" title="Indicateurs, Matin / Après-midi, jour par jour">
+              Version détaillée
             </button>
           </div>
         </div>
@@ -16611,7 +16614,110 @@ function cjrAfficher(){
     ${tableDep}`;
 }
 
+// Impression du Rapport Journalier au format du formulaire papier de la
+// station : en-tête centré, grand tableau quadrillé Date | Description |
+// Quantité | Prix | Montant total, sections Entrées / Autres entrées /
+// Dépenses, puis TOTAL DÉPENSES et DÉPÔT (= total entrées − total dépenses).
+// Les transferts (dépôt en banque, Zelle…) ne sont pas des dépenses : ils
+// sont rappelés sous le dépôt.
 function cjrImprimer(){
+  if(!_cjrModele){ toast('Chargez d\'abord le rapport.','inf'); return; }
+  const m=_cjrModele, t=m.totaux;
+  const b=(typeof _branding!=='undefined' && _branding) || {};
+  const e=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const nb=(v,d)=>(Number(v)||0).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
+  const nom=(b.raison_sociale && b.nom && b.raison_sociale.toLowerCase()!==b.nom.toLowerCase())
+    ? `${b.raison_sociale}` : (b.nom||b.raison_sociale||'Station');
+  const dateTxt = m.unJour ? frDate(m.debut) : `du ${frDate(m.debut)} au ${frDate(m.fin)}`;
+  const dateCourte = d => { const [y,mo,j]=d.split('-'); return `${j}/${mo}/${y}`; };
+
+  // Entrées : un total par carburant (toutes périodes confondues)
+  const prod={};
+  for(const sct of m.sections) for(const l of sct.lignes){
+    const x=prod[l.nom] ||= {g:0, m:0}; x.g+=l.g; x.m+=l.m;
+  }
+  // Ordre du formulaire : Gazoline (Essence), puis Diesel, puis les autres
+  const rang=n=>/gaz|essence/i.test(n)?0:(/diesel/i.test(n)?1:2);
+  const entrees=Object.entries(prod).map(([n,x])=>({n, g:x.g, m:x.m, px:x.g>0?x.m/x.g:0}))
+    .sort((a,c)=>rang(a.n)-rang(c.n) || a.n.localeCompare(c.n,'fr'));
+  const libProd=n=>/gaz/i.test(n) && !/essence/i.test(n) ? `${n} (Essence)` : n;
+  const totGaz=entrees.reduce((a,x)=>a+x.m,0);
+  const charges=m.depenses.filter(x=>!x.est_transfert), transferts=m.depenses.filter(x=>x.est_transfert);
+  const totDep=charges.reduce((a,x)=>a+x.montant,0), depot=totGaz-totDep;
+
+  const ligne=(c1,c2,c3,c4,c5,cls='')=>`<tr class="${cls}"><td class="c1">${c1}</td><td>${c2}</td><td class="r">${c3}</td><td class="r">${c4}</td><td class="r">${c5}</td></tr>`;
+  const vides=n=>Array.from({length:Math.max(0,n)},()=>ligne('&nbsp;','','','','')).join('');
+  const rowsEntrees = entrees.map((x,i)=>ligne(i===0?'<b>Entrées</b>':'', e(libProd(x.n)), nb(x.g,3), nb(x.px,2), nb(x.m,2))).join('')
+    + vides(2 - entrees.length) + (entrees.length ? '' : ligne('<b>Entrées</b>','','','',''));
+  const rowsDep = charges.map(x=>ligne(
+      e(m.unJour ? (x.beneficiaire||'') : `${dateCourte(x.date)}${x.beneficiaire?' · '+x.beneficiaire:''}`),
+      e(x.description||x.categorie||'') + (x.description && x.categorie && x.categorie!=='—' ? ` <span class="cat">(${e(x.categorie)})</span>` : ''),
+      '', '', nb(x.montant,2))).join('') + vides(18 - charges.length);
+
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Rapport Journalier ${m.debut}${m.unJour?'':' — '+m.fin}</title><style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    @page{size:A4 portrait;margin:10mm 12mm}
+    body{font-family:Arial,"Segoe UI",sans-serif;color:#000;font-size:11px;background:#fff}
+    .tete{text-align:center;margin-bottom:6px}
+    .tete h1{font-size:21px;font-weight:900;letter-spacing:.01em;text-transform:uppercase}
+    .tete .adr{font-size:10.5px;font-weight:700;margin-top:2px}
+    .tete .doc{font-size:10.5px;font-weight:700}
+    .date{font-size:12px;margin:6px 0 4px}.date b{font-size:14px;border-bottom:1px dotted #000;padding:0 6px}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;border:1.5px solid #000}
+    col.c1{width:19%}col.c2{width:37%}col.c3{width:13%}col.c4{width:10%}col.c5{width:21%}
+    th,td{border:1px solid #000;padding:3px 6px;height:22px;vertical-align:middle;font-variant-numeric:tabular-nums;font-size:11.5px}
+    th{font-size:10.5px;text-align:left;font-weight:700}
+    td.r,th.r{text-align:right}
+    td.c1{font-size:10.5px}
+    .tot td{font-weight:800;font-size:11.5px;background:#f2f2f2}
+    .sect td{font-weight:800}
+    .cat{color:#555;font-size:9.5px}
+    .depot td{height:34px;font-size:15px;font-weight:900}
+    .depot .lbl{font-size:12px}
+    .gdes{font-size:11px;font-weight:700;text-align:right!important}
+    .note{font-size:9.5px;margin-top:6px}
+    .sign{display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:26px;font-size:10px}
+    .sign div{border-top:1px solid #000;padding-top:3px;text-align:center}
+    .foot{margin-top:10px;font-size:8.5px;color:#555;text-align:center}
+    .noprint{text-align:center;margin:12px 0}.noprint button{padding:7px 20px;font-size:12px;border:1px solid #999;border-radius:6px;background:#f1f1f1;cursor:pointer}
+    @media print{.noprint{display:none}}
+  </style></head><body>
+    <div class="tete">
+      <h1>${e(nom)}</h1>
+      ${b.adresse?`<div class="adr">${e(b.adresse)}</div>`:''}
+      <div class="doc">Rapport Journalier</div>
+    </div>
+    <div class="date">Date : <b>${e(dateTxt)}</b>${m.filtres.liste.length?` <span class="cat">(${m.filtres.liste.map(e).join(' · ')})</span>`:''}</div>
+    <table>
+      <colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col class="c5"></colgroup>
+      <thead><tr><th>Date : ${e(m.unJour?dateCourte(m.debut):dateCourte(m.debut)+' → '+dateCourte(m.fin))}</th><th>Description</th><th class="r">Quantité</th><th class="r">Prix</th><th class="r">Montant total</th></tr></thead>
+      <tbody>
+        ${rowsEntrees}
+        ${ligne('','<b>TOTAL ENTRÉES GAZ</b>','','',nb(totGaz,2),'tot')}
+        ${ligne('<b>Autres Entrées</b>','','','','')}
+        ${vides(4)}
+        ${ligne('','<b>TOTAL AUTRES ENTRÉES</b>','','','','tot')}
+        ${ligne('<b>TOTAL ENTRÉES</b>','','','',nb(totGaz,2),'tot')}
+        ${ligne('<b>DÉPENSES</b>','','','','','sect')}
+        ${rowsDep}
+        ${ligne('<b>TOTAL DÉPENSES</b>','','','',nb(totDep,2),'tot')}
+        <tr class="depot"><td class="lbl"><b>DÉPÔT</b></td><td colspan="3"><b>${nb(depot,2)} gdes</b></td><td class="gdes">gourdes</td></tr>
+      </tbody>
+    </table>
+    ${transferts.length?`<div class="note">Transferts enregistrés (dépôt en banque, Zelle…), non comptés en dépenses :
+      ${transferts.map(x=>`${e(x.description||x.categorie)} ${nb(x.montant,2)} G`).join(' · ')} — total ${nb(transferts.reduce((a,x)=>a+x.montant,0),2)} G.</div>`:''}
+    <div class="sign"><div>Préparé par</div><div>Vérifié par</div></div>
+    <div class="foot">Imprimé le ${new Date().toLocaleString('fr-FR')} · Konekta</div>
+    <div class="noprint"><button onclick="window.print()">🖨 Imprimer</button></div>
+    <script>window.onload=function(){setTimeout(function(){window.print()},300)};<\/script>
+  </body></html>`;
+  const w = window.open('','_blank','width=900,height=1000,scrollbars=yes');
+  if(!w){ toast('Autorisez les fenêtres pop-up pour imprimer.','err'); return; }
+  w.document.write(html); w.document.close();
+}
+
+// Version détaillée (indicateurs, Matin / Après-midi, jour par jour)
+function cjrImprimerDetaille(){
   if(!_cjrModele){ toast('Chargez d\'abord le rapport.','inf'); return; }
   const m=_cjrModele, t=m.totaux;
   const org  = (typeof _branding!=='undefined' && (_branding.nom||_branding.raison_sociale)) || '';
