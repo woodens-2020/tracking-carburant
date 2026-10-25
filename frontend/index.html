@@ -631,7 +631,8 @@ canvas{display:block}
 /* Téléphone : la barre d'enregistrement reste au-dessus de la barre de navigation du bas */
 @media(max-width:768px){
   .sx-barre{bottom:calc(58px + env(safe-area-inset-bottom,0px))}
-  #env-banner{top:calc(env(safe-area-inset-top,0px) + 2px)!important;bottom:auto!important;font-size:10px!important;padding:3px 10px!important}
+  #env-banner{top:calc(env(safe-area-inset-top,0px) + 2px)!important;bottom:auto!important;font-size:10px!important;padding:3px 10px!important;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100vw - 16px)!important}
 }
 
 .prod-tabs{display:flex;gap:8px;flex-wrap:wrap}
@@ -3263,6 +3264,40 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .jr-src{display:inline-block;margin-top:3px;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 7px;
   background:rgba(249,115,22,.12);color:var(--orange);white-space:nowrap}
 .jr-src.ok{background:rgba(34,197,94,.12);color:var(--green)}
+/* En-tête de l'application sur petit écran : titre sur une ligne, réglages
+   et date en dessous (le sélecteur de date ne déborde plus) */
+@media (max-width:720px){
+  .main-header{flex-wrap:wrap;height:auto;min-height:56px;padding:8px 12px;row-gap:6px;column-gap:8px}
+  .main-header > div:first-child{flex:1 1 100%;min-width:0}
+  .main-title{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .main-sub{display:none}
+  .header-spacer{display:none}
+  .ui-toggles{flex:0 1 auto;flex-wrap:wrap}
+  .date-nav{margin-left:auto}
+  .date-input{width:138px;padding:5px 8px}
+}
+@media (max-width:768px){ body.env-test .main-header{padding-top:24px;height:auto;min-height:62px} }   /* place du bandeau STAGING, en haut sur mobile */
+@media (max-width:400px){
+  #theme-label{display:none}
+  .ui-toggles .toggle-btn{padding:4px 7px}
+  .date-input{width:124px}
+}
+/* Rapports pompistes sur petit écran : la liste devient des cartes */
+@media (max-width:720px){
+  .psp-liste thead{display:none}
+  .psp-liste,.psp-liste tbody,.psp-liste tr,.psp-liste td{display:block;width:100%}
+  .psp-liste tr{padding:12px 14px;border-bottom:1px solid var(--border)}
+  .psp-liste td{border:0;padding:2px 0;text-align:left!important}
+  .psp-liste td.r{display:inline-block;width:auto;margin-right:14px}
+  .psp-liste td:last-child{display:block;margin-top:8px}
+  .psp-liste td:last-child .btn{width:100%}
+  .psp-grid{grid-template-columns:1fr}
+  .psp-kpis{grid-template-columns:1fr}
+  .psp-head{flex-direction:column;gap:4px}
+  .psp-actions .btn{flex:1 1 100%}
+  .psp-tbl input{width:84px}
+  .psp-detail-barre{flex-wrap:wrap;gap:8px}
+}
 </style>
 </head>
 <script src="/vendor/chart.umd.min.js"></script>
@@ -18041,6 +18076,7 @@ function _bandeauEnvironnement(env){
     + 'font:700 12px/1.2 system-ui,sans-serif;letter-spacing:.06em;padding:8px 16px;border-radius:999px;'
     + 'box-shadow:0 4px 14px rgba(0,0,0,.35);pointer-events:none;max-width:calc(100vw - 32px);text-align:center';
   document.body.appendChild(d);
+  document.body.classList.add('env-test');
   if(!document.title.startsWith('[')) document.title = `[${String(env).toUpperCase()}] ${document.title}`;
 }
 

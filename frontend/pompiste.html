@@ -24,6 +24,8 @@
   }
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* Tablettes Android : pas d'agrandissement automatique du texte ; jamais de défilement horizontal */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-x:clip}
 html,body{margin:0;background:var(--bg);color:var(--text);
   font:18px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none}
 input,textarea{-webkit-user-select:text;user-select:text}
@@ -136,6 +138,7 @@ td.r,th.r{text-align:right;white-space:nowrap}
 .total{display:flex;justify-content:space-between;align-items:baseline;padding:12px 0;font-weight:800;font-size:19px}
 .total .v{font-family:var(--mono);font-size:24px}
 .ecart{border-radius:18px;padding:18px 20px;font-weight:900;font-size:22px;display:flex;justify-content:space-between;margin-top:6px}
+.ecart{gap:10px;align-items:center} .ecart span:last-child{white-space:nowrap}
 .ecart.ok{background:var(--ok-soft);color:var(--ok)}
 .ecart.neg{background:var(--err-soft);color:var(--err)}
 .ecart.pos{background:var(--warn-soft);color:var(--warn)}
@@ -170,12 +173,100 @@ td.r,th.r{text-align:right;white-space:nowrap}
 .barre-bas .btn{width:auto;flex:none;min-width:260px}
 .cache{display:none!important}
 .connexion{max-width:520px;margin:5vh auto 0}
-@media (max-width:600px){
-  html,body{font-size:17px} main{padding:16px 14px 140px} header{padding:12px 14px}
-  h1{font-size:26px} .pompe-titre{font-size:30px} .champ .val{font-size:36px}
-  .touche{height:64px;font-size:28px} .barre-bas .btn{min-width:160px;font-size:18px}
-  .billet,.entete-billets{grid-template-columns:110px 1fr} .billet .coup{font-size:19px} .case-n .val{font-size:26px}
-  .langues button{padding:6px 9px;font-size:13px} header .qui span{display:none}
+.langues .court{display:none}
+
+/* Lignes de pompe (vérification, rapport, résumé) */
+.lp{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)}
+.lp:last-of-type{border-bottom:0}
+.lp-nom{flex:1 1 auto;min-width:0}
+.lp-nom b{display:block;font-size:19px}
+.lp-idx{display:block;font-size:15px;color:var(--muted);overflow-wrap:anywhere}
+.lp-val{text-align:right;white-space:nowrap}
+.lp-val b{display:block;font-size:18px}
+.lp-val span{font-size:15px;color:var(--muted)}
+.lp-act{flex:none}
+.billets-resume td{white-space:nowrap}
+/* Rien ne doit élargir la page au-delà de l'écran */
+main,.card,.deux-col > *{min-width:0}
+.sub,h1,h2{overflow-wrap:anywhere}
+/* ── Une seule colonne (sous 820 px) : l'écran d'index doit tenir
+      au-dessus de la barre du bas, clavier compris ── */
+@media (max-width:819px){
+  .astuce{display:none}
+  .deux-col{gap:10px}
+  .deux-col .calcul{display:none}           /* gallons et total : déjà dans la barre du bas */
+  .champ{margin:8px 0;padding:10px 16px;border-radius:16px}
+  .champ .lib{font-size:14px}
+  .champ .val{font-size:32px;min-height:42px}
+  .pompe-titre{font-size:28px}
+  .pave{gap:8px;padding:10px;border-radius:18px}
+  .touche{height:56px;font-size:28px;border-radius:14px}
+}
+/* ── Tablettes étroites et téléphones ── */
+@media (max-width:720px){
+  html,body{font-size:17px}
+  main{padding:16px 14px 130px}
+  header{padding:10px 14px;flex-wrap:wrap;row-gap:8px}
+  h1{font-size:26px} .pompe-titre{font-size:30px} .champ .val{font-size:38px}
+  .gros{min-height:96px;font-size:23px;padding:16px 18px;gap:14px}
+  .gros.grand{min-height:120px;font-size:27px}
+  .gros .ico{width:54px;height:54px;font-size:28px}
+  .gros.grand .ico{width:64px;height:64px;font-size:34px}
+  .touche{height:66px;font-size:30px}
+  .barre-bas{padding:10px 14px calc(10px + env(safe-area-inset-bottom))}
+  .barre-bas .in{gap:10px}
+  .barre-bas .info{min-width:0}
+  .barre-bas .info b{font-size:20px;overflow-wrap:anywhere}
+  .barre-bas .btn{min-width:0;flex:0 1 auto;font-size:18px;padding:14px 16px;min-height:56px}
+  .fil .pas{font-size:13px;text-align:right}
+  .fil .retour{padding:9px 14px;font-size:16px}
+  .billet,.entete-billets{grid-template-columns:118px 1fr}
+  .billet .coup{font-size:20px}
+  .case-n .val{font-size:28px}
+  .total{font-size:17px} .total .v{font-size:21px}
+  .ecart{font-size:19px;padding:14px 16px}
+  .lp-nom b{font-size:18px}
+}
+@media (max-width:480px){
+  header{flex-wrap:nowrap;padding:8px 12px}
+  header .marque{flex:1;font-size:17px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  header .qui{display:none}
+  .langues{margin-left:0}
+  .langues .long{display:none} .langues .court{display:inline}
+  .langues button{padding:6px 10px;font-size:14px}
+  header #btn-sortir{padding:8px 12px;font-size:15px}
+  h1{font-size:24px} p.sub{font-size:16px;margin-bottom:14px}
+  .fil{min-height:44px;margin-bottom:8px} .resume{margin-bottom:8px}
+  .card{padding:16px;border-radius:16px}
+  .lp{flex-wrap:wrap;gap:6px 12px}
+  .lp-act{width:100%;text-align:right}
+  .barre-bas .btn{font-size:16px;padding:12px 14px}
+  .billet,.entete-billets{grid-template-columns:96px 1fr}
+  .billet .coup{font-size:18px}
+  .case-n{padding:4px 10px} .case-n .val{font-size:26px;min-height:36px}
+  .gros{font-size:21px}
+  .gros.grand{font-size:24px;min-height:104px}
+  /* Écran d'index : tout visible au-dessus de la barre du bas */
+  .astuce{display:none}
+  .pompe-titre{font-size:26px}
+  .champ{margin:8px 0;padding:10px 14px;border-radius:16px}
+  .champ .lib{font-size:14px}
+  .champ .val{font-size:30px;min-height:40px}
+  .deux-col{gap:10px}
+  .deux-col .calcul{display:none}           /* gallons et total : déjà dans la barre du bas */
+  .pave{gap:8px;padding:10px;border-radius:18px}
+  .touche{height:54px;font-size:26px;border-radius:14px}
+}
+@media (max-width:380px){
+  main{padding:12px 10px 124px}
+  .touche{height:50px;font-size:24px}
+  .pave{gap:8px;padding:10px}
+  .champ{padding:12px 14px}
+  .champ .val{font-size:28px}
+  .gros{padding:14px;gap:10px}
+  .gros .ico{width:44px;height:44px;font-size:24px}
+  .total .v{font-size:19px}
+}
 }
 </style>
 </head>
@@ -396,7 +487,8 @@ const affiche = (v, actif) => (v ? esc(v.replace('.', ',')) : '') + (actif ? '<s
 
 // ── En-tête : langue + utilisateur ──────────────────────────────────
 function majEntete(){
-  $('langues').innerHTML = ['ht','fr'].map(l => `<button class="${LANG===l?'on':''}" onclick="choisirLangue('${l}')">${l==='ht'?'Kreyòl':'Français'}</button>`).join('');
+  $('langues').innerHTML = ['ht','fr'].map(l => `<button class="${LANG===l?'on':''}" onclick="choisirLangue('${l}')">`
+    + `<span class="long">${l==='ht'?'Kreyòl':'Français'}</span><span class="court">${l==='ht'?'HT':'FR'}</span></button>`).join('');
   $('btn-sortir').textContent = t('sortir');
   if(S.ctx || S.etape === 'fin') rendre(); else if($('f-login')) ecranConnexion();
 }
@@ -673,7 +765,7 @@ function ecranIndex(id, prix, titreHaut, fin){
   $('app').innerHTML = entete() + `<div class="deux-col"><div>
       ${titreHaut}
       <h1 class="pompe-titre">${esc(q.nom)}</h1>
-      <p class="sub" style="margin:4px 0 0">${t('toucher_case')}</p>
+      <p class="sub astuce" style="margin:4px 0 0">${t('toucher_case')}</p>
       <div id="i-err"></div><div id="i-diff"></div>
       <div id="z-avant"></div><div id="z-apres"></div><div id="i-calc"></div>
     </div><div class="cote">${pave(true)}</div></div>`;
@@ -692,6 +784,16 @@ function rIndex(){
       ()=>{ S.champActif = null; if(dernier) aller('compteurs'); else { S.pos++; rendre(); } }, ok));
 }
 
+// Ligne de pompe des écrans de vérification : s'adapte à toutes les largeurs
+// (nom + index à gauche, gallons + montant à droite, bouton à la fin ; sur un
+// petit écran, le bouton passe en dessous au lieu de déborder).
+function lignePompe(nom, av, ap, g, montant, action){
+  return `<div class="lp"><div class="lp-nom"><b>${esc(nom)}</b>
+      <span class="lp-idx num">${nf(av,3)} → ${nf(ap,3)}</span></div>
+    <div class="lp-val num"><b>${nf(g,3)} gal</b><span>${G(montant)}</span></div>
+    ${action ? `<div class="lp-act">${action}</div>` : ''}</div>`;
+}
+
 // ── 5. Vérification des compteurs de ce carburant ───────────────────
 function lignes(){
   return S.choisies.map(id => { const v = valeurs(id); return {...v, montant: v.g * produit().prix_gallon}; });
@@ -700,10 +802,9 @@ function rCompteurs(){
   const l = lignes(), tot = l.reduce((a,x)=>a+x.montant,0), gal = l.reduce((a,x)=>a+x.g,0);
   $('app').innerHTML = entete() + `<h1>${t('verif_compteurs')}</h1>
     <p class="sub">${esc(produit().nom)} · ${per(S.periode)}, ${esc(jourTxt(S.date))}</p>
-    <div class="card"><table><thead><tr><th>${t('pompe')}</th><th class="r">${t('debut')}</th><th class="r">${t('fin')}</th><th class="r">${t('gallons')}</th><th></th></tr></thead><tbody>
-      ${l.map((x,i)=>`<tr><td><b>${esc(x.q.nom)}</b></td><td class="r num">${nf(x.av,3)}</td><td class="r num">${nf(x.ap,3)}</td>
-        <td class="r num"><b>${nf(x.g,3)}</b></td><td class="r"><button class="btn-mod" onclick="S.pos=${i};S.champActif=null;aller('index')">${t('modifier')}</button></td></tr>`).join('')}
-    </tbody></table>
+    <div class="card">
+      ${l.map((x,i) => lignePompe(x.q.nom, x.av, x.ap, x.g, x.montant,
+        `<button class="btn-mod" onclick="S.pos=${i};S.champActif=null;aller('index')">${t('modifier')}</button>`)).join('')}
     <div class="total"><span>${t('total')}</span><span class="v">${nf(gal,3)} gal</span></div>
     <div class="total" style="padding-top:0"><span>${t('montant')}</span><span class="v">${G(tot)}</span></div></div>
     <p class="sub">${t('argent_fin')}</p>`;
@@ -754,11 +855,8 @@ function rRapport(){
     </div>
     <div class="card"><h2 style="margin-top:0">${t('mon_rapport')}</h2>${Object.entries(lignesParProduit(r)).map(([nom, ls]) => `
       <div class="produit-tete">${esc(nom)}</div>
-      <table><tbody>${ls.map(l => `<tr><td><b>${esc(l.pompe_nom)}</b>
-          <div style="font-size:15px;color:var(--muted)" class="num">${nf(l.metter_avant,3)} → ${nf(l.metter_apres,3)}</div></td>
-        <td class="r num">${nf(l.gallons,3)} gal<div style="font-size:15px;color:var(--muted)">${G(l.montant)}</div></td>
-        <td class="r" style="width:56px"><button class="retirer" onclick="retirerPompe(${l.pompe_id})" aria-label="✕">✕</button></td></tr>`).join('')}
-      </tbody></table>`).join('')}
+      ${ls.map(l => lignePompe(l.pompe_nom, l.metter_avant, l.metter_apres, l.gallons, l.montant,
+          `<button class="retirer" onclick="retirerPompe(${l.pompe_id})" aria-label="✕">✕</button>`)).join('')}`).join('')}
       <div class="total"><span>${t('attendu')}</span><span class="v">${G(r.montant_attendu)}</span></div></div></div>`;
 }
 async function retirerPompe(id){
@@ -822,15 +920,12 @@ function rResume(){
     <p class="sub">${per(r.periode)}, ${esc(jourTxt(r.date))}. ${t('resume_sub')}</p>
     <div class="card"><div class="section-tete"><h2>${t('mes_compteurs')}</h2></div>
       ${Object.entries(lignesParProduit(r)).map(([nom, ls]) => `<div class="produit-tete">${esc(nom)}</div>
-        <table><tbody>${ls.map(l => `<tr><td><b>${esc(l.pompe_nom)}</b></td>
-          <td class="r num">${nf(l.metter_avant,3)} → ${nf(l.metter_apres,3)}</td>
-          <td class="r num"><b>${nf(l.gallons,3)} gal</b><div style="font-size:15px;color:var(--muted)">${G(l.montant)}</div></td>
-          <td class="r" style="width:120px"><button class="btn-mod" onclick="modifierPompe(${l.pompe_id})">${t('modifier')}</button></td></tr>`).join('')}
-        </tbody></table>`).join('')}
+        ${ls.map(l => lignePompe(l.pompe_nom, l.metter_avant, l.metter_apres, l.gallons, l.montant,
+          `<button class="btn-mod" onclick="modifierPompe(${l.pompe_id})">${t('modifier')}</button>`)).join('')}`).join('')}
       <div class="total"><span>${t('attendu')}</span><span class="v">${G(att)}</span></div></div>
     <div class="card"><div class="section-tete"><h2>${t('mon_argent')}</h2>
         <button class="btn-mod" onclick="S.depuisResume=true;aller('billetterie')">${t('modifier')}</button></div>
-      ${billets.length || num(S.monnaie) ? `<table><tbody>
+      ${billets.length || num(S.monnaie) ? `<table class="billets-resume"><tbody>
         ${billets.map(x => `<tr><td><b>${nf(x.c)} G</b></td><td class="r num">× ${x.n}</td><td class="r num"><b>${G(x.n * x.c)}</b></td></tr>`).join('')}
         ${num(S.monnaie) ? `<tr><td><b>${t('monnaie')}</b></td><td></td><td class="r num"><b>${G(num(S.monnaie))}</b></td></tr>` : ''}
       </tbody></table>` : `<p class="sub" style="margin:0">${t('aucun_argent')}</p>`}
