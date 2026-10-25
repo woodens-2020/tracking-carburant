@@ -296,11 +296,6 @@ def startup():
     init_db()
     with SessionLocal() as _db:
         assurer_role_pompiste(_db)
-        try:
-            from pompiste_routes import rattacher_employes_pompistes
-            rattacher_employes_pompistes(_db)
-        except Exception as _exc:
-            logging.getLogger("pompiste").warning("Rattachement employés pompistes : %s", _exc)
     # Migrations douces — colonnes ajoutées progressivement
     from sqlalchemy import text as _text
     _migrations = [
@@ -499,6 +494,14 @@ def startup():
                 _c.commit()
         except Exception:
             pass
+    # Après les migrations (colonne releves.rapport_pompiste_id) : chaque
+    # compte pompiste reçoit sa fiche employé. Ne bloque jamais le démarrage.
+    try:
+        from pompiste_routes import rattacher_employes_pompistes
+        with SessionLocal() as _db:
+            rattacher_employes_pompistes(_db)
+    except Exception as _exc:
+        print(f"[pompiste] rattachement des fiches employé impossible : {_exc}", flush=True)
     from datetime import datetime, timezone as _tz
     from models import SessionToken as _ST
     with SessionLocal() as _db:
