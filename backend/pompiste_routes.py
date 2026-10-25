@@ -128,6 +128,36 @@ def rattacher_employes_pompistes(db: Session) -> None:
     db.commit()
 
 
+class _RequeteInterne:
+    """Requête minimale pour upsert_releve hors d'un appel HTTP (seul
+    request.state.user.id est lu) : le relevé est attribué au pompiste."""
+    def __init__(self, user_id: int):
+        from types import SimpleNamespace
+        self.state = SimpleNamespace(user=SimpleNamespace(id=user_id))
+
+
+def rattraper_journal(db: Session) -> int:
+    """Démarrage : tout rapport terminé (soumis, en problème, finalisé) dont
+    un mètre manque dans le journal des compteurs y est écrit — notamment
+    les rapports soumis avant que l'espace pompiste n'écrive le journal au
+    « Terminer ». Idempotent : une pompe déjà dans le journal pour ce
+    créneau n'est pas touchée (saisie parallèle du module Saisie gardée)."""
+    n = 0
+    rapports = (db.query(RapportPompiste)
+                .filter(RapportPompiste.statut.in_(("SOUMIS", "PROBLEME", "CONFIRME", "RESOLU")))
+                .order_by(RapportPompiste.date, RapportPompiste.id).all())
+    rapports.sort(key=lambda r: (r.date, _RANG.get(r.periode, 9), r.id))     # Matin avant Après-midi
+    for rap in rapports:
+        manquantes = [l.pompe_id for l in rap.lignes
+                      if not db.query(Releve).filter_by(date=rap.date, periode=rap.periode, pompe_id=l.pompe_id).first()]
+        for pid in manquantes:
+            _ecrire_journal(db, rap, _RequeteInterne(rap.utilisateur_id), remplacer_saisie=False, seulement=pid)
+            n += 1
+    if n:
+        log.info("Journal des compteurs : %d mètre(s) de rapports pompistes rattrapé(s)", n)
+    return n
+
+
 def ids_employes_pompistes(db: Session) -> set:
     role = next((x for x in db.query(Role).all() if est_role_pompiste(x)), None)
     if not role:

@@ -180,6 +180,21 @@ td.r,th.r{text-align:right;white-space:nowrap}
 .cache{display:none!important}
 .connexion{max-width:520px;margin:5vh auto 0}
 
+/* Fenêtre de confirmation */
+.dlg{position:fixed;inset:0;z-index:50;background:rgba(15,23,42,.55);display:grid;place-items:center;padding:16px}
+.dlg-boite{background:var(--panel);color:var(--text);border-radius:24px;padding:24px;max-width:520px;width:100%;
+  box-shadow:0 18px 50px rgba(0,0,0,.35);text-align:center}
+.dlg-ico{font-size:52px;line-height:1}
+.dlg h2{font-size:24px;margin:10px 0 8px}
+.dlg-texte{color:var(--muted);font-size:18px;margin-bottom:18px}
+.dlg-texte b{color:var(--text)}
+.dlg-btns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dlg-btns .btn{min-height:60px;font-size:18px}
+.dlg.danger #dlg-oui{background:var(--err)}
+@media (max-width:420px){ .dlg-btns{grid-template-columns:1fr} .dlg-btns #dlg-oui{order:-1} }
+.note-flash{position:fixed;left:50%;top:76px;transform:translateX(-50%);z-index:40;background:var(--text);color:var(--bg);
+  font-weight:800;border-radius:14px;padding:12px 18px;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:calc(100vw - 32px);text-align:center}
+
 /* Billetterie au clavier de l'appareil */
 .billets-card{max-width:640px}
 .billets-card .billet{padding:4px 0;border-radius:14px;cursor:text}
@@ -337,11 +352,16 @@ main,.card,.deux-col > *{min-width:0}
   <div class="marque" id="marque">KONEKTA</div>
   <div class="langues" id="langues"></div>
   <div class="qui cache" id="qui"></div>
-  <button class="btn sec petit cache" id="btn-sortir" onclick="deconnexion()">Sortir</button>
+  <button class="btn sec petit cache" id="btn-sortir" onclick="demanderSortie()">Sortir</button>
 </header>
 
 <main id="app"></main>
 <div id="ticket" aria-hidden="true"></div>
+<div id="dlg" class="dlg cache" role="dialog" aria-modal="true" aria-labelledby="dlg-titre">
+  <div class="dlg-boite"><div class="dlg-ico" id="dlg-ico"></div><h2 id="dlg-titre"></h2><div id="dlg-texte" class="dlg-texte"></div>
+    <div class="dlg-btns"><button class="btn sec" id="dlg-non"></button><button class="btn" id="dlg-oui"></button></div></div>
+</div>
+<div id="note-flash" class="note-flash cache" role="status"></div>
 <div class="barre-bas cache" id="barre"><div class="in">
   <div class="info" id="barre-info"></div>
   <button class="btn" id="barre-btn"></button>
@@ -417,6 +437,18 @@ const TXT = {
     jours_courts:['Lu','Ma','Me','Je','Ve','Sa','Di'],
     e_date_future:'Un rapport ne peut pas être daté dans le futur.', e_date_ancienne:'Cette date est trop ancienne.',
     installer_app:'Installer l\'application sur cet appareil',
+    confirmer_titre_compteurs:'Envoyer les compteurs ?', confirmer_txt_compteurs:'<b>{p}</b> : {n} pompe(s) · {g} gal · <b>{m}</b>.<br>Vérifiez bien chaque index avant d\'envoyer.',
+    oui_envoyer:'Oui, envoyer', non_retour:'Non, revenir',
+    confirmer_titre_rapport:'Envoyer le rapport à la direction ?',
+    confirmer_txt_rapport:'Ventes attendues : <b>{a}</b><br>Argent compté : <b>{c}</b><br>Écart : <b>{e}</b><br>Une fois envoyé, seule la direction peut le modifier.',
+    oui_envoyer_rapport:'Oui, envoyer le rapport', retirer_titre:'Retirer cette pompe ?', oui_retirer:'Oui, la retirer',
+    sortir_titre:'Voulez-vous sortir ?', sortir_txt:'Vous allez être déconnecté.',
+    sortir_txt_brouillon:'Votre rapport n\'est pas terminé. Pas d\'inquiétude : tout ce que vous avez saisi est gardé, vous le retrouverez en revenant.',
+    oui_sortir:'Oui, sortir', rester:'Non, rester', quitter_titre:'Quitter l\'application ?', quitter_txt:'Vous pourrez la rouvrir avec l\'icône Konekta Ponpis.',
+    oui_quitter:'Oui, quitter', changer_titre:'Changer ?', changer_txt:'Vous avez déjà saisi des index. Si vous changez, ils seront effacés.',
+    oui_changer:'Oui, changer', recupere:'Nous avons repris là où vous en étiez.',
+    veille_titre:'Vous êtes toujours là ?', veille_txt:'Pour protéger votre compte, déconnexion dans {s} secondes. Votre saisie est gardée.',
+    veille_oui:'Je suis là, continuer', veille_non:'Me déconnecter',
     imprimer:'Imprimer la fiche', reimprimer:'Réimprimer', papier:'Papier',
     tk_titre:'RAPPORT POMPISTE', tk_no:'Rapport n°', tk_pompiste:'Pompiste', tk_code:'Code', tk_periode:'Période',
     tk_soumis:'Soumis le', tk_compteurs:'COMPTEURS', tk_prix:'Prix', tk_ventes:'VENTES', tk_argent:'ARGENT REMIS',
@@ -483,6 +515,18 @@ const TXT = {
     jours_courts:['Le','Ma','Mè','Je','Va','Sa','Di'],
     e_date_future:'Yon rapò pa ka gen yon dat nan lavni.', e_date_ancienne:'Dat sa a twò lontan.',
     installer_app:'Enstale aplikasyon an sou aparèy sa a',
+    confirmer_titre_compteurs:'Voye kontè yo ?', confirmer_txt_compteurs:'<b>{p}</b> : {n} ponp · {g} gal · <b>{m}</b>.<br>Verifye chak endèks byen anvan ou voye.',
+    oui_envoyer:'Wi, voye yo', non_retour:'Non, tounen',
+    confirmer_titre_rapport:'Voye rapò a bay direksyon an ?',
+    confirmer_txt_rapport:'Lajan ki dwe antre : <b>{a}</b><br>Lajan ou konte : <b>{c}</b><br>Diferans : <b>{e}</b><br>Apre ou voye l, se direksyon an sèlman ki ka chanje l.',
+    oui_envoyer_rapport:'Wi, voye rapò a', retirer_titre:'Retire ponp sa a ?', oui_retirer:'Wi, retire l',
+    sortir_titre:'Ou vle soti ?', sortir_txt:'Ou pral dekonekte.',
+    sortir_txt_brouillon:'Rapò ou a poko fini. Pa enkyete w : n ap kenbe tout sa ou te antre yo, w ap jwenn yo lè ou tounen.',
+    oui_sortir:'Wi, soti', rester:'Non, rete', quitter_titre:'Kite aplikasyon an ?', quitter_txt:'W ap ka relouvri l ak ikòn Konekta Ponpis la.',
+    oui_quitter:'Wi, kite l', changer_titre:'Chanje ?', changer_txt:'Ou te deja antre kèk endèks. Si ou chanje, sa ou te antre yo pral efase.',
+    oui_changer:'Wi, chanje', recupere:'Nou rekipere kote ou te ye a.',
+    veille_titre:'Ou la toujou ?', veille_txt:'Pou pwoteje kont ou, n ap dekonekte w nan {s} segonn. Sa ou te antre yo ap rete.',
+    veille_oui:'Mwen la, kontinye', veille_non:'Dekonekte m',
     imprimer:'Enprime fich la', reimprimer:'Re-enprime', papier:'Papye',
     tk_titre:'RAPÒ PONPIS', tk_no:'Rapò nimewo', tk_pompiste:'Ponpis', tk_code:'Kòd', tk_periode:'Peryòd',
     tk_soumis:'Soumèt le', tk_compteurs:'KONTÈ', tk_prix:'Pri', tk_ventes:'VANT', tk_argent:'LAJAN REMÈT',
@@ -503,7 +547,7 @@ const S = {};
 function reinit(){
   Object.assign(S, {ctx:null, etape:'charte', charte:false, date:null, periode:null, produitId:null,
     choisies:[], pos:0, index:{}, billets:{}, monnaie:'', note:'', erreurs:{}, dernier:null,
-    champ:null, modif:null, depuisResume:false, champActif:null, caseActive:null, dernierProduit:null});
+    champ:null, modif:null, depuisResume:false, champActif:null, caseActive:null, dernierProduit:null, _repriseFaite:false});
 }
 reinit();
 
@@ -561,6 +605,7 @@ function taper(k){
   else { if(v.replace('.','').length >= (c.max || 12)) return; if(v === '0') v = ''; v += k; }
   c.set(v);
   c.apres && c.apres();
+  sauverBrouillon();
 }
 document.addEventListener('click', e => { const b = e.target.closest('.touche'); if(b) taper(b.dataset.k); });
 document.addEventListener('keydown', e => {          // clavier physique (tablette avec clavier, tests)
@@ -607,6 +652,14 @@ async function chargerContexte(){
       if(S.charte && ['charte','periode'].includes(S.etape)) S.etape = 'rapport';
     }
     if(!S.date) S.date = S.ctx.aujourd_hui;
+    if(!S._repriseFaite){                     // une seule fois après la connexion
+      S._repriseFaite = true;
+      if(restaurerBrouillon()){
+        flash(t('recupere'));
+        if(!S.ctx.en_cours && S.date && S.periode && (S.ctx.date !== S.date || S.ctx.periode !== S.periode)) return chargerContexte();
+      }
+    }
+    if(_laisserPartir){ _laisserPartir = false; garderHistorique(); }
     $('qui').innerHTML = `<b>${esc(S.ctx.pompiste.nom)}</b><span>${esc(S.ctx.pompiste.username)}</span>`;
     $('qui').classList.remove('cache'); $('btn-sortir').classList.remove('cache');
     rendre();
@@ -665,10 +718,17 @@ async function ecranPasPompiste(){
 }
 
 async function deconnexion(){
-  clearTimeout(_veille);
+  sauverBrouillon();                       // rien n'est perdu : repris à la reconnexion
+  clearTimeout(_veille); clearTimeout(_veilleAlerte); clearInterval(_decompte);
+  const r = _dlgReponse; _dlgReponse = null; $('dlg').classList.add('cache'); if(r) r(true);
   try{ await api('POST','/api/logout'); }catch(e){}
   reinit();
   ecranConnexion();
+}
+async function demanderSortie(){
+  const ok = await demander({ico:'🚪', titre:t('sortir_titre'), texte: aDesDonnees() ? t('sortir_txt_brouillon') : t('sortir_txt'),
+                              oui:t('oui_sortir'), non:t('rester')});
+  if(ok) deconnexion();
 }
 
 // ── Navigation ──────────────────────────────────────────────────────
@@ -717,6 +777,7 @@ function rendre(){
   ({charte:rCharte, periode:rPeriode, calendrier:rCalendrier, produit:rProduit, pompes:rPompes, index:rIndex, compteurs:rCompteurs,
     rapport:rRapport, billetterie:rBilletterie, resume:rResume, modif:rModif, fin:rFin})[S.etape]();
   window.scrollTo(0,0);
+  sauverBrouillon();
 }
 
 // ── Charte ──────────────────────────────────────────────────────────
@@ -789,12 +850,22 @@ function rCalendrier(){
       <div class="cal-grille">${t('jours_courts').map(x => `<span class="cal-js">${x}</span>`).join('')}${cases.join('')}</div>
     </div>`;
 }
-function choisirDate(d){
-  if(d !== S.date){ S.periode = null; S.produitId = null; S.choisies = []; S.index = {}; S.erreurs = {}; }
+const indexSaisis = () => Object.values(S.index).some(x => x && (x.avant || x.apres));
+async function confirmerEffacement(){
+  return !indexSaisis() || demander({ico:'⚠️', titre:t('changer_titre'), texte:t('changer_txt'), oui:t('oui_changer'), non:t('non_retour'), danger:true});
+}
+async function choisirDate(d){
+  if(d !== S.date){
+    if(!await confirmerEffacement()) return;
+    S.periode = null; S.produitId = null; S.choisies = []; S.index = {}; S.erreurs = {};
+  }
   S.date = d; S.moisCal = null; aller('periode');
 }
 async function choisirPeriode(p){
-  if(p !== S.periode){ S.produitId = null; S.choisies = []; S.index = {}; S.erreurs = {}; }
+  if(p !== S.periode){
+    if(!await confirmerEffacement()) return;
+    S.produitId = null; S.choisies = []; S.index = {}; S.erreurs = {};
+  }
   S.periode = p; S.etape = 'produit';
   await chargerContexte();
 }
@@ -909,6 +980,9 @@ function confirmerDebut(id){
 }
 
 function rIndex(){
+  if(!produit() || !S.choisies.length) return aller(produit() ? 'pompes' : 'produit');
+  S.pos = Math.min(S.pos || 0, S.choisies.length - 1);
+  if(!pompeCtx(S.choisies[S.pos])) return aller('pompes');
   const id = S.choisies[S.pos], dernier = S.pos === S.choisies.length - 1;
   ecranIndex(id, produit().prix_gallon, `<p class="sub" style="margin:0">${t('pompe_x', {i: S.pos+1, n: S.choisies.length})}</p>`,
     (ok, v) => barre(ok ? `<b>${nf(v.g,3)} gal</b>${t('vendus')}` : t('tapez_deux'), dernier ? t('verifier') : t('suivante'),
@@ -930,6 +1004,7 @@ function lignes(){
   return S.choisies.map(id => { const v = valeurs(id); return {...v, montant: v.g * produit().prix_gallon}; });
 }
 function rCompteurs(){
+  if(!produit() || !S.choisies.length || S.choisies.some(id => !pompeCtx(id))) return aller(produit() ? 'pompes' : 'produit');
   const l = lignes(), tot = l.reduce((a,x)=>a+x.montant,0), gal = l.reduce((a,x)=>a+x.g,0);
   $('app').innerHTML = entete() + `<h1>${t('verif_compteurs')}</h1>
     <p class="sub">${esc(produit().nom)} · ${per(S.periode)}, ${esc(jourTxt(S.date))}</p>
@@ -943,6 +1018,11 @@ function rCompteurs(){
 }
 
 async function envoyerCompteurs(){
+  const l = lignes();
+  const ok = await demander({ico:'⛽', titre:t('confirmer_titre_compteurs'),
+    texte:t('confirmer_txt_compteurs', {n:l.length, g:nf(l.reduce((a,x)=>a+x.g,0),3), m:G(l.reduce((a,x)=>a+x.montant,0)), p:esc(produit()?.nom||'')}),
+    oui:t('oui_envoyer'), non:t('non_retour')});
+  if(!ok) return;
   const b = $('barre-btn'); b.disabled = true; b.textContent = t('envoi');
   try{
     await api('POST','/api/pompiste/compteurs',{
@@ -992,7 +1072,7 @@ function rRapport(){
 }
 async function retirerPompe(id){
   const l = enCours().lignes.find(x => x.pompe_id === id);
-  if(!confirm(t('retirer_q', {p: l.pompe_nom}))) return;
+  if(!await demander({ico:'🗑', titre:t('retirer_titre'), texte:t('retirer_q', {p: esc(l.pompe_nom)}), oui:t('oui_retirer'), non:t('non_retour'), danger:true})) return;
   try{ await api('DELETE', `/api/pompiste/compteurs/${id}`); }catch(e){ alert(e.message); }
   await chargerContexte();
 }
@@ -1042,6 +1122,7 @@ function rBilletterie(){
         S.billets[Number(el.dataset.c)] = v;
       }
       maj();
+      sauverBrouillon();
     });
     el.addEventListener('focus', () => { el.select(); el.closest('.billet').classList.add('actif'); });
     el.addEventListener('blur', () => el.closest('.billet').classList.remove('actif'));
@@ -1081,7 +1162,7 @@ function rResume(){
       <div class="ecart ${cls}"><span>${txt}</span><span>${signe(ec)}</span></div>
       <label for="r-note">${t('un_mot')}</label>
       <textarea id="r-note" rows="3" maxlength="500" placeholder="${esc(t('un_mot_ph'))}">${esc(S.note)}</textarea></div>`;
-  $('r-note').oninput = e => S.note = e.target.value;
+  $('r-note').oninput = e => { S.note = e.target.value; sauverBrouillon(); };
   barre(`${t('ecart')}<b>${signe(ec)}</b>`, t('envoyer_rapport'), terminer);
 }
 
@@ -1092,7 +1173,8 @@ function modifierPompe(id){
   aller('modif');
 }
 function rModif(){
-  const id = S.modif, l = enCours().lignes.find(x => x.pompe_id === id);
+  const id = S.modif, l = enCours()?.lignes.find(x => x.pompe_id === id);
+  if(!l || !pompeCtx(id)){ S.modif = null; return aller(enCours() ? 'resume' : 'periode'); }
   ecranIndex(id, l.prix_gallon, `<p class="sub" style="margin:0">${t('modifier_x', {p: esc(l.produit_nom)})}</p>`,
     (ok, v) => barre(ok ? `<b>${nf(v.g,3)} gal</b>${t('vendus')}` : '', t('enregistrer'), async () => {
       try{
@@ -1106,11 +1188,16 @@ function rModif(){
 }
 
 async function terminer(){
+  const att = enCours()?.montant_attendu || 0, cpt = totalCompte();
+  const ok = await demander({ico:'📨', titre:t('confirmer_titre_rapport'),
+    texte:t('confirmer_txt_rapport', {a:G(att), c:G(cpt), e:signe(cpt - att)}), oui:t('oui_envoyer_rapport'), non:t('non_retour')});
+  if(!ok) return;
   const b = $('barre-btn'); b.disabled = true; b.textContent = t('envoi');
   try{
     S.dernier = await api('POST','/api/pompiste/terminer',{
       billetterie: S.ctx.coupures.map(c => ({coupure:c, liasses:0, billets:ent(S.billets[c])})).filter(x => x.billets),
       monnaie: num(S.monnaie) || 0, note: S.note || null});
+    effacerBrouillon();
     aller('fin');
   }catch(e){
     if(e.status === 401) return ecranConnexion(t('session'));
@@ -1241,13 +1328,101 @@ async function chargerHistorique(){
 // Tablette partagée : déconnexion automatique après 10 min sans toucher
 // l'écran (le rapport commencé est gardé et repris à la reconnexion), et
 // 2 min après l'écran « Rapport envoyé » (le temps d'imprimer la fiche).
-let _veille = null;
+let _veille = null, _veilleAlerte = null, _decompte = null;
 function reveil(){
-  clearTimeout(_veille);
+  clearTimeout(_veille); clearTimeout(_veilleAlerte);
   if(!S.ctx && S.etape !== 'fin') return;
-  _veille = setTimeout(deconnexion, S.etape === 'fin' ? 120_000 : 10 * 60_000);
+  if(S.etape === 'fin'){ _veille = setTimeout(deconnexion, 120_000); return; }
+  // 9 min sans toucher l'écran : on prévient, puis déconnexion 60 s plus tard
+  _veilleAlerte = setTimeout(alerteVeille, 9 * 60_000);
+}
+async function alerteVeille(){
+  let n = 60;
+  const texte = () => t('veille_txt', {s:n});
+  _decompte = setInterval(() => { n--; const el = $('dlg-texte'); if(el) el.textContent = texte();
+    if(n <= 0){ clearInterval(_decompte); fermerDlg(false); } }, 1000);
+  const reste = await demander({ico:'⏰', titre:t('veille_titre'), texte:texte(), oui:t('veille_oui'), non:t('veille_non'), fond:true});
+  clearInterval(_decompte);
+  if(reste) reveil(); else if(S.ctx) deconnexion();
 }
 ['pointerdown','keydown'].forEach(ev => document.addEventListener(ev, reveil, {passive:true}));
+
+// ── Fenêtre de confirmation (remplace confirm(), gros boutons, 2 langues) ──
+let _dlgReponse = null;
+let _dlgFond = false;
+function demander({ico='', titre='', texte='', oui='OK', non='', danger=false, fond=false}){
+  return new Promise(res => {
+    if(_dlgReponse) _dlgReponse(false);
+    _dlgReponse = res; _dlgFond = fond;
+    $('dlg-ico').textContent = ico; $('dlg-titre').textContent = titre; $('dlg-texte').innerHTML = texte;
+    $('dlg-oui').textContent = oui; $('dlg-non').textContent = non; $('dlg-non').classList.toggle('cache', !non);
+    $('dlg').classList.toggle('danger', !!danger);
+    $('dlg').classList.remove('cache');
+    $('dlg-oui').focus();
+  });
+}
+function fermerDlg(valeur){
+  if(!_dlgReponse) return;
+  const r = _dlgReponse; _dlgReponse = null;
+  $('dlg').classList.add('cache');
+  r(valeur);
+}
+const dlgOuvert = () => !!_dlgReponse;
+$('dlg-oui').onclick = () => fermerDlg(true);
+$('dlg-non').onclick = () => fermerDlg(false);
+$('dlg').addEventListener('click', e => { if(e.target.id === 'dlg') fermerDlg(_dlgFond); });
+document.addEventListener('keydown', e => { if(dlgOuvert() && e.key === 'Escape') fermerDlg(false); });
+let _flash = null;
+function flash(msg){ const el = $('note-flash'); el.textContent = msg; el.classList.remove('cache');
+  clearTimeout(_flash); _flash = setTimeout(() => el.classList.add('cache'), 4000); }
+
+// ── Brouillon : ce qui est saisi reste sur l'appareil jusqu'à l'envoi ──
+// Sortie involontaire, retour arrière, coupure, déconnexion automatique :
+// à la reconnexion du même pompiste, il reprend là où il était.
+const CHAMPS_BROUILLON = ['etape','charte','date','periode','produitId','choisies','pos','index','billets','monnaie','note','depuisResume','modif','dernierProduit'];
+const cleBrouillon = () => S.ctx?.pompiste?.username ? 'ponpis-brouillon-' + S.ctx.pompiste.username : null;
+function sauverBrouillon(){
+  const k = cleBrouillon(); if(!k || S.etape === 'fin' || S.etape === 'charte') return;
+  const b = {t: Date.now(), enCours: S.ctx?.en_cours?.id || null};
+  for(const c of CHAMPS_BROUILLON) b[c] = S[c];
+  try{ localStorage.setItem(k, JSON.stringify(b)); }catch(e){}
+}
+function effacerBrouillon(){ const k = cleBrouillon(); if(k) try{ localStorage.removeItem(k); }catch(e){} }
+function restaurerBrouillon(){
+  const k = cleBrouillon(); if(!k) return false;
+  let b = null; try{ b = JSON.parse(localStorage.getItem(k) || 'null'); }catch(e){}
+  if(!b) return false;
+  const enCoursId = S.ctx?.en_cours?.id || null;
+  // Trop ancien, ou le rapport a changé ailleurs (terminé, annulé…) : on repart proprement
+  if(Date.now() - b.t > 12 * 3600_000 || (b.enCours || null) !== enCoursId){ effacerBrouillon(); return false; }
+  for(const c of CHAMPS_BROUILLON) if(b[c] !== undefined) S[c] = b[c];
+  if(!['periode','calendrier','produit','pompes','index','compteurs','rapport','billetterie','resume','modif'].includes(S.etape)) S.etape = 'periode';
+  if(S.etape === 'modif' && !S.modif) S.etape = 'resume';
+  S.charte = true; S.champActif = null; S.caseActive = null;
+  return true;
+}
+const aDesDonnees = () => !!(enCours() || indexSaisis() || Object.values(S.billets).some(Boolean) || S.monnaie || S.note);
+
+// ── Bouton retour d'Android / du navigateur ─────────────────────────
+// Il ramène à l'étape précédente au lieu de fermer l'application ; sur un
+// écran de départ, on demande avant de quitter.
+let _laisserPartir = false;
+function garderHistorique(){ try{ history.pushState({ponpis:1}, ''); }catch(e){} }
+try{ history.replaceState({ponpis:0}, ''); garderHistorique(); }catch(e){}
+window.addEventListener('popstate', async () => {
+  if(_laisserPartir) return;
+  if(dlgOuvert()){ fermerDlg(false); garderHistorique(); return; }
+  if(S.ctx) garderHistorique();
+  if(!S.ctx){ _laisserPartir = true; history.back(); return; }   // écran de connexion : retour normal
+  if(!['charte','rapport','fin','periode'].includes(S.etape)) return precedent();
+  const ok = await demander({ico:'🚪', titre:t('quitter_titre'), texte: aDesDonnees() ? t('sortir_txt_brouillon') : t('quitter_txt'),
+                              oui:t('oui_quitter'), non:t('rester')});
+  if(ok){ sauverBrouillon(); _laisserPartir = true; history.go(-2); }
+});
+window.addEventListener('beforeunload', e => {
+  sauverBrouillon();
+  if(S.ctx && S.etape !== 'fin' && aDesDonnees()){ e.preventDefault(); e.returnValue = ''; }
+});
 
 // ── Application installable (icône sur l'écran de l'appareil) ───────
 // Voir /pompiste/installer et frontend/pompiste-app/sw.js.

@@ -318,3 +318,33 @@ def test_application_installable(client):
     r = anonyme.get("/pompiste/qr.png")
     assert r.status_code == 200 and r.content[:4] == b"\x89PNG"
     assert anonyme.get("/pompiste/installer").status_code == 200
+
+
+def test_rattrapage_du_journal(client, db):
+    """Un rapport soumis avant l'écriture automatique du journal (mètres
+    absents du journal) est rattrapé au démarrage, toutes ses pompes."""
+    from tz_utils import today_haiti
+    import main as _m
+    import pompiste_routes
+    from models import Releve
+    jour = str(today_haiti())
+    p1, p2 = _produit(client, 700), None
+    pid_produit = client.get("/api/produits", headers=H).json()
+    prod = next(p for p in pid_produit if any(q["id"] == p1 for q in p["pompes"]))
+    p2 = client.post(f"/api/produits/{prod['id']}/pompes", headers=H, json={"nom": f"{prod['nom']} P2"}).json()["id"]
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Rat", "nom": "Trapage"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    r = p.post("/api/pompiste/compteurs", json={"date": jour, "periode": "Apres-midi", "charte_acceptee": True,
+              "lignes": [{"pompe_id": p1, "metter_avant": 0, "metter_apres": 40}, {"pompe_id": p2, "metter_avant": 0, "metter_apres": 25}]})
+    assert r.status_code == 201, r.text
+    rid = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 45}]}).json()["id"]
+    # Simule un rapport d'avant : ses mètres ne sont pas dans le journal
+    db.query(Releve).filter(Releve.rapport_pompiste_id == rid).delete()
+    db.commit()
+    assert db.query(Releve).filter(Releve.pompe_id.in_([p1, p2])).count() == 0
+    assert pompiste_routes.rattraper_journal(db) >= 2
+    rel = db.query(Releve).filter(Releve.pompe_id.in_([p1, p2])).all()
+    assert sorted(float(x.metter_apres) for x in rel) == [25.0, 40.0]
+    assert all(x.rapport_pompiste_id == rid and x.pompiste_id for x in rel)
+    assert pompiste_routes.rattraper_journal(db) == 0          # idempotent

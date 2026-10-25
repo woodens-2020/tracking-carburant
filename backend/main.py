@@ -503,6 +503,8 @@ def startup():
         from pompiste_routes import rattacher_employes_pompistes
         with SessionLocal() as _db:
             rattacher_employes_pompistes(_db)
+            from pompiste_routes import rattraper_journal
+            rattraper_journal(_db)
     except Exception as _exc:
         print(f"[pompiste] rattachement des fiches employé impossible : {_exc}", flush=True)
     from datetime import datetime, timezone as _tz
