@@ -857,18 +857,21 @@ def login_pompiste(data: LoginPompisteIn, request: Request, response: Response,
     comptes de rôle « Pompiste » (qui n'ont accès qu'à /pompiste)."""
     ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent", "")
-    _check_login_rate(ip)
     username = data.username.strip().lower()
+    # Compteur par identifiant : toutes les tablettes d'une station sortent
+    # par la même IP — un PIN mal tapé ne doit pas bloquer tout le monde.
+    cle = f"{ip}|pompiste|{username}"
+    _check_login_rate(cle)
     user = (db.query(Utilisateur)
             .filter(Utilisateur.username.ilike(username), Utilisateur.actif.is_(True)).first())
     _err = "Identifiant ou code PIN incorrect"
     if (not user or not est_role_pompiste(user.role_obj) or not user.code_acces_hash
             or not verify_code_acces(data.code_acces.strip(), user.code_acces_hash)):
-        _record_login_failure(ip)
+        _record_login_failure(cle)
         log_event(db, LOGIN_FAILED, user_id=user.id if user else None, ip_address=ip,
                   details={"username": username, "espace": "pompiste"})
         raise HTTPException(401, _err)
-    _clear_login_failures(ip)
+    _clear_login_failures(cle)
     token = create_session(db, user.id, ip_address=ip, user_agent=ua)
     log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip, details={"espace": "pompiste"})
     response.set_cookie(

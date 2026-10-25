@@ -138,7 +138,7 @@ def _index_precedent(db: Session, pompe_id: int, d: date_type, periode: str,
     q = (db.query(RapportPompisteLigne, RapportPompiste)
          .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
          .filter(RapportPompisteLigne.pompe_id == pompe_id,
-                 RapportPompiste.statut.in_(("EN_COURS", "SOUMIS")),
+                 RapportPompiste.statut.in_(("EN_COURS", "SOUMIS", "PROBLEME")),
                  RapportPompiste.date <= d, RapportPompiste.date >= d - timedelta(days=3)))
     if exclure_rapport_id:
         q = q.filter(RapportPompiste.id != exclure_rapport_id)
@@ -238,7 +238,8 @@ def _en_cours(db: Session, u: Utilisateur) -> Optional[RapportPompiste]:
             .order_by(RapportPompiste.id.desc()).first())
 
 
-_ACTIFS = ("EN_COURS", "SOUMIS", "CONFIRME")
+# Tout rapport non renvoyé au pompiste occupe ses pompes sur le créneau
+_ACTIFS = ("EN_COURS", "SOUMIS", "PROBLEME", "CONFIRME", "RESOLU")
 
 
 @router.get("/api/pompiste/contexte")
@@ -268,9 +269,9 @@ def contexte(date: Optional[date_type] = None, periode: Optional[str] = None,
         for q in p.pompes:
             if not q.actif:
                 continue
-            prec, src = _index_precedent(db, q.id, d, periode)
-            pompes.append({"id": q.id, "nom": q.nom, "index_precedent": prec,
-                           "index_precedent_source": src, "deja_rapportee": prises.get(q.id)})
+            # Pompes ajoutées dans « Produits & Pompes » : visibles ici dès
+            # leur création (lecture directe, rien à configurer).
+            pompes.append({"id": q.id, "nom": q.nom, "deja_rapportee": prises.get(q.id)})
         if pompes:
             produits.append({"id": p.id, "nom": p.nom,
                              "prix_gallon": _prix(db, p.pompes[0], d) if p.pompes else float(p.prix_gallon or 0),
@@ -287,6 +288,9 @@ class LigneIn(BaseModel):
     pompe_id: int
     metter_avant: float
     metter_apres: float
+    # Le pompiste a relu le compteur et maintient un index de début différent
+    # du dernier index enregistré (l'écart reste visible du superviseur).
+    debut_confirme: bool = False
 
 
 class BilletIn(BaseModel):
@@ -310,36 +314,45 @@ class TerminerIn(BaseModel):
 
 def _controler_lignes(db: Session, d: date_type, periode: str, lignes: list,
                       exclure_rapport_id: Optional[int] = None) -> list[dict]:
-    """Contrôle des index. Lève 422 avec la liste des pompes en erreur
-    (l'interface renvoie le pompiste à la saisie de ces pompes)."""
+    """Contrôle des index. Lève 422 avec la liste des pompes en erreur ; chaque
+    erreur porte un `code` que l'interface traduit (français / kreyòl) et
+    renvoie le pompiste à l'écran de la pompe.
+
+    Le pompiste lit et saisit lui-même les DEUX index : le dernier index connu
+    ne lui est jamais montré. S'il diffère de l'index de début saisi, on lui
+    demande de relire le compteur et de confirmer (code `debut_different`)."""
     erreurs, vues, sortie = [], set(), []
+
+    def err(pid, code, message, **extra):
+        erreurs.append({"pompe_id": pid, "code": code, "message": message, **extra})
+
     for l in lignes:
         pompe = db.get(Pompe, l.pompe_id)
         if not pompe or not pompe.actif:
-            erreurs.append({"pompe_id": l.pompe_id, "message": "Pompe introuvable ou inactive"})
+            err(l.pompe_id, "inactive", "Pompe introuvable ou inactive")
             continue
         if l.pompe_id in vues:
-            erreurs.append({"pompe_id": l.pompe_id, "message": f"{pompe.nom} : saisie en double"})
+            err(l.pompe_id, "double", f"{pompe.nom} : saisie en double")
             continue
         vues.add(l.pompe_id)
         if l.metter_avant < 0 or l.metter_apres < 0:
-            erreurs.append({"pompe_id": l.pompe_id, "message": f"{pompe.nom} : un index ne peut pas être négatif"})
+            err(l.pompe_id, "negatif", f"{pompe.nom} : un index ne peut pas être négatif")
             continue
         if l.metter_apres < l.metter_avant - TOLERANCE:
-            erreurs.append({"pompe_id": l.pompe_id,
-                            "message": f"{pompe.nom} : l'index de fin ({l.metter_apres:.3f}) est plus petit "
-                                       f"que l'index de début ({l.metter_avant:.3f}) — un compteur ne recule pas"})
+            err(l.pompe_id, "fin_inferieure",
+                f"{pompe.nom} : l'index de fin ({l.metter_apres:.3f}) est plus petit "
+                f"que l'index de début ({l.metter_avant:.3f}) — un compteur ne recule pas")
             continue
-        if l.metter_apres - l.metter_avant > MAX_GALLONS_PAR_POMPE_PERIODE:
-            erreurs.append({"pompe_id": l.pompe_id,
-                            "message": f"{pompe.nom} : {l.metter_apres - l.metter_avant:,.0f} gallons sur une période, "
-                                       "c'est anormal — vérifiez l'index (chiffre en trop ?)"})
+        g = l.metter_apres - l.metter_avant
+        if g > MAX_GALLONS_PAR_POMPE_PERIODE:
+            err(l.pompe_id, "anormal", f"{pompe.nom} : {g:,.0f} gallons sur une période, "
+                "c'est anormal — vérifiez l'index (chiffre en trop ?)", gallons=round(g))
             continue
-        prec, src = _index_precedent(db, l.pompe_id, d, periode, exclure_rapport_id)
-        if prec is not None and abs(prec - l.metter_avant) > TOLERANCE:
-            erreurs.append({"pompe_id": l.pompe_id,
-                            "message": f"{pompe.nom} : l'index de début ({l.metter_avant:.3f}) ne correspond pas "
-                                       f"au dernier index connu ({prec:.3f}, {src})"})
+        prec, _src = _index_precedent(db, l.pompe_id, d, periode, exclure_rapport_id)
+        if prec is not None and abs(prec - l.metter_avant) > TOLERANCE and not l.debut_confirme:
+            err(l.pompe_id, "debut_different",
+                f"{pompe.nom} : l'index de début ne correspond pas au dernier index enregistré. "
+                "Relisez le compteur ; si vous êtes sûr, confirmez.")
             continue
         sortie.append({"pompe": pompe, "avant": l.metter_avant, "apres": l.metter_apres})
     if erreurs:
@@ -366,8 +379,9 @@ def envoyer_compteurs(data: CompteursIn, u: Utilisateur = Depends(_require_pompi
         raise HTTPException(400, "Saisissez l'index d'au moins une pompe.")
     rap = _en_cours(db, u)
     if rap and (rap.date != data.date or rap.periode != data.periode):
-        raise HTTPException(409, f"Terminez d'abord votre rapport du {_per(rap.periode)} "
-                                 f"{rap.date.strftime('%d/%m')} (bouton « Terminer »).")
+        raise HTTPException(409, {"code": "terminer_dabord",
+                                  "message": f"Terminez d'abord votre rapport du {_per(rap.periode)} "
+                                             f"{rap.date.strftime('%d/%m')} (bouton « Terminer »)."})
     if not rap:
         _valider_date(data.date)
     lignes = _controler_lignes(db, data.date, data.periode, data.lignes)
@@ -380,7 +394,8 @@ def envoyer_compteurs(data: CompteursIn, u: Utilisateur = Depends(_require_pompi
                     RapportPompisteLigne.pompe_id.in_([x["pompe"].id for x in lignes])).all())
     if deja:
         noms = ", ".join(sorted({f"{l.pompe.nom} ({_nom(r.utilisateur)})" for l, r in deja}))
-        raise HTTPException(409, f"Déjà rapporté sur ce créneau : {noms}.")
+        raise HTTPException(409, {"code": "deja_rapporte", "pompes": noms,
+                                  "message": f"Déjà rapporté sur ce créneau : {noms}."})
 
     if not rap:
         rap = RapportPompiste(date=data.date, periode=data.periode, utilisateur_id=u.id,
@@ -420,6 +435,7 @@ def retirer_compteur(pompe_id: int, u: Utilisateur = Depends(_require_pompiste),
 class ModifLigneIn(BaseModel):
     metter_avant: float
     metter_apres: float
+    debut_confirme: bool = False
 
 
 @router.put("/api/pompiste/compteurs/{pompe_id}")
@@ -432,13 +448,20 @@ def modifier_compteur(pompe_id: int, data: ModifLigneIn, u: Utilisateur = Depend
     if not ligne:
         raise HTTPException(404, "Cette pompe n'est pas dans votre rapport en cours.")
     _controler_lignes(db, rap.date, rap.periode,
-                      [LigneIn(pompe_id=pompe_id, metter_avant=data.metter_avant, metter_apres=data.metter_apres)])
+                      [LigneIn(pompe_id=pompe_id, metter_avant=data.metter_avant, metter_apres=data.metter_apres,
+                               debut_confirme=data.debut_confirme)])
     ligne.metter_avant, ligne.metter_apres = data.metter_avant, data.metter_apres
     db.flush()
     _recalculer_attendu(rap)
     db.commit()
     db.refresh(rap)
     return _rapport_dict(db, rap)
+
+
+def _url_publique(request: Request) -> str:
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    hote = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+    return f"{proto}://{hote}/"
 
 
 def _emails_admins(db: Session) -> list[str]:
@@ -462,7 +485,7 @@ def _prevenir_admins(db: Session, rap: RapportPompiste, request: Request) -> Non
                 gallons=f"{sum(float(l.metter_apres) - float(l.metter_avant) for l in rap.lignes):,.3f} gal".replace(",", " "),
                 attendu=fmt(float(rap.montant_attendu)), compte=fmt(float(rap.montant_compte)),
                 ecart=("+" if float(rap.ecart) > 0 else "") + fmt(float(rap.ecart)),
-                lien=str(request.base_url).rstrip("/") + "/")
+                lien=_url_publique(request))
 
     def envoyer():
         try:
@@ -480,14 +503,17 @@ def terminer(data: TerminerIn, request: Request, u: Utilisateur = Depends(_requi
     avec l'ensemble des compteurs envoyés, puis envoi au superviseur."""
     rap = _en_cours(db, u)
     if not rap or not rap.lignes:
-        raise HTTPException(409, "Aucun compteur envoyé : saisissez d'abord vos pompes.")
+        raise HTTPException(409, {"code": "rien_a_terminer",
+                                  "message": "Aucun compteur envoyé : saisissez d'abord vos pompes."})
     for b in data.billetterie:
         if b.coupure not in COUPURES:
             raise HTTPException(400, f"Coupure inconnue : {b.coupure}")
         if b.liasses < 0 or b.billets < 0:
             raise HTTPException(400, "Les quantités de billets ne peuvent pas être négatives.")
-    if data.monnaie < 0:
-        raise HTTPException(400, "La monnaie ne peut pas être négative.")
+        if b.liasses * TAILLE_LIASSE + b.billets > 100_000:
+            raise HTTPException(400, f"Nombre de billets de {b.coupure} G anormal.")
+    if data.monnaie < 0 or data.monnaie > 1_000_000:
+        raise HTTPException(400, "Montant de monnaie invalide.")
     billetterie = [b.model_dump() if hasattr(b, "model_dump") else b.dict()
                    for b in data.billetterie if (b.liasses or b.billets)]
     _recalculer_attendu(rap)
@@ -549,10 +575,12 @@ def lister(statut: Optional[str] = None, date_debut: Optional[date_type] = None,
            date_fin: Optional[date_type] = None,
            _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     """`statut` accepte une liste séparée par des virgules (ex. SOUMIS,PROBLEME)."""
-    q = db.query(RapportPompiste).filter(RapportPompiste.statut != "EN_COURS")
     statuts = [x for x in (statut or "").split(",") if x]
+    q = db.query(RapportPompiste)
     if statuts:
         q = q.filter(RapportPompiste.statut.in_(statuts))
+    else:
+        q = q.filter(RapportPompiste.statut != "EN_COURS")
     if date_debut:
         q = q.filter(RapportPompiste.date >= date_debut)
     if date_fin:
@@ -560,7 +588,7 @@ def lister(statut: Optional[str] = None, date_debut: Optional[date_type] = None,
     rows = q.all()
     # À traiter : ordre chronologique (la continuité des compteurs impose de
     # finaliser le Matin avant l'Après-midi). Historique : plus récents d'abord.
-    a_traiter = bool(statuts) and set(statuts) <= set(_A_TRAITER)
+    a_traiter = bool(statuts) and set(statuts) <= set(_A_TRAITER + ("EN_COURS",))
     rows.sort(key=lambda r: (r.date, _RANG.get(r.periode, 9), r.id), reverse=not a_traiter)
     return [_rapport_dict(db, r, avec_journal=(r.statut in _A_TRAITER)) for r in rows[:200]]
 
@@ -569,7 +597,24 @@ def lister(statut: Optional[str] = None, date_debut: Optional[date_type] = None,
 def resume(_s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     a_verifier = db.query(RapportPompiste).filter_by(statut="SOUMIS").count()
     problemes = db.query(RapportPompiste).filter_by(statut="PROBLEME").count()
-    return {"a_verifier": a_verifier, "problemes": problemes, "a_confirmer": a_verifier + problemes}
+    non_termines = db.query(RapportPompiste).filter_by(statut="EN_COURS").count()
+    return {"a_verifier": a_verifier, "problemes": problemes, "non_termines": non_termines,
+            "a_confirmer": a_verifier + problemes}
+
+
+@router.delete("/api/pompiste-supervision/rapports/{rid}")
+def annuler_non_termine(rid: int, s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Supprime un rapport jamais terminé (pompiste parti sans « Terminer ») :
+    il bloquait ses pompes pour ce créneau. Aucun relevé n'a été écrit."""
+    rap = db.get(RapportPompiste, rid)
+    if not rap:
+        raise HTTPException(404, "Rapport introuvable")
+    if rap.statut != "EN_COURS":
+        raise HTTPException(409, "Seul un rapport non terminé peut être annulé.")
+    log.info("Rapport pompiste #%s (non terminé) annulé par l'utilisateur %s", rid, s.id)
+    db.delete(rap)
+    db.commit()
+    return {"ok": True}
 
 
 class LigneConfIn(BaseModel):

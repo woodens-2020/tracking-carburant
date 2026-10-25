@@ -19154,6 +19154,7 @@ async function pspOnglet(t){
   try{
     if(t === 'attente' || t === 'problemes'){
       PSP.rapports = await _pspApi('GET', '/rapports?statut=' + (t === 'attente' ? 'SOUMIS' : 'PROBLEME'));
+      PSP.nonTermines = t === 'attente' ? await _pspApi('GET', '/rapports?statut=EN_COURS') : [];
       pspRendreListe();
     }
     else if(t === 'historique') await pspHistorique();
@@ -19162,14 +19163,33 @@ async function pspOnglet(t){
   pspMajBadge();
 }
 
+function _pspNonTermines(){
+  const l = PSP.nonTermines || [];
+  if(!l.length) return '';
+  return `<div class="psp-card" style="border-color:rgba(249,115,22,.4)"><b>Rapports commencés, pas encore terminés (${l.length})</b>
+    <div class="psp-muted" style="margin:2px 0 8px">Le pompiste a envoyé des compteurs mais n'a pas compté l'argent. Ses pompes restent bloquées
+      pour cette période tant que le rapport n'est pas terminé ou annulé.</div>
+    <table class="psp-tbl"><tbody>${l.map(r => `<tr><td><b>${esc(r.pompiste_nom)}</b></td><td>${_pspPer(r.periode)} ${_pspDate(r.date)}</td>
+      <td>${r.lignes.map(x => esc(x.pompe_nom)).join(', ')}</td><td class="r">${_pspN(r.total_gallons)} gal</td>
+      <td class="r"><button class="btn btn-danger psp-mini" onclick="pspAnnuler(${r.id})">Annuler ce rapport</button></td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+async function pspAnnuler(id){
+  const r = (PSP.nonTermines || []).find(x => x.id === id);
+  if(!r || !confirm(`Annuler le rapport non terminé de ${r.pompiste_nom} (${_pspPer(r.periode)} ${_pspDate(r.date)}) ? Ses compteurs seront effacés et ses pompes libérées.`)) return;
+  try{ await _pspApi('DELETE', `/rapports/${id}`); notify('Rapport non terminé annulé.', 'ok'); pspOnglet(PSP.onglet); }
+  catch(e){ notify(e.message, 'err'); }
+}
+
 function pspRendreListe(){
   const c = document.getElementById('psp-contenu');
   if(!PSP.rapports.length){
-    c.innerHTML = `<div class="psp-card"><b>${PSP.onglet === 'attente' ? 'Aucun rapport à vérifier.' : 'Aucun rapport en problème.'}</b>
+    c.innerHTML = _pspNonTermines() + `<div class="psp-card"><b>${PSP.onglet === 'attente' ? 'Aucun rapport à vérifier.' : 'Aucun rapport en problème.'}</b>
       <div class="psp-muted" style="margin-top:4px">Les pompistes saisissent leurs compteurs sur <b>${esc(location.origin)}/pompiste</b>.</div></div>`;
     return;
   }
-  c.innerHTML = `<div class="psp-muted" style="margin-bottom:10px">Du plus ancien au plus récent : finalisez le Matin avant l'Après-midi (continuité des compteurs).</div>`
+  c.innerHTML = _pspNonTermines() + `<div class="psp-muted" style="margin-bottom:10px">Du plus ancien au plus récent : finalisez le Matin avant l'Après-midi (continuité des compteurs).</div>`
     + PSP.rapports.map(r => `<div id="psp-r-${r.id}">${pspCarte(r)}</div>`).join('');
 }
 
@@ -19194,7 +19214,7 @@ function pspCarte(r){
     const diffJ = j && (Math.abs(j.metter_avant - av) > 0.001 || Math.abs(j.metter_apres - ap) > 0.001);
     return `<tr class="${l.confirmee?'psp-ligne-ok':''}">
       <td><b>${esc(l.pompe_nom)}</b><div class="psp-muted">${esc(l.produit_nom)}</div></td>
-      <td class="r">${_pspN(prec)}${rupt ? '<div class="psp-neg" style="font-size:11px">≠ début</div>' : ''}</td>
+      <td class="r">${_pspN(prec)}${rupt ? `<div class="psp-neg" style="font-size:11px;font-weight:700">≠ début saisi (${av - prec > 0 ? '+' : ''}${_pspN(av - prec)})</div>` : ''}</td>
       <td class="r">${l.confirmee ? _pspN(av) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="avant" value="${av}">`}</td>
       <td class="r">${l.confirmee ? _pspN(ap) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="apres" value="${ap}">`}</td>
       <td class="r">${_pspN(l.gallons)}</td>
@@ -19206,10 +19226,10 @@ function pspCarte(r){
     ${j ? `<tr><td colspan="7"><div class="${diffJ?'psp-warn':'psp-muted'}">${diffJ ? '⚠ ' : ''}Journal déjà saisi par ${esc(j.saisi_par||'l\'administration')} :
        ${_pspN(j.metter_avant)} → ${_pspN(j.metter_apres)}${diffJ ? ' — la finalisation remplacera ces valeurs.' : ' (identique)'}</div></td></tr>` : ''}`;
   }).join('');
-  const billets = (r.billetterie||[]).map(b => `<tr><td><b>${Number(b.coupure).toLocaleString('fr-FR')} G</b></td>
-      <td class="r">${b.liasses||0}</td><td class="r">${b.billets||0}</td>
-      <td class="r">${_pspG(b.coupure * ((b.liasses||0) * 100 + (b.billets||0)))}</td></tr>`).join('')
-    + (r.monnaie ? `<tr><td><b>Monnaie</b></td><td></td><td></td><td class="r">${_pspG(r.monnaie)}</td></tr>` : '');
+  const billets = (r.billetterie||[]).map(b => { const n = (b.liasses||0) * 100 + (b.billets||0);
+      return `<tr><td><b>${Number(b.coupure).toLocaleString('fr-FR')} G</b></td>
+      <td class="r">${n}</td><td class="r">${_pspG(b.coupure * n)}</td></tr>`; }).join('')
+    + (r.monnaie ? `<tr><td><b>Monnaie</b></td><td></td><td class="r">${_pspG(r.monnaie)}</td></tr>` : '');
   const pb = r.statut === 'PROBLEME';
   const peutFinaliser = toutesLignes && r.billetterie_confirmee && r.ecart_confirme;
   return `<div class="psp-card">
@@ -19225,9 +19245,9 @@ function pspCarte(r){
        <div class="psp-muted" style="margin-top:4px">Modifiez un index avant de confirmer pour le corriger ; la saisie du pompiste reste conservée.</div>`)}
 
     ${_pspEtape(2, 'Billetterie', r.billetterie_confirmee,
-      `<div style="overflow-x:auto"><table class="psp-tbl" style="max-width:520px"><thead><tr><th>Coupure</th><th class="r">Liasses</th><th class="r">Billets</th><th class="r">Montant</th></tr></thead>
-        <tbody>${billets || '<tr><td colspan="4" class="psp-muted">Aucun billet déclaré</td></tr>'}
-        <tr><td><b>Total compté</b></td><td></td><td></td><td class="r"><b>${_pspG(r.montant_compte)}</b></td></tr></tbody></table></div>
+      `<div style="overflow-x:auto"><table class="psp-tbl" style="max-width:520px"><thead><tr><th>Coupure</th><th class="r">Nombre de billets</th><th class="r">Montant</th></tr></thead>
+        <tbody>${billets || '<tr><td colspan="3" class="psp-muted">Aucun billet déclaré</td></tr>'}
+        <tr><td><b>Total compté</b></td><td></td><td class="r"><b>${_pspG(r.montant_compte)}</b></td></tr></tbody></table></div>
        <div class="psp-actions">${r.billetterie_confirmee
          ? `<span class="psp-ok" style="font-weight:700">✓ Billetterie confirmée</span> <button class="psp-lien" onclick="pspBillets(${r.id},false)">reprendre</button>`
          : `<button class="btn btn-primary" onclick="pspBillets(${r.id},true)">Confirmer la billetterie</button>`}</div>`)}

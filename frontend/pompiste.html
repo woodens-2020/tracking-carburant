@@ -31,7 +31,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
 header{display:flex;align-items:center;gap:14px;padding:14px 24px;background:var(--panel);
   border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
 header .marque{font-weight:900;font-size:20px;letter-spacing:.03em}
-header .qui{margin-left:auto;text-align:right;line-height:1.2}
+.langues{margin-left:auto;display:flex;background:var(--bg);border:2px solid var(--border);border-radius:14px;padding:3px;gap:3px}
+.langues button{font:inherit;font-weight:800;font-size:15px;border:0;border-radius:10px;padding:8px 14px;cursor:pointer;
+  background:transparent;color:var(--muted)}
+.langues button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+header .qui{text-align:right;line-height:1.2}
 header .qui b{display:block;font-size:17px}
 header .qui span{font-size:14px;color:var(--muted);font-family:var(--mono)}
 main{max-width:1060px;margin:0 auto;padding:22px 24px 150px}
@@ -47,6 +51,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
   background:var(--accent);color:#fff;width:100%;min-height:64px;font-size:20px}
 .btn:active{background:var(--accent-2)}
 .btn:disabled{opacity:.35;cursor:default}
+.btn.attention{background:var(--warn)}
 .btn.sec{background:var(--panel);color:var(--text);border:2px solid var(--border)}
 .btn.petit{width:auto;min-height:0;padding:10px 18px;font-size:16px;border-radius:12px}
 .lien{background:none;border:0;color:var(--muted);font:inherit;font-size:17px;text-decoration:underline;
@@ -109,15 +114,15 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
 
 /* Billetterie */
 .billets{display:grid;gap:10px}
-.billet{display:grid;grid-template-columns:120px 1fr 1fr;gap:10px;align-items:center}
+.billet{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center}
 .billet .coup{font-size:24px;font-weight:900;white-space:nowrap}
 .billet .coup small{display:block;font-size:14px;font-weight:700;color:var(--muted);font-family:var(--mono)}
 .case-n{background:var(--panel);border:3px solid var(--border);border-radius:16px;padding:8px 12px;cursor:pointer;text-align:center}
 .case-n .lib{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
-.case-n .val{font-family:var(--mono);font-size:30px;font-weight:800;min-height:40px}
+.case-n .val{font-family:var(--mono);font-size:34px;font-weight:800;min-height:46px}
 .case-n.actif{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
 .case-n.zero .val{color:var(--border)}
-.entete-billets{display:grid;grid-template-columns:120px 1fr 1fr;gap:10px;font-size:14px;font-weight:800;color:var(--muted);
+.entete-billets{display:grid;grid-template-columns:150px 1fr;gap:12px;font-size:14px;font-weight:800;color:var(--muted);
   text-transform:uppercase;letter-spacing:.05em;padding:0 0 2px}
 .entete-billets span{text-align:center}
 .entete-billets span:first-child{text-align:left}
@@ -169,7 +174,8 @@ td.r,th.r{text-align:right;white-space:nowrap}
   html,body{font-size:17px} main{padding:16px 14px 140px} header{padding:12px 14px}
   h1{font-size:26px} .pompe-titre{font-size:30px} .champ .val{font-size:36px}
   .touche{height:64px;font-size:28px} .barre-bas .btn{min-width:160px;font-size:18px}
-  .billet,.entete-billets{grid-template-columns:86px 1fr 1fr} .billet .coup{font-size:19px} .case-n .val{font-size:24px}
+  .billet,.entete-billets{grid-template-columns:110px 1fr} .billet .coup{font-size:19px} .case-n .val{font-size:26px}
+  .langues button{padding:6px 9px;font-size:13px} header .qui span{display:none}
 }
 </style>
 </head>
@@ -177,6 +183,7 @@ td.r,th.r{text-align:right;white-space:nowrap}
 <div class="env cache" id="env"></div>
 <header>
   <div class="marque" id="marque">KONEKTA</div>
+  <div class="langues" id="langues"></div>
   <div class="qui cache" id="qui"></div>
   <button class="btn sec petit cache" id="btn-sortir" onclick="deconnexion()">Sortir</button>
 </header>
@@ -189,19 +196,137 @@ td.r,th.r{text-align:right;white-space:nowrap}
 
 <script>
 'use strict';
-/* Espace pompiste, pensé pour une tablette : une question par écran, gros
-   boutons, clavier de chiffres à l'écran (pas de clavier système).
-   1. Compteurs, carburant par carburant :
-      charte → période → carburant → pompes → index (une pompe par écran)
-      → vérification → « Envoyer les compteurs » → mon rapport
-      (« Ajouter un autre carburant » ou « Terminer »)
-   2. Au « Terminer » : billetterie de toute la période → résumé complet,
-      chaque ligne modifiable → envoi au superviseur. */
+/* Espace pompiste, pensé pour une tablette, en kreyòl ou en français.
+   Une question par écran, gros boutons, clavier de chiffres à l'écran.
+   1. Compteurs, carburant par carburant : charte → période → carburant →
+      pompes → les DEUX index de chaque pompe, lus par le pompiste →
+      vérification → envoi → « D'autres pompes ? » (oui : tel carburant /
+      non : j'ai fini)
+   2. Argent : nombre de billets par coupure + monnaie → résumé complet,
+      tout modifiable → envoi à la direction. */
+
+// ── Traductions ─────────────────────────────────────────────────────
+const TXT = {
+  fr: {
+    espace:'Espace pompiste', connexion_sub:'Choisissez votre langue, puis entrez votre code et votre PIN.',
+    mon_code:'Mon code', mon_pin:'Mon PIN (9 chiffres)', se_connecter:'Se connecter', pin_9:'Le PIN contient 9 chiffres.',
+    sortir:'Sortir', retour:'← Retour', etape1:'Étape 1 · Compteurs', etape2:'Étape 2 · Argent', envoyes:'Compteurs envoyés',
+    charte:'Charte de responsabilité', charte_sub:'Lisez et acceptez avant de commencer.',
+    c1:'Je lis moi-même les <b>deux index</b> (début et fin) sur chaque pompe.',
+    c2:'Je compte l\'argent <b>billet par billet</b> et je déclare exactement ce que je remets.',
+    c3:'Ce que je saisis avec mon code <b>m\'engage</b> : mon nom, la date et l\'heure sont enregistrés.',
+    c4:'Mon rapport est vérifié par la direction. En cas de doute, je préviens mon responsable.',
+    accepte:'J\'ai lu et j\'accepte', commencer:'Commencer', reprendre:'Reprendre mon rapport',
+    commence:'Vous avez un rapport commencé ({p}, {j}) : vous allez le reprendre.',
+    derniers:'Mes derniers rapports', chargement:'Chargement…', aucun_rapport:'Aucun rapport pour l\'instant.',
+    periode_q:'Quelle période ?', Matin:'Matin', 'Apres-midi':'Après-midi', auj:'Aujourd\'hui', hier:'Hier',
+    pour_hier:'Le rapport est pour hier ?', revenir_auj:'Revenir à aujourd\'hui',
+    carb_q:'Quel carburant ?', carb_autre_q:'Quel autre carburant ?', carb_sub:'Touchez le carburant de vos pompes.',
+    n_pompes:'{n} pompe(s)', toutes_saisies:'Toutes les pompes sont déjà saisies',
+    pompes_q:'Quelles pompes ?', pompes_sub:'Touchez chaque pompe que vous avez tenue.', toutes:'Toutes les pompes',
+    deja_moi:'Déjà dans votre rapport', deja_par:'Déjà saisie par {n}', a_saisir:'À saisir',
+    choisies:'{n} pompe(s) choisie(s)', aucune:'Aucune pompe choisie', continuer:'Continuer',
+    pompe_x:'Pompe {i} sur {n}', idx_debut:'Index de DÉBUT — lu sur la pompe', idx_fin:'Index de FIN — lu sur la pompe',
+    toucher_case:'Touchez une case, puis tapez le nombre sur le clavier.',
+    fin_sup:'L\'index de fin doit être plus grand que l\'index de début.', vendus:'vendus', tapez_deux:'Tapez les deux index',
+    suivante:'Pompe suivante →', verifier:'Vérifier', verif_compteurs:'Vérifiez vos compteurs',
+    pompe:'Pompe', debut:'Début', fin:'Fin', gallons:'Gallons', total:'Total', montant:'Montant', modifier:'Modifier',
+    argent_fin:'L\'argent se compte à la fin, quand vous aurez fini toutes vos pompes.',
+    envoyer_compteurs:'Envoyer les compteurs', envoi:'Envoi…',
+    autre_q:'Avez-vous d\'autres pompes pour cette période ?', autre_sub:'Vos compteurs {p} sont enregistrés.',
+    oui:'Oui', oui_sub:'J\'ai aussi tenu des pompes {p}', non_fini:'Non, j\'ai fini', non_fini_sub:'Je compte l\'argent',
+    mon_rapport:'Mon rapport', attendu:'Ventes attendues', retirer_q:'Retirer {p} de votre rapport ?',
+    compter:'Comptez l\'argent', compter_sub:'Tout l\'argent de la période. Touchez un billet, puis tapez combien vous en avez.',
+    billet:'Billet', nb_billets:'Nombre de billets', monnaie:'Monnaie', monnaie_sub:'pièces, en gourdes', montant_g:'Montant (G)',
+    total_compte:'Total compté', voir_resume:'Voir le résumé →',
+    resume:'Résumé de mon rapport', resume_sub:'Vérifiez tout. Touchez « Modifier » s\'il y a une erreur.',
+    mes_compteurs:'Mes compteurs', mon_argent:'Mon argent', aucun_argent:'Aucun argent saisi.', argent_compte:'Argent compté',
+    juste:'Caisse juste', manque:'Il manque', plus:'En plus', ecart:'Écart',
+    un_mot:'Un mot pour la direction ? (facultatif)', un_mot_ph:'Ex. : client parti sans payer…',
+    envoyer_rapport:'Envoyer mon rapport', modifier_x:'Modifier — {p}', enregistrer:'Enregistrer',
+    envoye:'Rapport envoyé', prevenue:'La direction a été prévenue et va le vérifier.',
+    compte:'Compté', deconnecter:'Me déconnecter', autre_rapport:'Faire un autre rapport',
+    SOUMIS:'En vérification', PROBLEME:'Problème signalé', CONFIRME:'Validé', RESOLU:'Résolu', REJETE:'À refaire',
+    refaire:'Refaites ce rapport après correction.', direction:'Direction', ecart_court:'écart',
+    session:'Session expirée — reconnectez-vous.', reessayer:'Réessayer',
+    pas_pompiste:'Compte non pompiste', pas_pompiste_sub:'Ce compte n\'est pas un compte pompiste.', aller_app:'Aller à l\'application',
+    debut_diff:'L\'index de début ne correspond pas au dernier index enregistré pour cette pompe.',
+    debut_diff_action:'Relisez le compteur sur la pompe. Corrigez-le, ou confirmez s\'il est juste.',
+    je_confirme:'Le compteur est juste, je confirme', confirme_ok:'Index de début confirmé.',
+    e_negatif:'Un index ne peut pas être négatif.', e_anormal:'{g} gallons sur une période, ce n\'est pas normal : vérifiez l\'index (un chiffre en trop ?).',
+    e_double:'Pompe saisie deux fois.', e_inactive:'Cette pompe n\'est plus active.',
+    e_fin_inferieure:'L\'index de fin est plus petit que l\'index de début : un compteur ne recule pas.',
+    e_deja:'Déjà saisie pour cette période : {p}.', e_terminer:'Terminez d\'abord votre rapport en cours (bouton « Non, j\'ai fini »).',
+    e_rien:'Aucun compteur envoyé : saisissez d\'abord vos pompes.',
+    jours:['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'],
+    mois:['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'],
+  },
+  ht: {
+    espace:'Espas ponpis', connexion_sub:'Chwazi lang ou, epi antre kòd ou ak PIN ou.',
+    mon_code:'Kòd mwen', mon_pin:'PIN mwen (9 chif)', se_connecter:'Konekte', pin_9:'PIN nan gen 9 chif.',
+    sortir:'Soti', retour:'← Tounen', etape1:'Etap 1 · Kontè', etape2:'Etap 2 · Lajan', envoyes:'Kontè yo voye',
+    charte:'Angajman responsablite', charte_sub:'Li epi aksepte anvan ou kòmanse.',
+    c1:'Se mwen menm ki li <b>de endèks yo</b> (kòmansman ak fen) sou chak ponp.',
+    c2:'Mwen konte lajan an <b>biyè pa biyè</b> epi mwen deklare egzakteman sa m ap remèt.',
+    c3:'Sa mwen antre ak kòd mwen <b>angaje m</b> : non mwen, dat la ak lè a anrejistre.',
+    c4:'Direksyon an ap verifye rapò mwen. Si m gen dout, m ap avèti responsab mwen.',
+    accepte:'Mwen li epi mwen aksepte', commencer:'Kòmanse', reprendre:'Kontinye rapò mwen',
+    commence:'Ou gen yon rapò ou te kòmanse ({p}, {j}) : w ap kontinye l.',
+    derniers:'Dènye rapò mwen yo', chargement:'N ap chaje…', aucun_rapport:'Pa gen rapò pou kounye a.',
+    periode_q:'Ki peryòd ?', Matin:'Maten', 'Apres-midi':'Apremidi', auj:'Jodi a', hier:'Yè',
+    pour_hier:'Rapò a se pou yè ?', revenir_auj:'Tounen nan jodi a',
+    carb_q:'Ki kabiran ?', carb_autre_q:'Ki lòt kabiran ?', carb_sub:'Touche kabiran ponp ou yo.',
+    n_pompes:'{n} ponp', toutes_saisies:'Tout ponp yo deja antre',
+    pompes_q:'Ki ponp ?', pompes_sub:'Touche chak ponp ou te kenbe.', toutes:'Tout ponp yo',
+    deja_moi:'Deja nan rapò ou', deja_par:'{n} deja antre l', a_saisir:'Pou antre',
+    choisies:'{n} ponp chwazi', aucune:'Ou poko chwazi ponp', continuer:'Kontinye',
+    pompe_x:'Ponp {i} sou {n}', idx_debut:'Endèks KÒMANSMAN — li sou ponp lan', idx_fin:'Endèks FEN — li sou ponp lan',
+    toucher_case:'Touche yon kaz, epi tape nimewo a sou klavye a.',
+    fin_sup:'Endèks fen an dwe pi gwo pase endèks kòmansman an.', vendus:'vann', tapez_deux:'Tape de endèks yo',
+    suivante:'Ponp swivan →', verifier:'Verifye', verif_compteurs:'Verifye kontè ou yo',
+    pompe:'Ponp', debut:'Kòmansman', fin:'Fen', gallons:'Galon', total:'Total', montant:'Kantite lajan', modifier:'Chanje',
+    argent_fin:'W ap konte lajan an alafen, lè w fin antre tout ponp ou yo.',
+    envoyer_compteurs:'Voye kontè yo', envoi:'N ap voye…',
+    autre_q:'Èske w gen lòt ponp pou peryòd sa a ?', autre_sub:'Kontè {p} ou yo anrejistre.',
+    oui:'Wi', oui_sub:'Mwen te kenbe ponp {p} tou', non_fini:'Non, mwen fini', non_fini_sub:'M ap konte lajan an',
+    mon_rapport:'Rapò mwen', attendu:'Lajan ki dwe antre', retirer_q:'Retire {p} nan rapò ou ?',
+    compter:'Konte lajan an', compter_sub:'Tout lajan peryòd la. Touche yon biyè, epi tape konbyen ou genyen.',
+    billet:'Biyè', nb_billets:'Kantite biyè', monnaie:'Monnen', monnaie_sub:'pyès, an goud', montant_g:'Kantite (G)',
+    total_compte:'Total ou konte', voir_resume:'Wè rezime a →',
+    resume:'Rezime rapò mwen', resume_sub:'Verifye tout bagay. Touche « Chanje » si gen yon erè.',
+    mes_compteurs:'Kontè mwen yo', mon_argent:'Lajan mwen', aucun_argent:'Ou pa antre okenn lajan.', argent_compte:'Lajan ou konte',
+    juste:'Kès la jis', manque:'Gen lajan ki manke', plus:'Gen lajan an plis', ecart:'Diferans',
+    un_mot:'Yon mo pou direksyon an ? (si ou vle)', un_mot_ph:'Egz. : yon kliyan ale san l pa peye…',
+    envoyer_rapport:'Voye rapò mwen', modifier_x:'Chanje — {p}', enregistrer:'Anrejistre',
+    envoye:'Rapò a voye', prevenue:'Direksyon an resevwa avètisman, l ap verifye l.',
+    compte:'Konte', deconnecter:'Dekonekte m', autre_rapport:'Fè yon lòt rapò',
+    SOUMIS:'Y ap verifye l', PROBLEME:'Gen yon pwoblèm', CONFIRME:'Valide', RESOLU:'Rezoud', REJETE:'Pou refè',
+    refaire:'Refè rapò sa a apre ou fin korije l.', direction:'Direksyon', ecart_court:'diferans',
+    session:'Sesyon an fini — konekte ankò.', reessayer:'Eseye ankò',
+    pas_pompiste:'Se pa yon kont ponpis', pas_pompiste_sub:'Kont sa a se pa yon kont ponpis.', aller_app:'Ale nan aplikasyon an',
+    debut_diff:'Endèks kòmansman an pa menm ak dènye endèks ki anrejistre pou ponp sa a.',
+    debut_diff_action:'Li kontè a ankò sou ponp lan. Korije l, oswa konfime si li bon.',
+    je_confirme:'Kontè a bon, mwen konfime', confirme_ok:'Endèks kòmansman an konfime.',
+    e_negatif:'Yon endèks pa ka negatif.', e_anormal:'{g} galon nan yon peryòd, sa pa nòmal : verifye endèks la (yon chif an plis ?).',
+    e_double:'Ponp lan antre de fwa.', e_inactive:'Ponp sa a pa aktif ankò.',
+    e_fin_inferieure:'Endèks fen an pi piti pase endèks kòmansman an : yon kontè pa ka fè bak.',
+    e_deja:'Deja antre pou peryòd sa a : {p}.', e_terminer:'Fini rapò ou kòmanse a anvan (bouton « Non, mwen fini »).',
+    e_rien:'Ou poko voye okenn kontè : antre ponp ou yo anvan.',
+    jours:['dimanch','lendi','madi','mèkredi','jedi','vandredi','samdi'],
+    mois:['janvye','fevriye','mas','avril','me','jen','jiyè','out','septanm','oktòb','novanm','desanm'],
+  },
+};
+let LANG = (() => { try{ return localStorage.getItem('pompiste-lang') || 'ht'; }catch(e){ return 'ht'; } })();
+function t(k, v){ let s = (TXT[LANG] && TXT[LANG][k]) ?? TXT.fr[k] ?? k;
+  if(v) for(const [a,b] of Object.entries(v)) s = s.replace('{' + a + '}', b); return s; }
+function choisirLangue(l){ LANG = l; try{ localStorage.setItem('pompiste-lang', l); }catch(e){}
+  document.documentElement.lang = l === 'ht' ? 'ht' : 'fr'; majEntete(); }
+
 const S = {};
 function reinit(){
   Object.assign(S, {ctx:null, etape:'charte', charte:false, date:null, periode:null, produitId:null,
     choisies:[], pos:0, index:{}, billets:{}, monnaie:'', note:'', erreurs:{}, dernier:null,
-    champ:null, modif:null, depuisResume:false});
+    champ:null, modif:null, depuisResume:false, champActif:null, caseActive:null, dernierProduit:null});
 }
 reinit();
 
@@ -210,11 +335,12 @@ const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 const nf = (n,d=0) => Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const G = n => nf(n) + ' G';
 const signe = n => (n > 0 ? '+' : '') + G(n);
-const per = p => p === 'Apres-midi' ? 'Après-midi' : p;
+const per = p => t(p);
 const num = v => { if(v == null || String(v).trim() === '') return null;
   const x = parseFloat(String(v).replace(',', '.').replace(/\s/g,'')); return isNaN(x) ? null : x; };
 const ent = v => { const x = parseInt(v,10); return isNaN(x) || x < 0 ? 0 : x; };
-const jourTxt = iso => new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long', day:'numeric', month:'long'});
+function jourTxt(iso){ const d = new Date(iso + 'T12:00:00');
+  return `${t('jours')[d.getDay()]} ${d.getDate()} ${t('mois')[d.getMonth()]}`; }
 const hier = iso => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate()-1);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
@@ -223,15 +349,28 @@ async function api(method, url, body){
     headers: body ? {'Content-Type':'application/json'} : {}, body: body ? JSON.stringify(body) : undefined});
   let d = null; try{ d = await r.json(); }catch(e){}
   if(!r.ok){ const e = new Error(typeof d?.detail === 'string' ? d.detail : (d?.detail?.message || 'Erreur ' + r.status));
-    e.status = r.status; e.detail = d?.detail; throw e; }
+    e.status = r.status; e.detail = d?.detail; e.code = d?.detail?.code; throw e; }
   return d;
+}
+// Message d'erreur dans la langue choisie (codes envoyés par le serveur)
+function msgErreur(e){
+  const c = e.code;
+  if(c === 'deja_rapporte') return t('e_deja', {p: esc(e.detail.pompes || '')});
+  if(c === 'terminer_dabord') return t('e_terminer');
+  if(c === 'rien_a_terminer') return t('e_rien');
+  return esc(e.message);
+}
+function msgLigne(x){
+  const m = {negatif:'e_negatif', double:'e_double', inactive:'e_inactive', fin_inferieure:'e_fin_inferieure',
+             debut_different:'debut_diff'}[x.code];
+  if(x.code === 'anormal') return t('e_anormal', {g: nf(x.gallons)});
+  return m ? t(m) : x.message;
 }
 
 // ── Clavier numérique à l'écran ─────────────────────────────────────
-// S.champ = {get, set, decimal, max, apres}  — le champ que le clavier remplit.
 function pave(decimal){
-  const t = ['1','2','3','4','5','6','7','8','9', decimal ? ',' : '', '0', '⌫'];
-  return `<div class="pave">${t.map(k => k ? `<button class="touche ${k==='⌫'?'eff':''}" data-k="${k}" aria-label="${k==='⌫'?'Effacer':k}">${k}</button>`
+  const k = ['1','2','3','4','5','6','7','8','9', decimal ? ',' : '', '0', '⌫'];
+  return `<div class="pave">${k.map(x => x ? `<button class="touche ${x==='⌫'?'eff':''}" data-k="${x}">${x}</button>`
                                          : '<span class="vide"></span>').join('')}</div>`;
 }
 function taper(k){
@@ -243,7 +382,7 @@ function taper(k){
   c.set(v);
   c.apres && c.apres();
 }
-document.addEventListener('click', e => { const t = e.target.closest('.touche'); if(t) taper(t.dataset.k); });
+document.addEventListener('click', e => { const b = e.target.closest('.touche'); if(b) taper(b.dataset.k); });
 document.addEventListener('keydown', e => {          // clavier physique (tablette avec clavier, tests)
   if(!S.champ || e.target.matches('input,textarea')) return;
   if(/^[0-9]$/.test(e.key)) taper(e.key);
@@ -255,8 +394,17 @@ document.addEventListener('keydown', e => {          // clavier physique (tablet
 });
 const affiche = (v, actif) => (v ? esc(v.replace('.', ',')) : '') + (actif ? '<span class="curseur"></span>' : '');
 
+// ── En-tête : langue + utilisateur ──────────────────────────────────
+function majEntete(){
+  $('langues').innerHTML = ['ht','fr'].map(l => `<button class="${LANG===l?'on':''}" onclick="choisirLangue('${l}')">${l==='ht'?'Kreyòl':'Français'}</button>`).join('');
+  $('btn-sortir').textContent = t('sortir');
+  if(S.ctx || S.etape === 'fin') rendre(); else if($('f-login')) ecranConnexion();
+}
+
 // ── Démarrage / connexion ───────────────────────────────────────────
 async function demarrer(){
+  document.documentElement.lang = LANG;
+  majEntete();
   try{
     const b = await api('GET','/api/config/branding');
     if(b?.nom) $('marque').textContent = b.nom;
@@ -284,48 +432,53 @@ async function chargerContexte(){
     if(e.status === 401) return ecranConnexion();
     if(e.status === 403) return ecranPasPompiste();
     sansBarre();
-    $('app').innerHTML = `<div class="alerte err">${esc(e.message)}</div>
-      <button class="btn" onclick="chargerContexte()">Réessayer</button>`;
+    $('app').innerHTML = `<div class="alerte err">${msgErreur(e)}</div>
+      <button class="btn" onclick="chargerContexte()">${t('reessayer')}</button>`;
   }
 }
 
 function ecranConnexion(msg){
-  S.champ = null;
+  S.champ = null; S.ctx = null;
   $('barre').classList.add('cache'); $('qui').classList.add('cache'); $('btn-sortir').classList.add('cache');
+  const u = $('l-user')?.value || '';
   $('app').innerHTML = `<div class="connexion">
-    <h1>Espace pompiste</h1><p class="sub">Entrez votre code et votre PIN.</p>
-    ${msg ? `<div class="alerte err">${esc(msg)}</div>` : ''}
+    <h1>${t('espace')}</h1><p class="sub">${t('connexion_sub')}</p>
+    <div class="choix deux" style="margin-bottom:16px">
+      <button class="gros ${LANG==='ht'?'on':''}" onclick="choisirLangue('ht')"><span class="ico">🇭🇹</span><span>Kreyòl</span></button>
+      <button class="gros ${LANG==='fr'?'on':''}" onclick="choisirLangue('fr')"><span class="ico">🇫🇷</span><span>Français</span></button>
+    </div>
+    ${msg ? `<div class="alerte err">${msg}</div>` : ''}
     <form class="card" id="f-login" autocomplete="on">
-      <label for="l-user">Mon code</label>
+      <label for="l-user">${t('mon_code')}</label>
       <input id="l-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required
-        placeholder="ex. jeanpierre4821" style="font-family:var(--mono);font-size:24px">
-      <label for="l-pin">Mon PIN (9 chiffres)</label>
+        value="${esc(u)}" placeholder="ex. jeanpierre4821" style="font-family:var(--mono);font-size:24px">
+      <label for="l-pin">${t('mon_pin')}</label>
       <input id="l-pin" type="password" inputmode="numeric" maxlength="9" autocomplete="current-password" required
         style="font-family:var(--mono);font-size:30px;letter-spacing:.3em;text-align:center">
       <div style="height:18px"></div>
-      <button class="btn" id="l-btn">Se connecter</button>
+      <button class="btn" id="l-btn">${t('se_connecter')}</button>
     </form></div>`;
-  $('l-user').focus();
   $('f-login').onsubmit = async ev => {
     ev.preventDefault();
     const pin = $('l-pin').value.trim();
-    if(!/^\d{9}$/.test(pin)) return ecranConnexion('Le PIN contient 9 chiffres.');
+    if(!/^\d{9}$/.test(pin)) return ecranConnexion(t('pin_9'));
     $('l-btn').disabled = true;
     try{
       await api('POST','/api/login/pompiste',{username:$('l-user').value.trim(), code_acces:pin});
       reinit();
       await chargerContexte();
-    }catch(e){ ecranConnexion(e.message); }
+    }catch(e){ ecranConnexion(esc(e.message)); }
   };
 }
 
 function ecranPasPompiste(){
-  $('app').innerHTML = `<div class="connexion card"><h1>Compte non pompiste</h1>
-    <p class="sub">Vous êtes connecté avec un compte qui n'est pas un compte pompiste.</p>
-    <button class="btn" onclick="location.href='/'">Aller à l'application</button></div>`;
+  $('app').innerHTML = `<div class="connexion card"><h1>${t('pas_pompiste')}</h1>
+    <p class="sub">${t('pas_pompiste_sub')}</p>
+    <button class="btn" onclick="location.href='/'">${t('aller_app')}</button></div>`;
 }
 
 async function deconnexion(){
+  clearTimeout(_veille);
   try{ await api('POST','/api/logout'); }catch(e){}
   reinit();
   ecranConnexion();
@@ -335,6 +488,7 @@ async function deconnexion(){
 const enCours = () => S.ctx?.en_cours;
 const produit = () => S.ctx.produits.find(p => p.id === S.produitId);
 const pompeCtx = id => { for(const p of S.ctx.produits) for(const q of p.pompes) if(q.id === id) return q; return null; };
+const libres = p => p.pompes.filter(q => !q.deja_rapportee);
 const PHASE_ARGENT = ['billetterie','resume','modif'];
 
 function aller(etape){ S.etape = etape; rendre(); }
@@ -350,25 +504,26 @@ function precedent(){
 
 function entete(titrePhase){
   const puces = [];
-  if(S.periode && !['periode','charte'].includes(S.etape)) puces.push(per(S.periode) + (S.date !== S.ctx.aujourd_hui ? ' (hier)' : ''));
+  if(S.periode && !['periode','charte'].includes(S.etape)) puces.push(per(S.periode) + (S.date !== S.ctx.aujourd_hui ? ` (${t('hier')})` : ''));
   if(S.produitId && ['pompes','index','compteurs'].includes(S.etape)) puces.push(produit()?.nom || '');
-  if(S.choisies.length && ['index','compteurs'].includes(S.etape))
-    puces.push(S.choisies.length + ' pompe' + (S.choisies.length > 1 ? 's' : ''));
-  const phase = titrePhase ?? (PHASE_ARGENT.includes(S.etape) ? 'Étape 2 · Argent' : 'Étape 1 · Compteurs');
+  if(S.choisies.length && ['index','compteurs'].includes(S.etape)) puces.push(t('n_pompes', {n: S.choisies.length}));
+  const phase = titrePhase ?? (PHASE_ARGENT.includes(S.etape) ? t('etape2') : t('etape1'));
   const avecRetour = !['charte','rapport'].includes(S.etape);
-  return `<div class="fil">${avecRetour ? '<button class="retour" onclick="precedent()">← Retour</button>' : ''}
+  return `<div class="fil">${avecRetour ? `<button class="retour" onclick="precedent()">${t('retour')}</button>` : ''}
       <span class="pas">${phase}</span></div>
     ${puces.length ? `<div class="resume">${puces.map(p=>`<span>${esc(p)}</span>`).join('')}</div>` : ''}`;
 }
 
 function barre(info, libelle, action, actif=true){
-  $('barre').classList.remove('cache');
+  $('barre').classList.remove('cache'); $('barre-btn').classList.remove('attention');
   $('barre-info').innerHTML = info;
   const b = $('barre-btn'); b.textContent = libelle; b.onclick = action; b.disabled = !actif;
 }
 const sansBarre = () => $('barre').classList.add('cache');
 
 function rendre(){
+  if(!S.ctx && S.etape !== 'fin') return;
+  setTimeout(reveil, 0);
   if(!S.charte && S.etape !== 'fin') S.etape = 'charte';
   S.champ = null;
   ({charte:rCharte, periode:rPeriode, produit:rProduit, pompes:rPompes, index:rIndex, compteurs:rCompteurs,
@@ -379,19 +534,15 @@ function rendre(){
 // ── Charte ──────────────────────────────────────────────────────────
 function rCharte(){
   $('app').innerHTML = entete('') + `
-    <h1>Charte de responsabilité</h1>
-    <p class="sub">Lisez et acceptez avant de commencer.</p>
+    <h1>${t('charte')}</h1>
+    <p class="sub">${t('charte_sub')}</p>
     <div class="card charte"><ul style="padding-left:22px;margin:0">
-      <li>Je lis moi-même les <b>vrais index</b> sur chaque pompe.</li>
-      <li>Je compte l'argent <b>billet par billet</b> et je déclare exactement ce que je remets.</li>
-      <li>Ce que je saisis avec mon code <b>m'engage</b> : mon nom, la date et l'heure sont enregistrés.</li>
-      <li>Mon rapport est vérifié par la direction. En cas de doute, je préviens mon responsable.</li>
+      <li>${t('c1')}</li><li>${t('c2')}</li><li>${t('c3')}</li><li>${t('c4')}</li>
     </ul>
-    <label class="case"><input type="checkbox" id="c-ok" ${S.charte?'checked':''}> J'ai lu et j'accepte</label></div>
-    ${enCours() ? `<div class="alerte warn">Vous avez un rapport commencé
-      (${per(enCours().periode)}, ${esc(jourTxt(enCours().date))}) : vous allez le reprendre.</div>` : ''}
-    <h2>Mes derniers rapports</h2><div class="card" id="hist"><span class="sub">Chargement…</span></div>`;
-  const maj = () => barre('', enCours() ? 'Reprendre mon rapport' : 'Commencer',
+    <label class="case"><input type="checkbox" id="c-ok" ${S.charte?'checked':''}> ${t('accepte')}</label></div>
+    ${enCours() ? `<div class="alerte warn">${t('commence', {p: per(enCours().periode), j: esc(jourTxt(enCours().date))})}</div>` : ''}
+    <h2>${t('derniers')}</h2><div class="card" id="hist"><span class="sub">${t('chargement')}</span></div>`;
+  const maj = () => barre('', enCours() ? t('reprendre') : t('commencer'),
     ()=>{ S.charte = true; aller(enCours() ? 'rapport' : 'periode'); }, $('c-ok').checked);
   $('c-ok').onchange = maj; maj();
   chargerHistorique();
@@ -402,15 +553,15 @@ function rPeriode(){
   sansBarre();
   const auj = S.date === S.ctx.aujourd_hui;
   $('app').innerHTML = entete() + `
-    <h1>Quelle période ?</h1>
-    <p class="sub">${auj ? "Aujourd'hui" : 'Hier'}, ${esc(jourTxt(S.date))}</p>
+    <h1>${t('periode_q')}</h1>
+    <p class="sub">${auj ? t('auj') : t('hier')}, ${esc(jourTxt(S.date))}</p>
     <div class="choix deux">
       <button class="gros grand ${S.periode==='Matin'?'on':''}" onclick="choisirPeriode('Matin')">
-        <span class="ico">☀️</span><span>Matin</span></button>
+        <span class="ico">☀️</span><span>${t('Matin')}</span></button>
       <button class="gros grand ${S.periode==='Apres-midi'?'on':''}" onclick="choisirPeriode('Apres-midi')">
-        <span class="ico">🌇</span><span>Après-midi</span></button>
+        <span class="ico">🌇</span><span>${t('Apres-midi')}</span></button>
     </div>
-    <button class="lien" onclick="basculerJour()">${auj ? 'Le rapport est pour hier ?' : "Revenir à aujourd'hui"}</button>`;
+    <button class="lien" onclick="basculerJour()">${auj ? t('pour_hier') : t('revenir_auj')}</button>`;
 }
 function basculerJour(){
   S.date = S.date === S.ctx.aujourd_hui ? hier(S.ctx.aujourd_hui) : S.ctx.aujourd_hui;
@@ -423,39 +574,44 @@ async function choisirPeriode(p){
 }
 
 // ── 2. Carburant ────────────────────────────────────────────────────
+const clsProduit = n => /diesel|dyez/i.test(n) ? 'die' : (/gaz|essence/i.test(n) ? 'gaz' : '');
 function rProduit(){
   sansBarre();
-  const cls = n => /diesel/i.test(n) ? 'die' : (/gaz|essence/i.test(n) ? 'gaz' : '');
   $('app').innerHTML = entete() + `
-    <h1>${enCours() ? 'Quel autre carburant ?' : 'Quel carburant ?'}</h1>
-    <p class="sub">Touchez le carburant de vos pompes.</p>
+    <h1>${enCours() ? t('carb_autre_q') : t('carb_q')}</h1>
+    <p class="sub">${t('carb_sub')}</p>
     <div class="choix deux">${S.ctx.produits.map(p => {
-      const libres = p.pompes.filter(q => !q.deja_rapportee).length;
-      return `<button class="gros grand ${cls(p.nom)} ${S.produitId===p.id?'on':''}" onclick="choisirProduit(${p.id})" ${libres?'':'disabled'}>
-        <span class="ico">⛽</span><span>${esc(p.nom)}<small>${libres ? `${p.pompes.length} pompe${p.pompes.length>1?'s':''} · ${nf(p.prix_gallon,2)} G/gal`
-          : 'Toutes les pompes sont déjà saisies'}</small></span></button>`;
+      const n = libres(p).length;
+      return `<button class="gros grand ${clsProduit(p.nom)} ${S.produitId===p.id?'on':''}" onclick="choisirProduit(${p.id})" ${n?'':'disabled'}>
+        <span class="ico">⛽</span><span>${esc(p.nom)}<small>${n ? `${t('n_pompes',{n:p.pompes.length})} · ${nf(p.prix_gallon,2)} G/gal`
+          : t('toutes_saisies')}</small></span></button>`;
     }).join('')}</div>`;
 }
-function choisirProduit(id){
+async function choisirProduit(id){
   if(id !== S.produitId){ S.choisies = []; S.index = {}; S.erreurs = {}; }
-  S.produitId = id; aller('pompes');
+  S.produitId = id; S.etape = 'pompes';
+  await chargerContexte();           // liste à jour : une pompe ajoutée apparaît tout de suite
 }
 
 // ── 3. Pompes ───────────────────────────────────────────────────────
 function rPompes(){
   const p = produit();
+  if(!p) return aller('produit');
+  S.choisies = S.choisies.filter(id => p.pompes.some(q => q.id === id && !q.deja_rapportee));
+  const tout = libres(p).length && libres(p).every(q => S.choisies.includes(q.id));
   $('app').innerHTML = entete() + `
-    <h1>Quelles pompes ?</h1>
-    <p class="sub">Touchez chaque pompe que vous avez tenue.</p>
+    <h1>${t('pompes_q')}</h1>
+    <p class="sub">${t('pompes_sub')}</p>
+    ${libres(p).length > 1 ? `<button class="gros ${tout?'on':''}" style="min-height:84px;margin-bottom:16px" onclick="toutesPompes()">
+      <span class="ico">✓✓</span><span>${t('toutes')}<small>${t('n_pompes',{n:libres(p).length})}</small></span><span class="coche">✓</span></button>` : ''}
     <div class="choix trois">${p.pompes.map(q => {
       const on = S.choisies.includes(q.id), prise = q.deja_rapportee;
       return `<button class="gros ${on?'on':''} ${S.erreurs[q.id]?'erreur':''}" onclick="basculerPompe(${q.id})" ${prise?'disabled':''}>
-        <span>${esc(q.nom)}<small>${prise ? (prise.moi ? 'Déjà dans votre rapport' : 'Déjà saisie par ' + esc(prise.par))
-          : (q.index_precedent != null ? 'Dernier index : ' + nf(q.index_precedent,3) : 'Aucun index précédent')}</small></span>
+        <span>${esc(q.nom)}<small>${prise ? (prise.moi ? t('deja_moi') : t('deja_par', {n: esc(prise.par)})) : t('a_saisir')}</small></span>
         <span class="coche">✓</span></button>`;
     }).join('')}</div>`;
   const n = S.choisies.length;
-  barre(n ? `<b>${n} pompe${n>1?'s':''}</b>choisie${n>1?'s':''}` : 'Aucune pompe choisie', 'Continuer',
+  barre(n ? `<b>${n}</b>${t('choisies', {n})}` : t('aucune'), t('continuer'),
         ()=>{ S.pos = 0; S.champActif = null; aller('index'); }, n > 0);
 }
 function basculerPompe(id){
@@ -464,59 +620,72 @@ function basculerPompe(id){
   S.choisies.sort((a,b) => p.pompes.findIndex(q=>q.id===a) - p.pompes.findIndex(q=>q.id===b));
   rPompes();
 }
-
-// ── 4. Index — une pompe par écran, clavier à l'écran ───────────────
-function valeurs(id){
-  const q = pompeCtx(id), s = S.index[id] || {};
-  const av = q.index_precedent != null ? q.index_precedent : num(s.avant);
-  const ap = num(s.apres);
-  return {q, av, ap, g: av != null && ap != null ? ap - av : null};
+function toutesPompes(){
+  const ids = libres(produit()).map(q => q.id);
+  S.choisies = ids.every(id => S.choisies.includes(id)) ? [] : ids;
+  rPompes();
 }
 
-/* Écran d'index partagé par la saisie (étape 4) et la modification depuis
-   le résumé : `id` = pompe, `prix` = prix/gal, `fin(ok, v)` = barre du bas. */
+// ── 4. Les deux index — une pompe par écran, clavier à l'écran ──────
+function valeurs(id){
+  const s = S.index[id] || {};
+  const av = num(s.avant), ap = num(s.apres);
+  return {q: pompeCtx(id), s, av, ap, g: av != null && ap != null ? ap - av : null};
+}
+
+/* Écran d'index partagé par la saisie et la modification depuis le résumé. */
 function ecranIndex(id, prix, titreHaut, fin){
-  const q = pompeCtx(id), s = (S.index[id] ||= {}), connu = q.index_precedent != null;
-  if(!S.champActif || S.champActif.id !== id) S.champActif = {id, k: connu || s.avant ? 'apres' : 'avant'};
+  const s = (S.index[id] ||= {}), q = pompeCtx(id);
+  if(!S.champActif || S.champActif.id !== id) S.champActif = {id, k: s.avant ? 'apres' : 'avant'};
   const dessin = () => {
     const k = S.champActif.k, v = valeurs(id);
-    $('z-avant').innerHTML = connu
-      ? `<div class="lib">Index de début</div><div class="val">${nf(q.index_precedent,3)}</div>
-         <div class="src">Repris du ${esc(q.index_precedent_source)}</div>`
-      : `<div class="lib">Index de début — touchez pour saisir</div>
-         <div class="val ${s.avant?'':'vide'}">${affiche(s.avant, k==='avant') || '0'}</div>
-         <div class="src">Pas d'index précédent : lisez aussi l'index de début.</div>`;
-    $('z-avant').className = 'champ ' + (connu ? 'fixe' : (k === 'avant' ? 'actif' : ''));
-    $('z-apres').innerHTML = `<div class="lib">Index de fin — lu sur la pompe</div>
-      <div class="val ${s.apres?'':'vide'}">${affiche(s.apres, k==='apres') || '0'}</div>`;
-    $('z-apres').className = 'champ ' + (k === 'apres' ? 'actif' : '');
-    const ok = v.av != null && v.ap != null && v.g >= 0;
+    for(const c of ['avant','apres']){
+      const el = $('z-' + c), val = s[c] || '';
+      el.className = 'champ ' + (k === c ? 'actif' : '');
+      el.innerHTML = `<div class="lib">${c === 'avant' ? t('idx_debut') : t('idx_fin')}</div>
+        <div class="val ${val?'':'vide'}">${affiche(val, k === c) || '0'}</div>`;
+    }
+    const diff = S.erreurs[id]?.code === 'debut_different';
+    $('i-diff').innerHTML = diff ? `<div class="alerte warn" style="margin:14px 0 0">⚠ ${t('debut_diff')}<br>
+        <span style="font-weight:600">${t('debut_diff_action')}</span></div>`
+      : (s.debutConfirme ? `<div class="alerte ok" style="margin:14px 0 0">✓ ${t('confirme_ok')}</div>` : '');
+    const autreErr = S.erreurs[id] && !diff;
+    $('i-err').innerHTML = autreErr ? `<div class="alerte err" style="margin-top:14px">${esc(msgLigne(S.erreurs[id]))}</div>` : '';
+    const ok = v.av != null && v.ap != null && v.g >= 0 && !diff;
     $('i-calc').innerHTML = v.g == null ? ''
-      : (v.g < 0 ? `<div class="msg-err">L'index de fin doit être plus grand que l'index de début.</div>`
+      : (v.g < 0 ? `<div class="msg-err">${t('fin_sup')}</div>`
                  : `<div class="calcul"><span>${nf(v.g,3)} gal</span><span>${G(v.g * prix)}</span></div>`);
-    fin(ok, v);
+    // Début à relire : le bouton de confirmation prend la place du bouton principal
+    if(diff){
+      barre(`<b>⚠</b>${t('debut_diff_action')}`, t('je_confirme'), () => confirmerDebut(id));
+      $('barre-btn').classList.add('attention');
+    } else { $('barre-btn').classList.remove('attention'); fin(ok, v); }
   };
   const choisir = k => {
-    if(k === 'avant' && connu) return;
     S.champActif.k = k;
-    S.champ = {decimal:true, max:12, get:()=>s[k] || '', set:x=>{ s[k] = x; delete S.erreurs[id]; }, apres:dessin};
+    S.champ = {decimal:true, max:12, get:()=>s[k] || '',
+               set:x=>{ s[k] = x; if(k === 'avant') s.debutConfirme = false; delete S.erreurs[id]; }, apres:dessin};
     dessin();
   };
   $('app').innerHTML = entete() + `<div class="deux-col"><div>
       ${titreHaut}
       <h1 class="pompe-titre">${esc(q.nom)}</h1>
-      ${S.erreurs[id] ? `<div class="alerte err" style="margin-top:14px">${esc(S.erreurs[id])}</div>` : ''}
+      <p class="sub" style="margin:4px 0 0">${t('toucher_case')}</p>
+      <div id="i-err"></div><div id="i-diff"></div>
       <div id="z-avant"></div><div id="z-apres"></div><div id="i-calc"></div>
     </div><div class="cote">${pave(true)}</div></div>`;
   $('z-avant').onclick = () => choisir('avant');
   $('z-apres').onclick = () => choisir('apres');
   choisir(S.champActif.k);
 }
+function confirmerDebut(id){
+  S.index[id].debutConfirme = true; delete S.erreurs[id]; rendre();
+}
 
 function rIndex(){
   const id = S.choisies[S.pos], dernier = S.pos === S.choisies.length - 1;
-  ecranIndex(id, produit().prix_gallon, `<p class="sub" style="margin:0">Pompe ${S.pos+1} sur ${S.choisies.length}</p>`,
-    (ok, v) => barre(ok ? `<b>${nf(v.g,3)} gal</b>vendus` : 'Tapez l\'index de fin', dernier ? 'Vérifier' : 'Pompe suivante →',
+  ecranIndex(id, produit().prix_gallon, `<p class="sub" style="margin:0">${t('pompe_x', {i: S.pos+1, n: S.choisies.length})}</p>`,
+    (ok, v) => barre(ok ? `<b>${nf(v.g,3)} gal</b>${t('vendus')}` : t('tapez_deux'), dernier ? t('verifier') : t('suivante'),
       ()=>{ S.champActif = null; if(dernier) aller('compteurs'); else { S.pos++; rendre(); } }, ok));
 }
 
@@ -526,194 +695,182 @@ function lignes(){
 }
 function rCompteurs(){
   const l = lignes(), tot = l.reduce((a,x)=>a+x.montant,0), gal = l.reduce((a,x)=>a+x.g,0);
-  $('app').innerHTML = entete() + `<h1>Vérifiez vos compteurs</h1>
+  $('app').innerHTML = entete() + `<h1>${t('verif_compteurs')}</h1>
     <p class="sub">${esc(produit().nom)} · ${per(S.periode)}, ${esc(jourTxt(S.date))}</p>
-    <div class="card"><table><thead><tr><th>Pompe</th><th class="r">Début</th><th class="r">Fin</th><th class="r">Gallons</th><th></th></tr></thead><tbody>
+    <div class="card"><table><thead><tr><th>${t('pompe')}</th><th class="r">${t('debut')}</th><th class="r">${t('fin')}</th><th class="r">${t('gallons')}</th><th></th></tr></thead><tbody>
       ${l.map((x,i)=>`<tr><td><b>${esc(x.q.nom)}</b></td><td class="r num">${nf(x.av,3)}</td><td class="r num">${nf(x.ap,3)}</td>
-        <td class="r num"><b>${nf(x.g,3)}</b></td><td class="r"><button class="btn-mod" onclick="S.pos=${i};S.champActif=null;aller('index')">Modifier</button></td></tr>`).join('')}
+        <td class="r num"><b>${nf(x.g,3)}</b></td><td class="r"><button class="btn-mod" onclick="S.pos=${i};S.champActif=null;aller('index')">${t('modifier')}</button></td></tr>`).join('')}
     </tbody></table>
-    <div class="total"><span>Total</span><span class="v">${nf(gal,3)} gal</span></div>
-    <div class="total" style="padding-top:0"><span>Montant</span><span class="v">${G(tot)}</span></div></div>
-    <p class="sub">L'argent se compte à la fin, quand vous appuierez sur « Terminer ».</p>`;
-  barre(`<b>${G(tot)}</b>${esc(produit().nom)}`, 'Envoyer les compteurs', envoyerCompteurs);
+    <div class="total"><span>${t('total')}</span><span class="v">${nf(gal,3)} gal</span></div>
+    <div class="total" style="padding-top:0"><span>${t('montant')}</span><span class="v">${G(tot)}</span></div></div>
+    <p class="sub">${t('argent_fin')}</p>`;
+  barre(`<b>${G(tot)}</b>${esc(produit().nom)}`, t('envoyer_compteurs'), envoyerCompteurs);
 }
 
 async function envoyerCompteurs(){
-  const b = $('barre-btn'); b.disabled = true; b.textContent = 'Envoi…';
+  const b = $('barre-btn'); b.disabled = true; b.textContent = t('envoi');
   try{
     await api('POST','/api/pompiste/compteurs',{
       date:S.date, periode:S.periode, charte_acceptee:S.charte,
-      lignes: lignes().map(x=>({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap}))});
+      lignes: lignes().map(x=>({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap, debut_confirme:!!x.s.debutConfirme}))});
+    S.dernierProduit = produit()?.nom;
     S.produitId = null; S.choisies = []; S.index = {}; S.erreurs = {};
     S.etape = 'rapport';
     await chargerContexte();
   }catch(e){
     if(e.status === 422 && e.detail?.erreurs){
-      S.erreurs = {}; for(const x of e.detail.erreurs) S.erreurs[x.pompe_id] = x.message;
+      S.erreurs = {}; for(const x of e.detail.erreurs) S.erreurs[x.pompe_id] = x;
       S.pos = Math.max(0, S.choisies.findIndex(id => S.erreurs[id])); S.etape = 'index'; S.champActif = null;
       await chargerContexte();
       return;
     }
-    if(e.status === 401) return ecranConnexion('Session expirée — reconnectez-vous.');
-    b.disabled = false; b.textContent = 'Envoyer les compteurs';
-    $('app').insertAdjacentHTML('afterbegin', `<div class="alerte err">${esc(e.message)}</div>`);
+    if(e.status === 401) return ecranConnexion(t('session'));
+    b.disabled = false; b.textContent = t('envoyer_compteurs');
+    $('app').insertAdjacentHTML('afterbegin', `<div class="alerte err">${msgErreur(e)}</div>`);
     window.scrollTo(0,0);
   }
 }
 
-// ── 6. Mon rapport : ajouter un autre carburant ou terminer ─────────
+// ── 6. « D'autres pompes ? » — oui (tel carburant) / non, j'ai fini ──
 function lignesParProduit(r){
   const g = {}; for(const l of r.lignes) (g[l.produit_nom] ||= []).push(l); return g;
 }
 function rRapport(){
   const r = enCours();
   if(!r){ S.etape = 'periode'; return rPeriode(); }
-  const reste = S.ctx.produits.some(p => p.pompes.some(q => !q.deja_rapportee));
+  const restants = S.ctx.produits.filter(p => libres(p).length);
   sansBarre();
-  $('app').innerHTML = entete('Compteurs envoyés') + `
-    <h1>Mon rapport</h1>
-    <p class="sub">${per(r.periode)}, ${esc(jourTxt(r.date))}</p>
-    <div class="deux-col"><div class="card">${Object.entries(lignesParProduit(r)).map(([nom, ls]) => `
+  $('app').innerHTML = entete(t('envoyes')) + `
+    <h1>${t('autre_q')}</h1>
+    <p class="sub">${S.dernierProduit ? t('autre_sub', {p: esc(S.dernierProduit)}) + ' · ' : ''}${per(r.periode)}, ${esc(jourTxt(r.date))}</p>
+    <div class="deux-col"><div class="choix">
+      ${restants.map(p => `<button class="gros ${clsProduit(p.nom)}" onclick="choisirProduit(${p.id})"><span class="ico">⛽</span>
+        <span>${t('oui')}, ${esc(p.nom)}<small>${t('oui_sub', {p: esc(p.nom)})}</small></span></button>`).join('')}
+      <button class="gros on" onclick="S.depuisResume=false;aller('billetterie')"><span class="ico">✔</span>
+        <span>${t('non_fini')}<small>${t('non_fini_sub')}</small></span></button>
+    </div>
+    <div class="card"><h2 style="margin-top:0">${t('mon_rapport')}</h2>${Object.entries(lignesParProduit(r)).map(([nom, ls]) => `
       <div class="produit-tete">${esc(nom)}</div>
       <table><tbody>${ls.map(l => `<tr><td><b>${esc(l.pompe_nom)}</b>
           <div style="font-size:15px;color:var(--muted)" class="num">${nf(l.metter_avant,3)} → ${nf(l.metter_apres,3)}</div></td>
         <td class="r num">${nf(l.gallons,3)} gal<div style="font-size:15px;color:var(--muted)">${G(l.montant)}</div></td>
-        <td class="r" style="width:56px"><button class="retirer" onclick="retirerPompe(${l.pompe_id})" aria-label="Retirer">✕</button></td></tr>`).join('')}
+        <td class="r" style="width:56px"><button class="retirer" onclick="retirerPompe(${l.pompe_id})" aria-label="✕">✕</button></td></tr>`).join('')}
       </tbody></table>`).join('')}
-      <div class="total"><span>Ventes attendues</span><span class="v">${G(r.montant_attendu)}</span></div></div>
-    <div class="choix">
-      ${reste ? `<button class="gros" onclick="aller('produit')"><span class="ico">＋</span>
-        <span>Ajouter un autre carburant<small>Si vous avez tenu d'autres pompes</small></span></button>` : ''}
-      <button class="gros on" onclick="S.depuisResume=false;aller('billetterie')"><span class="ico">✔</span>
-        <span>Terminer<small>Toutes mes pompes sont envoyées : je compte l'argent</small></span></button>
-    </div></div>`;
+      <div class="total"><span>${t('attendu')}</span><span class="v">${G(r.montant_attendu)}</span></div></div></div>`;
 }
 async function retirerPompe(id){
   const l = enCours().lignes.find(x => x.pompe_id === id);
-  if(!confirm(`Retirer ${l.pompe_nom} de votre rapport ? Vous pourrez la saisir à nouveau.`)) return;
+  if(!confirm(t('retirer_q', {p: l.pompe_nom}))) return;
   try{ await api('DELETE', `/api/pompiste/compteurs/${id}`); }catch(e){ alert(e.message); }
   await chargerContexte();
 }
 
-// ── 7. Billetterie (après « Terminer ») ─────────────────────────────
+// ── 7. Argent : nombre de billets par coupure + monnaie ─────────────
 function totalCompte(){
-  let t = 0;
-  for(const c of S.ctx.coupures){ const b = S.billets[c] || {}; t += c * (ent(b.liasses) * S.ctx.taille_liasse + ent(b.billets)); }
-  return t + (num(S.monnaie) || 0);
+  let s = 0;
+  for(const c of S.ctx.coupures) s += c * ent(S.billets[c]);
+  return s + (num(S.monnaie) || 0);
 }
 function rBilletterie(){
   if(!enCours()) return aller('periode');
   const c = S.ctx;
-  if(!S.caseActive) S.caseActive = {c: c.coupures[0], k: 'billets'};
-  const cle = (k, champ) => `${k}-${champ}`;
+  if(!S.caseActive) S.caseActive = c.coupures[0];
   $('app').innerHTML = entete() + `<div class="deux-col"><div>
-      <h1>Comptez l'argent</h1>
-      <p class="sub">Tout l'argent de la période. Touchez une case, puis tapez le nombre.
-        Une liasse = ${c.taille_liasse} billets.</p>
-      <div class="card"><div class="entete-billets"><span>Billet</span><span>Liasses</span><span>Billets</span></div>
+      <h1>${t('compter')}</h1>
+      <p class="sub">${t('compter_sub')}</p>
+      <div class="card"><div class="entete-billets"><span>${t('billet')}</span><span>${t('nb_billets')}</span></div>
       <div class="billets">${c.coupures.map(k => `
         <div class="billet"><div class="coup">${nf(k)} G<small id="st-${k}"></small></div>
-          <div class="case-n" data-c="${k}" data-k="liasses" id="cs-${cle(k,'liasses')}"><div class="lib">Liasses</div><div class="val"></div></div>
-          <div class="case-n" data-c="${k}" data-k="billets" id="cs-${cle(k,'billets')}"><div class="lib">Billets</div><div class="val"></div></div>
-        </div>`).join('')}
-        <div class="billet"><div class="coup">Monnaie<small>pièces, en G</small></div>
-          <div class="case-n" data-c="monnaie" data-k="montant" id="cs-monnaie" style="grid-column:span 2"><div class="lib">Montant</div><div class="val"></div></div></div>
+          <div class="case-n" data-c="${k}" id="cs-${k}"><div class="val"></div></div></div>`).join('')}
+        <div class="billet"><div class="coup">${t('monnaie')}<small>${t('monnaie_sub')}</small></div>
+          <div class="case-n" data-c="monnaie" id="cs-monnaie"><div class="val"></div></div></div>
       </div></div></div>
     <div class="cote">${pave(false)}
-      <div class="calcul" style="margin-top:14px"><span>Total</span><span id="b-total"></span></div></div></div>`;
+      <div class="calcul" style="margin-top:14px"><span>${t('total')}</span><span id="b-total"></span></div></div></div>`;
   const dessin = () => {
-    for(const k of c.coupures) for(const ch of ['liasses','billets']){
-      const el = $('cs-' + cle(k,ch)), v = (S.billets[k] || {})[ch] || '';
-      const act = S.caseActive.c === k && S.caseActive.k === ch;
+    for(const k of [...c.coupures, 'monnaie']){
+      const el = $('cs-' + k), v = k === 'monnaie' ? S.monnaie : (S.billets[k] || ''), act = S.caseActive === k;
       el.className = 'case-n' + (act ? ' actif' : '') + (v ? '' : ' zero');
       el.querySelector('.val').innerHTML = affiche(v, act) || '0';
-      const b = S.billets[k] || {}, n = ent(b.liasses) * c.taille_liasse + ent(b.billets);
-      $('st-' + k).textContent = n ? G(n * k) : '';
+      if(k !== 'monnaie') $('st-' + k).textContent = ent(v) ? G(ent(v) * k) : '';
     }
-    const actM = S.caseActive.c === 'monnaie', m = $('cs-monnaie');
-    m.className = 'case-n' + (actM ? ' actif' : '') + (S.monnaie ? '' : ' zero');
-    m.querySelector('.val').innerHTML = affiche(S.monnaie, actM) || '0';
     $('b-total').textContent = G(totalCompte());
-    barre(`Total compté<b>${G(totalCompte())}</b>`, 'Voir le résumé →', ()=>{ S.caseActive = null; aller('resume'); });
+    barre(`${t('total_compte')}<b>${G(totalCompte())}</b>`, t('voir_resume'), ()=>{ S.caseActive = null; aller('resume'); });
   };
-  const activer = (k, ch) => {
-    S.caseActive = {c:k, k:ch};
+  const activer = k => {
+    S.caseActive = k;
     S.champ = k === 'monnaie'
       ? {decimal:true, max:9, get:()=>S.monnaie, set:v=>{ S.monnaie = v; }, apres:dessin}
-      : {decimal:false, max:5, get:()=>(S.billets[k] || {})[ch] || '', set:v=>{ (S.billets[k] ||= {})[ch] = v; }, apres:dessin};
+      : {decimal:false, max:5, get:()=>S.billets[k] || '', set:v=>{ S.billets[k] = v; }, apres:dessin};
     dessin();
   };
   document.querySelectorAll('.case-n').forEach(el => el.onclick = () =>
-    activer(el.dataset.c === 'monnaie' ? 'monnaie' : Number(el.dataset.c), el.dataset.k));
-  activer(S.caseActive.c, S.caseActive.k);
+    activer(el.dataset.c === 'monnaie' ? 'monnaie' : Number(el.dataset.c)));
+  activer(S.caseActive);
 }
 
 // ── 8. Résumé complet avant l'envoi, tout est modifiable ────────────
 function rResume(){
   const r = enCours(), att = r.montant_attendu, cpt = totalCompte(), ec = cpt - att;
   const cls = Math.abs(ec) < 1 ? 'ok' : (ec < 0 ? 'neg' : 'pos');
-  const txt = Math.abs(ec) < 1 ? 'Caisse juste' : (ec < 0 ? 'Il manque' : 'En plus');
-  const billets = S.ctx.coupures.map(c => ({c, b:S.billets[c] || {}}))
-    .map(x => ({...x, n: ent(x.b.liasses) * S.ctx.taille_liasse + ent(x.b.billets)})).filter(x => x.n);
-  $('app').innerHTML = entete() + `<h1>Résumé de mon rapport</h1>
-    <p class="sub">${per(r.periode)}, ${esc(jourTxt(r.date))}. Vérifiez tout. Touchez « Modifier » s'il y a une erreur.</p>
-    <div class="card"><div class="section-tete"><h2>Mes compteurs</h2></div>
+  const txt = Math.abs(ec) < 1 ? t('juste') : (ec < 0 ? t('manque') : t('plus'));
+  const billets = S.ctx.coupures.map(c => ({c, n: ent(S.billets[c])})).filter(x => x.n);
+  $('app').innerHTML = entete() + `<h1>${t('resume')}</h1>
+    <p class="sub">${per(r.periode)}, ${esc(jourTxt(r.date))}. ${t('resume_sub')}</p>
+    <div class="card"><div class="section-tete"><h2>${t('mes_compteurs')}</h2></div>
       ${Object.entries(lignesParProduit(r)).map(([nom, ls]) => `<div class="produit-tete">${esc(nom)}</div>
         <table><tbody>${ls.map(l => `<tr><td><b>${esc(l.pompe_nom)}</b></td>
           <td class="r num">${nf(l.metter_avant,3)} → ${nf(l.metter_apres,3)}</td>
           <td class="r num"><b>${nf(l.gallons,3)} gal</b><div style="font-size:15px;color:var(--muted)">${G(l.montant)}</div></td>
-          <td class="r" style="width:120px"><button class="btn-mod" onclick="modifierPompe(${l.pompe_id})">Modifier</button></td></tr>`).join('')}
+          <td class="r" style="width:120px"><button class="btn-mod" onclick="modifierPompe(${l.pompe_id})">${t('modifier')}</button></td></tr>`).join('')}
         </tbody></table>`).join('')}
-      <div class="total"><span>Ventes attendues</span><span class="v">${G(att)}</span></div></div>
-    <div class="card"><div class="section-tete"><h2>Mon argent</h2>
-        <button class="btn-mod" onclick="S.depuisResume=true;aller('billetterie')">Modifier</button></div>
+      <div class="total"><span>${t('attendu')}</span><span class="v">${G(att)}</span></div></div>
+    <div class="card"><div class="section-tete"><h2>${t('mon_argent')}</h2>
+        <button class="btn-mod" onclick="S.depuisResume=true;aller('billetterie')">${t('modifier')}</button></div>
       ${billets.length || num(S.monnaie) ? `<table><tbody>
-        ${billets.map(x => `<tr><td><b>${nf(x.c)} G</b></td>
-          <td class="r num">${ent(x.b.liasses) ? `${ent(x.b.liasses)} liasse${ent(x.b.liasses)>1?'s':''} + ` : ''}${ent(x.b.billets)} billet${ent(x.b.billets)>1?'s':''}</td>
-          <td class="r num"><b>${G(x.n * x.c)}</b></td></tr>`).join('')}
-        ${num(S.monnaie) ? `<tr><td><b>Monnaie</b></td><td></td><td class="r num"><b>${G(num(S.monnaie))}</b></td></tr>` : ''}
-      </tbody></table>` : '<p class="sub" style="margin:0">Aucun argent saisi.</p>'}
-      <div class="total"><span>Argent compté</span><span class="v">${G(cpt)}</span></div></div>
+        ${billets.map(x => `<tr><td><b>${nf(x.c)} G</b></td><td class="r num">× ${x.n}</td><td class="r num"><b>${G(x.n * x.c)}</b></td></tr>`).join('')}
+        ${num(S.monnaie) ? `<tr><td><b>${t('monnaie')}</b></td><td></td><td class="r num"><b>${G(num(S.monnaie))}</b></td></tr>` : ''}
+      </tbody></table>` : `<p class="sub" style="margin:0">${t('aucun_argent')}</p>`}
+      <div class="total"><span>${t('argent_compte')}</span><span class="v">${G(cpt)}</span></div></div>
     <div class="card">
       <div class="ecart ${cls}"><span>${txt}</span><span>${signe(ec)}</span></div>
-      <label for="r-note">Un mot pour la direction ? (facultatif)</label>
-      <textarea id="r-note" rows="3" maxlength="500" placeholder="Ex. : client parti sans payer…">${esc(S.note)}</textarea></div>`;
+      <label for="r-note">${t('un_mot')}</label>
+      <textarea id="r-note" rows="3" maxlength="500" placeholder="${esc(t('un_mot_ph'))}">${esc(S.note)}</textarea></div>`;
   $('r-note').oninput = e => S.note = e.target.value;
-  barre(`Écart<b>${signe(ec)}</b>`, 'Envoyer mon rapport', terminer);
+  barre(`${t('ecart')}<b>${signe(ec)}</b>`, t('envoyer_rapport'), terminer);
 }
 
 function modifierPompe(id){
-  const l = enCours().lignes.find(x => x.pompe_id === id), q = pompeCtx(id);
-  S.modif = id; S.champActif = null;
-  S.index[id] = {avant: q.index_precedent != null ? '' : String(l.metter_avant), apres: String(l.metter_apres)};
+  const l = enCours().lignes.find(x => x.pompe_id === id);
+  S.modif = id; S.champActif = null; delete S.erreurs[id];
+  S.index[id] = {avant: String(l.metter_avant), apres: String(l.metter_apres), debutConfirme: false};
   aller('modif');
 }
 function rModif(){
   const id = S.modif, l = enCours().lignes.find(x => x.pompe_id === id);
-  ecranIndex(id, l.prix_gallon, `<p class="sub" style="margin:0">Modifier — ${esc(l.produit_nom)}</p>`,
-    (ok, v) => barre(ok ? `<b>${nf(v.g,3)} gal</b>vendus` : '', 'Enregistrer', async () => {
+  ecranIndex(id, l.prix_gallon, `<p class="sub" style="margin:0">${t('modifier_x', {p: esc(l.produit_nom)})}</p>`,
+    (ok, v) => barre(ok ? `<b>${nf(v.g,3)} gal</b>${t('vendus')}` : '', t('enregistrer'), async () => {
       try{
-        await api('PUT', `/api/pompiste/compteurs/${id}`, {metter_avant:v.av, metter_apres:v.ap});
+        await api('PUT', `/api/pompiste/compteurs/${id}`, {metter_avant:v.av, metter_apres:v.ap, debut_confirme:!!v.s.debutConfirme});
         S.modif = null; S.champActif = null; S.etape = 'resume';
         await chargerContexte();
       }catch(e){
-        S.erreurs[id] = e.detail?.erreurs?.[0]?.message || e.message; rendre();
+        S.erreurs[id] = e.detail?.erreurs?.[0] || {message: e.message}; rendre();
       }
     }, ok));
 }
 
 async function terminer(){
-  const b = $('barre-btn'); b.disabled = true; b.textContent = 'Envoi…';
+  const b = $('barre-btn'); b.disabled = true; b.textContent = t('envoi');
   try{
     S.dernier = await api('POST','/api/pompiste/terminer',{
-      billetterie: S.ctx.coupures.map(c=>({coupure:c, liasses:ent(S.billets[c]?.liasses), billets:ent(S.billets[c]?.billets)}))
-                     .filter(x=>x.liasses||x.billets),
+      billetterie: S.ctx.coupures.map(c => ({coupure:c, liasses:0, billets:ent(S.billets[c])})).filter(x => x.billets),
       monnaie: num(S.monnaie) || 0, note: S.note || null});
     aller('fin');
   }catch(e){
-    if(e.status === 401) return ecranConnexion('Session expirée — reconnectez-vous.');
-    b.disabled = false; b.textContent = 'Envoyer mon rapport';
-    $('app').insertAdjacentHTML('afterbegin', `<div class="alerte err">${esc(e.message)}</div>`);
+    if(e.status === 401) return ecranConnexion(t('session'));
+    b.disabled = false; b.textContent = t('envoyer_rapport');
+    $('app').insertAdjacentHTML('afterbegin', `<div class="alerte err">${msgErreur(e)}</div>`);
     window.scrollTo(0,0);
   }
 }
@@ -724,18 +881,18 @@ function rFin(){
   sansBarre();
   $('app').innerHTML = `<div style="max-width:640px;margin:0 auto">
     <div style="text-align:center;font-size:80px;margin-top:10px">✅</div>
-    <h1 style="text-align:center">Rapport envoyé</h1>
-    <p class="sub" style="text-align:center">La direction a été prévenue et va le vérifier.</p>
+    <h1 style="text-align:center">${t('envoye')}</h1>
+    <p class="sub" style="text-align:center">${t('prevenue')}</p>
     <div class="card">
       <div class="total"><span>${per(r.periode)}</span><span>${esc(jourTxt(r.date))}</span></div>
-      <div class="total"><span>Gallons</span><span class="v">${nf(r.total_gallons,3)}</span></div>
-      <div class="total"><span>Attendu</span><span class="v">${G(r.montant_attendu)}</span></div>
-      <div class="total"><span>Compté</span><span class="v">${G(r.montant_compte)}</span></div>
-      <div class="total"><span>Écart</span><span class="v">${signe(r.ecart)}</span></div></div>
-    <button class="btn" onclick="deconnexion()">Me déconnecter</button>
+      <div class="total"><span>${t('gallons')}</span><span class="v">${nf(r.total_gallons,3)}</span></div>
+      <div class="total"><span>${t('attendu')}</span><span class="v">${G(r.montant_attendu)}</span></div>
+      <div class="total"><span>${t('compte')}</span><span class="v">${G(r.montant_compte)}</span></div>
+      <div class="total"><span>${t('ecart')}</span><span class="v">${signe(r.ecart)}</span></div></div>
+    <button class="btn" onclick="deconnexion()">${t('deconnecter')}</button>
     <div style="height:12px"></div>
-    <button class="btn sec" onclick="nouveauRapport()">Faire un autre rapport</button>
-    <h2>Mes derniers rapports</h2><div class="card" id="hist"></div></div>`;
+    <button class="btn sec" onclick="nouveauRapport()">${t('autre_rapport')}</button>
+    <h2>${t('derniers')}</h2><div class="card" id="hist"></div></div>`;
   chargerHistorique();
 }
 function nouveauRapport(){
@@ -746,16 +903,26 @@ function nouveauRapport(){
 async function chargerHistorique(){
   try{
     const rs = await api('GET','/api/pompiste/rapports');
-    const lib = {SOUMIS:'En vérification', PROBLEME:'Problème signalé', CONFIRME:'Validé', RESOLU:'Résolu', REJETE:'À refaire'};
     $('hist').innerHTML = rs.length ? rs.slice(0,8).map(r=>`<div class="hist">
-      <div style="display:flex;justify-content:space-between;gap:8px"><b>${per(r.periode)} · ${new Date(r.date+'T12:00:00').toLocaleDateString('fr-FR')}</b>
-        <span class="badge ${r.statut}">${lib[r.statut] || r.statut}</span></div>
-      <div style="font-size:15px;color:var(--muted)">${esc([...new Set(r.lignes.map(l=>l.produit_nom))].join(', '))} · ${nf(r.total_gallons,3)} gal · écart ${signe(r.ecart)}</div>
-      ${r.commentaire_superviseur ? `<div class="com"><b>${esc(r.traite_par_nom||'Direction')} :</b> ${esc(r.commentaire_superviseur)}</div>` : ''}
-      ${r.statut==='REJETE' ? '<div style="font-size:15px;margin-top:6px;font-weight:700">Refaites ce rapport après correction.</div>' : ''}
-    </div>`).join('') : '<span class="sub">Aucun rapport pour l\'instant.</span>';
+      <div style="display:flex;justify-content:space-between;gap:8px"><b>${per(r.periode)} · ${esc(jourTxt(r.date))}</b>
+        <span class="badge ${r.statut}">${t(r.statut)}</span></div>
+      <div style="font-size:15px;color:var(--muted)">${esc([...new Set(r.lignes.map(l=>l.produit_nom))].join(', '))} · ${nf(r.total_gallons,3)} gal · ${t('ecart_court')} ${signe(r.ecart)}</div>
+      ${r.commentaire_superviseur ? `<div class="com"><b>${esc(r.traite_par_nom||t('direction'))} :</b> ${esc(r.commentaire_superviseur)}</div>` : ''}
+      ${r.statut==='REJETE' ? `<div style="font-size:15px;margin-top:6px;font-weight:700">${t('refaire')}</div>` : ''}
+    </div>`).join('') : `<span class="sub">${t('aucun_rapport')}</span>`;
   }catch(e){ const h = $('hist'); if(h) h.innerHTML = ''; }
 }
+
+// Tablette partagée : déconnexion automatique après 10 min sans toucher
+// l'écran (le rapport commencé est gardé et repris à la reconnexion), et
+// 60 s après l'écran « Rapport envoyé ».
+let _veille = null;
+function reveil(){
+  clearTimeout(_veille);
+  if(!S.ctx && S.etape !== 'fin') return;
+  _veille = setTimeout(deconnexion, S.etape === 'fin' ? 60_000 : 10 * 60_000);
+}
+['pointerdown','keydown'].forEach(ev => document.addEventListener(ev, reveil, {passive:true}));
 
 demarrer();
 </script>

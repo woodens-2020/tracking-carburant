@@ -40,10 +40,11 @@ def env(client):
             "uid": compte["id"], "p": p, "jour": str(today_haiti())}
 
 
-def _compteurs(env, pompe, avant, apres, periode="Matin", charte=True):
+def _compteurs(env, pompe, avant, apres, periode="Matin", charte=True, confirme=False):
     return env["p"].post("/api/pompiste/compteurs", json={
         "date": env["jour"], "periode": periode, "charte_acceptee": charte,
-        "lignes": [{"pompe_id": pompe, "metter_avant": avant, "metter_apres": apres}]})
+        "lignes": [{"pompe_id": pompe, "metter_avant": avant, "metter_apres": apres,
+                    "debut_confirme": confirme}]})
 
 
 def _terminer(env, billets):
@@ -73,6 +74,20 @@ def test_connexion_et_acces_limite(client, env):
     assert r.status_code in (302, 307) and r.headers["location"] == "/pompiste"
     assert p.get("/pompiste").status_code == 200
     assert client.get("/api/pompiste/contexte", headers=H).status_code == 403
+
+
+def test_contexte_sans_index_et_nouvelle_pompe(client, env):
+    """Le dernier index n'est jamais montré au pompiste ; une pompe ajoutée
+    dans « Produits & Pompes » apparaît tout de suite dans son espace."""
+    d = env["p"].get(f"/api/pompiste/contexte?date={env['jour']}&periode=Matin").json()
+    pompes = [q for pr in d["produits"] for q in pr["pompes"]]
+    assert pompes and all("index_precedent" not in q for q in pompes)
+    pid = next(pr["id"] for pr in d["produits"] if any(q["id"] == env["pompe"] for q in pr["pompes"]))
+    r = client.post(f"/api/produits/{pid}/pompes", headers=H, json={"nom": f"Nouvelle {time.time_ns()}"})
+    nouvelle = r.json()["id"]
+    d = env["p"].get(f"/api/pompiste/contexte?date={env['jour']}&periode=Matin").json()
+    assert any(q["id"] == nouvelle for pr in d["produits"] for q in pr["pompes"])
+    client.delete(f"/api/pompes/{nouvelle}", headers=H)
 
 
 def test_controles_des_index(env):
@@ -143,12 +158,18 @@ def test_verification_et_finalisation(client, env):
 
 
 def test_probleme_puis_resolu(client, env):
-    assert _compteurs(env, env["pompe"], 1100, 1200, periode="Apres-midi").status_code == 422   # suit 1098
+    # Début différent du dernier index (1098) : relire et confirmer
+    r = _compteurs(env, env["pompe"], 1100, 1200, periode="Apres-midi")
+    assert r.status_code == 422 and r.json()["detail"]["erreurs"][0]["code"] == "debut_different"
+    assert "1098" not in r.text                          # la valeur attendue n'est pas révélée
     assert _compteurs(env, env["pompe"], 1098, 1200, periode="Apres-midi").status_code == 201
     rid = _terminer(env, 40).json()["id"]
     assert _sup(client, rid, "probleme", commentaire="non").status_code == 400
     r = _sup(client, rid, "probleme", commentaire="Il manque 11 000 G, à voir avec le pompiste.")
     assert r.status_code == 200 and r.json()["statut"] == "PROBLEME"
+    # Pompe d'un rapport en problème : toujours prise sur ce créneau
+    r = _compteurs(env, env["pompe"], 1098, 1200, periode="Apres-midi")
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "deja_rapporte"
     assert client.get("/api/pompiste-supervision/resume", headers=H).json()["problemes"] >= 1
     client.post(f"/api/pompiste-supervision/rapports/{rid}/lignes/{env['pompe']}/confirmer", headers=H,
                 json={"metter_avant": 1098, "metter_apres": 1200})
@@ -175,6 +196,25 @@ def test_renvoi_au_pompiste(client, env):
     assert r.status_code == 200 and r.json()["statut"] == "REJETE"
 
 
+def test_debut_different_confirme_et_annulation(client, env):
+    """Début différent du dernier index : refusé tant que le pompiste ne
+    confirme pas, accepté ensuite. Un rapport jamais terminé peut être annulé
+    par le superviseur (il bloquait ses pompes)."""
+    r = client.post("/api/releves", headers=H, json={"date": env["jour"], "periode": "Matin", "pompe_id": env["diesel"],
+                                                     "prix_gallon": 600, "metter_avant": 100, "metter_apres": 150})
+    assert r.status_code == 200, r.text
+    r = _compteurs(env, env["diesel"], 160, 170, periode="Apres-midi")
+    assert r.status_code == 422 and r.json()["detail"]["erreurs"][0]["code"] == "debut_different"
+    r = _compteurs(env, env["diesel"], 160, 170, periode="Apres-midi", confirme=True)
+    assert r.status_code == 201, r.text
+    rid = r.json()["id"]
+    assert client.get("/api/pompiste-supervision/resume", headers=H).json()["non_termines"] >= 1
+    lst = client.get("/api/pompiste-supervision/rapports?statut=EN_COURS", headers=H).json()
+    assert any(x["id"] == rid for x in lst)
+    assert client.delete(f"/api/pompiste-supervision/rapports/{rid}", headers=H).status_code == 200
+    assert env["p"].get("/api/pompiste/contexte").json()["en_cours"] is None
+
+
 def test_desactivation_coupe_la_session(client, env):
     r = client.patch(f"/api/pompiste-supervision/comptes/{env['uid']}", headers=H, json={"actif": False})
     assert r.status_code == 200
@@ -182,3 +222,13 @@ def test_desactivation_coupe_la_session(client, env):
     r = client.patch(f"/api/pompiste-supervision/comptes/{env['uid']}", headers=H,
                      json={"actif": True, "nouveau_pin": True})
     assert r.status_code == 200 and len(r.json()["code_acces"]) == 9
+
+
+
+def test_limite_connexion_par_identifiant(client):
+    """Les tablettes d'une station partagent une IP : les erreurs d'un pompiste
+    ne doivent pas bloquer la connexion des autres."""
+    for _ in range(10):
+        assert client.post("/api/login/pompiste", json={"username": "inconnu.a", "code_acces": "111111111"}).status_code == 401
+    assert client.post("/api/login/pompiste", json={"username": "inconnu.a", "code_acces": "111111111"}).status_code == 429
+    assert client.post("/api/login/pompiste", json={"username": "inconnu.b", "code_acces": "111111111"}).status_code == 401
