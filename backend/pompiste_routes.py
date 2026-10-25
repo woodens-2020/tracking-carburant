@@ -279,10 +279,18 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
 # ESPACE POMPISTE
 # ═════════════════════════════════════════════════════════════════════
 
+# Le pompiste choisit la date de son rapport dans un calendrier : jamais
+# dans le futur, et au plus JOURS_EN_ARRIERE jours en arrière.
+JOURS_EN_ARRIERE = 31
+
+
 def _valider_date(d: date_type) -> None:
     aujourd_hui = today_haiti()
-    if d > aujourd_hui or d < aujourd_hui - timedelta(days=1):
-        raise HTTPException(400, "Date invalide : seuls aujourd'hui et hier sont acceptés.")
+    if d > aujourd_hui:
+        raise HTTPException(400, {"code": "date_future", "message": "Date invalide : un rapport ne peut pas être daté dans le futur."})
+    if d < aujourd_hui - timedelta(days=JOURS_EN_ARRIERE):
+        raise HTTPException(400, {"code": "date_ancienne",
+                                  "message": f"Date invalide : au plus {JOURS_EN_ARRIERE} jours en arrière."})
 
 
 def _en_cours(db: Session, u: Utilisateur) -> Optional[RapportPompiste]:
@@ -334,6 +342,7 @@ def contexte(date: Optional[date_type] = None, periode: Optional[str] = None,
     return {
         "pompiste": {"id": u.id, "nom": _nom(u), "username": u.username},
         "date": str(d), "periode": periode, "aujourd_hui": str(today_haiti()),
+        "date_min": str(today_haiti() - timedelta(days=JOURS_EN_ARRIERE)),
         "produits": produits, "coupures": list(COUPURES), "taille_liasse": TAILLE_LIASSE,
         "en_cours": _rapport_dict(db, ouvert) if ouvert else None,
     }

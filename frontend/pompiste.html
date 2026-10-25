@@ -174,6 +174,29 @@ td.r,th.r{text-align:right;white-space:nowrap}
 .cache{display:none!important}
 .connexion{max-width:520px;margin:5vh auto 0}
 
+/* Date du rapport et calendrier */
+.date-rapport{display:flex;align-items:center;gap:14px;width:100%;margin:0 0 16px;padding:14px 18px;cursor:pointer;
+  font:inherit;font-size:20px;font-weight:800;text-align:left;color:var(--text);
+  background:var(--panel);border:3px solid var(--border);border-radius:20px;box-shadow:var(--ombre)}
+.date-rapport .ico{font-size:28px}
+.date-rapport small{display:block;font-size:14px;font-weight:700;color:var(--muted)}
+.date-rapport .chg{margin-left:auto;flex:none;font-size:16px;color:var(--accent-2);background:var(--accent-soft);
+  border:2px solid var(--accent);border-radius:12px;padding:8px 14px}
+.calendrier{padding:16px;max-width:600px}
+.cal-tete{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-size:20px}
+.cal-nav{font:inherit;font-size:28px;font-weight:800;width:56px;height:52px;border-radius:14px;cursor:pointer;
+  border:2px solid var(--border);background:var(--touche);color:var(--text)}
+.cal-nav:disabled{opacity:.3;cursor:default}
+.cal-grille{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.cal-js{text-align:center;font-size:14px;font-weight:800;color:var(--muted);padding:4px 0}
+.jour{font:inherit;font-family:var(--mono);font-size:22px;font-weight:800;aspect-ratio:1;min-height:44px;border-radius:14px;cursor:pointer;
+  border:2px solid var(--border);background:var(--touche);color:var(--text)}
+.jour.auj{border-color:var(--accent)}
+.jour.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.jour:disabled{opacity:.25;cursor:default}
+@media (max-width:480px){ .cal-grille{gap:5px} .jour{font-size:18px;border-radius:10px} .date-rapport{font-size:17px;padding:12px 14px}
+  .date-rapport .chg{padding:6px 10px;font-size:14px} }
+
 /* Fiche imprimée (terminal à imprimante thermique) */
 #ticket{display:none}
 .papier{display:flex;gap:6px;justify-content:center;margin:10px 0 0}
@@ -373,6 +396,10 @@ const TXT = {
     e_fin_inferieure:'L\'index de fin est plus petit que l\'index de début : un compteur ne recule pas.',
     e_deja:'Déjà saisie pour cette période : {p}.', e_terminer:'Terminez d\'abord votre rapport en cours (bouton « Non, j\'ai fini »).',
     e_rien:'Aucun compteur envoyé : saisissez d\'abord vos pompes.',
+    date_rapport:'Date du rapport', changer_date:'Changer', choisir_date:'Pour quel jour est le rapport ?',
+    date_regle:'Touchez le jour. Pas de date dans le futur ; au plus {n} jours en arrière.',
+    jours_courts:['Lu','Ma','Me','Je','Ve','Sa','Di'],
+    e_date_future:'Un rapport ne peut pas être daté dans le futur.', e_date_ancienne:'Cette date est trop ancienne.',
     imprimer:'Imprimer la fiche', reimprimer:'Réimprimer', papier:'Papier',
     tk_titre:'RAPPORT POMPISTE', tk_no:'Rapport n°', tk_pompiste:'Pompiste', tk_code:'Code', tk_periode:'Période',
     tk_soumis:'Soumis le', tk_compteurs:'COMPTEURS', tk_prix:'Prix', tk_ventes:'VENTES', tk_argent:'ARGENT REMIS',
@@ -433,6 +460,10 @@ const TXT = {
     e_fin_inferieure:'Endèks fen an pi piti pase endèks kòmansman an : yon kontè pa ka fè bak.',
     e_deja:'Deja antre pou peryòd sa a : {p}.', e_terminer:'Fini rapò ou kòmanse a anvan (bouton « Non, mwen fini »).',
     e_rien:'Ou poko voye okenn kontè : antre ponp ou yo anvan.',
+    date_rapport:'Dat rapò a', changer_date:'Chanje', choisir_date:'Rapò a se pou ki jou ?',
+    date_regle:'Touche jou a. Pa gen dat nan lavni ; pa plis pase {n} jou annaryè.',
+    jours_courts:['Le','Ma','Mè','Je','Va','Sa','Di'],
+    e_date_future:'Yon rapò pa ka gen yon dat nan lavni.', e_date_ancienne:'Dat sa a twò lontan.',
     imprimer:'Enprime fich la', reimprimer:'Re-enprime', papier:'Papye',
     tk_titre:'RAPÒ PONPIS', tk_no:'Rapò nimewo', tk_pompiste:'Ponpis', tk_code:'Kòd', tk_periode:'Peryòd',
     tk_soumis:'Soumèt le', tk_compteurs:'KONTÈ', tk_prix:'Pri', tk_ventes:'VANT', tk_argent:'LAJAN REMÈT',
@@ -468,6 +499,7 @@ const num = v => { if(v == null || String(v).trim() === '') return null;
 const ent = v => { const x = parseInt(v,10); return isNaN(x) || x < 0 ? 0 : x; };
 function jourTxt(iso){ const d = new Date(iso + 'T12:00:00');
   return `${t('jours')[d.getDay()]} ${d.getDate()} ${t('mois')[d.getMonth()]}`; }
+const jourCourt = iso => { const d = new Date(iso + 'T12:00:00'); return `${d.getDate()} ${t('mois')[d.getMonth()].slice(0, 3)}`; };
 const hier = iso => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate()-1);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
@@ -485,6 +517,8 @@ function msgErreur(e){
   if(c === 'deja_rapporte') return t('e_deja', {p: esc(e.detail.pompes || '')});
   if(c === 'terminer_dabord') return t('e_terminer');
   if(c === 'rien_a_terminer') return t('e_rien');
+  if(c === 'date_future') return t('e_date_future');
+  if(c === 'date_ancienne') return t('e_date_ancienne');
   return esc(e.message);
 }
 function msgLigne(x){
@@ -628,7 +662,7 @@ function precedent(){
   const e = S.etape;
   if(e === 'index' && S.pos > 0){ S.pos--; S.champActif = null; return rendre(); }
   if(e === 'billetterie' && S.depuisResume) return aller('resume');
-  const retour = {periode:'charte', produit: enCours() ? 'rapport' : 'periode', pompes:'produit', index:'pompes',
+  const retour = {periode:'charte', calendrier:'periode', produit: enCours() ? 'rapport' : 'periode', pompes:'produit', index:'pompes',
                   compteurs:'index', billetterie:'rapport', resume:'billetterie', modif:'resume'}[e];
   if(e === 'compteurs'){ S.pos = S.choisies.length - 1; S.champActif = null; }
   aller(retour || 'charte');
@@ -636,7 +670,8 @@ function precedent(){
 
 function entete(titrePhase){
   const puces = [];
-  if(S.periode && !['periode','charte'].includes(S.etape)) puces.push(per(S.periode) + (S.date !== S.ctx.aujourd_hui ? ` (${t('hier')})` : ''));
+  if(S.periode && !['periode','charte','calendrier'].includes(S.etape))
+    puces.push(per(S.periode) + (S.date === S.ctx.aujourd_hui ? '' : ` · ${jourCourt(S.date)}`));
   if(S.produitId && ['pompes','index','compteurs'].includes(S.etape)) puces.push(produit()?.nom || '');
   if(S.choisies.length && ['index','compteurs'].includes(S.etape)) puces.push(t('n_pompes', {n: S.choisies.length}));
   const phase = titrePhase ?? (PHASE_ARGENT.includes(S.etape) ? t('etape2') : t('etape1'));
@@ -658,7 +693,7 @@ function rendre(){
   setTimeout(reveil, 0);
   if(!S.charte && S.etape !== 'fin') S.etape = 'charte';
   S.champ = null;
-  ({charte:rCharte, periode:rPeriode, produit:rProduit, pompes:rPompes, index:rIndex, compteurs:rCompteurs,
+  ({charte:rCharte, periode:rPeriode, calendrier:rCalendrier, produit:rProduit, pompes:rPompes, index:rIndex, compteurs:rCompteurs,
     rapport:rRapport, billetterie:rBilletterie, resume:rResume, modif:rModif, fin:rFin})[S.etape]();
   window.scrollTo(0,0);
 }
@@ -683,21 +718,59 @@ function rCharte(){
 // ── 1. Période ──────────────────────────────────────────────────────
 function rPeriode(){
   sansBarre();
-  const auj = S.date === S.ctx.aujourd_hui;
+  const auj = S.date === S.ctx.aujourd_hui, hi = S.date === hier(S.ctx.aujourd_hui);
   $('app').innerHTML = entete() + `
     <h1>${t('periode_q')}</h1>
-    <p class="sub">${auj ? t('auj') : t('hier')}, ${esc(jourTxt(S.date))}</p>
+    <button class="date-rapport" onclick="aller('calendrier')">
+      <span class="ico">📅</span>
+      <span><small>${t('date_rapport')}</small>${auj ? t('auj') + ', ' : (hi ? t('hier') + ', ' : '')}${esc(jourTxt(S.date))}</span>
+      <span class="chg">${t('changer_date')}</span></button>
     <div class="choix deux">
       <button class="gros grand ${S.periode==='Matin'?'on':''}" onclick="choisirPeriode('Matin')">
         <span class="ico">☀️</span><span>${t('Matin')}</span></button>
       <button class="gros grand ${S.periode==='Apres-midi'?'on':''}" onclick="choisirPeriode('Apres-midi')">
         <span class="ico">🌇</span><span>${t('Apres-midi')}</span></button>
-    </div>
-    <button class="lien" onclick="basculerJour()">${auj ? t('pour_hier') : t('revenir_auj')}</button>`;
+    </div>`;
 }
-function basculerJour(){
-  S.date = S.date === S.ctx.aujourd_hui ? hier(S.ctx.aujourd_hui) : S.ctx.aujourd_hui;
-  S.periode = null; rPeriode();
+
+// Calendrier : un mois à la fois, gros jours à toucher ; jours futurs et trop
+// anciens grisés (même règle que le serveur).
+function rCalendrier(){
+  sansBarre();
+  const auj = S.ctx.aujourd_hui, min = S.ctx.date_min || hier(auj);
+  if(!S.moisCal) S.moisCal = S.date.slice(0, 7);
+  const [a, m] = S.moisCal.split('-').map(Number);
+  const premier = new Date(a, m - 1, 1), nbJours = new Date(a, m, 0).getDate();
+  const decal = (premier.getDay() + 6) % 7;                 // semaine du lundi au dimanche
+  const iso = j => `${a}-${String(m).padStart(2,'0')}-${String(j).padStart(2,'0')}`;
+  const cases = [];
+  for(let i = 0; i < decal; i++) cases.push('<span></span>');
+  for(let j = 1; j <= nbJours; j++){
+    const d = iso(j), ok = d <= auj && d >= min;
+    cases.push(`<button class="jour ${d===S.date?'on':''} ${d===auj?'auj':''}" ${ok ? `onclick="choisirDate('${d}')"` : 'disabled'}>${j}</button>`);
+  }
+  const moisPrec = new Date(a, m - 2, 1), moisSuiv = new Date(a, m, 1);
+  const cle = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  const precOk = cle(moisPrec) >= min.slice(0, 7), suivOk = cle(moisSuiv) <= auj.slice(0, 7);
+  $('app').innerHTML = entete() + `
+    <h1>${t('choisir_date')}</h1>
+    <p class="sub">${t('date_regle', {n: S.ctx.date_min ? Math.round((new Date(auj) - new Date(min)) / 864e5) : 1})}</p>
+    <div class="choix deux" style="margin-bottom:14px">
+      <button class="gros ${S.date===auj?'on':''}" onclick="choisirDate('${auj}')"><span class="ico">📅</span><span>${t('auj')}<small>${esc(jourTxt(auj))}</small></span></button>
+      <button class="gros ${S.date===hier(auj)?'on':''}" onclick="choisirDate('${hier(auj)}')"><span class="ico">↩</span><span>${t('hier')}<small>${esc(jourTxt(hier(auj)))}</small></span></button>
+    </div>
+    <div class="card calendrier">
+      <div class="cal-tete">
+        <button class="cal-nav" ${precOk ? `onclick="S.moisCal='${cle(moisPrec)}';rCalendrier()"` : 'disabled'} aria-label="‹">‹</button>
+        <b>${t('mois')[m-1]} ${a}</b>
+        <button class="cal-nav" ${suivOk ? `onclick="S.moisCal='${cle(moisSuiv)}';rCalendrier()"` : 'disabled'} aria-label="›">›</button>
+      </div>
+      <div class="cal-grille">${t('jours_courts').map(x => `<span class="cal-js">${x}</span>`).join('')}${cases.join('')}</div>
+    </div>`;
+}
+function choisirDate(d){
+  if(d !== S.date){ S.periode = null; S.produitId = null; S.choisies = []; S.index = {}; S.erreurs = {}; }
+  S.date = d; S.moisCal = null; aller('periode');
 }
 async function choisirPeriode(p){
   if(p !== S.periode){ S.produitId = null; S.choisies = []; S.index = {}; S.erreurs = {}; }

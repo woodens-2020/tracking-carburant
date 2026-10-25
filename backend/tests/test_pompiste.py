@@ -273,3 +273,28 @@ def test_limite_connexion_par_identifiant(client):
         assert client.post("/api/login/pompiste", json={"username": "inconnu.a", "code_acces": "111111111"}).status_code == 401
     assert client.post("/api/login/pompiste", json={"username": "inconnu.a", "code_acces": "111111111"}).status_code == 429
     assert client.post("/api/login/pompiste", json={"username": "inconnu.b", "code_acces": "111111111"}).status_code == 401
+
+
+def test_date_choisie_dans_le_calendrier(client):
+    """Le pompiste choisit la date : jamais dans le futur, au plus 31 jours en arrière."""
+    from datetime import timedelta
+    from tz_utils import today_haiti
+    import main as _m
+    auj = today_haiti()
+    pompe = _produit(client, 300)
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Cal", "nom": "Endrier"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    ctx = p.get("/api/pompiste/contexte").json()
+    assert ctx["date_min"] == str(auj - timedelta(days=31))
+    def envoi(d):
+        return p.post("/api/pompiste/compteurs", json={"date": str(d), "periode": "Matin", "charte_acceptee": True,
+                      "lignes": [{"pompe_id": pompe, "metter_avant": 0, "metter_apres": 5}]})
+    r = envoi(auj + timedelta(days=1))
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "date_future"
+    r = envoi(auj - timedelta(days=32))
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "date_ancienne"
+    assert p.get(f"/api/pompiste/contexte?date={auj - timedelta(days=10)}&periode=Matin").status_code == 200
+    r = envoi(auj - timedelta(days=10))
+    assert r.status_code == 201, r.text
+    assert r.json()["date"] == str(auj - timedelta(days=10))
