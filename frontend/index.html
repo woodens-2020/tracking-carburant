@@ -17160,7 +17160,7 @@ async function _remplirFiltrePompistes(selId){
   if(!sel) return;
   const cur=sel.value;
   try{
-    if(!_pompistesCache) _pompistesCache=await GET('/pompistes');
+    _pompistesCache=await GET('/pompistes');
     sel.innerHTML='<option value="">Tous les pompistes</option>'+
       (_pompistesCache||[]).map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
     if(cur) sel.value=cur;
@@ -19521,20 +19521,25 @@ function pspCarte(r){
     const rupt = prec != null && Math.abs(prec - av) > 0.001;
     const corrige = l.metter_avant_corrige != null;
     const j = l.journal;
-    const diffJ = j && !j.de_ce_rapport && (Math.abs(j.metter_avant - av) > 0.001 || Math.abs(j.metter_apres - ap) > 0.001);
+    // Journal différent du rapport : saisie parallèle dans le module Saisie, ou
+    // relevé de ce rapport modifié ensuite dans la Saisie (la finalisation remettrait les valeurs du rapport)
+    const diffJ = j && (Math.abs(j.metter_avant - av) > 0.001 || Math.abs(j.metter_apres - ap) > 0.001);
     return `<tr class="${l.confirmee?'psp-ligne-ok':''}">
       <td><b>${esc(l.pompe_nom)}</b><div class="psp-muted">${esc(l.produit_nom)}</div></td>
       <td class="r">${_pspN(prec)}${rupt ? `<div class="psp-neg" style="font-size:11px;font-weight:700">≠ début saisi (${av - prec > 0 ? '+' : ''}${_pspN(av - prec)})</div>` : ''}</td>
-      <td class="r">${l.confirmee ? _pspN(av) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="avant" value="${av}">`}</td>
-      <td class="r">${l.confirmee ? _pspN(ap) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="apres" value="${ap}">`}</td>
+      <td class="r">${l.confirmee ? _pspN(av) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="avant" value="${_pspValeur(r.id, l.pompe_id, 'avant', av)}" oninput="_pspGarder(this)">`}</td>
+      <td class="r">${l.confirmee ? _pspN(ap) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="apres" value="${_pspValeur(r.id, l.pompe_id, 'apres', ap)}" oninput="_pspGarder(this)">`}</td>
       <td class="r">${_pspN(l.gallons)}</td>
       <td class="r">${_pspG(l.montant)}</td>
       <td class="r" style="white-space:nowrap">${l.confirmee
         ? `<span class="psp-ok" style="font-weight:700">✓ Confirmé${corrige?' (corrigé)':''}</span> <button class="psp-lien" onclick="pspLigne(${r.id},${l.pompe_id},false)">reprendre</button>`
         : `<button class="btn btn-primary psp-mini" onclick="pspLigne(${r.id},${l.pompe_id},true)">Confirmer</button>`}</td>
     </tr>${corrige ? `<tr><td colspan="7"><div class="psp-muted">Saisi par le pompiste : ${_pspN(l.metter_avant)} → ${_pspN(l.metter_apres)}</div></td></tr>` : ''}
-    ${j && !j.de_ce_rapport ? `<tr><td colspan="7"><div class="${diffJ?'psp-warn':'psp-muted'}">${diffJ ? '⚠ ' : ''}Saisi aussi dans le module Saisie par ${esc(j.saisi_par||'l\'administration')} :
-       ${_pspN(j.metter_avant)} → ${_pspN(j.metter_apres)}${diffJ ? ' — la finalisation remplacera ces valeurs.' : ' (identique)'}</div></td></tr>` : ''}`;
+    ${j && (diffJ || !j.de_ce_rapport) ? `<tr><td colspan="7"><div class="${diffJ?'psp-warn':'psp-muted'}">${diffJ ? '⚠ ' : ''}${j.de_ce_rapport
+         ? `Modifié ensuite dans le module Saisie par ${esc(j.modifie_par||'l\'administration')}`
+         : `Saisi aussi dans le module Saisie par ${esc(j.saisi_par||'l\'administration')}`} :
+       ${_pspN(j.metter_avant)} → ${_pspN(j.metter_apres)}${diffJ ? ' — la finalisation remettra les valeurs confirmées ici.' : ' (identique)'}
+       ${diffJ && !l.confirmee ? ` <button class="psp-lien" onclick="pspReprendreJournal(${r.id},${l.pompe_id},${j.metter_avant},${j.metter_apres})">reprendre ces valeurs</button>` : ''}</div></td></tr>` : ''}`;
   }).join('');
   const billets = (r.billetterie||[]).map(b => { const n = (b.liasses||0) * 100 + (b.billets||0);
       return `<tr><td><b>${Number(b.coupure).toLocaleString('fr-FR')} G</b></td>
@@ -19605,7 +19610,17 @@ async function pspLigne(id, pompe, confirmer){
   const v = k => parseFloat(String(document.querySelector(`input[data-r="${id}"][data-p="${pompe}"][data-k="${k}"]`).value).replace(',', '.'));
   const av = v('avant'), ap = v('apres');
   if(isNaN(av) || isNaN(ap)) return notify('Index invalide.', 'err');
-  _pspAction(id, `lignes/${pompe}/confirmer`, {metter_avant:av, metter_apres:ap}).catch(()=>{});
+  _pspAction(id, `lignes/${pompe}/confirmer`, {metter_avant:av, metter_apres:ap})
+    .then(() => { const s = _pspS(id); if(s.index) delete s.index[pompe]; }).catch(()=>{});
+}
+// Valeurs tapées par le superviseur dans les index non confirmés
+function _pspValeur(id, pompe, k, defaut){ const v = _pspS(id).index?.[pompe]?.[k]; return v != null ? esc(String(v)) : defaut; }
+function _pspGarder(el){ const s = _pspS(Number(el.dataset.r)); ((s.index ||= {})[el.dataset.p] ||= {})[el.dataset.k] = el.value; }
+function pspReprendreJournal(id, pompe, av, ap){
+  const set = (k, v) => { const el = document.querySelector(`input[data-r="${id}"][data-p="${pompe}"][data-k="${k}"]`);
+    if(el){ el.value = v; _pspGarder(el); } };
+  set('avant', av); set('apres', ap);
+  notify('Valeurs du journal reprises : confirmez la pompe pour les garder.', 'inf');
 }
 const pspBillets = (id, ok) => _pspAction(id, 'billetterie', {confirme: ok}).catch(()=>{});
 const pspEcart   = (id, ok) => _pspAction(id, 'ecart', {confirme: ok}).catch(()=>{});

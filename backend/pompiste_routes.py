@@ -274,7 +274,8 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
         if avec_journal:
             j = (db.query(Releve).filter_by(date=r.date, periode=r.periode, pompe_id=l.pompe_id).first())
             d["journal"] = ({"metter_avant": float(j.metter_avant), "metter_apres": float(j.metter_apres),
-                             "saisi_par": _nom(j.cree_par), "de_ce_rapport": j.rapport_pompiste_id == r.id}
+                             "saisi_par": _nom(j.cree_par), "modifie_par": _nom(j.modifie_par),
+                             "de_ce_rapport": j.rapport_pompiste_id == r.id}
                             if j else None)
             prec, src = _index_precedent(db, l.pompe_id, r.date, r.periode, exclure_rapport_id=r.id)
             d["index_precedent"] = prec
