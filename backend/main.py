@@ -2908,7 +2908,26 @@ def _build_journal_entries(
             "type_anomalie":    type_anomalie,
             "commentaire":      commentaire,
             "recommandation":   recommandation,
+            "motif_saisie":     getattr(r, "motif_ecart_compteur", None),
+            "resolution":       None,
         })
+
+    # Écarts justifiés par la direction : statut « resolu », retirés des
+    # problèmes (tant que les valeurs n'ont pas changé depuis la résolution)
+    a_verifier = [e["id"] for e in entries if e["statut"] != "ok" and isinstance(e["id"], int)]
+    if a_verifier:
+        from models import ResolutionMetter
+        resol = {x.releve_id: x for x in
+                 db.query(ResolutionMetter).filter(ResolutionMetter.releve_id.in_(a_verifier)).all()}
+        for e in entries:
+            x = resol.get(e["id"]) if isinstance(e["id"], int) else None
+            if x and _resolution_valable(x, e):
+                e["statut"] = "resolu"
+                e["resolution"] = {
+                    "description": x.description,
+                    "par":         x.resolu_par.nom_complet if x.resolu_par else None,
+                    "le":          x.resolu_le.isoformat() if x.resolu_le else None,
+                }
 
     # Post-filtres : appliqués APRÈS l'analyse de continuité pour ne pas
     # casser la chaîne Matin → Après-midi → Matin suivant.
@@ -2917,7 +2936,78 @@ def _build_journal_entries(
     if pompiste_id_filter:
         entries = [e for e in entries if e["pompiste_id"] == pompiste_id_filter]
 
+    # Affichage jour par jour : tous les relevés d'une date ensemble (Matin
+    # puis Après-midi, produit, pompe) — l'analyse ci-dessus reste par pompe
+    entries.sort(key=lambda e: (e["date"], PERIODE_RANG.get(e["periode"], 99),
+                                e["produit_nom"] or "", e["pompe_id"]))
     return entries
+
+
+def _resolution_valable(x, e: dict) -> bool:
+    proche = lambda a, b: abs(float(a) - float(b)) <= 0.001
+    if x.type_anomalie != e["type_anomalie"]:
+        return False
+    if not (proche(x.metter_avant, e["metter_avant"]) and proche(x.metter_apres, e["metter_apres"])):
+        return False
+    if (x.decalage is None) != (e["decalage"] is None):
+        return False
+    return x.decalage is None or proche(x.decalage, e["decalage"])
+
+
+DESCRIPTION_RESOLUTION_MIN = 20
+
+
+class ResolutionMetterIn(BaseModel):
+    description: str
+
+
+def _superviseur_journal(request: Request, db: Session):
+    from pompiste_routes import _user, peut_superviser
+    u = _user(request, db)
+    if not peut_superviser(u):
+        raise HTTPException(403, "Seule la direction ou l'administration peut résoudre un écart de compteur.")
+    return u
+
+
+@app.post("/api/journal/releves/{releve_id}/resoudre")
+def resoudre_ecart_metter(releve_id: int, data: ResolutionMetterIn, request: Request,
+                          db: Session = Depends(get_db)):
+    """Marque l'écart d'un relevé comme résolu, avec une justification
+    (au moins 20 caractères) : il sort de la liste des problèmes du journal."""
+    from models import ResolutionMetter
+    u = _superviseur_journal(request, db)
+    desc = " ".join((data.description or "").split())
+    if len(desc) < DESCRIPTION_RESOLUTION_MIN:
+        raise HTTPException(400, f"Décrivez la résolution en au moins {DESCRIPTION_RESOLUTION_MIN} caractères "
+                                 f"(actuellement {len(desc)}).")
+    r = db.get(Releve, releve_id)
+    if not r:
+        raise HTTPException(404, "Relevé introuvable.")
+    e = next((x for x in _build_journal_entries(db, r.date, r.date, pompe_id_filter=[r.pompe_id])
+              if x["id"] == releve_id), None)
+    if not e or e["statut"] == "ok":
+        raise HTTPException(400, "Ce relevé ne présente aucun écart à résoudre.")
+    x = db.query(ResolutionMetter).filter_by(releve_id=releve_id).first() or ResolutionMetter(releve_id=releve_id)
+    x.type_anomalie = e["type_anomalie"]
+    x.metter_avant, x.metter_apres, x.decalage = e["metter_avant"], e["metter_apres"], e["decalage"]
+    x.description = desc[:2000]
+    x.resolu_par_id = u.id
+    from datetime import datetime as _dt, timezone as _tz
+    x.resolu_le = _dt.now(_tz.utc)
+    db.add(x)
+    db.commit()
+    return {"releve_id": releve_id, "statut": "resolu", "description": x.description}
+
+
+@app.delete("/api/journal/releves/{releve_id}/resoudre")
+def rouvrir_ecart_metter(releve_id: int, request: Request, db: Session = Depends(get_db)):
+    from models import ResolutionMetter
+    _superviseur_journal(request, db)
+    n = db.query(ResolutionMetter).filter_by(releve_id=releve_id).delete()
+    db.commit()
+    if not n:
+        raise HTTPException(404, "Aucune résolution pour ce relevé.")
+    return {"releve_id": releve_id, "statut": "rouvert"}
 
 
 @app.get("/api/journal")
@@ -2951,15 +3041,18 @@ def journal_endpoint(
     # entre sessions (gallons non comptabilisés dans aucun relevé), mais la
     # quantité propre à la session en saut_compteur reste, elle, une mesure
     # réelle — seul ce type est exclu ici, tel que demandé.
-    nb_sauts       = sum(1 for e in entries if e["type_anomalie"] == "saut_compteur")
-    total_gallons  = round(sum(e["quantite"] for e in entries if e["type_anomalie"] != "saut_compteur"), 4)
+    # Un saut résolu (justifié par la direction) n'est plus exclu.
+    nb_resolus     = sum(1 for e in entries if e["statut"] == "resolu")
+    exclu          = lambda e: e["type_anomalie"] == "saut_compteur" and e["statut"] != "resolu"
+    nb_sauts       = sum(1 for e in entries if exclu(e))
+    total_gallons  = round(sum(e["quantite"] for e in entries if not exclu(e)), 4)
 
     # Récapitulatif des gallons vendus par produit (Diesel, Gazoline…) — hors
     # sauts de compteur, comme total_gallons. Sert au tableau récapitulatif
     # affiché partout où l'on filtre les gallons vendus.
     _pp: dict = {}
     for e in entries:
-        if e["type_anomalie"] == "saut_compteur":
+        if exclu(e):
             continue
         d = _pp.setdefault(e["produit_nom"] or "Inconnu",
                            {"gallons": 0.0, "montant": 0.0, "nb_releves": 0})
@@ -2985,6 +3078,7 @@ def journal_endpoint(
             "nb_ok":            nb_ok,
             "nb_alertes":       nb_alertes,
             "nb_erreurs":       nb_erreurs,
+            "nb_resolus":       nb_resolus,
             "taux_conformite":  taux_conformite,
             "nb_sauts_compteur": nb_sauts,
             "total_gallons":     total_gallons,
@@ -3334,7 +3428,7 @@ def journal_pdf(
     story.append(Spacer(1, 16))
 
     # Section alertes/erreurs
-    problemes = [e for e in entries if e["statut"] != "ok"]
+    problemes = [e for e in entries if e["statut"] in ("alerte", "erreur")]
     if problemes:
         story.append(Paragraph(f"Analyse des décalages ({len(problemes)} problème(s))", sH2))
         for e in problemes:

@@ -3265,6 +3265,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   background:rgba(249,115,22,.12);color:var(--orange);white-space:nowrap}
 .jr-src.ok{background:rgba(34,197,94,.12);color:var(--green)}
 .jr-src.attente{background:rgba(249,115,22,.16);color:var(--orange)}
+.jres-pied{padding:10px 16px 14px;border-top:1px solid var(--border);font-size:13px}
+.jres-pied textarea{background:var(--bg2,rgba(255,255,255,.04));color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:inherit;font-size:13.5px;resize:vertical}
+.jres-resolu{padding:10px 0;border-top:1px solid var(--border)}
+.jres-resolu:first-of-type{margin-top:8px}
 tr.jr-attente td{opacity:.62;font-style:italic}
 tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 /* Caisse principale */
@@ -17332,6 +17336,59 @@ const TYPE_LABELS={
   ok:              'CONFORME',
 };
 
+// ── Résolution d'un écart de compteur (justification ≥ 20 caractères) ──
+const JR_DESC_MIN = 20;
+function _jrBlocResolus(resolus){
+  if(!resolus.length) return '';
+  return `<details class="card jres-resolus" style="margin-top:12px;padding:12px 16px">
+    <summary style="cursor:pointer;font-weight:700;color:var(--green)">✓ Écarts résolus (${resolus.length})</summary>
+    ${resolus.map(e=>`<div class="jres-resolu">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div><b>${esc(e.pompe_nom)}</b> · ${frDate(e.date)} · ${e.periode==='Matin'?'🌅 Matin':'🌇 Après-midi'}
+          <span style="color:var(--muted)">· ${esc(TYPE_LABELS[e.type_anomalie]||e.type_anomalie||'')}${e.decalage!=null?` (${e.decalage>=0?'+':''}${e.decalage.toFixed(3)})`:''}</span></div>
+        <button class="btn btn-secondary btn-sm" onclick="jrRouvrirResolution(${e.id})">Rouvrir</button>
+      </div>
+      <div style="margin-top:4px;font-size:13.5px">${esc(e.resolution.description)}</div>
+      <div style="margin-top:2px;font-size:12px;color:var(--muted)">Résolu${e.resolution.par?` par ${esc(e.resolution.par)}`:''}${e.resolution.le?` le ${new Date(e.resolution.le).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})}`:''}</div>
+    </div>`).join('')}
+  </details>`;
+}
+function jrOuvrirResolution(id){
+  const box=document.getElementById('jres-pied-'+id); if(!box) return;
+  box.innerHTML=`<div class="janom-block-title" style="margin-bottom:6px">Justification de la résolution</div>
+    <textarea id="jres-desc-${id}" rows="3" style="width:100%;box-sizing:border-box" maxlength="2000"
+      placeholder="Ex. : compteur déréglé, réglé par le technicien le … ; écart confirmé avec le pompiste …"
+      oninput="jrCompterResolution(${id})"></textarea>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
+      <span id="jres-cpt-${id}" style="font-size:12px;color:var(--red)">0 / ${JR_DESC_MIN} caractères minimum</span>
+      <span style="flex:1"></span>
+      <button class="btn btn-secondary btn-sm" onclick="loadJournal()">Annuler</button>
+      <button class="btn btn-primary btn-sm" id="jres-ok-${id}" disabled onclick="jrResoudre(${id})">Confirmer la résolution</button>
+    </div>`;
+  document.getElementById('jres-desc-'+id).focus();
+}
+function jrCompterResolution(id){
+  const n=document.getElementById('jres-desc-'+id).value.trim().replace(/\s+/g,' ').length;
+  const c=document.getElementById('jres-cpt-'+id);
+  c.textContent=n>=JR_DESC_MIN?`${n} caractères ✓`:`${n} / ${JR_DESC_MIN} caractères minimum`;
+  c.style.color=n>=JR_DESC_MIN?'var(--green)':'var(--red)';
+  document.getElementById('jres-ok-'+id).disabled=n<JR_DESC_MIN;
+}
+async function jrResoudre(id){
+  const description=document.getElementById('jres-desc-'+id).value.trim();
+  if(description.replace(/\s+/g,' ').length<JR_DESC_MIN) return notify(`La description doit contenir au moins ${JR_DESC_MIN} caractères.`,'err');
+  try{
+    await POST(`/journal/releves/${id}/resoudre`,{description});
+    notify('Écart marqué comme résolu : retiré des problèmes du journal.','ok');
+    loadJournal();
+  }catch(e){ notify(e.message,'err'); }
+}
+async function jrRouvrirResolution(id){
+  if(!confirm('Rouvrir cet écart ? Il réapparaîtra dans les problèmes du journal.')) return;
+  try{ await DEL(`/journal/releves/${id}/resoudre`); notify('Écart rouvert.','inf'); loadJournal(); }
+  catch(e){ notify(e.message,'err'); }
+}
+
 function renderJournal(data){
   const {entries,resume}=data;
   const taux=resume.taux_conformite??100;
@@ -17396,15 +17453,19 @@ function renderJournal(data){
 
   // ── Analyse : alertes + erreurs ───────────
   const alertDiv=document.getElementById('journal-alertes');
-  const problemes=entries.filter(e=>e.statut!=='ok');
+  const problemes=entries.filter(e=>e.statut==='alerte'||e.statut==='erreur');
+  const resolus=entries.filter(e=>e.statut==='resolu');
+  const blocResolus=_jrBlocResolus(resolus);
   if(!problemes.length){
     alertDiv.innerHTML=`<div class="card" style="padding:14px 18px;border-left:3px solid var(--green)">
       <div style="display:flex;align-items:center;gap:10px;color:var(--green)">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-        <span style="font-weight:700">Continuité parfaite — aucun décalage détecté</span>
+        <span style="font-weight:700">${resolus.length?'Aucun écart en suspens':'Continuité parfaite — aucun décalage détecté'}</span>
       </div>
-      <div style="color:var(--muted);font-size:14px;margin-top:5px">Tous les relevés s'enchaînent correctement. Les meters sont cohérents sur toute la période.</div>
-    </div>`;
+      <div style="color:var(--muted);font-size:14px;margin-top:5px">${resolus.length
+        ?`Aucun écart en suspens : ${resolus.length} écart${resolus.length>1?'s':''} justifié${resolus.length>1?'s':''} par la direction (voir ci-dessous).`
+        :"Tous les relevés s'enchaînent correctement. Les meters sont cohérents sur toute la période."}</div>
+    </div>${blocResolus}`;
   } else {
     const nbErr=problemes.filter(e=>e.statut==='erreur').length;
     const nbAl =problemes.filter(e=>e.statut==='alerte').length;
@@ -17462,8 +17523,14 @@ function renderJournal(data){
             <div class="janom-block-text">${esc(e.recommandation)}</div>
           </div>
         </div>
+        ${e.motif_saisie?`<div class="jres-pied"><span class="janom-block-title">Motif donné à la saisie</span> ${esc(e.motif_saisie)}</div>`:''}
+        ${e.en_attente
+          ?`<div class="jres-pied" style="color:var(--muted)">⏳ Rapport pompiste pas encore finalisé : l'écart pourra être résolu après la validation.</div>`
+          :`<div class="jres-pied" id="jres-pied-${e.id}">
+              <button class="btn btn-secondary btn-sm" onclick="jrOuvrirResolution(${e.id})">✓ Marquer comme résolu</button>
+            </div>`}
       </div>`;
-    }).join('');
+    }).join('')+blocResolus;
   }
 
   // ── Table journal complet ─────────────────
@@ -17497,7 +17564,9 @@ function renderJournal(data){
       ?`<span class="num" style="color:var(--blue2)">${e.metter_attendu.toFixed(3)}</span>`
       :'<span class="c-dim">1re lecture</span>';
 
-    const statHtml=isErr
+    const statHtml=e.statut==='resolu'
+      ?`<span style="color:var(--green);font-weight:700" title="${esc((e.resolution&&e.resolution.description)||'')}">✓ Résolu</span>`
+      :isErr
       ?'<span style="color:var(--red);font-weight:700">⛔ Erreur</span>'
       :isAl
         ?'<span style="color:var(--blue);font-weight:700">⚠ Alerte</span>'
