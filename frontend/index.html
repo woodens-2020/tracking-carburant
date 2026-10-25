@@ -13086,6 +13086,19 @@ function _ymdLocal(d){
   return `${y}-${m}-${j}`;
 }
 function todayStr(){ return _ymdLocal(new Date()); }
+// Date du calendrier d'un Date, telle que la voit l'ordinateur. Un Date créé
+// depuis une chaîne « AAAA-MM-JJ » vaut minuit UTC : on lit alors ses
+// composantes UTC (sinon il reculerait d'un jour en Haïti) ; tout autre Date
+// (maintenant, minuit local, calculs à partir de maintenant…) est lu en heure
+// locale. Remplace x.toISOString().slice(0,10), qui donnait la date UTC et
+// basculait au lendemain chaque soir à partir de 20 h (UTC-4).
+function _ymd(d){
+  if(!(d instanceof Date)) d = new Date(d);
+  if(isNaN(d)) return '';
+  if(d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0 && d.getUTCMilliseconds() === 0)
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+  return _ymdLocal(d);
+}
 
 // Flèches ◀ ▶ du sélecteur de date global (en-tête) : décale d'un jour et
 // déclenche le rechargement via l'écouteur 'change' du #date-picker.
@@ -15351,8 +15364,8 @@ function setRaDate(offset){
 }
 
 function setRaPreset(p){
-  const fmtD=x=>x.toISOString().slice(0,10);
-  const now=new Date(currentDate);
+  const fmtD=x=>_ymd(x);
+  const now=new Date(currentDate+'T00:00:00');
   let debut=currentDate, fin=currentDate;
   if(p==='today'){ debut=fin=currentDate; }
   else if(p==='yesterday'){
@@ -16173,7 +16186,7 @@ async function ouvrirFicheSynthese(debutArg, finArg){
   let fin = finArg, debut = debutArg;
   if(!fin){ fin = currentDate; }
   if(!debut){
-    const d = new Date(fin); d.setDate(d.getDate()-29);
+    const d = new Date(fin+'T00:00:00'); d.setDate(d.getDate()-29);
     const p2 = n=>String(n).padStart(2,'0');
     debut = `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
   }
@@ -19591,8 +19604,8 @@ async function genRapport(){
 
 /* ── Mode journalier (original) ── */
 async function _genRapportJour(date, pid, content){
-  const fmtD = x => x.toISOString().slice(0,10);
-  const d    = new Date(date);
+  const fmtD = x => _ymd(x);
+  const d    = new Date(date+'T00:00:00');
   const hier = new Date(d); hier.setDate(d.getDate()-1);
   const d7   = new Date(d); d7.setDate(d.getDate()-6);
   const d30  = new Date(d); d30.setDate(d.getDate()-29);
@@ -19638,11 +19651,11 @@ async function _genRapportJour(date, pid, content){
 
 /* ── Mode période (nouveau) ── */
 async function _genRapportPeriode(debut, fin, pid, content){
-  const fmtD=x=>x.toISOString().slice(0,10);
-  const days=Math.round((new Date(fin)-new Date(debut))/(1000*86400));
+  const fmtD=x=>_ymd(x);
+  const days=Math.round((new Date(fin+'T00:00:00')-new Date(debut+'T00:00:00'))/(1000*86400));
 
   /* Période précédente de même durée */
-  const prevFin =new Date(debut); prevFin.setDate(prevFin.getDate()-1);
+  const prevFin =new Date(debut+'T00:00:00'); prevFin.setDate(prevFin.getDate()-1);
   const prevDebut=new Date(prevFin); prevDebut.setDate(prevDebut.getDate()-days);
 
   let sUrl=(deb,fi)=>{ let u=`/stats?date_debut=${deb}&date_fin=${fi}`; if(pid) u+=`&produit_id=${pid}`; return u; };
@@ -19666,7 +19679,7 @@ async function _genRapportPeriode(debut, fin, pid, content){
   let evolution=[];
   if(days>32){
     const buckets=[];
-    let cur2=new Date(debut); const endD=new Date(fin);
+    let cur2=new Date(debut+'T00:00:00'); const endD=new Date(fin+'T00:00:00');
     while(cur2<=endD){
       const bS=new Date(cur2),bE=new Date(cur2);
       bE.setMonth(bE.getMonth()+1); bE.setDate(0);
@@ -19799,9 +19812,9 @@ function _buildRapportPeriodeHTML(debut,fin,days,cur,prev,rent,rentPrev,evolutio
   (rent?.produits||[]).forEach(p=>{ parProdRent[p.produit_nom]=p; });
 
   const debutFmt=frD(debut), finFmt=frD(fin);
-  const prevDebutD=new Date(debut); prevDebutD.setDate(prevDebutD.getDate()-(days+1));
-  const prevFinD  =new Date(debut); prevFinD.setDate(prevFinD.getDate()-1);
-  const prevLabel =`${frD(prevDebutD.toISOString().slice(0,10))} → ${frD(prevFinD.toISOString().slice(0,10))}`;
+  const prevDebutD=new Date(debut+'T00:00:00'); prevDebutD.setDate(prevDebutD.getDate()-(days+1));
+  const prevFinD  =new Date(debut+'T00:00:00'); prevFinD.setDate(prevFinD.getDate()-1);
+  const prevLabel =`${frD(_ymd(prevDebutD))} → ${frD(_ymd(prevFinD))}`;
 
   return `
   <!-- En-tête -->
@@ -20353,7 +20366,7 @@ function buildRapportHTML(d, date){
   if(d.par_periode['Apres-midi']?.montant===0)
                                    qualite.push({label:t('q.apm'),    status:'err', note:t('q.absent')});
   else                             qualite.push({label:t('q.apm'),    status:'ok',  note:t('q.ok')});
-  if(mois.jours_actifs<5)          qualite.push({label:t('q.hist'),   status:'err', note:`${mois.jours_actifs} / ${new Date(date).getDate()}`});
+  if(mois.jours_actifs<5)          qualite.push({label:t('q.hist'),   status:'err', note:`${mois.jours_actifs} / ${new Date(date+'T00:00:00').getDate()}`});
   else if(mois.jours_actifs<10)    qualite.push({label:t('q.hist'),   status:'warn',note:`${mois.jours_actifs} ${t('ra.j.actifs')}`});
   else                             qualite.push({label:t('q.hist'),   status:'ok',  note:`${mois.jours_actifs} ${t('ra.j.actifs')}`});
   if(d.nb_anomalies>0)             qualite.push({label:t('q.anom'),   status:'err', note:`${d.nb_anomalies}`});
@@ -21034,7 +21047,7 @@ function initReport(){
 }
 
 function setReportPreset(p){
-  const d=new Date(currentDate);
+  const d=new Date(currentDate+'T00:00:00');
   const fmt=x=>{const y=x.getFullYear(),m=String(x.getMonth()+1).padStart(2,'0'),dd=String(x.getDate()).padStart(2,'0');return`${y}-${m}-${dd}`;};
   let debut=currentDate, fin=currentDate;
   if(p==='today'){ debut=fin=currentDate; }
@@ -21095,18 +21108,18 @@ async function generateReport(){
     const [stats, rent] = await Promise.all([GET(statsUrl), GET(rentUrl)]);
 
     /* Calcul évolution mensuelle si période > 32 jours */
-    const days=(new Date(fin)-new Date(debut))/(1000*86400);
+    const days=(new Date(fin+'T00:00:00')-new Date(debut+'T00:00:00'))/(1000*86400);
     let evolution=[];
     if(days>32){
       const buckets=[];
-      let cur=new Date(debut);
-      const endD=new Date(fin);
+      let cur=new Date(debut+'T00:00:00');
+      const endD=new Date(fin+'T00:00:00');
       while(cur<=endD){
         const bStart=new Date(cur);
         const bEnd=new Date(cur);
         bEnd.setMonth(bEnd.getMonth()+1); bEnd.setDate(0);
         if(bEnd>endD) bEnd.setTime(endD.getTime());
-        const fmtD=x=>x.toISOString().slice(0,10);
+        const fmtD=x=>_ymd(x);
         buckets.push({label:bStart.toLocaleDateString('fr-HT',{month:'short',year:'2-digit'}),
                       from:fmtD(bStart),to:fmtD(bEnd)});
         cur.setMonth(cur.getMonth()+1); cur.setDate(1);
@@ -21147,8 +21160,8 @@ function renderReport(debut, fin, pidRaw, stats, rent, evolution){
   const nb=stats?.nb_jours_couverts||0;
   const nbR=stats?.nb_releves||0;
   const prodLabel=document.getElementById('rpt-prod')?.options[document.getElementById('rpt-prod').selectedIndex]?.text||'Tous les produits';
-  const debutFmt=new Date(debut).toLocaleDateString('fr-HT',{day:'numeric',month:'long',year:'numeric'});
-  const finFmt  =new Date(fin).toLocaleDateString('fr-HT',{day:'numeric',month:'long',year:'numeric'});
+  const debutFmt=new Date(debut+'T00:00:00').toLocaleDateString('fr-HT',{day:'numeric',month:'long',year:'numeric'});
+  const finFmt  =new Date(fin+'T00:00:00').toLocaleDateString('fr-HT',{day:'numeric',month:'long',year:'numeric'});
   const now=new Date().toLocaleString('fr-HT');
 
   /* Données par produit */
@@ -21934,7 +21947,7 @@ async function loadProfitEvolution(debut, fin, pid){
   const pad = n=>String(n).padStart(2,'0');
   const fmt = d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 
-  const d1 = new Date(debut), d2 = new Date(fin);
+  const d1 = new Date(debut+'T00:00:00'), d2 = new Date(fin+'T00:00:00');
   const buckets = [];
   let cur = new Date(d1.getFullYear(), d1.getMonth(), 1);
   while(cur <= d2){
@@ -22321,7 +22334,7 @@ async function revokeApiKey(){
 
 function initRapports(){
   const today = todayStr();
-  const d7 = new Date(Date.now() - 6*864e5).toISOString().split('T')[0];
+  const d7 = _ymd(new Date(Date.now() - 6*864e5));
   const debut = document.getElementById('rpt-date-debut');
   const fin   = document.getElementById('rpt-date-fin');
   if(debut && !debut.value) debut.value = d7;
@@ -22332,7 +22345,7 @@ function initRapports(){
 function rptQuickPick(val){
   if(!val) return;
   const today = new Date();
-  const fmt   = d => d.toISOString().split('T')[0];
+  const fmt   = d => _ymd(d);
   const debut = document.getElementById('rpt-date-debut');
   const fin   = document.getElementById('rpt-date-fin');
   if(val === 'today'){
@@ -22430,7 +22443,7 @@ function _rptMsg(msg, type){
 
 function initAudit(){
   const today = todayStr();
-  const d7    = new Date(Date.now() - 6*864e5).toISOString().split('T')[0];
+  const d7    = _ymd(new Date(Date.now() - 6*864e5));
   const debut = document.getElementById('aud-date-debut');
   const fin   = document.getElementById('aud-date-fin');
   if(debut && !debut.value) debut.value = d7;
@@ -22440,7 +22453,7 @@ function initAudit(){
 function audQuickPick(val){
   if(!val) return;
   const today = new Date();
-  const fmt   = d => d.toISOString().split('T')[0];
+  const fmt   = d => _ymd(d);
   const debut = document.getElementById('aud-date-debut');
   const fin   = document.getElementById('aud-date-fin');
   if(val === 'week'){
@@ -23535,8 +23548,8 @@ async function supprimerAchat(id){
 
 function initStatistiques(){
   const fin   = currentDate;
-  const d     = new Date(fin); d.setDate(d.getDate()-29);
-  const debut = d.toISOString().slice(0,10);
+  const d     = new Date(fin+'T00:00:00'); d.setDate(d.getDate()-29);
+  const debut = _ymd(d);
   document.getElementById('st-debut').value = debut;
   document.getElementById('st-fin').value   = fin;
   const sel = document.getElementById('st-prod');
@@ -23567,14 +23580,14 @@ function _stFiltrerPompes(){
 function setStPreset(preset, btn){
   document.querySelectorAll('[data-sp]').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  const now = new Date(currentDate);
+  const now = new Date(currentDate+'T00:00:00');
   const pad = n => String(n).padStart(2,'0');
   const fmt = dt => `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
   let d1, d2 = currentDate;
   if(preset==='hier'){
     const t=new Date(now); t.setDate(t.getDate()-1); d1=d2=fmt(t);
-  } else if(preset==='7j'){ const t=new Date(now); t.setDate(t.getDate()-6); d1=t.toISOString().slice(0,10); }
-  else if(preset==='30j'){ const t=new Date(now); t.setDate(t.getDate()-29); d1=t.toISOString().slice(0,10); }
+  } else if(preset==='7j'){ const t=new Date(now); t.setDate(t.getDate()-6); d1=_ymd(t); }
+  else if(preset==='30j'){ const t=new Date(now); t.setDate(t.getDate()-29); d1=_ymd(t); }
   else if(preset==='mois'){ d1=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`; }
   else if(preset==='semd'){
     const jourIso = (now.getDay()+6)%7; // 0=lundi
@@ -23586,7 +23599,7 @@ function setStPreset(preset, btn){
     const firstPrev = new Date(now.getFullYear(), now.getMonth()-1, 1);
     const lastPrev  = new Date(now.getFullYear(), now.getMonth(), 0);
     d1=fmt(firstPrev); d2=fmt(lastPrev);
-  } else if(preset==='trim'){ const t=new Date(now); t.setDate(t.getDate()-89); d1=t.toISOString().slice(0,10); }
+  } else if(preset==='trim'){ const t=new Date(now); t.setDate(t.getDate()-89); d1=_ymd(t); }
   else if(preset==='an'){ d1=`${now.getFullYear()}-01-01`; }
   else if(preset==='and'){ d1=`${now.getFullYear()-1}-01-01`; d2=`${now.getFullYear()-1}-12-31`; }
   document.getElementById('st-debut').value = d1;
@@ -24963,7 +24976,7 @@ function _gidGroupTrend(serie){
     const d = new Date(pt.date+'T00:00:00');
     if(_gidGran === 'semaine'){
       const mon = new Date(d); mon.setDate(d.getDate() - d.getDay() + 1);
-      key = mon.toISOString().slice(0,10);
+      key = _ymd(mon);
     } else {
       key = pt.date.slice(0,7)+'-01';
     }
@@ -25812,7 +25825,7 @@ async function _pcxLoadStockDept(){
 }
 
 // ── Reporting par période (GET /pos/caisses/rapport) ──────────────────
-function _pcxDateISO(d){ return d.toISOString().slice(0,10); }
+function _pcxDateISO(d){ return _ymd(d); }
 
 function pcxRapportPreset(type){
   const fin = new Date();
@@ -26724,7 +26737,7 @@ async function loadPosDashboardBar(){
   const deb7  = new Date(); deb7.setDate(deb7.getDate() - 6);
   const deb = document.getElementById('posdb-f-debut');
   const fin = document.getElementById('posdb-f-fin');
-  if(deb && !deb.value) deb.value = deb7.toISOString().split('T')[0];
+  if(deb && !deb.value) deb.value = _ymd(deb7);
   if(fin && !fin.value) fin.value = today;
   _posDbSetActivePreset('7j');
 
@@ -26812,7 +26825,7 @@ function _posDbUpdateSubtitle(meta, caissId, mode){
 
 function _posDbPreset(range){
   const now   = new Date();
-  const fmt   = d => d.toISOString().split('T')[0];
+  const fmt   = d => _ymd(d);
   let deb = now, fin = now;
   if(range === 'yesterday'){
     deb = new Date(now); deb.setDate(now.getDate()-1);
@@ -30574,7 +30587,7 @@ async function loadPosVentes(){
 
   // Défaut : 7 derniers jours pour toujours avoir des données visibles
   const _now = new Date();
-  const _fmt = d => d.toISOString().split('T')[0];
+  const _fmt = d => _ymd(d);
   const _deb7 = new Date(_now); _deb7.setDate(_now.getDate() - 6);
   const debEl0 = document.getElementById('pos-ventes-debut');
   const finEl0 = document.getElementById('pos-ventes-fin');
@@ -30585,7 +30598,7 @@ async function loadPosVentes(){
 
 function posVentesPreset(range){
   const now = new Date();
-  const fmt = d => d.toISOString().split('T')[0];
+  const fmt = d => _ymd(d);
   let deb = now, fin = now;
   if(range === 'today'){
     /* deb/fin = aujourd'hui */
@@ -31737,8 +31750,8 @@ let _posChartCat = null, _posChartTop = null;
 
 async function loadPosRentabilite(){
   const today = new Date();
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-  const lastDay  = today.toISOString().split('T')[0];
+  const firstDay = _ymd(new Date(today.getFullYear(), today.getMonth(), 1));
+  const lastDay  = _ymd(today);
   const deb = document.getElementById('pos-rent-debut');
   const fin = document.getElementById('pos-rent-fin');
   if(deb && !deb.value) deb.value = firstDay;
@@ -31878,9 +31891,9 @@ function gcSetTab(tab){
 
 function gcResetFiltres(){
   const today = new Date();
-  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  const first = _ymd(new Date(today.getFullYear(), today.getMonth(), 1));
   document.getElementById('gc-debut').value = first;
-  document.getElementById('gc-fin').value   = today.toISOString().split('T')[0];
+  document.getElementById('gc-fin').value   = _ymd(today);
   document.getElementById('gc-filtre-produit').value = '';
   document.getElementById('gc-filtre-cat').value     = '';
   gcCharger();
@@ -31888,11 +31901,11 @@ function gcResetFiltres(){
 
 async function loadPosGrandeCaisse(){
   const today = new Date();
-  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  const first = _ymd(new Date(today.getFullYear(), today.getMonth(), 1));
   const deb = document.getElementById('gc-debut');
   const fin = document.getElementById('gc-fin');
   if(deb && !deb.value) deb.value = first;
-  if(fin && !fin.value) fin.value = today.toISOString().split('T')[0];
+  if(fin && !fin.value) fin.value = _ymd(today);
 
   // Charger les produits bar pour le filtre
   try {
@@ -32035,7 +32048,7 @@ let _anaSortAsc   = true;
 async function loadPosAnalyse(){
   const today  = new Date();
   const il30   = new Date(today); il30.setDate(today.getDate() - 29);
-  const fmt    = d => d.toISOString().split('T')[0];
+  const fmt    = d => _ymd(d);
 
   const eDeb = document.getElementById('ana-evo-debut');
   const eFin = document.getElementById('ana-evo-fin');
@@ -32175,7 +32188,7 @@ function anaSetTab(tab){
 function anaEvoPeriode(jours){
   const today = new Date();
   const debut = new Date(today); debut.setDate(debut.getDate() - jours + 1);
-  const fmt = d => d.toISOString().split('T')[0];
+  const fmt = d => _ymd(d);
   document.getElementById('ana-evo-debut').value = fmt(debut);
   document.getElementById('ana-evo-fin').value   = fmt(today);
   anaChargerEvolution();
@@ -32399,7 +32412,7 @@ function anaRentPeriode(periode){
   if(periode === 'mois')     debut = new Date(today.getFullYear(), today.getMonth(), 1);
   else if(periode === 'trim'){ debut = new Date(today); debut.setMonth(debut.getMonth() - 3); }
   else                       { debut = new Date(today); debut.setFullYear(debut.getFullYear() - 1); }
-  const fmt = d => d.toISOString().split('T')[0];
+  const fmt = d => _ymd(d);
   document.getElementById('ana-rent-debut').value = fmt(debut);
   document.getElementById('ana-rent-fin').value   = fmt(today);
   anaChargerRentabilite();
@@ -33862,8 +33875,8 @@ async function ckPlatActiver(id){
 
 async function loadCuisineDepenses(){
   const today = new Date();
-  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-  const fmt   = d => d.toISOString().split('T')[0];
+  const first = _ymd(new Date(today.getFullYear(), today.getMonth(), 1));
+  const fmt   = d => _ymd(d);
   const dDeb  = document.getElementById('dep-debut');
   const dFin  = document.getElementById('dep-fin');
   if(dDeb && !dDeb.value) dDeb.value = first;
@@ -34028,7 +34041,7 @@ async function loadCuisineVentes(){
 function ckVentesPeriode(jours){
   const today = new Date();
   const debut = jours === 0 ? today : new Date(today); if(jours>0) debut.setDate(debut.getDate()-jours+1);
-  const fmt   = d => d.toISOString().split('T')[0];
+  const fmt   = d => _ymd(d);
   document.getElementById('ventes-debut').value = fmt(debut);
   document.getElementById('ventes-fin').value   = fmt(today);
   ckVentesCharger();
@@ -34156,8 +34169,8 @@ async function ckVenteAnnuler(id){
 
 async function loadCuisineStats(){
   const today = new Date();
-  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-  const fmt   = d => d.toISOString().split('T')[0];
+  const first = _ymd(new Date(today.getFullYear(), today.getMonth(), 1));
+  const fmt   = d => _ymd(d);
   const sDeb  = document.getElementById('stats-debut');
   const sFin  = document.getElementById('stats-fin');
   if(sDeb && !sDeb.value) sDeb.value = first;
@@ -34171,7 +34184,7 @@ function ckStatsPeriode(periode){
   if(periode === 'mois')     debut = new Date(today.getFullYear(), today.getMonth(), 1);
   else if(periode === 'trim'){ debut = new Date(today); debut.setMonth(debut.getMonth()-3); }
   else                       { debut = new Date(today); debut.setFullYear(debut.getFullYear()-1); }
-  const fmt = d => d.toISOString().split('T')[0];
+  const fmt = d => _ymd(d);
   document.getElementById('stats-debut').value = fmt(debut);
   document.getElementById('stats-fin').value   = fmt(today);
   ckStatsCharger();
@@ -34306,8 +34319,8 @@ let _ckAchatsData = [];
 
 async function loadCuisineAchats(){
   const today = new Date();
-  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-  const fmt = d => d.toISOString().split('T')[0];
+  const first = _ymd(new Date(today.getFullYear(), today.getMonth(), 1));
+  const fmt = d => _ymd(d);
   const deb = document.getElementById('ckac-debut');
   const fin = document.getElementById('ckac-fin');
   if(deb && !deb.value) deb.value = first;
@@ -34755,8 +34768,8 @@ const _CKA_STATUT_LABEL = {
 
 async function loadCuisineAnalyse(){
   const today = new Date();
-  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-  const fmt   = d => d.toISOString().split('T')[0];
+  const first = _ymd(new Date(today.getFullYear(), today.getMonth(), 1));
+  const fmt   = d => _ymd(d);
   ['cka-syn-debut','cka-lots-debut'].forEach(id=>{
     const el = document.getElementById(id);
     if(el && !el.value) el.value = first;
@@ -34804,7 +34817,7 @@ function ckaSynthesePeriode(periode){
     deb = new Date(today.getFullYear(), 0, 1);
     fin = today;
   }
-  const fmt = d => d.toISOString().split('T')[0];
+  const fmt = d => _ymd(d);
   document.getElementById('cka-syn-debut').value = fmt(deb);
   document.getElementById('cka-syn-fin').value   = fmt(fin);
   ckaSyntheseCharger();
@@ -35758,8 +35771,8 @@ function _hdVarBadge(cur, prv){
 
 async function loadHotelDashboard(){
   const today = new Date();
-  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-  const fmt   = d => d.toISOString().split('T')[0];
+  const first = _ymd(new Date(today.getFullYear(), today.getMonth(), 1));
+  const fmt   = d => _ymd(d);
   const deb = document.getElementById('hd-debut');
   const fin = document.getElementById('hd-fin');
   if(deb && !deb.value) deb.value = first;
@@ -35777,7 +35790,7 @@ function hotelDashPeriode(periode){
   } else {
     deb = new Date(today.getFullYear(), today.getMonth(), 1);
   }
-  const fmt = d => d.toISOString().split('T')[0];
+  const fmt = d => _ymd(d);
   document.getElementById('hd-debut').value = fmt(deb);
   document.getElementById('hd-fin').value   = fmt(today);
   hotelDashCharger();
@@ -36887,8 +36900,8 @@ let _hdepData = [];
 
 async function loadHotelDepenses(){
   const today = new Date();
-  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-  const fmt   = d => d.toISOString().split('T')[0];
+  const first = _ymd(new Date(today.getFullYear(), today.getMonth(), 1));
+  const fmt   = d => _ymd(d);
   const dDeb  = document.getElementById('hdep-debut');
   const dFin  = document.getElementById('hdep-fin');
   if(dDeb && !dDeb.value) dDeb.value = first;
@@ -38169,7 +38182,7 @@ function zellePreFondXLS(){
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href     = url;
-  a.download = 'rapport-zelle-'+now.toISOString().substring(0,10)+'.xls';
+  a.download = 'rapport-zelle-'+_ymd(now)+'.xls';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -38251,7 +38264,7 @@ function zelleImprimerRecu(id){
 
   const taux    = t.taux_applique || _zelleConfig.taux || 130;
   const now     = new Date();
-  const rawDate = t.date_transaction ? t.date_transaction.substring(0,10) : now.toISOString().substring(0,10);
+  const rawDate = t.date_transaction ? t.date_transaction.substring(0,10) : _ymd(now);
   const dp      = rawDate.split('-');
   const dateAff = dp[2]+'/'+dp[1]+'/'+dp[0];
   const heureAff= String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
