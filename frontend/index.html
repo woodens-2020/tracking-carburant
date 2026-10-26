@@ -3289,6 +3289,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .gl-outils{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px}
 .gl-rang{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .gl-espace{flex:1}
+.gl-barre .gl-icone{height:34px}
 .gl-seg{display:inline-flex;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px}
 .gl-seg button{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:7px;background:none;color:var(--muted);border:0;cursor:pointer;white-space:nowrap}
 .gl-seg button:hover{color:var(--text)}
@@ -3337,7 +3338,11 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .gl-barre{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}
 .gl-sel{font-size:13px;color:var(--muted)}
 .gl-carte{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow-x:auto}
-.gl-tbl{width:100%;border-collapse:collapse;font-size:13.5px;min-width:760px;table-layout:fixed}
+.gl-tbl{width:100%;border-collapse:collapse;font-size:13.5px;min-width:640px}
+.gl-registre{min-width:0}
+@media (max-width:1100px){ .gl-registre td,.gl-registre th{padding-left:10px;padding-right:10px} .gl-registre .r{font-size:12.5px} .gl-desc{padding-left:26px!important} .gl-desc .gl-point{left:10px} }
+@media (max-width:600px){ .gl-registre{min-width:540px} }
+.gl-registre th.r,.gl-registre td.r{width:1%}
 .gl-tbl th{text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--border);background:var(--panel)}
 .gl-tbl td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
 .gl-tbl .r{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -3352,8 +3357,10 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .gl-type{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gl-point{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
 .gl-point.D{background:var(--green)} .gl-point.C{background:var(--red)}
-.gl-desc div{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gl-desc small{display:block;color:var(--muted);font-size:12px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gl-desc{position:relative;padding-left:30px!important}
+.gl-desc .gl-point{position:absolute;left:14px;top:15px;margin:0}
+.gl-desc div{font-weight:600;color:var(--text);overflow-wrap:anywhere}
+.gl-desc small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px;overflow-wrap:anywhere}
 .gl-qui{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gl-etiq{display:inline-block;font-size:11px;font-weight:700;padding:1px 6px;border-radius:5px;margin-left:6px;background:rgba(239,68,68,.12);color:var(--red);vertical-align:1px}
 .gl-etiq.retard{background:rgba(249,115,22,.14);color:var(--orange)}
@@ -3374,7 +3381,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 @media (max-width:720px){
   .gl-rang>.gl-seg{width:100%;overflow-x:auto} .gl-seg button{padding:6px 10px}
   .gl-dates{flex:1 1 100%} .gl-dates input{flex:1;width:auto;min-width:0}
-  .gl-espace{display:none} .gl-icone{flex:1}
+  .gl-barre .gl-espace{display:none}
   .gl-resume b{font-size:17px} .gl-resume .s b{font-size:18px}
 }
 .dep-presets{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
@@ -20259,9 +20266,6 @@ function glRendre(focus){
         .map(([k,l]) => `<button class="${f.preset===k?'on':''}" onclick="glPeriode('${k}')">${l}</button>`).join('')}</div>
       <div class="gl-dates"><input type="date" class="filter-input" value="${f.debut}" max="${currentDate}" onchange="glDate('debut', this.value)" aria-label="Du">
         <span>→</span><input type="date" class="filter-input" value="${f.fin}" max="${currentDate}" onchange="glDate('fin', this.value)" aria-label="Au"></div>
-      <span class="gl-espace"></span>
-      <button class="gl-icone" onclick="glExporter()" title="Exporter vers Excel (CSV)">⬇ Excel</button>
-      <button class="gl-icone" onclick="glImprimer()" title="Imprimer">⎙ Imprimer</button>
     </div>
     <div class="gl-rang">
       <div class="gl-recherche"><span>⌕</span><input id="gl-q" value="${esc(f.q)}" placeholder="Rechercher : description, n°, bénéficiaire, référence…" oninput="glFiltre('q', this.value)"></div>
@@ -20308,6 +20312,9 @@ function glRendre(focus){
     <div class="gl-seg">${[['journal','Journal'],['comptes','Par compte'],['jours','Par jour']]
       .map(([k,l]) => `<button class="${GL.vue===k?'on':''}" onclick="GL.vue='${k}';glRendre()">${l}</button>`).join('')}</div>
     <span class="gl-sel">${sel.length} opération${sel.length>1?'s':''}${actif?` · <span class="gl-dv">+${_glG(sD)}</span> <span class="gl-cv">−${_glG(sC)}</span> · net <b>${_glG(sD-sC)}</b>`:''}</span>
+    <span class="gl-espace"></span>
+    <button class="gl-icone" onclick="glExporter()" title="Exporter vers Excel (CSV)">⬇ Excel</button>
+    <button class="gl-icone" onclick="glImprimer()" title="Imprimer">⎙ Imprimer</button>
   </div>
   ${GL.vue === 'comptes' ? _glParCompte(d) : GL.vue === 'jours' ? _glParJour(d) : _glRegistre(lignes, sD, sC)}`;
 
@@ -20323,26 +20330,26 @@ function _glRegistre(lignes, sD, sC){
     if(x.date !== jour){
       jour = x.date; const j = finJour[jour];
       const libJ = _pspJour(jour);
-      h += `<tr class="gl-jour"><td colspan="3"><b>${libJ.charAt(0).toUpperCase() + libJ.slice(1)}</b><span>${_glJours(x.jours)}</span></td>
+      h += `<tr class="gl-jour"><td><b>${libJ.charAt(0).toUpperCase() + libJ.slice(1)}</b><span>${_glJours(x.jours)}</span></td>
         <td class="r gl-dv">${j&&j.debit?'+'+_glG(j.debit):''}</td><td class="r gl-cv">${j&&j.credit?'−'+_glG(j.credit):''}</td>
         <td class="r" title="Solde en fin de journée">${j?_glG(j.solde):''}</td></tr>`;
     }
     const ouvert = GL.ouvert === x.cle;
-    const sous = [(x.compte && (x.description||'').startsWith(x.compte)) ? null : x.compte, x.tiers && !(x.description||'').includes(x.tiers) ? x.tiers : null, x.reference ? 'Réf. ' + x.reference : null].filter(Boolean);
+    const sous = [x.type_lib, (x.compte && (x.description||'').startsWith(x.compte)) ? null : x.compte,
+                  x.tiers && !(x.description||'').includes(x.tiers) ? x.tiers : null, x.reference ? 'Réf. ' + x.reference : null,
+                  x.saisi_par ? 'par ' + x.saisi_par : null].filter(Boolean);
     h += `<tr class="gl-l ${x.annulee?'gl-annulee':''} ${ouvert?'ouvert':''}" onclick="glOuvrir('${x.cle}')">
-      <td class="gl-type"><span class="gl-point ${x.sens}"></span>${esc(x.type_lib)}</td>
-      <td class="gl-desc"><div>${esc(x.description||'')}${x.annulee?' <span class="gl-etiq">annulée</span>':''}</div>
+      <td class="gl-desc"><span class="gl-point ${x.sens}"></span><div>${esc(x.description||'')}${x.annulee?' <span class="gl-etiq">annulée</span>':''}${(x.retard_saisie||0)>2?`<span class="gl-etiq retard" title="Enregistrée ${x.retard_saisie} jours après sa date">saisie +${x.retard_saisie} j</span>`:''}</div>
         <small>${sous.map(esc).join(' · ')}</small></td>
-      <td class="gl-qui">${esc(x.saisi_par||'—')}${(x.retard_saisie||0)>2?`<span class="gl-etiq retard" title="Enregistrée ${x.retard_saisie} jours après sa date">+${x.retard_saisie} j</span>`:''}</td>
       <td class="r gl-dv">${x.debit?_glG(x.debit):''}</td>
       <td class="r gl-cv">${x.credit?_glG(x.credit):''}</td>
       <td class="r gl-solde ${x.solde<0?'neg':''}">${_glG(x.solde)}</td></tr>`;
-    if(ouvert) h += `<tr class="gl-detail"><td colspan="6">${_glDetail(x)}</td></tr>`;
+    if(ouvert) h += `<tr class="gl-detail"><td colspan="4">${_glDetail(x)}</td></tr>`;
   }
-  return `<div class="gl-carte"><table class="gl-tbl"><colgroup><col style="width:160px"><col><col style="width:140px"><col style="width:130px"><col style="width:130px"><col style="width:140px"></colgroup>
-    <thead><tr><th>Type</th><th>Opération</th><th>Saisi par</th><th class="r">Entrée</th><th class="r">Sortie</th><th class="r">Solde</th></tr></thead>
+  return `<div class="gl-carte"><table class="gl-tbl gl-registre">
+    <thead><tr><th>Opération</th><th class="r">Entrée</th><th class="r">Sortie</th><th class="r">Solde</th></tr></thead>
     <tbody>${h}</tbody>
-    <tfoot><tr><td colspan="3">${_glFiltreActif()?'Total de la sélection':'Total de la période'}</td>
+    <tfoot><tr><td>${_glFiltreActif()?'Total de la sélection':'Total de la période'}</td>
       <td class="r gl-dv">${_glG(sD)}</td><td class="r gl-cv">${_glG(sC)}</td><td class="r">${_glFiltreActif()?'':_glG(GL.data.solde_cloture)}</td></tr></tfoot></table>
     ${lignes.length > GL.limite ? `<div class="gl-plus-lignes"><button onclick="GL.limite+=400;glRendre()">Afficher la suite (${lignes.length-GL.limite} opérations)</button></div>` : ''}
   </div>`;

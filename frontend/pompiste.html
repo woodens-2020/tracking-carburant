@@ -40,7 +40,7 @@ header{display:flex;align-items:center;gap:14px;padding:14px 24px;background:var
   border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
 header .marque{font-weight:900;font-size:20px;letter-spacing:.03em}
 .langues{margin-left:auto;display:flex;background:var(--bg);border:2px solid var(--border);border-radius:14px;padding:3px;gap:3px}
-.langues button{font:inherit;font-weight:800;font-size:15px;border:0;border-radius:10px;padding:8px 14px;cursor:pointer;
+.langues button{font:inherit;font-weight:800;font-size:15px;border:0;border-radius:10px;padding:8px 14px;min-height:40px;cursor:pointer;
   background:transparent;color:var(--muted)}
 .langues button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 header .qui{text-align:right;line-height:1.2}
@@ -192,6 +192,11 @@ td.r,th.r{text-align:right;white-space:nowrap}
 .dlg-btns .btn{min-height:60px;font-size:18px}
 .dlg.danger #dlg-oui{background:var(--err)}
 @media (max-width:420px){ .dlg-btns{grid-template-columns:1fr} .dlg-btns #dlg-oui{order:-1} }
+.reprise{display:flex;align-items:center;gap:12px;background:var(--accent-soft);border:2px solid var(--accent);border-radius:16px;
+  padding:12px 14px;margin-bottom:14px}
+.reprise-ico{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:#fff;font-size:20px;font-weight:900}
+.reprise div{flex:1;min-width:0} .reprise b{display:block;font-size:17px} .reprise div span{display:block;font-size:15px;color:var(--muted)}
+.reprise button{flex:none;font:inherit;font-weight:800;font-size:16px;min-height:44px;padding:0 18px;border-radius:12px;border:0;background:var(--accent);color:#fff;cursor:pointer}
 .note-flash{position:fixed;left:50%;top:76px;transform:translateX(-50%);z-index:40;background:var(--text);color:var(--bg);
   font-weight:800;border-radius:14px;padding:12px 18px;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:calc(100vw - 32px);text-align:center}
 
@@ -403,7 +408,7 @@ const TXT = {
     toucher_case:'Touchez une case, puis tapez le nombre sur le clavier.',
     fin_sup:'L\'index de fin doit être plus grand que l\'index de début.', vendus:'vendus', tapez_deux:'Tapez les deux index',
     suivante:'Pompe suivante →', verifier:'Vérifier', verif_compteurs:'Vérifiez vos compteurs',
-    pompe:'Pompe', debut:'Début', fin:'Fin', gallons:'Gallons', total:'Total', montant:'Montant', modifier:'Modifier',
+    pompe:'Pompe', debut:'Début', fin:'Fin', gallons:'Gallons', total:'Total', montant:'Montant', modifier:'✏️ Modifier',
     argent_fin:'L\'argent se compte à la fin, quand vous aurez fini toutes vos pompes.',
     envoyer_compteurs:'Envoyer les compteurs', envoi:'Envoi…',
     autre_q:'Avez-vous d\'autres pompes pour cette période ?', autre_sub:'Vos compteurs {p} sont enregistrés.',
@@ -413,7 +418,7 @@ const TXT = {
     compter:'Comptez l\'argent', compter_sub:'Tout l\'argent de la période. Touchez un billet, puis tapez combien vous en avez.',
     billet:'Billet', nb_billets:'Nombre de billets', monnaie:'Monnaie', monnaie_sub:'pièces, en gourdes', montant_g:'Montant (G)',
     total_compte:'Total compté', voir_resume:'Voir le résumé →',
-    resume:'Résumé de mon rapport', resume_sub:'Vérifiez tout. Touchez « Modifier » s\'il y a une erreur.',
+    resume:'Résumé de mon rapport', resume_sub:'Vérifiez tout. Touchez ✏️ « Modifier » s\'il y a une erreur.',
     mes_compteurs:'Mes compteurs', mon_argent:'Mon argent', aucun_argent:'Aucun argent saisi.', argent_compte:'Argent compté',
     juste:'Caisse juste', manque:'Il manque', plus:'En plus', ecart:'Écart',
     un_mot:'Un mot pour la direction ? (facultatif)', un_mot_ph:'Ex. : client parti sans payer…',
@@ -446,7 +451,7 @@ const TXT = {
     sortir_txt_brouillon:'Votre rapport n\'est pas terminé. Pas d\'inquiétude : tout ce que vous avez saisi est gardé, vous le retrouverez en revenant.',
     oui_sortir:'Oui, sortir', rester:'Non, rester', quitter_titre:'Quitter l\'application ?', quitter_txt:'Vous pourrez la rouvrir avec l\'icône Konekta Ponpis.',
     oui_quitter:'Oui, quitter', changer_titre:'Changer ?', changer_txt:'Vous avez déjà saisi des index. Si vous changez, ils seront effacés.',
-    oui_changer:'Oui, changer', recupere:'Nous avons repris là où vous en étiez.',
+    oui_changer:'Oui, changer', recupere:'Nous avons repris là où vous en étiez.', reprise_titre:'Votre travail est récupéré', reprise_txt:'L\'application s\'était fermée, rien n\'est perdu : vous reprenez là où vous en étiez.',
     veille_titre:'Vous êtes toujours là ?', veille_txt:'Pour protéger votre compte, déconnexion dans {s} secondes. Votre saisie est gardée.',
     veille_oui:'Je suis là, continuer', veille_non:'Me déconnecter',
     imprimer:'Imprimer la fiche', reimprimer:'Réimprimer', papier:'Papier',
@@ -481,7 +486,7 @@ const TXT = {
     toucher_case:'Touche yon kaz, epi tape nimewo a sou klavye a.',
     fin_sup:'Endèks fen an dwe pi gwo pase endèks kòmansman an.', vendus:'vann', tapez_deux:'Tape de endèks yo',
     suivante:'Ponp swivan →', verifier:'Verifye', verif_compteurs:'Verifye kontè ou yo',
-    pompe:'Ponp', debut:'Kòmansman', fin:'Fen', gallons:'Galon', total:'Total', montant:'Kantite lajan', modifier:'Chanje',
+    pompe:'Ponp', debut:'Kòmansman', fin:'Fen', gallons:'Galon', total:'Total', montant:'Kantite lajan', modifier:'✏️ Chanje',
     argent_fin:'W ap konte lajan an alafen, lè w fin antre tout ponp ou yo.',
     envoyer_compteurs:'Voye kontè yo', envoi:'N ap voye…',
     autre_q:'Èske w gen lòt ponp pou peryòd sa a ?', autre_sub:'Kontè {p} ou yo anrejistre.',
@@ -491,7 +496,7 @@ const TXT = {
     compter:'Konte lajan an', compter_sub:'Tout lajan peryòd la. Touche yon biyè, epi tape konbyen ou genyen.',
     billet:'Biyè', nb_billets:'Kantite biyè', monnaie:'Monnen', monnaie_sub:'pyès, an goud', montant_g:'Kantite (G)',
     total_compte:'Total ou konte', voir_resume:'Wè rezime a →',
-    resume:'Rezime rapò mwen', resume_sub:'Verifye tout bagay. Touche « Chanje » si gen yon erè.',
+    resume:'Rezime rapò mwen', resume_sub:'Verifye tout bagay. Touche ✏️ « Chanje » si gen yon erè.',
     mes_compteurs:'Kontè mwen yo', mon_argent:'Lajan mwen', aucun_argent:'Ou pa antre okenn lajan.', argent_compte:'Lajan ou konte',
     juste:'Kès la jis', manque:'Gen lajan ki manke', plus:'Gen lajan an plis', ecart:'Diferans',
     un_mot:'Yon mo pou direksyon an ? (si ou vle)', un_mot_ph:'Egz. : yon kliyan ale san l pa peye…',
@@ -524,7 +529,7 @@ const TXT = {
     sortir_txt_brouillon:'Rapò ou a poko fini. Pa enkyete w : n ap kenbe tout sa ou te antre yo, w ap jwenn yo lè ou tounen.',
     oui_sortir:'Wi, soti', rester:'Non, rete', quitter_titre:'Kite aplikasyon an ?', quitter_txt:'W ap ka relouvri l ak ikòn Konekta Ponpis la.',
     oui_quitter:'Wi, kite l', changer_titre:'Chanje ?', changer_txt:'Ou te deja antre kèk endèks. Si ou chanje, sa ou te antre yo pral efase.',
-    oui_changer:'Wi, chanje', recupere:'Nou rekipere kote ou te ye a.',
+    oui_changer:'Wi, chanje', recupere:'Nou rekipere kote ou te ye a.', reprise_titre:'Nou rekipere travay ou a', reprise_txt:'Aplikasyon an te fèmen, men anyen pa pèdi : ou kontinye kote ou te rive a.',
     veille_titre:'Ou la toujou ?', veille_txt:'Pou pwoteje kont ou, n ap dekonekte w nan {s} segonn. Sa ou te antre yo ap rete.',
     veille_oui:'Mwen la, kontinye', veille_non:'Dekonekte m',
     imprimer:'Enprime fich la', reimprimer:'Re-enprime', papier:'Papye',
@@ -555,6 +560,8 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const nf = (n,d=0) => Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const G = n => nf(n) + ' G';
+// Gallons et index : jusqu'à 3 décimales, sans zéros inutiles (120,5 et non 120,500)
+const nfg = n => Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:3});
 const signe = n => (n > 0 ? '+' : '') + G(n);
 const per = p => t(p);
 const num = v => { if(v == null || String(v).trim() === '') return null;
@@ -655,7 +662,7 @@ async function chargerContexte(){
     if(!S._repriseFaite){                     // une seule fois après la connexion
       S._repriseFaite = true;
       if(restaurerBrouillon()){
-        flash(t('recupere'));
+        S.repris = true;
         if(!S.ctx.en_cours && S.date && S.periode && (S.ctx.date !== S.date || S.ctx.periode !== S.periode)) return chargerContexte();
       }
     }
@@ -738,7 +745,7 @@ const pompeCtx = id => { for(const p of S.ctx.produits) for(const q of p.pompes)
 const libres = p => p.pompes.filter(q => !q.deja_rapportee);
 const PHASE_ARGENT = ['billetterie','resume','modif'];
 
-function aller(etape){ S.etape = etape; rendre(); }
+function aller(etape){ S.etape = etape; S.repris = false; rendre(); }
 function precedent(){
   const e = S.etape;
   if(e === 'index' && S.pos > 0){ S.pos--; S.champActif = null; return rendre(); }
@@ -757,7 +764,10 @@ function entete(titrePhase){
   if(S.choisies.length && ['index','compteurs'].includes(S.etape)) puces.push(t('n_pompes', {n: S.choisies.length}));
   const phase = titrePhase ?? (PHASE_ARGENT.includes(S.etape) ? t('etape2') : t('etape1'));
   const avecRetour = !['charte','rapport'].includes(S.etape);
-  return `<div class="fil">${avecRetour ? `<button class="retour" onclick="precedent()">${t('retour')}</button>` : ''}
+  return `${S.repris ? `<div class="reprise" role="status"><span class="reprise-ico">↺</span>
+        <div><b>${t('reprise_titre')}</b><span>${t('reprise_txt')}</span></div>
+        <button onclick="S.repris=false;this.parentNode.remove()">OK</button></div>` : ''}
+    <div class="fil">${avecRetour ? `<button class="retour" onclick="precedent()">${t('retour')}</button>` : ''}
       <span class="pas">${phase}</span></div>
     ${puces.length ? `<div class="resume">${puces.map(p=>`<span>${esc(p)}</span>`).join('')}</div>` : ''}`;
 }
@@ -951,7 +961,7 @@ function ecranIndex(id, prix, titreHaut, fin){
     const ok = v.av != null && v.ap != null && v.g >= 0 && !diff;
     $('i-calc').innerHTML = v.g == null ? ''
       : (v.g < 0 ? `<div class="msg-err">${t('fin_sup')}</div>`
-                 : `<div class="calcul"><span>${nf(v.g,3)} gal</span><span>${G(v.g * prix)}</span></div>`);
+                 : `<div class="calcul"><span>${nfg(v.g)} gal</span><span>${G(v.g * prix)}</span></div>`);
     // Début à relire : le bouton de confirmation prend la place du bouton principal
     if(diff){
       barre(`<b>⚠</b>${t('debut_diff_action')}`, t('je_confirme'), () => confirmerDebut(id));
@@ -985,7 +995,7 @@ function rIndex(){
   if(!pompeCtx(S.choisies[S.pos])) return aller('pompes');
   const id = S.choisies[S.pos], dernier = S.pos === S.choisies.length - 1;
   ecranIndex(id, produit().prix_gallon, `<p class="sub" style="margin:0">${t('pompe_x', {i: S.pos+1, n: S.choisies.length})}</p>`,
-    (ok, v) => barre(ok ? `<b>${nf(v.g,3)} gal</b>${t('vendus')}` : t('tapez_deux'), dernier ? t('verifier') : t('suivante'),
+    (ok, v) => barre(ok ? `<b>${nfg(v.g)} gal</b>${t('vendus')}` : t('tapez_deux'), dernier ? t('verifier') : t('suivante'),
       ()=>{ S.champActif = null; if(dernier) aller('compteurs'); else { S.pos++; rendre(); } }, ok));
 }
 
@@ -994,8 +1004,8 @@ function rIndex(){
 // petit écran, le bouton passe en dessous au lieu de déborder).
 function lignePompe(nom, av, ap, g, montant, action){
   return `<div class="lp"><div class="lp-nom"><b>${esc(nom)}</b>
-      <span class="lp-idx num">${nf(av,3)} → ${nf(ap,3)}</span></div>
-    <div class="lp-val num"><b>${nf(g,3)} gal</b><span>${G(montant)}</span></div>
+      <span class="lp-idx num">${nfg(av)} → ${nfg(ap)}</span></div>
+    <div class="lp-val num"><b>${nfg(g)} gal</b><span>${G(montant)}</span></div>
     ${action ? `<div class="lp-act">${action}</div>` : ''}</div>`;
 }
 
@@ -1011,7 +1021,7 @@ function rCompteurs(){
     <div class="card">
       ${l.map((x,i) => lignePompe(x.q.nom, x.av, x.ap, x.g, x.montant,
         `<button class="btn-mod" onclick="S.pos=${i};S.champActif=null;aller('index')">${t('modifier')}</button>`)).join('')}
-    <div class="total"><span>${t('total')}</span><span class="v">${nf(gal,3)} gal</span></div>
+    <div class="total"><span>${t('total')}</span><span class="v">${nfg(gal)} gal</span></div>
     <div class="total" style="padding-top:0"><span>${t('montant')}</span><span class="v">${G(tot)}</span></div></div>
     <p class="sub">${t('argent_fin')}</p>`;
   barre(`<b>${G(tot)}</b>${esc(produit().nom)}`, t('envoyer_compteurs'), envoyerCompteurs);
@@ -1020,7 +1030,7 @@ function rCompteurs(){
 async function envoyerCompteurs(){
   const l = lignes();
   const ok = await demander({ico:'⛽', titre:t('confirmer_titre_compteurs'),
-    texte:t('confirmer_txt_compteurs', {n:l.length, g:nf(l.reduce((a,x)=>a+x.g,0),3), m:G(l.reduce((a,x)=>a+x.montant,0)), p:esc(produit()?.nom||'')}),
+    texte:t('confirmer_txt_compteurs', {n:l.length, g:nfg(l.reduce((a,x)=>a+x.g,0)), m:G(l.reduce((a,x)=>a+x.montant,0)), p:esc(produit()?.nom||'')}),
     oui:t('oui_envoyer'), non:t('non_retour')});
   if(!ok) return;
   const b = $('barre-btn'); b.disabled = true; b.textContent = t('envoi');
@@ -1176,7 +1186,7 @@ function rModif(){
   const id = S.modif, l = enCours()?.lignes.find(x => x.pompe_id === id);
   if(!l || !pompeCtx(id)){ S.modif = null; return aller(enCours() ? 'resume' : 'periode'); }
   ecranIndex(id, l.prix_gallon, `<p class="sub" style="margin:0">${t('modifier_x', {p: esc(l.produit_nom)})}</p>`,
-    (ok, v) => barre(ok ? `<b>${nf(v.g,3)} gal</b>${t('vendus')}` : '', t('enregistrer'), async () => {
+    (ok, v) => barre(ok ? `<b>${nfg(v.g)} gal</b>${t('vendus')}` : '', t('enregistrer'), async () => {
       try{
         await api('PUT', `/api/pompiste/compteurs/${id}`, {metter_avant:v.av, metter_apres:v.ap, debut_confirme:!!v.s.debutConfirme});
         S.modif = null; S.champActif = null; S.etape = 'resume';
@@ -1217,7 +1227,7 @@ function rFin(){
     <p class="sub" style="text-align:center">${t('prevenue')}</p>
     <div class="card">
       <div class="total"><span>${per(r.periode)}</span><span>${esc(jourTxt(r.date))}</span></div>
-      <div class="total"><span>${t('gallons')}</span><span class="v">${nf(r.total_gallons,3)}</span></div>
+      <div class="total"><span>${t('gallons')}</span><span class="v">${nfg(r.total_gallons)}</span></div>
       <div class="total"><span>${t('attendu')}</span><span class="v">${G(r.montant_attendu)}</span></div>
       <div class="total"><span>${t('compte')}</span><span class="v">${G(r.montant_compte)}</span></div>
       <div class="total"><span>${t('ecart')}</span><span class="v">${signe(r.ecart)}</span></div></div>
@@ -1261,13 +1271,13 @@ function ticketHtml(r){
     <div class="b">${t('tk_compteurs')}</div>
     ${Object.entries(parProduit).map(([nom, ls]) => `<div class="b">${esc(nom).toUpperCase()}</div>
       ${ls.map(l => `<div class="pompe"><div class="b">${esc(l.pompe_nom)}</div>
-        ${L(t('debut'), nf(l.metter_avant,3))}${L(t('fin'), nf(l.metter_apres,3))}
-        ${L(`${nf(l.gallons,3)} gal × ${nf(l.prix_gallon,2)}`, G(l.montant))}</div>`).join('')}
-      ${L(`<b>${t('total')} ${esc(nom)}</b>`, `<b>${nf(ls.reduce((a,x)=>a+x.gallons,0),3)} gal</b>`)}
+        ${L(t('debut'), nfg(l.metter_avant))}${L(t('fin'), nfg(l.metter_apres))}
+        ${L(`${nfg(l.gallons)} gal × ${nf(l.prix_gallon,2)}`, G(l.montant))}</div>`).join('')}
+      ${L(`<b>${t('total')} ${esc(nom)}</b>`, `<b>${nfg(ls.reduce((a,x)=>a+x.gallons,0))} gal</b>`)}
       ${L('', `<b>${G(ls.reduce((a,x)=>a+x.montant,0))}</b>`)}`).join('<div class="sep"></div>')}
     <div class="sep2"></div>
     <div class="b">${t('tk_ventes')}</div>
-    ${L(t('tk_total_gal'), nf(r.total_gallons,3))}
+    ${L(t('tk_total_gal'), nfg(r.total_gallons))}
     ${L(`<b>${t('tk_attendu')}</b>`, `<b>${G(r.montant_attendu)}</b>`)}
     <div class="sep"></div>
     <div class="b">${t('tk_argent')}</div>
@@ -1317,7 +1327,7 @@ async function chargerHistorique(){
     $('hist').innerHTML = rs.length ? rs.slice(0,8).map(r=>`<div class="hist">
       <div style="display:flex;justify-content:space-between;gap:8px"><b>${per(r.periode)} · ${esc(jourTxt(r.date))}</b>
         <span class="badge ${r.statut}">${t(r.statut)}</span></div>
-      <div style="font-size:15px;color:var(--muted)">${esc([...new Set(r.lignes.map(l=>l.produit_nom))].join(', '))} · ${nf(r.total_gallons,3)} gal · ${t('ecart_court')} ${signe(r.ecart)}</div>
+      <div style="font-size:15px;color:var(--muted)">${esc([...new Set(r.lignes.map(l=>l.produit_nom))].join(', '))} · ${nfg(r.total_gallons)} gal · ${t('ecart_court')} ${signe(r.ecart)}</div>
       ${r.commentaire_superviseur ? `<div class="com"><b>${esc(r.traite_par_nom||t('direction'))} :</b> ${esc(r.commentaire_superviseur)}</div>` : ''}
       ${r.statut==='REJETE' ? `<div style="font-size:15px;margin-top:6px;font-weight:700">${t('refaire')}</div>` : ''}
       <button class="btn-mod" style="margin-top:8px" onclick="reimprimer(${r.id})">🖨 ${t('reimprimer')}</button>
