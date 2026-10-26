@@ -2809,6 +2809,20 @@ def _build_journal_entries(
             )
             last_day.sort(key=lambda r: PERIODE_RANG.get(r.periode, 99))
             pompe_last[pid] = float(last_day[-1].metter_apres)
+    if inclure_en_attente and releves:
+        from datetime import timedelta as _td
+        from pompiste_routes import lignes_en_attente
+        cle = lambda x: (x.date, PERIODE_RANG.get(x.periode, 99))
+        avant: dict = {}
+        for x in lignes_en_attente(db, d_debut - _td(days=120), d_debut - _td(days=1)):
+            if x.pompe_id in pompe_last and (x.pompe_id not in avant or cle(x) > cle(avant[x.pompe_id])):
+                avant[x.pompe_id] = x
+        for pid, x in avant.items():
+            off = (db.query(Releve).filter(Releve.pompe_id == pid, Releve.date < d_debut)
+                   .order_by(Releve.date.desc()).all())
+            off = max(off, key=cle) if off else None
+            if off is None or cle(x) > cle(off):
+                pompe_last[pid] = float(x.metter_apres)
 
     entries = []
     for r in releves:
@@ -2983,7 +2997,8 @@ def resoudre_ecart_metter(releve_id: int, data: ResolutionMetterIn, request: Req
     r = db.get(Releve, releve_id)
     if not r:
         raise HTTPException(404, "Relevé introuvable.")
-    e = next((x for x in _build_journal_entries(db, r.date, r.date, pompe_id_filter=[r.pompe_id])
+    e = next((x for x in _build_journal_entries(db, r.date, r.date, pompe_id_filter=[r.pompe_id],
+                                                inclure_en_attente=True)
               if x["id"] == releve_id), None)
     if not e or e["statut"] == "ok":
         raise HTTPException(400, "Ce relevé ne présente aucun écart à résoudre.")
@@ -3351,7 +3366,8 @@ def journal_pdf(
     d_fin   = date_fin   or today_haiti()
     d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
 
-    entries    = _build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode, pompiste_id)
+    entries    = [e for e in _build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode,
+                                                pompiste_id, inclure_en_attente=True) if not e["en_attente"]]
     nb_alertes = sum(1 for e in entries if e["statut"] == "alerte")
     nb_erreurs = sum(1 for e in entries if e["statut"] == "erreur")
     nb_ok      = len(entries) - nb_alertes - nb_erreurs

@@ -89,3 +89,32 @@ def test_resolution_caduque_si_les_valeurs_changent(client):
     assert r.status_code in (200, 201), r.text
     e = next(x for x in _journal(client, "2026-04-05", "2026-04-05", [p])["entries"] if x["id"] == rid)
     assert e["statut"] == "alerte" and e["decalage"] == 5
+
+
+def test_ecart_apres_un_rapport_pompiste_en_attente(client):
+    """Cas du staging : le relevé précédent est un rapport pompiste pas
+    encore finalisé. L'écart affiché au journal doit pouvoir être résolu, et
+    rester résolu quelles que soient les dates choisies."""
+    from datetime import timedelta
+    from fastapi.testclient import TestClient
+    from tz_utils import today_haiti
+    import main as _m
+    (p,) = _pompes(client, 1)
+    j1, j2 = str(today_haiti() - timedelta(days=2)), str(today_haiti() - timedelta(days=1))
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Att", "nom": "Ente"}).json()
+    pp = TestClient(_m.app)
+    pp.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    r = pp.post("/api/pompiste/compteurs", json={"date": j1, "periode": "Matin", "charte_acceptee": True,
+                "lignes": [{"pompe_id": p, "metter_avant": 0, "metter_apres": 40, "debut_confirme": True}]})
+    assert r.status_code == 201, r.text
+    pp.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 4}]})
+    rid = _releve(client, j2, "Matin", p, 50, 90)                      # saut de 10 après le rapport en attente
+
+    for debut in (j1, j2):                                             # même écart, quelle que soit la période
+        e = next(x for x in _journal(client, debut, j2, [p])["entries"] if x["id"] == rid)
+        assert e["statut"] == "alerte" and e["decalage"] == 10, (debut, e)
+    r = client.post(f"/api/journal/releves/{rid}/resoudre", headers=H,
+                    json={"description": "Index du matin relu avec le pompiste, écart accepté."})
+    assert r.status_code == 200, r.text
+    for debut in (j1, j2):
+        assert next(x for x in _journal(client, debut, j2, [p])["entries"] if x["id"] == rid)["statut"] == "resolu"
