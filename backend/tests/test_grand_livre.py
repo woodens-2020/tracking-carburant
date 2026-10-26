@@ -71,3 +71,19 @@ def test_journal_de_caisse(client):
     # Totaux par compte
     comptes = {(c["sens"], c["compte"]): c for c in j["par_compte"]}
     assert comptes[("C", "Electricite")]["credit"] == 800
+
+
+def test_gallons_et_vente_sans_prix(client):
+    import grand_livre
+    assert grand_livre._gal(40) == "40" and grand_livre._gal(1234.5) == "1 234,5" and grand_livre._gal(0.125) == "0,125"
+    nom = f"GL0-{time.time_ns()}"
+    pid = client.post("/api/produits", headers=H, json={"nom": nom, "prix_gallon": 0}).json()["id"]
+    pompe = client.post(f"/api/produits/{pid}/pompes", headers=H, json={"nom": f"{nom} P1"}).json()["id"]
+    r = client.post("/api/releves", headers=H, json={"date": "2025-02-03", "periode": "Matin", "pompe_id": pompe,
+                                                      "prix_gallon": 0, "metter_avant": 0, "metter_apres": 12})
+    assert r.status_code in (200, 201), r.text
+    j = _journal(client, "2025-02-03", "2025-02-03")
+    ligne = next(l for l in j["lignes"] if l["produit_id"] == pid)
+    assert "12 gal" in ligne["description"]
+    ctl = {c["code"]: c for c in j["controles"]}
+    assert ligne["cle"] in ctl["ventes_sans_prix"]["cles"]

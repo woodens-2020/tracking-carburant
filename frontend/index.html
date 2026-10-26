@@ -3286,72 +3286,97 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .cp-src-v{font-family:var(--mono);font-size:17px;font-weight:800}
 .cp-src-s{font-size:12px;color:var(--muted)}
 
-.gl-grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:12px}
-.gl-grille .gl-large{grid-column:span 2}
-.gl-plus{display:none;font:inherit;font-size:13px;font-weight:600;margin-top:10px;padding:8px 12px;width:100%;text-align:left;
-  border:1px dashed var(--border);border-radius:10px;background:none;color:var(--muted);cursor:pointer}
-.gl-ligne-filtres{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
-.gl-seg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}
-.gl-seg button{font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;background:var(--panel);color:var(--muted);border:0;cursor:pointer}
-.gl-seg button+button{border-left:1px solid var(--border)}
-.gl-seg button.on{background:var(--orange);color:#fff}
-.gl-type small{opacity:.7;margin-left:3px}
-.gl-type.D.on{background:rgba(34,197,94,.18);border-color:var(--green);color:var(--green)}
-.gl-type.C.on{background:rgba(239,68,68,.15);border-color:var(--red);color:var(--red)}
-.gl-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
-.gl-kpi{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;border-top:3px solid var(--muted)}
-.gl-kpi.gl-d{border-top-color:var(--green)} .gl-kpi.gl-c{border-top-color:var(--red)} .gl-kpi.gl-s{border-top-color:var(--orange)}
-.gl-kpi-l{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-.gl-kpi-v{font-family:var(--mono);font-size:21px;font-weight:800;margin-top:4px;white-space:nowrap}
-.gl-d .gl-kpi-v{color:var(--green)} .gl-c .gl-kpi-v{color:var(--red)} .gl-s.neg .gl-kpi-v{color:var(--red)}
-.gl-kpi-s{font-size:12px;color:var(--muted);margin-top:3px}
-.gl-controles{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:14px}
-.gl-ctl{display:flex;gap:10px;text-align:left;font:inherit;font-size:13px;color:var(--text);background:var(--panel);border:1px solid var(--border);
-  border-left:4px solid var(--green);border-radius:12px;padding:10px 12px;cursor:pointer}
-.gl-ctl.alerte{border-left-color:var(--red)} .gl-ctl.info{border-left-color:var(--blue)}
-.gl-ctl-i{flex:0 0 22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:12px;color:#fff;background:var(--green)}
-.gl-ctl.alerte .gl-ctl-i{background:var(--red)} .gl-ctl.info .gl-ctl-i{background:var(--blue)}
-.gl-ctl-a{font-size:12px;font-weight:700;color:var(--orange)}
-.gl-barre{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.gl-outils{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px}
+.gl-rang{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.gl-espace{flex:1}
+.gl-seg{display:inline-flex;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px}
+.gl-seg button{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:7px;background:none;color:var(--muted);border:0;cursor:pointer;white-space:nowrap}
+.gl-seg button:hover{color:var(--text)}
+.gl-seg button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.25),inset 0 0 0 1px var(--border)}
+.gl-dates{display:flex;align-items:center;gap:6px;color:var(--muted)}
+.gl-dates input{width:150px;height:36px}
+.gl-icone{font:inherit;font-size:13px;font-weight:600;height:36px;padding:0 12px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer;white-space:nowrap}
+.gl-icone:hover,.gl-icone.on{border-color:var(--orange)}
+.gl-nb{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:9px;background:var(--orange);color:#fff;font-size:11px;margin-left:2px}
+.gl-recherche{flex:1;min-width:220px;display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid var(--border);border-radius:9px;background:var(--bg)}
+.gl-recherche span{color:var(--muted);font-size:16px}
+.gl-recherche input{flex:1;min-width:0;border:0;background:none;color:var(--text);font:inherit;font-size:13.5px;outline:none}
+.gl-recherche:focus-within{border-color:var(--orange)}
+.gl-avances{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:10px}
+.gl-champs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.gl-champs label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
+.gl-champs .filter-input{height:36px}
+.gl-types{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.gl-puce-type{font:inherit;font-size:12.5px;font-weight:600;padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer}
+.gl-puce-type small{opacity:.65;margin-left:2px}
+.gl-puce-type.D.on{border-color:var(--green);color:var(--green)} .gl-puce-type.C.on{border-color:var(--red);color:var(--red)}
+.gl-case{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin-left:6px}
+.gl-puces{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.gl-puces button{font:inherit;font-size:12.5px;font-weight:600;padding:4px 6px 4px 10px;border-radius:7px;border:1px solid var(--orange);background:rgba(249,115,22,.08);color:var(--text);cursor:pointer}
+.gl-puces button span{margin-left:4px;color:var(--muted)}
+.gl-puces .gl-lien,.gl-lien{border:0;background:none;color:var(--muted);text-decoration:underline;padding:4px}
+.gl-resume{display:grid;grid-template-columns:repeat(4,1fr);background:var(--panel);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.gl-resume>div{padding:14px 18px;display:flex;flex-direction:column;gap:4px}
+.gl-resume>div+div{border-left:1px solid var(--border)}
+.gl-resume span{font-size:12px;font-weight:600;color:var(--muted)}
+.gl-resume b{font-family:var(--mono);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--text)}
+.gl-resume b i{font-style:normal;font-size:13px;color:var(--muted)}
+.gl-resume .d b{color:var(--green)} .gl-resume .c b{color:var(--red)}
+.gl-resume .s{background:rgba(249,115,22,.06)} .gl-resume .s b{font-size:22px} .gl-resume .s.neg b{color:var(--red)}
+.gl-ctl-barre{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.gl-ctl-barre button{font:inherit;font-size:12.5px;font-weight:600;padding:5px 11px;border-radius:7px;cursor:pointer;border:1px solid var(--border);background:var(--panel);color:var(--text)}
+.gl-ctl-ok{color:var(--green)!important}
+.gl-ctl-p.alerte{border-color:rgba(239,68,68,.5)!important;color:var(--red)!important}
+.gl-ctl-p.info{border-color:rgba(59,130,246,.45)!important;color:var(--blue)!important}
+.gl-ctl-liste{background:var(--panel);border:1px solid var(--border);border-radius:12px;margin:-4px 0 12px;overflow:hidden}
+.gl-ctl-liste>div{display:flex;gap:10px;padding:9px 14px;cursor:pointer;font-size:13px}
+.gl-ctl-liste>div+div{border-top:1px solid var(--border)}
+.gl-ctl-liste b{flex:0 0 18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;color:#fff;background:var(--green);margin-top:1px}
+.gl-ctl-liste .alerte b{background:var(--red)} .gl-ctl-liste .info b{background:var(--blue)}
+.gl-ctl-liste small{color:var(--muted)}
+.gl-barre{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}
 .gl-sel{font-size:13px;color:var(--muted)}
-.gl-table-card{padding:0;overflow-x:auto}
-.gl-tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:880px}
-.gl-tbl th small{display:block;font-size:9.5px;font-weight:600;opacity:.8}
-.gl-tbl tr.gl-jour td.gl-dv{color:var(--green)} .gl-tbl tr.gl-jour td.gl-cv{color:var(--red)}
-.gl-tbl tr.gl-jour td.r{font-size:12.5px;text-transform:none;letter-spacing:0}
-.gl-tbl th{position:sticky;top:0;background:var(--panel);text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
-  padding:10px;border-bottom:2px solid var(--border);white-space:nowrap}
-.gl-tbl td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
-.gl-tbl .r{text-align:right;font-family:var(--mono);white-space:nowrap}
+.gl-carte{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow-x:auto}
+.gl-tbl{width:100%;border-collapse:collapse;font-size:13.5px;min-width:760px;table-layout:fixed}
+.gl-tbl th{text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--border);background:var(--panel)}
+.gl-tbl td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+.gl-tbl .r{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
 .gl-tbl .nw{white-space:nowrap}
-.gl-tbl tr.gl-jour td{background:rgba(249,115,22,.07);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--orange);padding:7px 10px}
-.gl-jours{font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted);margin-left:6px}
-.gl-tbl tr.gl-l{cursor:pointer} .gl-tbl tr.gl-l:hover td{background:rgba(255,255,255,.03)}
-.gl-tbl tr.gl-l.ouvert td{background:rgba(249,115,22,.06)}
-.gl-tbl tfoot td{font-weight:800;border-top:2px solid var(--border);padding:10px}
-.gl-n{font-family:var(--mono);font-size:11px;color:var(--muted);max-width:118px;line-height:1.3}
-.gl-desc{min-width:200px}
-.gl-t{font-size:11.5px;font-weight:700;border-radius:20px;padding:2px 9px;white-space:nowrap}
-.gl-t.D{background:rgba(34,197,94,.13);color:var(--green)} .gl-t.C{background:rgba(239,68,68,.12);color:var(--red)}
+.gl-tbl tr.gl-jour td{background:var(--bg);padding:8px 14px;font-size:12.5px;border-bottom:1px solid var(--border)}
+.gl-tbl tr.gl-jour td b{font-weight:700;color:var(--text)}
+.gl-tbl tr.gl-jour td span{color:var(--muted);margin-left:8px}
+.gl-tbl tr.gl-jour td.r{font-weight:600}
+.gl-tbl tr.gl-l{cursor:pointer} .gl-tbl tr.gl-l:hover td{background:rgba(127,127,127,.06)}
+.gl-tbl tr.gl-l.ouvert td{background:rgba(249,115,22,.07)}
+.gl-tbl tfoot td{font-weight:700;padding:11px 14px;border-bottom:0;background:var(--bg)}
+.gl-type{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gl-point{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
+.gl-point.D{background:var(--green)} .gl-point.C{background:var(--red)}
+.gl-desc div{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gl-desc small{display:block;color:var(--muted);font-size:12px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gl-qui{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gl-etiq{display:inline-block;font-size:11px;font-weight:700;padding:1px 6px;border-radius:5px;margin-left:6px;background:rgba(239,68,68,.12);color:var(--red);vertical-align:1px}
+.gl-etiq.retard{background:rgba(249,115,22,.14);color:var(--orange)}
 .gl-dv{color:var(--green)} .gl-cv{color:var(--red)}
-.gl-solde{font-weight:700} .gl-solde.neg{color:var(--red)}
-.gl-annulee td{text-decoration:line-through;opacity:.55} .gl-annulee .gl-annul-m{text-decoration:none}
-.gl-annul-m{font-size:11.5px;color:var(--red)}
-.gl-retard{font-size:11px;font-weight:700;color:var(--orange)}
-.gl-detail td{background:rgba(255,255,255,.02)}
-.gl-det{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px 16px}
-.gl-det div{display:flex;flex-direction:column;gap:2px} .gl-det span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-.gl-det b{font-weight:600;font-size:13px}
+.gl-solde{font-weight:700;color:var(--text)} .gl-solde.neg{color:var(--red)}
+.gl-annulee td{color:var(--muted)!important} .gl-annulee .gl-desc div{text-decoration:line-through;color:var(--muted)}
+.gl-annulee td.r{text-decoration:line-through}
+.gl-detail td{background:var(--bg);padding:12px 14px}
+.gl-det{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px 18px}
+.gl-det div{display:flex;flex-direction:column;gap:2px} .gl-det span{font-size:11.5px;color:var(--muted)}
+.gl-det b{font-weight:600;font-size:13px;word-break:break-word}
 .gl-barres{display:flex;flex-direction:column;gap:3px} .gl-barres i{display:block;height:6px;border-radius:3px;min-width:2px}
 .gl-barres i.d{background:var(--green)} .gl-barres i.c{background:var(--red)}
-@media (max-width:900px){ .gl-kpis{grid-template-columns:repeat(2,1fr)} .gl-grille .gl-large{grid-column:span 1} }
+.gl-vide{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:28px;text-align:center;color:var(--muted)}
+.gl-plus-lignes{text-align:center;padding:12px}
+.gl-plus-lignes button{font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer}
+@media (max-width:900px){ .gl-resume{grid-template-columns:repeat(2,1fr)} .gl-resume>div:nth-child(3){border-left:0} .gl-resume>div:nth-child(n+3){border-top:1px solid var(--border)} }
 @media (max-width:720px){
-  .gl-grille{grid-template-columns:repeat(2,1fr)} .gl-grille .gl-large{grid-column:span 2}
-  .gl-plus{display:block}
-  .gl-grille:not(.ouvert) > label:nth-child(n+4){display:none}
-  .gl-filtres .gl-ligne-filtres:last-child .btn{flex:1}
+  .gl-rang>.gl-seg{width:100%;overflow-x:auto} .gl-seg button{padding:6px 10px}
+  .gl-dates{flex:1 1 100%} .gl-dates input{flex:1;width:auto;min-width:0}
+  .gl-espace{display:none} .gl-icone{flex:1}
+  .gl-resume b{font-size:17px} .gl-resume .s b{font-size:18px}
 }
-@media (max-width:520px){ .gl-kpis{grid-template-columns:1fr} .gl-kpi-v{font-size:19px} .gl-seg button{padding:7px 9px} }
 .dep-presets{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .dep-presets button{font:inherit;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer;
   border:1px solid var(--border);background:var(--panel);color:var(--muted)}
@@ -20168,8 +20193,8 @@ function glPeriode(k){ _glPreset(k); glCharger(); }
 function glDate(cle, v){ if(!v) return; GL.f[cle] = v; GL.f.preset = '';
   if(GL.f.debut > GL.f.fin){ if(cle === 'debut') GL.f.fin = v; else GL.f.debut = v; } glCharger(); }
 function glFiltre(cle, v){ GL.f[cle] = v; GL.limite = 400; glRendre(cle === 'q' ? 'gl-q' : null); }
-function glType(t){ const a = GL.f.types; const i = a.indexOf(t); if(i < 0) a.push(t); else a.splice(i, 1); glRendre(); }
 function glReinit(){ Object.assign(GL.f, {q:'', sens:'', types:[], compte:'', module:'', saisi:'', min:'', max:'', annulees:true, cles:null, cles_titre:''}); glRendre(); }
+function glType(t){ const a = GL.f.types; const i = a.indexOf(t); if(i < 0) a.push(t); else a.splice(i, 1); glRendre(); }
 function glControle(i){
   const c = GL.data.controles[i];
   if(!c.cles || !c.cles.length){ if(c.lien) goTo(c.lien); return; }
@@ -20212,63 +20237,77 @@ function glRendre(focus){
   const uniq = k => [...new Set(d.lignes.map(x => x[k]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
   const saisis = [...new Set(d.lignes.flatMap(x => (x.saisi_par || '').split(', ')).filter(Boolean))].sort();
   const parType = {}; d.lignes.forEach(x => parType[x.type] = (parType[x.type] || 0) + 1);
-  const periode = d.date_debut === d.date_fin ? frDate(d.date_debut) : `du ${frDate(d.date_debut)} au ${frDate(d.date_fin)}`;
   const pos = document.activeElement?.id === focus ? document.activeElement.selectionStart : null;
+  const nbAvances = [f.compte, f.module, f.saisi, f.min, f.max].filter(v => v !== '' && v != null).length + f.types.length + (f.annulees ? 0 : 1);
+  const libType = Object.fromEntries(d.types.map(t => [t.type, t.lib]));
+  // Filtres actifs, retirables un par un
+  const puces = [];
+  if(f.cles) puces.push([f.cles_titre, "GL.f.cles=null"]);
+  f.types.forEach(t => puces.push([libType[t], `glType('${t}')`]));
+  if(f.compte) puces.push([f.compte, "glFiltre('compte','')"]);
+  if(f.module) puces.push([f.module, "glFiltre('module','')"]);
+  if(f.saisi) puces.push(['Saisi par ' + f.saisi, "glFiltre('saisi','')"]);
+  if(f.min !== '') puces.push(['≥ ' + f.min + ' G', "glFiltre('min','')"]);
+  if(f.max !== '') puces.push(['≤ ' + f.max + ' G', "glFiltre('max','')"]);
+  if(!f.annulees) puces.push(['Sans les annulées', "glFiltre('annulees',true)"]);
+  const aVoir = d.controles.filter(k => k.niveau !== 'ok'), nbOk = d.controles.length - aVoir.length;
 
   c.innerHTML = `
-  <div class="psp-card psp-filtres gl-filtres">
-    <div class="psp-chips">${[['jour',"Aujourd'hui"],['hier','Hier'],['7j','7 jours'],['30j','30 jours'],['mois','Ce mois'],['prec','Mois précédent'],['annee','Cette année']]
-      .map(([k,l]) => `<button class="psp-chip ${f.preset===k?'on':''}" onclick="glPeriode('${k}')">${l}</button>`).join('')}</div>
-    <button class="gl-plus" onclick="GL.plus=!GL.plus;glRendre()">${GL.plus?'▴ Moins de filtres':'▾ Plus de filtres'}${actif?' · <b>filtres actifs</b>':''}</button>
-    <div class="gl-grille ${GL.plus?'ouvert':''}">
-      <label class="cp-champ">Du<input type="date" class="filter-input" value="${f.debut}" max="${currentDate}" onchange="glDate('debut', this.value)"></label>
-      <label class="cp-champ">Au<input type="date" class="filter-input" value="${f.fin}" max="${currentDate}" onchange="glDate('fin', this.value)"></label>
-      <label class="cp-champ gl-large">Recherche<input id="gl-q" class="filter-input" value="${esc(f.q)}" placeholder="Description, n°, bénéficiaire, référence, compte…" oninput="glFiltre('q', this.value)"></label>
-      <label class="cp-champ">Compte / catégorie<select class="filter-input" onchange="glFiltre('compte', this.value)"><option value="">Tous les comptes</option>
-        ${uniq('compte').map(x => `<option ${f.compte===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
-      <label class="cp-champ">Module<select class="filter-input" onchange="glFiltre('module', this.value)"><option value="">Tous</option>
-        ${uniq('module').map(x => `<option ${f.module===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
-      <label class="cp-champ">Saisi par<select class="filter-input" onchange="glFiltre('saisi', this.value)"><option value="">Tout le monde</option>
-        ${saisis.map(x => `<option ${f.saisi===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
-      <label class="cp-champ">Montant min (G)<input class="filter-input" inputmode="decimal" value="${esc(f.min)}" onchange="glFiltre('min', this.value)" placeholder="0"></label>
-      <label class="cp-champ">Montant max (G)<input class="filter-input" inputmode="decimal" value="${esc(f.max)}" onchange="glFiltre('max', this.value)" placeholder="∞"></label>
+  <div class="gl-outils">
+    <div class="gl-rang">
+      <div class="gl-seg">${[['jour',"Aujourd'hui"],['hier','Hier'],['7j','7 jours'],['mois','Ce mois'],['prec','Mois préc.'],['annee','Année']]
+        .map(([k,l]) => `<button class="${f.preset===k?'on':''}" onclick="glPeriode('${k}')">${l}</button>`).join('')}</div>
+      <div class="gl-dates"><input type="date" class="filter-input" value="${f.debut}" max="${currentDate}" onchange="glDate('debut', this.value)" aria-label="Du">
+        <span>→</span><input type="date" class="filter-input" value="${f.fin}" max="${currentDate}" onchange="glDate('fin', this.value)" aria-label="Au"></div>
+      <span class="gl-espace"></span>
+      <button class="gl-icone" onclick="glExporter()" title="Exporter vers Excel (CSV)">⬇ Excel</button>
+      <button class="gl-icone" onclick="glImprimer()" title="Imprimer">⎙ Imprimer</button>
     </div>
-    <div class="gl-ligne-filtres">
-      <div class="gl-seg">${[['','Tout'],['D','Entrées (débit)'],['C','Sorties (crédit)']]
+    <div class="gl-rang">
+      <div class="gl-recherche"><span>⌕</span><input id="gl-q" value="${esc(f.q)}" placeholder="Rechercher : description, n°, bénéficiaire, référence…" oninput="glFiltre('q', this.value)"></div>
+      <div class="gl-seg">${[['','Tout'],['D','Entrées'],['C','Sorties']]
         .map(([k,l]) => `<button class="${f.sens===k?'on':''}" onclick="glFiltre('sens','${k}')">${l}</button>`).join('')}</div>
-      <div class="psp-chips">${d.types.filter(t => parType[t.type]).map(t =>
-        `<button class="psp-chip gl-type ${t.sens} ${f.types.includes(t.type)?'on':''}" onclick="glType('${t.type}')">${esc(t.lib)} <small>${parType[t.type]}</small></button>`).join('')}</div>
+      <button class="gl-icone ${GL.plus?'on':''}" onclick="GL.plus=!GL.plus;glRendre()">Filtres${nbAvances?` <b class="gl-nb">${nbAvances}</b>`:''} ${GL.plus?'▴':'▾'}</button>
     </div>
-    <div class="gl-ligne-filtres">
-      <label class="cp-case"><input type="checkbox" ${f.annulees?'checked':''} onchange="glFiltre('annulees', this.checked)"> Afficher les entrées annulées${d.nb_annulees?` (${d.nb_annulees})`:''}</label>
-      <div class="gl-seg">${[['desc','Plus récent d\'abord'],['asc','Plus ancien d\'abord']]
-        .map(([k,l]) => `<button class="${f.ordre===k?'on':''}" onclick="glFiltre('ordre','${k}')">${l}</button>`).join('')}</div>
-      <span style="flex:1"></span>
-      ${actif?'<button class="btn btn-secondary psp-mini" onclick="glReinit()">Effacer les filtres</button>':''}
-      <button class="btn btn-secondary psp-mini" onclick="glExporter()">⬇ Excel (CSV)</button>
-      <button class="btn btn-secondary psp-mini" onclick="glImprimer()">🖨 Imprimer</button>
-    </div>
+    ${GL.plus ? `<div class="gl-avances">
+      <div class="gl-champs">
+        <label>Compte<select class="filter-input" onchange="glFiltre('compte', this.value)"><option value="">Tous</option>
+          ${uniq('compte').map(x => `<option ${f.compte===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
+        <label>Module<select class="filter-input" onchange="glFiltre('module', this.value)"><option value="">Tous</option>
+          ${uniq('module').map(x => `<option ${f.module===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
+        <label>Saisi par<select class="filter-input" onchange="glFiltre('saisi', this.value)"><option value="">Tout le monde</option>
+          ${saisis.map(x => `<option ${f.saisi===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
+        <label>Montant min<input class="filter-input" inputmode="decimal" value="${esc(f.min)}" onchange="glFiltre('min', this.value)" placeholder="G"></label>
+        <label>Montant max<input class="filter-input" inputmode="decimal" value="${esc(f.max)}" onchange="glFiltre('max', this.value)" placeholder="G"></label>
+        <label>Ordre<select class="filter-input" onchange="glFiltre('ordre', this.value)">
+          <option value="desc" ${f.ordre==='desc'?'selected':''}>Plus récent d'abord</option><option value="asc" ${f.ordre==='asc'?'selected':''}>Plus ancien d'abord</option></select></label>
+      </div>
+      <div class="gl-types">${d.types.filter(t => parType[t.type]).map(t =>
+        `<button class="gl-puce-type ${t.sens} ${f.types.includes(t.type)?'on':''}" onclick="glType('${t.type}')">${esc(t.lib)} <small>${parType[t.type]}</small></button>`).join('')}
+        <label class="gl-case"><input type="checkbox" ${f.annulees?'checked':''} onchange="glFiltre('annulees', this.checked)"> Annulées${d.nb_annulees?` (${d.nb_annulees})`:''}</label></div>
+    </div>` : ''}
+    ${puces.length ? `<div class="gl-puces">${puces.map(([l, js]) => `<button onclick="${js};glRendre()">${esc(l)} <span>×</span></button>`).join('')}
+      <button class="gl-lien" onclick="glReinit()">Tout effacer</button></div>` : ''}
   </div>
 
-  <div class="gl-kpis">
-    <div class="gl-kpi"><div class="gl-kpi-l">Solde d'ouverture</div><div class="gl-kpi-v">${_glG(d.solde_ouverture)} G</div><div class="gl-kpi-s">au ${frDate(d.date_debut)}, avant la période</div></div>
-    <div class="gl-kpi gl-d"><div class="gl-kpi-l">Entrées · débit</div><div class="gl-kpi-v">+ ${_glG(d.total_debit)} G</div><div class="gl-kpi-s">${d.lignes.filter(x=>x.sens==='D'&&!x.annulee).length} opérations</div></div>
-    <div class="gl-kpi gl-c"><div class="gl-kpi-l">Sorties · crédit</div><div class="gl-kpi-v">− ${_glG(d.total_credit)} G</div><div class="gl-kpi-s">${d.lignes.filter(x=>x.sens==='C'&&!x.annulee).length} opérations</div></div>
-    <div class="gl-kpi gl-s ${d.solde_cloture<0?'neg':''}"><div class="gl-kpi-l">Solde de clôture</div><div class="gl-kpi-v">${_glG(d.solde_cloture)} G</div><div class="gl-kpi-s">${esc(periode)} · variation ${d.total_debit-d.total_credit>=0?'+':'−'} ${_glG(Math.abs(d.total_debit-d.total_credit))} G</div></div>
+  <div class="gl-resume">
+    <div><span>Ouverture</span><b>${_glG(d.solde_ouverture)} <i>G</i></b></div>
+    <div class="d"><span>Entrées</span><b>+ ${_glG(d.total_debit)} <i>G</i></b></div>
+    <div class="c"><span>Sorties</span><b>− ${_glG(d.total_credit)} <i>G</i></b></div>
+    <div class="s ${d.solde_cloture<0?'neg':''}"><span>Solde de clôture</span><b>${_glG(d.solde_cloture)} <i>G</i></b></div>
   </div>
 
-  <div class="gl-controles">${d.controles.map((k, i) => `
-    <button class="gl-ctl ${k.niveau}" onclick="glControle(${i})" ${(k.cles&&k.cles.length)||k.lien?'':'style="cursor:default"'}>
-      <span class="gl-ctl-i">${k.niveau==='ok'?'✓':k.niveau==='alerte'?'!':'i'}</span>
-      <span><b>${esc(k.titre)}</b><br><span class="psp-muted">${esc(k.texte)}${k.jours&&k.jours.length?` <br>${k.jours.slice(0,10).map(j=>frDate(j)).join(' · ')}${k.jours.length>10?' …':''}`:''}</span>
-      ${(k.cles&&k.cles.length)?'<br><span class="gl-ctl-a">Voir les opérations →</span>':k.lien?'<br><span class="gl-ctl-a">Ouvrir →</span>':''}</span>
-    </button>`).join('')}</div>
+  <div class="gl-ctl-barre">
+    <button class="gl-ctl-ok" onclick="GL.ctl=!GL.ctl;glRendre()" title="Voir le détail des contrôles">✓ ${nbOk} contrôle${nbOk>1?'s':''} OK${aVoir.length?'':' — tout est en ordre'}</button>
+    ${aVoir.map(k => `<button class="gl-ctl-p ${k.niveau}" onclick="glControle(${d.controles.indexOf(k)})" title="${esc(k.texte)}">${k.niveau==='alerte'?'!':'i'} ${esc(k.titre)}</button>`).join('')}
+  </div>
+  ${GL.ctl ? `<div class="gl-ctl-liste">${d.controles.map((k, i) => `<div class="${k.niveau}" onclick="glControle(${i})">
+      <b>${k.niveau==='ok'?'✓':k.niveau==='alerte'?'!':'i'}</b><div><div>${esc(k.titre)}</div><small>${esc(k.texte)}${k.jours&&k.jours.length?' — '+k.jours.slice(0,8).map(j=>frDate(j)).join(', ')+(k.jours.length>8?'…':''):''}</small></div></div>`).join('')}</div>` : ''}
 
   <div class="gl-barre" id="gl-registre">
     <div class="gl-seg">${[['journal','Journal'],['comptes','Par compte'],['jours','Par jour']]
       .map(([k,l]) => `<button class="${GL.vue===k?'on':''}" onclick="GL.vue='${k}';glRendre()">${l}</button>`).join('')}</div>
-    ${actif?`<div class="gl-sel">${f.cles?`<b>${esc(f.cles_titre)}</b> · `:''}Sélection : ${sel.length} opération${sel.length>1?'s':''} ·
-      <span class="gl-dv">+ ${_glG(sD)}</span> · <span class="gl-cv">− ${_glG(sC)}</span> · net <b>${_glG(sD-sC)} G</b></div>`:''}
+    <span class="gl-sel">${sel.length} opération${sel.length>1?'s':''}${actif?` · <span class="gl-dv">+${_glG(sD)}</span> <span class="gl-cv">−${_glG(sC)}</span> · net <b>${_glG(sD-sC)}</b>`:''}</span>
   </div>
   ${GL.vue === 'comptes' ? _glParCompte(d) : GL.vue === 'jours' ? _glParJour(d) : _glRegistre(lignes, sD, sC)}`;
 
@@ -20276,38 +20315,36 @@ function glRendre(focus){
 }
 
 function _glRegistre(lignes, sD, sC){
-  if(!lignes.length) return `<div class="psp-card"><b>Aucune opération ${_glFiltreActif()?'ne correspond aux filtres':'sur cette période'}.</b></div>`;
+  if(!lignes.length) return `<div class="gl-vide">Aucune opération ${_glFiltreActif()?'pour ces filtres':'sur cette période'}.</div>`;
   const vis = lignes.slice(0, GL.limite);
   const finJour = Object.fromEntries(GL.data.par_jour.map(j => [j.date, j]));
   let jour = null, h = '';
   for(const x of vis){
     if(x.date !== jour){
       jour = x.date; const j = finJour[jour];
-      h += `<tr class="gl-jour"><td colspan="6">${_pspJour(jour)} <span class="gl-jours">${_ckJoursBadge(x.jours)}</span></td>
-        <td class="r gl-dv">${j&&j.debit?_glG(j.debit):''}</td><td class="r gl-cv">${j&&j.credit?_glG(j.credit):''}</td>
+      const libJ = _pspJour(jour);
+      h += `<tr class="gl-jour"><td colspan="3"><b>${libJ.charAt(0).toUpperCase() + libJ.slice(1)}</b><span>${_glJours(x.jours)}</span></td>
+        <td class="r gl-dv">${j&&j.debit?'+'+_glG(j.debit):''}</td><td class="r gl-cv">${j&&j.credit?'−'+_glG(j.credit):''}</td>
         <td class="r" title="Solde en fin de journée">${j?_glG(j.solde):''}</td></tr>`;
     }
     const ouvert = GL.ouvert === x.cle;
+    const sous = [(x.compte && (x.description||'').startsWith(x.compte)) ? null : x.compte, x.tiers && !(x.description||'').includes(x.tiers) ? x.tiers : null, x.reference ? 'Réf. ' + x.reference : null].filter(Boolean);
     h += `<tr class="gl-l ${x.annulee?'gl-annulee':''} ${ouvert?'ouvert':''}" onclick="glOuvrir('${x.cle}')">
-      <td class="gl-n">${esc(x.cle).replace(/-/g, '-<wbr>')}</td>
-      <td><span class="gl-t ${x.sens}">${esc(x.type_lib)}</span></td>
-      <td>${esc(x.compte||'')}</td>
-      <td class="gl-desc">${esc(x.description||'')}${x.tiers&&!(x.description||'').includes(x.tiers)?`<div class="psp-muted">${esc(x.tiers)}</div>`:''}
-        ${x.annulee?`<div class="gl-annul-m">Annulée : ${esc(x.motif_annulation||'')}</div>`:''}</td>
-      <td>${x.reference?esc(x.reference):'<span class="psp-muted">—</span>'}</td>
-      <td class="psp-muted">${esc(x.saisi_par||'')}${(x.retard_saisie||0)>2?`<div class="gl-retard" title="Enregistrée ${x.retard_saisie} jours après sa date">saisie +${x.retard_saisie} j</div>`:''}</td>
+      <td class="gl-type"><span class="gl-point ${x.sens}"></span>${esc(x.type_lib)}</td>
+      <td class="gl-desc"><div>${esc(x.description||'')}${x.annulee?' <span class="gl-etiq">annulée</span>':''}</div>
+        <small>${sous.map(esc).join(' · ')}</small></td>
+      <td class="gl-qui">${esc(x.saisi_par||'—')}${(x.retard_saisie||0)>2?`<span class="gl-etiq retard" title="Enregistrée ${x.retard_saisie} jours après sa date">+${x.retard_saisie} j</span>`:''}</td>
       <td class="r gl-dv">${x.debit?_glG(x.debit):''}</td>
       <td class="r gl-cv">${x.credit?_glG(x.credit):''}</td>
       <td class="r gl-solde ${x.solde<0?'neg':''}">${_glG(x.solde)}</td></tr>`;
-    if(ouvert) h += `<tr class="gl-detail"><td colspan="9">${_glDetail(x)}</td></tr>`;
+    if(ouvert) h += `<tr class="gl-detail"><td colspan="6">${_glDetail(x)}</td></tr>`;
   }
-  return `<div class="psp-card gl-table-card"><table class="gl-tbl"><thead><tr>
-      <th>N°</th><th>Type</th><th>Compte</th><th>Description</th><th>Réf.</th><th>Saisi par</th>
-      <th class="r">Débit<small>entrée</small></th><th class="r">Crédit<small>sortie</small></th><th class="r">Solde</th></tr></thead>
+  return `<div class="gl-carte"><table class="gl-tbl"><colgroup><col style="width:160px"><col><col style="width:140px"><col style="width:130px"><col style="width:130px"><col style="width:140px"></colgroup>
+    <thead><tr><th>Type</th><th>Opération</th><th>Saisi par</th><th class="r">Entrée</th><th class="r">Sortie</th><th class="r">Solde</th></tr></thead>
     <tbody>${h}</tbody>
-    <tfoot><tr><td colspan="6">${_glFiltreActif()?'Total de la sélection':'Total de la période'} — ${lignes.filter(x=>!x.annulee).length} opérations</td>
+    <tfoot><tr><td colspan="3">${_glFiltreActif()?'Total de la sélection':'Total de la période'}</td>
       <td class="r gl-dv">${_glG(sD)}</td><td class="r gl-cv">${_glG(sC)}</td><td class="r">${_glFiltreActif()?'':_glG(GL.data.solde_cloture)}</td></tr></tfoot></table>
-    ${lignes.length > GL.limite ? `<div style="text-align:center;padding:12px"><button class="btn btn-secondary" onclick="GL.limite+=400;glRendre()">Afficher ${Math.min(400, lignes.length-GL.limite)} opérations de plus (${lignes.length-GL.limite} restantes)</button></div>` : ''}
+    ${lignes.length > GL.limite ? `<div class="gl-plus-lignes"><button onclick="GL.limite+=400;glRendre()">Afficher la suite (${lignes.length-GL.limite} opérations)</button></div>` : ''}
   </div>`;
 }
 const _glJours = j => j === 0 ? "aujourd'hui" : j === 1 ? 'hier' : `il y a ${j} jours`;
@@ -20315,7 +20352,8 @@ const _glJours = j => j === 0 ? "aujourd'hui" : j === 1 ? 'hier' : `il y a ${j} 
 function _glDetail(x){
   const dt = x.detail || {};
   const info = [
-    ['Opération', `${esc(x.cle)} · ${_glSens[x.sens]} · ${esc(x.module||'')}`],
+    ['N° d’opération', `${esc(x.cle)} · ${_glSens[x.sens]} · ${esc(x.module||'')}`],
+    ['Compte', esc(x.compte || '—')],
     ['Montant', `${_glG(x.debit||x.credit)} G`],
     ['Date de l\'opération', `${frDate(x.date)} (${_glJours(x.jours)})`],
     ['Enregistrée le', x.saisi_le ? new Date(x.saisi_le).toLocaleString('fr-FR', {dateStyle:'medium', timeStyle:'short'}) + ((x.retard_saisie||0) > 0 ? ` — ${x.retard_saisie} jour${x.retard_saisie>1?'s':''} après` : '') : '—'],
@@ -20323,7 +20361,7 @@ function _glDetail(x){
     ['Tiers', esc(x.tiers || '—')], ['Référence', esc(x.reference || '—')],
     ['Solde après', `${_glG(x.solde)} G`],
   ];
-  if(dt.gallons != null) info.push(['Carburant', `${_glG(dt.gallons).replace(',00','')} gal · ${dt.nb_releves} relevé${dt.nb_releves>1?'s':''} (${esc((dt.pompes||[]).join(', '))})${dt.dont_pompistes?` · ${dt.dont_pompistes} venant de rapports pompistes validés`:''}`]);
+  if(dt.gallons != null) info.push(['Carburant', `${Number(dt.gallons).toLocaleString('fr-FR', {maximumFractionDigits:3})} gal · ${dt.nb_releves} relevé${dt.nb_releves>1?'s':''} (${esc((dt.pompes||[]).join(', '))})${dt.dont_pompistes?` · ${dt.dont_pompistes} venant de rapports pompistes validés`:''}`]);
   if(dt.caisse) info.push(['Caisse', esc(dt.caisse)]);
   if(dt.notes) info.push(['Notes', esc(dt.notes)]);
   if(x.annulee) info.push(['Annulation', esc(x.motif_annulation || '')]);
@@ -20339,7 +20377,7 @@ function _glParCompte(d){
       <td class="r gl-dv">${c.debit?_glG(c.debit):''}</td><td class="r gl-cv">${c.credit?_glG(c.credit):''}</td>
       <td class="r psp-muted">${(sens==='D'?(tD?c.debit/tD:0):(tC?c.credit/tC:0)).toLocaleString('fr-FR',{style:'percent',maximumFractionDigits:1})}</td></tr>`).join('')
     || `<tr><td colspan="6" class="psp-muted">Aucune ${titre.toLowerCase()}.</td></tr>`;
-  return `<div class="psp-card gl-table-card"><table class="gl-tbl"><thead><tr><th>Compte</th><th>Type</th><th class="r">Opérations</th>
+  return `<div class="gl-carte"><table class="gl-tbl"><thead><tr><th>Compte</th><th>Type</th><th class="r">Opérations</th>
       <th class="r">Débit (entrée)</th><th class="r">Crédit (sortie)</th><th class="r">Part</th></tr></thead><tbody>
     <tr class="gl-jour"><td colspan="6">Entrées</td></tr>${bloc('D', 'Entrées')}
     <tr class="gl-jour"><td colspan="6">Sorties</td></tr>${bloc('C', 'Sorties')}</tbody>
@@ -20352,7 +20390,7 @@ function _glParJour(d){
   const max = Math.max(1, ...jours.map(j => Math.max(j.debit, j.credit)));
   let ouv = d.solde_ouverture; const ouvJ = {};
   d.par_jour.forEach(j => { ouvJ[j.date] = ouv; ouv = j.solde; });
-  return `<div class="psp-card gl-table-card"><table class="gl-tbl"><thead><tr><th>Jour</th><th class="r">Ouverture</th>
+  return `<div class="gl-carte"><table class="gl-tbl"><thead><tr><th>Jour</th><th class="r">Ouverture</th>
       <th class="r">Entrées</th><th class="r">Sorties</th><th class="r">Clôture</th><th style="width:28%"></th></tr></thead><tbody>
     ${jours.map(j => `<tr class="gl-l" onclick="GL.f.debut=GL.f.fin='${j.date}';GL.f.preset='';GL.vue='journal';glCharger()">
       <td class="nw"><b>${_pspJour(j.date)}</b></td><td class="r psp-muted">${_glG(ouvJ[j.date])}</td>

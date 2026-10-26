@@ -32,7 +32,7 @@ PERIODES = {"Matin": 0, "Apres-midi": 1}
 # type → (libellé, sens)  — sens « D » = débit (entrée), « C » = crédit (sortie)
 TYPES = {
     "vente_carburant": ("Ventes carburant", "D"),
-    "entree_source":   ("Entrée caisse principale", "D"),
+    "entree_source":   ("Entrée source", "D"),
     "renflouement":    ("Renflouement", "D"),
     "vente_bar":       ("Ventes Bar", "D"),
     "credit_bar":      ("Remboursement crédit Bar", "D"),
@@ -71,6 +71,12 @@ def _iso(v) -> Optional[str]:
 
 def _nom(u) -> Optional[str]:
     return (getattr(u, "nom_complet", None) or getattr(u, "username", None)) if u else None
+
+
+def _gal(v: float) -> str:
+    """Gallons à la française : 1 234,5 (jamais « 40.000 », qui se lit 40 000)."""
+    t = f"{v:,.3f}".rstrip("0").rstrip(".")
+    return t.replace(",", " ").replace(".", ",")
 
 
 def _ligne(cle, jour, type_, montant, *, compte, description, tiers=None, reference=None,
@@ -137,7 +143,7 @@ def construire_lignes(db: Session, debut: Optional[date_type], fin: Optional[dat
             f"VTE-{jour}-{periode}-{pid}", jour, "vente_carburant", g["montant"],
             compte=f"Ventes {nom}",
             description=f"Ventes {nom} — {per} · {len(g['pompes'])} pompe{'s' if len(g['pompes']) > 1 else ''} · "
-                        f"{g['gallons']:,.3f} gal".replace(",", " "),
+                        f"{_gal(g['gallons'])} gal",
             module="Station", saisi_par=", ".join(sorted(x for x in g["saisi"] if x)) or None,
             saisi_le=g["saisi_le"], lien="journal", produit_id=pid or None,
             detail={"periode": periode, "gallons": round(g["gallons"], 3), "pompes": sorted(g["pompes"]),
@@ -333,6 +339,16 @@ def controles(db: Session, debut: date_type, fin: date_type, lignes: list,
                     "texte": ("Aucun relevé validé ces jours-là : rapport pas encore saisi ou pas encore validé."
                               if manquants else "Chaque jour de la période a ses relevés."),
                     "jours": manquants[:62]})
+
+    # 2 bis. Ventes carburant sans prix (gallons vendus, 0 G encaissé)
+    sans_prix = [l for l in lignes if l["type"] == "vente_carburant" and l["debit"] <= 0
+                 and (l["detail"] or {}).get("gallons", 0) > 0]
+    if sans_prix:
+        out.append({"code": "ventes_sans_prix", "niveau": "alerte",
+                    "titre": f"{len(sans_prix)} vente{'s' if len(sans_prix) > 1 else ''} carburant sans prix",
+                    "texte": "Des gallons ont été vendus mais le prix est à 0 : la caisse ne reçoit rien. "
+                             "Vérifiez le prix de vente du produit à cette date.",
+                    "cles": [l["cle"] for l in sans_prix][:200]})
 
     # 3. Rapports pompistes en attente : pas encore dans la caisse
     att = (db.query(RapportPompiste).filter(RapportPompiste.statut.in_(("SOUMIS", "PROBLEME")),
