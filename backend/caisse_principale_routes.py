@@ -228,3 +228,21 @@ def lister_entrees(date_debut: Optional[date_type] = None, date_fin: Optional[da
         "entrees": [_entree_dict(e) for e in rows if inclure_annulees or not e.annulee],
         "nb_annulees": sum(1 for e in rows if e.annulee),
     }
+
+
+# ── Journal (grand livre de caisse) ─────────────────────────────────────
+
+@router.get("/journal")
+def journal_caisse(date_debut: Optional[date_type] = None, date_fin: Optional[date_type] = None,
+                   _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Tous les mouvements d'argent de la période (débit / crédit, solde
+    cumulé, jours, contrôles) — voir grand_livre.py."""
+    import grand_livre
+    amorcer_sources(db)
+    fin = date_fin or today_haiti()
+    debut = date_debut or fin.replace(day=1)
+    if debut > fin:
+        raise HTTPException(400, "La date de début est après la date de fin.")
+    if (fin - debut).days > 3700:
+        raise HTTPException(400, "Période trop longue (10 ans au plus).")
+    return grand_livre.journal(db, debut, fin)

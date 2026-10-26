@@ -534,8 +534,11 @@ class Depense(Base):
     # attribuee a une caisse carburant specifique.
     produit_id   = Column(Integer, ForeignKey("produits.id", ondelete="SET NULL"), nullable=True)
     created_at   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    # Qui a enregistré la dépense (journal de caisse) — NULL pour l'historique
+    saisi_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
 
-    produit = relationship("Produit")
+    produit   = relationship("Produit")
+    saisi_par = relationship("Utilisateur", foreign_keys=[saisi_par_id])
 
     __table_args__ = (
         CheckConstraint("montant > 0", name="chk_depense_montant_pos"),
@@ -572,6 +575,9 @@ class Achat(Base):
     reference    = Column(String(100), nullable=True)
     notes        = Column(String(500), nullable=True)
     created_at   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    saisi_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    saisi_par = relationship("Utilisateur", foreign_keys=[saisi_par_id])
 
     __table_args__ = (
         CheckConstraint("montant > 0", name="chk_achat_montant_pos"),

@@ -487,6 +487,8 @@ def startup():
         "ALTER TABLE rapports_pompiste ALTER COLUMN soumis_at DROP NOT NULL",
         "ALTER TABLE releves ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
         "CREATE INDEX IF NOT EXISTS idx_releves_rapport_pompiste ON releves (rapport_pompiste_id)",
+        "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
+        "ALTER TABLE achats ADD COLUMN IF NOT EXISTS saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
     ]
     # Chaque instruction est isolée : une qui échoue (moteur SQLite en dev,
     # table absente, type déjà à jour…) n'empêche pas les suivantes.
@@ -5588,6 +5590,7 @@ def lister_depenses(
                 "produit_nom": d.produit.nom if d.produit else None,
                 "created_at": d.created_at.isoformat() if d.created_at else None,
                 "sans_justificatif": nb_pj.get(d.id, 0) == 0,
+                "est_transfert": _est_categorie_transfert(db, d.categorie),
             }
             for d in depenses
         ],
@@ -5619,6 +5622,7 @@ def creer_depense(data: DepenseIn, request: Request, db: Session = Depends(get_d
         montant=data.montant, date_depense=date_d,
         beneficiaire=beneficiaire, reference=data.reference, notes=data.notes,
         produit_id=produit.id if produit else None,
+        saisi_par_id=getattr(getattr(request.state, "user", None), "id", None),
     )
     db.add(d)
 
@@ -6220,6 +6224,7 @@ def creer_achat(data: AchatIn, request: Request, db: Session = Depends(get_db)):
         fournisseur=data.fournisseur.strip(), description=data.description.strip(),
         categorie=categorie, montant=data.montant,
         date_achat=date_a, reference=data.reference, notes=data.notes,
+        saisi_par_id=getattr(getattr(request.state, "user", None), "id", None),
     )
     db.add(a)
 

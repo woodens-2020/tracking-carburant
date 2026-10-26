@@ -264,6 +264,10 @@ def _migrate_columns():
              "UPDATE categories_depense SET est_transfert = 1 WHERE nom_norm LIKE '%banque%' OR nom_norm LIKE '%zelle%' OR nom_norm LIKE '%transfert%' OR nom_norm LIKE '%virement%'"),
             ("releves", "rapport_pompiste_id",
              "ALTER TABLE releves ADD COLUMN rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL", None),
+            ("depenses", "saisi_par_id",
+             "ALTER TABLE depenses ADD COLUMN saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
+            ("achats", "saisi_par_id",
+             "ALTER TABLE achats ADD COLUMN saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
         ]
     elif _is_postgres:
         new_cols = [

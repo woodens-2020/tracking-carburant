@@ -3285,6 +3285,79 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .cp-src-n{font-weight:800}
 .cp-src-v{font-family:var(--mono);font-size:17px;font-weight:800}
 .cp-src-s{font-size:12px;color:var(--muted)}
+
+.gl-grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:12px}
+.gl-grille .gl-large{grid-column:span 2}
+.gl-plus{display:none;font:inherit;font-size:13px;font-weight:600;margin-top:10px;padding:8px 12px;width:100%;text-align:left;
+  border:1px dashed var(--border);border-radius:10px;background:none;color:var(--muted);cursor:pointer}
+.gl-ligne-filtres{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.gl-seg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.gl-seg button{font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;background:var(--panel);color:var(--muted);border:0;cursor:pointer}
+.gl-seg button+button{border-left:1px solid var(--border)}
+.gl-seg button.on{background:var(--orange);color:#fff}
+.gl-type small{opacity:.7;margin-left:3px}
+.gl-type.D.on{background:rgba(34,197,94,.18);border-color:var(--green);color:var(--green)}
+.gl-type.C.on{background:rgba(239,68,68,.15);border-color:var(--red);color:var(--red)}
+.gl-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+.gl-kpi{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;border-top:3px solid var(--muted)}
+.gl-kpi.gl-d{border-top-color:var(--green)} .gl-kpi.gl-c{border-top-color:var(--red)} .gl-kpi.gl-s{border-top-color:var(--orange)}
+.gl-kpi-l{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.gl-kpi-v{font-family:var(--mono);font-size:21px;font-weight:800;margin-top:4px;white-space:nowrap}
+.gl-d .gl-kpi-v{color:var(--green)} .gl-c .gl-kpi-v{color:var(--red)} .gl-s.neg .gl-kpi-v{color:var(--red)}
+.gl-kpi-s{font-size:12px;color:var(--muted);margin-top:3px}
+.gl-controles{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:14px}
+.gl-ctl{display:flex;gap:10px;text-align:left;font:inherit;font-size:13px;color:var(--text);background:var(--panel);border:1px solid var(--border);
+  border-left:4px solid var(--green);border-radius:12px;padding:10px 12px;cursor:pointer}
+.gl-ctl.alerte{border-left-color:var(--red)} .gl-ctl.info{border-left-color:var(--blue)}
+.gl-ctl-i{flex:0 0 22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:12px;color:#fff;background:var(--green)}
+.gl-ctl.alerte .gl-ctl-i{background:var(--red)} .gl-ctl.info .gl-ctl-i{background:var(--blue)}
+.gl-ctl-a{font-size:12px;font-weight:700;color:var(--orange)}
+.gl-barre{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.gl-sel{font-size:13px;color:var(--muted)}
+.gl-table-card{padding:0;overflow-x:auto}
+.gl-tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:880px}
+.gl-tbl th small{display:block;font-size:9.5px;font-weight:600;opacity:.8}
+.gl-tbl tr.gl-jour td.gl-dv{color:var(--green)} .gl-tbl tr.gl-jour td.gl-cv{color:var(--red)}
+.gl-tbl tr.gl-jour td.r{font-size:12.5px;text-transform:none;letter-spacing:0}
+.gl-tbl th{position:sticky;top:0;background:var(--panel);text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  padding:10px;border-bottom:2px solid var(--border);white-space:nowrap}
+.gl-tbl td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+.gl-tbl .r{text-align:right;font-family:var(--mono);white-space:nowrap}
+.gl-tbl .nw{white-space:nowrap}
+.gl-tbl tr.gl-jour td{background:rgba(249,115,22,.07);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--orange);padding:7px 10px}
+.gl-jours{font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted);margin-left:6px}
+.gl-tbl tr.gl-l{cursor:pointer} .gl-tbl tr.gl-l:hover td{background:rgba(255,255,255,.03)}
+.gl-tbl tr.gl-l.ouvert td{background:rgba(249,115,22,.06)}
+.gl-tbl tfoot td{font-weight:800;border-top:2px solid var(--border);padding:10px}
+.gl-n{font-family:var(--mono);font-size:11px;color:var(--muted);max-width:118px;line-height:1.3}
+.gl-desc{min-width:200px}
+.gl-t{font-size:11.5px;font-weight:700;border-radius:20px;padding:2px 9px;white-space:nowrap}
+.gl-t.D{background:rgba(34,197,94,.13);color:var(--green)} .gl-t.C{background:rgba(239,68,68,.12);color:var(--red)}
+.gl-dv{color:var(--green)} .gl-cv{color:var(--red)}
+.gl-solde{font-weight:700} .gl-solde.neg{color:var(--red)}
+.gl-annulee td{text-decoration:line-through;opacity:.55} .gl-annulee .gl-annul-m{text-decoration:none}
+.gl-annul-m{font-size:11.5px;color:var(--red)}
+.gl-retard{font-size:11px;font-weight:700;color:var(--orange)}
+.gl-detail td{background:rgba(255,255,255,.02)}
+.gl-det{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px 16px}
+.gl-det div{display:flex;flex-direction:column;gap:2px} .gl-det span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.gl-det b{font-weight:600;font-size:13px}
+.gl-barres{display:flex;flex-direction:column;gap:3px} .gl-barres i{display:block;height:6px;border-radius:3px;min-width:2px}
+.gl-barres i.d{background:var(--green)} .gl-barres i.c{background:var(--red)}
+@media (max-width:900px){ .gl-kpis{grid-template-columns:repeat(2,1fr)} .gl-grille .gl-large{grid-column:span 1} }
+@media (max-width:720px){
+  .gl-grille{grid-template-columns:repeat(2,1fr)} .gl-grille .gl-large{grid-column:span 2}
+  .gl-plus{display:block}
+  .gl-grille:not(.ouvert) > label:nth-child(n+4){display:none}
+  .gl-filtres .gl-ligne-filtres:last-child .btn{flex:1}
+}
+@media (max-width:520px){ .gl-kpis{grid-template-columns:1fr} .gl-kpi-v{font-size:19px} .gl-seg button{padding:7px 9px} }
+.dep-presets{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.dep-presets button{font:inherit;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer;
+  border:1px solid var(--border);background:var(--panel);color:var(--muted)}
+.dep-presets button.on{background:rgba(248,113,113,.15);border-color:#f87171;color:#f87171}
+.dep-presets .dep-effacer{border-style:dashed}
+.dep-resultat{font-size:13px;color:var(--muted);margin:-4px 0 10px}
 .cp-form{border-color:var(--orange)}
 .cp-champ{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
 .cp-case{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
@@ -4314,7 +4387,8 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
     <!-- ══════ PAGE : SAISIE ══════ -->
     <div id="page-caisse-principale" class="page">
       <div class="psp-tabs">
-        <button class="psp-tab on" data-cp="entrees" onclick="cpOnglet('entrees')">Entrées</button>
+        <button class="psp-tab on" data-cp="journal" onclick="cpOnglet('journal')">Journal de caisse</button>
+        <button class="psp-tab" data-cp="entrees" onclick="cpOnglet('entrees')">Entrées des sources</button>
         <button class="psp-tab" data-cp="sources" onclick="cpOnglet('sources')">Sources</button>
       </div>
       <div id="cp-contenu"></div>
@@ -6266,14 +6340,25 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
         </div>
         </div><!-- /dep-dash-capture -->
 
+        <div class="dep-presets" id="dep-presets">
+          <button type="button" data-p="jour" onclick="depPreset('jour')">Aujourd'hui</button>
+          <button type="button" data-p="hier" onclick="depPreset('hier')">Hier</button>
+          <button type="button" data-p="7j" onclick="depPreset('7j')">7 jours</button>
+          <button type="button" data-p="30j" onclick="depPreset('30j')">30 jours</button>
+          <button type="button" data-p="mois" onclick="depPreset('mois')">Ce mois</button>
+          <button type="button" data-p="prec" onclick="depPreset('prec')">Mois précédent</button>
+          <button type="button" data-p="annee" onclick="depPreset('annee')">Cette année</button>
+          <span style="flex:1"></span>
+          <button type="button" class="dep-effacer" id="dep-effacer" onclick="depEffacerFiltres()" style="display:none">Effacer les filtres</button>
+        </div>
         <div class="gi-filters">
           <div class="gi-filter-field">
             <label class="gi-filter-lbl">Du</label>
-            <input type="date" class="gi-filter-input" id="dep-filtre-debut" onchange="loadDepenses()"/>
+            <input type="date" class="gi-filter-input" id="dep-filtre-debut" onchange="_depPresetActif('');loadDepenses()"/>
           </div>
           <div class="gi-filter-field">
             <label class="gi-filter-lbl">Au</label>
-            <input type="date" class="gi-filter-input" id="dep-filtre-fin" onchange="loadDepenses()"/>
+            <input type="date" class="gi-filter-input" id="dep-filtre-fin" onchange="_depPresetActif('');loadDepenses()"/>
           </div>
           <div class="gi-filter-field">
             <label class="gi-filter-lbl">Catégorie</label>
@@ -6297,7 +6382,50 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
             <label class="gi-filter-lbl">Recherche</label>
             <input type="text" class="gi-filter-input" id="dep-recherche" placeholder="Description, bénéficiaire, référence…" oninput="depRechercheFiltrer()"/>
           </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Type</label>
+            <select class="gi-filter-input" id="dep-filtre-type" onchange="depRechercheFiltrer()">
+              <option value="">Tout</option>
+              <option value="charge">Charges (vraies dépenses)</option>
+              <option value="transfert">Transferts / dépôts en banque</option>
+            </select>
+          </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Montant min</label>
+            <input type="text" inputmode="decimal" class="gi-filter-input" id="dep-filtre-min" placeholder="0" style="width:110px" oninput="depRechercheFiltrer()"/>
+          </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Montant max</label>
+            <input type="text" inputmode="decimal" class="gi-filter-input" id="dep-filtre-max" placeholder="∞" style="width:110px" oninput="depRechercheFiltrer()"/>
+          </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Justificatif</label>
+            <select class="gi-filter-input" id="dep-filtre-pj" onchange="depRechercheFiltrer()">
+              <option value="">Tous</option>
+              <option value="avec">Avec document</option>
+              <option value="sans">Sans document</option>
+            </select>
+          </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Référence</label>
+            <select class="gi-filter-input" id="dep-filtre-ref" onchange="depRechercheFiltrer()">
+              <option value="">Toutes</option>
+              <option value="avec">Avec n° de reçu</option>
+              <option value="sans">Sans n° de reçu</option>
+            </select>
+          </div>
+          <div class="gi-filter-field">
+            <label class="gi-filter-lbl">Trier par</label>
+            <select class="gi-filter-input" id="dep-filtre-tri" onchange="depRechercheFiltrer()">
+              <option value="date-desc">Date (récent d'abord)</option>
+              <option value="date-asc">Date (ancien d'abord)</option>
+              <option value="montant-desc">Montant (plus gros d'abord)</option>
+              <option value="montant-asc">Montant (plus petit d'abord)</option>
+              <option value="saisie-desc">Dernières enregistrées</option>
+            </select>
+          </div>
         </div>
+        <div class="dep-resultat" id="dep-resultat"></div>
 
         <div class="gi-table-card">
           <div class="gi-table-hdr">
@@ -19813,7 +19941,7 @@ async function pspCompte(id, body){
 // Sources (Zo Vincent, Champin, autres…) → entrées (source, montant, date)
 // → total de la caisse principale. Sources configurables.
 // ══════════════════════════════════════════════
-const CP = {onglet:'entrees', sources:[], donnees:null, form:false, annuler:null,
+const CP = {onglet:'journal', sources:[], donnees:null, form:false, annuler:null,
             filtre:{debut:'', fin:'', source:'', annulees:false, preset:'mois'}};
 const _cpG = n => Number(n||0).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' G';
 
@@ -19849,7 +19977,8 @@ async function cpOnglet(t){
   c.innerHTML = '<div class="psp-muted">Chargement…</div>';
   try{
     CP.sources = await _cpApi('GET', '/sources');
-    if(t === 'entrees') await cpCharger(); else cpRendreSources();
+    if(t === 'journal') await glCharger();
+    else if(t === 'entrees') await cpCharger(); else cpRendreSources();
   }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
 }
 
@@ -19999,6 +20128,278 @@ async function cpRenommer(id){
   try{ await _cpApi('PATCH', `/sources/${id}`, {nom}); CP.renommer = null; cpOnglet('sources'); }
   catch(e){ notify(e.message, 'err'); }
 }
+
+// ══════════════════════════════════════════════
+// JOURNAL DE CAISSE (grand livre) — voir backend/grand_livre.py
+// Tous les mouvements d'argent du système au débit (entrée) / crédit
+// (sortie), solde cumulé, jours, contrôles. Les filtres s'appliquent tout
+// de suite sur la période chargée (aucun rechargement).
+// ══════════════════════════════════════════════
+const GL = {data:null, ouvert:null, vue:'journal', limite:400,
+            f:{preset:'mois', debut:'', fin:'', q:'', sens:'', types:[], compte:'', module:'', saisi:'',
+               min:'', max:'', annulees:true, ordre:'desc', cles:null, cles_titre:''}};
+const _glG = n => Number(n||0).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2});
+const _glSens = {D:'Entrée', C:'Sortie'};
+
+function _glPreset(k){
+  const f = GL.f, auj = new Date(currentDate + 'T12:00:00');
+  f.preset = k;
+  const d = n => { const x = new Date(auj); x.setDate(x.getDate() - n); return _ymd(x); };
+  if(k === 'jour'){ f.debut = f.fin = currentDate; }
+  else if(k === 'hier'){ f.debut = f.fin = d(1); }
+  else if(k === '7j'){ f.debut = d(6); f.fin = currentDate; }
+  else if(k === '30j'){ f.debut = d(29); f.fin = currentDate; }
+  else if(k === 'mois'){ f.debut = currentDate.slice(0, 8) + '01'; f.fin = currentDate; }
+  else if(k === 'prec'){ f.debut = _ymd(new Date(auj.getFullYear(), auj.getMonth() - 1, 1)); f.fin = _ymd(new Date(auj.getFullYear(), auj.getMonth(), 0)); }
+  else if(k === 'annee'){ f.debut = currentDate.slice(0, 4) + '-01-01'; f.fin = currentDate; }
+}
+
+async function glCharger(){
+  if(!GL.f.debut) _glPreset('mois');
+  const c = document.getElementById('cp-contenu');
+  if(!GL.data) c.innerHTML = '<div class="psp-muted">Chargement du journal…</div>';
+  try{
+    GL.data = await _cpApi('GET', `/journal?date_debut=${GL.f.debut}&date_fin=${GL.f.fin}`);
+    GL.limite = 400;
+    glRendre();
+  }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
+}
+function glPeriode(k){ _glPreset(k); glCharger(); }
+function glDate(cle, v){ if(!v) return; GL.f[cle] = v; GL.f.preset = '';
+  if(GL.f.debut > GL.f.fin){ if(cle === 'debut') GL.f.fin = v; else GL.f.debut = v; } glCharger(); }
+function glFiltre(cle, v){ GL.f[cle] = v; GL.limite = 400; glRendre(cle === 'q' ? 'gl-q' : null); }
+function glType(t){ const a = GL.f.types; const i = a.indexOf(t); if(i < 0) a.push(t); else a.splice(i, 1); glRendre(); }
+function glReinit(){ Object.assign(GL.f, {q:'', sens:'', types:[], compte:'', module:'', saisi:'', min:'', max:'', annulees:true, cles:null, cles_titre:''}); glRendre(); }
+function glControle(i){
+  const c = GL.data.controles[i];
+  if(!c.cles || !c.cles.length){ if(c.lien) goTo(c.lien); return; }
+  GL.f.cles = c.cles; GL.f.cles_titre = c.titre; GL.vue = 'journal'; glRendre();
+  document.getElementById('gl-registre')?.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function glCompte(nom){ GL.f.compte = nom; GL.vue = 'journal'; glRendre(); }
+function glOuvrir(cle){ GL.ouvert = GL.ouvert === cle ? null : cle; glRendre(); }
+
+function _glFiltrees(){
+  const f = GL.f, q = _navNorm(f.q || '');
+  const min = f.min === '' ? null : parseFloat(String(f.min).replace(',', '.'));
+  const max = f.max === '' ? null : parseFloat(String(f.max).replace(',', '.'));
+  const cles = f.cles ? new Set(f.cles) : null;
+  let l = GL.data.lignes.filter(x =>
+    (f.annulees || !x.annulee)
+    && (!f.sens || x.sens === f.sens)
+    && (!f.types.length || f.types.includes(x.type))
+    && (!f.compte || x.compte === f.compte)
+    && (!f.module || x.module === f.module)
+    && (!f.saisi || (x.saisi_par || '').split(', ').includes(f.saisi))
+    && (min === null || (x.debit || x.credit) >= min)
+    && (max === null || (x.debit || x.credit) <= max)
+    && (!cles || cles.has(x.cle))
+    && (!q || _navNorm([x.cle, x.description, x.compte, x.tiers, x.reference, x.saisi_par, x.type_lib, x.module].filter(Boolean).join(' ')).includes(q)));
+  if(f.ordre === 'desc') l = l.slice().reverse();
+  return l;
+}
+function _glFiltreActif(){
+  const f = GL.f;
+  return !!(f.q || f.sens || f.types.length || f.compte || f.module || f.saisi || f.min !== '' || f.max !== '' || !f.annulees || f.cles);
+}
+
+function glRendre(focus){
+  const c = document.getElementById('cp-contenu'), d = GL.data, f = GL.f;
+  if(!d) return;
+  const lignes = _glFiltrees(), actif = _glFiltreActif();
+  const sel = lignes.filter(x => !x.annulee);
+  const sD = sel.reduce((a, x) => a + x.debit, 0), sC = sel.reduce((a, x) => a + x.credit, 0);
+  const uniq = k => [...new Set(d.lignes.map(x => x[k]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const saisis = [...new Set(d.lignes.flatMap(x => (x.saisi_par || '').split(', ')).filter(Boolean))].sort();
+  const parType = {}; d.lignes.forEach(x => parType[x.type] = (parType[x.type] || 0) + 1);
+  const periode = d.date_debut === d.date_fin ? frDate(d.date_debut) : `du ${frDate(d.date_debut)} au ${frDate(d.date_fin)}`;
+  const pos = document.activeElement?.id === focus ? document.activeElement.selectionStart : null;
+
+  c.innerHTML = `
+  <div class="psp-card psp-filtres gl-filtres">
+    <div class="psp-chips">${[['jour',"Aujourd'hui"],['hier','Hier'],['7j','7 jours'],['30j','30 jours'],['mois','Ce mois'],['prec','Mois précédent'],['annee','Cette année']]
+      .map(([k,l]) => `<button class="psp-chip ${f.preset===k?'on':''}" onclick="glPeriode('${k}')">${l}</button>`).join('')}</div>
+    <button class="gl-plus" onclick="GL.plus=!GL.plus;glRendre()">${GL.plus?'▴ Moins de filtres':'▾ Plus de filtres'}${actif?' · <b>filtres actifs</b>':''}</button>
+    <div class="gl-grille ${GL.plus?'ouvert':''}">
+      <label class="cp-champ">Du<input type="date" class="filter-input" value="${f.debut}" max="${currentDate}" onchange="glDate('debut', this.value)"></label>
+      <label class="cp-champ">Au<input type="date" class="filter-input" value="${f.fin}" max="${currentDate}" onchange="glDate('fin', this.value)"></label>
+      <label class="cp-champ gl-large">Recherche<input id="gl-q" class="filter-input" value="${esc(f.q)}" placeholder="Description, n°, bénéficiaire, référence, compte…" oninput="glFiltre('q', this.value)"></label>
+      <label class="cp-champ">Compte / catégorie<select class="filter-input" onchange="glFiltre('compte', this.value)"><option value="">Tous les comptes</option>
+        ${uniq('compte').map(x => `<option ${f.compte===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
+      <label class="cp-champ">Module<select class="filter-input" onchange="glFiltre('module', this.value)"><option value="">Tous</option>
+        ${uniq('module').map(x => `<option ${f.module===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
+      <label class="cp-champ">Saisi par<select class="filter-input" onchange="glFiltre('saisi', this.value)"><option value="">Tout le monde</option>
+        ${saisis.map(x => `<option ${f.saisi===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
+      <label class="cp-champ">Montant min (G)<input class="filter-input" inputmode="decimal" value="${esc(f.min)}" onchange="glFiltre('min', this.value)" placeholder="0"></label>
+      <label class="cp-champ">Montant max (G)<input class="filter-input" inputmode="decimal" value="${esc(f.max)}" onchange="glFiltre('max', this.value)" placeholder="∞"></label>
+    </div>
+    <div class="gl-ligne-filtres">
+      <div class="gl-seg">${[['','Tout'],['D','Entrées (débit)'],['C','Sorties (crédit)']]
+        .map(([k,l]) => `<button class="${f.sens===k?'on':''}" onclick="glFiltre('sens','${k}')">${l}</button>`).join('')}</div>
+      <div class="psp-chips">${d.types.filter(t => parType[t.type]).map(t =>
+        `<button class="psp-chip gl-type ${t.sens} ${f.types.includes(t.type)?'on':''}" onclick="glType('${t.type}')">${esc(t.lib)} <small>${parType[t.type]}</small></button>`).join('')}</div>
+    </div>
+    <div class="gl-ligne-filtres">
+      <label class="cp-case"><input type="checkbox" ${f.annulees?'checked':''} onchange="glFiltre('annulees', this.checked)"> Afficher les entrées annulées${d.nb_annulees?` (${d.nb_annulees})`:''}</label>
+      <div class="gl-seg">${[['desc','Plus récent d\'abord'],['asc','Plus ancien d\'abord']]
+        .map(([k,l]) => `<button class="${f.ordre===k?'on':''}" onclick="glFiltre('ordre','${k}')">${l}</button>`).join('')}</div>
+      <span style="flex:1"></span>
+      ${actif?'<button class="btn btn-secondary psp-mini" onclick="glReinit()">Effacer les filtres</button>':''}
+      <button class="btn btn-secondary psp-mini" onclick="glExporter()">⬇ Excel (CSV)</button>
+      <button class="btn btn-secondary psp-mini" onclick="glImprimer()">🖨 Imprimer</button>
+    </div>
+  </div>
+
+  <div class="gl-kpis">
+    <div class="gl-kpi"><div class="gl-kpi-l">Solde d'ouverture</div><div class="gl-kpi-v">${_glG(d.solde_ouverture)} G</div><div class="gl-kpi-s">au ${frDate(d.date_debut)}, avant la période</div></div>
+    <div class="gl-kpi gl-d"><div class="gl-kpi-l">Entrées · débit</div><div class="gl-kpi-v">+ ${_glG(d.total_debit)} G</div><div class="gl-kpi-s">${d.lignes.filter(x=>x.sens==='D'&&!x.annulee).length} opérations</div></div>
+    <div class="gl-kpi gl-c"><div class="gl-kpi-l">Sorties · crédit</div><div class="gl-kpi-v">− ${_glG(d.total_credit)} G</div><div class="gl-kpi-s">${d.lignes.filter(x=>x.sens==='C'&&!x.annulee).length} opérations</div></div>
+    <div class="gl-kpi gl-s ${d.solde_cloture<0?'neg':''}"><div class="gl-kpi-l">Solde de clôture</div><div class="gl-kpi-v">${_glG(d.solde_cloture)} G</div><div class="gl-kpi-s">${esc(periode)} · variation ${d.total_debit-d.total_credit>=0?'+':'−'} ${_glG(Math.abs(d.total_debit-d.total_credit))} G</div></div>
+  </div>
+
+  <div class="gl-controles">${d.controles.map((k, i) => `
+    <button class="gl-ctl ${k.niveau}" onclick="glControle(${i})" ${(k.cles&&k.cles.length)||k.lien?'':'style="cursor:default"'}>
+      <span class="gl-ctl-i">${k.niveau==='ok'?'✓':k.niveau==='alerte'?'!':'i'}</span>
+      <span><b>${esc(k.titre)}</b><br><span class="psp-muted">${esc(k.texte)}${k.jours&&k.jours.length?` <br>${k.jours.slice(0,10).map(j=>frDate(j)).join(' · ')}${k.jours.length>10?' …':''}`:''}</span>
+      ${(k.cles&&k.cles.length)?'<br><span class="gl-ctl-a">Voir les opérations →</span>':k.lien?'<br><span class="gl-ctl-a">Ouvrir →</span>':''}</span>
+    </button>`).join('')}</div>
+
+  <div class="gl-barre" id="gl-registre">
+    <div class="gl-seg">${[['journal','Journal'],['comptes','Par compte'],['jours','Par jour']]
+      .map(([k,l]) => `<button class="${GL.vue===k?'on':''}" onclick="GL.vue='${k}';glRendre()">${l}</button>`).join('')}</div>
+    ${actif?`<div class="gl-sel">${f.cles?`<b>${esc(f.cles_titre)}</b> · `:''}Sélection : ${sel.length} opération${sel.length>1?'s':''} ·
+      <span class="gl-dv">+ ${_glG(sD)}</span> · <span class="gl-cv">− ${_glG(sC)}</span> · net <b>${_glG(sD-sC)} G</b></div>`:''}
+  </div>
+  ${GL.vue === 'comptes' ? _glParCompte(d) : GL.vue === 'jours' ? _glParJour(d) : _glRegistre(lignes, sD, sC)}`;
+
+  if(focus){ const el = document.getElementById(focus); if(el){ el.focus(); if(pos !== null) el.setSelectionRange(pos, pos); } }
+}
+
+function _glRegistre(lignes, sD, sC){
+  if(!lignes.length) return `<div class="psp-card"><b>Aucune opération ${_glFiltreActif()?'ne correspond aux filtres':'sur cette période'}.</b></div>`;
+  const vis = lignes.slice(0, GL.limite);
+  const finJour = Object.fromEntries(GL.data.par_jour.map(j => [j.date, j]));
+  let jour = null, h = '';
+  for(const x of vis){
+    if(x.date !== jour){
+      jour = x.date; const j = finJour[jour];
+      h += `<tr class="gl-jour"><td colspan="6">${_pspJour(jour)} <span class="gl-jours">${_ckJoursBadge(x.jours)}</span></td>
+        <td class="r gl-dv">${j&&j.debit?_glG(j.debit):''}</td><td class="r gl-cv">${j&&j.credit?_glG(j.credit):''}</td>
+        <td class="r" title="Solde en fin de journée">${j?_glG(j.solde):''}</td></tr>`;
+    }
+    const ouvert = GL.ouvert === x.cle;
+    h += `<tr class="gl-l ${x.annulee?'gl-annulee':''} ${ouvert?'ouvert':''}" onclick="glOuvrir('${x.cle}')">
+      <td class="gl-n">${esc(x.cle).replace(/-/g, '-<wbr>')}</td>
+      <td><span class="gl-t ${x.sens}">${esc(x.type_lib)}</span></td>
+      <td>${esc(x.compte||'')}</td>
+      <td class="gl-desc">${esc(x.description||'')}${x.tiers&&!(x.description||'').includes(x.tiers)?`<div class="psp-muted">${esc(x.tiers)}</div>`:''}
+        ${x.annulee?`<div class="gl-annul-m">Annulée : ${esc(x.motif_annulation||'')}</div>`:''}</td>
+      <td>${x.reference?esc(x.reference):'<span class="psp-muted">—</span>'}</td>
+      <td class="psp-muted">${esc(x.saisi_par||'')}${(x.retard_saisie||0)>2?`<div class="gl-retard" title="Enregistrée ${x.retard_saisie} jours après sa date">saisie +${x.retard_saisie} j</div>`:''}</td>
+      <td class="r gl-dv">${x.debit?_glG(x.debit):''}</td>
+      <td class="r gl-cv">${x.credit?_glG(x.credit):''}</td>
+      <td class="r gl-solde ${x.solde<0?'neg':''}">${_glG(x.solde)}</td></tr>`;
+    if(ouvert) h += `<tr class="gl-detail"><td colspan="9">${_glDetail(x)}</td></tr>`;
+  }
+  return `<div class="psp-card gl-table-card"><table class="gl-tbl"><thead><tr>
+      <th>N°</th><th>Type</th><th>Compte</th><th>Description</th><th>Réf.</th><th>Saisi par</th>
+      <th class="r">Débit<small>entrée</small></th><th class="r">Crédit<small>sortie</small></th><th class="r">Solde</th></tr></thead>
+    <tbody>${h}</tbody>
+    <tfoot><tr><td colspan="6">${_glFiltreActif()?'Total de la sélection':'Total de la période'} — ${lignes.filter(x=>!x.annulee).length} opérations</td>
+      <td class="r gl-dv">${_glG(sD)}</td><td class="r gl-cv">${_glG(sC)}</td><td class="r">${_glFiltreActif()?'':_glG(GL.data.solde_cloture)}</td></tr></tfoot></table>
+    ${lignes.length > GL.limite ? `<div style="text-align:center;padding:12px"><button class="btn btn-secondary" onclick="GL.limite+=400;glRendre()">Afficher ${Math.min(400, lignes.length-GL.limite)} opérations de plus (${lignes.length-GL.limite} restantes)</button></div>` : ''}
+  </div>`;
+}
+const _glJours = j => j === 0 ? "aujourd'hui" : j === 1 ? 'hier' : `il y a ${j} jours`;
+
+function _glDetail(x){
+  const dt = x.detail || {};
+  const info = [
+    ['Opération', `${esc(x.cle)} · ${_glSens[x.sens]} · ${esc(x.module||'')}`],
+    ['Montant', `${_glG(x.debit||x.credit)} G`],
+    ['Date de l\'opération', `${frDate(x.date)} (${_glJours(x.jours)})`],
+    ['Enregistrée le', x.saisi_le ? new Date(x.saisi_le).toLocaleString('fr-FR', {dateStyle:'medium', timeStyle:'short'}) + ((x.retard_saisie||0) > 0 ? ` — ${x.retard_saisie} jour${x.retard_saisie>1?'s':''} après` : '') : '—'],
+    ['Saisi par', esc(x.saisi_par || '—')],
+    ['Tiers', esc(x.tiers || '—')], ['Référence', esc(x.reference || '—')],
+    ['Solde après', `${_glG(x.solde)} G`],
+  ];
+  if(dt.gallons != null) info.push(['Carburant', `${_glG(dt.gallons).replace(',00','')} gal · ${dt.nb_releves} relevé${dt.nb_releves>1?'s':''} (${esc((dt.pompes||[]).join(', '))})${dt.dont_pompistes?` · ${dt.dont_pompistes} venant de rapports pompistes validés`:''}`]);
+  if(dt.caisse) info.push(['Caisse', esc(dt.caisse)]);
+  if(dt.notes) info.push(['Notes', esc(dt.notes)]);
+  if(x.annulee) info.push(['Annulation', esc(x.motif_annulation || '')]);
+  return `<div class="gl-det">${info.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
+    ${x.lien?`<div style="margin-top:8px"><button class="btn btn-secondary psp-mini" onclick="event.stopPropagation();goTo('${x.lien}')">Ouvrir dans le module →</button></div>`:''}`;
+}
+
+function _glParCompte(d){
+  const tD = d.par_compte.reduce((a, c) => a + c.debit, 0), tC = d.par_compte.reduce((a, c) => a + c.credit, 0);
+  const bloc = (sens, titre) => d.par_compte.filter(c => c.sens === sens).map(c => `
+    <tr class="gl-l" onclick="glCompte(${JSON.stringify(c.compte).replace(/"/g,'&quot;')})">
+      <td><b>${esc(c.compte)}</b></td><td class="psp-muted">${esc(c.type_lib)}</td><td class="r">${c.nb}</td>
+      <td class="r gl-dv">${c.debit?_glG(c.debit):''}</td><td class="r gl-cv">${c.credit?_glG(c.credit):''}</td>
+      <td class="r psp-muted">${(sens==='D'?(tD?c.debit/tD:0):(tC?c.credit/tC:0)).toLocaleString('fr-FR',{style:'percent',maximumFractionDigits:1})}</td></tr>`).join('')
+    || `<tr><td colspan="6" class="psp-muted">Aucune ${titre.toLowerCase()}.</td></tr>`;
+  return `<div class="psp-card gl-table-card"><table class="gl-tbl"><thead><tr><th>Compte</th><th>Type</th><th class="r">Opérations</th>
+      <th class="r">Débit (entrée)</th><th class="r">Crédit (sortie)</th><th class="r">Part</th></tr></thead><tbody>
+    <tr class="gl-jour"><td colspan="6">Entrées</td></tr>${bloc('D', 'Entrées')}
+    <tr class="gl-jour"><td colspan="6">Sorties</td></tr>${bloc('C', 'Sorties')}</tbody>
+    <tfoot><tr><td colspan="3">Total · variation de la caisse ${_glG(tD - tC)} G</td><td class="r gl-dv">${_glG(tD)}</td><td class="r gl-cv">${_glG(tC)}</td><td></td></tr></tfoot></table>
+    <div class="psp-muted" style="padding:8px 4px 0">Cliquez sur un compte pour voir ses opérations dans le journal.</div></div>`;
+}
+
+function _glParJour(d){
+  const jours = d.par_jour.slice(); if(GL.f.ordre === 'desc') jours.reverse();
+  const max = Math.max(1, ...jours.map(j => Math.max(j.debit, j.credit)));
+  let ouv = d.solde_ouverture; const ouvJ = {};
+  d.par_jour.forEach(j => { ouvJ[j.date] = ouv; ouv = j.solde; });
+  return `<div class="psp-card gl-table-card"><table class="gl-tbl"><thead><tr><th>Jour</th><th class="r">Ouverture</th>
+      <th class="r">Entrées</th><th class="r">Sorties</th><th class="r">Clôture</th><th style="width:28%"></th></tr></thead><tbody>
+    ${jours.map(j => `<tr class="gl-l" onclick="GL.f.debut=GL.f.fin='${j.date}';GL.f.preset='';GL.vue='journal';glCharger()">
+      <td class="nw"><b>${_pspJour(j.date)}</b></td><td class="r psp-muted">${_glG(ouvJ[j.date])}</td>
+      <td class="r gl-dv">${_glG(j.debit)}</td><td class="r gl-cv">${_glG(j.credit)}</td>
+      <td class="r gl-solde ${j.solde<0?'neg':''}">${_glG(j.solde)}</td>
+      <td><div class="gl-barres"><i class="d" style="width:${j.debit/max*100}%"></i><i class="c" style="width:${j.credit/max*100}%"></i></div></td></tr>`).join('')}
+    </tbody></table><div class="psp-muted" style="padding:8px 4px 0">Cliquez sur un jour pour ouvrir son journal.</div></div>`;
+}
+
+function glExporter(){
+  const l = _glFiltrees().slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  const n = v => v ? String(v.toFixed(2)).replace('.', ',') : '';
+  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const rows = [['N°','Date','Jours','Type','Sens','Compte','Description','Tiers','Référence','Module','Saisi par','Enregistrée le','Débit','Crédit','Solde','Annulée']]
+    .concat(l.map(x => [x.cle, x.date, x.jours, x.type_lib, _glSens[x.sens], x.compte, x.description, x.tiers, x.reference, x.module,
+      x.saisi_par, x.saisi_le ? new Date(x.saisi_le).toLocaleString('fr-FR') : '', n(x.debit), n(x.credit), n(x.solde), x.annulee ? 'oui : ' + (x.motif_annulation||'') : '']));
+  const csv = '\ufeff' + rows.map(r => r.map(q).join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = `journal-caisse_${GL.data.date_debut}_${GL.data.date_fin}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+function glImprimer(){
+  const d = GL.data, l = _glFiltrees().slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  const sel = l.filter(x => !x.annulee);
+  const w = window.open('', '_blank'); if(!w) return notify('Autorisez les fenêtres pour imprimer.', 'err');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Journal de caisse</title><style>
+    @page{size:11in 8.5in;margin:.4in}body{font:10px/1.35 Arial,sans-serif;color:#111}h1{font-size:16px;margin:0}
+    .k{display:flex;gap:18px;margin:8px 0 10px}.k div{border:1px solid #bbb;border-radius:4px;padding:5px 9px}.k b{display:block;font-size:12px}
+    table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ddd;padding:3px 4px;text-align:left;vertical-align:top}
+    th{background:#eee;font-size:9px;text-transform:uppercase}.r{text-align:right;white-space:nowrap}.x{text-decoration:line-through;color:#888}
+    tfoot td{font-weight:bold;border-top:2px solid #333}</style></head><body>
+    <h1>Journal de la caisse principale</h1>
+    <div>${d.date_debut===d.date_fin?frDate(d.date_debut):`Du ${frDate(d.date_debut)} au ${frDate(d.date_fin)}`} · imprimé le ${new Date().toLocaleString('fr-FR')}${_glFiltreActif()?' · <b>sélection filtrée</b>':''}</div>
+    <div class="k"><div>Solde d'ouverture<b>${_glG(d.solde_ouverture)} G</b></div><div>Entrées (débit)<b>${_glG(d.total_debit)} G</b></div>
+      <div>Sorties (crédit)<b>${_glG(d.total_credit)} G</b></div><div>Solde de clôture<b>${_glG(d.solde_cloture)} G</b></div></div>
+    <table><thead><tr><th>N°</th><th>Date</th><th>Type</th><th>Compte</th><th>Description</th><th>Réf.</th><th>Saisi par</th><th class="r">Débit</th><th class="r">Crédit</th><th class="r">Solde</th></tr></thead><tbody>
+    ${l.map(x => `<tr class="${x.annulee?'x':''}"><td>${esc(x.cle)}</td><td>${frDate(x.date)}</td><td>${esc(x.type_lib)}</td><td>${esc(x.compte||'')}</td>
+      <td>${esc(x.description||'')}${x.tiers?' — '+esc(x.tiers):''}</td><td>${esc(x.reference||'')}</td><td>${esc(x.saisi_par||'')}</td>
+      <td class="r">${x.debit?_glG(x.debit):''}</td><td class="r">${x.credit?_glG(x.credit):''}</td><td class="r">${_glG(x.solde)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="7">Total — ${sel.length} opérations</td><td class="r">${_glG(sel.reduce((a,x)=>a+x.debit,0))}</td>
+      <td class="r">${_glG(sel.reduce((a,x)=>a+x.credit,0))}</td><td></td></tr></tfoot></table>
+    <script>window.onload=()=>{window.print()}<\/script></body></html>`);
+  w.document.close();
+}
+
 async function cpBasculerSource(id, actif){
   try{ await _cpApi('PATCH', `/sources/${id}`, {actif}); cpOnglet('sources'); }
   catch(e){ notify(e.message, 'err'); }
@@ -23722,12 +24123,57 @@ function _renderDepPanels(data){
 // Filtre en direct (côté client, sans requête serveur) la liste déjà chargée
 // par description/catégorie/bénéficiaire/référence — réutilise _navNorm (déjà
 // défini pour la recherche de la sidebar) pour un match insensible aux accents.
+function _depPresetActif(k){
+  document.querySelectorAll('#dep-presets [data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === k));
+}
+function depPreset(k){
+  const auj = new Date(currentDate + 'T12:00:00');
+  const j = n => { const x = new Date(auj); x.setDate(x.getDate() - n); return _ymd(x); };
+  const p = {jour:[currentDate, currentDate], hier:[j(1), j(1)], '7j':[j(6), currentDate], '30j':[j(29), currentDate],
+             mois:[currentDate.slice(0, 8) + '01', currentDate],
+             prec:[_ymd(new Date(auj.getFullYear(), auj.getMonth() - 1, 1)), _ymd(new Date(auj.getFullYear(), auj.getMonth(), 0))],
+             annee:[currentDate.slice(0, 4) + '-01-01', currentDate]}[k];
+  document.getElementById('dep-filtre-debut').value = p[0];
+  document.getElementById('dep-filtre-fin').value = p[1];
+  _depPresetActif(k);
+  loadDepenses();
+}
+function depEffacerFiltres(){
+  ['dep-recherche','dep-filtre-min','dep-filtre-max'].forEach(id => { const e = document.getElementById(id); if(e) e.value = ''; });
+  ['dep-filtre-type','dep-filtre-pj','dep-filtre-ref','dep-filtre-cat','dep-filtre-benef','dep-filtre-caisse'].forEach(id => { const e = document.getElementById(id); if(e) e.value = ''; });
+  const t = document.getElementById('dep-filtre-tri'); if(t) t.value = 'date-desc';
+  loadDepenses();
+}
 function depRechercheFiltrer(){
-  const q = _navNorm(document.getElementById('dep-recherche')?.value || '');
-  const filtered = !q ? _depData : (_depData||[]).filter(d=>{
-    const hay = _navNorm([d.description, d.categorie, d.beneficiaire, d.reference].filter(Boolean).join(' '));
-    return hay.includes(q);
+  const v = id => document.getElementById(id)?.value || '';
+  const q = _navNorm(v('dep-recherche'));
+  const num = x => { const n = parseFloat(String(x).replace(/\s/g, '').replace(',', '.')); return isNaN(n) ? null : n; };
+  const min = num(v('dep-filtre-min')), max = num(v('dep-filtre-max'));
+  const type = v('dep-filtre-type'), pj = v('dep-filtre-pj'), ref = v('dep-filtre-ref'), tri = v('dep-filtre-tri') || 'date-desc';
+  let filtered = (_depData||[]).filter(d=>{
+    if(q && !_navNorm([d.description, d.categorie, d.beneficiaire, d.reference, d.notes, d.produit_nom].filter(Boolean).join(' ')).includes(q)) return false;
+    if(min !== null && d.montant < min) return false;
+    if(max !== null && d.montant > max) return false;
+    if(type === 'charge' && d.est_transfert) return false;
+    if(type === 'transfert' && !d.est_transfert) return false;
+    if(pj === 'avec' && d.sans_justificatif) return false;
+    if(pj === 'sans' && !d.sans_justificatif) return false;
+    if(ref === 'avec' && !d.reference) return false;
+    if(ref === 'sans' && d.reference) return false;
+    return true;
   });
+  const cmp = {'date-desc':(a,b)=>b.date_depense.localeCompare(a.date_depense)||b.id-a.id, 'date-asc':(a,b)=>a.date_depense.localeCompare(b.date_depense)||a.id-b.id,
+               'montant-desc':(a,b)=>b.montant-a.montant, 'montant-asc':(a,b)=>a.montant-b.montant,
+               'saisie-desc':(a,b)=>(b.created_at||'').localeCompare(a.created_at||'')}[tri];
+  filtered = filtered.slice().sort(cmp);
+  const actif = q || min !== null || max !== null || type || pj || ref || v('dep-filtre-cat') || v('dep-filtre-benef') || v('dep-filtre-caisse');
+  const eff = document.getElementById('dep-effacer'); if(eff) eff.style.display = actif ? '' : 'none';
+  const res = document.getElementById('dep-resultat');
+  if(res){
+    const tot = filtered.reduce((a, d) => a + d.montant, 0), tr = filtered.filter(d => d.est_transfert).reduce((a, d) => a + d.montant, 0);
+    res.innerHTML = `<b>${filtered.length}</b> dépense${filtered.length>1?'s':''}${actif&&_depData?` sur ${_depData.length}`:''} · total <b>${_htg(tot)}</b>`
+      + (tr ? ` · dont transferts ${_htg(tr)} · charges ${_htg(tot - tr)}` : '');
+  }
   _depUpdateKpis(filtered);
   renderDepTable(filtered);
   renderDepChartCategories('dep-chart-suivi', filtered);
