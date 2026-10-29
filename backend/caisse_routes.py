@@ -33,8 +33,8 @@ from models import (
     BarVente, BarLigneVente, BarSessionCaisse, BarSessionEvaluation,
     Employe, Utilisateur,
 )
-from tz_utils import HAITI_TZ, today_haiti, bounds_haiti
-from pos_service import LIEUX_VALIDES as _LIEUX_VALIDES
+from tz_utils import HAITI_TZ, today_haiti, bounds_haiti, fin_fenetre_session
+from pos_service import LIEUX_VALIDES as _LIEUX_VALIDES, session_bar_en_cours
 
 router = APIRouter(prefix="/api/pos/caisse", tags=["caisse"])
 
@@ -94,23 +94,21 @@ def _employe_est_admin(employe: Employe, db: Session) -> bool:
 
 def _fenetre_session(session: BarSessionCaisse, db: Session) -> tuple[datetime, datetime]:
     """Bornes [début, fin) de la fenêtre temporelle propre à cette session —
-    entre son ouverture et l'ouverture de la session suivante du même
-    caissier ce jour-là (ou la fin de la journée calendaire si c'est la
-    dernière). Sert à rattacher a posteriori, par le temps, des données qui
-    n'ont pas de lien direct vers la session (ventes/remboursements
-    enregistrés avant l'ajout de ce lien)."""
-    _, jour_fin = bounds_haiti(session.date_session)
+    de son ouverture jusqu'à sa soumission (même après minuit), sans jamais
+    dépasser l'ouverture de la session suivante du même caissier (voir
+    tz_utils.fin_fenetre_session). Sert à rattacher a posteriori, par le
+    temps, des données qui n'ont pas de lien direct vers la session
+    (ventes/remboursements enregistrés sans ce lien)."""
     suivante = (
         db.query(BarSessionCaisse)
         .filter(
-            BarSessionCaisse.caissier_id    == session.caissier_id,
-            BarSessionCaisse.date_session   == session.date_session,
-            BarSessionCaisse.numero_session  > session.numero_session,
+            BarSessionCaisse.caissier_id == session.caissier_id,
+            BarSessionCaisse.id           > session.id,
         )
-        .order_by(BarSessionCaisse.numero_session)
+        .order_by(BarSessionCaisse.id)
         .first()
     )
-    return session.created_at, (suivante.created_at if suivante else jour_fin)
+    return session.created_at, fin_fenetre_session(session, suivante)
 
 
 def _ventes_session(session: BarSessionCaisse, db: Session):
@@ -342,14 +340,17 @@ def dashboard_caissiere(
 
     # Jusqu'à MAX_SESSIONS_PAR_JOUR sessions par jour : on retient celle
     # EN_COURS si présente, sinon la plus récente (dernière ouverte) pour
-    # refléter l'état du jour.
+    # refléter l'état du jour. Sans date choisie, une session EN_COURS
+    # ouverte la veille (service de nuit passé minuit) reste la session
+    # affichée : elle ne se ferme qu'à sa soumission.
     sessions_du_jour = (
         db.query(BarSessionCaisse)
         .filter_by(caissier_id=caissier_id, date_session=jour)
         .order_by(BarSessionCaisse.numero_session)
         .all()
     )
-    session = next((s for s in sessions_du_jour if s.statut == "EN_COURS"), None) \
+    session = (None if date_sel else session_bar_en_cours(caissier_id, db)) \
+        or next((s for s in sessions_du_jour if s.statut == "EN_COURS"), None) \
         or (sessions_du_jour[-1] if sessions_du_jour else None)
 
     # Ventes de la session affichée uniquement (pas toutes celles du jour) —
@@ -476,7 +477,9 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
         .order_by(BarSessionCaisse.numero_session)
         .all()
     )
-    session = next((s for s in sessions_du_jour if s.statut == "EN_COURS"), None)
+    # Session EN_COURS de n'importe quel jour : celle ouverte avant minuit
+    # continue — on n'en ouvre jamais une seconde par-dessus.
+    session = session_bar_en_cours(data.caissier_id, db)
     if not session:
         if len(sessions_du_jour) >= MAX_SESSIONS_PAR_JOUR and not _employe_est_admin(employe, db):
             raise HTTPException(409, f"Limite de {MAX_SESSIONS_PAR_JOUR} sessions de caisse par jour atteinte pour ce caissier.")

@@ -865,19 +865,16 @@ def otp_verify_admin_code(
 
 
 def _session_ouverte_pour(db: Session, user: Utilisateur):
-    """Session de caisse EN_COURS du jour pour cet utilisateur, si son compte
+    """Session de caisse EN_COURS (quel que soit son jour d'ouverture — un
+    service de nuit passe minuit) pour cet utilisateur, si son compte
     est lié à un employé (caissier/manager/admin — voir /api/me), sinon None.
     Utilisée pour empêcher la déconnexion tant qu'une session n'est pas
     close : voir POST /api/logout."""
-    from models import BarSessionCaisse
+    from pos_service import session_bar_en_cours
     emp = db.query(Employe).filter_by(utilisateur_id=user.id, actif=True).first()
     if not emp:
         return None
-    return (
-        db.query(BarSessionCaisse)
-        .filter_by(caissier_id=emp.id, date_session=today_haiti(), statut="EN_COURS")
-        .first()
-    )
+    return session_bar_en_cours(emp.id, db)
 
 
 @app.post("/api/logout")

@@ -33,7 +33,7 @@ from models import (
     RenflouementDepartement, Employe, Utilisateur, CategorieDepense,
 )
 import listes_reference as lref
-from tz_utils import today_haiti, bounds_haiti, HAITI_TZ
+from tz_utils import today_haiti, bounds_haiti, HAITI_TZ, fin_fenetre_session
 
 router = APIRouter(prefix="/api/patisserie", tags=["Patisserie"])
 
@@ -507,10 +507,13 @@ def supprimer_depense(dep_id: int, db: Session = Depends(get_db)):
 # ══════════════════════════════════════════════════════════════════
 
 def _session_en_cours(caissier_id: int, db: Session) -> Optional[PatisserieSessionCaisse]:
-    aujourd_hui = today_haiti()
+    """Session EN_COURS de ce caissier, quel que soit son jour d'ouverture —
+    elle ne se ferme qu'à sa soumission, pas à minuit (voir
+    pos_service.session_bar_en_cours, module Bar)."""
     return (
         db.query(PatisserieSessionCaisse)
-        .filter_by(caissier_id=caissier_id, date_session=aujourd_hui, statut="EN_COURS")
+        .filter_by(caissier_id=caissier_id, statut="EN_COURS")
+        .order_by(PatisserieSessionCaisse.id.desc())
         .first()
     )
 
@@ -920,21 +923,19 @@ def _session_dict(s: PatisserieSessionCaisse, stats: dict = None) -> dict:
 
 def _fenetre_session(session: PatisserieSessionCaisse, db: Session) -> tuple[datetime, datetime]:
     """Bornes [début, fin) de la fenêtre temporelle propre à cette session —
-    entre son ouverture et l'ouverture de la session suivante du même
-    caissier ce jour-là (ou la fin de la journée calendaire si c'est la
-    dernière). Voir caisse_routes.py::_fenetre_session (module Bar)."""
-    _, jour_fin = bounds_haiti(session.date_session)
+    de son ouverture jusqu'à sa soumission (même après minuit), sans dépasser
+    l'ouverture de la session suivante du même caissier. Voir
+    caisse_routes.py::_fenetre_session (module Bar)."""
     suivante = (
         db.query(PatisserieSessionCaisse)
         .filter(
             PatisserieSessionCaisse.caissier_id == session.caissier_id,
-            PatisserieSessionCaisse.date_session == session.date_session,
-            PatisserieSessionCaisse.numero_session > session.numero_session,
+            PatisserieSessionCaisse.id > session.id,
         )
-        .order_by(PatisserieSessionCaisse.numero_session)
+        .order_by(PatisserieSessionCaisse.id)
         .first()
     )
-    return session.created_at, (suivante.created_at if suivante else jour_fin)
+    return session.created_at, fin_fenetre_session(session, suivante)
 
 
 def _ventes_session(session: PatisserieSessionCaisse, db: Session):
@@ -1038,7 +1039,8 @@ def dashboard_caissier(caissier_id: int = Query(...), db: Session = Depends(get_
         .order_by(PatisserieSessionCaisse.numero_session)
         .all()
     )
-    session = next((s for s in sessions_du_jour if s.statut == "EN_COURS"), None) \
+    # Une session EN_COURS ouverte la veille (passé minuit) reste affichée.
+    session = _session_en_cours(caissier_id, db) \
         or (sessions_du_jour[-1] if sessions_du_jour else None)
     ventes = _ventes_session(session, db) if session else []
     stats = _stats_session(ventes)
@@ -1113,7 +1115,8 @@ def ouvrir_session(data: OuvrirSessionIn, db: Session = Depends(get_db)):
         .order_by(PatisserieSessionCaisse.numero_session)
         .all()
     )
-    session = next((s for s in sessions_du_jour if s.statut == "EN_COURS"), None)
+    # Session EN_COURS de n'importe quel jour : on la poursuit.
+    session = _session_en_cours(data.caissier_id, db)
     if not session:
         if len(sessions_du_jour) >= MAX_SESSIONS_PAR_JOUR and not _employe_est_admin(employe, db):
             raise HTTPException(409, f"Limite de {MAX_SESSIONS_PAR_JOUR} sessions de caisse par jour atteinte.")

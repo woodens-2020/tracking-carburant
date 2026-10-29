@@ -34,6 +34,20 @@ LIEUX_VALIDES = {"DEVANT", "PISCINE"}
 # Helpers de calcul
 # ──────────────────────────────────────────────────────────────────
 
+def session_bar_en_cours(caissier_id: int, db: Session) -> BarSessionCaisse | None:
+    """Session de caisse Bar EN_COURS de ce caissier, QUEL QUE SOIT son jour
+    d'ouverture. Une session ne se ferme qu'à sa soumission : filtrer sur la
+    date du jour la rendait invisible à minuit (ventes de nuit sans session ni
+    bar, nouvelle session forcée, ancienne jamais soumise). S'il en existe
+    plusieurs (anomalie héritée de ce bug), on retient la plus récente."""
+    return (
+        db.query(BarSessionCaisse)
+        .filter_by(caissier_id=caissier_id, statut="EN_COURS")
+        .order_by(BarSessionCaisse.id.desc())
+        .first()
+    )
+
+
 def _dec(v) -> Decimal:
     """Conversion sûre en Decimal."""
     return Decimal(str(v)) if v is not None else Decimal("0")
@@ -226,11 +240,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     lieu_vente = None
     caissier_id = data.get("caissier_id")
     if caissier_id:
-        session_en_cours = (
-            db.query(BarSessionCaisse)
-            .filter_by(caissier_id=caissier_id, date_session=today_haiti(), statut="EN_COURS")
-            .first()
-        )
+        session_en_cours = session_bar_en_cours(caissier_id, db)
         session_id = session_en_cours.id if session_en_cours else None
         lieu_vente = session_en_cours.lieu if session_en_cours else None
 
