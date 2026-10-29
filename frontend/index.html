@@ -4160,7 +4160,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#3b82f6" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           </div>
           <h3 data-i18n="home.card.dashboard.title">Tableau de bord</h3>
-          <p data-i18n="home.card.dashboard.text">Analysez les ventes avec des filtres de date, produit et période. Visualisez les tendances.</p>
+          <p data-i18n="home.card.dashboard.text">Analysez les ventes avec des filtres de date et de produit. Visualisez les tendances.</p>
         </div>
         <div class="nav-card" onclick="goTo('saisie')" style="border-top:2px solid rgba(34,197,94,.4)">
           <div class="nav-card-icon" style="background:rgba(34,197,94,.12)">
@@ -4392,14 +4392,6 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
               <option value="">Tous les pompistes</option>
             </select>
           </div>
-          <div class="filter-group">
-            <label class="filter-label" data-i18n="dash.filter.periode">Période journée</label>
-            <select id="f-per" class="filter-select">
-              <option value="" data-i18n="dash.filter.periode.both">Matin + Après-midi</option>
-              <option value="Matin" data-i18n="dash.filter.periode.matin">Matin seulement</option>
-              <option value="Apres-midi" data-i18n="dash.filter.periode.pm">Après-midi seulement</option>
-            </select>
-          </div>
           <div class="filter-spacer"></div>
           <button class="btn btn-primary db-btn-analyze" onclick="applyFilters()">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -4545,14 +4537,6 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
             </div>
           </div>
           <div class="filter-group">
-            <label class="filter-label">Période</label>
-            <select id="jf-periode" class="filter-select" onchange="loadJournal()">
-              <option value="">Toutes les périodes</option>
-              <option value="Matin">🌅 Matin</option>
-              <option value="Apres-midi">🌇 Après-midi</option>
-            </select>
-          </div>
-          <div class="filter-group">
             <label class="filter-label">Pompiste</label>
             <select id="jf-pompiste" class="filter-select" onchange="loadJournal()">
               <option value="">Tous les pompistes</option>
@@ -4672,14 +4656,6 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
             <label class="filter-label" for="cjr-produit">Caisse / produit</label>
             <select id="cjr-produit" class="filter-select" onchange="cjrAfficher()">
               <option value="">Toutes les caisses</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label class="filter-label" for="cjr-periode">Période de vente</label>
-            <select id="cjr-periode" class="filter-select" onchange="cjrAfficher()">
-              <option value="">Journée entière</option>
-              <option value="Matin">Matin</option>
-              <option value="Apres-midi">Après-midi</option>
             </select>
           </div>
           <div class="filter-group">
@@ -4828,14 +4804,6 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
           <span class="gi-filter-lbl">Pompe</span>
           <select id="st-pompe" class="gi-filter-select">
             <option value="">Toutes les pompes</option>
-          </select>
-        </div>
-        <div class="gi-filter-field">
-          <span class="gi-filter-lbl">Période du jour</span>
-          <select id="st-periode-jour" class="gi-filter-select">
-            <option value="">Les deux</option>
-            <option value="Matin">Matin</option>
-            <option value="Apres-midi">Après-midi</option>
           </select>
         </div>
         <div class="gi-filter-field">
@@ -13529,7 +13497,7 @@ const LANGS = {
     'page.home.title':       'Accueil',
     'page.home.sub':         "Vue d'ensemble de la station",
     'page.dashboard.title':  'Tableau de bord',
-    'page.dashboard.sub':    'Filtres de période et de produit',
+    'page.dashboard.sub':    'Filtres de dates et de produit',
     'page.saisie.title':     'Saisie des relevés',
     'page.saisie.sub':       'Enregistrement des compteurs',
     'page.journal.title':    'Journal des Meters',
@@ -13790,7 +13758,7 @@ const LANGS = {
     'home.day.dim':          'Dimanche', 'home.day.lun':'Lundi', 'home.day.mar':'Mardi',
     'home.day.mer':          'Mercredi', 'home.day.jeu':'Jeudi', 'home.day.ven':'Vendredi', 'home.day.sam':'Samedi',
     'home.card.dashboard.title': 'Tableau de bord',
-    'home.card.dashboard.text':  'Analysez les ventes avec des filtres de date, produit et période. Visualisez les tendances.',
+    'home.card.dashboard.text':  'Analysez les ventes avec des filtres de date et de produit. Visualisez les tendances.',
     'home.card.saisie.title':    'Saisie des relevés',
     'home.card.saisie.text':     'Enregistrez les lectures des compteurs matin et après-midi pour chaque pompe.',
     'home.card.journal.title':   'Journal des Meters',
@@ -15655,7 +15623,7 @@ async function applyFilters(){
   const prodId =document.getElementById('f-prod').value;
   const pompeId=document.getElementById('f-pompe').value;
   const pompisteId=document.getElementById('f-pompiste')?.value;
-  const per    =document.getElementById('f-per').value;
+  const per    =document.getElementById('f-per')?.value || '';
   if(!debut||!fin){toast(t('dash.err.dates'),'err');return;}
 
   destroyDbCharts();
@@ -17411,7 +17379,7 @@ async function loadJournal(){
   const fin  =document.getElementById('jf-fin').value;
   const prodId=document.getElementById('jf-prod').value;
   const pompeIds=getCheckedPompes();
-  const periodeId=document.getElementById('jf-periode').value;
+  const periodeId=(document.getElementById('jf-periode')?.value || '');
   if(!debut||!fin){toast('Sélectionnez une plage de dates','err');return;}
 
   document.getElementById('journal-alertes').innerHTML=
@@ -17444,7 +17412,7 @@ function downloadJournalPdf(){
   const fin  =document.getElementById('jf-fin').value;
   const prodId=document.getElementById('jf-prod').value;
   const pompeIds=getCheckedPompes();
-  const periodeId=document.getElementById('jf-periode').value;
+  const periodeId=(document.getElementById('jf-periode')?.value || '');
   if(!debut||!fin){toast('Sélectionnez une plage de dates','err');return;}
   const pompisteId=document.getElementById('jf-pompiste')?.value;
   let url=`/api/journal/pdf?date_debut=${debut}&date_fin=${fin}`;
@@ -17461,7 +17429,7 @@ function downloadJournalXls(){
   const fin  =document.getElementById('jf-fin').value;
   const prodId=document.getElementById('jf-prod').value;
   const pompeIds=getCheckedPompes();
-  const periodeId=document.getElementById('jf-periode').value;
+  const periodeId=(document.getElementById('jf-periode')?.value || '');
   if(!debut||!fin){toast('Sélectionnez une plage de dates','err');return;}
   const pompisteId=document.getElementById('jf-pompiste')?.value;
   let url=`/api/releves/export?date_debut=${debut}&date_fin=${fin}`;
