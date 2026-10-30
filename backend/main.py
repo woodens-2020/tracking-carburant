@@ -491,6 +491,7 @@ def startup():
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS depenses JSON NOT NULL DEFAULT '[]'::json",
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS total_depenses NUMERIC(14,2) NOT NULL DEFAULT 0",
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS devises JSON NOT NULL DEFAULT '[]'::json",
+        "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
         "ALTER TABLE achats ADD COLUMN IF NOT EXISTS saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
     ]
     # Chaque instruction est isolée : une qui échoue (moteur SQLite en dev,
@@ -5594,6 +5595,8 @@ def lister_depenses(
                 "created_at": d.created_at.isoformat() if d.created_at else None,
                 "sans_justificatif": nb_pj.get(d.id, 0) == 0,
                 "est_transfert": _est_categorie_transfert(db, d.categorie),
+                "rapport_pompiste_id": getattr(d, "rapport_pompiste_id", None),
+                "saisi_par_nom": (d.saisi_par.nom_complet or d.saisi_par.username) if getattr(d, "saisi_par", None) else None,
             }
             for d in depenses
         ],

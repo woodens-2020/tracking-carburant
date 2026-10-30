@@ -425,12 +425,35 @@ def test_depenses_et_dollars(client):
     rid = d["id"]
     _sup(client, rid, f"lignes/{pompe}/confirmer", metter_avant=0, metter_apres=100)
     _sup(client, rid, "billetterie", confirme=True)
-    _sup(client, rid, "ecart", confirme=True)
-    assert _sup(client, rid, "finaliser", note=7, commentaire="Il manque 3 250 G").status_code == 200
-    deps = client.get(f"/api/depenses?date_debut={jour}&date_fin={jour}", headers=H).json()["depenses"]
-    miennes = [x for x in deps if (x["reference"] or "").startswith(f"RP{rid}-")]
-    assert sorted(x["montant"] for x in miennes) == [1500, 2000]
-    assert all("autorisée par" in x["notes"] for x in miennes)
+    # L'écart attend la décision sur chaque dépense
+    assert _sup(client, rid, "ecart", confirme=True).status_code == 409
+
+    def mes_depenses():
+        deps = client.get(f"/api/depenses?date_debut={jour}&date_fin={jour}", headers=H).json()["depenses"]
+        return [x for x in deps if (x["reference"] or "").startswith(f"RP{rid}-")]
+    # Confirmée : elle entre tout de suite dans les Dépenses, marquée « payée par le pompiste »
+    r = _sup(client, rid, "depenses/0/confirmer")
+    assert r.status_code == 200 and r.json()["depenses"][0]["statut"] == "confirmee"
+    assert [(x["montant"], x["rapport_pompiste_id"]) for x in mes_depenses()] == [(1500, rid)]
+    assert "autorisée par M. Pierre" in mes_depenses()[0]["notes"]
+    # Refusée (motif obligatoire) : elle ne réduit plus l'argent à remettre
+    assert _sup(client, rid, "depenses/1/refuser", motif="").status_code == 400
+    r = _sup(client, rid, "depenses/1/refuser", motif="Pas autorisée par la direction")
+    assert r.json()["total_depenses_retenues"] == 1500 and r.json()["ecart_final"] == -5250   # 43 250 + 1 500 − 50 000
+    assert len(mes_depenses()) == 1
+    # Reprendre puis reconfirmer ne crée pas de doublon
+    _sup(client, rid, "depenses/0/reprendre"); assert mes_depenses() == []
+    _sup(client, rid, "depenses/0/confirmer"); _sup(client, rid, "depenses/0/confirmer")
+    assert len(mes_depenses()) == 1
+    assert _sup(client, rid, "ecart", confirme=True).status_code == 200
+    assert _sup(client, rid, "finaliser", note=7, commentaire="Il manque 5 250 G").status_code == 200
+    assert len(mes_depenses()) == 1
+    # Journal de caisse : la dépense se déduit des ventes, pas une sortie de la caisse principale
+    j = client.get(f"/api/caisse-principale/journal?date_debut={jour}&date_fin={jour}", headers=H).json()
+    dpp = [l for l in j["lignes"] if l["type"] == "depense_pompiste"]
+    assert [(l["debit"], l["credit"]) for l in dpp] == [(-1500, 0)]
+    assert not [l for l in j["lignes"] if l["type"] == "depense" and (l["reference"] or "").startswith(f"RP{rid}-")]
+    assert {c["code"]: c for c in j["controles"]}["equilibre"]["niveau"] == "ok"
 
 
 def test_dollars_rapport_en_retard(client):

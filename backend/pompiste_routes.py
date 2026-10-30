@@ -322,6 +322,12 @@ def _total_billetterie(billetterie: list, monnaie: float) -> float:
     return round(total + float(monnaie or 0), 2)
 
 
+def _depenses_retenues(r: RapportPompiste) -> float:
+    """Dépenses qui réduisent l'argent à remettre : toutes, sauf celles que la
+    direction a refusées (le pompiste doit alors cet argent)."""
+    return round(sum(float(x["montant"]) for x in (r.depenses or []) if x.get("statut") != "refusee"), 2)
+
+
 def _nom(u: Optional[Utilisateur]) -> Optional[str]:
     return (u.nom_complet or u.username) if u else None
 
@@ -357,7 +363,10 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
         "pompiste_id": r.utilisateur_id, "pompiste_nom": _nom(r.utilisateur),
         "charte_acceptee_at": r.charte_acceptee_at.isoformat() if r.charte_acceptee_at else None,
         "billetterie": r.billetterie or [], "monnaie": float(r.monnaie or 0),
-        "depenses": r.depenses or [], "total_depenses": float(r.total_depenses or 0),
+        "depenses": [dict(x, statut=x.get("statut") or "en_attente", index=i) for i, x in enumerate(r.depenses or [])],
+        "total_depenses": float(r.total_depenses or 0),
+        "total_depenses_retenues": _depenses_retenues(r),
+        "depenses_a_decider": sum(1 for x in (r.depenses or []) if (x.get("statut") or "en_attente") == "en_attente"),
         "devises": r.devises or [],
         "montant_a_remettre": round(float(r.montant_attendu) - float(r.total_depenses or 0), 2),
         "montant_attendu": float(r.montant_attendu), "montant_compte": float(r.montant_compte),
@@ -370,8 +379,8 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
         "total_gallons": round(sum(x["gallons"] for x in lignes), 3),
         # Après corrections éventuelles du superviseur
         "montant_attendu_final": round(sum(x["montant"] for x in lignes), 2),
-        # Écart = argent compté + dépenses payées − ventes
-        "ecart_final": round(float(r.montant_compte) + float(r.total_depenses or 0) - sum(x["montant"] for x in lignes), 2),
+        # Écart = argent compté + dépenses payées (sauf celles refusées par la direction) − ventes
+        "ecart_final": round(float(r.montant_compte) + _depenses_retenues(r) - sum(x["montant"] for x in lignes), 2),
         "billetterie_confirmee": bool(r.billetterie_confirmee),
         "ecart_confirme": bool(r.ecart_confirme),
         "note_superviseur": r.note_superviseur,
@@ -988,6 +997,8 @@ def confirmer_ecart(rid: int, data: ConfirmeIn, _s: Utilisateur = Depends(_requi
     rap = _rapport_a_traiter(db, rid)
     if data.confirme and not (all(l.confirmee for l in rap.lignes) and rap.billetterie_confirmee):
         raise HTTPException(409, "Confirmez d'abord chaque mètre et la billetterie.")
+    if data.confirme and any((x.get("statut") or "en_attente") == "en_attente" for x in (rap.depenses or [])):
+        raise HTTPException(409, "Confirmez ou refusez d'abord chaque dépense du pompiste.")
     rap.ecart_confirme = data.confirme
     db.commit()
     db.refresh(rap)
@@ -1071,7 +1082,8 @@ def finaliser(rid: int, data: FinaliserIn, request: Request,
 
     # 2. Journal des compteurs — mêmes règles que le module Saisie
     avertissements = _ecrire_journal(db, rap, request, remplacer_saisie=True, motif=motif or None)
-    # 3. Dépenses payées par le pompiste → dépenses de la station (journal de caisse)
+    # 3. Dépenses confirmées : déjà dans les Dépenses depuis leur confirmation
+    #    (filet de sécurité si l'une manquait)
     _ecrire_depenses(db, rap, request, s)
 
     rap.statut = "RESOLU" if resolution else "CONFIRME"
@@ -1096,22 +1108,97 @@ def _ecrire_depenses(db: Session, rap: RapportPompiste, request: Request, s: Uti
     import listes_reference as lref
     if not rap.depenses:
         return 0
+    n = 0
+    for i, x in enumerate(rap.depenses):
+        if x.get("statut") == "confirmee" and _ecrire_une_depense(db, rap, i, request, s):
+            n += 1
+    return n
+
+
+def _ref_depense(rap: RapportPompiste, i: int) -> str:
+    return f"RP{rap.id}-{i + 1}"
+
+
+def _ecrire_une_depense(db: Session, rap: RapportPompiste, i: int, request: Request, s: Utilisateur) -> bool:
+    from models import Depense, CategorieDepense
+    import listes_reference as lref
+    ref = _ref_depense(rap, i)
+    if db.query(Depense).filter_by(reference=ref).first():
+        return False
     try:
         categorie = lref.resoudre(db, CategorieDepense, None, request=request, defaut=CATEGORIE_DEPENSE_POMPISTE)
     except HTTPException:
         categorie = CATEGORIE_DEPENSE_POMPISTE
-    n = 0
-    for i, x in enumerate(rap.depenses, 1):
-        ref = f"RP{rap.id}-{i}"
-        if db.query(Depense).filter_by(reference=ref).first():
-            continue
-        db.add(Depense(categorie=categorie or CATEGORIE_DEPENSE_POMPISTE, description=x["description"][:300],
-                       montant=x["montant"], date_depense=rap.date, beneficiaire=None, reference=ref,
-                       notes=(f"Payée par le pompiste {_nom(rap.utilisateur)} ({_per(rap.periode)}), "
-                              f"autorisée par {x['autorise_par']}. Rapport pompiste n°{rap.id}.")[:500],
-                       saisi_par_id=s.id))
-        n += 1
-    return n
+    x = rap.depenses[i]
+    db.add(Depense(categorie=categorie or CATEGORIE_DEPENSE_POMPISTE, description=x["description"][:300],
+                   montant=x["montant"], date_depense=rap.date, beneficiaire=None, reference=ref,
+                   notes=(f"Payée par le pompiste {_nom(rap.utilisateur)} sur ses ventes ({_per(rap.periode)}), "
+                          f"autorisée par {x['autorise_par']}. Rapport pompiste n°{rap.id}.")[:500],
+                   saisi_par_id=s.id, rapport_pompiste_id=rap.id))
+    return True
+
+
+def _retirer_une_depense(db: Session, rap: RapportPompiste, i: int) -> None:
+    from models import Depense
+    db.query(Depense).filter_by(reference=_ref_depense(rap, i), rapport_pompiste_id=rap.id).delete()
+
+
+class DepenseDecisionIn(BaseModel):
+    motif: Optional[str] = None
+
+
+def _decider_depense(db: Session, rid: int, i: int) -> tuple:
+    rap = _rapport_a_traiter(db, rid)
+    deps = [dict(x) for x in (rap.depenses or [])]
+    if not (0 <= i < len(deps)):
+        raise HTTPException(404, "Dépense introuvable dans ce rapport.")
+    return rap, deps
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/depenses/{i}/confirmer")
+def confirmer_depense(rid: int, i: int, request: Request, s: Utilisateur = Depends(_require_superviseur),
+                      db: Session = Depends(get_db)):
+    """Dépense du pompiste acceptée : elle entre tout de suite dans les
+    Dépenses de la station (sans sortir de la caisse principale)."""
+    rap, deps = _decider_depense(db, rid, i)
+    deps[i].update(statut="confirmee", motif=None, par=_nom(s), le=now_haiti().isoformat())
+    rap.depenses = deps
+    rap.ecart_confirme = False
+    _ecrire_une_depense(db, rap, i, request, s)
+    db.commit()
+    db.refresh(rap)
+    return _rapport_dict(db, rap, avec_journal=True)
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/depenses/{i}/refuser")
+def refuser_depense(rid: int, i: int, data: DepenseDecisionIn, s: Utilisateur = Depends(_require_superviseur),
+                    db: Session = Depends(get_db)):
+    """Dépense non acceptée : elle ne réduit plus l'argent à remettre (le
+    pompiste doit cet argent) et n'entre pas dans les Dépenses."""
+    motif = " ".join((data.motif or "").split())
+    if len(motif) < 5:
+        raise HTTPException(400, "Indiquez pourquoi la dépense est refusée (5 caractères au moins).")
+    rap, deps = _decider_depense(db, rid, i)
+    deps[i].update(statut="refusee", motif=motif[:300], par=_nom(s), le=now_haiti().isoformat())
+    rap.depenses = deps
+    rap.ecart_confirme = False
+    _retirer_une_depense(db, rap, i)
+    db.commit()
+    db.refresh(rap)
+    return _rapport_dict(db, rap, avec_journal=True)
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/depenses/{i}/reprendre")
+def reprendre_depense(rid: int, i: int, _s: Utilisateur = Depends(_require_superviseur),
+                      db: Session = Depends(get_db)):
+    rap, deps = _decider_depense(db, rid, i)
+    deps[i].update(statut="en_attente", motif=None, par=None, le=None)
+    rap.depenses = deps
+    rap.ecart_confirme = False
+    _retirer_une_depense(db, rap, i)
+    db.commit()
+    db.refresh(rap)
+    return _rapport_dict(db, rap, avec_journal=True)
 
 
 # ── Taux du jour des devises ────────────────────────────────────────────
@@ -1158,6 +1245,8 @@ def rejeter(rid: int, data: CommentaireIn, s: Utilisateur = Depends(_require_sup
     if len(commentaire) < _COMMENTAIRE_MIN:
         raise HTTPException(400, "Indiquez au pompiste ce qui ne va pas (commentaire obligatoire).")
     _retirer_du_journal(db, rap)       # il refera un rapport : pas de doublon dans le journal
+    for i in range(len(rap.depenses or [])):
+        _retirer_une_depense(db, rap, i)
     rap.statut = "REJETE"
     rap.traite_par_id = s.id
     rap.traite_at = now_haiti()

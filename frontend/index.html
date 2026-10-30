@@ -3364,7 +3364,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .gl-qui{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gl-etiq{display:inline-block;font-size:11px;font-weight:700;padding:1px 6px;border-radius:5px;margin-left:6px;background:rgba(239,68,68,.12);color:var(--red);vertical-align:1px}
 .gl-etiq.retard{background:rgba(249,115,22,.14);color:var(--orange)}
-.gl-dv{color:var(--green)} .gl-cv{color:var(--red)}
+.gl-dv{color:var(--green)} .gl-cv{color:var(--red)} .gl-deduit{color:var(--orange)}
 .gl-solde{font-weight:700;color:var(--text)} .gl-solde.neg{color:var(--red)}
 .gl-annulee td{color:var(--muted)!important} .gl-annulee .gl-desc div{text-decoration:line-through;color:var(--muted)}
 .gl-annulee td.r{text-decoration:line-through}
@@ -3384,6 +3384,15 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
   .gl-barre .gl-espace{display:none}
   .gl-resume b{font-size:17px} .gl-resume .s b{font-size:18px}
 }
+.psp-deps{display:flex;flex-direction:column;gap:8px}
+.psp-dep{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px 14px;align-items:center;padding:10px 12px;
+  border:1px solid var(--border);border-left:4px solid var(--orange);border-radius:10px;background:var(--bg)}
+.psp-dep.confirmee{border-left-color:var(--green)} .psp-dep.refusee{border-left-color:var(--red);opacity:.85}
+.psp-dep-mt{font-family:var(--mono);font-weight:800;font-size:15px;white-space:nowrap}
+.psp-dep-act{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.psp-dep-total{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:13.5px;color:var(--muted)}
+.psp-dep-total b{color:var(--text);font-family:var(--mono)}
+@media (max-width:720px){ .psp-dep{grid-template-columns:minmax(0,1fr) auto} .psp-dep-act{grid-column:1 / 3;justify-content:flex-start} }
 .dep-presets{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .dep-presets button{font:inherit;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer;
   border:1px solid var(--border);background:var(--panel);color:var(--muted)}
@@ -6389,6 +6398,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
               <option value="">Tout</option>
               <option value="charge">Charges (vraies dépenses)</option>
               <option value="transfert">Transferts / dépôts en banque</option>
+              <option value="pompiste">Payées par les pompistes</option>
             </select>
           </div>
           <div class="gi-filter-field">
@@ -19749,7 +19759,7 @@ function pspCarteLecture(r){
         <td class="r">${_pspN(l.gallons)}</td><td class="r">${_pspG(l.montant)}</td></tr>
         ${l.metter_avant_corrige != null ? `<tr><td colspan="5" class="psp-muted">Saisi par le pompiste : ${_pspN(l.metter_avant)} → ${_pspN(l.metter_apres)}</td></tr>` : ''}`).join('')}</tbody></table>
     <div class="psp-kpis"><div class="psp-kpi"><span>Ventes attendues</span><b>${_pspG(r.montant_attendu_final)}</b></div>
-      ${r.total_depenses ? `<div class="psp-kpi"><span>Dépenses</span><b>− ${_pspG(r.total_depenses)}</b></div>` : ''}
+      ${(r.depenses||[]).length ? `<div class="psp-kpi"><span>Dépenses retenues</span><b>− ${_pspG(r.total_depenses_retenues)}</b></div>` : ''}
       <div class="psp-kpi"><span>Argent compté</span><b>${_pspG(r.montant_compte)}</b></div>
       <div class="psp-kpi"><span>Écart</span><b>${_pspE(r.ecart_final)}</b></div></div>
     ${billets || (r.devises||[]).length ? `<table class="psp-tbl" style="max-width:420px"><thead><tr><th>Coupure</th><th class="r">Billets</th><th class="r">Montant</th></tr></thead><tbody>${billets}
@@ -19758,13 +19768,49 @@ function pspCarteLecture(r){
 }
 
 // Dépenses payées par le pompiste et autres devises (dollars au taux du jour)
+const _PSP_DEP_LIB = {confirmee:['CONFIRME','✓ Confirmée'], refusee:['REJETE','✗ Refusée'], en_attente:['SOUMIS','À décider']};
 function _pspDepensesHtml(r){
   if(!(r.depenses||[]).length) return '';
   return `<div class="psp-muted" style="margin:10px 0 4px;font-weight:700">Dépenses payées par le pompiste</div>
-    <table class="psp-tbl" style="max-width:620px"><thead><tr><th>Dépense</th><th>Autorisée par</th><th class="r">Montant</th></tr></thead><tbody>
-    ${r.depenses.map(x => `<tr><td>${esc(x.description)}</td><td>${esc(x.autorise_par)}</td><td class="r">${_pspG(x.montant)}</td></tr>`).join('')}
-    <tr><td><b>Total des dépenses</b></td><td></td><td class="r"><b>${_pspG(r.total_depenses)}</b></td></tr></tbody></table>
-    <div class="psp-muted" style="margin-top:4px">À la finalisation, elles sont enregistrées dans les Dépenses (catégorie « Dépense pompiste »).</div>`;
+    <table class="psp-tbl" style="max-width:720px"><thead><tr><th>Dépense</th><th>Autorisée par</th><th class="r">Montant</th><th>Décision</th></tr></thead><tbody>
+    ${r.depenses.map(x => `<tr><td>${esc(x.description)}</td><td>${esc(x.autorise_par)}</td><td class="r">${_pspG(x.montant)}</td>
+      <td><span class="psp-badge ${_PSP_DEP_LIB[x.statut][0]}">${_PSP_DEP_LIB[x.statut][1]}</span>${x.motif ? `<div class="psp-muted">${esc(x.motif)}</div>` : ''}</td></tr>`).join('')}
+    <tr><td><b>Dépenses retenues</b></td><td></td><td class="r"><b>${_pspG(r.total_depenses_retenues)}</b></td><td></td></tr></tbody></table>`;
+}
+
+// Étape « Dépenses du pompiste » : chaque dépense confirmée ou refusée, une par une
+function _pspEtapeDepenses(r){
+  const deps = r.depenses || [], faites = deps.filter(x => x.statut !== 'en_attente').length;
+  const st = _pspS(r.id);
+  return _pspEtape(3, `Dépenses du pompiste — confirmez chaque dépense (${faites}/${deps.length})`, faites === deps.length,
+    `<div class="psp-deps">${deps.map(x => `<div class="psp-dep ${x.statut}">
+        <div class="psp-dep-corps"><b>${esc(x.description)}</b>
+          <div class="psp-muted">Autorisée par <b>${esc(x.autorise_par)}</b></div>
+          ${x.statut === 'refusee' ? `<div class="psp-neg" style="font-size:12.5px">Refusée${x.par ? ' par ' + esc(x.par) : ''} : ${esc(x.motif||'')}</div>` : ''}
+          ${x.statut === 'confirmee' ? `<div class="psp-ok" style="font-size:12.5px">Confirmée${x.par ? ' par ' + esc(x.par) : ''} · inscrite dans les Dépenses (payée par le pompiste, hors caisse principale)</div>` : ''}</div>
+        <div class="psp-dep-mt">${_pspG(x.montant)}</div>
+        <div class="psp-dep-act">${x.statut === 'en_attente'
+          ? (st.refus === x.index
+            ? `<input class="filter-input" id="psp-refus-${r.id}-${x.index}" placeholder="Pourquoi la refuser ?" style="min-width:200px">
+               <button class="btn btn-danger psp-mini" onclick="pspDepense(${r.id},${x.index},'refuser')">Refuser</button>
+               <button class="psp-lien" onclick="_pspS(${r.id}).refus=null;_pspMaj(PSP.rapports.find(x=>x.id===${r.id}))">retour</button>`
+            : `<button class="btn btn-primary psp-mini" onclick="pspDepense(${r.id},${x.index},'confirmer')">Confirmer</button>
+               <button class="btn btn-secondary psp-mini" onclick="_pspS(${r.id}).refus=${x.index};_pspMaj(PSP.rapports.find(x=>x.id===${r.id}));setTimeout(()=>document.getElementById('psp-refus-${r.id}-${x.index}')?.focus(),0)">Refuser</button>`)
+          : `<span class="psp-badge ${_PSP_DEP_LIB[x.statut][0]}">${_PSP_DEP_LIB[x.statut][1]}</span>
+             <button class="psp-lien" onclick="pspDepense(${r.id},${x.index},'reprendre')">reprendre</button>`}</div>
+      </div>`).join('')}</div>
+     <div class="psp-dep-total"><span>Dépenses déclarées <b>${_pspG(r.total_depenses)}</b></span>
+       <span>Retenues <b>${_pspG(r.total_depenses_retenues)}</b></span>
+       <span>Argent à remettre <b>${_pspG(r.montant_attendu_final - r.total_depenses_retenues)}</b></span></div>
+     <div class="psp-muted" style="margin-top:6px">Une dépense confirmée entre tout de suite dans les Dépenses de la station. Elle ne sort pas de la caisse principale : le pompiste l'a payée avec l'argent de ses ventes. Une dépense refusée ne réduit plus l'argent à remettre.</div>`);
+}
+async function pspDepense(id, i, action){
+  const body = {};
+  if(action === 'refuser'){
+    body.motif = (document.getElementById(`psp-refus-${id}-${i}`)?.value || '').trim();
+    if(body.motif.length < 5) return notify('Indiquez pourquoi la dépense est refusée (5 caractères au moins).', 'err');
+  }
+  try{ await _pspAction(id, `depenses/${i}/${action}`, body); _pspS(id).refus = null; }catch(e){}
 }
 const _pspDevisesLignes = r => (r.devises||[]).map(x =>
   `<tr><td><b>${Number(x.montant).toLocaleString('fr-FR',{minimumFractionDigits:2})} $</b><div class="psp-muted">taux ${Number(x.taux).toLocaleString('fr-FR',{minimumFractionDigits:2})} G</div></td>
@@ -19824,24 +19870,25 @@ function pspCarte(r){
       `<div style="overflow-x:auto"><table class="psp-tbl" style="max-width:520px"><thead><tr><th>Coupure</th><th class="r">Nombre de billets</th><th class="r">Montant</th></tr></thead>
         <tbody>${billets || '<tr><td colspan="3" class="psp-muted">Aucun billet déclaré</td></tr>'}
         <tr><td><b>Total compté</b></td><td></td><td class="r"><b>${_pspG(r.montant_compte)}</b></td></tr></tbody></table></div>
-       ${_pspDepensesHtml(r)}
        <div class="psp-actions">${r.billetterie_confirmee
          ? `<span class="psp-ok" style="font-weight:700">✓ Billetterie confirmée</span> <button class="psp-lien" onclick="pspBillets(${r.id},false)">reprendre</button>`
-         : `<button class="btn btn-primary" onclick="pspBillets(${r.id},true)">Confirmer la billetterie${(r.depenses||[]).length?' et les dépenses':''}</button>`}</div>`)}
+         : `<button class="btn btn-primary" onclick="pspBillets(${r.id},true)">Confirmer la billetterie</button>`}</div>`)}
 
-    ${_pspEtape(3, 'Écart de caisse', r.ecart_confirme,
+    ${(r.depenses||[]).length ? _pspEtapeDepenses(r) : ''}
+
+    ${_pspEtape((r.depenses||[]).length ? 4 : 3, 'Écart de caisse', r.ecart_confirme,
       `<div class="psp-kpis">
         <div class="psp-kpi"><span>Ventes attendues</span><b>${_pspG(r.montant_attendu_final)}</b></div>
-        ${r.total_depenses ? `<div class="psp-kpi"><span>Dépenses</span><b>− ${_pspG(r.total_depenses)}</b></div>
-        <div class="psp-kpi"><span>Argent à remettre</span><b>${_pspG(r.montant_attendu_final - r.total_depenses)}</b></div>` : ''}
+        ${(r.depenses||[]).length ? `<div class="psp-kpi"><span>Dépenses retenues</span><b>− ${_pspG(r.total_depenses_retenues)}</b></div>
+        <div class="psp-kpi"><span>Argent à remettre</span><b>${_pspG(r.montant_attendu_final - r.total_depenses_retenues)}</b></div>` : ''}
         <div class="psp-kpi"><span>Argent compté</span><b>${_pspG(r.montant_compte)}</b></div>
         <div class="psp-kpi"><span>Écart</span><b>${_pspE(r.ecart_final)}</b></div></div>
        ${Math.abs(r.ecart_final - r.ecart) > 0.5 ? `<div class="psp-muted">Écart déclaré par le pompiste : ${_pspE(r.ecart)} — recalculé avec les mètres corrigés.</div>` : ''}
        <div class="psp-actions">${r.ecart_confirme
          ? `<span class="psp-ok" style="font-weight:700">✓ Écart confirmé</span> <button class="psp-lien" onclick="pspEcart(${r.id},false)">reprendre</button>`
-         : `<button class="btn btn-primary" onclick="pspEcart(${r.id},true)" ${toutesLignes && r.billetterie_confirmee ? '' : 'disabled title="Confirmez d\'abord les mètres et la billetterie"'}>Confirmer l'écart</button>`}</div>`)}
+         : `<button class="btn btn-primary" onclick="pspEcart(${r.id},true)" ${toutesLignes && r.billetterie_confirmee && !r.depenses_a_decider ? '' : 'disabled title="Confirmez d\'abord les mètres, la billetterie et chaque dépense"'}>Confirmer l'écart</button>`}</div>`)}
 
-    ${_pspEtape(4, pb ? 'Résolution et finalisation' : 'Finalisation', false,
+    ${_pspEtape((r.depenses||[]).length ? 5 : 4, pb ? 'Résolution et finalisation' : 'Finalisation', false,
       `<div class="psp-muted" style="margin-bottom:6px">Note du rapport (sur 10)</div>
        <div class="psp-notes">${[...Array(11).keys()].map(n => `<button class="psp-note ${s.note===n?'on':''}" onclick="pspNote(${r.id},${n})">${n}</button>`).join('')}</div>
        <textarea class="filter-input" id="psp-com-${r.id}" rows="2" style="width:100%;margin-top:10px;height:auto;padding:8px"
@@ -20359,7 +20406,7 @@ function _glRegistre(lignes, sD, sC){
     h += `<tr class="gl-l ${x.annulee?'gl-annulee':''} ${ouvert?'ouvert':''}" onclick="glOuvrir('${x.cle}')">
       <td class="gl-desc"><span class="gl-point ${x.sens}"></span><div>${esc(x.description||'')}${x.annulee?' <span class="gl-etiq">annulée</span>':''}${(x.retard_saisie||0)>2?`<span class="gl-etiq retard" title="Enregistrée ${x.retard_saisie} jours après sa date">saisie +${x.retard_saisie} j</span>`:''}</div>
         <small>${sous.map(esc).join(' · ')}</small></td>
-      <td class="r gl-dv">${x.debit?_glG(x.debit):''}</td>
+      <td class="r ${x.debit<0?'gl-deduit':'gl-dv'}" ${x.debit<0?'title="Déduite des ventes : payée par le pompiste, ne sort pas de la caisse principale"':''}>${x.debit?(x.debit<0?'− '+_glG(-x.debit):_glG(x.debit)):''}</td>
       <td class="r gl-cv">${x.credit?_glG(x.credit):''}</td>
       <td class="r gl-solde ${x.solde<0?'neg':''}">${_glG(x.solde)}</td></tr>`;
     if(ouvert) h += `<tr class="gl-detail"><td colspan="4">${_glDetail(x)}</td></tr>`;
@@ -24219,6 +24266,7 @@ function depRechercheFiltrer(){
     if(max !== null && d.montant > max) return false;
     if(type === 'charge' && d.est_transfert) return false;
     if(type === 'transfert' && !d.est_transfert) return false;
+    if(type === 'pompiste' && !d.rapport_pompiste_id) return false;
     if(pj === 'avec' && d.sans_justificatif) return false;
     if(pj === 'sans' && !d.sans_justificatif) return false;
     if(ref === 'avec' && !d.reference) return false;
@@ -24262,7 +24310,7 @@ function renderDepTable(data){
       <td>${_ckJoursBadge(d.jours)}</td>
       <td><span class="td-badge ${catColors[d.categorie]||'badge-gray'}">${d.categorie}</span></td>
       <td>${d.produit_nom?`<span class="td-badge ${caisseColors[d.produit_nom]||'badge-gray'}">${d.produit_nom}</span>`:'<span class="td-muted">Générale</span>'}</td>
-      <td>${d.description}${d.sans_justificatif?' <span class="td-badge badge-red" title="Aucun document joint">⚠ Inachevée</span>':''}</td>
+      <td>${d.description}${d.rapport_pompiste_id?` <span class="td-badge badge-amber" title="Payée par le pompiste avec l'argent de ses ventes (rapport n°${d.rapport_pompiste_id}) : ne sort pas de la caisse principale">⛽ Payée par le pompiste</span>`:(d.sans_justificatif?' <span class="td-badge badge-red" title="Aucun document joint">⚠ Inachevée</span>':'')}</td>
       <td class="td-muted">${d.beneficiaire||'—'}</td>
       <td class="td-amount">${_htg(d.montant)}</td>
       <td class="td-muted">${d.reference||'—'}</td>

@@ -563,6 +563,10 @@ class Depense(Base):
     created_at   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     # Qui a enregistré la dépense (journal de caisse) — NULL pour l'historique
     saisi_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    # Payée par un pompiste avec l'argent de ses ventes (confirmée sur son
+    # rapport) : c'est une dépense de la station, mais elle ne sort pas de la
+    # caisse principale — le pompiste a remis « ventes − dépenses ».
+    rapport_pompiste_id = Column(Integer, ForeignKey("rapports_pompiste.id", ondelete="SET NULL"), nullable=True)
 
     produit   = relationship("Produit")
     saisi_par = relationship("Utilisateur", foreign_keys=[saisi_par_id])

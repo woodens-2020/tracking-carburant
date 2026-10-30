@@ -270,6 +270,8 @@ def _migrate_columns():
              "ALTER TABLE rapports_pompiste ADD COLUMN total_depenses NUMERIC(14,2) NOT NULL DEFAULT 0", None),
             ("rapports_pompiste", "devises",
              "ALTER TABLE rapports_pompiste ADD COLUMN devises JSON NOT NULL DEFAULT '[]'", None),
+            ("depenses", "rapport_pompiste_id",
+             "ALTER TABLE depenses ADD COLUMN rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL", None),
             ("depenses", "saisi_par_id",
              "ALTER TABLE depenses ADD COLUMN saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
             ("achats", "saisi_par_id",
