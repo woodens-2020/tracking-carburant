@@ -431,3 +431,32 @@ def test_depenses_et_dollars(client):
     miennes = [x for x in deps if (x["reference"] or "").startswith(f"RP{rid}-")]
     assert sorted(x["montant"] for x in miennes) == [1500, 2000]
     assert all("autorisée par" in x["notes"] for x in miennes)
+
+
+def test_dollars_rapport_en_retard(client):
+    """Rapport daté d'il y a 15 jours, taux fixé aujourd'hui seulement : les
+    dollars sont acceptés avec le taux le plus proche (cas du staging)."""
+    from datetime import timedelta
+    from tz_utils import today_haiti
+    import main as _m
+    import pompiste_routes
+    from database import SessionLocal
+    jour = today_haiti() - timedelta(days=15)
+    db = SessionLocal()
+    try:
+        t_avant = pompiste_routes.taux_du_jour(db, jour - timedelta(days=400))
+    finally:
+        db.close()
+    client.post("/api/pompiste-supervision/taux", headers=H, json={"taux": 140})
+    pompe = _produit(client, 500)
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Ret", "nom": "Ard"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    r = p.post("/api/pompiste/compteurs", json={"date": str(jour), "periode": "Matin", "charte_acceptee": True,
+              "lignes": [{"pompe_id": pompe, "metter_avant": 0, "metter_apres": 10}]})
+    assert r.status_code == 201, r.text
+    ctx = p.get(f"/api/pompiste/contexte?date={jour}&periode=Matin").json()
+    assert ctx["taux"] is not None
+    r = p.post("/api/pompiste/terminer", json={"billetterie": [], "devises": [{"devise": "USD", "montant": 10}]})
+    assert r.status_code == 200, r.text
+    assert r.json()["devises"][0]["montant_htg"] == round(10 * ctx["taux"]["taux"], 2)

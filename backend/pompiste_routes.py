@@ -501,9 +501,12 @@ MAX_DEPENSES = 30
 
 
 def taux_du_jour(db: Session, d: date_type, devise: str = "USD"):
+    """Dernier taux en vigueur à la date du rapport. Rapport daté d'avant le
+    premier taux fixé (rapport en retard) : le taux le plus proche après."""
     from models import TauxDevise
-    return (db.query(TauxDevise).filter(TauxDevise.devise == devise, TauxDevise.date_effet <= d)
-            .order_by(TauxDevise.date_effet.desc(), TauxDevise.id.desc()).first())
+    q = db.query(TauxDevise).filter(TauxDevise.devise == devise)
+    return (q.filter(TauxDevise.date_effet <= d).order_by(TauxDevise.date_effet.desc(), TauxDevise.id.desc()).first()
+            or q.filter(TauxDevise.date_effet > d).order_by(TauxDevise.date_effet.asc(), TauxDevise.id.desc()).first())
 
 
 def _taux_dict(t) -> Optional[dict]:

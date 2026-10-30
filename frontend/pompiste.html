@@ -482,7 +482,7 @@ const TXT = {
     dep_enregistrer:'Enregistrer la dépense', dep_e_desc:'Décrivez la dépense.', dep_e_montant:'Indiquez le montant.',
     dep_e_autorise:'Indiquez qui a autorisé la dépense.', dep_total:'Total des dépenses', aucune_depense:'Aucune dépense.',
     retirer_titre_dep:'Retirer cette dépense ?', dep_retirer_q:'Retirer la dépense « {d} » ?', a_remettre:'Argent à remettre',
-    devise_titre:'Autres devises', usd:'Dollars américains ($)', usd_taux:'Taux du jour : 1 $ = {t} G',
+    devise_titre:'Autres devises', usd:'Dollars américains ($)', usd_taux:'Taux : 1 $ = {t} G (fixé le {d})',
     usd_sans_taux:'Taux du dollar pas encore fixé : demandez à la direction.',
     tk_depenses:'DÉPENSES', tk_a_remettre:'Argent à remettre', tk_autorise:'autorisée par',
     jours:['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'],
@@ -573,7 +573,7 @@ const TXT = {
     dep_enregistrer:'Anrejistre depans lan', dep_e_desc:'Dekri depans lan.', dep_e_montant:'Antre kantite lajan an.',
     dep_e_autorise:'Di ki moun ki te otorize depans lan.', dep_total:'Total depans', aucune_depense:'Pa gen depans.',
     retirer_titre_dep:'Retire depans sa a ?', dep_retirer_q:'Retire depans « {d} » ?', a_remettre:'Lajan pou remèt',
-    devise_titre:'Lòt deviz', usd:'Dola ameriken ($)', usd_taux:'To jodi a : 1 $ = {t} G',
+    devise_titre:'Lòt deviz', usd:'Dola ameriken ($)', usd_taux:'To : 1 $ = {t} G (depi {d})',
     usd_sans_taux:'Direksyon an poko mete to dola a : mande yo.',
     tk_depenses:'DEPANS', tk_a_remettre:'Lajan pou remèt', tk_autorise:'otorize pa',
     jours:['dimanch','lendi','madi','mèkredi','jedi','vandredi','samdi'],
@@ -1239,7 +1239,7 @@ function rBilletterie(){
           autocomplete="off" enterkeyhint="${tauxUSD() ? 'next' : 'done'}" maxlength="10" placeholder="0" value="${esc((S.monnaie || '').replace('.', ','))}"></label>
       <div class="devise-tete">${t('devise_titre')}</div>
       <label class="billet devise ${tauxUSD() ? '' : 'sans-taux'}" for="in-usd"><span class="coup">${t('usd')}
-          <small>${tauxUSD() ? t('usd_taux', {t: nf(tauxUSD(), 2)}) : t('usd_sans_taux')}</small><small id="st-usd"></small></span>
+          <small>${tauxUSD() ? t('usd_taux', {t: nf(tauxUSD(), 2), d: esc(jourCourt(S.ctx.taux.date_effet))}) : t('usd_sans_taux')}</small><small id="st-usd"></small></span>
         <input class="saisie-n" id="in-usd" data-c="usd" type="text" inputmode="decimal" ${tauxUSD() ? '' : 'disabled'}
           autocomplete="off" enterkeyhint="done" maxlength="10" placeholder="0 $" value="${esc((S.usd || '').replace('.', ','))}"></label>
     </div>
