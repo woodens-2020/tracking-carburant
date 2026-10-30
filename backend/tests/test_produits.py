@@ -59,3 +59,25 @@ def test_pompe_avec_releves_desactivee(client):
     assert pompes == []
     j = client.get(f"/api/journal?date_debut=2025-03-02&date_fin=2025-03-02&pompe_id={q}", headers=H).json()
     assert len(j["entries"]) == 1                     # historique gardé
+
+
+def test_changer_prix(client):
+    """Nouveau prix à partir d'une date : les relevés déjà enregistrés gardent
+    leur prix, ceux saisis ensuite prennent le nouveau ; tracé."""
+    p = _nouveau(client)
+    q = client.post(f"/api/produits/{p['id']}/pompes", headers=H, json={"nom": "P1"}).json()["id"]
+    r1 = client.post("/api/releves", headers=H, json={"date": "2025-04-01", "periode": "Matin", "pompe_id": q,
+                                                       "prix_gallon": 300, "metter_avant": 0, "metter_apres": 10}).json()
+    assert r1["prix_gallon"] == 300
+    r = client.post("/api/prix-vente", headers=H, json={"produit_id": p["id"], "prix_vente_gallon": 350,
+                                                         "date_effet": "2025-04-02"})
+    assert r.status_code == 201, r.text
+    assert client.post("/api/prix-vente", headers=H, json={"produit_id": p["id"], "prix_vente_gallon": 0,
+                                                           "date_effet": "2025-04-02"}).status_code == 400
+    r2 = client.post("/api/releves", headers=H, json={"date": "2025-04-02", "periode": "Matin", "pompe_id": q,
+                                                       "prix_gallon": 300, "metter_avant": 10, "metter_apres": 20}).json()
+    assert r2["prix_gallon"] == 350                       # le prix configuré s'applique
+    j = client.get(f"/api/journal?date_debut=2025-04-01&date_fin=2025-04-02&pompe_id={q}", headers=H).json()
+    assert [e["prix_gallon"] for e in j["entries"]] == [300, 350]   # l'ancien relevé garde son prix
+    actif = next(x for x in client.get("/api/produits", headers=H).json() if x["id"] == p["id"])["prix_vente_actif"]
+    assert actif == 350

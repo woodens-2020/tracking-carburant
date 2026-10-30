@@ -4884,7 +4884,10 @@ def reouvrir_livraison(livraison_id: int, db: Session = Depends(get_db)):
 
 # ---------- Prix de vente ----------
 @app.post("/api/prix-vente", status_code=201)
-def create_prix_vente(payload: PrixVenteIn, db: Session = Depends(get_db)):
+def create_prix_vente(payload: PrixVenteIn, request: Request, db: Session = Depends(get_db)):
+    """Nouveau prix de vente à partir d'une date (historique : jamais modifié).
+    Les relevés déjà enregistrés gardent le prix de leur saisie."""
+    _gerer_station(request, db)
     try:
         d = date_type.fromisoformat(payload.date_effet)
     except ValueError:
@@ -4895,11 +4898,17 @@ def create_prix_vente(payload: PrixVenteIn, db: Session = Depends(get_db)):
     if not produit:
         raise HTTPException(404, "Produit introuvable")
 
+    if payload.prix_vente_gallon > 1_000_000:
+        raise HTTPException(400, "Prix anormal.")
+    ancien = _prix_vente_a_date(db, produit.id, d)
     pv = PrixVente(
         produit_id        = payload.produit_id,
         prix_vente_gallon = payload.prix_vente_gallon,
         date_effet        = d,
     )
+    _tracer(db, request, "prix_vente_modifie", {"produit_id": produit.id, "produit": produit.nom,
+                                                "date_effet": str(d), "avant": ancien,
+                                                "apres": float(payload.prix_vente_gallon)})
     try:
         db.add(pv)
         db.commit()

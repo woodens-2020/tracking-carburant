@@ -3396,6 +3396,8 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .gest-edit{display:flex;flex-direction:column;gap:8px;padding:12px 14px;background:var(--panel2);border-bottom:1px solid var(--border)}
 .gest-edit label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
 .gest-edit-act{display:flex;gap:8px;justify-content:flex-end}
+.gest-prix{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.gest-hist{font-size:12px;color:var(--muted)}
 .prod-tab-adr{display:block;font-size:11px;font-weight:500;opacity:.75;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dep-presets{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .dep-presets button{font:inherit;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer;
@@ -17796,16 +17798,21 @@ function renderModalList(){
       ${_GEST.produit===p.id ? `<div class="gest-edit">
           <label>Nom du produit<input id="ge-nom-${p.id}" class="filter-input" value="${esc(p.nom)}" maxlength="100"></label>
           <label>Adresse / lieu<input id="ge-adr-${p.id}" class="filter-input" value="${esc(p.adresse||'')}" maxlength="255" placeholder="Où se trouve ce produit (station, site…)"></label>
+          <div class="gest-prix">
+            <label>Prix de vente (G / gallon)<input id="ge-prix-${p.id}" class="filter-input num" inputmode="decimal" value="${String(p.prix_vente_actif ?? p.prix_gallon ?? '').replace('.', ',')}"></label>
+            <label>À partir du<input id="ge-date-${p.id}" class="filter-input" type="date" value="${currentDate}"></label>
+          </div>
+          <div class="c-dim gest-hist" id="ge-hist-${p.id}">Chargement de l'historique des prix…</div>
           <div class="gest-edit-act"><button class="btn btn-secondary" onclick="_GEST.produit=null;renderModalList()">Annuler</button>
             <button class="btn btn-primary" onclick="enregistrerProduit(${p.id})">Enregistrer</button></div>
-          <div class="c-dim" style="font-size:12px">Les relevés et rapports déjà enregistrés gardent ce produit : ils s'afficheront sous le nouveau nom.</div></div>`
+          <div class="c-dim" style="font-size:12px">Les relevés et rapports déjà enregistrés gardent ce produit (ils s'afficheront sous le nouveau nom) et le prix de leur saisie ; le nouveau prix vaut pour les relevés enregistrés à partir de sa date.</div></div>`
       : `<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:9px 14px;background:var(--panel2);border-bottom:1px solid var(--border)">
         <div style="display:flex;flex-direction:column;min-width:0">
-          <span style="font-weight:600;font-size:15px">${esc(p.nom)} <span class="num c-amber" style="font-size:13px;font-weight:500">${fmtG(p.prix_gallon)}/gal</span></span>
+          <span style="font-weight:600;font-size:15px">${esc(p.nom)} <span class="num c-amber" style="font-size:13px;font-weight:500">${_fmtPrix(p.prix_vente_actif ?? p.prix_gallon)}/gal</span></span>
           <span style="font-size:12.5px;color:${p.adresse ? 'var(--text)' : 'var(--muted)'};opacity:${p.adresse ? '.85' : '1'}">${p.adresse ? '📍 ' + esc(p.adresse) : 'Adresse non renseignée — touchez « Modifier » pour l’ajouter'}</span>
         </div>
         <span class="c-dim" style="font-size:12px;margin-left:auto">${t('gestion.pompe.count',{n:p.pompes.length})}</span>
-        <button class="btn btn-secondary" style="height:30px;padding:0 10px;font-size:13px" onclick="_GEST.produit=${p.id};_GEST.pompe=null;renderModalList();setTimeout(()=>document.getElementById('ge-nom-${p.id}')?.focus(),0)">✏️ Modifier</button>
+        <button class="btn btn-secondary" style="height:30px;padding:0 10px;font-size:13px" onclick="_GEST.produit=${p.id};_GEST.pompe=null;renderModalList();_gestHistoriquePrix(${p.id});setTimeout(()=>document.getElementById('ge-nom-${p.id}')?.focus(),0)">✏️ Modifier</button>
       </div>`}
       <div style="padding:10px 14px">
         ${p.pompes.map(po=>`
@@ -17833,15 +17840,36 @@ async function _gestRecharger(){
   products=await GET('/produits');
   renderModalList(); renderProdTabs(); renderSaisie();
 }
+// Prix au gallon : deux décimales (fmtG arrondit à la gourde)
+const _fmtPrix = n => Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' G';
+async function _gestHistoriquePrix(id){
+  const el=document.getElementById('ge-hist-'+id); if(!el) return;
+  try{
+    const d=await GET('/prix-vente?produit_id='+id);
+    const l=(d.prix_vente||[]).slice(0,5);
+    el.innerHTML=l.length ? 'Derniers prix : '+l.map(x=>`<b>${_fmtPrix(x.prix_vente_gallon)}</b> dès le ${frDate(x.date_effet)}`).join(' · ')
+      : 'Aucun changement de prix enregistré pour ce produit.';
+  }catch(e){ el.textContent=''; }
+}
 async function enregistrerProduit(id){
+  const p=products.find(x=>x.id===id)||{};
   const nom=document.getElementById('ge-nom-'+id).value.trim();
   const adresse=document.getElementById('ge-adr-'+id).value.trim();
+  const prixTxt=document.getElementById('ge-prix-'+id).value.replace(/\s/g,'').replace(',','.');
+  const prix=parseFloat(prixTxt), dateEffet=document.getElementById('ge-date-'+id).value;
   if(nom.length<2){toast('Le nom du produit doit faire au moins 2 caractères.','err');return;}
+  const ancienPrix=p.prix_vente_actif ?? p.prix_gallon;
+  const prixChange=prixTxt!=='' && Math.abs(prix-(ancienPrix||0))>0.0005;
+  if(prixChange && !(prix>0)){toast('Indiquez un prix supérieur à 0.','err');return;}
+  if(prixChange && !dateEffet){toast('Indiquez la date à partir de laquelle le prix s\u2019applique.','err');return;}
+  if(prixChange && !await showConfirm(`Nouveau prix de ${nom} : ${_fmtPrix(prix)} par gallon (au lieu de ${_fmtPrix(ancienPrix)}), à partir du ${frDate(dateEffet)}. Les relevés déjà enregistrés gardent leur prix.`,
+      {title:'Changer le prix ?', type:'warn', okLabel:'Oui, changer le prix'})) return;
   try{
     await apiFetch('PATCH','/produits/'+id,{nom,adresse});
+    if(prixChange) await POST('/prix-vente',{produit_id:id, prix_vente_gallon:prix, date_effet:dateEffet});
     _GEST.produit=null;
     await _gestRecharger();
-    toast(`Produit enregistré : ${nom}`,'ok');
+    toast(prixChange ? `Produit enregistré : ${nom} — nouveau prix ${_fmtPrix(prix)}/gal dès le ${frDate(dateEffet)}` : `Produit enregistré : ${nom}`,'ok');
   }catch(e){toast(e.message,'err');}
 }
 async function enregistrerPompe(id){
