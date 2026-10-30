@@ -488,6 +488,9 @@ def startup():
         "ALTER TABLE releves ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
         "CREATE INDEX IF NOT EXISTS idx_releves_rapport_pompiste ON releves (rapport_pompiste_id)",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS depenses JSON NOT NULL DEFAULT '[]'::json",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS total_depenses NUMERIC(14,2) NOT NULL DEFAULT 0",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS devises JSON NOT NULL DEFAULT '[]'::json",
         "ALTER TABLE achats ADD COLUMN IF NOT EXISTS saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
     ]
     # Chaque instruction est isolée : une qui échoue (moteur SQLite en dev,

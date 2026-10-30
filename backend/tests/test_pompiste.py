@@ -388,3 +388,46 @@ def test_rattrapage_et_nettoyage_du_journal(client, db):
     assert sorted(float(x.metter_apres) for x in rel) == [25.0, 40.0]
     assert all(x.rapport_pompiste_id == rid and x.pompiste_id for x in rel)
     assert pompiste_routes.rattraper_journal(db) == 0
+
+def test_depenses_et_dollars(client):
+    """Le pompiste déclare ses dépenses (description, montant, qui a autorisé)
+    et ses dollars au taux du jour : l'argent à remettre = ventes − dépenses,
+    l'écart en tient compte ; à la finalisation, les dépenses entrent dans
+    les dépenses de la station (une seule fois)."""
+    from tz_utils import today_haiti
+    import main as _m
+    jour = str(today_haiti())
+    pompe = _produit(client, 500)
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Dep", "nom": "Ense"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    r = p.post("/api/pompiste/compteurs", json={"date": jour, "periode": "Matin", "charte_acceptee": True,
+              "lignes": [{"pompe_id": pompe, "metter_avant": 0, "metter_apres": 100}]})    # 50 000 G de ventes
+    assert r.status_code == 201, r.text
+    corps = {"billetterie": [{"coupure": 1000, "billets": 30}], "monnaie": 0,
+             "depenses": [{"description": "Glace pour la boutique", "montant": 1500, "autorise_par": "M. Pierre"},
+                          {"description": "Transport du gérant", "montant": 2000, "autorise_par": "Directeur"}],
+             "devises": [{"devise": "USD", "montant": 100}]}
+    # Pas de taux configuré : les dollars sont refusés
+    r = p.post("/api/pompiste/terminer", json=corps)
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "taux_absent"
+    assert client.post("/api/pompiste-supervision/taux", headers=H, json={"taux": 132.5}).status_code == 201
+    assert p.get("/api/pompiste/contexte").json()["taux"]["taux"] == 132.5
+    # Dépense incomplète refusée
+    mauvais = dict(corps, depenses=[{"description": "Glace", "montant": 1500, "autorise_par": ""}])
+    assert p.post("/api/pompiste/terminer", json=mauvais).status_code == 400
+    r = p.post("/api/pompiste/terminer", json=corps)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["total_depenses"] == 3500 and d["montant_a_remettre"] == 46500
+    assert d["devises"][0]["montant_htg"] == 13250 and d["montant_compte"] == 43250     # 30 000 G + 100 $ × 132,5
+    assert d["ecart"] == -3250                                                          # 43 250 + 3 500 − 50 000
+    rid = d["id"]
+    _sup(client, rid, f"lignes/{pompe}/confirmer", metter_avant=0, metter_apres=100)
+    _sup(client, rid, "billetterie", confirme=True)
+    _sup(client, rid, "ecart", confirme=True)
+    assert _sup(client, rid, "finaliser", note=7, commentaire="Il manque 3 250 G").status_code == 200
+    deps = client.get(f"/api/depenses?date_debut={jour}&date_fin={jour}", headers=H).json()["depenses"]
+    miennes = [x for x in deps if (x["reference"] or "").startswith(f"RP{rid}-")]
+    assert sorted(x["montant"] for x in miennes) == [1500, 2000]
+    assert all("autorisée par" in x["notes"] for x in miennes)

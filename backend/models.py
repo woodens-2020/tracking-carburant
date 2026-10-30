@@ -146,6 +146,12 @@ class RapportPompiste(Base):
     montant_compte     = Column(Numeric(14, 2), nullable=False, default=0)
     ecart              = Column(Numeric(14, 2), nullable=False, default=0)
     note_pompiste      = Column(String(500), nullable=True)
+    # Dépenses payées avec l'argent de la période : [{"description", "montant", "autorise_par"}]
+    # — elles réduisent l'argent à remettre ; devenues des Depense à la finalisation.
+    depenses           = Column(JSON, nullable=False, default=list)
+    total_depenses     = Column(Numeric(14, 2), nullable=False, default=0)
+    # Autres devises comptées : [{"devise": "USD", "montant", "taux", "montant_htg"}]
+    devises            = Column(JSON, nullable=False, default=list)
     soumis_at          = Column(DateTime(timezone=True), nullable=True)   # au « Terminer »
     traite_par_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     traite_at          = Column(DateTime(timezone=True), nullable=True)
@@ -171,6 +177,27 @@ class RapportPompiste(Base):
         Index("idx_rpomp_date", "date"),
         Index("idx_rpomp_statut", "statut"),
         Index("idx_rpomp_user", "utilisateur_id"),
+    )
+
+
+class TauxDevise(Base):
+    """Taux du jour d'une devise (1 USD = taux gourdes), fixé par la
+    direction. Le rapport pompiste prend le dernier taux en vigueur à sa
+    date ; chaque rapport garde le taux utilisé (historique figé)."""
+    __tablename__ = "taux_devises"
+
+    id          = Column(Integer, primary_key=True)
+    devise      = Column(String(3), nullable=False, default="USD")
+    taux        = Column(Numeric(12, 4), nullable=False)
+    date_effet  = Column(Date, nullable=False)
+    saisi_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    saisi_par = relationship("Utilisateur")
+
+    __table_args__ = (
+        CheckConstraint("taux > 0", name="chk_taux_devise_pos"),
+        Index("idx_taux_devise_date", "devise", "date_effet"),
     )
 
 

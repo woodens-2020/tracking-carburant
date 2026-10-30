@@ -4422,6 +4422,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
       <div class="psp-tabs">
         <button class="psp-tab on" data-t="rapports" onclick="pspOnglet('rapports')">Rapports <span id="psp-nb"></span></button>
         <button class="psp-tab" data-t="comptes" onclick="pspOnglet('comptes')">Comptes pompistes</button>
+        <button class="psp-tab" data-t="taux" onclick="pspOnglet('taux')">Taux du jour</button>
       </div>
       <div id="psp-contenu"></div>
     </div>
@@ -19585,9 +19586,39 @@ async function pspOnglet(t){
     if(t === 'rapports'){
       if(!PSP.comptes) PSP.comptes = await _pspApi('GET','/comptes');
       await pspChargerListe();
-    } else { PSP.comptes = await _pspApi('GET','/comptes'); pspRendreComptes(); }
+    } else if(t === 'taux'){ await pspRendreTaux(); }
+    else { PSP.comptes = await _pspApi('GET','/comptes'); pspRendreComptes(); }
   }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
   pspMajBadge();
+}
+
+async function pspRendreTaux(){
+  const d = await _pspApi('GET', '/taux');
+  const c = document.getElementById('psp-contenu'), a = d.actuel;
+  const fmt = n => Number(n).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:4});
+  c.innerHTML = `<div class="psp-card"><b>Taux du dollar américain</b>
+      <div class="psp-muted" style="margin:4px 0 12px">Les pompistes convertissent les dollars reçus avec le dernier taux en vigueur à la date de leur rapport.</div>
+      <div class="cp-total" style="margin-bottom:12px">
+        <div><div class="cp-total-l">Taux en vigueur</div><div class="cp-total-p">${a ? `depuis le ${frDate(a.date_effet)}${a.saisi_par_nom ? ' · ' + esc(a.saisi_par_nom) : ''}` : 'aucun taux fixé : les pompistes ne peuvent pas déclarer de dollars'}</div></div>
+        <div class="cp-total-v">${a ? `1 $ = ${fmt(a.taux)} G` : '—'}</div></div>
+      <div class="psp-grid">
+        <label class="cp-champ">Nouveau taux (gourdes pour 1 $)<input class="filter-input" id="tx-taux" inputmode="decimal" placeholder="ex. 132,50"></label>
+        <label class="cp-champ">À partir du<input class="filter-input" id="tx-date" type="date" value="${currentDate}" max="${currentDate}"></label>
+      </div>
+      <div id="tx-msg"></div>
+      <div class="psp-actions"><button class="btn btn-primary" onclick="pspFixerTaux()">Enregistrer le taux</button></div></div>
+    <div class="psp-card" style="padding:0;overflow-x:auto"><table class="psp-tbl"><thead><tr><th>À partir du</th><th class="r">1 $ =</th><th>Saisi par</th><th>Le</th></tr></thead><tbody>
+      ${d.historique.length ? d.historique.map(x => `<tr><td>${frDate(x.date_effet)}</td><td class="r"><b>${fmt(x.taux)} G</b></td>
+        <td>${esc(x.saisi_par_nom||'')}</td><td class="psp-muted">${x.saisi_le ? new Date(x.saisi_le).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}) : ''}</td></tr>`).join('')
+        : '<tr><td colspan="4" class="psp-muted">Aucun taux enregistré.</td></tr>'}</tbody></table></div>`;
+}
+async function pspFixerTaux(){
+  const v = parseFloat((document.getElementById('tx-taux').value || '').replace(/\s/g, '').replace(',', '.'));
+  const msg = m => document.getElementById('tx-msg').innerHTML = `<div class="psp-err">${esc(m)}</div>`;
+  if(!(v > 0)) return msg('Indiquez un taux supérieur à 0.');
+  try{ await _pspApi('POST', '/taux', {taux: v, devise: 'USD', date_effet: document.getElementById('tx-date').value || null});
+       notify(`Taux enregistré : 1 $ = ${v.toLocaleString('fr-FR')} G`, 'ok'); await pspRendreTaux(); }
+  catch(e){ msg(e.message); }
 }
 
 async function pspChargerListe(){
@@ -19718,11 +19749,26 @@ function pspCarteLecture(r){
         <td class="r">${_pspN(l.gallons)}</td><td class="r">${_pspG(l.montant)}</td></tr>
         ${l.metter_avant_corrige != null ? `<tr><td colspan="5" class="psp-muted">Saisi par le pompiste : ${_pspN(l.metter_avant)} → ${_pspN(l.metter_apres)}</td></tr>` : ''}`).join('')}</tbody></table>
     <div class="psp-kpis"><div class="psp-kpi"><span>Ventes attendues</span><b>${_pspG(r.montant_attendu_final)}</b></div>
+      ${r.total_depenses ? `<div class="psp-kpi"><span>Dépenses</span><b>− ${_pspG(r.total_depenses)}</b></div>` : ''}
       <div class="psp-kpi"><span>Argent compté</span><b>${_pspG(r.montant_compte)}</b></div>
       <div class="psp-kpi"><span>Écart</span><b>${_pspE(r.ecart_final)}</b></div></div>
-    ${billets ? `<table class="psp-tbl" style="max-width:420px"><thead><tr><th>Coupure</th><th class="r">Billets</th><th class="r">Montant</th></tr></thead><tbody>${billets}
-      ${r.monnaie ? `<tr><td>Monnaie</td><td></td><td class="r">${_pspG(r.monnaie)}</td></tr>` : ''}</tbody></table>` : ''}</div>`;
+    ${billets || (r.devises||[]).length ? `<table class="psp-tbl" style="max-width:420px"><thead><tr><th>Coupure</th><th class="r">Billets</th><th class="r">Montant</th></tr></thead><tbody>${billets}
+      ${r.monnaie ? `<tr><td>Monnaie</td><td></td><td class="r">${_pspG(r.monnaie)}</td></tr>` : ''}${_pspDevisesLignes(r)}</tbody></table>` : ''}
+    ${_pspDepensesHtml(r)}</div>`;
 }
+
+// Dépenses payées par le pompiste et autres devises (dollars au taux du jour)
+function _pspDepensesHtml(r){
+  if(!(r.depenses||[]).length) return '';
+  return `<div class="psp-muted" style="margin:10px 0 4px;font-weight:700">Dépenses payées par le pompiste</div>
+    <table class="psp-tbl" style="max-width:620px"><thead><tr><th>Dépense</th><th>Autorisée par</th><th class="r">Montant</th></tr></thead><tbody>
+    ${r.depenses.map(x => `<tr><td>${esc(x.description)}</td><td>${esc(x.autorise_par)}</td><td class="r">${_pspG(x.montant)}</td></tr>`).join('')}
+    <tr><td><b>Total des dépenses</b></td><td></td><td class="r"><b>${_pspG(r.total_depenses)}</b></td></tr></tbody></table>
+    <div class="psp-muted" style="margin-top:4px">À la finalisation, elles sont enregistrées dans les Dépenses (catégorie « Dépense pompiste »).</div>`;
+}
+const _pspDevisesLignes = r => (r.devises||[]).map(x =>
+  `<tr><td><b>${Number(x.montant).toLocaleString('fr-FR',{minimumFractionDigits:2})} $</b><div class="psp-muted">taux ${Number(x.taux).toLocaleString('fr-FR',{minimumFractionDigits:2})} G</div></td>
+   <td></td><td class="r">${_pspG(x.montant_htg)}</td></tr>`).join('');
 
 function _pspEtape(n, titre, fait, contenu){
   return `<div class="psp-etape ${fait?'fait':''}"><div class="psp-etape-tete"><span class="psp-pastille">${fait?'✓':n}</span><b>${titre}</b></div>${contenu}</div>`;
@@ -19758,7 +19804,8 @@ function pspCarte(r){
   const billets = (r.billetterie||[]).map(b => { const n = (b.liasses||0) * 100 + (b.billets||0);
       return `<tr><td><b>${Number(b.coupure).toLocaleString('fr-FR')} G</b></td>
       <td class="r">${n}</td><td class="r">${_pspG(b.coupure * n)}</td></tr>`; }).join('')
-    + (r.monnaie ? `<tr><td><b>Monnaie</b></td><td></td><td class="r">${_pspG(r.monnaie)}</td></tr>` : '');
+    + (r.monnaie ? `<tr><td><b>Monnaie</b></td><td></td><td class="r">${_pspG(r.monnaie)}</td></tr>` : '')
+    + _pspDevisesLignes(r);
   const pb = r.statut === 'PROBLEME';
   const peutFinaliser = toutesLignes && r.billetterie_confirmee && r.ecart_confirme;
   return `<div class="psp-card">
@@ -19777,13 +19824,16 @@ function pspCarte(r){
       `<div style="overflow-x:auto"><table class="psp-tbl" style="max-width:520px"><thead><tr><th>Coupure</th><th class="r">Nombre de billets</th><th class="r">Montant</th></tr></thead>
         <tbody>${billets || '<tr><td colspan="3" class="psp-muted">Aucun billet déclaré</td></tr>'}
         <tr><td><b>Total compté</b></td><td></td><td class="r"><b>${_pspG(r.montant_compte)}</b></td></tr></tbody></table></div>
+       ${_pspDepensesHtml(r)}
        <div class="psp-actions">${r.billetterie_confirmee
          ? `<span class="psp-ok" style="font-weight:700">✓ Billetterie confirmée</span> <button class="psp-lien" onclick="pspBillets(${r.id},false)">reprendre</button>`
-         : `<button class="btn btn-primary" onclick="pspBillets(${r.id},true)">Confirmer la billetterie</button>`}</div>`)}
+         : `<button class="btn btn-primary" onclick="pspBillets(${r.id},true)">Confirmer la billetterie${(r.depenses||[]).length?' et les dépenses':''}</button>`}</div>`)}
 
     ${_pspEtape(3, 'Écart de caisse', r.ecart_confirme,
       `<div class="psp-kpis">
         <div class="psp-kpi"><span>Ventes attendues</span><b>${_pspG(r.montant_attendu_final)}</b></div>
+        ${r.total_depenses ? `<div class="psp-kpi"><span>Dépenses</span><b>− ${_pspG(r.total_depenses)}</b></div>
+        <div class="psp-kpi"><span>Argent à remettre</span><b>${_pspG(r.montant_attendu_final - r.total_depenses)}</b></div>` : ''}
         <div class="psp-kpi"><span>Argent compté</span><b>${_pspG(r.montant_compte)}</b></div>
         <div class="psp-kpi"><span>Écart</span><b>${_pspE(r.ecart_final)}</b></div></div>
        ${Math.abs(r.ecart_final - r.ecart) > 0.5 ? `<div class="psp-muted">Écart déclaré par le pompiste : ${_pspE(r.ecart)} — recalculé avec les mètres corrigés.</div>` : ''}

@@ -357,6 +357,9 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
         "pompiste_id": r.utilisateur_id, "pompiste_nom": _nom(r.utilisateur),
         "charte_acceptee_at": r.charte_acceptee_at.isoformat() if r.charte_acceptee_at else None,
         "billetterie": r.billetterie or [], "monnaie": float(r.monnaie or 0),
+        "depenses": r.depenses or [], "total_depenses": float(r.total_depenses or 0),
+        "devises": r.devises or [],
+        "montant_a_remettre": round(float(r.montant_attendu) - float(r.total_depenses or 0), 2),
         "montant_attendu": float(r.montant_attendu), "montant_compte": float(r.montant_compte),
         "ecart": float(r.ecart), "note_pompiste": r.note_pompiste,
         "soumis_at": r.soumis_at.isoformat() if r.soumis_at else None,
@@ -367,7 +370,8 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
         "total_gallons": round(sum(x["gallons"] for x in lignes), 3),
         # Après corrections éventuelles du superviseur
         "montant_attendu_final": round(sum(x["montant"] for x in lignes), 2),
-        "ecart_final": round(float(r.montant_compte) - sum(x["montant"] for x in lignes), 2),
+        # Écart = argent compté + dépenses payées − ventes
+        "ecart_final": round(float(r.montant_compte) + float(r.total_depenses or 0) - sum(x["montant"] for x in lignes), 2),
         "billetterie_confirmee": bool(r.billetterie_confirmee),
         "ecart_confirme": bool(r.ecart_confirme),
         "note_superviseur": r.note_superviseur,
@@ -447,6 +451,7 @@ def contexte(date: Optional[date_type] = None, periode: Optional[str] = None,
         "date_min": str(today_haiti() - timedelta(days=JOURS_EN_ARRIERE)),
         "produits": produits, "coupures": list(COUPURES), "taille_liasse": TAILLE_LIASSE,
         "en_cours": _rapport_dict(db, ouvert) if ouvert else None,
+        "taux": _taux_dict(taux_du_jour(db, d)),
     }
 
 
@@ -472,10 +477,76 @@ class CompteursIn(BaseModel):
     lignes: list[LigneIn]
 
 
+class DepensePompisteIn(BaseModel):
+    description: str
+    montant: float
+    autorise_par: str
+
+
+class DeviseIn(BaseModel):
+    devise: str = "USD"
+    montant: float
+
+
 class TerminerIn(BaseModel):
     billetterie: list[BilletIn] = []
     monnaie: float = 0
     note: Optional[str] = None
+    depenses: list[DepensePompisteIn] = []
+    devises: list[DeviseIn] = []
+
+
+DEVISES = ("USD",)
+MAX_DEPENSES = 30
+
+
+def taux_du_jour(db: Session, d: date_type, devise: str = "USD"):
+    from models import TauxDevise
+    return (db.query(TauxDevise).filter(TauxDevise.devise == devise, TauxDevise.date_effet <= d)
+            .order_by(TauxDevise.date_effet.desc(), TauxDevise.id.desc()).first())
+
+
+def _taux_dict(t) -> Optional[dict]:
+    if not t:
+        return None
+    return {"id": t.id, "devise": t.devise, "taux": float(t.taux), "date_effet": str(t.date_effet),
+            "saisi_par_nom": _nom(t.saisi_par), "saisi_le": t.created_at.isoformat() if t.created_at else None}
+
+
+def _verifier_depenses(depenses: list) -> list:
+    if len(depenses) > MAX_DEPENSES:
+        raise HTTPException(400, f"Au plus {MAX_DEPENSES} dépenses par rapport.")
+    out = []
+    for i, x in enumerate(depenses, 1):
+        desc = " ".join((x.description or "").split())
+        aut = " ".join((x.autorise_par or "").split())
+        if len(desc) < 3:
+            raise HTTPException(400, {"code": "depense_description", "message": f"Dépense {i} : décrivez la dépense."})
+        if not (x.montant > 0) or x.montant > 10_000_000:
+            raise HTTPException(400, {"code": "depense_montant", "message": f"Dépense {i} : montant invalide."})
+        if len(aut) < 2:
+            raise HTTPException(400, {"code": "depense_autorise", "message": f"Dépense {i} : indiquez qui l'a autorisée."})
+        out.append({"description": desc[:200], "montant": round(x.montant, 2), "autorise_par": aut[:120]})
+    return out
+
+
+def _verifier_devises(db: Session, devises: list, d: date_type) -> list:
+    out = []
+    for x in devises:
+        dev = (x.devise or "USD").upper()
+        if dev not in DEVISES:
+            raise HTTPException(400, f"Devise inconnue : {dev}")
+        if not x.montant:
+            continue
+        if x.montant < 0 or x.montant > 1_000_000:
+            raise HTTPException(400, {"code": "devise_montant", "message": f"Montant en {dev} invalide."})
+        t = taux_du_jour(db, d, dev)
+        if not t:
+            raise HTTPException(409, {"code": "taux_absent",
+                                      "message": f"Le taux du jour {dev} n'est pas configuré : demandez à la direction."})
+        out.append({"devise": dev, "montant": round(x.montant, 2), "taux": float(t.taux),
+                    "montant_htg": round(x.montant * float(t.taux), 2)})
+    return out
 
 
 def _controler_lignes(db: Session, d: date_type, periode: str, lignes: list,
@@ -739,10 +810,16 @@ def terminer(data: TerminerIn, request: Request, u: Utilisateur = Depends(_requi
     billetterie = [b.model_dump() if hasattr(b, "model_dump") else b.dict()
                    for b in data.billetterie if (b.liasses or b.billets)]
     _recalculer_attendu(rap)
+    depenses = _verifier_depenses(data.depenses)
+    devises = _verifier_devises(db, data.devises, rap.date)
     rap.billetterie = billetterie
     rap.monnaie = round(data.monnaie, 2)
-    rap.montant_compte = _total_billetterie(billetterie, data.monnaie)
-    rap.ecart = round(float(rap.montant_compte) - float(rap.montant_attendu), 2)
+    rap.depenses = depenses
+    rap.total_depenses = round(sum(x["montant"] for x in depenses), 2)
+    rap.devises = devises
+    # Argent compté (gourdes + autres devises converties) + dépenses payées = ventes attendues
+    rap.montant_compte = round(_total_billetterie(billetterie, data.monnaie) + sum(x["montant_htg"] for x in devises), 2)
+    rap.ecart = round(float(rap.montant_compte) + float(rap.total_depenses) - float(rap.montant_attendu), 2)
     rap.note_pompiste = (data.note or "").strip()[:500] or None
     rap.statut = "SOUMIS"
     rap.soumis_at = now_haiti()
@@ -991,6 +1068,8 @@ def finaliser(rid: int, data: FinaliserIn, request: Request,
 
     # 2. Journal des compteurs — mêmes règles que le module Saisie
     avertissements = _ecrire_journal(db, rap, request, remplacer_saisie=True, motif=motif or None)
+    # 3. Dépenses payées par le pompiste → dépenses de la station (journal de caisse)
+    _ecrire_depenses(db, rap, request, s)
 
     rap.statut = "RESOLU" if resolution else "CONFIRME"
     rap.note_superviseur = data.note
@@ -1002,6 +1081,69 @@ def finaliser(rid: int, data: FinaliserIn, request: Request,
     out = _rapport_dict(db, rap)
     out["avertissements"] = avertissements
     return out
+
+
+CATEGORIE_DEPENSE_POMPISTE = "Dépense pompiste"
+
+
+def _ecrire_depenses(db: Session, rap: RapportPompiste, request: Request, s: Utilisateur) -> int:
+    """Une Depense par dépense déclarée, référence « RP<id>-<n> » : rejouer la
+    finalisation ne crée jamais de doublon."""
+    from models import Depense, CategorieDepense
+    import listes_reference as lref
+    if not rap.depenses:
+        return 0
+    try:
+        categorie = lref.resoudre(db, CategorieDepense, None, request=request, defaut=CATEGORIE_DEPENSE_POMPISTE)
+    except HTTPException:
+        categorie = CATEGORIE_DEPENSE_POMPISTE
+    n = 0
+    for i, x in enumerate(rap.depenses, 1):
+        ref = f"RP{rap.id}-{i}"
+        if db.query(Depense).filter_by(reference=ref).first():
+            continue
+        db.add(Depense(categorie=categorie or CATEGORIE_DEPENSE_POMPISTE, description=x["description"][:300],
+                       montant=x["montant"], date_depense=rap.date, beneficiaire=None, reference=ref,
+                       notes=(f"Payée par le pompiste {_nom(rap.utilisateur)} ({_per(rap.periode)}), "
+                              f"autorisée par {x['autorise_par']}. Rapport pompiste n°{rap.id}.")[:500],
+                       saisi_par_id=s.id))
+        n += 1
+    return n
+
+
+# ── Taux du jour des devises ────────────────────────────────────────────
+
+class TauxIn(BaseModel):
+    taux: float
+    devise: str = "USD"
+    date_effet: Optional[date_type] = None
+
+
+@router.get("/api/pompiste-supervision/taux")
+def lister_taux(devise: str = "USD", _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    from models import TauxDevise
+    hist = (db.query(TauxDevise).filter_by(devise=devise.upper())
+            .order_by(TauxDevise.date_effet.desc(), TauxDevise.id.desc()).limit(60).all())
+    return {"actuel": _taux_dict(taux_du_jour(db, today_haiti(), devise.upper())),
+            "historique": [_taux_dict(t) for t in hist]}
+
+
+@router.post("/api/pompiste-supervision/taux", status_code=201)
+def fixer_taux(data: TauxIn, s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    from models import TauxDevise
+    dev = (data.devise or "USD").upper()
+    if dev not in DEVISES:
+        raise HTTPException(400, f"Devise inconnue : {dev}")
+    if not (0 < data.taux < 100_000):
+        raise HTTPException(400, "Taux invalide.")
+    d = data.date_effet or today_haiti()
+    if d > today_haiti():
+        raise HTTPException(400, "Le taux ne peut pas être daté dans le futur.")
+    t = TauxDevise(devise=dev, taux=round(data.taux, 4), date_effet=d, saisi_par_id=s.id)
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return _taux_dict(t)
 
 
 @router.post("/api/pompiste-supervision/rapports/{rid}/rejeter")

@@ -192,6 +192,18 @@ td.r,th.r{text-align:right;white-space:nowrap}
 .dlg-btns .btn{min-height:60px;font-size:18px}
 .dlg.danger #dlg-oui{background:var(--err)}
 @media (max-width:420px){ .dlg-btns{grid-template-columns:1fr} .dlg-btns #dlg-oui{order:-1} }
+.dep-form{display:flex;flex-direction:column;gap:8px}
+.dep-form label{font-weight:800;font-size:16px;margin-top:6px}
+.saisie-t{font:inherit;font-size:20px;font-weight:700;width:100%;min-height:56px;padding:10px 14px;border-radius:14px;
+  border:2px solid var(--border);background:var(--bg);color:var(--text)}
+.saisie-t:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.dep-act{display:flex;gap:8px;align-items:center}
+.devise-tete{font-weight:800;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 2px}
+.billet.sans-taux{opacity:.7}
+.billet.devise{grid-template-columns:1fr;gap:8px}
+.billet.devise .coup{white-space:normal}
+.billet.devise .coup small{font-family:inherit;font-size:15px}
+.billet.devise .coup small#st-usd{font-family:var(--mono);font-size:16px;color:var(--text)}
 .reprise{display:flex;align-items:center;gap:12px;background:var(--accent-soft);border:2px solid var(--accent);border-radius:16px;
   padding:12px 14px;margin-bottom:14px}
 .reprise-ico{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:#fff;font-size:20px;font-weight:900}
@@ -445,7 +457,7 @@ const TXT = {
     confirmer_titre_compteurs:'Envoyer les compteurs ?', confirmer_txt_compteurs:'<b>{p}</b> : {n} pompe(s) · {g} gal · <b>{m}</b>.<br>Vérifiez bien chaque mètre avant d\'envoyer.',
     oui_envoyer:'Oui, envoyer', non_retour:'Non, revenir',
     confirmer_titre_rapport:'Envoyer le rapport à la direction ?',
-    confirmer_txt_rapport:'Ventes attendues : <b>{a}</b><br>Argent compté : <b>{c}</b><br>Écart : <b>{e}</b><br>Une fois envoyé, seule la direction peut le modifier.',
+    confirmer_txt_rapport:'Ventes : <b>{v}</b><br>Dépenses : <b>{d}</b><br>Argent à remettre : <b>{a}</b><br>Argent compté : <b>{c}</b><br>Écart : <b>{e}</b><br>Une fois envoyé, seule la direction peut le modifier.',
     oui_envoyer_rapport:'Oui, envoyer le rapport', retirer_titre:'Retirer cette pompe ?', oui_retirer:'Oui, la retirer',
     sortir_titre:'Voulez-vous sortir ?', sortir_txt:'Vous allez être déconnecté.',
     sortir_txt_brouillon:'Votre rapport n\'est pas terminé. Pas d\'inquiétude : tout ce que vous avez saisi est gardé, vous le retrouverez en revenant.',
@@ -460,6 +472,19 @@ const TXT = {
     tk_total_gal:'Total gallons', tk_attendu:'Ventes attendues', tk_compte:'Argent compté', tk_ecart:'Écart',
     tk_note:'Note', tk_sig_pompiste:'Signature pompiste', tk_sig_resp:'Signature responsable',
     tk_imprime:'Imprimé le', tk_verif:'À vérifier par la direction',
+    dep_q:'Avez-vous payé une dépense pendant la période ?', dep_autre_q:'Une autre dépense ?',
+    dep_q_sub:'Une dépense payée avec l\'argent des ventes (glace, transport…) se déduit de l\'argent à remettre.',
+    dep_oui:'Oui, il y a eu une dépense', dep_autre_oui:'Oui, une autre dépense', dep_oui_sub:'Je décris la dépense',
+    dep_non:'Non, pas de dépense', dep_fini:'Non, c\'est tout', dep_non_sub:'Je compte l\'argent',
+    mes_depenses:'Mes dépenses', dep_titre_n:'Dépense {n}', dep_desc:'Description de la dépense',
+    dep_desc_ph:'Ex. : glace, transport, réparation…', dep_montant:'Montant (G)',
+    dep_autorise:'Qui a autorisé la dépense ?', dep_autorise_ph:'Nom du responsable',
+    dep_enregistrer:'Enregistrer la dépense', dep_e_desc:'Décrivez la dépense.', dep_e_montant:'Indiquez le montant.',
+    dep_e_autorise:'Indiquez qui a autorisé la dépense.', dep_total:'Total des dépenses', aucune_depense:'Aucune dépense.',
+    retirer_titre_dep:'Retirer cette dépense ?', dep_retirer_q:'Retirer la dépense « {d} » ?', a_remettre:'Argent à remettre',
+    devise_titre:'Autres devises', usd:'Dollars américains ($)', usd_taux:'Taux du jour : 1 $ = {t} G',
+    usd_sans_taux:'Taux du dollar pas encore fixé : demandez à la direction.',
+    tk_depenses:'DÉPENSES', tk_a_remettre:'Argent à remettre', tk_autorise:'autorisée par',
     jours:['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'],
     mois:['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'],
   },
@@ -523,7 +548,7 @@ const TXT = {
     confirmer_titre_compteurs:'Voye kontè yo ?', confirmer_txt_compteurs:'<b>{p}</b> : {n} ponp · {g} gal · <b>{m}</b>.<br>Verifye chak mitè byen anvan ou voye.',
     oui_envoyer:'Wi, voye yo', non_retour:'Non, tounen',
     confirmer_titre_rapport:'Voye rapò a bay direksyon an ?',
-    confirmer_txt_rapport:'Lajan ki dwe antre : <b>{a}</b><br>Lajan ou konte : <b>{c}</b><br>Diferans : <b>{e}</b><br>Apre ou voye l, se direksyon an sèlman ki ka chanje l.',
+    confirmer_txt_rapport:'Vant : <b>{v}</b><br>Depans : <b>{d}</b><br>Lajan pou remèt : <b>{a}</b><br>Lajan ou konte : <b>{c}</b><br>Diferans : <b>{e}</b><br>Apre ou voye l, se direksyon an sèlman ki ka chanje l.',
     oui_envoyer_rapport:'Wi, voye rapò a', retirer_titre:'Retire ponp sa a ?', oui_retirer:'Wi, retire l',
     sortir_titre:'Ou vle soti ?', sortir_txt:'Ou pral dekonekte.',
     sortir_txt_brouillon:'Rapò ou a poko fini. Pa enkyete w : n ap kenbe tout sa ou te antre yo, w ap jwenn yo lè ou tounen.',
@@ -538,6 +563,19 @@ const TXT = {
     tk_total_gal:'Total galon', tk_attendu:'Lajan ki dwe antre', tk_compte:'Lajan konte', tk_ecart:'Diferans',
     tk_note:'Nòt', tk_sig_pompiste:'Siyati ponpis', tk_sig_resp:'Siyati responsab',
     tk_imprime:'Enprime le', tk_verif:'Direksyon an ap verifye l',
+    dep_q:'Èske ou te peye yon depans pandan peryòd la ?', dep_autre_q:'Gen yon lòt depans ?',
+    dep_q_sub:'Yon depans ou te peye ak lajan vant yo (glas, transpò…) ap retire sou lajan ou dwe remèt la.',
+    dep_oui:'Wi, te gen depans', dep_autre_oui:'Wi, yon lòt depans', dep_oui_sub:'M ap dekri depans lan',
+    dep_non:'Non, pa t gen depans', dep_fini:'Non, se tout', dep_non_sub:'M ap konte lajan an',
+    mes_depenses:'Depans mwen yo', dep_titre_n:'Depans {n}', dep_desc:'Ki depans ? (deskripsyon)',
+    dep_desc_ph:'Egz. : glas, transpò, reparasyon…', dep_montant:'Kantite lajan (G)',
+    dep_autorise:'Ki moun ki te otorize depans lan ?', dep_autorise_ph:'Non responsab la',
+    dep_enregistrer:'Anrejistre depans lan', dep_e_desc:'Dekri depans lan.', dep_e_montant:'Antre kantite lajan an.',
+    dep_e_autorise:'Di ki moun ki te otorize depans lan.', dep_total:'Total depans', aucune_depense:'Pa gen depans.',
+    retirer_titre_dep:'Retire depans sa a ?', dep_retirer_q:'Retire depans « {d} » ?', a_remettre:'Lajan pou remèt',
+    devise_titre:'Lòt deviz', usd:'Dola ameriken ($)', usd_taux:'To jodi a : 1 $ = {t} G',
+    usd_sans_taux:'Direksyon an poko mete to dola a : mande yo.',
+    tk_depenses:'DEPANS', tk_a_remettre:'Lajan pou remèt', tk_autorise:'otorize pa',
     jours:['dimanch','lendi','madi','mèkredi','jedi','vandredi','samdi'],
     mois:['janvye','fevriye','mas','avril','me','jen','jiyè','out','septanm','oktòb','novanm','desanm'],
   },
@@ -552,7 +590,8 @@ const S = {};
 function reinit(){
   Object.assign(S, {ctx:null, etape:'charte', charte:false, date:null, periode:null, produitId:null,
     choisies:[], pos:0, index:{}, billets:{}, monnaie:'', note:'', erreurs:{}, dernier:null,
-    champ:null, modif:null, depuisResume:false, champActif:null, caseActive:null, dernierProduit:null, _repriseFaite:false});
+    champ:null, modif:null, depuisResume:false, champActif:null, caseActive:null, dernierProduit:null, _repriseFaite:false,
+    depenses:[], depForm:null, depEdit:null, usd:''});
 }
 reinit();
 
@@ -743,7 +782,7 @@ const enCours = () => S.ctx?.en_cours;
 const produit = () => S.ctx.produits.find(p => p.id === S.produitId);
 const pompeCtx = id => { for(const p of S.ctx.produits) for(const q of p.pompes) if(q.id === id) return q; return null; };
 const libres = p => p.pompes.filter(q => !q.deja_rapportee);
-const PHASE_ARGENT = ['billetterie','resume','modif'];
+const PHASE_ARGENT = ['depenses','depense','billetterie','resume','modif'];
 
 function aller(etape){ S.etape = etape; S.repris = false; rendre(); }
 function precedent(){
@@ -751,7 +790,7 @@ function precedent(){
   if(e === 'index' && S.pos > 0){ S.pos--; S.champActif = null; return rendre(); }
   if(e === 'billetterie' && S.depuisResume) return aller('resume');
   const retour = {periode:'charte', calendrier:'periode', produit: enCours() ? 'rapport' : 'periode', pompes:'produit', index:'pompes',
-                  compteurs:'index', billetterie:'rapport', resume:'billetterie', modif:'resume'}[e];
+                  compteurs:'index', depenses:'rapport', depense:'depenses', billetterie:'depenses', resume:'billetterie', modif:'resume'}[e];
   if(e === 'compteurs'){ S.pos = S.choisies.length - 1; S.champActif = null; }
   aller(retour || 'charte');
 }
@@ -785,7 +824,7 @@ function rendre(){
   if(!S.charte && S.etape !== 'fin') S.etape = 'charte';
   S.champ = null;
   ({charte:rCharte, periode:rPeriode, calendrier:rCalendrier, produit:rProduit, pompes:rPompes, index:rIndex, compteurs:rCompteurs,
-    rapport:rRapport, billetterie:rBilletterie, resume:rResume, modif:rModif, fin:rFin})[S.etape]();
+    rapport:rRapport, depenses:rDepenses, depense:rDepense, billetterie:rBilletterie, resume:rResume, modif:rModif, fin:rFin})[S.etape]();
   window.scrollTo(0,0);
   sauverBrouillon();
 }
@@ -1071,7 +1110,7 @@ function rRapport(){
     <div class="deux-col"><div class="choix">
       ${restants.map(p => `<button class="gros ${clsProduit(p.nom)}" onclick="choisirProduit(${p.id})"><span class="ico">⛽</span>
         <span>${t('oui')}, ${esc(p.nom)}<small>${t('oui_sub', {p: esc(p.nom)})}</small></span></button>`).join('')}
-      <button class="gros on" onclick="S.depuisResume=false;aller('billetterie')"><span class="ico">✔</span>
+      <button class="gros on" onclick="S.depuisResume=false;aller('depenses')"><span class="ico">✔</span>
         <span>${t('non_fini')}<small>${t('non_fini_sub')}</small></span></button>
     </div>
     <div class="card"><h2 style="margin-top:0">${t('mon_rapport')}</h2>${Object.entries(lignesParProduit(r)).map(([nom, ls]) => `
@@ -1087,11 +1126,99 @@ async function retirerPompe(id){
   await chargerContexte();
 }
 
-// ── 7. Argent : nombre de billets par coupure + monnaie ─────────────
+// ── 7. Dépenses payées avec l'argent de la période ─────────────────
+// Après les compteurs : « Te gen depans ? » → description, montant, qui a
+// autorisé → « Gen yon lòt ? »… Elles se déduisent de l'argent à remettre.
+const totalDepenses = () => S.depenses.reduce((a, x) => a + (num(x.montant) || 0), 0);
+const aRemettre = () => (enCours()?.montant_attendu || 0) - totalDepenses();
+function rDepenses(){
+  if(!enCours()) return aller('periode');
+  const deja = S.depenses.length;
+  sansBarre();
+  $('app').innerHTML = entete() + `<h1>${deja ? t('dep_autre_q') : t('dep_q')}</h1>
+    <p class="sub">${t('dep_q_sub')}</p>
+    <div class="deux-col"><div class="choix">
+      <button class="gros" onclick="nouvelleDepense()"><span class="ico">🧾</span>
+        <span>${deja ? t('dep_autre_oui') : t('dep_oui')}<small>${t('dep_oui_sub')}</small></span></button>
+      <button class="gros on" onclick="finDepenses()"><span class="ico">✔</span>
+        <span>${deja ? t('dep_fini') : t('dep_non')}<small>${t('dep_non_sub')}</small></span></button>
+    </div>
+    ${deja ? `<div class="card"><h2 style="margin-top:0">${t('mes_depenses')}</h2>${listeDepenses(true)}
+      <div class="total"><span>${t('attendu')}</span><span class="v">${G(enCours().montant_attendu)}</span></div>
+      <div class="total"><span>${t('dep_total')}</span><span class="v">− ${G(totalDepenses())}</span></div>
+      <div class="total"><span><b>${t('a_remettre')}</b></span><span class="v">${G(aRemettre())}</span></div></div>` : ''}</div>`;
+}
+function listeDepenses(actions){
+  return S.depenses.map((x, i) => `<div class="lp"><div class="lp-nom"><b>${esc(x.description)}</b>
+      <span class="lp-idx">${t('tk_autorise')} ${esc(x.autorise_par)}</span></div>
+    <div class="lp-val num"><b>${G(num(x.montant))}</b></div>
+    ${actions ? `<div class="lp-act dep-act"><button class="btn-mod" onclick="modifierDepense(${i})">${t('modifier')}</button>
+      <button class="retirer" onclick="retirerDepense(${i})" aria-label="✕">✕</button></div>` : ''}</div>`).join('');
+}
+function nouvelleDepense(){ S.depEdit = null; S.depForm = {description:'', montant:'', autorise_par:''}; aller('depense'); }
+function modifierDepense(i){ S.depEdit = i; S.depForm = {...S.depenses[i]}; aller('depense'); }
+async function retirerDepense(i){
+  if(!await demander({ico:'🗑', titre:t('retirer_titre_dep'), texte:t('dep_retirer_q', {d: esc(S.depenses[i].description)}),
+                      oui:t('oui_retirer'), non:t('non_retour'), danger:true})) return;
+  S.depenses.splice(i, 1); rendre();
+}
+function finDepenses(){ aller(S.depuisResume ? 'resume' : 'billetterie'); }
+function rDepense(){
+  if(!enCours()) return aller('periode');
+  const f = S.depForm || (S.depForm = {description:'', montant:'', autorise_par:''});
+  const n = S.depEdit != null ? S.depEdit + 1 : S.depenses.length + 1;
+  $('app').innerHTML = entete() + `<h1>${t('dep_titre_n', {n})}</h1>
+    <div class="card dep-form">
+      <label for="d-desc">${t('dep_desc')}</label>
+      <input id="d-desc" class="saisie-t" type="text" maxlength="200" autocomplete="off" enterkeyhint="next"
+        placeholder="${esc(t('dep_desc_ph'))}" value="${esc(f.description)}">
+      <label for="d-montant">${t('dep_montant')}</label>
+      <input id="d-montant" class="saisie-t num" type="text" inputmode="decimal" maxlength="12" autocomplete="off" enterkeyhint="next"
+        placeholder="0" value="${esc(String(f.montant || '').replace('.', ','))}">
+      <label for="d-aut">${t('dep_autorise')}</label>
+      <input id="d-aut" class="saisie-t" type="text" maxlength="120" autocomplete="off" enterkeyhint="done"
+        placeholder="${esc(t('dep_autorise_ph'))}" value="${esc(f.autorise_par)}">
+      <div id="d-err"></div></div>`;
+  const ids = ['d-desc','d-montant','d-aut'], cles = ['description','montant','autorise_par'];
+  ids.forEach((id, i) => {
+    const el = $(id);
+    el.addEventListener('input', () => {
+      if(id === 'd-montant'){
+        let v = el.value.replace(',', '.').replace(/[^0-9.]/g, '');
+        const p = v.indexOf('.'); if(p >= 0) v = v.slice(0, p + 1) + v.slice(p + 1).replace(/\./g, '').slice(0, 2);
+        const vu = v.replace('.', ','); if(vu !== el.value) el.value = vu;
+        f.montant = v;
+      } else f[cles[i]] = el.value;
+      sauverBrouillon();
+    });
+    el.addEventListener('keydown', e => {
+      if(e.key !== 'Enter') return;
+      e.preventDefault();
+      if(i < ids.length - 1) $(ids[i + 1]).focus(); else { el.blur(); enregistrerDepense(); }
+    });
+  });
+  barre(`${t('dep_total')}<b>${G(totalDepenses())}</b>`, t('dep_enregistrer'), enregistrerDepense);
+  $(ids[!f.description ? 0 : (!f.montant ? 1 : 2)]).focus();
+}
+function enregistrerDepense(){
+  const f = S.depForm || {}, err = m => { $('d-err').innerHTML = `<div class="alerte err">${m}</div>`; };
+  const d = (f.description || '').trim(), m = num(f.montant), a = (f.autorise_par || '').trim();
+  if(d.length < 3){ $('d-desc').focus(); return err(t('dep_e_desc')); }
+  if(!(m > 0)){ $('d-montant').focus(); return err(t('dep_e_montant')); }
+  if(a.length < 2){ $('d-aut').focus(); return err(t('dep_e_autorise')); }
+  const x = {description: d, montant: String(m), autorise_par: a};
+  if(S.depEdit != null) S.depenses[S.depEdit] = x; else S.depenses.push(x);
+  S.depEdit = null; S.depForm = null;
+  aller('depenses');
+}
+
+// ── 8. Argent : nombre de billets par coupure + monnaie + dollars ─────
+const tauxUSD = () => S.ctx?.taux?.taux || null;
+const usdEnG = () => Math.round((num(S.usd) || 0) * (tauxUSD() || 0) * 100) / 100;
 function totalCompte(){
   let s = 0;
   for(const c of S.ctx.coupures) s += c * ent(S.billets[c]);
-  return s + (num(S.monnaie) || 0);
+  return s + (num(S.monnaie) || 0) + usdEnG();
 }
 function rBilletterie(){
   if(!enCours()) return aller('periode');
@@ -1109,23 +1236,29 @@ function rBilletterie(){
           autocomplete="off" enterkeyhint="next" maxlength="5" placeholder="0" value="${esc(S.billets[k] || '')}"></label>`).join('')}
       <label class="billet" for="in-monnaie"><span class="coup">${t('monnaie')}<small>${t('monnaie_sub')}</small></span>
         <input class="saisie-n" id="in-monnaie" data-c="monnaie" type="text" inputmode="decimal"
-          autocomplete="off" enterkeyhint="done" maxlength="10" placeholder="0" value="${esc((S.monnaie || '').replace('.', ','))}"></label>
+          autocomplete="off" enterkeyhint="${tauxUSD() ? 'next' : 'done'}" maxlength="10" placeholder="0" value="${esc((S.monnaie || '').replace('.', ','))}"></label>
+      <div class="devise-tete">${t('devise_titre')}</div>
+      <label class="billet devise ${tauxUSD() ? '' : 'sans-taux'}" for="in-usd"><span class="coup">${t('usd')}
+          <small>${tauxUSD() ? t('usd_taux', {t: nf(tauxUSD(), 2)}) : t('usd_sans_taux')}</small><small id="st-usd"></small></span>
+        <input class="saisie-n" id="in-usd" data-c="usd" type="text" inputmode="decimal" ${tauxUSD() ? '' : 'disabled'}
+          autocomplete="off" enterkeyhint="done" maxlength="10" placeholder="0 $" value="${esc((S.usd || '').replace('.', ','))}"></label>
     </div>
     <div class="total" style="margin-top:10px"><span>${t('total')}</span><span class="v" id="b-total"></span></div></div>`;
-  const champs = [...document.querySelectorAll('.saisie-n')];
+  const champs = [...document.querySelectorAll('.saisie-n:not(:disabled)')];
   const maj = () => {
     for(const k of c.coupures){ const n = ent(S.billets[k]); $('st-' + k).textContent = n ? G(n * k) : ''; }
+    $('st-usd').textContent = num(S.usd) ? '= ' + G(usdEnG()) : '';
     $('b-total').textContent = G(totalCompte());
     $('barre-info').innerHTML = `${t('total_compte')}<b>${G(totalCompte())}</b>`;
   };
   champs.forEach((el, i) => {
     el.addEventListener('input', () => {
-      if(el.dataset.c === 'monnaie'){
+      if(el.dataset.c === 'monnaie' || el.dataset.c === 'usd'){
         let v = el.value.replace(',', '.').replace(/[^0-9.]/g, '');
         const p = v.indexOf('.'); if(p >= 0) v = v.slice(0, p + 1) + v.slice(p + 1).replace(/\./g, '').slice(0, 2);
         const vu = v.replace('.', ',');           // affichage à la française, valeur enregistrée avec un point
         if(vu !== el.value) el.value = vu;
-        S.monnaie = v;
+        if(el.dataset.c === 'usd') S.usd = v; else S.monnaie = v;
       } else {
         const v = el.value.replace(/\D/g, '');
         if(v !== el.value) el.value = v;
@@ -1150,7 +1283,7 @@ function rBilletterie(){
 
 // ── 8. Résumé complet avant l'envoi, tout est modifiable ────────────
 function rResume(){
-  const r = enCours(), att = r.montant_attendu, cpt = totalCompte(), ec = cpt - att;
+  const r = enCours(), att = r.montant_attendu, dep = totalDepenses(), cpt = totalCompte(), ec = cpt + dep - att;
   const cls = Math.abs(ec) < 1 ? 'ok' : (ec < 0 ? 'neg' : 'pos');
   const txt = Math.abs(ec) < 1 ? t('juste') : (ec < 0 ? t('manque') : t('plus'));
   const billets = S.ctx.coupures.map(c => ({c, n: ent(S.billets[c])})).filter(x => x.n);
@@ -1161,11 +1294,17 @@ function rResume(){
         ${ls.map(l => lignePompe(l.pompe_nom, l.metter_avant, l.metter_apres, l.gallons, l.montant,
           `<button class="btn-mod" onclick="modifierPompe(${l.pompe_id})">${t('modifier')}</button>`)).join('')}`).join('')}
       <div class="total"><span>${t('attendu')}</span><span class="v">${G(att)}</span></div></div>
+    <div class="card"><div class="section-tete"><h2>${t('mes_depenses')}</h2>
+        <button class="btn-mod" onclick="S.depuisResume=true;aller('depenses')">${t('modifier')}</button></div>
+      ${S.depenses.length ? listeDepenses(false) : `<p class="sub" style="margin:0">${t('aucune_depense')}</p>`}
+      <div class="total"><span>${t('dep_total')}</span><span class="v">− ${G(dep)}</span></div>
+      <div class="total"><span><b>${t('a_remettre')}</b></span><span class="v">${G(att - dep)}</span></div></div>
     <div class="card"><div class="section-tete"><h2>${t('mon_argent')}</h2>
         <button class="btn-mod" onclick="S.depuisResume=true;aller('billetterie')">${t('modifier')}</button></div>
-      ${billets.length || num(S.monnaie) ? `<table class="billets-resume"><tbody>
+      ${billets.length || num(S.monnaie) || num(S.usd) ? `<table class="billets-resume"><tbody>
         ${billets.map(x => `<tr><td><b>${nf(x.c)} G</b></td><td class="r num">× ${x.n}</td><td class="r num"><b>${G(x.n * x.c)}</b></td></tr>`).join('')}
         ${num(S.monnaie) ? `<tr><td><b>${t('monnaie')}</b></td><td></td><td class="r num"><b>${G(num(S.monnaie))}</b></td></tr>` : ''}
+        ${num(S.usd) ? `<tr><td><b>${nf(num(S.usd), 2)} $</b></td><td class="r num">× ${nf(tauxUSD(), 2)}</td><td class="r num"><b>${G(usdEnG())}</b></td></tr>` : ''}
       </tbody></table>` : `<p class="sub" style="margin:0">${t('aucun_argent')}</p>`}
       <div class="total"><span>${t('argent_compte')}</span><span class="v">${G(cpt)}</span></div></div>
     <div class="card">
@@ -1198,15 +1337,17 @@ function rModif(){
 }
 
 async function terminer(){
-  const att = enCours()?.montant_attendu || 0, cpt = totalCompte();
+  const att = enCours()?.montant_attendu || 0, dep = totalDepenses(), cpt = totalCompte();
   const ok = await demander({ico:'📨', titre:t('confirmer_titre_rapport'),
-    texte:t('confirmer_txt_rapport', {a:G(att), c:G(cpt), e:signe(cpt - att)}), oui:t('oui_envoyer_rapport'), non:t('non_retour')});
+    texte:t('confirmer_txt_rapport', {v:G(att), d:G(dep), a:G(att - dep), c:G(cpt), e:signe(cpt + dep - att)}), oui:t('oui_envoyer_rapport'), non:t('non_retour')});
   if(!ok) return;
   const b = $('barre-btn'); b.disabled = true; b.textContent = t('envoi');
   try{
     S.dernier = await api('POST','/api/pompiste/terminer',{
       billetterie: S.ctx.coupures.map(c => ({coupure:c, liasses:0, billets:ent(S.billets[c])})).filter(x => x.billets),
-      monnaie: num(S.monnaie) || 0, note: S.note || null});
+      monnaie: num(S.monnaie) || 0, note: S.note || null,
+      depenses: S.depenses.map(x => ({description: x.description, montant: num(x.montant), autorise_par: x.autorise_par})),
+      devises: num(S.usd) ? [{devise: 'USD', montant: num(S.usd)}] : []});
     effacerBrouillon();
     aller('fin');
   }catch(e){
@@ -1229,6 +1370,8 @@ function rFin(){
       <div class="total"><span>${per(r.periode)}</span><span>${esc(jourTxt(r.date))}</span></div>
       <div class="total"><span>${t('gallons')}</span><span class="v">${nfg(r.total_gallons)}</span></div>
       <div class="total"><span>${t('attendu')}</span><span class="v">${G(r.montant_attendu)}</span></div>
+      ${r.total_depenses ? `<div class="total"><span>${t('dep_total')}</span><span class="v">− ${G(r.total_depenses)}</span></div>
+      <div class="total"><span>${t('a_remettre')}</span><span class="v">${G(r.montant_a_remettre)}</span></div>` : ''}
       <div class="total"><span>${t('compte')}</span><span class="v">${G(r.montant_compte)}</span></div>
       <div class="total"><span>${t('ecart')}</span><span class="v">${signe(r.ecart)}</span></div></div>
     <button class="btn btn-print" onclick="imprimerTicket(S.dernier)">🖨 ${t('imprimer')}</button>
@@ -1283,7 +1426,12 @@ function ticketHtml(r){
     <div class="b">${t('tk_argent')}</div>
     ${billets.map(x => L(`${nf(x.c)} G × ${x.n}`, G(x.c * x.n))).join('')}
     ${r.monnaie ? L(t('monnaie'), G(r.monnaie)) : ''}
+    ${(r.devises || []).map(x => L(`${nf(x.montant, 2)} $ × ${nf(x.taux, 2)}`, G(x.montant_htg))).join('')}
     ${L(`<b>${t('tk_compte')}</b>`, `<b>${G(r.montant_compte)}</b>`)}
+    ${(r.depenses || []).length ? `<div class="sep"></div><div class="b">${t('tk_depenses')}</div>
+      ${r.depenses.map(x => `<div>${esc(x.description)}</div>${L(`<span class="i">${t('tk_autorise')} ${esc(x.autorise_par)}</span>`, G(x.montant))}`).join('')}
+      ${L(`<b>${t('dep_total')}</b>`, `<b>${G(r.total_depenses)}</b>`)}
+      ${L(`<b>${t('tk_a_remettre')}</b>`, `<b>${G(r.montant_a_remettre)}</b>`)}` : ''}
     <div class="sep2"></div>
     <div class="l gr"><span>${t('tk_ecart')}</span><span>${signe(r.ecart)}</span></div>
     <div class="c">${Math.abs(r.ecart) < 1 ? t('juste') : (r.ecart < 0 ? t('manque') : t('plus'))}</div>
@@ -1389,7 +1537,8 @@ function flash(msg){ const el = $('note-flash'); el.textContent = msg; el.classL
 // ── Brouillon : ce qui est saisi reste sur l'appareil jusqu'à l'envoi ──
 // Sortie involontaire, retour arrière, coupure, déconnexion automatique :
 // à la reconnexion du même pompiste, il reprend là où il était.
-const CHAMPS_BROUILLON = ['etape','charte','date','periode','produitId','choisies','pos','index','billets','monnaie','note','depuisResume','modif','dernierProduit'];
+const CHAMPS_BROUILLON = ['etape','charte','date','periode','produitId','choisies','pos','index','billets','monnaie','note','depuisResume','modif','dernierProduit',
+                          'depenses','depForm','depEdit','usd'];
 const cleBrouillon = () => S.ctx?.pompiste?.username ? 'ponpis-brouillon-' + S.ctx.pompiste.username : null;
 function sauverBrouillon(){
   const k = cleBrouillon(); if(!k || S.etape === 'fin' || S.etape === 'charte') return;
@@ -1406,8 +1555,10 @@ function restaurerBrouillon(){
   // Trop ancien, ou le rapport a changé ailleurs (terminé, annulé…) : on repart proprement
   if(Date.now() - b.t > 12 * 3600_000 || (b.enCours || null) !== enCoursId){ effacerBrouillon(); return false; }
   for(const c of CHAMPS_BROUILLON) if(b[c] !== undefined) S[c] = b[c];
-  if(!['periode','calendrier','produit','pompes','index','compteurs','rapport','billetterie','resume','modif'].includes(S.etape)) S.etape = 'periode';
+  if(!['periode','calendrier','produit','pompes','index','compteurs','rapport','depenses','depense','billetterie','resume','modif'].includes(S.etape)) S.etape = 'periode';
   if(S.etape === 'modif' && !S.modif) S.etape = 'resume';
+  if(S.etape === 'depense' && !S.depForm) S.etape = 'depenses';
+  if(!Array.isArray(S.depenses)) S.depenses = [];
   S.charte = true; S.champActif = null; S.caseActive = null;
   return true;
 }
