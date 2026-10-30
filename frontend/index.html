@@ -3393,6 +3393,10 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .psp-dep-total{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:13.5px;color:var(--muted)}
 .psp-dep-total b{color:var(--text);font-family:var(--mono)}
 @media (max-width:720px){ .psp-dep{grid-template-columns:minmax(0,1fr) auto} .psp-dep-act{grid-column:1 / 3;justify-content:flex-start} }
+.gest-edit{display:flex;flex-direction:column;gap:8px;padding:12px 14px;background:var(--panel2);border-bottom:1px solid var(--border)}
+.gest-edit label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
+.gest-edit-act{display:flex;gap:8px;justify-content:flex-end}
+.prod-tab-adr{display:block;font-size:11px;font-weight:500;opacity:.75;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dep-presets{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .dep-presets button{font:inherit;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer;
   border:1px solid var(--border);background:var(--panel);color:var(--muted)}
@@ -13221,6 +13225,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <input id="np-nom"  class="filter-input" data-i18n-ph="gestion.new.nom.ph" placeholder="Nom (ex. Gazoline)" style="flex:1;min-width:120px">
         <input id="np-prix" class="filter-input" type="number" data-i18n-ph="gestion.new.prix.ph" placeholder="Prix/gal" style="width:100px;font-family:var(--mono)">
+        <input id="np-adresse" class="filter-input" placeholder="Adresse / lieu (ex. Route de Frères, Pétion-Ville)" style="flex:2;min-width:200px" maxlength="255">
         <button class="btn btn-primary" style="height:34px;padding:0 14px" onclick="addProduit()" data-i18n="gestion.new.add">+ Ajouter</button>
       </div>
     </div>
@@ -16180,7 +16185,7 @@ function renderProdTabs(){
   el.innerHTML=products.filter(p=>(p.pompes||[]).length).map(p=>{
     const faits=p.pompes.filter(po=>releves.some(r=>r.pompe_id===po.id&&r.periode===currentPeriode)).length;
     const complet=faits===p.pompes.length;
-    return `<button class="prod-tab ${p.id===currentProdId?'active':''}" onclick="selectProd(${p.id})">${esc(p.nom)}
+    return `<button class="prod-tab ${p.id===currentProdId?'active':''}" onclick="selectProd(${p.id})" ${p.adresse?`title="${esc(p.adresse)}"`:''}>${esc(p.nom)}${p.adresse?`<small class="prod-tab-adr">📍 ${esc(p.adresse)}</small>`:''}
       <span class="sx-tab-cpt${complet?' ok':''}">${complet?'✓':faits+'/'+p.pompes.length}</span></button>`;
   }).join('');
 }
@@ -17788,16 +17793,31 @@ function renderModalList(){
   if(!products.length){ el.innerHTML=`<div class="empty">${t('gestion.empty.products')}</div>`; return; }
   el.innerHTML=products.map(p=>`
     <div style="border:1px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden">
-      <div style="display:flex;align-items:center;gap:9px;padding:9px 14px;background:var(--panel2);border-bottom:1px solid var(--border)">
-        <span style="font-weight:600;font-size:15px">${esc(p.nom)}</span>
-        <span class="num c-amber" style="font-size:13px">${fmtG(p.prix_gallon)}/gal</span>
+      ${_GEST.produit===p.id ? `<div class="gest-edit">
+          <label>Nom du produit<input id="ge-nom-${p.id}" class="filter-input" value="${esc(p.nom)}" maxlength="100"></label>
+          <label>Adresse / lieu<input id="ge-adr-${p.id}" class="filter-input" value="${esc(p.adresse||'')}" maxlength="255" placeholder="Où se trouve ce produit (station, site…)"></label>
+          <div class="gest-edit-act"><button class="btn btn-secondary" onclick="_GEST.produit=null;renderModalList()">Annuler</button>
+            <button class="btn btn-primary" onclick="enregistrerProduit(${p.id})">Enregistrer</button></div>
+          <div class="c-dim" style="font-size:12px">Les relevés et rapports déjà enregistrés gardent ce produit : ils s'afficheront sous le nouveau nom.</div></div>`
+      : `<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:9px 14px;background:var(--panel2);border-bottom:1px solid var(--border)">
+        <div style="display:flex;flex-direction:column;min-width:0">
+          <span style="font-weight:600;font-size:15px">${esc(p.nom)} <span class="num c-amber" style="font-size:13px;font-weight:500">${fmtG(p.prix_gallon)}/gal</span></span>
+          <span style="font-size:12.5px;color:${p.adresse ? 'var(--text)' : 'var(--muted)'};opacity:${p.adresse ? '.85' : '1'}">${p.adresse ? '📍 ' + esc(p.adresse) : 'Adresse non renseignée — touchez « Modifier » pour l'ajouter'}</span>
+        </div>
         <span class="c-dim" style="font-size:12px;margin-left:auto">${t('gestion.pompe.count',{n:p.pompes.length})}</span>
-      </div>
+        <button class="btn btn-secondary" style="height:30px;padding:0 10px;font-size:13px" onclick="_GEST.produit=${p.id};_GEST.pompe=null;renderModalList();setTimeout(()=>document.getElementById('ge-nom-${p.id}')?.focus(),0)">✏️ Modifier</button>
+      </div>`}
       <div style="padding:10px 14px">
         ${p.pompes.map(po=>`
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.025)">
-            <span style="font-size:15px">${esc(po.nom)}</span>
-            <button class="btn-ghost" onclick="delPompe(${po.id},'${esc(po.nom)}')">✕</button>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.025)">
+            ${_GEST.pompe===po.id
+              ? `<input id="ge-pompe-${po.id}" class="filter-input" value="${esc(po.nom)}" maxlength="100" style="flex:1;height:32px"
+                   onkeydown="if(event.key==='Enter')enregistrerPompe(${po.id});if(event.key==='Escape'){_GEST.pompe=null;renderModalList()}">
+                 <button class="btn btn-primary" style="height:32px;padding:0 10px;font-size:13px" onclick="enregistrerPompe(${po.id})">OK</button>
+                 <button class="btn-ghost" onclick="_GEST.pompe=null;renderModalList()">Annuler</button>`
+              : `<span style="font-size:15px">${esc(po.nom)}</span>
+                 <span style="display:flex;gap:4px"><button class="btn-ghost" title="Renommer la pompe" onclick="_GEST.pompe=${po.id};_GEST.produit=null;renderModalList();setTimeout(()=>document.getElementById('ge-pompe-${po.id}')?.select(),0)">✏️</button>
+                 <button class="btn-ghost" title="Supprimer la pompe" onclick="delPompe(${po.id},'${esc(po.nom)}')">✕</button></span>`}
           </div>`).join('')}
         ${p.pompes.length===0?`<div class="c-dim" style="font-size:13px;padding:4px 0">${t('gestion.empty.pompe')}</div>`:''}
         <div style="display:flex;gap:7px;margin-top:8px">
@@ -17808,14 +17828,42 @@ function renderModalList(){
     </div>`).join('');
 }
 
+const _GEST = {produit:null, pompe:null};
+async function _gestRecharger(){
+  products=await GET('/produits');
+  renderModalList(); renderProdTabs(); renderSaisie();
+}
+async function enregistrerProduit(id){
+  const nom=document.getElementById('ge-nom-'+id).value.trim();
+  const adresse=document.getElementById('ge-adr-'+id).value.trim();
+  if(nom.length<2){toast('Le nom du produit doit faire au moins 2 caractères.','err');return;}
+  try{
+    await apiFetch('PATCH','/produits/'+id,{nom,adresse});
+    _GEST.produit=null;
+    await _gestRecharger();
+    toast(`Produit enregistré : ${nom}`,'ok');
+  }catch(e){toast(e.message,'err');}
+}
+async function enregistrerPompe(id){
+  const nom=document.getElementById('ge-pompe-'+id).value.trim();
+  if(!nom){toast(t('gestion.err.nom.pompe'),'err');return;}
+  try{
+    await apiFetch('PATCH','/pompes/'+id,{nom});
+    _GEST.pompe=null;
+    await _gestRecharger();
+    toast(`Pompe renommée : ${nom}`,'ok');
+  }catch(e){toast(e.message,'err');}
+}
 async function addProduit(){
   const nom=document.getElementById('np-nom').value.trim();
   const prix=parseFloat(document.getElementById('np-prix').value)||0;
+  const adresse=(document.getElementById('np-adresse')?.value||'').trim();
   if(!nom){toast(t('gestion.err.nom.produit'),'err');return;}
   try{
-    await POST('/produits',{nom,prix_gallon:prix});
+    await POST('/produits',{nom,prix_gallon:prix,adresse:adresse||null});
     document.getElementById('np-nom').value='';
     document.getElementById('np-prix').value='';
+    if(document.getElementById('np-adresse')) document.getElementById('np-adresse').value='';
     products=await GET('/produits');
     renderModalList();
     renderProdTabs();
@@ -17837,11 +17885,11 @@ async function addPompe(prodId){
 async function delPompe(id,nom){
   if(!await showConfirm(t('gestion.confirm.delpompe.body',{nom}), {title:t('gestion.confirm.delpompe.title'), type:'danger', okLabel:t('gestion.confirm.delpompe.ok')})) return;
   try{
-    await DEL('/pompes/'+id);
+    const r=await DEL('/pompes/'+id);
     products=await GET('/produits');
     renderModalList();
     renderSaisie();
-    toast(t('gestion.toast.pompe.deleted',{nom}),'ok');
+    toast(r&&r.desactivee ? `${nom} a déjà des relevés : elle est désactivée, son historique est gardé.` : t('gestion.toast.pompe.deleted',{nom}),'ok');
   }catch(e){toast(e.message,'err');}
 }
 

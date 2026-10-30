@@ -16,6 +16,9 @@ class Produit(Base):
     nom         = Column(String(100), unique=True, nullable=False)
     prix_gallon = Column(Numeric(12, 3), nullable=False, default=0)
     actif       = Column(Boolean, nullable=False, default=True)
+    # Lieu où se trouve ce produit et ses pompes (station, site) : le même
+    # système sert à plusieurs endroits.
+    adresse     = Column(String(255), nullable=True)
     created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     pompes = relationship(

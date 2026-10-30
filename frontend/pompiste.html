@@ -929,7 +929,7 @@ function rProduit(){
     <div class="choix deux">${S.ctx.produits.map(p => {
       const n = libres(p).length;
       return `<button class="gros grand ${clsProduit(p.nom)} ${S.produitId===p.id?'on':''}" onclick="choisirProduit(${p.id})" ${n?'':'disabled'}>
-        <span class="ico">⛽</span><span>${esc(p.nom)}<small>${n ? `${t('n_pompes',{n:p.pompes.length})} · ${nf(p.prix_gallon,2)} G/gal`
+        <span class="ico">⛽</span><span>${esc(p.nom)}<small>${p.adresse ? `📍 ${esc(p.adresse)}<br>` : ''}${n ? `${t('n_pompes',{n:p.pompes.length})} · ${nf(p.prix_gallon,2)} G/gal`
           : t('toutes_saisies')}</small></span></button>`;
     }).join('')}</div>`;
 }

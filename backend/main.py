@@ -492,6 +492,7 @@ def startup():
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS total_depenses NUMERIC(14,2) NOT NULL DEFAULT 0",
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS devises JSON NOT NULL DEFAULT '[]'::json",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
+        "ALTER TABLE produits ADD COLUMN IF NOT EXISTS adresse VARCHAR(255)",
         "ALTER TABLE achats ADD COLUMN IF NOT EXISTS saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
     ]
     # Chaque instruction est isolée : une qui échoue (moteur SQLite en dev,
@@ -1860,6 +1861,16 @@ class PompeIn(BaseModel):
 class ProduitIn(BaseModel):
     nom: str
     prix_gallon: float = 0
+    adresse: Optional[str] = None
+
+
+class ProduitPatch(BaseModel):
+    nom: Optional[str] = None
+    adresse: Optional[str] = None
+
+
+class PompePatch(BaseModel):
+    nom: str
 
 
 class ReleveIn(BaseModel):
@@ -1925,20 +1936,95 @@ def list_produits(date: Optional[date_type] = None, db: Session = Depends(get_db
             .first()
         )
         out.append({
-            "id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon,
+            "id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon, "adresse": p.adresse,
             "prix_vente_actif": float(px_actif.prix_vente_gallon) if px_actif else None,
             "pompes": [{"id": q.id, "nom": q.nom} for q in p.pompes if q.actif],
         })
     return out
 
 
+def _nom_produit_libre(db: Session, nom: str, sauf_id: Optional[int] = None) -> str:
+    nom = " ".join((nom or "").split())
+    if len(nom) < 2:
+        raise HTTPException(400, "Le nom du produit doit faire au moins 2 caractères.")
+    if len(nom) > 100:
+        raise HTTPException(400, "Nom du produit trop long (100 caractères au plus).")
+    for autre in db.query(Produit).all():
+        if autre.id != sauf_id and autre.nom.strip().casefold() == nom.casefold():
+            raise HTTPException(409, f"Le produit « {autre.nom} » existe déjà.")
+    return nom
+
+
+def _adresse(v: Optional[str]) -> Optional[str]:
+    a = " ".join((v or "").split())
+    if len(a) > 255:
+        raise HTTPException(400, "Adresse trop longue (255 caractères au plus).")
+    return a or None
+
+
+def _tracer(db: Session, request: Request, action: str, details: dict) -> None:
+    """Garde la trace d'une modification (qui, quand, avant → après)."""
+    import json as _json
+    from models import AuditLog
+    u = getattr(request.state, "user", None)
+    db.add(AuditLog(user_id=getattr(u, "id", None), action=action[:50],
+                    ip_address=(request.client.host if request.client else None),
+                    details=_json.dumps(details, ensure_ascii=False)))
+
+
+def _gerer_station(request: Request, db: Session):
+    from pompiste_routes import _user, peut_superviser
+    u = _user(request, db)
+    if not peut_superviser(u):
+        raise HTTPException(403, "Seule la direction ou l'administration peut modifier les produits et les pompes.")
+    return u
+
+
 @app.post("/api/produits")
 def create_produit(data: ProduitIn, db: Session = Depends(get_db)):
-    if db.query(Produit).filter_by(nom=data.nom).first():
-        raise HTTPException(400, "Produit existe deja")
-    p = Produit(nom=data.nom, prix_gallon=data.prix_gallon)
+    nom = _nom_produit_libre(db, data.nom)
+    p = Produit(nom=nom, prix_gallon=data.prix_gallon, adresse=_adresse(data.adresse))
     db.add(p); db.commit(); db.refresh(p)
-    return {"id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon}
+    return {"id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon, "adresse": p.adresse}
+
+
+@app.patch("/api/produits/{produit_id}")
+def modifier_produit(produit_id: int, data: ProduitPatch, request: Request, db: Session = Depends(get_db)):
+    """Renomme un produit et/ou change son adresse. L'historique (relevés,
+    rapports) reste attaché au produit : il s'affiche sous le nouveau nom."""
+    _gerer_station(request, db)
+    p = db.get(Produit, produit_id)
+    if not p:
+        raise HTTPException(404, "Produit introuvable")
+    avant = {"nom": p.nom, "adresse": p.adresse}
+    if data.nom is not None:
+        p.nom = _nom_produit_libre(db, data.nom, sauf_id=p.id)
+    if data.adresse is not None:
+        p.adresse = _adresse(data.adresse)
+    apres = {"nom": p.nom, "adresse": p.adresse}
+    if apres != avant:
+        _tracer(db, request, "produit_modifie", {"produit_id": p.id, "avant": avant, "apres": apres})
+    db.commit(); db.refresh(p)
+    return {"id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon, "adresse": p.adresse}
+
+
+@app.patch("/api/pompes/{pompe_id}")
+def modifier_pompe(pompe_id: int, data: PompePatch, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
+    q = db.get(Pompe, pompe_id)
+    if not q:
+        raise HTTPException(404, "Pompe introuvable")
+    nom = " ".join((data.nom or "").split())
+    if len(nom) < 1 or len(nom) > 100:
+        raise HTTPException(400, "Nom de pompe invalide (1 à 100 caractères).")
+    for autre in q.produit.pompes:
+        if autre.id != q.id and autre.nom.strip().casefold() == nom.casefold():
+            raise HTTPException(409, f"La pompe « {autre.nom} » existe déjà pour {q.produit.nom}.")
+    if nom != q.nom:
+        _tracer(db, request, "pompe_modifiee", {"pompe_id": q.id, "avant": q.nom, "apres": nom})
+        q.nom = nom
+    db.commit()
+    return {"id": q.id, "nom": q.nom, "produit_id": q.produit_id}
 
 
 @app.post("/api/produits/{produit_id}/pompes")
@@ -1955,8 +2041,16 @@ def delete_pompe(pompe_id: int, db: Session = Depends(get_db)):
     pompe = db.query(Pompe).get(pompe_id)
     if not pompe:
         raise HTTPException(404, "Pompe introuvable")
+    # Une pompe qui a déjà des relevés ne se supprime pas (l'historique les
+    # protège) : elle est désactivée, son historique reste.
+    from models import RapportPompisteLigne
+    if (db.query(Releve).filter_by(pompe_id=pompe_id).first()
+            or db.query(RapportPompisteLigne).filter_by(pompe_id=pompe_id).first()):
+        pompe.actif = False
+        db.commit()
+        return {"ok": True, "desactivee": True}
     db.delete(pompe); db.commit()
-    return {"ok": True}
+    return {"ok": True, "desactivee": False}
 
 
 # ---------- Releves ----------
