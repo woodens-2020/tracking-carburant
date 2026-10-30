@@ -281,6 +281,10 @@ def _migrate_columns():
         ]
     elif _is_postgres:
         new_cols = [
+            # Lue dès init_db (amorçage des produits) : doit exister avant
+            # les migrations de main.py
+            ("produits", "adresse",
+             "ALTER TABLE produits ADD COLUMN adresse VARCHAR(255)", None),
             ("releves",      "nb_modifications",
              "ALTER TABLE releves      ADD COLUMN nb_modifications INTEGER NOT NULL DEFAULT 0", None),
             ("utilisateurs", "api_key_hash",
