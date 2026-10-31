@@ -35,8 +35,39 @@ class Produit(Base):
     )
 
 
+class Distributeur(Base):
+    """Pompe physique de la station (« Pompe 1 », « Pompe 2 »…). Elle a des
+    faces (A, B…) ; chaque face porte des mètres (pistolets), chacun pour un
+    produit : Pompe 1 › Face A › Gazoline 1, Gazoline 2, Diesel 1."""
+    __tablename__ = "distributeurs"
+
+    id         = Column(Integer, primary_key=True)
+    nom        = Column(String(100), nullable=False)
+    ordre      = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    faces = relationship("Face", back_populates="distributeur", cascade="all, delete-orphan",
+                         order_by="Face.ordre, Face.id")
+
+
+class Face(Base):
+    """Face d'une pompe physique (A, B…)."""
+    __tablename__ = "faces"
+
+    id              = Column(Integer, primary_key=True)
+    distributeur_id = Column(Integer, ForeignKey("distributeurs.id", ondelete="CASCADE"), nullable=False)
+    nom             = Column(String(50), nullable=False)
+    ordre           = Column(Integer, nullable=False, default=0)
+
+    distributeur = relationship("Distributeur", back_populates="faces")
+    metres       = relationship("Pompe", back_populates="face", order_by="(Pompe.produit_id, Pompe.nom)")
+
+    __table_args__ = (Index("idx_faces_distributeur", "distributeur_id"),)
+
+
 class Pompe(Base):
-    """Pompe / distributeur physique rattaché à un produit."""
+    """Mètre (pistolet + compteur) d'un produit : « Gazoline 1 », « Diesel 1 »…
+    Placé sur une face d'une pompe physique (face_id), facultatif."""
     __tablename__ = "pompes"
 
     id         = Column(Integer, primary_key=True)
@@ -44,8 +75,16 @@ class Pompe(Base):
     nom        = Column(String(100), nullable=False)
     actif      = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    face_id    = Column(Integer, ForeignKey("faces.id", ondelete="SET NULL"), nullable=True)
 
     produit = relationship("Produit", back_populates="pompes")
+    face    = relationship("Face", back_populates="metres")
+
+    @property
+    def emplacement(self):
+        """« Pompe 1 · Face A », ou None si le mètre n'est placé nulle part."""
+        f = self.face
+        return f"{f.distributeur.nom} · Face {f.nom}" if f else None
 
     __table_args__ = (
         UniqueConstraint("produit_id", "nom", name="uq_pompe_nom"),

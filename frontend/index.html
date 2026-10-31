@@ -3395,6 +3395,24 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .psp-dep-total{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:13.5px;color:var(--muted)}
 .psp-dep-total b{color:var(--text);font-family:var(--mono)}
 @media (max-width:720px){ .psp-dep{grid-template-columns:minmax(0,1fr) auto} .psp-dep-act{grid-column:1 / 3;justify-content:flex-start} }
+.gest-onglets{display:flex;gap:4px;padding:10px 18px 0;border-bottom:1px solid var(--border)}
+.gest-onglets button{font:inherit;font-weight:600;font-size:13.5px;padding:8px 12px;background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);cursor:pointer}
+.gest-onglets button.on{color:var(--text);border-bottom-color:var(--orange)}
+.gest-explic{font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.5}
+.gest-ligne{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.gest-pompe{border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.gest-pompe-tete{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--panel2);border-bottom:1px solid var(--border);font-size:15px}
+.gest-faces{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;padding:10px 12px}
+.gest-face{border:1px dashed var(--border);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+.gest-face-tete{display:flex;align-items:center;gap:6px;font-size:13.5px;margin-bottom:2px}
+.gest-metre{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:14px;padding:3px 0;border-bottom:1px solid rgba(127,127,127,.12)}
+.gest-metre small{color:var(--muted);font-size:11.5px}
+.gest-sel{height:30px;font-size:12.5px;margin-top:4px}
+.gest-lien{background:none;border:0;color:var(--orange);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;text-align:left;padding:4px 0}
+.gest-nouveau-metre{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.gest-sans{border-top:1px solid var(--border);padding-top:10px;margin-top:4px}
+.gest-chip{display:inline-block;font-size:12.5px;border:1px solid var(--border);border-radius:14px;padding:3px 10px;margin:0 6px 6px 0}
+.gest-chip small{color:var(--muted)}
 .gest-edit{display:flex;flex-direction:column;gap:8px;padding:12px 14px;background:var(--panel2);border-bottom:1px solid var(--border)}
 .gest-edit label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
 .gest-edit-act{display:flex;gap:8px;justify-content:flex-end}
@@ -13224,7 +13242,11 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
       <button onclick="closeGestion()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
     </div>
 
-    <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
+    <div class="gest-onglets">
+      <button id="gest-o-produits" class="on" onclick="gestOnglet('produits')">Produits &amp; mètres</button>
+      <button id="gest-o-pompes" onclick="gestOnglet('pompes')">Pompes &amp; faces</button>
+    </div>
+    <div id="gest-nouveau-produit" style="padding:14px 18px;border-bottom:1px solid var(--border)">
       <div class="filter-label" style="margin-bottom:8px" data-i18n="gestion.new.product">Nouveau produit</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <input id="np-nom"  class="filter-input" data-i18n-ph="gestion.new.nom.ph" placeholder="Nom (ex. Gazoline)" style="flex:1;min-width:120px">
@@ -17792,7 +17814,102 @@ function openGestion(){
 }
 function closeGestion(){ document.getElementById('modal-gestion').classList.add('hidden'); }
 
+function gestOnglet(v){
+  _GEST.vue=v;
+  document.getElementById('gest-o-produits').classList.toggle('on', v==='produits');
+  document.getElementById('gest-o-pompes').classList.toggle('on', v==='pompes');
+  document.getElementById('gest-nouveau-produit').style.display = v==='produits' ? '' : 'none';
+  renderModalList();
+}
+
+// ── Pompes physiques : Pompe 1 › Face A › mètres (Gazoline 1, Diesel 1…) ──
+async function _gestPompes(){
+  const el=document.getElementById('modal-list');
+  let d;
+  try{ d=await GET('/distributeurs'); }catch(e){ el.innerHTML=`<div class="empty">${esc(e.message)}</div>`; return; }
+  _GEST.dist=d;
+  const sans=d.sans_emplacement||[];
+  const optProduits=products.map(p=>`<option value="${p.id}">${esc(p.nom)}${p.adresse?' — '+esc(p.adresse):''}</option>`).join('');
+  const optSans=sans.map(m=>`<option value="${m.id}">${esc(m.nom)} (${esc(m.produit_nom)})</option>`).join('');
+  el.innerHTML=`
+    <div class="gest-explic">Une <b>pompe</b> a des <b>faces</b> (A, B) ; chaque face porte ses <b>mètres</b> (pistolets), chacun pour un produit.
+      Ex. : Pompe 1 › Face A › Gazoline 1, Gazoline 2, Diesel 1.</div>
+    <div class="gest-ligne">
+      <input id="gd-nom" class="filter-input" placeholder="Nouvelle pompe (ex. Pompe 1)" maxlength="100" style="flex:1;min-width:150px">
+      <input id="gd-faces" class="filter-input" value="A, B" title="Faces, séparées par des virgules" style="width:110px">
+      <button class="btn btn-primary" style="height:34px" onclick="gestCreerPompe()">+ Créer la pompe</button>
+    </div>
+    ${d.distributeurs.length ? d.distributeurs.map(p=>`
+      <div class="gest-pompe">
+        <div class="gest-pompe-tete">
+          ${_GEST.edit==='d'+p.id
+            ? `<input id="ge-d-${p.id}" class="filter-input" value="${esc(p.nom)}" maxlength="100" style="flex:1" onkeydown="if(event.key==='Enter')gestRenommer('d',${p.id})">
+               <button class="btn btn-primary psp-mini" onclick="gestRenommer('d',${p.id})">OK</button><button class="btn-ghost" onclick="_GEST.edit=null;renderModalList()">Annuler</button>`
+            : `<b>⛽ ${esc(p.nom)}</b><span style="flex:1"></span>
+               <button class="btn-ghost" title="Renommer la pompe" onclick="_GEST.edit='d${p.id}';renderModalList()">✏️</button>
+               <button class="btn btn-secondary psp-mini" onclick="gestAjouterFace(${p.id})">+ Face</button>
+               <button class="btn-ghost" title="Supprimer la pompe" onclick="gestSupprimer('distributeurs',${p.id},'${esc(p.nom)}')">✕</button>`}
+        </div>
+        <div class="gest-faces">${p.faces.map(f=>`
+          <div class="gest-face">
+            <div class="gest-face-tete">${_GEST.edit==='f'+f.id
+              ? `<input id="ge-f-${f.id}" class="filter-input" value="${esc(f.nom)}" maxlength="50" style="flex:1" onkeydown="if(event.key==='Enter')gestRenommer('f',${f.id})">
+                 <button class="btn btn-primary psp-mini" onclick="gestRenommer('f',${f.id})">OK</button>`
+              : `<b>Face ${esc(f.nom)}</b><span style="flex:1"></span>
+                 <button class="btn-ghost" title="Renommer la face" onclick="_GEST.edit='f${f.id}';renderModalList()">✏️</button>
+                 <button class="btn-ghost" title="Supprimer la face" onclick="gestSupprimer('faces',${f.id},'Face ${esc(f.nom)}')">✕</button>`}</div>
+            ${f.metres.length ? f.metres.map(m=>`<div class="gest-metre"><span><b>${esc(m.nom)}</b> <small>${esc(m.produit_nom)}</small></span>
+                <button class="btn-ghost" title="Retirer de cette face" onclick="gestPlacer(${m.id},0)">✕</button></div>`).join('')
+              : '<div class="c-dim" style="font-size:12.5px;padding:4px 0">Aucun mètre.</div>'}
+            ${sans.length ? `<select class="filter-input gest-sel" onchange="if(this.value)gestPlacer(parseInt(this.value,10),${f.id})">
+                <option value="">+ Placer un mètre existant…</option>${optSans}</select>` : ''}
+            ${_GEST.nouveauMetre===f.id
+              ? `<div class="gest-nouveau-metre"><select id="gm-prod-${f.id}" class="filter-input">${optProduits}</select>
+                  <input id="gm-nom-${f.id}" class="filter-input" placeholder="Nom du mètre (ex. Gazoline 3)" maxlength="100" onkeydown="if(event.key==='Enter')gestNouveauMetre(${f.id})">
+                  <div style="display:flex;gap:6px"><button class="btn btn-primary psp-mini" onclick="gestNouveauMetre(${f.id})">Ajouter</button>
+                  <button class="btn-ghost" onclick="_GEST.nouveauMetre=null;renderModalList()">Annuler</button></div></div>`
+              : `<button class="gest-lien" onclick="_GEST.nouveauMetre=${f.id};renderModalList();setTimeout(()=>document.getElementById('gm-nom-${f.id}')?.focus(),0)">+ Nouveau mètre sur cette face</button>`}
+          </div>`).join('') || '<div class="c-dim" style="font-size:13px">Aucune face : ajoutez-en une.</div>'}</div>
+      </div>`).join('') : '<div class="empty">Aucune pompe : créez « Pompe 1 » ci-dessus.</div>'}
+    ${sans.length ? `<div class="gest-sans"><div class="filter-label" style="margin-bottom:6px">Mètres pas encore placés sur une pompe (${sans.length})</div>
+      ${sans.map(m=>`<span class="gest-chip">${esc(m.nom)} <small>${esc(m.produit_nom)}</small></span>`).join('')}</div>` : ''}`;
+}
+async function _gestApi(method, path, body, msg){
+  try{ await apiFetch(method, path, body); if(msg) toast(msg,'ok'); }
+  catch(e){ toast(e.message,'err'); return false; }
+  products=await GET('/produits'); renderModalList(); renderSaisie(); return true;
+}
+async function gestCreerPompe(){
+  const nom=document.getElementById('gd-nom').value.trim();
+  const faces=document.getElementById('gd-faces').value.split(',').map(x=>x.trim()).filter(Boolean);
+  if(!nom){toast('Donnez un nom à la pompe (ex. Pompe 1).','err');return;}
+  await _gestApi('POST','/distributeurs',{nom, faces}, `${nom} créée avec ${faces.length} face${faces.length>1?'s':''}.`);
+}
+async function gestAjouterFace(id){
+  const d=(_GEST.dist?.distributeurs||[]).find(x=>x.id===id);
+  const lettres='ABCDEFGH', prise=new Set((d?.faces||[]).map(f=>f.nom.toUpperCase()));
+  const nom=[...lettres].find(l=>!prise.has(l))||String((d?.faces||[]).length+1);
+  await _gestApi('POST',`/distributeurs/${id}/faces`,{nom}, `Face ${nom} ajoutée.`);
+}
+async function gestRenommer(type, id){
+  const nom=document.getElementById(`ge-${type}-${id}`).value.trim();
+  if(await _gestApi('PATCH', type==='d' ? `/distributeurs/${id}` : `/faces/${id}`, {nom}, 'Nom enregistré.')) { _GEST.edit=null; renderModalList(); }
+}
+async function gestSupprimer(quoi, id, nom){
+  if(!await showConfirm(`Supprimer ${nom} ? Les relevés ne sont pas touchés.`, {title:'Supprimer ?', type:'danger', okLabel:'Oui, supprimer'})) return;
+  await _gestApi('DELETE', `/${quoi}/${id}`, null, `${nom} supprimée.`);
+}
+async function gestPlacer(metre, face){
+  await _gestApi('PATCH', `/pompes/${metre}`, {face_id: face}, face ? 'Mètre placé.' : 'Mètre retiré de la face.');
+}
+async function gestNouveauMetre(face){
+  const prod=parseInt(document.getElementById('gm-prod-'+face).value,10), nom=document.getElementById('gm-nom-'+face).value.trim();
+  if(!nom){toast(t('gestion.err.nom.pompe'),'err');return;}
+  if(await _gestApi('POST', `/produits/${prod}/pompes`, {nom, face_id: face}, `${nom} ajouté.`)) { _GEST.nouveauMetre=null; renderModalList(); }
+}
+
 function renderModalList(){
+  if(_GEST.vue==='pompes') return _gestPompes();
   const el=document.getElementById('modal-list');
   if(!products.length){ el.innerHTML=`<div class="empty">${t('gestion.empty.products')}</div>`; return; }
   el.innerHTML=products.map(p=>`
@@ -17824,7 +17941,7 @@ function renderModalList(){
                    onkeydown="if(event.key==='Enter')enregistrerPompe(${po.id});if(event.key==='Escape'){_GEST.pompe=null;renderModalList()}">
                  <button class="btn btn-primary" style="height:32px;padding:0 10px;font-size:13px" onclick="enregistrerPompe(${po.id})">OK</button>
                  <button class="btn-ghost" onclick="_GEST.pompe=null;renderModalList()">Annuler</button>`
-              : `<span style="font-size:15px">${esc(po.nom)}</span>
+              : `<span style="font-size:15px">${esc(po.nom)}${po.emplacement?` <small class="c-dim" style="font-size:12px">· ${esc(po.emplacement)}</small>`:''}</span>
                  <span style="display:flex;gap:4px"><button class="btn-ghost" title="Renommer la pompe" onclick="_GEST.pompe=${po.id};_GEST.produit=null;renderModalList();setTimeout(()=>document.getElementById('ge-pompe-${po.id}')?.select(),0)">✏️</button>
                  <button class="btn-ghost" title="Supprimer la pompe" onclick="delPompe(${po.id},'${esc(po.nom)}')">✕</button></span>`}
           </div>`).join('')}
@@ -17837,7 +17954,7 @@ function renderModalList(){
     </div>`).join('');
 }
 
-const _GEST = {produit:null, pompe:null};
+const _GEST = {produit:null, pompe:null, vue:'produits', edit:null, nouveauMetre:null, dist:null};
 async function _gestRecharger(){
   products=await GET('/produits');
   renderModalList(); renderProdTabs(); renderSaisie();

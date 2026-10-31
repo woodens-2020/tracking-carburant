@@ -451,7 +451,8 @@ def contexte(date: Optional[date_type] = None, periode: Optional[str] = None,
                 continue
             # Pompes ajoutées dans « Produits & Pompes » : visibles ici dès
             # leur création (lecture directe, rien à configurer).
-            pompes.append({"id": q.id, "nom": q.nom, "deja_rapportee": prises.get(q.id)})
+            pompes.append({"id": q.id, "nom": q.nom, "emplacement": q.emplacement,
+                           "deja_rapportee": prises.get(q.id)})
         if pompes:
             produits.append({"id": p.id, "nom": p.nom, "adresse": p.adresse,
                              "prix_gallon": _prix(db, p.pompes[0], d) if p.pompes else float(p.prix_gallon or 0),

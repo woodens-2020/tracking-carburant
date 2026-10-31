@@ -20,7 +20,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
-from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse, OAuthState, CategorieDepense, CategorieAchat, Poste, Beneficiaire
+from models import Produit, Pompe, Distributeur, Face, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse, OAuthState, CategorieDepense, CategorieAchat, Poste, Beneficiaire
 import listes_reference as lref
 from otp_service import (
     OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
@@ -1856,6 +1856,7 @@ def serve_audit_xlsx():
 # ---------- Schemas ----------
 class PompeIn(BaseModel):
     nom: str
+    face_id: Optional[int] = None
 
 
 class ProduitIn(BaseModel):
@@ -1870,6 +1871,16 @@ class ProduitPatch(BaseModel):
 
 
 class PompePatch(BaseModel):
+    nom: Optional[str] = None
+    face_id: Optional[int] = None      # 0 = retirer de sa face
+
+
+class DistributeurIn(BaseModel):
+    nom: str
+    faces: List[str] = ["A", "B"]
+
+
+class NomIn(BaseModel):
     nom: str
 
 
@@ -1938,7 +1949,8 @@ def list_produits(date: Optional[date_type] = None, db: Session = Depends(get_db
         out.append({
             "id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon, "adresse": p.adresse,
             "prix_vente_actif": float(px_actif.prix_vente_gallon) if px_actif else None,
-            "pompes": [{"id": q.id, "nom": q.nom} for q in p.pompes if q.actif],
+            "pompes": [{"id": q.id, "nom": q.nom, "face_id": q.face_id, "emplacement": q.emplacement}
+                       for q in p.pompes if q.actif],
         })
     return out
 
@@ -2014,26 +2026,155 @@ def modifier_pompe(pompe_id: int, data: PompePatch, request: Request, db: Sessio
     q = db.get(Pompe, pompe_id)
     if not q:
         raise HTTPException(404, "Pompe introuvable")
-    nom = " ".join((data.nom or "").split())
-    if len(nom) < 1 or len(nom) > 100:
-        raise HTTPException(400, "Nom de pompe invalide (1 à 100 caractères).")
-    for autre in q.produit.pompes:
-        if autre.id != q.id and autre.nom.strip().casefold() == nom.casefold():
-            raise HTTPException(409, f"La pompe « {autre.nom} » existe déjà pour {q.produit.nom}.")
-    if nom != q.nom:
-        _tracer(db, request, "pompe_modifiee", {"pompe_id": q.id, "avant": q.nom, "apres": nom})
-        q.nom = nom
+    if data.nom is not None:
+        nom = " ".join((data.nom or "").split())
+        if len(nom) < 1 or len(nom) > 100:
+            raise HTTPException(400, "Nom de pompe invalide (1 à 100 caractères).")
+        for autre in q.produit.pompes:
+            if autre.id != q.id and autre.nom.strip().casefold() == nom.casefold():
+                raise HTTPException(409, f"La pompe « {autre.nom} » existe déjà pour {q.produit.nom}.")
+        if nom != q.nom:
+            _tracer(db, request, "pompe_modifiee", {"pompe_id": q.id, "avant": q.nom, "apres": nom})
+            q.nom = nom
+    if data.face_id is not None:
+        if data.face_id and not db.get(Face, data.face_id):
+            raise HTTPException(404, "Face introuvable")
+        avant = q.emplacement
+        q.face_id = data.face_id or None
+        db.flush(); db.refresh(q)
+        if avant != q.emplacement:
+            _tracer(db, request, "metre_deplace", {"pompe_id": q.id, "metre": q.nom, "avant": avant, "apres": q.emplacement})
+    db.commit(); db.refresh(q)
+    return {"id": q.id, "nom": q.nom, "produit_id": q.produit_id, "face_id": q.face_id, "emplacement": q.emplacement}
+
+
+# ---------- Pompes physiques (distributeurs) et faces ----------
+# Pompe 1 › Face A › mètres (Gazoline 1, Gazoline 2, Diesel 1) ; Face B › …
+
+def _metre_dict(q: Pompe) -> dict:
+    return {"id": q.id, "nom": q.nom, "produit_id": q.produit_id, "produit_nom": q.produit.nom,
+            "adresse": q.produit.adresse, "actif": bool(q.actif)}
+
+
+def _nom_court(v: str, maxi: int, quoi: str) -> str:
+    n = " ".join((v or "").split())
+    if not n or len(n) > maxi:
+        raise HTTPException(400, f"Nom de {quoi} invalide (1 à {maxi} caractères).")
+    return n
+
+
+@app.get("/api/distributeurs")
+def lister_distributeurs(db: Session = Depends(get_db)):
+    out = []
+    for d in db.query(Distributeur).order_by(Distributeur.ordre, Distributeur.id).all():
+        out.append({"id": d.id, "nom": d.nom,
+                    "faces": [{"id": f.id, "nom": f.nom,
+                               "metres": [_metre_dict(q) for q in f.metres if q.actif]} for f in d.faces]})
+    sans = (db.query(Pompe).join(Produit).filter(Pompe.face_id.is_(None), Pompe.actif.is_(True),
+                                                  Produit.actif.is_(True))
+            .order_by(Produit.nom, Pompe.nom).all())
+    return {"distributeurs": out, "sans_emplacement": [_metre_dict(q) for q in sans]}
+
+
+@app.post("/api/distributeurs", status_code=201)
+def creer_distributeur(data: DistributeurIn, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
+    nom = _nom_court(data.nom, 100, "pompe")
+    if any(x.nom.casefold() == nom.casefold() for x in db.query(Distributeur).all()):
+        raise HTTPException(409, f"La pompe « {nom} » existe déjà.")
+    faces = []
+    for f in data.faces or []:
+        f = _nom_court(f, 50, "face")
+        if f.casefold() not in [x.casefold() for x in faces]:
+            faces.append(f)
+    d = Distributeur(nom=nom, ordre=(db.query(Distributeur).count() or 0))
+    db.add(d); db.flush()
+    for i, f in enumerate(faces):
+        db.add(Face(distributeur_id=d.id, nom=f, ordre=i))
+    _tracer(db, request, "distributeur_cree", {"nom": nom, "faces": faces})
     db.commit()
-    return {"id": q.id, "nom": q.nom, "produit_id": q.produit_id}
+    return {"id": d.id, "nom": d.nom, "faces": faces}
+
+
+@app.patch("/api/distributeurs/{did}")
+def renommer_distributeur(did: int, data: NomIn, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
+    d = db.get(Distributeur, did)
+    if not d:
+        raise HTTPException(404, "Pompe introuvable")
+    nom = _nom_court(data.nom, 100, "pompe")
+    if any(x.id != did and x.nom.casefold() == nom.casefold() for x in db.query(Distributeur).all()):
+        raise HTTPException(409, f"La pompe « {nom} » existe déjà.")
+    _tracer(db, request, "distributeur_renomme", {"id": did, "avant": d.nom, "apres": nom})
+    d.nom = nom
+    db.commit()
+    return {"id": d.id, "nom": d.nom}
+
+
+@app.delete("/api/distributeurs/{did}")
+def supprimer_distributeur(did: int, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
+    d = db.get(Distributeur, did)
+    if not d:
+        raise HTTPException(404, "Pompe introuvable")
+    if any(f.metres for f in d.faces):
+        raise HTTPException(409, "Cette pompe porte encore des mètres : déplacez-les d'abord.")
+    _tracer(db, request, "distributeur_supprime", {"nom": d.nom})
+    db.delete(d); db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/distributeurs/{did}/faces", status_code=201)
+def ajouter_face(did: int, data: NomIn, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
+    d = db.get(Distributeur, did)
+    if not d:
+        raise HTTPException(404, "Pompe introuvable")
+    nom = _nom_court(data.nom, 50, "face")
+    if any(f.nom.casefold() == nom.casefold() for f in d.faces):
+        raise HTTPException(409, f"La face « {nom} » existe déjà sur {d.nom}.")
+    f = Face(distributeur_id=d.id, nom=nom, ordre=len(d.faces))
+    db.add(f); db.commit(); db.refresh(f)
+    return {"id": f.id, "nom": f.nom}
+
+
+@app.patch("/api/faces/{fid}")
+def renommer_face(fid: int, data: NomIn, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
+    f = db.get(Face, fid)
+    if not f:
+        raise HTTPException(404, "Face introuvable")
+    nom = _nom_court(data.nom, 50, "face")
+    if any(x.id != fid and x.nom.casefold() == nom.casefold() for x in f.distributeur.faces):
+        raise HTTPException(409, f"La face « {nom} » existe déjà sur {f.distributeur.nom}.")
+    f.nom = nom
+    db.commit()
+    return {"id": f.id, "nom": f.nom}
+
+
+@app.delete("/api/faces/{fid}")
+def supprimer_face(fid: int, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
+    f = db.get(Face, fid)
+    if not f:
+        raise HTTPException(404, "Face introuvable")
+    if [q for q in f.metres if q.actif]:
+        raise HTTPException(409, "Cette face porte encore des mètres : déplacez-les d'abord.")
+    for q in f.metres:            # mètres désactivés : ils gardent leur historique, sans face
+        q.face_id = None
+    db.delete(f); db.commit()
+    return {"ok": True}
 
 
 @app.post("/api/produits/{produit_id}/pompes")
 def add_pompe(produit_id: int, data: PompeIn, db: Session = Depends(get_db)):
     if not db.query(Produit).get(produit_id):
         raise HTTPException(404, "Produit introuvable")
-    pompe = Pompe(produit_id=produit_id, nom=data.nom)
+    if data.face_id and not db.get(Face, data.face_id):
+        raise HTTPException(404, "Face introuvable")
+    pompe = Pompe(produit_id=produit_id, nom=data.nom, face_id=data.face_id or None)
     db.add(pompe); db.commit(); db.refresh(pompe)
-    return {"id": pompe.id, "nom": pompe.nom}
+    return {"id": pompe.id, "nom": pompe.nom, "face_id": pompe.face_id, "emplacement": pompe.emplacement}
 
 
 @app.delete("/api/pompes/{pompe_id}")

@@ -192,6 +192,7 @@ td.r,th.r{text-align:right;white-space:nowrap}
 .dlg-btns .btn{min-height:60px;font-size:18px}
 .dlg.danger #dlg-oui{background:var(--err)}
 @media (max-width:420px){ .dlg-btns{grid-template-columns:1fr} .dlg-btns #dlg-oui{order:-1} }
+.emplacement{font-weight:700;color:var(--accent-2)}
 .dep-form{display:flex;flex-direction:column;gap:8px}
 .dep-form label{font-weight:800;font-size:16px;margin-top:6px}
 .saisie-t{font:inherit;font-size:20px;font-weight:700;width:100%;min-height:56px;padding:10px 14px;border-radius:14px;
@@ -953,7 +954,7 @@ function rPompes(){
     <div class="choix trois">${p.pompes.map(q => {
       const on = S.choisies.includes(q.id), prise = q.deja_rapportee;
       return `<button class="gros ${on?'on':''} ${S.erreurs[q.id]?'erreur':''}" onclick="basculerPompe(${q.id})" ${prise?'disabled':''}>
-        <span>${esc(q.nom)}<small>${prise ? (prise.moi ? t('deja_moi') : t('deja_par', {n: esc(prise.par)})) : t('a_saisir')}</small></span>
+        <span>${esc(q.nom)}${q.emplacement ? `<small class="emplacement">📍 ${esc(q.emplacement)}</small>` : ''}<small>${prise ? (prise.moi ? t('deja_moi') : t('deja_par', {n: esc(prise.par)})) : t('a_saisir')}</small></span>
         <span class="coche">✓</span></button>`;
     }).join('')}</div>`;
   const n = S.choisies.length;
