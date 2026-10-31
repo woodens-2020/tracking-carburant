@@ -3411,6 +3411,12 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .gest-lien{background:none;border:0;color:var(--orange);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;text-align:left;padding:4px 0}
 .gest-nouveau-metre{display:flex;flex-direction:column;gap:6px;margin-top:4px}
 .gest-sans{border-top:1px solid var(--border);padding-top:10px;margin-top:4px}
+.gest-ranger{border-top:1px solid var(--border);padding-top:12px;margin-top:6px}
+.gest-tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.gest-tbl th{text-align:left;font-size:11.5px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border)}
+.gest-tbl td{padding:6px 8px;border-bottom:1px solid rgba(127,127,127,.12);vertical-align:middle}
+.gest-tbl tr.non-place td:first-child{border-left:3px solid var(--orange)}
+.gest-tbl .gest-sel{margin:0;min-width:180px}
 .gest-chip{display:inline-block;font-size:12.5px;border:1px solid var(--border);border-radius:14px;padding:3px 10px;margin:0 6px 6px 0}
 .gest-chip small{color:var(--muted)}
 .gest-edit{display:flex;flex-direction:column;gap:8px;padding:12px 14px;background:var(--panel2);border-bottom:1px solid var(--border)}
@@ -17871,8 +17877,28 @@ async function _gestPompes(){
               : `<button class="gest-lien" onclick="_GEST.nouveauMetre=${f.id};renderModalList();setTimeout(()=>document.getElementById('gm-nom-${f.id}')?.focus(),0)">+ Nouveau mètre sur cette face</button>`}
           </div>`).join('') || '<div class="c-dim" style="font-size:13px">Aucune face : ajoutez-en une.</div>'}</div>
       </div>`).join('') : '<div class="empty">Aucune pompe : créez « Pompe 1 » ci-dessus.</div>'}
-    ${sans.length ? `<div class="gest-sans"><div class="filter-label" style="margin-bottom:6px">Mètres pas encore placés sur une pompe (${sans.length})</div>
-      ${sans.map(m=>`<span class="gest-chip">${esc(m.nom)} <small>${esc(m.produit_nom)}</small></span>`).join('')}</div>` : ''}`;
+    ${_gestTableauRanger(d)}`;
+}
+// Tous les mètres (déjà placés ou non) avec leur emplacement à choisir :
+// le moyen le plus rapide de ranger les mètres qui existaient déjà.
+function _gestTableauRanger(d){
+  const faces=[];
+  for(const p of d.distributeurs) for(const f of p.faces) faces.push({id:f.id, lib:`${p.nom} · Face ${f.nom}`});
+  const metres=[];
+  for(const p of d.distributeurs) for(const f of p.faces) for(const m of f.metres) metres.push({...m, face_id:f.id});
+  for(const m of d.sans_emplacement||[]) metres.push({...m, face_id:null});
+  metres.sort((a,b)=>(a.produit_nom||'').localeCompare(b.produit_nom||'','fr') || a.nom.localeCompare(b.nom,'fr',{numeric:true}));
+  if(!metres.length) return '';
+  const nonPlaces=metres.filter(m=>!m.face_id).length;
+  return `<div class="gest-ranger">
+    <div class="filter-label" style="margin-bottom:4px">Ranger tous les mètres (${metres.length})${nonPlaces?` — <span style="color:var(--orange)">${nonPlaces} pas encore placé${nonPlaces>1?'s':''}</span>`:' — tous placés ✓'}</div>
+    <div class="c-dim" style="font-size:12.5px;margin-bottom:8px">Choisissez l'emplacement de chaque mètre : il est enregistré tout de suite.${faces.length?'':' Créez d\u2019abord une pompe ci-dessus.'}</div>
+    <table class="gest-tbl"><thead><tr><th>Mètre</th><th>Produit</th><th>Emplacement</th></tr></thead><tbody>
+    ${metres.map(m=>`<tr class="${m.face_id?'':'non-place'}"><td><b>${esc(m.nom)}</b></td><td>${esc(m.produit_nom)}${m.adresse?`<div class="c-dim" style="font-size:11.5px">📍 ${esc(m.adresse)}</div>`:''}</td>
+      <td><select class="filter-input gest-sel" ${faces.length?'':'disabled'} onchange="gestPlacer(${m.id}, parseInt(this.value||'0',10))">
+        <option value="" ${m.face_id?'':'selected'}>— Pas encore placé —</option>
+        ${faces.map(f=>`<option value="${f.id}" ${m.face_id===f.id?'selected':''}>${esc(f.lib)}</option>`).join('')}</select></td></tr>`).join('')}
+    </tbody></table></div>`;
 }
 async function _gestApi(method, path, body, msg){
   try{ await apiFetch(method, path, body); if(msg) toast(msg,'ok'); }
