@@ -483,3 +483,42 @@ def test_dollars_rapport_en_retard(client):
     r = p.post("/api/pompiste/terminer", json={"billetterie": [], "devises": [{"devise": "USD", "montant": 10}]})
     assert r.status_code == 200, r.text
     assert r.json()["devises"][0]["montant_htg"] == round(10 * ctx["taux"]["taux"], 2)
+
+
+def test_pompiste_rattache_a_une_station(client):
+    """Plusieurs stations : à la création du compte, on choisit l'adresse
+    (parmi celles des produits) ; le pompiste ne voit et ne saisit que les
+    pompes de sa station."""
+    from tz_utils import today_haiti
+    import main as _m
+    t = time.time_ns()
+    a1, a2 = f"Route Nationale 1, Vertières {t}", f"Champin, Cap-Haïtien {t}"
+    p1 = client.post("/api/produits", headers=H, json={"nom": f"GazA-{t}", "prix_gallon": 500, "adresse": a1}).json()["id"]
+    p2 = client.post("/api/produits", headers=H, json={"nom": f"GazB-{t}", "prix_gallon": 500, "adresse": a2}).json()["id"]
+    q1 = client.post(f"/api/produits/{p1}/pompes", headers=H, json={"nom": "P1"}).json()["id"]
+    q2 = client.post(f"/api/produits/{p2}/pompes", headers=H, json={"nom": "P1"}).json()["id"]
+    st = client.get("/api/pompiste-supervision/stations", headers=H).json()
+    assert {a1, a2} <= {s["adresse"] for s in st}
+    assert client.post("/api/pompiste-supervision/comptes", headers=H,
+                       json={"prenom": "St", "nom": "Inconnue", "station_adresse": "Nulle part"}).status_code == 400
+    c = client.post("/api/pompiste-supervision/comptes", headers=H,
+                    json={"prenom": "Sta", "nom": "Tion", "station_adresse": "  " + a1.upper() + " "}).json()
+    assert c["station_adresse"] == a1                      # rapproché de l'adresse enregistrée
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    ctx = p.get("/api/pompiste/contexte").json()
+    ids = {x["id"] for x in ctx["produits"]}
+    assert p1 in ids and p2 not in ids and ctx["pompiste"]["station"] == a1
+    jour = str(today_haiti())
+    r = p.post("/api/pompiste/compteurs", json={"date": jour, "periode": "Matin", "charte_acceptee": True,
+              "lignes": [{"pompe_id": q2, "metter_avant": 0, "metter_apres": 5}]})
+    assert r.status_code == 422 and r.json()["detail"]["erreurs"][0]["code"] == "autre_station"
+    # Changement de station, puis « toutes les stations »
+    assert client.patch(f"/api/pompiste-supervision/comptes/{c['id']}", headers=H,
+                        json={"station_adresse": a2}).json()["station_adresse"] == a2
+    ids = {x["id"] for x in p.get("/api/pompiste/contexte").json()["produits"]}
+    assert p2 in ids and p1 not in ids
+    assert client.patch(f"/api/pompiste-supervision/comptes/{c['id']}", headers=H,
+                        json={"station_adresse": ""}).json()["station_adresse"] is None
+    ids = {x["id"] for x in p.get("/api/pompiste/contexte").json()["produits"]}
+    assert {p1, p2} <= ids

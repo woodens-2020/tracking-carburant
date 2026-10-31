@@ -3384,6 +3384,8 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
   .gl-barre .gl-espace{display:none}
   .gl-resume b{font-size:17px} .gl-resume .s b{font-size:18px}
 }
+.psp-station{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted);margin-top:10px;max-width:520px}
+.psp-station-sel{min-width:180px;max-width:280px;height:32px;font-size:13px}
 .psp-deps{display:flex;flex-direction:column;gap:8px}
 .psp-dep{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px 14px;align-items:center;padding:10px 12px;
   border:1px solid var(--border);border-left:4px solid var(--orange);border-radius:10px;background:var(--bg)}
@@ -20071,17 +20073,38 @@ function pspRendreComptes(){
         <select class="filter-input" id="psp-c-emp"><option value="">Lier à un employé (facultatif)</option>
           ${emps.map(e => `<option value="${e.id}">${esc(e.nom)} — ${esc(e.poste)}</option>`).join('')}</select>
       </div>
+      <label class="psp-station">Station où il travaille
+        <select class="filter-input" id="psp-c-station">${_pspOptionsStations(d.stations, '')}</select></label>
+      ${(d.stations||[]).length ? '' : `<div class="psp-muted" style="margin-top:4px">Aucune adresse n'est encore enregistrée sur les produits : ajoutez-les dans Saisie › « Gérer produits / pompes » › ✏️ Modifier.</div>`}
       <div id="psp-c-msg"></div>
       <div class="psp-actions"><button class="btn btn-primary" onclick="pspCreerCompte()">+ Créer le compte</button></div></div>
     <div class="psp-card"><b>Comptes (${d.comptes.length})</b>
-      ${d.comptes.length ? `<div style="overflow-x:auto;margin-top:8px"><table class="psp-tbl"><thead><tr><th>Nom</th><th>Code de connexion</th><th>Employé lié</th><th>Dernier rapport</th><th>Statut</th><th></th></tr></thead><tbody>
+      ${d.comptes.length ? `<div style="overflow-x:auto;margin-top:8px"><table class="psp-tbl"><thead><tr><th>Nom</th><th>Code de connexion</th><th>Station</th><th>Employé lié</th><th>Dernier rapport</th><th>Statut</th><th></th></tr></thead><tbody>
       ${d.comptes.map(u => `<tr><td><b>${esc(u.nom_complet)}</b></td><td style="font-family:var(--mono);font-size:14px"><b>${esc(u.username)}</b></td>
+        <td><select class="filter-input psp-station-sel" onchange="pspChangerStation(${u.id}, this)" title="Station où il travaille">${_pspOptionsStations(d.stations, u.station_adresse)}</select></td>
         <td>${esc(u.employe_nom||'—')}</td><td>${u.dernier_rapport ? _pspDate(u.dernier_rapport) : '—'}</td>
         <td>${u.actif ? '<span class="psp-badge CONFIRME">Actif</span>' : '<span class="psp-badge REJETE">Désactivé</span>'}</td>
         <td style="white-space:nowrap"><button class="btn btn-secondary" style="height:30px;padding:0 10px" onclick="pspCompte(${u.id},{nouveau_pin:true})">Nouveau PIN</button>
           <button class="btn ${u.actif?'btn-danger':'btn-secondary'}" style="height:30px;padding:0 10px" onclick="pspCompte(${u.id},{actif:${!u.actif}})">${u.actif?'Désactiver':'Réactiver'}</button></td></tr>`).join('')}
       </tbody></table></div>` : '<div class="psp-muted" style="margin-top:6px">Aucun compte pompiste pour l\'instant.</div>'}</div>`;
   PSP.pin = null;
+}
+
+// Stations = adresses enregistrées sur les produits (Gérer produits / pompes)
+function _pspOptionsStations(stations, actuelle){
+  const l = stations || [], a = (actuelle || '').trim();
+  const connue = !a || l.some(s => s.adresse === a);
+  return `<option value="" ${a ? '' : 'selected'}>Toutes les stations</option>`
+    + l.map(s => `<option value="${esc(s.adresse)}" ${s.adresse === a ? 'selected' : ''}>📍 ${esc(s.adresse)} — ${esc(s.produits.join(', '))}</option>`).join('')
+    + (connue ? '' : `<option value="${esc(a)}" selected>⚠ ${esc(a)} (adresse retirée des produits)</option>`);
+}
+async function pspChangerStation(id, sel){
+  const v = sel.value, txt = v ? `la station « ${v} »` : 'toutes les stations';
+  if(!await showConfirm(`Ce pompiste ne verra plus que les produits et les pompes de ${txt}.`, {title:'Changer de station ?', type:'warn', okLabel:'Oui, changer'})){
+    pspRendreComptes(); return;
+  }
+  await pspCompte(id, {station_adresse: v});
+  notify('Station enregistrée.', 'ok');
 }
 
 function _pspPinMsg(u){
@@ -20095,7 +20118,8 @@ async function pspCreerCompte(){
   const v = id => document.getElementById(id).value.trim();
   try{
     const u = await _pspApi('POST', '/comptes', {prenom:v('psp-c-prenom'), nom:v('psp-c-nom'),
-      code_acces: v('psp-c-pin') || null, employe_id: v('psp-c-emp') ? parseInt(v('psp-c-emp'), 10) : null});
+      code_acces: v('psp-c-pin') || null, employe_id: v('psp-c-emp') ? parseInt(v('psp-c-emp'), 10) : null,
+      station_adresse: v('psp-c-station') || null});
     PSP.pin = _pspPinMsg(u);
     PSP.comptes = await _pspApi('GET', '/comptes'); pspRendreComptes();
   }catch(e){ document.getElementById('psp-c-msg').innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }

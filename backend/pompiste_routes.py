@@ -443,6 +443,8 @@ def contexte(date: Optional[date_type] = None, periode: Optional[str] = None,
                               "moi": rap.utilisateur_id == u.id}
     produits = []
     for p in db.query(Produit).filter_by(actif=True).order_by(Produit.id).all():
+        if not de_ma_station(u, p):
+            continue
         pompes = []
         for q in p.pompes:
             if not q.actif:
@@ -455,7 +457,7 @@ def contexte(date: Optional[date_type] = None, periode: Optional[str] = None,
                              "prix_gallon": _prix(db, p.pompes[0], d) if p.pompes else float(p.prix_gallon or 0),
                              "pompes": pompes})
     return {
-        "pompiste": {"id": u.id, "nom": _nom(u), "username": u.username},
+        "pompiste": {"id": u.id, "nom": _nom(u), "username": u.username, "station": u.station_adresse},
         "date": str(d), "periode": periode, "aujourd_hui": str(today_haiti()),
         "date_min": str(today_haiti() - timedelta(days=JOURS_EN_ARRIERE)),
         "produits": produits, "coupures": list(COUPURES), "taille_liasse": TAILLE_LIASSE,
@@ -561,8 +563,19 @@ def _verifier_devises(db: Session, devises: list, d: date_type) -> list:
     return out
 
 
+def _norm_station(v: Optional[str]) -> str:
+    return " ".join((v or "").split()).casefold()
+
+
+def de_ma_station(u: Utilisateur, produit) -> bool:
+    """Le pompiste rattaché à une station ne voit et ne saisit que les
+    produits de cette adresse ; sans station, il voit tout."""
+    st = _norm_station(getattr(u, "station_adresse", None))
+    return not st or _norm_station(getattr(produit, "adresse", None)) == st
+
+
 def _controler_lignes(db: Session, d: date_type, periode: str, lignes: list,
-                      exclure_rapport_id: Optional[int] = None) -> list[dict]:
+                      exclure_rapport_id: Optional[int] = None, utilisateur: Optional[Utilisateur] = None) -> list[dict]:
     """Contrôle des index. Lève 422 avec la liste des pompes en erreur ; chaque
     erreur porte un `code` que l'interface traduit (français / kreyòl) et
     renvoie le pompiste à l'écran de la pompe.
@@ -579,6 +592,9 @@ def _controler_lignes(db: Session, d: date_type, periode: str, lignes: list,
         pompe = db.get(Pompe, l.pompe_id)
         if not pompe or not pompe.actif:
             err(l.pompe_id, "inactive", "Pompe introuvable ou inactive")
+            continue
+        if utilisateur is not None and not de_ma_station(utilisateur, pompe.produit):
+            err(l.pompe_id, "autre_station", f"{pompe.nom} n'est pas dans votre station.")
             continue
         if l.pompe_id in vues:
             err(l.pompe_id, "double", f"{pompe.nom} : saisie en double")
@@ -633,7 +649,7 @@ def envoyer_compteurs(data: CompteursIn, u: Utilisateur = Depends(_require_pompi
                                              f"{rap.date.strftime('%d/%m')} (bouton « Terminer »)."})
     if not rap:
         _valider_date(data.date)
-    lignes = _controler_lignes(db, data.date, data.periode, data.lignes)
+    lignes = _controler_lignes(db, data.date, data.periode, data.lignes, utilisateur=u)
 
     # Une pompe = un seul rapport actif par créneau
     deja = (db.query(RapportPompisteLigne, RapportPompiste)
@@ -698,7 +714,7 @@ def modifier_compteur(pompe_id: int, data: ModifLigneIn, u: Utilisateur = Depend
         raise HTTPException(404, "Cette pompe n'est pas dans votre rapport en cours.")
     _controler_lignes(db, rap.date, rap.periode,
                       [LigneIn(pompe_id=pompe_id, metter_avant=data.metter_avant, metter_apres=data.metter_apres,
-                               debut_confirme=data.debut_confirme)])
+                               debut_confirme=data.debut_confirme)], utilisateur=u)
     ligne.metter_avant, ligne.metter_apres = data.metter_avant, data.metter_apres
     db.flush()
     _recalculer_attendu(rap)
@@ -1265,7 +1281,36 @@ def _compte_dict(db: Session, u: Utilisateur) -> dict:
     return {"id": u.id, "username": u.username, "nom_complet": u.nom_complet, "actif": u.actif,
             "employe_id": emp.id if emp else None,
             "employe_nom": f"{emp.prenom} {emp.nom}" if emp else None,
+            "station_adresse": u.station_adresse,
             "dernier_rapport": str(dernier.date) if dernier else None}
+
+
+def stations_connues(db: Session) -> list[dict]:
+    """Toutes les adresses enregistrées sur les produits actifs, avec leurs
+    produits : la liste des stations où un pompiste peut travailler."""
+    out: dict = {}
+    for p in db.query(Produit).filter(Produit.actif.is_(True)).order_by(Produit.nom).all():
+        a = " ".join((p.adresse or "").split())
+        if not a:
+            continue
+        s = out.setdefault(_norm_station(a), {"adresse": a, "produits": []})
+        s["produits"].append(p.nom)
+    return sorted(out.values(), key=lambda x: x["adresse"].casefold())
+
+
+def _station_valide(db: Session, v: Optional[str]) -> Optional[str]:
+    a = " ".join((v or "").split())
+    if not a:
+        return None
+    for s in stations_connues(db):
+        if _norm_station(s["adresse"]) == _norm_station(a):
+            return s["adresse"]
+    raise HTTPException(400, "Station inconnue : choisissez une adresse enregistrée sur les produits.")
+
+
+@router.get("/api/pompiste-supervision/stations")
+def lister_stations(_s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    return stations_connues(db)
 
 
 @router.get("/api/pompiste-supervision/comptes")
@@ -1276,6 +1321,7 @@ def lister_comptes(_s: Utilisateur = Depends(_require_superviseur), db: Session 
                 .order_by(Employe.prenom, Employe.nom).all())
     return {
         "comptes": [_compte_dict(db, u) for u in rows],
+        "stations": stations_connues(db),
         "employes": [{"id": e.id, "nom": f"{e.prenom} {e.nom}", "poste": e.poste,
                       "lie": e.utilisateur_id is not None} for e in employes],
     }
@@ -1286,6 +1332,7 @@ class CompteIn(BaseModel):
     nom: str
     code_acces: Optional[str] = None     # vide = généré
     employe_id: Optional[int] = None
+    station_adresse: Optional[str] = None   # adresse des produits ; vide = toutes les stations
 
 
 def _slug(txt: str, n: int = 12) -> str:
@@ -1319,6 +1366,7 @@ def creer_compte(data: CompteIn, _s: Utilisateur = Depends(_require_superviseur)
     if not _CODE_RE.match(pin):
         raise HTTPException(400, "Le code PIN doit contenir exactement 9 chiffres.")
     username = _identifiant_unique(db, prenom, nom_famille)
+    station = _station_valide(db, data.station_adresse)
     emp = None
     if data.employe_id:
         emp = db.get(Employe, data.employe_id)
@@ -1334,6 +1382,7 @@ def creer_compte(data: CompteIn, _s: Utilisateur = Depends(_require_superviseur)
         password_hash=hash_password(secrets.token_urlsafe(24)),
         code_acces_hash=hash_code_acces(pin),
         role="operateur", role_id=role.id, poste=role.nom, actif=True,
+        station_adresse=station,
     )
     db.add(u)
     db.flush()
@@ -1351,6 +1400,7 @@ def creer_compte(data: CompteIn, _s: Utilisateur = Depends(_require_superviseur)
 class ComptePatch(BaseModel):
     actif: Optional[bool] = None
     nouveau_pin: bool = False
+    station_adresse: Optional[str] = None   # "" = toutes les stations
 
 
 @router.patch("/api/pompiste-supervision/comptes/{uid}")
@@ -1371,6 +1421,8 @@ def modifier_compte(uid: int, data: ComptePatch, _s: Utilisateur = Depends(_requ
     if data.nouveau_pin:
         pin = _nouveau_pin()
         u.code_acces_hash = hash_code_acces(pin)
+    if data.station_adresse is not None:
+        u.station_adresse = _station_valide(db, data.station_adresse)
     db.commit()
     out = _compte_dict(db, u)
     if pin:

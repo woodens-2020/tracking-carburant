@@ -272,6 +272,8 @@ def _migrate_columns():
              "ALTER TABLE rapports_pompiste ADD COLUMN devises JSON NOT NULL DEFAULT '[]'", None),
             ("produits", "adresse",
              "ALTER TABLE produits ADD COLUMN adresse VARCHAR(255) DEFAULT NULL", None),
+            ("utilisateurs", "station_adresse",
+             "ALTER TABLE utilisateurs ADD COLUMN station_adresse VARCHAR(255) DEFAULT NULL", None),
             ("depenses", "rapport_pompiste_id",
              "ALTER TABLE depenses ADD COLUMN rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL", None),
             ("depenses", "saisi_par_id",
@@ -285,6 +287,8 @@ def _migrate_columns():
             # les migrations de main.py
             ("produits", "adresse",
              "ALTER TABLE produits ADD COLUMN adresse VARCHAR(255)", None),
+            ("utilisateurs", "station_adresse",
+             "ALTER TABLE utilisateurs ADD COLUMN station_adresse VARCHAR(255)", None),
             ("releves",      "nb_modifications",
              "ALTER TABLE releves      ADD COLUMN nb_modifications INTEGER NOT NULL DEFAULT 0", None),
             ("utilisateurs", "api_key_hash",

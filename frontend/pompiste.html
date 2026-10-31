@@ -445,7 +445,7 @@ const TXT = {
     debut_diff_action:'Relisez le compteur sur la pompe. Corrigez-le, ou confirmez s\'il est juste.',
     je_confirme:'Le compteur est juste, je confirme', confirme_ok:'Mètre de début confirmé.',
     e_negatif:'Un mètre ne peut pas être négatif.', e_anormal:'{g} gallons sur une période, ce n\'est pas normal : vérifiez le mètre (un chiffre en trop ?).',
-    e_double:'Pompe saisie deux fois.', e_inactive:'Cette pompe n\'est plus active.',
+    e_double:'Pompe saisie deux fois.', e_autre_station:'Cette pompe n’est pas dans votre station.', e_inactive:'Cette pompe n\'est plus active.',
     e_fin_inferieure:'Le mètre de fin est plus petit que le mètre de début : un compteur ne recule pas.',
     e_deja:'Déjà saisie pour cette période : {p}.', e_terminer:'Terminez d\'abord votre rapport en cours (bouton « Non, j\'ai fini »).',
     e_rien:'Aucun compteur envoyé : saisissez d\'abord vos pompes.',
@@ -536,7 +536,7 @@ const TXT = {
     debut_diff_action:'Li kontè a ankò sou ponp lan. Korije l, oswa konfime si li bon.',
     je_confirme:'Kontè a bon, mwen konfime', confirme_ok:'Mitè kòmansman an konfime.',
     e_negatif:'Yon mitè pa ka negatif.', e_anormal:'{g} galon nan yon peryòd, sa pa nòmal : verifye mitè a (yon chif an plis ?).',
-    e_double:'Ponp lan antre de fwa.', e_inactive:'Ponp sa a pa aktif ankò.',
+    e_double:'Ponp lan antre de fwa.', e_autre_station:'Ponp sa a pa nan estasyon pa w la.', e_inactive:'Ponp sa a pa aktif ankò.',
     e_fin_inferieure:'Mitè fen an pi piti pase mitè kòmansman an : yon kontè pa ka fè bak.',
     e_deja:'Deja antre pou peryòd sa a : {p}.', e_terminer:'Fini rapò ou kòmanse a anvan (bouton « Non, mwen fini »).',
     e_rien:'Ou poko voye okenn kontè : antre ponp ou yo anvan.',
@@ -632,7 +632,7 @@ function msgErreur(e){
 }
 function msgLigne(x){
   const m = {negatif:'e_negatif', double:'e_double', inactive:'e_inactive', fin_inferieure:'e_fin_inferieure',
-             debut_different:'debut_diff'}[x.code];
+             debut_different:'debut_diff', autre_station:'e_autre_station'}[x.code];
   if(x.code === 'anormal') return t('e_anormal', {g: nf(x.gallons)});
   return m ? t(m) : x.message;
 }
@@ -706,7 +706,7 @@ async function chargerContexte(){
       }
     }
     if(_laisserPartir){ _laisserPartir = false; garderHistorique(); }
-    $('qui').innerHTML = `<b>${esc(S.ctx.pompiste.nom)}</b><span>${esc(S.ctx.pompiste.username)}</span>`;
+    $('qui').innerHTML = `<b>${esc(S.ctx.pompiste.nom)}</b><span>${S.ctx.pompiste.station ? '📍 ' + esc(S.ctx.pompiste.station) : esc(S.ctx.pompiste.username)}</span>`;
     $('qui').classList.remove('cache'); $('btn-sortir').classList.remove('cache');
     rendre();
   }catch(e){
