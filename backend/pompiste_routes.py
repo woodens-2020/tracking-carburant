@@ -302,6 +302,10 @@ def _index_precedent(db: Session, pompe_id: int, d: date_type, periode: str,
         if cle < cible and (cle_m is None or cle > cle_m):
             meilleur, cle_m = float(ligne.metter_apres), cle
             src = f"rapport pompiste — {_per(rap.periode)} du {rap.date.strftime('%d/%m')}"
+    if meilleur is None:
+        p = db.get(Pompe, pompe_id)
+        if p is not None and p.metre_depart is not None:
+            meilleur, src = float(p.metre_depart), "mètre de départ (enregistrement de la station)"
     return meilleur, src
 
 

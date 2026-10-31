@@ -76,6 +76,9 @@ class Pompe(Base):
     actif      = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     face_id    = Column(Integer, ForeignKey("faces.id", ondelete="SET NULL"), nullable=True)
+    # Chiffre du compteur à l'enregistrement du mètre : sert de « mètre
+    # précédent » tant qu'aucun relevé n'existe (contrôle de continuité).
+    metre_depart = Column(Numeric(14, 4), nullable=True)
 
     produit = relationship("Produit", back_populates="pompes")
     face    = relationship("Face", back_populates="metres")

@@ -1949,7 +1949,8 @@ def list_produits(date: Optional[date_type] = None, db: Session = Depends(get_db
         out.append({
             "id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon, "adresse": p.adresse,
             "prix_vente_actif": float(px_actif.prix_vente_gallon) if px_actif else None,
-            "pompes": [{"id": q.id, "nom": q.nom, "face_id": q.face_id, "emplacement": q.emplacement}
+            "pompes": [{"id": q.id, "nom": q.nom, "face_id": q.face_id, "emplacement": q.emplacement,
+                        "metre_depart": float(q.metre_depart) if q.metre_depart is not None else None}
                        for q in p.pompes if q.actif],
         })
     return out
@@ -2046,6 +2047,143 @@ def modifier_pompe(pompe_id: int, data: PompePatch, request: Request, db: Sessio
             _tracer(db, request, "metre_deplace", {"pompe_id": q.id, "metre": q.nom, "avant": avant, "apres": q.emplacement})
     db.commit(); db.refresh(q)
     return {"id": q.id, "nom": q.nom, "produit_id": q.produit_id, "face_id": q.face_id, "emplacement": q.emplacement}
+
+
+# ---------- Enregistrement complet d'une station ----------
+# Station (adresse) › produits et prix › pompes › faces › mètres (produit,
+# nom, mètre de départ), en une seule fois. « Retirer l'existant » archive
+# produits et mètres sans rien effacer : relevés, rapports, journal,
+# caisse gardent tout leur historique.
+
+class StationMetreIn(BaseModel):
+    produit: str                 # clé du produit dans « produits »
+    nom: str
+    metre_depart: Optional[float] = None
+
+
+class StationFaceIn(BaseModel):
+    nom: str
+    metres: List[StationMetreIn] = []
+
+
+class StationPompeIn(BaseModel):
+    nom: str
+    faces: List[StationFaceIn] = []
+
+
+class StationProduitIn(BaseModel):
+    cle: str
+    nom: str
+    prix: float
+
+
+class StationIn(BaseModel):
+    adresse: str
+    produits: List[StationProduitIn]
+    pompes: List[StationPompeIn]
+
+
+class RetirerToutIn(BaseModel):
+    confirmation: str
+
+
+@app.post("/api/stations/retirer-tout")
+def retirer_tout(data: RetirerToutIn, request: Request, db: Session = Depends(get_db)):
+    """Archive tous les produits, mètres et pompes physiques actuels. Rien
+    n'est effacé : les produits archivés gardent leur historique sous le nom
+    « … (archivé le JJ/MM/AAAA) », pour que de nouveaux produits puissent
+    reprendre les mêmes noms."""
+    _gerer_station(request, db)
+    if (data.confirmation or "").strip().upper() != "RETIRER":
+        raise HTTPException(400, "Tapez RETIRER pour confirmer.")
+    jour = today_haiti().strftime("%d/%m/%Y")
+    n_prod = n_metres = 0
+    for p in db.query(Produit).filter(Produit.actif.is_(True)).all():
+        p.actif = False
+        suffixe = f" (archivé le {jour})"
+        if suffixe not in p.nom:
+            base = p.nom[:100 - len(suffixe)]
+            nom, i = base + suffixe, 2
+            while db.query(Produit).filter(Produit.nom == nom, Produit.id != p.id).first():
+                nom = f"{base[:100 - len(suffixe) - 4]} #{i}{suffixe}"; i += 1
+            p.nom = nom
+        n_prod += 1
+    for q in db.query(Pompe).filter(Pompe.actif.is_(True)).all():
+        q.actif = False
+        n_metres += 1
+    db.query(Pompe).update({Pompe.face_id: None}, synchronize_session=False)
+    n_dist = db.query(Distributeur).count()
+    for d in db.query(Distributeur).all():
+        db.delete(d)
+    _tracer(db, request, "station_retiree", {"produits": n_prod, "metres": n_metres, "pompes": n_dist})
+    db.commit()
+    return {"produits_archives": n_prod, "metres_archives": n_metres, "pompes_retirees": n_dist}
+
+
+@app.post("/api/stations", status_code=201)
+def enregistrer_station(data: StationIn, request: Request, db: Session = Depends(get_db)):
+    """Crée en une fois : produits de la station (avec adresse et prix),
+    pompes physiques, faces, mètres placés avec leur mètre de départ."""
+    _gerer_station(request, db)
+    adresse = _adresse(data.adresse)
+    if not adresse:
+        raise HTTPException(400, "Indiquez l'adresse (le lieu) de la station.")
+    if not data.produits:
+        raise HTTPException(400, "Ajoutez au moins un produit (Gazoline, Diesel…).")
+    if not data.pompes:
+        raise HTTPException(400, "Ajoutez au moins une pompe.")
+    produits = {}
+    for x in data.produits:
+        cle = (x.cle or "").strip()
+        if not cle or cle in produits:
+            raise HTTPException(400, "Produits : clé manquante ou en double.")
+        if not (x.prix > 0):
+            raise HTTPException(400, f"{x.nom} : indiquez un prix de vente supérieur à 0.")
+        nom = _nom_produit_libre(db, x.nom)
+        if any(p.nom.casefold() == nom.casefold() for p in produits.values()):
+            raise HTTPException(409, f"Le produit « {nom} » est en double dans le formulaire.")
+        p = Produit(nom=nom, prix_gallon=round(x.prix, 3), adresse=adresse, actif=True)
+        db.add(p); db.flush()
+        db.add(PrixVente(produit_id=p.id, prix_vente_gallon=round(x.prix, 3), date_effet=today_haiti()))
+        produits[cle] = p
+    vus_pompes, noms_metres = set(), {}
+    n_metres = 0
+    for i, pp in enumerate(data.pompes):
+        nom_p = _nom_court(pp.nom, 100, "pompe")
+        if nom_p.casefold() in vus_pompes or any(d.nom.casefold() == nom_p.casefold() for d in db.query(Distributeur).all()):
+            raise HTTPException(409, f"La pompe « {nom_p} » existe déjà.")
+        vus_pompes.add(nom_p.casefold())
+        if not pp.faces:
+            raise HTTPException(400, f"{nom_p} : ajoutez au moins une face.")
+        d = Distributeur(nom=nom_p, ordre=(db.query(Distributeur).count() or 0) + i)
+        db.add(d); db.flush()
+        vues_faces = set()
+        for j, ff in enumerate(pp.faces):
+            nom_f = _nom_court(ff.nom, 50, "face")
+            if nom_f.casefold() in vues_faces:
+                raise HTTPException(409, f"{nom_p} : la face « {nom_f} » est en double.")
+            vues_faces.add(nom_f.casefold())
+            f = Face(distributeur_id=d.id, nom=nom_f, ordre=j)
+            db.add(f); db.flush()
+            for m in ff.metres:
+                p = produits.get(m.produit)
+                if not p:
+                    raise HTTPException(400, f"{nom_p} · Face {nom_f} : choisissez le produit du mètre.")
+                nom_m = _nom_court(m.nom, 100, "mètre")
+                cle_m = (p.id, nom_m.casefold())
+                if cle_m in noms_metres:
+                    raise HTTPException(409, f"Le mètre « {nom_m} » ({p.nom}) est en double ({noms_metres[cle_m]}).")
+                noms_metres[cle_m] = f"{nom_p} · Face {nom_f}"
+                if m.metre_depart is not None and m.metre_depart < 0:
+                    raise HTTPException(400, f"{nom_m} : le mètre de départ ne peut pas être négatif.")
+                db.add(Pompe(produit_id=p.id, nom=nom_m, face_id=f.id, actif=True,
+                             metre_depart=round(m.metre_depart, 4) if m.metre_depart is not None else None))
+                n_metres += 1
+    _tracer(db, request, "station_enregistree", {"adresse": adresse, "produits": [p.nom for p in produits.values()],
+                                                 "pompes": len(data.pompes), "metres": n_metres})
+    db.commit()
+    return {"adresse": adresse, "produits": [{"id": p.id, "nom": p.nom} for p in produits.values()],
+            "pompes": len(data.pompes), "metres": n_metres}
 
 
 # ---------- Pompes physiques (distributeurs) et faces ----------
@@ -2230,7 +2368,9 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
     # « mètre après » du relevé précédent. Sinon, des gallons sont sortis de
     # la pompe sans être vendus dans le système : un motif écrit est exigé.
     prec = _releve_precedent(db, data.pompe_id, data.date, data.periode)
-    ecart = round(data.metter_avant - float(prec.metter_apres), 4) if prec else 0.0
+    depart = None if prec else getattr(db.get(Pompe, data.pompe_id), "metre_depart", None)
+    ecart = (round(data.metter_avant - float(prec.metter_apres), 4) if prec
+             else (round(data.metter_avant - float(depart), 4) if depart is not None else 0.0))
     motif = (data.motif_ecart_compteur or "").strip()
     if abs(ecart) > TOLERANCE_ECART_COMPTEUR:
         if (not motif and r is not None and r.motif_ecart_compteur
@@ -2241,8 +2381,9 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
             raise HTTPException(
                 409,
                 f"{pompe.nom} : le mètre avant ({data.metter_avant:.3f}) est {sens} que le "
-                f"mètre après du relevé précédent ({float(prec.metter_apres):.3f}, "
-                f"{prec.periode} du {prec.date.strftime('%d/%m/%Y')}) — écart de "
+                + (f"mètre après du relevé précédent ({float(prec.metter_apres):.3f}, "
+                   f"{prec.periode} du {prec.date.strftime('%d/%m/%Y')}) — écart de " if prec else
+                   f"mètre de départ enregistré pour ce mètre ({float(depart):.3f}) — écart de ") +
                 f"{abs(ecart):.3f} gal. Indiquez le motif de cet écart pour enregistrer.",
             )
     else:
@@ -3041,7 +3182,8 @@ def _build_journal_entries(
             .scalar()
         )
         if last_date is None:
-            pompe_last[pid] = None
+            pp = db.get(Pompe, pid)
+            pompe_last[pid] = float(pp.metre_depart) if pp is not None and pp.metre_depart is not None else None
         else:
             last_day = (
                 db.query(Releve)
