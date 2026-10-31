@@ -447,18 +447,16 @@ def contexte(date: Optional[date_type] = None, periode: Optional[str] = None,
                               "moi": rap.utilisateur_id == u.id}
     produits = []
     for p in db.query(Produit).filter_by(actif=True).order_by(Produit.id).all():
-        if not de_ma_station(u, p):
-            continue
         pompes = []
         for q in p.pompes:
-            if not q.actif:
+            if not q.actif or not de_ma_station(u, q):
                 continue
             # Pompes ajoutées dans « Produits & Pompes » : visibles ici dès
             # leur création (lecture directe, rien à configurer).
             pompes.append({"id": q.id, "nom": q.nom, "emplacement": q.emplacement,
                            "deja_rapportee": prises.get(q.id)})
         if pompes:
-            produits.append({"id": p.id, "nom": p.nom, "adresse": p.adresse,
+            produits.append({"id": p.id, "nom": p.nom,
                              "prix_gallon": _prix(db, p.pompes[0], d) if p.pompes else float(p.prix_gallon or 0),
                              "pompes": pompes})
     return {
@@ -572,11 +570,12 @@ def _norm_station(v: Optional[str]) -> str:
     return " ".join((v or "").split()).casefold()
 
 
-def de_ma_station(u: Utilisateur, produit) -> bool:
-    """Le pompiste rattaché à une station ne voit et ne saisit que les
-    produits de cette adresse ; sans station, il voit tout."""
+def de_ma_station(u: Utilisateur, pompe) -> bool:
+    """Le pompiste rattaché à une station ne voit et ne saisit que les mètres
+    des pompes de cette adresse ; sans station, il voit tout. La station est
+    celle de la pompe physique (les produits sont communs à tous)."""
     st = _norm_station(getattr(u, "station_adresse", None))
-    return not st or _norm_station(getattr(produit, "adresse", None)) == st
+    return not st or _norm_station(getattr(pompe, "station", None)) == st
 
 
 def _controler_lignes(db: Session, d: date_type, periode: str, lignes: list,
@@ -598,7 +597,7 @@ def _controler_lignes(db: Session, d: date_type, periode: str, lignes: list,
         if not pompe or not pompe.actif:
             err(l.pompe_id, "inactive", "Pompe introuvable ou inactive")
             continue
-        if utilisateur is not None and not de_ma_station(utilisateur, pompe.produit):
+        if utilisateur is not None and not de_ma_station(utilisateur, pompe):
             err(l.pompe_id, "autre_station", f"{pompe.nom} n'est pas dans votre station.")
             continue
         if l.pompe_id in vues:
@@ -1291,15 +1290,16 @@ def _compte_dict(db: Session, u: Utilisateur) -> dict:
 
 
 def stations_connues(db: Session) -> list[dict]:
-    """Toutes les adresses enregistrées sur les produits actifs, avec leurs
-    produits : la liste des stations où un pompiste peut travailler."""
+    """Toutes les adresses enregistrées sur les pompes physiques, avec leurs
+    pompes : la liste des stations où un pompiste peut travailler."""
+    from models import Distributeur
     out: dict = {}
-    for p in db.query(Produit).filter(Produit.actif.is_(True)).order_by(Produit.nom).all():
-        a = " ".join((p.adresse or "").split())
+    for d in db.query(Distributeur).order_by(Distributeur.ordre, Distributeur.id).all():
+        a = " ".join((d.adresse or "").split())
         if not a:
             continue
         s = out.setdefault(_norm_station(a), {"adresse": a, "produits": []})
-        s["produits"].append(p.nom)
+        s["produits"].append(d.nom)          # nom des pompes de la station
     return sorted(out.values(), key=lambda x: x["adresse"].casefold())
 
 

@@ -493,10 +493,14 @@ def test_pompiste_rattache_a_une_station(client):
     import main as _m
     t = time.time_ns()
     a1, a2 = f"Route Nationale 1, Vertières {t}", f"Champin, Cap-Haïtien {t}"
-    p1 = client.post("/api/produits", headers=H, json={"nom": f"GazA-{t}", "prix_gallon": 500, "adresse": a1}).json()["id"]
-    p2 = client.post("/api/produits", headers=H, json={"nom": f"GazB-{t}", "prix_gallon": 500, "adresse": a2}).json()["id"]
-    q1 = client.post(f"/api/produits/{p1}/pompes", headers=H, json={"nom": "P1"}).json()["id"]
-    q2 = client.post(f"/api/produits/{p2}/pompes", headers=H, json={"nom": "P1"}).json()["id"]
+    p1 = client.post("/api/produits", headers=H, json={"nom": f"GazA-{t}", "prix_gallon": 500}).json()["id"]
+    p2 = client.post("/api/produits", headers=H, json={"nom": f"GazB-{t}", "prix_gallon": 500}).json()["id"]
+    # L'adresse est portée par les pompes physiques
+    f1 = client.post("/api/distributeurs", headers=H, json={"nom": f"P-A-{t}", "adresse": a1, "faces": ["A"]}).json()["id"]
+    f2 = client.post("/api/distributeurs", headers=H, json={"nom": f"P-B-{t}", "adresse": a2, "faces": ["A"]}).json()["id"]
+    dist = {d["id"]: d for d in client.get("/api/distributeurs", headers=H).json()["distributeurs"]}
+    q1 = client.post(f"/api/produits/{p1}/pompes", headers=H, json={"nom": "P1", "face_id": dist[f1]["faces"][0]["id"]}).json()["id"]
+    q2 = client.post(f"/api/produits/{p2}/pompes", headers=H, json={"nom": "P1", "face_id": dist[f2]["faces"][0]["id"]}).json()["id"]
     st = client.get("/api/pompiste-supervision/stations", headers=H).json()
     assert {a1, a2} <= {s["adresse"] for s in st}
     assert client.post("/api/pompiste-supervision/comptes", headers=H,

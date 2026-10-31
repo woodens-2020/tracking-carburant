@@ -510,6 +510,14 @@ def startup():
         from pompiste_routes import rattacher_employes_pompistes
         with SessionLocal() as _db:
             rattacher_employes_pompistes(_db)
+            try:
+                for _d in _db.query(Distributeur).filter(Distributeur.adresse.is_(None)).all():
+                    _adr = next((q.produit.adresse for f in _d.faces for q in f.metres if q.produit.adresse), None)
+                    if _adr:
+                        _d.adresse = _adr
+                _db.commit()
+            except Exception as _e:
+                _db.rollback(); print("Adresse des pompes : reprise impossible :", _e)
             from pompiste_routes import rattraper_journal, nettoyer_journal_anticipe
             nettoyer_journal_anticipe(_db)
             rattraper_journal(_db)
@@ -1878,6 +1886,12 @@ class PompePatch(BaseModel):
 class DistributeurIn(BaseModel):
     nom: str
     faces: List[str] = ["A", "B"]
+    adresse: Optional[str] = None
+
+
+class DistributeurPatch(BaseModel):
+    nom: Optional[str] = None
+    adresse: Optional[str] = None
 
 
 class NomIn(BaseModel):
@@ -1949,7 +1963,7 @@ def list_produits(date: Optional[date_type] = None, db: Session = Depends(get_db
         out.append({
             "id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon, "adresse": p.adresse,
             "prix_vente_actif": float(px_actif.prix_vente_gallon) if px_actif else None,
-            "pompes": [{"id": q.id, "nom": q.nom, "face_id": q.face_id, "emplacement": q.emplacement,
+            "pompes": [{"id": q.id, "nom": q.nom, "face_id": q.face_id, "emplacement": q.emplacement, "station": q.station,
                         "metre_depart": float(q.metre_depart) if q.metre_depart is not None else None}
                        for q in p.pompes if q.actif],
         })
@@ -2132,6 +2146,8 @@ def enregistrer_station(data: StationIn, request: Request, db: Session = Depends
         raise HTTPException(400, "Ajoutez au moins un produit (Gazoline, Diesel…).")
     if not data.pompes:
         raise HTTPException(400, "Ajoutez au moins une pompe.")
+    # Produits : les mêmes pour toutes les stations (Gazoline, Diesel…). Un
+    # produit déjà enregistré est repris ; son prix est mis à jour s'il change.
     produits = {}
     for x in data.produits:
         cle = (x.cle or "").strip()
@@ -2139,23 +2155,30 @@ def enregistrer_station(data: StationIn, request: Request, db: Session = Depends
             raise HTTPException(400, "Produits : clé manquante ou en double.")
         if not (x.prix > 0):
             raise HTTPException(400, f"{x.nom} : indiquez un prix de vente supérieur à 0.")
-        nom = _nom_produit_libre(db, x.nom)
+        nom = " ".join((x.nom or "").split())
         if any(p.nom.casefold() == nom.casefold() for p in produits.values()):
             raise HTTPException(409, f"Le produit « {nom} » est en double dans le formulaire.")
-        p = Produit(nom=nom, prix_gallon=round(x.prix, 3), adresse=adresse, actif=True)
-        db.add(p); db.flush()
-        db.add(PrixVente(produit_id=p.id, prix_vente_gallon=round(x.prix, 3), date_effet=today_haiti()))
+        p = next((q for q in db.query(Produit).filter(Produit.actif.is_(True)).all()
+                  if q.nom.strip().casefold() == nom.casefold()), None)
+        if p is None:
+            p = Produit(nom=_nom_produit_libre(db, nom), prix_gallon=round(x.prix, 3), actif=True)
+            db.add(p); db.flush()
+            db.add(PrixVente(produit_id=p.id, prix_vente_gallon=round(x.prix, 3), date_effet=today_haiti()))
+        else:
+            actuel = _prix_vente_a_date(db, p.id, today_haiti())
+            if actuel is None or abs(actuel - x.prix) > 0.0005:
+                db.add(PrixVente(produit_id=p.id, prix_vente_gallon=round(x.prix, 3), date_effet=today_haiti()))
         produits[cle] = p
     vus_pompes, noms_metres = set(), {}
     n_metres = 0
     for i, pp in enumerate(data.pompes):
         nom_p = _nom_court(pp.nom, 100, "pompe")
-        if nom_p.casefold() in vus_pompes or any(d.nom.casefold() == nom_p.casefold() for d in db.query(Distributeur).all()):
-            raise HTTPException(409, f"La pompe « {nom_p} » existe déjà.")
+        if nom_p.casefold() in vus_pompes or _pompe_existe(db, nom_p, adresse):
+            raise HTTPException(409, f"La pompe « {nom_p} » existe déjà dans la station « {adresse} ».")
         vus_pompes.add(nom_p.casefold())
         if not pp.faces:
             raise HTTPException(400, f"{nom_p} : ajoutez au moins une face.")
-        d = Distributeur(nom=nom_p, ordre=(db.query(Distributeur).count() or 0) + i)
+        d = Distributeur(nom=nom_p, adresse=adresse, ordre=(db.query(Distributeur).count() or 0) + i)
         db.add(d); db.flush()
         vues_faces = set()
         for j, ff in enumerate(pp.faces):
@@ -2171,6 +2194,8 @@ def enregistrer_station(data: StationIn, request: Request, db: Session = Depends
                     raise HTTPException(400, f"{nom_p} · Face {nom_f} : choisissez le produit du mètre.")
                 nom_m = _nom_court(m.nom, 100, "mètre")
                 cle_m = (p.id, nom_m.casefold())
+                if any(q.actif and q.nom.strip().casefold() == nom_m.casefold() for q in p.pompes):
+                    raise HTTPException(409, f"Le mètre « {nom_m} » ({p.nom}) existe déjà : choisissez un autre nom (ex. {nom_m} {nom_p}).")
                 if cle_m in noms_metres:
                     raise HTTPException(409, f"Le mètre « {nom_m} » ({p.nom}) est en double ({noms_metres[cle_m]}).")
                 noms_metres[cle_m] = f"{nom_p} · Face {nom_f}"
@@ -2189,9 +2214,16 @@ def enregistrer_station(data: StationIn, request: Request, db: Session = Depends
 # ---------- Pompes physiques (distributeurs) et faces ----------
 # Pompe 1 › Face A › mètres (Gazoline 1, Gazoline 2, Diesel 1) ; Face B › …
 
+def _pompe_existe(db: Session, nom: str, adresse: Optional[str], sauf_id: Optional[int] = None) -> bool:
+    """Chaque station a sa « Pompe 1 » : un nom de pompe est unique par station."""
+    n = lambda v: " ".join((v or "").split()).casefold()
+    return any(x.id != sauf_id and x.nom.casefold() == nom.casefold() and n(x.adresse) == n(adresse)
+               for x in db.query(Distributeur).all())
+
+
 def _metre_dict(q: Pompe) -> dict:
     return {"id": q.id, "nom": q.nom, "produit_id": q.produit_id, "produit_nom": q.produit.nom,
-            "adresse": q.produit.adresse, "actif": bool(q.actif)}
+            "station": q.station, "actif": bool(q.actif)}
 
 
 def _nom_court(v: str, maxi: int, quoi: str) -> str:
@@ -2205,7 +2237,7 @@ def _nom_court(v: str, maxi: int, quoi: str) -> str:
 def lister_distributeurs(db: Session = Depends(get_db)):
     out = []
     for d in db.query(Distributeur).order_by(Distributeur.ordre, Distributeur.id).all():
-        out.append({"id": d.id, "nom": d.nom,
+        out.append({"id": d.id, "nom": d.nom, "adresse": d.adresse,
                     "faces": [{"id": f.id, "nom": f.nom,
                                "metres": [_metre_dict(q) for q in f.metres if q.actif]} for f in d.faces]})
     sans = (db.query(Pompe).join(Produit).filter(Pompe.face_id.is_(None), Pompe.actif.is_(True),
@@ -2218,14 +2250,15 @@ def lister_distributeurs(db: Session = Depends(get_db)):
 def creer_distributeur(data: DistributeurIn, request: Request, db: Session = Depends(get_db)):
     _gerer_station(request, db)
     nom = _nom_court(data.nom, 100, "pompe")
-    if any(x.nom.casefold() == nom.casefold() for x in db.query(Distributeur).all()):
-        raise HTTPException(409, f"La pompe « {nom} » existe déjà.")
+    adr = _adresse(data.adresse)
+    if _pompe_existe(db, nom, adr):
+        raise HTTPException(409, f"La pompe « {nom} » existe déjà dans cette station.")
     faces = []
     for f in data.faces or []:
         f = _nom_court(f, 50, "face")
         if f.casefold() not in [x.casefold() for x in faces]:
             faces.append(f)
-    d = Distributeur(nom=nom, ordre=(db.query(Distributeur).count() or 0))
+    d = Distributeur(nom=nom, adresse=adr, ordre=(db.query(Distributeur).count() or 0))
     db.add(d); db.flush()
     for i, f in enumerate(faces):
         db.add(Face(distributeur_id=d.id, nom=f, ordre=i))
@@ -2235,18 +2268,21 @@ def creer_distributeur(data: DistributeurIn, request: Request, db: Session = Dep
 
 
 @app.patch("/api/distributeurs/{did}")
-def renommer_distributeur(did: int, data: NomIn, request: Request, db: Session = Depends(get_db)):
+def renommer_distributeur(did: int, data: DistributeurPatch, request: Request, db: Session = Depends(get_db)):
     _gerer_station(request, db)
     d = db.get(Distributeur, did)
     if not d:
         raise HTTPException(404, "Pompe introuvable")
-    nom = _nom_court(data.nom, 100, "pompe")
-    if any(x.id != did and x.nom.casefold() == nom.casefold() for x in db.query(Distributeur).all()):
-        raise HTTPException(409, f"La pompe « {nom} » existe déjà.")
-    _tracer(db, request, "distributeur_renomme", {"id": did, "avant": d.nom, "apres": nom})
-    d.nom = nom
+    avant = {"nom": d.nom, "adresse": d.adresse}
+    nom = _nom_court(data.nom, 100, "pompe") if data.nom is not None else d.nom
+    adr = _adresse(data.adresse) if data.adresse is not None else d.adresse
+    if _pompe_existe(db, nom, adr, sauf_id=did):
+        raise HTTPException(409, f"La pompe « {nom} » existe déjà dans cette station.")
+    d.nom, d.adresse = nom, adr
+    if {"nom": d.nom, "adresse": d.adresse} != avant:
+        _tracer(db, request, "distributeur_modifie", {"id": did, "avant": avant, "apres": {"nom": d.nom, "adresse": d.adresse}})
     db.commit()
-    return {"id": d.id, "nom": d.nom}
+    return {"id": d.id, "nom": d.nom, "adresse": d.adresse}
 
 
 @app.delete("/api/distributeurs/{did}")

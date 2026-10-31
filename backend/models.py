@@ -43,6 +43,9 @@ class Distributeur(Base):
 
     id         = Column(Integer, primary_key=True)
     nom        = Column(String(100), nullable=False)
+    # Station où se trouve la pompe (adresse). Les produits n'en ont pas :
+    # Gazoline, Diesel… sont les mêmes partout, la pompe porte le lieu.
+    adresse    = Column(String(255), nullable=True)
     ordre      = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -82,6 +85,12 @@ class Pompe(Base):
 
     produit = relationship("Produit", back_populates="pompes")
     face    = relationship("Face", back_populates="metres")
+
+    @property
+    def station(self):
+        """Adresse de la station = celle de la pompe physique qui porte le mètre."""
+        f = self.face
+        return f.distributeur.adresse if f else None
 
     @property
     def emplacement(self):

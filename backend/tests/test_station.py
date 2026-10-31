@@ -39,10 +39,11 @@ def test_retirer_puis_enregistrer_la_station(client):
     assert r.json()["metres"] == 8
     prods = {p["nom"]: p for p in client.get("/api/produits", headers=H).json()}
     assert set(prods) == {"Gazoline", "Diesel"}                       # mêmes noms qu'avant : possible
-    assert prods["Gazoline"]["adresse"] == "Route Nationale 1, Vertières"
     assert prods["Gazoline"]["prix_vente_actif"] == 925.5
+    assert all(q["station"] == "Route Nationale 1, Vertières" for q in prods["Gazoline"]["pompes"])
     dist = client.get("/api/distributeurs", headers=H).json()["distributeurs"]
     assert [d["nom"] for d in dist] == ["Pompe 1", "Pompe 2"]
+    assert {d["adresse"] for d in dist} == {"Route Nationale 1, Vertières"}      # l'adresse est sur les pompes
     assert [[m["nom"] for m in f["metres"]] for f in dist[0]["faces"]] == [
         ["Gazoline 1", "Gazoline 2", "Diesel 1"], ["Gazoline 3", "Gazoline 4", "Diesel 2"]]
     # Le mètre de départ sert de « mètre précédent »
@@ -69,3 +70,24 @@ def test_formulaire_controle(client):
     assert client.post("/api/stations", headers=H, json=st).status_code == 409      # mètre en double
     st["adresse"] = ""
     assert client.post("/api/stations", headers=H, json=st).status_code == 400      # adresse obligatoire
+
+
+
+def test_deuxieme_station_reprend_les_produits(client):
+    """Les produits sont communs : une 2e station reprend Gazoline / Diesel
+    (même prix ou nouveau prix), ses pompes portent sa propre adresse, et un
+    nom de mètre déjà pris est refusé avec un message clair."""
+    avant = {p["nom"]: p["id"] for p in client.get("/api/produits", headers=H).json()}
+    st = {"adresse": "Champin, Cap-Haïtien",
+          "produits": [{"cle": "g", "nom": "gazoline", "prix": 925.5}],
+          "pompes": [{"nom": "Pompe 1", "faces": [{"nom": "A", "metres": [{"produit": "g", "nom": "Gazoline 1"}]}]}]}
+    r = client.post("/api/stations", headers=H, json=st)
+    if "Gazoline" in avant:
+        assert r.status_code == 409 and "existe déjà" in r.json()["detail"]
+    st["pompes"][0]["faces"][0]["metres"][0]["nom"] = "Gazoline C1"
+    r = client.post("/api/stations", headers=H, json=st)
+    assert r.status_code == 201, r.text
+    apres = {p["nom"]: p for p in client.get("/api/produits", headers=H).json()}
+    assert [n for n in apres if n.casefold() == "gazoline"] == (["Gazoline"] if "Gazoline" in avant else ["gazoline"])
+    stations = {s["adresse"] for s in client.get("/api/pompiste-supervision/stations", headers=H).json()}
+    assert "Champin, Cap-Haïtien" in stations
