@@ -248,7 +248,10 @@ def verify_reset_token(raw_token: str, db: Session) -> Utilisateur:
         raise ValueError("Lien invalide ou déjà utilisé.")
     if record.used:
         raise ValueError("Ce lien a déjà été utilisé.")
-    if datetime.now(timezone.utc) > record.expires_at:
+    expire = record.expires_at
+    if expire.tzinfo is None:                       # SQLite rend des dates sans fuseau (UTC)
+        expire = expire.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > expire:
         raise ValueError("Ce lien a expiré. Faites une nouvelle demande.")
     return record.user
 

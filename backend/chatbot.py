@@ -89,6 +89,14 @@ def _executer_requete(db: Session, sql: str) -> dict:
     except ValueError as e:
         return {"erreur": str(e)}
     try:
+        # Station séparée : le SQL brut ne suit pas la traduction de schéma de
+        # l'ORM — on le borne au schéma de la station (jamais l'espace principal).
+        from database import espace_courant, _is_postgres
+        sch = espace_courant()
+        if sch:
+            if not _is_postgres:
+                return {"erreur": "Les rapports IA ne sont pas disponibles dans une station séparée sur cette installation."}
+            db.execute(sql_text(f'SET LOCAL search_path TO "{sch}"'))
         resultat = db.execute(sql_text(propre))
     except Exception as e:
         # Une requête en échec laisse la transaction Postgres avortée : sans rollback,

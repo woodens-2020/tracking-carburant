@@ -3447,6 +3447,9 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .cs-pin{border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:8px;font-size:13.5px}
 .cs-pin-ligne{display:flex;gap:8px} .cs-pin-ligne input{flex:1;font-size:18px;letter-spacing:.2em;text-align:center}
 .cs-note{font-size:12px;color:var(--muted)}
+.cs-retirer{font-size:13px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px}
+.cs-retirer summary{cursor:pointer;font-weight:600}
+.cs-retirer .cs-pin-ligne{margin-top:8px}
 .cs-lien{background:none;border:0;color:var(--orange);font:inherit;font-weight:600;cursor:pointer;text-align:left;padding:0}
 .sp-form{display:flex;flex-direction:column;gap:8px}
 .sp-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
@@ -18169,6 +18172,11 @@ function ouvrirChoixStation(premiere){
       }).join('')}</div>
       <div id="cs-pin" class="cs-pin" style="display:none"></div>
       ${_STATIONS.peut_creer ? `<button class="cs-lien" onclick="fermerChoixStation();goTo('saisie');setTimeout(()=>{openGestion();gestOnglet('station')},300)">+ Enregistrer une nouvelle station</button>` : ''}
+      ${_STATIONS.espaces.length ? `<details class="cs-retirer"><summary>Retirer une station séparée</summary>
+        <div class="cs-note">Elle n'est plus proposée et personne ne peut plus y entrer ; ses données sont gardées.</div>
+        <div class="cs-pin-ligne"><select id="cs-ret-id" class="filter-input">${_STATIONS.espaces.map(e => `<option value="${e.id}">${esc(e.nom)}</option>`).join('')}</select>
+          <input id="cs-ret-conf" class="filter-input" placeholder="Tapez RETIRER" style="max-width:150px;letter-spacing:0;text-align:left;font-size:14px">
+          <button class="btn btn-danger" onclick="retirerStation()">Retirer</button></div><div id="cs-ret-err"></div></details>` : ''}
     </div>`;
   ov.classList.add('show');
 }
@@ -18187,6 +18195,14 @@ function choisirStation(id, ici){
       <button class="btn btn-primary" onclick="entrerStation(${id})">Entrer</button></div>
     <div class="cs-note">Vous serez déconnecté de la station actuelle.</div><div id="cs-err"></div>`;
   document.getElementById('cs-pin-in').focus();
+}
+async function retirerStation(){
+  const id=parseInt(document.getElementById('cs-ret-id').value,10), conf=document.getElementById('cs-ret-conf').value.trim();
+  const err=m=>document.getElementById('cs-ret-err').innerHTML=`<div class="psp-err">${esc(m)}</div>`;
+  if(conf.toUpperCase()!=='RETIRER') return err('Tapez RETIRER pour confirmer.');
+  try{ const r=await POST(`/espaces/${id}/retirer`, {confirmation:conf}); notify(`Station retirée : ${r.nom}.`, 'ok'); await initStations();
+       if(_STATIONS && _STATIONS.peut_changer) ouvrirChoixStation(); else fermerChoixStation(); }
+  catch(e){ err(e.message); }
 }
 async function entrerStation(id){
   const pin = (document.getElementById('cs-pin-in').value || '').trim();

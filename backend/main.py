@@ -283,7 +283,7 @@ class EspaceMiddleware:
     lecture en base : cookie konekta_espace, validé contre le registre. À la
     connexion (/api/login, /api/login/pompiste), l'espace est celui du compte
     (email ou identifiant) et le cookie est posé en conséquence."""
-    _CONNEXIONS = {"/api/login", "/api/login/pompiste"}
+    _CONNEXIONS = {"/api/login", "/api/login/pompiste", "/api/auth/forgot-password", "/api/auth/reset-password"}
 
     def __init__(self, app):
         self.app = app
@@ -303,7 +303,16 @@ class EspaceMiddleware:
             if nom == ESPACE_COOKIE and val:
                 schema = val.strip()
         if schema and schema not in await run_in_threadpool(schemas_actifs):
-            schema, poser = None, True          # station supprimée : retour à l'espace principal
+            from espaces_routes import invalider_cache
+            invalider_cache()                    # station créée à l'instant (autre processus) ?
+            if schema not in await run_in_threadpool(schemas_actifs):
+                schema, poser = None, True      # station supprimée : retour à l'espace principal
+        if scope.get("method") == "GET" and scope.get("path") == "/api/auth/reset-password/verify":
+            from urllib.parse import parse_qs
+            from espaces_routes import espace_du_jeton_reset
+            jeton = (parse_qs((scope.get("query_string") or b"").decode("latin-1")).get("token") or [None])[0]
+            schema = await run_in_threadpool(espace_du_jeton_reset, jeton)
+            poser = True
         if scope.get("method") == "POST" and scope.get("path") in self._CONNEXIONS:
             corps, plus = b"", True
             while plus:
@@ -314,8 +323,15 @@ class EspaceMiddleware:
                 d = json.loads(corps or b"{}")
             except Exception:
                 d = {}
-            schema = await run_in_threadpool(espace_du_compte, d.get("email") if isinstance(d, dict) else None,
-                                             d.get("username") if isinstance(d, dict) else None)
+            d = d if isinstance(d, dict) else {}
+            if scope.get("path") == "/api/auth/reset-password":
+                from espaces_routes import espace_du_jeton_reset
+                schema = await run_in_threadpool(espace_du_jeton_reset, d.get("token"))
+            else:
+                ident = d.get("identifier")          # mot de passe oublié : email ou identifiant
+                email = d.get("email") or (ident if ident and "@" in ident else None)
+                username = d.get("username") or (ident if ident and "@" not in ident else None)
+                schema = await run_in_threadpool(espace_du_compte, email, username)
             poser = True
             envoye = {"fait": False}
 
@@ -1378,6 +1394,9 @@ def creer_utilisateur(
         raise HTTPException(409, f"L'identifiant '{username}' est déjà utilisé")
     if db.query(Utilisateur).filter_by(email=email_clean).first():
         raise HTTPException(409, "Cet email est déjà associé à un compte")
+    from espaces_routes import compte_ailleurs
+    if compte_ailleurs(email=email_clean) or compte_ailleurs(username=username):
+        raise HTTPException(409, "Cet email ou cet identifiant est déjà utilisé dans une autre station.")
 
     u = Utilisateur(
         username=username,

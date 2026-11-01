@@ -1351,7 +1351,9 @@ def _identifiant_unique(db: Session, prenom: str, nom: str) -> str:
     for _ in range(50):
         code = f"{base}{secrets.randbelow(10000):04d}"
         if not db.query(Utilisateur).filter(Utilisateur.username.ilike(code)).first():
-            return code
+            from espaces_routes import compte_ailleurs
+            if not compte_ailleurs(username=code):       # unique dans toutes les stations
+                return code
     raise HTTPException(500, "Impossible de générer un code unique, réessayez.")
 
 

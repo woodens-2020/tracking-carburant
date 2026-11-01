@@ -76,3 +76,52 @@ def test_station_separee(client):
     assert pp.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]}).status_code == 200
     noms = {q["nom"] for x in pp.get("/api/pompiste/contexte").json()["produits"] for q in x["pompes"]}
     assert noms == {"Gazoline 1", "Gazoline 2", "Diesel 1"}
+
+
+def test_comptes_uniques_et_mot_de_passe_oublie(client, monkeypatch):
+    """Un email déjà pris dans une station est refusé dans une autre ; le
+    lien « mot de passe oublié » du gérant est retrouvé dans sa station."""
+    import password_reset
+    p = _client()
+    assert p.post("/api/login", json=PROPRIO).status_code == 200
+    r = p.post("/api/espaces", json={"nom": "Station Limonade", "adresse": "Limonade",
+               "gerant": {"nom_complet": "Gérant Limonade", "email": "gerant.limonade@exemple.ht",
+                          "password": "MotDePasse2026", "pin": "555666777"}})
+    assert r.status_code == 201, r.text
+    # Dans la station principale, l'email du gérant de Limonade est refusé
+    roles = p.get("/api/admin/roles").json()
+    roles = roles if isinstance(roles, list) else roles.get("roles", [])
+    assert roles, "liste des rôles vide"
+    if True:
+        r = p.post("/api/admin/users", json={"username": "doublon", "email": "gerant.limonade@exemple.ht",
+                   "nom_complet": "Doublon", "password": "MotDePasse2026", "code_acces": "111222333",
+                   "role_id": roles[0]["id"]})
+        assert r.status_code == 409, r.text
+    # Mot de passe oublié : le jeton est créé dans la station de Limonade
+    captures = []
+    monkeypatch.setattr(password_reset, "_send_reset_email", lambda user, jeton, base: captures.append(jeton))
+    anonyme = _client()
+    assert anonyme.post("/api/auth/forgot-password", json={"identifier": "gerant.limonade@exemple.ht"}).status_code == 200
+    assert len(captures) == 1
+    assert _client().get(f"/api/auth/reset-password/verify?token={captures[0]}").status_code == 200
+    r = _client().post("/api/auth/reset-password", json={"token": captures[0], "new_password": "NouveauMdp2026!"})
+    assert r.status_code == 200, r.text
+    g = _client()
+    assert g.post("/api/login", json={"email": "gerant.limonade@exemple.ht", "password": "NouveauMdp2026!",
+                                      "code_acces": "555666777"}).status_code == 200
+
+
+def test_retirer_station_separee(client):
+    p = _client()
+    assert p.post("/api/login", json=PROPRIO).status_code == 200
+    eid = p.post("/api/espaces", json={"nom": "Station à retirer", "adresse": "Nulle part",
+                 "gerant": {"nom_complet": "G R", "email": "gerant.retirer@exemple.ht",
+                            "password": "MotDePasse2026", "pin": "444555666"}}).json()["id"]
+    assert p.post(f"/api/espaces/{eid}/retirer", json={"confirmation": "non"}).status_code == 400
+    assert p.post(f"/api/espaces/{eid}/retirer", json={"confirmation": "RETIRER"}).status_code == 200
+    assert all(x["id"] != eid for x in p.get("/api/espaces").json()["espaces"])
+    assert p.post("/api/espaces/entrer", json={"cible_id": eid, "pin": "123456789"}).status_code == 404
+    # Son gérant ne peut plus entrer
+    g = _client()
+    assert g.post("/api/login", json={"email": "gerant.retirer@exemple.ht", "password": "MotDePasse2026",
+                                      "code_acces": "444555666"}).status_code == 401

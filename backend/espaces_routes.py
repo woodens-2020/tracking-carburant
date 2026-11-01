@@ -85,6 +85,45 @@ def espace_du_compte(email: Optional[str] = None, username: Optional[str] = None
     return None
 
 
+def espace_du_jeton_reset(jeton: Optional[str]) -> Optional[str]:
+    """Station où a été demandé un lien « mot de passe oublié »."""
+    import hashlib
+    from models import PasswordResetToken
+    if not jeton:
+        return None
+    h = hashlib.sha256(jeton.encode("utf-8")).hexdigest()
+    for sch in [None, *schemas_actifs().keys()]:
+        try:
+            with session_espace(sch) as db:
+                if db.query(PasswordResetToken.id).filter_by(token_hash=h).first():
+                    return sch
+        except Exception:
+            continue
+    return None
+
+
+def compte_ailleurs(email: Optional[str] = None, username: Optional[str] = None) -> bool:
+    """Un compte avec cet email / cet identifiant existe-t-il dans une AUTRE
+    station (principale ou séparée) ? La connexion cherche le compte dans
+    toutes les stations : un doublon enverrait la personne au mauvais endroit."""
+    if not (email or username):
+        return False
+    courant = espace_courant()
+    for sch in [None, *schemas_actifs().keys()]:
+        if sch == courant:
+            continue
+        try:
+            with session_espace(sch) as db:
+                q = db.query(Utilisateur.id)
+                if email and q.filter(Utilisateur.email == email.strip().lower()).first():
+                    return True
+                if username and q.filter(Utilisateur.username.ilike(username.strip())).first():
+                    return True
+        except Exception:
+            continue
+    return False
+
+
 def _est_admin(u: Optional[Utilisateur]) -> bool:
     if not u or not u.actif:
         return False
@@ -292,3 +331,29 @@ def _desactiver(eid: int) -> None:
             e.actif = False
             pdb.commit()
     invalider_cache()
+
+
+class RetirerEspaceIn(BaseModel):
+    confirmation: str
+
+
+@router.post("/api/espaces/{eid}/retirer")
+def retirer(eid: int, data: RetirerEspaceIn, request: Request, response: Response, db: Session = Depends(get_db)):
+    """Retire une station séparée de la liste (ses données sont gardées dans
+    son schéma ; elle n'est plus proposée et personne ne peut plus y entrer)."""
+    import main
+    if not proprietaire(request, db):
+        raise HTTPException(403, "Seul le propriétaire peut retirer une station.")
+    if (data.confirmation or "").strip().upper() != "RETIRER":
+        raise HTTPException(400, "Tapez RETIRER pour confirmer.")
+    with session_principale() as pdb:
+        e = pdb.get(Espace, eid)
+        if not e or not e.actif:
+            raise HTTPException(404, "Station introuvable.")
+        schema, nom = e.schema, e.nom
+        e.actif = False
+        pdb.commit()
+    invalider_cache()
+    if espace_courant() == schema:                # on était dedans : retour à la station principale
+        _cookie_espace(response, None, main._SECURE_COOKIES)
+    return {"ok": True, "nom": nom}
