@@ -1,6 +1,7 @@
 import collections
 import hmac
 import logging
+import json
 import os
 import time as _time
 from datetime import date as date_type
@@ -276,8 +277,75 @@ def _resoudre_utilisateur(token, api_key_hdr):
 
 app.add_middleware(AuthMiddleware)
 
+
+class EspaceMiddleware:
+    """Choisit l'espace (station séparée) de chaque requête, avant toute
+    lecture en base : cookie konekta_espace, validé contre le registre. À la
+    connexion (/api/login, /api/login/pompiste), l'espace est celui du compte
+    (email ou identifiant) et le cookie est posé en conséquence."""
+    _CONNEXIONS = {"/api/login", "/api/login/pompiste"}
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        from database import definir_espace, retablir_espace
+        from espaces_routes import ESPACE_COOKIE, espace_du_compte, schemas_actifs
+        schema, poser = None, False
+        cookie = ""
+        for k, v in scope.get("headers") or []:
+            if k == b"cookie":
+                cookie = v.decode("latin-1")
+        for morceau in cookie.split(";"):
+            nom, _, val = morceau.strip().partition("=")
+            if nom == ESPACE_COOKIE and val:
+                schema = val.strip()
+        if schema and schema not in await run_in_threadpool(schemas_actifs):
+            schema, poser = None, True          # station supprimée : retour à l'espace principal
+        if scope.get("method") == "POST" and scope.get("path") in self._CONNEXIONS:
+            corps, plus = b"", True
+            while plus:
+                m = await receive()
+                corps += m.get("body", b"")
+                plus = m.get("more_body", False)
+            try:
+                d = json.loads(corps or b"{}")
+            except Exception:
+                d = {}
+            schema = await run_in_threadpool(espace_du_compte, d.get("email") if isinstance(d, dict) else None,
+                                             d.get("username") if isinstance(d, dict) else None)
+            poser = True
+            envoye = {"fait": False}
+
+            async def receive():                # le corps relu est rendu à l'application
+                if envoye["fait"]:
+                    return {"type": "http.disconnect"}
+                envoye["fait"] = True
+                return {"type": "http.request", "body": corps, "more_body": False}
+
+        async def send_espace(message):
+            if poser and message["type"] == "http.response.start":
+                attrs = "; Path=/; HttpOnly; SameSite=Lax" + ("; Secure" if _SECURE_COOKIES else "")
+                valeur = (f"{ESPACE_COOKIE}={schema}; Max-Age={30 * 24 * 3600}" if schema
+                          else f"{ESPACE_COOKIE}=; Max-Age=0")
+                message.setdefault("headers", []).append((b"set-cookie", (valeur + attrs).encode("latin-1")))
+            await send(message)
+
+        jeton = definir_espace(schema)
+        try:
+            await self.app(scope, receive, send_espace)
+        finally:
+            retablir_espace(jeton)
+
+
+app.add_middleware(EspaceMiddleware)
+
 # Module POS bar/restaurant
 app.include_router(pos_router)
+from espaces_routes import router as espaces_router
+app.include_router(espaces_router)
 app.include_router(bar_caisses_router)
 app.include_router(pos_analyse_router)
 app.include_router(caisse_router)
@@ -510,6 +578,8 @@ def startup():
         from pompiste_routes import rattacher_employes_pompistes
         with SessionLocal() as _db:
             rattacher_employes_pompistes(_db)
+            from database import migrer_espaces
+            print(f"Stations séparées mises à jour : {migrer_espaces()}")
             try:
                 for _d in _db.query(Distributeur).filter(Distributeur.adresse.is_(None)).all():
                     _adr = next((q.produit.adresse for f in _d.faces for q in f.metres if q.produit.adresse), None)
@@ -1989,12 +2059,12 @@ def _adresse(v: Optional[str]) -> Optional[str]:
     return a or None
 
 
-def _tracer(db: Session, request: Request, action: str, details: dict) -> None:
+def _tracer(db: Session, request: Request, action: str, details: dict, user_id: Optional[int] = None) -> None:
     """Garde la trace d'une modification (qui, quand, avant → après)."""
     import json as _json
     from models import AuditLog
     u = getattr(request.state, "user", None)
-    db.add(AuditLog(user_id=getattr(u, "id", None), action=action[:50],
+    db.add(AuditLog(user_id=user_id if user_id is not None else getattr(u, "id", None), action=action[:50],
                     ip_address=(request.client.host if request.client else None),
                     details=_json.dumps(details, ensure_ascii=False)))
 
@@ -2139,6 +2209,14 @@ def enregistrer_station(data: StationIn, request: Request, db: Session = Depends
     """Crée en une fois : produits de la station (avec adresse et prix),
     pompes physiques, faces, mètres placés avec leur mètre de départ."""
     _gerer_station(request, db)
+    out = _creer_station(db, data, request)
+    db.commit()
+    return out
+
+
+def _creer_station(db: Session, data: StationIn, request: Request, user_id: Optional[int] = None) -> dict:
+    """Corps de l'enregistrement (sans commit) : sert aussi à remplir une
+    station séparée, dans son propre espace."""
     adresse = _adresse(data.adresse)
     if not adresse:
         raise HTTPException(400, "Indiquez l'adresse (le lieu) de la station.")
@@ -2205,8 +2283,8 @@ def enregistrer_station(data: StationIn, request: Request, db: Session = Depends
                              metre_depart=round(m.metre_depart, 4) if m.metre_depart is not None else None))
                 n_metres += 1
     _tracer(db, request, "station_enregistree", {"adresse": adresse, "produits": [p.nom for p in produits.values()],
-                                                 "pompes": len(data.pompes), "metres": n_metres})
-    db.commit()
+                                                 "pompes": len(data.pompes), "metres": n_metres}, user_id=user_id)
+    db.flush()
     return {"adresse": adresse, "produits": [{"id": p.id, "nom": p.nom} for p in produits.values()],
             "pompes": len(data.pompes), "metres": n_metres}
 

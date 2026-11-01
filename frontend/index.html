@@ -3420,6 +3420,36 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .gest-tbl .gest-sel{margin:0;min-width:180px}
 .gest-chip{display:inline-block;font-size:12.5px;border:1px solid var(--border);border-radius:14px;padding:3px 10px;margin:0 6px 6px 0}
 .gest-chip small{color:var(--muted)}
+.sb-station{cursor:pointer;gap:10px;padding:8px 16px;border-top:1px solid var(--border)}
+.sb-station-ico{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:rgba(249,115,22,.14);flex-shrink:0}
+.sb-station-txt{display:flex;flex-direction:column;min-width:0}
+.sb-station-txt b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-station-txt small{font-size:11.5px;color:var(--orange)}
+.cs-overlay{position:fixed;inset:0;z-index:9000;background:rgba(5,10,20,.72);display:none;align-items:center;justify-content:center;
+  padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px))}
+.cs-overlay.show{display:flex}
+.cs-boite{background:var(--panel);border:1px solid var(--border);border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow:auto;padding:20px;
+  display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.cs-tete{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.cs-tete h2{margin:2px 0 0;font-size:20px}
+.cs-sur{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--orange)}
+.cs-fermer{background:none;border:0;color:var(--muted);font-size:20px;cursor:pointer}
+.cs-liste,.sp-choix{display:flex;flex-direction:column;gap:10px}
+.cs-carte{display:flex;align-items:center;gap:12px;text-align:left;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);
+  border-radius:12px;padding:12px 14px;cursor:pointer}
+.cs-carte:hover{border-color:var(--orange)}
+.cs-carte.ici{border-color:var(--green);background:rgba(34,197,94,.06)}
+.cs-ico{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:rgba(249,115,22,.14);font-size:19px;flex-shrink:0}
+.cs-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.cs-txt b{font-size:15px} .cs-txt small{font-size:12.5px;color:var(--muted);line-height:1.4}
+.cs-etat{font-size:12.5px;font-weight:700;color:var(--orange);white-space:nowrap}
+.cs-carte.ici .cs-etat{color:var(--green)}
+.cs-pin{border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:8px;font-size:13.5px}
+.cs-pin-ligne{display:flex;gap:8px} .cs-pin-ligne input{flex:1;font-size:18px;letter-spacing:.2em;text-align:center}
+.cs-note{font-size:12px;color:var(--muted)}
+.cs-lien{background:none;border:0;color:var(--orange);font:inherit;font-weight:600;cursor:pointer;text-align:left;padding:0}
+.sp-form{display:flex;flex-direction:column;gap:8px}
+.sp-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
 .st-bloc{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px}
 .st-titre{font-weight:700;font-size:14px}
 .st-champ{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
@@ -4086,6 +4116,12 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
   <div class="sb-footer">
     <div class="dot dot-ok" id="status-dot"></div>
     <span class="sb-footer-status" id="status-txt">Connexion…</span>
+  </div>
+
+  <!-- Station courante (propriétaire de plusieurs stations) -->
+  <div class="sb-footer sb-station" id="station-footer" style="display:none" onclick="ouvrirChoixStation()" title="Changer de station">
+    <span class="sb-station-ico">⛽</span>
+    <span class="sb-station-txt"><b id="station-nom">Station</b><small id="station-action">Changer de station</small></span>
   </div>
 
   <!-- Utilisateur / Déconnexion -->
@@ -18048,13 +18084,37 @@ async function _stEnregistrer(){
   if(!nb) return msg('Ajoutez au moins un mètre sur une face.');
   const sansDepart=[];
   for(const pp of st.pompes) for(const f of pp.faces) for(const m of f.metres) if(String(m.depart).trim()==='') sansDepart.push(m.nom);
-  if(!await showConfirm(`Enregistrer la station « ${st.adresse.trim()} » : ${st.produits.length} produit(s), ${st.pompes.length} pompe(s), ${nb} mètre(s).`
+  if(!(_STATIONS && _STATIONS.peut_creer) && !await showConfirm(`Enregistrer la station « ${st.adresse.trim()} » : ${st.produits.length} produit(s), ${st.pompes.length} pompe(s), ${nb} mètre(s).`
       + (sansDepart.length ? ` Sans mètre de départ : ${sansDepart.join(', ')} (leur premier relevé servira de départ).` : ''),
       {title:'Enregistrer la station ?', type:'warn', okLabel:'Oui, enregistrer'})) return;
   const corps={adresse:st.adresse.trim(),
     produits:st.produits.map(p=>({cle:p.cle, nom:p.nom.trim(), prix:num(p.prix)})),
     pompes:st.pompes.map(pp=>({nom:pp.nom.trim(), faces:pp.faces.map(f=>({nom:f.nom.trim(),
       metres:f.metres.map(m=>({produit:m.produit, nom:m.nom.trim(), metre_depart:num(m.depart)}))}))}))};
+  if(_STATIONS && _STATIONS.peut_creer){
+    const choix=await _demanderSeparation(corps);
+    if(!choix) return;
+    if(choix.separer){
+      const {adresse, ...station}=corps;
+      // Station séparée = espace vierge : les mètres nommés « Produit N » repartent de 1
+      const nomsProd=Object.fromEntries(station.produits.map(p=>[p.cle, p.nom]));
+      const compteur={};
+      for(const pp of station.pompes) for(const f of pp.faces) for(const m of f.metres){
+        const prod=nomsProd[m.produit]||'';
+        const reste=(m.nom||'').slice(prod.length+1);
+        if(prod && m.nom.toLowerCase().startsWith(prod.toLowerCase()+' ') && reste!=='' && [...reste].every(ch=>ch>='0'&&ch<='9')){
+          compteur[m.produit]=(compteur[m.produit]||0)+1; m.nom=`${prod} ${compteur[m.produit]}`;
+        }
+      }
+      try{
+        const r=await POST('/espaces', {nom:choix.nom, adresse, gerant:choix.gerant, station});
+        choix.overlay.classList.remove('show');
+        toast(`Station séparée créée : ${r.nom}. Le gérant se connecte avec ${r.gerant}.`,'ok');
+        _ST=null; await initStations(); closeGestion(); ouvrirChoixStation();
+      }catch(e){ choix.overlay.classList.add('show'); choix.afficherErreur(e.message); }
+      return;
+    }
+  }
   try{
     const r=await POST('/stations', corps);
     toast(`Station enregistrée : ${r.pompes} pompe(s), ${r.metres} mètre(s).`,'ok');
@@ -18070,6 +18130,115 @@ async function _stRetirerTout(){
     toast(`Retiré : ${r.produits_archives} produit(s), ${r.metres_archives} mètre(s), ${r.pompes_retirees} pompe(s). Historique gardé.`,'ok');
     products=await GET('/produits'); renderProdTabs(); renderSaisie(); _stRendre();
   }catch(e){ toast(e.message,'err'); }
+}
+
+
+// ══════════════════════════════════════════════
+// STATIONS SÉPARÉES (voir backend/espaces_routes.py)
+// Le propriétaire choisit sa station après la connexion et passe de l'une à
+// l'autre avec son PIN (il est déconnecté de la station quittée).
+// ══════════════════════════════════════════════
+let _STATIONS = null;
+async function initStations(){
+  try{ _STATIONS = await GET('/espaces'); }catch(e){ _STATIONS = null; return; }
+  const f = document.getElementById('station-footer');
+  if(!f) return;
+  const plusieurs = _STATIONS.peut_changer;
+  f.style.display = (plusieurs || _STATIONS.courant) ? '' : 'none';
+  document.getElementById('station-nom').textContent = _STATIONS.courant_nom || 'Station principale';
+  document.getElementById('station-action').textContent = plusieurs ? 'Changer de station' : 'Votre station';
+  f.style.cursor = plusieurs ? 'pointer' : 'default';
+  // Juste après la connexion : choisir sa station
+  let deja = null; try{ deja = sessionStorage.getItem('konekta-station-choisie'); }catch(e){}
+  if(plusieurs && !deja) ouvrirChoixStation(true);
+}
+function ouvrirChoixStation(premiere){
+  if(!_STATIONS || !_STATIONS.peut_changer) return;
+  let ov = document.getElementById('choix-station');
+  if(!ov){ ov = document.createElement('div'); ov.id = 'choix-station'; ov.className = 'cs-overlay'; document.body.appendChild(ov); }
+  const toutes = [{id:0, nom:'Station principale', adresse:'', schema:null}, ..._STATIONS.espaces];
+  ov.innerHTML = `<div class="cs-boite" role="dialog" aria-modal="true" aria-labelledby="cs-titre">
+      <div class="cs-tete"><div><div class="cs-sur">${premiere ? 'Bienvenue' : 'Changer de station'}</div>
+        <h2 id="cs-titre">Où voulez-vous aller ?</h2></div>
+        ${premiere ? '' : '<button class="cs-fermer" onclick="fermerChoixStation()" aria-label="Fermer">✕</button>'}</div>
+      <div class="cs-liste">${toutes.map(st => {
+        const ici = (st.schema || null) === (_STATIONS.courant || null);
+        return `<button class="cs-carte ${ici ? 'ici' : ''}" onclick="choisirStation(${st.id}, ${ici})">
+          <span class="cs-ico">⛽</span><span class="cs-txt"><b>${esc(st.nom)}</b>${st.adresse ? `<small>📍 ${esc(st.adresse)}</small>` : ''}</span>
+          <span class="cs-etat">${ici ? 'Vous êtes ici' : 'Entrer →'}</span></button>`;
+      }).join('')}</div>
+      <div id="cs-pin" class="cs-pin" style="display:none"></div>
+      ${_STATIONS.peut_creer ? `<button class="cs-lien" onclick="fermerChoixStation();goTo('saisie');setTimeout(()=>{openGestion();gestOnglet('station')},300)">+ Enregistrer une nouvelle station</button>` : ''}
+    </div>`;
+  ov.classList.add('show');
+}
+function fermerChoixStation(){
+  document.getElementById('choix-station')?.classList.remove('show');
+  try{ sessionStorage.setItem('konekta-station-choisie', '1'); }catch(e){}
+}
+function choisirStation(id, ici){
+  if(ici) return fermerChoixStation();
+  const st = [{id:0, nom:'Station principale'}, ..._STATIONS.espaces].find(x => x.id === id);
+  const z = document.getElementById('cs-pin');
+  z.style.display = '';
+  z.innerHTML = `<label for="cs-pin-in">Votre PIN pour entrer dans <b>${esc(st.nom)}</b></label>
+    <div class="cs-pin-ligne"><input id="cs-pin-in" type="password" inputmode="numeric" maxlength="9" autocomplete="off" placeholder="9 chiffres"
+      onkeydown="if(event.key==='Enter')entrerStation(${id})">
+      <button class="btn btn-primary" onclick="entrerStation(${id})">Entrer</button></div>
+    <div class="cs-note">Vous serez déconnecté de la station actuelle.</div><div id="cs-err"></div>`;
+  document.getElementById('cs-pin-in').focus();
+}
+async function entrerStation(id){
+  const pin = (document.getElementById('cs-pin-in').value || '').trim();
+  const err = m => document.getElementById('cs-err').innerHTML = `<div class="psp-err">${esc(m)}</div>`;
+  if(!/^[0-9]{9}$/.test(pin)) return err('Le PIN contient 9 chiffres.');
+  try{
+    await POST('/espaces/entrer', {cible_id: id, pin});
+    try{ sessionStorage.setItem('konekta-station-choisie', '1'); sessionStorage.removeItem('konekta_current_page'); }catch(e){}
+    location.href = '/';
+  }catch(e){ err(e.message); document.getElementById('cs-pin-in').select(); }
+}
+
+// Enregistrement d'une station : séparée (espace à part) ou fusionnée
+function _demanderSeparation(corps){
+  return new Promise(resolve => {
+    let ov = document.getElementById('separer-station');
+    if(!ov){ ov = document.createElement('div'); ov.id = 'separer-station'; ov.className = 'cs-overlay'; document.body.appendChild(ov); }
+    ov.innerHTML = `<div class="cs-boite" role="dialog" aria-modal="true" aria-labelledby="sp-titre">
+      <div class="cs-tete"><div><div class="cs-sur">${esc(corps.adresse)}</div><h2 id="sp-titre">Séparer cette station de la station actuelle ?</h2></div>
+        <button class="cs-fermer" id="sp-annuler" aria-label="Annuler">✕</button></div>
+      <div class="sp-choix">
+        <button class="cs-carte" id="sp-non"><span class="cs-ico">🔗</span><span class="cs-txt"><b>Non, fusionner</b>
+          <small>Même espace que la station actuelle (mêmes données, même caisse) ; elle reste identifiée par son adresse.</small></span></button>
+        <button class="cs-carte" id="sp-oui"><span class="cs-ico">🏢</span><span class="cs-txt"><b>Oui, séparer</b>
+          <small>Un espace Konekta à part, vierge, avec toutes les fonctions. Vous y passez avec votre PIN ; son gérant n'y voit que cette station.</small></span></button>
+      </div>
+      <div id="sp-form" class="sp-form" style="display:none">
+        <label>Nom de la station<input id="sp-nom" class="filter-input" maxlength="150" value="${esc(corps.adresse)}"></label>
+        <label>Nom du gérant<input id="sp-gnom" class="filter-input" maxlength="150"></label>
+        <label>Email du gérant<input id="sp-email" class="filter-input" type="email" maxlength="254" autocomplete="off"></label>
+        <label>Mot de passe du gérant (8 caractères au moins)<input id="sp-pass" class="filter-input" type="password" autocomplete="new-password"></label>
+        <label>PIN du gérant (9 chiffres)<input id="sp-pin" class="filter-input" inputmode="numeric" maxlength="9" autocomplete="off"></label>
+        <div id="sp-err"></div>
+        <div class="gest-edit-act"><button class="btn btn-secondary" id="sp-retour">Retour</button><button class="btn btn-primary" id="sp-creer">Créer la station séparée</button></div>
+      </div></div>`;
+    ov.classList.add('show');
+    const fin = v => { ov.classList.remove('show'); resolve(v); };
+    ov.querySelector('#sp-annuler').onclick = () => fin(null);
+    ov.querySelector('#sp-non').onclick = () => fin({separer:false});
+    ov.querySelector('#sp-oui').onclick = () => { ov.querySelector('.sp-choix').style.display='none'; ov.querySelector('#sp-form').style.display=''; ov.querySelector('#sp-gnom').focus(); };
+    ov.querySelector('#sp-retour').onclick = () => { ov.querySelector('.sp-choix').style.display=''; ov.querySelector('#sp-form').style.display='none'; };
+    ov.querySelector('#sp-creer').onclick = () => {
+      const v = id => ov.querySelector(id).value.trim();
+      const e = m => ov.querySelector('#sp-err').innerHTML = `<div class="psp-err">${esc(m)}</div>`;
+      if(v('#sp-nom').length < 2) return e('Indiquez le nom de la station.');
+      if(v('#sp-gnom').length < 2) return e('Indiquez le nom du gérant.');
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v('#sp-email'))) return e('Email du gérant invalide.');
+      if(ov.querySelector('#sp-pass').value.length < 8) return e('Le mot de passe doit faire au moins 8 caractères.');
+      if(!/^[0-9]{9}$/.test(v('#sp-pin'))) return e('Le PIN doit contenir exactement 9 chiffres.');
+      fin({separer:true, nom:v('#sp-nom'), gerant:{nom_complet:v('#sp-gnom'), email:v('#sp-email'), password:ov.querySelector('#sp-pass').value, pin:v('#sp-pin')}, afficherErreur:e, overlay:ov});
+    };
+  });
 }
 
 function renderModalList(){
@@ -19194,6 +19363,7 @@ async function loadCurrentUser(){
   }
 }
 async function logout(){
+  try{ sessionStorage.removeItem('konekta-station-choisie'); }catch(e){}
   try{
     const res = await fetch('/api/logout',{method:'POST',credentials:'include'});
     if(res.status === 409){
@@ -19868,6 +20038,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   // Logo + utilisateur (await pour que _appUser soit défini avant loadHome)
   initLogo();
   await loadCurrentUser();
+  await initStations();
   pspMajBadge();
 
   // Charger les produits en premier

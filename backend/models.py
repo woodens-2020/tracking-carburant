@@ -35,6 +35,22 @@ class Produit(Base):
     )
 
 
+class Espace(Base):
+    """Station séparée : un espace Konekta à part (ses pompes, pompistes,
+    rapports, caisse…), relié au propriétaire. Ses données vivent dans leur
+    propre schéma de base (`schema`) ; ce registre est dans l'espace principal.
+    Les stations « fusionnées » restent dans le même espace, distinguées par
+    l'adresse de leurs pompes."""
+    __tablename__ = "espaces"
+
+    id          = Column(Integer, primary_key=True)
+    nom         = Column(String(150), nullable=False)
+    adresse     = Column(String(255), nullable=True)
+    schema      = Column(String(40), nullable=False, unique=True)
+    actif       = Column(Boolean, nullable=False, default=True)
+    created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class Distributeur(Base):
     """Pompe physique de la station (« Pompe 1 », « Pompe 2 »…). Elle a des
     faces (A, B…) ; chaque face porte des mètres (pistolets), chacun pour un
