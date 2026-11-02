@@ -180,32 +180,34 @@ select.gm-in option{background:#0d1a30}
 /* Espace « Coordonnées des stations » */
 .gm-panel.large{width:520px}
 #geo-modal.fiche.loc .leaflet-bottom.leaflet-right{right:538px}
-.gl-tete{border-radius:16px;padding:16px;background:linear-gradient(135deg,rgba(16,185,129,.28),rgba(59,130,246,.14));border:1px solid rgba(52,211,153,.3)}
-.gl-tete h3{margin:0;font-size:20px}
-.gl-tete p{margin:4px 0 0;color:#c7d6ee;font-size:13px;line-height:1.45}
-.gl-prog{margin-top:12px;height:8px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
-.gl-prog i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#10b981,#3b82f6);transition:width .8s var(--gm-ease)}
-.gl-prog-t{display:flex;justify-content:space-between;font-size:12px;color:#c7d6ee;margin-top:6px}
-.gl-aide{border:1px dashed var(--gm-line);border-radius:14px;padding:10px 12px;font-size:12.5px;color:var(--gm-muted);line-height:1.5}
-.gl-aide code{font-family:var(--mono);font-size:11.5px;color:#c7d6ee;background:rgba(255,255,255,.06);padding:1px 5px;border-radius:5px}
-.gl-carte{border:1px solid var(--gm-line);border-radius:16px;background:rgba(255,255,255,.03);overflow:hidden;transition:border-color .3s,box-shadow .3s}
-.gl-carte.cible{border-color:var(--gm-acc);box-shadow:0 0 0 3px rgba(59,130,246,.25)}
-.gl-carte.fait{border-color:rgba(34,197,94,.45)}
-.gl-carte summary{list-style:none;display:flex;align-items:center;gap:11px;padding:12px 14px;cursor:pointer}
-.gl-carte summary::-webkit-details-marker{display:none}
-.gl-carte summary .fl{margin-left:auto;color:var(--gm-muted);transition:transform .3s}
-.gl-carte[open] summary .fl{transform:rotate(180deg)}
-.gl-carte summary b{display:block;font-size:14.5px}.gl-carte summary small{display:block;font-size:12px;color:var(--gm-muted);margin-top:1px}
-.gl-num{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;flex:none;background:rgba(255,255,255,.08)}
-.gl-carte.fait .gl-num{background:#16a34a;color:#fff}
-.gl-corps{padding:0 14px 14px;display:flex;flex-direction:column;gap:10px;animation:gm-monte .35s var(--gm-ease) both}
-.gl-coord{font-family:var(--mono);font-size:15px!important;letter-spacing:.02em}
-.gl-lu{font-size:12.5px;min-height:18px}
-.gl-lu.ok{color:#4ade80}.gl-lu.ko{color:#f87171}
-.gl-outils{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.gl-champs{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.gl-champs label,.gl-corps > label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--gm-muted)}
-.gl-cible-bandeau{position:absolute;left:50%;top:104px;transform:translateX(-50%);z-index:1100;padding:10px 16px;font-size:13.5px;
+.gx-tete{border-radius:16px;padding:16px;background:linear-gradient(135deg,rgba(16,185,129,.28),rgba(59,130,246,.14));border:1px solid rgba(52,211,153,.3)}
+.gx-tete h3{margin:0;font-size:20px}
+.gx-tete p{margin:4px 0 0;color:#c7d6ee;font-size:13px;line-height:1.45}
+.gx-prog{margin-top:12px;height:8px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
+.gx-prog i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#10b981,#3b82f6);transition:width .8s var(--gm-ease)}
+.gx-prog-t{display:flex;justify-content:space-between;font-size:12px;color:#c7d6ee;margin-top:6px}
+.gx-aide{border:1px dashed var(--gm-line);border-radius:14px;padding:10px 12px;font-size:12.5px;color:var(--gm-muted);line-height:1.5}
+.gx-aide code{font-family:var(--mono);font-size:11.5px;color:#c7d6ee;background:rgba(255,255,255,.06);padding:1px 5px;border-radius:5px}
+.gx-carte{border:1px solid var(--gm-line);border-radius:16px;background:rgba(255,255,255,.03);overflow:hidden;transition:border-color .3s,box-shadow .3s}
+.gx-carte.cible{border-color:var(--gm-acc);box-shadow:0 0 0 3px rgba(59,130,246,.25)}
+.gx-carte.fait{border-color:rgba(34,197,94,.45)}
+.gx-carte summary{list-style:none;display:flex;align-items:center;gap:11px;padding:12px 14px;cursor:pointer}
+.gx-carte summary::-webkit-details-marker{display:none}
+.gx-carte summary .fl{margin-left:auto;color:var(--gm-muted);transition:transform .3s}
+.gx-carte[open] summary .fl{transform:rotate(180deg)}
+.gx-carte summary b{display:block;font-size:14.5px}.gx-carte summary small{display:block;font-size:12px;color:var(--gm-muted);margin-top:1px}
+.gx-num{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;flex:none;background:rgba(255,255,255,.08)}
+.gx-carte.fait .gx-num{background:#16a34a;color:#fff}
+.gx-corps{padding:0 14px 14px;display:flex;flex-direction:column;gap:10px;animation:gm-monte .35s var(--gm-ease) both}
+.gx-coord{font-family:var(--mono);font-size:15px!important;letter-spacing:.02em}
+.gx-lu{font-size:12.5px;min-height:18px}
+.gx-lu.ok{color:#4ade80}.gx-lu.ko{color:#f87171}
+.gx-outils{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.gx-champs{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.gx-champs label,.gx-corps > label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--gm-muted)}
+.gx-cible-bandeau{position:absolute;left:50%;top:104px;transform:translateX(-50%);z-index:1100;padding:10px 16px;font-size:13.5px;
   display:flex;gap:10px;align-items:center;animation:gm-bas .4s var(--gm-ease) both}
 @media (max-width:1180px){.gm-panel.large{width:440px}#geo-modal.fiche.loc .leaflet-bottom.leaflet-right{right:458px}}
-@media (max-width:820px){.gm-panel.large{width:auto}.gl-cible-bandeau{top:auto;bottom:70%;width:calc(100% - 40px)}}
+@media (max-width:820px){.gm-panel.large{width:auto}.gx-cible-bandeau{top:auto;bottom:70%;width:calc(100% - 40px)}}
+/* Les blocs de la fiche ne se compriment jamais : le panneau défile */
+.gm-panel .corps > *{flex-shrink:0}

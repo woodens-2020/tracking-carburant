@@ -428,47 +428,47 @@ GEO.localiser = async function(ouvrirId){
   if(!GEO.locMode) return;
   const premier = ouvrirId != null ? ouvrirId : (GEO.locStations.find(s => s.latitude == null) || {}).id;
   $('geo-panel').innerHTML = `
-    <div class="gl-tete"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+    <div class="gx-tete"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
         <div><h3>📍 Coordonnées des stations</h3><p>Enregistrez le point GPS de chaque station : elle apparaît aussitôt sur la carte.</p></div>
         <button class="gm-btn" style="height:32px;padding:0 10px" onclick="GEO.fermerLoc()" aria-label="Fermer">✕</button></div>
-      <div class="gl-prog" aria-hidden="true"><i id="gl-barre" style="width:0"></i></div>
-      <div class="gl-prog-t"><span id="gl-compte"></span><span>${GEO.locStations.length} station(s)</span></div></div>
-    <div class="gl-aide"><b>Trois façons de donner la position :</b><br>
+      <div class="gx-prog" aria-hidden="true"><i id="gx-barre" style="width:0"></i></div>
+      <div class="gx-prog-t"><span id="gx-compte"></span><span>${GEO.locStations.length} station(s)</span></div></div>
+    <div class="gx-aide"><b>Trois façons de donner la position :</b><br>
       1. <b>Coller</b> des coordonnées : <code>19.7381, -72.2041</code>, un lien Google Maps, ou <code>19°44’17"N 72°12’15"W</code><br>
       2. <b>GPS de cet appareil</b>, sur place à la station<br>
       3. <b>Pointer sur la carte</b>, puis glisser le marqueur pour ajuster</div>
     ${GEO.locStations.map((s, i) => locCarte(s, i, s.id === premier)).join('')}`;
   setTimeout(locProgression, 60);
-  if(premier != null) setTimeout(() => $('gl-c-' + premier)?.focus(), 350);
+  if(premier != null) setTimeout(() => $('gx-c-' + premier)?.focus(), 350);
 };
 function locCarte(s, i, ouvert){
   const fait = s.latitude != null;
-  return `<details class="gl-carte ${fait ? 'fait' : ''}" id="gl-${s.id}" ${ouvert ? 'open' : ''} style="animation:gm-monte .45s ${0.05 * Math.min(i, 8)}s var(--gm-ease) both"
+  return `<details class="gx-carte ${fait ? 'fait' : ''}" id="gx-${s.id}" ${ouvert ? 'open' : ''} style="animation:gm-monte .45s ${0.05 * Math.min(i, 8)}s var(--gm-ease) both"
       ontoggle="if(this.open) GEO.locMontrer(${s.id})">
-    <summary><span class="gl-num">${fait ? '✓' : i + 1}</span>
-      <span style="min-width:0"><b>${esc(s.nom)}</b><small id="gl-etat-${s.id}">${fait ? `${n6(s.latitude)}, ${n6(s.longitude)} · ${LIB_GPS[s.verification]}` : 'À localiser'}</small></span>
+    <summary><span class="gx-num">${fait ? '✓' : i + 1}</span>
+      <span style="min-width:0"><b>${esc(s.nom)}</b><small id="gx-etat-${s.id}">${fait ? `${n6(s.latitude)}, ${n6(s.longitude)} · ${LIB_GPS[s.verification]}` : 'À localiser'}</small></span>
       <span class="fl">⌄</span></summary>
-    <div class="gl-corps">
-      <label>Coordonnées (latitude, longitude)<input class="gm-in gl-coord" id="gl-c-${s.id}" autocomplete="off" spellcheck="false"
+    <div class="gx-corps">
+      <label>Coordonnées (latitude, longitude)<input class="gm-in gx-coord" id="gx-c-${s.id}" autocomplete="off" spellcheck="false"
         placeholder="19.7381, -72.2041  ·  ou lien Google Maps" value="${fait ? `${s.latitude}, ${s.longitude}` : ''}" oninput="GEO.locLire(${s.id})"></label>
-      <div class="gl-lu" id="gl-lu-${s.id}" aria-live="polite"></div>
-      <div class="gl-outils"><button class="gm-btn" onclick="GEO.locGps(${s.id})">📡 GPS de cet appareil</button>
+      <div class="gx-lu" id="gx-lu-${s.id}" aria-live="polite"></div>
+      <div class="gx-outils"><button class="gm-btn" onclick="GEO.locGps(${s.id})">📡 GPS de cet appareil</button>
         <button class="gm-btn" onclick="GEO.locViser(${s.id})">🎯 Pointer sur la carte</button></div>
-      <div class="gl-champs">
-        <label>Département<select class="gm-in" id="gl-d-${s.id}"><option value="">—</option>${GEO.dep.departements.map(x => `<option ${s.departement === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
-        <label>Commune<input class="gm-in" id="gl-m-${s.id}" maxlength="100" value="${esc(s.commune || '')}"></label>
-        <label>Code de la station<input class="gm-in" id="gl-k-${s.id}" maxlength="30" value="${esc(s.code || '')}" placeholder="ex. CPV-01"></label>
+      <div class="gx-champs">
+        <label>Département<select class="gm-in" id="gx-d-${s.id}"><option value="">—</option>${GEO.dep.departements.map(x => `<option ${s.departement === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
+        <label>Commune<input class="gm-in" id="gx-m-${s.id}" maxlength="100" value="${esc(s.commune || '')}"></label>
+        <label>Code de la station<input class="gm-in" id="gx-k-${s.id}" maxlength="30" value="${esc(s.code || '')}" placeholder="ex. CPV-01"></label>
         <label style="justify-content:flex-end"><span style="display:flex;gap:7px;align-items:center;color:var(--gm-text);font-size:12.5px">
-          <input type="checkbox" id="gl-v-${s.id}" ${s.verification === 'verifie' ? 'checked' : ''}> Position vérifiée</span></label>
+          <input type="checkbox" id="gx-v-${s.id}" ${s.verification === 'verifie' ? 'checked' : ''}> Position vérifiée</span></label>
       </div>
-      <div id="gl-msg-${s.id}"></div>
+      <div id="gx-msg-${s.id}"></div>
       <button class="gm-btn prim grand" onclick="GEO.locSauver(${s.id})">Enregistrer ${esc(s.nom)}</button>
     </div></details>`;
 }
 function locProgression(){
   const l = GEO.locStations || [], n = l.filter(s => s.latitude != null).length;
-  if($('gl-barre')) $('gl-barre').style.width = (l.length ? n / l.length * 100 : 0) + '%';
-  if($('gl-compte')) $('gl-compte').textContent = `${n} localisée(s) sur ${l.length}`;
+  if($('gx-barre')) $('gx-barre').style.width = (l.length ? n / l.length * 100 : 0) + '%';
+  if($('gx-compte')) $('gx-compte').textContent = `${n} localisée(s) sur ${l.length}`;
 }
 GEO.locMontrer = function(id){                    // la carte va vers la station ouverte
   const s = (GEO.locStations || []).find(x => x.id === id), p = GEO.loc[id];
@@ -476,9 +476,9 @@ GEO.locMontrer = function(id){                    // la carte va vers la station
   if(lat != null) GEO.carte.flyTo([lat, lon], Math.max(GEO.carte.getZoom(), 15), {duration:DOUX ? 1 : 0});
 };
 GEO.locLire = function(id){
-  const r = GEO.lireCoord($('gl-c-' + id).value), z = $('gl-lu-' + id);
-  if(!r){ z.className = 'gl-lu'; z.textContent = ''; return; }
-  if(r.erreur){ z.className = 'gl-lu ko'; z.textContent = r.erreur; return; }
+  const r = GEO.lireCoord($('gx-c-' + id).value), z = $('gx-lu-' + id);
+  if(!r){ z.className = 'gx-lu'; z.textContent = ''; return; }
+  if(r.erreur){ z.className = 'gx-lu ko'; z.textContent = r.erreur; return; }
   GEO.locPoser(id, r.lat, r.lon, 'carte', null, false, r.note);
 };
 GEO.locPoser = function(id, lat, lon, source, precision, depuisCarte, note){
@@ -491,18 +491,18 @@ GEO.locPoser = function(id, lat, lon, source, precision, depuisCarte, note){
   }else GEO._locPin.setLatLng([lat, lon]);
   GEO._locPinPour = id;
   GEO._locPin.unbindTooltip().bindTooltip(esc(s ? s.nom : ''), {permanent:true, direction:'top', offset:[0, -28]}).openTooltip();
-  if(depuisCarte || source === 'gps') $('gl-c-' + id).value = `${lat}, ${lon}`;
-  const z = $('gl-lu-' + id);
-  z.className = 'gl-lu ok';
+  if(depuisCarte || source === 'gps') $('gx-c-' + id).value = `${lat}, ${lon}`;
+  const z = $('gx-lu-' + id);
+  z.className = 'gx-lu ok';
   z.textContent = `✓ ${lat}, ${lon} · ${source === 'gps' ? 'GPS' + (precision != null ? ' ± ' + Math.round(precision) + ' m' : '') : 'point placé'}${note || ''} — vérifiez sur la carte, puis enregistrez.`;
   if(GEO.cible === id) GEO.locAnnulerCible();
   GEO.carte.flyTo([lat, lon], Math.max(GEO.carte.getZoom(), 16), {duration:DOUX ? 1 : 0});
 };
 GEO.locGps = function(id){
-  const z = $('gl-lu-' + id), ko = m => { z.className = 'gl-lu ko'; z.textContent = m; };
+  const z = $('gx-lu-' + id), ko = m => { z.className = 'gx-lu ko'; z.textContent = m; };
   if(!window.isSecureContext) return ko('Le GPS demande une connexion sécurisée (https) : collez les coordonnées ou pointez sur la carte.');
   if(!navigator.geolocation) return ko('Cet appareil ne fournit pas de GPS : collez les coordonnées ou pointez sur la carte.');
-  z.className = 'gl-lu'; z.textContent = 'Recherche de la position…';
+  z.className = 'gx-lu'; z.textContent = 'Recherche de la position…';
   navigator.geolocation.getCurrentPosition(p => GEO.locPoser(id, p.coords.latitude, p.coords.longitude, 'gps', p.coords.accuracy),
     e => ko({1:'Accès à la position refusé : autorisez-le dans le navigateur, ou pointez sur la carte.', 2:'Position GPS introuvable : pointez sur la carte.',
              3:'Le GPS a mis trop de temps : réessayez ou pointez sur la carte.'}[e.code] || e.message), {enableHighAccuracy:true, timeout:20000, maximumAge:0});
@@ -511,23 +511,23 @@ GEO.locViser = function(id){
   GEO.locAnnulerCible();
   GEO.cible = id;
   const s = GEO.locStations.find(x => x.id === id);
-  $('gl-' + id).classList.add('cible');
+  $('gx-' + id).classList.add('cible');
   GEO.carte.getContainer().style.cursor = 'crosshair';
   const b = document.createElement('div');
-  b.className = 'gl-cible-bandeau gm-verre'; b.id = 'gl-bandeau';
+  b.className = 'gx-cible-bandeau gm-verre'; b.id = 'gx-bandeau';
   b.innerHTML = `🎯 Touchez la carte à l’emplacement de <b>${esc(s.nom)}</b> <button class="gm-btn" style="height:30px" onclick="GEO.locAnnulerCible()">Annuler</button>`;
   $('geo-modal').appendChild(b);
 };
 GEO.locAnnulerCible = function(){
-  if(GEO.cible != null) $('gl-' + GEO.cible)?.classList.remove('cible');
-  GEO.cible = null; $('gl-bandeau')?.remove();
+  if(GEO.cible != null) $('gx-' + GEO.cible)?.classList.remove('cible');
+  GEO.cible = null; $('gx-bandeau')?.remove();
   if(GEO.carte && !GEO.mode) GEO.carte.getContainer().style.cursor = '';
 };
 GEO.locSauver = async function(id, extra){
-  const z = $('gl-msg-' + id), s = GEO.locStations.find(x => x.id === id);
+  const z = $('gx-msg-' + id), s = GEO.locStations.find(x => x.id === id);
   const err = m => z.innerHTML = `<div class="gm-err">${esc(m)}</div>`;
   z.innerHTML = '';
-  const v = k => $(`gl-${k}-${id}`).value.trim();
+  const v = k => $(`gx-${k}-${id}`).value.trim();
   if(!GEO.loc[id]){
     const r = GEO.lireCoord(v('c'));
     if(r && r.erreur) return err(r.erreur);
@@ -538,7 +538,7 @@ GEO.locSauver = async function(id, extra){
     const infos = {code:v('k') || null, departement:v('d') || null, commune:v('m') || null, adresse:s.adresse || null};
     if(infos.code !== (s.code || null) || infos.departement !== (s.departement || null) || infos.commune !== (s.commune || null))
       await api('PUT', `/stations/${id}/infos`, infos);
-    const q = GEO.loc[id], verifie = $(`gl-v-${id}`).checked;
+    const q = GEO.loc[id], verifie = $(`gx-v-${id}`).checked;
     let d = null;
     if(q || (s.latitude != null && verifie !== (s.verification === 'verifie'))){
       const base = q || {lat:s.latitude, lon:s.longitude, source:'carte', precision:null};
@@ -550,15 +550,15 @@ GEO.locSauver = async function(id, extra){
                   {code:infos.code, departement:infos.departement, commune:infos.commune});
     delete GEO.loc[id];
     if(GEO._locPin){ GEO.carte.removeLayer(GEO._locPin); GEO._locPin = null; }
-    const c = $('gl-' + id);
+    const c = $('gx-' + id);
     c.classList.toggle('fait', s.latitude != null); c.open = false;
-    c.querySelector('.gl-num').textContent = s.latitude != null ? '✓' : c.querySelector('.gl-num').textContent;
-    $('gl-etat-' + id).textContent = s.latitude != null ? `${n6(s.latitude)}, ${n6(s.longitude)} · ${LIB_GPS[s.verification]}` : 'À localiser';
+    c.querySelector('.gx-num').textContent = s.latitude != null ? '✓' : c.querySelector('.gx-num').textContent;
+    $('gx-etat-' + id).textContent = s.latitude != null ? `${n6(s.latitude)}, ${n6(s.longitude)} · ${LIB_GPS[s.verification]}` : 'À localiser';
     locProgression();
     notify(`${s.nom} : enregistrée.`, 'ok');
     GEO.dep = null; await GEO.charger(false);
     const suivante = GEO.locStations.find(x => x.latitude == null);
-    if(suivante){ $('gl-' + suivante.id).open = true; $('gl-' + suivante.id).scrollIntoView({block:'nearest', behavior:DOUX ? 'smooth' : 'auto'}); }
+    if(suivante){ $('gx-' + suivante.id).open = true; $('gx-' + suivante.id).scrollIntoView({block:'nearest', behavior:DOUX ? 'smooth' : 'auto'}); }
     else setTimeout(() => { GEO.ajuster(); notify('Toutes vos stations sont sur la carte.', 'ok'); }, DOUX ? 700 : 0);
   }catch(e){
     if(e.message.includes('Une autre station') && await showConfirm(sansCode(e.message), {title:'Confirmer la position', type:'warn', okLabel:'Oui, enregistrer'}))
