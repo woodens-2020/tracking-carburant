@@ -4112,7 +4112,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
   </div>
 
   <!-- Station courante (propriétaire de plusieurs stations) -->
-  <div class="sb-footer sb-station" id="station-footer" style="display:none" onclick="ouvrirChoixStation()" title="Changer de station">
+  <div class="sb-footer sb-station" id="station-footer" style="display:none" onclick="allerCarteStations()" title="Changer de station (carte des stations)">
     <span class="sb-station-ico">⛽</span>
     <span class="sb-station-txt"><b id="station-nom">Station</b><small id="station-action">Changer de station</small></span>
   </div>
@@ -17808,7 +17808,7 @@ async function _stEnregistrer(){
         choix.overlay.classList.remove('show');
         toast(`Station séparée créée : ${r.nom}. Le gérant se connecte avec ${r.gerant}.`,'ok');
         if(r.avertissement_geo) toast(`Localisation : ${r.avertissement_geo} Corrigez-la sur la carte des stations.`,'err');
-        _ST=null; await initStations(); closeGestion(); ouvrirChoixStation();
+        _ST=null; await initStations(); closeGestion(); allerCarteStations();
       }catch(e){ choix.overlay.classList.add('show'); choix.afficherErreur(e.message); }
       return;
     }
@@ -17846,9 +17846,14 @@ async function initStations(){
   document.getElementById('station-nom').textContent = _STATIONS.courant_nom || 'Station principale';
   document.getElementById('station-action').textContent = plusieurs ? 'Changer de station' : (ouvrable ? 'Mes stations' : 'Votre station');
   f.style.cursor = ouvrable ? 'pointer' : 'default';
-  // Juste après la connexion : choisir sa station
-  let deja = null; try{ deja = sessionStorage.getItem('konekta-station-choisie'); }catch(e){}
-  if(plusieurs && !deja) ouvrirChoixStation(true);
+  // Après la connexion, le propriétaire arrive sur la carte des stations
+  // (page d'atterrissage) : c'est depuis la carte qu'il change de station.
+  try{ sessionStorage.setItem('konekta-station-choisie', '1'); }catch(e){}
+}
+// Changer de station = la carte des stations (l'ancienne fenêtre reste en secours)
+function allerCarteStations(){
+  if(!_STATIONS || !(_STATIONS.peut_changer || _STATIONS.peut_creer)) return;
+  if(_canAccess('geo') && window.initGeo) goTo('geo'); else ouvrirChoixStation();
 }
 function ouvrirChoixStation(premiere){
   if(!_STATIONS || !(_STATIONS.peut_changer || _STATIONS.peut_creer)) return;
@@ -19796,6 +19801,8 @@ document.addEventListener('DOMContentLoaded',async()=>{
     // l'atterrissage normal de page.
   } else if(!_isFreshLogin && _savedPage && _canAccess(_savedPage)){
     goTo(_savedPage);
+  } else if(_STATIONS && (_STATIONS.peut_changer || _STATIONS.peut_creer) && _canAccess('geo')){
+    goTo('geo');                        // propriétaire : la carte de ses stations d'abord
   } else if(_rlNom === 'manager'){
     goTo('notifications');
   } else if(_rlNom === 'assistant directeur'){

@@ -120,7 +120,8 @@ function listes(){
       <span class="geo-pt" style="background:${s.statut === 'inactive' ? 'var(--red2)' : COUL[s.verification]}"></span>
       <span><b>${esc(s.nom)}${s.ici ? ' · <span class="geo-note">vous êtes ici</span>' : ''}</b>
       <small>${esc([s.code, s.commune, s.departement].filter(Boolean).join(' · ') || 'Informations à compléter')}</small>
-      <small>${LIB_GPS[s.verification]}${s.statut === 'inactive' ? ' · inactive' : ''}</small></span></button>`).join('')
+      <small>${LIB_GPS[s.verification]}${s.statut === 'inactive' ? ' · inactive' : ''}</small>
+      ${!s.ici && s.statut === 'active' && GEO.vue && GEO.vue.peut_tout_voir ? `<small style="color:var(--blue2);font-weight:700" onclick="event.stopPropagation();GEO.allerVers(${s.id})">➜ Aller à cette station</small>` : ''}</span></button>`).join('')
     : '<div class="geo-note" style="padding:12px">Aucune station ne correspond aux filtres.</div>';
 }
 function marqueurs(){
@@ -129,6 +130,8 @@ function marqueurs(){
     if(s.latitude == null) continue;
     const m = L.marker([s.latitude, s.longitude], {icon:icone(s.statut === 'inactive' ? '#ef4444' : COUL[s.verification], GEO.sel === s.id), title:s.nom, keyboard:true});
     m.bindTooltip(`${esc(s.nom)}${s.commune ? ' — ' + esc(s.commune) : ''}`);
+    m.bindPopup(`<b>${esc(s.nom)}</b>${s.commune ? '<br>' + esc(s.commune) : ''}<br>`
+      + (s.ici ? '<i>Vous êtes ici</i>' : s.statut === 'active' ? `<a href="#" onclick="GEO.allerVers(${s.id});return false">➜ Aller à cette station</a>` : '<i>Station retirée</i>'));
     m.on('click', () => GEO.choisir(s.id, false));
     GEO.groupe.addLayer(m); GEO.marqueurs[s.id] = m;
   }
@@ -159,14 +162,21 @@ function apercu(){
     ${sans.length ? `<h4>À localiser</h4>${sans.map(s => `<button class="geo-btn" onclick="GEO.choisir(${s.id}, true);GEO.editerPosition()">📍 ${esc(s.nom)}</button>`).join('')}` : ''}
     <h4>Légende</h4><div class="geo-note">
       <span class="geo-badge ok">● vérifiée</span> <span class="geo-badge attention">● non vérifiée</span> <span class="geo-badge off">● inactive</span></div>
+    ${o.peut_tout_voir ? `<button class="geo-btn" onclick="ouvrirChoixStation()">Gérer les stations (retirer une station séparée)</button>` : ''}
     <p class="geo-note">Fond de carte © contributeurs OpenStreetMap. Une nouvelle station se localise lors de son enregistrement (Saisie › Gérer › Enregistrer une station).</p>`;
 }
 
 // ── Fiche technique ─────────────────────────────────────────────────
 GEO.choisir = async function(id, centrer){
   if(GEO._pin){ GEO.carte.removeLayer(GEO._pin); GEO._pin = null; }
+  const avant = GEO.sel;
   GEO.sel = id; GEO.mode = null; GEO.edition = null;
-  listes(); marqueurs();
+  listes();
+  // Seuls les deux marqueurs concernés changent (la bulle ouverte reste affichée)
+  for(const sid of [avant, id]){
+    const m = GEO.marqueurs[sid], st = GEO.stations.find(x => x.id === sid);
+    if(m && st) m.setIcon(icone(st.statut === 'inactive' ? '#ef4444' : COUL[st.verification], sid === id));
+  }
   const s = GEO.stations.find(x => x.id === id);
   if(centrer && s && s.latitude != null) GEO.carte.setView([s.latitude, s.longitude], Math.max(GEO.carte.getZoom(), 14));
   const p = document.getElementById('geo-panel');
@@ -181,8 +191,10 @@ function fiche(){
   p.innerHTML = `<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
       <div><h3>${esc(d.nom)}</h3><div class="geo-note">${esc(f.code || 'Sans code')} · ${d.statut === 'active' ? '<span class="geo-badge ok">Active</span>' : '<span class="geo-badge off">Inactive</span>'} ${gpsBadge}</div></div>
       <button class="geo-btn" onclick="GEO.annulerPosition();GEO.sel=null;GEO.charger(false)" aria-label="Fermer la fiche">✕</button></div>
+    ${d.statut === 'active' && !d.ici ? `<button class="geo-btn prim" style="width:100%;justify-content:center;height:42px;font-size:15px" onclick="GEO.allerVers(${d.id})">➜ Aller à cette station</button>
+      <div id="geo-aller"></div>` : (d.ici ? '<div class="geo-ok">Vous êtes dans cette station.</div>' : '')}
     <div class="geo-actions">
-      ${d.statut === 'active' ? `<button class="geo-btn prim" onclick="GEO.ouvrirTableau(${d.id})">📊 Tableau de bord</button>` : ''}
+      ${d.statut === 'active' ? `<button class="geo-btn" onclick="GEO.ouvrirTableau(${d.id})">📊 Tableau de bord</button>` : ''}
       <button class="geo-btn" onclick="GEO.section('details')">🔎 Détails techniques</button>
       <button class="geo-btn" onclick="GEO.section('infos')">✏️ Informations</button>
       <button class="geo-btn" onclick="GEO.editerPosition()">📍 Position GPS</button>
@@ -323,6 +335,29 @@ GEO.enregistrerPosition = async function(extra){
   }
 };
 
+// ── Aller dans une autre station (PIN), depuis la carte ─────────────
+GEO.allerVers = async function(id, page){
+  if(GEO.sel !== id || !GEO.detail || GEO.detail.id !== id) await GEO.choisir(id, true);
+  GEO.carte && GEO.carte.closePopup();
+  const z = document.getElementById('geo-aller');
+  if(!z) return;
+  z.innerHTML = `<div class="geo-form" style="margin-top:6px"><label for="geo-pin">Votre PIN pour entrer dans ${esc(GEO.detail.nom)}</label>
+    <div class="ligne"><input class="geo-in" id="geo-pin" type="password" inputmode="numeric" maxlength="9" autocomplete="off" placeholder="9 chiffres" style="flex:1"
+      onkeydown="if(event.key==='Enter')GEO.entrer(${id}, '${page || 'dashboard'}')">
+      <button class="geo-btn prim" onclick="GEO.entrer(${id}, '${page || 'dashboard'}')">Entrer</button></div>
+    <div class="geo-note">Vous quitterez la station actuelle ; vous arriverez sur le tableau de bord de ${esc(GEO.detail.nom)}.</div><div id="geo-pin-err"></div></div>`;
+  document.getElementById('geo-pin').focus();
+};
+GEO.entrer = async function(id, page){
+  const pin = (document.getElementById('geo-pin').value || '').trim(), err = m => document.getElementById('geo-pin-err').innerHTML = `<div class="geo-err">${esc(m)}</div>`;
+  if(!/^[0-9]{9}$/.test(pin)) return err('Le PIN contient 9 chiffres.');
+  try{
+    await POST('/espaces/entrer', {cible_id:id, pin});
+    try{ sessionStorage.setItem('konekta-station-choisie', '1'); sessionStorage.setItem('konekta_current_page', page || 'dashboard'); }catch(e){}
+    location.href = '/';
+  }catch(e){ err(e.message.replace(/^\[\d+\]\s*/, '')); document.getElementById('geo-pin').select(); }
+};
+
 // ── Tableau de bord de la station ──────────────────────────────────
 GEO.ouvrirTableau = function(id){
   const s = GEO.stations.find(x => x.id === id) || GEO.detail;
@@ -331,8 +366,7 @@ GEO.ouvrirTableau = function(id){
   const st = typeof _STATIONS !== 'undefined' ? _STATIONS : null;
   if(typeof ouvrirChoixStation !== 'function' || !st || !st.peut_changer)
     return notify('Changement de station réservé au propriétaire.', 'err');
-  window._ST_PAGE_APRES = 'dashboard';          // après le PIN : tableau de bord de cette station
-  ouvrirChoixStation(); choisirStation(id, false);
+  GEO.allerVers(id, 'dashboard');
 };
 
 // ── Sélecteur de position réutilisable (enregistrement d'une station) ──
