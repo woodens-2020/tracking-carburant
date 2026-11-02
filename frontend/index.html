@@ -17733,10 +17733,13 @@ async function _stEnregistrer(){
     produits:st.produits.map(p=>({cle:p.cle, nom:p.nom.trim(), prix:num(p.prix)})),
     pompes:st.pompes.map(pp=>({nom:pp.nom.trim(), faces:pp.faces.map(f=>({nom:f.nom.trim(),
       metres:f.metres.map(m=>({produit:m.produit, nom:m.nom.trim(), metre_depart:num(m.depart)}))}))}))};
-  if(_STATIONS && _STATIONS.peut_creer){
+  // Une nouvelle station est toujours séparée (pas de fusion) ; seule une
+  // station encore vide (aucun mètre) est équipée sur place.
+  const stationVide=!products.some(p=>(p.pompes||[]).length);
+  if(_STATIONS && _STATIONS.peut_creer && !stationVide){
     const choix=await _demanderSeparation(corps);
     if(!choix) return;
-    if(choix.separer){
+    {
       const {adresse, ...station}=corps;
       // Station séparée = espace vierge : les mètres nommés « Produit N » repartent de 1
       const nomsProd=Object.fromEntries(station.produits.map(p=>[p.cle, p.nom]));
@@ -17810,7 +17813,7 @@ function ouvrirChoixStation(premiere){
           <span class="cs-etat">${ici ? 'Vous êtes ici' : 'Entrer →'}</span></button>`;
       }).join('')}</div>
       <div id="cs-pin" class="cs-pin" style="display:none"></div>
-      ${_STATIONS.peut_creer && !_STATIONS.espaces.length ? `<div class="cs-note">Vous n'avez pas encore de station séparée. Enregistrez une station et répondez « Oui, séparer » : elle apparaîtra ici et vous pourrez y passer avec votre PIN.</div>` : ''}
+      ${_STATIONS.peut_creer && !_STATIONS.espaces.length ? `<div class="cs-note">Vous n'avez pas encore de station séparée. Enregistrez une nouvelle station (avec son gérant) : elle apparaîtra ici et vous pourrez y passer avec votre PIN.</div>` : ''}
       ${_STATIONS.peut_creer ? `<button class="cs-lien" onclick="fermerChoixStation();goTo('saisie');setTimeout(()=>{openGestion();gestOnglet('station')},300)">+ Enregistrer une nouvelle station</button>` : ''}
       ${_STATIONS.espaces.length ? `<details class="cs-retirer"><summary>Retirer une station séparée</summary>
         <div class="cs-note">Elle n'est plus proposée et personne ne peut plus y entrer ; ses données sont gardées.</div>
@@ -17855,35 +17858,29 @@ async function entrerStation(id){
   }catch(e){ err(e.message); document.getElementById('cs-pin-in').select(); }
 }
 
-// Enregistrement d'une station : séparée (espace à part) ou fusionnée
+// Nouvelle station : toujours un espace séparé, avec son gérant
 function _demanderSeparation(corps){
   return new Promise(resolve => {
     let ov = document.getElementById('separer-station');
     if(!ov){ ov = document.createElement('div'); ov.id = 'separer-station'; ov.className = 'cs-overlay'; document.body.appendChild(ov); }
     ov.innerHTML = `<div class="cs-boite" role="dialog" aria-modal="true" aria-labelledby="sp-titre">
-      <div class="cs-tete"><div><div class="cs-sur">${esc(corps.adresse)}</div><h2 id="sp-titre">Séparer cette station de la station actuelle ?</h2></div>
+      <div class="cs-tete"><div><div class="cs-sur">${esc(corps.adresse)}</div><h2 id="sp-titre">Nouvelle station séparée</h2></div>
         <button class="cs-fermer" id="sp-annuler" aria-label="Annuler">✕</button></div>
-      <div class="sp-choix">
-        <button class="cs-carte" id="sp-non"><span class="cs-ico">🔗</span><span class="cs-txt"><b>Non, fusionner</b>
-          <small>Même espace que la station actuelle (mêmes données, même caisse) ; elle reste identifiée par son adresse.</small></span></button>
-        <button class="cs-carte" id="sp-oui"><span class="cs-ico">🏢</span><span class="cs-txt"><b>Oui, séparer</b>
-          <small>Un espace Konekta à part, vierge, avec toutes les fonctions. Vous y passez avec votre PIN ; son gérant n'y voit que cette station.</small></span></button>
-      </div>
-      <div id="sp-form" class="sp-form" style="display:none">
+      <div class="cs-note" style="margin:0 0 12px">Chaque station a son propre espace Konekta : ses mètres, sa caisse, ses rapports. Vous y passez avec votre PIN ; son gérant n'y voit que cette station. Pour ajouter des pompes à la station actuelle, utilisez l'onglet « Pompes &amp; faces ».</div>
+      <div id="sp-form" class="sp-form">
         <label>Nom de la station<input id="sp-nom" class="filter-input" maxlength="150" value="${esc(corps.adresse)}"></label>
         <label>Nom du gérant<input id="sp-gnom" class="filter-input" maxlength="150"></label>
         <label>Email du gérant<input id="sp-email" class="filter-input" type="email" maxlength="254" autocomplete="off"></label>
         <label>Mot de passe du gérant (8 caractères au moins)<input id="sp-pass" class="filter-input" type="password" autocomplete="new-password"></label>
         <label>PIN du gérant (9 chiffres)<input id="sp-pin" class="filter-input" inputmode="numeric" maxlength="9" autocomplete="off"></label>
         <div id="sp-err"></div>
-        <div class="gest-edit-act"><button class="btn btn-secondary" id="sp-retour">Retour</button><button class="btn btn-primary" id="sp-creer">Créer la station séparée</button></div>
+        <div class="gest-edit-act"><button class="btn btn-secondary" id="sp-retour">Annuler</button><button class="btn btn-primary" id="sp-creer">Créer la station séparée</button></div>
       </div></div>`;
     ov.classList.add('show');
     const fin = v => { ov.classList.remove('show'); resolve(v); };
     ov.querySelector('#sp-annuler').onclick = () => fin(null);
-    ov.querySelector('#sp-non').onclick = () => fin({separer:false});
-    ov.querySelector('#sp-oui').onclick = () => { ov.querySelector('.sp-choix').style.display='none'; ov.querySelector('#sp-form').style.display=''; ov.querySelector('#sp-gnom').focus(); };
-    ov.querySelector('#sp-retour').onclick = () => { ov.querySelector('.sp-choix').style.display=''; ov.querySelector('#sp-form').style.display='none'; };
+    ov.querySelector('#sp-retour').onclick = () => fin(null);
+    setTimeout(() => ov.querySelector('#sp-gnom')?.focus(), 50);
     ov.querySelector('#sp-creer').onclick = () => {
       const v = id => ov.querySelector(id).value.trim();
       const e = m => ov.querySelector('#sp-err').innerHTML = `<div class="psp-err">${esc(m)}</div>`;
