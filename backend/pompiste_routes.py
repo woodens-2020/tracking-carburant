@@ -1445,6 +1445,7 @@ class CompteIn(BaseModel):
     employe_id: Optional[int] = None
     station_adresse: Optional[str] = None   # adresse des produits ; vide = toutes les stations
     espace_id: Optional[int] = None         # autre station (0 = principale) : compte créé dans cette station
+    username: Optional[str] = None          # code imposé (reprise d'un compte existant ailleurs) ; vide = généré
 
 
 def _slug(txt: str, n: int = 12) -> str:
@@ -1508,7 +1509,18 @@ def _creer_compte(data: CompteIn, db: Session) -> dict:
     pin = (data.code_acces or "").strip() or _nouveau_pin()
     if not _CODE_RE.match(pin):
         raise HTTPException(400, "Le code PIN doit contenir exactement 9 chiffres.")
-    username = _identifiant_unique(db, prenom, nom_famille)
+    if data.username:
+        # Reprise d'un compte (ex. depuis le staging) : le pompiste garde son code
+        username = data.username.strip().lower()
+        if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,39}", username):
+            raise HTTPException(400, "Code invalide : 3 à 40 caractères (lettres minuscules, chiffres, . _ -).")
+        if db.query(Utilisateur).filter(Utilisateur.username.ilike(username)).first():
+            raise HTTPException(409, f"Le code {username} existe déjà.")
+        from espaces_routes import compte_ailleurs
+        if compte_ailleurs(username=username):
+            raise HTTPException(409, f"Le code {username} est déjà utilisé dans une autre station.")
+    else:
+        username = _identifiant_unique(db, prenom, nom_famille)
     station = _station_valide(db, data.station_adresse)
     emp = None
     if data.employe_id:

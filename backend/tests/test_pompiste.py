@@ -622,3 +622,15 @@ def test_recuperation_garde_les_comptes(client, db):
     assert "seul le nom est repris" in fiches[0].notes
     t = TestClient(main.app)
     assert t.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]}).status_code == 200
+
+
+def test_reprise_compte_avec_code_impose(client):
+    import main
+    r = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Repris", "nom": "Compte", "username": "reprisCompte1234"})
+    assert r.status_code == 201, r.text
+    c = r.json()
+    assert c["username"] == "repriscompte1234" and len(c["code_acces"]) == 9
+    assert client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "A", "nom": "B", "username": "repriscompte1234"}).status_code == 409
+    assert client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "A", "nom": "B", "username": "x y"}).status_code == 400
+    t = TestClient(main.app)
+    assert t.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]}).status_code == 200
