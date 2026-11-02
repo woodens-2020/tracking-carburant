@@ -30,7 +30,7 @@ from stock_service import (
 from models import Base
 
 MAX_TOOL_ROUNDS = 8
-GEMINI_MODELS   = ["gemini-flash-latest", "gemini-flash-lite-latest"]
+GEMINI_MODELS   = ["gemini-flash-lite-latest", "gemini-flash-latest"]   # rapide et économique d'abord, puis secours
 CLAUDE_MODEL    = "claude-sonnet-5-5"
 DELAI_IA_S      = 40          # réponse du fournisseur (par tentative ; puis modèle de secours)
 DELAI_SQL_S     = 5           # requête SQL de dernier recours
