@@ -16988,8 +16988,10 @@ async function openPompisteModal(saved){
   pompisteRowsData=saved;
 
   try{
-    const employes=await GET('/employes?actif=true');
-    pompistesActifs=employes.filter(e=>(e.poste||'').trim().toLowerCase()==='pompiste');
+    // Tous les pompistes (comptes pompistes et employés « Pompiste »), y compris
+    // ceux qui sont partis : leurs relevés anciens doivent pouvoir leur être attribués.
+    pompistesActifs=(await GET('/pompistes?inclure_inactifs=true'))
+      .map(p=>({id:p.id, nom_complet:p.nom+(p.actif?'':' (inactif)')}));
   }catch(e){
     pompistesActifs=[];
   }
@@ -17034,6 +17036,7 @@ async function soumettrePompiste(){
   if(ok)   toast(t('saisie.pompiste.ok'),'ok');
   if(errs) toast(t('saisie.pompiste.err',{msg:lastErrMsg}),'err');
   if(ok && currentPage==='saisie') await loadSaisie();
+  if(ok && currentPage==='journal') loadJournal();
 }
 
 // ══════════════════════════════════════════════
@@ -17475,7 +17478,9 @@ function renderJournal(data){
       <td class="num" style="white-space:nowrap">${frDate(e.date)}</td>
       <td style="font-size:13px">${e.periode==='Matin'?'🌅 Matin':'🌇 Après-midi'}</td>
       <td style="font-weight:600">${esc(e.pompe_nom)}</td>
-      <td style="font-size:13px">${e.pompiste_nom?esc(e.pompiste_nom):'<span class="c-dim">—</span>'}${e.en_attente
+      <td style="font-size:13px">${e.pompiste_nom?esc(e.pompiste_nom):'<span class="c-dim">—</span>'}${!e.en_attente && e.id
+        ? ` <button class="btn-ghost" style="font-size:12px;padding:0 4px" title="Attribuer ce relevé à un pompiste"
+             onclick="openPompisteModal([{releveId:${e.id}, pompeNom:${esc(JSON.stringify(e.pompe_nom)).replace(/"/g,'&quot;')}, pompisteId:${e.pompiste_id||'null'}}])">✏️</button>` : ''}${e.en_attente
         ?`<div><span class="jr-src attente" title="Rapport pompiste pas encore finalisé : ni caisse, ni stock, ni totaux">⏳ En attente de validation — non compté</span></div>`
         : e.source==='pompiste'
         ?`<div><span class="jr-src ${['CONFIRME','RESOLU'].includes(e.rapport_statut)?'ok':''}" title="Saisi par le pompiste sur sa tablette">⛽ Espace pompiste · ${
@@ -20206,6 +20211,10 @@ function pspRendreComptes(){
           puis « Enstale aplikasyon an » : une icône apparaît sur l'écran de l'appareil.</div>
         <div style="margin-top:6px"><a href="/pompiste/installer" target="_blank" style="font-family:var(--mono)">${esc(location.origin)}/pompiste/installer</a></div></div>
     </div>
+    <div class="psp-card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:240px">
+        <b>Pompistes et employés</b><div class="psp-muted" style="margin-top:4px">Chaque compte pompiste a sa fiche employé (poste Pompiste) :
+        il peut recevoir des relevés, y compris ceux entrés au bureau ou corrigés dans le Journal Meters (bouton ✏️ à côté du pompiste).</div></div>
+      <button class="btn btn-secondary" onclick="pspRecupererEmployes()">Récupérer tous les pompistes comme employés</button></div>
     <div class="psp-card"><b>Nouveau compte pompiste</b>
       <div class="psp-muted" style="margin:4px 0 10px">Pas besoin d'email : le système crée un <b>code unique</b> (prénom + nom + 4 chiffres)
         et un <b>PIN de 9 chiffres</b>. Le pompiste se connecte sur <b>${esc(location.origin)}/pompiste</b> et n'a accès qu'à la saisie de ses compteurs.</div>
@@ -20259,6 +20268,14 @@ function _pspPinMsg(u){
     <div style="display:flex;gap:24px;flex-wrap:wrap">
       <div>Code : <b style="font-family:var(--mono);font-size:20px">${esc(u.username)}</b></div>
       <div>PIN : <b style="font-family:var(--mono);font-size:20px;letter-spacing:.08em">${esc(u.code_acces)}</b></div></div>`;
+}
+
+async function pspRecupererEmployes(){
+  try{
+    const r = await _pspApi('POST', '/recuperer-employes');
+    notify(`${r.comptes} compte(s) pompiste : ${r.fiches_creees} fiche(s) employé créée(s), ${r.releves_attribues} relevé(s) attribué(s).`, 'ok');
+    PSP.comptes = await _pspApi('GET', '/comptes'); pspRendreComptes();
+  }catch(e){ notify(e.message, 'err'); }
 }
 
 async function pspCreerCompte(){

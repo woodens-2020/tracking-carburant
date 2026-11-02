@@ -314,13 +314,14 @@ def test_date_choisie_dans_le_calendrier(client):
     p = TestClient(_m.app)
     p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
     ctx = p.get("/api/pompiste/contexte").json()
-    assert ctx["date_min"] == str(auj - timedelta(days=31))
+    from pompiste_routes import JOURS_EN_ARRIERE
+    assert ctx["date_min"] == str(auj - timedelta(days=JOURS_EN_ARRIERE))
     def envoi(d):
         return p.post("/api/pompiste/compteurs", json={"date": str(d), "periode": "Matin", "charte_acceptee": True,
                       "lignes": [{"pompe_id": pompe, "metter_avant": 0, "metter_apres": 5}]})
     r = envoi(auj + timedelta(days=1))
     assert r.status_code == 400 and r.json()["detail"]["code"] == "date_future"
-    r = envoi(auj - timedelta(days=32))
+    r = envoi(auj - timedelta(days=JOURS_EN_ARRIERE + 1))
     assert r.status_code == 400 and r.json()["detail"]["code"] == "date_ancienne"
     assert p.get(f"/api/pompiste/contexte?date={auj - timedelta(days=10)}&periode=Matin").status_code == 200
     r = envoi(auj - timedelta(days=10))
@@ -561,3 +562,42 @@ def test_creneau_automatique(client):
     assert [q["deja_rapportee"] is not None for x in ctx["produits"] for q in x["pompes"] if q["id"] == pompe] == [True]
     r = envoyer(c, 25, 30)
     assert r.status_code == 409 and r.json()["detail"]["code"] == "deja_rapporte"
+
+
+def test_pompistes_employes_et_rapports_anciens(client):
+    """Les pompistes deviennent des employés attribuables (même partis) ;
+    l'espace pompiste accepte les rapports des deux derniers mois."""
+    import main
+    from datetime import timedelta
+    from tz_utils import today_haiti
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Ancien", "nom": "Pompiste"}).json()
+    r = client.post("/api/pompiste-supervision/recuperer-employes", headers=H)
+    assert r.status_code == 200 and r.json()["comptes"] >= 1
+    emp = next(p for p in client.get("/api/pompistes", headers=H).json() if p["nom"] == "Ancien Pompiste")
+    # Le pompiste part : sa fiche reste attribuable aux relevés anciens
+    client.patch(f"/api/pompiste-supervision/comptes/{c['id']}", headers=H, json={"actif": False})
+    assert all(p["id"] != emp["id"] for p in client.get("/api/pompistes", headers=H).json())
+    assert any(p["id"] == emp["id"] and not p["actif"] for p in client.get("/api/pompistes?inclure_inactifs=true", headers=H).json())
+    pompe = _produit(client, 800)
+    jour = str(today_haiti() - timedelta(days=60))
+    rel = client.post("/api/releves", headers=H, json={"date": jour, "periode": "Matin", "pompe_id": pompe, "prix_gallon": 800,
+                                                       "metter_avant": 0, "metter_apres": 10}).json()
+    r = client.patch(f"/api/releves/{rel['id']}/pompiste", headers=H, json={"pompiste_id": emp["id"]})
+    assert r.status_code == 200 and r.json()["pompiste_id"] == emp["id"]
+    # Un employé qui n'est pas pompiste est refusé
+    autre = client.post("/api/employes", headers=H, json={"prenom": "Caissier", "nom": "Test", "poste": "Caissier",
+                                                         "date_embauche": str(today_haiti()), "salaire_base": 0})
+    if autre.status_code in (200, 201):
+        assert client.patch(f"/api/releves/{rel['id']}/pompiste", headers=H,
+                            json={"pompiste_id": autre.json()["id"]}).status_code == 400
+    # Espace pompiste : 60 jours en arrière acceptés, 80 refusés
+    c2 = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Deux", "nom": "Mois"}).json()
+    t = TestClient(main.app)
+    assert t.post("/api/login/pompiste", json={"username": c2["username"], "code_acces": c2["code_acces"]}).status_code == 200
+    pompe2 = _produit(client, 810)
+    assert t.get(f"/api/pompiste/contexte?date={today_haiti() - timedelta(days=60)}").status_code == 200
+    r = t.get(f"/api/pompiste/contexte?date={today_haiti() - timedelta(days=80)}")
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "date_ancienne"
+    r = t.post("/api/pompiste/compteurs", json={"date": str(today_haiti() - timedelta(days=60)), "charte_acceptee": True,
+               "lignes": [{"pompe_id": pompe2, "metter_avant": 0, "metter_apres": 5, "debut_confirme": True}]})
+    assert r.status_code == 201, r.text

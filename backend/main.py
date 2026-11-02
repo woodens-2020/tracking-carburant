@@ -603,8 +603,19 @@ def startup():
         from pompiste_routes import rattacher_employes_pompistes
         with SessionLocal() as _db:
             rattacher_employes_pompistes(_db)
-            from database import migrer_espaces
+            from database import migrer_espaces, definir_espace, retablir_espace, session_espace
             print(f"Stations séparées mises à jour : {migrer_espaces()}")
+            # Les pompistes de chaque station séparée deviennent aussi des employés
+            from espaces_routes import schemas_actifs
+            for _sch in schemas_actifs():
+                _jeton = definir_espace(_sch)
+                try:
+                    with session_espace(_sch) as _edb:
+                        rattacher_employes_pompistes(_edb)
+                except Exception as _exc:
+                    print(f"Pompistes de {_sch} : {_exc}")
+                finally:
+                    retablir_espace(_jeton)
             try:
                 for _d in _db.query(Distributeur).filter(Distributeur.adresse.is_(None)).all():
                     _adr = next((q.produit.adresse for f in _d.faces for q in f.metres if q.produit.adresse), None)
@@ -2772,10 +2783,13 @@ def assigner_pompiste(releve_id: int, data: ReleveAssignerPompisteIn, db: Sessio
         raise HTTPException(404, "Relevé introuvable")
 
     if data.pompiste_id is not None:
-        emp = db.query(Employe).filter_by(id=data.pompiste_id, actif=True).first()
+        # Un pompiste parti peut encore recevoir ses relevés anciens (saisie
+        # des rapports des mois passés) : la fiche inactive est acceptée.
+        from pompiste_routes import est_employe_pompiste
+        emp = db.get(Employe, data.pompiste_id)
         if not emp:
-            raise HTTPException(400, "Employé introuvable ou inactif")
-        if (emp.poste or "").strip().lower() != "pompiste":
+            raise HTTPException(400, "Employé introuvable")
+        if not est_employe_pompiste(db, emp):
             raise HTTPException(
                 400, f"'{emp.prenom} {emp.nom}' n'a pas le poste Pompiste (poste actuel : {emp.poste or '—'})."
             )

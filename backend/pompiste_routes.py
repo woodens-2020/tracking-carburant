@@ -114,18 +114,31 @@ def employe_du_compte(db: Session, u: Utilisateur, prenom: Optional[str] = None,
     return emp
 
 
-def rattacher_employes_pompistes(db: Session) -> None:
-    """Démarrage : comptes pompistes sans fiche employé (créés avant ce
-    rattachement) et relevés de l'espace pompiste sans pompiste attribué."""
+def rattacher_employes_pompistes(db: Session) -> dict:
+    """Chaque compte pompiste a sa fiche employé (poste « Pompiste ») et
+    chaque relevé venu de l'espace pompiste est attribué à son pompiste.
+    Lancé au démarrage dans chaque station et depuis « Comptes pompistes ».
+    Ne touche jamais un relevé déjà attribué."""
     role = assurer_role_pompiste(db)
-    for u in db.query(Utilisateur).filter_by(role_id=role.id).all():
+    comptes = db.query(Utilisateur).filter_by(role_id=role.id).all()
+    avant = {e.utilisateur_id for e in db.query(Employe).filter(Employe.utilisateur_id.isnot(None)).all()}
+    for u in comptes:
         employe_du_compte(db, u)
+    crees = sum(1 for u in comptes if u.id not in avant)
+    attribues = 0
     for r in db.query(Releve).filter(Releve.rapport_pompiste_id.isnot(None), Releve.pompiste_id.is_(None)).all():
         rap = db.get(RapportPompiste, r.rapport_pompiste_id)
         emp = db.query(Employe).filter_by(utilisateur_id=rap.utilisateur_id).first() if rap else None
         if emp:
             r.pompiste_id = emp.id
+            attribues += 1
     db.commit()
+    return {"comptes": len(comptes), "fiches_creees": crees, "releves_attribues": attribues}
+
+
+def est_employe_pompiste(db: Session, emp: Employe) -> bool:
+    """Poste « Pompiste » ou fiche liée à un compte pompiste."""
+    return (emp.poste or "").strip().lower() == "pompiste" or emp.id in ids_employes_pompistes(db)
 
 
 class _RequeteInterne:
@@ -400,7 +413,7 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
 
 # Le pompiste choisit la date de son rapport dans un calendrier : jamais
 # dans le futur, et au plus JOURS_EN_ARRIERE jours en arrière.
-JOURS_EN_ARRIERE = 31
+JOURS_EN_ARRIERE = 75        # saisie des rapports des deux derniers mois
 
 
 def _valider_date(d: date_type) -> None:
@@ -1376,6 +1389,13 @@ def _station_valide(db: Session, v: Optional[str]) -> Optional[str]:
 @router.get("/api/pompiste-supervision/stations")
 def lister_stations(_s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     return stations_connues(db)
+
+
+@router.post("/api/pompiste-supervision/recuperer-employes")
+def recuperer_employes(_s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Tous les pompistes enregistrés deviennent des employés (poste
+    Pompiste), disponibles pour l'attribution des relevés."""
+    return rattacher_employes_pompistes(db)
 
 
 @router.get("/api/pompiste-supervision/comptes")
