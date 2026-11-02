@@ -3666,30 +3666,6 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
       <span class="nav-active-dot"></span>
     </button>
 
-    <button class="nav-item" data-page="rapport-analytique" onclick="goTo('rapport-analytique')">
-      <span class="nav-icon">
-        <svg viewBox="0 0 24 24"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
-      </span>
-      <span data-i18n="nav.rapport">Rapport Analytique</span>
-      <span class="nav-active-dot"></span>
-    </button>
-
-    <button class="nav-item" data-page="statistiques" onclick="goTo('statistiques')">
-      <span class="nav-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      </span>
-      <span>Rapport Statistique</span>
-      <span class="nav-active-dot"></span>
-    </button>
-
-    <button class="nav-item" data-page="previsions" onclick="goTo('previsions')">
-      <span class="nav-icon">
-        <svg viewBox="0 0 24 24"><polyline points="2 20 8 14 13 17 22 7"/><polyline points="17 7 22 7 22 12"/></svg>
-      </span>
-      <span data-i18n="nav.previsions">Prévisions</span>
-      <span class="nav-active-dot"></span>
-    </button>
-
     <button class="nav-item" data-page="rapports" onclick="goTo('rapports')">
       <span class="nav-icon">
         <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -3745,14 +3721,6 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
         <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
       </span>
       <span>Achats</span>
-      <span class="nav-active-dot"></span>
-    </button>
-
-    <button class="nav-item" data-page="caisse" onclick="goTo('caisse')">
-      <span class="nav-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-      </span>
-      <span>Rapport de Caisse</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -4164,7 +4132,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17h7M17 14v7"/></svg></span>
     <span>Tableau</span>
   </button>
-  <button class="mnav-btn" data-page="caisse" onclick="goTo('caisse')">
+  <button class="mnav-btn" data-page="caisse-principale" onclick="goTo('caisse-principale')">
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M2 11h20"/></svg></span>
     <span>Caisse</span>
   </button>
@@ -4776,209 +4744,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
       <div id="cjr-body"></div>
     </div>
 
-    <!-- ══ RAPPORT ANALYTIQUE ══ -->
-    <div id="page-rapport-analytique" class="page">
 
-      <!-- Barre d'outils période -->
-      <div class="db-filters-card" style="margin-bottom:18px">
-
-        <!-- Presets rapides -->
-        <div class="db-preset-bar">
-          <span class="db-preset-lbl">Période rapide</span>
-          <div class="db-presets-wrap">
-            <button class="db-preset" onclick="setRaPreset('today')"         data-ra="today">Aujourd'hui</button>
-            <button class="db-preset" onclick="setRaPreset('yesterday')"     data-ra="yesterday">Hier</button>
-            <button class="db-preset" onclick="setRaPreset('week')"          data-ra="week">7 derniers jours</button>
-            <button class="db-preset" onclick="setRaPreset('month')"         data-ra="month">30 derniers jours</button>
-            <button class="db-preset" onclick="setRaPreset('current_month')" data-ra="current_month">Ce mois-ci</button>
-            <button class="db-preset" onclick="setRaPreset('quarter')"       data-ra="quarter">3 derniers mois</button>
-            <button class="db-preset" onclick="setRaPreset('year')"          data-ra="year">Cette année</button>
-          </div>
-        </div>
-
-        <!-- Champs de dates + produit + actions -->
-        <div class="db-custom-filters" style="flex-wrap:wrap;gap:10px">
-          <div class="filter-group">
-            <label class="filter-label">Début</label>
-            <input type="date" id="ra-debut" class="filter-input">
-          </div>
-          <div style="display:flex;align-items:flex-end;padding-bottom:1px;color:var(--muted);font-size:20px;font-weight:300">→</div>
-          <div class="filter-group">
-            <label class="filter-label">Fin</label>
-            <input type="date" id="ra-fin" class="filter-input">
-          </div>
-          <div class="filter-group">
-            <label class="filter-label">Produit</label>
-            <select id="ra-prod" class="filter-input" style="min-width:130px">
-              <option value="">Tous les produits</option>
-            </select>
-          </div>
-          <div class="filter-spacer"></div>
-          <button class="ra-btn-gen" onclick="genRapport()">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            Générer le rapport
-          </button>
-          <button id="ra-btn-print" onclick="printRapport()" class="ra-btn-dl" style="display:none">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            Imprimer
-          </button>
-          <button id="ra-btn-csv" onclick="exportRapportCSV()" class="ra-btn-dl" style="display:none">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            CSV
-          </button>
-        </div>
-      </div>
-
-      <!-- Contenu généré dynamiquement -->
-      <div id="ra-content">
-        <div class="ra-empty">
-          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          <span>Sélectionne une période et clique sur Générer le rapport</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══════════════════════════════════════════
-         PAGE RAPPORT STATISTIQUE
-    ══════════════════════════════════════════ -->
-    <div id="page-statistiques" class="page page-gi">
-    <div class="gi-page">
-
-      <!-- Header -->
-      <div class="gi-page-header" style="--gi-accent:#a78bfa;--gi-bg:rgba(167,139,250,.11);--gi-bd:rgba(167,139,250,.22);--gi-glow:rgba(167,139,250,.15)">
-        <div class="gi-page-header-left">
-          <div class="gi-page-header-icon">
-            <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          </div>
-          <div class="gi-page-header-text">
-            <div class="gi-title">Rapport Statistique</div>
-            <div class="gi-subtitle" id="stats-subtitle">Rendement · Variabilité · Rentabilité · Point mort · Rotation</div>
-          </div>
-        </div>
-        <div class="gi-page-header-actions">
-          <button class="gi-btn-secondary" onclick="exportStatsCsv()">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            CSV
-          </button>
-        </div>
-      </div>
-
-      <!-- Filtres -->
-      <div class="gi-filters">
-        <div class="gi-filter-field">
-          <span class="gi-filter-lbl">Période rapide</span>
-          <div style="display:flex;gap:5px;flex-wrap:wrap;max-width:420px">
-            <button class="gid-period-btn"        data-sp="hier"   onclick="setStPreset('hier'  ,this)">Hier</button>
-            <button class="gid-period-btn"        data-sp="7j"     onclick="setStPreset('7j'    ,this)">7 jours</button>
-            <button class="gid-period-btn active" data-sp="30j"    onclick="setStPreset('30j'   ,this)">30 jours</button>
-            <button class="gid-period-btn"        data-sp="mois"   onclick="setStPreset('mois'  ,this)">Ce mois</button>
-            <button class="gid-period-btn"        data-sp="semd"   onclick="setStPreset('semd'  ,this)">Semaine dernière</button>
-            <button class="gid-period-btn"        data-sp="moisd"  onclick="setStPreset('moisd' ,this)">Mois dernier</button>
-            <button class="gid-period-btn"        data-sp="trim"   onclick="setStPreset('trim'  ,this)">Trimestre</button>
-            <button class="gid-period-btn"        data-sp="an"     onclick="setStPreset('an'    ,this)">Année</button>
-            <button class="gid-period-btn"        data-sp="and"    onclick="setStPreset('and'   ,this)">Année dernière</button>
-          </div>
-        </div>
-        <div class="gi-filter-field">
-          <span class="gi-filter-lbl">Début</span>
-          <input type="date" id="st-debut" class="gi-filter-input" style="min-width:140px">
-        </div>
-        <div class="gi-filter-field">
-          <span class="gi-filter-lbl">Fin</span>
-          <input type="date" id="st-fin" class="gi-filter-input" style="min-width:140px">
-        </div>
-        <div class="gi-filter-field">
-          <span class="gi-filter-lbl">Produit</span>
-          <select id="st-prod" class="gi-filter-select" onchange="_stFiltrerPompes()">
-            <option value="">Tous les produits</option>
-          </select>
-        </div>
-        <div class="gi-filter-field">
-          <span class="gi-filter-lbl">Pompe</span>
-          <select id="st-pompe" class="gi-filter-select">
-            <option value="">Toutes les pompes</option>
-          </select>
-        </div>
-        <div class="gi-filter-field">
-          <span class="gi-filter-lbl">Comparer à</span>
-          <select id="st-comparaison" class="gi-filter-select">
-            <option value="precedente">Période précédente</option>
-            <option value="annee_derniere">Même période l'an dernier</option>
-          </select>
-        </div>
-        <div style="margin-top:auto">
-          <button class="gi-btn-primary" style="--gi-accent:#a78bfa;--gi-bd:rgba(167,139,250,.45);--gi-glow:rgba(167,139,250,.28)" onclick="loadStatistiques()">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            Analyser
-          </button>
-        </div>
-      </div>
-
-      <!-- Contenu dynamique -->
-      <div id="stats-body">
-        <div class="gi-empty">
-          <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <span>Sélectionnez une période et cliquez sur Analyser</span>
-        </div>
-      </div>
-
-    </div><!-- /gi-page -->
-    </div><!-- /page-statistiques -->
-
-    <!-- ══ PRÉVISIONS ══════════════════════════════════════════ -->
-    <div id="page-previsions" class="page">
-
-      <!-- Barre d'outils -->
-      <div class="db-filters-card" style="margin-bottom:20px">
-        <div class="db-preset-bar">
-          <span class="db-preset-lbl">Horizon rapide</span>
-          <div class="db-presets-wrap">
-            <button class="db-preset" onclick="setFcHorizon(7)" data-h="7">7 jours</button>
-            <button class="db-preset active" onclick="setFcHorizon(14)" data-h="14">14 jours</button>
-            <button class="db-preset" onclick="setFcHorizon(21)" data-h="21">21 jours</button>
-            <button class="db-preset" onclick="setFcHorizon(30)" data-h="30">30 jours</button>
-          </div>
-        </div>
-        <div class="db-custom-filters">
-          <div class="filter-group">
-            <label class="filter-label" data-i18n="fc.metric">Métrique</label>
-            <select id="fc-metric" class="filter-select">
-              <option value="montant" data-i18n-opt="fc.opt.montant">CA (Gourdes)</option>
-              <option value="quantite" data-i18n-opt="fc.opt.quantite">Volume (gallons)</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label class="filter-label" data-i18n="fc.horizon">Horizon (jours)</label>
-            <select id="fc-horizon" class="filter-select">
-              <option value="7">7 jours</option>
-              <option value="14" selected>14 jours</option>
-              <option value="21">21 jours</option>
-              <option value="30">30 jours</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label class="filter-label" data-i18n="fc.objectif">Objectif/jour (G)</label>
-            <input type="number" id="fc-objectif" min="0" step="1000" placeholder="ex : 500 000" class="filter-input" style="width:140px">
-          </div>
-          <div class="filter-spacer"></div>
-          <button class="btn btn-primary db-btn-analyze" onclick="calcForecast()">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            <span data-i18n="fc.calc">Calculer les prévisions</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Contenu dynamique -->
-      <div id="fc-content">
-        <div class="db-empty-state">
-          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="var(--border2)" stroke-width="1.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <p style="margin-top:14px;font-size:16px;color:var(--muted)" data-i18n="fc.empty">Paramètre l'horizon et clique sur Calculer les prévisions</p>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- ══ STOCK & RENTABILITÉ ══════════════════════════════════ -->
     <div id="page-stock" class="page">
 
       <!-- Onglets -->
@@ -6776,134 +6542,6 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
       </div>
     </div><!-- /page-achats -->
 
-    <!-- ══════════════════════════════════════════════════════ -->
-    <!-- PAGE RAPPORT DE CAISSE                                 -->
-    <!-- ══════════════════════════════════════════════════════ -->
-    <div id="page-caisse" class="page page-gi">
-      <div class="gi-page" style="--gi-accent:#22c55e;--gi-bg:rgba(34,197,94,.11);--gi-bd:rgba(34,197,94,.22);--gi-glow:rgba(34,197,94,.15)">
-
-        <!-- Header -->
-        <div class="gi-page-header">
-          <div class="gi-page-header-left">
-            <div class="gi-page-header-icon" style="background:linear-gradient(135deg,rgba(34,197,94,.25),rgba(34,197,94,.1));border-color:rgba(34,197,94,.3);box-shadow:0 0 18px rgba(34,197,94,.2)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-            </div>
-            <div class="gi-page-header-text">
-              <div class="gi-title">Rapport de Caisse</div>
-              <div class="gi-subtitle">Synthèse financière · Ventes · Sorties · Cash disponible</div>
-            </div>
-          </div>
-          <div class="gi-page-header-actions">
-            <button class="gi-btn-secondary" onclick="loadCaisse()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              Actualiser
-            </button>
-          </div>
-        </div>
-
-        <!-- Filtres période -->
-        <div class="gi-filters">
-          <div class="gi-filter-field">
-            <label class="gi-filter-lbl">Du</label>
-            <input type="date" class="gi-filter-input" id="caisse-debut" onchange="loadCaisse()"/>
-          </div>
-          <div class="gi-filter-field">
-            <label class="gi-filter-lbl">Au</label>
-            <input type="date" class="gi-filter-input" id="caisse-fin" onchange="loadCaisse()"/>
-          </div>
-          <div class="gi-filter-field" style="justify-content:flex-end;margin-left:auto">
-            <label class="gi-filter-lbl" style="opacity:0">.</label>
-            <button class="gi-btn-secondary" onclick="caisseResetFiltres()" style="height:36px">Tout afficher</button>
-          </div>
-        </div>
-
-        <!-- KPI principal : Cash disponible -->
-        <div id="caisse-cash-card" class="caisse-cash-card">
-          <div class="caisse-cash-label">CASH DISPONIBLE</div>
-          <div class="caisse-cash-val" id="caisse-cash-val">—</div>
-          <div class="caisse-cash-sub" id="caisse-cash-sub">Chargement…</div>
-          <button class="gi-btn-primary" id="caisse-btn-renfl" onclick="renflOpenModal('institution')" style="display:none;margin-top:12px;">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Renflouement de la Grande Caisse
-          </button>
-        </div>
-
-        <!-- KPI row : 4 blocs -->
-        <div class="gi-kpi-row" style="grid-template-columns:repeat(4,1fr)">
-          <div class="gi-kpi" style="border-top:3px solid #22c55e">
-            <div class="gi-kpi-lbl">Total Ventes (toute l'institution)</div>
-            <div class="gi-kpi-val" style="color:#22c55e" id="caisse-kpi-ventes">—</div>
-            <div class="gi-kpi-sub" id="caisse-kpi-ventes-gal">0 gal</div>
-          </div>
-          <div class="gi-kpi" style="border-top:3px solid #f7a93b">
-            <div class="gi-kpi-lbl">Total Achats (toute l'institution)</div>
-            <div class="gi-kpi-val" style="color:#f7a93b" id="caisse-kpi-achats">—</div>
-            <div class="gi-kpi-sub" id="caisse-kpi-achats-nb">0 achat(s)</div>
-          </div>
-          <div class="gi-kpi" style="border-top:3px solid #3fb6a8">
-            <div class="gi-kpi-lbl">Payroll versé (RH + Bar)</div>
-            <div class="gi-kpi-val" style="color:#3fb6a8" id="caisse-kpi-payroll">—</div>
-            <div class="gi-kpi-sub" id="caisse-kpi-payroll-sub">0 fiche(s) payée(s)</div>
-          </div>
-          <div class="gi-kpi" style="border-top:3px solid #f87171">
-            <div class="gi-kpi-lbl">Total Dépenses (toute l'institution)</div>
-            <div class="gi-kpi-val" style="color:#f87171" id="caisse-kpi-depenses">—</div>
-            <div class="gi-kpi-sub" id="caisse-kpi-depenses-nb">0 dépense(s)</div>
-          </div>
-        </div>
-
-        <!-- Détail : 2 colonnes -->
-        <div class="caisse-detail-grid">
-
-          <!-- Ventes par produit -->
-          <div class="gi-table-card">
-            <div class="gi-table-hdr" style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap">
-              <span class="gi-table-title" style="color:#22c55e">Cash carburant encaissé — par produit</span>
-              <span style="font-size:15px;font-weight:800;color:#22c55e" id="caisse-prod-total">—</span>
-            </div>
-            <div id="caisse-prod-wrap" style="padding:12px 16px"></div>
-          </div>
-
-          <!-- Dépenses par catégorie -->
-          <div class="gi-table-card">
-            <div class="gi-table-hdr">
-              <span class="gi-table-title" style="color:#f87171">Dépenses station par catégorie</span>
-            </div>
-            <div id="caisse-cat-wrap" style="padding:12px 16px"></div>
-          </div>
-
-        </div>
-
-        <!-- Autres départements (Bar, Cuisine, Hôtel) -->
-        <div class="gi-table-card" style="margin-top:16px">
-          <div class="gi-table-hdr">
-            <span class="gi-table-title" style="color:#a78bfa">Autres départements — détail</span>
-          </div>
-          <div id="caisse-autres-dept-wrap" style="padding:12px 16px"></div>
-        </div>
-
-        <!-- Renflouements récents -->
-        <div class="gi-table-card" style="margin-top:16px">
-          <div class="gi-table-hdr">
-            <span class="gi-table-title" style="color:#22c55e">Renflouements récents</span>
-            <span class="gi-table-count" id="caisse-renfl-total">—</span>
-          </div>
-          <div id="caisse-renfl-wrap" style="padding:12px 16px"></div>
-        </div>
-
-        <!-- Payroll en attente (brouillon) -->
-        <div id="caisse-engage-wrap" style="display:none" class="gi-table-card">
-          <div class="gi-table-hdr">
-            <span class="gi-table-title" style="color:#f7a93b">Payroll engagé (non encore versé)</span>
-            <span class="gi-table-count" id="caisse-engage-montant">—</span>
-          </div>
-          <div style="padding:10px 16px;font-size:14px;color:var(--muted)">
-            Ces fiches de paie sont en brouillon — elles seront déduites du cash une fois marquées comme payées.
-            <br>Cash après versement estimé : <strong id="caisse-apres-engage" style="color:#f7a93b">—</strong>
-          </div>
-        </div>
-
-      </div>
-    </div><!-- /page-caisse -->
 
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- PAGE POS — DASHBOARD BAR                                -->
@@ -15237,7 +14875,10 @@ function _defaultPage(){
   return 'home';
 }
 
+// Pages retirées : un ancien lien ou une page mémorisée mène au tableau de bord
+const _PAGES_RETIREES = new Set(['rapport-analytique','statistiques','previsions','caisse']);
 function goTo(page){
+  if(_PAGES_RETIREES.has(page)) page = 'dashboard';
   if(!_canAccess(page)){
     const def = _defaultPage();
     if(page !== def){
@@ -15280,8 +14921,6 @@ function goTo(page){
   if(page==='caisse-principale')  loadCaissePrincipale();
   if(page==='journal')            initJournal();
   if(page==='carburant-rapport')  loadCarburantRapport();
-  if(page==='rapport-analytique') initRapportAnalytique();
-  if(page==='previsions')         initPrevisions();
   if(page==='stock')              initStock();
   if(page==='admin')              initAdmin();
   if(page==='rapports-dl')       initRapports();
