@@ -369,6 +369,8 @@ app.add_middleware(EspaceMiddleware)
 app.include_router(pos_router)
 from espaces_routes import router as espaces_router
 app.include_router(espaces_router)
+from intelligence import router as intelligence_router
+app.include_router(intelligence_router)
 app.include_router(bar_caisses_router)
 app.include_router(pos_analyse_router)
 app.include_router(caisse_router)

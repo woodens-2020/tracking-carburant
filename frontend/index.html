@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Konekta · Bon Prix</title>
 <link rel="stylesheet" href="/shared/loading-overlay.css">
+<link rel="stylesheet" href="/shared/intelligence.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
@@ -3530,6 +3531,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 <div id="load-overlay"><div class="lo-badge"><div class="lo-ring"></div><span class="lo-k">K</span></div></div>
 <script src="/shared/loading-overlay.js"></script>
 <script src="/shared/i18n-errors.js"></script>
+<script src="/shared/intelligence.js" defer></script>
 
 <!-- ═══════ SIDEBAR ═══════ -->
 <aside class="sidebar" id="mnav-drawer">
@@ -3614,6 +3616,14 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       </span>
       <span>Tâches</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="intelligence" onclick="goTo('intelligence')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/><circle cx="19" cy="8" r="1.5"/></svg>
+      </span>
+      <span>Intelligence Center</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -4469,6 +4479,8 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
     </div>
 
     <!-- ══════ PAGE : SAISIE ══════ -->
+    <div id="page-intelligence" class="page"></div>
+
     <div id="page-caisse-principale" class="page">
       <div class="psp-tabs">
         <button class="psp-tab on" data-cp="journal" onclick="cpOnglet('journal')">Journal de caisse</button>
@@ -14818,6 +14830,7 @@ const PAGE_META={
   home:                {title: ()=>t('page.home.title'),        sub: ()=>t('page.home.sub')},
   dashboard:           {title: ()=>t('page.dashboard.title'),   sub: ()=>t('page.dashboard.sub')},
   saisie:              {title: ()=>t('page.saisie.title'),      sub: ()=>t('page.saisie.sub')},
+  intelligence:        {title: 'KONEKTA Intelligence Center',   sub: 'Analyse de gestion — revenu, charges, trésorerie, opérations, départements'},
   'caisse-principale': {title: 'Caisse principale',             sub: 'Entrées d\'argent par source (stations, autres) et total de la caisse'},
   'pompistes-rapports':{title: 'Rapports pompistes',            sub: 'Confirmer, corriger ou refuser les compteurs soumis par les pompistes'},
   journal:             {title: ()=>t('page.journal.title'),     sub: ()=>t('page.journal.sub')},
@@ -14919,6 +14932,7 @@ function goTo(page){
   if(page==='saisie')             loadSaisie();
   if(page==='pompistes-rapports') loadPompistesRapports();
   if(page==='caisse-principale')  loadCaissePrincipale();
+  if(page==='intelligence' && window.initIntelligence) initIntelligence();
   if(page==='journal')            initJournal();
   if(page==='carburant-rapport')  loadCarburantRapport();
   if(page==='stock')              initStock();
@@ -18676,8 +18690,8 @@ const _AREA_PAGES = {
     lecture: ['home'],
   },
   finance: {
-    complet: ['dashboard','journal','statistiques','gi-dashboard','depenses','achats','caisse'],
-    lecture: ['dashboard','journal','statistiques','gi-dashboard'],
+    complet: ['dashboard','journal','statistiques','intelligence','gi-dashboard','depenses','achats','caisse'],
+    lecture: ['dashboard','journal','statistiques','intelligence','gi-dashboard'],
   },
   bar: {
     complet: ['pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds','pos-fournisseurs'],
@@ -18712,7 +18726,7 @@ const _CAISSIER_ALLOWED = new Set([
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
-  'pos-fournisseurs','pompistes-rapports','caisse-principale',
+  'pos-fournisseurs','pompistes-rapports','caisse-principale','intelligence',
   'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'patisserie-dashboard','patisserie-produits','patisserie-achats','patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse',
@@ -18722,7 +18736,7 @@ const _MANAGER_ALLOWED = new Set([
 
 // Assistant Directeur — tous les rapports en lecture + Zelle complet
 const _AD_ALLOWED = new Set([
-  'home','pompistes-rapports','caisse-principale',
+  'home','pompistes-rapports','caisse-principale','intelligence',
   'dashboard','journal','carburant-rapport','statistiques','gi-dashboard','depenses','achats','caisse',
   'pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes',
   'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
@@ -18735,11 +18749,11 @@ const _AD_ALLOWED = new Set([
 // Fallback pour utilisateurs sans role_id (compatibilité ascendante)
 const _ACCES_POSTE_LEGACY = {
   'Directeur Général': null,
-  'Comptable':   ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
+  'Comptable':   ['home','dashboard','journal','carburant-rapport','statistiques','intelligence','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
-  'Superviseur': ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
+  'Superviseur': ['home','dashboard','journal','carburant-rapport','statistiques','intelligence','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
