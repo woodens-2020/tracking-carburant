@@ -2910,6 +2910,24 @@ def chat_endpoint(data: ChatIn, request: Request, db: Session = Depends(get_db))
     return result
 
 
+@app.get("/api/ia/journal")
+def journal_ia(request: Request, limite: int = 50, db: Session = Depends(get_db)):
+    """Journal de l'assistant IA (direction) : questions, outils, fournisseur,
+    durée, jetons, erreurs — suivi de la fiabilité et du coût."""
+    from models import IaJournal
+    from pompiste_routes import _user, peut_superviser
+    if not peut_superviser(_user(request, db)):
+        raise HTTPException(403, "Réservé à la direction.")
+    rows = db.query(IaJournal).order_by(IaJournal.id.desc()).limit(max(1, min(limite, 200))).all()
+    noms = {u.id: (u.nom_complet or u.username) for u in db.query(Utilisateur).filter(
+        Utilisateur.id.in_({r.utilisateur_id for r in rows if r.utilisateur_id})).all()}
+    return {"entrees": [{"date": r.created_at, "utilisateur": noms.get(r.utilisateur_id), "question": r.question,
+                         "outils": [o.get("nom") for o in (r.outils or [])], "fournisseur": r.fournisseur, "modele": r.modele,
+                         "duree_ms": r.duree_ms, "jetons_entree": r.jetons_entree, "jetons_sortie": r.jetons_sortie,
+                         "erreur": r.erreur} for r in rows],
+            "jetons_total": {"entree": sum(r.jetons_entree or 0 for r in rows), "sortie": sum(r.jetons_sortie or 0 for r in rows)}}
+
+
 @app.get("/api/chat/conversations")
 def list_conversations(request: Request, db: Session = Depends(get_db)):
     user = request.state.user
