@@ -121,7 +121,7 @@ def _valeur_stock(db: Session) -> Optional[dict]:
     coût d'achat connu : on n'invente pas de valeur)."""
     from models import Produit
     from stock_service import cout_moyen_pondere, stock_restant
-    total, gallons, inconnus = 0.0, 0.0, []
+    total, gallons, inconnus = 0.0, {}, []
     for p in db.query(Produit).filter(Produit.actif.is_(True)).all():
         if not p.pompes:
             continue
@@ -131,10 +131,10 @@ def _valeur_stock(db: Session) -> Optional[dict]:
             inconnus.append(p.nom)
             continue
         total += max(g, 0.0) * cmp_
-        gallons += max(g, 0.0)
+        gallons[p.nom] = round(max(g, 0.0), 3)
     if not total and inconnus:
         return None
-    return {"valeur": round(total, 2), "gallons": round(gallons, 1), "sans_cout": inconnus}
+    return {"valeur": round(total, 2), "gallons_par_produit": gallons, "sans_cout": inconnus}
 
 
 class _Station:
@@ -168,7 +168,7 @@ def _stations(request: Request, db: Session, demande: Optional[str]) -> list:
 
 def _donnees(db: Session, stations: list, debut: date_type, fin: date_type, avec_stock: bool = False) -> dict:
     """Données brutes des stations demandées, chaque ligne marquée de sa station."""
-    lignes, releves, solde, stock = [], [], 0.0, {"valeur": 0.0, "gallons": 0.0, "sans_cout": []}
+    lignes, releves, solde, stock = [], [], 0.0, {"valeur": 0.0, "gallons_par_produit": {}, "sans_cout": []}
     stock_connu = False
     for st in stations:
         def lire(s=st):
@@ -195,7 +195,8 @@ def _donnees(db: Session, stations: list, debut: date_type, fin: date_type, avec
         if avec_stock and d.get("stock"):
             stock_connu = True
             stock["valeur"] += d["stock"]["valeur"]
-            stock["gallons"] += d["stock"]["gallons"]
+            for p, g in d["stock"]["gallons_par_produit"].items():
+                stock["gallons_par_produit"][p] = round(stock["gallons_par_produit"].get(p, 0.0) + g, 3)
             stock["sans_cout"] += d["stock"]["sans_cout"]
     return {"lignes": lignes, "releves": releves, "solde_fin": round(solde, 2),
             "stock": stock if stock_connu else None}
@@ -282,14 +283,20 @@ def _kpis(lignes: list, releves: list, debut: date_type, fin: date_type) -> dict
     dec = sum(l["credit"] for l in lignes)
     jours = (fin - debut).days + 1
     jours_ventes = len({l["date"] for l in lignes if l["type"] in REVENU and _montant(l)})
-    gallons = sum(r["gallons"] for r in releves)
+    # Gazoline, Diesel, Propane… : gallons et prix moyen jamais additionnés entre produits
+    gal_pp: dict = defaultdict(float)
+    mnt_pp: dict = defaultdict(float)
+    for r in releves:
+        gal_pp[r["produit"]] += r["gallons"]
+        mnt_pp[r["produit"]] += r["montant"]
     return {
         "revenu": round(revenu, 2), "charges": round(charges, 2), "resultat": round(revenu - charges, 2),
         "marge": round((revenu - charges) / revenu * 100, 1) if revenu else None,
         "encaissements": round(enc, 2), "decaissements": round(dec, 2), "flux_net": round(enc - dec, 2),
-        "gallons": round(gallons, 1), "nb_releves": len(releves), "nb_operations": len(lignes),
+        "gallons_par_produit": {p: round(g, 3) for p, g in sorted(gal_pp.items())},
+        "prix_moyen_par_produit": {p: round(mnt_pp[p] / g, 2) for p, g in sorted(gal_pp.items()) if g},
+        "nb_releves": len(releves), "nb_operations": len(lignes),
         "revenu_moyen_jour": round(revenu / jours, 2), "jours": jours, "jours_ventes": jours_ventes,
-        "prix_moyen_gallon": round(sum(r["montant"] for r in releves) / gallons, 2) if gallons else None,
     }
 
 
@@ -351,7 +358,7 @@ def _grouper(items, cle, valeurs) -> list:
         o["nb"] += 1
     for o in out.values():
         for v in valeurs:
-            o[v] = round(o[v], 2)
+            o[v] = round(o[v], 3 if v.startswith("gallons") else 2)     # gallons : 3 décimales, argent : 2
     return list(out.values())
 
 
@@ -411,13 +418,15 @@ def _analyse_complete(lignes, releves, prev_l, prev_r, debut, fin, comp) -> dict
     for r in releves:
         par_prod_jour[r["produit"]][_seau(date_type.fromisoformat(r["date"]), g)] += r["gallons"]
 
-    pompistes = _grouper(releves, lambda r: r["pompiste"] or "Saisie au bureau",
-                         {"gallons": lambda r: r["gallons"], "montant": lambda r: r["montant"]})
+    pompistes = _grouper(releves, lambda r: r["pompiste"] or "Saisie au bureau", {"montant": lambda r: r["montant"]})
     jours_p = defaultdict(set)
+    gal_p = defaultdict(lambda: defaultdict(float))
     for r in releves:
         jours_p[r["pompiste"] or "Saisie au bureau"].add(r["date"])
+        gal_p[r["pompiste"] or "Saisie au bureau"][r["produit"]] += r["gallons"]
     for p in pompistes:
         p["jours"] = len(jours_p[p["nom"]])
+        p["gallons_par_produit"] = {k: round(v, 3) for k, v in sorted(gal_p[p["nom"]].items())}
     pompistes.sort(key=lambda p: -p["montant"])
     pompes = _grouper(releves, lambda r: f"{r['pompe']}" + (f" · {r['station']}" if len({x['station'] for x in releves}) > 1 else ""),
                       {"gallons": lambda r: r["gallons"], "montant": lambda r: r["montant"]})
@@ -426,23 +435,23 @@ def _analyse_complete(lignes, releves, prev_l, prev_r, debut, fin, comp) -> dict
                                                           "encaissements": lambda l: l["debit"], "decaissements": lambda l: l["credit"]})
     for s in stations:
         s["resultat"] = round(s["revenu"] - s["charges"], 2)
-    gal_st = defaultdict(float)
+    gal_st = defaultdict(lambda: defaultdict(float))
     for r in releves:
-        gal_st[r["station"]] += r["gallons"]
+        gal_st[r["station"]][r["produit"]] += r["gallons"]
     for s in stations:
-        s["gallons"] = round(gal_st.get(s["nom"], 0.0), 1)
+        s["gallons_par_produit"] = {p: round(g, 3) for p, g in sorted(gal_st.get(s["nom"], {}).items())}
 
     # Activité : jour de la semaine × créneau (ventes carburant, en gourdes)
-    carte = [[0.0, 0.0] for _ in range(7)]
+    carte = [0.0] * 7
     nb_jours_semaine = [0] * 7
     d = debut
     while d <= fin:
         nb_jours_semaine[d.weekday()] += 1
         d += timedelta(days=1)
     for r in releves:
-        carte[date_type.fromisoformat(r["date"]).weekday()][0 if r["periode"] == "Matin" else 1] += r["montant"]
-    activite = [{"jour": JOURS_SEMAINE[i], "matin": round(carte[i][0], 2), "apres_midi": round(carte[i][1], 2),
-                 "nb_jours": nb_jours_semaine[i]} for i in range(7)]
+        carte[date_type.fromisoformat(r["date"]).weekday()] += r["montant"]
+    activite = [{"jour": JOURS_SEMAINE[i], "montant": round(carte[i], 2), "nb_jours": nb_jours_semaine[i],
+                 "moyenne": round(carte[i] / nb_jours_semaine[i], 2) if nb_jours_semaine[i] else 0.0} for i in range(7)]
 
     # Calendrier : revenu par jour (365 derniers jours de la période au plus)
     cal = defaultdict(float)
@@ -459,7 +468,7 @@ def _analyse_complete(lignes, releves, prev_l, prev_r, debut, fin, comp) -> dict
     series = _series(lignes, debut, fin, g)
     series_prec = _series(prev_l, comp[0], comp[1], g) if comp else None
     for p in produits:
-        p["series"] = [round(par_prod_jour[p["nom"]].get(s["cle"], 0.0), 1) for s in series]
+        p["series"] = [round(par_prod_jour[p["nom"]].get(s["cle"], 0.0), 3) for s in series]
 
     out = {
         "granularite": g, "kpis": k, "kpis_prec": kp, "variations": variations,
@@ -535,7 +544,7 @@ def _insights(a: dict, lignes, releves, debut, fin, comp) -> list:
     for p in a["produits"]:
         if p["variation"] is not None and p["variation"] <= -15 and p["montant_prec"]:
             ajouter("attention", f"{p['nom']} : ventes en baisse de {abs(p['variation'])} %",
-                    f"{round(p['gallons'], 1)} gallons vendus contre {round(p['gallons_prec'] or 0, 1)}.",
+                    f"{p['gallons']:.3f} gallons vendus contre {(p['gallons_prec'] or 0):.3f}.".replace(".", ","),
                     "Ventes par produit", f"{_g(p['montant'])} contre {_g(p['montant_prec'])}",
                     "Prix, approvisionnement (rupture ?) et pompes de ce produit.")
 
@@ -560,8 +569,7 @@ def _insights(a: dict, lignes, releves, debut, fin, comp) -> list:
                     + ("…" if len(sans) > 8 else ""),
                     "Rapports pompistes en attente ou relevés manquants (Journal Meters).")
     if (fin - debut).days + 1 >= 14 and releves:
-        moy_j = [sum(x["matin"] + x["apres_midi"] for x in a["activite"] if x["jour"] == j["jour"]) / j["nb_jours"]
-                 if j["nb_jours"] else 0 for j in a["activite"]]
+        moy_j = [j["moyenne"] for j in a["activite"]]
         m = statistics.mean([v for v in moy_j if v]) if any(moy_j) else 0
         if m:
             i = max(range(7), key=lambda i: moy_j[i])
@@ -705,7 +713,10 @@ def releves_du_jour(request: Request, debut: date_type, fin: Optional[date_type]
     f = Filtres(produits=produits, employes=employes)
     d = _donnees(db, st, debut, fin)
     rs = sorted((r for r in d["releves"] if f.releve(r)), key=lambda r: (r["date"], r["periode"] != "Matin", r["pompe"]))
-    return {"releves": rs, "gallons": round(sum(r["gallons"] for r in rs), 3),
+    gal: dict = defaultdict(float)
+    for r in rs:
+        gal[r["produit"]] += r["gallons"]
+    return {"releves": rs, "gallons_par_produit": {p: round(g, 3) for p, g in sorted(gal.items())},
             "montant": round(sum(r["montant"] for r in rs), 2)}
 
 
@@ -764,13 +775,16 @@ def exporter(request: Request, quoi: str = "synthese", format: str = "xlsx",
         k, kp = a["kpis"], a["kpis_prec"] or {}
         libs = [("revenu", "Revenu (ventes)"), ("charges", "Charges"), ("resultat", "Résultat (revenu − charges)"),
                 ("marge", "Marge (%)"), ("encaissements", "Encaissements"), ("decaissements", "Décaissements"),
-                ("flux_net", "Flux net de caisse"), ("gallons", "Gallons vendus"), ("nb_releves", "Relevés de compteurs"),
+                ("flux_net", "Flux net de caisse"), ("nb_releves", "Relevés de compteurs"),
                 ("nb_operations", "Opérations"), ("revenu_moyen_jour", "Revenu moyen par jour")]
         res = entete + [["Comparaison", f"{a['comparaison']['debut']} au {a['comparaison']['fin']}" if a["comparaison"] else "aucune"],
                         ["Stations", ", ".join(x["nom"] for x in a["stations_analysees"])], ["Filtres", filtres_txt], [],
                         ["Indicateur", "Valeur", "Période de comparaison", "Variation (%)"]]
         for c, lib in libs:
             res.append([lib, k[c], kp.get(c), a["variations"].get(c)])
+        for p, g in k["gallons_par_produit"].items():
+            res.append([f"Gallons vendus — {p}", g, (kp.get("gallons_par_produit") or {}).get(p),
+                        _variation(g, (kp.get("gallons_par_produit") or {}).get(p))])
         res.append(["Trésorerie (solde caisse à la date de fin)", a["tresorerie"]["solde_fin"]])
         if a["stock"]:
             res.append(["Valeur du stock carburant (coût moyen)", a["stock"]["valeur"]])
@@ -784,8 +798,9 @@ def exporter(request: Request, quoi: str = "synthese", format: str = "xlsx",
              + [[x["nom"], x["montant"], x["prec"], x["variation"], x["nb"]] for x in a["charges_par_categorie"]]),
             ("Produits", [["Produit", "Gallons", "Montant", "Montant préc.", "Variation (%)", "Relevés"]]
              + [[x["nom"], x["gallons"], x["montant"], x["montant_prec"], x["variation"], x["nb"]] for x in a["produits"]]),
-            ("Pompistes", [["Pompiste", "Gallons", "Montant", "Relevés", "Jours"]]
-             + [[x["nom"], x["gallons"], x["montant"], x["nb"], x["jours"]] for x in a["pompistes"]]),
+            ("Pompistes", [["Pompiste", "Gallons par produit", "Montant", "Relevés", "Jours"]]
+             + [[x["nom"], " · ".join(f"{p} {g:.3f}" for p, g in x["gallons_par_produit"].items()), x["montant"], x["nb"], x["jours"]]
+                for x in a["pompistes"]]),
             ("Analyses", [["Niveau", "Constat", "Explication", "Preuve", "À examiner"]]
              + [[x["niveau"], x["titre"], x["explication"], x["preuve"], x["a_examiner"]] for x in a["analyses"]]),
         ]

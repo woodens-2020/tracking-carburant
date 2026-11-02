@@ -526,3 +526,38 @@ def test_pompiste_rattache_a_une_station(client):
                         json={"station_adresse": ""}).json()["station_adresse"] is None
     ids = {x["id"] for x in p.get("/api/pompiste/contexte").json()["produits"]}
     assert {p1, p2} <= ids
+
+
+def test_creneau_automatique(client):
+    """Le pompiste ne choisit plus matin / après-midi : 1er rapport du jour
+    d'une pompe = Matin, 2e = Après-midi, 3e refusé."""
+    import main
+    from tz_utils import today_haiti
+    pompe = _produit(client, 700)
+    jour = str(today_haiti())
+
+    def pompiste():
+        c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Auto", "nom": "Creneau"}).json()
+        t = TestClient(main.app)
+        assert t.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]}).status_code == 200
+        return t
+
+    def envoyer(t, av, ap):
+        return t.post("/api/pompiste/compteurs", json={"date": jour, "charte_acceptee": True,
+                      "lignes": [{"pompe_id": pompe, "metter_avant": av, "metter_apres": ap, "debut_confirme": True}]})
+
+    a, b, c = pompiste(), pompiste(), pompiste()
+    ctx = a.get(f"/api/pompiste/contexte?date={jour}").json()
+    assert ctx["periode"] is None
+    assert all(not q["deja_rapportee"] for x in ctx["produits"] for q in x["pompes"] if q["id"] == pompe)
+    r = envoyer(a, 0, 10)
+    assert r.status_code == 201, r.text
+    assert a.get("/api/pompiste/contexte").json()["en_cours"]["periode"] == "Matin"
+    r = envoyer(b, 10, 25)
+    assert r.status_code == 201, r.text
+    assert b.get("/api/pompiste/contexte").json()["en_cours"]["periode"] == "Apres-midi"
+    # Deux rapports ce jour : la pompe apparaît « déjà rapportée » et un 3e envoi est refusé
+    ctx = c.get(f"/api/pompiste/contexte?date={jour}").json()
+    assert [q["deja_rapportee"] is not None for x in ctx["produits"] for q in x["pompes"] if q["id"] == pompe] == [True]
+    r = envoyer(c, 25, 30)
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "deja_rapporte"

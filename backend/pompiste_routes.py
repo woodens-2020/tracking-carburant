@@ -424,6 +424,35 @@ def _en_cours(db: Session, u: Utilisateur) -> Optional[RapportPompiste]:
 _ACTIFS = ("EN_COURS", "SOUMIS", "PROBLEME", "CONFIRME", "RESOLU")
 
 
+def _creneaux_pris(db: Session, d: date_type) -> dict:
+    """{pompe_id: {créneau: info}} des pompes déjà couvertes ce jour-là
+    (rapport pompiste actif ou relevé du journal)."""
+    pris: dict = {}
+    for l, rap in (db.query(RapportPompisteLigne, RapportPompiste)
+                   .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
+                   .filter(RapportPompiste.date == d, RapportPompiste.statut.in_(_ACTIFS)).all()):
+        pris.setdefault(l.pompe_id, {})[rap.periode] = {"par": _nom(rap.utilisateur), "statut": rap.statut,
+                                                         "rapport_utilisateur_id": rap.utilisateur_id}
+    for r in db.query(Releve).filter(Releve.date == d).all():
+        pris.setdefault(r.pompe_id, {}).setdefault(r.periode, {"par": "bureau", "statut": "CONFIRME",
+                                                                "rapport_utilisateur_id": None})
+    return pris
+
+
+def creneau_automatique(db: Session, d: date_type, pompe_ids: list) -> str:
+    """Le pompiste ne choisit plus matin / après-midi : premier rapport du
+    jour de ces pompes = « Matin », le suivant = « Apres-midi » (deux
+    rapports par pompe et par jour au plus)."""
+    pris = _creneaux_pris(db, d)
+    for per in PERIODES:
+        if not any(per in pris.get(pid, {}) for pid in pompe_ids):
+            return per
+    occupees = [pid for pid in pompe_ids if len(pris.get(pid, {})) >= len(PERIODES)]
+    noms = ", ".join(sorted(p.nom for p in db.query(Pompe).filter(Pompe.id.in_(occupees or pompe_ids)).all()))
+    raise HTTPException(409, {"code": "deja_rapporte", "pompes": noms,
+                              "message": f"Ces pompes ont déjà leurs deux rapports pour cette journée : {noms}."})
+
+
 @router.get("/api/pompiste/contexte")
 def contexte(date: Optional[date_type] = None, periode: Optional[str] = None,
              u: Utilisateur = Depends(_require_pompiste), db: Session = Depends(get_db)):
@@ -433,18 +462,19 @@ def contexte(date: Optional[date_type] = None, periode: Optional[str] = None,
     else:
         d = date or today_haiti()
         _valider_date(d)
-        if periode is None:
-            periode = "Matin" if now_haiti().hour < 13 else "Apres-midi"
-    if periode not in PERIODES:
+    if periode is not None and periode not in PERIODES:
         raise HTTPException(400, "Période invalide")
-    # Pompes déjà couvertes sur ce créneau (par ce pompiste ou un collègue)
+    # Pompes déjà couvertes (par ce pompiste ou un collègue) : sur le créneau
+    # du rapport ouvert, sinon quand la pompe a déjà ses deux rapports du jour
     prises = {}
-    for l, rap in (db.query(RapportPompisteLigne, RapportPompiste)
-                   .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
-                   .filter(RapportPompiste.date == d, RapportPompiste.periode == periode,
-                           RapportPompiste.statut.in_(_ACTIFS)).all()):
-        prises[l.pompe_id] = {"par": _nom(rap.utilisateur), "statut": rap.statut,
-                              "moi": rap.utilisateur_id == u.id}
+    for pid, par_creneau in _creneaux_pris(db, d).items():
+        if periode is not None:
+            info = par_creneau.get(periode)
+        else:
+            info = par_creneau.get("Apres-midi") if len(par_creneau) >= len(PERIODES) else None
+        if info:
+            prises[pid] = {"par": info["par"], "statut": info["statut"],
+                           "moi": info["rapport_utilisateur_id"] == u.id}
     produits = []
     for p in db.query(Produit).filter_by(actif=True).order_by(Produit.id).all():
         pompes = []
@@ -487,7 +517,7 @@ class BilletIn(BaseModel):
 
 class CompteursIn(BaseModel):
     date: date_type
-    periode: str
+    periode: Optional[str] = None        # absent : créneau attribué automatiquement
     charte_acceptee: bool
     lignes: list[LigneIn]
 
@@ -667,17 +697,21 @@ def envoyer_compteurs(data: CompteursIn, u: Utilisateur = Depends(_require_pompi
     une seule fois, au « Terminer »."""
     if not data.charte_acceptee:
         raise HTTPException(400, "La charte de responsabilité doit être acceptée.")
-    if data.periode not in PERIODES:
+    if data.periode is not None and data.periode not in PERIODES:
         raise HTTPException(400, "Période invalide")
     if not data.lignes:
         raise HTTPException(400, "Saisissez l'index d'au moins une pompe.")
     rap = _en_cours(db, u)
-    if rap and (rap.date != data.date or rap.periode != data.periode):
+    if rap and (rap.date != data.date or (data.periode is not None and rap.periode != data.periode)):
         raise HTTPException(409, {"code": "terminer_dabord",
-                                  "message": f"Terminez d'abord votre rapport du {_per(rap.periode)} "
+                                  "message": f"Terminez d'abord votre rapport du "
                                              f"{rap.date.strftime('%d/%m')} (bouton « Terminer »)."})
     if not rap:
         _valider_date(data.date)
+    if rap:
+        data.periode = rap.periode
+    elif data.periode is None:
+        data.periode = creneau_automatique(db, data.date, [l.pompe_id for l in data.lignes])
     lignes = _controler_lignes(db, data.date, data.periode, data.lignes, utilisateur=u)
 
     # Une pompe = un seul rapport actif par créneau

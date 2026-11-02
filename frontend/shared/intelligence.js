@@ -70,7 +70,9 @@ function requete(extra){
 
 // ── Formats ─────────────────────────────────────────────────────────
 const G = v => v == null ? '—' : fmtG(v);
-const GAL = v => v == null ? '—' : Number(v).toLocaleString('fr-FR', {maximumFractionDigits:1}) + ' gal';
+const GAL = v => v == null ? '—' : Number(v).toLocaleString('fr-FR', {minimumFractionDigits:3, maximumFractionDigits:3}) + ' gal';
+// Gazoline, Diesel, Propane… : gallons jamais additionnés, une ligne par produit
+const galPP = (pp, sep) => { const l = Object.entries(pp || {}).filter(([, g]) => g); return l.length ? l.map(([n, g]) => `${esc(n)} ${GAL(g)}`).join(sep || ' · ') : '—'; };
 const N = v => v == null ? '—' : Number(v).toLocaleString('fr-FR');
 const PCT = v => v == null ? '—' : `${Number(v).toLocaleString('fr-FR', {maximumFractionDigits:1})} %`;
 function badge(v, inverse){
@@ -264,7 +266,7 @@ function libComp(d){ return d.comparaison ? `du ${fr(d.comparaison.debut)} au ${
 
 // ── Vue d'ensemble ──────────────────────────────────────────────────
 function carteKpi(id, titre, aide, valeur, variation, inverse, contexte, action){
-  return `<button class="ic-kpi" id="ic-k-${id}" onclick="${action}" aria-label="${esc(titre)} : ${esc(valeur)}">
+  return `<button class="ic-kpi" id="ic-k-${id}" onclick="${action}" aria-label="${esc(titre)} : ${esc(String(valeur).replace(/<[^>]+>/g, ' '))}">
     <span class="t">${titre}${info(aide)}</span><span class="v">${valeur}</span>${badge(variation, inverse)}
     <span class="c">${contexte}</span></button>`;
 }
@@ -278,9 +280,9 @@ function apercu(el, d){
       ${carteKpi('resultat', 'Résultat', 'Revenu − charges, en base caisse : un achat de stock compte quand il est payé.', G(k.resultat), v.resultat, false, k.marge != null ? `Marge : ${PCT(k.marge)} du revenu` : 'Pas de revenu sur la période', "IC.voir('finances')")}
       ${carteKpi('treso', 'Trésorerie', 'Solde de la caisse principale à la date de fin (toutes opérations, filtres non appliqués).', G(d.tresorerie.solde_fin), null, false, `Au ${fr(d.periode.fin)} · ouverture ${G(d.tresorerie.ouverture)}`, "goTo('caisse-principale')")}
       ${carteKpi('enc', 'Encaissements', 'Tout l\'argent entré dans la caisse : ventes, entrées des sources, renflouements, remboursements de crédit.', G(k.encaissements), v.encaissements, false, `Sorties : ${G(k.decaissements)} · flux net ${G(k.flux_net)}`, "IC.drill('entrees')")}
-      ${carteKpi('gallons', 'Gallons vendus', 'Somme des relevés de compteurs validés (les rapports pompistes en attente ne comptent pas).', GAL(k.gallons), v.gallons, false, `${N(k.nb_releves)} relevés · prix moyen ${k.prix_moyen_gallon ? G(k.prix_moyen_gallon) + '/gal' : '—'}`, "IC.voir('operations')")}
+      ${carteKpi('gallons', 'Gallons vendus', 'Relevés de compteurs validés, produit par produit : les gallons de Gazoline, Diesel et Propane ne s’additionnent jamais. Les rapports pompistes en attente ne comptent pas.', `<span style="font-size:15px;line-height:1.5;white-space:normal">${galPP(k.gallons_par_produit, '<br>')}</span>`, null, false, `${N(k.nb_releves)} relevés · prix moyen : ${Object.entries(k.prix_moyen_par_produit || {}).map(([n, p]) => `${esc(n)} ${G(p)}/gal`).join(' · ') || '—'}`, "IC.voir('operations')")}
       ${carteKpi('moyen', 'Revenu moyen / jour', 'Revenu divisé par le nombre de jours de la période.', G(k.revenu_moyen_jour), v.revenu_moyen_jour, false, `${k.jours_ventes} jour(s) de vente sur ${k.jours}`, "IC.voir('operations')")}
-      ${carteKpi('stock', 'Valeur du stock', 'Stock carburant restant aujourd\'hui × coût moyen d\'achat. Sans coût d\'achat connu, aucune valeur n\'est affichée.', d.stock ? G(d.stock.valeur) : '—', null, false, d.stock ? `${GAL(d.stock.gallons)} en cuve${d.stock.sans_cout.length ? ' · sans coût : ' + esc(d.stock.sans_cout.join(', ')) : ''}` : 'Aucun coût d\'achat enregistré', "goTo('stock')")}
+      ${carteKpi('stock', 'Valeur du stock', 'Stock carburant restant aujourd\'hui × coût moyen d\'achat. Sans coût d\'achat connu, aucune valeur n\'est affichée.', d.stock ? G(d.stock.valeur) : '—', null, false, d.stock ? `En cuve : ${galPP(d.stock.gallons_par_produit)}${d.stock.sans_cout.length ? ' · sans coût : ' + esc(d.stock.sans_cout.join(', ')) : ''}` : 'Aucun coût d\'achat enregistré', "goTo('stock')")}
     </div>
     <div class="ic-grille">
       <section class="ic-carte l8"><h3>Revenu et charges</h3><p class="q">Les ventes couvrent-elles les charges, ${d.granularite === 'jour' ? 'jour par jour' : 'par ' + d.granularite} ?${d.series_prec ? ' En pointillé : le revenu de la période de comparaison.' : ''}</p>
@@ -382,30 +384,29 @@ function tableCharges(d){
 
 // ── Opérations ──────────────────────────────────────────────────────
 function operations(el, d){
-  const hmMax = Math.max(1, ...d.activite.map(a => Math.max(a.matin / (a.nb_jours || 1), a.apres_midi / (a.nb_jours || 1))));
-  const cel = (v, n) => { const m = n ? v / n : 0, a = m / hmMax;
-    return `<div style="background:rgba(59,130,246,${(0.08 + a * 0.82).toFixed(2)});color:${a > .55 ? '#fff' : 'var(--text)'}" title="Moyenne par jour : ${G(m)}">${G(m)}</div>`; };
+  const hmMax = Math.max(1, ...d.activite.map(a => a.moyenne));
   el.innerHTML = `<div class="ic-grille">
-    <section class="ic-carte l8"><h3>Gallons vendus par produit</h3><p class="q">L'activité de chaque carburant dans le temps.</p>
+    <section class="ic-carte l8"><h3>Gallons vendus par produit</h3><p class="q">Chaque carburant a sa propre courbe : les gallons ne sont jamais additionnés entre produits.</p>
       ${d.produits.length ? '<div class="ic-graph"><canvas id="ic-g-gal"></canvas></div>' : vide('Aucun relevé validé sur la période.')}</section>
     <section class="ic-carte l4"><h3>Classement des produits</h3><p class="q">Ventes en gourdes. Cliquez pour le détail du produit.</p>
       ${d.produits.length ? '<div class="ic-graph"><canvas id="ic-g-prod"></canvas></div>' : vide()}</section>
     <section class="ic-carte l12"><h3>Calendrier des ventes</h3><p class="q">Chaque case est un jour (lignes : lundi → dimanche). Plus elle est foncée, plus le revenu est élevé. Cliquez sur un jour pour ses relevés.</p>
       ${calendrier(d)}</section>
-    <section class="ic-carte"><h3>Activité par jour et créneau</h3><p class="q">Ventes carburant moyennes par jour de la semaine, matin et après-midi.</p>
-      ${d.kpis.nb_releves ? `<div class="ic-hm"><div class="e"></div><div class="e">Matin</div><div class="e">Après-midi</div>
-        ${d.activite.map(a => `<div class="e">${a.jour}</div>${cel(a.matin, a.nb_jours)}${cel(a.apres_midi, a.nb_jours)}`).join('')}</div>` : vide()}</section>
+    <section class="ic-carte"><h3>Activité par jour de la semaine</h3><p class="q">Ventes carburant moyennes de chaque jour de la semaine sur la période.</p>
+      ${d.kpis.nb_releves ? `<table class="ic-tab"><tbody>${d.activite.map(a => `<tr><td style="width:90px">${a.jour}</td>
+        <td><div class="ic-barre" style="height:10px"><i style="width:${(a.moyenne / hmMax * 100).toFixed(1)}%"></i></div></td>
+        <td class="num">${G(a.moyenne)}</td></tr>`).join('')}</tbody></table>` : vide()}</section>
     <section class="ic-carte"><h3>Mètres les plus actifs</h3><p class="q">Gallons par mètre (pompe) sur la période.</p>
       ${d.pompes.length ? '<div class="ic-graph"><canvas id="ic-g-pompes"></canvas></div>' : vide()}</section>
     <section class="ic-carte l12"><h3>Pompistes</h3><p class="q">Volume et ventes des relevés de chaque pompiste (« Saisie au bureau » : relevés entrés par l'administration).</p>
-      ${d.pompistes.length ? `<div class="ic-tab-wrap"><table class="ic-tab"><thead><tr><th>Pompiste</th><th class="num">Gallons</th><th class="num">Ventes</th><th class="num">Relevés</th><th class="num">Jours</th><th>Part des ventes</th></tr></thead><tbody>
-        ${d.pompistes.map(p => `<tr class="clic" onclick="IC.filtrer('employes', ${esc(JSON.stringify(p.nom)).replace(/"/g, '&quot;')})"><td>${esc(p.nom)}</td><td class="num">${GAL(p.gallons)}</td><td class="num">${G(p.montant)}</td><td class="num">${p.nb}</td><td class="num">${p.jours}</td>
+      ${d.pompistes.length ? `<div class="ic-tab-wrap"><table class="ic-tab"><thead><tr><th>Pompiste</th><th class="num">Gallons par produit</th><th class="num">Ventes</th><th class="num">Relevés</th><th class="num">Jours</th><th>Part des ventes</th></tr></thead><tbody>
+        ${d.pompistes.map(p => `<tr class="clic" onclick="IC.filtrer('employes', ${esc(JSON.stringify(p.nom)).replace(/"/g, '&quot;')})"><td>${esc(p.nom)}</td><td class="num">${galPP(p.gallons_par_produit, '<br>')}</td><td class="num">${G(p.montant)}</td><td class="num">${p.nb}</td><td class="num">${p.jours}</td>
           <td><div class="ic-barre"><i style="width:${d.kpis.revenu ? Math.min(100, p.montant / d.produits.reduce((a, x) => a + x.montant, 0) * 100) : 0}%"></i></div></td></tr>`).join('')}
         </tbody></table></div>` : vide()}</section></div>`;
   const pal = palette();
   graph('ic-g-gal', {type:'line', data:{labels:d.series.map(x => etiq(x.cle, d.granularite)), datasets:d.produits.map((p, i) => ({label:p.nom, data:p.series,
-    borderColor:pal[i % pal.length], backgroundColor:pal[i % pal.length] + '40', fill:true, tension:.3, pointRadius:0}))},
-    options:{plugins:{tooltip:{callbacks:{label:c => `${c.dataset.label}: ${GAL(c.parsed.y)}`}}}, scales:{y:Object.assign({}, axeG, {stacked:true, beginAtZero:true}), x:{ticks:{color:css('--muted'), maxTicksLimit:12}, grid:{display:false}}}}});
+    borderColor:pal[i % pal.length], backgroundColor:pal[i % pal.length] + '20', fill:false, tension:.3, pointRadius:0}))},
+    options:{plugins:{tooltip:{callbacks:{label:c => `${c.dataset.label}: ${GAL(c.parsed.y)}`}}}, scales:{y:Object.assign({}, axeG, {beginAtZero:true}), x:{ticks:{color:css('--muted'), maxTicksLimit:12}, grid:{display:false}}}}});
   graph('ic-g-prod', {type:'bar', data:{labels:d.produits.map(p => p.nom), datasets:[{label:'Ventes', data:d.produits.map(p => p.montant), backgroundColor:d.produits.map((p, i) => pal[i % pal.length]), borderRadius:6}]},
     options:{indexAxis:'y', plugins:{legend:{display:false}, tooltip:tipG}, scales:{x:axeG, y:{ticks:{color:css('--text2')}, grid:{display:false}}},
       onClick:(e, el) => el.length && IC.produitDetail(d.produits[el[0].index])}});
@@ -439,8 +440,8 @@ function departements(el, d){
     <section class="ic-carte"><h3>Profil de la période</h3><p class="q">Cinq dimensions, en % de la plus forte des deux périodes${p ? '' : ' (choisissez une comparaison pour superposer la période de référence)'}.</p>
       <div class="ic-graph"><canvas id="ic-g-radar"></canvas></div></section>
     ${d.stations.length > 1 ? `<section class="ic-carte l12"><h3>Comparaison des stations</h3><p class="q">Chaque station séparée, sur les mêmes filtres.</p>
-      <div class="ic-tab-wrap"><table class="ic-tab"><thead><tr><th>Station</th><th class="num">Revenu</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Gallons</th><th class="num">Encaissements</th></tr></thead><tbody>
-      ${d.stations.map(s => `<tr><td>${esc(s.nom)}</td><td class="num">${G(s.revenu)}</td><td class="num">${G(s.charges)}</td><td class="num ${s.resultat >= 0 ? 'ic-pos' : 'ic-neg'}">${G(s.resultat)}</td><td class="num">${GAL(s.gallons)}</td><td class="num">${G(s.encaissements)}</td></tr>`).join('')}
+      <div class="ic-tab-wrap"><table class="ic-tab"><thead><tr><th>Station</th><th class="num">Revenu</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Gallons par produit</th><th class="num">Encaissements</th></tr></thead><tbody>
+      ${d.stations.map(s => `<tr><td>${esc(s.nom)}</td><td class="num">${G(s.revenu)}</td><td class="num">${G(s.charges)}</td><td class="num ${s.resultat >= 0 ? 'ic-pos' : 'ic-neg'}">${G(s.resultat)}</td><td class="num">${galPP(s.gallons_par_produit, '<br>')}</td><td class="num">${G(s.encaissements)}</td></tr>`).join('')}
       </tbody></table></div></section>` : ''}</div>`;
   const pal = palette();
   graph('ic-g-deps', {type:'bar', data:{labels:deps.map(x => x.nom), datasets:[
@@ -448,14 +449,14 @@ function departements(el, d){
     {label:'Charges', data:deps.map(x => x.charges), backgroundColor:pal[5], borderRadius:5}]},
     options:{indexAxis:'y', plugins:{tooltip:{callbacks:{label:c => `${c.dataset.label}: ${G(c.parsed.x)}`}}}, scales:{x:axeG, y:{ticks:{color:css('--text2')}, grid:{display:false}}},
       onClick:(e, el) => el.length && IC.filtrer('modules', deps[el[0].index].nom)}});
-  const dims = [['revenu', 'Revenu'], ['charges', 'Charges'], ['gallons', 'Gallons'], ['nb_operations', 'Opérations'], ['jours_ventes', 'Jours de vente']];
+  const dims = [['revenu', 'Revenu'], ['charges', 'Charges'], ['nb_releves', 'Relevés'], ['nb_operations', 'Opérations'], ['jours_ventes', 'Jours de vente']];
   const norm = (a, b) => { const m = Math.max(Math.abs(a || 0), Math.abs(b || 0)); return m ? Math.round(Math.abs(a || 0) / m * 100) : 0; };
   const ds = [{label:'Période choisie', data:dims.map(([c]) => norm(k[c], p && p[c])), borderColor:pal[0], backgroundColor:pal[0] + '33'}];
   if(p) ds.push({label:'Comparaison', data:dims.map(([c]) => norm(p[c], k[c])), borderColor:pal[1], backgroundColor:pal[1] + '22'});
   graph('ic-g-radar', {type:'radar', data:{labels:dims.map(x => x[1]), datasets:ds},
     options:{interaction:{mode:'nearest'}, scales:{r:{min:0, max:100, ticks:{display:false}, grid:{color:'rgba(127,127,127,.2)'}, angleLines:{color:'rgba(127,127,127,.2)'}, pointLabels:{color:css('--text2'), font:{size:12}}}},
       plugins:{tooltip:{callbacks:{label:c => { const cle = dims[c.dataIndex][0], src = c.datasetIndex === 0 ? k : p;
-        return `${c.dataset.label}: ${cle === 'gallons' ? GAL(src[cle]) : ['revenu', 'charges'].includes(cle) ? G(src[cle]) : N(src[cle])}`; }}}}}});
+        return `${c.dataset.label}: ${['revenu', 'charges'].includes(cle) ? G(src[cle]) : N(src[cle])}`; }}}}}});
 }
 
 // ── Explorateur ─────────────────────────────────────────────────────
@@ -553,7 +554,7 @@ IC.pdf = async function(){
     <h2>Indicateurs</h2><table><tr><th>Indicateur</th><th style="text-align:right">Valeur</th><th style="text-align:right">Variation</th></tr>
     ${lig('Revenu (ventes)', G(k.revenu), d.variations.revenu)}${lig('Charges', G(k.charges), d.variations.charges)}${lig('Résultat', G(k.resultat), d.variations.resultat)}
     ${lig('Encaissements', G(k.encaissements), d.variations.encaissements)}${lig('Décaissements', G(k.decaissements), d.variations.decaissements)}
-    ${lig('Gallons vendus', GAL(k.gallons), d.variations.gallons)}${lig('Trésorerie (caisse principale, au ' + fr(d.periode.fin) + ')', G(d.tresorerie.solde_fin))}
+    ${Object.entries(k.gallons_par_produit || {}).map(([n, g]) => lig('Gallons vendus — ' + esc(n), GAL(g))).join('')}${lig('Trésorerie (caisse principale, au ' + fr(d.periode.fin) + ')', G(d.tresorerie.solde_fin))}
     ${d.stock ? lig('Valeur du stock carburant', G(d.stock.valeur)) : ''}</table>
     <h2>Revenu et charges</h2>${g1}<div class="g"><div><h2>Charges</h2>${g2}</div><div><h2>Départements</h2>${g3}</div></div>
     <h2>Charges par catégorie</h2><table><tr><th>Catégorie</th><th style="text-align:right">Montant</th><th style="text-align:right">Opérations</th></tr>
@@ -592,10 +593,10 @@ IC.jourDetail = async function(date){
     const extra = {}; if(IC.f.stations.length) extra.stations = IC.f.stations.join(',');
     const q = new URLSearchParams(Object.assign({debut:date}, extra, IC.f.produits.length ? {produits:IC.f.produits.join('|')} : {}));
     const [r, o] = await Promise.all([GET('/intelligence/releves?' + q), GET('/intelligence/operations?' + (() => { const p = new URLSearchParams(requete({taille:100})); p.set('debut', date); p.set('fin', date); return p; })())]);
-    document.getElementById('ic-p-corps').innerHTML = `<div class="ic-kpis" style="grid-template-columns:1fr 1fr"><div class="ic-kpi"><span class="t">Gallons</span><span class="v">${GAL(r.gallons)}</span></div>
+    document.getElementById('ic-p-corps').innerHTML = `<div class="ic-kpis" style="grid-template-columns:1fr 1fr"><div class="ic-kpi"><span class="t">Gallons</span><span class="v" style="font-size:15px;white-space:normal">${galPP(r.gallons_par_produit, '<br>')}</span></div>
       <div class="ic-kpi"><span class="t">Ventes carburant</span><span class="v">${G(r.montant)}</span></div></div>
-      <h3 style="margin:0;font-size:15px">Relevés</h3>${r.releves.length ? `<div class="ic-tab-wrap"><table class="ic-tab"><thead><tr><th>Créneau</th><th>Mètre</th><th>Produit</th><th>Pompiste</th><th class="num">Gallons</th><th class="num">Montant</th></tr></thead><tbody>
-      ${r.releves.map(x => `<tr><td>${x.periode === 'Matin' ? 'Matin' : 'Après-midi'}</td><td>${esc(x.pompe)}</td><td>${esc(x.produit)}</td><td>${esc(x.pompiste || 'Bureau')}</td><td class="num">${GAL(x.gallons)}</td><td class="num">${G(x.montant)}</td></tr>`).join('')}</tbody></table></div>` : vide('Aucun relevé validé ce jour.')}
+      <h3 style="margin:0;font-size:15px">Relevés</h3>${r.releves.length ? `<div class="ic-tab-wrap"><table class="ic-tab"><thead><tr><th>Mètre</th><th>Produit</th><th>Pompiste</th><th class="num">Gallons</th><th class="num">Montant</th></tr></thead><tbody>
+      ${r.releves.map(x => `<tr><td>${esc(x.pompe)}</td><td>${esc(x.produit)}</td><td>${esc(x.pompiste || 'Bureau')}</td><td class="num">${GAL(x.gallons)}</td><td class="num">${G(x.montant)}</td></tr>`).join('')}</tbody></table></div>` : vide('Aucun relevé validé ce jour.')}
       <h3 style="margin:0;font-size:15px">Opérations de caisse</h3>${o.lignes.length ? `<div class="ic-tab-wrap"><table class="ic-tab"><thead><tr><th>Type</th><th>Catégorie</th><th>Description</th><th class="num">Montant</th></tr></thead><tbody>
       ${o.lignes.map(l => `<tr><td>${esc(l.type_lib)}</td><td>${esc(l.compte || '')}</td><td>${esc(l.description || '')}</td><td class="num ${l.sens === 'D' && l.type !== 'depense_pompiste' ? 'ic-pos' : 'ic-neg'}">${G(l.montant)}</td></tr>`).join('')}</tbody></table></div>` : vide('Aucune opération ce jour.')}
       <button class="ic-btn" onclick="goTo('journal')">Ouvrir le Journal Meters</button>`;

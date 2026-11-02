@@ -34,7 +34,7 @@ def test_indicateurs_et_comparaison(client):
     a = _a(client, f"debut={J1}&fin={J2}&produits={pid}")
     k = a["kpis"]
     # 25 gallons × 100 G : seules les ventes de ce produit (filtre produit)
-    assert k["revenu"] == 2500 and k["gallons"] == 25 and k["nb_releves"] == 3
+    assert k["revenu"] == 2500 and list(k["gallons_par_produit"].values()) == [25] and k["nb_releves"] == 3
     assert a["kpis_prec"]["revenu"] == 400 and a["variations"]["revenu"] == 525.0
     assert a["comparaison"] == {"debut": "2024-03-03", "fin": "2024-03-04"}
     assert [p["nom"] for p in a["produits"]] == [nom] and a["produits"][0]["gallons"] == 25
@@ -53,11 +53,11 @@ def test_indicateurs_et_comparaison(client):
     assert abs(cas[-1]["montant"] - b["tresorerie"]["solde_fin"]) < 0.01
     # Série journalière : la somme = le KPI
     assert b["granularite"] == "jour" and abs(sum(s["revenu"] for s in b["series"]) - kb["revenu"]) < 0.01
-    assert sum(x["matin"] + x["apres_midi"] for x in b["activite"]) > 0
+    assert sum(x["montant"] for x in b["activite"]) > 0
 
     # Filtre département et type
     c = _a(client, f"debut={J1}&fin={J2}&comparer=aucune&types=depense")
-    assert c["kpis"]["revenu"] == 0 and c["kpis"]["gallons"] == 0 and c["kpis"]["charges"] >= 800
+    assert c["kpis"]["revenu"] == 0 and c["kpis"]["gallons_par_produit"] == {} and c["kpis"]["charges"] >= 800
 
 
 def test_explorateur_et_exports(client):
@@ -69,7 +69,7 @@ def test_explorateur_et_exports(client):
     r = client.get(f"/api/intelligence/operations?debut={J1}&fin={J2}&q=Electricite&sens=C", headers=H).json()
     assert r["total"] >= 1 and all(l["sens"] == "C" for l in r["lignes"])
     rel = client.get(f"/api/intelligence/releves?debut={J1}&produits={pid}", headers=H).json()
-    assert len(rel["releves"]) == 2 and rel["gallons"] == 15
+    assert len(rel["releves"]) == 2 and rel["gallons_par_produit"] == {nom: 15}
     x = client.get(f"/api/intelligence/export?quoi=synthese&format=xlsx&debut={J1}&fin={J2}", headers=H)
     assert x.status_code == 200 and x.content[:2] == b"PK"
     c = client.get(f"/api/intelligence/export?quoi=operations&format=csv&debut={J1}&fin={J2}&produits={pid}", headers=H)

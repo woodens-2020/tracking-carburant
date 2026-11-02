@@ -3520,6 +3520,8 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
   .psp-tbl input{width:84px}
   .psp-detail-barre{flex-wrap:wrap;gap:8px}
 }
+.gpp{display:block;white-space:nowrap}.gpp-n{font-family:var(--font);font-weight:600;opacity:.75;margin-right:4px}
+.kpi-val .gpp,.grc-gal .gpp,.jres-num .gpp{font-size:.62em;line-height:1.35}
 </style>
 </head>
 <script src="/vendor/chart.umd.min.js"></script>
@@ -13074,13 +13076,22 @@ function _shiftGlobalDate(delta){
   dp.dispatchEvent(new Event('change'));
 }
 
+// Aucun arrondi à l'unité : l'argent garde 2 décimales, les gallons 3.
 function fmtG(n){
   if(n==null||isNaN(n)) return '— G';
-  return Math.round(n).toLocaleString('fr-FR')+' G';
+  return Number(n).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' G';
 }
 function fmtGal(n,d=3){
-  if(n==null||isNaN(n)) return '0.000 gal';
-  return parseFloat(n).toFixed(d)+' gal';
+  if(n==null||isNaN(n)) n = 0;
+  d = Math.max(d, 3);
+  return Number(n).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d})+' gal';
+}
+// Gallons : jamais additionnés entre produits (Gazoline, Diesel, Propane…).
+// pp = {nom: gallons} ou [[nom, gallons]] → une ligne par produit.
+function galParProduit(pp, sep){
+  const l = (Array.isArray(pp) ? pp : Object.entries(pp || {})).filter(([, g]) => Number(g));
+  if(!l.length) return fmtGal(0);
+  return l.map(([n, g]) => `<span class="gpp"><span class="gpp-n">${esc(n)}</span> ${fmtGal(g)}</span>`).join(sep || '');
 }
 // Formatage SANS arrondi : on montre toutes les décimales réelles (jusqu'à
 // maxDec pour neutraliser les poussières flottantes), séparateur de milliers.
@@ -13089,8 +13100,8 @@ function fmtNum(n, maxDec=4){
   const x = parseFloat(Number(n).toFixed(maxDec));
   return x.toLocaleString('fr-FR',{maximumFractionDigits:maxDec});
 }
-function fmtGalX(n){ return fmtNum(n,4)+' gal'; }
-function fmtGX(n){   return fmtNum(n,4)+' G'; }
+function fmtGalX(n){ return fmtGal(n); }
+function fmtGX(n){   return fmtG(Number(n)||0); }
 function shortNum(n){
   if(n>=1e6) return (n/1e6).toFixed(1)+'M';
   if(n>=1e3) return Math.round(n/1e3)+'K';
@@ -14963,7 +14974,7 @@ async function loadHome(){
 
     // KPI
     document.getElementById('kpi-day').textContent=fmtG(dayStats.total_montant);
-    document.getElementById('kpi-day-qte').textContent=fmtGal(dayStats.total_quantite,1);
+    document.getElementById('kpi-day-qte').innerHTML=galParProduit(Object.entries(dayStats.par_produit||{}).map(([n,v])=>[n,v.quantite||0]), ' ');
     document.getElementById('kpi-week').textContent=fmtG(serie.total_periode);
     const v=serie.variation_pct;
     document.getElementById('kpi-week-var').textContent=
@@ -15417,7 +15428,10 @@ function renderDashboard(stats,serie,debut,fin){
 
   const nbJours=Math.round((new Date(fin+'T12:00:00')-new Date(debut+'T12:00:00'))/86400000)+1;
   const moy    =stats.nb_jours_couverts>0?stats.total_montant/stats.nb_jours_couverts:0;
-  const prixMoy=stats.total_quantite>0?stats.total_montant/stats.total_quantite:0;
+  // Gazoline, Diesel, Propane : gallons et prix moyens jamais mélangés
+  const galPP=Object.entries(stats.par_produit||{}).map(([n,v])=>[n,v.quantite||0]);
+  const prixPP=Object.entries(stats.par_produit||{}).filter(([,v])=>v.quantite>0)
+    .map(([n,v])=>`<span class="gpp"><span class="gpp-n">${esc(n)}</span> ${fmtG(v.montant/v.quantite)}</span>`).join('') || fmtG(0);
   const tauxCouv=nbJours>0?Math.round(stats.nb_jours_couverts/nbJours*100):0;
 
   // Tendance KPI
@@ -15460,7 +15474,7 @@ function renderDashboard(stats,serie,debut,fin){
       <td class="dbt-rank">${medals[i]||'#'+(i+1)}</td>
       <td class="dbt-date">${label}</td>
       <td class="dbt-val">${fmtG(d.total_montant)}</td>
-      <td class="dbt-vol">${fmtGal(d.total_quantite||0,1)}</td>
+      <td class="dbt-vol">${Object.entries(d.par_produit||{}).map(([n,g])=>`${esc(n)} ${fmtGal(g)}`).join('<br>')||'—'}</td>
       <td class="dbt-bar"><div class="dbt-bar-wrap"><div class="dbt-bar-fill" style="width:${pct}%"></div></div></td>
     </tr>`;
   }).join('');
@@ -15483,7 +15497,7 @@ function renderDashboard(stats,serie,debut,fin){
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#22c55e" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 16 4-4 4 4 5-5"/></svg>
       </div>
       <div class="kpi-label">${t('dash.kpi.volume')}</div>
-      <div class="kpi-val" style="color:#22c55e">${fmtGal(stats.total_quantite,1)}</div>
+      <div class="kpi-val" style="color:#22c55e">${galParProduit(galPP)}</div>
       <div class="kpi-sub">${t('dash.kpi.volume.sub',{n:stats.nb_releves})}</div>
     </div>
 
@@ -15501,8 +15515,8 @@ function renderDashboard(stats,serie,debut,fin){
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
       </div>
       <div class="kpi-label">${t('dash.kpi.price')}</div>
-      <div class="kpi-val" style="color:#a78bfa">${fmtG(prixMoy)}</div>
-      <div class="kpi-sub">${t('dash.kpi.price.sub',{qte:fmtGal(stats.total_quantite,1),n:stats.nb_releves})}</div>
+      <div class="kpi-val" style="color:#a78bfa">${prixPP}</div>
+      <div class="kpi-sub">Prix moyen par gallon, produit par produit · ${stats.nb_releves} relevés</div>
     </div>
 
     <div class="kpi-card" style="border-top-color:${trendColor}">
@@ -15525,9 +15539,9 @@ function renderDashboard(stats,serie,debut,fin){
         <div class="grc-mnt">${fmtGX(v.montant||0)}</div>
       </div>`).join('')}
       ${pp.length>1?`<div class="galrecap-card grc-total">
-        <div class="grc-lbl">Total gallons vendus</div>
-        <div class="grc-gal">${fmtGalX(stats.total_quantite||0)}</div>
-        <div class="grc-mnt">${fmtGX(stats.total_montant||0)}</div>
+        <div class="grc-lbl">Total des ventes (gourdes)</div>
+        <div class="grc-gal">${fmtGX(stats.total_montant||0)}</div>
+        <div class="grc-mnt">Les gallons restent séparés par produit</div>
       </div>`:''}
     </div>`; })()}
 
@@ -15670,7 +15684,8 @@ function buildTrendChart(serie){
     type:dbChartType==='line'?'line':'bar',
     data:{
       labels,
-      datasets:[{
+      // Volume : une courbe par produit (Gazoline, Diesel, Propane… jamais additionnés)
+      datasets:isMonant ? [{
         label:isMonant?t('dash.metric.montant')+' (G)':t('dash.metric.volume')+' (gal)',
         data,
         backgroundColor:dbChartType==='line'?grad:days.map((_,i)=>hexToRgba(color,i===days.length-1?0.9:0.55)),
@@ -15685,13 +15700,18 @@ function buildTrendChart(serie){
         pointBorderWidth:2,
         pointRadius:3,
         pointHoverRadius:6,
-      }]
+      }] : [...new Set(days.flatMap(d=>Object.keys(d.par_produit||{})))].map((nom,k)=>{
+        const c=['#f59e0b','#3b82f6','#22c55e','#a78bfa','#ef4444'][k%5];
+        return {label:nom+' (gal)', data:days.map(d=>(d.par_produit||{})[nom]||0), borderColor:c,
+          backgroundColor:dbChartType==='line'?hexToRgba(c,0.12):hexToRgba(c,0.7), borderWidth:dbChartType==='line'?2:0,
+          borderRadius:dbChartType==='bar'?4:0, fill:false, tension:0.38, pointRadius:2, pointHoverRadius:5};
+      })
     },
     options:{
       responsive:true,maintainAspectRatio:false,
       interaction:{mode:'index',intersect:false},
       plugins:{
-        legend:{display:false},
+        legend:{display:!isMonant, labels:{color:'#bfcce0', boxWidth:12}},
         tooltip:{
           backgroundColor:'#0d1d35',
           borderColor:'rgba(59,130,246,.3)',
@@ -15700,7 +15720,7 @@ function buildTrendChart(serie){
           bodyColor:'#bfcce0',
           padding:10,
           callbacks:{
-            label:ctx=>isMonant?` ${fmtG(ctx.raw)}`:` ${fmtGal(ctx.raw,2)}`
+            label:ctx=>isMonant?` ${fmtG(ctx.raw)}`:` ${ctx.dataset.label.replace(' (gal)','')} : ${fmtGal(ctx.raw)}`
           }
         }
       },
@@ -16122,7 +16142,6 @@ function renderGalRecap(){
   });
   const rows=Object.entries(acc).sort((a,b)=>b[1].gal-a[1].gal);
   if(!rows.length){ box.innerHTML=''; return; }
-  const totGal=rows.reduce((s,[,v])=>s+v.gal,0);
   const totMnt=rows.reduce((s,[,v])=>s+v.mnt,0);
   box.innerHTML=`
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -16139,9 +16158,9 @@ function renderGalRecap(){
       <div class="grc-mnt">${fmtGX(v.mnt)}</div>
     </div>`).join('')}
     ${rows.length>1?`<div class="galrecap-card grc-total">
-      <div class="grc-lbl">Total gallons</div>
-      <div class="grc-gal">${fmtGalX(totGal)}</div>
-      <div class="grc-mnt">${fmtGX(totMnt)}</div>
+      <div class="grc-lbl">Total des ventes (gourdes)</div>
+      <div class="grc-gal">${fmtGX(totMnt)}</div>
+      <div class="grc-mnt">Les gallons restent séparés par produit</div>
     </div>`:''}
   </div>`;
 }
@@ -16170,8 +16189,8 @@ function _ficheSyntheseHtml(s){
   const org2 = (typeof _branding!=='undefined' && _branding.complexe) || '';
   const act  = (typeof _branding!=='undefined' && _branding.activites) || '';
   const num  = (v,dec)=>{ const x=parseFloat(Number(v||0).toFixed(dec)); return x.toLocaleString('fr-FR',{maximumFractionDigits:dec}); };
-  const gal  = v=>num(v,4)+' gal';
-  const grd  = v=>num(v,4)+' G';
+  const gal  = v=>fmtGal(v);
+  const grd  = v=>fmtG(Number(v)||0);
   const vp   = s.ventes.par_produit||[];
   const st   = s.stock||[];
   const dp   = s.depenses.liste||[];
@@ -16218,7 +16237,7 @@ function _ficheSyntheseHtml(s){
     <div class="period">Période : ${frDate(s.date_debut)} → ${frDate(s.date_fin)}</div>
 
     <div class="kpis">
-      <div class="kpi"><div class="l">Gallons vendus (total)</div><div class="v">${gal(s.ventes.total_gallons)}</div></div>
+      <div class="kpi"><div class="l">Produits vendus</div><div class="v" style="font-size:13px">${(s.ventes.par_produit||[]).length} (gallons par produit ci-dessous)</div></div>
       <div class="kpi"><div class="l">Recette carburant</div><div class="v">${grd(s.ventes.total_montant)}</div></div>
       <div class="kpi"><div class="l">Dépenses</div><div class="v">${grd(s.depenses.total)}</div></div>
     </div>
@@ -16228,7 +16247,7 @@ function _ficheSyntheseHtml(s){
     <table>
       <thead><tr><th>Produit</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead>
       <tbody>${rowsVentes}
-        <tr class="tot"><td>TOTAL</td><td class="r">${gal(s.ventes.total_gallons)}</td><td class="r">${grd(s.ventes.total_montant)}</td></tr>
+        <tr class="tot"><td>TOTAL (gourdes)</td><td class="r">—</td><td class="r">${grd(s.ventes.total_montant)}</td></tr>
       </tbody>
     </table>
 
@@ -17305,8 +17324,8 @@ function renderJournal(data){
       <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${resume.nb_en_attente} mètre${resume.nb_en_attente>1?'s':''} · ${fmtGX(resume.montant_en_attente)} — non compté tant que la direction n'a pas finalisé</div>
     </div>`:''}
     <div class="jres-card c-teal">
-      <div class="jres-lbl">Total gallons (hors sauts)</div>
-      <div class="jres-num c-teal">${fmtGalX(resume.total_gallons)}</div>
+      <div class="jres-lbl">Gallons par produit (hors sauts)</div>
+      <div class="jres-num c-teal">${galParProduit((resume.par_produit||[]).map(pp=>[pp.produit, pp.gallons]))}</div>
       ${resume.nb_sauts_compteur?`<div style="font-size:11.5px;color:var(--muted);margin-top:2px">${resume.nb_sauts_compteur} saut${resume.nb_sauts_compteur>1?'s':''} de compteur exclu${resume.nb_sauts_compteur>1?'s':''}</div>`:''}
     </div>
   </div>
@@ -17325,9 +17344,9 @@ function renderJournal(data){
       <div class="grc-mnt">${fmtGX(pp.montant)} · ${pp.nb_releves} relevé${pp.nb_releves>1?'s':''}</div>
     </div>`).join('')}
     ${resume.par_produit.length>1?`<div class="galrecap-card grc-total">
-      <div class="grc-lbl">Total gallons vendus</div>
-      <div class="grc-gal">${fmtGalX(resume.total_gallons)}</div>
-      <div class="grc-mnt">${fmtGX(resume.par_produit.reduce((s,p)=>s+p.montant,0))}</div>
+      <div class="grc-lbl">Total des ventes (gourdes)</div>
+      <div class="grc-gal">${fmtGX(resume.par_produit.reduce((s,p)=>s+p.montant,0))}</div>
+      <div class="grc-mnt">Les gallons restent séparés par produit</div>
     </div>`:''}
   </div>`:''}`;
 
@@ -19751,7 +19770,13 @@ const _PSP_FILTRES = [
 const _pspPer = p => p === 'Apres-midi' ? 'Après-midi' : p;
 const _pspDate = d => new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', {weekday:'short', day:'2-digit', month:'2-digit'});
 const _pspJour = d => new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
-const _pspG = n => Number(n||0).toLocaleString('fr-FR', {maximumFractionDigits:0}) + ' G';
+// Gallons d'un ou plusieurs rapports, produit par produit (jamais additionnés entre produits)
+function _pspGalProduits(lignes, sep){
+  const m = {};
+  for(const l of lignes || []) m[l.produit_nom || '—'] = (m[l.produit_nom || '—'] || 0) + Number(l.gallons || 0);
+  return Object.entries(m).map(([n, g]) => `${esc(n)} ${fmtGal(g)}`).join(sep || ' · ') || '—';
+}
+const _pspG = n => Number(n||0).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' G';
 const _pspN = (n,d=3) => n == null ? '—' : Number(n).toLocaleString('fr-FR', {minimumFractionDigits:d, maximumFractionDigits:d});
 const _pspE = n => `<span class="${Math.abs(n)<1?'psp-ok':(n<0?'psp-neg':'psp-pos')}">${n>0?'+':''}${_pspG(n)}</span>`;
 const _pspS = id => (PSP.saisie[id] ||= {note:null, com:'', motif:'', motifVisible:false});
@@ -19872,7 +19897,7 @@ function pspRendreListe(){
           <button class="btn btn-secondary psp-mini" onclick="pspPeriodeRapide(30)">30 jours</button>
           <button class="btn btn-secondary psp-mini" onclick="pspPeriodeRapide(0)">Tout</button></div>
       </div></div>
-    ${rs.length ? `<div class="psp-muted" style="margin:0 0 8px">${rs.length} rapport${rs.length>1?'s':''} · ${_pspN(tot('total_gallons'))} gal ·
+    ${rs.length ? `<div class="psp-muted" style="margin:0 0 8px">${rs.length} rapport${rs.length>1?'s':''} · ${_pspGalProduits(rs.flatMap(r => r.lignes))} ·
         attendu ${_pspG(tot('montant_attendu_final'))} · compté ${_pspG(tot('montant_compte'))}.
         Cliquez sur un rapport pour l'ouvrir. ${['A_TRAITER','SOUMIS'].includes(f.statut) ? 'Finalisez le Matin avant l\'Après-midi (continuité des compteurs).' : ''}</div>
       ${Object.entries(jours).map(([d, l]) => `<div class="psp-jour">${_pspJour(d)}</div>
@@ -19887,7 +19912,7 @@ function pspRendreListe(){
             return `<tr class="psp-ligne-clic" onclick="pspOuvrir(${r.id})">
               <td><b>${_pspPer(r.periode)}</b></td><td>${esc(r.pompiste_nom)}</td>
               <td><span class="psp-muted">${[...new Set(r.lignes.map(x => x.produit_nom))].map(esc).join(', ')}</span><br>${r.lignes.map(x => esc(x.pompe_nom)).join(', ')}</td>
-              <td class="r">${_pspN(r.total_gallons)}</td><td class="r">${_pspG(r.montant_attendu_final)}</td>
+              <td class="r">${_pspGalProduits(r.lignes, '<br>')}</td><td class="r">${_pspG(r.montant_attendu_final)}</td>
               <td class="r">${r.statut === 'EN_COURS' ? '—' : _pspG(r.montant_compte)}</td>
               <td class="r">${r.statut === 'EN_COURS' ? '—' : _pspE(r.ecart_final)}</td>
               <td class="psp-muted">${verif}</td>
@@ -21697,7 +21722,7 @@ function buildRapportHTML(d, date){
 
 // ── Helpers ───────────────────────────────────
 function fmtGal3(v){ return v==null ? '—' : parseFloat(v).toLocaleString('fr-HT',{minimumFractionDigits:3,maximumFractionDigits:3})+' gal'; }
-function fmtG2(v)  { return v==null ? '—' : parseFloat(v).toLocaleString('fr-HT',{minimumFractionDigits:0,maximumFractionDigits:0})+' G'; }
+function fmtG2(v)  { return v==null ? '—' : parseFloat(v).toLocaleString('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2})+' G'; }
 function fmtPct(v) { return v==null ? '—' : parseFloat(v).toFixed(1)+'%'; }
 
 function skTab(btn, panelId){
@@ -22063,7 +22088,8 @@ async function loadHistoriqueVente(){
     const rows = (d.livraisons||[]).filter(l=>l.rapport_gallons_vendus!=null);
     const sansRapport = (d.livraisons||[]).length - rows.length;
 
-    const totGal  = rows.reduce((s,l)=>s+parseFloat(l.rapport_gallons_vendus||0),0);
+    const galPP = {};                              // jamais additionnés entre produits
+    for(const l of rows) galPP[l.produit_nom] = (galPP[l.produit_nom]||0) + parseFloat(l.rapport_gallons_vendus||0);
     const totRev  = rows.reduce((s,l)=>s+parseFloat(l.rapport_revenu||0),0);
     const totCogs = rows.reduce((s,l)=>s+parseFloat(l.rapport_cogs||0),0);
     const totBen  = rows.reduce((s,l)=>s+parseFloat(l.rapport_benefice||0),0);
@@ -22071,7 +22097,7 @@ async function loadHistoriqueVente(){
 
     kpis.innerHTML = [
       {lbl:'Cargaisons clôturées', val:String((d.livraisons||[]).length), cls:''},
-      {lbl:'Gallons vendus',       val:fmtGal3(totGal),                   cls:''},
+      {lbl:'Gallons vendus',       val:galParProduit(galPP),              cls:''},
       {lbl:'Revenu',               val:fmtG2(totRev),                     cls:''},
       {lbl:'COGS',                 val:fmtG2(totCogs),                    cls:''},
       {lbl:'Bénéfice',             val:fmtG2(totBen),                     cls:totBen>=0?'sk-pos':'sk-neg'},
@@ -22422,8 +22448,8 @@ function renderReport(debut, fin, pidRaw, stats, rent, evolution){
         <div class="rpt-kpi-grid">
           <div class="rpt-kpi" style="border-top-color:#3b82f6">
             <div class="rpt-kpi-lbl">Volume vendu</div>
-            <div class="rpt-kpi-val">${fmtGal3(vol)}</div>
-            <div class="rpt-kpi-sub">${nb>0?(vol/nb).toFixed(0)+' gal/jour moy.':''}</div>
+            <div class="rpt-kpi-val">${prodNames.length>1 ? galParProduit(prodNames.map(n=>[n, parProd[n].quantite||0])) : fmtGal3(vol)}</div>
+            <div class="rpt-kpi-sub">${nb>0 && prodNames.length<=1 ? fmtGal(vol/nb)+'/jour moy.' : (prodNames.length>1 ? 'Gallons séparés par produit' : '')}</div>
           </div>
           <div class="rpt-kpi" style="border-top-color:#8b5cf6">
             <div class="rpt-kpi-lbl">Chiffre d'affaires</div>
@@ -22719,7 +22745,7 @@ function exportReportCSV(){
   csv+=`Produit filtre,${prodLabel}\n\n`;
 
   csv+=`RÉSUMÉ KPI\n`;
-  csv+=`Volume vendu,${(stats?.total_quantite||0).toFixed(3)} gal\n`;
+  for(const [n,v] of Object.entries(stats?.par_produit||{})) csv+=`Volume vendu — ${n},${(v.quantite||0).toFixed(3)} gal\n`;
   csv+=`CA total,${(rent?.total?.ca||0).toFixed(2)} G\n`;
   csv+=`Coût total,${(rent?.total?.cout||0).toFixed(2)} G\n`;
   csv+=`Bénéfice,${(rent?.total?.benefice||0).toFixed(2)} G\n`;
@@ -23761,7 +23787,7 @@ function _audMsg(msg, type){
 /* ══════════════════════════════════════════════════════════════
    MODULES GESTION INSTITUTIONNELLE — UTILITAIRES
    ══════════════════════════════════════════════════════════════ */
-const _htg = v => new Intl.NumberFormat('fr-HT',{minimumFractionDigits:0,maximumFractionDigits:0}).format(v) + ' HTG';
+const _htg = v => new Intl.NumberFormat('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v) + ' HTG';
 const _today = () => todayStr();
 
 function _giAlert(msg, type='error'){
@@ -26545,7 +26571,7 @@ async function loadGiDashboard(){
         const cbMax = cbProds[0].montant || 1;
         cbWrap.innerHTML = cbProds.map(p=>{
           const pct = cbTot>0 ? Math.round(p.montant/cbTot*100) : 0;
-          const gal = (p.gallons!=null) ? Number(p.gallons).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})+' gal' : '';
+          const gal = (p.gallons!=null) ? Number(p.gallons).toLocaleString('fr',{minimumFractionDigits:3,maximumFractionDigits:3})+' gal' : '';
           return `
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:9px">
             <div style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0"></div>
@@ -26679,7 +26705,7 @@ async function loadCaisse(){
     } else {
       prodWrap.innerHTML = parProd.map(p=>{
         const pct = stationTot > 0 ? Math.round(p.montant/stationTot*100) : 0;
-        const gal = (p.gallons!=null) ? Number(p.gallons).toLocaleString('fr',{minimumFractionDigits:2,maximumFractionDigits:2})+' gal' : '';
+        const gal = (p.gallons!=null) ? Number(p.gallons).toLocaleString('fr',{minimumFractionDigits:3,maximumFractionDigits:3})+' gal' : '';
         return `
         <div class="caisse-bar-row">
           <div class="caisse-bar-label">${esc(p.produit)}<div style="font-size:11px;color:rgba(255,255,255,.35)">${gal}${gal?' · ':''}${pct}% du cash carburant</div></div>

@@ -185,14 +185,14 @@ _LOGIN_ATTEMPTS: dict[str, list[float]] = collections.defaultdict(list)
 _LOGIN_MAX_FAILURES = 10    # tentatives échouées avant blocage
 _LOGIN_WINDOW_SEC   = 900   # fenêtre glissante : 15 minutes
 
-def _check_login_rate(ip: str | None) -> None:
+def _check_login_rate(ip: str | None, maximum: int = _LOGIN_MAX_FAILURES) -> None:
     """Lève HTTPException 429 si l'IP a trop de tentatives échouées récentes."""
     if not ip:
         return
     now = _time.monotonic()
     cut = now - _LOGIN_WINDOW_SEC
     _LOGIN_ATTEMPTS[ip] = [t for t in _LOGIN_ATTEMPTS[ip] if t > cut]
-    if len(_LOGIN_ATTEMPTS[ip]) >= _LOGIN_MAX_FAILURES:
+    if len(_LOGIN_ATTEMPTS[ip]) >= maximum:
         raise HTTPException(429, "Trop de tentatives — réessayez dans 15 minutes.")
 
 def _record_login_failure(ip: str | None) -> None:
@@ -1004,7 +1004,9 @@ def identifier_pompiste(data: IdentifierPompisteIn, request: Request):
     ip = request.client.host if request.client else None
     username = data.username.strip().lower()
     cle = f"{ip}|pompiste-code"
-    _check_login_rate(cle)
+    # Toutes les tablettes d'une station partagent l'IP : seuil plus large ici
+    # (le PIN, vérifié ensuite, garde son propre blocage par code).
+    _check_login_rate(cle, maximum=30)
     _sch, u = _compte_pompiste_origine(username) if username else (None, None)
     if not u:
         _record_login_failure(cle)
@@ -2181,7 +2183,8 @@ def _gerer_station(request: Request, db: Session):
 
 
 @app.post("/api/produits")
-def create_produit(data: ProduitIn, db: Session = Depends(get_db)):
+def create_produit(data: ProduitIn, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
     nom = _nom_produit_libre(db, data.nom)
     p = Produit(nom=nom, prix_gallon=data.prix_gallon, adresse=_adresse(data.adresse))
     db.add(p); db.commit(); db.refresh(p)
@@ -2522,7 +2525,8 @@ def supprimer_face(fid: int, request: Request, db: Session = Depends(get_db)):
 
 
 @app.post("/api/produits/{produit_id}/pompes")
-def add_pompe(produit_id: int, data: PompeIn, db: Session = Depends(get_db)):
+def add_pompe(produit_id: int, data: PompeIn, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
     if not db.query(Produit).get(produit_id):
         raise HTTPException(404, "Produit introuvable")
     if data.face_id and not db.get(Face, data.face_id):
@@ -2533,7 +2537,8 @@ def add_pompe(produit_id: int, data: PompeIn, db: Session = Depends(get_db)):
 
 
 @app.delete("/api/pompes/{pompe_id}")
-def delete_pompe(pompe_id: int, db: Session = Depends(get_db)):
+def delete_pompe(pompe_id: int, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
     pompe = db.query(Pompe).get(pompe_id)
     if not pompe:
         raise HTTPException(404, "Pompe introuvable")
@@ -3293,10 +3298,12 @@ def serie_endpoint(
         releves = [r for r in releves if r.pompiste_id == pompiste_id]
 
     par_date: dict = defaultdict(lambda: {"total_montant": 0.0, "total_quantite": 0.0})
+    gal_produit: dict = defaultdict(lambda: defaultdict(float))     # jamais additionnés entre produits
     for r in releves:
         ds = str(r.date)
         par_date[ds]["total_montant"]  += r.montant_vente
         par_date[ds]["total_quantite"] += r.quantite
+        gal_produit[ds][r.pompe.produit.nom if r.pompe and r.pompe.produit else "—"] += r.quantite
 
     result_jours = []
     for i in range(jours):
@@ -3307,6 +3314,7 @@ def serie_endpoint(
             "date":           ds,
             "total_montant":  round(day["total_montant"],  2),
             "total_quantite": round(day["total_quantite"], 3),
+            "par_produit":    {k: round(v, 3) for k, v in gal_produit.get(ds, {}).items()},
         })
 
     total_periode = round(sum(j["total_montant"] for j in result_jours), 2)

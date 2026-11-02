@@ -413,7 +413,7 @@ const TXT = {
     c3:'Ce que je saisis avec mon code <b>m\'engage</b> : mon nom, la date et l\'heure sont enregistrés.',
     c4:'Mon rapport est vérifié par la direction. En cas de doute, je préviens mon responsable.',
     accepte:'J\'ai lu et j\'accepte', commencer:'Commencer', reprendre:'Reprendre mon rapport',
-    commence:'Vous avez un rapport commencé ({p}, {j}) : vous allez le reprendre.',
+    commence:'Vous avez un rapport commencé ({j}) : vous allez le reprendre.',
     derniers:'Mes derniers rapports', chargement:'Chargement…', aucun_rapport:'Aucun rapport pour l\'instant.',
     periode_q:'Quelle période ?', Matin:'Matin', 'Apres-midi':'Après-midi', auj:'Aujourd\'hui', hier:'Hier',
     pour_hier:'Le rapport est pour hier ?', revenir_auj:'Revenir à aujourd\'hui',
@@ -453,7 +453,7 @@ const TXT = {
     e_negatif:'Un mètre ne peut pas être négatif.', e_anormal:'{g} gallons sur une période, ce n\'est pas normal : vérifiez le mètre (un chiffre en trop ?).',
     e_double:'Pompe saisie deux fois.', e_autre_station:'Cette pompe n’est pas dans votre station.', e_inactive:'Cette pompe n\'est plus active.',
     e_fin_inferieure:'Le mètre de fin est plus petit que le mètre de début : un compteur ne recule pas.',
-    e_deja:'Déjà saisie pour cette période : {p}.', e_terminer:'Terminez d\'abord votre rapport en cours (bouton « Non, j\'ai fini »).',
+    e_deja:'Ces pompes ont déjà leurs rapports pour ce jour : {p}.', e_terminer:'Terminez d\'abord votre rapport en cours (bouton « Non, j\'ai fini »).',
     e_rien:'Aucun compteur envoyé : saisissez d\'abord vos pompes.',
     date_rapport:'Date du rapport', changer_date:'Changer', choisir_date:'Pour quel jour est le rapport ?',
     date_regle:'Touchez le jour. Pas de date dans le futur ; au plus {n} jours en arrière.',
@@ -506,7 +506,7 @@ const TXT = {
     c3:'Sa mwen antre ak kòd mwen <b>angaje m</b> : non mwen, dat la ak lè a anrejistre.',
     c4:'Direksyon an ap verifye rapò mwen. Si m gen dout, m ap avèti responsab mwen.',
     accepte:'Mwen li epi mwen aksepte', commencer:'Kòmanse', reprendre:'Kontinye rapò mwen',
-    commence:'Ou gen yon rapò ou te kòmanse ({p}, {j}) : w ap kontinye l.',
+    commence:'Ou gen yon rapò ou te kòmanse ({j}) : w ap kontinye l.',
     derniers:'Dènye rapò mwen yo', chargement:'N ap chaje…', aucun_rapport:'Pa gen rapò pou kounye a.',
     periode_q:'Ki peryòd ?', Matin:'Maten', 'Apres-midi':'Apremidi', auj:'Jodi a', hier:'Yè',
     pour_hier:'Rapò a se pou yè ?', revenir_auj:'Tounen nan jodi a',
@@ -546,7 +546,7 @@ const TXT = {
     e_negatif:'Yon mitè pa ka negatif.', e_anormal:'{g} galon nan yon peryòd, sa pa nòmal : verifye mitè a (yon chif an plis ?).',
     e_double:'Ponp lan antre de fwa.', e_autre_station:'Ponp sa a pa nan estasyon pa w la.', e_inactive:'Ponp sa a pa aktif ankò.',
     e_fin_inferieure:'Mitè fen an pi piti pase mitè kòmansman an : yon kontè pa ka fè bak.',
-    e_deja:'Deja antre pou peryòd sa a : {p}.', e_terminer:'Fini rapò ou kòmanse a anvan (bouton « Non, mwen fini »).',
+    e_deja:'Ponp sa yo deja gen rapò yo pou jou sa a : {p}.', e_terminer:'Fini rapò ou kòmanse a anvan (bouton « Non, mwen fini »).',
     e_rien:'Ou poko voye okenn kontè : antre ponp ou yo anvan.',
     date_rapport:'Dat rapò a', changer_date:'Chanje', choisir_date:'Rapò a se pou ki jou ?',
     date_regle:'Touche jou a. Pa gen dat nan lavni ; pa plis pase {n} jou annaryè.',
@@ -606,9 +606,15 @@ reinit();
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const nf = (n,d=0) => Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
-const G = n => nf(n) + ' G';
+const G = n => nf(n, 2) + ' G';                 // 2 décimales, jamais arrondi à l'unité
 // Gallons et index : jusqu'à 3 décimales, sans zéros inutiles (120,5 et non 120,500)
-const nfg = n => Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:3});
+// Gallons par produit : Gazoline, Diesel, Propane… ne s'additionnent jamais
+function galProduits(lignes){
+  const m = {};
+  for(const l of lignes || []) m[l.produit_nom || '—'] = (m[l.produit_nom || '—'] || 0) + Number(l.gallons || 0);
+  return Object.entries(m);
+}
+const nfg = n => Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3});
 const signe = n => (n > 0 ? '+' : '') + G(n);
 const per = p => t(p);
 const num = v => { if(v == null || String(v).trim() === '') return null;
@@ -699,7 +705,7 @@ async function demarrer(){
 
 async function chargerContexte(){
   try{
-    const q = S.date && S.periode ? `?date=${S.date}&periode=${S.periode}` : '';
+    const q = S.date ? `?date=${S.date}` : '';           // créneau attribué par le serveur
     S.ctx = await api('GET','/api/pompiste/contexte' + q);
     if(S.ctx.en_cours){
       S.date = S.ctx.date; S.periode = S.ctx.periode;
@@ -710,7 +716,7 @@ async function chargerContexte(){
       S._repriseFaite = true;
       if(restaurerBrouillon()){
         S.repris = true;
-        if(!S.ctx.en_cours && S.date && S.periode && (S.ctx.date !== S.date || S.ctx.periode !== S.periode)) return chargerContexte();
+        if(!S.ctx.en_cours && S.date && S.ctx.date !== S.date) return chargerContexte();
       }
     }
     if(_laisserPartir){ _laisserPartir = false; garderHistorique(); }
@@ -848,8 +854,8 @@ function precedent(){
 
 function entete(titrePhase){
   const puces = [];
-  if(S.periode && !['periode','charte','calendrier'].includes(S.etape))
-    puces.push(per(S.periode) + (S.date === S.ctx.aujourd_hui ? '' : ` · ${jourCourt(S.date)}`));
+  if(S.date && S.ctx && S.date !== S.ctx.aujourd_hui && !['periode','charte','calendrier'].includes(S.etape))
+    puces.push(jourCourt(S.date));
   if(S.produitId && ['pompes','index','compteurs'].includes(S.etape)) puces.push(produit()?.nom || '');
   if(S.choisies.length && ['index','compteurs'].includes(S.etape)) puces.push(t('n_pompes', {n: S.choisies.length}));
   const phase = titrePhase ?? (PHASE_ARGENT.includes(S.etape) ? t('etape2') : t('etape1'));
@@ -889,7 +895,7 @@ function rCharte(){
       <li>${t('c1')}</li><li>${t('c2')}</li><li>${t('c3')}</li><li>${t('c4')}</li>
     </ul>
     <label class="case"><input type="checkbox" id="c-ok" ${S.charte?'checked':''}> ${t('accepte')}</label></div>
-    ${enCours() ? `<div class="alerte warn">${t('commence', {p: per(enCours().periode), j: esc(jourTxt(enCours().date))})}</div>` : ''}
+    ${enCours() ? `<div class="alerte warn">${t('commence', {j: esc(jourTxt(enCours().date))})}</div>` : ''}
     <h2>${t('derniers')}</h2><div class="card" id="hist"><span class="sub">${t('chargement')}</span></div>`;
   const maj = () => barre('', enCours() ? t('reprendre') : t('commencer'),
     ()=>{ S.charte = true; aller(enCours() ? 'rapport' : 'periode'); }, $('c-ok').checked);
@@ -902,17 +908,12 @@ function rPeriode(){
   sansBarre();
   const auj = S.date === S.ctx.aujourd_hui, hi = S.date === hier(S.ctx.aujourd_hui);
   $('app').innerHTML = entete() + `
-    <h1>${t('periode_q')}</h1>
+    <h1>${t('choisir_date')}</h1>
     <button class="date-rapport" onclick="aller('calendrier')">
       <span class="ico">📅</span>
       <span><small>${t('date_rapport')}</small>${auj ? t('auj') + ', ' : (hi ? t('hier') + ', ' : '')}${esc(jourTxt(S.date))}</span>
-      <span class="chg">${t('changer_date')}</span></button>
-    <div class="choix deux">
-      <button class="gros grand ${S.periode==='Matin'?'on':''}" onclick="choisirPeriode('Matin')">
-        <span class="ico">☀️</span><span>${t('Matin')}</span></button>
-      <button class="gros grand ${S.periode==='Apres-midi'?'on':''}" onclick="choisirPeriode('Apres-midi')">
-        <span class="ico">🌇</span><span>${t('Apres-midi')}</span></button>
-    </div>`;
+      <span class="chg">${t('changer_date')}</span></button>`;
+  barre('', t('continuer'), continuerDate);
 }
 
 // Calendrier : un mois à la fois, gros jours à toucher ; jours futurs et trop
@@ -961,12 +962,9 @@ async function choisirDate(d){
   }
   S.date = d; S.moisCal = null; aller('periode');
 }
-async function choisirPeriode(p){
-  if(p !== S.periode){
-    if(!await confirmerEffacement()) return;
-    S.produitId = null; S.choisies = []; S.index = {}; S.erreurs = {};
-  }
-  S.periode = p; S.etape = 'produit';
+// Plus de choix matin / après-midi : le serveur range le rapport tout seul
+async function continuerDate(){
+  S.etape = 'produit';
   await chargerContexte();
 }
 
@@ -1126,7 +1124,7 @@ function rCompteurs(){
   if(!produit() || !S.choisies.length || S.choisies.some(id => !pompeCtx(id))) return aller(produit() ? 'pompes' : 'produit');
   const l = lignes(), tot = l.reduce((a,x)=>a+x.montant,0), gal = l.reduce((a,x)=>a+x.g,0);
   $('app').innerHTML = entete() + `<h1>${t('verif_compteurs')}</h1>
-    <p class="sub">${esc(produit().nom)} · ${per(S.periode)}, ${esc(jourTxt(S.date))}</p>
+    <p class="sub">${esc(produit().nom)} · ${esc(jourTxt(S.date))}</p>
     <div class="card">
       ${l.map((x,i) => lignePompe(x.q.nom, x.av, x.ap, x.g, x.montant,
         `<button class="btn-mod" onclick="S.pos=${i};S.champActif=null;aller('index')">${t('modifier')}</button>`)).join('')}
@@ -1145,7 +1143,7 @@ async function envoyerCompteurs(){
   const b = $('barre-btn'); b.disabled = true; b.textContent = t('envoi');
   try{
     await api('POST','/api/pompiste/compteurs',{
-      date:S.date, periode:S.periode, charte_acceptee:S.charte,
+      date:S.date, periode: enCours() ? enCours().periode : null, charte_acceptee:S.charte,
       lignes: lignes().map(x=>({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap, debut_confirme:!!x.s.debutConfirme}))});
     S.dernierProduit = produit()?.nom;
     S.produitId = null; S.choisies = []; S.index = {}; S.erreurs = {};
@@ -1176,7 +1174,7 @@ function rRapport(){
   sansBarre();
   $('app').innerHTML = entete(t('envoyes')) + `
     <h1>${t('autre_q')}</h1>
-    <p class="sub">${S.dernierProduit ? t('autre_sub', {p: esc(S.dernierProduit)}) + ' · ' : ''}${per(r.periode)}, ${esc(jourTxt(r.date))}</p>
+    <p class="sub">${S.dernierProduit ? t('autre_sub', {p: esc(S.dernierProduit)}) + ' · ' : ''}${esc(jourTxt(r.date))}</p>
     <div class="deux-col"><div class="choix">
       ${restants.map(p => `<button class="gros ${clsProduit(p.nom)}" onclick="choisirProduit(${p.id})"><span class="ico">⛽</span>
         <span>${t('oui')}, ${esc(p.nom)}<small>${t('oui_sub', {p: esc(p.nom)})}</small></span></button>`).join('')}
@@ -1358,7 +1356,7 @@ function rResume(){
   const txt = Math.abs(ec) < 1 ? t('juste') : (ec < 0 ? t('manque') : t('plus'));
   const billets = S.ctx.coupures.map(c => ({c, n: ent(S.billets[c])})).filter(x => x.n);
   $('app').innerHTML = entete() + `<h1>${t('resume')}</h1>
-    <p class="sub">${per(r.periode)}, ${esc(jourTxt(r.date))}. ${t('resume_sub')}</p>
+    <p class="sub">${esc(jourTxt(r.date))}. ${t('resume_sub')}</p>
     <div class="card"><div class="section-tete"><h2>${t('mes_compteurs')}</h2></div>
       ${Object.entries(lignesParProduit(r)).map(([nom, ls]) => `<div class="produit-tete">${esc(nom)}</div>
         ${ls.map(l => lignePompe(l.pompe_nom, l.metter_avant, l.metter_apres, l.gallons, l.montant,
@@ -1437,8 +1435,8 @@ function rFin(){
     <h1 style="text-align:center">${t('envoye')}</h1>
     <p class="sub" style="text-align:center">${t('prevenue')}</p>
     <div class="card">
-      <div class="total"><span>${per(r.periode)}</span><span>${esc(jourTxt(r.date))}</span></div>
-      <div class="total"><span>${t('gallons')}</span><span class="v">${nfg(r.total_gallons)}</span></div>
+      <div class="total"><span>${t('date_rapport')}</span><span>${esc(jourTxt(r.date))}</span></div>
+      ${galProduits(r.lignes).map(([n, g]) => `<div class="total"><span>${esc(n)}</span><span class="v">${nfg(g)} gal</span></div>`).join('')}
       <div class="total"><span>${t('attendu')}</span><span class="v">${G(r.montant_attendu)}</span></div>
       ${r.total_depenses ? `<div class="total"><span>${t('dep_total')}</span><span class="v">− ${G(r.total_depenses)}</span></div>
       <div class="total"><span>${t('a_remettre')}</span><span class="v">${G(r.montant_a_remettre)}</span></div>` : ''}
@@ -1478,7 +1476,7 @@ function ticketHtml(r){
     <div class="sep"></div>
     <div class="b">${t('tk_pompiste')} : ${esc(r.pompiste_nom || pomp.nom || '')}</div>
     <div class="i">${t('tk_code')} : ${esc(pomp.username || '')}</div>
-    <div class="i">${t('tk_periode')} : ${per(r.periode)}, ${esc(jourTxt(r.date))}</div>
+    <div class="i">${t('date_rapport')} : ${esc(jourTxt(r.date))}</div>
     ${r.soumis_at ? `<div class="i">${t('tk_soumis')} : ${quand(r.soumis_at)}</div>` : ''}
     <div class="sep"></div>
     <div class="b">${t('tk_compteurs')}</div>
@@ -1490,7 +1488,7 @@ function ticketHtml(r){
       ${L('', `<b>${G(ls.reduce((a,x)=>a+x.montant,0))}</b>`)}`).join('<div class="sep"></div>')}
     <div class="sep2"></div>
     <div class="b">${t('tk_ventes')}</div>
-    ${L(t('tk_total_gal'), nfg(r.total_gallons))}
+    ${galProduits(r.lignes).map(([n, g]) => L(`${t('tk_total_gal')} ${esc(n)}`, nfg(g))).join('')}
     ${L(`<b>${t('tk_attendu')}</b>`, `<b>${G(r.montant_attendu)}</b>`)}
     <div class="sep"></div>
     <div class="b">${t('tk_argent')}</div>
@@ -1543,9 +1541,9 @@ async function chargerHistorique(){
   try{
     const rs = await api('GET','/api/pompiste/rapports');
     $('hist').innerHTML = rs.length ? rs.slice(0,8).map(r=>`<div class="hist">
-      <div style="display:flex;justify-content:space-between;gap:8px"><b>${per(r.periode)} · ${esc(jourTxt(r.date))}</b>
+      <div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(jourTxt(r.date))}</b>
         <span class="badge ${r.statut}">${t(r.statut)}</span></div>
-      <div style="font-size:15px;color:var(--muted)">${esc([...new Set(r.lignes.map(l=>l.produit_nom))].join(', '))} · ${nfg(r.total_gallons)} gal · ${t('ecart_court')} ${signe(r.ecart)}</div>
+      <div style="font-size:15px;color:var(--muted)">${galProduits(r.lignes).map(([n, g]) => `${esc(n)} ${nfg(g)} gal`).join(' · ')} · ${t('ecart_court')} ${signe(r.ecart)}</div>
       ${r.commentaire_superviseur ? `<div class="com"><b>${esc(r.traite_par_nom||t('direction'))} :</b> ${esc(r.commentaire_superviseur)}</div>` : ''}
       ${r.statut==='REJETE' ? `<div style="font-size:15px;margin-top:6px;font-weight:700">${t('refaire')}</div>` : ''}
       <button class="btn-mod" style="margin-top:8px" onclick="reimprimer(${r.id})">🖨 ${t('reimprimer')}</button>
