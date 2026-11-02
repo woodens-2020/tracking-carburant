@@ -601,3 +601,24 @@ def test_pompistes_employes_et_rapports_anciens(client):
     r = t.post("/api/pompiste/compteurs", json={"date": str(today_haiti() - timedelta(days=60)), "charte_acceptee": True,
                "lignes": [{"pompe_id": pompe2, "metter_avant": 0, "metter_apres": 5, "debut_confirme": True}]})
     assert r.status_code == 201, r.text
+
+
+def test_recuperation_garde_les_comptes(client, db):
+    """« Récupérer les pompistes » ne prend que le nom : le compte reste intact
+    et le pompiste se connecte toujours avec son code et son PIN."""
+    import main
+    from models import Employe, Utilisateur
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Garde", "nom": "Compte"}).json()
+    db.expire_all()
+    u = db.get(Utilisateur, c["id"])
+    avant = (u.username, u.code_acces_hash, u.password_hash, u.actif, u.role_id, u.nom_complet)
+    for _ in range(2):                                         # plusieurs fois : sans effet de bord
+        assert client.post("/api/pompiste-supervision/recuperer-employes", headers=H).status_code == 200
+    db.expire_all()
+    u = db.get(Utilisateur, c["id"])
+    assert (u.username, u.code_acces_hash, u.password_hash, u.actif, u.role_id, u.nom_complet) == avant
+    fiches = db.query(Employe).filter_by(utilisateur_id=u.id).all()
+    assert len(fiches) == 1 and (fiches[0].prenom, fiches[0].nom, fiches[0].poste) == ("Garde", "Compte", "Pompiste")
+    assert "seul le nom est repris" in fiches[0].notes
+    t = TestClient(main.app)
+    assert t.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]}).status_code == 200

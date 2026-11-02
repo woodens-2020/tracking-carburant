@@ -87,6 +87,21 @@ def _norm(txt: str) -> str:
     return re.sub(r"[^a-z0-9]", "", t)
 
 
+NOTE_FICHE_POMPISTE = ("Fiche créée à partir du compte pompiste : seul le nom est repris. "
+                       "Complétez le salaire, le contrat et les coordonnées.")
+
+
+def _date_du_compte(u: Utilisateur) -> date_type:
+    c = getattr(u, "created_at", None)
+    if c is None:
+        return today_haiti()
+    try:
+        from tz_utils import HAITI_TZ
+        return (c.astimezone(HAITI_TZ) if c.tzinfo else c).date()
+    except Exception:
+        return c.date()
+
+
 def employe_du_compte(db: Session, u: Utilisateur, prenom: Optional[str] = None,
                       nom: Optional[str] = None) -> Employe:
     """Fiche employé du compte pompiste (créée au besoin). C'est elle qui
@@ -105,10 +120,12 @@ def employe_du_compte(db: Session, u: Utilisateur, prenom: Optional[str] = None,
         if (e.poste or "").strip().lower() == "pompiste" and _norm(e.prenom) + _norm(e.nom) == cle:
             e.utilisateur_id = u.id
             return e
+    # Seul le nom vient du compte (qui n'est jamais modifié : le pompiste garde
+    # son code et son PIN). Date d'embauche = création du compte ; salaire et
+    # contrat sont à compléter dans Employés.
     emp = Employe(prenom=prenom.strip()[:100], nom=(nom or "").strip()[:100] or prenom.strip()[:100],
-                  poste="Pompiste", date_embauche=today_haiti(), salaire_base=0, type_contrat="CDI",
-                  actif=u.actif, utilisateur_id=u.id,
-                  notes="Fiche créée avec le compte pompiste (espace /pompiste).")
+                  poste="Pompiste", date_embauche=_date_du_compte(u), salaire_base=0, type_contrat="CDI",
+                  actif=u.actif, utilisateur_id=u.id, notes=NOTE_FICHE_POMPISTE)
     db.add(emp)
     db.flush()
     return emp
@@ -125,6 +142,13 @@ def rattacher_employes_pompistes(db: Session) -> dict:
     for u in comptes:
         employe_du_compte(db, u)
     crees = sum(1 for u in comptes if u.id not in avant)
+    # Fiches créées automatiquement avant ce réglage : date d'embauche = création
+    # du compte (et non le jour de la création de la fiche). Rien d'autre ne change.
+    for e in db.query(Employe).filter(Employe.notes.like("Fiche créée avec le compte pompiste%")).all():
+        u = db.get(Utilisateur, e.utilisateur_id) if e.utilisateur_id else None
+        if u:
+            e.date_embauche = _date_du_compte(u)
+            e.notes = NOTE_FICHE_POMPISTE
     attribues = 0
     for r in db.query(Releve).filter(Releve.rapport_pompiste_id.isnot(None), Releve.pompiste_id.is_(None)).all():
         rap = db.get(RapportPompiste, r.rapport_pompiste_id)
