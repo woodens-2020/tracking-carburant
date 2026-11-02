@@ -3523,6 +3523,12 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 }
 .gpp{display:block;white-space:nowrap}.gpp-n{font-family:var(--font);font-weight:600;opacity:.75;margin-right:4px}
 .kpi-val .gpp,.grc-gal .gpp,.jres-num .gpp{font-size:.62em;line-height:1.35}
+.md-tab-wrap{overflow-x:auto;margin:8px 0}
+.md-tab{border-collapse:collapse;font-size:13.5px;min-width:60%}
+.md-tab th{text-align:left;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border2);padding:6px 10px;white-space:nowrap}
+.md-tab td{border-bottom:1px solid var(--border);padding:6px 10px}
+.md-tab td.num{text-align:right;font-family:var(--mono);white-space:nowrap}
+.md-h1,.md-h2,.md-h3{font-weight:700;margin:10px 0 4px}.md-h1{font-size:17px}.md-h2{font-size:15.5px}.md-h3{font-size:14.5px}
 </style>
 </head>
 <script src="/vendor/chart.umd.min.js"></script>
@@ -13122,12 +13128,31 @@ function shortNum(n){
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function renderMd(s){
   if(!s) return '';
-  return esc(s)
+  const enLigne = t => t
     .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
     .replace(/\*(.*?)\*/g,'<em>$1</em>')
-    .replace(/`(.*?)`/g,'<code>$1</code>')
-    .replace(/^- (.+)$/gm,'<span style="display:block;padding-left:10px">• $1</span>')
-    .replace(/\n/g,'<br>');
+    .replace(/`(.*?)`/g,'<code>$1</code>');
+  // Tableaux Markdown (| a | b |) et titres (#, ##, ###) — texte échappé d'abord
+  const lignes = esc(s).split('\n'), out = [];
+  const estLigneTab = l => /^\s*\|.*\|\s*$/.test(l);
+  for(let i = 0; i < lignes.length; i++){
+    const l = lignes[i];
+    if(estLigneTab(l) && i + 1 < lignes.length && /^\s*\|[\s:|-]+\|\s*$/.test(lignes[i + 1])){
+      const cel = x => x.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const tete = cel(l); i += 1;
+      const corps = [];
+      while(i + 1 < lignes.length && estLigneTab(lignes[i + 1])){ i += 1; corps.push(cel(lignes[i])); }
+      const num = c => /^[-+−]?[\d\s .,]+\s*(G|gal|%|\$)?$/.test(c.replace(/<\/?strong>/g, ''));
+      out.push(`<div class="md-tab-wrap"><table class="md-tab"><thead><tr>${tete.map(c => `<th>${enLigne(c)}</th>`).join('')}</tr></thead><tbody>`
+        + corps.map(r => `<tr>${r.map(c => `<td class="${num(c) ? 'num' : ''}">${enLigne(c)}</td>`).join('')}</tr>`).join('') + '</tbody></table></div>');
+      continue;
+    }
+    const h = l.match(/^(#{1,3})\s+(.+)$/);
+    if(h){ out.push(`<div class="md-h${h[1].length}">${enLigne(h[2])}</div>`); continue; }
+    if(/^\s*[-*] .+$/.test(l)){ out.push(`<span style="display:block;padding-left:10px">• ${enLigne(l.replace(/^\s*[-*] /, ''))}</span>`); continue; }
+    out.push(enLigne(l) + '<br>');
+  }
+  return out.join('').replace(/(<br>)+$/, '');
 }
 function frDate(str){
   if(!str) return '';

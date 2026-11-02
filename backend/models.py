@@ -2221,6 +2221,25 @@ class PieceJointe(Base):
     )
 
 
+class IaJournal(Base):
+    """Journal de l'assistant IA : chaque question, les outils appelés, le
+    fournisseur, la durée, les jetons et l'erreur éventuelle (traçabilité)."""
+    __tablename__ = "ia_journal"
+
+    id              = Column(Integer, primary_key=True)
+    utilisateur_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True, index=True)
+    conversation_id = Column(Integer, nullable=True)
+    question        = Column(Text, nullable=False)
+    outils          = Column(JSON, nullable=True)          # [{nom, arguments, duree_ms, erreur}]
+    fournisseur     = Column(String(30), nullable=True)
+    modele          = Column(String(60), nullable=True)
+    duree_ms        = Column(Integer, nullable=True)
+    jetons_entree   = Column(Integer, nullable=True)
+    jetons_sortie   = Column(Integer, nullable=True)
+    erreur          = Column(Text, nullable=True)
+    created_at      = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
+
+
 class ChatConversation(Base):
     """Conversation avec l'assistant IA — historique persistant par utilisateur."""
     __tablename__ = "chat_conversations"

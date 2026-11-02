@@ -821,3 +821,71 @@ def exporter(request: Request, quoi: str = "synthese", format: str = "xlsx",
     return StreamingResponse(io.BytesIO(_xlsx(feuilles)),
                              media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                              headers={"Content-Disposition": f'attachment; filename="{nom}.xlsx"'})
+
+
+# ── Accès pour l'assistant IA (mêmes calculs, sans requête HTTP) ───────
+
+def synthese_ia(db: Session, debut: date_type, fin: date_type, comparer: str = "precedent",
+                modules: Optional[str] = None, types: Optional[str] = None, comptes: Optional[str] = None,
+                produits: Optional[str] = None) -> dict:
+    """Synthèse financière de la station où l'on se trouve, réduite à ce
+    dont l'IA a besoin (pas de séries jour par jour sur de longues périodes)."""
+    debut, fin, comp = _params(debut, fin, comparer, None, None)
+    sch = espace_courant()
+    st = [_Station(0 if sch is None else int(sch.split("_")[1]), "Station", sch)]
+    f = Filtres(modules, types, comptes, produits, None)
+    d = _donnees(db, st, debut, fin, avec_stock=True)
+    lignes = [l for l in d["lignes"] if f.ligne(l)]
+    releves = [r for r in d["releves"] if f.releve(r)]
+    prev_l, prev_r = [], []
+    if comp:
+        p = _donnees(db, st, comp[0], comp[1])
+        prev_l = [l for l in p["lignes"] if f.ligne(l)]
+        prev_r = [r for r in p["releves"] if f.releve(r)]
+    a = _analyse_complete(lignes, releves, prev_l, prev_r, debut, fin, comp)
+    ouverture = d["solde_fin"] - sum(l["debit"] - l["credit"] for l in d["lignes"])
+    for p in a["produits"]:
+        p.pop("series", None)
+    serie = a["series"] if len(a["series"]) <= 40 else None
+    return {
+        "periode": {"debut": str(debut), "fin": str(fin)},
+        "comparaison": {"debut": str(comp[0]), "fin": str(comp[1])} if comp else None,
+        "filtres": f.resume(),
+        "indicateurs": a["kpis"], "indicateurs_comparaison": a["kpis_prec"], "variations_pct": a["variations"],
+        "departements": a["departements"],
+        "charges_par_categorie": a["charges_par_categorie"][:15],
+        "produits_carburant": a["produits"],
+        "pompistes": a["pompistes"][:15],
+        "tresorerie": {"solde_ouverture": round(ouverture, 2), "solde_cloture": d["solde_fin"]},
+        "passage_ouverture_cloture": _cascade(d["lignes"], ouverture),
+        "stock_carburant": d["stock"],
+        "constats": a["analyses"],
+        "evolution": [{k: s[k] for k in ("cle", "revenu", "charges", "resultat")} for s in serie] if serie else None,
+        "granularite_evolution": a["granularite"],
+    }
+
+
+def operations_ia(db: Session, debut: date_type, fin: date_type, types: Optional[str] = None,
+                  comptes: Optional[str] = None, modules: Optional[str] = None, recherche: Optional[str] = None,
+                  tri: str = "montant", limite: int = 30) -> dict:
+    """Opérations du journal de caisse (les lignes derrière un chiffre)."""
+    debut, fin = _periode(debut, fin)
+    sch = espace_courant()
+    st = [_Station(0 if sch is None else int(sch.split("_")[1]), "Station", sch)]
+    f = Filtres(modules, types, comptes, None, None)
+    lignes = [l for l in _donnees(db, st, debut, fin)["lignes"] if f.ligne(l)]
+    if recherche:
+        q = recherche.casefold()
+        lignes = [l for l in lignes if any(q in str(l.get(c) or "").casefold() for c in ("description", "tiers", "compte", "reference"))]
+    lignes.sort(key=(lambda l: -_montant(l)) if tri == "montant" else (lambda l: (l["date"], l["cle"])), reverse=False)
+    limite = max(1, min(int(limite or 30), 100))
+    return {
+        "periode": {"debut": str(debut), "fin": str(fin)}, "total_operations": len(lignes),
+        "somme_entrees": round(sum(l["debit"] for l in lignes if l["type"] != "depense_pompiste"), 2),
+        "somme_sorties": round(sum(_montant(l) for l in lignes if l["sens"] == "C" or l["type"] == "depense_pompiste"), 2),
+        "operations": [{"date": l["date"], "type": l["type_lib"], "departement": l["module"], "categorie": l["compte"],
+                        "description": l["description"], "montant": _montant(l),
+                        "sens": "entrée" if l["sens"] == "D" and l["type"] != "depense_pompiste" else "sortie"}
+                       for l in lignes[:limite]],
+        "tronque": len(lignes) > limite,
+    }

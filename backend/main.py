@@ -2867,27 +2867,46 @@ class ChatIn(BaseModel):
 
 @app.post("/api/chat")
 def chat_endpoint(data: ChatIn, request: Request, db: Session = Depends(get_db)):
+    """Assistant IA : réservé à la direction (mêmes droits que la caisse et
+    l'Intelligence Center). L'historique est celui enregistré sur le serveur
+    (jamais celui envoyé par le navigateur) ; chaque question est journalisée."""
     from chatbot import chat
-    user   = request.state.user
-    result = chat(db, data.message, data.historique)
+    from models import IaJournal
+    from pompiste_routes import _user, peut_superviser
+    user = _user(request, db)
+    if not peut_superviser(user):
+        raise HTTPException(403, "L'assistant IA est réservé à la direction.")
+    message = (data.message or "").strip()
+    if not message:
+        raise HTTPException(400, "Message vide.")
+    if len(message) > 4000:
+        raise HTTPException(400, "Message trop long (4 000 caractères au plus).")
 
     conv = None
     if data.conversation_id:
         conv = (db.query(ChatConversation)
                 .filter_by(id=data.conversation_id, utilisateur_id=user.id)
                 .first())
+    historique = list(conv.historique or []) if conv else []
+    result = chat(db, message, historique)
+    trace = result.pop("trace", {}) or {}
+    db.rollback()                                   # rien de ce que les outils ont lu ne reste ouvert
+
     if conv:
         conv.historique = result["historique"]
     else:
-        conv = ChatConversation(
-            utilisateur_id=user.id,
-            titre=data.message.strip()[:80] or "Conversation",
-            historique=result["historique"],
-        )
+        conv = ChatConversation(utilisateur_id=user.id, titre=message[:80] or "Conversation",
+                                historique=result["historique"])
         db.add(conv)
+    db.flush()
+    db.add(IaJournal(utilisateur_id=user.id, conversation_id=conv.id, question=message[:4000],
+                     outils=trace.get("outils"), fournisseur=trace.get("fournisseur"), modele=trace.get("modele"),
+                     duree_ms=trace.get("duree_ms"), jetons_entree=trace.get("jetons_entree"),
+                     jetons_sortie=trace.get("jetons_sortie"), erreur=trace.get("erreur")))
     db.commit()
     db.refresh(conv)
     result["conversation_id"] = conv.id
+    result["sources"] = [o["nom"] for o in trace.get("outils", [])]
     return result
 
 
