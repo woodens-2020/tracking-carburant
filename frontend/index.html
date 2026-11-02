@@ -20184,7 +20184,7 @@ function pspRendreComptes(){
       <div class="psp-actions"><button class="btn btn-primary" onclick="pspCreerCompte()">+ Créer le compte</button></div></div>
     <div class="psp-card"><b>Comptes (${d.comptes.length})</b>
       ${d.comptes.length ? `<div style="overflow-x:auto;margin-top:8px"><table class="psp-tbl"><thead><tr><th>Nom</th><th>Code de connexion</th><th>Station</th><th>Employé lié</th><th>Dernier rapport</th><th>Statut</th><th></th></tr></thead><tbody>
-      ${d.comptes.map(u => `<tr><td><b>${esc(u.nom_complet)}</b>${u.venu_d_ailleurs ? '<div class="psp-muted" style="font-size:12px">Vient d'une autre station (même code, même PIN)</div>' : ''}</td><td style="font-family:var(--mono);font-size:14px"><b>${esc(u.username)}</b></td>
+      ${d.comptes.map(u => `<tr><td><b>${esc(u.nom_complet)}</b>${u.venu_d_ailleurs ? '<div class="psp-muted" style="font-size:12px">Vient d’une autre station (même code, même PIN)</div>' : ''}</td><td style="font-family:var(--mono);font-size:14px"><b>${esc(u.username)}</b></td>
         <td><select class="filter-input psp-station-sel" onchange="pspChangerStation(${u.id}, this)" title="Station où il travaille">${_pspOptionsStations(d.stations, u.station_adresse)}</select></td>
         <td>${esc(u.employe_nom||'—')}</td><td>${u.dernier_rapport ? _pspDate(u.dernier_rapport) : '—'}</td>
         <td>${u.actif ? '<span class="psp-badge CONFIRME">Actif</span>' : '<span class="psp-badge REJETE">Désactivé</span>'}</td>
