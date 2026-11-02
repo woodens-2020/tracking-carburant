@@ -93,6 +93,10 @@ GEO.ouvrir = async function(){
   }
   m.hidden = false;
   document.body.style.overflow = 'hidden';
+  if(!GEO.stations.length){                      // emplacements animés pendant le chargement
+    $('geo-liste').innerHTML = '<div class="gm-sq" style="height:68px;margin:6px 4px"></div>'.repeat(4);
+    $('geo-kpis').innerHTML = '<div class="gm-kpi gm-sq" style="height:44px"></div>'.repeat(4);
+  }
   requestAnimationFrame(() => requestAnimationFrame(() => m.classList.add('ouvert')));
   try{ await GEO.leaflet(); }
   catch(e){ $('geo-panel').innerHTML = `<div class="gm-err">${esc(e.message)}</div>`; $('geo-panel-box').classList.add('ouvert'); return; }

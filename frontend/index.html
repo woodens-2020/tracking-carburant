@@ -19803,8 +19803,10 @@ document.addEventListener('DOMContentLoaded',async()=>{
   } else if(!_isFreshLogin && _savedPage && _canAccess(_savedPage)){
     goTo(_savedPage);
   } else if(_STATIONS && (_STATIONS.peut_changer || _STATIONS.peut_creer) && _canAccess('geo')){
-    goTo(_defaultLandingPage());        // propriétaire : le centre des stations s'ouvre par-dessus
+    // Propriétaire : le centre des stations s'ouvre d'abord (ses données
+    // passent avant celles de la page d'accueil, chargée derrière).
     if(window.GEO) GEO.ouvrir();
+    setTimeout(() => goTo(_defaultLandingPage()), 900);
   } else if(_rlNom === 'manager'){
     goTo('notifications');
   } else if(_rlNom === 'assistant directeur'){
