@@ -14916,6 +14916,8 @@ function _defaultPage(){
 const _PAGES_RETIREES = new Set(['rapport-analytique','statistiques','previsions','caisse']);
 function goTo(page){
   if(_PAGES_RETIREES.has(page)) page = 'dashboard';
+  // Centre des stations : fenêtre plein écran par-dessus la page en cours
+  if(page === 'geo'){ if(_canAccess('geo') && window.GEO) GEO.ouvrir(); return; }
   if(!_canAccess(page)){
     const def = _defaultPage();
     if(page !== def){
@@ -14957,7 +14959,6 @@ function goTo(page){
   if(page==='pompistes-rapports') loadPompistesRapports();
   if(page==='caisse-principale')  loadCaissePrincipale();
   if(page==='intelligence' && window.initIntelligence) initIntelligence();
-  if(page==='geo' && window.initGeo) initGeo();
   if(page==='journal')            initJournal();
   if(page==='carburant-rapport')  loadCarburantRapport();
   if(page==='stock')              initStock();
@@ -19802,7 +19803,8 @@ document.addEventListener('DOMContentLoaded',async()=>{
   } else if(!_isFreshLogin && _savedPage && _canAccess(_savedPage)){
     goTo(_savedPage);
   } else if(_STATIONS && (_STATIONS.peut_changer || _STATIONS.peut_creer) && _canAccess('geo')){
-    goTo('geo');                        // propriétaire : la carte de ses stations d'abord
+    goTo(_defaultLandingPage());        // propriétaire : le centre des stations s'ouvre par-dessus
+    if(window.GEO) GEO.ouvrir();
   } else if(_rlNom === 'manager'){
     goTo('notifications');
   } else if(_rlNom === 'assistant directeur'){
