@@ -490,6 +490,8 @@ canvas{display:block}
 .dep-date-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .dep-date-row input{flex:1;min-width:140px}
 .dep-caisses{display:flex;gap:6px;flex-wrap:wrap}
+.dep-caisses[hidden]{display:none}
+.dep-source{display:flex;align-items:center;height:38px;padding:0 12px;border-radius:8px;border:1px solid var(--border2);background:var(--panel2);font-weight:600;color:var(--text)}
 .dep-chip{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.75);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
 .dep-chip.active{background:rgba(59,130,246,.18);border-color:#3b82f6;color:#93c5fd}
 .dep-chip:focus-visible{outline:2px solid #3b82f6;outline-offset:2px}
@@ -6350,11 +6352,14 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
                 </div>
               </div>
               <div class="gi-form-field">
-                <label class="gi-form-lbl">Payée par la caisse</label>
+                <label class="gi-form-lbl">Sortie de</label>
+                <div class="dep-source">💰 Caisse principale</div>
+                <!-- Plus de choix de caisse : toute dépense sort de la caisse principale.
+                     Champ gardé caché pour les anciennes dépenses (leur valeur ne change pas). -->
                 <select class="gi-form-select" id="dep-caisse" hidden>
-                  <option value="">— Générale (aucune caisse spécifique) —</option>
+                  <option value=""></option>
                 </select>
-                <div class="dep-caisses" id="dep-caisses" role="group" aria-label="Caisse d'origine"></div>
+                <div class="dep-caisses" id="dep-caisses" hidden></div>
               </div>
             </div>
 
@@ -6410,7 +6415,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
                 </div>
               </div>
             </details>
-            <div class="dep-aide">Entrée = enregistrer et saisir la suivante (date et caisse conservées).</div>
+            <div class="dep-aide">Entrée = enregistrer et saisir la suivante (date conservée).</div>
           </div>
           <div class="gi-modal-foot">
             <button class="gi-btn-secondary" onclick="closeDepModal()">Fermer</button>
@@ -16237,7 +16242,7 @@ function _ficheSyntheseHtml(s){
   const rowsVentes = vp.map(p=>`<tr><td>${p.produit}</td><td class="r">${gal(p.gallons)}</td><td class="r">${grd(p.montant)}</td></tr>`).join('')
     || `<tr><td colspan="3" class="c muted">Aucune vente sur la période</td></tr>`;
   const rowsStock = st.map(p=>`<tr><td>${p.produit}</td><td class="r">${gal(p.gallons_livres)}</td><td class="r">${gal(p.gallons_vendus)}</td><td class="r">${gal(p.gallons_ecartes)}</td><td class="r b">${gal(p.gallons_restants)}</td></tr>`).join('');
-  const rowsDep = dp.map(x=>`<tr><td>${x.date}</td><td>${x.categorie}</td><td>${(x.description||'').replace(/</g,'&lt;')}</td><td>${x.source||'Caisse générale'}</td><td class="r">${grd(x.montant)}</td></tr>`).join('')
+  const rowsDep = dp.map(x=>`<tr><td>${x.date}</td><td>${x.categorie}</td><td>${(x.description||'').replace(/</g,'&lt;')}</td><td>${x.source||'Caisse principale'}</td><td class="r">${grd(x.montant)}</td></tr>`).join('')
     || `<tr><td colspan="5" class="c muted">Aucune dépense sur la période</td></tr>`;
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Fiche de synthèse carburant</title><style>
     *{margin:0;padding:0;box-sizing:border-box}
@@ -16393,7 +16398,7 @@ async function loadCarburantRapport(){
     _cjrJours.forEach(d=>{
       (d.entrees.par_produit||[]).forEach(p=>caisses.add(p.produit));
       (d.depenses.liste||[]).forEach(x=>{
-        if(x.source && x.source!=='Caisse générale') caisses.add(x.source);
+        if(x.source && x.source!=='Caisse principale') caisses.add(x.source);
         if(x.categorie) cats.add(x.categorie);
         if(x.beneficiaire) benefs.add(x.beneficiaire);
       });
@@ -16406,7 +16411,7 @@ async function loadCarburantRapport(){
     const selP=document.getElementById('cjr-produit'), gardeP=selP.value;
     selP.innerHTML='<option value="">Toutes les caisses</option>'
       +tri(caisses).map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')
-      +'<option value="__generale">Caisse générale (dépenses non attribuées)</option>';
+      +'<option value="__generale">Caisse principale (dépenses non attribuées à un produit)</option>';
     if([...selP.options].some(o=>o.value===gardeP)) selP.value=gardeP;
     _cjrRemplir('cjr-cat', 'Toutes les catégories', tri(cats));
     _cjrRemplir('cjr-benef', 'Tous les bénéficiaires', tri(benefs));
@@ -16438,8 +16443,8 @@ function _cjrConstruire(){
       }
     }
     for(const x of (d.depenses.liste||[])){
-      const src=x.source||'Caisse générale';
-      if(fProd==='__generale' && src!=='Caisse générale') continue;
+      const src=x.source||'Caisse principale';
+      if(fProd==='__generale' && src!=='Caisse principale') continue;
       if(fProd && fProd!=='__generale' && src!==fProd) continue;
       if(fType==='charges' && x.est_transfert) continue;
       if(fType==='transferts' && !x.est_transfert) continue;
@@ -16466,7 +16471,7 @@ function _cjrConstruire(){
     totaux:{gallons:tg, ventes:tm, charges:tdc, transferts:tdt, depenses:tdc+tdt, solde:tm-tdc-tdt},
     filtres:{
       liste:[
-        fProd && `Caisse : ${fProd==='__generale'?'Caisse générale':fProd}`,
+        fProd && `Caisse : ${fProd==='__generale'?'Caisse principale':fProd}`,
         fPer && `Période : ${fPer==='Matin'?'Matin':'Après-midi'}`,
         fType && `Dépenses : ${fType==='charges'?'charges seulement':'transferts seulement'}`,
         fCat && `Catégorie : ${fCat}`,
@@ -16544,7 +16549,7 @@ function cjrAfficher(){
       <td>${esc(x.categorie)}</td>
       <td>${esc(x.description||'')}${x.reference?` <span class="c-muted">· ${esc(x.reference)}</span>`:''}</td>
       <td>${esc(x.beneficiaire||'—')}</td>
-      <td>${esc(x.source||'Caisse générale')}</td>
+      <td>${esc(x.source||'Caisse principale')}</td>
       <td>${x.est_transfert?'<span class="cjr-tag cjr-tag-tr">Transfert</span>':'<span class="cjr-tag">Charge</span>'}</td>
       <td class="tr num c-amber"><strong>${cjrG(x.montant)}</strong></td>
     </tr>`).join('');
@@ -16597,7 +16602,7 @@ function cjrAfficher(){
     <div class="cjr-note">Source : relevés de compteurs.</div>
     <div class="cjr-periodes">${_cjrTableVentesHtml(m,false)}</div>
     <h3 class="cjr-h">Dépenses</h3>
-    <div class="cjr-note">« Caisse générale » = non attribuée à la Gazoline ni au Diesel. Les transferts (dépôt en banque, Zelle) sortent de la caisse mais ne sont pas des charges.</div>
+    <div class="cjr-note">« Caisse principale » = dépense non attribuée à un produit. Les transferts (dépôt en banque, Zelle) sortent de la caisse mais ne sont pas des charges.</div>
     ${tableDep}`;
 }
 
@@ -16713,7 +16718,7 @@ function cjrImprimerDetaille(){
   const e = v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const ncD = m.unJour ? 5 : 6;   // colonnes avant « Montant »
   const dep = m.depenses.map(x=>`<tr>${m.unJour?'':`<td class="nw">${frDate(x.date)}</td>`}<td>${e(x.categorie)}</td><td>${e(x.description)}${x.reference?' · '+e(x.reference):''}</td>
-      <td>${e(x.beneficiaire||'—')}</td><td>${e(x.source||'Caisse générale')}</td><td>${x.est_transfert?'Transfert':'Charge'}</td><td class="r b nw">${cjrG(x.montant)}</td></tr>`).join('')
+      <td>${e(x.beneficiaire||'—')}</td><td>${e(x.source||'Caisse principale')}</td><td>${x.est_transfert?'Transfert':'Charge'}</td><td class="r b nw">${cjrG(x.montant)}</td></tr>`).join('')
     || `<tr><td colspan="${ncD+1}" class="c muted">Aucune dépense</td></tr>`;
   const jours = m.unJour ? '' : `<h2>Jour par jour</h2><table>
       <thead><tr><th>Date</th><th class="r">Gallons</th><th class="r">Ventes</th><th class="r">Charges</th><th class="r">Transferts</th><th class="r">Solde</th></tr></thead>
@@ -24571,8 +24576,8 @@ function _renderDepPanels(data){
 
   // Dépenses par caisse d'origine
   const caisseMap={};
-  data.forEach(d=>{ const k=d.produit_nom || 'Caisse générale'; caisseMap[k]=(caisseMap[k]||0)+d.montant; });
-  const caisseCols={ 'Gazoline':'#3b82f6', 'Diesel':'#f59e0b', 'Caisse générale':'#64748b' };
+  data.forEach(d=>{ const k=d.produit_nom || 'Caisse principale'; caisseMap[k]=(caisseMap[k]||0)+d.montant; });
+  const caisseCols={ 'Gazoline':'#3b82f6', 'Diesel':'#f59e0b', 'Caisse principale':'#64748b' };
   const caisseEntries = Object.entries(caisseMap).sort((a,b)=>b[1]-a[1])
     .map(([n,v],i)=>({name:n, value:v, color:caisseCols[n] || _DEP_CAT_PALETTE[i % _DEP_CAT_PALETTE.length]}));
   _depDonut('dep-chart-caisse','dep-caisse-legend', caisseEntries);
@@ -24659,7 +24664,7 @@ function renderDepTable(data){
       <td>${d.date_depense}</td>
       <td>${_ckJoursBadge(d.jours)}</td>
       <td><span class="td-badge ${catColors[d.categorie]||'badge-gray'}">${d.categorie}</span></td>
-      <td>${d.produit_nom?`<span class="td-badge ${caisseColors[d.produit_nom]||'badge-gray'}">${d.produit_nom}</span>`:'<span class="td-muted">Générale</span>'}</td>
+      <td>${d.produit_nom?`<span class="td-badge ${caisseColors[d.produit_nom]||'badge-gray'}">${d.produit_nom}</span>`:'<span class="td-muted">Caisse principale</span>'}</td>
       <td>${d.description}${d.rapport_pompiste_id?` <span class="td-badge badge-amber" title="Payée par le pompiste avec l'argent de ses ventes (rapport n°${d.rapport_pompiste_id}) : ne sort pas de la caisse principale">⛽ Payée par le pompiste</span>`:(d.sans_justificatif?' <span class="td-badge badge-red" title="Aucun document joint">⚠ Inachevée</span>':'')}</td>
       <td class="td-muted">${d.beneficiaire||'—'}</td>
       <td class="td-amount">${_htg(d.montant)}</td>
@@ -24756,7 +24761,7 @@ function openDepModal(id=null){
     _depViderSaisie();
     const memo=_depMemo();
     document.getElementById('dep-date').value=memo.date||_today();
-    document.getElementById('dep-caisse').value=memo.caisse||'';
+    document.getElementById('dep-caisse').value='';          // nouvelle dépense : caisse principale
   }
   _depRenderCaisses();
   _depMajChipsDate();

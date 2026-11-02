@@ -3822,7 +3822,7 @@ def carburant_synthese(
         "date":        str(d.date_depense),
         "categorie":   d.categorie or "—",
         "description": d.description or "",
-        "source":      (d.produit.nom if d.produit else "Caisse générale"),
+        "source":      (d.produit.nom if d.produit else "Caisse principale"),
         "montant":     float(_D(str(d.montant))),
     } for d in deps]
     total_depenses = float(sum((_D(str(d.montant)) for d in deps), _D("0")))
@@ -3945,7 +3945,7 @@ def carburant_rapport_jour(
     depenses_liste = [{
         "categorie":    x.categorie or "—",
         "description":  x.description or "",
-        "source":       (x.produit.nom if x.produit else "Caisse générale"),
+        "source":       (x.produit.nom if x.produit else "Caisse principale"),
         "reference":    getattr(x, "reference", None) or "",
         "montant":      float(_D(str(x.montant))),
         "produit_id":   x.produit_id,
@@ -6381,7 +6381,7 @@ def stats_depenses(
     par_caisse: dict[str, float] = {}
     for d in depenses:
         par_cat[d.categorie] = round(par_cat.get(d.categorie, 0) + float(d.montant), 2)
-        caisse_nom = d.produit.nom if d.produit else "Générale"
+        caisse_nom = d.produit.nom if d.produit else "Caisse principale"
         par_caisse[caisse_nom] = round(par_caisse.get(caisse_nom, 0) + float(d.montant), 2)
     return {
         "total": round(sum(par_cat.values()), 2),
