@@ -32,7 +32,7 @@ from models import Base
 MAX_TOOL_ROUNDS = 8
 GEMINI_MODELS   = ["gemini-flash-latest", "gemini-flash-lite-latest"]
 CLAUDE_MODEL    = "claude-sonnet-5-5"
-DELAI_IA_S      = 60          # réponse du fournisseur
+DELAI_IA_S      = 40          # réponse du fournisseur (par tentative ; puis modèle de secours)
 DELAI_SQL_S     = 5           # requête SQL de dernier recours
 HISTORIQUE_MAX  = 12          # messages gardés dans le contexte
 TAILLE_MESSAGE  = 4000        # caractères par message d'historique
@@ -379,7 +379,9 @@ def _chat_gemini(db: Session, message: str, historique: list, api_key: str, trac
             return _chat_gemini_model(db, message, historique, client, model_name, types, trace)
         except Exception as e:
             err_str = str(e)
-            if any(x in err_str for x in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "timed out", "Timeout")):
+            if any(x in err_str for x in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "504", "DEADLINE_EXCEEDED",
+                                           "500", "INTERNAL", "timed out", "Timeout")):
+                trace["outils"] = []                     # le modèle suivant repart de zéro
                 last_err = e
                 if i < len(GEMINI_MODELS) - 1:
                     time.sleep(1)
