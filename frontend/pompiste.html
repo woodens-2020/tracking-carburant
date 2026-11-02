@@ -402,8 +402,10 @@ main,.card,.deux-col > *{min-width:0}
 // ── Traductions ─────────────────────────────────────────────────────
 const TXT = {
   fr: {
-    espace:'Espace pompiste', connexion_sub:'Choisissez votre langue, puis entrez votre code et votre PIN.',
+    espace:'Espace pompiste', connexion_sub:'Choisissez votre langue, puis entrez votre code.',
     mon_code:'Mon code', mon_pin:'Mon PIN (9 chiffres)', se_connecter:'Se connecter', pin_9:'Le PIN contient 9 chiffres.',
+    continuer:'Continuer', bonjour:'Bonjour {p} !', quelle_station:'Dans quelle station travaillez-vous ?',
+    autre_station:'← Choisir une autre station', code_inconnu:'Ce code n’existe pas. Vérifiez-le ou demandez-le à votre superviseur.',
     sortir:'Sortir', retour:'← Retour', etape1:'Étape 1 · Compteurs', etape2:'Étape 2 · Argent', envoyes:'Compteurs envoyés',
     charte:'Charte de responsabilité', charte_sub:'Lisez et acceptez avant de commencer.',
     c1:'Je lis moi-même les <b>deux mètres</b> (début et fin) sur chaque pompe.',
@@ -493,8 +495,10 @@ const TXT = {
     mois:['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'],
   },
   ht: {
-    espace:'Espas ponpis', connexion_sub:'Chwazi lang ou, epi antre kòd ou ak PIN ou.',
+    espace:'Espas ponpis', connexion_sub:'Chwazi lang ou, epi antre kòd ou.',
     mon_code:'Kòd mwen', mon_pin:'PIN mwen (9 chif)', se_connecter:'Konekte', pin_9:'PIN nan gen 9 chif.',
+    continuer:'Kontinye', bonjour:'Bonjou {p} !', quelle_station:'Nan ki estasyon ou ap travay ?',
+    autre_station:'← Chwazi yon lòt estasyon', code_inconnu:'Kòd sa a pa egziste. Verifye l oswa mande sipèvizè w la.',
     sortir:'Soti', retour:'← Tounen', etape1:'Etap 1 · Kontè', etape2:'Etap 2 · Lajan', envoyes:'Kontè yo voye',
     charte:'Angajman responsablite', charte_sub:'Li epi aksepte anvan ou kòmanse.',
     c1:'Se mwen menm ki li <b>de mitè yo</b> (kòmansman ak fen) sou chak ponp.',
@@ -722,41 +726,84 @@ async function chargerContexte(){
   }
 }
 
+/* Connexion en 3 étapes : le code → la station où il travaille → le PIN. */
+const LG = {etape:'code', username:'', prenom:'', stations:[], station:null};
 function ecranConnexion(msg){
   S.champ = null; S.ctx = null;
   $('barre').classList.add('cache'); $('qui').classList.add('cache'); $('btn-sortir').classList.add('cache');
-  const u = $('l-user')?.value || '';
+  if($('l-user')) LG.username = $('l-user').value.trim();
+  const tete = `<h1>${t('espace')}</h1>`;
+  const err = msg ? `<div class="alerte err">${msg}</div>` : '';
+  if(LG.etape === 'station'){
+    $('app').innerHTML = `<div class="connexion">${tete}
+      <p class="sub">${t('bonjour', {p: esc(LG.prenom)})} ${t('quelle_station')}</p>${err}
+      <div class="choix">${LG.stations.map(st => `<button class="gros" onclick="lgChoisirStation(${st.id})">
+        <span class="ico">⛽</span><span>${esc(st.nom)}${st.adresse && st.adresse !== st.nom ? `<small>📍 ${esc(st.adresse)}</small>` : ''}</span></button>`).join('')}</div>
+      <button class="btn sec" type="button" style="margin-top:14px" onclick="lgRetour('code')">${t('retour')}</button></div>`;
+    return;
+  }
+  if(LG.etape === 'pin'){
+    $('app').innerHTML = `<div class="connexion">${tete}
+      <p class="sub">${t('bonjour', {p: esc(LG.prenom)})} ⛽ <b>${esc(LG.station.nom)}</b></p>${err}
+      <form class="card" id="f-login" autocomplete="on">
+        <input type="hidden" autocomplete="username" value="${esc(LG.username)}">
+        <label for="l-pin">${t('mon_pin')}</label>
+        <input id="l-pin" type="password" inputmode="numeric" maxlength="9" autocomplete="current-password" required
+          style="font-family:var(--mono);font-size:30px;letter-spacing:.3em;text-align:center">
+        <div style="height:18px"></div>
+        <button class="btn" id="l-btn">${t('se_connecter')}</button>
+      </form>
+      <button class="btn sec" type="button" style="margin-top:6px" onclick="lgRetour('station')">${t('autre_station')}</button></div>`;
+    $('l-pin').focus();
+    $('f-login').onsubmit = async ev => {
+      ev.preventDefault();
+      const pin = $('l-pin').value.trim();
+      if(!/^\d{9}$/.test(pin)) return ecranConnexion(t('pin_9'));
+      $('l-btn').disabled = true;
+      try{
+        await api('POST','/api/login/pompiste',{username:LG.username, code_acces:pin, espace_id:LG.station.id});
+        try{ localStorage.setItem('ponpis-station', String(LG.station.id)); }catch(e){}
+        LG.etape = 'code';
+        reinit();
+        await chargerContexte();
+      }catch(e){ ecranConnexion(esc(e.message)); }
+    };
+    return;
+  }
   $('app').innerHTML = `<div class="connexion">
-    <h1>${t('espace')}</h1><p class="sub">${t('connexion_sub')}</p>
+    ${tete}<p class="sub">${t('connexion_sub')}</p>
     <div class="choix deux" style="margin-bottom:16px">
       <button class="gros ${LANG==='ht'?'on':''}" onclick="choisirLangue('ht')"><span class="ico">🇭🇹</span><span>Kreyòl</span></button>
       <button class="gros ${LANG==='fr'?'on':''}" onclick="choisirLangue('fr')"><span class="ico">🇫🇷</span><span>Français</span></button>
     </div>
-    ${msg ? `<div class="alerte err">${msg}</div>` : ''}
+    ${err}
     <form class="card" id="f-login" autocomplete="on">
       <label for="l-user">${t('mon_code')}</label>
       <input id="l-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required
-        value="${esc(u)}" placeholder="ex. jeanpierre4821" style="font-family:var(--mono);font-size:24px">
-      <label for="l-pin">${t('mon_pin')}</label>
-      <input id="l-pin" type="password" inputmode="numeric" maxlength="9" autocomplete="current-password" required
-        style="font-family:var(--mono);font-size:30px;letter-spacing:.3em;text-align:center">
+        value="${esc(LG.username)}" placeholder="ex. jeanpierre4821" style="font-family:var(--mono);font-size:24px">
       <div style="height:18px"></div>
-      <button class="btn" id="l-btn">${t('se_connecter')}</button>
+      <button class="btn" id="l-btn">${t('continuer')}</button>
     </form>
     ${!enModeApp() ? `<button class="btn sec" id="btn-installer" type="button" onclick="installerApp()" style="margin-top:6px">📲 ${t('installer_app')}</button>` : ''}
     </div>`;
   $('f-login').onsubmit = async ev => {
     ev.preventDefault();
-    const pin = $('l-pin').value.trim();
-    if(!/^\d{9}$/.test(pin)) return ecranConnexion(t('pin_9'));
+    LG.username = $('l-user').value.trim();
+    if(!LG.username) return;
     $('l-btn').disabled = true;
     try{
-      await api('POST','/api/login/pompiste',{username:$('l-user').value.trim(), code_acces:pin});
-      reinit();
-      await chargerContexte();
-    }catch(e){ ecranConnexion(esc(e.message)); }
+      const r = await api('POST','/api/pompiste/identifier',{username:LG.username});
+      LG.prenom = r.prenom; LG.stations = r.stations;
+      if(r.stations.length === 1){ LG.station = r.stations[0]; LG.etape = 'pin'; }
+      else LG.etape = 'station';
+      ecranConnexion();
+    }catch(e){ ecranConnexion(e.code === 'code_inconnu' ? t('code_inconnu') : esc(e.message)); }
   };
 }
+function lgChoisirStation(id){
+  LG.station = LG.stations.find(s => s.id === id); LG.etape = 'pin'; ecranConnexion();
+}
+function lgRetour(etape){ LG.etape = etape; ecranConnexion(); }
 
 /* La tablette était connectée avec un autre compte (administration…) :
    l'espace pompiste ne mène jamais vers le système principal — on ferme

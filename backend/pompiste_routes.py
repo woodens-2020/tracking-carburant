@@ -1311,6 +1311,7 @@ def _compte_dict(db: Session, u: Utilisateur) -> dict:
             "employe_id": emp.id if emp else None,
             "employe_nom": f"{emp.prenom} {emp.nom}" if emp else None,
             "station_adresse": u.station_adresse,
+            "venu_d_ailleurs": bool(getattr(u, "compte_origine", None)),
             "dernier_rapport": str(dernier.date) if dernier else None}
 
 
@@ -1482,6 +1483,8 @@ def modifier_compte(uid: int, data: ComptePatch, _s: Utilisateur = Depends(_requ
         if not data.actif:
             from models import SessionToken
             db.query(SessionToken).filter_by(user_id=u.id).delete()
+    if data.nouveau_pin and u.compte_origine:
+        raise HTTPException(400, "Ce pompiste vient d'une autre station : son PIN se change dans sa station d'origine.")
     if data.nouveau_pin:
         pin = _nouveau_pin()
         u.code_acces_hash = hash_code_acces(pin)

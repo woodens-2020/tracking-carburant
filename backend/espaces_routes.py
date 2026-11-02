@@ -64,7 +64,8 @@ def espace_du_compte(email: Optional[str] = None, username: Optional[str] = None
     """Espace où vit le compte (None = espace principal, qui a la priorité :
     le propriétaire y est, ses comptes miroirs ne comptent pas)."""
     def trouve(db) -> bool:
-        q = db.query(Utilisateur).filter(Utilisateur.actif.is_(True))
+        # Les comptes d'un pompiste dans les autres stations ne comptent pas
+        q = db.query(Utilisateur).filter(Utilisateur.actif.is_(True), Utilisateur.compte_origine.is_(None))
         if email:
             return q.filter(Utilisateur.email == email.strip().lower()).first() is not None
         if username:
@@ -83,6 +84,35 @@ def espace_du_compte(email: Optional[str] = None, username: Optional[str] = None
         except Exception:
             continue
     return None
+
+
+def schema_de_station(eid) -> Optional[str]:
+    """Station choisie par son numéro (0 = principale) → schéma ; ValueError
+    si elle n'existe pas ou a été retirée."""
+    if eid in (0, None):
+        return None
+    sch = f"esp_{int(eid)}"
+    if sch not in schemas_actifs():
+        invalider_cache()
+        if sch not in schemas_actifs():
+            raise ValueError("Station inconnue")
+    return sch
+
+
+def stations_pompiste() -> list:
+    """Toutes les stations où un pompiste peut travailler : la principale
+    (avec l'adresse de ses pompes) et les stations séparées actives."""
+    from models import Distributeur
+    with session_principale() as db:
+        adresses = []
+        for (a,) in db.query(Distributeur.adresse).order_by(Distributeur.ordre, Distributeur.id).all():
+            a = " ".join((a or "").split())
+            if a and a.casefold() not in [x.casefold() for x in adresses]:
+                adresses.append(a)
+        out = [{"id": 0, "nom": "Station principale", "adresse": ", ".join(adresses) or None}]
+        out += [{"id": e.id, "nom": e.nom, "adresse": e.adresse}
+                for e in db.query(Espace).filter(Espace.actif.is_(True)).order_by(Espace.id).all()]
+    return out
 
 
 def espace_du_jeton_reset(jeton: Optional[str]) -> Optional[str]:

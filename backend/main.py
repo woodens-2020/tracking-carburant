@@ -206,7 +206,7 @@ def _clear_login_failures(ip: str | None) -> None:
 # Chemins accessibles sans être connecté
 _PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code",
                     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify",
-                    "/api/oauth/otp/send", "/api/config/branding", "/api/login/pompiste", "/pompiste",
+                    "/api/oauth/otp/send", "/api/config/branding", "/api/login/pompiste", "/api/pompiste/identifier", "/pompiste",
                     "/pompiste/manifest.webmanifest", "/pompiste-sw.js", "/pompiste/installer", "/pompiste/qr.png"}
 _PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/", "/pompiste-app/") if _DEBUG_MODE
                     else ("/api/auth/oauth/", "/shared/", "/pompiste-app/"))
@@ -332,6 +332,13 @@ class EspaceMiddleware:
                 email = d.get("email") or (ident if ident and "@" in ident else None)
                 username = d.get("username") or (ident if ident and "@" not in ident else None)
                 schema = await run_in_threadpool(espace_du_compte, email, username)
+                if scope.get("path") == "/api/login/pompiste" and isinstance(d.get("espace_id"), int):
+                    # Le pompiste a choisi la station où il travaille aujourd'hui
+                    from espaces_routes import schema_de_station
+                    try:
+                        schema = await run_in_threadpool(schema_de_station, d["espace_id"])
+                    except ValueError:
+                        pass
             poser = True
             envoye = {"fait": False}
 
@@ -965,6 +972,68 @@ def _session_ouverte_pour(db: Session, user: Utilisateur):
 class LoginPompisteIn(BaseModel):
     username:   str
     code_acces: str
+    espace_id:  Optional[int] = None    # station choisie (0 = principale) ; absent = sa station
+
+
+class IdentifierPompisteIn(BaseModel):
+    username: str
+
+
+def _compte_pompiste_origine(username: str):
+    """(schéma, compte) du compte pompiste d'origine, où qu'il soit."""
+    from database import session_espace
+    from espaces_routes import espace_du_compte
+    sch = espace_du_compte(username=username)
+    with session_espace(sch) as odb:
+        u = (odb.query(Utilisateur).filter(Utilisateur.username.ilike(username), Utilisateur.actif.is_(True),
+                                           Utilisateur.compte_origine.is_(None)).first())
+        if u and not est_role_pompiste(u.role_obj):
+            u = None
+        if u:
+            odb.expunge(u)
+    return sch, u
+
+
+@app.post("/api/pompiste/identifier")
+def identifier_pompiste(data: IdentifierPompisteIn, request: Request):
+    """Étape 1 de la connexion pompiste : le code existe-t-il ? Si oui, la
+    liste des stations, pour choisir celle où il travaille (le PIN suit)."""
+    from espaces_routes import stations_pompiste
+    ip = request.client.host if request.client else None
+    username = data.username.strip().lower()
+    cle = f"{ip}|pompiste-code"
+    _check_login_rate(cle)
+    _sch, u = _compte_pompiste_origine(username) if username else (None, None)
+    if not u:
+        _record_login_failure(cle)
+        raise HTTPException(404, {"code": "code_inconnu", "message": "Ce code n'existe pas."})
+    stations = stations_pompiste()
+    origine = 0 if _sch is None else int(_sch.split("_")[1])
+    for st in stations:
+        st["la_sienne"] = st["id"] == origine
+    return {"prenom": (u.nom_complet or "").split(" ")[0], "stations": stations}
+
+
+def _compte_dans_station(db: Session, sch_origine, origine: Utilisateur) -> Utilisateur:
+    """Compte du pompiste dans la station choisie (créé au premier passage) :
+    même code et même PIN que son compte d'origine, qui fait foi."""
+    from pompiste_routes import employe_du_compte
+    marque = f"{sch_origine or 'principal'}:{origine.id}"
+    u = db.query(Utilisateur).filter_by(compte_origine=marque).first()
+    if not u:
+        if db.query(Utilisateur.id).filter(Utilisateur.username.ilike(origine.username)).first():
+            raise HTTPException(409, "Un autre compte de cette station a déjà ce code : contactez le superviseur.")
+        role = assurer_role_pompiste(db)
+        u = Utilisateur(username=origine.username, nom_complet=origine.nom_complet,
+                        password_hash=origine.password_hash, role="operateur", role_id=role.id,
+                        poste=role.nom, actif=True, compte_origine=marque)
+        db.add(u)
+        db.flush()
+        prenom, _, nom = (origine.nom_complet or "").partition(" ")
+        employe_du_compte(db, u, prenom, nom)
+    u.code_acces_hash, u.nom_complet = origine.code_acces_hash, origine.nom_complet
+    db.commit()
+    return u
 
 
 @app.post("/api/login/pompiste")
@@ -979,9 +1048,22 @@ def login_pompiste(data: LoginPompisteIn, request: Request, response: Response,
     # par la même IP — un PIN mal tapé ne doit pas bloquer tout le monde.
     cle = f"{ip}|pompiste|{username}"
     _check_login_rate(cle)
-    user = (db.query(Utilisateur)
-            .filter(Utilisateur.username.ilike(username), Utilisateur.actif.is_(True)).first())
+    from database import espace_courant
+    sch_origine, origine = _compte_pompiste_origine(username)
+    ici = espace_courant()
     _err = "Identifiant ou code PIN incorrect"
+    if origine and sch_origine != ici:
+        # Autre station que la sienne : le PIN est vérifié sur son compte d'origine
+        if origine.code_acces_hash and verify_code_acces(data.code_acces.strip(), origine.code_acces_hash):
+            user = _compte_dans_station(db, sch_origine, origine)
+            if not user.actif:
+                raise HTTPException(403, "Votre accès à cette station a été désactivé.")
+        else:
+            user = None
+    else:
+        user = (db.query(Utilisateur)
+                .filter(Utilisateur.username.ilike(username), Utilisateur.actif.is_(True),
+                        Utilisateur.compte_origine.is_(None)).first())
     if (not user or not est_role_pompiste(user.role_obj) or not user.code_acces_hash
             or not verify_code_acces(data.code_acces.strip(), user.code_acces_hash)):
         _record_login_failure(cle)

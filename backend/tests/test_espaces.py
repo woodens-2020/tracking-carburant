@@ -91,6 +91,32 @@ def test_station_separee(client):
     assert c2["station_nom"] == "Station Champin"
     assert all(x["username"] != c2["username"] for x in p.get("/api/pompiste-supervision/comptes").json()["comptes"])
     assert any(x["username"] == c2["username"] for x in g.get("/api/pompiste-supervision/comptes").json()["comptes"])
+    # Un pompiste de la station principale choisit de travailler à Champin
+    c3 = p.post("/api/pompiste-supervision/comptes", json={"prenom": "Paul", "nom": "Principal"}).json()
+    anon = _client()
+    assert anon.post("/api/pompiste/identifier", json={"username": "inconnu9999"}).status_code == 404
+    r = anon.post("/api/pompiste/identifier", json={"username": c3["username"]})
+    assert r.status_code == 200 and r.json()["prenom"] == "Paul"
+    assert [(s["id"], s["la_sienne"]) for s in r.json()["stations"]] == [(0, True), (eid, False)]
+    assert anon.post("/api/login/pompiste", json={"username": c3["username"], "code_acces": "000000000",
+                                                  "espace_id": eid}).status_code == 401
+    for _ in range(2):                                   # 2e passage : même compte dans Champin
+        p3 = _client()
+        assert p3.post("/api/login/pompiste", json={"username": c3["username"], "code_acces": c3["code_acces"],
+                                                    "espace_id": eid}).status_code == 200
+        ctx = p3.get("/api/pompiste/contexte").json()
+        assert ctx["pompiste"]["station_nom"] == "Station Champin"
+        assert {q["nom"] for x in ctx["produits"] for q in x["pompes"]} == {"Gazoline 1", "Gazoline 2", "Diesel 1"}
+    venus = [x for x in g.get("/api/pompiste-supervision/comptes").json()["comptes"] if x["username"] == c3["username"]]
+    assert len(venus) == 1 and venus[0]["venu_d_ailleurs"] is True
+    assert g.patch(f"/api/pompiste-supervision/comptes/{venus[0]['id']}", json={"nouveau_pin": True}).status_code == 400
+    # Sans choix de station (ancienne application) : sa station d'origine
+    p4 = _client()
+    assert p4.post("/api/login/pompiste", json={"username": c3["username"], "code_acces": c3["code_acces"]}).status_code == 200
+    assert p4.get("/api/pompiste/contexte").json()["pompiste"]["station_nom"] is None
+    # Le pompiste créé à Champin peut aussi venir à la station principale
+    r = _client().post("/api/pompiste/identifier", json={"username": c2["username"]}).json()
+    assert [(s["id"], s["la_sienne"]) for s in r["stations"]] == [(0, False), (eid, True)]
     p2 = _client()
     assert p2.post("/api/login/pompiste", json={"username": c2["username"], "code_acces": c2["code_acces"]}).status_code == 200
     ctx = p2.get("/api/pompiste/contexte").json()

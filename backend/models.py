@@ -407,6 +407,8 @@ class Utilisateur(Base):
     telephone         = Column(String(20),  nullable=True)  # format E.164 (+509XXXXXXXX) — second canal OTP (SMS)
     # Pompiste : station (adresse des produits) où il travaille. NULL = toutes.
     station_adresse = Column(String(255), nullable=True)
+    # Pompiste venu d'une autre station : "<schema|principal>:<id>" du compte d'origine
+    compte_origine = Column(String(40), nullable=True)
 
     role_obj = relationship("Role", back_populates="utilisateurs")
 
