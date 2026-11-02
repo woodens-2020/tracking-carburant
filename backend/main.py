@@ -152,7 +152,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' blob:; "
             "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: blob:; "
+            "img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.fr; "
             "font-src 'self' data:; "
             "connect-src 'self'; "
             "worker-src 'self' blob:; "
@@ -371,6 +371,8 @@ from espaces_routes import router as espaces_router
 app.include_router(espaces_router)
 from intelligence import router as intelligence_router
 app.include_router(intelligence_router)
+from geospatial import router as geospatial_router
+app.include_router(geospatial_router)
 app.include_router(bar_caisses_router)
 app.include_router(pos_analyse_router)
 app.include_router(caisse_router)

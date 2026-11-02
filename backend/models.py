@@ -51,6 +51,45 @@ class Espace(Base):
     created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class StationGeo(Base):
+    """Fiche géographique d'une station (carte des stations). Registre tenu
+    dans l'espace principal : station_id 0 = station principale, sinon
+    espaces.id. Coordonnées WGS84 (EPSG:4326) en degrés décimaux."""
+    __tablename__ = "stations_geo"
+
+    id            = Column(Integer, primary_key=True)
+    station_id    = Column(Integer, nullable=False, unique=True)
+    code          = Column(String(30), nullable=True, unique=True)
+    pays          = Column(String(60), nullable=False, default="Haïti")
+    departement   = Column(String(60), nullable=True)
+    commune       = Column(String(100), nullable=True)
+    adresse       = Column(String(255), nullable=True)
+    latitude      = Column(Numeric(9, 6), nullable=True)
+    longitude     = Column(Numeric(9, 6), nullable=True)
+    precision_m   = Column(Numeric(10, 1), nullable=True)       # précision GPS annoncée par l'appareil
+    source        = Column(String(20), nullable=True)           # gps | carte
+    verification  = Column(String(20), nullable=False, default="non_verifie")   # verifie | non_verifie
+    capture_par   = Column(String(150), nullable=True)
+    capture_le    = Column(DateTime(timezone=True), nullable=True)
+    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (Index("ix_stations_geo_lat_lon", "latitude", "longitude"),)
+
+
+class StationGeoJournal(Base):
+    """Historique des modifications d'une fiche géographique (qui, quand, avant / après)."""
+    __tablename__ = "stations_geo_journal"
+
+    id          = Column(Integer, primary_key=True)
+    station_id  = Column(Integer, nullable=False, index=True)
+    utilisateur = Column(String(150), nullable=True)
+    action      = Column(String(40), nullable=False)
+    anciennes   = Column(JSON, nullable=True)
+    nouvelles   = Column(JSON, nullable=True)
+    created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class Distributeur(Base):
     """Pompe physique de la station (« Pompe 1 », « Pompe 2 »…). Elle a des
     faces (A, B…) ; chaque face porte des mètres (pistolets), chacun pour un

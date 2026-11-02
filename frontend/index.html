@@ -6,6 +6,7 @@
 <title>Konekta · Bon Prix</title>
 <link rel="stylesheet" href="/shared/loading-overlay.css">
 <link rel="stylesheet" href="/shared/intelligence.css">
+<link rel="stylesheet" href="/shared/geo.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
@@ -3534,6 +3535,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 <script src="/shared/loading-overlay.js"></script>
 <script src="/shared/i18n-errors.js"></script>
 <script src="/shared/intelligence.js" defer></script>
+<script src="/shared/geo.js" defer></script>
 
 <!-- ═══════ SIDEBAR ═══════ -->
 <aside class="sidebar" id="mnav-drawer">
@@ -3626,6 +3628,14 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/><circle cx="19" cy="8" r="1.5"/></svg>
       </span>
       <span>Intelligence Center</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="geo" onclick="goTo('geo')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      </span>
+      <span>Carte des stations</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -4482,6 +4492,8 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 
     <!-- ══════ PAGE : SAISIE ══════ -->
     <div id="page-intelligence" class="page"></div>
+
+    <div id="page-geo" class="page"></div>
 
     <div id="page-caisse-principale" class="page">
       <div class="psp-tabs">
@@ -14841,6 +14853,7 @@ const PAGE_META={
   home:                {title: ()=>t('page.home.title'),        sub: ()=>t('page.home.sub')},
   dashboard:           {title: ()=>t('page.dashboard.title'),   sub: ()=>t('page.dashboard.sub')},
   saisie:              {title: ()=>t('page.saisie.title'),      sub: ()=>t('page.saisie.sub')},
+  geo:                 {title: 'Carte des stations',             sub: 'Geospatial Station Intelligence Center — vos stations sur la carte d’Haïti'},
   intelligence:        {title: 'KONEKTA Intelligence Center',   sub: 'Analyse de gestion — revenu, charges, trésorerie, opérations, départements'},
   'caisse-principale': {title: 'Caisse principale',             sub: 'Entrées d\'argent par source (stations, autres) et total de la caisse'},
   'pompistes-rapports':{title: 'Rapports pompistes',            sub: 'Confirmer, corriger ou refuser les compteurs soumis par les pompistes'},
@@ -14944,6 +14957,7 @@ function goTo(page){
   if(page==='pompistes-rapports') loadPompistesRapports();
   if(page==='caisse-principale')  loadCaissePrincipale();
   if(page==='intelligence' && window.initIntelligence) initIntelligence();
+  if(page==='geo' && window.initGeo) initGeo();
   if(page==='journal')            initJournal();
   if(page==='carburant-rapport')  loadCarburantRapport();
   if(page==='stock')              initStock();
@@ -17790,9 +17804,10 @@ async function _stEnregistrer(){
         }
       }
       try{
-        const r=await POST('/espaces', {nom:choix.nom, adresse, gerant:choix.gerant, station});
+        const r=await POST('/espaces', {nom:choix.nom, adresse, gerant:choix.gerant, station, geo:choix.geo});
         choix.overlay.classList.remove('show');
         toast(`Station séparée créée : ${r.nom}. Le gérant se connecte avec ${r.gerant}.`,'ok');
+        if(r.avertissement_geo) toast(`Localisation : ${r.avertissement_geo} Corrigez-la sur la carte des stations.`,'err');
         _ST=null; await initStations(); closeGestion(); ouvrirChoixStation();
       }catch(e){ choix.overlay.classList.add('show'); choix.afficherErreur(e.message); }
       return;
@@ -17862,6 +17877,7 @@ function ouvrirChoixStation(premiere){
   ov.classList.add('show');
 }
 function fermerChoixStation(){
+  window._ST_PAGE_APRES = null;
   document.getElementById('choix-station')?.classList.remove('show');
   try{ sessionStorage.setItem('konekta-station-choisie', '1'); }catch(e){}
 }
@@ -17891,7 +17907,9 @@ async function entrerStation(id){
   if(!/^[0-9]{9}$/.test(pin)) return err('Le PIN contient 9 chiffres.');
   try{
     await POST('/espaces/entrer', {cible_id: id, pin});
-    try{ sessionStorage.setItem('konekta-station-choisie', '1'); sessionStorage.removeItem('konekta_current_page'); }catch(e){}
+    try{ sessionStorage.setItem('konekta-station-choisie', '1');
+         if(window._ST_PAGE_APRES) sessionStorage.setItem('konekta_current_page', window._ST_PAGE_APRES);   // ex. carte → tableau de bord
+         else sessionStorage.removeItem('konekta_current_page'); }catch(e){}
     location.href = '/';
   }catch(e){ err(e.message); document.getElementById('cs-pin-in').select(); }
 }
@@ -17911,6 +17929,19 @@ function _demanderSeparation(corps){
         <label>Email du gérant<input id="sp-email" class="filter-input" type="email" maxlength="254" autocomplete="off"></label>
         <label>Mot de passe du gérant (8 caractères au moins)<input id="sp-pass" class="filter-input" type="password" autocomplete="new-password"></label>
         <label>PIN du gérant (9 chiffres)<input id="sp-pin" class="filter-input" inputmode="numeric" maxlength="9" autocomplete="off"></label>
+        <fieldset style="border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px">
+          <legend style="font-size:13px;font-weight:700;padding:0 4px">Localisation (carte des stations)</legend>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <label>Code de la station<input id="sp-code" class="filter-input" maxlength="30" placeholder="ex. LMB-01"></label>
+            <label>Département<select id="sp-dep" class="filter-input"><option value="">—</option>${["Artibonite","Centre","Grand'Anse","Nippes","Nord","Nord-Est","Nord-Ouest","Ouest","Sud","Sud-Est"].map(x=>`<option>${esc(x)}</option>`).join('')}</select></label>
+          </div>
+          <label>Commune<input id="sp-com" class="filter-input" maxlength="100"></label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button type="button" class="btn btn-secondary" id="sp-gps">📡 Ma position GPS actuelle</button>
+            <span class="c-dim" style="font-size:12.5px">ou touchez la carte à l’emplacement de la station</span></div>
+          <div id="sp-carte" style="height:220px;border-radius:8px;border:1px solid var(--border2);overflow:hidden"></div>
+          <div id="sp-pos" class="c-dim" style="font-size:12.5px">Position : non définie (facultatif, à faire plus tard sur la carte des stations)</div>
+          <label style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="sp-verif"> Position vérifiée (emplacement exact)</label>
+        </fieldset>
         <div id="sp-err"></div>
         <div class="gest-edit-act"><button class="btn btn-secondary" id="sp-retour">Annuler</button><button class="btn btn-primary" id="sp-creer">Créer la station séparée</button></div>
       </div></div>`;
@@ -17918,6 +17949,21 @@ function _demanderSeparation(corps){
     const fin = v => { ov.classList.remove('show'); resolve(v); };
     ov.querySelector('#sp-annuler').onclick = () => fin(null);
     ov.querySelector('#sp-retour').onclick = () => fin(null);
+    // Localisation : GPS de l'appareil ou point placé sur la carte
+    let geo = {};
+    const pos = () => { ov.querySelector('#sp-pos').textContent = geo.latitude == null ? 'Position : non définie'
+      : `Position : ${geo.latitude.toFixed(6)}, ${geo.longitude.toFixed(6)} · ${geo.source === 'gps' ? 'GPS' + (geo.precision_m != null ? ' ± ' + Math.round(geo.precision_m) + ' m' : '') : 'placée sur la carte'}`; };
+    let selecteur = null;
+    if(window.GEO) GEO.selecteur(ov.querySelector('#sp-carte'), null, v => { geo = Object.assign(geo, v); pos(); })
+      .then(x => { selecteur = x; }).catch(() => { ov.querySelector('#sp-carte').innerHTML = '<div class="c-dim" style="padding:10px">Carte indisponible.</div>'; });
+    ov.querySelector('#sp-gps').onclick = () => {
+      const err = m => ov.querySelector('#sp-pos').textContent = m;
+      if(!window.isSecureContext || !navigator.geolocation) return err('GPS indisponible ici (connexion non sécurisée ou appareil sans GPS) : touchez la carte.');
+      err('Recherche de la position…');
+      navigator.geolocation.getCurrentPosition(p => selecteur && selecteur.poser(p.coords.latitude, p.coords.longitude, 'gps', p.coords.accuracy),
+        e => err(e.code === 1 ? 'Accès à la position refusé : touchez la carte pour placer la station.' : 'Position GPS introuvable : touchez la carte.'),
+        {enableHighAccuracy:true, timeout:20000, maximumAge:0});
+    };
     setTimeout(() => ov.querySelector('#sp-gnom')?.focus(), 50);
     ov.querySelector('#sp-creer').onclick = () => {
       const v = id => ov.querySelector(id).value.trim();
@@ -17927,7 +17973,9 @@ function _demanderSeparation(corps){
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v('#sp-email'))) return e('Email du gérant invalide.');
       if(ov.querySelector('#sp-pass').value.length < 8) return e('Le mot de passe doit faire au moins 8 caractères.');
       if(!/^[0-9]{9}$/.test(v('#sp-pin'))) return e('Le PIN doit contenir exactement 9 chiffres.');
-      fin({separer:true, nom:v('#sp-nom'), gerant:{nom_complet:v('#sp-gnom'), email:v('#sp-email'), password:ov.querySelector('#sp-pass').value, pin:v('#sp-pin')}, afficherErreur:e, overlay:ov});
+      fin({separer:true, nom:v('#sp-nom'), gerant:{nom_complet:v('#sp-gnom'), email:v('#sp-email'), password:ov.querySelector('#sp-pass').value, pin:v('#sp-pin')},
+           geo:Object.assign({code:v('#sp-code') || null, departement:v('#sp-dep') || null, commune:v('#sp-com') || null, verifie:ov.querySelector('#sp-verif').checked}, geo),
+           afficherErreur:e, overlay:ov});
     };
   });
 }
@@ -18714,8 +18762,8 @@ const _AREA_PAGES = {
     lecture: ['home'],
   },
   finance: {
-    complet: ['dashboard','journal','statistiques','intelligence','gi-dashboard','depenses','achats','caisse'],
-    lecture: ['dashboard','journal','statistiques','intelligence','gi-dashboard'],
+    complet: ['dashboard','journal','statistiques','intelligence','geo','gi-dashboard','depenses','achats','caisse'],
+    lecture: ['dashboard','journal','statistiques','intelligence','geo','gi-dashboard'],
   },
   bar: {
     complet: ['pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds','pos-fournisseurs'],
@@ -18750,7 +18798,7 @@ const _CAISSIER_ALLOWED = new Set([
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
-  'pos-fournisseurs','pompistes-rapports','caisse-principale','intelligence',
+  'pos-fournisseurs','pompistes-rapports','caisse-principale','intelligence','geo',
   'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'patisserie-dashboard','patisserie-produits','patisserie-achats','patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse',
@@ -18760,7 +18808,7 @@ const _MANAGER_ALLOWED = new Set([
 
 // Assistant Directeur — tous les rapports en lecture + Zelle complet
 const _AD_ALLOWED = new Set([
-  'home','pompistes-rapports','caisse-principale','intelligence',
+  'home','pompistes-rapports','caisse-principale','intelligence','geo',
   'dashboard','journal','carburant-rapport','statistiques','gi-dashboard','depenses','achats','caisse',
   'pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes',
   'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
@@ -18773,11 +18821,11 @@ const _AD_ALLOWED = new Set([
 // Fallback pour utilisateurs sans role_id (compatibilité ascendante)
 const _ACCES_POSTE_LEGACY = {
   'Directeur Général': null,
-  'Comptable':   ['home','dashboard','journal','carburant-rapport','statistiques','intelligence','gi-dashboard','employes','payroll','depenses','achats','caisse',
+  'Comptable':   ['home','dashboard','journal','carburant-rapport','statistiques','intelligence','geo','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
-  'Superviseur': ['home','dashboard','journal','carburant-rapport','statistiques','intelligence','gi-dashboard','employes','payroll','depenses','achats','caisse',
+  'Superviseur': ['home','dashboard','journal','carburant-rapport','statistiques','intelligence','geo','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],

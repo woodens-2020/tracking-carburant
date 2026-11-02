@@ -280,6 +280,7 @@ class EspaceIn(BaseModel):
     adresse: str
     gerant: GerantIn
     station: Optional[dict] = None       # même contenu que POST /api/stations
+    geo: Optional[dict] = None           # carte des stations : code, departement, commune, latitude, longitude, precision_m, source, verifie, forcer
 
 
 def _email_libre(email: str) -> None:
@@ -349,9 +350,35 @@ def creer(data: EspaceIn, request: Request, db: Session = Depends(get_db)):
         _desactiver(eid)
         raise HTTPException(500, f"La station n'a pas pu être créée : {exc}")
     invalider_cache()
+    avertissement_geo = _enregistrer_geo(eid, adresse, data.geo, proprio)
     main._tracer(db, request, "station_separee_creee", {"espace_id": eid, "nom": nom, "adresse": adresse, "gerant": email})
     db.commit()
-    return {"id": eid, "nom": nom, "adresse": adresse, "schema": schema, "gerant": email}
+    return {"id": eid, "nom": nom, "adresse": adresse, "schema": schema, "gerant": email,
+            "avertissement_geo": avertissement_geo}
+
+
+def _enregistrer_geo(eid: int, adresse: str, geo: Optional[dict], proprio) -> Optional[str]:
+    """Fiche géographique de la nouvelle station (département, commune,
+    position GPS ou placée sur la carte). La station est déjà créée : un
+    problème ici est rendu comme avertissement, à corriger sur la carte."""
+    if not geo:
+        return None
+    from geospatial import InfosIn, LocationIn, appliquer_infos, appliquer_location
+    qui = proprio.nom_complet or proprio.username
+    try:
+        with session_principale() as pdb:
+            appliquer_infos(pdb, eid, InfosIn(code=geo.get("code"), departement=geo.get("departement"),
+                                             commune=geo.get("commune"), adresse=adresse), qui)
+            if geo.get("latitude") is not None and geo.get("longitude") is not None:
+                appliquer_location(pdb, eid, LocationIn(**{k: geo[k] for k in ("latitude", "longitude", "precision_m",
+                                                                                "source", "verifie", "forcer") if k in geo}), qui)
+            pdb.commit()
+    except HTTPException as exc:
+        d = exc.detail
+        return d.get("message") if isinstance(d, dict) else str(d)
+    except Exception as exc:
+        return f"Localisation non enregistrée : {exc}"
+    return None
 
 
 def _desactiver(eid: int) -> None:
