@@ -1022,6 +1022,14 @@ def identifier_pompiste(data: IdentifierPompisteIn, request: Request):
     _check_login_rate(cle, maximum=30)
     _sch, u = _compte_pompiste_origine(username) if username else (None, None)
     if not u:
+        # Compte de l'ancien système pas encore repris : il le sera avec son PIN
+        import reprise_pompistes
+        prenom = reprise_pompistes.prenom_ailleurs(request, username) if username else None
+        if prenom is not None:
+            stations = stations_pompiste()
+            for st in stations:
+                st["la_sienne"] = st["id"] == 0
+            return {"prenom": prenom, "stations": stations, "reprise": True}
         _record_login_failure(cle)
         raise HTTPException(404, {"code": "code_inconnu", "message": "Ce code n'existe pas."})
     stations = stations_pompiste()
@@ -1067,6 +1075,14 @@ def login_pompiste(data: LoginPompisteIn, request: Request, response: Response,
     _check_login_rate(cle)
     from database import espace_courant
     sch_origine, origine = _compte_pompiste_origine(username)
+    if origine is None:
+        # Première connexion d'un pompiste de l'ancien système : son PIN habituel
+        # est vérifié là-bas ; s'il est bon, le compte est créé ici avec ce PIN.
+        import reprise_pompistes
+        nom = reprise_pompistes.verifier_ailleurs(request, username, data.code_acces.strip())
+        if nom:
+            reprise_pompistes.creer_compte_repris(username, nom, data.code_acces.strip())
+            sch_origine, origine = _compte_pompiste_origine(username)
     ici = espace_courant()
     _err = "Identifiant ou code PIN incorrect"
     if origine and sch_origine != ici:

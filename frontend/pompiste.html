@@ -405,6 +405,8 @@ const TXT = {
     espace:'Espace pompiste', connexion_sub:'Choisissez votre langue, puis entrez votre code.',
     mon_code:'Mon code', mon_pin:'Mon PIN (9 chiffres)', se_connecter:'Se connecter', pin_9:'Le PIN contient 9 chiffres.',
     continuer:'Continuer', bonjour:'Bonjour {p} !', quelle_station:'Dans quelle station travaillez-vous ?',
+    reprise_titre:'Première connexion au nouveau système', compris:'J’ai compris',
+    reprise_txt:'Tapez le PIN que vous utilisiez déjà (le même PIN de 9 chiffres). Le système le vérifie et le garde pour les prochaines fois.',
     autre_station:'← Choisir une autre station', code_inconnu:'Ce code n’existe pas. Vérifiez-le ou demandez-le à votre superviseur.',
     sortir:'Sortir', retour:'← Retour', etape1:'Étape 1 · Compteurs', etape2:'Étape 2 · Argent', envoyes:'Compteurs envoyés',
     charte:'Charte de responsabilité', charte_sub:'Lisez et acceptez avant de commencer.',
@@ -498,6 +500,8 @@ const TXT = {
     espace:'Espas ponpis', connexion_sub:'Chwazi lang ou, epi antre kòd ou.',
     mon_code:'Kòd mwen', mon_pin:'PIN mwen (9 chif)', se_connecter:'Konekte', pin_9:'PIN nan gen 9 chif.',
     continuer:'Kontinye', bonjour:'Bonjou {p} !', quelle_station:'Nan ki estasyon ou ap travay ?',
+    reprise_titre:'Premye koneksyon sou nouvo sistèm nan', compris:'Mwen konprann',
+    reprise_txt:'Tape PIN ou te konn sèvi a (menm PIN 9 chif la). Sistèm nan ap verifye l epi kenbe l pou pwochèn fwa yo.',
     autre_station:'← Chwazi yon lòt estasyon', code_inconnu:'Kòd sa a pa egziste. Verifye l oswa mande sipèvizè w la.',
     sortir:'Soti', retour:'← Tounen', etape1:'Etap 1 · Kontè', etape2:'Etap 2 · Lajan', envoyes:'Kontè yo voye',
     charte:'Angajman responsablite', charte_sub:'Li epi aksepte anvan ou kòmanse.',
@@ -751,6 +755,7 @@ function ecranConnexion(msg){
   if(LG.etape === 'pin'){
     $('app').innerHTML = `<div class="connexion">${tete}
       <p class="sub">${t('bonjour', {p: esc(LG.prenom)})} ⛽ <b>${esc(LG.station.nom)}</b></p>${err}
+      ${LG.reprise ? `<div class="alerte warn">${t('reprise_txt')}</div>` : ''}
       <form class="card" id="f-login" autocomplete="on">
         <input type="hidden" autocomplete="username" value="${esc(LG.username)}">
         <label for="l-pin">${t('mon_pin')}</label>
@@ -799,7 +804,9 @@ function ecranConnexion(msg){
     $('l-btn').disabled = true;
     try{
       const r = await api('POST','/api/pompiste/identifier',{username:LG.username});
-      LG.prenom = r.prenom; LG.stations = r.stations;
+      LG.prenom = r.prenom; LG.stations = r.stations; LG.reprise = !!r.reprise;
+      // Compte de l'ancien système : on lui demande le PIN qu'il avait déjà
+      if(LG.reprise) await demander({ico:'🔑', titre:t('reprise_titre'), texte:t('reprise_txt'), oui:t('compris')});
       if(r.stations.length === 1){ LG.station = r.stations[0]; LG.etape = 'pin'; }
       else LG.etape = 'station';
       ecranConnexion();
