@@ -56,6 +56,7 @@ GEO.ouvrir = async function(){
             <button data-f="sombre" class="on" onclick="GEO.changerFond('sombre')">Nuit</button>
             <button data-f="osm" onclick="GEO.changerFond('osm')">Plan</button>
             <button data-f="hot" onclick="GEO.changerFond('hot')">Humanitaire</button></div>
+          <button class="gm-btn" style="border-color:rgba(52,211,153,.5);background:rgba(16,185,129,.16)" onclick="GEO.localiser()" title="Enregistrer les coordonnées GPS des stations">📍 <span class="txt">Coordonnées</span></button>
           <button class="gm-btn" onclick="GEO.voirHaiti()" title="Toute l’île">🗺️ <span class="txt">Haïti</span></button>
           <button class="gm-btn" onclick="GEO.ajuster()" title="Toutes mes stations">◎ <span class="txt">Mes stations</span></button>
           <button class="gm-btn prim" onclick="GEO.fermer()" title="Fermer (Échap)">✕ <span class="txt">Fermer</span></button>
@@ -88,7 +89,9 @@ GEO.ouvrir = async function(){
     document.addEventListener('keydown', e => {
       if(e.key !== 'Escape' || $('geo-modal').hidden) return;
       if(document.querySelector('#gi-confirm-overlay.show, .cs-overlay.show')) return;
-      if(GEO.sel != null) GEO.fermerFiche(); else GEO.fermer();
+      if(GEO.cible != null) GEO.locAnnulerCible();
+      else if(GEO.locMode) GEO.fermerLoc();
+      else if(GEO.sel != null) GEO.fermerFiche(); else GEO.fermer();
     });
   }
   m.hidden = false;
@@ -106,7 +109,10 @@ GEO.ouvrir = async function(){
     L.control.scale({imperial:false, position:'bottomright'}).addTo(GEO.carte);
     GEO.couche = L.tileLayer(TUILES.osm[0], {maxZoom:19, attribution:TUILES.osm[1]}).addTo(GEO.carte);
     GEO.groupe = L.markerClusterGroup({showCoverageOnHover:false, maxClusterRadius:45, spiderfyOnMaxZoom:true}).addTo(GEO.carte);
-    GEO.carte.on('click', e => { if(GEO.mode) GEO.placer(e.latlng.lat, e.latlng.lng, 'carte'); });
+    GEO.carte.on('click', e => {
+      if(GEO.cible != null) GEO.locPoser(GEO.cible, e.latlng.lat, e.latlng.lng, 'carte', null, true);
+      else if(GEO.mode) GEO.placer(e.latlng.lat, e.latlng.lng, 'carte');
+    });
   }
   setTimeout(() => GEO.carte.invalidateSize(), 60);
   await GEO.charger(true);
@@ -115,6 +121,7 @@ GEO.fermer = function(){
   const m = $('geo-modal');
   if(!m || m.hidden) return;
   GEO.annulerPosition(true);
+  if(GEO.locMode) GEO.fermerLoc(true);
   m.classList.remove('ouvert');
   document.body.style.overflow = '';
   setTimeout(() => { m.hidden = true; }, DOUX ? 450 : 0);
@@ -150,6 +157,8 @@ function kpis(o){
   $('geo-kpis').innerHTML = k('Stations', o.total, '', 0) + k('Actives', o.actives, 'ok', 1) + k('Inactives', o.inactives, o.inactives ? 'off' : '', 2)
     + k('Départements', `${o.departements_couverts}<small style="font-size:12px;color:var(--gm-muted)">/10</small>`, '', 3)
     + k('GPS vérifié', o.gps_verifies, 'ok', 4) + k('À localiser', o.sans_gps, o.sans_gps ? 'warn' : '', 5);
+  const dernier = $('geo-kpis').lastElementChild;
+  if(dernier && o.sans_gps){ dernier.style.cursor = 'pointer'; dernier.title = 'Enregistrer les coordonnées'; dernier.onclick = () => GEO.localiser(); }
 }
 function listes(){
   const d = GEO.dep, dep = $('geo-dep'), com = $('geo-com');
@@ -165,7 +174,8 @@ function listes(){
       <span style="min-width:0"><b>${esc(s.nom)}</b>
         <small>${esc([s.code, s.commune, s.departement].filter(Boolean).join(' · ') || 'Informations à compléter')}</small>
         <small>${s.ici ? '<span style="color:#facc15">● Vous êtes ici</span> · ' : ''}${LIB_GPS[s.verification]}${s.statut === 'inactive' ? ' · inactive' : ''}</small>
-        ${!s.ici && s.statut === 'active' && peut ? `<span class="gm-aller" onclick="event.stopPropagation();GEO.allerVers(${s.id})">➜ Aller à cette station</span>` : ''}</span></button>`).join('')
+        ${!s.ici && s.statut === 'active' && peut ? `<span class="gm-aller" onclick="event.stopPropagation();GEO.allerVers(${s.id})">➜ Aller à cette station</span>` : ''}
+        ${s.latitude == null ? `<span class="gm-aller" style="color:#34d399;margin-left:${!s.ici && s.statut === 'active' && peut ? '10px' : '0'}" onclick="event.stopPropagation();GEO.localiser(${s.id})">📍 Localiser</span>` : ''}</span></button>`).join('')
     : '<div class="gm-vide">Aucune station ne correspond.<br><button class="gm-btn" style="margin-top:10px" onclick="GEO.reinitialiser()">Effacer les filtres</button></div>';
 }
 function marqueurs(){
@@ -207,6 +217,7 @@ GEO.fermerFiche = function(){
   listes();
 };
 GEO.choisir = async function(id, voler){
+  if(GEO.locMode) GEO.fermerLoc(true);
   if(GEO._pin){ GEO.carte.removeLayer(GEO._pin); GEO._pin = null; }
   const avant = GEO.sel;
   GEO.sel = id; GEO.mode = null; GEO.edition = null;
@@ -376,6 +387,192 @@ GEO.enregistrerPosition = async function(extra){
       return GEO.enregistrerPosition(Object.assign({}, extra, {[code]:true}));
     z.innerHTML = `<div class="gm-err">${esc(sansCode(e.message))}</div>`;
   }
+};
+
+// ── Espace « Coordonnées des stations » ─────────────────────────────
+// Lit des coordonnées collées : « 19.7381, -72.2041 », « 19,7381 ; -72,2041 »,
+// lien Google Maps (…@19.7381,-72.2041… ou ?q=…), degrés-minutes-secondes
+// (19°44'17"N 72°12'15"W). Une longitude positive d'Haïti reçoit son signe −.
+GEO.lireCoord = function(txt){
+  const t = String(txt || '').trim();
+  if(!t) return null;
+  let lat, lon, m = t.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || t.match(/[?&](?:q|query|ll|destination|center)=(-?\d+\.\d+)(?:,|%2C)\s*(-?\d+\.\d+)/i);
+  if(m){ lat = +m[1]; lon = +m[2]; }
+  else if((m = t.match(/(\d{1,2})\s*°\s*(\d{1,2})\s*['′’]\s*(?:(\d{1,2}(?:[.,]\d+)?)\s*(?:"|″|''|”)?)?\s*([NS])[\s,;]+(\d{1,3})\s*°\s*(\d{1,2})\s*['′’]\s*(?:(\d{1,2}(?:[.,]\d+)?)\s*(?:"|″|''|”)?)?\s*([EWO])/i))){
+    const dms = (d, mi, sec) => +d + +mi / 60 + (sec ? +String(sec).replace(',', '.') / 3600 : 0);
+    lat = dms(m[1], m[2], m[3]) * (/S/i.test(m[4]) ? -1 : 1);
+    lon = dms(m[5], m[6], m[7]) * (/[WO]/i.test(m[8]) ? -1 : 1);
+  }else{
+    let p = t.includes(';') ? t.split(';') : null;
+    if(!p){ const a = t.match(/-?\d+(?:\.\d+)?/g); p = a && a.length === 2 ? a : null; }
+    if(!p){ const a = t.match(/-?\d+(?:,\d+)?/g); p = a && a.length === 2 ? a : null; }
+    if(!p || p.length !== 2) return {erreur:'Format non reconnu. Exemple : 19.7381, -72.2041'};
+    lat = parseFloat(String(p[0]).trim().replace(',', '.')); lon = parseFloat(String(p[1]).trim().replace(',', '.'));
+  }
+  if(!isFinite(lat) || !isFinite(lon)) return {erreur:'Coordonnées illisibles.'};
+  let note = '';
+  if(lon >= 71.6 && lon <= 74.6){ lon = -lon; note = ' · signe « − » ajouté à la longitude (Ouest)'; }
+  if(lat < 17.9 || lat > 20.2 || lon < -74.6 || lon > -71.6) return {erreur:'Ce point est hors d’Haïti (latitude ≈ 18 à 20, longitude ≈ −72 à −74).'};
+  return {lat:+lat.toFixed(6), lon:+lon.toFixed(6), note};
+};
+GEO.localiser = async function(ouvrirId){
+  if(GEO.sel != null) GEO.fermerFiche();
+  GEO.annulerPosition(true);
+  GEO.locMode = true; GEO.loc = {}; GEO.cible = null;
+  $('geo-panel-box').classList.add('ouvert', 'large'); $('geo-modal').classList.add('fiche', 'loc');
+  $('geo-panel').innerHTML = '<div class="gm-sq" style="height:110px"></div>' + '<div class="gm-sq" style="height:64px"></div>'.repeat(3);
+  try{
+    const [r, d] = await Promise.all([api('GET', '/stations'), GEO.dep ? GEO.dep : api('GET', '/departments')]);
+    GEO.dep = d; GEO.locStations = r.stations;
+  }catch(e){ $('geo-panel').innerHTML = `<div class="gm-err">${esc(sansCode(e.message))}</div>`; return; }
+  if(!GEO.locMode) return;
+  const premier = ouvrirId != null ? ouvrirId : (GEO.locStations.find(s => s.latitude == null) || {}).id;
+  $('geo-panel').innerHTML = `
+    <div class="gl-tete"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+        <div><h3>📍 Coordonnées des stations</h3><p>Enregistrez le point GPS de chaque station : elle apparaît aussitôt sur la carte.</p></div>
+        <button class="gm-btn" style="height:32px;padding:0 10px" onclick="GEO.fermerLoc()" aria-label="Fermer">✕</button></div>
+      <div class="gl-prog" aria-hidden="true"><i id="gl-barre" style="width:0"></i></div>
+      <div class="gl-prog-t"><span id="gl-compte"></span><span>${GEO.locStations.length} station(s)</span></div></div>
+    <div class="gl-aide"><b>Trois façons de donner la position :</b><br>
+      1. <b>Coller</b> des coordonnées : <code>19.7381, -72.2041</code>, un lien Google Maps, ou <code>19°44’17"N 72°12’15"W</code><br>
+      2. <b>GPS de cet appareil</b>, sur place à la station<br>
+      3. <b>Pointer sur la carte</b>, puis glisser le marqueur pour ajuster</div>
+    ${GEO.locStations.map((s, i) => locCarte(s, i, s.id === premier)).join('')}`;
+  setTimeout(locProgression, 60);
+  if(premier != null) setTimeout(() => $('gl-c-' + premier)?.focus(), 350);
+};
+function locCarte(s, i, ouvert){
+  const fait = s.latitude != null;
+  return `<details class="gl-carte ${fait ? 'fait' : ''}" id="gl-${s.id}" ${ouvert ? 'open' : ''} style="animation:gm-monte .45s ${0.05 * Math.min(i, 8)}s var(--gm-ease) both"
+      ontoggle="if(this.open) GEO.locMontrer(${s.id})">
+    <summary><span class="gl-num">${fait ? '✓' : i + 1}</span>
+      <span style="min-width:0"><b>${esc(s.nom)}</b><small id="gl-etat-${s.id}">${fait ? `${n6(s.latitude)}, ${n6(s.longitude)} · ${LIB_GPS[s.verification]}` : 'À localiser'}</small></span>
+      <span class="fl">⌄</span></summary>
+    <div class="gl-corps">
+      <label>Coordonnées (latitude, longitude)<input class="gm-in gl-coord" id="gl-c-${s.id}" autocomplete="off" spellcheck="false"
+        placeholder="19.7381, -72.2041  ·  ou lien Google Maps" value="${fait ? `${s.latitude}, ${s.longitude}` : ''}" oninput="GEO.locLire(${s.id})"></label>
+      <div class="gl-lu" id="gl-lu-${s.id}" aria-live="polite"></div>
+      <div class="gl-outils"><button class="gm-btn" onclick="GEO.locGps(${s.id})">📡 GPS de cet appareil</button>
+        <button class="gm-btn" onclick="GEO.locViser(${s.id})">🎯 Pointer sur la carte</button></div>
+      <div class="gl-champs">
+        <label>Département<select class="gm-in" id="gl-d-${s.id}"><option value="">—</option>${GEO.dep.departements.map(x => `<option ${s.departement === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
+        <label>Commune<input class="gm-in" id="gl-m-${s.id}" maxlength="100" value="${esc(s.commune || '')}"></label>
+        <label>Code de la station<input class="gm-in" id="gl-k-${s.id}" maxlength="30" value="${esc(s.code || '')}" placeholder="ex. CPV-01"></label>
+        <label style="justify-content:flex-end"><span style="display:flex;gap:7px;align-items:center;color:var(--gm-text);font-size:12.5px">
+          <input type="checkbox" id="gl-v-${s.id}" ${s.verification === 'verifie' ? 'checked' : ''}> Position vérifiée</span></label>
+      </div>
+      <div id="gl-msg-${s.id}"></div>
+      <button class="gm-btn prim grand" onclick="GEO.locSauver(${s.id})">Enregistrer ${esc(s.nom)}</button>
+    </div></details>`;
+}
+function locProgression(){
+  const l = GEO.locStations || [], n = l.filter(s => s.latitude != null).length;
+  if($('gl-barre')) $('gl-barre').style.width = (l.length ? n / l.length * 100 : 0) + '%';
+  if($('gl-compte')) $('gl-compte').textContent = `${n} localisée(s) sur ${l.length}`;
+}
+GEO.locMontrer = function(id){                    // la carte va vers la station ouverte
+  const s = (GEO.locStations || []).find(x => x.id === id), p = GEO.loc[id];
+  const lat = p ? p.lat : s && s.latitude, lon = p ? p.lon : s && s.longitude;
+  if(lat != null) GEO.carte.flyTo([lat, lon], Math.max(GEO.carte.getZoom(), 15), {duration:DOUX ? 1 : 0});
+};
+GEO.locLire = function(id){
+  const r = GEO.lireCoord($('gl-c-' + id).value), z = $('gl-lu-' + id);
+  if(!r){ z.className = 'gl-lu'; z.textContent = ''; return; }
+  if(r.erreur){ z.className = 'gl-lu ko'; z.textContent = r.erreur; return; }
+  GEO.locPoser(id, r.lat, r.lon, 'carte', null, false, r.note);
+};
+GEO.locPoser = function(id, lat, lon, source, precision, depuisCarte, note){
+  lat = +(+lat).toFixed(6); lon = +(+lon).toFixed(6);
+  GEO.loc[id] = {lat, lon, source, precision};
+  const s = GEO.locStations.find(x => x.id === id);
+  if(!GEO._locPin){
+    GEO._locPin = L.marker([lat, lon], {draggable:true, zIndexOffset:1000, icon:icone({statut:'active', verification:'verifie'}, true)}).addTo(GEO.carte);
+    GEO._locPin.on('dragend', e => { const p = e.target.getLatLng(), c = GEO._locPinPour; if(c != null) GEO.locPoser(c, p.lat, p.lng, 'carte', null, true); });
+  }else GEO._locPin.setLatLng([lat, lon]);
+  GEO._locPinPour = id;
+  GEO._locPin.unbindTooltip().bindTooltip(esc(s ? s.nom : ''), {permanent:true, direction:'top', offset:[0, -28]}).openTooltip();
+  if(depuisCarte || source === 'gps') $('gl-c-' + id).value = `${lat}, ${lon}`;
+  const z = $('gl-lu-' + id);
+  z.className = 'gl-lu ok';
+  z.textContent = `✓ ${lat}, ${lon} · ${source === 'gps' ? 'GPS' + (precision != null ? ' ± ' + Math.round(precision) + ' m' : '') : 'point placé'}${note || ''} — vérifiez sur la carte, puis enregistrez.`;
+  if(GEO.cible === id) GEO.locAnnulerCible();
+  GEO.carte.flyTo([lat, lon], Math.max(GEO.carte.getZoom(), 16), {duration:DOUX ? 1 : 0});
+};
+GEO.locGps = function(id){
+  const z = $('gl-lu-' + id), ko = m => { z.className = 'gl-lu ko'; z.textContent = m; };
+  if(!window.isSecureContext) return ko('Le GPS demande une connexion sécurisée (https) : collez les coordonnées ou pointez sur la carte.');
+  if(!navigator.geolocation) return ko('Cet appareil ne fournit pas de GPS : collez les coordonnées ou pointez sur la carte.');
+  z.className = 'gl-lu'; z.textContent = 'Recherche de la position…';
+  navigator.geolocation.getCurrentPosition(p => GEO.locPoser(id, p.coords.latitude, p.coords.longitude, 'gps', p.coords.accuracy),
+    e => ko({1:'Accès à la position refusé : autorisez-le dans le navigateur, ou pointez sur la carte.', 2:'Position GPS introuvable : pointez sur la carte.',
+             3:'Le GPS a mis trop de temps : réessayez ou pointez sur la carte.'}[e.code] || e.message), {enableHighAccuracy:true, timeout:20000, maximumAge:0});
+};
+GEO.locViser = function(id){
+  GEO.locAnnulerCible();
+  GEO.cible = id;
+  const s = GEO.locStations.find(x => x.id === id);
+  $('gl-' + id).classList.add('cible');
+  GEO.carte.getContainer().style.cursor = 'crosshair';
+  const b = document.createElement('div');
+  b.className = 'gl-cible-bandeau gm-verre'; b.id = 'gl-bandeau';
+  b.innerHTML = `🎯 Touchez la carte à l’emplacement de <b>${esc(s.nom)}</b> <button class="gm-btn" style="height:30px" onclick="GEO.locAnnulerCible()">Annuler</button>`;
+  $('geo-modal').appendChild(b);
+};
+GEO.locAnnulerCible = function(){
+  if(GEO.cible != null) $('gl-' + GEO.cible)?.classList.remove('cible');
+  GEO.cible = null; $('gl-bandeau')?.remove();
+  if(GEO.carte && !GEO.mode) GEO.carte.getContainer().style.cursor = '';
+};
+GEO.locSauver = async function(id, extra){
+  const z = $('gl-msg-' + id), s = GEO.locStations.find(x => x.id === id);
+  const err = m => z.innerHTML = `<div class="gm-err">${esc(m)}</div>`;
+  z.innerHTML = '';
+  const v = k => $(`gl-${k}-${id}`).value.trim();
+  if(!GEO.loc[id]){
+    const r = GEO.lireCoord(v('c'));
+    if(r && r.erreur) return err(r.erreur);
+    if(r && (r.lat !== s.latitude || r.lon !== s.longitude)) GEO.loc[id] = {lat:r.lat, lon:r.lon, source:'carte', precision:null};
+    else if(!r && s.latitude == null) return err('Donnez la position : collez les coordonnées, utilisez le GPS ou pointez sur la carte.');
+  }
+  try{
+    const infos = {code:v('k') || null, departement:v('d') || null, commune:v('m') || null, adresse:s.adresse || null};
+    if(infos.code !== (s.code || null) || infos.departement !== (s.departement || null) || infos.commune !== (s.commune || null))
+      await api('PUT', `/stations/${id}/infos`, infos);
+    const q = GEO.loc[id], verifie = $(`gl-v-${id}`).checked;
+    let d = null;
+    if(q || (s.latitude != null && verifie !== (s.verification === 'verifie'))){
+      const base = q || {lat:s.latitude, lon:s.longitude, source:'carte', precision:null};
+      d = await api('POST', `/stations/${id}/location`, Object.assign({latitude:base.lat, longitude:base.lon, precision_m:base.precision,
+        source:base.source, verifie, confirmer_remplacement:true}, extra || {}));
+    }
+    // Station enregistrée : sa carte se ferme, la suivante à localiser s'ouvre
+    Object.assign(s, d ? {latitude:d.latitude, longitude:d.longitude, verification:d.verification} : {},
+                  {code:infos.code, departement:infos.departement, commune:infos.commune});
+    delete GEO.loc[id];
+    if(GEO._locPin){ GEO.carte.removeLayer(GEO._locPin); GEO._locPin = null; }
+    const c = $('gl-' + id);
+    c.classList.toggle('fait', s.latitude != null); c.open = false;
+    c.querySelector('.gl-num').textContent = s.latitude != null ? '✓' : c.querySelector('.gl-num').textContent;
+    $('gl-etat-' + id).textContent = s.latitude != null ? `${n6(s.latitude)}, ${n6(s.longitude)} · ${LIB_GPS[s.verification]}` : 'À localiser';
+    locProgression();
+    notify(`${s.nom} : enregistrée.`, 'ok');
+    GEO.dep = null; await GEO.charger(false);
+    const suivante = GEO.locStations.find(x => x.latitude == null);
+    if(suivante){ $('gl-' + suivante.id).open = true; $('gl-' + suivante.id).scrollIntoView({block:'nearest', behavior:DOUX ? 'smooth' : 'auto'}); }
+    else setTimeout(() => { GEO.ajuster(); notify('Toutes vos stations sont sur la carte.', 'ok'); }, DOUX ? 700 : 0);
+  }catch(e){
+    if(e.message.includes('Une autre station') && await showConfirm(sansCode(e.message), {title:'Confirmer la position', type:'warn', okLabel:'Oui, enregistrer'}))
+      return GEO.locSauver(id, Object.assign({}, extra, {forcer:true}));
+    err(sansCode(e.message));
+  }
+};
+GEO.fermerLoc = function(silencieux){
+  GEO.locAnnulerCible();
+  if(GEO._locPin && GEO.carte){ GEO.carte.removeLayer(GEO._locPin); GEO._locPin = null; }
+  GEO.locMode = false; GEO.loc = {};
+  $('geo-panel-box').classList.remove('large');
+  $('geo-modal').classList.remove('loc');
+  if(!silencieux){ $('geo-panel-box').classList.remove('ouvert'); $('geo-modal').classList.remove('fiche'); }
 };
 
 // ── Aller dans une autre station (PIN), depuis la carte ─────────────
