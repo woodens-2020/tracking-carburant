@@ -710,7 +710,7 @@ async function chargerContexte(){
       }
     }
     if(_laisserPartir){ _laisserPartir = false; garderHistorique(); }
-    $('qui').innerHTML = `<b>${esc(S.ctx.pompiste.nom)}</b><span>${S.ctx.pompiste.station ? '📍 ' + esc(S.ctx.pompiste.station) : esc(S.ctx.pompiste.username)}</span>`;
+    $('qui').innerHTML = `<b>${esc(S.ctx.pompiste.nom)}</b><span>${(S.ctx.pompiste.station_nom || S.ctx.pompiste.station) ? '📍 ' + esc([S.ctx.pompiste.station_nom, S.ctx.pompiste.station].filter(Boolean).join(' · ')) : esc(S.ctx.pompiste.username)}</span>`;
     $('qui').classList.remove('cache'); $('btn-sortir').classList.remove('cache');
     rendre();
   }catch(e){

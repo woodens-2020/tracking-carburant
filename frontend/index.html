@@ -20178,7 +20178,7 @@ function pspRendreComptes(){
           ${emps.map(e => `<option value="${e.id}">${esc(e.nom)} — ${esc(e.poste)}</option>`).join('')}</select>
       </div>
       <label class="psp-station">Station où il travaille
-        <select class="filter-input" id="psp-c-station">${_pspOptionsStations(d.stations, '')}</select></label>
+        <select class="filter-input" id="psp-c-station">${_pspOptionsStations(d.stations, '', d)}</select></label>
       ${(d.stations||[]).length ? '' : `<div class="psp-muted" style="margin-top:4px">Aucune station n'est encore enregistrée : ajoutez l'adresse des pompes dans Saisie › « Gérer produits / pompes » › Pompes &amp; faces (ou Enregistrer une station).</div>`}
       <div id="psp-c-msg"></div>
       <div class="psp-actions"><button class="btn btn-primary" onclick="pspCreerCompte()">+ Créer le compte</button></div></div>
@@ -20195,12 +20195,16 @@ function pspRendreComptes(){
 }
 
 // Stations = adresses enregistrées sur les pompes physiques (Gérer produits / pompes)
-function _pspOptionsStations(stations, actuelle){
+function _pspOptionsStations(stations, actuelle, creation){
   const l = stations || [], a = (actuelle || '').trim();
   const connue = !a || l.some(s => s.adresse === a);
-  return `<option value="" ${a ? '' : 'selected'}>Toutes les stations</option>`
+  // À la création : les autres stations séparées du propriétaire (le compte est créé dans cette station)
+  const autres = creation && (creation.autres_stations || []).length
+    ? `<optgroup label="Autres stations">${creation.autres_stations.map(e => `<option value="esp:${e.id}">⛽ ${esc(e.nom)}</option>`).join('')}</optgroup>` : '';
+  const ici = creation ? esc(creation.station_courante || 'Cette station') : 'Toutes les stations';
+  return `<option value="" ${a ? '' : 'selected'}>${creation ? '⛽ ' + ici + ' (toutes ses pompes)' : ici}</option>`
     + l.map(s => `<option value="${esc(s.adresse)}" ${s.adresse === a ? 'selected' : ''}>📍 ${esc(s.adresse)} — ${esc(s.produits.join(', '))}</option>`).join('')
-    + (connue ? '' : `<option value="${esc(a)}" selected>⚠ ${esc(a)} (plus aucune pompe à cette adresse)</option>`);
+    + (connue ? '' : `<option value="${esc(a)}" selected>⚠ ${esc(a)} (plus aucune pompe à cette adresse)</option>`) + (autres || '');
 }
 async function pspChangerStation(id, sel){
   const v = sel.value, txt = v ? `la station « ${v} »` : 'toutes les stations';
@@ -20220,11 +20224,12 @@ function _pspPinMsg(u){
 
 async function pspCreerCompte(){
   const v = id => document.getElementById(id).value.trim();
+  const st = v('psp-c-station'), autre = st.startsWith('esp:');
   try{
     const u = await _pspApi('POST', '/comptes', {prenom:v('psp-c-prenom'), nom:v('psp-c-nom'),
       code_acces: v('psp-c-pin') || null, employe_id: v('psp-c-emp') ? parseInt(v('psp-c-emp'), 10) : null,
-      station_adresse: v('psp-c-station') || null});
-    PSP.pin = _pspPinMsg(u);
+      station_adresse: autre ? null : (st || null), espace_id: autre ? parseInt(st.slice(4), 10) : null});
+    PSP.pin = _pspPinMsg(u) + (autre ? `<div class="psp-muted" style="margin-top:6px">Compte créé pour <b>${esc(u.station_nom)}</b> : il apparaît dans la liste des comptes de cette station.</div>` : '');
     PSP.comptes = await _pspApi('GET', '/comptes'); pspRendreComptes();
   }catch(e){ document.getElementById('psp-c-msg').innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
 }

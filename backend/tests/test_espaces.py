@@ -76,6 +76,26 @@ def test_station_separee(client):
     assert pp.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]}).status_code == 200
     noms = {q["nom"] for x in pp.get("/api/pompiste/contexte").json()["produits"] for q in x["pompes"]}
     assert noms == {"Gazoline 1", "Gazoline 2", "Diesel 1"}
+    assert pp.get("/api/pompiste/contexte").json()["pompiste"]["station_nom"] == "Station Champin"
+    # Le gérant ne peut pas créer de compte dans une autre station
+    assert g.get("/api/pompiste-supervision/comptes").json()["autres_stations"] == []
+    assert g.post("/api/pompiste-supervision/comptes", json={"prenom": "X", "nom": "Y", "espace_id": 0}).status_code == 403
+
+    # Depuis la station principale, le propriétaire crée un pompiste pour Champin
+    lst = p.get("/api/pompiste-supervision/comptes").json()
+    assert lst["station_courante"] == "Station principale"
+    assert lst["autres_stations"] == [{"id": eid, "nom": "Station Champin"}]
+    r = p.post("/api/pompiste-supervision/comptes", json={"prenom": "Jean", "nom": "Champin", "espace_id": eid})
+    assert r.status_code == 201, r.text
+    c2 = r.json()
+    assert c2["station_nom"] == "Station Champin"
+    assert all(x["username"] != c2["username"] for x in p.get("/api/pompiste-supervision/comptes").json()["comptes"])
+    assert any(x["username"] == c2["username"] for x in g.get("/api/pompiste-supervision/comptes").json()["comptes"])
+    p2 = _client()
+    assert p2.post("/api/login/pompiste", json={"username": c2["username"], "code_acces": c2["code_acces"]}).status_code == 200
+    ctx = p2.get("/api/pompiste/contexte").json()
+    assert ctx["pompiste"]["station_nom"] == "Station Champin"
+    assert {q["nom"] for x in ctx["produits"] for q in x["pompes"]} == {"Gazoline 1", "Gazoline 2", "Diesel 1"}
 
 
 def test_comptes_uniques_et_mot_de_passe_oublie(client, monkeypatch):

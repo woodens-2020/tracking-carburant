@@ -460,7 +460,8 @@ def contexte(date: Optional[date_type] = None, periode: Optional[str] = None,
                              "prix_gallon": _prix(db, p.pompes[0], d) if p.pompes else float(p.prix_gallon or 0),
                              "pompes": pompes})
     return {
-        "pompiste": {"id": u.id, "nom": _nom(u), "username": u.username, "station": u.station_adresse},
+        "pompiste": {"id": u.id, "nom": _nom(u), "username": u.username, "station": u.station_adresse,
+                     "station_nom": _nom_station_courante()},
         "date": str(d), "periode": periode, "aujourd_hui": str(today_haiti()),
         "date_min": str(today_haiti() - timedelta(days=JOURS_EN_ARRIERE)),
         "produits": produits, "coupures": list(COUPURES), "taille_liasse": TAILLE_LIASSE,
@@ -568,6 +569,30 @@ def _verifier_devises(db: Session, devises: list, d: date_type) -> list:
 
 def _norm_station(v: Optional[str]) -> str:
     return " ".join((v or "").split()).casefold()
+
+
+def _nom_station_courante() -> Optional[str]:
+    """Nom de la station séparée où l'on se trouve (None = station principale)."""
+    from database import espace_courant
+    from espaces_routes import schemas_actifs
+    sch = espace_courant()
+    return schemas_actifs().get(sch) if sch else None
+
+
+def autres_stations(request: Request, db: Session) -> list[dict]:
+    """Pour le propriétaire : les autres stations (séparées, ou la principale
+    depuis une station séparée) où il peut créer un compte pompiste."""
+    from database import espace_courant, session_principale
+    from espaces_routes import proprietaire
+    from models import Espace
+    if not proprietaire(request, db):
+        return []
+    courant = espace_courant()
+    out = [] if courant is None else [{"id": 0, "nom": "Station principale"}]
+    with session_principale() as pdb:
+        out += [{"id": e.id, "nom": e.nom} for e in pdb.query(Espace).filter(Espace.actif.is_(True)).order_by(Espace.id)
+                if e.schema != courant]
+    return out
 
 
 def de_ma_station(u: Utilisateur, pompe) -> bool:
@@ -1319,7 +1344,7 @@ def lister_stations(_s: Utilisateur = Depends(_require_superviseur), db: Session
 
 
 @router.get("/api/pompiste-supervision/comptes")
-def lister_comptes(_s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+def lister_comptes(request: Request, _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     role = assurer_role_pompiste(db)
     rows = db.query(Utilisateur).filter_by(role_id=role.id).order_by(Utilisateur.nom_complet).all()
     employes = (db.query(Employe).filter(Employe.actif.is_(True))
@@ -1327,6 +1352,8 @@ def lister_comptes(_s: Utilisateur = Depends(_require_superviseur), db: Session 
     return {
         "comptes": [_compte_dict(db, u) for u in rows],
         "stations": stations_connues(db),
+        "station_courante": _nom_station_courante() or "Station principale",
+        "autres_stations": autres_stations(request, db),
         "employes": [{"id": e.id, "nom": f"{e.prenom} {e.nom}", "poste": e.poste,
                       "lie": e.utilisateur_id is not None} for e in employes],
     }
@@ -1338,6 +1365,7 @@ class CompteIn(BaseModel):
     code_acces: Optional[str] = None     # vide = généré
     employe_id: Optional[int] = None
     station_adresse: Optional[str] = None   # adresse des produits ; vide = toutes les stations
+    espace_id: Optional[int] = None         # autre station (0 = principale) : compte créé dans cette station
 
 
 def _slug(txt: str, n: int = 12) -> str:
@@ -1362,8 +1390,37 @@ def _nouveau_pin() -> str:
 
 
 @router.post("/api/pompiste-supervision/comptes", status_code=201)
-def creer_compte(data: CompteIn, _s: Utilisateur = Depends(_require_superviseur),
+def creer_compte(data: CompteIn, request: Request, _s: Utilisateur = Depends(_require_superviseur),
                  db: Session = Depends(get_db)):
+    if data.espace_id is not None:
+        # Compte créé dans une autre station : réservé au propriétaire
+        from database import definir_espace, retablir_espace, session_espace
+        cible = {x["id"]: x for x in autres_stations(request, db)}.get(data.espace_id)
+        if not cible:
+            raise HTTPException(403, "Station introuvable, ou réservée au propriétaire.")
+        if data.espace_id == 0:
+            schema = None
+        else:
+            from database import session_principale
+            from models import Espace
+            with session_principale() as pdb:
+                schema = pdb.get(Espace, data.espace_id).schema
+        if data.employe_id:
+            raise HTTPException(400, "Pour lier un employé d'une autre station, entrez dans cette station.")
+        jeton = definir_espace(schema)
+        try:
+            with session_espace(schema) as edb:
+                out = _creer_compte(data.model_copy(update={"station_adresse": None}), edb)
+        finally:
+            retablir_espace(jeton)
+        out["station_nom"] = cible["nom"]
+        return out
+    out = _creer_compte(data, db)
+    out["station_nom"] = _nom_station_courante() or "Station principale"
+    return out
+
+
+def _creer_compte(data: CompteIn, db: Session) -> dict:
     from admin_routes import _CODE_RE
     prenom, nom_famille = data.prenom.strip(), data.nom.strip()
     if not prenom or not nom_famille:
