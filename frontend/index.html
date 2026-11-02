@@ -18146,23 +18146,23 @@ async function initStations(){
   try{ _STATIONS = await GET('/espaces'); }catch(e){ _STATIONS = null; return; }
   const f = document.getElementById('station-footer');
   if(!f) return;
-  const plusieurs = _STATIONS.peut_changer;
-  f.style.display = (plusieurs || _STATIONS.courant) ? '' : 'none';
+  const plusieurs = _STATIONS.peut_changer, ouvrable = plusieurs || _STATIONS.peut_creer;
+  f.style.display = (ouvrable || _STATIONS.courant) ? '' : 'none';
   document.getElementById('station-nom').textContent = _STATIONS.courant_nom || 'Station principale';
-  document.getElementById('station-action').textContent = plusieurs ? 'Changer de station' : 'Votre station';
-  f.style.cursor = plusieurs ? 'pointer' : 'default';
+  document.getElementById('station-action').textContent = plusieurs ? 'Changer de station' : (ouvrable ? 'Mes stations' : 'Votre station');
+  f.style.cursor = ouvrable ? 'pointer' : 'default';
   // Juste après la connexion : choisir sa station
   let deja = null; try{ deja = sessionStorage.getItem('konekta-station-choisie'); }catch(e){}
   if(plusieurs && !deja) ouvrirChoixStation(true);
 }
 function ouvrirChoixStation(premiere){
-  if(!_STATIONS || !_STATIONS.peut_changer) return;
+  if(!_STATIONS || !(_STATIONS.peut_changer || _STATIONS.peut_creer)) return;
   let ov = document.getElementById('choix-station');
   if(!ov){ ov = document.createElement('div'); ov.id = 'choix-station'; ov.className = 'cs-overlay'; document.body.appendChild(ov); }
   const toutes = [{id:0, nom:'Station principale', adresse:'', schema:null}, ..._STATIONS.espaces];
   ov.innerHTML = `<div class="cs-boite" role="dialog" aria-modal="true" aria-labelledby="cs-titre">
       <div class="cs-tete"><div><div class="cs-sur">${premiere ? 'Bienvenue' : 'Changer de station'}</div>
-        <h2 id="cs-titre">Où voulez-vous aller ?</h2></div>
+        <h2 id="cs-titre">${_STATIONS.espaces.length ? 'Où voulez-vous aller ?' : 'Vos stations'}</h2></div>
         ${premiere ? '' : '<button class="cs-fermer" onclick="fermerChoixStation()" aria-label="Fermer">✕</button>'}</div>
       <div class="cs-liste">${toutes.map(st => {
         const ici = (st.schema || null) === (_STATIONS.courant || null);
@@ -18171,6 +18171,7 @@ function ouvrirChoixStation(premiere){
           <span class="cs-etat">${ici ? 'Vous êtes ici' : 'Entrer →'}</span></button>`;
       }).join('')}</div>
       <div id="cs-pin" class="cs-pin" style="display:none"></div>
+      ${_STATIONS.peut_creer && !_STATIONS.espaces.length ? `<div class="cs-note">Vous n'avez pas encore de station séparée. Enregistrez une station et répondez « Oui, séparer » : elle apparaîtra ici et vous pourrez y passer avec votre PIN.</div>` : ''}
       ${_STATIONS.peut_creer ? `<button class="cs-lien" onclick="fermerChoixStation();goTo('saisie');setTimeout(()=>{openGestion();gestOnglet('station')},300)">+ Enregistrer une nouvelle station</button>` : ''}
       ${_STATIONS.espaces.length ? `<details class="cs-retirer"><summary>Retirer une station séparée</summary>
         <div class="cs-note">Elle n'est plus proposée et personne ne peut plus y entrer ; ses données sont gardées.</div>
