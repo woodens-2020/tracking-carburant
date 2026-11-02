@@ -77,3 +77,29 @@ def test_source_par_domaine(monkeypatch):
     assert reprise_pompistes.source(req("app.konekta-bpccp.com")) is None
     monkeypatch.setenv("APP_ENV", "staging")
     assert reprise_pompistes.source(req("konekta-cpv.com")) is None             # jamais sur le staging lui-même
+
+
+def test_compte_cree_d_avance_pin_a_reprendre(client, monkeypatch):
+    """Compte créé d'avance (même code, PIN vide) : visible dans la liste ;
+    à la 1re connexion, l'ancien PIN vérifié devient son PIN."""
+    import reprise_pompistes
+    H = {"X-API-Key": "smoke-test-key"}
+    ANCIENS["avance5678"] = ("Paul Avance", "456456456")
+    monkeypatch.setattr(reprise_pompistes, "source", lambda request: "http://ancien.systeme")
+    monkeypatch.setattr(reprise_pompistes, "_appel", _faux_ancien)
+    r = client.post("/api/pompiste-supervision/comptes", headers=H,
+                    json={"prenom": "Paul", "nom": "Avance", "username": "avance5678", "reprendre_pin": True})
+    assert r.status_code == 201, r.text
+    assert r.json()["code_acces"] is None
+    assert any(c["username"] == "avance5678" and c["pin_a_reprendre"]
+               for c in client.get("/api/pompiste-supervision/comptes", headers=H).json()["comptes"])
+    assert client.post("/api/pompiste-supervision/comptes", headers=H,
+                       json={"prenom": "X", "nom": "Y", "reprendre_pin": True}).status_code == 400   # code obligatoire
+    c = _client()
+    assert c.post("/api/pompiste/identifier", json={"username": "avance5678"}).json()["reprise"] is True
+    assert c.post("/api/login/pompiste", json={"username": "avance5678", "code_acces": "111222333"}).status_code == 401
+    assert c.post("/api/login/pompiste", json={"username": "avance5678", "code_acces": "456456456"}).status_code == 200
+    monkeypatch.setattr(reprise_pompistes, "_appel", lambda *a, **k: (_ for _ in ()).throw(AssertionError("appel inutile")))
+    assert _client().post("/api/login/pompiste", json={"username": "avance5678", "code_acces": "456456456"}).status_code == 200
+    assert not any(c["username"] == "avance5678" and c["pin_a_reprendre"]
+                   for c in client.get("/api/pompiste-supervision/comptes", headers=H).json()["comptes"])

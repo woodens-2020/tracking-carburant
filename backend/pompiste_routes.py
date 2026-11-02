@@ -1383,6 +1383,7 @@ def _compte_dict(db: Session, u: Utilisateur) -> dict:
             "employe_nom": f"{emp.prenom} {emp.nom}" if emp else None,
             "station_adresse": u.station_adresse,
             "venu_d_ailleurs": bool(getattr(u, "compte_origine", None)),
+            "pin_a_reprendre": not u.code_acces_hash,
             "dernier_rapport": str(dernier.date) if dernier else None}
 
 
@@ -1446,6 +1447,7 @@ class CompteIn(BaseModel):
     station_adresse: Optional[str] = None   # adresse des produits ; vide = toutes les stations
     espace_id: Optional[int] = None         # autre station (0 = principale) : compte créé dans cette station
     username: Optional[str] = None          # code imposé (reprise d'un compte existant ailleurs) ; vide = généré
+    reprendre_pin: bool = False             # PIN laissé vide : le pompiste tape son ancien PIN à la 1re connexion
 
 
 def _slug(txt: str, n: int = 12) -> str:
@@ -1506,9 +1508,11 @@ def _creer_compte(data: CompteIn, db: Session) -> dict:
     if not prenom or not nom_famille:
         raise HTTPException(400, "Le prénom et le nom sont requis.")
     nom = f"{prenom} {nom_famille}"
-    pin = (data.code_acces or "").strip() or _nouveau_pin()
-    if not _CODE_RE.match(pin):
+    pin = None if data.reprendre_pin else ((data.code_acces or "").strip() or _nouveau_pin())
+    if pin is not None and not _CODE_RE.match(pin):
         raise HTTPException(400, "Le code PIN doit contenir exactement 9 chiffres.")
+    if data.reprendre_pin and not data.username:
+        raise HTTPException(400, "Le PIN ne peut être repris que pour un compte repris avec son code.")
     if data.username:
         # Reprise d'un compte (ex. depuis le staging) : le pompiste garde son code
         username = data.username.strip().lower()
@@ -1535,7 +1539,7 @@ def _creer_compte(data: CompteIn, db: Session) -> dict:
         # Pas de mot de passe utilisable : la connexion pompiste se fait par
         # identifiant + PIN, et ce compte ne passe jamais par /api/login.
         password_hash=hash_password(secrets.token_urlsafe(24)),
-        code_acces_hash=hash_code_acces(pin),
+        code_acces_hash=hash_code_acces(pin) if pin else None,
         role="operateur", role_id=role.id, poste=role.nom, actif=True,
         station_adresse=station,
     )
@@ -1548,7 +1552,7 @@ def _creer_compte(data: CompteIn, db: Session) -> dict:
     db.commit()
     db.refresh(u)
     out = _compte_dict(db, u)
-    out["code_acces"] = pin      # affiché une seule fois
+    out["code_acces"] = pin      # affiché une seule fois (None : PIN à reprendre)
     return out
 
 

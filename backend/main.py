@@ -1021,6 +1021,14 @@ def identifier_pompiste(data: IdentifierPompisteIn, request: Request):
     # (le PIN, vérifié ensuite, garde son propre blocage par code).
     _check_login_rate(cle, maximum=30)
     _sch, u = _compte_pompiste_origine(username) if username else (None, None)
+    if u and not u.code_acces_hash:
+        # Compte créé d'avance, PIN à reprendre : on lui demandera son ancien PIN
+        from espaces_routes import stations_pompiste as _st
+        stations = _st()
+        origine = 0 if _sch is None else int(_sch.split("_")[1])
+        for st in stations:
+            st["la_sienne"] = st["id"] == origine
+        return {"prenom": (u.nom_complet or "").split(" ")[0], "stations": stations, "reprise": True}
     if not u:
         # Compte de l'ancien système pas encore repris : il le sera avec son PIN
         import reprise_pompistes
@@ -1082,6 +1090,12 @@ def login_pompiste(data: LoginPompisteIn, request: Request, response: Response,
         nom = reprise_pompistes.verifier_ailleurs(request, username, data.code_acces.strip())
         if nom:
             reprise_pompistes.creer_compte_repris(username, nom, data.code_acces.strip())
+            sch_origine, origine = _compte_pompiste_origine(username)
+    elif not origine.code_acces_hash:
+        # Compte créé d'avance sans PIN : son ancien PIN, vérifié par l'ancien système, devient son PIN
+        import reprise_pompistes
+        if reprise_pompistes.verifier_ailleurs(request, username, data.code_acces.strip()):
+            reprise_pompistes.fixer_pin(sch_origine, origine.id, data.code_acces.strip())
             sch_origine, origine = _compte_pompiste_origine(username)
     ici = espace_courant()
     _err = "Identifiant ou code PIN incorrect"

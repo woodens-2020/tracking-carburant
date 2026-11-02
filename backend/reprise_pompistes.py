@@ -105,3 +105,16 @@ def creer_compte_repris(username: str, nom_complet: str, pin: str):
         employe_du_compte(db, u, prenom or nom_complet, nom or prenom)
         db.commit()
         log.info("Reprise pompistes : compte %s repris de l'ancien système", username)
+
+
+def fixer_pin(schema, user_id: int, pin: str) -> None:
+    """Compte créé d'avance avec « PIN à reprendre » : enregistre le PIN vérifié."""
+    from auth import hash_code_acces
+    from database import session_espace
+    from models import Utilisateur
+    with session_espace(schema) as db:
+        u = db.get(Utilisateur, user_id)
+        if u and not u.code_acces_hash:
+            u.code_acces_hash = hash_code_acces(pin)
+            db.commit()
+            log.info("Reprise pompistes : PIN repris pour %s", u.username)
