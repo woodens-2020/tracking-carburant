@@ -17,6 +17,52 @@ const TUILES = {osm:['https://tile.openstreetmap.org/{z}/{x}/{y}.png', OSM],
 const DOUX = !matchMedia('(prefers-reduced-motion: reduce)').matches;
 const api = (m, u, b) => m === 'GET' ? GET('/geospatial' + u) : (m === 'PUT' ? PUT('/geospatial' + u, b) : POST('/geospatial' + u, b));
 const n6 = v => v == null ? '—' : Number(v).toFixed(6);
+// Plus Codes (Open Location Code, Google Maps) : « PQQJ+X74 Cap-Haïtien » ou « 77F9PQQJ+X74 »
+const OLC = '23456789CFGHJMPQRVWX';
+const VILLES = {'cap-haitien':[19.7578, -72.2042], 'cap haitien':[19.7578, -72.2042], 'okap':[19.7578, -72.2042], 'limonade':[19.6697, -72.1253],
+  'quartier-morin':[19.6967, -72.1567], 'milot':[19.6097, -72.2131], 'plaine-du-nord':[19.6789, -72.2706], 'acul-du-nord':[19.6833, -72.3167],
+  'limbe':[19.7056, -72.4033], 'fort-liberte':[19.6631, -71.8381], 'ouanaminthe':[19.5500, -71.7333], 'port-de-paix':[19.9394, -72.8303],
+  'gonaives':[19.4500, -72.6833], 'saint-marc':[19.1081, -72.6936], 'hinche':[19.1500, -72.0167], 'mirebalais':[18.8333, -72.1000],
+  'port-au-prince':[18.5392, -72.3350], 'delmas':[18.5447, -72.3025], 'petion-ville':[18.5125, -72.2853], 'carrefour':[18.5411, -72.3994],
+  'croix-des-bouquets':[18.5778, -72.2261], 'leogane':[18.5111, -72.6339], 'petit-goave':[18.4314, -72.8669], 'jacmel':[18.2342, -72.5347],
+  'miragoane':[18.4461, -73.0897], 'les cayes':[18.1933, -73.7461], 'cayes':[18.1933, -73.7461], 'jeremie':[18.6500, -74.1167]};
+const sansAccent = t => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+GEO.plusCode = function(lat, lon){                 // code complet (11 caractères, ≈ 3 m)
+  let la = Math.min(Math.max(+lat, -90), 90 - 1e-10) + 90, lo = ((+lon + 180) % 360 + 360) % 360, c = '', r = 20;
+  for(let i = 0; i < 5; i++){
+    const a = Math.floor(la / r + 1e-9), b = Math.floor(lo / r + 1e-9);
+    c += OLC[a] + OLC[b]; la -= a * r; lo -= b * r; r /= 20;
+    if(i === 3) c += '+';
+  }
+  r *= 20;
+  return c + OLC[Math.min(4, Math.floor(la / (r / 5))) * 4 + Math.min(3, Math.floor(lo / (r / 4)))];
+};
+function lirePlusCode(t, ref){
+  const m = t.toUpperCase().match(/(^|[^0-9A-Z])([23456789CFGHJMPQRVWX]{8}|[23456789CFGHJMPQRVWX]{4})\+([23456789CFGHJMPQRVWX]{2,3})(?![0-9A-Z])/);
+  if(!m) return null;
+  let code = m[2] + m[3], lieu = '';
+  if(m[2].length === 4){                         // code court : complété par la ville citée (ou la carte)
+    const v = sansAccent(t.slice(m.index + m[0].length)).replace(/[,.]/g, ' ').trim();
+    const cle = Object.keys(VILLES).find(k => v.startsWith(k) || v.startsWith(k.replace(/-/g, ' ')));
+    const [rl, rg] = cle ? VILLES[cle] : ref;
+    lieu = cle ? '' : ' · ville non précisée : complété autour de la zone affichée';
+    code = GEO.plusCode(rl, rg).slice(0, 4) + code;
+    const p = decoderOLC(code);
+    if(p[0] - rl > .5) p[0] -= 1; else if(rl - p[0] > .5) p[0] += 1;      // le point le plus proche de la ville
+    if(p[1] - rg > .5) p[1] -= 1; else if(rg - p[1] > .5) p[1] += 1;
+    return {lat:p[0], lon:p[1], note:' · Plus Code ' + m[2] + '+' + m[3] + lieu};
+  }
+  const p = decoderOLC(code);
+  return {lat:p[0], lon:p[1], note:' · Plus Code ' + m[2] + '+' + m[3]};
+}
+function decoderOLC(c){
+  let la = -90, lo = -180, r = 20;
+  const n = Math.min(c.length, 10);
+  for(let i = 0; i < n; i += 2){ la += OLC.indexOf(c[i]) * r; lo += OLC.indexOf(c[i + 1]) * r; r /= 20; }
+  r *= 20;
+  if(c.length > 10){ const g = OLC.indexOf(c[10]), h = r / 5, w = r / 4; return [la + Math.floor(g / 4) * h + h / 2, lo + (g % 4) * w + w / 2]; }
+  return [la + r / 2, lo + r / 2];
+}
 const qs = o => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== '' && v != null)).toString();
 const $ = id => document.getElementById(id);
 const sansCode = m => String(m || '').replace(/^\[\d+\]\s*/, '');
@@ -185,7 +231,8 @@ function marqueurs(){
     if(s.latitude == null) continue;
     const m = L.marker([s.latitude, s.longitude], {icon:icone(s, GEO.sel === s.id), title:s.nom, keyboard:true, riseOnHover:true});
     m.bindTooltip(`${esc(s.nom)}${s.commune ? ' — ' + esc(s.commune) : ''}`, {direction:'top', offset:[0, -26]});
-    m.bindPopup(`<b style="font-size:14px">${esc(s.nom)}</b>${s.commune ? '<br><span style="color:var(--gm-muted)">' + esc(s.commune) + '</span>' : ''}<br>`
+    const lieu = [s.adresse && s.adresse !== s.nom ? s.adresse : '', s.commune].filter(Boolean).join(', ');
+    m.bindPopup(`<b style="font-size:14px">${esc(s.nom)}</b>${lieu ? '<br><span style="color:var(--gm-muted)">📍 ' + esc(lieu) + '</span>' : ''}<br>`
       + (s.ici ? '<span style="color:#facc15">● Vous êtes ici</span>' : s.statut === 'active' && peut ? `<a href="#" onclick="GEO.allerVers(${s.id});return false">➜ Aller à cette station</a>` : '<i>Station retirée</i>'));
     m.on('click', () => GEO.choisir(s.id, false));
     GEO.groupe.addLayer(m); GEO.marqueurs[s.id] = m;
@@ -266,6 +313,7 @@ function fiche(){
     <div class="gm-bloc"><h4>Localisation</h4><dl class="gm-dl"><dt>Pays</dt><dd>${esc(f.pays)}</dd><dt>Département</dt><dd>${esc(f.departement || '—')}</dd>
       <dt>Commune</dt><dd>${esc(f.commune || '—')}</dd><dt>Adresse</dt><dd>${esc(d.adresse || '—')}</dd>
       <dt>Coordonnées</dt><dd style="font-family:var(--mono);font-size:12.5px">${n6(f.latitude)}, ${n6(f.longitude)}</dd>
+      ${f.latitude != null ? `<dt>Plus Code</dt><dd><span class="gm-pc" title="${GEO.plusCode(f.latitude, f.longitude)}">${GEO.plusCode(f.latitude, f.longitude).slice(4)}</span>${f.commune ? ' ' + esc(f.commune) : ''}</dd>` : ''}
       <dt>Précision</dt><dd>${f.precision_m != null ? '± ' + Number(f.precision_m).toLocaleString('fr-FR') + ' m' : '—'}</dd></dl></div>
     <div class="gm-bloc"><h4>Identification</h4><dl class="gm-dl"><dt>Propriétaire</dt><dd>${esc(d.proprietaire || '—')}</dd>
       <dt>Enregistrée le</dt><dd>${d.enregistree_le ? new Date(d.enregistree_le).toLocaleDateString('fr-FR') : (d.id === 0 ? 'Station d’origine' : '—')}</dd></dl></div>
@@ -392,10 +440,16 @@ GEO.enregistrerPosition = async function(extra){
 // ── Espace « Coordonnées des stations » ─────────────────────────────
 // Lit des coordonnées collées : « 19.7381, -72.2041 », « 19,7381 ; -72,2041 »,
 // lien Google Maps (…@19.7381,-72.2041… ou ?q=…), degrés-minutes-secondes
-// (19°44'17"N 72°12'15"W). Une longitude positive d'Haïti reçoit son signe −.
+// (19°44'17"N 72°12'15"W), Plus Code (PQQJ+X74 Cap-Haïtien). Une longitude positive d'Haïti reçoit son signe −.
 GEO.lireCoord = function(txt){
   const t = String(txt || '').trim();
   if(!t) return null;
+  const c = GEO.carte && GEO.carte.getCenter(), ref = c && c.lat > 17.9 && c.lat < 20.2 ? [c.lat, c.lng] : VILLES['cap-haitien'];
+  const pc = lirePlusCode(t, ref);
+  if(pc){
+    if(pc.lat < 17.9 || pc.lat > 20.2 || pc.lon < -74.6 || pc.lon > -71.6) return {erreur:'Ce Plus Code est hors d’Haïti : ajoutez la ville (ex. PQQJ+X74 Cap-Haïtien).'};
+    return {lat:+pc.lat.toFixed(6), lon:+pc.lon.toFixed(6), note:pc.note};
+  }
   let lat, lon, m = t.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || t.match(/[?&](?:q|query|ll|destination|center)=(-?\d+\.\d+)(?:,|%2C)\s*(-?\d+\.\d+)/i);
   if(m){ lat = +m[1]; lon = +m[2]; }
   else if((m = t.match(/(\d{1,2})\s*°\s*(\d{1,2})\s*['′’]\s*(?:(\d{1,2}(?:[.,]\d+)?)\s*(?:"|″|''|”)?)?\s*([NS])[\s,;]+(\d{1,3})\s*°\s*(\d{1,2})\s*['′’]\s*(?:(\d{1,2}(?:[.,]\d+)?)\s*(?:"|″|''|”)?)?\s*([EWO])/i))){
@@ -434,7 +488,7 @@ GEO.localiser = async function(ouvrirId){
       <div class="gx-prog" aria-hidden="true"><i id="gx-barre" style="width:0"></i></div>
       <div class="gx-prog-t"><span id="gx-compte"></span><span>${GEO.locStations.length} station(s)</span></div></div>
     <div class="gx-aide"><b>Trois façons de donner la position :</b><br>
-      1. <b>Coller</b> des coordonnées : <code>19.7381, -72.2041</code>, un lien Google Maps, ou <code>19°44’17"N 72°12’15"W</code><br>
+      1. <b>Coller</b> des coordonnées : <code>19.7381, -72.2041</code>, un lien Google Maps, un Plus Code <code>PQQJ+X74 Cap-Haïtien</code> ou <code>19°44’17"N 72°12’15"W</code><br>
       2. <b>GPS de cet appareil</b>, sur place à la station<br>
       3. <b>Pointer sur la carte</b>, puis glisser le marqueur pour ajuster</div>
     ${GEO.locStations.map((s, i) => locCarte(s, i, s.id === premier)).join('')}`;
@@ -450,7 +504,7 @@ function locCarte(s, i, ouvert){
       <span class="fl">⌄</span></summary>
     <div class="gx-corps">
       <label>Coordonnées (latitude, longitude)<input class="gm-in gx-coord" id="gx-c-${s.id}" autocomplete="off" spellcheck="false"
-        placeholder="19.7381, -72.2041  ·  ou lien Google Maps" value="${fait ? `${s.latitude}, ${s.longitude}` : ''}" oninput="GEO.locLire(${s.id})"></label>
+        placeholder="19.7381, -72.2041  ·  Plus Code  ·  lien Google Maps" value="${fait ? `${s.latitude}, ${s.longitude}` : ''}" oninput="GEO.locLire(${s.id})"></label>
       <div class="gx-lu" id="gx-lu-${s.id}" aria-live="polite"></div>
       <div class="gx-outils"><button class="gm-btn" onclick="GEO.locGps(${s.id})">📡 GPS de cet appareil</button>
         <button class="gm-btn" onclick="GEO.locViser(${s.id})">🎯 Pointer sur la carte</button></div>
