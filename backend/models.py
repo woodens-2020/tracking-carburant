@@ -71,6 +71,16 @@ class StationGeo(Base):
     verification  = Column(String(20), nullable=False, default="non_verifie")   # verifie | non_verifie
     capture_par   = Column(String(150), nullable=True)
     capture_le    = Column(DateTime(timezone=True), nullable=True)
+    # Contacts et gestion de la station
+    responsable       = Column(String(150), nullable=True)
+    telephone         = Column(String(30), nullable=True)
+    email             = Column(String(254), nullable=True)
+    urgence_nom       = Column(String(150), nullable=True)
+    urgence_telephone = Column(String(30), nullable=True)
+    horaires          = Column(String(120), nullable=True)
+    note              = Column(String(500), nullable=True)
+    maj_par           = Column(String(150), nullable=True)
+    maj_le            = Column(DateTime(timezone=True), nullable=True)
     created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 

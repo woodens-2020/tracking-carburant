@@ -77,3 +77,30 @@ def test_carte_des_stations(client):
     assert g.get("/api/geospatial/overview").json()["total"] == 1
     near = g.get(f"/api/geospatial/stations/nearby?lat={CAP[0]}&lon={CAP[1]}&rayon_km=50").json()["stations"]
     assert [s["id"] for s in near] == [lid]
+
+
+def test_fiche_station_contacts(client):
+    """Contacts de la station : numéros d'Haïti normalisés, email contrôlé,
+    seuls les champs envoyés changent, fiche complète suivie."""
+    p = _c()
+    assert p.post("/api/login", json=PROPRIO).status_code == 200
+    r = p.put("/api/geospatial/stations/0/infos", json={
+        "adresse": "Champin", "departement": "Nord", "commune": "Cap-Haïtien", "responsable": "Marie Gérante",
+        "telephone": "3712 3456", "email": "Station.Champin@Exemple.ht", "urgence_nom": "Pompiers",
+        "urgence_telephone": "+509 4455-6677", "horaires": "6 h – 22 h", "note": "Accès camions par l’arrière"})
+    assert r.status_code == 200, r.text
+    f = r.json()["fiche"]
+    assert f["telephone"] == "+509 3712-3456" and f["urgence_telephone"] == "+509 4455-6677"
+    assert f["email"] == "station.champin@exemple.ht" and f["maj_par"] and f["maj_le"]
+    assert r.json()["journal"][0]["action"] == "informations"
+    # Un seul champ envoyé : le reste ne bouge pas
+    r = p.put("/api/geospatial/stations/0/infos", json={"telephone": "50937123457"})
+    assert r.json()["fiche"]["telephone"] == "+509 3712-3457" and r.json()["fiche"]["email"] == "station.champin@exemple.ht"
+    assert p.put("/api/geospatial/stations/0/infos", json={"telephone": "+1 305 555 0101"}).json()["fiche"]["telephone"] == "+13055550101"
+    for mauvais in ({"telephone": "abc"}, {"telephone": "123"}, {"urgence_telephone": "+509 12"}, {"email": "pas-un-email"}):
+        assert p.put("/api/geospatial/stations/0/infos", json=mauvais).status_code == 400, mauvais
+    # Effacer un champ
+    assert p.put("/api/geospatial/stations/0/infos", json={"email": ""}).json()["fiche"]["email"] is None
+    s = next(x for x in p.get("/api/geospatial/stations").json()["stations"] if x["id"] == 0)
+    assert "email" in s["completude"]["manquants"] and s["completude"]["pct"] < 100 and s["a_revoir"] is False
+    assert s["telephone"] == "+13055550101" and s["responsable"] == "Marie Gérante"

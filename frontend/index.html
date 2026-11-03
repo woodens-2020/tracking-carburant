@@ -3457,6 +3457,32 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .cs-lien{background:none;border:0;color:var(--orange);font:inherit;font-weight:600;cursor:pointer;text-align:left;padding:0}
 .sp-form{display:flex;flex-direction:column;gap:8px}
 .sp-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
+/* Fiches des stations (contacts, GPS, urgence) */
+.sf-resume{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-bottom:12px}
+.sf-kpi{border:1px solid var(--border);border-radius:10px;padding:9px 12px;background:var(--surface,transparent)}
+.sf-kpi b{display:block;font-size:20px;font-family:var(--mono)}.sf-kpi span{font-size:12px;color:var(--muted)}
+.sf-carte{border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden;transition:border-color .2s,box-shadow .2s}
+.sf-carte.ouverte{border-color:var(--orange);box-shadow:0 6px 24px rgba(0,0,0,.12)}
+.sf-tete{display:flex;gap:12px;align-items:center;padding:12px 14px;cursor:pointer}
+.sf-anneau{--p:0;width:46px;height:46px;flex:0 0 46px;border-radius:50%;display:grid;place-items:center;font:700 12px var(--mono);
+  background:radial-gradient(closest-side,var(--card,#fff) 76%,transparent 78%),conic-gradient(var(--sf-c,#22c55e) calc(var(--p)*1%),var(--border) 0)}
+.sf-tete h4{margin:0;font-size:15px}.sf-tete small{color:var(--muted);font-size:12.5px}
+.sf-badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+.sf-b{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--border);color:var(--muted)}
+.sf-b.ok{background:rgba(34,197,94,.15);color:#16a34a}.sf-b.warn{background:rgba(245,158,11,.16);color:#d97706}.sf-b.ko{background:rgba(239,68,68,.14);color:#dc2626}
+.sf-actions{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 12px}
+.sf-actions a,.sf-actions button{font-size:12.5px;text-decoration:none}
+.sf-coche{display:inline-flex!important;flex:0 0 auto;gap:7px;align-items:center;font-size:12.5px;cursor:pointer}
+.sf-coche input{width:16px!important;height:16px;flex:0 0 16px;margin:0}
+.sf-urg{background:#dc2626!important;color:#fff!important;border-color:#dc2626!important}
+.sf-corps{border-top:1px solid var(--border);padding:12px 14px;display:flex;flex-direction:column;gap:12px;animation:sf-ouvre .25s ease both}
+@keyframes sf-ouvre{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.sf-sec{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.sf-sec-t{grid-column:1/-1;font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:6px}
+.sf-sec.urgence{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:10px}
+.sf-lu{grid-column:1/-1;font-size:12.5px;min-height:16px}.sf-lu.ok{color:#16a34a}.sf-lu.ko{color:#dc2626}
+.sf-manque{font-size:12.5px;color:#d97706}
+@media (prefers-reduced-motion:reduce){.sf-corps{animation:none}.sf-carte{transition:none}}
 .st-bloc{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px}
 .st-titre{font-weight:700;font-size:14px}
 .st-champ{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
@@ -12977,6 +13003,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
     <div class="gest-onglets">
       <button id="gest-o-produits" class="on" onclick="gestOnglet('produits')">Produits &amp; mètres</button>
       <button id="gest-o-pompes" onclick="gestOnglet('pompes')">Pompes &amp; faces</button>
+      <button id="gest-o-fiches" onclick="gestOnglet('fiches')">Fiches des stations</button>
       <button id="gest-o-station" onclick="gestOnglet('station')">Enregistrer une station</button>
     </div>
     <div id="gest-nouveau-produit" style="padding:14px 18px;border-bottom:1px solid var(--border)">
@@ -13185,10 +13212,11 @@ async function apiFetch(method,path,body){
     const err=await res.json().catch(()=>({detail:res.statusText}));
     let msg = Array.isArray(err.detail)
       ? err.detail.map(e=>e.msg||JSON.stringify(e)).join(', ')
-      : (err.detail || res.statusText);
+      : (err.detail && typeof err.detail==='object' ? (err.detail.message || JSON.stringify(err.detail)) : (err.detail || res.statusText));
     if(typeof window.translateApiError === 'function') msg = window.translateApiError(msg);
     const e = new Error(`[${res.status}] ${msg}`);
     e.status = res.status;
+    if(err.detail && typeof err.detail==='object' && !Array.isArray(err.detail)) e.code = err.detail.code;
     throw e;
   }
   return res.json();
@@ -17598,6 +17626,7 @@ function gestOnglet(v){
   document.getElementById('gest-o-produits').classList.toggle('on', v==='produits');
   document.getElementById('gest-o-pompes').classList.toggle('on', v==='pompes');
   document.getElementById('gest-o-station').classList.toggle('on', v==='station');
+  document.getElementById('gest-o-fiches').classList.toggle('on', v==='fiches');
   document.getElementById('gest-nouveau-produit').style.display = v==='produits' ? '' : 'none';
   renderModalList();
 }
@@ -17778,6 +17807,145 @@ function _stRendre(){
       <div class="c-dim" style="font-size:12.5px;margin:4px 0 8px">Ils disparaissent de la saisie et de l'espace pompiste, <b>sans rien effacer</b> : relevés, rapports, journal et caisse gardent tout leur historique (anciens produits renommés « … (archivé le …) »).</div>
       <div class="st-ligne"><input id="st-confirme" class="filter-input" placeholder="Tapez RETIRER pour confirmer" style="max-width:240px">
         <button class="btn btn-danger" onclick="_stRetirerTout()">Retirer l'existant</button></div></div>`;
+}
+// ── Fiches des stations : GPS, contacts, urgence ─────────────────────
+const _SF = {liste:[], dep:[], ouverte:null};
+async function _sfCharger(ouvrir){
+  const el=document.getElementById('modal-list');
+  if(!_SF.liste.length) el.innerHTML='<div class="empty">Chargement des stations…</div>';
+  try{
+    const [r, d]=await Promise.all([GET('/geospatial/stations'), _SF.dep.length?{departements:_SF.dep}:GET('/geospatial/departments')]);
+    _SF.liste=r.stations; _SF.dep=d.departements;
+  }catch(e){ el.innerHTML=`<div class="empty">${esc(e.message)}</div>`; return; }
+  if(ouvrir!==undefined) _SF.ouverte=ouvrir;
+  _sfRendre();
+}
+const _sfTel = v => v ? 'tel:'+String(v).replace(/[^\d+]/g,'') : '';
+function _sfRendre(){
+  const el=document.getElementById('modal-list'), L=_SF.liste;
+  const completes=L.filter(s=>s.completude.pct===100).length, gps=L.filter(s=>s.latitude!=null).length;
+  const revoir=L.filter(s=>s.a_revoir).length, urg=L.filter(s=>s.urgence_telephone).length;
+  el.innerHTML=`
+    <div class="gest-explic">Tenez à jour la fiche de chaque station : <b>position GPS</b>, <b>téléphone</b>, <b>email</b> et <b>contact d’urgence</b>.
+      Les stations apparaissent sur la carte et leurs contacts sont accessibles en un clic.</div>
+    <div class="sf-resume">
+      <div class="sf-kpi"><b>${completes}/${L.length}</b><span>fiches complètes</span></div>
+      <div class="sf-kpi"><b>${gps}/${L.length}</b><span>sur la carte (GPS)</span></div>
+      <div class="sf-kpi"><b>${urg}/${L.length}</b><span>avec numéro d’urgence</span></div>
+      <div class="sf-kpi"><b style="color:${revoir?'#d97706':'inherit'}">${revoir}</b><span>à revoir (+ de 6 mois)</span></div>
+    </div>
+    ${L.map(_sfCarte).join('') || '<div class="empty">Aucune station.</div>'}`;
+}
+function _sfCarte(s){
+  const c=s.completude, ouv=_SF.ouverte===s.id;
+  const coul=c.pct===100?'#22c55e':(c.pct>=60?'#f59e0b':'#ef4444');
+  const maj=s.maj_le?new Date(s.maj_le).toLocaleDateString('fr-FR'):null;
+  return `<div class="sf-carte ${ouv?'ouverte':''}" id="sf-${s.id}">
+    <div class="sf-tete" onclick="_sfBasculer(${s.id})" role="button" tabindex="0" aria-expanded="${ouv}" onkeydown="if(event.key==='Enter')_sfBasculer(${s.id})">
+      <div class="sf-anneau" style="--p:${c.pct};--sf-c:${coul}">${c.pct}%</div>
+      <div style="flex:1;min-width:0"><h4>${esc(s.nom)}${s.code?` <span class="c-dim" style="font-weight:500;font-size:12.5px">· ${esc(s.code)}</span>`:''}</h4>
+        <small>${esc([s.adresse, s.commune, s.departement].filter(Boolean).join(', ') || 'Adresse à compléter')}</small>
+        <div class="sf-badges">
+          ${s.latitude!=null?`<span class="sf-b ${s.verification==='verifie'?'ok':'warn'}">📍 ${s.verification==='verifie'?'GPS vérifié':'GPS non vérifié'}</span>`:'<span class="sf-b ko">📍 Sans GPS</span>'}
+          ${s.statut!=='active'?'<span class="sf-b ko">Inactive</span>':''}
+          ${s.a_revoir?'<span class="sf-b warn">À revoir</span>':''}
+          ${maj?`<span class="sf-b">Mise à jour le ${maj}</span>`:''}
+        </div></div>
+      <span style="font-size:18px;color:var(--muted);transform:rotate(${ouv?180:0}deg);transition:transform .2s">⌄</span>
+    </div>
+    ${!ouv?`<div class="sf-actions">
+      ${s.telephone?`<a class="btn btn-secondary psp-mini" href="${_sfTel(s.telephone)}">📞 ${esc(s.telephone)}</a>`:''}
+      ${s.email?`<a class="btn btn-secondary psp-mini" href="mailto:${esc(s.email)}">✉️ ${esc(s.email)}</a>`:''}
+      ${s.urgence_telephone?`<a class="btn psp-mini sf-urg" href="${_sfTel(s.urgence_telephone)}">🚨 Urgence${s.urgence_nom?' · '+esc(s.urgence_nom):''}</a>`:''}
+      ${c.manquants.length?`<span class="sf-manque">À compléter : ${esc(c.manquants.join(', '))}</span>`:''}
+    </div>`:_sfFormulaire(s)}
+  </div>`;
+}
+function _sfFormulaire(s){
+  const ch=(k,lib,v,attr='')=>`<label class="st-champ">${lib}<input class="filter-input" id="sf-${k}-${s.id}" value="${esc(v||'')}" ${attr}></label>`;
+  return `<div class="sf-corps">
+    <div class="sf-sec"><div class="sf-sec-t">📍 Localisation</div>
+      ${ch('adresse','Adresse',s.adresse,'maxlength="255" placeholder="Ex. Champin"')}
+      <label class="st-champ">Département<select class="filter-input" id="sf-departement-${s.id}"><option value="">—</option>
+        ${_SF.dep.map(d=>`<option ${s.departement===d?'selected':''}>${esc(d)}</option>`).join('')}</select></label>
+      ${ch('commune','Commune',s.commune,'maxlength="100" placeholder="Ex. Cap-Haïtien"')}
+      ${ch('code','Code de la station',s.code,'maxlength="30" placeholder="Ex. CPV-01"')}
+      <label class="st-champ" style="grid-column:1/-1">Coordonnées GPS — latitude, longitude, Plus Code ou lien Google Maps
+        <input class="filter-input" id="sf-gps-${s.id}" autocomplete="off" spellcheck="false" style="font-family:var(--mono)"
+          placeholder="19.739888, -72.219297  ·  PQQJ+X74 Cap-Haïtien" value="${s.latitude!=null?`${s.latitude}, ${s.longitude}`:''}" oninput="_sfLireGps(${s.id})"></label>
+      <div class="sf-lu" id="sf-lu-${s.id}" aria-live="polite"></div>
+      <div class="st-ligne" style="grid-column:1/-1">
+        <button class="btn btn-secondary psp-mini" onclick="_sfGpsAppareil(${s.id})">📡 GPS de cet appareil</button>
+        <button class="btn btn-secondary psp-mini" onclick="_sfCarteOuvrir(${s.id})">🗺️ Pointer sur la carte</button>
+        <label class="sf-coche"><input type="checkbox" id="sf-verifie-${s.id}" ${s.verification==='verifie'?'checked':''}> Position vérifiée sur place</label>
+      </div></div>
+    <div class="sf-sec"><div class="sf-sec-t">📞 Contacts de la station</div>
+      ${ch('responsable','Responsable / gérant',s.responsable,'maxlength="150" placeholder="Nom et prénom"')}
+      ${ch('telephone','Téléphone',s.telephone,'type="tel" inputmode="tel" maxlength="30" placeholder="3712 3456"')}
+      ${ch('email','Email de la station',s.email,'type="email" maxlength="254" placeholder="station@exemple.com"')}
+      ${ch('horaires','Horaires',s.horaires,'maxlength="120" placeholder="Ex. 6 h – 22 h, 7 j / 7"')}</div>
+    <div class="sf-sec urgence"><div class="sf-sec-t">🚨 Contact d’urgence</div>
+      ${ch('urgence_nom','Nom du contact',s.urgence_nom,'maxlength="150" placeholder="Ex. Gérant de nuit, pompiers…"')}
+      ${ch('urgence_telephone','Numéro d’urgence',s.urgence_telephone,'type="tel" inputmode="tel" maxlength="30" placeholder="+509 4455 6677"')}</div>
+    <label class="st-champ">Note interne<textarea class="filter-input" id="sf-note-${s.id}" maxlength="500" rows="2" style="height:auto;padding:8px"
+      placeholder="Ex. accès camions par l’arrière">${esc(s.note||'')}</textarea></label>
+    <div id="sf-msg-${s.id}"></div>
+    <div class="gest-edit-act"><button class="btn btn-secondary" onclick="_sfBasculer(${s.id})">Annuler</button>
+      <button class="btn btn-primary" id="sf-ok-${s.id}" onclick="_sfEnregistrer(${s.id})">Enregistrer la fiche</button></div>
+  </div>`;
+}
+function _sfBasculer(id){ _SF.ouverte=_SF.ouverte===id?null:id; _sfRendre(); if(_SF.ouverte!=null) setTimeout(()=>document.getElementById('sf-'+id)?.scrollIntoView({block:'nearest',behavior:'smooth'}),30); }
+function _sfLireGps(id){
+  const z=document.getElementById('sf-lu-'+id), v=document.getElementById('sf-gps-'+id).value;
+  const r=window.GEO&&GEO.lireCoord?GEO.lireCoord(v):null;
+  if(!r){ z.className='sf-lu'; z.textContent=''; return null; }
+  if(r.erreur){ z.className='sf-lu ko'; z.textContent=r.erreur; return r; }
+  z.className='sf-lu ok'; z.textContent=`✓ ${r.lat}, ${r.lon}${r.note||''}`; return r;
+}
+function _sfGpsAppareil(id){
+  const z=document.getElementById('sf-lu-'+id), ko=m=>{ z.className='sf-lu ko'; z.textContent=m; };
+  if(!window.isSecureContext||!navigator.geolocation) return ko('GPS indisponible sur cet appareil : collez les coordonnées ou pointez sur la carte.');
+  z.className='sf-lu'; z.textContent='Recherche de la position…';
+  navigator.geolocation.getCurrentPosition(p=>{
+    document.getElementById('sf-gps-'+id).value=`${p.coords.latitude.toFixed(6)}, ${p.coords.longitude.toFixed(6)}`;
+    _SF.precision={id, m:p.coords.accuracy}; const r=_sfLireGps(id);
+    if(r&&!r.erreur) z.textContent+=` · GPS ± ${Math.round(p.coords.accuracy)} m`;
+  }, e=>ko(e.code===1?'Accès à la position refusé dans le navigateur.':'Position GPS introuvable : réessayez ou pointez sur la carte.'),
+  {enableHighAccuracy:true, timeout:20000, maximumAge:0});
+}
+async function _sfCarteOuvrir(id){
+  if(!window.GEO) return;
+  closeGestion(); await GEO.ouvrir(); GEO.localiser(id);
+}
+async function _sfEnregistrer(id, extra){
+  const s=_SF.liste.find(x=>x.id===id), v=k=>(document.getElementById(`sf-${k}-${id}`)?.value||'').trim();
+  const z=document.getElementById('sf-msg-'+id), bt=document.getElementById('sf-ok-'+id);
+  const err=m=>{ z.innerHTML=`<div class="psp-err">${esc(String(m).replace(/^\[\d+\]\s*/,''))}</div>`; };
+  z.innerHTML='';
+  const gps=v('gps'), r=gps?_sfLireGps(id):null;
+  if(r&&r.erreur) return err(r.erreur);
+  const infos={adresse:v('adresse'), departement:v('departement'), commune:v('commune'), code:v('code'), responsable:v('responsable'),
+    telephone:v('telephone'), email:v('email'), horaires:v('horaires'), urgence_nom:v('urgence_nom'), urgence_telephone:v('urgence_telephone'), note:v('note')};
+  const verifie=document.getElementById('sf-verifie-'+id).checked;
+  const bouge=r&&(r.lat!==s.latitude||r.lon!==s.longitude), verif=r&&!bouge&&verifie!==(s.verification==='verifie');
+  bt.disabled=true; bt.textContent='Enregistrement…';
+  try{
+    await PUT(`/geospatial/stations/${id}/infos`, infos);
+    if(bouge||verif){
+      const prec=_SF.precision&&_SF.precision.id===id&&bouge?_SF.precision.m:null;
+      await POST(`/geospatial/stations/${id}/location`, Object.assign({latitude:r.lat, longitude:r.lon, precision_m:prec,
+        source:prec!=null?'gps':'carte', verifie, confirmer_remplacement:true}, extra||{}));
+    }
+    notify(`${s.nom} : fiche enregistrée.`, 'ok');
+    _SF.precision=null; _SF.ouverte=null;
+    if(window.GEO) GEO.dep=null;
+    await _sfCharger();
+  }catch(e){
+    bt.disabled=false; bt.textContent='Enregistrer la fiche';
+    if(e.code==='station_proche' && await showConfirm(String(e.message).replace(/^\[\d+\]\s*/,''), {title:'Autre station proche', type:'warn', okLabel:'Oui, enregistrer'}))
+      return _sfEnregistrer(id, {forcer:true});
+    err(e.message);
+  }
 }
 function _stRetirerProduit(i){
   const cle=_ST.produits[i].cle; _ST.produits.splice(i,1);
@@ -18018,6 +18186,7 @@ function _demanderSeparation(corps){
 
 function renderModalList(){
   if(_GEST.vue==='station') return _stRendre();
+  if(_GEST.vue==='fiches') return _sfCharger();
   if(_GEST.vue==='pompes') return _gestPompes();
   const el=document.getElementById('modal-list');
   if(!products.length){ el.innerHTML=`<div class="empty">${t('gestion.empty.products')}</div>`; return; }

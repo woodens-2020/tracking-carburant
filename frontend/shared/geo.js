@@ -315,12 +315,24 @@ function fiche(){
       <dt>Coordonnées</dt><dd style="font-family:var(--mono);font-size:12.5px">${n6(f.latitude)}, ${n6(f.longitude)}</dd>
       ${f.latitude != null ? `<dt>Plus Code</dt><dd><span class="gm-pc" title="${GEO.plusCode(f.latitude, f.longitude)}">${GEO.plusCode(f.latitude, f.longitude).slice(4)}</span>${f.commune ? ' ' + esc(f.commune) : ''}</dd>` : ''}
       <dt>Précision</dt><dd>${f.precision_m != null ? '± ' + Number(f.precision_m).toLocaleString('fr-FR') + ' m' : '—'}</dd></dl></div>
+    ${contacts(f)}
     <div class="gm-bloc"><h4>Identification</h4><dl class="gm-dl"><dt>Propriétaire</dt><dd>${esc(d.proprietaire || '—')}</dd>
       <dt>Enregistrée le</dt><dd>${d.enregistree_le ? new Date(d.enregistree_le).toLocaleDateString('fr-FR') : (d.id === 0 ? 'Station d’origine' : '—')}</dd></dl></div>
     <div id="geo-section"></div>`;
   if(GEO.edition && GEO.edition !== 'position') GEO.section(GEO.edition);
 }
 GEO.fiche = fiche;
+function contacts(f){                             // téléphone, email, urgence : un clic pour appeler / écrire
+  const tel = v => 'tel:' + String(v).replace(/[^\d+]/g, '');
+  const l = [];
+  if(f.responsable) l.push(`<dt>Responsable</dt><dd>${esc(f.responsable)}</dd>`);
+  if(f.telephone) l.push(`<dt>Téléphone</dt><dd><a href="${tel(f.telephone)}">${esc(f.telephone)}</a></dd>`);
+  if(f.email) l.push(`<dt>Email</dt><dd><a href="mailto:${esc(f.email)}">${esc(f.email)}</a></dd>`);
+  if(f.horaires) l.push(`<dt>Horaires</dt><dd>${esc(f.horaires)}</dd>`);
+  const urg = f.urgence_telephone ? `<a class="gm-btn grand" style="background:#dc2626;border-color:#dc2626;color:#fff;margin-top:10px" href="${tel(f.urgence_telephone)}">🚨 Urgence${f.urgence_nom ? ' · ' + esc(f.urgence_nom) : ''} — ${esc(f.urgence_telephone)}</a>` : '';
+  if(!l.length && !urg) return `<div class="gm-bloc"><h4>Contacts</h4><div class="gm-note">Aucun contact enregistré : ajoutez-les dans Gestion › Fiches des stations.</div></div>`;
+  return `<div class="gm-bloc"><h4>Contacts</h4>${l.length ? `<dl class="gm-dl">${l.join('')}</dl>` : ''}${urg}</div>`;
+}
 GEO.section = function(quoi){
   GEO.edition = quoi;
   const d = GEO.detail, f = d.fiche, z = $('geo-section');

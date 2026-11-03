@@ -213,3 +213,4 @@ select.gm-in option{background:#0d1a30}
 .gm-panel .corps > *{flex-shrink:0}
 .gm-pc{font-family:var(--mono);font-size:12.5px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:6px;
   background:color-mix(in srgb, var(--gm-acc) 16%, transparent);color:var(--gm-text)}
+.gm-dl a{color:var(--gm-acc2);text-decoration:none;font-weight:600}

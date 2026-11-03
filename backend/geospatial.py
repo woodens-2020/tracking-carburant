@@ -20,6 +20,7 @@ premier tri par carré de latitude / longitude indexé.
 from __future__ import annotations
 
 import math
+import re
 import threading
 import time
 from datetime import timedelta
@@ -77,12 +78,29 @@ def _nom_utilisateur(u: Utilisateur) -> str:
 
 # ── Fiches ──────────────────────────────────────────────────────────────
 
+CONTACTS = ("responsable", "telephone", "email", "urgence_nom", "urgence_telephone", "horaires", "note")
+# Ce qu'une fiche à jour doit avoir (pour le suivi « fiche complète »)
+ESSENTIELS = {"adresse": "adresse", "departement": "département", "commune": "commune", "gps": "position GPS",
+              "responsable": "responsable", "telephone": "téléphone", "email": "email",
+              "urgence_telephone": "numéro d’urgence"}
+A_REVOIR_JOURS = 180
+
+
+def _completude(d: dict) -> dict:
+    manquants = [lib for k, lib in ESSENTIELS.items()
+                 if not (d.get("latitude") is not None if k == "gps" else d.get(k))]
+    return {"pct": round(100 * (len(ESSENTIELS) - len(manquants)) / len(ESSENTIELS)), "manquants": manquants}
+
+
 def _fiche_dict(f: Optional[StationGeo]) -> dict:
     if not f:
-        return {"code": None, "pays": "Haïti", "departement": None, "commune": None, "adresse": None,
-                "latitude": None, "longitude": None, "precision_m": None, "source": None,
-                "verification": "absent", "capture_par": None, "capture_le": None}
-    return {"code": f.code, "pays": f.pays, "departement": f.departement, "commune": f.commune, "adresse": f.adresse,
+        return dict({"code": None, "pays": "Haïti", "departement": None, "commune": None, "adresse": None,
+                     "latitude": None, "longitude": None, "precision_m": None, "source": None,
+                     "verification": "absent", "capture_par": None, "capture_le": None,
+                     "maj_par": None, "maj_le": None}, **{k: None for k in CONTACTS})
+    return {**{k: getattr(f, k) for k in CONTACTS},
+            "maj_par": f.maj_par, "maj_le": f.maj_le.isoformat() if f.maj_le else None,
+            "code": f.code, "pays": f.pays, "departement": f.departement, "commune": f.commune, "adresse": f.adresse,
             "latitude": float(f.latitude) if f.latitude is not None else None,
             "longitude": float(f.longitude) if f.longitude is not None else None,
             "precision_m": float(f.precision_m) if f.precision_m is not None else None,
@@ -99,9 +117,14 @@ def _ligne_carte(s, f: Optional[StationGeo]) -> dict:
     """Données légères pour la carte et la liste."""
     sid, nom, adresse, actif, _sch = s
     d = _fiche_dict(f)
+    d["adresse"] = d["adresse"] or adresse
+    maj = f.maj_le if f and f.maj_le else (f.capture_le if f else None)
     return {"id": sid, "nom": nom, "code": d["code"], "departement": d["departement"], "commune": d["commune"],
-            "adresse": d["adresse"] or adresse, "statut": "active" if actif else "inactive",
+            "adresse": d["adresse"], "statut": "active" if actif else "inactive",
             "latitude": d["latitude"], "longitude": d["longitude"], "verification": d["verification"],
+            **{k: d[k] for k in CONTACTS},
+            "completude": _completude(d), "maj_le": maj.isoformat() if maj else None,
+            "a_revoir": bool(maj and (today_haiti() - maj.date()).days > A_REVOIR_JOURS),
             "ici": sid == _id_courant()}
 
 
@@ -270,29 +293,81 @@ def _fiche_pour(pdb: Session, sid: int) -> StationGeo:
 
 
 class InfosIn(BaseModel):
+    """Seuls les champs envoyés sont modifiés ; un champ envoyé vide est effacé."""
     code: Optional[str] = None
     departement: Optional[str] = None
     commune: Optional[str] = None
     adresse: Optional[str] = None
+    responsable: Optional[str] = None
+    telephone: Optional[str] = None
+    email: Optional[str] = None
+    urgence_nom: Optional[str] = None
+    urgence_telephone: Optional[str] = None
+    horaires: Optional[str] = None
+    note: Optional[str] = None
+
+
+_EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[a-z]{2,24}$", re.I)
+_TEL_INVALIDE = "{} : numéro invalide (ex. 3712 3456 ou +509 3712 3456)."
+
+
+def normaliser_telephone(v: Optional[str], libelle: str) -> Optional[str]:
+    """Numéro d'Haïti (8 chiffres, avec ou sans +509) → « +509 3712-3456 » ;
+    numéro étranger gardé avec son indicatif. Refuse ce qui n'est pas un numéro."""
+    v = (v or "").strip()
+    if not v:
+        return None
+    if re.search(r"[^\d\s+().-]", v) or v.count("+") > 1 or ("+" in v and not v.startswith("+")):
+        raise HTTPException(400, _TEL_INVALIDE.format(libelle))
+    chiffres = re.sub(r"\D", "", v)
+    if chiffres.startswith("509") and len(chiffres) == 11:
+        chiffres = chiffres[3:]
+    elif v.startswith("+"):
+        if 8 <= len(chiffres) <= 15:
+            return "+" + chiffres
+        raise HTTPException(400, _TEL_INVALIDE.format(libelle))
+    if len(chiffres) != 8:
+        raise HTTPException(400, _TEL_INVALIDE.format(libelle))
+    return f"+509 {chiffres[:4]}-{chiffres[4:]}"
 
 
 def appliquer_infos(pdb: Session, sid: int, data: InfosIn, qui: str) -> StationGeo:
     nettoie = lambda v, n: (" ".join((v or "").split())[:n] or None)
-    code = nettoie(data.code, 30)
-    if code:
-        code = code.upper()
-        autre = pdb.query(StationGeo).filter(StationGeo.code == code, StationGeo.station_id != sid).first()
-        if autre:
-            raise HTTPException(409, f"Le code {code} est déjà utilisé par une autre station.")
-    if data.departement and data.departement not in DEPARTEMENTS:
-        raise HTTPException(400, "Département inconnu.")
+    envoyes = data.model_fields_set
+    val = {}
+    if "code" in envoyes:
+        code = nettoie(data.code, 30)
+        if code:
+            code = code.upper()
+            autre = pdb.query(StationGeo).filter(StationGeo.code == code, StationGeo.station_id != sid).first()
+            if autre:
+                raise HTTPException(409, f"Le code {code} est déjà utilisé par une autre station.")
+        val["code"] = code
+    if "departement" in envoyes:
+        if data.departement and data.departement not in DEPARTEMENTS:
+            raise HTTPException(400, "Département inconnu.")
+        val["departement"] = data.departement or None
+    for k, n in (("commune", 100), ("adresse", 255), ("responsable", 150), ("urgence_nom", 150), ("horaires", 120)):
+        if k in envoyes:
+            val[k] = nettoie(getattr(data, k), n)
+    if "note" in envoyes:
+        val["note"] = (data.note or "").strip()[:500] or None
+    if "email" in envoyes:
+        e = (data.email or "").strip().lower() or None
+        if e and (len(e) > 254 or not _EMAIL_RE.match(e)):
+            raise HTTPException(400, "Email de la station invalide (ex. station@exemple.com).")
+        val["email"] = e
+    for k, lib in (("telephone", "Téléphone"), ("urgence_telephone", "Numéro d’urgence")):
+        if k in envoyes:
+            val[k] = normaliser_telephone(getattr(data, k), lib)
     f = _fiche_pour(pdb, sid)
-    avant = {k: getattr(f, k) for k in ("code", "departement", "commune", "adresse")}
-    f.code, f.departement = code, data.departement or None
-    f.commune, f.adresse = nettoie(data.commune, 100), nettoie(data.adresse, 255)
-    apres = {k: getattr(f, k) for k in avant}
-    if avant != apres:
-        _journaliser(pdb, sid, qui, "informations", avant, apres)
+    avant = {k: getattr(f, k) for k in val}
+    for k, v in val.items():
+        setattr(f, k, v)
+    if any(avant[k] != val[k] for k in val):
+        f.maj_par, f.maj_le = qui, now_haiti()
+        _journaliser(pdb, sid, qui, "informations", {k: v for k, v in avant.items() if v != val[k]},
+                     {k: v for k, v in val.items() if v != avant[k]})
     return f
 
 
@@ -340,6 +415,7 @@ def appliquer_location(pdb: Session, sid: int, data: LocationIn, qui: str) -> St
     f.precision_m = round(data.precision_m, 1) if data.precision_m is not None else None
     f.source, f.verification = data.source, "verifie" if data.verifie else "non_verifie"
     f.capture_par, f.capture_le = qui, now_haiti()
+    f.maj_par, f.maj_le = qui, f.capture_le
     pdb.flush()
     apres = {"latitude": float(f.latitude), "longitude": float(f.longitude),
              "precision_m": float(f.precision_m) if f.precision_m is not None else None,
