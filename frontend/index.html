@@ -3407,6 +3407,28 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .gest-ligne{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .gest-pompe{border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden}
 .gest-pompe-tete{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--panel2);border-bottom:1px solid var(--border);font-size:15px}
+/* Tableau des pompes : une colonne par pompe, mètres à glisser */
+.gp-grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-bottom:12px}
+.gp-pompe{border:1px solid var(--border);border-radius:12px;background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
+.gp-tete{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--panel2);border-bottom:1px solid var(--border)}
+.gp-num{flex:0 0 26px;height:26px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:13px;background:var(--orange);color:#fff}
+.gp-tn{flex:1;min-width:0;cursor:pointer}.gp-tn b{display:block;font-size:15px}.gp-tn small{display:block;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gp-act{display:flex;gap:2px}
+.gp-ic{background:none;border:1px solid transparent;border-radius:7px;color:var(--muted);cursor:pointer;font-size:12px;padding:3px 6px;line-height:1}
+.gp-ic:hover:not(:disabled){border-color:var(--border);color:var(--text)}.gp-ic:disabled{opacity:.3;cursor:default}
+.gp-zone{padding:8px;display:flex;flex-direction:column;gap:6px;min-height:64px;flex:1;transition:background .15s,outline-color .15s;outline:2px dashed transparent;outline-offset:-6px;border-radius:10px}
+.gp-zone.survol{background:rgba(249,115,22,.08);outline-color:var(--orange)}
+.gp-vide{font-size:12.5px;color:var(--muted);text-align:center;padding:14px 6px}
+.gp-m{display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--border);border-left:4px solid var(--muted);border-radius:9px;background:var(--bg);cursor:grab}
+.gp-m.gaz{border-left-color:#16a34a}.gp-m.die{border-left-color:#2563eb}.gp-m.kero{border-left-color:#a855f7}
+.gp-m.glisse{opacity:.45}.gp-m.edition{cursor:default;border-left-color:var(--orange)}.gp-m.edition input{flex:1;height:30px}
+.gp-poignee{color:var(--muted);font-size:14px}
+.gp-mn{flex:1;min-width:0}.gp-mn b{display:block;font-size:13.5px}.gp-mn small{font-size:11px;color:var(--muted)}
+.gp-vers{font:inherit;font-size:12px;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:2px 4px;max-width:58px;cursor:pointer}
+.gp-ajout{margin:0 8px 8px;font:inherit;font-weight:700;font-size:12.5px;border:1px dashed var(--border);background:none;color:var(--orange);border-radius:9px;padding:7px;cursor:pointer}
+.gp-nouveau,.gp-edit{display:flex;flex-direction:column;gap:6px}.gp-nouveau{padding:0 8px 8px}.gp-edit{flex:1}
+.gp-creer{border-style:dashed}.gp-sans{border-color:var(--orange)}
+.gp-zone-sans{flex-direction:row;flex-wrap:wrap}.gp-zone-sans .gp-m{flex:1 1 220px}
 .gest-metres{padding:8px 12px 10px;display:flex;flex-direction:column;gap:4px}
 .gest-metres-act{display:flex;flex-direction:column;gap:6px;margin-top:4px}
 .gest-faces{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;padding:10px 12px}
@@ -17633,74 +17655,107 @@ function gestOnglet(v){
   renderModalList();
 }
 
-// ── Pompes physiques : Pompe 1 › mètres (Gazoline 1, Gazoline 2, Diesel 1…) ──
+// ── Pompes physiques : tableau à arranger (Pompe 1 › Gazoline 1, Diesel 1…) ──
+// Glisser un mètre d'une pompe à l'autre (ou « Déplacer vers… » au doigt),
+// renommer sur place, monter / descendre une pompe. Chaque geste est
+// enregistré tout de suite.
+const _gpCls = n => /diesel|dyez/i.test(n||'') ? 'die' : (/gaz|essence|sp9|95|91/i.test(n||'') ? 'gaz' : (/k[ée]ro/i.test(n||'') ? 'kero' : ''));
 async function _gestPompes(){
   const el=document.getElementById('modal-list');
   let d;
   try{ d=await GET('/distributeurs'); }catch(e){ el.innerHTML=`<div class="empty">${esc(e.message)}</div>`; return; }
   _GEST.dist=d;
-  const sans=d.sans_emplacement||[];
+  const L=d.distributeurs, sans=d.sans_emplacement||[];
+  const plusieurs=new Set(L.map(p=>(p.adresse||'').trim().toLowerCase())).size>1;
+  const adresses=[...new Set(L.map(x=>x.adresse).filter(Boolean))];
   const optProduits=products.map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
-  const optSans=sans.map(m=>`<option value="${m.id}">${esc(m.nom)} (${esc(m.produit_nom)})</option>`).join('');
+  const vers=(m, ici)=>`<select class="gp-vers" title="Déplacer vers une autre pompe" onchange="if(this.value!=='')gestPlacer(${m.id}, parseInt(this.value,10))">
+      <option value="">↔</option>${L.filter(p=>p.id!==ici).map(p=>`<option value="${p.id}">→ ${esc(p.nom)}</option>`).join('')}
+      ${ici?'<option value="0">Retirer de la pompe</option>':''}</select>`;
+  const metre=(m, ici)=>_GEST.edit==='m'+m.id
+    ? `<div class="gp-m edition"><input id="ge-m-${m.id}" class="filter-input" value="${esc(m.nom)}" maxlength="100"
+          onkeydown="if(event.key==='Enter')gestRenommerMetre(${m.id});if(event.key==='Escape'){_GEST.edit=null;renderModalList()}">
+        <button class="btn btn-primary psp-mini" onclick="gestRenommerMetre(${m.id})">OK</button></div>`
+    : `<div class="gp-m ${_gpCls(m.produit_nom)}" draggable="true" data-m="${m.id}" title="Glissez vers une autre pompe">
+        <span class="gp-poignee" aria-hidden="true">⠿</span>
+        <span class="gp-mn"><b>${esc(m.nom)}</b><small>${esc(m.produit_nom)}</small></span>
+        <button class="gp-ic" title="Renommer" onclick="_GEST.edit='m${m.id}';renderModalList()">✏️</button>
+        ${vers(m, ici)}</div>`;
   el.innerHTML=`
-    <div class="gest-explic">Chaque <b>pompe</b> porte ses <b>mètres</b> (pistolets), chacun pour un produit.
-      Ex. : Pompe 1 › Gazoline 1, Gazoline 2, Diesel 1.</div>
-    <div class="gest-ligne">
-      <input id="gd-nom" class="filter-input" placeholder="Nouvelle pompe (ex. Pompe 3)" maxlength="100" style="flex:1;min-width:150px">
-      <input id="gd-adresse" class="filter-input" placeholder="Adresse de la station" maxlength="255" style="flex:2;min-width:180px" list="gd-adresses">
-      <datalist id="gd-adresses">${[...new Set(d.distributeurs.map(x=>x.adresse).filter(Boolean))].map(a=>`<option value="${esc(a)}">`).join('')}</datalist>
-      <button class="btn btn-primary" style="height:34px" onclick="gestCreerPompe()">+ Créer la pompe</button>
+    <div class="gest-explic"><b>Arrangez vos pompes :</b> glissez un mètre d’une pompe à l’autre (ou utilisez ↔), touchez ✏️ pour corriger un nom,
+      ▲ ▼ pour l’ordre des pompes. Tout est enregistré aussitôt ; les relevés ne bougent pas.</div>
+    <datalist id="gd-adresses">${adresses.map(a=>`<option value="${esc(a)}">`).join('')}</datalist>
+    <div class="gp-grille">
+      ${L.map((p,i)=>`<div class="gp-pompe" data-p="${p.id}">
+        <div class="gp-tete">${_GEST.edit==='d'+p.id
+          ? `<div class="gp-edit"><input id="ge-d-${p.id}" class="filter-input" value="${esc(p.nom)}" maxlength="100" placeholder="Nom de la pompe" onkeydown="if(event.key==='Enter')gestRenommer('d',${p.id})">
+              <input id="ge-da-${p.id}" class="filter-input" value="${esc(p.adresse||'')}" maxlength="255" placeholder="Adresse de la station" list="gd-adresses" onkeydown="if(event.key==='Enter')gestRenommer('d',${p.id})">
+              <div style="display:flex;gap:6px"><button class="btn btn-primary psp-mini" onclick="gestRenommer('d',${p.id})">OK</button>
+              <button class="btn-ghost" onclick="_GEST.edit=null;renderModalList()">Annuler</button></div></div>`
+          : `<span class="gp-num">${i+1}</span>
+            <span class="gp-tn" onclick="_GEST.edit='d${p.id}';renderModalList()" title="Renommer">
+              <b>⛽ ${esc(p.nom)}</b><small>${p.adresse ? '📍 ' + esc(p.adresse) : '<span style="color:var(--orange)">Adresse à ajouter</span>'} · ${p.metres.length} mètre${p.metres.length>1?'s':''}</small></span>
+            <span class="gp-act">
+              <button class="gp-ic" title="Monter" ${i?'':'disabled'} onclick="gestOrdre(${p.id},-1)">▲</button>
+              <button class="gp-ic" title="Descendre" ${i<L.length-1?'':'disabled'} onclick="gestOrdre(${p.id},1)">▼</button>
+              <button class="gp-ic" title="Renommer / adresse" onclick="_GEST.edit='d${p.id}';renderModalList()">✏️</button>
+              ${p.metres.length?'':`<button class="gp-ic" title="Supprimer la pompe vide" onclick="gestSupprimer('distributeurs',${p.id},'${esc(p.nom)}')">🗑</button>`}</span>`}
+        </div>
+        <div class="gp-zone" data-p="${p.id}">
+          ${p.metres.map(m=>metre(m, p.id)).join('') || '<div class="gp-vide">Déposez un mètre ici</div>'}
+        </div>
+        ${_GEST.nouveauMetre===p.id
+          ? `<div class="gp-nouveau"><select id="gm-prod-${p.id}" class="filter-input">${optProduits}</select>
+              <input id="gm-nom-${p.id}" class="filter-input" placeholder="Nom du mètre (ex. Gazoline 9)" maxlength="100" onkeydown="if(event.key==='Enter')gestNouveauMetre(${p.id})">
+              <div style="display:flex;gap:6px"><button class="btn btn-primary psp-mini" onclick="gestNouveauMetre(${p.id})">Ajouter</button>
+              <button class="btn-ghost" onclick="_GEST.nouveauMetre=null;renderModalList()">Annuler</button></div></div>`
+          : `<button class="gp-ajout" onclick="_GEST.nouveauMetre=${p.id};renderModalList()">+ Nouveau mètre</button>`}
+      </div>`).join('')}
+      <div class="gp-pompe gp-creer">
+        <div class="gp-tete"><span class="gp-num">+</span><span class="gp-tn"><b>Nouvelle pompe</b><small>Elle apparaît aussitôt dans la saisie et l’espace pompiste</small></span></div>
+        <div class="gp-edit" style="padding:10px 12px">
+          <input id="gd-nom" class="filter-input" placeholder="Nom (ex. Pompe ${L.length+1})" maxlength="100" value="Pompe ${L.length+1}">
+          <input id="gd-adresse" class="filter-input" placeholder="Adresse de la station" maxlength="255" list="gd-adresses" value="${esc(adresses.length===1?adresses[0]:'')}">
+          <button class="btn btn-primary" style="height:34px" onclick="gestCreerPompe()">Créer la pompe</button></div>
+      </div>
     </div>
-    ${d.distributeurs.length ? d.distributeurs.map(p=>`
-      <div class="gest-pompe">
-        <div class="gest-pompe-tete">
-          ${_GEST.edit==='d'+p.id
-            ? `<input id="ge-d-${p.id}" class="filter-input" value="${esc(p.nom)}" maxlength="100" style="flex:1" onkeydown="if(event.key==='Enter')gestRenommer('d',${p.id})">
-               <input id="ge-da-${p.id}" class="filter-input" value="${esc(p.adresse||'')}" maxlength="255" placeholder="Adresse de la station" style="flex:2" list="gd-adresses" onkeydown="if(event.key==='Enter')gestRenommer('d',${p.id})">
-               <button class="btn btn-primary psp-mini" onclick="gestRenommer('d',${p.id})">OK</button><button class="btn-ghost" onclick="_GEST.edit=null;renderModalList()">Annuler</button>`
-            : `<b>⛽ ${esc(p.nom)}</b><span class="gest-adr">${p.adresse ? '📍 ' + esc(p.adresse) : '<span style="color:var(--orange)">Adresse de la station à ajouter (✏️)</span>'}</span>
-               <span class="c-dim" style="font-size:12.5px">${p.metres.length} mètre${p.metres.length>1?'s':''}</span><span style="flex:1"></span>
-               <button class="btn-ghost" title="Modifier la pompe (nom, adresse)" onclick="_GEST.edit='d${p.id}';renderModalList()">✏️</button>
-               <button class="btn-ghost" title="Supprimer la pompe" onclick="gestSupprimer('distributeurs',${p.id},'${esc(p.nom)}')">✕</button>`}
-        </div>
-        <div class="gest-metres">
-          ${p.metres.length ? p.metres.map(m=>`<div class="gest-metre"><span><b>${esc(m.nom)}</b> <small>${esc(m.produit_nom)}</small></span>
-              <button class="btn-ghost" title="Retirer de cette pompe" onclick="gestPlacer(${m.id},0)">✕</button></div>`).join('')
-            : '<div class="c-dim" style="font-size:12.5px;padding:4px 0">Aucun mètre.</div>'}
-          <div class="gest-metres-act">
-            ${sans.length ? `<select class="filter-input gest-sel" onchange="if(this.value)gestPlacer(parseInt(this.value,10),${p.id})">
-                <option value="">+ Placer un mètre existant…</option>${optSans}</select>` : ''}
-            ${_GEST.nouveauMetre===p.id
-              ? `<div class="gest-nouveau-metre"><select id="gm-prod-${p.id}" class="filter-input">${optProduits}</select>
-                  <input id="gm-nom-${p.id}" class="filter-input" placeholder="Nom du mètre (ex. Gazoline 3)" maxlength="100" onkeydown="if(event.key==='Enter')gestNouveauMetre(${p.id})">
-                  <div style="display:flex;gap:6px"><button class="btn btn-primary psp-mini" onclick="gestNouveauMetre(${p.id})">Ajouter</button>
-                  <button class="btn-ghost" onclick="_GEST.nouveauMetre=null;renderModalList()">Annuler</button></div></div>`
-              : `<button class="gest-lien" onclick="_GEST.nouveauMetre=${p.id};renderModalList();setTimeout(()=>document.getElementById('gm-nom-${p.id}')?.focus(),0)">+ Nouveau mètre sur ${esc(p.nom)}</button>`}
-          </div>
-        </div>
-      </div>`).join('') : '<div class="empty">Aucune pompe : créez « Pompe 1 » ci-dessus.</div>'}
-    ${_gestTableauRanger(d)}`;
+    ${sans.length ? `<div class="gp-pompe gp-sans">
+      <div class="gp-tete"><span class="gp-num" style="background:var(--orange)">!</span><span class="gp-tn"><b>Mètres sans pompe (${sans.length})</b>
+        <small>Glissez-les sur leur pompe, ou choisissez avec ↔</small></span></div>
+      <div class="gp-zone gp-zone-sans" data-p="0">${sans.map(m=>metre(m, 0)).join('')}</div></div>` : ''}`;
+  _gpGlisser(el);
+  // Champ en cours de modification : prêt à taper
+  const champ=_GEST.edit ? document.getElementById(_GEST.edit[0]==='m' ? 'ge-m-'+_GEST.edit.slice(1) : 'ge-d-'+_GEST.edit.slice(1))
+    : (_GEST.nouveauMetre ? document.getElementById('gm-nom-'+_GEST.nouveauMetre) : null);
+  if(champ){ champ.focus(); if(champ.select) champ.select(); }
 }
-// Tous les mètres (déjà placés ou non) avec leur pompe à choisir :
-// le moyen le plus rapide de ranger les mètres qui existaient déjà.
-function _gestTableauRanger(d){
-  const plusieurs=new Set(d.distributeurs.map(p=>(p.adresse||'').trim().toLowerCase())).size>1;
-  const pompes=d.distributeurs.map(p=>({id:p.id, lib:`${p.nom}${plusieurs && p.adresse ? ' — ' + p.adresse : ''}`}));
-  const metres=[];
-  for(const p of d.distributeurs) for(const m of p.metres) metres.push({...m, pompe:p.id});
-  for(const m of d.sans_emplacement||[]) metres.push({...m, pompe:null});
-  metres.sort((a,b)=>(a.produit_nom||'').localeCompare(b.produit_nom||'','fr') || a.nom.localeCompare(b.nom,'fr',{numeric:true}));
-  if(!metres.length) return '';
-  const nonPlaces=metres.filter(m=>!m.pompe).length;
-  return `<div class="gest-ranger">
-    <div class="filter-label" style="margin-bottom:4px">Ranger tous les mètres (${metres.length})${nonPlaces?` — <span style="color:var(--orange)">${nonPlaces} pas encore placé${nonPlaces>1?'s':''}</span>`:' — tous placés ✓'}</div>
-    <div class="c-dim" style="font-size:12.5px;margin-bottom:8px">Choisissez la pompe de chaque mètre : c’est enregistré tout de suite.${pompes.length?'':' Créez d’abord une pompe ci-dessus.'}</div>
-    <table class="gest-tbl"><thead><tr><th>Mètre</th><th>Produit</th><th>Pompe</th></tr></thead><tbody>
-    ${metres.map(m=>`<tr class="${m.pompe?'':'non-place'}"><td><b>${esc(m.nom)}</b></td><td>${esc(m.produit_nom)}</td>
-      <td><select class="filter-input gest-sel" ${pompes.length?'':'disabled'} onchange="gestPlacer(${m.id}, parseInt(this.value||'0',10))">
-        <option value="" ${m.pompe?'':'selected'}>— Pas encore placé —</option>
-        ${pompes.map(p=>`<option value="${p.id}" ${m.pompe===p.id?'selected':''}>${esc(p.lib)}</option>`).join('')}</select></td></tr>`).join('')}
-    </tbody></table></div>`;
+// Glisser-déposer (souris) ; sur tablette, le menu ↔ fait la même chose
+function _gpGlisser(el){
+  el.querySelectorAll('.gp-m[draggable]').forEach(m=>{
+    m.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain', m.dataset.m); e.dataTransfer.effectAllowed='move'; m.classList.add('glisse'); });
+    m.addEventListener('dragend', ()=>m.classList.remove('glisse'));
+  });
+  el.querySelectorAll('.gp-zone').forEach(z=>{
+    z.addEventListener('dragover', e=>{ e.preventDefault(); z.classList.add('survol'); });
+    z.addEventListener('dragleave', ()=>z.classList.remove('survol'));
+    z.addEventListener('drop', e=>{
+      e.preventDefault(); z.classList.remove('survol');
+      const id=parseInt(e.dataTransfer.getData('text/plain'),10), cible=parseInt(z.dataset.p,10);
+      const avant=(_GEST.dist?.distributeurs||[]).find(p=>p.metres.some(m=>m.id===id));
+      if(id && (avant ? avant.id : 0)!==cible) gestPlacer(id, cible);
+    });
+  });
+}
+async function gestOrdre(id, sens){
+  const ids=(_GEST.dist?.distributeurs||[]).map(p=>p.id), i=ids.indexOf(id), j=i+sens;
+  if(i<0 || j<0 || j>=ids.length) return;
+  [ids[i], ids[j]]=[ids[j], ids[i]];
+  await _gestApi('POST', '/distributeurs/ordre', {ids}, null);
+}
+async function gestRenommerMetre(id){
+  const nom=(document.getElementById('ge-m-'+id)?.value||'').trim();
+  if(!nom){ toast('Donnez un nom au mètre.','err'); return; }
+  if(await _gestApi('PATCH', `/pompes/${id}`, {nom}, 'Mètre renommé.')){ _GEST.edit=null; renderModalList(); }
 }
 async function _gestApi(method, path, body, msg){
   try{ await apiFetch(method, path, body); if(msg) toast(msg,'ok'); }

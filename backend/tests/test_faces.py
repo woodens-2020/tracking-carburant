@@ -68,3 +68,14 @@ def test_pompe_vide_supprimee(client):
     did = client.post("/api/distributeurs", headers=H, json={"nom": f"Pompe vide {t}"}).json()["id"]
     assert client.delete(f"/api/distributeurs/{did}", headers=H).status_code == 200
     assert not [x for x in client.get("/api/distributeurs", headers=H).json()["distributeurs"] if x["id"] == did]
+
+
+def test_ordre_des_pompes(client):
+    t = time.time_ns()
+    a = client.post("/api/distributeurs", headers=H, json={"nom": f"Ordre A {t}"}).json()["id"]
+    b = client.post("/api/distributeurs", headers=H, json={"nom": f"Ordre B {t}"}).json()["id"]
+    assert client.post("/api/distributeurs/ordre", headers=H, json={"ids": [b, a]}).status_code == 200
+    ids = [x["id"] for x in client.get("/api/distributeurs", headers=H).json()["distributeurs"]]
+    assert ids[:2] == [b, a]
+    assert client.post("/api/distributeurs/ordre", headers=H, json={"ids": [b, b]}).status_code == 400
+    assert client.post("/api/distributeurs/ordre", headers=H, json={"ids": [999999]}).status_code == 400

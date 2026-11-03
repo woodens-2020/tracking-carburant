@@ -2530,6 +2530,26 @@ def creer_distributeur(data: DistributeurIn, request: Request, db: Session = Dep
     return {"id": d.id, "nom": d.nom, "adresse": d.adresse}
 
 
+class OrdreIn(BaseModel):
+    ids: List[int]
+
+
+@app.post("/api/distributeurs/ordre")
+def ordonner_distributeurs(data: OrdreIn, request: Request, db: Session = Depends(get_db)):
+    """Range les pompes dans l'ordre donné (Pompe 1, Pompe 2…) : c'est
+    l'ordre de la saisie, de l'espace pompiste et de la feuille."""
+    _gerer_station(request, db)
+    pompes = {d.id: d for d in db.query(Distributeur).all()}
+    if len(set(data.ids)) != len(data.ids) or any(i not in pompes for i in data.ids):
+        raise HTTPException(400, "Liste de pompes invalide.")
+    reste = [d for d in sorted(pompes.values(), key=lambda x: (x.ordre, x.id)) if d.id not in data.ids]
+    for i, d in enumerate([pompes[i] for i in data.ids] + reste):
+        d.ordre = i
+    _tracer(db, request, "pompes_ordonnees", {"ordre": [pompes[i].nom for i in data.ids]})
+    db.commit()
+    return {"ordre": [d.id for d in sorted(pompes.values(), key=lambda x: x.ordre)]}
+
+
 @app.patch("/api/distributeurs/{did}")
 def renommer_distributeur(did: int, data: DistributeurPatch, request: Request, db: Session = Depends(get_db)):
     _gerer_station(request, db)
