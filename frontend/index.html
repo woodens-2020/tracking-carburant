@@ -598,6 +598,11 @@ canvas{display:block}
 .psp-sup{display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)}
 .psp-sup .psp-lien{color:var(--muted)}.psp-sup .psp-lien:hover{color:#ef4444}
 .sx-origine{color:#a78bfa}
+.jr-val{background:none;border:1px dashed transparent;border-radius:8px;cursor:pointer;font:inherit;font-family:var(--mono);
+  padding:4px 6px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.jr-val .jr-pen{font-size:12px;opacity:.55;transition:opacity .15s}
+.jr-val:hover,.jr-val:focus-visible{border-color:var(--orange);background:rgba(249,115,22,.1);outline:none}
+.jr-val:hover .jr-pen,.jr-val:focus-visible .jr-pen{opacity:1}
 .jr-crayon{background:none;border:1px solid transparent;border-radius:8px;cursor:pointer;font-size:14px;padding:3px 6px;line-height:1}
 .jr-crayon:hover{border-color:var(--orange);background:rgba(249,115,22,.1)}
 .jc-grille{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:end;margin:8px 0}
@@ -16982,16 +16987,17 @@ function renderJournal(data){
       <td style="font-size:13px">${e.periode==='Matin'?'🌅 Matin':'🌇 Après-midi'}</td>
       <td style="font-weight:600">${esc(e.pompe_nom)}</td>
       <td style="font-size:13px">${e.pompiste_nom?esc(e.pompiste_nom):'<span class="c-dim">—</span>'}</td>
-      <td class="tr num" style="color:var(--blue)">${e.metter_avant.toFixed(3)}</td>
-      <td class="tr num" style="color:var(--blue2)">${e.metter_apres.toFixed(3)}</td>
+      ${!e.en_attente && typeof e.id==='number'
+        ? `<td class="tr num"><button class="jr-val" style="color:var(--blue)" title="Corriger le mètre avant" onclick="jrCorriger(${e.id},'av')">${e.metter_avant.toFixed(3)}<span class="jr-pen">✏️</span></button></td>
+      <td class="tr num"><button class="jr-val" style="color:var(--blue2)" title="Corriger le mètre après" onclick="jrCorriger(${e.id},'ap')">${e.metter_apres.toFixed(3)}<span class="jr-pen">✏️</span></button></td>`
+        : `<td class="tr num" style="color:var(--blue)">${e.metter_avant.toFixed(3)}</td>
+      <td class="tr num" style="color:var(--blue2)">${e.metter_apres.toFixed(3)}</td>`}
       <td class="tr">${attStr}</td>
       <td class="tr">${decStr}</td>
       <td class="tr num c-teal">${fmtGal(e.quantite)}</td>
       <td class="tr num c-amber">${fmtG(e.montant_vente)}</td>
       <td><span class="type-pill ${pillCls}">${typeLabel}</span></td>
       <td>${statHtml}</td>
-      <td class="tr">${!e.en_attente && typeof e.id==='number'
-        ? `<button class="jr-crayon" title="Corriger le mètre avant / après" aria-label="Corriger ${esc(e.pompe_nom)} du ${frDate(e.date)}" onclick="jrCorriger(${e.id})">✏️</button>` : ''}</td>
     </tr>`;
   }).join('');
 
@@ -17008,10 +17014,10 @@ function renderJournal(data){
         <thead><tr>
           <th>Date</th><th>Période</th><th style="min-width:90px">Pompe</th>
           <th style="min-width:90px">Pompiste</th>
-          <th class="tr">Meter avant</th><th class="tr">Meter après</th>
+          <th class="tr">Meter avant ✏️</th><th class="tr">Meter après ✏️</th>
           <th class="tr">Attendu</th><th class="tr">Décalage</th>
           <th class="tr">Qté (gal)</th><th class="tr">Montant (G)</th>
-          <th>Type</th><th>Statut</th><th class="tr" title="Corriger un mètre">✏️</th>
+          <th>Type</th><th>Statut</th>
         </tr></thead>
         <tbody>${rows}</tbody>
         <tfoot>
@@ -17025,7 +17031,7 @@ function renderJournal(data){
             <td class="tr num c-amber" style="padding:10px 14px;font-size:16px;font-weight:900">
               ${fmtG(totalMontant)}
             </td>
-            <td colspan="3"></td>
+            <td colspan="2"></td>
           </tr>
         </tfoot>
       </table>
@@ -18211,7 +18217,7 @@ function demanderSuppression({titre, texte, lignes=[], bouton='Supprimer'}){
 }
 
 // Journal Meters : corriger rapidement un mètre (✏️)
-function jrCorriger(id){
+function jrCorriger(id, champ){
   const e=_JR_ENTRIES.find(x=>x.id===id); if(!e) return;
   document.getElementById('sup-ov')?.remove();
   const ov=document.createElement('div');
@@ -18266,7 +18272,7 @@ function jrCorriger(id){
   document.getElementById('jc-oui').onclick=ok;
   ov.addEventListener('click', k=>{ if(k.target===ov) fin(); });
   maj();
-  setTimeout(()=>{ const a=document.getElementById('jc-ap'); a.focus(); a.select(); }, 30);
+  setTimeout(()=>{ const a=document.getElementById(champ==='av'?'jc-av':'jc-ap'); a.focus(); a.select(); }, 30);
 }
 
 function showConfirm(msg, opts={}){
