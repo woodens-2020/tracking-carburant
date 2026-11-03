@@ -1139,6 +1139,39 @@ def annuler_non_termine(rid: int, s: Utilisateur = Depends(_require_superviseur)
     return {"ok": True}
 
 
+class SuppressionRapportIn(BaseModel):
+    motif: str
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/supprimer")
+def supprimer_rapport(rid: int, data: SuppressionRapportIn, request: Request,
+                      s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Supprime un rapport mal fait, quel que soit son état (envoyé,
+    problème, renvoyé ou finalisé) : ses relevés sortent du journal et ses
+    dépenses des dépenses ; ses pompes sont libérées pour ce créneau. La
+    trace (contenu, qui, motif) reste dans le journal d'audit."""
+    import main
+    from models import Depense
+    rap = db.get(RapportPompiste, rid)
+    if not rap:
+        raise HTTPException(404, "Rapport introuvable")
+    motif = " ".join((data.motif or "").split())
+    if len(motif) < 5:
+        raise HTTPException(400, "Indiquez pourquoi vous supprimez ce rapport (5 caractères minimum).")
+    trace = {"rapport_id": rap.id, "pompiste": _nom(rap.utilisateur), "date": str(rap.date), "periode": rap.periode,
+             "statut": rap.statut, "motif": motif[:300], "montant_attendu": float(rap.montant_attendu),
+             "montant_compte": float(rap.montant_compte), "ecart": float(rap.ecart),
+             "lignes": [{"pompe": l.pompe.nom, "avant": float(l.metter_avant), "apres": float(l.metter_apres)} for l in rap.lignes]}
+    n_releves = _retirer_du_journal(db, rap)
+    n_depenses = db.query(Depense).filter_by(rapport_pompiste_id=rap.id).delete()
+    trace.update(releves_retires=n_releves, depenses_retirees=n_depenses)
+    main._tracer(db, request, "rapport_pompiste_supprime", trace)
+    db.delete(rap)
+    db.commit()
+    log.info("Rapport pompiste #%s supprimé par l'utilisateur %s : %s", rid, s.id, motif)
+    return {"ok": True, "releves_retires": n_releves, "depenses_retirees": n_depenses}
+
+
 class LigneConfIn(BaseModel):
     metter_avant: float
     metter_apres: float

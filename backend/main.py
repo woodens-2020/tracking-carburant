@@ -2847,6 +2847,44 @@ def _releve_dict(r: Releve):
     }
 
 
+class SuppressionRelevesIn(BaseModel):
+    ids: List[int]
+    motif: str
+
+
+@app.post("/api/releves/supprimer")
+def supprimer_releves(data: SuppressionRelevesIn, request: Request, db: Session = Depends(get_db)):
+    """Supprime des relevés mal saisis (un seul, ou tout un rapport) pour
+    libérer la place : la pompe peut être ressaisie pour ce jour. Caisse,
+    stock et journal se recalculent d'eux-mêmes ; la trace (qui, quand,
+    valeurs, motif) reste dans le journal d'audit. Un relevé venu d'un
+    rapport pompiste se supprime avec son rapport."""
+    from pompiste_routes import _require_superviseur
+    from models import ResolutionMetter
+    _require_superviseur(request, db)
+    motif = " ".join((data.motif or "").split())
+    if len(motif) < 5:
+        raise HTTPException(400, "Indiquez pourquoi vous supprimez (5 caractères minimum).")
+    if not data.ids or len(data.ids) > 200:
+        raise HTTPException(400, "Choisissez les relevés à supprimer.")
+    rows = db.query(Releve).filter(Releve.id.in_(set(data.ids))).all()
+    if len(rows) != len(set(data.ids)):
+        raise HTTPException(404, "Relevé introuvable (déjà supprimé ?).")
+    venus = sorted({r.rapport_pompiste_id for r in rows if r.rapport_pompiste_id})
+    if venus:
+        raise HTTPException(409, "Ces relevés viennent d'un rapport pompiste (n° " + ", ".join(map(str, venus)) + ") : "
+                                 "supprimez le rapport dans « Rapports pompistes ».")
+    trace = [{"id": r.id, "date": str(r.date), "periode": r.periode, "pompe": r.pompe.nom if r.pompe else r.pompe_id,
+              "avant": float(r.metter_avant), "apres": float(r.metter_apres), "prix": float(r.prix_gallon),
+              "pompiste_id": r.pompiste_id} for r in rows]
+    for r in rows:
+        db.query(ResolutionMetter).filter_by(releve_id=r.id).delete()
+        db.delete(r)
+    _tracer(db, request, "releves_supprimes", {"motif": motif[:300], "releves": trace})
+    db.commit()
+    return {"supprimes": len(rows)}
+
+
 class ReleveAssignerPompisteIn(BaseModel):
     pompiste_id: Optional[int] = None   # None = retirer l'attribution
 

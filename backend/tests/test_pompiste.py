@@ -683,3 +683,48 @@ def test_doublon_inactif_cache_de_la_saisie(client):
     client.patch(f"/api/pompiste-supervision/comptes/{seul['id']}", headers=H, json={"actif": False})
     noms = [p["nom"].lower() for p in client.get("/api/pompistes?inclure_inactifs=true", headers=H).json()]
     assert noms.count("rose doublon") == 1 and "parti sansdoublon" in noms
+
+
+def test_supprimer_releves_et_rapport_mal_saisis(client):
+    """Un relevé (ou tout un rapport) mal saisi se supprime avec un motif :
+    la place est libérée et peut être ressaisie ; un rapport pompiste, même
+    finalisé, se supprime avec ses relevés et ses dépenses."""
+    from tz_utils import today_haiti
+    import main as _m
+    jour = str(today_haiti())
+    pompe = _produit(client, 500)
+    r = client.post("/api/releves", headers=H, json={"date": jour, "periode": "Matin", "pompe_id": pompe, "prix_gallon": 500,
+                                                     "metter_avant": 0, "metter_apres": 999})
+    rid = r.json()["id"]
+    assert client.post("/api/releves/supprimer", headers=H, json={"ids": [rid], "motif": ""}).status_code == 400
+    assert client.post("/api/releves/supprimer", headers=H, json={"ids": [rid], "motif": "Index faux tapé"}).json()["supprimes"] == 1
+    assert client.post("/api/releves/supprimer", headers=H, json={"ids": [rid], "motif": "Index faux tapé"}).status_code == 404
+    # La place est libre : nouvelle saisie possible
+    r = client.post("/api/releves", headers=H, json={"date": jour, "periode": "Matin", "pompe_id": pompe, "prix_gallon": 500,
+                                                     "metter_avant": 0, "metter_apres": 10})
+    assert r.status_code in (200, 201), r.text
+    assert client.post("/api/releves/supprimer", headers=H, json={"ids": [r.json()["id"]], "motif": "nettoyage test"}).status_code == 200
+    # Rapport pompiste envoyé (avec une dépense) puis supprimé
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Sup", "nom": "Prime"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    assert p.post("/api/pompiste/compteurs", json={"date": jour, "charte_acceptee": True,
+              "lignes": [{"pompe_id": pompe, "metter_avant": 0, "metter_apres": 20, "debut_confirme": True}]}).status_code == 201
+    rap = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 10}],
+                 "depenses": [{"description": "Glace test", "montant": 100, "autorise_par": "Gérant"}]}).json()
+    # Ses relevés au journal ne se suppriment pas un par un
+    from database import SessionLocal
+    from models import Releve, RapportPompiste
+    with SessionLocal() as s:
+        lies = [x.id for x in s.query(Releve).filter_by(rapport_pompiste_id=rap["id"]).all()]
+    if lies:
+        assert client.post("/api/releves/supprimer", headers=H, json={"ids": lies, "motif": "essai direct"}).status_code == 409
+    assert client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/supprimer", headers=H, json={"motif": "x"}).status_code == 400
+    r = client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/supprimer", headers=H, json={"motif": "Rapport mal rempli"})
+    assert r.status_code == 200, r.text
+    with SessionLocal() as s:
+        assert s.get(RapportPompiste, rap["id"]) is None
+        assert not s.query(Releve).filter_by(rapport_pompiste_id=rap["id"]).count()
+    # Les pompes sont libérées : le pompiste peut refaire son rapport
+    assert p.post("/api/pompiste/compteurs", json={"date": jour, "charte_acceptee": True,
+              "lignes": [{"pompe_id": pompe, "metter_avant": 0, "metter_apres": 20, "debut_confirme": True}]}).status_code == 201

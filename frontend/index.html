@@ -585,6 +585,22 @@ canvas{display:block}
 .sx-nom{font-size:17px;font-weight:800;color:var(--text);margin-bottom:6px}
 .sx-meta{font-size:12px;color:var(--muted);margin-top:4px}
 .sx-pompiste{cursor:pointer;color:var(--teal,#2dd4bf)}
+.sup-ov{position:fixed;inset:0;z-index:2147483000;background:rgba(2,6,23,.6);display:grid;place-items:center;padding:16px;animation:sup-in .15s ease}
+@keyframes sup-in{from{opacity:0}to{opacity:1}}
+.sup-boite{background:var(--card,#0f172a);color:var(--text);border:1px solid var(--border);border-radius:14px;max-width:460px;width:100%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.sup-ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:rgba(239,68,68,.15);font-size:22px;margin-bottom:8px}
+.sup-boite h3{margin:0 0 6px;font-size:17px}.sup-boite p{margin:0 0 10px;color:var(--muted);font-size:13.5px}
+.sup-liste{margin:0 0 12px;padding:8px 12px 8px 26px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.25);border-radius:10px;font-size:13px;max-height:180px;overflow:auto}
+.sup-boite label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:4px}
+.sup-boite input{width:100%}.sup-err{color:#ef4444;font-size:12.5px;min-height:16px;margin-top:4px}
+.sup-act{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.sx-btn-sup{background:none;border:1px solid transparent;border-radius:8px;color:var(--muted);cursor:pointer;font-size:13px;padding:4px 8px}
+.sx-btn-sup:hover{border-color:rgba(239,68,68,.4);color:#ef4444}
+.sx-sup-tout{display:flex;justify-content:flex-end;margin:-4px 0 12px}
+.sx-sup-tout button{background:none;border:0;color:var(--muted);font-size:12.5px;cursor:pointer;text-decoration:underline dotted}
+.sx-sup-tout button:hover{color:#ef4444}
+.psp-sup{display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)}
+.psp-sup .psp-lien{color:var(--muted)}.psp-sup .psp-lien:hover{color:#ef4444}
 .sx-qui{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px;padding:10px 14px;border:1px solid var(--border);
   border-left:4px solid var(--orange);border-radius:10px;background:var(--panel2,transparent)}
 .sx-qui label{font-weight:700;font-size:14px}
@@ -16144,6 +16160,8 @@ function renderSaisie(){
     } else {
       statut=`<span class="sx-chip sx-chip-todo">À saisir</span>`;
     }
+    if(isEdit && !r.rapport_pompiste_id)
+      action+=`<button type="button" class="sx-btn-sup" title="Supprimer ce relevé mal saisi" onclick="sxSupprimer([${r.id}])">🗑 Supprimer</button>`;
 
     const saisiPar=isEdit&&r.cree_par_nom
       ?`<div class="sx-meta">Saisi par ${esc(r.cree_par_nom)}${(r.modifie_par_nom&&r.modifie_par_nom!==r.cree_par_nom)?` · modifié par ${esc(r.modifie_par_nom)}`:''}</div>`:'';
@@ -16188,6 +16206,8 @@ function renderSaisie(){
         <div class="sx-ctx-sous">${frDate(currentDate)} · ${nbFaits}/${p.pompes.length} pompe(s) enregistrée(s) · prix ${fmtNum(pxDefaut,2)} G/gal (Paramètres › Prix de vente)</div>
       </div>
     </div>
+    ${perRel.filter(r=>!r.rapport_pompiste_id).length>1?`<div class="sx-sup-tout"><button type="button"
+        onclick="sxSupprimer(${JSON.stringify(perRel.filter(r=>!r.rapport_pompiste_id).map(r=>r.id))})">🗑 Supprimer tout ce rapport (${esc(p.nom)} · ${label} du ${frDate(currentDate)})</button></div>`:''}
     <div class="sx-liste">${cartes}</div>
     <div class="sx-barre" id="sx-barre">
       <div class="sx-barre-tot"><span id="sx-tot-nb">Aucune saisie en cours</span><strong id="sx-tot-val"></strong></div>
@@ -17040,6 +17060,24 @@ function prepareConfirm(periode){
       <input class="inp" id="motif-ecart-${r.pompeId}" maxlength="255" placeholder="Motif de l'écart (5 caractères minimum)" style="width:100%">`).join('')}`:'';
 
   document.getElementById('modal-confirm').classList.remove('hidden');
+}
+
+// Supprimer des relevés mal saisis : la place est libérée pour une nouvelle saisie
+async function sxSupprimer(ids){
+  const lignes=ids.map(id=>releves.find(r=>r.id===id)).filter(Boolean).map(r=>{
+    const po=(products.find(x=>x.id===r.produit_id)?.pompes||[]).find(x=>x.id===r.pompe_id);
+    return `${po?po.nom:'Pompe'} : ${fmtNum(r.metter_avant,3)} → ${fmtNum(r.metter_apres,3)}${r.pompiste_nom?' · '+r.pompiste_nom:''}`;
+  });
+  const motif=await demanderSuppression({titre: ids.length>1?`Supprimer ces ${ids.length} relevés ?`:'Supprimer ce relevé ?',
+    texte:'La pompe redevient libre pour ce jour : vous pourrez la ressaisir. Ventes, caisse et stock sont recalculés. La trace reste au journal d’audit.',
+    lignes, bouton: ids.length>1?`Supprimer les ${ids.length} relevés`:'Supprimer le relevé'});
+  if(!motif) return;
+  try{
+    const r=await POST('/releves/supprimer',{ids, motif});
+    toast(`${r.supprimes} relevé${r.supprimes>1?'s':''} supprimé${r.supprimes>1?'s':''} : la place est libre.`,'ok');
+    await loadSaisie();
+    if(currentPage==='home') loadHome();
+  }catch(e){ toast(e.message,'err'); }
 }
 
 function closeConfirm(){ document.getElementById('modal-confirm').classList.add('hidden'); pendingSave=null; }
@@ -19470,6 +19508,34 @@ function _closeConfirm(result){
   if(_confirmResolve){ _confirmResolve(result); _confirmResolve=null; }
 }
 
+// Suppression d'un relevé / d'un rapport mal saisi : on montre ce qui part,
+// on demande le motif (gardé au journal d'audit). Retourne le motif ou null.
+function demanderSuppression({titre, texte, lignes=[], bouton='Supprimer'}){
+  return new Promise(res => {
+    document.getElementById('sup-ov')?.remove();
+    const ov=document.createElement('div');
+    ov.id='sup-ov'; ov.className='sup-ov'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
+    ov.innerHTML=`<div class="sup-boite">
+      <div class="sup-ico">🗑</div><h3>${esc(titre)}</h3><p>${esc(texte)}</p>
+      ${lignes.length?`<ul class="sup-liste">${lignes.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:''}
+      <label for="sup-motif">Pourquoi ? (obligatoire)</label>
+      <input id="sup-motif" class="filter-input" maxlength="300" placeholder="Ex. index mal tapé, mauvais jour, rapport en double…">
+      <div class="sup-err" id="sup-err"></div>
+      <div class="sup-act"><button class="btn btn-secondary" id="sup-non">Annuler</button><button class="btn btn-danger" id="sup-oui">${esc(bouton)}</button></div></div>`;
+    document.body.appendChild(ov);
+    const fin=v=>{ ov.remove(); res(v); };
+    const ok=()=>{ const m=document.getElementById('sup-motif').value.trim();
+      if(m.length<5){ document.getElementById('sup-err').textContent='Indiquez le motif (5 caractères minimum).'; document.getElementById('sup-motif').focus(); return; }
+      fin(m); };
+    document.getElementById('sup-non').onclick=()=>fin(null);
+    document.getElementById('sup-oui').onclick=ok;
+    ov.addEventListener('click', e=>{ if(e.target===ov) fin(null); });
+    const inp=document.getElementById('sup-motif');
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter') ok(); if(e.key==='Escape') fin(null); });
+    setTimeout(()=>inp.focus(), 30);
+  });
+}
+
 function showConfirm(msg, opts={}){
   // opts: { title, type:'danger'|'warn'|'ok', okLabel, cancelLabel }
   const type   = opts.type || 'danger';
@@ -20292,6 +20358,25 @@ function _pspMaj(r){
   if(el) el.innerHTML = ['SOUMIS','PROBLEME'].includes(r.statut) ? pspCarte(r) : pspCarteLecture(r);
 }
 
+async function pspSupprimer(id){
+  const r = PSP.rapports.find(x => x.id === id);
+  if(!r) return;
+  const lignes = [`${r.pompiste_nom} · ${_pspDate(r.date)} · ${_PSP_LIB[r.statut] || r.statut}`,
+    ...(r.lignes||[]).map(l => `${l.pompe_nom} : ${_pspN(l.metter_avant_corrige ?? l.metter_avant)} → ${_pspN(l.metter_apres_corrige ?? l.metter_apres)}`),
+    ...((r.depenses||[]).length ? [`${r.depenses.length} dépense(s) déclarée(s), retirée(s) aussi`] : [])];
+  const motif = await demanderSuppression({titre:'Supprimer ce rapport pompiste ?',
+    texte: ['CONFIRME','RESOLU'].includes(r.statut)
+      ? 'Ce rapport est finalisé : ses relevés sortent du journal et ses dépenses des dépenses. Les pompes redeviennent libres pour ce jour.'
+      : 'Ses relevés et ses dépenses sont retirés ; les pompes redeviennent libres : le pompiste (ou vous) peut refaire le rapport.',
+    lignes, bouton:'Supprimer le rapport'});
+  if(!motif) return;
+  try{
+    await _pspApi('POST', `/rapports/${id}/supprimer`, {motif});
+    notify('Rapport supprimé : les pompes sont libres.', 'ok');
+    PSP.ouvert = null; pspChargerListe(); pspMajBadge();
+  }catch(e){ notify(e.message, 'err'); }
+}
+
 async function pspAnnuler(id){
   const r = PSP.rapports.find(x => x.id === id);
   if(!r || !confirm(`Annuler le rapport non terminé de ${r.pompiste_nom} (${_pspPer(r.periode)} ${_pspDate(r.date)}) ? Ses compteurs seront effacés et ses pompes libérées.`)) return;
@@ -20330,7 +20415,8 @@ function pspCarteLecture(r){
       <div class="psp-kpi"><span>Écart</span><b>${_pspE(r.ecart_final)}</b></div></div>
     ${billets || (r.devises||[]).length ? `<table class="psp-tbl" style="max-width:420px"><thead><tr><th>Coupure</th><th class="r">Billets</th><th class="r">Montant</th></tr></thead><tbody>${billets}
       ${r.monnaie ? `<tr><td>Monnaie</td><td></td><td class="r">${_pspG(r.monnaie)}</td></tr>` : ''}${_pspDevisesLignes(r)}</tbody></table>` : ''}
-    ${_pspDepensesHtml(r)}${_pspFeuilleHtml(r)}</div>`;
+    ${_pspDepensesHtml(r)}${_pspFeuilleHtml(r)}
+    <div class="psp-sup"><button class="psp-lien" onclick="pspSupprimer(${r.id})">🗑 Supprimer ce rapport (mal fait)</button></div></div>`;
 }
 
 // Feuille du pompiste : C = bons et chèques, D = crédits, F = crédit en caisse
@@ -20486,6 +20572,7 @@ function pspCarte(r){
          ${pb ? '' : `<button class="btn btn-danger" onclick="pspProbleme(${r.id})">⚠ Signaler un problème</button>`}
          <button class="btn btn-secondary" onclick="pspRenvoyer(${r.id})">Renvoyer au pompiste</button>
        </div>`)}
+    <div class="psp-sup"><button class="psp-lien" onclick="pspSupprimer(${r.id})">🗑 Supprimer ce rapport (mal fait)</button></div>
   </div>`;
 }
 
