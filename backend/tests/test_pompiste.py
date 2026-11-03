@@ -634,3 +634,40 @@ def test_reprise_compte_avec_code_impose(client):
     assert client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "A", "nom": "B", "username": "x y"}).status_code == 400
     t = TestClient(main.app)
     assert t.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]}).status_code == 200
+
+
+def test_feuille_bons_credits_et_credit_en_caisse(client):
+    """Feuille de la station : C = bons et chèques et D = crédits justifient des
+    ventes ; F = crédit en caisse (fonds reçu de la caisse) est retiré du cash.
+    Short / Over = (E − F) + C + D + dépenses − ventes."""
+    from tz_utils import today_haiti
+    import main as _m
+    jour = str(today_haiti())
+    pompe, diesel = _produit(client, 500), _produit(client, 600)
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Feu", "nom": "Ille"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    # Les deux carburants envoyés ensemble, comme sur la feuille : 50 000 + 12 000 G
+    r = p.post("/api/pompiste/compteurs", json={"date": jour, "charte_acceptee": True, "lignes": [
+        {"pompe_id": pompe, "metter_avant": 0, "metter_apres": 100}, {"pompe_id": diesel, "metter_avant": 0, "metter_apres": 20}]})
+    assert r.status_code == 201, r.text
+    assert "station" in p.get("/api/pompiste/contexte").json()
+    corps = {"billetterie": [{"coupure": 1000, "billets": 45}], "monnaie": 250, "heures": "06:00 – 14:00",
+             "bons": [{"reference": "Chèque BNC 0042", "montant": 10000}],
+             "credits": [{"nom": "Transport Saint-Michel", "montant": 4000}],
+             "fonds_caisse": {"nom": "Caissière Rose", "montant": 2000},
+             "depenses": [{"description": "Glace", "montant": 500, "autorise_par": "Gérant"}]}
+    for mauvais in ({"credits": [{"nom": "", "montant": 10}]}, {"bons": [{"reference": "x", "montant": -5}]},
+                    {"fonds_caisse": {"nom": "", "montant": 100}}):
+        assert p.post("/api/pompiste/terminer", json=dict(corps, **mauvais)).status_code == 400, mauvais
+    r = p.post("/api/pompiste/terminer", json=corps)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["montant_attendu"] == 62000 and d["montant_compte"] == 45250
+    assert d["totaux_feuille"] == {"bons": 10000, "credits": 4000, "fonds_caisse": 2000, "net": 12000}
+    # (45 250 − 2 000) + 10 000 + 4 000 + 500 − 62 000 = −4 250 (short)
+    assert d["ecart"] == -4250 and d["ecart_final"] == -4250
+    assert d["feuille"]["heures"] == "06:00 – 14:00" and d["feuille"]["credits"][0]["nom"] == "Transport Saint-Michel"
+    sup = client.get("/api/pompiste-supervision/rapports", headers=H).json()
+    lst = sup["rapports"] if isinstance(sup, dict) else sup
+    assert any(x["id"] == d["id"] and x["totaux_feuille"]["net"] == 12000 for x in lst)

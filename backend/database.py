@@ -392,6 +392,8 @@ def _migrate_columns():
              "ALTER TABLE rapports_pompiste ADD COLUMN total_depenses NUMERIC(14,2) NOT NULL DEFAULT 0", None),
             ("rapports_pompiste", "devises",
              "ALTER TABLE rapports_pompiste ADD COLUMN devises JSON NOT NULL DEFAULT '[]'", None),
+            ("rapports_pompiste", "feuille",
+             "ALTER TABLE rapports_pompiste ADD COLUMN feuille JSON DEFAULT NULL", None),
             ("produits", "adresse",
              "ALTER TABLE produits ADD COLUMN adresse VARCHAR(255) DEFAULT NULL", None),
             ("utilisateurs", "station_adresse",

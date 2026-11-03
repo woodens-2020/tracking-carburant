@@ -20244,12 +20244,27 @@ function pspCarteLecture(r){
         ${l.metter_avant_corrige != null ? `<tr><td colspan="5" class="psp-muted">Saisi par le pompiste : ${_pspN(l.metter_avant)} → ${_pspN(l.metter_apres)}</td></tr>` : ''}`).join('')}</tbody></table>
     <div class="psp-kpis"><div class="psp-kpi"><span>Ventes attendues</span><b>${_pspG(r.montant_attendu_final)}</b></div>
       ${(r.depenses||[]).length ? `<div class="psp-kpi"><span>Dépenses retenues</span><b>− ${_pspG(r.total_depenses_retenues)}</b></div>` : ''}
-      <div class="psp-kpi"><span>Argent compté</span><b>${_pspG(r.montant_compte)}</b></div>
+      <div class="psp-kpi"><span>Argent compté</span><b>${_pspG(r.montant_compte)}</b></div>${_pspFeuilleKpi(r)}
       <div class="psp-kpi"><span>Écart</span><b>${_pspE(r.ecart_final)}</b></div></div>
     ${billets || (r.devises||[]).length ? `<table class="psp-tbl" style="max-width:420px"><thead><tr><th>Coupure</th><th class="r">Billets</th><th class="r">Montant</th></tr></thead><tbody>${billets}
       ${r.monnaie ? `<tr><td>Monnaie</td><td></td><td class="r">${_pspG(r.monnaie)}</td></tr>` : ''}${_pspDevisesLignes(r)}</tbody></table>` : ''}
-    ${_pspDepensesHtml(r)}</div>`;
+    ${_pspDepensesHtml(r)}${_pspFeuilleHtml(r)}</div>`;
 }
+
+// Feuille du pompiste : C = bons et chèques, D = crédits, F = crédit en caisse
+function _pspFeuilleHtml(r){
+  const f = r.feuille || {}, tf = r.totaux_feuille || {};
+  if(!tf.bons && !tf.credits && !tf.fonds_caisse && !f.heures) return '';
+  const lignes = [...(f.bons||[]).map(x => ['C · Bon / chèque', x.reference || '—', x.montant]),
+                  ...(f.credits||[]).map(x => ['D · Crédit client', x.nom, x.montant]),
+                  ...(f.fonds_caisse ? [['F · Crédit en caisse', f.fonds_caisse.nom, -f.fonds_caisse.montant]] : [])];
+  return `<div class="psp-muted" style="margin:10px 0 4px;font-weight:700">Feuille du pompiste${f.heures ? ' · heures : ' + esc(f.heures) : ''}</div>
+    ${lignes.length ? `<table class="psp-tbl" style="max-width:720px"><thead><tr><th>Partie</th><th>Détail</th><th class="r">Montant</th></tr></thead><tbody>
+    ${lignes.map(([a, b, m]) => `<tr><td>${a}</td><td>${esc(b)}</td><td class="r">${m < 0 ? '− ' + _pspG(-m) : _pspG(m)}</td></tr>`).join('')}
+    <tr><td><b>C + D − F</b></td><td></td><td class="r"><b>${_pspG(tf.net)}</b></td></tr></tbody></table>` : ''}`;
+}
+const _pspFeuilleKpi = r => (r.totaux_feuille && r.totaux_feuille.net)
+  ? `<div class="psp-kpi"><span>Bons + crédits − crédit en caisse</span><b>${_pspG(r.totaux_feuille.net)}</b></div>` : '';
 
 // Dépenses payées par le pompiste et autres devises (dollars au taux du jour)
 const _PSP_DEP_LIB = {confirmee:['CONFIRME','✓ Confirmée'], refusee:['REJETE','✗ Refusée'], en_attente:['SOUMIS','À décider']};
@@ -20365,8 +20380,9 @@ function pspCarte(r){
         <div class="psp-kpi"><span>Ventes attendues</span><b>${_pspG(r.montant_attendu_final)}</b></div>
         ${(r.depenses||[]).length ? `<div class="psp-kpi"><span>Dépenses retenues</span><b>− ${_pspG(r.total_depenses_retenues)}</b></div>
         <div class="psp-kpi"><span>Argent à remettre</span><b>${_pspG(r.montant_attendu_final - r.total_depenses_retenues)}</b></div>` : ''}
-        <div class="psp-kpi"><span>Argent compté</span><b>${_pspG(r.montant_compte)}</b></div>
+        <div class="psp-kpi"><span>Argent compté</span><b>${_pspG(r.montant_compte)}</b></div>${_pspFeuilleKpi(r)}
         <div class="psp-kpi"><span>Écart</span><b>${_pspE(r.ecart_final)}</b></div></div>
+       ${_pspFeuilleHtml(r)}
        ${Math.abs(r.ecart_final - r.ecart) > 0.5 ? `<div class="psp-muted">Écart déclaré par le pompiste : ${_pspE(r.ecart)} — recalculé avec les mètres corrigés.</div>` : ''}
        <div class="psp-actions">${r.ecart_confirme
          ? `<span class="psp-ok" style="font-weight:700">✓ Écart confirmé</span> <button class="psp-lien" onclick="pspEcart(${r.id},false)">reprendre</button>`

@@ -363,6 +363,16 @@ def _total_billetterie(billetterie: list, monnaie: float) -> float:
     return round(total + float(monnaie or 0), 2)
 
 
+def _totaux_feuille(r: RapportPompiste) -> dict:
+    """C = bons et chèques, D = crédits, F = crédit en caisse (fonds reçu de
+    la caisse, à rendre) : C + D justifient des ventes, F est retiré du cash."""
+    f = r.feuille or {}
+    bons = round(sum(float(x["montant"]) for x in f.get("bons") or []), 2)
+    credits = round(sum(float(x["montant"]) for x in f.get("credits") or []), 2)
+    fonds = round(float((f.get("fonds_caisse") or {}).get("montant") or 0), 2)
+    return {"bons": bons, "credits": credits, "fonds_caisse": fonds, "net": round(bons + credits - fonds, 2)}
+
+
 def _depenses_retenues(r: RapportPompiste) -> float:
     """Dépenses qui réduisent l'argent à remettre : toutes, sauf celles que la
     direction a refusées (le pompiste doit alors cet argent)."""
@@ -409,6 +419,7 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
         "total_depenses_retenues": _depenses_retenues(r),
         "depenses_a_decider": sum(1 for x in (r.depenses or []) if (x.get("statut") or "en_attente") == "en_attente"),
         "devises": r.devises or [],
+        "feuille": r.feuille or {}, "totaux_feuille": _totaux_feuille(r),
         "montant_a_remettre": round(float(r.montant_attendu) - float(r.total_depenses or 0), 2),
         "montant_attendu": float(r.montant_attendu), "montant_compte": float(r.montant_compte),
         "ecart": float(r.ecart), "note_pompiste": r.note_pompiste,
@@ -420,8 +431,10 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
         "total_gallons": round(sum(x["gallons"] for x in lignes), 3),
         # Après corrections éventuelles du superviseur
         "montant_attendu_final": round(sum(x["montant"] for x in lignes), 2),
-        # Écart = argent compté + dépenses payées (sauf celles refusées par la direction) − ventes
-        "ecart_final": round(float(r.montant_compte) + _depenses_retenues(r) - sum(x["montant"] for x in lignes), 2),
+        # Écart = argent compté + dépenses payées (sauf celles refusées par la direction)
+        #         + bons et crédits − crédit en caisse − ventes
+        "ecart_final": round(float(r.montant_compte) + _depenses_retenues(r) + _totaux_feuille(r)["net"]
+                             - sum(x["montant"] for x in lignes), 2),
         "billetterie_confirmee": bool(r.billetterie_confirmee),
         "ecart_confirme": bool(r.ecart_confirme),
         "note_superviseur": r.note_superviseur,
@@ -529,6 +542,7 @@ def contexte(date: Optional[date_type] = None, periode: Optional[str] = None,
     return {
         "pompiste": {"id": u.id, "nom": _nom(u), "username": u.username, "station": u.station_adresse,
                      "station_nom": _nom_station_courante()},
+        "station": _fiche_station(),
         "date": str(d), "periode": periode, "aujourd_hui": str(today_haiti()),
         "date_min": str(today_haiti() - timedelta(days=JOURS_EN_ARRIERE)),
         "produits": produits, "coupures": list(COUPURES), "taille_liasse": TAILLE_LIASSE,
@@ -570,12 +584,67 @@ class DeviseIn(BaseModel):
     montant: float
 
 
+class BonIn(BaseModel):
+    reference: str = ""
+    montant: float
+
+
+class CreditIn(BaseModel):
+    nom: str
+    montant: float
+
+
+class FondsCaisseIn(BaseModel):
+    nom: str = ""
+    montant: float = 0
+
+
 class TerminerIn(BaseModel):
     billetterie: list[BilletIn] = []
     monnaie: float = 0
     note: Optional[str] = None
     depenses: list[DepensePompisteIn] = []
     devises: list[DeviseIn] = []
+    # Feuille : heures de travail, C = bons et chèques, D = crédits, F = crédit en caisse
+    heures: Optional[str] = None
+    bons: list[BonIn] = []
+    credits: list[CreditIn] = []
+    fonds_caisse: Optional[FondsCaisseIn] = None
+
+
+MAX_LIGNES_FEUILLE = 30
+MAX_MONTANT_LIGNE = 10_000_000
+
+
+def _verifier_feuille(data: "TerminerIn") -> dict:
+    """Contrôle des parties C, D et F de la feuille ; retourne ce qui est gardé."""
+    texte = lambda v, n: " ".join((v or "").split())[:n]
+    def montant(v, quoi):
+        if v is None or v != v or v <= 0 or v > MAX_MONTANT_LIGNE:
+            raise HTTPException(400, {"code": "feuille_montant", "message": f"{quoi} : montant invalide."})
+        return round(float(v), 2)
+    if len(data.bons) > MAX_LIGNES_FEUILLE or len(data.credits) > MAX_LIGNES_FEUILLE:
+        raise HTTPException(400, f"Au plus {MAX_LIGNES_FEUILLE} lignes par partie de la feuille.")
+    bons = [{"reference": texte(b.reference, 120), "montant": montant(b.montant, f"Bon / chèque {i}")}
+            for i, b in enumerate(data.bons, 1)]
+    credits = []
+    for i, c in enumerate(data.credits, 1):
+        nom = texte(c.nom, 120)
+        if len(nom) < 2:
+            raise HTTPException(400, {"code": "credit_nom", "message": f"Crédit {i} : indiquez le nom du client."})
+        credits.append({"nom": nom, "montant": montant(c.montant, f"Crédit {i}")})
+    fonds = None
+    if data.fonds_caisse and (data.fonds_caisse.montant or 0) > 0:
+        nom = texte(data.fonds_caisse.nom, 120)
+        if len(nom) < 2:
+            raise HTTPException(400, {"code": "fonds_nom",
+                                      "message": "Crédit en caisse : indiquez qui a remis l'argent."})
+        fonds = {"nom": nom, "montant": montant(data.fonds_caisse.montant, "Crédit en caisse")}
+    out = {"bons": bons, "credits": credits, "fonds_caisse": fonds}
+    heures = texte(data.heures, 40)
+    if heures:
+        out["heures"] = heures
+    return out
 
 
 DEVISES = ("USD",)
@@ -660,6 +729,22 @@ def autres_stations(request: Request, db: Session) -> list[dict]:
         out += [{"id": e.id, "nom": e.nom} for e in pdb.query(Espace).filter(Espace.actif.is_(True)).order_by(Espace.id)
                 if e.schema != courant]
     return out
+
+
+def _fiche_station() -> dict:
+    """En-tête de la feuille : nom, adresse et téléphones de la station (fiche des stations)."""
+    try:
+        from geospatial import _id_courant
+        from database import session_principale
+        from models import StationGeo
+        with session_principale() as pdb:
+            f = pdb.query(StationGeo).filter_by(station_id=_id_courant()).first()
+            if not f:
+                return {}
+            return {"adresse": f.adresse, "commune": f.commune, "telephone": f.telephone,
+                    "urgence_telephone": f.urgence_telephone}
+    except Exception:
+        return {}
 
 
 def de_ma_station(u: Utilisateur, pompe) -> bool:
@@ -940,6 +1025,7 @@ def terminer(data: TerminerIn, request: Request, u: Utilisateur = Depends(_requi
     _recalculer_attendu(rap)
     depenses = _verifier_depenses(data.depenses)
     devises = _verifier_devises(db, data.devises, rap.date)
+    rap.feuille = _verifier_feuille(data)
     rap.billetterie = billetterie
     rap.monnaie = round(data.monnaie, 2)
     rap.depenses = depenses
@@ -947,7 +1033,8 @@ def terminer(data: TerminerIn, request: Request, u: Utilisateur = Depends(_requi
     rap.devises = devises
     # Argent compté (gourdes + autres devises converties) + dépenses payées = ventes attendues
     rap.montant_compte = round(_total_billetterie(billetterie, data.monnaie) + sum(x["montant_htg"] for x in devises), 2)
-    rap.ecart = round(float(rap.montant_compte) + float(rap.total_depenses) - float(rap.montant_attendu), 2)
+    rap.ecart = round(float(rap.montant_compte) + float(rap.total_depenses) + _totaux_feuille(rap)["net"]
+                      - float(rap.montant_attendu), 2)
     rap.note_pompiste = (data.note or "").strip()[:500] or None
     rap.statut = "SOUMIS"
     rap.soumis_at = now_haiti()

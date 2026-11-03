@@ -365,6 +365,77 @@ main,.card,.deux-col > *{min-width:0}
   .total .v{font-size:19px}
 }
 }
+/* ── Feuille du pompiste : même ordre que la feuille papier de la station ── */
+.feuille{max-width:1000px;margin:0 auto}
+.fe-tete{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:22px 22px 16px;margin-bottom:14px;
+  box-shadow:var(--ombre);text-align:center;position:relative;overflow:hidden}
+.fe-tete::before{content:'';position:absolute;inset:0 0 auto 0;height:6px;background:linear-gradient(90deg,var(--accent),#f59e0b,var(--die))}
+.fe-marque{font:900 30px/1.1 Georgia,"Times New Roman",serif;letter-spacing:.03em;text-transform:uppercase}
+.fe-sous{font-weight:800;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-size:15px;margin-top:4px}
+.fe-adr{font-size:15px;color:var(--muted);margin-top:2px}
+.fe-filet{height:2px;background:var(--text);opacity:.5;margin:12px 10% 4px;border-radius:2px}
+.fe-info{display:grid;grid-template-columns:1.4fr 1fr 1.3fr;gap:12px;margin-top:12px;text-align:left}
+.fe-info>div{border-bottom:2px dashed var(--border);padding:4px 2px 6px;min-width:0}
+.fe-info small{display:block;font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.fe-info b{font-size:17px}
+.fe-date{font:inherit;font-weight:800;font-size:17px;background:none;border:0;color:var(--text);padding:0;cursor:pointer;text-align:left}
+.fe-date:not(:disabled)::after{content:' ✎';color:var(--accent)}
+.fe-heures{display:flex;gap:6px;align-items:center;font-size:14px;color:var(--muted)}
+.fe-heures input{padding:6px 8px;border-radius:10px;font-size:16px;width:auto;min-width:0;flex:1}
+.fe-sec{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:16px 18px;margin-bottom:14px;box-shadow:var(--ombre);min-width:0}
+.fe-sec-t{display:flex;align-items:center;gap:10px;font-weight:900;font-size:19px;margin-bottom:8px;flex-wrap:wrap}
+.fe-sec-t small{font-weight:600;font-size:14px;color:var(--muted);flex-basis:100%}
+.fe-l{display:inline-grid;place-items:center;min-width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;font-size:18px;padding:0 6px}
+.fe-tr{display:grid;grid-template-columns:minmax(110px,1.3fr) 1fr 1fr .8fr 1fr;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--border)}
+.fe-th{font-size:12.5px;font-weight:800;text-transform:uppercase;color:var(--muted);letter-spacing:.04em;border-bottom:2px solid var(--border)}
+.fe-th span:nth-child(n+2),.fe-v{text-align:right}
+.fe-in{padding:10px 12px;border-radius:12px;font-size:18px;text-align:right;min-width:0}
+.fe-pn{min-width:0}.fe-pn b{display:block;font-size:17px}.fe-pn small{display:block;color:var(--muted);font-size:12.5px}
+.fe-v{font-family:var(--mono);font-size:16px;font-weight:700}
+.fe-prod{margin:14px 0 2px;font-weight:900;font-size:15px;padding:4px 12px;border-radius:8px;display:inline-block;background:var(--touche)}
+.fe-prod.gaz{background:var(--gaz-soft);color:var(--gaz)}.fe-prod.die{background:var(--die-soft);color:var(--die)}
+.fe-tr.envoye{background:var(--ok-soft);border-radius:10px}
+.fe-tr.envoye .fe-pn small{color:var(--ok);font-weight:800}
+.fe-tr.prise{opacity:.5}
+.fe-tr.erreur{background:var(--err-soft);border-radius:10px}.fe-tr.erreur .fe-in{border-color:var(--err)}
+.fe-mod{font:inherit;font-size:13px;font-weight:800;border:0;background:none;color:var(--accent);padding:2px 0;cursor:pointer}
+.fe-err{margin:4px 0 8px;font-weight:800;font-size:15px;color:var(--err)}
+.fe-err.warn{color:var(--warn)}
+.fe-err label{display:flex;gap:8px;align-items:center;color:var(--text);margin:6px 0 0;font-size:15px}
+.fe-err input[type=checkbox]{width:22px;height:22px;flex:0 0 22px}
+.fe-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fe-cols>.fe-sec{margin-bottom:14px}
+.fe-ligne{display:grid;grid-template-columns:1.6fr 1fr 40px;gap:8px;margin-bottom:8px;align-items:center}
+.fe-ligne.trois{grid-template-columns:1.3fr .9fr 1fr 40px}
+.fe-ligne input{padding:10px 12px;border-radius:12px;font-size:16px;min-width:0}
+.fe-x{font:inherit;font-weight:900;border:0;border-radius:10px;height:40px;background:var(--err-soft);color:var(--err);cursor:pointer}
+.fe-aj{font:inherit;font-weight:800;font-size:15px;border:2px dashed var(--border);background:transparent;color:var(--accent);
+  border-radius:12px;padding:10px 14px;cursor:pointer;width:100%;margin-top:2px}
+.fe-ss{font-weight:800;font-size:13px;color:var(--muted);margin:12px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+.fe-bil{display:grid;grid-template-columns:96px 1fr 1fr;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)}
+.fe-bil b{font-size:18px}.fe-bil small{display:block;font-size:12px;color:var(--muted);font-weight:700}
+.fe-bil input{padding:9px 12px;border-radius:12px;font-size:17px;text-align:right;min-width:0}
+.fe-tot{display:flex;justify-content:space-between;gap:10px;padding:10px 2px 2px;font-weight:900;font-size:17px}
+.fe-tot .v{font-family:var(--mono);white-space:nowrap}
+.fe-tot.grand{font-size:20px;border-top:2px solid var(--border);margin-top:6px}
+.fe-recap .total{padding:8px 0;font-size:17px}.fe-recap .total .v{font-size:19px}
+.fe-sig{display:flex;justify-content:flex-end;margin-top:22px}
+.fe-sig div{min-width:280px;border-top:2px solid var(--text);padding-top:6px;text-align:center;font-size:14px;color:var(--muted)}
+.fe-sig b{display:block;color:var(--text);font-size:15px}
+.feuille .saisie-n{font-family:inherit;font-size:16px;font-weight:700;text-align:left;padding:10px 12px;border-width:2px;border-radius:12px;min-width:0}
+.feuille .saisie-n.num,.feuille .saisie-n[data-n]{font-family:var(--mono);text-align:right;font-size:17px}
+.feuille .saisie-n.fe-in{font-size:18px}
+.fe-guide{display:block;margin:10px auto 0;background:none;border:0;color:var(--muted);text-decoration:underline;font:inherit;font-size:15px;cursor:pointer}
+@media (max-width:760px){.fe-cols,.fe-info{grid-template-columns:1fr}}
+@media (max-width:560px){
+  .fe-th{display:none}
+  .fe-tr{grid-template-columns:1fr 1fr;grid-template-areas:"n n" "a b" "g m"}
+  .fe-tr>:nth-child(1){grid-area:n}.fe-tr>:nth-child(2){grid-area:a}.fe-tr>:nth-child(3){grid-area:b}
+  .fe-tr>:nth-child(4){grid-area:g;text-align:left}.fe-tr>:nth-child(5){grid-area:m}
+  .fe-ligne,.fe-ligne.trois{grid-template-columns:1fr 1fr}
+  .fe-ligne>:first-child{grid-column:1/-1}
+  .fe-marque{font-size:24px}
+}
 </style>
 </head>
 <body>
@@ -493,6 +564,23 @@ const TXT = {
     devise_titre:'Autres devises', usd:'Dollars américains ($)', usd_taux:'Taux : 1 $ = {t} G (fixé le {d})',
     usd_sans_taux:'Taux du dollar pas encore fixé : demandez à la direction.',
     tk_depenses:'DÉPENSES', tk_a_remettre:'Argent à remettre', tk_autorise:'autorisée par',
+    fe_phase:'Feuille du pompiste', fe_nom:'Nom et prénom', fe_date:'Date', fe_heures:'Heures', fe_a_h:'à',
+    fe_a:'Compteurs', fe_pompe:'Pompe', fe_avant:'Avant', fe_apres:'Après', fe_gallons:'Gallons', fe_total:'Total',
+    fe_b:'Vente', fe_prix:'Prix', fe_c:'Bons valeur et chèques', fe_c_ref:'N° du bon ou du chèque', fe_montant:'Montant',
+    fe_c_aj:'+ Ajouter un bon ou un chèque', fe_d:'Crédit et autre', fe_d_cli:'Client', fe_d_aj:'+ Ajouter un crédit',
+    fe_d_dep:'+ Ajouter une dépense', fe_d_credits:'Crédits clients', fe_d_depenses:'Dépenses payées', fe_desc:'Description',
+    fe_autorise:'Autorisée par', fe_e:'Cash reçu', fe_billet:'Billet', fe_qte:'Qté', fe_total_cash:'Total cash',
+    fe_f:'Crédit en caisse', fe_f_sub:'Argent remis par la caisse au début (fonds de départ) : il est retiré du cash.',
+    fe_f_nom:'Remis par (nom et prénom)', fe_f_cash:'Cash', fe_recap:'Short / Over', fe_vente_b:'Vente (B)',
+    fe_remis:'Total remis (C + D + E − F)', fe_short:'Short — il manque', fe_over:'Over — il y a en plus', fe_juste:'Juste',
+    fe_sig:'Signature autorisée', fe_sig_txt:'Signé à l’envoi par {n} · code {c}', fe_envoyer:'Envoyer ma feuille',
+    fe_guide:'Mode pas à pas (une pompe à la fois)', fe_feuille_btn:'📄 Revenir à la feuille', fe_vide:'—',
+    fe_e_incomplet:'{p} : tapez les deux index (avant et après).', fe_e_aucune:'Tapez les index d’au moins une pompe.',
+    fe_e_index:'Un index est à corriger : voir la pompe en rouge.', fe_e_bon:'Bon / chèque {i} : montant invalide.',
+    fe_e_credit:'Crédit {i} : nom du client et montant.', fe_e_dep:'Dépense {i} : description, montant et qui l’a autorisée.',
+    fe_e_fonds:'Crédit en caisse : indiquez qui a remis l’argent.', fe_confirmer_t:'Envoyer la feuille ?',
+    fe_confirmer:'Vente : <b>{b}</b><br>Remis : <b>{j}</b><br>Short / Over : <b>{e}</b>', fe_envoye_l:'envoyé',
+    fe_relu:'J’ai relu le compteur : ce début est bon', tk_feuille:'BONS, CRÉDITS, CAISSE', tk_heures:'Heures',
     jours:['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'],
     mois:['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'],
   },
@@ -588,6 +676,23 @@ const TXT = {
     devise_titre:'Lòt deviz', usd:'Dola ameriken ($)', usd_taux:'To : 1 $ = {t} G (depi {d})',
     usd_sans_taux:'Direksyon an poko mete to dola a : mande yo.',
     tk_depenses:'DEPANS', tk_a_remettre:'Lajan pou remèt', tk_autorise:'otorize pa',
+    fe_phase:'Fèy ponpis la', fe_nom:'Non ak siyati', fe_date:'Dat', fe_heures:'Lè', fe_a_h:'rive',
+    fe_a:'Kontè yo', fe_pompe:'Ponp', fe_avant:'Anvan', fe_apres:'Apre', fe_gallons:'Galon', fe_total:'Total',
+    fe_b:'Vant', fe_prix:'Pri', fe_c:'Bon valè ak chèk', fe_c_ref:'Nimewo bon an oswa chèk la', fe_montant:'Kantite lajan',
+    fe_c_aj:'+ Ajoute yon bon oswa yon chèk', fe_d:'Kredi ak lòt', fe_d_cli:'Kliyan', fe_d_aj:'+ Ajoute yon kredi',
+    fe_d_dep:'+ Ajoute yon depans', fe_d_credits:'Kredi kliyan', fe_d_depenses:'Depans ki peye', fe_desc:'Sa li ye',
+    fe_autorise:'Otorize pa', fe_e:'Kach resevwa', fe_billet:'Biyè', fe_qte:'Kantite', fe_total_cash:'Total kach',
+    fe_f:'Kredi nan kès', fe_f_sub:'Lajan kès la te ba ou lè w t ap kòmanse (fon) : yo retire l nan kach la.',
+    fe_f_nom:'Moun ki te remèt li (non ak siyati)', fe_f_cash:'Kach', fe_recap:'Short / Over', fe_vente_b:'Vant (B)',
+    fe_remis:'Total remèt (C + D + E − F)', fe_short:'Short — gen ki manke', fe_over:'Over — gen anplis', fe_juste:'Jis',
+    fe_sig:'Siyati otorize', fe_sig_txt:'Siyen lè w voye l, pa {n} · kòd {c}', fe_envoyer:'Voye fèy mwen an',
+    fe_guide:'Mòd etap pa etap (yon ponp alafwa)', fe_feuille_btn:'📄 Retounen sou fèy la', fe_vide:'—',
+    fe_e_incomplet:'{p} : tape de endèks yo (anvan ak apre).', fe_e_aucune:'Tape endèks omwen yon ponp.',
+    fe_e_index:'Gen yon endèks pou korije : gade ponp ki an wouj la.', fe_e_bon:'Bon / chèk {i} : kantite lajan an pa bon.',
+    fe_e_credit:'Kredi {i} : non kliyan an ak kantite lajan an.', fe_e_dep:'Depans {i} : sa li ye, kantite lajan ak ki moun ki otorize l.',
+    fe_e_fonds:'Kredi nan kès : di ki moun ki te remèt lajan an.', fe_confirmer_t:'Voye fèy la ?',
+    fe_confirmer:'Vant : <b>{b}</b><br>Remèt : <b>{j}</b><br>Short / Over : <b>{e}</b>', fe_envoye_l:'voye',
+    fe_relu:'Mwen reli kontè a : kòmansman sa a bon', tk_feuille:'BON, KREDI, KÈS', tk_heures:'Lè',
     jours:['dimanch','lendi','madi','mèkredi','jedi','vandredi','samdi'],
     mois:['janvye','fevriye','mas','avril','me','jen','jiyè','out','septanm','oktòb','novanm','desanm'],
   },
@@ -603,7 +708,8 @@ function reinit(){
   Object.assign(S, {ctx:null, etape:'charte', charte:false, date:null, periode:null, produitId:null,
     choisies:[], pos:0, index:{}, billets:{}, monnaie:'', note:'', erreurs:{}, dernier:null,
     champ:null, modif:null, depuisResume:false, champActif:null, caseActive:null, dernierProduit:null, _repriseFaite:false,
-    depenses:[], depForm:null, depEdit:null, usd:''});
+    depenses:[], depForm:null, depEdit:null, usd:'', bons:[], credits:[], fonds:{nom:'', montant:''}, heures:{debut:'', fin:''},
+    guide:false, depuisFeuille:false});
 }
 reinit();
 
@@ -713,7 +819,7 @@ async function chargerContexte(){
     S.ctx = await api('GET','/api/pompiste/contexte' + q);
     if(S.ctx.en_cours){
       S.date = S.ctx.date; S.periode = S.ctx.periode;
-      if(S.charte && ['charte','periode'].includes(S.etape)) S.etape = 'rapport';
+      if(S.charte && ['charte','periode'].includes(S.etape)) S.etape = S.guide ? 'rapport' : 'feuille';
     }
     if(!S.date) S.date = S.ctx.aujourd_hui;
     if(!S._repriseFaite){                     // une seule fois après la connexion
@@ -853,6 +959,8 @@ function precedent(){
   const e = S.etape;
   if(e === 'index' && S.pos > 0){ S.pos--; S.champActif = null; return rendre(); }
   if(e === 'billetterie' && S.depuisResume) return aller('resume');
+  if(e === 'feuille') return aller(enCours() ? 'charte' : 'periode');
+  if(e === 'modif' && S.depuisFeuille) return aller('feuille');
   const retour = {periode:'charte', calendrier:'periode', produit: enCours() ? 'rapport' : 'periode', pompes:'produit', index:'pompes',
                   compteurs:'index', depenses:'rapport', depense:'depenses', billetterie:'depenses', resume:'billetterie', modif:'resume'}[e];
   if(e === 'compteurs'){ S.pos = S.choisies.length - 1; S.champActif = null; }
@@ -888,7 +996,7 @@ function rendre(){
   if(!S.charte && S.etape !== 'fin') S.etape = 'charte';
   S.champ = null;
   ({charte:rCharte, periode:rPeriode, calendrier:rCalendrier, produit:rProduit, pompes:rPompes, index:rIndex, compteurs:rCompteurs,
-    rapport:rRapport, depenses:rDepenses, depense:rDepense, billetterie:rBilletterie, resume:rResume, modif:rModif, fin:rFin})[S.etape]();
+    feuille:rFeuille, rapport:rRapport, depenses:rDepenses, depense:rDepense, billetterie:rBilletterie, resume:rResume, modif:rModif, fin:rFin})[S.etape]();
   window.scrollTo(0,0);
   sauverBrouillon();
 }
@@ -905,7 +1013,7 @@ function rCharte(){
     ${enCours() ? `<div class="alerte warn">${t('commence', {j: esc(jourTxt(enCours().date))})}</div>` : ''}
     <h2>${t('derniers')}</h2><div class="card" id="hist"><span class="sub">${t('chargement')}</span></div>`;
   const maj = () => barre('', enCours() ? t('reprendre') : t('commencer'),
-    ()=>{ S.charte = true; aller(enCours() ? 'rapport' : 'periode'); }, $('c-ok').checked);
+    ()=>{ S.charte = true; aller(enCours() ? (S.guide ? 'rapport' : 'feuille') : 'periode'); }, $('c-ok').checked);
   $('c-ok').onchange = maj; maj();
   chargerHistorique();
 }
@@ -971,7 +1079,7 @@ async function choisirDate(d){
 }
 // Plus de choix matin / après-midi : le serveur range le rapport tout seul
 async function continuerDate(){
-  S.etape = 'produit';
+  S.etape = S.guide ? 'produit' : 'feuille';
   await chargerContexte();
 }
 
@@ -1185,6 +1293,8 @@ function rRapport(){
     <div class="deux-col"><div class="choix">
       ${restants.map(p => `<button class="gros ${clsProduit(p.nom)}" onclick="choisirProduit(${p.id})"><span class="ico">⛽</span>
         <span>${t('oui')}, ${esc(p.nom)}<small>${t('oui_sub', {p: esc(p.nom)})}</small></span></button>`).join('')}
+      <button class="gros" onclick="S.guide=false;aller('feuille')"><span class="ico">📄</span>
+        <span>${t('fe_feuille_btn')}<small>${t('fe_phase')}</small></span></button>
       <button class="gros on" onclick="S.depuisResume=false;aller('depenses')"><span class="ico">✔</span>
         <span>${t('non_fini')}<small>${t('non_fini_sub')}</small></span></button>
     </div>
@@ -1390,7 +1500,8 @@ function rResume(){
   barre(`${t('ecart')}<b>${signe(ec)}</b>`, t('envoyer_rapport'), terminer);
 }
 
-function modifierPompe(id){
+function modifierPompe(id, depuisFeuille){
+  S.depuisFeuille = !!depuisFeuille;
   const l = enCours().lignes.find(x => x.pompe_id === id);
   S.modif = id; S.champActif = null; delete S.erreurs[id];
   S.index[id] = {avant: String(l.metter_avant), apres: String(l.metter_apres), debutConfirme: false};
@@ -1398,12 +1509,12 @@ function modifierPompe(id){
 }
 function rModif(){
   const id = S.modif, l = enCours()?.lignes.find(x => x.pompe_id === id);
-  if(!l || !pompeCtx(id)){ S.modif = null; return aller(enCours() ? 'resume' : 'periode'); }
+  if(!l || !pompeCtx(id)){ S.modif = null; return aller(enCours() ? (S.depuisFeuille ? 'feuille' : 'resume') : 'periode'); }
   ecranIndex(id, l.prix_gallon, `<p class="sub" style="margin:0">${t('modifier_x', {p: esc(l.produit_nom)})}</p>`,
     (ok, v) => barre(ok ? `<b>${nfg(v.g)} gal</b>${t('vendus')}` : '', t('enregistrer'), async () => {
       try{
         await api('PUT', `/api/pompiste/compteurs/${id}`, {metter_avant:v.av, metter_apres:v.ap, debut_confirme:!!v.s.debutConfirme});
-        S.modif = null; S.champActif = null; S.etape = 'resume';
+        S.modif = null; S.champActif = null; S.etape = S.depuisFeuille ? 'feuille' : 'resume';
         await chargerContexte();
       }catch(e){
         S.erreurs[id] = e.detail?.erreurs?.[0] || {message: e.message}; rendre();
@@ -1433,6 +1544,289 @@ async function terminer(){
   }
 }
 
+// ── Feuille du pompiste : comme la feuille papier de la station ─────
+// A compteurs · B vente · C bons et chèques · D crédits (et dépenses) ·
+// E cash reçu · F crédit en caisse · Short / Over · signature. Les envois
+// au serveur restent les mêmes : compteurs, puis « Terminer ».
+const feEnvoyees = () => enCours()?.lignes || [];
+const feEnvoyee = id => feEnvoyees().find(l => l.pompe_id === id);
+const r2 = n => Math.round(n * 100) / 100;
+function feSaisies(){
+  const out = [];
+  for(const p of S.ctx.produits) for(const q of p.pompes){
+    if(feEnvoyee(q.id) || q.deja_rapportee) continue;
+    const s = S.index[q.id];
+    if(!s || (!s.avant && !s.apres)) continue;
+    const av = num(s.avant), ap = num(s.apres);
+    out.push({p, q, s, av, ap, complet: av != null && ap != null, g: av != null && ap != null ? ap - av : null});
+  }
+  return out;
+}
+function feVentes(){                              // gallons par produit, jamais additionnés entre produits
+  const m = new Map();
+  const ligne = (id, nom, prix) => { if(!m.has(id)) m.set(id, {nom, prix, g:0, m:0}); return m.get(id); };
+  for(const p of S.ctx.produits) ligne(p.id, p.nom, p.prix_gallon);
+  for(const l of feEnvoyees()){ const x = ligne(l.produit_id, l.produit_nom, l.prix_gallon); x.g += l.gallons; x.m += l.montant; }
+  for(const x of feSaisies()) if(x.complet && x.g >= 0){ const y = ligne(x.p.id, x.p.nom, x.p.prix_gallon); y.g += x.g; y.m += r2(x.g * x.p.prix_gallon); }
+  return [...m.values()].filter(x => x.g || x.m);
+}
+const somme = (l, k) => l.reduce((a, x) => a + (num(x[k]) || 0), 0);
+function feTotaux(){
+  const B = r2(feVentes().reduce((a, x) => a + x.m, 0)), C = r2(somme(S.bons, 'montant'));
+  const Dc = r2(somme(S.credits, 'montant')), Dd = r2(totalDepenses()), E = r2(totalCompte()), F = r2(num(S.fonds.montant) || 0);
+  const just = r2(E - F + C + Dc + Dd);
+  return {B, C, Dc, Dd, D: r2(Dc + Dd), E, F, EF: r2(E - F), just, ecart: r2(just - B)};
+}
+const feChamp = (f, v, opts = "") => `<input ${/class=/.test(opts) ? "" : `class="saisie-n"`} data-f="${f}" type="text" autocomplete="off" value="${esc(v)}" ${opts}>`;
+const feDec = v => esc(String(v ?? '').replace('.', ','));
+const lettre = (l, titre, sous) => `<div class="fe-sec-t"><span class="fe-l">${l}</span>${titre}${sous ? `<small>${sous}</small>` : ''}</div>`;
+
+function rFeuille(){
+  const c = S.ctx, st = c.station || {}, m = S.marque || {}, r = enCours(), pomp = c.pompiste || {};
+  const nomStation = pomp.station_nom || m.nom || 'KONEKTA';
+  const adresse = [st.adresse, st.commune].filter(Boolean).join(', ') || m.adresse || '';
+  const tels = [st.telephone || m.telephone1, m.telephone2].filter(Boolean).join(' / ');
+  const lignesA = c.produits.map(p => `<div class="fe-prod ${clsProduit(p.nom)}">${esc(p.nom)} · ${nf(p.prix_gallon, 2)} G/gal</div>
+    ${p.pompes.map(q => feLigneA(p, q)).join('')}`).join('');
+  $('app').innerHTML = entete(t('fe_phase')) + `<div class="feuille">
+    <div class="fe-tete">
+      <div class="fe-marque">${esc(nomStation)}</div>
+      ${m.nom && m.nom !== nomStation ? `<div class="fe-sous">${esc(m.nom)}</div>` : ''}
+      ${adresse ? `<div class="fe-adr">${esc(adresse)}</div>` : ''}
+      ${tels ? `<div class="fe-adr"><b>Tél : ${esc(tels)}</b></div>` : ''}
+      <div class="fe-filet"></div>
+      <div class="fe-info">
+        <div><small>${t('fe_nom')}</small><b>${esc(pomp.nom || '')}</b></div>
+        <div><small>${t('fe_date')}</small><button class="fe-date" onclick="aller('calendrier')" ${r ? 'disabled' : ''}>${esc(jourTxt(S.date))}</button></div>
+        <div><small>${t('fe_heures')}</small><div class="fe-heures">
+          <input type="time" data-f="heure:debut" value="${esc(S.heures.debut)}" aria-label="${t('fe_heures')}"> ${t('fe_a_h')}
+          <input type="time" data-f="heure:fin" value="${esc(S.heures.fin)}" aria-label="${t('fe_heures')}"></div></div>
+      </div>
+    </div>
+    <div id="fe-msg"></div>
+
+    <div class="fe-sec">${lettre('A', t('fe_a'))}
+      <div class="fe-tr fe-th"><span>${t('fe_pompe')}</span><span>${t('fe_avant')}</span><span>${t('fe_apres')}</span><span>${t('fe_gallons')}</span><span>${t('fe_total')}</span></div>
+      ${lignesA}</div>
+
+    <div class="fe-sec">${lettre('B', t('fe_b'))}<div id="fe-b"></div></div>
+
+    <div class="fe-cols">
+      <div class="fe-sec">${lettre('C', t('fe_c'))}
+        ${S.bons.map((x, i) => `<div class="fe-ligne">
+          ${feChamp(`bon:${i}:reference`, x.reference, `placeholder="${esc(t('fe_c_ref'))}" maxlength="120"`)}
+          ${feChamp(`bon:${i}:montant`, feDec(x.montant), `class="saisie-n num" inputmode="decimal" placeholder="${esc(t('fe_montant'))}" data-n="dec"`)}
+          <button class="fe-x" onclick="feRetirer('bons',${i})" aria-label="✕">✕</button></div>`).join('')}
+        <button class="fe-aj" onclick="feAjouter('bons')">${t('fe_c_aj')}</button>
+        <div class="fe-tot"><span>${t('fe_total')} C</span><span class="v" id="fe-tc"></span></div></div>
+
+      <div class="fe-sec">${lettre('D', t('fe_d'))}
+        ${S.credits.length ? `<div class="fe-ss">${t('fe_d_credits')}</div>` : ''}
+        ${S.credits.map((x, i) => `<div class="fe-ligne">
+          ${feChamp(`cre:${i}:nom`, x.nom, `placeholder="${esc(t('fe_d_cli'))}" maxlength="120"`)}
+          ${feChamp(`cre:${i}:montant`, feDec(x.montant), `inputmode="decimal" placeholder="${esc(t('fe_montant'))}" data-n="dec"`)}
+          <button class="fe-x" onclick="feRetirer('credits',${i})" aria-label="✕">✕</button></div>`).join('')}
+        <button class="fe-aj" onclick="feAjouter('credits')">${t('fe_d_aj')}</button>
+        ${S.depenses.length ? `<div class="fe-ss">${t('fe_d_depenses')}</div>` : ''}
+        ${S.depenses.map((x, i) => `<div class="fe-ligne trois">
+          ${feChamp(`dep:${i}:description`, x.description, `placeholder="${esc(t('fe_desc'))}" maxlength="200"`)}
+          ${feChamp(`dep:${i}:montant`, feDec(x.montant), `inputmode="decimal" placeholder="${esc(t('fe_montant'))}" data-n="dec"`)}
+          ${feChamp(`dep:${i}:autorise_par`, x.autorise_par, `placeholder="${esc(t('fe_autorise'))}" maxlength="120"`)}
+          <button class="fe-x" onclick="feRetirer('depenses',${i})" aria-label="✕">✕</button></div>`).join('')}
+        <button class="fe-aj" onclick="feAjouter('depenses')" style="margin-top:8px">${t('fe_d_dep')}</button>
+        <div class="fe-tot"><span>${t('fe_total')} D</span><span class="v" id="fe-td"></span></div></div>
+    </div>
+
+    <div class="fe-cols">
+      <div class="fe-sec">${lettre('E', t('fe_e'))}
+        <div class="fe-bil fe-th" style="border-bottom-width:2px"><span>${t('fe_billet')}</span><span style="text-align:right">${t('fe_qte')}</span><span style="text-align:right">${t('fe_total')}</span></div>
+        ${c.coupures.map(k => `<div class="fe-bil"><b>${nf(k)} ×</b>
+          ${feChamp(`bil:${k}`, S.billets[k] || '', `inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="0" data-n="int"`)}
+          <span class="fe-v" id="fe-bil-${k}"></span></div>`).join('')}
+        <div class="fe-bil"><b>${t('monnaie')}</b>${feChamp('monnaie', feDec(S.monnaie), `inputmode="decimal" maxlength="10" placeholder="0" data-n="dec"`)}<span class="fe-v" id="fe-mon"></span></div>
+        ${tauxUSD() ? `<div class="fe-bil"><b>$ US<small>1 $ = ${nf(tauxUSD(), 2)} G</small></b>
+          ${feChamp('usd', feDec(S.usd), `inputmode="decimal" maxlength="10" placeholder="0 $" data-n="dec"`)}<span class="fe-v" id="fe-usd"></span></div>` : ''}
+        <div class="fe-tot grand"><span>${t('fe_total_cash')}</span><span class="v" id="fe-te"></span></div></div>
+
+      <div class="fe-sec">${lettre('F', t('fe_f'), t('fe_f_sub'))}
+        <label>${t('fe_f_nom')}</label>${feChamp('fonds:nom', S.fonds.nom, `maxlength="120"`)}
+        <label>${t('fe_f_cash')}</label>${feChamp('fonds:montant', feDec(S.fonds.montant), `class="saisie-n num" inputmode="decimal" maxlength="12" placeholder="0" data-n="dec"`)}
+        <div class="fe-tot grand"><span>E − F</span><span class="v" id="fe-ef"></span></div></div>
+    </div>
+
+    <div class="fe-sec fe-recap">${lettre('±', t('fe_recap'))}<div id="fe-recap"></div>
+      <label for="fe-note">${t('un_mot')}</label>
+      <textarea id="fe-note" data-f="note" rows="2" maxlength="500" placeholder="${esc(t('un_mot_ph'))}">${esc(S.note)}</textarea>
+      <div class="fe-sig"><div><b>${t('fe_sig')}</b>${t('fe_sig_txt', {n: esc(pomp.nom || ''), c: esc(pomp.username || '')})}</div></div>
+    </div>
+    <button class="fe-guide" onclick="S.guide=true;aller(enCours() ? 'rapport' : 'produit')">${t('fe_guide')}</button>
+  </div>`;
+  feBrancher();
+  feMaj();
+  barre('', t('fe_envoyer'), feEnvoyer);
+  if(S.feFocus){ const el = document.querySelector(`[data-f="${S.feFocus}"]`); S.feFocus = null; if(el) setTimeout(() => el.focus(), 30); }
+}
+function feLigneA(p, q){
+  const l = feEnvoyee(q.id);
+  if(l) return `<div class="fe-tr envoye" id="fe-r-${q.id}">
+      <span class="fe-pn"><b>${esc(q.nom)}</b><small>✓ ${t('fe_envoye_l')} · <button class="fe-mod" onclick="modifierPompe(${q.id},true)">${t('modifier')}</button></small></span>
+      <span class="fe-v">${nfg(l.metter_avant)}</span><span class="fe-v">${nfg(l.metter_apres)}</span>
+      <span class="fe-v">${nfg(l.gallons)}</span><span class="fe-v">${G(l.montant)}</span></div>`;
+  const prise = q.deja_rapportee;
+  if(prise) return `<div class="fe-tr prise"><span class="fe-pn"><b>${esc(q.nom)}</b>
+      <small>${prise.moi ? t('deja_moi') : t('deja_par', {n: esc(prise.par)})}</small></span><span></span><span></span><span></span><span></span></div>`;
+  const s = S.index[q.id] || {}, e = S.erreurs[q.id], diff = e?.code === 'debut_different';
+  return `<div class="fe-tr ${e ? 'erreur' : ''}" id="fe-r-${q.id}">
+      <span class="fe-pn"><b>${esc(q.nom)}</b>${q.emplacement ? `<small>📍 ${esc(q.emplacement)}</small>` : ''}</span>
+      ${feChamp(`idx:${q.id}:avant`, feDec(s.avant), `class="saisie-n fe-in num" inputmode="decimal" maxlength="14" placeholder="${esc(t('fe_avant'))}" data-n="dec3"`)}
+      ${feChamp(`idx:${q.id}:apres`, feDec(s.apres), `class="saisie-n fe-in num" inputmode="decimal" maxlength="14" placeholder="${esc(t('fe_apres'))}" data-n="dec3"`)}
+      <span class="fe-v" id="fe-g-${q.id}"></span><span class="fe-v" id="fe-m-${q.id}"></span></div>
+    ${diff ? `<div class="fe-err warn">⚠ ${t('debut_diff')}<label><input type="checkbox" ${s.debutConfirme ? 'checked' : ''}
+        onchange="feConfirmerDebut(${q.id}, this.checked)"> ${t('fe_relu')}</label></div>`
+      : (e ? `<div class="fe-err">${esc(msgLigne(e))}</div>` : '')}`;
+}
+function feConfirmerDebut(id, oui){ (S.index[id] ||= {}).debutConfirme = oui; sauverBrouillon(); }
+function feNettoyer(el){
+  const n = el.dataset.n;
+  if(!n) return el.value;
+  if(n === 'int'){ const v = el.value.replace(/\D/g, ''); if(v !== el.value) el.value = v; return v; }
+  const dec = n === 'dec3' ? 3 : 2;
+  let v = el.value.replace(',', '.').replace(/[^0-9.]/g, '');
+  const p = v.indexOf('.'); if(p >= 0) v = v.slice(0, p + 1) + v.slice(p + 1).replace(/\./g, '').slice(0, dec);
+  const vu = v.replace('.', ','); if(vu !== el.value) el.value = vu;
+  return v;
+}
+function feEcrire(el){
+  const v = feNettoyer(el), [k, a, b] = el.dataset.f.split(':');
+  if(k === 'idx'){ const s = (S.index[a] ||= {}); s[b] = v; if(b === 'avant') s.debutConfirme = false;
+    if(S.erreurs[a]){ delete S.erreurs[a]; const r = $('fe-r-' + a); r?.classList.remove('erreur'); r?.nextElementSibling?.classList.contains('fe-err') && r.nextElementSibling.remove(); } }
+  else if(k === 'bon') S.bons[a][b] = v;
+  else if(k === 'cre') S.credits[a][b] = v;
+  else if(k === 'dep') S.depenses[a][b] = v;
+  else if(k === 'bil') S.billets[a] = v;
+  else if(k === 'monnaie') S.monnaie = v;
+  else if(k === 'usd') S.usd = v;
+  else if(k === 'fonds') S.fonds[a] = v;
+  else if(k === 'heure') S.heures[a] = v;
+  else if(k === 'note') S.note = v;
+}
+function feBrancher(){
+  const champs = [...$('app').querySelectorAll('[data-f]')];
+  champs.forEach((el, i) => {
+    el.addEventListener('input', () => { feEcrire(el); feMaj(); sauverBrouillon(); });
+    el.addEventListener('focus', () => { if(el.dataset.n) el.select(); });
+    if(el.tagName !== 'TEXTAREA') el.addEventListener('keydown', e => {
+      if(e.key !== 'Enter') return;
+      e.preventDefault();
+      const suivant = champs.slice(i + 1).find(x => x.type !== 'time');
+      if(suivant) suivant.focus(); else el.blur();
+    });
+  });
+}
+function feAjouter(liste){
+  const vide = {bons:{reference:'', montant:''}, credits:{nom:'', montant:''}, depenses:{description:'', montant:'', autorise_par:''}}[liste];
+  S[liste].push(vide);
+  S.feFocus = {bons:'bon', credits:'cre', depenses:'dep'}[liste] + ':' + (S[liste].length - 1) + ':' + Object.keys(vide)[0];
+  rendreSansHaut();
+}
+function feRetirer(liste, i){ S[liste].splice(i, 1); rendreSansHaut(); }
+function rendreSansHaut(){ const y = window.scrollY; rendre(); window.scrollTo(0, y); }
+function feMaj(){
+  for(const x of feSaisies()){
+    const g = $('fe-g-' + x.q.id), m = $('fe-m-' + x.q.id);
+    if(!g) continue;
+    g.textContent = x.complet ? (x.g < 0 ? '⚠' : nfg(x.g)) : '';
+    m.textContent = x.complet && x.g >= 0 ? G(x.g * x.p.prix_gallon) : (x.complet ? t('fin_sup') : '');
+    g.closest('.fe-tr').classList.toggle('erreur', !!(x.complet && x.g < 0) || !!S.erreurs[x.q.id]);
+  }
+  for(const p of S.ctx.produits) for(const q of p.pompes){   // ligne vidée : on efface son calcul
+    const s = S.index[q.id];
+    if((!s || (!s.avant && !s.apres)) && $('fe-g-' + q.id)){ $('fe-g-' + q.id).textContent = ''; $('fe-m-' + q.id).textContent = ''; }
+  }
+  const v = feVentes(), T = feTotaux();
+  $('fe-b').innerHTML = v.length ? `<div class="fe-tr fe-th" style="grid-template-columns:1.4fr 1fr 1fr 1.2fr"><span>${t('fe_b')}</span><span>${t('fe_gallons')}</span><span>${t('fe_prix')}</span><span>${t('fe_total')}</span></div>
+    ${v.map(x => `<div class="fe-tr" style="grid-template-columns:1.4fr 1fr 1fr 1.2fr;grid-template-areas:none">
+      <b style="grid-area:auto">${esc(x.nom)}</b><span class="fe-v" style="grid-area:auto">${nfg(x.g)}</span><span class="fe-v" style="grid-area:auto">${nf(x.prix, 2)}</span><span class="fe-v" style="grid-area:auto">${G(x.m)}</span></div>`).join('')}
+    <div class="fe-tot grand"><span>${t('fe_total')} B</span><span class="v">${G(T.B)}</span></div>`
+    : `<p class="sub" style="margin:0">${t('fe_e_aucune')}</p>`;
+  $('fe-tc').textContent = G(T.C);
+  $('fe-td').textContent = G(T.D);
+  for(const k of S.ctx.coupures){ const n = ent(S.billets[k]); $('fe-bil-' + k).textContent = n ? G(n * k) : ''; }
+  $('fe-mon').textContent = num(S.monnaie) ? G(num(S.monnaie)) : '';
+  if($('fe-usd')) $('fe-usd').textContent = num(S.usd) ? G(usdEnG()) : '';
+  $('fe-te').textContent = G(T.E);
+  $('fe-ef').textContent = G(T.EF);
+  const cls = Math.abs(T.ecart) < 1 ? 'ok' : (T.ecart < 0 ? 'neg' : 'pos');
+  const lib = Math.abs(T.ecart) < 1 ? t('fe_juste') : (T.ecart < 0 ? t('fe_short') : t('fe_over'));
+  $('fe-recap').innerHTML = `
+    <div class="total"><span>${t('fe_vente_b')}</span><span class="v">${G(T.B)}</span></div>
+    <div class="total"><span>C · ${t('fe_c')}</span><span class="v">${G(T.C)}</span></div>
+    <div class="total"><span>D · ${t('fe_d')}</span><span class="v">${G(T.D)}</span></div>
+    <div class="total"><span>E − F · ${t('fe_e')}</span><span class="v">${G(T.EF)}</span></div>
+    <div class="total" style="border-top:2px solid var(--border)"><span>${t('fe_remis')}</span><span class="v">${G(T.just)}</span></div>
+    <div class="ecart ${cls}"><span>${lib}</span><span>${signe(T.ecart)}</span></div>`;
+  $('barre-info').innerHTML = `${lib}<b>${signe(T.ecart)}</b>`;
+}
+async function feEnvoyer(){
+  const z = $('fe-msg');
+  const err = (m, el) => { z.innerHTML = `<div class="alerte err">${m}</div>`; (el || z).scrollIntoView({block:'center', behavior:'smooth'}); };
+  const sais = feSaisies(), inc = sais.find(x => !x.complet), neg = sais.find(x => x.complet && x.g < 0);
+  if(inc) return err(t('fe_e_incomplet', {p: esc(inc.q.nom)}), $('fe-r-' + inc.q.id));
+  if(neg) return err(`${esc(neg.q.nom)} : ${t('fin_sup')}`, $('fe-r-' + neg.q.id));
+  if(!sais.length && !feEnvoyees().length) return err(t('fe_e_aucune'));
+  for(const [i, x] of S.bons.entries()) if(!(num(x.montant) > 0)) return err(t('fe_e_bon', {i: i + 1}), document.querySelector(`[data-f="bon:${i}:montant"]`));
+  for(const [i, x] of S.credits.entries()) if(!(num(x.montant) > 0) || (x.nom || '').trim().length < 2)
+    return err(t('fe_e_credit', {i: i + 1}), document.querySelector(`[data-f="cre:${i}:nom"]`));
+  for(const [i, x] of S.depenses.entries()) if((x.description || '').trim().length < 3 || !(num(x.montant) > 0) || (x.autorise_par || '').trim().length < 2)
+    return err(t('fe_e_dep', {i: i + 1}), document.querySelector(`[data-f="dep:${i}:description"]`));
+  if(num(S.fonds.montant) > 0 && (S.fonds.nom || '').trim().length < 2) return err(t('fe_e_fonds'), document.querySelector('[data-f="fonds:nom"]'));
+  const T = feTotaux();
+  if(!await demander({ico:'📨', titre:t('fe_confirmer_t'), texte:t('fe_confirmer', {b:G(T.B), j:G(T.just), e:signe(T.ecart)}),
+                      oui:t('oui_envoyer_rapport'), non:t('non_retour')})) return;
+  const b = $('barre-btn'); b.disabled = true; b.textContent = t('envoi');
+  try{
+    if(sais.length){
+      try{
+        await api('POST', '/api/pompiste/compteurs', {date:S.date, periode: enCours() ? enCours().periode : null, charte_acceptee:S.charte,
+          lignes: sais.map(x => ({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap, debut_confirme:!!x.s.debutConfirme}))});
+      }catch(e){
+        if(e.status === 422 && e.detail?.erreurs){
+          S.erreurs = {}; for(const x of e.detail.erreurs) S.erreurs[x.pompe_id] = x;
+          rendre(); err(t('fe_e_index'), $('fe-r-' + e.detail.erreurs[0].pompe_id));
+          return;
+        }
+        throw e;
+      }
+      for(const x of sais) delete S.index[x.q.id];
+      S.erreurs = {};
+      S.ctx = await api('GET', '/api/pompiste/contexte?date=' + S.date);
+    }
+    const h = [S.heures.debut, S.heures.fin].filter(Boolean).join(' – ');
+    S.dernier = await api('POST', '/api/pompiste/terminer', {
+      billetterie: S.ctx.coupures.map(c => ({coupure:c, liasses:0, billets:ent(S.billets[c])})).filter(x => x.billets),
+      monnaie: num(S.monnaie) || 0, note: S.note || null, heures: h || null,
+      depenses: S.depenses.map(x => ({description: x.description.trim(), montant: num(x.montant), autorise_par: x.autorise_par.trim()})),
+      devises: num(S.usd) ? [{devise: 'USD', montant: num(S.usd)}] : [],
+      bons: S.bons.map(x => ({reference: (x.reference || '').trim(), montant: num(x.montant)})),
+      credits: S.credits.map(x => ({nom: x.nom.trim(), montant: num(x.montant)})),
+      fonds_caisse: num(S.fonds.montant) > 0 ? {nom: S.fonds.nom.trim(), montant: num(S.fonds.montant)} : null});
+    effacerBrouillon();
+    aller('fin');
+  }catch(e){
+    if(e.status === 401) return ecranConnexion(t('session'));
+    rendre();
+    err(msgErreur(e));
+  }
+}
+function feTicket(r, L){
+  const f = r.feuille || {}, tf = r.totaux_feuille || {};
+  if(!tf.bons && !tf.credits && !tf.fonds_caisse) return '';
+  return `<div class="sep"></div><div class="b">${t('tk_feuille')}</div>
+    ${(f.bons || []).map(x => L(`C · ${esc(x.reference || t('fe_c'))}`, G(x.montant))).join('')}
+    ${(f.credits || []).map(x => L(`D · ${esc(x.nom)}`, G(x.montant))).join('')}
+    ${f.fonds_caisse ? L(`F · ${esc(f.fonds_caisse.nom)}`, '− ' + G(f.fonds_caisse.montant)) : ''}`;
+}
+
 // ── Envoyé ──────────────────────────────────────────────────────────
 function rFin(){
   const r = S.dernier;
@@ -1448,6 +1842,9 @@ function rFin(){
       ${r.total_depenses ? `<div class="total"><span>${t('dep_total')}</span><span class="v">− ${G(r.total_depenses)}</span></div>
       <div class="total"><span>${t('a_remettre')}</span><span class="v">${G(r.montant_a_remettre)}</span></div>` : ''}
       <div class="total"><span>${t('compte')}</span><span class="v">${G(r.montant_compte)}</span></div>
+      ${r.totaux_feuille?.bons ? `<div class="total"><span>C · ${t('fe_c')}</span><span class="v">${G(r.totaux_feuille.bons)}</span></div>` : ''}
+      ${r.totaux_feuille?.credits ? `<div class="total"><span>D · ${t('fe_d_credits')}</span><span class="v">${G(r.totaux_feuille.credits)}</span></div>` : ''}
+      ${r.totaux_feuille?.fonds_caisse ? `<div class="total"><span>F · ${t('fe_f')}</span><span class="v">− ${G(r.totaux_feuille.fonds_caisse)}</span></div>` : ''}
       <div class="total"><span>${t('ecart')}</span><span class="v">${signe(r.ecart)}</span></div></div>
     <button class="btn btn-print" onclick="imprimerTicket(S.dernier)">🖨 ${t('imprimer')}</button>
     <div class="papier">${t('papier')} : ${['58','80'].map(l => `<button data-l="${l}" class="${PAPIER===l?'on':''}" onclick="choisirPapier('${l}')">${l} mm</button>`).join('')}</div>
@@ -1485,6 +1882,7 @@ function ticketHtml(r){
     <div class="i">${t('tk_code')} : ${esc(pomp.username || '')}</div>
     <div class="i">${t('date_rapport')} : ${esc(jourTxt(r.date))}</div>
     ${r.soumis_at ? `<div class="i">${t('tk_soumis')} : ${quand(r.soumis_at)}</div>` : ''}
+    ${r.feuille?.heures ? `<div class="i">${t('tk_heures')} : ${esc(r.feuille.heures)}</div>` : ''}
     <div class="sep"></div>
     <div class="b">${t('tk_compteurs')}</div>
     ${Object.entries(parProduit).map(([nom, ls]) => `<div class="b">${esc(nom).toUpperCase()}</div>
@@ -1503,6 +1901,7 @@ function ticketHtml(r){
     ${r.monnaie ? L(t('monnaie'), G(r.monnaie)) : ''}
     ${(r.devises || []).map(x => L(`${nf(x.montant, 2)} $ × ${nf(x.taux, 2)}`, G(x.montant_htg))).join('')}
     ${L(`<b>${t('tk_compte')}</b>`, `<b>${G(r.montant_compte)}</b>`)}
+    ${feTicket(r, L)}
     ${(r.depenses || []).length ? `<div class="sep"></div><div class="b">${t('tk_depenses')}</div>
       ${r.depenses.map(x => `<div>${esc(x.description)}</div>${L(`<span class="i">${t('tk_autorise')} ${esc(x.autorise_par)}</span>`, G(x.montant))}`).join('')}
       ${L(`<b>${t('dep_total')}</b>`, `<b>${G(r.total_depenses)}</b>`)}
@@ -1613,7 +2012,7 @@ function flash(msg){ const el = $('note-flash'); el.textContent = msg; el.classL
 // Sortie involontaire, retour arrière, coupure, déconnexion automatique :
 // à la reconnexion du même pompiste, il reprend là où il était.
 const CHAMPS_BROUILLON = ['etape','charte','date','periode','produitId','choisies','pos','index','billets','monnaie','note','depuisResume','modif','dernierProduit',
-                          'depenses','depForm','depEdit','usd'];
+                          'depenses','depForm','depEdit','usd','bons','credits','fonds','heures','guide','depuisFeuille'];
 const cleBrouillon = () => S.ctx?.pompiste?.username ? 'ponpis-brouillon-' + S.ctx.pompiste.username : null;
 function sauverBrouillon(){
   const k = cleBrouillon(); if(!k || S.etape === 'fin' || S.etape === 'charte') return;
@@ -1630,14 +2029,19 @@ function restaurerBrouillon(){
   // Trop ancien, ou le rapport a changé ailleurs (terminé, annulé…) : on repart proprement
   if(Date.now() - b.t > 12 * 3600_000 || (b.enCours || null) !== enCoursId){ effacerBrouillon(); return false; }
   for(const c of CHAMPS_BROUILLON) if(b[c] !== undefined) S[c] = b[c];
-  if(!['periode','calendrier','produit','pompes','index','compteurs','rapport','depenses','depense','billetterie','resume','modif'].includes(S.etape)) S.etape = 'periode';
+  if(!['feuille','periode','calendrier','produit','pompes','index','compteurs','rapport','depenses','depense','billetterie','resume','modif'].includes(S.etape)) S.etape = 'periode';
+  if(!Array.isArray(S.bons)) S.bons = [];
+  if(!Array.isArray(S.credits)) S.credits = [];
+  if(!S.fonds) S.fonds = {nom:'', montant:''};
+  if(!S.heures) S.heures = {debut:'', fin:''};
   if(S.etape === 'modif' && !S.modif) S.etape = 'resume';
   if(S.etape === 'depense' && !S.depForm) S.etape = 'depenses';
   if(!Array.isArray(S.depenses)) S.depenses = [];
   S.charte = true; S.champActif = null; S.caseActive = null;
   return true;
 }
-const aDesDonnees = () => !!(enCours() || indexSaisis() || Object.values(S.billets).some(Boolean) || S.monnaie || S.note);
+const aDesDonnees = () => !!(enCours() || indexSaisis() || Object.values(S.billets).some(Boolean) || S.monnaie || S.note
+  || S.bons.length || S.credits.length || num(S.fonds.montant));
 
 // ── Bouton retour d'Android / du navigateur ─────────────────────────
 // Il ramène à l'étape précédente au lieu de fermer l'application ; sur un

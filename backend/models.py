@@ -271,6 +271,10 @@ class RapportPompiste(Base):
     total_depenses     = Column(Numeric(14, 2), nullable=False, default=0)
     # Autres devises comptées : [{"devise": "USD", "montant", "taux", "montant_htg"}]
     devises            = Column(JSON, nullable=False, default=list)
+    # Feuille du pompiste (comme la feuille papier de la station) :
+    # {"heures": "06:00 – 14:00", "bons": [{"reference", "montant"}] (C = bons valeur et chèques),
+    #  "credits": [{"nom", "montant"}] (D = crédits), "fonds_caisse": {"nom", "montant"} (F = crédit en caisse)}
+    feuille            = Column(JSON, nullable=True)
     soumis_at          = Column(DateTime(timezone=True), nullable=True)   # au « Terminer »
     traite_par_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     traite_at          = Column(DateTime(timezone=True), nullable=True)

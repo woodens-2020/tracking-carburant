@@ -586,6 +586,7 @@ def startup():
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS depenses JSON NOT NULL DEFAULT '[]'::json",
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS total_depenses NUMERIC(14,2) NOT NULL DEFAULT 0",
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS devises JSON NOT NULL DEFAULT '[]'::json",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS feuille JSON",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
         "ALTER TABLE produits ADD COLUMN IF NOT EXISTS adresse VARCHAR(255)",
         "ALTER TABLE achats ADD COLUMN IF NOT EXISTS saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
