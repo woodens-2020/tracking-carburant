@@ -628,6 +628,23 @@ canvas{display:block}
 .hm-src.pompiste{background:rgba(167,139,250,.15);color:#a78bfa}
 .hm-vide{text-align:center;color:var(--muted);padding:40px 10px}
 .hm-plus{display:block;margin:12px auto 0}
+.hm-sep{flex:1}
+.hm-vues{display:inline-flex;border:1px solid var(--border);border-radius:999px;padding:2px;gap:2px}
+.hm-vues button{border:0!important;padding:4px 11px!important}
+.hm-q{font:inherit;font-size:13px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:999px;padding:5px 12px;min-width:200px}
+.hm-q:focus{outline:none;border-color:var(--orange)}
+.hm-trouve{font-size:12.5px;color:var(--orange);font-weight:700;margin:0 0 8px}
+.hm-rel mark,.hm-apres mark{background:rgba(249,115,22,.3);color:inherit;border-radius:4px;padding:0 2px}
+.hm-apres{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.hm-ap-l{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border);border-left:4px solid #22c55e}
+.hm-ap-l:last-child{border-bottom:0}
+.hm-ap-l.alerte{border-left-color:#f59e0b}.hm-ap-l.erreur{border-left-color:#ef4444}.hm-ap-l.attente{border-left-color:#a78bfa}
+.hm-ap-l span{display:flex;align-items:center;gap:8px;font-size:13.5px}.hm-ap-l small{color:var(--muted)}
+.hm-ap-l b{font-family:var(--mono);font-size:18px;text-align:right}
+.hm-ap-l .hm-ap-qui{justify-content:flex-end;color:var(--muted);font-size:12.5px}
+.hm-ap-th{border-left-color:transparent;background:var(--panel2,transparent);font-size:11px!important;text-transform:uppercase;letter-spacing:.04em}
+.hm-ap-th span{font-size:11px!important;font-weight:800;color:var(--muted)}.hm-ap-th span:nth-child(n+2){justify-content:flex-end}
+@media (max-width:720px){.hm-sep{display:none}.hm-q{flex:1 1 100%;min-width:0}.hm-ap-l{grid-template-columns:1fr auto}.hm-ap-l .hm-ap-qui{grid-column:1 / -1;justify-content:flex-start}}
 .hm-legende{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin:-4px 0 12px}
 .hm-legende span{display:inline-flex;align-items:center;gap:6px}
 /* Un relevé = une carte : Début → Fin, puis ce qui a été vendu */
@@ -17146,7 +17163,7 @@ function prepareConfirm(periode){
 }
 
 // ── Historique des mètres d'une pompe : tous les relevés passés ─────────
-const HM = {pompe:null, nom:'', produit:'', jours:90, lignes:[], vus:50};
+const HM = {pompe:null, nom:'', produit:'', jours:90, lignes:[], vus:50, vue:'tout', q:''};
 const _HM_PERIODES = [[30,'30 jours'],[90,'3 mois'],[365,'12 mois'],[0,'Tout']];
 function _hmTrouver(id){
   for(const p of products||[]) for(const q of p.pompes||[]) if(q.id===id) return {nom:q.nom, produit:p.nom, emplacement:q.emplacement};
@@ -17170,11 +17187,22 @@ async function hmOuvrir(id){
 }
 function _hmEchap(e){ if(e.key==='Escape' && !document.getElementById('sup-ov')) hmFermer(); }
 function hmFermer(){ document.getElementById('hm-ov')?.remove(); document.removeEventListener('keydown', _hmEchap); }
+function hmVue(v){
+  HM.vue=v; HM.vus=50;
+  document.querySelectorAll('.hm-vues button').forEach(b=>b.classList.toggle('on', b.textContent.includes(v==='apres'?'après':'complets')));
+  hmRendre();
+}
 async function hmPeriode(j){ HM.jours=j; HM.vus=50; await hmCharger(); }
 async function hmCharger(){
   const f=document.getElementById('hm-filtres'), c=document.getElementById('hm-corps');
   if(!f) return;
-  f.innerHTML=_HM_PERIODES.map(([j,l])=>`<button class="${HM.jours===j?'on':''}" onclick="hmPeriode(${j})">${l}</button>`).join('');
+  f.innerHTML=_HM_PERIODES.map(([j,l])=>`<button class="${HM.jours===j?'on':''}" onclick="hmPeriode(${j})">${l}</button>`).join('')
+    + `<span class="hm-sep"></span>
+      <span class="hm-vues" role="group" aria-label="Affichage">
+        <button class="${HM.vue==='tout'?'on':''}" onclick="hmVue('tout')">Relevés complets</button>
+        <button class="${HM.vue==='apres'?'on':''}" onclick="hmVue('apres')">Mètres après seulement</button></span>
+      <input id="hm-q" class="hm-q" type="search" inputmode="decimal" placeholder="🔎 Chercher un index (ex. 1573)" value="${esc(HM.q)}"
+        oninput="HM.q=this.value;HM.vus=50;hmRendre()">`;
   c.innerHTML='<div class="hm-vide">Chargement…</div>';
   const fin=new Date(), debut=new Date();
   if(HM.jours) debut.setDate(debut.getDate()-HM.jours+1); else debut.setFullYear(2000,0,1);
@@ -17194,7 +17222,12 @@ function hmRendre(){
   const anomalies=ok.filter(e=>e.statut!=='ok').length, dernier=ok[0];
   const idx=v=>v==null?'—':Number(v).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3});
   const per=p=>p==='Matin'?'Matin':(p==='Apres-midi'?'Après-midi':p);
-  const vus=L.slice(0, HM.vus);
+  // Recherche d'un index : chiffres tapés, avec ou sans espace / virgule
+  const q=(HM.q||'').replace(/[\s.]/g,'').replace(',', '.');
+  const brut=v=>Number(v).toFixed(3), trouves=q ? L.filter(e=>(HM.vue==='apres' ? [e.metter_apres] : [e.metter_avant, e.metter_apres]).some(v=>brut(v).includes(q))) : L;
+  const vus=trouves.slice(0, HM.vus);
+  const surligne=t=>{ if(!q) return t; const nu=t.replace(/[\s  ]/g,''), i=nu.replace(',', '.').indexOf(q);
+    return i<0 ? t : `<mark>${t}</mark>`; };
   // Liste du plus récent au plus ancien : entre une carte et la suivante (plus
   // ancienne), on compare son « Début » à la « Fin » de la précédente.
   const lien=(recent, ancien)=>{
@@ -17214,9 +17247,9 @@ function hmRendre(){
       <div class="hm-rel-tete"><span class="hm-st ${st}"></span><b>${frDate(e.date)}</b><span class="hm-per">${per(e.periode)}</span>
         <span class="hm-qui">${e.pompiste_nom?`⛽ ${esc(e.pompiste_nom)}`:'<span>Pompiste non indiqué</span>'}${src}</span></div>
       <div class="hm-compteur">
-        <div class="hm-idx"><small>Début · mètre avant</small><b>${idx(e.metter_avant)}</b><em>index au départ</em></div>
+        <div class="hm-idx"><small>Début · mètre avant</small><b>${surligne(idx(e.metter_avant))}</b><em>index au départ</em></div>
         <div class="hm-fleche" aria-hidden="true">→</div>
-        <div class="hm-idx"><small>Fin · mètre après</small><b>${idx(e.metter_apres)}</b><em>index à la fin</em></div>
+        <div class="hm-idx"><small>Fin · mètre après</small><b>${surligne(idx(e.metter_apres))}</b><em>index à la fin</em></div>
         <div class="hm-fleche hm-egal" aria-hidden="true">=</div>
         <div class="hm-vendu"><small>Vendu</small><b>${fmtGal(e.quantite)}</b><span>${fmtG(e.montant_vente)} · ${fmtNum(e.prix_gallon,2)} G/gal</span></div>
       </div></div>`;
@@ -17232,8 +17265,14 @@ function hmRendre(){
     <div class="hm-legende"><span><i class="hm-st"></i>Correct</span><span><i class="hm-st alerte"></i>Saut</span>
       <span><i class="hm-st erreur"></i>Erreur</span><span><i class="hm-st attente"></i>Rapport à confirmer</span>
       <span>Vendu = Fin − Début</span></div>
-    ${vus.map((e,i)=>carte(e) + lien(e, L[i+1])).join('')}
-    ${L.length>HM.vus?`<button class="btn btn-secondary hm-plus" onclick="HM.vus+=50;hmRendre()">Voir plus (${L.length-HM.vus} restants)</button>`:''}`;
+    ${trouves.length===L.length?'':`<div class="hm-trouve">${trouves.length} relevé${trouves.length>1?'s':''} pour « ${esc(HM.q)} »</div>`}
+    ${!trouves.length?`<div class="hm-vide">Aucun index ne contient « ${esc(HM.q)} ».</div>`
+      : HM.vue==='apres'
+      ? `<div class="hm-apres"><div class="hm-ap-l hm-ap-th"><span>Date</span><span>Mètre après (fin)</span><span>Pompiste</span></div>
+          ${vus.map(e=>`<div class="hm-ap-l ${e.en_attente?'attente':e.statut}"><span><i class="hm-st ${e.en_attente?'attente':e.statut}"></i>${frDate(e.date)} <small>${per(e.periode)}</small></span>
+            <b>${surligne(idx(e.metter_apres))}</b><span class="hm-ap-qui">${e.pompiste_nom?esc(e.pompiste_nom):'—'}</span></div>`).join('')}</div>`
+      : vus.map((e,i)=>carte(e) + (HM.q ? '' : lien(e, L[i+1]))).join('')}
+    ${trouves.length>HM.vus?`<button class="btn btn-secondary hm-plus" onclick="HM.vus+=50;hmRendre()">Voir plus (${trouves.length-HM.vus} restants)</button>`:''}`;
 }
 
 // Supprimer des relevés mal saisis : la place est libérée pour une nouvelle saisie
