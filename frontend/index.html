@@ -602,6 +602,47 @@ canvas{display:block}
 .psp-sup{display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)}
 .psp-sup .psp-lien{color:var(--muted)}.psp-sup .psp-lien:hover{color:#ef4444}
 .sx-origine{color:#a78bfa}
+/* Historique des mètres d'une pompe */
+.hm-btn{display:inline-flex;align-items:center;gap:5px;background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);
+  cursor:pointer;font:inherit;font-size:12px;font-weight:600;padding:3px 8px;margin-top:6px}
+.hm-btn:hover{color:var(--text);border-color:var(--orange)}
+.hm-ov{position:fixed;inset:0;z-index:2147482000;background:rgba(2,6,23,.62);display:flex;justify-content:flex-end;animation:sup-in .15s ease}
+.hm-panneau{background:var(--card,#0f172a);color:var(--text);width:min(980px,100%);height:100%;display:flex;flex-direction:column;
+  border-left:1px solid var(--border);box-shadow:-20px 0 60px rgba(0,0,0,.35);animation:hm-glisse .25s cubic-bezier(.2,.8,.2,1)}
+@keyframes hm-glisse{from{transform:translateX(40px);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.hm-panneau,.hm-ov{animation:none}}
+.hm-tete{display:flex;align-items:flex-start;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border)}
+.hm-tete h3{margin:0;font-size:18px}.hm-tete small{color:var(--muted);font-size:12.5px}
+.hm-fermer{margin-left:auto;background:none;border:1px solid var(--border);border-radius:9px;color:var(--text);cursor:pointer;width:34px;height:34px;font-size:15px}
+.hm-filtres{display:flex;gap:6px;flex-wrap:wrap;padding:10px 18px;border-bottom:1px solid var(--border)}
+.hm-filtres button{background:none;border:1px solid var(--border);border-radius:999px;color:var(--muted);cursor:pointer;font:inherit;font-size:12.5px;font-weight:700;padding:5px 12px}
+.hm-filtres button.on{background:var(--orange);border-color:var(--orange);color:#fff}
+.hm-corps{flex:1;overflow:auto;padding:14px 18px 22px}
+.hm-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px}
+.hm-kpi{border:1px solid var(--border);border-radius:10px;padding:9px 12px}
+.hm-kpi span{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.hm-kpi b{font-family:var(--mono);font-size:16px}
+.hm-table{width:100%;border-collapse:collapse;font-size:13px}
+.hm-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:6px 8px;border-bottom:2px solid var(--border);position:sticky;top:-14px;background:var(--card,#0f172a)}
+.hm-table td{padding:8px;border-bottom:1px solid var(--border);vertical-align:top}
+.hm-table .r{text-align:right;font-family:var(--mono);white-space:nowrap}
+.hm-table tr.attente td{opacity:.7;font-style:italic}
+.hm-st{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:#22c55e}
+.hm-st.alerte{background:#f59e0b}.hm-st.erreur{background:#ef4444}.hm-st.attente{background:#a78bfa}
+.hm-src{display:inline-block;white-space:nowrap;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--border);color:var(--muted)}
+.hm-src.pompiste{background:rgba(167,139,250,.15);color:#a78bfa}
+.hm-note{color:var(--muted);font-size:11.5px;margin-top:2px}
+.hm-vide{text-align:center;color:var(--muted);padding:40px 10px}
+.hm-plus{display:block;margin:12px auto 0}
+@media (max-width:720px){
+  .hm-table thead{display:none}
+  .hm-table,.hm-table tbody,.hm-table tr,.hm-table td{display:block;width:100%}
+  .hm-table tr{border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:8px}
+  .hm-table td{border:0;padding:3px 0;display:flex;justify-content:space-between;gap:10px;text-align:right}
+  .hm-table td::before{content:attr(data-l);color:var(--muted);font-size:11.5px;font-weight:700;text-align:left}
+  .hm-table td.hm-quand{font-weight:700;font-size:14px}.hm-table td.hm-quand::before{content:none}
+  .hm-panneau{width:100%}
+}
 .sx-chip-attente{background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.35)}
 .sx-pompe.sx-attente{opacity:.85;border-style:dashed}
 .per-nb[hidden]{display:none!important}
@@ -16202,6 +16243,7 @@ function renderSaisie(){
         <div class="sx-nom">${esc(po.nom)}</div>
         <div class="row-badge">${statut}</div>
         ${origine}${saisiPar}${pompisteInfo}
+        <button type="button" class="hm-btn" title="Tous les mètres passés de ${esc(po.nom)}" onclick="hmOuvrir(${po.id})">🕘 Historique</button>
       </div>
       <div class="sx-field">
         <label for="sx-av-${po.id}">Mètre avant</label>
@@ -17089,6 +17131,82 @@ function prepareConfirm(periode){
   document.getElementById('modal-confirm').classList.remove('hidden');
 }
 
+// ── Historique des mètres d'une pompe : tous les relevés passés ─────────
+const HM = {pompe:null, nom:'', produit:'', jours:90, lignes:[], vus:50};
+const _HM_PERIODES = [[30,'30 jours'],[90,'3 mois'],[365,'12 mois'],[0,'Tout']];
+function _hmTrouver(id){
+  for(const p of products||[]) for(const q of p.pompes||[]) if(q.id===id) return {nom:q.nom, produit:p.nom, emplacement:q.emplacement};
+  return {nom:'Pompe', produit:'', emplacement:null};
+}
+async function hmOuvrir(id){
+  const q=_hmTrouver(id);
+  Object.assign(HM, {pompe:id, nom:q.nom, produit:q.produit, emplacement:q.emplacement, lignes:[], vus:50});
+  document.getElementById('hm-ov')?.remove();
+  const ov=document.createElement('div');
+  ov.id='hm-ov'; ov.className='hm-ov'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true'); ov.setAttribute('aria-label','Historique des mètres');
+  ov.innerHTML=`<div class="hm-panneau">
+    <div class="hm-tete"><div><h3>🕘 ${esc(q.nom)}</h3><small>${esc([q.produit, q.emplacement].filter(Boolean).join(' · '))} — tous les mètres passés</small></div>
+      <button class="hm-fermer" onclick="hmFermer()" aria-label="Fermer">✕</button></div>
+    <div class="hm-filtres" id="hm-filtres"></div>
+    <div class="hm-corps" id="hm-corps"><div class="hm-vide">Chargement…</div></div></div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e=>{ if(e.target===ov) hmFermer(); });
+  document.addEventListener('keydown', _hmEchap);
+  await hmCharger();
+}
+function _hmEchap(e){ if(e.key==='Escape' && !document.getElementById('sup-ov')) hmFermer(); }
+function hmFermer(){ document.getElementById('hm-ov')?.remove(); document.removeEventListener('keydown', _hmEchap); }
+async function hmPeriode(j){ HM.jours=j; HM.vus=50; await hmCharger(); }
+async function hmCharger(){
+  const f=document.getElementById('hm-filtres'), c=document.getElementById('hm-corps');
+  if(!f) return;
+  f.innerHTML=_HM_PERIODES.map(([j,l])=>`<button class="${HM.jours===j?'on':''}" onclick="hmPeriode(${j})">${l}</button>`).join('');
+  c.innerHTML='<div class="hm-vide">Chargement…</div>';
+  const fin=new Date(), debut=new Date();
+  if(HM.jours) debut.setDate(debut.getDate()-HM.jours+1); else debut.setFullYear(2000,0,1);
+  const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  try{
+    const j=await GET(`/journal?pompe_id=${HM.pompe}&date_debut=${iso(debut)}&date_fin=${iso(fin)}`);
+    const rang={Matin:0,'Apres-midi':1};
+    HM.lignes=(j.entries||[]).slice().sort((a,b)=>b.date.localeCompare(a.date) || (rang[b.periode]??9)-(rang[a.periode]??9));
+  }catch(e){ c.innerHTML=`<div class="hm-vide">${esc(e.message)}</div>`; return; }
+  hmRendre();
+}
+function hmRendre(){
+  const c=document.getElementById('hm-corps'); if(!c) return;
+  const L=HM.lignes, ok=L.filter(e=>!e.en_attente);
+  if(!L.length){ c.innerHTML=`<div class="hm-vide">Aucun relevé pour ${esc(HM.nom)} sur cette période.</div>`; return; }
+  const gal=ok.reduce((a,e)=>a+(e.quantite||0),0), mnt=ok.reduce((a,e)=>a+(e.montant_vente||0),0);
+  const anomalies=ok.filter(e=>e.statut!=='ok').length, dernier=ok[0];
+  const per=p=>p==='Matin'?'Matin':(p==='Apres-midi'?'Après-midi':p);
+  const lignes=L.slice(0, HM.vus).map(e=>{
+    const st=e.en_attente?'attente':e.statut;
+    const src=e.source==='pompiste'
+      ? `<span class="hm-src pompiste">📨 Rapport n°${e.rapport_pompiste_id}${e.en_attente?' · en attente':''}</span>`
+      : `<span class="hm-src">✍ Saisie</span>`;
+    const note=e.statut!=='ok' && e.commentaire ? `<div class="hm-note">${esc(e.commentaire)}</div>` : '';
+    return `<tr class="${e.en_attente?'attente':''}">
+      <td class="hm-quand"><span class="hm-st ${st}" title="${esc(e.en_attente?'Rapport en attente de confirmation':(e.statut==='ok'?'Continuité correcte':e.commentaire||''))}"></span>${frDate(e.date)} · ${per(e.periode)}${note}</td>
+      <td class="r" data-l="Avant">${fmtNum(e.metter_avant,3)}</td>
+      <td class="r" data-l="Après">${fmtNum(e.metter_apres,3)}</td>
+      <td class="r" data-l="Gallons">${fmtGal(e.quantite)}</td>
+      <td class="r" data-l="Montant">${fmtG(e.montant_vente)}</td>
+      <td data-l="Pompiste">${e.pompiste_nom?esc(e.pompiste_nom):'<span class="c-dim">—</span>'}</td>
+      <td data-l="Source">${src}</td></tr>`;
+  }).join('');
+  c.innerHTML=`
+    <div class="hm-kpis">
+      <div class="hm-kpi"><span>Relevés</span><b>${ok.length}</b></div>
+      <div class="hm-kpi"><span>Gallons · ${esc(HM.produit)}</span><b>${fmtGal(gal)}</b></div>
+      <div class="hm-kpi"><span>Ventes</span><b>${fmtG(mnt)}</b></div>
+      <div class="hm-kpi"><span>Dernier index</span><b>${dernier?fmtNum(dernier.metter_apres,3):'—'}</b></div>
+      <div class="hm-kpi"><span>Anomalies</span><b style="color:${anomalies?'#f59e0b':'inherit'}">${anomalies}</b></div>
+    </div>
+    <table class="hm-table"><thead><tr><th>Date</th><th class="r">Avant</th><th class="r">Après</th><th class="r">Gallons</th><th class="r">Montant</th><th>Pompiste</th><th>Source</th></tr></thead>
+      <tbody>${lignes}</tbody></table>
+    ${L.length>HM.vus?`<button class="btn btn-secondary hm-plus" onclick="HM.vus+=50;hmRendre()">Voir plus (${L.length-HM.vus} restants)</button>`:''}`;
+}
+
 // Supprimer des relevés mal saisis : la place est libérée pour une nouvelle saisie
 async function sxSupprimer(ids){
   const lignes=ids.map(id=>releves.find(r=>r.id===id)).filter(Boolean).map(r=>{
@@ -17790,6 +17908,7 @@ async function _gestPompes(){
     : `<div class="gp-m ${_gpCls(m.produit_nom)}" draggable="true" data-m="${m.id}" title="Glissez vers une autre pompe">
         <span class="gp-poignee" aria-hidden="true">⠿</span>
         <span class="gp-mn"><b>${esc(m.nom)}</b><small>${esc(m.produit_nom)}</small></span>
+        <button class="gp-ic" title="Historique des mètres" onclick="hmOuvrir(${m.id})">🕘</button>
         <button class="gp-ic" title="Renommer" onclick="_GEST.edit='m${m.id}';renderModalList()">✏️</button>
         ${vers(m, ici)}</div>`;
   el.innerHTML=`
