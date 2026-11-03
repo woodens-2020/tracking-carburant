@@ -581,6 +581,114 @@ canvas{display:block}
 .sx-nom{font-size:17px;font-weight:800;color:var(--text);margin-bottom:6px}
 .sx-meta{font-size:12px;color:var(--muted);margin-top:4px}
 .sx-pompiste{cursor:pointer;color:var(--teal,#2dd4bf)}
+.sup-ov{position:fixed;inset:0;z-index:2147483000;background:rgba(2,6,23,.6);display:grid;place-items:center;padding:16px;animation:sup-in .15s ease}
+@keyframes sup-in{from{opacity:0}to{opacity:1}}
+.sup-boite{background:var(--card,#0f172a);color:var(--text);border:1px solid var(--border);border-radius:14px;max-width:460px;width:100%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.sup-ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:rgba(239,68,68,.15);font-size:22px;margin-bottom:8px}
+.sup-boite h3{margin:0 0 6px;font-size:17px}.sup-boite p{margin:0 0 10px;color:var(--muted);font-size:13.5px}
+.sup-liste{margin:0 0 12px;padding:8px 12px 8px 26px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.25);border-radius:10px;font-size:13px;max-height:180px;overflow:auto}
+.sup-boite label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:4px}
+.sup-boite input{width:100%}.sup-err{color:#ef4444;font-size:12.5px;min-height:16px;margin-top:4px}
+.sup-act{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.sx-btn-sup{background:none;border:1px solid transparent;border-radius:8px;color:var(--muted);cursor:pointer;font-size:13px;padding:4px 8px}
+.sx-btn-sup:hover{border-color:rgba(239,68,68,.4);color:#ef4444}
+.sx-sup-tout{display:flex;justify-content:flex-end;margin:-4px 0 12px}
+.sx-sup-tout button{background:none;border:0;color:var(--muted);font-size:12.5px;cursor:pointer;text-decoration:underline dotted}
+.sx-sup-tout button:hover{color:#ef4444}
+.psp-sup{display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)}
+.psp-sup .psp-lien{color:var(--muted)}.psp-sup .psp-lien:hover{color:#ef4444}
+.sx-origine{color:#a78bfa}
+.jr-crayon{background:none;border:1px solid transparent;border-radius:8px;cursor:pointer;font-size:14px;padding:3px 6px;line-height:1}
+.jr-crayon:hover{border-color:var(--orange);background:rgba(249,115,22,.1)}
+.jc-grille{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:end;margin:8px 0}
+.jc-grille label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px}
+.jc-grille input{width:100%;font-family:var(--mono);font-size:18px;text-align:right}
+.jc-fleche{padding-bottom:10px;color:var(--muted);font-size:18px}
+.jc-calc{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px;padding:8px 10px;border-radius:9px;background:var(--bg);border:1px solid var(--border);margin-bottom:8px}
+.jc-calc b{font-family:var(--mono)}.jc-ok{color:#22c55e}.jc-saut{color:#f59e0b}.jc-ko{color:#ef4444}
+.sup-boite .jc-motif{margin-top:6px}
+/* Historique des mètres d'une pompe */
+.hm-btn{display:inline-flex;align-items:center;gap:5px;background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);
+  cursor:pointer;font:inherit;font-size:12px;font-weight:600;padding:3px 8px;margin-top:6px}
+.hm-btn:hover{color:var(--text);border-color:var(--orange)}
+.hm-ov{position:fixed;inset:0;z-index:2147482000;background:rgba(2,6,23,.62);display:flex;justify-content:flex-end;animation:sup-in .15s ease}
+.hm-panneau{background:var(--card,#0f172a);color:var(--text);width:min(980px,100%);height:100%;display:flex;flex-direction:column;
+  border-left:1px solid var(--border);box-shadow:-20px 0 60px rgba(0,0,0,.35);animation:hm-glisse .25s cubic-bezier(.2,.8,.2,1)}
+@keyframes hm-glisse{from{transform:translateX(40px);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.hm-panneau,.hm-ov{animation:none}}
+.hm-tete{display:flex;align-items:flex-start;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border)}
+.hm-tete h3{margin:0;font-size:18px}.hm-tete small{color:var(--muted);font-size:12.5px}
+.hm-fermer{margin-left:auto;background:none;border:1px solid var(--border);border-radius:9px;color:var(--text);cursor:pointer;width:34px;height:34px;font-size:15px}
+.hm-filtres{display:flex;gap:6px;flex-wrap:wrap;padding:10px 18px;border-bottom:1px solid var(--border)}
+.hm-filtres button{background:none;border:1px solid var(--border);border-radius:999px;color:var(--muted);cursor:pointer;font:inherit;font-size:12.5px;font-weight:700;padding:5px 12px}
+.hm-filtres button.on{background:var(--orange);border-color:var(--orange);color:#fff}
+.hm-corps{flex:1;overflow:auto;padding:14px 18px 22px}
+.hm-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px}
+.hm-kpi{border:1px solid var(--border);border-radius:10px;padding:9px 12px}
+.hm-kpi span{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.hm-kpi b{font-family:var(--mono);font-size:16px}
+.hm-st{display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;flex:0 0 10px}
+.hm-st.alerte{background:#f59e0b}.hm-st.erreur{background:#ef4444}.hm-st.attente{background:#a78bfa}
+.hm-src{display:inline-block;white-space:nowrap;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--border);color:var(--muted)}
+.hm-src.pompiste{background:rgba(167,139,250,.15);color:#a78bfa}
+.hm-vide{text-align:center;color:var(--muted);padding:40px 10px}
+.hm-plus{display:block;margin:12px auto 0}
+.hm-sep{flex:1}
+.hm-vues{display:inline-flex;border:1px solid var(--border);border-radius:999px;padding:2px;gap:2px}
+.hm-vues button{border:0!important;padding:4px 11px!important}
+.hm-q{font:inherit;font-size:13px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:999px;padding:5px 12px;min-width:200px}
+.hm-q:focus{outline:none;border-color:var(--orange)}
+.hm-trouve{font-size:12.5px;color:var(--orange);font-weight:700;margin:0 0 8px}
+.hm-rel mark,.hm-apres mark{background:rgba(249,115,22,.3);color:inherit;border-radius:4px;padding:0 2px}
+.hm-apres{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.hm-ap-l{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border);border-left:4px solid #22c55e}
+.hm-ap-l:last-child{border-bottom:0}
+.hm-ap-l.alerte{border-left-color:#f59e0b}.hm-ap-l.erreur{border-left-color:#ef4444}.hm-ap-l.attente{border-left-color:#a78bfa}
+.hm-ap-l span{display:flex;align-items:center;gap:8px;font-size:13.5px}.hm-ap-l small{color:var(--muted)}
+.hm-ap-l b{font-family:var(--mono);font-size:18px;text-align:right}
+.hm-ap-l .hm-ap-qui{justify-content:flex-end;color:var(--muted);font-size:12.5px}
+.hm-ap-th{border-left-color:transparent;background:var(--panel2,transparent);font-size:11px!important;text-transform:uppercase;letter-spacing:.04em}
+.hm-ap-th span{font-size:11px!important;font-weight:800;color:var(--muted)}.hm-ap-th span:nth-child(n+2){justify-content:flex-end}
+@media (max-width:720px){.hm-sep{display:none}.hm-q{flex:1 1 100%;min-width:0}.hm-ap-l{grid-template-columns:1fr auto}.hm-ap-l .hm-ap-qui{grid-column:1 / -1;justify-content:flex-start}}
+.hm-legende{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin:-4px 0 12px}
+.hm-legende span{display:inline-flex;align-items:center;gap:6px}
+/* Un relevé = une carte : Début → Fin, puis ce qui a été vendu */
+.hm-rel{border:1px solid var(--border);border-left:4px solid #22c55e;border-radius:12px;padding:12px 14px;background:var(--panel,transparent)}
+.hm-rel.alerte{border-left-color:#f59e0b}.hm-rel.erreur{border-left-color:#ef4444}.hm-rel.attente{border-left-color:#a78bfa;opacity:.85}
+.hm-rel-tete{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.hm-rel-tete b{font-size:14.5px}.hm-rel-tete .hm-per{font-size:12px;color:var(--muted);font-weight:600}
+.hm-rel-tete .hm-qui{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.hm-compteur{display:grid;grid-template-columns:1fr auto 1fr auto minmax(150px,1.1fr);gap:10px;align-items:stretch}
+.hm-idx{border:1px solid var(--border);border-radius:10px;padding:8px 12px;background:var(--bg)}
+.hm-idx small{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.hm-idx b{display:block;font-family:var(--mono);font-size:19px;letter-spacing:.01em;margin-top:2px;white-space:nowrap}
+.hm-idx em{display:block;font-style:normal;font-size:11px;color:var(--muted)}
+.hm-fleche{display:grid;place-items:center;color:var(--muted);font-size:20px}
+.hm-vendu{border-radius:10px;padding:8px 12px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3)}
+.hm-vendu small{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--orange)}
+.hm-vendu b{display:block;font-family:var(--mono);font-size:19px;white-space:nowrap}
+.hm-vendu span{display:block;font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+/* Entre deux relevés : le compteur reprend-il là où il s'était arrêté ? */
+.hm-lien{display:flex;align-items:center;gap:8px;margin:0 0 0 22px;padding:6px 0 6px 14px;border-left:2px dashed var(--border);font-size:12px;color:var(--muted)}
+.hm-lien.ok{color:#22c55e}.hm-lien.saut{color:#f59e0b;font-weight:700}.hm-lien.recul{color:#ef4444;font-weight:700}
+@media (max-width:720px){
+  .hm-panneau{width:100%}
+  .hm-compteur{grid-template-columns:1fr auto 1fr}
+  .hm-compteur .hm-egal{display:none}
+  .hm-vendu{grid-column:1 / -1;display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .hm-idx b,.hm-vendu b{font-size:17px}
+  .hm-rel-tete .hm-qui{margin-left:0;width:100%}
+}
+.sx-chip-attente{background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.35)}
+.sx-pompe.sx-attente{opacity:.85;border-style:dashed}
+.per-nb[hidden]{display:none!important}
+.per-nb{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--orange);color:#fff;font-size:11.5px;font-weight:800}
+.sx-qui{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px;padding:10px 14px;border:1px solid var(--border);
+  border-left:4px solid var(--orange);border-radius:10px;background:var(--panel2,transparent)}
+.sx-qui label{font-weight:700;font-size:14px}
+.sx-qui select{min-width:240px;max-width:100%;height:36px}
+.sx-qui-aide{font-size:12.5px;color:var(--muted)}
+.sx-qui.choisi{border-left-color:var(--teal,#2dd4bf)}
 .sx-pompiste-vide{color:var(--muted);text-decoration:underline dotted}
 .sx-field label{display:block;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
 .sx-pompe .sx-inp{width:100%;max-width:none;min-width:0;box-sizing:border-box;font-family:var(--mono);font-size:16px;padding:10px 12px;text-align:right}
@@ -16690,8 +16798,10 @@ async function jrRouvrirResolution(id){
   catch(e){ notify(e.message,'err'); }
 }
 
+let _JR_ENTRIES=[];
 function renderJournal(data){
   const {entries,resume}=data;
+  _JR_ENTRIES=entries;
   const taux=resume.taux_conformite??100;
   const tauxCol=taux>=99?'var(--green)':taux>=90?'var(--blue)':'var(--red)';
 
@@ -16823,6 +16933,7 @@ function renderJournal(data){
         ${e.en_attente
           ?`<div class="jres-pied" style="color:var(--muted)">⏳ Rapport pompiste pas encore finalisé : l'écart pourra être résolu après la validation.</div>`
           :`<div class="jres-pied" id="jres-pied-${e.id}">
+              <button class="btn btn-primary btn-sm" onclick="jrCorriger(${e.id})">✏️ Corriger le mètre</button>
               <button class="btn btn-secondary btn-sm" onclick="jrOuvrirResolution(${e.id})">✓ Marquer comme résolu</button>
             </div>`}
       </div>`;
@@ -16879,6 +16990,8 @@ function renderJournal(data){
       <td class="tr num c-amber">${fmtG(e.montant_vente)}</td>
       <td><span class="type-pill ${pillCls}">${typeLabel}</span></td>
       <td>${statHtml}</td>
+      <td class="tr">${!e.en_attente && typeof e.id==='number'
+        ? `<button class="jr-crayon" title="Corriger le mètre avant / après" aria-label="Corriger ${esc(e.pompe_nom)} du ${frDate(e.date)}" onclick="jrCorriger(${e.id})">✏️</button>` : ''}</td>
     </tr>`;
   }).join('');
 
@@ -16898,7 +17011,7 @@ function renderJournal(data){
           <th class="tr">Meter avant</th><th class="tr">Meter après</th>
           <th class="tr">Attendu</th><th class="tr">Décalage</th>
           <th class="tr">Qté (gal)</th><th class="tr">Montant (G)</th>
-          <th>Type</th><th>Statut</th>
+          <th>Type</th><th>Statut</th><th class="tr" title="Corriger un mètre">✏️</th>
         </tr></thead>
         <tbody>${rows}</tbody>
         <tfoot>
@@ -16912,7 +17025,7 @@ function renderJournal(data){
             <td class="tr num c-amber" style="padding:10px 14px;font-size:16px;font-weight:900">
               ${fmtG(totalMontant)}
             </td>
-            <td colspan="2"></td>
+            <td colspan="3"></td>
           </tr>
         </tfoot>
       </table>
@@ -18067,6 +18180,93 @@ function _closeConfirm(result){
   const overlay = document.getElementById('gi-confirm-overlay');
   if(overlay) overlay.classList.remove('show');
   if(_confirmResolve){ _confirmResolve(result); _confirmResolve=null; }
+}
+
+// Suppression d'un relevé / d'un rapport mal saisi : on montre ce qui part,
+// on demande le motif (gardé au journal d'audit). Retourne le motif ou null.
+function demanderSuppression({titre, texte, lignes=[], bouton='Supprimer'}){
+  return new Promise(res => {
+    document.getElementById('sup-ov')?.remove();
+    const ov=document.createElement('div');
+    ov.id='sup-ov'; ov.className='sup-ov'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
+    ov.innerHTML=`<div class="sup-boite">
+      <div class="sup-ico">🗑</div><h3>${esc(titre)}</h3><p>${esc(texte)}</p>
+      ${lignes.length?`<ul class="sup-liste">${lignes.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:''}
+      <label for="sup-motif">Pourquoi ? (obligatoire)</label>
+      <input id="sup-motif" class="filter-input" maxlength="300" placeholder="Ex. index mal tapé, mauvais jour, rapport en double…">
+      <div class="sup-err" id="sup-err"></div>
+      <div class="sup-act"><button class="btn btn-secondary" id="sup-non">Annuler</button><button class="btn btn-danger" id="sup-oui">${esc(bouton)}</button></div></div>`;
+    document.body.appendChild(ov);
+    const fin=v=>{ ov.remove(); res(v); };
+    const ok=()=>{ const m=document.getElementById('sup-motif').value.trim();
+      if(m.length<5){ document.getElementById('sup-err').textContent='Indiquez le motif (5 caractères minimum).'; document.getElementById('sup-motif').focus(); return; }
+      fin(m); };
+    document.getElementById('sup-non').onclick=()=>fin(null);
+    document.getElementById('sup-oui').onclick=ok;
+    ov.addEventListener('click', e=>{ if(e.target===ov) fin(null); });
+    const inp=document.getElementById('sup-motif');
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter') ok(); if(e.key==='Escape') fin(null); });
+    setTimeout(()=>inp.focus(), 30);
+  });
+}
+
+// Journal Meters : corriger rapidement un mètre (✏️)
+function jrCorriger(id){
+  const e=_JR_ENTRIES.find(x=>x.id===id); if(!e) return;
+  document.getElementById('sup-ov')?.remove();
+  const ov=document.createElement('div');
+  ov.id='sup-ov'; ov.className='sup-ov'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
+  const f3=v=>v==null?'—':Number(v).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3});
+  const per=e.periode==='Matin'?'Matin':'Après-midi';
+  ov.innerHTML=`<div class="sup-boite">
+    <div class="sup-ico" style="background:rgba(249,115,22,.15)">✏️</div>
+    <h3>Corriger ${esc(e.pompe_nom)}</h3>
+    <p>${frDate(e.date)} · ${per}${e.pompiste_nom?' · ⛽ '+esc(e.pompiste_nom):''}${e.metter_attendu!=null?` — fin du relevé précédent : <b>${f3(e.metter_attendu)}</b>`:''}</p>
+    <div class="jc-grille">
+      <div><label for="jc-av">Début · mètre avant</label><input id="jc-av" class="filter-input" inputmode="decimal" value="${e.metter_avant}"></div>
+      <div class="jc-fleche">→</div>
+      <div><label for="jc-ap">Fin · mètre après</label><input id="jc-ap" class="filter-input" inputmode="decimal" value="${e.metter_apres}"></div>
+    </div>
+    <div class="jc-calc" id="jc-calc"></div>
+    <div id="jc-motif-zone" hidden><label for="jc-motif">Motif de l’écart avec le relevé précédent (obligatoire)</label>
+      <input id="jc-motif" class="filter-input jc-motif" maxlength="255" value="${esc(e.motif_saisie||'')}" placeholder="Ex. essai de la pompe, compteur remis à zéro…"></div>
+    <div class="sup-err" id="sup-err"></div>
+    <div class="sup-act"><button class="btn btn-secondary" id="jc-non">Annuler</button><button class="btn btn-primary" id="jc-oui">Enregistrer la correction</button></div></div>`;
+  document.body.appendChild(ov);
+  const num=v=>{ const x=parseFloat(String(v).replace(/\s/g,'').replace(',','.')); return isNaN(x)?null:x; };
+  const maj=()=>{
+    const av=num(document.getElementById('jc-av').value), ap=num(document.getElementById('jc-ap').value), z=document.getElementById('jc-calc');
+    const ecart=(av!=null && e.metter_attendu!=null) ? Math.round((av-e.metter_attendu)*1e4)/1e4 : 0;
+    document.getElementById('jc-motif-zone').hidden=Math.abs(ecart)<=0.001;
+    if(av==null||ap==null){ z.innerHTML='<span class="jc-ko">Tapez les deux index.</span>'; return; }
+    const g=ap-av;
+    z.innerHTML=`<span>Vendu : <b class="${g<0?'jc-ko':''}">${g<0?'impossible (fin < début)':fmtGal(g)}</b>${g>=0?` · ${fmtG(g*e.prix_gallon)}`:''}</span>
+      <span class="${Math.abs(ecart)<=0.001?'jc-ok':(ecart>0?'jc-saut':'jc-ko')}">${e.metter_attendu==null?'Première lecture':(Math.abs(ecart)<=0.001?'✓ Reprend exactement':`Écart ${ecart>0?'+':''}${f3(ecart)} gal`)}</span>`;
+  };
+  const fin=()=>ov.remove();
+  const ok=async()=>{
+    const av=num(document.getElementById('jc-av').value), ap=num(document.getElementById('jc-ap').value), err=document.getElementById('sup-err');
+    if(av==null||ap==null){ err.textContent='Tapez les deux index.'; return; }
+    if(ap<av){ err.textContent='La fin doit être supérieure ou égale au début.'; return; }
+    const zone=document.getElementById('jc-motif-zone'), motif=document.getElementById('jc-motif').value.trim();
+    if(!zone.hidden && motif.length<5){ err.textContent='Indiquez le motif de l’écart (5 caractères minimum).'; document.getElementById('jc-motif').focus(); return; }
+    const b=document.getElementById('jc-oui'); b.disabled=true; b.textContent='Enregistrement…';
+    try{
+      const r=await POST('/releves',{date:e.date, periode:e.periode, pompe_id:e.pompe_id, prix_gallon:e.prix_gallon,
+        metter_avant:av, metter_apres:ap, motif_ecart_compteur:zone.hidden?null:motif});
+      fin();
+      toast(`${e.pompe_nom} du ${frDate(e.date)} corrigé : ${f3(av)} → ${f3(ap)}.`,'ok');
+      (r.avertissements||[]).forEach(m=>toast(m, m.startsWith('✓')?'ok':'inf'));
+      await loadJournal();
+    }catch(x){ b.disabled=false; b.textContent='Enregistrer la correction'; err.textContent=String(x.message).replace(/^\[\d+\]\s*/,''); }
+  };
+  ['jc-av','jc-ap','jc-motif'].forEach(i=>{ const el=document.getElementById(i);
+    el.addEventListener('input', maj); el.addEventListener('keydown', k=>{ if(k.key==='Enter') ok(); if(k.key==='Escape') fin(); }); });
+  document.getElementById('jc-non').onclick=fin;
+  document.getElementById('jc-oui').onclick=ok;
+  ov.addEventListener('click', k=>{ if(k.target===ov) fin(); });
+  maj();
+  setTimeout(()=>{ const a=document.getElementById('jc-ap'); a.focus(); a.select(); }, 30);
 }
 
 function showConfirm(msg, opts={}){
