@@ -671,3 +671,15 @@ def test_feuille_bons_credits_et_credit_en_caisse(client):
     sup = client.get("/api/pompiste-supervision/rapports", headers=H).json()
     lst = sup["rapports"] if isinstance(sup, dict) else sup
     assert any(x["id"] == d["id"] and x["totaux_feuille"]["net"] == 12000 for x in lst)
+
+
+def test_doublon_inactif_cache_de_la_saisie(client):
+    """Deux comptes pour la même personne : le doublon désactivé et jamais
+    utilisé n'apparaît pas ; un pompiste parti sans doublon reste proposé."""
+    a = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Rose", "nom": "Doublon"}).json()
+    b = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "rose", "nom": "doublon"}).json()
+    assert client.patch(f"/api/pompiste-supervision/comptes/{b['id']}", headers=H, json={"actif": False}).status_code == 200
+    seul = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Parti", "nom": "Sansdoublon"}).json()
+    client.patch(f"/api/pompiste-supervision/comptes/{seul['id']}", headers=H, json={"actif": False})
+    noms = [p["nom"].lower() for p in client.get("/api/pompistes?inclure_inactifs=true", headers=H).json()]
+    assert noms.count("rose doublon") == 1 and "parti sansdoublon" in noms

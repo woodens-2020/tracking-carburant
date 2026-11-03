@@ -2893,6 +2893,19 @@ def lister_pompistes(inclure_inactifs: bool = False, db: Session = Depends(get_d
         e for e in q.order_by(Employe.nom, Employe.prenom).all()
         if (e.poste or "").strip().lower() == "pompiste" or e.id in lies
     ]
+    if inclure_inactifs:
+        # Un pompiste parti reste proposé (rapports anciens saisis à la main),
+        # sauf le doublon : fiche inactive, jamais utilisée, au même nom
+        # qu'un pompiste actif — c'est le même pompiste.
+        import unicodedata
+        from models import RapportPompiste
+        cle = lambda e: " ".join(sorted(unicodedata.normalize("NFKD", f"{e.prenom} {e.nom}").encode("ascii", "ignore")
+                                        .decode().lower().split()))
+        actifs = {cle(e) for e in emps if e.actif}
+        avec_releves = {i for (i,) in db.query(Releve.pompiste_id).filter(Releve.pompiste_id.isnot(None)).distinct()}
+        avec_rapports = {i for (i,) in db.query(RapportPompiste.utilisateur_id).distinct()}
+        emps = [e for e in emps if e.actif or cle(e) not in actifs or e.id in avec_releves
+                or (e.utilisateur_id and e.utilisateur_id in avec_rapports)]
     return [{"id": e.id, "nom": f"{e.prenom} {e.nom}", "actif": e.actif} for e in emps]
 
 
