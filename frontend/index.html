@@ -3407,6 +3407,8 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .gest-ligne{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .gest-pompe{border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden}
 .gest-pompe-tete{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--panel2);border-bottom:1px solid var(--border);font-size:15px}
+.gest-metres{padding:8px 12px 10px;display:flex;flex-direction:column;gap:4px}
+.gest-metres-act{display:flex;flex-direction:column;gap:6px;margin-top:4px}
 .gest-faces{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;padding:10px 12px}
 .gest-face{border:1px dashed var(--border);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:4px}
 .gest-face-tete{display:flex;align-items:center;gap:6px;font-size:13.5px;margin-bottom:2px}
@@ -13002,7 +13004,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 
     <div class="gest-onglets">
       <button id="gest-o-produits" class="on" onclick="gestOnglet('produits')">Produits &amp; mètres</button>
-      <button id="gest-o-pompes" onclick="gestOnglet('pompes')">Pompes &amp; faces</button>
+      <button id="gest-o-pompes" onclick="gestOnglet('pompes')">Pompes</button>
       <button id="gest-o-fiches" onclick="gestOnglet('fiches')">Fiches des stations</button>
       <button id="gest-o-station" onclick="gestOnglet('station')">Enregistrer une station</button>
     </div>
@@ -17631,7 +17633,7 @@ function gestOnglet(v){
   renderModalList();
 }
 
-// ── Pompes physiques : Pompe 1 › Face A › mètres (Gazoline 1, Diesel 1…) ──
+// ── Pompes physiques : Pompe 1 › mètres (Gazoline 1, Gazoline 2, Diesel 1…) ──
 async function _gestPompes(){
   const el=document.getElementById('modal-list');
   let d;
@@ -17641,13 +17643,12 @@ async function _gestPompes(){
   const optProduits=products.map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
   const optSans=sans.map(m=>`<option value="${m.id}">${esc(m.nom)} (${esc(m.produit_nom)})</option>`).join('');
   el.innerHTML=`
-    <div class="gest-explic">Une <b>pompe</b> a des <b>faces</b> (A, B) ; chaque face porte ses <b>mètres</b> (pistolets), chacun pour un produit.
-      Ex. : Pompe 1 › Face A › Gazoline 1, Gazoline 2, Diesel 1.</div>
+    <div class="gest-explic">Chaque <b>pompe</b> porte ses <b>mètres</b> (pistolets), chacun pour un produit.
+      Ex. : Pompe 1 › Gazoline 1, Gazoline 2, Diesel 1.</div>
     <div class="gest-ligne">
-      <input id="gd-nom" class="filter-input" placeholder="Nouvelle pompe (ex. Pompe 1)" maxlength="100" style="flex:1;min-width:150px">
+      <input id="gd-nom" class="filter-input" placeholder="Nouvelle pompe (ex. Pompe 3)" maxlength="100" style="flex:1;min-width:150px">
       <input id="gd-adresse" class="filter-input" placeholder="Adresse de la station" maxlength="255" style="flex:2;min-width:180px" list="gd-adresses">
       <datalist id="gd-adresses">${[...new Set(d.distributeurs.map(x=>x.adresse).filter(Boolean))].map(a=>`<option value="${esc(a)}">`).join('')}</datalist>
-      <input id="gd-faces" class="filter-input" value="A, B" title="Faces, séparées par des virgules" style="width:110px">
       <button class="btn btn-primary" style="height:34px" onclick="gestCreerPompe()">+ Créer la pompe</button>
     </div>
     ${d.distributeurs.length ? d.distributeurs.map(p=>`
@@ -17657,54 +17658,48 @@ async function _gestPompes(){
             ? `<input id="ge-d-${p.id}" class="filter-input" value="${esc(p.nom)}" maxlength="100" style="flex:1" onkeydown="if(event.key==='Enter')gestRenommer('d',${p.id})">
                <input id="ge-da-${p.id}" class="filter-input" value="${esc(p.adresse||'')}" maxlength="255" placeholder="Adresse de la station" style="flex:2" list="gd-adresses" onkeydown="if(event.key==='Enter')gestRenommer('d',${p.id})">
                <button class="btn btn-primary psp-mini" onclick="gestRenommer('d',${p.id})">OK</button><button class="btn-ghost" onclick="_GEST.edit=null;renderModalList()">Annuler</button>`
-            : `<b>⛽ ${esc(p.nom)}</b><span class="gest-adr">${p.adresse ? '📍 ' + esc(p.adresse) : '<span style="color:var(--orange)">Adresse de la station à ajouter (✏️)</span>'}</span><span style="flex:1"></span>
+            : `<b>⛽ ${esc(p.nom)}</b><span class="gest-adr">${p.adresse ? '📍 ' + esc(p.adresse) : '<span style="color:var(--orange)">Adresse de la station à ajouter (✏️)</span>'}</span>
+               <span class="c-dim" style="font-size:12.5px">${p.metres.length} mètre${p.metres.length>1?'s':''}</span><span style="flex:1"></span>
                <button class="btn-ghost" title="Modifier la pompe (nom, adresse)" onclick="_GEST.edit='d${p.id}';renderModalList()">✏️</button>
-               <button class="btn btn-secondary psp-mini" onclick="gestAjouterFace(${p.id})">+ Face</button>
                <button class="btn-ghost" title="Supprimer la pompe" onclick="gestSupprimer('distributeurs',${p.id},'${esc(p.nom)}')">✕</button>`}
         </div>
-        <div class="gest-faces">${p.faces.map(f=>`
-          <div class="gest-face">
-            <div class="gest-face-tete">${_GEST.edit==='f'+f.id
-              ? `<input id="ge-f-${f.id}" class="filter-input" value="${esc(f.nom)}" maxlength="50" style="flex:1" onkeydown="if(event.key==='Enter')gestRenommer('f',${f.id})">
-                 <button class="btn btn-primary psp-mini" onclick="gestRenommer('f',${f.id})">OK</button>`
-              : `<b>Face ${esc(f.nom)}</b><span style="flex:1"></span>
-                 <button class="btn-ghost" title="Renommer la face" onclick="_GEST.edit='f${f.id}';renderModalList()">✏️</button>
-                 <button class="btn-ghost" title="Supprimer la face" onclick="gestSupprimer('faces',${f.id},'Face ${esc(f.nom)}')">✕</button>`}</div>
-            ${f.metres.length ? f.metres.map(m=>`<div class="gest-metre"><span><b>${esc(m.nom)}</b> <small>${esc(m.produit_nom)}</small></span>
-                <button class="btn-ghost" title="Retirer de cette face" onclick="gestPlacer(${m.id},0)">✕</button></div>`).join('')
-              : '<div class="c-dim" style="font-size:12.5px;padding:4px 0">Aucun mètre.</div>'}
-            ${sans.length ? `<select class="filter-input gest-sel" onchange="if(this.value)gestPlacer(parseInt(this.value,10),${f.id})">
+        <div class="gest-metres">
+          ${p.metres.length ? p.metres.map(m=>`<div class="gest-metre"><span><b>${esc(m.nom)}</b> <small>${esc(m.produit_nom)}</small></span>
+              <button class="btn-ghost" title="Retirer de cette pompe" onclick="gestPlacer(${m.id},0)">✕</button></div>`).join('')
+            : '<div class="c-dim" style="font-size:12.5px;padding:4px 0">Aucun mètre.</div>'}
+          <div class="gest-metres-act">
+            ${sans.length ? `<select class="filter-input gest-sel" onchange="if(this.value)gestPlacer(parseInt(this.value,10),${p.id})">
                 <option value="">+ Placer un mètre existant…</option>${optSans}</select>` : ''}
-            ${_GEST.nouveauMetre===f.id
-              ? `<div class="gest-nouveau-metre"><select id="gm-prod-${f.id}" class="filter-input">${optProduits}</select>
-                  <input id="gm-nom-${f.id}" class="filter-input" placeholder="Nom du mètre (ex. Gazoline 3)" maxlength="100" onkeydown="if(event.key==='Enter')gestNouveauMetre(${f.id})">
-                  <div style="display:flex;gap:6px"><button class="btn btn-primary psp-mini" onclick="gestNouveauMetre(${f.id})">Ajouter</button>
+            ${_GEST.nouveauMetre===p.id
+              ? `<div class="gest-nouveau-metre"><select id="gm-prod-${p.id}" class="filter-input">${optProduits}</select>
+                  <input id="gm-nom-${p.id}" class="filter-input" placeholder="Nom du mètre (ex. Gazoline 3)" maxlength="100" onkeydown="if(event.key==='Enter')gestNouveauMetre(${p.id})">
+                  <div style="display:flex;gap:6px"><button class="btn btn-primary psp-mini" onclick="gestNouveauMetre(${p.id})">Ajouter</button>
                   <button class="btn-ghost" onclick="_GEST.nouveauMetre=null;renderModalList()">Annuler</button></div></div>`
-              : `<button class="gest-lien" onclick="_GEST.nouveauMetre=${f.id};renderModalList();setTimeout(()=>document.getElementById('gm-nom-${f.id}')?.focus(),0)">+ Nouveau mètre sur cette face</button>`}
-          </div>`).join('') || '<div class="c-dim" style="font-size:13px">Aucune face : ajoutez-en une.</div>'}</div>
+              : `<button class="gest-lien" onclick="_GEST.nouveauMetre=${p.id};renderModalList();setTimeout(()=>document.getElementById('gm-nom-${p.id}')?.focus(),0)">+ Nouveau mètre sur ${esc(p.nom)}</button>`}
+          </div>
+        </div>
       </div>`).join('') : '<div class="empty">Aucune pompe : créez « Pompe 1 » ci-dessus.</div>'}
     ${_gestTableauRanger(d)}`;
 }
-// Tous les mètres (déjà placés ou non) avec leur emplacement à choisir :
+// Tous les mètres (déjà placés ou non) avec leur pompe à choisir :
 // le moyen le plus rapide de ranger les mètres qui existaient déjà.
 function _gestTableauRanger(d){
-  const faces=[];
   const plusieurs=new Set(d.distributeurs.map(p=>(p.adresse||'').trim().toLowerCase())).size>1;
-  for(const p of d.distributeurs) for(const f of p.faces) faces.push({id:f.id, lib:`${p.nom} · Face ${f.nom}${plusieurs && p.adresse ? ' — ' + p.adresse : ''}`});
+  const pompes=d.distributeurs.map(p=>({id:p.id, lib:`${p.nom}${plusieurs && p.adresse ? ' — ' + p.adresse : ''}`}));
   const metres=[];
-  for(const p of d.distributeurs) for(const f of p.faces) for(const m of f.metres) metres.push({...m, face_id:f.id});
-  for(const m of d.sans_emplacement||[]) metres.push({...m, face_id:null});
+  for(const p of d.distributeurs) for(const m of p.metres) metres.push({...m, pompe:p.id});
+  for(const m of d.sans_emplacement||[]) metres.push({...m, pompe:null});
   metres.sort((a,b)=>(a.produit_nom||'').localeCompare(b.produit_nom||'','fr') || a.nom.localeCompare(b.nom,'fr',{numeric:true}));
   if(!metres.length) return '';
-  const nonPlaces=metres.filter(m=>!m.face_id).length;
+  const nonPlaces=metres.filter(m=>!m.pompe).length;
   return `<div class="gest-ranger">
     <div class="filter-label" style="margin-bottom:4px">Ranger tous les mètres (${metres.length})${nonPlaces?` — <span style="color:var(--orange)">${nonPlaces} pas encore placé${nonPlaces>1?'s':''}</span>`:' — tous placés ✓'}</div>
-    <div class="c-dim" style="font-size:12.5px;margin-bottom:8px">Choisissez l'emplacement de chaque mètre : il est enregistré tout de suite.${faces.length?'':' Créez d\u2019abord une pompe ci-dessus.'}</div>
-    <table class="gest-tbl"><thead><tr><th>Mètre</th><th>Produit</th><th>Emplacement</th></tr></thead><tbody>
-    ${metres.map(m=>`<tr class="${m.face_id?'':'non-place'}"><td><b>${esc(m.nom)}</b></td><td>${esc(m.produit_nom)}</td>
-      <td><select class="filter-input gest-sel" ${faces.length?'':'disabled'} onchange="gestPlacer(${m.id}, parseInt(this.value||'0',10))">
-        <option value="" ${m.face_id?'':'selected'}>— Pas encore placé —</option>
-        ${faces.map(f=>`<option value="${f.id}" ${m.face_id===f.id?'selected':''}>${esc(f.lib)}</option>`).join('')}</select></td></tr>`).join('')}
+    <div class="c-dim" style="font-size:12.5px;margin-bottom:8px">Choisissez la pompe de chaque mètre : c’est enregistré tout de suite.${pompes.length?'':' Créez d’abord une pompe ci-dessus.'}</div>
+    <table class="gest-tbl"><thead><tr><th>Mètre</th><th>Produit</th><th>Pompe</th></tr></thead><tbody>
+    ${metres.map(m=>`<tr class="${m.pompe?'':'non-place'}"><td><b>${esc(m.nom)}</b></td><td>${esc(m.produit_nom)}</td>
+      <td><select class="filter-input gest-sel" ${pompes.length?'':'disabled'} onchange="gestPlacer(${m.id}, parseInt(this.value||'0',10))">
+        <option value="" ${m.pompe?'':'selected'}>— Pas encore placé —</option>
+        ${pompes.map(p=>`<option value="${p.id}" ${m.pompe===p.id?'selected':''}>${esc(p.lib)}</option>`).join('')}</select></td></tr>`).join('')}
     </tbody></table></div>`;
 }
 async function _gestApi(method, path, body, msg){
@@ -17715,43 +17710,36 @@ async function _gestApi(method, path, body, msg){
 async function gestCreerPompe(){
   const nom=document.getElementById('gd-nom').value.trim();
   const adresse=(document.getElementById('gd-adresse')?.value||'').trim();
-  const faces=document.getElementById('gd-faces').value.split(',').map(x=>x.trim()).filter(Boolean);
   if(!nom){toast('Donnez un nom à la pompe (ex. Pompe 1).','err');return;}
   if(!adresse){toast('Indiquez l’adresse de la station où se trouve la pompe.','err');return;}
-  await _gestApi('POST','/distributeurs',{nom, faces, adresse}, `${nom} créée avec ${faces.length} face${faces.length>1?'s':''}.`);
-}
-async function gestAjouterFace(id){
-  const d=(_GEST.dist?.distributeurs||[]).find(x=>x.id===id);
-  const lettres='ABCDEFGH', prise=new Set((d?.faces||[]).map(f=>f.nom.toUpperCase()));
-  const nom=[...lettres].find(l=>!prise.has(l))||String((d?.faces||[]).length+1);
-  await _gestApi('POST',`/distributeurs/${id}/faces`,{nom}, `Face ${nom} ajoutée.`);
+  await _gestApi('POST','/distributeurs',{nom, adresse}, `${nom} créée.`);
 }
 async function gestRenommer(type, id){
   const nom=document.getElementById(`ge-${type}-${id}`).value.trim();
-  const corps = type==='d' ? {nom, adresse:(document.getElementById(`ge-da-${id}`)?.value||'').trim()} : {nom};
-  if(await _gestApi('PATCH', type==='d' ? `/distributeurs/${id}` : `/faces/${id}`, corps, 'Enregistré.')) { _GEST.edit=null; renderModalList(); }
+  const corps = {nom, adresse:(document.getElementById(`ge-da-${id}`)?.value||'').trim()};
+  if(await _gestApi('PATCH', `/distributeurs/${id}`, corps, 'Enregistré.')) { _GEST.edit=null; renderModalList(); }
 }
 async function gestSupprimer(quoi, id, nom){
   if(!await showConfirm(`Supprimer ${nom} ? Les relevés ne sont pas touchés.`, {title:'Supprimer ?', type:'danger', okLabel:'Oui, supprimer'})) return;
   await _gestApi('DELETE', `/${quoi}/${id}`, null, `${nom} supprimée.`);
 }
-async function gestPlacer(metre, face){
-  await _gestApi('PATCH', `/pompes/${metre}`, {face_id: face}, face ? 'Mètre placé.' : 'Mètre retiré de la face.');
+async function gestPlacer(metre, pompe){
+  await _gestApi('PATCH', `/pompes/${metre}`, {distributeur_id: pompe}, pompe ? 'Mètre placé sur la pompe.' : 'Mètre retiré de la pompe.');
 }
-async function gestNouveauMetre(face){
-  const prod=parseInt(document.getElementById('gm-prod-'+face).value,10), nom=document.getElementById('gm-nom-'+face).value.trim();
+async function gestNouveauMetre(pompe){
+  const prod=parseInt(document.getElementById('gm-prod-'+pompe).value,10), nom=document.getElementById('gm-nom-'+pompe).value.trim();
   if(!nom){toast(t('gestion.err.nom.pompe'),'err');return;}
-  if(await _gestApi('POST', `/produits/${prod}/pompes`, {nom, face_id: face}, `${nom} ajouté.`)) { _GEST.nouveauMetre=null; renderModalList(); }
+  if(await _gestApi('POST', `/produits/${prod}/pompes`, {nom, distributeur_id: pompe}, `${nom} ajouté.`)) { _GEST.nouveauMetre=null; renderModalList(); }
 }
 
 // ── Formulaire « Enregistrer une station » ─────────────────────────────
-// Station (adresse) › produits et prix › Pompe › Faces › mètres (produit,
+// Station (adresse) › produits et prix › Pompe › mètres (produit,
 // nom, mètre de départ). Envoyé en une fois : POST /api/stations.
 let _ST = null;
 function _stNeuf(){
   const connus=(products||[]).map((p,i)=>({cle:'p'+(i+1), nom:p.nom, prix:String(p.prix_vente_actif ?? p.prix_gallon ?? '').replace('.',',')}));
   return {adresse:'', produits: connus.length ? connus : [{cle:'p1', nom:'Gazoline', prix:''}, {cle:'p2', nom:'Diesel', prix:''}],
-          pompes:[{nom:'Pompe 1', faces:[{nom:'A', metres:[]}, {nom:'B', metres:[]}]}], seq:(connus.length||2)+1};
+          pompes:[{nom:'Pompe 1', metres:[]}, {nom:'Pompe 2', metres:[]}], seq:(connus.length||2)+1};
 }
 function _stNomAuto(cle){
   const p=_ST.produits.find(x=>x.cle===cle); if(!p) return '';
@@ -17760,7 +17748,7 @@ function _stNomAuto(cle){
   const pris=new Set();
   const existant=(products||[]).find(x=>x.nom.trim().toLowerCase()===p.nom.trim().toLowerCase());
   for(const q of existant?.pompes||[]) pris.add(q.nom.trim().toLowerCase());
-  for(const pp of _ST.pompes) for(const f of pp.faces) for(const m of f.metres) pris.add((m.nom||'').trim().toLowerCase());
+  for(const pp of _ST.pompes) for(const m of pp.metres) pris.add((m.nom||'').trim().toLowerCase());
   let n=1; while(pris.has(`${p.nom} ${n}`.toLowerCase())) n++;
   return `${p.nom} ${n}`;
 }
@@ -17768,9 +17756,9 @@ function _stRendre(){
   if(!_ST) _ST=_stNeuf();
   const el=document.getElementById('modal-list'), st=_ST;
   const optP=sel=>st.produits.map(p=>`<option value="${p.cle}" ${p.cle===sel?'selected':''}>${esc(p.nom||'(sans nom)')}</option>`).join('');
-  const nb=st.pompes.reduce((a,p)=>a+p.faces.reduce((b,f)=>b+f.metres.length,0),0);
+  const nb=st.pompes.reduce((a,p)=>a+p.metres.length,0);
   el.innerHTML=`
-    <div class="gest-explic">Enregistrez la station complète selon sa structure : <b>Pompe › Faces › mètres</b>.
+    <div class="gest-explic">Enregistrez la station complète selon sa structure : <b>Pompe › mètres</b>.
       Le <b>mètre de départ</b> est le chiffre affiché aujourd'hui sur chaque compteur : le premier relevé partira de là.</div>
     <div class="st-bloc"><div class="st-titre">1. Station</div>
       <label class="st-champ">Adresse de la station (elle sera mise sur toutes ses pompes)<input class="filter-input" maxlength="255" placeholder="Ex. Route Nationale 1, Vertières"
@@ -17781,24 +17769,21 @@ function _stRendre(){
         <input class="filter-input num" placeholder="Prix G / gallon" inputmode="decimal" value="${esc(String(p.prix))}" style="width:150px" oninput="_ST.produits[${i}].prix=this.value">
         ${st.produits.length>1?`<button class="btn-ghost" title="Retirer" onclick="_stRetirerProduit(${i})">✕</button>`:''}</div>`).join('')}
       <button class="gest-lien" onclick="_ST.produits.push({cle:'p'+(_ST.seq++),nom:'',prix:''});_stRendre()">+ Ajouter un produit</button></div>
-    <div class="st-bloc"><div class="st-titre">3. Pompes, faces et mètres <span class="c-dim" style="font-weight:500">(${st.pompes.length} pompe${st.pompes.length>1?'s':''}, ${nb} mètre${nb>1?'s':''})</span></div>
+    <div class="st-bloc"><div class="st-titre">3. Pompes et mètres <span class="c-dim" style="font-weight:500">(${st.pompes.length} pompe${st.pompes.length>1?'s':''}, ${nb} mètre${nb>1?'s':''})</span></div>
       ${st.pompes.map((pp,i)=>`<div class="gest-pompe"><div class="gest-pompe-tete">
           ⛽ <input class="filter-input" value="${esc(pp.nom)}" maxlength="100" style="max-width:200px" oninput="_ST.pompes[${i}].nom=this.value">
           <span style="flex:1"></span>
-          <button class="btn btn-secondary psp-mini" onclick="_stAjouterFace(${i})">+ Face</button>
           ${st.pompes.length>1?`<button class="btn-ghost" title="Retirer cette pompe" onclick="_ST.pompes.splice(${i},1);_stRendre()">✕</button>`:''}</div>
-        <div class="gest-faces st-faces">${pp.faces.map((f,j)=>`<div class="gest-face">
-          <div class="gest-face-tete"><b>Face</b><input class="filter-input" value="${esc(f.nom)}" maxlength="50" style="width:70px;height:30px" oninput="_ST.pompes[${i}].faces[${j}].nom=this.value">
-            <span style="flex:1"></span>${pp.faces.length>1?`<button class="btn-ghost" title="Retirer cette face" onclick="_ST.pompes[${i}].faces.splice(${j},1);_stRendre()">✕</button>`:''}</div>
-          ${f.metres.length?'<div class="st-entete"><span>Produit</span><span>Nom du mètre</span><span>Mètre de départ</span><span></span></div>':''}
-          ${f.metres.map((m,k)=>`<div class="st-metre">
-            <select class="filter-input" onchange="_ST.pompes[${i}].faces[${j}].metres[${k}].produit=this.value">${optP(m.produit)}</select>
-            <input class="filter-input" placeholder="Nom (ex. Gazoline 1)" value="${esc(m.nom)}" maxlength="100" oninput="_ST.pompes[${i}].faces[${j}].metres[${k}].nom=this.value">
-            <input class="filter-input num" placeholder="Mètre de départ" inputmode="decimal" value="${esc(String(m.depart))}" oninput="_ST.pompes[${i}].faces[${j}].metres[${k}].depart=this.value">
-            <button class="btn-ghost" title="Retirer ce mètre" onclick="_ST.pompes[${i}].faces[${j}].metres.splice(${k},1);_stRendre()">✕</button></div>`).join('')
-            || '<div class="c-dim" style="font-size:12.5px">Aucun mètre sur cette face.</div>'}
-          <div class="st-ajout">${st.produits.filter(p=>p.nom.trim()).map(p=>`<button class="gest-lien" onclick="_stAjouterMetre(${i},${j},'${p.cle}')">+ ${esc(p.nom)}</button>`).join('')}</div>
-        </div>`).join('')}</div></div>`).join('')}
+        <div class="gest-face" style="margin:8px 12px 10px">
+          ${pp.metres.length?'<div class="st-entete"><span>Produit</span><span>Nom du mètre</span><span>Mètre de départ</span><span></span></div>':''}
+          ${pp.metres.map((m,k)=>`<div class="st-metre">
+            <select class="filter-input" onchange="_ST.pompes[${i}].metres[${k}].produit=this.value">${optP(m.produit)}</select>
+            <input class="filter-input" placeholder="Nom (ex. Gazoline 1)" value="${esc(m.nom)}" maxlength="100" oninput="_ST.pompes[${i}].metres[${k}].nom=this.value">
+            <input class="filter-input num" placeholder="Mètre de départ" inputmode="decimal" value="${esc(String(m.depart))}" oninput="_ST.pompes[${i}].metres[${k}].depart=this.value">
+            <button class="btn-ghost" title="Retirer ce mètre" onclick="_ST.pompes[${i}].metres.splice(${k},1);_stRendre()">✕</button></div>`).join('')
+            || '<div class="c-dim" style="font-size:12.5px">Aucun mètre sur cette pompe.</div>'}
+          <div class="st-ajout">${st.produits.filter(p=>p.nom.trim()).map(p=>`<button class="gest-lien" onclick="_stAjouterMetre(${i},'${p.cle}')">+ ${esc(p.nom)}</button>`).join('')}</div>
+        </div></div>`).join('')}
       <button class="btn btn-secondary" onclick="_stAjouterPompe()">+ Ajouter une pompe</button></div>
     <div id="st-msg"></div>
     <div class="gest-edit-act" style="margin:6px 0 16px"><button class="btn btn-secondary" onclick="_ST=_stNeuf();_stRendre()">Recommencer</button>
@@ -17949,19 +17934,15 @@ async function _sfEnregistrer(id, extra){
 }
 function _stRetirerProduit(i){
   const cle=_ST.produits[i].cle; _ST.produits.splice(i,1);
-  for(const pp of _ST.pompes) for(const f of pp.faces) f.metres=f.metres.filter(m=>m.produit!==cle);
+  for(const pp of _ST.pompes) pp.metres=pp.metres.filter(m=>m.produit!==cle);
   _stRendre();
-}
-function _stAjouterFace(i){
-  const pris=new Set(_ST.pompes[i].faces.map(f=>f.nom.toUpperCase()));
-  _ST.pompes[i].faces.push({nom:[...'ABCDEFGH'].find(l=>!pris.has(l))||'', metres:[]}); _stRendre();
 }
 function _stAjouterPompe(){
   const n=_ST.pompes.length+1;
-  _ST.pompes.push({nom:`Pompe ${n}`, faces:[{nom:'A', metres:[]}, {nom:'B', metres:[]}]}); _stRendre();
+  _ST.pompes.push({nom:`Pompe ${n}`, metres:[]}); _stRendre();
 }
-function _stAjouterMetre(i,j,cle){
-  _ST.pompes[i].faces[j].metres.push({produit:cle, nom:_stNomAuto(cle), depart:''}); _stRendre();
+function _stAjouterMetre(i,cle){
+  _ST.pompes[i].metres.push({produit:cle, nom:_stNomAuto(cle), depart:''}); _stRendre();
 }
 async function _stEnregistrer(){
   const st=_ST, msg=m=>{ document.getElementById('st-msg').innerHTML=`<div class="psp-err" style="margin-bottom:8px">${esc(m)}</div>`; };
@@ -17969,21 +17950,21 @@ async function _stEnregistrer(){
   if(!st.adresse.trim()) return msg('Indiquez l’adresse de la station.');
   for(const p of st.produits){ if(!p.nom.trim()) return msg('Donnez un nom à chaque produit.'); if(!(num(p.prix)>0)) return msg(`${p.nom} : indiquez le prix de vente par gallon.`); }
   let nb=0;
-  for(const pp of st.pompes) for(const f of pp.faces) for(const m of f.metres){
+  for(const pp of st.pompes) for(const m of pp.metres){
     nb++;
-    if(!m.nom.trim()) return msg(`${pp.nom} · Face ${f.nom} : donnez un nom à chaque mètre.`);
+    if(!m.nom.trim()) return msg(`${pp.nom} : donnez un nom à chaque mètre.`);
     if(String(m.depart).trim()!=='' && num(m.depart)===null) return msg(`${m.nom} : mètre de départ invalide.`);
   }
-  if(!nb) return msg('Ajoutez au moins un mètre sur une face.');
+  if(!nb) return msg('Ajoutez au moins un mètre sur une pompe.');
   const sansDepart=[];
-  for(const pp of st.pompes) for(const f of pp.faces) for(const m of f.metres) if(String(m.depart).trim()==='') sansDepart.push(m.nom);
+  for(const pp of st.pompes) for(const m of pp.metres) if(String(m.depart).trim()==='') sansDepart.push(m.nom);
   if(!(_STATIONS && _STATIONS.peut_creer) && !await showConfirm(`Enregistrer la station « ${st.adresse.trim()} » : ${st.produits.length} produit(s), ${st.pompes.length} pompe(s), ${nb} mètre(s).`
       + (sansDepart.length ? ` Sans mètre de départ : ${sansDepart.join(', ')} (leur premier relevé servira de départ).` : ''),
       {title:'Enregistrer la station ?', type:'warn', okLabel:'Oui, enregistrer'})) return;
   const corps={adresse:st.adresse.trim(),
     produits:st.produits.map(p=>({cle:p.cle, nom:p.nom.trim(), prix:num(p.prix)})),
-    pompes:st.pompes.map(pp=>({nom:pp.nom.trim(), faces:pp.faces.map(f=>({nom:f.nom.trim(),
-      metres:f.metres.map(m=>({produit:m.produit, nom:m.nom.trim(), metre_depart:num(m.depart)}))}))}))};
+    pompes:st.pompes.map(pp=>({nom:pp.nom.trim(),
+      metres:pp.metres.map(m=>({produit:m.produit, nom:m.nom.trim(), metre_depart:num(m.depart)}))}))};
   // Une nouvelle station est toujours séparée (pas de fusion) ; seule une
   // station encore vide (aucun mètre) est équipée sur place.
   const stationVide=!products.some(p=>(p.pompes||[]).length);
@@ -17995,7 +17976,7 @@ async function _stEnregistrer(){
       // Station séparée = espace vierge : les mètres nommés « Produit N » repartent de 1
       const nomsProd=Object.fromEntries(station.produits.map(p=>[p.cle, p.nom]));
       const compteur={};
-      for(const pp of station.pompes) for(const f of pp.faces) for(const m of f.metres){
+      for(const pp of station.pompes) for(const m of pp.metres){
         const prod=nomsProd[m.produit]||'';
         const reste=(m.nom||'').slice(prod.length+1);
         if(prod && m.nom.toLowerCase().startsWith(prod.toLowerCase()+' ') && reste!=='' && [...reste].every(ch=>ch>='0'&&ch<='9')){
@@ -18126,7 +18107,7 @@ function _demanderSeparation(corps){
     ov.innerHTML = `<div class="cs-boite" role="dialog" aria-modal="true" aria-labelledby="sp-titre">
       <div class="cs-tete"><div><div class="cs-sur">${esc(corps.adresse)}</div><h2 id="sp-titre">Nouvelle station séparée</h2></div>
         <button class="cs-fermer" id="sp-annuler" aria-label="Annuler">✕</button></div>
-      <div class="cs-note" style="margin:0 0 12px">Chaque station a son propre espace Konekta : ses mètres, sa caisse, ses rapports. Vous y passez avec votre PIN ; son gérant n'y voit que cette station. Pour ajouter des pompes à la station actuelle, utilisez l'onglet « Pompes &amp; faces ».</div>
+      <div class="cs-note" style="margin:0 0 12px">Chaque station a son propre espace Konekta : ses mètres, sa caisse, ses rapports. Vous y passez avec votre PIN ; son gérant n'y voit que cette station. Pour ajouter des pompes à la station actuelle, utilisez l'onglet « Pompes ».</div>
       <div id="sp-form" class="sp-form">
         <label>Nom de la station<input id="sp-nom" class="filter-input" maxlength="150" value="${esc(corps.adresse)}"></label>
         <label>Nom du gérant<input id="sp-gnom" class="filter-input" maxlength="150"></label>

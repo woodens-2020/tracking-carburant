@@ -101,9 +101,10 @@ class StationGeoJournal(Base):
 
 
 class Distributeur(Base):
-    """Pompe physique de la station (« Pompe 1 », « Pompe 2 »…). Elle a des
-    faces (A, B…) ; chaque face porte des mètres (pistolets), chacun pour un
-    produit : Pompe 1 › Face A › Gazoline 1, Gazoline 2, Diesel 1."""
+    """Pompe physique de la station (« Pompe 1 », « Pompe 2 »…) qui porte ses
+    mètres (pistolets), chacun pour un produit : Pompe 1 › Gazoline 1,
+    Gazoline 2, Diesel 1. Plus de faces A / B : la pompe a une seule face
+    interne (table faces), jamais montrée."""
     __tablename__ = "distributeurs"
 
     id         = Column(Integer, primary_key=True)
@@ -119,7 +120,8 @@ class Distributeur(Base):
 
 
 class Face(Base):
-    """Face d'une pompe physique (A, B…)."""
+    """Rangement interne des mètres d'une pompe : une seule par pompe
+    (les faces A / B ne sont plus utilisées, voir fusionner_faces)."""
     __tablename__ = "faces"
 
     id              = Column(Integer, primary_key=True)
@@ -159,9 +161,13 @@ class Pompe(Base):
 
     @property
     def emplacement(self):
-        """« Pompe 1 · Face A », ou None si le mètre n'est placé nulle part."""
+        """« Pompe 1 », ou None si le mètre n'est placé sur aucune pompe."""
         f = self.face
-        return f"{f.distributeur.nom} · Face {f.nom}" if f else None
+        return f.distributeur.nom if f else None
+
+    @property
+    def distributeur_id(self):
+        return self.face.distributeur_id if self.face else None
 
     __table_args__ = (
         UniqueConstraint("produit_id", "nom", name="uq_pompe_nom"),

@@ -1,5 +1,5 @@
 """
-Réenregistrer une station selon la logique Pompe › Faces › mètres :
+Réenregistrer une station selon la logique Pompe › mètres (sans faces) :
 « retirer l'existant » archive produits et mètres sans rien effacer, puis
 le formulaire crée tout en une fois avec le mètre de départ de chaque mètre.
 """
@@ -12,8 +12,9 @@ def _station(adresse="Route Nationale 1, Vertières"):
     return {"adresse": adresse,
             "produits": [{"cle": "g", "nom": "Gazoline", "prix": 925.5}, {"cle": "d", "nom": "Diesel", "prix": 1000}],
             "pompes": [
-                {"nom": "Pompe 1", "faces": [face("A", [("g", "Gazoline 1", 1000), ("g", "Gazoline 2", 2000), ("d", "Diesel 1", 500)]),
-                                             face("B", [("g", "Gazoline 3", 3000), ("g", "Gazoline 4", 4000), ("d", "Diesel 2", 600)])]},
+                {"nom": "Pompe 1", "metres": face("", [("g", "Gazoline 1", 1000), ("g", "Gazoline 2", 2000), ("d", "Diesel 1", 500),
+                                               ("g", "Gazoline 3", 3000), ("g", "Gazoline 4", 4000), ("d", "Diesel 2", 600)])["metres"]},
+                # Ancien format (faces A / B) encore accepté : les mètres vont sur la pompe
                 {"nom": "Pompe 2", "faces": [face("A", [("g", "Gazoline 5", 0)]), face("B", [("d", "Diesel 3", 0)])]}]}
 
 
@@ -44,8 +45,8 @@ def test_retirer_puis_enregistrer_la_station(client):
     dist = client.get("/api/distributeurs", headers=H).json()["distributeurs"]
     assert [d["nom"] for d in dist] == ["Pompe 1", "Pompe 2"]
     assert {d["adresse"] for d in dist} == {"Route Nationale 1, Vertières"}      # l'adresse est sur les pompes
-    assert [[m["nom"] for m in f["metres"]] for f in dist[0]["faces"]] == [
-        ["Gazoline 1", "Gazoline 2", "Diesel 1"], ["Gazoline 3", "Gazoline 4", "Diesel 2"]]
+    assert sorted(m["nom"] for m in dist[0]["metres"]) == ["Diesel 1", "Diesel 2", "Gazoline 1", "Gazoline 2", "Gazoline 3", "Gazoline 4"]
+    assert sorted(m["nom"] for m in dist[1]["metres"]) == ["Diesel 3", "Gazoline 5"] and len(dist[1]["faces"]) == 1
     # Le mètre de départ sert de « mètre précédent »
     g1 = next(q for q in prods["Gazoline"]["pompes"] if q["nom"] == "Gazoline 1")
     assert g1["metre_depart"] == 1000

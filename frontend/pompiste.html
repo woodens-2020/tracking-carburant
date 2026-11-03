@@ -491,7 +491,7 @@ const TXT = {
     periode_q:'Quelle période ?', Matin:'Matin', 'Apres-midi':'Après-midi', auj:'Aujourd\'hui', hier:'Hier',
     pour_hier:'Le rapport est pour hier ?', revenir_auj:'Revenir à aujourd\'hui',
     carb_q:'Quel carburant ?', carb_autre_q:'Quel autre carburant ?', carb_sub:'Touchez le carburant de vos pompes.',
-    n_pompes:'{n} pompe(s)', toute_face:'Toute cette face', autres_metres:'Autres mètres', toutes_saisies:'Toutes les pompes sont déjà saisies',
+    n_pompes:'{n} pompe(s)', toute_face:'Toute cette pompe', autres_metres:'Autres mètres', toutes_saisies:'Toutes les pompes sont déjà saisies',
     pompes_q:'Quelles pompes ?', pompes_sub:'Touchez chaque pompe que vous avez tenue.', toutes:'Toutes les pompes',
     deja_moi:'Déjà dans votre rapport', deja_par:'Déjà saisie par {n}', a_saisir:'À saisir',
     choisies:'{n} pompe(s) choisie(s)', aucune:'Aucune pompe choisie', continuer:'Continuer',
@@ -603,7 +603,7 @@ const TXT = {
     periode_q:'Ki peryòd ?', Matin:'Maten', 'Apres-midi':'Apremidi', auj:'Jodi a', hier:'Yè',
     pour_hier:'Rapò a se pou yè ?', revenir_auj:'Tounen nan jodi a',
     carb_q:'Ki kabiran ?', carb_autre_q:'Ki lòt kabiran ?', carb_sub:'Touche kabiran ponp ou yo.',
-    n_pompes:'{n} ponp', toute_face:'Tout fas sa a', autres_metres:'Lòt mèt', toutes_saisies:'Tout ponp yo deja antre',
+    n_pompes:'{n} ponp', toute_face:'Tout ponp sa a', autres_metres:'Lòt mèt', toutes_saisies:'Tout ponp yo deja antre',
     pompes_q:'Ki ponp ?', pompes_sub:'Touche chak ponp ou te kenbe.', toutes:'Tout ponp yo',
     deja_moi:'Deja nan rapò ou', deja_par:'{n} deja antre l', a_saisir:'Pou antre',
     choisies:'{n} ponp chwazi', aucune:'Ou poko chwazi ponp', continuer:'Kontinye',
@@ -1136,7 +1136,7 @@ function basculerPompe(id){
   S.choisies.sort((a,b) => p.pompes.findIndex(q=>q.id===a) - p.pompes.findIndex(q=>q.id===b));
   rPompes();
 }
-// Mètres regroupés par emplacement (« Pompe 1 · Face A »), dans l'ordre ;
+// Mètres regroupés par pompe (« Pompe 1 »), dans l'ordre ;
 // les mètres pas encore placés à la fin.
 function groupesEmplacement(pompes){
   const g = new Map();

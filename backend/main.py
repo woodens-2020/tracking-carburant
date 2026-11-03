@@ -606,6 +606,7 @@ def startup():
         from pompiste_routes import rattacher_employes_pompistes
         with SessionLocal() as _db:
             rattacher_employes_pompistes(_db)
+            print(f"Faces regroupées (station principale) : {fusionner_faces(_db)}")
             from database import migrer_espaces, definir_espace, retablir_espace, session_espace
             print(f"Stations séparées mises à jour : {migrer_espaces()}")
             # Les pompistes de chaque station séparée deviennent aussi des employés
@@ -615,6 +616,7 @@ def startup():
                 try:
                     with session_espace(_sch) as _edb:
                         rattacher_employes_pompistes(_edb)
+                        fusionner_faces(_edb)
                 except Exception as _exc:
                     print(f"Pompistes de {_sch} : {_exc}")
                 finally:
@@ -2083,7 +2085,8 @@ def serve_audit_xlsx():
 # ---------- Schemas ----------
 class PompeIn(BaseModel):
     nom: str
-    face_id: Optional[int] = None
+    distributeur_id: Optional[int] = None    # pompe physique qui porte le mètre
+    face_id: Optional[int] = None            # ancien format (faces A / B)
 
 
 class ProduitIn(BaseModel):
@@ -2099,12 +2102,13 @@ class ProduitPatch(BaseModel):
 
 class PompePatch(BaseModel):
     nom: Optional[str] = None
-    face_id: Optional[int] = None      # 0 = retirer de sa face
+    distributeur_id: Optional[int] = None   # 0 = retirer de sa pompe
+    face_id: Optional[int] = None           # ancien format (faces A / B)
 
 
 class DistributeurIn(BaseModel):
     nom: str
-    faces: List[str] = ["A", "B"]
+    faces: List[str] = []                    # ignoré : plus de faces A / B
     adresse: Optional[str] = None
 
 
@@ -2182,7 +2186,7 @@ def list_produits(date: Optional[date_type] = None, db: Session = Depends(get_db
         out.append({
             "id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon, "adresse": p.adresse,
             "prix_vente_actif": float(px_actif.prix_vente_gallon) if px_actif else None,
-            "pompes": [{"id": q.id, "nom": q.nom, "face_id": q.face_id, "emplacement": q.emplacement, "station": q.station,
+            "pompes": [{"id": q.id, "nom": q.nom, "face_id": q.face_id, "distributeur_id": q.distributeur_id, "emplacement": q.emplacement, "station": q.station,
                         "metre_depart": float(q.metre_depart) if q.metre_depart is not None else None}
                        for q in p.pompes if q.actif],
         })
@@ -2271,20 +2275,20 @@ def modifier_pompe(pompe_id: int, data: PompePatch, request: Request, db: Sessio
         if nom != q.nom:
             _tracer(db, request, "pompe_modifiee", {"pompe_id": q.id, "avant": q.nom, "apres": nom})
             q.nom = nom
-    if data.face_id is not None:
-        if data.face_id and not db.get(Face, data.face_id):
-            raise HTTPException(404, "Face introuvable")
+    cible = _cible_metre(db, data.distributeur_id, data.face_id)
+    if cible is not None:
         avant = q.emplacement
-        q.face_id = data.face_id or None
+        q.face_id = cible or None
         db.flush(); db.refresh(q)
         if avant != q.emplacement:
             _tracer(db, request, "metre_deplace", {"pompe_id": q.id, "metre": q.nom, "avant": avant, "apres": q.emplacement})
     db.commit(); db.refresh(q)
-    return {"id": q.id, "nom": q.nom, "produit_id": q.produit_id, "face_id": q.face_id, "emplacement": q.emplacement}
+    return {"id": q.id, "nom": q.nom, "produit_id": q.produit_id, "distributeur_id": q.distributeur_id,
+            "face_id": q.face_id, "emplacement": q.emplacement}
 
 
 # ---------- Enregistrement complet d'une station ----------
-# Station (adresse) › produits et prix › pompes › faces › mètres (produit,
+# Station (adresse) › produits et prix › pompes › mètres (produit,
 # nom, mètre de départ), en une seule fois. « Retirer l'existant » archive
 # produits et mètres sans rien effacer : relevés, rapports, journal,
 # caisse gardent tout leur historique.
@@ -2302,7 +2306,8 @@ class StationFaceIn(BaseModel):
 
 class StationPompeIn(BaseModel):
     nom: str
-    faces: List[StationFaceIn] = []
+    metres: List[StationMetreIn] = []
+    faces: List[StationFaceIn] = []          # ancien format : leurs mètres sont repris sur la pompe
 
 
 class StationProduitIn(BaseModel):
@@ -2357,7 +2362,7 @@ def retirer_tout(data: RetirerToutIn, request: Request, db: Session = Depends(ge
 @app.post("/api/stations", status_code=201)
 def enregistrer_station(data: StationIn, request: Request, db: Session = Depends(get_db)):
     """Crée en une fois : produits de la station (avec adresse et prix),
-    pompes physiques, faces, mètres placés avec leur mètre de départ."""
+    pompes physiques et leurs mètres, avec leur mètre de départ."""
     _gerer_station(request, db)
     out = _creer_station(db, data, request)
     db.commit()
@@ -2404,34 +2409,26 @@ def _creer_station(db: Session, data: StationIn, request: Request, user_id: Opti
         if nom_p.casefold() in vus_pompes or _pompe_existe(db, nom_p, adresse):
             raise HTTPException(409, f"La pompe « {nom_p} » existe déjà dans la station « {adresse} ».")
         vus_pompes.add(nom_p.casefold())
-        if not pp.faces:
-            raise HTTPException(400, f"{nom_p} : ajoutez au moins une face.")
         d = Distributeur(nom=nom_p, adresse=adresse, ordre=(db.query(Distributeur).count() or 0) + i)
         db.add(d); db.flush()
-        vues_faces = set()
-        for j, ff in enumerate(pp.faces):
-            nom_f = _nom_court(ff.nom, 50, "face")
-            if nom_f.casefold() in vues_faces:
-                raise HTTPException(409, f"{nom_p} : la face « {nom_f} » est en double.")
-            vues_faces.add(nom_f.casefold())
-            f = Face(distributeur_id=d.id, nom=nom_f, ordre=j)
-            db.add(f); db.flush()
-            for m in ff.metres:
-                p = produits.get(m.produit)
-                if not p:
-                    raise HTTPException(400, f"{nom_p} · Face {nom_f} : choisissez le produit du mètre.")
-                nom_m = _nom_court(m.nom, 100, "mètre")
-                cle_m = (p.id, nom_m.casefold())
-                if any(q.actif and q.nom.strip().casefold() == nom_m.casefold() for q in p.pompes):
-                    raise HTTPException(409, f"Le mètre « {nom_m} » ({p.nom}) existe déjà : choisissez un autre nom (ex. {nom_m} {nom_p}).")
-                if cle_m in noms_metres:
-                    raise HTTPException(409, f"Le mètre « {nom_m} » ({p.nom}) est en double ({noms_metres[cle_m]}).")
-                noms_metres[cle_m] = f"{nom_p} · Face {nom_f}"
-                if m.metre_depart is not None and m.metre_depart < 0:
-                    raise HTTPException(400, f"{nom_m} : le mètre de départ ne peut pas être négatif.")
-                db.add(Pompe(produit_id=p.id, nom=nom_m, face_id=f.id, actif=True,
-                             metre_depart=round(m.metre_depart, 4) if m.metre_depart is not None else None))
-                n_metres += 1
+        f = Face(distributeur_id=d.id, nom=FACE_UNIQUE, ordre=0)
+        db.add(f); db.flush()
+        for m in list(pp.metres) + [m for ff in pp.faces for m in ff.metres]:
+            p = produits.get(m.produit)
+            if not p:
+                raise HTTPException(400, f"{nom_p} : choisissez le produit du mètre.")
+            nom_m = _nom_court(m.nom, 100, "mètre")
+            cle_m = (p.id, nom_m.casefold())
+            if any(q.actif and q.nom.strip().casefold() == nom_m.casefold() for q in p.pompes):
+                raise HTTPException(409, f"Le mètre « {nom_m} » ({p.nom}) existe déjà : choisissez un autre nom (ex. {nom_m} {nom_p}).")
+            if cle_m in noms_metres:
+                raise HTTPException(409, f"Le mètre « {nom_m} » ({p.nom}) est en double ({noms_metres[cle_m]}).")
+            noms_metres[cle_m] = nom_p
+            if m.metre_depart is not None and m.metre_depart < 0:
+                raise HTTPException(400, f"{nom_m} : le mètre de départ ne peut pas être négatif.")
+            db.add(Pompe(produit_id=p.id, nom=nom_m, face_id=f.id, actif=True,
+                         metre_depart=round(m.metre_depart, 4) if m.metre_depart is not None else None))
+            n_metres += 1
     _tracer(db, request, "station_enregistree", {"adresse": adresse, "produits": [p.nom for p in produits.values()],
                                                  "pompes": len(data.pompes), "metres": n_metres}, user_id=user_id)
     db.flush()
@@ -2439,8 +2436,51 @@ def _creer_station(db: Session, data: StationIn, request: Request, user_id: Opti
             "pompes": len(data.pompes), "metres": n_metres}
 
 
-# ---------- Pompes physiques (distributeurs) et faces ----------
-# Pompe 1 › Face A › mètres (Gazoline 1, Gazoline 2, Diesel 1) ; Face B › …
+# ---------- Pompes physiques (distributeurs) ----------
+# Pompe 1 › mètres (Gazoline 1, Gazoline 2, Diesel 1…). Les faces A / B ne
+# sont plus utilisées : chaque pompe garde une seule face interne qui range
+# ses mètres (fusionner_faces regroupe les anciennes au démarrage).
+
+FACE_UNIQUE = "A"
+
+
+def _face_unique(db: Session, d: Distributeur) -> Face:
+    f = sorted(d.faces, key=lambda x: (x.ordre, x.id))[0] if d.faces else None
+    if f is None:
+        f = Face(distributeur_id=d.id, nom=FACE_UNIQUE, ordre=0)
+        db.add(f); db.flush(); db.refresh(d)
+    return f
+
+
+def fusionner_faces(db: Session) -> int:
+    """Une seule face par pompe : les mètres des faces B, C… rejoignent la
+    première face, les faces vides sont retirées. Rien n'est effacé des
+    mètres ni de leur historique. Idempotent ; retourne les faces retirées."""
+    n = 0
+    for d in db.query(Distributeur).all():
+        garde = _face_unique(db, d)
+        for f in [x for x in d.faces if x.id != garde.id]:
+            db.query(Pompe).filter(Pompe.face_id == f.id).update({Pompe.face_id: garde.id}, synchronize_session=False)
+            db.delete(f)
+            n += 1
+    db.commit()
+    return n
+
+
+def _cible_metre(db: Session, distributeur_id: Optional[int], face_id: Optional[int]):
+    """Face interne où ranger un mètre : None = ne rien changer, 0 = retirer de sa pompe."""
+    if distributeur_id is not None:
+        if not distributeur_id:
+            return 0
+        d = db.get(Distributeur, distributeur_id)
+        if not d:
+            raise HTTPException(404, "Pompe introuvable")
+        return _face_unique(db, d).id
+    if face_id is not None:
+        if face_id and not db.get(Face, face_id):
+            raise HTTPException(404, "Pompe introuvable")
+        return face_id
+    return None
 
 def _pompe_existe(db: Session, nom: str, adresse: Optional[str], sauf_id: Optional[int] = None) -> bool:
     """Chaque station a sa « Pompe 1 » : un nom de pompe est unique par station."""
@@ -2465,9 +2505,10 @@ def _nom_court(v: str, maxi: int, quoi: str) -> str:
 def lister_distributeurs(db: Session = Depends(get_db)):
     out = []
     for d in db.query(Distributeur).order_by(Distributeur.ordre, Distributeur.id).all():
-        out.append({"id": d.id, "nom": d.nom, "adresse": d.adresse,
-                    "faces": [{"id": f.id, "nom": f.nom,
-                               "metres": [_metre_dict(q) for q in f.metres if q.actif]} for f in d.faces]})
+        metres = [_metre_dict(q) for f in sorted(d.faces, key=lambda x: (x.ordre, x.id)) for q in f.metres if q.actif]
+        out.append({"id": d.id, "nom": d.nom, "adresse": d.adresse, "metres": metres,
+                    # ancien format, pour compatibilité : une seule face
+                    "faces": [{"id": f.id, "nom": f.nom, "metres": metres} for f in d.faces[:1]]})
     sans = (db.query(Pompe).join(Produit).filter(Pompe.face_id.is_(None), Pompe.actif.is_(True),
                                                   Produit.actif.is_(True))
             .order_by(Produit.nom, Pompe.nom).all())
@@ -2481,18 +2522,12 @@ def creer_distributeur(data: DistributeurIn, request: Request, db: Session = Dep
     adr = _adresse(data.adresse)
     if _pompe_existe(db, nom, adr):
         raise HTTPException(409, f"La pompe « {nom} » existe déjà dans cette station.")
-    faces = []
-    for f in data.faces or []:
-        f = _nom_court(f, 50, "face")
-        if f.casefold() not in [x.casefold() for x in faces]:
-            faces.append(f)
     d = Distributeur(nom=nom, adresse=adr, ordre=(db.query(Distributeur).count() or 0))
     db.add(d); db.flush()
-    for i, f in enumerate(faces):
-        db.add(Face(distributeur_id=d.id, nom=f, ordre=i))
-    _tracer(db, request, "distributeur_cree", {"nom": nom, "faces": faces})
+    db.add(Face(distributeur_id=d.id, nom=FACE_UNIQUE, ordre=0))
+    _tracer(db, request, "distributeur_cree", {"nom": nom})
     db.commit()
-    return {"id": d.id, "nom": d.nom, "faces": faces}
+    return {"id": d.id, "nom": d.nom, "adresse": d.adresse}
 
 
 @app.patch("/api/distributeurs/{did}")
@@ -2528,16 +2563,8 @@ def supprimer_distributeur(did: int, request: Request, db: Session = Depends(get
 
 @app.post("/api/distributeurs/{did}/faces", status_code=201)
 def ajouter_face(did: int, data: NomIn, request: Request, db: Session = Depends(get_db)):
-    _gerer_station(request, db)
-    d = db.get(Distributeur, did)
-    if not d:
-        raise HTTPException(404, "Pompe introuvable")
-    nom = _nom_court(data.nom, 50, "face")
-    if any(f.nom.casefold() == nom.casefold() for f in d.faces):
-        raise HTTPException(409, f"La face « {nom} » existe déjà sur {d.nom}.")
-    f = Face(distributeur_id=d.id, nom=nom, ordre=len(d.faces))
-    db.add(f); db.commit(); db.refresh(f)
-    return {"id": f.id, "nom": f.nom}
+    """Plus de faces A / B : les mètres se placent directement sur la pompe."""
+    raise HTTPException(410, "Les faces ne sont plus utilisées : placez les mètres directement sur la pompe.")
 
 
 @app.patch("/api/faces/{fid}")
@@ -2573,11 +2600,11 @@ def add_pompe(produit_id: int, data: PompeIn, request: Request, db: Session = De
     _gerer_station(request, db)
     if not db.query(Produit).get(produit_id):
         raise HTTPException(404, "Produit introuvable")
-    if data.face_id and not db.get(Face, data.face_id):
-        raise HTTPException(404, "Face introuvable")
-    pompe = Pompe(produit_id=produit_id, nom=data.nom, face_id=data.face_id or None)
+    cible = _cible_metre(db, data.distributeur_id, data.face_id)
+    pompe = Pompe(produit_id=produit_id, nom=data.nom, face_id=cible or None)
     db.add(pompe); db.commit(); db.refresh(pompe)
-    return {"id": pompe.id, "nom": pompe.nom, "face_id": pompe.face_id, "emplacement": pompe.emplacement}
+    return {"id": pompe.id, "nom": pompe.nom, "distributeur_id": pompe.distributeur_id, "face_id": pompe.face_id,
+            "emplacement": pompe.emplacement}
 
 
 @app.delete("/api/pompes/{pompe_id}")
