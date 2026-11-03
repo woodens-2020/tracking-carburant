@@ -585,6 +585,12 @@ canvas{display:block}
 .sx-nom{font-size:17px;font-weight:800;color:var(--text);margin-bottom:6px}
 .sx-meta{font-size:12px;color:var(--muted);margin-top:4px}
 .sx-pompiste{cursor:pointer;color:var(--teal,#2dd4bf)}
+.sx-qui{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px;padding:10px 14px;border:1px solid var(--border);
+  border-left:4px solid var(--orange);border-radius:10px;background:var(--panel2,transparent)}
+.sx-qui label{font-weight:700;font-size:14px}
+.sx-qui select{min-width:240px;max-width:100%;height:36px}
+.sx-qui-aide{font-size:12.5px;color:var(--muted)}
+.sx-qui.choisi{border-left-color:var(--teal,#2dd4bf)}
 .sx-pompiste-vide{color:var(--muted);text-decoration:underline dotted}
 .sx-field label{display:block;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
 .sx-pompe .sx-inp{width:100%;max-width:none;min-width:0;box-sizing:border-box;font-family:var(--mono);font-size:16px;padding:10px 12px;text-align:right}
@@ -4590,6 +4596,11 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
           <svg viewBox="0 0 24 24"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="1" y1="18" x2="3" y2="18"/><line x1="21" y1="18" x2="23" y2="18"/><line x1="18.36" y1="11.64" x2="19.78" y2="10.22"/></svg>
           <span data-i18n="saisie.period.apresmidi">Après-midi</span>
         </button>
+      </div>
+      <div class="sx-qui" id="sx-qui">
+        <label for="sx-pompiste">⛽ Pompiste de ce rapport</label>
+        <select id="sx-pompiste" class="inp" onchange="sxChoisirPompiste(this.value)"><option value="">Chargement des pompistes…</option></select>
+        <span class="sx-qui-aide" id="sx-qui-aide">Choisissez le pompiste : chaque relevé enregistré lui sera attribué.</span>
       </div>
       <div id="saisie-content"></div>
       <div id="saisie-galrecap"></div>
@@ -16010,10 +16021,34 @@ async function loadSaisie(){
       GET('/releves?date='+currentDate),
     ]);
     await loadIndexPrecedents();
+    await sxChargerPompistes();
     renderProdTabs();
     renderSaisie();
     initExportSelects();
   }catch(e){ toast(t('saisie.load.err',{msg:e.message}),'err'); }
+}
+
+// Pompiste du rapport saisi à la main : choisi une fois, attribué à chaque
+// relevé enregistré (journal, rapports et filtres par pompiste).
+let sxPompiste = (() => { try{ return sessionStorage.getItem('sx-pompiste') || ''; }catch(e){ return ''; } })();
+async function sxChargerPompistes(){
+  const sel=document.getElementById('sx-pompiste'); if(!sel) return;
+  try{ pompistesActifs=(await GET('/pompistes?inclure_inactifs=true')).map(p=>({id:p.id, nom_complet:p.nom+(p.actif?'':' (parti)')})); }
+  catch(e){ pompistesActifs=[]; }
+  if(!pompistesActifs.some(p=>String(p.id)===sxPompiste)) sxPompiste='';
+  sel.innerHTML=`<option value="">${pompistesActifs.length?'— Choisir le pompiste —':'Aucun pompiste enregistré'}</option>`
+    + pompistesActifs.map(p=>`<option value="${p.id}" ${String(p.id)===sxPompiste?'selected':''}>${esc(p.nom_complet)}</option>`).join('');
+  sxMajPompiste();
+}
+function sxChoisirPompiste(v){
+  sxPompiste=v||''; try{ sessionStorage.setItem('sx-pompiste', sxPompiste); }catch(e){}
+  sxMajPompiste();
+}
+function sxMajPompiste(){
+  const p=(pompistesActifs||[]).find(x=>String(x.id)===sxPompiste);
+  document.getElementById('sx-qui')?.classList.toggle('choisi', !!p);
+  const a=document.getElementById('sx-qui-aide');
+  if(a) a.textContent = p ? `Les relevés enregistrés seront attribués à ${p.nom_complet}.` : 'Choisissez le pompiste : chaque relevé enregistré lui sera attribué.';
 }
 
 // Index de continuité : dernier « mètre après » connu pour chaque pompe,
@@ -17059,9 +17094,20 @@ async function doSave(){
   avertissements.forEach(a=>toast(a,'inf'));
 
   if(ok){
+    const choisi=parseInt(sxPompiste||'0',10);
+    if(choisi){
+      let att=0, attErr='';
+      for(const s of saved){
+        try{ await PATCH(`/releves/${s.releveId}/pompiste`, {pompiste_id:choisi}); att++; }
+        catch(e){ if(!attErr) attErr=e.message; }
+      }
+      const nom=(pompistesActifs||[]).find(p=>p.id===choisi)?.nom_complet||'';
+      if(att) toast(`${att} relevé${att>1?'s':''} attribué${att>1?'s':''} à ${nom}.`,'ok');
+      if(attErr) toast(`Attribution du pompiste : ${attErr}`,'err');
+    }
     await loadSaisie();
     if(currentPage==='home') loadHome();
-    openPompisteModal(saved);
+    if(!choisi) openPompisteModal(saved);
   }
 }
 
@@ -17088,7 +17134,7 @@ async function openPompisteModal(saved){
     // Tous les pompistes (comptes pompistes et employés « Pompiste »), y compris
     // ceux qui sont partis : leurs relevés anciens doivent pouvoir leur être attribués.
     pompistesActifs=(await GET('/pompistes?inclure_inactifs=true'))
-      .map(p=>({id:p.id, nom_complet:p.nom+(p.actif?'':' (inactif)')}));
+      .map(p=>({id:p.id, nom_complet:p.nom+(p.actif?'':' (parti)')}));
   }catch(e){
     pompistesActifs=[];
   }
@@ -17096,7 +17142,7 @@ async function openPompisteModal(saved){
   document.getElementById('pompiste-rows').innerHTML = saved.map((row,i)=>{
     const options = pompistesActifs.length
       ? `<option value="">${t('saisie.pompiste.placeholder')}</option>`+
-        pompistesActifs.map(e=>`<option value="${e.id}" ${row.pompisteId===e.id?'selected':''}>${esc(e.nom_complet)}</option>`).join('')
+        pompistesActifs.map(e=>`<option value="${e.id}" ${(row.pompisteId ?? (parseInt(sxPompiste||'0',10)||null))===e.id?'selected':''}>${esc(e.nom_complet)}</option>`).join('')
       : `<option value="">${t('saisie.pompiste.none')}</option>`;
     return `
     <tr>
