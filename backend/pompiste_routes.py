@@ -202,8 +202,8 @@ def _valeurs_finales(l: RapportPompisteLigne):
 
 
 def nettoyer_journal_anticipe(db: Session) -> int:
-    """Démarrage : un rapport pas encore finalisé (soumis, en problème) ne
-    doit rien avoir dans le journal officiel. Les relevés écrits par l'ancien
+    """Démarrage : un rapport pas encore finalisé (soumis, en problème) n'a
+    au journal officiel que ses mètres déjà confirmés par la direction. Les relevés écrits par l'ancien
     fonctionnement (au « Terminer ») sont retirés s'ils sont identiques au
     rapport ; s'ils ont été modifiés ensuite à la main (module Saisie), ils
     deviennent une saisie ordinaire et sont gardés."""
@@ -212,6 +212,8 @@ def nettoyer_journal_anticipe(db: Session) -> int:
         lignes = {l.pompe_id: l for l in rap.lignes}
         for r in db.query(Releve).filter_by(rapport_pompiste_id=rap.id).all():
             l = lignes.get(r.pompe_id)
+            if l is not None and l.confirmee:
+                continue                    # mètre confirmé par la direction : il reste au journal
             av, ap = _valeurs_finales(l) if l else (None, None)
             if l is not None and abs(float(r.metter_avant) - av) <= TOLERANCE and abs(float(r.metter_apres) - ap) <= TOLERANCE:
                 db.delete(r)
@@ -1181,7 +1183,8 @@ class LigneConfIn(BaseModel):
 def confirmer_ligne(rid: int, pompe_id: int, data: LigneConfIn, request: Request,
                     _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     """Confirme un mètre, en le corrigeant si les valeurs envoyées diffèrent
-    de celles du pompiste (qui restent conservées)."""
+    de celles du pompiste (qui restent conservées). Le mètre confirmé entre
+    aussitôt au journal : il apparaît dans la Saisie, attribué au pompiste."""
     rap = _rapport_a_traiter(db, rid)
     l = next((x for x in rap.lignes if x.pompe_id == pompe_id), None)
     if not l:
@@ -1196,8 +1199,11 @@ def confirmer_ligne(rid: int, pompe_id: int, data: LigneConfIn, request: Request
     l.confirmee, l.confirmee_at = True, now_haiti()
     rap.ecart_confirme = False          # l'écart dépend des mètres : à revoir après une correction
     db.commit()
+    avertissements = _ecrire_journal(db, rap, request, remplacer_saisie=True, seulement=pompe_id)
     db.refresh(rap)
-    return _rapport_dict(db, rap, avec_journal=True)
+    out = _rapport_dict(db, rap, avec_journal=True)
+    out["avertissements"] = avertissements
+    return out
 
 
 @router.post("/api/pompiste-supervision/rapports/{rid}/lignes/{pompe_id}/reprendre")
@@ -1208,6 +1214,13 @@ def reprendre_ligne(rid: int, pompe_id: int, _s: Utilisateur = Depends(_require_
     if not l:
         raise HTTPException(404, "Pompe absente du rapport")
     l.confirmee, l.confirmee_at = False, None
+    # Le mètre n'est plus confirmé : il sort de la Saisie (sauf s'il y a été modifié à la main)
+    for r in db.query(Releve).filter_by(rapport_pompiste_id=rap.id, pompe_id=pompe_id).all():
+        av, ap = _valeurs_finales(l)
+        if abs(float(r.metter_avant) - av) <= TOLERANCE and abs(float(r.metter_apres) - ap) <= TOLERANCE:
+            db.delete(r)
+        else:
+            r.rapport_pompiste_id = None
     db.commit()
     db.refresh(rap)
     return _rapport_dict(db, rap, avec_journal=True)

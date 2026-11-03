@@ -601,6 +601,8 @@ canvas{display:block}
 .sx-sup-tout button:hover{color:#ef4444}
 .psp-sup{display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)}
 .psp-sup .psp-lien{color:var(--muted)}.psp-sup .psp-lien:hover{color:#ef4444}
+.sx-origine{color:#a78bfa}
+.per-nb{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--orange);color:#fff;font-size:11.5px;font-weight:800}
 .sx-qui{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px;padding:10px 14px;border:1px solid var(--border);
   border-left:4px solid var(--orange);border-radius:10px;background:var(--panel2,transparent)}
 .sx-qui label{font-weight:700;font-size:14px}
@@ -16118,6 +16120,13 @@ function renderSaisie(){
   const perRel=releves.filter(r=>r.periode===per&&r.produit_id===p.id);
   const pxDefaut=(p.prix_vente_actif!=null)?p.prix_vente_actif:p.prix_gallon;
   const nbFaits=p.pompes.filter(po=>perRel.some(r=>r.pompe_id===po.id)).length;
+  // Nombre de relevés de ce produit dans chaque période (un rapport pompiste
+  // peut être rangé en « Après-midi » : on le voit sans changer d'onglet)
+  document.querySelectorAll('.per-sel-btn').forEach(b=>{
+    const n=releves.filter(r=>r.periode===b.dataset.per&&r.produit_id===p.id).length;
+    let sp=b.querySelector('.per-nb'); if(!sp){ sp=document.createElement('span'); sp.className='per-nb'; b.appendChild(sp); }
+    sp.textContent=n?String(n):''; sp.hidden=!n;
+  });
 
   const cartes=p.pompes.map((po,idx)=>{
     const r=perRel.find(x=>x.pompe_id===po.id);
@@ -16163,6 +16172,8 @@ function renderSaisie(){
     if(isEdit && !r.rapport_pompiste_id)
       action+=`<button type="button" class="sx-btn-sup" title="Supprimer ce relevé mal saisi" onclick="sxSupprimer([${r.id}])">🗑 Supprimer</button>`;
 
+    const origine=isEdit&&r.rapport_pompiste_id
+      ?`<div class="sx-meta sx-origine" title="Mètre confirmé depuis le rapport du pompiste">📨 Rapport pompiste n°${r.rapport_pompiste_id}${r.rapport_statut&&!['CONFIRME','RESOLU'].includes(r.rapport_statut)?' · rapport en cours de vérification':''}</div>`:'';
     const saisiPar=isEdit&&r.cree_par_nom
       ?`<div class="sx-meta">Saisi par ${esc(r.cree_par_nom)}${(r.modifie_par_nom&&r.modifie_par_nom!==r.cree_par_nom)?` · modifié par ${esc(r.modifie_par_nom)}`:''}</div>`:'';
     const pompisteInfo=!isEdit?'':(r.pompiste_nom
@@ -16174,7 +16185,7 @@ function renderSaisie(){
       <div class="sx-id">
         <div class="sx-nom">${esc(po.nom)}</div>
         <div class="row-badge">${statut}</div>
-        ${saisiPar}${pompisteInfo}
+        ${origine}${saisiPar}${pompisteInfo}
       </div>
       <div class="sx-field">
         <label for="sx-av-${po.id}">Mètre avant</label>
@@ -20591,7 +20602,9 @@ async function pspLigne(id, pompe, confirmer){
   const av = v('avant'), ap = v('apres');
   if(isNaN(av) || isNaN(ap)) return notify('Index invalide.', 'err');
   _pspAction(id, `lignes/${pompe}/confirmer`, {metter_avant:av, metter_apres:ap})
-    .then(() => { const s = _pspS(id); if(s.index) delete s.index[pompe]; }).catch(()=>{});
+    .then(r => { const s = _pspS(id); if(s.index) delete s.index[pompe];
+      const l = (r?.lignes||[]).find(x => x.pompe_id === pompe);
+      if(l?.journal?.de_ce_rapport) notify(`${l.pompe_nom} confirmé : il est dans la Saisie (${_pspDate(r.date)}).`, 'ok'); }).catch(()=>{});
 }
 // Valeurs tapées par le superviseur dans les index non confirmés
 function _pspValeur(id, pompe, k, defaut){ const v = _pspS(id).index?.[pompe]?.[k]; return v != null ? esc(String(v)) : defaut; }

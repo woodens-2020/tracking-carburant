@@ -252,11 +252,12 @@ def test_journal_comme_le_module_saisie(client):
     assert j["resume"]["total_gallons"] == 0 and j["resume"]["nb_en_attente"] == 1 and j["resume"]["gallons_en_attente"] == 50
     assert [e["pompe_id"] for e in journal(pompiste_id=emp_id)["entries"]] == [pompe]
     assert gallons_du_jour() == avant                                 # rapport du jour / caisse inchangés
-    # Correction d'un mètre : toujours en attente, valeur corrigée affichée
+    # Mètre confirmé (corrigé) par la direction : il entre aussitôt au journal / dans la Saisie
     _sup(client, rid, f"lignes/{pompe}/confirmer", metter_avant=10, metter_apres=58)
     j = journal(pompe_id=pompe)
-    assert j["entries"][0]["en_attente"] and j["entries"][0]["metter_apres"] == 58 and gallons_du_jour() == avant
-    # Finalisation : les chiffres entrent dans le système
+    assert len(j["entries"]) == 1 and j["entries"][0]["en_attente"] is False and j["entries"][0]["metter_apres"] == 58
+    assert abs(gallons_du_jour() - avant - 48) < 1e-6
+    # Finalisation : le rapport est clos, les chiffres restent les mêmes
     _sup(client, rid, "billetterie", confirme=True)
     _sup(client, rid, "ecart", confirme=True)
     r = _sup(client, rid, "finaliser", note=9, commentaire="Index relu : 58")
@@ -728,3 +729,38 @@ def test_supprimer_releves_et_rapport_mal_saisis(client):
     # Les pompes sont libérées : le pompiste peut refaire son rapport
     assert p.post("/api/pompiste/compteurs", json={"date": jour, "charte_acceptee": True,
               "lignes": [{"pompe_id": pompe, "metter_avant": 0, "metter_apres": 20, "debut_confirme": True}]}).status_code == 201
+
+
+def test_metre_confirme_entre_dans_la_saisie(client):
+    """Dès que la direction confirme un mètre d'un rapport pompiste, il est
+    dans la Saisie (journal), attribué au pompiste ; « reprendre » l'en retire ;
+    le nettoyage du démarrage le garde."""
+    from tz_utils import today_haiti
+    import main as _m
+    jour = str(today_haiti())
+    pompe = _produit(client, 500)
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Con", "nom": "Firme"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    assert p.post("/api/pompiste/compteurs", json={"date": jour, "charte_acceptee": True,
+              "lignes": [{"pompe_id": pompe, "metter_avant": 0, "metter_apres": 40, "debut_confirme": True}]}).status_code == 201
+    rap = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 20}]}).json()
+    dans_saisie = lambda: [x for x in client.get(f"/api/releves?date={jour}", headers=H).json() if x["pompe_id"] == pompe]
+    assert dans_saisie() == []                                     # soumis, pas encore confirmé
+    r = client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/lignes/{pompe}/confirmer", headers=H,
+                    json={"metter_avant": 0, "metter_apres": 40})
+    assert r.status_code == 200 and not any("non écrit" in a for a in r.json()["avertissements"]), r.text
+    x = dans_saisie()
+    assert len(x) == 1 and float(x[0]["metter_apres"]) == 40 and x[0]["pompiste_nom"] == "Con Firme" \
+        and x[0]["rapport_pompiste_id"] == rap["id"]
+    from database import SessionLocal
+    from pompiste_routes import nettoyer_journal_anticipe
+    with SessionLocal() as s:
+        nettoyer_journal_anticipe(s)
+    assert len(dans_saisie()) == 1                                 # gardé au redémarrage
+    # Correction puis reprise
+    client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/lignes/{pompe}/confirmer", headers=H,
+                json={"metter_avant": 0, "metter_apres": 38})
+    assert float(dans_saisie()[0]["metter_apres"]) == 38
+    assert client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/lignes/{pompe}/reprendre", headers=H).status_code == 200
+    assert dans_saisie() == []
