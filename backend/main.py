@@ -2153,6 +2153,51 @@ def _releve_precedent(db: Session, pompe_id: int, d: date_type, periode: str) ->
     return meilleur
 
 
+def _releve_suivant(db: Session, pompe_id: int, d: date_type, periode: str) -> Optional[Releve]:
+    """Premier relevé de la pompe strictement après (d, periode)."""
+    rang = {"Matin": 0, "Apres-midi": 1}
+    cible = (d, rang.get(periode, 9))
+    meilleur, cle_meilleure = None, None
+    for r in (db.query(Releve)
+              .filter(Releve.pompe_id == pompe_id, Releve.date >= d)
+              .order_by(Releve.date.asc())
+              .limit(10).all()):
+        cle = (r.date, rang.get(r.periode, 9))
+        if cle > cible and (cle_meilleure is None or cle < cle_meilleure):
+            meilleur, cle_meilleure = r, cle
+    return meilleur
+
+
+def _reprendre_suivant(db: Session, pompe_id: int, d: date_type, periode: str) -> Optional[str]:
+    """Rapports entrés dans le désordre : quand un relevé est ajouté, modifié
+    ou supprimé au milieu, le relevé SUIVANT de la pompe est recalculé. Son
+    écart enregistré disparaît si le compteur reprend maintenant exactement ;
+    sinon il est mis à jour et un avertissement est rendu."""
+    nxt = _releve_suivant(db, pompe_id, d, periode)
+    if not nxt:
+        return None
+    prec = _releve_precedent(db, pompe_id, nxt.date, nxt.periode)
+    base = float(prec.metter_apres) if prec else getattr(nxt.pompe, "metre_depart", None)
+    if base is None:
+        return None
+    ecart = round(float(nxt.metter_avant) - float(base), 4)
+    per = "Matin" if nxt.periode == "Matin" else "Après-midi"
+    quand = f"{nxt.date.strftime('%d/%m/%Y')} ({per})"
+    msg = None
+    if abs(ecart) <= TOLERANCE_ECART_COMPTEUR:
+        if nxt.ecart_compteur is not None or nxt.motif_ecart_compteur:
+            nxt.ecart_compteur, nxt.motif_ecart_compteur = None, None
+            msg = (f"✓ {nxt.pompe.nom} : le relevé du {quand} reprend maintenant exactement à {base:.3f} — "
+                   "l'écart qui y était noté a disparu.")
+    else:
+        if nxt.motif_ecart_compteur:
+            nxt.ecart_compteur = ecart
+        msg = (f"{nxt.pompe.nom} : le relevé suivant, du {quand}, commence à {float(nxt.metter_avant):.3f} alors que le "
+               f"précédent finit à {base:.3f} — écart de {abs(ecart):.3f} gal. Vérifiez l'un des deux.")
+    db.commit()
+    return msg
+
+
 def _prix_vente_a_date(db: Session, produit_id: int, d: date_type) -> Optional[float]:
     pv = (db.query(PrixVente)
           .filter(PrixVente.produit_id == produit_id, PrixVente.date_effet <= d)
@@ -2735,6 +2780,11 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
     db.commit(); db.refresh(r)
 
     avertissements = []
+    # Rapport rentré avant celui qui le précède (ou rattrapage) : le relevé
+    # suivant de la pompe est remis à jour par rapport à celui-ci.
+    suite = _reprendre_suivant(db, data.pompe_id, data.date, data.periode)
+    if suite:
+        avertissements.append(suite)
     if prix_officiel is not None and abs(prix_officiel - data.prix_gallon) > 0.0005:
         avertissements.append(
             f"Prix appliqué : {prix_officiel:g} G/gal (prix en vigueur le "
@@ -2888,12 +2938,14 @@ def supprimer_releves(data: SuppressionRelevesIn, request: Request, db: Session 
     trace = [{"id": r.id, "date": str(r.date), "periode": r.periode, "pompe": r.pompe.nom if r.pompe else r.pompe_id,
               "avant": float(r.metter_avant), "apres": float(r.metter_apres), "prix": float(r.prix_gallon),
               "pompiste_id": r.pompiste_id} for r in rows]
+    places = [(r.pompe_id, r.date, r.periode) for r in rows]
     for r in rows:
         db.query(ResolutionMetter).filter_by(releve_id=r.id).delete()
         db.delete(r)
     _tracer(db, request, "releves_supprimes", {"motif": motif[:300], "releves": trace})
     db.commit()
-    return {"supprimes": len(rows)}
+    avertissements = [m for m in (_reprendre_suivant(db, *pl) for pl in places) if m]
+    return {"supprimes": len(rows), "avertissements": avertissements}
 
 
 class ReleveAssignerPompisteIn(BaseModel):

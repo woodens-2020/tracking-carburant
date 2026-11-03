@@ -17288,6 +17288,7 @@ async function sxSupprimer(ids){
   try{
     const r=await POST('/releves/supprimer',{ids, motif});
     toast(`${r.supprimes} relevé${r.supprimes>1?'s':''} supprimé${r.supprimes>1?'s':''} : la place est libre.`,'ok');
+    (r.avertissements||[]).forEach(m=>toast(m, m.startsWith('✓')?'ok':'inf'));
     await loadSaisie();
     if(currentPage==='home') loadHome();
   }catch(e){ toast(e.message,'err'); }
@@ -17342,7 +17343,7 @@ async function doSave(){
 
   if(ok)   toast(t('saisie.save.ok',{n:ok}),'ok');
   if(errs) toast(t('saisie.save.err',{n:errs,msg:lastErrMsg}),'err');
-  avertissements.forEach(a=>toast(a,'inf'));
+  avertissements.forEach(a=>toast(a, a.startsWith('✓')?'ok':'inf'));
 
   if(ok){
     const choisi=parseInt(sxPompiste||'0',10);

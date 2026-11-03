@@ -173,3 +173,34 @@ def test_description_de_depense_obligatoire(client):
     r = client.post("/api/depenses", headers=H, json={
         "categorie": "Electricite", "description": "   ", "montant": 100, "date_depense": "2026-07-16"})
     assert r.status_code == 400 and "description" in r.json()["detail"].lower()
+
+
+def test_rapports_entres_dans_le_desordre_se_corrigent(client):
+    """On entre d'abord le jour 3 (écart avec motif), puis le jour 2 qui
+    manquait : le jour 3 reprend exactement, son écart noté disparaît, le
+    journal n'a plus d'anomalie. Un jour 2 mal tapé est signalé."""
+    import time
+    H = {"X-API-Key": "smoke-test-key"}
+    pid = client.post("/api/produits", headers=H, json={"nom": f"Desordre-{time.time_ns()}", "prix_gallon": 100}).json()["id"]
+    pompe = client.post(f"/api/produits/{pid}/pompes", headers=H, json={"nom": f"D-{time.time_ns()}"}).json()["id"]
+    rel = lambda d, av, ap, motif=None: client.post("/api/releves", headers=H, json={
+        "date": d, "periode": "Matin", "pompe_id": pompe, "prix_gallon": 100, "metter_avant": av, "metter_apres": ap,
+        "motif_ecart_compteur": motif})
+    assert rel("2025-03-01", 0, 100).status_code in (200, 201)
+    assert rel("2025-03-03", 150, 200).status_code == 409                       # écart sans motif : refusé
+    j3 = rel("2025-03-03", 150, 200, "jour 2 pas encore saisi")
+    assert j3.status_code in (200, 201)
+    j = client.get(f"/api/journal?date_debut=2025-03-01&date_fin=2025-03-31&pompe_id={pompe}", headers=H).json()
+    assert [e["statut"] for e in sorted(j["entries"], key=lambda e: e["date"])] == ["ok", "alerte"]
+    # Le jour 2 qui manquait : 100 → 150
+    r = rel("2025-03-02", 100, 150)
+    assert r.status_code in (200, 201), r.text
+    assert any("reprend maintenant exactement" in a for a in r.json().get("avertissements", []))
+    rows = {x["date"]: x for x in client.get("/api/releves?date=2025-03-03", headers=H).json() if x["pompe_id"] == pompe}
+    assert rows["2025-03-03"]["ecart_compteur"] is None and rows["2025-03-03"]["motif_ecart_compteur"] is None
+    j = client.get(f"/api/journal?date_debut=2025-03-01&date_fin=2025-03-31&pompe_id={pompe}", headers=H).json()
+    assert all(e["statut"] == "ok" for e in j["entries"]) and len(j["entries"]) == 3
+    assert abs(sum(e["quantite"] for e in j["entries"]) - 200) < 1e-6
+    # Jour 2 corrigé avec une faute de frappe : le jour 3 est signalé
+    r = rel("2025-03-02", 100, 140)
+    assert any("relevé suivant" in a for a in r.json().get("avertissements", []))
