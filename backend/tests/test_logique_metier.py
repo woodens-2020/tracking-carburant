@@ -204,3 +204,19 @@ def test_rapports_entres_dans_le_desordre_se_corrigent(client):
     # Jour 2 corrigé avec une faute de frappe : le jour 3 est signalé
     r = rel("2025-03-02", 100, 140)
     assert any("relevé suivant" in a for a in r.json().get("avertissements", []))
+
+
+def test_rapport_certifie(client):
+    """Certifié (check bleu) : compteur continu, et rapport pompiste finalisé."""
+    import time
+    H = {"X-API-Key": "smoke-test-key"}
+    pid = client.post("/api/produits", headers=H, json={"nom": f"Cert-{time.time_ns()}", "prix_gallon": 100}).json()["id"]
+    pompe = client.post(f"/api/produits/{pid}/pompes", headers=H, json={"nom": f"C-{time.time_ns()}"}).json()["id"]
+    rel = lambda d, av, ap, motif=None: client.post("/api/releves", headers=H, json={
+        "date": d, "periode": "Matin", "pompe_id": pompe, "prix_gallon": 100, "metter_avant": av, "metter_apres": ap,
+        "motif_ecart_compteur": motif}).json()
+    assert rel("2025-04-01", 0, 50)["certifie"] is True
+    assert rel("2025-04-02", 50, 80)["certifie"] is True                    # reprend exactement
+    assert rel("2025-04-03", 90, 120, "essai pompe")["certifie"] is False   # écart noté : pas certifié
+    rows = [x for x in client.get("/api/releves?date=2025-04-02", headers=H).json() if x["pompe_id"] == pompe]
+    assert rows[0]["certifie"] is True

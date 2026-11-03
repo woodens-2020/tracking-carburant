@@ -602,6 +602,10 @@ canvas{display:block}
 .psp-sup{display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)}
 .psp-sup .psp-lien{color:var(--muted)}.psp-sup .psp-lien:hover{color:#ef4444}
 .sx-origine{color:#a78bfa}
+.cert{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;color:#3b82f6;background:rgba(37,99,235,.12);
+  border:1px solid rgba(37,99,235,.35);border-radius:999px;padding:2px 9px 2px 3px;white-space:nowrap;vertical-align:middle}
+.cert::before{content:'✓';display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:#2563eb;color:#fff;font-size:10.5px;font-weight:900}
+.cert.grand{font-size:13px;padding:4px 12px 4px 4px}.cert.grand::before{width:20px;height:20px;font-size:12px}
 .jr-val{background:none;border:1px dashed transparent;border-radius:8px;cursor:pointer;font:inherit;font-family:var(--mono);
   padding:4px 6px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .jr-val .jr-pen{font-size:12px;opacity:.55;transition:opacity .15s}
@@ -16286,7 +16290,7 @@ function renderSaisie(){
                 data-is-edit="${isEdit?'1':'0'}" data-nb-mod="${nbMod}" data-av="${av}" data-ap="${ap}" data-ip="${ipVal!=null?ipVal:''}">
       <div class="sx-id">
         <div class="sx-nom">${esc(po.nom)}</div>
-        <div class="row-badge">${statut}</div>
+        <div class="row-badge">${statut}${isEdit&&r.certifie?' <span class="cert" title="Compteur continu et rapport validé">Certifié</span>':''}</div>
         ${origine}${saisiPar}${pompisteInfo}
         <button type="button" class="hm-btn" title="Tous les mètres passés de ${esc(po.nom)}" onclick="hmOuvrir(${po.id})">🕘 Historique</button>
       </div>
@@ -16316,7 +16320,8 @@ function renderSaisie(){
   el.innerHTML=`
     <div class="sx-ctx">
       <div>
-        <div class="sx-ctx-titre">${esc(p.nom)} · ${label}</div>
+        <div class="sx-ctx-titre">${esc(p.nom)} · ${label}${nbFaits===p.pompes.length && p.pompes.length && perRel.every(r=>r.certifie)
+          ?' <span class="cert grand" title="Toutes les pompes sont saisies, compteurs continus et rapports validés">Rapport certifié</span>':''}</div>
         <div class="sx-ctx-sous">${frDate(currentDate)} · ${nbFaits}/${p.pompes.length} pompe(s) enregistrée(s) · prix ${fmtNum(pxDefaut,2)} G/gal (Paramètres › Prix de vente)</div>
       </div>
     </div>
@@ -17885,6 +17890,7 @@ function renderJournal(data){
       :isAl
         ?'<span style="color:var(--blue);font-weight:700">⚠ Alerte</span>'
         :'<span style="color:var(--green)">✓ OK</span>';
+    const certifie=!e.en_attente && ['ok','resolu'].includes(e.statut) && (e.source!=='pompiste' || ['CONFIRME','RESOLU'].includes(e.rapport_statut));
 
     return `<tr class="${rowCls}${e.en_attente?' jr-attente':''}">
       <td class="num" style="white-space:nowrap">${frDate(e.date)}</td>
@@ -17907,7 +17913,7 @@ function renderJournal(data){
       <td class="tr num c-teal">${fmtGal(e.quantite)}</td>
       <td class="tr num c-amber">${fmtG(e.montant_vente)}</td>
       <td><span class="type-pill ${pillCls}">${typeLabel}</span></td>
-      <td>${statHtml}</td>
+      <td>${statHtml}${certifie?'<div style="margin-top:3px"><span class="cert" title="Compteur continu et rapport validé">Certifié</span></div>':''}</td>
     </tr>`;
   }).join('');
 
@@ -20621,7 +20627,7 @@ function pspRendreListe(){
               <td class="r">${r.statut === 'EN_COURS' ? '—' : _pspG(r.montant_compte)}</td>
               <td class="r">${r.statut === 'EN_COURS' ? '—' : _pspE(r.ecart_final)}</td>
               <td class="psp-muted">${verif}</td>
-              <td><span class="psp-badge ${r.statut}">${_PSP_LIB[r.statut]}</span></td>
+              <td><span class="psp-badge ${r.statut}">${_PSP_LIB[r.statut]}</span>${r.certifie?' <span class="cert">Certifié</span>':''}</td>
               <td class="r"><button class="btn ${['SOUMIS','PROBLEME'].includes(r.statut)?'btn-primary':'btn-secondary'} psp-mini">${['SOUMIS','PROBLEME'].includes(r.statut)?'Ouvrir et corriger':'Ouvrir'}</button></td></tr>`;
           }).join('')}</tbody></table></div>`).join('')}`
     : `<div class="psp-card"><b>Aucun rapport pour ce filtre.</b>
@@ -20693,7 +20699,7 @@ function pspCarteLecture(r){
   const billets = (r.billetterie||[]).map(b => { const n = (b.liasses||0) * 100 + (b.billets||0);
     return `<tr><td>${Number(b.coupure).toLocaleString('fr-FR')} G</td><td class="r">${n}</td><td class="r">${_pspG(b.coupure*n)}</td></tr>`; }).join('');
   return `<div class="psp-card"><div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspPer(r.periode)} ${_pspDate(r.date)}
-      <span class="psp-badge ${r.statut}" style="margin-left:6px">${_PSP_LIB[r.statut]}</span></div>
+      <span class="psp-badge ${r.statut}" style="margin-left:6px">${_PSP_LIB[r.statut]}</span>${r.certifie?' <span class="cert grand">Rapport certifié</span>':''}</div>
       <div class="psp-muted">${r.traite_par_nom ? 'par ' + esc(r.traite_par_nom) : ''}${r.traite_at ? ' · ' + new Date(r.traite_at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : ''}</div></div>
     ${r.note_superviseur != null ? `<div class="psp-kpi" style="display:inline-block;margin-bottom:10px"><span>Note du rapport</span><b>${r.note_superviseur}/10</b></div>` : ''}
     ${r.probleme_commentaire ? `<div class="psp-err" style="margin:0 0 8px">Problème : ${esc(r.probleme_commentaire)}</div>` : ''}
@@ -20817,7 +20823,7 @@ function pspCarte(r){
   const peutFinaliser = toutesLignes && r.billetterie_confirmee && r.ecart_confirme;
   return `<div class="psp-card">
     <div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspPer(r.periode)} ${_pspDate(r.date)}
-        <span class="psp-badge ${r.statut}" style="margin-left:6px">${_PSP_LIB[r.statut]}</span></div>
+        <span class="psp-badge ${r.statut}" style="margin-left:6px">${_PSP_LIB[r.statut]}</span>${r.certifie?' <span class="cert grand">Rapport certifié</span>':''}</div>
       <div class="psp-muted">soumis ${r.soumis_at ? new Date(r.soumis_at).toLocaleString('fr-FR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : ''} · charte acceptée</div></div>
     ${pb ? `<div class="psp-err" style="margin:0 0 10px">Problème signalé par ${esc(r.probleme_par_nom||'')} : ${esc(r.probleme_commentaire||'')}</div>` : ''}
     ${r.note_pompiste ? `<div class="psp-warn" style="color:var(--text);margin:0 0 10px"><b>Note du pompiste :</b> ${esc(r.note_pompiste)}</div>` : ''}

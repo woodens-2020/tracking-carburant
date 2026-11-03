@@ -413,6 +413,7 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
         lignes.append(d)
     return {
         "id": r.id, "date": str(r.date), "periode": r.periode, "statut": r.statut,
+        "certifie": r.statut in ("CONFIRME", "RESOLU"),
         "pompiste_id": r.utilisateur_id, "pompiste_nom": _nom(r.utilisateur),
         "charte_acceptee_at": r.charte_acceptee_at.isoformat() if r.charte_acceptee_at else None,
         "billetterie": r.billetterie or [], "monnaie": float(r.monnaie or 0),

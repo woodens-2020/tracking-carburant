@@ -2905,6 +2905,10 @@ def _releve_dict(r: Releve):
         "source":       "pompiste" if r.rapport_pompiste_id else "saisie",
         "rapport_pompiste_id": r.rapport_pompiste_id,
         "rapport_statut": r.rapport_pompiste.statut if r.rapport_pompiste else None,
+        # Certifié : le compteur reprend là où il s'était arrêté (aucun écart
+        # noté) et, s'il vient d'un rapport pompiste, ce rapport est finalisé.
+        "certifie": r.ecart_compteur is None and r.metter_apres >= r.metter_avant
+                    and (not r.rapport_pompiste or r.rapport_pompiste.statut in ("CONFIRME", "RESOLU")),
     }
 
 
