@@ -622,26 +622,40 @@ canvas{display:block}
 .hm-kpi{border:1px solid var(--border);border-radius:10px;padding:9px 12px}
 .hm-kpi span{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
 .hm-kpi b{font-family:var(--mono);font-size:16px}
-.hm-table{width:100%;border-collapse:collapse;font-size:13px}
-.hm-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:6px 8px;border-bottom:2px solid var(--border);position:sticky;top:-14px;background:var(--card,#0f172a)}
-.hm-table td{padding:8px;border-bottom:1px solid var(--border);vertical-align:top}
-.hm-table .r{text-align:right;font-family:var(--mono);white-space:nowrap}
-.hm-table tr.attente td{opacity:.7;font-style:italic}
-.hm-st{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:#22c55e}
+.hm-st{display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;flex:0 0 10px}
 .hm-st.alerte{background:#f59e0b}.hm-st.erreur{background:#ef4444}.hm-st.attente{background:#a78bfa}
-.hm-src{display:inline-block;white-space:nowrap;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--border);color:var(--muted)}
+.hm-src{display:inline-block;white-space:nowrap;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--border);color:var(--muted)}
 .hm-src.pompiste{background:rgba(167,139,250,.15);color:#a78bfa}
-.hm-note{color:var(--muted);font-size:11.5px;margin-top:2px}
 .hm-vide{text-align:center;color:var(--muted);padding:40px 10px}
 .hm-plus{display:block;margin:12px auto 0}
+.hm-legende{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin:-4px 0 12px}
+.hm-legende span{display:inline-flex;align-items:center;gap:6px}
+/* Un relevé = une carte : Début → Fin, puis ce qui a été vendu */
+.hm-rel{border:1px solid var(--border);border-left:4px solid #22c55e;border-radius:12px;padding:12px 14px;background:var(--panel,transparent)}
+.hm-rel.alerte{border-left-color:#f59e0b}.hm-rel.erreur{border-left-color:#ef4444}.hm-rel.attente{border-left-color:#a78bfa;opacity:.85}
+.hm-rel-tete{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.hm-rel-tete b{font-size:14.5px}.hm-rel-tete .hm-per{font-size:12px;color:var(--muted);font-weight:600}
+.hm-rel-tete .hm-qui{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.hm-compteur{display:grid;grid-template-columns:1fr auto 1fr auto minmax(150px,1.1fr);gap:10px;align-items:stretch}
+.hm-idx{border:1px solid var(--border);border-radius:10px;padding:8px 12px;background:var(--bg)}
+.hm-idx small{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.hm-idx b{display:block;font-family:var(--mono);font-size:19px;letter-spacing:.01em;margin-top:2px;white-space:nowrap}
+.hm-idx em{display:block;font-style:normal;font-size:11px;color:var(--muted)}
+.hm-fleche{display:grid;place-items:center;color:var(--muted);font-size:20px}
+.hm-vendu{border-radius:10px;padding:8px 12px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3)}
+.hm-vendu small{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--orange)}
+.hm-vendu b{display:block;font-family:var(--mono);font-size:19px;white-space:nowrap}
+.hm-vendu span{display:block;font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+/* Entre deux relevés : le compteur reprend-il là où il s'était arrêté ? */
+.hm-lien{display:flex;align-items:center;gap:8px;margin:0 0 0 22px;padding:6px 0 6px 14px;border-left:2px dashed var(--border);font-size:12px;color:var(--muted)}
+.hm-lien.ok{color:#22c55e}.hm-lien.saut{color:#f59e0b;font-weight:700}.hm-lien.recul{color:#ef4444;font-weight:700}
 @media (max-width:720px){
-  .hm-table thead{display:none}
-  .hm-table,.hm-table tbody,.hm-table tr,.hm-table td{display:block;width:100%}
-  .hm-table tr{border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:8px}
-  .hm-table td{border:0;padding:3px 0;display:flex;justify-content:space-between;gap:10px;text-align:right}
-  .hm-table td::before{content:attr(data-l);color:var(--muted);font-size:11.5px;font-weight:700;text-align:left}
-  .hm-table td.hm-quand{font-weight:700;font-size:14px}.hm-table td.hm-quand::before{content:none}
   .hm-panneau{width:100%}
+  .hm-compteur{grid-template-columns:1fr auto 1fr}
+  .hm-compteur .hm-egal{display:none}
+  .hm-vendu{grid-column:1 / -1;display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .hm-idx b,.hm-vendu b{font-size:17px}
+  .hm-rel-tete .hm-qui{margin-left:0;width:100%}
 }
 .sx-chip-attente{background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.35)}
 .sx-pompe.sx-attente{opacity:.85;border-style:dashed}
@@ -17178,32 +17192,47 @@ function hmRendre(){
   if(!L.length){ c.innerHTML=`<div class="hm-vide">Aucun relevé pour ${esc(HM.nom)} sur cette période.</div>`; return; }
   const gal=ok.reduce((a,e)=>a+(e.quantite||0),0), mnt=ok.reduce((a,e)=>a+(e.montant_vente||0),0);
   const anomalies=ok.filter(e=>e.statut!=='ok').length, dernier=ok[0];
+  const idx=v=>v==null?'—':Number(v).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3});
   const per=p=>p==='Matin'?'Matin':(p==='Apres-midi'?'Après-midi':p);
-  const lignes=L.slice(0, HM.vus).map(e=>{
+  const vus=L.slice(0, HM.vus);
+  // Liste du plus récent au plus ancien : entre une carte et la suivante (plus
+  // ancienne), on compare son « Début » à la « Fin » de la précédente.
+  const lien=(recent, ancien)=>{
+    if(!ancien) return '';
+    const d=Number(recent.metter_avant)-Number(ancien.metter_apres);
+    if(Math.abs(d)<=0.001) return `<div class="hm-lien ok">✓ Le compteur reprend exactement à ${idx(ancien.metter_apres)}</div>`;
+    return d>0
+      ? `<div class="hm-lien saut">⚠ Saut de ${idx(d)} gal : la fin précédente était ${idx(ancien.metter_apres)}, le début suivant ${idx(recent.metter_avant)} (gallons sortis sans être vendus dans le système)</div>`
+      : `<div class="hm-lien recul">⛔ Le compteur a reculé de ${idx(-d)} : fin précédente ${idx(ancien.metter_apres)}, début suivant ${idx(recent.metter_avant)}</div>`;
+  };
+  const carte=e=>{
     const st=e.en_attente?'attente':e.statut;
     const src=e.source==='pompiste'
-      ? `<span class="hm-src pompiste">📨 Rapport n°${e.rapport_pompiste_id}${e.en_attente?' · en attente':''}</span>`
+      ? `<span class="hm-src pompiste">📨 Rapport n°${e.rapport_pompiste_id}${e.en_attente?' · à confirmer':''}</span>`
       : `<span class="hm-src">✍ Saisie</span>`;
-    const note=e.statut!=='ok' && e.commentaire ? `<div class="hm-note">${esc(e.commentaire)}</div>` : '';
-    return `<tr class="${e.en_attente?'attente':''}">
-      <td class="hm-quand"><span class="hm-st ${st}" title="${esc(e.en_attente?'Rapport en attente de confirmation':(e.statut==='ok'?'Continuité correcte':e.commentaire||''))}"></span>${frDate(e.date)} · ${per(e.periode)}${note}</td>
-      <td class="r" data-l="Avant">${fmtNum(e.metter_avant,3)}</td>
-      <td class="r" data-l="Après">${fmtNum(e.metter_apres,3)}</td>
-      <td class="r" data-l="Gallons">${fmtGal(e.quantite)}</td>
-      <td class="r" data-l="Montant">${fmtG(e.montant_vente)}</td>
-      <td data-l="Pompiste">${e.pompiste_nom?esc(e.pompiste_nom):'<span class="c-dim">—</span>'}</td>
-      <td data-l="Source">${src}</td></tr>`;
-  }).join('');
+    return `<div class="hm-rel ${st}">
+      <div class="hm-rel-tete"><span class="hm-st ${st}"></span><b>${frDate(e.date)}</b><span class="hm-per">${per(e.periode)}</span>
+        <span class="hm-qui">${e.pompiste_nom?`⛽ ${esc(e.pompiste_nom)}`:'<span>Pompiste non indiqué</span>'}${src}</span></div>
+      <div class="hm-compteur">
+        <div class="hm-idx"><small>Début · mètre avant</small><b>${idx(e.metter_avant)}</b><em>index au départ</em></div>
+        <div class="hm-fleche" aria-hidden="true">→</div>
+        <div class="hm-idx"><small>Fin · mètre après</small><b>${idx(e.metter_apres)}</b><em>index à la fin</em></div>
+        <div class="hm-fleche hm-egal" aria-hidden="true">=</div>
+        <div class="hm-vendu"><small>Vendu</small><b>${fmtGal(e.quantite)}</b><span>${fmtG(e.montant_vente)} · ${fmtNum(e.prix_gallon,2)} G/gal</span></div>
+      </div></div>`;
+  };
   c.innerHTML=`
     <div class="hm-kpis">
       <div class="hm-kpi"><span>Relevés</span><b>${ok.length}</b></div>
-      <div class="hm-kpi"><span>Gallons · ${esc(HM.produit)}</span><b>${fmtGal(gal)}</b></div>
+      <div class="hm-kpi"><span>Vendu · ${esc(HM.produit)}</span><b>${fmtGal(gal)}</b></div>
       <div class="hm-kpi"><span>Ventes</span><b>${fmtG(mnt)}</b></div>
-      <div class="hm-kpi"><span>Dernier index</span><b>${dernier?fmtNum(dernier.metter_apres,3):'—'}</b></div>
+      <div class="hm-kpi"><span>Index actuel</span><b>${dernier?idx(dernier.metter_apres):'—'}</b></div>
       <div class="hm-kpi"><span>Anomalies</span><b style="color:${anomalies?'#f59e0b':'inherit'}">${anomalies}</b></div>
     </div>
-    <table class="hm-table"><thead><tr><th>Date</th><th class="r">Avant</th><th class="r">Après</th><th class="r">Gallons</th><th class="r">Montant</th><th>Pompiste</th><th>Source</th></tr></thead>
-      <tbody>${lignes}</tbody></table>
+    <div class="hm-legende"><span><i class="hm-st"></i>Correct</span><span><i class="hm-st alerte"></i>Saut</span>
+      <span><i class="hm-st erreur"></i>Erreur</span><span><i class="hm-st attente"></i>Rapport à confirmer</span>
+      <span>Vendu = Fin − Début</span></div>
+    ${vus.map((e,i)=>carte(e) + lien(e, L[i+1])).join('')}
     ${L.length>HM.vus?`<button class="btn btn-secondary hm-plus" onclick="HM.vus+=50;hmRendre()">Voir plus (${L.length-HM.vus} restants)</button>`:''}`;
 }
 
