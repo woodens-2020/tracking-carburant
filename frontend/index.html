@@ -602,6 +602,15 @@ canvas{display:block}
 .psp-sup{display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)}
 .psp-sup .psp-lien{color:var(--muted)}.psp-sup .psp-lien:hover{color:#ef4444}
 .sx-origine{color:#a78bfa}
+.jr-crayon{background:none;border:1px solid transparent;border-radius:8px;cursor:pointer;font-size:14px;padding:3px 6px;line-height:1}
+.jr-crayon:hover{border-color:var(--orange);background:rgba(249,115,22,.1)}
+.jc-grille{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:end;margin:8px 0}
+.jc-grille label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px}
+.jc-grille input{width:100%;font-family:var(--mono);font-size:18px;text-align:right}
+.jc-fleche{padding-bottom:10px;color:var(--muted);font-size:18px}
+.jc-calc{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px;padding:8px 10px;border-radius:9px;background:var(--bg);border:1px solid var(--border);margin-bottom:8px}
+.jc-calc b{font-family:var(--mono)}.jc-ok{color:#22c55e}.jc-saut{color:#f59e0b}.jc-ko{color:#ef4444}
+.sup-boite .jc-motif{margin-top:6px}
 /* Historique des mètres d'une pompe */
 .hm-btn{display:inline-flex;align-items:center;gap:5px;background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);
   cursor:pointer;font:inherit;font-size:12px;font-weight:600;padding:3px 8px;margin-top:6px}
@@ -17686,8 +17695,10 @@ async function jrRouvrirResolution(id){
   catch(e){ notify(e.message,'err'); }
 }
 
+let _JR_ENTRIES=[];
 function renderJournal(data){
   const {entries,resume}=data;
+  _JR_ENTRIES=entries;
   const taux=resume.taux_conformite??100;
   const tauxCol=taux>=99?'var(--green)':taux>=90?'var(--blue)':'var(--red)';
 
@@ -17824,6 +17835,7 @@ function renderJournal(data){
         ${e.en_attente
           ?`<div class="jres-pied" style="color:var(--muted)">⏳ Rapport pompiste pas encore finalisé : l'écart pourra être résolu après la validation.</div>`
           :`<div class="jres-pied" id="jres-pied-${e.id}">
+              <button class="btn btn-primary btn-sm" onclick="jrCorriger(${e.id})">✏️ Corriger le mètre</button>
               <button class="btn btn-secondary btn-sm" onclick="jrOuvrirResolution(${e.id})">✓ Marquer comme résolu</button>
             </div>`}
       </div>`;
@@ -17875,7 +17887,7 @@ function renderJournal(data){
       <td style="font-weight:600">${esc(e.pompe_nom)}</td>
       <td style="font-size:13px">${e.pompiste_nom?esc(e.pompiste_nom):'<span class="c-dim">—</span>'}${!e.en_attente && e.id
         ? ` <button class="btn-ghost" style="font-size:12px;padding:0 4px" title="Attribuer ce relevé à un pompiste"
-             onclick="openPompisteModal([{releveId:${e.id}, pompeNom:${esc(JSON.stringify(e.pompe_nom)).replace(/"/g,'&quot;')}, pompisteId:${e.pompiste_id||'null'}}])">✏️</button>` : ''}${e.en_attente
+             onclick="openPompisteModal([{releveId:${e.id}, pompeNom:${esc(JSON.stringify(e.pompe_nom)).replace(/"/g,'&quot;')}, pompisteId:${e.pompiste_id||'null'}}])">👤</button>` : ''}${e.en_attente
         ?`<div><span class="jr-src attente" title="Rapport pompiste pas encore finalisé : ni caisse, ni stock, ni totaux">⏳ En attente de validation — non compté</span></div>`
         : e.source==='pompiste'
         ?`<div><span class="jr-src ${['CONFIRME','RESOLU'].includes(e.rapport_statut)?'ok':''}" title="Saisi par le pompiste sur sa tablette">⛽ Espace pompiste · ${
@@ -17888,6 +17900,8 @@ function renderJournal(data){
       <td class="tr num c-amber">${fmtG(e.montant_vente)}</td>
       <td><span class="type-pill ${pillCls}">${typeLabel}</span></td>
       <td>${statHtml}</td>
+      <td class="tr">${!e.en_attente && typeof e.id==='number'
+        ? `<button class="jr-crayon" title="Corriger le mètre avant / après" aria-label="Corriger ${esc(e.pompe_nom)} du ${frDate(e.date)}" onclick="jrCorriger(${e.id})">✏️</button>` : ''}</td>
     </tr>`;
   }).join('');
 
@@ -17907,7 +17921,7 @@ function renderJournal(data){
           <th class="tr">Meter avant</th><th class="tr">Meter après</th>
           <th class="tr">Attendu</th><th class="tr">Décalage</th>
           <th class="tr">Qté (gal)</th><th class="tr">Montant (G)</th>
-          <th>Type</th><th>Statut</th>
+          <th>Type</th><th>Statut</th><th class="tr" title="Corriger un mètre">✏️</th>
         </tr></thead>
         <tbody>${rows}</tbody>
         <tfoot>
@@ -17921,13 +17935,13 @@ function renderJournal(data){
             <td class="tr num c-amber" style="padding:10px 14px;font-size:16px;font-weight:900">
               ${fmtG(totalMontant)}
             </td>
-            <td colspan="2"></td>
+            <td colspan="3"></td>
           </tr>
           ${attente.length?`<tr class="jr-attente-pied"><td colspan="8" style="padding:8px 14px;font-size:12.5px;color:var(--orange)">
               ⏳ En attente de validation (non compté) &mdash; ${attente.length} mètre${attente.length>1?'s':''} de rapports pompistes</td>
             <td class="tr num" style="padding:8px 14px;color:var(--orange)">${fmtGal(attente.reduce((s,e)=>s+(e.quantite||0),0))}</td>
             <td class="tr num" style="padding:8px 14px;color:var(--orange)">${fmtG(attente.reduce((s,e)=>s+(e.montant_vente||0),0))}</td>
-            <td colspan="2"></td></tr>`:''}
+            <td colspan="3"></td></tr>`:''}
         </tfoot>
       </table>
     </div>
@@ -19749,6 +19763,65 @@ function demanderSuppression({titre, texte, lignes=[], bouton='Supprimer'}){
     inp.addEventListener('keydown', e=>{ if(e.key==='Enter') ok(); if(e.key==='Escape') fin(null); });
     setTimeout(()=>inp.focus(), 30);
   });
+}
+
+// Journal Meters : corriger rapidement un mètre (✏️)
+function jrCorriger(id){
+  const e=_JR_ENTRIES.find(x=>x.id===id); if(!e) return;
+  document.getElementById('sup-ov')?.remove();
+  const ov=document.createElement('div');
+  ov.id='sup-ov'; ov.className='sup-ov'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
+  const f3=v=>v==null?'—':Number(v).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3});
+  const per=e.periode==='Matin'?'Matin':'Après-midi';
+  ov.innerHTML=`<div class="sup-boite">
+    <div class="sup-ico" style="background:rgba(249,115,22,.15)">✏️</div>
+    <h3>Corriger ${esc(e.pompe_nom)}</h3>
+    <p>${frDate(e.date)} · ${per}${e.pompiste_nom?' · ⛽ '+esc(e.pompiste_nom):''}${e.metter_attendu!=null?` — fin du relevé précédent : <b>${f3(e.metter_attendu)}</b>`:''}</p>
+    <div class="jc-grille">
+      <div><label for="jc-av">Début · mètre avant</label><input id="jc-av" class="filter-input" inputmode="decimal" value="${e.metter_avant}"></div>
+      <div class="jc-fleche">→</div>
+      <div><label for="jc-ap">Fin · mètre après</label><input id="jc-ap" class="filter-input" inputmode="decimal" value="${e.metter_apres}"></div>
+    </div>
+    <div class="jc-calc" id="jc-calc"></div>
+    <div id="jc-motif-zone" hidden><label for="jc-motif">Motif de l’écart avec le relevé précédent (obligatoire)</label>
+      <input id="jc-motif" class="filter-input jc-motif" maxlength="255" value="${esc(e.motif_saisie||'')}" placeholder="Ex. essai de la pompe, compteur remis à zéro…"></div>
+    <div class="sup-err" id="sup-err"></div>
+    <div class="sup-act"><button class="btn btn-secondary" id="jc-non">Annuler</button><button class="btn btn-primary" id="jc-oui">Enregistrer la correction</button></div></div>`;
+  document.body.appendChild(ov);
+  const num=v=>{ const x=parseFloat(String(v).replace(/\s/g,'').replace(',','.')); return isNaN(x)?null:x; };
+  const maj=()=>{
+    const av=num(document.getElementById('jc-av').value), ap=num(document.getElementById('jc-ap').value), z=document.getElementById('jc-calc');
+    const ecart=(av!=null && e.metter_attendu!=null) ? Math.round((av-e.metter_attendu)*1e4)/1e4 : 0;
+    document.getElementById('jc-motif-zone').hidden=Math.abs(ecart)<=0.001;
+    if(av==null||ap==null){ z.innerHTML='<span class="jc-ko">Tapez les deux index.</span>'; return; }
+    const g=ap-av;
+    z.innerHTML=`<span>Vendu : <b class="${g<0?'jc-ko':''}">${g<0?'impossible (fin < début)':fmtGal(g)}</b>${g>=0?` · ${fmtG(g*e.prix_gallon)}`:''}</span>
+      <span class="${Math.abs(ecart)<=0.001?'jc-ok':(ecart>0?'jc-saut':'jc-ko')}">${e.metter_attendu==null?'Première lecture':(Math.abs(ecart)<=0.001?'✓ Reprend exactement':`Écart ${ecart>0?'+':''}${f3(ecart)} gal`)}</span>`;
+  };
+  const fin=()=>ov.remove();
+  const ok=async()=>{
+    const av=num(document.getElementById('jc-av').value), ap=num(document.getElementById('jc-ap').value), err=document.getElementById('sup-err');
+    if(av==null||ap==null){ err.textContent='Tapez les deux index.'; return; }
+    if(ap<av){ err.textContent='La fin doit être supérieure ou égale au début.'; return; }
+    const zone=document.getElementById('jc-motif-zone'), motif=document.getElementById('jc-motif').value.trim();
+    if(!zone.hidden && motif.length<5){ err.textContent='Indiquez le motif de l’écart (5 caractères minimum).'; document.getElementById('jc-motif').focus(); return; }
+    const b=document.getElementById('jc-oui'); b.disabled=true; b.textContent='Enregistrement…';
+    try{
+      const r=await POST('/releves',{date:e.date, periode:e.periode, pompe_id:e.pompe_id, prix_gallon:e.prix_gallon,
+        metter_avant:av, metter_apres:ap, motif_ecart_compteur:zone.hidden?null:motif});
+      fin();
+      toast(`${e.pompe_nom} du ${frDate(e.date)} corrigé : ${f3(av)} → ${f3(ap)}.`,'ok');
+      (r.avertissements||[]).forEach(m=>toast(m, m.startsWith('✓')?'ok':'inf'));
+      await loadJournal();
+    }catch(x){ b.disabled=false; b.textContent='Enregistrer la correction'; err.textContent=String(x.message).replace(/^\[\d+\]\s*/,''); }
+  };
+  ['jc-av','jc-ap','jc-motif'].forEach(i=>{ const el=document.getElementById(i);
+    el.addEventListener('input', maj); el.addEventListener('keydown', k=>{ if(k.key==='Enter') ok(); if(k.key==='Escape') fin(); }); });
+  document.getElementById('jc-non').onclick=fin;
+  document.getElementById('jc-oui').onclick=ok;
+  ov.addEventListener('click', k=>{ if(k.target===ov) fin(); });
+  maj();
+  setTimeout(()=>{ const a=document.getElementById('jc-ap'); a.focus(); a.select(); }, 30);
 }
 
 function showConfirm(msg, opts={}){
