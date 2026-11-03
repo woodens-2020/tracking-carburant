@@ -2670,6 +2670,17 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
          .filter_by(date=data.date, periode=data.periode, pompe_id=data.pompe_id)
          .first())
 
+    # Une pompe déjà dans un rapport pompiste en attente (envoyé, pas encore
+    # confirmé) a sa place prise pour ce créneau : pas de double saisie.
+    if r is None and not getattr(request.state, "depuis_rapport", None):
+        from pompiste_routes import mettres_en_attente
+        pris = next((x for x in mettres_en_attente(db, data.date, data.periode) if x["pompe_id"] == data.pompe_id), None)
+        if pris:
+            raise HTTPException(409, {"code": "dans_un_rapport", "rapport_id": pris["rapport_id"],
+                                      "message": f"{pompe.nom} est déjà dans le rapport de {pris['pompiste']} "
+                                                 f"(n°{pris['rapport_id']}, en attente) pour ce créneau : confirmez-le dans "
+                                                 "« Rapports pompistes », ou supprimez ce rapport pour libérer la pompe."})
+
     # Règle 1 — le prix vient de l'historique des prix de vente (Paramètres),
     # jamais du navigateur : le chiffre d'affaires doit toujours pouvoir être
     # reconstitué à partir de cet historique. Repli sur le prix envoyé

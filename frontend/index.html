@@ -602,6 +602,9 @@ canvas{display:block}
 .psp-sup{display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)}
 .psp-sup .psp-lien{color:var(--muted)}.psp-sup .psp-lien:hover{color:#ef4444}
 .sx-origine{color:#a78bfa}
+.sx-chip-attente{background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.35)}
+.sx-pompe.sx-attente{opacity:.85;border-style:dashed}
+.per-nb[hidden]{display:none!important}
 .per-nb{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--orange);color:#fff;font-size:11.5px;font-weight:800}
 .sx-qui{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px;padding:10px 14px;border:1px solid var(--border);
   border-left:4px solid var(--orange);border-radius:10px;background:var(--panel2,transparent)}
@@ -16039,6 +16042,8 @@ async function loadSaisie(){
       GET('/releves?date='+currentDate),
     ]);
     await loadIndexPrecedents();
+    // Pompes prises par un rapport pompiste en attente : pas de double saisie
+    try{ sxEnAttente=await GET('/releves/en-attente?date='+currentDate); }catch(e){ sxEnAttente=[]; }
     await sxChargerPompistes();
     renderProdTabs();
     renderSaisie();
@@ -16048,6 +16053,7 @@ async function loadSaisie(){
 
 // Pompiste du rapport saisi à la main : choisi une fois, attribué à chaque
 // relevé enregistré (journal, rapports et filtres par pompiste).
+let sxEnAttente = [];
 let sxPompiste = (() => { try{ return sessionStorage.getItem('sx-pompiste') || ''; }catch(e){ return ''; } })();
 async function sxChargerPompistes(){
   const sel=document.getElementById('sx-pompiste'); if(!sel) return;
@@ -16123,7 +16129,8 @@ function renderSaisie(){
   // Nombre de relevés de ce produit dans chaque période (un rapport pompiste
   // peut être rangé en « Après-midi » : on le voit sans changer d'onglet)
   document.querySelectorAll('.per-sel-btn').forEach(b=>{
-    const n=releves.filter(r=>r.periode===b.dataset.per&&r.produit_id===p.id).length;
+    const n=releves.filter(r=>r.periode===b.dataset.per&&r.produit_id===p.id).length
+      + sxEnAttente.filter(x=>x.periode===b.dataset.per&&p.pompes.some(po=>po.id===x.pompe_id)).length;
     let sp=b.querySelector('.per-nb'); if(!sp){ sp=document.createElement('span'); sp.className='per-nb'; b.appendChild(sp); }
     sp.textContent=n?String(n):''; sp.hidden=!n;
   });
@@ -16159,6 +16166,11 @@ function renderSaisie(){
            </label>`
         : 'Premier relevé de cette pompe';
     }
+    const attente=!isEdit ? sxEnAttente.find(x=>x.pompe_id===po.id && x.periode===per) : null;
+    if(attente){
+      avRo=true; apRo=true;
+      hintAv=`Dans le rapport de <b>${esc(attente.pompiste)}</b> (n°${attente.rapport_id}) : confirmez-le dans « Rapports pompistes », ou supprimez ce rapport pour libérer la pompe.`;
+    }
 
     let statut, action='';
     if(locked){
@@ -16168,6 +16180,10 @@ function renderSaisie(){
       action=`<button type="button" class="sx-btn-mod" onclick="enableRow(this.closest('.sx-pompe'))">✎ ${t('saisie.btn.modify')} <span>(${t('saisie.btn.modify.remaining',{n:MAX_MODIFICATIONS_PAR_RELEVE-nbMod})})</span></button>`;
     } else {
       statut=`<span class="sx-chip sx-chip-todo">À saisir</span>`;
+    }
+    if(attente){
+      statut=`<span class="sx-chip sx-chip-attente">⏳ Rapport de ${esc(attente.pompiste)}</span>`;
+      action=`<button type="button" class="sx-btn-mod" onclick="goTo('pompistes-rapports')">📨 Ouvrir le rapport</button>`;
     }
     if(isEdit && !r.rapport_pompiste_id)
       action+=`<button type="button" class="sx-btn-sup" title="Supprimer ce relevé mal saisi" onclick="sxSupprimer([${r.id}])">🗑 Supprimer</button>`;
@@ -16180,7 +16196,7 @@ function renderSaisie(){
       ?`<div class="pompiste-badge sx-meta sx-pompiste" data-releve-id="${r.id}" data-pompe-nom="${esc(po.nom)}" data-pompiste-id="${r.pompiste_id}" onclick="openPompisteModalFromBadge(this)" title="${t('saisie.pompiste.submit')}">⛽ ${esc(r.pompiste_nom)}</div>`
       :`<div class="pompiste-badge sx-meta sx-pompiste sx-pompiste-vide" data-releve-id="${r.id}" data-pompe-nom="${esc(po.nom)}" onclick="openPompisteModalFromBadge(this)">⛽ ${t('saisie.pompiste.submit')}</div>`);
 
-    return `<div class="sx-pompe${isEdit?' sx-done':''}" data-pompe="${po.id}" data-per="${per}" data-defpx="${pxDefaut}"
+    return `<div class="sx-pompe${isEdit?' sx-done':''}${attente?' sx-attente':''}" data-pompe="${po.id}" data-per="${per}" data-defpx="${pxDefaut}"
                 data-is-edit="${isEdit?'1':'0'}" data-nb-mod="${nbMod}" data-av="${av}" data-ap="${ap}" data-ip="${ipVal!=null?ipVal:''}">
       <div class="sx-id">
         <div class="sx-nom">${esc(po.nom)}</div>

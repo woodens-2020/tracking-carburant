@@ -476,6 +476,33 @@ def _en_cours(db: Session, u: Utilisateur) -> Optional[RapportPompiste]:
 _ACTIFS = ("EN_COURS", "SOUMIS", "PROBLEME", "CONFIRME", "RESOLU")
 
 
+_EN_ATTENTE = ("EN_COURS", "SOUMIS", "PROBLEME")
+
+
+def mettres_en_attente(db: Session, d: date_type, periode: Optional[str] = None) -> list[dict]:
+    """Pompes d'un rapport pompiste pas encore finalisé dont le mètre n'est
+    pas (encore) au journal : leur place est prise, la Saisie ne doit pas
+    les ressaisir en parallèle."""
+    out = []
+    q = (db.query(RapportPompisteLigne, RapportPompiste)
+         .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
+         .filter(RapportPompiste.date == d, RapportPompiste.statut.in_(_EN_ATTENTE)))
+    if periode:
+        q = q.filter(RapportPompiste.periode == periode)
+    for l, rap in q.all():
+        if db.query(Releve).filter_by(date=rap.date, periode=rap.periode, pompe_id=l.pompe_id).first():
+            continue
+        out.append({"pompe_id": l.pompe_id, "periode": rap.periode, "rapport_id": rap.id, "statut": rap.statut,
+                    "pompiste": _nom(rap.utilisateur)})
+    return out
+
+
+@router.get("/api/releves/en-attente")
+def releves_en_attente(date: date_type, periode: Optional[str] = None,
+                       _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    return mettres_en_attente(db, date, periode)
+
+
 def _creneaux_pris(db: Session, d: date_type) -> dict:
     """{pompe_id: {créneau: info}} des pompes déjà couvertes ce jour-là
     (rapport pompiste actif ou relevé du journal)."""
@@ -926,6 +953,10 @@ def _ecrire_journal(db: Session, rap: RapportPompiste, request: Request, *, remp
     import main
     employe = employe_du_compte(db, rap.utilisateur)
     avertissements = []
+    try:
+        request.state.depuis_rapport = rap.id
+    except Exception:
+        pass
     for l in rap.lignes:
         if seulement is not None and l.pompe_id != seulement:
             continue

@@ -764,3 +764,33 @@ def test_metre_confirme_entre_dans_la_saisie(client):
     assert float(dans_saisie()[0]["metter_apres"]) == 38
     assert client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/lignes/{pompe}/reprendre", headers=H).status_code == 200
     assert dans_saisie() == []
+
+
+def test_pompe_dans_un_rapport_en_attente_indisponible_en_saisie(client):
+    """Rapport pompiste envoyé : ses pompes sont prises pour ce créneau — la
+    Saisie les refuse (et les montre « en attente ») jusqu'à la confirmation
+    du mètre ou la suppression du rapport."""
+    from tz_utils import today_haiti
+    import main as _m
+    jour = str(today_haiti())
+    pompe = _produit(client, 500)
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Pla", "nom": "Ceprise"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    assert p.post("/api/pompiste/compteurs", json={"date": jour, "charte_acceptee": True,
+              "lignes": [{"pompe_id": pompe, "metter_avant": 0, "metter_apres": 40, "debut_confirme": True}]}).status_code == 201
+    rap = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 20}]}).json()
+    att = client.get(f"/api/releves/en-attente?date={jour}", headers=H).json()
+    assert any(x["pompe_id"] == pompe and x["rapport_id"] == rap["id"] and x["pompiste"] == "Pla Ceprise" for x in att)
+    saisie = lambda: client.post("/api/releves", headers=H, json={"date": jour, "periode": rap["periode"], "pompe_id": pompe,
+                                                                  "prix_gallon": 500, "metter_avant": 0, "metter_apres": 41})
+    r = saisie()
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "dans_un_rapport", r.text
+    # Mètre confirmé : il est au journal, plus « en attente » ; la Saisie peut le modifier
+    assert client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/lignes/{pompe}/confirmer", headers=H,
+                       json={"metter_avant": 0, "metter_apres": 40}).status_code == 200
+    assert not any(x["pompe_id"] == pompe for x in client.get(f"/api/releves/en-attente?date={jour}", headers=H).json())
+    assert saisie().status_code in (200, 201)
+    # Rapport supprimé : place libre
+    assert client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/supprimer", headers=H, json={"motif": "test place"}).status_code == 200
+    assert not any(x["pompe_id"] == pompe for x in client.get(f"/api/releves/en-attente?date={jour}", headers=H).json())
