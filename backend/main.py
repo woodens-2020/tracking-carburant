@@ -4002,6 +4002,12 @@ def _build_journal_entries(
                     "le":          x.resolu_le.isoformat() if x.resolu_le else None,
                 }
 
+    # Certifié : compteur continu (ou écart résolu) et, pour un relevé venu
+    # d'un rapport pompiste, rapport finalisé.
+    for e in entries:
+        e["certifie"] = (not e["en_attente"] and e["statut"] in ("ok", "resolu")
+                         and (e["source"] != "pompiste" or e["rapport_statut"] in ("CONFIRME", "RESOLU")))
+
     # Post-filtres : appliqués APRÈS l'analyse de continuité pour ne pas
     # casser la chaîne Matin → Après-midi → Matin suivant.
     if periode_filter:
@@ -4092,6 +4098,7 @@ def journal_endpoint(
     pompe_id:   List[int] = Query(default=[]),
     periode:    Optional[str] = None,
     pompiste_id: Optional[int] = None,
+    certifie: Optional[str] = None,          # "oui" | "non" ; vide = tous
     db: Session = Depends(get_db),
 ):
     from datetime import date as dt
@@ -4099,8 +4106,8 @@ def journal_endpoint(
     d_fin   = date_fin   or today_haiti()
     d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
 
-    tous = _build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode, pompiste_id,
-                                  inclure_en_attente=True)
+    tous = _filtre_certifie(_build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode,
+                                                   pompiste_id, inclure_en_attente=True), certifie)
     # Les rapports pompistes pas encore finalisés sont listés mais ne comptent
     # dans aucun total (ni gallons, ni montant, ni conformité)
     en_attente = [e for e in tous if e["en_attente"]]
@@ -4400,6 +4407,14 @@ def carburant_rapport_jour(
     }
 
 
+def _filtre_certifie(entries: list, certifie: Optional[str]) -> list:
+    if certifie not in (None, "", "oui", "non"):
+        raise HTTPException(400, "certifie : « oui » ou « non ».")
+    if not certifie:
+        return entries
+    return [e for e in entries if e["certifie"] == (certifie == "oui")]
+
+
 @app.get("/api/journal/pdf")
 def journal_pdf(
     date_debut: Optional[date_type] = None,
@@ -4408,6 +4423,7 @@ def journal_pdf(
     pompe_id:   List[int] = Query(default=[]),
     periode:    Optional[str] = None,
     pompiste_id: Optional[int] = None,
+    certifie: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     import io
@@ -4425,8 +4441,9 @@ def journal_pdf(
     d_fin   = date_fin   or today_haiti()
     d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
 
-    entries    = [e for e in _build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode,
-                                                pompiste_id, inclure_en_attente=True) if not e["en_attente"]]
+    entries    = [e for e in _filtre_certifie(_build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None,
+                                                                 periode, pompiste_id, inclure_en_attente=True), certifie)
+                  if not e["en_attente"]]
     nb_alertes = sum(1 for e in entries if e["statut"] == "alerte")
     nb_erreurs = sum(1 for e in entries if e["statut"] == "erreur")
     nb_ok      = len(entries) - nb_alertes - nb_erreurs

@@ -4828,6 +4828,14 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
               <option value="">Tous les pompistes</option>
             </select>
           </div>
+          <div class="filter-group">
+            <label class="filter-label">Certification</label>
+            <select id="jf-certif" class="filter-select" onchange="loadJournal()">
+              <option value="">Tous les mètres</option>
+              <option value="oui">✓ Certifiés seulement</option>
+              <option value="non">Non certifiés (à vérifier)</option>
+            </select>
+          </div>
           <div class="filter-spacer"></div>
           <button class="btn btn-primary db-btn-analyze" onclick="loadJournal()">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -17606,6 +17614,8 @@ async function loadJournal(){
     pompeIds.forEach(id=>{ url+=`&pompe_id=${id}`; });
     if(periodeId) url+=`&periode=${encodeURIComponent(periodeId)}`;
     if(pompisteId) url+=`&pompiste_id=${pompisteId}`;
+    const certif=document.getElementById('jf-certif')?.value;
+    if(certif) url+=`&certifie=${certif}`;
     const data=await GET(url);
     renderJournal(data);
     document.getElementById('btn-journal-pdf').style.display='';
@@ -17630,6 +17640,8 @@ function downloadJournalPdf(){
   pompeIds.forEach(id=>{ url+=`&pompe_id=${id}`; });
   if(periodeId) url+=`&periode=${encodeURIComponent(periodeId)}`;
   if(pompisteId) url+=`&pompiste_id=${pompisteId}`;
+  const certif=document.getElementById('jf-certif')?.value;
+  if(certif) url+=`&certifie=${certif}`;
   window.location.href=url;
 }
 
@@ -17741,6 +17753,11 @@ function renderJournal(data){
     <div class="jres-card c-blue">
       <div class="jres-lbl">Total relevés</div>
       <div class="jres-num c-teal">${resume.total_entrees}</div>
+    </div>
+    <div class="jres-card c-blue" style="cursor:pointer" title="Afficher seulement les non certifiés" onclick="const f=document.getElementById('jf-certif');f.value=f.value==='non'?'':'non';loadJournal()">
+      <div class="jres-lbl">Certifiés</div>
+      <div class="jres-num" style="color:#3b82f6">${entries.filter(e=>e.certifie).length}<span style="font-size:.55em;color:var(--muted)"> / ${entries.filter(e=>!e.en_attente).length}</span></div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${entries.filter(e=>!e.en_attente&&!e.certifie).length} à vérifier — cliquez pour les voir</div>
     </div>
     <div class="jres-card c-green">
       <div class="jres-lbl">Conformes</div>
@@ -17912,7 +17929,7 @@ function renderJournal(data){
       :isAl
         ?'<span style="color:var(--blue);font-weight:700">⚠ Alerte</span>'
         :'<span style="color:var(--green)">✓ OK</span>';
-    const certifie=!e.en_attente && ['ok','resolu'].includes(e.statut) && (e.source!=='pompiste' || ['CONFIRME','RESOLU'].includes(e.rapport_statut));
+    const certifie=!!e.certifie;
 
     return `<tr class="${rowCls}${e.en_attente?' jr-attente':''}">
       <td class="num" style="white-space:nowrap">${frDate(e.date)}</td>
