@@ -17,7 +17,7 @@ import unicodedata
 from datetime import date as date_type
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -231,6 +231,40 @@ def lister_entrees(date_debut: Optional[date_type] = None, date_fin: Optional[da
 
 
 # ── Journal (grand livre de caisse) ─────────────────────────────────────
+
+class RefusDepenseIn(BaseModel):
+    motif: str
+
+
+@router.post("/depenses-pompiste/{depense_id}/refuser")
+def refuser_depense_pompiste(depense_id: int, data: RefusDepenseIn, request: Request,
+                             s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """La direction ne laisse pas passer une dépense payée par un pompiste
+    sur ses ventes : elle sort des Dépenses (et du journal de la caisse), le
+    rapport la garde marquée « refusée » avec le motif, et le pompiste doit
+    cet argent. Possible aussi sur un rapport déjà finalisé."""
+    from models import Depense, RapportPompiste
+    from pompiste_routes import _nom as nom_u, _ref_depense
+    import main
+    motif = " ".join((data.motif or "").split())
+    if len(motif) < 5:
+        raise HTTPException(400, "Indiquez pourquoi la dépense ne passe pas (5 caractères au moins).")
+    d = db.get(Depense, depense_id)
+    if not d or not d.rapport_pompiste_id:
+        raise HTTPException(404, "Dépense pompiste introuvable.")
+    rap = db.get(RapportPompiste, d.rapport_pompiste_id)
+    deps = [dict(x) for x in ((rap.depenses if rap else None) or [])]
+    i = next((k for k in range(len(deps)) if _ref_depense(rap, k) == d.reference), None)
+    trace = {"depense_id": d.id, "reference": d.reference, "montant": float(d.montant),
+             "description": d.description, "rapport_pompiste_id": d.rapport_pompiste_id, "motif": motif[:300]}
+    if i is not None:
+        deps[i].update(statut="refusee", motif=motif[:300], par=nom_u(s), le=now_haiti().isoformat())
+        rap.depenses = deps
+    db.delete(d)
+    main._tracer(db, request, "depense_pompiste_refusee", trace)
+    db.commit()
+    return {"ok": True, "rapport_pompiste_id": trace["rapport_pompiste_id"], "montant": trace["montant"]}
+
 
 @router.get("/journal")
 def journal_caisse(date_debut: Optional[date_type] = None, date_fin: Optional[date_type] = None,

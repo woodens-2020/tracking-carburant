@@ -456,6 +456,19 @@ def test_depenses_et_dollars(client):
     assert [(l["debit"], l["credit"]) for l in dpp] == [(-1500, 0)]
     assert not [l for l in j["lignes"] if l["type"] == "depense" and (l["reference"] or "").startswith(f"RP{rid}-")]
     assert {c["code"]: c for c in j["controles"]}["equilibre"]["niveau"] == "ok"
+    # Caisse principale : la direction supprime la dépense (elle ne passe pas), même rapport finalisé
+    did = mes_depenses()[0]["id"]
+    url = f"/api/caisse-principale/depenses-pompiste/{did}/refuser"
+    assert client.post(url, headers=H, json={"motif": "non"}).status_code == 400
+    assert client.post(url, headers=H, json={"motif": "Glace jamais livrée"}).status_code == 200
+    assert mes_depenses() == []
+    j = client.get(f"/api/caisse-principale/journal?date_debut={jour}&date_fin={jour}", headers=H).json()
+    assert not [l for l in j["lignes"] if l["type"] == "depense_pompiste"]
+    liste = client.get("/api/pompiste-supervision/rapports?statut=CONFIRME,RESOLU", headers=H).json()
+    rap = next(x for x in (liste["rapports"] if isinstance(liste, dict) else liste) if x["id"] == rid)
+    assert rap["depenses"][0]["statut"] == "refusee" and rap["depenses"][0]["motif"] == "Glace jamais livrée"
+    assert rap["total_depenses_retenues"] == 0
+    assert client.post(url, headers=H, json={"motif": "Glace jamais livrée"}).status_code == 404
 
 
 def test_dollars_rapport_en_retard(client):

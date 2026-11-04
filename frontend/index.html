@@ -21645,7 +21645,23 @@ function _glDetail(x){
   if(dt.notes) info.push(['Notes', esc(dt.notes)]);
   if(x.annulee) info.push(['Annulation', esc(x.motif_annulation || '')]);
   return `<div class="gl-det">${info.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
-    ${x.lien?`<div style="margin-top:8px"><button class="btn btn-secondary psp-mini" onclick="event.stopPropagation();goTo('${x.lien}')">Ouvrir dans le module →</button></div>`:''}`;
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      ${x.lien?`<button class="btn btn-secondary psp-mini" onclick="event.stopPropagation();goTo('${x.lien}')">Ouvrir dans le module →</button>`:''}
+      ${x.type==='depense_pompiste'?`<button class="btn btn-danger psp-mini" onclick="event.stopPropagation();glRefuserDepense('${esc(x.cle)}')">🗑 Supprimer cette dépense</button>`:''}</div>`;
+}
+// Dépense payée par un pompiste : la direction peut refuser qu'elle passe
+async function glRefuserDepense(cle){
+  const x=(GL.data.lignes||[]).find(l=>l.cle===cle); if(!x) return;
+  const id=parseInt(String(cle).replace('DPP-',''),10);
+  const motif=await demanderSuppression({titre:'Supprimer cette dépense du pompiste ?',
+    texte:'Elle sort des Dépenses et du journal de la caisse. Le rapport du pompiste la garde marquée « refusée » avec votre motif : cet argent est dû par le pompiste. La trace reste au journal d’audit.',
+    lignes:[`${frDate(x.date)} · ${x.description} · ${_glG(x.debit||x.credit)} G`], bouton:'Supprimer la dépense'});
+  if(!motif) return;
+  try{
+    await _cpApi('POST', `/depenses-pompiste/${id}/refuser`, {motif});
+    notify('Dépense supprimée : elle ne passe pas, le pompiste doit ce montant.', 'ok');
+    GL.ouvert=null; await glCharger();
+  }catch(e){ notify(String(e.message).replace(/^\[\d+\]\s*/,''), 'err'); }
 }
 
 function _glParCompte(d){
