@@ -614,6 +614,8 @@ canvas{display:block}
 .jr-val .jr-pen{font-size:12px;opacity:.55;transition:opacity .15s}
 .jr-val:hover,.jr-val:focus-visible{border-color:var(--orange);background:rgba(249,115,22,.1);outline:none}
 .jr-val:hover .jr-pen,.jr-val:focus-visible .jr-pen{opacity:1}
+.jr-sup{background:none;border:0;color:var(--muted);font-size:11.5px;cursor:pointer;padding:2px 0;margin-top:3px;text-decoration:underline dotted}
+.jr-sup:hover{color:#ef4444}
 .jr-crayon{background:none;border:1px solid transparent;border-radius:8px;cursor:pointer;font-size:14px;padding:3px 6px;line-height:1}
 .jr-crayon:hover{border-color:var(--orange);background:rgba(249,115,22,.1)}
 .jc-grille{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:end;margin:8px 0}
@@ -17933,7 +17935,8 @@ function renderJournal(data){
       <td class="tr num c-teal">${fmtGal(e.quantite)}</td>
       <td class="tr num c-amber">${fmtG(e.montant_vente)}</td>
       <td><span class="type-pill ${pillCls}">${typeLabel}</span></td>
-      <td>${statHtml}${certifie?'<div style="margin-top:3px"><span class="cert" title="Compteur continu et rapport validé">Certifié</span></div>':''}</td>
+      <td>${statHtml}${certifie?'<div style="margin-top:3px"><span class="cert" title="Compteur continu et rapport validé">Certifié</span></div>':''}${e.id!=null
+        ?`<div><button class="jr-sup" title="${e.rapport_pompiste_id?'Supprimer le rapport pompiste n°'+e.rapport_pompiste_id:'Supprimer ce relevé'}" onclick="jrSupprimer(${JSON.stringify(e.id).replace(/"/g,'&quot;')})">🗑 Supprimer</button></div>`:''}</td>
     </tr>`;
   }).join('');
 
@@ -19901,6 +19904,34 @@ function demanderSuppression({titre, texte, lignes=[], bouton='Supprimer'}){
     inp.addEventListener('keydown', e=>{ if(e.key==='Enter') ok(); if(e.key==='Escape') fin(null); });
     setTimeout(()=>inp.focus(), 30);
   });
+}
+
+// Journal Meters : supprimer un relevé (saisie) ou tout le rapport pompiste
+// d'où il vient — la place est libérée, la continuité est recalculée.
+async function jrSupprimer(id){
+  const e=_JR_ENTRIES.find(x=>x.id===id); if(!e) return;
+  const per=p=>p==='Matin'?'Matin':'Après-midi', f3=v=>Number(v).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3});
+  const ligne=x=>`${frDate(x.date)} ${per(x.periode)} · ${x.pompe_nom} : ${f3(x.metter_avant)} → ${f3(x.metter_apres)}${x.pompiste_nom?' · '+x.pompiste_nom:''}`;
+  try{
+    if(e.rapport_pompiste_id){
+      const rid=e.rapport_pompiste_id, lignes=_JR_ENTRIES.filter(x=>x.rapport_pompiste_id===rid);
+      const motif=await demanderSuppression({titre:`Supprimer le rapport pompiste n°${rid} ?`,
+        texte:'Ce relevé vient d’un rapport pompiste : c’est le rapport entier qui est supprimé (ses mètres et ses dépenses). Les pompes redeviennent libres pour ce créneau ; la trace reste au journal d’audit.',
+        lignes:lignes.map(ligne), bouton:'Supprimer le rapport'});
+      if(!motif) return;
+      await POST(`/pompiste-supervision/rapports/${rid}/supprimer`,{motif});
+      toast(`Rapport pompiste n°${rid} supprimé : les pompes sont libres.`,'ok');
+    }else{
+      const motif=await demanderSuppression({titre:'Supprimer ce relevé ?',
+        texte:'La pompe redevient libre pour ce créneau : vous pourrez la ressaisir. Ventes, caisse et stock sont recalculés ; la trace reste au journal d’audit.',
+        lignes:[ligne(e)], bouton:'Supprimer le relevé'});
+      if(!motif) return;
+      const r=await POST('/releves/supprimer',{ids:[e.id], motif});
+      toast('Relevé supprimé : la place est libre.','ok');
+      (r.avertissements||[]).forEach(m=>toast(m, m.startsWith('✓')?'ok':'inf'));
+    }
+    await loadJournal();
+  }catch(x){ toast(String(x.message).replace(/^\[\d+\]\s*/,''),'err'); }
 }
 
 // Journal Meters : corriger rapidement un mètre (✏️)
