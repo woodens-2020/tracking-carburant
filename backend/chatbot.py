@@ -293,7 +293,8 @@ def _system_prompt(db: Session) -> str:
     except Exception:
         modules = "carburant"
     sch = espace_courant()
-    station = "station principale"
+    from espaces_routes import nom_principale
+    station = nom_principale()
     if sch:
         from espaces_routes import schemas_actifs
         station = schemas_actifs().get(sch, sch)

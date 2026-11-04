@@ -733,6 +733,11 @@ def _verifier_devises(db: Session, devises: list, d: date_type) -> list:
     return out
 
 
+def _nom_principale() -> str:
+    from espaces_routes import nom_principale
+    return nom_principale()
+
+
 def _norm_station(v: Optional[str]) -> str:
     return " ".join((v or "").split()).casefold()
 
@@ -754,7 +759,8 @@ def autres_stations(request: Request, db: Session) -> list[dict]:
     if not proprietaire(request, db):
         return []
     courant = espace_courant()
-    out = [] if courant is None else [{"id": 0, "nom": "Station principale"}]
+    from espaces_routes import nom_principale
+    out = [] if courant is None else [{"id": 0, "nom": nom_principale()}]
     with session_principale() as pdb:
         out += [{"id": e.id, "nom": e.nom} for e in pdb.query(Espace).filter(Espace.actif.is_(True)).order_by(Espace.id)
                 if e.schema != courant]
@@ -1588,20 +1594,90 @@ def recuperer_employes(_s: Utilisateur = Depends(_require_superviseur), db: Sess
     return rattacher_employes_pompistes(db)
 
 
+def _autorisations(request: Request, db: Session, comptes: list[dict]) -> None:
+    """Propriétaire : pour chaque pompiste de cette station, les autres
+    stations où il est autorisé (compte actif là-bas) ; pour un compte venu
+    d'une autre station, le nom de celle-ci."""
+    from database import espace_courant, session_espace
+    from espaces_routes import nom_station
+    from main import marque_origine
+    autres = autres_stations(request, db)
+    ici = espace_courant()
+    actifs: dict = {}
+    for st in autres:
+        try:
+            with session_espace(None if st["id"] == 0 else f"esp_{st['id']}") as sdb:
+                actifs[st["id"]] = {m for (m,) in sdb.query(Utilisateur.compte_origine)
+                                    .filter(Utilisateur.compte_origine.isnot(None), Utilisateur.actif.is_(True)).all()}
+        except Exception:
+            actifs[st["id"]] = set()
+    for c in comptes:
+        if c["venu_d_ailleurs"]:
+            sch = (c.pop("_origine", "") or "").split(":")[0]
+            try:
+                c["origine_nom"] = nom_station(0 if sch == "principal" else int(sch.split("_")[1]))
+            except (ValueError, IndexError):
+                c["origine_nom"] = None
+            continue
+        c.pop("_origine", None)
+        m = marque_origine(ici, c["id"])
+        c["autorisations"] = [{"espace_id": st["id"], "nom": st["nom"], "autorise": m in actifs[st["id"]]} for st in autres]
+
+
 @router.get("/api/pompiste-supervision/comptes")
 def lister_comptes(request: Request, _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     role = assurer_role_pompiste(db)
     rows = db.query(Utilisateur).filter_by(role_id=role.id).order_by(Utilisateur.nom_complet).all()
     employes = (db.query(Employe).filter(Employe.actif.is_(True))
                 .order_by(Employe.prenom, Employe.nom).all())
+    comptes = [dict(_compte_dict(db, u), _origine=u.compte_origine) for u in rows]
+    _autorisations(request, db, comptes)
     return {
-        "comptes": [_compte_dict(db, u) for u in rows],
+        "comptes": comptes,
         "stations": stations_connues(db),
-        "station_courante": _nom_station_courante() or "Station principale",
+        "station_courante": _nom_station_courante() or _nom_principale(),
         "autres_stations": autres_stations(request, db),
         "employes": [{"id": e.id, "nom": f"{e.prenom} {e.nom}", "poste": e.poste,
                       "lie": e.utilisateur_id is not None} for e in employes],
     }
+
+
+class AutorisationIn(BaseModel):
+    espace_id: int
+    autorise: bool
+
+
+@router.post("/api/pompiste-supervision/comptes/{uid}/stations")
+def autoriser_station(uid: int, data: AutorisationIn, request: Request,
+                      s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Le propriétaire autorise (ou retire) un pompiste de cette station à
+    travailler aussi dans une autre : son compte y est créé (même code, même
+    PIN). Sans autorisation, il ne peut entrer que dans sa station."""
+    from database import definir_espace, espace_courant, retablir_espace, session_espace
+    from main import _compte_dans_station, _tracer
+    cible = {x["id"]: x for x in autres_stations(request, db)}.get(data.espace_id)
+    if not cible:
+        raise HTTPException(403, "Station introuvable, ou réservée au propriétaire.")
+    u = db.get(Utilisateur, uid)
+    if not u or not est_role_pompiste(u.role_obj):
+        raise HTTPException(404, "Compte pompiste introuvable.")
+    if u.compte_origine:
+        raise HTTPException(400, "Ce compte vient d'une autre station : gérez-le depuis sa station d'origine.")
+    ici = espace_courant()
+    schema = None if data.espace_id == 0 else f"esp_{data.espace_id}"
+    jeton = definir_espace(schema)
+    try:
+        with session_espace(schema) as edb:
+            m = _compte_dans_station(edb, ici, u, creer=data.autorise)
+            if m is not None:
+                m.actif = data.autorise
+                edb.commit()
+    finally:
+        retablir_espace(jeton)
+    _tracer(db, request, "pompiste_station_autorisee" if data.autorise else "pompiste_station_retiree",
+            {"compte": u.username, "station": cible["nom"]})
+    db.commit()
+    return {"espace_id": data.espace_id, "nom": cible["nom"], "autorise": data.autorise}
 
 
 class CompteIn(BaseModel):
@@ -1663,7 +1739,7 @@ def creer_compte(data: CompteIn, request: Request, _s: Utilisateur = Depends(_re
         out["station_nom"] = cible["nom"]
         return out
     out = _creer_compte(data, db)
-    out["station_nom"] = _nom_station_courante() or "Station principale"
+    out["station_nom"] = _nom_station_courante() or _nom_principale()
     return out
 
 

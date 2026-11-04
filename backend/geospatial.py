@@ -57,7 +57,8 @@ def _stations_accessibles(request: Request, db: Session) -> list:
     from espaces_routes import proprietaire
     with session_principale() as pdb:
         espaces = pdb.query(Espace).order_by(Espace.id).all()
-        toutes = [(0, "Station principale", None, True, None)] + [
+        from espaces_routes import nom_principale
+        toutes = [(0, nom_principale(), None, True, None)] + [
             (e.id, e.nom, e.adresse, bool(e.actif), e.schema) for e in espaces]
     if proprietaire(request, db):
         return toutes
@@ -294,6 +295,7 @@ def _fiche_pour(pdb: Session, sid: int) -> StationGeo:
 
 class InfosIn(BaseModel):
     """Seuls les champs envoyés sont modifiés ; un champ envoyé vide est effacé."""
+    nom: Optional[str] = None
     code: Optional[str] = None
     departement: Optional[str] = None
     commune: Optional[str] = None
@@ -331,10 +333,36 @@ def normaliser_telephone(v: Optional[str], libelle: str) -> Optional[str]:
     return f"+509 {chiffres[:4]}-{chiffres[4:]}"
 
 
+def renommer_station(pdb: Session, sid: int, nom: Optional[str], qui: str) -> None:
+    """Nom unique (sans tenir compte des majuscules) : deux stations du même
+    nom, c'est la porte ouverte aux rapports entrés dans la mauvaise."""
+    nom = " ".join((nom or "").split())[:150]
+    if len(nom) < 2:
+        raise HTTPException(400, "Donnez un nom à la station (2 caractères minimum).")
+    from espaces_routes import nom_principale
+    autres = [(0, nom_principale())] + [(e.id, e.nom) for e in pdb.query(Espace).filter(Espace.actif.is_(True)).all()]
+    if any(i != sid and n.casefold() == nom.casefold() for i, n in autres):
+        raise HTTPException(409, f"Une autre station s'appelle déjà « {nom} ».")
+    if sid == 0:
+        f = _fiche_pour(pdb, 0)
+        avant = f.nom or "Station principale"
+        f.nom = nom
+    else:
+        e = pdb.get(Espace, sid)
+        if not e:
+            raise HTTPException(404, "Station introuvable.")
+        avant, e.nom = e.nom, nom
+    if avant != nom:
+        _journaliser(pdb, sid, qui, "nom", {"nom": avant}, {"nom": nom})
+    pdb.flush()
+
+
 def appliquer_infos(pdb: Session, sid: int, data: InfosIn, qui: str) -> StationGeo:
     nettoie = lambda v, n: (" ".join((v or "").split())[:n] or None)
     envoyes = data.model_fields_set
     val = {}
+    if "nom" in envoyes:
+        renommer_station(pdb, sid, data.nom, qui)
     if "code" in envoyes:
         code = nettoie(data.code, 30)
         if code:
@@ -378,6 +406,8 @@ def modifier_infos(sid: int, data: InfosIn, request: Request, s: Utilisateur = D
     with session_principale() as pdb:
         appliquer_infos(pdb, sid, data, _nom_utilisateur(s))
         pdb.commit()
+    from espaces_routes import invalider_cache
+    invalider_cache()
     return detail(sid, request, s, db)
 
 

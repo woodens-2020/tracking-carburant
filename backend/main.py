@@ -1026,36 +1026,57 @@ def identifier_pompiste(data: IdentifierPompisteIn, request: Request):
     _sch, u = _compte_pompiste_origine(username) if username else (None, None)
     if u and not u.code_acces_hash:
         # Compte créé d'avance, PIN à reprendre : on lui demandera son ancien PIN
-        from espaces_routes import stations_pompiste as _st
-        stations = _st()
-        origine = 0 if _sch is None else int(_sch.split("_")[1])
-        for st in stations:
-            st["la_sienne"] = st["id"] == origine
-        return {"prenom": (u.nom_complet or "").split(" ")[0], "stations": stations, "reprise": True}
+        return {"prenom": (u.nom_complet or "").split(" ")[0], "stations": stations_du_pompiste(_sch, u), "reprise": True}
     if not u:
         # Compte de l'ancien système pas encore repris : il le sera avec son PIN
         import reprise_pompistes
         prenom = reprise_pompistes.prenom_ailleurs(request, username) if username else None
         if prenom is not None:
-            stations = stations_pompiste()
-            for st in stations:
-                st["la_sienne"] = st["id"] == 0
+            # Ancien système = station principale : il n'entre que là
+            stations = [dict(st, la_sienne=True) for st in stations_pompiste() if st["id"] == 0]
             return {"prenom": prenom, "stations": stations, "reprise": True}
         _record_login_failure(cle)
         raise HTTPException(404, {"code": "code_inconnu", "message": "Ce code n'existe pas."})
-    stations = stations_pompiste()
-    origine = 0 if _sch is None else int(_sch.split("_")[1])
-    for st in stations:
-        st["la_sienne"] = st["id"] == origine
-    return {"prenom": (u.nom_complet or "").split(" ")[0], "stations": stations}
+    return {"prenom": (u.nom_complet or "").split(" ")[0], "stations": stations_du_pompiste(_sch, u)}
 
 
-def _compte_dans_station(db: Session, sch_origine, origine: Utilisateur) -> Utilisateur:
-    """Compte du pompiste dans la station choisie (créé au premier passage) :
-    même code et même PIN que son compte d'origine, qui fait foi."""
+def marque_origine(sch_origine, origine_id: int) -> str:
+    return f"{sch_origine or 'principal'}:{origine_id}"
+
+
+def stations_du_pompiste(sch_origine, origine: Utilisateur) -> list:
+    """Stations où ce pompiste peut entrer : la sienne, plus celles où la
+    direction l'a autorisé (compte actif dans cette station). Un pompiste
+    ne choisit jamais une station qui n'est pas la sienne : ses rapports ne
+    peuvent pas se retrouver dans une autre station."""
+    from database import session_espace
+    from espaces_routes import stations_pompiste
+    origine_id = 0 if sch_origine is None else int(sch_origine.split("_")[1])
+    marque = marque_origine(sch_origine, origine.id)
+    out = []
+    for st in stations_pompiste():
+        if st["id"] == origine_id:
+            out.append(dict(st, la_sienne=True))
+            continue
+        try:
+            with session_espace(None if st["id"] == 0 else f"esp_{st['id']}") as sdb:
+                ok = sdb.query(Utilisateur.id).filter_by(compte_origine=marque, actif=True).first() is not None
+        except Exception:
+            ok = False
+        if ok:
+            out.append(dict(st, la_sienne=False))
+    return out
+
+
+def _compte_dans_station(db: Session, sch_origine, origine: Utilisateur, creer: bool = False) -> Optional[Utilisateur]:
+    """Compte du pompiste dans une autre station que la sienne : même code
+    et même PIN que son compte d'origine, qui fait foi. Créé seulement quand
+    la direction l'autorise (creer=True) ; sinon None."""
     from pompiste_routes import employe_du_compte
-    marque = f"{sch_origine or 'principal'}:{origine.id}"
+    marque = marque_origine(sch_origine, origine.id)
     u = db.query(Utilisateur).filter_by(compte_origine=marque).first()
+    if not u and not creer:
+        return None
     if not u:
         if db.query(Utilisateur.id).filter(Utilisateur.username.ilike(origine.username)).first():
             raise HTTPException(409, "Un autre compte de cette station a déjà ce code : contactez le superviseur.")
@@ -1106,8 +1127,11 @@ def login_pompiste(data: LoginPompisteIn, request: Request, response: Response,
         # Autre station que la sienne : le PIN est vérifié sur son compte d'origine
         if origine.code_acces_hash and verify_code_acces(data.code_acces.strip(), origine.code_acces_hash):
             user = _compte_dans_station(db, sch_origine, origine)
-            if not user.actif:
-                raise HTTPException(403, "Votre accès à cette station a été désactivé.")
+            if user is None or not user.actif:
+                raise HTTPException(403, {"code": "station_non_autorisee",
+                                          "message": "Ce n'est pas votre station : vos rapports ne peuvent être "
+                                                     "faits que dans la vôtre. Demandez à la direction si vous "
+                                                     "devez travailler ici."})
         else:
             user = None
     else:

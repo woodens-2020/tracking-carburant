@@ -59,6 +59,9 @@ class StationGeo(Base):
 
     id            = Column(Integer, primary_key=True)
     station_id    = Column(Integer, nullable=False, unique=True)
+    # Nom affiché de la station principale (station_id 0) ; les stations
+    # séparées gardent le leur dans espaces.nom.
+    nom           = Column(String(150), nullable=True)
     code          = Column(String(30), nullable=True, unique=True)
     pays          = Column(String(60), nullable=False, default="Haïti")
     departement   = Column(String(60), nullable=True)

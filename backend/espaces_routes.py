@@ -56,8 +56,34 @@ def schemas_actifs() -> dict:
     return _CACHE["schemas"]
 
 
+NOM_PRINCIPALE_DEFAUT = "Station principale"
+
+
+def nom_principale() -> str:
+    """Nom donné à la station principale (fiche des stations), sinon « Station principale »."""
+    if time.time() - _CACHE.get("t_nom", 0) > 30 or "nom" not in _CACHE:
+        try:
+            from models import StationGeo
+            with session_principale() as db:
+                f = db.query(StationGeo).filter_by(station_id=0).first()
+                _CACHE["nom"] = (f.nom if f and f.nom else None) or NOM_PRINCIPALE_DEFAUT
+        except Exception:
+            _CACHE["nom"] = NOM_PRINCIPALE_DEFAUT
+        _CACHE["t_nom"] = time.time()
+    return _CACHE["nom"]
+
+
+def nom_station(sid: int) -> Optional[str]:
+    if not sid:
+        return nom_principale()
+    with session_principale() as db:
+        e = db.get(Espace, sid)
+        return e.nom if e else None
+
+
 def invalider_cache():
     _CACHE["t"] = 0.0
+    _CACHE["t_nom"] = 0.0
 
 
 def espace_du_compte(email: Optional[str] = None, username: Optional[str] = None) -> Optional[str]:
@@ -109,7 +135,7 @@ def stations_pompiste() -> list:
             a = " ".join((a or "").split())
             if a and a.casefold() not in [x.casefold() for x in adresses]:
                 adresses.append(a)
-        out = [{"id": 0, "nom": "Station principale", "adresse": ", ".join(adresses) or None}]
+        out = [{"id": 0, "nom": nom_principale(), "adresse": ", ".join(adresses) or None}]
         out += [{"id": e.id, "nom": e.nom, "adresse": e.adresse}
                 for e in db.query(Espace).filter(Espace.actif.is_(True)).order_by(Espace.id).all()]
     return out
@@ -195,8 +221,8 @@ def lister(request: Request, db: Session = Depends(get_db)):
     proprio = proprietaire(request, db)
     with session_principale() as pdb:
         espaces = [_espace_dict(e) for e in pdb.query(Espace).filter(Espace.actif.is_(True)).order_by(Espace.id).all()]
-    nom_courant = next((e["nom"] for e in espaces if e["schema"] == courant), None) if courant else "Station principale"
-    return {"courant": courant, "courant_nom": nom_courant,
+    nom_courant = next((e["nom"] for e in espaces if e["schema"] == courant), None) if courant else nom_principale()
+    return {"courant": courant, "courant_nom": nom_courant, "principale_nom": nom_principale(),
             "peut_changer": bool(proprio) and bool(espaces),
             "peut_creer": bool(proprio),
             "espaces": espaces if proprio else [e for e in espaces if e["schema"] == courant]}

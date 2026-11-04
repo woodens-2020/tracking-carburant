@@ -478,7 +478,9 @@ const TXT = {
     continuer:'Continuer', bonjour:'Bonjour {p} !', quelle_station:'Dans quelle station travaillez-vous ?',
     reprise_titre:'Première connexion au nouveau système', compris:'J’ai compris',
     reprise_txt:'Tapez le PIN que vous utilisiez déjà (le même PIN de 9 chiffres). Le système le vérifie et le garde pour les prochaines fois.',
-    autre_station:'← Choisir une autre station', code_inconnu:'Ce code n’existe pas. Vérifiez-le ou demandez-le à votre superviseur.',
+    autre_station:'← Choisir une autre station',
+    pas_ta_station:'Ce n’est pas votre station : vos rapports se font seulement dans la vôtre. Si vous devez travailler ici, demandez à la direction de vous autoriser.',
+    code_inconnu:'Ce code n’existe pas. Vérifiez-le ou demandez-le à votre superviseur.',
     sortir:'Sortir', retour:'← Retour', etape1:'Étape 1 · Compteurs', etape2:'Étape 2 · Argent', envoyes:'Compteurs envoyés',
     charte:'Charte de responsabilité', charte_sub:'Lisez et acceptez avant de commencer.',
     c1:'Je lis moi-même les <b>deux mètres</b> (début et fin) sur chaque pompe.',
@@ -590,7 +592,9 @@ const TXT = {
     continuer:'Kontinye', bonjour:'Bonjou {p} !', quelle_station:'Nan ki estasyon ou ap travay ?',
     reprise_titre:'Premye koneksyon sou nouvo sistèm nan', compris:'Mwen konprann',
     reprise_txt:'Tape PIN ou te konn sèvi a (menm PIN 9 chif la). Sistèm nan ap verifye l epi kenbe l pou pwochèn fwa yo.',
-    autre_station:'← Chwazi yon lòt estasyon', code_inconnu:'Kòd sa a pa egziste. Verifye l oswa mande sipèvizè w la.',
+    autre_station:'← Chwazi yon lòt estasyon',
+    pas_ta_station:'Se pa estasyon pa w la : ou fè rapò w yo sèlman nan pa w la. Si ou dwe travay isit, mande direksyon an otorize w.',
+    code_inconnu:'Kòd sa a pa egziste. Verifye l oswa mande sipèvizè w la.',
     sortir:'Soti', retour:'← Tounen', etape1:'Etap 1 · Kontè', etape2:'Etap 2 · Lajan', envoyes:'Kontè yo voye',
     charte:'Angajman responsablite', charte_sub:'Li epi aksepte anvan ou kòmanse.',
     c1:'Se mwen menm ki li <b>de mitè yo</b> (kòmansman ak fen) sou chak ponp.',
@@ -870,7 +874,7 @@ function ecranConnexion(msg){
         <div style="height:18px"></div>
         <button class="btn" id="l-btn">${t('se_connecter')}</button>
       </form>
-      <button class="btn sec" type="button" style="margin-top:6px" onclick="lgRetour('station')">${t('autre_station')}</button></div>`;
+      ${LG.stations.length > 1 ? `<button class="btn sec" type="button" style="margin-top:6px" onclick="lgRetour('station')">${t('autre_station')}</button>` : ''}</div>`;
     $('l-pin').focus();
     $('f-login').onsubmit = async ev => {
       ev.preventDefault();
@@ -883,7 +887,7 @@ function ecranConnexion(msg){
         LG.etape = 'code';
         reinit();
         await chargerContexte();
-      }catch(e){ ecranConnexion(esc(e.message)); }
+      }catch(e){ ecranConnexion(e.code === 'station_non_autorisee' ? t('pas_ta_station') : esc(e.message)); }
     };
     return;
   }

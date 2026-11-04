@@ -599,6 +599,9 @@ canvas{display:block}
 .sx-sup-tout{display:flex;justify-content:flex-end;margin:-4px 0 12px}
 .sx-sup-tout button{background:none;border:0;color:var(--muted);font-size:12.5px;cursor:pointer;text-decoration:underline dotted}
 .sx-sup-tout button:hover{color:#ef4444}
+.psp-autor{width:auto;max-width:max-content;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-size:12.5px;padding:3px 9px;margin:2px 4px 2px 0;border:1px solid var(--border);border-radius:999px;cursor:pointer;color:var(--muted)}
+.psp-autor input{width:16px!important;height:16px!important;min-width:0!important;padding:0!important;margin:0;flex:0 0 16px}
+.psp-autor.on{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.1);color:inherit}
 .psp-sup{display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)}
 .psp-sup .psp-lien{color:var(--muted)}.psp-sup .psp-lien:hover{color:#ef4444}
 .sx-origine{color:#a78bfa}
@@ -18229,6 +18232,10 @@ function _sfCarte(s){
 function _sfFormulaire(s){
   const ch=(k,lib,v,attr='')=>`<label class="st-champ">${lib}<input class="filter-input" id="sf-${k}-${s.id}" value="${esc(v||'')}" ${attr}></label>`;
   return `<div class="sf-corps">
+    <div class="sf-sec"><div class="sf-sec-t">⛽ Nom de la station</div>
+      <label class="st-champ" style="grid-column:1/-1">Nom affiché partout (connexion des pompistes, changement de station, carte, rapports)
+        <input class="filter-input" id="sf-nom-${s.id}" value="${esc(s.nom||'')}" maxlength="150" required placeholder="Ex. Vertières"></label>
+      <div class="c-dim" style="grid-column:1/-1;font-size:12.5px">Deux stations ne peuvent pas porter le même nom : chaque pompiste et chaque rapport restent dans la bonne.</div></div>
     <div class="sf-sec"><div class="sf-sec-t">📍 Localisation</div>
       ${ch('adresse','Adresse',s.adresse,'maxlength="255" placeholder="Ex. Champin"')}
       <label class="st-champ">Département<select class="filter-input" id="sf-departement-${s.id}"><option value="">—</option>
@@ -18289,7 +18296,8 @@ async function _sfEnregistrer(id, extra){
   z.innerHTML='';
   const gps=v('gps'), r=gps?_sfLireGps(id):null;
   if(r&&r.erreur) return err(r.erreur);
-  const infos={adresse:v('adresse'), departement:v('departement'), commune:v('commune'), code:v('code'), responsable:v('responsable'),
+  if(v('nom').length<2){ document.getElementById('sf-nom-'+id).focus(); return err('Donnez un nom à la station.'); }
+  const infos={nom:v('nom'), adresse:v('adresse'), departement:v('departement'), commune:v('commune'), code:v('code'), responsable:v('responsable'),
     telephone:v('telephone'), email:v('email'), horaires:v('horaires'), urgence_nom:v('urgence_nom'), urgence_telephone:v('urgence_telephone'), note:v('note')};
   const verifie=document.getElementById('sf-verifie-'+id).checked;
   const bouge=r&&(r.lat!==s.latitude||r.lon!==s.longitude), verif=r&&!bouge&&verifie!==(s.verification==='verifie');
@@ -18301,8 +18309,9 @@ async function _sfEnregistrer(id, extra){
       await POST(`/geospatial/stations/${id}/location`, Object.assign({latitude:r.lat, longitude:r.lon, precision_m:prec,
         source:prec!=null?'gps':'carte', verifie, confirmer_remplacement:true}, extra||{}));
     }
-    notify(`${s.nom} : fiche enregistrée.`, 'ok');
+    notify(`${v('nom')||s.nom} : fiche enregistrée.`, 'ok');
     _SF.precision=null; _SF.ouverte=null;
+    if(v('nom')!==s.nom) initStations();
     if(window.GEO) GEO.dep=null;
     await _sfCharger();
   }catch(e){
@@ -18397,13 +18406,14 @@ async function _stRetirerTout(){
 // l'autre avec son PIN (il est déconnecté de la station quittée).
 // ══════════════════════════════════════════════
 let _STATIONS = null;
+const _nomPrincipale = () => (_STATIONS && _STATIONS.principale_nom) || 'Station principale';
 async function initStations(){
   try{ _STATIONS = await GET('/espaces'); }catch(e){ _STATIONS = null; return; }
   const f = document.getElementById('station-footer');
   if(!f) return;
   const plusieurs = _STATIONS.peut_changer, ouvrable = plusieurs || _STATIONS.peut_creer;
   f.style.display = (ouvrable || _STATIONS.courant) ? '' : 'none';
-  document.getElementById('station-nom').textContent = _STATIONS.courant_nom || 'Station principale';
+  document.getElementById('station-nom').textContent = _STATIONS.courant_nom || _nomPrincipale();
   document.getElementById('station-action').textContent = plusieurs ? 'Changer de station' : (ouvrable ? 'Mes stations' : 'Votre station');
   f.style.cursor = ouvrable ? 'pointer' : 'default';
   // Après la connexion, le propriétaire arrive sur la carte des stations
@@ -18419,7 +18429,7 @@ function ouvrirChoixStation(premiere){
   if(!_STATIONS || !(_STATIONS.peut_changer || _STATIONS.peut_creer)) return;
   let ov = document.getElementById('choix-station');
   if(!ov){ ov = document.createElement('div'); ov.id = 'choix-station'; ov.className = 'cs-overlay'; document.body.appendChild(ov); }
-  const toutes = [{id:0, nom:'Station principale', adresse:'', schema:null}, ..._STATIONS.espaces];
+  const toutes = [{id:0, nom:_nomPrincipale(), adresse:'', schema:null}, ..._STATIONS.espaces];
   ov.innerHTML = `<div class="cs-boite" role="dialog" aria-modal="true" aria-labelledby="cs-titre">
       <div class="cs-tete"><div><div class="cs-sur">${premiere ? 'Bienvenue' : 'Changer de station'}</div>
         <h2 id="cs-titre">${_STATIONS.espaces.length ? 'Où voulez-vous aller ?' : 'Vos stations'}</h2></div>
@@ -18448,7 +18458,7 @@ function fermerChoixStation(){
 }
 function choisirStation(id, ici){
   if(ici) return fermerChoixStation();
-  const st = [{id:0, nom:'Station principale'}, ..._STATIONS.espaces].find(x => x.id === id);
+  const st = [{id:0, nom:_nomPrincipale()}, ..._STATIONS.espaces].find(x => x.id === id);
   const z = document.getElementById('cs-pin');
   z.style.display = '';
   z.innerHTML = `<label for="cs-pin-in">Votre PIN pour entrer dans <b>${esc(st.nom)}</b></label>
@@ -20976,15 +20986,38 @@ function pspRendreComptes(){
       <div id="psp-c-msg"></div>
       <div class="psp-actions"><button class="btn btn-primary" onclick="pspCreerCompte()">+ Créer le compte</button></div></div>
     <div class="psp-card"><b>Comptes (${d.comptes.length})</b>
-      ${d.comptes.length ? `<div style="overflow-x:auto;margin-top:8px"><table class="psp-tbl"><thead><tr><th>Nom</th><th>Code de connexion</th><th>Station</th><th>Employé lié</th><th>Dernier rapport</th><th>Statut</th><th></th></tr></thead><tbody>
-      ${d.comptes.map(u => `<tr><td><b>${esc(u.nom_complet)}</b>${u.venu_d_ailleurs ? '<div class="psp-muted" style="font-size:12px">Vient d’une autre station (même code, même PIN)</div>' : ''}${u.pin_a_reprendre ? '<div class="psp-muted" style="font-size:12px;color:var(--orange)">PIN à reprendre : il tapera son ancien PIN à sa 1re connexion</div>' : ''}</td><td style="font-family:var(--mono);font-size:14px"><b>${esc(u.username)}</b></td>
+      ${d.comptes.length ? `<div style="overflow-x:auto;margin-top:8px"><table class="psp-tbl"><thead><tr><th>Nom</th><th>Code de connexion</th><th>Station</th>${_pspAvecAutres(d) ? '<th>Autres stations</th>' : ''}<th>Employé lié</th><th>Dernier rapport</th><th>Statut</th><th></th></tr></thead><tbody>
+      ${d.comptes.map(u => `<tr><td><b>${esc(u.nom_complet)}</b>${u.venu_d_ailleurs ? `<div class="psp-muted" style="font-size:12px">Vient de <b>${esc(u.origine_nom || 'une autre station')}</b> (même code, même PIN) : autorisé ici par la direction</div>` : ''}${u.pin_a_reprendre ? '<div class="psp-muted" style="font-size:12px;color:var(--orange)">PIN à reprendre : il tapera son ancien PIN à sa 1re connexion</div>' : ''}</td><td style="font-family:var(--mono);font-size:14px"><b>${esc(u.username)}</b></td>
         <td><select class="filter-input psp-station-sel" onchange="pspChangerStation(${u.id}, this)" title="Station où il travaille">${_pspOptionsStations(d.stations, u.station_adresse)}</select></td>
+        ${_pspAvecAutres(d) ? `<td>${_pspAutorisations(u)}</td>` : ''}
         <td>${esc(u.employe_nom||'—')}</td><td>${u.dernier_rapport ? _pspDate(u.dernier_rapport) : '—'}</td>
         <td>${u.actif ? '<span class="psp-badge CONFIRME">Actif</span>' : '<span class="psp-badge REJETE">Désactivé</span>'}</td>
         <td style="white-space:nowrap">${u.venu_d_ailleurs ? '' : `<button class="btn btn-secondary" style="height:30px;padding:0 10px" onclick="pspCompte(${u.id},{nouveau_pin:true})">Nouveau PIN</button>`}
           <button class="btn ${u.actif?'btn-danger':'btn-secondary'}" style="height:30px;padding:0 10px" onclick="pspCompte(${u.id},{actif:${!u.actif}})">${u.actif?'Désactiver':'Réactiver'}</button></td></tr>`).join('')}
       </tbody></table></div>` : '<div class="psp-muted" style="margin-top:6px">Aucun compte pompiste pour l\'instant.</div>'}</div>`;
   PSP.pin = null;
+}
+
+// Un pompiste n'entre que dans sa station ; la direction peut l'autoriser dans une autre
+const _pspAvecAutres = d => (d.autres_stations || []).length > 0;
+function _pspAutorisations(u){
+  if(u.venu_d_ailleurs) return '<span class="psp-muted">—</span>';
+  return (u.autorisations || []).map(a => `<label class="psp-autor ${a.autorise ? 'on' : ''}" title="${a.autorise ? 'Peut aussi faire ses rapports à ' + esc(a.nom) : 'Ne peut pas entrer à ' + esc(a.nom)}">
+    <input type="checkbox" ${a.autorise ? 'checked' : ''} onchange="pspAutoriser(${u.id}, ${a.espace_id}, this)"> ${esc(a.nom)}</label>`).join('') || '—';
+}
+async function pspAutoriser(id, espace, box){
+  const u = PSP.comptes.comptes.find(x => x.id === id), a = (u.autorisations || []).find(x => x.espace_id === espace);
+  const oui = box.checked;
+  const ok = await showConfirm(oui
+      ? `${u.nom_complet} pourra aussi se connecter à « ${a.nom} » (même code, même PIN). Ses rapports faits là-bas resteront dans « ${a.nom} ».`
+      : `${u.nom_complet} ne pourra plus entrer à « ${a.nom} ». Les rapports déjà faits là-bas y restent.`,
+    {title: oui ? 'Autoriser dans une autre station ?' : 'Retirer l’accès ?', type:'warn', okLabel: oui ? 'Oui, autoriser' : 'Oui, retirer'});
+  if(!ok){ box.checked = !oui; return; }
+  try{
+    await _pspApi('POST', `/comptes/${id}/stations`, {espace_id: espace, autorise: oui});
+    notify(oui ? `${u.nom_complet} est autorisé à ${a.nom}.` : `${u.nom_complet} n’a plus accès à ${a.nom}.`, 'ok');
+    PSP.comptes = await _pspApi('GET', '/comptes'); pspRendreComptes();
+  }catch(e){ box.checked = !oui; notify(e.message, 'err'); }
 }
 
 // Stations = adresses enregistrées sur les pompes physiques (Gérer produits / pompes)
@@ -20994,7 +21027,7 @@ function _pspOptionsStations(stations, actuelle, creation){
   // À la création : les autres stations séparées du propriétaire (le compte est créé dans cette station)
   const autres = creation && (creation.autres_stations || []).length
     ? `<optgroup label="Autres stations">${creation.autres_stations.map(e => `<option value="esp:${e.id}">⛽ ${esc(e.nom)}</option>`).join('')}</optgroup>` : '';
-  const ici = creation ? esc(creation.station_courante || 'Cette station') : 'Toutes les stations';
+  const ici = creation ? esc(creation.station_courante || 'Cette station') : 'Toutes les pompes de la station';
   return `<option value="" ${a ? '' : 'selected'}>${creation ? '⛽ ' + ici + ' (toutes ses pompes)' : ici}</option>`
     + l.map(s => `<option value="${esc(s.adresse)}" ${s.adresse === a ? 'selected' : ''}>📍 ${esc(s.adresse)} — ${esc(s.produits.join(', '))}</option>`).join('')
     + (connue ? '' : `<option value="${esc(a)}" selected>⚠ ${esc(a)} (plus aucune pompe à cette adresse)</option>`) + (autres || '');
