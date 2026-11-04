@@ -3548,6 +3548,20 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .gp-ajout{margin:0 8px 8px;font:inherit;font-weight:700;font-size:12.5px;border:1px dashed var(--border);background:none;color:var(--orange);border-radius:9px;padding:7px;cursor:pointer}
 .gp-nouveau,.gp-edit{display:flex;flex-direction:column;gap:6px}.gp-nouveau{padding:0 8px 8px}.gp-edit{flex:1}
 .gp-creer{border-style:dashed}.gp-sans{border-color:var(--orange)}
+.gp-off{opacity:.9;border-style:dashed}
+.md-barre{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:10px 0 14px}
+.md-compte{font-size:13px;color:var(--muted);flex:1;min-width:160px}
+.md-groupe{border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.md-gt{font-weight:800;font-size:13px;letter-spacing:.04em;text-transform:uppercase;padding:8px 12px;background:var(--bg);border-bottom:1px solid var(--border)}
+.md-ligne{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(0,1.1fr);gap:6px 10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border)}
+.md-ligne:last-child{border-bottom:0}.md-ligne.fixe{background:rgba(34,197,94,.05)}
+.md-nom b{display:block}.md-nom small,.md-prop small,.md-in small{display:block;font-size:11px;color:var(--muted);font-weight:700}
+.md-prop em{display:block;font-style:normal;font-size:11.5px;color:var(--muted)}
+.md-pv{background:none;border:1px dashed var(--border);border-radius:8px;padding:3px 8px;font-family:var(--mono);font-size:14px;color:inherit;cursor:pointer}
+.md-pv:hover:not([disabled]){border-color:var(--orange)}
+.md-in input{width:100%;font-family:var(--mono);font-size:15px;text-align:right}
+.md-suite{font-size:12.5px;grid-column:1/-1}.md-ok{color:#22c55e}.md-ko{color:#f59e0b;font-weight:700}
+@media (max-width:560px){.md-ligne{grid-template-columns:1fr 1fr}.md-nom{grid-column:1/-1}}
 .gp-zone-sans{flex-direction:row;flex-wrap:wrap}.gp-zone-sans .gp-m{flex:1 1 220px}
 .gest-metres{padding:8px 12px 10px;display:flex;flex-direction:column;gap:4px}
 .gest-metres-act{display:flex;flex-direction:column;gap:6px;margin-top:4px}
@@ -13152,6 +13166,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
     <div class="gest-onglets">
       <button id="gest-o-produits" class="on" onclick="gestOnglet('produits')">Produits &amp; mètres</button>
       <button id="gest-o-pompes" onclick="gestOnglet('pompes')">Pompes</button>
+      <button id="gest-o-depart" onclick="gestOnglet('depart')">Mètres de départ</button>
       <button id="gest-o-fiches" onclick="gestOnglet('fiches')">Fiches des stations</button>
       <button id="gest-o-station" onclick="gestOnglet('station')">Enregistrer une station</button>
     </div>
@@ -16242,7 +16257,8 @@ function renderSaisie(){
     const ip=indexPrecedents[po.id];
     const ipVal=(ip&&ip.index_precedent!=null)?ip.index_precedent:null;
     const ipSrc=(ip&&ip.source_periode)
-      ?`${ip.source_periode==='Matin'?'Matin':'Après-midi'} ${frDate(ip.source_date)}`:'';
+      ?(ip.source_periode==='depart'?`mètre de départ du ${frDate(ip.source_date)}`
+        :`${ip.source_periode==='Matin'?'Matin':'Après-midi'} ${frDate(ip.source_date)}`):'';
 
     // Nouvelle saisie : mètre avant ET mètre après saisissables. La case
     // « Index attendu » reporte le mètre après de la période précédente
@@ -17135,7 +17151,8 @@ function prepareConfirm(periode){
     if(prec && prec.index_precedent!=null){
       const e=Math.round((av-prec.index_precedent)*10000)/10000;
       if(Math.abs(e)>0.001) ecart={valeur:e,precedent:prec.index_precedent,
-        source:`${prec.source_periode==='Matin'?t('saisie.period.matin'):t('saisie.period.apresmidi')} ${frDate(prec.source_date)}`};
+        source:prec.source_periode==='depart'?`mètre de départ du ${frDate(prec.source_date)}`
+          :`${prec.source_periode==='Matin'?t('saisie.period.matin'):t('saisie.period.apresmidi')} ${frDate(prec.source_date)}`};
     }
     data.push({pompeId,pompeNom:pompe?.nom||'?',px,av,ap,qte,mnt,ecart});
   }
@@ -17978,6 +17995,7 @@ function gestOnglet(v){
   document.getElementById('gest-o-pompes').classList.toggle('on', v==='pompes');
   document.getElementById('gest-o-station').classList.toggle('on', v==='station');
   document.getElementById('gest-o-fiches').classList.toggle('on', v==='fiches');
+  document.getElementById('gest-o-depart').classList.toggle('on', v==='depart');
   document.getElementById('gest-nouveau-produit').style.display = v==='produits' ? '' : 'none';
   renderModalList();
 }
@@ -18050,7 +18068,14 @@ async function _gestPompes(){
     ${sans.length ? `<div class="gp-pompe gp-sans">
       <div class="gp-tete"><span class="gp-num" style="background:var(--orange)">!</span><span class="gp-tn"><b>Mètres sans pompe (${sans.length})</b>
         <small>Glissez-les sur leur pompe, ou choisissez avec ↔</small></span></div>
-      <div class="gp-zone gp-zone-sans" data-p="0">${sans.map(m=>metre(m, 0)).join('')}</div></div>` : ''}`;
+      <div class="gp-zone gp-zone-sans" data-p="0">${sans.map(m=>metre(m, 0)).join('')}</div></div>` : ''}
+    ${(d.desactives||[]).length ? `<div class="gp-pompe gp-off">
+      <div class="gp-tete"><span class="gp-num" style="background:var(--muted)">↩</span><span class="gp-tn"><b>Mètres supprimés (${d.desactives.length})</b>
+        <small>Leurs relevés sont gardés mais n’apparaissent plus dans la saisie : « Réactiver » annule la suppression</small></span></div>
+      <div class="gp-zone">${d.desactives.map(m=>`<div class="gp-m ${_gpCls(m.produit_nom)}">
+        <span class="gp-mn"><b>${esc(m.nom)}</b><small>${esc(m.produit_nom)} · ${m.nb_releves} relevé${m.nb_releves>1?'s':''}${m.dernier_releve?' · dernier le '+frDate(m.dernier_releve):''}</small></span>
+        <button class="gp-ic" title="Historique des mètres" onclick="hmOuvrir(${m.id})">🕘</button>
+        <button class="btn btn-secondary psp-mini" onclick="gestReactiver(${m.id},'${esc(m.nom)}')">↩ Réactiver</button></div>`).join('')}</div></div>` : ''}`;
   _gpGlisser(el);
   // Champ en cours de modification : prêt à taper
   const champ=_GEST.edit ? document.getElementById(_GEST.edit[0]==='m' ? 'ge-m-'+_GEST.edit.slice(1) : 'ge-d-'+_GEST.edit.slice(1))
@@ -18103,8 +18128,14 @@ async function gestRenommer(type, id){
   if(await _gestApi('PATCH', `/distributeurs/${id}`, corps, 'Enregistré.')) { _GEST.edit=null; renderModalList(); }
 }
 async function gestSupprimer(quoi, id, nom){
-  if(!await showConfirm(`Supprimer ${nom} ? Les relevés ne sont pas touchés.`, {title:'Supprimer ?', type:'danger', okLabel:'Oui, supprimer'})) return;
+  const txt = quoi==='pompes'
+    ? `Supprimer ${nom} ? S’il a déjà des relevés, ils sont gardés mais ne s’affichent plus dans la saisie. Vous pourrez l’annuler dans « Mètres supprimés » (↩ Réactiver).`
+    : `Supprimer ${nom} ? Les relevés ne sont pas touchés.`;
+  if(!await showConfirm(txt, {title:'Supprimer ?', type:'danger', okLabel:'Oui, supprimer'})) return;
   await _gestApi('DELETE', `/${quoi}/${id}`, null, `${nom} supprimée.`);
+}
+async function gestReactiver(id, nom){
+  await _gestApi('PATCH', `/pompes/${id}`, {actif:true}, `${nom} est de retour, avec tous ses relevés. Placez-le sur sa pompe.`);
 }
 async function gestPlacer(metre, pompe){
   await _gestApi('PATCH', `/pompes/${metre}`, {distributeur_id: pompe}, pompe ? 'Mètre placé sur la pompe.' : 'Mètre retiré de la pompe.');
@@ -18176,6 +18207,90 @@ function _stRendre(){
       <div class="st-ligne"><input id="st-confirme" class="filter-input" placeholder="Tapez RETIRER pour confirmer" style="max-width:240px">
         <button class="btn btn-danger" onclick="_stRetirerTout()">Retirer l'existant</button></div></div>`;
 }
+// ── Mètres de départ : l'index de chaque mètre à la fin du mois précédent ──
+// (ex. 31/10 pour démarrer novembre). La continuité repart de ce chiffre.
+const _MD = {date:null, metres:[], val:{}};
+async function _mdCharger(date){
+  const el=document.getElementById('modal-list');
+  el.innerHTML='<div class="empty">Chargement des mètres…</div>';
+  try{
+    const r=await GET('/metres-depart'+(date?`?date=${date}`:(_MD.date?`?date=${_MD.date}`:'')));
+    _MD.date=r.date; _MD.metres=r.metres; _MD.val={};
+    for(const m of r.metres){
+      const v=m.fixe?m.depart.metre:(m.proposition?m.proposition.metre:null);
+      _MD.val[m.pompe_id]=v==null?'':String(v);
+    }
+  }catch(e){ el.innerHTML=`<div class="empty">${esc(e.message)}</div>`; return; }
+  _mdRendre();
+}
+const _mdNum=v=>{ const x=parseFloat(String(v).replace(/\s/g,'').replace(',','.')); return isNaN(x)?null:x; };
+const _mdF=v=>v==null?'—':Number(v).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3});
+const _mdPer=p=>p==='Matin'?'Matin':'Après-midi';
+function _mdSuite(m){
+  const v=_mdNum(_MD.val[m.pompe_id]), a=m.premier_apres;
+  if(!a) return '<span class="c-dim">Pas encore de relevé après</span>';
+  const quand=`${frDate(a.date)} ${_mdPer(a.periode)} : début ${_mdF(a.metter_avant)}`;
+  if(v==null) return `<span class="c-dim">${quand}</span>`;
+  const d=Math.round((a.metter_avant-v)*1e4)/1e4;
+  return Math.abs(d)<=0.001 ? `<span class="md-ok">✓ ${quand}</span>`
+    : `<span class="md-ko">⚠ ${quand} · écart ${d>0?'+':''}${_mdF(d)}</span>`;
+}
+function _mdRendre(){
+  const el=document.getElementById('modal-list'), L=_MD.metres;
+  const fixes=L.filter(m=>m.fixe).length;
+  const groupes={}; L.forEach(m=>(groupes[m.produit_nom]=groupes[m.produit_nom]||[]).push(m));
+  el.innerHTML=`
+    <div class="gest-explic">Pour démarrer le mois proprement, notez l’<b>index de chaque mètre à la fin du ${frDate(_MD.date)}</b>.
+      La continuité repart de ce chiffre : le premier relevé du mois doit commencer exactement là. Les relevés d’avant restent dans l’historique.</div>
+    <div class="md-barre">
+      <label class="st-champ" style="margin:0">Index à la fin du<input type="date" class="filter-input" id="md-date" value="${_MD.date}" onchange="_mdCharger(this.value)"></label>
+      <span class="md-compte"><b>${fixes}/${L.length}</b> mètres de départ enregistrés pour cette date</span>
+      <button class="btn btn-secondary" onclick="_mdReprendre()">Reprendre toutes les propositions</button>
+    </div>
+    ${Object.entries(groupes).map(([prod, ms])=>`<div class="md-groupe"><div class="md-gt">${esc(prod)}</div>
+      ${ms.map(m=>{
+        const pr=m.proposition;
+        const src=pr?`Fin du ${frDate(pr.date)} ${_mdPer(pr.periode)}${pr.pompiste?' · '+esc(pr.pompiste):''}${pr.source==='rapport_en_attente'?' · rapport pompiste pas encore confirmé':''}`:'Aucun relevé jusqu’à cette date';
+        return `<div class="md-ligne ${m.fixe?'fixe':''}">
+          <div class="md-nom"><b>${esc(m.nom)}</b><small>${m.emplacement?esc(m.emplacement):'Sans pompe'}${m.fixe?' · <span class="md-ok">✓ enregistré</span>':''}</small></div>
+          <div class="md-prop"><small>Proposé</small><button class="md-pv" ${pr?'':'disabled'} title="Reprendre ce chiffre" onclick="_mdPrendre(${m.pompe_id})">${pr?_mdF(pr.metre):'—'}</button><em>${src}</em></div>
+          <label class="md-in"><small>Mètre de départ</small><input class="filter-input" inputmode="decimal" id="md-${m.pompe_id}" value="${esc(_MD.val[m.pompe_id])}"
+            placeholder="Index au ${frDate(_MD.date)}" oninput="_MD.val[${m.pompe_id}]=this.value;document.getElementById('md-s-${m.pompe_id}').innerHTML=_mdSuite(_MD.metres.find(x=>x.pompe_id===${m.pompe_id}))"></label>
+          <div class="md-suite" id="md-s-${m.pompe_id}">${_mdSuite(m)}</div>
+        </div>`;}).join('')}</div>`).join('') || '<div class="empty">Aucun mètre actif.</div>'}
+    <div id="md-msg"></div>
+    <div class="gest-edit-act" style="margin-top:12px"><button class="btn btn-primary" id="md-ok" onclick="_mdEnregistrer()">Enregistrer les mètres de départ</button></div>`;
+}
+function _mdPrendre(id){
+  const m=_MD.metres.find(x=>x.pompe_id===id); if(!m||!m.proposition) return;
+  _MD.val[id]=String(m.proposition.metre);
+  const i=document.getElementById('md-'+id); if(i) i.value=_MD.val[id];
+  document.getElementById('md-s-'+id).innerHTML=_mdSuite(m);
+}
+function _mdReprendre(){ _MD.metres.forEach(m=>{ if(m.proposition) _MD.val[m.pompe_id]=String(m.proposition.metre); }); _mdRendre(); }
+async function _mdEnregistrer(){
+  const z=document.getElementById('md-msg'), bt=document.getElementById('md-ok');
+  const metres=[];
+  for(const m of _MD.metres){
+    const brut=String(_MD.val[m.pompe_id]??'').trim(), v=_mdNum(brut);
+    if(brut && v==null){ z.innerHTML=`<div class="psp-err">${esc(m.produit_nom)} · ${esc(m.nom)} : chiffre invalide.</div>`; document.getElementById('md-'+m.pompe_id)?.focus(); return; }
+    if(v!=null || m.fixe) metres.push({pompe_id:m.pompe_id, metre:v});
+  }
+  if(!metres.length){ z.innerHTML='<div class="psp-err">Tapez au moins un mètre de départ.</div>'; return; }
+  if(!await showConfirm(`Enregistrer ${metres.filter(x=>x.metre!=null).length} mètre(s) de départ à la fin du ${frDate(_MD.date)} ? Le premier relevé suivant de chaque mètre est recalculé.`,
+      {title:'Mètres de départ', type:'warn', okLabel:'Oui, enregistrer'})) return;
+  bt.disabled=true; bt.textContent='Enregistrement…';
+  try{
+    const r=await PUT('/metres-depart',{date:_MD.date, metres});
+    toast(`${r.modifies} mètre(s) de départ enregistré(s) au ${frDate(r.date)}.`,'ok');
+    (r.avertissements||[]).forEach(m=>toast(m, m.startsWith('✓')?'ok':'inf'));
+    _MD.metres=r.metres; _MD.val={};
+    for(const m of r.metres) _MD.val[m.pompe_id]=m.fixe?String(m.depart.metre):(m.proposition?String(m.proposition.metre):'');
+    _mdRendre();
+    if(typeof loadSaisie==='function' && currentPage==='saisie') loadSaisie();
+  }catch(e){ bt.disabled=false; bt.textContent='Enregistrer les mètres de départ'; z.innerHTML=`<div class="psp-err">${esc(String(e.message).replace(/^\[\d+\]\s*/,''))}</div>`; }
+}
+
 // ── Fiches des stations : GPS, contacts, urgence ─────────────────────
 const _SF = {liste:[], dep:[], ouverte:null};
 async function _sfCharger(ouvrir){
@@ -18558,6 +18673,7 @@ function _demanderSeparation(corps){
 function renderModalList(){
   if(_GEST.vue==='station') return _stRendre();
   if(_GEST.vue==='fiches') return _sfCharger();
+  if(_GEST.vue==='depart') return _mdCharger();
   if(_GEST.vue==='pompes') return _gestPompes();
   const el=document.getElementById('modal-list');
   if(!products.length){ el.innerHTML=`<div class="empty">${t('gestion.empty.products')}</div>`; return; }

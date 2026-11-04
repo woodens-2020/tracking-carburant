@@ -321,11 +321,15 @@ def _index_precedent(db: Session, pompe_id: int, d: date_type, periode: str,
     ou rapport pompiste encore en attente de confirmation (sinon le pompiste
     suivant ne pourrait pas enchaîner tant que le superviseur n'est pas passé).
     Retourne (valeur, libellé de la source) ou (None, None)."""
+    import main  # import tardif : main importe ce module
     cible = (d, _RANG[periode])
     meilleur, cle_m, src = None, None, None
-    for r in (db.query(Releve)
-              .filter(Releve.pompe_id == pompe_id, Releve.date <= d)
-              .order_by(Releve.date.desc()).limit(6).all()):
+    p = db.get(Pompe, pompe_id)
+    dd = main.depart_applicable(p, d)
+    qr = db.query(Releve).filter(Releve.pompe_id == pompe_id, Releve.date <= d)
+    if dd:
+        qr = qr.filter(Releve.date > dd)
+    for r in (qr.order_by(Releve.date.desc()).limit(6).all()):
         cle = (r.date, _RANG.get(r.periode, 9))
         if cle < cible and (cle_m is None or cle > cle_m):
             meilleur, cle_m, src = float(r.metter_apres), cle, f"journal — {_per(r.periode)} du {r.date.strftime('%d/%m')}"
@@ -336,15 +340,19 @@ def _index_precedent(db: Session, pompe_id: int, d: date_type, periode: str,
                  RapportPompiste.date <= d, RapportPompiste.date >= d - timedelta(days=3)))
     if exclure_rapport_id:
         q = q.filter(RapportPompiste.id != exclure_rapport_id)
+    if dd:
+        q = q.filter(RapportPompiste.date > dd)
     for ligne, rap in q.all():
         cle = (rap.date, _RANG.get(rap.periode, 9))
         if cle < cible and (cle_m is None or cle > cle_m):
             meilleur, cle_m = float(ligne.metter_apres), cle
             src = f"rapport pompiste — {_per(rap.periode)} du {rap.date.strftime('%d/%m')}"
     if meilleur is None:
-        p = db.get(Pompe, pompe_id)
-        if p is not None and p.metre_depart is not None:
-            meilleur, src = float(p.metre_depart), "mètre de départ (enregistrement de la station)"
+        dep = main.base_depart(p, d)
+        if dep is not None:
+            meilleur = dep
+            src = (f"mètre de départ du {p.date_depart.strftime('%d/%m')}" if p.date_depart
+                   else "mètre de départ (enregistrement de la station)")
     return meilleur, src
 
 

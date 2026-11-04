@@ -79,3 +79,27 @@ def test_ordre_des_pompes(client):
     assert ids[:2] == [b, a]
     assert client.post("/api/distributeurs/ordre", headers=H, json={"ids": [b, b]}).status_code == 400
     assert client.post("/api/distributeurs/ordre", headers=H, json={"ids": [999999]}).status_code == 400
+
+
+def test_metre_supprime_puis_reactive(client):
+    """Supprimer un mètre qui a des relevés le désactive (relevés gardés) ;
+    « Réactiver » annule la suppression."""
+    t = time.time_ns()
+    gaz = _produit(client, "Gaz")
+    m = client.post(f"/api/produits/{gaz}/pompes", headers=H, json={"nom": "Gazoline 1"}).json()["id"]
+    r = client.post("/api/releves", headers=H, json={"date": "2025-02-03", "periode": "Matin", "pompe_id": m,
+                                                     "prix_gallon": 500, "metter_avant": 100, "metter_apres": 150})
+    assert r.status_code == 200, r.text
+    assert client.delete(f"/api/pompes/{m}", headers=H).json()["desactivee"] is True
+    pompes = lambda: next(p for p in client.get("/api/produits", headers=H).json() if p["id"] == gaz)["pompes"]
+    assert pompes() == []
+    off = [x for x in client.get("/api/distributeurs", headers=H).json()["desactives"] if x["id"] == m]
+    assert len(off) == 1 and off[0]["nb_releves"] == 1 and off[0]["dernier_releve"] == "2025-02-03"
+    # Recréer un mètre du même nom : refusé, on propose de le réactiver
+    r = client.post(f"/api/produits/{gaz}/pompes", headers=H, json={"nom": "gazoline 1"})
+    assert r.status_code == 409 and "réactivez" in r.json()["detail"]
+    assert client.patch(f"/api/pompes/{m}", headers=H, json={"actif": True}).status_code == 200
+    assert m in [p["id"] for p in pompes()]
+    assert not [x for x in client.get("/api/distributeurs", headers=H).json()["desactives"] if x["id"] == m]
+    rel = client.get("/api/releves?date=2025-02-03", headers=H).json()
+    assert any(x["pompe_id"] == m and x["metter_apres"] == 150 for x in rel)

@@ -2128,6 +2128,7 @@ class PompePatch(BaseModel):
     nom: Optional[str] = None
     distributeur_id: Optional[int] = None   # 0 = retirer de sa pompe
     face_id: Optional[int] = None           # ancien format (faces A / B)
+    actif: Optional[bool] = None            # True = réactiver un mètre désactivé
 
 
 class DistributeurIn(BaseModel):
@@ -2161,15 +2162,35 @@ TOLERANCE_ECART_COMPTEUR = 0.001
 MOTIF_ECART_MIN_CARACTERES = 5
 
 
+def depart_applicable(pompe, d: date_type) -> Optional[date_type]:
+    """Date du point de départ du mètre si `d` vient après : les relevés
+    jusqu'à cette date ne servent plus à la continuité."""
+    dd = getattr(pompe, "date_depart", None)
+    return dd if dd is not None and d > dd else None
+
+
+def base_depart(pompe, d: date_type) -> Optional[float]:
+    """Index de départ à utiliser quand aucun relevé ne précède `d` : le
+    mètre de départ, sauf pour un relevé daté avant son point de départ."""
+    if pompe is None or pompe.metre_depart is None:
+        return None
+    if pompe.date_depart is not None and d <= pompe.date_depart:
+        return None
+    return float(pompe.metre_depart)
+
+
 def _releve_precedent(db: Session, pompe_id: int, d: date_type, periode: str) -> Optional[Releve]:
     """Dernier relevé de la pompe strictement avant (d, periode), dans l'ordre
-    chronologique Matin puis Après-midi."""
+    chronologique Matin puis Après-midi — sans remonter avant le point de
+    départ du mètre."""
     rang = {"Matin": 0, "Apres-midi": 1}
     cible = (d, rang.get(periode, 9))
     meilleur, cle_meilleure = None, None
-    for r in (db.query(Releve)
-              .filter(Releve.pompe_id == pompe_id, Releve.date <= d)
-              .order_by(Releve.date.desc())
+    q = db.query(Releve).filter(Releve.pompe_id == pompe_id, Releve.date <= d)
+    dd = depart_applicable(db.get(Pompe, pompe_id), d)
+    if dd:
+        q = q.filter(Releve.date > dd)
+    for r in (q.order_by(Releve.date.desc())
               .limit(10).all()):
         cle = (r.date, rang.get(r.periode, 9))
         if cle < cible and (cle_meilleure is None or cle > cle_meilleure):
@@ -2201,7 +2222,7 @@ def _reprendre_suivant(db: Session, pompe_id: int, d: date_type, periode: str) -
     if not nxt:
         return None
     prec = _releve_precedent(db, pompe_id, nxt.date, nxt.periode)
-    base = float(prec.metter_apres) if prec else getattr(nxt.pompe, "metre_depart", None)
+    base = float(prec.metter_apres) if prec else base_depart(nxt.pompe, nxt.date)
     if base is None:
         return None
     ecart = round(float(nxt.metter_avant) - float(base), 4)
@@ -2334,12 +2355,23 @@ def modifier_pompe(pompe_id: int, data: PompePatch, request: Request, db: Sessio
     q = db.get(Pompe, pompe_id)
     if not q:
         raise HTTPException(404, "Pompe introuvable")
+    if data.actif and not q.actif:
+        # Annule une suppression : le mètre et tous ses relevés reviennent
+        # dans la saisie, l'espace pompiste et les pompes.
+        if not q.produit.actif:
+            raise HTTPException(409, f"Le produit « {q.produit.nom} » est archivé : ce mètre ne peut pas revenir seul.")
+        for autre in q.produit.pompes:
+            if autre.id != q.id and autre.actif and autre.nom.strip().casefold() == q.nom.strip().casefold():
+                raise HTTPException(409, f"Un mètre actif s'appelle déjà « {autre.nom} » pour {q.produit.nom} : "
+                                         "renommez-le d'abord.")
+        q.actif = True
+        _tracer(db, request, "pompe_reactivee", {"pompe_id": q.id, "metre": q.nom, "produit": q.produit.nom})
     if data.nom is not None:
         nom = " ".join((data.nom or "").split())
         if len(nom) < 1 or len(nom) > 100:
             raise HTTPException(400, "Nom de pompe invalide (1 à 100 caractères).")
         for autre in q.produit.pompes:
-            if autre.id != q.id and autre.nom.strip().casefold() == nom.casefold():
+            if autre.id != q.id and autre.actif and autre.nom.strip().casefold() == nom.casefold():
                 raise HTTPException(409, f"La pompe « {autre.nom} » existe déjà pour {q.produit.nom}.")
         if nom != q.nom:
             _tracer(db, request, "pompe_modifiee", {"pompe_id": q.id, "avant": q.nom, "apres": nom})
@@ -2581,7 +2613,17 @@ def lister_distributeurs(db: Session = Depends(get_db)):
     sans = (db.query(Pompe).join(Produit).filter(Pompe.face_id.is_(None), Pompe.actif.is_(True),
                                                   Produit.actif.is_(True))
             .order_by(Produit.nom, Pompe.nom).all())
-    return {"distributeurs": out, "sans_emplacement": [_metre_dict(q) for q in sans]}
+    # Mètres supprimés alors qu'ils avaient des relevés : désactivés, leurs
+    # relevés gardés ; on peut les réactiver (annuler la suppression).
+    off = (db.query(Pompe).join(Produit).filter(Pompe.actif.is_(False), Produit.actif.is_(True))
+           .order_by(Produit.nom, Pompe.nom).all())
+    desactives = []
+    for q in off:
+        rel = db.query(Releve).filter_by(pompe_id=q.id)
+        dernier = rel.order_by(Releve.date.desc()).first()
+        desactives.append(dict(_metre_dict(q), nb_releves=rel.count(),
+                               dernier_releve=str(dernier.date) if dernier else None))
+    return {"distributeurs": out, "sans_emplacement": [_metre_dict(q) for q in sans], "desactives": desactives}
 
 
 @app.post("/api/distributeurs", status_code=201)
@@ -2689,8 +2731,15 @@ def add_pompe(produit_id: int, data: PompeIn, request: Request, db: Session = De
     _gerer_station(request, db)
     if not db.query(Produit).get(produit_id):
         raise HTTPException(404, "Produit introuvable")
+    nom = " ".join((data.nom or "").split())
+    meme = next((x for x in db.query(Pompe).filter_by(produit_id=produit_id).all()
+                 if x.nom.strip().casefold() == nom.casefold()), None)
+    if meme:
+        raise HTTPException(409, f"« {meme.nom} » existe déjà pour ce produit" + (
+            "." if meme.actif else " (mètre supprimé, ses relevés sont gardés) : réactivez-le dans "
+                                   "« Mètres supprimés » au lieu d'en créer un nouveau."))
     cible = _cible_metre(db, data.distributeur_id, data.face_id)
-    pompe = Pompe(produit_id=produit_id, nom=data.nom, face_id=cible or None)
+    pompe = Pompe(produit_id=produit_id, nom=nom, face_id=cible or None)
     db.add(pompe); db.commit(); db.refresh(pompe)
     return {"id": pompe.id, "nom": pompe.nom, "distributeur_id": pompe.distributeur_id, "face_id": pompe.face_id,
             "emplacement": pompe.emplacement}
@@ -2708,8 +2757,10 @@ def delete_pompe(pompe_id: int, request: Request, db: Session = Depends(get_db))
     if (db.query(Releve).filter_by(pompe_id=pompe_id).first()
             or db.query(RapportPompisteLigne).filter_by(pompe_id=pompe_id).first()):
         pompe.actif = False
+        _tracer(db, request, "pompe_desactivee", {"pompe_id": pompe.id, "metre": pompe.nom, "produit": pompe.produit.nom})
         db.commit()
         return {"ok": True, "desactivee": True}
+    _tracer(db, request, "pompe_supprimee", {"pompe_id": pompe.id, "metre": pompe.nom, "produit": pompe.produit.nom})
     db.delete(pompe); db.commit()
     return {"ok": True, "desactivee": False}
 
@@ -2761,7 +2812,7 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
     # « mètre après » du relevé précédent. Sinon, des gallons sont sortis de
     # la pompe sans être vendus dans le système : un motif écrit est exigé.
     prec = _releve_precedent(db, data.pompe_id, data.date, data.periode)
-    depart = None if prec else getattr(db.get(Pompe, data.pompe_id), "metre_depart", None)
+    depart = None if prec else base_depart(db.get(Pompe, data.pompe_id), data.date)
     ecart = (round(data.metter_avant - float(prec.metter_apres), 4) if prec
              else (round(data.metter_avant - float(depart), 4) if depart is not None else 0.0))
     motif = (data.motif_ecart_compteur or "").strip()
@@ -2885,11 +2936,15 @@ def releves_index_precedent(date: date_type, periode: str,
                .all())
     par_pompe: dict = {}
     dejadans: dict = {}
+    par_id = {p.id: p for p in pompes}
     for r in releves:
         clef = (r.date, _rang.get(r.periode, 9))
         if clef == cible:
             dejadans[r.pompe_id] = float(r.metter_apres)
             continue
+        dd = depart_applicable(par_id.get(r.pompe_id), date)
+        if dd and r.date <= dd:
+            continue                      # avant le point de départ du mètre
         if clef < cible:
             cur = par_pompe.get(r.pompe_id)
             if cur is None or clef > cur[0]:
@@ -2898,17 +2953,125 @@ def releves_index_precedent(date: date_type, periode: str,
     out = []
     for p in pompes:
         info = par_pompe.get(p.id)
+        dep = None if info else base_depart(p, date)
         out.append({
             "pompe_id":        p.id,
             "pompe_nom":       p.nom,
             "produit_id":      p.produit_id,
-            "index_precedent": round(float(info[1].metter_apres), 4) if info else None,
-            "source_date":     str(info[1].date) if info else None,
-            "source_periode":  info[1].periode if info else None,
+            "index_precedent": round(float(info[1].metter_apres), 4) if info else (round(dep, 4) if dep is not None else None),
+            "source_date":     str(info[1].date) if info else (str(p.date_depart) if dep is not None and p.date_depart else None),
+            "source_periode":  info[1].periode if info else ("depart" if dep is not None else None),
             "deja_saisi":      p.id in dejadans,
             "valeur_saisie":   dejadans.get(p.id),
         })
     return out
+
+
+# ---------- Mètres de départ (début de mois) ----------
+# Pour démarrer un mois propre (ex. novembre), on fixe pour chaque mètre
+# l'index à la fin du dernier jour du mois précédent (31/10). La continuité
+# repart de ce chiffre ; les relevés d'avant restent en historique.
+
+def _fin_mois_precedent(d: date_type) -> date_type:
+    from datetime import timedelta
+    return d.replace(day=1) - timedelta(days=1)
+
+
+def _metres_depart(db: Session, jour: date_type) -> list:
+    from datetime import timedelta
+    from pompiste_routes import lignes_en_attente
+    rang = lambda p: PERIODE_RANG.get(p, 9)
+    pendantes: dict = {}
+    for x in lignes_en_attente(db, jour - timedelta(days=60), jour):
+        cur = pendantes.get(x.pompe_id)
+        if cur is None or (x.date, rang(x.periode)) > (cur.date, rang(cur.periode)):
+            pendantes[x.pompe_id] = x
+    out = []
+    pompes = (db.query(Pompe).join(Produit).filter(Pompe.actif.is_(True), Produit.actif.is_(True))
+              .order_by(Produit.nom, Pompe.nom).all())
+    for p in pompes:
+        # Proposition : la fin du dernier relevé au plus tard ce jour-là
+        avant = (db.query(Releve).filter(Releve.pompe_id == p.id, Releve.date <= jour)
+                 .order_by(Releve.date.desc()).limit(4).all())
+        dernier = max(avant, key=lambda r: (r.date, rang(r.periode))) if avant else None
+        prop = ({"metre": float(dernier.metter_apres), "date": str(dernier.date), "periode": dernier.periode,
+                 "source": "journal", "pompiste": (f"{dernier.pompiste.prenom} {dernier.pompiste.nom}" if dernier.pompiste else None)}
+                if dernier else None)
+        x = pendantes.get(p.id)
+        if x is not None and (dernier is None or (x.date, rang(x.periode)) > (dernier.date, rang(dernier.periode))):
+            prop = {"metre": float(x.metter_apres), "date": str(x.date), "periode": x.periode,
+                    "source": "rapport_en_attente",
+                    "pompiste": (f"{x.pompiste.prenom} {x.pompiste.nom}" if x.pompiste else None)}
+        # Premier relevé après : reprend-il le départ ?
+        apres = (db.query(Releve).filter(Releve.pompe_id == p.id, Releve.date > jour)
+                 .order_by(Releve.date.asc()).limit(4).all())
+        premier = min(apres, key=lambda r: (r.date, rang(r.periode))) if apres else None
+        fixe = p.metre_depart is not None and p.date_depart == jour
+        out.append({
+            "pompe_id": p.id, "nom": p.nom, "produit_id": p.produit_id, "produit_nom": p.produit.nom,
+            "emplacement": p.emplacement,
+            "depart": {"date": str(p.date_depart) if p.date_depart else None,
+                       "metre": float(p.metre_depart) if p.metre_depart is not None else None},
+            "fixe": fixe,
+            "proposition": prop,
+            "premier_apres": ({"date": str(premier.date), "periode": premier.periode,
+                               "metter_avant": float(premier.metter_avant)} if premier else None),
+        })
+    return out
+
+
+@app.get("/api/metres-depart")
+def lire_metres_depart(date: Optional[date_type] = None, db: Session = Depends(get_db)):
+    jour = date or _fin_mois_precedent(today_haiti())
+    return {"date": str(jour), "metres": _metres_depart(db, jour)}
+
+
+class MetreDepartIn(BaseModel):
+    pompe_id: int
+    metre: Optional[float] = None        # None = retirer le point de départ
+
+
+class MetresDepartIn(BaseModel):
+    date: date_type
+    metres: List[MetreDepartIn]
+
+
+@app.put("/api/metres-depart")
+def enregistrer_metres_depart(data: MetresDepartIn, request: Request, db: Session = Depends(get_db)):
+    """Fixe l'index de départ de chaque mètre à la fin de `date`. Le premier
+    relevé suivant est recalculé (son écart disparaît s'il reprend exactement)."""
+    _gerer_station(request, db)
+    if data.date > today_haiti():
+        raise HTTPException(400, "La date de départ ne peut pas être dans le futur.")
+    changes, avertissements = [], []
+    for m in data.metres:
+        p = db.get(Pompe, m.pompe_id)
+        if not p:
+            raise HTTPException(404, f"Mètre {m.pompe_id} introuvable.")
+        if m.metre is not None and (m.metre < 0 or m.metre > 1e10):
+            raise HTTPException(400, f"{p.nom} : index de départ invalide.")
+        avant = {"date": str(p.date_depart) if p.date_depart else None,
+                 "metre": float(p.metre_depart) if p.metre_depart is not None else None}
+        if m.metre is None:
+            if p.date_depart != data.date:
+                continue
+            p.metre_depart, p.date_depart = None, None
+        else:
+            p.metre_depart, p.date_depart = round(m.metre, 4), data.date
+        apres = {"date": str(p.date_depart) if p.date_depart else None,
+                 "metre": float(p.metre_depart) if p.metre_depart is not None else None}
+        if apres != avant:
+            changes.append({"pompe_id": p.id, "metre": p.nom, "produit": p.produit.nom, "avant": avant, "apres": apres})
+    db.flush()
+    for c in changes:
+        msg = _reprendre_suivant(db, c["pompe_id"], data.date, "Apres-midi")
+        if msg:
+            avertissements.append(msg)
+    if changes:
+        _tracer(db, request, "metres_depart", {"date": str(data.date), "metres": changes})
+    db.commit()
+    return {"date": str(data.date), "modifies": len(changes), "avertissements": avertissements,
+            "metres": _metres_depart(db, data.date)}
 
 
 def _releve_dict(r: Releve):
@@ -3359,8 +3522,14 @@ def anomalies(date: date_type, historique: bool = False, inclure_traitees: bool 
 
         meter_apres_precedent = None
         releve_courant_valide = True
+        dep_franchi = False
 
         for r in liste:
+            if (not dep_franchi and pompe_obj.date_depart is not None and pompe_obj.metre_depart is not None
+                    and r.date > pompe_obj.date_depart):
+                dep_franchi = True
+                meter_apres_precedent = float(pompe_obj.metre_depart)
+                releve_courant_valide = True
             nom = pompe_obj.nom
 
             if r.metter_apres < r.metter_avant:
@@ -3671,17 +3840,19 @@ def _build_journal_entries(
     #   2. Charger toutes les sessions de cette date et trier par PERIODE_RANG
     #      → garantit que c'est bien l'Après-midi qui est pris si présent.
     pompe_last: dict = {}
+    departs: dict = {}            # pid -> (date de départ, index de départ)
+    franchi: set = set()          # pompes dont le point de départ est déjà passé
     for pid in {r.pompe_id for r in releves}:
-        last_date = (
-            db.query(Releve.date)
-            .filter(Releve.pompe_id == pid, Releve.date < d_debut)
-            .order_by(Releve.date.desc())
-            .limit(1)
-            .scalar()
-        )
+        pp = db.get(Pompe, pid)
+        if pp is not None and pp.date_depart is not None and pp.metre_depart is not None:
+            departs[pid] = (pp.date_depart, float(pp.metre_depart))
+        q_last = db.query(Releve.date).filter(Releve.pompe_id == pid, Releve.date < d_debut)
+        if pid in departs and d_debut > departs[pid][0]:
+            franchi.add(pid)
+            q_last = q_last.filter(Releve.date > departs[pid][0])
+        last_date = q_last.order_by(Releve.date.desc()).limit(1).scalar()
         if last_date is None:
-            pp = db.get(Pompe, pid)
-            pompe_last[pid] = float(pp.metre_depart) if pp is not None and pp.metre_depart is not None else None
+            pompe_last[pid] = base_depart(pp, d_debut) if pp is not None else None
         else:
             last_day = (
                 db.query(Releve)
@@ -3696,11 +3867,15 @@ def _build_journal_entries(
         cle = lambda x: (x.date, PERIODE_RANG.get(x.periode, 99))
         avant: dict = {}
         for x in lignes_en_attente(db, d_debut - _td(days=120), d_debut - _td(days=1)):
+            if x.pompe_id in franchi and x.date <= departs[x.pompe_id][0]:
+                continue
             if x.pompe_id in pompe_last and (x.pompe_id not in avant or cle(x) > cle(avant[x.pompe_id])):
                 avant[x.pompe_id] = x
         for pid, x in avant.items():
-            off = (db.query(Releve).filter(Releve.pompe_id == pid, Releve.date < d_debut)
-                   .order_by(Releve.date.desc()).all())
+            q_off = db.query(Releve).filter(Releve.pompe_id == pid, Releve.date < d_debut)
+            if pid in franchi:
+                q_off = q_off.filter(Releve.date > departs[pid][0])
+            off = q_off.order_by(Releve.date.desc()).all()
             off = max(off, key=cle) if off else None
             if off is None or cle(x) > cle(off):
                 pompe_last[pid] = float(x.metter_apres)
@@ -3712,6 +3887,9 @@ def _build_journal_entries(
         ap   = float(r.metter_apres)
         qte  = float(r.quantite)
         mnt  = float(r.montant_vente)
+        if pid in departs and pid not in franchi and r.date > departs[pid][0]:
+            franchi.add(pid)
+            pompe_last[pid] = departs[pid][1]          # la chaîne repart du point de départ
         prec = pompe_last.get(pid)
         decalage = round(av - prec, 4) if prec is not None else None
 

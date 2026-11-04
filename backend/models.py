@@ -152,6 +152,10 @@ class Pompe(Base):
     # Chiffre du compteur à l'enregistrement du mètre : sert de « mètre
     # précédent » tant qu'aucun relevé n'existe (contrôle de continuité).
     metre_depart = Column(Numeric(14, 4), nullable=True)
+    # Point de départ : metre_depart = index à la FIN de cette date (ex. le
+    # 31/10 pour démarrer novembre). Les relevés jusqu'à cette date restent
+    # en historique mais la continuité repart de ce chiffre.
+    date_depart = Column(Date, nullable=True)
 
     produit = relationship("Produit", back_populates="pompes")
     face    = relationship("Face", back_populates="metres")
