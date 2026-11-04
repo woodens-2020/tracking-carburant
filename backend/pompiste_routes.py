@@ -1405,9 +1405,16 @@ def _ecrire_depenses(db: Session, rap: RapportPompiste, request: Request, s: Uti
         return 0
     n = 0
     for i, x in enumerate(rap.depenses):
-        if x.get("statut") == "confirmee" and _ecrire_une_depense(db, rap, i, request, s):
+        if (x.get("statut") == "confirmee" and _vers_depenses(x)
+                and _ecrire_une_depense(db, rap, i, request, s)):
             n += 1
     return n
+
+
+def _vers_depenses(x: dict) -> bool:
+    """Une dépense confirmée va dans les Dépenses (et le rapport du jour),
+    sauf si le superviseur a choisi de ne pas l'y envoyer."""
+    return x.get("vers_depenses") is not False
 
 
 def _ref_depense(rap: RapportPompiste, i: int) -> str:
@@ -1440,6 +1447,7 @@ def _retirer_une_depense(db: Session, rap: RapportPompiste, i: int) -> None:
 
 class DepenseDecisionIn(BaseModel):
     motif: Optional[str] = None
+    envoyer: Optional[bool] = None      # confirmer : envoyer aux Dépenses (oui par défaut)
 
 
 def _decider_depense(db: Session, rid: int, i: int) -> tuple:
@@ -1451,15 +1459,21 @@ def _decider_depense(db: Session, rid: int, i: int) -> tuple:
 
 
 @router.post("/api/pompiste-supervision/rapports/{rid}/depenses/{i}/confirmer")
-def confirmer_depense(rid: int, i: int, request: Request, s: Utilisateur = Depends(_require_superviseur),
-                      db: Session = Depends(get_db)):
-    """Dépense du pompiste acceptée : elle entre tout de suite dans les
-    Dépenses de la station (sans sortir de la caisse principale)."""
+def confirmer_depense(rid: int, i: int, request: Request, data: Optional[DepenseDecisionIn] = None,
+                      s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Dépense du pompiste acceptée : elle réduit l'argent à remettre et, si
+    `envoyer` (par défaut), entre tout de suite dans les Dépenses de la
+    station et le rapport du jour (sans sortir de la caisse principale)."""
     rap, deps = _decider_depense(db, rid, i)
-    deps[i].update(statut="confirmee", motif=None, par=_nom(s), le=now_haiti().isoformat())
+    envoyer = not (data and data.envoyer is False)
+    deps[i].update(statut="confirmee", motif=None, par=_nom(s), le=now_haiti().isoformat(),
+                   vers_depenses=envoyer)
     rap.depenses = deps
     rap.ecart_confirme = False
-    _ecrire_une_depense(db, rap, i, request, s)
+    if envoyer:
+        _ecrire_une_depense(db, rap, i, request, s)
+    else:
+        _retirer_une_depense(db, rap, i)
     db.commit()
     db.refresh(rap)
     return _rapport_dict(db, rap, avec_journal=True)
@@ -1488,9 +1502,44 @@ def reprendre_depense(rid: int, i: int, _s: Utilisateur = Depends(_require_super
                       db: Session = Depends(get_db)):
     rap, deps = _decider_depense(db, rid, i)
     deps[i].update(statut="en_attente", motif=None, par=None, le=None)
+    deps[i].pop("vers_depenses", None)
     rap.depenses = deps
     rap.ecart_confirme = False
     _retirer_une_depense(db, rap, i)
+    db.commit()
+    db.refresh(rap)
+    return _rapport_dict(db, rap, avec_journal=True)
+
+
+class EnvoiDepenseIn(BaseModel):
+    envoyer: bool
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/depenses/{i}/envoyer")
+def envoyer_depense(rid: int, i: int, data: EnvoiDepenseIn, request: Request,
+                    s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Envoie (ou retire) une dépense confirmée dans les Dépenses de la station
+    et le rapport du jour — même après la finalisation du rapport. Le montant
+    dû par le pompiste ne change pas : la dépense reste confirmée."""
+    import main
+    rap = db.get(RapportPompiste, rid)
+    if not rap:
+        raise HTTPException(404, "Rapport introuvable")
+    deps = [dict(x) for x in (rap.depenses or [])]
+    if not (0 <= i < len(deps)):
+        raise HTTPException(404, "Dépense introuvable dans ce rapport.")
+    if deps[i].get("statut") != "confirmee":
+        raise HTTPException(409, "Confirmez d'abord la dépense.")
+    if _vers_depenses(deps[i]) != data.envoyer:
+        deps[i]["vers_depenses"] = data.envoyer
+        rap.depenses = deps
+        if data.envoyer:
+            _ecrire_une_depense(db, rap, i, request, s)
+        else:
+            _retirer_une_depense(db, rap, i)
+        main._tracer(db, request, "depense_pompiste_envoyee" if data.envoyer else "depense_pompiste_retenue",
+                     {"rapport_pompiste_id": rap.id, "reference": _ref_depense(rap, i),
+                      "description": deps[i].get("description"), "montant": deps[i].get("montant")})
     db.commit()
     db.refresh(rap)
     return _rapport_dict(db, rap, avec_journal=True)

@@ -4347,10 +4347,22 @@ def carburant_rapport_jour(
         db.query(Depense).filter(Depense.date_depense == d)
         .order_by(Depense.id.asc()).all()
     )
+    def _source_dep(x):
+        if x.produit:
+            return x.produit.nom
+        if getattr(x, "rapport_pompiste_id", None):
+            from models import RapportPompiste
+            rap = db.get(RapportPompiste, x.rapport_pompiste_id)
+            u = rap.utilisateur if rap else None
+            nom = (u.nom_complet or u.username) if u else ""
+            return f"Payée par le pompiste {nom}".strip()
+        return "Caisse principale"
+
     depenses_liste = [{
         "categorie":    x.categorie or "—",
         "description":  x.description or "",
-        "source":       (x.produit.nom if x.produit else "Caisse principale"),
+        "source":       _source_dep(x),
+        "pompiste":     bool(getattr(x, "rapport_pompiste_id", None)),
         "reference":    getattr(x, "reference", None) or "",
         "montant":      float(_D(str(x.montant))),
         "produit_id":   x.produit_id,

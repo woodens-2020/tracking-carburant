@@ -447,9 +447,29 @@ def test_depenses_et_dollars(client):
     _sup(client, rid, "depenses/0/reprendre"); assert mes_depenses() == []
     _sup(client, rid, "depenses/0/confirmer"); _sup(client, rid, "depenses/0/confirmer")
     assert len(mes_depenses()) == 1
+    # Flèche « ➜ Dépenses : Non » à la confirmation : confirmée, mais hors des Dépenses
+    _sup(client, rid, "depenses/0/reprendre")
+    r = _sup(client, rid, "depenses/0/confirmer", envoyer=False)
+    assert r.json()["depenses"][0]["vers_depenses"] is False and r.json()["total_depenses_retenues"] == 1500
+    assert mes_depenses() == []
+    assert _sup(client, rid, "depenses/1/envoyer", envoyer=True).status_code == 409     # refusée
+    # Envoyée plus tard : elle entre dans les Dépenses et le rapport du jour
+    r = _sup(client, rid, "depenses/0/envoyer", envoyer=True)
+    assert r.status_code == 200 and r.json()["depenses"][0]["vers_depenses"] is True
+    assert len(mes_depenses()) == 1
+    rj = client.get(f"/api/carburant/rapport-jour?date={jour}", headers=H).json()
+    lj = [x for x in rj["depenses"]["liste"] if x["reference"] == f"RP{rid}-1"]
+    assert len(lj) == 1 and lj[0]["pompiste"] and lj[0]["source"].startswith("Payée par le pompiste")
+    _sup(client, rid, "depenses/0/envoyer", envoyer=False); assert mes_depenses() == []
+    rj = client.get(f"/api/carburant/rapport-jour?date={jour}", headers=H).json()
+    assert not [x for x in rj["depenses"]["liste"] if x["reference"] == f"RP{rid}-1"]
+    _sup(client, rid, "depenses/0/envoyer", envoyer=True); assert len(mes_depenses()) == 1
     assert _sup(client, rid, "ecart", confirme=True).status_code == 200
     assert _sup(client, rid, "finaliser", note=7, commentaire="Il manque 5 250 G").status_code == 200
     assert len(mes_depenses()) == 1
+    # Après finalisation, la flèche marche encore (retirer puis renvoyer)
+    _sup(client, rid, "depenses/0/envoyer", envoyer=False); assert mes_depenses() == []
+    _sup(client, rid, "depenses/0/envoyer", envoyer=True); assert len(mes_depenses()) == 1
     # Journal de caisse : la dépense se déduit des ventes, pas une sortie de la caisse principale
     j = client.get(f"/api/caisse-principale/journal?date_debut={jour}&date_fin={jour}", headers=H).json()
     dpp = [l for l in j["lignes"] if l["type"] == "depense_pompiste"]

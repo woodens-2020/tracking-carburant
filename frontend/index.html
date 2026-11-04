@@ -3518,6 +3518,11 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .psp-dep.confirmee{border-left-color:var(--green)} .psp-dep.refusee{border-left-color:var(--red);opacity:.85}
 .psp-dep-mt{font-family:var(--mono);font-weight:800;font-size:15px;white-space:nowrap}
 .psp-dep-act{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.psp-fleche{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:999px;padding:3px 10px 3px 4px;
+  background:none;color:inherit;font-size:12px;cursor:pointer;white-space:nowrap;margin:2px 4px 2px 0}
+.psp-fleche .psp-fl-ic{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font-size:12px;color:#fff;background:#22c55e}
+.psp-fleche.oui{border-color:rgba(34,197,94,.55)}
+.psp-fleche.non{border-color:var(--border);color:var(--muted)}.psp-fleche.non .psp-fl-ic{background:var(--muted)}
 .psp-dep-total{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:13.5px;color:var(--muted)}
 .psp-dep-total b{color:var(--text);font-family:var(--mono)}
 @media (max-width:720px){ .psp-dep{grid-template-columns:minmax(0,1fr) auto} .psp-dep-act{grid-column:1 / 3;justify-content:flex-start} }
@@ -20915,8 +20920,28 @@ function _pspDepensesHtml(r){
   return `<div class="psp-muted" style="margin:10px 0 4px;font-weight:700">Dépenses payées par le pompiste</div>
     <table class="psp-tbl" style="max-width:720px"><thead><tr><th>Dépense</th><th>Autorisée par</th><th class="r">Montant</th><th>Décision</th></tr></thead><tbody>
     ${r.depenses.map(x => `<tr><td>${esc(x.description)}</td><td>${esc(x.autorise_par)}</td><td class="r">${_pspG(x.montant)}</td>
-      <td><span class="psp-badge ${_PSP_DEP_LIB[x.statut][0]}">${_PSP_DEP_LIB[x.statut][1]}</span>${x.motif ? `<div class="psp-muted">${esc(x.motif)}</div>` : ''}</td></tr>`).join('')}
+      <td><span class="psp-badge ${_PSP_DEP_LIB[x.statut][0]}">${_PSP_DEP_LIB[x.statut][1]}</span>${x.motif ? `<div class="psp-muted">${esc(x.motif)}</div>` : ''}
+        ${x.statut === 'confirmee' ? _pspFleche(r.id, x.index, x.vers_depenses !== false, true) : ''}</td></tr>`).join('')}
     <tr><td><b>Dépenses retenues</b></td><td></td><td class="r"><b>${_pspG(r.total_depenses_retenues)}</b></td><td></td></tr></tbody></table>`;
+}
+
+// Flèche « ➜ Dépenses » : envoie (ou non) la dépense dans les Dépenses de la
+// station et le rapport du jour. Avant la confirmation, elle prépare le choix ;
+// après, elle envoie ou retire la dépense tout de suite.
+function _pspFleche(id, i, oui, apres){
+  const clic = apres ? `pspEnvoyer(${id},${i},${!oui})` : `pspChoixEnvoi(${id},${i})`;
+  return `<button type="button" class="psp-fleche ${oui ? 'oui' : 'non'}" onclick="${clic}"
+    title="${oui ? 'Va dans les Dépenses et le rapport du jour — cliquez pour ne pas l’envoyer' : 'Ne va pas dans les Dépenses — cliquez pour l’envoyer'}">
+    <span class="psp-fl-ic">${oui ? '➜' : '⊘'}</span>Dépenses : <b>${oui ? 'Oui' : 'Non'}</b></button>`;
+}
+const _pspEnvoi = (id, i) => { const e = _pspS(id).envoi || {}; return e[i] !== false; };
+function pspChoixEnvoi(id, i){
+  const st = _pspS(id); st.envoi = st.envoi || {}; st.envoi[i] = !_pspEnvoi(id, i);
+  _pspMaj(PSP.rapports.find(x => x.id === id));
+}
+async function pspEnvoyer(id, i, envoyer){
+  try{ await _pspAction(id, `depenses/${i}/envoyer`, {envoyer});
+       notify(envoyer ? 'Dépense envoyée dans les Dépenses et le rapport du jour.' : 'Dépense retirée des Dépenses et du rapport du jour.', 'ok'); }catch(e){}
 }
 
 // Étape « Dépenses du pompiste » : chaque dépense confirmée ou refusée, une par une
@@ -20928,22 +20953,26 @@ function _pspEtapeDepenses(r){
         <div class="psp-dep-corps"><b>${esc(x.description)}</b>
           <div class="psp-muted">Autorisée par <b>${esc(x.autorise_par)}</b></div>
           ${x.statut === 'refusee' ? `<div class="psp-neg" style="font-size:12.5px">Refusée${x.par ? ' par ' + esc(x.par) : ''} : ${esc(x.motif||'')}</div>` : ''}
-          ${x.statut === 'confirmee' ? `<div class="psp-ok" style="font-size:12.5px">Confirmée${x.par ? ' par ' + esc(x.par) : ''} · inscrite dans les Dépenses (payée par le pompiste, hors caisse principale)</div>` : ''}</div>
+          ${x.statut === 'confirmee' ? `<div class="psp-ok" style="font-size:12.5px">Confirmée${x.par ? ' par ' + esc(x.par) : ''} · ${x.vers_depenses !== false
+              ? 'envoyée dans les Dépenses et le rapport du jour (payée par le pompiste, hors caisse principale)'
+              : 'gardée hors des Dépenses et du rapport du jour'}</div>` : ''}</div>
         <div class="psp-dep-mt">${_pspG(x.montant)}</div>
         <div class="psp-dep-act">${x.statut === 'en_attente'
           ? (st.refus === x.index
             ? `<input class="filter-input" id="psp-refus-${r.id}-${x.index}" placeholder="Pourquoi la refuser ?" style="min-width:200px">
                <button class="btn btn-danger psp-mini" onclick="pspDepense(${r.id},${x.index},'refuser')">Refuser</button>
                <button class="psp-lien" onclick="_pspS(${r.id}).refus=null;_pspMaj(PSP.rapports.find(x=>x.id===${r.id}))">retour</button>`
-            : `<button class="btn btn-primary psp-mini" onclick="pspDepense(${r.id},${x.index},'confirmer')">Confirmer</button>
+            : `${_pspFleche(r.id, x.index, _pspEnvoi(r.id, x.index), false)}
+               <button class="btn btn-primary psp-mini" onclick="pspDepense(${r.id},${x.index},'confirmer')">Confirmer</button>
                <button class="btn btn-secondary psp-mini" onclick="_pspS(${r.id}).refus=${x.index};_pspMaj(PSP.rapports.find(x=>x.id===${r.id}));setTimeout(()=>document.getElementById('psp-refus-${r.id}-${x.index}')?.focus(),0)">Refuser</button>`)
-          : `<span class="psp-badge ${_PSP_DEP_LIB[x.statut][0]}">${_PSP_DEP_LIB[x.statut][1]}</span>
+          : `${x.statut === 'confirmee' ? _pspFleche(r.id, x.index, x.vers_depenses !== false, true) : ''}
+             <span class="psp-badge ${_PSP_DEP_LIB[x.statut][0]}">${_PSP_DEP_LIB[x.statut][1]}</span>
              <button class="psp-lien" onclick="pspDepense(${r.id},${x.index},'reprendre')">reprendre</button>`}</div>
       </div>`).join('')}</div>
      <div class="psp-dep-total"><span>Dépenses déclarées <b>${_pspG(r.total_depenses)}</b></span>
        <span>Retenues <b>${_pspG(r.total_depenses_retenues)}</b></span>
        <span>Argent à remettre <b>${_pspG(r.montant_attendu_final - r.total_depenses_retenues)}</b></span></div>
-     <div class="psp-muted" style="margin-top:6px">Une dépense confirmée entre tout de suite dans les Dépenses de la station. Elle ne sort pas de la caisse principale : le pompiste l'a payée avec l'argent de ses ventes. Une dépense refusée ne réduit plus l'argent à remettre.</div>`);
+     <div class="psp-muted" style="margin-top:6px">La flèche <b>➜ Dépenses</b> choisit si la dépense confirmée part dans les Dépenses de la station et le rapport du jour (Oui par défaut) ; vous pouvez la changer plus tard, même après la finalisation. Elle ne sort pas de la caisse principale : le pompiste l'a payée avec l'argent de ses ventes. Une dépense refusée ne réduit plus l'argent à remettre.</div>`);
 }
 async function pspDepense(id, i, action){
   const body = {};
@@ -20951,7 +20980,9 @@ async function pspDepense(id, i, action){
     body.motif = (document.getElementById(`psp-refus-${id}-${i}`)?.value || '').trim();
     if(body.motif.length < 5) return notify('Indiquez pourquoi la dépense est refusée (5 caractères au moins).', 'err');
   }
-  try{ await _pspAction(id, `depenses/${i}/${action}`, body); _pspS(id).refus = null; }catch(e){}
+  if(action === 'confirmer') body.envoyer = _pspEnvoi(id, i);
+  try{ await _pspAction(id, `depenses/${i}/${action}`, body); _pspS(id).refus = null;
+       if(_pspS(id).envoi) delete _pspS(id).envoi[i]; }catch(e){}
 }
 const _pspDevisesLignes = r => (r.devises||[]).map(x =>
   `<tr><td><b>${Number(x.montant).toLocaleString('fr-FR',{minimumFractionDigits:2})} $</b><div class="psp-muted">taux ${Number(x.taux).toLocaleString('fr-FR',{minimumFractionDigits:2})} G</div></td>
