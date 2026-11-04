@@ -1007,10 +1007,20 @@ def _ecrire_journal(db: Session, rap: RapportPompiste, request: Request, *, remp
 
 
 def _retirer_du_journal(db: Session, rap: RapportPompiste) -> int:
+    """Retire du journal les relevés écrits par ce rapport. Un relevé lié au
+    rapport mais dont les index ne sont plus ceux du rapport (saisie faite ou
+    corrigée à la main dans le module Saisie) n'est pas effacé : il redevient
+    une saisie ordinaire (même règle que `nettoyer_journal_anticipe`)."""
+    lignes = {l.pompe_id: l for l in rap.lignes}
     n = 0
     for r in db.query(Releve).filter_by(rapport_pompiste_id=rap.id).all():
-        db.delete(r)
-        n += 1
+        l = lignes.get(r.pompe_id)
+        av, ap = _valeurs_finales(l) if l else (None, None)
+        if l is not None and abs(float(r.metter_avant) - av) <= TOLERANCE                 and abs(float(r.metter_apres) - ap) <= TOLERANCE:
+            db.delete(r)
+            n += 1
+        else:
+            r.rapport_pompiste_id = None
     return n
 
 

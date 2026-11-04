@@ -785,6 +785,38 @@ def test_supprimer_releves_et_rapport_mal_saisis(client):
     assert r.status_code == 409 and "déjà rapporté" in r.json()["detail"]
 
 
+def test_supprimer_rapport_garde_saisie_corrigee(client):
+    """Supprimer un rapport n'efface que les relevés qui sont encore les siens :
+    un relevé lié au rapport mais corrigé à la main (autres index) reste au
+    journal comme saisie ordinaire."""
+    from tz_utils import today_haiti
+    from database import SessionLocal
+    from models import Releve
+    import main as _m
+    jour = str(today_haiti())
+    p1, p2 = _produit(client, 500), _produit(client, 500)
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Gar", "nom": "Saisie"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    assert p.post("/api/pompiste/compteurs", json={"date": jour, "charte_acceptee": True, "lignes": [
+        {"pompe_id": p1, "metter_avant": 0, "metter_apres": 20, "debut_confirme": True},
+        {"pompe_id": p2, "metter_avant": 0, "metter_apres": 30, "debut_confirme": True}]}).status_code == 201
+    rap = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 25}], "depenses": []}).json()
+    for pid, ap in ((p1, 20), (p2, 30)):
+        assert _sup(client, rap["id"], f"lignes/{pid}/confirmer", metter_avant=0, metter_apres=ap).status_code == 200
+    with SessionLocal() as s:
+        r2 = s.query(Releve).filter_by(rapport_pompiste_id=rap["id"], pompe_id=p2).one()
+        r2.metter_apres = 35                      # corrigé à la main dans la Saisie
+        s.commit()
+        id2 = r2.id
+    r = client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/supprimer", headers=H, json={"motif": "Rapport d'une autre station"})
+    assert r.status_code == 200 and r.json()["releves_retires"] == 1, r.text
+    with SessionLocal() as s:
+        assert not s.query(Releve).filter_by(pompe_id=p1, date=today_haiti()).count()
+        gardé = s.get(Releve, id2)
+        assert gardé is not None and gardé.rapport_pompiste_id is None and float(gardé.metter_apres) == 35
+
+
 def test_metre_confirme_entre_dans_la_saisie(client):
     """Dès que la direction confirme un mètre d'un rapport pompiste, il est
     dans la Saisie (journal), attribué au pompiste ; « reprendre » l'en retire ;
