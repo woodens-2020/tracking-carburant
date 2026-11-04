@@ -24,3 +24,17 @@ def test_filtre_certifie(client):
     assert non["entries"][0]["type_anomalie"] == "saut_compteur"         # la continuité reste calculée sur tout
     assert client.get(url + "&certifie=peut-etre", headers=H).status_code == 400
     assert client.get(url.replace("/api/journal", "/api/journal/pdf") + "&certifie=non", headers=H).status_code == 200
+
+
+def test_supprimer_un_releve(client):
+    """🗑 du Journal Meters : motif obligatoire, la place est libérée."""
+    prod = client.post("/api/produits", headers=H, json={"nom": f"Sup-{time.time_ns()}", "prix_gallon": 500}).json()["id"]
+    m = client.post(f"/api/produits/{prod}/pompes", headers=H, json={"nom": "Diesel 1"}).json()["id"]
+    rid = client.post("/api/releves", headers=H, json={"date": "2025-06-01", "periode": "Matin", "pompe_id": m,
+                      "prix_gallon": 500, "metter_avant": 10, "metter_apres": 30}).json()["id"]
+    assert client.post("/api/releves/supprimer", headers=H, json={"ids": [rid], "motif": "x"}).status_code == 400
+    r = client.post("/api/releves/supprimer", headers=H, json={"ids": [rid], "motif": "index mal tapé"})
+    assert r.status_code == 200 and r.json()["supprimes"] == 1
+    url = f"/api/journal?date_debut=2025-06-01&date_fin=2025-06-01&pompe_id={m}"
+    assert client.get(url, headers=H).json()["entries"] == []
+    assert client.post("/api/releves/supprimer", headers=H, json={"ids": [rid], "motif": "encore une fois"}).status_code == 404

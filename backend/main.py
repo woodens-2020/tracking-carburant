@@ -1928,6 +1928,50 @@ def _releve_dict(r: Releve):
     }
 
 
+class SuppressionRelevesIn(BaseModel):
+    ids: List[int]
+    motif: str
+
+
+def _tracer(db: Session, request: Request, action: str, details: dict) -> None:
+    """Garde la trace d'une modification (qui, quand, valeurs) dans audit_logs."""
+    import json as _json
+    from models import AuditLog
+    u = getattr(request.state, "user", None)
+    db.add(AuditLog(user_id=getattr(u, "id", None), action=action[:50],
+                    ip_address=(request.client.host if request.client else None),
+                    details=_json.dumps(details, ensure_ascii=False)))
+
+
+@app.post("/api/releves/supprimer")
+def supprimer_releves(data: SuppressionRelevesIn, request: Request, db: Session = Depends(get_db)):
+    """Supprime des relevés mal saisis pour libérer la place : la pompe peut
+    être ressaisie pour ce jour. Caisse, stock et journal se recalculent
+    d'eux-mêmes ; la trace (qui, quand, valeurs, motif) reste dans le journal
+    d'audit. (Repris de cpv 21ae68d, sans la partie rapports pompistes.)"""
+    from journal_droits import _user, peut_superviser
+    from models import ResolutionMetter
+    if not peut_superviser(_user(request, db)):
+        raise HTTPException(403, "Seule la direction ou l'administration peut supprimer un relevé.")
+    motif = " ".join((data.motif or "").split())
+    if len(motif) < 5:
+        raise HTTPException(400, "Indiquez pourquoi vous supprimez (5 caractères minimum).")
+    if not data.ids or len(data.ids) > 200:
+        raise HTTPException(400, "Choisissez les relevés à supprimer.")
+    rows = db.query(Releve).filter(Releve.id.in_(set(data.ids))).all()
+    if len(rows) != len(set(data.ids)):
+        raise HTTPException(404, "Relevé introuvable (déjà supprimé ?).")
+    trace = [{"id": r.id, "date": str(r.date), "periode": r.periode, "pompe": r.pompe.nom if r.pompe else r.pompe_id,
+              "avant": float(r.metter_avant), "apres": float(r.metter_apres), "prix": float(r.prix_gallon),
+              "pompiste_id": r.pompiste_id} for r in rows]
+    for r in rows:
+        db.query(ResolutionMetter).filter_by(releve_id=r.id).delete()
+        db.delete(r)
+    _tracer(db, request, "releves_supprimes", {"motif": motif[:300], "releves": trace})
+    db.commit()
+    return {"supprimes": len(rows)}
+
+
 class ReleveAssignerPompisteIn(BaseModel):
     pompiste_id: Optional[int] = None   # None = retirer l'attribution
 
