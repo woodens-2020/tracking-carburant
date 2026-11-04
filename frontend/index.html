@@ -3526,6 +3526,11 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .psp-dep.confirmee{border-left-color:var(--green)} .psp-dep.refusee{border-left-color:var(--red);opacity:.85}
 .psp-dep-mt{font-family:var(--mono);font-weight:800;font-size:15px;white-space:nowrap}
 .psp-dep-act{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.psp-cp-liste{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;margin:6px 0 12px;text-align:left}
+.psp-cp-opt{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--border);border-radius:10px;padding:8px 10px;cursor:pointer;font-size:13px}
+.psp-cp-opt input{width:16px!important;height:16px!important;min-width:0!important;margin:2px 0 0}
+.psp-cp-opt:has(input:checked){border-color:var(--primary,#3b82f6);background:rgba(59,130,246,.08)}
+.psp-cp-opt.off{opacity:.55;cursor:not-allowed}
 .psp-fleche{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:999px;padding:3px 10px 3px 4px;
   background:none;color:inherit;font-size:12px;cursor:pointer;white-space:nowrap;margin:2px 4px 2px 0}
 .psp-fleche .psp-fl-ic{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font-size:12px;color:#fff;background:#22c55e}
@@ -21052,7 +21057,9 @@ function pspCarte(r){
     // relevé de ce rapport modifié ensuite dans la Saisie (la finalisation remettrait les valeurs du rapport)
     const diffJ = j && (Math.abs(j.metter_avant - av) > 0.001 || Math.abs(j.metter_apres - ap) > 0.001);
     return `<tr class="${l.confirmee?'psp-ligne-ok':''}">
-      <td><b>${esc(l.pompe_nom)}</b><div class="psp-muted">${esc(l.produit_nom)}</div></td>
+      <td><b>${esc(l.pompe_nom)}</b><div class="psp-muted">${esc(l.produit_nom)}</div>
+        ${l.pompe_saisie ? `<div class="psp-warn" style="font-size:11px;padding:2px 6px;margin-top:2px">saisi sur ${esc(l.pompe_saisie.pompe_nom)}</div>` : ''}
+        <button class="psp-lien" style="font-size:11.5px" onclick="pspChangerPompe(${r.id},${l.pompe_id})" title="Le pompiste s'est trompé de pompe : remettre ces index sur la bonne">⇄ changer de pompe</button></td>
       <td class="r">${_pspN(prec)}${rupt ? `<div class="psp-neg" style="font-size:11px;font-weight:700">≠ début saisi (${av - prec > 0 ? '+' : ''}${_pspN(av - prec)})</div>` : ''}</td>
       <td class="r">${l.confirmee ? _pspN(av) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="avant" value="${_pspValeur(r.id, l.pompe_id, 'avant', av)}" oninput="_pspGarder(this)">`}</td>
       <td class="r">${l.confirmee ? _pspN(ap) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="apres" value="${_pspValeur(r.id, l.pompe_id, 'apres', ap)}" oninput="_pspGarder(this)">`}</td>
@@ -21061,7 +21068,9 @@ function pspCarte(r){
       <td class="r" style="white-space:nowrap">${l.confirmee
         ? `<span class="psp-ok" style="font-weight:700">✓ Confirmé${corrige?' (corrigé)':''}</span> <button class="psp-lien" onclick="pspLigne(${r.id},${l.pompe_id},false)">reprendre</button>`
         : `<button class="btn btn-primary psp-mini" onclick="pspLigne(${r.id},${l.pompe_id},true)">Confirmer</button>`}</td>
-    </tr>${corrige ? `<tr><td colspan="7"><div class="psp-muted">Saisi par le pompiste : ${_pspN(l.metter_avant)} → ${_pspN(l.metter_apres)}</div></td></tr>` : ''}
+    </tr>${l.pompe_suggeree ? `<tr><td colspan="7"><div class="psp-warn">⚠ Le début ${_pspN(av)} ne suit pas ${esc(l.pompe_nom)}, mais il suit exactement <b>${esc(l.pompe_suggeree.pompe_nom)}</b> : le pompiste s'est sans doute trompé de pompe.
+       <button class="btn btn-primary psp-mini" onclick="pspChangerPompe(${r.id},${l.pompe_id},${l.pompe_suggeree.pompe_id})">⇄ Mettre sur ${esc(l.pompe_suggeree.pompe_nom)}</button></div></td></tr>` : ''}
+    ${corrige ? `<tr><td colspan="7"><div class="psp-muted">Saisi par le pompiste : ${_pspN(l.metter_avant)} → ${_pspN(l.metter_apres)}</div></td></tr>` : ''}
     ${j && (diffJ || !j.de_ce_rapport) ? `<tr><td colspan="7"><div class="${diffJ?'psp-warn':'psp-muted'}">${diffJ ? '⚠ ' : ''}${j.de_ce_rapport
          ? `Modifié ensuite dans le module Saisie par ${esc(j.modifie_par||'l\'administration')}`
          : `Saisi aussi dans le module Saisie par ${esc(j.saisi_par||'l\'administration')}`} :
@@ -21157,6 +21166,59 @@ function pspReprendreJournal(id, pompe, av, ap){
     if(el){ el.value = v; _pspGarder(el); } };
   set('avant', av); set('apres', ap);
   notify('Valeurs du journal reprises : confirmez la pompe pour les garder.', 'inf');
+}
+// Le pompiste a mis des index sur la mauvaise pompe : on les remet sur la
+// bonne (la plus probable d'abord : celle dont le dernier index est le début saisi).
+async function pspChangerPompe(id, pompe, cible){
+  const r = PSP.rapports.find(x => x.id === id); if(!r) return;
+  const l = r.lignes.find(x => x.pompe_id === pompe); if(!l) return;
+  let poss;
+  try{ poss = await _pspApi('GET', `/rapports/${id}/lignes/${pompe}/pompes-possibles`); }
+  catch(e){ return notify(e.message, 'err'); }
+  const av = l.metter_avant_corrige ?? l.metter_avant, ap = l.metter_apres_corrige ?? l.metter_apres;
+  const choix0 = cible ?? (poss.find(x => x.suit) || {}).pompe_id;
+  const opt = x => {
+    const etat = x.prise_par ? `<span class="psp-neg">déjà rapportée — ${esc(x.prise_par)}</span>`
+      : x.suit ? '<span class="psp-ok" style="font-weight:700">✓ suit le début saisi</span>'
+      : x.index_precedent == null ? '<span class="psp-muted">aucun index connu</span>'
+      : `<span class="psp-muted">écart ${x.ecart > 0 ? '+' : ''}${_pspN(x.ecart)}</span>`;
+    return `<label class="psp-cp-opt ${x.prise_par ? 'off' : ''}">
+      <input type="radio" name="psp-cp" value="${x.pompe_id}" ${x.prise_par ? 'disabled' : ''} ${x.pompe_id === choix0 && !x.prise_par ? 'checked' : ''}>
+      <span><b>${esc(x.pompe_nom)}</b> <small class="psp-muted">${esc(x.produit_nom)}</small>${x.dans_rapport ? ' <small class="psp-warn" style="padding:1px 5px">dans ce rapport : index échangés</small>' : ''}<br>
+      <small>dernier index ${_pspN(x.index_precedent)} · ${etat}</small></span></label>`;
+  };
+  document.getElementById('sup-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'sup-ov'; ov.className = 'sup-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+  ov.innerHTML = `<div class="sup-boite" style="max-width:520px">
+    <div class="sup-ico">⇄</div><h3>Changer de pompe</h3>
+    <p>Index saisis sur <b>${esc(l.pompe_nom)}</b> : ${_pspN(av)} → ${_pspN(ap)} (${_pspN(l.gallons)} gal).
+      Sur quelle pompe le pompiste les a-t-il réellement lus ? Le prix suit la pompe choisie ; le mètre sera à reconfirmer.</p>
+    <div class="psp-cp-liste">${poss.map(opt).join('') || '<div class="psp-muted">Aucune autre pompe active.</div>'}</div>
+    <label for="sup-motif">Pourquoi ? (obligatoire)</label>
+    <input id="sup-motif" class="filter-input" maxlength="300" placeholder="Ex. le pompiste a choisi Diesel 1 au lieu de Diesel 2">
+    <div class="sup-err" id="sup-err"></div>
+    <div class="sup-act"><button class="btn btn-secondary" id="sup-non">Annuler</button><button class="btn btn-primary" id="sup-oui">⇄ Changer de pompe</button></div></div>`;
+  document.body.appendChild(ov);
+  const fin = () => ov.remove(), err = t => { document.getElementById('sup-err').textContent = t; };
+  const ok = async () => {
+    const c = ov.querySelector('input[name="psp-cp"]:checked'), m = document.getElementById('sup-motif').value.trim();
+    if(!c) return err('Choisissez la bonne pompe.');
+    if(m.length < 5) return err('Indiquez le motif (5 caractères minimum).');
+    const neuve = Number(c.value), nom = (poss.find(x => x.pompe_id === neuve) || {}).pompe_nom || '';
+    try{
+      const x = await _pspApi('POST', `/rapports/${id}/lignes/${pompe}/changer-pompe`, {pompe_id: neuve, motif: m});
+      fin(); const st = _pspS(id); if(st.index){ delete st.index[pompe]; delete st.index[neuve]; }
+      _pspMaj(x); pspMajBadge();
+      notify(`Index remis sur ${nom} : confirmez ce mètre.`, 'ok');
+    }catch(e){ err(e.message); }
+  };
+  document.getElementById('sup-non').onclick = fin;
+  document.getElementById('sup-oui').onclick = ok;
+  ov.addEventListener('click', e => { if(e.target === ov) fin(); });
+  const inp = document.getElementById('sup-motif');
+  inp.addEventListener('keydown', e => { if(e.key === 'Enter') ok(); if(e.key === 'Escape') fin(); });
+  setTimeout(() => inp.focus(), 30);
 }
 const pspBillets = (id, ok) => _pspAction(id, 'billetterie', {confirme: ok}).catch(()=>{});
 const pspEcart   = (id, ok) => _pspAction(id, 'ecart', {confirme: ok}).catch(()=>{});

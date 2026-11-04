@@ -817,6 +817,85 @@ def test_supprimer_rapport_garde_saisie_corrigee(client):
         assert gardé is not None and gardé.rapport_pompiste_id is None and float(gardé.metter_apres) == 35
 
 
+def test_changer_de_pompe(client):
+    """Index mis sur la mauvaise pompe : la direction les remet sur la bonne
+    (suggérée d'après le dernier index connu) ; le prix suit la pompe ; si la
+    bonne pompe est aussi dans le rapport, les index sont échangés."""
+    from datetime import timedelta
+    from tz_utils import today_haiti
+    from database import SessionLocal
+    from models import Releve
+    import main as _m
+    hier, jour = str(today_haiti() - timedelta(days=1)), str(today_haiti())
+    pa, pb, pc = _produit(client, 500), _produit(client, 650), _produit(client, 700)
+    for pid, fin in ((pa, 100), (pb, 500), (pc, 900)):
+        r = client.post("/api/releves", headers=H, json={"date": hier, "periode": "Apres-midi", "pompe_id": pid,
+                                                         "prix_gallon": 500, "metter_avant": 0, "metter_apres": fin})
+        assert r.status_code in (200, 201), r.text
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Mau", "nom": "Pompe"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    # Les index de B (500 → 520) tapés sur A ; ceux de C sur C, sauf qu'il a croisé avec A ensuite
+    assert p.post("/api/pompiste/compteurs", json={"date": jour, "periode": "Matin", "charte_acceptee": True, "lignes": [
+        {"pompe_id": pa, "metter_avant": 500, "metter_apres": 520, "debut_confirme": True}]}).status_code == 201
+    rap = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 13}], "depenses": []}).json()
+    rid = rap["id"]
+    d = client.get(f"/api/pompiste-supervision/rapports?statut=SOUMIS", headers=H).json()
+    l = next(x for x in next(r for r in d if r["id"] == rid)["lignes"] if x["pompe_id"] == pa)
+    assert l["pompe_suggeree"]["pompe_id"] == pb
+    poss = client.get(f"/api/pompiste-supervision/rapports/{rid}/lignes/{pa}/pompes-possibles", headers=H).json()
+    assert poss[0]["pompe_id"] == pb and poss[0]["suit"] and pa not in [x["pompe_id"] for x in poss]
+    # Confirmé sur A (au journal), puis remis sur B : sort du journal de A, à reconfirmer
+    assert _sup(client, rid, f"lignes/{pa}/confirmer", metter_avant=500, metter_apres=520).status_code == 200
+    assert _sup(client, rid, f"lignes/{pa}/changer-pompe", pompe_id=pb, motif="x").status_code == 400
+    assert _sup(client, rid, f"lignes/{pa}/changer-pompe", pompe_id=pa, motif="même pompe").status_code == 400
+    r = _sup(client, rid, f"lignes/{pa}/changer-pompe", pompe_id=pb, motif="Index de la pompe B")
+    assert r.status_code == 200, r.text
+    l = r.json()["lignes"][0]
+    assert l["pompe_id"] == pb and l["pompe_saisie"]["pompe_id"] == pa and not l["confirmee"]
+    assert l["prix_gallon"] == 650 and l["montant"] == 20 * 650 and l["index_precedent"] == 500
+    assert "pompe_suggeree" not in l
+    with SessionLocal() as s:
+        assert not s.query(Releve).filter_by(pompe_id=pa, periode="Matin").filter(Releve.date == today_haiti()).count()
+    assert _sup(client, rid, f"lignes/{pb}/confirmer", metter_avant=500, metter_apres=520).status_code == 200
+    with SessionLocal() as s:
+        rb = s.query(Releve).filter_by(pompe_id=pb, periode="Matin").filter(Releve.date == today_haiti()).one()
+        assert rb.rapport_pompiste_id == rid and float(rb.metter_apres) == 520
+    # Retour sur A : la pompe saisie n'est plus signalée
+    r = _sup(client, rid, f"lignes/{pb}/changer-pompe", pompe_id=pa, motif="Finalement c'était A")
+    assert r.json()["lignes"][0]["pompe_id"] == pa and r.json()["lignes"][0]["pompe_saisie"] is None
+    assert r.json()["lignes"][0]["prix_gallon"] == 500
+    with SessionLocal() as s:
+        assert not s.query(Releve).filter_by(pompe_id=pb, periode="Matin").filter(Releve.date == today_haiti()).count()
+    assert _sup(client, rid, f"lignes/{pa}/changer-pompe", pompe_id=pb, motif="Index de la pompe B").status_code == 200
+
+    # Index croisés dans un même rapport : B et C échangent leurs index
+    c2 = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Croi", "nom": "Sé"}).json()
+    q = TestClient(_m.app)
+    q.post("/api/login/pompiste", json={"username": c2["username"], "code_acces": c2["code_acces"]})
+    assert q.post("/api/pompiste/compteurs", json={"date": jour, "periode": "Apres-midi", "charte_acceptee": True, "lignes": [
+        {"pompe_id": pa, "metter_avant": 900, "metter_apres": 930, "debut_confirme": True},
+        {"pompe_id": pc, "metter_avant": 100, "metter_apres": 110, "debut_confirme": True}]}).status_code == 201
+    rap2 = q.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 26}], "depenses": []}).json()
+    r = _sup(client, rap2["id"], f"lignes/{pa}/changer-pompe", pompe_id=pc, motif="Index croisés A et C")
+    assert r.status_code == 200, r.text
+    L = {x["pompe_id"]: x for x in r.json()["lignes"]}
+    assert (L[pa]["metter_avant"], L[pa]["metter_apres"], L[pa]["prix_gallon"]) == (100, 110, 500)
+    assert (L[pc]["metter_avant"], L[pc]["metter_apres"], L[pc]["prix_gallon"]) == (900, 930, 700)
+    assert L[pa]["pompe_saisie"]["pompe_id"] == pc and L[pc]["pompe_saisie"]["pompe_id"] == pa
+    assert L[pa]["index_precedent"] == 100 and L[pc]["index_precedent"] == 900
+    # B est déjà rapportée le matin, pas l'après-midi ; mais un autre rapport l'après-midi la bloque
+    r = _sup(client, rap2["id"], f"lignes/{pa}/changer-pompe", pompe_id=pb, motif="essai pompe B")
+    assert r.status_code == 200, r.text
+    c3 = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Tro", "nom": "Isieme"}).json()
+    t = TestClient(_m.app)
+    t.post("/api/login/pompiste", json={"username": c3["username"], "code_acces": c3["code_acces"]})
+    assert t.post("/api/pompiste/compteurs", json={"date": jour, "periode": "Apres-midi", "charte_acceptee": True, "lignes": [
+        {"pompe_id": pa, "metter_avant": 100, "metter_apres": 105, "debut_confirme": True}]}).status_code == 201
+    r = _sup(client, rap2["id"], f"lignes/{pb}/changer-pompe", pompe_id=pa, motif="retour sur A")
+    assert r.status_code == 409 and "déjà rapportée" in r.json()["detail"]
+
+
 def test_metre_confirme_entre_dans_la_saisie(client):
     """Dès que la direction confirme un mètre d'un rapport pompiste, il est
     dans la Saisie (journal), attribué au pompiste ; « reprendre » l'en retire ;

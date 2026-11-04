@@ -419,6 +419,11 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
             prec, src = _index_precedent(db, l.pompe_id, r.date, r.periode, exclure_rapport_id=r.id)
             d["index_precedent"] = prec
             d["index_precedent_source"] = src
+            if prec is not None and abs(prec - av) > TOLERANCE and r.statut in _A_TRAITER:
+                d["pompe_suggeree"] = next(({"pompe_id": x["pompe_id"], "pompe_nom": x["pompe_nom"]}
+                                            for x in _pompes_possibles(db, r, l) if x["suit"]), None)
+        d["pompe_saisie"] = ({"pompe_id": l.pompe_saisie_id, "pompe_nom": l.pompe_saisie.nom}
+                             if l.pompe_saisie_id and l.pompe_saisie else None)
         lignes.append(d)
     return {
         "id": r.id, "date": str(r.date), "periode": r.periode, "statut": r.statut,
@@ -1287,6 +1292,119 @@ def restaurer_rapport(rid: int, request: Request, s: Utilisateur = Depends(_requ
     return _rapport_dict(db, rap, avec_journal=rap.statut in _A_TRAITER)
 
 
+def _retirer_ligne_du_journal(db: Session, rap: RapportPompiste, l: RapportPompisteLigne) -> None:
+    """Le mètre n'est plus confirmé : il sort de la Saisie, sauf s'il y a été
+    modifié à la main (il redevient alors une saisie ordinaire)."""
+    av, ap = _valeurs_finales(l)
+    for r in db.query(Releve).filter_by(rapport_pompiste_id=rap.id, pompe_id=l.pompe_id).all():
+        if abs(float(r.metter_avant) - av) <= TOLERANCE and abs(float(r.metter_apres) - ap) <= TOLERANCE:
+            db.delete(r)
+        else:
+            r.rapport_pompiste_id = None
+
+
+def _pompes_possibles(db: Session, rap: RapportPompiste, l: RapportPompisteLigne) -> list:
+    """Pompes actives sur lesquelles ces index peuvent être remis, la plus
+    probable d'abord : celle dont le dernier index connu est le début saisi
+    (`suit`). `dans_rapport` = déjà dans ce rapport (on échange alors les
+    index des deux pompes) ; `prise_par` = créneau déjà rapporté ailleurs."""
+    av, _ap = _valeurs_finales(l)
+    dans = {x.pompe_id for x in rap.lignes}
+    prises = {}
+    for lp, rp in (db.query(RapportPompisteLigne, RapportPompiste)
+                   .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
+                   .filter(RapportPompiste.date == rap.date, RapportPompiste.periode == rap.periode,
+                           RapportPompiste.statut.in_(_ACTIFS), RapportPompiste.supprime_at.is_(None),
+                           RapportPompiste.id != rap.id).all()):
+        prises[lp.pompe_id] = f"rapport n°{rp.id} ({_nom(rp.utilisateur)})"
+    out = []
+    for p in db.query(Pompe).filter(Pompe.actif.is_(True), Pompe.id != l.pompe_id).order_by(Pompe.nom).all():
+        prec, _src = _index_precedent(db, p.id, rap.date, rap.periode, exclure_rapport_id=rap.id)
+        out.append({"pompe_id": p.id, "pompe_nom": p.nom, "produit_nom": p.produit.nom if p.produit else "",
+                    "index_precedent": prec, "ecart": round(av - prec, 4) if prec is not None else None,
+                    "suit": prec is not None and abs(prec - av) <= TOLERANCE and p.id not in prises,
+                    "dans_rapport": p.id in dans, "prise_par": prises.get(p.id)})
+    out.sort(key=lambda x: (not x["suit"], x["prise_par"] is not None,
+                            abs(x["ecart"]) if x["ecart"] is not None else float("inf"), x["pompe_nom"]))
+    return out
+
+
+@router.get("/api/pompiste-supervision/rapports/{rid}/lignes/{pompe_id}/pompes-possibles")
+def pompes_possibles(rid: int, pompe_id: int, _s: Utilisateur = Depends(_require_superviseur),
+                     db: Session = Depends(get_db)):
+    rap = _rapport_a_traiter(db, rid)
+    l = next((x for x in rap.lignes if x.pompe_id == pompe_id), None)
+    if not l:
+        raise HTTPException(404, "Pompe absente du rapport")
+    return _pompes_possibles(db, rap, l)
+
+
+class ChangerPompeIn(BaseModel):
+    pompe_id: int
+    motif: str
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/lignes/{pompe_id}/changer-pompe")
+def changer_pompe(rid: int, pompe_id: int, data: ChangerPompeIn, request: Request,
+                  s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Le pompiste a mis ces index sur la mauvaise pompe : la direction les
+    remet sur la bonne. Si la bonne pompe est déjà dans le rapport (index
+    croisés), les index des deux pompes sont échangés. Le prix suit la pompe
+    (son carburant). Les mètres touchés sont à reconfirmer ; la pompe choisie
+    par le pompiste reste affichée."""
+    import main
+    rap = _rapport_a_traiter(db, rid)
+    l = next((x for x in rap.lignes if x.pompe_id == pompe_id), None)
+    if not l:
+        raise HTTPException(404, "Pompe absente du rapport")
+    motif = " ".join((data.motif or "").split())
+    if len(motif) < 5:
+        raise HTTPException(400, "Indiquez pourquoi vous changez de pompe (5 caractères minimum).")
+    if data.pompe_id == pompe_id:
+        raise HTTPException(400, "C'est déjà cette pompe.")
+    neuve = db.get(Pompe, data.pompe_id)
+    if not neuve or not neuve.actif:
+        raise HTTPException(404, "Pompe introuvable ou inactive.")
+    autre = next((x for x in rap.lignes if x.pompe_id == neuve.id), None)
+    pris = (db.query(RapportPompisteLigne, RapportPompiste)
+            .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
+            .filter(RapportPompiste.date == rap.date, RapportPompiste.periode == rap.periode,
+                    RapportPompiste.statut.in_(_ACTIFS), RapportPompiste.supprime_at.is_(None),
+                    RapportPompiste.id != rap.id, RapportPompisteLigne.pompe_id == neuve.id).first())
+    if pris:
+        raise HTTPException(409, f"{neuve.nom} est déjà rapportée sur ce créneau (rapport n°{pris[1].id}, "
+                                 f"{_nom(pris[1].utilisateur)}).")
+    ancienne = l.pompe
+    trace = {"rapport_id": rap.id, "date": str(rap.date), "periode": rap.periode, "motif": motif[:300],
+             "de": ancienne.nom, "vers": neuve.nom, "echange": autre is not None,
+             "index": list(_valeurs_finales(l))}
+    # Les mètres touchés ne sont plus confirmés : ils sortent d'abord du journal
+    for x in ([l, autre] if autre else [l]):
+        _retirer_ligne_du_journal(db, rap, x)
+        x.confirmee, x.confirmee_at = False, None
+    if autre:
+        # Index croisés : chaque pompe reprend les index de l'autre (prix inchangés)
+        trace["index_autre"] = list(_valeurs_finales(autre))
+        for k in ("metter_avant", "metter_apres", "metter_avant_corrige", "metter_apres_corrige"):
+            va, vb = getattr(l, k), getattr(autre, k)
+            setattr(l, k, vb)
+            setattr(autre, k, va)
+        sa, sb = l.pompe_saisie_id or l.pompe_id, autre.pompe_saisie_id or autre.pompe_id
+        l.pompe_saisie_id = None if sb == l.pompe_id else sb
+        autre.pompe_saisie_id = None if sa == autre.pompe_id else sa
+    else:
+        origine = l.pompe_saisie_id or l.pompe_id
+        l.pompe, l.pompe_id = neuve, neuve.id
+        l.prix_gallon = _prix(db, neuve, rap.date)
+        l.pompe_saisie_id = None if origine == neuve.id else origine
+    rap.ecart_confirme = False
+    main._tracer(db, request, "rapport_pompiste_pompe_changee", trace)
+    db.commit()
+    db.refresh(rap)
+    log.info("Rapport pompiste #%s : %s -> %s par l'utilisateur %s", rid, ancienne.nom, neuve.nom, s.id)
+    return _rapport_dict(db, rap, avec_journal=True)
+
+
 class LigneConfIn(BaseModel):
     metter_avant: float
     metter_apres: float
@@ -1327,13 +1445,7 @@ def reprendre_ligne(rid: int, pompe_id: int, _s: Utilisateur = Depends(_require_
     if not l:
         raise HTTPException(404, "Pompe absente du rapport")
     l.confirmee, l.confirmee_at = False, None
-    # Le mètre n'est plus confirmé : il sort de la Saisie (sauf s'il y a été modifié à la main)
-    for r in db.query(Releve).filter_by(rapport_pompiste_id=rap.id, pompe_id=pompe_id).all():
-        av, ap = _valeurs_finales(l)
-        if abs(float(r.metter_avant) - av) <= TOLERANCE and abs(float(r.metter_apres) - ap) <= TOLERANCE:
-            db.delete(r)
-        else:
-            r.rapport_pompiste_id = None
+    _retirer_ligne_du_journal(db, rap, l)
     db.commit()
     db.refresh(rap)
     return _rapport_dict(db, rap, avec_journal=True)

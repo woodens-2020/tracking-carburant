@@ -358,9 +358,13 @@ class RapportPompisteLigne(Base):
     metter_apres_corrige = Column(Numeric(14, 4), nullable=True)
     confirmee            = Column(Boolean, nullable=False, default=False)   # mètre vérifié par le superviseur
     confirmee_at         = Column(DateTime(timezone=True), nullable=True)
+    # Pompe choisie par le pompiste quand la direction a remis ces index sur
+    # la bonne pompe (erreur de pompe) ; vide sinon.
+    pompe_saisie_id      = Column(Integer, ForeignKey("pompes.id", ondelete="SET NULL"), nullable=True)
 
     rapport = relationship("RapportPompiste", back_populates="lignes")
-    pompe   = relationship("Pompe")
+    pompe   = relationship("Pompe", foreign_keys=[pompe_id])
+    pompe_saisie = relationship("Pompe", foreign_keys=[pompe_saisie_id])
 
     __table_args__ = (
         UniqueConstraint("rapport_id", "pompe_id", name="uq_rpomp_ligne"),

@@ -394,6 +394,8 @@ def _migrate_columns():
              "ALTER TABLE rapports_pompiste ADD COLUMN devises JSON NOT NULL DEFAULT '[]'", None),
             ("rapports_pompiste", "feuille",
              "ALTER TABLE rapports_pompiste ADD COLUMN feuille JSON DEFAULT NULL", None),
+            ("rapports_pompiste_lignes", "pompe_saisie_id",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN pompe_saisie_id INTEGER DEFAULT NULL", None),
             ("rapports_pompiste", "supprime_at",
              "ALTER TABLE rapports_pompiste ADD COLUMN supprime_at DATETIME DEFAULT NULL", None),
             ("rapports_pompiste", "suppression",
