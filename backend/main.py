@@ -587,6 +587,8 @@ def startup():
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS total_depenses NUMERIC(14,2) NOT NULL DEFAULT 0",
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS devises JSON NOT NULL DEFAULT '[]'::json",
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS feuille JSON",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS supprime_at TIMESTAMPTZ",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS suppression JSON",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
         "ALTER TABLE produits ADD COLUMN IF NOT EXISTS adresse VARCHAR(255)",
         "ALTER TABLE achats ADD COLUMN IF NOT EXISTS saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
@@ -4273,6 +4275,7 @@ def carburant_synthese(
 @app.get("/api/carburant/rapport-jour")
 def carburant_rapport_jour(
     date: Optional[date_type] = None,
+    sans_non_certifies: bool = False,
     db: Session = Depends(get_db),
 ):
     """Rapport de caisse carburant pour UNE journée :
@@ -4292,6 +4295,28 @@ def carburant_rapport_jour(
         db.query(Releve).join(Pompe, Releve.pompe_id == Pompe.id)
         .filter(Releve.date == d).all()
     )
+    # Mêmes contrôles que le Journal Meters : chaque relevé non certifié (écart
+    # de compteur, saisie invalide, rapport pompiste non confirmé) est signalé
+    # ici aussi — et peut être écarté du total (sans_non_certifies).
+    journal = {e["id"]: e for e in _build_journal_entries(db, d, d) if not e.get("en_attente")}
+    a_verifier = []
+    for r in rel_jour:
+        e = journal.get(r.id)
+        if e is None or e["certifie"]:
+            continue
+        a_verifier.append({
+            "releve_id": r.id, "periode": r.periode, "pompe": r.pompe.nom,
+            "produit": produits.get(r.pompe.produit_id, "Inconnu"),
+            "metter_avant": float(r.metter_avant), "metter_apres": float(r.metter_apres),
+            "gallons": float(e["quantite"]), "montant": float(e["montant_vente"]),
+            "statut": e["statut"], "type_anomalie": e.get("type_anomalie"),
+            "decalage": e.get("decalage"), "source": e.get("source"),
+            "pompiste": e.get("pompiste_nom"), "rapport_pompiste_id": e.get("rapport_pompiste_id"),
+        })
+    a_verifier.sort(key=lambda x: (0 if x["statut"] == "erreur" else 1, -x["montant"]))
+    if sans_non_certifies:
+        exclus = {x["releve_id"] for x in a_verifier}
+        rel_jour = [r for r in rel_jour if r.id not in exclus]
     # Agrégation par (période, produit) ET par produit (jour entier).
     par_pp = {}          # (periode, pid) -> {gallons, montant, nb}
     ent = {}             # pid -> {gallons, montant, nb}   (jour entier)
@@ -4402,6 +4427,14 @@ def carburant_rapport_jour(
     return {
         "date":      str(d),
         "genere_le": _dtn2.now(_tzu2.utc).isoformat(),
+        "sans_non_certifies": sans_non_certifies,
+        "non_certifies": {
+            "lignes":  a_verifier,
+            "nb":      len(a_verifier),
+            "nb_erreurs": sum(1 for x in a_verifier if x["statut"] == "erreur"),
+            "gallons": round(sum(x["gallons"] for x in a_verifier), 4),
+            "montant": round(sum(x["montant"] for x in a_verifier), 2),
+        },
         "entrees": {
             "par_periode":   entrees_par_periode,
             "par_produit":   entrees_par_produit,

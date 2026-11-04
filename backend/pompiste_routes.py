@@ -181,7 +181,7 @@ def rattraper_journal(db: Session) -> int:
     créneau n'est pas touchée (saisie parallèle du module Saisie gardée)."""
     n = 0
     rapports = (db.query(RapportPompiste)
-                .filter(RapportPompiste.statut.in_(("CONFIRME", "RESOLU")))
+                .filter(RapportPompiste.statut.in_(("CONFIRME", "RESOLU")), RapportPompiste.supprime_at.is_(None))
                 .order_by(RapportPompiste.date, RapportPompiste.id).all())
     rapports.sort(key=lambda r: (r.date, _RANG.get(r.periode, 9), r.id))     # Matin avant Après-midi
     for rap in rapports:
@@ -208,7 +208,8 @@ def nettoyer_journal_anticipe(db: Session) -> int:
     rapport ; s'ils ont été modifiés ensuite à la main (module Saisie), ils
     deviennent une saisie ordinaire et sont gardés."""
     n = 0
-    for rap in db.query(RapportPompiste).filter(RapportPompiste.statut.in_(("EN_COURS", "SOUMIS", "PROBLEME"))).all():
+    for rap in db.query(RapportPompiste).filter(RapportPompiste.statut.in_(("EN_COURS", "SOUMIS", "PROBLEME")),
+                                                RapportPompiste.supprime_at.is_(None)).all():
         lignes = {l.pompe_id: l for l in rap.lignes}
         for r in db.query(Releve).filter_by(rapport_pompiste_id=rap.id).all():
             l = lignes.get(r.pompe_id)
@@ -258,7 +259,7 @@ def lignes_en_attente(db: Session, d_debut: date_type, d_fin: date_type) -> list
     Saisie) n'est pas doublée."""
     out = []
     for rap in (db.query(RapportPompiste)
-                .filter(RapportPompiste.statut.in_(("SOUMIS", "PROBLEME")),
+                .filter(RapportPompiste.statut.in_(("SOUMIS", "PROBLEME")), RapportPompiste.supprime_at.is_(None),
                         RapportPompiste.date >= d_debut, RapportPompiste.date <= d_fin).all()):
         employe = db.query(Employe).filter_by(utilisateur_id=rap.utilisateur_id).first()
         for l in rap.lignes:
@@ -336,7 +337,7 @@ def _index_precedent(db: Session, pompe_id: int, d: date_type, periode: str,
     q = (db.query(RapportPompisteLigne, RapportPompiste)
          .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
          .filter(RapportPompisteLigne.pompe_id == pompe_id,
-                 RapportPompiste.statut.in_(("EN_COURS", "SOUMIS", "PROBLEME")),
+                 RapportPompiste.statut.in_(("EN_COURS", "SOUMIS", "PROBLEME")), RapportPompiste.supprime_at.is_(None),
                  RapportPompiste.date <= d, RapportPompiste.date >= d - timedelta(days=3)))
     if exclure_rapport_id:
         q = q.filter(RapportPompiste.id != exclure_rapport_id)
@@ -452,6 +453,7 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
         "probleme_commentaire": r.probleme_commentaire,
         "probleme_par_nom": _nom(r.probleme_par),
         "probleme_at": r.probleme_at.isoformat() if r.probleme_at else None,
+        "supprime": (dict(r.suppression or {}, le=r.supprime_at.isoformat()) if r.supprime_at else None),
     }
 
 
@@ -477,7 +479,7 @@ def _en_cours(db: Session, u: Utilisateur) -> Optional[RapportPompiste]:
     """Rapport du pompiste dont les compteurs sont envoyés mais pas encore
     terminé (billetterie à faire). Un seul à la fois."""
     return (db.query(RapportPompiste)
-            .filter_by(utilisateur_id=u.id, statut="EN_COURS")
+            .filter_by(utilisateur_id=u.id, statut="EN_COURS").filter(RapportPompiste.supprime_at.is_(None))
             .order_by(RapportPompiste.id.desc()).first())
 
 
@@ -495,7 +497,7 @@ def mettres_en_attente(db: Session, d: date_type, periode: Optional[str] = None)
     out = []
     q = (db.query(RapportPompisteLigne, RapportPompiste)
          .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
-         .filter(RapportPompiste.date == d, RapportPompiste.statut.in_(_EN_ATTENTE)))
+         .filter(RapportPompiste.date == d, RapportPompiste.statut.in_(_EN_ATTENTE), RapportPompiste.supprime_at.is_(None)))
     if periode:
         q = q.filter(RapportPompiste.periode == periode)
     for l, rap in q.all():
@@ -518,7 +520,7 @@ def _creneaux_pris(db: Session, d: date_type) -> dict:
     pris: dict = {}
     for l, rap in (db.query(RapportPompisteLigne, RapportPompiste)
                    .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
-                   .filter(RapportPompiste.date == d, RapportPompiste.statut.in_(_ACTIFS)).all()):
+                   .filter(RapportPompiste.date == d, RapportPompiste.statut.in_(_ACTIFS), RapportPompiste.supprime_at.is_(None)).all()):
         pris.setdefault(l.pompe_id, {})[rap.periode] = {"par": _nom(rap.utilisateur), "statut": rap.statut,
                                                          "rapport_utilisateur_id": rap.utilisateur_id}
     for r in db.query(Releve).filter(Releve.date == d).all():
@@ -884,7 +886,7 @@ def envoyer_compteurs(data: CompteursIn, u: Utilisateur = Depends(_require_pompi
     deja = (db.query(RapportPompisteLigne, RapportPompiste)
             .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
             .filter(RapportPompiste.date == data.date, RapportPompiste.periode == data.periode,
-                    RapportPompiste.statut.in_(_ACTIFS),
+                    RapportPompiste.statut.in_(_ACTIFS), RapportPompiste.supprime_at.is_(None),
                     RapportPompisteLigne.pompe_id.in_([x["pompe"].id for x in lignes])).all())
     if deja:
         noms = ", ".join(sorted({f"{l.pompe.nom} ({_nom(r.utilisateur)})" for l, r in deja}))
@@ -1113,7 +1115,7 @@ def terminer(data: TerminerIn, request: Request, u: Utilisateur = Depends(_requi
 @router.get("/api/pompiste/rapports")
 def mes_rapports(u: Utilisateur = Depends(_require_pompiste), db: Session = Depends(get_db)):
     rows = (db.query(RapportPompiste)
-            .filter(RapportPompiste.utilisateur_id == u.id, RapportPompiste.statut != "EN_COURS")
+            .filter(RapportPompiste.utilisateur_id == u.id, RapportPompiste.statut != "EN_COURS", RapportPompiste.supprime_at.is_(None))
             .order_by(RapportPompiste.id.desc()).limit(20).all())
     return [_rapport_dict(db, r) for r in rows]
 
@@ -1133,6 +1135,8 @@ def _rapport_a_traiter(db: Session, rid: int) -> RapportPompiste:
     rap = db.get(RapportPompiste, rid)
     if not rap:
         raise HTTPException(404, "Rapport introuvable")
+    if rap.supprime_at is not None:
+        raise HTTPException(409, "Ce rapport est supprimé : restaurez-le d'abord.")
     if rap.statut not in _A_TRAITER:
         raise HTTPException(409, "Ce rapport est déjà finalisé.")
     return rap
@@ -1142,9 +1146,15 @@ def _rapport_a_traiter(db: Session, rid: int) -> RapportPompiste:
 def lister(statut: Optional[str] = None, date_debut: Optional[date_type] = None,
            date_fin: Optional[date_type] = None, utilisateur_id: Optional[int] = None,
            _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
-    """`statut` accepte une liste séparée par des virgules (ex. SOUMIS,PROBLEME)."""
+    """`statut` accepte une liste séparée par des virgules (ex. SOUMIS,PROBLEME).
+    SUPPRIME = les rapports supprimés (corbeille), qu'on peut restaurer."""
     statuts = [x for x in (statut or "").split(",") if x]
     q = db.query(RapportPompiste)
+    if "SUPPRIME" in statuts:
+        q = q.filter(RapportPompiste.supprime_at.isnot(None))
+        statuts = []
+    else:
+        q = q.filter(RapportPompiste.supprime_at.is_(None))
     if statuts:
         q = q.filter(RapportPompiste.statut.in_(statuts))
     else:
@@ -1165,9 +1175,10 @@ def lister(statut: Optional[str] = None, date_debut: Optional[date_type] = None,
 
 @router.get("/api/pompiste-supervision/resume")
 def resume(_s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
-    a_verifier = db.query(RapportPompiste).filter_by(statut="SOUMIS").count()
-    problemes = db.query(RapportPompiste).filter_by(statut="PROBLEME").count()
-    non_termines = db.query(RapportPompiste).filter_by(statut="EN_COURS").count()
+    vivants = db.query(RapportPompiste).filter(RapportPompiste.supprime_at.is_(None))
+    a_verifier = vivants.filter_by(statut="SOUMIS").count()
+    problemes = vivants.filter_by(statut="PROBLEME").count()
+    non_termines = vivants.filter_by(statut="EN_COURS").count()
     return {"a_verifier": a_verifier, "problemes": problemes, "non_termines": non_termines,
             "a_confirmer": a_verifier + problemes}
 
@@ -1196,12 +1207,13 @@ def supprimer_rapport(rid: int, data: SuppressionRapportIn, request: Request,
                       s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     """Supprime un rapport mal fait, quel que soit son état (envoyé,
     problème, renvoyé ou finalisé) : ses relevés sortent du journal et ses
-    dépenses des dépenses ; ses pompes sont libérées pour ce créneau. La
-    trace (contenu, qui, motif) reste dans le journal d'audit."""
+    dépenses des dépenses ; ses pompes sont libérées pour ce créneau. Le
+    rapport part à la corbeille (filtre « Supprimés ») : on peut le restaurer.
+    La trace (contenu, qui, motif) reste dans le journal d'audit."""
     import main
     from models import Depense
     rap = db.get(RapportPompiste, rid)
-    if not rap:
+    if not rap or rap.supprime_at is not None:
         raise HTTPException(404, "Rapport introuvable")
     motif = " ".join((data.motif or "").split())
     if len(motif) < 5:
@@ -1214,10 +1226,55 @@ def supprimer_rapport(rid: int, data: SuppressionRapportIn, request: Request,
     n_depenses = db.query(Depense).filter_by(rapport_pompiste_id=rap.id).delete()
     trace.update(releves_retires=n_releves, depenses_retirees=n_depenses)
     main._tracer(db, request, "rapport_pompiste_supprime", trace)
-    db.delete(rap)
+    rap.supprime_at = now_haiti()
+    rap.suppression = {"motif": motif[:300], "par": _nom(s), "statut_avant": rap.statut,
+                       "releves_retires": n_releves, "depenses_retirees": n_depenses}
     db.commit()
     log.info("Rapport pompiste #%s supprimé par l'utilisateur %s : %s", rid, s.id, motif)
     return {"ok": True, "releves_retires": n_releves, "depenses_retirees": n_depenses}
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/restaurer")
+def restaurer_rapport(rid: int, request: Request, s: Utilisateur = Depends(_require_superviseur),
+                      db: Session = Depends(get_db)):
+    """Sort un rapport de la corbeille. Il revient « à vérifier » : chaque
+    mètre, la billetterie, les dépenses et l'écart sont à reconfirmer (les
+    corrections déjà faites sont gardées) — rien ne rentre au journal ni aux
+    Dépenses sans une nouvelle confirmation."""
+    import main
+    rap = db.get(RapportPompiste, rid)
+    if not rap or rap.supprime_at is None:
+        raise HTTPException(404, "Rapport supprimé introuvable")
+    avant = (rap.suppression or {}).get("statut_avant") or rap.statut
+    pris = (db.query(RapportPompisteLigne, RapportPompiste)
+            .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
+            .filter(RapportPompiste.date == rap.date, RapportPompiste.periode == rap.periode,
+                    RapportPompiste.statut.in_(_ACTIFS), RapportPompiste.supprime_at.is_(None),
+                    RapportPompiste.id != rap.id,
+                    RapportPompisteLigne.pompe_id.in_([l.pompe_id for l in rap.lignes])).all())
+    if pris:
+        noms = ", ".join(sorted({f"{l.pompe.nom} (rapport n°{r.id}, {_nom(r.utilisateur)})" for l, r in pris}))
+        raise HTTPException(409, f"Impossible de restaurer : ce créneau est déjà rapporté — {noms}. "
+                                 "Supprimez d'abord l'autre rapport.")
+    rap.supprime_at, rap.suppression = None, None
+    if rap.statut != "EN_COURS":
+        rap.statut = "PROBLEME" if avant == "PROBLEME" else ("REJETE" if avant == "REJETE" else "SOUMIS")
+    for l in rap.lignes:
+        l.confirmee = False
+    rap.billetterie_confirmee = False
+    rap.ecart_confirme = False
+    deps = [dict(x) for x in (rap.depenses or [])]
+    for x in deps:
+        x.update(statut="en_attente", motif=None, par=None, le=None)
+        x.pop("vers_depenses", None)
+    rap.depenses = deps
+    rap.traite_par_id, rap.traite_at, rap.note_superviseur = None, None, None
+    main._tracer(db, request, "rapport_pompiste_restaure",
+                 {"rapport_id": rap.id, "pompiste": _nom(rap.utilisateur), "date": str(rap.date),
+                  "periode": rap.periode, "statut_avant": avant, "statut": rap.statut})
+    db.commit()
+    db.refresh(rap)
+    return _rapport_dict(db, rap, avec_journal=rap.statut in _A_TRAITER)
 
 
 class LigneConfIn(BaseModel):
@@ -1523,7 +1580,7 @@ def envoyer_depense(rid: int, i: int, data: EnvoiDepenseIn, request: Request,
     dû par le pompiste ne change pas : la dépense reste confirmée."""
     import main
     rap = db.get(RapportPompiste, rid)
-    if not rap:
+    if not rap or rap.supprime_at is not None:
         raise HTTPException(404, "Rapport introuvable")
     deps = [dict(x) for x in (rap.depenses or [])]
     if not (0 <= i < len(deps)):

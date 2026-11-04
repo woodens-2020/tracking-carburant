@@ -528,6 +528,14 @@ canvas{display:block}
 .cjr-vide td{opacity:.5}
 .cjr-ventes{width:100%}
 .cjr-periodes{display:flex;flex-direction:column;gap:16px;width:100%}
+.cjr-nc{border:1px solid rgba(245,158,11,.55);background:rgba(245,158,11,.07);border-radius:12px;padding:10px 12px;margin:0 0 14px}
+.cjr-nc-err{border-color:rgba(239,68,68,.6);background:rgba(239,68,68,.07)}
+.cjr-nc-ok{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.06);font-size:13px}
+.cjr-nc-tete{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-bottom:8px;font-size:13.5px}
+.cjr-nc-err .cjr-nc-tete>b{color:var(--red)}
+.cjr-nc-bas{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-weight:700;cursor:pointer}
+.cjr-nc-bas input{width:16px!important;height:16px!important;min-width:0!important;margin:0}
+.cjr-nc-l-err td{color:var(--red)}
 /* Matin et Après-midi : mêmes largeurs de colonnes, alignées d'un bloc à l'autre */
 .cjr-per .cjr-table{width:100%;table-layout:fixed}
 .cjr-per .cjr-table col.c-prod{width:40%}
@@ -16584,6 +16592,7 @@ function _ficheSyntheseHtml(s){
 //   Montants à 2 décimales, gallons à 3 décimales.
 // ══════════════════════════════════════════════════════════════════
 let _cjrJours = [];          // réponses /carburant/rapport-jour, une par jour
+let _cjrSansNC = false;      // true = total sans les relevés non certifiés (mêmes contrôles que le Journal Meters)
 let _cjrModele = null;       // données filtrées affichées (réutilisées pour l'impression)
 const _CJR_MAX_JOURS = 62;
 const _CJR_PERIODES = [['Matin','Matin'], ['Apres-midi','Après-midi']];
@@ -16652,7 +16661,7 @@ async function loadCarburantRapport(){
   try{
     // Catégories et bénéficiaires enregistrés (listes de référence des dépenses)
     try{ await Promise.all([_chargerListeRef('categories-depense'), _chargerListeRef('beneficiaires')]); }catch(_){}
-    _cjrJours=await Promise.all(jours.map(j=>GET('/carburant/rapport-jour?date='+j)));
+    _cjrJours=await Promise.all(jours.map(j=>GET('/carburant/rapport-jour?date='+j+(_cjrSansNC?'&sans_non_certifies=1':''))));
 
     const caisses=new Set(), cats=new Set(), benefs=new Set();
     _cjrJours.forEach(d=>{
@@ -16739,6 +16748,28 @@ function _cjrConstruire(){
       ].filter(Boolean),
     },
   };
+}
+
+// Relevés non certifiés (erreur, écart de compteur, saisie à vérifier) :
+// signalés en rouge comme au Journal Meters, et on peut les écarter du total.
+const _CJR_TYPES = {recul_compteur:'Recul compteur', saut_compteur:'Saut compteur', saisie_invalide:'Saisie invalide', premiere_lecture:'1re lecture'};
+function cjrBasculerNC(v){ _cjrSansNC = !!v; loadCarburantRapport(); }
+function _cjrNonCertifiesHtml(){
+  const L = _cjrJours.flatMap(d => ((d.non_certifies||{}).lignes||[]).map(x => ({...x, date:d.date})));
+  if(!L.length) return `<div class="cjr-nc cjr-nc-ok">✓ Tous les relevés de la sélection sont certifiés (mêmes contrôles que le Journal Meters).</div>`;
+  const mt = L.reduce((a,x)=>a+x.montant,0), gal = L.reduce((a,x)=>a+x.gallons,0), err = L.filter(x=>x.statut==='erreur').length;
+  const unJour = _cjrJours.length === 1;
+  return `<div class="cjr-nc ${err?'cjr-nc-err':''}">
+    <div class="cjr-nc-tete"><b>⚠ ${L.length} relevé${L.length>1?'s':''} non certifié${L.length>1?'s':''}${err?` · dont ${err} en erreur`:''} : ${cjrGal(gal)} · ${cjrG(mt)}</b>
+      <span>${_cjrSansNC ? 'Ils sont <b>exclus</b> des ventes ci-dessous.' : 'Ils sont <b>comptés</b> dans les ventes ci-dessous.'}</span>
+      <label class="cjr-nc-bas"><input type="checkbox" ${_cjrSansNC?'checked':''} onchange="cjrBasculerNC(this.checked)"> Total sans les relevés non certifiés</label></div>
+    <div class="tbl-wrap"><table class="dt cjr-table"><thead><tr>${unJour?'':'<th>Date</th>'}<th>Période</th><th>Mètre</th><th>Problème</th><th>Pompiste</th><th class="tr">Index</th><th class="tr">Gallons</th><th class="tr">Montant</th></tr></thead>
+    <tbody>${L.map(x=>`<tr class="${x.statut==='erreur'?'cjr-nc-l-err':''}">${unJour?'':`<td class="num">${frDate(x.date)}</td>`}
+      <td>${x.periode==='Matin'?'Matin':'Après-midi'}</td><td><b>${esc(x.pompe)}</b><small class="c-muted"> · ${esc(x.produit)}</small></td>
+      <td>${esc(_CJR_TYPES[x.type_anomalie] || (x.statut==='erreur'?'Erreur':'À vérifier'))}${x.decalage!=null&&x.type_anomalie!=='premiere_lecture'?`<small class="c-muted"> · écart ${cjrPx(x.decalage)}</small>`:''}</td>
+      <td>${esc(x.pompiste||'—')}${x.rapport_pompiste_id?`<small class="c-muted"> · rapport n°${x.rapport_pompiste_id}</small>`:''}</td>
+      <td class="tr num">${cjrPx(x.metter_avant)} → ${cjrPx(x.metter_apres)}</td><td class="tr num">${cjrGal(x.gallons)}</td><td class="tr num"><b>${cjrG(x.montant)}</b></td></tr>`).join('')}</tbody></table></div>
+    <div class="cjr-note" style="margin:6px 0 0">Corrigez-les dans le Journal Meters (résoudre l’écart ou supprimer le relevé) : le rapport se met à jour tout seul.</div></div>`;
 }
 
 function _cjrPeriodeTexte(m){
@@ -16840,6 +16871,7 @@ function cjrAfficher(){
   const parPeriode = m.sections.map(s=>`${s.libelle} ${cjrG(s.m)}`).join('<br>');
   body.innerHTML = `
     ${filtres}
+    ${_cjrNonCertifiesHtml()}
     <div class="cjr-kpis">
       <div class="cjr-kpi">
         <div class="cjr-kpi-l">Ventes</div>
@@ -19938,11 +19970,11 @@ async function jrSupprimer(id){
     if(e.rapport_pompiste_id){
       const rid=e.rapport_pompiste_id, lignes=_JR_ENTRIES.filter(x=>x.rapport_pompiste_id===rid);
       const motif=await demanderSuppression({titre:`Supprimer le rapport pompiste n°${rid} ?`,
-        texte:'Ce relevé vient d’un rapport pompiste : c’est le rapport entier qui est supprimé (ses mètres et ses dépenses). Les pompes redeviennent libres pour ce créneau ; la trace reste au journal d’audit.',
+        texte:'Ce relevé vient d’un rapport pompiste : c’est le rapport entier qui est supprimé (ses mètres et ses dépenses). Les pompes redeviennent libres pour ce créneau. Le rapport est gardé dans Rapports pompistes → « 🗑 Supprimés » : vous pourrez le restaurer.',
         lignes:lignes.map(ligne), bouton:'Supprimer le rapport'});
       if(!motif) return;
       await POST(`/pompiste-supervision/rapports/${rid}/supprimer`,{motif});
-      toast(`Rapport pompiste n°${rid} supprimé : les pompes sont libres.`,'ok');
+      toast(`Rapport pompiste n°${rid} supprimé : gardé dans Rapports pompistes → « 🗑 Supprimés ».`,'ok');
     }else{
       const motif=await demanderSuppression({titre:'Supprimer ce relevé ?',
         texte:'La pompe redevient libre pour ce créneau : vous pourrez la ressaisir. Ventes, caisse et stock sont recalculés ; la trace reste au journal d’audit.',
@@ -20656,7 +20688,7 @@ const _PSP_LIB = {EN_COURS:'Non terminé', SOUMIS:'À vérifier', PROBLEME:'Prob
 const _PSP_FILTRES = [
   ['A_TRAITER','À traiter','SOUMIS,PROBLEME'], ['SOUMIS','À vérifier','SOUMIS'], ['PROBLEME','Problèmes','PROBLEME'],
   ['EN_COURS','Non terminés','EN_COURS'], ['FINALISE','Finalisés','CONFIRME,RESOLU'], ['REJETE','Renvoyés','REJETE'],
-  ['TOUS','Tous','EN_COURS,SOUMIS,PROBLEME,CONFIRME,RESOLU,REJETE']];
+  ['TOUS','Tous','EN_COURS,SOUMIS,PROBLEME,CONFIRME,RESOLU,REJETE'], ['SUPPRIME','🗑 Supprimés','SUPPRIME']];
 const _pspPer = p => p === 'Apres-midi' ? 'Après-midi' : p;
 const _pspDate = d => new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', {weekday:'short', day:'2-digit', month:'2-digit'});
 const _pspJour = d => new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
@@ -20806,7 +20838,8 @@ function pspRendreListe(){
               <td class="r">${r.statut === 'EN_COURS' ? '—' : _pspG(r.montant_compte)}</td>
               <td class="r">${r.statut === 'EN_COURS' ? '—' : _pspE(r.ecart_final)}</td>
               <td class="psp-muted">${verif}</td>
-              <td><span class="psp-badge ${r.statut}">${_PSP_LIB[r.statut]}</span>${r.certifie?' <span class="cert">Certifié</span>':''}</td>
+              <td>${r.supprime ? `<span class="psp-badge REJETE">🗑 Supprimé</span><div class="psp-muted">${esc(r.supprime.motif||'')}</div>`
+                : `<span class="psp-badge ${r.statut}">${_PSP_LIB[r.statut]}</span>${r.certifie?' <span class="cert">Certifié</span>':''}`}</td>
               <td class="r"><button class="btn ${['SOUMIS','PROBLEME'].includes(r.statut)?'btn-primary':'btn-secondary'} psp-mini">${['SOUMIS','PROBLEME'].includes(r.statut)?'Ouvrir et corriger':'Ouvrir'}</button></td></tr>`;
           }).join('')}</tbody></table></div>`).join('')}`
     : `<div class="psp-card"><b>Aucun rapport pour ce filtre.</b>
@@ -20826,7 +20859,7 @@ function pspRendreDetail(r){
   c.innerHTML = `<div class="psp-detail-barre">
       <button class="btn btn-secondary" onclick="pspFermer()">← Retour à la liste</button>
       <span class="psp-muted">Rapport n°${r.id}</span></div>
-    <div id="psp-r-${r.id}">${r.statut === 'EN_COURS' ? pspCarteNonTermine(r)
+    <div id="psp-r-${r.id}">${r.supprime ? pspCarteLecture(r) : r.statut === 'EN_COURS' ? pspCarteNonTermine(r)
       : (['SOUMIS','PROBLEME'].includes(r.statut) ? pspCarte(r) : pspCarteLecture(r))}</div>`;
 }
 
@@ -20834,7 +20867,7 @@ function _pspMaj(r){
   const i = PSP.rapports.findIndex(x => x.id === r.id);
   if(i >= 0) PSP.rapports[i] = r;
   const el = document.getElementById('psp-r-' + r.id);
-  if(el) el.innerHTML = ['SOUMIS','PROBLEME'].includes(r.statut) ? pspCarte(r) : pspCarteLecture(r);
+  if(el) el.innerHTML = (!r.supprime && ['SOUMIS','PROBLEME'].includes(r.statut)) ? pspCarte(r) : pspCarteLecture(r);
 }
 
 async function pspSupprimer(id){
@@ -20845,14 +20878,26 @@ async function pspSupprimer(id){
     ...((r.depenses||[]).length ? [`${r.depenses.length} dépense(s) déclarée(s), retirée(s) aussi`] : [])];
   const motif = await demanderSuppression({titre:'Supprimer ce rapport pompiste ?',
     texte: ['CONFIRME','RESOLU'].includes(r.statut)
-      ? 'Ce rapport est finalisé : ses relevés sortent du journal et ses dépenses des dépenses. Les pompes redeviennent libres pour ce jour.'
-      : 'Ses relevés et ses dépenses sont retirés ; les pompes redeviennent libres : le pompiste (ou vous) peut refaire le rapport.',
+      ? 'Ce rapport est finalisé : ses relevés sortent du journal et ses dépenses des dépenses. Les pompes redeviennent libres pour ce jour. Il reste dans « 🗑 Supprimés » : vous pourrez le restaurer.'
+      : 'Ses relevés et ses dépenses sont retirés ; les pompes redeviennent libres : le pompiste (ou vous) peut refaire le rapport. Il reste dans « 🗑 Supprimés » : vous pourrez le restaurer.',
     lignes, bouton:'Supprimer le rapport'});
   if(!motif) return;
   try{
     await _pspApi('POST', `/rapports/${id}/supprimer`, {motif});
-    notify('Rapport supprimé : les pompes sont libres.', 'ok');
+    notify('Rapport supprimé : les pompes sont libres. Il est gardé dans « 🗑 Supprimés ».', 'ok');
     PSP.ouvert = null; pspChargerListe(); pspMajBadge();
+  }catch(e){ notify(e.message, 'err'); }
+}
+
+async function pspRestaurer(id){
+  const r = PSP.rapports.find(x => x.id === id); if(!r) return;
+  if(!await showConfirm(`Restaurer le rapport n°${id} de ${r.pompiste_nom} (${_pspDate(r.date)}, ${_pspPer(r.periode)}) ? Il revient « à vérifier » : ses mètres, sa billetterie et ses dépenses sont à reconfirmer avant d’entrer au journal.`,
+      {title:'Restaurer ce rapport ?', type:'warn', okLabel:'Oui, restaurer'})) return;
+  try{
+    const x = await _pspApi('POST', `/rapports/${id}/restaurer`, {});
+    notify(`Rapport n°${id} restauré : il est dans « À traiter ».`, 'ok');
+    PSP.filtre.statut = x.statut === 'REJETE' ? 'REJETE' : 'A_TRAITER'; PSP.ouvert = id;
+    await pspChargerListe(); pspMajBadge();
   }catch(e){ notify(e.message, 'err'); }
 }
 
@@ -20877,7 +20922,10 @@ function pspCarteNonTermine(r){
 function pspCarteLecture(r){
   const billets = (r.billetterie||[]).map(b => { const n = (b.liasses||0) * 100 + (b.billets||0);
     return `<tr><td>${Number(b.coupure).toLocaleString('fr-FR')} G</td><td class="r">${n}</td><td class="r">${_pspG(b.coupure*n)}</td></tr>`; }).join('');
-  return `<div class="psp-card"><div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspPer(r.periode)} ${_pspDate(r.date)}
+  const sup = r.supprime;
+  return `<div class="psp-card">${sup ? `<div class="psp-err" style="margin:0 0 10px">🗑 <b>Rapport supprimé</b>${sup.le ? ' le ' + new Date(sup.le).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : ''}${sup.par ? ' par ' + esc(sup.par) : ''} : ${esc(sup.motif||'')}.
+      Il ne compte plus nulle part (journal, rapport du jour, dépenses). <b>Restaurer</b> le remet « à vérifier » : tout est à reconfirmer.</div>` : ''}
+    <div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspPer(r.periode)} ${_pspDate(r.date)}
       <span class="psp-badge ${r.statut}" style="margin-left:6px">${_PSP_LIB[r.statut]}</span>${r.certifie?' <span class="cert grand">Rapport certifié</span>':''}</div>
       <div class="psp-muted">${r.traite_par_nom ? 'par ' + esc(r.traite_par_nom) : ''}${r.traite_at ? ' · ' + new Date(r.traite_at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : ''}</div></div>
     ${r.note_superviseur != null ? `<div class="psp-kpi" style="display:inline-block;margin-bottom:10px"><span>Note du rapport</span><b>${r.note_superviseur}/10</b></div>` : ''}
@@ -20895,7 +20943,8 @@ function pspCarteLecture(r){
     ${billets || (r.devises||[]).length ? `<table class="psp-tbl" style="max-width:420px"><thead><tr><th>Coupure</th><th class="r">Billets</th><th class="r">Montant</th></tr></thead><tbody>${billets}
       ${r.monnaie ? `<tr><td>Monnaie</td><td></td><td class="r">${_pspG(r.monnaie)}</td></tr>` : ''}${_pspDevisesLignes(r)}</tbody></table>` : ''}
     ${_pspDepensesHtml(r)}${_pspFeuilleHtml(r)}
-    <div class="psp-sup"><button class="psp-lien" onclick="pspSupprimer(${r.id})">🗑 Supprimer ce rapport (mal fait)</button></div></div>`;
+    <div class="psp-sup">${sup ? `<button class="btn btn-primary" onclick="pspRestaurer(${r.id})">↩ Restaurer ce rapport</button>`
+      : `<button class="psp-lien" onclick="pspSupprimer(${r.id})">🗑 Supprimer ce rapport (mal fait)</button>`}</div></div>`;
 }
 
 // Feuille du pompiste : C = bons et chèques, D = crédits, F = crédit en caisse
@@ -20921,7 +20970,7 @@ function _pspDepensesHtml(r){
     <table class="psp-tbl" style="max-width:720px"><thead><tr><th>Dépense</th><th>Autorisée par</th><th class="r">Montant</th><th>Décision</th></tr></thead><tbody>
     ${r.depenses.map(x => `<tr><td>${esc(x.description)}</td><td>${esc(x.autorise_par)}</td><td class="r">${_pspG(x.montant)}</td>
       <td><span class="psp-badge ${_PSP_DEP_LIB[x.statut][0]}">${_PSP_DEP_LIB[x.statut][1]}</span>${x.motif ? `<div class="psp-muted">${esc(x.motif)}</div>` : ''}
-        ${x.statut === 'confirmee' ? _pspFleche(r.id, x.index, x.vers_depenses !== false, true) : ''}</td></tr>`).join('')}
+        ${x.statut === 'confirmee' && !r.supprime ? _pspFleche(r.id, x.index, x.vers_depenses !== false, true) : ''}</td></tr>`).join('')}
     <tr><td><b>Dépenses retenues</b></td><td></td><td class="r"><b>${_pspG(r.total_depenses_retenues)}</b></td><td></td></tr></tbody></table>`;
 }
 

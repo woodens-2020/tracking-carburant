@@ -24,3 +24,22 @@ def test_filtre_certifie(client):
     assert non["entries"][0]["type_anomalie"] == "saut_compteur"         # la continuité reste calculée sur tout
     assert client.get(url + "&certifie=peut-etre", headers=H).status_code == 400
     assert client.get(url.replace("/api/journal", "/api/journal/pdf") + "&certifie=non", headers=H).status_code == 200
+
+
+def test_rapport_jour_signale_non_certifies(client):
+    """Rapport journalier : les relevés non certifiés du Journal Meters sont
+    signalés, et peuvent être écartés du total."""
+    prod = client.post("/api/produits", headers=H, json={"nom": f"RJ-{time.time_ns()}", "prix_gallon": 500}).json()["id"]
+    m = client.post(f"/api/produits/{prod}/pompes", headers=H, json={"nom": "Gazoline 1"}).json()["id"]
+    rel = lambda d, per, av, ap, motif=None: client.post("/api/releves", headers=H, json={
+        "date": d, "periode": per, "pompe_id": m, "prix_gallon": 500, "metter_avant": av, "metter_apres": ap,
+        "motif_ecart_compteur": motif}).json()
+    rel("2025-06-15", "Apres-midi", 100, 150)
+    rel("2025-06-16", "Matin", 150, 170)                                  # continu : certifié
+    saut = rel("2025-06-16", "Apres-midi", 190, 200, "écart à vérifier")  # saut : non certifié
+    rj = client.get("/api/carburant/rapport-jour?date=2025-06-16", headers=H).json()
+    nc = [x for x in rj["non_certifies"]["lignes"] if x["releve_id"] == saut["id"]]
+    assert len(nc) == 1 and nc[0]["type_anomalie"] == "saut_compteur" and nc[0]["montant"] == 5000
+    sans = client.get("/api/carburant/rapport-jour?date=2025-06-16&sans_non_certifies=true", headers=H).json()
+    assert sans["sans_non_certifies"] is True
+    assert round(rj["entrees"]["total"] - sans["entrees"]["total"], 2) == rj["non_certifies"]["montant"]

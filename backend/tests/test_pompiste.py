@@ -757,11 +757,32 @@ def test_supprimer_releves_et_rapport_mal_saisis(client):
     r = client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/supprimer", headers=H, json={"motif": "Rapport mal rempli"})
     assert r.status_code == 200, r.text
     with SessionLocal() as s:
-        assert s.get(RapportPompiste, rap["id"]) is None
+        gardé = s.get(RapportPompiste, rap["id"])
+        assert gardé is not None and gardé.supprime_at is not None          # corbeille, pas effacé
         assert not s.query(Releve).filter_by(rapport_pompiste_id=rap["id"]).count()
+    liste = lambda st: [x["id"] for x in client.get(f"/api/pompiste-supervision/rapports?statut={st}", headers=H).json()]
+    assert rap["id"] not in liste("SOUMIS,PROBLEME,CONFIRME,RESOLU,REJETE") and rap["id"] in liste("SUPPRIME")
+    sup = next(x for x in client.get("/api/pompiste-supervision/rapports?statut=SUPPRIME", headers=H).json() if x["id"] == rap["id"])
+    assert sup["supprime"]["motif"] == "Rapport mal rempli" and sup["supprime"]["statut_avant"] == "SOUMIS"
+    # Supprimé : plus de décision possible, plus en attente au journal
+    assert client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/depenses/0/confirmer", headers=H, json={}).status_code == 409
+    j = client.get(f"/api/journal?date_debut={jour}&date_fin={jour}", headers=H).json()
+    assert not [e for e in j["entries"] if e.get("rapport_pompiste_id") == rap["id"]]
+    # Restaurer : il revient « à vérifier », tout est à reconfirmer
+    r = client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/restaurer", headers=H)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["statut"] == "SOUMIS" and d["supprime"] is None and not any(l["confirmee"] for l in d["lignes"])
+    assert d["depenses"][0]["statut"] == "en_attente"
+    assert client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/restaurer", headers=H).status_code == 404
+    assert _sup(client, rap["id"], f"lignes/{pompe}/confirmer", metter_avant=0, metter_apres=20).status_code == 200
+    assert client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/supprimer", headers=H, json={"motif": "Rapport mal rempli"}).status_code == 200
     # Les pompes sont libérées : le pompiste peut refaire son rapport
     assert p.post("/api/pompiste/compteurs", json={"date": jour, "charte_acceptee": True,
               "lignes": [{"pompe_id": pompe, "metter_avant": 0, "metter_apres": 20, "debut_confirme": True}]}).status_code == 201
+    # … et l'ancien ne peut plus revenir sur ce créneau sans retirer le nouveau
+    r = client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/restaurer", headers=H)
+    assert r.status_code == 409 and "déjà rapporté" in r.json()["detail"]
 
 
 def test_metre_confirme_entre_dans_la_saisie(client):

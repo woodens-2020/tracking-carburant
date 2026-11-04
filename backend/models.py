@@ -299,6 +299,11 @@ class RapportPompiste(Base):
     probleme_commentaire  = Column(String(1000), nullable=True)
     probleme_at           = Column(DateTime(timezone=True), nullable=True)
     probleme_par_id       = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    # Supprimé par la direction (corbeille) : le rapport est gardé pour pouvoir
+    # le restaurer, mais il ne compte plus nulle part (journal, caisse,
+    # dépenses, créneaux). {"motif", "par", "le", "statut_avant", ...}
+    supprime_at           = Column(DateTime(timezone=True), nullable=True)
+    suppression           = Column(JSON, nullable=True)
 
     utilisateur = relationship("Utilisateur", foreign_keys=[utilisateur_id])
     probleme_par = relationship("Utilisateur", foreign_keys=[probleme_par_id])

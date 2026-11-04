@@ -373,6 +373,7 @@ def controles(db: Session, debut: date_type, fin: date_type, lignes: list,
 
     # 3. Rapports pompistes en attente : pas encore dans la caisse
     att = (db.query(RapportPompiste).filter(RapportPompiste.statut.in_(("SOUMIS", "PROBLEME")),
+                                            RapportPompiste.supprime_at.is_(None),
                                             RapportPompiste.date >= debut, RapportPompiste.date <= fin).all())
     if att:
         mt = 0.0
