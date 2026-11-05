@@ -629,6 +629,8 @@ canvas{display:block}
 .jr-val{background:none;border:1px dashed transparent;border-radius:8px;cursor:pointer;font:inherit;font-family:var(--mono);
   padding:4px 6px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .jr-val .jr-pen{font-size:12px;opacity:.55;transition:opacity .15s}
+.jr-val-date{font-family:inherit;padding:3px 6px;margin-left:-6px;color:var(--text)}
+.psp-date-btn{font-family:inherit;font-weight:700;padding:1px 6px;margin:0 -2px;color:var(--text)}
 .jr-val:hover,.jr-val:focus-visible{border-color:var(--orange);background:rgba(249,115,22,.1);outline:none}
 .jr-val:hover .jr-pen,.jr-val:focus-visible .jr-pen{opacity:1}
 .jr-sup{background:none;border:0;color:var(--muted);font-size:11.5px;cursor:pointer;padding:2px 0;margin-top:3px;text-decoration:underline dotted}
@@ -18049,7 +18051,9 @@ function renderJournal(data){
     const certifie=!!e.certifie;
 
     return `<tr class="${rowCls}${e.en_attente?' jr-attente':''}">
-      <td class="num" style="white-space:nowrap">${frDate(e.date)}</td>
+      <td class="num" style="white-space:nowrap">${e.id!=null
+        ? `<button class="jr-val jr-val-date" title="${e.rapport_pompiste_id?'Changer la date / période du rapport pompiste n°'+e.rapport_pompiste_id:'Changer la date / période de ce relevé'}" onclick="jrChangerDate(${JSON.stringify(e.id).replace(/"/g,'&quot;')})">${frDate(e.date)}<span class="jr-pen">✏️</span></button>`
+        : frDate(e.date)}</td>
       <td style="font-size:13px">${e.periode==='Matin'?'🌅 Matin':'🌇 Après-midi'}</td>
       <td style="font-weight:600">${esc(e.pompe_nom)}</td>
       <td style="font-size:13px">${e.pompiste_nom?esc(e.pompiste_nom):'<span class="c-dim">—</span>'}${!e.en_attente && e.id
@@ -18070,8 +18074,7 @@ function renderJournal(data){
       <td class="tr num c-amber">${fmtG(e.montant_vente)}</td>
       <td><span class="type-pill ${pillCls}">${typeLabel}</span></td>
       <td>${statHtml}${certifie?'<div style="margin-top:3px"><span class="cert" title="Compteur continu et rapport validé">Certifié</span></div>':''}${e.id!=null
-        ?`<div><button class="jr-sup" title="${e.rapport_pompiste_id?'Changer la date du rapport pompiste n°'+e.rapport_pompiste_id:'Changer la date de ce relevé'}" onclick="jrChangerDate(${JSON.stringify(e.id).replace(/"/g,'&quot;')})">📅 Date</button></div>
-          <div><button class="jr-sup" title="${e.rapport_pompiste_id?'Supprimer le rapport pompiste n°'+e.rapport_pompiste_id:'Supprimer ce relevé'}" onclick="jrSupprimer(${JSON.stringify(e.id).replace(/"/g,'&quot;')})">🗑 Supprimer</button></div>`:''}</td>
+        ?`<div><button class="jr-sup" title="${e.rapport_pompiste_id?'Supprimer le rapport pompiste n°'+e.rapport_pompiste_id:'Supprimer ce relevé'}" onclick="jrSupprimer(${JSON.stringify(e.id).replace(/"/g,'&quot;')})">🗑 Supprimer</button></div>`:''}</td>
     </tr>`;
   }).join('');
 
@@ -18086,7 +18089,7 @@ function renderJournal(data){
     <div class="tbl-wrap">
       <table class="dt">
         <thead><tr>
-          <th>Date</th><th>Période</th><th style="min-width:90px">Pompe</th>
+          <th>Date ✏️</th><th>Période</th><th style="min-width:90px">Pompe</th>
           <th style="min-width:90px">Pompiste</th>
           <th class="tr">Meter avant ✏️</th><th class="tr">Meter après ✏️</th>
           <th class="tr">Attendu</th><th class="tr">Décalage</th>
@@ -21101,6 +21104,13 @@ async function pspAnnuler(id){
   catch(e){ notify(e.message, 'err'); }
 }
 
+// Date et période du rapport dans l'en-tête ; crayon si on peut la changer
+function _pspDateEntete(r){
+  const txt = `${_pspPer(r.periode)} ${_pspDate(r.date)}`;
+  const ok = r.supprime || ['SOUMIS','PROBLEME','CONFIRME','RESOLU'].includes(r.statut);
+  return ok ? `<button class="jr-val psp-date-btn" title="Changer la date / période de ce rapport" onclick="pspChangerDate(${r.id})">${txt}<span class="jr-pen">✏️</span></button>` : txt;
+}
+
 function pspCarteNonTermine(r){
   return `<div class="psp-card"><div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspPer(r.periode)} ${_pspDate(r.date)}
       <span class="psp-badge EN_COURS" style="margin-left:6px">Non terminé</span></div></div>
@@ -21118,7 +21128,7 @@ function pspCarteLecture(r){
   const sup = r.supprime;
   return `<div class="psp-card">${sup ? `<div class="psp-err" style="margin:0 0 10px">🗑 <b>Rapport supprimé</b>${sup.le ? ' le ' + new Date(sup.le).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : ''}${sup.par ? ' par ' + esc(sup.par) : ''} : ${esc(sup.motif||'')}.
       Il ne compte plus nulle part (journal, rapport du jour, dépenses). <b>Restaurer</b> le remet « à vérifier » : tout est à reconfirmer.</div>` : ''}
-    <div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspPer(r.periode)} ${_pspDate(r.date)}
+    <div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspDateEntete(r)}
       <span class="psp-badge ${r.statut}" style="margin-left:6px">${_PSP_LIB[r.statut]}</span>${r.certifie?' <span class="cert grand">Rapport certifié</span>':''}</div>
       <div class="psp-muted">${r.traite_par_nom ? 'par ' + esc(r.traite_par_nom) : ''}${r.traite_at ? ' · ' + new Date(r.traite_at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : ''}</div></div>
     ${r.note_superviseur != null ? `<div class="psp-kpi" style="display:inline-block;margin-bottom:10px"><span>Note du rapport</span><b>${r.note_superviseur}/10</b></div>` : ''}
@@ -21136,9 +21146,8 @@ function pspCarteLecture(r){
     ${billets || (r.devises||[]).length ? `<table class="psp-tbl" style="max-width:420px"><thead><tr><th>Coupure</th><th class="r">Billets</th><th class="r">Montant</th></tr></thead><tbody>${billets}
       ${r.monnaie ? `<tr><td>Monnaie</td><td></td><td class="r">${_pspG(r.monnaie)}</td></tr>` : ''}${_pspDevisesLignes(r)}</tbody></table>` : ''}
     ${_pspDepensesHtml(r)}${_pspFeuilleHtml(r)}
-    <div class="psp-sup">${sup ? `<button class="btn btn-secondary" onclick="pspChangerDate(${r.id})">📅 Changer la date</button>
-        <button class="btn btn-primary" onclick="pspRestaurer(${r.id})">↩ Restaurer ce rapport</button>`
-      : `${['CONFIRME','RESOLU'].includes(r.statut) ? `<button class="psp-lien" onclick="pspChangerDate(${r.id})">📅 Changer la date / période</button> ` : ''}<button class="psp-lien" onclick="pspSupprimer(${r.id})">🗑 Supprimer ce rapport (mal fait)</button>`}</div></div>`;
+    <div class="psp-sup">${sup ? `<button class="btn btn-primary" onclick="pspRestaurer(${r.id})">↩ Restaurer ce rapport</button>`
+      : `<button class="psp-lien" onclick="pspSupprimer(${r.id})">🗑 Supprimer ce rapport (mal fait)</button>`}</div></div>`;
 }
 
 // Feuille du pompiste : C = bons et chèques, D = crédits, F = crédit en caisse
@@ -21274,7 +21283,7 @@ function pspCarte(r){
   const pb = r.statut === 'PROBLEME';
   const peutFinaliser = toutesLignes && r.billetterie_confirmee && r.ecart_confirme;
   return `<div class="psp-card">
-    <div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspPer(r.periode)} ${_pspDate(r.date)}
+    <div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspDateEntete(r)}
         <span class="psp-badge ${r.statut}" style="margin-left:6px">${_PSP_LIB[r.statut]}</span>${r.certifie?' <span class="cert grand">Rapport certifié</span>':''}</div>
       <div class="psp-muted">soumis ${r.soumis_at ? new Date(r.soumis_at).toLocaleString('fr-FR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : ''} · charte acceptée</div></div>
     ${pb ? `<div class="psp-err" style="margin:0 0 10px">Problème signalé par ${esc(r.probleme_par_nom||'')} : ${esc(r.probleme_commentaire||'')}</div>` : ''}
@@ -21324,8 +21333,7 @@ function pspCarte(r){
          ${pb ? '' : `<button class="btn btn-danger" onclick="pspProbleme(${r.id})">⚠ Signaler un problème</button>`}
          <button class="btn btn-secondary" onclick="pspRenvoyer(${r.id})">Renvoyer au pompiste</button>
        </div>`)}
-    <div class="psp-sup"><button class="psp-lien" onclick="pspChangerDate(${r.id})">📅 Changer la date / période</button>
-      <button class="psp-lien" onclick="pspSupprimer(${r.id})">🗑 Supprimer ce rapport (mal fait)</button></div>
+    <div class="psp-sup"><button class="psp-lien" onclick="pspSupprimer(${r.id})">🗑 Supprimer ce rapport (mal fait)</button></div>
   </div>`;
 }
 
