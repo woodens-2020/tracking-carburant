@@ -207,7 +207,8 @@ def _clear_login_failures(ip: str | None) -> None:
 _PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code",
                     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify",
                     "/api/oauth/otp/send", "/api/config/branding", "/api/login/pompiste", "/api/pompiste/identifier", "/pompiste",
-                    "/pompiste/manifest.webmanifest", "/pompiste-sw.js", "/pompiste/installer", "/pompiste/qr.png"}
+                    "/pompiste/manifest.webmanifest", "/pompiste-sw.js", "/pompiste/installer", "/pompiste/qr.png",
+                    "/pompiste/konekta-ponpis.apk", "/.well-known/assetlinks.json"}
 _PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/", "/pompiste-app/") if _DEBUG_MODE
                     else ("/api/auth/oauth/", "/shared/", "/pompiste-app/"))
 
@@ -2066,6 +2067,29 @@ def pompiste_service_worker():
 def pompiste_installer():
     return FileResponse(os.path.join(_POMPISTE_APP_DIR, "installer.html"), media_type="text/html",
                         headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+# Application Android « Konekta Ponpis » (APK, Trusted Web Activity) : elle
+# ouvre /pompiste en plein écran. Empreinte SHA-256 de la clé de signature
+# (publique) : Android vérifie /.well-known/assetlinks.json pour cacher la
+# barre d'adresse. La clé elle-même n'est jamais dans le dépôt.
+_APK_PAQUET = "com.konekta.ponpis"
+_APK_EMPREINTES = ["6B:F8:E0:4A:B6:7A:4A:D6:67:63:DA:F7:CB:48:65:BB:B6:48:FD:1D:81:CA:6B:14:C7:2F:1E:93:6F:5E:7D:42"]
+
+
+@app.get("/.well-known/assetlinks.json", include_in_schema=False)
+def assetlinks():
+    return JSONResponse([{"relation": ["delegate_permission/common.handle_all_urls"],
+                          "target": {"namespace": "android_app", "package_name": _APK_PAQUET,
+                                     "sha256_cert_fingerprints": _APK_EMPREINTES}}],
+                        headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/pompiste/konekta-ponpis.apk", include_in_schema=False)
+def pompiste_apk():
+    return FileResponse(os.path.join(_POMPISTE_APP_DIR, "konekta-ponpis.apk"),
+                        media_type="application/vnd.android.package-archive", filename="konekta-ponpis.apk",
+                        headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/pompiste/qr.png", include_in_schema=False)

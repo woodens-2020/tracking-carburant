@@ -49,6 +49,17 @@ b.k{display:inline-block;border:2px solid var(--border);border-radius:8px;paddin
 
   <div class="ok cache" id="deja">✅ Aplikasyon an deja enstale sou aparèy sa a. · L'application est déjà installée.</div>
 
+  <div class="card cache" id="carte-apk">
+    <a class="btn" href="/pompiste/konekta-ponpis.apk" download>⬇ Telechaje aplikasyon Android lan</a>
+    <ol style="margin-top:12px">
+      <li>Touche bouton anlè a : fichye <b>konekta-ponpis.apk</b> la telechaje.</li>
+      <li>Louvri l (notifikasyon « Telechajman fini », oswa <b>Fichye → Telechajman</b>).</li>
+      <li>Si telefòn nan mande sa, otorize <b>« Enstale aplikasyon enkoni »</b> pou Chrome (yon sèl fwa).</li>
+      <li>Touche <b>Enstale</b>, epi <b>Louvri</b> : ikòn <b>Konekta Ponpis</b> la sou ekran an.</li>
+    </ol>
+    <p class="fr">Télécharger l'APK, l'ouvrir, autoriser « Installer des applis inconnues » si demandé, puis « Installer ».</p>
+  </div>
+
   <div class="card">
     <button class="btn" id="btn-installer" onclick="installer()">📲 Enstale aplikasyon an</button>
     <a class="btn sec" href="/pompiste">Louvri l san enstale · Ouvrir sans installer</a>
@@ -96,6 +107,8 @@ window.addEventListener('appinstalled', () => { montrerDeja(); $('aide').classLi
 
 // Navigateur de l'appareil : l'installation n'est pas la même partout
 const UA = navigator.userAgent || '';
+// Android : l'application à télécharger (APK) est proposée en premier
+if(/Android/i.test(UA) && !dejaInstallee()) $('carte-apk').classList.remove('cache');
 const NAV = /iPhone|iPad|iPod/i.test(UA) ? 'ios'
   : /; wv\)|FBAN|FBAV|Instagram|WhatsApp|Line\/|Messenger|Snapchat/i.test(UA) ? 'integre'
   : /SamsungBrowser/i.test(UA) ? 'samsung'
