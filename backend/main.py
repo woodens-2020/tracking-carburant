@@ -3142,6 +3142,132 @@ def supprimer_releves(data: SuppressionRelevesIn, request: Request, db: Session 
     return {"supprimes": len(rows), "avertissements": avertissements}
 
 
+class ReleveDateIn(BaseModel):
+    date: date_type
+    periode: str
+    motif: str
+
+
+def _analyse_date_releve(db: Session, r: Releve, d: date_type, periode: str) -> dict:
+    """Ce que change le déplacement d'un relevé saisi vers (d, periode) :
+    refus (futur, même créneau, place prise, rapport pompiste) et
+    avertissements (continuité, rupture laissée, prix, date ancienne)."""
+    from pompiste_routes import _voisins, mettres_en_attente, TOLERANCE as TOL, _per
+    bloq, avert = [], []
+    if r.rapport_pompiste_id:
+        bloq.append(f"Ce relevé vient du rapport pompiste n°{r.rapport_pompiste_id} : changez la date du rapport entier.")
+    if periode not in PERIODES:
+        bloq.append("Période invalide.")
+    if d > today_haiti():
+        bloq.append("La date ne peut pas être dans le futur.")
+    if d == r.date and periode == r.periode:
+        bloq.append("C'est déjà la date et la période de ce relevé.")
+    if bloq:
+        return {"bloquants": bloq, "avertissements": avert, "lignes": []}
+    nom = r.pompe.nom if r.pompe else f"pompe {r.pompe_id}"
+    occupe = db.query(Releve).filter(Releve.date == d, Releve.periode == periode,
+                                     Releve.pompe_id == r.pompe_id, Releve.id != r.id).first()
+    if occupe:
+        bloq.append(f"{nom} a déjà un relevé sur ce créneau ({float(occupe.metter_avant):,.3f} → "
+                    f"{float(occupe.metter_apres):,.3f}) : supprimez ou déplacez-le d'abord.".replace(",", " "))
+    pris = next((x for x in mettres_en_attente(db, d, periode) if x["pompe_id"] == r.pompe_id), None)
+    if pris:
+        bloq.append(f"{nom} est dans le rapport pompiste n°{pris['rapport_id']} ({pris['pompiste']}) sur ce créneau.")
+    if (today_haiti() - d).days > 62:
+        avert.append(f"Date ancienne ({(today_haiti() - d).days} jours) : vérifiez qu'il s'agit bien du bon jour.")
+    av, ap = float(r.metter_avant), float(r.metter_apres)
+    (prec, src_p), (suiv, src_s) = _voisins(db, r.pompe_id, d, periode, -1, exclure_releve_id=r.id)
+    ecart_debut = round(av - prec, 4) if prec is not None else None
+    ecart_fin = round(suiv - ap, 4) if suiv is not None else None
+    prix_n = _prix_vente_a_date(db, r.pompe.produit_id, d) if r.pompe else None
+    prix_n = float(prix_n) if prix_n is not None else float(r.prix_gallon)
+    ligne = {"pompe_id": r.pompe_id, "pompe_nom": nom, "metter_avant": av, "metter_apres": ap,
+             "index_precedent": prec, "source_precedent": src_p, "ecart_debut": ecart_debut,
+             "index_suivant": suiv, "source_suivant": src_s, "ecart_fin": ecart_fin,
+             "suit": ecart_debut is not None and abs(ecart_debut) <= TOL,
+             "enchaine": ecart_fin is None or abs(ecart_fin) <= TOL,
+             "prix_actuel": float(r.prix_gallon), "prix_nouveau": prix_n,
+             "montant_actuel": round((ap - av) * float(r.prix_gallon), 2),
+             "montant_nouveau": round((ap - av) * prix_n, 2), "saisie_existante": None}
+    if ecart_debut is not None and not ligne["suit"]:
+        avert.append(f"{nom} : le début {av:,.3f} ne suit pas la fin précédente {prec:,.3f} ({src_p}) — "
+                     f"{'recul' if ecart_debut < 0 else 'saut'} de {abs(ecart_debut):,.3f} gal.".replace(",", " "))
+    if not ligne["enchaine"]:
+        avert.append(f"{nom} : la fin {ap:,.3f} ne rejoint pas le début suivant {suiv:,.3f} ({src_s}) — "
+                     f"écart de {abs(ecart_fin):,.3f} gal.".replace(",", " "))
+    (prec_a, _), (suiv_a, src_a) = _voisins(db, r.pompe_id, r.date, r.periode, -1, exclure_releve_id=r.id)
+    if prec_a is not None and suiv_a is not None and abs(suiv_a - prec_a) > TOL:
+        avert.append(f"{nom} : à l'ancien créneau ({_per(r.periode)} du {r.date.strftime('%d/%m')}), le relevé suivant "
+                     f"({src_a}) ne suivra plus rien — écart de {abs(suiv_a - prec_a):,.3f} gal.".replace(",", " "))
+    if abs(prix_n - float(r.prix_gallon)) > 0.0005:
+        avert.append(f"{nom} : prix du {d.strftime('%d/%m')} = {prix_n:g} G/gal (au lieu de {float(r.prix_gallon):g}) : "
+                     f"{ligne['montant_actuel']:,.2f} → {ligne['montant_nouveau']:,.2f} G.".replace(",", " "))
+    cree = getattr(r.pompe, "created_at", None)
+    if cree is not None and cree.date() > d:
+        avert.append(f"{nom} : pompe créée le {cree.strftime('%d/%m/%Y')}, après cette date.")
+    from models import ResolutionMetter
+    if db.query(ResolutionMetter).filter_by(releve_id=r.id).first():
+        avert.append("La justification d'écart enregistrée pour ce relevé ne vaudra plus : elle est retirée.")
+    return {"bloquants": bloq, "avertissements": avert, "lignes": [ligne]}
+
+
+@app.get("/api/releves/{releve_id}/changer-date/apercu")
+def apercu_date_releve(releve_id: int, date: date_type, periode: str, request: Request, db: Session = Depends(get_db)):
+    from pompiste_routes import _require_superviseur
+    _require_superviseur(request, db)
+    r = db.get(Releve, releve_id)
+    if not r:
+        raise HTTPException(404, "Relevé introuvable.")
+    return _analyse_date_releve(db, r, date, periode)
+
+
+@app.post("/api/releves/{releve_id}/changer-date")
+def changer_date_releve(releve_id: int, data: ReleveDateIn, request: Request, db: Session = Depends(get_db)):
+    """Relevé saisi sur le mauvais jour ou la mauvaise période : déplacé
+    (index inchangés), au prix du nouveau jour ; l'écart de compteur est
+    recalculé au nouveau créneau et les relevés suivants des deux créneaux
+    sont remis à jour. Trace au journal d'audit."""
+    from pompiste_routes import _require_superviseur
+    from models import ResolutionMetter
+    _require_superviseur(request, db)
+    motif = " ".join((data.motif or "").split())
+    if len(motif) < 5:
+        raise HTTPException(400, "Indiquez pourquoi vous changez la date (5 caractères minimum).")
+    r = db.get(Releve, releve_id)
+    if not r:
+        raise HTTPException(404, "Relevé introuvable.")
+    an = _analyse_date_releve(db, r, data.date, data.periode)
+    if an["bloquants"]:
+        code = 409 if any("déjà un relevé" in x or "rapport pompiste" in x for x in an["bloquants"]) else 400
+        raise HTTPException(code, " ".join(an["bloquants"]))
+    ancien = (r.pompe_id, r.date, r.periode)
+    l = an["lignes"][0]
+    _tracer(db, request, "releve_date_changee", {
+        "releve_id": r.id, "pompe": l["pompe_nom"], "motif": motif[:300],
+        "de": {"date": str(r.date), "periode": r.periode}, "vers": {"date": str(data.date), "periode": data.periode},
+        "avant": l["metter_avant"], "apres": l["metter_apres"], "avertissements": an["avertissements"][:20]})
+    db.query(ResolutionMetter).filter_by(releve_id=r.id).delete()
+    r.date, r.periode = data.date, data.periode
+    r.prix_gallon = l["prix_nouveau"]
+    # Écart de compteur au nouveau créneau (motif = celui du déplacement)
+    if l["ecart_debut"] is not None and abs(l["ecart_debut"]) > TOLERANCE_ECART_COMPTEUR:
+        r.ecart_compteur, r.motif_ecart_compteur = l["ecart_debut"], (r.motif_ecart_compteur or motif)[:255]
+    else:
+        r.ecart_compteur, r.motif_ecart_compteur = None, None
+    r.nb_modifications = (r.nb_modifications or 0) + 1
+    u = getattr(request.state, "user", None)
+    if u is not None:
+        r.modifie_par_id = u.id
+    db.commit()
+    avertissements = list(an["avertissements"])
+    for pl in (ancien, (r.pompe_id, r.date, r.periode)):
+        m = _reprendre_suivant(db, *pl)
+        if m:
+            avertissements.append(m)
+    db.commit()
+    return {"id": r.id, "date": str(r.date), "periode": r.periode, "avertissements": avertissements}
+
+
 class ReleveAssignerPompisteIn(BaseModel):
     pompiste_id: Optional[int] = None   # None = retirer l'attribution
 

@@ -1351,16 +1351,19 @@ _DATE_MODIFIABLE = ("SOUMIS", "PROBLEME", "CONFIRME", "RESOLU")
 _ANCIENNETE_MAX_JOURS = 62
 
 
-def _voisins(db: Session, pompe_id: int, d: date_type, periode: str, rid: int) -> tuple:
+def _voisins(db: Session, pompe_id: int, d: date_type, periode: str, rid: int,
+             exclure_releve_id: Optional[int] = None) -> tuple:
     """Index de la pompe juste avant et juste après (d, periode), hors ce
-    rapport : journal officiel et rapports pompistes pas encore finalisés.
-    Retourne ((fin précédente, source), (début suivant, source))."""
+    rapport (ou ce relevé) : journal officiel et rapports pompistes pas encore
+    finalisés. Retourne ((fin précédente, source), (début suivant, source))."""
     import main
     cible = (d, _RANG[periode])
     p = db.get(Pompe, pompe_id)
     prec, suiv = None, None             # (clé, valeur, source)
     rel = (db.query(Releve).filter(Releve.pompe_id == pompe_id,
                                    (Releve.rapport_pompiste_id.is_(None)) | (Releve.rapport_pompiste_id != rid)))
+    if exclure_releve_id:
+        rel = rel.filter(Releve.id != exclure_releve_id)
     for r in rel.filter(Releve.date <= d).order_by(Releve.date.desc()).limit(6).all():
         cle = (r.date, _RANG.get(r.periode, 9))
         if cle < cible and (prec is None or cle > prec[0]):
