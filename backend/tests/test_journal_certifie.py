@@ -83,3 +83,18 @@ def test_gallons_par_carburant_jamais_melanges(client):
     rj = client.get("/api/carburant/rapport-jour?date=2025-03-10", headers=H).json()
     assert rj["reconciliation"]["releves"]["gallons_par_carburant"] == {"Gazoline": 30, "Diesel": 5}
     assert rj["entrees"]["total"] == 5000 + 12000 + 3500
+
+
+def test_rapport_jour_meme_centimes_que_le_journal(client):
+    """Chaque relevé compte au centime près (comme au Journal Meters) : les
+    deux totaux sont identiques, sans demi-centime."""
+    pid = client.post("/api/produits", headers=H, json={"nom": f"Gazoline C{time.time_ns()}", "prix_gallon": 750}).json()["id"]
+    for k, (av, ap) in enumerate(((0, 0.0013), (0.0013, 0.0026), (0.0026, 0.0039))):
+        m = client.post(f"/api/produits/{pid}/pompes", headers=H, json={"nom": f"C{k}"}).json()["id"]
+        r = client.post("/api/releves", headers=H, json={"date": "2019-02-03", "periode": "Matin", "pompe_id": m,
+                                                         "prix_gallon": 750, "metter_avant": 0, "metter_apres": 1.0007})
+        assert r.status_code in (200, 201), r.text
+    j = client.get("/api/journal?date_debut=2019-02-03&date_fin=2019-02-03", headers=H).json()
+    rj = client.get("/api/carburant/rapport-jour?date=2019-02-03", headers=H).json()
+    tj = round(sum(x["montant"] for x in j["resume"]["par_produit"]), 2)
+    assert rj["entrees"]["total"] == tj and round(tj, 2) == tj and abs(tj - 3 * 750.525) < 0.05

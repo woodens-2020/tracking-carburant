@@ -4358,7 +4358,7 @@ def carburant_rapport_jour(
                        "montant": round(sum(x["montant"] for x in L), 2),
                        "gallons_par_carburant": _gallons_par_famille(L)}
     brut = [{"gallons": float(r.metter_apres) - float(r.metter_avant),
-             "montant": (float(r.metter_apres) - float(r.metter_avant)) * float(r.prix_gallon),
+             "montant": float(r.montant_vente),
              "produit": produits.get(r.pompe.produit_id, "Inconnu")}
             for r in rel_jour if float(r.metter_apres) >= float(r.metter_avant)]
     reconciliation = {
@@ -4381,7 +4381,8 @@ def carburant_rapport_jour(
         if q < 0:
             continue
         pid = r.pompe.produit_id
-        montant = q * _D(str(r.prix_gallon))
+        # Montant du relevé arrondi au centime, comme au Journal Meters et à la caisse
+        montant = _D(str(r.montant_vente))
         for bucket, key in ((par_pp, (r.periode, pid)), (ent, pid)):
             a = bucket.setdefault(key, {"gallons": _D("0"), "montant": _D("0"), "nb": 0})
             a["gallons"] += q
