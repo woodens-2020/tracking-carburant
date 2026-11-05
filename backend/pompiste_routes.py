@@ -1345,53 +1345,219 @@ class ChangerDateIn(BaseModel):
     motif: str
 
 
+# Statuts dont on peut changer la date (EN_COURS : le pompiste est encore
+# dessus ; REJETE : il le refait lui-même).
+_DATE_MODIFIABLE = ("SOUMIS", "PROBLEME", "CONFIRME", "RESOLU")
+_ANCIENNETE_MAX_JOURS = 62
+
+
+def _voisins(db: Session, pompe_id: int, d: date_type, periode: str, rid: int) -> tuple:
+    """Index de la pompe juste avant et juste après (d, periode), hors ce
+    rapport : journal officiel et rapports pompistes pas encore finalisés.
+    Retourne ((fin précédente, source), (début suivant, source))."""
+    import main
+    cible = (d, _RANG[periode])
+    p = db.get(Pompe, pompe_id)
+    prec, suiv = None, None             # (clé, valeur, source)
+    rel = (db.query(Releve).filter(Releve.pompe_id == pompe_id,
+                                   (Releve.rapport_pompiste_id.is_(None)) | (Releve.rapport_pompiste_id != rid)))
+    for r in rel.filter(Releve.date <= d).order_by(Releve.date.desc()).limit(6).all():
+        cle = (r.date, _RANG.get(r.periode, 9))
+        if cle < cible and (prec is None or cle > prec[0]):
+            prec = (cle, float(r.metter_apres), f"journal — {_per(r.periode)} du {r.date.strftime('%d/%m')}")
+    for r in rel.filter(Releve.date >= d).order_by(Releve.date.asc()).limit(6).all():
+        cle = (r.date, _RANG.get(r.periode, 9))
+        if cle > cible and (suiv is None or cle < suiv[0]):
+            suiv = (cle, float(r.metter_avant), f"journal — {_per(r.periode)} du {r.date.strftime('%d/%m')}")
+    for l, rp in (db.query(RapportPompisteLigne, RapportPompiste)
+                  .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
+                  .filter(RapportPompisteLigne.pompe_id == pompe_id, RapportPompiste.id != rid,
+                          RapportPompiste.statut.in_(_EN_ATTENTE), RapportPompiste.supprime_at.is_(None),
+                          RapportPompiste.date >= d - timedelta(days=3), RapportPompiste.date <= d + timedelta(days=3))
+                  .all()):
+        cle = (rp.date, _RANG.get(rp.periode, 9))
+        av, ap = _valeurs_finales(l)
+        src = f"rapport n°{rp.id} — {_per(rp.periode)} du {rp.date.strftime('%d/%m')}"
+        if cle < cible and (prec is None or cle > prec[0]):
+            prec = (cle, ap, src)
+        if cle > cible and (suiv is None or cle < suiv[0]):
+            suiv = (cle, av, src)
+    if prec is None:
+        dep = main.base_depart(p, d)
+        if dep is not None:
+            prec = (None, dep, "mètre de départ")
+    return ((prec[1], prec[2]) if prec else (None, None)), ((suiv[1], suiv[2]) if suiv else (None, None))
+
+
+def _analyse_date(db: Session, rap: RapportPompiste, d: date_type, periode: str) -> dict:
+    """Tout ce que change le déplacement du rapport vers (d, periode) :
+    `bloquants` (refus), `avertissements` (à savoir avant de valider) et le
+    détail par pompe (continuité, saisie existante, prix)."""
+    bloq, avert, lignes = [], [], []
+    supprime = rap.supprime_at is not None
+    if periode not in PERIODES:
+        bloq.append("Période invalide.")
+    if not supprime and rap.statut not in _DATE_MODIFIABLE:
+        bloq.append("Un rapport non terminé ou renvoyé au pompiste ne peut pas changer de date "
+                    "(le pompiste doit d'abord le terminer ou le refaire).")
+    if d > today_haiti():
+        bloq.append("La date ne peut pas être dans le futur.")
+    if d == rap.date and periode == rap.periode:
+        bloq.append("C'est déjà la date et la période de ce rapport.")
+    if bloq:
+        return {"bloquants": bloq, "avertissements": avert, "lignes": lignes}
+    if (today_haiti() - d).days > _ANCIENNETE_MAX_JOURS:
+        avert.append(f"Date ancienne ({(today_haiti() - d).days} jours) : vérifiez qu'il s'agit bien du bon jour.")
+    # Créneau déjà rapporté (mêmes pompes, autre rapport vivant)
+    pris = (db.query(RapportPompisteLigne, RapportPompiste)
+            .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
+            .filter(RapportPompiste.date == d, RapportPompiste.periode == periode,
+                    RapportPompiste.statut.in_(_ACTIFS), RapportPompiste.supprime_at.is_(None),
+                    RapportPompiste.id != rap.id,
+                    RapportPompisteLigne.pompe_id.in_([l.pompe_id for l in rap.lignes])).all())
+    if pris:
+        noms = ", ".join(sorted({f"{l.pompe.nom} (rapport n°{r.id}, {_nom(r.utilisateur)})" for l, r in pris}))
+        bloq.append(f"Ce créneau est déjà rapporté — {noms}. Supprimez ou déplacez d'abord l'autre rapport.")
+    # Même pompiste, autre rapport sur ce créneau (autres pompes)
+    autre = (db.query(RapportPompiste)
+             .filter(RapportPompiste.utilisateur_id == rap.utilisateur_id, RapportPompiste.date == d,
+                     RapportPompiste.periode == periode, RapportPompiste.id != rap.id,
+                     RapportPompiste.statut.in_(_ACTIFS), RapportPompiste.supprime_at.is_(None)).first())
+    if autre:
+        avert.append(f"{_nom(rap.utilisateur)} a déjà le rapport n°{autre.id} sur ce créneau (autres pompes) : "
+                     "il aura deux rapports pour la même période.")
+    if rap.statut in ("CONFIRME", "RESOLU") and not supprime:
+        avert.append("Rapport finalisé : il revient « à vérifier ». Ses mètres sortent du journal du "
+                     f"{rap.date.strftime('%d/%m')} et entrent au {d.strftime('%d/%m')} quand vous les reconfirmez ; "
+                     "billetterie et dépenses restent comme décidé.")
+    elif any(l.confirmee for l in rap.lignes) and not supprime:
+        avert.append("Les mètres déjà confirmés sortent du journal : à reconfirmer sur le nouveau créneau.")
+    # Par pompe : continuité au nouveau créneau, saisie existante, prix
+    for l in rap.lignes:
+        av, ap = _valeurs_finales(l)
+        (prec, src_p), (suiv, src_s) = _voisins(db, l.pompe_id, d, periode, rap.id)
+        saisie = (db.query(Releve).filter_by(date=d, periode=periode, pompe_id=l.pompe_id)
+                  .filter((Releve.rapport_pompiste_id.is_(None)) | (Releve.rapport_pompiste_id != rap.id)).first())
+        prix_n = _prix(db, l.pompe, d)
+        x = {"pompe_id": l.pompe_id, "pompe_nom": l.pompe.nom, "metter_avant": av, "metter_apres": ap,
+             "index_precedent": prec, "source_precedent": src_p,
+             "ecart_debut": round(av - prec, 4) if prec is not None else None,
+             "index_suivant": suiv, "source_suivant": src_s,
+             "ecart_fin": round(suiv - ap, 4) if suiv is not None else None,
+             "saisie_existante": ({"metter_avant": float(saisie.metter_avant), "metter_apres": float(saisie.metter_apres),
+                                   "saisi_par": _nom(saisie.cree_par)} if saisie else None),
+             "prix_actuel": float(l.prix_gallon), "prix_nouveau": prix_n,
+             "montant_actuel": round((ap - av) * float(l.prix_gallon), 2), "montant_nouveau": round((ap - av) * prix_n, 2)}
+        x["suit"] = x["ecart_debut"] is not None and abs(x["ecart_debut"]) <= TOLERANCE
+        x["enchaine"] = x["ecart_fin"] is None or abs(x["ecart_fin"]) <= TOLERANCE
+        lignes.append(x)
+        if x["ecart_debut"] is not None and not x["suit"]:
+            sens = "recul" if x["ecart_debut"] < 0 else "saut"
+            avert.append(f"{l.pompe.nom} : le début {av:,.3f} ne suit pas la fin précédente {prec:,.3f} "
+                         f"({src_p}) — {sens} de {abs(x['ecart_debut']):,.3f} gal.".replace(",", " "))
+        if not x["enchaine"]:
+            avert.append(f"{l.pompe.nom} : la fin {ap:,.3f} ne rejoint pas le début suivant {suiv:,.3f} "
+                         f"({src_s}) — écart de {abs(x['ecart_fin']):,.3f} gal.".replace(",", " "))
+        if saisie:
+            avert.append(f"{l.pompe.nom} : déjà saisi dans le module Saisie sur ce créneau "
+                         f"({float(saisie.metter_avant):,.3f} → {float(saisie.metter_apres):,.3f}) ; à la confirmation, "
+                         "les valeurs du rapport remplaceront cette saisie.".replace(",", " "))
+        if abs(prix_n - float(l.prix_gallon)) > 0.0005:
+            avert.append(f"{l.pompe.nom} : prix du {d.strftime('%d/%m')} = {prix_n:g} G/gal "
+                         f"(au lieu de {float(l.prix_gallon):g}) : {x['montant_actuel']:,.2f} → {x['montant_nouveau']:,.2f} G."
+                         .replace(",", " "))
+        cree = getattr(l.pompe, "created_at", None)
+        if cree is not None and cree.date() > d:
+            avert.append(f"{l.pompe.nom} : pompe créée le {cree.strftime('%d/%m/%Y')}, après cette date.")
+    # Ancien créneau : ce que deviennent les relevés suivants (rapport encore au journal)
+    for l in (rap.lignes if not supprime else []):
+        (prec_a, _sp), (suiv_a, src_a) = _voisins(db, l.pompe_id, rap.date, rap.periode, rap.id)
+        if suiv_a is not None and prec_a is not None and abs(suiv_a - prec_a) > TOLERANCE:
+            avert.append(f"{l.pompe.nom} : à l'ancien créneau ({_per(rap.periode)} du {rap.date.strftime('%d/%m')}), "
+                         f"le relevé suivant ({src_a}) ne suivra plus rien — écart de {abs(suiv_a - prec_a):,.3f} gal."
+                         .replace(",", " "))
+    # Devises : taux du nouveau jour
+    for x in rap.devises or []:
+        t = taux_du_jour(db, d, x.get("devise", "USD"))
+        if t is None:
+            avert.append(f"Pas de taux {x.get('devise')} pour le {d.strftime('%d/%m')} : l'ancien taux est gardé.")
+        elif abs(float(t.taux) - float(x.get("taux") or 0)) > 0.00001:
+            avert.append(f"{x.get('devise')} : taux du {d.strftime('%d/%m')} = {float(t.taux):g} (au lieu de "
+                         f"{float(x.get('taux') or 0):g}) — l'argent compté est recalculé.")
+    nb_dep = sum(1 for x in rap.depenses or [] if x.get("statut") != "refusee")
+    if nb_dep:
+        avert.append(f"{nb_dep} dépense(s) du pompiste : déplacée(s) au {d.strftime('%d/%m')} (Dépenses et rapport du jour).")
+    return {"bloquants": bloq, "avertissements": avert, "lignes": lignes}
+
+
+@router.get("/api/pompiste-supervision/rapports/{rid}/changer-date/apercu")
+def apercu_changer_date(rid: int, date: date_type, periode: str,
+                        _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Ce que changerait le déplacement du rapport, avant de valider."""
+    rap = db.get(RapportPompiste, rid)
+    if not rap:
+        raise HTTPException(404, "Rapport introuvable")
+    return _analyse_date(db, rap, date, periode)
+
+
 @router.post("/api/pompiste-supervision/rapports/{rid}/changer-date")
 def changer_date(rid: int, data: ChangerDateIn, request: Request,
                  s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     """Rapport enregistré sur le mauvais jour ou la mauvaise période : la
-    direction le déplace. Possible dans la corbeille (avant « Restaurer ») ou
-    tant que le rapport est à vérifier ; ses mètres sont alors à reconfirmer.
-    Le prix de chaque pompe est repris au tarif du nouveau jour."""
+    direction le déplace (corbeille, à vérifier ou finalisé). Les mètres sont
+    à reconfirmer sur le nouveau créneau ; prix et taux du nouveau jour ;
+    dépenses du pompiste déplacées avec lui. Voir `_analyse_date`."""
     import main
+    from models import Depense
     rap = db.get(RapportPompiste, rid)
     if not rap:
         raise HTTPException(404, "Rapport introuvable")
-    supprime = rap.supprime_at is not None
-    if not supprime and rap.statut not in _A_TRAITER:
-        raise HTTPException(409, "Seul un rapport à vérifier, ou supprimé, peut changer de date.")
     motif = " ".join((data.motif or "").split())
     if len(motif) < 5:
         raise HTTPException(400, "Indiquez pourquoi vous changez la date (5 caractères minimum).")
-    if data.periode not in PERIODES:
-        raise HTTPException(400, "Période invalide")
-    if data.date > today_haiti():
-        raise HTTPException(400, "La date ne peut pas être dans le futur.")
-    if data.date == rap.date and data.periode == rap.periode:
-        raise HTTPException(400, "C'est déjà la date et la période de ce rapport.")
+    an = _analyse_date(db, rap, data.date, data.periode)
+    if an["bloquants"]:
+        code = 409 if any("déjà rapporté" in x or "non terminé" in x for x in an["bloquants"]) else 400
+        raise HTTPException(code, " ".join(an["bloquants"]))
+    supprime = rap.supprime_at is not None
+    trace = {"rapport_id": rap.id, "pompiste": _nom(rap.utilisateur), "motif": motif[:300],
+             "de": {"date": str(rap.date), "periode": rap.periode},
+             "vers": {"date": str(data.date), "periode": data.periode}, "supprime": supprime,
+             "statut_avant": rap.statut, "avertissements": an["avertissements"][:20]}
     if not supprime:
-        pris = (db.query(RapportPompisteLigne, RapportPompiste)
-                .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
-                .filter(RapportPompiste.date == data.date, RapportPompiste.periode == data.periode,
-                        RapportPompiste.statut.in_(_ACTIFS), RapportPompiste.supprime_at.is_(None),
-                        RapportPompiste.id != rap.id,
-                        RapportPompisteLigne.pompe_id.in_([l.pompe_id for l in rap.lignes])).all())
-        if pris:
-            noms = ", ".join(sorted({f"{l.pompe.nom} (rapport n°{r.id}, {_nom(r.utilisateur)})" for l, r in pris}))
-            raise HTTPException(409, f"Ce créneau est déjà rapporté — {noms}.")
         for l in rap.lignes:
             _retirer_ligne_du_journal(db, rap, l)
             l.confirmee, l.confirmee_at = False, None
         rap.ecart_confirme = False
-    trace = {"rapport_id": rap.id, "pompiste": _nom(rap.utilisateur), "motif": motif[:300],
-             "de": {"date": str(rap.date), "periode": rap.periode},
-             "vers": {"date": str(data.date), "periode": data.periode}, "supprime": supprime}
+        if rap.statut in ("CONFIRME", "RESOLU"):
+            rap.statut = "SOUMIS"
+            rap.traite_par_id, rap.traite_at = None, None
     rap.date, rap.periode = data.date, data.periode
     for l in rap.lignes:
         l.prix_gallon = _prix(db, l.pompe, data.date)
+    # Argent compté en devises : taux du nouveau jour (s'il existe)
+    devises = [dict(x) for x in (rap.devises or [])]
+    for x in devises:
+        t = taux_du_jour(db, data.date, x.get("devise", "USD"))
+        if t is not None:
+            x["taux"] = float(t.taux)
+            x["montant_htg"] = round(float(x["montant"]) * float(t.taux), 2)
+    if devises:
+        ancien = sum(float(x.get("montant_htg") or 0) for x in (rap.devises or []))
+        rap.devises = devises
+        rap.montant_compte = round(float(rap.montant_compte) - ancien + sum(x["montant_htg"] for x in devises), 2)
+    _recalculer_attendu(rap)
+    rap.ecart = round(float(rap.montant_compte) + float(rap.total_depenses or 0) + _totaux_feuille(rap)["net"]
+                      - float(rap.montant_attendu), 2)
+    # Les dépenses du pompiste suivent le rapport (Dépenses, rapport du jour, caisse)
+    for dep in db.query(Depense).filter_by(rapport_pompiste_id=rap.id).all():
+        dep.date_depense = data.date
     main._tracer(db, request, "rapport_pompiste_date_changee", trace)
     db.commit()
     db.refresh(rap)
-    return _rapport_dict(db, rap, avec_journal=not supprime and rap.statut in _A_TRAITER)
+    out = _rapport_dict(db, rap, avec_journal=not supprime and rap.statut in _A_TRAITER)
+    out["avertissements"] = an["avertissements"]
+    return out
 
 
 class ChangerPompeIn(BaseModel):

@@ -3535,6 +3535,8 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .psp-dep.confirmee{border-left-color:var(--green)} .psp-dep.refusee{border-left-color:var(--red);opacity:.85}
 .psp-dep-mt{font-family:var(--mono);font-weight:800;font-size:15px;white-space:nowrap}
 .psp-dep-act{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.cd-apercu{border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin:0 0 10px;max-height:300px;overflow-y:auto;text-align:left;font-size:12.5px}
+.cd-avert{margin:8px 0 0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:4px;color:var(--orange)}
 .psp-cp-liste{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;margin:6px 0 12px;text-align:left}
 .psp-cp-opt{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--border);border-radius:10px;padding:8px 10px;cursor:pointer;font-size:13px}
 .psp-cp-opt input{width:16px!important;height:16px!important;min-width:0!important;margin:2px 0 0}
@@ -20972,40 +20974,70 @@ async function pspSupprimer(id){
   }catch(e){ notify(e.message, 'err'); }
 }
 
-// Rapport sur le mauvais jour ou la mauvaise période : on le déplace
+// Rapport sur le mauvais jour ou la mauvaise période : on le déplace, après
+// un aperçu de tout ce que cela change (continuité, saisie, prix, dépenses…)
 function pspChangerDate(id){
   const r = PSP.rapports.find(x => x.id === id); if(!r) return;
   document.getElementById('sup-ov')?.remove();
   const ov = document.createElement('div');
   ov.id = 'sup-ov'; ov.className = 'sup-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
-  ov.innerHTML = `<div class="sup-boite">
+  ov.innerHTML = `<div class="sup-boite" style="max-width:640px">
     <div class="sup-ico">📅</div><h3>Changer la date du rapport n°${id}</h3>
-    <p>${esc(r.pompiste_nom)} · actuellement ${_pspDate(r.date)}, ${_pspPer(r.periode)}.
-      ${r.supprime ? 'Il reste dans la corbeille : restaurez-le ensuite.' : 'Ses mètres seront à reconfirmer.'}</p>
+    <p>${esc(r.pompiste_nom)} · actuellement <b>${_pspDate(r.date)}, ${_pspPer(r.periode)}</b>.
+      ${r.supprime ? 'Il reste dans la corbeille : restaurez-le ensuite.' : 'Ses mètres seront à reconfirmer sur le nouveau créneau.'}</p>
     <div style="display:flex;gap:8px;margin:4px 0 10px">
       <input type="date" id="cd-date" class="filter-input" value="${r.date}" max="${currentDate}" style="flex:1">
       <select id="cd-per" class="filter-select" style="flex:1">
         <option value="Matin" ${r.periode==='Matin'?'selected':''}>Matin</option>
         <option value="Apres-midi" ${r.periode==='Apres-midi'?'selected':''}>Après-midi</option></select></div>
+    <div id="cd-apercu" class="cd-apercu"><div class="psp-muted">Choisissez la nouvelle date et la période : l’aperçu montre tout ce que cela change.</div></div>
     <label for="sup-motif">Pourquoi ? (obligatoire)</label>
     <input id="sup-motif" class="filter-input" maxlength="300" placeholder="Ex. rapport du 31/10 après-midi saisi le 02/11">
     <div class="sup-err" id="sup-err"></div>
-    <div class="sup-act"><button class="btn btn-secondary" id="sup-non">Annuler</button><button class="btn btn-primary" id="sup-oui">📅 Changer la date</button></div></div>`;
+    <div class="sup-act"><button class="btn btn-secondary" id="sup-non">Annuler</button><button class="btn btn-primary" id="sup-oui" disabled>📅 Changer la date</button></div></div>`;
   document.body.appendChild(ov);
   const fin = () => ov.remove(), err = t => { document.getElementById('sup-err').textContent = t; };
+  const btn = document.getElementById('sup-oui');
+  let bloque = true, seq = 0;
+  const apercu = async () => {
+    const date = document.getElementById('cd-date').value, periode = document.getElementById('cd-per').value;
+    const box = document.getElementById('cd-apercu'), n = ++seq;
+    btn.disabled = true; bloque = true; err('');
+    if(!date){ box.innerHTML = '<div class="psp-muted">Choisissez la date.</div>'; return; }
+    box.innerHTML = '<div class="psp-muted"><span class="spinner"></span> Vérification…</div>';
+    try{
+      const a = await _pspApi('GET', `/rapports/${id}/changer-date/apercu?date=${date}&periode=${encodeURIComponent(periode)}`);
+      if(n !== seq) return;
+      const lig = (a.lignes||[]).map(x => `<tr>
+          <td><b>${esc(x.pompe_nom)}</b></td>
+          <td class="r">${_pspN(x.index_precedent)}<div class="psp-muted" style="font-size:10.5px">${esc(x.source_precedent||'aucun')}</div></td>
+          <td class="r ${x.index_precedent!=null && !x.suit ? 'psp-neg' : 'psp-ok'}">${_pspN(x.metter_avant)} → ${_pspN(x.metter_apres)}</td>
+          <td class="r ${x.enchaine ? '' : 'psp-neg'}">${_pspN(x.index_suivant)}<div class="psp-muted" style="font-size:10.5px">${esc(x.source_suivant||'—')}</div></td>
+          <td class="r">${_pspG(x.montant_nouveau)}</td></tr>`).join('');
+      box.innerHTML = `${(a.bloquants||[]).map(t => `<div class="psp-err" style="margin:0 0 6px">⛔ ${esc(t)}</div>`).join('')}
+        ${lig ? `<div style="overflow-x:auto"><table class="psp-tbl" style="font-size:12px"><thead><tr><th>Pompe</th><th class="r">Fin précédente</th>
+          <th class="r">Index du rapport</th><th class="r">Début suivant</th><th class="r">Montant</th></tr></thead><tbody>${lig}</tbody></table></div>` : ''}
+        ${(a.avertissements||[]).length ? `<ul class="cd-avert">${a.avertissements.map(t => `<li>⚠ ${esc(t)}</li>`).join('')}</ul>`
+          : (a.bloquants||[]).length ? '' : '<div class="psp-ok" style="font-weight:700;margin-top:6px">✓ Les index s’enchaînent avec ce créneau.</div>'}`;
+      bloque = !!(a.bloquants||[]).length; btn.disabled = bloque;
+    }catch(e){ if(n === seq) box.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
+  };
   const ok = async () => {
+    if(bloque) return;
     const date = document.getElementById('cd-date').value, periode = document.getElementById('cd-per').value;
     const m = document.getElementById('sup-motif').value.trim();
-    if(!date) return err('Choisissez la date.');
     if(m.length < 5) return err('Indiquez le motif (5 caractères minimum).');
+    btn.disabled = true;
     try{
       const x = await _pspApi('POST', `/rapports/${id}/changer-date`, {date, periode, motif: m});
       fin(); notify(`Rapport n°${id} déplacé au ${_pspDate(x.date)} (${_pspPer(x.periode)}).`, 'ok');
       PSP.ouvert = id; await pspChargerListe(); pspMajBadge();
-    }catch(e){ err(e.message); }
+    }catch(e){ err(e.message); btn.disabled = false; }
   };
+  document.getElementById('cd-date').addEventListener('change', apercu);
+  document.getElementById('cd-per').addEventListener('change', apercu);
   document.getElementById('sup-non').onclick = fin;
-  document.getElementById('sup-oui').onclick = ok;
+  btn.onclick = ok;
   ov.addEventListener('click', e => { if(e.target === ov) fin(); });
   document.getElementById('sup-motif').addEventListener('keydown', e => { if(e.key === 'Enter') ok(); if(e.key === 'Escape') fin(); });
 }
@@ -21066,7 +21098,7 @@ function pspCarteLecture(r){
     ${_pspDepensesHtml(r)}${_pspFeuilleHtml(r)}
     <div class="psp-sup">${sup ? `<button class="btn btn-secondary" onclick="pspChangerDate(${r.id})">📅 Changer la date</button>
         <button class="btn btn-primary" onclick="pspRestaurer(${r.id})">↩ Restaurer ce rapport</button>`
-      : `<button class="psp-lien" onclick="pspSupprimer(${r.id})">🗑 Supprimer ce rapport (mal fait)</button>`}</div></div>`;
+      : `${['CONFIRME','RESOLU'].includes(r.statut) ? `<button class="psp-lien" onclick="pspChangerDate(${r.id})">📅 Changer la date / période</button> ` : ''}<button class="psp-lien" onclick="pspSupprimer(${r.id})">🗑 Supprimer ce rapport (mal fait)</button>`}</div></div>`;
 }
 
 // Feuille du pompiste : C = bons et chèques, D = crédits, F = crédit en caisse
