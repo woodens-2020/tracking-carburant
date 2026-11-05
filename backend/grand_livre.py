@@ -204,11 +204,13 @@ def construire_lignes(db: Session, debut: Optional[date_type], fin: Optional[dat
     # ── Sorties ─────────────────────────────────────────────────────────
     # Dépenses payées par un pompiste sur ses ventes : le pompiste a remis
     # « ventes − dépenses ». Elles ne sortent pas de la caisse principale ; elles
-    # réduisent l'entrée des ventes, une fois le rapport finalisé (comme les ventes).
+    # réduisent l'entrée des ventes dès qu'elles sont dans les Dépenses (dépense
+    # confirmée, envoyée aux Dépenses) — au même moment que dans le Rapport
+    # journalier, comme les mètres confirmés entrent aussitôt dans les ventes.
     from models import RapportPompiste
     for d in per_date(db.query(Depense).filter(Depense.rapport_pompiste_id.isnot(None)), Depense.date_depense).all():
         rap = db.get(RapportPompiste, d.rapport_pompiste_id)
-        if not rap or rap.statut not in ("CONFIRME", "RESOLU"):
+        if not rap:
             continue
         pomp = _nom(rap.utilisateur) or "pompiste"
         out.append(_ligne(
@@ -333,10 +335,8 @@ def controles(db: Session, debut: date_type, fin: date_type, lignes: list,
     from models import Depense, RapportPompiste
     dpp = db.query(Depense).filter(Depense.rapport_pompiste_id.isnot(None),
                                    Depense.date_depense >= debut, Depense.date_depense <= fin).all()
-    dpp_tout = sum(float(x.montant) for x in dpp)
-    dpp_final = sum(float(x.montant) for x in dpp
-                    if (db.get(RapportPompiste, x.rapport_pompiste_id) or RapportPompiste()).statut in ("CONFIRME", "RESOLU"))
-    attendu_d = round(syn["synthese"]["total_entrees"] + sources - dpp_final, 2)
+    dpp_tout = sum(float(x.montant) for x in dpp if db.get(RapportPompiste, x.rapport_pompiste_id))
+    attendu_d = round(syn["synthese"]["total_entrees"] + sources - dpp_tout, 2)
     attendu_c = round(syn["synthese"]["total_sorties"] - dpp_tout, 2)
     ecart = round(abs(attendu_d - total_debit) + abs(attendu_c - total_credit), 2)
     out.append({"code": "equilibre", "niveau": "ok" if ecart < 0.01 else "alerte",

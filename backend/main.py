@@ -4257,14 +4257,17 @@ def releves_comptes(db: Session, releves) -> list:
     if not releves:
         return releves
     d0, d1 = min(r.date for r in releves), max(r.date for r in releves)
-    exclus = {e["id"] for e in _build_journal_entries(db, d0, d1)
+    # Même chaîne que le Journal Meters (rapports en attente compris) : un
+    # relevé y est en saut ou non de la même façon partout.
+    exclus = {e["id"] for e in _build_journal_entries(db, d0, d1, inclure_en_attente=True)
               if not e.get("en_attente") and isinstance(e["id"], int) and _exclu_du_total(e)}
     return [r for r in releves if r.id not in exclus] if exclus else releves
 
 
 def sauts_non_comptes(db: Session, d0, d1) -> dict:
     """Sauts de compteur non résolus sur la période : ce qui n'est pas compté."""
-    L = [e for e in _build_journal_entries(db, d0, d1) if not e.get("en_attente") and _exclu_du_total(e)]
+    L = [e for e in _build_journal_entries(db, d0, d1, inclure_en_attente=True)
+         if not e.get("en_attente") and _exclu_du_total(e)]
     return {"nb": len(L), "montant": round(sum(e["montant_vente"] for e in L), 2),
             "gallons_par_carburant": _gallons_par_famille([{"produit": e["produit_nom"], "gallons": e["quantite"]} for e in L])}
 

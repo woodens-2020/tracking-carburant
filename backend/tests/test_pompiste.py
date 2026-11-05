@@ -1087,3 +1087,31 @@ def test_changer_date_contraintes(client):
     jr = client.get(f"/api/journal?date_debut={j1}&date_fin={j3}&pompe_id={pa}", headers=H).json()["entries"]
     assert [(e["date"], e["periode"], e["metter_avant"]) for e in jr] == [
         (str(j1), "Matin", 0), (str(j2), "Apres-midi", 100), (str(j3), "Matin", 120)]
+
+
+def test_depense_pompiste_meme_moment_partout(client):
+    """Dépense du pompiste confirmée (rapport pas encore finalisé) : elle est
+    au même moment dans les Dépenses, le Rapport journalier et la Caisse
+    principale, qui reste équilibrée."""
+    import main as _m
+    from tz_utils import today_haiti
+    d = str(today_haiti())
+    pa = _produit(client, 500)
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Dep", "nom": f"Ense{time.time_ns()}"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    assert p.post("/api/pompiste/compteurs", json={"date": d, "periode": "Matin", "charte_acceptee": True, "lignes": [
+        {"pompe_id": pa, "metter_avant": 0, "metter_apres": 10, "debut_confirme": True}]}).status_code == 201
+    rid = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 4}],
+                 "depenses": [{"description": "Glace", "montant": 908, "autorise_par": "Gérant"}]}).json()["id"]
+    assert _sup(client, rid, f"lignes/{pa}/confirmer", metter_avant=0, metter_apres=10).status_code == 200
+    assert _sup(client, rid, "depenses/0/confirmer").status_code == 200
+    deps = client.get(f"/api/depenses?date_debut={d}&date_fin={d}", headers=H).json()
+    deps = deps if isinstance(deps, list) else (deps.get("items") or deps.get("depenses") or [])
+    assert sum(float(x["montant"]) for x in deps if x.get("rapport_pompiste_id") == rid) == 908
+    rj = client.get(f"/api/carburant/rapport-jour?date={d}", headers=H).json()
+    assert any(x["montant"] == 908 and x["pompiste"] for x in rj["depenses"]["liste"])
+    cp = client.get(f"/api/caisse-principale/journal?date_debut={d}&date_fin={d}", headers=H).json()
+    dpp = [l for l in cp["lignes"] if l["type"] == "depense_pompiste" and (l.get("detail") or {}).get("rapport_pompiste_id") == rid]
+    assert len(dpp) == 1 and abs(dpp[0]["debit"]) == 908
+    assert {c["code"]: c for c in cp["controles"]}["equilibre"]["niveau"] == "ok"
