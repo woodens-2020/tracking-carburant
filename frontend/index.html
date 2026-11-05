@@ -538,7 +538,7 @@ canvas{display:block}
 .cjr-nc-l-err td{color:var(--red)}
 .cjr-rec{border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin:0 0 12px;font-size:13.5px;max-width:760px}
 .cjr-rec-t{font-weight:800;margin-bottom:6px}.cjr-rec-t small{font-weight:500;color:var(--muted)}
-.cjr-rec-l{display:grid;grid-template-columns:1fr auto 110px;gap:10px;padding:3px 0;align-items:baseline}
+.cjr-rec-l{display:grid;grid-template-columns:1fr auto 260px;gap:10px;padding:3px 0;align-items:baseline}
 .cjr-rec-l b,.cjr-rec-l small{text-align:right;font-variant-numeric:tabular-nums}.cjr-rec-l small{color:var(--muted)}
 .cjr-rec-l.neg{color:var(--red)}
 .cjr-rec-l.tot{border-top:1px solid var(--border);margin-top:4px;padding-top:6px;font-size:14.5px}
@@ -16704,25 +16704,37 @@ async function loadCarburantRapport(){
   }
 }
 
+// Carburant d'un produit : Gazoline 1 / 2 → Gazoline, Diesel 1 / 2 → Diesel.
+// Les gallons d'essence et de diesel ne s'additionnent jamais.
+function _cjrFam(n){ return /gaz|essence/i.test(n||'') ? 'Gazoline' : (/diesel/i.test(n||'') ? 'Diesel' : (n||'Autre')); }
+const _cjrRangFam = n => n==='Gazoline' ? 0 : (n==='Diesel' ? 1 : 2);
+// {Gazoline: g, Diesel: g} → « Gazoline 1 909,706 gal · Diesel 562,480 gal »
+function cjrGalF(o, sep){
+  const l = Object.entries(o||{}).filter(([,g])=>Math.abs(g)>0.00001).sort((a,b)=>_cjrRangFam(a[0])-_cjrRangFam(b[0]));
+  if(!l.length) return cjrGal(0);
+  return l.map(([n,g])=>`${esc(n)} ${cjrGal(g)}`).join(sep ?? ' · ');
+}
+const _cjrAjF = (o, k, g) => { o[k] = (o[k]||0) + g; return o; };
+
 // Construit les données affichées à partir des jours chargés et des filtres
 function _cjrConstruire(){
   const val=id=>document.getElementById(id)?.value||'';
   const fProd=val('cjr-produit'), fPer=val('cjr-periode'), fType=val('cjr-type'), fCat=val('cjr-cat'), fBen=val('cjr-benef');
   const filtreDepenses = !!(fCat||fBen||fType);
-  // ventes[periode][produit] = {g, m}
-  const ventes={'Matin':{}, 'Apres-midi':{}};
+  // ventes[carburant] = {g, m} : Gazoline et Diesel, toutes périodes confondues
+  const ventes={};
   const jours=[], depenses=[];
-  let tg=0, tm=0, tdc=0, tdt=0;
+  const tg={}; let tm=0, tdc=0, tdt=0;
   for(const d of _cjrJours){
-    let jg=0, jm=0, jdc=0, jdt=0;
+    const jg={}; let jm=0, jdc=0, jdt=0;
     for(const pe of (d.entrees.par_periode||[])){
       if(fPer && pe.periode!==fPer) continue;
-      if(!ventes[pe.periode]) continue;
       for(const p of (pe.par_produit||[])){
         if(fProd && fProd!==p.produit) continue;
-        const e=ventes[pe.periode][p.produit] ||= {g:0, m:0};
+        const f=_cjrFam(p.produit);
+        const e=ventes[f] ||= {g:0, m:0};
         e.g+=p.gallons; e.m+=p.montant;
-        jg+=p.gallons; jm+=p.montant;
+        _cjrAjF(jg, f, p.gallons); _cjrAjF(tg, f, p.gallons); jm+=p.montant;
       }
     }
     for(const x of (d.depenses.liste||[])){
@@ -16737,20 +16749,14 @@ function _cjrConstruire(){
       if(x.est_transfert) jdt+=x.montant; else jdc+=x.montant;
     }
     jours.push({date:d.date, gallons:jg, ventes:jm, charges:jdc, transferts:jdt, solde:jm-jdc-jdt});
-    tg+=jg; tm+=jm; tdc+=jdc; tdt+=jdt;
+    tm+=jm; tdc+=jdc; tdt+=jdt;
   }
-  // Une section par période, dans l'ordre Matin puis Après-midi
-  const sections=_CJR_PERIODES.filter(([k])=>!fPer||fPer===k).map(([k,lib])=>{
-    const lignes=Object.entries(ventes[k]).map(([nom,e])=>({nom, g:e.g, m:e.m, prix:e.g>0?e.m/e.g:0}))
-      .sort((a,b)=>b.m-a.m);
-    const g=lignes.reduce((s,l)=>s+l.g,0), m=lignes.reduce((s,l)=>s+l.m,0);
-    return {cle:k, libelle:lib, lignes, g, m, prix:g>0?m/g:0};
-  });
-  const sec=k=>sections.find(s=>s.cle===k)||{g:0,m:0};
-  const lib=(v,tous,dict)=>!v?tous:(dict&&dict[v])||v;
+  // Une ligne par carburant : Gazoline puis Diesel (Gazoline 1 et 2 réunies, etc.)
+  const familles=Object.entries(ventes).map(([nom,e])=>({nom, g:e.g, m:e.m, prix:e.g>0?e.m/e.g:0}))
+    .sort((a,b)=>_cjrRangFam(a.nom)-_cjrRangFam(b.nom));
   return {
     debut:_cjrJours[0]?.date, fin:_cjrJours[_cjrJours.length-1]?.date, unJour:_cjrJours.length===1,
-    jours, sections, matin:sec('Matin'), am:sec('Apres-midi'), depenses, filtreDepenses,
+    jours, familles, depenses, filtreDepenses,
     totaux:{gallons:tg, ventes:tm, charges:tdc, transferts:tdt, depenses:tdc+tdt, solde:tm-tdc-tdt},
     filtres:{
       liste:[
@@ -16770,26 +16776,29 @@ const _CJR_TYPES = {recul_compteur:'Recul compteur', saut_compteur:'Saut compteu
 function cjrBasculerNC(v){ _cjrSansNC = !!v; loadCarburantRapport(); }
 // Du total des relevés aux ventes comptées : même règle que le Journal Meters
 function _cjrReconciliationHtml(){
-  const som = k => _cjrJours.reduce((a,d)=>{ const x=((d.reconciliation||{})[k])||{}; a.nb+=x.nb||0; a.g+=x.gallons||0; a.m+=x.montant||0; return a; }, {nb:0,g:0,m:0});
+  const som = k => _cjrJours.reduce((a,d)=>{ const x=((d.reconciliation||{})[k])||{}; a.nb+=x.nb||0; a.m+=x.montant||0;
+    for(const [f,g] of Object.entries(x.gallons_par_carburant||{})) _cjrAjF(a.g, f, g); return a; }, {nb:0,g:{},m:0});
   const rel = som('releves'), sauts = som('sauts_exclus'), autres = som('autres_exclus'), att = som('en_attente');
-  const compte = rel.m - sauts.m - autres.m, compteG = rel.g - sauts.g - autres.g;
-  const ligne = (lib, x, signe, cls='') => `<div class="cjr-rec-l ${cls}"><span>${lib}</span><b>${signe}${cjrG(x.m)}</b><small>${signe}${cjrGal(x.g)}</small></div>`;
+  const compteG = {...rel.g};
+  for(const x of [sauts, autres]) for(const [f,g] of Object.entries(x.g)) _cjrAjF(compteG, f, -g);
+  const compte = rel.m - sauts.m - autres.m;
+  const ligne = (lib, x, signe, cls='') => `<div class="cjr-rec-l ${cls}"><span>${lib}</span><b>${signe}${cjrG(x.m)}</b><small>${signe}${cjrGalF(x.g)}</small></div>`;
   return `<div class="cjr-rec">
     <div class="cjr-rec-t">D’où vient le total des ventes <small>— même calcul que le Journal Meters</small></div>
     ${ligne(`Relevés de compteur (${rel.nb})`, rel, '')}
     ${sauts.nb ? ligne(`Sauts de compteur non résolus (${sauts.nb}) — non comptés, comme au Journal Meters`, sauts, '− ', 'neg') : ''}
     ${autres.nb ? ligne(`Autres relevés non certifiés (${autres.nb}) — exclus par la case ci-dessous`, autres, '− ', 'neg') : ''}
     ${ligne('= Ventes comptées', {m:compte, g:compteG}, '', 'tot')}
-    ${att.nb ? `<div class="cjr-rec-att">⏳ <b>${att.nb} mètre${att.nb>1?'s':''} en attente de validation : ${cjrG(att.m)} (${cjrGal(att.g)})</b> — rapports pompistes pas encore finalisés : ni ici, ni au Journal Meters tant que la direction ne les a pas confirmés.</div>` : ''}
+    ${att.nb ? `<div class="cjr-rec-att">⏳ <b>${att.nb} mètre${att.nb>1?'s':''} en attente de validation : ${cjrG(att.m)} (${cjrGalF(att.g)})</b> — rapports pompistes pas encore finalisés : ni ici, ni au Journal Meters tant que la direction ne les a pas confirmés.</div>` : ''}
   </div>`;
 }
 function _cjrNonCertifiesHtml(){
   const L = _cjrJours.flatMap(d => ((d.non_certifies||{}).lignes||[]).map(x => ({...x, date:d.date})));
   if(!L.length) return _cjrReconciliationHtml() + `<div class="cjr-nc cjr-nc-ok">✓ Tous les relevés de la sélection sont certifiés (mêmes contrôles que le Journal Meters).</div>`;
-  const mt = L.reduce((a,x)=>a+x.montant,0), gal = L.reduce((a,x)=>a+x.gallons,0), err = L.filter(x=>x.statut==='erreur').length;
+  const mt = L.reduce((a,x)=>a+x.montant,0), gal = L.reduce((a,x)=>_cjrAjF(a,_cjrFam(x.produit),x.gallons),{}), err = L.filter(x=>x.statut==='erreur').length;
   const unJour = _cjrJours.length === 1, autres = L.filter(x=>!x.exclu_journal).length;
   return _cjrReconciliationHtml() + `<div class="cjr-nc ${err?'cjr-nc-err':''}">
-    <div class="cjr-nc-tete"><b>⚠ ${L.length} relevé${L.length>1?'s':''} non certifié${L.length>1?'s':''}${err?` · dont ${err} en erreur`:''} : ${cjrGal(gal)} · ${cjrG(mt)}</b>
+    <div class="cjr-nc-tete"><b>⚠ ${L.length} relevé${L.length>1?'s':''} non certifié${L.length>1?'s':''}${err?` · dont ${err} en erreur`:''} : ${cjrGalF(gal)} · ${cjrG(mt)}</b>
       <span>Colonne « Compté » : ce qui entre dans les ventes. Corrigez-les dans le Journal Meters.</span>
       ${autres ? `<label class="cjr-nc-bas"><input type="checkbox" ${_cjrSansNC?'checked':''} onchange="cjrBasculerNC(this.checked)"> Exclure aussi les autres non certifiés (reculs, erreurs…)</label>` : ''}</div>
     <div class="tbl-wrap"><table class="dt cjr-table"><thead><tr>${unJour?'':'<th>Date</th>'}<th>Période</th><th>Mètre</th><th>Problème</th><th>Pompiste</th><th class="tr">Index</th><th class="tr">Gallons</th><th class="tr">Montant</th><th>Compté</th></tr></thead>
@@ -16815,43 +16824,21 @@ const _CJR_ICONES = {
 const _CJR_HORAIRES = {'Matin':'1re période de la journée', 'Apres-midi':'2e période de la journée'};
 
 function _cjrTableVentesHtml(m, impression){
-  const t=m.totaux;
-  const blocs=m.sections.map(s=>{
-    const lignes = s.lignes.length
-      ? s.lignes.map(l=>`<tr><td>${esc(l.nom)}</td><td class="${impression?'r':'tr num'}">${cjrGal(l.g)}</td><td class="${impression?'r':'tr num'}">${cjrPx(l.prix)}</td><td class="${impression?'r':'tr num'}">${cjrG(l.m)}</td></tr>`).join('')
-      : `<tr class="cjr-per-vide"><td colspan="4">Aucune vente sur cette période</td></tr>`;
-    const cle = s.cle==='Matin' ? 'matin' : 'am';
-    if(impression){
-      return `<div class="pv pv-${cle}">
-        <div class="pv-tete"><span class="pv-nom">${s.libelle.toUpperCase()}</span><span class="pv-res">${cjrGal(s.g)} · <b>${cjrG(s.m)}</b></span></div>
-        <table><thead><tr><th>Produit</th><th class="r">Gallons</th><th class="r">Prix moyen / gal</th><th class="r">Montant</th></tr></thead>
-        <tbody>${lignes}<tr class="pv-sous"><td>Sous-total ${s.libelle}</td><td class="r">${cjrGal(s.g)}</td><td class="r">${cjrPx(s.prix)}</td><td class="r">${cjrG(s.m)}</td></tr></tbody></table>
-      </div>`;
-    }
-    return `<div class="cjr-per cjr-per-${cle}">
-      <div class="cjr-per-tete">
-        <span class="cjr-per-ico">${_CJR_ICONES[s.cle]||''}</span>
-        <span class="cjr-per-nom">${s.libelle}<small>${_CJR_HORAIRES[s.cle]||''}</small></span>
-        <span class="cjr-per-res"><span class="num">${cjrGal(s.g)}</span><strong class="num">${cjrG(s.m)}</strong></span>
-      </div>
-      <div class="tbl-wrap"><table class="dt cjr-table">
-        <colgroup><col class="c-prod"><col class="c-num"><col class="c-num"><col class="c-num"></colgroup>
-        <thead><tr><th>Produit</th><th class="tr">Gallons</th><th class="tr">Prix moyen / gal</th><th class="tr">Montant</th></tr></thead>
-        <tbody>${lignes}</tbody>
-        <tfoot><tr class="cjr-per-sous"><td>Sous-total ${s.libelle}</td><td class="tr num">${cjrGal(s.g)}</td><td class="tr num">${cjrPx(s.prix)}</td><td class="tr num">${cjrG(s.m)}</td></tr></tfoot>
-      </table></div>
-    </div>`;
-  }).join('');
-  if(m.sections.length<2) return blocs;
-  const libTot = m.unJour ? 'Total de la journée' : 'Total de la période';
-  const detail = m.sections.map(s=>`${s.libelle} ${cjrG(s.m)}`).join(' + ');
+  const t=m.totaux, c = impression ? 'r' : 'tr num';
+  const lignes = m.familles.length
+    ? m.familles.map(l=>`<tr><td><b>${esc(l.nom)}</b></td><td class="${c}">${cjrGal(l.g)}</td><td class="${c}">${cjrPx(l.prix)}</td><td class="${c}">${cjrG(l.m)}</td></tr>`).join('')
+    : `<tr class="cjr-per-vide"><td colspan="4">Aucune vente sur cette sélection</td></tr>`;
+  const libTot = m.unJour ? 'Total des ventes de la journée' : 'Total des ventes de la période';
   if(impression){
-    return blocs + `<div class="pv-total"><span>${libTot.toUpperCase()}</span><span class="pv-total-det">${detail}</span><span>${cjrGal(t.gallons)} · <b>${cjrG(t.ventes)}</b></span></div>`;
+    return `<table><thead><tr><th>Carburant</th><th class="r">Gallons</th><th class="r">Prix moyen / gal</th><th class="r">Montant</th></tr></thead>
+      <tbody>${lignes}<tr class="tot"><td colspan="3">${libTot} (gourdes)</td><td class="r">${cjrG(t.ventes)}</td></tr></tbody></table>`;
   }
-  return blocs + `<div class="cjr-per-total">
-      <span class="cjr-per-total-l">${libTot}<small>${detail}</small></span>
-      <span class="cjr-per-res"><span class="num">${cjrGal(t.gallons)}</span><strong class="num">${cjrG(t.ventes)}</strong></span>
-    </div>`;
+  return `<div class="tbl-wrap"><table class="dt cjr-table">
+      <colgroup><col class="c-prod"><col class="c-num"><col class="c-num"><col class="c-num"></colgroup>
+      <thead><tr><th>Carburant</th><th class="tr">Gallons</th><th class="tr">Prix moyen / gal</th><th class="tr">Montant</th></tr></thead>
+      <tbody>${lignes}</tbody>
+      <tfoot><tr class="cjr-per-sous"><td colspan="3">${libTot} (gourdes) — les gallons restent séparés par carburant</td><td class="tr num">${cjrG(t.ventes)}</td></tr></tfoot>
+    </table></div>`;
 }
 
 function cjrAfficher(){
@@ -16890,15 +16877,15 @@ function cjrAfficher(){
     <div class="tbl-wrap"><table class="dt cjr-table">
       <thead><tr><th>Date</th><th class="tr">Gallons</th><th class="tr">Ventes</th><th class="tr">Charges</th><th class="tr">Transferts</th><th class="tr">Solde</th></tr></thead>
       <tbody>${m.jours.map(j=>`<tr${(j.ventes===0&&j.charges===0&&j.transferts===0)?' class="cjr-vide"':''}>
-        <td class="num">${frDate(j.date)}</td><td class="tr num">${cjrGal(j.gallons)}</td><td class="tr num c-teal">${cjrG(j.ventes)}</td>
+        <td class="num">${frDate(j.date)}</td><td class="tr num">${cjrGalF(j.gallons,'<br>')}</td><td class="tr num c-teal">${cjrG(j.ventes)}</td>
         <td class="tr num">${cjrG(j.charges)}</td><td class="tr num">${cjrG(j.transferts)}</td>
         <td class="tr num" style="color:${j.solde>=0?'var(--green)':'var(--red)'}"><strong>${cjrG(j.solde)}</strong></td></tr>`).join('')}</tbody>
-      <tfoot><tr class="recap-total"><td>TOTAL</td><td class="tr num">${cjrGal(t.gallons)}</td><td class="tr num c-teal">${cjrG(t.ventes)}</td>
+      <tfoot><tr class="recap-total"><td>TOTAL</td><td class="tr num">${cjrGalF(t.gallons,'<br>')}</td><td class="tr num c-teal">${cjrG(t.ventes)}</td>
         <td class="tr num">${cjrG(t.charges)}</td><td class="tr num">${cjrG(t.transferts)}</td>
         <td class="tr num" style="color:${soldeCol}">${cjrG(t.solde)}</td></tr></tfoot>
     </table></div>`;
 
-  const parPeriode = m.sections.map(s=>`${s.libelle} ${cjrG(s.m)}`).join('<br>');
+  const parCarb = m.familles.map(f=>`${esc(f.nom)} ${cjrGal(f.g)} · ${cjrG(f.m)}`).join('<br>');
   body.innerHTML = `
     ${filtres}
     ${_cjrNonCertifiesHtml()}
@@ -16906,7 +16893,7 @@ function cjrAfficher(){
       <div class="cjr-kpi">
         <div class="cjr-kpi-l">Ventes</div>
         <div class="cjr-kpi-v" style="color:var(--green)">${cjrG(t.ventes)}</div>
-        <div class="cjr-kpi-s">${cjrGal(t.gallons)} vendus<br>${parPeriode}</div>
+        <div class="cjr-kpi-s">${parCarb || cjrGal(0)}</div>
       </div>
       <div class="cjr-kpi">
         <div class="cjr-kpi-l">Dépenses</div>
@@ -16922,7 +16909,7 @@ function cjrAfficher(){
     ${tableJours}
     <h3 class="cjr-h">Ventes de carburant</h3>
     <div class="cjr-note">Source : relevés de compteurs.</div>
-    <div class="cjr-periodes">${_cjrTableVentesHtml(m,false)}</div>
+    ${_cjrTableVentesHtml(m,false)}
     <h3 class="cjr-h">Dépenses</h3>
     <div class="cjr-note">« Caisse principale » = dépense non attribuée à un produit. Les transferts (dépôt en banque, Zelle) sortent de la caisse mais ne sont pas des charges.</div>
     ${tableDep}`;
@@ -16947,9 +16934,7 @@ function cjrImprimer(){
 
   // Entrées : un total par carburant (toutes périodes confondues)
   const prod={};
-  for(const sct of m.sections) for(const l of sct.lignes){
-    const x=prod[l.nom] ||= {g:0, m:0}; x.g+=l.g; x.m+=l.m;
-  }
+  for(const l of m.familles){ const x=prod[l.nom] ||= {g:0, m:0}; x.g+=l.g; x.m+=l.m; }
   // Ordre du formulaire : Gazoline (Essence), puis Diesel, puis les autres
   const rang=n=>/gaz|essence/i.test(n)?0:(/diesel/i.test(n)?1:2);
   const entrees=Object.entries(prod).map(([n,x])=>({n, g:x.g, m:x.m, px:x.g>0?x.m/x.g:0}))
@@ -17030,7 +17015,7 @@ function cjrImprimer(){
   w.document.write(html); w.document.close();
 }
 
-// Version détaillée (indicateurs, Matin / Après-midi, jour par jour)
+// Version détaillée (indicateurs, ventes par carburant, jour par jour)
 function cjrImprimerDetaille(){
   if(!_cjrModele){ toast('Chargez d\'abord le rapport.','inf'); return; }
   const m=_cjrModele, t=m.totaux;
@@ -17044,9 +17029,9 @@ function cjrImprimerDetaille(){
     || `<tr><td colspan="${ncD+1}" class="c muted">Aucune dépense</td></tr>`;
   const jours = m.unJour ? '' : `<h2>Jour par jour</h2><table>
       <thead><tr><th>Date</th><th class="r">Gallons</th><th class="r">Ventes</th><th class="r">Charges</th><th class="r">Transferts</th><th class="r">Solde</th></tr></thead>
-      <tbody>${m.jours.map(j=>`<tr><td class="nw">${frDate(j.date)}</td><td class="r nw">${cjrGal(j.gallons)}</td><td class="r nw">${cjrG(j.ventes)}</td><td class="r nw">${cjrG(j.charges)}</td><td class="r nw">${cjrG(j.transferts)}</td><td class="r b nw">${cjrG(j.solde)}</td></tr>`).join('')}
-      <tr class="tot"><td>TOTAL</td><td class="r nw">${cjrGal(t.gallons)}</td><td class="r nw">${cjrG(t.ventes)}</td><td class="r nw">${cjrG(t.charges)}</td><td class="r nw">${cjrG(t.transferts)}</td><td class="r nw">${cjrG(t.solde)}</td></tr></tbody></table>`;
-  const parPeriode = m.sections.map(s=>`${s.libelle} : ${cjrG(s.m)}`).join('<br>');
+      <tbody>${m.jours.map(j=>`<tr><td class="nw">${frDate(j.date)}</td><td class="r nw">${cjrGalF(j.gallons,'<br>')}</td><td class="r nw">${cjrG(j.ventes)}</td><td class="r nw">${cjrG(j.charges)}</td><td class="r nw">${cjrG(j.transferts)}</td><td class="r b nw">${cjrG(j.solde)}</td></tr>`).join('')}
+      <tr class="tot"><td>TOTAL</td><td class="r nw">${cjrGalF(t.gallons,'<br>')}</td><td class="r nw">${cjrG(t.ventes)}</td><td class="r nw">${cjrG(t.charges)}</td><td class="r nw">${cjrG(t.transferts)}</td><td class="r nw">${cjrG(t.solde)}</td></tr></tbody></table>`;
+  const parCarb = m.familles.map(f=>`${e(f.nom)} : ${cjrGal(f.g)} · ${cjrG(f.m)}`).join('<br>');
   const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Rapport caisse carburant ${m.debut}${m.unJour?'':' — '+m.fin}</title><style>
     *{margin:0;padding:0;box-sizing:border-box}
     @page{size:A4 portrait;margin:12mm 12mm 14mm}
@@ -17095,7 +17080,7 @@ function cjrImprimerDetaille(){
     </div>
     ${m.filtres.liste.length?`<div class="filtres">Filtres : ${m.filtres.liste.map(e).join(' · ')}</div>`:''}
     <div class="kpis">
-      <div class="kpi"><div class="l">Ventes</div><div class="v ok">${cjrG(t.ventes)}</div><div class="s">${cjrGal(t.gallons)}<br>${parPeriode}</div></div>
+      <div class="kpi"><div class="l">Ventes</div><div class="v ok">${cjrG(t.ventes)}</div><div class="s">${parCarb || cjrGal(0)}</div></div>
       <div class="kpi"><div class="l">Dépenses</div><div class="v dep">${cjrG(t.depenses)}</div><div class="s">${m.depenses.length} dépense(s)${t.transferts?`<br>dont transferts ${cjrG(t.transferts)}`:''}</div></div>
       <div class="kpi"><div class="l">Solde (ventes − dépenses)</div><div class="v ${t.solde>=0?'ok':'neg'}">${cjrG(t.solde)}</div></div>
     </div>
@@ -17849,26 +17834,26 @@ function renderJournal(data){
       <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${resume.nb_en_attente} mètre${resume.nb_en_attente>1?'s':''} · ${fmtGX(resume.montant_en_attente)} — non compté tant que la direction n'a pas finalisé</div>
     </div>`:''}
     <div class="jres-card c-teal">
-      <div class="jres-lbl">Gallons par produit (hors sauts)</div>
-      <div class="jres-num c-teal">${galParProduit((resume.par_produit||[]).map(pp=>[pp.produit, pp.gallons]))}</div>
+      <div class="jres-lbl">Gallons par carburant (hors sauts)</div>
+      <div class="jres-num c-teal">${galParProduit((resume.par_famille||resume.par_produit||[]).map(pp=>[pp.famille||pp.produit, pp.gallons]))}</div>
       ${resume.nb_sauts_compteur?`<div style="font-size:11.5px;color:var(--muted);margin-top:2px">${resume.nb_sauts_compteur} saut${resume.nb_sauts_compteur>1?'s':''} de compteur exclu${resume.nb_sauts_compteur>1?'s':''}</div>`:''}
     </div>
   </div>
   ${(resume.par_produit&&resume.par_produit.length)?`
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:14px">
-    <div class="galrecap-title" style="margin:0">Gallons vendus par produit</div>
+    <div class="galrecap-title" style="margin:0">Gallons vendus par carburant</div>
     <button class="btn btn-secondary btn-sm" style="font-size:12.5px" onclick="ouvrirFicheSynthese(document.getElementById('jf-debut').value,document.getElementById('jf-fin').value)">
       <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
       Fiche de synthèse
     </button>
   </div>
   <div class="galrecap" style="margin-top:8px">
-    ${resume.par_produit.map(pp=>`<div class="galrecap-card">
-      <div class="grc-lbl">${esc(pp.produit)}</div>
+    ${(resume.par_famille||resume.par_produit).map(pp=>`<div class="galrecap-card">
+      <div class="grc-lbl">${esc(pp.famille||pp.produit)}</div>
       <div class="grc-gal">${fmtGalX(pp.gallons)}</div>
       <div class="grc-mnt">${fmtGX(pp.montant)} · ${pp.nb_releves} relevé${pp.nb_releves>1?'s':''}</div>
     </div>`).join('')}
-    ${resume.par_produit.length>1?`<div class="galrecap-card grc-total">
+    ${(resume.par_famille||resume.par_produit).length>1?`<div class="galrecap-card grc-total">
       <div class="grc-lbl">Total des ventes (gourdes)</div>
       <div class="grc-gal">${fmtGX(resume.par_produit.reduce((s,p)=>s+p.montant,0))}</div>
       <div class="grc-mnt">Les gallons restent séparés par produit</div>
@@ -17966,8 +17951,13 @@ function renderJournal(data){
   }
 
   // Les rapports pompistes pas encore finalisés sont affichés mais jamais totalisés
-  const valides     = entries.filter(e=>!e.en_attente), attente = entries.filter(e=>e.en_attente);
-  const totalQte    = valides.reduce((s,e)=>s+(e.quantite||0),0);
+  // Même règle que le récapitulatif et le Rapport journalier : un saut de
+  // compteur non résolu n'est pas compté ; gallons séparés par carburant.
+  const _exclu = e => e.type_anomalie==='saut_compteur' && e.statut!=='resolu';
+  const tous_v      = entries.filter(e=>!e.en_attente), attente = entries.filter(e=>e.en_attente);
+  const valides     = tous_v.filter(e=>!_exclu(e)), sautsNC = tous_v.filter(_exclu);
+  const _galF = L => galParProduit(Object.entries(L.reduce((o,e)=>{ const f=_cjrFam(e.produit_nom); o[f]=(o[f]||0)+(e.quantite||0); return o; },{}))
+                      .sort((a,b)=>_cjrRangFam(a[0])-_cjrRangFam(b[0])), '<br>');
   const totalMontant= valides.reduce((s,e)=>s+(e.montant_vente||0),0);
 
   const rows=entries.map(e=>{
@@ -18046,19 +18036,24 @@ function renderJournal(data){
         <tfoot>
           <tr style="background:var(--panel3);border-top:2px solid var(--border2)">
             <td colspan="8" style="padding:10px 14px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">
-              Total validé &mdash; ${valides.length} relevé${valides.length>1?'s':''}
+              Total compté &mdash; ${valides.length} relevé${valides.length>1?'s':''}
             </td>
-            <td class="tr num c-teal" style="padding:10px 14px;font-size:16px;font-weight:900">
-              ${fmtGal(totalQte)}
+            <td class="tr num c-teal" style="padding:10px 14px;font-size:14px;font-weight:900;white-space:nowrap">
+              ${_galF(valides)}
             </td>
             <td class="tr num c-amber" style="padding:10px 14px;font-size:16px;font-weight:900">
               ${fmtG(totalMontant)}
             </td>
             <td colspan="2"></td>
           </tr>
+          ${sautsNC.length?`<tr><td colspan="8" style="padding:8px 14px;font-size:12.5px;color:var(--red)">
+              Sauts de compteur non résolus (non comptés) &mdash; ${sautsNC.length} relevé${sautsNC.length>1?'s':''} : résolvez l’écart pour les compter</td>
+            <td class="tr num" style="padding:8px 14px;color:var(--red);white-space:nowrap">${_galF(sautsNC)}</td>
+            <td class="tr num" style="padding:8px 14px;color:var(--red)">${fmtG(sautsNC.reduce((s,e)=>s+(e.montant_vente||0),0))}</td>
+            <td colspan="2"></td></tr>`:''}
           ${attente.length?`<tr class="jr-attente-pied"><td colspan="8" style="padding:8px 14px;font-size:12.5px;color:var(--orange)">
               ⏳ En attente de validation (non compté) &mdash; ${attente.length} mètre${attente.length>1?'s':''} de rapports pompistes</td>
-            <td class="tr num" style="padding:8px 14px;color:var(--orange)">${fmtGal(attente.reduce((s,e)=>s+(e.quantite||0),0))}</td>
+            <td class="tr num" style="padding:8px 14px;color:var(--orange);white-space:nowrap">${_galF(attente)}</td>
             <td class="tr num" style="padding:8px 14px;color:var(--orange)">${fmtG(attente.reduce((s,e)=>s+(e.montant_vente||0),0))}</td>
             <td colspan="2"></td></tr>`:''}
         </tfoot>

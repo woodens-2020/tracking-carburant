@@ -4093,6 +4093,26 @@ def rouvrir_ecart_metter(releve_id: int, request: Request, db: Session = Depends
     return {"releve_id": releve_id, "statut": "rouvert"}
 
 
+def _famille_carburant(nom: Optional[str]) -> str:
+    """Gazoline 1 / Gazoline 2 → « Gazoline » ; Diesel 1 / Diesel 2 → « Diesel ».
+    Les gallons d'essence et de diesel ne s'additionnent jamais."""
+    n = (nom or "").lower()
+    if "gaz" in n or "essence" in n:
+        return "Gazoline"
+    if "diesel" in n:
+        return "Diesel"
+    return nom or "Inconnu"
+
+
+def _gallons_par_famille(lignes) -> dict:
+    """{famille: gallons} à partir de lignes {"produit", "gallons"}."""
+    out: dict = {}
+    for x in lignes:
+        f = _famille_carburant(x["produit"])
+        out[f] = round(out.get(f, 0.0) + x["gallons"], 4)
+    return out
+
+
 def _exclu_du_total(e: dict) -> bool:
     """Règle unique des ventes comptées (Journal Meters ET Rapport journalier) :
     un saut de compteur non résolu n'est pas compté ; tout le reste l'est."""
@@ -4155,6 +4175,13 @@ def journal_endpoint(
          for k, v in _pp.items()),
         key=lambda x: x["gallons"], reverse=True,
     )
+    _pf: dict = {}
+    for x in par_produit:
+        f = _pf.setdefault(_famille_carburant(x["produit"]), {"gallons": 0.0, "montant": 0.0, "nb_releves": 0})
+        f["gallons"] += x["gallons"]; f["montant"] += x["montant"]; f["nb_releves"] += x["nb_releves"]
+    par_famille = [{"famille": k, "gallons": round(v["gallons"], 4), "montant": round(v["montant"], 2),
+                    "nb_releves": v["nb_releves"]}
+                   for k, v in sorted(_pf.items(), key=lambda kv: ({"Gazoline": 0, "Diesel": 1}.get(kv[0], 2), kv[0]))]
 
     return {
         "date_debut": str(d_debut),
@@ -4173,6 +4200,7 @@ def journal_endpoint(
             "nb_sauts_compteur": nb_sauts,
             "total_gallons":     total_gallons,
             "par_produit":       par_produit,
+            "par_famille":       par_famille,
         },
     }
 
@@ -4327,9 +4355,11 @@ def carburant_rapport_jour(
     for x in a_verifier:
         x["compte"] = not (x["exclu_journal"] or sans_non_certifies)
     somme = lambda L: {"nb": len(L), "gallons": round(sum(x["gallons"] for x in L), 4),
-                       "montant": round(sum(x["montant"] for x in L), 2)}
+                       "montant": round(sum(x["montant"] for x in L), 2),
+                       "gallons_par_carburant": _gallons_par_famille(L)}
     brut = [{"gallons": float(r.metter_apres) - float(r.metter_avant),
-             "montant": (float(r.metter_apres) - float(r.metter_avant)) * float(r.prix_gallon)}
+             "montant": (float(r.metter_apres) - float(r.metter_avant)) * float(r.prix_gallon),
+             "produit": produits.get(r.pompe.produit_id, "Inconnu")}
             for r in rel_jour if float(r.metter_apres) >= float(r.metter_avant)]
     reconciliation = {
         "releves": somme(brut),
@@ -4337,7 +4367,9 @@ def carburant_rapport_jour(
         "autres_exclus": somme([x for x in a_verifier if not x["exclu_journal"] and sans_non_certifies]),
         "en_attente": {"nb": len(en_attente_j),
                        "gallons": round(sum(e["quantite"] for e in en_attente_j), 4),
-                       "montant": round(sum(e["montant_vente"] for e in en_attente_j), 2)},
+                       "montant": round(sum(e["montant_vente"] for e in en_attente_j), 2),
+                       "gallons_par_carburant": _gallons_par_famille(
+                           [{"produit": e["produit_nom"], "gallons": e["quantite"]} for e in en_attente_j])},
     }
     exclus = {x["releve_id"] for x in a_verifier if not x["compte"]}
     rel_jour = [r for r in rel_jour if r.id not in exclus]

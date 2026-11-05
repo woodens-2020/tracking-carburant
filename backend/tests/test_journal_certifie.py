@@ -61,3 +61,25 @@ def test_rapport_jour_signale_non_certifies(client):
     sans = client.get("/api/carburant/rapport-jour?date=2025-06-16&sans_non_certifies=true", headers=H).json()
     assert sans["sans_non_certifies"] is True and sans["entrees"]["total"] == 10000
     assert sans["reconciliation"]["autres_exclus"]["montant"] == 5000
+
+
+def test_gallons_par_carburant_jamais_melanges(client):
+    """Gazoline 1 et 2 sont réunies, Diesel 1 et 2 aussi ; essence et diesel
+    ne s'additionnent jamais en gallons (journal et rapport du jour)."""
+    ns = time.time_ns()
+    pompes = {}
+    for nom, prix in ((f"Gazoline 1 T{ns}", 500), (f"Gazoline 2 T{ns}", 600), (f"Diesel 1 T{ns}", 700)):
+        pid = client.post("/api/produits", headers=H, json={"nom": nom, "prix_gallon": prix}).json()["id"]
+        pompes[nom] = (client.post(f"/api/produits/{pid}/pompes", headers=H, json={"nom": f"P {nom}"}).json()["id"], prix)
+    for (pm, prix), (av, ap) in zip(pompes.values(), ((0, 10), (0, 20), (0, 5))):
+        r = client.post("/api/releves", headers=H, json={"date": "2025-03-10", "periode": "Matin", "pompe_id": pm,
+                                                         "prix_gallon": prix, "metter_avant": av, "metter_apres": ap})
+        assert r.status_code in (200, 201), r.text
+    j = client.get("/api/journal?date_debut=2025-03-10&date_fin=2025-03-10", headers=H).json()
+    fam = {x["famille"]: x for x in j["resume"]["par_famille"]}
+    assert set(fam) == {"Gazoline", "Diesel"}
+    assert fam["Gazoline"]["gallons"] == 30 and fam["Gazoline"]["montant"] == 10 * 500 + 20 * 600
+    assert fam["Diesel"]["gallons"] == 5
+    rj = client.get("/api/carburant/rapport-jour?date=2025-03-10", headers=H).json()
+    assert rj["reconciliation"]["releves"]["gallons_par_carburant"] == {"Gazoline": 30, "Diesel": 5}
+    assert rj["entrees"]["total"] == 5000 + 12000 + 3500
