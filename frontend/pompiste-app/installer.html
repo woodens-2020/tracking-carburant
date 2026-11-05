@@ -30,6 +30,13 @@ ol{padding-left:22px;margin:8px 0 0} li{margin-bottom:10px}
 .qr img{width:200px;height:200px;border-radius:12px;background:#fff;padding:8px}
 .lien{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px;word-break:break-all;background:var(--bg);border-radius:10px;padding:8px 10px}
 .cache{display:none!important}
+.aide{background:#fff7ed;border:2px solid var(--accent);border-radius:16px;padding:16px;margin-top:14px}
+@media (prefers-color-scheme: dark){.aide{background:#2a1708}}
+.aide h2{font-size:19px;margin:0 0 8px}
+.aide ol{margin-top:4px}
+.att{display:inline-block;width:18px;height:18px;border:3px solid rgba(255,255,255,.5);border-top-color:#fff;border-radius:50%;
+  animation:tourne .8s linear infinite;vertical-align:-3px;margin-right:8px}
+@keyframes tourne{to{transform:rotate(360deg)}}
 b.k{display:inline-block;border:2px solid var(--border);border-radius:8px;padding:0 8px;font-size:16px}
 </style>
 </head>
@@ -46,6 +53,7 @@ b.k{display:inline-block;border:2px solid var(--border);border-radius:8px;paddin
     <button class="btn" id="btn-installer" onclick="installer()">📲 Enstale aplikasyon an</button>
     <a class="btn sec" href="/pompiste">Louvri l san enstale · Ouvrir sans installer</a>
     <p class="fr" id="msg-btn" style="margin:12px 0 0">Si bouton « Enstale » la pa mache, swiv etap ki anba yo.</p>
+    <div class="aide cache" id="aide"></div>
   </div>
 
   <div class="card">
@@ -76,15 +84,66 @@ b.k{display:inline-block;border:2px solid var(--border);border-radius:8px;paddin
 document.getElementById('lien').textContent = location.origin + '/pompiste/installer';
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/pompiste-sw.js', {scope: '/pompiste'}).catch(() => {});
 let invite = null;
+const $ = id => document.getElementById(id);
 const dejaInstallee = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-if(dejaInstallee()) document.getElementById('deja').classList.remove('cache');
+const montrerDeja = () => $('deja').classList.remove('cache');
+if(dejaInstallee()) montrerDeja();
+// Chrome sait dire si l'application est déjà sur l'appareil (related_applications du manifest)
+if(navigator.getInstalledRelatedApps) navigator.getInstalledRelatedApps().then(l => { if(l && l.length) montrerDeja(); }).catch(() => {});
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); invite = e;
-  document.getElementById('msg-btn').textContent = 'Touche bouton an pou mete ikòn nan sou ekran aparèy la.'; });
-window.addEventListener('appinstalled', () => { document.getElementById('deja').classList.remove('cache'); });
+  $('msg-btn').textContent = 'Touche bouton an pou mete ikòn nan sou ekran aparèy la.'; });
+window.addEventListener('appinstalled', () => { montrerDeja(); $('aide').classList.add('cache'); });
+
+// Navigateur de l'appareil : l'installation n'est pas la même partout
+const UA = navigator.userAgent || '';
+const NAV = /iPhone|iPad|iPod/i.test(UA) ? 'ios'
+  : /; wv\)|FBAN|FBAV|Instagram|WhatsApp|Line\/|Messenger|Snapchat/i.test(UA) ? 'integre'
+  : /SamsungBrowser/i.test(UA) ? 'samsung'
+  : /Firefox/i.test(UA) ? 'firefox'
+  : /Android/i.test(UA) ? 'chrome' : 'autre';
+const LIEN_CHROME = 'intent://' + location.host + '/pompiste/installer#Intent;scheme=https;package=com.android.chrome;end';
+const BTN_CHROME = `<a class="btn" style="margin-top:12px" href="${LIEN_CHROME}">🌐 Louvri l nan Chrome</a>`;
+
+function aide(){
+  const a = $('aide');
+  const etapes = {
+    integre: `<h2>⚠ Paj la louvri andedan yon lòt aplikasyon (WhatsApp, Facebook…)</h2>
+      <p>Enstalasyon an mache sèlman nan <b>Chrome</b>. Touche bouton anba a pou louvri paj la nan Chrome, epi touche « Enstale » ankò.</p>${BTN_CHROME}
+      <p class="fr">Page ouverte dans une autre application : ouvrez-la dans Chrome pour installer.</p>`,
+    samsung: `<h2>Samsung Internet</h2><ol>
+      <li>Touche <b class="k">≡</b> anba adwat.</li><li>Chwazi <b>« Ajoute paj nan »</b> → <b>« Ekran dakèy »</b>.</li>
+      <li>Konfime : ikòn <b>Konekta Ponpis</b> la parèt sou ekran an.</li></ol>
+      <p>Oswa louvri l nan Chrome :</p>${BTN_CHROME}`,
+    firefox: `<h2>Firefox</h2><ol><li>Touche <b class="k">⋮</b> anlè adwat.</li><li>Chwazi <b>« Enstale »</b> oswa <b>« Ajoute sou ekran dakèy »</b>.</li></ol>${BTN_CHROME}`,
+    ios: `<h2>iPhone</h2><ol><li>Ouvri paj sa a nan <b>Safari</b>.</li><li>Touche <b class="k">⬆</b> (Pataje) anba a.</li>
+      <li>Chwazi <b>« Sur l'écran d'accueil »</b>, epi <b>« Ajouter »</b>.</li></ol>`,
+    chrome: `<h2>Chrome</h2><ol><li>Touche <b class="k">⋮</b> anlè adwat ekran an.</li>
+      <li>Chwazi <b>« Enstale aplikasyon an »</b> oswa <b>« Ajoute sou ekran an »</b>.</li>
+      <li>Konfime : ikòn <b>Konekta Ponpis</b> la parèt sou ekran an.</li></ol>
+      <p class="fr">Si ou pa wè « Enstale » nan meni an, aplikasyon an ka deja enstale : chèche ikòn oranj <b>Konekta Ponpis</b> sou ekran telefòn nan.</p>`,
+    autre: `<h2>Enstale l</h2><p>Ouvri paj sa a nan <b>Chrome</b> sou telefòn Android la, epi touche « Enstale aplikasyon an ».</p>`,
+  };
+  a.innerHTML = etapes[NAV] || etapes.autre;
+  a.classList.remove('cache');
+  a.scrollIntoView({behavior: 'smooth', block: 'center'});
+}
+
 async function installer(){
-  if(invite){ invite.prompt(); const r = await invite.userChoice; invite = null;
-    if(r.outcome === 'accepted') document.getElementById('deja').classList.remove('cache'); return; }
-  document.getElementById('msg-btn').innerHTML = '<b>Swiv etap ki anba yo</b> : menu ⋮ nan Chrome → « Enstale aplikasyon an ».';
+  const btn = $('btn-installer');
+  // Chrome peut mettre quelques secondes à proposer l'installation : on l'attend
+  if(!invite && NAV !== 'integre' && NAV !== 'ios'){
+    btn.disabled = true; btn.innerHTML = '<span class="att"></span>Ap prepare…';
+    for(let i = 0; i < 12 && !invite; i++) await new Promise(r => setTimeout(r, 250));
+    btn.disabled = false; btn.innerHTML = '📲 Enstale aplikasyon an';
+  }
+  if(invite){
+    invite.prompt();
+    const r = await invite.userChoice; invite = null;
+    if(r.outcome === 'accepted'){ montrerDeja(); $('aide').classList.add('cache'); }
+    else aide();
+    return;
+  }
+  aide();
 }
 </script>
 </body>

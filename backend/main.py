@@ -2030,7 +2030,7 @@ def _url_publique_site(request: Request) -> str:
 
 
 @app.get("/pompiste/manifest.webmanifest", include_in_schema=False)
-def pompiste_manifest():
+def pompiste_manifest(request: Request):
     nom = os.getenv("BRANDING_NOM", "").strip()
     return JSONResponse({
         "id": "/pompiste",
@@ -2049,6 +2049,10 @@ def pompiste_manifest():
             {"src": "/pompiste-app/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
             {"src": "/pompiste-app/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
         ],
+        # Permet à la page d'installation de savoir si l'application est déjà sur l'appareil
+        "related_applications": [{"platform": "webapp",
+                                  "url": _url_publique_site(request) + "/pompiste/manifest.webmanifest"}],
+        "prefer_related_applications": False,
     }, media_type="application/manifest+json", headers={"Cache-Control": "no-cache"})
 
 

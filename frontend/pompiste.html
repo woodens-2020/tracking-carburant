@@ -2076,8 +2076,9 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('/pompiste-sw.
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); _inviteInstall = e; });
 window.addEventListener('appinstalled', () => { _inviteInstall = null; const b = $('btn-installer'); if(b) b.remove(); });
 async function installerApp(){
+  for(let i = 0; i < 8 && !_inviteInstall; i++) await new Promise(r => setTimeout(r, 250));
   if(_inviteInstall){ _inviteInstall.prompt(); await _inviteInstall.userChoice; _inviteInstall = null; return; }
-  location.href = '/pompiste/installer';      // instructions + QR code
+  location.href = '/pompiste/installer';      // instructions selon le navigateur + QR code
 }
 
 demarrer();
