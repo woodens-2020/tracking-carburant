@@ -32,7 +32,8 @@ def compute_stats(db: Session, date_debut: date_type, date_fin: date_type,
     if pompe_id:
         releves = [r for r in releves if r.pompe_id == pompe_id]
     if pompiste_id:
-        releves = [r for r in releves if r.pompiste_id == pompiste_id]
+        ids = set(pompiste_id) if isinstance(pompiste_id, (list, tuple, set)) else {pompiste_id}
+        releves = [r for r in releves if r.pompiste_id in ids]
 
     total_quantite = 0.0
     total_montant = 0.0

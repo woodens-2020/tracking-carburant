@@ -70,3 +70,35 @@ def test_changer_date_releve_journal(client):
         assert s.get(Releve, j3["id"]).ecart_compteur is None
     E = client.get("/api/journal?date_debut=2017-04-01&date_fin=2017-04-05", headers=H).json()["entries"]
     assert all(e["statut"] == "ok" for e in E if e["pompe_id"] == m and e["type_anomalie"] != "premiere_lecture")
+
+
+def test_filtre_plusieurs_pompistes(client):
+    """Filtre Pompiste à cases : plusieurs pompistes à la fois (journal, stats)."""
+    from datetime import date
+    from database import SessionLocal
+    from models import Employe
+    ns = time.time_ns()
+    with SessionLocal() as s:
+        emps = []
+        for k in range(3):
+            e = Employe(nom=f"Case{k}-{ns}", prenom="Pp", poste="Pompiste", date_embauche=date(2018, 1, 1),
+                        salaire_base=0, type_contrat="CDI", actif=True)
+            s.add(e); s.flush(); emps.append(e.id)
+        s.commit()
+    pompes = []
+    for k in range(3):
+        pid = client.post("/api/produits", headers=H, json={"nom": f"PP{k}-{ns}", "prix_gallon": 500}).json()["id"]
+        pompes.append(client.post(f"/api/produits/{pid}/pompes", headers=H, json={"nom": f"PP{k}"}).json()["id"])
+    for pm, emp in zip(pompes, emps):
+        r = client.post("/api/releves", headers=H, json={"date": "2018-05-05", "periode": "Matin", "pompe_id": pm,
+                                                         "prix_gallon": 500, "metter_avant": 0, "metter_apres": 10})
+        assert r.status_code in (200, 201), r.text
+        assert client.patch(f"/api/releves/{r.json()['id']}/pompiste", headers=H, json={"pompiste_id": emp}).status_code == 200
+    base = "/api/journal?date_debut=2018-05-05&date_fin=2018-05-05"
+    deux = client.get(f"{base}&pompiste_id={emps[0]}&pompiste_id={emps[2]}", headers=H).json()
+    assert sorted(e["pompe_id"] for e in deux["entries"]) == sorted([pompes[0], pompes[2]])
+    un = client.get(f"{base}&pompiste_id={emps[1]}", headers=H).json()
+    assert [e["pompe_id"] for e in un["entries"]] == [pompes[1]]
+    st = client.get(f"/api/stats?date_debut=2018-05-05&date_fin=2018-05-05&pompiste_id={emps[0]}&pompiste_id={emps[1]}", headers=H).json()
+    assert st["total_quantite"] == 20
+    assert client.get(f"/api/journal/pdf?date_debut=2018-05-05&date_fin=2018-05-05&pompiste_id={emps[0]}", headers=H).status_code == 200

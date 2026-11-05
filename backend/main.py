@@ -2236,7 +2236,7 @@ def stats_endpoint(date_debut: date_type, date_fin: date_type,
                    produit_id: Optional[int] = None,
                    pompe_id: Optional[int] = None,
                    periode: Optional[str] = None,
-                   pompiste_id: Optional[int] = None,
+                   pompiste_id: List[int] = Query(default=[]),
                    db: Session = Depends(get_db)):
     from stats import compute_stats
     return compute_stats(db, date_debut, date_fin, produit_id, periode, pompe_id, pompiste_id)
@@ -2667,7 +2667,7 @@ def serie_endpoint(
     jours: int = 7,
     produit_id: Optional[int] = None,
     periode: Optional[str] = None,
-    pompiste_id: Optional[int] = None,
+    pompiste_id: List[int] = Query(default=[]),
     db: Session = Depends(get_db),
 ):
     """
@@ -2695,7 +2695,7 @@ def serie_endpoint(
     if produit_id:
         releves = [r for r in releves if r.pompe.produit_id == produit_id]
     if pompiste_id:
-        releves = [r for r in releves if r.pompiste_id == pompiste_id]
+        releves = [r for r in releves if r.pompiste_id in set(pompiste_id)]
 
     par_date: dict = defaultdict(lambda: {"total_montant": 0.0, "total_quantite": 0.0})
     for r in releves:
@@ -2726,7 +2726,7 @@ def serie_endpoint(
     if produit_id:
         prev_releves = [r for r in prev_releves if r.pompe.produit_id == produit_id]
     if pompiste_id:
-        prev_releves = [r for r in prev_releves if r.pompiste_id == pompiste_id]
+        prev_releves = [r for r in prev_releves if r.pompiste_id in set(pompiste_id)]
     prev_total = round(sum(r.montant_vente for r in prev_releves), 2)
 
     variation_pct = None
@@ -2753,7 +2753,7 @@ def _build_journal_entries(
     produit_id: Optional[int] = None,
     pompe_id_filter: Optional[List[int]] = None,
     periode_filter: Optional[str] = None,
-    pompiste_id_filter: Optional[int] = None,
+    pompiste_id_filter=None,                  # un id ou une liste d'ids
 ) -> list:
     """
     Source unique de vérité pour la construction des entrées du journal.
@@ -2930,7 +2930,9 @@ def _build_journal_entries(
     if periode_filter:
         entries = [e for e in entries if e["periode"] == periode_filter]
     if pompiste_id_filter:
-        entries = [e for e in entries if e["pompiste_id"] == pompiste_id_filter]
+        ids = (set(pompiste_id_filter) if isinstance(pompiste_id_filter, (list, tuple, set))
+               else {pompiste_id_filter})
+        entries = [e for e in entries if e["pompiste_id"] in ids]
 
     # Affichage jour par jour : tous les relevés d'une date ensemble (Matin
     # puis Après-midi, produit, pompe) — l'analyse ci-dessus reste par pompe
@@ -3013,7 +3015,7 @@ def journal_endpoint(
     produit_id: Optional[int] = None,
     pompe_id:   List[int] = Query(default=[]),
     periode:    Optional[str] = None,
-    pompiste_id: Optional[int] = None,
+    pompiste_id: List[int] = Query(default=[]),
     certifie: Optional[str] = None,          # "oui" | "non" ; vide = tous
     db: Session = Depends(get_db),
 ):
@@ -3331,7 +3333,7 @@ def journal_pdf(
     produit_id: Optional[int] = None,
     pompe_id:   List[int] = Query(default=[]),
     periode:    Optional[str] = None,
-    pompiste_id: Optional[int] = None,
+    pompiste_id: List[int] = Query(default=[]),
     certifie: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
@@ -3555,7 +3557,7 @@ def export_releves_xlsx(
     produit_id: Optional[int] = None,
     pompe_id:   List[int] = Query(default=[]),
     periode:    Optional[str] = None,
-    pompiste_id: Optional[int] = None,
+    pompiste_id: List[int] = Query(default=[]),
     db: Session = Depends(get_db),
 ):
     import io
@@ -3575,7 +3577,7 @@ def export_releves_xlsx(
     if produit_id:  q = q.filter(Pompe.produit_id == produit_id)
     if pompe_id:    q = q.filter(Releve.pompe_id.in_(pompe_id))
     if periode:     q = q.filter(Releve.periode == periode)
-    if pompiste_id: q = q.filter(Releve.pompiste_id == pompiste_id)
+    if pompiste_id: q = q.filter(Releve.pompiste_id.in_(pompiste_id))
     releves = q.order_by(Releve.date.desc(), Releve.periode, Releve.pompe_id).all()
 
     # ── Styles helpers ─────────────────────────────────────────────────
