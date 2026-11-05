@@ -25,7 +25,8 @@ def compute_stats(db: Session, date_debut: date_type, date_fin: date_type,
     )
     if periode:
         q = q.filter(Releve.periode == periode)
-    releves = q.all()
+    import main  # import tardif : main importe ce module
+    releves = main.releves_comptes(db, q.all())
 
     if produit_id:
         releves = [r for r in releves if r.pompe.produit_id == produit_id]

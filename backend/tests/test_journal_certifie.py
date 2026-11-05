@@ -130,3 +130,31 @@ def test_changer_date_releve_journal(client):
         assert s.get(Releve, j3["id"]).ecart_compteur is None
     E = client.get("/api/journal?date_debut=2017-04-01&date_fin=2017-04-05", headers=H).json()["entries"]
     assert all(e["statut"] == "ok" for e in E if e["pompe_id"] == m and e["type_anomalie"] != "premiere_lecture")
+
+
+def test_meme_total_dans_tous_les_modules(client):
+    """Un saut de compteur non résolu n'est compté nulle part : Journal
+    Meters, Rapport journalier, Accueil / Tableau de bord (stats, série),
+    synthèse du jour et Caisse principale donnent le même total, la caisse
+    reste équilibrée et signale le saut."""
+    d = "2016-06-02"
+    pid = client.post("/api/produits", headers=H, json={"nom": f"Gazoline T{time.time_ns()}", "prix_gallon": 500}).json()["id"]
+    m = client.post(f"/api/produits/{pid}/pompes", headers=H, json={"nom": "TT1"}).json()["id"]
+    for dd, per, av, ap in (("2016-06-01", "Apres-midi", 0, 100), (d, "Matin", 100, 110), (d, "Apres-midi", 130, 140)):
+        r = client.post("/api/releves", headers=H, json={"date": dd, "periode": per, "pompe_id": m, "prix_gallon": 500,
+                                                         "metter_avant": av, "metter_apres": ap, "motif_ecart_compteur": "saut test"})
+        assert r.status_code in (200, 201), r.text
+    attendu = 10 * 500                      # le relevé en saut (130 → 140) n'est pas compté
+    j = client.get(f"/api/journal?date_debut={d}&date_fin={d}&pompe_id={m}", headers=H).json()
+    assert round(sum(x["montant"] for x in j["resume"]["par_produit"]), 2) == attendu
+    tot = lambda u, k: client.get(u, headers=H).json()[k]
+    assert tot(f"/api/stats?date_debut={d}&date_fin={d}&pompe_id={m}", "total_montant") == attendu
+    cp = client.get(f"/api/caisse-principale/journal?date_debut={d}&date_fin={d}", headers=H).json()
+    ventes = [l for l in cp["lignes"] if l["type"] == "vente_carburant" and l.get("produit_id") == pid]
+    assert round(sum(l["debit"] for l in ventes), 2) == attendu
+    ctl = {c["code"]: c for c in cp["controles"]}
+    assert ctl["equilibre"]["niveau"] == "ok"
+    assert "sauts_non_comptes" in ctl
+    rj = client.get(f"/api/carburant/rapport-jour?date={d}", headers=H).json()
+    vj = next(x for x in rj["entrees"]["par_produit"] if x["produit"].startswith("Gazoline T"))
+    assert vj["montant"] == attendu

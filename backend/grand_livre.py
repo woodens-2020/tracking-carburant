@@ -121,8 +121,10 @@ def construire_lignes(db: Session, debut: Optional[date_type], fin: Optional[dat
     out = []
 
     # ── Ventes carburant : une ligne par jour, période et produit ──────
+    # Même règle que le Journal Meters : saut de compteur non résolu non compté
+    from main import releves_comptes
     groupes: dict = {}
-    for r in per_date(db.query(Releve), Releve.date).all():
+    for r in releves_comptes(db, per_date(db.query(Releve), Releve.date).all()):
         produit = r.pompe.produit if r.pompe else None
         k = (r.date, r.periode, produit.id if produit else 0)
         g = groupes.setdefault(k, {"produit": produit, "montant": 0.0, "gallons": 0.0, "pompes": set(),
@@ -370,6 +372,17 @@ def controles(db: Session, debut: date_type, fin: date_type, lignes: list,
                     "texte": "Des gallons ont été vendus mais le prix est à 0 : la caisse ne reçoit rien. "
                              "Vérifiez le prix de vente du produit à cette date.",
                     "cles": [l["cle"] for l in sans_prix][:200]})
+
+    # 2 bis. Sauts de compteur non résolus : pas comptés (comme au Journal Meters)
+    from main import sauts_non_comptes
+    sn = sauts_non_comptes(db, debut, fin) if debut and fin else {"nb": 0}
+    if sn["nb"]:
+        gal = " · ".join(f"{k} {v:,.3f} gal" for k, v in sn["gallons_par_carburant"].items()).replace(",", " ")
+        out.append({"code": "sauts_non_comptes", "niveau": "alerte",
+                    "titre": f"{sn['nb']} saut{'s' if sn['nb'] > 1 else ''} de compteur non résolu{'s' if sn['nb'] > 1 else ''} : pas comptés",
+                    "texte": (f"{sn['montant']:,.2f} G ({gal}) ne sont pas dans les ventes, comme au Journal Meters et "
+                              "au Rapport journalier. Justifiez ou corrigez l'écart dans le Journal Meters pour les compter.")
+                             .replace(",", " ")})
 
     # 3. Rapports pompistes en attente : pas encore dans la caisse
     att = (db.query(RapportPompiste).filter(RapportPompiste.statut.in_(("SOUMIS", "PROBLEME")),

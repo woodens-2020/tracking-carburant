@@ -3341,9 +3341,9 @@ def rapport(date: date_type, db: Session = Depends(get_db)):
         bloc = {"produit_id": p.id, "produit_nom": p.nom, "periodes": []}
         prod_cash = 0
         for per in PERIODES:
-            releves = (db.query(Releve)
-                       .filter(Releve.date == date, Releve.periode == per,
-                               Releve.pompe_id.in_(pompe_ids)).all())
+            releves = releves_comptes(db, db.query(Releve)
+                                      .filter(Releve.date == date, Releve.periode == per,
+                                              Releve.pompe_id.in_(pompe_ids)).all())
             cash = sum(r.montant_vente for r in releves)
             prod_cash += cash
             bloc["periodes"].append({
@@ -3862,7 +3862,7 @@ def serie_endpoint(
     q = db.query(Releve).filter(Releve.date >= d_debut, Releve.date <= d_fin)
     if periode:
         q = q.filter(Releve.periode == periode)
-    releves = q.all()
+    releves = releves_comptes(db, q.all())
     if produit_id:
         releves = [r for r in releves if r.pompe.produit_id == produit_id]
     if pompiste_id:
@@ -3896,7 +3896,7 @@ def serie_endpoint(
     pq = db.query(Releve).filter(Releve.date >= prev_debut, Releve.date <= prev_fin)
     if periode:
         pq = pq.filter(Releve.periode == periode)
-    prev_releves = pq.all()
+    prev_releves = releves_comptes(db, pq.all())
     if produit_id:
         prev_releves = [r for r in prev_releves if r.pompe.produit_id == produit_id]
     if pompiste_id:
@@ -4245,6 +4245,28 @@ def _exclu_du_total(e: dict) -> bool:
     """Règle unique des ventes comptées (Journal Meters ET Rapport journalier) :
     un saut de compteur non résolu n'est pas compté ; tout le reste l'est."""
     return e.get("type_anomalie") == "saut_compteur" and e.get("statut") != "resolu"
+
+
+def releves_comptes(db: Session, releves) -> list:
+    """Règle unique des ventes comptées dans TOUS les totaux d'argent
+    (Journal Meters, Rapport journalier, caisse, tableaux de bord,
+    statistiques, rentabilité) : un relevé en saut de compteur non résolu
+    n'est pas compté tant que l'écart n'est pas justifié. Le stock physique
+    (FIFO) reste calculé sur tous les relevés."""
+    releves = list(releves)
+    if not releves:
+        return releves
+    d0, d1 = min(r.date for r in releves), max(r.date for r in releves)
+    exclus = {e["id"] for e in _build_journal_entries(db, d0, d1)
+              if not e.get("en_attente") and isinstance(e["id"], int) and _exclu_du_total(e)}
+    return [r for r in releves if r.id not in exclus] if exclus else releves
+
+
+def sauts_non_comptes(db: Session, d0, d1) -> dict:
+    """Sauts de compteur non résolus sur la période : ce qui n'est pas compté."""
+    L = [e for e in _build_journal_entries(db, d0, d1) if not e.get("en_attente") and _exclu_du_total(e)]
+    return {"nb": len(L), "montant": round(sum(e["montant_vente"] for e in L), 2),
+            "gallons_par_carburant": _gallons_par_famille([{"produit": e["produit_nom"], "gallons": e["quantite"]} for e in L])}
 
 
 @app.get("/api/journal")
@@ -5091,7 +5113,7 @@ def _build_rapport_data(db: Session, date_rapport: date_type) -> dict:
     mois_debut = date_type(d.year, d.month, 1)
 
     def stats(debut, fin):
-        q = db.query(Releve).filter(Releve.date >= debut, Releve.date <= fin).all()
+        q = releves_comptes(db, db.query(Releve).filter(Releve.date >= debut, Releve.date <= fin).all())
         return {
             "nb_releves":    len(q),
             "total_montant": round(sum(r.montant_vente for r in q), 2),
@@ -7714,7 +7736,7 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     q_rel = db.query(Releve)
     if date_debut: q_rel = q_rel.filter(Releve.date >= date_debut)
     if date_fin:   q_rel = q_rel.filter(Releve.date <= date_fin)
-    ventes_station = round(sum(float(r.montant_vente) for r in q_rel.all()), 2)
+    ventes_station = round(sum(float(r.montant_vente) for r in releves_comptes(db, q_rel.all())), 2)
 
     # ── Entrées : Bar (cash CASH/MIXTE encaissé à la vente + crédits remboursés) ──
     q_bv = db.query(BarVente).filter(BarVente.statut != "ANNULEE")
@@ -7899,7 +7921,7 @@ def rapport_caisse(
     q_rel = db.query(Releve)
     if date_debut: q_rel = q_rel.filter(Releve.date >= date_debut)
     if date_fin:   q_rel = q_rel.filter(Releve.date <= date_fin)
-    releves = q_rel.all()
+    releves = releves_comptes(db, q_rel.all())
     total_gallons = round(sum(float(r.quantite) for r in releves), 3)
 
     prod_map = {}
@@ -7995,7 +8017,7 @@ def gi_dashboard(
     if produit_id:
         from sqlalchemy.orm import joinedload
         q_releves = q_releves.join(Releve.pompe).filter(Pompe.produit_id == produit_id)
-    releves = q_releves.order_by(Releve.date).all()
+    releves = releves_comptes(db, q_releves.order_by(Releve.date).all())
 
     total_ventes  = round(sum(float(r.montant_vente) for r in releves), 2)
     total_gallons = round(sum(float(r.quantite) for r in releves), 3)
@@ -8172,7 +8194,7 @@ def get_statistiques(
             q = q.filter(Releve.pompe_id.in_(ids)) if ids else q.filter(False)
         if periode_jour:
             q = q.filter(Releve.periode == periode_jour)
-        return q.all()
+        return releves_comptes(db, q.all())
 
     releves  = _q_releves(debut, fin)
     prev_rel = _q_releves(prev_debut, prev_fin)

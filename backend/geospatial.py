@@ -201,7 +201,8 @@ def _activite(sch) -> dict:
     jeton = definir_espace(sch)
     try:
         with session_espace(sch) as sdb:
-            rs = sdb.query(Releve).filter(Releve.date >= debut, Releve.date <= fin).all()
+            import main
+            rs = main.releves_comptes(sdb, sdb.query(Releve).filter(Releve.date >= debut, Releve.date <= fin).all())
             dernier = sdb.query(Releve.date).order_by(Releve.date.desc()).first()
             gal: dict = {}
             for r in rs:
