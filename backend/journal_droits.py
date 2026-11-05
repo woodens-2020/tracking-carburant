@@ -31,3 +31,10 @@ def peut_superviser(u: Utilisateur) -> bool:
         return True
     nom = (r.nom or "").lower()
     return any(m in nom for m in ("directeur", "superviseur", "manager", "gérant", "gerant"))
+
+
+def _require_superviseur(request: Request, db: Session) -> Utilisateur:
+    u = _user(request, db)
+    if not peut_superviser(u):
+        raise HTTPException(403, "Réservé à la direction ou à l'administration.")
+    return u

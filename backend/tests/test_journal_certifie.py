@@ -38,3 +38,35 @@ def test_supprimer_un_releve(client):
     url = f"/api/journal?date_debut=2025-06-01&date_fin=2025-06-01&pompe_id={m}"
     assert client.get(url, headers=H).json()["entries"] == []
     assert client.post("/api/releves/supprimer", headers=H, json={"ids": [rid], "motif": "encore une fois"}).status_code == 404
+
+
+def test_changer_date_releve_journal(client):
+    """Journal Meters : un relevé saisi sur le mauvais jour est déplacé ; la
+    chaîne des compteurs se recalcule aux deux créneaux."""
+    from database import SessionLocal
+    from models import Releve
+    pid = client.post("/api/produits", headers=H, json={"nom": f"Gazoline D{time.time_ns()}", "prix_gallon": 500}).json()["id"]
+    m = client.post(f"/api/produits/{pid}/pompes", headers=H, json={"nom": "DJ1"}).json()["id"]
+    rel = lambda d, per, av, ap: client.post("/api/releves", headers=H, json={
+        "date": d, "periode": per, "pompe_id": m, "prix_gallon": 500, "metter_avant": av, "metter_apres": ap,
+        "motif_ecart_compteur": "mise en place test"}).json()
+    rel("2017-04-01", "Matin", 0, 100)
+    j3 = rel("2017-04-03", "Matin", 120, 150)            # écart noté : 100 → 120 manque
+    faux = rel("2017-04-05", "Matin", 100, 120)          # ce relevé est celui du 02/04 après-midi
+    ap = lambda d, per: client.get(f"/api/releves/{faux['id']}/changer-date/apercu?date={d}&periode={per}", headers=H).json()
+    a = ap("2017-04-02", "Apres-midi")
+    assert a["bloquants"] == [] and a["lignes"][0]["suit"] and a["lignes"][0]["enchaine"]
+    assert ap("2017-04-03", "Matin")["bloquants"]                       # place déjà prise
+    assert ap("2099-01-01", "Matin")["bloquants"]                       # futur
+    assert client.post(f"/api/releves/{faux['id']}/changer-date", headers=H,
+                       json={"date": "2017-04-03", "periode": "Matin", "motif": "essai place prise"}).status_code == 409
+    r = client.post(f"/api/releves/{faux['id']}/changer-date", headers=H,
+                    json={"date": "2017-04-02", "periode": "Apres-midi", "motif": "Relevé du 02/04 après-midi"})
+    assert r.status_code == 200, r.text
+    assert any("reprend maintenant exactement" in t for t in r.json()["avertissements"])
+    with SessionLocal() as s:
+        x = s.get(Releve, faux["id"])
+        assert str(x.date) == "2017-04-02" and x.periode == "Apres-midi" and x.ecart_compteur is None
+        assert s.get(Releve, j3["id"]).ecart_compteur is None
+    E = client.get("/api/journal?date_debut=2017-04-01&date_fin=2017-04-05", headers=H).json()["entries"]
+    assert all(e["statut"] == "ok" for e in E if e["pompe_id"] == m and e["type_anomalie"] != "premiere_lecture")
