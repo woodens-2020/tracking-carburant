@@ -40,6 +40,24 @@ def test_rapport_jour_signale_non_certifies(client):
     rj = client.get("/api/carburant/rapport-jour?date=2025-06-16", headers=H).json()
     nc = [x for x in rj["non_certifies"]["lignes"] if x["releve_id"] == saut["id"]]
     assert len(nc) == 1 and nc[0]["type_anomalie"] == "saut_compteur" and nc[0]["montant"] == 5000
+    # Même total que le Journal Meters : le saut non résolu n'est pas compté
+    assert nc[0]["compte"] is False and nc[0]["exclu_journal"] is True
+    j = client.get("/api/journal?date_debut=2025-06-16&date_fin=2025-06-16", headers=H).json()
+    total_journal = round(sum(x["montant"] for x in j["resume"]["par_produit"]), 2)
+    assert rj["entrees"]["total"] == total_journal == 10000
+    rec = rj["reconciliation"]
+    assert rec["releves"]["montant"] == 15000 and rec["sauts_exclus"]["montant"] == 5000
+    assert rec["releves"]["montant"] - rec["sauts_exclus"]["montant"] - rec["autres_exclus"]["montant"] == rj["entrees"]["total"]
+    # Un recul est compté (comme au journal), sauf si l'on coche « exclure aussi »
+    prod2 = client.post("/api/produits", headers=H, json={"nom": f"RJ2-{time.time_ns()}", "prix_gallon": 500}).json()["id"]
+    m2 = client.post(f"/api/produits/{prod2}/pompes", headers=H, json={"nom": "Diesel 9"}).json()["id"]
+    for d, per, av, ap in (("2025-06-15", "Apres-midi", 100, 300), ("2025-06-16", "Matin", 250, 260)):
+        r = client.post("/api/releves", headers=H, json={"date": d, "periode": per, "pompe_id": m2, "prix_gallon": 500,
+                                                         "metter_avant": av, "metter_apres": ap, "motif_ecart_compteur": "changement de compteur"})
+        assert r.status_code in (200, 201), r.text
+    rj = client.get("/api/carburant/rapport-jour?date=2025-06-16", headers=H).json()
+    j = client.get("/api/journal?date_debut=2025-06-16&date_fin=2025-06-16", headers=H).json()
+    assert rj["entrees"]["total"] == round(sum(x["montant"] for x in j["resume"]["par_produit"]), 2) == 15000
     sans = client.get("/api/carburant/rapport-jour?date=2025-06-16&sans_non_certifies=true", headers=H).json()
-    assert sans["sans_non_certifies"] is True
-    assert round(rj["entrees"]["total"] - sans["entrees"]["total"], 2) == rj["non_certifies"]["montant"]
+    assert sans["sans_non_certifies"] is True and sans["entrees"]["total"] == 10000
+    assert sans["reconciliation"]["autres_exclus"]["montant"] == 5000

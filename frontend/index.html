@@ -536,6 +536,15 @@ canvas{display:block}
 .cjr-nc-bas{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-weight:700;cursor:pointer}
 .cjr-nc-bas input{width:16px!important;height:16px!important;min-width:0!important;margin:0}
 .cjr-nc-l-err td{color:var(--red)}
+.cjr-rec{border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin:0 0 12px;font-size:13.5px;max-width:760px}
+.cjr-rec-t{font-weight:800;margin-bottom:6px}.cjr-rec-t small{font-weight:500;color:var(--muted)}
+.cjr-rec-l{display:grid;grid-template-columns:1fr auto 110px;gap:10px;padding:3px 0;align-items:baseline}
+.cjr-rec-l b,.cjr-rec-l small{text-align:right;font-variant-numeric:tabular-nums}.cjr-rec-l small{color:var(--muted)}
+.cjr-rec-l.neg{color:var(--red)}
+.cjr-rec-l.tot{border-top:1px solid var(--border);margin-top:4px;padding-top:6px;font-size:14.5px}
+.cjr-rec-att{margin-top:8px;padding:6px 10px;border-radius:8px;background:rgba(245,158,11,.1);color:var(--text)}
+.cjr-oui{color:var(--green);font-weight:700;white-space:nowrap}.cjr-non{color:var(--red);font-weight:700;white-space:nowrap}
+@media (max-width:600px){.cjr-rec-l{grid-template-columns:1fr auto}.cjr-rec-l small{display:none}}
 /* Matin et Après-midi : mêmes largeurs de colonnes, alignées d'un bloc à l'autre */
 .cjr-per .cjr-table{width:100%;table-layout:fixed}
 .cjr-per .cjr-table col.c-prod{width:40%}
@@ -16759,21 +16768,37 @@ function _cjrConstruire(){
 // signalés en rouge comme au Journal Meters, et on peut les écarter du total.
 const _CJR_TYPES = {recul_compteur:'Recul compteur', saut_compteur:'Saut compteur', saisie_invalide:'Saisie invalide', premiere_lecture:'1re lecture'};
 function cjrBasculerNC(v){ _cjrSansNC = !!v; loadCarburantRapport(); }
+// Du total des relevés aux ventes comptées : même règle que le Journal Meters
+function _cjrReconciliationHtml(){
+  const som = k => _cjrJours.reduce((a,d)=>{ const x=((d.reconciliation||{})[k])||{}; a.nb+=x.nb||0; a.g+=x.gallons||0; a.m+=x.montant||0; return a; }, {nb:0,g:0,m:0});
+  const rel = som('releves'), sauts = som('sauts_exclus'), autres = som('autres_exclus'), att = som('en_attente');
+  const compte = rel.m - sauts.m - autres.m, compteG = rel.g - sauts.g - autres.g;
+  const ligne = (lib, x, signe, cls='') => `<div class="cjr-rec-l ${cls}"><span>${lib}</span><b>${signe}${cjrG(x.m)}</b><small>${signe}${cjrGal(x.g)}</small></div>`;
+  return `<div class="cjr-rec">
+    <div class="cjr-rec-t">D’où vient le total des ventes <small>— même calcul que le Journal Meters</small></div>
+    ${ligne(`Relevés de compteur (${rel.nb})`, rel, '')}
+    ${sauts.nb ? ligne(`Sauts de compteur non résolus (${sauts.nb}) — non comptés, comme au Journal Meters`, sauts, '− ', 'neg') : ''}
+    ${autres.nb ? ligne(`Autres relevés non certifiés (${autres.nb}) — exclus par la case ci-dessous`, autres, '− ', 'neg') : ''}
+    ${ligne('= Ventes comptées', {m:compte, g:compteG}, '', 'tot')}
+    ${att.nb ? `<div class="cjr-rec-att">⏳ <b>${att.nb} mètre${att.nb>1?'s':''} en attente de validation : ${cjrG(att.m)} (${cjrGal(att.g)})</b> — rapports pompistes pas encore finalisés : ni ici, ni au Journal Meters tant que la direction ne les a pas confirmés.</div>` : ''}
+  </div>`;
+}
 function _cjrNonCertifiesHtml(){
   const L = _cjrJours.flatMap(d => ((d.non_certifies||{}).lignes||[]).map(x => ({...x, date:d.date})));
-  if(!L.length) return `<div class="cjr-nc cjr-nc-ok">✓ Tous les relevés de la sélection sont certifiés (mêmes contrôles que le Journal Meters).</div>`;
+  if(!L.length) return _cjrReconciliationHtml() + `<div class="cjr-nc cjr-nc-ok">✓ Tous les relevés de la sélection sont certifiés (mêmes contrôles que le Journal Meters).</div>`;
   const mt = L.reduce((a,x)=>a+x.montant,0), gal = L.reduce((a,x)=>a+x.gallons,0), err = L.filter(x=>x.statut==='erreur').length;
-  const unJour = _cjrJours.length === 1;
-  return `<div class="cjr-nc ${err?'cjr-nc-err':''}">
+  const unJour = _cjrJours.length === 1, autres = L.filter(x=>!x.exclu_journal).length;
+  return _cjrReconciliationHtml() + `<div class="cjr-nc ${err?'cjr-nc-err':''}">
     <div class="cjr-nc-tete"><b>⚠ ${L.length} relevé${L.length>1?'s':''} non certifié${L.length>1?'s':''}${err?` · dont ${err} en erreur`:''} : ${cjrGal(gal)} · ${cjrG(mt)}</b>
-      <span>${_cjrSansNC ? 'Ils sont <b>exclus</b> des ventes ci-dessous.' : 'Ils sont <b>comptés</b> dans les ventes ci-dessous.'}</span>
-      <label class="cjr-nc-bas"><input type="checkbox" ${_cjrSansNC?'checked':''} onchange="cjrBasculerNC(this.checked)"> Total sans les relevés non certifiés</label></div>
-    <div class="tbl-wrap"><table class="dt cjr-table"><thead><tr>${unJour?'':'<th>Date</th>'}<th>Période</th><th>Mètre</th><th>Problème</th><th>Pompiste</th><th class="tr">Index</th><th class="tr">Gallons</th><th class="tr">Montant</th></tr></thead>
+      <span>Colonne « Compté » : ce qui entre dans les ventes. Corrigez-les dans le Journal Meters.</span>
+      ${autres ? `<label class="cjr-nc-bas"><input type="checkbox" ${_cjrSansNC?'checked':''} onchange="cjrBasculerNC(this.checked)"> Exclure aussi les autres non certifiés (reculs, erreurs…)</label>` : ''}</div>
+    <div class="tbl-wrap"><table class="dt cjr-table"><thead><tr>${unJour?'':'<th>Date</th>'}<th>Période</th><th>Mètre</th><th>Problème</th><th>Pompiste</th><th class="tr">Index</th><th class="tr">Gallons</th><th class="tr">Montant</th><th>Compté</th></tr></thead>
     <tbody>${L.map(x=>`<tr class="${x.statut==='erreur'?'cjr-nc-l-err':''}">${unJour?'':`<td class="num">${frDate(x.date)}</td>`}
       <td>${x.periode==='Matin'?'Matin':'Après-midi'}</td><td><b>${esc(x.pompe)}</b><small class="c-muted"> · ${esc(x.produit)}</small></td>
       <td>${esc(_CJR_TYPES[x.type_anomalie] || (x.statut==='erreur'?'Erreur':'À vérifier'))}${x.decalage!=null&&x.type_anomalie!=='premiere_lecture'?`<small class="c-muted"> · écart ${cjrPx(x.decalage)}</small>`:''}</td>
       <td>${esc(x.pompiste||'—')}${x.rapport_pompiste_id?`<small class="c-muted"> · rapport n°${x.rapport_pompiste_id}</small>`:''}</td>
-      <td class="tr num">${cjrPx(x.metter_avant)} → ${cjrPx(x.metter_apres)}</td><td class="tr num">${cjrGal(x.gallons)}</td><td class="tr num"><b>${cjrG(x.montant)}</b></td></tr>`).join('')}</tbody></table></div>
+      <td class="tr num">${cjrPx(x.metter_avant)} → ${cjrPx(x.metter_apres)}</td><td class="tr num">${cjrGal(x.gallons)}</td><td class="tr num"><b>${cjrG(x.montant)}</b></td>
+      <td>${x.compte ? '<span class="cjr-oui">✓ compté</span>' : `<span class="cjr-non">✗ ${x.exclu_journal ? 'non compté (saut)' : 'exclu'}</span>`}</td></tr>`).join('')}</tbody></table></div>
     <div class="cjr-note" style="margin:6px 0 0">Corrigez-les dans le Journal Meters (résoudre l’écart ou supprimer le relevé) : le rapport se met à jour tout seul.</div></div>`;
 }
 

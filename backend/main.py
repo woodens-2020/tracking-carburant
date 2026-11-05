@@ -4093,6 +4093,12 @@ def rouvrir_ecart_metter(releve_id: int, request: Request, db: Session = Depends
     return {"releve_id": releve_id, "statut": "rouvert"}
 
 
+def _exclu_du_total(e: dict) -> bool:
+    """Règle unique des ventes comptées (Journal Meters ET Rapport journalier) :
+    un saut de compteur non résolu n'est pas compté ; tout le reste l'est."""
+    return e.get("type_anomalie") == "saut_compteur" and e.get("statut") != "resolu"
+
+
 @app.get("/api/journal")
 def journal_endpoint(
     date_debut: Optional[date_type] = None,
@@ -4127,7 +4133,7 @@ def journal_endpoint(
     # réelle — seul ce type est exclu ici, tel que demandé.
     # Un saut résolu (justifié par la direction) n'est plus exclu.
     nb_resolus     = sum(1 for e in entries if e["statut"] == "resolu")
-    exclu          = lambda e: e["type_anomalie"] == "saut_compteur" and e["statut"] != "resolu"
+    exclu          = _exclu_du_total
     nb_sauts       = sum(1 for e in entries if exclu(e))
     total_gallons  = round(sum(e["quantite"] for e in entries if not exclu(e)), 4)
 
@@ -4296,10 +4302,12 @@ def carburant_rapport_jour(
         db.query(Releve).join(Pompe, Releve.pompe_id == Pompe.id)
         .filter(Releve.date == d).all()
     )
-    # Mêmes contrôles que le Journal Meters : chaque relevé non certifié (écart
-    # de compteur, saisie invalide, rapport pompiste non confirmé) est signalé
-    # ici aussi — et peut être écarté du total (sans_non_certifies).
-    journal = {e["id"]: e for e in _build_journal_entries(db, d, d) if not e.get("en_attente")}
+    # Mêmes contrôles et même total que le Journal Meters : chaque relevé non
+    # certifié est signalé ; les sauts de compteur non résolus ne sont pas
+    # comptés (_exclu_du_total) ; `sans_non_certifies` écarte aussi les autres.
+    tous_j = _build_journal_entries(db, d, d, inclure_en_attente=True)
+    journal = {e["id"]: e for e in tous_j if not e.get("en_attente")}
+    en_attente_j = [e for e in tous_j if e.get("en_attente")]
     a_verifier = []
     for r in rel_jour:
         e = journal.get(r.id)
@@ -4313,11 +4321,26 @@ def carburant_rapport_jour(
             "statut": e["statut"], "type_anomalie": e.get("type_anomalie"),
             "decalage": e.get("decalage"), "source": e.get("source"),
             "pompiste": e.get("pompiste_nom"), "rapport_pompiste_id": e.get("rapport_pompiste_id"),
+            "exclu_journal": _exclu_du_total(e),
         })
     a_verifier.sort(key=lambda x: (0 if x["statut"] == "erreur" else 1, -x["montant"]))
-    if sans_non_certifies:
-        exclus = {x["releve_id"] for x in a_verifier}
-        rel_jour = [r for r in rel_jour if r.id not in exclus]
+    for x in a_verifier:
+        x["compte"] = not (x["exclu_journal"] or sans_non_certifies)
+    somme = lambda L: {"nb": len(L), "gallons": round(sum(x["gallons"] for x in L), 4),
+                       "montant": round(sum(x["montant"] for x in L), 2)}
+    brut = [{"gallons": float(r.metter_apres) - float(r.metter_avant),
+             "montant": (float(r.metter_apres) - float(r.metter_avant)) * float(r.prix_gallon)}
+            for r in rel_jour if float(r.metter_apres) >= float(r.metter_avant)]
+    reconciliation = {
+        "releves": somme(brut),
+        "sauts_exclus": somme([x for x in a_verifier if x["exclu_journal"]]),
+        "autres_exclus": somme([x for x in a_verifier if not x["exclu_journal"] and sans_non_certifies]),
+        "en_attente": {"nb": len(en_attente_j),
+                       "gallons": round(sum(e["quantite"] for e in en_attente_j), 4),
+                       "montant": round(sum(e["montant_vente"] for e in en_attente_j), 2)},
+    }
+    exclus = {x["releve_id"] for x in a_verifier if not x["compte"]}
+    rel_jour = [r for r in rel_jour if r.id not in exclus]
     # Agrégation par (période, produit) ET par produit (jour entier).
     par_pp = {}          # (periode, pid) -> {gallons, montant, nb}
     ent = {}             # pid -> {gallons, montant, nb}   (jour entier)
@@ -4429,6 +4452,7 @@ def carburant_rapport_jour(
         "date":      str(d),
         "genere_le": _dtn2.now(_tzu2.utc).isoformat(),
         "sans_non_certifies": sans_non_certifies,
+        "reconciliation": reconciliation,
         "non_certifies": {
             "lignes":  a_verifier,
             "nb":      len(a_verifier),
