@@ -959,3 +959,25 @@ def test_pompe_dans_un_rapport_en_attente_indisponible_en_saisie(client):
     # Rapport supprimé : place libre
     assert client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/supprimer", headers=H, json={"motif": "test place"}).status_code == 200
     assert not any(x["pompe_id"] == pompe for x in client.get(f"/api/releves/en-attente?date={jour}", headers=H).json())
+
+
+def test_filtre_plusieurs_pompistes(client):
+    """Filtre Pompiste à cases : plusieurs pompistes à la fois (journal, stats)."""
+    pompes = [_produit(client, 500) for _ in range(3)]
+    noms = [("Case", f"Un{time.time_ns()}"), ("Case", f"Deux{time.time_ns()}"), ("Case", f"Trois{time.time_ns()}")]
+    emps = []
+    for pr, nm in noms:
+        client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": pr, "nom": nm})
+        emps.append(next(x["id"] for x in client.get("/api/pompistes", headers=H).json() if x["nom"] == f"{pr} {nm}"))
+    for pm, emp in zip(pompes, emps):
+        r = client.post("/api/releves", headers=H, json={"date": "2018-05-05", "periode": "Matin", "pompe_id": pm,
+                                                         "prix_gallon": 500, "metter_avant": 0, "metter_apres": 10})
+        assert r.status_code in (200, 201), r.text
+        assert client.patch(f"/api/releves/{r.json()['id']}/pompiste", headers=H, json={"pompiste_id": emp}).status_code == 200
+    base = "/api/journal?date_debut=2018-05-05&date_fin=2018-05-05"
+    deux = client.get(f"{base}&pompiste_id={emps[0]}&pompiste_id={emps[2]}", headers=H).json()
+    assert sorted(e["pompe_id"] for e in deux["entries"]) == sorted([pompes[0], pompes[2]])
+    un = client.get(f"{base}&pompiste_id={emps[1]}", headers=H).json()
+    assert [e["pompe_id"] for e in un["entries"]] == [pompes[1]]
+    st = client.get(f"/api/stats?date_debut=2018-05-05&date_fin=2018-05-05&pompiste_id={emps[0]}&pompiste_id={emps[1]}", headers=H).json()
+    assert st["total_quantite"] == 20

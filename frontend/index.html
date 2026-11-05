@@ -4691,9 +4691,18 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
           </div>
           <div class="filter-group">
             <label class="filter-label">Pompiste</label>
-            <select id="f-pompiste" class="filter-select">
-              <option value="">Tous les pompistes</option>
-            </select>
+            <div class="jf-dd-wrap pp-dd" id="f-pompiste-dd" data-change="">
+              <button type="button" class="jf-dd-btn" id="f-pompiste-btn" onclick="ppOuvrir(event,'f-pompiste')">
+                <span id="f-pompiste-label">Tous les pompistes</span>
+                <svg class="jf-dd-chevron" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="jf-dd-panel" id="f-pompiste-panel" style="display:none">
+                <label class="jf-check-item jf-check-all">
+                  <input type="checkbox" id="f-pompiste-all" checked onchange="ppTous('f-pompiste')"> Tous les pompistes
+                </label>
+                <div id="f-pompiste-wrap"></div>
+              </div>
+            </div>
           </div>
           <div class="filter-spacer"></div>
           <button class="btn btn-primary db-btn-analyze" onclick="applyFilters()">
@@ -4851,9 +4860,18 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
           </div>
           <div class="filter-group">
             <label class="filter-label">Pompiste</label>
-            <select id="jf-pompiste" class="filter-select" onchange="loadJournal()">
-              <option value="">Tous les pompistes</option>
-            </select>
+            <div class="jf-dd-wrap pp-dd" id="jf-pompiste-dd" data-change="loadJournal">
+              <button type="button" class="jf-dd-btn" id="jf-pompiste-btn" onclick="ppOuvrir(event,'jf-pompiste')">
+                <span id="jf-pompiste-label">Tous les pompistes</span>
+                <svg class="jf-dd-chevron" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="jf-dd-panel" id="jf-pompiste-panel" style="display:none">
+                <label class="jf-check-item jf-check-all">
+                  <input type="checkbox" id="jf-pompiste-all" checked onchange="ppTous('jf-pompiste')"> Tous les pompistes
+                </label>
+                <div id="jf-pompiste-wrap"></div>
+              </div>
+            </div>
           </div>
           <div class="filter-group">
             <label class="filter-label">Certification</label>
@@ -15659,7 +15677,7 @@ async function applyFilters(){
   const fin  =document.getElementById('f-fin').value;
   const prodId =document.getElementById('f-prod').value;
   const pompeId=document.getElementById('f-pompe').value;
-  const pompisteId=document.getElementById('f-pompiste')?.value;
+  const pompisteIds=ppIds('f-pompiste');
   const per    =document.getElementById('f-per')?.value || '';
   if(!debut||!fin){toast(t('dash.err.dates'),'err');return;}
 
@@ -15671,7 +15689,7 @@ async function applyFilters(){
     let statsUrl=`/stats?date_debut=${debut}&date_fin=${fin}`;
     if(prodId)  statsUrl+=`&produit_id=${prodId}`;
     if(pompeId) statsUrl+=`&pompe_id=${pompeId}`;
-    if(pompisteId) statsUrl+=`&pompiste_id=${pompisteId}`;
+    pompisteIds.forEach(id=>{ statsUrl+=`&pompiste_id=${id}`; });
     if(per)     statsUrl+=`&periode=${encodeURIComponent(per)}`;
 
     const d1=new Date(debut+'T12:00:00');
@@ -15679,7 +15697,7 @@ async function applyFilters(){
     const jours=Math.min(90,Math.round((d2-d1)/86400000)+1);
     let serieUrl=`/serie?date_fin=${fin}&jours=${jours}`;
     if(prodId)  serieUrl+=`&produit_id=${prodId}`;
-    if(pompisteId) serieUrl+=`&pompiste_id=${pompisteId}`;
+    pompisteIds.forEach(id=>{ serieUrl+=`&pompiste_id=${id}`; });
     if(per)     serieUrl+=`&periode=${encodeURIComponent(per)}`;
 
     const [stats,serie]=await Promise.all([GET(statsUrl),GET(serieUrl)]);
@@ -17560,17 +17578,57 @@ function initJournal(){
 }
 
 let _pompistesCache=null;
-async function _remplirFiltrePompistes(selId){
-  const sel=document.getElementById(selId||'jf-pompiste');
-  if(!sel) return;
-  const cur=sel.value;
+// Filtre Pompiste : une case à cocher par pompiste (aucune cochée = tous)
+async function _remplirFiltrePompistes(grp){
+  grp = grp || 'jf-pompiste';
+  const wrap=document.getElementById(grp+'-wrap');
+  if(!wrap) return;
+  const avant=new Set(ppIds(grp));
   try{
     _pompistesCache=await GET('/pompistes');
-    sel.innerHTML='<option value="">Tous les pompistes</option>'+
-      (_pompistesCache||[]).map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
-    if(cur) sel.value=cur;
+    wrap.innerHTML=(_pompistesCache||[]).map(p=>`<label class="jf-check-item">
+        <input type="checkbox" class="pp-cb" value="${p.id}" ${avant.has(String(p.id))?'checked':''} onchange="ppCocher('${grp}')"> ${esc(p.nom)}
+      </label>`).join('') || '<div class="c-muted" style="padding:6px 10px;font-size:12.5px">Aucun pompiste</div>';
   }catch(e){ /* liste vide : le filtre reste sur « Tous » */ }
+  _ppSync(grp);
 }
+function ppIds(grp){
+  return [...document.querySelectorAll(`#${grp}-wrap .pp-cb:checked`)].map(cb=>cb.value);
+}
+function _ppSync(grp){
+  const coches=[...document.querySelectorAll(`#${grp}-wrap .pp-cb:checked`)];
+  const all=document.getElementById(grp+'-all'); if(all) all.checked=!coches.length;
+  const lbl=document.getElementById(grp+'-label'); if(!lbl) return;
+  lbl.textContent = !coches.length ? 'Tous les pompistes'
+    : coches.length===1 ? coches[0].closest('label').textContent.trim() : `${coches.length} pompistes`;
+}
+function _ppChange(grp){
+  const f=document.getElementById(grp+'-dd')?.dataset.change;
+  if(f && typeof window[f]==='function') window[f]();
+}
+function ppCocher(grp){ _ppSync(grp); _ppChange(grp); }
+function ppTous(grp){
+  document.querySelectorAll(`#${grp}-wrap .pp-cb`).forEach(cb=>cb.checked=false);
+  _ppSync(grp); _ppChange(grp);
+}
+function ppOuvrir(e, grp){
+  e.stopPropagation();
+  const panel=document.getElementById(grp+'-panel'), btn=document.getElementById(grp+'-btn');
+  const ouvrir=panel.style.display==='none';
+  if(ouvrir){
+    const r=btn.getBoundingClientRect();
+    panel.style.top=(r.bottom+4)+'px'; panel.style.left=r.left+'px'; panel.style.width=Math.max(r.width,200)+'px';
+  }
+  panel.style.display=ouvrir?'block':'none';
+  btn.classList.toggle('open',ouvrir);
+}
+document.addEventListener('click',function(e){
+  document.querySelectorAll('.pp-dd').forEach(dd=>{
+    if(dd.contains(e.target)) return;
+    const panel=dd.querySelector('.jf-dd-panel'); if(panel) panel.style.display='none';
+    dd.querySelector('.jf-dd-btn')?.classList.remove('open');
+  });
+});
 
 function updateJournalPompes(){
   const prodId=parseInt(document.getElementById('jf-prod').value)||0;
@@ -17660,12 +17718,12 @@ async function loadJournal(){
   document.getElementById('btn-journal-xls').style.display='none';
 
   try{
-    const pompisteId=document.getElementById('jf-pompiste')?.value;
+    const pompisteIds=ppIds('jf-pompiste');
     let url=`/journal?date_debut=${debut}&date_fin=${fin}`;
     if(prodId)    url+=`&produit_id=${prodId}`;
     pompeIds.forEach(id=>{ url+=`&pompe_id=${id}`; });
     if(periodeId) url+=`&periode=${encodeURIComponent(periodeId)}`;
-    if(pompisteId) url+=`&pompiste_id=${pompisteId}`;
+    pompisteIds.forEach(id=>{ url+=`&pompiste_id=${id}`; });
     const certif=document.getElementById('jf-certif')?.value;
     if(certif) url+=`&certifie=${certif}`;
     const data=await GET(url);
@@ -17686,12 +17744,12 @@ function downloadJournalPdf(){
   const pompeIds=getCheckedPompes();
   const periodeId=(document.getElementById('jf-periode')?.value || '');
   if(!debut||!fin){toast('Sélectionnez une plage de dates','err');return;}
-  const pompisteId=document.getElementById('jf-pompiste')?.value;
+  const pompisteIds=ppIds('jf-pompiste');
   let url=`/api/journal/pdf?date_debut=${debut}&date_fin=${fin}`;
   if(prodId)    url+=`&produit_id=${prodId}`;
   pompeIds.forEach(id=>{ url+=`&pompe_id=${id}`; });
   if(periodeId) url+=`&periode=${encodeURIComponent(periodeId)}`;
-  if(pompisteId) url+=`&pompiste_id=${pompisteId}`;
+  pompisteIds.forEach(id=>{ url+=`&pompiste_id=${id}`; });
   const certif=document.getElementById('jf-certif')?.value;
   if(certif) url+=`&certifie=${certif}`;
   window.location.href=url;
@@ -17705,12 +17763,12 @@ function downloadJournalXls(){
   const pompeIds=getCheckedPompes();
   const periodeId=(document.getElementById('jf-periode')?.value || '');
   if(!debut||!fin){toast('Sélectionnez une plage de dates','err');return;}
-  const pompisteId=document.getElementById('jf-pompiste')?.value;
+  const pompisteIds=ppIds('jf-pompiste');
   let url=`/api/releves/export?date_debut=${debut}&date_fin=${fin}`;
   if(prodId)    url+=`&produit_id=${prodId}`;
   pompeIds.forEach(id=>{ url+=`&pompe_id=${id}`; });
   if(periodeId) url+=`&periode=${encodeURIComponent(periodeId)}`;
-  if(pompisteId) url+=`&pompiste_id=${pompisteId}`;
+  pompisteIds.forEach(id=>{ url+=`&pompiste_id=${id}`; });
   window.location.href=url;
 }
 
