@@ -981,3 +981,48 @@ def test_filtre_plusieurs_pompistes(client):
     assert [e["pompe_id"] for e in un["entries"]] == [pompes[1]]
     st = client.get(f"/api/stats?date_debut=2018-05-05&date_fin=2018-05-05&pompiste_id={emps[0]}&pompiste_id={emps[1]}", headers=H).json()
     assert st["total_quantite"] == 20
+
+
+def test_changer_date_rapport(client):
+    """Rapport sur le mauvais jour : déplacé depuis la corbeille puis restauré
+    (cas du rapport n°4), ou déplacé tant qu'il est à vérifier."""
+    from datetime import timedelta
+    from tz_utils import today_haiti
+    from database import SessionLocal
+    from models import Releve
+    import main as _m
+    j0, j2 = today_haiti() - timedelta(days=2), today_haiti()
+    pa = _produit(client, 500)
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Dat", "nom": f"Ee{time.time_ns()}"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    assert p.post("/api/pompiste/compteurs", json={"date": str(j2), "periode": "Matin", "charte_acceptee": True, "lignes": [
+        {"pompe_id": pa, "metter_avant": 0, "metter_apres": 10, "debut_confirme": True}]}).status_code == 201
+    rid = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 5}], "depenses": []}).json()["id"]
+    assert _sup(client, rid, f"lignes/{pa}/confirmer", metter_avant=0, metter_apres=10).status_code == 200
+    # À vérifier : déplacé, le mètre confirmé sort du journal et est à reconfirmer
+    assert _sup(client, rid, "changer-date", date=str(j2), periode="Matin", motif="même créneau").status_code == 400
+    assert _sup(client, rid, "changer-date", date=str(j2 + timedelta(days=1)), periode="Matin", motif="dans le futur").status_code == 400
+    r = _sup(client, rid, "changer-date", date=str(j0), periode="Apres-midi", motif="Saisi sur le mauvais jour")
+    assert r.status_code == 200, r.text
+    assert r.json()["date"] == str(j0) and r.json()["periode"] == "Apres-midi" and not r.json()["lignes"][0]["confirmee"]
+    with SessionLocal() as s:
+        assert not s.query(Releve).filter_by(rapport_pompiste_id=rid).count()
+    # Corbeille : déplacé puis restauré sur le nouveau créneau
+    assert _sup(client, rid, "supprimer", motif="Rapport mal daté").status_code == 200
+    r = _sup(client, rid, "changer-date", date=str(j2 - timedelta(days=1)), periode="Matin", motif="Le bon jour est la veille")
+    assert r.status_code == 200 and r.json()["supprime"] is not None
+    r = _sup(client, rid, "restaurer")
+    assert r.status_code == 200 and r.json()["statut"] == "SOUMIS" and r.json()["date"] == str(j2 - timedelta(days=1))
+    assert _sup(client, rid, f"lignes/{pa}/confirmer", metter_avant=0, metter_apres=10).status_code == 200
+    with SessionLocal() as s:
+        rel = s.query(Releve).filter_by(rapport_pompiste_id=rid).one()
+        assert rel.date == j2 - timedelta(days=1) and rel.periode == "Matin"
+    # Créneau déjà pris par un autre rapport : refusé
+    c2 = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Aut", "nom": f"Re{time.time_ns()}"}).json()
+    q = TestClient(_m.app)
+    q.post("/api/login/pompiste", json={"username": c2["username"], "code_acces": c2["code_acces"]})
+    assert q.post("/api/pompiste/compteurs", json={"date": str(j2), "periode": "Apres-midi", "charte_acceptee": True, "lignes": [
+        {"pompe_id": pa, "metter_avant": 10, "metter_apres": 12, "debut_confirme": True}]}).status_code == 201
+    r = _sup(client, rid, "changer-date", date=str(j2), periode="Apres-midi", motif="essai créneau pris")
+    assert r.status_code == 409 and "déjà rapporté" in r.json()["detail"]

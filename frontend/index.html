@@ -20972,6 +20972,44 @@ async function pspSupprimer(id){
   }catch(e){ notify(e.message, 'err'); }
 }
 
+// Rapport sur le mauvais jour ou la mauvaise période : on le déplace
+function pspChangerDate(id){
+  const r = PSP.rapports.find(x => x.id === id); if(!r) return;
+  document.getElementById('sup-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'sup-ov'; ov.className = 'sup-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+  ov.innerHTML = `<div class="sup-boite">
+    <div class="sup-ico">📅</div><h3>Changer la date du rapport n°${id}</h3>
+    <p>${esc(r.pompiste_nom)} · actuellement ${_pspDate(r.date)}, ${_pspPer(r.periode)}.
+      ${r.supprime ? 'Il reste dans la corbeille : restaurez-le ensuite.' : 'Ses mètres seront à reconfirmer.'}</p>
+    <div style="display:flex;gap:8px;margin:4px 0 10px">
+      <input type="date" id="cd-date" class="filter-input" value="${r.date}" max="${currentDate}" style="flex:1">
+      <select id="cd-per" class="filter-select" style="flex:1">
+        <option value="Matin" ${r.periode==='Matin'?'selected':''}>Matin</option>
+        <option value="Apres-midi" ${r.periode==='Apres-midi'?'selected':''}>Après-midi</option></select></div>
+    <label for="sup-motif">Pourquoi ? (obligatoire)</label>
+    <input id="sup-motif" class="filter-input" maxlength="300" placeholder="Ex. rapport du 31/10 après-midi saisi le 02/11">
+    <div class="sup-err" id="sup-err"></div>
+    <div class="sup-act"><button class="btn btn-secondary" id="sup-non">Annuler</button><button class="btn btn-primary" id="sup-oui">📅 Changer la date</button></div></div>`;
+  document.body.appendChild(ov);
+  const fin = () => ov.remove(), err = t => { document.getElementById('sup-err').textContent = t; };
+  const ok = async () => {
+    const date = document.getElementById('cd-date').value, periode = document.getElementById('cd-per').value;
+    const m = document.getElementById('sup-motif').value.trim();
+    if(!date) return err('Choisissez la date.');
+    if(m.length < 5) return err('Indiquez le motif (5 caractères minimum).');
+    try{
+      const x = await _pspApi('POST', `/rapports/${id}/changer-date`, {date, periode, motif: m});
+      fin(); notify(`Rapport n°${id} déplacé au ${_pspDate(x.date)} (${_pspPer(x.periode)}).`, 'ok');
+      PSP.ouvert = id; await pspChargerListe(); pspMajBadge();
+    }catch(e){ err(e.message); }
+  };
+  document.getElementById('sup-non').onclick = fin;
+  document.getElementById('sup-oui').onclick = ok;
+  ov.addEventListener('click', e => { if(e.target === ov) fin(); });
+  document.getElementById('sup-motif').addEventListener('keydown', e => { if(e.key === 'Enter') ok(); if(e.key === 'Escape') fin(); });
+}
+
 async function pspRestaurer(id){
   const r = PSP.rapports.find(x => x.id === id); if(!r) return;
   if(!await showConfirm(`Restaurer le rapport n°${id} de ${r.pompiste_nom} (${_pspDate(r.date)}, ${_pspPer(r.periode)}) ? Il revient « à vérifier » : ses mètres, sa billetterie et ses dépenses sont à reconfirmer avant d’entrer au journal.`,
@@ -21026,7 +21064,8 @@ function pspCarteLecture(r){
     ${billets || (r.devises||[]).length ? `<table class="psp-tbl" style="max-width:420px"><thead><tr><th>Coupure</th><th class="r">Billets</th><th class="r">Montant</th></tr></thead><tbody>${billets}
       ${r.monnaie ? `<tr><td>Monnaie</td><td></td><td class="r">${_pspG(r.monnaie)}</td></tr>` : ''}${_pspDevisesLignes(r)}</tbody></table>` : ''}
     ${_pspDepensesHtml(r)}${_pspFeuilleHtml(r)}
-    <div class="psp-sup">${sup ? `<button class="btn btn-primary" onclick="pspRestaurer(${r.id})">↩ Restaurer ce rapport</button>`
+    <div class="psp-sup">${sup ? `<button class="btn btn-secondary" onclick="pspChangerDate(${r.id})">📅 Changer la date</button>
+        <button class="btn btn-primary" onclick="pspRestaurer(${r.id})">↩ Restaurer ce rapport</button>`
       : `<button class="psp-lien" onclick="pspSupprimer(${r.id})">🗑 Supprimer ce rapport (mal fait)</button>`}</div></div>`;
 }
 
@@ -21213,7 +21252,8 @@ function pspCarte(r){
          ${pb ? '' : `<button class="btn btn-danger" onclick="pspProbleme(${r.id})">⚠ Signaler un problème</button>`}
          <button class="btn btn-secondary" onclick="pspRenvoyer(${r.id})">Renvoyer au pompiste</button>
        </div>`)}
-    <div class="psp-sup"><button class="psp-lien" onclick="pspSupprimer(${r.id})">🗑 Supprimer ce rapport (mal fait)</button></div>
+    <div class="psp-sup"><button class="psp-lien" onclick="pspChangerDate(${r.id})">📅 Changer la date / période</button>
+      <button class="psp-lien" onclick="pspSupprimer(${r.id})">🗑 Supprimer ce rapport (mal fait)</button></div>
   </div>`;
 }
 

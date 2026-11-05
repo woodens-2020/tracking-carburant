@@ -1339,6 +1339,61 @@ def pompes_possibles(rid: int, pompe_id: int, _s: Utilisateur = Depends(_require
     return _pompes_possibles(db, rap, l)
 
 
+class ChangerDateIn(BaseModel):
+    date: date_type
+    periode: str
+    motif: str
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/changer-date")
+def changer_date(rid: int, data: ChangerDateIn, request: Request,
+                 s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Rapport enregistré sur le mauvais jour ou la mauvaise période : la
+    direction le déplace. Possible dans la corbeille (avant « Restaurer ») ou
+    tant que le rapport est à vérifier ; ses mètres sont alors à reconfirmer.
+    Le prix de chaque pompe est repris au tarif du nouveau jour."""
+    import main
+    rap = db.get(RapportPompiste, rid)
+    if not rap:
+        raise HTTPException(404, "Rapport introuvable")
+    supprime = rap.supprime_at is not None
+    if not supprime and rap.statut not in _A_TRAITER:
+        raise HTTPException(409, "Seul un rapport à vérifier, ou supprimé, peut changer de date.")
+    motif = " ".join((data.motif or "").split())
+    if len(motif) < 5:
+        raise HTTPException(400, "Indiquez pourquoi vous changez la date (5 caractères minimum).")
+    if data.periode not in PERIODES:
+        raise HTTPException(400, "Période invalide")
+    if data.date > today_haiti():
+        raise HTTPException(400, "La date ne peut pas être dans le futur.")
+    if data.date == rap.date and data.periode == rap.periode:
+        raise HTTPException(400, "C'est déjà la date et la période de ce rapport.")
+    if not supprime:
+        pris = (db.query(RapportPompisteLigne, RapportPompiste)
+                .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
+                .filter(RapportPompiste.date == data.date, RapportPompiste.periode == data.periode,
+                        RapportPompiste.statut.in_(_ACTIFS), RapportPompiste.supprime_at.is_(None),
+                        RapportPompiste.id != rap.id,
+                        RapportPompisteLigne.pompe_id.in_([l.pompe_id for l in rap.lignes])).all())
+        if pris:
+            noms = ", ".join(sorted({f"{l.pompe.nom} (rapport n°{r.id}, {_nom(r.utilisateur)})" for l, r in pris}))
+            raise HTTPException(409, f"Ce créneau est déjà rapporté — {noms}.")
+        for l in rap.lignes:
+            _retirer_ligne_du_journal(db, rap, l)
+            l.confirmee, l.confirmee_at = False, None
+        rap.ecart_confirme = False
+    trace = {"rapport_id": rap.id, "pompiste": _nom(rap.utilisateur), "motif": motif[:300],
+             "de": {"date": str(rap.date), "periode": rap.periode},
+             "vers": {"date": str(data.date), "periode": data.periode}, "supprime": supprime}
+    rap.date, rap.periode = data.date, data.periode
+    for l in rap.lignes:
+        l.prix_gallon = _prix(db, l.pompe, data.date)
+    main._tracer(db, request, "rapport_pompiste_date_changee", trace)
+    db.commit()
+    db.refresh(rap)
+    return _rapport_dict(db, rap, avec_journal=not supprime and rap.statut in _A_TRAITER)
+
+
 class ChangerPompeIn(BaseModel):
     pompe_id: int
     motif: str
