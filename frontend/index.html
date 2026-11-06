@@ -16810,7 +16810,7 @@ function _cjrReconciliationHtml(){
   return `<div class="cjr-rec">
     <div class="cjr-rec-t">D’où vient le total des ventes <small>— même calcul que le Journal Meters</small></div>
     ${ligne(`Relevés de compteur (${rel.nb})`, rel, '')}
-    ${sauts.nb ? ligne(`Sauts de compteur non résolus (${sauts.nb}) — non comptés, comme au Journal Meters`, sauts, '− ', 'neg') : ''}
+    ${sauts.nb ? ligne(`Sauts et reculs de compteur non confirmés (${sauts.nb}) — non comptés tant que vous ne les confirmez pas au Journal Meters`, sauts, '− ', 'neg') : ''}
     ${autres.nb ? ligne(`Autres relevés non certifiés (${autres.nb}) — exclus par la case ci-dessous`, autres, '− ', 'neg') : ''}
     ${ligne('= Ventes comptées', {m:compte, g:compteG}, '', 'tot')}
     ${att.nb ? `<div class="cjr-rec-att">⏳ <b>${att.nb} mètre${att.nb>1?'s':''} en attente de validation : ${cjrG(att.m)} (${cjrGalF(att.g)})</b> — rapports pompistes pas encore finalisés : ni ici, ni au Journal Meters tant que la direction ne les a pas confirmés.</div>` : ''}
@@ -16824,14 +16824,14 @@ function _cjrNonCertifiesHtml(){
   return _cjrReconciliationHtml() + `<div class="cjr-nc ${err?'cjr-nc-err':''}">
     <div class="cjr-nc-tete"><b>⚠ ${L.length} relevé${L.length>1?'s':''} non certifié${L.length>1?'s':''}${err?` · dont ${err} en erreur`:''} : ${cjrGalF(gal)} · ${cjrG(mt)}</b>
       <span>Colonne « Compté » : ce qui entre dans les ventes. Corrigez-les dans le Journal Meters.</span>
-      ${autres ? `<label class="cjr-nc-bas"><input type="checkbox" ${_cjrSansNC?'checked':''} onchange="cjrBasculerNC(this.checked)"> Exclure aussi les autres non certifiés (reculs, erreurs…)</label>` : ''}</div>
+      ${autres ? `<label class="cjr-nc-bas"><input type="checkbox" ${_cjrSansNC?'checked':''} onchange="cjrBasculerNC(this.checked)"> Exclure aussi les autres non certifiés (saisies invalides, erreurs…)</label>` : ''}</div>
     <div class="tbl-wrap"><table class="dt cjr-table"><thead><tr>${unJour?'':'<th>Date</th>'}<th>Période</th><th>Mètre</th><th>Problème</th><th>Pompiste</th><th class="tr">Index</th><th class="tr">Gallons</th><th class="tr">Montant</th><th>Compté</th></tr></thead>
     <tbody>${L.map(x=>`<tr class="${x.statut==='erreur'?'cjr-nc-l-err':''}">${unJour?'':`<td class="num">${frDate(x.date)}</td>`}
       <td>${x.periode==='Matin'?'Matin':'Après-midi'}</td><td><b>${esc(x.pompe)}</b><small class="c-muted"> · ${esc(x.produit)}</small></td>
       <td>${esc(_CJR_TYPES[x.type_anomalie] || (x.statut==='erreur'?'Erreur':'À vérifier'))}${x.decalage!=null&&x.type_anomalie!=='premiere_lecture'?`<small class="c-muted"> · écart ${cjrPx(x.decalage)}</small>`:''}</td>
       <td>${esc(x.pompiste||'—')}${x.rapport_pompiste_id?`<small class="c-muted"> · rapport n°${x.rapport_pompiste_id}</small>`:''}</td>
       <td class="tr num">${cjrPx(x.metter_avant)} → ${cjrPx(x.metter_apres)}</td><td class="tr num">${cjrGal(x.gallons)}</td><td class="tr num"><b>${cjrG(x.montant)}</b></td>
-      <td>${x.compte ? '<span class="cjr-oui">✓ compté</span>' : `<span class="cjr-non">✗ ${x.exclu_journal ? 'non compté (saut)' : 'exclu'}</span>`}</td></tr>`).join('')}</tbody></table></div>
+      <td>${x.compte ? '<span class="cjr-oui">✓ compté</span>' : `<span class="cjr-non">✗ ${x.exclu_journal ? `non compté (${x.type_anomalie === 'recul_compteur' ? 'recul' : 'saut'})` : 'exclu'}</span>`}</td></tr>`).join('')}</tbody></table></div>
     <div class="cjr-note" style="margin:6px 0 0">Corrigez-les dans le Journal Meters (résoudre l’écart ou supprimer le relevé) : le rapport se met à jour tout seul.</div></div>`;
 }
 
@@ -17898,9 +17898,9 @@ function renderJournal(data){
       <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${resume.nb_en_attente} mètre${resume.nb_en_attente>1?'s':''} · ${fmtGX(resume.montant_en_attente)} — non compté tant que la direction n'a pas finalisé</div>
     </div>`:''}
     <div class="jres-card c-teal">
-      <div class="jres-lbl">Gallons par carburant (hors sauts)</div>
+      <div class="jres-lbl">Gallons par carburant (hors sauts / reculs)</div>
       <div class="jres-num c-teal">${galParProduit((resume.par_famille||resume.par_produit||[]).map(pp=>[pp.famille||pp.produit, pp.gallons]))}</div>
-      ${resume.nb_sauts_compteur?`<div style="font-size:11.5px;color:var(--muted);margin-top:2px">${resume.nb_sauts_compteur} saut${resume.nb_sauts_compteur>1?'s':''} de compteur exclu${resume.nb_sauts_compteur>1?'s':''}</div>`:''}
+      ${resume.nb_sauts_compteur?`<div style="font-size:11.5px;color:var(--muted);margin-top:2px">${resume.nb_sauts_compteur} saut${resume.nb_sauts_compteur>1?'s':''} / recul${resume.nb_sauts_compteur>1?'s':''} non confirmé${resume.nb_sauts_compteur>1?'s':''} : pas comptés</div>`:''}
     </div>
   </div>
   ${(resume.par_produit&&resume.par_produit.length)?`
@@ -18017,7 +18017,7 @@ function renderJournal(data){
   // Les rapports pompistes pas encore finalisés sont affichés mais jamais totalisés
   // Même règle que le récapitulatif et le Rapport journalier : un saut de
   // compteur non résolu n'est pas compté ; gallons séparés par carburant.
-  const _exclu = e => e.type_anomalie==='saut_compteur' && e.statut!=='resolu';
+  const _exclu = e => ['saut_compteur','recul_compteur'].includes(e.type_anomalie) && e.statut!=='resolu';
   const tous_v      = entries.filter(e=>!e.en_attente), attente = entries.filter(e=>e.en_attente);
   const valides     = tous_v.filter(e=>!_exclu(e)), sautsNC = tous_v.filter(_exclu);
   const _galF = L => galParProduit(Object.entries(L.reduce((o,e)=>{ const f=_cjrFam(e.produit_nom); o[f]=(o[f]||0)+(e.quantite||0); return o; },{}))
@@ -18113,7 +18113,7 @@ function renderJournal(data){
             <td colspan="2"></td>
           </tr>
           ${sautsNC.length?`<tr><td colspan="8" style="padding:8px 14px;font-size:12.5px;color:var(--red)">
-              Sauts de compteur non résolus (non comptés) &mdash; ${sautsNC.length} relevé${sautsNC.length>1?'s':''} : résolvez l’écart pour les compter</td>
+              Sauts et reculs non confirmés (non comptés) &mdash; ${sautsNC.length} relevé${sautsNC.length>1?'s':''} : confirmez (justifiez) l’écart pour les compter</td>
             <td class="tr num" style="padding:8px 14px;color:var(--red);white-space:nowrap">${_galF(sautsNC)}</td>
             <td class="tr num" style="padding:8px 14px;color:var(--red)">${fmtG(sautsNC.reduce((s,e)=>s+(e.montant_vente||0),0))}</td>
             <td colspan="2"></td></tr>`:''}

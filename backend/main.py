@@ -4270,17 +4270,18 @@ def _gallons_par_famille(lignes) -> dict:
 
 
 def _exclu_du_total(e: dict) -> bool:
-    """Règle unique des ventes comptées (Journal Meters ET Rapport journalier) :
-    un saut de compteur non résolu n'est pas compté ; tout le reste l'est."""
-    return e.get("type_anomalie") == "saut_compteur" and e.get("statut") != "resolu"
+    """Règle unique des ventes comptées (tous les modules) : seuls comptent les
+    relevés qui s'enchaînent. Un saut ou un recul de compteur ne compte pas
+    tant que la direction ne l'a pas confirmé (écart résolu / justifié)."""
+    return e.get("type_anomalie") in ("saut_compteur", "recul_compteur") and e.get("statut") != "resolu"
 
 
 def releves_comptes(db: Session, releves) -> list:
     """Règle unique des ventes comptées dans TOUS les totaux d'argent
     (Journal Meters, Rapport journalier, caisse, tableaux de bord,
-    statistiques, rentabilité) : un relevé en saut de compteur non résolu
-    n'est pas compté tant que l'écart n'est pas justifié. Le stock physique
-    (FIFO) reste calculé sur tous les relevés."""
+    statistiques, rentabilité) : un relevé en saut ou en recul de compteur
+    n'est pas compté tant que la direction n'a pas confirmé l'écart. Le stock
+    physique (FIFO) reste calculé sur tous les relevés."""
     releves = list(releves)
     if not releves:
         return releves
@@ -4293,7 +4294,7 @@ def releves_comptes(db: Session, releves) -> list:
 
 
 def sauts_non_comptes(db: Session, d0, d1) -> dict:
-    """Sauts de compteur non résolus sur la période : ce qui n'est pas compté."""
+    """Sauts et reculs de compteur non confirmés sur la période : ce qui n'est pas compté."""
     L = [e for e in _build_journal_entries(db, d0, d1, inclure_en_attente=True)
          if not e.get("en_attente") and _exclu_du_total(e)]
     return {"nb": len(L), "montant": round(sum(e["montant_vente"] for e in L), 2),

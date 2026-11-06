@@ -48,19 +48,27 @@ def test_rapport_jour_signale_non_certifies(client):
     rec = rj["reconciliation"]
     assert rec["releves"]["montant"] == 15000 and rec["sauts_exclus"]["montant"] == 5000
     assert rec["releves"]["montant"] - rec["sauts_exclus"]["montant"] - rec["autres_exclus"]["montant"] == rj["entrees"]["total"]
-    # Un recul est compté (comme au journal), sauf si l'on coche « exclure aussi »
+    # Un recul non plus n'est pas compté tant que la direction ne l'a pas confirmé
     prod2 = client.post("/api/produits", headers=H, json={"nom": f"RJ2-{time.time_ns()}", "prix_gallon": 500}).json()["id"]
     m2 = client.post(f"/api/produits/{prod2}/pompes", headers=H, json={"nom": "Diesel 9"}).json()["id"]
+    ids = []
     for d, per, av, ap in (("2025-06-15", "Apres-midi", 100, 300), ("2025-06-16", "Matin", 250, 260)):
         r = client.post("/api/releves", headers=H, json={"date": d, "periode": per, "pompe_id": m2, "prix_gallon": 500,
                                                          "metter_avant": av, "metter_apres": ap, "motif_ecart_compteur": "changement de compteur"})
         assert r.status_code in (200, 201), r.text
+        ids.append(r.json()["id"])
+    total = lambda: (client.get("/api/carburant/rapport-jour?date=2025-06-16", headers=H).json()["entrees"]["total"],
+                     round(sum(x["montant"] for x in client.get("/api/journal?date_debut=2025-06-16&date_fin=2025-06-16",
+                                                                headers=H).json()["resume"]["par_produit"]), 2))
+    assert total() == (10000, 10000)                       # saut (5 000) et recul (5 000) non comptés
     rj = client.get("/api/carburant/rapport-jour?date=2025-06-16", headers=H).json()
-    j = client.get("/api/journal?date_debut=2025-06-16&date_fin=2025-06-16", headers=H).json()
-    assert rj["entrees"]["total"] == round(sum(x["montant"] for x in j["resume"]["par_produit"]), 2) == 15000
-    sans = client.get("/api/carburant/rapport-jour?date=2025-06-16&sans_non_certifies=true", headers=H).json()
-    assert sans["sans_non_certifies"] is True and sans["entrees"]["total"] == 10000
-    assert sans["reconciliation"]["autres_exclus"]["montant"] == 5000
+    nc = {x["releve_id"]: x for x in rj["non_certifies"]["lignes"]}
+    assert nc[ids[1]]["type_anomalie"] == "recul_compteur" and nc[ids[1]]["compte"] is False
+    # Confirmé (écart justifié) : il compte partout
+    r = client.post(f"/api/journal/releves/{ids[1]}/resoudre", headers=H,
+                    json={"description": "Compteur changé le matin : nouveau départ vérifié sur place"})
+    assert r.status_code == 200, r.text
+    assert total() == (15000, 15000)
 
 
 def test_gallons_par_carburant_jamais_melanges(client):
