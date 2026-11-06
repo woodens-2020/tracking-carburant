@@ -166,3 +166,36 @@ def test_meme_total_dans_tous_les_modules(client):
     rj = client.get(f"/api/carburant/rapport-jour?date={d}", headers=H).json()
     vj = next(x for x in rj["entrees"]["par_produit"] if x["produit"].startswith("Gazoline T"))
     assert vj["montant"] == attendu
+
+
+def test_propane_jamais_melange_au_carburant(client):
+    """Propane : activité à part. Ses ventes, ses dépenses et son total ne se
+    mélangent jamais à ceux du carburant (Gazoline, Diesel), même saisis le
+    même jour."""
+    ns = time.time_ns(); d = "2014-08-08"
+    pompes = {}
+    for nom, prix in ((f"Gazoline P{ns}", 500), (f"Propane P{ns}", 300)):
+        pid = client.post("/api/produits", headers=H, json={"nom": nom, "prix_gallon": prix}).json()["id"]
+        pompes[nom] = (pid, client.post(f"/api/produits/{pid}/pompes", headers=H, json={"nom": f"P {nom}"}).json()["id"], prix)
+    for (pid, pm, prix), q in zip(pompes.values(), (10, 20)):
+        r = client.post("/api/releves", headers=H, json={"date": d, "periode": "Matin", "pompe_id": pm, "prix_gallon": prix,
+                                                         "metter_avant": 0, "metter_apres": q})
+        assert r.status_code in (200, 201), r.text
+    prop_id = pompes[f"Propane P{ns}"][0]
+    for desc, prod in (("Bouteille propane", prop_id), ("Électricité", None)):
+        r = client.post("/api/depenses", headers=H, json={"categorie": "Divers", "description": desc, "montant": 100,
+                                                          "date_depense": d, "produit_id": prod})
+        assert r.status_code in (200, 201), r.text
+    rj = lambda a: client.get(f"/api/carburant/rapport-jour?date={d}&activite={a}", headers=H).json()
+    c, p = rj("carburant"), rj("propane")
+    assert c["entrees"]["total"] == 5000 and p["entrees"]["total"] == 6000
+    assert [x["description"] for x in c["depenses"]["liste"]] == ["Électricité"]
+    assert [x["description"] for x in p["depenses"]["liste"]] == ["Bouteille propane"]
+    assert set(c["activites"]) == {"carburant", "propane"}
+    assert {x["produit"] for x in p["entrees"]["par_produit"]} == {f"Propane P{ns}"}
+    j = client.get(f"/api/journal?date_debut={d}&date_fin={d}", headers=H).json()
+    assert j["resume"]["par_activite"] == {"carburant": 5000, "propane": 6000}
+    assert {x["famille"] for x in j["resume"]["par_famille"]} == {"Gazoline", "Propane"}
+    jp = client.get(f"/api/journal?date_debut={d}&date_fin={d}&activite=propane", headers=H).json()
+    assert {e["produit_nom"] for e in jp["entries"]} == {f"Propane P{ns}"}
+    assert client.get(f"/api/journal?date_debut={d}&date_fin={d}&activite=autre", headers=H).status_code == 400

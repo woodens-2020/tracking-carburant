@@ -528,6 +528,12 @@ canvas{display:block}
 .cjr-vide td{opacity:.5}
 .cjr-ventes{width:100%}
 .cjr-periodes{display:flex;flex-direction:column;gap:16px;width:100%}
+.cjr-act{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 12px;align-items:stretch}
+.cjr-act-b{flex:1;min-width:180px;display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center;text-align:left;
+  background:var(--panel2,var(--panel));border:2px solid var(--border);border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--text);font:inherit}
+.cjr-act-b span{grid-row:span 2;font-size:24px}.cjr-act-b b{font-size:15px}.cjr-act-b small{color:var(--muted)}
+.cjr-act-b.on,.cjr-act-b:hover{border-color:var(--orange,#ea580c);background:rgba(234,88,12,.08)}
+.cjr-act-n{flex-basis:100%;font-size:12px;color:var(--muted)}
 .cjr-nc{border:1px solid rgba(245,158,11,.55);background:rgba(245,158,11,.07);border-radius:12px;padding:10px 12px;margin:0 0 14px}
 .cjr-nc-err{border-color:rgba(239,68,68,.6);background:rgba(239,68,68,.07)}
 .cjr-nc-ok{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.06);font-size:13px}
@@ -16630,7 +16636,45 @@ function _ficheSyntheseHtml(s){
 //   Montants à 2 décimales, gallons à 3 décimales.
 // ══════════════════════════════════════════════════════════════════
 let _cjrJours = [];          // réponses /carburant/rapport-jour, une par jour
-let _cjrSansNC = false;      // true = total sans les relevés non certifiés (mêmes contrôles que le Journal Meters)
+let _cjrSansNC = false;
+// Activité affichée / imprimée : le propane ne se mélange jamais au carburant
+let _cjrActivite = 'carburant';
+let _cjrActivites = ['carburant'];
+const _CJR_ACT = {carburant:{lib:'Carburant', det:'Gazoline + Diesel', ico:'⛽', titre:'CARBURANT'},
+                  propane:{lib:'Propane', det:'Propane seulement', ico:'🔥', titre:'PROPANE'}};
+const _cjrAvecPropane = () => _cjrActivites.includes('propane');
+function cjrActivite(a){ if(a === _cjrActivite) return; _cjrActivite = a; loadCarburantRapport(); }
+function _cjrChoixActivite(){
+  if(!_cjrAvecPropane()) return '';
+  return `<div class="cjr-act">${['carburant','propane'].map(a => `<button type="button" class="cjr-act-b ${a===_cjrActivite?'on':''}" onclick="cjrActivite('${a}')">
+      <span>${_CJR_ACT[a].ico}</span><b>${_CJR_ACT[a].lib}</b><small>${_CJR_ACT[a].det}</small></button>`).join('')}
+    <div class="cjr-act-n">Jamais mélangés : chaque activité a ses ventes, ses dépenses et son solde.</div></div>`;
+}
+// Avant d'imprimer : Propane ou Carburant ?
+function _cjrQuelleActivite(){
+  return new Promise(res => {
+    if(!_cjrAvecPropane()) return res(_cjrActivite);
+    document.getElementById('sup-ov')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'sup-ov'; ov.className = 'sup-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+    ov.innerHTML = `<div class="sup-boite"><div class="sup-ico">🖨</div><h3>Quel rapport imprimer ?</h3>
+      <p>Le propane et le carburant s'impriment séparément, jamais ensemble.</p>
+      <div class="cjr-act" style="margin:10px 0 4px">${['carburant','propane'].map(a => `<button type="button" class="cjr-act-b" data-a="${a}">
+        <span>${_CJR_ACT[a].ico}</span><b>${_CJR_ACT[a].lib}</b><small>${_CJR_ACT[a].det}</small></button>`).join('')}</div>
+      <div class="sup-act"><button class="btn btn-secondary" id="sup-non">Annuler</button></div></div>`;
+    document.body.appendChild(ov);
+    const fin = v => { ov.remove(); res(v); };
+    ov.querySelectorAll('.cjr-act-b').forEach(b => b.onclick = () => fin(b.dataset.a));
+    document.getElementById('sup-non').onclick = () => fin(null);
+    ov.addEventListener('click', e => { if(e.target === ov) fin(null); });
+  });
+}
+async function _cjrAvantImpression(){
+  const a = await _cjrQuelleActivite();
+  if(!a) return false;
+  if(a !== _cjrActivite){ _cjrActivite = a; await loadCarburantRapport(); }
+  return true;
+}      // true = total sans les relevés non certifiés (mêmes contrôles que le Journal Meters)
 let _cjrModele = null;       // données filtrées affichées (réutilisées pour l'impression)
 const _CJR_MAX_JOURS = 62;
 const _CJR_PERIODES = [['Matin','Matin'], ['Apres-midi','Après-midi']];
@@ -16699,7 +16743,9 @@ async function loadCarburantRapport(){
   try{
     // Catégories et bénéficiaires enregistrés (listes de référence des dépenses)
     try{ await Promise.all([_chargerListeRef('categories-depense'), _chargerListeRef('beneficiaires')]); }catch(_){}
-    _cjrJours=await Promise.all(jours.map(j=>GET('/carburant/rapport-jour?date='+j+(_cjrSansNC?'&sans_non_certifies=1':''))));
+    _cjrJours=await Promise.all(jours.map(j=>GET('/carburant/rapport-jour?date='+j+(_cjrSansNC?'&sans_non_certifies=1':'')+'&activite='+_cjrActivite)));
+    _cjrActivites=[...new Set(_cjrJours.flatMap(d=>d.activites||['carburant']))];
+    if(!_cjrAvecPropane() && _cjrActivite!=='carburant'){ _cjrActivite='carburant'; return loadCarburantRapport(); }
 
     const caisses=new Set(), cats=new Set(), benefs=new Set();
     _cjrJours.forEach(d=>{
@@ -16730,8 +16776,8 @@ async function loadCarburantRapport(){
 
 // Carburant d'un produit : Gazoline 1 / 2 → Gazoline, Diesel 1 / 2 → Diesel.
 // Les gallons d'essence et de diesel ne s'additionnent jamais.
-function _cjrFam(n){ return /gaz|essence/i.test(n||'') ? 'Gazoline' : (/diesel/i.test(n||'') ? 'Diesel' : (n||'Autre')); }
-const _cjrRangFam = n => n==='Gazoline' ? 0 : (n==='Diesel' ? 1 : 2);
+function _cjrFam(n){ return /propan/i.test(n||'') ? 'Propane' : /gaz|essence/i.test(n||'') ? 'Gazoline' : (/diesel/i.test(n||'') ? 'Diesel' : (n||'Autre')); }
+const _cjrRangFam = n => n==='Gazoline' ? 0 : (n==='Diesel' ? 1 : (n==='Propane' ? 2 : 3));
 // {Gazoline: g, Diesel: g} → « Gazoline 1 909,706 gal · Diesel 562,480 gal »
 function cjrGalF(o, sep){
   const l = Object.entries(o||{}).filter(([,g])=>Math.abs(g)>0.00001).sort((a,b)=>_cjrRangFam(a[0])-_cjrRangFam(b[0]));
@@ -16854,12 +16900,12 @@ function _cjrTableVentesHtml(m, impression){
     : `<tr class="cjr-per-vide"><td colspan="4">Aucune vente sur cette sélection</td></tr>`;
   const libTot = m.unJour ? 'Total des ventes de la journée' : 'Total des ventes de la période';
   if(impression){
-    return `<table><thead><tr><th>Carburant</th><th class="r">Gallons</th><th class="r">Prix moyen / gal</th><th class="r">Montant</th></tr></thead>
+    return `<table><thead><tr><th>Produit</th><th class="r">Gallons</th><th class="r">Prix moyen / gal</th><th class="r">Montant</th></tr></thead>
       <tbody>${lignes}<tr class="tot"><td colspan="3">${libTot} (gourdes)</td><td class="r">${cjrG(t.ventes)}</td></tr></tbody></table>`;
   }
   return `<div class="tbl-wrap"><table class="dt cjr-table">
       <colgroup><col class="c-prod"><col class="c-num"><col class="c-num"><col class="c-num"></colgroup>
-      <thead><tr><th>Carburant</th><th class="tr">Gallons</th><th class="tr">Prix moyen / gal</th><th class="tr">Montant</th></tr></thead>
+      <thead><tr><th>Produit</th><th class="tr">Gallons</th><th class="tr">Prix moyen / gal</th><th class="tr">Montant</th></tr></thead>
       <tbody>${lignes}</tbody>
       <tfoot><tr class="cjr-per-sous"><td colspan="3">${libTot} (gourdes) — les gallons restent séparés par carburant</td><td class="tr num">${cjrG(t.ventes)}</td></tr></tfoot>
     </table></div>`;
@@ -16871,6 +16917,8 @@ function cjrAfficher(){
   const m=_cjrModele=_cjrConstruire();
   const t=m.totaux;
   document.getElementById('cjr-sous').textContent = 'Rapport ' + _cjrPeriodeTexte(m);
+  const titre = document.querySelector('#page-carburant-rapport .per-title');
+  if(titre) titre.textContent = 'Rapport de caisse ' + (_cjrActivite === 'propane' ? 'propane' : 'carburant');
   const soldeCol = t.solde>=0 ? 'var(--green)' : 'var(--red)';
   const filtres = m.filtres.liste.length
     ? `<div class="cjr-filtres-actifs">Filtres actifs : ${m.filtres.liste.map(f=>`<b>${esc(f)}</b>`).join(' · ')}
@@ -16911,6 +16959,7 @@ function cjrAfficher(){
 
   const parCarb = m.familles.map(f=>`${esc(f.nom)} ${cjrGal(f.g)} · ${cjrG(f.m)}`).join('<br>');
   body.innerHTML = `
+    ${_cjrChoixActivite()}
     ${filtres}
     ${_cjrNonCertifiesHtml()}
     <div class="cjr-kpis">
@@ -16931,7 +16980,7 @@ function cjrAfficher(){
       </div>
     </div>
     ${tableJours}
-    <h3 class="cjr-h">Ventes de carburant</h3>
+    <h3 class="cjr-h">Ventes ${_cjrActivite==='propane'?'de propane':'de carburant (Gazoline, Diesel)'}</h3>
     <div class="cjr-note">Source : relevés de compteurs.</div>
     ${_cjrTableVentesHtml(m,false)}
     <h3 class="cjr-h">Dépenses</h3>
@@ -16945,8 +16994,9 @@ function cjrAfficher(){
 // Dépenses, puis TOTAL DÉPENSES et DÉPÔT (= total entrées − total dépenses).
 // Les transferts (dépôt en banque, Zelle…) ne sont pas des dépenses : ils
 // sont rappelés sous le dépôt.
-function cjrImprimer(){
+async function cjrImprimer(){
   if(!_cjrModele){ toast('Chargez d\'abord le rapport.','inf'); return; }
+  if(!await _cjrAvantImpression()) return;
   const m=_cjrModele, t=m.totaux;
   const b=(typeof _branding!=='undefined' && _branding) || {};
   const e=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -17008,7 +17058,7 @@ function cjrImprimer(){
     <div class="tete">
       <h1>${e(nom)}</h1>
       ${b.adresse?`<div class="adr">${e(b.adresse)}</div>`:''}
-      <div class="doc">Rapport Journalier</div>
+      <div class="doc">Rapport Journalier${_cjrAvecPropane() ? ' — ' + _CJR_ACT[_cjrActivite].lib.toUpperCase() : ''}</div>
     </div>
     <div class="date">Date : <b>${e(dateTxt)}</b>${m.filtres.liste.length?` <span class="cat">(${m.filtres.liste.map(e).join(' · ')})</span>`:''}</div>
     <table>
@@ -17040,8 +17090,9 @@ function cjrImprimer(){
 }
 
 // Version détaillée (indicateurs, ventes par carburant, jour par jour)
-function cjrImprimerDetaille(){
+async function cjrImprimerDetaille(){
   if(!_cjrModele){ toast('Chargez d\'abord le rapport.','inf'); return; }
+  if(!await _cjrAvantImpression()) return;
   const m=_cjrModele, t=m.totaux;
   const org  = (typeof _branding!=='undefined' && (_branding.nom||_branding.raison_sociale)) || '';
   const org2 = (typeof _branding!=='undefined' && _branding.complexe) || '';
@@ -17100,7 +17151,7 @@ function cjrImprimerDetaille(){
   </style></head><body>
     <div class="head">
       <div>${org?`<div class="org">${e(org)}</div>`:''}${act?`<div class="act">${e(act).replace(/·/g,' • ')}</div>`:''}${org2?`<div class="sub">${e(org2)}</div>`:''}</div>
-      <div class="doc"><h1>RAPPORT DE CAISSE CARBURANT</h1><div class="per">${_cjrPeriodeTexte(m)}</div></div>
+      <div class="doc"><h1>RAPPORT DE CAISSE ${_CJR_ACT[_cjrActivite].titre}</h1><div class="per">${_cjrPeriodeTexte(m)}</div></div>
     </div>
     ${m.filtres.liste.length?`<div class="filtres">Filtres : ${m.filtres.liste.map(e).join(' · ')}</div>`:''}
     <div class="kpis">
@@ -17109,7 +17160,7 @@ function cjrImprimerDetaille(){
       <div class="kpi"><div class="l">Solde (ventes − dépenses)</div><div class="v ${t.solde>=0?'ok':'neg'}">${cjrG(t.solde)}</div></div>
     </div>
     ${jours}
-    <h2>Ventes de carburant</h2>
+    <h2>Ventes ${_cjrActivite==='propane'?'de propane':'de carburant'}</h2>
     ${_cjrTableVentesHtml(m,true)}
     <h2>Dépenses (${m.depenses.length})</h2>
     <table><thead><tr>${m.unJour?'':'<th>Date</th>'}<th>Catégorie</th><th>Description</th><th>Bénéficiaire</th><th>Caisse</th><th>Type</th><th class="r">Montant</th></tr></thead>
@@ -17733,6 +17784,7 @@ async function loadJournal(){
     const certif=document.getElementById('jf-certif')?.value;
     if(certif) url+=`&certifie=${certif}`;
     const data=await GET(url);
+    _jrActivites = [...new Set((products||[]).map(p => /propan/i.test(p.nom) ? 'propane' : 'carburant'))];
     renderJournal(data);
     document.getElementById('btn-journal-pdf').style.display='';
     document.getElementById('btn-journal-xls').style.display='';
@@ -17742,8 +17794,16 @@ async function loadJournal(){
   }
 }
 
-function downloadJournalPdf(){
+// Journal Meters : propane et carburant s'impriment / s'exportent séparément
+let _jrActivites = [];
+async function _jrQuelleActivite(){
+  if(!_jrActivites.includes('propane')) return '';
+  _cjrActivites = [...new Set(['carburant', ..._jrActivites])];
+  return await _cjrQuelleActivite();
+}
+async function downloadJournalPdf(){
   if(_isReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return; }
+  const act = await _jrQuelleActivite(); if(act === null) return;
   const debut=document.getElementById('jf-debut').value;
   const fin  =document.getElementById('jf-fin').value;
   const prodId=document.getElementById('jf-prod').value;
@@ -17758,11 +17818,13 @@ function downloadJournalPdf(){
   pompisteIds.forEach(id=>{ url+=`&pompiste_id=${id}`; });
   const certif=document.getElementById('jf-certif')?.value;
   if(certif) url+=`&certifie=${certif}`;
+  if(act) url+=`&activite=${act}`;
   window.location.href=url;
 }
 
-function downloadJournalXls(){
+async function downloadJournalXls(){
   if(_isReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return; }
+  const act = await _jrQuelleActivite(); if(act === null) return;
   const debut=document.getElementById('jf-debut').value;
   const fin  =document.getElementById('jf-fin').value;
   const prodId=document.getElementById('jf-prod').value;
@@ -17775,6 +17837,7 @@ function downloadJournalXls(){
   pompeIds.forEach(id=>{ url+=`&pompe_id=${id}`; });
   if(periodeId) url+=`&periode=${encodeURIComponent(periodeId)}`;
   pompisteIds.forEach(id=>{ url+=`&pompiste_id=${id}`; });
+  if(act) url+=`&activite=${act}`;
   window.location.href=url;
 }
 
@@ -17917,7 +17980,12 @@ function renderJournal(data){
       <div class="grc-gal">${fmtGalX(pp.gallons)}</div>
       <div class="grc-mnt">${fmtGX(pp.montant)} · ${pp.nb_releves} relevé${pp.nb_releves>1?'s':''}</div>
     </div>`).join('')}
-    ${(resume.par_famille||resume.par_produit).length>1?`<div class="galrecap-card grc-total">
+    ${Object.keys(resume.par_activite||{}).length>1
+      ? Object.entries(resume.par_activite).map(([a,m])=>`<div class="galrecap-card grc-total">
+          <div class="grc-lbl">Total ${a==='propane'?'🔥 Propane':'⛽ Carburant (Gazoline + Diesel)'} (gourdes)</div>
+          <div class="grc-gal">${fmtGX(m)}</div>
+          <div class="grc-mnt">Propane et carburant jamais additionnés</div></div>`).join('')
+      : (resume.par_famille||resume.par_produit).length>1?`<div class="galrecap-card grc-total">
       <div class="grc-lbl">Total des ventes (gourdes)</div>
       <div class="grc-gal">${fmtGX(resume.par_produit.reduce((s,p)=>s+p.montant,0))}</div>
       <div class="grc-mnt">Les gallons restent séparés par produit</div>

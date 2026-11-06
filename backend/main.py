@@ -3957,6 +3957,7 @@ def _build_journal_entries(
     periode_filter: Optional[str] = None,
     pompiste_id_filter=None,                  # un id ou une liste d'ids
     inclure_en_attente: bool = False,
+    activite: Optional[str] = None,           # "carburant" | "propane" | None (tout)
 ) -> list:
     """
     Source unique de vérité pour la construction des entrées du journal.
@@ -4173,6 +4174,8 @@ def _build_journal_entries(
         ids = (set(pompiste_id_filter) if isinstance(pompiste_id_filter, (list, tuple, set))
                else {pompiste_id_filter})
         entries = [e for e in entries if e["pompiste_id"] in ids]
+    if activite:
+        entries = [e for e in entries if _activite_produit(e.get("produit_nom")) == activite]
 
     # Affichage jour par jour : tous les relevés d'une date ensemble (Matin
     # puis Après-midi, produit, pompe) — l'analyse ci-dessus reste par pompe
@@ -4253,11 +4256,29 @@ def _famille_carburant(nom: Optional[str]) -> str:
     """Gazoline 1 / Gazoline 2 → « Gazoline » ; Diesel 1 / Diesel 2 → « Diesel ».
     Les gallons d'essence et de diesel ne s'additionnent jamais."""
     n = (nom or "").lower()
+    if "propan" in n:
+        return "Propane"
     if "gaz" in n or "essence" in n:
         return "Gazoline"
     if "diesel" in n:
         return "Diesel"
     return nom or "Inconnu"
+
+
+ACTIVITES = ("carburant", "propane")
+
+
+def _activite_produit(nom: Optional[str]) -> str:
+    """Propane = activité à part, jamais mélangée au carburant (Gazoline, Diesel)."""
+    return "propane" if _famille_carburant(nom) == "Propane" else "carburant"
+
+
+def _activite_valide(activite: Optional[str]) -> Optional[str]:
+    if activite in (None, "", "tout"):
+        return None
+    if activite not in ACTIVITES:
+        raise HTTPException(400, "activite : « carburant » ou « propane ».")
+    return activite
 
 
 def _gallons_par_famille(lignes) -> dict:
@@ -4310,6 +4331,7 @@ def journal_endpoint(
     periode:    Optional[str] = None,
     pompiste_id: List[int] = Query(default=[]),
     certifie: Optional[str] = None,          # "oui" | "non" ; vide = tous
+    activite: Optional[str] = None,          # "carburant" | "propane" ; vide = tout
     db: Session = Depends(get_db),
 ):
     from datetime import date as dt
@@ -4318,7 +4340,8 @@ def journal_endpoint(
     d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
 
     tous = _filtre_certifie(_build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode,
-                                                   pompiste_id, inclure_en_attente=True), certifie)
+                                                   pompiste_id, inclure_en_attente=True,
+                                                   activite=_activite_valide(activite)), certifie)
     # Les rapports pompistes pas encore finalisés sont listés mais ne comptent
     # dans aucun total (ni gallons, ni montant, ni conformité)
     en_attente = [e for e in tous if e["en_attente"]]
@@ -4383,6 +4406,9 @@ def journal_endpoint(
             "total_gallons":     total_gallons,
             "par_produit":       par_produit,
             "par_famille":       par_famille,
+            "par_activite":      {a: round(sum(x["montant"] for x in par_famille
+                                               if _activite_produit(x["famille"]) == a), 2)
+                                  for a in ACTIVITES if any(_activite_produit(x["famille"]) == a for x in par_famille)},
         },
     }
 
@@ -4493,6 +4519,7 @@ def carburant_synthese(
 def carburant_rapport_jour(
     date: Optional[date_type] = None,
     sans_non_certifies: bool = False,
+    activite: Optional[str] = None,          # "carburant" | "propane" ; vide = tout
     db: Session = Depends(get_db),
 ):
     """Rapport de caisse carburant pour UNE journée :
@@ -4508,14 +4535,17 @@ def carburant_rapport_jour(
     produits = {p.id: p.nom for p in db.query(Produit).all()}
 
     # ── ENTRÉES du jour : ventes de carburant (relevés du jour) ──────
+    activite = _activite_valide(activite)
     rel_jour = (
         db.query(Releve).join(Pompe, Releve.pompe_id == Pompe.id)
         .filter(Releve.date == d).all()
     )
+    if activite:      # Propane et carburant ne se mélangent jamais
+        rel_jour = [r for r in rel_jour if _activite_produit(produits.get(r.pompe.produit_id)) == activite]
     # Mêmes contrôles et même total que le Journal Meters : chaque relevé non
     # certifié est signalé ; les sauts de compteur non résolus ne sont pas
     # comptés (_exclu_du_total) ; `sans_non_certifies` écarte aussi les autres.
-    tous_j = _build_journal_entries(db, d, d, inclure_en_attente=True)
+    tous_j = _build_journal_entries(db, d, d, inclure_en_attente=True, activite=activite)
     journal = {e["id"]: e for e in tous_j if not e.get("en_attente")}
     en_attente_j = [e for e in tous_j if e.get("en_attente")]
     a_verifier = []
@@ -4611,6 +4641,21 @@ def carburant_rapport_jour(
         db.query(Depense).filter(Depense.date_depense == d)
         .order_by(Depense.id.asc()).all()
     )
+    if activite:
+        # Dépense d'un produit : son activité ; payée par un pompiste : celle du
+        # rapport (propane seulement si tous ses mètres sont du propane) ;
+        # dépense générale de la caisse : carburant.
+        from models import RapportPompiste as _RP
+
+        def _act_dep(x):
+            if x.produit_id:
+                return _activite_produit(produits.get(x.produit_id))
+            if getattr(x, "rapport_pompiste_id", None):
+                rap = db.get(_RP, x.rapport_pompiste_id)
+                acts = {_activite_produit(produits.get(l.pompe.produit_id)) for l in (rap.lignes if rap else [])}
+                return "propane" if acts == {"propane"} else "carburant"
+            return "carburant"
+        deps = [x for x in deps if _act_dep(x) == activite]
     def _source_dep(x):
         if x.produit:
             return x.produit.nom
@@ -4667,6 +4712,8 @@ def carburant_rapport_jour(
         "date":      str(d),
         "genere_le": _dtn2.now(_tzu2.utc).isoformat(),
         "sans_non_certifies": sans_non_certifies,
+        "activite": activite,
+        "activites": sorted({_activite_produit(n) for n in produits.values()}),
         "reconciliation": reconciliation,
         "non_certifies": {
             "lignes":  a_verifier,
@@ -4709,6 +4756,7 @@ def journal_pdf(
     periode:    Optional[str] = None,
     pompiste_id: List[int] = Query(default=[]),
     certifie: Optional[str] = None,
+    activite: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     import io
@@ -4727,7 +4775,8 @@ def journal_pdf(
     d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
 
     entries    = [e for e in _filtre_certifie(_build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None,
-                                                                 periode, pompiste_id, inclure_en_attente=True), certifie)
+                                                                 periode, pompiste_id, inclure_en_attente=True,
+                                                                 activite=_activite_valide(activite)), certifie)
                   if not e["en_attente"]]
     nb_alertes = sum(1 for e in entries if e["statut"] == "alerte")
     nb_erreurs = sum(1 for e in entries if e["statut"] == "erreur")
@@ -4933,6 +4982,7 @@ def export_releves_xlsx(
     pompe_id:   List[int] = Query(default=[]),
     periode:    Optional[str] = None,
     pompiste_id: List[int] = Query(default=[]),
+    activite: Optional[str] = None,          # "carburant" | "propane" ; vide = tout
     db: Session = Depends(get_db),
 ):
     import io
@@ -4954,6 +5004,9 @@ def export_releves_xlsx(
     if periode:     q = q.filter(Releve.periode == periode)
     if pompiste_id: q = q.filter(Releve.pompiste_id.in_(pompiste_id))
     releves = q.order_by(Releve.date.desc(), Releve.periode, Releve.pompe_id).all()
+    act = _activite_valide(activite)
+    if act:      # propane et carburant jamais dans le même fichier
+        releves = [r for r in releves if _activite_produit(r.pompe.produit.nom if r.pompe and r.pompe.produit else None) == act]
 
     # ── Styles helpers ─────────────────────────────────────────────────
     def _fill(hex_color):
