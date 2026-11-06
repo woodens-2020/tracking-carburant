@@ -3402,6 +3402,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .psp-chip.on{background:rgba(249,115,22,.12);border-color:var(--orange);color:var(--text)}
 .psp-jour{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--orange);margin:16px 0 6px}
 .psp-liste td{vertical-align:middle}
+.psp-poubelle{background:none;border:1px solid transparent;border-radius:8px;cursor:pointer;font-size:15px;padding:3px 6px;margin-left:4px;opacity:.6;vertical-align:middle}
+.psp-poubelle:hover,.psp-poubelle:focus-visible{opacity:1;border-color:var(--red);background:rgba(239,68,68,.1);outline:none}
 .psp-ligne-clic{cursor:pointer}
 .psp-ligne-clic:hover td{background:rgba(249,115,22,.06)}
 .psp-detail-barre{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -20929,7 +20931,8 @@ function pspRendreListe(){
               <td class="psp-muted">${verif}</td>
               <td>${r.supprime ? `<span class="psp-badge REJETE">🗑 Supprimé</span><div class="psp-muted">${esc(r.supprime.motif||'')}</div>`
                 : `<span class="psp-badge ${r.statut}">${_PSP_LIB[r.statut]}</span>${r.certifie?' <span class="cert">Certifié</span>':''}`}</td>
-              <td class="r"><button class="btn ${['SOUMIS','PROBLEME'].includes(r.statut)?'btn-primary':'btn-secondary'} psp-mini">${['SOUMIS','PROBLEME'].includes(r.statut)?'Ouvrir et corriger':'Ouvrir'}</button></td></tr>`;
+              <td class="r" style="white-space:nowrap"><button class="btn ${['SOUMIS','PROBLEME'].includes(r.statut)?'btn-primary':'btn-secondary'} psp-mini">${['SOUMIS','PROBLEME'].includes(r.statut)?'Ouvrir et corriger':'Ouvrir'}</button>
+                ${r.supprime || r.statut === 'EN_COURS' ? '' : `<button class="psp-poubelle" title="Supprimer ce rapport (entré par erreur) — il reste récupérable dans « 🗑 Supprimés »" onclick="event.stopPropagation();pspSupprimer(${r.id})">🗑</button>`}</td></tr>`;
           }).join('')}</tbody></table></div>`).join('')}`
     : `<div class="psp-card"><b>Aucun rapport pour ce filtre.</b>
         <div class="psp-muted" style="margin-top:4px">Les pompistes saisissent leurs compteurs sur <b>${esc(location.origin)}/pompiste</b>.</div></div>`}`;
@@ -21258,7 +21261,7 @@ function pspCarte(r){
       <td><b>${esc(l.pompe_nom)}</b><div class="psp-muted">${esc(l.produit_nom)}</div>
         ${l.pompe_saisie ? `<div class="psp-warn" style="font-size:11px;padding:2px 6px;margin-top:2px">saisi sur ${esc(l.pompe_saisie.pompe_nom)}</div>` : ''}
         <button class="psp-lien" style="font-size:11.5px" onclick="pspChangerPompe(${r.id},${l.pompe_id})" title="Le pompiste s'est trompé de pompe : remettre ces index sur la bonne">⇄ changer de pompe</button></td>
-      <td class="r">${_pspN(prec)}${rupt ? `<div class="psp-neg" style="font-size:11px;font-weight:700">≠ début saisi (${av - prec > 0 ? '+' : ''}${_pspN(av - prec)})</div>` : ''}</td>
+      <td class="r">${_pspN(prec)}${rupt ? `<div class="psp-neg" style="font-size:11px;font-weight:700">écart ${av - prec > 0 ? '+' : ''}${_pspN(av - prec)} gal · ${_pspG(Math.abs(av - prec) * l.prix_gallon)}</div>` : ''}</td>
       <td class="r">${l.confirmee ? _pspN(av) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="avant" value="${_pspValeur(r.id, l.pompe_id, 'avant', av)}" oninput="_pspGarder(this)">`}</td>
       <td class="r">${l.confirmee ? _pspN(ap) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="apres" value="${_pspValeur(r.id, l.pompe_id, 'apres', ap)}" oninput="_pspGarder(this)">`}</td>
       <td class="r">${_pspN(l.gallons)}</td>
@@ -21292,7 +21295,9 @@ function pspCarte(r){
     ${_pspEtape(1, `Mètres — confirmez chaque pompe (${r.lignes.filter(l=>l.confirmee).length}/${r.lignes.length})`, toutesLignes,
       `<div style="overflow-x:auto"><table class="psp-tbl"><thead><tr><th>Pompe</th><th class="r">Index précédent</th><th class="r">Début</th><th class="r">Fin</th>
         <th class="r">Gallons</th><th class="r">Montant</th><th></th></tr></thead><tbody>${lignes}</tbody></table></div>
-       <div class="psp-muted" style="margin-top:4px">Modifiez un index avant de confirmer pour le corriger ; la saisie du pompiste reste conservée.</div>`)}
+       ${_pspResumeEcarts(r)}
+       <div class="psp-muted" style="margin-top:4px">Modifiez un index avant de confirmer pour le corriger ; la saisie du pompiste reste conservée.
+         <b>Rien n'entre au journal, à la caisse ni aux Dépenses avant « Finaliser ».</b></div>`)}
 
     ${_pspEtape(2, 'Billetterie', r.billetterie_confirmee,
       `<div style="overflow-x:auto"><table class="psp-tbl" style="max-width:520px"><thead><tr><th>Coupure</th><th class="r">Nombre de billets</th><th class="r">Montant</th></tr></thead>
@@ -21346,15 +21351,33 @@ async function _pspAction(id, path, body){
   catch(e){ _pspMsg(id, `<div class="psp-err">${esc(e.message)}</div>`); notify(e.message, 'err'); throw e; }
 }
 
+// Écarts de compteur des mètres du rapport (gallons par carburant, gourdes)
+function _pspResumeEcarts(r){
+  const L = r.lignes.map(l => ({l, e: l.index_precedent != null ? (l.metter_avant_corrige ?? l.metter_avant) - l.index_precedent : 0}))
+    .filter(x => Math.abs(x.e) > 0.001);
+  if(!L.length) return '<div class="psp-ok" style="margin-top:8px;font-weight:700">✓ Aucun écart de compteur : chaque début suit le dernier index.</div>';
+  const mt = L.reduce((a, x) => a + Math.abs(x.e) * x.l.prix_gallon, 0);
+  return `<div class="psp-err" style="margin-top:8px">⚠ <b>${L.length} écart${L.length>1?'s':''} de compteur</b> :
+    ${L.map(x => `${esc(x.l.pompe_nom)} ${x.e > 0 ? '+' : ''}${_pspN(x.e)} gal (${_pspG(Math.abs(x.e) * x.l.prix_gallon)})`).join(' · ')}
+    — total ${_pspG(mt)}.</div>`;
+}
+
 async function pspLigne(id, pompe, confirmer){
   if(!confirmer) return _pspAction(id, `lignes/${pompe}/reprendre`).catch(()=>{});
   const v = k => parseFloat(String(document.querySelector(`input[data-r="${id}"][data-p="${pompe}"][data-k="${k}"]`).value).replace(',', '.'));
   const av = v('avant'), ap = v('apres');
   if(isNaN(av) || isNaN(ap)) return notify('Index invalide.', 'err');
+  // Écart avec le dernier index connu : on dit combien, avant de confirmer
+  const r0 = PSP.rapports.find(x => x.id === id), l0 = (r0?.lignes||[]).find(x => x.pompe_id === pompe);
+  if(l0 && l0.index_precedent != null && Math.abs(av - l0.index_precedent) > 0.001){
+    const e = av - l0.index_precedent, mt = Math.abs(e) * l0.prix_gallon;
+    if(!await showConfirm(`${l0.pompe_nom} : le début ${_pspN(av)} ne suit pas le dernier index ${_pspN(l0.index_precedent)}
+        (${l0.index_precedent_source||'journal'}). Écart de ${e > 0 ? '+' : ''}${_pspN(e)} gallons, soit ${_pspG(mt)} au prix de ${_pspN(l0.prix_gallon)} G/gal.
+        ${e > 0 ? 'Ces gallons sont sortis de la pompe sans être dans un rapport.' : 'Le compteur recule : vérifiez la lecture.'} Confirmer quand même ?`,
+        {title:`Écart de compteur : ${_pspG(mt)}`, type:'warn', okLabel:'Confirmer avec l’écart'})) return;
+  }
   _pspAction(id, `lignes/${pompe}/confirmer`, {metter_avant:av, metter_apres:ap})
-    .then(r => { const s = _pspS(id); if(s.index) delete s.index[pompe];
-      const l = (r?.lignes||[]).find(x => x.pompe_id === pompe);
-      if(l?.journal?.de_ce_rapport) notify(`${l.pompe_nom} confirmé : il est dans la Saisie (${_pspDate(r.date)}).`, 'ok'); }).catch(()=>{});
+    .then(r => { const s = _pspS(id); if(s.index) delete s.index[pompe]; }).catch(()=>{});
 }
 // Valeurs tapées par le superviseur dans les index non confirmés
 function _pspValeur(id, pompe, k, defaut){ const v = _pspS(id).index?.[pompe]?.[k]; return v != null ? esc(String(v)) : defaut; }

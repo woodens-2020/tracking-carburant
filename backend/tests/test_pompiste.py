@@ -252,11 +252,11 @@ def test_journal_comme_le_module_saisie(client):
     assert j["resume"]["total_gallons"] == 0 and j["resume"]["nb_en_attente"] == 1 and j["resume"]["gallons_en_attente"] == 50
     assert [e["pompe_id"] for e in journal(pompiste_id=emp_id)["entries"]] == [pompe]
     assert gallons_du_jour() == avant                                 # rapport du jour / caisse inchangés
-    # Mètre confirmé (corrigé) par la direction : il entre aussitôt au journal / dans la Saisie
+    # Mètre confirmé (corrigé) par la direction : toujours « en attente », compté nulle part
     _sup(client, rid, f"lignes/{pompe}/confirmer", metter_avant=10, metter_apres=58)
     j = journal(pompe_id=pompe)
-    assert len(j["entries"]) == 1 and j["entries"][0]["en_attente"] is False and j["entries"][0]["metter_apres"] == 58
-    assert abs(gallons_du_jour() - avant - 48) < 1e-6
+    assert len(j["entries"]) == 1 and j["entries"][0]["en_attente"] is True and j["entries"][0]["metter_apres"] == 58
+    assert gallons_du_jour() == avant
     # Finalisation : le rapport est clos, les chiffres restent les mêmes
     _sup(client, rid, "billetterie", confirme=True)
     _sup(client, rid, "ecart", confirme=True)
@@ -433,40 +433,33 @@ def test_depenses_et_dollars(client):
     def mes_depenses():
         deps = client.get(f"/api/depenses?date_debut={jour}&date_fin={jour}", headers=H).json()["depenses"]
         return [x for x in deps if (x["reference"] or "").startswith(f"RP{rid}-")]
-    # Confirmée : elle entre tout de suite dans les Dépenses, marquée « payée par le pompiste »
+    # Confirmée : rien dans les Dépenses avant la finalisation du rapport
     r = _sup(client, rid, "depenses/0/confirmer")
     assert r.status_code == 200 and r.json()["depenses"][0]["statut"] == "confirmee"
-    assert [(x["montant"], x["rapport_pompiste_id"]) for x in mes_depenses()] == [(1500, rid)]
-    assert "autorisée par M. Pierre" in mes_depenses()[0]["notes"]
+    assert mes_depenses() == []
     # Refusée (motif obligatoire) : elle ne réduit plus l'argent à remettre
     assert _sup(client, rid, "depenses/1/refuser", motif="").status_code == 400
     r = _sup(client, rid, "depenses/1/refuser", motif="Pas autorisée par la direction")
     assert r.json()["total_depenses_retenues"] == 1500 and r.json()["ecart_final"] == -5250   # 43 250 + 1 500 − 50 000
-    assert len(mes_depenses()) == 1
-    # Reprendre puis reconfirmer ne crée pas de doublon
-    _sup(client, rid, "depenses/0/reprendre"); assert mes_depenses() == []
-    _sup(client, rid, "depenses/0/confirmer"); _sup(client, rid, "depenses/0/confirmer")
-    assert len(mes_depenses()) == 1
-    # Flèche « ➜ Dépenses : Non » à la confirmation : confirmée, mais hors des Dépenses
+    # Reprendre, reconfirmer, flèche Non puis Oui : seulement le choix, toujours rien dans les Dépenses
+    _sup(client, rid, "depenses/0/reprendre"); _sup(client, rid, "depenses/0/confirmer"); _sup(client, rid, "depenses/0/confirmer")
     _sup(client, rid, "depenses/0/reprendre")
     r = _sup(client, rid, "depenses/0/confirmer", envoyer=False)
     assert r.json()["depenses"][0]["vers_depenses"] is False and r.json()["total_depenses_retenues"] == 1500
-    assert mes_depenses() == []
     assert _sup(client, rid, "depenses/1/envoyer", envoyer=True).status_code == 409     # refusée
-    # Envoyée plus tard : elle entre dans les Dépenses et le rapport du jour
     r = _sup(client, rid, "depenses/0/envoyer", envoyer=True)
     assert r.status_code == 200 and r.json()["depenses"][0]["vers_depenses"] is True
-    assert len(mes_depenses()) == 1
+    assert mes_depenses() == []
+    rj = client.get(f"/api/carburant/rapport-jour?date={jour}", headers=H).json()
+    assert not [x for x in rj["depenses"]["liste"] if x["reference"] == f"RP{rid}-1"]
+    assert _sup(client, rid, "ecart", confirme=True).status_code == 200
+    assert _sup(client, rid, "finaliser", note=7, commentaire="Il manque 5 250 G").status_code == 200
+    # Finalisé : elle est dans les Dépenses et le rapport du jour, marquée « payée par le pompiste »
+    assert [(x["montant"], x["rapport_pompiste_id"]) for x in mes_depenses()] == [(1500, rid)]
+    assert "autorisée par M. Pierre" in mes_depenses()[0]["notes"]
     rj = client.get(f"/api/carburant/rapport-jour?date={jour}", headers=H).json()
     lj = [x for x in rj["depenses"]["liste"] if x["reference"] == f"RP{rid}-1"]
     assert len(lj) == 1 and lj[0]["pompiste"] and lj[0]["source"].startswith("Payée par le pompiste")
-    _sup(client, rid, "depenses/0/envoyer", envoyer=False); assert mes_depenses() == []
-    rj = client.get(f"/api/carburant/rapport-jour?date={jour}", headers=H).json()
-    assert not [x for x in rj["depenses"]["liste"] if x["reference"] == f"RP{rid}-1"]
-    _sup(client, rid, "depenses/0/envoyer", envoyer=True); assert len(mes_depenses()) == 1
-    assert _sup(client, rid, "ecart", confirme=True).status_code == 200
-    assert _sup(client, rid, "finaliser", note=7, commentaire="Il manque 5 250 G").status_code == 200
-    assert len(mes_depenses()) == 1
     # Après finalisation, la flèche marche encore (retirer puis renvoyer)
     _sup(client, rid, "depenses/0/envoyer", envoyer=False); assert mes_depenses() == []
     _sup(client, rid, "depenses/0/envoyer", envoyer=True); assert len(mes_depenses()) == 1
@@ -804,6 +797,8 @@ def test_supprimer_rapport_garde_saisie_corrigee(client):
     rap = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 25}], "depenses": []}).json()
     for pid, ap in ((p1, 20), (p2, 30)):
         assert _sup(client, rap["id"], f"lignes/{pid}/confirmer", metter_avant=0, metter_apres=ap).status_code == 200
+    _sup(client, rap["id"], "billetterie", confirme=True); _sup(client, rap["id"], "ecart", confirme=True)
+    assert _sup(client, rap["id"], "finaliser", note=8, commentaire="ok").status_code == 200
     with SessionLocal() as s:
         r2 = s.query(Releve).filter_by(rapport_pompiste_id=rap["id"], pompe_id=p2).one()
         r2.metter_apres = 35                      # corrigé à la main dans la Saisie
@@ -858,9 +853,8 @@ def test_changer_de_pompe(client):
     with SessionLocal() as s:
         assert not s.query(Releve).filter_by(pompe_id=pa, periode="Matin").filter(Releve.date == today_haiti()).count()
     assert _sup(client, rid, f"lignes/{pb}/confirmer", metter_avant=500, metter_apres=520).status_code == 200
-    with SessionLocal() as s:
-        rb = s.query(Releve).filter_by(pompe_id=pb, periode="Matin").filter(Releve.date == today_haiti()).one()
-        assert rb.rapport_pompiste_id == rid and float(rb.metter_apres) == 520
+    with SessionLocal() as s:          # confirmé mais pas finalisé : rien au journal
+        assert not s.query(Releve).filter_by(pompe_id=pb, periode="Matin").filter(Releve.date == today_haiti()).count()
     # Retour sur A : la pompe saisie n'est plus signalée
     r = _sup(client, rid, f"lignes/{pb}/changer-pompe", pompe_id=pa, motif="Finalement c'était A")
     assert r.json()["lignes"][0]["pompe_id"] == pa and r.json()["lignes"][0]["pompe_saisie"] is None
@@ -897,9 +891,9 @@ def test_changer_de_pompe(client):
 
 
 def test_metre_confirme_entre_dans_la_saisie(client):
-    """Dès que la direction confirme un mètre d'un rapport pompiste, il est
-    dans la Saisie (journal), attribué au pompiste ; « reprendre » l'en retire ;
-    le nettoyage du démarrage le garde."""
+    """Un mètre confirmé par la direction n'entre dans la Saisie (journal)
+    qu'à la finalisation du rapport ; avant, il reste « en attente », et le
+    nettoyage du démarrage retire ce qu'un ancien fonctionnement y aurait mis."""
     from tz_utils import today_haiti
     import main as _m
     jour = str(today_haiti())
@@ -911,24 +905,26 @@ def test_metre_confirme_entre_dans_la_saisie(client):
               "lignes": [{"pompe_id": pompe, "metter_avant": 0, "metter_apres": 40, "debut_confirme": True}]}).status_code == 201
     rap = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 20}]}).json()
     dans_saisie = lambda: [x for x in client.get(f"/api/releves?date={jour}", headers=H).json() if x["pompe_id"] == pompe]
-    assert dans_saisie() == []                                     # soumis, pas encore confirmé
     r = client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/lignes/{pompe}/confirmer", headers=H,
                     json={"metter_avant": 0, "metter_apres": 40})
-    assert r.status_code == 200 and not any("non écrit" in a for a in r.json()["avertissements"]), r.text
+    assert r.status_code == 200, r.text
+    assert dans_saisie() == []                                     # confirmé, pas encore finalisé
+    # Ancien fonctionnement : un relevé écrit à la confirmation est retiré au démarrage
+    from database import SessionLocal
+    from models import Releve
+    from pompiste_routes import nettoyer_journal_anticipe
+    with SessionLocal() as s:
+        s.add(Releve(date=today_haiti(), periode=rap["periode"], pompe_id=pompe, prix_gallon=500,
+                     metter_avant=0, metter_apres=40, rapport_pompiste_id=rap["id"]))
+        s.commit()
+        nettoyer_journal_anticipe(s)
+    assert dans_saisie() == []
+    # Finalisation : il entre dans la Saisie, attribué au pompiste
+    _sup(client, rap["id"], "billetterie", confirme=True); _sup(client, rap["id"], "ecart", confirme=True)
+    assert _sup(client, rap["id"], "finaliser", note=9, commentaire="ok").status_code == 200
     x = dans_saisie()
     assert len(x) == 1 and float(x[0]["metter_apres"]) == 40 and x[0]["pompiste_nom"] == "Con Firme" \
         and x[0]["rapport_pompiste_id"] == rap["id"]
-    from database import SessionLocal
-    from pompiste_routes import nettoyer_journal_anticipe
-    with SessionLocal() as s:
-        nettoyer_journal_anticipe(s)
-    assert len(dans_saisie()) == 1                                 # gardé au redémarrage
-    # Correction puis reprise
-    client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/lignes/{pompe}/confirmer", headers=H,
-                json={"metter_avant": 0, "metter_apres": 38})
-    assert float(dans_saisie()[0]["metter_apres"]) == 38
-    assert client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/lignes/{pompe}/reprendre", headers=H).status_code == 200
-    assert dans_saisie() == []
 
 
 def test_pompe_dans_un_rapport_en_attente_indisponible_en_saisie(client):
@@ -951,11 +947,11 @@ def test_pompe_dans_un_rapport_en_attente_indisponible_en_saisie(client):
                                                                   "prix_gallon": 500, "metter_avant": 0, "metter_apres": 41})
     r = saisie()
     assert r.status_code == 409 and r.json()["detail"]["code"] == "dans_un_rapport", r.text
-    # Mètre confirmé : il est au journal, plus « en attente » ; la Saisie peut le modifier
+    # Mètre confirmé mais rapport pas finalisé : toujours « en attente », la place reste prise
     assert client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/lignes/{pompe}/confirmer", headers=H,
                        json={"metter_avant": 0, "metter_apres": 40}).status_code == 200
-    assert not any(x["pompe_id"] == pompe for x in client.get(f"/api/releves/en-attente?date={jour}", headers=H).json())
-    assert saisie().status_code in (200, 201)
+    assert any(x["pompe_id"] == pompe for x in client.get(f"/api/releves/en-attente?date={jour}", headers=H).json())
+    assert saisie().status_code == 409
     # Rapport supprimé : place libre
     assert client.post(f"/api/pompiste-supervision/rapports/{rap['id']}/supprimer", headers=H, json={"motif": "test place"}).status_code == 200
     assert not any(x["pompe_id"] == pompe for x in client.get(f"/api/releves/en-attente?date={jour}", headers=H).json())
@@ -1015,6 +1011,8 @@ def test_changer_date_rapport(client):
     r = _sup(client, rid, "restaurer")
     assert r.status_code == 200 and r.json()["statut"] == "SOUMIS" and r.json()["date"] == str(j2 - timedelta(days=1))
     assert _sup(client, rid, f"lignes/{pa}/confirmer", metter_avant=0, metter_apres=10).status_code == 200
+    _sup(client, rid, "billetterie", confirme=True); _sup(client, rid, "ecart", confirme=True)
+    assert _sup(client, rid, "finaliser", note=8, commentaire="ok").status_code == 200
     with SessionLocal() as s:
         rel = s.query(Releve).filter_by(rapport_pompiste_id=rid).one()
         assert rel.date == j2 - timedelta(days=1) and rel.periode == "Matin"
@@ -1072,7 +1070,9 @@ def test_changer_date_contraintes(client):
         assert _sup(client, rid, f"lignes/{pid}/confirmer", metter_avant=av, metter_apres=ap).status_code == 200
     assert _sup(client, rid, "depenses/0/confirmer").status_code == 200
     _sup(client, rid, "billetterie", confirme=True); _sup(client, rid, "ecart", confirme=True)
-    assert _sup(client, rid, "finaliser", note=8, commentaire="ok").status_code == 200
+    assert _sup(client, rid, "finaliser", note=8, commentaire="ok").status_code == 409        # écart : motif exigé
+    assert _sup(client, rid, "finaliser", note=8, commentaire="ok",
+                motif_ecart_compteur="rapport tapé sur le mauvais jour").status_code == 200
     r = _sup(client, rid, "changer-date", date=str(j2), periode="Apres-midi", motif="Rapport de l'avant-veille")
     assert r.status_code == 200, r.text
     d = r.json()
@@ -1082,8 +1082,12 @@ def test_changer_date_contraintes(client):
         assert not s.query(Releve).filter_by(rapport_pompiste_id=rid).count()
         dep = s.query(Depense).filter_by(rapport_pompiste_id=rid).one()
         assert dep.date_depense == j2
-    # Reconfirmé sur le nouveau créneau : au journal du J2, la chaîne de A est continue
-    assert _sup(client, rid, f"lignes/{pa}/confirmer", metter_avant=100, metter_apres=120).status_code == 200
+    # Reconfirmé et refinalisé sur le nouveau créneau : au journal du J2, la chaîne de A est continue
+    for pid, av, ap in ((pa, 100, 120), (pb, 7, 9)):
+        assert _sup(client, rid, f"lignes/{pid}/confirmer", metter_avant=av, metter_apres=ap).status_code == 200
+    _sup(client, rid, "ecart", confirme=True)
+    assert _sup(client, rid, "finaliser", note=8, commentaire="ok",
+                motif_ecart_compteur="saisie du module Saisie remplacée").status_code == 200
     jr = client.get(f"/api/journal?date_debut={j1}&date_fin={j3}&pompe_id={pa}", headers=H).json()["entries"]
     assert [(e["date"], e["periode"], e["metter_avant"]) for e in jr] == [
         (str(j1), "Matin", 0), (str(j2), "Apres-midi", 100), (str(j3), "Matin", 120)]
@@ -1106,12 +1110,19 @@ def test_depense_pompiste_meme_moment_partout(client):
                  "depenses": [{"description": "Glace", "montant": 908, "autorise_par": "Gérant"}]}).json()["id"]
     assert _sup(client, rid, f"lignes/{pa}/confirmer", metter_avant=0, metter_apres=10).status_code == 200
     assert _sup(client, rid, "depenses/0/confirmer").status_code == 200
-    deps = client.get(f"/api/depenses?date_debut={d}&date_fin={d}", headers=H).json()
-    deps = deps if isinstance(deps, list) else (deps.get("items") or deps.get("depenses") or [])
-    assert sum(float(x["montant"]) for x in deps if x.get("rapport_pompiste_id") == rid) == 908
-    rj = client.get(f"/api/carburant/rapport-jour?date={d}", headers=H).json()
-    assert any(x["montant"] == 908 and x["pompiste"] for x in rj["depenses"]["liste"])
-    cp = client.get(f"/api/caisse-principale/journal?date_debut={d}&date_fin={d}", headers=H).json()
-    dpp = [l for l in cp["lignes"] if l["type"] == "depense_pompiste" and (l.get("detail") or {}).get("rapport_pompiste_id") == rid]
-    assert len(dpp) == 1 and abs(dpp[0]["debit"]) == 908
+
+    def partout():
+        deps = client.get(f"/api/depenses?date_debut={d}&date_fin={d}", headers=H).json()
+        deps = deps if isinstance(deps, list) else (deps.get("items") or deps.get("depenses") or [])
+        rj = client.get(f"/api/carburant/rapport-jour?date={d}", headers=H).json()
+        cp = client.get(f"/api/caisse-principale/journal?date_debut={d}&date_fin={d}", headers=H).json()
+        dpp = [l for l in cp["lignes"] if l["type"] == "depense_pompiste" and (l.get("detail") or {}).get("rapport_pompiste_id") == rid]
+        return (sum(float(x["montant"]) for x in deps if x.get("rapport_pompiste_id") == rid),
+                sum(x["montant"] for x in rj["depenses"]["liste"] if x["pompiste"] and x["montant"] == 908),
+                sum(abs(l["debit"]) for l in dpp)), cp
+    assert partout()[0] == (0, 0, 0)                     # confirmée, pas finalisée : nulle part
+    _sup(client, rid, "billetterie", confirme=True); _sup(client, rid, "ecart", confirme=True)
+    assert _sup(client, rid, "finaliser", note=8, commentaire="ok").status_code == 200
+    vals, cp = partout()
+    assert vals == (908, 908, 908)                       # finalisée : partout en même temps
     assert {c["code"]: c for c in cp["controles"]}["equilibre"]["niveau"] == "ok"

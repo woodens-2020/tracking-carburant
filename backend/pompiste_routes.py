@@ -203,24 +203,25 @@ def _valeurs_finales(l: RapportPompisteLigne):
 
 def nettoyer_journal_anticipe(db: Session) -> int:
     """Démarrage : un rapport pas encore finalisé (soumis, en problème) n'a
-    au journal officiel que ses mètres déjà confirmés par la direction. Les relevés écrits par l'ancien
-    fonctionnement (au « Terminer ») sont retirés s'ils sont identiques au
-    rapport ; s'ils ont été modifiés ensuite à la main (module Saisie), ils
-    deviennent une saisie ordinaire et sont gardés."""
+    rien au journal officiel ni dans les Dépenses : tout y entre à la
+    finalisation. Les relevés écrits avant (au « Terminer », ou à la
+    confirmation d'un mètre par l'ancien fonctionnement) sont retirés s'ils
+    sont identiques au rapport ; s'ils ont été modifiés ensuite à la main
+    (module Saisie), ils deviennent une saisie ordinaire et sont gardés."""
+    from models import Depense
     n = 0
     for rap in db.query(RapportPompiste).filter(RapportPompiste.statut.in_(("EN_COURS", "SOUMIS", "PROBLEME")),
                                                 RapportPompiste.supprime_at.is_(None)).all():
         lignes = {l.pompe_id: l for l in rap.lignes}
         for r in db.query(Releve).filter_by(rapport_pompiste_id=rap.id).all():
             l = lignes.get(r.pompe_id)
-            if l is not None and l.confirmee:
-                continue                    # mètre confirmé par la direction : il reste au journal
             av, ap = _valeurs_finales(l) if l else (None, None)
             if l is not None and abs(float(r.metter_avant) - av) <= TOLERANCE and abs(float(r.metter_apres) - ap) <= TOLERANCE:
                 db.delete(r)
             else:
                 r.rapport_pompiste_id = None
             n += 1
+        n += db.query(Depense).filter_by(rapport_pompiste_id=rap.id).delete()
     db.commit()
     if n:
         log.info("Journal officiel : %d relevé(s) de rapports non finalisés retirés", n)
@@ -419,6 +420,9 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
             prec, src = _index_precedent(db, l.pompe_id, r.date, r.periode, exclure_rapport_id=r.id)
             d["index_precedent"] = prec
             d["index_precedent_source"] = src
+            if prec is not None and abs(prec - av) > TOLERANCE:
+                d["ecart_compteur"] = round(av - prec, 4)
+                d["ecart_compteur_montant"] = round((av - prec) * float(l.prix_gallon), 2)
             if prec is not None and abs(prec - av) > TOLERANCE and r.statut in _A_TRAITER:
                 d["pompe_suggeree"] = next(({"pompe_id": x["pompe_id"], "pompe_nom": x["pompe_nom"]}
                                             for x in _pompes_possibles(db, r, l) if x["suit"]), None)
@@ -1638,8 +1642,9 @@ class LigneConfIn(BaseModel):
 def confirmer_ligne(rid: int, pompe_id: int, data: LigneConfIn, request: Request,
                     _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     """Confirme un mètre, en le corrigeant si les valeurs envoyées diffèrent
-    de celles du pompiste (qui restent conservées). Le mètre confirmé entre
-    aussitôt au journal : il apparaît dans la Saisie, attribué au pompiste."""
+    de celles du pompiste (qui restent conservées). Rien n'entre au journal,
+    à la caisse ni dans les totaux avant la finalisation du rapport : le
+    mètre reste « en attente de validation »."""
     rap = _rapport_a_traiter(db, rid)
     l = next((x for x in rap.lignes if x.pompe_id == pompe_id), None)
     if not l:
@@ -1654,11 +1659,8 @@ def confirmer_ligne(rid: int, pompe_id: int, data: LigneConfIn, request: Request
     l.confirmee, l.confirmee_at = True, now_haiti()
     rap.ecart_confirme = False          # l'écart dépend des mètres : à revoir après une correction
     db.commit()
-    avertissements = _ecrire_journal(db, rap, request, remplacer_saisie=True, seulement=pompe_id)
     db.refresh(rap)
-    out = _rapport_dict(db, rap, avec_journal=True)
-    out["avertissements"] = avertissements
-    return out
+    return _rapport_dict(db, rap, avec_journal=True)
 
 
 @router.post("/api/pompiste-supervision/rapports/{rid}/lignes/{pompe_id}/reprendre")
@@ -1780,8 +1782,7 @@ def finaliser(rid: int, data: FinaliserIn, request: Request,
 
     # 2. Journal des compteurs — mêmes règles que le module Saisie
     avertissements = _ecrire_journal(db, rap, request, remplacer_saisie=True, motif=motif or None)
-    # 3. Dépenses confirmées : déjà dans les Dépenses depuis leur confirmation
-    #    (filet de sécurité si l'une manquait)
+    # 3. Dépenses confirmées (et envoyées) : elles entrent dans les Dépenses maintenant
     _ecrire_depenses(db, rap, request, s)
 
     rap.statut = "RESOLU" if resolution else "CONFIRME"
@@ -1865,18 +1866,14 @@ def _decider_depense(db: Session, rid: int, i: int) -> tuple:
 def confirmer_depense(rid: int, i: int, request: Request, data: Optional[DepenseDecisionIn] = None,
                       s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     """Dépense du pompiste acceptée : elle réduit l'argent à remettre et, si
-    `envoyer` (par défaut), entre tout de suite dans les Dépenses de la
-    station et le rapport du jour (sans sortir de la caisse principale)."""
+    `envoyer` (par défaut), elle entrera dans les Dépenses de la station et le
+    rapport du jour à la finalisation du rapport (rien avant)."""
     rap, deps = _decider_depense(db, rid, i)
     envoyer = not (data and data.envoyer is False)
     deps[i].update(statut="confirmee", motif=None, par=_nom(s), le=now_haiti().isoformat(),
                    vers_depenses=envoyer)
     rap.depenses = deps
     rap.ecart_confirme = False
-    if envoyer:
-        _ecrire_une_depense(db, rap, i, request, s)
-    else:
-        _retirer_une_depense(db, rap, i)
     db.commit()
     db.refresh(rap)
     return _rapport_dict(db, rap, avec_journal=True)
@@ -1936,10 +1933,11 @@ def envoyer_depense(rid: int, i: int, data: EnvoiDepenseIn, request: Request,
     if _vers_depenses(deps[i]) != data.envoyer:
         deps[i]["vers_depenses"] = data.envoyer
         rap.depenses = deps
-        if data.envoyer:
-            _ecrire_une_depense(db, rap, i, request, s)
-        else:
-            _retirer_une_depense(db, rap, i)
+        if rap.statut in ("CONFIRME", "RESOLU"):     # avant la finalisation : seulement le choix
+            if data.envoyer:
+                _ecrire_une_depense(db, rap, i, request, s)
+            else:
+                _retirer_une_depense(db, rap, i)
         main._tracer(db, request, "depense_pompiste_envoyee" if data.envoyer else "depense_pompiste_retenue",
                      {"rapport_pompiste_id": rap.id, "reference": _ref_depense(rap, i),
                       "description": deps[i].get("description"), "montant": deps[i].get("montant")})
