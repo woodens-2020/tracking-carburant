@@ -1493,7 +1493,9 @@ def _analyse_date(db: Session, rap: RapportPompiste, d: date_type, periode: str)
                          f"{float(x.get('taux') or 0):g}) — l'argent compté est recalculé.")
     nb_dep = sum(1 for x in rap.depenses or [] if x.get("statut") != "refusee")
     if nb_dep:
-        avert.append(f"{nb_dep} dépense(s) du pompiste : déplacée(s) au {d.strftime('%d/%m')} (Dépenses et rapport du jour).")
+        avert.append(f"{nb_dep} dépense(s) du pompiste : elles suivent le rapport au {d.strftime('%d/%m')}"
+                     + (" et sortent des Dépenses jusqu'à la nouvelle finalisation." if rap.statut in ("CONFIRME", "RESOLU")
+                        and rap.supprime_at is None else "."))
     return {"bloquants": bloq, "avertissements": avert, "lignes": lignes}
 
 
@@ -1527,6 +1529,7 @@ def changer_date(rid: int, data: ChangerDateIn, request: Request,
         code = 409 if any("déjà rapporté" in x or "non terminé" in x for x in an["bloquants"]) else 400
         raise HTTPException(code, " ".join(an["bloquants"]))
     supprime = rap.supprime_at is not None
+    etait_finalise = not supprime and rap.statut in ("CONFIRME", "RESOLU")
     trace = {"rapport_id": rap.id, "pompiste": _nom(rap.utilisateur), "motif": motif[:300],
              "de": {"date": str(rap.date), "periode": rap.periode},
              "vers": {"date": str(data.date), "periode": data.periode}, "supprime": supprime,
@@ -1556,7 +1559,11 @@ def changer_date(rid: int, data: ChangerDateIn, request: Request,
     _recalculer_attendu(rap)
     rap.ecart = round(float(rap.montant_compte) + float(rap.total_depenses or 0) + _totaux_feuille(rap)["net"]
                       - float(rap.montant_attendu), 2)
-    # Les dépenses du pompiste suivent le rapport (Dépenses, rapport du jour, caisse)
+    # Le rapport n'est plus finalisé : ses dépenses sortent des Dépenses (rapport du
+    # jour, caisse) comme ses mètres sortent du journal ; elles y reviendront, au
+    # nouveau jour, à la nouvelle finalisation.
+    if etait_finalise:
+        db.query(Depense).filter_by(rapport_pompiste_id=rap.id).delete()
     for dep in db.query(Depense).filter_by(rapport_pompiste_id=rap.id).all():
         dep.date_depense = data.date
     main._tracer(db, request, "rapport_pompiste_date_changee", trace)

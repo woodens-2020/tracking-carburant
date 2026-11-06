@@ -1078,16 +1078,18 @@ def test_changer_date_contraintes(client):
     d = r.json()
     assert d["statut"] == "SOUMIS" and d["date"] == str(j2) and not any(l["confirmee"] for l in d["lignes"])
     assert d["depenses"][0]["statut"] == "confirmee"
-    with SessionLocal() as s:
+    with SessionLocal() as s:          # plus finalisé : ni au journal, ni dans les Dépenses
         assert not s.query(Releve).filter_by(rapport_pompiste_id=rid).count()
-        dep = s.query(Depense).filter_by(rapport_pompiste_id=rid).one()
-        assert dep.date_depense == j2
+        assert not s.query(Depense).filter_by(rapport_pompiste_id=rid).count()
     # Reconfirmé et refinalisé sur le nouveau créneau : au journal du J2, la chaîne de A est continue
     for pid, av, ap in ((pa, 100, 120), (pb, 7, 9)):
         assert _sup(client, rid, f"lignes/{pid}/confirmer", metter_avant=av, metter_apres=ap).status_code == 200
     _sup(client, rid, "ecart", confirme=True)
     assert _sup(client, rid, "finaliser", note=8, commentaire="ok",
                 motif_ecart_compteur="saisie du module Saisie remplacée").status_code == 200
+    with SessionLocal() as s:          # refinalisé : la dépense revient, au nouveau jour
+        dep = s.query(Depense).filter_by(rapport_pompiste_id=rid).one()
+        assert dep.date_depense == j2
     jr = client.get(f"/api/journal?date_debut={j1}&date_fin={j3}&pompe_id={pa}", headers=H).json()["entries"]
     assert [(e["date"], e["periode"], e["metter_avant"]) for e in jr] == [
         (str(j1), "Matin", 0), (str(j2), "Apres-midi", 100), (str(j3), "Matin", 120)]
