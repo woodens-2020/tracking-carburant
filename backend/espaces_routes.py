@@ -15,7 +15,7 @@ l'espace où elle a été enregistrée, distinguée par l'adresse de ses pompes.
   « miroir » qui reprend son email, son mot de passe et son PIN).
 - Création d'une station séparée : registre dans l'espace principal, schéma
   vierge, compte du gérant (email, mot de passe, PIN) et miroir du
-  propriétaire ; la station (pompes, faces, mètres) y est enregistrée.
+  propriétaire ; la station (pompes, faces, meters) y est enregistrée.
 """
 from __future__ import annotations
 
@@ -320,7 +320,7 @@ def _email_libre(email: str) -> None:
 @router.post("/api/espaces", status_code=201)
 def creer(data: EspaceIn, request: Request, db: Session = Depends(get_db)):
     """Station séparée : espace vierge avec toutes les fonctions de Konekta,
-    compte du gérant, et la station (pompes, faces, mètres) enregistrée dedans."""
+    compte du gérant, et la station (pompes, faces, meters) enregistrée dedans."""
     import main
     proprio = proprietaire(request, db)
     if not proprio:

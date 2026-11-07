@@ -206,7 +206,7 @@ def construire_lignes(db: Session, debut: Optional[date_type], fin: Optional[dat
     # « ventes − dépenses ». Elles ne sortent pas de la caisse principale ; elles
     # réduisent l'entrée des ventes dès qu'elles sont dans les Dépenses (dépense
     # confirmée, envoyée aux Dépenses) — au même moment que dans le Rapport
-    # journalier, comme les mètres confirmés entrent aussitôt dans les ventes.
+    # journalier, comme les meters confirmés entrent aussitôt dans les ventes.
     from models import RapportPompiste
     for d in per_date(db.query(Depense).filter(Depense.rapport_pompiste_id.isnot(None)), Depense.date_depense).all():
         rap = db.get(RapportPompiste, d.rapport_pompiste_id)

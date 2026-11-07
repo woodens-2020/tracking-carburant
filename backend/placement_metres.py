@@ -1,22 +1,22 @@
-"""Intelligence de placement des mètres.
+"""Intelligence de placement des meters.
 
 Les pompistes se trompent souvent de ligne : l'index du 91 écrit sur la ligne
-du 95, Diesel 1 et Diesel 2 croisés, le mètre d'un autre distributeur… Les
+du 95, Diesel 1 et Diesel 2 croisés, le meter d'un autre distributeur… Les
 index, eux, ne mentent pas : un compteur reprend toujours exactement là où il
 s'est arrêté. Le moteur cherche donc, pour chaque ligne d'un rapport (ou
-chaque relevé du journal), le mètre dont la chaîne d'index se poursuit, et
+chaque relevé du journal), le meter dont la chaîne d'index se poursuit, et
 propose de remettre les index à leur place au moment de la confirmation.
 
 Indices utilisés, du plus fort au plus faible :
-  1. le début saisi reprend exactement la fin connue d'un mètre ;
+  1. le début saisi reprend exactement la fin connue d'un meter ;
   2. il la reprend à un chiffre près (faute de frappe) ;
-  3. le volume de la période est habituel pour ce mètre (profil appris des
+  3. le volume de la période est habituel pour ce meter (profil appris des
      relevés des 90 derniers jours, recalculé chaque jour) ;
   4. la mémoire des erreurs : ce pompiste (ou la station) a déjà fait cette
      erreur-là, corrigée par la direction (table erreurs_metre_apprises).
 Les lignes d'un même rapport sont placées ensemble (échanges et rotations
-91 ↔ 95 ↔ …), chaque mètre ne recevant qu'une ligne. Le propane ne se place
-jamais sur un mètre de carburant, ni l'inverse ; changer de carburant
+91 ↔ 95 ↔ …), chaque meter ne recevant qu'une ligne. Le propane ne se place
+jamais sur un meter de carburant, ni l'inverse ; changer de carburant
 (gazoline ↔ diesel) n'est proposé que sur une reprise exacte de l'index.
 Rien n'est déplacé sans le geste de la direction.
 """
@@ -41,8 +41,8 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 TOL = 0.001
-SEUIL = 45          # score minimal d'un autre mètre pour être proposé
-MARGE = 20          # avance minimale sur le mètre choisi par le pompiste
+SEUIL = 45          # score minimal d'un autre meter pour être proposé
+MARGE = 20          # avance minimale sur le meter choisi par le pompiste
 ECART_PROCHE = 2.0  # gallons : début presque repris (lecture approximative)
 FAMILLES = {"Gazoline", "Diesel", "Propane"}
 
@@ -58,8 +58,8 @@ def activite(p: Pompe) -> str:
 
 
 def libelle(p: Pompe) -> str:
-    """« Gazoline 2 · Gazoline__91 » : le nom du mètre seul est ambigu (les
-    deux distributeurs ont les mêmes noms de mètres)."""
+    """« Gazoline 2 · Gazoline__91 » : le nom du meter seul est ambigu (les
+    deux distributeurs ont les mêmes noms de meters)."""
     return f"{p.produit.nom} · {p.nom}" if p.produit else p.nom
 
 
@@ -84,7 +84,7 @@ def faute_de_frappe(a: float, b: float) -> bool:
 
 
 def profil(db: Session, pompe_id: int, avant: date_type) -> Optional[dict]:
-    """Volume habituel du mètre (gallons par période), appris des relevés des
+    """Volume habituel du meter (gallons par période), appris des relevés des
     90 jours précédents : se met à jour tout seul, jour après jour."""
     rows = (db.query(Releve.metter_avant, Releve.metter_apres)
             .filter(Releve.pompe_id == pompe_id, Releve.date < avant, Releve.date >= avant - timedelta(days=90))
@@ -115,7 +115,7 @@ def _personne(db: Session, utilisateur_id: Optional[int] = None, employe_id: Opt
 
 
 def habitudes(db: Session, pompe_saisie_id: int, uids: set, eids: set) -> dict:
-    """{bon mètre: (fois pour ce pompiste, fois pour toute la station)}."""
+    """{bon meter: (fois pour ce pompiste, fois pour toute la station)}."""
     out: dict = {}
     for x in (db.query(ErreurMetreApprise)
               .filter(ErreurMetreApprise.pompe_saisie_id == pompe_saisie_id, ErreurMetreApprise.nb > 0).all()):
@@ -144,7 +144,7 @@ def _compter(db, utilisateur_id, employe_id, de, vers, pas, d) -> None:
 
 def apprendre(db: Session, origine: int, ancien: int, nouveau: int, d: date_type,
               utilisateur_id: Optional[int] = None, employe_id: Optional[int] = None) -> None:
-    """Des index saisis sur `origine` passent du mètre `ancien` au mètre
+    """Des index saisis sur `origine` passent du meter `ancien` au meter
     `nouveau` : la correction précédente (origine → ancien) est annulée, la
     nouvelle (origine → nouveau) est retenue."""
     if not (utilisateur_id or employe_id) or ancien == nouveau:
@@ -156,7 +156,7 @@ def apprendre(db: Session, origine: int, ancien: int, nouveau: int, d: date_type
 # ── Évaluation d'un placement ──────────────────────────────────────────
 def evaluer(av: float, ap: float, saisie: Pompe, cand: Pompe, prec: Optional[float], src: Optional[str],
             prof: Optional[dict], hab: dict) -> dict:
-    """Score de « ces index appartiennent à ce mètre »."""
+    """Score de « ces index appartiennent à ce meter »."""
     score, raisons, exact = 0, [], False
     if prec is None:
         raisons.append("aucun index connu avant ce créneau")
@@ -177,7 +177,7 @@ def evaluer(av: float, ap: float, saisie: Pompe, cand: Pompe, prec: Optional[flo
     g = ap - av
     if _volume_anormal(g, prof):
         score -= 25
-        raisons.append(f"{_n(g, 0)} gal : bien plus que d'habitude sur ce mètre (au plus {_n(prof['max'], 0)})")
+        raisons.append(f"{_n(g, 0)} gal : bien plus que d'habitude sur ce meter (au plus {_n(prof['max'], 0)})")
     elif prof and score > 0:
         score += 5
         raisons.append(f"volume habituel ({_n(g, 1)} gal, d'ordinaire ~{_n(prof['mediane'], 0)})")
@@ -208,7 +208,7 @@ def evaluer(av: float, ap: float, saisie: Pompe, cand: Pompe, prec: Optional[flo
 
 def _meilleur_placement(options: list) -> list:
     """options[i] = [(pompe_id, score)], la 1re option = rester. Maximise la
-    somme des scores, un mètre par ligne ; à égalité, le moins de changements."""
+    somme des scores, un meter par ligne ; à égalité, le moins de changements."""
     n = len(options)
     borne = [0] * (n + 1)
     for i in range(n - 1, -1, -1):
@@ -243,7 +243,7 @@ def _confiance(ev: dict) -> str:
 # ── Pistes hors créneau (mauvaise date, rapport supprimé) ──────────────
 # Quand un rapport est saisi au mauvais jour ou à la mauvaise période, ou que
 # le rapport d'avant est dans la corbeille, le « dernier index » du créneau ne
-# dit rien. On cherche alors, sur tous les mètres et quelques jours autour,
+# dit rien. On cherche alors, sur tous les meters et quelques jours autour,
 # l'index qui finit exactement là où la ligne commence (créneau d'avant) ou qui
 # commence là où elle finit (créneau d'après) : journal, rapports en attente
 # et corbeille.
@@ -370,7 +370,7 @@ def diagnostic_dates(rap: RapportPompiste, lignes_pistes: list) -> dict:
 
 # ── Rapport pompiste ───────────────────────────────────────────────────
 def _pompes_prises(db: Session, rap: RapportPompiste) -> dict:
-    """Mètres déjà rapportés sur ce créneau ailleurs (autre rapport, ou
+    """Meters déjà rapportés sur ce créneau ailleurs (autre rapport, ou
     saisie du module Saisie) : on ne peut pas y remettre des index."""
     from pompiste_routes import _ACTIFS, _nom
     prises = {}
@@ -415,7 +415,7 @@ def plan_rapport(db: Session, rap: RapportPompiste) -> dict:
 
     def eval_pistes(av, ap, saisie, p, e, pistes, hab):
         """Le créneau ne dit rien (mauvaise date, rapport d'avant dans la
-        corbeille) : la fin d'un autre créneau proche sur ce mètre peut le dire."""
+        corbeille) : la fin d'un autre créneau proche sur ce meter peut le dire."""
         if e["exact"]:
             return e
         for x in pistes:
@@ -436,7 +436,7 @@ def plan_rapport(db: Session, rap: RapportPompiste) -> dict:
         reste = evaluer(av, ap, saisie, saisie, p0, s0, prof_de(saisie), hab)
         pistes = [] if reste["exact"] else pistes_ligne(av, ap, idx, tous, activite(saisie))
         pistes_de[l.pompe_id] = pistes
-        # La comparaison tient compte d'une piste sur le mètre choisi (pour ne
+        # La comparaison tient compte d'une piste sur le meter choisi (pour ne
         # pas déplacer des index qui y sont bien), mais la ligne reste signalée.
         cmp = eval_pistes(av, ap, saisie, saisie, reste, pistes, hab)
         ev = {saisie.id: reste}
@@ -449,7 +449,7 @@ def plan_rapport(db: Session, rap: RapportPompiste) -> dict:
                 pr, src = prec_de(p)
                 e = eval_pistes(av, ap, saisie, p, evaluer(av, ap, saisie, p, pr, src, prof_de(p), hab), pistes, hab)
                 # Une reprise exacte ailleurs l'emporte sur une reprise
-                # approximative (faute de frappe) sur le mètre choisi
+                # approximative (faute de frappe) sur le meter choisi
                 if e["score"] >= SEUIL and (e["score"] >= cmp["score"] + MARGE
                                             or (e["exact"] and not cmp["exact"] and e["score"] > cmp["score"])):
                     autres.append(e)
@@ -493,7 +493,7 @@ def _piste_json(x: dict) -> dict:
 
 
 def appliquer_plan(db: Session, rap: RapportPompiste, mapping: dict) -> list:
-    """Remet les index des lignes sur leurs nouveaux mètres (déplacements,
+    """Remet les index des lignes sur leurs nouveaux meters (déplacements,
     échanges, rotations). Les lignes touchées sortent du journal et sont à
     reconfirmer ; la pompe choisie par le pompiste reste mémorisée et
     l'erreur est apprise. Rend la trace des changements."""
@@ -501,19 +501,19 @@ def appliquer_plan(db: Session, rap: RapportPompiste, mapping: dict) -> list:
     lignes = {l.pompe_id: l for l in rap.lignes}
     mapping = {int(k): int(v) for k, v in mapping.items() if int(k) != int(v)}
     if not mapping:
-        raise HTTPException(400, "Aucun changement de mètre à appliquer.")
+        raise HTTPException(400, "Aucun changement de meter à appliquer.")
     for k in mapping:
         if k not in lignes:
-            raise HTTPException(404, f"Mètre {k} absent du rapport.")
+            raise HTTPException(404, f"Meter {k} absent du rapport.")
     final = [mapping.get(pid, pid) for pid in lignes]
     if len(set(final)) != len(final):
-        raise HTTPException(409, "Deux lignes iraient sur le même mètre : déplacez aussi la ligne qui l'occupe.")
+        raise HTTPException(409, "Deux lignes iraient sur le même meter : déplacez aussi la ligne qui l'occupe.")
     prises = _pompes_prises(db, rap)
     cibles = {}
     for src, dst in mapping.items():
         p = db.get(Pompe, dst)
         if not p or not p.actif:
-            raise HTTPException(404, "Mètre introuvable ou inactif.")
+            raise HTTPException(404, "Meter introuvable ou inactif.")
         if activite(p) != activite(lignes[src].pompe):
             raise HTTPException(400, "Le propane et le carburant ne se mélangent jamais.")
         if dst not in lignes and dst in prises:
@@ -531,8 +531,8 @@ def appliquer_plan(db: Session, rap: RapportPompiste, mapping: dict) -> list:
              for s, d in mapping.items()]
     for src in mapping:
         _retirer_ligne_du_journal(db, rap, lignes[src])
-    # Lignes hôtes : celles déjà sur un mètre cible ; les lignes libérées
-    # passent sur les mètres cibles qui ne sont pas encore dans le rapport.
+    # Lignes hôtes : celles déjà sur un meter cible ; les lignes libérées
+    # passent sur les meters cibles qui ne sont pas encore dans le rapport.
     hotes = {dst: lignes[dst] for dst in mapping.values() if dst in lignes}
     liberees = [lignes[src] for src in mapping if src not in mapping.values()]
     neuves = [dst for dst in mapping.values() if dst not in lignes]
@@ -559,8 +559,8 @@ def appliquer_plan(db: Session, rap: RapportPompiste, mapping: dict) -> list:
 # ── Journal Meters ─────────────────────────────────────────────────────
 def annoter_journal(db: Session, entries: list) -> None:
     """Saut ou recul d'un relevé dont le début reprend la fin d'un AUTRE
-    mètre du même créneau : index sans doute écrits sur la mauvaise ligne.
-    Ajoute `metre_probable` (et `echange` si les deux mètres sont croisés)."""
+    meter du même créneau : index sans doute écrits sur la mauvaise ligne.
+    Ajoute `metre_probable` (et `echange` si les deux meters sont croisés)."""
     import main
     par_creneau = defaultdict(list)
     for e in entries:
@@ -631,8 +631,8 @@ def _ecart_au_creneau(db: Session, r: Releve, motif: str) -> None:
 @router.post("/api/releves/{releve_id}/deplacer")
 def deplacer_releve(releve_id: int, data: DeplacerReleveIn, request: Request, db: Session = Depends(get_db)):
     """Journal Meters : index écrits sur la mauvaise ligne. Le relevé passe
-    sur le bon mètre ; si ce mètre a déjà un relevé sur le créneau, les index
-    (et le pompiste qui les a lus) sont échangés. Le prix suit le mètre.
+    sur le bon meter ; si ce meter a déjà un relevé sur le créneau, les index
+    (et le pompiste qui les a lus) sont échangés. Le prix suit le meter.
     L'erreur est retenue pour le pompiste du relevé."""
     import main
     from models import ResolutionMetter
@@ -640,15 +640,15 @@ def deplacer_releve(releve_id: int, data: DeplacerReleveIn, request: Request, db
     _require_superviseur(request, db)
     motif = " ".join((data.motif or "").split())
     if len(motif) < 5:
-        raise HTTPException(400, "Indiquez pourquoi vous changez de mètre (5 caractères minimum).")
+        raise HTTPException(400, "Indiquez pourquoi vous changez de meter (5 caractères minimum).")
     r = db.get(Releve, releve_id)
     if not r:
         raise HTTPException(404, "Relevé introuvable.")
     neuve = db.get(Pompe, data.pompe_id)
     if not neuve or not neuve.actif:
-        raise HTTPException(404, "Mètre introuvable ou inactif.")
+        raise HTTPException(404, "Meter introuvable ou inactif.")
     if neuve.id == r.pompe_id:
-        raise HTTPException(400, "C'est déjà ce mètre.")
+        raise HTTPException(400, "C'est déjà ce meter.")
     ancienne = r.pompe
     if activite(neuve) != activite(ancienne):
         raise HTTPException(400, "Le propane et le carburant ne se mélangent jamais.")
@@ -657,7 +657,7 @@ def deplacer_releve(releve_id: int, data: DeplacerReleveIn, request: Request, db
         rp = x.rapport_pompiste
         if rp is not None and rp.statut in _A_TRAITER + ("EN_COURS",) and rp.supprime_at is None:
             raise HTTPException(409, f"Relevé du rapport pompiste n°{rp.id} pas encore finalisé : "
-                                     "changez le mètre dans Rapports pompistes.")
+                                     "changez le meter dans Rapports pompistes.")
     _bloque(r)
     autre = db.query(Releve).filter_by(date=r.date, periode=r.periode, pompe_id=neuve.id).first()
     if autre:
@@ -671,8 +671,8 @@ def deplacer_releve(releve_id: int, data: DeplacerReleveIn, request: Request, db
     db.query(ResolutionMetter).filter(ResolutionMetter.releve_id.in_([x.id for x in touches])).delete(
         synchronize_session=False)
     emp_r, emp_a = r.pompiste_id, (autre.pompiste_id if autre else None)
-    # Ce que le pompiste avait écrit suit les index : mètre d'origine et index
-    # d'origine sont conservés (registre des erreurs de mètre)
+    # Ce que le pompiste avait écrit suit les index : meter d'origine et index
+    # d'origine sont conservés (registre des erreurs de meter)
     cles = ("metter_avant", "metter_apres", "pompiste_id", "metter_avant_saisi", "metter_apres_saisi")
     origine_r = r.pompe_saisie_id or r.pompe_id
     if autre:
@@ -712,7 +712,7 @@ def deplacer_releve(releve_id: int, data: DeplacerReleveIn, request: Request, db
 
 @router.get("/api/placement-metres/memoire")
 def memoire(request: Request, db: Session = Depends(get_db)):
-    """Ce que le système a appris : erreurs de mètre par pompiste."""
+    """Ce que le système a appris : erreurs de meter par pompiste."""
     from pompiste_routes import _require_superviseur, _nom
     from models import Utilisateur
     _require_superviseur(request, db)
@@ -733,9 +733,9 @@ def memoire(request: Request, db: Session = Depends(get_db)):
     return {"date": str(today_haiti()), "erreurs": out}
 
 
-# ── Registre des erreurs de mètre ──────────────────────────────────────
+# ── Registre des erreurs de meter ──────────────────────────────────────
 TYPES_ERREUR = {
-    "mauvais_metre": "Index sur le mauvais mètre",
+    "mauvais_metre": "Index sur le mauvais meter",
     "index_corrige": "Index corrigé",
     "ecart_compteur": "Écart de compteur non expliqué",
 }
@@ -762,8 +762,8 @@ def _ligne_saisie_rapport(db: Session, e: dict) -> Optional[dict]:
 
 
 def registre_erreurs(db: Session, d_debut: date_type, d_fin: date_type, pompiste_ids: Optional[list] = None) -> dict:
-    """Toutes les erreurs de mètre de la période, sans rien perdre de ce que
-    le pompiste avait écrit : corrections faites (mauvais mètre, index
+    """Toutes les erreurs de meter de la période, sans rien perdre de ce que
+    le pompiste avait écrit : corrections faites (mauvais meter, index
     corrigés) et écarts encore non expliqués, avec leur poids en gallons et
     en gourdes ; statistiques par pompiste."""
     import main
