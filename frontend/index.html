@@ -4481,55 +4481,8 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
         </button>
       </div>
 
-      <!-- KPI rapides -->
-      <div class="kpi-grid">
-        <div class="kpi-card" style="border-top-color:#f59e0b">
-          <div class="kpi-icon-wrap" style="background:rgba(245,158,11,.12)">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#f59e0b" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          </div>
-          <div class="kpi-label" data-i18n="home.kpi.day">Ventes du jour</div>
-          <div class="kpi-val c-amber" id="kpi-day">—</div>
-          <div class="kpi-sub" id="kpi-day-qte">0 gal · aujourd'hui</div>
-        </div>
-        <div class="kpi-card" style="border-top-color:#22c55e">
-          <div class="kpi-icon-wrap" style="background:rgba(34,197,94,.12)">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#22c55e" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-          </div>
-          <div class="kpi-label" data-i18n="home.kpi.week">Total semaine</div>
-          <div class="kpi-val c-teal" id="kpi-week">—</div>
-          <div class="kpi-sub" id="kpi-week-var" data-i18n="home.kpi.week.sub">vs semaine précédente</div>
-        </div>
-        <div class="kpi-card" style="border-top-color:#ef4444">
-          <div class="kpi-icon-wrap" style="background:rgba(239,68,68,.12)">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#ef4444" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          </div>
-          <div class="kpi-label" data-i18n="home.kpi.anom">Anomalies détectées</div>
-          <div class="kpi-val" id="kpi-anom" style="color:var(--green)">—</div>
-          <div class="kpi-sub" id="kpi-anom-sub" data-i18n="home.kpi.anom.sub">aujourd'hui</div>
-        </div>
-        <div class="kpi-card" style="border-top-color:#a78bfa">
-          <div class="kpi-icon-wrap" style="background:rgba(167,139,250,.12)">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#a78bfa" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-          </div>
-          <div class="kpi-label" data-i18n="home.kpi.prods">Produits actifs</div>
-          <div class="kpi-val" style="color:#a78bfa" id="kpi-prods">—</div>
-          <div class="kpi-sub" id="kpi-pompes-sub">0 pompes</div>
-        </div>
-      </div>
-
-      <!-- Mini anomalies -->
-      <div class="card mt10">
-        <div class="card-head">
-          <div class="card-title">
-            <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            <span data-i18n="home.anom.title">Anomalies détectées —</span> <span id="home-anom-date" style="font-weight:400;color:var(--muted)"></span>
-          </div>
-          <span id="home-anom-badge"></span>
-        </div>
-        <div class="card-body" id="home-anom-body" style="padding:12px">
-          <div class="loading-row"><span class="spinner"></span><span data-i18n="home.anom.loading">Chargement…</span></div>
-        </div>
-      </div>
+      <!-- Assistant (chatbot) : la carte de « Rapports IA » est affichée ici -->
+      <div id="home-chat"></div>
     </div>
 
     <!-- ══════ PAGE : NOTIFICATIONS ══════ -->
@@ -4935,7 +4888,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 
     <!-- ══════ PAGE : RAPPORTS ══════ -->
     <div id="page-rapports" class="page">
-      <div class="card">
+      <div class="card" id="chat-carte">
         <div class="card-head" style="background:linear-gradient(135deg,var(--panel2),var(--panel));padding:18px 16px;border-bottom:1px solid var(--border)">
           <div style="display:flex;align-items:center;gap:12px">
             <div class="kpi-icon-wrap" style="background:linear-gradient(135deg,rgba(59,130,246,.18),rgba(167,139,250,.12));border:1px solid rgba(59,130,246,.2)">
@@ -15232,6 +15185,7 @@ function goTo(page){
   document.querySelectorAll('.nav-item, .mnav-btn').forEach(n=>n.classList.remove('active'));
   const pageEl=document.getElementById('page-'+page);
   if(!pageEl) return;
+  if(page === 'home' || page === 'rapports') _placerChat(page);
   pageEl.classList.add('active');
   // "Commandes" n'a pas d'entrée propre dans le menu (accessible via l'onglet
   // dans Ventes) — on garde le sur-lignage sur "Ventes & Commandes" pour elle.
@@ -15274,46 +15228,20 @@ function goTo(page){
 // PAGE ACCUEIL
 // ══════════════════════════════════════════════
 async function loadHome(){
-  // Greeting & date
   const now=new Date();
   const dayKeys=['dim','lun','mar','mer','jeu','ven','sam'];
   document.getElementById('home-greeting').textContent=
     t('home.greeting',{day:t('home.day.'+dayKeys[now.getDay()]),date:frDate(currentDate)});
   document.getElementById('home-date').textContent=t('home.subtitle');
-  document.getElementById('home-anom-date').textContent=frDate(currentDate);
-
-  try{
-    const [dayStats,serie,anom]=await Promise.all([
-      GET(`/stats?date_debut=${currentDate}&date_fin=${currentDate}`),
-      GET(`/serie?date_fin=${currentDate}&jours=7`),
-      GET(`/anomalies?date=${currentDate}`),
-    ]);
-
-    // KPI
-    document.getElementById('kpi-day').textContent=fmtG(dayStats.total_montant);
-    document.getElementById('kpi-day-qte').innerHTML=galParProduit(Object.entries(dayStats.par_produit||{}).map(([n,v])=>[n,v.quantite||0]), ' ');
-    document.getElementById('kpi-week').textContent=fmtG(serie.total_periode);
-    const v=serie.variation_pct;
-    document.getElementById('kpi-week-var').textContent=
-      v==null ? t('home.kpi.week.sub.none')
-      : (v>=0 ? t('home.kpi.week.sub.up',{pct:v.toFixed(1)}) : t('home.kpi.week.sub.down',{pct:v.toFixed(1)}));
-    document.getElementById('kpi-week-var').style.color=
-      v==null?'var(--muted)':v>=0?'var(--green)':'var(--red)';
-
-    const nb=anom.nb_anomalies;
-    document.getElementById('kpi-anom').textContent=String(nb);
-    document.getElementById('kpi-anom').style.color=nb>0?'var(--red)':'var(--green)';
-    document.getElementById('kpi-anom-sub').textContent=
-      nb===0?t('home.kpi.anom.sub.ok'):t('home.kpi.anom.sub.n',{n:nb});
-
-    const nbP=products.length;
-    const nbPo=products.reduce((s,p)=>s+p.pompes.length,0);
-    document.getElementById('kpi-prods').textContent=String(nbP);
-    document.getElementById('kpi-pompes-sub').textContent=t('home.kpi.prods.sub',{n:nbPo});
-
-    renderHomeAnom(anom);
-    setStatus(true);
-  }catch(e){ setStatus(false); console.error(e); }
+  _placerChat('home');
+  setStatus(true);
+}
+// Une seule carte de chatbot (une seule conversation) : sur l'accueil ou sur « Rapports IA »
+function _placerChat(page){
+  const c = document.getElementById('chat-carte');
+  if(page === 'home' && !_canAccess('rapports')) return;   // pas de droit sur l'assistant : pas d'assistant
+  const cible = document.getElementById(page === 'home' ? 'home-chat' : 'page-rapports');
+  if(c && cible && c.parentElement !== cible) cible.appendChild(c);
 }
 
 function renderHomeAnom(data){
