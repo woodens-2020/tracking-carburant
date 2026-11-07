@@ -258,6 +258,26 @@ class _UserProxy:
                  "est_pompiste")
 
 
+def _admin_proprietaire_dans_espace(db):
+    """Clé admin statique dans une station séparée : le compte du propriétaire
+    (admin « admin » de l'espace principal) dans cette station, retrouvé par
+    son email, comme lorsqu'il change de station depuis l'interface."""
+    from database import espace_courant, session_principale
+    from espaces_routes import _est_admin, _miroir
+    if not espace_courant():
+        return None
+    with session_principale() as pdb:
+        p = pdb.query(Utilisateur).filter_by(username="admin", actif=True).first()
+        if not (p and p.email and _est_admin(p)):
+            return None
+        pdb.expunge(p)
+    u = db.query(Utilisateur).filter(Utilisateur.email == p.email).first()
+    if u is None:                   # jamais entré dans cette station : même compte miroir que l'interface
+        u = _miroir(db, p)
+        db.commit()
+    return u if _est_admin(u) else None
+
+
 def _resoudre_utilisateur(token, api_key_hdr):
     with SessionLocal() as db:
         user = get_session_user(db, token)
@@ -265,6 +285,8 @@ def _resoudre_utilisateur(token, api_key_hdr):
             # Clé statique admin depuis .env (timing-safe)
             if _ADMIN_API_KEY and hmac.compare_digest(api_key_hdr, _ADMIN_API_KEY):
                 user = db.query(Utilisateur).filter_by(username="admin", actif=True).first()
+                if not user:
+                    user = _admin_proprietaire_dans_espace(db)
             else:
                 user = verify_api_key(db, api_key_hdr)
         if not user:

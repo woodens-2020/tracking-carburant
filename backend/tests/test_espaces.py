@@ -70,6 +70,31 @@ def test_station_separee(client):
     assert info["courant"] == f"esp_{eid}" and info["peut_changer"] is False and info["peut_creer"] is False
     assert g.post("/api/espaces/entrer", json={"cible_id": 0, "pin": "987654321"}).status_code == 403
 
+    # Clé admin statique : fonctionne aussi dans la station séparée (compte miroir du propriétaire)
+    import os
+    k = {"X-API-Key": os.environ["ADMIN_API_KEY"]}
+    cle = _client()
+    assert cle.get("/api/journal?date_debut=2025-06-01&date_fin=2025-06-01", headers=k).json()["entries"] == []
+    cle.cookies.set("konekta_espace", f"esp_{eid}")
+    r = cle.get("/api/journal?date_debut=2025-06-01&date_fin=2025-06-01", headers=k)
+    assert r.status_code == 200 and len(r.json()["entries"]) == 1
+    # … même dans une station où le propriétaire n'est jamais entré
+    r = p.post("/api/espaces", json=dict(corps, nom="Station Neuve", gerant=dict(corps["gerant"], email="neuve@exemple.ht")))
+    assert r.status_code == 201, r.text
+    nid = r.json()["id"]
+    from database import session_espace
+    from models import Utilisateur
+    with session_espace(f"esp_{nid}") as sdb:      # compte du propriétaire sous un autre identifiant
+        sdb.query(Utilisateur).filter(Utilisateur.email == PROPRIO["email"]).update({"username": "proprio_neuve"})
+        sdb.commit()
+    neuve = _client(); neuve.cookies.set("konekta_espace", f"esp_{nid}")
+    r = neuve.get("/api/produits", headers=k)
+    assert r.status_code == 200 and {x["nom"] for x in r.json()} == {"Gazoline", "Diesel"}
+    assert p.post(f"/api/espaces/{nid}/retirer", json={"confirmation": "RETIRER"}).status_code == 200
+    anon = _client(); anon.cookies.set("konekta_espace", f"esp_{eid}")
+    assert anon.get("/api/journal?date_debut=2025-06-01&date_fin=2025-06-01",
+                    headers={"X-API-Key": "mauvaise"}).status_code == 401
+
     # Un pompiste créé par le gérant arrive dans la station de Champin
     c = g.post("/api/pompiste-supervision/comptes", json={"prenom": "Pom", "nom": "Champin"}).json()
     pp = _client()
