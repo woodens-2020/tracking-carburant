@@ -612,13 +612,16 @@ def registre_erreurs(db: Session, d_debut: date_type, d_fin: date_type, pompiste
 
     def st(nom):
         return stats.setdefault(nom or "Non attribué", {
-            "pompiste": nom or "Non attribué", "releves": 0, "gallons": 0.0, "erreurs": 0,
-            "mauvais_metre": 0, "index_corrige": 0, "ecart_compteur": 0, "ecart_gallons": 0.0})
+            "pompiste": nom or "Non attribué", "releves": 0, "gallons": {}, "erreurs": 0,
+            "mauvais_metre": 0, "index_corrige": 0, "ecart_compteur": 0, "ecart_gallons": {}})
+
+    def ajoute(dct, fam, g):      # gallons toujours séparés par carburant
+        dct[fam] = dct.get(fam, 0.0) + g
 
     for e in entries:
         s_p = st(e.get("pompiste_nom"))
         s_p["releves"] += 1
-        s_p["gallons"] += e.get("quantite") or 0
+        ajoute(s_p["gallons"], main._famille_carburant(e["produit_nom"]), e.get("quantite") or 0)
         retenu = {"libelle": f"{e['produit_nom']} · {e['pompe_nom']}", "metter_avant": e["metter_avant"],
                   "metter_apres": e["metter_apres"], "gallons": e["quantite"]}
         base = {"releve_id": e["id"] if isinstance(e["id"], int) else None, "date": e["date"],
@@ -640,7 +643,7 @@ def registre_erreurs(db: Session, d_debut: date_type, d_fin: date_type, pompiste
             s_p["erreurs"] += 1
             for t in types:
                 s_p[t] += 1
-            s_p["ecart_gallons"] += abs(d_gal)
+            ajoute(s_p["ecart_gallons"], base["famille"], abs(d_gal))
         if e.get("type_anomalie") in ("saut_compteur", "recul_compteur") and e.get("statut") != "resolu":
             g = abs(e.get("decalage") or 0)
             lignes.append(dict(base, types=["ecart_compteur"], statut="a_verifier",
@@ -651,10 +654,11 @@ def registre_erreurs(db: Session, d_debut: date_type, d_fin: date_type, pompiste
                                metre_probable=e.get("metre_probable"), autre_carburant=False))
             s_p["erreurs"] += 1
             s_p["ecart_compteur"] += 1
-            s_p["ecart_gallons"] += g
+            ajoute(s_p["ecart_gallons"], base["famille"], g)
     for x in stats.values():
         x["taux_erreur"] = round(100 * x["erreurs"] / x["releves"], 1) if x["releves"] else 0.0
-        x["gallons"], x["ecart_gallons"] = round(x["gallons"], 3), round(x["ecart_gallons"], 3)
+        x["gallons"] = {k: round(v, 3) for k, v in x["gallons"].items()}
+        x["ecart_gallons"] = {k: round(v, 3) for k, v in x["ecart_gallons"].items() if v}
     lignes.sort(key=lambda x: (x["date"], 0 if x["periode"] == "Matin" else 1, x["retenu"]["libelle"]))
     return {"date_debut": str(d_debut), "date_fin": str(d_fin), "types": TYPES_ERREUR,
             "total": {"erreurs": len(lignes), "corrigees": sum(x["statut"] == "corrige" for x in lignes),

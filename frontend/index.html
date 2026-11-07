@@ -20171,11 +20171,13 @@ async function jrErreursMetre(debut, fin, pompisteIds){
   catch(e){ el.innerHTML = ''; return; }
   const n3 = v => v==null ? '—' : Number(v).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3});
   const typ = t => `<span class="badge" style="margin-right:4px">${esc(d.types[t]||t)}</span>`;
+  // Gazoline, diesel et propane ne s'additionnent jamais : une ligne par carburant
+  const galF = o => Object.entries(o||{}).map(([f,g]) => `${esc(f)} ${n3(g)}`).join('<br>') || '—';
   const stats = d.par_pompiste.filter(x => x.releves).map(x => `<tr>
-      <td><b>${esc(x.pompiste)}</b></td><td class="num">${x.releves}</td><td class="num">${n3(x.gallons)}</td>
+      <td><b>${esc(x.pompiste)}</b></td><td class="num">${x.releves}</td><td class="num">${galF(x.gallons)}</td>
       <td class="num" style="font-weight:700;color:${x.erreurs?'var(--red)':'var(--green)'}">${x.erreurs}</td>
       <td class="num">${x.mauvais_metre}</td><td class="num">${x.index_corrige}</td><td class="num">${x.ecart_compteur}</td>
-      <td class="num">${x.taux_erreur.toLocaleString('fr-FR')} %</td><td class="num">${n3(x.ecart_gallons)}</td></tr>`).join('');
+      <td class="num">${x.taux_erreur.toLocaleString('fr-FR')} %</td><td class="num">${galF(x.ecart_gallons)}</td></tr>`).join('');
   const lignes = d.erreurs.map(x => `<tr class="${x.statut==='a_verifier'?'row-alerte':''}">
       <td style="white-space:nowrap">${frDate(x.date)}<div class="c-dim" style="font-size:12px">${x.periode==='Matin'?'Matin':'Après-midi'}</div></td>
       <td>${esc(x.pompiste)}</td>

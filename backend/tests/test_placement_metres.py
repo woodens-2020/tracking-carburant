@@ -185,4 +185,5 @@ def test_saisie_d_origine_conservee_et_registre(client):
     assert par["R91"]["types"] == ["mauvais_metre"] and par["R91"]["saisi"]["libelle"].endswith("R95")
     assert par["R91"]["pompiste"] == "Reg Istre" and par["R91"]["statut"] == "corrige"
     st = next(x for x in reg["par_pompiste"] if x["pompiste"] == "Reg Istre")
+    assert st["gallons"] == {"Gazoline": 100.0}
     assert st["mauvais_metre"] == 1 and st["releves"] == 1 and st["taux_erreur"] == 100.0
