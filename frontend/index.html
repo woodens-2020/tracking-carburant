@@ -21122,7 +21122,7 @@ function pspVentesImprimer(i){
     ${p.nb_depenses ? `<h2>Dépenses</h2><table><thead><tr><th>Date</th><th>Description</th><th>Catégorie</th><th class="r">Montant</th></tr></thead>
       <tbody>${p.liste_depenses.map(x => `<tr><td>${dc(x.date)}</td><td>${e(x.description)}</td><td>${e(x.categorie || '')}</td><td class="r">${nb(x.montant, 2)}</td></tr>`).join('')}</tbody>
       <tfoot><tr><td colspan="3">TOTAL DÉPENSES</td><td class="r">${nb(tdep, 2)}</td></tr></tfoot></table>` : ''}
-    ${(p.releves_detail || []).length ? `<h2>Relevés</h2><table><thead><tr><th>Date</th><th>Période</th><th>Meeter</th><th class="r">Avant</th><th class="r">Après</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead>
+    ${(p.releves_detail || []).length ? `<h2>Meeters</h2><table><thead><tr><th>Date</th><th>Période</th><th>Meeter</th><th class="r">Avant</th><th class="r">Après</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead>
       <tbody>${p.releves_detail.map(x => `<tr><td>${dc(x.date)}</td><td>${x.periode === 'Apres-midi' ? 'Après-midi' : e(x.periode)}</td><td>${e(x.meeter)}</td>
         <td class="r">${nb(x.avant, 3)}</td><td class="r">${nb(x.apres, 3)}</td><td class="r">${nb(x.gallons, 3)}</td><td class="r">${nb(x.montant, 2)}</td></tr>`).join('')}</tbody></table>` : ''}
     <div class="sign"><div>Signature du pompiste</div><div>Vérifié par</div></div>
@@ -21178,7 +21178,7 @@ function pspVentesFiche(i, garder){
     </table></div>
     ${p.nb_depenses ? `<h3 class="cjr-h">Dépenses</h3><div class="tbl-wrap"><table class="dt cjr-table"><thead><tr><th>Date</th><th>Description</th><th>Catégorie</th><th class="tr">Montant</th></tr></thead>
       <tbody>${p.liste_depenses.map(x => `<tr><td class="num">${frDate(x.date)}</td><td>${esc(x.description)}</td><td>${esc(x.categorie || '')}</td><td class="tr num c-amber">${cjrG(x.montant)}</td></tr>`).join('')}</tbody></table></div>` : ''}
-    ${(p.releves_detail || []).length ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:700">Voir ses relevés (${p.releves_detail.length})</summary>
+    ${(p.releves_detail || []).length ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:700">Voir ses meeters (${p.releves_detail.length})</summary>
       <div class="tbl-wrap"><table class="dt cjr-table"><thead><tr><th>Date</th><th>Période</th><th>Meeter</th><th class="tr">Avant</th><th class="tr">Après</th><th class="tr">Gallons</th><th class="tr">Montant</th></tr></thead>
       <tbody>${p.releves_detail.map(x => `<tr><td class="num">${frDate(x.date)}</td><td>${x.periode === 'Apres-midi' ? 'Après-midi' : esc(x.periode)}</td><td>${esc(x.meeter)}</td>
         <td class="tr num">${cjrGal(x.avant).replace(' gal', '')}</td><td class="tr num">${cjrGal(x.apres).replace(' gal', '')}</td>
