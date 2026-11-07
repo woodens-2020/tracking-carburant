@@ -440,3 +440,259 @@ def retirer(eid: int, data: RetirerEspaceIn, request: Request, response: Respons
     if espace_courant() == schema:                # on était dedans : retour à la station principale
         _cookie_espace(response, None, main._SECURE_COOKIES)
     return {"ok": True, "nom": nom}
+
+
+# ══════════════════════════════════════════════════════════════════════
+# RESPONSABLES DE PLUSIEURS STATIONS
+# Comme un pompiste : le compte vit dans sa station d'origine ; le
+# propriétaire l'autorise dans d'autres stations, où un compte « miroir »
+# (même mot de passe, même PIN, même rôle) est créé. Après la connexion,
+# la liste des stations s'affiche : il choisit où il travaille et y entre
+# sans retaper son PIN (connexion de moins de FRAICHEUR_MIN minutes) ;
+# plus tard, changer de station demande son PIN.
+# ══════════════════════════════════════════════════════════════════════
+FRAICHEUR_MIN = 15
+
+
+def _sch(eid: int) -> Optional[str]:
+    return None if not eid else f"esp_{int(eid)}"
+
+
+def _eid(sch: Optional[str]) -> int:
+    return 0 if not sch else int(sch.split("_")[1])
+
+
+def _marque(sch: Optional[str], uid: int) -> str:
+    return f"{sch or 'principal'}:{uid}"
+
+
+def _est_pompiste(u: Utilisateur) -> bool:
+    from pompiste_routes import est_role_pompiste
+    return est_role_pompiste(u.role_obj)
+
+
+def _session_fraiche(request: Request, db: Session) -> bool:
+    from datetime import datetime, timedelta, timezone
+
+    import main
+    from models import SessionToken
+    tok = request.cookies.get(main.SESSION_COOKIE)
+    s = db.query(SessionToken).filter_by(token=tok).first() if tok else None
+    if not s or not s.created_at:
+        return False
+    cree = s.created_at if s.created_at.tzinfo else s.created_at.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - cree <= timedelta(minutes=FRAICHEUR_MIN)
+
+
+def _origine(moi: Utilisateur):
+    """(schéma, compte d'origine détaché) du responsable connecté."""
+    if not moi.compte_origine:
+        return espace_courant(), moi
+    sch, _, uid = moi.compte_origine.partition(":")
+    sch = None if sch == "principal" else sch
+    with session_espace(sch) as odb:
+        o = odb.get(Utilisateur, int(uid))
+        if not o or not o.actif:
+            raise HTTPException(403, "Votre compte d'origine est désactivé.")
+        _ = o.role_obj
+        odb.expunge(o)
+    return sch, o
+
+
+def _role_dans(tdb: Session, o: Utilisateur):
+    from models import Role
+    r0 = o.role_obj
+    if not r0:
+        return None
+    r = tdb.query(Role).filter(Role.nom == r0.nom).first()
+    if not r:
+        r = Role(nom=r0.nom, description=r0.description, permissions=dict(r0.permissions or {}),
+                 est_admin=bool(r0.est_admin), est_systeme=False)
+        tdb.add(r)
+        tdb.flush()
+    return r
+
+
+def _miroir_responsable(tdb: Session, sch_o: Optional[str], o: Utilisateur, creer: bool = False) -> Optional[Utilisateur]:
+    """Compte du responsable dans une autre station (créé si `creer`), remis
+    à jour sur son compte d'origine, qui fait foi."""
+    marque = _marque(sch_o, o.id)
+    u = tdb.query(Utilisateur).filter_by(compte_origine=marque).first()
+    if not u:
+        if not creer:
+            return None
+        if o.email and tdb.query(Utilisateur.id).filter(Utilisateur.email == o.email).first():
+            raise HTTPException(409, "Un autre compte de cette station a déjà cet email.")
+        base = re.sub(r"[^a-z0-9._-]", "", (o.username or "responsable").lower())[:60] or "responsable"
+        nom, i = base, 2
+        while tdb.query(Utilisateur.id).filter(Utilisateur.username == nom).first():
+            nom = f"{base}{i}"
+            i += 1
+        u = Utilisateur(username=nom, compte_origine=marque, actif=True)
+        tdb.add(u)
+    u.email, u.password_hash, u.code_acces_hash = o.email, o.password_hash, o.code_acces_hash
+    u.nom_complet, u.poste, u.telephone = o.nom_complet, o.poste, o.telephone
+    u.role = o.role if o.role in ("admin", "operateur", "pdg") else "operateur"
+    r = _role_dans(tdb, o)
+    u.role_id = r.id if r else None
+    tdb.flush()
+    return u
+
+
+def _autorises(sch_o: Optional[str], o: Utilisateur) -> dict:
+    """{station id: True} pour chaque station où ce responsable peut entrer."""
+    out = {_eid(sch_o): True}
+    m = _marque(sch_o, o.id)
+    for st in stations_pompiste():
+        if st["id"] == _eid(sch_o):
+            continue
+        try:
+            with session_espace(_sch(st["id"])) as sdb:
+                if sdb.query(Utilisateur.id).filter_by(compte_origine=m, actif=True).first():
+                    out[st["id"]] = True
+        except Exception:
+            continue
+    return out
+
+
+@router.get("/api/espaces/mes-stations")
+def mes_stations(request: Request, db: Session = Depends(get_db)):
+    """Stations où la personne connectée peut travailler (toutes pour le
+    propriétaire), pour choisir après la connexion."""
+    moi = _moi(request, db)
+    toutes = stations_pompiste()
+    ici = _eid(espace_courant())
+    proprio = proprietaire(request, db)
+    if proprio:
+        ok = {st["id"]: True for st in toutes}
+    elif _est_pompiste(moi):
+        ok = {ici: True}
+    else:
+        sch_o, o = _origine(moi)
+        ok = _autorises(sch_o, o)
+    return {"fraiche": _session_fraiche(request, db), "proprietaire": bool(proprio),
+            "stations": [dict(st, ici=st["id"] == ici, autorise=bool(ok.get(st["id"]))) for st in toutes]}
+
+
+class AllerIn(BaseModel):
+    cible_id: int = 0
+    pin: Optional[str] = None
+
+
+@router.post("/api/espaces/aller")
+def aller(data: AllerIn, request: Request, response: Response, db: Session = Depends(get_db)):
+    """Entrer dans la station choisie : sans PIN juste après la connexion,
+    avec le PIN ensuite. Déconnecté de la station quittée."""
+    import main
+    moi = _moi(request, db)
+    if _est_pompiste(moi):
+        raise HTTPException(403, "Les pompistes choisissent leur station à la connexion.")
+    proprio = proprietaire(request, db)
+    sch_o, o = (None, proprio) if proprio else _origine(moi)
+    try:
+        cible = schema_de_station(data.cible_id)
+    except ValueError:
+        raise HTTPException(404, "Station introuvable.")
+    if not _session_fraiche(request, db):
+        ip = request.client.host if request.client else None
+        cle = f"{ip}|espace|{_marque(sch_o, o.id)}"
+        main._check_login_rate(cle)
+        if not o.code_acces_hash or not verify_code_acces((data.pin or "").strip(), o.code_acces_hash):
+            main._record_login_failure(cle)
+            raise HTTPException(400, "PIN incorrect.")      # pas 401 : l'interface y lirait une session expirée
+        main._clear_login_failures(cle)
+    with session_espace(cible) as tdb:
+        if proprio:
+            u = _miroir(tdb, proprio) if cible else tdb.get(Utilisateur, proprio.id)
+        elif cible == sch_o:
+            u = tdb.get(Utilisateur, o.id)
+        else:
+            u = tdb.query(Utilisateur).filter_by(compte_origine=_marque(sch_o, o.id), actif=True).first()
+            if u is None:
+                raise HTTPException(403, "Vous n'êtes pas autorisé dans cette station : demandez au propriétaire.")
+            u = _miroir_responsable(tdb, sch_o, o)      # remis à jour (mot de passe, PIN, rôle)
+        if not u or not u.actif:
+            raise HTTPException(403, "Compte désactivé dans cette station.")
+        tdb.commit()
+        token = create_session(tdb, u.id, ip_address=request.client.host if request.client else None,
+                               user_agent=request.headers.get("user-agent", ""))
+    ancien = request.cookies.get(main.SESSION_COOKIE)
+    if ancien:
+        try:
+            delete_session(db, ancien)            # déconnecté de la station quittée
+        except Exception:
+            db.rollback()
+    response.set_cookie(main.SESSION_COOKIE, token, httponly=True, samesite="lax",
+                        secure=main._SECURE_COOKIES, max_age=12 * 3600, path="/")
+    _cookie_espace(response, cible, main._SECURE_COOKIES)
+    return {"ok": True, "courant": cible, "nom": nom_station(data.cible_id) if data.cible_id else nom_principale()}
+
+
+@router.get("/api/espaces/responsables")
+def responsables(request: Request, db: Session = Depends(get_db)):
+    """Propriétaire : les responsables de chaque station (hors pompistes) et
+    les stations où chacun est autorisé."""
+    proprio = proprietaire(request, db)
+    if not proprio:
+        raise HTTPException(403, "Réservé au propriétaire.")
+    toutes = stations_pompiste()
+    actifs, comptes = {}, []
+    for st in toutes:
+        try:
+            with session_espace(_sch(st["id"])) as sdb:
+                actifs[st["id"]] = {m for (m,) in sdb.query(Utilisateur.compte_origine)
+                                    .filter(Utilisateur.compte_origine.isnot(None), Utilisateur.actif.is_(True)).all()}
+                for u in (sdb.query(Utilisateur).filter(Utilisateur.actif.is_(True), Utilisateur.compte_origine.is_(None))
+                          .order_by(Utilisateur.nom_complet).all()):
+                    if _est_pompiste(u) or (u.email and u.email == proprio.email):
+                        continue
+                    comptes.append({"station_id": st["id"], "station_nom": st["nom"], "id": u.id,
+                                    "nom": u.nom_complet or u.username, "email": u.email,
+                                    "role": u.role_obj.nom if u.role_obj else u.role})
+        except Exception:
+            actifs.setdefault(st["id"], set())
+    for c in comptes:
+        m = _marque(_sch(c["station_id"]), c["id"])
+        c["autorisations"] = [{"espace_id": st["id"], "nom": st["nom"], "autorise": m in actifs.get(st["id"], set())}
+                              for st in toutes if st["id"] != c["station_id"]]
+    return {"stations": toutes, "responsables": comptes}
+
+
+class AutoriserResponsableIn(BaseModel):
+    station_id: int          # station d'origine du compte
+    compte_id: int
+    espace_id: int           # station où il est autorisé (ou retiré)
+    autorise: bool
+
+
+@router.post("/api/espaces/responsables/autoriser")
+def autoriser_responsable(data: AutoriserResponsableIn, request: Request, db: Session = Depends(get_db)):
+    """Propriétaire : autoriser (ou retirer) un responsable dans une autre
+    station. Retiré, il en est déconnecté tout de suite."""
+    import main
+    if not proprietaire(request, db):
+        raise HTTPException(403, "Réservé au propriétaire.")
+    if data.station_id == data.espace_id:
+        raise HTTPException(400, "C'est déjà sa station.")
+    try:
+        sch_o, cible = schema_de_station(data.station_id), schema_de_station(data.espace_id)
+    except ValueError:
+        raise HTTPException(404, "Station introuvable.")
+    with session_espace(sch_o) as odb:
+        o = odb.get(Utilisateur, data.compte_id)
+        if not o or not o.actif or o.compte_origine or _est_pompiste(o):
+            raise HTTPException(404, "Responsable introuvable.")
+        _ = o.role_obj
+        odb.expunge(o)
+    with session_espace(cible) as tdb:
+        u = _miroir_responsable(tdb, sch_o, o, creer=data.autorise)
+        if u is not None:
+            u.actif = data.autorise
+            if not data.autorise:
+                from models import SessionToken
+                tdb.query(SessionToken).filter_by(user_id=u.id).delete()   # sorti tout de suite
+        tdb.commit()
+    main._tracer(db, request, "responsable_station_autorisee" if data.autorise else "responsable_station_retiree",
+                 {"compte": o.username, "station_origine": data.station_id, "station": data.espace_id})
+    db.commit()
+    return {"ok": True, "autorise": data.autorise}

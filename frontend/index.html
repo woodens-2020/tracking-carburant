@@ -18761,14 +18761,100 @@ async function initStations(){
   document.getElementById('station-nom').textContent = _STATIONS.courant_nom || _nomPrincipale();
   document.getElementById('station-action').textContent = plusieurs ? 'Changer de station' : (ouvrable ? 'Mes stations' : 'Votre station');
   f.style.cursor = ouvrable ? 'pointer' : 'default';
-  // Après la connexion, le propriétaire arrive sur la carte des stations
-  // (page d'atterrissage) : c'est depuis la carte qu'il change de station.
   try{ sessionStorage.setItem('konekta-station-choisie', '1'); }catch(e){}
+  // Responsable de plusieurs stations : il peut aussi changer de station
+  try{ _MES_STATIONS = await GET('/espaces/mes-stations'); }catch(e){ _MES_STATIONS = null; }
+  const nb = _MES_STATIONS ? _MES_STATIONS.stations.filter(s => s.autorise).length : 0;
+  if(!ouvrable && nb > 1){
+    f.style.display = ''; f.style.cursor = 'pointer';
+    document.getElementById('station-action').textContent = 'Changer de station';
+  }
 }
-// Changer de station = la carte des stations (l'ancienne fenêtre reste en secours)
+let _MES_STATIONS = null;
+// Changer de station : la liste des stations (le propriétaire garde sa fenêtre complète)
 function allerCarteStations(){
-  if(!_STATIONS || !(_STATIONS.peut_changer || _STATIONS.peut_creer)) return;
-  if(_canAccess('geo') && window.initGeo) goTo('geo'); else ouvrirChoixStation();
+  if(_STATIONS && (_STATIONS.peut_changer || _STATIONS.peut_creer)) return ouvrirChoixStation();
+  if(_MES_STATIONS && _MES_STATIONS.stations.filter(s => s.autorise).length > 1) ouvrirMesStations(false);
+}
+// Liste des stations après la connexion (ou pour changer) : on choisit, on y entre.
+// Juste après la connexion, pas de PIN à retaper ; ensuite, le PIN est demandé.
+async function ouvrirMesStations(premiere){
+  try{ _MES_STATIONS = await GET('/espaces/mes-stations'); }catch(e){ return toast(e.message, 'err'); }
+  const M = _MES_STATIONS;
+  let ov = document.getElementById('mes-stations');
+  if(!ov){ ov = document.createElement('div'); ov.id = 'mes-stations'; ov.className = 'cs-overlay'; document.body.appendChild(ov); }
+  const fermer = () => ov.classList.remove('show');
+  ov.innerHTML = `<div class="cs-boite" role="dialog" aria-modal="true" aria-labelledby="ms-titre">
+      <div class="cs-tete"><div><div class="cs-sur">${premiere ? 'Bienvenue' : 'Changer de station'}</div>
+        <h2 id="ms-titre">Dans quelle station travaillez-vous ?</h2></div>
+        <button class="cs-fermer" id="ms-fermer" aria-label="Fermer">✕</button></div>
+      <div class="cs-liste">${M.stations.map(st => `<button class="cs-carte ${st.ici ? 'ici' : ''}" data-id="${st.id}" ${st.autorise ? '' : 'disabled style="opacity:.45;cursor:not-allowed"'}>
+          <span class="cs-ico">⛽</span><span class="cs-txt"><b>${esc(st.nom)}</b>${st.adresse ? `<small>📍 ${esc(st.adresse)}</small>` : ''}</span>
+          <span class="cs-etat">${st.ici ? 'Vous êtes ici' : st.autorise ? 'Entrer →' : 'Non autorisé'}</span></button>`).join('')}</div>
+      <div id="ms-pin" class="cs-pin" style="display:none"></div>
+      <div id="ms-err"></div>
+      <div class="cs-note">Une station grisée : demandez au propriétaire de vous y autoriser.</div>
+    </div>`;
+  ov.classList.add('show');
+  ov.querySelector('#ms-fermer').onclick = fermer;
+  const err = m => { ov.querySelector('#ms-err').innerHTML = `<div class="psp-err">${esc(m)}</div>`; };
+  const entrer = async (id, pin) => {
+    try{
+      await POST('/espaces/aller', pin ? {cible_id: id, pin} : {cible_id: id});
+      try{ sessionStorage.setItem('konekta-station-choisie', '1'); sessionStorage.removeItem('konekta_current_page'); }catch(e){}
+      location.href = '/';
+    }catch(e){ err(e.message); }
+  };
+  ov.querySelectorAll('.cs-carte[data-id]').forEach(b => b.onclick = () => {
+    const st = M.stations.find(x => x.id === Number(b.dataset.id));
+    if(!st || !st.autorise) return;
+    if(st.ici) return fermer();
+    if(M.fraiche) return entrer(st.id);
+    const z = ov.querySelector('#ms-pin'); z.style.display = '';
+    z.innerHTML = `<label for="ms-pin-in">Votre PIN pour entrer dans <b>${esc(st.nom)}</b></label>
+      <div class="cs-pin-ligne"><input id="ms-pin-in" type="password" inputmode="numeric" maxlength="9" autocomplete="off" placeholder="9 chiffres">
+        <button class="btn btn-primary" id="ms-ok">Entrer</button></div>
+      <div class="cs-note">Vous serez déconnecté de la station actuelle.</div>`;
+    const go = () => { const p = ov.querySelector('#ms-pin-in').value.trim();
+      if(!/^[0-9]{9}$/.test(p)) return err('Le PIN contient 9 chiffres.'); entrer(st.id, p); };
+    ov.querySelector('#ms-ok').onclick = go;
+    ov.querySelector('#ms-pin-in').onkeydown = e => { if(e.key === 'Enter') go(); };
+    ov.querySelector('#ms-pin-in').focus();
+  });
+}
+// Propriétaire : quels responsables peuvent entrer dans quelles stations
+async function ouvrirResponsablesStations(){
+  let D;
+  try{ D = await GET('/espaces/responsables'); }catch(e){ return toast(e.message, 'err'); }
+  let ov = document.getElementById('resp-stations');
+  if(!ov){ ov = document.createElement('div'); ov.id = 'resp-stations'; ov.className = 'cs-overlay'; document.body.appendChild(ov); }
+  const parSt = {};
+  D.responsables.forEach(r => (parSt[r.station_nom] ||= []).push(r));
+  ov.innerHTML = `<div class="cs-boite" role="dialog" aria-modal="true" aria-labelledby="rs-titre" style="max-width:640px">
+      <div class="cs-tete"><div><div class="cs-sur">Propriétaire</div><h2 id="rs-titre">Responsables : stations autorisées</h2></div>
+        <button class="cs-fermer" id="rs-fermer" aria-label="Fermer">✕</button></div>
+      <div class="cs-note" style="margin:0 0 10px">Cochez les stations où chaque responsable peut aussi travailler. Après sa connexion, il choisit sa station dans la liste. Décoché, il en sort tout de suite.</div>
+      <div style="max-height:60vh;overflow:auto">${Object.keys(parSt).length ? Object.entries(parSt).map(([st, L]) => `
+        <div style="margin:10px 0 4px;font-weight:800">⛽ ${esc(st)}</div>
+        ${L.map(r => `<div style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin:6px 0">
+          <b>${esc(r.nom)}</b> <small class="psp-muted">${esc(r.role || '')}${r.email ? ' · ' + esc(r.email) : ''}</small>
+          <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px">${r.autorisations.map(a => `
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer">
+              <input type="checkbox" data-st="${r.station_id}" data-c="${r.id}" data-e="${a.espace_id}" ${a.autorise ? 'checked' : ''}> ${esc(a.nom)}</label>`).join('')}</div></div>`).join('')}`).join('')
+        : '<div class="psp-muted">Aucun responsable enregistré.</div>'}</div>
+    </div>`;
+  ov.classList.add('show');
+  ov.querySelector('#rs-fermer').onclick = () => ov.classList.remove('show');
+  ov.addEventListener('click', e => { if(e.target === ov) ov.classList.remove('show'); });
+  ov.querySelectorAll('input[type=checkbox][data-c]').forEach(cb => cb.onchange = async () => {
+    cb.disabled = true;
+    try{
+      await POST('/espaces/responsables/autoriser', {station_id: Number(cb.dataset.st), compte_id: Number(cb.dataset.c),
+                                                     espace_id: Number(cb.dataset.e), autorise: cb.checked});
+      toast(cb.checked ? 'Autorisé dans cette station.' : 'Retiré de cette station.', 'ok');
+    }catch(e){ cb.checked = !cb.checked; toast(e.message, 'err'); }
+    cb.disabled = false;
+  });
 }
 function ouvrirChoixStation(premiere){
   if(!_STATIONS || !(_STATIONS.peut_changer || _STATIONS.peut_creer)) return;
@@ -18787,6 +18873,7 @@ function ouvrirChoixStation(premiere){
       }).join('')}</div>
       <div id="cs-pin" class="cs-pin" style="display:none"></div>
       ${_STATIONS.peut_creer && !_STATIONS.espaces.length ? `<div class="cs-note">Vous n'avez pas encore de station séparée. Enregistrez une nouvelle station (avec son gérant) : elle apparaîtra ici et vous pourrez y passer avec votre PIN.</div>` : ''}
+      ${_STATIONS.peut_creer ? `<button class="cs-lien" onclick="fermerChoixStation();ouvrirResponsablesStations()">👥 Responsables : stations autorisées</button>` : ''}
       ${_STATIONS.peut_creer ? `<button class="cs-lien" onclick="fermerChoixStation();goTo('saisie');setTimeout(()=>{openGestion();gestOnglet('station')},300)">+ Enregistrer une nouvelle station</button>` : ''}
       ${_STATIONS.espaces.length ? `<details class="cs-retirer"><summary>Retirer une station séparée</summary>
         <div class="cs-note">Elle n'est plus proposée et personne ne peut plus y entrer ; ses données sont gardées.</div>
@@ -20883,11 +20970,10 @@ document.addEventListener('DOMContentLoaded',async()=>{
     // l'atterrissage normal de page.
   } else if(!_isFreshLogin && _savedPage && _canAccess(_savedPage)){
     goTo(_savedPage);
-  } else if(_STATIONS && (_STATIONS.peut_changer || _STATIONS.peut_creer) && _canAccess('geo')){
-    // Propriétaire : le centre des stations s'ouvre d'abord (ses données
-    // passent avant celles de la page d'accueil, chargée derrière).
-    if(window.GEO) GEO.ouvrir();
-    setTimeout(() => goTo(_defaultLandingPage()), 900);
+  } else if(_isFreshLogin && _MES_STATIONS && _MES_STATIONS.stations.filter(s => s.autorise).length > 1){
+    // Plusieurs stations : il choisit où il travaille, puis il y est dirigé
+    goTo(_defaultLandingPage());
+    ouvrirMesStations(true);
   } else if(_rlNom === 'manager'){
     goTo('notifications');
   } else if(_rlNom === 'assistant directeur'){
