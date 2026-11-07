@@ -41,7 +41,7 @@ def classement(db: Session, d0: date_type, d1: date_type) -> dict:
             lignes[eid] = {"pompiste_id": eid, "pompiste": _nom(e), "poste": e.poste if e else None,
                            "par_carburant": defaultdict(lambda: {"gallons": 0.0, "montant": 0.0, "releves": 0}),
                            "montant": 0.0, "releves": 0, "creneaux": set(), "jours": set(),
-                           "depenses": 0.0, "nb_depenses": 0, "liste_depenses": []}
+                           "depenses": 0.0, "nb_depenses": 0, "liste_depenses": [], "detail": []}
         return lignes[eid]
 
     totaux = defaultdict(lambda: {"gallons": 0.0, "montant": 0.0})
@@ -54,6 +54,11 @@ def classement(db: Session, d0: date_type, d1: date_type) -> dict:
         c["gallons"] += g; c["montant"] += mt; c["releves"] += 1
         x["montant"] += mt; x["releves"] += 1
         x["creneaux"].add((r.date, r.periode)); x["jours"].add(r.date)
+        x["detail"].append({"date": str(r.date), "periode": r.periode, "famille": fam,
+                            "meeter": (f"{r.pompe.produit.nom} · {r.pompe.nom}" if r.pompe and r.pompe.produit
+                                       else (r.pompe.nom if r.pompe else "")),
+                            "avant": float(r.metter_avant), "apres": float(r.metter_apres),
+                            "gallons": round(g, 3), "montant": round(mt, 2)})
         totaux[fam]["gallons"] += g; totaux[fam]["montant"] += mt
     # Dépenses : attribuées au pompiste, sinon au pompiste du rapport qui les a payées
     emp_du_compte = {}
@@ -84,6 +89,7 @@ def classement(db: Session, d0: date_type, d1: date_type) -> dict:
             "part": round(100 * x["montant"] / total_ventes, 1) if total_ventes else 0.0,
             "depenses": round(x["depenses"], 2), "nb_depenses": x["nb_depenses"],
             "liste_depenses": sorted(x["liste_depenses"], key=lambda y: y["date"]),
+            "releves_detail": sorted(x["detail"], key=lambda y: (y["date"], y["periode"] != "Matin", y["meeter"])),
             "net": round(x["montant"] - x["depenses"], 2),
             "moyenne_creneau": round(x["montant"] / len(x["creneaux"]), 2) if x["creneaux"] else 0.0,
         })
