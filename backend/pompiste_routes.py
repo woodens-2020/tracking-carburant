@@ -175,7 +175,7 @@ class _RequeteInterne:
 
 def rattraper_journal(db: Session) -> int:
     """Démarrage : tout rapport terminé (soumis, en problème, finalisé) dont
-    un mètre manque dans le journal des compteurs y est écrit — notamment
+    un meter manque dans le journal des compteurs y est écrit — notamment
     les rapports soumis avant que l'espace pompiste n'écrive le journal au
     « Terminer ». Idempotent : une pompe déjà dans le journal pour ce
     créneau n'est pas touchée (saisie parallèle du module Saisie gardée)."""
@@ -191,7 +191,7 @@ def rattraper_journal(db: Session) -> int:
             _ecrire_journal(db, rap, _RequeteInterne(rap.utilisateur_id), remplacer_saisie=False, seulement=pid)
             n += 1
     if n:
-        log.info("Journal des compteurs : %d mètre(s) de rapports pompistes rattrapé(s)", n)
+        log.info("Journal des compteurs : %d meter(s) de rapports pompistes rattrapé(s)", n)
     return n
 
 
@@ -205,7 +205,7 @@ def nettoyer_journal_anticipe(db: Session) -> int:
     """Démarrage : un rapport pas encore finalisé (soumis, en problème) n'a
     rien au journal officiel ni dans les Dépenses : tout y entre à la
     finalisation. Les relevés écrits avant (au « Terminer », ou à la
-    confirmation d'un mètre par l'ancien fonctionnement) sont retirés s'ils
+    confirmation d'un meter par l'ancien fonctionnement) sont retirés s'ils
     sont identiques au rapport ; s'ils ont été modifiés ensuite à la main
     (module Saisie), ils deviennent une saisie ordinaire et sont gardés."""
     from models import Depense
@@ -229,7 +229,7 @@ def nettoyer_journal_anticipe(db: Session) -> int:
 
 
 class LignePendante:
-    """Mètre d'un rapport pompiste pas encore finalisé, présenté au Journal
+    """Meter d'un rapport pompiste pas encore finalisé, présenté au Journal
     Meters comme un relevé (mêmes attributs que Releve) mais marqué
     « en attente » : il n'est compté dans aucun total, ni caisse, ni stock."""
     en_attente = True
@@ -255,7 +255,7 @@ class LignePendante:
 
 
 def lignes_en_attente(db: Session, d_debut: date_type, d_fin: date_type) -> list:
-    """Mètres des rapports soumis / en problème de la période. Une pompe déjà
+    """Meters des rapports soumis / en problème de la période. Une pompe déjà
     présente au journal officiel pour le même créneau (saisie du module
     Saisie) n'est pas doublée."""
     out = []
@@ -353,8 +353,8 @@ def _index_precedent(db: Session, pompe_id: int, d: date_type, periode: str,
         dep = main.base_depart(p, d)
         if dep is not None:
             meilleur = dep
-            src = (f"mètre de départ du {p.date_depart.strftime('%d/%m')}" if p.date_depart
-                   else "mètre de départ (enregistrement de la station)")
+            src = (f"meter de départ du {p.date_depart.strftime('%d/%m')}" if p.date_depart
+                   else "meter de départ (enregistrement de la station)")
     return meilleur, src
 
 
@@ -432,7 +432,7 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
         try:
             placement = placement_metres.plan_rapport(db, r)
         except Exception:
-            log.exception("Placement des mètres du rapport #%s", r.id)
+            log.exception("Placement des meters du rapport #%s", r.id)
         for pr in (placement or {}).get("propositions", []):
             x = next((y for y in lignes if y["pompe_id"] == pr["pompe_id"]), None)
             if x is not None:
@@ -511,7 +511,7 @@ _EN_ATTENTE = ("EN_COURS", "SOUMIS", "PROBLEME")
 
 
 def mettres_en_attente(db: Session, d: date_type, periode: Optional[str] = None) -> list[dict]:
-    """Pompes d'un rapport pompiste pas encore finalisé dont le mètre n'est
+    """Pompes d'un rapport pompiste pas encore finalisé dont le meter n'est
     pas (encore) au journal : leur place est prise, la Saisie ne doit pas
     les ressaisir en parallèle."""
     out = []
@@ -814,7 +814,7 @@ def _fiche_station() -> dict:
 
 
 def de_ma_station(u: Utilisateur, pompe) -> bool:
-    """Le pompiste rattaché à une station ne voit et ne saisit que les mètres
+    """Le pompiste rattaché à une station ne voit et ne saisit que les meters
     des pompes de cette adresse ; sans station, il voit tout. La station est
     celle de la pompe physique (les produits sont communs à tous)."""
     st = _norm_station(getattr(u, "station_adresse", None))
@@ -976,11 +976,11 @@ def modifier_compteur(pompe_id: int, data: ModifLigneIn, u: Utilisateur = Depend
 
 def _ecrire_journal(db: Session, rap: RapportPompiste, request: Request, *, remplacer_saisie: bool,
                     motif: Optional[str] = None, seulement: Optional[int] = None) -> list[str]:
-    """Écrit les mètres du rapport dans le journal des compteurs (`releves`),
+    """Écrit les meters du rapport dans le journal des compteurs (`releves`),
     avec exactement les règles du module Saisie (prix officiel à la date,
     continuité des compteurs, alertes de stock) via `upsert_releve`.
 
-    - au « Terminer » du pompiste : le journal reçoit ses mètres tout de suite
+    - au « Terminer » du pompiste : le journal reçoit ses meters tout de suite
       (statut du rapport : à vérifier) ; une saisie déjà faite dans le module
       Saisie pour la même pompe n'est pas écrasée — le superviseur tranche ;
     - à chaque correction / à la finalisation : mise à jour des mêmes relevés ;
@@ -1152,7 +1152,7 @@ def mes_rapports(u: Utilisateur = Depends(_require_pompiste), db: Session = Depe
 
 # ═════════════════════════════════════════════════════════════════════
 # SUPERVISION
-# Vérification élément par élément : chaque mètre, la billetterie, l'écart.
+# Vérification élément par élément : chaque meter, la billetterie, l'écart.
 # Puis « Finaliser » avec une note (CONFIRME), ou « Signaler un problème »
 # (PROBLEME) puis, une fois réglé, « Résolu et finalisé » (RESOLU).
 # La finalisation écrit le journal des compteurs.
@@ -1268,7 +1268,7 @@ def supprimer_rapport(rid: int, data: SuppressionRapportIn, request: Request,
 def restaurer_rapport(rid: int, request: Request, s: Utilisateur = Depends(_require_superviseur),
                       db: Session = Depends(get_db)):
     """Sort un rapport de la corbeille. Il revient « à vérifier » : chaque
-    mètre, la billetterie, les dépenses et l'écart sont à reconfirmer (les
+    meter, la billetterie, les dépenses et l'écart sont à reconfirmer (les
     corrections déjà faites sont gardées) — rien ne rentre au journal ni aux
     Dépenses sans une nouvelle confirmation."""
     import main
@@ -1308,7 +1308,7 @@ def restaurer_rapport(rid: int, request: Request, s: Utilisateur = Depends(_requ
 
 
 def _retirer_ligne_du_journal(db: Session, rap: RapportPompiste, l: RapportPompisteLigne) -> None:
-    """Le mètre n'est plus confirmé : il sort de la Saisie, sauf s'il y a été
+    """Le meter n'est plus confirmé : il sort de la Saisie, sauf s'il y a été
     modifié à la main (il redevient alors une saisie ordinaire)."""
     av, ap = _valeurs_finales(l)
     for r in db.query(Releve).filter_by(rapport_pompiste_id=rap.id, pompe_id=l.pompe_id).all():
@@ -1403,7 +1403,7 @@ def _voisins(db: Session, pompe_id: int, d: date_type, periode: str, rid: int,
     if prec is None:
         dep = main.base_depart(p, d)
         if dep is not None:
-            prec = (None, dep, "mètre de départ")
+            prec = (None, dep, "meter de départ")
     return ((prec[1], prec[2]) if prec else (None, None)), ((suiv[1], suiv[2]) if suiv else (None, None))
 
 
@@ -1445,11 +1445,11 @@ def _analyse_date(db: Session, rap: RapportPompiste, d: date_type, periode: str)
         avert.append(f"{_nom(rap.utilisateur)} a déjà le rapport n°{autre.id} sur ce créneau (autres pompes) : "
                      "il aura deux rapports pour la même période.")
     if rap.statut in ("CONFIRME", "RESOLU") and not supprime:
-        avert.append("Rapport finalisé : il revient « à vérifier ». Ses mètres sortent du journal du "
+        avert.append("Rapport finalisé : il revient « à vérifier ». Ses meters sortent du journal du "
                      f"{rap.date.strftime('%d/%m')} et entrent au {d.strftime('%d/%m')} quand vous les reconfirmez ; "
                      "billetterie et dépenses restent comme décidé.")
     elif any(l.confirmee for l in rap.lignes) and not supprime:
-        avert.append("Les mètres déjà confirmés sortent du journal : à reconfirmer sur le nouveau créneau.")
+        avert.append("Les meters déjà confirmés sortent du journal : à reconfirmer sur le nouveau créneau.")
     # Par pompe : continuité au nouveau créneau, saisie existante, prix
     for l in rap.lignes:
         av, ap = _valeurs_finales(l)
@@ -1524,7 +1524,7 @@ def apercu_changer_date(rid: int, date: date_type, periode: str,
 def changer_date(rid: int, data: ChangerDateIn, request: Request,
                  s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     """Rapport enregistré sur le mauvais jour ou la mauvaise période : la
-    direction le déplace (corbeille, à vérifier ou finalisé). Les mètres sont
+    direction le déplace (corbeille, à vérifier ou finalisé). Les meters sont
     à reconfirmer sur le nouveau créneau ; prix et taux du nouveau jour ;
     dépenses du pompiste déplacées avec lui. Voir `_analyse_date`."""
     import main
@@ -1571,7 +1571,7 @@ def changer_date(rid: int, data: ChangerDateIn, request: Request,
     rap.ecart = round(float(rap.montant_compte) + float(rap.total_depenses or 0) + _totaux_feuille(rap)["net"]
                       - float(rap.montant_attendu), 2)
     # Le rapport n'est plus finalisé : ses dépenses sortent des Dépenses (rapport du
-    # jour, caisse) comme ses mètres sortent du journal ; elles y reviendront, au
+    # jour, caisse) comme ses meters sortent du journal ; elles y reviendront, au
     # nouveau jour, à la nouvelle finalisation.
     if etait_finalise:
         db.query(Depense).filter_by(rapport_pompiste_id=rap.id).delete()
@@ -1596,7 +1596,7 @@ def changer_pompe(rid: int, pompe_id: int, data: ChangerPompeIn, request: Reques
     """Le pompiste a mis ces index sur la mauvaise pompe : la direction les
     remet sur la bonne. Si la bonne pompe est déjà dans le rapport (index
     croisés), les index des deux pompes sont échangés. Le prix suit la pompe
-    (son carburant). Les mètres touchés sont à reconfirmer ; la pompe choisie
+    (son carburant). Les meters touchés sont à reconfirmer ; la pompe choisie
     par le pompiste reste affichée."""
     import main
     rap = _rapport_a_traiter(db, rid)
@@ -1627,7 +1627,7 @@ def changer_pompe(rid: int, pompe_id: int, data: ChangerPompeIn, request: Reques
     trace = {"rapport_id": rap.id, "date": str(rap.date), "periode": rap.periode, "motif": motif[:300],
              "de": ancienne.nom, "vers": neuve.nom, "echange": autre is not None,
              "index": list(_valeurs_finales(l))}
-    # Les mètres touchés ne sont plus confirmés : ils sortent d'abord du journal
+    # Les meters touchés ne sont plus confirmés : ils sortent d'abord du journal
     for x in ([l, autre] if autre else [l]):
         _retirer_ligne_du_journal(db, rap, x)
         x.confirmee, x.confirmee_at = False, None
@@ -1676,14 +1676,14 @@ def placement_rapport(rid: int, _s: Utilisateur = Depends(_require_superviseur),
 def reclasser(rid: int, data: ReclasserIn, request: Request,
               s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     """Applique d'un coup le placement proposé (ou celui envoyé) : chaque
-    ligne retrouve son mètre, échanges et rotations compris. Les mètres
+    ligne retrouve son meter, échanges et rotations compris. Les meters
     touchés sont à reconfirmer ; l'erreur est retenue pour ce pompiste."""
     import main
     import placement_metres
     rap = _rapport_a_traiter(db, rid)
     motif = " ".join((data.motif or "").split())
     if len(motif) < 5:
-        raise HTTPException(400, "Indiquez pourquoi vous changez de mètre (5 caractères minimum).")
+        raise HTTPException(400, "Indiquez pourquoi vous changez de meter (5 caractères minimum).")
     plan = data.plan if data.plan is not None else placement_metres.plan_rapport(db, rap)["plan"]
     try:
         mapping = {int(x["pompe_id"]): int(x["vers"]) for x in plan}
@@ -1695,7 +1695,7 @@ def reclasser(rid: int, data: ReclasserIn, request: Request,
                   "motif": motif[:300], "changements": changements})
     db.commit()
     db.refresh(rap)
-    log.info("Rapport pompiste #%s : %d mètre(s) reclassé(s) par l'utilisateur %s", rid, len(changements), s.id)
+    log.info("Rapport pompiste #%s : %d meter(s) reclassé(s) par l'utilisateur %s", rid, len(changements), s.id)
     return _rapport_dict(db, rap, avec_journal=True)
 
 
@@ -1707,10 +1707,10 @@ class LigneConfIn(BaseModel):
 @router.post("/api/pompiste-supervision/rapports/{rid}/lignes/{pompe_id}/confirmer")
 def confirmer_ligne(rid: int, pompe_id: int, data: LigneConfIn, request: Request,
                     _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
-    """Confirme un mètre, en le corrigeant si les valeurs envoyées diffèrent
+    """Confirme un meter, en le corrigeant si les valeurs envoyées diffèrent
     de celles du pompiste (qui restent conservées). Rien n'entre au journal,
     à la caisse ni dans les totaux avant la finalisation du rapport : le
-    mètre reste « en attente de validation »."""
+    meter reste « en attente de validation »."""
     rap = _rapport_a_traiter(db, rid)
     l = next((x for x in rap.lignes if x.pompe_id == pompe_id), None)
     if not l:
@@ -1723,7 +1723,7 @@ def confirmer_ligne(rid: int, pompe_id: int, data: LigneConfIn, request: Request
     else:
         l.metter_avant_corrige = l.metter_apres_corrige = None
     l.confirmee, l.confirmee_at = True, now_haiti()
-    rap.ecart_confirme = False          # l'écart dépend des mètres : à revoir après une correction
+    rap.ecart_confirme = False          # l'écart dépend des meters : à revoir après une correction
     db.commit()
     db.refresh(rap)
     return _rapport_dict(db, rap, avec_journal=True)
@@ -1762,7 +1762,7 @@ def confirmer_ecart(rid: int, data: ConfirmeIn, _s: Utilisateur = Depends(_requi
                     db: Session = Depends(get_db)):
     rap = _rapport_a_traiter(db, rid)
     if data.confirme and not (all(l.confirmee for l in rap.lignes) and rap.billetterie_confirmee):
-        raise HTTPException(409, "Confirmez d'abord chaque mètre et la billetterie.")
+        raise HTTPException(409, "Confirmez d'abord chaque meter et la billetterie.")
     if data.confirme and any((x.get("statut") or "en_attente") == "en_attente" for x in (rap.depenses or [])):
         raise HTTPException(409, "Confirmez ou refusez d'abord chaque dépense du pompiste.")
     rap.ecart_confirme = data.confirme
@@ -1806,7 +1806,7 @@ def finaliser(rid: int, data: FinaliserIn, request: Request,
     rap = _rapport_a_traiter(db, rid)
     manquants = [l.pompe.nom for l in rap.lignes if not l.confirmee]
     if manquants:
-        raise HTTPException(409, "Mètres pas encore confirmés : " + ", ".join(manquants) + ".")
+        raise HTTPException(409, "Meters pas encore confirmés : " + ", ".join(manquants) + ".")
     if not rap.billetterie_confirmee:
         raise HTTPException(409, "Confirmez d'abord la billetterie.")
     if not rap.ecart_confirme:
@@ -1820,7 +1820,7 @@ def finaliser(rid: int, data: FinaliserIn, request: Request,
     if resolution and len(commentaire) < _COMMENTAIRE_MIN:
         raise HTTPException(400, "Expliquez comment le problème a été résolu.")
     if corrige and len(commentaire) < _COMMENTAIRE_MIN:
-        raise HTTPException(400, "Expliquez la correction des mètres dans le commentaire.")
+        raise HTTPException(400, "Expliquez la correction des meters dans le commentaire.")
 
     # 1. Contrôles AVANT toute écriture (le journal est écrit pompe par pompe :
     #    on refuse tout plutôt que d'en écrire la moitié).
@@ -1837,7 +1837,7 @@ def finaliser(rid: int, data: FinaliserIn, request: Request,
             raise HTTPException(409, {
                 "message": (f"{l.pompe.nom} : l'index de début ({av:.3f}) ne suit pas le journal "
                             f"({float(prec.metter_apres):.3f}, {_per(prec.periode)} du {prec.date.strftime('%d/%m/%Y')}). "
-                            "Corrigez le mètre, finalisez d'abord le rapport précédent, "
+                            "Corrigez le meter, finalisez d'abord le rapport précédent, "
                             "ou indiquez le motif de l'écart."),
                 "motif_requis": True, "pompe_id": l.pompe_id})
         identique = existant and abs(float(existant.metter_avant) - av) <= TOLERANCE \

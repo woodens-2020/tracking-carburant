@@ -105,7 +105,7 @@ class StationGeoJournal(Base):
 
 class Distributeur(Base):
     """Pompe physique de la station (« Pompe 1 », « Pompe 2 »…) qui porte ses
-    mètres (pistolets), chacun pour un produit : Pompe 1 › Gazoline 1,
+    meters (pistolets), chacun pour un produit : Pompe 1 › Gazoline 1,
     Gazoline 2, Diesel 1. Plus de faces A / B : la pompe a une seule face
     interne (table faces), jamais montrée."""
     __tablename__ = "distributeurs"
@@ -123,7 +123,7 @@ class Distributeur(Base):
 
 
 class Face(Base):
-    """Rangement interne des mètres d'une pompe : une seule par pompe
+    """Rangement interne des meters d'une pompe : une seule par pompe
     (les faces A / B ne sont plus utilisées, voir fusionner_faces)."""
     __tablename__ = "faces"
 
@@ -139,7 +139,7 @@ class Face(Base):
 
 
 class Pompe(Base):
-    """Mètre (pistolet + compteur) d'un produit : « Gazoline 1 », « Diesel 1 »…
+    """Meter (pistolet + compteur) d'un produit : « Gazoline 1 », « Diesel 1 »…
     Placé sur une face d'une pompe physique (face_id), facultatif."""
     __tablename__ = "pompes"
 
@@ -149,7 +149,7 @@ class Pompe(Base):
     actif      = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     face_id    = Column(Integer, ForeignKey("faces.id", ondelete="SET NULL"), nullable=True)
-    # Chiffre du compteur à l'enregistrement du mètre : sert de « mètre
+    # Chiffre du compteur à l'enregistrement du meter : sert de « meter
     # précédent » tant qu'aucun relevé n'existe (contrôle de continuité).
     metre_depart = Column(Numeric(14, 4), nullable=True)
     # Point de départ : metre_depart = index à la FIN de cette date (ex. le
@@ -162,13 +162,13 @@ class Pompe(Base):
 
     @property
     def station(self):
-        """Adresse de la station = celle de la pompe physique qui porte le mètre."""
+        """Adresse de la station = celle de la pompe physique qui porte le meter."""
         f = self.face
         return f.distributeur.adresse if f else None
 
     @property
     def emplacement(self):
-        """« Pompe 1 », ou None si le mètre n'est placé sur aucune pompe."""
+        """« Pompe 1 », ou None si le meter n'est placé sur aucune pompe."""
         f = self.face
         return f.distributeur.nom if f else None
 
@@ -209,7 +209,7 @@ class Releve(Base):
     # l'enregistrement (endpoint dédié, ne consomme jamais nb_modifications :
     # ce n'est pas une correction de valeur, juste une attribution).
     pompiste_id    = Column(Integer, ForeignKey("employes.id", ondelete="SET NULL"), nullable=True)
-    # Continuité des compteurs : écart entre ce « mètre avant » et le « mètre
+    # Continuité des compteurs : écart entre ce « meter avant » et le « meter
     # après » du relevé précédent de la même pompe (0/NULL = continu). Tout
     # écart exige un motif écrit à la saisie — sinon des gallons sortent de
     # la pompe sans être vendus nulle part dans le système.
@@ -220,9 +220,9 @@ class Releve(Base):
     # corrections du superviseur, retiré si le rapport est renvoyé.
     rapport_pompiste_id  = Column(Integer, ForeignKey("rapports_pompiste.id", ondelete="SET NULL"), nullable=True)
     # Saisie d'origine du pompiste, conservée quand la direction corrige :
-    # mètre sur lequel il avait écrit ces index (NULL = ce mètre) et index
+    # meter sur lequel il avait écrit ces index (NULL = ce meter) et index
     # qu'il avait écrits (NULL = identiques). Sert au registre des erreurs
-    # de mètre : on corrige, mais on n'efface jamais ce qu'il a écrit.
+    # de meter : on corrige, mais on n'efface jamais ce qu'il a écrit.
     pompe_saisie_id      = Column(Integer, ForeignKey("pompes.id", ondelete="SET NULL"), nullable=True)
     metter_avant_saisi   = Column(Numeric(14, 4), nullable=True)
     metter_apres_saisi   = Column(Numeric(14, 4), nullable=True)
@@ -364,7 +364,7 @@ class RapportPompisteLigne(Base):
     metter_apres        = Column(Numeric(14, 4), nullable=False)
     metter_avant_corrige = Column(Numeric(14, 4), nullable=True)
     metter_apres_corrige = Column(Numeric(14, 4), nullable=True)
-    confirmee            = Column(Boolean, nullable=False, default=False)   # mètre vérifié par le superviseur
+    confirmee            = Column(Boolean, nullable=False, default=False)   # meter vérifié par le superviseur
     confirmee_at         = Column(DateTime(timezone=True), nullable=True)
     # Pompe choisie par le pompiste quand la direction a remis ces index sur
     # la bonne pompe (erreur de pompe) ; vide sinon.
@@ -2677,11 +2677,11 @@ class ResolutionMetter(Base):
 
 
 class ErreurMetreApprise(Base):
-    """Mémoire des erreurs de mètre : chaque fois que la direction remet des
-    index sur le bon mètre (ex. le 91 écrit sur la ligne du 95), le couple
-    (mètre choisi par le pompiste → bon mètre) est compté pour ce pompiste.
+    """Mémoire des erreurs de meter : chaque fois que la direction remet des
+    index sur le bon meter (ex. le 91 écrit sur la ligne du 95), le couple
+    (meter choisi par le pompiste → bon meter) est compté pour ce pompiste.
     Le moteur de placement s'en sert pour proposer plus vite et plus sûrement
-    le bon mètre la fois suivante. Une remise en place annulée décompte."""
+    le bon meter la fois suivante. Une remise en place annulée décompte."""
     __tablename__ = "erreurs_metre_apprises"
 
     id                = Column(Integer, primary_key=True)

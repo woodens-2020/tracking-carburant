@@ -665,7 +665,7 @@ canvas{display:block}
 .jc-calc{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px;padding:8px 10px;border-radius:9px;background:var(--bg);border:1px solid var(--border);margin-bottom:8px}
 .jc-calc b{font-family:var(--mono)}.jc-ok{color:#22c55e}.jc-saut{color:#f59e0b}.jc-ko{color:#ef4444}
 .sup-boite .jc-motif{margin-top:6px}
-/* Historique des mètres d'une pompe */
+/* Historique des meters d'une pompe */
 .hm-btn{display:inline-flex;align-items:center;gap:5px;background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);
   cursor:pointer;font:inherit;font-size:12px;font-weight:600;padding:3px 8px;margin-top:6px}
 .hm-btn:hover{color:var(--text);border-color:var(--orange)}
@@ -889,7 +889,7 @@ td:has(.ip-report) input.inp-av[readonly]{ display:none; }
 }
 .btn-row-new{color:var(--blue2);border-color:rgba(59,130,246,.35);}
 .btn-row-new:hover{background:var(--blue-d);}
-/* Report d'index de continuité — pilule cliquable sous « mètre avant » */
+/* Report d'index de continuité — pilule cliquable sous « meter avant » */
 .ip-report{
   display:flex;align-items:flex-start;gap:7px;margin-top:6px;padding:6px 9px;
   font-size:11px;line-height:1.4;color:var(--text2);cursor:pointer;text-align:left;
@@ -3583,7 +3583,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .gest-ligne{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .gest-pompe{border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden}
 .gest-pompe-tete{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--panel2);border-bottom:1px solid var(--border);font-size:15px}
-/* Tableau des pompes : une colonne par pompe, mètres à glisser */
+/* Tableau des pompes : une colonne par pompe, meters à glisser */
 .gp-grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-bottom:12px}
 .gp-pompe{border:1px solid var(--border);border-radius:12px;background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
 .gp-tete{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--panel2);border-bottom:1px solid var(--border)}
@@ -4456,12 +4456,12 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
         </button>
         <button class="hm-tuile" data-page="saisie" onclick="goTo('saisie')" style="--c:#22c55e">
           <span class="hm-ico">✏️</span>
-          <span class="hm-txt"><b>Saisir mètres</b><small>Lectures des compteurs, matin et après-midi</small></span>
+          <span class="hm-txt"><b>Saisir Meters</b><small>Lectures des compteurs, matin et après-midi</small></span>
           <span class="hm-fl">→</span>
         </button>
         <button class="hm-tuile" data-page="journal" onclick="goTo('journal')" style="--c:#3b82f6">
           <span class="hm-ico">📒</span>
-          <span class="hm-txt"><b>Journal Meters</b><small>Historique des index, écarts et erreurs de mètre</small></span>
+          <span class="hm-txt"><b>Journal Meters</b><small>Historique des index, écarts et erreurs de meter</small></span>
           <span class="hm-fl">→</span>
         </button>
         <button class="hm-tuile" data-page="carburant-rapport" onclick="goTo('carburant-rapport')" style="--c:#a78bfa">
@@ -4851,7 +4851,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
           <div class="filter-group">
             <label class="filter-label">Certification</label>
             <select id="jf-certif" class="filter-select" onchange="loadJournal()">
-              <option value="">Tous les mètres</option>
+              <option value="">Tous les meters</option>
               <option value="oui">✓ Certifiés seulement</option>
               <option value="non">Non certifiés (à vérifier)</option>
             </select>
@@ -4881,7 +4881,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
       <!-- Table journal complet -->
       <div id="journal-table"></div>
 
-      <!-- Registre des erreurs de mètre (saisie d'origine conservée) -->
+      <!-- Registre des erreurs de meter (saisie d'origine conservée) -->
       <div id="journal-erreurs" style="margin-top:16px"></div>
 
     </div>
@@ -13197,9 +13197,9 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
     </div>
 
     <div class="gest-onglets">
-      <button id="gest-o-produits" class="on" onclick="gestOnglet('produits')">Produits &amp; mètres</button>
+      <button id="gest-o-produits" class="on" onclick="gestOnglet('produits')">Produits &amp; meters</button>
       <button id="gest-o-pompes" onclick="gestOnglet('pompes')">Pompes</button>
-      <button id="gest-o-depart" onclick="gestOnglet('depart')">Mètres de départ</button>
+      <button id="gest-o-depart" onclick="gestOnglet('depart')">Meters de départ</button>
       <button id="gest-o-fiches" onclick="gestOnglet('fiches')">Fiches des stations</button>
       <button id="gest-o-station" onclick="gestOnglet('station')">Enregistrer une station</button>
     </div>
@@ -16191,8 +16191,8 @@ function sxMajPompiste(){
   if(a) a.textContent = p ? `Les relevés enregistrés seront attribués à ${p.nom_complet}.` : 'Choisissez le pompiste : chaque relevé enregistré lui sera attribué.';
 }
 
-// Index de continuité : dernier « mètre après » connu pour chaque pompe,
-// avant (currentDate, currentPeriode). Sert à préremplir « mètre avant ».
+// Index de continuité : dernier « meter après » connu pour chaque pompe,
+// avant (currentDate, currentPeriode). Sert à préremplir « meter avant ».
 async function loadIndexPrecedents(){
   indexPrecedents = {};
   try{
@@ -16261,16 +16261,16 @@ function renderSaisie(){
     const nbMod=r?(r.nb_modifications||0):0;
     const locked=isEdit&&nbMod>=MAX_MODIFICATIONS_PAR_RELEVE;
 
-    // Index de continuité : le mètre après précédent devient le mètre avant.
+    // Index de continuité : le meter après précédent devient le meter avant.
     const ip=indexPrecedents[po.id];
     const ipVal=(ip&&ip.index_precedent!=null)?ip.index_precedent:null;
     const ipSrc=(ip&&ip.source_periode)
-      ?(ip.source_periode==='depart'?`mètre de départ du ${frDate(ip.source_date)}`
+      ?(ip.source_periode==='depart'?`meter de départ du ${frDate(ip.source_date)}`
         :`${ip.source_periode==='Matin'?'Matin':'Après-midi'} ${frDate(ip.source_date)}`):'';
 
-    // Nouvelle saisie : mètre avant ET mètre après saisissables. La case
-    // « Index attendu » reporte le mètre après de la période précédente
-    // dans le mètre avant (cocher = reporter, décocher = effacer).
+    // Nouvelle saisie : meter avant ET meter après saisissables. La case
+    // « Index attendu » reporte le meter après de la période précédente
+    // dans le meter avant (cocher = reporter, décocher = effacer).
     let avVal='', avRo=true, apRo=true, hintAv='';
     if(isEdit){
       avVal=av; hintAv=r.ecart_compteur?`<span class="sx-warn">Écart ${fmtNum(r.ecart_compteur,3)} gal · ${esc(r.motif_ecart_compteur||'')}</span>`:'';
@@ -16306,7 +16306,7 @@ function renderSaisie(){
       action+=`<button type="button" class="sx-btn-sup" title="Supprimer ce relevé mal saisi" onclick="sxSupprimer([${r.id}])">🗑 Supprimer</button>`;
 
     const origine=isEdit&&r.rapport_pompiste_id
-      ?`<div class="sx-meta sx-origine" title="Mètre confirmé depuis le rapport du pompiste">📨 Rapport pompiste n°${r.rapport_pompiste_id}${r.rapport_statut&&!['CONFIRME','RESOLU'].includes(r.rapport_statut)?' · rapport en cours de vérification':''}</div>`:'';
+      ?`<div class="sx-meta sx-origine" title="Meter confirmé depuis le rapport du pompiste">📨 Rapport pompiste n°${r.rapport_pompiste_id}${r.rapport_statut&&!['CONFIRME','RESOLU'].includes(r.rapport_statut)?' · rapport en cours de vérification':''}</div>`:'';
     const saisiPar=isEdit&&r.cree_par_nom
       ?`<div class="sx-meta">Saisi par ${esc(r.cree_par_nom)}${(r.modifie_par_nom&&r.modifie_par_nom!==r.cree_par_nom)?` · modifié par ${esc(r.modifie_par_nom)}`:''}</div>`:'';
     const pompisteInfo=!isEdit?'':(r.pompiste_nom
@@ -16319,16 +16319,16 @@ function renderSaisie(){
         <div class="sx-nom">${esc(po.nom)}</div>
         <div class="row-badge">${statut}${isEdit&&r.certifie?' <span class="cert" title="Compteur continu et rapport validé">Certifié</span>':''}</div>
         ${origine}${saisiPar}${pompisteInfo}
-        <button type="button" class="hm-btn" title="Tous les mètres passés de ${esc(po.nom)}" onclick="hmOuvrir(${po.id})">🕘 Historique</button>
+        <button type="button" class="hm-btn" title="Tous les meters passés de ${esc(po.nom)}" onclick="hmOuvrir(${po.id})">🕘 Historique</button>
       </div>
       <div class="sx-field">
-        <label for="sx-av-${po.id}">Mètre avant</label>
+        <label for="sx-av-${po.id}">Meter avant</label>
         <input id="sx-av-${po.id}" class="inp inp-av sx-inp" type="number" step="0.0001" inputmode="decimal" value="${avVal}" ${avRo?'readonly':''}
                placeholder="${avRo?'':'Index du compteur'}" oninput="sxAvantSaisi(this)" onkeydown="sxEntree(event,this)">
         <div class="sx-hint">${hintAv}</div>
       </div>
       <div class="sx-field sx-field-main">
-        <label for="sx-ap-${po.id}">Mètre après</label>
+        <label for="sx-ap-${po.id}">Meter après</label>
         <input id="sx-ap-${po.id}" class="inp inp-ap sx-inp" type="number" step="0.0001" inputmode="decimal" value="${isEdit?ap:''}" ${apRo?'readonly':''}
                placeholder="${apRo?'':'Index du compteur'}" data-idx="${idx}"
                oninput="calcRow(this.closest('.sx-pompe'))" onkeydown="sxEntree(event,this)">
@@ -16364,12 +16364,12 @@ function renderSaisie(){
     </div>`;
   renderGalRecap();
   sxMajTotaux();
-  // Curseur directement sur le premier mètre après à saisir
+  // Curseur directement sur le premier meter après à saisir
   const premier=[...el.querySelectorAll('.sx-pompe:not(.sx-done) .sx-inp:not([readonly])')].find(i=>i.value==='');
   if(premier && document.getElementById('page-saisie')?.classList.contains('active')) premier.focus();
 }
 
-// Entrée : mètre avant → mètre après de la même pompe → mètre avant de la
+// Entrée : meter avant → meter après de la même pompe → meter avant de la
 // pompe suivante ; sur le dernier champ → enregistrer.
 function sxEntree(ev, inp){
   if(ev.key!=='Enter') return;
@@ -16380,7 +16380,7 @@ function sxEntree(ev, inp){
   else prepareConfirm(currentPeriode);
 }
 
-// Saisie manuelle du mètre avant : la case de report se décoche si la
+// Saisie manuelle du meter avant : la case de report se décoche si la
 // valeur tapée n'est plus l'index attendu.
 function sxAvantSaisi(inp){
   const carte=inp.closest('.sx-pompe');
@@ -16389,8 +16389,8 @@ function sxAvantSaisi(inp){
   calcRow(carte);
 }
 
-// Case « Index attendu » : cochée → reporte la valeur dans le mètre avant et
-// place le curseur sur le mètre après ; décochée → efface le mètre avant.
+// Case « Index attendu » : cochée → reporte la valeur dans le meter avant et
+// place le curseur sur le meter après ; décochée → efface le meter avant.
 function applyIndexPrecedent(cb){
   const carte=cb.closest('.sx-pompe'); if(!carte) return;
   const inpAv=carte.querySelector('.inp-av');
@@ -16407,7 +16407,7 @@ function applyIndexPrecedent(cb){
   calcRow(carte);
 }
 
-// Totaux de ce qui va être enregistré (cartes en saisie avec un mètre après)
+// Totaux de ce qui va être enregistré (cartes en saisie avec un meter après)
 function sxMajTotaux(){
   let n=0, g=0, m=0;
   document.querySelectorAll('#saisie-content .sx-pompe').forEach(c=>{
@@ -16800,7 +16800,7 @@ function _cjrReconciliationHtml(){
     ${sauts.nb ? ligne(`Sauts et reculs de compteur non confirmés (${sauts.nb}) — non comptés tant que vous ne les confirmez pas au Journal Meters`, sauts, '− ', 'neg') : ''}
     ${autres.nb ? ligne(`Autres relevés non certifiés (${autres.nb}) — exclus par la case ci-dessous`, autres, '− ', 'neg') : ''}
     ${ligne('= Ventes comptées', {m:compte, g:compteG}, '', 'tot')}
-    ${att.nb ? `<div class="cjr-rec-att">⏳ <b>${att.nb} mètre${att.nb>1?'s':''} en attente de validation : ${cjrG(att.m)} (${cjrGalF(att.g)})</b> — rapports pompistes pas encore finalisés : ni ici, ni au Journal Meters tant que la direction ne les a pas confirmés.</div>` : ''}
+    ${att.nb ? `<div class="cjr-rec-att">⏳ <b>${att.nb} meter${att.nb>1?'s':''} en attente de validation : ${cjrG(att.m)} (${cjrGalF(att.g)})</b> — rapports pompistes pas encore finalisés : ni ici, ni au Journal Meters tant que la direction ne les a pas confirmés.</div>` : ''}
   </div>`;
 }
 function _cjrNonCertifiesHtml(){
@@ -16812,7 +16812,7 @@ function _cjrNonCertifiesHtml(){
     <div class="cjr-nc-tete"><b>⚠ ${L.length} relevé${L.length>1?'s':''} non certifié${L.length>1?'s':''}${err?` · dont ${err} en erreur`:''} : ${cjrGalF(gal)} · ${cjrG(mt)}</b>
       <span>Colonne « Compté » : ce qui entre dans les ventes. Corrigez-les dans le Journal Meters.</span>
       ${autres ? `<label class="cjr-nc-bas"><input type="checkbox" ${_cjrSansNC?'checked':''} onchange="cjrBasculerNC(this.checked)"> Exclure aussi les autres non certifiés (saisies invalides, erreurs…)</label>` : ''}</div>
-    <div class="tbl-wrap"><table class="dt cjr-table"><thead><tr>${unJour?'':'<th>Date</th>'}<th>Période</th><th>Mètre</th><th>Problème</th><th>Pompiste</th><th class="tr">Index</th><th class="tr">Gallons</th><th class="tr">Montant</th><th>Compté</th></tr></thead>
+    <div class="tbl-wrap"><table class="dt cjr-table"><thead><tr>${unJour?'':'<th>Date</th>'}<th>Période</th><th>Meter</th><th>Problème</th><th>Pompiste</th><th class="tr">Index</th><th class="tr">Gallons</th><th class="tr">Montant</th><th>Compté</th></tr></thead>
     <tbody>${L.map(x=>`<tr class="${x.statut==='erreur'?'cjr-nc-l-err':''}">${unJour?'':`<td class="num">${frDate(x.date)}</td>`}
       <td>${x.periode==='Matin'?'Matin':'Après-midi'}</td><td><b>${esc(x.pompe)}</b><small class="c-muted"> · ${esc(x.produit)}</small></td>
       <td>${esc(_CJR_TYPES[x.type_anomalie] || (x.statut==='erreur'?'Erreur':'À vérifier'))}${x.decalage!=null&&x.type_anomalie!=='premiere_lecture'?`<small class="c-muted"> · écart ${cjrPx(x.decalage)}</small>`:''}</td>
@@ -17167,7 +17167,7 @@ function calcRow(tr){
   const err=tr.querySelector('.sx-hint-err');
   if(!vide&&ap<av){
     apI.classList.add('err');
-    if(err) err.textContent='Le mètre après doit être plus grand que le mètre avant';
+    if(err) err.textContent='Le meter après doit être plus grand que le meter avant';
   } else {
     apI.classList.remove('err');
     if(err) err.textContent='';
@@ -17207,9 +17207,9 @@ function prepareConfirm(periode){
     const ap=parseFloat(inpAp.value);
     const px=parseFloat(tr.querySelector('.inp-px').value)||parseFloat(tr.dataset.defpx)||0;
 
-    if(isNaN(ap)) continue;   // pas de mètre après → pompe non saisie, ignorée
+    if(isNaN(ap)) continue;   // pas de meter après → pompe non saisie, ignorée
     if(isNaN(av)){
-      toast(`${pompe?.nom||'Pompe'} : saisissez le mètre avant (ou cochez l'index attendu).`,'err');
+      toast(`${pompe?.nom||'Pompe'} : saisissez le meter avant (ou cochez l'index attendu).`,'err');
       inpAv.classList.add('err'); inpAv.focus();
       hasError=true;
       continue;
@@ -17222,14 +17222,14 @@ function prepareConfirm(periode){
     }
     const qte=Math.round((ap-av)*10000)/10000;
     const mnt=Math.round(qte*px*100)/100;
-    // Continuité : « mètre avant » ≠ « mètre après » du relevé précédent →
+    // Continuité : « meter avant » ≠ « meter après » du relevé précédent →
     // gallons sortis sans vente enregistrée ; le serveur exige un motif.
     const prec=indexPrecedents[pompeId];
     let ecart=null;
     if(prec && prec.index_precedent!=null){
       const e=Math.round((av-prec.index_precedent)*10000)/10000;
       if(Math.abs(e)>0.001) ecart={valeur:e,precedent:prec.index_precedent,
-        source:prec.source_periode==='depart'?`mètre de départ du ${frDate(prec.source_date)}`
+        source:prec.source_periode==='depart'?`meter de départ du ${frDate(prec.source_date)}`
           :`${prec.source_periode==='Matin'?t('saisie.period.matin'):t('saisie.period.apresmidi')} ${frDate(prec.source_date)}`};
     }
     data.push({pompeId,pompeNom:pompe?.nom||'?',px,av,ap,qte,mnt,ecart});
@@ -17268,7 +17268,7 @@ function prepareConfirm(periode){
   boxEc.hidden=!ecarts.length;
   boxEc.innerHTML=ecarts.length?`
     <div style="font-weight:700;color:var(--amber,#b45309);margin-bottom:6px">⚠ Compteur non continu</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Le mètre avant doit être égal au mètre après du relevé précédent. Sinon, des gallons sont sortis de la pompe sans être vendus dans le système. Explique l'écart (essai, panne, vente non saisie, erreur de lecture…).</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Le meter avant doit être égal au meter après du relevé précédent. Sinon, des gallons sont sortis de la pompe sans être vendus dans le système. Explique l'écart (essai, panne, vente non saisie, erreur de lecture…).</div>
     ${ecarts.map(r=>`
       <label for="motif-ecart-${r.pompeId}" style="display:block;font-size:13px;margin:8px 0 4px">
         <strong>${esc(r.pompeNom)}</strong> — avant ${fmtNum(r.av,3)} · précédent ${fmtNum(r.ecart.precedent,3)} (${esc(r.ecart.source)}) ·
@@ -17279,7 +17279,7 @@ function prepareConfirm(periode){
   document.getElementById('modal-confirm').classList.remove('hidden');
 }
 
-// ── Historique des mètres d'une pompe : tous les relevés passés ─────────
+// ── Historique des meters d'une pompe : tous les relevés passés ─────────
 const HM = {pompe:null, nom:'', produit:'', jours:90, lignes:[], vus:50, vue:'tout', q:''};
 const _HM_PERIODES = [[30,'30 jours'],[90,'3 mois'],[365,'12 mois'],[0,'Tout']];
 function _hmTrouver(id){
@@ -17291,9 +17291,9 @@ async function hmOuvrir(id){
   Object.assign(HM, {pompe:id, nom:q.nom, produit:q.produit, emplacement:q.emplacement, lignes:[], vus:50});
   document.getElementById('hm-ov')?.remove();
   const ov=document.createElement('div');
-  ov.id='hm-ov'; ov.className='hm-ov'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true'); ov.setAttribute('aria-label','Historique des mètres');
+  ov.id='hm-ov'; ov.className='hm-ov'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true'); ov.setAttribute('aria-label','Historique des meters');
   ov.innerHTML=`<div class="hm-panneau">
-    <div class="hm-tete"><div><h3>🕘 ${esc(q.nom)}</h3><small>${esc([q.produit, q.emplacement].filter(Boolean).join(' · '))} — tous les mètres passés</small></div>
+    <div class="hm-tete"><div><h3>🕘 ${esc(q.nom)}</h3><small>${esc([q.produit, q.emplacement].filter(Boolean).join(' · '))} — tous les meters passés</small></div>
       <button class="hm-fermer" onclick="hmFermer()" aria-label="Fermer">✕</button></div>
     <div class="hm-filtres" id="hm-filtres"></div>
     <div class="hm-corps" id="hm-corps"><div class="hm-vide">Chargement…</div></div></div>`;
@@ -17317,7 +17317,7 @@ async function hmCharger(){
     + `<span class="hm-sep"></span>
       <span class="hm-vues" role="group" aria-label="Affichage">
         <button class="${HM.vue==='tout'?'on':''}" onclick="hmVue('tout')">Relevés complets</button>
-        <button class="${HM.vue==='apres'?'on':''}" onclick="hmVue('apres')">Mètres après seulement</button></span>
+        <button class="${HM.vue==='apres'?'on':''}" onclick="hmVue('apres')">Meters après seulement</button></span>
       <input id="hm-q" class="hm-q" type="search" inputmode="decimal" placeholder="🔎 Chercher un index (ex. 1573)" value="${esc(HM.q)}"
         oninput="HM.q=this.value;HM.vus=50;hmRendre()">`;
   c.innerHTML='<div class="hm-vide">Chargement…</div>';
@@ -17364,9 +17364,9 @@ function hmRendre(){
       <div class="hm-rel-tete"><span class="hm-st ${st}"></span><b>${frDate(e.date)}</b><span class="hm-per">${per(e.periode)}</span>
         <span class="hm-qui">${e.pompiste_nom?`⛽ ${esc(e.pompiste_nom)}`:'<span>Pompiste non indiqué</span>'}${src}</span></div>
       <div class="hm-compteur">
-        <div class="hm-idx"><small>Début · mètre avant</small><b>${surligne(idx(e.metter_avant))}</b><em>index au départ</em></div>
+        <div class="hm-idx"><small>Début · meter avant</small><b>${surligne(idx(e.metter_avant))}</b><em>index au départ</em></div>
         <div class="hm-fleche" aria-hidden="true">→</div>
-        <div class="hm-idx"><small>Fin · mètre après</small><b>${surligne(idx(e.metter_apres))}</b><em>index à la fin</em></div>
+        <div class="hm-idx"><small>Fin · meter après</small><b>${surligne(idx(e.metter_apres))}</b><em>index à la fin</em></div>
         <div class="hm-fleche hm-egal" aria-hidden="true">=</div>
         <div class="hm-vendu"><small>Vendu</small><b>${fmtGal(e.quantite)}</b><span>${fmtG(e.montant_vente)} · ${fmtNum(e.prix_gallon,2)} G/gal</span></div>
       </div></div>`;
@@ -17385,7 +17385,7 @@ function hmRendre(){
     ${trouves.length===L.length?'':`<div class="hm-trouve">${trouves.length} relevé${trouves.length>1?'s':''} pour « ${esc(HM.q)} »</div>`}
     ${!trouves.length?`<div class="hm-vide">Aucun index ne contient « ${esc(HM.q)} ».</div>`
       : HM.vue==='apres'
-      ? `<div class="hm-apres"><div class="hm-ap-l hm-ap-th"><span>Date</span><span>Mètre après (fin)</span><span>Pompiste</span></div>
+      ? `<div class="hm-apres"><div class="hm-ap-l hm-ap-th"><span>Date</span><span>Meter après (fin)</span><span>Pompiste</span></div>
           ${vus.map(e=>`<div class="hm-ap-l ${e.en_attente?'attente':e.statut}"><span><i class="hm-st ${e.en_attente?'attente':e.statut}"></i>${frDate(e.date)} <small>${per(e.periode)}</small></span>
             <b>${surligne(idx(e.metter_apres))}</b><span class="hm-ap-qui">${e.pompiste_nom?esc(e.pompiste_nom):'—'}</span></div>`).join('')}</div>`
       : vus.map((e,i)=>carte(e) + (HM.q ? '' : lien(e, L[i+1]))).join('')}
@@ -17900,7 +17900,7 @@ function renderJournal(data){
     ${resume.nb_en_attente?`<div class="jres-card c-amber">
       <div class="jres-lbl">En attente de validation</div>
       <div class="jres-num" style="color:var(--orange)">${fmtGalX(resume.gallons_en_attente)}</div>
-      <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${resume.nb_en_attente} mètre${resume.nb_en_attente>1?'s':''} · ${fmtGX(resume.montant_en_attente)} — non compté tant que la direction n'a pas finalisé</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${resume.nb_en_attente} meter${resume.nb_en_attente>1?'s':''} · ${fmtGX(resume.montant_en_attente)} — non compté tant que la direction n'a pas finalisé</div>
     </div>`:''}
     <div class="jres-card c-teal">
       <div class="jres-lbl">Gallons par carburant (hors sauts / reculs)</div>
@@ -18008,9 +18008,9 @@ function renderJournal(data){
         </div>
         ${e.motif_saisie?`<div class="jres-pied"><span class="janom-block-title">Motif donné à la saisie</span> ${esc(e.motif_saisie)}</div>`:''}
         ${e.metre_probable?`<div class="jres-pied" style="border-left:3px solid var(--orange,#ea580c)">
-            🧠 <b>Mètre probable : ${esc(e.metre_probable.libelle)}</b>
+            🧠 <b>Meter probable : ${esc(e.metre_probable.libelle)}</b>
             <span class="badge">confiance ${esc(e.metre_probable.confiance)}</span>
-            ${e.metre_probable.echange?'<small> · index croisés entre les deux mètres</small>':''}
+            ${e.metre_probable.echange?'<small> · index croisés entre les deux meters</small>':''}
             ${e.metre_probable.autre_carburant?'<b style="color:var(--red)"> · ⚠ autre carburant</b>':''}
             ${e.metre_probable.deja_vu?`<small> · erreur déjà vue ${e.metre_probable.deja_vu} fois</small>`:''}
             ${!e.en_attente && !(e.rapport_pompiste_id && !['CONFIRME','RESOLU'].includes(e.rapport_statut))
@@ -18020,7 +18020,7 @@ function renderJournal(data){
         ${e.en_attente
           ?`<div class="jres-pied" style="color:var(--muted)">⏳ Rapport pompiste pas encore finalisé : l'écart pourra être résolu après la validation.</div>`
           :`<div class="jres-pied" id="jres-pied-${e.id}">
-              <button class="btn btn-primary btn-sm" onclick="jrCorriger(${e.id})">✏️ Corriger le mètre</button>
+              <button class="btn btn-primary btn-sm" onclick="jrCorriger(${e.id})">✏️ Corriger le meter</button>
               <button class="btn btn-secondary btn-sm" onclick="jrOuvrirResolution(${e.id})">✓ Marquer comme résolu</button>
             </div>`}
       </div>`;
@@ -18086,8 +18086,8 @@ function renderJournal(data){
         ?`<div><span class="jr-src ${['CONFIRME','RESOLU'].includes(e.rapport_statut)?'ok':''}" title="Saisi par le pompiste sur sa tablette">⛽ Espace pompiste · ${
           {SOUMIS:'à vérifier',PROBLEME:'problème',CONFIRME:'validé',RESOLU:'résolu'}[e.rapport_statut]||'—'}</span></div>`:''}</td>
       ${!e.en_attente && typeof e.id==='number'
-        ? `<td class="tr num"><button class="jr-val" style="color:var(--blue)" title="Corriger le mètre avant" onclick="jrCorriger(${e.id},'av')">${e.metter_avant.toFixed(3)}<span class="jr-pen">✏️</span></button></td>
-      <td class="tr num"><button class="jr-val" style="color:var(--blue2)" title="Corriger le mètre après" onclick="jrCorriger(${e.id},'ap')">${e.metter_apres.toFixed(3)}<span class="jr-pen">✏️</span></button></td>`
+        ? `<td class="tr num"><button class="jr-val" style="color:var(--blue)" title="Corriger le meter avant" onclick="jrCorriger(${e.id},'av')">${e.metter_avant.toFixed(3)}<span class="jr-pen">✏️</span></button></td>
+      <td class="tr num"><button class="jr-val" style="color:var(--blue2)" title="Corriger le meter après" onclick="jrCorriger(${e.id},'ap')">${e.metter_apres.toFixed(3)}<span class="jr-pen">✏️</span></button></td>`
         : `<td class="tr num" style="color:var(--blue)">${e.metter_avant.toFixed(3)}</td>
       <td class="tr num" style="color:var(--blue2)">${e.metter_apres.toFixed(3)}</td>`}
       <td class="tr">${attStr}</td>
@@ -18138,7 +18138,7 @@ function renderJournal(data){
             <td class="tr num" style="padding:8px 14px;color:var(--red)">${fmtG(sautsNC.reduce((s,e)=>s+(e.montant_vente||0),0))}</td>
             <td colspan="2"></td></tr>`:''}
           ${attente.length?`<tr class="jr-attente-pied"><td colspan="8" style="padding:8px 14px;font-size:12.5px;color:var(--orange)">
-              ⏳ En attente de validation (non compté) &mdash; ${attente.length} mètre${attente.length>1?'s':''} de rapports pompistes</td>
+              ⏳ En attente de validation (non compté) &mdash; ${attente.length} meter${attente.length>1?'s':''} de rapports pompistes</td>
             <td class="tr num" style="padding:8px 14px;color:var(--orange);white-space:nowrap">${_galF(attente)}</td>
             <td class="tr num" style="padding:8px 14px;color:var(--orange)">${fmtG(attente.reduce((s,e)=>s+(e.montant_vente||0),0))}</td>
             <td colspan="2"></td></tr>`:''}
@@ -18169,7 +18169,7 @@ function gestOnglet(v){
 }
 
 // ── Pompes physiques : tableau à arranger (Pompe 1 › Gazoline 1, Diesel 1…) ──
-// Glisser un mètre d'une pompe à l'autre (ou « Déplacer vers… » au doigt),
+// Glisser un meter d'une pompe à l'autre (ou « Déplacer vers… » au doigt),
 // renommer sur place, monter / descendre une pompe. Chaque geste est
 // enregistré tout de suite.
 const _gpCls = n => /diesel|dyez/i.test(n||'') ? 'die' : (/gaz|essence|sp9|95|91/i.test(n||'') ? 'gaz' : (/k[ée]ro/i.test(n||'') ? 'kero' : ''));
@@ -18192,11 +18192,11 @@ async function _gestPompes(){
     : `<div class="gp-m ${_gpCls(m.produit_nom)}" draggable="true" data-m="${m.id}" title="Glissez vers une autre pompe">
         <span class="gp-poignee" aria-hidden="true">⠿</span>
         <span class="gp-mn"><b>${esc(m.nom)}</b><small>${esc(m.produit_nom)}</small></span>
-        <button class="gp-ic" title="Historique des mètres" onclick="hmOuvrir(${m.id})">🕘</button>
+        <button class="gp-ic" title="Historique des meters" onclick="hmOuvrir(${m.id})">🕘</button>
         <button class="gp-ic" title="Renommer" onclick="_GEST.edit='m${m.id}';renderModalList()">✏️</button>
         ${vers(m, ici)}</div>`;
   el.innerHTML=`
-    <div class="gest-explic"><b>Arrangez vos pompes :</b> glissez un mètre d’une pompe à l’autre (ou utilisez ↔), touchez ✏️ pour corriger un nom,
+    <div class="gest-explic"><b>Arrangez vos pompes :</b> glissez un meter d’une pompe à l’autre (ou utilisez ↔), touchez ✏️ pour corriger un nom,
       ▲ ▼ pour l’ordre des pompes. Tout est enregistré aussitôt ; les relevés ne bougent pas.</div>
     <datalist id="gd-adresses">${adresses.map(a=>`<option value="${esc(a)}">`).join('')}</datalist>
     <div class="gp-grille">
@@ -18208,7 +18208,7 @@ async function _gestPompes(){
               <button class="btn-ghost" onclick="_GEST.edit=null;renderModalList()">Annuler</button></div></div>`
           : `<span class="gp-num">${i+1}</span>
             <span class="gp-tn" onclick="_GEST.edit='d${p.id}';renderModalList()" title="Renommer">
-              <b>⛽ ${esc(p.nom)}</b><small>${p.adresse ? '📍 ' + esc(p.adresse) : '<span style="color:var(--orange)">Adresse à ajouter</span>'} · ${p.metres.length} mètre${p.metres.length>1?'s':''}</small></span>
+              <b>⛽ ${esc(p.nom)}</b><small>${p.adresse ? '📍 ' + esc(p.adresse) : '<span style="color:var(--orange)">Adresse à ajouter</span>'} · ${p.metres.length} meter${p.metres.length>1?'s':''}</small></span>
             <span class="gp-act">
               <button class="gp-ic" title="Monter" ${i?'':'disabled'} onclick="gestOrdre(${p.id},-1)">▲</button>
               <button class="gp-ic" title="Descendre" ${i<L.length-1?'':'disabled'} onclick="gestOrdre(${p.id},1)">▼</button>
@@ -18216,14 +18216,14 @@ async function _gestPompes(){
               ${p.metres.length?'':`<button class="gp-ic" title="Supprimer la pompe vide" onclick="gestSupprimer('distributeurs',${p.id},'${esc(p.nom)}')">🗑</button>`}</span>`}
         </div>
         <div class="gp-zone" data-p="${p.id}">
-          ${p.metres.map(m=>metre(m, p.id)).join('') || '<div class="gp-vide">Déposez un mètre ici</div>'}
+          ${p.metres.map(m=>metre(m, p.id)).join('') || '<div class="gp-vide">Déposez un meter ici</div>'}
         </div>
         ${_GEST.nouveauMetre===p.id
           ? `<div class="gp-nouveau"><select id="gm-prod-${p.id}" class="filter-input">${optProduits}</select>
-              <input id="gm-nom-${p.id}" class="filter-input" placeholder="Nom du mètre (ex. Gazoline 9)" maxlength="100" onkeydown="if(event.key==='Enter')gestNouveauMetre(${p.id})">
+              <input id="gm-nom-${p.id}" class="filter-input" placeholder="Nom du meter (ex. Gazoline 9)" maxlength="100" onkeydown="if(event.key==='Enter')gestNouveauMetre(${p.id})">
               <div style="display:flex;gap:6px"><button class="btn btn-primary psp-mini" onclick="gestNouveauMetre(${p.id})">Ajouter</button>
               <button class="btn-ghost" onclick="_GEST.nouveauMetre=null;renderModalList()">Annuler</button></div></div>`
-          : `<button class="gp-ajout" onclick="_GEST.nouveauMetre=${p.id};renderModalList()">+ Nouveau mètre</button>`}
+          : `<button class="gp-ajout" onclick="_GEST.nouveauMetre=${p.id};renderModalList()">+ Nouveau meter</button>`}
       </div>`).join('')}
       <div class="gp-pompe gp-creer">
         <div class="gp-tete"><span class="gp-num">+</span><span class="gp-tn"><b>Nouvelle pompe</b><small>Elle apparaît aussitôt dans la saisie et l’espace pompiste</small></span></div>
@@ -18234,15 +18234,15 @@ async function _gestPompes(){
       </div>
     </div>
     ${sans.length ? `<div class="gp-pompe gp-sans">
-      <div class="gp-tete"><span class="gp-num" style="background:var(--orange)">!</span><span class="gp-tn"><b>Mètres sans pompe (${sans.length})</b>
+      <div class="gp-tete"><span class="gp-num" style="background:var(--orange)">!</span><span class="gp-tn"><b>Meters sans pompe (${sans.length})</b>
         <small>Glissez-les sur leur pompe, ou choisissez avec ↔</small></span></div>
       <div class="gp-zone gp-zone-sans" data-p="0">${sans.map(m=>metre(m, 0)).join('')}</div></div>` : ''}
     ${(d.desactives||[]).length ? `<div class="gp-pompe gp-off">
-      <div class="gp-tete"><span class="gp-num" style="background:var(--muted)">↩</span><span class="gp-tn"><b>Mètres supprimés (${d.desactives.length})</b>
+      <div class="gp-tete"><span class="gp-num" style="background:var(--muted)">↩</span><span class="gp-tn"><b>Meters supprimés (${d.desactives.length})</b>
         <small>Leurs relevés sont gardés mais n’apparaissent plus dans la saisie : « Réactiver » annule la suppression</small></span></div>
       <div class="gp-zone">${d.desactives.map(m=>`<div class="gp-m ${_gpCls(m.produit_nom)}">
         <span class="gp-mn"><b>${esc(m.nom)}</b><small>${esc(m.produit_nom)} · ${m.nb_releves} relevé${m.nb_releves>1?'s':''}${m.dernier_releve?' · dernier le '+frDate(m.dernier_releve):''}</small></span>
-        <button class="gp-ic" title="Historique des mètres" onclick="hmOuvrir(${m.id})">🕘</button>
+        <button class="gp-ic" title="Historique des meters" onclick="hmOuvrir(${m.id})">🕘</button>
         <button class="btn btn-secondary psp-mini" onclick="gestReactiver(${m.id},'${esc(m.nom)}')">↩ Réactiver</button></div>`).join('')}</div></div>` : ''}`;
   _gpGlisser(el);
   // Champ en cours de modification : prêt à taper
@@ -18275,8 +18275,8 @@ async function gestOrdre(id, sens){
 }
 async function gestRenommerMetre(id){
   const nom=(document.getElementById('ge-m-'+id)?.value||'').trim();
-  if(!nom){ toast('Donnez un nom au mètre.','err'); return; }
-  if(await _gestApi('PATCH', `/pompes/${id}`, {nom}, 'Mètre renommé.')){ _GEST.edit=null; renderModalList(); }
+  if(!nom){ toast('Donnez un nom au meter.','err'); return; }
+  if(await _gestApi('PATCH', `/pompes/${id}`, {nom}, 'Meter renommé.')){ _GEST.edit=null; renderModalList(); }
 }
 async function _gestApi(method, path, body, msg){
   try{ await apiFetch(method, path, body); if(msg) toast(msg,'ok'); }
@@ -18297,7 +18297,7 @@ async function gestRenommer(type, id){
 }
 async function gestSupprimer(quoi, id, nom){
   const txt = quoi==='pompes'
-    ? `Supprimer ${nom} ? S’il a déjà des relevés, ils sont gardés mais ne s’affichent plus dans la saisie. Vous pourrez l’annuler dans « Mètres supprimés » (↩ Réactiver).`
+    ? `Supprimer ${nom} ? S’il a déjà des relevés, ils sont gardés mais ne s’affichent plus dans la saisie. Vous pourrez l’annuler dans « Meters supprimés » (↩ Réactiver).`
     : `Supprimer ${nom} ? Les relevés ne sont pas touchés.`;
   if(!await showConfirm(txt, {title:'Supprimer ?', type:'danger', okLabel:'Oui, supprimer'})) return;
   await _gestApi('DELETE', `/${quoi}/${id}`, null, `${nom} supprimée.`);
@@ -18306,7 +18306,7 @@ async function gestReactiver(id, nom){
   await _gestApi('PATCH', `/pompes/${id}`, {actif:true}, `${nom} est de retour, avec tous ses relevés. Placez-le sur sa pompe.`);
 }
 async function gestPlacer(metre, pompe){
-  await _gestApi('PATCH', `/pompes/${metre}`, {distributeur_id: pompe}, pompe ? 'Mètre placé sur la pompe.' : 'Mètre retiré de la pompe.');
+  await _gestApi('PATCH', `/pompes/${metre}`, {distributeur_id: pompe}, pompe ? 'Meter placé sur la pompe.' : 'Meter retiré de la pompe.');
 }
 async function gestNouveauMetre(pompe){
   const prod=parseInt(document.getElementById('gm-prod-'+pompe).value,10), nom=document.getElementById('gm-nom-'+pompe).value.trim();
@@ -18315,8 +18315,8 @@ async function gestNouveauMetre(pompe){
 }
 
 // ── Formulaire « Enregistrer une station » ─────────────────────────────
-// Station (adresse) › produits et prix › Pompe › mètres (produit,
-// nom, mètre de départ). Envoyé en une fois : POST /api/stations.
+// Station (adresse) › produits et prix › Pompe › meters (produit,
+// nom, meter de départ). Envoyé en une fois : POST /api/stations.
 let _ST = null;
 function _stNeuf(){
   const connus=(products||[]).map((p,i)=>({cle:'p'+(i+1), nom:p.nom, prix:String(p.prix_vente_actif ?? p.prix_gallon ?? '').replace('.',',')}));
@@ -18325,8 +18325,8 @@ function _stNeuf(){
 }
 function _stNomAuto(cle){
   const p=_ST.produits.find(x=>x.cle===cle); if(!p) return '';
-  // À la suite des mètres déjà enregistrés pour ce produit (les noms de
-  // mètres sont uniques par produit, toutes stations confondues)
+  // À la suite des meters déjà enregistrés pour ce produit (les noms de
+  // meters sont uniques par produit, toutes stations confondues)
   const pris=new Set();
   const existant=(products||[]).find(x=>x.nom.trim().toLowerCase()===p.nom.trim().toLowerCase());
   for(const q of existant?.pompes||[]) pris.add(q.nom.trim().toLowerCase());
@@ -18340,8 +18340,8 @@ function _stRendre(){
   const optP=sel=>st.produits.map(p=>`<option value="${p.cle}" ${p.cle===sel?'selected':''}>${esc(p.nom||'(sans nom)')}</option>`).join('');
   const nb=st.pompes.reduce((a,p)=>a+p.metres.length,0);
   el.innerHTML=`
-    <div class="gest-explic">Enregistrez la station complète selon sa structure : <b>Pompe › mètres</b>.
-      Le <b>mètre de départ</b> est le chiffre affiché aujourd'hui sur chaque compteur : le premier relevé partira de là.</div>
+    <div class="gest-explic">Enregistrez la station complète selon sa structure : <b>Pompe › meters</b>.
+      Le <b>meter de départ</b> est le chiffre affiché aujourd'hui sur chaque compteur : le premier relevé partira de là.</div>
     <div class="st-bloc"><div class="st-titre">1. Station</div>
       <label class="st-champ">Adresse de la station (elle sera mise sur toutes ses pompes)<input class="filter-input" maxlength="255" placeholder="Ex. Route Nationale 1, Vertières"
         value="${esc(st.adresse)}" oninput="_ST.adresse=this.value"></label></div>
@@ -18351,19 +18351,19 @@ function _stRendre(){
         <input class="filter-input num" placeholder="Prix G / gallon" inputmode="decimal" value="${esc(String(p.prix))}" style="width:150px" oninput="_ST.produits[${i}].prix=this.value">
         ${st.produits.length>1?`<button class="btn-ghost" title="Retirer" onclick="_stRetirerProduit(${i})">✕</button>`:''}</div>`).join('')}
       <button class="gest-lien" onclick="_ST.produits.push({cle:'p'+(_ST.seq++),nom:'',prix:''});_stRendre()">+ Ajouter un produit</button></div>
-    <div class="st-bloc"><div class="st-titre">3. Pompes et mètres <span class="c-dim" style="font-weight:500">(${st.pompes.length} pompe${st.pompes.length>1?'s':''}, ${nb} mètre${nb>1?'s':''})</span></div>
+    <div class="st-bloc"><div class="st-titre">3. Pompes et meters <span class="c-dim" style="font-weight:500">(${st.pompes.length} pompe${st.pompes.length>1?'s':''}, ${nb} meter${nb>1?'s':''})</span></div>
       ${st.pompes.map((pp,i)=>`<div class="gest-pompe"><div class="gest-pompe-tete">
           ⛽ <input class="filter-input" value="${esc(pp.nom)}" maxlength="100" style="max-width:200px" oninput="_ST.pompes[${i}].nom=this.value">
           <span style="flex:1"></span>
           ${st.pompes.length>1?`<button class="btn-ghost" title="Retirer cette pompe" onclick="_ST.pompes.splice(${i},1);_stRendre()">✕</button>`:''}</div>
         <div class="gest-face" style="margin:8px 12px 10px">
-          ${pp.metres.length?'<div class="st-entete"><span>Produit</span><span>Nom du mètre</span><span>Mètre de départ</span><span></span></div>':''}
+          ${pp.metres.length?'<div class="st-entete"><span>Produit</span><span>Nom du meter</span><span>Meter de départ</span><span></span></div>':''}
           ${pp.metres.map((m,k)=>`<div class="st-metre">
             <select class="filter-input" onchange="_ST.pompes[${i}].metres[${k}].produit=this.value">${optP(m.produit)}</select>
             <input class="filter-input" placeholder="Nom (ex. Gazoline 1)" value="${esc(m.nom)}" maxlength="100" oninput="_ST.pompes[${i}].metres[${k}].nom=this.value">
-            <input class="filter-input num" placeholder="Mètre de départ" inputmode="decimal" value="${esc(String(m.depart))}" oninput="_ST.pompes[${i}].metres[${k}].depart=this.value">
-            <button class="btn-ghost" title="Retirer ce mètre" onclick="_ST.pompes[${i}].metres.splice(${k},1);_stRendre()">✕</button></div>`).join('')
-            || '<div class="c-dim" style="font-size:12.5px">Aucun mètre sur cette pompe.</div>'}
+            <input class="filter-input num" placeholder="Meter de départ" inputmode="decimal" value="${esc(String(m.depart))}" oninput="_ST.pompes[${i}].metres[${k}].depart=this.value">
+            <button class="btn-ghost" title="Retirer ce meter" onclick="_ST.pompes[${i}].metres.splice(${k},1);_stRendre()">✕</button></div>`).join('')
+            || '<div class="c-dim" style="font-size:12.5px">Aucun meter sur cette pompe.</div>'}
           <div class="st-ajout">${st.produits.filter(p=>p.nom.trim()).map(p=>`<button class="gest-lien" onclick="_stAjouterMetre(${i},'${p.cle}')">+ ${esc(p.nom)}</button>`).join('')}</div>
         </div></div>`).join('')}
       <button class="btn btn-secondary" onclick="_stAjouterPompe()">+ Ajouter une pompe</button></div>
@@ -18375,12 +18375,12 @@ function _stRendre(){
       <div class="st-ligne"><input id="st-confirme" class="filter-input" placeholder="Tapez RETIRER pour confirmer" style="max-width:240px">
         <button class="btn btn-danger" onclick="_stRetirerTout()">Retirer l'existant</button></div></div>`;
 }
-// ── Mètres de départ : l'index de chaque mètre à la fin du mois précédent ──
+// ── Meters de départ : l'index de chaque meter à la fin du mois précédent ──
 // (ex. 31/10 pour démarrer novembre). La continuité repart de ce chiffre.
 const _MD = {date:null, metres:[], val:{}};
 async function _mdCharger(date){
   const el=document.getElementById('modal-list');
-  el.innerHTML='<div class="empty">Chargement des mètres…</div>';
+  el.innerHTML='<div class="empty">Chargement des meters…</div>';
   try{
     const r=await GET('/metres-depart'+(date?`?date=${date}`:(_MD.date?`?date=${_MD.date}`:'')));
     _MD.date=r.date; _MD.metres=r.metres; _MD.val={};
@@ -18408,11 +18408,11 @@ function _mdRendre(){
   const fixes=L.filter(m=>m.fixe).length;
   const groupes={}; L.forEach(m=>(groupes[m.produit_nom]=groupes[m.produit_nom]||[]).push(m));
   el.innerHTML=`
-    <div class="gest-explic">Pour démarrer le mois proprement, notez l’<b>index de chaque mètre à la fin du ${frDate(_MD.date)}</b>.
+    <div class="gest-explic">Pour démarrer le mois proprement, notez l’<b>index de chaque meter à la fin du ${frDate(_MD.date)}</b>.
       La continuité repart de ce chiffre : le premier relevé du mois doit commencer exactement là. Les relevés d’avant restent dans l’historique.</div>
     <div class="md-barre">
       <label class="st-champ" style="margin:0">Index à la fin du<input type="date" class="filter-input" id="md-date" value="${_MD.date}" onchange="_mdCharger(this.value)"></label>
-      <span class="md-compte"><b>${fixes}/${L.length}</b> mètres de départ enregistrés pour cette date</span>
+      <span class="md-compte"><b>${fixes}/${L.length}</b> meters de départ enregistrés pour cette date</span>
       <button class="btn btn-secondary" onclick="_mdReprendre()">Reprendre toutes les propositions</button>
     </div>
     ${Object.entries(groupes).map(([prod, ms])=>`<div class="md-groupe"><div class="md-gt">${esc(prod)}</div>
@@ -18422,12 +18422,12 @@ function _mdRendre(){
         return `<div class="md-ligne ${m.fixe?'fixe':''}">
           <div class="md-nom"><b>${esc(m.nom)}</b><small>${m.emplacement?esc(m.emplacement):'Sans pompe'}${m.fixe?' · <span class="md-ok">✓ enregistré</span>':''}</small></div>
           <div class="md-prop"><small>Proposé</small><button class="md-pv" ${pr?'':'disabled'} title="Reprendre ce chiffre" onclick="_mdPrendre(${m.pompe_id})">${pr?_mdF(pr.metre):'—'}</button><em>${src}</em></div>
-          <label class="md-in"><small>Mètre de départ</small><input class="filter-input" inputmode="decimal" id="md-${m.pompe_id}" value="${esc(_MD.val[m.pompe_id])}"
+          <label class="md-in"><small>Meter de départ</small><input class="filter-input" inputmode="decimal" id="md-${m.pompe_id}" value="${esc(_MD.val[m.pompe_id])}"
             placeholder="Index au ${frDate(_MD.date)}" oninput="_MD.val[${m.pompe_id}]=this.value;document.getElementById('md-s-${m.pompe_id}').innerHTML=_mdSuite(_MD.metres.find(x=>x.pompe_id===${m.pompe_id}))"></label>
           <div class="md-suite" id="md-s-${m.pompe_id}">${_mdSuite(m)}</div>
-        </div>`;}).join('')}</div>`).join('') || '<div class="empty">Aucun mètre actif.</div>'}
+        </div>`;}).join('')}</div>`).join('') || '<div class="empty">Aucun meter actif.</div>'}
     <div id="md-msg"></div>
-    <div class="gest-edit-act" style="margin-top:12px"><button class="btn btn-primary" id="md-ok" onclick="_mdEnregistrer()">Enregistrer les mètres de départ</button></div>`;
+    <div class="gest-edit-act" style="margin-top:12px"><button class="btn btn-primary" id="md-ok" onclick="_mdEnregistrer()">Enregistrer les meters de départ</button></div>`;
 }
 function _mdPrendre(id){
   const m=_MD.metres.find(x=>x.pompe_id===id); if(!m||!m.proposition) return;
@@ -18444,19 +18444,19 @@ async function _mdEnregistrer(){
     if(brut && v==null){ z.innerHTML=`<div class="psp-err">${esc(m.produit_nom)} · ${esc(m.nom)} : chiffre invalide.</div>`; document.getElementById('md-'+m.pompe_id)?.focus(); return; }
     if(v!=null || m.fixe) metres.push({pompe_id:m.pompe_id, metre:v});
   }
-  if(!metres.length){ z.innerHTML='<div class="psp-err">Tapez au moins un mètre de départ.</div>'; return; }
-  if(!await showConfirm(`Enregistrer ${metres.filter(x=>x.metre!=null).length} mètre(s) de départ à la fin du ${frDate(_MD.date)} ? Le premier relevé suivant de chaque mètre est recalculé.`,
-      {title:'Mètres de départ', type:'warn', okLabel:'Oui, enregistrer'})) return;
+  if(!metres.length){ z.innerHTML='<div class="psp-err">Tapez au moins un meter de départ.</div>'; return; }
+  if(!await showConfirm(`Enregistrer ${metres.filter(x=>x.metre!=null).length} meter(s) de départ à la fin du ${frDate(_MD.date)} ? Le premier relevé suivant de chaque meter est recalculé.`,
+      {title:'Meters de départ', type:'warn', okLabel:'Oui, enregistrer'})) return;
   bt.disabled=true; bt.textContent='Enregistrement…';
   try{
     const r=await PUT('/metres-depart',{date:_MD.date, metres});
-    toast(`${r.modifies} mètre(s) de départ enregistré(s) au ${frDate(r.date)}.`,'ok');
+    toast(`${r.modifies} meter(s) de départ enregistré(s) au ${frDate(r.date)}.`,'ok');
     (r.avertissements||[]).forEach(m=>toast(m, m.startsWith('✓')?'ok':'inf'));
     _MD.metres=r.metres; _MD.val={};
     for(const m of r.metres) _MD.val[m.pompe_id]=m.fixe?String(m.depart.metre):(m.proposition?String(m.proposition.metre):'');
     _mdRendre();
     if(typeof loadSaisie==='function' && currentPage==='saisie') loadSaisie();
-  }catch(e){ bt.disabled=false; bt.textContent='Enregistrer les mètres de départ'; z.innerHTML=`<div class="psp-err">${esc(String(e.message).replace(/^\[\d+\]\s*/,''))}</div>`; }
+  }catch(e){ bt.disabled=false; bt.textContent='Enregistrer les meters de départ'; z.innerHTML=`<div class="psp-err">${esc(String(e.message).replace(/^\[\d+\]\s*/,''))}</div>`; }
 }
 
 // ── Fiches des stations : GPS, contacts, urgence ─────────────────────
@@ -18624,28 +18624,28 @@ async function _stEnregistrer(){
   let nb=0;
   for(const pp of st.pompes) for(const m of pp.metres){
     nb++;
-    if(!m.nom.trim()) return msg(`${pp.nom} : donnez un nom à chaque mètre.`);
-    if(String(m.depart).trim()!=='' && num(m.depart)===null) return msg(`${m.nom} : mètre de départ invalide.`);
+    if(!m.nom.trim()) return msg(`${pp.nom} : donnez un nom à chaque meter.`);
+    if(String(m.depart).trim()!=='' && num(m.depart)===null) return msg(`${m.nom} : meter de départ invalide.`);
   }
-  if(!nb) return msg('Ajoutez au moins un mètre sur une pompe.');
+  if(!nb) return msg('Ajoutez au moins un meter sur une pompe.');
   const sansDepart=[];
   for(const pp of st.pompes) for(const m of pp.metres) if(String(m.depart).trim()==='') sansDepart.push(m.nom);
-  if(!(_STATIONS && _STATIONS.peut_creer) && !await showConfirm(`Enregistrer la station « ${st.adresse.trim()} » : ${st.produits.length} produit(s), ${st.pompes.length} pompe(s), ${nb} mètre(s).`
-      + (sansDepart.length ? ` Sans mètre de départ : ${sansDepart.join(', ')} (leur premier relevé servira de départ).` : ''),
+  if(!(_STATIONS && _STATIONS.peut_creer) && !await showConfirm(`Enregistrer la station « ${st.adresse.trim()} » : ${st.produits.length} produit(s), ${st.pompes.length} pompe(s), ${nb} meter(s).`
+      + (sansDepart.length ? ` Sans meter de départ : ${sansDepart.join(', ')} (leur premier relevé servira de départ).` : ''),
       {title:'Enregistrer la station ?', type:'warn', okLabel:'Oui, enregistrer'})) return;
   const corps={adresse:st.adresse.trim(),
     produits:st.produits.map(p=>({cle:p.cle, nom:p.nom.trim(), prix:num(p.prix)})),
     pompes:st.pompes.map(pp=>({nom:pp.nom.trim(),
       metres:pp.metres.map(m=>({produit:m.produit, nom:m.nom.trim(), metre_depart:num(m.depart)}))}))};
   // Une nouvelle station est toujours séparée (pas de fusion) ; seule une
-  // station encore vide (aucun mètre) est équipée sur place.
+  // station encore vide (aucun meter) est équipée sur place.
   const stationVide=!products.some(p=>(p.pompes||[]).length);
   if(_STATIONS && _STATIONS.peut_creer && !stationVide){
     const choix=await _demanderSeparation(corps);
     if(!choix) return;
     {
       const {adresse, ...station}=corps;
-      // Station séparée = espace vierge : les mètres nommés « Produit N » repartent de 1
+      // Station séparée = espace vierge : les meters nommés « Produit N » repartent de 1
       const nomsProd=Object.fromEntries(station.produits.map(p=>[p.cle, p.nom]));
       const compteur={};
       for(const pp of station.pompes) for(const m of pp.metres){
@@ -18667,7 +18667,7 @@ async function _stEnregistrer(){
   }
   try{
     const r=await POST('/stations', corps);
-    toast(`Station enregistrée : ${r.pompes} pompe(s), ${r.metres} mètre(s).`,'ok');
+    toast(`Station enregistrée : ${r.pompes} pompe(s), ${r.metres} meter(s).`,'ok');
     _ST=null; products=await GET('/produits'); renderProdTabs(); renderSaisie(); gestOnglet('pompes');
   }catch(e){ msg(e.message); }
 }
@@ -18677,7 +18677,7 @@ async function _stRetirerTout(){
   if(!await showConfirm('Retirer tous les produits et pompes actuels ? Leur historique est gardé.', {title:'Retirer l’existant ?', type:'danger', okLabel:'Oui, retirer'})) return;
   try{
     const r=await POST('/stations/retirer-tout', {confirmation:c});
-    toast(`Retiré : ${r.produits_archives} produit(s), ${r.metres_archives} mètre(s), ${r.pompes_retirees} pompe(s). Historique gardé.`,'ok');
+    toast(`Retiré : ${r.produits_archives} produit(s), ${r.metres_archives} meter(s), ${r.pompes_retirees} pompe(s). Historique gardé.`,'ok');
     products=await GET('/produits'); renderProdTabs(); renderSaisie(); _stRendre();
   }catch(e){ toast(e.message,'err'); }
 }
@@ -18867,7 +18867,7 @@ function _demanderSeparation(corps){
     ov.innerHTML = `<div class="cs-boite" role="dialog" aria-modal="true" aria-labelledby="sp-titre">
       <div class="cs-tete"><div><div class="cs-sur">${esc(corps.adresse)}</div><h2 id="sp-titre">Nouvelle station séparée</h2></div>
         <button class="cs-fermer" id="sp-annuler" aria-label="Annuler">✕</button></div>
-      <div class="cs-note" style="margin:0 0 12px">Chaque station a son propre espace Konekta : ses mètres, sa caisse, ses rapports. Vous y passez avec votre PIN ; son gérant n'y voit que cette station. Pour ajouter des pompes à la station actuelle, utilisez l'onglet « Pompes ».</div>
+      <div class="cs-note" style="margin:0 0 12px">Chaque station a son propre espace Konekta : ses meters, sa caisse, ses rapports. Vous y passez avec votre PIN ; son gérant n'y voit que cette station. Pour ajouter des pompes à la station actuelle, utilisez l'onglet « Pompes ».</div>
       <div id="sp-form" class="sp-form">
         <label>Nom de la station<input id="sp-nom" class="filter-input" maxlength="150" value="${esc(corps.adresse)}"></label>
         <label>Nom du gérant<input id="sp-gnom" class="filter-input" maxlength="150"></label>
@@ -20169,7 +20169,7 @@ async function jrSupprimer(id){
     if(e.rapport_pompiste_id){
       const rid=e.rapport_pompiste_id, lignes=_JR_ENTRIES.filter(x=>x.rapport_pompiste_id===rid);
       const motif=await demanderSuppression({titre:`Supprimer le rapport pompiste n°${rid} ?`,
-        texte:'Ce relevé vient d’un rapport pompiste : c’est le rapport entier qui est supprimé (ses mètres et ses dépenses). Les pompes redeviennent libres pour ce créneau. Le rapport est gardé dans Rapports pompistes → « 🗑 Supprimés » : vous pourrez le restaurer.',
+        texte:'Ce relevé vient d’un rapport pompiste : c’est le rapport entier qui est supprimé (ses meters et ses dépenses). Les pompes redeviennent libres pour ce créneau. Le rapport est gardé dans Rapports pompistes → « 🗑 Supprimés » : vous pourrez le restaurer.',
         lignes:lignes.map(ligne), bouton:'Supprimer le rapport'});
       if(!motif) return;
       await POST(`/pompiste-supervision/rapports/${rid}/supprimer`,{motif});
@@ -20187,8 +20187,8 @@ async function jrSupprimer(id){
   }catch(x){ toast(String(x.message).replace(/^\[\d+\]\s*/,''),'err'); }
 }
 
-// Journal Meters : corriger rapidement un mètre (✏️)
-// Registre des erreurs de mètre : ce que le pompiste a écrit est conservé,
+// Journal Meters : corriger rapidement un meter (✏️)
+// Registre des erreurs de meter : ce que le pompiste a écrit est conservé,
 // à côté de ce qui a été retenu ; écarts non expliqués ; taux par pompiste
 async function jrErreursMetre(debut, fin, pompisteIds){
   const el = document.getElementById('journal-erreurs'); if(!el) return;
@@ -20211,19 +20211,19 @@ async function jrErreursMetre(debut, fin, pompisteIds){
       <td><b>${esc(x.saisi.libelle)}</b><div style="font-size:12px">${n3(x.saisi.metter_avant)} → ${n3(x.saisi.metter_apres)} · ${n3(x.saisi.gallons)} gal</div></td>
       <td>${x.statut==='corrige'
         ? `<b>${esc(x.retenu.libelle)}</b><div style="font-size:12px">${n3(x.retenu.metter_avant)} → ${n3(x.retenu.metter_apres)} · ${n3(x.retenu.gallons)} gal</div>`
-        : `<span style="color:var(--blue)">attendu ${n3(x.metter_attendu)}</span>${x.metre_probable?`<div style="font-size:12px">🧠 mètre probable : <b>${esc(x.metre_probable.libelle)}</b></div>`:''}`}</td>
+        : `<span style="color:var(--blue)">attendu ${n3(x.metter_attendu)}</span>${x.metre_probable?`<div style="font-size:12px">🧠 meter probable : <b>${esc(x.metre_probable.libelle)}</b></div>`:''}`}</td>
       <td class="num">${x.ecart_gallons?n3(x.ecart_gallons)+' gal':'—'}<div style="font-size:12px">${x.ecart_gourdes?fmtGX(Math.abs(x.ecart_gourdes)):''}</div></td>
       <td>${x.statut==='corrige'?'<span style="color:var(--green);font-weight:700">✓ corrigé</span>':(x.en_attente?'⏳ rapport en attente':'<span style="color:var(--blue);font-weight:700">à vérifier</span>')}</td></tr>`).join('');
   el.innerHTML = `<div class="card" style="padding:14px 16px">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-      <div style="font-size:15px;font-weight:700">🧾 Registre des erreurs de mètre</div>
+      <div style="font-size:15px;font-weight:700">🧾 Registre des erreurs de meter</div>
       <span class="badge">${d.total.erreurs} erreur${d.total.erreurs>1?'s':''}</span>
       <span class="badge" style="color:var(--green)">${d.total.corrigees} corrigée${d.total.corrigees>1?'s':''}</span>
       <span class="badge" style="color:var(--blue)">${d.total.a_verifier} à vérifier</span></div>
-    <div class="c-dim" style="font-size:13px;margin-bottom:10px">Chaque correction garde ce que le pompiste avait écrit (mètre et index) à côté de ce qui a été retenu. Rien n'est effacé : on suit chaque gallon.</div>
-    ${stats?`<div style="overflow-x:auto;margin-bottom:12px"><table class="dt"><thead><tr><th>Pompiste</th><th class="num">Relevés</th><th class="num">Gallons</th><th class="num">Erreurs</th><th class="num">Mauvais mètre</th><th class="num">Index corrigés</th><th class="num">Écarts</th><th class="num">Taux</th><th class="num">Gallons en écart</th></tr></thead><tbody>${stats}</tbody></table></div>`:''}
+    <div class="c-dim" style="font-size:13px;margin-bottom:10px">Chaque correction garde ce que le pompiste avait écrit (meter et index) à côté de ce qui a été retenu. Rien n'est effacé : on suit chaque gallon.</div>
+    ${stats?`<div style="overflow-x:auto;margin-bottom:12px"><table class="dt"><thead><tr><th>Pompiste</th><th class="num">Relevés</th><th class="num">Gallons</th><th class="num">Erreurs</th><th class="num">Mauvais meter</th><th class="num">Index corrigés</th><th class="num">Écarts</th><th class="num">Taux</th><th class="num">Gallons en écart</th></tr></thead><tbody>${stats}</tbody></table></div>`:''}
     ${lignes?`<div style="overflow-x:auto"><table class="dt"><thead><tr><th>Date</th><th>Pompiste</th><th>Erreur</th><th>Saisi par le pompiste</th><th>Retenu</th><th class="num">Écart</th><th>Statut</th></tr></thead><tbody>${lignes}</tbody></table></div>`
-      :'<div style="color:var(--green);font-weight:700">✓ Aucune erreur de mètre sur la période.</div>'}</div>`;
+      :'<div style="color:var(--green);font-weight:700">✓ Aucune erreur de meter sur la période.</div>'}</div>`;
 }
 async function jrDeplacerMetre(id, pompe, nom, echange){
   const m = prompt(`${echange ? 'Échanger les index avec' : 'Mettre ce relevé sur'} ${nom} ?
@@ -20250,9 +20250,9 @@ function jrCorriger(id, champ){
     <h3>Corriger ${esc(e.pompe_nom)}</h3>
     <p>${frDate(e.date)} · ${per}${e.pompiste_nom?' · ⛽ '+esc(e.pompiste_nom):''}${e.metter_attendu!=null?` — fin du relevé précédent : <b>${f3(e.metter_attendu)}</b>`:''}</p>
     <div class="jc-grille">
-      <div><label for="jc-av">Début · mètre avant</label><input id="jc-av" class="filter-input" inputmode="decimal" value="${e.metter_avant}"></div>
+      <div><label for="jc-av">Début · meter avant</label><input id="jc-av" class="filter-input" inputmode="decimal" value="${e.metter_avant}"></div>
       <div class="jc-fleche">→</div>
-      <div><label for="jc-ap">Fin · mètre après</label><input id="jc-ap" class="filter-input" inputmode="decimal" value="${e.metter_apres}"></div>
+      <div><label for="jc-ap">Fin · meter après</label><input id="jc-ap" class="filter-input" inputmode="decimal" value="${e.metter_apres}"></div>
     </div>
     <div class="jc-calc" id="jc-calc"></div>
     <div id="jc-motif-zone" hidden><label for="jc-motif">Motif de l’écart avec le relevé précédent (obligatoire)</label>
@@ -20926,7 +20926,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
 
 // ══════════════════════════════════════════════
 // RAPPORTS POMPISTES — supervision (voir backend/pompiste_routes.py)
-// Vérification élément par élément : chaque mètre, la billetterie, l'écart ;
+// Vérification élément par élément : chaque meter, la billetterie, l'écart ;
 // puis « Finaliser » avec une note sur 10, ou « Signaler un problème » puis
 // « Résolu et finalisé ». La finalisation écrit le journal des compteurs.
 // ══════════════════════════════════════════════
@@ -21079,7 +21079,7 @@ function pspRendreListe(){
           ${l.map(r => {
             const nc = r.lignes.filter(x => x.confirmee).length;
             const verif = ['SOUMIS','PROBLEME'].includes(r.statut)
-              ? `${nc}/${r.lignes.length} mètres${r.billetterie_confirmee?' · billets ✓':''}${r.ecart_confirme?' · écart ✓':''}`
+              ? `${nc}/${r.lignes.length} meters${r.billetterie_confirmee?' · billets ✓':''}${r.ecart_confirme?' · écart ✓':''}`
               : (r.note_superviseur != null ? `note ${r.note_superviseur}/10` : '—');
             return `<tr class="psp-ligne-clic" onclick="pspOuvrir(${r.id})">
               <td><b>${_pspPer(r.periode)}</b></td><td>${esc(r.pompiste_nom)}</td>
@@ -21210,7 +21210,7 @@ function pspChangerDate(id, info, apres){
   _dlgChangerDate({
     titre: `Changer la date du rapport n°${id}`,
     texte: `${esc(r.pompiste_nom||'')} · actuellement <b>${_pspDate(r.date)}, ${_pspPer(r.periode)}</b>.
-      ${r.supprime ? 'Il reste dans la corbeille : restaurez-le ensuite.' : 'Tout le rapport est déplacé ; ses mètres seront à reconfirmer sur le nouveau créneau.'}`,
+      ${r.supprime ? 'Il reste dans la corbeille : restaurez-le ensuite.' : 'Tout le rapport est déplacé ; ses meters seront à reconfirmer sur le nouveau créneau.'}`,
     date: r.date, periode: r.periode,
     apercu: (d, p) => _pspApi('GET', `/rapports/${id}/changer-date/apercu?date=${d}&periode=${encodeURIComponent(p)}`),
     envoyer: (d, p, motif) => _pspApi('POST', `/rapports/${id}/changer-date`, {date: d, periode: p, motif}),
@@ -21231,7 +21231,7 @@ function jrChangerDate(id){
   };
   if(e.rapport_pompiste_id){
     return pspChangerDate(e.rapport_pompiste_id, {pompiste_nom: e.pompiste_nom, date: e.date, periode: e.periode}, async x => {
-      toast(`Rapport n°${e.rapport_pompiste_id} déplacé au ${frDate(x.date)} : ses mètres sont à reconfirmer dans « Rapports pompistes ».`, 'ok');
+      toast(`Rapport n°${e.rapport_pompiste_id} déplacé au ${frDate(x.date)} : ses meters sont à reconfirmer dans « Rapports pompistes ».`, 'ok');
       await loadJournal(); if(typeof pspMajBadge === 'function') pspMajBadge();
     });
   }
@@ -21249,7 +21249,7 @@ function jrChangerDate(id){
 
 async function pspRestaurer(id){
   const r = PSP.rapports.find(x => x.id === id); if(!r) return;
-  if(!await showConfirm(`Restaurer le rapport n°${id} de ${r.pompiste_nom} (${_pspDate(r.date)}, ${_pspPer(r.periode)}) ? Il revient « à vérifier » : ses mètres, sa billetterie et ses dépenses sont à reconfirmer avant d’entrer au journal.`,
+  if(!await showConfirm(`Restaurer le rapport n°${id} de ${r.pompiste_nom} (${_pspDate(r.date)}, ${_pspPer(r.periode)}) ? Il revient « à vérifier » : ses meters, sa billetterie et ses dépenses sont à reconfirmer avant d’entrer au journal.`,
       {title:'Restaurer ce rapport ?', type:'warn', okLabel:'Oui, restaurer'})) return;
   try{
     const x = await _pspApi('POST', `/rapports/${id}/restaurer`, {});
@@ -21454,7 +21454,7 @@ function pspCarte(r){
     ${pb ? `<div class="psp-err" style="margin:0 0 10px">Problème signalé par ${esc(r.probleme_par_nom||'')} : ${esc(r.probleme_commentaire||'')}</div>` : ''}
     ${r.note_pompiste ? `<div class="psp-warn" style="color:var(--text);margin:0 0 10px"><b>Note du pompiste :</b> ${esc(r.note_pompiste)}</div>` : ''}
 
-    ${_pspEtape(1, `Mètres — confirmez chaque pompe (${r.lignes.filter(l=>l.confirmee).length}/${r.lignes.length})`, toutesLignes,
+    ${_pspEtape(1, `Meters — confirmez chaque pompe (${r.lignes.filter(l=>l.confirmee).length}/${r.lignes.length})`, toutesLignes,
       `${_pspPlacement(r)}<div style="overflow-x:auto"><table class="psp-tbl"><thead><tr><th>Pompe</th><th class="r">Index précédent</th><th class="r">Début</th><th class="r">Fin</th>
         <th class="r">Gallons</th><th class="r">Montant</th><th></th></tr></thead><tbody>${lignes}</tbody></table></div>
        ${_pspResumeEcarts(r)}
@@ -21479,23 +21479,23 @@ function pspCarte(r){
         <div class="psp-kpi"><span>Argent compté</span><b>${_pspG(r.montant_compte)}</b></div>${_pspFeuilleKpi(r)}
         <div class="psp-kpi"><span>Écart</span><b>${_pspE(r.ecart_final)}</b></div></div>
        ${_pspFeuilleHtml(r)}
-       ${Math.abs(r.ecart_final - r.ecart) > 0.5 ? `<div class="psp-muted">Écart déclaré par le pompiste : ${_pspE(r.ecart)} — recalculé avec les mètres corrigés.</div>` : ''}
+       ${Math.abs(r.ecart_final - r.ecart) > 0.5 ? `<div class="psp-muted">Écart déclaré par le pompiste : ${_pspE(r.ecart)} — recalculé avec les meters corrigés.</div>` : ''}
        <div class="psp-actions">${r.ecart_confirme
          ? `<span class="psp-ok" style="font-weight:700">✓ Écart confirmé</span> <button class="psp-lien" onclick="pspEcart(${r.id},false)">reprendre</button>`
-         : `<button class="btn btn-primary" onclick="pspEcart(${r.id},true)" ${toutesLignes && r.billetterie_confirmee && !r.depenses_a_decider ? '' : 'disabled title="Confirmez d\'abord les mètres, la billetterie et chaque dépense"'}>Confirmer l'écart</button>`}</div>`)}
+         : `<button class="btn btn-primary" onclick="pspEcart(${r.id},true)" ${toutesLignes && r.billetterie_confirmee && !r.depenses_a_decider ? '' : 'disabled title="Confirmez d\'abord les meters, la billetterie et chaque dépense"'}>Confirmer l'écart</button>`}</div>`)}
 
     ${_pspEtape((r.depenses||[]).length ? 5 : 4, pb ? 'Résolution et finalisation' : 'Finalisation', false,
       `<div class="psp-muted" style="margin-bottom:6px">Note du rapport (sur 10)</div>
        <div class="psp-notes">${[...Array(11).keys()].map(n => `<button class="psp-note ${s.note===n?'on':''}" onclick="pspNote(${r.id},${n})">${n}</button>`).join('')}</div>
        <textarea class="filter-input" id="psp-com-${r.id}" rows="2" style="width:100%;margin-top:10px;height:auto;padding:8px"
          oninput="_pspS(${r.id}).com=this.value"
-         placeholder="${pb ? 'Comment le problème a-t-il été résolu ? (obligatoire)' : 'Commentaire (obligatoire si un mètre a été corrigé, pour signaler un problème ou renvoyer)'}">${esc(s.com)}</textarea>
+         placeholder="${pb ? 'Comment le problème a-t-il été résolu ? (obligatoire)' : 'Commentaire (obligatoire si un meter a été corrigé, pour signaler un problème ou renvoyer)'}">${esc(s.com)}</textarea>
        <input class="filter-input" id="psp-motif-${r.id}" style="width:100%;margin-top:8px;${s.motifVisible?'':'display:none'}"
          oninput="_pspS(${r.id}).motif=this.value" value="${esc(s.motif)}"
          placeholder="Motif de l'écart de compteur (ex. remise à zéro, panne…)">
        <div id="psp-msg-${r.id}"></div>
        <div class="psp-actions">
-         <button class="btn btn-primary" onclick="pspFinaliser(${r.id})" ${peutFinaliser ? '' : 'disabled title="Confirmez d\'abord les mètres, la billetterie et l\'écart"'}>
+         <button class="btn btn-primary" onclick="pspFinaliser(${r.id})" ${peutFinaliser ? '' : 'disabled title="Confirmez d\'abord les meters, la billetterie et l\'écart"'}>
            ${pb ? '✓ Marquer résolu et finaliser' : '✓ Finaliser — rapport correct'}</button>
          ${pb ? '' : `<button class="btn btn-danger" onclick="pspProbleme(${r.id})">⚠ Signaler un problème</button>`}
          <button class="btn btn-secondary" onclick="pspRenvoyer(${r.id})">Renvoyer au pompiste</button>
@@ -21518,12 +21518,12 @@ function _pspPlacement(r){
       <span class="psp-badge ${p.confiance==='haute'?'CONFIRME':'PROBLEME'}">confiance ${esc(p.confiance)}</span>
       ${p.echange ? '<small class="psp-muted">(index croisés)</small>' : ''}${p.autre_carburant ? ' <b class="psp-neg">⚠ autre carburant</b>' : ''}
       <div class="psp-muted" style="font-size:12px">${_pspN(p.metter_avant)} → ${_pspN(p.metter_apres)} · ${(p.raisons||[]).map(esc).join(' · ')}</div></div>`).join('')}
-    <div style="margin-top:6px"><button class="btn btn-primary psp-mini" onclick="pspReclasser(${r.id})">⇄ Appliquer ce placement (${P.propositions.length} mètre${P.propositions.length>1?'s':''})</button>
-      <small class="psp-muted">Les mètres touchés seront à reconfirmer ; l'erreur est retenue pour ce pompiste.</small></div></div>`;
+    <div style="margin-top:6px"><button class="btn btn-primary psp-mini" onclick="pspReclasser(${r.id})">⇄ Appliquer ce placement (${P.propositions.length} meter${P.propositions.length>1?'s':''})</button>
+      <small class="psp-muted">Les meters touchés seront à reconfirmer ; l'erreur est retenue pour ce pompiste.</small></div></div>`;
 }
 async function pspReclasser(id){
   const r = PSP.rapports.find(x => x.id === id); if(!r || !r.placement) return;
-  const m = prompt('Pourquoi remettre ces index sur ces mètres ? (5 caractères minimum)',
+  const m = prompt('Pourquoi remettre ces index sur ces meters ? (5 caractères minimum)',
                    'Index écrits sur la mauvaise ligne de la feuille');
   if(m == null) return;
   if(m.trim().length < 5) return notify('Indiquez le motif (5 caractères minimum).', 'err');
@@ -21531,7 +21531,7 @@ async function pspReclasser(id){
     const x = await _pspApi('POST', `/rapports/${id}/reclasser`, {motif: m.trim(), plan: r.placement.plan});
     const st = _pspS(id); if(st.index) r.placement.plan.forEach(p => { delete st.index[p.pompe_id]; delete st.index[p.vers]; });
     _pspMaj(x); pspMajBadge();
-    notify('Index remis sur les bons mètres : confirmez-les.', 'ok');
+    notify('Index remis sur les bons meters : confirmez-les.', 'ok');
   }catch(e){ notify(e.message, 'err'); }
 }
 async function _pspAction(id, path, body){
@@ -21540,7 +21540,7 @@ async function _pspAction(id, path, body){
   catch(e){ _pspMsg(id, `<div class="psp-err">${esc(e.message)}</div>`); notify(e.message, 'err'); throw e; }
 }
 
-// Écarts de compteur des mètres du rapport (gallons par carburant, gourdes)
+// Écarts de compteur des meters du rapport (gallons par carburant, gourdes)
 function _pspResumeEcarts(r){
   const L = r.lignes.map(l => ({l, e: l.index_precedent != null ? (l.metter_avant_corrige ?? l.metter_avant) - l.index_precedent : 0}))
     .filter(x => Math.abs(x.e) > 0.001);
@@ -21603,7 +21603,7 @@ async function pspChangerPompe(id, pompe, cible){
   ov.innerHTML = `<div class="sup-boite" style="max-width:520px">
     <div class="sup-ico">⇄</div><h3>Changer de pompe</h3>
     <p>Index saisis sur <b>${esc(l.pompe_nom)}</b> : ${_pspN(av)} → ${_pspN(ap)} (${_pspN(l.gallons)} gal).
-      Sur quelle pompe le pompiste les a-t-il réellement lus ? Le prix suit la pompe choisie ; le mètre sera à reconfirmer.</p>
+      Sur quelle pompe le pompiste les a-t-il réellement lus ? Le prix suit la pompe choisie ; le meter sera à reconfirmer.</p>
     <div class="psp-cp-liste">${poss.map(opt).join('') || '<div class="psp-muted">Aucune autre pompe active.</div>'}</div>
     <label for="sup-motif">Pourquoi ? (obligatoire)</label>
     <input id="sup-motif" class="filter-input" maxlength="300" placeholder="Ex. le pompiste a choisi Diesel 1 au lieu de Diesel 2">
@@ -21620,7 +21620,7 @@ async function pspChangerPompe(id, pompe, cible){
       const x = await _pspApi('POST', `/rapports/${id}/lignes/${pompe}/changer-pompe`, {pompe_id: neuve, motif: m});
       fin(); const st = _pspS(id); if(st.index){ delete st.index[pompe]; delete st.index[neuve]; }
       _pspMaj(x); pspMajBadge();
-      notify(`Index remis sur ${nom} : confirmez ce mètre.`, 'ok');
+      notify(`Index remis sur ${nom} : confirmez ce meter.`, 'ok');
     }catch(e){ err(e.message); }
   };
   document.getElementById('sup-non').onclick = fin;

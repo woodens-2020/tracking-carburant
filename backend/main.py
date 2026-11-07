@@ -2164,7 +2164,7 @@ def serve_audit_xlsx():
 # ---------- Schemas ----------
 class PompeIn(BaseModel):
     nom: str
-    distributeur_id: Optional[int] = None    # pompe physique qui porte le mètre
+    distributeur_id: Optional[int] = None    # pompe physique qui porte le meter
     face_id: Optional[int] = None            # ancien format (faces A / B)
 
 
@@ -2183,7 +2183,7 @@ class PompePatch(BaseModel):
     nom: Optional[str] = None
     distributeur_id: Optional[int] = None   # 0 = retirer de sa pompe
     face_id: Optional[int] = None           # ancien format (faces A / B)
-    actif: Optional[bool] = None            # True = réactiver un mètre désactivé
+    actif: Optional[bool] = None            # True = réactiver un meter désactivé
 
 
 class DistributeurIn(BaseModel):
@@ -2208,7 +2208,7 @@ class ReleveIn(BaseModel):
     prix_gallon: float          # ignoré si un prix de vente est configuré à cette date
     metter_avant: float
     metter_apres: float
-    # Obligatoire si metter_avant ≠ « mètre après » du relevé précédent de la pompe
+    # Obligatoire si metter_avant ≠ « meter après » du relevé précédent de la pompe
     motif_ecart_compteur: Optional[str] = None
 
 
@@ -2218,7 +2218,7 @@ MOTIF_ECART_MIN_CARACTERES = 5
 
 
 def depart_applicable(pompe, d: date_type) -> Optional[date_type]:
-    """Date du point de départ du mètre si `d` vient après : les relevés
+    """Date du point de départ du meter si `d` vient après : les relevés
     jusqu'à cette date ne servent plus à la continuité."""
     dd = getattr(pompe, "date_depart", None)
     return dd if dd is not None and d > dd else None
@@ -2226,7 +2226,7 @@ def depart_applicable(pompe, d: date_type) -> Optional[date_type]:
 
 def base_depart(pompe, d: date_type) -> Optional[float]:
     """Index de départ à utiliser quand aucun relevé ne précède `d` : le
-    mètre de départ, sauf pour un relevé daté avant son point de départ."""
+    meter de départ, sauf pour un relevé daté avant son point de départ."""
     if pompe is None or pompe.metre_depart is None:
         return None
     if pompe.date_depart is not None and d <= pompe.date_depart:
@@ -2237,7 +2237,7 @@ def base_depart(pompe, d: date_type) -> Optional[float]:
 def _releve_precedent(db: Session, pompe_id: int, d: date_type, periode: str) -> Optional[Releve]:
     """Dernier relevé de la pompe strictement avant (d, periode), dans l'ordre
     chronologique Matin puis Après-midi — sans remonter avant le point de
-    départ du mètre."""
+    départ du meter."""
     rang = {"Matin": 0, "Apres-midi": 1}
     cible = (d, rang.get(periode, 9))
     meilleur, cle_meilleure = None, None
@@ -2411,13 +2411,13 @@ def modifier_pompe(pompe_id: int, data: PompePatch, request: Request, db: Sessio
     if not q:
         raise HTTPException(404, "Pompe introuvable")
     if data.actif and not q.actif:
-        # Annule une suppression : le mètre et tous ses relevés reviennent
+        # Annule une suppression : le meter et tous ses relevés reviennent
         # dans la saisie, l'espace pompiste et les pompes.
         if not q.produit.actif:
-            raise HTTPException(409, f"Le produit « {q.produit.nom} » est archivé : ce mètre ne peut pas revenir seul.")
+            raise HTTPException(409, f"Le produit « {q.produit.nom} » est archivé : ce meter ne peut pas revenir seul.")
         for autre in q.produit.pompes:
             if autre.id != q.id and autre.actif and autre.nom.strip().casefold() == q.nom.strip().casefold():
-                raise HTTPException(409, f"Un mètre actif s'appelle déjà « {autre.nom} » pour {q.produit.nom} : "
+                raise HTTPException(409, f"Un meter actif s'appelle déjà « {autre.nom} » pour {q.produit.nom} : "
                                          "renommez-le d'abord.")
         q.actif = True
         _tracer(db, request, "pompe_reactivee", {"pompe_id": q.id, "metre": q.nom, "produit": q.produit.nom})
@@ -2444,9 +2444,9 @@ def modifier_pompe(pompe_id: int, data: PompePatch, request: Request, db: Sessio
 
 
 # ---------- Enregistrement complet d'une station ----------
-# Station (adresse) › produits et prix › pompes › mètres (produit,
-# nom, mètre de départ), en une seule fois. « Retirer l'existant » archive
-# produits et mètres sans rien effacer : relevés, rapports, journal,
+# Station (adresse) › produits et prix › pompes › meters (produit,
+# nom, meter de départ), en une seule fois. « Retirer l'existant » archive
+# produits et meters sans rien effacer : relevés, rapports, journal,
 # caisse gardent tout leur historique.
 
 class StationMetreIn(BaseModel):
@@ -2463,7 +2463,7 @@ class StationFaceIn(BaseModel):
 class StationPompeIn(BaseModel):
     nom: str
     metres: List[StationMetreIn] = []
-    faces: List[StationFaceIn] = []          # ancien format : leurs mètres sont repris sur la pompe
+    faces: List[StationFaceIn] = []          # ancien format : leurs meters sont repris sur la pompe
 
 
 class StationProduitIn(BaseModel):
@@ -2484,7 +2484,7 @@ class RetirerToutIn(BaseModel):
 
 @app.post("/api/stations/retirer-tout")
 def retirer_tout(data: RetirerToutIn, request: Request, db: Session = Depends(get_db)):
-    """Archive tous les produits, mètres et pompes physiques actuels. Rien
+    """Archive tous les produits, meters et pompes physiques actuels. Rien
     n'est effacé : les produits archivés gardent leur historique sous le nom
     « … (archivé le JJ/MM/AAAA) », pour que de nouveaux produits puissent
     reprendre les mêmes noms."""
@@ -2518,7 +2518,7 @@ def retirer_tout(data: RetirerToutIn, request: Request, db: Session = Depends(ge
 @app.post("/api/stations", status_code=201)
 def enregistrer_station(data: StationIn, request: Request, db: Session = Depends(get_db)):
     """Crée en une fois : produits de la station (avec adresse et prix),
-    pompes physiques et leurs mètres, avec leur mètre de départ."""
+    pompes physiques et leurs meters, avec leur meter de départ."""
     _gerer_station(request, db)
     out = _creer_station(db, data, request)
     db.commit()
@@ -2572,16 +2572,16 @@ def _creer_station(db: Session, data: StationIn, request: Request, user_id: Opti
         for m in list(pp.metres) + [m for ff in pp.faces for m in ff.metres]:
             p = produits.get(m.produit)
             if not p:
-                raise HTTPException(400, f"{nom_p} : choisissez le produit du mètre.")
-            nom_m = _nom_court(m.nom, 100, "mètre")
+                raise HTTPException(400, f"{nom_p} : choisissez le produit du meter.")
+            nom_m = _nom_court(m.nom, 100, "meter")
             cle_m = (p.id, nom_m.casefold())
             if any(q.actif and q.nom.strip().casefold() == nom_m.casefold() for q in p.pompes):
-                raise HTTPException(409, f"Le mètre « {nom_m} » ({p.nom}) existe déjà : choisissez un autre nom (ex. {nom_m} {nom_p}).")
+                raise HTTPException(409, f"Le meter « {nom_m} » ({p.nom}) existe déjà : choisissez un autre nom (ex. {nom_m} {nom_p}).")
             if cle_m in noms_metres:
-                raise HTTPException(409, f"Le mètre « {nom_m} » ({p.nom}) est en double ({noms_metres[cle_m]}).")
+                raise HTTPException(409, f"Le meter « {nom_m} » ({p.nom}) est en double ({noms_metres[cle_m]}).")
             noms_metres[cle_m] = nom_p
             if m.metre_depart is not None and m.metre_depart < 0:
-                raise HTTPException(400, f"{nom_m} : le mètre de départ ne peut pas être négatif.")
+                raise HTTPException(400, f"{nom_m} : le meter de départ ne peut pas être négatif.")
             db.add(Pompe(produit_id=p.id, nom=nom_m, face_id=f.id, actif=True,
                          metre_depart=round(m.metre_depart, 4) if m.metre_depart is not None else None))
             n_metres += 1
@@ -2593,9 +2593,9 @@ def _creer_station(db: Session, data: StationIn, request: Request, user_id: Opti
 
 
 # ---------- Pompes physiques (distributeurs) ----------
-# Pompe 1 › mètres (Gazoline 1, Gazoline 2, Diesel 1…). Les faces A / B ne
+# Pompe 1 › meters (Gazoline 1, Gazoline 2, Diesel 1…). Les faces A / B ne
 # sont plus utilisées : chaque pompe garde une seule face interne qui range
-# ses mètres (fusionner_faces regroupe les anciennes au démarrage).
+# ses meters (fusionner_faces regroupe les anciennes au démarrage).
 
 FACE_UNIQUE = "A"
 
@@ -2609,9 +2609,9 @@ def _face_unique(db: Session, d: Distributeur) -> Face:
 
 
 def fusionner_faces(db: Session) -> int:
-    """Une seule face par pompe : les mètres des faces B, C… rejoignent la
+    """Une seule face par pompe : les meters des faces B, C… rejoignent la
     première face, les faces vides sont retirées. Rien n'est effacé des
-    mètres ni de leur historique. Idempotent ; retourne les faces retirées."""
+    meters ni de leur historique. Idempotent ; retourne les faces retirées."""
     n = 0
     for d in db.query(Distributeur).all():
         garde = _face_unique(db, d)
@@ -2624,7 +2624,7 @@ def fusionner_faces(db: Session) -> int:
 
 
 def _cible_metre(db: Session, distributeur_id: Optional[int], face_id: Optional[int]):
-    """Face interne où ranger un mètre : None = ne rien changer, 0 = retirer de sa pompe."""
+    """Face interne où ranger un meter : None = ne rien changer, 0 = retirer de sa pompe."""
     if distributeur_id is not None:
         if not distributeur_id:
             return 0
@@ -2668,7 +2668,7 @@ def lister_distributeurs(db: Session = Depends(get_db)):
     sans = (db.query(Pompe).join(Produit).filter(Pompe.face_id.is_(None), Pompe.actif.is_(True),
                                                   Produit.actif.is_(True))
             .order_by(Produit.nom, Pompe.nom).all())
-    # Mètres supprimés alors qu'ils avaient des relevés : désactivés, leurs
+    # Meters supprimés alors qu'ils avaient des relevés : désactivés, leurs
     # relevés gardés ; on peut les réactiver (annuler la suppression).
     off = (db.query(Pompe).join(Produit).filter(Pompe.actif.is_(False), Produit.actif.is_(True))
            .order_by(Produit.nom, Pompe.nom).all())
@@ -2741,7 +2741,7 @@ def supprimer_distributeur(did: int, request: Request, db: Session = Depends(get
     if not d:
         raise HTTPException(404, "Pompe introuvable")
     if any(f.metres for f in d.faces):
-        raise HTTPException(409, "Cette pompe porte encore des mètres : déplacez-les d'abord.")
+        raise HTTPException(409, "Cette pompe porte encore des meters : déplacez-les d'abord.")
     _tracer(db, request, "distributeur_supprime", {"nom": d.nom})
     db.delete(d); db.commit()
     return {"ok": True}
@@ -2749,8 +2749,8 @@ def supprimer_distributeur(did: int, request: Request, db: Session = Depends(get
 
 @app.post("/api/distributeurs/{did}/faces", status_code=201)
 def ajouter_face(did: int, data: NomIn, request: Request, db: Session = Depends(get_db)):
-    """Plus de faces A / B : les mètres se placent directement sur la pompe."""
-    raise HTTPException(410, "Les faces ne sont plus utilisées : placez les mètres directement sur la pompe.")
+    """Plus de faces A / B : les meters se placent directement sur la pompe."""
+    raise HTTPException(410, "Les faces ne sont plus utilisées : placez les meters directement sur la pompe.")
 
 
 @app.patch("/api/faces/{fid}")
@@ -2774,8 +2774,8 @@ def supprimer_face(fid: int, request: Request, db: Session = Depends(get_db)):
     if not f:
         raise HTTPException(404, "Face introuvable")
     if [q for q in f.metres if q.actif]:
-        raise HTTPException(409, "Cette face porte encore des mètres : déplacez-les d'abord.")
-    for q in f.metres:            # mètres désactivés : ils gardent leur historique, sans face
+        raise HTTPException(409, "Cette face porte encore des meters : déplacez-les d'abord.")
+    for q in f.metres:            # meters désactivés : ils gardent leur historique, sans face
         q.face_id = None
     db.delete(f); db.commit()
     return {"ok": True}
@@ -2791,8 +2791,8 @@ def add_pompe(produit_id: int, data: PompeIn, request: Request, db: Session = De
                  if x.nom.strip().casefold() == nom.casefold()), None)
     if meme:
         raise HTTPException(409, f"« {meme.nom} » existe déjà pour ce produit" + (
-            "." if meme.actif else " (mètre supprimé, ses relevés sont gardés) : réactivez-le dans "
-                                   "« Mètres supprimés » au lieu d'en créer un nouveau."))
+            "." if meme.actif else " (meter supprimé, ses relevés sont gardés) : réactivez-le dans "
+                                   "« Meters supprimés » au lieu d'en créer un nouveau."))
     cible = _cible_metre(db, data.distributeur_id, data.face_id)
     pompe = Pompe(produit_id=produit_id, nom=nom, face_id=cible or None)
     db.add(pompe); db.commit(); db.refresh(pompe)
@@ -2863,8 +2863,8 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
     prix_officiel = _prix_vente_a_date(db, pompe.produit_id, data.date)
     prix = prix_officiel if prix_officiel is not None else data.prix_gallon
 
-    # Règle 2 — continuité des compteurs : le « mètre avant » doit être le
-    # « mètre après » du relevé précédent. Sinon, des gallons sont sortis de
+    # Règle 2 — continuité des compteurs : le « meter avant » doit être le
+    # « meter après » du relevé précédent. Sinon, des gallons sont sortis de
     # la pompe sans être vendus dans le système : un motif écrit est exigé.
     prec = _releve_precedent(db, data.pompe_id, data.date, data.periode)
     depart = None if prec else base_depart(db.get(Pompe, data.pompe_id), data.date)
@@ -2874,15 +2874,15 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
     if abs(ecart) > TOLERANCE_ECART_COMPTEUR:
         if (not motif and r is not None and r.motif_ecart_compteur
                 and abs(float(r.metter_avant) - data.metter_avant) <= TOLERANCE_ECART_COMPTEUR):
-            motif = r.motif_ecart_compteur          # correction sans toucher au mètre avant
+            motif = r.motif_ecart_compteur          # correction sans toucher au meter avant
         if len(motif) < MOTIF_ECART_MIN_CARACTERES:
             sens = "plus haut" if ecart > 0 else "plus bas"
             raise HTTPException(
                 409,
-                f"{pompe.nom} : le mètre avant ({data.metter_avant:.3f}) est {sens} que le "
-                + (f"mètre après du relevé précédent ({float(prec.metter_apres):.3f}, "
+                f"{pompe.nom} : le meter avant ({data.metter_avant:.3f}) est {sens} que le "
+                + (f"meter après du relevé précédent ({float(prec.metter_apres):.3f}, "
                    f"{prec.periode} du {prec.date.strftime('%d/%m/%Y')}) — écart de " if prec else
-                   f"mètre de départ enregistré pour ce mètre ({float(depart):.3f}) — écart de ") +
+                   f"meter de départ enregistré pour ce meter ({float(depart):.3f}) — écart de ") +
                 f"{abs(ecart):.3f} gal. Indiquez le motif de cet écart pour enregistrer.",
             )
     else:
@@ -2973,7 +2973,7 @@ def releves_index_precedent(date: date_type, periode: str,
                             db: Session = Depends(get_db)):
     """Pour chaque pompe active, l'index (`metter_apres`) du DERNIER relevé
     strictement antérieur à (date, periode) dans l'ordre chronologique —
-    Matin puis Après-midi. Sert à préremplir « mètre avant » lors de la
+    Matin puis Après-midi. Sert à préremplir « meter avant » lors de la
     saisie : la fin d'une période devient le début de la suivante (même
     jour) ou du lendemain. Renvoie aussi la date/période source pour
     l'afficher, et si un relevé existe déjà pour (date, periode, pompe)."""
@@ -3004,7 +3004,7 @@ def releves_index_precedent(date: date_type, periode: str,
             continue
         dd = depart_applicable(par_id.get(r.pompe_id), date)
         if dd and r.date <= dd:
-            continue                      # avant le point de départ du mètre
+            continue                      # avant le point de départ du meter
         if clef < cible:
             cur = par_pompe.get(r.pompe_id)
             if cur is None or clef > cur[0]:
@@ -3027,8 +3027,8 @@ def releves_index_precedent(date: date_type, periode: str,
     return out
 
 
-# ---------- Mètres de départ (début de mois) ----------
-# Pour démarrer un mois propre (ex. novembre), on fixe pour chaque mètre
+# ---------- Meters de départ (début de mois) ----------
+# Pour démarrer un mois propre (ex. novembre), on fixe pour chaque meter
 # l'index à la fin du dernier jour du mois précédent (31/10). La continuité
 # repart de ce chiffre ; les relevés d'avant restent en historique.
 
@@ -3098,7 +3098,7 @@ class MetresDepartIn(BaseModel):
 
 @app.put("/api/metres-depart")
 def enregistrer_metres_depart(data: MetresDepartIn, request: Request, db: Session = Depends(get_db)):
-    """Fixe l'index de départ de chaque mètre à la fin de `date`. Le premier
+    """Fixe l'index de départ de chaque meter à la fin de `date`. Le premier
     relevé suivant est recalculé (son écart disparaît s'il reprend exactement)."""
     _gerer_station(request, db)
     if data.date > today_haiti():
@@ -3107,7 +3107,7 @@ def enregistrer_metres_depart(data: MetresDepartIn, request: Request, db: Sessio
     for m in data.metres:
         p = db.get(Pompe, m.pompe_id)
         if not p:
-            raise HTTPException(404, f"Mètre {m.pompe_id} introuvable.")
+            raise HTTPException(404, f"Meter {m.pompe_id} introuvable.")
         if m.metre is not None and (m.metre < 0 or m.metre > 1e10):
             raise HTTPException(400, f"{p.nom} : index de départ invalide.")
         avant = {"date": str(p.date_depart) if p.date_depart else None,
@@ -3135,7 +3135,7 @@ def enregistrer_metres_depart(data: MetresDepartIn, request: Request, db: Sessio
 
 
 def _saisie_pompiste(r) -> Optional[dict]:
-    """Ce que le pompiste avait écrit, si la direction l'a corrigé (mètre
+    """Ce que le pompiste avait écrit, si la direction l'a corrigé (meter
     et/ou index) ; None si le relevé est tel qu'il a été saisi."""
     ps = getattr(r, "pompe_saisie_id", None)
     av_s, ap_s = getattr(r, "metter_avant_saisi", None), getattr(r, "metter_apres_saisi", None)
@@ -3771,7 +3771,7 @@ def anomalies(date: date_type, historique: bool = False, inclure_traitees: bool 
                     "valeur_saisie": float(r.metter_avant),
                     "ecart":         ecart,
                     "message": (
-                        f"Le mètre avant ({float(r.metter_avant):.3f}) dépasse le mètre après "
+                        f"Le meter avant ({float(r.metter_avant):.3f}) dépasse le meter après "
                         f"précédent ({float(meter_apres_precedent):.3f}) : {ecart:.3f} gal sortis "
                         "sans vente enregistrée. "
                         + (f"Motif donné : « {motif} »." if motif else "Aucun motif donné.")
@@ -4213,12 +4213,12 @@ def _build_journal_entries(
                          and (e["source"] != "pompiste" or e["rapport_statut"] in ("CONFIRME", "RESOLU")))
 
     # Index écrits sur la mauvaise ligne : le moteur de placement signale le
-    # mètre dont la chaîne se poursuit (avant les filtres, sur tout le créneau)
+    # meter dont la chaîne se poursuit (avant les filtres, sur tout le créneau)
     try:
         import placement_metres
         placement_metres.annoter_journal(db, entries)
     except Exception:
-        log.exception("Placement des mètres (journal)")
+        log.exception("Placement des meters (journal)")
 
     # Post-filtres : appliqués APRÈS l'analyse de continuité pour ne pas
     # casser la chaîne Matin → Après-midi → Matin suivant.
@@ -4697,7 +4697,7 @@ def carburant_rapport_jour(
     )
     if activite:
         # Dépense d'un produit : son activité ; payée par un pompiste : celle du
-        # rapport (propane seulement si tous ses mètres sont du propane) ;
+        # rapport (propane seulement si tous ses meters sont du propane) ;
         # dépense générale de la caisse : carburant.
         from models import RapportPompiste as _RP
 
