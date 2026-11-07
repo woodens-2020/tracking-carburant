@@ -237,7 +237,135 @@ def _meilleur_placement(options: list) -> list:
 
 
 def _confiance(ev: dict) -> str:
-    return "haute" if ev["exact"] and ev["score"] >= 100 else "moyenne"
+    return "haute" if ev["exact"] and ev["score"] >= 100 and not ev.get("piste") else "moyenne"
+
+
+# ── Pistes hors créneau (mauvaise date, rapport supprimé) ──────────────
+# Quand un rapport est saisi au mauvais jour ou à la mauvaise période, ou que
+# le rapport d'avant est dans la corbeille, le « dernier index » du créneau ne
+# dit rien. On cherche alors, sur tous les meeters et quelques jours autour,
+# l'index qui finit exactement là où la ligne commence (créneau d'avant) ou qui
+# commence là où elle finit (créneau d'après) : journal, rapports en attente
+# et corbeille.
+FENETRE_JOURS = 7
+_RANG = {"Matin": 0, "Apres-midi": 1}
+
+
+def _per(p: str) -> str:
+    return "Après-midi" if p == "Apres-midi" else p
+
+
+def creneau_suivant(d: date_type, periode: str) -> tuple:
+    return (d, "Apres-midi") if periode == "Matin" else (d + timedelta(days=1), "Matin")
+
+
+def creneau_precedent(d: date_type, periode: str) -> tuple:
+    return (d - timedelta(days=1), "Apres-midi") if periode == "Matin" else (d, "Matin")
+
+
+def index_autour(db: Session, d: date_type, exclure_rapport_id: Optional[int] = None) -> list:
+    """Tous les index connus de d−7 à d+7 : journal, rapports pompistes pas
+    encore finalisés et rapports de la corbeille (hors `exclure_rapport_id`)."""
+    from pompiste_routes import _EN_ATTENTE, _nom, _valeurs_finales
+    d0, d1 = d - timedelta(days=FENETRE_JOURS), d + timedelta(days=FENETRE_JOURS)
+    out, vus = [], set()
+    for r in db.query(Releve).filter(Releve.date >= d0, Releve.date <= d1).all():
+        if exclure_rapport_id and r.rapport_pompiste_id == exclure_rapport_id:
+            continue
+        av, ap = float(r.metter_avant), float(r.metter_apres)
+        vus.add((r.pompe_id, r.date, r.periode, round(av, 3), round(ap, 3)))
+        out.append({"pompe_id": r.pompe_id, "date": r.date, "periode": r.periode, "av": av, "ap": ap,
+                    "rapport_id": r.rapport_pompiste_id, "supprime": False, "origine": "journal",
+                    "source": f"journal — {_per(r.periode)} du {r.date.strftime('%d/%m')}"})
+    q = (db.query(RapportPompisteLigne, RapportPompiste)
+         .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
+         .filter(RapportPompiste.date >= d0, RapportPompiste.date <= d1,
+                 RapportPompiste.supprime_at.isnot(None) | RapportPompiste.statut.in_(_EN_ATTENTE)))
+    if exclure_rapport_id:
+        q = q.filter(RapportPompiste.id != exclure_rapport_id)
+    for l, rp in q.all():
+        av, ap = _valeurs_finales(l)
+        if (l.pompe_id, rp.date, rp.periode, round(av, 3), round(ap, 3)) in vus:
+            continue
+        sup = rp.supprime_at is not None
+        qui = _nom(rp.utilisateur)
+        out.append({"pompe_id": l.pompe_id, "date": rp.date, "periode": rp.periode, "av": av, "ap": ap,
+                    "rapport_id": rp.id, "supprime": sup, "origine": "corbeille" if sup else "rapport",
+                    "source": f"rapport n°{rp.id}{' de ' + qui if qui else ''} ({_per(rp.periode)} du "
+                              f"{rp.date.strftime('%d/%m')})" + (" — dans la corbeille" if sup else ", en attente")})
+    return out
+
+
+def _accord(x: float, y: float) -> Optional[str]:
+    if abs(x - y) <= TOL:
+        return "exact"
+    if abs(x - y) <= 0.01 or faute_de_frappe(x, y):
+        return "approx"
+    return None
+
+
+def pistes_ligne(av: float, ap: float, idx: list, pompes: dict, activ: str) -> list:
+    """Index connus qui s'enchaînent avec cette ligne, n'importe où autour :
+    `sens` = "avant" (finit où la ligne commence) ou "apres" (commence où elle
+    finit). Les reprises exactes d'abord."""
+    out = []
+    for x in idx:
+        p = pompes.get(x["pompe_id"])
+        if p is None or activite(p) != activ:
+            continue
+        for sens, a, b in (("avant", av, x["ap"]), ("apres", ap, x["av"])):
+            acc = _accord(a, b)
+            if acc:
+                out.append(dict(x, sens=sens, accord=acc, valeur=b, libelle=libelle(p)))
+    out.sort(key=lambda x: (x["accord"] != "exact", x["sens"] != "avant", x["supprime"]))
+    return out
+
+
+def _cle(d: date_type, periode: str) -> tuple:
+    return (d, _RANG.get(periode, 9))
+
+
+def diagnostic_dates(rap: RapportPompiste, lignes_pistes: list) -> dict:
+    """Ce que les pistes disent de la date du rapport : rapports de la
+    corbeille à restaurer, rapports dans le désordre, créneau probable."""
+    ici = _cle(rap.date, rap.periode)
+    messages, a_restaurer, creneaux = [], {}, []
+    for lib, pistes in lignes_pistes:
+        # Une reprise exacte quelque part : les « à un chiffre près » ne comptent plus
+        if any(p["accord"] == "exact" for p in pistes):
+            pistes = [p for p in pistes if p["accord"] == "exact"]
+        av_ = next((p for p in pistes if p["sens"] == "avant"), None)
+        ap_ = next((p for p in pistes if p["sens"] == "apres"), None)
+        for p in (av_, ap_):
+            if p and p["supprime"]:
+                a_restaurer[p["rapport_id"]] = p["source"]
+        if av_:
+            c = _cle(av_["date"], av_["periode"])
+            if c >= ici:
+                messages.append(f"{lib} : le début reprend la fin du {av_['source']}, qui est "
+                                + ("au même créneau" if c == ici else "à un créneau plus tard")
+                                + " que ce rapport : l'un des deux n'est pas à la bonne date.")
+            if not av_["supprime"]:
+                creneaux.append(creneau_suivant(av_["date"], av_["periode"]))
+        if ap_:
+            c = _cle(ap_["date"], ap_["periode"])
+            if c <= ici:
+                messages.append(f"{lib} : la fin est le début du {ap_['source']}, qui est "
+                                + ("au même créneau" if c == ici else "à un créneau plus tôt")
+                                + " que ce rapport : l'un des deux n'est pas à la bonne date.")
+            if not ap_["supprime"]:
+                creneaux.append(creneau_precedent(ap_["date"], ap_["periode"]))
+    for rid, src in sorted(a_restaurer.items()):
+        messages.append(f"Les index s'enchaînent avec le {src} : restaurez-le (« 🗑 Supprimés ») "
+                        "et vérifiez sa date, sinon il manque ses gallons entre deux relevés.")
+    probable = None
+    if creneaux and len(set(creneaux)) == 1 and creneaux[0] != (rap.date, rap.periode):
+        d, p = creneaux[0]
+        probable = {"date": str(d), "periode": p,
+                    "libelle": f"{_per(p)} du {d.strftime('%d/%m/%Y')}"}
+        messages.insert(0, f"Ce rapport est probablement celui du {probable['libelle']} : "
+                           "ses index s'y enchaînent.")
+    return {"messages": messages, "a_restaurer": sorted(a_restaurer), "creneau_probable": probable}
 
 
 # ── Rapport pompiste ───────────────────────────────────────────────────
@@ -281,26 +409,49 @@ def plan_rapport(db: Session, rap: RapportPompiste) -> dict:
         return cache_prof[p.id]
 
     uids, eids = _personne(db, utilisateur_id=rap.utilisateur_id)
-    options, evals = [], []
+    idx = index_autour(db, rap.date, exclure_rapport_id=rap.id)
+    tous = {p.id: p for p in db.query(Pompe).filter(Pompe.actif.is_(True)).all()}
+    options, evals, pistes_de = [], [], {}
+
+    def eval_pistes(av, ap, saisie, p, e, pistes, hab):
+        """Le créneau ne dit rien (mauvaise date, rapport d'avant dans la
+        corbeille) : la fin d'un autre créneau proche sur ce meeter peut le dire."""
+        if e["exact"]:
+            return e
+        for x in pistes:
+            if x["sens"] != "avant" or x["pompe_id"] != p.id:
+                continue
+            alt = evaluer(av, ap, saisie, p, x["valeur"], x["source"], prof_de(p), hab)
+            alt["score"] -= 5   # un peu moins sûr que la reprise du créneau même
+            alt["piste"] = {k: x[k] for k in ("source", "rapport_id", "supprime", "accord")}
+            if alt["score"] > e["score"]:
+                e = alt
+        return e
+
     for l in lignes:
         av, ap = _valeurs_finales(l)
         saisie = l.pompe
         hab = habitudes(db, l.pompe_saisie_id or l.pompe_id, uids, eids)
         p0, s0 = prec_de(saisie)
         reste = evaluer(av, ap, saisie, saisie, p0, s0, prof_de(saisie), hab)
+        pistes = [] if reste["exact"] else pistes_ligne(av, ap, idx, tous, activite(saisie))
+        pistes_de[l.pompe_id] = pistes
+        # La comparaison tient compte d'une piste sur le meeter choisi (pour ne
+        # pas déplacer des index qui y sont bien), mais la ligne reste signalée.
+        cmp = eval_pistes(av, ap, saisie, saisie, reste, pistes, hab)
         ev = {saisie.id: reste}
-        opts = [(saisie.id, reste["score"])]
-        if not (reste["exact"] and not _volume_anormal(ap - av, prof_de(saisie))):
+        opts = [(saisie.id, cmp["score"])]
+        if not (cmp["exact"] and not _volume_anormal(ap - av, prof_de(saisie))):
             autres = []
             for p in pompes:
                 if p.id == saisie.id or activite(p) != activite(saisie):
                     continue
                 pr, src = prec_de(p)
-                e = evaluer(av, ap, saisie, p, pr, src, prof_de(p), hab)
+                e = eval_pistes(av, ap, saisie, p, evaluer(av, ap, saisie, p, pr, src, prof_de(p), hab), pistes, hab)
                 # Une reprise exacte ailleurs l'emporte sur une reprise
                 # approximative (faute de frappe) sur le meeter choisi
-                if e["score"] >= SEUIL and (e["score"] >= reste["score"] + MARGE
-                                            or (e["exact"] and not reste["exact"] and e["score"] > reste["score"])):
+                if e["score"] >= SEUIL and (e["score"] >= cmp["score"] + MARGE
+                                            or (e["exact"] and not cmp["exact"] and e["score"] > cmp["score"])):
                     autres.append(e)
             autres.sort(key=lambda e: -e["score"])
             for e in autres[:3]:
@@ -323,12 +474,22 @@ def plan_rapport(db: Session, rap: RapportPompiste) -> dict:
                 "vers_pompe_nom": cible.nom, "confiance": _confiance(e), "score": e["score"],
                 "autre_carburant": e["autre_carburant"], "echange": echange,
                 "raisons": e["raisons"], "raisons_actuel": reste["raisons"],
-                "metter_avant": av, "metter_apres": ap,
+                "metter_avant": av, "metter_apres": ap, "piste": e.get("piste"),
             })
             plan.append({"pompe_id": l.pompe_id, "vers": c})
         elif not reste["exact"] and reste["index_precedent"] is not None:
-            sans_place.append({"pompe_id": l.pompe_id, "libelle": libelle(l.pompe), "raisons": reste["raisons"]})
-    return {"propositions": propositions, "plan": plan, "sans_place": sans_place}
+            sans_place.append({"pompe_id": l.pompe_id, "libelle": libelle(l.pompe), "raisons": reste["raisons"],
+                               "pistes": [_piste_json(x) for x in pistes_de.get(l.pompe_id, [])[:4]]})
+    # La date : ce que les index trouvés ailleurs disent du créneau du rapport
+    dates = diagnostic_dates(rap, [(libelle(l.pompe), pistes_de.get(l.pompe_id) or [])
+                                   for l, e in zip(lignes, evals) if not e[l.pompe_id]["exact"]])
+    return {"propositions": propositions, "plan": plan, "sans_place": sans_place, "dates": dates}
+
+
+def _piste_json(x: dict) -> dict:
+    return {"pompe_id": x["pompe_id"], "libelle": x["libelle"], "sens": x["sens"], "accord": x["accord"],
+            "valeur": x["valeur"], "source": x["source"], "rapport_id": x["rapport_id"],
+            "supprime": x["supprime"], "date": str(x["date"]), "periode": x["periode"]}
 
 
 def appliquer_plan(db: Session, rap: RapportPompiste, mapping: dict) -> list:

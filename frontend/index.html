@@ -21604,15 +21604,32 @@ function _pspCom(id){ return (_pspS(id).com || '').trim(); }
 // Intelligence de placement : le moteur replace toutes les lignes ensemble
 // (91 écrit sur la ligne du 95, diesels croisés…) d'après la chaîne des index
 function _pspPlacement(r){
-  const P = r.placement; if(!P || !(P.propositions||[]).length) return '';
-  return `<div class="psp-warn" style="margin:0 0 10px;color:var(--text)">
+  const P = r.placement; if(!P) return '';
+  const props = P.propositions || [], D = P.dates || {}, msgs = D.messages || [];
+  const pistes = (P.sans_place || []).filter(s => (s.pistes || []).length);
+  let h = '';
+  if(msgs.length || pistes.length){
+    const cp = D.creneau_probable;
+    h += `<div class="psp-warn" style="margin:0 0 10px;color:var(--text)">
+      <div style="font-weight:800;margin-bottom:4px">📅 Date ou rapport manquant ? Les index s'enchaînent ailleurs</div>
+      ${msgs.map(m => `<div style="margin:3px 0">• ${esc(m)}</div>`).join('')}
+      ${pistes.map(s => `<div style="margin:5px 0"><b>${esc(s.libelle)}</b>${s.pistes.map(x =>
+        `<div class="psp-muted" style="font-size:12px">${x.sens === 'avant' ? 'le début reprend la fin' : 'la fin est le début'} de
+          <b>${esc(x.libelle)}</b> (${_pspN(x.valeur)}${x.accord === 'exact' ? '' : ', à un chiffre près'}) — ${esc(x.source)}</div>`).join('')}</div>`).join('')}
+      ${cp ? `<div style="margin-top:6px"><button class="btn btn-secondary psp-mini" onclick="pspChangerDate(${r.id})">📅 Changer la date (proposé : ${esc(cp.libelle)})</button></div>` : ''}
+      ${(D.a_restaurer||[]).length ? `<div style="margin-top:6px"><button class="btn btn-secondary psp-mini" onclick="PSP.ouvert=null;pspFiltre('statut','SUPPRIME')">🗑 Voir les rapports supprimés (n°${D.a_restaurer.join(', n°')})</button></div>` : ''}
+    </div>`;
+  }
+  if(!props.length) return h;
+  return h + `<div class="psp-warn" style="margin:0 0 10px;color:var(--text)">
     <div style="font-weight:800;margin-bottom:4px">🧠 Index sur la mauvaise ligne — placement proposé</div>
-    ${P.propositions.map(p => `<div style="margin:4px 0">
+    ${props.map(p => `<div style="margin:4px 0">
       <b>${esc(p.de)}</b> → <b>${esc(p.vers)}</b>
       <span class="psp-badge ${p.confiance==='haute'?'CONFIRME':'PROBLEME'}">confiance ${esc(p.confiance)}</span>
       ${p.echange ? '<small class="psp-muted">(index croisés)</small>' : ''}${p.autre_carburant ? ' <b class="psp-neg">⚠ autre carburant</b>' : ''}
+      ${p.piste && p.piste.supprime ? ' <b class="psp-neg">rapport d\'avant dans la corbeille</b>' : ''}
       <div class="psp-muted" style="font-size:12px">${_pspN(p.metter_avant)} → ${_pspN(p.metter_apres)} · ${(p.raisons||[]).map(esc).join(' · ')}</div></div>`).join('')}
-    <div style="margin-top:6px"><button class="btn btn-primary psp-mini" onclick="pspReclasser(${r.id})">⇄ Appliquer ce placement (${P.propositions.length} meeter${P.propositions.length>1?'s':''})</button>
+    <div style="margin-top:6px"><button class="btn btn-primary psp-mini" onclick="pspReclasser(${r.id})">⇄ Appliquer ce placement (${props.length} meeter${props.length>1?'s':''})</button>
       <small class="psp-muted">Les meeters touchés seront à reconfirmer ; l'erreur est retenue pour ce pompiste.</small></div></div>`;
 }
 async function pspReclasser(id){
@@ -21680,10 +21697,12 @@ async function pspChangerPompe(id, pompe, cible){
   try{ poss = await _pspApi('GET', `/rapports/${id}/lignes/${pompe}/pompes-possibles`); }
   catch(e){ return notify(e.message, 'err'); }
   const av = l.metter_avant_corrige ?? l.metter_avant, ap = l.metter_apres_corrige ?? l.metter_apres;
-  const choix0 = cible ?? (poss.find(x => x.suit) || {}).pompe_id;
+  const choix0 = cible ?? (poss.find(x => x.suit) || poss.find(x => x.piste && !x.prise_par) || {}).pompe_id;
   const opt = x => {
     const etat = x.prise_par ? `<span class="psp-neg">déjà rapportée — ${esc(x.prise_par)}</span>`
       : x.suit ? '<span class="psp-ok" style="font-weight:700">✓ suit le début saisi</span>'
+      : x.piste ? `<span class="psp-ok" style="font-weight:700">✓ le début reprend ${_pspN(x.piste.valeur)}${x.piste.accord === 'exact' ? '' : ' (à un chiffre près)'}</span>
+          <br><small class="${x.piste.supprime ? 'psp-neg' : 'psp-muted'}">${esc(x.piste.source)} — vérifiez la date</small>`
       : x.index_precedent == null ? '<span class="psp-muted">aucun index connu</span>'
       : `<span class="psp-muted">écart ${x.ecart > 0 ? '+' : ''}${_pspN(x.ecart)}</span>`;
     return `<label class="psp-cp-opt ${x.prise_par ? 'off' : ''}">

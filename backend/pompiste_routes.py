@@ -50,6 +50,14 @@ TAILLE_LIASSE = 100
 MAX_GALLONS_PAR_POMPE_PERIODE = 5000
 TOLERANCE = 0.001
 _COMMENTAIRE_MIN = 5
+# Une ligne de rapport en attente qui recule, ou saute plus que ça depuis
+# l'index d'avant, n'est pas sur ce meeter (ou pas à cette date) : elle ne
+# sert pas de « dernier index » au rapport suivant.
+SAUT_PLAUSIBLE = 1500.0
+
+
+def _suite_plausible(base: Optional[float], debut: float) -> bool:
+    return base is None or (debut >= base - TOLERANCE and debut - base <= SAUT_PLAUSIBLE)
 
 
 # ── Identification des rôles ─────────────────────────────────────────
@@ -335,6 +343,7 @@ def _index_precedent(db: Session, pompe_id: int, d: date_type, periode: str,
         cle = (r.date, _RANG.get(r.periode, 9))
         if cle < cible and (cle_m is None or cle > cle_m):
             meilleur, cle_m, src = float(r.metter_apres), cle, f"journal — {_per(r.periode)} du {r.date.strftime('%d/%m')}"
+    base_journal = meilleur
     q = (db.query(RapportPompisteLigne, RapportPompiste)
          .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
          .filter(RapportPompisteLigne.pompe_id == pompe_id,
@@ -344,11 +353,20 @@ def _index_precedent(db: Session, pompe_id: int, d: date_type, periode: str,
         q = q.filter(RapportPompiste.id != exclure_rapport_id)
     if dd:
         q = q.filter(RapportPompiste.date > dd)
-    for ligne, rap in q.all():
+    # Lignes en attente, dans l'ordre des créneaux : chacune doit pouvoir
+    # suivre l'index d'avant (journal ou ligne en attente déjà retenue). Une
+    # ligne qui ne le peut pas (index d'un autre meeter, mauvaise date) ne sert
+    # pas de base au rapport suivant : elle aura son propre écart.
+    fin = base_journal if base_journal is not None else main.base_depart(p, d)
+    for ligne, rap in sorted(q.all(), key=lambda x: ((x[1].date, _RANG.get(x[1].periode, 9)), x[1].id)):
         cle = (rap.date, _RANG.get(rap.periode, 9))
-        if cle < cible and (cle_m is None or cle > cle_m):
-            meilleur, cle_m = float(ligne.metter_apres), cle
-            src = f"rapport pompiste — {_per(rap.periode)} du {rap.date.strftime('%d/%m')}"
+        if cle >= cible or (cle_m is not None and cle <= cle_m):
+            continue
+        av_l, ap_l = _valeurs_finales(ligne)
+        if not _suite_plausible(fin, av_l):
+            continue
+        meilleur, cle_m, fin = ap_l, cle, ap_l
+        src = f"rapport pompiste — {_per(rap.periode)} du {rap.date.strftime('%d/%m')}"
     if meilleur is None:
         dep = main.base_depart(p, d)
         if dep is not None:
@@ -1332,14 +1350,31 @@ def _pompes_possibles(db: Session, rap: RapportPompiste, l: RapportPompisteLigne
                            RapportPompiste.statut.in_(_ACTIFS), RapportPompiste.supprime_at.is_(None),
                            RapportPompiste.id != rap.id).all()):
         prises[lp.pompe_id] = f"rapport n°{rp.id} ({_nom(rp.utilisateur)})"
+    import placement_metres as pm
+    actives = db.query(Pompe).filter(Pompe.actif.is_(True)).order_by(Pompe.nom).all()
+    # Le dernier index du créneau ne dit rien quand la date est fausse ou que
+    # le rapport d'avant est à la corbeille : on cherche aussi la fin exacte
+    # du début saisi sur les jours autour (journal, rapports, corbeille).
+    pistes = pm.pistes_ligne(av, _ap, pm.index_autour(db, rap.date, exclure_rapport_id=rap.id),
+                             {p.id: p for p in actives}, pm.activite(l.pompe))
+    piste_de = {}
+    for x in pistes:
+        if x["sens"] == "avant" and x["pompe_id"] not in piste_de:
+            piste_de[x["pompe_id"]] = x
     out = []
-    for p in db.query(Pompe).filter(Pompe.actif.is_(True), Pompe.id != l.pompe_id).order_by(Pompe.nom).all():
+    for p in actives:
+        if p.id == l.pompe_id or pm.activite(p) != pm.activite(l.pompe):
+            continue        # le propane et le carburant ne se mélangent jamais
         prec, _src = _index_precedent(db, p.id, rap.date, rap.periode, exclure_rapport_id=rap.id)
+        x = piste_de.get(p.id)
         out.append({"pompe_id": p.id, "pompe_nom": p.nom, "produit_nom": p.produit.nom if p.produit else "",
                     "index_precedent": prec, "ecart": round(av - prec, 4) if prec is not None else None,
                     "suit": prec is not None and abs(prec - av) <= TOLERANCE and p.id not in prises,
+                    "piste": ({"source": x["source"], "valeur": x["valeur"], "accord": x["accord"],
+                               "supprime": x["supprime"], "rapport_id": x["rapport_id"]} if x else None),
                     "dans_rapport": p.id in dans, "prise_par": prises.get(p.id)})
-    out.sort(key=lambda x: (not x["suit"], x["prise_par"] is not None,
+    out.sort(key=lambda x: (not x["suit"], x["piste"] is None, (x["piste"] or {}).get("accord") != "exact",
+                            x["prise_par"] is not None,
                             abs(x["ecart"]) if x["ecart"] is not None else float("inf"), x["pompe_nom"]))
     return out
 
@@ -1387,6 +1422,7 @@ def _voisins(db: Session, pompe_id: int, d: date_type, periode: str, rid: int,
         cle = (r.date, _RANG.get(r.periode, 9))
         if cle > cible and (suiv is None or cle < suiv[0]):
             suiv = (cle, float(r.metter_avant), f"journal — {_per(r.periode)} du {r.date.strftime('%d/%m')}")
+    prec_j = prec
     for l, rp in (db.query(RapportPompisteLigne, RapportPompiste)
                   .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
                   .filter(RapportPompisteLigne.pompe_id == pompe_id, RapportPompiste.id != rid,
@@ -1396,6 +1432,8 @@ def _voisins(db: Session, pompe_id: int, d: date_type, periode: str, rid: int,
         cle = (rp.date, _RANG.get(rp.periode, 9))
         av, ap = _valeurs_finales(l)
         src = f"rapport n°{rp.id} — {_per(rp.periode)} du {rp.date.strftime('%d/%m')}"
+        if cle < cible and prec_j is not None and not _suite_plausible(prec_j[1], av):
+            continue        # index d'un autre meeter ou d'une autre date : ne sert pas de base
         if cle < cible and (prec is None or cle > prec[0]):
             prec = (cle, ap, src)
         if cle > cible and (suiv is None or cle < suiv[0]):

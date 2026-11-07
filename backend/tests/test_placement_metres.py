@@ -187,3 +187,58 @@ def test_saisie_d_origine_conservee_et_registre(client):
     st = next(x for x in reg["par_pompiste"] if x["pompiste"] == "Reg Istre")
     assert st["gallons"] == {"Gazoline": 100.0}
     assert st["mauvais_metre"] == 1 and st["releves"] == 1 and st["taux_erreur"] == 100.0
+
+
+def _rapport(client, prenom, d, per, lignes):
+    import main as _m
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": prenom, "nom": f"N{time.time_ns()}"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    r = p.post("/api/pompiste/compteurs", json={"date": d, "periode": per, "charte_acceptee": True, "lignes": [
+        {"pompe_id": a, "metter_avant": b, "metter_apres": e, "debut_confirme": True} for a, b, e in lignes]})
+    assert r.status_code == 201, r.text
+    return p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 1}], "depenses": []}).json()["id"]
+
+
+def test_rapport_d_avant_dans_la_corbeille_et_mauvaise_date(client):
+    """Le rapport d'avant est à la corbeille : le dernier index du créneau ne
+    dit rien, mais la fin de ce rapport supprimé retrouve le bon mètre et dit
+    quoi restaurer. Une ligne posée sur le mauvais mètre ne sert pas de base
+    au rapport suivant."""
+    from tz_utils import today_haiti
+    j3, j2, j1 = (str(today_haiti() - timedelta(days=k)) for k in (13, 12, 11))
+    ns = time.time_ns()
+    a, b = _produit(client, f"Gazoline W{ns}", 500, ["G_91", "G__91"])
+    _releve(client, j3, "Apres-midi", a, 0, 147280.209)
+    _releve(client, j3, "Apres-midi", b, 0, 337966.622)
+    r1 = _rapport(client, "Avant", j2, "Matin", [(a, 147280.209, 147473.246)])
+    assert _sup(client, r1, "supprimer", motif="Rapport supprimé par erreur").status_code == 200
+    # Le suivant reprend la fin du rapport supprimé (à un chiffre près) mais sur le mauvais mètre
+    r2 = _rapport(client, "Apres", j2, "Apres-midi", [(b, 147473.249, 147736.905)])
+    pl = client.get(f"/api/pompiste-supervision/rapports/{r2}/placement", headers=H).json()
+    assert pl["plan"] == [{"pompe_id": b, "vers": a}], pl
+    pr = pl["propositions"][0]
+    assert pr["piste"]["supprime"] and pr["piste"]["rapport_id"] == r1 and pr["confiance"] == "moyenne"
+    assert pl["dates"]["a_restaurer"] == [r1]
+    poss = client.get(f"/api/pompiste-supervision/rapports/{r2}/lignes/{b}/pompes-possibles", headers=H).json()
+    assert poss[0]["pompe_id"] == a and poss[0]["piste"]["rapport_id"] == r1
+    # Rapport suivant sur b : sa base reste la fin du journal, pas la ligne égarée de r2
+    r3 = _rapport(client, "Suite", j1, "Matin", [(b, 337966.622, 338100.0)])
+    d = next(x for x in client.get("/api/pompiste-supervision/rapports?statut=SOUMIS", headers=H).json() if x["id"] == r3)
+    assert d["lignes"][0]["index_precedent"] == 337966.622 and "ecart_compteur" not in d["lignes"][0]
+
+
+def test_rapport_au_mauvais_creneau(client):
+    """Rapport de l'Après-midi saisi comme Matin : son début est la fin du
+    Matin déjà au journal → l'un des deux n'est pas à la bonne date, et le
+    créneau probable est l'Après-midi."""
+    from tz_utils import today_haiti
+    j1, j0 = str(today_haiti() - timedelta(days=16)), str(today_haiti() - timedelta(days=15))
+    (a,) = _produit(client, f"Gazoline X{time.time_ns()}", 500, ["G1"])
+    _releve(client, j1, "Apres-midi", a, 0, 1000.457)
+    _releve(client, j0, "Matin", a, 1000.457, 1093.812)
+    rid = _rapport(client, "Mauvais", j0, "Matin", [(a, 1093.812, 1217.339)])
+    pl = client.get(f"/api/pompiste-supervision/rapports/{rid}/placement", headers=H).json()
+    cp = pl["dates"]["creneau_probable"]
+    assert cp and (cp["date"], cp["periode"]) == (j0, "Apres-midi"), pl["sans_place"]
+    assert any("même créneau" in m for m in pl["dates"]["messages"]) and pl["plan"] == []
