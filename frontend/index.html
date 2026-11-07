@@ -4722,6 +4722,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
         <button class="psp-tab on" data-t="rapports" onclick="pspOnglet('rapports')">Rapports <span id="psp-nb"></span></button>
         <button class="psp-tab" data-t="comptes" onclick="pspOnglet('comptes')">Comptes pompistes</button>
         <button class="psp-tab" data-t="taux" onclick="pspOnglet('taux')">Taux du jour</button>
+        <button class="psp-tab" data-t="ventes" onclick="pspOnglet('ventes')">📊 Ventes par pompiste</button>
       </div>
       <div id="psp-contenu"></div>
     </div>
@@ -16936,92 +16937,11 @@ function cjrAfficher(){
     <h3 class="cjr-h">Ventes ${_cjrActivite==='propane'?'de propane':'de carburant (Gazoline, Diesel)'}</h3>
     <div class="cjr-note">Source : relevés de compteurs.</div>
     ${_cjrTableVentesHtml(m,false)}
-    <h3 class="cjr-h">Ventes par pompiste</h3>
-    <div class="cjr-note">Tous les pompistes, classés par montant vendu sur les mêmes dates que le rapport. Cliquez sur un nom pour voir ses gallons par carburant, ses relevés, ses dépenses et ce qui reste après ses dépenses.</div>
-    <div id="cjr-pompistes"><div class="loading-row" style="padding:14px"><span class="spinner"></span>Chargement…</div></div>
     <h3 class="cjr-h">Dépenses</h3>
     <div class="cjr-note">« Caisse principale » = dépense non attribuée à un produit. Les transferts (dépôt en banque, Zelle) sortent de la caisse mais ne sont pas des charges.</div>
     ${tableDep}`;
-  cjrPompistes();
 }
 
-// Ventes par pompiste (rapport journalier) : la liste des noms de tous les
-// pompistes ; un clic sur un nom affiche ses informations (rang, gallons par
-// carburant, montant, créneaux, dépenses, reste, relevés).
-let _cjrPompData = null;
-async function cjrPompistes(){
-  const z = document.getElementById('cjr-pompistes'); if(!z) return;
-  const d1 = document.getElementById('cjr-date').value, d2 = document.getElementById('cjr-fin').value || d1;
-  let d, tous = [];
-  try{
-    [d, tous] = await Promise.all([GET(`/pompistes/classement?date_debut=${d1}&date_fin=${d2}`),
-                                   GET('/pompistes').catch(() => [])]);
-  }catch(e){ z.innerHTML = `<div class="empty" style="color:var(--red)">${esc(e.message)}</div>`; return; }
-  if(document.getElementById('cjr-date').value !== d1) return;          // dates changées entre-temps
-  const propane = _cjrActivite === 'propane';
-  const fams = Object.keys(d.totaux).filter(f => (f === 'Propane') === propane).sort((a, b) => _cjrRangFam(a) - _cjrRangFam(b));
-  const vide = {par_carburant: {}, montant: 0, creneaux: 0, jours: 0, depenses: 0, nb_depenses: 0, liste_depenses: [], releves_detail: []};
-  const par = new Map(d.pompistes.map(p => [p.pompiste_id, p]));
-  // Tous les pompistes, même ceux qui n'ont rien vendu sur ces dates
-  (tous || []).forEach(e => { if(!par.has(e.id)) par.set(e.id, {...vide, pompiste_id: e.id, pompiste: e.nom}); });
-  // Montant de l'activité affichée seulement (le propane n'est jamais mêlé au carburant)
-  const L = [...par.values()].map(p => {
-    const det = (p.releves_detail || []).filter(r => fams.includes(r.famille));
-    return {...p, det, mt: fams.reduce((t, f) => t + (p.par_carburant[f]?.montant || 0), 0),
-            cr: new Set(det.map(r => r.date + r.periode)).size, jr: new Set(det.map(r => r.date)).size};
-  }).filter(p => p.pompiste_id != null || p.mt > 0);
-  L.sort((a, b) => (a.pompiste_id == null) - (b.pompiste_id == null) || b.mt - a.mt || a.pompiste.localeCompare(b.pompiste, 'fr'));
-  const tot = L.reduce((t, p) => t + p.mt, 0);
-  let r = 0; L.forEach(p => { p.rg = p.pompiste_id == null ? null : (p.mt > 0 ? ++r : null); });
-  _cjrPompData = {L, fams, tot};
-  if(!L.length){ z.innerHTML = '<div class="empty" style="padding:14px">Aucun pompiste enregistré.</div>'; return; }
-  const med = x => x === 1 ? '🥇' : x === 2 ? '🥈' : x === 3 ? '🥉' : x ? `n°${x}` : '';
-  const sel = L.some(p => String(p.pompiste_id) === String(window._cjrPompSel)) ? window._cjrPompSel : null;
-  z.innerHTML = `<div class="cjr-noms">${L.map((p, i) => `<button type="button" class="cjr-nom ${String(p.pompiste_id) === String(sel) ? 'on' : ''}"
-        data-i="${i}" onclick="cjrPompiste(${i})">
-        <span class="cjr-nom-r">${med(p.rg)}</span><span class="cjr-nom-n">${esc(p.pompiste)}</span>
-        <span class="cjr-nom-m">${p.mt > 0 ? cjrG(p.mt) : 'aucune vente'}</span></button>`).join('')}</div>
-    <div id="cjr-pomp-fiche">${sel != null ? '' : '<div class="cjr-note" style="margin-top:8px">Cliquez sur un nom pour voir ses informations.</div>'}</div>`;
-  if(sel != null) cjrPompiste(L.findIndex(p => String(p.pompiste_id) === String(sel)));
-}
-function cjrPompiste(i){
-  const D = _cjrPompData; if(!D) return;
-  const p = D.L[i], f = document.getElementById('cjr-pomp-fiche'); if(!p || !f) return;
-  // Un second clic sur le même nom referme la fiche
-  if(String(window._cjrPompSel) === String(p.pompiste_id) && f.dataset.i === String(i) && f.innerHTML.trim()){
-    window._cjrPompSel = null; f.dataset.i = ''; f.innerHTML = '';
-    document.querySelectorAll('.cjr-nom').forEach(b => b.classList.remove('on')); return;
-  }
-  window._cjrPompSel = p.pompiste_id; f.dataset.i = String(i);
-  document.querySelectorAll('.cjr-nom').forEach(b => b.classList.toggle('on', b.dataset.i === String(i)));
-  const reste = p.mt - p.depenses;
-  f.innerHTML = `<div class="card" style="margin-top:12px;padding:14px 16px">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <div style="font-size:18px;font-weight:800">${esc(p.pompiste)}</div>
-      <div class="c-muted">${p.rg ? `Rang ${p.rg} sur ${D.L.filter(x => x.rg).length}` : 'Pas de vente sur ces dates'} · ${D.tot ? (100 * p.mt / D.tot).toLocaleString('fr-FR', {maximumFractionDigits: 1}) : 0} % des ventes</div>
-    </div>
-    <div class="cjr-kpis" style="margin-top:10px">
-      ${D.fams.map(x => `<div class="cjr-kpi"><div class="cjr-kpi-l">${esc(x)}</div>
-        <div class="cjr-kpi-v" style="font-size:18px">${cjrGal(p.par_carburant[x]?.gallons || 0)}</div>
-        <div class="cjr-kpi-s">${cjrG(p.par_carburant[x]?.montant || 0)}</div></div>`).join('')}
-      <div class="cjr-kpi"><div class="cjr-kpi-l">Montant vendu</div><div class="cjr-kpi-v" style="color:var(--green);font-size:18px">${cjrG(p.mt)}</div>
-        <div class="cjr-kpi-s">${p.cr} créneau(x) · ${p.jr} jour(s)${p.cr ? ` · ${cjrG(p.mt / p.cr)} par créneau` : ''}</div></div>
-      <div class="cjr-kpi"><div class="cjr-kpi-l">Dépenses</div><div class="cjr-kpi-v" style="color:var(--orange);font-size:18px">${cjrG(p.depenses)}</div>
-        <div class="cjr-kpi-s">${p.nb_depenses} dépense(s)</div></div>
-      <div class="cjr-kpi cjr-kpi-solde"><div class="cjr-kpi-l">Reste après dépenses</div>
-        <div class="cjr-kpi-v" style="color:${reste >= 0 ? 'var(--green)' : 'var(--red)'};font-size:18px">${cjrG(reste)}</div></div>
-    </div>
-    ${p.nb_depenses ? `<h4 class="cjr-h" style="font-size:14px">Dépenses</h4>
-      <div class="tbl-wrap"><table class="dt cjr-table"><thead><tr><th>Date</th><th>Description</th><th>Catégorie</th><th class="tr">Montant</th></tr></thead>
-      <tbody>${p.liste_depenses.map(x => `<tr><td class="num">${frDate(x.date)}</td><td>${esc(x.description)}</td><td>${esc(x.categorie || '')}</td>
-        <td class="tr num c-amber">${cjrG(x.montant)}</td></tr>`).join('')}</tbody></table></div>` : ''}
-    ${p.det.length ? `<h4 class="cjr-h" style="font-size:14px">Relevés</h4>
-      <div class="tbl-wrap"><table class="dt cjr-table"><thead><tr><th>Date</th><th>Période</th><th>Meeter</th><th class="tr">Avant</th><th class="tr">Après</th><th class="tr">Gallons</th><th class="tr">Montant</th></tr></thead>
-      <tbody>${p.det.map(x => `<tr><td class="num">${frDate(x.date)}</td><td>${x.periode === 'Apres-midi' ? 'Après-midi' : esc(x.periode)}</td><td>${esc(x.meeter)}</td>
-        <td class="tr num">${cjrGal(x.avant).replace(' gal', '')}</td><td class="tr num">${cjrGal(x.apres).replace(' gal', '')}</td>
-        <td class="tr num">${cjrGal(x.gallons)}</td><td class="tr num c-teal">${cjrG(x.montant)}</td></tr>`).join('')}</tbody></table></div>` : ''}
-  </div>`;
-}
 
 // Impression du Rapport Journalier au format du formulaire papier de la
 // station : en-tête centré, grand tableau quadrillé Date | Description |
@@ -21084,9 +21004,110 @@ async function pspOnglet(t){
       if(!PSP.comptes) PSP.comptes = await _pspApi('GET','/comptes');
       await pspChargerListe();
     } else if(t === 'taux'){ await pspRendreTaux(); }
+    else if(t === 'ventes'){ await pspVentes(); }
     else { PSP.comptes = await _pspApi('GET','/comptes'); pspRendreComptes(); }
   }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
   pspMajBadge();
+}
+
+// Ventes par pompiste : la liste des noms ; un clic sur un nom affiche son
+// rapport jour par jour (comme le Rapport journalier) : total gazoline, total
+// diesel (jamais additionnés), montant vendu, dépenses, reste ; puis ses relevés.
+let _pvData = null;
+async function pspVentes(){
+  const c = document.getElementById('psp-contenu');
+  const K = PSP.ventes ||= {debut: currentDate.slice(0,8) + '01', fin: currentDate, sel: null};
+  let d, tous = [];
+  try{
+    [d, tous] = await Promise.all([GET(`/pompistes/classement?date_debut=${K.debut}&date_fin=${K.fin}`),
+                                   GET('/pompistes').catch(() => [])]);
+  }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; return; }
+  const fams = Object.keys(d.totaux).sort((a, b) => _cjrRangFam(a) - _cjrRangFam(b));
+  const vide = {par_carburant: {}, montant: 0, creneaux: 0, jours: 0, depenses: 0, nb_depenses: 0, liste_depenses: [], releves_detail: []};
+  const par = new Map(d.pompistes.map(p => [p.pompiste_id, p]));
+  (tous || []).forEach(e => { if(!par.has(e.id)) par.set(e.id, {...vide, pompiste_id: e.id, pompiste: e.nom}); });
+  const L = [...par.values()].filter(p => p.pompiste_id != null || p.montant > 0);
+  L.sort((a, b) => (a.pompiste_id == null) - (b.pompiste_id == null) || b.montant - a.montant || a.pompiste.localeCompare(b.pompiste, 'fr'));
+  let r = 0; L.forEach(p => { p.rg = p.pompiste_id != null && p.montant > 0 ? ++r : null; });
+  _pvData = {L, fams};
+  window._pvPer = (dd, ff) => { if(!dd || !ff) return; K.debut = dd; K.fin = ff; pspVentes(); };
+  const auj = new Date(currentDate + 'T12:00:00');
+  const iso = x => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+  const d7 = new Date(auj); d7.setDate(d7.getDate() - 6);
+  const mp = new Date(auj.getFullYear(), auj.getMonth() - 1, 1), mpf = new Date(auj.getFullYear(), auj.getMonth(), 0);
+  const med = x => x === 1 ? '🥇' : x === 2 ? '🥈' : x === 3 ? '🥉' : x ? `n°${x}` : '';
+  c.innerHTML = `<div class="psp-card">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:end">
+        <label class="cp-champ">Du<input type="date" class="filter-input" id="pv-d" value="${K.debut}"></label>
+        <label class="cp-champ">Au<input type="date" class="filter-input" id="pv-f" value="${K.fin}"></label>
+        <button class="btn btn-primary psp-mini" onclick="_pvPer(document.getElementById('pv-d').value, document.getElementById('pv-f').value)">Afficher</button>
+        <button class="btn btn-secondary psp-mini" onclick="_pvPer('${currentDate}','${currentDate}')">Aujourd’hui</button>
+        <button class="btn btn-secondary psp-mini" onclick="_pvPer('${iso(d7)}','${currentDate}')">7 jours</button>
+        <button class="btn btn-secondary psp-mini" onclick="_pvPer('${currentDate.slice(0,8)}01','${currentDate}')">Ce mois</button>
+        <button class="btn btn-secondary psp-mini" onclick="_pvPer('${iso(mp)}','${iso(mpf)}')">Mois passé</button>
+      </div>
+      <div class="psp-muted" style="margin-top:8px">Cliquez sur un pompiste pour voir son rapport jour par jour.</div></div>
+    <div class="cjr-noms">${L.map((p, i) => `<button type="button" class="cjr-nom ${String(p.pompiste_id) === String(K.sel) ? 'on' : ''}" data-i="${i}" onclick="pspVentesFiche(${i})">
+        <span class="cjr-nom-r">${med(p.rg)}</span><span class="cjr-nom-n">${esc(p.pompiste)}</span>
+        <span class="cjr-nom-m">${p.montant > 0 ? cjrG(p.montant) : 'aucune vente'}</span></button>`).join('')}</div>
+    <div id="pv-fiche"></div>`;
+  const i0 = L.findIndex(p => String(p.pompiste_id) === String(K.sel));
+  if(i0 >= 0) pspVentesFiche(i0, true);
+}
+function pspVentesFiche(i, garder){
+  const D = _pvData, K = PSP.ventes; if(!D) return;
+  const p = D.L[i], f = document.getElementById('pv-fiche'); if(!p || !f) return;
+  if(!garder && String(K.sel) === String(p.pompiste_id) && f.innerHTML.trim()){      // second clic : on referme
+    K.sel = null; f.innerHTML = ''; document.querySelectorAll('.cjr-nom').forEach(b => b.classList.remove('on')); return;
+  }
+  K.sel = p.pompiste_id;
+  document.querySelectorAll('.cjr-nom').forEach(b => b.classList.toggle('on', b.dataset.i === String(i)));
+  // Jour par jour : gallons par carburant, montant, dépenses, reste
+  const J = {};
+  const jour = dt => (J[dt] ||= {g: {}, mt: 0, dep: 0, cr: new Set()});
+  (p.releves_detail || []).forEach(x => { const j = jour(x.date); j.g[x.famille] = (j.g[x.famille] || 0) + x.gallons; j.mt += x.montant; j.cr.add(x.periode); });
+  (p.liste_depenses || []).forEach(x => { jour(x.date).dep += x.montant; });
+  const dates = Object.keys(J).sort();
+  const fams = D.fams.filter(fm => (p.par_carburant[fm]?.gallons || 0) > 0);
+  const cols = fams.length ? fams : ['Gazoline', 'Diesel'];
+  const tg = fm => dates.reduce((t, dt) => t + (J[dt].g[fm] || 0), 0);
+  const tmt = dates.reduce((t, dt) => t + J[dt].mt, 0), tdep = dates.reduce((t, dt) => t + J[dt].dep, 0);
+  const per = x => x.has('Matin') && x.has('Apres-midi') ? 'Matin + Après-midi' : x.has('Matin') ? 'Matin' : x.has('Apres-midi') ? 'Après-midi' : '—';
+  const coul = v => v >= 0 ? 'var(--green)' : 'var(--red)';
+  f.innerHTML = `<div class="psp-card" style="margin-top:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="font-size:18px;font-weight:800">${esc(p.pompiste)}</div>
+      <div class="psp-muted">${p.rg ? `Rang ${p.rg} sur ${D.L.filter(x => x.rg).length}` : 'Pas de vente sur ces dates'} · du ${frDate(K.debut)} au ${frDate(K.fin)}</div>
+    </div>
+    <div class="cjr-kpis" style="margin-top:10px">
+      ${cols.map(fm => `<div class="cjr-kpi"><div class="cjr-kpi-l">Total ${esc(fm.toLowerCase())}</div>
+        <div class="cjr-kpi-v" style="font-size:18px">${cjrGal(tg(fm))}</div><div class="cjr-kpi-s">${cjrG(p.par_carburant[fm]?.montant || 0)}</div></div>`).join('')}
+      <div class="cjr-kpi"><div class="cjr-kpi-l">Montant vendu</div><div class="cjr-kpi-v" style="color:var(--green);font-size:18px">${cjrG(tmt)}</div>
+        <div class="cjr-kpi-s">${dates.filter(dt => J[dt].mt > 0).length} jour(s) · ${p.creneaux} créneau(x)</div></div>
+      <div class="cjr-kpi"><div class="cjr-kpi-l">Dépenses</div><div class="cjr-kpi-v" style="color:var(--orange);font-size:18px">${cjrG(tdep)}</div>
+        <div class="cjr-kpi-s">${p.nb_depenses} dépense(s)</div></div>
+      <div class="cjr-kpi cjr-kpi-solde"><div class="cjr-kpi-l">Reste (vendu − dépenses)</div>
+        <div class="cjr-kpi-v" style="color:${coul(tmt - tdep)};font-size:18px">${cjrG(tmt - tdep)}</div></div>
+    </div>
+    <h3 class="cjr-h">Jour par jour</h3>
+    <div class="tbl-wrap"><table class="dt cjr-table">
+      <thead><tr><th>Date</th><th>Période</th>${cols.map(fm => `<th class="tr">Total ${esc(fm.toLowerCase())}</th>`).join('')}<th class="tr">Montant vendu</th><th class="tr">Dépenses</th><th class="tr">Reste</th></tr></thead>
+      <tbody>${dates.length ? dates.map(dt => { const j = J[dt]; return `<tr>
+        <td class="num">${frDate(dt)}</td><td>${per(j.cr)}</td>${cols.map(fm => `<td class="tr num">${j.g[fm] ? cjrGal(j.g[fm]) : '—'}</td>`).join('')}
+        <td class="tr num c-teal">${cjrG(j.mt)}</td><td class="tr num">${j.dep ? cjrG(j.dep) : '—'}</td>
+        <td class="tr num" style="color:${coul(j.mt - j.dep)}"><strong>${cjrG(j.mt - j.dep)}</strong></td></tr>`; }).join('')
+        : `<tr><td colspan="${cols.length + 5}" class="empty" style="padding:14px">Aucune vente ni dépense sur ces dates</td></tr>`}</tbody>
+      ${dates.length ? `<tfoot><tr class="recap-total"><td>TOTAL</td><td></td>${cols.map(fm => `<td class="tr num">${cjrGal(tg(fm))}</td>`).join('')}
+        <td class="tr num c-teal">${cjrG(tmt)}</td><td class="tr num">${cjrG(tdep)}</td><td class="tr num" style="color:${coul(tmt - tdep)}">${cjrG(tmt - tdep)}</td></tr></tfoot>` : ''}
+    </table></div>
+    ${p.nb_depenses ? `<h3 class="cjr-h">Dépenses</h3><div class="tbl-wrap"><table class="dt cjr-table"><thead><tr><th>Date</th><th>Description</th><th>Catégorie</th><th class="tr">Montant</th></tr></thead>
+      <tbody>${p.liste_depenses.map(x => `<tr><td class="num">${frDate(x.date)}</td><td>${esc(x.description)}</td><td>${esc(x.categorie || '')}</td><td class="tr num c-amber">${cjrG(x.montant)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+    ${(p.releves_detail || []).length ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:700">Voir ses relevés (${p.releves_detail.length})</summary>
+      <div class="tbl-wrap"><table class="dt cjr-table"><thead><tr><th>Date</th><th>Période</th><th>Meeter</th><th class="tr">Avant</th><th class="tr">Après</th><th class="tr">Gallons</th><th class="tr">Montant</th></tr></thead>
+      <tbody>${p.releves_detail.map(x => `<tr><td class="num">${frDate(x.date)}</td><td>${x.periode === 'Apres-midi' ? 'Après-midi' : esc(x.periode)}</td><td>${esc(x.meeter)}</td>
+        <td class="tr num">${cjrGal(x.avant).replace(' gal', '')}</td><td class="tr num">${cjrGal(x.apres).replace(' gal', '')}</td>
+        <td class="tr num">${cjrGal(x.gallons)}</td><td class="tr num c-teal">${cjrG(x.montant)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}
+  </div>`;
 }
 
 async function pspRendreTaux(){
