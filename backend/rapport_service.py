@@ -65,7 +65,7 @@ def _anomalies_compteurs(
                     "date": str(r.date),
                     "periode": r.periode,
                     "message": (
-                        f"Meter avant ({av:.0f}) > meter après ({ap:.0f}) "
+                        f"Meeter avant ({av:.0f}) > meeter après ({ap:.0f}) "
                         f"— {r.pompe.nom} {r.date} {r.periode}"
                     ),
                 })

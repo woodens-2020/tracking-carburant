@@ -508,7 +508,7 @@ def send_rapport_pompiste_email(destinataires: list[str], pompiste: str, creneau
     html = f"""<div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:auto;color:#0f172a">
       <h2 style="margin:0 0 6px">Rapport pompiste à vérifier</h2>
       <p style="color:#475569;margin:0 0 16px">{pompiste} vient de soumettre son rapport. Connectez-vous à
-      Konekta pour vérifier les meters, la billetterie et l'écart, puis finaliser ou corriger le rapport.</p>
+      Konekta pour vérifier les meeters, la billetterie et l'écart, puis finaliser ou corriger le rapport.</p>
       <table style="width:100%;border-collapse:collapse;border-top:1px solid #e2e8f0">{lignes}</table>
       <p style="margin:22px 0"><a href="{lien}" style="background:#ea580c;color:#fff;text-decoration:none;
       padding:12px 20px;border-radius:10px;font-weight:700">Ouvrir les rapports pompistes</a></p>

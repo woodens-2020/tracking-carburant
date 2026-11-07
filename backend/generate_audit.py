@@ -12,7 +12,7 @@ from datetime import date
 # ══════════════════════════════════════════════════════════════════
 
 AUDIT_DATE = "2026-06-17"
-PROJET     = "PétroSync — Suivi Meters Station Carburant"
+PROJET     = "PétroSync — Suivi Meeters Station Carburant"
 AUDITEUR   = "Claude Code (Anthropic) · Audit automatisé"
 
 # ─── Vulnérabilités sécurité ──────────────────────────────────────

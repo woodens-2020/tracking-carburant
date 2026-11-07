@@ -121,7 +121,7 @@ def construire_lignes(db: Session, debut: Optional[date_type], fin: Optional[dat
     out = []
 
     # ── Ventes carburant : une ligne par jour, période et produit ──────
-    # Même règle que le Journal Meters : saut de compteur non résolu non compté
+    # Même règle que le Journal Meeters : saut de compteur non résolu non compté
     from main import releves_comptes
     groupes: dict = {}
     for r in releves_comptes(db, per_date(db.query(Releve), Releve.date).all()):
@@ -206,7 +206,7 @@ def construire_lignes(db: Session, debut: Optional[date_type], fin: Optional[dat
     # « ventes − dépenses ». Elles ne sortent pas de la caisse principale ; elles
     # réduisent l'entrée des ventes dès qu'elles sont dans les Dépenses (dépense
     # confirmée, envoyée aux Dépenses) — au même moment que dans le Rapport
-    # journalier, comme les meters confirmés entrent aussitôt dans les ventes.
+    # journalier, comme les meeters confirmés entrent aussitôt dans les ventes.
     from models import RapportPompiste
     for d in per_date(db.query(Depense).filter(Depense.rapport_pompiste_id.isnot(None)), Depense.date_depense).all():
         rap = db.get(RapportPompiste, d.rapport_pompiste_id)
@@ -373,15 +373,15 @@ def controles(db: Session, debut: date_type, fin: date_type, lignes: list,
                              "Vérifiez le prix de vente du produit à cette date.",
                     "cles": [l["cle"] for l in sans_prix][:200]})
 
-    # 2 bis. Sauts et reculs de compteur non confirmés : pas comptés (comme au Journal Meters)
+    # 2 bis. Sauts et reculs de compteur non confirmés : pas comptés (comme au Journal Meeters)
     from main import sauts_non_comptes
     sn = sauts_non_comptes(db, debut, fin) if debut and fin else {"nb": 0}
     if sn["nb"]:
         gal = " · ".join(f"{k} {v:,.3f} gal" for k, v in sn["gallons_par_carburant"].items()).replace(",", " ")
         out.append({"code": "sauts_non_comptes", "niveau": "alerte",
                     "titre": f"{sn['nb']} saut{'s' if sn['nb'] > 1 else ''} / recul{'s' if sn['nb'] > 1 else ''} de compteur non confirmé{'s' if sn['nb'] > 1 else ''} : pas comptés",
-                    "texte": (f"{sn['montant']:,.2f} G ({gal}) ne sont pas dans les ventes, comme au Journal Meters et "
-                              "au Rapport journalier. Confirmez (justifiez) ou corrigez l'écart dans le Journal Meters pour les compter.")
+                    "texte": (f"{sn['montant']:,.2f} G ({gal}) ne sont pas dans les ventes, comme au Journal Meeters et "
+                              "au Rapport journalier. Confirmez (justifiez) ou corrigez l'écart dans le Journal Meeters pour les compter.")
                              .replace(",", " ")})
 
     # 3. Rapports pompistes en attente : pas encore dans la caisse
