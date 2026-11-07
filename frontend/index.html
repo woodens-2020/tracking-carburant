@@ -21054,6 +21054,86 @@ async function pspVentes(){
   const i0 = L.findIndex(p => String(p.pompiste_id) === String(K.sel));
   if(i0 >= 0) pspVentesFiche(i0, true);
 }
+// Jour par jour d'un pompiste : gallons par carburant, montant, dépenses, reste
+function _pvJours(p, famsTous){
+  const J = {};
+  const jour = dt => (J[dt] ||= {g: {}, mt: 0, dep: 0, cr: new Set()});
+  (p.releves_detail || []).forEach(x => { const j = jour(x.date); j.g[x.famille] = (j.g[x.famille] || 0) + x.gallons; j.mt += x.montant; j.cr.add(x.periode); });
+  (p.liste_depenses || []).forEach(x => { jour(x.date).dep += x.montant; });
+  const dates = Object.keys(J).sort();
+  const fams = famsTous.filter(fm => (p.par_carburant[fm]?.gallons || 0) > 0);
+  const cols = fams.length ? fams : ['Gazoline', 'Diesel'];
+  const tg = fm => dates.reduce((t, dt) => t + (J[dt].g[fm] || 0), 0);
+  const tmt = dates.reduce((t, dt) => t + J[dt].mt, 0), tdep = dates.reduce((t, dt) => t + J[dt].dep, 0);
+  const per = x => x.has('Matin') && x.has('Apres-midi') ? 'Matin + Après-midi' : x.has('Matin') ? 'Matin' : x.has('Apres-midi') ? 'Après-midi' : '—';
+  return {J, dates, cols, tg, tmt, tdep, per};
+}
+// Impression du rapport d'un pompiste, format lettre 8,5 × 11 po
+function pspVentesImprimer(i){
+  const D = _pvData, K = PSP.ventes; if(!D) return;
+  const p = D.L[i]; if(!p) return;
+  const {J, dates, cols, tg, tmt, tdep, per} = _pvJours(p, D.fams);
+  const b = (typeof _branding !== 'undefined' && _branding) || {};
+  const e = v => String(v ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const nb = (v, d) => (Number(v) || 0).toLocaleString('fr-FR', {minimumFractionDigits: d, maximumFractionDigits: d});
+  const ent = b.raison_sociale || b.nom || 'Station';
+  const station = (typeof _STATIONS !== 'undefined' && _STATIONS && _STATIONS.courant_nom) || '';
+  const dc = d => { const [y, mo, j] = d.split('-'); return `${j}/${mo}/${y}`; };
+  const periode = K.debut === K.fin ? dc(K.debut) : `du ${dc(K.debut)} au ${dc(K.fin)}`;
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Ventes ${e(p.pompiste)} ${K.debut}${K.debut === K.fin ? '' : ' — ' + K.fin}</title><style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    @page{size:8.5in 11in;margin:0.45in 0.5in}
+    body{font-family:Arial,"Segoe UI",sans-serif;color:#000;font-size:11px;background:#fff}
+    .tete{text-align:center;margin-bottom:10px}
+    .tete h1{font-size:19px;font-weight:900;text-transform:uppercase}
+    .tete .s{font-size:11px;font-weight:700;margin-top:2px}
+    .info{display:flex;justify-content:space-between;font-size:12px;margin:8px 0;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:6px 0}
+    .info b{font-size:14px}
+    .kpis{display:grid;grid-template-columns:repeat(${cols.length + 3},1fr);gap:6px;margin:8px 0 12px}
+    .kpi{border:1px solid #000;padding:5px 7px}.kpi .l{font-size:9px;font-weight:700;text-transform:uppercase}.kpi .v{font-size:13px;font-weight:900;margin-top:2px}
+    h2{font-size:11.5px;font-weight:900;text-transform:uppercase;margin:12px 0 4px}
+    table{width:100%;border-collapse:collapse;border:1.5px solid #000}
+    th,td{border:1px solid #000;padding:3px 6px;font-variant-numeric:tabular-nums;font-size:10.5px}
+    th{font-size:9.5px;text-align:left;background:#eee}
+    .r{text-align:right}
+    tfoot td{font-weight:900;background:#f2f2f2}
+    tr{page-break-inside:avoid}
+    .sign{display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:30px;font-size:10px}
+    .sign div{border-top:1px solid #000;padding-top:3px;text-align:center}
+    .foot{margin-top:10px;font-size:8.5px;color:#555;text-align:center}
+    .noprint{text-align:center;margin:12px 0}.noprint button{padding:7px 20px;font-size:12px;border:1px solid #999;border-radius:6px;background:#f1f1f1;cursor:pointer}
+    @media print{.noprint{display:none}}
+  </style></head><body>
+    <div class="tete"><h1>${e(ent)}</h1>${station ? `<div class="s">Station : ${e(station)}</div>` : ''}<div class="s">Rapport des ventes du pompiste</div></div>
+    <div class="info"><div>Pompiste : <b>${e(p.pompiste)}</b>${p.rg ? ` (rang ${p.rg} sur ${D.L.filter(x => x.rg).length})` : ''}</div><div>Période : <b>${e(periode)}</b></div></div>
+    <div class="kpis">
+      ${cols.map(fm => `<div class="kpi"><div class="l">Total ${e(fm.toLowerCase())}</div><div class="v">${nb(tg(fm), 3)} gal</div></div>`).join('')}
+      <div class="kpi"><div class="l">Montant vendu</div><div class="v">${nb(tmt, 2)} G</div></div>
+      <div class="kpi"><div class="l">Dépenses</div><div class="v">${nb(tdep, 2)} G</div></div>
+      <div class="kpi"><div class="l">Reste</div><div class="v">${nb(tmt - tdep, 2)} G</div></div>
+    </div>
+    <h2>Jour par jour</h2>
+    <table><thead><tr><th>Date</th><th>Période</th>${cols.map(fm => `<th class="r">Total ${e(fm.toLowerCase())} (gal)</th>`).join('')}<th class="r">Montant vendu</th><th class="r">Dépenses</th><th class="r">Reste</th></tr></thead>
+      <tbody>${dates.length ? dates.map(dt => { const j = J[dt]; return `<tr><td>${dc(dt)}</td><td>${per(j.cr)}</td>${cols.map(fm => `<td class="r">${j.g[fm] ? nb(j.g[fm], 3) : '—'}</td>`).join('')}
+        <td class="r">${nb(j.mt, 2)}</td><td class="r">${j.dep ? nb(j.dep, 2) : '—'}</td><td class="r">${nb(j.mt - j.dep, 2)}</td></tr>`; }).join('')
+        : `<tr><td colspan="${cols.length + 5}">Aucune vente ni dépense sur ces dates</td></tr>`}</tbody>
+      ${dates.length ? `<tfoot><tr><td>TOTAL</td><td></td>${cols.map(fm => `<td class="r">${nb(tg(fm), 3)}</td>`).join('')}<td class="r">${nb(tmt, 2)}</td><td class="r">${nb(tdep, 2)}</td><td class="r">${nb(tmt - tdep, 2)}</td></tr></tfoot>` : ''}
+    </table>
+    ${p.nb_depenses ? `<h2>Dépenses</h2><table><thead><tr><th>Date</th><th>Description</th><th>Catégorie</th><th class="r">Montant</th></tr></thead>
+      <tbody>${p.liste_depenses.map(x => `<tr><td>${dc(x.date)}</td><td>${e(x.description)}</td><td>${e(x.categorie || '')}</td><td class="r">${nb(x.montant, 2)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="3">TOTAL DÉPENSES</td><td class="r">${nb(tdep, 2)}</td></tr></tfoot></table>` : ''}
+    ${(p.releves_detail || []).length ? `<h2>Relevés</h2><table><thead><tr><th>Date</th><th>Période</th><th>Meeter</th><th class="r">Avant</th><th class="r">Après</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead>
+      <tbody>${p.releves_detail.map(x => `<tr><td>${dc(x.date)}</td><td>${x.periode === 'Apres-midi' ? 'Après-midi' : e(x.periode)}</td><td>${e(x.meeter)}</td>
+        <td class="r">${nb(x.avant, 3)}</td><td class="r">${nb(x.apres, 3)}</td><td class="r">${nb(x.gallons, 3)}</td><td class="r">${nb(x.montant, 2)}</td></tr>`).join('')}</tbody></table>` : ''}
+    <div class="sign"><div>Signature du pompiste</div><div>Vérifié par</div></div>
+    <div class="foot">Imprimé le ${new Date().toLocaleString('fr-FR')} · Konekta</div>
+    <div class="noprint"><button onclick="window.print()">🖨 Imprimer</button></div>
+    <script>window.onload=function(){setTimeout(function(){window.print()},300)};<\/script>
+  </body></html>`;
+  const w = window.open('', '_blank', 'width=900,height=1000,scrollbars=yes');
+  if(!w){ toast('Autorisez les fenêtres pop-up pour imprimer.', 'err'); return; }
+  w.document.write(html); w.document.close();
+}
 function pspVentesFiche(i, garder){
   const D = _pvData, K = PSP.ventes; if(!D) return;
   const p = D.L[i], f = document.getElementById('pv-fiche'); if(!p || !f) return;
@@ -21062,22 +21142,18 @@ function pspVentesFiche(i, garder){
   }
   K.sel = p.pompiste_id;
   document.querySelectorAll('.cjr-nom').forEach(b => b.classList.toggle('on', b.dataset.i === String(i)));
-  // Jour par jour : gallons par carburant, montant, dépenses, reste
-  const J = {};
-  const jour = dt => (J[dt] ||= {g: {}, mt: 0, dep: 0, cr: new Set()});
-  (p.releves_detail || []).forEach(x => { const j = jour(x.date); j.g[x.famille] = (j.g[x.famille] || 0) + x.gallons; j.mt += x.montant; j.cr.add(x.periode); });
-  (p.liste_depenses || []).forEach(x => { jour(x.date).dep += x.montant; });
-  const dates = Object.keys(J).sort();
-  const fams = D.fams.filter(fm => (p.par_carburant[fm]?.gallons || 0) > 0);
-  const cols = fams.length ? fams : ['Gazoline', 'Diesel'];
-  const tg = fm => dates.reduce((t, dt) => t + (J[dt].g[fm] || 0), 0);
-  const tmt = dates.reduce((t, dt) => t + J[dt].mt, 0), tdep = dates.reduce((t, dt) => t + J[dt].dep, 0);
-  const per = x => x.has('Matin') && x.has('Apres-midi') ? 'Matin + Après-midi' : x.has('Matin') ? 'Matin' : x.has('Apres-midi') ? 'Après-midi' : '—';
+  const {J, dates, cols, tg, tmt, tdep, per} = _pvJours(p, D.fams);
   const coul = v => v >= 0 ? 'var(--green)' : 'var(--red)';
   f.innerHTML = `<div class="psp-card" style="margin-top:12px">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
       <div style="font-size:18px;font-weight:800">${esc(p.pompiste)}</div>
       <div class="psp-muted">${p.rg ? `Rang ${p.rg} sur ${D.L.filter(x => x.rg).length}` : 'Pas de vente sur ces dates'} · du ${frDate(K.debut)} au ${frDate(K.fin)}</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-top:10px;padding:10px;border:1px dashed var(--border);border-radius:10px">
+      <label class="cp-champ">Du<input type="date" class="filter-input" id="pvf-d" value="${K.debut}"></label>
+      <label class="cp-champ">Au<input type="date" class="filter-input" id="pvf-f" value="${K.fin}"></label>
+      <button class="btn btn-primary psp-mini" onclick="_pvPer(document.getElementById('pvf-d').value, document.getElementById('pvf-f').value)">Filtrer</button>
+      <button class="btn btn-secondary psp-mini" onclick="pspVentesImprimer(${i})" title="Format lettre 8,5 × 11 po">🖨 Imprimer (8,5 × 11)</button>
     </div>
     <div class="cjr-kpis" style="margin-top:10px">
       ${cols.map(fm => `<div class="cjr-kpi"><div class="cjr-kpi-l">Total ${esc(fm.toLowerCase())}</div>
