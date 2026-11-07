@@ -18065,6 +18065,16 @@ function renderJournal(data){
           </div>
         </div>
         ${e.motif_saisie?`<div class="jres-pied"><span class="janom-block-title">Motif donné à la saisie</span> ${esc(e.motif_saisie)}</div>`:''}
+        ${e.metre_probable?`<div class="jres-pied" style="border-left:3px solid var(--orange,#ea580c)">
+            🧠 <b>Mètre probable : ${esc(e.metre_probable.libelle)}</b>
+            <span class="badge">confiance ${esc(e.metre_probable.confiance)}</span>
+            ${e.metre_probable.echange?'<small> · index croisés entre les deux mètres</small>':''}
+            ${e.metre_probable.autre_carburant?'<b style="color:var(--red)"> · ⚠ autre carburant</b>':''}
+            ${e.metre_probable.deja_vu?`<small> · erreur déjà vue ${e.metre_probable.deja_vu} fois</small>`:''}
+            ${!e.en_attente && !(e.rapport_pompiste_id && !['CONFIRME','RESOLU'].includes(e.rapport_statut))
+              ?`<button class="btn btn-primary btn-sm" style="margin-left:8px" onclick="jrDeplacerMetre(${e.id},${e.metre_probable.pompe_id},'${esc(e.metre_probable.libelle).replace(/'/g,'&#39;')}',${e.metre_probable.echange})">⇄ Mettre sur ${esc(e.metre_probable.libelle)}</button>`
+              :'<small> · à corriger dans Rapports pompistes</small>'}
+          </div>`:''}
         ${e.en_attente
           ?`<div class="jres-pied" style="color:var(--muted)">⏳ Rapport pompiste pas encore finalisé : l'écart pourra être résolu après la validation.</div>`
           :`<div class="jres-pied" id="jres-pied-${e.id}">
@@ -20148,6 +20158,19 @@ async function jrSupprimer(id){
 }
 
 // Journal Meters : corriger rapidement un mètre (✏️)
+async function jrDeplacerMetre(id, pompe, nom, echange){
+  const m = prompt(`${echange ? 'Échanger les index avec' : 'Mettre ce relevé sur'} ${nom} ?
+Motif (5 caractères minimum) :`,
+                   'Index écrits sur la mauvaise ligne de la feuille');
+  if(m == null) return;
+  if(m.trim().length < 5) return toast('Indiquez le motif (5 caractères minimum).', 'err');
+  try{
+    const x = await POST(`/releves/${id}/deplacer`, {pompe_id: pompe, motif: m.trim()});
+    toast(x.echange ? `Index échangés avec ${nom}.` : `Relevé remis sur ${nom}.`, 'ok');
+    (x.avertissements||[]).forEach(a => toast(a, 'inf'));
+    loadJournal();
+  }catch(e){ toast(e.message || 'Erreur', 'err'); }
+}
 function jrCorriger(id, champ){
   const e=_JR_ENTRIES.find(x=>x.id===id); if(!e) return;
   document.getElementById('sup-ov')?.remove();
@@ -21337,7 +21360,10 @@ function pspCarte(r){
       <td class="r" style="white-space:nowrap">${l.confirmee
         ? `<span class="psp-ok" style="font-weight:700">✓ Confirmé${corrige?' (corrigé)':''}</span> <button class="psp-lien" onclick="pspLigne(${r.id},${l.pompe_id},false)">reprendre</button>`
         : `<button class="btn btn-primary psp-mini" onclick="pspLigne(${r.id},${l.pompe_id},true)">Confirmer</button>`}</td>
-    </tr>${l.pompe_suggeree ? `<tr><td colspan="7"><div class="psp-warn">⚠ Le début ${_pspN(av)} ne suit pas ${esc(l.pompe_nom)}, mais il suit exactement <b>${esc(l.pompe_suggeree.pompe_nom)}</b> : le pompiste s'est sans doute trompé de pompe.
+    </tr>${l.pompe_suggeree ? `<tr><td colspan="7"><div class="psp-warn">🧠 Le début ${_pspN(av)} ne suit pas ${esc(l.produit_nom)} · ${esc(l.pompe_nom)} : ces index sont sans doute ceux de <b>${esc(l.pompe_suggeree.pompe_nom)}</b>
+       <span class="psp-badge ${l.pompe_suggeree.confiance==='haute'?'CONFIRME':'PROBLEME'}" style="margin-left:4px">confiance ${esc(l.pompe_suggeree.confiance||'')}</span>
+       ${l.pompe_suggeree.autre_carburant ? '<b class="psp-neg"> ⚠ autre carburant</b>' : ''}
+       <div class="psp-muted" style="margin:3px 0">${(l.pompe_suggeree.raisons||[]).map(esc).join(' · ')}</div>
        <button class="btn btn-primary psp-mini" onclick="pspChangerPompe(${r.id},${l.pompe_id},${l.pompe_suggeree.pompe_id})">⇄ Mettre sur ${esc(l.pompe_suggeree.pompe_nom)}</button></div></td></tr>` : ''}
     ${corrige ? `<tr><td colspan="7"><div class="psp-muted">Saisi par le pompiste : ${_pspN(l.metter_avant)} → ${_pspN(l.metter_apres)}</div></td></tr>` : ''}
     ${j && (diffJ || !j.de_ce_rapport) ? `<tr><td colspan="7"><div class="${diffJ?'psp-warn':'psp-muted'}">${diffJ ? '⚠ ' : ''}${j.de_ce_rapport
@@ -21361,7 +21387,7 @@ function pspCarte(r){
     ${r.note_pompiste ? `<div class="psp-warn" style="color:var(--text);margin:0 0 10px"><b>Note du pompiste :</b> ${esc(r.note_pompiste)}</div>` : ''}
 
     ${_pspEtape(1, `Mètres — confirmez chaque pompe (${r.lignes.filter(l=>l.confirmee).length}/${r.lignes.length})`, toutesLignes,
-      `<div style="overflow-x:auto"><table class="psp-tbl"><thead><tr><th>Pompe</th><th class="r">Index précédent</th><th class="r">Début</th><th class="r">Fin</th>
+      `${_pspPlacement(r)}<div style="overflow-x:auto"><table class="psp-tbl"><thead><tr><th>Pompe</th><th class="r">Index précédent</th><th class="r">Début</th><th class="r">Fin</th>
         <th class="r">Gallons</th><th class="r">Montant</th><th></th></tr></thead><tbody>${lignes}</tbody></table></div>
        ${_pspResumeEcarts(r)}
        <div class="psp-muted" style="margin-top:4px">Modifiez un index avant de confirmer pour le corriger ; la saisie du pompiste reste conservée.
@@ -21413,6 +21439,33 @@ function pspCarte(r){
 function _pspMsg(id, html){ const el = document.getElementById('psp-msg-' + id); if(el) el.innerHTML = html; }
 function _pspCom(id){ return (_pspS(id).com || '').trim(); }
 
+// Intelligence de placement : le moteur replace toutes les lignes ensemble
+// (91 écrit sur la ligne du 95, diesels croisés…) d'après la chaîne des index
+function _pspPlacement(r){
+  const P = r.placement; if(!P || !(P.propositions||[]).length) return '';
+  return `<div class="psp-warn" style="margin:0 0 10px;color:var(--text)">
+    <div style="font-weight:800;margin-bottom:4px">🧠 Index sur la mauvaise ligne — placement proposé</div>
+    ${P.propositions.map(p => `<div style="margin:4px 0">
+      <b>${esc(p.de)}</b> → <b>${esc(p.vers)}</b>
+      <span class="psp-badge ${p.confiance==='haute'?'CONFIRME':'PROBLEME'}">confiance ${esc(p.confiance)}</span>
+      ${p.echange ? '<small class="psp-muted">(index croisés)</small>' : ''}${p.autre_carburant ? ' <b class="psp-neg">⚠ autre carburant</b>' : ''}
+      <div class="psp-muted" style="font-size:12px">${_pspN(p.metter_avant)} → ${_pspN(p.metter_apres)} · ${(p.raisons||[]).map(esc).join(' · ')}</div></div>`).join('')}
+    <div style="margin-top:6px"><button class="btn btn-primary psp-mini" onclick="pspReclasser(${r.id})">⇄ Appliquer ce placement (${P.propositions.length} mètre${P.propositions.length>1?'s':''})</button>
+      <small class="psp-muted">Les mètres touchés seront à reconfirmer ; l'erreur est retenue pour ce pompiste.</small></div></div>`;
+}
+async function pspReclasser(id){
+  const r = PSP.rapports.find(x => x.id === id); if(!r || !r.placement) return;
+  const m = prompt('Pourquoi remettre ces index sur ces mètres ? (5 caractères minimum)',
+                   'Index écrits sur la mauvaise ligne de la feuille');
+  if(m == null) return;
+  if(m.trim().length < 5) return notify('Indiquez le motif (5 caractères minimum).', 'err');
+  try{
+    const x = await _pspApi('POST', `/rapports/${id}/reclasser`, {motif: m.trim(), plan: r.placement.plan});
+    const st = _pspS(id); if(st.index) r.placement.plan.forEach(p => { delete st.index[p.pompe_id]; delete st.index[p.vers]; });
+    _pspMaj(x); pspMajBadge();
+    notify('Index remis sur les bons mètres : confirmez-les.', 'ok');
+  }catch(e){ notify(e.message, 'err'); }
+}
 async function _pspAction(id, path, body){
   try{ const r = await _pspApi('POST', `/rapports/${id}/${path}`, body); _pspMaj(r); pspMajBadge();
        (r.avertissements||[]).forEach(a => notify(a, 'warn')); return r; }

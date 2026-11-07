@@ -409,6 +409,8 @@ app.include_router(taches_router)
 app.include_router(pieces_jointes_router)
 app.include_router(listes_reference_router)
 app.include_router(pompiste_router)
+from placement_metres import router as placement_router
+app.include_router(placement_router)
 app.include_router(caisse_principale_router)
 
 
@@ -4187,6 +4189,14 @@ def _build_journal_entries(
     for e in entries:
         e["certifie"] = (not e["en_attente"] and e["statut"] in ("ok", "resolu")
                          and (e["source"] != "pompiste" or e["rapport_statut"] in ("CONFIRME", "RESOLU")))
+
+    # Index écrits sur la mauvaise ligne : le moteur de placement signale le
+    # mètre dont la chaîne se poursuit (avant les filtres, sur tout le créneau)
+    try:
+        import placement_metres
+        placement_metres.annoter_journal(db, entries)
+    except Exception:
+        log.exception("Placement des mètres (journal)")
 
     # Post-filtres : appliqués APRÈS l'analyse de continuité pour ne pas
     # casser la chaîne Matin → Après-midi → Matin suivant.

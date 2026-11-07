@@ -423,13 +423,24 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
             if prec is not None and abs(prec - av) > TOLERANCE:
                 d["ecart_compteur"] = round(av - prec, 4)
                 d["ecart_compteur_montant"] = round((av - prec) * float(l.prix_gallon), 2)
-            if prec is not None and abs(prec - av) > TOLERANCE and r.statut in _A_TRAITER:
-                d["pompe_suggeree"] = next(({"pompe_id": x["pompe_id"], "pompe_nom": x["pompe_nom"]}
-                                            for x in _pompes_possibles(db, r, l) if x["suit"]), None)
         d["pompe_saisie"] = ({"pompe_id": l.pompe_saisie_id, "pompe_nom": l.pompe_saisie.nom}
                              if l.pompe_saisie_id and l.pompe_saisie else None)
         lignes.append(d)
+    placement = None
+    if avec_journal and r.statut in _A_TRAITER and any("ecart_compteur" in x for x in lignes):
+        import placement_metres
+        try:
+            placement = placement_metres.plan_rapport(db, r)
+        except Exception:
+            log.exception("Placement des mètres du rapport #%s", r.id)
+        for pr in (placement or {}).get("propositions", []):
+            x = next((y for y in lignes if y["pompe_id"] == pr["pompe_id"]), None)
+            if x is not None:
+                x["pompe_suggeree"] = {"pompe_id": pr["vers_pompe_id"], "pompe_nom": pr["vers"],
+                                       "confiance": pr["confiance"], "raisons": pr["raisons"],
+                                       "autre_carburant": pr["autre_carburant"], "echange": pr["echange"]}
     return {
+        "placement": placement,
         "id": r.id, "date": str(r.date), "periode": r.periode, "statut": r.statut,
         "certifie": r.statut in ("CONFIRME", "RESOLU"),
         "pompiste_id": r.utilisateur_id, "pompiste_nom": _nom(r.utilisateur),
@@ -1600,6 +1611,9 @@ def changer_pompe(rid: int, pompe_id: int, data: ChangerPompeIn, request: Reques
     neuve = db.get(Pompe, data.pompe_id)
     if not neuve or not neuve.actif:
         raise HTTPException(404, "Pompe introuvable ou inactive.")
+    import placement_metres as _pm
+    if _pm.activite(neuve) != _pm.activite(l.pompe):
+        raise HTTPException(400, "Le propane et le carburant ne se mélangent jamais.")
     autre = next((x for x in rap.lignes if x.pompe_id == neuve.id), None)
     pris = (db.query(RapportPompisteLigne, RapportPompiste)
             .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
@@ -1617,9 +1631,14 @@ def changer_pompe(rid: int, pompe_id: int, data: ChangerPompeIn, request: Reques
     for x in ([l, autre] if autre else [l]):
         _retirer_ligne_du_journal(db, rap, x)
         x.confirmee, x.confirmee_at = False, None
+    import placement_metres
     if autre:
         # Index croisés : chaque pompe reprend les index de l'autre (prix inchangés)
         trace["index_autre"] = list(_valeurs_finales(autre))
+        placement_metres.apprendre(db, l.pompe_saisie_id or l.pompe_id, l.pompe_id, autre.pompe_id,
+                                   rap.date, utilisateur_id=rap.utilisateur_id)
+        placement_metres.apprendre(db, autre.pompe_saisie_id or autre.pompe_id, autre.pompe_id, l.pompe_id,
+                                   rap.date, utilisateur_id=rap.utilisateur_id)
         for k in ("metter_avant", "metter_apres", "metter_avant_corrige", "metter_apres_corrige"):
             va, vb = getattr(l, k), getattr(autre, k)
             setattr(l, k, vb)
@@ -1629,6 +1648,7 @@ def changer_pompe(rid: int, pompe_id: int, data: ChangerPompeIn, request: Reques
         autre.pompe_saisie_id = None if sa == autre.pompe_id else sa
     else:
         origine = l.pompe_saisie_id or l.pompe_id
+        placement_metres.apprendre(db, origine, l.pompe_id, neuve.id, rap.date, utilisateur_id=rap.utilisateur_id)
         l.pompe, l.pompe_id = neuve, neuve.id
         l.prix_gallon = _prix(db, neuve, rap.date)
         l.pompe_saisie_id = None if origine == neuve.id else origine
@@ -1637,6 +1657,45 @@ def changer_pompe(rid: int, pompe_id: int, data: ChangerPompeIn, request: Reques
     db.commit()
     db.refresh(rap)
     log.info("Rapport pompiste #%s : %s -> %s par l'utilisateur %s", rid, ancienne.nom, neuve.nom, s.id)
+    return _rapport_dict(db, rap, avec_journal=True)
+
+
+class ReclasserIn(BaseModel):
+    motif: str
+    plan: Optional[list] = None      # [{"pompe_id", "vers"}] ; absent = le plan proposé
+
+
+@router.get("/api/pompiste-supervision/rapports/{rid}/placement")
+def placement_rapport(rid: int, _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Placement proposé par le moteur pour toutes les lignes du rapport."""
+    import placement_metres
+    return placement_metres.plan_rapport(db, _rapport_a_traiter(db, rid))
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/reclasser")
+def reclasser(rid: int, data: ReclasserIn, request: Request,
+              s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Applique d'un coup le placement proposé (ou celui envoyé) : chaque
+    ligne retrouve son mètre, échanges et rotations compris. Les mètres
+    touchés sont à reconfirmer ; l'erreur est retenue pour ce pompiste."""
+    import main
+    import placement_metres
+    rap = _rapport_a_traiter(db, rid)
+    motif = " ".join((data.motif or "").split())
+    if len(motif) < 5:
+        raise HTTPException(400, "Indiquez pourquoi vous changez de mètre (5 caractères minimum).")
+    plan = data.plan if data.plan is not None else placement_metres.plan_rapport(db, rap)["plan"]
+    try:
+        mapping = {int(x["pompe_id"]): int(x["vers"]) for x in plan}
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(400, "Plan invalide.")
+    changements = placement_metres.appliquer_plan(db, rap, mapping)
+    main._tracer(db, request, "rapport_pompiste_metres_reclasses",
+                 {"rapport_id": rap.id, "date": str(rap.date), "periode": rap.periode,
+                  "motif": motif[:300], "changements": changements})
+    db.commit()
+    db.refresh(rap)
+    log.info("Rapport pompiste #%s : %d mètre(s) reclassé(s) par l'utilisateur %s", rid, len(changements), s.id)
     return _rapport_dict(db, rap, avec_journal=True)
 
 

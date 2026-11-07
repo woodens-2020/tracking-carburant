@@ -2668,6 +2668,31 @@ class ResolutionMetter(Base):
     resolu_par = relationship("Utilisateur")
 
 
+class ErreurMetreApprise(Base):
+    """Mémoire des erreurs de mètre : chaque fois que la direction remet des
+    index sur le bon mètre (ex. le 91 écrit sur la ligne du 95), le couple
+    (mètre choisi par le pompiste → bon mètre) est compté pour ce pompiste.
+    Le moteur de placement s'en sert pour proposer plus vite et plus sûrement
+    le bon mètre la fois suivante. Une remise en place annulée décompte."""
+    __tablename__ = "erreurs_metre_apprises"
+
+    id                = Column(Integer, primary_key=True)
+    utilisateur_id    = Column(Integer, ForeignKey("utilisateurs.id", ondelete="CASCADE"), nullable=True)
+    employe_id        = Column(Integer, ForeignKey("employes.id", ondelete="CASCADE"), nullable=True)
+    pompe_saisie_id   = Column(Integer, ForeignKey("pompes.id", ondelete="CASCADE"), nullable=False)
+    pompe_correcte_id = Column(Integer, ForeignKey("pompes.id", ondelete="CASCADE"), nullable=False)
+    nb                = Column(Integer, nullable=False, default=0)
+    derniere_date     = Column(Date, nullable=True)
+    updated_at        = Column(DateTime(timezone=True), nullable=False, server_default=func.now(),
+                               onupdate=func.now())
+
+    __table_args__ = (
+        Index("idx_erreur_metre_saisie", "pompe_saisie_id"),
+        Index("idx_erreur_metre_user", "utilisateur_id"),
+        Index("idx_erreur_metre_emp", "employe_id"),
+    )
+
+
 class SourceEntree(Base):
     """Source d'argent qui alimente la caisse principale (station Zo Vincent,
     station Champin, autres…). Configurable : ajout, renommage, désactivation
