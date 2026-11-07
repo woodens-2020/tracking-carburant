@@ -1848,6 +1848,17 @@ def finaliser(rid: int, data: FinaliserIn, request: Request,
 
     # 2. Journal des compteurs — mêmes règles que le module Saisie
     avertissements = _ecrire_journal(db, rap, request, remplacer_saisie=True, motif=motif or None)
+    # Le relevé officiel garde la trace de ce que le pompiste avait écrit
+    for l in rap.lignes:
+        rj = db.query(Releve).filter_by(date=rap.date, periode=rap.periode, pompe_id=l.pompe_id).first()
+        if rj is None:
+            continue
+        rj.pompe_saisie_id = l.pompe_saisie_id if l.pompe_saisie_id != l.pompe_id else None
+        av_f, ap_f = _valeurs_finales(l)
+        if abs(float(l.metter_avant) - av_f) > TOLERANCE or abs(float(l.metter_apres) - ap_f) > TOLERANCE:
+            rj.metter_avant_saisi, rj.metter_apres_saisi = l.metter_avant, l.metter_apres
+        else:
+            rj.metter_avant_saisi = rj.metter_apres_saisi = None
     # 3. Dépenses confirmées (et envoyées) : elles entrent dans les Dépenses maintenant
     _ecrire_depenses(db, rap, request, s)
 

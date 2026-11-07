@@ -4918,6 +4918,9 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
       <!-- Table journal complet -->
       <div id="journal-table"></div>
 
+      <!-- Registre des erreurs de mètre (saisie d'origine conservée) -->
+      <div id="journal-erreurs" style="margin-top:16px"></div>
+
     </div>
 
     <!-- ══════ PAGE : RAPPORTS ══════ -->
@@ -17786,6 +17789,7 @@ async function loadJournal(){
     const data=await GET(url);
     _jrActivites = [...new Set((products||[]).map(p => /propan/i.test(p.nom) ? 'propane' : 'carburant'))];
     renderJournal(data);
+    jrErreursMetre(debut, fin, pompisteIds);
     document.getElementById('btn-journal-pdf').style.display='';
     document.getElementById('btn-journal-xls').style.display='';
   }catch(e){
@@ -18135,7 +18139,7 @@ function renderJournal(data){
         ? `<button class="jr-val jr-val-date" title="${e.rapport_pompiste_id?'Changer la date / période du rapport pompiste n°'+e.rapport_pompiste_id:'Changer la date / période de ce relevé'}" onclick="jrChangerDate(${JSON.stringify(e.id).replace(/"/g,'&quot;')})">${frDate(e.date)}<span class="jr-pen">✏️</span></button>`
         : frDate(e.date)}</td>
       <td style="font-size:13px">${e.periode==='Matin'?'🌅 Matin':'🌇 Après-midi'}</td>
-      <td style="font-weight:600">${esc(e.pompe_nom)}</td>
+      <td style="font-weight:600">${esc(e.pompe_nom)}${e.saisie_pompiste?`<div style="font-size:11px;font-weight:600;color:var(--orange,#ea580c)" title="Saisie d'origine du pompiste, conservée">✎ ${e.saisie_pompiste.mauvais_metre?`saisi sur ${esc(e.saisie_pompiste.produit_nom||'')} · ${esc(e.saisie_pompiste.pompe_nom||'')}`:'index corrigés'} : ${e.saisie_pompiste.metter_avant.toFixed(3)} → ${e.saisie_pompiste.metter_apres.toFixed(3)}</div>`:''}</td>
       <td style="font-size:13px">${e.pompiste_nom?esc(e.pompiste_nom):'<span class="c-dim">—</span>'}${!e.en_attente && e.id
         ? ` <button class="btn-ghost" style="font-size:12px;padding:0 4px" title="Attribuer ce relevé à un pompiste"
              onclick="openPompisteModal([{releveId:${e.id}, pompeNom:${esc(JSON.stringify(e.pompe_nom)).replace(/"/g,'&quot;')}, pompisteId:${e.pompiste_id||'null'}}])">👤</button>` : ''}${e.en_attente
@@ -20158,6 +20162,41 @@ async function jrSupprimer(id){
 }
 
 // Journal Meters : corriger rapidement un mètre (✏️)
+// Registre des erreurs de mètre : ce que le pompiste a écrit est conservé,
+// à côté de ce qui a été retenu ; écarts non expliqués ; taux par pompiste
+async function jrErreursMetre(debut, fin, pompisteIds){
+  const el = document.getElementById('journal-erreurs'); if(!el) return;
+  let d;
+  try{ d = await GET(`/erreurs-metre?date_debut=${debut}&date_fin=${fin}` + (pompisteIds||[]).map(i=>`&pompiste_id=${i}`).join('')); }
+  catch(e){ el.innerHTML = ''; return; }
+  const n3 = v => v==null ? '—' : Number(v).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3});
+  const typ = t => `<span class="badge" style="margin-right:4px">${esc(d.types[t]||t)}</span>`;
+  const stats = d.par_pompiste.filter(x => x.releves).map(x => `<tr>
+      <td><b>${esc(x.pompiste)}</b></td><td class="num">${x.releves}</td><td class="num">${n3(x.gallons)}</td>
+      <td class="num" style="font-weight:700;color:${x.erreurs?'var(--red)':'var(--green)'}">${x.erreurs}</td>
+      <td class="num">${x.mauvais_metre}</td><td class="num">${x.index_corrige}</td><td class="num">${x.ecart_compteur}</td>
+      <td class="num">${x.taux_erreur.toLocaleString('fr-FR')} %</td><td class="num">${n3(x.ecart_gallons)}</td></tr>`).join('');
+  const lignes = d.erreurs.map(x => `<tr class="${x.statut==='a_verifier'?'row-alerte':''}">
+      <td style="white-space:nowrap">${frDate(x.date)}<div class="c-dim" style="font-size:12px">${x.periode==='Matin'?'Matin':'Après-midi'}</div></td>
+      <td>${esc(x.pompiste)}</td>
+      <td>${x.types.map(typ).join('')}${x.autre_carburant?'<b style="color:var(--red)"> ⚠ autre carburant</b>':''}</td>
+      <td><b>${esc(x.saisi.libelle)}</b><div style="font-size:12px">${n3(x.saisi.metter_avant)} → ${n3(x.saisi.metter_apres)} · ${n3(x.saisi.gallons)} gal</div></td>
+      <td>${x.statut==='corrige'
+        ? `<b>${esc(x.retenu.libelle)}</b><div style="font-size:12px">${n3(x.retenu.metter_avant)} → ${n3(x.retenu.metter_apres)} · ${n3(x.retenu.gallons)} gal</div>`
+        : `<span style="color:var(--blue)">attendu ${n3(x.metter_attendu)}</span>${x.metre_probable?`<div style="font-size:12px">🧠 mètre probable : <b>${esc(x.metre_probable.libelle)}</b></div>`:''}`}</td>
+      <td class="num">${x.ecart_gallons?n3(x.ecart_gallons)+' gal':'—'}<div style="font-size:12px">${x.ecart_gourdes?fmtGX(Math.abs(x.ecart_gourdes)):''}</div></td>
+      <td>${x.statut==='corrige'?'<span style="color:var(--green);font-weight:700">✓ corrigé</span>':(x.en_attente?'⏳ rapport en attente':'<span style="color:var(--blue);font-weight:700">à vérifier</span>')}</td></tr>`).join('');
+  el.innerHTML = `<div class="card" style="padding:14px 16px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+      <div style="font-size:15px;font-weight:700">🧾 Registre des erreurs de mètre</div>
+      <span class="badge">${d.total.erreurs} erreur${d.total.erreurs>1?'s':''}</span>
+      <span class="badge" style="color:var(--green)">${d.total.corrigees} corrigée${d.total.corrigees>1?'s':''}</span>
+      <span class="badge" style="color:var(--blue)">${d.total.a_verifier} à vérifier</span></div>
+    <div class="c-dim" style="font-size:13px;margin-bottom:10px">Chaque correction garde ce que le pompiste avait écrit (mètre et index) à côté de ce qui a été retenu. Rien n'est effacé : on suit chaque gallon.</div>
+    ${stats?`<div style="overflow-x:auto;margin-bottom:12px"><table class="dt"><thead><tr><th>Pompiste</th><th class="num">Relevés</th><th class="num">Gallons</th><th class="num">Erreurs</th><th class="num">Mauvais mètre</th><th class="num">Index corrigés</th><th class="num">Écarts</th><th class="num">Taux</th><th class="num">Gallons en écart</th></tr></thead><tbody>${stats}</tbody></table></div>`:''}
+    ${lignes?`<div style="overflow-x:auto"><table class="dt"><thead><tr><th>Date</th><th>Pompiste</th><th>Erreur</th><th>Saisi par le pompiste</th><th>Retenu</th><th class="num">Écart</th><th>Statut</th></tr></thead><tbody>${lignes}</tbody></table></div>`
+      :'<div style="color:var(--green);font-weight:700">✓ Aucune erreur de mètre sur la période.</div>'}</div>`;
+}
 async function jrDeplacerMetre(id, pompe, nom, echange){
   const m = prompt(`${echange ? 'Échanger les index avec' : 'Mettre ce relevé sur'} ${nom} ?
 Motif (5 caractères minimum) :`,

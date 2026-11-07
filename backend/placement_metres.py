@@ -29,7 +29,7 @@ from datetime import timedelta
 from statistics import median
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -510,13 +510,21 @@ def deplacer_releve(releve_id: int, data: DeplacerReleveIn, request: Request, db
     db.query(ResolutionMetter).filter(ResolutionMetter.releve_id.in_([x.id for x in touches])).delete(
         synchronize_session=False)
     emp_r, emp_a = r.pompiste_id, (autre.pompiste_id if autre else None)
+    # Ce que le pompiste avait écrit suit les index : mètre d'origine et index
+    # d'origine sont conservés (registre des erreurs de mètre)
+    cles = ("metter_avant", "metter_apres", "pompiste_id", "metter_avant_saisi", "metter_apres_saisi")
+    origine_r = r.pompe_saisie_id or r.pompe_id
     if autre:
-        for k in ("metter_avant", "metter_apres", "pompiste_id"):
+        origine_a = autre.pompe_saisie_id or autre.pompe_id
+        for k in cles:
             va, vb = getattr(r, k), getattr(autre, k)
             setattr(r, k, vb)
             setattr(autre, k, va)
+        r.pompe_saisie_id = None if origine_a == r.pompe_id else origine_a
+        autre.pompe_saisie_id = None if origine_r == autre.pompe_id else origine_r
     else:
         r.pompe, r.pompe_id = neuve, neuve.id
+        r.pompe_saisie_id = None if origine_r == neuve.id else origine_r
         pv = main._prix_vente_a_date(db, neuve.produit_id, r.date)
         r.prix_gallon = float(pv) if pv is not None else float(neuve.produit.prix_gallon or 0)
     for x in touches:
@@ -526,9 +534,9 @@ def deplacer_releve(releve_id: int, data: DeplacerReleveIn, request: Request, db
     db.flush()
     for x in touches:
         _ecart_au_creneau(db, x, motif)
-    apprendre(db, ancienne.id, ancienne.id, neuve.id, r.date, employe_id=emp_r)
+    apprendre(db, origine_r, ancienne.id, neuve.id, r.date, employe_id=emp_r)
     if autre:
-        apprendre(db, neuve.id, neuve.id, ancienne.id, r.date, employe_id=emp_a)
+        apprendre(db, origine_a, neuve.id, ancienne.id, r.date, employe_id=emp_a)
     main._tracer(db, request, "releve_metre_change", trace)
     db.commit()
     avertissements = []
@@ -562,3 +570,104 @@ def memoire(request: Request, db: Session = Depends(get_db)):
         out.append({"pompiste": qui, "saisi_sur": libelle(de), "bon_metre": libelle(vers), "fois": x.nb,
                     "derniere_date": str(x.derniere_date) if x.derniere_date else None})
     return {"date": str(today_haiti()), "erreurs": out}
+
+
+# ── Registre des erreurs de mètre ──────────────────────────────────────
+TYPES_ERREUR = {
+    "mauvais_metre": "Index sur le mauvais mètre",
+    "index_corrige": "Index corrigé",
+    "ecart_compteur": "Écart de compteur non expliqué",
+}
+
+
+def _ligne_saisie_rapport(db: Session, e: dict) -> Optional[dict]:
+    """Rapports finalisés avant la conservation sur le relevé : la saisie
+    d'origine est lue sur la ligne du rapport."""
+    rid = e.get("rapport_pompiste_id")
+    if not rid or e.get("rapport_statut") not in ("CONFIRME", "RESOLU"):
+        return None
+    l = db.query(RapportPompisteLigne).filter_by(rapport_id=rid, pompe_id=e["pompe_id"]).first()
+    if l is None:
+        return None
+    corrige = l.metter_avant_corrige is not None or l.metter_apres_corrige is not None
+    if not l.pompe_saisie_id and not corrige:
+        return None
+    p = l.pompe_saisie
+    av, ap = float(l.metter_avant), float(l.metter_apres)
+    return {"pompe_id": l.pompe_saisie_id, "pompe_nom": p.nom if p else None,
+            "produit_nom": p.produit.nom if p and p.produit else None,
+            "mauvais_metre": bool(l.pompe_saisie_id), "index_corriges": corrige,
+            "metter_avant": av, "metter_apres": ap, "gallons": round(ap - av, 4)}
+
+
+def registre_erreurs(db: Session, d_debut: date_type, d_fin: date_type, pompiste_ids: Optional[list] = None) -> dict:
+    """Toutes les erreurs de mètre de la période, sans rien perdre de ce que
+    le pompiste avait écrit : corrections faites (mauvais mètre, index
+    corrigés) et écarts encore non expliqués, avec leur poids en gallons et
+    en gourdes ; statistiques par pompiste."""
+    import main
+    entries = main._build_journal_entries(db, d_debut, d_fin, inclure_en_attente=True,
+                                          pompiste_id_filter=pompiste_ids or None)
+    lignes, stats = [], {}
+
+    def st(nom):
+        return stats.setdefault(nom or "Non attribué", {
+            "pompiste": nom or "Non attribué", "releves": 0, "gallons": 0.0, "erreurs": 0,
+            "mauvais_metre": 0, "index_corrige": 0, "ecart_compteur": 0, "ecart_gallons": 0.0})
+
+    for e in entries:
+        s_p = st(e.get("pompiste_nom"))
+        s_p["releves"] += 1
+        s_p["gallons"] += e.get("quantite") or 0
+        retenu = {"libelle": f"{e['produit_nom']} · {e['pompe_nom']}", "metter_avant": e["metter_avant"],
+                  "metter_apres": e["metter_apres"], "gallons": e["quantite"]}
+        base = {"releve_id": e["id"] if isinstance(e["id"], int) else None, "date": e["date"],
+                "periode": e["periode"], "pompiste": e.get("pompiste_nom") or "Non attribué",
+                "pompiste_id": e.get("pompiste_id"), "produit_nom": e["produit_nom"],
+                "famille": main._famille_carburant(e["produit_nom"]), "en_attente": e.get("en_attente", False),
+                "rapport_pompiste_id": e.get("rapport_pompiste_id"), "retenu": retenu}
+        sp = None if e.get("en_attente") else (e.get("saisie_pompiste") or _ligne_saisie_rapport(db, e))
+        if sp:
+            types = (["mauvais_metre"] if sp["mauvais_metre"] else []) + (["index_corrige"] if sp["index_corriges"] else [])
+            lib = (f"{sp['produit_nom']} · {sp['pompe_nom']}" if sp.get("pompe_nom") else retenu["libelle"])
+            d_gal = round((e["quantite"] or 0) - sp["gallons"], 4)
+            autre_carb = bool(sp.get("produit_nom")) and main._famille_carburant(sp["produit_nom"]) != base["famille"]
+            lignes.append(dict(base, types=types, statut="corrige",
+                               saisi={"libelle": lib, "metter_avant": sp["metter_avant"],
+                                      "metter_apres": sp["metter_apres"], "gallons": sp["gallons"]},
+                               ecart_gallons=d_gal, ecart_gourdes=round(d_gal * e["prix_gallon"], 2),
+                               autre_carburant=autre_carb))
+            s_p["erreurs"] += 1
+            for t in types:
+                s_p[t] += 1
+            s_p["ecart_gallons"] += abs(d_gal)
+        if e.get("type_anomalie") in ("saut_compteur", "recul_compteur") and e.get("statut") != "resolu":
+            g = abs(e.get("decalage") or 0)
+            lignes.append(dict(base, types=["ecart_compteur"], statut="a_verifier",
+                               saisi={"libelle": retenu["libelle"], "metter_avant": e["metter_avant"],
+                                      "metter_apres": e["metter_apres"], "gallons": e["quantite"]},
+                               metter_attendu=e.get("metter_attendu"), decalage=e.get("decalage"),
+                               ecart_gallons=round(g, 4), ecart_gourdes=round(g * e["prix_gallon"], 2),
+                               metre_probable=e.get("metre_probable"), autre_carburant=False))
+            s_p["erreurs"] += 1
+            s_p["ecart_compteur"] += 1
+            s_p["ecart_gallons"] += g
+    for x in stats.values():
+        x["taux_erreur"] = round(100 * x["erreurs"] / x["releves"], 1) if x["releves"] else 0.0
+        x["gallons"], x["ecart_gallons"] = round(x["gallons"], 3), round(x["ecart_gallons"], 3)
+    lignes.sort(key=lambda x: (x["date"], 0 if x["periode"] == "Matin" else 1, x["retenu"]["libelle"]))
+    return {"date_debut": str(d_debut), "date_fin": str(d_fin), "types": TYPES_ERREUR,
+            "total": {"erreurs": len(lignes), "corrigees": sum(x["statut"] == "corrige" for x in lignes),
+                      "a_verifier": sum(x["statut"] == "a_verifier" for x in lignes)},
+            "par_pompiste": sorted(stats.values(), key=lambda x: (-x["erreurs"], x["pompiste"])),
+            "erreurs": lignes}
+
+
+@router.get("/api/erreurs-metre")
+def erreurs_metre(request: Request, date_debut: date_type, date_fin: date_type,
+                  pompiste_id: list[int] = Query(default=[]), db: Session = Depends(get_db)):
+    from pompiste_routes import _require_superviseur
+    _require_superviseur(request, db)
+    if date_fin < date_debut or (date_fin - date_debut).days > 93:
+        raise HTTPException(400, "Période de 3 mois au plus.")
+    return registre_erreurs(db, date_debut, date_fin, pompiste_id)

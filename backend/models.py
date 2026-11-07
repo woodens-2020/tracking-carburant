@@ -219,8 +219,16 @@ class Releve(Base):
     # Écrit dès que le pompiste termine son rapport, mis à jour par les
     # corrections du superviseur, retiré si le rapport est renvoyé.
     rapport_pompiste_id  = Column(Integer, ForeignKey("rapports_pompiste.id", ondelete="SET NULL"), nullable=True)
+    # Saisie d'origine du pompiste, conservée quand la direction corrige :
+    # mètre sur lequel il avait écrit ces index (NULL = ce mètre) et index
+    # qu'il avait écrits (NULL = identiques). Sert au registre des erreurs
+    # de mètre : on corrige, mais on n'efface jamais ce qu'il a écrit.
+    pompe_saisie_id      = Column(Integer, ForeignKey("pompes.id", ondelete="SET NULL"), nullable=True)
+    metter_avant_saisi   = Column(Numeric(14, 4), nullable=True)
+    metter_apres_saisi   = Column(Numeric(14, 4), nullable=True)
 
-    pompe       = relationship("Pompe")
+    pompe       = relationship("Pompe", foreign_keys=[pompe_id])
+    pompe_saisie = relationship("Pompe", foreign_keys=[pompe_saisie_id])
     rapport_pompiste = relationship("RapportPompiste", foreign_keys=[rapport_pompiste_id])
     cree_par    = relationship("Utilisateur", foreign_keys=[cree_par_id])
     modifie_par = relationship("Utilisateur", foreign_keys=[modifie_par_id])

@@ -2901,6 +2901,11 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
                 f"{MAX_MODIFICATIONS_PAR_RELEVE} fois."
             )
         r.nb_modifications += 1
+        # Correction d'index : ce qui avait été écrit d'abord est conservé
+        if r.metter_avant_saisi is None and r.metter_apres_saisi is None and (
+                abs(float(r.metter_avant) - data.metter_avant) > TOLERANCE_ECART_COMPTEUR
+                or abs(float(r.metter_apres) - data.metter_apres) > TOLERANCE_ECART_COMPTEUR):
+            r.metter_avant_saisi, r.metter_apres_saisi = r.metter_avant, r.metter_apres
     r.prix_gallon    = prix
     r.metter_avant   = data.metter_avant
     r.metter_apres   = data.metter_apres
@@ -3127,6 +3132,22 @@ def enregistrer_metres_depart(data: MetresDepartIn, request: Request, db: Sessio
     db.commit()
     return {"date": str(data.date), "modifies": len(changes), "avertissements": avertissements,
             "metres": _metres_depart(db, data.date)}
+
+
+def _saisie_pompiste(r) -> Optional[dict]:
+    """Ce que le pompiste avait écrit, si la direction l'a corrigé (mètre
+    et/ou index) ; None si le relevé est tel qu'il a été saisi."""
+    ps = getattr(r, "pompe_saisie_id", None)
+    av_s, ap_s = getattr(r, "metter_avant_saisi", None), getattr(r, "metter_apres_saisi", None)
+    if not ps and av_s is None and ap_s is None:
+        return None
+    p = r.pompe_saisie if ps else None
+    av = float(av_s) if av_s is not None else float(r.metter_avant)
+    ap = float(ap_s) if ap_s is not None else float(r.metter_apres)
+    return {"pompe_id": ps, "pompe_nom": p.nom if p else None,
+            "produit_nom": p.produit.nom if p and p.produit else None,
+            "mauvais_metre": bool(ps), "index_corriges": av_s is not None or ap_s is not None,
+            "metter_avant": av, "metter_apres": ap, "gallons": round(ap - av, 4)}
 
 
 def _releve_dict(r: Releve):
@@ -4164,6 +4185,7 @@ def _build_journal_entries(
             "commentaire":      commentaire,
             "recommandation":   recommandation,
             "motif_saisie":     getattr(r, "motif_ecart_compteur", None),
+            "saisie_pompiste":  _saisie_pompiste(r),
             "resolution":       None,
         })
 

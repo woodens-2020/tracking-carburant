@@ -143,3 +143,46 @@ def test_journal_index_croises_et_deplacement(client):
     assert (mine[g91]["metter_avant"], mine[g91]["metter_apres"]) == (3000, 3150)
     assert (mine[g95]["metter_avant"], mine[g95]["metter_apres"]) == (1000, 1002)
     assert all(x["type_anomalie"] == "ok" and "metre_probable" not in x for x in mine.values())
+    # Ce que le pompiste avait écrit reste visible
+    assert mine[g91]["saisie_pompiste"]["pompe_id"] == g95 and mine[g95]["saisie_pompiste"]["pompe_id"] == g91
+
+
+def test_saisie_d_origine_conservee_et_registre(client):
+    """Corriger n'efface jamais ce que le pompiste a écrit : le journal et le
+    registre des erreurs montrent la saisie d'origine à côté du retenu."""
+    import main as _m
+    from tz_utils import today_haiti
+    hier, jour = str(today_haiti() - timedelta(days=12)), str(today_haiti() - timedelta(days=11))
+    ns = time.time_ns()
+    g95, g91, g2 = _produit(client, f"Gazoline R{ns}", 500, ["R95", "R91", "R91b"])
+    for p, fin in ((g95, 1000), (g91, 3000), (g2, 6000)):
+        _releve(client, hier, "Apres-midi", p, 0, fin)
+    # 1. Index corrigé dans la Saisie : l'ancien est gardé
+    a = _releve(client, jour, "Matin", g2, 6000, 6400)
+    _releve(client, jour, "Matin", g2, 6000, 6040)
+    # 2. Rapport pompiste : 91 écrit sur le 95, remis en place puis finalisé
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Reg", "nom": "Istre"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    assert p.post("/api/pompiste/compteurs", json={"date": jour, "periode": "Matin", "charte_acceptee": True, "lignes": [
+        {"pompe_id": g95, "metter_avant": 3000, "metter_apres": 3100, "debut_confirme": True}]}).status_code == 201
+    rap = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 50}], "depenses": []}).json()
+    r = _sup(client, rap["id"], "reclasser", motif="91 écrit sur la ligne du 95")
+    assert r.status_code == 200, r.text
+    assert _sup(client, rap["id"], f"lignes/{g91}/confirmer", metter_avant=3000, metter_apres=3100).status_code == 200
+    _sup(client, rap["id"], "billetterie", confirme=True); _sup(client, rap["id"], "ecart", confirme=True)
+    r = _sup(client, rap["id"], "finaliser", note=7, commentaire="Ligne 95 au lieu de 91")
+    assert r.status_code == 200, r.text
+    j = {x["pompe_id"]: x for x in client.get(f"/api/journal?date_debut={jour}&date_fin={jour}", headers=H).json()["entries"]
+         if x["pompe_id"] in (g95, g91, g2)}
+    assert j[g2]["saisie_pompiste"]["index_corriges"] and j[g2]["saisie_pompiste"]["metter_apres"] == 6400
+    assert j[g91]["saisie_pompiste"]["mauvais_metre"] and j[g91]["saisie_pompiste"]["pompe_id"] == g95
+    assert g95 not in j                                           # plus rien sur le 95
+    reg = client.get(f"/api/erreurs-metre?date_debut={jour}&date_fin={jour}", headers=H).json()
+    mine = [x for x in reg["erreurs"] if x["retenu"]["libelle"].startswith(f"Gazoline R{ns}")]
+    par = {x["retenu"]["libelle"].split(" · ")[1]: x for x in mine}
+    assert par["R91b"]["types"] == ["index_corrige"] and par["R91b"]["ecart_gallons"] == -360
+    assert par["R91"]["types"] == ["mauvais_metre"] and par["R91"]["saisi"]["libelle"].endswith("R95")
+    assert par["R91"]["pompiste"] == "Reg Istre" and par["R91"]["statut"] == "corrige"
+    st = next(x for x in reg["par_pompiste"] if x["pompiste"] == "Reg Istre")
+    assert st["mauvais_metre"] == 1 and st["releves"] == 1 and st["taux_erreur"] == 100.0
