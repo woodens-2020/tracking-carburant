@@ -182,7 +182,7 @@ OUTILS = [
          "required": ["date_debut", "date_fin"]}},
     {"name": "ventes_carburant",
      "description": ("Ventes de carburant validées (relevés de compteurs) : montant total en gourdes, et gallons + montant "
-                     "PAR PRODUIT et PAR POMPE (meter). Les gallons ne sont jamais additionnés entre produits."),
+                     "PAR PRODUIT et PAR POMPE (meeter). Les gallons ne sont jamais additionnés entre produits."),
      "parameters": {"type": "object", "properties": dict(_P_DATES, **{
          "produit_id": {"type": "integer", "description": "Optionnel — id produit."}}), "required": ["date_debut", "date_fin"]}},
     {"name": "get_stock",
@@ -306,7 +306,7 @@ def _system_prompt(db: Session) -> str:
 CONTEXTE
 - Aujourd'hui : {t.isoformat()} · station : {station} · modules actifs : {modules}
 - Monnaie : gourde (G). Quantités carburant : gallons (gal).
-- Produits et pompes (meters) :
+- Produits et pompes (meeters) :
 {ctx_produits}
 
 DATES RELATIVES (convertis en AAAA-MM-JJ avant d'appeler un outil)

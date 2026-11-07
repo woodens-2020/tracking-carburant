@@ -567,7 +567,7 @@ def _insights(a: dict, lignes, releves, debut, fin, comp) -> list:
                     "Des jours de la période n'ont aucune vente validée alors que les autres en ont.",
                     "Jours de vente", ", ".join(date_type.fromisoformat(c["date"]).strftime("%d/%m") for c in sans[:8])
                     + ("…" if len(sans) > 8 else ""),
-                    "Rapports pompistes en attente ou relevés manquants (Journal Meters).")
+                    "Rapports pompistes en attente ou relevés manquants (Journal Meeters).")
     if (fin - debut).days + 1 >= 14 and releves:
         moy_j = [j["moyenne"] for j in a["activite"]]
         m = statistics.mean([v for v in moy_j if v]) if any(moy_j) else 0
