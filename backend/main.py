@@ -411,6 +411,8 @@ app.include_router(listes_reference_router)
 app.include_router(pompiste_router)
 from placement_metres import router as placement_router
 app.include_router(placement_router)
+from classement_pompistes import router as classement_router
+app.include_router(classement_router)
 app.include_router(caisse_principale_router)
 
 
@@ -616,6 +618,7 @@ def startup():
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS pompe_saisie_id INTEGER REFERENCES pompes(id) ON DELETE SET NULL",
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS suppression JSON",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
+        "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL",
         "ALTER TABLE produits ADD COLUMN IF NOT EXISTS adresse VARCHAR(255)",
         "ALTER TABLE achats ADD COLUMN IF NOT EXISTS saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
     ]
@@ -7006,6 +7009,7 @@ class DepenseIn(BaseModel):
     reference:    Optional[str] = None
     notes:        Optional[str] = None
     produit_id:   Optional[int] = None   # caisse d'origine (Gazoline/Diesel) — None = generale
+    pompiste_id:  Optional[int] = None   # employé (pompiste) qui a fait la dépense
 
 class DepensePatch(BaseModel):
     categorie:    Optional[str]   = None
@@ -7017,6 +7021,8 @@ class DepensePatch(BaseModel):
     notes:        Optional[str]   = None
     produit_id:   Optional[int]   = None
     caisse_generale: Optional[bool] = None  # true = detacher explicitement la caisse (produit_id -> NULL)
+    pompiste_id:  Optional[int]   = None
+    sans_pompiste: Optional[bool] = None    # true = la dépense n'est plus attribuée à un pompiste
 
 @app.get("/api/depenses")
 def lister_depenses(
@@ -7067,6 +7073,8 @@ def lister_depenses(
                 "sans_justificatif": nb_pj.get(d.id, 0) == 0,
                 "est_transfert": _est_categorie_transfert(db, d.categorie),
                 "rapport_pompiste_id": getattr(d, "rapport_pompiste_id", None),
+                "pompiste_id": d.pompiste_id,
+                "pompiste_nom": f"{d.pompiste.prenom} {d.pompiste.nom}".strip() if d.pompiste else None,
                 "saisi_par_nom": (d.saisi_par.nom_complet or d.saisi_par.username) if getattr(d, "saisi_par", None) else None,
             }
             for d in depenses
@@ -7094,7 +7102,10 @@ def creer_depense(data: DepenseIn, request: Request, db: Session = Depends(get_d
         if not produit:
             raise HTTPException(400, "Produit (caisse) introuvable.")
     _verifier_limite(db, data.montant)
+    if data.pompiste_id is not None and not db.get(Employe, data.pompiste_id):
+        raise HTTPException(400, "Pompiste introuvable.")
     d = Depense(
+        pompiste_id=data.pompiste_id,
         categorie=categorie, description=data.description.strip(),
         montant=data.montant, date_depense=date_d,
         beneficiaire=beneficiaire, reference=data.reference, notes=data.notes,
@@ -7152,6 +7163,12 @@ def modifier_depense(depense_id: int, data: DepensePatch, request: Request, db: 
         if not produit:
             raise HTTPException(400, "Produit (caisse) introuvable.")
         d.produit_id = produit.id
+    if data.sans_pompiste:
+        d.pompiste_id = None
+    elif data.pompiste_id is not None:
+        if not db.get(Employe, data.pompiste_id):
+            raise HTTPException(400, "Pompiste introuvable.")
+        d.pompiste_id = data.pompiste_id
     db.commit()
     return {"message": "Dépense mise à jour."}
 

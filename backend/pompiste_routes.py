@@ -1955,8 +1955,14 @@ def _ecrire_une_depense(db: Session, rap: RapportPompiste, i: int, request: Requ
                    montant=x["montant"], date_depense=rap.date, beneficiaire=None, reference=ref,
                    notes=(f"Payée par le pompiste {_nom(rap.utilisateur)} sur ses ventes ({_per(rap.periode)}), "
                           f"autorisée par {x['autorise_par']}. Rapport pompiste n°{rap.id}.")[:500],
-                   saisi_par_id=s.id, rapport_pompiste_id=rap.id))
+                   saisi_par_id=s.id, rapport_pompiste_id=rap.id, pompiste_id=_employe_id(db, rap)))
     return True
+
+
+def _employe_id(db: Session, rap: RapportPompiste) -> Optional[int]:
+    """Fiche employé du pompiste de ce rapport (pour lui attribuer ses dépenses)."""
+    e = db.query(Employe.id).filter(Employe.utilisateur_id == rap.utilisateur_id).first()
+    return e[0] if e else None
 
 
 def _retirer_une_depense(db: Session, rap: RapportPompiste, i: int) -> None:

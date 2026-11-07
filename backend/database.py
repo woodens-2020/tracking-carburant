@@ -445,6 +445,8 @@ def _migrate_columns():
              "ALTER TABLE depenses ADD COLUMN rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL", None),
             ("depenses", "saisi_par_id",
              "ALTER TABLE depenses ADD COLUMN saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
+            ("depenses", "pompiste_id",
+             "ALTER TABLE depenses ADD COLUMN pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL", None),
             ("achats", "saisi_par_id",
              "ALTER TABLE achats ADD COLUMN saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
         ]
@@ -647,6 +649,8 @@ def _migrate_columns():
              "ALTER TABLE releves ADD COLUMN metter_avant_saisi NUMERIC(14,4)", None),
             ("releves", "metter_apres_saisi",
              "ALTER TABLE releves ADD COLUMN metter_apres_saisi NUMERIC(14,4)", None),
+            ("depenses", "pompiste_id",
+             "ALTER TABLE depenses ADD COLUMN pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL", None),
             ("livraisons", "motif_reste_manuel",
              "ALTER TABLE livraisons ADD COLUMN motif_reste_manuel VARCHAR(255)", None),
             ("livraisons", "motif_cloture",

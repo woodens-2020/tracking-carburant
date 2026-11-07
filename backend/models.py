@@ -724,6 +724,9 @@ class Depense(Base):
     # rapport) : c'est une dépense de la station, mais elle ne sort pas de la
     # caisse principale — le pompiste a remis « ventes − dépenses ».
     rapport_pompiste_id = Column(Integer, ForeignKey("rapports_pompiste.id", ondelete="SET NULL"), nullable=True)
+    # Pompiste qui a fait la dépense (classement des pompistes)
+    pompiste_id = Column(Integer, ForeignKey("employes.id", ondelete="SET NULL"), nullable=True)
+    pompiste = relationship("Employe", foreign_keys=[pompiste_id])
 
     produit   = relationship("Produit")
     saisi_par = relationship("Utilisateur", foreign_keys=[saisi_par_id])
