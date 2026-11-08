@@ -165,7 +165,7 @@ app.add_middleware(
 PERIODES = ["Matin", "Apres-midi"]
 
 # Bug 9 fix : constante au niveau module, plus de magic number dans la fonction
-MAX_MODIFICATIONS_PAR_RELEVE = 4
+MAX_MODIFICATIONS_PAR_RELEVE = 5
 
 # Clé API statique admin depuis .env (override de secours pour scripts/CI)
 _ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
