@@ -2293,3 +2293,97 @@ class SecretApplication(Base):
     cle    = Column(String(60), nullable=False, unique=True)
     valeur = Column(String(200), nullable=False)
     cree_le = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# CRÉDITS — dettes (nous devons) et créances (on nous doit)
+#   total_du = montant_initial + Σ AUGMENTATION
+#   reste    = total_du − Σ DEPOT        (calculé, jamais stocké)
+#   statut   = SOLDE quand reste = 0, ACTIF sinon ; ANNULE seulement à la main
+# ══════════════════════════════════════════════════════════════════════════
+
+class Credit(Base):
+    """Un crédit avec un tiers : DETTE (l'entreprise doit) ou CREANCE (le
+    tiers doit à l'entreprise). Montants dans une seule devise (HTG ou USD),
+    jamais convertis ni additionnés entre devises."""
+    __tablename__ = "credits"
+
+    id              = Column(Integer, primary_key=True)
+    sens            = Column(String(10), nullable=False)               # DETTE | CREANCE
+    tiers_nom       = Column(String(150), nullable=False)
+    tiers_contact   = Column(String(150), nullable=True)
+    description     = Column(String(500), nullable=True)
+    montant_initial = Column(Numeric(14, 2), nullable=False)
+    devise          = Column(String(3), nullable=False, default="HTG")  # HTG | USD
+    date_credit     = Column(Date, nullable=False)
+    date_echeance   = Column(Date, nullable=True)
+    statut          = Column(String(10), nullable=False, default="ACTIF")  # ACTIF | SOLDE | ANNULE
+    notes           = Column(Text, nullable=True)
+    createur_id     = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at      = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at      = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    createur   = relationship("Utilisateur")
+    mouvements = relationship("CreditMouvement", back_populates="credit", cascade="all, delete-orphan",
+                              order_by="(CreditMouvement.date_mouvement, CreditMouvement.id)")
+
+    __table_args__ = (
+        CheckConstraint("sens IN ('DETTE','CREANCE')", name="chk_credit_sens"),
+        CheckConstraint("devise IN ('HTG','USD')", name="chk_credit_devise"),
+        CheckConstraint("statut IN ('ACTIF','SOLDE','ANNULE')", name="chk_credit_statut"),
+        CheckConstraint("montant_initial > 0", name="chk_credit_montant"),
+        Index("idx_credit_sens_statut", "sens", "statut"),
+        Index("idx_credit_echeance", "date_echeance"),
+    )
+
+    def _somme(self, type_mvt: str):
+        from decimal import Decimal
+        return sum((m.montant for m in self.mouvements if m.type == type_mvt), Decimal("0"))
+
+    def total_du(self):
+        return self.montant_initial + self._somme("AUGMENTATION")
+
+    def total_depose(self):
+        return self._somme("DEPOT")
+
+    def reste(self):
+        return self.total_du() - self.total_depose()
+
+    def en_retard(self, aujourdhui=None) -> bool:
+        if aujourdhui is None:
+            from tz_utils import today_haiti
+            aujourdhui = today_haiti()
+        return self.statut == "ACTIF" and self.date_echeance is not None and self.date_echeance < aujourdhui
+
+    def recalculer_statut(self) -> None:
+        """SOLDE quand le reste est nul, ACTIF sinon ; ANNULE n'est jamais
+        modifié ici (seulement par une action manuelle)."""
+        if self.statut == "ANNULE":
+            return
+        self.statut = "SOLDE" if self.reste() <= 0 else "ACTIF"
+
+
+class CreditMouvement(Base):
+    """Opération sur un crédit : DEPOT (versement, fait baisser le reste) ou
+    AUGMENTATION (le crédit grossit)."""
+    __tablename__ = "credit_mouvements"
+
+    id             = Column(Integer, primary_key=True)
+    credit_id      = Column(Integer, ForeignKey("credits.id", ondelete="CASCADE"), nullable=False)
+    type           = Column(String(15), nullable=False)               # DEPOT | AUGMENTATION
+    montant        = Column(Numeric(14, 2), nullable=False)
+    date_mouvement = Column(Date, nullable=False)
+    mode_paiement  = Column(String(40), nullable=True)
+    reference      = Column(String(100), nullable=True)
+    note           = Column(String(500), nullable=True)
+    createur_id    = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    credit   = relationship("Credit", back_populates="mouvements")
+    createur = relationship("Utilisateur")
+
+    __table_args__ = (
+        CheckConstraint("type IN ('DEPOT','AUGMENTATION')", name="chk_credit_mvt_type"),
+        CheckConstraint("montant > 0", name="chk_credit_mvt_montant"),
+        Index("idx_credit_mvt_credit", "credit_id"),
+    )

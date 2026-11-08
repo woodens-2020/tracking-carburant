@@ -2688,6 +2688,70 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
   display:none;align-items:center;justify-content:center;
 }
 .gi-modal-overlay.open{display:flex}
+/* ── Module Crédits ─────────────────────────────────────────────── */
+.cr-barre{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.cr-sens{display:inline-flex;border:1px solid var(--border);border-radius:12px;padding:3px;gap:3px;background:var(--panel)}
+.cr-sens button{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:9px;padding:8px 14px;cursor:pointer;background:none;color:var(--muted)}
+.cr-sens button.on{background:var(--orange);color:#fff}
+.cr-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:14px}
+.cr-kpi{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;border-top:3px solid var(--border)}
+.cr-kpi.dette{border-top-color:var(--red)}.cr-kpi.creance{border-top-color:var(--green)}
+.cr-kpi-l{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.cr-kpi-v{font-family:var(--mono);font-size:22px;font-weight:800;margin:4px 0 2px;white-space:nowrap}
+.cr-kpi.dette .cr-kpi-v{color:var(--red)}.cr-kpi.creance .cr-kpi-v{color:var(--green)}
+.cr-kpi-s{font-size:12.5px;color:var(--muted)}
+.cr-kpi-s b{color:var(--text)}.cr-kpi-s .cr-ret{color:var(--red);font-weight:700}
+.cr-filtres{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.cr-filtres .db-preset{margin:0}
+.cr-filtres input,.cr-filtres select{height:34px}
+.cr-q{flex:1 1 220px;min-width:180px}
+.cr-tbl-wrap{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow-x:auto}
+.cr-tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.cr-tbl th{font-size:11.5px;color:var(--muted);font-weight:700;text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap}
+.cr-tbl td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.cr-tbl tr:last-child td{border-bottom:0}
+.cr-tbl .r{text-align:right;font-family:var(--mono);white-space:nowrap}
+.cr-tbl tbody tr{cursor:pointer}.cr-tbl tbody tr:hover td{background:rgba(249,115,22,.05)}
+.cr-tbl tr.annule td{opacity:.55}
+.cr-tiers b{display:block}.cr-tiers small{color:var(--muted);font-size:12px}
+.cr-badge{display:inline-block;font-size:11px;font-weight:800;border-radius:999px;padding:2px 9px;white-space:nowrap}
+.cr-badge.DETTE{background:rgba(239,68,68,.12);color:var(--red)}
+.cr-badge.CREANCE{background:rgba(34,197,94,.12);color:var(--green)}
+.cr-badge.ACTIF{background:rgba(59,130,246,.12);color:#3b82f6}
+.cr-badge.SOLDE{background:rgba(34,197,94,.12);color:var(--green)}
+.cr-badge.ANNULE{background:rgba(148,163,184,.15);color:var(--muted)}
+.cr-badge.RETARD{background:rgba(239,68,68,.14);color:var(--red)}
+.cr-prog{height:6px;border-radius:999px;background:var(--border);overflow:hidden;min-width:70px;margin-top:5px}
+.cr-prog span{display:block;height:100%;background:var(--green);border-radius:999px}
+.cr-ech-ret{color:var(--red);font-weight:700}
+.cr-vide{padding:40px 16px;text-align:center;color:var(--muted)}
+.cr-detail-tete{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start;margin-bottom:12px}
+.cr-detail-tete h4{margin:0 0 4px;font-size:18px}
+.cr-detail-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.cr-detail-kpis div{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:9px 11px}
+.cr-detail-kpis span{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.cr-detail-kpis b{font-family:var(--mono);font-size:15px;white-space:nowrap}
+.cr-actions{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 14px}
+.cr-actions .btn{height:34px}
+.cr-mvt-dep{color:var(--green);font-weight:700}.cr-mvt-aug{color:var(--orange);font-weight:700}
+.cr-sup{background:none;border:1px solid transparent;border-radius:8px;color:var(--muted);cursor:pointer;font-size:13px;padding:3px 7px}
+.cr-sup:hover{border-color:rgba(239,68,68,.4);color:#ef4444}
+.cr-aide{font-size:12.5px;color:var(--muted);margin-top:4px}
+.cr-aide b{font-family:var(--mono);color:var(--text)}
+.cr-err{color:#ef4444;font-size:13px;font-weight:600;min-height:18px;margin-top:6px}
+.cr-types{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cr-types button{font:inherit;font-size:13.5px;font-weight:700;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--muted);cursor:pointer;text-align:left}
+.cr-types button small{display:block;font-weight:500;font-size:11.5px;margin-top:2px}
+.cr-types button.on{border-color:var(--orange);background:rgba(249,115,22,.1);color:var(--text)}
+.cr-notes{white-space:pre-wrap;font-size:12.5px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:12px}
+@media (max-width:720px){
+  .cr-detail-kpis{grid-template-columns:1fr 1fr}
+  .cr-tbl .cr-col-m{display:none}
+  .cr-tbl th,.cr-tbl td{padding:8px 7px;font-size:12.5px}
+  .cr-tbl .r{font-size:12px}
+  .cr-mvt-dep,.cr-mvt-aug{font-size:12px}
+  .cr-sens{width:100%}.cr-sens button{flex:1;padding:8px 6px}
+}
 .gi-modal{
   background:linear-gradient(160deg,#0e1e38 0%,#09132a 100%);
   border:1px solid rgba(255,255,255,.1);
@@ -3825,6 +3889,15 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="credits" onclick="goTo('credits')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </span>
+      <span>Crédits</span>
+      <span id="nav-credits-badge" style="display:none;margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:800;line-height:1;padding:2.5px 6px;border-radius:10px">0</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <div class="nav-section" data-i18n="nav.config">Configuration</div>
 
     <button class="nav-item" data-page="gestion" onclick="openGestion()">
@@ -4402,6 +4475,137 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
         <div class="gi-modal-foot">
           <button class="gi-btn-secondary" onclick="tacheCloseModal()">Annuler</button>
           <button class="gi-btn-primary" onclick="tacheSubmit()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-credits" class="page">
+      <div class="cr-barre">
+        <div class="cr-sens" role="tablist" aria-label="Sens des crédits">
+          <button type="button" data-sens="DETTE" onclick="crSens('DETTE')">Nous devons</button>
+          <button type="button" data-sens="CREANCE" onclick="crSens('CREANCE')">On nous doit</button>
+          <button type="button" data-sens="" onclick="crSens('')">Tout</button>
+        </div>
+        <button class="btn-xls" onclick="crOuvrirCredit()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nouveau crédit
+        </button>
+      </div>
+      <div id="cr-kpis" class="cr-kpis"></div>
+      <div class="cr-filtres">
+        <button class="db-preset" data-st="" onclick="crStatut('')">En cours et soldés</button>
+        <button class="db-preset" data-st="ACTIF" onclick="crStatut('ACTIF')">Actifs</button>
+        <button class="db-preset" data-st="EN_RETARD" onclick="crStatut('EN_RETARD')">En retard</button>
+        <button class="db-preset" data-st="SOLDE" onclick="crStatut('SOLDE')">Soldés</button>
+        <button class="db-preset" data-st="ANNULE" onclick="crStatut('ANNULE')">Annulés</button>
+        <select id="cr-devise" class="filter-select" onchange="loadCredits()" aria-label="Devise">
+          <option value="">HTG et USD</option><option value="HTG">HTG</option><option value="USD">USD</option>
+        </select>
+        <input id="cr-q" class="filter-input cr-q" type="search" placeholder="Rechercher un nom, un contact, une description…"
+               oninput="crRechercher()" aria-label="Rechercher">
+      </div>
+      <div id="cr-liste" class="cr-tbl-wrap"><div class="cr-vide">Chargement…</div></div>
+    </div>
+
+    <!-- Crédits : nouveau / modifier -->
+    <div class="gi-modal-overlay" id="cr-modal-credit">
+      <div class="gi-modal" style="max-width:560px">
+        <div class="gi-modal-head">
+          <h3 id="cr-mc-titre">Nouveau crédit</h3>
+          <button class="gi-modal-close" onclick="crFermer('cr-modal-credit')" aria-label="Fermer">&times;</button>
+        </div>
+        <div class="gi-modal-body">
+          <input type="hidden" id="cr-mc-id">
+          <div class="gi-form-row full"><div class="gi-form-field">
+            <label class="gi-form-lbl">Sens *</label>
+            <div class="cr-types" id="cr-mc-sens">
+              <button type="button" data-v="DETTE" onclick="crChoix('cr-mc-sens','DETTE')">Nous devons<small>Dette envers un fournisseur, un prêteur…</small></button>
+              <button type="button" data-v="CREANCE" onclick="crChoix('cr-mc-sens','CREANCE')">On nous doit<small>Créance d'un client, d'un employé…</small></button>
+            </div>
+          </div></div>
+          <div class="gi-form-row">
+            <div class="gi-form-field"><label class="gi-form-lbl" for="cr-mc-nom">Tiers (nom) *</label>
+              <input class="gi-form-input" id="cr-mc-nom" maxlength="150" placeholder="Ex. Fournisseur Boissons SA"></div>
+            <div class="gi-form-field"><label class="gi-form-lbl" for="cr-mc-contact">Contact</label>
+              <input class="gi-form-input" id="cr-mc-contact" maxlength="150" placeholder="Téléphone ou email"></div>
+          </div>
+          <div class="gi-form-row full"><div class="gi-form-field">
+            <label class="gi-form-lbl" for="cr-mc-desc">Description</label>
+            <input class="gi-form-input" id="cr-mc-desc" maxlength="500" placeholder="Ex. Livraison de boissons du 02/11, facture n° 1234">
+          </div></div>
+          <div class="gi-form-row">
+            <div class="gi-form-field"><label class="gi-form-lbl" for="cr-mc-montant">Montant initial *</label>
+              <input class="gi-form-input" id="cr-mc-montant" type="number" step="0.01" min="0.01" inputmode="decimal" placeholder="0.00"></div>
+            <div class="gi-form-field"><label class="gi-form-lbl" for="cr-mc-devise">Devise *</label>
+              <select class="gi-form-input" id="cr-mc-devise"><option value="HTG">HTG — gourdes</option><option value="USD">USD — dollars</option></select></div>
+          </div>
+          <div class="gi-form-row">
+            <div class="gi-form-field"><label class="gi-form-lbl" for="cr-mc-date">Date du crédit *</label>
+              <input class="gi-form-input" id="cr-mc-date" type="date"></div>
+            <div class="gi-form-field"><label class="gi-form-lbl" for="cr-mc-ech">Échéance</label>
+              <input class="gi-form-input" id="cr-mc-ech" type="date"></div>
+          </div>
+          <div class="gi-form-row full"><div class="gi-form-field">
+            <label class="gi-form-lbl" for="cr-mc-notes">Notes</label>
+            <textarea class="gi-form-input" id="cr-mc-notes" rows="2"></textarea>
+          </div></div>
+          <div class="cr-err" id="cr-mc-err"></div>
+        </div>
+        <div class="gi-modal-foot">
+          <button class="gi-btn-secondary" onclick="crFermer('cr-modal-credit')">Annuler</button>
+          <button class="gi-btn-primary" id="cr-mc-ok" onclick="crEnregistrerCredit()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Crédits : fiche d'un crédit -->
+    <div class="gi-modal-overlay" id="cr-modal-detail">
+      <div class="gi-modal" style="max-width:820px">
+        <div class="gi-modal-head">
+          <h3>Fiche du crédit</h3>
+          <button class="gi-modal-close" onclick="crFermer('cr-modal-detail')" aria-label="Fermer">&times;</button>
+        </div>
+        <div class="gi-modal-body" id="cr-detail"></div>
+      </div>
+    </div>
+
+    <!-- Crédits : dépôt / augmentation -->
+    <div class="gi-modal-overlay" id="cr-modal-mvt">
+      <div class="gi-modal" style="max-width:480px">
+        <div class="gi-modal-head">
+          <h3 id="cr-mm-titre">Nouveau mouvement</h3>
+          <button class="gi-modal-close" onclick="crFermer('cr-modal-mvt')" aria-label="Fermer">&times;</button>
+        </div>
+        <div class="gi-modal-body">
+          <div class="gi-form-row full"><div class="gi-form-field">
+            <label class="gi-form-lbl">Type *</label>
+            <div class="cr-types" id="cr-mm-type"></div>
+          </div></div>
+          <div class="gi-form-row">
+            <div class="gi-form-field"><label class="gi-form-lbl" for="cr-mm-montant">Montant *</label>
+              <input class="gi-form-input" id="cr-mm-montant" type="number" step="0.01" min="0.01" inputmode="decimal" placeholder="0.00" oninput="crAideMvt()">
+              <div class="cr-aide" id="cr-mm-aide"></div></div>
+            <div class="gi-form-field"><label class="gi-form-lbl" for="cr-mm-date">Date *</label>
+              <input class="gi-form-input" id="cr-mm-date" type="date"></div>
+          </div>
+          <div class="gi-form-row">
+            <div class="gi-form-field"><label class="gi-form-lbl" for="cr-mm-mode">Mode de paiement</label>
+              <select class="gi-form-input" id="cr-mm-mode">
+                <option value="">—</option><option>Cash</option><option>Chèque</option><option>Virement</option>
+                <option>MonCash</option><option>NatCash</option><option>Zelle</option><option>Autre</option>
+              </select></div>
+            <div class="gi-form-field"><label class="gi-form-lbl" for="cr-mm-ref">Référence</label>
+              <input class="gi-form-input" id="cr-mm-ref" maxlength="100" placeholder="N° de reçu, de chèque…"></div>
+          </div>
+          <div class="gi-form-row full"><div class="gi-form-field">
+            <label class="gi-form-lbl" for="cr-mm-note">Note</label>
+            <input class="gi-form-input" id="cr-mm-note" maxlength="500">
+          </div></div>
+          <div class="cr-err" id="cr-mm-err"></div>
+        </div>
+        <div class="gi-modal-foot">
+          <button class="gi-btn-secondary" onclick="crFermer('cr-modal-mvt')">Annuler</button>
+          <button class="gi-btn-primary" id="cr-mm-ok" onclick="crEnregistrerMvt()">Enregistrer</button>
         </div>
       </div>
     </div>
@@ -14537,6 +14741,7 @@ const PAGE_META={
   depenses:            {title: 'Dépenses Opérationnelles',       sub: 'Charges et coûts de la station'},
   achats:              {title: 'Gestion des Achats',             sub: 'Matériel, équipements et fournitures'},
   'gi-dashboard':      {title: 'Tableau de Bord Gestion',        sub: 'Vue analytique consolidée — Ventes · Employés · Payroll · Dépenses · Cash'},
+  credits:             {title: 'Crédits',                        sub: 'Dettes (nous devons) et créances (on nous doit)'},
   caisse:              {title: 'Rapport de Caisse',              sub: 'Synthèse financière consolidée — Ventes · Achats · Payroll · Dépenses'},
   'pos-caisse':        {title: 'Caisse POS',                    sub: 'Bar / Restaurant — Encaissement en temps réel'},
   'pos-produits':      {title: 'Produits Bar',                  sub: 'Catalogue et historique des prix'},
@@ -14608,6 +14813,7 @@ function goTo(page){
   _startScrollFix();
 
   if(page==='notifications')      loadNotificationsPage();
+  if(page==='credits')            loadCredits();
   if(page==='taches')             loadTachesPage();
   if(page==='home')               loadHome();
   if(page==='dashboard')          initDashboard();
@@ -17976,6 +18182,15 @@ function _isAdmin(){
   return !!(_appUser?.est_admin || _appUser?.permissions?.admin === true || _appUser?.role === 'admin');
 }
 
+// Module Crédits : direction seulement (admin, PDG, manager, directeur,
+// assistant directeur) — même règle que backend/credits_routes.py
+function _peutCredits(){
+  if(!_appUser) return false;
+  if(_isAdmin() || _appUser.role === 'pdg') return true;
+  const rn = (_appUser.role_nom||'').trim().toLowerCase();
+  return ['manager','directeur','assistant directeur','pdg','direction'].includes(rn) || rn.startsWith('directeur');
+}
+
 function _getAllowedPages(){
   if(!_appUser) return new Set();
   const _rn = (_appUser.role_nom||_appUser.poste||'').toLowerCase();
@@ -18009,6 +18224,7 @@ function _canAccess(page){
   // avant toute vérification de rôle (voir _modules / _MODULE_PAGES).
   if(!_pageModuleEnabled(page)) return false;
   // Admin vérifié sur les 3 indicateurs (est_admin, role, permissions.admin)
+  if(page==='credits') return _peutCredits();
   if(_isAdmin()) return true;
   const _rnCanAccess = (_appUser.role_nom||_appUser.poste||'').toLowerCase();
   // Pages admin interdites à tous les non-admins, sauf Manager (accès complet demandé) —
@@ -23503,6 +23719,283 @@ function exportStatsCsv(){
   a.href    = 'data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
   a.download= `statistiques-${_stData.periode.debut}-${_stData.periode.fin}.csv`;
   a.click();
+}
+
+// ══════════════════════════════════════════════
+// CRÉDITS — dettes (nous devons) et créances (on nous doit)
+// API : /api/credits (backend/credits_routes.py). Les montants HTG et USD
+// ne s'additionnent jamais : totaux affichés par devise.
+// ══════════════════════════════════════════════
+const CR = {sens:'DETTE', statut:'', credits:[], resume:null, ouvert:null, mvtType:'DEPOT', tq:null};
+const _CR_SENS = {DETTE:'Nous devons', CREANCE:'On nous doit'};
+const _CR_STATUT = {ACTIF:'Actif', SOLDE:'Soldé', ANNULE:'Annulé'};
+const _crM = (v, dev) => `${Number(v||0).toLocaleString('fr-FR',{minimumFractionDigits:2, maximumFractionDigits:2})} ${dev||''}`.trim();
+const _crErr = e => String(e && e.message || e).replace(/^\[\d+\]\s*/, '');
+const _crAuj = () => todayStr();
+function crFermer(id){ document.getElementById(id).classList.remove('open'); }
+function crChoix(grp, v){
+  document.querySelectorAll(`#${grp} button`).forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  if(grp === 'cr-mm-type'){ CR.mvtType = v; crAideMvt(); }
+}
+function _crValChoix(grp){ return document.querySelector(`#${grp} button.on`)?.dataset.v || ''; }
+
+function crSens(s){ CR.sens = s; loadCredits(); }
+function crStatut(s){ CR.statut = s; loadCredits(); }
+function crRechercher(){ clearTimeout(CR.tq); CR.tq = setTimeout(loadCredits, 250); }
+
+async function loadCredits(){
+  document.querySelectorAll('#page-credits .cr-sens button').forEach(b => b.classList.toggle('on', b.dataset.sens === CR.sens));
+  document.querySelectorAll('#page-credits .cr-filtres .db-preset').forEach(b => b.classList.toggle('active', b.dataset.st === CR.statut));
+  const p = new URLSearchParams();
+  if(CR.sens) p.set('sens', CR.sens);
+  if(CR.statut) p.set('statut', CR.statut);
+  const dev = document.getElementById('cr-devise').value; if(dev) p.set('devise', dev);
+  const q = document.getElementById('cr-q').value.trim(); if(q) p.set('q', q);
+  try{
+    const d = await GET('/credits?' + p.toString());
+    CR.credits = d.credits; CR.resume = d.resume;
+    _crRendreKpis(); _crRendreListe(); _crBadge();
+  }catch(e){
+    document.getElementById('cr-liste').innerHTML = `<div class="cr-vide">${esc(_crErr(e))}</div>`;
+  }
+}
+
+function _crBadge(){
+  const b = document.getElementById('nav-credits-badge'); if(!b || !CR.resume) return;
+  const n = ['DETTE','CREANCE'].reduce((s, k) => s + CR.resume[k].HTG.nb_en_retard + CR.resume[k].USD.nb_en_retard, 0);
+  b.textContent = n; b.style.display = n ? '' : 'none';
+  b.title = n ? `${n} crédit${n>1?'s':''} en retard` : '';
+}
+
+function _crRendreKpis(){
+  const r = CR.resume, el = document.getElementById('cr-kpis');
+  const sens = CR.sens ? [CR.sens] : ['DETTE','CREANCE'];
+  const cartes = [];
+  for(const s of sens){
+    for(const dv of ['HTG','USD']){
+      const b = r[s][dv];
+      if(!b.nb && dv === 'USD') continue;           // pas de carte USD vide
+      cartes.push(`<div class="cr-kpi ${s.toLowerCase()}">
+        <div class="cr-kpi-l">${s==='DETTE' ? 'Reste à payer' : 'Reste à encaisser'} · ${dv}</div>
+        <div class="cr-kpi-v">${_crM(b.reste, dv)}</div>
+        <div class="cr-kpi-s">${b.nb_actifs} actif${b.nb_actifs>1?'s':''} · déjà ${s==='DETTE'?'payé':'reçu'} <b>${_crM(b.total_depose, dv)}</b> sur ${_crM(b.total_du, dv)}</div>
+        ${b.nb_en_retard ? `<div class="cr-kpi-s"><span class="cr-ret">⚠ ${b.nb_en_retard} en retard · ${_crM(b.reste_en_retard, dv)}</span></div>` : ''}
+      </div>`);
+    }
+  }
+  el.innerHTML = cartes.join('');
+}
+
+function _crRendreListe(){
+  const el = document.getElementById('cr-liste');
+  if(!CR.credits.length){
+    el.innerHTML = `<div class="cr-vide">Aucun crédit pour ce filtre.<br><button class="btn btn-primary" style="margin-top:12px" onclick="crOuvrirCredit()">+ Nouveau crédit</button></div>`;
+    return;
+  }
+  el.innerHTML = `<table class="cr-tbl"><thead><tr>
+      <th>Tiers</th>${CR.sens ? '' : '<th>Sens</th>'}<th class="cr-col-m">Date</th><th>Échéance</th>
+      <th class="r cr-col-m">Total dû</th><th class="r cr-col-m">Déposé</th><th class="r">Reste</th><th>Statut</th></tr></thead><tbody>
+    ${CR.credits.map(c => {
+      const pct = c.total_du > 0 ? Math.min(100, Math.round(c.total_depose / c.total_du * 100)) : 0;
+      const ech = c.date_echeance
+        ? (c.en_retard ? `<span class="cr-ech-ret">${frDate(c.date_echeance)}<br><small>+${c.jours_retard} j</small></span>` : frDate(c.date_echeance))
+        : '<span class="c-dim">—</span>';
+      return `<tr class="${c.statut==='ANNULE'?'annule':''}" onclick="crOuvrirDetail(${c.id})">
+        <td class="cr-tiers"><b>${esc(c.tiers_nom)}</b>${c.description ? `<small>${esc(c.description)}</small>` : ''}</td>
+        ${CR.sens ? '' : `<td><span class="cr-badge ${c.sens}">${_CR_SENS[c.sens]}</span></td>`}
+        <td class="cr-col-m" style="white-space:nowrap">${frDate(c.date_credit)}</td>
+        <td style="white-space:nowrap">${ech}</td>
+        <td class="r cr-col-m">${_crM(c.total_du, c.devise)}</td>
+        <td class="r cr-col-m">${_crM(c.total_depose, c.devise)}</td>
+        <td class="r"><b>${_crM(c.reste, c.devise)}</b><div class="cr-prog" title="${pct} % déposé"><span style="width:${pct}%"></span></div></td>
+        <td>${c.en_retard ? '<span class="cr-badge RETARD">En retard</span>' : `<span class="cr-badge ${c.statut}">${_CR_STATUT[c.statut]}</span>`}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+// ── Nouveau / modifier un crédit ──────────────────────────────────────────
+function crOuvrirCredit(c=null){
+  document.getElementById('cr-mc-id').value = c ? c.id : '';
+  document.getElementById('cr-mc-titre').textContent = c ? 'Modifier le crédit' : 'Nouveau crédit';
+  crChoix('cr-mc-sens', c ? c.sens : (CR.sens || 'DETTE'));
+  document.querySelectorAll('#cr-mc-sens button').forEach(b => b.disabled = !!c);   // le sens ne change pas après création
+  document.getElementById('cr-mc-nom').value = c ? c.tiers_nom : '';
+  document.getElementById('cr-mc-contact').value = c ? (c.tiers_contact||'') : '';
+  document.getElementById('cr-mc-desc').value = c ? (c.description||'') : '';
+  document.getElementById('cr-mc-montant').value = c ? c.montant_initial : '';
+  const dv = document.getElementById('cr-mc-devise');
+  dv.value = c ? c.devise : 'HTG';
+  dv.disabled = !!(c && c.nb_mouvements);
+  dv.title = dv.disabled ? 'La devise ne peut plus changer : ce crédit a déjà des mouvements.' : '';
+  const dt = document.getElementById('cr-mc-date');
+  dt.value = c ? c.date_credit : _crAuj(); dt.max = _crAuj();
+  document.getElementById('cr-mc-ech').value = c ? (c.date_echeance||'') : '';
+  document.getElementById('cr-mc-notes').value = c ? (c.notes||'') : '';
+  document.getElementById('cr-mc-err').textContent = '';
+  document.getElementById('cr-modal-credit').classList.add('open');
+  setTimeout(() => document.getElementById('cr-mc-nom').focus(), 50);
+}
+
+async function crEnregistrerCredit(){
+  const id = document.getElementById('cr-mc-id').value, err = document.getElementById('cr-mc-err');
+  const v = k => document.getElementById(k).value.trim();
+  const montant = parseFloat(v('cr-mc-montant').replace(',', '.'));
+  if(!_crValChoix('cr-mc-sens')) return err.textContent = 'Choisissez : nous devons ou on nous doit.';
+  if(!v('cr-mc-nom')) return err.textContent = 'Indiquez le nom du tiers.';
+  if(!(montant > 0)) return err.textContent = 'Indiquez un montant supérieur à 0.';
+  if(!v('cr-mc-date')) return err.textContent = 'Indiquez la date du crédit.';
+  if(v('cr-mc-ech') && v('cr-mc-ech') < v('cr-mc-date')) return err.textContent = "L'échéance ne peut pas précéder la date du crédit.";
+  const corps = {tiers_nom: v('cr-mc-nom'), tiers_contact: v('cr-mc-contact'), description: v('cr-mc-desc'),
+                 montant_initial: montant, devise: v('cr-mc-devise'), date_credit: v('cr-mc-date'), notes: v('cr-mc-notes')};
+  const b = document.getElementById('cr-mc-ok'); b.disabled = true; err.textContent = '';
+  try{
+    let c;
+    if(id){
+      corps.date_echeance = v('cr-mc-ech') || null; corps.effacer_echeance = !v('cr-mc-ech');
+      c = await PUT(`/credits/${id}`, corps);
+      notify('Crédit modifié.', 'ok');
+    }else{
+      corps.sens = _crValChoix('cr-mc-sens'); corps.date_echeance = v('cr-mc-ech') || null;
+      c = await POST('/credits', corps);
+      notify(`Crédit enregistré : ${c.tiers_nom}, ${_crM(c.total_du, c.devise)}.`, 'ok');
+    }
+    crFermer('cr-modal-credit');
+    await loadCredits();
+    if(id) _crRendreDetail(c);
+  }catch(e){ err.textContent = _crErr(e); }
+  finally{ b.disabled = false; }
+}
+
+// ── Fiche d'un crédit ─────────────────────────────────────────────────────
+async function crOuvrirDetail(id){
+  const box = document.getElementById('cr-detail');
+  box.innerHTML = '<div class="cr-vide">Chargement…</div>';
+  document.getElementById('cr-modal-detail').classList.add('open');
+  try{ _crRendreDetail(await GET(`/credits/${id}`)); }
+  catch(e){ box.innerHTML = `<div class="cr-vide">${esc(_crErr(e))}</div>`; }
+}
+
+function _crRendreDetail(c){
+  CR.ouvert = c;
+  const dv = c.devise, payer = c.sens === 'DETTE';
+  const mv = c.mouvements.length ? `<div class="cr-tbl-wrap"><table class="cr-tbl"><thead><tr>
+        <th>Date</th><th>Type</th><th class="r">Montant</th><th class="cr-col-m">Mode · Réf.</th><th class="cr-col-m">Par</th><th></th></tr></thead><tbody>
+      ${c.mouvements.map(m => `<tr style="cursor:default">
+        <td style="white-space:nowrap">${frDate(m.date_mouvement)}</td>
+        <td>${m.type==='DEPOT' ? `<span class="cr-mvt-dep">${payer?'Paiement versé':'Paiement reçu'}</span>` : '<span class="cr-mvt-aug">Augmentation</span>'}
+          ${m.note ? `<div class="cr-aide">${esc(m.note)}</div>` : ''}</td>
+        <td class="r">${m.type==='DEPOT'?'−':'+'} ${_crM(m.montant, dv)}</td>
+        <td class="cr-col-m">${esc([m.mode_paiement, m.reference].filter(Boolean).join(' · ') || '—')}</td>
+        <td class="cr-col-m" style="font-size:12.5px;color:var(--muted)">${esc(m.createur_nom||'')}</td>
+        <td style="text-align:right"><button class="cr-sup" title="Retirer ce mouvement (erreur de saisie)" aria-label="Retirer ce mouvement" onclick="crSupprimerMvt(${m.id})">🗑</button></td>
+      </tr>`).join('')}</tbody></table></div>`
+    : '<div class="cr-vide" style="padding:20px">Aucun mouvement pour l’instant.</div>';
+  const annule = c.statut === 'ANNULE';
+  document.getElementById('cr-detail').innerHTML = `
+    <div class="cr-detail-tete">
+      <div><h4>${esc(c.tiers_nom)}</h4>
+        <div class="cr-aide">${c.tiers_contact ? esc(c.tiers_contact) + ' · ' : ''}crédit du ${frDate(c.date_credit)}${c.date_echeance ? ` · échéance ${frDate(c.date_echeance)}` : ''}</div>
+        ${c.description ? `<div class="cr-aide">${esc(c.description)}</div>` : ''}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="cr-badge ${c.sens}">${_CR_SENS[c.sens]}</span>
+        ${c.en_retard ? `<span class="cr-badge RETARD">En retard de ${c.jours_retard} j</span>` : `<span class="cr-badge ${c.statut}">${_CR_STATUT[c.statut]}</span>`}</div>
+    </div>
+    <div class="cr-detail-kpis">
+      <div><span>Montant initial</span><b>${_crM(c.montant_initial, dv)}</b></div>
+      <div><span>Augmentations</span><b>+ ${_crM(c.total_augmentations, dv)}</b></div>
+      <div><span>${payer?'Déjà payé':'Déjà reçu'}</span><b style="color:var(--green)">${_crM(c.total_depose, dv)}</b></div>
+      <div><span>Reste</span><b style="color:${c.reste>0?(payer?'var(--red)':'var(--orange)'):'var(--green)'}">${_crM(c.reste, dv)}</b></div>
+    </div>
+    <div class="cr-actions">
+      ${annule ? '' : `<button class="btn btn-primary" ${c.reste>0?'':'disabled title="Rien à déposer : crédit soldé"'} onclick="crOuvrirMvt('DEPOT')">${payer?'+ Paiement versé':'+ Paiement reçu'}</button>
+      <button class="btn btn-secondary" onclick="crOuvrirMvt('AUGMENTATION')">+ Augmentation</button>
+      <button class="btn btn-secondary" onclick="crOuvrirCredit(CR.ouvert)">✏️ Modifier</button>
+      <button class="btn btn-secondary" onclick="crAnnuler()">Annuler le crédit</button>`}
+      ${annule ? '<button class="btn btn-secondary" onclick="crReactiver()">Réactiver</button>' : ''}
+      <button class="btn btn-danger" onclick="crSupprimer()">🗑 Supprimer</button>
+    </div>
+    ${c.notes ? `<div class="cr-notes">${esc(c.notes)}</div>` : ''}
+    ${mv}`;
+}
+
+// ── Dépôt / augmentation ──────────────────────────────────────────────────
+function crOuvrirMvt(type){
+  const c = CR.ouvert, payer = c.sens === 'DETTE';
+  document.getElementById('cr-mm-titre').textContent = `${c.tiers_nom} — nouveau mouvement`;
+  document.getElementById('cr-mm-type').innerHTML = `
+    <button type="button" data-v="DEPOT" onclick="crChoix('cr-mm-type','DEPOT')" ${c.reste>0?'':'disabled'}>${payer?'Paiement versé':'Paiement reçu'}<small>Fait baisser le reste</small></button>
+    <button type="button" data-v="AUGMENTATION" onclick="crChoix('cr-mm-type','AUGMENTATION')">Augmentation<small>Le crédit grossit</small></button>`;
+  document.getElementById('cr-mm-montant').value = '';
+  const d = document.getElementById('cr-mm-date');
+  d.value = _crAuj(); d.min = c.date_credit; d.max = _crAuj();
+  ['cr-mm-mode','cr-mm-ref','cr-mm-note'].forEach(k => document.getElementById(k).value = '');
+  document.getElementById('cr-mm-err').textContent = '';
+  crChoix('cr-mm-type', type);
+  document.getElementById('cr-modal-mvt').classList.add('open');
+  setTimeout(() => document.getElementById('cr-mm-montant').focus(), 50);
+}
+
+function crAideMvt(){
+  const c = CR.ouvert; if(!c) return;
+  const a = document.getElementById('cr-mm-aide'), m = parseFloat((document.getElementById('cr-mm-montant').value||'').replace(',', '.')) || 0;
+  if(CR.mvtType === 'DEPOT'){
+    const apres = Math.round((c.reste - m) * 100) / 100;
+    a.innerHTML = `Reste actuel <b>${_crM(c.reste, c.devise)}</b>${m>0 ? ` → après : <b style="color:${apres<0?'#ef4444':''}">${_crM(apres, c.devise)}</b>` : ''}
+      · <a href="#" onclick="document.getElementById('cr-mm-montant').value=${c.reste};crAideMvt();return false">tout le reste</a>`;
+  }else{
+    a.innerHTML = `Total dû <b>${_crM(c.total_du, c.devise)}</b>${m>0 ? ` → après : <b>${_crM(c.total_du + m, c.devise)}</b>` : ''}`;
+  }
+}
+
+async function crEnregistrerMvt(){
+  const c = CR.ouvert, err = document.getElementById('cr-mm-err');
+  const montant = parseFloat((document.getElementById('cr-mm-montant').value||'').replace(',', '.'));
+  const date = document.getElementById('cr-mm-date').value;
+  if(!(montant > 0)) return err.textContent = 'Indiquez un montant supérieur à 0.';
+  if(CR.mvtType === 'DEPOT' && montant > c.reste + 0.001) return err.textContent = `Le montant dépasse le reste (${_crM(c.reste, c.devise)}).`;
+  if(!date) return err.textContent = 'Indiquez la date.';
+  if(date < c.date_credit) return err.textContent = `La date ne peut pas précéder la date du crédit (${frDate(c.date_credit)}).`;
+  const b = document.getElementById('cr-mm-ok'); b.disabled = true; err.textContent = '';
+  try{
+    const x = await POST(`/credits/${c.id}/mouvements`, {type: CR.mvtType, montant, date_mouvement: date,
+      mode_paiement: document.getElementById('cr-mm-mode').value || null,
+      reference: document.getElementById('cr-mm-ref').value.trim() || null,
+      note: document.getElementById('cr-mm-note').value.trim() || null});
+    crFermer('cr-modal-mvt');
+    notify(x.statut === 'SOLDE' ? `✓ ${x.tiers_nom} : crédit soldé.` : `Enregistré. Reste : ${_crM(x.reste, x.devise)}.`, 'ok');
+    _crRendreDetail(x);
+    loadCredits();
+  }catch(e){ err.textContent = _crErr(e); }
+  finally{ b.disabled = false; }
+}
+
+// ── Annuler / réactiver / supprimer ───────────────────────────────────────
+async function _crAction(fn, msg){
+  try{ const x = await fn(); notify(msg, 'ok'); if(x && x.id) _crRendreDetail(x); await loadCredits(); return x; }
+  catch(e){ notify(_crErr(e), 'err'); }
+}
+async function crAnnuler(){
+  const c = CR.ouvert;
+  const motif = await demanderSuppression({titre: 'Annuler ce crédit ?',
+    texte: 'Un crédit annulé sort de tous les totaux. Il reste consultable (filtre « Annulés ») et peut être réactivé.',
+    lignes: [`${c.tiers_nom} — reste ${_crM(c.reste, c.devise)}`], bouton: 'Annuler le crédit'});
+  if(motif) _crAction(() => POST(`/credits/${c.id}/annuler`, {motif}), 'Crédit annulé.');
+}
+function crReactiver(){ const c = CR.ouvert; _crAction(() => POST(`/credits/${c.id}/reactiver`, {}), 'Crédit réactivé.'); }
+async function crSupprimer(){
+  const c = CR.ouvert;
+  const motif = await demanderSuppression({titre: 'Supprimer définitivement ce crédit ?',
+    texte: `Le crédit et ses ${c.nb_mouvements} mouvement(s) sont effacés. La trace reste au journal d’audit. Pour un crédit simplement abandonné, préférez « Annuler ».`,
+    lignes: [`${c.tiers_nom} — total ${_crM(c.total_du, c.devise)}, reste ${_crM(c.reste, c.devise)}`], bouton: 'Supprimer'});
+  if(!motif) return;
+  const x = await _crAction(() => POST(`/credits/${c.id}/supprimer`, {motif}), 'Crédit supprimé.');
+  if(x) crFermer('cr-modal-detail');
+}
+async function crSupprimerMvt(mid){
+  const c = CR.ouvert, m = c.mouvements.find(x => x.id === mid); if(!m) return;
+  const motif = await demanderSuppression({titre: 'Retirer ce mouvement ?',
+    texte: 'À utiliser pour une erreur de saisie. Le reste et le statut sont recalculés ; la trace reste au journal d’audit.',
+    lignes: [`${frDate(m.date_mouvement)} · ${m.type==='DEPOT'?'Paiement':'Augmentation'} · ${_crM(m.montant, c.devise)}`], bouton: 'Retirer'});
+  if(motif) _crAction(() => POST(`/credits/${c.id}/mouvements/${mid}/supprimer`, {motif}), 'Mouvement retiré.');
 }
 
 /* ── Chargement automatique à la navigation ── */

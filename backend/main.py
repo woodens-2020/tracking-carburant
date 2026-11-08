@@ -265,6 +265,8 @@ app.include_router(pieces_jointes_router)
 app.include_router(listes_reference_router)
 from bar_achats_routes import router as bar_achats_router
 app.include_router(bar_achats_router)
+from credits_routes import router as credits_router
+app.include_router(credits_router)
 
 
 @app.on_event("startup")
