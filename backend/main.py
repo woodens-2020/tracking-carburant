@@ -1922,6 +1922,9 @@ def _releve_dict(r: Releve):
         "modifie_par_nom": r.modifie_par.nom_complet if r.modifie_par else None,
         "pompiste_id":  r.pompiste_id,
         "pompiste_nom": f"{r.pompiste.prenom} {r.pompiste.nom}" if r.pompiste else None,
+        # Certifié : le compteur reprend là où il s'était arrêté (aucun écart
+        # noté). bpccp n'a pas de rapports pompistes : seule la continuité compte.
+        "certifie": r.ecart_compteur is None and r.metter_apres >= r.metter_avant,
     }
 
 

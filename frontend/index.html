@@ -598,6 +598,10 @@ canvas{display:block}
 .psp-sup{display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)}
 .psp-sup .psp-lien{color:var(--muted)}.psp-sup .psp-lien:hover{color:#ef4444}
 .sx-origine{color:#a78bfa}
+.cert{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;color:#3b82f6;background:rgba(37,99,235,.12);
+  border:1px solid rgba(37,99,235,.35);border-radius:999px;padding:2px 9px 2px 3px;white-space:nowrap;vertical-align:middle}
+.cert::before{content:'✓';display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:#2563eb;color:#fff;font-size:10.5px;font-weight:900}
+.cert.grand{font-size:13px;padding:4px 12px 4px 4px}.cert.grand::before{width:20px;height:20px;font-size:12px}
 .jr-val{background:none;border:1px dashed transparent;border-radius:8px;cursor:pointer;font:inherit;font-family:var(--mono);
   padding:4px 6px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .jr-val .jr-pen{font-size:12px;opacity:.55;transition:opacity .15s}
@@ -15640,7 +15644,7 @@ function renderSaisie(){
                 data-is-edit="${isEdit?'1':'0'}" data-nb-mod="${nbMod}" data-av="${av}" data-ap="${ap}" data-ip="${ipVal!=null?ipVal:''}">
       <div class="sx-id">
         <div class="sx-nom">${esc(po.nom)}</div>
-        <div class="row-badge">${statut}</div>
+        <div class="row-badge">${statut}${isEdit&&r.certifie?' <span class="cert" title="Compteur continu">Certifié</span>':''}</div>
         ${saisiPar}${pompisteInfo}
       </div>
       <div class="sx-field">
@@ -15669,7 +15673,8 @@ function renderSaisie(){
   el.innerHTML=`
     <div class="sx-ctx">
       <div>
-        <div class="sx-ctx-titre">${esc(p.nom)} · ${label}</div>
+        <div class="sx-ctx-titre">${esc(p.nom)} · ${label}${nbFaits===p.pompes.length && p.pompes.length && perRel.every(r=>r.certifie)
+          ?' <span class="cert grand" title="Toutes les pompes sont saisies, compteurs continus">Rapport certifié</span>':''}</div>
         <div class="sx-ctx-sous">${frDate(currentDate)} · ${nbFaits}/${p.pompes.length} pompe(s) enregistrée(s) · prix ${fmtNum(pxDefaut,2)} G/gal (Paramètres › Prix de vente)</div>
       </div>
     </div>
@@ -16974,6 +16979,7 @@ function renderJournal(data){
       ?`<span class="num" style="color:var(--blue2)">${e.metter_attendu.toFixed(3)}</span>`
       :'<span class="c-dim">1re lecture</span>';
 
+    const certifie=!e.en_attente && ['ok','resolu'].includes(e.statut);
     const statHtml=e.statut==='resolu'
       ?`<span style="color:var(--green);font-weight:700" title="${esc((e.resolution&&e.resolution.description)||'')}">✓ Résolu</span>`
       :isErr
@@ -16997,7 +17003,7 @@ function renderJournal(data){
       <td class="tr num c-teal">${fmtGal(e.quantite)}</td>
       <td class="tr num c-amber">${fmtG(e.montant_vente)}</td>
       <td><span class="type-pill ${pillCls}">${typeLabel}</span></td>
-      <td>${statHtml}</td>
+      <td>${statHtml}${certifie?'<div style="margin-top:3px"><span class="cert" title="Compteur continu">Certifié</span></div>':''}</td>
     </tr>`;
   }).join('');
 
