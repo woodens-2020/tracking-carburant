@@ -144,3 +144,54 @@ def test_acces_reserve_a_la_direction(client):
     c = TestClient(_m.app)
     c.cookies.set(_m.SESSION_COOKIE, token)
     assert c.get("/api/credits").status_code == 403
+
+
+def test_releve_d_un_credit_pdf_et_excel(client):
+    import io
+    from openpyxl import load_workbook
+    c = _credit(client, tiers_nom="Fournisseur Relevé & Fils", montant_initial=1000, description="Facture <12>")
+    _mvt(client, c["id"], "AUGMENTATION", 500, date_mouvement=J(6), note="2e livraison")
+    _mvt(client, c["id"], "DEPOT", 400, date_mouvement=J(5), mode_paiement="Cash", reference="R-1")
+    _mvt(client, c["id"], "DEPOT", 100, date_mouvement=J(2))
+    r = client.get(f"/api/credits/{c['id']}/releve.pdf", headers=H)
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
+    assert r.content[:5] == b"%PDF-" and "attachment" in r.headers["content-disposition"]
+    r = client.get(f"/api/credits/{c['id']}/releve.xlsx", headers=H)
+    assert r.status_code == 200 and r.headers["content-disposition"].endswith('.xlsx"')
+    ws = load_workbook(io.BytesIO(r.content)).active
+    rows = [[c.value for c in row] for row in ws.iter_rows()]
+    ops = [row for row in rows if row[1] in ("Montant initial", "Augmentation", "Paiement versé")]
+    # Solde après chaque opération : 1000 → 1500 → 1100 → 1000
+    assert [row[6] for row in ops] == [1000, 1500, 1100, 1000]
+    total = next(row for row in rows if row[1] == "Total")
+    assert total[4:7] == [1500, 500, 1000]
+    assert client.get(f"/api/credits/{c['id']}/releve.doc", headers=H).status_code == 404
+    assert client.get("/api/credits/999999/releve.pdf", headers=H).status_code == 404
+
+
+def test_releve_des_paiements_de_la_periode(client):
+    import io
+    from openpyxl import load_workbook
+    a = _credit(client, tiers_nom=f"Periode A {time.time_ns()}", montant_initial=1000, date_credit=J(40))
+    b = _credit(client, tiers_nom=f"Periode B {time.time_ns()}", montant_initial=50, devise="USD", date_credit=J(40))
+    _mvt(client, a["id"], "DEPOT", 300, date_mouvement=J(30))      # hors période
+    _mvt(client, a["id"], "DEPOT", 200, date_mouvement=J(3))
+    _mvt(client, b["id"], "DEPOT", 20, date_mouvement=J(2))
+    url = f"/api/credits/export/paiements.xlsx?sens=DETTE&date_debut={J(7)}&date_fin={J(0)}"
+    r = client.get(url, headers=H)
+    assert r.status_code == 200
+    wb = load_workbook(io.BytesIO(r.content))
+    rows = [[c.value for c in row] for row in wb["Paiements"].iter_rows()]
+    noms = [row[1] for row in rows]
+    assert a["tiers_nom"] in noms and b["tiers_nom"] in noms
+    lig_a = [row for row in rows if row[1] == a["tiers_nom"]]
+    assert [row[7] for row in lig_a] == [200]                         # le paiement de J-30 n'y est pas
+    assert any(row[1] == "Total HTG" for row in rows) and any(row[1] == "Total USD" for row in rows)
+    sit = [[c.value for c in row] for row in wb["Situation"].iter_rows()]
+    ra = next(row for row in sit if row[0] == a["tiers_nom"])
+    assert ra[5:8] == [1000, 500, 500]
+    r = client.get(url.replace(".xlsx", ".pdf"), headers=H)
+    assert r.status_code == 200 and r.content[:5] == b"%PDF-"
+    assert client.get(f"/api/credits/export/paiements.pdf?date_debut={J(0)}&date_fin={J(3)}", headers=H).status_code == 400
+    # Période sans paiement : un document quand même
+    assert client.get("/api/credits/export/paiements.pdf?date_debut=2001-01-01&date_fin=2001-01-31", headers=H).status_code == 200

@@ -24,7 +24,7 @@ from datetime import date as date_type
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
@@ -450,3 +450,58 @@ def supprimer_mouvement(credit_id: int, mouvement_id: int, data: MotifIn, reques
     _tracer(db, request, u, "credit_mouvement_supprime", {"credit_id": c.id, "motif": motif, "mouvement": trace})
     db.commit()
     return _credit_dict(_get(db, c.id), today_haiti(), avec_mouvements=True)
+
+
+# ── Relevés PDF / Excel ───────────────────────────────────────────────────────
+
+def _fichier(contenu: bytes, nom: str, fmt: str) -> Response:
+    import credits_exports as cx
+    media = "application/pdf" if fmt == "pdf" else cx.XLSX
+    return Response(content=contenu, media_type=media,
+                    headers={"Content-Disposition": f'attachment; filename="{nom}.{fmt}"'})
+
+
+@router.get("/{credit_id}/releve.{fmt}")
+def releve_credit(credit_id: int, fmt: str, db: Session = Depends(get_db), _u: Utilisateur = Depends(_direction)):
+    """Relevé d'un crédit : chaque opération avec le solde après elle."""
+    import credits_exports as cx
+    if fmt not in ("pdf", "xlsx"):
+        raise HTTPException(404, "Format : pdf ou xlsx.")
+    c = _get(db, credit_id)
+    contenu = cx.pdf_releve_credit(c) if fmt == "pdf" else cx.xlsx_releve_credit(c)
+    return _fichier(contenu, cx.nom_fichier("releve", c.tiers_nom, today_haiti()), fmt)
+
+
+@router.get("/export/paiements.{fmt}")
+def releve_paiements(
+    fmt: str,
+    date_debut: Optional[date_type] = None,
+    date_fin: Optional[date_type] = None,
+    sens: Optional[str] = None,
+    devise: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _u: Utilisateur = Depends(_direction),
+):
+    """Relevé des paiements d'une période (hors crédits annulés) et
+    situation des crédits concernés. Par défaut : le mois en cours."""
+    import credits_exports as cx
+    if fmt not in ("pdf", "xlsx"):
+        raise HTTPException(404, "Format : pdf ou xlsx.")
+    if sens and sens not in SENS:
+        raise HTTPException(400, "sens : DETTE ou CREANCE.")
+    if devise and devise not in DEVISES:
+        raise HTTPException(400, "devise : HTG ou USD.")
+    fin = date_fin or today_haiti()
+    debut = date_debut or fin.replace(day=1)
+    if debut > fin:
+        raise HTTPException(400, "La date de début doit précéder la date de fin.")
+    q = (db.query(Credit).options(selectinload(Credit.mouvements).selectinload(CreditMouvement.createur))
+         .filter(Credit.statut != "ANNULE"))
+    if sens:
+        q = q.filter(Credit.sens == sens)
+    if devise:
+        q = q.filter(Credit.devise == devise)
+    credits = q.all()
+    contenu = (cx.pdf_paiements if fmt == "pdf" else cx.xlsx_paiements)(credits, debut, fin, sens)
+    quoi = {"DETTE": "dettes", "CREANCE": "creances"}.get(sens, "credits")
+    return _fichier(contenu, cx.nom_fichier("paiements", quoi, debut, fin), fmt)

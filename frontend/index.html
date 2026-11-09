@@ -4486,10 +4486,13 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
           <button type="button" data-sens="CREANCE" onclick="crSens('CREANCE')">On nous doit</button>
           <button type="button" data-sens="" onclick="crSens('')">Tout</button>
         </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary" style="height:38px" onclick="crOuvrirReleve()">⬇ Relevé des paiements</button>
         <button class="btn-xls" onclick="crOuvrirCredit()">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Nouveau crédit
         </button>
+        </div>
       </div>
       <div id="cr-kpis" class="cr-kpis"></div>
       <div class="cr-filtres">
@@ -4566,6 +4569,50 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
           <button class="gi-modal-close" onclick="crFermer('cr-modal-detail')" aria-label="Fermer">&times;</button>
         </div>
         <div class="gi-modal-body" id="cr-detail"></div>
+      </div>
+    </div>
+
+    <!-- Crédits : relevé des paiements (PDF / Excel) -->
+    <div class="gi-modal-overlay" id="cr-modal-releve">
+      <div class="gi-modal" style="max-width:460px">
+        <div class="gi-modal-head">
+          <h3>Relevé des paiements</h3>
+          <button class="gi-modal-close" onclick="crFermer('cr-modal-releve')" aria-label="Fermer">&times;</button>
+        </div>
+        <div class="gi-modal-body">
+          <div class="gi-form-row full"><div class="gi-form-field">
+            <label class="gi-form-lbl">Crédits</label>
+            <div class="cr-types" id="cr-rl-sens" style="grid-template-columns:1fr 1fr 1fr">
+              <button type="button" data-v="DETTE" onclick="crChoix('cr-rl-sens','DETTE')">Nous devons</button>
+              <button type="button" data-v="CREANCE" onclick="crChoix('cr-rl-sens','CREANCE')">On nous doit</button>
+              <button type="button" data-v="TOUS" onclick="crChoix('cr-rl-sens','TOUS')">Tout</button>
+            </div>
+          </div></div>
+          <div class="gi-form-row full"><div class="gi-form-field">
+            <label class="gi-form-lbl">Période</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button type="button" class="db-preset" onclick="crPeriode('mois')">Ce mois</button>
+              <button type="button" class="db-preset" onclick="crPeriode('mois-1')">Mois dernier</button>
+              <button type="button" class="db-preset" onclick="crPeriode('annee')">Cette année</button>
+            </div>
+          </div></div>
+          <div class="gi-form-row">
+            <div class="gi-form-field"><label class="gi-form-lbl" for="cr-rl-debut">Du</label>
+              <input class="gi-form-input" id="cr-rl-debut" type="date"></div>
+            <div class="gi-form-field"><label class="gi-form-lbl" for="cr-rl-fin">Au</label>
+              <input class="gi-form-input" id="cr-rl-fin" type="date"></div>
+          </div>
+          <div class="gi-form-row full"><div class="gi-form-field">
+            <label class="gi-form-lbl" for="cr-rl-devise">Devise</label>
+            <select class="gi-form-input" id="cr-rl-devise"><option value="">HTG et USD (totaux séparés)</option><option value="HTG">HTG</option><option value="USD">USD</option></select>
+          </div></div>
+          <div class="cr-aide">Le relevé liste chaque paiement de la période, puis la situation à ce jour de chaque crédit concerné. Les crédits annulés n’y figurent pas.</div>
+          <div class="cr-err" id="cr-rl-err"></div>
+        </div>
+        <div class="gi-modal-foot">
+          <button class="gi-btn-secondary" onclick="crTelechargerReleve('xlsx')">⬇ Excel</button>
+          <button class="gi-btn-primary" onclick="crTelechargerReleve('pdf')">⬇ PDF</button>
+        </div>
       </div>
     </div>
 
@@ -23911,6 +23958,8 @@ function _crRendreDetail(c){
       <button class="btn btn-secondary" onclick="crOuvrirCredit(CR.ouvert)">✏️ Modifier</button>
       <button class="btn btn-secondary" onclick="crAnnuler()">Annuler le crédit</button>`}
       ${annule ? '<button class="btn btn-secondary" onclick="crReactiver()">Réactiver</button>' : ''}
+      <button class="btn btn-secondary" title="Télécharger le relevé de ce crédit en PDF" onclick="crTelecharger('/api/credits/${c.id}/releve.pdf')">⬇ Relevé PDF</button>
+      <button class="btn btn-secondary" title="Télécharger le relevé de ce crédit en Excel" onclick="crTelecharger('/api/credits/${c.id}/releve.xlsx')">⬇ Excel</button>
       <button class="btn btn-danger" onclick="crSupprimer()">🗑 Supprimer</button>
     </div>
     ${c.notes ? `<div class="cr-notes">${esc(c.notes)}</div>` : ''}
@@ -23966,6 +24015,52 @@ async function crEnregistrerMvt(){
     loadCredits();
   }catch(e){ err.textContent = _crErr(e); }
   finally{ b.disabled = false; }
+}
+
+// ── Relevés PDF / Excel ───────────────────────────────────────────────────
+// Téléchargement par fetch (marche aussi avec une clé API) ; message clair
+// en cas d'erreur au lieu d'une page JSON.
+async function crTelecharger(url){
+  try{
+    const h = {}; const k = sessionStorage.getItem('api_key'); if(k) h['X-API-Key'] = k;
+    const r = await fetch(url, {headers: h, credentials: 'include'});
+    if(!r.ok){ const d = await r.json().catch(() => ({})); throw new Error(d.detail || ('Erreur ' + r.status)); }
+    const nom = (r.headers.get('content-disposition') || '').match(/filename="([^"]+)"/)?.[1] || 'releve';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(await r.blob()); a.download = nom;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    notify('Téléchargé : ' + nom, 'ok');
+    return true;
+  }catch(e){ notify(_crErr(e), 'err'); return false; }
+}
+function crPeriode(p){
+  const d = new Date(todayStr() + 'T12:00:00');
+  let deb, fin = new Date(d);
+  if(p === 'mois') deb = new Date(d.getFullYear(), d.getMonth(), 1);
+  else if(p === 'mois-1'){ deb = new Date(d.getFullYear(), d.getMonth() - 1, 1); fin = new Date(d.getFullYear(), d.getMonth(), 0); }
+  else deb = new Date(d.getFullYear(), 0, 1);
+  document.getElementById('cr-rl-debut').value = _ymdLocal(deb);
+  document.getElementById('cr-rl-fin').value = _ymdLocal(fin);
+}
+function crOuvrirReleve(){
+  crChoix('cr-rl-sens', CR.sens || 'TOUS');
+  crPeriode('mois');
+  ['cr-rl-debut','cr-rl-fin'].forEach(k => document.getElementById(k).max = todayStr());
+  document.getElementById('cr-rl-devise').value = document.getElementById('cr-devise').value;
+  document.getElementById('cr-rl-err').textContent = '';
+  document.getElementById('cr-modal-releve').classList.add('open');
+}
+async function crTelechargerReleve(fmt){
+  const deb = document.getElementById('cr-rl-debut').value, fin = document.getElementById('cr-rl-fin').value;
+  const err = document.getElementById('cr-rl-err');
+  if(!deb || !fin) return err.textContent = 'Choisissez la période.';
+  if(deb > fin) return err.textContent = 'La date de début doit précéder la date de fin.';
+  err.textContent = '';
+  const p = new URLSearchParams({date_debut: deb, date_fin: fin});
+  const s = _crValChoix('cr-rl-sens'); if(s && s !== 'TOUS') p.set('sens', s);
+  const dv = document.getElementById('cr-rl-devise').value; if(dv) p.set('devise', dv);
+  if(await crTelecharger('/api/credits/export/paiements.' + fmt + '?' + p.toString())) crFermer('cr-modal-releve');
 }
 
 // ── Annuler / réactiver / supprimer ───────────────────────────────────────
