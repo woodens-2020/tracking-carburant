@@ -275,3 +275,16 @@ def test_config_et_droits(client, st):
     a = _analyser(p, st, st["g"]["P3"], REF["P3"], REF["P3"] + 150)
     assert "VOLUME_ELEVE" in {x["code"] for x in a["anomalies"]} and a["volume_max"] == 100
     assert client.put("/api/smart-meter/config", headers=H, json=c).status_code == 200      # remise à l'état initial
+
+
+def test_liste_dynamique_des_derniers_meeters(client, st):
+    """Liste de la saisie : dernier meeter de chaque pompe, gazoline et diesel séparés."""
+    p = _pompiste(client)
+    r = p.get(f"/api/pompiste/derniers-meeters?date={st['jour']}")
+    assert r.status_code == 200, r.text
+    L = {x["pompe_id"]: x for x in r.json()["meeters"]}
+    assert L[st["g"]["P3"]]["dernier_meter"] == REF["P3"] and L[st["g"]["P3"]]["famille"] == "Gazoline"
+    assert L[st["dsl"]]["famille"] == "Diesel"
+    fams = [x["famille"] for x in r.json()["meeters"]]
+    assert fams == sorted(fams, key=lambda f: {"Gazoline": 0, "Diesel": 1, "Propane": 2}.get(f, 3))   # classés par carburant
+    assert client.get(f"/api/pompiste/derniers-meeters?date={st['jour']}", headers=H).status_code == 403   # pompistes seulement

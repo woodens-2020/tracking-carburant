@@ -317,6 +317,45 @@ def analyser_index(data: AnalyseIn, request: Request, db: Session = Depends(get_
                     exclure_rapport_id=rap.id if rap else None, pompes_exclues=pris - {data.pompe_id})
 
 
+@router.get("/api/pompiste/derniers-meeters")
+def derniers_meeters(request: Request, date: Optional[date_type] = None, periode: Optional[str] = None,
+                     db: Session = Depends(get_db)):
+    """Liste dynamique de la saisie : le dernier meeter de chaque pompe de la
+    station du pompiste (référence du créneau qu'il va rapporter), classée par
+    carburant (gazoline, diesel, propane, jamais mêlés). Le pompiste tape les
+    premiers chiffres, la liste se resserre, il prend le sien."""
+    from placement_metres import activite, famille, libelle
+    from pompiste_routes import (PERIODES, _creneaux_pris, _en_cours, _require_pompiste, _valider_date,
+                                 creneau_automatique, de_ma_station)
+    u = _require_pompiste(request, db)
+    rap = _en_cours(db, u)
+    d = rap.date if rap else (date or today_haiti())
+    if not rap:
+        _valider_date(d)
+    if periode is not None and periode not in PERIODES:
+        raise HTTPException(400, "Période invalide")
+    pris = _creneaux_pris(db, d)
+    out = []
+    for p in db.query(Pompe).filter(Pompe.actif.is_(True)).all():
+        if not de_ma_station(u, p):
+            continue
+        per = rap.periode if rap else periode
+        if per is None:
+            try:
+                per = creneau_automatique(db, d, [p.id])
+            except HTTPException:
+                continue                     # déjà ses deux rapports du jour
+        prise = per in pris.get(p.id, {}) and not (rap and p.id in {l.pompe_id for l in rap.lignes})
+        ref = reference(db, p, d, per, exclure_rapport_id=rap.id if rap else None)
+        out.append({"pompe_id": p.id, "libelle": libelle(p), "produit": p.produit.nom if p.produit else "",
+                    "meeter": p.nom, "famille": famille(p), "activite": activite(p), "periode": per,
+                    "dernier_meter": _f(ref["valeur"]), "source": ref["source"], "reference_statut": ref["statut"],
+                    "reference_date": ref["date"], "prise": bool(prise)})
+    rang = {"Gazoline": 0, "Diesel": 1, "Propane": 2}
+    out.sort(key=lambda x: (rang.get(x["famille"], 3), x["produit"], x["meeter"]))
+    return {"date": str(d), "meeters": out}
+
+
 # ── API direction : configuration ─────────────────────────────────────
 class ConfigIn(BaseModel):
     ecart_exact: float = Field(gt=0, le=1)
