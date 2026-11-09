@@ -3381,6 +3381,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 
 /* ── Rapports pompistes (supervision) ─────────────────────────────── */
 .psp-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.psp-sm{font-size:12.5px;border-left:3px solid var(--orange);padding:4px 8px;background:rgba(249,115,22,.06);border-radius:4px}
+.psp-warn-t{color:var(--orange)}
+.psp-ac{margin:2px 0 6px;padding:6px;border:1px solid rgba(249,115,22,.5);border-radius:10px;background:var(--panel2)}
+.psp-ac-i{display:flex;gap:10px;align-items:center;width:100%;text-align:left;font:inherit;color:var(--text);cursor:pointer;
+  background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin:3px 0}
+.psp-ac-i:hover{border-color:var(--orange)}
+.psp-ac-tr td{background:transparent}
 .psp-tab{font:inherit;font-weight:600;font-size:13px;padding:8px 14px;border-radius:9px;cursor:pointer;
   border:1px solid var(--border);background:var(--panel);color:var(--muted)}
 .psp-tab.on{background:var(--orange);border-color:var(--orange);color:#fff}
@@ -21318,6 +21325,7 @@ async function pspChargerListe(){
   if(f.debut) q += `&date_debut=${f.debut}`;
   if(f.fin) q += `&date_fin=${f.fin}`;
   if(f.pompiste) q += `&utilisateur_id=${f.pompiste}`;
+  PSP.dm = {};                                  // derniers meeters rechargés avec la liste
   PSP.rapports = await _pspApi('GET', q);
   if(PSP.ouvert){
     const r = PSP.rapports.find(x => x.id === PSP.ouvert);
@@ -21694,6 +21702,77 @@ function _pspEtape(n, titre, fait, contenu){
   return `<div class="psp-etape ${fait?'fait':''}"><div class="psp-etape-tete"><span class="psp-pastille">${fait?'✓':n}</span><b>${titre}</b></div>${contenu}</div>`;
 }
 
+// ── Smart Meter dans la validation ─────────────────────────────────
+// Ce que le moteur a trouvé quand le pompiste a tapé ce meeter (figé à
+// l'envoi) : la direction voit tout, propose « Mettre sur … » si un autre
+// meeter correspond.
+const _PSP_SM = {MATCH_CONFIRMED:['✓ Meeter reconnu à la saisie','psp-ok'], MATCH_REVIEW:['⚠ À vérifier','psp-warn-t'],
+  UNMATCHED:['⛔ Aucune correspondance fiable à la saisie','psp-neg'], INITIAL_READING:['ℹ Première lecture du meeter','psp-muted']};
+function _pspSmartLigne(r, l){
+  const x = l.rapprochement; if(!x) return '';
+  const [lib, cls] = _PSP_SM[x.statut] || [x.statut, 'psp-muted'];
+  const sg = v => v == null ? '—' : (v > 0 ? '+' : '') + _pspN(v);
+  const prop = x.pompe_proposee && x.pompe_proposee.pompe_id !== l.pompe_id ? x.pompe_proposee : null;
+  const dec = x.decision_pompiste === 'ACCEPTE' ? 'le pompiste a pris la proposition'
+    : x.decision_pompiste === 'REFUSE' ? 'le pompiste a gardé son choix' : '';
+  const anos = (x.anomalies || []).filter(a => a !== 'MAUVAIS_METEER');
+  if(x.statut === 'MATCH_CONFIRMED' && !anos.length && !l.pompe_saisie) return '';
+  return `<tr><td colspan="7" style="padding-top:0"><div class="psp-sm">
+    🧠 <b class="${cls}">${lib}</b>${x.confiance && x.confiance !== 'NONE' ? ` · confiance ${esc(x.confiance)}` : ''}${dec ? ` · ${dec}` : ''}
+    · dernier meeter ${_pspN(x.index_reference)} <span class="psp-muted">(${esc(x.source_reference || '—')})</span> · écart ${sg(x.ecart_reference)}
+    ${anos.map(a => `<span class="psp-badge PROBLEME" style="margin-left:4px">${esc(a)}</span>`).join('')}
+    ${prop && !l.confirmee ? `<div style="margin-top:4px">Proposé : <b>${esc(prop.libelle)}</b>
+      <button class="btn btn-primary psp-mini" style="margin-left:6px" onclick="pspChangerPompe(${r.id},${l.pompe_id},${prop.pompe_id})">⇄ Mettre sur ${esc(prop.libelle.split(' · ').pop())}</button></div>` : ''}
+  </div></td></tr>`;
+}
+// Liste dynamique de la case « Début » : même carburant seulement, se resserre
+// à chaque chiffre, le plus proche sinon ; toucher le meeter de cette pompe
+// remplit la case, toucher une autre pompe ouvre « Changer de pompe ».
+async function _pspAcCharger(rid){
+  PSP.dm ||= {};
+  if(!PSP.dm[rid]) PSP.dm[rid] = _pspApi('GET', `/rapports/${rid}/derniers-meeters`).then(d => d.meeters || []).catch(() => []);
+  return PSP.dm[rid];
+}
+function _pspAcDist(txt, ref){
+  const t0 = String(txt).replace(',', '.'), [e, dcm] = t0.split('.'), ent = (e || '').replace(/\D/g, '');
+  const ci = String(Math.trunc(ref));
+  if(ent.length < ci.length && dcm === undefined){ const k = 10 ** (ci.length - ent.length); return {d: Math.abs(Number(ent || 0) - Math.trunc(ref / k)) * k, complet: false}; }
+  const v = Number(t0.replace(/[^0-9.]/g, '')); return {d: Math.abs(v - ref), ecart: v - ref, complet: true};
+}
+async function pspAc(rid, pid, val){
+  const z = document.getElementById(`psp-ac-${rid}-${pid}`); if(!z) return;
+  const chif = String(val || '').replace(/\D/g, '');
+  if(!chif){ z.innerHTML = ''; return; }
+  const L = await _pspAcCharger(rid);
+  const el = document.querySelector(`input[data-r="${rid}"][data-p="${pid}"][data-k="avant"]`);
+  if(!el || String(el.value).replace(/\D/g, '') !== chif) return;
+  const moi = L.find(x => x.pompe_id === pid), fam = moi ? moi.famille : null;
+  const c = L.filter(x => x.dernier_meter != null && !x.prise && (fam == null || x.famille === fam))
+    .map(x => ({...x, ..._pspAcDist(val, x.dernier_meter), debut: Number(x.dernier_meter).toFixed(3).replace(/\D/g, '').startsWith(chif)}))
+    .sort((a, b) => (b.debut - a.debut) || (a.d - b.d));
+  if(!c.length || (c[0].complet && c[0].pompe_id === pid && Math.abs(c[0].ecart) < 0.0005)){ z.innerHTML = ''; return; }
+  const deb = c.filter(x => x.debut), liste = deb.length ? deb.slice(0, 3) : c.slice(0, 1);
+  const ec = x => !x.complet || Math.abs(x.ecart) < 0.0005 ? '' : ` <span class="${Math.abs(x.ecart) <= 50 ? 'psp-warn-t' : 'psp-neg'}">${x.ecart > 0 ? '+' : '−'}${_pspN(Math.abs(x.ecart))} gal</span>`;
+  z.innerHTML = `<div class="psp-ac">${deb.length ? '' : '<div class="psp-muted" style="font-size:12px">Le plus proche :</div>'}
+    ${liste.map(x => `<button type="button" class="psp-ac-i" onmousedown="event.preventDefault()" onclick="pspAcPrendre(${rid},${pid},${x.pompe_id},'${Number(x.dernier_meter).toFixed(3)}')">
+      <b class="num">${_pspN(x.dernier_meter)}</b> <span>${esc(x.libelle)}${x.pompe_id === pid ? ' · <i>cette pompe</i>' : x.dans_rapport ? ' · <i>dans ce rapport (index échangés)</i>' : ''}${ec(x)}</span>
+    </button>`).join('')}</div>`;
+}
+function pspAcFermer(rid, pid){
+  const el = document.querySelector(`input[data-r="${rid}"][data-p="${pid}"][data-k="avant"]`);
+  if(el && document.activeElement === el) return;
+  const z = document.getElementById(`psp-ac-${rid}-${pid}`); if(z) z.innerHTML = '';
+}
+function pspAcPrendre(rid, pid, cible, val){
+  const z = document.getElementById(`psp-ac-${rid}-${pid}`); if(z) z.innerHTML = '';
+  if(cible === pid){
+    const el = document.querySelector(`input[data-r="${rid}"][data-p="${pid}"][data-k="avant"]`);
+    if(el){ el.value = val.replace('.', ','); _pspGarder(el); }
+    return;
+  }
+  pspChangerPompe(rid, pid, cible);           // motif demandé, tracé, saisie du pompiste gardée
+}
+
 function pspCarte(r){
   const s = _pspS(r.id), toutesLignes = r.lignes.every(l => l.confirmee);
   const lignes = r.lignes.map(l => {
@@ -21709,18 +21788,16 @@ function pspCarte(r){
         ${l.pompe_saisie ? `<div class="psp-warn" style="font-size:11px;padding:2px 6px;margin-top:2px">saisi sur ${esc(l.pompe_saisie.pompe_nom)}</div>` : ''}
         <button class="psp-lien" style="font-size:11.5px" onclick="pspChangerPompe(${r.id},${l.pompe_id})" title="Le pompiste s'est trompé de pompe : remettre ces index sur la bonne">⇄ changer de pompe</button></td>
       <td class="r">${_pspN(prec)}${rupt ? `<div class="psp-neg" style="font-size:11px;font-weight:700">écart ${av - prec > 0 ? '+' : ''}${_pspN(av - prec)} gal · ${_pspG(Math.abs(av - prec) * l.prix_gallon)}</div>` : ''}</td>
-      <td class="r">${l.confirmee ? _pspN(av) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="avant" value="${_pspValeur(r.id, l.pompe_id, 'avant', av)}" oninput="_pspGarder(this)">`}</td>
+      <td class="r">${l.confirmee ? _pspN(av) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="avant" value="${_pspValeur(r.id, l.pompe_id, 'avant', av)}"
+          oninput="_pspGarder(this);pspAc(${r.id},${l.pompe_id},this.value)" onfocus="pspAc(${r.id},${l.pompe_id},this.value)" onblur="setTimeout(()=>pspAcFermer(${r.id},${l.pompe_id}),250)" autocomplete="off">`}</td>
       <td class="r">${l.confirmee ? _pspN(ap) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="apres" value="${_pspValeur(r.id, l.pompe_id, 'apres', ap)}" oninput="_pspGarder(this)">`}</td>
       <td class="r">${_pspN(l.gallons)}</td>
       <td class="r">${_pspG(l.montant)}</td>
       <td class="r" style="white-space:nowrap">${l.confirmee
         ? `<span class="psp-ok" style="font-weight:700">✓ Confirmé${corrige?' (corrigé)':''}</span> <button class="psp-lien" onclick="pspLigne(${r.id},${l.pompe_id},false)">reprendre</button>`
         : `<button class="btn btn-primary psp-mini" onclick="pspLigne(${r.id},${l.pompe_id},true)">Confirmer</button>`}</td>
-    </tr>${l.pompe_suggeree ? `<tr><td colspan="7"><div class="psp-warn">🧠 Le début ${_pspN(av)} ne suit pas ${esc(l.produit_nom)} · ${esc(l.pompe_nom)} : ces index sont sans doute ceux de <b>${esc(l.pompe_suggeree.pompe_nom)}</b>
-       <span class="psp-badge ${l.pompe_suggeree.confiance==='haute'?'CONFIRME':'PROBLEME'}" style="margin-left:4px">confiance ${esc(l.pompe_suggeree.confiance||'')}</span>
-       ${l.pompe_suggeree.autre_carburant ? '<b class="psp-neg"> ⚠ autre carburant</b>' : ''}
-       <div class="psp-muted" style="margin:3px 0">${(l.pompe_suggeree.raisons||[]).map(esc).join(' · ')}</div>
-       <button class="btn btn-primary psp-mini" onclick="pspChangerPompe(${r.id},${l.pompe_id},${l.pompe_suggeree.pompe_id})">⇄ Mettre sur ${esc(l.pompe_suggeree.pompe_nom)}</button></div></td></tr>` : ''}
+    </tr><tr class="psp-ac-tr"><td colspan="7" style="padding:0;border:0"><div id="psp-ac-${r.id}-${l.pompe_id}"></div></td></tr>
+    ${_pspSmartLigne(r, l)}
     ${corrige ? `<tr><td colspan="7"><div class="psp-muted">Saisi par le pompiste : ${_pspN(l.metter_avant)} → ${_pspN(l.metter_apres)}</div></td></tr>` : ''}
     ${j && (diffJ || !j.de_ce_rapport) ? `<tr><td colspan="7"><div class="${diffJ?'psp-warn':'psp-muted'}">${diffJ ? '⚠ ' : ''}${j.de_ce_rapport
          ? `Modifié ensuite dans le module Saisie par ${esc(j.modifie_par||'l\'administration')}`
