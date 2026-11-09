@@ -475,6 +475,7 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
     return {
         "placement": placement,
         "conflits": conflits_creneau(db, r) if avec_journal and r.statut in _A_TRAITER else [],
+        "fusions": fusions_possibles(db, r) if avec_journal and r.statut in _A_TRAITER else [],
         "id": r.id, "date": str(r.date), "periode": r.periode, "statut": r.statut,
         "certifie": r.statut in ("CONFIRME", "RESOLU"),
         "pompiste_id": r.utilisateur_id, "pompiste_nom": _nom(r.utilisateur),
@@ -1260,6 +1261,27 @@ def conflits_creneau(db: Session, rap: RapportPompiste, pompe_ids: Optional[list
     return sorted(set(out))
 
 
+def fusions_possibles(db: Session, rap: RapportPompiste) -> list[dict]:
+    """Relais entre deux pompistes sur le même meeter et le même créneau : une
+    ligne de ce rapport commence exactement où celle d'un autre rapport finit
+    (ou l'inverse). Elle peut être fusionnée dans l'autre rapport."""
+    out = []
+    for l in rap.lignes:
+        av, ap = _valeurs_finales(l)
+        for tl, t in (db.query(RapportPompisteLigne, RapportPompiste)
+                      .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
+                      .filter(RapportPompiste.date == rap.date, RapportPompiste.periode == rap.periode,
+                              RapportPompiste.id != rap.id, RapportPompiste.statut.in_(_ACTIFS),
+                              RapportPompiste.supprime_at.is_(None), RapportPompisteLigne.pompe_id == l.pompe_id).all()):
+            tav, tap = _valeurs_finales(tl)
+            sens = "apres" if abs(tap - av) <= TOLERANCE else ("avant" if abs(ap - tav) <= TOLERANCE else None)
+            if sens:
+                out.append({"pompe_id": l.pompe_id, "pompe_nom": l.pompe.nom, "vers_rapport_id": t.id,
+                            "vers_pompiste": _nom(t.utilisateur), "vers_statut": t.statut, "sens": sens,
+                            "resultat": [tav, ap] if sens == "apres" else [av, tap]})
+    return out
+
+
 def _rapport_a_traiter(db: Session, rid: int) -> RapportPompiste:
     rap = db.get(RapportPompiste, rid)
     if not rap:
@@ -1711,6 +1733,70 @@ def changer_date(rid: int, data: ChangerDateIn, request: Request,
 class ChangerPompeIn(BaseModel):
     pompe_id: int
     motif: str
+
+
+class FusionIn(BaseModel):
+    vers_rapport_id: int
+    motif: str
+
+
+@router.post("/api/pompiste-supervision/rapports/{rid}/lignes/{pompe_id}/fusionner")
+def fusionner_ligne(rid: int, pompe_id: int, data: FusionIn, request: Request,
+                    s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
+    """Relais sur un même meeter dans le même créneau : le segment de cette
+    ligne est rattaché à la ligne de l'autre rapport (même meeter, mêmes jour et
+    période, segments qui se suivent exactement), qui couvre alors les deux ;
+    la ligne sort de ce rapport. Le rapport cible peut être finalisé : son
+    relevé du journal suit. Montants et écarts des deux rapports recalculés ;
+    les valeurs saisies par les pompistes restent conservées ; trace d'audit."""
+    import main
+    rap = _rapport_a_traiter(db, rid)
+    l = next((x for x in rap.lignes if x.pompe_id == pompe_id), None)
+    if not l:
+        raise HTTPException(404, "Pompe absente du rapport")
+    motif = " ".join((data.motif or "").split())
+    if len(motif) < 5:
+        raise HTTPException(400, "Indiquez le motif (5 caractères minimum).")
+    if len(rap.lignes) < 2:
+        raise HTTPException(409, "C'est la seule ligne de ce rapport : supprimez plutôt le rapport.")
+    t = db.get(RapportPompiste, data.vers_rapport_id)
+    if not t or t.id == rap.id or t.supprime_at is not None or t.statut not in _ACTIFS:
+        raise HTTPException(404, "Rapport cible introuvable.")
+    if (t.date, t.periode) != (rap.date, rap.periode):
+        raise HTTPException(400, "Les deux rapports doivent être du même jour et de la même période.")
+    tl = next((x for x in t.lignes if x.pompe_id == pompe_id), None)
+    if not tl:
+        raise HTTPException(404, "Ce meeter n'est pas dans le rapport cible.")
+    av, ap = _valeurs_finales(l)
+    tav, tap = _valeurs_finales(tl)
+    if abs(tap - av) <= TOLERANCE:
+        nav, nap = tav, ap
+    elif abs(ap - tav) <= TOLERANCE:
+        nav, nap = av, tap
+    else:
+        raise HTTPException(400, f"Les deux segments ne se suivent pas ({tav:.3f} → {tap:.3f} et {av:.3f} → {ap:.3f}).")
+    trace = {"rapport_id": rap.id, "vers_rapport_id": t.id, "pompe": l.pompe.nom, "date": str(rap.date),
+             "periode": rap.periode, "segment": [av, ap], "cible_avant": [tav, tap], "cible_apres": [nav, nap],
+             "motif": motif[:300]}
+    # La ligne cible couvre les deux segments (valeurs des pompistes gardées)
+    tl.metter_avant_corrige, tl.metter_apres_corrige = nav, nap
+    if t.statut in ("CONFIRME", "RESOLU"):
+        for r in db.query(Releve).filter_by(rapport_pompiste_id=t.id, pompe_id=pompe_id, date=t.date, periode=t.periode).all():
+            r.metter_avant, r.metter_apres, r.modifie_par_id = nav, nap, s.id
+    # La ligne sort de ce rapport
+    _retirer_ligne_du_journal(db, rap, l)
+    rap.lignes.remove(l)
+    db.flush()
+    for x in (rap, t):
+        _recalculer_attendu(x)
+        x.ecart = round(float(x.montant_compte) + float(x.total_depenses or 0) + _totaux_feuille(x)["net"]
+                        - float(x.montant_attendu), 2)
+    rap.ecart_confirme = False
+    main._tracer(db, request, "ligne_fusionnee", trace)
+    main._tracer(db, request, "ligne_recue_par_fusion", dict(trace, rapport_id=t.id, depuis_rapport_id=rap.id))
+    db.commit()
+    db.refresh(rap)
+    return _rapport_dict(db, rap, avec_journal=True)
 
 
 @router.post("/api/pompiste-supervision/rapports/{rid}/lignes/{pompe_id}/changer-pompe")

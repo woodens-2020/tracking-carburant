@@ -21838,6 +21838,21 @@ function pspAcPrendre(rid, pid, cible, val, kind){
   pspChangerPompe(rid, pid, cible);           // motif demandé, tracé, saisie du pompiste gardée
 }
 
+// Relais : le segment de cette ligne rejoint la ligne de l'autre rapport
+async function pspFusionner(rid, pompe, vers){
+  const m = prompt(`Mettre ce segment dans le rapport n°${vers} ? Ce rapport couvrira les deux segments (son journal suit), et la ligne sort de celui-ci.
+
+Motif (obligatoire) :`,
+                   'Relais entre deux pompistes sur le même meeter');
+  if(m == null) return;
+  if(m.trim().length < 5) return notify('Indiquez le motif (5 caractères minimum).', 'err');
+  try{
+    const x = await _pspApi('POST', `/rapports/${rid}/lignes/${pompe}/fusionner`, {vers_rapport_id: vers, motif: m.trim()});
+    _pspMaj(x); pspMajBadge();
+    notify(`Segment mis dans le rapport n°${vers} : montants des deux rapports recalculés.`, 'ok');
+  }catch(e){ notify(e.message, 'err'); }
+}
+
 // ── Transfert vers une autre station (voir backend/transfert_station.py) ──
 async function pspTransferer(id){
   const r = PSP.rapports.find(x => x.id === id); if(!r) return;
@@ -21971,7 +21986,10 @@ function pspCarte(r){
       <div class="psp-muted">soumis ${r.soumis_at ? new Date(r.soumis_at).toLocaleString('fr-FR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : ''} · charte acceptée</div></div>
     ${(r.conflits || []).length ? `<div class="psp-err" style="margin:0 0 10px">⛔ <b>Meeters déjà rapportés sur ce créneau par un autre rapport</b> :
       ${r.conflits.map(c => `<div>• ${esc(c)}</div>`).join('')}
-      <div style="margin-top:4px">Changez la date (✏️ à côté de la date) ou la pompe (⇄ changer de pompe) de l'un des rapports : la confirmation et la finalisation sont bloquées tant que le conflit existe.</div></div>` : ''}
+      ${(r.fusions || []).map(f => `<div style="margin-top:6px;color:var(--text)">🔗 Relais sur <b>${esc(f.pompe_nom)}</b> : ce segment suit exactement celui du rapport n°${f.vers_rapport_id} (${esc(f.vers_pompiste || '')}).
+        <button class="btn btn-primary psp-mini" style="margin-left:6px" onclick="pspFusionner(${r.id},${f.pompe_id},${f.vers_rapport_id})">🔗 Mettre dans le rapport n°${f.vers_rapport_id}</button>
+        <span class="psp-muted">→ ${_pspN(f.resultat[0])} → ${_pspN(f.resultat[1])}</span></div>`).join('')}
+      <div style="margin-top:4px">Sinon, changez la date (✏️ à côté de la date) ou la pompe (⇄ changer de pompe) de l'un des rapports : la confirmation et la finalisation sont bloquées tant que le conflit existe.</div></div>` : ''}
     ${pb ? `<div class="psp-err" style="margin:0 0 10px">Problème signalé par ${esc(r.probleme_par_nom||'')} : ${esc(r.probleme_commentaire||'')}</div>` : ''}
     ${r.note_pompiste ? `<div class="psp-warn" style="color:var(--text);margin:0 0 10px"><b>Note du pompiste :</b> ${esc(r.note_pompiste)}</div>` : ''}
 
