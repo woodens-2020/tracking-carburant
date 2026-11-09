@@ -242,3 +242,26 @@ def test_rapport_au_mauvais_creneau(client):
     cp = pl["dates"]["creneau_probable"]
     assert cp and (cp["date"], cp["periode"]) == (j0, "Apres-midi"), pl["sans_place"]
     assert any("même créneau" in m for m in pl["dates"]["messages"]) and pl["plan"] == []
+
+
+def test_rapport_a_probleme_supprime_le_pompiste_refait_le_creneau(client):
+    """Rapport signalé « problème » puis supprimé : le créneau redevient libre
+    et le pompiste refait le rapport du même jour, même période."""
+    import main as _m
+    from tz_utils import today_haiti
+    j = str(today_haiti() - timedelta(days=20))
+    (a,) = _produit(client, f"Gazoline P{time.time_ns()}", 500, ["G1"])
+    _releve(client, str(today_haiti() - timedelta(days=21)), "Apres-midi", a, 0, 1000.457)
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Re", "nom": f"Fait{time.time_ns()}"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    envoi = lambda av, ap: p.post("/api/pompiste/compteurs", json={"date": j, "charte_acceptee": True, "lignes": [
+        {"pompe_id": a, "metter_avant": av, "metter_apres": ap, "debut_confirme": True}]})
+    r = envoi(1000.457, 1093.812)
+    assert r.status_code == 201 and r.json()["periode"] == "Matin", r.text
+    rid = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 46}], "depenses": []}).json()["id"]
+    assert _sup(client, rid, "probleme", commentaire="Billetterie fausse, à refaire").status_code == 200
+    # Tant que le rapport existe, le créneau Matin est pris : un nouvel envoi irait sur l'Après-midi
+    assert _sup(client, rid, "supprimer", motif="Rapport à refaire par le pompiste").status_code == 200
+    r = envoi(1000.457, 1093.812)
+    assert r.status_code == 201 and r.json()["periode"] == "Matin", r.text

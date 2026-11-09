@@ -3431,7 +3431,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .psp-chip.on{background:rgba(249,115,22,.12);border-color:var(--orange);color:var(--text)}
 .psp-jour{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--orange);margin:16px 0 6px}
 .psp-liste td{vertical-align:middle}
-.psp-poubelle{background:none;border:1px solid transparent;border-radius:8px;cursor:pointer;font-size:15px;padding:3px 6px;margin-left:4px;opacity:.6;vertical-align:middle}
+.psp-poubelle{background:none;border:1px solid transparent;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--red);padding:3px 6px;margin-left:4px;opacity:.85;vertical-align:middle}
 .psp-poubelle:hover,.psp-poubelle:focus-visible{opacity:1;border-color:var(--red);background:rgba(239,68,68,.1);outline:none}
 .psp-ligne-clic{cursor:pointer}
 .psp-ligne-clic:hover td{background:rgba(249,115,22,.06)}
@@ -4723,6 +4723,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
         <button class="psp-tab" data-t="comptes" onclick="pspOnglet('comptes')">Comptes pompistes</button>
         <button class="psp-tab" data-t="taux" onclick="pspOnglet('taux')">Taux du jour</button>
         <button class="psp-tab" data-t="ventes" onclick="pspOnglet('ventes')">📊 Ventes par pompiste</button>
+        <button class="psp-tab" data-t="reconciliation" onclick="pspOnglet('reconciliation')">🔎 Réconciliation des meeters</button>
       </div>
       <div id="psp-contenu"></div>
     </div>
@@ -17859,6 +17860,29 @@ function jrCompterResolution(id){
   c.style.color=n>=JR_DESC_MIN?'var(--green)':'var(--red)';
   document.getElementById('jres-ok-'+id).disabled=n<JR_DESC_MIN;
 }
+// Notice courte sous une ligne du journal : quelle erreur, et quoi faire
+function _jrNotice(e, isErr){
+  const n3 = v => v==null ? '—' : Number(v).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3});
+  const ec = e.decalage!=null ? Math.abs(e.decalage) : null;
+  const quoi = {
+    saut_compteur:  `Saut de ${n3(ec)} gal : le meeter avant ${n3(e.metter_avant)} ne suit pas la fin précédente ${n3(e.metter_attendu)}.`,
+    recul_compteur: `Recul de ${n3(ec)} gal : le meeter avant ${n3(e.metter_avant)} est plus bas que la fin précédente ${n3(e.metter_attendu)}.`,
+    saisie_invalide:`Meeter après ${n3(e.metter_apres)} plus bas que le meeter avant ${n3(e.metter_avant)}.`,
+  }[e.type_anomalie] || (TYPE_LABELS[e.type_anomalie] || 'Anomalie') + (e.commentaire ? ' : ' + e.commentaire : '');
+  const mp = e.metre_probable;
+  const peutAgir = !e.en_attente && typeof e.id==='number';
+  const deplacer = mp && peutAgir && !(e.rapport_pompiste_id && !['CONFIRME','RESOLU'].includes(e.rapport_statut))
+    ? ` <button class="btn btn-primary btn-sm" style="padding:2px 8px;font-size:12px" onclick="jrDeplacerMetre(${e.id},${mp.pompe_id},'${esc(mp.libelle).replace(/'/g,'&#39;')}',${mp.echange})">⇄ Mettre sur ${esc(mp.libelle)}</button>` : '';
+  const col = isErr ? 'var(--red)' : 'var(--blue)';
+  return `<tr class="jr-notice"><td colspan="12" style="padding:4px 14px 8px;border-top:none;font-size:12.5px">
+    <div id="jres-pied-${e.id}" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;border-left:3px solid ${col};padding-left:8px">
+      <span style="color:${col};font-weight:700">${isErr?'⛔':'⚠'} ${esc(quoi)}</span>
+      ${mp ? `<span>🧠 Meeter probable : <b>${esc(mp.libelle)}</b></span>${deplacer}` : ''}
+      ${e.en_attente ? '<span class="c-muted">⏳ À corriger dans Rapports pompistes</span>'
+        : peutAgir ? `<button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:12px" onclick="jrOuvrirResolution(${e.id})">✓ Marquer comme résolu</button>` : ''}
+    </div></td></tr>`;
+}
+
 async function jrResoudre(id){
   const description=document.getElementById('jres-desc-'+id).value.trim();
   if(description.replace(/\s+/g,' ').length<JR_DESC_MIN) return notify(`La description doit contenir au moins ${JR_DESC_MIN} caractères.`,'err');
@@ -17948,98 +17972,9 @@ function renderJournal(data){
     </div>`:''}
   </div>`:''}`;
 
-  // ── Analyse : alertes + erreurs ───────────
-  const alertDiv=document.getElementById('journal-alertes');
-  const problemes=entries.filter(e=>e.statut==='alerte'||e.statut==='erreur');
-  const resolus=entries.filter(e=>e.statut==='resolu');
-  const blocResolus=_jrBlocResolus(resolus);
-  if(!problemes.length){
-    alertDiv.innerHTML=`<div class="card" style="padding:14px 18px;border-left:3px solid var(--green)">
-      <div style="display:flex;align-items:center;gap:10px;color:var(--green)">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-        <span style="font-weight:700">${resolus.length?'Aucun écart en suspens':'Continuité parfaite — aucun décalage détecté'}</span>
-      </div>
-      <div style="color:var(--muted);font-size:14px;margin-top:5px">${resolus.length
-        ?`Aucun écart en suspens : ${resolus.length} écart${resolus.length>1?'s':''} justifié${resolus.length>1?'s':''} par la direction (voir ci-dessous).`
-        :"Tous les relevés s'enchaînent correctement. Les meeters sont cohérents sur toute la période."}</div>
-    </div>${blocResolus}`;
-  } else {
-    const nbErr=problemes.filter(e=>e.statut==='erreur').length;
-    const nbAl =problemes.filter(e=>e.statut==='alerte').length;
-    alertDiv.innerHTML=`
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-      <div style="font-size:15px;font-weight:700;color:var(--text)">Problèmes détectés</div>
-      ${nbErr?`<span class="badge" style="background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.25)">${nbErr} erreur${nbErr>1?'s':''}</span>`:''}
-      ${nbAl ?`<span class="badge" style="background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.25)">${nbAl} alerte${nbAl>1?'s':''}</span>`:''}
-    </div>
-    `+problemes.map((e,i)=>{
-      const isErr=e.statut==='erreur';
-      const typeLabel=TYPE_LABELS[e.type_anomalie]||e.type_anomalie||'ANOMALIE';
-      const decStr=e.decalage!=null?(e.decalage>=0?`+${e.decalage.toFixed(3)}`:`${e.decalage.toFixed(3)}`):'—';
-      const attStr=e.metter_attendu!=null?e.metter_attendu.toFixed(3):'—';
-
-      // Chaîne explicite selon le type
-      let chainRows='';
-      if(e.type_anomalie==='saisie_invalide'){
-        chainRows=`
-          <div class="janom-chain-row"><span class="janom-chain-lbl">Meeter avant saisi</span><span class="janom-chain-val c-amber">${e.metter_avant.toFixed(3)}</span></div>
-          <div class="janom-chain-sep" style="color:var(--red);font-size:22px;padding-left:130px">↓ ✗</div>
-          <div class="janom-chain-row"><span class="janom-chain-lbl">Meeter après saisi</span><span class="janom-chain-val c-red">${e.metter_apres.toFixed(3)}</span><span class="janom-chain-diff" style="background:rgba(239,68,68,.15);color:var(--red)">impossible</span></div>`;
-      } else if(e.type_anomalie==='recul_compteur'){
-        chainRows=`
-          <div class="janom-chain-row"><span class="janom-chain-lbl">Fin session préc.</span><span class="janom-chain-val c-teal">${attStr}</span></div>
-          <div class="janom-chain-sep" style="color:var(--red);font-size:22px;padding-left:130px">↓ ✗</div>
-          <div class="janom-chain-row"><span class="janom-chain-lbl">Début actuel</span><span class="janom-chain-val c-red">${e.metter_avant.toFixed(3)}</span><span class="janom-chain-diff" style="background:rgba(239,68,68,.15);color:var(--red)">${decStr}</span></div>`;
-      } else if(e.type_anomalie==='saut_compteur'){
-        chainRows=`
-          <div class="janom-chain-row"><span class="janom-chain-lbl">Fin session préc.</span><span class="janom-chain-val c-teal">${attStr}</span></div>
-          <div class="janom-chain-sep" style="color:var(--blue);font-size:22px;padding-left:130px">↓ ⚠</div>
-          <div class="janom-chain-row"><span class="janom-chain-lbl">Début actuel</span><span class="janom-chain-val c-amber">${e.metter_avant.toFixed(3)}</span><span class="janom-chain-diff" style="background:rgba(59,130,246,.15);color:var(--blue)">${decStr} gal</span></div>
-          <div style="border-top:1px solid var(--border);margin:8px 0"></div>
-          <div class="janom-chain-row"><span class="janom-chain-lbl">Attendu</span><span class="janom-chain-val c-teal">${attStr}</span></div>
-          <div class="janom-chain-row"><span class="janom-chain-lbl">Écart non compté</span><span class="janom-chain-val" style="color:var(--blue)">${e.ecart_gallons!=null?e.ecart_gallons.toFixed(3)+' gal':'—'}</span></div>`;
-      }
-
-      return `<div class="janom-card ${isErr?'is-err':'is-alerte'} stagger" style="animation-delay:${i*55}ms">
-        <div class="janom-head">
-          <div style="flex:1">
-            <div class="janom-type" style="color:${isErr?'var(--red)':'var(--blue)'}">${typeLabel}</div>
-            <div class="janom-title">${esc(e.pompe_nom)} <span style="font-weight:400;color:var(--muted)">·</span> ${esc(e.produit_nom)}</div>
-            <div class="janom-sub">${frDate(e.date)} · ${e.periode==='Matin'?'🌅 Matin':'🌇 Après-midi'} · #${e.id}</div>
-          </div>
-          <span class="janom-badge ${isErr?'err':'alerte'}">${isErr?'⛔ ERREUR':'⚠ ALERTE'}</span>
-        </div>
-        <div class="janom-body">
-          ${chainRows?`<div class="janom-chain"><div class="janom-chain-title">Chaîne des valeurs</div>${chainRows}</div>`:'<div></div>'}
-          <div class="janom-block">
-            <div class="janom-block-title">Explication</div>
-            <div class="janom-block-text">${esc(e.commentaire)}</div>
-          </div>
-          <div class="janom-block" style="margin-left:10px">
-            <div class="janom-block-title">Action recommandée</div>
-            <div class="janom-block-text">${esc(e.recommandation)}</div>
-          </div>
-        </div>
-        ${e.motif_saisie?`<div class="jres-pied"><span class="janom-block-title">Motif donné à la saisie</span> ${esc(e.motif_saisie)}</div>`:''}
-        ${e.metre_probable?`<div class="jres-pied" style="border-left:3px solid var(--orange,#ea580c)">
-            🧠 <b>Meeter probable : ${esc(e.metre_probable.libelle)}</b>
-            <span class="badge">confiance ${esc(e.metre_probable.confiance)}</span>
-            ${e.metre_probable.echange?'<small> · index croisés entre les deux meeters</small>':''}
-            ${e.metre_probable.autre_carburant?'<b style="color:var(--red)"> · ⚠ autre carburant</b>':''}
-            ${e.metre_probable.deja_vu?`<small> · erreur déjà vue ${e.metre_probable.deja_vu} fois</small>`:''}
-            ${!e.en_attente && !(e.rapport_pompiste_id && !['CONFIRME','RESOLU'].includes(e.rapport_statut))
-              ?`<button class="btn btn-primary btn-sm" style="margin-left:8px" onclick="jrDeplacerMetre(${e.id},${e.metre_probable.pompe_id},'${esc(e.metre_probable.libelle).replace(/'/g,'&#39;')}',${e.metre_probable.echange})">⇄ Mettre sur ${esc(e.metre_probable.libelle)}</button>`
-              :'<small> · à corriger dans Rapports pompistes</small>'}
-          </div>`:''}
-        ${e.en_attente
-          ?`<div class="jres-pied" style="color:var(--muted)">⏳ Rapport pompiste pas encore finalisé : l'écart pourra être résolu après la validation.</div>`
-          :`<div class="jres-pied" id="jres-pied-${e.id}">
-              <button class="btn btn-primary btn-sm" onclick="jrCorriger(${e.id})">✏️ Corriger le meeter</button>
-              <button class="btn btn-secondary btn-sm" onclick="jrOuvrirResolution(${e.id})">✓ Marquer comme résolu</button>
-            </div>`}
-      </div>`;
-    }).join('')+blocResolus;
-  }
+  // Pas de cartes d'explication au-dessus du tableau : chaque problème a sa
+  // notice courte sous sa ligne du tableau (voir _jrNotice).
+  document.getElementById('journal-alertes').innerHTML='';
 
   // ── Table journal complet ─────────────────
   const tblDiv=document.getElementById('journal-table');
@@ -18111,7 +18046,7 @@ function renderJournal(data){
       <td><span class="type-pill ${pillCls}">${typeLabel}</span></td>
       <td>${statHtml}${certifie?'<div style="margin-top:3px"><span class="cert" title="Compteur continu et rapport validé">Certifié</span></div>':''}${e.id!=null
         ?`<div><button class="jr-sup" title="${e.rapport_pompiste_id?'Supprimer le rapport pompiste n°'+e.rapport_pompiste_id:'Supprimer ce relevé'}" onclick="jrSupprimer(${JSON.stringify(e.id).replace(/"/g,'&quot;')})">🗑 Supprimer</button></div>`:''}</td>
-    </tr>`;
+    </tr>${(isErr||isAl)?_jrNotice(e,isErr):''}`;
   }).join('');
 
   tblDiv.innerHTML=`<div class="card">
@@ -21005,6 +20940,7 @@ async function pspOnglet(t){
       await pspChargerListe();
     } else if(t === 'taux'){ await pspRendreTaux(); }
     else if(t === 'ventes'){ await pspVentes(); }
+    else if(t === 'reconciliation'){ await smReconciliation(); }
     else { PSP.comptes = await _pspApi('GET','/comptes'); pspRendreComptes(); }
   }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
   pspMajBadge();
@@ -21122,7 +21058,7 @@ function pspVentesImprimer(i){
     ${p.nb_depenses ? `<h2>Dépenses</h2><table><thead><tr><th>Date</th><th>Description</th><th>Catégorie</th><th class="r">Montant</th></tr></thead>
       <tbody>${p.liste_depenses.map(x => `<tr><td>${dc(x.date)}</td><td>${e(x.description)}</td><td>${e(x.categorie || '')}</td><td class="r">${nb(x.montant, 2)}</td></tr>`).join('')}</tbody>
       <tfoot><tr><td colspan="3">TOTAL DÉPENSES</td><td class="r">${nb(tdep, 2)}</td></tr></tfoot></table>` : ''}
-    ${(p.releves_detail || []).length ? `<h2>Relevés</h2><table><thead><tr><th>Date</th><th>Période</th><th>Meeter</th><th class="r">Avant</th><th class="r">Après</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead>
+    ${(p.releves_detail || []).length ? `<h2>Meeters</h2><table><thead><tr><th>Date</th><th>Période</th><th>Meeter</th><th class="r">Avant</th><th class="r">Après</th><th class="r">Gallons</th><th class="r">Montant</th></tr></thead>
       <tbody>${p.releves_detail.map(x => `<tr><td>${dc(x.date)}</td><td>${x.periode === 'Apres-midi' ? 'Après-midi' : e(x.periode)}</td><td>${e(x.meeter)}</td>
         <td class="r">${nb(x.avant, 3)}</td><td class="r">${nb(x.apres, 3)}</td><td class="r">${nb(x.gallons, 3)}</td><td class="r">${nb(x.montant, 2)}</td></tr>`).join('')}</tbody></table>` : ''}
     <div class="sign"><div>Signature du pompiste</div><div>Vérifié par</div></div>
@@ -21155,16 +21091,6 @@ function pspVentesFiche(i, garder){
       <button class="btn btn-primary psp-mini" onclick="_pvPer(document.getElementById('pvf-d').value, document.getElementById('pvf-f').value)">Filtrer</button>
       <button class="btn btn-secondary psp-mini" onclick="pspVentesImprimer(${i})" title="Format lettre 8,5 × 11 po">🖨 Imprimer (8,5 × 11)</button>
     </div>
-    <div class="cjr-kpis" style="margin-top:10px">
-      ${cols.map(fm => `<div class="cjr-kpi"><div class="cjr-kpi-l">Total ${esc(fm.toLowerCase())}</div>
-        <div class="cjr-kpi-v" style="font-size:18px">${cjrGal(tg(fm))}</div><div class="cjr-kpi-s">${cjrG(p.par_carburant[fm]?.montant || 0)}</div></div>`).join('')}
-      <div class="cjr-kpi"><div class="cjr-kpi-l">Montant vendu</div><div class="cjr-kpi-v" style="color:var(--green);font-size:18px">${cjrG(tmt)}</div>
-        <div class="cjr-kpi-s">${dates.filter(dt => J[dt].mt > 0).length} jour(s) · ${p.creneaux} créneau(x)</div></div>
-      <div class="cjr-kpi"><div class="cjr-kpi-l">Dépenses</div><div class="cjr-kpi-v" style="color:var(--orange);font-size:18px">${cjrG(tdep)}</div>
-        <div class="cjr-kpi-s">${p.nb_depenses} dépense(s)</div></div>
-      <div class="cjr-kpi cjr-kpi-solde"><div class="cjr-kpi-l">Reste (vendu − dépenses)</div>
-        <div class="cjr-kpi-v" style="color:${coul(tmt - tdep)};font-size:18px">${cjrG(tmt - tdep)}</div></div>
-    </div>
     <h3 class="cjr-h">Jour par jour</h3>
     <div class="tbl-wrap"><table class="dt cjr-table">
       <thead><tr><th>Date</th><th>Période</th>${cols.map(fm => `<th class="tr">Total ${esc(fm.toLowerCase())}</th>`).join('')}<th class="tr">Montant vendu</th><th class="tr">Dépenses</th><th class="tr">Reste</th></tr></thead>
@@ -21178,12 +21104,183 @@ function pspVentesFiche(i, garder){
     </table></div>
     ${p.nb_depenses ? `<h3 class="cjr-h">Dépenses</h3><div class="tbl-wrap"><table class="dt cjr-table"><thead><tr><th>Date</th><th>Description</th><th>Catégorie</th><th class="tr">Montant</th></tr></thead>
       <tbody>${p.liste_depenses.map(x => `<tr><td class="num">${frDate(x.date)}</td><td>${esc(x.description)}</td><td>${esc(x.categorie || '')}</td><td class="tr num c-amber">${cjrG(x.montant)}</td></tr>`).join('')}</tbody></table></div>` : ''}
-    ${(p.releves_detail || []).length ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:700">Voir ses relevés (${p.releves_detail.length})</summary>
+    ${(p.releves_detail || []).length ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:700">Voir ses meeters (${p.releves_detail.length})</summary>
       <div class="tbl-wrap"><table class="dt cjr-table"><thead><tr><th>Date</th><th>Période</th><th>Meeter</th><th class="tr">Avant</th><th class="tr">Après</th><th class="tr">Gallons</th><th class="tr">Montant</th></tr></thead>
       <tbody>${p.releves_detail.map(x => `<tr><td class="num">${frDate(x.date)}</td><td>${x.periode === 'Apres-midi' ? 'Après-midi' : esc(x.periode)}</td><td>${esc(x.meeter)}</td>
         <td class="tr num">${cjrGal(x.avant).replace(' gal', '')}</td><td class="tr num">${cjrGal(x.apres).replace(' gal', '')}</td>
         <td class="tr num">${cjrGal(x.gallons)}</td><td class="tr num c-teal">${cjrG(x.montant)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}
   </div>`;
+}
+
+// ══ Réconciliation des meeters (Smart Meter, voir backend/smart_meter.py) ══
+// Chaque ligne de rapport pompiste avec ce que le moteur a trouvé à la saisie
+// (statut figé), ses anomalies et sa validation ; filtres et actions de la direction.
+const _SM_STATUTS = {MATCH_CONFIRMED:'✓ Correspondance confirmée', MATCH_REVIEW:'⚠ À vérifier', UNMATCHED:'⛔ Sans correspondance',
+  INITIAL_READING:'ℹ Première lecture', NON_ANALYSE:'— Saisi avant le moteur'};
+const _SM_VALID = {EN_ATTENTE:'En attente', VERIFIE:'Vérifié', REJETE:'Rejeté', SUPPRIME:'Supprimé'};
+const _SM_COUL = {MATCH_CONFIRMED:'var(--green)', MATCH_REVIEW:'var(--orange)', UNMATCHED:'var(--red)', INITIAL_READING:'var(--blue)'};
+async function smReconciliation(){
+  const c = document.getElementById('psp-contenu');
+  const F = PSP.sm ||= {debut: currentDate.slice(0,8) + '01', fin: currentDate, distributeur:'', pompe:'', pompiste:'',
+                        anomalie:'', rapprochement:'', validation:''};
+  const q = new URLSearchParams({date_debut: F.debut, date_fin: F.fin});
+  [['distributeur_id', F.distributeur], ['pompe_id', F.pompe], ['pompiste_id', F.pompiste], ['anomalie', F.anomalie],
+   ['statut_rapprochement', F.rapprochement], ['statut_validation', F.validation]].forEach(([k, v]) => { if(v) q.set(k, v); });
+  let d, dist = [];
+  try{
+    [d, dist] = await Promise.all([GET('/smart-meter/reconciliation?' + q), GET('/distributeurs').then(x => x.distributeurs || []).catch(() => [])]);
+    if(!PSP.comptes) PSP.comptes = await _pspApi('GET', '/comptes');
+  }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; return; }
+  const meeters = (products || []).flatMap(p => p.pompes.map(q2 => ({id: q2.id, lib: `${p.nom} · ${q2.nom}`})));
+  const opt = (L, v) => L.map(([k, l]) => `<option value="${esc(String(k))}" ${String(k) === String(v) ? 'selected' : ''}>${esc(l)}</option>`).join('');
+  const sel = (id, lib, L, v, tous) => `<label class="cp-champ">${lib}<select class="filter-select" id="${id}">
+      <option value="">${tous}</option>${opt(L, v)}</select></label>`;
+  const R = d.resume, n3 = v => v == null ? '—' : Number(v).toLocaleString('fr-FR', {minimumFractionDigits:3, maximumFractionDigits:3});
+  const sg = v => v == null ? '—' : (v > 0 ? '+' : '') + n3(v);
+  const carte = (lib, v, coul, f, val) => `<button class="cjr-nom ${F[f] === val ? 'on' : ''}" onclick="smFiltre('${f}', '${val}')">
+      <span class="cjr-nom-r" style="color:${coul}">${lib}</span><span class="cjr-nom-n">${v}</span></button>`;
+  c.innerHTML = `<div class="psp-card">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:end">
+        <label class="cp-champ">Du<input type="date" class="filter-input" id="sm-d" value="${F.debut}"></label>
+        <label class="cp-champ">Au<input type="date" class="filter-input" id="sm-f" value="${F.fin}"></label>
+        ${sel('sm-dist', 'Pompe', dist.map(x => [x.id, x.nom]), F.distributeur, 'Toutes')}
+        ${sel('sm-pompe', 'Pistolet (meeter)', meeters.map(x => [x.id, x.lib]), F.pompe, 'Tous')}
+        ${sel('sm-pompiste', 'Pompiste', (PSP.comptes.comptes || []).map(x => [x.id, x.nom_complet || x.username]), F.pompiste, 'Tous')}
+        ${sel('sm-ano', "Type d'anomalie", Object.entries(d.anomalies), F.anomalie, 'Toutes')}
+        ${sel('sm-rap', 'Rapprochement', Object.entries(_SM_STATUTS), F.rapprochement, 'Tous')}
+        ${sel('sm-val', 'Validation', Object.entries(_SM_VALID), F.validation, 'Toutes')}
+        <button class="btn btn-primary psp-mini" onclick="smAppliquer()">Filtrer</button>
+      </div></div>
+    <div class="cjr-noms" style="margin-bottom:12px">
+      ${carte('Lignes', R.total, 'var(--muted)', 'rapprochement', '')}
+      ${carte('Confirmées', R.MATCH_CONFIRMED, _SM_COUL.MATCH_CONFIRMED, 'rapprochement', 'MATCH_CONFIRMED')}
+      ${carte('À vérifier', R.MATCH_REVIEW, _SM_COUL.MATCH_REVIEW, 'rapprochement', 'MATCH_REVIEW')}
+      ${carte('Sans correspondance', R.UNMATCHED, _SM_COUL.UNMATCHED, 'rapprochement', 'UNMATCHED')}
+      ${carte('Écarts positifs', R.ECART_POSITIF, 'var(--blue)', 'anomalie', 'ECART_POSITIF')}
+      ${carte('Reculs', R.RECUL, 'var(--red)', 'anomalie', 'RECUL')}
+      ${carte('Mauvais pistolet', R.MAUVAIS_METEER, 'var(--orange)', 'anomalie', 'MAUVAIS_METEER')}
+      ${carte('Volume élevé', R.VOLUME_ELEVE, 'var(--red)', 'anomalie', 'VOLUME_ELEVE')}
+      ${carte('En attente de validation', R.en_attente, 'var(--orange)', 'validation', 'EN_ATTENTE')}
+    </div>
+    <div class="psp-card" style="padding:0;overflow-x:auto"><table class="psp-tbl"><thead><tr>
+      <th>Date</th><th>Pompiste</th><th>Meeter</th><th class="r">Début / fin saisis</th><th class="r">Retenus</th>
+      <th class="r">Référence</th><th class="r">Écart</th><th>Rapprochement</th><th>Anomalies</th><th>Validation</th><th></th></tr></thead>
+      <tbody>${d.lignes.length ? d.lignes.map((x, i) => `<tr>
+        <td>${frDate(x.date)}<div class="psp-muted">${esc(x.periode_lib)} · n°${x.rapport_id}</div></td>
+        <td>${esc(x.pompiste || '—')}</td>
+        <td><b>${esc(x.meeter)}</b>${x.meeter_saisi ? `<div class="psp-muted">✎ saisi sur ${esc(x.meeter_saisi)}</div>` : ''}
+          ${x.meeter_propose && x.meeter_propose !== x.meeter ? `<div style="color:var(--orange);font-size:12px">🧠 proposé : ${esc(x.meeter_propose)}</div>` : ''}</td>
+        <td class="r num">${n3(x.metter_avant_saisi)}<br>${n3(x.metter_apres_saisi)}</td>
+        <td class="r num">${x.metter_avant !== x.metter_avant_saisi || x.metter_apres !== x.metter_apres_saisi
+          ? `<b>${n3(x.metter_avant)}<br>${n3(x.metter_apres)}</b>` : '<span class="psp-muted">idem</span>'}</td>
+        <td class="r num">${n3(x.index_reference)}<div class="psp-muted" style="font-size:11px">${esc(x.source_reference || '')}</div></td>
+        <td class="r num" style="color:${x.ecart_reference && Math.abs(x.ecart_reference) > 0.001 ? (x.ecart_reference < 0 ? 'var(--red)' : 'var(--blue)') : 'inherit'}">${sg(x.ecart_reference)}</td>
+        <td><span style="color:${_SM_COUL[x.statut_rapprochement] || 'var(--muted)'};font-weight:700">${_SM_STATUTS[x.statut_rapprochement] || x.statut_rapprochement}</span>
+          ${x.confiance ? `<div class="psp-muted">confiance ${esc(x.confiance)}${x.decision_pompiste && x.decision_pompiste !== 'AUCUNE' ? ' · pompiste : ' + (x.decision_pompiste === 'ACCEPTE' ? 'a pris la proposition' : 'a gardé son choix') : ''}</div>` : ''}</td>
+        <td>${x.anomalies.map(a => `<span class="psp-badge PROBLEME" title="${esc(d.anomalies[a] || '')}" style="margin:1px">${esc(a)}</span>`).join(' ') || '—'}</td>
+        <td><span class="psp-badge ${x.statut_validation === 'VERIFIE' ? 'CONFIRME' : x.statut_validation === 'EN_ATTENTE' ? 'SOUMIS' : 'REJETE'}">${_SM_VALID[x.statut_validation]}</span>
+          ${x.note_verification ? `<div class="psp-muted" style="font-size:11.5px">📝 ${esc(x.note_verification)} — ${esc(x.verifie_par || '')}</div>` : ''}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-secondary psp-mini" onclick="smOuvrir(${x.rapport_id}, '${x.date}')">Ouvrir</button>
+          <button class="btn btn-secondary psp-mini" onclick="smVerifier(${x.rapport_id}, ${x.pompe_id})">📝 Vérifié</button>
+          <button class="btn btn-secondary psp-mini" onclick="smHistorique(${x.rapport_id})">Historique</button></td></tr>`).join('')
+      : '<tr><td colspan="11" class="psp-muted">Aucune ligne pour ces filtres.</td></tr>'}</tbody></table></div>
+    <details class="psp-card" style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">⚙ Seuils du moteur</summary><div id="sm-config">…</div></details>
+    <details class="psp-card"><summary style="cursor:pointer;font-weight:700">🔁 Compteurs remplacés ou remis à zéro</summary><div id="sm-chg">…</div></details>`;
+  smConfig(); smChangements(meeters);
+}
+function smFiltre(k, v){ PSP.sm[k] = PSP.sm[k] === v ? '' : v; smReconciliation(); }
+function smAppliquer(){
+  const g = id => document.getElementById(id).value;
+  Object.assign(PSP.sm, {debut: g('sm-d'), fin: g('sm-f'), distributeur: g('sm-dist'), pompe: g('sm-pompe'),
+    pompiste: g('sm-pompiste'), anomalie: g('sm-ano'), rapprochement: g('sm-rap'), validation: g('sm-val')});
+  smReconciliation();
+}
+async function smOuvrir(id, date){
+  Object.assign(PSP.filtre, {statut: 'TOUS', debut: date, fin: date});
+  PSP.ouvert = id; await pspOnglet('rapports');
+}
+async function smVerifier(rid, pompe){
+  const note = prompt('Note de vérification (obligatoire) : qu’avez-vous vérifié ? Ex. « pistolet confirmé sur place avec le pompiste »');
+  if(note == null) return;
+  try{ await POST(`/smart-meter/rapports/${rid}/lignes/${pompe}/verifier`, {note}); notify('Vérification enregistrée.', 'ok'); smReconciliation(); }
+  catch(e){ notify(e.message, 'err'); }
+}
+async function smHistorique(rid){
+  let h;
+  try{ h = await GET(`/smart-meter/rapports/${rid}/historique`); }catch(e){ return notify(e.message, 'err'); }
+  document.getElementById('sup-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'sup-ov'; ov.className = 'sup-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+  const det = o => Object.entries(o || {}).filter(([k]) => !['rapport_id'].includes(k))
+    .map(([k, v]) => `<div><span class="psp-muted">${esc(k)}</span> : ${esc(typeof v === 'object' ? JSON.stringify(v) : String(v))}</div>`).join('');
+  ov.innerHTML = `<div class="sup-boite" style="max-width:720px;max-height:80vh;overflow:auto">
+    <h3>Historique du rapport n°${rid}</h3>
+    ${h.length ? h.map(x => `<div style="border-top:1px solid var(--border);padding:8px 0;font-size:13px">
+      <b>${esc(x.action)}</b> · ${x.le ? new Date(x.le).toLocaleString('fr-FR') : ''} · ${esc(x.par || '—')}${det(x.details)}</div>`).join('')
+      : '<div class="psp-muted">Aucune intervention enregistrée.</div>'}
+    <div class="sup-act"><button class="btn btn-secondary" onclick="document.getElementById('sup-ov').remove()">Fermer</button></div></div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if(e.target === ov) ov.remove(); });
+}
+async function smConfig(){
+  const z = document.getElementById('sm-config'); if(!z) return;
+  let c; try{ c = await GET('/smart-meter/config'); }catch(e){ z.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; return; }
+  const champ = (id, lib, v, aide) => `<label class="cp-champ">${lib}<input class="filter-input" id="${id}" inputmode="decimal" value="${v}">
+      <small class="psp-muted">${aide}</small></label>`;
+  z.innerHTML = `<div class="psp-muted" style="margin:6px 0 10px">Confiance <b>forte</b> : l'index reprend la référence à moins de « exact ».
+      <b>Moyenne</b> : à un chiffre près, ou à moins de « moyen ». <b>Faible</b> : à moins de « faible ». Au-delà : aucune correspondance,
+      le meeter le plus proche est proposé comme référence provisoire.</div>
+    <div class="psp-grid">
+      ${champ('smc-ex', 'Écart exact (gal)', c.ecart_exact, 'confiance forte')}
+      ${champ('smc-me', 'Écart moyen (gal)', c.ecart_medium, 'confiance moyenne')}
+      ${champ('smc-lo', 'Écart faible (gal)', c.ecart_low, 'confiance faible')}
+      ${champ('smc-vm', 'Volume max par période (gal)', c.volume_max_defaut, 'au-delà : anomalie VOLUME_ELEVE')}
+    </div>
+    <div class="psp-actions"><button class="btn btn-primary" onclick="smConfigEnregistrer()">Enregistrer les seuils</button></div>`;
+  PSP.smConfig = c;
+}
+async function smConfigEnregistrer(){
+  const v = id => parseFloat(String(document.getElementById(id).value).replace(',', '.'));
+  try{
+    await apiFetch('PUT', '/smart-meter/config', {ecart_exact: v('smc-ex'), ecart_medium: v('smc-me'), ecart_low: v('smc-lo'),
+      volume_max_defaut: v('smc-vm'), volumes_max: (PSP.smConfig || {}).volumes_max || {}});
+    notify('Seuils enregistrés.', 'ok'); smConfig();
+  }catch(e){ notify(e.message, 'err'); }
+}
+async function smChangements(meeters){
+  const z = document.getElementById('sm-chg'); if(!z) return;
+  let L; try{ L = await GET('/smart-meter/changements-compteur'); }catch(e){ z.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; return; }
+  const n3 = v => v == null ? '—' : Number(v).toLocaleString('fr-FR', {minimumFractionDigits:3, maximumFractionDigits:3});
+  z.innerHTML = `<div class="psp-muted" style="margin:6px 0 10px">Un compteur remplacé ou remis à zéro n'est jamais traité comme une lecture normale :
+      enregistrez-le ici ; le nouvel index initial devient le point de départ du meeter à partir de la date (rien n'est effacé).</div>
+    <div class="psp-grid">
+      <label class="cp-champ">Meeter<select class="filter-select" id="chg-p">${meeters.map(x => `<option value="${x.id}">${esc(x.lib)}</option>`).join('')}</select></label>
+      <label class="cp-champ">À partir du<input type="date" class="filter-input" id="chg-d" value="${currentDate}" max="${currentDate}"></label>
+      <label class="cp-champ">Ancien n° de compteur<input class="filter-input" id="chg-an"></label>
+      <label class="cp-champ">Nouveau n° de compteur<input class="filter-input" id="chg-nn"></label>
+      <label class="cp-champ">Ancien index final<input class="filter-input" id="chg-af" inputmode="decimal"></label>
+      <label class="cp-champ">Nouvel index initial *<input class="filter-input" id="chg-ni" inputmode="decimal"></label>
+      <label class="cp-champ">Motif *<input class="filter-input" id="chg-mo" maxlength="500"></label>
+      <label class="cp-champ">Autorisé par *<input class="filter-input" id="chg-au" maxlength="150"></label>
+    </div>
+    <div class="psp-actions"><button class="btn btn-primary" onclick="smChangementEnregistrer()">Enregistrer le changement</button></div>
+    ${L.length ? `<table class="psp-tbl" style="margin-top:10px"><thead><tr><th>Date</th><th>Meeter</th><th>Ancien → nouveau n°</th>
+      <th class="r">Index final</th><th class="r">Index initial</th><th>Motif</th><th>Autorisé par</th></tr></thead><tbody>
+      ${L.map(x => `<tr><td>${frDate(x.date_changement)}</td><td>${esc(x.meeter || '')}</td><td>${esc(x.ancien_numero || '—')} → ${esc(x.nouveau_numero || '—')}</td>
+        <td class="r num">${n3(x.ancien_index_final)}</td><td class="r num">${n3(x.nouvel_index_initial)}</td><td>${esc(x.motif)}</td><td>${esc(x.autorise_par)}</td></tr>`).join('')}
+      </tbody></table>` : ''}`;
+}
+async function smChangementEnregistrer(){
+  const g = id => document.getElementById(id).value.trim(), nb = id => g(id) === '' ? null : parseFloat(g(id).replace(',', '.'));
+  if(nb('chg-ni') == null) return notify("Indiquez le nouvel index initial.", 'err');
+  if(!confirm('Enregistrer ce changement de compteur ? Le nouvel index initial devient le point de départ du meeter.')) return;
+  try{
+    await POST('/smart-meter/changements-compteur', {pompe_id: Number(g('chg-p')), date_changement: g('chg-d'),
+      ancien_numero: g('chg-an') || null, nouveau_numero: g('chg-nn') || null, ancien_index_final: nb('chg-af'),
+      nouvel_index_initial: nb('chg-ni'), motif: g('chg-mo'), autorise_par: g('chg-au')});
+    notify('Changement de compteur enregistré.', 'ok'); smReconciliation();
+  }catch(e){ notify(e.message, 'err'); }
 }
 
 async function pspRendreTaux(){
@@ -21282,7 +21379,7 @@ function pspRendreListe(){
               <td>${r.supprime ? `<span class="psp-badge REJETE">🗑 Supprimé</span><div class="psp-muted">${esc(r.supprime.motif||'')}</div>`
                 : `<span class="psp-badge ${r.statut}">${_PSP_LIB[r.statut]}</span>${r.certifie?' <span class="cert">Certifié</span>':''}`}</td>
               <td class="r" style="white-space:nowrap"><button class="btn ${['SOUMIS','PROBLEME'].includes(r.statut)?'btn-primary':'btn-secondary'} psp-mini">${['SOUMIS','PROBLEME'].includes(r.statut)?'Ouvrir et corriger':'Ouvrir'}</button>
-                ${r.supprime || r.statut === 'EN_COURS' ? '' : `<button class="psp-poubelle" title="Supprimer ce rapport (entré par erreur) — il reste récupérable dans « 🗑 Supprimés »" onclick="event.stopPropagation();pspSupprimer(${r.id})">🗑</button>`}</td></tr>`;
+                ${r.supprime || r.statut === 'EN_COURS' ? '' : `<button class="psp-poubelle" title="Supprimer ce rapport (entré par erreur) — il reste récupérable dans « 🗑 Supprimés »" onclick="event.stopPropagation();pspSupprimer(${r.id})">🗑 Supprimer</button>`}</td></tr>`;
           }).join('')}</tbody></table></div>`).join('')}`
     : `<div class="psp-card"><b>Aucun rapport pour ce filtre.</b>
         <div class="psp-muted" style="margin-top:4px">Les pompistes saisissent leurs compteurs sur <b>${esc(location.origin)}/pompiste</b>.</div></div>`}`;

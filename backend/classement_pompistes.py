@@ -45,7 +45,9 @@ def classement(db: Session, d0: date_type, d1: date_type) -> dict:
         return lignes[eid]
 
     totaux = defaultdict(lambda: {"gallons": 0.0, "montant": 0.0})
-    for r in db.query(Releve).filter(Releve.date >= d0, Releve.date <= d1).all():
+    # Ventes officielles seulement : même règle que tous les totaux (sauts non
+    # confirmés exclus, voir main.releves_comptes)
+    for r in main.releves_comptes(db, db.query(Releve).filter(Releve.date >= d0, Releve.date <= d1).all()):
         g = max(0.0, float(r.metter_apres) - float(r.metter_avant))
         mt = g * float(r.prix_gallon or 0)
         fam = main._famille_carburant(r.pompe.produit.nom if r.pompe and r.pompe.produit else "") or "Autre"
