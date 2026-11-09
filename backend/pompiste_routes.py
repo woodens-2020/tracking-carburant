@@ -1350,6 +1350,10 @@ def restaurer_rapport(rid: int, request: Request, s: Utilisateur = Depends(_requ
     rap = db.get(RapportPompiste, rid)
     if not rap or rap.supprime_at is None:
         raise HTTPException(404, "Rapport supprimé introuvable")
+    vers = (rap.suppression or {}).get("transfere_vers")
+    if vers:
+        raise HTTPException(409, f"Ce rapport a été transféré vers {vers.get('station')} (rapport n°{vers.get('rapport_id')}) : "
+                                 "il ne peut pas être restauré ici (il compterait deux fois).")
     avant = (rap.suppression or {}).get("statut_avant") or rap.statut
     pris = (db.query(RapportPompisteLigne, RapportPompiste)
             .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)

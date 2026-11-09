@@ -415,6 +415,8 @@ from classement_pompistes import router as classement_router
 app.include_router(classement_router)
 from smart_meter import router as smart_meter_router
 app.include_router(smart_meter_router)
+from transfert_station import router as transfert_router
+app.include_router(transfert_router)
 app.include_router(caisse_principale_router)
 
 
