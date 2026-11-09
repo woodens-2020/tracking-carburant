@@ -21325,7 +21325,7 @@ async function pspChargerListe(){
   if(f.debut) q += `&date_debut=${f.debut}`;
   if(f.fin) q += `&date_fin=${f.fin}`;
   if(f.pompiste) q += `&utilisateur_id=${f.pompiste}`;
-  PSP.dm = {};                                  // derniers meeters rechargés avec la liste
+  PSP.dm = {}; PSP.hm = {};                     // derniers meeters et historique rechargés avec la liste
   PSP.rapports = await _pspApi('GET', q);
   if(PSP.ouvert){
     const r = PSP.rapports.find(x => x.id === PSP.ouvert);
@@ -21739,35 +21739,100 @@ function _pspAcDist(txt, ref){
   if(ent.length < ci.length && dcm === undefined){ const k = 10 ** (ci.length - ent.length); return {d: Math.abs(Number(ent || 0) - Math.trunc(ref / k)) * k, complet: false}; }
   const v = Number(t0.replace(/[^0-9.]/g, '')); return {d: Math.abs(v - ref), ecart: v - ref, complet: true};
 }
-async function pspAc(rid, pid, val){
+// Historique complet de chaque meeter autour du rapport (journal, rapports
+// en attente, corbeille) : la correction cherche où s'insère le chiffre tapé.
+async function _pspHist(rid){
+  PSP.hm ||= {};
+  if(!PSP.hm[rid]) PSP.hm[rid] = _pspApi('GET', `/rapports/${rid}/historique-meeters?jours=15`).then(d => d.meeters || []).catch(() => []);
+  return PSP.hm[rid];
+}
+const _pspPer2 = p => p === 'Apres-midi' ? 'après-midi' : (p === 'Matin' ? 'matin' : '');
+const _pspQuand = pt => pt.date ? `${pt.date.slice(8, 10)}/${pt.date.slice(5, 7)} ${_pspPer2(pt.periode)}`.trim() : '';
+const _pspSrc = pt => pt.origine === 'journal' ? `journal ${_pspQuand(pt)}`
+  : pt.origine === 'depart' ? 'meeter de départ'
+  : `rapport n°${pt.rapport_id}${pt.supprime ? ' (corbeille)' : ''} ${_pspQuand(pt)}`;
+// Où le chiffre v s'insère dans la chaîne d'un meeter. kind 'avant' : début
+// de période (suite d'une fin) ; 'apres' : fin de période (rejoint un début).
+// Retourne {rang, d, texte, val} — rang 0 = suite exacte, 1 = dans un trou,
+// 2 = avant le premier / après le dernier, 3 = chevauche un relevé existant.
+function _pspPlace(v, pts, kind){
+  if(!pts.length) return null;
+  const TOL = 0.01, n3 = x => _pspN(x);
+  for(const pt of pts){
+    if(kind === 'avant' && Math.abs(pt.ap - v) <= TOL) return {rang: 0, d: Math.abs(pt.ap - v), val: pt.ap, texte: `suite exacte de la fin du ${_pspSrc(pt)}`};
+    if(kind === 'apres' && Math.abs(pt.av - v) <= TOL) return {rang: 0, d: Math.abs(pt.av - v), val: pt.av, texte: `rejoint le début du ${_pspSrc(pt)}`};
+  }
+  const last = pts[pts.length - 1], first = pts[0];
+  for(let i = 0; i < pts.length - 1; i++){
+    const a = pts[i], b = pts[i + 1];
+    if(v > a.ap && v < b.av){
+      const da = v - a.ap, db = b.av - v;
+      return {rang: 1, d: Math.min(da, db), val: kind === 'avant' ? a.ap : b.av,
+              texte: `entre la fin du ${_pspSrc(a)} (${n3(a.ap)}, +${n3(da)} gal) et le début du ${_pspSrc(b)} (${n3(b.av)}, −${n3(db)} gal)`};
+    }
+  }
+  for(const pt of pts) if(v > pt.av + TOL && v < pt.ap - TOL)
+    return {rang: 3, d: Math.min(v - pt.av, pt.ap - v), val: kind === 'avant' ? pt.ap : pt.av, texte: `dans la période déjà rapportée par le ${_pspSrc(pt)} (${n3(pt.av)} → ${n3(pt.ap)})`};
+  if(v > last.ap) return {rang: 2, d: v - last.ap, val: last.ap, texte: `+${n3(v - last.ap)} gal après la fin du ${_pspSrc(last)} (${n3(last.ap)})`};
+  return {rang: 2, d: first.av - v, val: first.av, texte: `${n3(first.av - v)} gal avant le début du ${_pspSrc(first)} (${n3(first.av)})`};
+}
+async function pspAc(rid, pid, val, kind){
+  kind = kind || 'avant';
   const z = document.getElementById(`psp-ac-${rid}-${pid}`); if(!z) return;
   const chif = String(val || '').replace(/\D/g, '');
   if(!chif){ z.innerHTML = ''; return; }
-  const L = await _pspAcCharger(rid);
-  const el = document.querySelector(`input[data-r="${rid}"][data-p="${pid}"][data-k="avant"]`);
-  if(!el || String(el.value).replace(/\D/g, '') !== chif) return;
-  const moi = L.find(x => x.pompe_id === pid), fam = moi ? moi.famille : null;
-  const c = L.filter(x => x.dernier_meter != null && !x.prise && (fam == null || x.famille === fam))
-    .map(x => ({...x, ..._pspAcDist(val, x.dernier_meter), debut: Number(x.dernier_meter).toFixed(3).replace(/\D/g, '').startsWith(chif)}))
-    .sort((a, b) => (b.debut - a.debut) || (a.d - b.d));
-  if(!c.length || (c[0].complet && c[0].pompe_id === pid && Math.abs(c[0].ecart) < 0.0005)){ z.innerHTML = ''; return; }
-  const deb = c.filter(x => x.debut), liste = deb.length ? deb.slice(0, 3) : c.slice(0, 1);
-  const ec = x => !x.complet || Math.abs(x.ecart) < 0.0005 ? '' : ` <span class="${Math.abs(x.ecart) <= 50 ? 'psp-warn-t' : 'psp-neg'}">${x.ecart > 0 ? '+' : '−'}${_pspN(Math.abs(x.ecart))} gal</span>`;
-  z.innerHTML = `<div class="psp-ac">${deb.length ? '' : '<div class="psp-muted" style="font-size:12px">Le plus proche :</div>'}
-    ${liste.map(x => `<button type="button" class="psp-ac-i" onmousedown="event.preventDefault()" onclick="pspAcPrendre(${rid},${pid},${x.pompe_id},'${Number(x.dernier_meter).toFixed(3)}')">
-      <b class="num">${_pspN(x.dernier_meter)}</b> <span>${esc(x.libelle)}${x.pompe_id === pid ? ' · <i>cette pompe</i>' : x.dans_rapport ? ' · <i>dans ce rapport (index échangés)</i>' : ''}${ec(x)}</span>
+  const M = await _pspHist(rid);
+  const el = document.querySelector(`input[data-r="${rid}"][data-p="${pid}"][data-k="${kind}"]`);
+  if(!el || String(el.value).replace(/\D/g, '') !== chif) return;          // la frappe a continué
+  const moi = M.find(x => x.pompe_id === pid), fam = moi ? moi.famille : null;
+  const memes = M.filter(x => x.points.length && (fam == null || x.famille === fam));   // jamais d'autre carburant
+  const t0 = String(val).replace(',', '.'), [ent, dcm] = t0.split('.');
+  const ref = memes.flatMap(x => x.points.map(pt => pt.ap)).filter(x => x != null);
+  const longueur = ref.length ? Math.min(...ref.map(x => String(Math.trunc(x)).length)) : 5;
+  let props = [];
+  if((ent || '').replace(/\D/g, '').length < longueur && dcm === undefined){
+    // Frappe en cours : les index (passés et suivants) qui commencent par ces chiffres
+    for(const x of memes){
+      const vus = new Map();
+      for(const pt of x.points) for(const [cle, v] of [[kind === 'avant' ? 'ap' : 'av', kind === 'avant' ? pt.ap : pt.av]]){
+        if(Number(v).toFixed(3).replace(/\D/g, '').startsWith(chif) && !vus.has(v))
+          vus.set(v, {pompe_id: x.pompe_id, libelle: x.libelle, rang: 0, d: 0, val: v,
+                      texte: `${kind === 'avant' ? 'fin' : 'début'} du ${_pspSrc(pt)}`});
+      }
+      const l = [...vus.values()]; if(l.length) props.push(l[l.length - 1]);   // le plus récent du meeter
+    }
+  } else {
+    const v = Number(t0.replace(/[^0-9.]/g, ''));
+    for(const x of memes){ const pl = _pspPlace(v, x.points, kind); if(pl) props.push({...pl, pompe_id: x.pompe_id, libelle: x.libelle}); }
+    props.sort((a, b) => a.rang - b.rang || a.d - b.d);
+    const meilleur = props[0];
+    if(meilleur && meilleur.rang === 0) props = props.filter(p => p.rang === 0);
+    else {
+      // Seulement le plausible (dans un trou, ou à moins de 1 000 gal) ; sinon le seul plus proche
+      const plausibles = props.filter(p => p.rang === 1 || (p.rang === 2 && p.d <= 1000));
+      props = plausibles.length ? plausibles.slice(0, 3) : props.slice(0, 1);
+    }
+    if(meilleur && meilleur.rang === 0 && meilleur.pompe_id === pid && props.length === 1){ z.innerHTML = ''; return; }   // déjà le bon meeter
+  }
+  if(!props.length){ z.innerHTML = ''; return; }
+  const garde = (p) => (ent || '').replace(/\D/g, '').length >= longueur || dcm !== undefined ? t0.replace(/[^0-9.]/g, '') : Number(p.val).toFixed(3);
+  z.innerHTML = `<div class="psp-ac"><div class="psp-muted" style="font-size:12px">Historique des meeters (${fam ? esc(fam) : ''}, 15 jours autour) :</div>
+    ${props.slice(0, 4).map(x => `<button type="button" class="psp-ac-i" onmousedown="event.preventDefault()"
+        onclick="pspAcPrendre(${rid},${pid},${x.pompe_id},'${garde(x)}','${kind}')">
+      <b>${esc(x.libelle)}</b>${x.pompe_id === pid ? ' <i class="psp-muted">· cette pompe</i>' : ''}
+      <span class="${x.rang === 0 ? 'psp-ok' : x.rang === 1 ? 'psp-warn-t' : 'psp-muted'}" style="font-size:12.5px">${x.rang === 0 ? '✓ ' : x.rang === 1 ? '◆ ' : ''}${esc(x.texte)}</span>
     </button>`).join('')}</div>`;
 }
-function pspAcFermer(rid, pid){
-  const el = document.querySelector(`input[data-r="${rid}"][data-p="${pid}"][data-k="avant"]`);
+function pspAcFermer(rid, pid, kind){
+  const el = document.querySelector(`input[data-r="${rid}"][data-p="${pid}"][data-k="${kind || 'avant'}"]`);
   if(el && document.activeElement === el) return;
   const z = document.getElementById(`psp-ac-${rid}-${pid}`); if(z) z.innerHTML = '';
 }
-function pspAcPrendre(rid, pid, cible, val){
+function pspAcPrendre(rid, pid, cible, val, kind){
   const z = document.getElementById(`psp-ac-${rid}-${pid}`); if(z) z.innerHTML = '';
   if(cible === pid){
-    const el = document.querySelector(`input[data-r="${rid}"][data-p="${pid}"][data-k="avant"]`);
-    if(el){ el.value = val.replace('.', ','); _pspGarder(el); }
+    const el = document.querySelector(`input[data-r="${rid}"][data-p="${pid}"][data-k="${kind || 'avant'}"]`);
+    if(el){ el.value = String(val).replace('.', ','); _pspGarder(el); }
     return;
   }
   pspChangerPompe(rid, pid, cible);           // motif demandé, tracé, saisie du pompiste gardée
@@ -21790,7 +21855,8 @@ function pspCarte(r){
       <td class="r">${_pspN(prec)}${rupt ? `<div class="psp-neg" style="font-size:11px;font-weight:700">écart ${av - prec > 0 ? '+' : ''}${_pspN(av - prec)} gal · ${_pspG(Math.abs(av - prec) * l.prix_gallon)}</div>` : ''}</td>
       <td class="r">${l.confirmee ? _pspN(av) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="avant" value="${_pspValeur(r.id, l.pompe_id, 'avant', av)}"
           oninput="_pspGarder(this);pspAc(${r.id},${l.pompe_id},this.value)" onfocus="pspAc(${r.id},${l.pompe_id},this.value)" onblur="setTimeout(()=>pspAcFermer(${r.id},${l.pompe_id}),250)" autocomplete="off">`}</td>
-      <td class="r">${l.confirmee ? _pspN(ap) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="apres" value="${_pspValeur(r.id, l.pompe_id, 'apres', ap)}" oninput="_pspGarder(this)">`}</td>
+      <td class="r">${l.confirmee ? _pspN(ap) : `<input class="filter-input" data-r="${r.id}" data-p="${l.pompe_id}" data-k="apres" value="${_pspValeur(r.id, l.pompe_id, 'apres', ap)}"
+          oninput="_pspGarder(this);pspAc(${r.id},${l.pompe_id},this.value,'apres')" onfocus="pspAc(${r.id},${l.pompe_id},this.value,'apres')" onblur="setTimeout(()=>pspAcFermer(${r.id},${l.pompe_id},'apres'),250)" autocomplete="off">`}</td>
       <td class="r">${_pspN(l.gallons)}</td>
       <td class="r">${_pspG(l.montant)}</td>
       <td class="r" style="white-space:nowrap">${l.confirmee

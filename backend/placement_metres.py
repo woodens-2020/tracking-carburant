@@ -263,11 +263,13 @@ def creneau_precedent(d: date_type, periode: str) -> tuple:
     return (d - timedelta(days=1), "Apres-midi") if periode == "Matin" else (d, "Matin")
 
 
-def index_autour(db: Session, d: date_type, exclure_rapport_id: Optional[int] = None) -> list:
-    """Tous les index connus de d−7 à d+7 : journal, rapports pompistes pas
-    encore finalisés et rapports de la corbeille (hors `exclure_rapport_id`)."""
+def index_autour(db: Session, d: date_type, exclure_rapport_id: Optional[int] = None,
+                 jours: int = FENETRE_JOURS) -> list:
+    """Tous les index connus de d−jours à d+jours (7 par défaut) : journal,
+    rapports pompistes pas encore finalisés et rapports de la corbeille (hors
+    `exclure_rapport_id`)."""
     from pompiste_routes import _EN_ATTENTE, _nom, _valeurs_finales
-    d0, d1 = d - timedelta(days=FENETRE_JOURS), d + timedelta(days=FENETRE_JOURS)
+    d0, d1 = d - timedelta(days=jours), d + timedelta(days=jours)
     out, vus = [], set()
     for r in db.query(Releve).filter(Releve.date >= d0, Releve.date <= d1).all():
         if exclure_rapport_id and r.rapport_pompiste_id == exclure_rapport_id:
