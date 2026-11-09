@@ -383,6 +383,39 @@ def derniers_meeters_rapport(rid: int, request: Request, db: Session = Depends(g
     return {"rapport_id": rap.id, "date": str(rap.date), "periode": rap.periode, "meeters": out}
 
 
+@router.get("/api/pompiste-supervision/rapports/{rid}/historique-meeters")
+def historique_meeters_rapport(rid: int, request: Request, jours: int = 15, db: Session = Depends(get_db)):
+    """Correction d'un rapport (direction) : TOUS les index passés et suivants
+    de chaque meeter autour de la date du rapport (journal, rapports en
+    attente, corbeille ; hors ce rapport), dans l'ordre des créneaux. La
+    correction y cherche où s'insère le chiffre tapé : suite exacte d'une fin,
+    trou entre deux relevés (créneau manquant, mauvaise date), après le
+    dernier."""
+    from placement_metres import activite, famille, index_autour, libelle
+    _superviseur(request, db)
+    rap = db.get(RapportPompiste, rid)
+    if not rap:
+        raise HTTPException(404, "Rapport introuvable")
+    jours = max(1, min(int(jours), 62))
+    rang = {"Matin": 0, "Apres-midi": 1}
+    par = {}
+    for x in index_autour(db, rap.date, exclure_rapport_id=rap.id, jours=jours):
+        par.setdefault(x["pompe_id"], []).append({
+            "date": str(x["date"]), "periode": x["periode"], "av": round(x["av"], 3), "ap": round(x["ap"], 3),
+            "source": x["source"], "origine": x["origine"], "rapport_id": x["rapport_id"], "supprime": x["supprime"]})
+    out = []
+    for p in db.query(Pompe).filter(Pompe.actif.is_(True)).all():
+        pts = sorted(par.get(p.id, []), key=lambda y: (y["date"], rang.get(y["periode"], 9), y["av"]))
+        if p.metre_depart is not None:          # point de départ du meeter (compteur changé, début du suivi)
+            pts.insert(0, {"date": str(p.date_depart) if p.date_depart else None, "periode": None,
+                           "av": float(p.metre_depart), "ap": float(p.metre_depart), "source": "meeter de départ",
+                           "origine": "depart", "rapport_id": None, "supprime": False})
+        out.append({"pompe_id": p.id, "libelle": libelle(p), "produit": p.produit.nom if p.produit else "",
+                    "meeter": p.nom, "famille": famille(p), "activite": activite(p),
+                    "dans_rapport": any(l.pompe_id == p.id for l in rap.lignes), "points": pts})
+    return {"rapport_id": rap.id, "date": str(rap.date), "periode": rap.periode, "jours": jours, "meeters": out}
+
+
 # ── API direction : configuration ─────────────────────────────────────
 class ConfigIn(BaseModel):
     ecart_exact: float = Field(gt=0, le=1)

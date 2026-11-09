@@ -306,3 +306,22 @@ def test_derniers_meeters_pour_la_validation(client, st):
     rp = x["lignes"][0]["rapprochement"]
     assert rp["statut"] == "MATCH_REVIEW" and rp["pompe_proposee"]["pompe_id"] == st["g"]["P3"]
     assert client.post(f"/api/pompiste-supervision/rapports/{rid}/supprimer", headers=H, json={"motif": "nettoyage du test"}).status_code == 200
+
+
+def test_historique_des_meeters_pour_la_correction(client, st):
+    """Correction : tous les index passés d'un meeter (journal, rapports, corbeille)."""
+    p = _pompiste(client)
+    assert _envoyer(p, st, st["g"]["P4"], REF["P4"], REF["P4"] + 30).status_code == 201
+    rid = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 15}], "depenses": []}).json()["id"]
+    p2 = _pompiste(client)
+    assert _envoyer(p2, st, st["g"]["P2"], REF["P2"], REF["P2"] + 20).status_code == 201
+    rid2 = p2.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 10}], "depenses": []}).json()["id"]
+    assert client.post(f"/api/pompiste-supervision/rapports/{rid2}/supprimer", headers=H, json={"motif": "test de la corbeille"}).status_code == 200
+    assert p.get(f"/api/pompiste-supervision/rapports/{rid}/historique-meeters").status_code == 403
+    h = client.get(f"/api/pompiste-supervision/rapports/{rid}/historique-meeters", headers=H).json()
+    M = {x["pompe_id"]: x for x in h["meeters"]}
+    assert any(pt["ap"] == REF["P4"] and pt["origine"] == "journal" for pt in M[st["g"]["P4"]]["points"])
+    assert not any(pt["rapport_id"] == rid for pt in M[st["g"]["P4"]]["points"])            # hors ce rapport
+    assert any(pt["rapport_id"] == rid2 and pt["supprime"] for pt in M[st["g"]["P2"]]["points"])   # la corbeille compte
+    for r in (rid,):
+        client.post(f"/api/pompiste-supervision/rapports/{r}/supprimer", headers=H, json={"motif": "nettoyage du test"})
