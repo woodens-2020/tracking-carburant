@@ -452,6 +452,20 @@ main,.card,.deux-col > *{min-width:0}
 .sm-note{font-size:13px;margin-top:6px;opacity:.85}
 .sm-ano{font-size:12.5px;margin-top:5px;color:#fbbf24}
 .fe-sm:empty{display:none}
+.fe-ac:empty,#i-ac:empty{display:none}
+.ac{margin:6px 0 8px;border:1px solid rgba(249,115,22,.55);border-radius:12px;background:rgba(15,23,42,.6);padding:8px}
+.ac-t{font-size:12.5px;font-weight:800;opacity:.85;margin:0 2px 6px}
+.ac-g{margin-bottom:6px}
+.ac-gt{display:inline-block;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:8px;margin:2px 0 4px}
+.ac-gt.gaz{background:rgba(34,197,94,.18);color:#4ade80}.ac-gt.die{background:rgba(59,130,246,.18);color:#60a5fa}.ac-gt:not(.gaz):not(.die){background:rgba(249,115,22,.18);color:#fb923c}
+.ac-i{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:9px 10px;margin:3px 0}
+.ac-i:hover,.ac-i:focus{border-color:#f97316;background:rgba(249,115,22,.12)}
+.ac-i.ici{border-color:rgba(34,197,94,.6)}
+.ac-i:disabled{opacity:.45;cursor:not-allowed}
+.ac-v{font-weight:800;font-size:16px;min-width:9.5em}
+.ac-n{font-size:13px;opacity:.9}
+.ac-vide{font-size:13px;opacity:.8;padding:4px}
 .fe-sm{margin:-2px 0 8px}
 .fe-sm .sm{margin:4px 0 0;padding:10px 12px}
 .sm.compact{font-size:13px;padding:6px 10px;font-weight:600}
@@ -549,6 +563,8 @@ const TXT = {
     sm_provisoire:'Référence numérique la plus proche, pas une preuve : une vérification est nécessaire.',
     sm_enregistrer:'Vous pouvez quand même enregistrer : le rapport sera vérifié par la direction.',
     sm_HIGH:'forte', sm_MEDIUM:'moyenne', sm_LOW:'faible', sm_NONE:'aucune',
+    ac_titre:'Derniers meeters — touchez le vôtre', ac_cette:'cette pompe', ac_aucun:'Aucun dernier meeter ne commence par ces chiffres.',
+    ac_prise:'déjà rapportée',
     sm_a_ECART_POSITIF:'Saut : le meeter de début est au-dessus du dernier meeter enregistré.',
     sm_a_RECUL:'Recul : le meeter de début est en dessous du dernier meeter enregistré.',
     sm_a_VOLUME_ELEVE:'Beaucoup de gallons pour une période : vérifiez le meeter de fin.',
@@ -677,6 +693,8 @@ const TXT = {
     sm_provisoire:'Se chif ki pi pre a sèlman, se pa yon prèv : fòk yo verifye.',
     sm_enregistrer:'Ou ka anrejistre kanmenm : direksyon an ap verifye rapò a.',
     sm_HIGH:'fò', sm_MEDIUM:'mwayen', sm_LOW:'fèb', sm_NONE:'okenn',
+    ac_titre:'Dènye mèt yo — touche pa w la', ac_cette:'ponp sa a', ac_aucun:'Okenn dènye mèt pa kòmanse ak chif sa yo.',
+    ac_prise:'deja rapòte',
     sm_a_ECART_POSITIF:'So : mèt kòmansman an pi wo pase dènye mèt ki anrejistre a.',
     sm_a_RECUL:'Bak : mèt kòmansman an pi ba pase dènye mèt ki anrejistre a.',
     sm_a_VOLUME_ELEVE:'Anpil galon pou yon sèl peryòd : verifye mèt fen an.',
@@ -1226,6 +1244,7 @@ function ecranIndex(id, prix, titreHaut, fin){
         <div class="val ${val?'':'vide'}">${affiche(val, k === c) || '0'}</div>`;
     }
     smartAnalyser(id);
+    if(k === 'avant') acAfficher(id); else if($('i-ac')) $('i-ac').innerHTML = '';
     const diff = S.erreurs[id]?.code === 'debut_different';
     $('i-diff').innerHTML = diff ? `<div class="alerte warn" style="margin:14px 0 0">⚠ ${t('debut_diff')}<br>
         <span style="font-weight:600">${t('debut_diff_action')}</span></div>`
@@ -1253,7 +1272,7 @@ function ecranIndex(id, prix, titreHaut, fin){
       <h1 class="pompe-titre">${esc(q.nom)}</h1>${q.emplacement ? `<div class="emplacement" style="margin:-6px 0 8px">📍 ${esc(q.emplacement)}</div>` : ''}
       <p class="sub astuce" style="margin:4px 0 0">${t('toucher_case')}</p>
       <div id="i-err"></div><div id="i-diff"></div>
-      <div id="z-avant"></div><div id="z-apres"></div><div id="i-calc"></div><div id="i-smart"></div>
+      <div id="z-avant"></div><div id="i-ac"></div><div id="z-apres"></div><div id="i-calc"></div><div id="i-smart"></div>
     </div><div class="cote">${pave(true)}</div></div>`;
   $('z-avant').onclick = () => choisir('avant');
   $('z-apres').onclick = () => choisir('apres');
@@ -1270,6 +1289,11 @@ function smartAnalyser(id){
   const s = S.index[id] || {}, av = num(s.avant), ap = num(s.apres);
   const z = smZone(id); if(!z) return;
   if(av == null){ z.innerHTML = ''; return; }
+  // Pendant la frappe, seule la liste s'affiche : le contrôle attend que la
+  // partie entière ait autant de chiffres que le plus court des derniers meeters
+  const entiers = L => (L || []).filter(x => x.dernier_meter != null).map(x => String(Math.trunc(x.dernier_meter)).length);
+  const min = Math.min(...entiers(AC.liste), 99) === 99 ? 5 : Math.min(...entiers(AC.liste));
+  if(String(Math.trunc(av)).length < min){ z.innerHTML = ''; return; }
   const cle = `${id}|${av}|${ap ?? ''}|${S.date}`;
   if(SM.res[id]?.cle === cle){ z.innerHTML = smartHtml(id, SM.res[id].a); return; }
   SM.minuteurs ||= {};
@@ -1348,6 +1372,72 @@ function smartGarder(id){
   (S.index[id] ||= {}).decision = 'REFUSE';
   if(S.etape === 'feuille') sauverBrouillon();
   const z = smZone(id); if(z && SM.res[id]) z.innerHTML = smartHtml(id, SM.res[id].a);
+}
+
+// ── Liste dynamique : dès le premier chiffre du meeter de début, les
+// derniers meeters de la station s'affichent, classés par carburant
+// (gazoline, diesel, propane, jamais mêlés) ; la liste se resserre à chaque
+// chiffre ; un toucher met le meeter sur la bonne pompe.
+const AC = {cle: null, liste: null, charge: null};
+async function acCharger(){
+  const cle = `${S.date}|${enCours() ? enCours().id : ''}`;
+  if(AC.cle === cle && AC.liste) return AC.liste;
+  if(AC.charge && AC.cle === cle) return AC.charge;
+  AC.cle = cle;
+  AC.charge = api('GET', `/api/pompiste/derniers-meeters?date=${S.date}`).then(d => (AC.liste = d.meeters || []))
+    .catch(() => (AC.liste = []));
+  return AC.charge;
+}
+const acChiffres = v => String(v ?? '').replace(/\D/g, '');
+const acZone = id => S.etape === 'feuille' ? $('fe-ac-' + id) : $('i-ac');
+async function acAfficher(id){
+  id = Number(id);
+  const z = acZone(id); if(!z) return;
+  const tape = acChiffres((S.index[id] || {}).avant);
+  if(!tape){ z.innerHTML = ''; return; }
+  const L = await acCharger();
+  if(acChiffres((S.index[id] || {}).avant) !== tape || !acZone(id)) return;   // l'utilisateur a continué de taper
+  const ok = L.filter(x => x.dernier_meter != null && acChiffres(Number(x.dernier_meter).toFixed(3)).startsWith(tape));
+  if(!ok.length){ z.innerHTML = `<div class="ac"><div class="ac-vide">${t('ac_aucun')}</div></div>`; return; }
+  const groupes = {};
+  for(const x of ok) (groupes[x.famille] ||= []).push(x);
+  const ordre = ['Gazoline', 'Diesel', 'Propane'];
+  const fams = Object.keys(groupes).sort((a, b) => (ordre.indexOf(a) + 1 || 9) - (ordre.indexOf(b) + 1 || 9));
+  z.innerHTML = `<div class="ac"><div class="ac-t">${t('ac_titre')}</div>${fams.map(f => `<div class="ac-g">
+      <div class="ac-gt ${clsProduit(f)}">${esc(f)}</div>
+      ${groupes[f].slice(0, 12).map(x => `<button type="button" class="ac-i ${x.pompe_id === id ? 'ici' : ''}" ${x.prise ? 'disabled' : ''}
+          onmousedown="event.preventDefault()" onclick="acPrendre(${id}, ${x.pompe_id}, '${Number(x.dernier_meter).toFixed(3)}')">
+        <span class="ac-v num">${nfg(x.dernier_meter)}</span>
+        <span class="ac-n">${esc(x.libelle)}${x.pompe_id === id ? ` <small>· ${t('ac_cette')}</small>` : ''}${x.prise ? ` <small>· ${t('ac_prise')}</small>` : ''}</span>
+      </button>`).join('')}</div>`).join('')}</div>`;
+}
+// Le pompiste touche un meeter de la liste : la valeur va sur la pompe de ce
+// meeter (s'il l'avait tapée sur une autre ligne, ses chiffres y passent).
+function acPrendre(id, pid, val){
+  id = Number(id); pid = Number(pid);
+  const s = S.index[id] || {};
+  if(pid === id){
+    s.avant = val; s.debutConfirme = false; S.index[id] = s;
+  } else {
+    const autre = S.index[pid] || {};
+    S.index[pid] = {...autre, avant: val, apres: autre.apres || s.apres || '', debutConfirme: false,
+                    pompeChoisie: s.pompeChoisie || id, decision: 'ACCEPTE'};
+    if(autre.avant || autre.apres) S.index[id] = {...autre, debutConfirme: false}; else delete S.index[id];
+    delete S.erreurs[id];
+    if(S.etape !== 'feuille'){
+      const i = S.choisies.indexOf(id), j = S.choisies.indexOf(pid);
+      if(j >= 0) S.choisies[j] = pid;
+      if(i >= 0) S.choisies[i] = pid;
+      if(j >= 0 && i >= 0 && i !== j) S.choisies[j] = id;
+    }
+  }
+  delete S.erreurs[pid]; delete SM.res[id]; delete SM.res[pid];
+  if(S.etape === 'feuille'){
+    S.feFocus = `idx:${pid}:apres`; sauverBrouillon(); rendreSansHaut();
+    setTimeout(() => $('fe-r-' + pid)?.scrollIntoView({block: 'center', behavior: 'smooth'}), 60);
+  } else {
+    S.champActif = {id: pid, k: 'apres'}; rendre();
+  }
 }
 
 function confirmerDebut(id){
@@ -1830,7 +1920,7 @@ function feLigneA(p, q){
       ${feChamp(`idx:${q.id}:avant`, feDec(s.avant), `class="saisie-n fe-in num" inputmode="decimal" maxlength="14" placeholder="${esc(t('fe_avant'))}" data-n="dec3"`)}
       ${feChamp(`idx:${q.id}:apres`, feDec(s.apres), `class="saisie-n fe-in num" inputmode="decimal" maxlength="14" placeholder="${esc(t('fe_apres'))}" data-n="dec3"`)}
       <span class="fe-v" id="fe-g-${q.id}"></span><span class="fe-v" id="fe-m-${q.id}"></span></div>
-    <div class="fe-sm" id="fe-sm-${q.id}"></div>
+    <div class="fe-ac" id="fe-ac-${q.id}"></div><div class="fe-sm" id="fe-sm-${q.id}"></div>
     ${diff ? `<div class="fe-err warn">⚠ ${t('debut_diff')}<label><input type="checkbox" ${s.debutConfirme ? 'checked' : ''}
         onchange="feConfirmerDebut(${q.id}, this.checked)"> ${t('fe_relu')}</label></div>`
       : (e ? `<div class="fe-err">${esc(msgLigne(e))}</div>` : '')}`;
@@ -1864,7 +1954,12 @@ function feBrancher(){
   const champs = [...$('app').querySelectorAll('[data-f]')];
   champs.forEach((el, i) => {
     el.addEventListener('input', () => { feEcrire(el); feMaj(); sauverBrouillon();
-      const f = el.dataset.f.split(':'); if(f[0] === 'idx') smartAnalyser(f[1]); });
+      const f = el.dataset.f.split(':'); if(f[0] === 'idx'){ smartAnalyser(f[1]); if(f[2] === 'avant') acAfficher(f[1]); } });
+    if(/^idx:\d+:avant$/.test(el.dataset.f)){
+      const pid = el.dataset.f.split(':')[1];
+      el.addEventListener('focus', () => acAfficher(pid));
+      el.addEventListener('blur', () => setTimeout(() => { const z = $('fe-ac-' + pid); if(z && document.activeElement !== el) z.innerHTML = ''; }, 250));
+    }
     el.addEventListener('focus', () => { if(el.dataset.n) el.select(); });
     if(el.tagName !== 'TEXTAREA') el.addEventListener('keydown', e => {
       if(e.key !== 'Enter') return;
