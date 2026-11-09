@@ -135,15 +135,23 @@ def apercu_transfert(rid: int, espace_id: int, request: Request, db: Session = D
         pris = {pid for pid, c in _creneaux_pris(tdb, rap.date).items() if rap.periode in c}
         lignes, bloq = [], []
         for l in src:
-            c = _candidats(tdb, rap.date, rap.periode, l, pris)
-            libres = [x for x in c if not x["prise"]]
-            prop = libres[0]["pompe_id"] if libres else None
-            if not c:
+            lignes.append({**l, "proposition": None, "candidats": _candidats(tdb, rap.date, rap.periode, l, pris)})
+        # Propositions pour toutes les lignes ensemble : un meeter cible différent
+        # par ligne, les meilleures correspondances servies d'abord (suite
+        # exacte, puis à un chiffre près, puis la plus petite différence).
+        paires = sorted(((-_NIV[c["niveau"]], abs(c["ecart"]) if c["ecart"] is not None else 1e18, i, c["pompe_id"])
+                         for i, l in enumerate(lignes) for c in l["candidats"] if not c["prise"]))
+        pris_ici = set()
+        for _n, _e, i, pid in paires:
+            if lignes[i]["proposition"] is None and pid not in pris_ici:
+                lignes[i]["proposition"] = pid
+                pris_ici.add(pid)
+        for l in lignes:
+            if not l["candidats"]:
                 bloq.append(f"{l['libelle']} : aucun meeter de {l['famille']} dans {st['nom']}.")
-            elif not libres:
-                bloq.append(f"{l['libelle']} : tous les meeters de {l['famille']} de {st['nom']} sont déjà rapportés "
-                            "sur ce créneau.")
-            lignes.append({**l, "proposition": prop, "candidats": c})
+            elif l["proposition"] is None:
+                bloq.append(f"{l['libelle']} : plus de meeter de {l['famille']} libre dans {st['nom']} sur ce créneau "
+                            "(déjà rapportés, ou pris par une autre ligne de ce rapport).")
         return lignes, bloq
     lignes, bloq = _dans_cible(sch, calc)
     av = []
@@ -182,7 +190,8 @@ def transferer(rid: int, data: TransfertIn, request: Request, db: Session = Depe
     if set(mapping) != {l["pompe_id"] for l in src}:
         raise HTTPException(400, "Choisissez le meeter de la station cible pour chaque ligne du rapport.")
     if len(set(mapping.values())) != len(mapping):
-        raise HTTPException(400, "Deux lignes iraient sur le même meeter.")
+        raise HTTPException(400, "Deux lignes de ce rapport iraient sur le même meeter de la station cible : "
+                                 "choisissez un meeter différent pour chaque ligne.")
     sch_o, origine = _origine(db, rap.utilisateur)
     sch = _schema(data.espace_id)
     from pompiste_routes import _nom_principale, _nom_station_courante
