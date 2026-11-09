@@ -466,6 +466,8 @@ main,.card,.deux-col > *{min-width:0}
 .ac-v{font-weight:800;font-size:16px;min-width:9.5em}
 .ac-n{font-size:13px;opacity:.9}
 .ac-vide{font-size:13px;opacity:.8;padding:4px}
+.ac-i.top{border-color:#f97316;box-shadow:0 0 0 1px rgba(249,115,22,.4)}
+.ac-ok{color:#4ade80;font-weight:700}.ac-proche{color:#fbbf24;font-weight:700}.ac-loin{color:#f87171}
 .fe-sm{margin:-2px 0 8px}
 .fe-sm .sm{margin:4px 0 0;padding:10px 12px}
 .sm.compact{font-size:13px;padding:6px 10px;font-weight:600}
@@ -564,7 +566,8 @@ const TXT = {
     sm_enregistrer:'Vous pouvez quand même enregistrer : le rapport sera vérifié par la direction.',
     sm_HIGH:'forte', sm_MEDIUM:'moyenne', sm_LOW:'faible', sm_NONE:'aucune',
     ac_titre:'Derniers meeters — touchez le vôtre', ac_cette:'cette pompe', ac_aucun:'Aucun dernier meeter ne commence par ces chiffres.',
-    ac_prise:'déjà rapportée',
+    ac_prise:'déjà rapportée', ac_proches:'Aucun meeter ne commence par ces chiffres — voici les plus proches',
+    ac_plus_proche:'le plus proche', ac_egal:'identique',
     sm_a_ECART_POSITIF:'Saut : le meeter de début est au-dessus du dernier meeter enregistré.',
     sm_a_RECUL:'Recul : le meeter de début est en dessous du dernier meeter enregistré.',
     sm_a_VOLUME_ELEVE:'Beaucoup de gallons pour une période : vérifiez le meeter de fin.',
@@ -694,7 +697,8 @@ const TXT = {
     sm_enregistrer:'Ou ka anrejistre kanmenm : direksyon an ap verifye rapò a.',
     sm_HIGH:'fò', sm_MEDIUM:'mwayen', sm_LOW:'fèb', sm_NONE:'okenn',
     ac_titre:'Dènye mèt yo — touche pa w la', ac_cette:'ponp sa a', ac_aucun:'Okenn dènye mèt pa kòmanse ak chif sa yo.',
-    ac_prise:'deja rapòte',
+    ac_prise:'deja rapòte', ac_proches:'Pa gen mèt ki kòmanse ak chif sa yo — men sa ki pi pre yo',
+    ac_plus_proche:'sa ki pi pre a', ac_egal:'menm chif la',
     sm_a_ECART_POSITIF:'So : mèt kòmansman an pi wo pase dènye mèt ki anrejistre a.',
     sm_a_RECUL:'Bak : mèt kòmansman an pi ba pase dènye mèt ki anrejistre a.',
     sm_a_VOLUME_ELEVE:'Anpil galon pou yon sèl peryòd : verifye mèt fen an.',
@@ -1390,29 +1394,60 @@ async function acCharger(){
 }
 const acChiffres = v => String(v ?? '').replace(/\D/g, '');
 const acZone = id => S.etape === 'feuille' ? $('fe-ac-' + id) : $('i-ac');
+// Distance entre ce qui est tapé et un dernier meeter. Pendant la frappe de
+// la partie entière (moins de chiffres que le meeter), on compare au même
+// ordre de grandeur : « 2274 » est à 0 de 227 467,397 et à 1 de 227 321,152
+// (×100 gal). Dès que la partie entière est complète : écart réel en gallons.
+function acDistance(txt, ref){
+  const [e, dcm] = String(txt).split('.'), ent = (e || '').replace(/\D/g, '');
+  const ci = String(Math.trunc(ref));
+  if(ent.length < ci.length && dcm === undefined){
+    const k = 10 ** (ci.length - ent.length);
+    return {d: Math.abs(Number(ent || 0) - Math.trunc(ref / k)) * k, complet: false};
+  }
+  const v = Number(String(txt).replace(/[^0-9.]/g, ''));
+  return {d: Math.abs(v - ref), ecart: v - ref, complet: true};
+}
 async function acAfficher(id){
   id = Number(id);
   const z = acZone(id); if(!z) return;
-  const tape = acChiffres((S.index[id] || {}).avant);
+  const txt = String((S.index[id] || {}).avant || '');
+  const tape = acChiffres(txt);
   if(!tape){ z.innerHTML = ''; return; }
   const L = await acCharger();
   if(acChiffres((S.index[id] || {}).avant) !== tape || !acZone(id)) return;   // l'utilisateur a continué de taper
-  const ok = L.filter(x => x.dernier_meter != null && acChiffres(Number(x.dernier_meter).toFixed(3)).startsWith(tape));
-  if(!ok.length){ z.innerHTML = `<div class="ac"><div class="ac-vide">${t('ac_aucun')}</div></div>`; return; }
+  // Tous les derniers meeters, du plus proche au plus loin : ceux qui
+  // commencent par les chiffres tapés d'abord, puis les plus proches.
+  const tous = L.filter(x => x.dernier_meter != null).map(x => {
+    const dist = acDistance(txt, Number(x.dernier_meter));
+    return {...x, ...dist, debut: acChiffres(Number(x.dernier_meter).toFixed(3)).startsWith(tape)};
+  });
+  if(!tous.length){ z.innerHTML = ''; return; }
+  const aucunDebut = !tous.some(x => x.debut);
   const groupes = {};
-  for(const x of ok) (groupes[x.famille] ||= []).push(x);
+  for(const x of tous) (groupes[x.famille] ||= []).push(x);
+  for(const f in groupes) groupes[f].sort((a, b) => (b.debut - a.debut) || (a.d - b.d));
   const ordre = ['Gazoline', 'Diesel', 'Propane'];
-  const fams = Object.keys(groupes).sort((a, b) => (ordre.indexOf(a) + 1 || 9) - (ordre.indexOf(b) + 1 || 9));
-  z.innerHTML = `<div class="ac"><div class="ac-t">${t('ac_titre')}</div>${fams.map(f => `<div class="ac-g">
+  // La famille de la ligne en cours d'abord, puis gazoline, diesel, propane
+  const ici = (L.find(x => x.pompe_id === id) || {}).famille;
+  const fams = Object.keys(groupes).sort((a, b) => (b === ici) - (a === ici) || (ordre.indexOf(a) + 1 || 9) - (ordre.indexOf(b) + 1 || 9));
+  const meilleur = Math.min(...tous.map(x => x.d));
+  const ecartTxt = x => !x.complet ? '' : Math.abs(x.ecart) < 0.0005 ? `<small class="ac-ok">· ${t('ac_egal')}</small>`
+    : `<small class="${Math.abs(x.ecart) <= 50 ? 'ac-proche' : 'ac-loin'}">· ${t('sm_ecart')} ${x.ecart > 0 ? '+' : '−'}${nfg(Math.abs(x.ecart))} gal</small>`;
+  z.innerHTML = `<div class="ac"><div class="ac-t">${aucunDebut ? t('ac_proches') : t('ac_titre')}</div>${fams.map(f => `<div class="ac-g">
       <div class="ac-gt ${clsProduit(f)}">${esc(f)}</div>
-      ${groupes[f].slice(0, 12).map(x => `<button type="button" class="ac-i ${x.pompe_id === id ? 'ici' : ''}" ${x.prise ? 'disabled' : ''}
-          onmousedown="event.preventDefault()" onclick="acPrendre(${id}, ${x.pompe_id}, '${Number(x.dernier_meter).toFixed(3)}')">
+      ${groupes[f].slice(0, 6).map(x => `<button type="button" class="ac-i ${x.pompe_id === id ? 'ici' : ''} ${x.d === meilleur ? 'top' : ''}" ${x.prise ? 'disabled' : ''}
+          onmousedown="event.preventDefault()" onclick="acPrendre(${id}, ${x.pompe_id}, '${x.complet ? String(txt).replace(/[^0-9.]/g, '') : Number(x.dernier_meter).toFixed(3)}')">
         <span class="ac-v num">${nfg(x.dernier_meter)}</span>
-        <span class="ac-n">${esc(x.libelle)}${x.pompe_id === id ? ` <small>· ${t('ac_cette')}</small>` : ''}${x.prise ? ` <small>· ${t('ac_prise')}</small>` : ''}</span>
+        <span class="ac-n">${esc(x.libelle)}${x.d === meilleur ? ` <small class="ac-ok">· ${t('ac_plus_proche')}</small>` : ''}
+          ${x.pompe_id === id ? ` <small>· ${t('ac_cette')}</small>` : ''}${x.prise ? ` <small>· ${t('ac_prise')}</small>` : ''} ${ecartTxt(x)}</span>
       </button>`).join('')}</div>`).join('')}</div>`;
 }
 // Le pompiste touche un meeter de la liste : la valeur va sur la pompe de ce
 // meeter (s'il l'avait tapée sur une autre ligne, ses chiffres y passent).
+// Frappe en cours : le dernier meeter complète la saisie. Meeter déjà tapé en
+// entier : ce que le pompiste a lu est gardé tel quel (jamais remplacé),
+// seule la pompe change ; l'écart reste visible au contrôle.
 function acPrendre(id, pid, val){
   id = Number(id); pid = Number(pid);
   const s = S.index[id] || {};
