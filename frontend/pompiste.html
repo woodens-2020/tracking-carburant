@@ -1305,7 +1305,7 @@ function smartHtml(id, a){
   if(a.statut_rapprochement === 'INITIAL_READING')
     return tete('info', 'ℹ', t('sm_initial')) + `<div class="sm-note">${t('sm_enregistrer')}</div>` + anos + `</div>`;
   if(a.statut_rapprochement === 'UNMATCHED'){
-    const pp = a.plus_proche;
+    const pp = a.plus_proche && a.plus_proche.pompe_id !== Number(id) ? a.plus_proche : null;   // le plus proche = ce meeter : rien à proposer
     return tete('err', '⚠', t('sm_aucun')) + ligne(t('sm_choisi'), a.choisi)
       + (pp ? ligne(t('sm_proche'), pp, 'prop') + `<div class="sm-note">${t('sm_provisoire')}</div>` + btn(pp) : '')
       + garder + `<div class="sm-note">${t('sm_enregistrer')}</div>` + anos + `</div>`;
