@@ -95,3 +95,39 @@ def test_transfert_vers_une_autre_station(client):
     g = _c()
     g.post("/api/login", json={"email": f"tr{ns}@exemple.ht", "password": "MotDePasse2026", "code_acces": "987654321"})
     assert g.get(f"/api/pompiste-supervision/rapports/{nid}/transfert/apercu?espace_id=0").status_code == 403
+
+
+def test_deux_lignes_jamais_sur_le_meme_meeter(client):
+    """Deux lignes de gazoline proches du même meeter cible : l'aperçu propose
+    deux meeters différents, et le transfert passe tel quel."""
+    from tz_utils import today_haiti
+    ns = time.time_ns()
+    jour = str(today_haiti() - timedelta(days=6))
+    p = _c()
+    assert p.post("/api/login", json=PROPRIO).status_code == 200
+    st = {"produits": [{"cle": "g", "nom": "Gazoline", "prix": 900}],
+          "pompes": [{"nom": "Pompe 1", "faces": [{"nom": "A", "metres": [
+              {"produit": "g", "nom": "Gazoline 1", "metre_depart": 7000.25}, {"produit": "g", "nom": "Gazoline 2", "metre_depart": 9100.5}]}]}]}
+    r = p.post("/api/espaces", json={"nom": f"Station DL{ns}", "adresse": "Ailleurs", "station": st,
+                                     "gerant": {"nom_complet": "Gérant DL", "email": f"dl{ns}@exemple.ht",
+                                                "password": "MotDePasse2026", "pin": "987654321"}})
+    assert r.status_code == 201, r.text
+    eid = r.json()["id"]
+    B = {q["nom"]: q["id"] for x in _c(f"esp_{eid}").get("/api/produits", headers=H).json() for q in x["pompes"]}
+    pid = client.post("/api/produits", headers=H, json={"nom": f"Gazoline DLP{ns}", "prix_gallon": 800}).json()["id"]
+    g1, g2 = [client.post(f"/api/produits/{pid}/pompes", headers=H, json={"nom": n}).json()["id"] for n in ("A", "B")]
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "Deux", "nom": f"Lignes{ns}"}).json()
+    pp = _c()
+    pp.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    assert pp.post("/api/pompiste/compteurs", json={"date": jour, "charte_acceptee": True, "lignes": [
+        {"pompe_id": g1, "metter_avant": 7000.25, "metter_apres": 7050.25, "debut_confirme": True},
+        {"pompe_id": g2, "metter_avant": 7000.75, "metter_apres": 7020.75, "debut_confirme": True}]}).status_code == 201
+    rid = pp.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 50}], "depenses": []}).json()["id"]
+    ap = p.get(f"/api/pompiste-supervision/rapports/{rid}/transfert/apercu?espace_id={eid}").json()
+    props = {l["pompe_id"]: l["proposition"] for l in ap["lignes"]}
+    assert props[g1] == B["Gazoline 1"] and props[g2] == B["Gazoline 2"], ap        # suite exacte servie d'abord
+    assert p.post(f"/api/pompiste-supervision/rapports/{rid}/transfert", json={"espace_id": eid, "motif": "Mauvaise station",
+                  "lignes": {str(g1): B["Gazoline 1"], str(g2): B["Gazoline 1"]}}).status_code == 400
+    r = p.post(f"/api/pompiste-supervision/rapports/{rid}/transfert", json={"espace_id": eid, "motif": "Mauvaise station",
+               "lignes": {str(k): v for k, v in props.items()}})
+    assert r.status_code == 200, r.text

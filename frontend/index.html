@@ -21875,6 +21875,17 @@ async function pspTransferer(id){
       </tbody></table>
       <div class="psp-muted" style="font-size:12px;margin-top:4px">Proposé par le moteur : le meeter dont la dernière fin est reprise par le début du rapport. Jamais d'autre carburant.</div>`;
     document.getElementById('tr-oui').disabled = !!(A.bloquants || []).length;
+    ov.querySelectorAll('select.tr-l').forEach(x => x.onchange = verifier);
+    verifier();
+  };
+  // Un meeter cible différent pour chaque ligne : les doublons sont signalés tout de suite
+  const verifier = () => {
+    const sels = [...ov.querySelectorAll('select.tr-l')], vus = {};
+    sels.forEach(x => { if(x.value) (vus[x.value] ||= []).push(x); });
+    let doublon = false;
+    sels.forEach(x => { const d = x.value && vus[x.value].length > 1; x.style.outline = d ? '2px solid var(--red)' : ''; doublon ||= d; });
+    err(doublon ? 'Deux lignes sont sur le même meeter : choisissez un meeter différent pour chaque ligne (en rouge).' : '');
+    document.getElementById('tr-oui').disabled = doublon || !!((A && A.bloquants) || []).length;
   };
   document.getElementById('tr-st').onchange = charger;
   document.getElementById('tr-non').onclick = fin;
