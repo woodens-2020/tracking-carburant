@@ -474,6 +474,7 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
                                        "autre_carburant": pr["autre_carburant"], "echange": pr["echange"]}
     return {
         "placement": placement,
+        "conflits": conflits_creneau(db, r) if avec_journal and r.statut in _A_TRAITER else [],
         "id": r.id, "date": str(r.date), "periode": r.periode, "statut": r.statut,
         "certifie": r.statut in ("CONFIRME", "RESOLU"),
         "pompiste_id": r.utilisateur_id, "pompiste_nom": _nom(r.utilisateur),
@@ -1236,6 +1237,29 @@ def mes_rapports(u: Utilisateur = Depends(_require_pompiste), db: Session = Depe
 _A_TRAITER = ("SOUMIS", "PROBLEME")
 
 
+def conflits_creneau(db: Session, rap: RapportPompiste, pompe_ids: Optional[list] = None) -> list[str]:
+    """Meeters de ce rapport déjà rapportés sur le même créneau par un AUTRE
+    rapport pompiste (actif, ou déjà au journal). Tant qu'il y en a, le meeter
+    ne peut être ni confirmé ni finalisé : le journal ne doit jamais recevoir
+    deux fois le même meeter pour un créneau (ex. rapport transféré d'une
+    autre station sur un créneau déjà pris). Une saisie du module Saisie n'est
+    pas un conflit (la finalisation la remplace, comme avant)."""
+    ids = set(pompe_ids if pompe_ids is not None else [l.pompe_id for l in rap.lignes])
+    out = []
+    for l, r in (db.query(RapportPompisteLigne, RapportPompiste)
+                 .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
+                 .filter(RapportPompiste.date == rap.date, RapportPompiste.periode == rap.periode,
+                         RapportPompiste.id != rap.id, RapportPompiste.statut.in_(_ACTIFS),
+                         RapportPompiste.supprime_at.is_(None), RapportPompisteLigne.pompe_id.in_(ids)).all()):
+        out.append(f"{l.pompe.produit.nom if l.pompe.produit else ''} · {l.pompe.nom} (rapport n°{r.id}, {_nom(r.utilisateur)})")
+    for x in (db.query(Releve).filter(Releve.date == rap.date, Releve.periode == rap.periode, Releve.pompe_id.in_(ids),
+                                      Releve.rapport_pompiste_id.isnot(None), Releve.rapport_pompiste_id != rap.id).all()):
+        lib = f"{x.pompe.produit.nom if x.pompe and x.pompe.produit else ''} · {x.pompe.nom if x.pompe else x.pompe_id}"
+        if not any(o.startswith(lib) for o in out):
+            out.append(f"{lib} (journal, rapport n°{x.rapport_pompiste_id})")
+    return sorted(set(out))
+
+
 def _rapport_a_traiter(db: Session, rid: int) -> RapportPompiste:
     rap = db.get(RapportPompiste, rid)
     if not rap:
@@ -1814,6 +1838,10 @@ def confirmer_ligne(rid: int, pompe_id: int, data: LigneConfIn, request: Request
     l = next((x for x in rap.lignes if x.pompe_id == pompe_id), None)
     if not l:
         raise HTTPException(404, "Pompe absente du rapport")
+    conflits = conflits_creneau(db, rap, [pompe_id])
+    if conflits:
+        raise HTTPException(409, "Ce meeter est déjà rapporté sur ce créneau : " + "; ".join(conflits)
+                            + ". Changez la date ou la pompe de l'un des deux rapports avant de confirmer.")
     av, ap = float(data.metter_avant), float(data.metter_apres)
     if av < 0 or ap < av - TOLERANCE:
         raise HTTPException(400, f"{l.pompe.nom} : l'index de fin doit être supérieur ou égal au début.")
@@ -1906,6 +1934,10 @@ def finaliser(rid: int, data: FinaliserIn, request: Request,
     manquants = [l.pompe.nom for l in rap.lignes if not l.confirmee]
     if manquants:
         raise HTTPException(409, "Meeters pas encore confirmés : " + ", ".join(manquants) + ".")
+    conflits = conflits_creneau(db, rap)
+    if conflits:
+        raise HTTPException(409, "Meeters déjà rapportés sur ce créneau : " + "; ".join(conflits)
+                            + ". Changez la date ou la pompe de l'un des rapports avant de finaliser.")
     if not rap.billetterie_confirmee:
         raise HTTPException(409, "Confirmez d'abord la billetterie.")
     if not rap.ecart_confirme:

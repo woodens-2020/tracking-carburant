@@ -21859,23 +21859,33 @@ async function pspTransferer(id){
     <div class="sup-act"><button class="btn btn-secondary" id="tr-non">Annuler</button><button class="btn btn-primary" id="tr-oui">🔀 Transférer</button></div></div>`;
   document.body.appendChild(ov);
   const fin = () => ov.remove(), err = t => { document.getElementById('tr-err').textContent = t; };
-  let A = null;
+  let A = null, forcer = false;
   const niv = {HIGH: 'suite exacte', MEDIUM: 'très proche', LOW: 'proche', NONE: 'éloigné'};
   const charger = async () => {
     const z = document.getElementById('tr-corps'); z.innerHTML = '<div class="psp-muted">Chargement…</div>'; err('');
     try{ A = await _pspApi('GET', `/rapports/${id}/transfert/apercu?espace_id=${document.getElementById('tr-st').value}`); }
     catch(e){ z.innerHTML = ''; return err(e.message); }
+    forcer = false; dessiner();
+  };
+  const dessiner = () => {
+    const z = document.getElementById('tr-corps');
     z.innerHTML = `${(A.bloquants || []).map(b => `<div class="psp-err" style="margin:4px 0">⛔ ${esc(b)}</div>`).join('')}
+      ${(A.conflits || []).length ? `<div class="psp-err" style="margin:4px 0">⚠ Meeters déjà rapportés sur ce créneau dans ${esc(A.station.nom)} :
+        ${A.conflits.map(c => `<div>• ${esc(c)}</div>`).join('')}
+        <label style="display:flex;gap:8px;align-items:center;justify-content:flex-start;text-align:left;margin:6px 0 0;font-weight:700;cursor:pointer;width:auto">
+          <input type="checkbox" id="tr-forcer" ${forcer ? 'checked' : ''} style="width:18px;height:18px;flex:none;margin:0">
+          <span style="flex:1">Transférer quand même : je réglerai le conflit là-bas (date ou pompe)</span></label>
+        <div class="psp-muted" style="font-size:12px">Le rapport arrivera en « Problème » ; ses meeters ne pourront être ni confirmés ni finalisés tant que le conflit existe.</div></div>` : ''}
       ${(A.avertissements || []).map(b => `<div class="psp-warn" style="margin:4px 0;color:var(--text)">⚠ ${esc(b)}</div>`).join('')}
       <table class="psp-tbl" style="margin-top:6px"><thead><tr><th>Meeter du rapport</th><th class="r">Début → fin</th><th>Meeter dans ${esc(A.station.nom)}</th></tr></thead><tbody>
       ${A.lignes.map(l => `<tr><td><b>${esc(l.libelle)}</b></td><td class="r">${_pspN(l.av)} → ${_pspN(l.ap)}</td>
         <td><select class="filter-select tr-l" data-src="${l.pompe_id}" style="min-width:260px">${l.candidats.map(c => `<option value="${c.pompe_id}"
-            ${c.prise ? 'disabled' : ''} ${c.pompe_id === l.proposition ? 'selected' : ''}>${esc(c.libelle)} — dernier ${_pspN(c.dernier_meter)}${c.ecart != null ? `, écart ${c.ecart > 0 ? '+' : ''}${_pspN(c.ecart)}` : ''}
+            ${c.prise && !forcer && c.pompe_id !== l.proposition ? 'disabled' : ''} ${c.pompe_id === l.proposition ? 'selected' : ''}>${esc(c.libelle)} — dernier ${_pspN(c.dernier_meter)}${c.ecart != null ? `, écart ${c.ecart > 0 ? '+' : ''}${_pspN(c.ecart)}` : ''}
             (${niv[c.niveau] || ''})${c.prise ? ' · déjà rapporté' : ''}</option>`).join('') || '<option value="">aucun meeter de ce carburant</option>'}</select></td></tr>`).join('')}
       </tbody></table>
       <div class="psp-muted" style="font-size:12px;margin-top:4px">Proposé par le moteur : le meeter dont la dernière fin est reprise par le début du rapport. Jamais d'autre carburant.</div>`;
-    document.getElementById('tr-oui').disabled = !!(A.bloquants || []).length;
     ov.querySelectorAll('select.tr-l').forEach(x => x.onchange = verifier);
+    const f = document.getElementById('tr-forcer'); if(f) f.onchange = () => { forcer = f.checked; dessiner(); };
     verifier();
   };
   // Un meeter cible différent pour chaque ligne : les doublons sont signalés tout de suite
@@ -21884,8 +21894,12 @@ async function pspTransferer(id){
     sels.forEach(x => { if(x.value) (vus[x.value] ||= []).push(x); });
     let doublon = false;
     sels.forEach(x => { const d = x.value && vus[x.value].length > 1; x.style.outline = d ? '2px solid var(--red)' : ''; doublon ||= d; });
-    err(doublon ? 'Deux lignes sont sur le même meeter : choisissez un meeter différent pour chaque ligne (en rouge).' : '');
-    document.getElementById('tr-oui').disabled = doublon || !!((A && A.bloquants) || []).length;
+    // Un meeter choisi déjà rapporté sur ce créneau : seulement « quand même »
+    const prises = new Set((A ? A.lignes : []).flatMap(l => l.candidats.filter(c => c.prise).map(c => String(c.pompe_id))));
+    const conflit = sels.some(x => prises.has(x.value));
+    err(doublon ? 'Deux lignes sont sur le même meeter : choisissez un meeter différent pour chaque ligne (en rouge).'
+        : conflit && !forcer ? 'Un meeter choisi est déjà rapporté sur ce créneau : cochez « Transférer quand même » ou choisissez-en un autre.' : '');
+    document.getElementById('tr-oui').disabled = doublon || (conflit && !forcer) || !!((A && A.bloquants) || []).length;
   };
   document.getElementById('tr-st').onchange = charger;
   document.getElementById('tr-non').onclick = fin;
@@ -21899,9 +21913,10 @@ async function pspTransferer(id){
     if(!confirm(`Transférer le rapport n°${id} vers ${A.station.nom} (${_pspDate(r.date)}, ${_pspPer(r.periode)}) ?`)) return;
     const b = document.getElementById('tr-oui'); b.disabled = true;
     try{
-      const x = await _pspApi('POST', `/rapports/${id}/transfert`, {espace_id: Number(document.getElementById('tr-st').value), motif: m, lignes});
+      const x = await _pspApi('POST', `/rapports/${id}/transfert`, {espace_id: Number(document.getElementById('tr-st').value), motif: m, lignes, forcer});
       fin();
-      notify(`Rapport transféré vers ${x.station.nom} (rapport n°${x.rapport_id}, ${_pspDate(x.date)} ${_pspPer(x.periode)}) : à vérifier là-bas.`, 'ok');
+      notify(`Rapport transféré vers ${x.station.nom} (rapport n°${x.rapport_id}, ${_pspDate(x.date)} ${_pspPer(x.periode)}) : `
+        + ((x.conflits || []).length ? `en « Problème » là-bas — conflit à régler : ${x.conflits.join(', ')}.` : 'à vérifier là-bas.'), (x.conflits || []).length ? 'warn' : 'ok');
       PSP.ouvert = null; pspChargerListe(); pspMajBadge();
     }catch(e){ b.disabled = false; err(e.message); }
   };
@@ -21954,6 +21969,9 @@ function pspCarte(r){
         ${((PSP.comptes || {}).autres_stations || []).length ? `<button class="btn btn-secondary psp-mini" style="margin-left:8px" onclick="pspTransferer(${r.id})"
           title="Le pompiste s'est trompé de station : envoyer ce rapport dans la bonne, au même jour et à la même période">🔀 Transférer vers une autre station</button>` : ''}</div>
       <div class="psp-muted">soumis ${r.soumis_at ? new Date(r.soumis_at).toLocaleString('fr-FR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : ''} · charte acceptée</div></div>
+    ${(r.conflits || []).length ? `<div class="psp-err" style="margin:0 0 10px">⛔ <b>Meeters déjà rapportés sur ce créneau par un autre rapport</b> :
+      ${r.conflits.map(c => `<div>• ${esc(c)}</div>`).join('')}
+      <div style="margin-top:4px">Changez la date (✏️ à côté de la date) ou la pompe (⇄ changer de pompe) de l'un des rapports : la confirmation et la finalisation sont bloquées tant que le conflit existe.</div></div>` : ''}
     ${pb ? `<div class="psp-err" style="margin:0 0 10px">Problème signalé par ${esc(r.probleme_par_nom||'')} : ${esc(r.probleme_commentaire||'')}</div>` : ''}
     ${r.note_pompiste ? `<div class="psp-warn" style="color:var(--text);margin:0 0 10px"><b>Note du pompiste :</b> ${esc(r.note_pompiste)}</div>` : ''}
 

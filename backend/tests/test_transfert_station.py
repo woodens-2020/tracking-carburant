@@ -91,6 +91,22 @@ def test_transfert_vers_une_autre_station(client):
     assert l["proposition"] == B["Gazoline 2"]
     assert p.post(f"/api/pompiste-supervision/rapports/{rid2}/transfert",
                   json={"espace_id": eid, "motif": "Mauvaise station", "lignes": {str(gp2): B["Gazoline 1"]}}).status_code == 409
+    # « Transférer quand même » : il arrive en problème, la confirmation est bloquée tant que le conflit existe
+    r = p.post(f"/api/pompiste-supervision/rapports/{rid2}/transfert", json={"espace_id": eid, "motif": "Mauvaise station",
+               "lignes": {str(gp2): B["Gazoline 1"]}, "forcer": True})
+    assert r.status_code == 200, r.text
+    nid2 = r.json()["rapport_id"]
+    assert r.json()["conflits"] and "Gazoline 1" in r.json()["conflits"][0]
+    rb2 = next(x for x in cible.get("/api/pompiste-supervision/rapports?statut=PROBLEME", headers=H).json() if x["id"] == nid2)
+    assert rb2["statut"] == "PROBLEME" and rb2["conflits"] and "Transféré" in rb2["probleme_commentaire"]
+    rc = cible.post(f"/api/pompiste-supervision/rapports/{nid2}/lignes/{B['Gazoline 1']}/confirmer", headers=H,
+                    json={"metter_avant": 5050.25, "metter_apres": 5060.25})
+    assert rc.status_code == 409 and "déjà rapporté" in rc.json()["detail"]
+    # Réglé là-bas : la ligne passe sur le meeter libre, la confirmation redevient possible
+    assert cible.post(f"/api/pompiste-supervision/rapports/{nid2}/lignes/{B['Gazoline 1']}/changer-pompe", headers=H,
+                      json={"pompe_id": B["Gazoline 2"], "motif": "Conflit réglé : c'était Gazoline 2"}).status_code == 200
+    assert cible.post(f"/api/pompiste-supervision/rapports/{nid2}/lignes/{B['Gazoline 2']}/confirmer", headers=H,
+                      json={"metter_avant": 5050.25, "metter_apres": 5060.25}).status_code == 200
     # Le gérant d'une station ne transfère pas (réservé au propriétaire)
     g = _c()
     g.post("/api/login", json={"email": f"tr{ns}@exemple.ht", "password": "MotDePasse2026", "code_acces": "987654321"})

@@ -146,14 +146,24 @@ def apercu_transfert(rid: int, espace_id: int, request: Request, db: Session = D
             if lignes[i]["proposition"] is None and pid not in pris_ici:
                 lignes[i]["proposition"] = pid
                 pris_ici.add(pid)
+        # Plus de meeter libre : le meilleur meeter déjà rapporté est proposé,
+        # signalé en conflit (transfert possible « quand même », à régler là-bas)
+        conflits = []
+        for i, l in enumerate(lignes):
+            if l["proposition"] is None:
+                for c in l["candidats"]:
+                    if c["pompe_id"] not in pris_ici:
+                        l["proposition"], l["conflit"] = c["pompe_id"], True
+                        pris_ici.add(c["pompe_id"])
+                        conflits.append(f"{l['libelle']} → {c['libelle']} : déjà rapporté sur ce créneau dans {st['nom']}.")
+                        break
         for l in lignes:
             if not l["candidats"]:
                 bloq.append(f"{l['libelle']} : aucun meeter de {l['famille']} dans {st['nom']}.")
             elif l["proposition"] is None:
-                bloq.append(f"{l['libelle']} : plus de meeter de {l['famille']} libre dans {st['nom']} sur ce créneau "
-                            "(déjà rapportés, ou pris par une autre ligne de ce rapport).")
-        return lignes, bloq
-    lignes, bloq = _dans_cible(sch, calc)
+                bloq.append(f"{l['libelle']} : plus aucun meeter de {l['famille']} dans {st['nom']} pour cette ligne.")
+        return lignes, bloq, conflits
+    lignes, bloq, conflits = _dans_cible(sch, calc)
     av = []
     if rap.statut in ("CONFIRME", "RESOLU"):
         av.append("Rapport finalisé : ses relevés sortent du journal de cette station et ses dépenses des Dépenses ; "
@@ -161,13 +171,14 @@ def apercu_transfert(rid: int, espace_id: int, request: Request, db: Session = D
     if any(x.get("statut") not in (None, "en_attente") for x in rap.depenses or []):
         av.append("Les dépenses déjà décidées seront à décider de nouveau dans l'autre station.")
     return {"rapport_id": rap.id, "date": str(rap.date), "periode": rap.periode, "station": st,
-            "lignes": lignes, "bloquants": bloq, "avertissements": av}
+            "lignes": lignes, "bloquants": bloq, "conflits": conflits, "avertissements": av}
 
 
 class TransfertIn(BaseModel):
     espace_id: int
     motif: str
     lignes: dict          # {pompe_id source: pompe_id cible}
+    forcer: bool = False  # transférer même si un meeter cible est déjà rapporté sur ce créneau
 
 
 @router.post("/api/pompiste-supervision/rapports/{rid}/transfert")
@@ -203,7 +214,7 @@ def transferer(rid: int, data: TransfertIn, request: Request, db: Session = Depe
     def creer(tdb):
         from placement_metres import activite, famille, libelle
         pris = {pid for pid, c in _creneaux_pris(tdb, rap.date).items() if rap.periode in c}
-        cibles = {}
+        cibles, conflits = {}, []
         for l in src:
             p = tdb.get(Pompe, mapping[l["pompe_id"]])
             if not p or not p.actif:
@@ -211,7 +222,10 @@ def transferer(rid: int, data: TransfertIn, request: Request, db: Session = Depe
             if activite(p) != l["activite"] or famille(p) != l["famille"]:
                 raise HTTPException(400, f"{l['libelle']} : le carburant ne correspond pas ({libelle(p)}).")
             if p.id in pris:
-                raise HTTPException(409, f"{libelle(p)} est déjà rapporté sur ce créneau dans {st['nom']}.")
+                if not data.forcer:
+                    raise HTTPException(409, f"{libelle(p)} est déjà rapporté sur ce créneau dans {st['nom']} "
+                                             "(cochez « transférer quand même » pour le régler là-bas).")
+                conflits.append(libelle(p))
             cibles[l["pompe_id"]] = p
         # Compte du pompiste dans la station cible (créé inactif : aucun accès donné)
         if sch == sch_o:
@@ -240,6 +254,13 @@ def transferer(rid: int, data: TransfertIn, request: Request, db: Session = Depe
                                                  metter_avant=l["metter_avant"], metter_apres=l["metter_apres"],
                                                  metter_avant_corrige=l["metter_avant_corrige"],
                                                  metter_apres_corrige=l["metter_apres_corrige"]))
+        if conflits:
+            # Le rapport arrive en problème : à régler (date ou pompe) avant toute confirmation
+            n.statut, n.probleme_at = "PROBLEME", now_haiti()
+            n.probleme_commentaire = (f"Transféré depuis {station_origine} (rapport n°{rap.id}) alors que ces meeters "
+                                      f"sont déjà rapportés sur ce créneau : {', '.join(conflits)}. Changez la date ou "
+                                      "la pompe de l'un des rapports : la confirmation est bloquée tant que le "
+                                      "conflit existe.")[:1000]
         tdb.flush()
         _recalculer_attendu(n)
         n.ecart = round(float(n.montant_compte) + float(n.total_depenses or 0) + _totaux_feuille(n)["net"]
@@ -252,13 +273,13 @@ def transferer(rid: int, data: TransfertIn, request: Request, db: Session = Depe
         tdb.add(AuditLog(user_id=None, action="rapport_pompiste_transfere_recu",
                          ip_address=request.client.host if request.client else None,
                          details=json.dumps({"rapport_id": n.id, "depuis": {"station": station_origine, "rapport_id": rap.id},
-                                             "par": _nom(s), "motif": motif[:300], **instant,
+                                             "par": _nom(s), "motif": motif[:300], **instant, "conflits": conflits,
                                              "meeters": {l["libelle"]: libelle(cibles[l["pompe_id"]]) for l in src}},
                                             ensure_ascii=False)))
         tdb.commit()
-        return n.id
+        return n.id, conflits
 
-    nouveau = _dans_cible(sch, creer)
+    nouveau, conflits = _dans_cible(sch, creer)
 
     # 2. Station d'origine : hors du journal et des Dépenses, à la corbeille, marqué transféré
     try:
@@ -283,4 +304,4 @@ def transferer(rid: int, data: TransfertIn, request: Request, db: Session = Depe
         _dans_cible(sch, annuler)
         raise
     return {"ok": True, "station": st, "rapport_id": nouveau, "date": str(rap.date), "periode": rap.periode,
-            "releves_retires": n_rel, "depenses_retirees": n_dep}
+            "releves_retires": n_rel, "depenses_retirees": n_dep, "conflits": conflits}
