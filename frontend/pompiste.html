@@ -451,6 +451,10 @@ main,.card,.deux-col > *{min-width:0}
 .sm-btn.sec{background:transparent;border:1px solid rgba(255,255,255,.25);color:inherit}
 .sm-note{font-size:13px;margin-top:6px;opacity:.85}
 .sm-ano{font-size:12.5px;margin-top:5px;color:#fbbf24}
+.fe-sm:empty{display:none}
+.fe-sm{margin:-2px 0 8px}
+.fe-sm .sm{margin:4px 0 0;padding:10px 12px}
+.sm.compact{font-size:13px;padding:6px 10px;font-weight:600}
 </style>
 </head>
 <body>
@@ -1259,20 +1263,23 @@ function ecranIndex(id, prix, titreHaut, fin){
 // appartient l'index (dernier meeter, écart, confiance) ; le pompiste prend le
 // meeter proposé ou garde son choix. Rien n'est bloqué : la direction vérifie.
 const SM = {res:{}, minuteur:null};
+const smZone = id => S.etape === 'feuille' ? $('fe-sm-' + id) : $('i-smart');
+const smVisible = id => S.etape === 'feuille' ? !!$('fe-sm-' + id) : !!(S.champActif && S.champActif.id === id && $('i-smart'));
 function smartAnalyser(id){
+  id = Number(id);
   const s = S.index[id] || {}, av = num(s.avant), ap = num(s.apres);
-  const z = $('i-smart'); if(!z) return;
+  const z = smZone(id); if(!z) return;
   if(av == null){ z.innerHTML = ''; return; }
   const cle = `${id}|${av}|${ap ?? ''}|${S.date}`;
   if(SM.res[id]?.cle === cle){ z.innerHTML = smartHtml(id, SM.res[id].a); return; }
-  clearTimeout(SM.minuteur);
-  SM.minuteur = setTimeout(async () => {
+  SM.minuteurs ||= {};
+  clearTimeout(SM.minuteurs[id]);
+  SM.minuteurs[id] = setTimeout(async () => {
     try{
       const a = await api('POST', '/api/pompiste/analyser-index', {date:S.date, periode: enCours() ? enCours().periode : null,
         pompe_id:id, metter_avant:av, metter_apres:ap});
       SM.res[id] = {cle, a};
-      const z2 = $('i-smart');
-      if(z2 && S.champActif && S.champActif.id === id) z2.innerHTML = smartHtml(id, a);
+      if(smVisible(id)) smZone(id).innerHTML = smartHtml(id, a);
     }catch(e){ /* le contrôle n'empêche jamais la saisie */ }
   }, 450);
 }
@@ -1290,6 +1297,9 @@ function smartHtml(id, a){
   const tete = (cls, ico, txt) => `<div class="sm ${cls}"><div class="sm-t">${ico} ${txt}</div>
     <div class="sm-chiffres"><span>${t('sm_nouveau')} <b class="num">${n(num(s.avant))}</b></span></div>`;
   const pris = s.decision === 'ACCEPTE' && s.pompeChoisie ? `<div class="sm-note">✓ ${t('sm_pris', {m: esc(a.choisi.libelle)})}</div>` : '';
+  if(a.statut_rapprochement === 'MATCH_CONFIRMED' && S.etape === 'feuille')
+    return `<div class="sm ok compact">✓ ${t('sm_ok')} · ${t('sm_dernier')} <b class="num">${n(a.choisi.dernier_meter)}</b> · ${t('sm_ecart')} <b class="num">${sg(a.choisi.ecart)}</b>${pris}</div>`
+      + anos;
   if(a.statut_rapprochement === 'MATCH_CONFIRMED')
     return tete('ok', '✓', t('sm_ok')) + ligne(t('sm_choisi'), a.choisi) + pris + anos + `</div>`;
   if(a.statut_rapprochement === 'INITIAL_READING')
@@ -1314,6 +1324,17 @@ function smartHtml(id, a){
 function smartUtiliser(id, cible){
   if(id === cible) return;
   const s = S.index[id] || {};
+  if(S.etape === 'feuille'){
+    const v = {...s, pompeChoisie: s.pompeChoisie || id, decision: 'ACCEPTE', debutConfirme: false};
+    const autre = S.index[cible];
+    if(autre && (autre.avant || autre.apres)) S.index[id] = {...autre, debutConfirme: false};
+    else delete S.index[id];
+    S.index[cible] = v;
+    delete S.erreurs[id]; delete S.erreurs[cible]; delete SM.res[id]; delete SM.res[cible];
+    sauverBrouillon(); rendreSansHaut();
+    setTimeout(() => $('fe-r-' + cible)?.scrollIntoView({block: 'center', behavior: 'smooth'}), 60);
+    return;
+  }
   const v = {...s, pompeChoisie: s.pompeChoisie || id, decision: 'ACCEPTE', debutConfirme: false};
   const i = S.choisies.indexOf(id), j = S.choisies.indexOf(cible);
   if(j >= 0){ S.index[id] = {...(S.index[cible] || {}), debutConfirme: false}; S.choisies[j] = cible; }
@@ -1325,7 +1346,8 @@ function smartUtiliser(id, cible){
 }
 function smartGarder(id){
   (S.index[id] ||= {}).decision = 'REFUSE';
-  const z = $('i-smart'); if(z && SM.res[id]) z.innerHTML = smartHtml(id, SM.res[id].a);
+  if(S.etape === 'feuille') sauverBrouillon();
+  const z = smZone(id); if(z && SM.res[id]) z.innerHTML = smartHtml(id, SM.res[id].a);
 }
 
 function confirmerDebut(id){
@@ -1789,6 +1811,7 @@ function rFeuille(){
   </div>`;
   feBrancher();
   feMaj();
+  for(const id of Object.keys(S.index)) if(num(S.index[id]?.avant) != null) smartAnalyser(id);   // contrôle gardé après un nouvel affichage
   barre('', t('fe_envoyer'), feEnvoyer);
   if(S.feFocus){ const el = document.querySelector(`[data-f="${S.feFocus}"]`); S.feFocus = null; if(el) setTimeout(() => el.focus(), 30); }
 }
@@ -1807,6 +1830,7 @@ function feLigneA(p, q){
       ${feChamp(`idx:${q.id}:avant`, feDec(s.avant), `class="saisie-n fe-in num" inputmode="decimal" maxlength="14" placeholder="${esc(t('fe_avant'))}" data-n="dec3"`)}
       ${feChamp(`idx:${q.id}:apres`, feDec(s.apres), `class="saisie-n fe-in num" inputmode="decimal" maxlength="14" placeholder="${esc(t('fe_apres'))}" data-n="dec3"`)}
       <span class="fe-v" id="fe-g-${q.id}"></span><span class="fe-v" id="fe-m-${q.id}"></span></div>
+    <div class="fe-sm" id="fe-sm-${q.id}"></div>
     ${diff ? `<div class="fe-err warn">⚠ ${t('debut_diff')}<label><input type="checkbox" ${s.debutConfirme ? 'checked' : ''}
         onchange="feConfirmerDebut(${q.id}, this.checked)"> ${t('fe_relu')}</label></div>`
       : (e ? `<div class="fe-err">${esc(msgLigne(e))}</div>` : '')}`;
@@ -1839,7 +1863,8 @@ function feEcrire(el){
 function feBrancher(){
   const champs = [...$('app').querySelectorAll('[data-f]')];
   champs.forEach((el, i) => {
-    el.addEventListener('input', () => { feEcrire(el); feMaj(); sauverBrouillon(); });
+    el.addEventListener('input', () => { feEcrire(el); feMaj(); sauverBrouillon();
+      const f = el.dataset.f.split(':'); if(f[0] === 'idx') smartAnalyser(f[1]); });
     el.addEventListener('focus', () => { if(el.dataset.n) el.select(); });
     if(el.tagName !== 'TEXTAREA') el.addEventListener('keydown', e => {
       if(e.key !== 'Enter') return;
