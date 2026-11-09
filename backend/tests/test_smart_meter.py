@@ -288,3 +288,21 @@ def test_liste_dynamique_des_derniers_meeters(client, st):
     fams = [x["famille"] for x in r.json()["meeters"]]
     assert fams == sorted(fams, key=lambda f: {"Gazoline": 0, "Diesel": 1, "Propane": 2}.get(f, 3))   # classés par carburant
     assert client.get(f"/api/pompiste/derniers-meeters?date={st['jour']}", headers=H).status_code == 403   # pompistes seulement
+
+
+def test_derniers_meeters_pour_la_validation(client, st):
+    """Validation d'un rapport : la direction a la même liste, pour le créneau du rapport."""
+    p = _pompiste(client)
+    r = _envoyer(p, st, st["g"]["P1"], REF["P3"], REF["P3"] + 40)
+    assert r.status_code == 201, r.text
+    rid = p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 30}], "depenses": []}).json()["id"]
+    assert p.get(f"/api/pompiste-supervision/rapports/{rid}/derniers-meeters").status_code == 403    # direction seulement
+    d = client.get(f"/api/pompiste-supervision/rapports/{rid}/derniers-meeters", headers=H).json()
+    L = {x["pompe_id"]: x for x in d["meeters"]}
+    assert L[st["g"]["P3"]]["dernier_meter"] == REF["P3"] and L[st["g"]["P1"]]["dans_rapport"]
+    assert L[st["dsl"]]["famille"] == "Diesel"
+    # La fiche du rapport porte le rapprochement figé à la saisie
+    x = next(x for x in client.get("/api/pompiste-supervision/rapports?statut=SOUMIS", headers=H).json() if x["id"] == rid)
+    rp = x["lignes"][0]["rapprochement"]
+    assert rp["statut"] == "MATCH_REVIEW" and rp["pompe_proposee"]["pompe_id"] == st["g"]["P3"]
+    assert client.post(f"/api/pompiste-supervision/rapports/{rid}/supprimer", headers=H, json={"motif": "nettoyage du test"}).status_code == 200

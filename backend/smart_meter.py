@@ -356,6 +356,33 @@ def derniers_meeters(request: Request, date: Optional[date_type] = None, periode
     return {"date": str(d), "meeters": out}
 
 
+@router.get("/api/pompiste-supervision/rapports/{rid}/derniers-meeters")
+def derniers_meeters_rapport(rid: int, request: Request, db: Session = Depends(get_db)):
+    """Validation d'un rapport (direction) : le dernier meeter de chaque pompe
+    pour le créneau de ce rapport (hors ce rapport), par carburant ; `prise` =
+    déjà rapportée sur ce créneau par un autre rapport ou au journal,
+    `dans_rapport` = déjà une ligne de ce rapport."""
+    from placement_metres import activite, famille, libelle
+    from pompiste_routes import _creneaux_pris
+    _superviseur(request, db)
+    rap = db.get(RapportPompiste, rid)
+    if not rap:
+        raise HTTPException(404, "Rapport introuvable")
+    dans = {l.pompe_id for l in rap.lignes}
+    pris = {pid for pid, c in _creneaux_pris(db, rap.date).items()
+            if rap.periode in c and c[rap.periode].get("rapport_utilisateur_id") != rap.utilisateur_id}
+    out = []
+    for p in db.query(Pompe).filter(Pompe.actif.is_(True)).all():
+        ref = reference(db, p, rap.date, rap.periode, exclure_rapport_id=rap.id)
+        out.append({"pompe_id": p.id, "libelle": libelle(p), "produit": p.produit.nom if p.produit else "",
+                    "meeter": p.nom, "famille": famille(p), "activite": activite(p),
+                    "dernier_meter": _f(ref["valeur"]), "source": ref["source"], "reference_statut": ref["statut"],
+                    "prise": p.id in pris and p.id not in dans, "dans_rapport": p.id in dans})
+    rang = {"Gazoline": 0, "Diesel": 1, "Propane": 2}
+    out.sort(key=lambda x: (rang.get(x["famille"], 3), x["produit"], x["meeter"]))
+    return {"rapport_id": rap.id, "date": str(rap.date), "periode": rap.periode, "meeters": out}
+
+
 # ── API direction : configuration ─────────────────────────────────────
 class ConfigIn(BaseModel):
     ecart_exact: float = Field(gt=0, le=1)
