@@ -19,6 +19,8 @@ def _credit(client, **kw):
 
 
 def _mvt(client, cid, type_, montant, **kw):
+    if type_ == "DEPOT":
+        kw.setdefault("deposant_nom", "Marie Joseph")
     return client.post(f"/api/credits/{cid}/mouvements", headers=H,
                        json={"type": type_, "montant": montant, **kw})
 
@@ -162,9 +164,10 @@ def test_releve_d_un_credit_pdf_et_excel(client):
     rows = [[c.value for c in row] for row in ws.iter_rows()]
     ops = [row for row in rows if row[1] in ("Montant initial", "Augmentation", "Paiement versé")]
     # Solde après chaque opération : 1000 → 1500 → 1100 → 1000
-    assert [row[6] for row in ops] == [1000, 1500, 1100, 1000]
+    assert [row[7] for row in ops] == [1000, 1500, 1100, 1000]
+    assert [row[2] for row in ops] == [None, None, "Marie Joseph", "Marie Joseph"]
     total = next(row for row in rows if row[1] == "Total")
-    assert total[4:7] == [1500, 500, 1000]
+    assert total[5:8] == [1500, 500, 1000]
     assert client.get(f"/api/credits/{c['id']}/releve.doc", headers=H).status_code == 404
     assert client.get("/api/credits/999999/releve.pdf", headers=H).status_code == 404
 
@@ -185,7 +188,8 @@ def test_releve_des_paiements_de_la_periode(client):
     noms = [row[1] for row in rows]
     assert a["tiers_nom"] in noms and b["tiers_nom"] in noms
     lig_a = [row for row in rows if row[1] == a["tiers_nom"]]
-    assert [row[7] for row in lig_a] == [200]                         # le paiement de J-30 n'y est pas
+    assert [row[8] for row in lig_a] == [200]                         # le paiement de J-30 n'y est pas
+    assert [row[3] for row in lig_a] == ["Marie Joseph"]
     assert any(row[1] == "Total HTG" for row in rows) and any(row[1] == "Total USD" for row in rows)
     sit = [[c.value for c in row] for row in wb["Situation"].iter_rows()]
     ra = next(row for row in sit if row[0] == a["tiers_nom"])
@@ -195,3 +199,13 @@ def test_releve_des_paiements_de_la_periode(client):
     assert client.get(f"/api/credits/export/paiements.pdf?date_debut={J(0)}&date_fin={J(3)}", headers=H).status_code == 400
     # Période sans paiement : un document quand même
     assert client.get("/api/credits/export/paiements.pdf?date_debut=2001-01-01&date_fin=2001-01-31", headers=H).status_code == 200
+
+
+def test_nom_de_la_personne_qui_a_fait_le_depot(client):
+    c = _credit(client, montant_initial=500)
+    r = _mvt(client, c["id"], "DEPOT", 100, deposant_nom="   ")
+    assert r.status_code == 400 and "nom de la personne" in r.json()["detail"]
+    c = _mvt(client, c["id"], "DEPOT", 100, deposant_nom="  Jean   Baptiste ").json()
+    assert c["mouvements"][-1]["deposant_nom"] == "Jean Baptiste"
+    c = _mvt(client, c["id"], "AUGMENTATION", 50).json()                  # pas exigé pour une augmentation
+    assert c["mouvements"][-1]["deposant_nom"] is None

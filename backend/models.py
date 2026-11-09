@@ -2374,6 +2374,7 @@ class CreditMouvement(Base):
     montant        = Column(Numeric(14, 2), nullable=False)
     date_mouvement = Column(Date, nullable=False)
     mode_paiement  = Column(String(40), nullable=True)
+    deposant_nom   = Column(String(150), nullable=True)               # qui a versé / remis l'argent
     reference      = Column(String(100), nullable=True)
     note           = Column(String(500), nullable=True)
     createur_id    = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)

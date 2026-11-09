@@ -103,6 +103,7 @@ class MouvementIn(BaseModel):
     montant:        Decimal
     date_mouvement: Optional[date_type] = None
     mode_paiement:  Optional[str] = None
+    deposant_nom:   Optional[str] = None
     reference:      Optional[str] = None
     note:           Optional[str] = None
 
@@ -163,6 +164,7 @@ def _mvt_dict(m: CreditMouvement) -> dict:
     return {
         "id": m.id, "credit_id": m.credit_id, "type": m.type, "montant": _f(m.montant),
         "date_mouvement": str(m.date_mouvement), "mode_paiement": m.mode_paiement,
+        "deposant_nom": m.deposant_nom,
         "reference": m.reference, "note": m.note,
         "createur_nom": _nom(m.createur),
         "created_at": m.created_at.isoformat() if m.created_at else None,
@@ -409,6 +411,8 @@ def ajouter_mouvement(credit_id: int, data: MouvementIn, request: Request, db: S
         raise HTTPException(400, f"La date ne peut pas précéder la date du crédit "
                                  f"({c.date_credit.strftime('%d/%m/%Y')}).")
     if data.type == "DEPOT":
+        if not _txt(data.deposant_nom, 150):
+            raise HTTPException(400, "Indiquez le nom de la personne qui a fait le dépôt.")
         reste = c.reste()
         if reste <= 0:
             raise HTTPException(409, "Ce crédit est déjà soldé : il ne reste rien à déposer.")
@@ -416,7 +420,8 @@ def ajouter_mouvement(credit_id: int, data: MouvementIn, request: Request, db: S
             raise HTTPException(409, f"Le dépôt ({_f(montant):,.2f} {c.devise}) dépasse le reste "
                                      f"({_f(reste):,.2f} {c.devise}).".replace(",", " "))
     m = CreditMouvement(credit_id=c.id, type=data.type, montant=montant, date_mouvement=d,
-                        mode_paiement=_txt(data.mode_paiement, 40), reference=_txt(data.reference, 100),
+                        mode_paiement=_txt(data.mode_paiement, 40), deposant_nom=_txt(data.deposant_nom, 150),
+                        reference=_txt(data.reference, 100),
                         note=_txt(data.note, 500), createur_id=u.id)
     db.add(m)
     c.mouvements.append(m)
@@ -424,7 +429,8 @@ def ajouter_mouvement(credit_id: int, data: MouvementIn, request: Request, db: S
     db.flush()
     _tracer(db, request, u, "credit_mouvement_ajoute", {"credit_id": c.id, "mouvement_id": m.id,
                                                         "type": m.type, "montant": str(montant),
-                                                        "devise": c.devise, "date": str(d)})
+                                                        "devise": c.devise, "date": str(d),
+                                                        "deposant": m.deposant_nom})
     db.commit()
     return _credit_dict(_get(db, c.id), aujourdhui, avec_mouvements=True)
 

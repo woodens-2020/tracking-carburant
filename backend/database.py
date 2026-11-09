@@ -256,6 +256,8 @@ def _migrate_columns():
             ("bar_produits", "seuil_piscine", "ALTER TABLE bar_produits ADD COLUMN seuil_piscine NUMERIC(12,3)", None),
             ("bar_livraisons_internes", "type_bon", "ALTER TABLE bar_livraisons_internes ADD COLUMN type_bon VARCHAR(20) NOT NULL DEFAULT 'TRANSFERT'", None),
             ("bar_livraisons_internes", "origine", "ALTER TABLE bar_livraisons_internes ADD COLUMN origine VARCHAR(20)", None),
+            # Crédits : nom de la personne qui a versé / remis le paiement
+            ("credit_mouvements", "deposant_nom", "ALTER TABLE credit_mouvements ADD COLUMN deposant_nom VARCHAR(150)", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -416,6 +418,8 @@ def _migrate_columns():
             ("bar_produits", "seuil_piscine", "ALTER TABLE bar_produits ADD COLUMN seuil_piscine NUMERIC(12,3)", None),
             ("bar_livraisons_internes", "type_bon", "ALTER TABLE bar_livraisons_internes ADD COLUMN type_bon VARCHAR(20) NOT NULL DEFAULT 'TRANSFERT'", None),
             ("bar_livraisons_internes", "origine", "ALTER TABLE bar_livraisons_internes ADD COLUMN origine VARCHAR(20)", None),
+            # Crédits : nom de la personne qui a versé / remis le paiement
+            ("credit_mouvements", "deposant_nom", "ALTER TABLE credit_mouvements ADD COLUMN deposant_nom VARCHAR(150)", None),
         ]
     else:
         return

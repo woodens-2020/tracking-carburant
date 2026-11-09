@@ -62,7 +62,7 @@ def lignes_credit(c) -> list[dict]:
     """Opérations d'un crédit dans l'ordre, avec le solde après chacune.
     Première ligne : le montant initial à la date du crédit."""
     solde = Decimal(c.montant_initial)
-    out = [{"date": c.date_credit, "operation": "Montant initial", "mode": "", "note": c.description or "",
+    out = [{"date": c.date_credit, "operation": "Montant initial", "mode": "", "deposant": "", "note": c.description or "",
             "plus": Decimal(c.montant_initial), "moins": None, "solde": solde, "par": ""}]
     for m in sorted(c.mouvements, key=lambda x: (x.date_mouvement, x.id)):
         if m.type == "AUGMENTATION":
@@ -72,6 +72,7 @@ def lignes_credit(c) -> list[dict]:
         out.append({
             "date": m.date_mouvement, "operation": TYPE_LIB[(c.sens, m.type)],
             "mode": " · ".join(x for x in (m.mode_paiement, m.reference) if x),
+            "deposant": m.deposant_nom or "",
             "note": m.note or "",
             "plus": m.montant if m.type == "AUGMENTATION" else None,
             "moins": m.montant if m.type == "DEPOT" else None,
@@ -208,15 +209,15 @@ def pdf_releve_credit(c) -> bytes:
     ], larg))
     story.append(Paragraph("Opérations", S["h2"]))
     P = lambda s, st="cell": Paragraph(escape(s or ""), S[st])
-    data = [["Date", "Opération", "Mode · Réf.", "Note", "Augmentation", "Paiement", "Solde", "Saisi par"]]
+    data = [["Date", "Opération", "Déposé par", "Mode · Réf.", "Note", "Augmentation", "Paiement", "Solde", "Saisi par"]]
     for l in lignes_credit(c):
-        data.append([_d(l["date"]), P(l["operation"], "cellb"), P(l["mode"]), P(l["note"]),
+        data.append([_d(l["date"]), P(l["operation"], "cellb"), P(l["deposant"]), P(l["mode"]), P(l["note"]),
                      _m(l["plus"]) if l["plus"] is not None else "", _m(l["moins"]) if l["moins"] is not None else "",
                      _m(l["solde"]), P(l["par"])])
-    data.append(["", f"Total ({dv})", "", "", _m(du), _m(dep), _m(du - dep), ""])
+    data.append(["", f"Total ({dv})", "", "", "", _m(du), _m(dep), _m(du - dep), ""])
     w = larg
-    story.append(_pdf_table(data, [w * .09, w * .13, w * .14, w * .21, w * .11, w * .11, w * .11, w * .10],
-                            total=True, droite_depuis=4, droite_jusqua=6))
+    story.append(_pdf_table(data, [w * .085, w * .115, w * .13, w * .12, w * .15, w * .1, w * .1, w * .1, w * .1],
+                            total=True, droite_depuis=5, droite_jusqua=7))
     if c.notes:
         story.append(Paragraph("Notes", S["h2"]))
         story.append(Paragraph(escape(c.notes).replace("\n", "<br/>"), S["cell"]))
@@ -237,17 +238,17 @@ def pdf_paiements(credits: list, d_debut: date_type, d_fin: date_type, sens: Opt
     for dv in sorted(sel["paiements"]):
         lst = sel["paiements"][dv]
         story.append(Paragraph(f"Paiements en {dv} — {len(lst)} paiement{'s' if len(lst) > 1 else ''}", S["h2"]))
-        data = [["Date", "Tiers", "Sens", "Mode · Réf.", "Note", "Saisi par", "Montant"]]
+        data = [["Date", "Tiers", "Sens", "Déposé par", "Mode · Réf.", "Note", "Saisi par", "Montant"]]
         total = Decimal("0")
         for m, c in lst:
             total += m.montant
-            data.append([_d(m.date_mouvement), P(c.tiers_nom, "cellb"), SENS_LIB[c.sens],
+            data.append([_d(m.date_mouvement), P(c.tiers_nom, "cellb"), SENS_LIB[c.sens], P(m.deposant_nom),
                          P(" · ".join(x for x in (m.mode_paiement, m.reference) if x)), P(m.note),
                          P((m.createur.nom_complet or m.createur.username) if m.createur else ""), _m(m.montant, dv)])
-        data.append(["", f"Total {dv}", "", "", "", "", _m(total, dv)])
+        data.append(["", f"Total {dv}", "", "", "", "", "", _m(total, dv)])
         w = larg
-        story.append(_pdf_table(data, [w * .09, w * .22, w * .1, w * .15, w * .2, w * .11, w * .13],
-                                total=True, droite_depuis=6))
+        story.append(_pdf_table(data, [w * .085, w * .19, w * .09, w * .14, w * .13, w * .14, w * .1, w * .125],
+                                total=True, droite_depuis=7))
     if sel["situation"]:
         story.append(Paragraph("Situation des crédits concernés (à ce jour)", S["h2"]))
         data = [["Tiers", "Sens", "Devise", "Échéance", "Statut", "Total dû", "Déjà payé", "Reste"]]
@@ -345,12 +346,12 @@ def xlsx_releve_credit(c) -> bytes:
         ws.cell(r, 3, dv)
         r += 1
     r += 1
-    lignes = [[l["date"], l["operation"], l["mode"], l["note"], l["plus"], l["moins"], l["solde"], l["par"]]
+    lignes = [[l["date"], l["operation"], l["deposant"], l["mode"], l["note"], l["plus"], l["moins"], l["solde"], l["par"]]
               for l in lignes_credit(c)]
-    _xl_table(ws, r, ["Date", "Opération", "Mode · Réf.", "Note", f"Augmentation ({dv})", f"Paiement ({dv})",
-                      f"Solde ({dv})", "Saisi par"], lignes, o, {5, 6, 7},
-              total=["", "Total", "", "", du, dep, du - dep, ""])
-    _xl_largeurs(ws, [12, 18, 22, 34, 17, 17, 17, 20])
+    _xl_table(ws, r, ["Date", "Opération", "Déposé par", "Mode · Réf.", "Note", f"Augmentation ({dv})", f"Paiement ({dv})",
+                      f"Solde ({dv})", "Saisi par"], lignes, o, {6, 7, 8},
+              total=["", "Total", "", "", "", du, dep, du - dep, ""])
+    _xl_largeurs(ws, [12, 18, 24, 22, 34, 17, 17, 17, 20])
     ws.freeze_panes = ws.cell(r + 1, 1)
     buf = io.BytesIO()
     wb.save(buf)
@@ -374,11 +375,11 @@ def xlsx_paiements(credits: list, d_debut: date_type, d_fin: date_type, sens: Op
         lignes, total = [], Decimal("0")
         for m, c in lst:
             total += m.montant
-            lignes.append([m.date_mouvement, c.tiers_nom, SENS_LIB[c.sens], m.mode_paiement or "", m.reference or "",
+            lignes.append([m.date_mouvement, c.tiers_nom, SENS_LIB[c.sens], m.deposant_nom or "", m.mode_paiement or "", m.reference or "",
                            m.note or "", (m.createur.nom_complet or m.createur.username) if m.createur else "", m.montant])
-        r = _xl_table(ws, r + 1, ["Date", "Tiers", "Sens", "Mode", "Référence", "Note", "Saisi par", f"Montant ({dv})"],
-                      lignes, o, {8}, total=["", f"Total {dv}", "", "", "", "", "", total])
-    _xl_largeurs(ws, [12, 30, 14, 14, 16, 34, 20, 18])
+        r = _xl_table(ws, r + 1, ["Date", "Tiers", "Sens", "Déposé par", "Mode", "Référence", "Note", "Saisi par", f"Montant ({dv})"],
+                      lignes, o, {9}, total=["", f"Total {dv}", "", "", "", "", "", "", total])
+    _xl_largeurs(ws, [12, 30, 14, 24, 14, 16, 34, 20, 18])
     ws2 = wb.create_sheet("Situation")
     r2 = _xl_entete(ws2, "Situation des crédits concernés", [f"À ce jour ({_d(today_haiti())})"], o)
     lignes = []

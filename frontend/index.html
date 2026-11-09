@@ -2727,10 +2727,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .cr-vide{padding:40px 16px;text-align:center;color:var(--muted)}
 .cr-detail-tete{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start;margin-bottom:12px}
 .cr-detail-tete h4{margin:0 0 4px;font-size:18px}
-.cr-detail-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.cr-detail-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}
 .cr-detail-kpis div{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:9px 11px}
 .cr-detail-kpis span{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-.cr-detail-kpis b{font-family:var(--mono);font-size:15px;white-space:nowrap}
+.cr-detail-kpis b{font-family:var(--mono);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
 .cr-actions{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 14px}
 .cr-actions .btn{height:34px}
 .cr-mvt-dep{color:var(--green);font-weight:700}.cr-mvt-aug{color:var(--orange);font-weight:700}
@@ -4563,7 +4563,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 
     <!-- Crédits : fiche d'un crédit -->
     <div class="gi-modal-overlay" id="cr-modal-detail">
-      <div class="gi-modal" style="max-width:820px">
+      <div class="gi-modal" style="width:min(1040px,96vw);max-width:none">
         <div class="gi-modal-head">
           <h3>Fiche du crédit</h3>
           <button class="gi-modal-close" onclick="crFermer('cr-modal-detail')" aria-label="Fermer">&times;</button>
@@ -4635,6 +4635,11 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
             <div class="gi-form-field"><label class="gi-form-lbl" for="cr-mm-date">Date *</label>
               <input class="gi-form-input" id="cr-mm-date" type="date"></div>
           </div>
+          <div class="gi-form-row full" id="cr-mm-dep-zone"><div class="gi-form-field">
+            <label class="gi-form-lbl" for="cr-mm-deposant" id="cr-mm-dep-lbl">Nom de la personne qui a fait le dépôt *</label>
+            <input class="gi-form-input" id="cr-mm-deposant" maxlength="150" autocomplete="off" list="cr-deposants" placeholder="Prénom et nom">
+            <datalist id="cr-deposants"></datalist>
+          </div></div>
           <div class="gi-form-row">
             <div class="gi-form-field"><label class="gi-form-lbl" for="cr-mm-mode">Mode de paiement</label>
               <select class="gi-form-input" id="cr-mm-mode">
@@ -23782,7 +23787,8 @@ const _crAuj = () => todayStr();
 function crFermer(id){ document.getElementById(id).classList.remove('open'); }
 function crChoix(grp, v){
   document.querySelectorAll(`#${grp} button`).forEach(b => b.classList.toggle('on', b.dataset.v === v));
-  if(grp === 'cr-mm-type'){ CR.mvtType = v; crAideMvt(); }
+  if(grp === 'cr-mm-type'){ CR.mvtType = v; crAideMvt();
+    const z = document.getElementById('cr-mm-dep-zone'); if(z) z.style.display = v === 'DEPOT' ? '' : 'none'; }
 }
 function _crValChoix(grp){ return document.querySelector(`#${grp} button.on`)?.dataset.v || ''; }
 
@@ -23926,12 +23932,13 @@ function _crRendreDetail(c){
   CR.ouvert = c;
   const dv = c.devise, payer = c.sens === 'DETTE';
   const mv = c.mouvements.length ? `<div class="cr-tbl-wrap"><table class="cr-tbl"><thead><tr>
-        <th>Date</th><th>Type</th><th class="r">Montant</th><th class="cr-col-m">Mode · Réf.</th><th class="cr-col-m">Par</th><th></th></tr></thead><tbody>
+        <th>Date</th><th>Type</th><th class="r">Montant</th><th>Déposé par</th><th class="cr-col-m">Mode · Réf.</th><th class="cr-col-m">Saisi par</th><th></th></tr></thead><tbody>
       ${c.mouvements.map(m => `<tr style="cursor:default">
         <td style="white-space:nowrap">${frDate(m.date_mouvement)}</td>
         <td>${m.type==='DEPOT' ? `<span class="cr-mvt-dep">${payer?'Paiement versé':'Paiement reçu'}</span>` : '<span class="cr-mvt-aug">Augmentation</span>'}
           ${m.note ? `<div class="cr-aide">${esc(m.note)}</div>` : ''}</td>
         <td class="r">${m.type==='DEPOT'?'−':'+'} ${_crM(m.montant, dv)}</td>
+        <td>${m.deposant_nom ? esc(m.deposant_nom) : '<span class="c-dim">—</span>'}</td>
         <td class="cr-col-m">${esc([m.mode_paiement, m.reference].filter(Boolean).join(' · ') || '—')}</td>
         <td class="cr-col-m" style="font-size:12.5px;color:var(--muted)">${esc(m.createur_nom||'')}</td>
         <td style="text-align:right"><button class="cr-sup" title="Retirer ce mouvement (erreur de saisie)" aria-label="Retirer ce mouvement" onclick="crSupprimerMvt(${m.id})">🗑</button></td>
@@ -23976,7 +23983,12 @@ function crOuvrirMvt(type){
   document.getElementById('cr-mm-montant').value = '';
   const d = document.getElementById('cr-mm-date');
   d.value = _crAuj(); d.min = c.date_credit; d.max = _crAuj();
-  ['cr-mm-mode','cr-mm-ref','cr-mm-note'].forEach(k => document.getElementById(k).value = '');
+  ['cr-mm-mode','cr-mm-ref','cr-mm-note','cr-mm-deposant'].forEach(k => document.getElementById(k).value = '');
+  document.getElementById('cr-mm-dep-lbl').textContent = payer
+    ? 'Nom de la personne qui a fait le dépôt (de notre côté) *'
+    : 'Nom de la personne qui a apporté le paiement *';
+  const noms = [...new Set(c.mouvements.map(m => m.deposant_nom).filter(Boolean))];
+  document.getElementById('cr-deposants').innerHTML = noms.map(n => `<option value="${esc(n)}">`).join('');
   document.getElementById('cr-mm-err').textContent = '';
   crChoix('cr-mm-type', type);
   document.getElementById('cr-modal-mvt').classList.add('open');
@@ -24002,11 +24014,14 @@ async function crEnregistrerMvt(){
   if(!(montant > 0)) return err.textContent = 'Indiquez un montant supérieur à 0.';
   if(CR.mvtType === 'DEPOT' && montant > c.reste + 0.001) return err.textContent = `Le montant dépasse le reste (${_crM(c.reste, c.devise)}).`;
   if(!date) return err.textContent = 'Indiquez la date.';
+  const deposant = document.getElementById('cr-mm-deposant').value.trim();
+  if(CR.mvtType === 'DEPOT' && !deposant){ document.getElementById('cr-mm-deposant').focus(); return err.textContent = 'Indiquez le nom de la personne qui a fait le dépôt.'; }
   if(date < c.date_credit) return err.textContent = `La date ne peut pas précéder la date du crédit (${frDate(c.date_credit)}).`;
   const b = document.getElementById('cr-mm-ok'); b.disabled = true; err.textContent = '';
   try{
     const x = await POST(`/credits/${c.id}/mouvements`, {type: CR.mvtType, montant, date_mouvement: date,
       mode_paiement: document.getElementById('cr-mm-mode').value || null,
+      deposant_nom: CR.mvtType === 'DEPOT' ? deposant : null,
       reference: document.getElementById('cr-mm-ref').value.trim() || null,
       note: document.getElementById('cr-mm-note').value.trim() || null});
     crFermer('cr-modal-mvt');
