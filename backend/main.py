@@ -413,6 +413,8 @@ from placement_metres import router as placement_router
 app.include_router(placement_router)
 from classement_pompistes import router as classement_router
 app.include_router(classement_router)
+from smart_meter import router as smart_meter_router
+app.include_router(smart_meter_router)
 app.include_router(caisse_principale_router)
 
 
@@ -619,6 +621,18 @@ def startup():
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS suppression JSON",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS statut_rapprochement VARCHAR(20)",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS confiance VARCHAR(10)",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS score_rapprochement INTEGER",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS pompe_proposee_id INTEGER REFERENCES pompes(id) ON DELETE SET NULL",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS index_reference NUMERIC(14,4)",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS source_reference VARCHAR(200)",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS ecart_reference NUMERIC(14,4)",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS decision_pompiste VARCHAR(10)",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS anomalies JSON",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS verifie_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS verifie_at TIMESTAMPTZ",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS note_verification VARCHAR(500)",
         "ALTER TABLE produits ADD COLUMN IF NOT EXISTS adresse VARCHAR(255)",
         "ALTER TABLE achats ADD COLUMN IF NOT EXISTS saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
     ]

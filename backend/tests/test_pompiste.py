@@ -95,7 +95,13 @@ def test_controles_des_index(env):
     r = _compteurs(env, env["pompe"], 1000, 900)
     assert r.status_code == 422
     assert r.json()["detail"]["erreurs"][0]["pompe_id"] == env["pompe"]
-    assert _compteurs(env, env["pompe"], 1000, 1000 + 9000).status_code == 422     # zéro en trop
+    # Zéro en trop : enregistré (décision de la direction, Smart Meter), mais
+    # la ligne porte l'anomalie VOLUME_ELEVE et reste à vérifier
+    r = _compteurs(env, env["pompe"], 1000, 1000 + 9000)
+    assert r.status_code == 201, r.text
+    ligne = r.json()["lignes"][0]
+    assert "VOLUME_ELEVE" in ligne["rapprochement"]["anomalies"]
+    assert env["p"].delete(f"/api/pompiste/compteurs/{env['pompe']}").status_code == 200
     assert env["p"].post("/api/pompiste/terminer", json={}).status_code == 409    # rien à terminer
 
 

@@ -4723,6 +4723,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
         <button class="psp-tab" data-t="comptes" onclick="pspOnglet('comptes')">Comptes pompistes</button>
         <button class="psp-tab" data-t="taux" onclick="pspOnglet('taux')">Taux du jour</button>
         <button class="psp-tab" data-t="ventes" onclick="pspOnglet('ventes')">📊 Ventes par pompiste</button>
+        <button class="psp-tab" data-t="reconciliation" onclick="pspOnglet('reconciliation')">🔎 Réconciliation des meeters</button>
       </div>
       <div id="psp-contenu"></div>
     </div>
@@ -20939,6 +20940,7 @@ async function pspOnglet(t){
       await pspChargerListe();
     } else if(t === 'taux'){ await pspRendreTaux(); }
     else if(t === 'ventes'){ await pspVentes(); }
+    else if(t === 'reconciliation'){ await smReconciliation(); }
     else { PSP.comptes = await _pspApi('GET','/comptes'); pspRendreComptes(); }
   }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
   pspMajBadge();
@@ -21108,6 +21110,177 @@ function pspVentesFiche(i, garder){
         <td class="tr num">${cjrGal(x.avant).replace(' gal', '')}</td><td class="tr num">${cjrGal(x.apres).replace(' gal', '')}</td>
         <td class="tr num">${cjrGal(x.gallons)}</td><td class="tr num c-teal">${cjrG(x.montant)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}
   </div>`;
+}
+
+// ══ Réconciliation des meeters (Smart Meter, voir backend/smart_meter.py) ══
+// Chaque ligne de rapport pompiste avec ce que le moteur a trouvé à la saisie
+// (statut figé), ses anomalies et sa validation ; filtres et actions de la direction.
+const _SM_STATUTS = {MATCH_CONFIRMED:'✓ Correspondance confirmée', MATCH_REVIEW:'⚠ À vérifier', UNMATCHED:'⛔ Sans correspondance',
+  INITIAL_READING:'ℹ Première lecture', NON_ANALYSE:'— Saisi avant le moteur'};
+const _SM_VALID = {EN_ATTENTE:'En attente', VERIFIE:'Vérifié', REJETE:'Rejeté', SUPPRIME:'Supprimé'};
+const _SM_COUL = {MATCH_CONFIRMED:'var(--green)', MATCH_REVIEW:'var(--orange)', UNMATCHED:'var(--red)', INITIAL_READING:'var(--blue)'};
+async function smReconciliation(){
+  const c = document.getElementById('psp-contenu');
+  const F = PSP.sm ||= {debut: currentDate.slice(0,8) + '01', fin: currentDate, distributeur:'', pompe:'', pompiste:'',
+                        anomalie:'', rapprochement:'', validation:''};
+  const q = new URLSearchParams({date_debut: F.debut, date_fin: F.fin});
+  [['distributeur_id', F.distributeur], ['pompe_id', F.pompe], ['pompiste_id', F.pompiste], ['anomalie', F.anomalie],
+   ['statut_rapprochement', F.rapprochement], ['statut_validation', F.validation]].forEach(([k, v]) => { if(v) q.set(k, v); });
+  let d, dist = [];
+  try{
+    [d, dist] = await Promise.all([GET('/smart-meter/reconciliation?' + q), GET('/distributeurs').then(x => x.distributeurs || []).catch(() => [])]);
+    if(!PSP.comptes) PSP.comptes = await _pspApi('GET', '/comptes');
+  }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; return; }
+  const meeters = (products || []).flatMap(p => p.pompes.map(q2 => ({id: q2.id, lib: `${p.nom} · ${q2.nom}`})));
+  const opt = (L, v) => L.map(([k, l]) => `<option value="${esc(String(k))}" ${String(k) === String(v) ? 'selected' : ''}>${esc(l)}</option>`).join('');
+  const sel = (id, lib, L, v, tous) => `<label class="cp-champ">${lib}<select class="filter-select" id="${id}">
+      <option value="">${tous}</option>${opt(L, v)}</select></label>`;
+  const R = d.resume, n3 = v => v == null ? '—' : Number(v).toLocaleString('fr-FR', {minimumFractionDigits:3, maximumFractionDigits:3});
+  const sg = v => v == null ? '—' : (v > 0 ? '+' : '') + n3(v);
+  const carte = (lib, v, coul, f, val) => `<button class="cjr-nom ${F[f] === val ? 'on' : ''}" onclick="smFiltre('${f}', '${val}')">
+      <span class="cjr-nom-r" style="color:${coul}">${lib}</span><span class="cjr-nom-n">${v}</span></button>`;
+  c.innerHTML = `<div class="psp-card">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:end">
+        <label class="cp-champ">Du<input type="date" class="filter-input" id="sm-d" value="${F.debut}"></label>
+        <label class="cp-champ">Au<input type="date" class="filter-input" id="sm-f" value="${F.fin}"></label>
+        ${sel('sm-dist', 'Pompe', dist.map(x => [x.id, x.nom]), F.distributeur, 'Toutes')}
+        ${sel('sm-pompe', 'Pistolet (meeter)', meeters.map(x => [x.id, x.lib]), F.pompe, 'Tous')}
+        ${sel('sm-pompiste', 'Pompiste', (PSP.comptes.comptes || []).map(x => [x.id, x.nom_complet || x.username]), F.pompiste, 'Tous')}
+        ${sel('sm-ano', "Type d'anomalie", Object.entries(d.anomalies), F.anomalie, 'Toutes')}
+        ${sel('sm-rap', 'Rapprochement', Object.entries(_SM_STATUTS), F.rapprochement, 'Tous')}
+        ${sel('sm-val', 'Validation', Object.entries(_SM_VALID), F.validation, 'Toutes')}
+        <button class="btn btn-primary psp-mini" onclick="smAppliquer()">Filtrer</button>
+      </div></div>
+    <div class="cjr-noms" style="margin-bottom:12px">
+      ${carte('Lignes', R.total, 'var(--muted)', 'rapprochement', '')}
+      ${carte('Confirmées', R.MATCH_CONFIRMED, _SM_COUL.MATCH_CONFIRMED, 'rapprochement', 'MATCH_CONFIRMED')}
+      ${carte('À vérifier', R.MATCH_REVIEW, _SM_COUL.MATCH_REVIEW, 'rapprochement', 'MATCH_REVIEW')}
+      ${carte('Sans correspondance', R.UNMATCHED, _SM_COUL.UNMATCHED, 'rapprochement', 'UNMATCHED')}
+      ${carte('Écarts positifs', R.ECART_POSITIF, 'var(--blue)', 'anomalie', 'ECART_POSITIF')}
+      ${carte('Reculs', R.RECUL, 'var(--red)', 'anomalie', 'RECUL')}
+      ${carte('Mauvais pistolet', R.MAUVAIS_METEER, 'var(--orange)', 'anomalie', 'MAUVAIS_METEER')}
+      ${carte('Volume élevé', R.VOLUME_ELEVE, 'var(--red)', 'anomalie', 'VOLUME_ELEVE')}
+      ${carte('En attente de validation', R.en_attente, 'var(--orange)', 'validation', 'EN_ATTENTE')}
+    </div>
+    <div class="psp-card" style="padding:0;overflow-x:auto"><table class="psp-tbl"><thead><tr>
+      <th>Date</th><th>Pompiste</th><th>Meeter</th><th class="r">Début / fin saisis</th><th class="r">Retenus</th>
+      <th class="r">Référence</th><th class="r">Écart</th><th>Rapprochement</th><th>Anomalies</th><th>Validation</th><th></th></tr></thead>
+      <tbody>${d.lignes.length ? d.lignes.map((x, i) => `<tr>
+        <td>${frDate(x.date)}<div class="psp-muted">${esc(x.periode_lib)} · n°${x.rapport_id}</div></td>
+        <td>${esc(x.pompiste || '—')}</td>
+        <td><b>${esc(x.meeter)}</b>${x.meeter_saisi ? `<div class="psp-muted">✎ saisi sur ${esc(x.meeter_saisi)}</div>` : ''}
+          ${x.meeter_propose && x.meeter_propose !== x.meeter ? `<div style="color:var(--orange);font-size:12px">🧠 proposé : ${esc(x.meeter_propose)}</div>` : ''}</td>
+        <td class="r num">${n3(x.metter_avant_saisi)}<br>${n3(x.metter_apres_saisi)}</td>
+        <td class="r num">${x.metter_avant !== x.metter_avant_saisi || x.metter_apres !== x.metter_apres_saisi
+          ? `<b>${n3(x.metter_avant)}<br>${n3(x.metter_apres)}</b>` : '<span class="psp-muted">idem</span>'}</td>
+        <td class="r num">${n3(x.index_reference)}<div class="psp-muted" style="font-size:11px">${esc(x.source_reference || '')}</div></td>
+        <td class="r num" style="color:${x.ecart_reference && Math.abs(x.ecart_reference) > 0.001 ? (x.ecart_reference < 0 ? 'var(--red)' : 'var(--blue)') : 'inherit'}">${sg(x.ecart_reference)}</td>
+        <td><span style="color:${_SM_COUL[x.statut_rapprochement] || 'var(--muted)'};font-weight:700">${_SM_STATUTS[x.statut_rapprochement] || x.statut_rapprochement}</span>
+          ${x.confiance ? `<div class="psp-muted">confiance ${esc(x.confiance)}${x.decision_pompiste && x.decision_pompiste !== 'AUCUNE' ? ' · pompiste : ' + (x.decision_pompiste === 'ACCEPTE' ? 'a pris la proposition' : 'a gardé son choix') : ''}</div>` : ''}</td>
+        <td>${x.anomalies.map(a => `<span class="psp-badge PROBLEME" title="${esc(d.anomalies[a] || '')}" style="margin:1px">${esc(a)}</span>`).join(' ') || '—'}</td>
+        <td><span class="psp-badge ${x.statut_validation === 'VERIFIE' ? 'CONFIRME' : x.statut_validation === 'EN_ATTENTE' ? 'SOUMIS' : 'REJETE'}">${_SM_VALID[x.statut_validation]}</span>
+          ${x.note_verification ? `<div class="psp-muted" style="font-size:11.5px">📝 ${esc(x.note_verification)} — ${esc(x.verifie_par || '')}</div>` : ''}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-secondary psp-mini" onclick="smOuvrir(${x.rapport_id}, '${x.date}')">Ouvrir</button>
+          <button class="btn btn-secondary psp-mini" onclick="smVerifier(${x.rapport_id}, ${x.pompe_id})">📝 Vérifié</button>
+          <button class="btn btn-secondary psp-mini" onclick="smHistorique(${x.rapport_id})">Historique</button></td></tr>`).join('')
+      : '<tr><td colspan="11" class="psp-muted">Aucune ligne pour ces filtres.</td></tr>'}</tbody></table></div>
+    <details class="psp-card" style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">⚙ Seuils du moteur</summary><div id="sm-config">…</div></details>
+    <details class="psp-card"><summary style="cursor:pointer;font-weight:700">🔁 Compteurs remplacés ou remis à zéro</summary><div id="sm-chg">…</div></details>`;
+  smConfig(); smChangements(meeters);
+}
+function smFiltre(k, v){ PSP.sm[k] = PSP.sm[k] === v ? '' : v; smReconciliation(); }
+function smAppliquer(){
+  const g = id => document.getElementById(id).value;
+  Object.assign(PSP.sm, {debut: g('sm-d'), fin: g('sm-f'), distributeur: g('sm-dist'), pompe: g('sm-pompe'),
+    pompiste: g('sm-pompiste'), anomalie: g('sm-ano'), rapprochement: g('sm-rap'), validation: g('sm-val')});
+  smReconciliation();
+}
+async function smOuvrir(id, date){
+  Object.assign(PSP.filtre, {statut: 'TOUS', debut: date, fin: date});
+  PSP.ouvert = id; await pspOnglet('rapports');
+}
+async function smVerifier(rid, pompe){
+  const note = prompt('Note de vérification (obligatoire) : qu’avez-vous vérifié ? Ex. « pistolet confirmé sur place avec le pompiste »');
+  if(note == null) return;
+  try{ await POST(`/smart-meter/rapports/${rid}/lignes/${pompe}/verifier`, {note}); notify('Vérification enregistrée.', 'ok'); smReconciliation(); }
+  catch(e){ notify(e.message, 'err'); }
+}
+async function smHistorique(rid){
+  let h;
+  try{ h = await GET(`/smart-meter/rapports/${rid}/historique`); }catch(e){ return notify(e.message, 'err'); }
+  document.getElementById('sup-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'sup-ov'; ov.className = 'sup-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+  const det = o => Object.entries(o || {}).filter(([k]) => !['rapport_id'].includes(k))
+    .map(([k, v]) => `<div><span class="psp-muted">${esc(k)}</span> : ${esc(typeof v === 'object' ? JSON.stringify(v) : String(v))}</div>`).join('');
+  ov.innerHTML = `<div class="sup-boite" style="max-width:720px;max-height:80vh;overflow:auto">
+    <h3>Historique du rapport n°${rid}</h3>
+    ${h.length ? h.map(x => `<div style="border-top:1px solid var(--border);padding:8px 0;font-size:13px">
+      <b>${esc(x.action)}</b> · ${x.le ? new Date(x.le).toLocaleString('fr-FR') : ''} · ${esc(x.par || '—')}${det(x.details)}</div>`).join('')
+      : '<div class="psp-muted">Aucune intervention enregistrée.</div>'}
+    <div class="sup-act"><button class="btn btn-secondary" onclick="document.getElementById('sup-ov').remove()">Fermer</button></div></div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if(e.target === ov) ov.remove(); });
+}
+async function smConfig(){
+  const z = document.getElementById('sm-config'); if(!z) return;
+  let c; try{ c = await GET('/smart-meter/config'); }catch(e){ z.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; return; }
+  const champ = (id, lib, v, aide) => `<label class="cp-champ">${lib}<input class="filter-input" id="${id}" inputmode="decimal" value="${v}">
+      <small class="psp-muted">${aide}</small></label>`;
+  z.innerHTML = `<div class="psp-muted" style="margin:6px 0 10px">Confiance <b>forte</b> : l'index reprend la référence à moins de « exact ».
+      <b>Moyenne</b> : à un chiffre près, ou à moins de « moyen ». <b>Faible</b> : à moins de « faible ». Au-delà : aucune correspondance,
+      le meeter le plus proche est proposé comme référence provisoire.</div>
+    <div class="psp-grid">
+      ${champ('smc-ex', 'Écart exact (gal)', c.ecart_exact, 'confiance forte')}
+      ${champ('smc-me', 'Écart moyen (gal)', c.ecart_medium, 'confiance moyenne')}
+      ${champ('smc-lo', 'Écart faible (gal)', c.ecart_low, 'confiance faible')}
+      ${champ('smc-vm', 'Volume max par période (gal)', c.volume_max_defaut, 'au-delà : anomalie VOLUME_ELEVE')}
+    </div>
+    <div class="psp-actions"><button class="btn btn-primary" onclick="smConfigEnregistrer()">Enregistrer les seuils</button></div>`;
+  PSP.smConfig = c;
+}
+async function smConfigEnregistrer(){
+  const v = id => parseFloat(String(document.getElementById(id).value).replace(',', '.'));
+  try{
+    await apiFetch('PUT', '/smart-meter/config', {ecart_exact: v('smc-ex'), ecart_medium: v('smc-me'), ecart_low: v('smc-lo'),
+      volume_max_defaut: v('smc-vm'), volumes_max: (PSP.smConfig || {}).volumes_max || {}});
+    notify('Seuils enregistrés.', 'ok'); smConfig();
+  }catch(e){ notify(e.message, 'err'); }
+}
+async function smChangements(meeters){
+  const z = document.getElementById('sm-chg'); if(!z) return;
+  let L; try{ L = await GET('/smart-meter/changements-compteur'); }catch(e){ z.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; return; }
+  const n3 = v => v == null ? '—' : Number(v).toLocaleString('fr-FR', {minimumFractionDigits:3, maximumFractionDigits:3});
+  z.innerHTML = `<div class="psp-muted" style="margin:6px 0 10px">Un compteur remplacé ou remis à zéro n'est jamais traité comme une lecture normale :
+      enregistrez-le ici ; le nouvel index initial devient le point de départ du meeter à partir de la date (rien n'est effacé).</div>
+    <div class="psp-grid">
+      <label class="cp-champ">Meeter<select class="filter-select" id="chg-p">${meeters.map(x => `<option value="${x.id}">${esc(x.lib)}</option>`).join('')}</select></label>
+      <label class="cp-champ">À partir du<input type="date" class="filter-input" id="chg-d" value="${currentDate}" max="${currentDate}"></label>
+      <label class="cp-champ">Ancien n° de compteur<input class="filter-input" id="chg-an"></label>
+      <label class="cp-champ">Nouveau n° de compteur<input class="filter-input" id="chg-nn"></label>
+      <label class="cp-champ">Ancien index final<input class="filter-input" id="chg-af" inputmode="decimal"></label>
+      <label class="cp-champ">Nouvel index initial *<input class="filter-input" id="chg-ni" inputmode="decimal"></label>
+      <label class="cp-champ">Motif *<input class="filter-input" id="chg-mo" maxlength="500"></label>
+      <label class="cp-champ">Autorisé par *<input class="filter-input" id="chg-au" maxlength="150"></label>
+    </div>
+    <div class="psp-actions"><button class="btn btn-primary" onclick="smChangementEnregistrer()">Enregistrer le changement</button></div>
+    ${L.length ? `<table class="psp-tbl" style="margin-top:10px"><thead><tr><th>Date</th><th>Meeter</th><th>Ancien → nouveau n°</th>
+      <th class="r">Index final</th><th class="r">Index initial</th><th>Motif</th><th>Autorisé par</th></tr></thead><tbody>
+      ${L.map(x => `<tr><td>${frDate(x.date_changement)}</td><td>${esc(x.meeter || '')}</td><td>${esc(x.ancien_numero || '—')} → ${esc(x.nouveau_numero || '—')}</td>
+        <td class="r num">${n3(x.ancien_index_final)}</td><td class="r num">${n3(x.nouvel_index_initial)}</td><td>${esc(x.motif)}</td><td>${esc(x.autorise_par)}</td></tr>`).join('')}
+      </tbody></table>` : ''}`;
+}
+async function smChangementEnregistrer(){
+  const g = id => document.getElementById(id).value.trim(), nb = id => g(id) === '' ? null : parseFloat(g(id).replace(',', '.'));
+  if(nb('chg-ni') == null) return notify("Indiquez le nouvel index initial.", 'err');
+  if(!confirm('Enregistrer ce changement de compteur ? Le nouvel index initial devient le point de départ du meeter.')) return;
+  try{
+    await POST('/smart-meter/changements-compteur', {pompe_id: Number(g('chg-p')), date_changement: g('chg-d'),
+      ancien_numero: g('chg-an') || null, nouveau_numero: g('chg-nn') || null, ancien_index_final: nb('chg-af'),
+      nouvel_index_initial: nb('chg-ni'), motif: g('chg-mo'), autorise_par: g('chg-au')});
+    notify('Changement de compteur enregistré.', 'ok'); smReconciliation();
+  }catch(e){ notify(e.message, 'err'); }
 }
 
 async function pspRendreTaux(){

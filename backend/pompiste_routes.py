@@ -443,6 +443,21 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
                 d["ecart_compteur_montant"] = round((av - prec) * float(l.prix_gallon), 2)
         d["pompe_saisie"] = ({"pompe_id": l.pompe_saisie_id, "pompe_nom": l.pompe_saisie.nom}
                              if l.pompe_saisie_id and l.pompe_saisie else None)
+        # Smart Meter : rapprochement figé à la saisie, et sa vérification
+        d["rapprochement"] = ({
+            "statut": l.statut_rapprochement, "confiance": l.confiance,
+            "pompe_proposee": ({"pompe_id": l.pompe_proposee_id,
+                                "libelle": f"{l.pompe_proposee.produit.nom} · {l.pompe_proposee.nom}"
+                                if l.pompe_proposee.produit else l.pompe_proposee.nom}
+                               if l.pompe_proposee_id and l.pompe_proposee else None),
+            "index_reference": float(l.index_reference) if l.index_reference is not None else None,
+            "source_reference": l.source_reference,
+            "ecart_reference": float(l.ecart_reference) if l.ecart_reference is not None else None,
+            "decision_pompiste": l.decision_pompiste, "anomalies": list(l.anomalies or []),
+            "verifie_par": _nom(l.verifie_par) if l.verifie_par_id and l.verifie_par else None,
+            "verifie_at": l.verifie_at.isoformat() if l.verifie_at else None,
+            "note_verification": l.note_verification,
+        } if l.statut_rapprochement else None)
         lignes.append(d)
     placement = None
     if avec_journal and r.statut in _A_TRAITER and any("ecart_compteur" in x for x in lignes):
@@ -636,6 +651,10 @@ class LigneIn(BaseModel):
     # Le pompiste a relu le compteur et maintient un index de début différent
     # du dernier index enregistré (l'écart reste visible du superviseur).
     debut_confirme: bool = False
+    # Smart Meter : meeter choisi au départ par le pompiste, et sa réponse à
+    # la proposition du moteur (ACCEPTE = il a pris le meeter proposé).
+    pompe_choisie_id: Optional[int] = None
+    decision: Optional[str] = None
 
 
 class BilletIn(BaseModel):
@@ -873,11 +892,8 @@ def _controler_lignes(db: Session, d: date_type, periode: str, lignes: list,
                 f"{pompe.nom} : l'index de fin ({l.metter_apres:.3f}) est plus petit "
                 f"que l'index de début ({l.metter_avant:.3f}) — un compteur ne recule pas")
             continue
-        g = l.metter_apres - l.metter_avant
-        if g > MAX_GALLONS_PAR_POMPE_PERIODE:
-            err(l.pompe_id, "anormal", f"{pompe.nom} : {g:,.0f} gallons sur une période, "
-                "c'est anormal — vérifiez l'index (chiffre en trop ?)", gallons=round(g))
-            continue
+        # Volume au-dessus de la limite du meeter : accepté, mais la ligne
+        # porte l'anomalie VOLUME_ELEVE et reste à vérifier (smart_meter.py).
         prec, _src = _index_precedent(db, l.pompe_id, d, periode, exclure_rapport_id)
         if prec is not None and abs(prec - l.metter_avant) > TOLERANCE and not l.debut_confirme:
             err(l.pompe_id, "debut_different",
@@ -920,7 +936,11 @@ def envoyer_compteurs(data: CompteursIn, u: Utilisateur = Depends(_require_pompi
         data.periode = creneau_automatique(db, data.date, [l.pompe_id for l in data.lignes])
     lignes = _controler_lignes(db, data.date, data.periode, data.lignes, utilisateur=u)
 
-    # Une pompe = un seul rapport actif par créneau
+    # Une pompe = un seul rapport actif par créneau. Verrou PostgreSQL par
+    # (jour, créneau, meeter) jusqu'à la fin de la transaction : deux envois
+    # simultanés du même meeter passent l'un après l'autre, le second voit le
+    # premier et est refusé.
+    _verrouiller_creneau(db, data.date, data.periode, [x["pompe"].id for x in lignes])
     deja = (db.query(RapportPompisteLigne, RapportPompiste)
             .join(RapportPompiste, RapportPompisteLigne.rapport_id == RapportPompiste.id)
             .filter(RapportPompiste.date == data.date, RapportPompiste.periode == data.periode,
@@ -935,14 +955,50 @@ def envoyer_compteurs(data: CompteursIn, u: Utilisateur = Depends(_require_pompi
         rap = RapportPompiste(date=data.date, periode=data.periode, utilisateur_id=u.id,
                               statut="EN_COURS", charte_acceptee_at=now_haiti(), billetterie=[])
         db.add(rap)
+    entrees = {l.pompe_id: l for l in data.lignes}
     for x in lignes:
         rap.lignes.append(RapportPompisteLigne(pompe_id=x["pompe"].id, prix_gallon=_prix(db, x["pompe"], data.date),
                                                metter_avant=x["avant"], metter_apres=x["apres"]))
     db.flush()
+    for ligne in rap.lignes:
+        e = entrees.get(ligne.pompe_id)
+        if e is not None and ligne.statut_rapprochement is None:
+            _rapprocher_ligne(db, rap, ligne, u, e.pompe_choisie_id, e.decision)
     _recalculer_attendu(rap)
     db.commit()
     db.refresh(rap)
     return _rapport_dict(db, rap)
+
+
+def _verrouiller_creneau(db: Session, d: date_type, periode: str, pompe_ids: list) -> None:
+    """Verrou transactionnel PostgreSQL par meeter et par créneau (sans effet
+    sur SQLite, qui n'a qu'un écrivain à la fois)."""
+    from sqlalchemy import text
+    if db.get_bind().dialect.name != "postgresql":
+        return
+    for pid in sorted(set(pompe_ids)):
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": f"releve:{d}:{periode}:{pid}"})
+
+
+def _rapprocher_ligne(db: Session, rap: RapportPompiste, ligne: RapportPompisteLigne, u: Utilisateur,
+                      pompe_choisie_id: Optional[int], decision: Optional[str]) -> None:
+    """Smart Meter : fige sur la ligne ce que le moteur trouve à l'envoi
+    (recalculé ici, côté serveur — jamais repris de l'interface). Si le
+    pompiste a accepté la proposition du moteur, le meeter qu'il avait choisi
+    au départ est gardé (pompe_saisie_id) et l'erreur est apprise."""
+    import placement_metres
+    import smart_meter
+    autres = {x.pompe_id for x in rap.lignes if x.id != ligne.id}
+    autres |= {pid for pid, c in _creneaux_pris(db, rap.date).items()
+               if rap.periode in c and c[rap.periode].get("rapport_utilisateur_id") != u.id}
+    an = smart_meter.analyser(db, rap.date, rap.periode, ligne.pompe_id, ligne.metter_avant, ligne.metter_apres,
+                              utilisateur=u, exclure_rapport_id=rap.id, pompes_exclues=autres - {ligne.pompe_id})
+    smart_meter.enregistrer_sur_ligne(ligne, an, decision)
+    if pompe_choisie_id and pompe_choisie_id != ligne.pompe_id and decision == "ACCEPTE":
+        if db.get(Pompe, pompe_choisie_id):
+            ligne.pompe_saisie_id = pompe_choisie_id
+            placement_metres.apprendre(db, pompe_choisie_id, pompe_choisie_id, ligne.pompe_id, rap.date,
+                                       utilisateur_id=u.id)
 
 
 @router.delete("/api/pompiste/compteurs/{pompe_id}")
@@ -986,6 +1042,7 @@ def modifier_compteur(pompe_id: int, data: ModifLigneIn, u: Utilisateur = Depend
                                debut_confirme=data.debut_confirme)], utilisateur=u)
     ligne.metter_avant, ligne.metter_apres = data.metter_avant, data.metter_apres
     db.flush()
+    _rapprocher_ligne(db, rap, ligne, u, None, ligne.decision_pompiste)
     _recalculer_attendu(rap)
     db.commit()
     db.refresh(rap)

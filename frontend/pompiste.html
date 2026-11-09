@@ -436,6 +436,21 @@ main,.card,.deux-col > *{min-width:0}
   .fe-ligne>:first-child{grid-column:1/-1}
   .fe-marque{font-size:24px}
 }
+.sm{border-radius:14px;padding:12px 14px;margin:14px 0 0;border:1px solid var(--bord, #2a3550);background:rgba(255,255,255,.03)}
+.sm.ok{border-color:rgba(34,197,94,.55);background:rgba(34,197,94,.08)}
+.sm.warn{border-color:rgba(249,115,22,.6);background:rgba(249,115,22,.08)}
+.sm.err{border-color:rgba(239,68,68,.6);background:rgba(239,68,68,.08)}
+.sm.info{border-color:rgba(59,130,246,.55);background:rgba(59,130,246,.08)}
+.sm-t{font-weight:800;font-size:16px;margin-bottom:6px}
+.sm-l{margin:8px 0 4px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.12)}
+.sm-l.prop .sm-lib b{color:#f97316}
+.sm-lib{font-size:14px;margin-bottom:3px}
+.sm-chiffres{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;opacity:.9}
+.sm-btn{display:block;width:100%;margin-top:8px;padding:12px;border-radius:12px;border:0;font:inherit;font-weight:800;font-size:15px;
+  background:#f97316;color:#fff;cursor:pointer}
+.sm-btn.sec{background:transparent;border:1px solid rgba(255,255,255,.25);color:inherit}
+.sm-note{font-size:13px;margin-top:6px;opacity:.85}
+.sm-ano{font-size:12.5px;margin-top:5px;color:#fbbf24}
 </style>
 </head>
 <body>
@@ -522,6 +537,20 @@ const TXT = {
     refaire:'Refaites ce rapport après correction.', direction:'Direction', ecart_court:'écart',
     session:'Session expirée — reconnectez-vous.', reessayer:'Réessayer',
     autre_compte:'Cette tablette était connectée avec un compte qui n\'est pas un compte pompiste : il a été déconnecté. Entrez votre code pompiste.',
+    sm_titre:'Contrôle du meeter', sm_ok:'Meeter reconnu', sm_revoir:'À vérifier', sm_aucun:'Aucune correspondance fiable',
+    sm_initial:'Première lecture de ce meeter', sm_choisi:'Meeter choisi', sm_propose:'Meeter proposé', sm_proche:'Le plus proche',
+    sm_dernier:'Dernier meeter enregistré', sm_nouveau:'Nouveau meeter saisi', sm_ecart:'Écart', sm_conf:'Confiance',
+    sm_utiliser:'Utiliser {m}', sm_garder:'Garder mon choix', sm_garde:'Vous gardez votre choix : la direction vérifiera.',
+    sm_pris:'Vous avez pris {m}.', sm_candidats:'Plusieurs meeters sont proches : choisissez le bon.',
+    sm_provisoire:'Référence numérique la plus proche, pas une preuve : une vérification est nécessaire.',
+    sm_enregistrer:'Vous pouvez quand même enregistrer : le rapport sera vérifié par la direction.',
+    sm_HIGH:'forte', sm_MEDIUM:'moyenne', sm_LOW:'faible', sm_NONE:'aucune',
+    sm_a_ECART_POSITIF:'Saut : le meeter de début est au-dessus du dernier meeter enregistré.',
+    sm_a_RECUL:'Recul : le meeter de début est en dessous du dernier meeter enregistré.',
+    sm_a_VOLUME_ELEVE:'Beaucoup de gallons pour une période : vérifiez le meeter de fin.',
+    sm_a_VOLUME_NUL:'Aucun gallon vendu : début et fin sont identiques.',
+    sm_a_INITIAL_READING:'Première lecture : aucun meeter enregistré avant pour cette pompe.',
+    sm_a_COMPTEUR_CHANGE:'Compteur changé récemment.',
     debut_diff:'Le meeter de début ne correspond pas au dernier meeter enregistré pour cette pompe.',
     debut_diff_action:'Relisez le compteur sur la pompe. Corrigez-le, ou confirmez s\'il est juste.',
     je_confirme:'Le compteur est juste, je confirme', confirme_ok:'Meeter de début confirmé.',
@@ -636,6 +665,20 @@ const TXT = {
     refaire:'Refè rapò sa a apre ou fin korije l.', direction:'Direksyon', ecart_court:'diferans',
     session:'Sesyon an fini — konekte ankò.', reessayer:'Eseye ankò',
     autre_compte:'Tablèt la te konekte ak yon kont ki pa kont ponpis : nou dekonekte l. Antre kòd ponpis ou.',
+    sm_titre:'Kontwòl mèt la', sm_ok:'Mèt la rekonèt', sm_revoir:'Pou verifye', sm_aucun:'Pa gen okenn mèt ki koresponn byen',
+    sm_initial:'Premye fwa mèt sa a li', sm_choisi:'Mèt ou chwazi a', sm_propose:'Mèt sistèm nan pwopoze', sm_proche:'Sa ki pi pre a',
+    sm_dernier:'Dènye mèt ki anrejistre', sm_nouveau:'Nouvo mèt ou antre a', sm_ecart:'Diferans', sm_conf:'Konfyans',
+    sm_utiliser:'Pran {m}', sm_garder:'Kenbe chwa mwen', sm_garde:'Ou kenbe chwa ou : direksyon an ap verifye.',
+    sm_pris:'Ou pran {m}.', sm_candidats:'Gen plizyè mèt ki pre : chwazi bon an.',
+    sm_provisoire:'Se chif ki pi pre a sèlman, se pa yon prèv : fòk yo verifye.',
+    sm_enregistrer:'Ou ka anrejistre kanmenm : direksyon an ap verifye rapò a.',
+    sm_HIGH:'fò', sm_MEDIUM:'mwayen', sm_LOW:'fèb', sm_NONE:'okenn',
+    sm_a_ECART_POSITIF:'So : mèt kòmansman an pi wo pase dènye mèt ki anrejistre a.',
+    sm_a_RECUL:'Bak : mèt kòmansman an pi ba pase dènye mèt ki anrejistre a.',
+    sm_a_VOLUME_ELEVE:'Anpil galon pou yon sèl peryòd : verifye mèt fen an.',
+    sm_a_VOLUME_NUL:'Pa gen galon ki vann : kòmansman ak fen menm.',
+    sm_a_INITIAL_READING:'Premye lekti : pa gen mèt ki te anrejistre avan pou ponp sa a.',
+    sm_a_COMPTEUR_CHANGE:'Yo fèk chanje kontè a.',
     debut_diff:'Mitè kòmansman an pa menm ak dènye mitè ki anrejistre pou ponp sa a.',
     debut_diff_action:'Li kontè a ankò sou ponp lan. Korije l, oswa konfime si li bon.',
     je_confirme:'Kontè a bon, mwen konfime', confirme_ok:'Mitè kòmansman an konfime.',
@@ -1178,6 +1221,7 @@ function ecranIndex(id, prix, titreHaut, fin){
       el.innerHTML = `<div class="lib">${c === 'avant' ? t('idx_debut') : t('idx_fin')}</div>
         <div class="val ${val?'':'vide'}">${affiche(val, k === c) || '0'}</div>`;
     }
+    smartAnalyser(id);
     const diff = S.erreurs[id]?.code === 'debut_different';
     $('i-diff').innerHTML = diff ? `<div class="alerte warn" style="margin:14px 0 0">⚠ ${t('debut_diff')}<br>
         <span style="font-weight:600">${t('debut_diff_action')}</span></div>`
@@ -1205,12 +1249,85 @@ function ecranIndex(id, prix, titreHaut, fin){
       <h1 class="pompe-titre">${esc(q.nom)}</h1>${q.emplacement ? `<div class="emplacement" style="margin:-6px 0 8px">📍 ${esc(q.emplacement)}</div>` : ''}
       <p class="sub astuce" style="margin:4px 0 0">${t('toucher_case')}</p>
       <div id="i-err"></div><div id="i-diff"></div>
-      <div id="z-avant"></div><div id="z-apres"></div><div id="i-calc"></div>
+      <div id="z-avant"></div><div id="z-apres"></div><div id="i-calc"></div><div id="i-smart"></div>
     </div><div class="cote">${pave(true)}</div></div>`;
   $('z-avant').onclick = () => choisir('avant');
   $('z-apres').onclick = () => choisir('apres');
   choisir(S.champActif.k);
 }
+// ── Smart Meter : pendant la saisie, le serveur dit à quel meeter
+// appartient l'index (dernier meeter, écart, confiance) ; le pompiste prend le
+// meeter proposé ou garde son choix. Rien n'est bloqué : la direction vérifie.
+const SM = {res:{}, minuteur:null};
+function smartAnalyser(id){
+  const s = S.index[id] || {}, av = num(s.avant), ap = num(s.apres);
+  const z = $('i-smart'); if(!z) return;
+  if(av == null){ z.innerHTML = ''; return; }
+  const cle = `${id}|${av}|${ap ?? ''}|${S.date}`;
+  if(SM.res[id]?.cle === cle){ z.innerHTML = smartHtml(id, SM.res[id].a); return; }
+  clearTimeout(SM.minuteur);
+  SM.minuteur = setTimeout(async () => {
+    try{
+      const a = await api('POST', '/api/pompiste/analyser-index', {date:S.date, periode: enCours() ? enCours().periode : null,
+        pompe_id:id, metter_avant:av, metter_apres:ap});
+      SM.res[id] = {cle, a};
+      const z2 = $('i-smart');
+      if(z2 && S.champActif && S.champActif.id === id) z2.innerHTML = smartHtml(id, a);
+    }catch(e){ /* le contrôle n'empêche jamais la saisie */ }
+  }, 450);
+}
+function smartHtml(id, a){
+  const s = S.index[id] || {}, n = v => v == null ? '—' : nfg(v), conf = c => t('sm_' + (c || 'NONE'));
+  const sg = v => v == null ? '—' : (v > 0 ? '+' : '') + nfg(v);
+  const ligne = (lib, c, cls) => `<div class="sm-l ${cls||''}"><div class="sm-lib">${lib} : <b>${esc(c.libelle)}</b></div>
+      <div class="sm-chiffres"><span>${t('sm_dernier')} <b class="num">${n(c.dernier_meter)}</b></span>
+      <span>${t('sm_ecart')} <b class="num">${sg(c.ecart)}</b></span>${c.niveau ? `<span>${t('sm_conf')} <b>${conf(c.niveau)}</b></span>` : ''}</div></div>`;
+  const btn = (c) => `<button class="sm-btn" onclick="smartUtiliser(${id}, ${c.pompe_id})">${t('sm_utiliser', {m: esc(c.libelle)})}</button>`;
+  const garder = s.decision === 'REFUSE' ? `<div class="sm-note">${t('sm_garde')}</div>`
+    : `<button class="sm-btn sec" onclick="smartGarder(${id})">${t('sm_garder')}</button>`;
+  const anos = (a.anomalies || []).filter(x => x.code !== 'MAUVAIS_METEER')
+    .map(x => `<div class="sm-ano">⚠ ${esc(t('sm_a_' + x.code) !== 'sm_a_' + x.code ? t('sm_a_' + x.code) : x.message)}</div>`).join('');
+  const tete = (cls, ico, txt) => `<div class="sm ${cls}"><div class="sm-t">${ico} ${txt}</div>
+    <div class="sm-chiffres"><span>${t('sm_nouveau')} <b class="num">${n(num(s.avant))}</b></span></div>`;
+  const pris = s.decision === 'ACCEPTE' && s.pompeChoisie ? `<div class="sm-note">✓ ${t('sm_pris', {m: esc(a.choisi.libelle)})}</div>` : '';
+  if(a.statut_rapprochement === 'MATCH_CONFIRMED')
+    return tete('ok', '✓', t('sm_ok')) + ligne(t('sm_choisi'), a.choisi) + pris + anos + `</div>`;
+  if(a.statut_rapprochement === 'INITIAL_READING')
+    return tete('info', 'ℹ', t('sm_initial')) + `<div class="sm-note">${t('sm_enregistrer')}</div>` + anos + `</div>`;
+  if(a.statut_rapprochement === 'UNMATCHED'){
+    const pp = a.plus_proche;
+    return tete('err', '⚠', t('sm_aucun')) + ligne(t('sm_choisi'), a.choisi)
+      + (pp ? ligne(t('sm_proche'), pp, 'prop') + `<div class="sm-note">${t('sm_provisoire')}</div>` + btn(pp) : '')
+      + garder + `<div class="sm-note">${t('sm_enregistrer')}</div>` + anos + `</div>`;
+  }
+  // MATCH_REVIEW
+  if(a.recommande){
+    const autres = a.ambigu ? (a.candidats || []).filter(c => !c.choisi && c.pompe_id !== a.recommande.pompe_id && c.niveau === a.recommande.niveau) : [];
+    return tete('warn', '⚠', t('sm_revoir')) + ligne(t('sm_choisi'), a.choisi) + ligne(t('sm_propose'), a.recommande, 'prop')
+      + btn(a.recommande) + autres.map(c => ligne(t('sm_propose'), c, 'prop') + btn(c)).join('')
+      + (a.ambigu ? `<div class="sm-note">${t('sm_candidats')}</div>` : '') + garder + anos + `</div>`;
+  }
+  return tete('warn', '⚠', t('sm_revoir')) + ligne(t('sm_choisi'), a.choisi) + pris + anos + `</div>`;
+}
+// Le pompiste prend le meeter proposé : ses index passent sur ce meeter (et
+// ceux de ce meeter, s'il l'avait aussi choisi, passent sur le premier).
+function smartUtiliser(id, cible){
+  if(id === cible) return;
+  const s = S.index[id] || {};
+  const v = {...s, pompeChoisie: s.pompeChoisie || id, decision: 'ACCEPTE', debutConfirme: false};
+  const i = S.choisies.indexOf(id), j = S.choisies.indexOf(cible);
+  if(j >= 0){ S.index[id] = {...(S.index[cible] || {}), debutConfirme: false}; S.choisies[j] = cible; }
+  else { delete S.index[id]; S.choisies[i] = cible; }
+  S.index[cible] = v;
+  delete S.erreurs[id]; delete S.erreurs[cible]; delete SM.res[id]; delete SM.res[cible];
+  S.champActif = {id: cible, k: v.apres ? 'apres' : 'avant'};
+  rendre();
+}
+function smartGarder(id){
+  (S.index[id] ||= {}).decision = 'REFUSE';
+  const z = $('i-smart'); if(z && SM.res[id]) z.innerHTML = smartHtml(id, SM.res[id].a);
+}
+
 function confirmerDebut(id){
   S.index[id].debutConfirme = true; delete S.erreurs[id]; rendre();
 }
@@ -1236,8 +1353,12 @@ function lignePompe(nom, av, ap, g, montant, action){
 }
 
 // ── 5. Vérification des compteurs de ce carburant ───────────────────
+function prixPompe(id){
+  for(const p of S.ctx.produits) if(p.pompes.some(q => q.id === id)) return p.prix_gallon;
+  return produit()?.prix_gallon || 0;
+}
 function lignes(){
-  return S.choisies.map(id => { const v = valeurs(id); return {...v, montant: v.g * produit().prix_gallon}; });
+  return S.choisies.map(id => { const v = valeurs(id); return {...v, montant: v.g * prixPompe(id)}; });
 }
 function rCompteurs(){
   if(!produit() || !S.choisies.length || S.choisies.some(id => !pompeCtx(id))) return aller(produit() ? 'pompes' : 'produit');
@@ -1263,7 +1384,8 @@ async function envoyerCompteurs(){
   try{
     await api('POST','/api/pompiste/compteurs',{
       date:S.date, periode: enCours() ? enCours().periode : null, charte_acceptee:S.charte,
-      lignes: lignes().map(x=>({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap, debut_confirme:!!x.s.debutConfirme}))});
+      lignes: lignes().map(x=>({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap, debut_confirme:!!x.s.debutConfirme,
+                                pompe_choisie_id:x.s.pompeChoisie||null, decision:x.s.decision||null}))});
     S.dernierProduit = produit()?.nom;
     S.produitId = null; S.choisies = []; S.index = {}; S.erreurs = {};
     S.etape = 'rapport';
@@ -1792,7 +1914,8 @@ async function feEnvoyer(){
     if(sais.length){
       try{
         await api('POST', '/api/pompiste/compteurs', {date:S.date, periode: enCours() ? enCours().periode : null, charte_acceptee:S.charte,
-          lignes: sais.map(x => ({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap, debut_confirme:!!x.s.debutConfirme}))});
+          lignes: sais.map(x => ({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap, debut_confirme:!!x.s.debutConfirme,
+                                  pompe_choisie_id:x.s.pompeChoisie||null, decision:x.s.decision||null}))});
       }catch(e){
         if(e.status === 422 && e.detail?.erreurs){
           S.erreurs = {}; for(const x of e.detail.erreurs) S.erreurs[x.pompe_id] = x;

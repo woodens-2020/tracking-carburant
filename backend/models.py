@@ -369,10 +369,27 @@ class RapportPompisteLigne(Base):
     # Pompe choisie par le pompiste quand la direction a remis ces index sur
     # la bonne pompe (erreur de pompe) ; vide sinon.
     pompe_saisie_id      = Column(Integer, ForeignKey("pompes.id", ondelete="SET NULL"), nullable=True)
+    # Smart Meter (voir smart_meter.py) : ce que le moteur a trouvé à la
+    # saisie, figé à l'envoi (jamais recalculé ensuite) ; la vérification
+    # par la direction est notée à part.
+    statut_rapprochement = Column(String(20), nullable=True)   # MATCH_CONFIRMED | MATCH_REVIEW | UNMATCHED | INITIAL_READING
+    confiance            = Column(String(10), nullable=True)   # HIGH | MEDIUM | LOW | NONE
+    score_rapprochement  = Column(Integer, nullable=True)
+    pompe_proposee_id    = Column(Integer, ForeignKey("pompes.id", ondelete="SET NULL"), nullable=True)
+    index_reference      = Column(Numeric(14, 4), nullable=True)
+    source_reference     = Column(String(200), nullable=True)
+    ecart_reference      = Column(Numeric(14, 4), nullable=True)
+    decision_pompiste    = Column(String(10), nullable=True)   # ACCEPTE | REFUSE | AUCUNE
+    anomalies            = Column(JSON, nullable=True)         # ["RECUL", "VOLUME_ELEVE", …]
+    verifie_par_id       = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    verifie_at           = Column(DateTime(timezone=True), nullable=True)
+    note_verification    = Column(String(500), nullable=True)
 
     rapport = relationship("RapportPompiste", back_populates="lignes")
     pompe   = relationship("Pompe", foreign_keys=[pompe_id])
     pompe_saisie = relationship("Pompe", foreign_keys=[pompe_saisie_id])
+    pompe_proposee = relationship("Pompe", foreign_keys=[pompe_proposee_id])
+    verifie_par = relationship("Utilisateur", foreign_keys=[verifie_par_id])
 
     __table_args__ = (
         UniqueConstraint("rapport_id", "pompe_id", name="uq_rpomp_ligne"),
@@ -2745,3 +2762,45 @@ class EntreeCaisse(Base):
         Index("idx_entree_caisse_date", "date_entree"),
         Index("idx_entree_caisse_source", "source_id"),
     )
+
+
+
+class ChangementCompteur(Base):
+    """Compteur (meeter) remplacé ou remis à zéro : jamais traité comme une
+    lecture normale. Enregistré par la direction ; devient le point de départ
+    du meeter (Pompe.metre_depart / date_depart) pour la continuité."""
+    __tablename__ = "changements_compteur"
+
+    id                  = Column(Integer, primary_key=True)
+    pompe_id            = Column(Integer, ForeignKey("pompes.id", ondelete="RESTRICT"), nullable=False)
+    date_changement     = Column(Date, nullable=False)          # le nouveau compteur sert à partir de ce jour
+    ancien_numero       = Column(String(80), nullable=True)
+    nouveau_numero      = Column(String(80), nullable=True)
+    ancien_index_final  = Column(Numeric(14, 4), nullable=True)
+    nouvel_index_initial = Column(Numeric(14, 4), nullable=False)
+    motif               = Column(String(500), nullable=False)
+    autorise_par        = Column(String(150), nullable=False)
+    cree_par_id         = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at          = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    # Point de départ remplacé (pour annuler proprement)
+    ancien_metre_depart = Column(Numeric(14, 4), nullable=True)
+    ancienne_date_depart = Column(Date, nullable=True)
+
+    pompe = relationship("Pompe")
+
+    __table_args__ = (Index("idx_chg_compteur_pompe", "pompe_id", "date_changement"),)
+
+
+class ConfigRapprochement(Base):
+    """Seuils du moteur Smart Meter, modifiables par la direction (une ligne
+    par station). `volumes_max` : {pompe_id: gallons max par période}."""
+    __tablename__ = "config_rapprochement"
+
+    id               = Column(Integer, primary_key=True)
+    ecart_exact      = Column(Numeric(10, 4), nullable=False, default=0.001)   # HIGH : reprise exacte
+    ecart_medium     = Column(Numeric(10, 4), nullable=False, default=2)       # MEDIUM : à quelques gallons
+    ecart_low        = Column(Numeric(10, 4), nullable=False, default=50)      # LOW : écart encore plausible
+    volume_max_defaut = Column(Numeric(10, 2), nullable=False, default=5000)   # gallons par période
+    volumes_max      = Column(JSON, nullable=True)
+    modifie_par_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    modifie_at       = Column(DateTime(timezone=True), nullable=True)
