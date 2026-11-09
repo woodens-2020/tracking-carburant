@@ -21838,6 +21838,65 @@ function pspAcPrendre(rid, pid, cible, val, kind){
   pspChangerPompe(rid, pid, cible);           // motif demandé, tracé, saisie du pompiste gardée
 }
 
+// ── Transfert vers une autre station (voir backend/transfert_station.py) ──
+async function pspTransferer(id){
+  const r = PSP.rapports.find(x => x.id === id); if(!r) return;
+  const st = (PSP.comptes || {}).autres_stations || [];
+  if(!st.length) return notify('Aucune autre station.', 'err');
+  document.getElementById('sup-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'sup-ov'; ov.className = 'sup-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+  ov.innerHTML = `<div class="sup-boite" style="max-width:760px;max-height:88vh;overflow:auto">
+    <div class="sup-ico">🔀</div><h3>Transférer le rapport n°${id} vers une autre station</h3>
+    <p>${esc(r.pompiste_nom || '')} · <b>${_pspDate(r.date)}, ${_pspPer(r.periode)}</b> — le rapport garde <b>ce jour et cette période</b>.
+      Il arrive « à vérifier » dans l'autre station ; ici, il sort du journal et des Dépenses et part à la corbeille (marqué transféré).</p>
+    <label for="tr-st">Station où le pompiste travaillait vraiment</label>
+    <select id="tr-st" class="filter-select" style="width:100%">${st.map(x => `<option value="${x.id}">${esc(x.nom)}</option>`).join('')}</select>
+    <div id="tr-corps" style="margin-top:10px"><div class="psp-muted">Chargement…</div></div>
+    <label for="tr-motif">Pourquoi ? (obligatoire)</label>
+    <input id="tr-motif" class="filter-input" maxlength="300" placeholder="Ex. le pompiste a choisi Champin au lieu de la station principale">
+    <div class="sup-err" id="tr-err"></div>
+    <div class="sup-act"><button class="btn btn-secondary" id="tr-non">Annuler</button><button class="btn btn-primary" id="tr-oui">🔀 Transférer</button></div></div>`;
+  document.body.appendChild(ov);
+  const fin = () => ov.remove(), err = t => { document.getElementById('tr-err').textContent = t; };
+  let A = null;
+  const niv = {HIGH: 'suite exacte', MEDIUM: 'très proche', LOW: 'proche', NONE: 'éloigné'};
+  const charger = async () => {
+    const z = document.getElementById('tr-corps'); z.innerHTML = '<div class="psp-muted">Chargement…</div>'; err('');
+    try{ A = await _pspApi('GET', `/rapports/${id}/transfert/apercu?espace_id=${document.getElementById('tr-st').value}`); }
+    catch(e){ z.innerHTML = ''; return err(e.message); }
+    z.innerHTML = `${(A.bloquants || []).map(b => `<div class="psp-err" style="margin:4px 0">⛔ ${esc(b)}</div>`).join('')}
+      ${(A.avertissements || []).map(b => `<div class="psp-warn" style="margin:4px 0;color:var(--text)">⚠ ${esc(b)}</div>`).join('')}
+      <table class="psp-tbl" style="margin-top:6px"><thead><tr><th>Meeter du rapport</th><th class="r">Début → fin</th><th>Meeter dans ${esc(A.station.nom)}</th></tr></thead><tbody>
+      ${A.lignes.map(l => `<tr><td><b>${esc(l.libelle)}</b></td><td class="r">${_pspN(l.av)} → ${_pspN(l.ap)}</td>
+        <td><select class="filter-select tr-l" data-src="${l.pompe_id}" style="min-width:260px">${l.candidats.map(c => `<option value="${c.pompe_id}"
+            ${c.prise ? 'disabled' : ''} ${c.pompe_id === l.proposition ? 'selected' : ''}>${esc(c.libelle)} — dernier ${_pspN(c.dernier_meter)}${c.ecart != null ? `, écart ${c.ecart > 0 ? '+' : ''}${_pspN(c.ecart)}` : ''}
+            (${niv[c.niveau] || ''})${c.prise ? ' · déjà rapporté' : ''}</option>`).join('') || '<option value="">aucun meeter de ce carburant</option>'}</select></td></tr>`).join('')}
+      </tbody></table>
+      <div class="psp-muted" style="font-size:12px;margin-top:4px">Proposé par le moteur : le meeter dont la dernière fin est reprise par le début du rapport. Jamais d'autre carburant.</div>`;
+    document.getElementById('tr-oui').disabled = !!(A.bloquants || []).length;
+  };
+  document.getElementById('tr-st').onchange = charger;
+  document.getElementById('tr-non').onclick = fin;
+  ov.addEventListener('click', e => { if(e.target === ov) fin(); });
+  document.getElementById('tr-oui').onclick = async () => {
+    if(!A) return;
+    const m = document.getElementById('tr-motif').value.trim();
+    if(m.length < 5) return err('Indiquez le motif (5 caractères minimum).');
+    const lignes = {};
+    for(const sel of ov.querySelectorAll('select.tr-l')){ if(!sel.value) return err('Choisissez un meeter pour chaque ligne.'); lignes[sel.dataset.src] = Number(sel.value); }
+    if(!confirm(`Transférer le rapport n°${id} vers ${A.station.nom} (${_pspDate(r.date)}, ${_pspPer(r.periode)}) ?`)) return;
+    const b = document.getElementById('tr-oui'); b.disabled = true;
+    try{
+      const x = await _pspApi('POST', `/rapports/${id}/transfert`, {espace_id: Number(document.getElementById('tr-st').value), motif: m, lignes});
+      fin();
+      notify(`Rapport transféré vers ${x.station.nom} (rapport n°${x.rapport_id}, ${_pspDate(x.date)} ${_pspPer(x.periode)}) : à vérifier là-bas.`, 'ok');
+      PSP.ouvert = null; pspChargerListe(); pspMajBadge();
+    }catch(e){ b.disabled = false; err(e.message); }
+  };
+  charger();
+}
+
 function pspCarte(r){
   const s = _pspS(r.id), toutesLignes = r.lignes.every(l => l.confirmee);
   const lignes = r.lignes.map(l => {
@@ -21880,7 +21939,9 @@ function pspCarte(r){
   const peutFinaliser = toutesLignes && r.billetterie_confirmee && r.ecart_confirme;
   return `<div class="psp-card">
     <div class="psp-head"><div><b>${esc(r.pompiste_nom)}</b> · ${_pspDateEntete(r)}
-        <span class="psp-badge ${r.statut}" style="margin-left:6px">${_PSP_LIB[r.statut]}</span>${r.certifie?' <span class="cert grand">Rapport certifié</span>':''}</div>
+        <span class="psp-badge ${r.statut}" style="margin-left:6px">${_PSP_LIB[r.statut]}</span>${r.certifie?' <span class="cert grand">Rapport certifié</span>':''}
+        ${((PSP.comptes || {}).autres_stations || []).length ? `<button class="btn btn-secondary psp-mini" style="margin-left:8px" onclick="pspTransferer(${r.id})"
+          title="Le pompiste s'est trompé de station : envoyer ce rapport dans la bonne, au même jour et à la même période">🔀 Transférer vers une autre station</button>` : ''}</div>
       <div class="psp-muted">soumis ${r.soumis_at ? new Date(r.soumis_at).toLocaleString('fr-FR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : ''} · charte acceptée</div></div>
     ${pb ? `<div class="psp-err" style="margin:0 0 10px">Problème signalé par ${esc(r.probleme_par_nom||'')} : ${esc(r.probleme_commentaire||'')}</div>` : ''}
     ${r.note_pompiste ? `<div class="psp-warn" style="color:var(--text);margin:0 0 10px"><b>Note du pompiste :</b> ${esc(r.note_pompiste)}</div>` : ''}
