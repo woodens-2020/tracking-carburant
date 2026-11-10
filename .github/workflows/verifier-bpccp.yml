@@ -36,7 +36,7 @@ jobs:
 
       - name: Démarrage, routes principales et logique métier
         working-directory: backend
-        run: python -m pytest tests/test_smoke.py tests/test_logique_stock.py tests/test_logique_metier.py tests/test_bar_depot.py tests/test_bar_v29.py tests/test_resolution_metter.py tests/test_journal_certifie.py tests/test_credits.py tests/test_pompiste.py tests/test_placement_metres.py tests/test_smart_meter.py tests/test_transfert_station.py tests/test_espaces.py tests/test_faces.py tests/test_station.py tests/test_metres_depart.py tests/test_classement_pompistes.py tests/test_caisse_principale.py tests/test_grand_livre.py tests/test_intelligence.py tests/test_geospatial.py tests/test_ia.py tests/test_produits.py tests/test_responsables_stations.py -v
+        run: python -m pytest tests/test_smoke.py tests/test_logique_stock.py tests/test_logique_metier.py tests/test_bar_depot.py tests/test_bar_v29.py tests/test_resolution_metter.py tests/test_journal_certifie.py tests/test_credits.py tests/test_espaces.py tests/test_faces.py tests/test_pompiste.py tests/test_placement_metres.py tests/test_smart_meter.py tests/test_transfert_station.py tests/test_station.py tests/test_metres_depart.py tests/test_classement_pompistes.py tests/test_caisse_principale.py tests/test_grand_livre.py tests/test_intelligence.py tests/test_geospatial.py tests/test_ia.py tests/test_produits.py tests/test_responsables_stations.py -v
 
       - uses: actions/setup-node@v4
         with:
