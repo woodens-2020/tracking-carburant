@@ -267,6 +267,11 @@ def creer_user(
         raise HTTPException(409, f"L'identifiant '{username}' est déjà utilisé")
     if db.query(Utilisateur).filter_by(email=email).first():
         raise HTTPException(409, "Cet email est déjà associé à un compte")
+    from espaces_routes import compte_ailleurs
+    if compte_ailleurs(email=email):
+        raise HTTPException(409, "Cet email est déjà utilisé par un compte d'une autre station.")
+    if compte_ailleurs(username=username):
+        raise HTTPException(409, f"L'identifiant '{username}' est déjà utilisé dans une autre station.")
     telephone = None
     if data.telephone and data.telephone.strip():
         try:
@@ -323,6 +328,9 @@ def modifier_user(
             raise HTTPException(400, "Adresse email invalide")
         if db.query(Utilisateur).filter(Utilisateur.email == email, Utilisateur.id != uid).first():
             raise HTTPException(409, "Cet email est déjà associé à un autre compte")
+        from espaces_routes import compte_ailleurs
+        if email != (u.email or "") and compte_ailleurs(email=email):
+            raise HTTPException(409, "Cet email est déjà utilisé par un compte d'une autre station.")
         u.email = email
     if data.telephone is not None:
         if data.telephone.strip():

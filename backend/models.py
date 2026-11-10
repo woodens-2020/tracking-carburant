@@ -16,6 +16,9 @@ class Produit(Base):
     nom         = Column(String(100), unique=True, nullable=False)
     prix_gallon = Column(Numeric(12, 3), nullable=False, default=0)
     actif       = Column(Boolean, nullable=False, default=True)
+    # Lieu où se trouve ce produit et ses pompes (station, site) : le même
+    # système sert à plusieurs endroits.
+    adresse     = Column(String(255), nullable=True)
     created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     pompes = relationship(
@@ -32,8 +35,112 @@ class Produit(Base):
     )
 
 
+class Espace(Base):
+    """Station séparée : un espace Konekta à part (ses pompes, pompistes,
+    rapports, caisse…), relié au propriétaire. Ses données vivent dans leur
+    propre schéma de base (`schema`) ; ce registre est dans l'espace principal.
+    Les stations « fusionnées » restent dans le même espace, distinguées par
+    l'adresse de leurs pompes."""
+    __tablename__ = "espaces"
+
+    id          = Column(Integer, primary_key=True)
+    nom         = Column(String(150), nullable=False)
+    adresse     = Column(String(255), nullable=True)
+    schema      = Column(String(40), nullable=False, unique=True)
+    actif       = Column(Boolean, nullable=False, default=True)
+    created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class StationGeo(Base):
+    """Fiche géographique d'une station (carte des stations). Registre tenu
+    dans l'espace principal : station_id 0 = station principale, sinon
+    espaces.id. Coordonnées WGS84 (EPSG:4326) en degrés décimaux."""
+    __tablename__ = "stations_geo"
+
+    id            = Column(Integer, primary_key=True)
+    station_id    = Column(Integer, nullable=False, unique=True)
+    # Nom affiché de la station principale (station_id 0) ; les stations
+    # séparées gardent le leur dans espaces.nom.
+    nom           = Column(String(150), nullable=True)
+    code          = Column(String(30), nullable=True, unique=True)
+    pays          = Column(String(60), nullable=False, default="Haïti")
+    departement   = Column(String(60), nullable=True)
+    commune       = Column(String(100), nullable=True)
+    adresse       = Column(String(255), nullable=True)
+    latitude      = Column(Numeric(9, 6), nullable=True)
+    longitude     = Column(Numeric(9, 6), nullable=True)
+    precision_m   = Column(Numeric(10, 1), nullable=True)       # précision GPS annoncée par l'appareil
+    source        = Column(String(20), nullable=True)           # gps | carte
+    verification  = Column(String(20), nullable=False, default="non_verifie")   # verifie | non_verifie
+    capture_par   = Column(String(150), nullable=True)
+    capture_le    = Column(DateTime(timezone=True), nullable=True)
+    # Contacts et gestion de la station
+    responsable       = Column(String(150), nullable=True)
+    telephone         = Column(String(30), nullable=True)
+    email             = Column(String(254), nullable=True)
+    urgence_nom       = Column(String(150), nullable=True)
+    urgence_telephone = Column(String(30), nullable=True)
+    horaires          = Column(String(120), nullable=True)
+    note              = Column(String(500), nullable=True)
+    maj_par           = Column(String(150), nullable=True)
+    maj_le            = Column(DateTime(timezone=True), nullable=True)
+    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (Index("ix_stations_geo_lat_lon", "latitude", "longitude"),)
+
+
+class StationGeoJournal(Base):
+    """Historique des modifications d'une fiche géographique (qui, quand, avant / après)."""
+    __tablename__ = "stations_geo_journal"
+
+    id          = Column(Integer, primary_key=True)
+    station_id  = Column(Integer, nullable=False, index=True)
+    utilisateur = Column(String(150), nullable=True)
+    action      = Column(String(40), nullable=False)
+    anciennes   = Column(JSON, nullable=True)
+    nouvelles   = Column(JSON, nullable=True)
+    created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class Distributeur(Base):
+    """Pompe physique de la station (« Pompe 1 », « Pompe 2 »…) qui porte ses
+    meeters (pistolets), chacun pour un produit : Pompe 1 › Gazoline 1,
+    Gazoline 2, Diesel 1. Plus de faces A / B : la pompe a une seule face
+    interne (table faces), jamais montrée."""
+    __tablename__ = "distributeurs"
+
+    id         = Column(Integer, primary_key=True)
+    nom        = Column(String(100), nullable=False)
+    # Station où se trouve la pompe (adresse). Les produits n'en ont pas :
+    # Gazoline, Diesel… sont les mêmes partout, la pompe porte le lieu.
+    adresse    = Column(String(255), nullable=True)
+    ordre      = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    faces = relationship("Face", back_populates="distributeur", cascade="all, delete-orphan",
+                         order_by="Face.ordre, Face.id")
+
+
+class Face(Base):
+    """Rangement interne des meeters d'une pompe : une seule par pompe
+    (les faces A / B ne sont plus utilisées, voir fusionner_faces)."""
+    __tablename__ = "faces"
+
+    id              = Column(Integer, primary_key=True)
+    distributeur_id = Column(Integer, ForeignKey("distributeurs.id", ondelete="CASCADE"), nullable=False)
+    nom             = Column(String(50), nullable=False)
+    ordre           = Column(Integer, nullable=False, default=0)
+
+    distributeur = relationship("Distributeur", back_populates="faces")
+    metres       = relationship("Pompe", back_populates="face", order_by="(Pompe.produit_id, Pompe.nom)")
+
+    __table_args__ = (Index("idx_faces_distributeur", "distributeur_id"),)
+
+
 class Pompe(Base):
-    """Pompe / distributeur physique rattaché à un produit."""
+    """Meeter (pistolet + compteur) d'un produit : « Gazoline 1 », « Diesel 1 »…
+    Placé sur une face d'une pompe physique (face_id), facultatif."""
     __tablename__ = "pompes"
 
     id         = Column(Integer, primary_key=True)
@@ -41,8 +148,33 @@ class Pompe(Base):
     nom        = Column(String(100), nullable=False)
     actif      = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    face_id    = Column(Integer, ForeignKey("faces.id", ondelete="SET NULL"), nullable=True)
+    # Chiffre du compteur à l'enregistrement du meeter : sert de « meeter
+    # précédent » tant qu'aucun relevé n'existe (contrôle de continuité).
+    metre_depart = Column(Numeric(14, 4), nullable=True)
+    # Point de départ : metre_depart = index à la FIN de cette date (ex. le
+    # 31/10 pour démarrer novembre). Les relevés jusqu'à cette date restent
+    # en historique mais la continuité repart de ce chiffre.
+    date_depart = Column(Date, nullable=True)
 
     produit = relationship("Produit", back_populates="pompes")
+    face    = relationship("Face", back_populates="metres")
+
+    @property
+    def station(self):
+        """Adresse de la station = celle de la pompe physique qui porte le meeter."""
+        f = self.face
+        return f.distributeur.adresse if f else None
+
+    @property
+    def emplacement(self):
+        """« Pompe 1 », ou None si le meeter n'est placé sur aucune pompe."""
+        f = self.face
+        return f.distributeur.nom if f else None
+
+    @property
+    def distributeur_id(self):
+        return self.face.distributeur_id if self.face else None
 
     __table_args__ = (
         UniqueConstraint("produit_id", "nom", name="uq_pompe_nom"),
@@ -77,14 +209,27 @@ class Releve(Base):
     # l'enregistrement (endpoint dédié, ne consomme jamais nb_modifications :
     # ce n'est pas une correction de valeur, juste une attribution).
     pompiste_id    = Column(Integer, ForeignKey("employes.id", ondelete="SET NULL"), nullable=True)
-    # Continuité des compteurs : écart entre ce « mètre avant » et le « mètre
+    # Continuité des compteurs : écart entre ce « meeter avant » et le « meeter
     # après » du relevé précédent de la même pompe (0/NULL = continu). Tout
     # écart exige un motif écrit à la saisie — sinon des gallons sortent de
     # la pompe sans être vendus nulle part dans le système.
     ecart_compteur       = Column(Numeric(14, 4), nullable=True)
     motif_ecart_compteur = Column(String(255), nullable=True)
+    # Relevé venu de l'espace pompiste (NULL = saisi dans le module Saisie).
+    # Écrit dès que le pompiste termine son rapport, mis à jour par les
+    # corrections du superviseur, retiré si le rapport est renvoyé.
+    rapport_pompiste_id  = Column(Integer, ForeignKey("rapports_pompiste.id", ondelete="SET NULL"), nullable=True)
+    # Saisie d'origine du pompiste, conservée quand la direction corrige :
+    # meeter sur lequel il avait écrit ces index (NULL = ce meeter) et index
+    # qu'il avait écrits (NULL = identiques). Sert au registre des erreurs
+    # de meeter : on corrige, mais on n'efface jamais ce qu'il a écrit.
+    pompe_saisie_id      = Column(Integer, ForeignKey("pompes.id", ondelete="SET NULL"), nullable=True)
+    metter_avant_saisi   = Column(Numeric(14, 4), nullable=True)
+    metter_apres_saisi   = Column(Numeric(14, 4), nullable=True)
 
-    pompe       = relationship("Pompe")
+    pompe       = relationship("Pompe", foreign_keys=[pompe_id])
+    pompe_saisie = relationship("Pompe", foreign_keys=[pompe_saisie_id])
+    rapport_pompiste = relationship("RapportPompiste", foreign_keys=[rapport_pompiste_id])
     cree_par    = relationship("Utilisateur", foreign_keys=[cree_par_id])
     modifie_par = relationship("Utilisateur", foreign_keys=[modifie_par_id])
     pompiste    = relationship("Employe", foreign_keys=[pompiste_id])
@@ -113,6 +258,144 @@ class Releve(Base):
     def montant_vente(self) -> float:
         """Montant en gourdes pour ce relevé."""
         return round(self.quantite * float(self.prix_gallon), 2)
+
+
+class RapportPompiste(Base):
+    """Rapport de fin de période d'un pompiste (espace /pompiste) : index de
+    ses pompes, envoyés carburant par carburant (statut EN_COURS), puis
+    billetterie unique au « Terminer » (statut SOUMIS). Reste en dehors du
+    journal des compteurs (`releves`) tant qu'un superviseur ne l'a pas
+    confirmé — la confirmation écrit (ou corrige) les relevés officiels.
+    Un rapport refusé reste en historique ; le pompiste en soumet un nouveau."""
+    __tablename__ = "rapports_pompiste"
+
+    id                 = Column(Integer, primary_key=True)
+    date               = Column(Date, nullable=False)
+    periode            = Column(String(20), nullable=False)
+    utilisateur_id     = Column(Integer, ForeignKey("utilisateurs.id", ondelete="RESTRICT"), nullable=False)
+    statut             = Column(String(20), nullable=False, default="EN_COURS")
+    # EN_COURS (compteurs envoyés) → SOUMIS (« Terminer ») → CONFIRME (finalisé, correct)
+    #                                       ↘ PROBLEME → RESOLU (finalisé après résolution)
+    # REJETE = renvoyé au pompiste, qui refait un rapport.
+    charte_acceptee_at = Column(DateTime(timezone=True), nullable=False)
+    # [{"coupure": 1000, "liasses": 2, "billets": 13}, ...] + monnaie (pièces)
+    billetterie        = Column(JSON, nullable=False, default=list)
+    monnaie            = Column(Numeric(14, 2), nullable=False, default=0)
+    # Rapprochement figé à la soumission : Σ gallons × prix vs argent compté
+    montant_attendu    = Column(Numeric(14, 2), nullable=False, default=0)
+    montant_compte     = Column(Numeric(14, 2), nullable=False, default=0)
+    ecart              = Column(Numeric(14, 2), nullable=False, default=0)
+    note_pompiste      = Column(String(500), nullable=True)
+    # Dépenses payées avec l'argent de la période : [{"description", "montant", "autorise_par"}]
+    # — elles réduisent l'argent à remettre ; devenues des Depense à la finalisation.
+    depenses           = Column(JSON, nullable=False, default=list)
+    total_depenses     = Column(Numeric(14, 2), nullable=False, default=0)
+    # Autres devises comptées : [{"devise": "USD", "montant", "taux", "montant_htg"}]
+    devises            = Column(JSON, nullable=False, default=list)
+    # Feuille du pompiste (comme la feuille papier de la station) :
+    # {"heures": "06:00 – 14:00", "bons": [{"reference", "montant"}] (C = bons valeur et chèques),
+    #  "credits": [{"nom", "montant"}] (D = crédits), "fonds_caisse": {"nom", "montant"} (F = crédit en caisse)}
+    feuille            = Column(JSON, nullable=True)
+    soumis_at          = Column(DateTime(timezone=True), nullable=True)   # au « Terminer »
+    traite_par_id      = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    traite_at          = Column(DateTime(timezone=True), nullable=True)
+    commentaire_superviseur = Column(String(1000), nullable=True)
+    # Vérification par le superviseur, élément par élément
+    billetterie_confirmee = Column(Boolean, nullable=False, default=False)
+    ecart_confirme        = Column(Boolean, nullable=False, default=False)
+    note_superviseur      = Column(Integer, nullable=True)          # note du rapport, sur 10
+    probleme_commentaire  = Column(String(1000), nullable=True)
+    probleme_at           = Column(DateTime(timezone=True), nullable=True)
+    probleme_par_id       = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    # Supprimé par la direction (corbeille) : le rapport est gardé pour pouvoir
+    # le restaurer, mais il ne compte plus nulle part (journal, caisse,
+    # dépenses, créneaux). {"motif", "par", "le", "statut_avant", ...}
+    supprime_at           = Column(DateTime(timezone=True), nullable=True)
+    suppression           = Column(JSON, nullable=True)
+
+    utilisateur = relationship("Utilisateur", foreign_keys=[utilisateur_id])
+    probleme_par = relationship("Utilisateur", foreign_keys=[probleme_par_id])
+    traite_par  = relationship("Utilisateur", foreign_keys=[traite_par_id])
+    lignes      = relationship("RapportPompisteLigne", back_populates="rapport",
+                               cascade="all, delete-orphan", order_by="RapportPompisteLigne.id")
+
+    __table_args__ = (
+        CheckConstraint("periode IN ('Matin', 'Apres-midi')", name="chk_rpomp_periode"),
+        CheckConstraint("statut IN ('EN_COURS','SOUMIS','PROBLEME','CONFIRME','RESOLU','REJETE')", name="chk_rpomp_statut"),
+        CheckConstraint("note_superviseur IS NULL OR (note_superviseur BETWEEN 0 AND 10)", name="chk_rpomp_note"),
+        Index("idx_rpomp_date", "date"),
+        Index("idx_rpomp_statut", "statut"),
+        Index("idx_rpomp_user", "utilisateur_id"),
+    )
+
+
+class TauxDevise(Base):
+    """Taux du jour d'une devise (1 USD = taux gourdes), fixé par la
+    direction. Le rapport pompiste prend le dernier taux en vigueur à sa
+    date ; chaque rapport garde le taux utilisé (historique figé)."""
+    __tablename__ = "taux_devises"
+
+    id          = Column(Integer, primary_key=True)
+    devise      = Column(String(3), nullable=False, default="USD")
+    taux        = Column(Numeric(12, 4), nullable=False)
+    date_effet  = Column(Date, nullable=False)
+    saisi_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    saisi_par = relationship("Utilisateur")
+
+    __table_args__ = (
+        CheckConstraint("taux > 0", name="chk_taux_devise_pos"),
+        Index("idx_taux_devise_date", "devise", "date_effet"),
+    )
+
+
+class RapportPompisteLigne(Base):
+    """Index d'une pompe dans un rapport pompiste. Les colonnes *_corrige
+    sont remplies par le superviseur s'il modifie les index à la confirmation
+    (les valeurs du pompiste restent conservées pour l'historique)."""
+    __tablename__ = "rapports_pompiste_lignes"
+
+    id                  = Column(Integer, primary_key=True)
+    rapport_id          = Column(Integer, ForeignKey("rapports_pompiste.id", ondelete="CASCADE"), nullable=False)
+    pompe_id            = Column(Integer, ForeignKey("pompes.id", ondelete="RESTRICT"), nullable=False)
+    prix_gallon         = Column(Numeric(12, 3), nullable=False, default=0)
+    metter_avant        = Column(Numeric(14, 4), nullable=False)
+    metter_apres        = Column(Numeric(14, 4), nullable=False)
+    metter_avant_corrige = Column(Numeric(14, 4), nullable=True)
+    metter_apres_corrige = Column(Numeric(14, 4), nullable=True)
+    confirmee            = Column(Boolean, nullable=False, default=False)   # meeter vérifié par le superviseur
+    confirmee_at         = Column(DateTime(timezone=True), nullable=True)
+    # Pompe choisie par le pompiste quand la direction a remis ces index sur
+    # la bonne pompe (erreur de pompe) ; vide sinon.
+    pompe_saisie_id      = Column(Integer, ForeignKey("pompes.id", ondelete="SET NULL"), nullable=True)
+    # Smart Meter (voir smart_meter.py) : ce que le moteur a trouvé à la
+    # saisie, figé à l'envoi (jamais recalculé ensuite) ; la vérification
+    # par la direction est notée à part.
+    statut_rapprochement = Column(String(20), nullable=True)   # MATCH_CONFIRMED | MATCH_REVIEW | UNMATCHED | INITIAL_READING
+    confiance            = Column(String(10), nullable=True)   # HIGH | MEDIUM | LOW | NONE
+    score_rapprochement  = Column(Integer, nullable=True)
+    pompe_proposee_id    = Column(Integer, ForeignKey("pompes.id", ondelete="SET NULL"), nullable=True)
+    index_reference      = Column(Numeric(14, 4), nullable=True)
+    source_reference     = Column(String(200), nullable=True)
+    ecart_reference      = Column(Numeric(14, 4), nullable=True)
+    decision_pompiste    = Column(String(10), nullable=True)   # ACCEPTE | REFUSE | AUCUNE
+    anomalies            = Column(JSON, nullable=True)         # ["RECUL", "VOLUME_ELEVE", …]
+    verifie_par_id       = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    verifie_at           = Column(DateTime(timezone=True), nullable=True)
+    note_verification    = Column(String(500), nullable=True)
+
+    rapport = relationship("RapportPompiste", back_populates="lignes")
+    pompe   = relationship("Pompe", foreign_keys=[pompe_id])
+    pompe_saisie = relationship("Pompe", foreign_keys=[pompe_saisie_id])
+    pompe_proposee = relationship("Pompe", foreign_keys=[pompe_proposee_id])
+    verifie_par = relationship("Utilisateur", foreign_keys=[verifie_par_id])
+
+    __table_args__ = (
+        UniqueConstraint("rapport_id", "pompe_id", name="uq_rpomp_ligne"),
+        CheckConstraint("metter_apres >= metter_avant", name="chk_rpomp_ligne_ordre"),
+        Index("idx_rpomp_ligne_rapport", "rapport_id"),
+    )
 
 
 class Livraison(Base):
@@ -222,6 +505,10 @@ class Utilisateur(Base):
     oauth_sub         = Column(String(255), unique=True, nullable=True)
     role_id           = Column(Integer, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True)
     telephone         = Column(String(20),  nullable=True)  # format E.164 (+509XXXXXXXX) — second canal OTP (SMS)
+    # Pompiste : station (adresse des produits) où il travaille. NULL = toutes.
+    station_adresse = Column(String(255), nullable=True)
+    # Pompiste venu d'une autre station : "<schema|principal>:<id>" du compte d'origine
+    compte_origine = Column(String(40), nullable=True)
 
     role_obj = relationship("Role", back_populates="utilisateurs")
 
@@ -448,8 +735,18 @@ class Depense(Base):
     # attribuee a une caisse carburant specifique.
     produit_id   = Column(Integer, ForeignKey("produits.id", ondelete="SET NULL"), nullable=True)
     created_at   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    # Qui a enregistré la dépense (journal de caisse) — NULL pour l'historique
+    saisi_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    # Payée par un pompiste avec l'argent de ses ventes (confirmée sur son
+    # rapport) : c'est une dépense de la station, mais elle ne sort pas de la
+    # caisse principale — le pompiste a remis « ventes − dépenses ».
+    rapport_pompiste_id = Column(Integer, ForeignKey("rapports_pompiste.id", ondelete="SET NULL"), nullable=True)
+    # Pompiste qui a fait la dépense (classement des pompistes)
+    pompiste_id = Column(Integer, ForeignKey("employes.id", ondelete="SET NULL"), nullable=True)
+    pompiste = relationship("Employe", foreign_keys=[pompiste_id])
 
-    produit = relationship("Produit")
+    produit   = relationship("Produit")
+    saisi_par = relationship("Utilisateur", foreign_keys=[saisi_par_id])
 
     __table_args__ = (
         CheckConstraint("montant > 0", name="chk_depense_montant_pos"),
@@ -486,6 +783,9 @@ class Achat(Base):
     reference    = Column(String(100), nullable=True)
     notes        = Column(String(500), nullable=True)
     created_at   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    saisi_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    saisi_par = relationship("Utilisateur", foreign_keys=[saisi_par_id])
 
     __table_args__ = (
         CheckConstraint("montant > 0", name="chk_achat_montant_pos"),
@@ -1733,6 +2033,25 @@ class PieceJointe(Base):
     )
 
 
+class IaJournal(Base):
+    """Journal de l'assistant IA : chaque question, les outils appelés, le
+    fournisseur, la durée, les jetons et l'erreur éventuelle (traçabilité)."""
+    __tablename__ = "ia_journal"
+
+    id              = Column(Integer, primary_key=True)
+    utilisateur_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True, index=True)
+    conversation_id = Column(Integer, nullable=True)
+    question        = Column(Text, nullable=False)
+    outils          = Column(JSON, nullable=True)          # [{nom, arguments, duree_ms, erreur}]
+    fournisseur     = Column(String(30), nullable=True)
+    modele          = Column(String(60), nullable=True)
+    duree_ms        = Column(Integer, nullable=True)
+    jetons_entree   = Column(Integer, nullable=True)
+    jetons_sortie   = Column(Integer, nullable=True)
+    erreur          = Column(Text, nullable=True)
+    created_at      = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
+
+
 class ChatConversation(Base):
     """Conversation avec l'assistant IA — historique persistant par utilisateur."""
     __tablename__ = "chat_conversations"
@@ -2388,3 +2707,111 @@ class CreditMouvement(Base):
         CheckConstraint("montant > 0", name="chk_credit_mvt_montant"),
         Index("idx_credit_mvt_credit", "credit_id"),
     )
+class ErreurMetreApprise(Base):
+    """Mémoire des erreurs de meeter : chaque fois que la direction remet des
+    index sur le bon meeter (ex. le 91 écrit sur la ligne du 95), le couple
+    (meeter choisi par le pompiste → bon meeter) est compté pour ce pompiste.
+    Le moteur de placement s'en sert pour proposer plus vite et plus sûrement
+    le bon meeter la fois suivante. Une remise en place annulée décompte."""
+    __tablename__ = "erreurs_metre_apprises"
+
+    id                = Column(Integer, primary_key=True)
+    utilisateur_id    = Column(Integer, ForeignKey("utilisateurs.id", ondelete="CASCADE"), nullable=True)
+    employe_id        = Column(Integer, ForeignKey("employes.id", ondelete="CASCADE"), nullable=True)
+    pompe_saisie_id   = Column(Integer, ForeignKey("pompes.id", ondelete="CASCADE"), nullable=False)
+    pompe_correcte_id = Column(Integer, ForeignKey("pompes.id", ondelete="CASCADE"), nullable=False)
+    nb                = Column(Integer, nullable=False, default=0)
+    derniere_date     = Column(Date, nullable=True)
+    updated_at        = Column(DateTime(timezone=True), nullable=False, server_default=func.now(),
+                               onupdate=func.now())
+
+    __table_args__ = (
+        Index("idx_erreur_metre_saisie", "pompe_saisie_id"),
+        Index("idx_erreur_metre_user", "utilisateur_id"),
+        Index("idx_erreur_metre_emp", "employe_id"),
+    )
+
+
+class SourceEntree(Base):
+    """Source d'argent qui alimente la caisse principale (station Zo Vincent,
+    station Champin, autres…). Configurable : ajout, renommage, désactivation
+    (une source désactivée garde son historique mais n'est plus proposée)."""
+    __tablename__ = "sources_entree"
+
+    id         = Column(Integer, primary_key=True)
+    nom        = Column(String(120), nullable=False)
+    nom_norm   = Column(String(120), nullable=False, unique=True)
+    actif      = Column(Boolean, nullable=False, default=True)
+    ordre      = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class EntreeCaisse(Base):
+    """Entrée d'argent dans la caisse principale : source, montant, date.
+    Jamais supprimée : une erreur s'annule avec un motif (trace conservée)."""
+    __tablename__ = "entrees_caisse"
+
+    id            = Column(Integer, primary_key=True)
+    source_id     = Column(Integer, ForeignKey("sources_entree.id", ondelete="RESTRICT"), nullable=False)
+    montant       = Column(Numeric(14, 2), nullable=False)
+    date_entree   = Column(Date, nullable=False)
+    reference     = Column(String(120), nullable=True)
+    note          = Column(String(500), nullable=True)
+    saisi_par_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    annulee       = Column(Boolean, nullable=False, default=False)
+    annulee_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    annulee_at    = Column(DateTime(timezone=True), nullable=True)
+    motif_annulation = Column(String(300), nullable=True)
+
+    source     = relationship("SourceEntree")
+    saisi_par  = relationship("Utilisateur", foreign_keys=[saisi_par_id])
+    annulee_par = relationship("Utilisateur", foreign_keys=[annulee_par_id])
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_entree_caisse_montant"),
+        Index("idx_entree_caisse_date", "date_entree"),
+        Index("idx_entree_caisse_source", "source_id"),
+    )
+
+
+
+class ChangementCompteur(Base):
+    """Compteur (meeter) remplacé ou remis à zéro : jamais traité comme une
+    lecture normale. Enregistré par la direction ; devient le point de départ
+    du meeter (Pompe.metre_depart / date_depart) pour la continuité."""
+    __tablename__ = "changements_compteur"
+
+    id                  = Column(Integer, primary_key=True)
+    pompe_id            = Column(Integer, ForeignKey("pompes.id", ondelete="RESTRICT"), nullable=False)
+    date_changement     = Column(Date, nullable=False)          # le nouveau compteur sert à partir de ce jour
+    ancien_numero       = Column(String(80), nullable=True)
+    nouveau_numero      = Column(String(80), nullable=True)
+    ancien_index_final  = Column(Numeric(14, 4), nullable=True)
+    nouvel_index_initial = Column(Numeric(14, 4), nullable=False)
+    motif               = Column(String(500), nullable=False)
+    autorise_par        = Column(String(150), nullable=False)
+    cree_par_id         = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at          = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    # Point de départ remplacé (pour annuler proprement)
+    ancien_metre_depart = Column(Numeric(14, 4), nullable=True)
+    ancienne_date_depart = Column(Date, nullable=True)
+
+    pompe = relationship("Pompe")
+
+    __table_args__ = (Index("idx_chg_compteur_pompe", "pompe_id", "date_changement"),)
+
+
+class ConfigRapprochement(Base):
+    """Seuils du moteur Smart Meter, modifiables par la direction (une ligne
+    par station). `volumes_max` : {pompe_id: gallons max par période}."""
+    __tablename__ = "config_rapprochement"
+
+    id               = Column(Integer, primary_key=True)
+    ecart_exact      = Column(Numeric(10, 4), nullable=False, default=0.001)   # HIGH : reprise exacte
+    ecart_medium     = Column(Numeric(10, 4), nullable=False, default=2)       # MEDIUM : à quelques gallons
+    ecart_low        = Column(Numeric(10, 4), nullable=False, default=50)      # LOW : écart encore plausible
+    volume_max_defaut = Column(Numeric(10, 2), nullable=False, default=5000)   # gallons par période
+    volumes_max      = Column(JSON, nullable=True)
+    modifie_par_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    modifie_at       = Column(DateTime(timezone=True), nullable=True)

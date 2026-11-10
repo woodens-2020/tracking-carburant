@@ -5,11 +5,13 @@ Variables d'environnement (fichier .env ou système) :
   DATABASE_URL=postgresql+psycopg2://user:password@host:5432/dbname
   (Fallback SQLite pour développement local sans PostgreSQL)
 """
+import contextvars
 import os
+import re
 from pathlib import Path
 
 from sqlalchemy import create_engine, event, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session as _Session
 # Chargement du fichier .env si python-dotenv est disponible
 # ENV_FILE permet de pointer vers un autre fichier (ex: .env.test) sans toucher au .env de prod
 try:
@@ -60,20 +62,140 @@ elif _is_sqlite:
         echo=False,
     )
 
-    # Active les clés étrangères sur SQLite (désactivées par défaut)
+    # Active les clés étrangères sur SQLite (désactivées par défaut) et
+    # rattache les bases des stations séparées (un fichier par espace, vu
+    # comme un schéma — même mécanisme que les schémas PostgreSQL).
     @event.listens_for(engine, "connect")
     def _sqlite_fk(dbapi_conn, _):
         dbapi_conn.execute("PRAGMA foreign_keys=ON")
+        try:
+            for (sch,) in dbapi_conn.execute("SELECT schema FROM espaces").fetchall():
+                if _SCHEMA_RE.match(sch or ""):
+                    dbapi_conn.execute(f"ATTACH DATABASE ? AS {sch}", (_fichier_espace(sch),))
+        except Exception:
+            pass                               # table pas encore créée
 
 else:
     raise ValueError(f"DATABASE_URL non supportée : {DATABASE_URL}")
 
-# ── Session factory ───────────────────────────────────────────────
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# ── Espaces (stations séparées) ───────────────────────────────────
+# L'espace courant (None = espace principal) est porté par la requête
+# (cookie, voir main.EspaceMiddleware) ; toute session ouverte pendant la
+# requête lit et écrit dans le schéma de cet espace.
+_SCHEMA_RE = re.compile(r"^esp_[0-9]{1,6}$")
+_espace_courant: contextvars.ContextVar = contextvars.ContextVar("konekta_espace", default=None)
+_moteurs: dict = {}
+
+
+def espace_courant():
+    return _espace_courant.get()
+
+
+def definir_espace(schema):
+    """Retourne le jeton pour revenir à l'espace précédent (reset)."""
+    if schema is not None and not _SCHEMA_RE.match(schema):
+        raise ValueError("Schéma d'espace invalide")
+    return _espace_courant.set(schema)
+
+
+def retablir_espace(jeton):
+    _espace_courant.reset(jeton)
+
+
+def moteur_espace(schema):
+    """Moteur qui traduit les tables vers le schéma de l'espace."""
+    if not schema:
+        return engine
+    if schema not in _moteurs:
+        _moteurs[schema] = engine.execution_options(schema_translate_map={None: schema})
+    return _moteurs[schema]
+
+
+def _fichier_espace(schema: str) -> str:
+    base = DATABASE_URL.replace("sqlite:///", "", 1)
+    p = Path(base)
+    return str(p.with_name(f"{p.stem}__{schema}{p.suffix or '.db'}"))
+
+
+class _SessionEspace:
+    """Remplace sessionmaker : chaque session est liée à l'espace courant."""
+    def __init__(self):
+        self._fabrique = sessionmaker(autocommit=False, autoflush=False)
+
+    def __call__(self, **kw):
+        kw.setdefault("bind", moteur_espace(_espace_courant.get()))
+        return self._fabrique(**kw)
+
+
+SessionLocal = _SessionEspace()
+
+
+def session_principale() -> _Session:
+    """Session sur l'espace principal, quel que soit l'espace courant."""
+    return _Session(bind=engine, autoflush=False)
+
+
+def session_espace(schema) -> _Session:
+    return _Session(bind=moteur_espace(schema), autoflush=False)
+
+
+def creer_schema_espace(schema: str) -> None:
+    """Crée le schéma (PostgreSQL) ou le fichier rattaché (SQLite) et toutes
+    les tables de Konekta dedans."""
+    if not _SCHEMA_RE.match(schema):
+        raise ValueError("Schéma d'espace invalide")
+    if _is_postgres:
+        with engine.begin() as c:
+            c.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
+    else:
+        engine.dispose()                       # les connexions rouvertes rattachent le nouveau fichier
+        with engine.begin() as c:
+            noms = [r[1] for r in c.exec_driver_sql("PRAGMA database_list").fetchall()]
+            if schema not in noms:
+                c.exec_driver_sql(f"ATTACH DATABASE ? AS {schema}", (_fichier_espace(schema),))
+    with moteur_espace(schema).begin() as c:
+        Base.metadata.create_all(bind=c)
+
+
+def migrer_espaces() -> int:
+    """Démarrage : chaque espace séparé reçoit les nouvelles tables et les
+    colonnes ajoutées depuis sa création (ajout générique, colonnes
+    facultatives). Retourne le nombre d'espaces mis à jour."""
+    from sqlalchemy import inspect as _inspect
+    try:
+        with session_principale() as db:
+            schemas = [r[0] for r in db.execute(text("SELECT schema FROM espaces")).fetchall()]
+    except Exception:
+        return 0
+    n = 0
+    for sch in schemas:
+        if not _SCHEMA_RE.match(sch or ""):
+            continue
+        try:
+            with moteur_espace(sch).begin() as c:
+                Base.metadata.create_all(bind=c)
+            insp = _inspect(engine)
+            with engine.begin() as c:
+                for table in Base.metadata.sorted_tables:
+                    try:
+                        existantes = {col["name"] for col in insp.get_columns(table.name, schema=sch)}
+                    except Exception:
+                        continue
+                    for col in table.columns:
+                        if col.name in existantes:
+                            continue
+                        type_sql = col.type.compile(dialect=engine.dialect)
+                        c.execute(text(f'ALTER TABLE "{sch}"."{table.name}" ADD COLUMN "{col.name}" {type_sql}'
+                                       if _is_postgres else
+                                       f'ALTER TABLE {sch}."{table.name}" ADD COLUMN "{col.name}" {type_sql}'))
+            n += 1
+        except Exception as exc:
+            print(f"Espace {sch} : migration impossible : {exc}")
+    return n
 
 
 def get_db():
-    """Dépendance FastAPI : fournit une session et la ferme automatiquement."""
+    """Dépendance FastAPI : fournit une session (sur l'espace de la requête) et la ferme automatiquement."""
     db = SessionLocal()
     try:
         yield db
@@ -258,9 +380,135 @@ def _migrate_columns():
             ("bar_livraisons_internes", "origine", "ALTER TABLE bar_livraisons_internes ADD COLUMN origine VARCHAR(20)", None),
             # Crédits : nom de la personne qui a versé / remis le paiement
             ("credit_mouvements", "deposant_nom", "ALTER TABLE credit_mouvements ADD COLUMN deposant_nom VARCHAR(150)", None),
+            ("releves", "rapport_pompiste_id",
+             "ALTER TABLE releves ADD COLUMN rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL", None),
+            ("rapports_pompiste", "depenses",
+             "ALTER TABLE rapports_pompiste ADD COLUMN depenses JSON NOT NULL DEFAULT '[]'", None),
+            ("rapports_pompiste", "total_depenses",
+             "ALTER TABLE rapports_pompiste ADD COLUMN total_depenses NUMERIC(14,2) NOT NULL DEFAULT 0", None),
+            ("rapports_pompiste", "devises",
+             "ALTER TABLE rapports_pompiste ADD COLUMN devises JSON NOT NULL DEFAULT '[]'", None),
+            ("rapports_pompiste", "feuille",
+             "ALTER TABLE rapports_pompiste ADD COLUMN feuille JSON DEFAULT NULL", None),
+            ("rapports_pompiste_lignes", "pompe_saisie_id",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN pompe_saisie_id INTEGER DEFAULT NULL", None),
+            ("rapports_pompiste_lignes", "statut_rapprochement",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN statut_rapprochement VARCHAR(20)", None),
+            ("rapports_pompiste_lignes", "confiance",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN confiance VARCHAR(10)", None),
+            ("rapports_pompiste_lignes", "score_rapprochement",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN score_rapprochement INTEGER", None),
+            ("rapports_pompiste_lignes", "pompe_proposee_id",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN pompe_proposee_id INTEGER", None),
+            ("rapports_pompiste_lignes", "index_reference",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN index_reference NUMERIC(14,4)", None),
+            ("rapports_pompiste_lignes", "source_reference",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN source_reference VARCHAR(200)", None),
+            ("rapports_pompiste_lignes", "ecart_reference",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN ecart_reference NUMERIC(14,4)", None),
+            ("rapports_pompiste_lignes", "decision_pompiste",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN decision_pompiste VARCHAR(10)", None),
+            ("rapports_pompiste_lignes", "anomalies",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN anomalies JSON", None),
+            ("rapports_pompiste_lignes", "verifie_par_id",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN verifie_par_id INTEGER", None),
+            ("rapports_pompiste_lignes", "verifie_at",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN verifie_at TIMESTAMP", None),
+            ("rapports_pompiste_lignes", "note_verification",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN note_verification VARCHAR(500)", None),
+            ("releves", "pompe_saisie_id",
+             "ALTER TABLE releves ADD COLUMN pompe_saisie_id INTEGER DEFAULT NULL", None),
+            ("releves", "metter_avant_saisi",
+             "ALTER TABLE releves ADD COLUMN metter_avant_saisi NUMERIC DEFAULT NULL", None),
+            ("releves", "metter_apres_saisi",
+             "ALTER TABLE releves ADD COLUMN metter_apres_saisi NUMERIC DEFAULT NULL", None),
+            ("rapports_pompiste", "supprime_at",
+             "ALTER TABLE rapports_pompiste ADD COLUMN supprime_at DATETIME DEFAULT NULL", None),
+            ("rapports_pompiste", "suppression",
+             "ALTER TABLE rapports_pompiste ADD COLUMN suppression JSON DEFAULT NULL", None),
+            ("produits", "adresse",
+             "ALTER TABLE produits ADD COLUMN adresse VARCHAR(255) DEFAULT NULL", None),
+            ("utilisateurs", "station_adresse",
+             "ALTER TABLE utilisateurs ADD COLUMN station_adresse VARCHAR(255) DEFAULT NULL", None),
+            ("utilisateurs", "compte_origine",
+             "ALTER TABLE utilisateurs ADD COLUMN compte_origine VARCHAR(40) DEFAULT NULL", None),
+            # Fiche station : contacts et gestion
+            ("stations_geo", "responsable",
+             "ALTER TABLE stations_geo ADD COLUMN responsable VARCHAR(150)", None),
+            ("stations_geo", "telephone",
+             "ALTER TABLE stations_geo ADD COLUMN telephone VARCHAR(30)", None),
+            ("stations_geo", "email",
+             "ALTER TABLE stations_geo ADD COLUMN email VARCHAR(254)", None),
+            ("stations_geo", "urgence_nom",
+             "ALTER TABLE stations_geo ADD COLUMN urgence_nom VARCHAR(150)", None),
+            ("stations_geo", "urgence_telephone",
+             "ALTER TABLE stations_geo ADD COLUMN urgence_telephone VARCHAR(30)", None),
+            ("stations_geo", "horaires",
+             "ALTER TABLE stations_geo ADD COLUMN horaires VARCHAR(120)", None),
+            ("stations_geo", "note",
+             "ALTER TABLE stations_geo ADD COLUMN note VARCHAR(500)", None),
+            ("stations_geo", "maj_par",
+             "ALTER TABLE stations_geo ADD COLUMN maj_par VARCHAR(150)", None),
+            ("stations_geo", "maj_le",
+             "ALTER TABLE stations_geo ADD COLUMN maj_le DATETIME", None),
+            ("stations_geo", "nom",
+             "ALTER TABLE stations_geo ADD COLUMN nom VARCHAR(150)", None),
+            ("pompes", "face_id",
+             "ALTER TABLE pompes ADD COLUMN face_id INTEGER REFERENCES faces(id) ON DELETE SET NULL", None),
+            ("pompes", "metre_depart",
+             "ALTER TABLE pompes ADD COLUMN metre_depart NUMERIC(14,4)", None),
+            ("pompes", "date_depart",
+             "ALTER TABLE pompes ADD COLUMN date_depart DATE", None),
+            ("distributeurs", "adresse",
+             "ALTER TABLE distributeurs ADD COLUMN adresse VARCHAR(255)", None),
+            ("depenses", "rapport_pompiste_id",
+             "ALTER TABLE depenses ADD COLUMN rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL", None),
+            ("depenses", "saisi_par_id",
+             "ALTER TABLE depenses ADD COLUMN saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
+            ("depenses", "pompiste_id",
+             "ALTER TABLE depenses ADD COLUMN pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL", None),
+            ("achats", "saisi_par_id",
+             "ALTER TABLE achats ADD COLUMN saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
         ]
     elif _is_postgres:
         new_cols = [
+            # Lue dès init_db (amorçage des produits) : doit exister avant
+            # les migrations de main.py
+            ("produits", "adresse",
+             "ALTER TABLE produits ADD COLUMN adresse VARCHAR(255)", None),
+            ("utilisateurs", "station_adresse",
+             "ALTER TABLE utilisateurs ADD COLUMN station_adresse VARCHAR(255)", None),
+            ("utilisateurs", "compte_origine",
+             "ALTER TABLE utilisateurs ADD COLUMN compte_origine VARCHAR(40)", None),
+            # Fiche station : contacts et gestion
+            ("stations_geo", "responsable",
+             "ALTER TABLE stations_geo ADD COLUMN responsable VARCHAR(150)", None),
+            ("stations_geo", "telephone",
+             "ALTER TABLE stations_geo ADD COLUMN telephone VARCHAR(30)", None),
+            ("stations_geo", "email",
+             "ALTER TABLE stations_geo ADD COLUMN email VARCHAR(254)", None),
+            ("stations_geo", "urgence_nom",
+             "ALTER TABLE stations_geo ADD COLUMN urgence_nom VARCHAR(150)", None),
+            ("stations_geo", "urgence_telephone",
+             "ALTER TABLE stations_geo ADD COLUMN urgence_telephone VARCHAR(30)", None),
+            ("stations_geo", "horaires",
+             "ALTER TABLE stations_geo ADD COLUMN horaires VARCHAR(120)", None),
+            ("stations_geo", "note",
+             "ALTER TABLE stations_geo ADD COLUMN note VARCHAR(500)", None),
+            ("stations_geo", "maj_par",
+             "ALTER TABLE stations_geo ADD COLUMN maj_par VARCHAR(150)", None),
+            ("stations_geo", "maj_le",
+             "ALTER TABLE stations_geo ADD COLUMN maj_le TIMESTAMP WITH TIME ZONE", None),
+            ("stations_geo", "nom",
+             "ALTER TABLE stations_geo ADD COLUMN nom VARCHAR(150)", None),
+            ("pompes", "face_id",
+             "ALTER TABLE pompes ADD COLUMN face_id INTEGER REFERENCES faces(id) ON DELETE SET NULL", None),
+            ("pompes", "metre_depart",
+             "ALTER TABLE pompes ADD COLUMN metre_depart NUMERIC(14,4)", None),
+            ("pompes", "date_depart",
+             "ALTER TABLE pompes ADD COLUMN date_depart DATE", None),
+            ("distributeurs", "adresse",
+             "ALTER TABLE distributeurs ADD COLUMN adresse VARCHAR(255)", None),
             ("releves",      "nb_modifications",
              "ALTER TABLE releves      ADD COLUMN nb_modifications INTEGER NOT NULL DEFAULT 0", None),
             ("utilisateurs", "api_key_hash",
@@ -387,6 +635,38 @@ def _migrate_columns():
              "ALTER TABLE releves ADD COLUMN ecart_compteur NUMERIC(14,4)", None),
             ("releves", "motif_ecart_compteur",
              "ALTER TABLE releves ADD COLUMN motif_ecart_compteur VARCHAR(255)", None),
+            ("releves", "pompe_saisie_id",
+             "ALTER TABLE releves ADD COLUMN pompe_saisie_id INTEGER REFERENCES pompes(id) ON DELETE SET NULL", None),
+            ("releves", "metter_avant_saisi",
+             "ALTER TABLE releves ADD COLUMN metter_avant_saisi NUMERIC(14,4)", None),
+            ("releves", "metter_apres_saisi",
+             "ALTER TABLE releves ADD COLUMN metter_apres_saisi NUMERIC(14,4)", None),
+            ("depenses", "pompiste_id",
+             "ALTER TABLE depenses ADD COLUMN pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL", None),
+            ("rapports_pompiste_lignes", "statut_rapprochement",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN statut_rapprochement VARCHAR(20)", None),
+            ("rapports_pompiste_lignes", "confiance",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN confiance VARCHAR(10)", None),
+            ("rapports_pompiste_lignes", "score_rapprochement",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN score_rapprochement INTEGER", None),
+            ("rapports_pompiste_lignes", "pompe_proposee_id",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN pompe_proposee_id INTEGER REFERENCES pompes(id) ON DELETE SET NULL", None),
+            ("rapports_pompiste_lignes", "index_reference",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN index_reference NUMERIC(14,4)", None),
+            ("rapports_pompiste_lignes", "source_reference",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN source_reference VARCHAR(200)", None),
+            ("rapports_pompiste_lignes", "ecart_reference",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN ecart_reference NUMERIC(14,4)", None),
+            ("rapports_pompiste_lignes", "decision_pompiste",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN decision_pompiste VARCHAR(10)", None),
+            ("rapports_pompiste_lignes", "anomalies",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN anomalies JSON", None),
+            ("rapports_pompiste_lignes", "verifie_par_id",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN verifie_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
+            ("rapports_pompiste_lignes", "verifie_at",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN verifie_at TIMESTAMPTZ", None),
+            ("rapports_pompiste_lignes", "note_verification",
+             "ALTER TABLE rapports_pompiste_lignes ADD COLUMN note_verification VARCHAR(500)", None),
             ("livraisons", "motif_reste_manuel",
              "ALTER TABLE livraisons ADD COLUMN motif_reste_manuel VARCHAR(255)", None),
             ("livraisons", "motif_cloture",

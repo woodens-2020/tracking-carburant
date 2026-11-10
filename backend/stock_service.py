@@ -101,7 +101,8 @@ def revenu_ventes(
         )
         .all()
     )
-    return round(sum(r.montant_vente for r in releves if r.quantite >= 0), 2)
+    import main  # import tardif : ventes comptées, même règle que la caisse
+    return round(sum(r.montant_vente for r in main.releves_comptes(db, releves) if r.quantite >= 0), 2)
 
 
 # ══════════════════════════════════════════════════════════════════════════

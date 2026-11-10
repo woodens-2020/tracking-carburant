@@ -1,0 +1,2378 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Konekta Ponpis</title>
+<link rel="manifest" href="/pompiste/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/pompiste-app/favicon-64.png">
+<link rel="apple-touch-icon" href="/pompiste-app/icone-apple-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Konekta Ponpis">
+<style>
+:root{
+  --bg:#eef2f7; --panel:#fff; --text:#0f172a; --muted:#64748b; --border:#d7dee8;
+  --accent:#ea580c; --accent-2:#c2410c; --accent-soft:#fff1e8; --ok:#16a34a; --ok-soft:#e7f6ec;
+  --err:#dc2626; --err-soft:#fdecec; --warn:#b45309; --warn-soft:#fff5dc;
+  --gaz:#16a34a; --gaz-soft:#e7f6ec; --die:#2563eb; --die-soft:#e8effd;
+  --touche:#f6f8fb; --ombre:0 1px 2px rgba(15,23,42,.06),0 4px 14px rgba(15,23,42,.06);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0b1220; --panel:#121b2f; --text:#e5e9f2; --muted:#94a3b8; --border:#26334f;
+    --accent:#fb923c; --accent-2:#f97316; --accent-soft:#2a1c10; --ok:#4ade80; --ok-soft:#0f2619;
+    --err:#f87171; --err-soft:#2c1414; --warn:#fbbf24; --warn-soft:#2a2210;
+    --gaz:#4ade80; --gaz-soft:#0f2619; --die:#60a5fa; --die-soft:#101d33; --touche:#18233b;
+    --ombre:0 1px 2px rgba(0,0,0,.3);
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* Tablettes Android : pas d'agrandissement automatique du texte ; jamais de défilement horizontal */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-x:clip}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font:18px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none}
+input,textarea{-webkit-user-select:text;user-select:text}
+.env{background:#b91c1c;color:#fff;text-align:center;font-size:13px;font-weight:700;letter-spacing:.08em;padding:5px}
+header{display:flex;align-items:center;gap:14px;padding:14px 24px;background:var(--panel);
+  border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
+header .marque{font-weight:900;font-size:20px;letter-spacing:.03em}
+.langues{margin-left:auto;display:flex;background:var(--bg);border:2px solid var(--border);border-radius:14px;padding:3px;gap:3px}
+.langues button{font:inherit;font-weight:800;font-size:15px;border:0;border-radius:10px;padding:8px 14px;min-height:40px;cursor:pointer;
+  background:transparent;color:var(--muted)}
+.langues button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+header .qui{text-align:right;line-height:1.2}
+header .qui b{display:block;font-size:17px}
+header .qui span{font-size:14px;color:var(--muted);font-family:var(--mono)}
+main{max-width:1060px;margin:0 auto;padding:22px 24px 150px}
+h1{font-size:32px;line-height:1.15;margin:4px 0 6px;letter-spacing:-.01em}
+h2{font-size:20px;margin:26px 0 10px}
+p.sub{color:var(--muted);margin:0 0 20px;font-size:18px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:20px;margin-bottom:14px;box-shadow:var(--ombre)}
+label{display:block;font-size:15px;font-weight:700;color:var(--muted);margin:12px 0 6px}
+input,textarea{width:100%;font:inherit;color:var(--text);background:var(--bg);
+  border:2px solid var(--border);border-radius:14px;padding:14px 16px}
+input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+.btn{font:inherit;font-weight:800;border:0;border-radius:16px;padding:16px 22px;cursor:pointer;
+  background:var(--accent);color:#fff;width:100%;min-height:64px;font-size:20px}
+.btn:active{background:var(--accent-2)}
+.btn:disabled{opacity:.35;cursor:default}
+.btn.attention{background:var(--warn)}
+.btn.sec{background:var(--panel);color:var(--text);border:2px solid var(--border)}
+.btn.petit{width:auto;min-height:0;padding:10px 18px;font-size:16px;border-radius:12px}
+.lien{background:none;border:0;color:var(--muted);font:inherit;font-size:17px;text-decoration:underline;
+  cursor:pointer;padding:14px 0;display:block;margin:8px auto 0}
+
+/* Fil */
+.fil{display:flex;align-items:center;gap:12px;margin:0 0 16px;min-height:52px}
+.fil .retour{font:inherit;font-weight:800;font-size:17px;background:var(--panel);border:2px solid var(--border);
+  color:var(--text);border-radius:14px;padding:11px 20px;cursor:pointer}
+.fil .pas{margin-left:auto;font-size:15px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.resume{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.resume span{font-size:15px;font-weight:800;background:var(--panel);border:1px solid var(--border);border-radius:22px;padding:6px 14px}
+
+/* Gros boutons de choix */
+.choix{display:grid;gap:16px}
+@media (min-width:700px){ .choix.deux{grid-template-columns:1fr 1fr} .choix.trois{grid-template-columns:repeat(2,1fr)} }
+@media (min-width:980px){ .choix.trois{grid-template-columns:repeat(3,1fr)} }
+.gros{display:flex;align-items:center;gap:18px;width:100%;min-height:110px;padding:20px 22px;cursor:pointer;
+  font:inherit;font-size:26px;font-weight:900;text-align:left;color:var(--text);
+  background:var(--panel);border:3px solid var(--border);border-radius:24px;box-shadow:var(--ombre)}
+.gros:active{transform:scale(.985)}
+.gros .ico{flex:none;width:64px;height:64px;border-radius:18px;display:grid;place-items:center;font-size:34px;background:var(--bg)}
+.gros small{display:block;font-size:16px;font-weight:600;color:var(--muted);margin-top:3px}
+.gros.gaz .ico{background:var(--gaz-soft);color:var(--gaz)}
+.gros.die .ico{background:var(--die-soft);color:var(--die)}
+.gros.on{border-color:var(--accent);background:var(--accent-soft)}
+.gros.on .coche{background:var(--accent);border-color:var(--accent);color:#fff}
+.gros .coche{margin-left:auto;flex:none;width:44px;height:44px;border-radius:50%;border:3px solid var(--border);
+  display:grid;place-items:center;font-size:24px;color:transparent}
+.gros:disabled{opacity:.45;cursor:default}
+.gros.erreur{border-color:var(--err)}
+.gros.grand{min-height:150px;font-size:32px}
+.gros.grand .ico{width:80px;height:80px;font-size:44px}
+
+/* Deux colonnes : informations | clavier */
+.deux-col{display:grid;gap:20px}
+@media (min-width:820px){ .deux-col{grid-template-columns:1fr 380px;align-items:start} .deux-col .cote{position:sticky;top:96px} }
+.pompe-titre{font-size:38px;font-weight:900;margin:0}
+.champ{background:var(--panel);border:3px solid var(--border);border-radius:20px;padding:16px 20px;margin:14px 0;cursor:pointer}
+.champ.actif{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.champ.fixe{cursor:default;background:var(--bg)}
+.champ .lib{font-size:16px;font-weight:800;color:var(--muted)}
+.champ .val{font-family:var(--mono);font-size:44px;font-weight:800;min-height:58px;letter-spacing:.02em}
+.champ .val.vide{color:var(--border)}
+.champ .src{font-size:14px;color:var(--muted);margin-top:2px}
+.curseur{display:inline-block;width:3px;height:42px;background:var(--accent);vertical-align:-6px;margin-left:2px;animation:clig 1s steps(1) infinite}
+@keyframes clig{50%{opacity:0}}
+.calcul{display:flex;justify-content:space-between;font-family:var(--mono);font-size:22px;font-weight:800;
+  background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px 20px}
+.msg-err{color:var(--err);font-weight:800;margin-top:10px;font-size:18px}
+
+/* Clavier numérique */
+.pave{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;background:var(--panel);border:1px solid var(--border);
+  border-radius:24px;padding:14px;box-shadow:var(--ombre)}
+.touche{font:inherit;font-size:34px;font-weight:800;font-family:var(--mono);height:82px;border-radius:18px;cursor:pointer;
+  border:2px solid var(--border);background:var(--touche);color:var(--text)}
+.touche:active{background:var(--accent-soft);border-color:var(--accent)}
+.touche.eff{font-size:28px;color:var(--err)}
+.pave .vide{visibility:hidden}
+
+/* Billetterie */
+.billets{display:grid;gap:10px}
+.billet{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center}
+.billet .coup{font-size:24px;font-weight:900;white-space:nowrap}
+.billet .coup small{display:block;font-size:14px;font-weight:700;color:var(--muted);font-family:var(--mono)}
+.case-n{background:var(--panel);border:3px solid var(--border);border-radius:16px;padding:8px 12px;cursor:pointer;text-align:center}
+.case-n .lib{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.case-n .val{font-family:var(--mono);font-size:34px;font-weight:800;min-height:46px}
+.case-n.actif{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.case-n.zero .val{color:var(--border)}
+.entete-billets{display:grid;grid-template-columns:150px 1fr;gap:12px;font-size:14px;font-weight:800;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.05em;padding:0 0 2px}
+.entete-billets span{text-align:center}
+.entete-billets span:first-child{text-align:left}
+
+/* Tableaux / récap */
+table{width:100%;border-collapse:collapse}
+th,td{padding:12px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle}
+th{font-size:14px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+td.r,th.r{text-align:right;white-space:nowrap}
+.num{font-family:var(--mono)}
+.total{display:flex;justify-content:space-between;align-items:baseline;padding:12px 0;font-weight:800;font-size:19px}
+.total .v{font-family:var(--mono);font-size:24px}
+.ecart{border-radius:18px;padding:18px 20px;font-weight:900;font-size:22px;display:flex;justify-content:space-between;margin-top:6px}
+.ecart{gap:10px;align-items:center} .ecart span:last-child{white-space:nowrap}
+.ecart.ok{background:var(--ok-soft);color:var(--ok)}
+.ecart.neg{background:var(--err-soft);color:var(--err)}
+.ecart.pos{background:var(--warn-soft);color:var(--warn)}
+.alerte{border-radius:18px;padding:16px 20px;margin-bottom:16px;font-weight:800}
+.alerte.err{background:var(--err-soft);color:var(--err)}
+.alerte.ok{background:var(--ok-soft);color:var(--ok)}
+.alerte.warn{background:var(--warn-soft);color:var(--warn)}
+.charte li{margin-bottom:14px;font-size:19px}
+.case{display:flex;gap:14px;align-items:center;margin:18px 0 4px;font-weight:900;font-size:22px;
+  background:var(--accent-soft);border:3px solid var(--accent);border-radius:18px;padding:18px;cursor:pointer}
+.case input{width:36px;height:36px;flex:none;margin:0;accent-color:var(--accent)}
+.badge{display:inline-block;font-size:14px;font-weight:800;border-radius:20px;padding:3px 12px}
+.badge.SOUMIS{background:var(--warn-soft);color:var(--warn)}
+.badge.PROBLEME{background:var(--err-soft);color:var(--err)}
+.badge.CONFIRME,.badge.RESOLU{background:var(--ok-soft);color:var(--ok)}
+.badge.REJETE{background:var(--err-soft);color:var(--err)}
+.hist{border-bottom:1px solid var(--border);padding:12px 0}
+.hist:last-child{border:0}
+.com{margin-top:8px;font-size:16px;background:var(--bg);border-radius:12px;padding:10px 12px}
+.section-tete{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.section-tete h2{margin:0}
+.produit-tete{font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);margin:8px 0 2px}
+.btn-mod{font:inherit;font-weight:800;font-size:16px;border-radius:12px;padding:10px 16px;cursor:pointer;
+  background:var(--accent-soft);color:var(--accent-2);border:2px solid var(--accent)}
+.retirer{flex:none;width:48px;height:48px;border-radius:14px;border:2px solid var(--border);background:transparent;
+  color:var(--muted);font-size:18px;cursor:pointer}
+.barre-bas{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--border);
+  padding:14px 24px calc(14px + env(safe-area-inset-bottom));z-index:6;box-shadow:0 -4px 18px rgba(15,23,42,.06)}
+.barre-bas .in{max-width:1060px;margin:0 auto;display:flex;gap:16px;align-items:center}
+.barre-bas .info{flex:1;font-size:16px;color:var(--muted)}
+.barre-bas .info b{display:block;color:var(--text);font-family:var(--mono);font-size:24px}
+.barre-bas .btn{width:auto;flex:none;min-width:260px}
+.cache{display:none!important}
+.connexion{max-width:520px;margin:5vh auto 0}
+
+/* Fenêtre de confirmation */
+.dlg{position:fixed;inset:0;z-index:50;background:rgba(15,23,42,.55);display:grid;place-items:center;padding:16px}
+.dlg-boite{background:var(--panel);color:var(--text);border-radius:24px;padding:24px;max-width:520px;width:100%;
+  box-shadow:0 18px 50px rgba(0,0,0,.35);text-align:center}
+.dlg-ico{font-size:52px;line-height:1}
+.dlg h2{font-size:24px;margin:10px 0 8px}
+.dlg-texte{color:var(--muted);font-size:18px;margin-bottom:18px}
+.dlg-texte b{color:var(--text)}
+.dlg-btns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dlg-btns .btn{min-height:60px;font-size:18px}
+.dlg.danger #dlg-oui{background:var(--err)}
+@media (max-width:420px){ .dlg-btns{grid-template-columns:1fr} .dlg-btns #dlg-oui{order:-1} }
+.emplacement{font-weight:700;color:var(--accent-2)}
+.lieu-tete{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0 10px;font-weight:800;font-size:17px;color:var(--accent-2)}
+.lieu-tout{font:inherit;font-size:15px;font-weight:800;min-height:44px;padding:0 16px;border-radius:12px;border:2px solid var(--accent);background:var(--panel);color:var(--accent-2);cursor:pointer}
+.lieu-tout.on{background:var(--accent);color:#fff}
+.dep-form{display:flex;flex-direction:column;gap:8px}
+.dep-form label{font-weight:800;font-size:16px;margin-top:6px}
+.saisie-t{font:inherit;font-size:20px;font-weight:700;width:100%;min-height:56px;padding:10px 14px;border-radius:14px;
+  border:2px solid var(--border);background:var(--bg);color:var(--text)}
+.saisie-t:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.dep-act{display:flex;gap:8px;align-items:center}
+.devise-tete{font-weight:800;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 2px}
+.billet.sans-taux{opacity:.7}
+.billet.devise{grid-template-columns:1fr;gap:8px}
+.billet.devise .coup{white-space:normal}
+.billet.devise .coup small{font-family:inherit;font-size:15px}
+.billet.devise .coup small#st-usd{font-family:var(--mono);font-size:16px;color:var(--text)}
+.reprise{display:flex;align-items:center;gap:12px;background:var(--accent-soft);border:2px solid var(--accent);border-radius:16px;
+  padding:12px 14px;margin-bottom:14px}
+.reprise-ico{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:#fff;font-size:20px;font-weight:900}
+.reprise div{flex:1;min-width:0} .reprise b{display:block;font-size:17px} .reprise div span{display:block;font-size:15px;color:var(--muted)}
+.reprise button{flex:none;font:inherit;font-weight:800;font-size:16px;min-height:44px;padding:0 18px;border-radius:12px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+.note-flash{position:fixed;left:50%;top:76px;transform:translateX(-50%);z-index:40;background:var(--text);color:var(--bg);
+  font-weight:800;border-radius:14px;padding:12px 18px;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:calc(100vw - 32px);text-align:center}
+
+/* Billetterie au clavier de l'appareil */
+.billets-card{max-width:640px}
+.billets-card .billet{padding:4px 0;border-radius:14px;cursor:text}
+.saisie-n{font-family:var(--mono);font-size:30px;font-weight:800;text-align:center;padding:10px 12px;border-width:3px;
+  background:var(--panel);min-width:0}
+.saisie-n::placeholder{color:var(--border)}
+.billet.actif .coup{color:var(--accent-2)}
+@media (max-width:480px){ .saisie-n{font-size:24px;padding:8px 10px} }
+
+/* Date du rapport et calendrier */
+.date-rapport{display:flex;align-items:center;gap:14px;width:100%;margin:0 0 16px;padding:14px 18px;cursor:pointer;
+  font:inherit;font-size:20px;font-weight:800;text-align:left;color:var(--text);
+  background:var(--panel);border:3px solid var(--border);border-radius:20px;box-shadow:var(--ombre)}
+.date-rapport .ico{font-size:28px}
+.date-rapport small{display:block;font-size:14px;font-weight:700;color:var(--muted)}
+.date-rapport .chg{margin-left:auto;flex:none;font-size:16px;color:var(--accent-2);background:var(--accent-soft);
+  border:2px solid var(--accent);border-radius:12px;padding:8px 14px}
+.calendrier{padding:16px;max-width:600px}
+.cal-tete{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-size:20px}
+.cal-nav{font:inherit;font-size:28px;font-weight:800;width:56px;height:52px;border-radius:14px;cursor:pointer;
+  border:2px solid var(--border);background:var(--touche);color:var(--text)}
+.cal-nav:disabled{opacity:.3;cursor:default}
+.cal-grille{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.cal-js{text-align:center;font-size:14px;font-weight:800;color:var(--muted);padding:4px 0}
+.jour{font:inherit;font-family:var(--mono);font-size:22px;font-weight:800;aspect-ratio:1;min-height:44px;border-radius:14px;cursor:pointer;
+  border:2px solid var(--border);background:var(--touche);color:var(--text)}
+.jour.auj{border-color:var(--accent)}
+.jour.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.jour:disabled{opacity:.25;cursor:default}
+@media (max-width:480px){ .cal-grille{gap:5px} .jour{font-size:18px;border-radius:10px} .date-rapport{font-size:17px;padding:12px 14px}
+  .date-rapport .chg{padding:6px 10px;font-size:14px} }
+
+/* Fiche imprimée (terminal à imprimante thermique) */
+#ticket{display:none}
+.papier{display:flex;gap:6px;justify-content:center;margin:10px 0 0}
+.papier button{font:inherit;font-weight:700;font-size:15px;border-radius:10px;padding:8px 14px;cursor:pointer;
+  border:2px solid var(--border);background:var(--panel);color:var(--muted)}
+.papier button.on{border-color:var(--accent);color:var(--text)}
+.btn-print{background:var(--text);color:var(--bg)}
+@media print{
+  body{background:#fff!important}
+  body > *:not(#ticket){display:none!important}
+  #ticket{display:block!important;color:#000;background:#fff;font:12px/1.35 "Courier New",ui-monospace,monospace;margin:0;padding:0}
+  #ticket.l58{width:48mm;font-size:11px} #ticket.l80{width:72mm}
+  #ticket .i,#ticket .b{overflow-wrap:anywhere}
+  #ticket .c{text-align:center} #ticket .b{font-weight:700}
+  #ticket .gr{font-size:15px;font-weight:700}
+  #ticket .sep{border-top:1px dashed #000;margin:5px 0}
+  #ticket .sep2{border-top:2px solid #000;margin:5px 0}
+  #ticket .l{display:flex;justify-content:space-between;gap:6px}
+  #ticket .l span:last-child{text-align:right;white-space:nowrap}
+  #ticket .pompe{margin:3px 0}
+  #ticket .sig{margin-top:18px;border-top:1px solid #000;padding-top:2px;text-align:center;font-size:10px}
+}
+.langues .court{display:none}
+
+/* Lignes de pompe (vérification, rapport, résumé) */
+.lp{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)}
+.lp:last-of-type{border-bottom:0}
+.lp-nom{flex:1 1 auto;min-width:0}
+.lp-nom b{display:block;font-size:19px}
+.lp-idx{display:block;font-size:15px;color:var(--muted);overflow-wrap:anywhere}
+.lp-val{text-align:right;white-space:nowrap}
+.lp-val b{display:block;font-size:18px}
+.lp-val span{font-size:15px;color:var(--muted)}
+.lp-act{flex:none}
+.billets-resume td{white-space:nowrap}
+/* Rien ne doit élargir la page au-delà de l'écran */
+main,.card,.deux-col > *{min-width:0}
+.sub,h1,h2{overflow-wrap:anywhere}
+/* ── Une seule colonne (sous 820 px) : l'écran d'index doit tenir
+      au-dessus de la barre du bas, clavier compris ── */
+@media (max-width:819px){
+  .astuce{display:none}
+  .deux-col{gap:10px}
+  .deux-col .calcul{display:none}           /* gallons et total : déjà dans la barre du bas */
+  .champ{margin:8px 0;padding:10px 16px;border-radius:16px}
+  .champ .lib{font-size:14px}
+  .champ .val{font-size:32px;min-height:42px}
+  .pompe-titre{font-size:28px}
+  .pave{gap:8px;padding:10px;border-radius:18px}
+  .touche{height:56px;font-size:28px;border-radius:14px}
+}
+/* ── Tablettes étroites et téléphones ── */
+@media (max-width:720px){
+  html,body{font-size:17px}
+  main{padding:16px 14px 130px}
+  header{padding:10px 14px;flex-wrap:wrap;row-gap:8px}
+  h1{font-size:26px} .pompe-titre{font-size:30px} .champ .val{font-size:38px}
+  .gros{min-height:96px;font-size:23px;padding:16px 18px;gap:14px}
+  .gros.grand{min-height:120px;font-size:27px}
+  .gros .ico{width:54px;height:54px;font-size:28px}
+  .gros.grand .ico{width:64px;height:64px;font-size:34px}
+  .touche{height:66px;font-size:30px}
+  .barre-bas{padding:10px 14px calc(10px + env(safe-area-inset-bottom))}
+  .barre-bas .in{gap:10px}
+  .barre-bas .info{min-width:0}
+  .barre-bas .info b{font-size:20px;overflow-wrap:anywhere}
+  .barre-bas .btn{min-width:0;flex:0 1 auto;font-size:18px;padding:14px 16px;min-height:56px}
+  .fil .pas{font-size:13px;text-align:right}
+  .fil .retour{padding:9px 14px;font-size:16px}
+  .billet,.entete-billets{grid-template-columns:118px 1fr}
+  .billet .coup{font-size:20px}
+  .case-n .val{font-size:28px}
+  .total{font-size:17px} .total .v{font-size:21px}
+  .ecart{font-size:19px;padding:14px 16px}
+  .lp-nom b{font-size:18px}
+}
+@media (max-width:480px){
+  header{flex-wrap:nowrap;padding:8px 12px}
+  header .marque{flex:1;font-size:17px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  header .qui{display:none}
+  .langues{margin-left:0}
+  .langues .long{display:none} .langues .court{display:inline}
+  .langues button{padding:6px 10px;font-size:14px}
+  header #btn-sortir{padding:8px 12px;font-size:15px}
+  h1{font-size:24px} p.sub{font-size:16px;margin-bottom:14px}
+  .fil{min-height:44px;margin-bottom:8px} .resume{margin-bottom:8px}
+  .card{padding:16px;border-radius:16px}
+  .lp{flex-wrap:wrap;gap:6px 12px}
+  .lp-act{width:100%;text-align:right}
+  .barre-bas .btn{font-size:16px;padding:12px 14px}
+  .billet,.entete-billets{grid-template-columns:96px 1fr}
+  .billet .coup{font-size:18px}
+  .case-n{padding:4px 10px} .case-n .val{font-size:26px;min-height:36px}
+  .gros{font-size:21px}
+  .gros.grand{font-size:24px;min-height:104px}
+  /* Écran d'index : tout visible au-dessus de la barre du bas */
+  .astuce{display:none}
+  .pompe-titre{font-size:26px}
+  .champ{margin:8px 0;padding:10px 14px;border-radius:16px}
+  .champ .lib{font-size:14px}
+  .champ .val{font-size:30px;min-height:40px}
+  .deux-col{gap:10px}
+  .deux-col .calcul{display:none}           /* gallons et total : déjà dans la barre du bas */
+  .pave{gap:8px;padding:10px;border-radius:18px}
+  .touche{height:54px;font-size:26px;border-radius:14px}
+}
+@media (max-width:380px){
+  main{padding:12px 10px 124px}
+  .touche{height:50px;font-size:24px}
+  .pave{gap:8px;padding:10px}
+  .champ{padding:12px 14px}
+  .champ .val{font-size:28px}
+  .gros{padding:14px;gap:10px}
+  .gros .ico{width:44px;height:44px;font-size:24px}
+  .total .v{font-size:19px}
+}
+}
+/* ── Feuille du pompiste : même ordre que la feuille papier de la station ── */
+.feuille{max-width:1000px;margin:0 auto}
+.fe-tete{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:22px 22px 16px;margin-bottom:14px;
+  box-shadow:var(--ombre);text-align:center;position:relative;overflow:hidden}
+.fe-tete::before{content:'';position:absolute;inset:0 0 auto 0;height:6px;background:linear-gradient(90deg,var(--accent),#f59e0b,var(--die))}
+.fe-marque{font:900 30px/1.1 Georgia,"Times New Roman",serif;letter-spacing:.03em;text-transform:uppercase}
+.fe-sous{font-weight:800;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-size:15px;margin-top:4px}
+.fe-adr{font-size:15px;color:var(--muted);margin-top:2px}
+.fe-filet{height:2px;background:var(--text);opacity:.5;margin:12px 10% 4px;border-radius:2px}
+.fe-info{display:grid;grid-template-columns:1.4fr 1fr 1.3fr;gap:12px;margin-top:12px;text-align:left}
+.fe-info>div{border-bottom:2px dashed var(--border);padding:4px 2px 6px;min-width:0}
+.fe-info small{display:block;font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.fe-info b{font-size:17px}
+.fe-date{font:inherit;font-weight:800;font-size:17px;background:none;border:0;color:var(--text);padding:0;cursor:pointer;text-align:left}
+.fe-date:not(:disabled)::after{content:' ✎';color:var(--accent)}
+.fe-heures{display:flex;gap:6px;align-items:center;font-size:14px;color:var(--muted)}
+.fe-heures input{padding:6px 8px;border-radius:10px;font-size:16px;width:auto;min-width:0;flex:1}
+.fe-sec{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:16px 18px;margin-bottom:14px;box-shadow:var(--ombre);min-width:0}
+.fe-sec-t{display:flex;align-items:center;gap:10px;font-weight:900;font-size:19px;margin-bottom:8px;flex-wrap:wrap}
+.fe-sec-t small{font-weight:600;font-size:14px;color:var(--muted);flex-basis:100%}
+.fe-l{display:inline-grid;place-items:center;min-width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;font-size:18px;padding:0 6px}
+.fe-tr{display:grid;grid-template-columns:minmax(110px,1.3fr) 1fr 1fr .8fr 1fr;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--border)}
+.fe-th{font-size:12.5px;font-weight:800;text-transform:uppercase;color:var(--muted);letter-spacing:.04em;border-bottom:2px solid var(--border)}
+.fe-th span:nth-child(n+2),.fe-v{text-align:right}
+.fe-in{padding:10px 12px;border-radius:12px;font-size:18px;text-align:right;min-width:0}
+.fe-pn{min-width:0}.fe-pn b{display:block;font-size:17px}.fe-pn small{display:block;color:var(--muted);font-size:12.5px}
+.fe-v{font-family:var(--mono);font-size:16px;font-weight:700}
+.fe-prod{margin:14px 0 2px;font-weight:900;font-size:15px;padding:4px 12px;border-radius:8px;display:inline-block;background:var(--touche)}
+.fe-prod.gaz{background:var(--gaz-soft);color:var(--gaz)}.fe-prod.die{background:var(--die-soft);color:var(--die)}
+.fe-tr.envoye{background:var(--ok-soft);border-radius:10px}
+.fe-tr.envoye .fe-pn small{color:var(--ok);font-weight:800}
+.fe-tr.prise{opacity:.5}
+.fe-tr.erreur{background:var(--err-soft);border-radius:10px}.fe-tr.erreur .fe-in{border-color:var(--err)}
+.fe-mod{font:inherit;font-size:13px;font-weight:800;border:0;background:none;color:var(--accent);padding:2px 0;cursor:pointer}
+.fe-err{margin:4px 0 8px;font-weight:800;font-size:15px;color:var(--err)}
+.fe-err.warn{color:var(--warn)}
+.fe-err label{display:flex;gap:8px;align-items:center;color:var(--text);margin:6px 0 0;font-size:15px}
+.fe-err input[type=checkbox]{width:22px;height:22px;flex:0 0 22px}
+.fe-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fe-cols>.fe-sec{margin-bottom:14px}
+.fe-ligne{display:grid;grid-template-columns:1.6fr 1fr 40px;gap:8px;margin-bottom:8px;align-items:center}
+.fe-ligne.trois{grid-template-columns:1.3fr .9fr 1fr 40px}
+.fe-ligne input{padding:10px 12px;border-radius:12px;font-size:16px;min-width:0}
+.fe-x{font:inherit;font-weight:900;border:0;border-radius:10px;height:40px;background:var(--err-soft);color:var(--err);cursor:pointer}
+.fe-aj{font:inherit;font-weight:800;font-size:15px;border:2px dashed var(--border);background:transparent;color:var(--accent);
+  border-radius:12px;padding:10px 14px;cursor:pointer;width:100%;margin-top:2px}
+.fe-ss{font-weight:800;font-size:13px;color:var(--muted);margin:12px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+.fe-bil{display:grid;grid-template-columns:96px 1fr 1fr;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)}
+.fe-bil b{font-size:18px}.fe-bil small{display:block;font-size:12px;color:var(--muted);font-weight:700}
+.fe-bil input{padding:9px 12px;border-radius:12px;font-size:17px;text-align:right;min-width:0}
+.fe-tot{display:flex;justify-content:space-between;gap:10px;padding:10px 2px 2px;font-weight:900;font-size:17px}
+.fe-tot .v{font-family:var(--mono);white-space:nowrap}
+.fe-tot.grand{font-size:20px;border-top:2px solid var(--border);margin-top:6px}
+.fe-recap .total{padding:8px 0;font-size:17px}.fe-recap .total .v{font-size:19px}
+.fe-sig{display:flex;justify-content:flex-end;margin-top:22px}
+.fe-sig div{min-width:280px;border-top:2px solid var(--text);padding-top:6px;text-align:center;font-size:14px;color:var(--muted)}
+.fe-sig b{display:block;color:var(--text);font-size:15px}
+.feuille .saisie-n{font-family:inherit;font-size:16px;font-weight:700;text-align:left;padding:10px 12px;border-width:2px;border-radius:12px;min-width:0}
+.feuille .saisie-n.num,.feuille .saisie-n[data-n]{font-family:var(--mono);text-align:right;font-size:17px}
+.feuille .saisie-n.fe-in{font-size:18px}
+.fe-guide{display:block;margin:10px auto 0;background:none;border:0;color:var(--muted);text-decoration:underline;font:inherit;font-size:15px;cursor:pointer}
+@media (max-width:760px){.fe-cols,.fe-info{grid-template-columns:1fr}}
+@media (max-width:560px){
+  .fe-th{display:none}
+  .fe-tr{grid-template-columns:1fr 1fr;grid-template-areas:"n n" "a b" "g m"}
+  .fe-tr>:nth-child(1){grid-area:n}.fe-tr>:nth-child(2){grid-area:a}.fe-tr>:nth-child(3){grid-area:b}
+  .fe-tr>:nth-child(4){grid-area:g;text-align:left}.fe-tr>:nth-child(5){grid-area:m}
+  .fe-ligne,.fe-ligne.trois{grid-template-columns:1fr 1fr}
+  .fe-ligne>:first-child{grid-column:1/-1}
+  .fe-marque{font-size:24px}
+}
+.sm{border-radius:14px;padding:12px 14px;margin:14px 0 0;border:1px solid var(--bord, #2a3550);background:rgba(255,255,255,.03)}
+.sm.ok{border-color:rgba(34,197,94,.55);background:rgba(34,197,94,.08)}
+.sm.warn{border-color:rgba(249,115,22,.6);background:rgba(249,115,22,.08)}
+.sm.err{border-color:rgba(239,68,68,.6);background:rgba(239,68,68,.08)}
+.sm.info{border-color:rgba(59,130,246,.55);background:rgba(59,130,246,.08)}
+.sm-t{font-weight:800;font-size:16px;margin-bottom:6px}
+.sm-l{margin:8px 0 4px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.12)}
+.sm-l.prop .sm-lib b{color:#f97316}
+.sm-lib{font-size:14px;margin-bottom:3px}
+.sm-chiffres{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;opacity:.9}
+.sm-btn{display:block;width:100%;margin-top:8px;padding:12px;border-radius:12px;border:0;font:inherit;font-weight:800;font-size:15px;
+  background:#f97316;color:#fff;cursor:pointer}
+.sm-btn.sec{background:transparent;border:1px solid rgba(255,255,255,.25);color:inherit}
+.sm-note{font-size:13px;margin-top:6px;opacity:.85}
+.sm-ano{font-size:12.5px;margin-top:5px;color:#fbbf24}
+.fe-sm:empty{display:none}
+.fe-ac:empty,#i-ac:empty{display:none}
+.ac{margin:6px 0 8px;border:1px solid rgba(249,115,22,.55);border-radius:12px;background:rgba(15,23,42,.6);padding:8px}
+.ac-t{font-size:12.5px;font-weight:800;opacity:.85;margin:0 2px 6px}
+.ac-g{margin-bottom:6px}
+.ac-gt{display:inline-block;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:8px;margin:2px 0 4px}
+.ac-gt.gaz{background:rgba(34,197,94,.18);color:#4ade80}.ac-gt.die{background:rgba(59,130,246,.18);color:#60a5fa}.ac-gt:not(.gaz):not(.die){background:rgba(249,115,22,.18);color:#fb923c}
+.ac-i{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:9px 10px;margin:3px 0}
+.ac-i:hover,.ac-i:focus{border-color:#f97316;background:rgba(249,115,22,.12)}
+.ac-i.ici{border-color:rgba(34,197,94,.6)}
+.ac-i:disabled{opacity:.45;cursor:not-allowed}
+.ac-v{font-weight:800;font-size:16px;min-width:9.5em}
+.ac-n{font-size:13px;opacity:.9}
+.ac-vide{font-size:13px;opacity:.8;padding:4px}
+.ac-i.top{border-color:#f97316;box-shadow:0 0 0 1px rgba(249,115,22,.4)}
+.ac-ok{color:#4ade80;font-weight:700}.ac-proche{color:#fbbf24;font-weight:700}.ac-loin{color:#f87171}
+.fe-sm{margin:-2px 0 8px}
+.fe-sm .sm{margin:4px 0 0;padding:10px 12px}
+.sm.compact{font-size:13px;padding:6px 10px;font-weight:600}
+.sm-lien{background:none;border:0;color:inherit;opacity:.75;font:inherit;font-size:12.5px;text-decoration:underline;cursor:pointer;margin-top:6px;padding:0}
+</style>
+</head>
+<body>
+<div class="env cache" id="env"></div>
+<header>
+  <div class="marque" id="marque">KONEKTA</div>
+  <div class="langues" id="langues"></div>
+  <div class="qui cache" id="qui"></div>
+  <button class="btn sec petit cache" id="btn-sortir" onclick="demanderSortie()">Sortir</button>
+</header>
+
+<main id="app"></main>
+<div id="ticket" aria-hidden="true"></div>
+<div id="dlg" class="dlg cache" role="dialog" aria-modal="true" aria-labelledby="dlg-titre">
+  <div class="dlg-boite"><div class="dlg-ico" id="dlg-ico"></div><h2 id="dlg-titre"></h2><div id="dlg-texte" class="dlg-texte"></div>
+    <div class="dlg-btns"><button class="btn sec" id="dlg-non"></button><button class="btn" id="dlg-oui"></button></div></div>
+</div>
+<div id="note-flash" class="note-flash cache" role="status"></div>
+<div class="barre-bas cache" id="barre"><div class="in">
+  <div class="info" id="barre-info"></div>
+  <button class="btn" id="barre-btn"></button>
+</div></div>
+
+<script>
+'use strict';
+/* Espace pompiste, pensé pour une tablette, en kreyòl ou en français.
+   Une question par écran, gros boutons, clavier de chiffres à l'écran.
+   1. Compteurs, carburant par carburant : charte → période → carburant →
+      pompes → les DEUX index de chaque pompe, lus par le pompiste →
+      vérification → envoi → « D'autres pompes ? » (oui : tel carburant /
+      non : j'ai fini)
+   2. Argent : nombre de billets par coupure + monnaie → résumé complet,
+      tout modifiable → envoi à la direction. */
+
+// ── Traductions ─────────────────────────────────────────────────────
+const TXT = {
+  fr: {
+    espace:'Espace pompiste', connexion_sub:'Choisissez votre langue, puis entrez votre code.',
+    mon_code:'Mon code', mon_pin:'Mon PIN (9 chiffres)', se_connecter:'Se connecter', pin_9:'Le PIN contient 9 chiffres.',
+    continuer:'Continuer', bonjour:'Bonjour {p} !', quelle_station:'Dans quelle station travaillez-vous ?',
+    reprise_titre:'Première connexion au nouveau système', compris:'J’ai compris',
+    reprise_txt:'Tapez le PIN que vous utilisiez déjà (le même PIN de 9 chiffres). Le système le vérifie et le garde pour les prochaines fois.',
+    autre_station:'← Choisir une autre station',
+    pas_ta_station:'Ce n’est pas votre station : vos rapports se font seulement dans la vôtre. Si vous devez travailler ici, demandez à la direction de vous autoriser.',
+    code_inconnu:'Ce code n’existe pas. Vérifiez-le ou demandez-le à votre superviseur.',
+    sortir:'Sortir', retour:'← Retour', etape1:'Étape 1 · Compteurs', etape2:'Étape 2 · Argent', envoyes:'Compteurs envoyés',
+    charte:'Charte de responsabilité', charte_sub:'Lisez et acceptez avant de commencer.',
+    c1:'Je lis moi-même les <b>deux meeters</b> (début et fin) sur chaque pompe.',
+    c2:'Je compte l\'argent <b>billet par billet</b> et je déclare exactement ce que je remets.',
+    c3:'Ce que je saisis avec mon code <b>m\'engage</b> : mon nom, la date et l\'heure sont enregistrés.',
+    c4:'Mon rapport est vérifié par la direction. En cas de doute, je préviens mon responsable.',
+    accepte:'J\'ai lu et j\'accepte', commencer:'Commencer', reprendre:'Reprendre mon rapport',
+    commence:'Vous avez un rapport commencé ({j}) : vous allez le reprendre.',
+    derniers:'Mes derniers rapports', chargement:'Chargement…', aucun_rapport:'Aucun rapport pour l\'instant.',
+    periode_q:'Quelle période ?', Matin:'Matin', 'Apres-midi':'Après-midi', auj:'Aujourd\'hui', hier:'Hier',
+    pour_hier:'Le rapport est pour hier ?', revenir_auj:'Revenir à aujourd\'hui',
+    carb_q:'Quel carburant ?', carb_autre_q:'Quel autre carburant ?', carb_sub:'Touchez le carburant de vos pompes.',
+    n_pompes:'{n} pompe(s)', toute_face:'Toute cette pompe', autres_metres:'Autres meeters', toutes_saisies:'Toutes les pompes sont déjà saisies',
+    pompes_q:'Quelles pompes ?', pompes_sub:'Touchez chaque pompe que vous avez tenue.', toutes:'Toutes les pompes',
+    deja_moi:'Déjà dans votre rapport', deja_par:'Déjà saisie par {n}', a_saisir:'À saisir',
+    choisies:'{n} pompe(s) choisie(s)', aucune:'Aucune pompe choisie', continuer:'Continuer',
+    pompe_x:'Pompe {i} sur {n}', idx_debut:'Meeter de DÉBUT — lu sur la pompe', idx_fin:'Meeter de FIN — lu sur la pompe',
+    toucher_case:'Touchez une case, puis tapez le nombre sur le clavier.',
+    fin_sup:'Le meeter de fin doit être plus grand que le meeter de début.', vendus:'vendus', tapez_deux:'Tapez les deux meeters',
+    suivante:'Pompe suivante →', verifier:'Vérifier', verif_compteurs:'Vérifiez vos compteurs',
+    pompe:'Pompe', debut:'Début', fin:'Fin', gallons:'Gallons', total:'Total', montant:'Montant', modifier:'✏️ Modifier',
+    argent_fin:'L\'argent se compte à la fin, quand vous aurez fini toutes vos pompes.',
+    envoyer_compteurs:'Envoyer les compteurs', envoi:'Envoi…',
+    autre_q:'Avez-vous d\'autres pompes pour cette période ?', autre_sub:'Vos compteurs {p} sont enregistrés.',
+    oui:'Oui', oui_sub:'J\'ai aussi tenu des pompes {p}', non_fini:'Non, j\'ai fini', non_fini_sub:'Je compte l\'argent',
+    mon_rapport:'Mon rapport', attendu:'Ventes attendues', retirer_q:'Retirer {p} de votre rapport ?',
+    compter_sub_clavier:'Tout l\'argent de la période. Tapez le nombre de billets avec le clavier de l\'appareil ; « Entrée » passe au billet suivant.',
+    compter:'Comptez l\'argent', compter_sub:'Tout l\'argent de la période. Touchez un billet, puis tapez combien vous en avez.',
+    billet:'Billet', nb_billets:'Nombre de billets', monnaie:'Monnaie', monnaie_sub:'pièces, en gourdes', montant_g:'Montant (G)',
+    total_compte:'Total compté', voir_resume:'Voir le résumé →',
+    resume:'Résumé de mon rapport', resume_sub:'Vérifiez tout. Touchez ✏️ « Modifier » s\'il y a une erreur.',
+    mes_compteurs:'Mes compteurs', mon_argent:'Mon argent', aucun_argent:'Aucun argent saisi.', argent_compte:'Argent compté',
+    juste:'Caisse juste', manque:'Il manque', plus:'En plus', ecart:'Écart',
+    un_mot:'Un mot pour la direction ? (facultatif)', un_mot_ph:'Ex. : client parti sans payer…',
+    envoyer_rapport:'Envoyer mon rapport', modifier_x:'Modifier — {p}', enregistrer:'Enregistrer',
+    envoye:'Rapport envoyé', prevenue:'La direction a été prévenue et va le vérifier.',
+    compte:'Compté', deconnecter:'Me déconnecter', autre_rapport:'Faire un autre rapport',
+    SOUMIS:'En vérification', PROBLEME:'Problème signalé', CONFIRME:'Validé', RESOLU:'Résolu', REJETE:'À refaire',
+    refaire:'Refaites ce rapport après correction.', direction:'Direction', ecart_court:'écart',
+    session:'Session expirée — reconnectez-vous.', reessayer:'Réessayer',
+    autre_compte:'Cette tablette était connectée avec un compte qui n\'est pas un compte pompiste : il a été déconnecté. Entrez votre code pompiste.',
+    sm_titre:'Contrôle du meeter', sm_ok:'Meeter reconnu', sm_revoir:'À vérifier', sm_aucun:'Aucune correspondance fiable',
+    sm_initial:'Première lecture de ce meeter', sm_choisi:'Meeter choisi', sm_propose:'Meeter proposé', sm_proche:'Le plus proche',
+    sm_dernier:'Dernier meeter enregistré', sm_nouveau:'Nouveau meeter saisi', sm_ecart:'Écart', sm_conf:'Confiance',
+    sm_utiliser:'Utiliser {m}', sm_garder:'Garder mon choix', sm_garde:'Vous gardez votre choix : la direction vérifiera.',
+    sm_pris:'Vous avez pris {m}.', sm_candidats:'Plusieurs meeters sont proches : choisissez le bon.',
+    sm_provisoire:'Référence numérique la plus proche, pas une preuve : une vérification est nécessaire.',
+    sm_enregistrer:'Vous pouvez quand même enregistrer : le rapport sera vérifié par la direction.',
+    sm_HIGH:'forte', sm_MEDIUM:'moyenne', sm_LOW:'faible', sm_NONE:'aucune',
+    sm_court_prop:'Ce meeter ressemble à celui de {m}.', sm_court_verif:'Meeter différent du dernier enregistré : la direction vérifiera.',
+    ac_titre:'Derniers meeters — touchez le vôtre', ac_cette:'cette pompe', ac_aucun:'Aucun dernier meeter ne commence par ces chiffres.',
+    ac_prise:'déjà rapportée', ac_proches:'Aucun meeter ne commence par ces chiffres — voici les plus proches',
+    ac_plus_proche:'le plus proche', ac_egal:'identique', ac_proche_seul:'Le plus proche :',
+    sm_a_ECART_POSITIF:'Saut : le meeter de début est au-dessus du dernier meeter enregistré.',
+    sm_a_RECUL:'Recul : le meeter de début est en dessous du dernier meeter enregistré.',
+    sm_a_VOLUME_ELEVE:'Beaucoup de gallons pour une période : vérifiez le meeter de fin.',
+    sm_a_VOLUME_NUL:'Aucun gallon vendu : début et fin sont identiques.',
+    sm_a_INITIAL_READING:'Première lecture : aucun meeter enregistré avant pour cette pompe.',
+    sm_a_COMPTEUR_CHANGE:'Compteur changé récemment.',
+    debut_diff:'Le meeter de début ne correspond pas au dernier meeter enregistré pour cette pompe.',
+    debut_diff_action:'Relisez le compteur sur la pompe. Corrigez-le, ou confirmez s\'il est juste.',
+    je_confirme:'Le compteur est juste, je confirme', confirme_ok:'Meeter de début confirmé.',
+    e_negatif:'Un meeter ne peut pas être négatif.', e_anormal:'{g} gallons sur une période, ce n\'est pas normal : vérifiez le meeter (un chiffre en trop ?).',
+    e_double:'Pompe saisie deux fois.', e_autre_station:'Cette pompe n’est pas dans votre station.', e_inactive:'Cette pompe n\'est plus active.',
+    e_fin_inferieure:'Le meeter de fin est plus petit que le meeter de début : un compteur ne recule pas.',
+    e_deja:'Ces pompes ont déjà leurs rapports pour ce jour : {p}.', e_terminer:'Terminez d\'abord votre rapport en cours (bouton « Non, j\'ai fini »).',
+    e_rien:'Aucun compteur envoyé : saisissez d\'abord vos pompes.',
+    date_rapport:'Date du rapport', changer_date:'Changer', choisir_date:'Pour quel jour est le rapport ?',
+    date_regle:'Touchez le jour. Pas de date dans le futur ; au plus {n} jours en arrière.',
+    jours_courts:['Lu','Ma','Me','Je','Ve','Sa','Di'],
+    e_date_future:'Un rapport ne peut pas être daté dans le futur.', e_date_ancienne:'Cette date est trop ancienne.',
+    installer_app:'Installer l\'application sur cet appareil',
+    confirmer_titre_compteurs:'Envoyer les compteurs ?', confirmer_txt_compteurs:'<b>{p}</b> : {n} pompe(s) · {g} gal · <b>{m}</b>.<br>Vérifiez bien chaque meeter avant d\'envoyer.',
+    oui_envoyer:'Oui, envoyer', non_retour:'Non, revenir',
+    confirmer_titre_rapport:'Envoyer le rapport à la direction ?',
+    confirmer_txt_rapport:'Ventes : <b>{v}</b><br>Dépenses : <b>{d}</b><br>Argent à remettre : <b>{a}</b><br>Argent compté : <b>{c}</b><br>Écart : <b>{e}</b><br>Une fois envoyé, seule la direction peut le modifier.',
+    oui_envoyer_rapport:'Oui, envoyer le rapport', retirer_titre:'Retirer cette pompe ?', oui_retirer:'Oui, la retirer',
+    sortir_titre:'Voulez-vous sortir ?', sortir_txt:'Vous allez être déconnecté.',
+    sortir_txt_brouillon:'Votre rapport n\'est pas terminé. Pas d\'inquiétude : tout ce que vous avez saisi est gardé, vous le retrouverez en revenant.',
+    oui_sortir:'Oui, sortir', rester:'Non, rester', quitter_titre:'Quitter l\'application ?', quitter_txt:'Vous pourrez la rouvrir avec l\'icône Konekta Ponpis.',
+    oui_quitter:'Oui, quitter', changer_titre:'Changer ?', changer_txt:'Vous avez déjà saisi des meeters. Si vous changez, ils seront effacés.',
+    oui_changer:'Oui, changer', recupere:'Nous avons repris là où vous en étiez.', reprise_titre:'Votre travail est récupéré', reprise_txt:'L\'application s\'était fermée, rien n\'est perdu : vous reprenez là où vous en étiez.',
+    veille_titre:'Vous êtes toujours là ?', veille_txt:'Pour protéger votre compte, déconnexion dans {s} secondes. Votre saisie est gardée.',
+    veille_oui:'Je suis là, continuer', veille_non:'Me déconnecter',
+    imprimer:'Imprimer la fiche', reimprimer:'Réimprimer', papier:'Papier',
+    tk_titre:'RAPPORT POMPISTE', tk_no:'Rapport n°', tk_pompiste:'Pompiste', tk_code:'Code', tk_periode:'Période',
+    tk_soumis:'Soumis le', tk_compteurs:'COMPTEURS', tk_prix:'Prix', tk_ventes:'VENTES', tk_argent:'ARGENT REMIS',
+    tk_total_gal:'Total gallons', tk_attendu:'Ventes attendues', tk_compte:'Argent compté', tk_ecart:'Écart',
+    tk_note:'Note', tk_sig_pompiste:'Signature pompiste', tk_sig_resp:'Signature responsable',
+    tk_imprime:'Imprimé le', tk_verif:'À vérifier par la direction',
+    dep_q:'Avez-vous payé une dépense pendant la période ?', dep_autre_q:'Une autre dépense ?',
+    dep_q_sub:'Une dépense payée avec l\'argent des ventes (glace, transport…) se déduit de l\'argent à remettre.',
+    dep_oui:'Oui, il y a eu une dépense', dep_autre_oui:'Oui, une autre dépense', dep_oui_sub:'Je décris la dépense',
+    dep_non:'Non, pas de dépense', dep_fini:'Non, c\'est tout', dep_non_sub:'Je compte l\'argent',
+    mes_depenses:'Mes dépenses', dep_titre_n:'Dépense {n}', dep_desc:'Description de la dépense',
+    dep_desc_ph:'Ex. : glace, transport, réparation…', dep_montant:'Montant (G)',
+    dep_autorise:'Qui a autorisé la dépense ?', dep_autorise_ph:'Nom du responsable',
+    dep_enregistrer:'Enregistrer la dépense', dep_e_desc:'Décrivez la dépense.', dep_e_montant:'Indiquez le montant.',
+    dep_e_autorise:'Indiquez qui a autorisé la dépense.', dep_total:'Total des dépenses', aucune_depense:'Aucune dépense.',
+    retirer_titre_dep:'Retirer cette dépense ?', dep_retirer_q:'Retirer la dépense « {d} » ?', a_remettre:'Argent à remettre',
+    devise_titre:'Autres devises', usd:'Dollars américains ($)', usd_taux:'Taux : 1 $ = {t} G (fixé le {d})',
+    usd_sans_taux:'Taux du dollar pas encore fixé : demandez à la direction.',
+    tk_depenses:'DÉPENSES', tk_a_remettre:'Argent à remettre', tk_autorise:'autorisée par',
+    fe_phase:'Feuille du pompiste', fe_nom:'Nom et prénom', fe_date:'Date', fe_heures:'Heures', fe_a_h:'à',
+    fe_a:'Compteurs', fe_pompe:'Pompe', fe_avant:'Avant', fe_apres:'Après', fe_gallons:'Gallons', fe_total:'Total',
+    fe_b:'Vente', fe_prix:'Prix', fe_c:'Bons valeur et chèques', fe_c_ref:'N° du bon ou du chèque', fe_montant:'Montant',
+    fe_c_aj:'+ Ajouter un bon ou un chèque', fe_d:'Crédit et autre', fe_d_cli:'Client', fe_d_aj:'+ Ajouter un crédit',
+    fe_d_dep:'+ Ajouter une dépense', fe_d_credits:'Crédits clients', fe_d_depenses:'Dépenses payées', fe_desc:'Description',
+    fe_autorise:'Autorisée par', fe_e:'Cash reçu', fe_billet:'Billet', fe_qte:'Qté', fe_total_cash:'Total cash',
+    fe_f:'Crédit en caisse', fe_f_sub:'Argent remis par la caisse au début (fonds de départ) : il est retiré du cash.',
+    fe_f_nom:'Remis par (nom et prénom)', fe_f_cash:'Cash', fe_recap:'Short / Over', fe_vente_b:'Vente (B)',
+    fe_remis:'Total remis (C + D + E − F)', fe_short:'Short — il manque', fe_over:'Over — il y a en plus', fe_juste:'Juste',
+    fe_sig:'Signature autorisée', fe_sig_txt:'Signé à l’envoi par {n} · code {c}', fe_envoyer:'Envoyer ma feuille',
+    fe_guide:'Mode pas à pas (une pompe à la fois)', fe_feuille_btn:'📄 Revenir à la feuille', fe_vide:'—',
+    fe_e_incomplet:'{p} : tapez les deux index (avant et après).', fe_e_aucune:'Tapez les index d’au moins une pompe.',
+    fe_e_index:'Un index est à corriger : voir la pompe en rouge.', fe_e_bon:'Bon / chèque {i} : montant invalide.',
+    fe_e_credit:'Crédit {i} : nom du client et montant.', fe_e_dep:'Dépense {i} : description, montant et qui l’a autorisée.',
+    fe_e_fonds:'Crédit en caisse : indiquez qui a remis l’argent.', fe_confirmer_t:'Envoyer la feuille ?',
+    fe_confirmer:'Vente : <b>{b}</b><br>Remis : <b>{j}</b><br>Short / Over : <b>{e}</b>', fe_envoye_l:'envoyé',
+    fe_relu:'J’ai relu le compteur : ce début est bon', tk_feuille:'BONS, CRÉDITS, CAISSE', tk_heures:'Heures',
+    jours:['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'],
+    mois:['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'],
+  },
+  ht: {
+    espace:'Espas ponpis', connexion_sub:'Chwazi lang ou, epi antre kòd ou.',
+    mon_code:'Kòd mwen', mon_pin:'PIN mwen (9 chif)', se_connecter:'Konekte', pin_9:'PIN nan gen 9 chif.',
+    continuer:'Kontinye', bonjour:'Bonjou {p} !', quelle_station:'Nan ki estasyon ou ap travay ?',
+    reprise_titre:'Premye koneksyon sou nouvo sistèm nan', compris:'Mwen konprann',
+    reprise_txt:'Tape PIN ou te konn sèvi a (menm PIN 9 chif la). Sistèm nan ap verifye l epi kenbe l pou pwochèn fwa yo.',
+    autre_station:'← Chwazi yon lòt estasyon',
+    pas_ta_station:'Se pa estasyon pa w la : ou fè rapò w yo sèlman nan pa w la. Si ou dwe travay isit, mande direksyon an otorize w.',
+    code_inconnu:'Kòd sa a pa egziste. Verifye l oswa mande sipèvizè w la.',
+    sortir:'Soti', retour:'← Tounen', etape1:'Etap 1 · Kontè', etape2:'Etap 2 · Lajan', envoyes:'Kontè yo voye',
+    charte:'Angajman responsablite', charte_sub:'Li epi aksepte anvan ou kòmanse.',
+    c1:'Se mwen menm ki li <b>de mitè yo</b> (kòmansman ak fen) sou chak ponp.',
+    c2:'Mwen konte lajan an <b>biyè pa biyè</b> epi mwen deklare egzakteman sa m ap remèt.',
+    c3:'Sa mwen antre ak kòd mwen <b>angaje m</b> : non mwen, dat la ak lè a anrejistre.',
+    c4:'Direksyon an ap verifye rapò mwen. Si m gen dout, m ap avèti responsab mwen.',
+    accepte:'Mwen li epi mwen aksepte', commencer:'Kòmanse', reprendre:'Kontinye rapò mwen',
+    commence:'Ou gen yon rapò ou te kòmanse ({j}) : w ap kontinye l.',
+    derniers:'Dènye rapò mwen yo', chargement:'N ap chaje…', aucun_rapport:'Pa gen rapò pou kounye a.',
+    periode_q:'Ki peryòd ?', Matin:'Maten', 'Apres-midi':'Apremidi', auj:'Jodi a', hier:'Yè',
+    pour_hier:'Rapò a se pou yè ?', revenir_auj:'Tounen nan jodi a',
+    carb_q:'Ki kabiran ?', carb_autre_q:'Ki lòt kabiran ?', carb_sub:'Touche kabiran ponp ou yo.',
+    n_pompes:'{n} ponp', toute_face:'Tout ponp sa a', autres_metres:'Lòt mèt', toutes_saisies:'Tout ponp yo deja antre',
+    pompes_q:'Ki ponp ?', pompes_sub:'Touche chak ponp ou te kenbe.', toutes:'Tout ponp yo',
+    deja_moi:'Deja nan rapò ou', deja_par:'{n} deja antre l', a_saisir:'Pou antre',
+    choisies:'{n} ponp chwazi', aucune:'Ou poko chwazi ponp', continuer:'Kontinye',
+    pompe_x:'Ponp {i} sou {n}', idx_debut:'Mitè KÒMANSMAN — li sou ponp lan', idx_fin:'Mitè FEN — li sou ponp lan',
+    toucher_case:'Touche yon kaz, epi tape nimewo a sou klavye a.',
+    fin_sup:'Mitè fen an dwe pi gwo pase mitè kòmansman an.', vendus:'vann', tapez_deux:'Tape de mitè yo',
+    suivante:'Ponp swivan →', verifier:'Verifye', verif_compteurs:'Verifye kontè ou yo',
+    pompe:'Ponp', debut:'Kòmansman', fin:'Fen', gallons:'Galon', total:'Total', montant:'Kantite lajan', modifier:'✏️ Chanje',
+    argent_fin:'W ap konte lajan an alafen, lè w fin antre tout ponp ou yo.',
+    envoyer_compteurs:'Voye kontè yo', envoi:'N ap voye…',
+    autre_q:'Èske w gen lòt ponp pou peryòd sa a ?', autre_sub:'Kontè {p} ou yo anrejistre.',
+    oui:'Wi', oui_sub:'Mwen te kenbe ponp {p} tou', non_fini:'Non, mwen fini', non_fini_sub:'M ap konte lajan an',
+    mon_rapport:'Rapò mwen', attendu:'Lajan ki dwe antre', retirer_q:'Retire {p} nan rapò ou ?',
+    compter_sub_clavier:'Tout lajan peryòd la. Tape kantite biyè yo ak klavye aparèy la ; « Antre » fè w pase nan biyè swivan an.',
+    compter:'Konte lajan an', compter_sub:'Tout lajan peryòd la. Touche yon biyè, epi tape konbyen ou genyen.',
+    billet:'Biyè', nb_billets:'Kantite biyè', monnaie:'Monnen', monnaie_sub:'pyès, an goud', montant_g:'Kantite (G)',
+    total_compte:'Total ou konte', voir_resume:'Wè rezime a →',
+    resume:'Rezime rapò mwen', resume_sub:'Verifye tout bagay. Touche ✏️ « Chanje » si gen yon erè.',
+    mes_compteurs:'Kontè mwen yo', mon_argent:'Lajan mwen', aucun_argent:'Ou pa antre okenn lajan.', argent_compte:'Lajan ou konte',
+    juste:'Kès la jis', manque:'Gen lajan ki manke', plus:'Gen lajan an plis', ecart:'Diferans',
+    un_mot:'Yon mo pou direksyon an ? (si ou vle)', un_mot_ph:'Egz. : yon kliyan ale san l pa peye…',
+    envoyer_rapport:'Voye rapò mwen', modifier_x:'Chanje — {p}', enregistrer:'Anrejistre',
+    envoye:'Rapò a voye', prevenue:'Direksyon an resevwa avètisman, l ap verifye l.',
+    compte:'Konte', deconnecter:'Dekonekte m', autre_rapport:'Fè yon lòt rapò',
+    SOUMIS:'Y ap verifye l', PROBLEME:'Gen yon pwoblèm', CONFIRME:'Valide', RESOLU:'Rezoud', REJETE:'Pou refè',
+    refaire:'Refè rapò sa a apre ou fin korije l.', direction:'Direksyon', ecart_court:'diferans',
+    session:'Sesyon an fini — konekte ankò.', reessayer:'Eseye ankò',
+    autre_compte:'Tablèt la te konekte ak yon kont ki pa kont ponpis : nou dekonekte l. Antre kòd ponpis ou.',
+    sm_titre:'Kontwòl mèt la', sm_ok:'Mèt la rekonèt', sm_revoir:'Pou verifye', sm_aucun:'Pa gen okenn mèt ki koresponn byen',
+    sm_initial:'Premye fwa mèt sa a li', sm_choisi:'Mèt ou chwazi a', sm_propose:'Mèt sistèm nan pwopoze', sm_proche:'Sa ki pi pre a',
+    sm_dernier:'Dènye mèt ki anrejistre', sm_nouveau:'Nouvo mèt ou antre a', sm_ecart:'Diferans', sm_conf:'Konfyans',
+    sm_utiliser:'Pran {m}', sm_garder:'Kenbe chwa mwen', sm_garde:'Ou kenbe chwa ou : direksyon an ap verifye.',
+    sm_pris:'Ou pran {m}.', sm_candidats:'Gen plizyè mèt ki pre : chwazi bon an.',
+    sm_provisoire:'Se chif ki pi pre a sèlman, se pa yon prèv : fòk yo verifye.',
+    sm_enregistrer:'Ou ka anrejistre kanmenm : direksyon an ap verifye rapò a.',
+    sm_HIGH:'fò', sm_MEDIUM:'mwayen', sm_LOW:'fèb', sm_NONE:'okenn',
+    sm_court_prop:'Mèt sa a sanble pou {m}.', sm_court_verif:'Mèt la pa menm ak dènye a : direksyon an ap verifye.',
+    ac_titre:'Dènye mèt yo — touche pa w la', ac_cette:'ponp sa a', ac_aucun:'Okenn dènye mèt pa kòmanse ak chif sa yo.',
+    ac_prise:'deja rapòte', ac_proches:'Pa gen mèt ki kòmanse ak chif sa yo — men sa ki pi pre yo',
+    ac_plus_proche:'sa ki pi pre a', ac_egal:'menm chif la', ac_proche_seul:'Sa ki pi pre a :',
+    sm_a_ECART_POSITIF:'So : mèt kòmansman an pi wo pase dènye mèt ki anrejistre a.',
+    sm_a_RECUL:'Bak : mèt kòmansman an pi ba pase dènye mèt ki anrejistre a.',
+    sm_a_VOLUME_ELEVE:'Anpil galon pou yon sèl peryòd : verifye mèt fen an.',
+    sm_a_VOLUME_NUL:'Pa gen galon ki vann : kòmansman ak fen menm.',
+    sm_a_INITIAL_READING:'Premye lekti : pa gen mèt ki te anrejistre avan pou ponp sa a.',
+    sm_a_COMPTEUR_CHANGE:'Yo fèk chanje kontè a.',
+    debut_diff:'Mitè kòmansman an pa menm ak dènye mitè ki anrejistre pou ponp sa a.',
+    debut_diff_action:'Li kontè a ankò sou ponp lan. Korije l, oswa konfime si li bon.',
+    je_confirme:'Kontè a bon, mwen konfime', confirme_ok:'Mitè kòmansman an konfime.',
+    e_negatif:'Yon mitè pa ka negatif.', e_anormal:'{g} galon nan yon peryòd, sa pa nòmal : verifye mitè a (yon chif an plis ?).',
+    e_double:'Ponp lan antre de fwa.', e_autre_station:'Ponp sa a pa nan estasyon pa w la.', e_inactive:'Ponp sa a pa aktif ankò.',
+    e_fin_inferieure:'Mitè fen an pi piti pase mitè kòmansman an : yon kontè pa ka fè bak.',
+    e_deja:'Ponp sa yo deja gen rapò yo pou jou sa a : {p}.', e_terminer:'Fini rapò ou kòmanse a anvan (bouton « Non, mwen fini »).',
+    e_rien:'Ou poko voye okenn kontè : antre ponp ou yo anvan.',
+    date_rapport:'Dat rapò a', changer_date:'Chanje', choisir_date:'Rapò a se pou ki jou ?',
+    date_regle:'Touche jou a. Pa gen dat nan lavni ; pa plis pase {n} jou annaryè.',
+    jours_courts:['Le','Ma','Mè','Je','Va','Sa','Di'],
+    e_date_future:'Yon rapò pa ka gen yon dat nan lavni.', e_date_ancienne:'Dat sa a twò lontan.',
+    installer_app:'Enstale aplikasyon an sou aparèy sa a',
+    confirmer_titre_compteurs:'Voye kontè yo ?', confirmer_txt_compteurs:'<b>{p}</b> : {n} ponp · {g} gal · <b>{m}</b>.<br>Verifye chak mitè byen anvan ou voye.',
+    oui_envoyer:'Wi, voye yo', non_retour:'Non, tounen',
+    confirmer_titre_rapport:'Voye rapò a bay direksyon an ?',
+    confirmer_txt_rapport:'Vant : <b>{v}</b><br>Depans : <b>{d}</b><br>Lajan pou remèt : <b>{a}</b><br>Lajan ou konte : <b>{c}</b><br>Diferans : <b>{e}</b><br>Apre ou voye l, se direksyon an sèlman ki ka chanje l.',
+    oui_envoyer_rapport:'Wi, voye rapò a', retirer_titre:'Retire ponp sa a ?', oui_retirer:'Wi, retire l',
+    sortir_titre:'Ou vle soti ?', sortir_txt:'Ou pral dekonekte.',
+    sortir_txt_brouillon:'Rapò ou a poko fini. Pa enkyete w : n ap kenbe tout sa ou te antre yo, w ap jwenn yo lè ou tounen.',
+    oui_sortir:'Wi, soti', rester:'Non, rete', quitter_titre:'Kite aplikasyon an ?', quitter_txt:'W ap ka relouvri l ak ikòn Konekta Ponpis la.',
+    oui_quitter:'Wi, kite l', changer_titre:'Chanje ?', changer_txt:'Ou te deja antre kèk mitè. Si ou chanje, sa ou te antre yo pral efase.',
+    oui_changer:'Wi, chanje', recupere:'Nou rekipere kote ou te ye a.', reprise_titre:'Nou rekipere travay ou a', reprise_txt:'Aplikasyon an te fèmen, men anyen pa pèdi : ou kontinye kote ou te rive a.',
+    veille_titre:'Ou la toujou ?', veille_txt:'Pou pwoteje kont ou, n ap dekonekte w nan {s} segonn. Sa ou te antre yo ap rete.',
+    veille_oui:'Mwen la, kontinye', veille_non:'Dekonekte m',
+    imprimer:'Enprime fich la', reimprimer:'Re-enprime', papier:'Papye',
+    tk_titre:'RAPÒ PONPIS', tk_no:'Rapò nimewo', tk_pompiste:'Ponpis', tk_code:'Kòd', tk_periode:'Peryòd',
+    tk_soumis:'Soumèt le', tk_compteurs:'KONTÈ', tk_prix:'Pri', tk_ventes:'VANT', tk_argent:'LAJAN REMÈT',
+    tk_total_gal:'Total galon', tk_attendu:'Lajan ki dwe antre', tk_compte:'Lajan konte', tk_ecart:'Diferans',
+    tk_note:'Nòt', tk_sig_pompiste:'Siyati ponpis', tk_sig_resp:'Siyati responsab',
+    tk_imprime:'Enprime le', tk_verif:'Direksyon an ap verifye l',
+    dep_q:'Èske ou te peye yon depans pandan peryòd la ?', dep_autre_q:'Gen yon lòt depans ?',
+    dep_q_sub:'Yon depans ou te peye ak lajan vant yo (glas, transpò…) ap retire sou lajan ou dwe remèt la.',
+    dep_oui:'Wi, te gen depans', dep_autre_oui:'Wi, yon lòt depans', dep_oui_sub:'M ap dekri depans lan',
+    dep_non:'Non, pa t gen depans', dep_fini:'Non, se tout', dep_non_sub:'M ap konte lajan an',
+    mes_depenses:'Depans mwen yo', dep_titre_n:'Depans {n}', dep_desc:'Ki depans ? (deskripsyon)',
+    dep_desc_ph:'Egz. : glas, transpò, reparasyon…', dep_montant:'Kantite lajan (G)',
+    dep_autorise:'Ki moun ki te otorize depans lan ?', dep_autorise_ph:'Non responsab la',
+    dep_enregistrer:'Anrejistre depans lan', dep_e_desc:'Dekri depans lan.', dep_e_montant:'Antre kantite lajan an.',
+    dep_e_autorise:'Di ki moun ki te otorize depans lan.', dep_total:'Total depans', aucune_depense:'Pa gen depans.',
+    retirer_titre_dep:'Retire depans sa a ?', dep_retirer_q:'Retire depans « {d} » ?', a_remettre:'Lajan pou remèt',
+    devise_titre:'Lòt deviz', usd:'Dola ameriken ($)', usd_taux:'To : 1 $ = {t} G (depi {d})',
+    usd_sans_taux:'Direksyon an poko mete to dola a : mande yo.',
+    tk_depenses:'DEPANS', tk_a_remettre:'Lajan pou remèt', tk_autorise:'otorize pa',
+    fe_phase:'Fèy ponpis la', fe_nom:'Non ak siyati', fe_date:'Dat', fe_heures:'Lè', fe_a_h:'rive',
+    fe_a:'Kontè yo', fe_pompe:'Ponp', fe_avant:'Anvan', fe_apres:'Apre', fe_gallons:'Galon', fe_total:'Total',
+    fe_b:'Vant', fe_prix:'Pri', fe_c:'Bon valè ak chèk', fe_c_ref:'Nimewo bon an oswa chèk la', fe_montant:'Kantite lajan',
+    fe_c_aj:'+ Ajoute yon bon oswa yon chèk', fe_d:'Kredi ak lòt', fe_d_cli:'Kliyan', fe_d_aj:'+ Ajoute yon kredi',
+    fe_d_dep:'+ Ajoute yon depans', fe_d_credits:'Kredi kliyan', fe_d_depenses:'Depans ki peye', fe_desc:'Sa li ye',
+    fe_autorise:'Otorize pa', fe_e:'Kach resevwa', fe_billet:'Biyè', fe_qte:'Kantite', fe_total_cash:'Total kach',
+    fe_f:'Kredi nan kès', fe_f_sub:'Lajan kès la te ba ou lè w t ap kòmanse (fon) : yo retire l nan kach la.',
+    fe_f_nom:'Moun ki te remèt li (non ak siyati)', fe_f_cash:'Kach', fe_recap:'Short / Over', fe_vente_b:'Vant (B)',
+    fe_remis:'Total remèt (C + D + E − F)', fe_short:'Short — gen ki manke', fe_over:'Over — gen anplis', fe_juste:'Jis',
+    fe_sig:'Siyati otorize', fe_sig_txt:'Siyen lè w voye l, pa {n} · kòd {c}', fe_envoyer:'Voye fèy mwen an',
+    fe_guide:'Mòd etap pa etap (yon ponp alafwa)', fe_feuille_btn:'📄 Retounen sou fèy la', fe_vide:'—',
+    fe_e_incomplet:'{p} : tape de endèks yo (anvan ak apre).', fe_e_aucune:'Tape endèks omwen yon ponp.',
+    fe_e_index:'Gen yon endèks pou korije : gade ponp ki an wouj la.', fe_e_bon:'Bon / chèk {i} : kantite lajan an pa bon.',
+    fe_e_credit:'Kredi {i} : non kliyan an ak kantite lajan an.', fe_e_dep:'Depans {i} : sa li ye, kantite lajan ak ki moun ki otorize l.',
+    fe_e_fonds:'Kredi nan kès : di ki moun ki te remèt lajan an.', fe_confirmer_t:'Voye fèy la ?',
+    fe_confirmer:'Vant : <b>{b}</b><br>Remèt : <b>{j}</b><br>Short / Over : <b>{e}</b>', fe_envoye_l:'voye',
+    fe_relu:'Mwen reli kontè a : kòmansman sa a bon', tk_feuille:'BON, KREDI, KÈS', tk_heures:'Lè',
+    jours:['dimanch','lendi','madi','mèkredi','jedi','vandredi','samdi'],
+    mois:['janvye','fevriye','mas','avril','me','jen','jiyè','out','septanm','oktòb','novanm','desanm'],
+  },
+};
+let LANG = (() => { try{ return localStorage.getItem('pompiste-lang') || 'ht'; }catch(e){ return 'ht'; } })();
+function t(k, v){ let s = (TXT[LANG] && TXT[LANG][k]) ?? TXT.fr[k] ?? k;
+  if(v) for(const [a,b] of Object.entries(v)) s = s.replace('{' + a + '}', b); return s; }
+function choisirLangue(l){ LANG = l; try{ localStorage.setItem('pompiste-lang', l); }catch(e){}
+  document.documentElement.lang = l === 'ht' ? 'ht' : 'fr'; majEntete(); }
+
+const S = {};
+function reinit(){
+  Object.assign(S, {ctx:null, etape:'charte', charte:false, date:null, periode:null, produitId:null,
+    choisies:[], pos:0, index:{}, billets:{}, monnaie:'', note:'', erreurs:{}, dernier:null,
+    champ:null, modif:null, depuisResume:false, champActif:null, caseActive:null, dernierProduit:null, _repriseFaite:false,
+    depenses:[], depForm:null, depEdit:null, usd:'', bons:[], credits:[], fonds:{nom:'', montant:''}, heures:{debut:'', fin:''},
+    guide:false, depuisFeuille:false});
+}
+reinit();
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const nf = (n,d=0) => Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const G = n => nf(n, 2) + ' G';                 // 2 décimales, jamais arrondi à l'unité
+// Gallons et index : jusqu'à 3 décimales, sans zéros inutiles (120,5 et non 120,500)
+// Gallons par produit : Gazoline, Diesel, Propane… ne s'additionnent jamais
+function galProduits(lignes){
+  const m = {};
+  for(const l of lignes || []) m[l.produit_nom || '—'] = (m[l.produit_nom || '—'] || 0) + Number(l.gallons || 0);
+  return Object.entries(m);
+}
+const nfg = n => Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3});
+const signe = n => (n > 0 ? '+' : '') + G(n);
+const per = p => t(p);
+const num = v => { if(v == null || String(v).trim() === '') return null;
+  const x = parseFloat(String(v).replace(',', '.').replace(/\s/g,'')); return isNaN(x) ? null : x; };
+const ent = v => { const x = parseInt(v,10); return isNaN(x) || x < 0 ? 0 : x; };
+function jourTxt(iso){ const d = new Date(iso + 'T12:00:00');
+  return `${t('jours')[d.getDay()]} ${d.getDate()} ${t('mois')[d.getMonth()]}`; }
+const jourCourt = iso => { const d = new Date(iso + 'T12:00:00'); return `${d.getDate()} ${t('mois')[d.getMonth()].slice(0, 3)}`; };
+const hier = iso => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate()-1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+
+async function api(method, url, body){
+  const r = await fetch(url, {method, credentials:'include',
+    headers: body ? {'Content-Type':'application/json'} : {}, body: body ? JSON.stringify(body) : undefined});
+  let d = null; try{ d = await r.json(); }catch(e){}
+  if(!r.ok){ const e = new Error(typeof d?.detail === 'string' ? d.detail : (d?.detail?.message || 'Erreur ' + r.status));
+    e.status = r.status; e.detail = d?.detail; e.code = d?.detail?.code; throw e; }
+  return d;
+}
+// Message d'erreur dans la langue choisie (codes envoyés par le serveur)
+function msgErreur(e){
+  const c = e.code;
+  if(c === 'deja_rapporte') return t('e_deja', {p: esc(e.detail.pompes || '')});
+  if(c === 'terminer_dabord') return t('e_terminer');
+  if(c === 'rien_a_terminer') return t('e_rien');
+  if(c === 'date_future') return t('e_date_future');
+  if(c === 'date_ancienne') return t('e_date_ancienne');
+  return esc(e.message);
+}
+function msgLigne(x){
+  const m = {negatif:'e_negatif', double:'e_double', inactive:'e_inactive', fin_inferieure:'e_fin_inferieure',
+             debut_different:'debut_diff', autre_station:'e_autre_station'}[x.code];
+  if(x.code === 'anormal') return t('e_anormal', {g: nf(x.gallons)});
+  return m ? t(m) : x.message;
+}
+
+// ── Clavier numérique à l'écran ─────────────────────────────────────
+function pave(decimal){
+  const k = ['1','2','3','4','5','6','7','8','9', decimal ? ',' : '', '0', '⌫'];
+  return `<div class="pave">${k.map(x => x ? `<button class="touche ${x==='⌫'?'eff':''}" data-k="${x}">${x}</button>`
+                                         : '<span class="vide"></span>').join('')}</div>`;
+}
+function taper(k){
+  const c = S.champ; if(!c) return;
+  let v = c.get() || '';
+  if(k === '⌫') v = v.slice(0, -1);
+  else if(k === ',' || k === '.'){ if(!c.decimal || v.includes('.')) return; v = (v || '0') + '.'; }
+  else { if(v.replace('.','').length >= (c.max || 12)) return; if(v === '0') v = ''; v += k; }
+  c.set(v);
+  c.apres && c.apres();
+  sauverBrouillon();
+}
+document.addEventListener('click', e => { const b = e.target.closest('.touche'); if(b) taper(b.dataset.k); });
+document.addEventListener('keydown', e => {          // clavier physique (tablette avec clavier, tests)
+  if(!S.champ || e.target.matches('input,textarea')) return;
+  if(/^[0-9]$/.test(e.key)) taper(e.key);
+  else if(e.key === ',' || e.key === '.') taper('.');
+  else if(e.key === 'Backspace') taper('⌫');
+  else if(e.key === 'Enter'){ const b = $('barre-btn'); if(!$('barre').classList.contains('cache') && !b.disabled) b.click(); }
+  else return;
+  e.preventDefault();
+});
+const affiche = (v, actif) => (v ? esc(v.replace('.', ',')) : '') + (actif ? '<span class="curseur"></span>' : '');
+
+// ── En-tête : langue + utilisateur ──────────────────────────────────
+function majEntete(){
+  $('langues').innerHTML = ['ht','fr'].map(l => `<button class="${LANG===l?'on':''}" onclick="choisirLangue('${l}')">`
+    + `<span class="long">${l==='ht'?'Kreyòl':'Français'}</span><span class="court">${l==='ht'?'HT':'FR'}</span></button>`).join('');
+  $('btn-sortir').textContent = t('sortir');
+  if(S.ctx || S.etape === 'fin') rendre(); else if($('f-login')) ecranConnexion();
+}
+
+// ── Démarrage / connexion ───────────────────────────────────────────
+async function demarrer(){
+  document.documentElement.lang = LANG;
+  majEntete();
+  try{
+    const b = await api('GET','/api/config/branding');
+    if(b?.nom) $('marque').textContent = b.nom;
+    S.marque = b || {};
+    if(b?.environnement && b.environnement !== 'production'){
+      $('env').textContent = String(b.environnement).toUpperCase() + ' — environnement de test';
+      $('env').classList.remove('cache');
+    }
+  }catch(e){}
+  await chargerContexte();
+}
+
+async function chargerContexte(){
+  try{
+    const q = S.date ? `?date=${S.date}` : '';           // créneau attribué par le serveur
+    S.ctx = await api('GET','/api/pompiste/contexte' + q);
+    if(S.ctx.en_cours){
+      S.date = S.ctx.date; S.periode = S.ctx.periode;
+      if(S.charte && ['charte','periode'].includes(S.etape)) S.etape = S.guide ? 'rapport' : 'feuille';
+    }
+    if(!S.date) S.date = S.ctx.aujourd_hui;
+    if(!S._repriseFaite){                     // une seule fois après la connexion
+      S._repriseFaite = true;
+      if(restaurerBrouillon()){
+        S.repris = true;
+        if(!S.ctx.en_cours && S.date && S.ctx.date !== S.date) return chargerContexte();
+      }
+    }
+    if(_laisserPartir){ _laisserPartir = false; garderHistorique(); }
+    $('qui').innerHTML = `<b>${esc(S.ctx.pompiste.nom)}</b><span>${(S.ctx.pompiste.station_nom || S.ctx.pompiste.station) ? '📍 ' + esc([S.ctx.pompiste.station_nom, S.ctx.pompiste.station].filter(Boolean).join(' · ')) : esc(S.ctx.pompiste.username)}</span>`;
+    $('qui').classList.remove('cache'); $('btn-sortir').classList.remove('cache');
+    rendre();
+  }catch(e){
+    if(e.status === 401) return ecranConnexion();
+    if(e.status === 403) return ecranPasPompiste();
+    sansBarre();
+    $('app').innerHTML = `<div class="alerte err">${msgErreur(e)}</div>
+      <button class="btn" onclick="chargerContexte()">${t('reessayer')}</button>`;
+  }
+}
+
+/* Connexion en 3 étapes : le code → la station où il travaille → le PIN. */
+const LG = {etape:'code', username:'', prenom:'', stations:[], station:null};
+function ecranConnexion(msg){
+  S.champ = null; S.ctx = null;
+  $('barre').classList.add('cache'); $('qui').classList.add('cache'); $('btn-sortir').classList.add('cache');
+  if($('l-user')) LG.username = $('l-user').value.trim();
+  const tete = `<h1>${t('espace')}</h1>`;
+  const err = msg ? `<div class="alerte err">${msg}</div>` : '';
+  if(LG.etape === 'station'){
+    $('app').innerHTML = `<div class="connexion">${tete}
+      <p class="sub">${t('bonjour', {p: esc(LG.prenom)})} ${t('quelle_station')}</p>${err}
+      <div class="choix">${LG.stations.map(st => `<button class="gros" onclick="lgChoisirStation(${st.id})">
+        <span class="ico">⛽</span><span>${esc(st.nom)}${st.adresse && st.adresse !== st.nom ? `<small>📍 ${esc(st.adresse)}</small>` : ''}</span></button>`).join('')}</div>
+      <button class="btn sec" type="button" style="margin-top:14px" onclick="lgRetour('code')">${t('retour')}</button></div>`;
+    return;
+  }
+  if(LG.etape === 'pin'){
+    $('app').innerHTML = `<div class="connexion">${tete}
+      <p class="sub">${t('bonjour', {p: esc(LG.prenom)})} ⛽ <b>${esc(LG.station.nom)}</b></p>${err}
+      ${LG.reprise ? `<div class="alerte warn">${t('reprise_txt')}</div>` : ''}
+      <form class="card" id="f-login" autocomplete="on">
+        <input type="hidden" autocomplete="username" value="${esc(LG.username)}">
+        <label for="l-pin">${t('mon_pin')}</label>
+        <input id="l-pin" type="password" inputmode="numeric" maxlength="9" autocomplete="current-password" required
+          style="font-family:var(--mono);font-size:30px;letter-spacing:.3em;text-align:center">
+        <div style="height:18px"></div>
+        <button class="btn" id="l-btn">${t('se_connecter')}</button>
+      </form>
+      ${LG.stations.length > 1 ? `<button class="btn sec" type="button" style="margin-top:6px" onclick="lgRetour('station')">${t('autre_station')}</button>` : ''}</div>`;
+    $('l-pin').focus();
+    $('f-login').onsubmit = async ev => {
+      ev.preventDefault();
+      const pin = $('l-pin').value.trim();
+      if(!/^\d{9}$/.test(pin)) return ecranConnexion(t('pin_9'));
+      $('l-btn').disabled = true;
+      try{
+        await api('POST','/api/login/pompiste',{username:LG.username, code_acces:pin, espace_id:LG.station.id});
+        try{ localStorage.setItem('ponpis-station', String(LG.station.id)); }catch(e){}
+        LG.etape = 'code';
+        reinit();
+        await chargerContexte();
+      }catch(e){ ecranConnexion(e.code === 'station_non_autorisee' ? t('pas_ta_station') : esc(e.message)); }
+    };
+    return;
+  }
+  $('app').innerHTML = `<div class="connexion">
+    ${tete}<p class="sub">${t('connexion_sub')}</p>
+    <div class="choix deux" style="margin-bottom:16px">
+      <button class="gros ${LANG==='ht'?'on':''}" onclick="choisirLangue('ht')"><span class="ico">🇭🇹</span><span>Kreyòl</span></button>
+      <button class="gros ${LANG==='fr'?'on':''}" onclick="choisirLangue('fr')"><span class="ico">🇫🇷</span><span>Français</span></button>
+    </div>
+    ${err}
+    <form class="card" id="f-login" autocomplete="on">
+      <label for="l-user">${t('mon_code')}</label>
+      <input id="l-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required
+        value="${esc(LG.username)}" placeholder="ex. jeanpierre4821" style="font-family:var(--mono);font-size:24px">
+      <div style="height:18px"></div>
+      <button class="btn" id="l-btn">${t('continuer')}</button>
+    </form>
+    ${!enModeApp() ? `<button class="btn sec" id="btn-installer" type="button" onclick="installerApp()" style="margin-top:6px">📲 ${t('installer_app')}</button>` : ''}
+    </div>`;
+  $('f-login').onsubmit = async ev => {
+    ev.preventDefault();
+    LG.username = $('l-user').value.trim();
+    if(!LG.username) return;
+    $('l-btn').disabled = true;
+    try{
+      const r = await api('POST','/api/pompiste/identifier',{username:LG.username});
+      LG.prenom = r.prenom; LG.stations = r.stations; LG.reprise = !!r.reprise;
+      // Compte de l'ancien système : on lui demande le PIN qu'il avait déjà
+      if(LG.reprise) await demander({ico:'🔑', titre:t('reprise_titre'), texte:t('reprise_txt'), oui:t('compris')});
+      if(r.stations.length === 1){ LG.station = r.stations[0]; LG.etape = 'pin'; }
+      else LG.etape = 'station';
+      ecranConnexion();
+    }catch(e){ ecranConnexion(e.code === 'code_inconnu' ? t('code_inconnu') : esc(e.message)); }
+  };
+}
+function lgChoisirStation(id){
+  LG.station = LG.stations.find(s => s.id === id); LG.etape = 'pin'; ecranConnexion();
+}
+function lgRetour(etape){ LG.etape = etape; ecranConnexion(); }
+
+/* La tablette était connectée avec un autre compte (administration…) :
+   l'espace pompiste ne mène jamais vers le système principal — on ferme
+   cette session et on affiche la connexion pompiste. */
+async function ecranPasPompiste(){
+  try{ await api('POST','/api/logout'); }catch(e){}
+  reinit();
+  ecranConnexion(t('autre_compte'));
+}
+
+async function deconnexion(){
+  sauverBrouillon();                       // rien n'est perdu : repris à la reconnexion
+  clearTimeout(_veille); clearTimeout(_veilleAlerte); clearInterval(_decompte);
+  const r = _dlgReponse; _dlgReponse = null; $('dlg').classList.add('cache'); if(r) r(true);
+  try{ await api('POST','/api/logout'); }catch(e){}
+  reinit();
+  ecranConnexion();
+}
+async function demanderSortie(){
+  const ok = await demander({ico:'🚪', titre:t('sortir_titre'), texte: aDesDonnees() ? t('sortir_txt_brouillon') : t('sortir_txt'),
+                              oui:t('oui_sortir'), non:t('rester')});
+  if(ok) deconnexion();
+}
+
+// ── Navigation ──────────────────────────────────────────────────────
+const enCours = () => S.ctx?.en_cours;
+const produit = () => S.ctx.produits.find(p => p.id === S.produitId);
+const pompeCtx = id => { for(const p of S.ctx.produits) for(const q of p.pompes) if(q.id === id) return q; return null; };
+const libres = p => p.pompes.filter(q => !q.deja_rapportee);
+const PHASE_ARGENT = ['depenses','depense','billetterie','resume','modif'];
+
+function aller(etape){ S.etape = etape; S.repris = false; rendre(); }
+function precedent(){
+  const e = S.etape;
+  if(e === 'index' && S.pos > 0){ S.pos--; S.champActif = null; return rendre(); }
+  if(e === 'billetterie' && S.depuisResume) return aller('resume');
+  if(e === 'feuille') return aller(enCours() ? 'charte' : 'periode');
+  if(e === 'modif' && S.depuisFeuille) return aller('feuille');
+  const retour = {periode:'charte', calendrier:'periode', produit: enCours() ? 'rapport' : 'periode', pompes:'produit', index:'pompes',
+                  compteurs:'index', depenses:'rapport', depense:'depenses', billetterie:'depenses', resume:'billetterie', modif:'resume'}[e];
+  if(e === 'compteurs'){ S.pos = S.choisies.length - 1; S.champActif = null; }
+  aller(retour || 'charte');
+}
+
+function entete(titrePhase){
+  const puces = [];
+  if(S.date && S.ctx && S.date !== S.ctx.aujourd_hui && !['periode','charte','calendrier'].includes(S.etape))
+    puces.push(jourCourt(S.date));
+  if(S.produitId && ['pompes','index','compteurs'].includes(S.etape)) puces.push(produit()?.nom || '');
+  if(S.choisies.length && ['index','compteurs'].includes(S.etape)) puces.push(t('n_pompes', {n: S.choisies.length}));
+  const phase = titrePhase ?? (PHASE_ARGENT.includes(S.etape) ? t('etape2') : t('etape1'));
+  const avecRetour = !['charte','rapport'].includes(S.etape);
+  return `${S.repris ? `<div class="reprise" role="status"><span class="reprise-ico">↺</span>
+        <div><b>${t('reprise_titre')}</b><span>${t('reprise_txt')}</span></div>
+        <button onclick="S.repris=false;this.parentNode.remove()">OK</button></div>` : ''}
+    <div class="fil">${avecRetour ? `<button class="retour" onclick="precedent()">${t('retour')}</button>` : ''}
+      <span class="pas">${phase}</span></div>
+    ${puces.length ? `<div class="resume">${puces.map(p=>`<span>${esc(p)}</span>`).join('')}</div>` : ''}`;
+}
+
+function barre(info, libelle, action, actif=true){
+  $('barre').classList.remove('cache'); $('barre-btn').classList.remove('attention');
+  $('barre-info').innerHTML = info;
+  const b = $('barre-btn'); b.textContent = libelle; b.onclick = action; b.disabled = !actif;
+}
+const sansBarre = () => $('barre').classList.add('cache');
+
+function rendre(){
+  if(!S.ctx && S.etape !== 'fin') return;
+  setTimeout(reveil, 0);
+  if(!S.charte && S.etape !== 'fin') S.etape = 'charte';
+  S.champ = null;
+  ({charte:rCharte, periode:rPeriode, calendrier:rCalendrier, produit:rProduit, pompes:rPompes, index:rIndex, compteurs:rCompteurs,
+    feuille:rFeuille, rapport:rRapport, depenses:rDepenses, depense:rDepense, billetterie:rBilletterie, resume:rResume, modif:rModif, fin:rFin})[S.etape]();
+  window.scrollTo(0,0);
+  sauverBrouillon();
+}
+
+// ── Charte ──────────────────────────────────────────────────────────
+function rCharte(){
+  $('app').innerHTML = entete('') + `
+    <h1>${t('charte')}</h1>
+    <p class="sub">${t('charte_sub')}</p>
+    <div class="card charte"><ul style="padding-left:22px;margin:0">
+      <li>${t('c1')}</li><li>${t('c2')}</li><li>${t('c3')}</li><li>${t('c4')}</li>
+    </ul>
+    <label class="case"><input type="checkbox" id="c-ok" ${S.charte?'checked':''}> ${t('accepte')}</label></div>
+    ${enCours() ? `<div class="alerte warn">${t('commence', {j: esc(jourTxt(enCours().date))})}</div>` : ''}
+    <h2>${t('derniers')}</h2><div class="card" id="hist"><span class="sub">${t('chargement')}</span></div>`;
+  const maj = () => barre('', enCours() ? t('reprendre') : t('commencer'),
+    ()=>{ S.charte = true; aller(enCours() ? (S.guide ? 'rapport' : 'feuille') : 'periode'); }, $('c-ok').checked);
+  $('c-ok').onchange = maj; maj();
+  chargerHistorique();
+}
+
+// ── 1. Période ──────────────────────────────────────────────────────
+function rPeriode(){
+  sansBarre();
+  const auj = S.date === S.ctx.aujourd_hui, hi = S.date === hier(S.ctx.aujourd_hui);
+  $('app').innerHTML = entete() + `
+    <h1>${t('choisir_date')}</h1>
+    <button class="date-rapport" onclick="aller('calendrier')">
+      <span class="ico">📅</span>
+      <span><small>${t('date_rapport')}</small>${auj ? t('auj') + ', ' : (hi ? t('hier') + ', ' : '')}${esc(jourTxt(S.date))}</span>
+      <span class="chg">${t('changer_date')}</span></button>`;
+  barre('', t('continuer'), continuerDate);
+}
+
+// Calendrier : un mois à la fois, gros jours à toucher ; jours futurs et trop
+// anciens grisés (même règle que le serveur).
+function rCalendrier(){
+  sansBarre();
+  const auj = S.ctx.aujourd_hui, min = S.ctx.date_min || hier(auj);
+  if(!S.moisCal) S.moisCal = S.date.slice(0, 7);
+  const [a, m] = S.moisCal.split('-').map(Number);
+  const premier = new Date(a, m - 1, 1), nbJours = new Date(a, m, 0).getDate();
+  const decal = (premier.getDay() + 6) % 7;                 // semaine du lundi au dimanche
+  const iso = j => `${a}-${String(m).padStart(2,'0')}-${String(j).padStart(2,'0')}`;
+  const cases = [];
+  for(let i = 0; i < decal; i++) cases.push('<span></span>');
+  for(let j = 1; j <= nbJours; j++){
+    const d = iso(j), ok = d <= auj && d >= min;
+    cases.push(`<button class="jour ${d===S.date?'on':''} ${d===auj?'auj':''}" ${ok ? `onclick="choisirDate('${d}')"` : 'disabled'}>${j}</button>`);
+  }
+  const moisPrec = new Date(a, m - 2, 1), moisSuiv = new Date(a, m, 1);
+  const cle = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  const precOk = cle(moisPrec) >= min.slice(0, 7), suivOk = cle(moisSuiv) <= auj.slice(0, 7);
+  $('app').innerHTML = entete() + `
+    <h1>${t('choisir_date')}</h1>
+    <p class="sub">${t('date_regle', {n: S.ctx.date_min ? Math.round((new Date(auj) - new Date(min)) / 864e5) : 1})}</p>
+    <div class="choix deux" style="margin-bottom:14px">
+      <button class="gros ${S.date===auj?'on':''}" onclick="choisirDate('${auj}')"><span class="ico">📅</span><span>${t('auj')}<small>${esc(jourTxt(auj))}</small></span></button>
+      <button class="gros ${S.date===hier(auj)?'on':''}" onclick="choisirDate('${hier(auj)}')"><span class="ico">↩</span><span>${t('hier')}<small>${esc(jourTxt(hier(auj)))}</small></span></button>
+    </div>
+    <div class="card calendrier">
+      <div class="cal-tete">
+        <button class="cal-nav" ${precOk ? `onclick="S.moisCal='${cle(moisPrec)}';rCalendrier()"` : 'disabled'} aria-label="‹">‹</button>
+        <b>${t('mois')[m-1]} ${a}</b>
+        <button class="cal-nav" ${suivOk ? `onclick="S.moisCal='${cle(moisSuiv)}';rCalendrier()"` : 'disabled'} aria-label="›">›</button>
+      </div>
+      <div class="cal-grille">${t('jours_courts').map(x => `<span class="cal-js">${x}</span>`).join('')}${cases.join('')}</div>
+    </div>`;
+}
+const indexSaisis = () => Object.values(S.index).some(x => x && (x.avant || x.apres));
+async function confirmerEffacement(){
+  return !indexSaisis() || demander({ico:'⚠️', titre:t('changer_titre'), texte:t('changer_txt'), oui:t('oui_changer'), non:t('non_retour'), danger:true});
+}
+async function choisirDate(d){
+  if(d !== S.date){
+    if(!await confirmerEffacement()) return;
+    S.periode = null; S.produitId = null; S.choisies = []; S.index = {}; S.erreurs = {};
+  }
+  S.date = d; S.moisCal = null; aller('periode');
+}
+// Plus de choix matin / après-midi : le serveur range le rapport tout seul
+async function continuerDate(){
+  S.etape = S.guide ? 'produit' : 'feuille';
+  await chargerContexte();
+}
+
+// ── 2. Carburant ────────────────────────────────────────────────────
+const clsProduit = n => /diesel|dyez/i.test(n) ? 'die' : (/gaz|essence/i.test(n) ? 'gaz' : '');
+function rProduit(){
+  sansBarre();
+  $('app').innerHTML = entete() + `
+    <h1>${enCours() ? t('carb_autre_q') : t('carb_q')}</h1>
+    <p class="sub">${t('carb_sub')}</p>
+    <div class="choix deux">${S.ctx.produits.map(p => {
+      const n = libres(p).length;
+      return `<button class="gros grand ${clsProduit(p.nom)} ${S.produitId===p.id?'on':''}" onclick="choisirProduit(${p.id})" ${n?'':'disabled'}>
+        <span class="ico">⛽</span><span>${esc(p.nom)}<small>${n ? `${t('n_pompes',{n:p.pompes.length})} · ${nf(p.prix_gallon,2)} G/gal`
+          : t('toutes_saisies')}</small></span></button>`;
+    }).join('')}</div>`;
+}
+async function choisirProduit(id){
+  if(id !== S.produitId){ S.choisies = []; S.index = {}; S.erreurs = {}; }
+  S.produitId = id; S.etape = 'pompes';
+  await chargerContexte();           // liste à jour : une pompe ajoutée apparaît tout de suite
+}
+
+// ── 3. Pompes ───────────────────────────────────────────────────────
+function rPompes(){
+  const p = produit();
+  if(!p) return aller('produit');
+  S.choisies = S.choisies.filter(id => p.pompes.some(q => q.id === id && !q.deja_rapportee));
+  const tout = libres(p).length && libres(p).every(q => S.choisies.includes(q.id));
+  $('app').innerHTML = entete() + `
+    <h1>${t('pompes_q')}</h1>
+    <p class="sub">${t('pompes_sub')}</p>
+    ${libres(p).length > 1 ? `<button class="gros ${tout?'on':''}" style="min-height:84px;margin-bottom:16px" onclick="toutesPompes()">
+      <span class="ico">✓✓</span><span>${t('toutes')}<small>${t('n_pompes',{n:libres(p).length})}</small></span><span class="coche">✓</span></button>` : ''}
+    ${groupesEmplacement(p.pompes).map(([lieu, qs]) => {
+      const dispo = qs.filter(q => !q.deja_rapportee), tousOn = dispo.length && dispo.every(q => S.choisies.includes(q.id));
+      return `${lieu ? `<div class="lieu-tete"><span>📍 ${esc(lieu)}</span>
+          ${dispo.length > 1 ? `<button class="lieu-tout ${tousOn?'on':''}" data-l="${esc(lieu)}" onclick="basculerLieu(this.dataset.l)">${tousOn ? '✓ ' : ''}${t('toute_face')}</button>` : ''}</div>`
+        : (groupesEmplacement(p.pompes).length > 1 ? `<div class="lieu-tete"><span>${t('autres_metres')}</span></div>` : '')}
+      <div class="choix trois">${qs.map(q => {
+        const on = S.choisies.includes(q.id), prise = q.deja_rapportee;
+        return `<button class="gros ${on?'on':''} ${S.erreurs[q.id]?'erreur':''}" onclick="basculerPompe(${q.id})" ${prise?'disabled':''}>
+          <span>${esc(q.nom)}<small>${prise ? (prise.moi ? t('deja_moi') : t('deja_par', {n: esc(prise.par)})) : t('a_saisir')}</small></span>
+          <span class="coche">✓</span></button>`;
+      }).join('')}</div>`;
+    }).join('')}`;
+  const n = S.choisies.length;
+  barre(n ? `<b>${n}</b>${t('choisies', {n})}` : t('aucune'), t('continuer'),
+        ()=>{ S.pos = 0; S.champActif = null; aller('index'); }, n > 0);
+}
+function basculerPompe(id){
+  const p = produit();
+  S.choisies = S.choisies.includes(id) ? S.choisies.filter(x => x !== id) : [...S.choisies, id];
+  S.choisies.sort((a,b) => p.pompes.findIndex(q=>q.id===a) - p.pompes.findIndex(q=>q.id===b));
+  rPompes();
+}
+// Meeters regroupés par pompe (« Pompe 1 »), dans l'ordre ;
+// les meeters pas encore placés à la fin.
+function groupesEmplacement(pompes){
+  const g = new Map();
+  for(const q of pompes){ const k = q.emplacement || ''; if(!g.has(k)) g.set(k, []); g.get(k).push(q); }
+  return [...g.entries()].sort((a, b) => (a[0] ? 0 : 1) - (b[0] ? 0 : 1) || a[0].localeCompare(b[0], 'fr', {numeric:true}));
+}
+function basculerLieu(lieu){
+  const ids = produit().pompes.filter(q => (q.emplacement || '') === lieu && !q.deja_rapportee).map(q => q.id);
+  const tous = ids.every(id => S.choisies.includes(id));
+  S.choisies = tous ? S.choisies.filter(id => !ids.includes(id)) : [...new Set([...S.choisies, ...ids])];
+  rPompes();
+}
+function toutesPompes(){
+  const ids = libres(produit()).map(q => q.id);
+  S.choisies = ids.every(id => S.choisies.includes(id)) ? [] : ids;
+  rPompes();
+}
+
+// ── 4. Les deux index — une pompe par écran, clavier à l'écran ──────
+function valeurs(id){
+  const s = S.index[id] || {};
+  const av = num(s.avant), ap = num(s.apres);
+  return {q: pompeCtx(id), s, av, ap, g: av != null && ap != null ? ap - av : null};
+}
+
+/* Écran d'index partagé par la saisie et la modification depuis le résumé. */
+function ecranIndex(id, prix, titreHaut, fin){
+  const s = (S.index[id] ||= {}), q = pompeCtx(id);
+  if(!S.champActif || S.champActif.id !== id) S.champActif = {id, k: s.avant ? 'apres' : 'avant'};
+  const dessin = () => {
+    const k = S.champActif.k, v = valeurs(id);
+    for(const c of ['avant','apres']){
+      const el = $('z-' + c), val = s[c] || '';
+      el.className = 'champ ' + (k === c ? 'actif' : '');
+      el.innerHTML = `<div class="lib">${c === 'avant' ? t('idx_debut') : t('idx_fin')}</div>
+        <div class="val ${val?'':'vide'}">${affiche(val, k === c) || '0'}</div>`;
+    }
+    smartAnalyser(id);
+    if(k === 'avant') acAfficher(id); else if($('i-ac')) $('i-ac').innerHTML = '';
+    const diff = S.erreurs[id]?.code === 'debut_different';
+    $('i-diff').innerHTML = diff ? `<div class="alerte warn" style="margin:14px 0 0">⚠ ${t('debut_diff')}<br>
+        <span style="font-weight:600">${t('debut_diff_action')}</span></div>`
+      : (s.debutConfirme ? `<div class="alerte ok" style="margin:14px 0 0">✓ ${t('confirme_ok')}</div>` : '');
+    const autreErr = S.erreurs[id] && !diff;
+    $('i-err').innerHTML = autreErr ? `<div class="alerte err" style="margin-top:14px">${esc(msgLigne(S.erreurs[id]))}</div>` : '';
+    const ok = v.av != null && v.ap != null && v.g >= 0 && !diff;
+    $('i-calc').innerHTML = v.g == null ? ''
+      : (v.g < 0 ? `<div class="msg-err">${t('fin_sup')}</div>`
+                 : `<div class="calcul"><span>${nfg(v.g)} gal</span><span>${G(v.g * prix)}</span></div>`);
+    // Début à relire : le bouton de confirmation prend la place du bouton principal
+    if(diff){
+      barre(`<b>⚠</b>${t('debut_diff_action')}`, t('je_confirme'), () => confirmerDebut(id));
+      $('barre-btn').classList.add('attention');
+    } else { $('barre-btn').classList.remove('attention'); fin(ok, v); }
+  };
+  const choisir = k => {
+    S.champActif.k = k;
+    S.champ = {decimal:true, max:12, get:()=>s[k] || '',
+               set:x=>{ s[k] = x; if(k === 'avant') s.debutConfirme = false; delete S.erreurs[id]; }, apres:dessin};
+    dessin();
+  };
+  $('app').innerHTML = entete() + `<div class="deux-col"><div>
+      ${titreHaut}
+      <h1 class="pompe-titre">${esc(q.nom)}</h1>${q.emplacement ? `<div class="emplacement" style="margin:-6px 0 8px">📍 ${esc(q.emplacement)}</div>` : ''}
+      <p class="sub astuce" style="margin:4px 0 0">${t('toucher_case')}</p>
+      <div id="i-err"></div><div id="i-diff"></div>
+      <div id="z-avant"></div><div id="i-ac"></div><div id="z-apres"></div><div id="i-calc"></div><div id="i-smart"></div>
+    </div><div class="cote">${pave(true)}</div></div>`;
+  $('z-avant').onclick = () => choisir('avant');
+  $('z-apres').onclick = () => choisir('apres');
+  choisir(S.champActif.k);
+}
+// ── Smart Meter : pendant la saisie, le serveur dit à quel meeter
+// appartient l'index (dernier meeter, écart, confiance) ; le pompiste prend le
+// meeter proposé ou garde son choix. Rien n'est bloqué : la direction vérifie.
+const SM = {res:{}, minuteur:null};
+const smZone = id => S.etape === 'feuille' ? $('fe-sm-' + id) : $('i-smart');
+// Sur la fiche, pendant que le pompiste tape le début, seule la liste parle
+const smEnFrappe = id => S.etape === 'feuille' && document.activeElement && document.activeElement.dataset
+  && document.activeElement.dataset.f === `idx:${id}:avant`;
+const smVisible = id => S.etape === 'feuille' ? !!$('fe-sm-' + id) : !!(S.champActif && S.champActif.id === id && $('i-smart'));
+function smartAnalyser(id){
+  id = Number(id);
+  const s = S.index[id] || {}, av = num(s.avant), ap = num(s.apres);
+  const z = smZone(id); if(!z) return;
+  if(av == null){ z.innerHTML = ''; return; }
+  // Pendant la frappe, seule la liste s'affiche : le contrôle attend que la
+  // partie entière ait autant de chiffres que le plus court des derniers meeters
+  const entiers = L => (L || []).filter(x => x.dernier_meter != null).map(x => String(Math.trunc(x.dernier_meter)).length);
+  const min = Math.min(...entiers(AC.liste), 99) === 99 ? 5 : Math.min(...entiers(AC.liste));
+  if(String(Math.trunc(av)).length < min){ z.innerHTML = ''; return; }
+  const cle = `${id}|${av}|${ap ?? ''}|${S.date}`;
+  if(smEnFrappe(id)){ z.innerHTML = ''; }
+  else if(SM.res[id]?.cle === cle){ z.innerHTML = smartHtml(id, SM.res[id].a); return; }
+  SM.minuteurs ||= {};
+  clearTimeout(SM.minuteurs[id]);
+  SM.minuteurs[id] = setTimeout(async () => {
+    try{
+      const a = await api('POST', '/api/pompiste/analyser-index', {date:S.date, periode: enCours() ? enCours().periode : null,
+        pompe_id:id, metter_avant:av, metter_apres:ap});
+      SM.res[id] = {cle, a};
+      if(smVisible(id) && !smEnFrappe(id)) smZone(id).innerHTML = smartHtml(id, a);
+    }catch(e){ /* le contrôle n'empêche jamais la saisie */ }
+  }, 450);
+}
+function smartHtml(id, a){
+  const s = S.index[id] || {}, n = v => v == null ? '—' : nfg(v), conf = c => t('sm_' + (c || 'NONE'));
+  const sg = v => v == null ? '—' : (v > 0 ? '+' : '') + nfg(v);
+  const ligne = (lib, c, cls) => `<div class="sm-l ${cls||''}"><div class="sm-lib">${lib} : <b>${esc(c.libelle)}</b></div>
+      <div class="sm-chiffres"><span>${t('sm_dernier')} <b class="num">${n(c.dernier_meter)}</b></span>
+      <span>${t('sm_ecart')} <b class="num">${sg(c.ecart)}</b></span>${c.niveau ? `<span>${t('sm_conf')} <b>${conf(c.niveau)}</b></span>` : ''}</div></div>`;
+  const btn = (c) => `<button class="sm-btn" onclick="smartUtiliser(${id}, ${c.pompe_id})">${t('sm_utiliser', {m: esc(c.libelle)})}</button>`;
+  const garder = s.decision === 'REFUSE' ? `<div class="sm-note">${t('sm_garde')}</div>`
+    : `<button class="sm-btn sec" onclick="smartGarder(${id})">${t('sm_garder')}</button>`;
+  const anos = (a.anomalies || []).filter(x => x.code !== 'MAUVAIS_METEER')
+    .map(x => `<div class="sm-ano">⚠ ${esc(t('sm_a_' + x.code) !== 'sm_a_' + x.code ? t('sm_a_' + x.code) : x.message)}</div>`).join('');
+  const tete = (cls, ico, txt) => `<div class="sm ${cls}"><div class="sm-t">${ico} ${txt}</div>
+    <div class="sm-chiffres"><span>${t('sm_nouveau')} <b class="num">${n(num(s.avant))}</b></span></div>`;
+  const pris = s.decision === 'ACCEPTE' && s.pompeChoisie ? `<div class="sm-note">✓ ${t('sm_pris', {m: esc(a.choisi.libelle)})}</div>` : '';
+  if(S.etape === 'feuille' && a.statut_rapprochement !== 'MATCH_CONFIRMED'){
+    const prop = a.recommande || (a.plus_proche && a.plus_proche.pompe_id !== Number(id) ? a.plus_proche : null);
+    const court = c => esc(c.libelle.split(' · ').pop());
+    const msg = a.statut_rapprochement === 'INITIAL_READING' ? t('sm_initial')
+      : prop ? t('sm_court_prop', {m: court(prop)}) : t('sm_court_verif');
+    return `<div class="sm ${prop ? 'warn' : 'info'} compact"><div>⚠ ${msg}</div>
+      ${prop ? `<button class="sm-btn" style="margin-top:6px;padding:9px" onclick="smartUtiliser(${id}, ${prop.pompe_id})">${t('sm_utiliser', {m: court(prop)})}</button>` : ''}
+      ${prop && s.decision !== 'REFUSE' ? `<button class="sm-lien" onclick="smartGarder(${id})">${t('sm_garder')}</button>` : ''}
+      ${s.decision === 'REFUSE' ? `<div class="sm-note">${t('sm_garde')}</div>` : ''}</div>`;
+  }
+  if(a.statut_rapprochement === 'MATCH_CONFIRMED' && S.etape === 'feuille')
+    return `<div class="sm ok compact">✓ ${t('sm_ok')}</div>`;
+  if(a.statut_rapprochement === 'MATCH_CONFIRMED')
+    return tete('ok', '✓', t('sm_ok')) + ligne(t('sm_choisi'), a.choisi) + pris + anos + `</div>`;
+  if(a.statut_rapprochement === 'INITIAL_READING')
+    return tete('info', 'ℹ', t('sm_initial')) + `<div class="sm-note">${t('sm_enregistrer')}</div>` + anos + `</div>`;
+  if(a.statut_rapprochement === 'UNMATCHED'){
+    const pp = a.plus_proche && a.plus_proche.pompe_id !== Number(id) ? a.plus_proche : null;   // le plus proche = ce meeter : rien à proposer
+    return tete('err', '⚠', t('sm_aucun')) + ligne(t('sm_choisi'), a.choisi)
+      + (pp ? ligne(t('sm_proche'), pp, 'prop') + `<div class="sm-note">${t('sm_provisoire')}</div>` + btn(pp) : '')
+      + garder + `<div class="sm-note">${t('sm_enregistrer')}</div>` + anos + `</div>`;
+  }
+  // MATCH_REVIEW
+  if(a.recommande){
+    const autres = a.ambigu ? (a.candidats || []).filter(c => !c.choisi && c.pompe_id !== a.recommande.pompe_id && c.niveau === a.recommande.niveau) : [];
+    return tete('warn', '⚠', t('sm_revoir')) + ligne(t('sm_choisi'), a.choisi) + ligne(t('sm_propose'), a.recommande, 'prop')
+      + btn(a.recommande) + autres.map(c => ligne(t('sm_propose'), c, 'prop') + btn(c)).join('')
+      + (a.ambigu ? `<div class="sm-note">${t('sm_candidats')}</div>` : '') + garder + anos + `</div>`;
+  }
+  return tete('warn', '⚠', t('sm_revoir')) + ligne(t('sm_choisi'), a.choisi) + pris + anos + `</div>`;
+}
+// Le pompiste prend le meeter proposé : ses index passent sur ce meeter (et
+// ceux de ce meeter, s'il l'avait aussi choisi, passent sur le premier).
+function smartUtiliser(id, cible){
+  if(id === cible) return;
+  const s = S.index[id] || {};
+  if(S.etape === 'feuille'){
+    const v = {...s, pompeChoisie: s.pompeChoisie || id, decision: 'ACCEPTE', debutConfirme: false};
+    const autre = S.index[cible];
+    if(autre && (autre.avant || autre.apres)) S.index[id] = {...autre, debutConfirme: false};
+    else delete S.index[id];
+    S.index[cible] = v;
+    delete S.erreurs[id]; delete S.erreurs[cible]; delete SM.res[id]; delete SM.res[cible];
+    sauverBrouillon(); rendreSansHaut();
+    setTimeout(() => $('fe-r-' + cible)?.scrollIntoView({block: 'center', behavior: 'smooth'}), 60);
+    return;
+  }
+  const v = {...s, pompeChoisie: s.pompeChoisie || id, decision: 'ACCEPTE', debutConfirme: false};
+  const i = S.choisies.indexOf(id), j = S.choisies.indexOf(cible);
+  if(j >= 0){ S.index[id] = {...(S.index[cible] || {}), debutConfirme: false}; S.choisies[j] = cible; }
+  else { delete S.index[id]; S.choisies[i] = cible; }
+  S.index[cible] = v;
+  delete S.erreurs[id]; delete S.erreurs[cible]; delete SM.res[id]; delete SM.res[cible];
+  S.champActif = {id: cible, k: v.apres ? 'apres' : 'avant'};
+  rendre();
+}
+function smartGarder(id){
+  (S.index[id] ||= {}).decision = 'REFUSE';
+  if(S.etape === 'feuille') sauverBrouillon();
+  const z = smZone(id); if(z && SM.res[id]) z.innerHTML = smartHtml(id, SM.res[id].a);
+}
+
+// ── Liste dynamique : dès le premier chiffre du meeter de début, les
+// derniers meeters de la station s'affichent, classés par carburant
+// (gazoline, diesel, propane, jamais mêlés) ; la liste se resserre à chaque
+// chiffre ; un toucher met le meeter sur la bonne pompe.
+const AC = {cle: null, liste: null, charge: null};
+async function acCharger(){
+  const cle = `${S.date}|${enCours() ? enCours().id : ''}`;
+  if(AC.cle === cle && AC.liste) return AC.liste;
+  if(AC.charge && AC.cle === cle) return AC.charge;
+  AC.cle = cle;
+  AC.charge = api('GET', `/api/pompiste/derniers-meeters?date=${S.date}`).then(d => (AC.liste = d.meeters || []))
+    .catch(() => (AC.liste = []));
+  return AC.charge;
+}
+const acChiffres = v => String(v ?? '').replace(/\D/g, '');
+const acZone = id => S.etape === 'feuille' ? $('fe-ac-' + id) : $('i-ac');
+// Distance entre ce qui est tapé et un dernier meeter. Pendant la frappe de
+// la partie entière (moins de chiffres que le meeter), on compare au même
+// ordre de grandeur : « 2274 » est à 0 de 227 467,397 et à 1 de 227 321,152
+// (×100 gal). Dès que la partie entière est complète : écart réel en gallons.
+function acDistance(txt, ref){
+  const [e, dcm] = String(txt).split('.'), ent = (e || '').replace(/\D/g, '');
+  const ci = String(Math.trunc(ref));
+  if(ent.length < ci.length && dcm === undefined){
+    const k = 10 ** (ci.length - ent.length);
+    return {d: Math.abs(Number(ent || 0) - Math.trunc(ref / k)) * k, complet: false};
+  }
+  const v = Number(String(txt).replace(/[^0-9.]/g, ''));
+  return {d: Math.abs(v - ref), ecart: v - ref, complet: true};
+}
+// Liste simple et prudente : seulement le carburant de la ligne (jamais de
+// diesel sur une ligne de gazoline, ni l'inverse) ; elle se resserre à chaque
+// chiffre : les meeters qui commencent par les chiffres tapés (3 au plus),
+// sinon le seul plus proche ; rien quand le meeter tapé est déjà le bon.
+async function acAfficher(id){
+  id = Number(id);
+  const z = acZone(id); if(!z) return;
+  const txt = String((S.index[id] || {}).avant || '');
+  const tape = acChiffres(txt);
+  if(!tape){ z.innerHTML = ''; return; }
+  const L = await acCharger();
+  if(acChiffres((S.index[id] || {}).avant) !== tape || !acZone(id)) return;   // l'utilisateur a continué de taper
+  const moi = L.find(x => x.pompe_id === id);
+  const fam = moi ? moi.famille : null;
+  const cands = L.filter(x => x.dernier_meter != null && !x.prise && (fam == null || x.famille === fam))
+    .map(x => ({...x, ...acDistance(txt, Number(x.dernier_meter)),
+                debut: acChiffres(Number(x.dernier_meter).toFixed(3)).startsWith(tape)}))
+    .sort((a, b) => (b.debut - a.debut) || (a.d - b.d));
+  if(!cands.length){ z.innerHTML = ''; return; }
+  // Déjà le bon meeter sur cette ligne : rien à proposer
+  if(cands[0].complet && cands[0].pompe_id === id && Math.abs(cands[0].ecart) < 0.0005){ z.innerHTML = ''; return; }
+  const debut = cands.filter(x => x.debut);
+  const liste = debut.length ? debut.slice(0, 3) : cands.slice(0, 1);
+  const ecart = x => !x.complet || Math.abs(x.ecart) < 0.0005 ? ''
+    : ` <small class="${Math.abs(x.ecart) <= 50 ? 'ac-proche' : 'ac-loin'}">${x.ecart > 0 ? '+' : '−'}${nfg(Math.abs(x.ecart))} gal</small>`;
+  z.innerHTML = `<div class="ac">${debut.length ? '' : `<div class="ac-t">${t('ac_proche_seul')}</div>`}
+    ${liste.map(x => `<button type="button" class="ac-i ${x.pompe_id === id ? 'ici' : ''}"
+        onmousedown="event.preventDefault()" onclick="acPrendre(${id}, ${x.pompe_id}, '${x.complet ? String(txt).replace(/[^0-9.]/g, '') : Number(x.dernier_meter).toFixed(3)}')">
+      <span class="ac-v num">${nfg(x.dernier_meter)}</span>
+      <span class="ac-n">${esc(x.produit && moi && x.produit !== moi.produit ? x.libelle : x.meeter)}${x.pompe_id === id ? ` <small>· ${t('ac_cette')}</small>` : ''}${ecart(x)}</span>
+    </button>`).join('')}</div>`;
+}
+// Le pompiste touche un meeter de la liste : la valeur va sur la pompe de ce
+// meeter (s'il l'avait tapée sur une autre ligne, ses chiffres y passent).
+// Frappe en cours : le dernier meeter complète la saisie. Meeter déjà tapé en
+// entier : ce que le pompiste a lu est gardé tel quel (jamais remplacé),
+// seule la pompe change ; l'écart reste visible au contrôle.
+function acPrendre(id, pid, val){
+  id = Number(id); pid = Number(pid);
+  const s = S.index[id] || {};
+  if(pid === id){
+    s.avant = val; s.debutConfirme = false; S.index[id] = s;
+  } else {
+    const autre = S.index[pid] || {};
+    S.index[pid] = {...autre, avant: val, apres: autre.apres || s.apres || '', debutConfirme: false,
+                    pompeChoisie: s.pompeChoisie || id, decision: 'ACCEPTE'};
+    if(autre.avant || autre.apres) S.index[id] = {...autre, debutConfirme: false}; else delete S.index[id];
+    delete S.erreurs[id];
+    if(S.etape !== 'feuille'){
+      const i = S.choisies.indexOf(id), j = S.choisies.indexOf(pid);
+      if(j >= 0) S.choisies[j] = pid;
+      if(i >= 0) S.choisies[i] = pid;
+      if(j >= 0 && i >= 0 && i !== j) S.choisies[j] = id;
+    }
+  }
+  delete S.erreurs[pid]; delete SM.res[id]; delete SM.res[pid];
+  if(S.etape === 'feuille'){
+    S.feFocus = `idx:${pid}:apres`; sauverBrouillon(); rendreSansHaut();
+    setTimeout(() => $('fe-r-' + pid)?.scrollIntoView({block: 'center', behavior: 'smooth'}), 60);
+  } else {
+    S.champActif = {id: pid, k: 'apres'}; rendre();
+  }
+}
+
+function confirmerDebut(id){
+  S.index[id].debutConfirme = true; delete S.erreurs[id]; rendre();
+}
+
+function rIndex(){
+  if(!produit() || !S.choisies.length) return aller(produit() ? 'pompes' : 'produit');
+  S.pos = Math.min(S.pos || 0, S.choisies.length - 1);
+  if(!pompeCtx(S.choisies[S.pos])) return aller('pompes');
+  const id = S.choisies[S.pos], dernier = S.pos === S.choisies.length - 1;
+  ecranIndex(id, produit().prix_gallon, `<p class="sub" style="margin:0">${t('pompe_x', {i: S.pos+1, n: S.choisies.length})}</p>`,
+    (ok, v) => barre(ok ? `<b>${nfg(v.g)} gal</b>${t('vendus')}` : t('tapez_deux'), dernier ? t('verifier') : t('suivante'),
+      ()=>{ S.champActif = null; if(dernier) aller('compteurs'); else { S.pos++; rendre(); } }, ok));
+}
+
+// Ligne de pompe des écrans de vérification : s'adapte à toutes les largeurs
+// (nom + index à gauche, gallons + montant à droite, bouton à la fin ; sur un
+// petit écran, le bouton passe en dessous au lieu de déborder).
+function lignePompe(nom, av, ap, g, montant, action){
+  return `<div class="lp"><div class="lp-nom"><b>${esc(nom)}</b>
+      <span class="lp-idx num">${nfg(av)} → ${nfg(ap)}</span></div>
+    <div class="lp-val num"><b>${nfg(g)} gal</b><span>${G(montant)}</span></div>
+    ${action ? `<div class="lp-act">${action}</div>` : ''}</div>`;
+}
+
+// ── 5. Vérification des compteurs de ce carburant ───────────────────
+function prixPompe(id){
+  for(const p of S.ctx.produits) if(p.pompes.some(q => q.id === id)) return p.prix_gallon;
+  return produit()?.prix_gallon || 0;
+}
+function lignes(){
+  return S.choisies.map(id => { const v = valeurs(id); return {...v, montant: v.g * prixPompe(id)}; });
+}
+function rCompteurs(){
+  if(!produit() || !S.choisies.length || S.choisies.some(id => !pompeCtx(id))) return aller(produit() ? 'pompes' : 'produit');
+  const l = lignes(), tot = l.reduce((a,x)=>a+x.montant,0), gal = l.reduce((a,x)=>a+x.g,0);
+  $('app').innerHTML = entete() + `<h1>${t('verif_compteurs')}</h1>
+    <p class="sub">${esc(produit().nom)} · ${esc(jourTxt(S.date))}</p>
+    <div class="card">
+      ${l.map((x,i) => lignePompe(x.q.nom, x.av, x.ap, x.g, x.montant,
+        `<button class="btn-mod" onclick="S.pos=${i};S.champActif=null;aller('index')">${t('modifier')}</button>`)).join('')}
+    <div class="total"><span>${t('total')}</span><span class="v">${nfg(gal)} gal</span></div>
+    <div class="total" style="padding-top:0"><span>${t('montant')}</span><span class="v">${G(tot)}</span></div></div>
+    <p class="sub">${t('argent_fin')}</p>`;
+  barre(`<b>${G(tot)}</b>${esc(produit().nom)}`, t('envoyer_compteurs'), envoyerCompteurs);
+}
+
+async function envoyerCompteurs(){
+  const l = lignes();
+  const ok = await demander({ico:'⛽', titre:t('confirmer_titre_compteurs'),
+    texte:t('confirmer_txt_compteurs', {n:l.length, g:nfg(l.reduce((a,x)=>a+x.g,0)), m:G(l.reduce((a,x)=>a+x.montant,0)), p:esc(produit()?.nom||'')}),
+    oui:t('oui_envoyer'), non:t('non_retour')});
+  if(!ok) return;
+  const b = $('barre-btn'); b.disabled = true; b.textContent = t('envoi');
+  try{
+    await api('POST','/api/pompiste/compteurs',{
+      date:S.date, periode: enCours() ? enCours().periode : null, charte_acceptee:S.charte,
+      lignes: lignes().map(x=>({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap, debut_confirme:!!x.s.debutConfirme,
+                                pompe_choisie_id:x.s.pompeChoisie||null, decision:x.s.decision||null}))});
+    S.dernierProduit = produit()?.nom;
+    S.produitId = null; S.choisies = []; S.index = {}; S.erreurs = {};
+    S.etape = 'rapport';
+    await chargerContexte();
+  }catch(e){
+    if(e.status === 422 && e.detail?.erreurs){
+      S.erreurs = {}; for(const x of e.detail.erreurs) S.erreurs[x.pompe_id] = x;
+      S.pos = Math.max(0, S.choisies.findIndex(id => S.erreurs[id])); S.etape = 'index'; S.champActif = null;
+      await chargerContexte();
+      return;
+    }
+    if(e.status === 401) return ecranConnexion(t('session'));
+    b.disabled = false; b.textContent = t('envoyer_compteurs');
+    $('app').insertAdjacentHTML('afterbegin', `<div class="alerte err">${msgErreur(e)}</div>`);
+    window.scrollTo(0,0);
+  }
+}
+
+// ── 6. « D'autres pompes ? » — oui (tel carburant) / non, j'ai fini ──
+function lignesParProduit(r){
+  const g = {}; for(const l of r.lignes) (g[l.produit_nom] ||= []).push(l); return g;
+}
+function rRapport(){
+  const r = enCours();
+  if(!r){ S.etape = 'periode'; return rPeriode(); }
+  const restants = S.ctx.produits.filter(p => libres(p).length);
+  sansBarre();
+  $('app').innerHTML = entete(t('envoyes')) + `
+    <h1>${t('autre_q')}</h1>
+    <p class="sub">${S.dernierProduit ? t('autre_sub', {p: esc(S.dernierProduit)}) + ' · ' : ''}${esc(jourTxt(r.date))}</p>
+    <div class="deux-col"><div class="choix">
+      ${restants.map(p => `<button class="gros ${clsProduit(p.nom)}" onclick="choisirProduit(${p.id})"><span class="ico">⛽</span>
+        <span>${t('oui')}, ${esc(p.nom)}<small>${t('oui_sub', {p: esc(p.nom)})}</small></span></button>`).join('')}
+      <button class="gros" onclick="S.guide=false;aller('feuille')"><span class="ico">📄</span>
+        <span>${t('fe_feuille_btn')}<small>${t('fe_phase')}</small></span></button>
+      <button class="gros on" onclick="S.depuisResume=false;aller('depenses')"><span class="ico">✔</span>
+        <span>${t('non_fini')}<small>${t('non_fini_sub')}</small></span></button>
+    </div>
+    <div class="card"><h2 style="margin-top:0">${t('mon_rapport')}</h2>${Object.entries(lignesParProduit(r)).map(([nom, ls]) => `
+      <div class="produit-tete">${esc(nom)}</div>
+      ${ls.map(l => lignePompe(l.pompe_nom, l.metter_avant, l.metter_apres, l.gallons, l.montant,
+          `<button class="retirer" onclick="retirerPompe(${l.pompe_id})" aria-label="✕">✕</button>`)).join('')}`).join('')}
+      <div class="total"><span>${t('attendu')}</span><span class="v">${G(r.montant_attendu)}</span></div></div></div>`;
+}
+async function retirerPompe(id){
+  const l = enCours().lignes.find(x => x.pompe_id === id);
+  if(!await demander({ico:'🗑', titre:t('retirer_titre'), texte:t('retirer_q', {p: esc(l.pompe_nom)}), oui:t('oui_retirer'), non:t('non_retour'), danger:true})) return;
+  try{ await api('DELETE', `/api/pompiste/compteurs/${id}`); }catch(e){ alert(e.message); }
+  await chargerContexte();
+}
+
+// ── 7. Dépenses payées avec l'argent de la période ─────────────────
+// Après les compteurs : « Te gen depans ? » → description, montant, qui a
+// autorisé → « Gen yon lòt ? »… Elles se déduisent de l'argent à remettre.
+const totalDepenses = () => S.depenses.reduce((a, x) => a + (num(x.montant) || 0), 0);
+const aRemettre = () => (enCours()?.montant_attendu || 0) - totalDepenses();
+function rDepenses(){
+  if(!enCours()) return aller('periode');
+  const deja = S.depenses.length;
+  sansBarre();
+  $('app').innerHTML = entete() + `<h1>${deja ? t('dep_autre_q') : t('dep_q')}</h1>
+    <p class="sub">${t('dep_q_sub')}</p>
+    <div class="deux-col"><div class="choix">
+      <button class="gros" onclick="nouvelleDepense()"><span class="ico">🧾</span>
+        <span>${deja ? t('dep_autre_oui') : t('dep_oui')}<small>${t('dep_oui_sub')}</small></span></button>
+      <button class="gros on" onclick="finDepenses()"><span class="ico">✔</span>
+        <span>${deja ? t('dep_fini') : t('dep_non')}<small>${t('dep_non_sub')}</small></span></button>
+    </div>
+    ${deja ? `<div class="card"><h2 style="margin-top:0">${t('mes_depenses')}</h2>${listeDepenses(true)}
+      <div class="total"><span>${t('attendu')}</span><span class="v">${G(enCours().montant_attendu)}</span></div>
+      <div class="total"><span>${t('dep_total')}</span><span class="v">− ${G(totalDepenses())}</span></div>
+      <div class="total"><span><b>${t('a_remettre')}</b></span><span class="v">${G(aRemettre())}</span></div></div>` : ''}</div>`;
+}
+function listeDepenses(actions){
+  return S.depenses.map((x, i) => `<div class="lp"><div class="lp-nom"><b>${esc(x.description)}</b>
+      <span class="lp-idx">${t('tk_autorise')} ${esc(x.autorise_par)}</span></div>
+    <div class="lp-val num"><b>${G(num(x.montant))}</b></div>
+    ${actions ? `<div class="lp-act dep-act"><button class="btn-mod" onclick="modifierDepense(${i})">${t('modifier')}</button>
+      <button class="retirer" onclick="retirerDepense(${i})" aria-label="✕">✕</button></div>` : ''}</div>`).join('');
+}
+function nouvelleDepense(){ S.depEdit = null; S.depForm = {description:'', montant:'', autorise_par:''}; aller('depense'); }
+function modifierDepense(i){ S.depEdit = i; S.depForm = {...S.depenses[i]}; aller('depense'); }
+async function retirerDepense(i){
+  if(!await demander({ico:'🗑', titre:t('retirer_titre_dep'), texte:t('dep_retirer_q', {d: esc(S.depenses[i].description)}),
+                      oui:t('oui_retirer'), non:t('non_retour'), danger:true})) return;
+  S.depenses.splice(i, 1); rendre();
+}
+function finDepenses(){ aller(S.depuisResume ? 'resume' : 'billetterie'); }
+function rDepense(){
+  if(!enCours()) return aller('periode');
+  const f = S.depForm || (S.depForm = {description:'', montant:'', autorise_par:''});
+  const n = S.depEdit != null ? S.depEdit + 1 : S.depenses.length + 1;
+  $('app').innerHTML = entete() + `<h1>${t('dep_titre_n', {n})}</h1>
+    <div class="card dep-form">
+      <label for="d-desc">${t('dep_desc')}</label>
+      <input id="d-desc" class="saisie-t" type="text" maxlength="200" autocomplete="off" enterkeyhint="next"
+        placeholder="${esc(t('dep_desc_ph'))}" value="${esc(f.description)}">
+      <label for="d-montant">${t('dep_montant')}</label>
+      <input id="d-montant" class="saisie-t num" type="text" inputmode="decimal" maxlength="12" autocomplete="off" enterkeyhint="next"
+        placeholder="0" value="${esc(String(f.montant || '').replace('.', ','))}">
+      <label for="d-aut">${t('dep_autorise')}</label>
+      <input id="d-aut" class="saisie-t" type="text" maxlength="120" autocomplete="off" enterkeyhint="done"
+        placeholder="${esc(t('dep_autorise_ph'))}" value="${esc(f.autorise_par)}">
+      <div id="d-err"></div></div>`;
+  const ids = ['d-desc','d-montant','d-aut'], cles = ['description','montant','autorise_par'];
+  ids.forEach((id, i) => {
+    const el = $(id);
+    el.addEventListener('input', () => {
+      if(id === 'd-montant'){
+        let v = el.value.replace(',', '.').replace(/[^0-9.]/g, '');
+        const p = v.indexOf('.'); if(p >= 0) v = v.slice(0, p + 1) + v.slice(p + 1).replace(/\./g, '').slice(0, 2);
+        const vu = v.replace('.', ','); if(vu !== el.value) el.value = vu;
+        f.montant = v;
+      } else f[cles[i]] = el.value;
+      sauverBrouillon();
+    });
+    el.addEventListener('keydown', e => {
+      if(e.key !== 'Enter') return;
+      e.preventDefault();
+      if(i < ids.length - 1) $(ids[i + 1]).focus(); else { el.blur(); enregistrerDepense(); }
+    });
+  });
+  barre(`${t('dep_total')}<b>${G(totalDepenses())}</b>`, t('dep_enregistrer'), enregistrerDepense);
+  $(ids[!f.description ? 0 : (!f.montant ? 1 : 2)]).focus();
+}
+function enregistrerDepense(){
+  const f = S.depForm || {}, err = m => { $('d-err').innerHTML = `<div class="alerte err">${m}</div>`; };
+  const d = (f.description || '').trim(), m = num(f.montant), a = (f.autorise_par || '').trim();
+  if(d.length < 3){ $('d-desc').focus(); return err(t('dep_e_desc')); }
+  if(!(m > 0)){ $('d-montant').focus(); return err(t('dep_e_montant')); }
+  if(a.length < 2){ $('d-aut').focus(); return err(t('dep_e_autorise')); }
+  const x = {description: d, montant: String(m), autorise_par: a};
+  if(S.depEdit != null) S.depenses[S.depEdit] = x; else S.depenses.push(x);
+  S.depEdit = null; S.depForm = null;
+  aller('depenses');
+}
+
+// ── 8. Argent : nombre de billets par coupure + monnaie + dollars ─────
+const tauxUSD = () => S.ctx?.taux?.taux || null;
+const usdEnG = () => Math.round((num(S.usd) || 0) * (tauxUSD() || 0) * 100) / 100;
+function totalCompte(){
+  let s = 0;
+  for(const c of S.ctx.coupures) s += c * ent(S.billets[c]);
+  return s + (num(S.monnaie) || 0) + usdEnG();
+}
+function rBilletterie(){
+  if(!enCours()) return aller('periode');
+  const c = S.ctx;
+  // Saisie au clavier de l'appareil (touches du terminal ou clavier du système) :
+  // de vraies cases de saisie, sans le clavier à l'écran. « Entrée » passe à la
+  // case suivante ; après la monnaie, elle ouvre le résumé.
+  $('app').innerHTML = entete() + `
+    <h1>${t('compter')}</h1>
+    <p class="sub">${t('compter_sub_clavier')}</p>
+    <div class="card billets-card"><div class="entete-billets"><span>${t('billet')}</span><span>${t('nb_billets')}</span></div>
+    <div class="billets">${c.coupures.map(k => `
+      <label class="billet" for="in-${k}"><span class="coup">${nf(k)} G<small id="st-${k}"></small></span>
+        <input class="saisie-n" id="in-${k}" data-c="${k}" type="text" inputmode="numeric" pattern="[0-9]*"
+          autocomplete="off" enterkeyhint="next" maxlength="5" placeholder="0" value="${esc(S.billets[k] || '')}"></label>`).join('')}
+      <label class="billet" for="in-monnaie"><span class="coup">${t('monnaie')}<small>${t('monnaie_sub')}</small></span>
+        <input class="saisie-n" id="in-monnaie" data-c="monnaie" type="text" inputmode="decimal"
+          autocomplete="off" enterkeyhint="${tauxUSD() ? 'next' : 'done'}" maxlength="10" placeholder="0" value="${esc((S.monnaie || '').replace('.', ','))}"></label>
+      <div class="devise-tete">${t('devise_titre')}</div>
+      <label class="billet devise ${tauxUSD() ? '' : 'sans-taux'}" for="in-usd"><span class="coup">${t('usd')}
+          <small>${tauxUSD() ? t('usd_taux', {t: nf(tauxUSD(), 2), d: esc(jourCourt(S.ctx.taux.date_effet))}) : t('usd_sans_taux')}</small><small id="st-usd"></small></span>
+        <input class="saisie-n" id="in-usd" data-c="usd" type="text" inputmode="decimal" ${tauxUSD() ? '' : 'disabled'}
+          autocomplete="off" enterkeyhint="done" maxlength="10" placeholder="0 $" value="${esc((S.usd || '').replace('.', ','))}"></label>
+    </div>
+    <div class="total" style="margin-top:10px"><span>${t('total')}</span><span class="v" id="b-total"></span></div></div>`;
+  const champs = [...document.querySelectorAll('.saisie-n:not(:disabled)')];
+  const maj = () => {
+    for(const k of c.coupures){ const n = ent(S.billets[k]); $('st-' + k).textContent = n ? G(n * k) : ''; }
+    $('st-usd').textContent = num(S.usd) ? '= ' + G(usdEnG()) : '';
+    $('b-total').textContent = G(totalCompte());
+    $('barre-info').innerHTML = `${t('total_compte')}<b>${G(totalCompte())}</b>`;
+  };
+  champs.forEach((el, i) => {
+    el.addEventListener('input', () => {
+      if(el.dataset.c === 'monnaie' || el.dataset.c === 'usd'){
+        let v = el.value.replace(',', '.').replace(/[^0-9.]/g, '');
+        const p = v.indexOf('.'); if(p >= 0) v = v.slice(0, p + 1) + v.slice(p + 1).replace(/\./g, '').slice(0, 2);
+        const vu = v.replace('.', ',');           // affichage à la française, valeur enregistrée avec un point
+        if(vu !== el.value) el.value = vu;
+        if(el.dataset.c === 'usd') S.usd = v; else S.monnaie = v;
+      } else {
+        const v = el.value.replace(/\D/g, '');
+        if(v !== el.value) el.value = v;
+        S.billets[Number(el.dataset.c)] = v;
+      }
+      maj();
+      sauverBrouillon();
+    });
+    el.addEventListener('focus', () => { el.select(); el.closest('.billet').classList.add('actif'); });
+    el.addEventListener('blur', () => el.closest('.billet').classList.remove('actif'));
+    el.addEventListener('keydown', e => {
+      if(e.key !== 'Enter') return;
+      e.preventDefault();
+      if(i < champs.length - 1) champs[i + 1].focus();
+      else { el.blur(); $('barre-btn').click(); }
+    });
+  });
+  barre(`${t('total_compte')}<b>${G(totalCompte())}</b>`, t('voir_resume'), () => aller('resume'));
+  maj();
+  champs[0].focus();
+}
+
+// ── 8. Résumé complet avant l'envoi, tout est modifiable ────────────
+function rResume(){
+  const r = enCours(), att = r.montant_attendu, dep = totalDepenses(), cpt = totalCompte(), ec = cpt + dep - att;
+  const cls = Math.abs(ec) < 1 ? 'ok' : (ec < 0 ? 'neg' : 'pos');
+  const txt = Math.abs(ec) < 1 ? t('juste') : (ec < 0 ? t('manque') : t('plus'));
+  const billets = S.ctx.coupures.map(c => ({c, n: ent(S.billets[c])})).filter(x => x.n);
+  $('app').innerHTML = entete() + `<h1>${t('resume')}</h1>
+    <p class="sub">${esc(jourTxt(r.date))}. ${t('resume_sub')}</p>
+    <div class="card"><div class="section-tete"><h2>${t('mes_compteurs')}</h2></div>
+      ${Object.entries(lignesParProduit(r)).map(([nom, ls]) => `<div class="produit-tete">${esc(nom)}</div>
+        ${ls.map(l => lignePompe(l.pompe_nom, l.metter_avant, l.metter_apres, l.gallons, l.montant,
+          `<button class="btn-mod" onclick="modifierPompe(${l.pompe_id})">${t('modifier')}</button>`)).join('')}`).join('')}
+      <div class="total"><span>${t('attendu')}</span><span class="v">${G(att)}</span></div></div>
+    <div class="card"><div class="section-tete"><h2>${t('mes_depenses')}</h2>
+        <button class="btn-mod" onclick="S.depuisResume=true;aller('depenses')">${t('modifier')}</button></div>
+      ${S.depenses.length ? listeDepenses(false) : `<p class="sub" style="margin:0">${t('aucune_depense')}</p>`}
+      <div class="total"><span>${t('dep_total')}</span><span class="v">− ${G(dep)}</span></div>
+      <div class="total"><span><b>${t('a_remettre')}</b></span><span class="v">${G(att - dep)}</span></div></div>
+    <div class="card"><div class="section-tete"><h2>${t('mon_argent')}</h2>
+        <button class="btn-mod" onclick="S.depuisResume=true;aller('billetterie')">${t('modifier')}</button></div>
+      ${billets.length || num(S.monnaie) || num(S.usd) ? `<table class="billets-resume"><tbody>
+        ${billets.map(x => `<tr><td><b>${nf(x.c)} G</b></td><td class="r num">× ${x.n}</td><td class="r num"><b>${G(x.n * x.c)}</b></td></tr>`).join('')}
+        ${num(S.monnaie) ? `<tr><td><b>${t('monnaie')}</b></td><td></td><td class="r num"><b>${G(num(S.monnaie))}</b></td></tr>` : ''}
+        ${num(S.usd) ? `<tr><td><b>${nf(num(S.usd), 2)} $</b></td><td class="r num">× ${nf(tauxUSD(), 2)}</td><td class="r num"><b>${G(usdEnG())}</b></td></tr>` : ''}
+      </tbody></table>` : `<p class="sub" style="margin:0">${t('aucun_argent')}</p>`}
+      <div class="total"><span>${t('argent_compte')}</span><span class="v">${G(cpt)}</span></div></div>
+    <div class="card">
+      <div class="ecart ${cls}"><span>${txt}</span><span>${signe(ec)}</span></div>
+      <label for="r-note">${t('un_mot')}</label>
+      <textarea id="r-note" rows="3" maxlength="500" placeholder="${esc(t('un_mot_ph'))}">${esc(S.note)}</textarea></div>`;
+  $('r-note').oninput = e => { S.note = e.target.value; sauverBrouillon(); };
+  barre(`${t('ecart')}<b>${signe(ec)}</b>`, t('envoyer_rapport'), terminer);
+}
+
+function modifierPompe(id, depuisFeuille){
+  S.depuisFeuille = !!depuisFeuille;
+  const l = enCours().lignes.find(x => x.pompe_id === id);
+  S.modif = id; S.champActif = null; delete S.erreurs[id];
+  S.index[id] = {avant: String(l.metter_avant), apres: String(l.metter_apres), debutConfirme: false};
+  aller('modif');
+}
+function rModif(){
+  const id = S.modif, l = enCours()?.lignes.find(x => x.pompe_id === id);
+  if(!l || !pompeCtx(id)){ S.modif = null; return aller(enCours() ? (S.depuisFeuille ? 'feuille' : 'resume') : 'periode'); }
+  ecranIndex(id, l.prix_gallon, `<p class="sub" style="margin:0">${t('modifier_x', {p: esc(l.produit_nom)})}</p>`,
+    (ok, v) => barre(ok ? `<b>${nfg(v.g)} gal</b>${t('vendus')}` : '', t('enregistrer'), async () => {
+      try{
+        await api('PUT', `/api/pompiste/compteurs/${id}`, {metter_avant:v.av, metter_apres:v.ap, debut_confirme:!!v.s.debutConfirme});
+        S.modif = null; S.champActif = null; S.etape = S.depuisFeuille ? 'feuille' : 'resume';
+        await chargerContexte();
+      }catch(e){
+        S.erreurs[id] = e.detail?.erreurs?.[0] || {message: e.message}; rendre();
+      }
+    }, ok));
+}
+
+async function terminer(){
+  const att = enCours()?.montant_attendu || 0, dep = totalDepenses(), cpt = totalCompte();
+  const ok = await demander({ico:'📨', titre:t('confirmer_titre_rapport'),
+    texte:t('confirmer_txt_rapport', {v:G(att), d:G(dep), a:G(att - dep), c:G(cpt), e:signe(cpt + dep - att)}), oui:t('oui_envoyer_rapport'), non:t('non_retour')});
+  if(!ok) return;
+  const b = $('barre-btn'); b.disabled = true; b.textContent = t('envoi');
+  try{
+    S.dernier = await api('POST','/api/pompiste/terminer',{
+      billetterie: S.ctx.coupures.map(c => ({coupure:c, liasses:0, billets:ent(S.billets[c])})).filter(x => x.billets),
+      monnaie: num(S.monnaie) || 0, note: S.note || null,
+      depenses: S.depenses.map(x => ({description: x.description, montant: num(x.montant), autorise_par: x.autorise_par})),
+      devises: num(S.usd) ? [{devise: 'USD', montant: num(S.usd)}] : []});
+    effacerBrouillon();
+    aller('fin');
+  }catch(e){
+    if(e.status === 401) return ecranConnexion(t('session'));
+    b.disabled = false; b.textContent = t('envoyer_rapport');
+    $('app').insertAdjacentHTML('afterbegin', `<div class="alerte err">${msgErreur(e)}</div>`);
+    window.scrollTo(0,0);
+  }
+}
+
+// ── Feuille du pompiste : comme la feuille papier de la station ─────
+// A compteurs · B vente · C bons et chèques · D crédits (et dépenses) ·
+// E cash reçu · F crédit en caisse · Short / Over · signature. Les envois
+// au serveur restent les mêmes : compteurs, puis « Terminer ».
+const feEnvoyees = () => enCours()?.lignes || [];
+const feEnvoyee = id => feEnvoyees().find(l => l.pompe_id === id);
+const r2 = n => Math.round(n * 100) / 100;
+function feSaisies(){
+  const out = [];
+  for(const p of S.ctx.produits) for(const q of p.pompes){
+    if(feEnvoyee(q.id) || q.deja_rapportee) continue;
+    const s = S.index[q.id];
+    if(!s || (!s.avant && !s.apres)) continue;
+    const av = num(s.avant), ap = num(s.apres);
+    out.push({p, q, s, av, ap, complet: av != null && ap != null, g: av != null && ap != null ? ap - av : null});
+  }
+  return out;
+}
+function feVentes(){                              // gallons par produit, jamais additionnés entre produits
+  const m = new Map();
+  const ligne = (id, nom, prix) => { if(!m.has(id)) m.set(id, {nom, prix, g:0, m:0}); return m.get(id); };
+  for(const p of S.ctx.produits) ligne(p.id, p.nom, p.prix_gallon);
+  for(const l of feEnvoyees()){ const x = ligne(l.produit_id, l.produit_nom, l.prix_gallon); x.g += l.gallons; x.m += l.montant; }
+  for(const x of feSaisies()) if(x.complet && x.g >= 0){ const y = ligne(x.p.id, x.p.nom, x.p.prix_gallon); y.g += x.g; y.m += r2(x.g * x.p.prix_gallon); }
+  return [...m.values()].filter(x => x.g || x.m);
+}
+const somme = (l, k) => l.reduce((a, x) => a + (num(x[k]) || 0), 0);
+function feTotaux(){
+  const B = r2(feVentes().reduce((a, x) => a + x.m, 0)), C = r2(somme(S.bons, 'montant'));
+  const Dc = r2(somme(S.credits, 'montant')), Dd = r2(totalDepenses()), E = r2(totalCompte()), F = r2(num(S.fonds.montant) || 0);
+  const just = r2(E - F + C + Dc + Dd);
+  return {B, C, Dc, Dd, D: r2(Dc + Dd), E, F, EF: r2(E - F), just, ecart: r2(just - B)};
+}
+const feChamp = (f, v, opts = "") => `<input ${/class=/.test(opts) ? "" : `class="saisie-n"`} data-f="${f}" type="text" autocomplete="off" value="${esc(v)}" ${opts}>`;
+const feDec = v => esc(String(v ?? '').replace('.', ','));
+const lettre = (l, titre, sous) => `<div class="fe-sec-t"><span class="fe-l">${l}</span>${titre}${sous ? `<small>${sous}</small>` : ''}</div>`;
+
+function rFeuille(){
+  const c = S.ctx, st = c.station || {}, m = S.marque || {}, r = enCours(), pomp = c.pompiste || {};
+  const nomStation = pomp.station_nom || m.nom || 'KONEKTA';
+  const adresse = [st.adresse, st.commune].filter(Boolean).join(', ') || m.adresse || '';
+  const tels = [st.telephone || m.telephone1, m.telephone2].filter(Boolean).join(' / ');
+  const lignesA = c.produits.map(p => `<div class="fe-prod ${clsProduit(p.nom)}">${esc(p.nom)} · ${nf(p.prix_gallon, 2)} G/gal</div>
+    ${p.pompes.map(q => feLigneA(p, q)).join('')}`).join('');
+  $('app').innerHTML = entete(t('fe_phase')) + `<div class="feuille">
+    <div class="fe-tete">
+      <div class="fe-marque">${esc(nomStation)}</div>
+      ${m.nom && m.nom !== nomStation ? `<div class="fe-sous">${esc(m.nom)}</div>` : ''}
+      ${adresse ? `<div class="fe-adr">${esc(adresse)}</div>` : ''}
+      ${tels ? `<div class="fe-adr"><b>Tél : ${esc(tels)}</b></div>` : ''}
+      <div class="fe-filet"></div>
+      <div class="fe-info">
+        <div><small>${t('fe_nom')}</small><b>${esc(pomp.nom || '')}</b></div>
+        <div><small>${t('fe_date')}</small><button class="fe-date" onclick="aller('calendrier')" ${r ? 'disabled' : ''}>${esc(jourTxt(S.date))}</button></div>
+        <div><small>${t('fe_heures')}</small><div class="fe-heures">
+          <input type="time" data-f="heure:debut" value="${esc(S.heures.debut)}" aria-label="${t('fe_heures')}"> ${t('fe_a_h')}
+          <input type="time" data-f="heure:fin" value="${esc(S.heures.fin)}" aria-label="${t('fe_heures')}"></div></div>
+      </div>
+    </div>
+    <div id="fe-msg"></div>
+
+    <div class="fe-sec">${lettre('A', t('fe_a'))}
+      <div class="fe-tr fe-th"><span>${t('fe_pompe')}</span><span>${t('fe_avant')}</span><span>${t('fe_apres')}</span><span>${t('fe_gallons')}</span><span>${t('fe_total')}</span></div>
+      ${lignesA}</div>
+
+    <div class="fe-sec">${lettre('B', t('fe_b'))}<div id="fe-b"></div></div>
+
+    <div class="fe-cols">
+      <div class="fe-sec">${lettre('C', t('fe_c'))}
+        ${S.bons.map((x, i) => `<div class="fe-ligne">
+          ${feChamp(`bon:${i}:reference`, x.reference, `placeholder="${esc(t('fe_c_ref'))}" maxlength="120"`)}
+          ${feChamp(`bon:${i}:montant`, feDec(x.montant), `class="saisie-n num" inputmode="decimal" placeholder="${esc(t('fe_montant'))}" data-n="dec"`)}
+          <button class="fe-x" onclick="feRetirer('bons',${i})" aria-label="✕">✕</button></div>`).join('')}
+        <button class="fe-aj" onclick="feAjouter('bons')">${t('fe_c_aj')}</button>
+        <div class="fe-tot"><span>${t('fe_total')} C</span><span class="v" id="fe-tc"></span></div></div>
+
+      <div class="fe-sec">${lettre('D', t('fe_d'))}
+        ${S.credits.length ? `<div class="fe-ss">${t('fe_d_credits')}</div>` : ''}
+        ${S.credits.map((x, i) => `<div class="fe-ligne">
+          ${feChamp(`cre:${i}:nom`, x.nom, `placeholder="${esc(t('fe_d_cli'))}" maxlength="120"`)}
+          ${feChamp(`cre:${i}:montant`, feDec(x.montant), `inputmode="decimal" placeholder="${esc(t('fe_montant'))}" data-n="dec"`)}
+          <button class="fe-x" onclick="feRetirer('credits',${i})" aria-label="✕">✕</button></div>`).join('')}
+        <button class="fe-aj" onclick="feAjouter('credits')">${t('fe_d_aj')}</button>
+        ${S.depenses.length ? `<div class="fe-ss">${t('fe_d_depenses')}</div>` : ''}
+        ${S.depenses.map((x, i) => `<div class="fe-ligne trois">
+          ${feChamp(`dep:${i}:description`, x.description, `placeholder="${esc(t('fe_desc'))}" maxlength="200"`)}
+          ${feChamp(`dep:${i}:montant`, feDec(x.montant), `inputmode="decimal" placeholder="${esc(t('fe_montant'))}" data-n="dec"`)}
+          ${feChamp(`dep:${i}:autorise_par`, x.autorise_par, `placeholder="${esc(t('fe_autorise'))}" maxlength="120"`)}
+          <button class="fe-x" onclick="feRetirer('depenses',${i})" aria-label="✕">✕</button></div>`).join('')}
+        <button class="fe-aj" onclick="feAjouter('depenses')" style="margin-top:8px">${t('fe_d_dep')}</button>
+        <div class="fe-tot"><span>${t('fe_total')} D</span><span class="v" id="fe-td"></span></div></div>
+    </div>
+
+    <div class="fe-cols">
+      <div class="fe-sec">${lettre('E', t('fe_e'))}
+        <div class="fe-bil fe-th" style="border-bottom-width:2px"><span>${t('fe_billet')}</span><span style="text-align:right">${t('fe_qte')}</span><span style="text-align:right">${t('fe_total')}</span></div>
+        ${c.coupures.map(k => `<div class="fe-bil"><b>${nf(k)} ×</b>
+          ${feChamp(`bil:${k}`, S.billets[k] || '', `inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="0" data-n="int"`)}
+          <span class="fe-v" id="fe-bil-${k}"></span></div>`).join('')}
+        <div class="fe-bil"><b>${t('monnaie')}</b>${feChamp('monnaie', feDec(S.monnaie), `inputmode="decimal" maxlength="10" placeholder="0" data-n="dec"`)}<span class="fe-v" id="fe-mon"></span></div>
+        ${tauxUSD() ? `<div class="fe-bil"><b>$ US<small>1 $ = ${nf(tauxUSD(), 2)} G</small></b>
+          ${feChamp('usd', feDec(S.usd), `inputmode="decimal" maxlength="10" placeholder="0 $" data-n="dec"`)}<span class="fe-v" id="fe-usd"></span></div>` : ''}
+        <div class="fe-tot grand"><span>${t('fe_total_cash')}</span><span class="v" id="fe-te"></span></div></div>
+
+      <div class="fe-sec">${lettre('F', t('fe_f'), t('fe_f_sub'))}
+        <label>${t('fe_f_nom')}</label>${feChamp('fonds:nom', S.fonds.nom, `maxlength="120"`)}
+        <label>${t('fe_f_cash')}</label>${feChamp('fonds:montant', feDec(S.fonds.montant), `class="saisie-n num" inputmode="decimal" maxlength="12" placeholder="0" data-n="dec"`)}
+        <div class="fe-tot grand"><span>E − F</span><span class="v" id="fe-ef"></span></div></div>
+    </div>
+
+    <div class="fe-sec fe-recap">${lettre('±', t('fe_recap'))}<div id="fe-recap"></div>
+      <label for="fe-note">${t('un_mot')}</label>
+      <textarea id="fe-note" data-f="note" rows="2" maxlength="500" placeholder="${esc(t('un_mot_ph'))}">${esc(S.note)}</textarea>
+      <div class="fe-sig"><div><b>${t('fe_sig')}</b>${t('fe_sig_txt', {n: esc(pomp.nom || ''), c: esc(pomp.username || '')})}</div></div>
+    </div>
+    <button class="fe-guide" onclick="S.guide=true;aller(enCours() ? 'rapport' : 'produit')">${t('fe_guide')}</button>
+  </div>`;
+  feBrancher();
+  feMaj();
+  for(const id of Object.keys(S.index)) if(num(S.index[id]?.avant) != null) smartAnalyser(id);   // contrôle gardé après un nouvel affichage
+  barre('', t('fe_envoyer'), feEnvoyer);
+  if(S.feFocus){ const el = document.querySelector(`[data-f="${S.feFocus}"]`); S.feFocus = null; if(el) setTimeout(() => el.focus(), 30); }
+}
+function feLigneA(p, q){
+  const l = feEnvoyee(q.id);
+  if(l) return `<div class="fe-tr envoye" id="fe-r-${q.id}">
+      <span class="fe-pn"><b>${esc(q.nom)}</b><small>✓ ${t('fe_envoye_l')} · <button class="fe-mod" onclick="modifierPompe(${q.id},true)">${t('modifier')}</button></small></span>
+      <span class="fe-v">${nfg(l.metter_avant)}</span><span class="fe-v">${nfg(l.metter_apres)}</span>
+      <span class="fe-v">${nfg(l.gallons)}</span><span class="fe-v">${G(l.montant)}</span></div>`;
+  const prise = q.deja_rapportee;
+  if(prise) return `<div class="fe-tr prise"><span class="fe-pn"><b>${esc(q.nom)}</b>
+      <small>${prise.moi ? t('deja_moi') : t('deja_par', {n: esc(prise.par)})}</small></span><span></span><span></span><span></span><span></span></div>`;
+  const s = S.index[q.id] || {}, e = S.erreurs[q.id], diff = e?.code === 'debut_different';
+  return `<div class="fe-tr ${e ? 'erreur' : ''}" id="fe-r-${q.id}">
+      <span class="fe-pn"><b>${esc(q.nom)}</b>${q.emplacement ? `<small>📍 ${esc(q.emplacement)}</small>` : ''}</span>
+      ${feChamp(`idx:${q.id}:avant`, feDec(s.avant), `class="saisie-n fe-in num" inputmode="decimal" maxlength="14" placeholder="${esc(t('fe_avant'))}" data-n="dec3"`)}
+      ${feChamp(`idx:${q.id}:apres`, feDec(s.apres), `class="saisie-n fe-in num" inputmode="decimal" maxlength="14" placeholder="${esc(t('fe_apres'))}" data-n="dec3"`)}
+      <span class="fe-v" id="fe-g-${q.id}"></span><span class="fe-v" id="fe-m-${q.id}"></span></div>
+    <div class="fe-ac" id="fe-ac-${q.id}"></div><div class="fe-sm" id="fe-sm-${q.id}"></div>
+    ${diff ? `<div class="fe-err warn">⚠ ${t('debut_diff')}<label><input type="checkbox" ${s.debutConfirme ? 'checked' : ''}
+        onchange="feConfirmerDebut(${q.id}, this.checked)"> ${t('fe_relu')}</label></div>`
+      : (e ? `<div class="fe-err">${esc(msgLigne(e))}</div>` : '')}`;
+}
+function feConfirmerDebut(id, oui){ (S.index[id] ||= {}).debutConfirme = oui; sauverBrouillon(); }
+function feNettoyer(el){
+  const n = el.dataset.n;
+  if(!n) return el.value;
+  if(n === 'int'){ const v = el.value.replace(/\D/g, ''); if(v !== el.value) el.value = v; return v; }
+  const dec = n === 'dec3' ? 3 : 2;
+  let v = el.value.replace(',', '.').replace(/[^0-9.]/g, '');
+  const p = v.indexOf('.'); if(p >= 0) v = v.slice(0, p + 1) + v.slice(p + 1).replace(/\./g, '').slice(0, dec);
+  const vu = v.replace('.', ','); if(vu !== el.value) el.value = vu;
+  return v;
+}
+function feEcrire(el){
+  const v = feNettoyer(el), [k, a, b] = el.dataset.f.split(':');
+  if(k === 'idx'){ const s = (S.index[a] ||= {}); s[b] = v; if(b === 'avant') s.debutConfirme = false;
+    if(S.erreurs[a]){ delete S.erreurs[a]; const r = $('fe-r-' + a); r?.classList.remove('erreur'); r?.nextElementSibling?.classList.contains('fe-err') && r.nextElementSibling.remove(); } }
+  else if(k === 'bon') S.bons[a][b] = v;
+  else if(k === 'cre') S.credits[a][b] = v;
+  else if(k === 'dep') S.depenses[a][b] = v;
+  else if(k === 'bil') S.billets[a] = v;
+  else if(k === 'monnaie') S.monnaie = v;
+  else if(k === 'usd') S.usd = v;
+  else if(k === 'fonds') S.fonds[a] = v;
+  else if(k === 'heure') S.heures[a] = v;
+  else if(k === 'note') S.note = v;
+}
+function feBrancher(){
+  const champs = [...$('app').querySelectorAll('[data-f]')];
+  champs.forEach((el, i) => {
+    el.addEventListener('input', () => { feEcrire(el); feMaj(); sauverBrouillon();
+      const f = el.dataset.f.split(':'); if(f[0] === 'idx'){ smartAnalyser(f[1]); if(f[2] === 'avant') acAfficher(f[1]); } });
+    if(/^idx:\d+:avant$/.test(el.dataset.f)){
+      const pid = el.dataset.f.split(':')[1];
+      el.addEventListener('focus', () => acAfficher(pid));
+      el.addEventListener('blur', () => setTimeout(() => { const z = $('fe-ac-' + pid); if(z && document.activeElement !== el){ z.innerHTML = ''; smartAnalyser(pid); } }, 250));
+    }
+    el.addEventListener('focus', () => { if(el.dataset.n) el.select(); });
+    if(el.tagName !== 'TEXTAREA') el.addEventListener('keydown', e => {
+      if(e.key !== 'Enter') return;
+      e.preventDefault();
+      const suivant = champs.slice(i + 1).find(x => x.type !== 'time');
+      if(suivant) suivant.focus(); else el.blur();
+    });
+  });
+}
+function feAjouter(liste){
+  const vide = {bons:{reference:'', montant:''}, credits:{nom:'', montant:''}, depenses:{description:'', montant:'', autorise_par:''}}[liste];
+  S[liste].push(vide);
+  S.feFocus = {bons:'bon', credits:'cre', depenses:'dep'}[liste] + ':' + (S[liste].length - 1) + ':' + Object.keys(vide)[0];
+  rendreSansHaut();
+}
+function feRetirer(liste, i){ S[liste].splice(i, 1); rendreSansHaut(); }
+function rendreSansHaut(){ const y = window.scrollY; rendre(); window.scrollTo(0, y); }
+function feMaj(){
+  for(const x of feSaisies()){
+    const g = $('fe-g-' + x.q.id), m = $('fe-m-' + x.q.id);
+    if(!g) continue;
+    g.textContent = x.complet ? (x.g < 0 ? '⚠' : nfg(x.g)) : '';
+    m.textContent = x.complet && x.g >= 0 ? G(x.g * x.p.prix_gallon) : (x.complet ? t('fin_sup') : '');
+    g.closest('.fe-tr').classList.toggle('erreur', !!(x.complet && x.g < 0) || !!S.erreurs[x.q.id]);
+  }
+  for(const p of S.ctx.produits) for(const q of p.pompes){   // ligne vidée : on efface son calcul
+    const s = S.index[q.id];
+    if((!s || (!s.avant && !s.apres)) && $('fe-g-' + q.id)){ $('fe-g-' + q.id).textContent = ''; $('fe-m-' + q.id).textContent = ''; }
+  }
+  const v = feVentes(), T = feTotaux();
+  $('fe-b').innerHTML = v.length ? `<div class="fe-tr fe-th" style="grid-template-columns:1.4fr 1fr 1fr 1.2fr"><span>${t('fe_b')}</span><span>${t('fe_gallons')}</span><span>${t('fe_prix')}</span><span>${t('fe_total')}</span></div>
+    ${v.map(x => `<div class="fe-tr" style="grid-template-columns:1.4fr 1fr 1fr 1.2fr;grid-template-areas:none">
+      <b style="grid-area:auto">${esc(x.nom)}</b><span class="fe-v" style="grid-area:auto">${nfg(x.g)}</span><span class="fe-v" style="grid-area:auto">${nf(x.prix, 2)}</span><span class="fe-v" style="grid-area:auto">${G(x.m)}</span></div>`).join('')}
+    <div class="fe-tot grand"><span>${t('fe_total')} B</span><span class="v">${G(T.B)}</span></div>`
+    : `<p class="sub" style="margin:0">${t('fe_e_aucune')}</p>`;
+  $('fe-tc').textContent = G(T.C);
+  $('fe-td').textContent = G(T.D);
+  for(const k of S.ctx.coupures){ const n = ent(S.billets[k]); $('fe-bil-' + k).textContent = n ? G(n * k) : ''; }
+  $('fe-mon').textContent = num(S.monnaie) ? G(num(S.monnaie)) : '';
+  if($('fe-usd')) $('fe-usd').textContent = num(S.usd) ? G(usdEnG()) : '';
+  $('fe-te').textContent = G(T.E);
+  $('fe-ef').textContent = G(T.EF);
+  const cls = Math.abs(T.ecart) < 1 ? 'ok' : (T.ecart < 0 ? 'neg' : 'pos');
+  const lib = Math.abs(T.ecart) < 1 ? t('fe_juste') : (T.ecart < 0 ? t('fe_short') : t('fe_over'));
+  $('fe-recap').innerHTML = `
+    <div class="total"><span>${t('fe_vente_b')}</span><span class="v">${G(T.B)}</span></div>
+    <div class="total"><span>C · ${t('fe_c')}</span><span class="v">${G(T.C)}</span></div>
+    <div class="total"><span>D · ${t('fe_d')}</span><span class="v">${G(T.D)}</span></div>
+    <div class="total"><span>E − F · ${t('fe_e')}</span><span class="v">${G(T.EF)}</span></div>
+    <div class="total" style="border-top:2px solid var(--border)"><span>${t('fe_remis')}</span><span class="v">${G(T.just)}</span></div>
+    <div class="ecart ${cls}"><span>${lib}</span><span>${signe(T.ecart)}</span></div>`;
+  $('barre-info').innerHTML = `${lib}<b>${signe(T.ecart)}</b>`;
+}
+async function feEnvoyer(){
+  const z = $('fe-msg');
+  const err = (m, el) => { z.innerHTML = `<div class="alerte err">${m}</div>`; (el || z).scrollIntoView({block:'center', behavior:'smooth'}); };
+  const sais = feSaisies(), inc = sais.find(x => !x.complet), neg = sais.find(x => x.complet && x.g < 0);
+  if(inc) return err(t('fe_e_incomplet', {p: esc(inc.q.nom)}), $('fe-r-' + inc.q.id));
+  if(neg) return err(`${esc(neg.q.nom)} : ${t('fin_sup')}`, $('fe-r-' + neg.q.id));
+  if(!sais.length && !feEnvoyees().length) return err(t('fe_e_aucune'));
+  for(const [i, x] of S.bons.entries()) if(!(num(x.montant) > 0)) return err(t('fe_e_bon', {i: i + 1}), document.querySelector(`[data-f="bon:${i}:montant"]`));
+  for(const [i, x] of S.credits.entries()) if(!(num(x.montant) > 0) || (x.nom || '').trim().length < 2)
+    return err(t('fe_e_credit', {i: i + 1}), document.querySelector(`[data-f="cre:${i}:nom"]`));
+  for(const [i, x] of S.depenses.entries()) if((x.description || '').trim().length < 3 || !(num(x.montant) > 0) || (x.autorise_par || '').trim().length < 2)
+    return err(t('fe_e_dep', {i: i + 1}), document.querySelector(`[data-f="dep:${i}:description"]`));
+  if(num(S.fonds.montant) > 0 && (S.fonds.nom || '').trim().length < 2) return err(t('fe_e_fonds'), document.querySelector('[data-f="fonds:nom"]'));
+  const T = feTotaux();
+  if(!await demander({ico:'📨', titre:t('fe_confirmer_t'), texte:t('fe_confirmer', {b:G(T.B), j:G(T.just), e:signe(T.ecart)}),
+                      oui:t('oui_envoyer_rapport'), non:t('non_retour')})) return;
+  const b = $('barre-btn'); b.disabled = true; b.textContent = t('envoi');
+  try{
+    if(sais.length){
+      try{
+        await api('POST', '/api/pompiste/compteurs', {date:S.date, periode: enCours() ? enCours().periode : null, charte_acceptee:S.charte,
+          lignes: sais.map(x => ({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap, debut_confirme:!!x.s.debutConfirme,
+                                  pompe_choisie_id:x.s.pompeChoisie||null, decision:x.s.decision||null}))});
+      }catch(e){
+        if(e.status === 422 && e.detail?.erreurs){
+          S.erreurs = {}; for(const x of e.detail.erreurs) S.erreurs[x.pompe_id] = x;
+          rendre(); err(t('fe_e_index'), $('fe-r-' + e.detail.erreurs[0].pompe_id));
+          return;
+        }
+        throw e;
+      }
+      for(const x of sais) delete S.index[x.q.id];
+      S.erreurs = {};
+      S.ctx = await api('GET', '/api/pompiste/contexte?date=' + S.date);
+    }
+    const h = [S.heures.debut, S.heures.fin].filter(Boolean).join(' – ');
+    S.dernier = await api('POST', '/api/pompiste/terminer', {
+      billetterie: S.ctx.coupures.map(c => ({coupure:c, liasses:0, billets:ent(S.billets[c])})).filter(x => x.billets),
+      monnaie: num(S.monnaie) || 0, note: S.note || null, heures: h || null,
+      depenses: S.depenses.map(x => ({description: x.description.trim(), montant: num(x.montant), autorise_par: x.autorise_par.trim()})),
+      devises: num(S.usd) ? [{devise: 'USD', montant: num(S.usd)}] : [],
+      bons: S.bons.map(x => ({reference: (x.reference || '').trim(), montant: num(x.montant)})),
+      credits: S.credits.map(x => ({nom: x.nom.trim(), montant: num(x.montant)})),
+      fonds_caisse: num(S.fonds.montant) > 0 ? {nom: S.fonds.nom.trim(), montant: num(S.fonds.montant)} : null});
+    effacerBrouillon();
+    aller('fin');
+  }catch(e){
+    if(e.status === 401) return ecranConnexion(t('session'));
+    rendre();
+    err(msgErreur(e));
+  }
+}
+function feTicket(r, L){
+  const f = r.feuille || {}, tf = r.totaux_feuille || {};
+  if(!tf.bons && !tf.credits && !tf.fonds_caisse) return '';
+  return `<div class="sep"></div><div class="b">${t('tk_feuille')}</div>
+    ${(f.bons || []).map(x => L(`C · ${esc(x.reference || t('fe_c'))}`, G(x.montant))).join('')}
+    ${(f.credits || []).map(x => L(`D · ${esc(x.nom)}`, G(x.montant))).join('')}
+    ${f.fonds_caisse ? L(`F · ${esc(f.fonds_caisse.nom)}`, '− ' + G(f.fonds_caisse.montant)) : ''}`;
+}
+
+// ── Envoyé ──────────────────────────────────────────────────────────
+function rFin(){
+  const r = S.dernier;
+  sansBarre();
+  $('app').innerHTML = `<div style="max-width:640px;margin:0 auto">
+    <div style="text-align:center;font-size:80px;margin-top:10px">✅</div>
+    <h1 style="text-align:center">${t('envoye')}</h1>
+    <p class="sub" style="text-align:center">${t('prevenue')}</p>
+    <div class="card">
+      <div class="total"><span>${t('date_rapport')}</span><span>${esc(jourTxt(r.date))}</span></div>
+      ${galProduits(r.lignes).map(([n, g]) => `<div class="total"><span>${esc(n)}</span><span class="v">${nfg(g)} gal</span></div>`).join('')}
+      <div class="total"><span>${t('attendu')}</span><span class="v">${G(r.montant_attendu)}</span></div>
+      ${r.total_depenses ? `<div class="total"><span>${t('dep_total')}</span><span class="v">− ${G(r.total_depenses)}</span></div>
+      <div class="total"><span>${t('a_remettre')}</span><span class="v">${G(r.montant_a_remettre)}</span></div>` : ''}
+      <div class="total"><span>${t('compte')}</span><span class="v">${G(r.montant_compte)}</span></div>
+      ${r.totaux_feuille?.bons ? `<div class="total"><span>C · ${t('fe_c')}</span><span class="v">${G(r.totaux_feuille.bons)}</span></div>` : ''}
+      ${r.totaux_feuille?.credits ? `<div class="total"><span>D · ${t('fe_d_credits')}</span><span class="v">${G(r.totaux_feuille.credits)}</span></div>` : ''}
+      ${r.totaux_feuille?.fonds_caisse ? `<div class="total"><span>F · ${t('fe_f')}</span><span class="v">− ${G(r.totaux_feuille.fonds_caisse)}</span></div>` : ''}
+      <div class="total"><span>${t('ecart')}</span><span class="v">${signe(r.ecart)}</span></div></div>
+    <button class="btn btn-print" onclick="imprimerTicket(S.dernier)">🖨 ${t('imprimer')}</button>
+    <div class="papier">${t('papier')} : ${['58','80'].map(l => `<button data-l="${l}" class="${PAPIER===l?'on':''}" onclick="choisirPapier('${l}')">${l} mm</button>`).join('')}</div>
+    <div style="height:12px"></div>
+    <button class="btn" onclick="deconnexion()">${t('deconnecter')}</button>
+    <div style="height:12px"></div>
+    <button class="btn sec" onclick="nouveauRapport()">${t('autre_rapport')}</button>
+    <h2>${t('derniers')}</h2><div class="card" id="hist"></div></div>`;
+  chargerHistorique();
+  // Fiche imprimée automatiquement dès la soumission
+  if(!r._imprime){ r._imprime = true; setTimeout(() => imprimerTicket(r), 400); }
+}
+// ── Fiche du rapport, format ticket (imprimante thermique du terminal) ──
+let PAPIER = (() => { try{ return localStorage.getItem('pompiste-papier') || '58'; }catch(e){ return '58'; } })();
+function choisirPapier(l){ PAPIER = l; try{ localStorage.setItem('pompiste-papier', l); }catch(e){}
+  document.querySelectorAll('.papier button').forEach(b => b.classList.toggle('on', b.dataset.l === l)); }
+
+function ticketHtml(r){
+  const m = S.marque || {}, L = (a, b) => `<div class="l"><span>${a}</span><span>${b}</span></div>`;
+  const pomp = S.ctx?.pompiste || {};
+  const parProduit = {};
+  for(const l of r.lignes) (parProduit[l.produit_nom] ||= []).push(l);
+  const quand = d => { const x = new Date(d); return `${String(x.getDate()).padStart(2,'0')}/${String(x.getMonth()+1).padStart(2,'0')}/${x.getFullYear()} `
+    + `${String(x.getHours()).padStart(2,'0')}:${String(x.getMinutes()).padStart(2,'0')}`; };
+  const billets = (r.billetterie || []).map(b => ({c: b.coupure, n: (b.liasses||0) * 100 + (b.billets||0)})).filter(x => x.n);
+  return `<div class="c gr">${esc(m.nom || 'KONEKTA')}</div>
+    ${m.raison_sociale || m.complexe ? `<div class="c">${esc([m.raison_sociale, m.complexe].filter(Boolean).join(' · '))}</div>` : ''}
+    ${m.adresse ? `<div class="c">${esc(m.adresse)}</div>` : ''}
+    ${m.telephone1 ? `<div class="c">${esc(m.telephone1)}</div>` : ''}
+    <div class="sep2"></div>
+    <div class="c b">${t('tk_titre')}</div>
+    <div class="c">${t('tk_no')} ${r.id}</div>
+    <div class="sep"></div>
+    <div class="b">${t('tk_pompiste')} : ${esc(r.pompiste_nom || pomp.nom || '')}</div>
+    <div class="i">${t('tk_code')} : ${esc(pomp.username || '')}</div>
+    <div class="i">${t('date_rapport')} : ${esc(jourTxt(r.date))}</div>
+    ${r.soumis_at ? `<div class="i">${t('tk_soumis')} : ${quand(r.soumis_at)}</div>` : ''}
+    ${r.feuille?.heures ? `<div class="i">${t('tk_heures')} : ${esc(r.feuille.heures)}</div>` : ''}
+    <div class="sep"></div>
+    <div class="b">${t('tk_compteurs')}</div>
+    ${Object.entries(parProduit).map(([nom, ls]) => `<div class="b">${esc(nom).toUpperCase()}</div>
+      ${ls.map(l => `<div class="pompe"><div class="b">${esc(l.pompe_nom)}</div>
+        ${L(t('debut'), nfg(l.metter_avant))}${L(t('fin'), nfg(l.metter_apres))}
+        ${L(`${nfg(l.gallons)} gal × ${nf(l.prix_gallon,2)}`, G(l.montant))}</div>`).join('')}
+      ${L(`<b>${t('total')} ${esc(nom)}</b>`, `<b>${nfg(ls.reduce((a,x)=>a+x.gallons,0))} gal</b>`)}
+      ${L('', `<b>${G(ls.reduce((a,x)=>a+x.montant,0))}</b>`)}`).join('<div class="sep"></div>')}
+    <div class="sep2"></div>
+    <div class="b">${t('tk_ventes')}</div>
+    ${galProduits(r.lignes).map(([n, g]) => L(`${t('tk_total_gal')} ${esc(n)}`, nfg(g))).join('')}
+    ${L(`<b>${t('tk_attendu')}</b>`, `<b>${G(r.montant_attendu)}</b>`)}
+    <div class="sep"></div>
+    <div class="b">${t('tk_argent')}</div>
+    ${billets.map(x => L(`${nf(x.c)} G × ${x.n}`, G(x.c * x.n))).join('')}
+    ${r.monnaie ? L(t('monnaie'), G(r.monnaie)) : ''}
+    ${(r.devises || []).map(x => L(`${nf(x.montant, 2)} $ × ${nf(x.taux, 2)}`, G(x.montant_htg))).join('')}
+    ${L(`<b>${t('tk_compte')}</b>`, `<b>${G(r.montant_compte)}</b>`)}
+    ${feTicket(r, L)}
+    ${(r.depenses || []).length ? `<div class="sep"></div><div class="b">${t('tk_depenses')}</div>
+      ${r.depenses.map(x => `<div>${esc(x.description)}</div>${L(`<span class="i">${t('tk_autorise')} ${esc(x.autorise_par)}</span>`, G(x.montant))}`).join('')}
+      ${L(`<b>${t('dep_total')}</b>`, `<b>${G(r.total_depenses)}</b>`)}
+      ${L(`<b>${t('tk_a_remettre')}</b>`, `<b>${G(r.montant_a_remettre)}</b>`)}` : ''}
+    <div class="sep2"></div>
+    <div class="l gr"><span>${t('tk_ecart')}</span><span>${signe(r.ecart)}</span></div>
+    <div class="c">${Math.abs(r.ecart) < 1 ? t('juste') : (r.ecart < 0 ? t('manque') : t('plus'))}</div>
+    ${r.note_pompiste ? `<div class="sep"></div><div>${t('tk_note')} : ${esc(r.note_pompiste)}</div>` : ''}
+    <div class="sig">${t('tk_sig_pompiste')}</div>
+    <div class="sig">${t('tk_sig_resp')}</div>
+    <div class="sep"></div>
+    <div class="c">${t('tk_verif')}</div>
+    <div class="c">${t('tk_imprime')} ${quand(new Date())}</div>
+    <div style="height:14mm"></div>`;
+}
+
+function imprimerTicket(r){
+  const tk = $('ticket');
+  tk.className = 'l' + PAPIER;
+  tk.innerHTML = ticketHtml(r);
+  let st = document.getElementById('format-page');
+  if(!st){ st = document.createElement('style'); st.id = 'format-page'; document.head.appendChild(st); }
+  st.textContent = `@page{size:${PAPIER}mm auto;margin:2mm 3mm}`;
+  clearTimeout(_veille);                 // pas de déconnexion pendant la fenêtre d'impression
+  setTimeout(() => window.print(), 50);
+}
+window.addEventListener('afterprint', () => reveil());
+
+async function reimprimer(id){
+  try{
+    const rs = await api('GET','/api/pompiste/rapports');
+    const r = rs.find(x => x.id === id);
+    if(r) imprimerTicket(r);
+  }catch(e){}
+}
+
+function nouveauRapport(){
+  const charte = S.charte; reinit(); S.charte = charte;
+  S.etape = 'periode'; chargerContexte();
+}
+
+async function chargerHistorique(){
+  try{
+    const rs = await api('GET','/api/pompiste/rapports');
+    $('hist').innerHTML = rs.length ? rs.slice(0,8).map(r=>`<div class="hist">
+      <div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(jourTxt(r.date))}</b>
+        <span class="badge ${r.statut}">${t(r.statut)}</span></div>
+      <div style="font-size:15px;color:var(--muted)">${galProduits(r.lignes).map(([n, g]) => `${esc(n)} ${nfg(g)} gal`).join(' · ')} · ${t('ecart_court')} ${signe(r.ecart)}</div>
+      ${r.commentaire_superviseur ? `<div class="com"><b>${esc(r.traite_par_nom||t('direction'))} :</b> ${esc(r.commentaire_superviseur)}</div>` : ''}
+      ${r.statut==='REJETE' ? `<div style="font-size:15px;margin-top:6px;font-weight:700">${t('refaire')}</div>` : ''}
+      <button class="btn-mod" style="margin-top:8px" onclick="reimprimer(${r.id})">🖨 ${t('reimprimer')}</button>
+    </div>`).join('') : `<span class="sub">${t('aucun_rapport')}</span>`;
+  }catch(e){ const h = $('hist'); if(h) h.innerHTML = ''; }
+}
+
+// Tablette partagée : déconnexion automatique après 10 min sans toucher
+// l'écran (le rapport commencé est gardé et repris à la reconnexion), et
+// 2 min après l'écran « Rapport envoyé » (le temps d'imprimer la fiche).
+let _veille = null, _veilleAlerte = null, _decompte = null;
+function reveil(){
+  clearTimeout(_veille); clearTimeout(_veilleAlerte);
+  if(!S.ctx && S.etape !== 'fin') return;
+  if(S.etape === 'fin'){ _veille = setTimeout(deconnexion, 120_000); return; }
+  // 9 min sans toucher l'écran : on prévient, puis déconnexion 60 s plus tard
+  _veilleAlerte = setTimeout(alerteVeille, 9 * 60_000);
+}
+async function alerteVeille(){
+  let n = 60;
+  const texte = () => t('veille_txt', {s:n});
+  _decompte = setInterval(() => { n--; const el = $('dlg-texte'); if(el) el.textContent = texte();
+    if(n <= 0){ clearInterval(_decompte); fermerDlg(false); } }, 1000);
+  const reste = await demander({ico:'⏰', titre:t('veille_titre'), texte:texte(), oui:t('veille_oui'), non:t('veille_non'), fond:true});
+  clearInterval(_decompte);
+  if(reste) reveil(); else if(S.ctx) deconnexion();
+}
+['pointerdown','keydown'].forEach(ev => document.addEventListener(ev, reveil, {passive:true}));
+
+// ── Fenêtre de confirmation (remplace confirm(), gros boutons, 2 langues) ──
+let _dlgReponse = null;
+let _dlgFond = false;
+function demander({ico='', titre='', texte='', oui='OK', non='', danger=false, fond=false}){
+  return new Promise(res => {
+    if(_dlgReponse) _dlgReponse(false);
+    _dlgReponse = res; _dlgFond = fond;
+    $('dlg-ico').textContent = ico; $('dlg-titre').textContent = titre; $('dlg-texte').innerHTML = texte;
+    $('dlg-oui').textContent = oui; $('dlg-non').textContent = non; $('dlg-non').classList.toggle('cache', !non);
+    $('dlg').classList.toggle('danger', !!danger);
+    $('dlg').classList.remove('cache');
+    $('dlg-oui').focus();
+  });
+}
+function fermerDlg(valeur){
+  if(!_dlgReponse) return;
+  const r = _dlgReponse; _dlgReponse = null;
+  $('dlg').classList.add('cache');
+  r(valeur);
+}
+const dlgOuvert = () => !!_dlgReponse;
+$('dlg-oui').onclick = () => fermerDlg(true);
+$('dlg-non').onclick = () => fermerDlg(false);
+$('dlg').addEventListener('click', e => { if(e.target.id === 'dlg') fermerDlg(_dlgFond); });
+document.addEventListener('keydown', e => { if(dlgOuvert() && e.key === 'Escape') fermerDlg(false); });
+let _flash = null;
+function flash(msg){ const el = $('note-flash'); el.textContent = msg; el.classList.remove('cache');
+  clearTimeout(_flash); _flash = setTimeout(() => el.classList.add('cache'), 4000); }
+
+// ── Brouillon : ce qui est saisi reste sur l'appareil jusqu'à l'envoi ──
+// Sortie involontaire, retour arrière, coupure, déconnexion automatique :
+// à la reconnexion du même pompiste, il reprend là où il était.
+const CHAMPS_BROUILLON = ['etape','charte','date','periode','produitId','choisies','pos','index','billets','monnaie','note','depuisResume','modif','dernierProduit',
+                          'depenses','depForm','depEdit','usd','bons','credits','fonds','heures','guide','depuisFeuille'];
+const cleBrouillon = () => S.ctx?.pompiste?.username ? 'ponpis-brouillon-' + S.ctx.pompiste.username : null;
+function sauverBrouillon(){
+  const k = cleBrouillon(); if(!k || S.etape === 'fin' || S.etape === 'charte') return;
+  const b = {t: Date.now(), enCours: S.ctx?.en_cours?.id || null};
+  for(const c of CHAMPS_BROUILLON) b[c] = S[c];
+  try{ localStorage.setItem(k, JSON.stringify(b)); }catch(e){}
+}
+function effacerBrouillon(){ const k = cleBrouillon(); if(k) try{ localStorage.removeItem(k); }catch(e){} }
+function restaurerBrouillon(){
+  const k = cleBrouillon(); if(!k) return false;
+  let b = null; try{ b = JSON.parse(localStorage.getItem(k) || 'null'); }catch(e){}
+  if(!b) return false;
+  const enCoursId = S.ctx?.en_cours?.id || null;
+  // Trop ancien, ou le rapport a changé ailleurs (terminé, annulé…) : on repart proprement
+  if(Date.now() - b.t > 12 * 3600_000 || (b.enCours || null) !== enCoursId){ effacerBrouillon(); return false; }
+  for(const c of CHAMPS_BROUILLON) if(b[c] !== undefined) S[c] = b[c];
+  if(!['feuille','periode','calendrier','produit','pompes','index','compteurs','rapport','depenses','depense','billetterie','resume','modif'].includes(S.etape)) S.etape = 'periode';
+  if(!Array.isArray(S.bons)) S.bons = [];
+  if(!Array.isArray(S.credits)) S.credits = [];
+  if(!S.fonds) S.fonds = {nom:'', montant:''};
+  if(!S.heures) S.heures = {debut:'', fin:''};
+  if(S.etape === 'modif' && !S.modif) S.etape = 'resume';
+  if(S.etape === 'depense' && !S.depForm) S.etape = 'depenses';
+  if(!Array.isArray(S.depenses)) S.depenses = [];
+  S.charte = true; S.champActif = null; S.caseActive = null;
+  return true;
+}
+const aDesDonnees = () => !!(enCours() || indexSaisis() || Object.values(S.billets).some(Boolean) || S.monnaie || S.note
+  || S.bons.length || S.credits.length || num(S.fonds.montant));
+
+// ── Bouton retour d'Android / du navigateur ─────────────────────────
+// Il ramène à l'étape précédente au lieu de fermer l'application ; sur un
+// écran de départ, on demande avant de quitter.
+let _laisserPartir = false;
+function garderHistorique(){ try{ history.pushState({ponpis:1}, ''); }catch(e){} }
+try{ history.replaceState({ponpis:0}, ''); garderHistorique(); }catch(e){}
+window.addEventListener('popstate', async () => {
+  if(_laisserPartir) return;
+  if(dlgOuvert()){ fermerDlg(false); garderHistorique(); return; }
+  if(S.ctx) garderHistorique();
+  if(!S.ctx){ _laisserPartir = true; history.back(); return; }   // écran de connexion : retour normal
+  if(!['charte','rapport','fin','periode'].includes(S.etape)) return precedent();
+  const ok = await demander({ico:'🚪', titre:t('quitter_titre'), texte: aDesDonnees() ? t('sortir_txt_brouillon') : t('quitter_txt'),
+                              oui:t('oui_quitter'), non:t('rester')});
+  if(ok){ sauverBrouillon(); _laisserPartir = true; history.go(-2); }
+});
+window.addEventListener('beforeunload', e => {
+  sauverBrouillon();
+  if(S.ctx && S.etape !== 'fin' && aDesDonnees()){ e.preventDefault(); e.returnValue = ''; }
+});
+
+// ── Application installable (icône sur l'écran de l'appareil) ───────
+// Voir /pompiste/installer et frontend/pompiste-app/sw.js.
+let _inviteInstall = null;
+const enModeApp = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/pompiste-sw.js', {scope: '/pompiste'}).catch(() => {});
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); _inviteInstall = e; });
+window.addEventListener('appinstalled', () => { _inviteInstall = null; const b = $('btn-installer'); if(b) b.remove(); });
+async function installerApp(){
+  for(let i = 0; i < 8 && !_inviteInstall; i++) await new Promise(r => setTimeout(r, 250));
+  if(_inviteInstall){ _inviteInstall.prompt(); await _inviteInstall.userChoice; _inviteInstall = null; return; }
+  location.href = '/pompiste/installer';      // instructions selon le navigateur + QR code
+}
+
+demarrer();
+</script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import collections
 import hmac
 import logging
+import json
 import os
 import time as _time
 from datetime import date as date_type
@@ -20,7 +21,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, get_db, engine, SessionLocal
-from models import Produit, Pompe, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse, OAuthState, CategorieDepense, CategorieAchat, Poste, Beneficiaire
+from models import Produit, Pompe, Distributeur, Face, Releve, Utilisateur, Role, Livraison, PrixVente, Employe, FichePaie, Depense, Achat, ParametreDepense, OTPCode, LoginSecurityEvent, SessionToken, ChatConversation, RenflouementCaisse, OAuthState, CategorieDepense, CategorieAchat, Poste, Beneficiaire
 import listes_reference as lref
 from otp_service import (
     OTP_ENABLED, OTP_PENDING_COOKIE, OTP_PENDING_MAX_AGE,
@@ -47,6 +48,8 @@ from zelle_routes import router as zelle_router
 from taches_routes import router as taches_router
 from pieces_jointes_routes import router as pieces_jointes_router
 from listes_reference_routes import router as listes_reference_router
+from pompiste_routes import router as pompiste_router, assurer_role_pompiste, est_role_pompiste
+from caisse_principale_routes import router as caisse_principale_router
 from auth import (
     SESSION_COOKIE, hash_password, verify_password,
     hash_code_acces, verify_code_acces,
@@ -118,10 +121,17 @@ _MODULES = {
     "cuisine":    os.getenv("MODULE_CUISINE",    "true").lower() == "true",
     "zelle":      os.getenv("MODULE_ZELLE",      "true").lower() == "true",
     "patisserie": os.getenv("MODULE_PATISSERIE", "true").lower() == "true",
+    # Commerce & Distribution (entrepôts, fournisseurs...) — indépendant de
+    # MODULE_BAR : une institution carburant-only comme Vertières peut avoir
+    # Bar désactivé tout en utilisant Commerce. Défaut FALSE (module tout
+    # nouveau, opt-in explicite par institution, contrairement aux autres
+    # modules ci-dessus qui existaient déjà avant l'ajout du système de
+    # toggles et restent donc actifs par défaut pour ne rien casser).
+    "commerce":   os.getenv("MODULE_COMMERCE",   "false").lower() == "true",
 }
 
 app = FastAPI(
-    title="Suivi des Meters - Station",
+    title="Suivi des Meeters - Station",
     docs_url="/docs"        if _DEBUG_MODE else None,
     redoc_url="/redoc"      if _DEBUG_MODE else None,
     openapi_url="/openapi.json" if _DEBUG_MODE else None,
@@ -142,10 +152,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' blob:; "
             "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: blob:; "
+            "img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.fr; "
             "font-src 'self' data:; "
             "connect-src 'self'; "
-            "worker-src blob:; "
+            "worker-src 'self' blob:; "
             "frame-ancestors 'none';"
         )
         if _SECURE_COOKIES:
@@ -175,14 +185,14 @@ _LOGIN_ATTEMPTS: dict[str, list[float]] = collections.defaultdict(list)
 _LOGIN_MAX_FAILURES = 10    # tentatives échouées avant blocage
 _LOGIN_WINDOW_SEC   = 900   # fenêtre glissante : 15 minutes
 
-def _check_login_rate(ip: str | None) -> None:
+def _check_login_rate(ip: str | None, maximum: int = _LOGIN_MAX_FAILURES) -> None:
     """Lève HTTPException 429 si l'IP a trop de tentatives échouées récentes."""
     if not ip:
         return
     now = _time.monotonic()
     cut = now - _LOGIN_WINDOW_SEC
     _LOGIN_ATTEMPTS[ip] = [t for t in _LOGIN_ATTEMPTS[ip] if t > cut]
-    if len(_LOGIN_ATTEMPTS[ip]) >= _LOGIN_MAX_FAILURES:
+    if len(_LOGIN_ATTEMPTS[ip]) >= maximum:
         raise HTTPException(429, "Trop de tentatives — réessayez dans 15 minutes.")
 
 def _record_login_failure(ip: str | None) -> None:
@@ -196,9 +206,11 @@ def _clear_login_failures(ip: str | None) -> None:
 # Chemins accessibles sans être connecté
 _PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request-admin-code", "/api/otp/verify-admin-code",
                     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify",
-                    "/api/oauth/otp/send", "/api/config/branding"}
-_PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/") if _DEBUG_MODE
-                    else ("/api/auth/oauth/", "/shared/"))
+                    "/api/oauth/otp/send", "/api/config/branding", "/api/login/pompiste", "/api/pompiste/identifier", "/pompiste",
+                    "/pompiste/manifest.webmanifest", "/pompiste-sw.js", "/pompiste/installer", "/pompiste/qr.png",
+                    "/pompiste/konekta-ponpis.apk", "/.well-known/assetlinks.json"}
+_PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/", "/pompiste-app/") if _DEBUG_MODE
+                    else ("/api/auth/oauth/", "/shared/", "/pompiste-app/"))
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -219,15 +231,51 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not proxy:
             if path.startswith("/api/"):
                 return JSONResponse({"detail": "Non authentifié"}, status_code=401)
-            return RedirectResponse(url="/login")
+            # Préserve ?scan=CODE (arrivée directe depuis un QR de caisse
+            # scanné avant d'être connecté) pour que login.html puisse
+            # reprendre le flux de livraison juste après la connexion.
+            scan = request.query_params.get("scan")
+            login_url = f"/login?scan={url_quote(scan)}" if scan else "/login"
+            return RedirectResponse(url=login_url)
 
         request.state.user = proxy
+        # Compte pompiste : uniquement son espace de saisie, rien d'autre.
+        if proxy.est_pompiste and not (path in _POMPISTE_PATHS or path.startswith("/api/pompiste/")):
+            if path.startswith("/api/"):
+                return JSONResponse({"detail": "Espace réservé : saisie des compteurs uniquement"},
+                                    status_code=403)
+            return RedirectResponse(url="/pompiste")
         return await call_next(request)
+
+
+# Seuls chemins ouverts à un compte pompiste (en plus de /api/pompiste/…)
+_POMPISTE_PATHS = {"/pompiste", "/api/logout", "/api/auth/me", "/api/auth/login-meta"}
 
 
 class _UserProxy:
     """Attributs scalaires de l'utilisateur, copiés avant la fermeture de session."""
-    __slots__ = ("id","role","role_id","actif","nom_complet","username","poste","email","api_key_hash")
+    __slots__ = ("id","role","role_id","actif","nom_complet","username","poste","email","api_key_hash",
+                 "est_pompiste")
+
+
+def _admin_proprietaire_dans_espace(db):
+    """Clé admin statique dans une station séparée : le compte du propriétaire
+    (admin « admin » de l'espace principal) dans cette station, retrouvé par
+    son email, comme lorsqu'il change de station depuis l'interface."""
+    from database import espace_courant, session_principale
+    from espaces_routes import _est_admin, _miroir
+    if not espace_courant():
+        return None
+    with session_principale() as pdb:
+        p = pdb.query(Utilisateur).filter_by(username="admin", actif=True).first()
+        if not (p and p.email and _est_admin(p)):
+            return None
+        pdb.expunge(p)
+    u = db.query(Utilisateur).filter(Utilisateur.email == p.email).first()
+    if u is None:                   # jamais entré dans cette station : même compte miroir que l'interface
+        u = _miroir(db, p)
+        db.commit()
+    return u if _est_admin(u) else None
 
 
 def _resoudre_utilisateur(token, api_key_hdr):
@@ -237,21 +285,118 @@ def _resoudre_utilisateur(token, api_key_hdr):
             # Clé statique admin depuis .env (timing-safe)
             if _ADMIN_API_KEY and hmac.compare_digest(api_key_hdr, _ADMIN_API_KEY):
                 user = db.query(Utilisateur).filter_by(username="admin", actif=True).first()
+                if not user:
+                    user = _admin_proprietaire_dans_espace(db)
             else:
                 user = verify_api_key(db, api_key_hdr)
         if not user:
             return None
         proxy = _UserProxy()
-        for attr in _UserProxy.__slots__:
+        for attr in _UserProxy.__slots__[:-1]:
             setattr(proxy, attr, getattr(user, attr))
+        proxy.est_pompiste = est_role_pompiste(user.role_obj)
         return proxy
 
 
 app.add_middleware(AuthMiddleware)
 
+
+class EspaceMiddleware:
+    """Choisit l'espace (station séparée) de chaque requête, avant toute
+    lecture en base : cookie konekta_espace, validé contre le registre. À la
+    connexion (/api/login, /api/login/pompiste), l'espace est celui du compte
+    (email ou identifiant) et le cookie est posé en conséquence."""
+    _CONNEXIONS = {"/api/login", "/api/login/pompiste", "/api/auth/forgot-password", "/api/auth/reset-password"}
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        from database import definir_espace, retablir_espace
+        from espaces_routes import ESPACE_COOKIE, espace_du_compte, schemas_actifs
+        schema, poser = None, False
+        cookie = ""
+        for k, v in scope.get("headers") or []:
+            if k == b"cookie":
+                cookie = v.decode("latin-1")
+        for morceau in cookie.split(";"):
+            nom, _, val = morceau.strip().partition("=")
+            if nom == ESPACE_COOKIE and val:
+                schema = val.strip()
+        if schema and schema not in await run_in_threadpool(schemas_actifs):
+            from espaces_routes import invalider_cache
+            invalider_cache()                    # station créée à l'instant (autre processus) ?
+            if schema not in await run_in_threadpool(schemas_actifs):
+                schema, poser = None, True      # station supprimée : retour à l'espace principal
+        if scope.get("method") == "GET" and scope.get("path") == "/api/auth/reset-password/verify":
+            from urllib.parse import parse_qs
+            from espaces_routes import espace_du_jeton_reset
+            jeton = (parse_qs((scope.get("query_string") or b"").decode("latin-1")).get("token") or [None])[0]
+            schema = await run_in_threadpool(espace_du_jeton_reset, jeton)
+            poser = True
+        if scope.get("method") == "POST" and scope.get("path") in self._CONNEXIONS:
+            corps, plus = b"", True
+            while plus:
+                m = await receive()
+                corps += m.get("body", b"")
+                plus = m.get("more_body", False)
+            try:
+                d = json.loads(corps or b"{}")
+            except Exception:
+                d = {}
+            d = d if isinstance(d, dict) else {}
+            if scope.get("path") == "/api/auth/reset-password":
+                from espaces_routes import espace_du_jeton_reset
+                schema = await run_in_threadpool(espace_du_jeton_reset, d.get("token"))
+            else:
+                ident = d.get("identifier")          # mot de passe oublié : email ou identifiant
+                email = d.get("email") or (ident if ident and "@" in ident else None)
+                username = d.get("username") or (ident if ident and "@" not in ident else None)
+                schema = await run_in_threadpool(espace_du_compte, email, username)
+                if scope.get("path") == "/api/login/pompiste" and isinstance(d.get("espace_id"), int):
+                    # Le pompiste a choisi la station où il travaille aujourd'hui
+                    from espaces_routes import schema_de_station
+                    try:
+                        schema = await run_in_threadpool(schema_de_station, d["espace_id"])
+                    except ValueError:
+                        pass
+            poser = True
+            envoye = {"fait": False}
+
+            async def receive():                # le corps relu est rendu à l'application
+                if envoye["fait"]:
+                    return {"type": "http.disconnect"}
+                envoye["fait"] = True
+                return {"type": "http.request", "body": corps, "more_body": False}
+
+        async def send_espace(message):
+            if poser and message["type"] == "http.response.start":
+                attrs = "; Path=/; HttpOnly; SameSite=Lax" + ("; Secure" if _SECURE_COOKIES else "")
+                valeur = (f"{ESPACE_COOKIE}={schema}; Max-Age={30 * 24 * 3600}" if schema
+                          else f"{ESPACE_COOKIE}=; Max-Age=0")
+                message.setdefault("headers", []).append((b"set-cookie", (valeur + attrs).encode("latin-1")))
+            await send(message)
+
+        jeton = definir_espace(schema)
+        try:
+            await self.app(scope, receive, send_espace)
+        finally:
+            retablir_espace(jeton)
+
+
+app.add_middleware(EspaceMiddleware)
+
 # Module POS bar/restaurant
 app.include_router(pos_router)
 app.include_router(bar_depot_router)
+from espaces_routes import router as espaces_router
+app.include_router(espaces_router)
+from intelligence import router as intelligence_router
+app.include_router(intelligence_router)
+from geospatial import router as geospatial_router
+app.include_router(geospatial_router)
 app.include_router(pos_analyse_router)
 app.include_router(caisse_router)
 app.include_router(hotel_router)
@@ -267,6 +412,16 @@ from bar_achats_routes import router as bar_achats_router
 app.include_router(bar_achats_router)
 from credits_routes import router as credits_router
 app.include_router(credits_router)
+app.include_router(pompiste_router)
+from placement_metres import router as placement_router
+app.include_router(placement_router)
+from classement_pompistes import router as classement_router
+app.include_router(classement_router)
+from smart_meter import router as smart_meter_router
+app.include_router(smart_meter_router)
+from transfert_station import router as transfert_router
+app.include_router(transfert_router)
+app.include_router(caisse_principale_router)
 
 
 @app.on_event("startup")
@@ -285,6 +440,8 @@ def startup():
             _db_f.close()
     except Exception as _e:
         log.warning("Rattachement des fournisseurs ignoré : %s", _e)
+    with SessionLocal() as _db:
+        assurer_role_pompiste(_db)
     # Migrations douces — colonnes ajoutées progressivement
     from sqlalchemy import text as _text
     _migrations = [
@@ -404,6 +561,44 @@ def startup():
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_hotel_proformas_numero ON hotel_proformas (numero)",
         "CREATE INDEX IF NOT EXISTS idx_hotel_pf_statut ON hotel_proformas (statut)",
         "CREATE INDEX IF NOT EXISTS idx_hotel_pf_arrivee ON hotel_proformas (date_arrivee_prevue)",
+        # Espace pompiste : rapport EN_COURS (compteurs envoyés, billetterie pas encore faite)
+        "ALTER TABLE rapports_pompiste DROP CONSTRAINT IF EXISTS chk_rpomp_statut",
+        "ALTER TABLE rapports_pompiste ADD CONSTRAINT chk_rpomp_statut CHECK (statut IN ('EN_COURS','SOUMIS','PROBLEME','CONFIRME','RESOLU','REJETE'))",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS billetterie_confirmee BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS ecart_confirme BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS note_superviseur INTEGER",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS probleme_commentaire VARCHAR(1000)",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS probleme_at TIMESTAMPTZ",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS probleme_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS confirmee BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS confirmee_at TIMESTAMPTZ",
+        "ALTER TABLE rapports_pompiste ALTER COLUMN soumis_at DROP NOT NULL",
+        "ALTER TABLE releves ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
+        "CREATE INDEX IF NOT EXISTS idx_releves_rapport_pompiste ON releves (rapport_pompiste_id)",
+        "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS depenses JSON NOT NULL DEFAULT '[]'::json",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS total_depenses NUMERIC(14,2) NOT NULL DEFAULT 0",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS devises JSON NOT NULL DEFAULT '[]'::json",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS feuille JSON",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS supprime_at TIMESTAMPTZ",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS pompe_saisie_id INTEGER REFERENCES pompes(id) ON DELETE SET NULL",
+        "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS suppression JSON",
+        "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
+        "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS statut_rapprochement VARCHAR(20)",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS confiance VARCHAR(10)",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS score_rapprochement INTEGER",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS pompe_proposee_id INTEGER REFERENCES pompes(id) ON DELETE SET NULL",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS index_reference NUMERIC(14,4)",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS source_reference VARCHAR(200)",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS ecart_reference NUMERIC(14,4)",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS decision_pompiste VARCHAR(10)",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS anomalies JSON",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS verifie_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS verifie_at TIMESTAMPTZ",
+        "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS note_verification VARCHAR(500)",
+        "ALTER TABLE produits ADD COLUMN IF NOT EXISTS adresse VARCHAR(255)",
+        "ALTER TABLE achats ADD COLUMN IF NOT EXISTS saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL",
     ]
     # Chaque instruction est isolée : une qui échoue (moteur SQLite en dev,
     # table absente, type déjà à jour…) n'empêche pas les suivantes.
@@ -414,6 +609,40 @@ def startup():
                 _c.commit()
         except Exception:
             pass
+    # Après les migrations (colonne releves.rapport_pompiste_id) : chaque
+    # compte pompiste reçoit sa fiche employé. Ne bloque jamais le démarrage.
+    try:
+        from pompiste_routes import rattacher_employes_pompistes
+        with SessionLocal() as _db:
+            rattacher_employes_pompistes(_db)
+            print(f"Faces regroupées (station principale) : {fusionner_faces(_db)}")
+            from database import migrer_espaces, definir_espace, retablir_espace, session_espace
+            print(f"Stations séparées mises à jour : {migrer_espaces()}")
+            # Les pompistes de chaque station séparée deviennent aussi des employés
+            from espaces_routes import schemas_actifs
+            for _sch in schemas_actifs():
+                _jeton = definir_espace(_sch)
+                try:
+                    with session_espace(_sch) as _edb:
+                        rattacher_employes_pompistes(_edb)
+                        fusionner_faces(_edb)
+                except Exception as _exc:
+                    print(f"Pompistes de {_sch} : {_exc}")
+                finally:
+                    retablir_espace(_jeton)
+            try:
+                for _d in _db.query(Distributeur).filter(Distributeur.adresse.is_(None)).all():
+                    _adr = next((q.produit.adresse for f in _d.faces for q in f.metres if q.produit.adresse), None)
+                    if _adr:
+                        _d.adresse = _adr
+                _db.commit()
+            except Exception as _e:
+                _db.rollback(); print("Adresse des pompes : reprise impossible :", _e)
+            from pompiste_routes import rattraper_journal, nettoyer_journal_anticipe
+            nettoyer_journal_anticipe(_db)
+            rattraper_journal(_db)
+    except Exception as _exc:
+        print(f"[pompiste] rattachement des fiches employé impossible : {_exc}", flush=True)
     from datetime import datetime, timezone as _tz
     from models import SessionToken as _ST
     with SessionLocal() as _db:
@@ -448,6 +677,27 @@ def startup():
             _db.commit()
         except Exception:
             pass
+
+        # ── Seed des départements bar (gestion des caisses/QR) ───────────
+        # Seulement 2 départements (demande explicite du 11/09/2026) : Bar
+        # Devant et Bar Piscine. Un « Derrière » avait été seedé plus tôt
+        # (essai) — désactivé ci-dessous plutôt que supprimé, pour ne
+        # jamais casser une caisse déjà historiquement transférée là-bas
+        # (aucune suppression silencieuse de donnée, voir doctrine du
+        # module) ; il disparaît simplement des listes de choix actives.
+        try:
+            from models import BarDepartement as _BD
+            import re as _re
+            for _nom in ("Devant", "Piscine"):
+                _norm = _re.sub(r"\s+", " ", _nom.strip()).casefold()
+                if not _db.query(_BD).filter_by(nom_norm=_norm).first():
+                    _db.add(_BD(nom=_nom, nom_norm=_norm, actif=True))
+            _derriere = _db.query(_BD).filter_by(nom_norm="derrière").first()
+            if _derriere and _derriere.actif:
+                _derriere.actif = False
+            _db.commit()
+        except Exception:
+            _db.rollback()
 
         # ── Seed des listes de référence partagées (idempotent) ──────────
         # Valeurs par défaut + toutes les valeurs déjà présentes dans les
@@ -744,6 +994,174 @@ def _session_ouverte_pour(db: Session, user: Utilisateur):
         .filter_by(caissier_id=emp.id, date_session=today_haiti(), statut="EN_COURS")
         .first()
     )
+
+
+class LoginPompisteIn(BaseModel):
+    username:   str
+    code_acces: str
+    espace_id:  Optional[int] = None    # station choisie (0 = principale) ; absent = sa station
+
+
+class IdentifierPompisteIn(BaseModel):
+    username: str
+
+
+def _compte_pompiste_origine(username: str):
+    """(schéma, compte) du compte pompiste d'origine, où qu'il soit."""
+    from database import session_espace
+    from espaces_routes import espace_du_compte
+    sch = espace_du_compte(username=username)
+    with session_espace(sch) as odb:
+        u = (odb.query(Utilisateur).filter(Utilisateur.username.ilike(username), Utilisateur.actif.is_(True),
+                                           Utilisateur.compte_origine.is_(None)).first())
+        if u and not est_role_pompiste(u.role_obj):
+            u = None
+        if u:
+            odb.expunge(u)
+    return sch, u
+
+
+@app.post("/api/pompiste/identifier")
+def identifier_pompiste(data: IdentifierPompisteIn, request: Request):
+    """Étape 1 de la connexion pompiste : le code existe-t-il ? Si oui, la
+    liste des stations, pour choisir celle où il travaille (le PIN suit)."""
+    from espaces_routes import stations_pompiste
+    ip = request.client.host if request.client else None
+    username = data.username.strip().lower()
+    cle = f"{ip}|pompiste-code"
+    # Toutes les tablettes d'une station partagent l'IP : seuil plus large ici
+    # (le PIN, vérifié ensuite, garde son propre blocage par code).
+    _check_login_rate(cle, maximum=30)
+    _sch, u = _compte_pompiste_origine(username) if username else (None, None)
+    if u and not u.code_acces_hash:
+        # Compte créé d'avance, PIN à reprendre : on lui demandera son ancien PIN
+        return {"prenom": (u.nom_complet or "").split(" ")[0], "stations": stations_du_pompiste(_sch, u), "reprise": True}
+    if not u:
+        # Compte de l'ancien système pas encore repris : il le sera avec son PIN
+        import reprise_pompistes
+        prenom = reprise_pompistes.prenom_ailleurs(request, username) if username else None
+        if prenom is not None:
+            # Ancien système = station principale : il n'entre que là
+            stations = [dict(st, la_sienne=True) for st in stations_pompiste() if st["id"] == 0]
+            return {"prenom": prenom, "stations": stations, "reprise": True}
+        _record_login_failure(cle)
+        raise HTTPException(404, {"code": "code_inconnu", "message": "Ce code n'existe pas."})
+    return {"prenom": (u.nom_complet or "").split(" ")[0], "stations": stations_du_pompiste(_sch, u)}
+
+
+def marque_origine(sch_origine, origine_id: int) -> str:
+    return f"{sch_origine or 'principal'}:{origine_id}"
+
+
+def stations_du_pompiste(sch_origine, origine: Utilisateur) -> list:
+    """Stations où ce pompiste peut entrer : la sienne, plus celles où la
+    direction l'a autorisé (compte actif dans cette station). Un pompiste
+    ne choisit jamais une station qui n'est pas la sienne : ses rapports ne
+    peuvent pas se retrouver dans une autre station."""
+    from database import session_espace
+    from espaces_routes import stations_pompiste
+    origine_id = 0 if sch_origine is None else int(sch_origine.split("_")[1])
+    marque = marque_origine(sch_origine, origine.id)
+    out = []
+    for st in stations_pompiste():
+        if st["id"] == origine_id:
+            out.append(dict(st, la_sienne=True))
+            continue
+        try:
+            with session_espace(None if st["id"] == 0 else f"esp_{st['id']}") as sdb:
+                ok = sdb.query(Utilisateur.id).filter_by(compte_origine=marque, actif=True).first() is not None
+        except Exception:
+            ok = False
+        if ok:
+            out.append(dict(st, la_sienne=False))
+    return out
+
+
+def _compte_dans_station(db: Session, sch_origine, origine: Utilisateur, creer: bool = False) -> Optional[Utilisateur]:
+    """Compte du pompiste dans une autre station que la sienne : même code
+    et même PIN que son compte d'origine, qui fait foi. Créé seulement quand
+    la direction l'autorise (creer=True) ; sinon None."""
+    from pompiste_routes import employe_du_compte
+    marque = marque_origine(sch_origine, origine.id)
+    u = db.query(Utilisateur).filter_by(compte_origine=marque).first()
+    if not u and not creer:
+        return None
+    if not u:
+        if db.query(Utilisateur.id).filter(Utilisateur.username.ilike(origine.username)).first():
+            raise HTTPException(409, "Un autre compte de cette station a déjà ce code : contactez le superviseur.")
+        role = assurer_role_pompiste(db)
+        u = Utilisateur(username=origine.username, nom_complet=origine.nom_complet,
+                        password_hash=origine.password_hash, role="operateur", role_id=role.id,
+                        poste=role.nom, actif=True, compte_origine=marque)
+        db.add(u)
+        db.flush()
+        prenom, _, nom = (origine.nom_complet or "").partition(" ")
+        employe_du_compte(db, u, prenom, nom)
+    u.code_acces_hash, u.nom_complet = origine.code_acces_hash, origine.nom_complet
+    db.commit()
+    return u
+
+
+@app.post("/api/login/pompiste")
+def login_pompiste(data: LoginPompisteIn, request: Request, response: Response,
+                   db: Session = Depends(get_db)):
+    """Connexion de l'espace pompiste : identifiant + PIN, réservée aux
+    comptes de rôle « Pompiste » (qui n'ont accès qu'à /pompiste)."""
+    ip = request.client.host if request.client else None
+    ua = request.headers.get("user-agent", "")
+    username = data.username.strip().lower()
+    # Compteur par identifiant : toutes les tablettes d'une station sortent
+    # par la même IP — un PIN mal tapé ne doit pas bloquer tout le monde.
+    cle = f"{ip}|pompiste|{username}"
+    _check_login_rate(cle)
+    from database import espace_courant
+    sch_origine, origine = _compte_pompiste_origine(username)
+    if origine is None:
+        # Première connexion d'un pompiste de l'ancien système : son PIN habituel
+        # est vérifié là-bas ; s'il est bon, le compte est créé ici avec ce PIN.
+        import reprise_pompistes
+        nom = reprise_pompistes.verifier_ailleurs(request, username, data.code_acces.strip())
+        if nom:
+            reprise_pompistes.creer_compte_repris(username, nom, data.code_acces.strip())
+            sch_origine, origine = _compte_pompiste_origine(username)
+    elif not origine.code_acces_hash:
+        # Compte créé d'avance sans PIN : son ancien PIN, vérifié par l'ancien système, devient son PIN
+        import reprise_pompistes
+        if reprise_pompistes.verifier_ailleurs(request, username, data.code_acces.strip()):
+            reprise_pompistes.fixer_pin(sch_origine, origine.id, data.code_acces.strip())
+            sch_origine, origine = _compte_pompiste_origine(username)
+    ici = espace_courant()
+    _err = "Identifiant ou code PIN incorrect"
+    if origine and sch_origine != ici:
+        # Autre station que la sienne : le PIN est vérifié sur son compte d'origine
+        if origine.code_acces_hash and verify_code_acces(data.code_acces.strip(), origine.code_acces_hash):
+            user = _compte_dans_station(db, sch_origine, origine)
+            if user is None or not user.actif:
+                raise HTTPException(403, {"code": "station_non_autorisee",
+                                          "message": "Ce n'est pas votre station : vos rapports ne peuvent être "
+                                                     "faits que dans la vôtre. Demandez à la direction si vous "
+                                                     "devez travailler ici."})
+        else:
+            user = None
+    else:
+        user = (db.query(Utilisateur)
+                .filter(Utilisateur.username.ilike(username), Utilisateur.actif.is_(True),
+                        Utilisateur.compte_origine.is_(None)).first())
+    if (not user or not est_role_pompiste(user.role_obj) or not user.code_acces_hash
+            or not verify_code_acces(data.code_acces.strip(), user.code_acces_hash)):
+        _record_login_failure(cle)
+        log_event(db, LOGIN_FAILED, user_id=user.id if user else None, ip_address=ip,
+                  details={"username": username, "espace": "pompiste"})
+        raise HTTPException(401, _err)
+    _clear_login_failures(cle)
+    token = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    log_event(db, LOGIN_SUCCESS, user_id=user.id, ip_address=ip, details={"espace": "pompiste"})
+    response.set_cookie(
+        SESSION_COOKIE, token,
+        httponly=True, samesite="lax", secure=_SECURE_COOKIES,
+        max_age=12 * 3600, path="/",
+    )
+    return {"id": user.id, "username": user.username, "nom_complet": user.nom_complet}
 
 
 @app.post("/api/logout")
@@ -1141,6 +1559,9 @@ def creer_utilisateur(
         raise HTTPException(409, f"L'identifiant '{username}' est déjà utilisé")
     if db.query(Utilisateur).filter_by(email=email_clean).first():
         raise HTTPException(409, "Cet email est déjà associé à un compte")
+    from espaces_routes import compte_ailleurs
+    if compte_ailleurs(email=email_clean) or compte_ailleurs(username=username):
+        raise HTTPException(409, "Cet email ou cet identifiant est déjà utilisé dans une autre station.")
 
     u = Utilisateur(
         username=username,
@@ -1593,6 +2014,103 @@ def oauth_otp_send(
     }
 
 
+@app.get("/pompiste", include_in_schema=False)
+def serve_pompiste():
+    html_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "pompiste.html"
+    )
+    return FileResponse(html_path, media_type="text/html",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+# ---------- Application pompiste installable (PWA « Konekta Ponpis ») ----------
+# L'espace /pompiste s'installe sur l'appareil Android depuis Chrome : icône
+# sur l'écran, ouverture en plein écran, connecté en direct au système.
+_POMPISTE_APP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "pompiste-app")
+
+
+def _url_publique_site(request: Request) -> str:
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    hote = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+    return f"{proto}://{hote}"
+
+
+@app.get("/pompiste/manifest.webmanifest", include_in_schema=False)
+def pompiste_manifest(request: Request):
+    nom = os.getenv("BRANDING_NOM", "").strip()
+    return JSONResponse({
+        "id": "/pompiste",
+        "name": "Konekta Ponpis" + (f" · {nom}" if nom else ""),
+        "short_name": "Konekta Ponpis",
+        "description": "Espace pompiste : compteurs, argent et rapport de période.",
+        "lang": "ht",
+        "start_url": "/pompiste",
+        "scope": "/pompiste",
+        "display": "standalone",
+        "orientation": "any",
+        "background_color": "#eef2f7",
+        "theme_color": "#ea580c",
+        "icons": [
+            {"src": "/pompiste-app/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": "/pompiste-app/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+            {"src": "/pompiste-app/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+        ],
+        # Permet à la page d'installation de savoir si l'application est déjà sur l'appareil
+        "related_applications": [{"platform": "webapp",
+                                  "url": _url_publique_site(request) + "/pompiste/manifest.webmanifest"}],
+        "prefer_related_applications": False,
+    }, media_type="application/manifest+json", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/pompiste-sw.js", include_in_schema=False)
+def pompiste_service_worker():
+    return FileResponse(os.path.join(_POMPISTE_APP_DIR, "sw.js"), media_type="application/javascript",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+@app.get("/pompiste/installer", include_in_schema=False)
+def pompiste_installer():
+    return FileResponse(os.path.join(_POMPISTE_APP_DIR, "installer.html"), media_type="text/html",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+# Application Android « Konekta Ponpis » (APK, Trusted Web Activity) : elle
+# ouvre /pompiste en plein écran. Empreinte SHA-256 de la clé de signature
+# (publique) : Android vérifie /.well-known/assetlinks.json pour cacher la
+# barre d'adresse. La clé elle-même n'est jamais dans le dépôt.
+_APK_PAQUET = "com.konekta.ponpis"
+_APK_EMPREINTES = ["6B:F8:E0:4A:B6:7A:4A:D6:67:63:DA:F7:CB:48:65:BB:B6:48:FD:1D:81:CA:6B:14:C7:2F:1E:93:6F:5E:7D:42"]
+
+
+@app.get("/.well-known/assetlinks.json", include_in_schema=False)
+def assetlinks():
+    return JSONResponse([{"relation": ["delegate_permission/common.handle_all_urls"],
+                          "target": {"namespace": "android_app", "package_name": _APK_PAQUET,
+                                     "sha256_cert_fingerprints": _APK_EMPREINTES}}],
+                        headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/pompiste/konekta-ponpis.apk", include_in_schema=False)
+def pompiste_apk():
+    return FileResponse(os.path.join(_POMPISTE_APP_DIR, "konekta-ponpis.apk"),
+                        media_type="application/vnd.android.package-archive", filename="konekta-ponpis.apk",
+                        headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/pompiste/qr.png", include_in_schema=False)
+def pompiste_qr(request: Request):
+    """QR code du lien d'installation, à scanner avec l'appareil du pompiste."""
+    import io
+    import qrcode
+    img = qrcode.make(_url_publique_site(request) + "/pompiste/installer", box_size=10, border=2)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(buf.getvalue(), media_type="image/png", headers={"Cache-Control": "no-cache"})
+
+
+app.mount("/pompiste-app", StaticFiles(directory=_POMPISTE_APP_DIR), name="pompiste-app")
+
+
 @app.get("/login", include_in_schema=False)
 def serve_login():
     html_path = os.path.join(
@@ -1627,11 +2145,41 @@ def serve_audit_xlsx():
 # ---------- Schemas ----------
 class PompeIn(BaseModel):
     nom: str
+    distributeur_id: Optional[int] = None    # pompe physique qui porte le meeter
+    face_id: Optional[int] = None            # ancien format (faces A / B)
 
 
 class ProduitIn(BaseModel):
     nom: str
     prix_gallon: float = 0
+    adresse: Optional[str] = None
+
+
+class ProduitPatch(BaseModel):
+    nom: Optional[str] = None
+    adresse: Optional[str] = None
+
+
+class PompePatch(BaseModel):
+    nom: Optional[str] = None
+    distributeur_id: Optional[int] = None   # 0 = retirer de sa pompe
+    face_id: Optional[int] = None           # ancien format (faces A / B)
+    actif: Optional[bool] = None            # True = réactiver un meeter désactivé
+
+
+class DistributeurIn(BaseModel):
+    nom: str
+    faces: List[str] = []                    # ignoré : plus de faces A / B
+    adresse: Optional[str] = None
+
+
+class DistributeurPatch(BaseModel):
+    nom: Optional[str] = None
+    adresse: Optional[str] = None
+
+
+class NomIn(BaseModel):
+    nom: str
 
 
 class ReleveIn(BaseModel):
@@ -1641,7 +2189,7 @@ class ReleveIn(BaseModel):
     prix_gallon: float          # ignoré si un prix de vente est configuré à cette date
     metter_avant: float
     metter_apres: float
-    # Obligatoire si metter_avant ≠ « mètre après » du relevé précédent de la pompe
+    # Obligatoire si metter_avant ≠ « meeter après » du relevé précédent de la pompe
     motif_ecart_compteur: Optional[str] = None
 
 
@@ -1650,15 +2198,35 @@ TOLERANCE_ECART_COMPTEUR = 0.001
 MOTIF_ECART_MIN_CARACTERES = 5
 
 
+def depart_applicable(pompe, d: date_type) -> Optional[date_type]:
+    """Date du point de départ du meeter si `d` vient après : les relevés
+    jusqu'à cette date ne servent plus à la continuité."""
+    dd = getattr(pompe, "date_depart", None)
+    return dd if dd is not None and d > dd else None
+
+
+def base_depart(pompe, d: date_type) -> Optional[float]:
+    """Index de départ à utiliser quand aucun relevé ne précède `d` : le
+    meeter de départ, sauf pour un relevé daté avant son point de départ."""
+    if pompe is None or pompe.metre_depart is None:
+        return None
+    if pompe.date_depart is not None and d <= pompe.date_depart:
+        return None
+    return float(pompe.metre_depart)
+
+
 def _releve_precedent(db: Session, pompe_id: int, d: date_type, periode: str) -> Optional[Releve]:
     """Dernier relevé de la pompe strictement avant (d, periode), dans l'ordre
-    chronologique Matin puis Après-midi."""
+    chronologique Matin puis Après-midi — sans remonter avant le point de
+    départ du meeter."""
     rang = {"Matin": 0, "Apres-midi": 1}
     cible = (d, rang.get(periode, 9))
     meilleur, cle_meilleure = None, None
-    for r in (db.query(Releve)
-              .filter(Releve.pompe_id == pompe_id, Releve.date <= d)
-              .order_by(Releve.date.desc())
+    q = db.query(Releve).filter(Releve.pompe_id == pompe_id, Releve.date <= d)
+    dd = depart_applicable(db.get(Pompe, pompe_id), d)
+    if dd:
+        q = q.filter(Releve.date > dd)
+    for r in (q.order_by(Releve.date.desc())
               .limit(10).all()):
         cle = (r.date, rang.get(r.periode, 9))
         if cle < cible and (cle_meilleure is None or cle > cle_meilleure):
@@ -1681,38 +2249,19 @@ def _releve_suivant(db: Session, pompe_id: int, d: date_type, periode: str) -> O
     return meilleur
 
 
-def _voisins_journal(db: Session, pompe_id: int, d: date_type, periode: str, exclure_releve_id: int) -> tuple:
-    """Index de la pompe juste avant et juste après (d, periode) dans le
-    journal, hors le relevé `exclure_releve_id`.
-    Retourne ((fin précédente, source), (début suivant, source))."""
-    rang = {"Matin": 0, "Apres-midi": 1}
-    per = lambda p: "Après-midi" if p == "Apres-midi" else p
-    cible = (d, rang.get(periode, 9))
-    q = db.query(Releve).filter(Releve.pompe_id == pompe_id, Releve.id != exclure_releve_id)
-    prec = suiv = None
-    for r in q.filter(Releve.date <= d).order_by(Releve.date.desc()).limit(6).all():
-        cle = (r.date, rang.get(r.periode, 9))
-        if cle < cible and (prec is None or cle > prec[0]):
-            prec = (cle, float(r.metter_apres), f"journal — {per(r.periode)} du {r.date.strftime('%d/%m')}")
-    for r in q.filter(Releve.date >= d).order_by(Releve.date.asc()).limit(6).all():
-        cle = (r.date, rang.get(r.periode, 9))
-        if cle > cible and (suiv is None or cle < suiv[0]):
-            suiv = (cle, float(r.metter_avant), f"journal — {per(r.periode)} du {r.date.strftime('%d/%m')}")
-    return ((prec[1], prec[2]) if prec else (None, None)), ((suiv[1], suiv[2]) if suiv else (None, None))
-
-
 def _reprendre_suivant(db: Session, pompe_id: int, d: date_type, periode: str) -> Optional[str]:
-    """Quand un relevé est déplacé, le relevé SUIVANT de la pompe est
-    recalculé : son écart disparaît si le compteur reprend maintenant
-    exactement ; sinon il est mis à jour et un avertissement est rendu."""
+    """Rapports entrés dans le désordre : quand un relevé est ajouté, modifié
+    ou supprimé au milieu, le relevé SUIVANT de la pompe est recalculé. Son
+    écart enregistré disparaît si le compteur reprend maintenant exactement ;
+    sinon il est mis à jour et un avertissement est rendu."""
     nxt = _releve_suivant(db, pompe_id, d, periode)
     if not nxt:
         return None
     prec = _releve_precedent(db, pompe_id, nxt.date, nxt.periode)
-    if not prec:
+    base = float(prec.metter_apres) if prec else base_depart(nxt.pompe, nxt.date)
+    if base is None:
         return None
-    base = float(prec.metter_apres)
-    ecart = round(float(nxt.metter_avant) - base, 4)
+    ecart = round(float(nxt.metter_avant) - float(base), 4)
     per = "Matin" if nxt.periode == "Matin" else "Après-midi"
     quand = f"{nxt.date.strftime('%d/%m/%Y')} ({per})"
     msg = None
@@ -1761,38 +2310,495 @@ def list_produits(date: Optional[date_type] = None, db: Session = Depends(get_db
             .first()
         )
         out.append({
-            "id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon,
+            "id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon, "adresse": p.adresse,
             "prix_vente_actif": float(px_actif.prix_vente_gallon) if px_actif else None,
-            "pompes": [{"id": q.id, "nom": q.nom} for q in p.pompes if q.actif],
+            "pompes": [{"id": q.id, "nom": q.nom, "face_id": q.face_id, "distributeur_id": q.distributeur_id, "emplacement": q.emplacement, "station": q.station,
+                        "metre_depart": float(q.metre_depart) if q.metre_depart is not None else None}
+                       for q in p.pompes if q.actif],
         })
     return out
 
 
+def _nom_produit_libre(db: Session, nom: str, sauf_id: Optional[int] = None) -> str:
+    nom = " ".join((nom or "").split())
+    if len(nom) < 2:
+        raise HTTPException(400, "Le nom du produit doit faire au moins 2 caractères.")
+    if len(nom) > 100:
+        raise HTTPException(400, "Nom du produit trop long (100 caractères au plus).")
+    for autre in db.query(Produit).all():
+        if autre.id != sauf_id and autre.nom.strip().casefold() == nom.casefold():
+            raise HTTPException(409, f"Le produit « {autre.nom} » existe déjà.")
+    return nom
+
+
+def _adresse(v: Optional[str]) -> Optional[str]:
+    a = " ".join((v or "").split())
+    if len(a) > 255:
+        raise HTTPException(400, "Adresse trop longue (255 caractères au plus).")
+    return a or None
+
+
+def _tracer(db: Session, request: Request, action: str, details: dict, user_id: Optional[int] = None) -> None:
+    """Garde la trace d'une modification (qui, quand, avant → après)."""
+    import json as _json
+    from models import AuditLog
+    u = getattr(request.state, "user", None)
+    db.add(AuditLog(user_id=user_id if user_id is not None else getattr(u, "id", None), action=action[:50],
+                    ip_address=(request.client.host if request.client else None),
+                    details=_json.dumps(details, ensure_ascii=False)))
+
+
+def _gerer_station(request: Request, db: Session):
+    from pompiste_routes import _user, peut_superviser
+    u = _user(request, db)
+    if not peut_superviser(u):
+        raise HTTPException(403, "Seule la direction ou l'administration peut modifier les produits et les pompes.")
+    return u
+
+
 @app.post("/api/produits")
-def create_produit(data: ProduitIn, db: Session = Depends(get_db)):
-    if db.query(Produit).filter_by(nom=data.nom).first():
-        raise HTTPException(400, "Produit existe deja")
-    p = Produit(nom=data.nom, prix_gallon=data.prix_gallon)
+def create_produit(data: ProduitIn, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
+    nom = _nom_produit_libre(db, data.nom)
+    p = Produit(nom=nom, prix_gallon=data.prix_gallon, adresse=_adresse(data.adresse))
     db.add(p); db.commit(); db.refresh(p)
-    return {"id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon}
+    return {"id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon, "adresse": p.adresse}
+
+
+@app.patch("/api/produits/{produit_id}")
+def modifier_produit(produit_id: int, data: ProduitPatch, request: Request, db: Session = Depends(get_db)):
+    """Renomme un produit et/ou change son adresse. L'historique (relevés,
+    rapports) reste attaché au produit : il s'affiche sous le nouveau nom."""
+    _gerer_station(request, db)
+    p = db.get(Produit, produit_id)
+    if not p:
+        raise HTTPException(404, "Produit introuvable")
+    avant = {"nom": p.nom, "adresse": p.adresse}
+    if data.nom is not None:
+        p.nom = _nom_produit_libre(db, data.nom, sauf_id=p.id)
+    if data.adresse is not None:
+        p.adresse = _adresse(data.adresse)
+    apres = {"nom": p.nom, "adresse": p.adresse}
+    if apres != avant:
+        _tracer(db, request, "produit_modifie", {"produit_id": p.id, "avant": avant, "apres": apres})
+    db.commit(); db.refresh(p)
+    return {"id": p.id, "nom": p.nom, "prix_gallon": p.prix_gallon, "adresse": p.adresse}
+
+
+@app.patch("/api/pompes/{pompe_id}")
+def modifier_pompe(pompe_id: int, data: PompePatch, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
+    q = db.get(Pompe, pompe_id)
+    if not q:
+        raise HTTPException(404, "Pompe introuvable")
+    if data.actif and not q.actif:
+        # Annule une suppression : le meeter et tous ses relevés reviennent
+        # dans la saisie, l'espace pompiste et les pompes.
+        if not q.produit.actif:
+            raise HTTPException(409, f"Le produit « {q.produit.nom} » est archivé : ce meeter ne peut pas revenir seul.")
+        for autre in q.produit.pompes:
+            if autre.id != q.id and autre.actif and autre.nom.strip().casefold() == q.nom.strip().casefold():
+                raise HTTPException(409, f"Un meeter actif s'appelle déjà « {autre.nom} » pour {q.produit.nom} : "
+                                         "renommez-le d'abord.")
+        q.actif = True
+        _tracer(db, request, "pompe_reactivee", {"pompe_id": q.id, "metre": q.nom, "produit": q.produit.nom})
+    if data.nom is not None:
+        nom = " ".join((data.nom or "").split())
+        if len(nom) < 1 or len(nom) > 100:
+            raise HTTPException(400, "Nom de pompe invalide (1 à 100 caractères).")
+        for autre in q.produit.pompes:
+            if autre.id != q.id and autre.actif and autre.nom.strip().casefold() == nom.casefold():
+                raise HTTPException(409, f"La pompe « {autre.nom} » existe déjà pour {q.produit.nom}.")
+        if nom != q.nom:
+            _tracer(db, request, "pompe_modifiee", {"pompe_id": q.id, "avant": q.nom, "apres": nom})
+            q.nom = nom
+    cible = _cible_metre(db, data.distributeur_id, data.face_id)
+    if cible is not None:
+        avant = q.emplacement
+        q.face_id = cible or None
+        db.flush(); db.refresh(q)
+        if avant != q.emplacement:
+            _tracer(db, request, "metre_deplace", {"pompe_id": q.id, "metre": q.nom, "avant": avant, "apres": q.emplacement})
+    db.commit(); db.refresh(q)
+    return {"id": q.id, "nom": q.nom, "produit_id": q.produit_id, "distributeur_id": q.distributeur_id,
+            "face_id": q.face_id, "emplacement": q.emplacement}
+
+
+# ---------- Enregistrement complet d'une station ----------
+# Station (adresse) › produits et prix › pompes › meeters (produit,
+# nom, meeter de départ), en une seule fois. « Retirer l'existant » archive
+# produits et meeters sans rien effacer : relevés, rapports, journal,
+# caisse gardent tout leur historique.
+
+class StationMetreIn(BaseModel):
+    produit: str                 # clé du produit dans « produits »
+    nom: str
+    metre_depart: Optional[float] = None
+
+
+class StationFaceIn(BaseModel):
+    nom: str
+    metres: List[StationMetreIn] = []
+
+
+class StationPompeIn(BaseModel):
+    nom: str
+    metres: List[StationMetreIn] = []
+    faces: List[StationFaceIn] = []          # ancien format : leurs meeters sont repris sur la pompe
+
+
+class StationProduitIn(BaseModel):
+    cle: str
+    nom: str
+    prix: float
+
+
+class StationIn(BaseModel):
+    adresse: str
+    produits: List[StationProduitIn]
+    pompes: List[StationPompeIn]
+
+
+class RetirerToutIn(BaseModel):
+    confirmation: str
+
+
+@app.post("/api/stations/retirer-tout")
+def retirer_tout(data: RetirerToutIn, request: Request, db: Session = Depends(get_db)):
+    """Archive tous les produits, meeters et pompes physiques actuels. Rien
+    n'est effacé : les produits archivés gardent leur historique sous le nom
+    « … (archivé le JJ/MM/AAAA) », pour que de nouveaux produits puissent
+    reprendre les mêmes noms."""
+    _gerer_station(request, db)
+    if (data.confirmation or "").strip().upper() != "RETIRER":
+        raise HTTPException(400, "Tapez RETIRER pour confirmer.")
+    jour = today_haiti().strftime("%d/%m/%Y")
+    n_prod = n_metres = 0
+    for p in db.query(Produit).filter(Produit.actif.is_(True)).all():
+        p.actif = False
+        suffixe = f" (archivé le {jour})"
+        if suffixe not in p.nom:
+            base = p.nom[:100 - len(suffixe)]
+            nom, i = base + suffixe, 2
+            while db.query(Produit).filter(Produit.nom == nom, Produit.id != p.id).first():
+                nom = f"{base[:100 - len(suffixe) - 4]} #{i}{suffixe}"; i += 1
+            p.nom = nom
+        n_prod += 1
+    for q in db.query(Pompe).filter(Pompe.actif.is_(True)).all():
+        q.actif = False
+        n_metres += 1
+    db.query(Pompe).update({Pompe.face_id: None}, synchronize_session=False)
+    n_dist = db.query(Distributeur).count()
+    for d in db.query(Distributeur).all():
+        db.delete(d)
+    _tracer(db, request, "station_retiree", {"produits": n_prod, "metres": n_metres, "pompes": n_dist})
+    db.commit()
+    return {"produits_archives": n_prod, "metres_archives": n_metres, "pompes_retirees": n_dist}
+
+
+@app.post("/api/stations", status_code=201)
+def enregistrer_station(data: StationIn, request: Request, db: Session = Depends(get_db)):
+    """Crée en une fois : produits de la station (avec adresse et prix),
+    pompes physiques et leurs meeters, avec leur meeter de départ."""
+    _gerer_station(request, db)
+    out = _creer_station(db, data, request)
+    db.commit()
+    return out
+
+
+def _creer_station(db: Session, data: StationIn, request: Request, user_id: Optional[int] = None) -> dict:
+    """Corps de l'enregistrement (sans commit) : sert aussi à remplir une
+    station séparée, dans son propre espace."""
+    adresse = _adresse(data.adresse)
+    if not adresse:
+        raise HTTPException(400, "Indiquez l'adresse (le lieu) de la station.")
+    if not data.produits:
+        raise HTTPException(400, "Ajoutez au moins un produit (Gazoline, Diesel…).")
+    if not data.pompes:
+        raise HTTPException(400, "Ajoutez au moins une pompe.")
+    # Produits : les mêmes pour toutes les stations (Gazoline, Diesel…). Un
+    # produit déjà enregistré est repris ; son prix est mis à jour s'il change.
+    produits = {}
+    for x in data.produits:
+        cle = (x.cle or "").strip()
+        if not cle or cle in produits:
+            raise HTTPException(400, "Produits : clé manquante ou en double.")
+        if not (x.prix > 0):
+            raise HTTPException(400, f"{x.nom} : indiquez un prix de vente supérieur à 0.")
+        nom = " ".join((x.nom or "").split())
+        if any(p.nom.casefold() == nom.casefold() for p in produits.values()):
+            raise HTTPException(409, f"Le produit « {nom} » est en double dans le formulaire.")
+        p = next((q for q in db.query(Produit).filter(Produit.actif.is_(True)).all()
+                  if q.nom.strip().casefold() == nom.casefold()), None)
+        if p is None:
+            p = Produit(nom=_nom_produit_libre(db, nom), prix_gallon=round(x.prix, 3), actif=True)
+            db.add(p); db.flush()
+            db.add(PrixVente(produit_id=p.id, prix_vente_gallon=round(x.prix, 3), date_effet=today_haiti()))
+        else:
+            actuel = _prix_vente_a_date(db, p.id, today_haiti())
+            if actuel is None or abs(actuel - x.prix) > 0.0005:
+                db.add(PrixVente(produit_id=p.id, prix_vente_gallon=round(x.prix, 3), date_effet=today_haiti()))
+        produits[cle] = p
+    vus_pompes, noms_metres = set(), {}
+    n_metres = 0
+    for i, pp in enumerate(data.pompes):
+        nom_p = _nom_court(pp.nom, 100, "pompe")
+        if nom_p.casefold() in vus_pompes or _pompe_existe(db, nom_p, adresse):
+            raise HTTPException(409, f"La pompe « {nom_p} » existe déjà dans la station « {adresse} ».")
+        vus_pompes.add(nom_p.casefold())
+        d = Distributeur(nom=nom_p, adresse=adresse, ordre=(db.query(Distributeur).count() or 0) + i)
+        db.add(d); db.flush()
+        f = Face(distributeur_id=d.id, nom=FACE_UNIQUE, ordre=0)
+        db.add(f); db.flush()
+        for m in list(pp.metres) + [m for ff in pp.faces for m in ff.metres]:
+            p = produits.get(m.produit)
+            if not p:
+                raise HTTPException(400, f"{nom_p} : choisissez le produit du meeter.")
+            nom_m = _nom_court(m.nom, 100, "meeter")
+            cle_m = (p.id, nom_m.casefold())
+            if any(q.actif and q.nom.strip().casefold() == nom_m.casefold() for q in p.pompes):
+                raise HTTPException(409, f"Le meeter « {nom_m} » ({p.nom}) existe déjà : choisissez un autre nom (ex. {nom_m} {nom_p}).")
+            if cle_m in noms_metres:
+                raise HTTPException(409, f"Le meeter « {nom_m} » ({p.nom}) est en double ({noms_metres[cle_m]}).")
+            noms_metres[cle_m] = nom_p
+            if m.metre_depart is not None and m.metre_depart < 0:
+                raise HTTPException(400, f"{nom_m} : le meeter de départ ne peut pas être négatif.")
+            db.add(Pompe(produit_id=p.id, nom=nom_m, face_id=f.id, actif=True,
+                         metre_depart=round(m.metre_depart, 4) if m.metre_depart is not None else None))
+            n_metres += 1
+    _tracer(db, request, "station_enregistree", {"adresse": adresse, "produits": [p.nom for p in produits.values()],
+                                                 "pompes": len(data.pompes), "metres": n_metres}, user_id=user_id)
+    db.flush()
+    return {"adresse": adresse, "produits": [{"id": p.id, "nom": p.nom} for p in produits.values()],
+            "pompes": len(data.pompes), "metres": n_metres}
+
+
+# ---------- Pompes physiques (distributeurs) ----------
+# Pompe 1 › meeters (Gazoline 1, Gazoline 2, Diesel 1…). Les faces A / B ne
+# sont plus utilisées : chaque pompe garde une seule face interne qui range
+# ses meeters (fusionner_faces regroupe les anciennes au démarrage).
+
+FACE_UNIQUE = "A"
+
+
+def _face_unique(db: Session, d: Distributeur) -> Face:
+    f = sorted(d.faces, key=lambda x: (x.ordre, x.id))[0] if d.faces else None
+    if f is None:
+        f = Face(distributeur_id=d.id, nom=FACE_UNIQUE, ordre=0)
+        db.add(f); db.flush(); db.refresh(d)
+    return f
+
+
+def fusionner_faces(db: Session) -> int:
+    """Une seule face par pompe : les meeters des faces B, C… rejoignent la
+    première face, les faces vides sont retirées. Rien n'est effacé des
+    meeters ni de leur historique. Idempotent ; retourne les faces retirées."""
+    n = 0
+    for d in db.query(Distributeur).all():
+        garde = _face_unique(db, d)
+        for f in [x for x in d.faces if x.id != garde.id]:
+            db.query(Pompe).filter(Pompe.face_id == f.id).update({Pompe.face_id: garde.id}, synchronize_session=False)
+            db.delete(f)
+            n += 1
+    db.commit()
+    return n
+
+
+def _cible_metre(db: Session, distributeur_id: Optional[int], face_id: Optional[int]):
+    """Face interne où ranger un meeter : None = ne rien changer, 0 = retirer de sa pompe."""
+    if distributeur_id is not None:
+        if not distributeur_id:
+            return 0
+        d = db.get(Distributeur, distributeur_id)
+        if not d:
+            raise HTTPException(404, "Pompe introuvable")
+        return _face_unique(db, d).id
+    if face_id is not None:
+        if face_id and not db.get(Face, face_id):
+            raise HTTPException(404, "Pompe introuvable")
+        return face_id
+    return None
+
+def _pompe_existe(db: Session, nom: str, adresse: Optional[str], sauf_id: Optional[int] = None) -> bool:
+    """Chaque station a sa « Pompe 1 » : un nom de pompe est unique par station."""
+    n = lambda v: " ".join((v or "").split()).casefold()
+    return any(x.id != sauf_id and x.nom.casefold() == nom.casefold() and n(x.adresse) == n(adresse)
+               for x in db.query(Distributeur).all())
+
+
+def _metre_dict(q: Pompe) -> dict:
+    return {"id": q.id, "nom": q.nom, "produit_id": q.produit_id, "produit_nom": q.produit.nom,
+            "station": q.station, "actif": bool(q.actif)}
+
+
+def _nom_court(v: str, maxi: int, quoi: str) -> str:
+    n = " ".join((v or "").split())
+    if not n or len(n) > maxi:
+        raise HTTPException(400, f"Nom de {quoi} invalide (1 à {maxi} caractères).")
+    return n
+
+
+@app.get("/api/distributeurs")
+def lister_distributeurs(db: Session = Depends(get_db)):
+    out = []
+    for d in db.query(Distributeur).order_by(Distributeur.ordre, Distributeur.id).all():
+        metres = [_metre_dict(q) for f in sorted(d.faces, key=lambda x: (x.ordre, x.id)) for q in f.metres if q.actif]
+        out.append({"id": d.id, "nom": d.nom, "adresse": d.adresse, "metres": metres,
+                    # ancien format, pour compatibilité : une seule face
+                    "faces": [{"id": f.id, "nom": f.nom, "metres": metres} for f in d.faces[:1]]})
+    sans = (db.query(Pompe).join(Produit).filter(Pompe.face_id.is_(None), Pompe.actif.is_(True),
+                                                  Produit.actif.is_(True))
+            .order_by(Produit.nom, Pompe.nom).all())
+    # Meeters supprimés alors qu'ils avaient des relevés : désactivés, leurs
+    # relevés gardés ; on peut les réactiver (annuler la suppression).
+    off = (db.query(Pompe).join(Produit).filter(Pompe.actif.is_(False), Produit.actif.is_(True))
+           .order_by(Produit.nom, Pompe.nom).all())
+    desactives = []
+    for q in off:
+        rel = db.query(Releve).filter_by(pompe_id=q.id)
+        dernier = rel.order_by(Releve.date.desc()).first()
+        desactives.append(dict(_metre_dict(q), nb_releves=rel.count(),
+                               dernier_releve=str(dernier.date) if dernier else None))
+    return {"distributeurs": out, "sans_emplacement": [_metre_dict(q) for q in sans], "desactives": desactives}
+
+
+@app.post("/api/distributeurs", status_code=201)
+def creer_distributeur(data: DistributeurIn, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
+    nom = _nom_court(data.nom, 100, "pompe")
+    adr = _adresse(data.adresse)
+    if _pompe_existe(db, nom, adr):
+        raise HTTPException(409, f"La pompe « {nom} » existe déjà dans cette station.")
+    d = Distributeur(nom=nom, adresse=adr, ordre=(db.query(Distributeur).count() or 0))
+    db.add(d); db.flush()
+    db.add(Face(distributeur_id=d.id, nom=FACE_UNIQUE, ordre=0))
+    _tracer(db, request, "distributeur_cree", {"nom": nom})
+    db.commit()
+    return {"id": d.id, "nom": d.nom, "adresse": d.adresse}
+
+
+class OrdreIn(BaseModel):
+    ids: List[int]
+
+
+@app.post("/api/distributeurs/ordre")
+def ordonner_distributeurs(data: OrdreIn, request: Request, db: Session = Depends(get_db)):
+    """Range les pompes dans l'ordre donné (Pompe 1, Pompe 2…) : c'est
+    l'ordre de la saisie, de l'espace pompiste et de la feuille."""
+    _gerer_station(request, db)
+    pompes = {d.id: d for d in db.query(Distributeur).all()}
+    if len(set(data.ids)) != len(data.ids) or any(i not in pompes for i in data.ids):
+        raise HTTPException(400, "Liste de pompes invalide.")
+    reste = [d for d in sorted(pompes.values(), key=lambda x: (x.ordre, x.id)) if d.id not in data.ids]
+    for i, d in enumerate([pompes[i] for i in data.ids] + reste):
+        d.ordre = i
+    _tracer(db, request, "pompes_ordonnees", {"ordre": [pompes[i].nom for i in data.ids]})
+    db.commit()
+    return {"ordre": [d.id for d in sorted(pompes.values(), key=lambda x: x.ordre)]}
+
+
+@app.patch("/api/distributeurs/{did}")
+def renommer_distributeur(did: int, data: DistributeurPatch, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
+    d = db.get(Distributeur, did)
+    if not d:
+        raise HTTPException(404, "Pompe introuvable")
+    avant = {"nom": d.nom, "adresse": d.adresse}
+    nom = _nom_court(data.nom, 100, "pompe") if data.nom is not None else d.nom
+    adr = _adresse(data.adresse) if data.adresse is not None else d.adresse
+    if _pompe_existe(db, nom, adr, sauf_id=did):
+        raise HTTPException(409, f"La pompe « {nom} » existe déjà dans cette station.")
+    d.nom, d.adresse = nom, adr
+    if {"nom": d.nom, "adresse": d.adresse} != avant:
+        _tracer(db, request, "distributeur_modifie", {"id": did, "avant": avant, "apres": {"nom": d.nom, "adresse": d.adresse}})
+    db.commit()
+    return {"id": d.id, "nom": d.nom, "adresse": d.adresse}
+
+
+@app.delete("/api/distributeurs/{did}")
+def supprimer_distributeur(did: int, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
+    d = db.get(Distributeur, did)
+    if not d:
+        raise HTTPException(404, "Pompe introuvable")
+    if any(f.metres for f in d.faces):
+        raise HTTPException(409, "Cette pompe porte encore des meeters : déplacez-les d'abord.")
+    _tracer(db, request, "distributeur_supprime", {"nom": d.nom})
+    db.delete(d); db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/distributeurs/{did}/faces", status_code=201)
+def ajouter_face(did: int, data: NomIn, request: Request, db: Session = Depends(get_db)):
+    """Plus de faces A / B : les meeters se placent directement sur la pompe."""
+    raise HTTPException(410, "Les faces ne sont plus utilisées : placez les meeters directement sur la pompe.")
+
+
+@app.patch("/api/faces/{fid}")
+def renommer_face(fid: int, data: NomIn, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
+    f = db.get(Face, fid)
+    if not f:
+        raise HTTPException(404, "Face introuvable")
+    nom = _nom_court(data.nom, 50, "face")
+    if any(x.id != fid and x.nom.casefold() == nom.casefold() for x in f.distributeur.faces):
+        raise HTTPException(409, f"La face « {nom} » existe déjà sur {f.distributeur.nom}.")
+    f.nom = nom
+    db.commit()
+    return {"id": f.id, "nom": f.nom}
+
+
+@app.delete("/api/faces/{fid}")
+def supprimer_face(fid: int, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
+    f = db.get(Face, fid)
+    if not f:
+        raise HTTPException(404, "Face introuvable")
+    if [q for q in f.metres if q.actif]:
+        raise HTTPException(409, "Cette face porte encore des meeters : déplacez-les d'abord.")
+    for q in f.metres:            # meeters désactivés : ils gardent leur historique, sans face
+        q.face_id = None
+    db.delete(f); db.commit()
+    return {"ok": True}
 
 
 @app.post("/api/produits/{produit_id}/pompes")
-def add_pompe(produit_id: int, data: PompeIn, db: Session = Depends(get_db)):
+def add_pompe(produit_id: int, data: PompeIn, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
     if not db.query(Produit).get(produit_id):
         raise HTTPException(404, "Produit introuvable")
-    pompe = Pompe(produit_id=produit_id, nom=data.nom)
+    nom = " ".join((data.nom or "").split())
+    meme = next((x for x in db.query(Pompe).filter_by(produit_id=produit_id).all()
+                 if x.nom.strip().casefold() == nom.casefold()), None)
+    if meme:
+        raise HTTPException(409, f"« {meme.nom} » existe déjà pour ce produit" + (
+            "." if meme.actif else " (meeter supprimé, ses relevés sont gardés) : réactivez-le dans "
+                                   "« Meeters supprimés » au lieu d'en créer un nouveau."))
+    cible = _cible_metre(db, data.distributeur_id, data.face_id)
+    pompe = Pompe(produit_id=produit_id, nom=nom, face_id=cible or None)
     db.add(pompe); db.commit(); db.refresh(pompe)
-    return {"id": pompe.id, "nom": pompe.nom}
+    return {"id": pompe.id, "nom": pompe.nom, "distributeur_id": pompe.distributeur_id, "face_id": pompe.face_id,
+            "emplacement": pompe.emplacement}
 
 
 @app.delete("/api/pompes/{pompe_id}")
-def delete_pompe(pompe_id: int, db: Session = Depends(get_db)):
+def delete_pompe(pompe_id: int, request: Request, db: Session = Depends(get_db)):
+    _gerer_station(request, db)
     pompe = db.query(Pompe).get(pompe_id)
     if not pompe:
         raise HTTPException(404, "Pompe introuvable")
+    # Une pompe qui a déjà des relevés ne se supprime pas (l'historique les
+    # protège) : elle est désactivée, son historique reste.
+    from models import RapportPompisteLigne
+    if (db.query(Releve).filter_by(pompe_id=pompe_id).first()
+            or db.query(RapportPompisteLigne).filter_by(pompe_id=pompe_id).first()):
+        pompe.actif = False
+        _tracer(db, request, "pompe_desactivee", {"pompe_id": pompe.id, "metre": pompe.nom, "produit": pompe.produit.nom})
+        db.commit()
+        return {"ok": True, "desactivee": True}
+    _tracer(db, request, "pompe_supprimee", {"pompe_id": pompe.id, "metre": pompe.nom, "produit": pompe.produit.nom})
     db.delete(pompe); db.commit()
-    return {"ok": True}
+    return {"ok": True, "desactivee": False}
 
 
 # ---------- Releves ----------
@@ -1820,6 +2826,17 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
          .filter_by(date=data.date, periode=data.periode, pompe_id=data.pompe_id)
          .first())
 
+    # Une pompe déjà dans un rapport pompiste en attente (envoyé, pas encore
+    # confirmé) a sa place prise pour ce créneau : pas de double saisie.
+    if r is None and not getattr(request.state, "depuis_rapport", None):
+        from pompiste_routes import mettres_en_attente
+        pris = next((x for x in mettres_en_attente(db, data.date, data.periode) if x["pompe_id"] == data.pompe_id), None)
+        if pris:
+            raise HTTPException(409, {"code": "dans_un_rapport", "rapport_id": pris["rapport_id"],
+                                      "message": f"{pompe.nom} est déjà dans le rapport de {pris['pompiste']} "
+                                                 f"(n°{pris['rapport_id']}, en attente) pour ce créneau : confirmez-le dans "
+                                                 "« Rapports pompistes », ou supprimez ce rapport pour libérer la pompe."})
+
     # Règle 1 — le prix vient de l'historique des prix de vente (Paramètres),
     # jamais du navigateur : le chiffre d'affaires doit toujours pouvoir être
     # reconstitué à partir de cet historique. Repli sur le prix envoyé
@@ -1827,23 +2844,26 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
     prix_officiel = _prix_vente_a_date(db, pompe.produit_id, data.date)
     prix = prix_officiel if prix_officiel is not None else data.prix_gallon
 
-    # Règle 2 — continuité des compteurs : le « mètre avant » doit être le
-    # « mètre après » du relevé précédent. Sinon, des gallons sont sortis de
+    # Règle 2 — continuité des compteurs : le « meeter avant » doit être le
+    # « meeter après » du relevé précédent. Sinon, des gallons sont sortis de
     # la pompe sans être vendus dans le système : un motif écrit est exigé.
     prec = _releve_precedent(db, data.pompe_id, data.date, data.periode)
-    ecart = round(data.metter_avant - float(prec.metter_apres), 4) if prec else 0.0
+    depart = None if prec else base_depart(db.get(Pompe, data.pompe_id), data.date)
+    ecart = (round(data.metter_avant - float(prec.metter_apres), 4) if prec
+             else (round(data.metter_avant - float(depart), 4) if depart is not None else 0.0))
     motif = (data.motif_ecart_compteur or "").strip()
     if abs(ecart) > TOLERANCE_ECART_COMPTEUR:
         if (not motif and r is not None and r.motif_ecart_compteur
                 and abs(float(r.metter_avant) - data.metter_avant) <= TOLERANCE_ECART_COMPTEUR):
-            motif = r.motif_ecart_compteur          # correction sans toucher au mètre avant
+            motif = r.motif_ecart_compteur          # correction sans toucher au meeter avant
         if len(motif) < MOTIF_ECART_MIN_CARACTERES:
             sens = "plus haut" if ecart > 0 else "plus bas"
             raise HTTPException(
                 409,
-                f"{pompe.nom} : le mètre avant ({data.metter_avant:.3f}) est {sens} que le "
-                f"mètre après du relevé précédent ({float(prec.metter_apres):.3f}, "
-                f"{prec.periode} du {prec.date.strftime('%d/%m/%Y')}) — écart de "
+                f"{pompe.nom} : le meeter avant ({data.metter_avant:.3f}) est {sens} que le "
+                + (f"meeter après du relevé précédent ({float(prec.metter_apres):.3f}, "
+                   f"{prec.periode} du {prec.date.strftime('%d/%m/%Y')}) — écart de " if prec else
+                   f"meeter de départ enregistré pour ce meeter ({float(depart):.3f}) — écart de ") +
                 f"{abs(ecart):.3f} gal. Indiquez le motif de cet écart pour enregistrer.",
             )
     else:
@@ -1862,6 +2882,11 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
                 f"{MAX_MODIFICATIONS_PAR_RELEVE} fois."
             )
         r.nb_modifications += 1
+        # Correction d'index : ce qui avait été écrit d'abord est conservé
+        if r.metter_avant_saisi is None and r.metter_apres_saisi is None and (
+                abs(float(r.metter_avant) - data.metter_avant) > TOLERANCE_ECART_COMPTEUR
+                or abs(float(r.metter_apres) - data.metter_apres) > TOLERANCE_ECART_COMPTEUR):
+            r.metter_avant_saisi, r.metter_apres_saisi = r.metter_avant, r.metter_apres
     r.prix_gallon    = prix
     r.metter_avant   = data.metter_avant
     r.metter_apres   = data.metter_apres
@@ -1871,6 +2896,11 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
     db.commit(); db.refresh(r)
 
     avertissements = []
+    # Rapport rentré avant celui qui le précède (ou rattrapage) : le relevé
+    # suivant de la pompe est remis à jour par rapport à celui-ci.
+    suite = _reprendre_suivant(db, data.pompe_id, data.date, data.periode)
+    if suite:
+        avertissements.append(suite)
     if prix_officiel is not None and abs(prix_officiel - data.prix_gallon) > 0.0005:
         avertissements.append(
             f"Prix appliqué : {prix_officiel:g} G/gal (prix en vigueur le "
@@ -1924,7 +2954,7 @@ def releves_index_precedent(date: date_type, periode: str,
                             db: Session = Depends(get_db)):
     """Pour chaque pompe active, l'index (`metter_apres`) du DERNIER relevé
     strictement antérieur à (date, periode) dans l'ordre chronologique —
-    Matin puis Après-midi. Sert à préremplir « mètre avant » lors de la
+    Matin puis Après-midi. Sert à préremplir « meeter avant » lors de la
     saisie : la fin d'une période devient le début de la suivante (même
     jour) ou du lendemain. Renvoie aussi la date/période source pour
     l'afficher, et si un relevé existe déjà pour (date, periode, pompe)."""
@@ -1947,11 +2977,15 @@ def releves_index_precedent(date: date_type, periode: str,
                .all())
     par_pompe: dict = {}
     dejadans: dict = {}
+    par_id = {p.id: p for p in pompes}
     for r in releves:
         clef = (r.date, _rang.get(r.periode, 9))
         if clef == cible:
             dejadans[r.pompe_id] = float(r.metter_apres)
             continue
+        dd = depart_applicable(par_id.get(r.pompe_id), date)
+        if dd and r.date <= dd:
+            continue                      # avant le point de départ du meeter
         if clef < cible:
             cur = par_pompe.get(r.pompe_id)
             if cur is None or clef > cur[0]:
@@ -1960,17 +2994,141 @@ def releves_index_precedent(date: date_type, periode: str,
     out = []
     for p in pompes:
         info = par_pompe.get(p.id)
+        dep = None if info else base_depart(p, date)
         out.append({
             "pompe_id":        p.id,
             "pompe_nom":       p.nom,
             "produit_id":      p.produit_id,
-            "index_precedent": round(float(info[1].metter_apres), 4) if info else None,
-            "source_date":     str(info[1].date) if info else None,
-            "source_periode":  info[1].periode if info else None,
+            "index_precedent": round(float(info[1].metter_apres), 4) if info else (round(dep, 4) if dep is not None else None),
+            "source_date":     str(info[1].date) if info else (str(p.date_depart) if dep is not None and p.date_depart else None),
+            "source_periode":  info[1].periode if info else ("depart" if dep is not None else None),
             "deja_saisi":      p.id in dejadans,
             "valeur_saisie":   dejadans.get(p.id),
         })
     return out
+
+
+# ---------- Meeters de départ (début de mois) ----------
+# Pour démarrer un mois propre (ex. novembre), on fixe pour chaque meeter
+# l'index à la fin du dernier jour du mois précédent (31/10). La continuité
+# repart de ce chiffre ; les relevés d'avant restent en historique.
+
+def _fin_mois_precedent(d: date_type) -> date_type:
+    from datetime import timedelta
+    return d.replace(day=1) - timedelta(days=1)
+
+
+def _metres_depart(db: Session, jour: date_type) -> list:
+    from datetime import timedelta
+    from pompiste_routes import lignes_en_attente
+    rang = lambda p: PERIODE_RANG.get(p, 9)
+    pendantes: dict = {}
+    for x in lignes_en_attente(db, jour - timedelta(days=60), jour):
+        cur = pendantes.get(x.pompe_id)
+        if cur is None or (x.date, rang(x.periode)) > (cur.date, rang(cur.periode)):
+            pendantes[x.pompe_id] = x
+    out = []
+    pompes = (db.query(Pompe).join(Produit).filter(Pompe.actif.is_(True), Produit.actif.is_(True))
+              .order_by(Produit.nom, Pompe.nom).all())
+    for p in pompes:
+        # Proposition : la fin du dernier relevé au plus tard ce jour-là
+        avant = (db.query(Releve).filter(Releve.pompe_id == p.id, Releve.date <= jour)
+                 .order_by(Releve.date.desc()).limit(4).all())
+        dernier = max(avant, key=lambda r: (r.date, rang(r.periode))) if avant else None
+        prop = ({"metre": float(dernier.metter_apres), "date": str(dernier.date), "periode": dernier.periode,
+                 "source": "journal", "pompiste": (f"{dernier.pompiste.prenom} {dernier.pompiste.nom}" if dernier.pompiste else None)}
+                if dernier else None)
+        x = pendantes.get(p.id)
+        if x is not None and (dernier is None or (x.date, rang(x.periode)) > (dernier.date, rang(dernier.periode))):
+            prop = {"metre": float(x.metter_apres), "date": str(x.date), "periode": x.periode,
+                    "source": "rapport_en_attente",
+                    "pompiste": (f"{x.pompiste.prenom} {x.pompiste.nom}" if x.pompiste else None)}
+        # Premier relevé après : reprend-il le départ ?
+        apres = (db.query(Releve).filter(Releve.pompe_id == p.id, Releve.date > jour)
+                 .order_by(Releve.date.asc()).limit(4).all())
+        premier = min(apres, key=lambda r: (r.date, rang(r.periode))) if apres else None
+        fixe = p.metre_depart is not None and p.date_depart == jour
+        out.append({
+            "pompe_id": p.id, "nom": p.nom, "produit_id": p.produit_id, "produit_nom": p.produit.nom,
+            "emplacement": p.emplacement,
+            "depart": {"date": str(p.date_depart) if p.date_depart else None,
+                       "metre": float(p.metre_depart) if p.metre_depart is not None else None},
+            "fixe": fixe,
+            "proposition": prop,
+            "premier_apres": ({"date": str(premier.date), "periode": premier.periode,
+                               "metter_avant": float(premier.metter_avant)} if premier else None),
+        })
+    return out
+
+
+@app.get("/api/metres-depart")
+def lire_metres_depart(date: Optional[date_type] = None, db: Session = Depends(get_db)):
+    jour = date or _fin_mois_precedent(today_haiti())
+    return {"date": str(jour), "metres": _metres_depart(db, jour)}
+
+
+class MetreDepartIn(BaseModel):
+    pompe_id: int
+    metre: Optional[float] = None        # None = retirer le point de départ
+
+
+class MetresDepartIn(BaseModel):
+    date: date_type
+    metres: List[MetreDepartIn]
+
+
+@app.put("/api/metres-depart")
+def enregistrer_metres_depart(data: MetresDepartIn, request: Request, db: Session = Depends(get_db)):
+    """Fixe l'index de départ de chaque meeter à la fin de `date`. Le premier
+    relevé suivant est recalculé (son écart disparaît s'il reprend exactement)."""
+    _gerer_station(request, db)
+    if data.date > today_haiti():
+        raise HTTPException(400, "La date de départ ne peut pas être dans le futur.")
+    changes, avertissements = [], []
+    for m in data.metres:
+        p = db.get(Pompe, m.pompe_id)
+        if not p:
+            raise HTTPException(404, f"Meeter {m.pompe_id} introuvable.")
+        if m.metre is not None and (m.metre < 0 or m.metre > 1e10):
+            raise HTTPException(400, f"{p.nom} : index de départ invalide.")
+        avant = {"date": str(p.date_depart) if p.date_depart else None,
+                 "metre": float(p.metre_depart) if p.metre_depart is not None else None}
+        if m.metre is None:
+            if p.date_depart != data.date:
+                continue
+            p.metre_depart, p.date_depart = None, None
+        else:
+            p.metre_depart, p.date_depart = round(m.metre, 4), data.date
+        apres = {"date": str(p.date_depart) if p.date_depart else None,
+                 "metre": float(p.metre_depart) if p.metre_depart is not None else None}
+        if apres != avant:
+            changes.append({"pompe_id": p.id, "metre": p.nom, "produit": p.produit.nom, "avant": avant, "apres": apres})
+    db.flush()
+    for c in changes:
+        msg = _reprendre_suivant(db, c["pompe_id"], data.date, "Apres-midi")
+        if msg:
+            avertissements.append(msg)
+    if changes:
+        _tracer(db, request, "metres_depart", {"date": str(data.date), "metres": changes})
+    db.commit()
+    return {"date": str(data.date), "modifies": len(changes), "avertissements": avertissements,
+            "metres": _metres_depart(db, data.date)}
+
+
+def _saisie_pompiste(r) -> Optional[dict]:
+    """Ce que le pompiste avait écrit, si la direction l'a corrigé (meeter
+    et/ou index) ; None si le relevé est tel qu'il a été saisi."""
+    ps = getattr(r, "pompe_saisie_id", None)
+    av_s, ap_s = getattr(r, "metter_avant_saisi", None), getattr(r, "metter_apres_saisi", None)
+    if not ps and av_s is None and ap_s is None:
+        return None
+    p = r.pompe_saisie if ps else None
+    av = float(av_s) if av_s is not None else float(r.metter_avant)
+    ap = float(ap_s) if ap_s is not None else float(r.metter_apres)
+    return {"pompe_id": ps, "pompe_nom": p.nom if p else None,
+            "produit_nom": p.produit.nom if p and p.produit else None,
+            "mauvais_metre": bool(ps), "index_corriges": av_s is not None or ap_s is not None,
+            "metter_avant": av, "metter_apres": ap, "gallons": round(ap - av, 4)}
 
 
 def _releve_dict(r: Releve):
@@ -1988,9 +3146,13 @@ def _releve_dict(r: Releve):
         "modifie_par_nom": r.modifie_par.nom_complet if r.modifie_par else None,
         "pompiste_id":  r.pompiste_id,
         "pompiste_nom": f"{r.pompiste.prenom} {r.pompiste.nom}" if r.pompiste else None,
+        "source":       "pompiste" if r.rapport_pompiste_id else "saisie",
+        "rapport_pompiste_id": r.rapport_pompiste_id,
+        "rapport_statut": r.rapport_pompiste.statut if r.rapport_pompiste else None,
         # Certifié : le compteur reprend là où il s'était arrêté (aucun écart
-        # noté). bpccp n'a pas de rapports pompistes : seule la continuité compte.
-        "certifie": r.ecart_compteur is None and r.metter_apres >= r.metter_avant,
+        # noté) et, s'il vient d'un rapport pompiste, ce rapport est finalisé.
+        "certifie": r.ecart_compteur is None and r.metter_apres >= r.metter_avant
+                    and (not r.rapport_pompiste or r.rapport_pompiste.statut in ("CONFIRME", "RESOLU")),
     }
 
 
@@ -1999,26 +3161,16 @@ class SuppressionRelevesIn(BaseModel):
     motif: str
 
 
-def _tracer(db: Session, request: Request, action: str, details: dict) -> None:
-    """Garde la trace d'une modification (qui, quand, valeurs) dans audit_logs."""
-    import json as _json
-    from models import AuditLog
-    u = getattr(request.state, "user", None)
-    db.add(AuditLog(user_id=getattr(u, "id", None), action=action[:50],
-                    ip_address=(request.client.host if request.client else None),
-                    details=_json.dumps(details, ensure_ascii=False)))
-
-
 @app.post("/api/releves/supprimer")
 def supprimer_releves(data: SuppressionRelevesIn, request: Request, db: Session = Depends(get_db)):
-    """Supprime des relevés mal saisis pour libérer la place : la pompe peut
-    être ressaisie pour ce jour. Caisse, stock et journal se recalculent
-    d'eux-mêmes ; la trace (qui, quand, valeurs, motif) reste dans le journal
-    d'audit. (Repris de cpv 21ae68d, sans la partie rapports pompistes.)"""
-    from journal_droits import _user, peut_superviser
+    """Supprime des relevés mal saisis (un seul, ou tout un rapport) pour
+    libérer la place : la pompe peut être ressaisie pour ce jour. Caisse,
+    stock et journal se recalculent d'eux-mêmes ; la trace (qui, quand,
+    valeurs, motif) reste dans le journal d'audit. Un relevé venu d'un
+    rapport pompiste se supprime avec son rapport."""
+    from pompiste_routes import _require_superviseur
     from models import ResolutionMetter
-    if not peut_superviser(_user(request, db)):
-        raise HTTPException(403, "Seule la direction ou l'administration peut supprimer un relevé.")
+    _require_superviseur(request, db)
     motif = " ".join((data.motif or "").split())
     if len(motif) < 5:
         raise HTTPException(400, "Indiquez pourquoi vous supprimez (5 caractères minimum).")
@@ -2027,15 +3179,21 @@ def supprimer_releves(data: SuppressionRelevesIn, request: Request, db: Session 
     rows = db.query(Releve).filter(Releve.id.in_(set(data.ids))).all()
     if len(rows) != len(set(data.ids)):
         raise HTTPException(404, "Relevé introuvable (déjà supprimé ?).")
+    venus = sorted({r.rapport_pompiste_id for r in rows if r.rapport_pompiste_id})
+    if venus:
+        raise HTTPException(409, "Ces relevés viennent d'un rapport pompiste (n° " + ", ".join(map(str, venus)) + ") : "
+                                 "supprimez le rapport dans « Rapports pompistes ».")
     trace = [{"id": r.id, "date": str(r.date), "periode": r.periode, "pompe": r.pompe.nom if r.pompe else r.pompe_id,
               "avant": float(r.metter_avant), "apres": float(r.metter_apres), "prix": float(r.prix_gallon),
               "pompiste_id": r.pompiste_id} for r in rows]
+    places = [(r.pompe_id, r.date, r.periode) for r in rows]
     for r in rows:
         db.query(ResolutionMetter).filter_by(releve_id=r.id).delete()
         db.delete(r)
     _tracer(db, request, "releves_supprimes", {"motif": motif[:300], "releves": trace})
     db.commit()
-    return {"supprimes": len(rows)}
+    avertissements = [m for m in (_reprendre_suivant(db, *pl) for pl in places) if m]
+    return {"supprimes": len(rows), "avertissements": avertissements}
 
 
 class ReleveDateIn(BaseModel):
@@ -2048,9 +3206,10 @@ def _analyse_date_releve(db: Session, r: Releve, d: date_type, periode: str) -> 
     """Ce que change le déplacement d'un relevé saisi vers (d, periode) :
     refus (futur, même créneau, place prise, rapport pompiste) et
     avertissements (continuité, rupture laissée, prix, date ancienne)."""
-    TOL = TOLERANCE_ECART_COMPTEUR
-    _per = lambda p: "Après-midi" if p == "Apres-midi" else p
+    from pompiste_routes import _voisins, mettres_en_attente, TOLERANCE as TOL, _per
     bloq, avert = [], []
+    if r.rapport_pompiste_id:
+        bloq.append(f"Ce relevé vient du rapport pompiste n°{r.rapport_pompiste_id} : changez la date du rapport entier.")
     if periode not in PERIODES:
         bloq.append("Période invalide.")
     if d > today_haiti():
@@ -2065,10 +3224,13 @@ def _analyse_date_releve(db: Session, r: Releve, d: date_type, periode: str) -> 
     if occupe:
         bloq.append(f"{nom} a déjà un relevé sur ce créneau ({float(occupe.metter_avant):,.3f} → "
                     f"{float(occupe.metter_apres):,.3f}) : supprimez ou déplacez-le d'abord.".replace(",", " "))
+    pris = next((x for x in mettres_en_attente(db, d, periode) if x["pompe_id"] == r.pompe_id), None)
+    if pris:
+        bloq.append(f"{nom} est dans le rapport pompiste n°{pris['rapport_id']} ({pris['pompiste']}) sur ce créneau.")
     if (today_haiti() - d).days > 62:
         avert.append(f"Date ancienne ({(today_haiti() - d).days} jours) : vérifiez qu'il s'agit bien du bon jour.")
     av, ap = float(r.metter_avant), float(r.metter_apres)
-    (prec, src_p), (suiv, src_s) = _voisins_journal(db, r.pompe_id, d, periode, r.id)
+    (prec, src_p), (suiv, src_s) = _voisins(db, r.pompe_id, d, periode, -1, exclure_releve_id=r.id)
     ecart_debut = round(av - prec, 4) if prec is not None else None
     ecart_fin = round(suiv - ap, 4) if suiv is not None else None
     prix_n = _prix_vente_a_date(db, r.pompe.produit_id, d) if r.pompe else None
@@ -2087,7 +3249,7 @@ def _analyse_date_releve(db: Session, r: Releve, d: date_type, periode: str) -> 
     if not ligne["enchaine"]:
         avert.append(f"{nom} : la fin {ap:,.3f} ne rejoint pas le début suivant {suiv:,.3f} ({src_s}) — "
                      f"écart de {abs(ecart_fin):,.3f} gal.".replace(",", " "))
-    (prec_a, _), (suiv_a, src_a) = _voisins_journal(db, r.pompe_id, r.date, r.periode, r.id)
+    (prec_a, _), (suiv_a, src_a) = _voisins(db, r.pompe_id, r.date, r.periode, -1, exclure_releve_id=r.id)
     if prec_a is not None and suiv_a is not None and abs(suiv_a - prec_a) > TOL:
         avert.append(f"{nom} : à l'ancien créneau ({_per(r.periode)} du {r.date.strftime('%d/%m')}), le relevé suivant "
                      f"({src_a}) ne suivra plus rien — écart de {abs(suiv_a - prec_a):,.3f} gal.".replace(",", " "))
@@ -2105,7 +3267,7 @@ def _analyse_date_releve(db: Session, r: Releve, d: date_type, periode: str) -> 
 
 @app.get("/api/releves/{releve_id}/changer-date/apercu")
 def apercu_date_releve(releve_id: int, date: date_type, periode: str, request: Request, db: Session = Depends(get_db)):
-    from journal_droits import _require_superviseur
+    from pompiste_routes import _require_superviseur
     _require_superviseur(request, db)
     r = db.get(Releve, releve_id)
     if not r:
@@ -2119,7 +3281,7 @@ def changer_date_releve(releve_id: int, data: ReleveDateIn, request: Request, db
     (index inchangés), au prix du nouveau jour ; l'écart de compteur est
     recalculé au nouveau créneau et les relevés suivants des deux créneaux
     sont remis à jour. Trace au journal d'audit."""
-    from journal_droits import _require_superviseur
+    from pompiste_routes import _require_superviseur
     from models import ResolutionMetter
     _require_superviseur(request, db)
     motif = " ".join((data.motif or "").split())
@@ -2176,10 +3338,13 @@ def assigner_pompiste(releve_id: int, data: ReleveAssignerPompisteIn, db: Sessio
         raise HTTPException(404, "Relevé introuvable")
 
     if data.pompiste_id is not None:
-        emp = db.query(Employe).filter_by(id=data.pompiste_id, actif=True).first()
+        # Un pompiste parti peut encore recevoir ses relevés anciens (saisie
+        # des rapports des mois passés) : la fiche inactive est acceptée.
+        from pompiste_routes import est_employe_pompiste
+        emp = db.get(Employe, data.pompiste_id)
         if not emp:
-            raise HTTPException(400, "Employé introuvable ou inactif")
-        if (emp.poste or "").strip().lower() != "pompiste":
+            raise HTTPException(400, "Employé introuvable")
+        if not est_employe_pompiste(db, emp):
             raise HTTPException(
                 400, f"'{emp.prenom} {emp.nom}' n'a pas le poste Pompiste (poste actuel : {emp.poste or '—'})."
             )
@@ -2197,10 +3362,25 @@ def lister_pompistes(inclure_inactifs: bool = False, db: Session = Depends(get_d
     q = db.query(Employe)
     if not inclure_inactifs:
         q = q.filter(Employe.actif.is_(True))
+    from pompiste_routes import ids_employes_pompistes
+    lies = ids_employes_pompistes(db)
     emps = [
         e for e in q.order_by(Employe.nom, Employe.prenom).all()
-        if (e.poste or "").strip().lower() == "pompiste"
+        if (e.poste or "").strip().lower() == "pompiste" or e.id in lies
     ]
+    if inclure_inactifs:
+        # Un pompiste parti reste proposé (rapports anciens saisis à la main),
+        # sauf le doublon : fiche inactive, jamais utilisée, au même nom
+        # qu'un pompiste actif — c'est le même pompiste.
+        import unicodedata
+        from models import RapportPompiste
+        cle = lambda e: " ".join(sorted(unicodedata.normalize("NFKD", f"{e.prenom} {e.nom}").encode("ascii", "ignore")
+                                        .decode().lower().split()))
+        actifs = {cle(e) for e in emps if e.actif}
+        avec_releves = {i for (i,) in db.query(Releve.pompiste_id).filter(Releve.pompiste_id.isnot(None)).distinct()}
+        avec_rapports = {i for (i,) in db.query(RapportPompiste.utilisateur_id).distinct()}
+        emps = [e for e in emps if e.actif or cle(e) not in actifs or e.id in avec_releves
+                or (e.utilisateur_id and e.utilisateur_id in avec_rapports)]
     return [{"id": e.id, "nom": f"{e.prenom} {e.nom}", "actif": e.actif} for e in emps]
 
 
@@ -2215,9 +3395,9 @@ def rapport(date: date_type, db: Session = Depends(get_db)):
         bloc = {"produit_id": p.id, "produit_nom": p.nom, "periodes": []}
         prod_cash = 0
         for per in PERIODES:
-            releves = (db.query(Releve)
-                       .filter(Releve.date == date, Releve.periode == per,
-                               Releve.pompe_id.in_(pompe_ids)).all())
+            releves = releves_comptes(db, db.query(Releve)
+                                      .filter(Releve.date == date, Releve.periode == per,
+                                              Releve.pompe_id.in_(pompe_ids)).all())
             cash = sum(r.montant_vente for r in releves)
             prod_cash += cash
             bloc["periodes"].append({
@@ -2253,28 +3433,65 @@ class ChatIn(BaseModel):
 
 @app.post("/api/chat")
 def chat_endpoint(data: ChatIn, request: Request, db: Session = Depends(get_db)):
+    """Assistant IA : réservé à la direction (mêmes droits que la caisse et
+    l'Intelligence Center). L'historique est celui enregistré sur le serveur
+    (jamais celui envoyé par le navigateur) ; chaque question est journalisée."""
     from chatbot import chat
-    user   = request.state.user
-    result = chat(db, data.message, data.historique)
+    from models import IaJournal
+    from pompiste_routes import _user, peut_superviser
+    user = _user(request, db)
+    if not peut_superviser(user):
+        raise HTTPException(403, "L'assistant IA est réservé à la direction.")
+    message = (data.message or "").strip()
+    if not message:
+        raise HTTPException(400, "Message vide.")
+    if len(message) > 4000:
+        raise HTTPException(400, "Message trop long (4 000 caractères au plus).")
 
     conv = None
     if data.conversation_id:
         conv = (db.query(ChatConversation)
                 .filter_by(id=data.conversation_id, utilisateur_id=user.id)
                 .first())
+    historique = list(conv.historique or []) if conv else []
+    result = chat(db, message, historique)
+    trace = result.pop("trace", {}) or {}
+    db.rollback()                                   # rien de ce que les outils ont lu ne reste ouvert
+
     if conv:
         conv.historique = result["historique"]
     else:
-        conv = ChatConversation(
-            utilisateur_id=user.id,
-            titre=data.message.strip()[:80] or "Conversation",
-            historique=result["historique"],
-        )
+        conv = ChatConversation(utilisateur_id=user.id, titre=message[:80] or "Conversation",
+                                historique=result["historique"])
         db.add(conv)
+    db.flush()
+    db.add(IaJournal(utilisateur_id=user.id, conversation_id=conv.id, question=message[:4000],
+                     outils=trace.get("outils"), fournisseur=trace.get("fournisseur"), modele=trace.get("modele"),
+                     duree_ms=trace.get("duree_ms"), jetons_entree=trace.get("jetons_entree"),
+                     jetons_sortie=trace.get("jetons_sortie"), erreur=trace.get("erreur")))
     db.commit()
     db.refresh(conv)
     result["conversation_id"] = conv.id
+    result["sources"] = [o["nom"] for o in trace.get("outils", [])]
     return result
+
+
+@app.get("/api/ia/journal")
+def journal_ia(request: Request, limite: int = 50, db: Session = Depends(get_db)):
+    """Journal de l'assistant IA (direction) : questions, outils, fournisseur,
+    durée, jetons, erreurs — suivi de la fiabilité et du coût."""
+    from models import IaJournal
+    from pompiste_routes import _user, peut_superviser
+    if not peut_superviser(_user(request, db)):
+        raise HTTPException(403, "Réservé à la direction.")
+    rows = db.query(IaJournal).order_by(IaJournal.id.desc()).limit(max(1, min(limite, 200))).all()
+    noms = {u.id: (u.nom_complet or u.username) for u in db.query(Utilisateur).filter(
+        Utilisateur.id.in_({r.utilisateur_id for r in rows if r.utilisateur_id})).all()}
+    return {"entrees": [{"date": r.created_at, "utilisateur": noms.get(r.utilisateur_id), "question": r.question,
+                         "outils": [o.get("nom") for o in (r.outils or [])], "fournisseur": r.fournisseur, "modele": r.modele,
+                         "duree_ms": r.duree_ms, "jetons_entree": r.jetons_entree, "jetons_sortie": r.jetons_sortie,
+                         "erreur": r.erreur} for r in rows],
+            "jetons_total": {"entree": sum(r.jetons_entree or 0 for r in rows), "sortie": sum(r.jetons_sortie or 0 for r in rows)}}
 
 
 @app.get("/api/chat/conversations")
@@ -2385,7 +3602,7 @@ def api_marquer_non_resolu(notification_id: int, request: Request, db: Session =
     return {"ok": True}
 
 
-# ---------- Detection d'anomalies dans la suite des meters ----------
+# ---------- Detection d'anomalies dans la suite des meeters ----------
 # PERIODE_ORDRE supprimé — utiliser PERIODE_RANG défini plus bas (identique).
 # Seuil du saut anormal : une quantite > SEUIL_SAUT x la moyenne de la pompe
 # est signalee comme avertissement (pas comme erreur bloquante).
@@ -2488,8 +3705,14 @@ def anomalies(date: date_type, historique: bool = False, inclure_traitees: bool 
 
         meter_apres_precedent = None
         releve_courant_valide = True
+        dep_franchi = False
 
         for r in liste:
+            if (not dep_franchi and pompe_obj.date_depart is not None and pompe_obj.metre_depart is not None
+                    and r.date > pompe_obj.date_depart):
+                dep_franchi = True
+                meter_apres_precedent = float(pompe_obj.metre_depart)
+                releve_courant_valide = True
             nom = pompe_obj.nom
 
             if r.metter_apres < r.metter_avant:
@@ -2504,8 +3727,8 @@ def anomalies(date: date_type, historique: bool = False, inclure_traitees: bool 
                     "valeur_attendue_min": float(r.metter_avant),
                     "valeur_saisie":      float(r.metter_apres),
                     "message": (
-                        f"Le meter apres ({r.metter_apres}) est inferieur au "
-                        f"meter avant ({r.metter_avant}). La quantite vendue "
+                        f"Le meeter apres ({r.metter_apres}) est inferieur au "
+                        f"meeter avant ({r.metter_avant}). La quantite vendue "
                         f"serait negative, ce qui est impossible."
                     ),
                 })
@@ -2529,7 +3752,7 @@ def anomalies(date: date_type, historique: bool = False, inclure_traitees: bool 
                     "valeur_saisie": float(r.metter_avant),
                     "ecart":         ecart,
                     "message": (
-                        f"Le mètre avant ({float(r.metter_avant):.3f}) dépasse le mètre après "
+                        f"Le meeter avant ({float(r.metter_avant):.3f}) dépasse le meeter après "
                         f"précédent ({float(meter_apres_precedent):.3f}) : {ecart:.3f} gal sortis "
                         "sans vente enregistrée. "
                         + (f"Motif donné : « {motif} »." if motif else "Aucun motif donné.")
@@ -2548,8 +3771,8 @@ def anomalies(date: date_type, historique: bool = False, inclure_traitees: bool 
                     "valeur_attendue_min": round(meter_apres_precedent, 4),
                     "valeur_saisie":      float(r.metter_avant),
                     "message": (
-                        f"Le meter avant ({r.metter_avant}) est inferieur au "
-                        f"meter apres precedent ({round(meter_apres_precedent, 4)}). "
+                        f"Le meeter avant ({r.metter_avant}) est inferieur au "
+                        f"meeter apres precedent ({round(meter_apres_precedent, 4)}). "
                         f"Le compteur ne peut pas reculer."
                     ),
                 })
@@ -2693,17 +3916,19 @@ def serie_endpoint(
     q = db.query(Releve).filter(Releve.date >= d_debut, Releve.date <= d_fin)
     if periode:
         q = q.filter(Releve.periode == periode)
-    releves = q.all()
+    releves = releves_comptes(db, q.all())
     if produit_id:
         releves = [r for r in releves if r.pompe.produit_id == produit_id]
     if pompiste_id:
         releves = [r for r in releves if r.pompiste_id in set(pompiste_id)]
 
     par_date: dict = defaultdict(lambda: {"total_montant": 0.0, "total_quantite": 0.0})
+    gal_produit: dict = defaultdict(lambda: defaultdict(float))     # jamais additionnés entre produits
     for r in releves:
         ds = str(r.date)
         par_date[ds]["total_montant"]  += r.montant_vente
         par_date[ds]["total_quantite"] += r.quantite
+        gal_produit[ds][r.pompe.produit.nom if r.pompe and r.pompe.produit else "—"] += r.quantite
 
     result_jours = []
     for i in range(jours):
@@ -2714,6 +3939,7 @@ def serie_endpoint(
             "date":           ds,
             "total_montant":  round(day["total_montant"],  2),
             "total_quantite": round(day["total_quantite"], 3),
+            "par_produit":    {k: round(v, 3) for k, v in gal_produit.get(ds, {}).items()},
         })
 
     total_periode = round(sum(j["total_montant"] for j in result_jours), 2)
@@ -2724,7 +3950,7 @@ def serie_endpoint(
     pq = db.query(Releve).filter(Releve.date >= prev_debut, Releve.date <= prev_fin)
     if periode:
         pq = pq.filter(Releve.periode == periode)
-    prev_releves = pq.all()
+    prev_releves = releves_comptes(db, pq.all())
     if produit_id:
         prev_releves = [r for r in prev_releves if r.pompe.produit_id == produit_id]
     if pompiste_id:
@@ -2742,7 +3968,7 @@ def serie_endpoint(
     }
 
 
-# ---------- Journal des meters + analyse des décalages ----------
+# ---------- Journal des meeters + analyse des décalages ----------
 # Consolidation : PERIODE_ORDRE (anomalies) et PERIODE_RANG (journal) étaient
 # identiques — on garde un seul nom, PERIODE_RANG, utilisé partout.
 PERIODE_RANG = {"Matin": 0, "Apres-midi": 1}
@@ -2756,6 +3982,8 @@ def _build_journal_entries(
     pompe_id_filter: Optional[List[int]] = None,
     periode_filter: Optional[str] = None,
     pompiste_id_filter=None,                  # un id ou une liste d'ids
+    inclure_en_attente: bool = False,
+    activite: Optional[str] = None,           # "carburant" | "propane" | None (tout)
 ) -> list:
     """
     Source unique de vérité pour la construction des entrées du journal.
@@ -2776,6 +4004,14 @@ def _build_journal_entries(
     # dans l'ordre chronologique pour que l'analyse de continuité (pompe_last)
     # soit correcte. Le filtre est appliqué en post-traitement ci-dessous.
     releves = q.all()
+    if inclure_en_attente:
+        # Rapports pompistes pas encore finalisés : affichés « en attente de
+        # validation », placés dans la chaîne des compteurs, jamais totalisés
+        from pompiste_routes import lignes_en_attente
+        att = lignes_en_attente(db, d_debut, d_fin)
+        if pompe_id_filter:
+            att = [x for x in att if x.pompe_id in pompe_id_filter]
+        releves = releves + att
     if produit_id:
         releves = [r for r in releves if r.pompe.produit_id == produit_id]
 
@@ -2788,16 +4024,19 @@ def _build_journal_entries(
     #   2. Charger toutes les sessions de cette date et trier par PERIODE_RANG
     #      → garantit que c'est bien l'Après-midi qui est pris si présent.
     pompe_last: dict = {}
+    departs: dict = {}            # pid -> (date de départ, index de départ)
+    franchi: set = set()          # pompes dont le point de départ est déjà passé
     for pid in {r.pompe_id for r in releves}:
-        last_date = (
-            db.query(Releve.date)
-            .filter(Releve.pompe_id == pid, Releve.date < d_debut)
-            .order_by(Releve.date.desc())
-            .limit(1)
-            .scalar()
-        )
+        pp = db.get(Pompe, pid)
+        if pp is not None and pp.date_depart is not None and pp.metre_depart is not None:
+            departs[pid] = (pp.date_depart, float(pp.metre_depart))
+        q_last = db.query(Releve.date).filter(Releve.pompe_id == pid, Releve.date < d_debut)
+        if pid in departs and d_debut > departs[pid][0]:
+            franchi.add(pid)
+            q_last = q_last.filter(Releve.date > departs[pid][0])
+        last_date = q_last.order_by(Releve.date.desc()).limit(1).scalar()
         if last_date is None:
-            pompe_last[pid] = None
+            pompe_last[pid] = base_depart(pp, d_debut) if pp is not None else None
         else:
             last_day = (
                 db.query(Releve)
@@ -2806,6 +4045,24 @@ def _build_journal_entries(
             )
             last_day.sort(key=lambda r: PERIODE_RANG.get(r.periode, 99))
             pompe_last[pid] = float(last_day[-1].metter_apres)
+    if inclure_en_attente and releves:
+        from datetime import timedelta as _td
+        from pompiste_routes import lignes_en_attente
+        cle = lambda x: (x.date, PERIODE_RANG.get(x.periode, 99))
+        avant: dict = {}
+        for x in lignes_en_attente(db, d_debut - _td(days=120), d_debut - _td(days=1)):
+            if x.pompe_id in franchi and x.date <= departs[x.pompe_id][0]:
+                continue
+            if x.pompe_id in pompe_last and (x.pompe_id not in avant or cle(x) > cle(avant[x.pompe_id])):
+                avant[x.pompe_id] = x
+        for pid, x in avant.items():
+            q_off = db.query(Releve).filter(Releve.pompe_id == pid, Releve.date < d_debut)
+            if pid in franchi:
+                q_off = q_off.filter(Releve.date > departs[pid][0])
+            off = q_off.order_by(Releve.date.desc()).all()
+            off = max(off, key=cle) if off else None
+            if off is None or cle(x) > cle(off):
+                pompe_last[pid] = float(x.metter_apres)
 
     entries = []
     for r in releves:
@@ -2814,6 +4071,9 @@ def _build_journal_entries(
         ap   = float(r.metter_apres)
         qte  = float(r.quantite)
         mnt  = float(r.montant_vente)
+        if pid in departs and pid not in franchi and r.date > departs[pid][0]:
+            franchi.add(pid)
+            pompe_last[pid] = departs[pid][1]          # la chaîne repart du point de départ
         prec = pompe_last.get(pid)
         decalage = round(av - prec, 4) if prec is not None else None
 
@@ -2823,7 +4083,7 @@ def _build_journal_entries(
             statut        = "erreur"
             type_anomalie = "saisie_invalide"
             commentaire   = (
-                f"Le meter après ({ap:.4f}) est inférieur au meter avant ({av:.4f}). "
+                f"Le meeter après ({ap:.4f}) est inférieur au meeter avant ({av:.4f}). "
                 "Un compteur ne peut physiquement pas reculer — saisie à corriger immédiatement."
             )
             recommandation = (
@@ -2843,7 +4103,7 @@ def _build_journal_entries(
             )
             recommandation = (
                 f"Vérifiez si le compteur a été remplacé ou manipulé. "
-                f"En cas d'erreur de saisie, corrigez le meter avant à {prec:.4f}. "
+                f"En cas d'erreur de saisie, corrigez le meeter avant à {prec:.4f}. "
                 "En cas de remplacement confirmé, documentez la nouvelle base."
             )
             pompe_last[pid] = ap
@@ -2853,7 +4113,7 @@ def _build_journal_entries(
             type_anomalie = "saut_compteur"
             commentaire   = (
                 f"Saut du compteur : attendu {prec:.4f} (fin de la session précédente) "
-                f"mais le meter avant saisi est {av:.4f}. "
+                f"mais le meeter avant saisi est {av:.4f}. "
                 f"Écart positif de {decalage:.4f} — correspond à {decalage:.4f} gallons non comptabilisés."
             )
             recommandation = (
@@ -2887,6 +4147,11 @@ def _build_journal_entries(
             "produit_nom":      r.pompe.produit.nom,
             "pompiste_id":      r.pompiste_id,
             "pompiste_nom":     (f"{r.pompiste.prenom} {r.pompiste.nom}" if r.pompiste else None),
+            "source":           "pompiste" if r.rapport_pompiste_id else "saisie",
+            "en_attente":       bool(getattr(r, "en_attente", False)),
+            "rapport_pompiste_id": r.rapport_pompiste_id,
+            "rapport_statut":   r.rapport_pompiste.statut if r.rapport_pompiste else None,
+            "saisi_par":        r.cree_par.nom_complet if r.cree_par else None,
             "prix_gallon":      float(r.prix_gallon),
             "metter_avant":     av,
             "metter_apres":     ap,
@@ -2901,6 +4166,7 @@ def _build_journal_entries(
             "commentaire":      commentaire,
             "recommandation":   recommandation,
             "motif_saisie":     getattr(r, "motif_ecart_compteur", None),
+            "saisie_pompiste":  _saisie_pompiste(r),
             "resolution":       None,
         })
 
@@ -2924,8 +4190,16 @@ def _build_journal_entries(
     # Certifié : compteur continu (ou écart résolu) et, pour un relevé venu
     # d'un rapport pompiste, rapport finalisé.
     for e in entries:
-        e["certifie"] = (not e.get("en_attente") and e["statut"] in ("ok", "resolu")
-                         and (e.get("source") != "pompiste" or e.get("rapport_statut") in ("CONFIRME", "RESOLU")))
+        e["certifie"] = (not e["en_attente"] and e["statut"] in ("ok", "resolu")
+                         and (e["source"] != "pompiste" or e["rapport_statut"] in ("CONFIRME", "RESOLU")))
+
+    # Index écrits sur la mauvaise ligne : le moteur de placement signale le
+    # meeter dont la chaîne se poursuit (avant les filtres, sur tout le créneau)
+    try:
+        import placement_metres
+        placement_metres.annoter_journal(db, entries)
+    except Exception:
+        log.exception("Placement des meeters (journal)")
 
     # Post-filtres : appliqués APRÈS l'analyse de continuité pour ne pas
     # casser la chaîne Matin → Après-midi → Matin suivant.
@@ -2935,6 +4209,8 @@ def _build_journal_entries(
         ids = (set(pompiste_id_filter) if isinstance(pompiste_id_filter, (list, tuple, set))
                else {pompiste_id_filter})
         entries = [e for e in entries if e["pompiste_id"] in ids]
+    if activite:
+        entries = [e for e in entries if _activite_produit(e.get("produit_nom")) == activite]
 
     # Affichage jour par jour : tous les relevés d'une date ensemble (Matin
     # puis Après-midi, produit, pompe) — l'analyse ci-dessus reste par pompe
@@ -2962,7 +4238,7 @@ class ResolutionMetterIn(BaseModel):
 
 
 def _superviseur_journal(request: Request, db: Session):
-    from journal_droits import _user, peut_superviser
+    from pompiste_routes import _user, peut_superviser
     u = _user(request, db)
     if not peut_superviser(u):
         raise HTTPException(403, "Seule la direction ou l'administration peut résoudre un écart de compteur.")
@@ -2983,7 +4259,8 @@ def resoudre_ecart_metter(releve_id: int, data: ResolutionMetterIn, request: Req
     r = db.get(Releve, releve_id)
     if not r:
         raise HTTPException(404, "Relevé introuvable.")
-    e = next((x for x in _build_journal_entries(db, r.date, r.date, pompe_id_filter=[r.pompe_id])
+    e = next((x for x in _build_journal_entries(db, r.date, r.date, pompe_id_filter=[r.pompe_id],
+                                                inclure_en_attente=True)
               if x["id"] == releve_id), None)
     if not e or e["statut"] == "ok":
         raise HTTPException(400, "Ce relevé ne présente aucun écart à résoudre.")
@@ -3010,6 +4287,76 @@ def rouvrir_ecart_metter(releve_id: int, request: Request, db: Session = Depends
     return {"releve_id": releve_id, "statut": "rouvert"}
 
 
+def _famille_carburant(nom: Optional[str]) -> str:
+    """Gazoline 1 / Gazoline 2 → « Gazoline » ; Diesel 1 / Diesel 2 → « Diesel ».
+    Les gallons d'essence et de diesel ne s'additionnent jamais."""
+    n = (nom or "").lower()
+    if "propan" in n:
+        return "Propane"
+    if "gaz" in n or "essence" in n:
+        return "Gazoline"
+    if "diesel" in n:
+        return "Diesel"
+    return nom or "Inconnu"
+
+
+ACTIVITES = ("carburant", "propane")
+
+
+def _activite_produit(nom: Optional[str]) -> str:
+    """Propane = activité à part, jamais mélangée au carburant (Gazoline, Diesel)."""
+    return "propane" if _famille_carburant(nom) == "Propane" else "carburant"
+
+
+def _activite_valide(activite: Optional[str]) -> Optional[str]:
+    if activite in (None, "", "tout"):
+        return None
+    if activite not in ACTIVITES:
+        raise HTTPException(400, "activite : « carburant » ou « propane ».")
+    return activite
+
+
+def _gallons_par_famille(lignes) -> dict:
+    """{famille: gallons} à partir de lignes {"produit", "gallons"}."""
+    out: dict = {}
+    for x in lignes:
+        f = _famille_carburant(x["produit"])
+        out[f] = round(out.get(f, 0.0) + x["gallons"], 4)
+    return out
+
+
+def _exclu_du_total(e: dict) -> bool:
+    """Règle unique des ventes comptées (tous les modules) : seuls comptent les
+    relevés qui s'enchaînent. Un saut ou un recul de compteur ne compte pas
+    tant que la direction ne l'a pas confirmé (écart résolu / justifié)."""
+    return e.get("type_anomalie") in ("saut_compteur", "recul_compteur") and e.get("statut") != "resolu"
+
+
+def releves_comptes(db: Session, releves) -> list:
+    """Règle unique des ventes comptées dans TOUS les totaux d'argent
+    (Journal Meeters, Rapport journalier, caisse, tableaux de bord,
+    statistiques, rentabilité) : un relevé en saut ou en recul de compteur
+    n'est pas compté tant que la direction n'a pas confirmé l'écart. Le stock
+    physique (FIFO) reste calculé sur tous les relevés."""
+    releves = list(releves)
+    if not releves:
+        return releves
+    d0, d1 = min(r.date for r in releves), max(r.date for r in releves)
+    # Même chaîne que le Journal Meeters (rapports en attente compris) : un
+    # relevé y est en saut ou non de la même façon partout.
+    exclus = {e["id"] for e in _build_journal_entries(db, d0, d1, inclure_en_attente=True)
+              if not e.get("en_attente") and isinstance(e["id"], int) and _exclu_du_total(e)}
+    return [r for r in releves if r.id not in exclus] if exclus else releves
+
+
+def sauts_non_comptes(db: Session, d0, d1) -> dict:
+    """Sauts et reculs de compteur non confirmés sur la période : ce qui n'est pas compté."""
+    L = [e for e in _build_journal_entries(db, d0, d1, inclure_en_attente=True)
+         if not e.get("en_attente") and _exclu_du_total(e)]
+    return {"nb": len(L), "montant": round(sum(e["montant_vente"] for e in L), 2),
+            "gallons_par_carburant": _gallons_par_famille([{"produit": e["produit_nom"], "gallons": e["quantite"]} for e in L])}
+
+
 @app.get("/api/journal")
 def journal_endpoint(
     date_debut: Optional[date_type] = None,
@@ -3019,6 +4366,7 @@ def journal_endpoint(
     periode:    Optional[str] = None,
     pompiste_id: List[int] = Query(default=[]),
     certifie: Optional[str] = None,          # "oui" | "non" ; vide = tous
+    activite: Optional[str] = None,          # "carburant" | "propane" ; vide = tout
     db: Session = Depends(get_db),
 ):
     from datetime import date as dt
@@ -3026,8 +4374,13 @@ def journal_endpoint(
     d_fin   = date_fin   or today_haiti()
     d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
 
-    entries = _filtre_certifie(_build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode,
-                                                      pompiste_id), certifie)
+    tous = _filtre_certifie(_build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode,
+                                                   pompiste_id, inclure_en_attente=True,
+                                                   activite=_activite_valide(activite)), certifie)
+    # Les rapports pompistes pas encore finalisés sont listés mais ne comptent
+    # dans aucun total (ni gallons, ni montant, ni conformité)
+    en_attente = [e for e in tous if e["en_attente"]]
+    entries = [e for e in tous if not e["en_attente"]]
 
     nb_alertes = sum(1 for e in entries if e["statut"] == "alerte")
     nb_erreurs = sum(1 for e in entries if e["statut"] == "erreur")
@@ -3040,7 +4393,7 @@ def journal_endpoint(
     # réelle — seul ce type est exclu ici, tel que demandé.
     # Un saut résolu (justifié par la direction) n'est plus exclu.
     nb_resolus     = sum(1 for e in entries if e["statut"] == "resolu")
-    exclu          = lambda e: e["type_anomalie"] == "saut_compteur" and e["statut"] != "resolu"
+    exclu          = _exclu_du_total
     nb_sauts       = sum(1 for e in entries if exclu(e))
     total_gallons  = round(sum(e["quantite"] for e in entries if not exclu(e)), 4)
 
@@ -3062,12 +4415,22 @@ def journal_endpoint(
          for k, v in _pp.items()),
         key=lambda x: x["gallons"], reverse=True,
     )
+    _pf: dict = {}
+    for x in par_produit:
+        f = _pf.setdefault(_famille_carburant(x["produit"]), {"gallons": 0.0, "montant": 0.0, "nb_releves": 0})
+        f["gallons"] += x["gallons"]; f["montant"] += x["montant"]; f["nb_releves"] += x["nb_releves"]
+    par_famille = [{"famille": k, "gallons": round(v["gallons"], 4), "montant": round(v["montant"], 2),
+                    "nb_releves": v["nb_releves"]}
+                   for k, v in sorted(_pf.items(), key=lambda kv: ({"Gazoline": 0, "Diesel": 1}.get(kv[0], 2), kv[0]))]
 
     return {
         "date_debut": str(d_debut),
         "date_fin":   str(d_fin),
-        "entries":    entries,
+        "entries":    tous,
         "resume": {
+            "nb_en_attente":     len(en_attente),
+            "gallons_en_attente": round(sum(e["quantite"] for e in en_attente), 4),
+            "montant_en_attente": round(sum(e["montant_vente"] for e in en_attente), 2),
             "total_entrees":    len(entries),
             "nb_ok":            nb_ok,
             "nb_alertes":       nb_alertes,
@@ -3077,6 +4440,10 @@ def journal_endpoint(
             "nb_sauts_compteur": nb_sauts,
             "total_gallons":     total_gallons,
             "par_produit":       par_produit,
+            "par_famille":       par_famille,
+            "par_activite":      {a: round(sum(x["montant"] for x in par_famille
+                                               if _activite_produit(x["famille"]) == a), 2)
+                                  for a in ACTIVITES if any(_activite_produit(x["famille"]) == a for x in par_famille)},
         },
     }
 
@@ -3140,7 +4507,7 @@ def carburant_synthese(
         "date":        str(d.date_depense),
         "categorie":   d.categorie or "—",
         "description": d.description or "",
-        "source":      (d.produit.nom if d.produit else "Caisse générale"),
+        "source":      (d.produit.nom if d.produit else "Caisse principale"),
         "montant":     float(_D(str(d.montant))),
     } for d in deps]
     total_depenses = float(sum((_D(str(d.montant)) for d in deps), _D("0")))
@@ -3186,6 +4553,8 @@ def carburant_synthese(
 @app.get("/api/carburant/rapport-jour")
 def carburant_rapport_jour(
     date: Optional[date_type] = None,
+    sans_non_certifies: bool = False,
+    activite: Optional[str] = None,          # "carburant" | "propane" ; vide = tout
     db: Session = Depends(get_db),
 ):
     """Rapport de caisse carburant pour UNE journée :
@@ -3201,10 +4570,56 @@ def carburant_rapport_jour(
     produits = {p.id: p.nom for p in db.query(Produit).all()}
 
     # ── ENTRÉES du jour : ventes de carburant (relevés du jour) ──────
+    activite = _activite_valide(activite)
     rel_jour = (
         db.query(Releve).join(Pompe, Releve.pompe_id == Pompe.id)
         .filter(Releve.date == d).all()
     )
+    if activite:      # Propane et carburant ne se mélangent jamais
+        rel_jour = [r for r in rel_jour if _activite_produit(produits.get(r.pompe.produit_id)) == activite]
+    # Mêmes contrôles et même total que le Journal Meeters : chaque relevé non
+    # certifié est signalé ; les sauts de compteur non résolus ne sont pas
+    # comptés (_exclu_du_total) ; `sans_non_certifies` écarte aussi les autres.
+    tous_j = _build_journal_entries(db, d, d, inclure_en_attente=True, activite=activite)
+    journal = {e["id"]: e for e in tous_j if not e.get("en_attente")}
+    en_attente_j = [e for e in tous_j if e.get("en_attente")]
+    a_verifier = []
+    for r in rel_jour:
+        e = journal.get(r.id)
+        if e is None or e["certifie"]:
+            continue
+        a_verifier.append({
+            "releve_id": r.id, "periode": r.periode, "pompe": r.pompe.nom,
+            "produit": produits.get(r.pompe.produit_id, "Inconnu"),
+            "metter_avant": float(r.metter_avant), "metter_apres": float(r.metter_apres),
+            "gallons": float(e["quantite"]), "montant": float(e["montant_vente"]),
+            "statut": e["statut"], "type_anomalie": e.get("type_anomalie"),
+            "decalage": e.get("decalage"), "source": e.get("source"),
+            "pompiste": e.get("pompiste_nom"), "rapport_pompiste_id": e.get("rapport_pompiste_id"),
+            "exclu_journal": _exclu_du_total(e),
+        })
+    a_verifier.sort(key=lambda x: (0 if x["statut"] == "erreur" else 1, -x["montant"]))
+    for x in a_verifier:
+        x["compte"] = not (x["exclu_journal"] or sans_non_certifies)
+    somme = lambda L: {"nb": len(L), "gallons": round(sum(x["gallons"] for x in L), 4),
+                       "montant": round(sum(x["montant"] for x in L), 2),
+                       "gallons_par_carburant": _gallons_par_famille(L)}
+    brut = [{"gallons": float(r.metter_apres) - float(r.metter_avant),
+             "montant": float(r.montant_vente),
+             "produit": produits.get(r.pompe.produit_id, "Inconnu")}
+            for r in rel_jour if float(r.metter_apres) >= float(r.metter_avant)]
+    reconciliation = {
+        "releves": somme(brut),
+        "sauts_exclus": somme([x for x in a_verifier if x["exclu_journal"]]),
+        "autres_exclus": somme([x for x in a_verifier if not x["exclu_journal"] and sans_non_certifies]),
+        "en_attente": {"nb": len(en_attente_j),
+                       "gallons": round(sum(e["quantite"] for e in en_attente_j), 4),
+                       "montant": round(sum(e["montant_vente"] for e in en_attente_j), 2),
+                       "gallons_par_carburant": _gallons_par_famille(
+                           [{"produit": e["produit_nom"], "gallons": e["quantite"]} for e in en_attente_j])},
+    }
+    exclus = {x["releve_id"] for x in a_verifier if not x["compte"]}
+    rel_jour = [r for r in rel_jour if r.id not in exclus]
     # Agrégation par (période, produit) ET par produit (jour entier).
     par_pp = {}          # (periode, pid) -> {gallons, montant, nb}
     ent = {}             # pid -> {gallons, montant, nb}   (jour entier)
@@ -3213,7 +4628,8 @@ def carburant_rapport_jour(
         if q < 0:
             continue
         pid = r.pompe.produit_id
-        montant = q * _D(str(r.prix_gallon))
+        # Montant du relevé arrondi au centime, comme au Journal Meeters et à la caisse
+        montant = _D(str(r.montant_vente))
         for bucket, key in ((par_pp, (r.periode, pid)), (ent, pid)):
             a = bucket.setdefault(key, {"gallons": _D("0"), "montant": _D("0"), "nb": 0})
             a["gallons"] += q
@@ -3260,10 +4676,37 @@ def carburant_rapport_jour(
         db.query(Depense).filter(Depense.date_depense == d)
         .order_by(Depense.id.asc()).all()
     )
+    if activite:
+        # Dépense d'un produit : son activité ; payée par un pompiste : celle du
+        # rapport (propane seulement si tous ses meeters sont du propane) ;
+        # dépense générale de la caisse : carburant.
+        from models import RapportPompiste as _RP
+
+        def _act_dep(x):
+            if x.produit_id:
+                return _activite_produit(produits.get(x.produit_id))
+            if getattr(x, "rapport_pompiste_id", None):
+                rap = db.get(_RP, x.rapport_pompiste_id)
+                acts = {_activite_produit(produits.get(l.pompe.produit_id)) for l in (rap.lignes if rap else [])}
+                return "propane" if acts == {"propane"} else "carburant"
+            return "carburant"
+        deps = [x for x in deps if _act_dep(x) == activite]
+    def _source_dep(x):
+        if x.produit:
+            return x.produit.nom
+        if getattr(x, "rapport_pompiste_id", None):
+            from models import RapportPompiste
+            rap = db.get(RapportPompiste, x.rapport_pompiste_id)
+            u = rap.utilisateur if rap else None
+            nom = (u.nom_complet or u.username) if u else ""
+            return f"Payée par le pompiste {nom}".strip()
+        return "Caisse principale"
+
     depenses_liste = [{
         "categorie":    x.categorie or "—",
         "description":  x.description or "",
-        "source":       (x.produit.nom if x.produit else "Caisse générale"),
+        "source":       _source_dep(x),
+        "pompiste":     bool(getattr(x, "rapport_pompiste_id", None)),
         "reference":    getattr(x, "reference", None) or "",
         "montant":      float(_D(str(x.montant))),
         "produit_id":   x.produit_id,
@@ -3303,6 +4746,17 @@ def carburant_rapport_jour(
     return {
         "date":      str(d),
         "genere_le": _dtn2.now(_tzu2.utc).isoformat(),
+        "sans_non_certifies": sans_non_certifies,
+        "activite": activite,
+        "activites": sorted({_activite_produit(n) for n in produits.values()}),
+        "reconciliation": reconciliation,
+        "non_certifies": {
+            "lignes":  a_verifier,
+            "nb":      len(a_verifier),
+            "nb_erreurs": sum(1 for x in a_verifier if x["statut"] == "erreur"),
+            "gallons": round(sum(x["gallons"] for x in a_verifier), 4),
+            "montant": round(sum(x["montant"] for x in a_verifier), 2),
+        },
         "entrees": {
             "par_periode":   entrees_par_periode,
             "par_produit":   entrees_par_produit,
@@ -3337,6 +4791,7 @@ def journal_pdf(
     periode:    Optional[str] = None,
     pompiste_id: List[int] = Query(default=[]),
     certifie: Optional[str] = None,
+    activite: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     import io
@@ -3355,7 +4810,9 @@ def journal_pdf(
     d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
 
     entries    = [e for e in _filtre_certifie(_build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None,
-                                                                 periode, pompiste_id), certifie)]
+                                                                 periode, pompiste_id, inclure_en_attente=True,
+                                                                 activite=_activite_valide(activite)), certifie)
+                  if not e["en_attente"]]
     nb_alertes = sum(1 for e in entries if e["statut"] == "alerte")
     nb_erreurs = sum(1 for e in entries if e["statut"] == "erreur")
     nb_ok      = len(entries) - nb_alertes - nb_erreurs
@@ -3396,7 +4853,7 @@ def journal_pdf(
     story = []
 
     # En-tête
-    story.append(Paragraph("Journal des Meters", sTitle))
+    story.append(Paragraph("Journal des Meeters", sTitle))
     periode_txt = f"{d_debut.strftime('%d/%m/%Y')} → {d_fin.strftime('%d/%m/%Y')}"
     story.append(Paragraph(f"Période : {periode_txt}  ·  Généré le {today_haiti().strftime('%d/%m/%Y')}", sSub))
     story.append(HRFlowable(width="100%", thickness=1, color=C_BLUE, spaceAfter=12))
@@ -3446,9 +4903,9 @@ def journal_pdf(
             al_data = [
                 [Paragraph(f"{label} — {e['pompe_nom']} · {e['produit_nom']} | {e['date']} {e['periode']} | Décalage : {dec_str}", sAlHead)],
                 [Paragraph(
-                    f"<b>Meter avant :</b> {e['metter_avant']:.4f}  |  "
+                    f"<b>Meeter avant :</b> {e['metter_avant']:.4f}  |  "
                     f"<b>Attendu :</b> {att_str}  |  "
-                    f"<b>Meter après :</b> {e['metter_apres']:.4f}  |  "
+                    f"<b>Meeter après :</b> {e['metter_apres']:.4f}  |  "
                     f"<b>Qté :</b> {e['quantite']:.4f} gal  |  "
                     f"<b>Montant :</b> {e['montant_vente']:,.0f} G",
                     sAlBody
@@ -3479,7 +4936,7 @@ def journal_pdf(
         story.append(Paragraph("Aucun relevé pour cette période.", sBody))
     else:
         hdr = ["Date", "Période", "Pompe", "Produit",
-               "Meter avant", "Meter après", "Qté (gal)", "Montant (G)",
+               "Meeter avant", "Meeter après", "Qté (gal)", "Montant (G)",
                "Décalage", "Attendu", "Statut"]
         t_data = [hdr]
         for e in entries:
@@ -3536,7 +4993,7 @@ def journal_pdf(
     story.append(Spacer(1, 16))
     story.append(HRFlowable(width="100%", thickness=0.5, color=C_GRAY))
     story.append(Paragraph(
-        f"Station Carburant · Journal des Meters · {periode_txt} · {len(entries)} relevé(s)",
+        f"Station Carburant · Journal des Meeters · {periode_txt} · {len(entries)} relevé(s)",
         sSmall
     ))
 
@@ -3560,6 +5017,7 @@ def export_releves_xlsx(
     pompe_id:   List[int] = Query(default=[]),
     periode:    Optional[str] = None,
     pompiste_id: List[int] = Query(default=[]),
+    activite: Optional[str] = None,          # "carburant" | "propane" ; vide = tout
     db: Session = Depends(get_db),
 ):
     import io
@@ -3581,6 +5039,9 @@ def export_releves_xlsx(
     if periode:     q = q.filter(Releve.periode == periode)
     if pompiste_id: q = q.filter(Releve.pompiste_id.in_(pompiste_id))
     releves = q.order_by(Releve.date.desc(), Releve.periode, Releve.pompe_id).all()
+    act = _activite_valide(activite)
+    if act:      # propane et carburant jamais dans le même fichier
+        releves = [r for r in releves if _activite_produit(r.pompe.produit.nom if r.pompe and r.pompe.produit else None) == act]
 
     # ── Styles helpers ─────────────────────────────────────────────────
     def _fill(hex_color):
@@ -3635,7 +5096,7 @@ def export_releves_xlsx(
     ws1.merge_cells("A2:J2");  ws1.row_dimensions[2].height = 14
 
     HDR1  = ["#", "Date", "Période", "Produit", "Pompe",
-             "Prix/Gallon (G)", "Meter Avant", "Meter Après", "Quantité (gal)", "Montant (G)"]
+             "Prix/Gallon (G)", "Meeter Avant", "Meeter Après", "Quantité (gal)", "Montant (G)"]
     WDT1  = [6, 13, 13, 16, 16, 18, 14, 14, 15, 15]
     ws1.row_dimensions[3].height = 26
     for col, (h, w) in enumerate(zip(HDR1, WDT1), 1):
@@ -3772,7 +5233,7 @@ def _build_rapport_data(db: Session, date_rapport: date_type) -> dict:
     mois_debut = date_type(d.year, d.month, 1)
 
     def stats(debut, fin):
-        q = db.query(Releve).filter(Releve.date >= debut, Releve.date <= fin).all()
+        q = releves_comptes(db, db.query(Releve).filter(Releve.date >= debut, Releve.date <= fin).all())
         return {
             "nb_releves":    len(q),
             "total_montant": round(sum(r.montant_vente for r in q), 2),
@@ -3837,7 +5298,7 @@ def _build_rapport_data(db: Session, date_rapport: date_type) -> dict:
                     "pompe": r.pompe.nom,
                     "date": str(r.date),
                     "periode": r.periode,
-                    "detail": f"meter avant {av:.0f} > meter après {ap:.0f}",
+                    "detail": f"meeter avant {av:.0f} > meeter après {ap:.0f}",
                 })
             elif prev_ap is not None and av < prev_ap - 0.001:
                 nb_anom += 1
@@ -4772,7 +6233,10 @@ def reouvrir_livraison(livraison_id: int, db: Session = Depends(get_db)):
 
 # ---------- Prix de vente ----------
 @app.post("/api/prix-vente", status_code=201)
-def create_prix_vente(payload: PrixVenteIn, db: Session = Depends(get_db)):
+def create_prix_vente(payload: PrixVenteIn, request: Request, db: Session = Depends(get_db)):
+    """Nouveau prix de vente à partir d'une date (historique : jamais modifié).
+    Les relevés déjà enregistrés gardent le prix de leur saisie."""
+    _gerer_station(request, db)
     try:
         d = date_type.fromisoformat(payload.date_effet)
     except ValueError:
@@ -4783,11 +6247,17 @@ def create_prix_vente(payload: PrixVenteIn, db: Session = Depends(get_db)):
     if not produit:
         raise HTTPException(404, "Produit introuvable")
 
+    if payload.prix_vente_gallon > 1_000_000:
+        raise HTTPException(400, "Prix anormal.")
+    ancien = _prix_vente_a_date(db, produit.id, d)
     pv = PrixVente(
         produit_id        = payload.produit_id,
         prix_vente_gallon = payload.prix_vente_gallon,
         date_effet        = d,
     )
+    _tracer(db, request, "prix_vente_modifie", {"produit_id": produit.id, "produit": produit.nom,
+                                                "date_effet": str(d), "avant": ancien,
+                                                "apres": float(payload.prix_vente_gallon)})
     try:
         db.add(pv)
         db.commit()
@@ -5517,6 +6987,7 @@ class DepenseIn(BaseModel):
     reference:    Optional[str] = None
     notes:        Optional[str] = None
     produit_id:   Optional[int] = None   # caisse d'origine (Gazoline/Diesel) — None = generale
+    pompiste_id:  Optional[int] = None   # employé (pompiste) qui a fait la dépense
 
 class DepensePatch(BaseModel):
     categorie:    Optional[str]   = None
@@ -5528,6 +6999,8 @@ class DepensePatch(BaseModel):
     notes:        Optional[str]   = None
     produit_id:   Optional[int]   = None
     caisse_generale: Optional[bool] = None  # true = detacher explicitement la caisse (produit_id -> NULL)
+    pompiste_id:  Optional[int]   = None
+    sans_pompiste: Optional[bool] = None    # true = la dépense n'est plus attribuée à un pompiste
 
 @app.get("/api/depenses")
 def lister_depenses(
@@ -5576,6 +7049,11 @@ def lister_depenses(
                 "produit_nom": d.produit.nom if d.produit else None,
                 "created_at": d.created_at.isoformat() if d.created_at else None,
                 "sans_justificatif": nb_pj.get(d.id, 0) == 0,
+                "est_transfert": _est_categorie_transfert(db, d.categorie),
+                "rapport_pompiste_id": getattr(d, "rapport_pompiste_id", None),
+                "pompiste_id": d.pompiste_id,
+                "pompiste_nom": f"{d.pompiste.prenom} {d.pompiste.nom}".strip() if d.pompiste else None,
+                "saisi_par_nom": (d.saisi_par.nom_complet or d.saisi_par.username) if getattr(d, "saisi_par", None) else None,
             }
             for d in depenses
         ],
@@ -5602,11 +7080,15 @@ def creer_depense(data: DepenseIn, request: Request, db: Session = Depends(get_d
         if not produit:
             raise HTTPException(400, "Produit (caisse) introuvable.")
     _verifier_limite(db, data.montant)
+    if data.pompiste_id is not None and not db.get(Employe, data.pompiste_id):
+        raise HTTPException(400, "Pompiste introuvable.")
     d = Depense(
+        pompiste_id=data.pompiste_id,
         categorie=categorie, description=data.description.strip(),
         montant=data.montant, date_depense=date_d,
         beneficiaire=beneficiaire, reference=data.reference, notes=data.notes,
         produit_id=produit.id if produit else None,
+        saisi_par_id=getattr(getattr(request.state, "user", None), "id", None),
     )
     db.add(d)
 
@@ -5659,6 +7141,12 @@ def modifier_depense(depense_id: int, data: DepensePatch, request: Request, db: 
         if not produit:
             raise HTTPException(400, "Produit (caisse) introuvable.")
         d.produit_id = produit.id
+    if data.sans_pompiste:
+        d.pompiste_id = None
+    elif data.pompiste_id is not None:
+        if not db.get(Employe, data.pompiste_id):
+            raise HTTPException(400, "Pompiste introuvable.")
+        d.pompiste_id = data.pompiste_id
     db.commit()
     return {"message": "Dépense mise à jour."}
 
@@ -5695,7 +7183,7 @@ def stats_depenses(
     par_caisse: dict[str, float] = {}
     for d in depenses:
         par_cat[d.categorie] = round(par_cat.get(d.categorie, 0) + float(d.montant), 2)
-        caisse_nom = d.produit.nom if d.produit else "Générale"
+        caisse_nom = d.produit.nom if d.produit else "Caisse principale"
         par_caisse[caisse_nom] = round(par_caisse.get(caisse_nom, 0) + float(d.montant), 2)
     return {
         "total": round(sum(par_cat.values()), 2),
@@ -6208,6 +7696,7 @@ def creer_achat(data: AchatIn, request: Request, db: Session = Depends(get_db)):
         fournisseur=data.fournisseur.strip(), description=data.description.strip(),
         categorie=categorie, montant=data.montant,
         date_achat=date_a, reference=data.reference, notes=data.notes,
+        saisi_par_id=getattr(getattr(request.state, "user", None), "id", None),
     )
     db.add(a)
 
@@ -6381,7 +7870,7 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     q_rel = db.query(Releve)
     if date_debut: q_rel = q_rel.filter(Releve.date >= date_debut)
     if date_fin:   q_rel = q_rel.filter(Releve.date <= date_fin)
-    ventes_station = round(sum(float(r.montant_vente) for r in q_rel.all()), 2)
+    ventes_station = round(sum(float(r.montant_vente) for r in releves_comptes(db, q_rel.all())), 2)
 
     # ── Entrées : Bar (cash CASH/MIXTE encaissé à la vente + crédits remboursés) ──
     q_bv = db.query(BarVente).filter(BarVente.statut != "ANNULEE")
@@ -6566,7 +8055,7 @@ def rapport_caisse(
     q_rel = db.query(Releve)
     if date_debut: q_rel = q_rel.filter(Releve.date >= date_debut)
     if date_fin:   q_rel = q_rel.filter(Releve.date <= date_fin)
-    releves = q_rel.all()
+    releves = releves_comptes(db, q_rel.all())
     total_gallons = round(sum(float(r.quantite) for r in releves), 3)
 
     prod_map = {}
@@ -6662,7 +8151,7 @@ def gi_dashboard(
     if produit_id:
         from sqlalchemy.orm import joinedload
         q_releves = q_releves.join(Releve.pompe).filter(Pompe.produit_id == produit_id)
-    releves = q_releves.order_by(Releve.date).all()
+    releves = releves_comptes(db, q_releves.order_by(Releve.date).all())
 
     total_ventes  = round(sum(float(r.montant_vente) for r in releves), 2)
     total_gallons = round(sum(float(r.quantite) for r in releves), 3)
@@ -6839,7 +8328,7 @@ def get_statistiques(
             q = q.filter(Releve.pompe_id.in_(ids)) if ids else q.filter(False)
         if periode_jour:
             q = q.filter(Releve.periode == periode_jour)
-        return q.all()
+        return releves_comptes(db, q.all())
 
     releves  = _q_releves(debut, fin)
     prev_rel = _q_releves(prev_debut, prev_fin)

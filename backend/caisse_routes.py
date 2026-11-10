@@ -439,7 +439,9 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
     repartir sur une session propre après un incident, sans attendre le
     lendemain). Le lieu (Bar Devant / Bar Piscine) est choisi une fois par
     session, avant le comptage de stock — requis uniquement à la création
-    (une session déjà EN_COURS a déjà le sien)."""
+    (une session déjà EN_COURS a déjà le sien). Ce lieu détermine aussi le
+    département dont le stock est vérifié/décompté à chaque vente (voir
+    pos_service.py::departement_id_pour_lieu)."""
     employe = db.query(Employe).filter_by(id=data.caissier_id).first()
     if not employe:
         raise HTTPException(404, "Caissier introuvable")
