@@ -29822,6 +29822,7 @@ let _posCart = [];
 let _posMode = 'CASH';
 let _posProduits = [];       // cache des produits bar avec prix actif
 let _posCuisinePlats = [];   // cache des plats cuisine pour vente via bar
+let _posSessionLieu = null;  // lieu (DEVANT/PISCINE) de la session de caisse en cours — filtre le catalogue vendu
 /* Charger les produits bar dans le cache — le stock affiché/vendable est
    scopé au département du bar en cours (_posCaisseLieu, connu via le
    dashboard de session — voir _posDashLoadData) dès qu'une session avec un

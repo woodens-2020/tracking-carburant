@@ -2048,8 +2048,8 @@ def pompiste_manifest(request: Request):
         "scope": "/pompiste",
         "display": "standalone",
         "orientation": "any",
-        "background_color": "#eef2f7",
-        "theme_color": "#ea580c",
+        "background_color": "#f1f5f4",
+        "theme_color": "#0f766e",
         "icons": [
             {"src": "/pompiste-app/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
             {"src": "/pompiste-app/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
@@ -2078,7 +2078,7 @@ def pompiste_installer():
 # ouvre /pompiste en plein écran. Empreinte SHA-256 de la clé de signature
 # (publique) : Android vérifie /.well-known/assetlinks.json pour cacher la
 # barre d'adresse. La clé elle-même n'est jamais dans le dépôt.
-_APK_PAQUET = "com.konekta.ponpis"
+_APK_PAQUET = "com.konekta.ponpis.bpccp"   # APK propre à BPCCP (même clé de signature)
 _APK_EMPREINTES = ["6B:F8:E0:4A:B6:7A:4A:D6:67:63:DA:F7:CB:48:65:BB:B6:48:FD:1D:81:CA:6B:14:C7:2F:1E:93:6F:5E:7D:42"]
 
 
@@ -2092,6 +2092,8 @@ def assetlinks():
 
 @app.get("/pompiste/konekta-ponpis.apk", include_in_schema=False)
 def pompiste_apk():
+    if not os.path.exists(os.path.join(_POMPISTE_APP_DIR, "konekta-ponpis.apk")):
+        raise HTTPException(404, "Application Android pas encore disponible pour cette station.")
     return FileResponse(os.path.join(_POMPISTE_APP_DIR, "konekta-ponpis.apk"),
                         media_type="application/vnd.android.package-archive", filename="konekta-ponpis.apk",
                         headers={"Cache-Control": "no-cache"})
