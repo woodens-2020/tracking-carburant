@@ -4593,6 +4593,7 @@ def carburant_rapport_jour(
     date: Optional[date_type] = None,
     sans_non_certifies: bool = False,
     activite: Optional[str] = None,          # "carburant" | "propane" ; vide = tout
+    periode: Optional[str] = None,           # vacation : "Matin" | "Apres-midi" ; vide = journée entière
     db: Session = Depends(get_db),
 ):
     """Rapport de caisse carburant pour UNE journée :
@@ -4615,10 +4616,14 @@ def carburant_rapport_jour(
     )
     if activite:      # Propane et carburant ne se mélangent jamais
         rel_jour = [r for r in rel_jour if _activite_produit(produits.get(r.pompe.produit_id)) == activite]
+    if periode and periode not in PERIODES:
+        raise HTTPException(400, "Période invalide")
+    if periode:       # une seule vacation
+        rel_jour = [r for r in rel_jour if r.periode == periode]
     # Mêmes contrôles et même total que le Journal Meeters : chaque relevé non
     # certifié est signalé ; les sauts de compteur non résolus ne sont pas
     # comptés (_exclu_du_total) ; `sans_non_certifies` écarte aussi les autres.
-    tous_j = _build_journal_entries(db, d, d, inclure_en_attente=True, activite=activite)
+    tous_j = _build_journal_entries(db, d, d, periode_filter=periode or None, inclure_en_attente=True, activite=activite)
     journal = {e["id"]: e for e in tous_j if not e.get("en_attente")}
     en_attente_j = [e for e in tous_j if e.get("en_attente")]
     a_verifier = []
@@ -4714,6 +4719,22 @@ def carburant_rapport_jour(
         db.query(Depense).filter(Depense.date_depense == d)
         .order_by(Depense.id.asc()).all()
     )
+    if periode:
+        # Une vacation : seules les dépenses payées par un pompiste pendant
+        # cette vacation (celles de son rapport). Les dépenses générales de la
+        # journée n'appartiennent à aucune vacation.
+        from models import RapportPompiste as _RPv
+        _per_rap = {}
+
+        def _de_la_vacation(x):
+            rid = getattr(x, "rapport_pompiste_id", None)
+            if not rid:
+                return False
+            if rid not in _per_rap:
+                rap = db.get(_RPv, rid)
+                _per_rap[rid] = rap.periode if rap else None
+            return _per_rap[rid] == periode
+        deps = [x for x in deps if _de_la_vacation(x)]
     if activite:
         # Dépense d'un produit : son activité ; payée par un pompiste : celle du
         # rapport (propane seulement si tous ses meeters sont du propane) ;

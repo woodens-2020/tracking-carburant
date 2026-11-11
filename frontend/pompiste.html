@@ -623,6 +623,7 @@ const TXT = {
     usd_sans_taux:'Taux du dollar pas encore fixé : demandez à la direction.',
     tk_depenses:'DÉPENSES', tk_a_remettre:'Argent à remettre', tk_autorise:'autorisée par',
     fe_phase:'Feuille du pompiste', fe_nom:'Nom et prénom', fe_date:'Date', fe_heures:'Heures', fe_a_h:'à',
+    vacation:'Vacation', vacation_q:'Quelle vacation ?', vacation_sub:'Choisissez votre vacation : matin ou après-midi.', vac_matin:'Matin', vac_am:'Après-midi', vac_prise:'déjà faite', vac_choisir:'Choisissez la vacation',
     fe_a:'Compteurs', fe_pompe:'Pompe', fe_avant:'Avant', fe_apres:'Après', fe_gallons:'Gallons', fe_total:'Total',
     fe_b:'Vente', fe_prix:'Prix', fe_c:'Bons valeur et chèques', fe_c_ref:'N° du bon ou du chèque', fe_montant:'Montant',
     fe_c_aj:'+ Ajouter un bon ou un chèque', fe_d:'Crédit et autre', fe_d_cli:'Client', fe_d_aj:'+ Ajouter un crédit',
@@ -755,6 +756,7 @@ const TXT = {
     usd_sans_taux:'Direksyon an poko mete to dola a : mande yo.',
     tk_depenses:'DEPANS', tk_a_remettre:'Lajan pou remèt', tk_autorise:'otorize pa',
     fe_phase:'Fèy ponpis la', fe_nom:'Non ak siyati', fe_date:'Dat', fe_heures:'Lè', fe_a_h:'rive',
+    vacation:'Vakasyon', vacation_q:'Ki vakasyon ?', vacation_sub:'Chwazi vakasyon ou : maten oswa apremidi.', vac_matin:'Maten', vac_am:'Apremidi', vac_prise:'deja fèt', vac_choisir:'Chwazi vakasyon an',
     fe_a:'Kontè yo', fe_pompe:'Ponp', fe_avant:'Anvan', fe_apres:'Apre', fe_gallons:'Galon', fe_total:'Total',
     fe_b:'Vant', fe_prix:'Pri', fe_c:'Bon valè ak chèk', fe_c_ref:'Nimewo bon an oswa chèk la', fe_montant:'Kantite lajan',
     fe_c_aj:'+ Ajoute yon bon oswa yon chèk', fe_d:'Kredi ak lòt', fe_d_cli:'Kliyan', fe_d_aj:'+ Ajoute yon kredi',
@@ -893,7 +895,7 @@ async function demarrer(){
 
 async function chargerContexte(){
   try{
-    const q = S.date ? `?date=${S.date}` : '';           // créneau attribué par le serveur
+    const q = S.date ? `?date=${S.date}` + (S.periode ? `&periode=${encodeURIComponent(S.periode)}` : '') : '';
     S.ctx = await api('GET','/api/pompiste/contexte' + q);
     if(S.ctx.en_cours){
       S.date = S.ctx.date; S.periode = S.ctx.periode;
@@ -1105,8 +1107,16 @@ function rPeriode(){
     <button class="date-rapport" onclick="aller('calendrier')">
       <span class="ico">📅</span>
       <span><small>${t('date_rapport')}</small>${auj ? t('auj') + ', ' : (hi ? t('hier') + ', ' : '')}${esc(jourTxt(S.date))}</span>
-      <span class="chg">${t('changer_date')}</span></button>`;
-  barre('', t('continuer'), continuerDate);
+      <span class="chg">${t('changer_date')}</span></button>
+    <h2>${t('vacation_q')}</h2>
+    <p class="sub">${t('vacation_sub')}</p>
+    <div class="choix deux vacations">
+      <button class="gros grand vac ${S.periode==='Matin'?'on':''}" onclick="choisirVacation('Matin')">
+        <span class="ico">🌅</span><span>${t('vac_matin')}</span><span class="coche">✓</span></button>
+      <button class="gros grand vac ${S.periode==='Apres-midi'?'on':''}" onclick="choisirVacation('Apres-midi')">
+        <span class="ico">🌇</span><span>${t('vac_am')}</span><span class="coche">✓</span></button>
+    </div>`;
+  barre(S.periode ? '' : t('vac_choisir'), t('continuer'), continuerDate, !!S.periode);
 }
 
 // Calendrier : un mois à la fois, gros jours à toucher ; jours futurs et trop
@@ -1156,7 +1166,12 @@ async function choisirDate(d){
   S.date = d; S.moisCal = null; aller('periode');
 }
 // Plus de choix matin / après-midi : le serveur range le rapport tout seul
+function choisirVacation(p){
+  if(enCours()) return;
+  S.periode = p; sauverBrouillon(); rPeriode();
+}
 async function continuerDate(){
+  if(!S.periode && !enCours()) return;
   S.etape = S.guide ? 'produit' : 'feuille';
   await chargerContexte();
 }
@@ -1313,7 +1328,7 @@ function smartAnalyser(id){
   clearTimeout(SM.minuteurs[id]);
   SM.minuteurs[id] = setTimeout(async () => {
     try{
-      const a = await api('POST', '/api/pompiste/analyser-index', {date:S.date, periode: enCours() ? enCours().periode : null,
+      const a = await api('POST', '/api/pompiste/analyser-index', {date:S.date, periode: enCours() ? enCours().periode : (S.periode || null),
         pompe_id:id, metter_avant:av, metter_apres:ap});
       SM.res[id] = {cle, a};
       if(smVisible(id) && !smEnFrappe(id)) smZone(id).innerHTML = smartHtml(id, a);
@@ -1545,7 +1560,7 @@ async function envoyerCompteurs(){
   const b = $('barre-btn'); b.disabled = true; b.textContent = t('envoi');
   try{
     await api('POST','/api/pompiste/compteurs',{
-      date:S.date, periode: enCours() ? enCours().periode : null, charte_acceptee:S.charte,
+      date:S.date, periode: enCours() ? enCours().periode : (S.periode || null), charte_acceptee:S.charte,
       lignes: lignes().map(x=>({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap, debut_confirme:!!x.s.debutConfirme,
                                 pompe_choisie_id:x.s.pompeChoisie||null, decision:x.s.decision||null}))});
     S.dernierProduit = produit()?.nom;
@@ -1888,6 +1903,8 @@ function rFeuille(){
       <div class="fe-info">
         <div><small>${t('fe_nom')}</small><b>${esc(pomp.nom || '')}</b></div>
         <div><small>${t('fe_date')}</small><button class="fe-date" onclick="aller('calendrier')" ${r ? 'disabled' : ''}>${esc(jourTxt(S.date))}</button></div>
+        <div><small>${t('vacation')}</small><button class="fe-date" onclick="aller('periode')" ${r ? 'disabled' : ''}>${
+          (r ? r.periode : S.periode) === 'Apres-midi' ? '🌇 ' + t('vac_am') : ((r ? r.periode : S.periode) === 'Matin' ? '🌅 ' + t('vac_matin') : '—')}</button></div>
         <div><small>${t('fe_heures')}</small><div class="fe-heures">
           <input type="time" data-f="heure:debut" value="${esc(S.heures.debut)}" aria-label="${t('fe_heures')}"> ${t('fe_a_h')}
           <input type="time" data-f="heure:fin" value="${esc(S.heures.fin)}" aria-label="${t('fe_heures')}"></div></div>
@@ -2086,7 +2103,7 @@ async function feEnvoyer(){
   try{
     if(sais.length){
       try{
-        await api('POST', '/api/pompiste/compteurs', {date:S.date, periode: enCours() ? enCours().periode : null, charte_acceptee:S.charte,
+        await api('POST', '/api/pompiste/compteurs', {date:S.date, periode: enCours() ? enCours().periode : (S.periode || null), charte_acceptee:S.charte,
           lignes: sais.map(x => ({pompe_id:x.q.id, metter_avant:x.av, metter_apres:x.ap, debut_confirme:!!x.s.debutConfirme,
                                   pompe_choisie_id:x.s.pompeChoisie||null, decision:x.s.decision||null}))});
       }catch(e){
@@ -2099,7 +2116,7 @@ async function feEnvoyer(){
       }
       for(const x of sais) delete S.index[x.q.id];
       S.erreurs = {};
-      S.ctx = await api('GET', '/api/pompiste/contexte?date=' + S.date);
+      S.ctx = await api('GET', '/api/pompiste/contexte?date=' + S.date + (S.periode ? '&periode=' + encodeURIComponent(S.periode) : ''));
     }
     const h = [S.heures.debut, S.heures.fin].filter(Boolean).join(' – ');
     S.dernier = await api('POST', '/api/pompiste/terminer', {

@@ -1274,6 +1274,7 @@ def _rapport_a_traiter(db: Session, rid: int) -> RapportPompiste:
 @router.get("/api/pompiste-supervision/rapports")
 def lister(statut: Optional[str] = None, date_debut: Optional[date_type] = None,
            date_fin: Optional[date_type] = None, utilisateur_id: Optional[int] = None,
+           periode: Optional[str] = None,
            _s: Utilisateur = Depends(_require_superviseur), db: Session = Depends(get_db)):
     """`statut` accepte une liste séparée par des virgules (ex. SOUMIS,PROBLEME).
     SUPPRIME = les rapports supprimés (corbeille), qu'on peut restaurer."""
@@ -1294,6 +1295,10 @@ def lister(statut: Optional[str] = None, date_debut: Optional[date_type] = None,
         q = q.filter(RapportPompiste.date <= date_fin)
     if utilisateur_id:
         q = q.filter(RapportPompiste.utilisateur_id == utilisateur_id)
+    if periode:                                   # vacation : Matin / Apres-midi
+        if periode not in PERIODES:
+            raise HTTPException(400, "Période invalide")
+        q = q.filter(RapportPompiste.periode == periode)
     rows = q.all()
     # À traiter : ordre chronologique (la continuité des compteurs impose de
     # finaliser le Matin avant l'Après-midi). Historique : plus récents d'abord.

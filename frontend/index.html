@@ -5209,6 +5209,14 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
             </select>
           </div>
           <div class="filter-group">
+            <label class="filter-label" for="f-per">Vacation</label>
+            <select id="f-per" class="filter-select">
+              <option value="">Matin + Après-midi</option>
+              <option value="Matin">🌅 Matin</option>
+              <option value="Apres-midi">🌇 Après-midi</option>
+            </select>
+          </div>
+          <div class="filter-group">
             <label class="filter-label">Pompiste</label>
             <div class="jf-dd-wrap pp-dd" id="f-pompiste-dd" data-change="">
               <button type="button" class="jf-dd-btn" id="f-pompiste-btn" onclick="ppOuvrir(event,'f-pompiste')">
@@ -5396,6 +5404,14 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
             </div>
           </div>
           <div class="filter-group">
+            <label class="filter-label" for="jf-periode">Vacation</label>
+            <select id="jf-periode" class="filter-select" onchange="loadJournal()">
+              <option value="">Matin + Après-midi</option>
+              <option value="Matin">🌅 Matin</option>
+              <option value="Apres-midi">🌇 Après-midi</option>
+            </select>
+          </div>
+          <div class="filter-group">
             <label class="filter-label">Certification</label>
             <select id="jf-certif" class="filter-select" onchange="loadJournal()">
               <option value="">Tous les meeters</option>
@@ -5515,6 +5531,14 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
               <input type="date" id="cjr-fin" class="filter-input" onchange="cjrDatesChangees()">
               <button class="btn btn-secondary btn-sm" onclick="cjrDecalerJour(1)" title="Jour suivant" aria-label="Jour suivant">▶</button>
             </div>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label" for="cjr-vac">Vacation</label>
+            <select id="cjr-vac" class="filter-select" onchange="loadCarburantRapport()">
+              <option value="">Matin + Après-midi</option>
+              <option value="Matin">🌅 Matin</option>
+              <option value="Apres-midi">🌇 Après-midi</option>
+            </select>
           </div>
           <div class="filter-group">
             <label class="filter-label" for="cjr-produit">Caisse / produit</label>
@@ -17147,7 +17171,9 @@ async function loadCarburantRapport(){
   try{
     // Catégories et bénéficiaires enregistrés (listes de référence des dépenses)
     try{ await Promise.all([_chargerListeRef('categories-depense'), _chargerListeRef('beneficiaires')]); }catch(_){}
-    _cjrJours=await Promise.all(jours.map(j=>GET('/carburant/rapport-jour?date='+j+(_cjrSansNC?'&sans_non_certifies=1':'')+'&activite='+_cjrActivite)));
+    const _vac=(document.getElementById('cjr-vac')||{}).value||'';
+    _cjrJours=await Promise.all(jours.map(j=>GET('/carburant/rapport-jour?date='+j+(_cjrSansNC?'&sans_non_certifies=1':'')+'&activite='+_cjrActivite
+      +(_vac?'&periode='+encodeURIComponent(_vac):''))));
     _cjrActivites=[...new Set(_cjrJours.flatMap(d=>d.activites||['carburant']))];
     if(!_cjrAvecPropane() && _cjrActivite!=='carburant'){ _cjrActivite='carburant'; return loadCarburantRapport(); }
 
@@ -21486,7 +21512,7 @@ async function pspVentes(){
   const K = PSP.ventes ||= {debut: currentDate.slice(0,8) + '01', fin: currentDate, sel: null};
   let d, tous = [];
   try{
-    [d, tous] = await Promise.all([GET(`/pompistes/classement?date_debut=${K.debut}&date_fin=${K.fin}`),
+    [d, tous] = await Promise.all([GET(`/pompistes/classement?date_debut=${K.debut}&date_fin=${K.fin}` + (K.periode ? `&periode=${encodeURIComponent(K.periode)}` : '')),
                                    GET('/pompistes').catch(() => [])]);
   }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; return; }
   const fams = Object.keys(d.totaux).sort((a, b) => _cjrRangFam(a) - _cjrRangFam(b));
@@ -21507,6 +21533,10 @@ async function pspVentes(){
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:end">
         <label class="cp-champ">Du<input type="date" class="filter-input" id="pv-d" value="${K.debut}"></label>
         <label class="cp-champ">Au<input type="date" class="filter-input" id="pv-f" value="${K.fin}"></label>
+        <label class="cp-champ">Vacation<select class="filter-input" onchange="PSP.ventes.periode=this.value;pspVentes()">
+          <option value="">Matin + Après-midi</option>
+          <option value="Matin" ${K.periode==='Matin'?'selected':''}>🌅 Matin</option>
+          <option value="Apres-midi" ${K.periode==='Apres-midi'?'selected':''}>🌇 Après-midi</option></select></label>
         <button class="btn btn-primary psp-mini" onclick="_pvPer(document.getElementById('pv-d').value, document.getElementById('pv-f').value)">Afficher</button>
         <button class="btn btn-secondary psp-mini" onclick="_pvPer('${currentDate}','${currentDate}')">Aujourd’hui</button>
         <button class="btn btn-secondary psp-mini" onclick="_pvPer('${iso(d7)}','${currentDate}')">7 jours</button>
@@ -21849,6 +21879,7 @@ async function pspChargerListe(){
   if(f.debut) q += `&date_debut=${f.debut}`;
   if(f.fin) q += `&date_fin=${f.fin}`;
   if(f.pompiste) q += `&utilisateur_id=${f.pompiste}`;
+  if(f.periode) q += `&periode=${encodeURIComponent(f.periode)}`;
   PSP.dm = {}; PSP.hm = {};                     // derniers meeters et historique rechargés avec la liste
   PSP.rapports = await _pspApi('GET', q);
   if(PSP.ouvert){
@@ -21882,6 +21913,10 @@ function pspRendreListe(){
       <div class="psp-grid" style="margin-top:10px">
         <select class="filter-input" onchange="pspFiltre('pompiste', this.value)"><option value="">Tous les pompistes</option>
           ${comptes.map(u => `<option value="${u.id}" ${String(f.pompiste)===String(u.id)?'selected':''}>${esc(u.nom_complet)}</option>`).join('')}</select>
+        <select class="filter-input" onchange="pspFiltre('periode', this.value)" title="Vacation">
+          <option value="">Matin + Après-midi</option>
+          <option value="Matin" ${f.periode==='Matin'?'selected':''}>🌅 Matin</option>
+          <option value="Apres-midi" ${f.periode==='Apres-midi'?'selected':''}>🌇 Après-midi</option></select>
         <input type="date" class="filter-input" value="${f.debut}" onchange="pspFiltre('debut', this.value)" title="Du">
         <input type="date" class="filter-input" value="${f.fin}" onchange="pspFiltre('fin', this.value)" title="Au">
         <div style="display:flex;gap:6px"><button class="btn btn-secondary psp-mini" onclick="pspPeriodeRapide(1)">Aujourd'hui</button>

@@ -30,7 +30,7 @@ def _nom(e: Optional[Employe]) -> str:
     return f"{e.prenom or ''} {e.nom or ''}".strip() if e else NON_ATTRIBUE
 
 
-def classement(db: Session, d0: date_type, d1: date_type) -> dict:
+def classement(db: Session, d0: date_type, d1: date_type, periode: Optional[str] = None) -> dict:
     import main
     from models import Utilisateur
     lignes: dict = {}
@@ -47,7 +47,10 @@ def classement(db: Session, d0: date_type, d1: date_type) -> dict:
     totaux = defaultdict(lambda: {"gallons": 0.0, "montant": 0.0})
     # Ventes officielles seulement : même règle que tous les totaux (sauts non
     # confirmés exclus, voir main.releves_comptes)
-    for r in main.releves_comptes(db, db.query(Releve).filter(Releve.date >= d0, Releve.date <= d1).all()):
+    q_rel = db.query(Releve).filter(Releve.date >= d0, Releve.date <= d1)
+    if periode:
+        q_rel = q_rel.filter(Releve.periode == periode)
+    for r in main.releves_comptes(db, q_rel.all()):
         g = max(0.0, float(r.metter_apres) - float(r.metter_avant))
         mt = g * float(r.prix_gallon or 0)
         fam = main._famille_carburant(r.pompe.produit.nom if r.pompe and r.pompe.produit else "") or "Autre"
@@ -65,6 +68,10 @@ def classement(db: Session, d0: date_type, d1: date_type) -> dict:
     # Dépenses : attribuées au pompiste, sinon au pompiste du rapport qui les a payées
     emp_du_compte = {}
     for d in db.query(Depense).filter(Depense.date_depense >= d0, Depense.date_depense <= d1).all():
+        if periode:                       # une vacation : seules les dépenses de ses rapports
+            rap_v = db.get(RapportPompiste, d.rapport_pompiste_id) if d.rapport_pompiste_id else None
+            if not rap_v or rap_v.periode != periode:
+                continue
         eid = d.pompiste_id
         if eid is None and d.rapport_pompiste_id:
             rap = db.get(RapportPompiste, d.rapport_pompiste_id)
@@ -113,9 +120,12 @@ def classement(db: Session, d0: date_type, d1: date_type) -> dict:
 
 
 @router.get("/api/pompistes/classement")
-def classement_pompistes(date_debut: date_type, date_fin: date_type, db: Session = Depends(get_db)):
+def classement_pompistes(date_debut: date_type, date_fin: date_type, periode: Optional[str] = None,
+                         db: Session = Depends(get_db)):
     if date_fin < date_debut:
         raise HTTPException(400, "La date de fin est avant la date de début.")
     if (date_fin - date_debut).days > MAX_JOURS:
         raise HTTPException(400, f"Période trop longue ({MAX_JOURS} jours au plus).")
-    return classement(db, date_debut, date_fin)
+    if periode and periode not in ("Matin", "Apres-midi"):
+        raise HTTPException(400, "Période invalide")
+    return classement(db, date_debut, date_fin, periode or None)
