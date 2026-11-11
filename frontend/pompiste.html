@@ -1903,13 +1903,20 @@ function rFeuille(){
       <div class="fe-info">
         <div><small>${t('fe_nom')}</small><b>${esc(pomp.nom || '')}</b></div>
         <div><small>${t('fe_date')}</small><button class="fe-date" onclick="aller('calendrier')" ${r ? 'disabled' : ''}>${esc(jourTxt(S.date))}</button></div>
-        <div><small>${t('vacation')}</small><button class="fe-date" onclick="aller('periode')" ${r ? 'disabled' : ''}>${
-          (r ? r.periode : S.periode) === 'Apres-midi' ? '🌇 ' + t('vac_am') : ((r ? r.periode : S.periode) === 'Matin' ? '🌅 ' + t('vac_matin') : '—')}</button></div>
+
         <div><small>${t('fe_heures')}</small><div class="fe-heures">
           <input type="time" data-f="heure:debut" value="${esc(S.heures.debut)}" aria-label="${t('fe_heures')}"> ${t('fe_a_h')}
           <input type="time" data-f="heure:fin" value="${esc(S.heures.fin)}" aria-label="${t('fe_heures')}"></div></div>
       </div>
     </div>
+    <div class="fe-sec fe-vac" id="fe-vac">${lettre('🕘', t('vacation_q'), r ? '' : t('vacation_sub'))}
+      <div class="fe-vac-choix">
+        ${[['Matin', '🌅', t('vac_matin')], ['Apres-midi', '🌇', t('vac_am')]].map(([v, ico, lib]) => {
+          const on = (r ? r.periode : S.periode) === v;
+          return `<button type="button" class="fe-vac-b ${on ? 'on' : ''}" ${r ? 'disabled' : `onclick="feChoisirVacation('${v}')"`}>
+            <span class="ico">${ico}</span><b>${lib}</b><span class="coche">${on ? '✓' : ''}</span></button>`;
+        }).join('')}
+      </div></div>
     <div id="fe-msg"></div>
 
     <div class="fe-sec">${lettre('A', t('fe_a'))}
@@ -2083,9 +2090,20 @@ function feMaj(){
     <div class="ecart ${cls}"><span>${lib}</span><span>${signe(T.ecart)}</span></div>`;
   $('barre-info').innerHTML = `${lib}<b>${signe(T.ecart)}</b>`;
 }
+async function feChoisirVacation(p){
+  if(enCours() || S.periode === p) return;
+  S.periode = p; sauverBrouillon();
+  const y = window.scrollY;
+  await chargerContexte();
+  window.scrollTo(0, y);
+}
 async function feEnvoyer(){
   const z = $('fe-msg');
   const err = (m, el) => { z.innerHTML = `<div class="alerte err">${m}</div>`; (el || z).scrollIntoView({block:'center', behavior:'smooth'}); };
+  if(!enCours() && !S.periode){
+    $('fe-vac')?.classList.add('a-choisir');
+    return err(t('vac_choisir'), $('fe-vac'));
+  }
   const sais = feSaisies(), inc = sais.find(x => !x.complet), neg = sais.find(x => x.complet && x.g < 0);
   if(inc) return err(t('fe_e_incomplet', {p: esc(inc.q.nom)}), $('fe-r-' + inc.q.id));
   if(neg) return err(`${esc(neg.q.nom)} : ${t('fin_sup')}`, $('fe-r-' + neg.q.id));
