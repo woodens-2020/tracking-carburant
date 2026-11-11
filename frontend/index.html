@@ -3770,6 +3770,12 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 .psp-ligne-clic{cursor:pointer}
 .psp-ligne-clic:hover td{background:rgba(249,115,22,.06)}
 .psp-impr{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.psp-appli{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.psp-appli-qr{width:140px;height:140px;background:#fff;border-radius:10px;padding:5px;flex:none}
+.psp-appli-txt{flex:1;min-width:240px;display:flex;flex-direction:column;gap:6px}
+.psp-appli-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.psp-appli-btns .btn{text-decoration:none}
+.psp-appli-lien{font-family:var(--mono);font-size:13px;word-break:break-all}
 .psp-detail-barre{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .psp-badge.EN_COURS{background:rgba(148,163,184,.15);color:var(--muted)}
 .jr-src{display:inline-block;margin-top:3px;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 7px;
@@ -5244,6 +5250,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
       <div class="psp-tabs">
         <button class="psp-tab on" data-t="rapports" onclick="pspOnglet('rapports')">Rapports <span id="psp-nb"></span></button>
         <button class="psp-tab" data-t="comptes" onclick="pspOnglet('comptes')">Comptes pompistes</button>
+        <button class="psp-tab" data-t="appli" onclick="pspOnglet('appli')">📲 Application pompiste</button>
         <button class="psp-tab" data-t="taux" onclick="pspOnglet('taux')">Taux du jour</button>
         <button class="psp-tab" data-t="ventes" onclick="pspOnglet('ventes')">📊 Ventes par pompiste</button>
         <button class="psp-tab" data-t="reconciliation" onclick="pspOnglet('reconciliation')">🔎 Réconciliation des meeters</button>
@@ -21395,6 +21402,7 @@ async function pspOnglet(t){
     } else if(t === 'taux'){ await pspRendreTaux(); }
     else if(t === 'ventes'){ await pspVentes(); }
     else if(t === 'reconciliation'){ await smReconciliation(); }
+    else if(t === 'appli'){ c.innerHTML = _pspBlocApplication(); }
     else { PSP.comptes = await _pspApi('GET','/comptes'); pspRendreComptes(); }
   }catch(e){ c.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; }
   pspMajBadge();
@@ -22777,17 +22785,36 @@ async function pspRenvoyer(id){
   }catch(e){}
 }
 
+// Application des pompistes : téléchargement Android, lien d'installation, QR code
+function _pspBlocApplication(){
+  const lien = location.origin + '/pompiste/installer', apk = location.origin + '/pompiste/konekta-ponpis.apk';
+  return `<div class="psp-card psp-appli">
+      <img src="/pompiste/qr.png" alt="QR code d'installation" class="psp-appli-qr">
+      <div class="psp-appli-txt">
+        <b>📲 Application des pompistes</b>
+        <div class="psp-muted">Pour installer l'application sur le téléphone ou la tablette d'un pompiste : scannez le QR code
+          avec l'appareil, ou envoyez-lui le lien (WhatsApp, SMS). Sur Android, « Télécharger l'application » installe
+          l'application ; sur les autres appareils, le lien propose « Enstale aplikasyon an ».</div>
+        <div class="psp-appli-btns">
+          <a class="btn btn-primary" href="/pompiste/konekta-ponpis.apk" download>⬇ Télécharger l'application Android</a>
+          <a class="btn btn-secondary" href="/pompiste/installer" target="_blank">🌐 Page d'installation</a>
+          <button class="btn btn-secondary" onclick="_pspCopierLien('${lien}')">📋 Copier le lien</button>
+          <a class="btn btn-secondary" target="_blank" href="https://wa.me/?text=${encodeURIComponent('Telechaje aplikasyon ponpis la : ' + lien)}">💬 Envoyer par WhatsApp</a>
+        </div>
+        <div class="psp-appli-lien">${esc(lien)}</div>
+        <div class="psp-muted" style="font-size:12px">Fichier Android direct : ${esc(apk)}</div>
+      </div></div>`;
+}
+async function _pspCopierLien(l){
+  try{ await navigator.clipboard.writeText(l); notify('Lien copié : ' + l, 'ok'); }
+  catch(e){ prompt('Copiez ce lien :', l); }
+}
+
 function pspRendreComptes(){
   const c = document.getElementById('psp-contenu'), d = PSP.comptes;
   const emps = d.employes.filter(e => !e.lie);
   c.innerHTML = `${PSP.pin ? `<div class="psp-okbox">${PSP.pin}</div>` : ''}
-    <div class="psp-card" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-      <img src="/pompiste/qr.png" alt="QR" style="width:110px;height:110px;background:#fff;border-radius:8px;padding:4px">
-      <div style="flex:1;min-width:220px"><b>Installer l'application « Konekta Ponpis » sur un appareil</b>
-        <div class="psp-muted" style="margin-top:4px">Scannez ce QR code avec l'appareil du pompiste (ou ouvrez le lien dans Chrome),
-          puis « Enstale aplikasyon an » : une icône apparaît sur l'écran de l'appareil.</div>
-        <div style="margin-top:6px"><a href="/pompiste/installer" target="_blank" style="font-family:var(--mono)">${esc(location.origin)}/pompiste/installer</a></div></div>
-    </div>
+    ${_pspBlocApplication()}
     <div class="psp-card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:240px">
         <b>Pompistes et employés</b><div class="psp-muted" style="margin-top:4px">Chaque compte pompiste a sa fiche employé (poste Pompiste) :
         il peut recevoir des relevés, y compris ceux entrés au bureau ou corrigés dans le Journal Meeters (bouton ✏️ à côté du pompiste).</div></div>
