@@ -1867,6 +1867,7 @@ function feTotaux(){
 }
 const feChamp = (f, v, opts = "") => `<input ${/class=/.test(opts) ? "" : `class="saisie-n"`} data-f="${f}" type="text" autocomplete="off" value="${esc(v)}" ${opts}>`;
 const feDec = v => esc(String(v ?? '').replace('.', ','));
+const feLab = (lib, champ, cls = '') => `<label class="fe-chp ${cls}"><span>${lib}</span>${champ}</label>`;
 const lettre = (l, titre, sous) => `<div class="fe-sec-t"><span class="fe-l">${l}</span>${titre}${sous ? `<small>${sous}</small>` : ''}</div>`;
 
 function rFeuille(){
@@ -1878,6 +1879,7 @@ function rFeuille(){
     ${p.pompes.map(q => feLigneA(p, q)).join('')}`).join('');
   $('app').innerHTML = entete(t('fe_phase')) + `<div class="feuille">
     <div class="fe-tete">
+      <div class="fe-complexe">${esc(m.complexe || 'Complexe Commercial de Pillatre')}</div>
       <div class="fe-marque">${esc(nomStation)}</div>
       ${m.nom && m.nom !== nomStation ? `<div class="fe-sous">${esc(m.nom)}</div>` : ''}
       ${adresse ? `<div class="fe-adr">${esc(adresse)}</div>` : ''}
@@ -1902,8 +1904,8 @@ function rFeuille(){
     <div class="fe-cols">
       <div class="fe-sec">${lettre('C', t('fe_c'))}
         ${S.bons.map((x, i) => `<div class="fe-ligne">
-          ${feChamp(`bon:${i}:reference`, x.reference, `placeholder="${esc(t('fe_c_ref'))}" maxlength="120"`)}
-          ${feChamp(`bon:${i}:montant`, feDec(x.montant), `class="saisie-n num" inputmode="decimal" placeholder="${esc(t('fe_montant'))}" data-n="dec"`)}
+          ${feLab(t('fe_c_ref'), feChamp(`bon:${i}:reference`, x.reference, `placeholder="${esc(t('fe_c_ref'))}" maxlength="120"`))}
+          ${feLab(t('fe_montant'), feChamp(`bon:${i}:montant`, feDec(x.montant), `class="saisie-n num" inputmode="decimal" placeholder="0,00" data-n="dec"`))}
           <button class="fe-x" onclick="feRetirer('bons',${i})" aria-label="✕">✕</button></div>`).join('')}
         <button class="fe-aj" onclick="feAjouter('bons')">${t('fe_c_aj')}</button>
         <div class="fe-tot"><span>${t('fe_total')} C</span><span class="v" id="fe-tc"></span></div></div>
@@ -1911,15 +1913,15 @@ function rFeuille(){
       <div class="fe-sec">${lettre('D', t('fe_d'))}
         ${S.credits.length ? `<div class="fe-ss">${t('fe_d_credits')}</div>` : ''}
         ${S.credits.map((x, i) => `<div class="fe-ligne">
-          ${feChamp(`cre:${i}:nom`, x.nom, `placeholder="${esc(t('fe_d_cli'))}" maxlength="120"`)}
-          ${feChamp(`cre:${i}:montant`, feDec(x.montant), `inputmode="decimal" placeholder="${esc(t('fe_montant'))}" data-n="dec"`)}
+          ${feLab(t('fe_d_cli'), feChamp(`cre:${i}:nom`, x.nom, `placeholder="${esc(t('fe_d_cli'))}" maxlength="120"`))}
+          ${feLab(t('fe_montant'), feChamp(`cre:${i}:montant`, feDec(x.montant), `inputmode="decimal" placeholder="0,00" data-n="dec"`))}
           <button class="fe-x" onclick="feRetirer('credits',${i})" aria-label="✕">✕</button></div>`).join('')}
         <button class="fe-aj" onclick="feAjouter('credits')">${t('fe_d_aj')}</button>
         ${S.depenses.length ? `<div class="fe-ss">${t('fe_d_depenses')}</div>` : ''}
         ${S.depenses.map((x, i) => `<div class="fe-ligne trois">
-          ${feChamp(`dep:${i}:description`, x.description, `placeholder="${esc(t('fe_desc'))}" maxlength="200"`)}
-          ${feChamp(`dep:${i}:montant`, feDec(x.montant), `inputmode="decimal" placeholder="${esc(t('fe_montant'))}" data-n="dec"`)}
-          ${feChamp(`dep:${i}:autorise_par`, x.autorise_par, `placeholder="${esc(t('fe_autorise'))}" maxlength="120"`)}
+          ${feLab(t('fe_desc'), feChamp(`dep:${i}:description`, x.description, `placeholder="${esc(t('fe_desc'))}" maxlength="200"`))}
+          ${feLab(t('fe_montant'), feChamp(`dep:${i}:montant`, feDec(x.montant), `inputmode="decimal" placeholder="0,00" data-n="dec"`))}
+          ${feLab(t('fe_autorise'), feChamp(`dep:${i}:autorise_par`, x.autorise_par, `placeholder="${esc(t('fe_autorise'))}" maxlength="120"`))}
           <button class="fe-x" onclick="feRetirer('depenses',${i})" aria-label="✕">✕</button></div>`).join('')}
         <button class="fe-aj" onclick="feAjouter('depenses')" style="margin-top:8px">${t('fe_d_dep')}</button>
         <div class="fe-tot"><span>${t('fe_total')} D</span><span class="v" id="fe-td"></span></div></div>
@@ -1957,19 +1959,20 @@ function rFeuille(){
 }
 function feLigneA(p, q){
   const l = feEnvoyee(q.id);
-  if(l) return `<div class="fe-tr envoye" id="fe-r-${q.id}">
-      <span class="fe-pn"><b>${esc(q.nom)}</b><small>✓ ${t('fe_envoye_l')} · <button class="fe-mod" onclick="modifierPompe(${q.id},true)">${t('modifier')}</button></small></span>
-      <span class="fe-v">${nfg(l.metter_avant)}</span><span class="fe-v">${nfg(l.metter_apres)}</span>
-      <span class="fe-v">${nfg(l.gallons)}</span><span class="fe-v">${G(l.montant)}</span></div>`;
+  if(l) return `<div class="fe-tr fe-carte envoye" id="fe-r-${q.id}">
+      <div class="fe-pn"><b>${esc(q.nom)}</b><small>✓ ${t('fe_envoye_l')} · <button class="fe-mod" onclick="modifierPompe(${q.id},true)">${t('modifier')}</button></small></div>
+      <div class="fe-chp fixe"><span>${t('fe_avant')}</span><b class="fe-v">${nfg(l.metter_avant)}</b></div>
+      <div class="fe-chp fixe"><span>${t('fe_apres')}</span><b class="fe-v">${nfg(l.metter_apres)}</b></div>
+      <div class="fe-res"><span>${t('fe_gallons')}<b class="fe-v">${nfg(l.gallons)}</b></span><span>${t('fe_total')}<b class="fe-v">${G(l.montant)}</b></span></div></div>`;
   const prise = q.deja_rapportee;
-  if(prise) return `<div class="fe-tr prise"><span class="fe-pn"><b>${esc(q.nom)}</b>
-      <small>${prise.moi ? t('deja_moi') : t('deja_par', {n: esc(prise.par)})}</small></span><span></span><span></span><span></span><span></span></div>`;
+  if(prise) return `<div class="fe-tr fe-carte prise"><div class="fe-pn"><b>${esc(q.nom)}</b>
+      <small>${prise.moi ? t('deja_moi') : t('deja_par', {n: esc(prise.par)})}</small></div></div>`;
   const s = S.index[q.id] || {}, e = S.erreurs[q.id], diff = e?.code === 'debut_different';
-  return `<div class="fe-tr ${e ? 'erreur' : ''}" id="fe-r-${q.id}">
-      <span class="fe-pn"><b>${esc(q.nom)}</b>${q.emplacement ? `<small>📍 ${esc(q.emplacement)}</small>` : ''}</span>
-      ${feChamp(`idx:${q.id}:avant`, feDec(s.avant), `class="saisie-n fe-in num" inputmode="decimal" maxlength="14" placeholder="${esc(t('fe_avant'))}" data-n="dec3"`)}
-      ${feChamp(`idx:${q.id}:apres`, feDec(s.apres), `class="saisie-n fe-in num" inputmode="decimal" maxlength="14" placeholder="${esc(t('fe_apres'))}" data-n="dec3"`)}
-      <span class="fe-v" id="fe-g-${q.id}"></span><span class="fe-v" id="fe-m-${q.id}"></span></div>
+  return `<div class="fe-tr fe-carte ${e ? 'erreur' : ''}" id="fe-r-${q.id}">
+      <div class="fe-pn"><b>${esc(q.nom)}</b>${q.emplacement ? `<small>📍 ${esc(q.emplacement)}</small>` : ''}</div>
+      ${feLab('① ' + t('fe_avant'), feChamp(`idx:${q.id}:avant`, feDec(s.avant), `class="saisie-n fe-in num" inputmode="decimal" maxlength="14" placeholder="0,000" data-n="dec3"`))}
+      ${feLab('② ' + t('fe_apres'), feChamp(`idx:${q.id}:apres`, feDec(s.apres), `class="saisie-n fe-in num" inputmode="decimal" maxlength="14" placeholder="0,000" data-n="dec3"`))}
+      <div class="fe-res"><span>${t('fe_gallons')}<b class="fe-v" id="fe-g-${q.id}">—</b></span><span>${t('fe_total')}<b class="fe-v" id="fe-m-${q.id}">—</b></span></div></div>
     <div class="fe-ac" id="fe-ac-${q.id}"></div><div class="fe-sm" id="fe-sm-${q.id}"></div>
     ${diff ? `<div class="fe-err warn">⚠ ${t('debut_diff')}<label><input type="checkbox" ${s.debutConfirme ? 'checked' : ''}
         onchange="feConfirmerDebut(${q.id}, this.checked)"> ${t('fe_relu')}</label></div>`
@@ -2167,8 +2170,9 @@ function ticketHtml(r){
   const quand = d => { const x = new Date(d); return `${String(x.getDate()).padStart(2,'0')}/${String(x.getMonth()+1).padStart(2,'0')}/${x.getFullYear()} `
     + `${String(x.getHours()).padStart(2,'0')}:${String(x.getMinutes()).padStart(2,'0')}`; };
   const billets = (r.billetterie || []).map(b => ({c: b.coupure, n: (b.liasses||0) * 100 + (b.billets||0)})).filter(x => x.n);
-  return `<div class="c gr">${esc(m.nom || 'KONEKTA')}</div>
-    ${m.raison_sociale || m.complexe ? `<div class="c">${esc([m.raison_sociale, m.complexe].filter(Boolean).join(' · '))}</div>` : ''}
+  return `<div class="c b">${esc((m.complexe || 'Complexe Commercial de Pillatre').toUpperCase())}</div>
+    <div class="c gr">${esc(m.nom || 'KONEKTA')}</div>
+    ${m.raison_sociale ? `<div class="c">${esc(m.raison_sociale)}</div>` : ''}
     ${m.adresse ? `<div class="c">${esc(m.adresse)}</div>` : ''}
     ${m.telephone1 ? `<div class="c">${esc(m.telephone1)}</div>` : ''}
     <div class="sep2"></div>

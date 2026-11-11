@@ -3769,6 +3769,7 @@ td.dep-actions .pos-btn+.pos-btn{margin-left:6px}
 .psp-poubelle:hover,.psp-poubelle:focus-visible{opacity:1;border-color:var(--red);background:rgba(239,68,68,.1);outline:none}
 .psp-ligne-clic{cursor:pointer}
 .psp-ligne-clic:hover td{background:rgba(249,115,22,.06)}
+.psp-impr{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .psp-detail-barre{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .psp-badge.EN_COURS{background:rgba(148,163,184,.15);color:var(--muted)}
 .jr-src{display:inline-block;margin-top:3px;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 7px;
@@ -3917,6 +3918,15 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
 .psp-dep-total{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:13.5px;color:var(--muted)}
 .psp-dep-total b{color:var(--text);font-family:var(--mono)}
 @media (max-width:720px){ .psp-dep{grid-template-columns:minmax(0,1fr) auto} .psp-dep-act{grid-column:1 / 3;justify-content:flex-start} }
+/* Configuration des stations : grande fenêtre, onglets qui défilent, plein écran sur téléphone */
+#modal-gestion .modal-box{width:min(1100px,96vw);max-width:none;max-height:92vh;display:flex;flex-direction:column}
+#modal-gestion #modal-list{overflow:auto;flex:1}
+#modal-gestion .gest-onglets{overflow-x:auto;scrollbar-width:none;flex:none}
+#modal-gestion .gest-onglets button{white-space:nowrap;flex:none}
+@media (max-width:700px){
+  #modal-gestion .modal-box{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;border-radius:0}
+  #modal-gestion #modal-list{padding:10px 12px!important}
+}
 .gest-onglets{display:flex;gap:4px;padding:10px 18px 0;border-bottom:1px solid var(--border)}
 .gest-onglets button{font:inherit;font-weight:600;font-size:13.5px;padding:8px 12px;background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);cursor:pointer}
 .gest-onglets button.on{color:var(--text);border-bottom-color:var(--orange)}
@@ -4351,7 +4361,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
       <span class="nav-icon">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
       </span>
-      <span data-i18n="nav.gestion">Produits &amp; Pompes</span>
+      <span data-i18n="nav.gestion">Configuration des stations</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -13626,17 +13636,17 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
     <div class="card-head">
       <div class="card-title">
         <svg viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-        <span data-i18n="gestion.title">Produits &amp; Pompes</span>
+        <span data-i18n="gestion.title">Configuration des stations</span>
       </div>
       <button onclick="closeGestion()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
     </div>
 
     <div class="gest-onglets">
-      <button id="gest-o-produits" class="on" onclick="gestOnglet('produits')">Produits &amp; meeters</button>
-      <button id="gest-o-pompes" onclick="gestOnglet('pompes')">Pompes</button>
-      <button id="gest-o-depart" onclick="gestOnglet('depart')">Meeters de départ</button>
-      <button id="gest-o-fiches" onclick="gestOnglet('fiches')">Fiches des stations</button>
-      <button id="gest-o-station" onclick="gestOnglet('station')">Enregistrer une station</button>
+      <button id="gest-o-fiches" onclick="gestOnglet('fiches')">🏢 Stations (nom, adresse, téléphone)</button>
+      <button id="gest-o-produits" class="on" onclick="gestOnglet('produits')">⛽ Produits &amp; prix</button>
+      <button id="gest-o-pompes" onclick="gestOnglet('pompes')">🔧 Pompes &amp; meeters</button>
+      <button id="gest-o-depart" onclick="gestOnglet('depart')">🔢 Meeters de départ</button>
+      <button id="gest-o-station" onclick="gestOnglet('station')">➕ Nouvelle station</button>
     </div>
     <div id="gest-nouveau-produit" style="padding:14px 18px;border-bottom:1px solid var(--border)">
       <div class="filter-label" style="margin-bottom:8px" data-i18n="gestion.new.product">Nouveau produit</div>
@@ -13956,7 +13966,7 @@ const LANGS = {
     'nav.ai':          'Rapports IA',
     'nav.stock':       'Stock & Rentabilité',
     'nav.config':      'CONFIGURATION',
-    'nav.gestion':     'Produits & Pompes',
+    'nav.gestion':     'Configuration des stations',
     // Pages META
     'page.home.title':       'Accueil',
     'page.home.sub':         "Vue d'ensemble de la station",
@@ -14444,7 +14454,7 @@ const LANGS = {
     'resp.p2.text':    'En cas de problème, d\'anomalie ou de doute sur une manipulation, <strong>contactez immédiatement le département informatique</strong> avant de poursuivre — mieux vaut vérifier que corriger après coup.',
     'resp.ok':         "J'ai compris et j'accepte",
 
-    'gestion.title':       'Produits & Pompes',
+    'gestion.title':       'Configuration des stations',
     'gestion.new.product':  'Nouveau produit',
     'gestion.new.nom.ph':   'Nom (ex. Gazoline)',
     'gestion.new.prix.ph':  'Prix/gal',
@@ -14474,7 +14484,7 @@ const LANGS = {
     'nav.ai':          'AI Reports',
     'nav.stock':       'Stock & Profit',
     'nav.config':      'CONFIGURATION',
-    'nav.gestion':     'Products & Pumps',
+    'nav.gestion':     'Station setup',
     'page.home.title':       'Home',
     'page.home.sub':         'Station overview',
     'page.dashboard.title':  'Dashboard',
@@ -14950,7 +14960,7 @@ const LANGS = {
     'resp.p2.text':    'If you encounter a problem, an anomaly, or have a doubt about an action, <strong>contact the IT department immediately</strong> before continuing — better to check first than to fix it afterward.',
     'resp.ok':         'I understand and accept',
 
-    'gestion.title':       'Products & Pumps',
+    'gestion.title':       'Station setup',
     'gestion.new.product':  'New product',
     'gestion.new.nom.ph':   'Name (e.g. Gasoline)',
     'gestion.new.prix.ph':  'Price/gal',
@@ -14980,7 +14990,7 @@ const LANGS = {
     'nav.ai':          'Informes IA',
     'nav.stock':       'Inventario y Rentabilidad',
     'nav.config':      'CONFIGURACIÓN',
-    'nav.gestion':     'Productos y Bombas',
+    'nav.gestion':     'Configuración de estaciones',
     'page.home.title':       'Inicio',
     'page.home.sub':         'Resumen de la estación',
     'page.dashboard.title':  'Panel de control',
@@ -15456,7 +15466,7 @@ const LANGS = {
     'resp.p2.text':    'Si detecta un problema, una anomalía o tiene una duda sobre una acción, <strong>contacte de inmediato al departamento de informática</strong> antes de continuar — es mejor verificar que corregir después.',
     'resp.ok':         'Entendido, acepto',
 
-    'gestion.title':       'Productos y Surtidores',
+    'gestion.title':       'Configuración de estaciones',
     'gestion.new.product':  'Nuevo producto',
     'gestion.new.nom.ph':   'Nombre (ej. Gasolina)',
     'gestion.new.prix.ph':  'Precio/gal',
@@ -18526,6 +18536,7 @@ function renderJournal(data){
 // ══════════════════════════════════════════════
 function openGestion(){
   document.getElementById('modal-gestion').classList.remove('hidden');
+  if(!_GEST._ouvert){ _GEST._ouvert = true; return gestOnglet('fiches'); }
   renderModalList();
 }
 function closeGestion(){ document.getElementById('modal-gestion').classList.add('hidden'); }
@@ -18716,7 +18727,7 @@ function _stRendre(){
     <div class="gest-explic">Enregistrez la station complète selon sa structure : <b>Pompe › meeters</b>.
       Le <b>meeter de départ</b> est le chiffre affiché aujourd'hui sur chaque compteur : le premier relevé partira de là.</div>
     <div class="st-bloc"><div class="st-titre">1. Station</div>
-      <label class="st-champ">Adresse de la station (elle sera mise sur toutes ses pompes)<input class="filter-input" maxlength="255" placeholder="Ex. Route Nationale 1, Vertières"
+      <label class="st-champ">Adresse de la station (elle sera mise sur toutes ses pompes)<input class="filter-input" maxlength="255" placeholder="Ex. Route Nationale 3, Pillatre, Acul du Nord"
         value="${esc(st.adresse)}" oninput="_ST.adresse=this.value"></label></div>
     <div class="st-bloc"><div class="st-titre">2. Produits vendus et prix <span class="c-dim" style="font-weight:500">— communs à toutes les stations</span></div>
       ${st.produits.map((p,i)=>`<div class="st-ligne">
@@ -18890,7 +18901,7 @@ function _sfFormulaire(s){
   return `<div class="sf-corps">
     <div class="sf-sec"><div class="sf-sec-t">⛽ Nom de la station</div>
       <label class="st-champ" style="grid-column:1/-1">Nom affiché partout (connexion des pompistes, changement de station, carte, rapports)
-        <input class="filter-input" id="sf-nom-${s.id}" value="${esc(s.nom||'')}" maxlength="150" required placeholder="Ex. Vertières"></label>
+        <input class="filter-input" id="sf-nom-${s.id}" value="${esc(s.nom||'')}" maxlength="150" required placeholder="Ex. Station Pillatre"></label>
       <div class="c-dim" style="grid-column:1/-1;font-size:12.5px">Deux stations ne peuvent pas porter le même nom : chaque pompiste et chaque rapport restent dans la bonne.</div></div>
     <div class="sf-sec"><div class="sf-sec-t">📍 Localisation</div>
       ${ch('adresse','Adresse',s.adresse,'maxlength="255" placeholder="Ex. Champin"')}
@@ -21841,9 +21852,128 @@ function pspRendreDetail(r){
   const prec = PSP.rapports[i-1], suiv = PSP.rapports[i+1];
   c.innerHTML = `<div class="psp-detail-barre">
       <button class="btn btn-secondary" onclick="pspFermer()">← Retour à la liste</button>
-      <span class="psp-muted">Rapport n°${r.id}</span></div>
+      <div class="psp-impr" role="group" aria-label="Imprimer la fiche">
+        <span class="psp-muted">Rapport n°${r.id} · Imprimer :</span>
+        <button class="btn btn-secondary btn-sm" onclick="pspImprimerFiche(${r.id},'page')" title="Feuille entière (Lettre 8,5 × 11)">🖨 Page</button>
+        <button class="btn btn-secondary btn-sm" onclick="pspImprimerFiche(${r.id},'pos80')" title="Imprimante de caisse 80 mm">🧾 POS 80</button>
+        <button class="btn btn-secondary btn-sm" onclick="pspImprimerFiche(${r.id},'pos58')" title="Petite imprimante 58 mm">🧾 POS 58</button>
+        <button class="btn btn-secondary btn-sm" onclick="pspImprimerFiche(${r.id},'tel')" title="Format téléphone : à enregistrer en PDF ou partager">📱 Téléphone</button>
+      </div></div>
     <div id="psp-r-${r.id}">${r.supprime ? pspCarteLecture(r) : r.statut === 'EN_COURS' ? pspCarteNonTermine(r)
       : (['SOUMIS','PROBLEME'].includes(r.statut) ? pspCarte(r) : pspCarteLecture(r))}</div>`;
+}
+
+// ── Fiche du rapport pompiste imprimée : page entière, POS 80 / 58 mm, téléphone ──
+const _FICHE_COMPLEXE = 'Complexe Commercial de Pillatre';
+function _ficheHtml(r, fmt){
+  const b = (typeof _branding === 'object' && _branding) || {};
+  const G = n => Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' G';
+  const N = (n,d=3) => n == null ? '—' : Number(n).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
+  const per = p => p === 'Apres-midi' ? 'Après-midi' : (p || '');
+  const f = r.feuille || {}, tf = r.totaux_feuille || {};
+  const parProd = {};
+  (r.lignes||[]).forEach(l => (parProd[l.produit_nom] ||= []).push(l));
+  const av = l => l.metter_avant_corrige ?? l.metter_avant, ap = l => l.metter_apres_corrige ?? l.metter_apres;
+  const billets = (r.billetterie||[]).map(x => ({c:x.coupure, n:(x.liasses||0)*100 + (x.billets||0)})).filter(x => x.n);
+  const L = (a, v, cls='') => `<div class="l ${cls}"><span>${a}</span><span>${v}</span></div>`;
+  const etroit = fmt !== 'page';
+  const attendu = r.montant_attendu_final ?? r.montant_attendu;
+  const compteurs = Object.entries(parProd).map(([nom, ls]) => `<div class="prod">${esc(nom)}</div>` + (etroit
+    ? ls.map(l => `<div class="pompe"><b>${esc(l.pompe_nom)}</b>${L('Meeter avant', N(av(l)))}${L('Meeter après', N(ap(l)))}
+        ${L(`${N(l.gallons)} gal × ${N(l.prix_gallon,2)}`, G(l.montant))}</div>`).join('')
+    : `<table><thead><tr><th>Pompe</th><th>Meeter avant</th><th>Meeter après</th><th>Gallons</th><th>Prix</th><th>Montant</th></tr></thead><tbody>
+        ${ls.map(l => `<tr><td>${esc(l.pompe_nom)}</td><td>${N(av(l))}</td><td>${N(ap(l))}</td><td>${N(l.gallons)}</td><td>${N(l.prix_gallon,2)}</td><td>${G(l.montant)}</td></tr>`).join('')}
+      </tbody></table>`)
+    + L(`<b>Total ${esc(nom)}</b>`, `<b>${N(ls.reduce((a,x)=>a+x.gallons,0))} gal · ${G(ls.reduce((a,x)=>a+x.montant,0))}</b>`, 'tot')).join('');
+  const liste = (titre, xs, lib) => xs.length ? `<div class="sec"><h3>${titre}</h3>${xs.map(x => L(lib(x), G(x.montant))).join('')}</div>` : '';
+  const statut = (typeof _PSP_LIB === 'object' && _PSP_LIB[r.statut]) || r.statut;
+  return `<div class="tete">
+      <div class="complexe">${esc(b.complexe || _FICHE_COMPLEXE)}</div>
+      <div class="nom">${esc(b.nom || 'KONEKTA')}</div>
+      ${b.adresse ? `<div class="adr">${esc(b.adresse)}</div>` : ''}
+      ${b.telephone1 ? `<div class="adr">Tél : ${esc([b.telephone1, b.telephone2].filter(Boolean).join(' / '))}</div>` : ''}
+      <div class="titre">FICHE DU POMPISTE — RAPPORT N° ${r.id}</div></div>
+    <div class="sec infos">
+      ${L('Pompiste', `<b>${esc(r.pompiste_nom || '')}</b>`)}
+      ${L('Date', `${esc(frDate(r.date))} · ${esc(per(r.periode))}`)}
+      ${f.heures ? L('Heures', esc(f.heures)) : ''}
+      ${L('Statut', esc(statut))}
+      ${r.traite_par_nom ? L('Vérifié par', esc(r.traite_par_nom)) : ''}</div>
+    <div class="sec"><h3>A · Compteurs</h3>${compteurs || '<div class="vide">Aucun meeter</div>'}
+      ${L('<b>Ventes attendues</b>', `<b>${G(attendu)}</b>`, 'grand')}</div>
+    ${liste('C · Bons et chèques', f.bons || [], x => esc(x.reference || 'Bon'))}
+    ${liste('D · Crédits clients', f.credits || [], x => esc(x.nom || 'Client'))}
+    ${(r.depenses||[]).length ? `<div class="sec"><h3>D · Dépenses payées</h3>${r.depenses.map(x =>
+        L(`${esc(x.description)}${x.autorise_par ? ` <i>(aut. ${esc(x.autorise_par)})</i>` : ''}${x.statut === 'refusee' ? ' <i>— refusée</i>' : ''}`, G(x.montant))).join('')}
+      ${L('<b>Dépenses retenues</b>', `<b>${G(r.total_depenses_retenues)}</b>`, 'tot')}</div>` : ''}
+    <div class="sec"><h3>E · Argent compté</h3>
+      ${billets.map(x => L(`${Number(x.c).toLocaleString('fr-FR')} G × ${x.n}`, G(x.c * x.n))).join('')}
+      ${r.monnaie ? L('Monnaie', G(r.monnaie)) : ''}
+      ${(r.devises||[]).map(x => L(`${N(x.montant,2)} $ × ${N(x.taux,2)}`, G(x.montant_htg))).join('')}
+      ${L('<b>Total compté</b>', `<b>${G(r.montant_compte)}</b>`, 'tot')}</div>
+    ${tf.fonds_caisse ? `<div class="sec"><h3>F · Fonds de caisse reçu</h3>${L(esc((f.fonds_caisse||{}).nom || 'Fonds'), G(tf.fonds_caisse))}</div>` : ''}
+    <div class="sec recap"><h3>Résumé</h3>
+      ${L('Ventes attendues', G(attendu))}
+      ${r.total_depenses_retenues ? L('− Dépenses retenues', G(r.total_depenses_retenues)) : ''}
+      ${tf.net ? L('− Bons / crédits (net)', G(tf.net)) : ''}
+      ${L('Argent compté', G(r.montant_compte))}
+      ${L('<b>Écart</b>', `<b>${(r.ecart > 0 ? '+' : '') + G(r.ecart)}</b>`, 'grand ' + (Math.abs(r.ecart) < 1 ? 'ok' : (r.ecart < 0 ? 'neg' : 'pos')))}
+      <div class="mention">${Math.abs(r.ecart) < 1 ? 'Juste' : (r.ecart < 0 ? 'Manque' : 'En plus')}</div></div>
+    ${r.note_pompiste ? `<div class="sec"><h3>Note du pompiste</h3><div>${esc(r.note_pompiste)}</div></div>` : ''}
+    ${r.commentaire_superviseur ? `<div class="sec"><h3>Commentaire de la direction</h3><div>${esc(r.commentaire_superviseur)}</div></div>` : ''}
+    <div class="sigs"><div>Signature du pompiste</div><div>Signature du responsable</div></div>
+    <div class="pied">Imprimé le ${new Date().toLocaleString('fr-FR')} · ${esc(b.nom || 'Konekta')}</div>`;
+}
+function _ficheCss(fmt){
+  const ticket = fmt.startsWith('pos');
+  const largeur = {pos80:'72mm', pos58:'48mm', tel:'360px', page:'100%'}[fmt] || '100%';
+  const page = {pos80:'@page{size:80mm auto;margin:3mm 4mm}', pos58:'@page{size:58mm auto;margin:2mm 3mm}',
+                tel:'@page{size:100mm 240mm;margin:6mm}', page:'@page{size:letter;margin:12mm}'}[fmt];
+  const police = ticket ? (fmt === 'pos58' ? '11px' : '12px') + '/1.35 "Courier New",ui-monospace,monospace'
+                        : '13px/1.45 "Segoe UI",Arial,sans-serif';
+  return `${page}
+    *{box-sizing:border-box} body{margin:0;background:${fmt === 'tel' ? '#e8eef0' : '#fff'};color:#000;font:${police}}
+    .fiche{width:${largeur};margin:0 auto;${fmt === 'tel' ? 'max-width:100%;background:#fff;margin:14px auto;border-radius:18px;padding:16px;box-shadow:0 6px 24px rgba(0,0,0,.15);' : ''}${fmt === 'page' ? 'max-width:190mm;' : ''}}
+    .tete{text-align:center;padding-bottom:8px;border-bottom:${ticket ? '2px dashed #000' : '3px double #0b3b46'};margin-bottom:8px}
+    .complexe{font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:${ticket ? '1em' : '15px'};${ticket ? '' : 'color:#0b3b46'}}
+    .nom{font-weight:900;font-size:${ticket ? '1.3em' : '22px'};margin-top:2px}
+    .adr{font-size:.92em}
+    .titre{margin-top:8px;font-weight:800;${ticket ? '' : 'display:inline-block;background:#0f766e;color:#fff;padding:4px 14px;border-radius:20px;font-size:12px;letter-spacing:.06em'}}
+    .sec{padding:6px 0;border-bottom:${ticket ? '1px dashed #000' : '1px solid #d3e0de'}}
+    h3{margin:2px 0 4px;font-size:${ticket ? '1em' : '13px'};text-transform:uppercase;letter-spacing:.05em;${ticket ? '' : 'color:#0f766e'}}
+    .l{display:flex;justify-content:space-between;gap:8px;padding:1px 0} .l span:last-child{text-align:right;white-space:nowrap}
+    .l.tot{border-top:1px ${ticket ? 'dashed' : 'solid'} #999;margin-top:3px;padding-top:3px}
+    .l.grand{font-size:1.15em;margin-top:4px}
+    ${ticket ? '' : '.l.ok b{color:#15803d} .l.neg b{color:#c2410c} .l.pos b{color:#a16207}'}
+    .mention{text-align:center;font-weight:800;margin-top:2px}
+    .prod{font-weight:900;margin:6px 0 2px;${ticket ? 'text-transform:uppercase' : 'color:#115e59'}}
+    .pompe{margin:3px 0 5px}
+    table{width:100%;border-collapse:collapse;margin:2px 0 4px} th,td{border:1px solid #c9d6d4;padding:4px 6px;text-align:right}
+    th{background:#e3f4f1;font-size:11px;text-transform:uppercase} td:first-child,th:first-child{text-align:left}
+    ${fmt === 'page' ? '.infos{display:grid;grid-template-columns:1fr 1fr;column-gap:24px}' : ''}
+    .sigs{display:${fmt === 'page' ? 'grid' : 'block'};grid-template-columns:1fr 1fr;gap:30px;margin-top:${ticket ? '16px' : '34px'}}
+    .sigs div{border-top:1px solid #000;padding-top:3px;text-align:center;font-size:.85em;margin-top:${ticket ? '22px' : '0'}}
+    .pied{text-align:center;font-size:.8em;color:#444;margin-top:10px}
+    .vide{color:#666;font-style:italic}
+    .barre{position:sticky;top:0;display:flex;gap:8px;justify-content:center;padding:10px;background:#0b3b46}
+    .barre button{font:600 14px "Segoe UI",Arial;border:0;border-radius:20px;padding:9px 16px;cursor:pointer;background:#fff;color:#0b3b46}
+    @media print{.barre{display:none} body{background:#fff} .fiche{box-shadow:none;margin:0;border-radius:0;padding:0}}`;
+}
+function pspImprimerFiche(id, fmt){
+  const r = PSP.rapports.find(x => x.id === id);
+  if(!r) return notify('Rapport introuvable.', 'err');
+  const w = window.open('', '_blank');
+  if(!w) return notify('Autorisez les fenêtres (pop-up) pour imprimer.', 'err');
+  const titre = `Fiche pompiste n°${r.id} — ${r.pompiste_nom || ''}`;
+  const auto = fmt !== 'tel' ? '<scr' + 'ipt>setTimeout(function(){print()},350)</scr' + 'ipt>' : '';
+  w.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>${esc(titre)}</title><style>${_ficheCss(fmt)}</style></head><body>
+    ${fmt === 'tel' ? `<div class="barre"><button id="imprimer">🖨 Imprimer / PDF</button>${navigator.share ? '<button id="partager">📤 Partager</button>' : ''}</div>` : ''}
+    <div class="fiche">${_ficheHtml(r, fmt)}</div>${auto}</body></html>`);
+  w.document.close();
+  const bi = w.document.getElementById('imprimer'); if(bi) bi.onclick = () => w.print();
+  const bp = w.document.getElementById('partager');
+  if(bp) bp.onclick = () => w.navigator.share({title: titre, text: w.document.querySelector('.fiche').innerText}).catch(() => {});
 }
 
 function _pspMaj(r){

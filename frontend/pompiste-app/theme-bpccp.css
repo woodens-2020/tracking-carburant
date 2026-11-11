@@ -132,3 +132,53 @@ input:focus,textarea:focus,.saisie-t:focus{border-color:var(--accent);box-shadow
   .touche:active{color:#03211f}
   .jour.on{color:#03211f}
 }
+
+/* ═══ Fiche du pompiste : une colonne, champs l'un au-dessus de l'autre ═══ */
+.feuille{max-width:640px}
+.fe-cols{grid-template-columns:1fr!important;gap:0}
+.fe-th{display:none!important}
+.fe-complexe{font-size:13px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--or);margin-bottom:4px}
+.fe-info{grid-template-columns:1fr!important}
+.fe-heures{flex-wrap:nowrap}
+
+/* Une carte par meeter */
+.fe-tr.fe-carte{display:flex;flex-direction:column;gap:10px;align-items:stretch;padding:14px;margin:10px 0;
+  background:var(--bg);border:2px solid var(--border);border-radius:18px}
+.fe-tr.fe-carte .fe-pn{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.fe-tr.fe-carte .fe-pn b{font-size:20px}
+.fe-tr.fe-carte.envoye{background:var(--ok-soft);border-color:var(--ok)}
+.fe-tr.fe-carte.erreur{border-color:var(--err);background:var(--err-soft)}
+.fe-tr.fe-carte.prise{opacity:.6}
+.fe-tr.fe-carte:focus-within{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+
+/* Champ étiqueté (étiquette au-dessus, grand champ en dessous) */
+.fe-chp{display:flex;flex-direction:column;gap:6px;margin:0;font-size:13px;font-weight:800;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--muted)}
+.fe-chp > span{padding-left:4px}
+.feuille .fe-chp .saisie-n{width:100%;min-height:56px;font-size:22px;padding:12px 16px;border-radius:14px;background:var(--panel);
+  text-transform:none;letter-spacing:0;color:var(--text)}
+.feuille .fe-chp .saisie-n.num,.feuille .fe-chp .saisie-n[data-n]{text-align:left;font-size:24px}
+.fe-chp.fixe{flex-direction:row;justify-content:space-between;align-items:center;background:var(--panel);
+  border-radius:12px;padding:10px 14px}
+.fe-chp.fixe .fe-v{font-size:19px;color:var(--text)}
+
+/* Résultat de la ligne : gallons et total en deux pastilles */
+.fe-res{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fe-res > span{display:flex;flex-direction:column;gap:2px;background:var(--panel);border:1px solid var(--border);border-radius:12px;
+  padding:8px 12px;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.fe-res .fe-v{font-size:18px;text-align:left;color:var(--accent-2);letter-spacing:0}
+.fe-res .fe-v:empty::before{content:'—';color:var(--border)}
+
+/* Bons, crédits, dépenses : chaque élément est une petite carte */
+.fe-ligne,.fe-ligne.trois{display:grid!important;grid-template-columns:1fr 44px!important;gap:10px;padding:12px;margin-bottom:10px;
+  background:var(--bg);border:2px solid var(--border);border-radius:16px;align-items:end}
+.fe-ligne > .fe-chp{grid-column:1}
+.fe-ligne > .fe-x{grid-column:2;grid-row:1;align-self:start;height:44px;border-radius:50%}
+.fe-ligne .fe-chp input{min-height:52px;font-size:19px;background:var(--panel)}
+.fe-aj{border-radius:14px;min-height:52px}
+
+/* Argent compté (E) : lignes plus aérées */
+.fe-bil{grid-template-columns:90px 1fr 1fr;padding:8px 0}
+.fe-bil input{min-height:50px;font-size:20px!important}
+.fe-sec{padding:18px}
+.fe-sec-t{font-size:20px}
