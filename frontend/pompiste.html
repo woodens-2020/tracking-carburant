@@ -787,7 +787,7 @@ const S = {};
 function reinit(){
   Object.assign(S, {ctx:null, etape:'charte', charte:false, date:null, periode:null, produitId:null,
     choisies:[], pos:0, index:{}, billets:{}, monnaie:'', note:'', erreurs:{}, dernier:null,
-    champ:null, modif:null, depuisResume:false, champActif:null, caseActive:null, dernierProduit:null, _repriseFaite:false,
+    champ:null, modif:null, depuisResume:false, champActif:null, caseActive:null, dernierProduit:null, _repriseFaite:false, _vacDemandee:false,
     depenses:[], depForm:null, depEdit:null, usd:'', bons:[], credits:[], fonds:{nom:'', montant:''}, heures:{debut:'', fin:''},
     guide:false, depuisFeuille:false});
 }
@@ -1073,6 +1073,12 @@ const sansBarre = () => $('barre').classList.add('cache');
 function rendre(){
   if(!S.ctx && S.etape !== 'fin') return;
   setTimeout(reveil, 0);
+  // Juste après la connexion : choisir la vacation avant tout le reste.
+  // Un rapport déjà ouvert impose la sienne.
+  if(S.etape !== 'fin' && !S._vacDemandee){
+    if(enCours()) S._vacDemandee = true;
+    else { sansBarre(); return rVacationConnexion(); }
+  }
   if(!S.charte && S.etape !== 'fin') S.etape = 'charte';
   S.champ = null;
   ({charte:rCharte, periode:rPeriode, calendrier:rCalendrier, produit:rProduit, pompes:rPompes, index:rIndex, compteurs:rCompteurs,
@@ -1166,6 +1172,26 @@ async function choisirDate(d){
   S.date = d; S.moisCal = null; aller('periode');
 }
 // Plus de choix matin / après-midi : le serveur range le rapport tout seul
+// ── Vacation choisie dès la connexion ───────────────────────────
+function rVacationConnexion(){
+  const auj = S.date === S.ctx.aujourd_hui;
+  $('app').innerHTML = `<div class="connexion vac-connexion">
+    <h1>${t('vacation_q')}</h1>
+    <p class="sub">${t('bonjour', {p: esc((S.ctx.pompiste.nom || '').split(' ')[0])})} ${t('vacation_sub')}</p>
+    <div class="choix vac-gros">
+      <button class="gros grand vac ${S.periode==='Matin'?'on':''}" onclick="choisirVacationConnexion('Matin')">
+        <span class="ico">🌅</span><span>${t('vac_matin')}<small>${auj ? t('auj') : esc(jourTxt(S.date))}</small></span><span class="coche">✓</span></button>
+      <button class="gros grand vac ${S.periode==='Apres-midi'?'on':''}" onclick="choisirVacationConnexion('Apres-midi')">
+        <span class="ico">🌇</span><span>${t('vac_am')}<small>${auj ? t('auj') : esc(jourTxt(S.date))}</small></span><span class="coche">✓</span></button>
+    </div></div>`;
+  window.scrollTo(0, 0);
+}
+async function choisirVacationConnexion(p){
+  S._vacDemandee = true;
+  const change = S.periode !== p;
+  S.periode = p; sauverBrouillon();
+  if(change) await chargerContexte(); else rendre();
+}
 function choisirVacation(p){
   if(enCours()) return;
   S.periode = p; sauverBrouillon(); rPeriode();

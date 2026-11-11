@@ -206,3 +206,8 @@ input:focus,textarea:focus,.saisie-t:focus{border-color:var(--accent);box-shadow
   .fe-vac-b.on{background:var(--accent);border-color:var(--accent);color:#fff}
 }
 @media (max-width:480px) and (prefers-color-scheme: dark){ .fe-vac-b.on{color:#03211f} }
+
+/* Vacation choisie dès la connexion */
+.vac-connexion .vac-gros{display:grid;gap:16px}
+.vac-connexion .gros.grand{min-height:130px}
+.vac-connexion .gros .ico{font-size:44px}
