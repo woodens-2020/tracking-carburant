@@ -2730,6 +2730,42 @@ def supprimer_distributeur(did: int, request: Request, db: Session = Depends(get
     return {"ok": True}
 
 
+class RetirerDistributeurIn(BaseModel):
+    motif: str = Field(..., min_length=3, max_length=300)
+
+
+@app.post("/api/distributeurs/{did}/retirer")
+def retirer_distributeur(did: int, data: RetirerDistributeurIn, request: Request, db: Session = Depends(get_db)):
+    """Retire une pompe physique qui ne sert plus, avec ses meeters, en un
+    seul geste. Un meeter qui a déjà des relevés (ou un rapport pompiste)
+    n'est jamais effacé : il est désactivé et détaché de la pompe, son
+    historique reste dans le journal (réactivable). Les autres sont effacés."""
+    from models import RapportPompisteLigne
+    _gerer_station(request, db)
+    d = db.get(Distributeur, did)
+    if not d:
+        raise HTTPException(404, "Pompe introuvable")
+    desactives, effaces = [], []
+    for f in list(d.faces):
+        for q in list(f.metres):
+            garde = (db.query(Releve).filter_by(pompe_id=q.id).first()
+                     or db.query(RapportPompisteLigne).filter_by(pompe_id=q.id).first())
+            if garde:
+                q.actif = False
+                q.face_id = None
+                desactives.append(q.nom)
+            else:
+                effaces.append(q.nom)
+                db.delete(q)
+    db.flush()
+    _tracer(db, request, "distributeur_retire", {"nom": d.nom, "motif": data.motif.strip(),
+                                                 "meeters_desactives": desactives, "meeters_effaces": effaces})
+    nom = d.nom
+    db.delete(d)
+    db.commit()
+    return {"ok": True, "nom": nom, "meeters_desactives": desactives, "meeters_effaces": effaces}
+
+
 @app.post("/api/distributeurs/{did}/faces", status_code=201)
 def ajouter_face(did: int, data: NomIn, request: Request, db: Session = Depends(get_db)):
     """Plus de faces A / B : les meeters se placent directement sur la pompe."""

@@ -103,3 +103,26 @@ def test_metre_supprime_puis_reactive(client):
     assert not [x for x in client.get("/api/distributeurs", headers=H).json()["desactives"] if x["id"] == m]
     rel = client.get("/api/releves?date=2025-02-03", headers=H).json()
     assert any(x["pompe_id"] == m and x["metter_apres"] == 150 for x in rel)
+
+
+def test_retirer_une_pompe_qui_ne_sert_plus(client):
+    """Retirer une pompe physique et ses meeters en un geste : un meeter avec
+    des relevés est désactivé (historique gardé, réactivable), les autres
+    sont effacés ; un motif est exigé."""
+    t = time.time_ns()
+    gaz = _produit(client, "GazR")
+    did = client.post("/api/distributeurs", headers=H, json={"nom": f"Vieille pompe {t}"}).json()["id"]
+    avec = client.post(f"/api/produits/{gaz}/pompes", headers=H, json={"nom": "Gazoline 7", "distributeur_id": did}).json()["id"]
+    sans = client.post(f"/api/produits/{gaz}/pompes", headers=H, json={"nom": "Gazoline 8", "distributeur_id": did}).json()["id"]
+    assert client.post("/api/releves", headers=H, json={"date": "2025-07-01", "periode": "Matin", "pompe_id": avec,
+                       "prix_gallon": 500, "metter_avant": 10, "metter_apres": 30}).status_code in (200, 201)
+    assert client.post(f"/api/distributeurs/{did}/retirer", headers=H, json={"motif": ""}).status_code == 422
+    r = client.post(f"/api/distributeurs/{did}/retirer", headers=H, json={"motif": "pompe démontée"})
+    assert r.status_code == 200, r.text
+    assert r.json()["meeters_desactives"] == ["Gazoline 7"] and r.json()["meeters_effaces"] == ["Gazoline 8"]
+    d = client.get("/api/distributeurs", headers=H).json()
+    assert all(x["id"] != did for x in d["distributeurs"])
+    assert any(m["id"] == avec for m in d["desactives"])
+    assert all(m["id"] != sans for m in d["desactives"] + d["sans_emplacement"])
+    j = client.get(f"/api/journal?date_debut=2025-07-01&date_fin=2025-07-01&pompe_id={avec}", headers=H).json()
+    assert len(j["entries"]) == 1                                  # l'historique reste

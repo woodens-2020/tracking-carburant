@@ -3933,6 +3933,13 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
   #modal-gestion .modal-box{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;border-radius:0}
   #modal-gestion #modal-list{padding:10px 12px!important}
 }
+.ret-aide{font-size:13px;color:var(--muted);background:var(--panel2,rgba(255,255,255,.03));border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px}
+.ret-h{margin:16px 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.ret-carte{border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.ret-tete,.ret-l{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ret-tete{padding-bottom:8px;margin-bottom:6px;border-bottom:1px dashed var(--border)}
+.ret-l{padding:6px 0}
+.ret-l small,.ret-tete small{color:var(--muted);margin-left:4px}
 .gest-onglets{display:flex;gap:4px;padding:10px 18px 0;border-bottom:1px solid var(--border)}
 .gest-onglets button{font:inherit;font-weight:600;font-size:13.5px;padding:8px 12px;background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);cursor:pointer}
 .gest-onglets button.on{color:var(--text);border-bottom-color:var(--orange)}
@@ -13654,6 +13661,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
       <button id="gest-o-pompes" onclick="gestOnglet('pompes')">🔧 Pompes &amp; meeters</button>
       <button id="gest-o-depart" onclick="gestOnglet('depart')">🔢 Meeters de départ</button>
       <button id="gest-o-station" onclick="gestOnglet('station')">➕ Nouvelle station</button>
+      <button id="gest-o-retirer" onclick="gestOnglet('retirer')">🗑 Retirer ce qui ne sert plus</button>
     </div>
     <div id="gest-nouveau-produit" style="padding:14px 18px;border-bottom:1px solid var(--border)">
       <div class="filter-label" style="margin-bottom:8px" data-i18n="gestion.new.product">Nouveau produit</div>
@@ -18555,6 +18563,7 @@ function gestOnglet(v){
   document.getElementById('gest-o-station').classList.toggle('on', v==='station');
   document.getElementById('gest-o-fiches').classList.toggle('on', v==='fiches');
   document.getElementById('gest-o-depart').classList.toggle('on', v==='depart');
+  document.getElementById('gest-o-retirer').classList.toggle('on', v==='retirer');
   document.getElementById('gest-nouveau-produit').style.display = v==='produits' ? '' : 'none';
   renderModalList();
 }
@@ -19316,11 +19325,71 @@ function _demanderSeparation(corps){
   });
 }
 
+// ── Retirer ce qui ne sert plus : pompes physiques, meeters, stations séparées ──
+// Rien n'efface l'historique : un meeter qui a des relevés est seulement
+// désactivé (réactivable dans « Pompes & meeters »), une station retirée garde
+// ses données.
+async function _retRendre(){
+  const el = document.getElementById('modal-list');
+  el.innerHTML = '<div class="psp-muted">Chargement…</div>';
+  let d, st;
+  try{ [d, st] = await Promise.all([GET('/distributeurs'), GET('/espaces').catch(() => null)]); }
+  catch(e){ el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  const metre = m => `<div class="ret-l"><span><b>${esc(m.nom)}</b> <small>${esc(m.produit_nom || '')}</small></span>
+      <button class="btn btn-secondary btn-sm" onclick="_retMetre(${m.id}, '${esc(m.nom).replace(/'/g, "\\'")}')">Retirer ce meeter</button></div>`;
+  const espaces = (st && st.espaces) || [];
+  el.innerHTML = `<div class="ret-aide">Retirez une pompe, un meeter ou une station qui ne sert plus. <b>L'historique n'est jamais effacé</b> :
+      un meeter qui a déjà des relevés est seulement désactivé (vous pouvez le réactiver dans « Pompes &amp; meeters ») ;
+      une station retirée garde toutes ses données.</div>
+    <h4 class="ret-h">Pompes</h4>
+    ${d.distributeurs.length ? d.distributeurs.map(p => `<div class="ret-carte">
+        <div class="ret-tete"><span>⛽ <b>${esc(p.nom)}</b> <small>${p.metres.length} meeter(s)</small></span>
+          <button class="btn btn-danger btn-sm" onclick="_retPompe(${p.id})">🗑 Retirer la pompe</button></div>
+        ${p.metres.map(metre).join('') || '<div class="psp-muted">Aucun meeter sur cette pompe.</div>'}</div>`).join('')
+      : '<div class="psp-muted">Aucune pompe enregistrée.</div>'}
+    ${d.sans_emplacement.length ? `<h4 class="ret-h">Meeters sans pompe</h4><div class="ret-carte">${d.sans_emplacement.map(metre).join('')}</div>` : ''}
+    <h4 class="ret-h">Stations</h4>
+    <div class="ret-carte"><div class="ret-l"><span>🏢 <b>${esc(_nomPrincipale())}</b> <small>station principale</small></span>
+        <span class="psp-muted">ne se retire pas</span></div>
+      ${espaces.map(e => `<div class="ret-l"><span>🏢 <b>${esc(e.nom)}</b>${e.adresse ? ` <small>${esc(e.adresse)}</small>` : ''}</span>
+        ${st.peut_creer ? `<button class="btn btn-danger btn-sm" onclick="_retStation(${e.id}, '${esc(e.nom).replace(/'/g, "\\'")}')">🗑 Retirer la station</button>`
+          : '<span class="psp-muted">réservé au propriétaire</span>'}</div>`).join('')}
+      ${espaces.length ? '' : '<div class="psp-muted" style="margin-top:6px">Aucune station séparée.</div>'}</div>`;
+  _GEST.dist = d;
+}
+async function _retPompe(id){
+  const p = (_GEST.dist?.distributeurs || []).find(x => x.id === id); if(!p) return;
+  const motif = await demanderSuppression({titre: `Retirer « ${p.nom} » ?`,
+    texte: 'La pompe est retirée avec ses meeters. Un meeter qui a déjà des relevés est désactivé (son historique reste dans le journal) ; les autres sont effacés.',
+    lignes: p.metres.length ? p.metres.map(m => `${m.nom} (${m.produit_nom || ''})`) : ['Aucun meeter'], bouton: 'Retirer la pompe'});
+  if(!motif) return;
+  try{
+    const r = await POST(`/distributeurs/${id}/retirer`, {motif});
+    notify(`${r.nom} retirée.` + (r.meeters_desactives.length ? ` Désactivés (historique gardé) : ${r.meeters_desactives.join(', ')}.` : ''), 'ok');
+    products = await GET('/produits'); _retRendre(); if(typeof renderSaisie === 'function') renderSaisie();
+  }catch(e){ notify(e.message, 'err'); }
+}
+async function _retMetre(id, nom){
+  await delPompe(id, nom);
+  if(_GEST.vue === 'retirer') _retRendre();
+}
+async function _retStation(id, nom){
+  const motif = await demanderSuppression({titre: `Retirer la station « ${nom} » ?`,
+    texte: 'Elle n’est plus proposée et personne ne peut plus y entrer (pompistes compris). Ses données sont gardées.',
+    lignes: [nom], bouton: 'Retirer la station'});
+  if(!motif) return;
+  try{
+    const r = await POST(`/espaces/${id}/retirer`, {confirmation: 'RETIRER'});
+    notify(`Station retirée : ${r.nom}.`, 'ok'); await initStations(); _retRendre();
+  }catch(e){ notify(e.message, 'err'); }
+}
+
 function renderModalList(){
   if(_GEST.vue==='station') return _stRendre();
   if(_GEST.vue==='fiches') return _sfCharger();
   if(_GEST.vue==='depart') return _mdCharger();
   if(_GEST.vue==='pompes') return _gestPompes();
+  if(_GEST.vue==='retirer') return _retRendre();
   const el=document.getElementById('modal-list');
   if(!products.length){ el.innerHTML=`<div class="empty">${t('gestion.empty.products')}</div>`; return; }
   el.innerHTML=products.map(p=>`
