@@ -2235,7 +2235,9 @@ class ReleveIn(BaseModel):
 
 
 # Tolérance d'arrondi sur la continuité des compteurs (gallons)
-TOLERANCE_ECART_COMPTEUR = 0.001
+# Index à 3 décimales : tout écart d'au moins 0,001 gal est un vrai écart
+# (demande de la direction : aucun écart ne doit passer inaperçu).
+TOLERANCE_ECART_COMPTEUR = 0.0005
 MOTIF_ECART_MIN_CARACTERES = 5
 
 
@@ -4134,7 +4136,7 @@ def _build_journal_entries(
             # Bug 2 fix : NE PAS mettre à jour pompe_last — ap est corrompu.
             # On conserve la dernière référence valide connue.
 
-        elif decalage is not None and decalage < -0.001:
+        elif decalage is not None and decalage < -TOLERANCE_ECART_COMPTEUR:
             statut        = "erreur"
             type_anomalie = "recul_compteur"
             commentaire   = (
@@ -4149,7 +4151,7 @@ def _build_journal_entries(
             )
             pompe_last[pid] = ap
 
-        elif decalage is not None and decalage > 0.001:
+        elif decalage is not None and decalage > TOLERANCE_ECART_COMPTEUR:
             statut        = "alerte"
             type_anomalie = "saut_compteur"
             commentaire   = (
@@ -4228,10 +4230,11 @@ def _build_journal_entries(
                     "le":          x.resolu_le.isoformat() if x.resolu_le else None,
                 }
 
-    # Certifié : compteur continu (ou écart résolu) et, pour un relevé venu
-    # d'un rapport pompiste, rapport finalisé.
+    # Certifié : compteur parfaitement continu et, pour un relevé venu d'un
+    # rapport pompiste, rapport finalisé. Un écart ou un saut, même justifié
+    # (« résolu ») ou corrigé par la direction, ne reçoit jamais le sceau.
     for e in entries:
-        e["certifie"] = (not e["en_attente"] and e["statut"] in ("ok", "resolu")
+        e["certifie"] = (not e["en_attente"] and e["statut"] == "ok"
                          and (e["source"] != "pompiste" or e["rapport_statut"] in ("CONFIRME", "RESOLU")))
 
     # Index écrits sur la mauvaise ligne : le moteur de placement signale le

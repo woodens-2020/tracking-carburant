@@ -66,6 +66,7 @@ def test_ecart_resolu_avec_description(client):
     e = next(x for x in j["entries"] if x["id"] == rid)
     assert e["statut"] == "resolu" and e["resolution"]["description"] == desc
     assert j["resume"]["nb_alertes"] == 0 and j["resume"]["nb_resolus"] == 1
+    assert e["certifie"] is False                      # justifié, mais jamais « certifié »
     assert j["resume"]["total_gallons"] == 65           # le saut justifié n'est plus exclu
 
     # Un relevé sans écart ne se « résout » pas
@@ -118,3 +119,15 @@ def test_ecart_apres_un_rapport_pompiste_en_attente(client):
     assert r.status_code == 200, r.text
     for debut in (j1, j2):
         assert next(x for x in _journal(client, debut, j2, [p])["entries"] if x["id"] == rid)["statut"] == "resolu"
+
+
+def test_ecart_d_un_millieme_detecte(client):
+    """Index à 3 décimales : un écart de 0,001 gal est un vrai écart."""
+    (p,) = _pompes(client, 1)
+    _releve(client, "2026-04-05", "Matin", p, 100, 140)
+    r = client.post("/api/releves", headers=H, json={"date": "2026-04-05", "periode": "Apres-midi", "pompe_id": p,
+                    "prix_gallon": 100, "metter_avant": 140.001, "metter_apres": 150})
+    assert r.status_code == 409                          # motif exigé, même pour 0,001
+    rid = _releve(client, "2026-04-05", "Apres-midi", p, 140.001, 150)
+    e = next(x for x in _journal(client, "2026-04-05", "2026-04-05", [p])["entries"] if x["id"] == rid)
+    assert e["statut"] == "alerte" and e["certifie"] is False

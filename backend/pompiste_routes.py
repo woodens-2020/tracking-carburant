@@ -413,6 +413,29 @@ def _nom(u: Optional[Utilisateur]) -> Optional[str]:
     return (u.nom_complet or u.username) if u else None
 
 
+def _meeters_continus(db: Session, r: RapportPompiste) -> bool:
+    """Sceau « certifié » d'un rapport finalisé : chaque meeter reprend
+    exactement là où le relevé précédent du journal s'est arrêté. Un écart ou
+    un saut — même corrigé ou justifié par la direction — retire le sceau."""
+    import main  # import tardif : main importe ce module
+    for l in r.lignes:
+        av = float(l.metter_avant_corrige if l.metter_avant_corrige is not None else l.metter_avant)
+        cible = (r.date, _RANG.get(r.periode, 9))
+        p = db.get(Pompe, l.pompe_id)
+        dd = main.depart_applicable(p, r.date)
+        q = db.query(Releve).filter(Releve.pompe_id == l.pompe_id, Releve.date <= r.date)
+        if dd:
+            q = q.filter(Releve.date > dd)
+        prec = None
+        for x in q.order_by(Releve.date.desc()).limit(4).all():
+            if (x.date, _RANG.get(x.periode, 9)) < cible:
+                prec = x if prec is None or (x.date, _RANG.get(x.periode, 9)) > (prec.date, _RANG.get(prec.periode, 9)) else prec
+        base = float(prec.metter_apres) if prec else (float(p.metre_depart) if dd and p.metre_depart is not None else None)
+        if base is not None and abs(av - base) > main.TOLERANCE_ECART_COMPTEUR:
+            return False
+    return True
+
+
 def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -> dict:
     lignes = []
     for l in r.lignes:
@@ -477,7 +500,7 @@ def _rapport_dict(db: Session, r: RapportPompiste, avec_journal: bool = False) -
         "conflits": conflits_creneau(db, r) if avec_journal and r.statut in _A_TRAITER else [],
         "fusions": fusions_possibles(db, r) if avec_journal and r.statut in _A_TRAITER else [],
         "id": r.id, "date": str(r.date), "periode": r.periode, "statut": r.statut,
-        "certifie": r.statut in ("CONFIRME", "RESOLU"),
+        "certifie": r.statut in ("CONFIRME", "RESOLU") and _meeters_continus(db, r),
         "pompiste_id": r.utilisateur_id, "pompiste_nom": _nom(r.utilisateur),
         "charte_acceptee_at": r.charte_acceptee_at.isoformat() if r.charte_acceptee_at else None,
         "billetterie": r.billetterie or [], "monnaie": float(r.monnaie or 0),
