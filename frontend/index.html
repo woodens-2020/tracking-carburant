@@ -513,6 +513,15 @@ canvas{display:block}
 .dep-date-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .dep-date-row input{flex:1;min-width:140px}
 .dep-caisses{display:flex;gap:6px;flex-wrap:wrap}
+.cjr-choix{width:46px;text-align:center}
+.cjr-pm{width:30px;height:30px;border-radius:50%;border:1.5px dashed var(--orange,#f59e0b);background:transparent;color:var(--orange,#f59e0b);font-size:19px;font-weight:800;line-height:1;cursor:pointer}
+.cjr-pm:hover{background:rgba(245,158,11,.15)}
+.cjr-pm-on{border:1.5px solid var(--green,#22c55e);background:rgba(34,197,94,.15);color:var(--green,#22c55e);font-size:15px}
+.cjr-pm-on:hover{background:rgba(239,68,68,.15);border-color:var(--red,#ef4444);color:var(--red,#ef4444)}
+tr.cjr-hors td{opacity:.62}
+tr.cjr-hors td.cjr-choix{opacity:1}
+.cjr-tag-hors{background:rgba(245,158,11,.14);color:var(--orange,#f59e0b)}
+.cjr-a-choisir{margin:0 0 8px;padding:9px 12px;border-radius:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);font-size:13.5px}
 .dep-caisses[hidden]{display:none}
 .dep-source{display:flex;align-items:center;height:38px;padding:0 12px;border-radius:8px;border:1px solid var(--border2);background:var(--panel2);font-weight:600;color:var(--text)}
 .dep-chip{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.75);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
@@ -6604,15 +6613,6 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
                 <label class="gi-form-lbl" for="dep-pompiste">Pompiste (s'il a fait la dépense)</label>
                 <select class="gi-form-select" id="dep-pompiste"><option value="">— Aucun (dépense de la station) —</option></select>
               </div>
-            </div>
-            <!-- Question posée pour chaque dépense : entre-t-elle dans le rapport journalier ? -->
-            <div class="gi-form-field dep-rj">
-              <span class="gi-form-lbl">Mettre cette dépense dans le rapport journalier ?</span>
-              <div class="dep-caisses" role="radiogroup" aria-label="Mettre cette dépense dans le rapport journalier">
-                <button type="button" class="dep-chip active" id="dep-rj-oui" role="radio" aria-checked="true" onclick="_depRj(true)">Oui, dans le rapport</button>
-                <button type="button" class="dep-chip" id="dep-rj-non" role="radio" aria-checked="false" onclick="_depRj(false)">Non, hors du rapport</button>
-              </div>
-              <input type="hidden" id="dep-rj" value="1">
             </div>
 
             <!-- L'essentiel -->
@@ -16778,18 +16778,22 @@ function _cjrConstruire(){
         _cjrAjF(jg, f, p.gallons); _cjrAjF(tg, f, p.gallons); jm+=p.montant;
       }
     }
-    for(const x of (d.depenses.liste||[])){
+    const garde = x => {
       const src=x.source||'Caisse principale';
-      if(fProd==='__generale' && src!=='Caisse principale') continue;
-      if(fProd && fProd!=='__generale' && src!==fProd) continue;
-      if(fType==='charges' && x.est_transfert) continue;
-      if(fType==='transferts' && !x.est_transfert) continue;
-      if(fCat && x.categorie!==fCat) continue;
-      if(fBen && (x.beneficiaire||'')!==fBen) continue;
+      if(fProd==='__generale' && src!=='Caisse principale') return false;
+      if(fProd && fProd!=='__generale' && src!==fProd) return false;
+      if(fType==='charges' && x.est_transfert) return false;
+      if(fType==='transferts' && !x.est_transfert) return false;
+      if(fCat && x.categorie!==fCat) return false;
+      if(fBen && (x.beneficiaire||'')!==fBen) return false;
+      return true;
+    };
+    for(const x of (d.depenses.liste||[])){
+      if(!garde(x)) continue;
       depenses.push({...x, date:d.date});
       if(x.est_transfert) jdt+=x.montant; else jdc+=x.montant;
     }
-    for(const x of (d.depenses.hors_rapport||[])) horsRapport.push({...x, date:d.date});
+    for(const x of (d.depenses.hors_rapport||[])) if(garde(x)) horsRapport.push({...x, date:d.date});
     jours.push({date:d.date, gallons:jg, ventes:jm, charges:jdc, transferts:jdt, solde:jm-jdc-jdt});
     tm+=jm; tdc+=jdc; tdt+=jdt;
   }
@@ -16896,38 +16900,36 @@ function cjrAfficher(){
     ? `<div class="cjr-filtres-actifs">Filtres actifs : ${m.filtres.liste.map(f=>`<b>${esc(f)}</b>`).join(' · ')}
         <button type="button" class="sx-link" onclick="cjrReinitialiserFiltres()">tout effacer</button></div>` : '';
 
-  const lignesD = m.depenses.map(x=>`<tr>
+  // Toutes les dépenses de la sélection sur la même feuille : celles qui sont
+  // dans le rapport (✓, bouton − pour les retirer) et les autres (bouton +
+  // pour les ajouter). Seules les premières comptent dans les totaux.
+  const toutes = [...m.depenses.map(x=>({...x, dans:true})), ...m.horsRapport.map(x=>({...x, dans:false}))]
+    .sort((a,b)=> a.date<b.date?-1 : a.date>b.date?1 : (a.id||0)-(b.id||0));
+  const lignesD = toutes.map(x=>`<tr class="${x.dans?'':'cjr-hors'}">
+      <td class="cjr-choix">${x.id
+        ? (x.dans
+          ? `<button type="button" class="cjr-pm cjr-pm-on" title="Dans le rapport — cliquez pour la retirer" aria-label="Retirer du rapport" onclick="cjrDepenseDansRapport(${x.id}, false)">✓</button>`
+          : `<button type="button" class="cjr-pm" title="Pas dans le rapport — cliquez pour l'ajouter" aria-label="Ajouter au rapport" onclick="cjrDepenseDansRapport(${x.id}, true)">+</button>`)
+        : ''}</td>
       ${m.unJour?'':`<td class="num">${frDate(x.date)}</td>`}
       <td>${esc(x.categorie)}</td>
-      <td>${esc(x.description||'')}${x.reference?` <span class="c-muted">· ${esc(x.reference)}</span>`:''}</td>
+      <td>${esc(x.description||'')}${x.reference?` <span class="c-muted">· ${esc(x.reference)}</span>`:''}${x.dans?'':' <span class="cjr-tag cjr-tag-hors">Pas dans le rapport</span>'}</td>
       <td>${esc(x.beneficiaire||'—')}</td>
       <td>${esc(x.source||'Caisse principale')}</td>
       <td>${x.est_transfert?'<span class="cjr-tag cjr-tag-tr">Transfert</span>':'<span class="cjr-tag">Charge</span>'}</td>
-      <td class="tr num c-amber"><strong>${cjrG(x.montant)}</strong></td>
-      <td class="tr">${x.id?`<button type="button" class="btn btn-secondary psp-mini" title="Garder cette dépense, mais hors du rapport journalier"
-        onclick="cjrDepenseDansRapport(${x.id}, false)">Retirer du rapport</button>`:''}</td>
+      <td class="tr num ${x.dans?'c-amber':'c-muted'}">${x.dans?`<strong>${cjrG(x.montant)}</strong>`:cjrG(x.montant)}</td>
     </tr>`).join('');
-  const nbColD = m.unJour ? 5 : 6;   // colonnes avant « Montant »
-  const tableHors = m.horsRapport.length ? `
-    <h3 class="cjr-h">Dépenses gardées hors du rapport journalier</h3>
-    <div class="cjr-note">Elles restent dans la liste des dépenses, mais ne comptent pas dans les totaux ni dans le solde ci-dessus.</div>
-    <div class="tbl-wrap"><table class="dt cjr-table">
-      <thead><tr>${m.unJour?'':'<th>Date</th>'}<th>Catégorie</th><th>Description</th><th>Bénéficiaire</th><th class="tr">Montant</th><th></th></tr></thead>
-      <tbody>${m.horsRapport.map(x=>`<tr class="cjr-vide">
-        ${m.unJour?'':`<td class="num">${frDate(x.date)}</td>`}
-        <td>${esc(x.categorie)}</td><td>${esc(x.description||'')}</td><td>${esc(x.beneficiaire||'—')}</td>
-        <td class="tr num">${cjrG(x.montant)}</td>
-        <td class="tr"><button type="button" class="btn btn-secondary psp-mini" onclick="cjrDepenseDansRapport(${x.id}, true)">Remettre dans le rapport</button></td>
-      </tr>`).join('')}</tbody>
-    </table></div>` : '';
+  const nbColD = m.unJour ? 6 : 7;   // colonnes avant « Montant »
+  const nbHors = m.horsRapport.length, totHors = m.horsRapport.reduce((a,x)=>a+x.montant,0);
   const tableDep = `
+    ${nbHors?`<div class="cjr-a-choisir">${nbHors} dépense(s) pas encore dans le rapport (${cjrG(totHors)}) : cliquez sur <b>+</b> pour ajouter celles qui vont dans le rapport.</div>`:''}
     <div class="tbl-wrap"><table class="dt cjr-table">
-      <thead><tr>${m.unJour?'':'<th>Date</th>'}<th>Catégorie</th><th>Description</th><th>Bénéficiaire</th><th>Caisse</th><th>Type</th><th class="tr">Montant</th><th></th></tr></thead>
-      <tbody>${lignesD || `<tr><td colspan="${nbColD+2}" class="empty" style="padding:14px">Aucune dépense sur cette sélection</td></tr>`}</tbody>
+      <thead><tr><th title="Dans le rapport ?">Rapport</th>${m.unJour?'':'<th>Date</th>'}<th>Catégorie</th><th>Description</th><th>Bénéficiaire</th><th>Caisse</th><th>Type</th><th class="tr">Montant</th></tr></thead>
+      <tbody>${lignesD || `<tr><td colspan="${nbColD+1}" class="empty" style="padding:14px">Aucune dépense sur cette sélection</td></tr>`}</tbody>
       ${lignesD?`<tfoot>
-        ${t.transferts&&t.charges?`<tr><td colspan="${nbColD}">Charges</td><td class="tr num">${cjrG(t.charges)}</td><td></td></tr>
-        <tr><td colspan="${nbColD}">Transferts (dépôt en banque, Zelle…)</td><td class="tr num">${cjrG(t.transferts)}</td><td></td></tr>`:''}
-        <tr class="recap-total"><td colspan="${nbColD}">TOTAL DÉPENSES</td><td class="tr num c-amber">${cjrG(t.depenses)}</td><td></td></tr></tfoot>`:''}
+        ${t.transferts&&t.charges?`<tr><td colspan="${nbColD}">Charges</td><td class="tr num">${cjrG(t.charges)}</td></tr>
+        <tr><td colspan="${nbColD}">Transferts (dépôt en banque, Zelle…)</td><td class="tr num">${cjrG(t.transferts)}</td></tr>`:''}
+        <tr class="recap-total"><td colspan="${nbColD}">TOTAL DÉPENSES DANS LE RAPPORT</td><td class="tr num c-amber">${cjrG(t.depenses)}</td></tr></tfoot>`:''}
     </table></div>`;
 
   const tableJours = m.unJour ? '' : `
@@ -16971,17 +16973,14 @@ function cjrAfficher(){
     ${_cjrTableVentesHtml(m,false)}
     <h3 class="cjr-h">Dépenses</h3>
     <div class="cjr-note">« Caisse principale » = dépense non attribuée à un produit. Les transferts (dépôt en banque, Zelle) sortent de la caisse mais ne sont pas des charges.</div>
-    ${tableDep}
-    ${tableHors}`;
+    ${tableDep}`;
 }
 async function cjrDepenseDansRapport(id, inclure){
-  const ok = await showConfirm(inclure
-    ? 'Remettre cette dépense dans le rapport journalier ? Elle comptera de nouveau dans les totaux du jour.'
-    : 'Retirer cette dépense du rapport journalier ? Elle reste enregistrée dans les dépenses, mais ne compte plus dans les totaux du jour.',
-    {title: inclure ? 'Remettre dans le rapport' : 'Retirer du rapport', type:'warn', okLabel: inclure ? 'Oui, remettre' : 'Oui, retirer'});
-  if(!ok) return;
-  try{ await PUT('/depenses/'+id, {dans_rapport_journalier: !!inclure}); notify(inclure?'Dépense remise dans le rapport.':'Dépense retirée du rapport journalier.','ok'); loadCarburantRapport(); }
-  catch(e){ notify(e.message,'err'); }
+  try{
+    await PUT('/depenses/'+id, {dans_rapport_journalier: !!inclure});
+    notify(inclure?'Dépense ajoutée au rapport journalier.':'Dépense retirée du rapport journalier.','ok');
+    loadCarburantRapport();
+  }catch(e){ notify(e.message,'err'); }
 }
 
 
@@ -26755,7 +26754,7 @@ function renderDepTable(data){
       <td>${_ckJoursBadge(d.jours)}</td>
       <td><span class="td-badge ${catColors[d.categorie]||'badge-gray'}">${d.categorie}</span></td>
       <td>${d.produit_nom?`<span class="td-badge ${caisseColors[d.produit_nom]||'badge-gray'}">${d.produit_nom}</span>`:'<span class="td-muted">Caisse principale</span>'}</td>
-      <td>${esc(d.description||'')}${d.rapport_pompiste_id?` <span class="td-badge badge-amber" title="Payée par le pompiste avec l'argent de ses ventes (rapport n°${d.rapport_pompiste_id}) : ne sort pas de la caisse principale">⛽ Payée par le pompiste</span>`:(d.sans_justificatif?' <span class="td-badge badge-red" title="Aucun document joint">⚠ Inachevée</span>':'')}${d.dans_rapport_journalier===false?' <span class="td-badge badge-amber" title="Enregistrée, mais gardée hors du rapport journalier (modifiez la dépense pour la remettre)">Hors rapport journalier</span>':''}</td>
+      <td>${esc(d.description||'')}${d.rapport_pompiste_id?` <span class="td-badge badge-amber" title="Payée par le pompiste avec l'argent de ses ventes (rapport n°${d.rapport_pompiste_id}) : ne sort pas de la caisse principale">⛽ Payée par le pompiste</span>`:(d.sans_justificatif?' <span class="td-badge badge-red" title="Aucun document joint">⚠ Inachevée</span>':'')}${d.dans_rapport_journalier===false?' <span class="td-badge badge-amber" title="Pas encore dans le rapport journalier : ajoutez-la avec le + sur la feuille du Rapport journalier">Pas dans le rapport journalier</span>':''}</td>
       <td class="td-muted">${d.beneficiaire||'—'}</td>
       <td class="td-amount">${_htg(d.montant)}</td>
       <td class="td-muted">${d.reference||'—'}</td>
@@ -26838,12 +26837,6 @@ async function _depRemplirPompistes(choix){
   }catch(e){}
   sel.value = choix ? String(choix) : '';
 }
-function _depRj(oui){
-  document.getElementById('dep-rj').value = oui ? '1' : '0';
-  for(const [k,v] of [['oui',oui],['non',!oui]]){
-    const b=document.getElementById('dep-rj-'+k); b.classList.toggle('active', v); b.setAttribute('aria-checked', String(v));
-  }
-}
 function openDepModal(id=null){
   _depPopulateCaisseSelects();
   const _d0 = id ? _depData.find(x=>x.id===id) : null;
@@ -26864,14 +26857,12 @@ function openDepModal(id=null){
       document.getElementById('dep-ref').value     =d.reference||'';
       document.getElementById('dep-notes').value   =d.notes||'';
       document.getElementById('dep-plus').open = !!(d.beneficiaire||d.reference||d.notes);
-      _depRj(d.dans_rapport_journalier !== false);
     }
   } else {
     _depViderSaisie();
     const memo=_depMemo();
     document.getElementById('dep-date').value=memo.date||_today();
     document.getElementById('dep-caisse').value='';          // nouvelle dépense : caisse principale
-    _depRj(true);
   }
   _depRenderCaisses();
   _depMajChipsDate();
@@ -26899,8 +26890,10 @@ async function submitDep(continuer=false){
     reference: document.getElementById('dep-ref').value.trim()||null,
     notes: document.getElementById('dep-notes').value.trim()||null,
     produit_id: caisseVal?parseInt(caisseVal,10):null,
-    dans_rapport_journalier: document.getElementById('dep-rj').value !== '0',
   };
+  // Nouvelle dépense : pas encore dans le rapport journalier — la direction
+  // l'ajoute avec le « + » sur la feuille du rapport journalier.
+  if(!id) body.dans_rapport_journalier=false;
   const pompVal=(document.getElementById('dep-pompiste')||{}).value||'';
   if(pompVal) body.pompiste_id=parseInt(pompVal,10); else if(id) body.sans_pompiste=true;
   if(id && !caisseVal) body.caisse_generale=true;

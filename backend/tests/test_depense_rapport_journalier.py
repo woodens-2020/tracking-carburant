@@ -1,6 +1,7 @@
-"""Chaque dépense répond à « Mettre cette dépense dans le rapport journalier ? » :
-une dépense gardée hors du rapport reste dans la liste des dépenses, mais
-n'entre dans aucun total du rapport journalier (listée à part)."""
+"""Rapport journalier : toutes les dépenses du jour sont sur la feuille ; la
+direction choisit avec « + » celles qui entrent dans le rapport. Une dépense
+pas dans le rapport reste dans les dépenses, sans compter dans les totaux.
+Sans le champ, l'API garde l'ancien comportement (dans le rapport)."""
 H = {"X-API-Key": "smoke-test-key"}
 JOUR = "2026-06-21"
 
@@ -33,3 +34,10 @@ def test_depense_hors_rapport_journalier(client):
     assert r.status_code == 200 and r.json()["dans_rapport_journalier"] is True
     rj = client.get(f"/api/carburant/rapport-jour?date={JOUR}", headers=H).json()
     assert rj["depenses"]["total"] == 1000 and not rj["depenses"]["hors_rapport"]
+
+
+def test_sans_le_champ_la_depense_est_dans_le_rapport(client):
+    r = client.post("/api/depenses", headers=H, json={
+        "categorie": "Electricite", "description": "ancien client", "montant": 50, "date_depense": "2026-06-22"})
+    rj = client.get("/api/carburant/rapport-jour?date=2026-06-22", headers=H).json()
+    assert r.json()["id"] in [x["id"] for x in rj["depenses"]["liste"]]
