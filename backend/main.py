@@ -419,6 +419,8 @@ from transfert_station import router as transfert_router
 app.include_router(transfert_router)
 from archive_rapports import router as archive_rapports_router
 app.include_router(archive_rapports_router)
+from autres_entrees_routes import router as autres_entrees_router, autres_entrees_du_jour
+app.include_router(autres_entrees_router)
 app.include_router(caisse_principale_router)
 
 
@@ -4605,7 +4607,8 @@ def carburant_rapport_jour(
       - Entrées   = argent encaissé (ventes de carburant), détaillé par
                     période (Matin / Après-midi) puis par produit
       - Dépenses  = dépenses de la station enregistrées ce jour-là
-      - Disponible = Entrées − Dépenses (solde du jour)
+      - Autres entrées = argent en plus ajouté par la direction (« + »)
+      - Disponible = Entrées + Autres entrées − Dépenses (solde du jour)
     Aucune valeur n'est arrondie."""
     from decimal import Decimal as _D
     from datetime import datetime as _dtn2, timezone as _tzu2
@@ -4767,7 +4770,10 @@ def carburant_rapport_jour(
     depenses_hors_rapport = [_dep_ligne(x) for x in deps_hors]
     tot_dep = sum((_D(str(x.montant)) for x in deps), _D("0"))
 
-    disponible_jour = tot_ent_m - tot_dep
+    # Autres entrées (argent en plus, ajouté avec « + » sur le rapport)
+    autres = autres_entrees_du_jour(db, d, activite)
+    tot_autres = sum((_D(str(x["montant"])) for x in autres), _D("0"))
+    disponible_jour = tot_ent_m + tot_autres - tot_dep
 
     # ── DISPONIBLE PAR PRODUIT (Gazoline / Diesel...) — jamais mélangés :
     # chaque caisse carburant n'est débitée que de ses propres dépenses
@@ -4814,6 +4820,10 @@ def carburant_rapport_jour(
             "par_produit":   entrees_par_produit,
             "total_gallons": float(tot_ent_g),
             "total":         float(tot_ent_m),
+        },
+        "autres_entrees": {
+            "liste": autres,
+            "total": float(tot_autres),
         },
         "depenses": {
             "liste":            depenses_liste,

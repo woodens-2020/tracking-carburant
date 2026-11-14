@@ -16764,10 +16764,12 @@ function _cjrConstruire(){
   const filtreDepenses = !!(fCat||fBen||fType);
   // ventes[carburant] = {g, m} : Gazoline et Diesel, toutes périodes confondues
   const ventes={};
-  const jours=[], depenses=[], horsRapport=[];
-  const tg={}; let tm=0, tdc=0, tdt=0;
+  const jours=[], depenses=[], horsRapport=[], autres=[];
+  const tg={}; let tm=0, tdc=0, tdt=0, ta=0;
+  const avecAutres = !fProd || fProd==='__generale';
   for(const d of _cjrJours){
-    const jg={}; let jm=0, jdc=0, jdt=0;
+    const jg={}; let jm=0, jdc=0, jdt=0, ja=0;
+    if(avecAutres) for(const x of ((d.autres_entrees||{}).liste||[])){ autres.push({...x, date:d.date}); ja+=x.montant; }
     for(const pe of (d.entrees.par_periode||[])){
       if(fPer && pe.periode!==fPer) continue;
       for(const p of (pe.par_produit||[])){
@@ -16794,16 +16796,16 @@ function _cjrConstruire(){
       if(x.est_transfert) jdt+=x.montant; else jdc+=x.montant;
     }
     for(const x of (d.depenses.hors_rapport||[])) if(garde(x)) horsRapport.push({...x, date:d.date});
-    jours.push({date:d.date, gallons:jg, ventes:jm, charges:jdc, transferts:jdt, solde:jm-jdc-jdt});
-    tm+=jm; tdc+=jdc; tdt+=jdt;
+    jours.push({date:d.date, gallons:jg, ventes:jm, autres:ja, charges:jdc, transferts:jdt, solde:jm+ja-jdc-jdt});
+    tm+=jm; tdc+=jdc; tdt+=jdt; ta+=ja;
   }
   // Une ligne par carburant : Gazoline puis Diesel (Gazoline 1 et 2 réunies, etc.)
   const familles=Object.entries(ventes).map(([nom,e])=>({nom, g:e.g, m:e.m, prix:e.g>0?e.m/e.g:0}))
     .sort((a,b)=>_cjrRangFam(a.nom)-_cjrRangFam(b.nom));
   return {
     debut:_cjrJours[0]?.date, fin:_cjrJours[_cjrJours.length-1]?.date, unJour:_cjrJours.length===1,
-    jours, familles, depenses, horsRapport, filtreDepenses,
-    totaux:{gallons:tg, ventes:tm, charges:tdc, transferts:tdt, depenses:tdc+tdt, solde:tm-tdc-tdt},
+    jours, familles, depenses, horsRapport, autres, filtreDepenses,
+    totaux:{gallons:tg, ventes:tm, autres:ta, charges:tdc, transferts:tdt, depenses:tdc+tdt, solde:tm+ta-tdc-tdt},
     filtres:{
       liste:[
         fProd && `Caisse : ${fProd==='__generale'?'Caisse principale':fProd}`,
@@ -16935,12 +16937,12 @@ function cjrAfficher(){
   const tableJours = m.unJour ? '' : `
     <h3 class="cjr-h">Jour par jour</h3>
     <div class="tbl-wrap"><table class="dt cjr-table">
-      <thead><tr><th>Date</th><th class="tr">Gallons</th><th class="tr">Ventes</th><th class="tr">Charges</th><th class="tr">Transferts</th><th class="tr">Solde</th></tr></thead>
-      <tbody>${m.jours.map(j=>`<tr${(j.ventes===0&&j.charges===0&&j.transferts===0)?' class="cjr-vide"':''}>
-        <td class="num">${frDate(j.date)}</td><td class="tr num">${cjrGalF(j.gallons,'<br>')}</td><td class="tr num c-teal">${cjrG(j.ventes)}</td>
+      <thead><tr><th>Date</th><th class="tr">Gallons</th><th class="tr">Ventes</th>${t.autres?'<th class="tr">Autres entrées</th>':''}<th class="tr">Charges</th><th class="tr">Transferts</th><th class="tr">Solde</th></tr></thead>
+      <tbody>${m.jours.map(j=>`<tr${(j.ventes===0&&j.autres===0&&j.charges===0&&j.transferts===0)?' class="cjr-vide"':''}>
+        <td class="num">${frDate(j.date)}</td><td class="tr num">${cjrGalF(j.gallons,'<br>')}</td><td class="tr num c-teal">${cjrG(j.ventes)}</td>${t.autres?`<td class="tr num c-teal">${cjrG(j.autres)}</td>`:''}
         <td class="tr num">${cjrG(j.charges)}</td><td class="tr num">${cjrG(j.transferts)}</td>
         <td class="tr num" style="color:${j.solde>=0?'var(--green)':'var(--red)'}"><strong>${cjrG(j.solde)}</strong></td></tr>`).join('')}</tbody>
-      <tfoot><tr class="recap-total"><td>TOTAL</td><td class="tr num">${cjrGalF(t.gallons,'<br>')}</td><td class="tr num c-teal">${cjrG(t.ventes)}</td>
+      <tfoot><tr class="recap-total"><td>TOTAL</td><td class="tr num">${cjrGalF(t.gallons,'<br>')}</td><td class="tr num c-teal">${cjrG(t.ventes)}</td>${t.autres?`<td class="tr num c-teal">${cjrG(t.autres)}</td>`:''}
         <td class="tr num">${cjrG(t.charges)}</td><td class="tr num">${cjrG(t.transferts)}</td>
         <td class="tr num" style="color:${soldeCol}">${cjrG(t.solde)}</td></tr></tfoot>
     </table></div>`;
@@ -16961,8 +16963,13 @@ function cjrAfficher(){
         <div class="cjr-kpi-v" style="color:var(--orange)">${cjrG(t.depenses)}</div>
         <div class="cjr-kpi-s">${m.depenses.length} dépense(s)${t.transferts?`<br>dont transferts ${cjrG(t.transferts)}`:''}</div>
       </div>
+      ${t.autres?`<div class="cjr-kpi">
+        <div class="cjr-kpi-l">Autres entrées</div>
+        <div class="cjr-kpi-v" style="color:var(--green)">${cjrG(t.autres)}</div>
+        <div class="cjr-kpi-s">${m.autres.length} entrée(s) en plus des ventes</div>
+      </div>`:''}
       <div class="cjr-kpi cjr-kpi-solde">
-        <div class="cjr-kpi-l">Solde (ventes − dépenses)</div>
+        <div class="cjr-kpi-l">Solde (ventes${t.autres?' + autres entrées':''} − dépenses)</div>
         <div class="cjr-kpi-v" style="color:${soldeCol}">${cjrG(t.solde)}</div>
         <div class="cjr-kpi-s">${t.solde>=0?'Argent restant en caisse sur la sélection':'Plus de dépenses que de ventes'}</div>
       </div>
@@ -16971,6 +16978,7 @@ function cjrAfficher(){
     <h3 class="cjr-h">Ventes ${_cjrActivite==='propane'?'de propane':'de carburant (Gazoline, Diesel)'}</h3>
     <div class="cjr-note">Source : relevés de compteurs.</div>
     ${_cjrTableVentesHtml(m,false)}
+    ${_cjrAutresHtml(m)}
     <h3 class="cjr-h">Dépenses</h3>
     <div class="cjr-note">« Caisse principale » = dépense non attribuée à un produit. Les transferts (dépôt en banque, Zelle) sortent de la caisse mais ne sont pas des charges.</div>
     ${tableDep}`;
@@ -17006,6 +17014,79 @@ async function cjrDepenseDansRapport(id, inclure){
 }
 
 
+// ── Autres entrées : argent en plus des ventes (montant, description, note).
+// « + » ouvre une ligne de saisie dans le tableau (pas de fenêtre) ; l'ajout et
+// le retrait s'affichent tout de suite, l'enregistrement part en arrière-plan.
+let _cjrAutreForm = false, _cjrAutreTmp = 0;
+function cjrAutreOuvrir(ouvrir){
+  _cjrAutreForm = ouvrir !== false; _cjrReafficher();
+  if(_cjrAutreForm) setTimeout(() => document.getElementById('cjr-ae-montant')?.focus(), 0);
+}
+function _cjrAeTouche(ev){ if(ev.key==='Enter') cjrAutreAjouter(); else if(ev.key==='Escape') cjrAutreOuvrir(false); }
+function _cjrAutresHtml(m){
+  const t = m.totaux, nbCol = m.unJour ? 3 : 4;
+  const lignes = m.autres.map(x => `<tr>
+      <td class="cjr-choix"><button type="button" class="cjr-pm cjr-pm-on" title="Retirer cette entrée" aria-label="Retirer" onclick="cjrAutreRetirer('${String(x.id)}')">✕</button></td>
+      ${m.unJour?'':`<td class="num">${frDate(x.date)}</td>`}
+      <td>${esc(x.description)}</td>
+      <td class="c-muted">${esc(x.note||'')}</td>
+      <td class="tr num c-teal"><strong>${cjrG(x.montant)}</strong></td></tr>`).join('');
+  const dates = _cjrJours.map(d => d.date);
+  const form = _cjrAutreForm ? `<tr class="cjr-ae-form">
+      <td></td>
+      ${m.unJour?'':`<td><select id="cjr-ae-date" class="form-control">${dates.map(d=>`<option value="${d}"${d===m.fin?' selected':''}>${frDate(d)}</option>`).join('')}</select></td>`}
+      <td><input id="cjr-ae-desc" class="form-control" placeholder="Description" maxlength="255" onkeydown="_cjrAeTouche(event)"></td>
+      <td><input id="cjr-ae-note" class="form-control" placeholder="Note (facultatif)" maxlength="500" onkeydown="_cjrAeTouche(event)"></td>
+      <td class="tr"><div style="display:flex;gap:6px;justify-content:flex-end;align-items:center;flex-wrap:wrap">
+        <input id="cjr-ae-montant" class="form-control" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Montant" style="max-width:130px;text-align:right" onkeydown="_cjrAeTouche(event)">
+        <button type="button" class="btn btn-primary btn-sm" onclick="cjrAutreAjouter()">Ajouter</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="cjrAutreOuvrir(false)">Annuler</button></div></td></tr>` : '';
+  return `<h3 class="cjr-h" style="display:flex;align-items:center;gap:10px">Autres entrées
+      <button type="button" class="cjr-pm" title="Ajouter de l'argent en plus (montant, description, note)" aria-label="Ajouter une autre entrée" onclick="cjrAutreOuvrir()">+</button></h3>
+    <div class="cjr-note">Argent en plus des ventes de carburant : compté dans le total des entrées et le dépôt, et imprimé sur la fiche du rapport.</div>
+    <div class="tbl-wrap"><table class="dt cjr-table">
+      <thead><tr><th></th>${m.unJour?'':'<th>Date</th>'}<th>Description</th><th>Note</th><th class="tr">Montant</th></tr></thead>
+      <tbody>${form}${lignes || (form ? '' : `<tr><td colspan="${nbCol+1}" class="empty" style="padding:12px">Aucune autre entrée — cliquez sur <b>+</b> pour en ajouter une</td></tr>`)}</tbody>
+      ${lignes?`<tfoot><tr class="recap-total"><td colspan="${nbCol}">TOTAL AUTRES ENTRÉES</td><td class="tr num c-teal">${cjrG(t.autres)}</td></tr></tfoot>`:''}
+    </table></div>`;
+}
+function _cjrAutresJour(date){
+  const d = _cjrJours.find(j => j.date === date); if(!d) return null;
+  return d.autres_entrees ||= {liste: [], total: 0};
+}
+function _cjrAutreMaj(ae){ ae.total = Math.round(ae.liste.reduce((a,x)=>a+x.montant,0)*100)/100; }
+async function cjrAutreAjouter(){
+  const val = id => (document.getElementById(id)?.value || '').trim();
+  const montant = Math.round(parseFloat(val('cjr-ae-montant').replace(',', '.'))*100)/100;
+  const description = val('cjr-ae-desc'), note = val('cjr-ae-note');
+  const date = val('cjr-ae-date') || _cjrModele?.fin || _cjrJours[0]?.date;
+  if(!(montant > 0)){ document.getElementById('cjr-ae-montant')?.focus(); return; }
+  if(description.length < 2){ document.getElementById('cjr-ae-desc')?.focus(); return; }
+  const ae = _cjrAutresJour(date); if(!ae) return;
+  const x = {id: 'tmp' + (++_cjrAutreTmp), date, montant, description, note};
+  ae.liste.push(x); _cjrAutreMaj(ae);
+  _cjrAutreForm = false; _cjrReafficher();
+  try{
+    const r = await POST('/carburant/autres-entrees', {date, montant, description, note: note || null,
+      activite: _cjrActivite === 'propane' ? 'propane' : null});
+    x.id = r.id; _cjrReafficher();
+  }catch(e){
+    ae.liste = ae.liste.filter(y => y !== x); _cjrAutreMaj(ae); _cjrReafficher();
+    notify('Entrée non enregistrée : ' + e.message, 'err');
+  }
+}
+async function cjrAutreRetirer(id){
+  for(const d of _cjrJours){
+    const ae = d.autres_entrees; const k = ae ? ae.liste.findIndex(x => String(x.id) === String(id)) : -1;
+    if(k < 0) continue;
+    const [x] = ae.liste.splice(k, 1); _cjrAutreMaj(ae); _cjrReafficher();
+    if(typeof x.id !== 'number') return;          // pas encore enregistrée
+    try{ await DEL('/carburant/autres-entrees/' + x.id); }
+    catch(e){ ae.liste.splice(k, 0, x); _cjrAutreMaj(ae); _cjrReafficher(); notify('Entrée non retirée : ' + e.message, 'err'); }
+    return;
+  }
+}
+
 // Impression du Rapport Journalier au format du formulaire papier de la
 // station : en-tête centré, grand tableau quadrillé Date | Description |
 // Quantité | Prix | Montant total, sections Entrées / Autres entrées /
@@ -17034,12 +17115,17 @@ async function cjrImprimer(){
   const libProd=n=>/gaz/i.test(n) && !/essence/i.test(n) ? `${n} (Essence)` : n;
   const totGaz=entrees.reduce((a,x)=>a+x.m,0);
   const charges=m.depenses.filter(x=>!x.est_transfert), transferts=m.depenses.filter(x=>x.est_transfert);
-  const totDep=charges.reduce((a,x)=>a+x.montant,0), depot=totGaz-totDep;
+  const totAutres=(m.autres||[]).reduce((a,x)=>a+x.montant,0), totEnt=totGaz+totAutres;
+  const totDep=charges.reduce((a,x)=>a+x.montant,0), depot=totEnt-totDep;
 
   const ligne=(c1,c2,c3,c4,c5,cls='')=>`<tr class="${cls}"><td class="c1">${c1}</td><td>${c2}</td><td class="r">${c3}</td><td class="r">${c4}</td><td class="r">${c5}</td></tr>`;
   const vides=n=>Array.from({length:Math.max(0,n)},()=>ligne('&nbsp;','','','','')).join('');
   const rowsEntrees = entrees.map((x,i)=>ligne(i===0?'<b>Entrées</b>':'', e(libProd(x.n)), nb(x.g,3), nb(x.px,2), nb(x.m,2))).join('')
     + vides(2 - entrees.length) + (entrees.length ? '' : ligne('<b>Entrées</b>','','','',''));
+  const rowsAutres = (m.autres||[]).map(x=>ligne(
+      e(m.unJour ? '' : dateCourte(x.date)),
+      e(x.description) + (x.note ? ` <span class="cat">— ${e(x.note)}</span>` : ''),
+      '', '', nb(x.montant,2))).join('') + vides(4 - (m.autres||[]).length);
   const rowsDep = charges.map(x=>ligne(
       e(m.unJour ? (x.beneficiaire||'') : `${dateCourte(x.date)}${x.beneficiaire?' · '+x.beneficiaire:''}`),
       e(x.description||x.categorie||'') + (x.description && x.categorie && x.categorie!=='—' ? ` <span class="cat">(${e(x.categorie)})</span>` : ''),
@@ -17086,9 +17172,9 @@ async function cjrImprimer(){
         ${rowsEntrees}
         ${ligne('','<b>TOTAL ENTRÉES GAZ</b>','','',nb(totGaz,2),'tot')}
         ${ligne('<b>Autres Entrées</b>','','','','')}
-        ${vides(4)}
-        ${ligne('','<b>TOTAL AUTRES ENTRÉES</b>','','','','tot')}
-        ${ligne('<b>TOTAL ENTRÉES</b>','','','',nb(totGaz,2),'tot')}
+        ${rowsAutres}
+        ${ligne('','<b>TOTAL AUTRES ENTRÉES</b>','','',totAutres?nb(totAutres,2):'','tot')}
+        ${ligne('<b>TOTAL ENTRÉES</b>','','','',nb(totEnt,2),'tot')}
         ${ligne('<b>DÉPENSES</b>','','','','','sect')}
         ${rowsDep}
         ${ligne('<b>TOTAL DÉPENSES</b>','','','',nb(totDep,2),'tot')}
@@ -17121,9 +17207,9 @@ async function cjrImprimerDetaille(){
       <td>${e(x.beneficiaire||'—')}</td><td>${e(x.source||'Caisse principale')}</td><td>${x.est_transfert?'Transfert':'Charge'}</td><td class="r b nw">${cjrG(x.montant)}</td></tr>`).join('')
     || `<tr><td colspan="${ncD+1}" class="c muted">Aucune dépense</td></tr>`;
   const jours = m.unJour ? '' : `<h2>Jour par jour</h2><table>
-      <thead><tr><th>Date</th><th class="r">Gallons</th><th class="r">Ventes</th><th class="r">Charges</th><th class="r">Transferts</th><th class="r">Solde</th></tr></thead>
-      <tbody>${m.jours.map(j=>`<tr><td class="nw">${frDate(j.date)}</td><td class="r nw">${cjrGalF(j.gallons,'<br>')}</td><td class="r nw">${cjrG(j.ventes)}</td><td class="r nw">${cjrG(j.charges)}</td><td class="r nw">${cjrG(j.transferts)}</td><td class="r b nw">${cjrG(j.solde)}</td></tr>`).join('')}
-      <tr class="tot"><td>TOTAL</td><td class="r nw">${cjrGalF(t.gallons,'<br>')}</td><td class="r nw">${cjrG(t.ventes)}</td><td class="r nw">${cjrG(t.charges)}</td><td class="r nw">${cjrG(t.transferts)}</td><td class="r nw">${cjrG(t.solde)}</td></tr></tbody></table>`;
+      <thead><tr><th>Date</th><th class="r">Gallons</th><th class="r">Ventes</th>${t.autres?'<th class="r">Autres entrées</th>':''}<th class="r">Charges</th><th class="r">Transferts</th><th class="r">Solde</th></tr></thead>
+      <tbody>${m.jours.map(j=>`<tr><td class="nw">${frDate(j.date)}</td><td class="r nw">${cjrGalF(j.gallons,'<br>')}</td><td class="r nw">${cjrG(j.ventes)}</td>${t.autres?`<td class="r nw">${cjrG(j.autres)}</td>`:''}<td class="r nw">${cjrG(j.charges)}</td><td class="r nw">${cjrG(j.transferts)}</td><td class="r b nw">${cjrG(j.solde)}</td></tr>`).join('')}
+      <tr class="tot"><td>TOTAL</td><td class="r nw">${cjrGalF(t.gallons,'<br>')}</td><td class="r nw">${cjrG(t.ventes)}</td>${t.autres?`<td class="r nw">${cjrG(t.autres)}</td>`:''}<td class="r nw">${cjrG(t.charges)}</td><td class="r nw">${cjrG(t.transferts)}</td><td class="r nw">${cjrG(t.solde)}</td></tr></tbody></table>`;
   const parCarb = m.familles.map(f=>`${e(f.nom)} : ${cjrGal(f.g)} · ${cjrG(f.m)}`).join('<br>');
   const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Rapport caisse carburant ${m.debut}${m.unJour?'':' — '+m.fin}</title><style>
     *{margin:0;padding:0;box-sizing:border-box}
@@ -17175,11 +17261,16 @@ async function cjrImprimerDetaille(){
     <div class="kpis">
       <div class="kpi"><div class="l">Ventes</div><div class="v ok">${cjrG(t.ventes)}</div><div class="s">${parCarb || cjrGal(0)}</div></div>
       <div class="kpi"><div class="l">Dépenses</div><div class="v dep">${cjrG(t.depenses)}</div><div class="s">${m.depenses.length} dépense(s)${t.transferts?`<br>dont transferts ${cjrG(t.transferts)}`:''}</div></div>
-      <div class="kpi"><div class="l">Solde (ventes − dépenses)</div><div class="v ${t.solde>=0?'ok':'neg'}">${cjrG(t.solde)}</div></div>
+      ${t.autres?`<div class="kpi"><div class="l">Autres entrées</div><div class="v ok">${cjrG(t.autres)}</div><div class="s">${m.autres.length} entrée(s)</div></div>`:''}
+      <div class="kpi"><div class="l">Solde (ventes${t.autres?' + autres entrées':''} − dépenses)</div><div class="v ${t.solde>=0?'ok':'neg'}">${cjrG(t.solde)}</div></div>
     </div>
     ${jours}
     <h2>Ventes ${_cjrActivite==='propane'?'de propane':'de carburant'}</h2>
     ${_cjrTableVentesHtml(m,true)}
+    ${m.autres.length?`<h2>Autres entrées (${m.autres.length})</h2>
+    <table><thead><tr>${m.unJour?'':'<th>Date</th>'}<th>Description</th><th>Note</th><th class="r">Montant</th></tr></thead>
+      <tbody>${m.autres.map(x=>`<tr>${m.unJour?'':`<td class="nw">${frDate(x.date)}</td>`}<td>${e(x.description)}</td><td>${e(x.note||'')}</td><td class="r b nw">${cjrG(x.montant)}</td></tr>`).join('')}
+      <tr class="tot"><td colspan="${m.unJour?2:3}">TOTAL AUTRES ENTRÉES</td><td class="r nw">${cjrG(t.autres)}</td></tr></tbody></table>`:''}
     <h2>Dépenses (${m.depenses.length})</h2>
     <table><thead><tr>${m.unJour?'':'<th>Date</th>'}<th>Catégorie</th><th>Description</th><th>Bénéficiaire</th><th>Caisse</th><th>Type</th><th class="r">Montant</th></tr></thead>
       <tbody>${dep}

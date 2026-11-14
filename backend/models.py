@@ -719,6 +719,27 @@ class FichePaie(Base):
     )
 
 
+class AutreEntreeRapport(Base):
+    """Argent en plus ajouté par la direction sur le Rapport journalier (hors
+    ventes de carburant) : montant, description, note. Compté dans le total
+    des entrées et le dépôt du jour, et imprimé sous « Autres Entrées »."""
+    __tablename__ = "autres_entrees_rapport"
+
+    id          = Column(Integer, primary_key=True)
+    date        = Column(Date, nullable=False)
+    montant     = Column(Numeric(14, 2), nullable=False)
+    description = Column(String(255), nullable=False)
+    note        = Column(String(500), nullable=True)
+    activite    = Column(String(20), nullable=True)      # "propane" ; vide = carburant
+    cree_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_autre_entree_montant"),
+        Index("idx_autre_entree_date", "date"),
+    )
+
+
 class Depense(Base):
     """Dépense opérationnelle de la station."""
     __tablename__ = "depenses"
