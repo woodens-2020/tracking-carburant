@@ -417,6 +417,8 @@ from smart_meter import router as smart_meter_router
 app.include_router(smart_meter_router)
 from transfert_station import router as transfert_router
 app.include_router(transfert_router)
+from archive_rapports import router as archive_rapports_router
+app.include_router(archive_rapports_router)
 app.include_router(caisse_principale_router)
 
 
@@ -623,6 +625,7 @@ def startup():
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS suppression JSON",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL",
+        "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS hors_rapport_journalier BOOLEAN",
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS statut_rapprochement VARCHAR(20)",
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS confiance VARCHAR(10)",
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS score_rapprochement INTEGER",
@@ -4729,6 +4732,10 @@ def carburant_rapport_jour(
                 return "propane" if acts == {"propane"} else "carburant"
             return "carburant"
         deps = [x for x in deps if _act_dep(x) == activite]
+    # Dépenses que la direction a choisi de garder hors du rapport journalier :
+    # listées à part, elles n'entrent dans aucun total du jour.
+    deps_hors = [x for x in deps if getattr(x, "hors_rapport_journalier", None)]
+    deps = [x for x in deps if not getattr(x, "hors_rapport_journalier", None)]
     def _source_dep(x):
         if x.produit:
             return x.produit.nom
@@ -4740,7 +4747,9 @@ def carburant_rapport_jour(
             return f"Payée par le pompiste {nom}".strip()
         return "Caisse principale"
 
-    depenses_liste = [{
+    def _dep_ligne(x):
+        return {
+        "id":           x.id,
         "categorie":    x.categorie or "—",
         "description":  x.description or "",
         "source":       _source_dep(x),
@@ -4750,7 +4759,9 @@ def carburant_rapport_jour(
         "produit_id":   x.produit_id,
         "beneficiaire": x.beneficiaire or "",
         "est_transfert": _est_categorie_transfert(db, x.categorie),
-    } for x in deps]
+        }
+    depenses_liste = [_dep_ligne(x) for x in deps]
+    depenses_hors_rapport = [_dep_ligne(x) for x in deps_hors]
     tot_dep = sum((_D(str(x.montant)) for x in deps), _D("0"))
 
     disponible_jour = tot_ent_m - tot_dep
@@ -4806,6 +4817,9 @@ def carburant_rapport_jour(
             "nb":               len(depenses_liste),
             "total":            float(tot_dep),
             "total_generale":   float(dep_generale),
+            # Gardées hors du rapport journalier par la direction (non comptées)
+            "hors_rapport":       depenses_hors_rapport,
+            "total_hors_rapport": round(sum(x["montant"] for x in depenses_hors_rapport), 2),
         },
         "disponible":            float(disponible_jour),
         "disponible_par_produit": disponible_par_produit,
@@ -7026,6 +7040,8 @@ class DepenseIn(BaseModel):
     notes:        Optional[str] = None
     produit_id:   Optional[int] = None   # caisse d'origine (Gazoline/Diesel) — None = generale
     pompiste_id:  Optional[int] = None   # employé (pompiste) qui a fait la dépense
+    # Réponse à « Mettre cette dépense dans le rapport journalier ? »
+    dans_rapport_journalier: bool = True
 
 class DepensePatch(BaseModel):
     categorie:    Optional[str]   = None
@@ -7039,6 +7055,7 @@ class DepensePatch(BaseModel):
     caisse_generale: Optional[bool] = None  # true = detacher explicitement la caisse (produit_id -> NULL)
     pompiste_id:  Optional[int]   = None
     sans_pompiste: Optional[bool] = None    # true = la dépense n'est plus attribuée à un pompiste
+    dans_rapport_journalier: Optional[bool] = None
 
 @app.get("/api/depenses")
 def lister_depenses(
@@ -7091,6 +7108,7 @@ def lister_depenses(
                 "rapport_pompiste_id": getattr(d, "rapport_pompiste_id", None),
                 "pompiste_id": d.pompiste_id,
                 "pompiste_nom": f"{d.pompiste.prenom} {d.pompiste.nom}".strip() if d.pompiste else None,
+                "dans_rapport_journalier": not d.hors_rapport_journalier,
                 "saisi_par_nom": (d.saisi_par.nom_complet or d.saisi_par.username) if getattr(d, "saisi_par", None) else None,
             }
             for d in depenses
@@ -7127,6 +7145,7 @@ def creer_depense(data: DepenseIn, request: Request, db: Session = Depends(get_d
         beneficiaire=beneficiaire, reference=data.reference, notes=data.notes,
         produit_id=produit.id if produit else None,
         saisi_par_id=getattr(getattr(request.state, "user", None), "id", None),
+        hors_rapport_journalier=(not data.dans_rapport_journalier) or None,
     )
     db.add(d)
 
@@ -7185,8 +7204,10 @@ def modifier_depense(depense_id: int, data: DepensePatch, request: Request, db: 
         if not db.get(Employe, data.pompiste_id):
             raise HTTPException(400, "Pompiste introuvable.")
         d.pompiste_id = data.pompiste_id
+    if data.dans_rapport_journalier is not None:
+        d.hors_rapport_journalier = (not data.dans_rapport_journalier) or None
     db.commit()
-    return {"message": "Dépense mise à jour."}
+    return {"message": "Dépense mise à jour.", "dans_rapport_journalier": not d.hors_rapport_journalier}
 
 @app.delete("/api/depenses/{depense_id}")
 def supprimer_depense(depense_id: int, db: Session = Depends(get_db)):
