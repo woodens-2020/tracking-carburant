@@ -184,7 +184,8 @@ def test_propane_jamais_melange_au_carburant(client):
     prop_id = pompes[f"Propane P{ns}"][0]
     for desc, prod in (("Bouteille propane", prop_id), ("Électricité", None)):
         r = client.post("/api/depenses", headers=H, json={"categorie": "Divers", "description": desc, "montant": 100,
-                                                          "date_depense": d, "produit_id": prod})
+                                                          "date_depense": d, "produit_id": prod,
+                                                          "dans_rapport_journalier": True})
         assert r.status_code in (200, 201), r.text
     rj = lambda a: client.get(f"/api/carburant/rapport-jour?date={d}&activite={a}", headers=H).json()
     c, p = rj("carburant"), rj("propane")

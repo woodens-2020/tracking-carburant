@@ -744,11 +744,11 @@ class Depense(Base):
     # Pompiste qui a fait la dépense (classement des pompistes)
     pompiste_id = Column(Integer, ForeignKey("employes.id", ondelete="SET NULL"), nullable=True)
     pompiste = relationship("Employe", foreign_keys=[pompiste_id])
-    # Choix de la direction : la dépense compte-t-elle dans le rapport
-    # journalier ? NULL / False = oui (comportement historique) ; True =
-    # gardée dans les dépenses mais affichée à part, hors des totaux du jour.
+    # Choix de la direction sur la feuille du rapport journalier (bouton « + ») :
+    # seule une dépense à True compte dans le rapport journalier ; NULL /
+    # False = listée sur la feuille, hors des totaux, en attente du choix.
     # Nullable : les stations séparées reçoivent la colonne sans défaut.
-    hors_rapport_journalier = Column(Boolean, nullable=True)
+    dans_rapport_journalier = Column(Boolean, nullable=True)
 
     produit   = relationship("Produit")
     saisi_par = relationship("Utilisateur", foreign_keys=[saisi_par_id])

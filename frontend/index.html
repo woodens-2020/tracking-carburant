@@ -16975,12 +16975,34 @@ function cjrAfficher(){
     <div class="cjr-note">« Caisse principale » = dépense non attribuée à un produit. Les transferts (dépôt en banque, Zelle) sortent de la caisse mais ne sont pas des charges.</div>
     ${tableDep}`;
 }
+// « + » / « ✓ » : la dépense passe tout de suite d'une liste à l'autre (totaux
+// recalculés sur place, sans recharger la page ni message) ; l'enregistrement
+// part en arrière-plan. En cas d'échec seulement, on revient en arrière.
+function _cjrDeplacerDepense(id, inclure){
+  for(const d of _cjrJours){
+    const de = d.depenses, src = inclure ? (de.hors_rapport ||= []) : (de.liste ||= []), dst = inclure ? (de.liste ||= []) : (de.hors_rapport ||= []);
+    const k = src.findIndex(x => x.id === id);
+    if(k < 0) continue;
+    const [x] = src.splice(k, 1); dst.push(x); dst.sort((a,b) => (a.id||0) - (b.id||0));
+    const sgn = inclure ? 1 : -1;
+    de.total = Math.round(((de.total||0) + sgn*x.montant)*100)/100;
+    de.total_hors_rapport = Math.round(((de.total_hors_rapport||0) - sgn*x.montant)*100)/100;
+    return true;
+  }
+  return false;
+}
+function _cjrReafficher(){ const y = window.scrollY; cjrAfficher(); window.scrollTo(0, y); }
+const _cjrEnvois = {};
 async function cjrDepenseDansRapport(id, inclure){
-  try{
-    await PUT('/depenses/'+id, {dans_rapport_journalier: !!inclure});
-    notify(inclure?'Dépense ajoutée au rapport journalier.':'Dépense retirée du rapport journalier.','ok');
-    loadCarburantRapport();
-  }catch(e){ notify(e.message,'err'); }
+  if(!_cjrDeplacerDepense(id, inclure)) return;
+  _cjrReafficher();
+  const n = (_cjrEnvois[id] = (_cjrEnvois[id]||0) + 1);
+  try{ await PUT('/depenses/'+id, {dans_rapport_journalier: !!inclure}); }
+  catch(e){
+    if(_cjrEnvois[id] !== n) return;          // un clic plus récent a déjà pris le relais
+    _cjrDeplacerDepense(id, !inclure); _cjrReafficher();
+    notify('Dépense non enregistrée : ' + e.message, 'err');
+  }
 }
 
 

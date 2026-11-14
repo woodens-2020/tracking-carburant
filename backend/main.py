@@ -625,7 +625,7 @@ def startup():
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS suppression JSON",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL",
-        "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS hors_rapport_journalier BOOLEAN",
+        "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS dans_rapport_journalier BOOLEAN",
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS statut_rapprochement VARCHAR(20)",
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS confiance VARCHAR(10)",
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS score_rapprochement INTEGER",
@@ -4732,10 +4732,10 @@ def carburant_rapport_jour(
                 return "propane" if acts == {"propane"} else "carburant"
             return "carburant"
         deps = [x for x in deps if _act_dep(x) == activite]
-    # Dépenses que la direction a choisi de garder hors du rapport journalier :
-    # listées à part, elles n'entrent dans aucun total du jour.
-    deps_hors = [x for x in deps if getattr(x, "hors_rapport_journalier", None)]
-    deps = [x for x in deps if not getattr(x, "hors_rapport_journalier", None)]
+    # Seules les dépenses que la direction a ajoutées (« + ») comptent dans le
+    # rapport journalier ; les autres sont listées à part, hors des totaux.
+    deps_hors = [x for x in deps if getattr(x, "dans_rapport_journalier", None) is not True]
+    deps = [x for x in deps if getattr(x, "dans_rapport_journalier", None) is True]
     def _source_dep(x):
         if x.produit:
             return x.produit.nom
@@ -7040,8 +7040,8 @@ class DepenseIn(BaseModel):
     notes:        Optional[str] = None
     produit_id:   Optional[int] = None   # caisse d'origine (Gazoline/Diesel) — None = generale
     pompiste_id:  Optional[int] = None   # employé (pompiste) qui a fait la dépense
-    # Réponse à « Mettre cette dépense dans le rapport journalier ? »
-    dans_rapport_journalier: bool = True
+    # Ajoutée au rapport journalier ? Non par défaut : la direction choisit (« + »)
+    dans_rapport_journalier: bool = False
 
 class DepensePatch(BaseModel):
     categorie:    Optional[str]   = None
@@ -7108,7 +7108,7 @@ def lister_depenses(
                 "rapport_pompiste_id": getattr(d, "rapport_pompiste_id", None),
                 "pompiste_id": d.pompiste_id,
                 "pompiste_nom": f"{d.pompiste.prenom} {d.pompiste.nom}".strip() if d.pompiste else None,
-                "dans_rapport_journalier": not d.hors_rapport_journalier,
+                "dans_rapport_journalier": d.dans_rapport_journalier is True,
                 "saisi_par_nom": (d.saisi_par.nom_complet or d.saisi_par.username) if getattr(d, "saisi_par", None) else None,
             }
             for d in depenses
@@ -7145,7 +7145,7 @@ def creer_depense(data: DepenseIn, request: Request, db: Session = Depends(get_d
         beneficiaire=beneficiaire, reference=data.reference, notes=data.notes,
         produit_id=produit.id if produit else None,
         saisi_par_id=getattr(getattr(request.state, "user", None), "id", None),
-        hors_rapport_journalier=(not data.dans_rapport_journalier) or None,
+        dans_rapport_journalier=bool(data.dans_rapport_journalier),
     )
     db.add(d)
 
@@ -7205,9 +7205,9 @@ def modifier_depense(depense_id: int, data: DepensePatch, request: Request, db: 
             raise HTTPException(400, "Pompiste introuvable.")
         d.pompiste_id = data.pompiste_id
     if data.dans_rapport_journalier is not None:
-        d.hors_rapport_journalier = (not data.dans_rapport_journalier) or None
+        d.dans_rapport_journalier = bool(data.dans_rapport_journalier)
     db.commit()
-    return {"message": "Dépense mise à jour.", "dans_rapport_journalier": not d.hors_rapport_journalier}
+    return {"message": "Dépense mise à jour.", "dans_rapport_journalier": d.dans_rapport_journalier is True}
 
 @app.delete("/api/depenses/{depense_id}")
 def supprimer_depense(depense_id: int, db: Session = Depends(get_db)):
