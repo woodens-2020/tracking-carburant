@@ -208,7 +208,7 @@ def construire_lignes(db: Session, debut: Optional[date_type], fin: Optional[dat
     # confirmée, envoyée aux Dépenses) — au même moment que dans le Rapport
     # journalier, comme les meeters confirmés entrent aussitôt dans les ventes.
     from models import RapportPompiste
-    for d in per_date(db.query(Depense).filter(Depense.rapport_pompiste_id.isnot(None)), Depense.date_depense).all():
+    for d in per_date(db.query(Depense).filter(Depense.rapport_pompiste_id.isnot(None), Depense.dans_rapport_journalier.is_(True)), Depense.date_depense).all():
         rap = db.get(RapportPompiste, d.rapport_pompiste_id)
         if not rap:
             continue
@@ -218,7 +218,7 @@ def construire_lignes(db: Session, debut: Optional[date_type], fin: Optional[dat
             description=f"{d.description} — payée par {pomp} sur ses ventes", reference=d.reference,
             module="Station", saisi_par=_nom(d.saisi_par), saisi_le=d.created_at, lien="depenses",
             detail={"rapport_pompiste_id": rap.id, "notes": d.notes, "hors_caisse": True}))
-    for d in per_date(db.query(Depense).filter(Depense.rapport_pompiste_id.is_(None)), Depense.date_depense).all():
+    for d in per_date(db.query(Depense).filter(Depense.rapport_pompiste_id.is_(None), Depense.dans_rapport_journalier.is_(True)), Depense.date_depense).all():
         transfert = _est_categorie_transfert(db, d.categorie)
         out.append(_ligne(
             f"DEP-{d.id}", d.date_depense, "transfert" if transfert else "depense", d.montant,
@@ -333,7 +333,7 @@ def controles(db: Session, debut: date_type, fin: date_type, lignes: list,
     sources = sum(float(e.montant) for e in db.query(EntreeCaisse).filter(
         EntreeCaisse.date_entree >= debut, EntreeCaisse.date_entree <= fin, EntreeCaisse.annulee.is_(False)).all())
     from models import Depense, RapportPompiste
-    dpp = db.query(Depense).filter(Depense.rapport_pompiste_id.isnot(None),
+    dpp = db.query(Depense).filter(Depense.rapport_pompiste_id.isnot(None), Depense.dans_rapport_journalier.is_(True),
                                    Depense.date_depense >= debut, Depense.date_depense <= fin).all()
     dpp_tout = sum(float(x.montant) for x in dpp if db.get(RapportPompiste, x.rapport_pompiste_id))
     attendu_d = round(syn["synthese"]["total_entrees"] + sources - dpp_tout, 2)

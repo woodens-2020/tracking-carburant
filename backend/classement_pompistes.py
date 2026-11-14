@@ -64,7 +64,7 @@ def classement(db: Session, d0: date_type, d1: date_type) -> dict:
         totaux[fam]["gallons"] += g; totaux[fam]["montant"] += mt
     # Dépenses : attribuées au pompiste, sinon au pompiste du rapport qui les a payées
     emp_du_compte = {}
-    for d in db.query(Depense).filter(Depense.date_depense >= d0, Depense.date_depense <= d1).all():
+    for d in db.query(Depense).filter(Depense.date_depense >= d0, Depense.date_depense <= d1, Depense.dans_rapport_journalier.is_(True)).all():
         eid = d.pompiste_id
         if eid is None and d.rapport_pompiste_id:
             rap = db.get(RapportPompiste, d.rapport_pompiste_id)

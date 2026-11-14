@@ -24,7 +24,7 @@ def _donnees(client):
                                                           "prix_gallon": 100, "metter_avant": av, "metter_apres": ap})
         assert r.status_code in (200, 201), r.text
     for cat, m, d in (("Electricite", 800, J2), ("Electricite", 200, J0), ("Dépot_en_Banque", 2000, J2)):
-        assert client.post("/api/depenses", headers=H, json={"categorie": cat, "description": "bi", "montant": m,
+        assert client.post("/api/depenses", headers=H, json={"dans_rapport_journalier": True, "categorie": cat, "description": "bi", "montant": m,
                                                              "date_depense": d}).status_code in (200, 201)
     return pid, nom
 

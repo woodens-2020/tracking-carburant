@@ -140,7 +140,7 @@ def test_depot_banque_est_un_transfert_pas_une_charge(client):
     jour = "2026-07-15"
     for cat, montant in (("Dépot_en_Banque", 1000), ("Electricite", 200)):
         r = client.post("/api/depenses", headers=H, json={
-            "categorie": cat, "description": "test", "montant": montant, "date_depense": jour})
+            "categorie": cat, "description": "test", "montant": montant, "date_depense": jour, "dans_rapport_journalier": True})
         assert r.status_code in (200, 201), r.text
     d = client.get(f"/api/caisse/rapport?date_debut={jour}&date_fin={jour}", headers=H).json()
     assert d["depenses"]["total"] == 200
