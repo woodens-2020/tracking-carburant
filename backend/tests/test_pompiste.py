@@ -457,14 +457,15 @@ def test_depenses_et_dollars(client):
     assert r.status_code == 200 and r.json()["depenses"][0]["vers_depenses"] is True
     assert mes_depenses() == []
     rj = client.get(f"/api/carburant/rapport-jour?date={jour}", headers=H).json()
-    assert not [x for x in rj["depenses"]["liste"] if x["reference"] == f"RP{rid}-1"]
+    assert not [x for x in rj["depenses"]["liste"] + rj["depenses"]["hors_rapport"] if x["reference"] == f"RP{rid}-1"]
     assert _sup(client, rid, "ecart", confirme=True).status_code == 200
     assert _sup(client, rid, "finaliser", note=7, commentaire="Il manque 5 250 G").status_code == 200
     # Finalisé : elle est dans les Dépenses et le rapport du jour, marquée « payée par le pompiste »
     assert [(x["montant"], x["rapport_pompiste_id"]) for x in mes_depenses()] == [(1500, rid)]
     assert "autorisée par M. Pierre" in mes_depenses()[0]["notes"]
     rj = client.get(f"/api/carburant/rapport-jour?date={jour}", headers=H).json()
-    lj = [x for x in rj["depenses"]["liste"] if x["reference"] == f"RP{rid}-1"]
+    # Sur la feuille du rapport journalier, en attente du choix de la direction (« + »)
+    lj = [x for x in rj["depenses"]["hors_rapport"] if x["reference"] == f"RP{rid}-1"]
     assert len(lj) == 1 and lj[0]["pompiste"] and lj[0]["source"].startswith("Payée par le pompiste")
     # Après finalisation, la flèche marche encore (retirer puis renvoyer)
     _sup(client, rid, "depenses/0/envoyer", envoyer=False); assert mes_depenses() == []
@@ -1126,7 +1127,8 @@ def test_depense_pompiste_meme_moment_partout(client):
         cp = client.get(f"/api/caisse-principale/journal?date_debut={d}&date_fin={d}", headers=H).json()
         dpp = [l for l in cp["lignes"] if l["type"] == "depense_pompiste" and (l.get("detail") or {}).get("rapport_pompiste_id") == rid]
         return (sum(float(x["montant"]) for x in deps if x.get("rapport_pompiste_id") == rid),
-                sum(x["montant"] for x in rj["depenses"]["liste"] if x["pompiste"] and x["montant"] == 908),
+                sum(x["montant"] for x in rj["depenses"]["liste"] + rj["depenses"]["hors_rapport"]   # sur la feuille du jour
+                        if x["pompiste"] and x["montant"] == 908),
                 sum(abs(l["debit"]) for l in dpp)), cp
     assert partout()[0] == (0, 0, 0)                     # confirmée, pas finalisée : nulle part
     _sup(client, rid, "billetterie", confirme=True); _sup(client, rid, "ecart", confirme=True)

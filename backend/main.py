@@ -417,6 +417,8 @@ from smart_meter import router as smart_meter_router
 app.include_router(smart_meter_router)
 from transfert_station import router as transfert_router
 app.include_router(transfert_router)
+from archive_rapports import router as archive_rapports_router
+app.include_router(archive_rapports_router)
 app.include_router(caisse_principale_router)
 
 
@@ -623,6 +625,7 @@ def startup():
         "ALTER TABLE rapports_pompiste ADD COLUMN IF NOT EXISTS suppression JSON",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL",
+        "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS dans_rapport_journalier BOOLEAN",
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS statut_rapprochement VARCHAR(20)",
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS confiance VARCHAR(10)",
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS score_rapprochement INTEGER",
@@ -2232,7 +2235,9 @@ class ReleveIn(BaseModel):
 
 
 # Tolérance d'arrondi sur la continuité des compteurs (gallons)
-TOLERANCE_ECART_COMPTEUR = 0.001
+# Index à 3 décimales : tout écart d'au moins 0,001 gal est un vrai écart
+# (demande de la direction : aucun écart ne doit passer inaperçu).
+TOLERANCE_ECART_COMPTEUR = 0.0005
 MOTIF_ECART_MIN_CARACTERES = 5
 
 
@@ -4131,7 +4136,7 @@ def _build_journal_entries(
             # Bug 2 fix : NE PAS mettre à jour pompe_last — ap est corrompu.
             # On conserve la dernière référence valide connue.
 
-        elif decalage is not None and decalage < -0.001:
+        elif decalage is not None and decalage < -TOLERANCE_ECART_COMPTEUR:
             statut        = "erreur"
             type_anomalie = "recul_compteur"
             commentaire   = (
@@ -4146,7 +4151,7 @@ def _build_journal_entries(
             )
             pompe_last[pid] = ap
 
-        elif decalage is not None and decalage > 0.001:
+        elif decalage is not None and decalage > TOLERANCE_ECART_COMPTEUR:
             statut        = "alerte"
             type_anomalie = "saut_compteur"
             commentaire   = (
@@ -4225,10 +4230,11 @@ def _build_journal_entries(
                     "le":          x.resolu_le.isoformat() if x.resolu_le else None,
                 }
 
-    # Certifié : compteur continu (ou écart résolu) et, pour un relevé venu
-    # d'un rapport pompiste, rapport finalisé.
+    # Certifié : compteur parfaitement continu et, pour un relevé venu d'un
+    # rapport pompiste, rapport finalisé. Un écart ou un saut, même justifié
+    # (« résolu ») ou corrigé par la direction, ne reçoit jamais le sceau.
     for e in entries:
-        e["certifie"] = (not e["en_attente"] and e["statut"] in ("ok", "resolu")
+        e["certifie"] = (not e["en_attente"] and e["statut"] == "ok"
                          and (e["source"] != "pompiste" or e["rapport_statut"] in ("CONFIRME", "RESOLU")))
 
     # Index écrits sur la mauvaise ligne : le moteur de placement signale le
@@ -4729,6 +4735,10 @@ def carburant_rapport_jour(
                 return "propane" if acts == {"propane"} else "carburant"
             return "carburant"
         deps = [x for x in deps if _act_dep(x) == activite]
+    # Seules les dépenses que la direction a ajoutées (« + ») comptent dans le
+    # rapport journalier ; les autres sont listées à part, hors des totaux.
+    deps_hors = [x for x in deps if getattr(x, "dans_rapport_journalier", None) is not True]
+    deps = [x for x in deps if getattr(x, "dans_rapport_journalier", None) is True]
     def _source_dep(x):
         if x.produit:
             return x.produit.nom
@@ -4740,7 +4750,9 @@ def carburant_rapport_jour(
             return f"Payée par le pompiste {nom}".strip()
         return "Caisse principale"
 
-    depenses_liste = [{
+    def _dep_ligne(x):
+        return {
+        "id":           x.id,
         "categorie":    x.categorie or "—",
         "description":  x.description or "",
         "source":       _source_dep(x),
@@ -4750,7 +4762,9 @@ def carburant_rapport_jour(
         "produit_id":   x.produit_id,
         "beneficiaire": x.beneficiaire or "",
         "est_transfert": _est_categorie_transfert(db, x.categorie),
-    } for x in deps]
+        }
+    depenses_liste = [_dep_ligne(x) for x in deps]
+    depenses_hors_rapport = [_dep_ligne(x) for x in deps_hors]
     tot_dep = sum((_D(str(x.montant)) for x in deps), _D("0"))
 
     disponible_jour = tot_ent_m - tot_dep
@@ -4806,6 +4820,9 @@ def carburant_rapport_jour(
             "nb":               len(depenses_liste),
             "total":            float(tot_dep),
             "total_generale":   float(dep_generale),
+            # Gardées hors du rapport journalier par la direction (non comptées)
+            "hors_rapport":       depenses_hors_rapport,
+            "total_hors_rapport": round(sum(x["montant"] for x in depenses_hors_rapport), 2),
         },
         "disponible":            float(disponible_jour),
         "disponible_par_produit": disponible_par_produit,
@@ -7026,6 +7043,8 @@ class DepenseIn(BaseModel):
     notes:        Optional[str] = None
     produit_id:   Optional[int] = None   # caisse d'origine (Gazoline/Diesel) — None = generale
     pompiste_id:  Optional[int] = None   # employé (pompiste) qui a fait la dépense
+    # Ajoutée au rapport journalier ? Non par défaut : la direction choisit (« + »)
+    dans_rapport_journalier: bool = False
 
 class DepensePatch(BaseModel):
     categorie:    Optional[str]   = None
@@ -7039,6 +7058,7 @@ class DepensePatch(BaseModel):
     caisse_generale: Optional[bool] = None  # true = detacher explicitement la caisse (produit_id -> NULL)
     pompiste_id:  Optional[int]   = None
     sans_pompiste: Optional[bool] = None    # true = la dépense n'est plus attribuée à un pompiste
+    dans_rapport_journalier: Optional[bool] = None
 
 @app.get("/api/depenses")
 def lister_depenses(
@@ -7091,6 +7111,7 @@ def lister_depenses(
                 "rapport_pompiste_id": getattr(d, "rapport_pompiste_id", None),
                 "pompiste_id": d.pompiste_id,
                 "pompiste_nom": f"{d.pompiste.prenom} {d.pompiste.nom}".strip() if d.pompiste else None,
+                "dans_rapport_journalier": d.dans_rapport_journalier is True,
                 "saisi_par_nom": (d.saisi_par.nom_complet or d.saisi_par.username) if getattr(d, "saisi_par", None) else None,
             }
             for d in depenses
@@ -7127,6 +7148,7 @@ def creer_depense(data: DepenseIn, request: Request, db: Session = Depends(get_d
         beneficiaire=beneficiaire, reference=data.reference, notes=data.notes,
         produit_id=produit.id if produit else None,
         saisi_par_id=getattr(getattr(request.state, "user", None), "id", None),
+        dans_rapport_journalier=bool(data.dans_rapport_journalier),
     )
     db.add(d)
 
@@ -7185,8 +7207,10 @@ def modifier_depense(depense_id: int, data: DepensePatch, request: Request, db: 
         if not db.get(Employe, data.pompiste_id):
             raise HTTPException(400, "Pompiste introuvable.")
         d.pompiste_id = data.pompiste_id
+    if data.dans_rapport_journalier is not None:
+        d.dans_rapport_journalier = bool(data.dans_rapport_journalier)
     db.commit()
-    return {"message": "Dépense mise à jour."}
+    return {"message": "Dépense mise à jour.", "dans_rapport_journalier": d.dans_rapport_journalier is True}
 
 @app.delete("/api/depenses/{depense_id}")
 def supprimer_depense(depense_id: int, db: Session = Depends(get_db)):

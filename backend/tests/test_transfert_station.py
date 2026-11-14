@@ -147,3 +147,46 @@ def test_deux_lignes_jamais_sur_le_meme_meeter(client):
     r = p.post(f"/api/pompiste-supervision/rapports/{rid}/transfert", json={"espace_id": eid, "motif": "Mauvaise station",
                "lignes": {str(k): v for k, v in props.items()}})
     assert r.status_code == 200, r.text
+
+
+def test_relais_fusionne_dans_le_rapport_finalise(client, db):
+    """Deux pompistes se relaient sur le même meeter au même créneau : la ligne
+    du second rejoint le rapport (finalisé) du premier, journal mis à jour."""
+    from tz_utils import today_haiti
+    from models import RapportPompiste
+    ns = time.time_ns()
+    jour = str(today_haiti() - timedelta(days=7))
+    pid = client.post("/api/produits", headers=H, json={"nom": f"Diesel RL{ns}", "prix_gallon": 800}).json()["id"]
+    p1, q1 = [client.post(f"/api/produits/{pid}/pompes", headers=H, json={"nom": n}).json()["id"] for n in ("D1", "D2")]
+    def pomp(n):
+        c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": n, "nom": f"RL{ns}"}).json()
+        x = _c(); x.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]}); return x
+    a, b = pomp("Myrtha"), pomp("Mireille")
+    assert a.post("/api/pompiste/compteurs", json={"date": jour, "periode": "Matin", "charte_acceptee": True, "lignes": [
+        {"pompe_id": p1, "metter_avant": 73754.428, "metter_apres": 73763.478, "debut_confirme": True}]}).status_code == 201
+    ra = a.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 7}], "depenses": []}).json()["id"]
+    sup = lambda r, act, **b: client.post(f"/api/pompiste-supervision/rapports/{r}/{act}", headers=H, json=b)
+    assert sup(ra, f"lignes/{p1}/confirmer", metter_avant=73754.428, metter_apres=73763.478).status_code == 200
+    assert sup(ra, "billetterie", confirme=True).status_code == 200 and sup(ra, "ecart", confirme=True).status_code == 200
+    assert sup(ra, "finaliser", note=8, commentaire="ok").status_code == 200, sup(ra, "finaliser", note=8, commentaire="ok").text
+    # Le second rapport du même créneau (arrivé là par transfert) : même meeter, suite exacte, + un autre meeter
+    assert b.post("/api/pompiste/compteurs", json={"date": jour, "periode": "Apres-midi", "charte_acceptee": True, "lignes": [
+        {"pompe_id": p1, "metter_avant": 73763.478, "metter_apres": 73787.97, "debut_confirme": True},
+        {"pompe_id": q1, "metter_avant": 100.5, "metter_apres": 120.5, "debut_confirme": True}]}).status_code == 201
+    rb = b.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 36}], "depenses": []}).json()["id"]
+    x = db.get(RapportPompiste, rb); x.periode = "Matin"; db.commit()
+    d = next(r for r in client.get("/api/pompiste-supervision/rapports?statut=SOUMIS", headers=H).json() if r["id"] == rb)
+    assert d["conflits"] and d["fusions"][0]["vers_rapport_id"] == ra and d["fusions"][0]["resultat"] == [73754.428, 73787.97]
+    assert sup(rb, f"lignes/{p1}/confirmer", metter_avant=73763.478, metter_apres=73787.97).status_code == 409
+    assert sup(rb, f"lignes/{p1}/fusionner", vers_rapport_id=ra, motif="x").status_code == 400
+    r = sup(rb, f"lignes/{p1}/fusionner", vers_rapport_id=ra, motif="Relais Myrtha → Mireille sur le même meeter")
+    assert r.status_code == 200, r.text
+    assert [l["pompe_id"] for l in r.json()["lignes"]] == [q1] and r.json()["conflits"] == []
+    assert r.json()["montant_attendu"] == 20 * 800
+    fa = next(r for r in client.get("/api/pompiste-supervision/rapports?statut=CONFIRME,RESOLU", headers=H).json() if r["id"] == ra)
+    la = fa["lignes"][0]
+    assert (la["metter_avant"], la["metter_apres"]) == (73754.428, 73763.478)                 # saisie de Myrtha gardée
+    assert (la["metter_avant_corrige"], la["metter_apres_corrige"]) == (73754.428, 73787.97)
+    j = [e for e in client.get(f"/api/journal?date_debut={jour}&date_fin={jour}", headers=H).json()["entries"] if e["pompe_id"] == p1]
+    assert len(j) == 1 and (j[0]["metter_avant"], j[0]["metter_apres"]) == (73754.428, 73787.97)
+    assert sup(rb, f"lignes/{q1}/confirmer", metter_avant=100.5, metter_apres=120.5).status_code == 200

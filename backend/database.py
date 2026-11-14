@@ -471,6 +471,8 @@ def _migrate_columns():
              "ALTER TABLE depenses ADD COLUMN saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
             ("depenses", "pompiste_id",
              "ALTER TABLE depenses ADD COLUMN pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL", None),
+            ("depenses", "dans_rapport_journalier",
+             "ALTER TABLE depenses ADD COLUMN dans_rapport_journalier BOOLEAN", None),
             ("achats", "saisi_par_id",
              "ALTER TABLE achats ADD COLUMN saisi_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
         ]
@@ -675,6 +677,8 @@ def _migrate_columns():
              "ALTER TABLE releves ADD COLUMN metter_apres_saisi NUMERIC(14,4)", None),
             ("depenses", "pompiste_id",
              "ALTER TABLE depenses ADD COLUMN pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL", None),
+            ("depenses", "dans_rapport_journalier",
+             "ALTER TABLE depenses ADD COLUMN dans_rapport_journalier BOOLEAN", None),
             ("rapports_pompiste_lignes", "statut_rapprochement",
              "ALTER TABLE rapports_pompiste_lignes ADD COLUMN statut_rapprochement VARCHAR(20)", None),
             ("rapports_pompiste_lignes", "confiance",

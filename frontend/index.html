@@ -513,6 +513,15 @@ canvas{display:block}
 .dep-date-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .dep-date-row input{flex:1;min-width:140px}
 .dep-caisses{display:flex;gap:6px;flex-wrap:wrap}
+.cjr-choix{width:46px;text-align:center}
+.cjr-pm{width:30px;height:30px;border-radius:50%;border:1.5px dashed var(--orange,#f59e0b);background:transparent;color:var(--orange,#f59e0b);font-size:19px;font-weight:800;line-height:1;cursor:pointer}
+.cjr-pm:hover{background:rgba(245,158,11,.15)}
+.cjr-pm-on{border:1.5px solid var(--green,#22c55e);background:rgba(34,197,94,.15);color:var(--green,#22c55e);font-size:15px}
+.cjr-pm-on:hover{background:rgba(239,68,68,.15);border-color:var(--red,#ef4444);color:var(--red,#ef4444)}
+tr.cjr-hors td{opacity:.62}
+tr.cjr-hors td.cjr-choix{opacity:1}
+.cjr-tag-hors{background:rgba(245,158,11,.14);color:var(--orange,#f59e0b)}
+.cjr-a-choisir{margin:0 0 8px;padding:9px 12px;border-radius:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);font-size:13.5px}
 .dep-caisses[hidden]{display:none}
 .dep-source{display:flex;align-items:center;height:38px;padding:0 12px;border-radius:8px;border:1px solid var(--border2);background:var(--panel2);font-weight:600;color:var(--text)}
 .dep-chip{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.75);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
@@ -16755,7 +16764,7 @@ function _cjrConstruire(){
   const filtreDepenses = !!(fCat||fBen||fType);
   // ventes[carburant] = {g, m} : Gazoline et Diesel, toutes périodes confondues
   const ventes={};
-  const jours=[], depenses=[];
+  const jours=[], depenses=[], horsRapport=[];
   const tg={}; let tm=0, tdc=0, tdt=0;
   for(const d of _cjrJours){
     const jg={}; let jm=0, jdc=0, jdt=0;
@@ -16769,17 +16778,22 @@ function _cjrConstruire(){
         _cjrAjF(jg, f, p.gallons); _cjrAjF(tg, f, p.gallons); jm+=p.montant;
       }
     }
-    for(const x of (d.depenses.liste||[])){
+    const garde = x => {
       const src=x.source||'Caisse principale';
-      if(fProd==='__generale' && src!=='Caisse principale') continue;
-      if(fProd && fProd!=='__generale' && src!==fProd) continue;
-      if(fType==='charges' && x.est_transfert) continue;
-      if(fType==='transferts' && !x.est_transfert) continue;
-      if(fCat && x.categorie!==fCat) continue;
-      if(fBen && (x.beneficiaire||'')!==fBen) continue;
+      if(fProd==='__generale' && src!=='Caisse principale') return false;
+      if(fProd && fProd!=='__generale' && src!==fProd) return false;
+      if(fType==='charges' && x.est_transfert) return false;
+      if(fType==='transferts' && !x.est_transfert) return false;
+      if(fCat && x.categorie!==fCat) return false;
+      if(fBen && (x.beneficiaire||'')!==fBen) return false;
+      return true;
+    };
+    for(const x of (d.depenses.liste||[])){
+      if(!garde(x)) continue;
       depenses.push({...x, date:d.date});
       if(x.est_transfert) jdt+=x.montant; else jdc+=x.montant;
     }
+    for(const x of (d.depenses.hors_rapport||[])) if(garde(x)) horsRapport.push({...x, date:d.date});
     jours.push({date:d.date, gallons:jg, ventes:jm, charges:jdc, transferts:jdt, solde:jm-jdc-jdt});
     tm+=jm; tdc+=jdc; tdt+=jdt;
   }
@@ -16788,7 +16802,7 @@ function _cjrConstruire(){
     .sort((a,b)=>_cjrRangFam(a.nom)-_cjrRangFam(b.nom));
   return {
     debut:_cjrJours[0]?.date, fin:_cjrJours[_cjrJours.length-1]?.date, unJour:_cjrJours.length===1,
-    jours, familles, depenses, filtreDepenses,
+    jours, familles, depenses, horsRapport, filtreDepenses,
     totaux:{gallons:tg, ventes:tm, charges:tdc, transferts:tdt, depenses:tdc+tdt, solde:tm-tdc-tdt},
     filtres:{
       liste:[
@@ -16886,24 +16900,36 @@ function cjrAfficher(){
     ? `<div class="cjr-filtres-actifs">Filtres actifs : ${m.filtres.liste.map(f=>`<b>${esc(f)}</b>`).join(' · ')}
         <button type="button" class="sx-link" onclick="cjrReinitialiserFiltres()">tout effacer</button></div>` : '';
 
-  const lignesD = m.depenses.map(x=>`<tr>
+  // Toutes les dépenses de la sélection sur la même feuille : celles qui sont
+  // dans le rapport (✓, bouton − pour les retirer) et les autres (bouton +
+  // pour les ajouter). Seules les premières comptent dans les totaux.
+  const toutes = [...m.depenses.map(x=>({...x, dans:true})), ...m.horsRapport.map(x=>({...x, dans:false}))]
+    .sort((a,b)=> a.date<b.date?-1 : a.date>b.date?1 : (a.id||0)-(b.id||0));
+  const lignesD = toutes.map(x=>`<tr class="${x.dans?'':'cjr-hors'}">
+      <td class="cjr-choix">${x.id
+        ? (x.dans
+          ? `<button type="button" class="cjr-pm cjr-pm-on" title="Dans le rapport — cliquez pour la retirer" aria-label="Retirer du rapport" onclick="cjrDepenseDansRapport(${x.id}, false)">✓</button>`
+          : `<button type="button" class="cjr-pm" title="Pas dans le rapport — cliquez pour l'ajouter" aria-label="Ajouter au rapport" onclick="cjrDepenseDansRapport(${x.id}, true)">+</button>`)
+        : ''}</td>
       ${m.unJour?'':`<td class="num">${frDate(x.date)}</td>`}
       <td>${esc(x.categorie)}</td>
-      <td>${esc(x.description||'')}${x.reference?` <span class="c-muted">· ${esc(x.reference)}</span>`:''}</td>
+      <td>${esc(x.description||'')}${x.reference?` <span class="c-muted">· ${esc(x.reference)}</span>`:''}${x.dans?'':' <span class="cjr-tag cjr-tag-hors">Pas dans le rapport</span>'}</td>
       <td>${esc(x.beneficiaire||'—')}</td>
       <td>${esc(x.source||'Caisse principale')}</td>
       <td>${x.est_transfert?'<span class="cjr-tag cjr-tag-tr">Transfert</span>':'<span class="cjr-tag">Charge</span>'}</td>
-      <td class="tr num c-amber"><strong>${cjrG(x.montant)}</strong></td>
+      <td class="tr num ${x.dans?'c-amber':'c-muted'}">${x.dans?`<strong>${cjrG(x.montant)}</strong>`:cjrG(x.montant)}</td>
     </tr>`).join('');
-  const nbColD = m.unJour ? 5 : 6;   // colonnes avant « Montant »
+  const nbColD = m.unJour ? 6 : 7;   // colonnes avant « Montant »
+  const nbHors = m.horsRapport.length, totHors = m.horsRapport.reduce((a,x)=>a+x.montant,0);
   const tableDep = `
+    ${nbHors?`<div class="cjr-a-choisir">${nbHors} dépense(s) pas encore dans le rapport (${cjrG(totHors)}) : cliquez sur <b>+</b> pour ajouter celles qui vont dans le rapport.</div>`:''}
     <div class="tbl-wrap"><table class="dt cjr-table">
-      <thead><tr>${m.unJour?'':'<th>Date</th>'}<th>Catégorie</th><th>Description</th><th>Bénéficiaire</th><th>Caisse</th><th>Type</th><th class="tr">Montant</th></tr></thead>
+      <thead><tr><th title="Dans le rapport ?">Rapport</th>${m.unJour?'':'<th>Date</th>'}<th>Catégorie</th><th>Description</th><th>Bénéficiaire</th><th>Caisse</th><th>Type</th><th class="tr">Montant</th></tr></thead>
       <tbody>${lignesD || `<tr><td colspan="${nbColD+1}" class="empty" style="padding:14px">Aucune dépense sur cette sélection</td></tr>`}</tbody>
       ${lignesD?`<tfoot>
         ${t.transferts&&t.charges?`<tr><td colspan="${nbColD}">Charges</td><td class="tr num">${cjrG(t.charges)}</td></tr>
         <tr><td colspan="${nbColD}">Transferts (dépôt en banque, Zelle…)</td><td class="tr num">${cjrG(t.transferts)}</td></tr>`:''}
-        <tr class="recap-total"><td colspan="${nbColD}">TOTAL DÉPENSES</td><td class="tr num c-amber">${cjrG(t.depenses)}</td></tr></tfoot>`:''}
+        <tr class="recap-total"><td colspan="${nbColD}">TOTAL DÉPENSES DANS LE RAPPORT</td><td class="tr num c-amber">${cjrG(t.depenses)}</td></tr></tfoot>`:''}
     </table></div>`;
 
   const tableJours = m.unJour ? '' : `
@@ -16948,6 +16974,35 @@ function cjrAfficher(){
     <h3 class="cjr-h">Dépenses</h3>
     <div class="cjr-note">« Caisse principale » = dépense non attribuée à un produit. Les transferts (dépôt en banque, Zelle) sortent de la caisse mais ne sont pas des charges.</div>
     ${tableDep}`;
+}
+// « + » / « ✓ » : la dépense passe tout de suite d'une liste à l'autre (totaux
+// recalculés sur place, sans recharger la page ni message) ; l'enregistrement
+// part en arrière-plan. En cas d'échec seulement, on revient en arrière.
+function _cjrDeplacerDepense(id, inclure){
+  for(const d of _cjrJours){
+    const de = d.depenses, src = inclure ? (de.hors_rapport ||= []) : (de.liste ||= []), dst = inclure ? (de.liste ||= []) : (de.hors_rapport ||= []);
+    const k = src.findIndex(x => x.id === id);
+    if(k < 0) continue;
+    const [x] = src.splice(k, 1); dst.push(x); dst.sort((a,b) => (a.id||0) - (b.id||0));
+    const sgn = inclure ? 1 : -1;
+    de.total = Math.round(((de.total||0) + sgn*x.montant)*100)/100;
+    de.total_hors_rapport = Math.round(((de.total_hors_rapport||0) - sgn*x.montant)*100)/100;
+    return true;
+  }
+  return false;
+}
+function _cjrReafficher(){ const y = window.scrollY; cjrAfficher(); window.scrollTo(0, y); }
+const _cjrEnvois = {};
+async function cjrDepenseDansRapport(id, inclure){
+  if(!_cjrDeplacerDepense(id, inclure)) return;
+  _cjrReafficher();
+  const n = (_cjrEnvois[id] = (_cjrEnvois[id]||0) + 1);
+  try{ await PUT('/depenses/'+id, {dans_rapport_journalier: !!inclure}); }
+  catch(e){
+    if(_cjrEnvois[id] !== n) return;          // un clic plus récent a déjà pris le relais
+    _cjrDeplacerDepense(id, !inclure); _cjrReafficher();
+    notify('Dépense non enregistrée : ' + e.message, 'err');
+  }
 }
 
 
@@ -18461,12 +18516,26 @@ function _sfCarte(s){
       <span style="font-size:18px;color:var(--muted);transform:rotate(${ouv?180:0}deg);transition:transform .2s">⌄</span>
     </div>
     ${!ouv?`<div class="sf-actions">
+      <button class="btn btn-secondary psp-mini" onclick="_sfRenommer(${s.id})" title="Changer le nom de cette station">✏️ Renommer</button>
       ${s.telephone?`<a class="btn btn-secondary psp-mini" href="${_sfTel(s.telephone)}">📞 ${esc(s.telephone)}</a>`:''}
       ${s.email?`<a class="btn btn-secondary psp-mini" href="mailto:${esc(s.email)}">✉️ ${esc(s.email)}</a>`:''}
       ${s.urgence_telephone?`<a class="btn psp-mini sf-urg" href="${_sfTel(s.urgence_telephone)}">🚨 Urgence${s.urgence_nom?' · '+esc(s.urgence_nom):''}</a>`:''}
       ${c.manquants.length?`<span class="sf-manque">À compléter : ${esc(c.manquants.join(', '))}</span>`:''}
     </div>`:_sfFormulaire(s)}
   </div>`;
+}
+// Renommer une station sans ouvrir toute la fiche (nom unique, journalisé côté serveur)
+async function _sfRenommer(id){
+  const s=_SF.liste.find(x=>x.id===id); if(!s) return;
+  const nom=(window.prompt(`Nouveau nom pour la station « ${s.nom} » :`, s.nom)||'').replace(/\s+/g,' ').trim();
+  if(!nom || nom===s.nom) return;
+  if(nom.length<2) return notify('Le nom doit contenir au moins 2 caractères.','err');
+  try{
+    await PUT(`/geospatial/stations/${id}/infos`, {nom});
+    notify(`Station renommée : ${nom}.`, 'ok');
+    initStations(); if(window.GEO) GEO.dep=null;
+    await _sfCharger();
+  }catch(e){ notify(String(e.message).replace(/^\[\d+\]\s*/,''), 'err'); }
 }
 function _sfFormulaire(s){
   const ch=(k,lib,v,attr='')=>`<label class="st-champ">${lib}<input class="filter-input" id="sf-${k}-${s.id}" value="${esc(v||'')}" ${attr}></label>`;
@@ -21364,6 +21433,11 @@ function pspRendreListe(){
           <button class="btn btn-secondary psp-mini" onclick="pspPeriodeRapide(7)">7 jours</button>
           <button class="btn btn-secondary psp-mini" onclick="pspPeriodeRapide(30)">30 jours</button>
           <button class="btn btn-secondary psp-mini" onclick="pspPeriodeRapide(0)">Tout</button></div>
+      </div>
+      <div class="psp-actions">
+        <span class="psp-muted" style="align-self:center">📁 Archive de la période${f.debut||f.fin ? '' : ' (mois en cours)'} :</span>
+        <button class="btn btn-secondary psp-mini" onclick="pspArchivePeriode('zip')" title="Un PDF et un texte simple par rapport, plus les fiches papier jointes">Tout en PDF (zip)</button>
+        <button class="btn btn-secondary psp-mini" onclick="pspArchivePeriode('json')" title="Tous les rapports dans un seul fichier texte simple">Texte simple (un fichier)</button>
       </div></div>
     ${rs.length ? `<div class="psp-muted" style="margin:0 0 8px">${rs.length} rapport${rs.length>1?'s':''} · ${_pspGalProduits(rs.flatMap(r => r.lignes))} ·
         attendu ${_pspG(tot('montant_attendu_final'))} · compté ${_pspG(tot('montant_compte'))}.
@@ -21407,7 +21481,65 @@ function pspRendreDetail(r){
       <button class="btn btn-secondary" onclick="pspFermer()">← Retour à la liste</button>
       <span class="psp-muted">Rapport n°${r.id}</span></div>
     <div id="psp-r-${r.id}">${r.supprime ? pspCarteLecture(r) : r.statut === 'EN_COURS' ? pspCarteNonTermine(r)
-      : (['SOUMIS','PROBLEME'].includes(r.statut) ? pspCarte(r) : pspCarteLecture(r))}</div>`;
+      : (['SOUMIS','PROBLEME'].includes(r.statut) ? pspCarte(r) : pspCarteLecture(r))}</div>
+    ${r.statut === 'EN_COURS' ? '' : `<div class="psp-card" id="psp-archive-${r.id}"><div class="psp-muted">Chargement de l'archive…</div></div>`}`;
+  if(r.statut !== 'EN_COURS') pspArchiveCharger(r.id);
+}
+
+// ── Archive d'un rapport : PDF / texte simple (nommés <pompiste>_<date>_<période>)
+//    et fiches papier scannées jointes au rapport (renommées au même format).
+async function _pspTelecharger(path, nomParDefaut){
+  const h = {}; const k = sessionStorage.getItem('api_key'); if(k) h['X-API-Key'] = k;
+  try{
+    const r = await fetch('/api/pompiste-supervision' + path, {headers:h, credentials:'include'});
+    if(!r.ok){ const d = await r.json().catch(()=>null); throw new Error(d?.detail || ('Erreur ' + r.status)); }
+    const nom = ((r.headers.get('content-disposition')||'').match(/filename="([^"]+)"/)||[])[1] || nomParDefaut;
+    const url = URL.createObjectURL(await r.blob());
+    const a = document.createElement('a'); a.href = url; a.download = nom; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }catch(e){ notify(e.message, 'err'); }
+}
+async function pspArchiveCharger(rid){
+  const z = document.getElementById('psp-archive-' + rid); if(!z) return;
+  let fiches = [];
+  try{ fiches = await _pspApi('GET', `/rapports/${rid}/fiches`); }catch(e){ z.innerHTML = `<div class="psp-err">${esc(e.message)}</div>`; return; }
+  z.innerHTML = `<div class="psp-head"><div><b>📁 Archive du rapport</b></div></div>
+    <div class="psp-muted" style="margin-bottom:8px">Fichiers nommés automatiquement : <b>nom du pompiste_date_période</b>.</div>
+    <div class="psp-actions" style="margin-top:0">
+      <button class="btn btn-secondary" onclick="_pspTelecharger('/rapports/${rid}/pdf','rapport.pdf')">📄 Télécharger le PDF</button>
+      <button class="btn btn-secondary" onclick="_pspTelecharger('/rapports/${rid}/texte','rapport.json')">📝 Texte simple</button>
+      <label class="btn btn-primary" style="cursor:pointer">📎 Joindre la fiche papier (PDF ou photo)
+        <input type="file" accept="application/pdf,image/jpeg,image/png" multiple hidden onchange="pspArchiveJoindre(${rid}, this)"></label>
+    </div>
+    ${fiches.length ? `<table class="psp-tbl" style="margin-top:10px"><thead><tr><th>Fiche jointe</th><th>Ajoutée par</th><th class="r">Taille</th><th></th></tr></thead><tbody>
+      ${fiches.map(f => `<tr><td><button class="psp-lien" onclick="_pspTelecharger('/rapports/${rid}/fiches/${f.id}','${esc(f.nom_fichier)}')">${esc(f.nom_fichier)}</button></td>
+        <td class="psp-muted">${esc(f.ajoute_par||'—')}${f.created_at ? ' · ' + new Date(f.created_at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : ''}</td>
+        <td class="r psp-muted">${Math.max(1, Math.round(f.taille_octets/1024))} Ko</td>
+        <td class="r"><button class="psp-poubelle" onclick="pspArchiveRetirer(${rid}, ${f.id})">Retirer</button></td></tr>`).join('')}</tbody></table>`
+      : '<div class="psp-muted" style="margin-top:8px">Aucune fiche papier jointe pour ce rapport.</div>'}`;
+}
+async function pspArchiveJoindre(rid, input){
+  const files = [...(input.files || [])]; if(!files.length) return;
+  const h = {}; const k = sessionStorage.getItem('api_key'); if(k) h['X-API-Key'] = k;
+  for(const f of files){
+    const fd = new FormData(); fd.append('fichier', f);
+    try{
+      const r = await fetch(`/api/pompiste-supervision/rapports/${rid}/fiches`, {method:'POST', headers:h, credentials:'include', body:fd});
+      const d = await r.json().catch(()=>null);
+      if(!r.ok) throw new Error(d?.detail || ('Erreur ' + r.status));
+      notify(`Fiche enregistrée : ${d.nom_fichier}`, 'ok');
+    }catch(e){ notify(`${f.name} : ${e.message}`, 'err'); }
+  }
+  pspArchiveCharger(rid);
+}
+async function pspArchiveRetirer(rid, fid){
+  if(!await showConfirm('Retirer cette fiche jointe du rapport ?', {title:'Retirer la fiche', type:'danger', okLabel:'Retirer'})) return;
+  try{ await _pspApi('DELETE', `/rapports/${rid}/fiches/${fid}`); pspArchiveCharger(rid); }catch(e){ notify(e.message, 'err'); }
+}
+function pspArchivePeriode(format){
+  const f = PSP.filtre, auj = _pspIso(new Date());
+  const deb = f.debut || (f.fin || auj).slice(0, 8) + '01', fin = f.fin || auj;
+  _pspTelecharger(`/archive?date_debut=${deb}&date_fin=${fin}&format=${format}`, `Rapports_pompistes_${deb}_${fin}.${format}`);
 }
 
 function _pspMaj(r){
@@ -21838,6 +21970,21 @@ function pspAcPrendre(rid, pid, cible, val, kind){
   pspChangerPompe(rid, pid, cible);           // motif demandé, tracé, saisie du pompiste gardée
 }
 
+// Relais : le segment de cette ligne rejoint la ligne de l'autre rapport
+async function pspFusionner(rid, pompe, vers){
+  const m = prompt(`Mettre ce segment dans le rapport n°${vers} ? Ce rapport couvrira les deux segments (son journal suit), et la ligne sort de celui-ci.
+
+Motif (obligatoire) :`,
+                   'Relais entre deux pompistes sur le même meeter');
+  if(m == null) return;
+  if(m.trim().length < 5) return notify('Indiquez le motif (5 caractères minimum).', 'err');
+  try{
+    const x = await _pspApi('POST', `/rapports/${rid}/lignes/${pompe}/fusionner`, {vers_rapport_id: vers, motif: m.trim()});
+    _pspMaj(x); pspMajBadge();
+    notify(`Segment mis dans le rapport n°${vers} : montants des deux rapports recalculés.`, 'ok');
+  }catch(e){ notify(e.message, 'err'); }
+}
+
 // ── Transfert vers une autre station (voir backend/transfert_station.py) ──
 async function pspTransferer(id){
   const r = PSP.rapports.find(x => x.id === id); if(!r) return;
@@ -21971,7 +22118,10 @@ function pspCarte(r){
       <div class="psp-muted">soumis ${r.soumis_at ? new Date(r.soumis_at).toLocaleString('fr-FR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : ''} · charte acceptée</div></div>
     ${(r.conflits || []).length ? `<div class="psp-err" style="margin:0 0 10px">⛔ <b>Meeters déjà rapportés sur ce créneau par un autre rapport</b> :
       ${r.conflits.map(c => `<div>• ${esc(c)}</div>`).join('')}
-      <div style="margin-top:4px">Changez la date (✏️ à côté de la date) ou la pompe (⇄ changer de pompe) de l'un des rapports : la confirmation et la finalisation sont bloquées tant que le conflit existe.</div></div>` : ''}
+      ${(r.fusions || []).map(f => `<div style="margin-top:6px;color:var(--text)">🔗 Relais sur <b>${esc(f.pompe_nom)}</b> : ce segment suit exactement celui du rapport n°${f.vers_rapport_id} (${esc(f.vers_pompiste || '')}).
+        <button class="btn btn-primary psp-mini" style="margin-left:6px" onclick="pspFusionner(${r.id},${f.pompe_id},${f.vers_rapport_id})">🔗 Mettre dans le rapport n°${f.vers_rapport_id}</button>
+        <span class="psp-muted">→ ${_pspN(f.resultat[0])} → ${_pspN(f.resultat[1])}</span></div>`).join('')}
+      <div style="margin-top:4px">Sinon, changez la date (✏️ à côté de la date) ou la pompe (⇄ changer de pompe) de l'un des rapports : la confirmation et la finalisation sont bloquées tant que le conflit existe.</div></div>` : ''}
     ${pb ? `<div class="psp-err" style="margin:0 0 10px">Problème signalé par ${esc(r.probleme_par_nom||'')} : ${esc(r.probleme_commentaire||'')}</div>` : ''}
     ${r.note_pompiste ? `<div class="psp-warn" style="color:var(--text);margin:0 0 10px"><b>Note du pompiste :</b> ${esc(r.note_pompiste)}</div>` : ''}
 
@@ -26626,7 +26776,7 @@ function renderDepTable(data){
       <td>${_ckJoursBadge(d.jours)}</td>
       <td><span class="td-badge ${catColors[d.categorie]||'badge-gray'}">${d.categorie}</span></td>
       <td>${d.produit_nom?`<span class="td-badge ${caisseColors[d.produit_nom]||'badge-gray'}">${d.produit_nom}</span>`:'<span class="td-muted">Caisse principale</span>'}</td>
-      <td>${d.description}${d.rapport_pompiste_id?` <span class="td-badge badge-amber" title="Payée par le pompiste avec l'argent de ses ventes (rapport n°${d.rapport_pompiste_id}) : ne sort pas de la caisse principale">⛽ Payée par le pompiste</span>`:(d.sans_justificatif?' <span class="td-badge badge-red" title="Aucun document joint">⚠ Inachevée</span>':'')}</td>
+      <td>${esc(d.description||'')}${d.rapport_pompiste_id?` <span class="td-badge badge-amber" title="Payée par le pompiste avec l'argent de ses ventes (rapport n°${d.rapport_pompiste_id}) : ne sort pas de la caisse principale">⛽ Payée par le pompiste</span>`:(d.sans_justificatif?' <span class="td-badge badge-red" title="Aucun document joint">⚠ Inachevée</span>':'')}${d.dans_rapport_journalier===false?' <span class="td-badge badge-amber" title="Pas encore dans le rapport journalier : ajoutez-la avec le + sur la feuille du Rapport journalier">Pas dans le rapport journalier</span>':''}</td>
       <td class="td-muted">${d.beneficiaire||'—'}</td>
       <td class="td-amount">${_htg(d.montant)}</td>
       <td class="td-muted">${d.reference||'—'}</td>
@@ -26763,6 +26913,9 @@ async function submitDep(continuer=false){
     notes: document.getElementById('dep-notes').value.trim()||null,
     produit_id: caisseVal?parseInt(caisseVal,10):null,
   };
+  // Nouvelle dépense : pas encore dans le rapport journalier — la direction
+  // l'ajoute avec le « + » sur la feuille du rapport journalier.
+  if(!id) body.dans_rapport_journalier=false;
   const pompVal=(document.getElementById('dep-pompiste')||{}).value||'';
   if(pompVal) body.pompiste_id=parseInt(pompVal,10); else if(id) body.sans_pompiste=true;
   if(id && !caisseVal) body.caisse_generale=true;
