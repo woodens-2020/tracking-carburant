@@ -62,9 +62,9 @@ def _donnees(client):
     for d, per, av, ap in ((J1, "Matin", 0, 12.5), (J2, "Matin", 12.5, 20)):
         assert client.post("/api/releves", headers=H, json={"date": d, "periode": per, "pompe_id": pompe, "prix_gallon": 100,
                                                              "metter_avant": av, "metter_apres": ap}).status_code in (200, 201)
-    assert client.post("/api/depenses", headers=H, json={"categorie": "Electricite", "description": "ia", "montant": 300.55,
+    assert client.post("/api/depenses", headers=H, json={"dans_rapport_journalier": True, "categorie": "Electricite", "description": "ia", "montant": 300.55,
                                                          "date_depense": J2}).status_code in (200, 201)
-    assert client.post("/api/depenses", headers=H, json={"categorie": "Dépot_en_Banque", "description": "ia", "montant": 1000,
+    assert client.post("/api/depenses", headers=H, json={"dans_rapport_journalier": True, "categorie": "Dépot_en_Banque", "description": "ia", "montant": 1000,
                                                          "date_depense": J2}).status_code in (200, 201)
     return pid, nom
 

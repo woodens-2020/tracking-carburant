@@ -39,3 +39,17 @@ def test_plus_ajoute_et_retire(client):
     assert [x["id"] for x in d["hors_rapport"]] == [b]
     client.put(f"/api/depenses/{a}", headers=H, json={"dans_rapport_journalier": False})
     assert _rj(client, jour)["total"] == 0
+
+
+def test_seules_les_cochees_comptent_partout(client):
+    """Une dépense pas cochée (« + ») n'est comptée nulle part : caisse, synthèse,
+    classement des pompistes ; cochée, elle compte partout."""
+    jour = "2026-06-24"
+    caisse = lambda: client.get(f"/api/caisse/rapport?date_debut={jour}&date_fin={jour}", headers=H).json()["depenses"]["total"]
+    synth = lambda: client.get(f"/api/carburant/synthese?date_debut={jour}&date_fin={jour}", headers=H).json()
+    a0, s0 = caisse(), synth()
+    a = _creer(client, 4321, jour)
+    assert caisse() == a0 and synth()["depenses"]["total"] == s0["depenses"]["total"]
+    client.put(f"/api/depenses/{a}", headers=H, json={"dans_rapport_journalier": True})
+    assert round(caisse() - a0, 2) == 4321
+    assert round(synth()["depenses"]["total"] - s0["depenses"]["total"], 2) == 4321

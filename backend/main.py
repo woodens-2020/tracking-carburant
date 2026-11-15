@@ -4545,7 +4545,7 @@ def carburant_synthese(
     # ── Dépenses de la période (table Depense = station carburant) ────
     deps = (
         db.query(Depense)
-        .filter(Depense.date_depense >= d_debut, Depense.date_depense <= d_fin)
+        .filter(Depense.date_depense >= d_debut, Depense.date_depense <= d_fin, Depense.dans_rapport_journalier.is_(True))   # cochées seulement
         .order_by(Depense.date_depense.asc())
         .all()
     )
@@ -8012,7 +8012,7 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     total_achats = round(achats_station + achats_bar + achats_cuisine, 2)
 
     # ── Sorties : Dépenses Station ───────────────────────────────
-    q_dep = db.query(Depense)
+    q_dep = db.query(Depense).filter(Depense.dans_rapport_journalier.is_(True))   # seules les dépenses cochées (« + ») comptent
     if date_debut: q_dep = q_dep.filter(Depense.date_depense >= date_debut)
     if date_fin:   q_dep = q_dep.filter(Depense.date_depense <= date_fin)
     toutes_depenses = q_dep.all()
@@ -8260,7 +8260,7 @@ def gi_dashboard(
     # ── Dépenses (détail station, pour trend + par_categorie) ───
     depenses = (db.query(Depense)
                 .filter(Depense.date_depense >= date_debut,
-                        Depense.date_depense <= date_fin)
+                        Depense.date_depense <= date_fin, Depense.dans_rapport_journalier.is_(True))
                 .all())
     dep_par_cat: dict[str, float] = {}
     for d in depenses:
@@ -8477,7 +8477,7 @@ def get_statistiques(
     cout_achats    = sum(float(l.gallons_recus) * float(l.prix_achat_gallon) for l in livraisons)
 
     # ── Dépenses ────────────────────────────────────────────────
-    depenses = db.query(Depense).filter(Depense.date_depense >= debut, Depense.date_depense <= fin).all()
+    depenses = db.query(Depense).filter(Depense.date_depense >= debut, Depense.date_depense <= fin, Depense.dans_rapport_journalier.is_(True)).all()
     total_dep = sum(float(d.montant) for d in depenses)
 
     marge_brute      = ca_total - cout_achats

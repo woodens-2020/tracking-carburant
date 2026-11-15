@@ -32,7 +32,7 @@ def test_journal_de_caisse(client):
                      json={"source_id": src["id"], "montant": 999, "date_entree": J1}).json()
     client.post(f"/api/caisse-principale/entrees/{e2['id']}/annuler", headers=H, json={"motif": "Saisie en double"})
     for cat, m in (("Electricite", 800), ("Dépot_en_Banque", 2000)):
-        r = client.post("/api/depenses", headers=H, json={"categorie": cat, "description": "test", "montant": m,
+        r = client.post("/api/depenses", headers=H, json={"dans_rapport_journalier": True, "categorie": cat, "description": "test", "montant": m,
                                                           "date_depense": J2})
         assert r.status_code in (200, 201), r.text
     r = client.post("/api/achats", headers=H, json={"fournisseur": "Quincaillerie", "description": "Tuyau",

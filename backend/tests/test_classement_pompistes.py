@@ -34,10 +34,10 @@ def test_classement(client):
     rel(d1, "Matin", d, 2000, 2010, a)        # Anne : 10 gal diesel = 6 000
     rel(d1, "Apres-midi", g, 1100, 1300, b)   # Bob : 200 gal gazoline = 100 000
     rel(d2, "Matin", g, 1300, 1310, None)     # sans pompiste
-    r = client.post("/api/depenses", headers=H, json={"categorie": "Divers", "description": "Glace", "montant": 2500,
+    r = client.post("/api/depenses", headers=H, json={"dans_rapport_journalier": True, "categorie": "Divers", "description": "Glace", "montant": 2500,
                                                        "date_depense": d1, "pompiste_id": a})
     assert r.status_code == 201, r.text
-    client.post("/api/depenses", headers=H, json={"categorie": "Divers", "description": "Station", "montant": 999, "date_depense": d1})
+    client.post("/api/depenses", headers=H, json={"dans_rapport_journalier": True, "categorie": "Divers", "description": "Station", "montant": 999, "date_depense": d1})
     c = client.get(f"/api/pompistes/classement?date_debut={d1}&date_fin={d2}", headers=H).json()
     P = {x["pompiste"]: x for x in c["pompistes"]}
     A, B = P[f"Anne C{ns}"], P[f"Bob C{ns}"]

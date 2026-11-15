@@ -470,7 +470,11 @@ def test_depenses_et_dollars(client):
     # Après finalisation, la flèche marche encore (retirer puis renvoyer)
     _sup(client, rid, "depenses/0/envoyer", envoyer=False); assert mes_depenses() == []
     _sup(client, rid, "depenses/0/envoyer", envoyer=True); assert len(mes_depenses()) == 1
-    # Journal de caisse : la dépense se déduit des ventes, pas une sortie de la caisse principale
+    # Journal de caisse : pas comptée tant que la direction ne l'a pas cochée (« + »)
+    j = client.get(f"/api/caisse-principale/journal?date_debut={jour}&date_fin={jour}", headers=H).json()
+    assert not [l for l in j["lignes"] if l["type"] == "depense_pompiste"]
+    client.put(f"/api/depenses/{mes_depenses()[0]['id']}", headers=H, json={"dans_rapport_journalier": True})
+    # Cochée : elle se déduit des ventes, pas une sortie de la caisse principale
     j = client.get(f"/api/caisse-principale/journal?date_debut={jour}&date_fin={jour}", headers=H).json()
     dpp = [l for l in j["lignes"] if l["type"] == "depense_pompiste"]
     assert [(l["debit"], l["credit"]) for l in dpp] == [(-1500, 0)]
@@ -1134,5 +1138,9 @@ def test_depense_pompiste_meme_moment_partout(client):
     _sup(client, rid, "billetterie", confirme=True); _sup(client, rid, "ecart", confirme=True)
     assert _sup(client, rid, "finaliser", note=8, commentaire="ok").status_code == 200
     vals, cp = partout()
-    assert vals == (908, 908, 908)                       # finalisée : partout en même temps
+    assert vals == (908, 908, 0)                         # finalisée : Dépenses + feuille du jour, pas encore comptée
+    dep = next(x for x in client.get(f"/api/depenses?date_debut={d}&date_fin={d}", headers=H).json()["depenses"] if x.get("rapport_pompiste_id") == rid)
+    client.put(f"/api/depenses/{dep['id']}", headers=H, json={"dans_rapport_journalier": True})
+    vals, cp = partout()
+    assert vals == (908, 908, 908)                       # cochée (« + ») : comptée dans la caisse
     assert {c["code"]: c for c in cp["controles"]}["equilibre"]["niveau"] == "ok"
