@@ -628,6 +628,7 @@ def startup():
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS rapport_pompiste_id INTEGER REFERENCES rapports_pompiste(id) ON DELETE SET NULL",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS pompiste_id INTEGER REFERENCES employes(id) ON DELETE SET NULL",
         "ALTER TABLE depenses ADD COLUMN IF NOT EXISTS dans_rapport_journalier BOOLEAN",
+        "ALTER TABLE releves ADD COLUMN IF NOT EXISTS fiche_papier BOOLEAN",
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS statut_rapprochement VARCHAR(20)",
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS confiance VARCHAR(10)",
         "ALTER TABLE rapports_pompiste_lignes ADD COLUMN IF NOT EXISTS score_rapprochement INTEGER",
@@ -2234,6 +2235,8 @@ class ReleveIn(BaseModel):
     metter_apres: float
     # Obligatoire si metter_avant ≠ « meeter après » du relevé précédent de la pompe
     motif_ecart_compteur: Optional[str] = None
+    # Saisi d'après la fiche papier de la direction : prioritaire sur les rapports pompistes
+    fiche_papier: Optional[bool] = None
 
 
 # Tolérance d'arrondi sur la continuité des compteurs (gallons)
@@ -2871,6 +2874,11 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
          .filter_by(date=data.date, periode=data.periode, pompe_id=data.pompe_id)
          .first())
 
+    # Fiche papier de la direction : prioritaire, aucun rapport pompiste ne la remplace
+    if r is not None and r.fiche_papier and getattr(request.state, "depuis_rapport", None):
+        raise HTTPException(409, f"{pompe.nom} : ce créneau vient de la fiche papier de la direction — "
+                                 "le rapport pompiste ne la remplace pas.")
+
     # Une pompe déjà dans un rapport pompiste en attente (envoyé, pas encore
     # confirmé) a sa place prise pour ce créneau : pas de double saisie.
     if r is None and not getattr(request.state, "depuis_rapport", None):
@@ -2935,6 +2943,10 @@ def upsert_releve(data: ReleveIn, request: Request, db: Session = Depends(get_db
     r.prix_gallon    = prix
     r.metter_avant   = data.metter_avant
     r.metter_apres   = data.metter_apres
+    if data.fiche_papier is not None and not getattr(request.state, "depuis_rapport", None):
+        r.fiche_papier = True if data.fiche_papier else None
+        if data.fiche_papier:
+            r.rapport_pompiste_id = None   # la fiche ne dépend plus d'aucun rapport (corbeille comprise)
     r.ecart_compteur       = ecart if motif else None
     r.motif_ecart_compteur = motif[:255] if motif else None
     r.modifie_par_id = request.state.user.id
@@ -3204,6 +3216,31 @@ def _releve_dict(r: Releve):
 class SuppressionRelevesIn(BaseModel):
     ids: List[int]
     motif: str
+
+
+class FichePapierIn(BaseModel):
+    ids: List[int]
+    fiche_papier: bool = True
+
+
+@app.post("/api/releves/fiche-papier")
+def marquer_fiche_papier(data: FichePapierIn, request: Request, db: Session = Depends(get_db)):
+    """La direction marque des relevés comme saisis d'après sa fiche papier :
+    prioritaires, aucun rapport pompiste ne les remplace (ou retire la marque)."""
+    from pompiste_routes import _require_superviseur
+    _require_superviseur(request, db)
+    if not data.ids or len(data.ids) > 500:
+        raise HTTPException(400, "Choisissez les relevés (500 au plus).")
+    rows = db.query(Releve).filter(Releve.id.in_(set(data.ids))).all()
+    if len(rows) != len(set(data.ids)):
+        raise HTTPException(404, "Relevé introuvable.")
+    for r in rows:
+        r.fiche_papier = True if data.fiche_papier else None
+        if data.fiche_papier:
+            r.rapport_pompiste_id = None
+    _tracer(db, request, "releves_fiche_papier", {"ids": sorted(r.id for r in rows), "fiche_papier": data.fiche_papier})
+    db.commit()
+    return {"marques": len(rows)}
 
 
 @app.post("/api/releves/supprimer")
@@ -4192,7 +4229,9 @@ def _build_journal_entries(
             "produit_nom":      r.pompe.produit.nom,
             "pompiste_id":      r.pompiste_id,
             "pompiste_nom":     (f"{r.pompiste.prenom} {r.pompiste.nom}" if r.pompiste else None),
-            "source":           "pompiste" if r.rapport_pompiste_id else "saisie",
+            "source":           ("fiche_papier" if getattr(r, "fiche_papier", None) else
+                                 "pompiste" if r.rapport_pompiste_id else "saisie"),
+            "fiche_papier":     bool(getattr(r, "fiche_papier", None)),
             "en_attente":       bool(getattr(r, "en_attente", False)),
             "rapport_pompiste_id": r.rapport_pompiste_id,
             "rapport_statut":   r.rapport_pompiste.statut if r.rapport_pompiste else None,

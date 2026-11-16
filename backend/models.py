@@ -225,6 +225,8 @@ class Releve(Base):
     # de meeter : on corrige, mais on n'efface jamais ce qu'il a écrit.
     pompe_saisie_id      = Column(Integer, ForeignKey("pompes.id", ondelete="SET NULL"), nullable=True)
     metter_avant_saisi   = Column(Numeric(14, 4), nullable=True)
+    # Saisi d'après la fiche papier de la direction : prioritaire, jamais remplacé par un rapport pompiste
+    fiche_papier         = Column(Boolean, nullable=True)
     metter_apres_saisi   = Column(Numeric(14, 4), nullable=True)
 
     pompe       = relationship("Pompe", foreign_keys=[pompe_id])
