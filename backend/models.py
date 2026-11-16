@@ -783,6 +783,11 @@ class BarVente(Base):
     # Piscine), repris de la session de caisse à l'encaissement. NULL =
     # vente historique sans lieu connu : comptée avec le Bar (Devant).
     lieu             = Column(String(20), nullable=True)
+    # Devise réellement reçue (voir devise.py) : montant_devise dans cette
+    # devise, taux_change HTG pour 1 USD. NULL/HTG = gourdes.
+    devise          = Column(String(3), nullable=False, default="HTG", server_default="HTG")
+    montant_devise  = Column(Numeric(14, 2), nullable=True)
+    taux_change     = Column(Numeric(10, 4), nullable=True)
 
     caissier  = relationship("Employe")
     session   = relationship("BarSessionCaisse")
@@ -832,10 +837,12 @@ class BarMouvementStock(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "type_mouvement IN ('ENTREE','SORTIE_VENTE','AJUSTEMENT','PERTE','CASSE','VOLONTAIRE')",
+            "type_mouvement IN ('ENTREE','SORTIE_VENTE','AJUSTEMENT','PERTE','CASSE','VOLONTAIRE','TRANSFERT')",
             name="chk_bar_mouv_type",
         ),
-        CheckConstraint("lieu IS NULL OR lieu IN ('DEVANT','PISCINE')", name="chk_bar_mouv_lieu"),
+        # DEPOT = Dépôt central (v28) : stock reçu des fournisseurs, puis
+        # transféré vers Bar Devant / Bar Piscine ou vendu à un client externe.
+        CheckConstraint("lieu IS NULL OR lieu IN ('DEVANT','PISCINE','DEPOT')", name="chk_bar_mouv_lieu"),
         Index("idx_bar_mouv_produit", "produit_id"),
         Index("idx_bar_mouv_date",    "date_mouvement"),
         Index("idx_bar_mouv_vente",   "reference_vente_id"),
@@ -933,6 +940,11 @@ class BarRemboursement(Base):
     date_remb      = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     notes          = Column(String(300), nullable=True)
+    # Devise réellement reçue (voir devise.py) : montant_devise dans cette
+    # devise, taux_change HTG pour 1 USD. NULL/HTG = gourdes.
+    devise          = Column(String(3), nullable=False, default="HTG", server_default="HTG")
+    montant_devise  = Column(Numeric(14, 2), nullable=True)
+    taux_change     = Column(Numeric(10, 4), nullable=True)
 
     credit = relationship("BarCredit", back_populates="remboursements")
 
@@ -1281,6 +1293,152 @@ class HotelPaiement(Base):
 
 
 # ══════════════════════════════════════════════════════════════════
+# DÉPÔT CENTRAL — achats/réception, transferts, ventes, caisse dépôt
+# ══════════════════════════════════════════════════════════════════
+# Le stock du dépôt est celui des mouvements bar_mouvements_stock de lieu
+# 'DEPOT' (mêmes articles que le Bar : bar_produits).
+
+class DepotAchat(Base):
+    """Achat de marchandises pour le dépôt (une facture fournisseur).
+    statut : EN_ATTENTE (enregistré, pas encore reçu) → RECEPTIONNE (stock
+    du dépôt augmenté) ; ECART (quantités reçues ≠ commandées : correction
+    demandée) ; ANNULE."""
+    __tablename__ = "depot_achats"
+
+    id                 = Column(Integer, primary_key=True)
+    numero             = Column(String(30), nullable=False, unique=True)      # DA-2026-0001
+    fournisseur        = Column(String(150), nullable=False)
+    numero_facture     = Column(String(80), nullable=True)
+    date_facture       = Column(Date, nullable=True)
+    statut             = Column(String(12), nullable=False, default="EN_ATTENTE")
+    total              = Column(Numeric(14, 2), nullable=False, default=0)
+    notes              = Column(String(500), nullable=True)
+    ecart_notes        = Column(String(500), nullable=True)
+    cree_par_id        = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    receptionne_par_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    date_reception     = Column(DateTime(timezone=True), nullable=True)
+    created_at         = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    lignes          = relationship("DepotAchatLigne", back_populates="achat",
+                                   cascade="all, delete-orphan", order_by="DepotAchatLigne.id")
+    cree_par        = relationship("Utilisateur", foreign_keys=[cree_par_id])
+    receptionne_par = relationship("Utilisateur", foreign_keys=[receptionne_par_id])
+
+    __table_args__ = (
+        CheckConstraint("statut IN ('EN_ATTENTE','ECART','RECEPTIONNE','ANNULE')", name="chk_depot_achat_statut"),
+        Index("idx_depot_achat_date", "created_at"),
+    )
+
+
+class DepotAchatLigne(Base):
+    __tablename__ = "depot_achat_lignes"
+
+    id             = Column(Integer, primary_key=True)
+    achat_id       = Column(Integer, ForeignKey("depot_achats.id", ondelete="CASCADE"), nullable=False)
+    produit_id     = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
+    quantite       = Column(Numeric(12, 3), nullable=False)          # commandée / facturée
+    prix_achat     = Column(Numeric(12, 2), nullable=False)          # par unité
+    sous_total     = Column(Numeric(14, 2), nullable=False)
+    quantite_recue = Column(Numeric(12, 3), nullable=True)           # comptée à la réception
+
+    achat   = relationship("DepotAchat", back_populates="lignes")
+    produit = relationship("BarProduit")
+
+    __table_args__ = (
+        CheckConstraint("quantite > 0", name="chk_depot_al_qte_pos"),
+        CheckConstraint("prix_achat >= 0", name="chk_depot_al_prix_pos"),
+        Index("idx_depot_al_achat", "achat_id"),
+        Index("idx_depot_al_produit", "produit_id"),
+    )
+
+
+class DepotTransaction(Base):
+    """Transfert du dépôt vers un bar, ou vente à un client externe — avec
+    sa facture. statut : PREPAREE → VALIDEE (stock déplacé) | ANNULEE ;
+    statut_paiement : NON_PAYEE | PARTIELLE | PAYEE (caisse du dépôt)."""
+    __tablename__ = "depot_transactions"
+
+    id              = Column(Integer, primary_key=True)
+    numero          = Column(String(30), nullable=False, unique=True)     # FD-2026-0001
+    type            = Column(String(10), nullable=False)                   # TRANSFERT | VENTE
+    destination     = Column(String(10), nullable=False)                   # DEVANT | PISCINE | CLIENT
+    client_nom      = Column(String(150), nullable=True)
+    client_contact  = Column(String(100), nullable=True)
+    statut          = Column(String(10), nullable=False, default="PREPAREE")
+    statut_paiement = Column(String(10), nullable=False, default="NON_PAYEE")
+    total           = Column(Numeric(14, 2), nullable=False, default=0)    # en gourdes
+    montant_paye    = Column(Numeric(14, 2), nullable=False, default=0)    # équivalent gourdes
+    notes           = Column(String(500), nullable=True)
+    responsable_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    valide_par_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    date_validation = Column(DateTime(timezone=True), nullable=True)
+    created_at      = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    lignes      = relationship("DepotTransactionLigne", back_populates="transaction",
+                               cascade="all, delete-orphan", order_by="DepotTransactionLigne.id")
+    paiements   = relationship("DepotPaiement", back_populates="transaction",
+                               cascade="all, delete-orphan", order_by="DepotPaiement.date_paiement")
+    responsable = relationship("Utilisateur", foreign_keys=[responsable_id])
+    valide_par  = relationship("Utilisateur", foreign_keys=[valide_par_id])
+
+    __table_args__ = (
+        CheckConstraint("type IN ('TRANSFERT','VENTE')", name="chk_depot_tx_type"),
+        CheckConstraint("destination IN ('DEVANT','PISCINE','CLIENT')", name="chk_depot_tx_dest"),
+        CheckConstraint("statut IN ('PREPAREE','VALIDEE','ANNULEE')", name="chk_depot_tx_statut"),
+        CheckConstraint("statut_paiement IN ('NON_PAYEE','PARTIELLE','PAYEE')", name="chk_depot_tx_paie"),
+        Index("idx_depot_tx_date", "created_at"),
+        Index("idx_depot_tx_dest", "destination"),
+    )
+
+
+class DepotTransactionLigne(Base):
+    __tablename__ = "depot_transaction_lignes"
+
+    id             = Column(Integer, primary_key=True)
+    transaction_id = Column(Integer, ForeignKey("depot_transactions.id", ondelete="CASCADE"), nullable=False)
+    produit_id     = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
+    quantite       = Column(Numeric(12, 3), nullable=False)
+    prix_unitaire  = Column(Numeric(12, 2), nullable=False)
+    sous_total     = Column(Numeric(14, 2), nullable=False)
+
+    transaction = relationship("DepotTransaction", back_populates="lignes")
+    produit     = relationship("BarProduit")
+
+    __table_args__ = (
+        CheckConstraint("quantite > 0", name="chk_depot_tl_qte_pos"),
+        Index("idx_depot_tl_tx", "transaction_id"),
+    )
+
+
+class DepotPaiement(Base):
+    """Paiement reçu par la caisse du dépôt pour une facture — gourdes ou
+    dollars (voir devise.py)."""
+    __tablename__ = "depot_paiements"
+
+    id             = Column(Integer, primary_key=True)
+    transaction_id = Column(Integer, ForeignKey("depot_transactions.id", ondelete="CASCADE"), nullable=False)
+    numero_recu    = Column(String(30), nullable=False, unique=True)       # RD-2026-0001
+    date_paiement  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    devise         = Column(String(3), nullable=False, default="HTG")
+    montant        = Column(Numeric(14, 2), nullable=False)                # dans la devise
+    taux_change    = Column(Numeric(10, 4), nullable=True)
+    montant_htg    = Column(Numeric(14, 2), nullable=False)
+    methode        = Column(String(12), nullable=False, default="CASH")    # CASH | CARTE | ZELLE | VIREMENT | CHEQUE
+    notes          = Column(String(300), nullable=True)
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    transaction = relationship("DepotTransaction", back_populates="paiements")
+    utilisateur = relationship("Utilisateur")
+
+    __table_args__ = (
+        CheckConstraint("devise IN ('HTG','USD')", name="chk_depot_paie_devise"),
+        CheckConstraint("montant > 0", name="chk_depot_paie_montant_pos"),
+        CheckConstraint("methode IN ('CASH','CARTE','ZELLE','VIREMENT','CHEQUE')", name="chk_depot_paie_methode"),
+        Index("idx_depot_paie_date", "date_paiement"),
+    )
+
+
+# ══════════════════════════════════════════════════════════════════
 # PISCINE — vente de cartes d'accès
 # ══════════════════════════════════════════════════════════════════
 
@@ -1315,6 +1473,11 @@ class PiscineVente(Base):
     notes          = Column(String(300), nullable=True)
     statut         = Column(String(10), nullable=False, default="VALIDEE")  # VALIDEE | ANNULEE
     utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    # Devise réellement reçue (voir devise.py) : montant_devise dans cette
+    # devise, taux_change HTG pour 1 USD. NULL/HTG = gourdes.
+    devise          = Column(String(3), nullable=False, default="HTG", server_default="HTG")
+    montant_devise  = Column(Numeric(14, 2), nullable=True)
+    taux_change     = Column(Numeric(10, 4), nullable=True)
 
     utilisateur = relationship("Utilisateur")
 
@@ -1416,6 +1579,11 @@ class CuisineVente(Base):
     client_nom     = Column(String(100), nullable=True)
     notes          = Column(String(200), nullable=True)
     statut         = Column(String(20), nullable=False, default="VALIDEE")
+    # Devise réellement reçue (voir devise.py) : montant_devise dans cette
+    # devise, taux_change HTG pour 1 USD. NULL/HTG = gourdes.
+    devise          = Column(String(3), nullable=False, default="HTG", server_default="HTG")
+    montant_devise  = Column(Numeric(14, 2), nullable=True)
+    taux_change     = Column(Numeric(10, 4), nullable=True)
 
     lignes = relationship("CuisineLigneVente", back_populates="vente",
                           cascade="all, delete-orphan")
@@ -2065,6 +2233,10 @@ class PatisserieVente(Base):
     mode_paiement   = Column(String(20),  nullable=False, default="CASH")  # CASH, CREDIT
     statut          = Column(String(20),  nullable=False, default="PAYEE")  # PAYEE, ANNULEE
     client_nom      = Column(String(150), nullable=True)
+    # Devise réellement reçue (voir devise.py)
+    devise          = Column(String(3), nullable=False, default="HTG", server_default="HTG")
+    montant_devise  = Column(Numeric(14, 2), nullable=True)
+    taux_change     = Column(Numeric(10, 4), nullable=True)
 
     caissier = relationship("Employe")
     session  = relationship("PatisserieSessionCaisse")

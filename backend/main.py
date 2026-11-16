@@ -46,6 +46,8 @@ from taches_routes import router as taches_router
 from pieces_jointes_routes import router as pieces_jointes_router
 from listes_reference_routes import router as listes_reference_router
 from piscine_routes import router as piscine_router
+from depot_routes import router as depot_router
+from devise import router as devise_router
 from auth import (
     SESSION_COOKIE, SESSION_DURATION_ADMIN_HOURS, hash_password, verify_password,
     hash_code_acces, verify_code_acces,
@@ -125,6 +127,7 @@ _MODULES = {
     "zelle":      os.getenv("MODULE_ZELLE",      "true").lower() == "true",
     "patisserie": os.getenv("MODULE_PATISSERIE", "true").lower() == "true",
     "piscine":    os.getenv("MODULE_PISCINE",    "true").lower() == "true",
+    "depot":      os.getenv("MODULE_DEPOT",      "true").lower() == "true",
 }
 
 app = FastAPI(
@@ -420,6 +423,8 @@ app.include_router(taches_router)
 app.include_router(pieces_jointes_router)
 app.include_router(listes_reference_router)
 app.include_router(piscine_router)
+app.include_router(depot_router)
+app.include_router(devise_router)
 
 
 @app.on_event("startup")
@@ -566,12 +571,12 @@ def startup():
             dict(
                 nom="Manager",
                 description="Accès manager : produits, stock, ventes, crédits, rentabilité, analyse, sessions + hôtel (séjours, employés, rapport). Lecture seule.",
-                permissions={"finance":"aucun","bar":"complet","piscine":"complet","cuisine":"aucun","hotel":"complet","employes":"aucun","carburant":"aucun","admin":False},
+                permissions={"finance":"aucun","bar":"complet","piscine":"complet","depot":"complet","cuisine":"aucun","hotel":"complet","employes":"aucun","carburant":"aucun","admin":False},
             ),
             dict(
                 nom="Assistant Directeur",
                 description="Lecture de tous les rapports + accès complet au département Zelle.",
-                permissions={"finance":"complet","bar":"complet","piscine":"complet","cuisine":"complet","hotel":"complet","employes":"complet","carburant":"complet","admin":False},
+                permissions={"finance":"complet","bar":"complet","piscine":"complet","depot":"lecture","cuisine":"complet","hotel":"complet","employes":"complet","carburant":"complet","admin":False},
             ),
         ]
         try:
@@ -5904,17 +5909,25 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     q_bv = db.query(BarVente).filter(BarVente.statut != "ANNULEE")
     if dt_debut: q_bv = q_bv.filter(BarVente.date_heure >= dt_debut)
     if dt_fin:   q_bv = q_bv.filter(BarVente.date_heure <= dt_fin)
+    # Gourdes et dollars séparés (voir devise.py) : une vente ou un
+    # remboursement payé en USD n'entre jamais dans le cash en gourdes.
+    from pos_service import cash_vente
     cash_dept = {"DEVANT": 0.0, "PISCINE": 0.0}
+    usd = {"bar": 0.0, "piscine": 0.0, "cuisine": 0.0, "hotel": 0.0, "depot": 0.0}
     for v in q_bv.all():
-        if v.mode_paiement in ("CASH", "MIXTE"):
-            cash_dept[lieu_de(v.lieu)] += float(v.montant_paye)
+        h, u = cash_vente(v)
+        cash_dept[lieu_de(v.lieu)] += h
+        usd["bar"] += u
     q_remb = (db.query(BarRemboursement, BarVente.lieu)
               .join(BarCredit, BarRemboursement.credit_id == BarCredit.id)
               .outerjoin(BarVente, BarCredit.vente_id == BarVente.id))
     if dt_debut: q_remb = q_remb.filter(BarRemboursement.date_remb >= dt_debut)
     if dt_fin:   q_remb = q_remb.filter(BarRemboursement.date_remb <= dt_fin)
     for r, lieu_v in q_remb.all():
-        cash_dept[lieu_de(lieu_v)] += float(r.montant)
+        if r.devise == "USD":
+            usd["bar"] += float(r.montant_devise or 0)
+        else:
+            cash_dept[lieu_de(lieu_v)] += float(r.montant)
     # Bar : ses deux comptoirs (Bar Devant + Bar Piscine) — tout le module Bar.
     ventes_bar     = round(cash_dept["DEVANT"] + cash_dept["PISCINE"], 2)
 
@@ -5923,7 +5936,9 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     q_pv = db.query(PiscineVente).filter(PiscineVente.statut == "VALIDEE")
     if dt_debut: q_pv = q_pv.filter(PiscineVente.date_vente >= dt_debut)
     if dt_fin:   q_pv = q_pv.filter(PiscineVente.date_vente <= dt_fin)
-    ventes_piscine = round(sum(float(v.montant_net) for v in q_pv.all()), 2)
+    _pv = q_pv.all()
+    ventes_piscine = round(sum(float(v.montant_net) for v in _pv if (v.devise or "HTG") != "USD"), 2)
+    usd["piscine"] = sum(float(v.montant_devise or 0) for v in _pv if v.devise == "USD")
 
     # ── Entrées : Cuisine (mode CASH uniquement — CREDIT pas encore encaissé) ──
     q_cv = db.query(CuisineVente).filter(
@@ -5931,7 +5946,9 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     )
     if dt_debut: q_cv = q_cv.filter(CuisineVente.date_heure >= dt_debut)
     if dt_fin:   q_cv = q_cv.filter(CuisineVente.date_heure <= dt_fin)
-    ventes_cuisine = round(sum(float(v.total) for v in q_cv.all()), 2)
+    _cv = q_cv.all()
+    ventes_cuisine = round(sum(float(v.total) for v in _cv if (v.devise or "HTG") != "USD"), 2)
+    usd["cuisine"] = sum(float(v.montant_devise or 0) for v in _cv if v.devise == "USD")
 
     # ── Entrées : Hôtel — gourdes et dollars SÉPARÉS ─────────────
     # Seuls les paiements reçus en gourdes entrent dans ce cash HTG ; les
@@ -5946,6 +5963,19 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     hotel_paiements = q_hp.all()
     ventes_hotel = round(sum(float(p.montant) for p in hotel_paiements if p.devise == "HTG"), 2)
     hotel_usd    = round(sum(float(p.montant) for p in hotel_paiements if p.devise == "USD"), 2)
+    usd["hotel"] = hotel_usd
+
+    # ── Entrées : Dépôt central — paiements des clients EXTERNES seulement
+    # (un transfert payé par un bar est un mouvement interne : le compter ici
+    # doublerait le cash déjà compté dans les ventes du bar). ──
+    from models import DepotPaiement, DepotTransaction, DepotAchat
+    q_dp = (db.query(DepotPaiement).join(DepotTransaction, DepotPaiement.transaction_id == DepotTransaction.id)
+            .filter(DepotTransaction.destination == "CLIENT"))
+    if dt_debut: q_dp = q_dp.filter(DepotPaiement.date_paiement >= dt_debut)
+    if dt_fin:   q_dp = q_dp.filter(DepotPaiement.date_paiement <= dt_fin)
+    _dp = q_dp.all()
+    ventes_depot = round(sum(float(p.montant) for p in _dp if p.devise != "USD"), 2)
+    usd["depot"] = sum(float(p.montant) for p in _dp if p.devise == "USD")
     hotel_usd_equiv_htg = round(sum(float(p.montant_htg) for p in hotel_paiements if p.devise == "USD"), 2)
 
     # ── Entrées : Renflouements manuels de la Grande Caisse ─────
@@ -5955,7 +5985,7 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     renfl_rows = q_renfl.order_by(RenflouementCaisse.date_renflouement.desc()).all()
     total_renflouements = round(sum(float(r.montant) for r in renfl_rows), 2)
 
-    total_entrees = round(ventes_station + ventes_bar + ventes_piscine + ventes_cuisine + ventes_hotel + total_renflouements, 2)
+    total_entrees = round(ventes_station + ventes_bar + ventes_piscine + ventes_cuisine + ventes_hotel + ventes_depot + total_renflouements, 2)
 
     # ── Sorties : Achats Station ─────────────────────────────────
     q_ach = db.query(Achat)
@@ -5989,7 +6019,12 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     if dt_fin:   q_cd = q_cd.filter(CuisineDepense.date_depense <= dt_fin)
     depenses_cuisine = round(sum(float(d.montant) for d in q_cd.all()), 2)
 
-    total_achats = round(achats_station + achats_bar + achats_piscine + achats_cuisine, 2)
+    q_da = db.query(DepotAchat).filter(DepotAchat.statut == "RECEPTIONNE")
+    if dt_debut: q_da = q_da.filter(DepotAchat.date_reception >= dt_debut)
+    if dt_fin:   q_da = q_da.filter(DepotAchat.date_reception <= dt_fin)
+    achats_depot = round(sum(float(a.total) for a in q_da.all()), 2)
+
+    total_achats = round(achats_station + achats_bar + achats_piscine + achats_cuisine + achats_depot, 2)
 
     # ── Sorties : Dépenses Station ───────────────────────────────
     q_dep = db.query(Depense)
@@ -6056,6 +6091,7 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
             "piscine":       ventes_piscine,
             "cuisine":       ventes_cuisine,
             "hotel":         ventes_hotel,
+            "depot":         ventes_depot,
             "renflouements": total_renflouements,
             "total":         total_entrees,
         },
@@ -6064,12 +6100,15 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
             "usd":            hotel_usd,
             "equivalent_htg": hotel_usd_equiv_htg,
         },
+        # Tous les dollars reçus, par département — fonds USD à part.
+        "dollars": {**{k: round(v, 2) for k, v in usd.items()}, "total": round(sum(usd.values()), 2)},
         "renflouements_liste": [_renflouement_dict(r) for r in renfl_rows[:20]],
         "sorties": {
             "achats_station":   achats_station,
             "achats_bar":       achats_bar,
             "achats_piscine":   achats_piscine,
             "achats_cuisine":   achats_cuisine,
+            "achats_depot":     achats_depot,
             "depenses_station": depenses_station,
             "depenses_cuisine": depenses_cuisine,
             "depenses_hotel":   depenses_hotel,
@@ -6149,6 +6188,9 @@ def rapport_caisse(
             "ventes_cuisine": synth["entrees"]["cuisine"],
             "ventes_hotel":   synth["entrees"]["hotel"],
             "hotel_usd":      synth["hotel_dollars"]["usd"],
+            "ventes_depot":   synth["entrees"]["depot"],
+            "achats_depot":   synth["sorties"]["achats_depot"],
+            "dollars":        synth["dollars"],
             "achats_bar":     synth["sorties"]["achats_bar"],
             "achats_piscine": synth["sorties"]["achats_piscine"],
             "achats_cuisine": synth["sorties"]["achats_cuisine"],
@@ -6331,6 +6373,9 @@ def gi_dashboard(
             "ventes_cuisine":   synth["entrees"]["cuisine"],
             "ventes_hotel":     synth["entrees"]["hotel"],
             "hotel_usd":        synth["hotel_dollars"]["usd"],
+            "ventes_depot":     synth["entrees"]["depot"],
+            "achats_depot":     synth["sorties"]["achats_depot"],
+            "dollars":          synth["dollars"],
             "achats_bar":       synth["sorties"]["achats_bar"],
             "achats_piscine":   synth["sorties"]["achats_piscine"],
             "achats_cuisine":   synth["sorties"]["achats_cuisine"],

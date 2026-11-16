@@ -182,7 +182,22 @@ def _cash_remboursements_collectes(
         )
         .all()
     )
-    return sum((Decimal(str(r.montant)) for r in rembs), Decimal("0"))
+    return sum((Decimal(str(r.montant)) for r in rembs if (r.devise or "HTG") != "USD"), Decimal("0"))
+
+
+def _usd_session(ventes, employe, db, session) -> Decimal:
+    """Dollars reçus pendant la session (ventes + remboursements payés en
+    USD) — tiroir dollars, compté à part des gourdes."""
+    from models import BarRemboursement
+    usd = sum((Decimal(str(v.montant_devise or 0)) for v in ventes
+               if v.mode_paiement in ("CASH", "MIXTE") and v.devise == "USD"), Decimal("0"))
+    if employe and employe.utilisateur_id and session is not None:
+        debut, fin = _fenetre_session(session, db)
+        usd += sum((Decimal(str(r.montant_devise or 0)) for r in db.query(BarRemboursement).filter(
+            BarRemboursement.utilisateur_id == employe.utilisateur_id,
+            BarRemboursement.date_remb >= debut, BarRemboursement.date_remb < fin,
+            BarRemboursement.devise == "USD").all()), Decimal("0"))
+    return usd
 
 
 def _cash_ventes_decimal(ventes) -> Decimal:
@@ -192,8 +207,10 @@ def _cash_ventes_decimal(ventes) -> Decimal:
     une fois additionnée sur toutes les ventes d'une journée à fort volume.
     Utilisé à la fois par _stats_ventes() (affichage) et soumettre_session()
     (stockage de la réconciliation) pour qu'ils calculent identiquement."""
+    # Gourdes seulement : une vente payée en dollars va dans le tiroir USD.
     return sum(
-        (Decimal(str(v.montant_paye)) for v in ventes if v.mode_paiement in ("CASH", "MIXTE")),
+        (Decimal(str(v.montant_paye)) for v in ventes
+         if v.mode_paiement in ("CASH", "MIXTE") and (v.devise or "HTG") != "USD"),
         Decimal("0"),
     )
 
@@ -206,6 +223,7 @@ def _stats_ventes(
     cash       = _cash_ventes_decimal(ventes)
     if employe is not None and jour is not None and db is not None:
         cash += _cash_remboursements_collectes(employe, jour, db, session=session)
+    cash_usd = _usd_session(ventes, employe, db, session) if db is not None else Decimal("0")
     credit_tot = sum((Decimal(str(v.montant_total)) for v in ventes if v.mode_paiement == "CREDIT"), Decimal("0"))
     modes: dict = {}
     for v in ventes:
@@ -226,6 +244,7 @@ def _stats_ventes(
         "nb_ventes":  len(ventes),
         "total":      float(total),
         "cash":       float(cash),
+        "cash_usd":   float(cash_usd),
         "credit":     float(credit_tot),
         "par_mode":   {k: float(v) for k, v in modes.items()},
         "top_produits": [
@@ -440,6 +459,8 @@ def detail_session(session_id: int, db: Session = Depends(get_db)):
             "montant_total": float(v.montant_total),
             "montant_paye":  float(v.montant_paye),
             "mode_paiement": v.mode_paiement,
+            "devise":        v.devise or "HTG",
+            "montant_devise": float(v.montant_devise) if v.montant_devise is not None else None,
             "client_nom":    v.client_nom,
             "lignes": [
                 {

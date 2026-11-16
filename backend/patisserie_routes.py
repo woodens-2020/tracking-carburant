@@ -587,11 +587,15 @@ def enregistrer_vente(data: dict, request: Request, db: Session = Depends(get_db
         ))
         mouvements_a_faire.append((produit, qte))
 
+    mode = data.get("mode_paiement") or "CASH"
+    import devise as dv
+    pay = dv.paiement_vente(total, data.get("devise") if mode == "CASH" else "HTG", data.get("taux_change"), db)
     vente = PatisserieVente(
         numero_ticket=_generer_ticket(db), caissier_id=caissier_id,
         session_id=session.id if session else None,
-        montant_total=total, mode_paiement=data.get("mode_paiement") or "CASH",
+        montant_total=total, mode_paiement=mode,
         client_nom=(data.get("client_nom") or "").strip() or None, statut="PAYEE",
+        **pay,
     )
     for l in ligne_objs:
         l.vente = vente
@@ -615,7 +619,9 @@ def enregistrer_vente(data: dict, request: Request, db: Session = Depends(get_db
             )
             db.commit()
 
-    return {"id": vente.id, "numero_ticket": vente.numero_ticket, "montant_total": float(total), "message": "Vente enregistrée"}
+    return {"id": vente.id, "numero_ticket": vente.numero_ticket, "montant_total": float(total),
+            "devise": vente.devise, "montant_devise": float(vente.montant_devise) if vente.montant_devise is not None else None,
+            "message": "Vente enregistrée"}
 
 
 @router.post("/ventes/{vente_id}/annuler")
@@ -965,7 +971,10 @@ def _ventes_session(session: PatisserieSessionCaisse, db: Session):
 
 
 def _stats_session(ventes: list[PatisserieVente]) -> dict:
-    cash  = sum((Decimal(str(v.montant_total)) for v in ventes if v.mode_paiement == "CASH"), Decimal("0"))
+    cash  = sum((Decimal(str(v.montant_total)) for v in ventes
+                 if v.mode_paiement == "CASH" and (v.devise or "HTG") != "USD"), Decimal("0"))
+    cash_usd = sum((Decimal(str(v.montant_devise or 0)) for v in ventes
+                    if v.mode_paiement == "CASH" and v.devise == "USD"), Decimal("0"))
     total = sum((Decimal(str(v.montant_total)) for v in ventes), Decimal("0"))
     credit_tot = sum((Decimal(str(v.montant_total)) for v in ventes if v.mode_paiement == "CREDIT"), Decimal("0"))
     modes: dict = {}
@@ -987,6 +996,7 @@ def _stats_session(ventes: list[PatisserieVente]) -> dict:
         "nb_ventes": len(ventes),
         "total_ventes": float(total),
         "cash_attendu": float(cash),
+        "cash_usd": float(cash_usd),
         "credit": float(credit_tot),
         "par_mode": {k: float(v) for k, v in modes.items()},
         "top_produits": [
@@ -1654,7 +1664,11 @@ def dashboard(
     # CA total (ventes + commandes, CASH+CREDIT confondus), pas un solde de
     # caisse réel. Les acomptes de commande ne sont pas inclus : leur mode de
     # paiement n'est pas tracé, impossible de garantir qu'ils sont en cash.
-    ventes_cash = sum(float(_dec(v.montant_total)) for v in ventes if v.mode_paiement == "CASH")
+    # Gourdes seulement : les ventes payées en dollars forment la caisse USD.
+    ventes_cash = sum(float(_dec(v.montant_total)) for v in ventes
+                      if v.mode_paiement == "CASH" and (v.devise or "HTG") != "USD")
+    ventes_usd  = sum(float(_dec(v.montant_devise)) for v in ventes
+                      if v.mode_paiement == "CASH" and v.devise == "USD")
     renflouements = db.query(RenflouementDepartement).filter(
         RenflouementDepartement.departement == "PATISSERIE",
         RenflouementDepartement.date_renflouement >= dt_deb, RenflouementDepartement.date_renflouement <= dt_fin,
@@ -1701,5 +1715,6 @@ def dashboard(
             "achats":        round(total_achats, 2),
             "depenses":      round(total_depenses, 2),
             "disponible":    caisse_disponible,
+            "disponible_usd": round(ventes_usd, 2),
         },
     }

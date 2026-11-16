@@ -388,6 +388,17 @@ def _migrate_columns():
     else:
         return
 
+    # v28 — devise réellement reçue (HTG / USD) sur toutes les ventes
+    # encaissées (voir devise.py), quel que soit le moteur.
+    _num14 = "NUMERIC" if _is_sqlite else "NUMERIC(14,2)"
+    _num10 = "NUMERIC" if _is_sqlite else "NUMERIC(10,4)"
+    for _t in ("bar_ventes", "bar_remboursements", "cuisine_ventes", "patisserie_ventes", "piscine_ventes"):
+        new_cols += [
+            (_t, "devise",         f"ALTER TABLE {_t} ADD COLUMN devise VARCHAR(3) NOT NULL DEFAULT 'HTG'", None),
+            (_t, "montant_devise", f"ALTER TABLE {_t} ADD COLUMN montant_devise {_num14}", None),
+            (_t, "taux_change",    f"ALTER TABLE {_t} ADD COLUMN taux_change {_num10}", None),
+        ]
+
     # Ajout des colonnes manquantes — commité tout de suite, dans SA PROPRE
     # connexion/transaction, avant de toucher aux blocs de contraintes
     # ci-dessous. CRITIQUE : ne jamais partager une connexion/transaction
@@ -400,7 +411,10 @@ def _migrate_columns():
     # a silencieusement effacé la colonne pourtant déjà ajoutée avec succès
     # dans la même connexion, juste avant le commit final.
     with engine.connect() as conn:
+        tables_existantes = set(insp.get_table_names())
         for table, col, ddl_col, ddl_idx in new_cols:
+            if table not in tables_existantes:
+                continue
             existing = [c["name"] for c in insp.get_columns(table)]
             if col not in existing:
                 conn.execute(sql_text(ddl_col))
@@ -518,6 +532,21 @@ def _migrate_columns():
                 conn.commit()
             except Exception:
                 conn.rollback()  # contrainte déjà à jour
+
+        # v28 — Dépôt central : lieu DEPOT et mouvement TRANSFERT sur le
+        # stock bar.
+        for _nom, _check in (
+            ("chk_bar_mouv_lieu", "lieu IS NULL OR lieu IN ('DEVANT','PISCINE','DEPOT')"),
+            ("chk_bar_mouv_type", "type_mouvement IN ('ENTREE','SORTIE_VENTE','AJUSTEMENT','PERTE','CASSE','VOLONTAIRE','TRANSFERT')"),
+        ):
+            with engine.connect() as conn:
+                try:
+                    conn.execute(sql_text(f"ALTER TABLE bar_mouvements_stock DROP CONSTRAINT IF EXISTS {_nom}"))
+                    conn.execute(sql_text(f"ALTER TABLE bar_mouvements_stock ADD CONSTRAINT {_nom} CHECK ({_check})"))
+                    conn.commit()
+                except Exception as e:
+                    conn.rollback()
+                    print(f"[migration v28] {_nom} : {e}")
 
         # v27 — domaine du département (DEVANT / PISCINE) sur ventes,
         # achats et paie bar : même contrainte que chk_session_lieu.

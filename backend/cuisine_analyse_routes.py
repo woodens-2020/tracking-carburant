@@ -217,12 +217,13 @@ def synthese(
     # uniquement — une vente CREDIT n'est pas encore du cash) + renflouements
     # - achats - dépenses. Distinct de "actuel.benefice_net" ci-dessus qui est
     # une marge sur ventes totales (CASH+CREDIT), pas un vrai solde de caisse. ──
-    ventes_cash = float(_dec(
-        db.query(sqlfunc.sum(CuisineVente.total))
-        .filter(CuisineVente.statut == "VALIDEE", CuisineVente.mode_paiement == "CASH",
-                CuisineVente.date_heure >= dt_deb, CuisineVente.date_heure <= dt_fin)
-        .scalar()
-    ))
+    # Gourdes et dollars séparés : une vente payée en USD alimente la caisse
+    # dollars, jamais la caisse gourdes.
+    _cv = (db.query(CuisineVente)
+           .filter(CuisineVente.statut == "VALIDEE", CuisineVente.mode_paiement == "CASH",
+                   CuisineVente.date_heure >= dt_deb, CuisineVente.date_heure <= dt_fin).all())
+    ventes_cash = sum(float(_dec(v.total)) for v in _cv if (v.devise or "HTG") != "USD")
+    ventes_usd  = sum(float(_dec(v.montant_devise)) for v in _cv if v.devise == "USD")
     depenses_periode = float(_dec(
         db.query(sqlfunc.sum(CuisineDepense.montant))
         .filter(CuisineDepense.date_depense >= dt_deb, CuisineDepense.date_depense <= dt_fin)
@@ -251,6 +252,7 @@ def synthese(
             "depenses":        round(depenses_periode, 2),
             "renflouements":   round(renflouements_periode, 2),
             "disponible":      caisse_disponible,
+            "disponible_usd":  round(ventes_usd, 2),
         },
     }
 

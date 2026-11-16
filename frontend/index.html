@@ -3507,6 +3507,29 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <!-- ── Section Dépôt central ── -->
+    <div class="nav-section-label">Dépôt central</div>
+    <button class="nav-item" data-page="depot-produits" onclick="goTo('depot-produits')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-8h6v8"/></svg></span>
+      <span>Inventaire &amp; Prix</span><span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="depot-achats" onclick="goTo('depot-achats')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg></span>
+      <span>Achats &amp; Réception</span><span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="depot-transactions" onclick="goTo('depot-transactions')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/></svg></span>
+      <span>Transferts &amp; Ventes</span><span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="depot-caisse" onclick="goTo('depot-caisse')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
+      <span>Caisse Dépôt</span><span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="depot-rapport" onclick="goTo('depot-rapport')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg></span>
+      <span>Rapport Dépôt</span><span class="nav-active-dot"></span>
+    </button>
+
     <!-- ── Section Zelle ── -->
     <div class="nav-section-label">Zelle</div>
     <button class="nav-item" data-page="zelle" onclick="goTo('zelle')">
@@ -6733,6 +6756,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <button class="pos-mode-btn" data-mode="CREDIT" onclick="posSetMode('CREDIT',this)" data-i18n="pos.caisse.mode.credit">CRÉDIT</button>
                 <button class="pos-mode-btn" data-mode="MIXTE" onclick="posSetMode('MIXTE',this)" data-i18n="pos.caisse.mode.mixte">MIXTE</button>
               </div>
+              <!-- Devise remise par le client : gourdes ou dollars (caisse USD séparée) -->
+              <div id="pos-devise-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-end">
+                <div style="flex:1"><label class="pos-label">Payé en</label>
+                  <select class="pos-select" id="pos-devise" onchange="posDeviseChange()">
+                    <option value="HTG">Gourdes (HTG)</option><option value="USD">Dollars (USD)</option>
+                  </select></div>
+                <div id="pos-taux-wrap" style="flex:1;display:none"><label class="pos-label">Taux (G / $)</label>
+                  <input class="pos-input" id="pos-taux" type="number" min="0.0001" step="any" oninput="posCalcMonnaie()"></div>
+              </div>
+              <div id="pos-devise-info" style="display:none;margin:-2px 0 8px;font-size:14px;font-weight:700;color:#38bdf8"></div>
               <div id="pos-cash-row" style="display:none;margin-bottom:8px">
                 <label class="pos-label" data-i18n="pos.caisse.recu.label">Montant reçu du client</label>
                 <input class="pos-input" id="pos-montant-recu" type="number" min="0" step="0.01" placeholder="G 0.00" oninput="posCalcMonnaie()">
@@ -7860,8 +7893,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <span id="pos-remb-solde-affiche" style="font-size:23px;font-weight:800;color:#f87171">G 0.00</span>
         </div>
         <input type="hidden" id="pos-remb-credit-id">
+        <!-- Devise du remboursement (gourdes ou dollars) -->
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <div style="flex:1"><label class="pos-label">Payé en</label>
+            <select class="pos-select" id="pos-remb-devise" onchange="posRembDevise()"><option value="HTG">Gourdes (HTG)</option><option value="USD">Dollars (USD)</option></select></div>
+          <div id="pos-remb-taux-wrap" style="flex:1;display:none"><label class="pos-label">Taux (G / $)</label>
+            <input class="pos-input" id="pos-remb-taux" type="number" min="0.0001" step="any" oninput="posRembCalcMonnaie()"></div>
+        </div>
+        <div id="pos-remb-usd-info" style="display:none;margin-bottom:8px;font-weight:700;color:#38bdf8"></div>
         <!-- Montant remis par le client -->
-        <label class="pos-label">Montant remis par le client (G)</label>
+        <label class="pos-label" id="pos-remb-remis-label">Montant remis par le client (G)</label>
         <input class="pos-input" id="pos-remb-remis" type="number" min="0" step="0.01" placeholder="0.00"
           oninput="posRembCalcMonnaie()" style="margin-bottom:10px">
         <!-- Monnaie à rendre (auto-calculée) -->
@@ -8294,6 +8335,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <div style="display:flex;justify-content:space-between"><span style="color:rgba(255,255,255,.55)">Montant (cartes × prix)</span><b id="pisv-brut">—</b></div>
                 <div style="display:flex;justify-content:space-between"><span style="color:rgba(255,255,255,.55)">Rabais</span><b id="pisv-rabais" style="color:#fbbf24">—</b></div>
                 <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.1);padding-top:6px;font-size:18px"><span>Total à encaisser</span><b id="pisv-net" style="color:#34d399">—</b></div>
+                <div id="pisv-net-usd" style="display:none;justify-content:space-between;font-size:16px"><span>En dollars</span><b style="color:#38bdf8"></b></div>
+              </div>
+              <div class="pos-form-row">
+                <div><label class="pos-label">Payé en</label>
+                  <select class="pos-select" id="pisv-devise" onchange="deviseChampsMaj('pisv').then(pisvCalculer)"><option value="HTG">Gourdes (HTG)</option><option value="USD">Dollars (USD)</option></select></div>
+                <div id="pisv-taux-wrap" style="display:none"><label class="pos-label">Taux (G pour 1 $)</label>
+                  <input class="pos-input" id="pisv-taux" type="number" min="0.0001" step="any" oninput="pisvCalculer()"></div>
               </div>
               <div id="pisv-alerte" style="display:none;color:#f87171;font-size:13px"></div>
               <button class="pos-btn primary" style="font-size:16px;padding:10px" onclick="pisvEnregistrer()">Enregistrer la vente</button>
@@ -8344,6 +8392,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         </div>
       </div>
     </div><!-- /page-piscine-parametres -->
+
+    <!-- ══════════════ DÉPÔT CENTRAL (contenu rendu par depRendre*) ══════════════ -->
+    <div id="page-depot-produits" class="page page-gi"><div class="pos-page gi-page" id="depot-produits-root"></div></div>
+    <div id="page-depot-achats" class="page page-gi"><div class="pos-page gi-page" id="depot-achats-root"></div></div>
+    <div id="page-depot-transactions" class="page page-gi"><div class="pos-page gi-page" id="depot-transactions-root"></div></div>
+    <div id="page-depot-caisse" class="page page-gi"><div class="pos-page gi-page" id="depot-caisse-root"></div></div>
+    <div id="page-depot-rapport" class="page page-gi"><div class="pos-page gi-page" id="depot-rapport-root"></div></div>
+    <div class="pos-modal-bg" id="depot-modal-bg" onclick="if(event.target===this)depFermer()">
+      <div class="pos-modal" id="depot-modal" style="max-width:880px;width:96%"></div>
+    </div>
 
     <div class="pos-modal-bg" id="pdep-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
       <div class="pos-modal">
@@ -9593,9 +9651,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div id="ck-pay-total" style="font-size:25px;font-weight:800;color:#3fb6a8">G 0.00</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+            <div style="display:flex;gap:8px">
+              <div style="flex:1"><label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Payé en</label>
+                <select class="pos-select" id="ck-devise" style="width:100%" onchange="deviseChampsMaj('ck').then(ckCalcMonnaie)"><option value="HTG">Gourdes (HTG)</option><option value="USD">Dollars (USD)</option></select></div>
+              <div id="ck-taux-wrap" style="flex:1;display:none"><label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Taux (G / $)</label>
+                <input class="pos-input" id="ck-taux" type="number" min="0.0001" step="any" oninput="ckCalcMonnaie()" style="width:100%"></div>
+            </div>
+            <div id="ck-usd-info" style="display:none;font-weight:700;color:#38bdf8"></div>
             <div>
-              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Montant reçu</label>
-              <input class="pos-input" id="ck-pay-recu" type="number" min="0" step="1" placeholder="0" oninput="ckCalcMonnaie()" style="width:100%">
+              <label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px" id="ck-pay-recu-label">Montant reçu</label>
+              <input class="pos-input" id="ck-pay-recu" type="number" min="0" step="any" placeholder="0" oninput="ckCalcMonnaie()" style="width:100%">
             </div>
             <div id="ck-pay-monnaie-box" style="display:none;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.25);border-radius:8px;padding:10px 14px">
               <div style="font-size:12px;color:rgba(255,255,255,.4)">Monnaie à rendre</div>
@@ -10684,7 +10749,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
           <div id="pt-vente-lignes" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
           <button class="pos-btn ghost" style="width:100%;margin-bottom:12px" onclick="ptVenteAjouterLigne()">+ Ajouter un article</button>
-          <div style="text-align:right;font-weight:800;font-size:16px;margin-bottom:12px">Total : <span id="pt-vente-total">0</span> G</div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <div style="flex:1"><label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Payé en</label>
+              <select class="pos-select" id="pt-vente-devise" style="width:100%" onchange="deviseChampsMaj('pt-vente').then(ptVenteRecalculer)"><option value="HTG">Gourdes (HTG)</option><option value="USD">Dollars (USD)</option></select></div>
+            <div id="pt-vente-taux-wrap" style="flex:1;display:none"><label style="font-size:13px;color:rgba(255,255,255,.4);display:block;margin-bottom:4px">Taux (G / $)</label>
+              <input class="pos-input" id="pt-vente-taux" type="number" min="0.0001" step="any" oninput="ptVenteRecalculer()" style="width:100%"></div>
+          </div>
+          <div style="text-align:right;font-weight:800;font-size:16px;margin-bottom:12px">Total : <span id="pt-vente-total">0</span> G <span id="pt-vente-total-usd" style="color:#38bdf8"></span></div>
           <div style="display:flex;gap:8px">
             <button class="pos-btn ghost" style="flex:1" onclick="ptVenteFermerModal()">Annuler</button>
             <button class="pos-btn teal" id="pt-vente-btn-encaisser" style="flex:2" onclick="ptVenteSauvegarder()">Encaisser</button>
@@ -14495,6 +14566,11 @@ const PAGE_META={
   'piscine-ventes':     {title: 'Vente de cartes',         sub: 'Piscine — enregistrer les cartes vendues'},
   'piscine-depenses':   {title: 'Dépenses Piscine',        sub: 'Charges de la Piscine — déduites de ses recettes'},
   'piscine-parametres': {title: 'Paramètres Piscine',      sub: 'Prix de la carte'},
+  'depot-produits':     {title: 'Dépôt — Inventaire & prix', sub: 'Stock du dépôt central'},
+  'depot-achats':       {title: 'Dépôt — Achats & réception', sub: 'Factures fournisseurs et contrôle de la marchandise'},
+  'depot-transactions': {title: 'Dépôt — Transferts & ventes', sub: 'Bar Devant · Bar Piscine · Clients externes'},
+  'depot-caisse':       {title: 'Caisse Dépôt',               sub: 'Paiements en gourdes et en dollars'},
+  'depot-rapport':      {title: 'Rapport Dépôt',              sub: 'Inventaire · ventes · achats · caisse'},
   'zelle':                {title: 'Tableau de bord — Zelle',      sub: 'Bilan général · Balance HTG · Répartition par source'},
   'zelle-paiements':      {title: 'Paiements Zelle',              sub: 'Toutes les transactions en gourdes (HTG)'},
   'zelle-fonds':          {title: 'Réception de Fonds',           sub: 'Déclaration des fonds reçus en gourdes (HTG)'},
@@ -17480,6 +17556,7 @@ const _MODULE_PAGES = {
               'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-depenses','pos-rentabilite',
               'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis'],
   piscine:   ['piscine-dashboard','piscine-ventes','piscine-depenses','piscine-parametres'],
+  depot:     ['depot-produits','depot-achats','depot-transactions','depot-caisse','depot-rapport'],
   hotel:     ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma',
               'hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   zelle:     ['zelle','zelle-paiements','zelle-fonds'],
@@ -17518,6 +17595,13 @@ const _AREA_PAGES = {
     operationnel: ['piscine-dashboard','piscine-ventes'],
     lecture: ['piscine-dashboard'],
   },
+  // Dépôt central — complet : tout ; opérationnel : réception, transferts,
+  // encaissement (pas de prix) ; lecture : inventaire, caisse, rapport.
+  depot: {
+    complet: ['depot-produits','depot-achats','depot-transactions','depot-caisse','depot-rapport'],
+    operationnel: ['depot-produits','depot-achats','depot-transactions','depot-caisse'],
+    lecture: ['depot-produits','depot-caisse','depot-rapport'],
+  },
   cuisine: {
     complet: ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse'],
     lecture: ['cuisine-ventes','cuisine-stats'],
@@ -17553,6 +17637,7 @@ const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-depenses','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
   'piscine-dashboard','piscine-ventes','piscine-depenses','piscine-parametres',
+  'depot-produits','depot-achats','depot-transactions','depot-caisse','depot-rapport',
   'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'patisserie-dashboard','patisserie-produits','patisserie-achats','patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse',
@@ -17569,6 +17654,7 @@ const _AD_ALLOWED = new Set([
   'pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes',
   'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','pos-depenses',
   'piscine-dashboard','piscine-depenses',
+  'depot-produits','depot-caisse','depot-rapport',
   'cuisine-plats','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'employes','payroll',
@@ -17581,11 +17667,13 @@ const _ACCES_POSTE_LEGACY = {
   'Comptable':   ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-depenses','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'piscine-dashboard','piscine-ventes','piscine-depenses','piscine-parametres',
+                  'depot-produits','depot-achats','depot-transactions','depot-caisse','depot-rapport',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-depenses','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'piscine-dashboard','piscine-ventes','piscine-depenses','piscine-parametres',
+                  'depot-produits','depot-achats','depot-transactions','depot-caisse','depot-rapport',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Pompiste':            ['home','saisie'],
@@ -21564,8 +21652,20 @@ function _audMsg(msg, type){
    MODULES GESTION INSTITUTIONNELLE — UTILITAIRES
    ══════════════════════════════════════════════════════════════ */
 const _htg = v => new Intl.NumberFormat('fr-HT',{minimumFractionDigits:0,maximumFractionDigits:0}).format(v) + ' HTG';
-// Montant en dollars (paiements hôtel en USD) — toujours affiché à part des gourdes.
+// Montant en dollars (paiements en USD) — toujours affiché à part des gourdes.
 const _usd = v => new Intl.NumberFormat('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v)||0) + ' $';
+// Rapport de caisse : dollars reçus par département (fonds USD séparé).
+function _caisseBlocDollars(dl){
+  if(!dl) return '';
+  const lib = {bar:'Bar', piscine:'Piscine', cuisine:'Cuisine', hotel:'Hôtel', depot:'Dépôt central'};
+  const lignes = Object.keys(lib).filter(k => (dl[k]||0) > 0);
+  return `<div style="border-top:1px dashed rgba(255,255,255,.15);margin-top:8px;padding-top:8px">
+    <div style="font-size:12px;font-weight:700;color:#38bdf8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Dollars reçus (hors cash gourdes)</div>
+    ${lignes.map(k=>`<div class="caisse-bar-row" style="justify-content:space-between"><div class="caisse-bar-label" style="min-width:0">${lib[k]}</div><div class="caisse-bar-val" style="color:#38bdf8">${_usd(dl[k])}</div></div>`).join('')
+      || '<div style="font-size:13px;color:rgba(255,255,255,.35)">Aucun dollar reçu sur la période</div>'}
+    <div class="caisse-bar-row" style="justify-content:space-between;font-weight:800"><div class="caisse-bar-label" style="min-width:0">Total dollars</div><div class="caisse-bar-val" style="color:#38bdf8">${_usd(dl.total||0)}</div></div>
+  </div>`;
+}
 const _today = () => todayStr();
 
 function _giAlert(msg, type='error'){
@@ -22917,6 +23017,11 @@ const _giPageLoaders = {
   'piscine-dashboard':  loadPiscineDashboard,
   'piscine-ventes':     loadPiscineVentes,
   'piscine-parametres': loadPiscineParametres,
+  'depot-produits':     loadDepotProduits,
+  'depot-achats':       loadDepotAchats,
+  'depot-transactions': loadDepotTransactions,
+  'depot-caisse':       loadDepotCaisse,
+  'depot-rapport':      loadDepotRapport,
   'pos-rentabilite':    loadPosRentabilite,
   'pos-grande-caisse':      loadPosGrandeCaisse,
   'pos-analyse':            loadPosAnalyse,
@@ -22966,6 +23071,7 @@ const _ARM_DOMAINES = [
   { key:'finance',   label:'💰 Finance',     color:'#34d399' },
   { key:'bar',       label:'🍺 Bar & POS',   color:'#60a5fa' },
   { key:'piscine',   label:'🏊 Piscine',     color:'#22d3ee' },
+  { key:'depot',     label:'📦 Dépôt central', color:'#a78bfa' },
   { key:'cuisine',   label:'🍽️ Cuisine',     color:'#fb923c' },
   { key:'patisserie',label:'🍰 Pâtisserie',  color:'#f9a8d4' },
   { key:'hotel',     label:'🏨 Hôtel',       color:'#a78bfa' },
@@ -23028,7 +23134,7 @@ function _armBuildMatrix(perms){
   matrix.innerHTML = _ARM_DOMAINES.map(d => {
     const cur = (perms||{})[d.key] || (d.key==='piscine' ? (perms||{}).bar : null) || 'aucun';
     // « Opérationnel » : réception (Hôtel) / vendeur de cartes (Piscine).
-    const niveaux = ['hotel','piscine'].includes(d.key) ? ['complet','operationnel','lecture','aucun'] : ['complet','lecture','aucun'];
+    const niveaux = ['hotel','piscine','depot'].includes(d.key) ? ['complet','operationnel','lecture','aucun'] : ['complet','lecture','aucun'];
     const opts = niveaux.map(v =>
       `<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:14px">
         <input type="radio" name="arm-${d.key}" value="${v}" ${cur===v?'checked':''} style="accent-color:${d.color}"> ${v.charAt(0).toUpperCase()+v.slice(1)}
@@ -24094,7 +24200,7 @@ async function loadGiDashboard(){
     //         département sur la page Rapport de Caisse) ─────────
     const ad = d.autres_departements || {ventes_bar:0, ventes_cuisine:0, ventes_hotel:0, achats_bar:0, achats_cuisine:0, depenses_cuisine:0, depenses_hotel:0, payroll_bar:0};
     const ventesTotal   = d.synthese.total_entrees;
-    const achatsTotal   = d.achats.total + ad.achats_bar + (ad.achats_piscine||0) + ad.achats_cuisine;
+    const achatsTotal   = d.achats.total + ad.achats_bar + (ad.achats_piscine||0) + ad.achats_cuisine + (ad.achats_depot||0);
     const depensesTotal = d.depenses.total + ad.depenses_cuisine + ad.depenses_hotel + (ad.depenses_bar||0) + (ad.depenses_piscine||0);
 
     document.getElementById('gid-kpi-ventes').textContent      = _htg(ventesTotal);
@@ -24349,7 +24455,7 @@ async function loadCaisse(){
     // ── KPIs (totaux consolidés — toute l'institution) ────
     const ad = d.autres_departements || {ventes_bar:0, ventes_cuisine:0, ventes_hotel:0, achats_bar:0, achats_cuisine:0, depenses_cuisine:0, depenses_hotel:0, payroll_bar:0};
     const ventesTotal   = d.synthese.total_entrees;
-    const achatsTotal   = d.achats.total + ad.achats_bar + (ad.achats_piscine||0) + ad.achats_cuisine;
+    const achatsTotal   = d.achats.total + ad.achats_bar + (ad.achats_piscine||0) + ad.achats_cuisine + (ad.achats_depot||0);
     const depensesTotal = d.depenses.total + ad.depenses_cuisine + ad.depenses_hotel + (ad.depenses_bar||0) + (ad.depenses_piscine||0);
 
     document.getElementById('caisse-kpi-ventes').textContent    = _htg(ventesTotal);
@@ -24370,6 +24476,8 @@ async function loadCaisse(){
       const rows = [
         {label:'Ventes Bar (cash encaissé)',   val: ad.ventes_bar,     sens:'entree'},
         {label:'Piscine — ventes de cartes',  val: ad.ventes_piscine||0, sens:'entree'},
+        {label:'Dépôt — paiements clients externes', val: ad.ventes_depot||0, sens:'entree'},
+        {label:'Dépôt — achats réceptionnés',  val: ad.achats_depot||0, sens:'sortie'},
         {label:'Ventes Cuisine (cash)',        val: ad.ventes_cuisine, sens:'entree'},
         {label:'Ventes Hôtel (gourdes reçues)', val: ad.ventes_hotel,  sens:'entree'},
         {label:'Achats Bar (confirmés)',       val: ad.achats_bar,     sens:'sortie'},
@@ -24384,11 +24492,7 @@ async function loadCaisse(){
         <div class="caisse-bar-row" style="justify-content:space-between">
           <div class="caisse-bar-label" style="min-width:0">${r.label}</div>
           <div class="caisse-bar-val" style="color:${r.sens==='entree'?'#22c55e':'#f87171'}">${r.sens==='entree'?'+':'−'} ${_htg(r.val)}</div>
-        </div>`).join('') + ((ad.hotel_usd||0) > 0 ? `
-        <div class="caisse-bar-row" style="justify-content:space-between;border-top:1px dashed rgba(255,255,255,.15);margin-top:6px;padding-top:8px">
-          <div class="caisse-bar-label" style="min-width:0">Hôtel — dollars reçus (fonds USD à part, hors cash gourdes)</div>
-          <div class="caisse-bar-val" style="color:#38bdf8">${_usd(ad.hotel_usd)}</div>
-        </div>` : '');
+        </div>`).join('') + _caisseBlocDollars(ad.dollars);
     }
 
     // ── Cash carburant encaissé — total + détail Gazoline / Diesel ──
@@ -24911,7 +25015,8 @@ function _posDbRenderKpis(k, meta){
   set('posdb-kpi-nb',     nb);
   set('posdb-kpi-hier',   posGx(prev));
 
-  set('posdb-kpi-cash-pct',   ca > 0 ? t('pos.dash.pctofca',{pct:Math.round(cash/ca*100)}) : '—');
+  set('posdb-kpi-cash-pct',   (ca > 0 ? t('pos.dash.pctofca',{pct:Math.round(cash/ca*100)}) : '—')
+    + ((k.cash_usd||0) > 0 ? ` · + ${_usd(k.cash_usd)} reçus en dollars` : ''));
   set('posdb-kpi-credit-pct', ca > 0 ? t('pos.dash.pctofca',{pct:Math.round(credit/ca*100)}) : '—');
   set('posdb-kpi-moy',        nb > 0 ? t('pos.dash.kpi.avgticket',{v:posGx(ca/nb)}) : t('pos.dash.kpi.novente'));
 
@@ -25499,7 +25604,7 @@ async function _posDashLoadData(caissier_id){
     const cred  = document.getElementById('pos-dash-credit');
     if(nb)    nb.textContent    = d.nb_ventes||0;
     if(total) total.textContent = posGx(d.total||0);
-    if(cash)  cash.textContent  = posGx(d.cash||0);
+    if(cash)  cash.innerHTML    = posGx(d.cash||0) + ((d.cash_usd||0) > 0 ? `<div style="font-size:12px;color:#38bdf8">+ ${_usd(d.cash_usd)}</div>` : '');
     if(cred)  cred.textContent  = posGx(d.credit||0);
 
     // Évolution
@@ -25934,7 +26039,12 @@ function posShowReceipt(result, cart, montantRecu, clientNom, mode, caissierNom)
   <hr class="sep">
   <table>
     <tr><td style="font-size:15px;font-weight:700;padding:2px 0">TOTAL</td><td style="font-size:15px;font-weight:700;text-align:right;padding:2px 0">G ${total.toFixed(2)}</td></tr>
-    ${mode==='CASH'&&montantRecu>0?`
+    ${result.devise==='USD'?`
+      <tr><td style="font-size:13px;font-weight:700;padding:2px 0">Payé en dollars</td><td style="font-size:13px;font-weight:700;text-align:right;padding:2px 0">$ ${parseFloat(result.montant_devise||0).toFixed(2)}</td></tr>
+      <tr><td style="font-size:12px;color:#555;padding:2px 0">Taux</td><td style="font-size:12px;text-align:right;padding:2px 0">${result.taux_change} G / $</td></tr>
+      ${montantRecu>0?`<tr><td style="font-size:13px;color:#555;padding:2px 0">Reçu</td><td style="font-size:13px;text-align:right;padding:2px 0">$ ${montantRecu.toFixed(2)}</td></tr>
+      <tr><td style="font-size:14px;font-weight:700;padding:3px 0">Monnaie</td><td style="font-size:14px;font-weight:700;text-align:right;padding:3px 0">$ ${(montantRecu-parseFloat(result.montant_devise||0)).toFixed(2)}</td></tr>`:''}`:''}
+    ${result.devise!=='USD'&&mode==='CASH'&&montantRecu>0?`
       <tr><td style="font-size:13px;color:#555;padding:2px 0">Montant reçu</td><td style="font-size:13px;text-align:right;padding:2px 0">G ${montantRecu.toFixed(2)}</td></tr>
       <tr><td style="font-size:14px;font-weight:700;padding:3px 0">Monnaie</td><td style="font-size:14px;font-weight:700;text-align:right;padding:3px 0">G ${(montantRecu-total).toFixed(2)}</td></tr>`:''
     }
@@ -25960,13 +26070,48 @@ function posPrintReceipt(){
   _posOuvrirImprimer(paper.innerHTML, `Ticket ${_branding.nom}`);
 }
 
+// Paiement en dollars : le client remet l'équivalent du total au taux du
+// jour ; la vente reste en gourdes, les dollars vont dans la caisse USD.
+async function posDeviseChange(){
+  const usd = document.getElementById('pos-devise')?.value === 'USD';
+  document.getElementById('pos-taux-wrap').style.display = usd ? '' : 'none';
+  const t = document.getElementById('pos-taux');
+  if(usd && t && !t.value) t.value = await tauxUsdDuJour();
+  const recu = document.getElementById('pos-montant-recu');
+  if(recu) recu.placeholder = usd ? '$ 0.00' : 'G 0.00';
+  posCalcMonnaie();
+}
+function _posDevise(){
+  const devise = document.getElementById('pos-devise')?.value || 'HTG';
+  const taux = devise==='USD' ? (parseFloat(document.getElementById('pos-taux')?.value||0) || 0) : 0;
+  return { devise, taux };
+}
+
 function posCalcMonnaie(){
   const display = document.getElementById('pos-monnaie-display');
   if(!display) return;
+  const { devise, taux } = _posDevise();
+  const totalG = _posCart.reduce((s,it)=>s+it.prix*it.quantite, 0);
+  const info = document.getElementById('pos-devise-info');
+  if(info){
+    const usdOk = devise==='USD' && taux > 0 && _posMode !== 'CREDIT';
+    info.style.display = usdOk ? '' : 'none';
+    if(usdOk) info.textContent = `À encaisser en dollars : ${_usd(totalG/taux)} (taux ${taux})`;
+  }
   if(_posMode !== 'CASH'){ display.style.display='none'; return; }
   const recu = parseFloat(document.getElementById('pos-montant-recu')?.value||0);
   if(!recu){ display.style.display='none'; return; }
-  const total = _posCart.reduce((s,it)=>s+it.prix*it.quantite, 0);
+  if(devise==='USD'){
+    if(!taux){ display.style.display='none'; return; }
+    const m = recu - totalG/taux;
+    display.style.display = '';
+    display.style.background = m >= 0 ? 'rgba(63,182,168,.12)' : 'rgba(248,113,113,.1)';
+    display.style.border = m >= 0 ? '1px solid rgba(63,182,168,.35)' : '1px solid rgba(248,113,113,.3)';
+    display.style.color = m >= 0 ? '#3fb6a8' : '#f87171';
+    display.textContent = m >= 0 ? `Monnaie à rendre : ${_usd(m)} (≈ ${posGx(m*taux)})` : `Manque : ${_usd(-m)}`;
+    return;
+  }
+  const total = totalG;
   const monnaie = recu - total;
   display.style.display = '';
   if(monnaie >= 0){
@@ -26003,9 +26148,14 @@ async function posEncaisser(){
     }
     const caissierNom = caissierSel && caissierSel.selectedIndex > 0 ? caissierSel.options[caissierSel.selectedIndex].text : '';
     const montantRecuVal = parseFloat(document.getElementById('pos-montant-recu')?.value||0);
+    const dv = _posDevise();
+    if(dv.devise==='USD' && !dv.taux && _posMode!=='CREDIT'){
+      btn.disabled = false; btn.textContent = t('pos.caisse.encaisser');
+      posAlert('Indiquez le taux du dollar.', 'warn'); return;
+    }
     if(_posMode==='CASH'){
-      const total = _posCart.reduce((s,it)=>s+it.prix*it.quantite, 0);
-      if(montantRecuVal > 0 && montantRecuVal < total){
+      const total = _posCart.reduce((s,it)=>s+it.prix*it.quantite, 0) / (dv.devise==='USD' ? dv.taux : 1);
+      if(montantRecuVal > 0 && montantRecuVal < total - 0.005){
         btn.disabled = false; btn.textContent = t('pos.caisse.encaisser');
         posAlert(t('pos.caisse.err.montantInsuffisant',{v:(total-montantRecuVal).toFixed(2)}), 'warn'); return;
       }
@@ -26022,8 +26172,12 @@ async function posEncaisser(){
       client_id: clientId,
       montant_paye: montantPaye,
       caissier_id: caissierSel && caissierSel.value ? parseInt(caissierSel.value) : null,
+      devise: dv.devise,
+      taux_change: dv.devise==='USD' ? dv.taux : null,
     };
     const result = await apiFetch('POST','/pos/ventes', payload);
+    const _devSel = document.getElementById('pos-devise');
+    if(_devSel && _devSel.value !== 'HTG'){ _devSel.value = 'HTG'; posDeviseChange(); }
     _posCart = [];
     document.getElementById('pos-client-nom').value = '';
     _clientAcClearSelection('pos-client-nom');
@@ -28954,15 +29108,34 @@ function posRembModal(creditId){
   setTimeout(()=>document.getElementById('pos-remb-remis')?.focus(),120);
 }
 
-function posRembCalcMonnaie(){
+async function posRembDevise(){
+  const usd = document.getElementById('pos-remb-devise')?.value === 'USD';
+  document.getElementById('pos-remb-taux-wrap').style.display = usd ? '' : 'none';
+  const t = document.getElementById('pos-remb-taux');
+  if(usd && t && !t.value) t.value = await tauxUsdDuJour();
+  document.getElementById('pos-remb-remis-label').textContent = `Montant remis par le client (${usd?'$':'G'})`;
+  posRembCalcMonnaie();
+}
+// Solde à rembourser dans la devise choisie (dollars : solde ÷ taux).
+function _posRembDu(){
   const solde = parseFloat(_posRembCreditCourant?.solde||0);
+  const usd = document.getElementById('pos-remb-devise')?.value === 'USD';
+  const taux = parseFloat(document.getElementById('pos-remb-taux')?.value||0) || 0;
+  return usd ? { usd:true, taux, du: taux ? Math.round(solde/taux*100)/100 : 0 } : { usd:false, taux:0, du: solde };
+}
+
+function posRembCalcMonnaie(){
+  const r = _posRembDu();
+  const solde = r.du;
+  const info = document.getElementById('pos-remb-usd-info');
+  if(info){ info.style.display = r.usd && r.taux ? '' : 'none'; info.textContent = `À payer en dollars : ${_usd(r.du)}`; }
   const remis = parseFloat(document.getElementById('pos-remb-remis').value||0);
   const box   = document.getElementById('pos-remb-monnaie-box');
   const el    = document.getElementById('pos-remb-monnaie');
   if(remis>0){
     const monnaie = remis - solde;
     box.style.display = 'flex';
-    el.textContent   = posGx(Math.max(0,monnaie));
+    el.textContent   = r.usd ? _usd(Math.max(0,monnaie)) : posGx(Math.max(0,monnaie));
     el.style.color   = monnaie>=0 ? '#34d399' : '#f87171';
   } else { box.style.display = 'none'; }
 }
@@ -28971,12 +29144,16 @@ async function posEnregistrerRemb(){
   const creditId = parseInt(document.getElementById('pos-remb-credit-id').value);
   const credit   = _posRembCreditCourant;
   if(!credit||!creditId){ posAlert('Crédit introuvable.'); return; }
-  const montant = parseFloat(credit.solde);
+  const r = _posRembDu();
+  if(r.usd && !r.taux){ posAlert('Indiquez le taux du dollar.','warn'); return; }
+  const montant = r.usd ? r.du : parseFloat(credit.solde);
   const remis   = parseFloat(document.getElementById('pos-remb-remis').value||0);
   const notes   = document.getElementById('pos-remb-notes').value.trim()||null;
   if(montant<=0){ posAlert('Solde déjà nul.'); return; }
   try {
-    const result = await apiFetch('POST',`/pos/credits/${creditId}/remboursement`,{ montant, notes });
+    const result = await apiFetch('POST',`/pos/credits/${creditId}/remboursement`,
+      { montant, notes, devise: r.usd ? 'USD' : 'HTG', taux_change: r.usd ? r.taux : null });
+    const _sel = document.getElementById('pos-remb-devise'); if(_sel){ _sel.value='HTG'; posRembDevise(); }
     document.getElementById('pos-remb-modal-bg').classList.remove('open');
     _posAfficherRembRecu({ credit, montant, remis, monnaie: Math.max(0,remis-montant),
       notes, solde_restant: result.solde_restant,
@@ -29883,6 +30060,9 @@ function _gcRender(d){
     caisseEl.textContent = posGx(caisse.disponible);
     caisseEl.style.color = caisse.disponible >= 0 ? '#34d399' : '#f87171';
   }
+  const gcSub = document.getElementById('gc-kpi-caisse-sub');
+  if(gcSub) gcSub.innerHTML = 'Ventes cash + remboursements + renflouements − achats − paie − dépenses'
+    + ((caisse.disponible_usd||0) > 0 ? `<br><b style="color:#38bdf8">+ ${_usd(caisse.disponible_usd)} reçus en dollars (caisse USD séparée)</b>` : '');
   const btnRenflBar = document.getElementById('gc-btn-renfl');
   if(btnRenflBar) btnRenflBar.style.display = (_appUser?.role === 'pdg' || _isAdmin()) ? '' : 'none';
 
@@ -31531,14 +31711,26 @@ function ckFermerPaiement(){
   document.getElementById('ck-pay-bg').classList.remove('open');
 }
 
+// Total à encaisser dans la devise choisie (dollars : total ÷ taux).
+function _ckTotalDevise(){
+  const totalG = _ckCart.reduce((s, it) => s + it.prix * it.quantite, 0);
+  const { devise, taux_change } = deviseLue('ck');
+  if(devise === 'USD') return { devise, taux: taux_change, total: taux_change ? Math.round(totalG/taux_change*100)/100 : 0 };
+  return { devise, taux: null, total: totalG };
+}
+
 function ckCalcMonnaie(){
-  const total = _ckCart.reduce((s, it) => s + it.prix * it.quantite, 0);
+  const d = _ckTotalDevise();
+  const total = d.total;
+  const info = document.getElementById('ck-usd-info');
+  if(info){ info.style.display = d.devise==='USD' ? '' : 'none'; info.textContent = `À encaisser en dollars : ${_usd(d.total)}`; }
+  const lbl = document.getElementById('ck-pay-recu-label'); if(lbl) lbl.textContent = `Montant reçu (${d.devise==='USD'?'$':'G'})`;
   const recu  = parseFloat(document.getElementById('ck-pay-recu')?.value || 0);
   const box   = document.getElementById('ck-pay-monnaie-box');
   const el    = document.getElementById('ck-pay-monnaie');
   if(recu >= total && box && el){
     box.style.display = '';
-    el.textContent    = posGx(recu - total);
+    el.textContent    = d.devise==='USD' ? _usd(recu - total) : posGx(recu - total);
   } else if(box){
     box.style.display = 'none';
   }
@@ -31549,8 +31741,10 @@ async function ckEnregistrerVente(){
   const mode   = document.getElementById('ck-pay-mode')?.value || 'CASH';
   const client = document.getElementById('ck-pay-client')?.value.trim() || '';
   const recu   = parseFloat(document.getElementById('ck-pay-recu')?.value || 0);
-  const total  = _ckCart.reduce((s, it) => s + it.prix * it.quantite, 0);
-  if(mode === 'CASH' && recu < total){ posAlert('Montant reçu insuffisant.','warn'); return; }
+  const dv     = _ckTotalDevise();
+  if(dv.devise === 'USD' && !dv.taux){ posAlert('Indiquez le taux du dollar.','warn'); return; }
+  const total  = dv.total;
+  if(mode === 'CASH' && recu < total - 0.005){ posAlert('Montant reçu insuffisant.','warn'); return; }
 
   const payload = {
     lignes: _ckCart.map(it => ({
@@ -31561,10 +31755,13 @@ async function ckEnregistrerVente(){
     })),
     mode_paiement: mode,
     client_nom:    client,
+    devise:        dv.devise,
+    taux_change:   dv.taux,
   };
 
   try {
     const result = await apiFetch('POST', '/cuisine/ventes', payload);
+    const _cd = document.getElementById('ck-devise'); if(_cd){ _cd.value = 'HTG'; deviseChampsMaj('ck'); }
     ckFermerPaiement();
     _ckRecuCourant = { result, cart: [..._ckCart], total, recu, mode, client };
     ckAfficherRecu(_ckRecuCourant);
@@ -32749,7 +32946,8 @@ async function ckaSyntheseCharger(){
     const caisse = d.caisse || {disponible: 0};
     const caisseEl = document.getElementById('cka-kpi-caisse');
     if(caisseEl){
-      caisseEl.textContent = posGx(caisse.disponible);
+      caisseEl.innerHTML = posGx(caisse.disponible)
+        + ((caisse.disponible_usd||0) > 0 ? `<div style="font-size:13px;color:#38bdf8">+ ${_usd(caisse.disponible_usd)} (caisse dollars)</div>` : '');
       caisseEl.style.color = caisse.disponible >= 0 ? '#4ade80' : '#f87171';
     }
     const btnRenflCuisine = document.getElementById('cka-btn-renfl');
@@ -32912,7 +33110,8 @@ async function loadPatisserieDashboard(){
       `Ventes cash : ${fmtG(d.caisse.ventes_cash)}<br>`+
       `Renflouements : ${fmtG(d.caisse.renflouements)}<br>`+
       `− Achats confirmés : ${fmtG(d.caisse.achats)}<br>`+
-      `− Dépenses : ${fmtG(d.caisse.depenses)}`;
+      `− Dépenses : ${fmtG(d.caisse.depenses)}`
+      + ((d.caisse.disponible_usd||0) > 0 ? `<br><b style="color:#38bdf8">Caisse dollars : ${_usd(d.caisse.disponible_usd)}</b>` : '');
     const benEl = document.getElementById('ptd-benefice');
     benEl.textContent = fmtG(d.benefice) + ` (${d.marge_pct}%)`;
     benEl.style.color = d.benefice >= 0 ? '#34d399' : '#f87171';
@@ -33283,6 +33482,8 @@ function ptVenteRecalculer(){
     if(p) total += p.prix_vente * (l.quantite||0);
   }
   document.getElementById('pt-vente-total').textContent = fmtG(total).replace(' G','');
+  const dv = deviseLue('pt-vente'); const u = document.getElementById('pt-vente-total-usd');
+  if(u) u.textContent = dv.devise==='USD' && dv.taux_change ? `= ${_usd(total/dv.taux_change)}` : '';
 }
 
 async function ptVenteSauvegarder(){
@@ -33292,12 +33493,16 @@ async function ptVenteSauvegarder(){
   const lignes = _ptVenteLignes.filter(l=>l.produit_id && l.quantite>0);
   if(!lignes.length){ posAlert('Ajoutez au moins un article.','warn'); return; }
   try{
-    await apiFetch('POST', '/patisserie/ventes', {
+    const dv = deviseLue('pt-vente');
+    if(dv.devise === 'USD' && !dv.taux_change){ posAlert('Indiquez le taux du dollar.','warn'); return; }
+    const r = await apiFetch('POST', '/patisserie/ventes', {
       caissier_id: caissierId,
       mode_paiement: document.getElementById('pt-vente-mode').value,
       client_nom: document.getElementById('pt-vente-client').value.trim(),
-      lignes,
+      lignes, ...dv,
     });
+    if(r && r.devise === 'USD') posAlert(`Payé en dollars : ${_usd(r.montant_devise)}.`,'ok');
+    const _pd = document.getElementById('pt-vente-devise'); if(_pd){ _pd.value='HTG'; deviseChampsMaj('pt-vente'); }
     ptVenteFermerModal(); posAlert('Vente enregistrée.','ok'); loadPatisserieVentes(); loadPatisserieProduits();
   }catch(e){ posAlert(e.message||'Erreur.'); }
 }
@@ -35085,6 +35290,454 @@ async function hotelEmpDesactiver(id, nom){
 let _hdepData = [];
 
 // ══════════════════════════════════════════════════════════════════
+// DEVISES — sélecteur gourdes / dollars réutilisable
+// ══════════════════════════════════════════════════════════════════
+// Taux du jour commun à tous les départements (/api/devise/taux).
+let _tauxUsd = null;
+async function tauxUsdDuJour(force){
+  if(_tauxUsd && !force) return _tauxUsd;
+  try { _tauxUsd = (await apiFetch('GET','/devise/taux')).taux_usd; } catch(e){ _tauxUsd = _tauxUsd || 130; }
+  return _tauxUsd;
+}
+// HTML : choix de la devise + taux. `onchange` est rappelé à chaque saisie.
+function deviseChampsHtml(prefix, onchange){
+  return `<div class="pos-form-row">
+    <div><label class="pos-label">Payé en</label>
+      <select class="pos-select" id="${prefix}-devise" onchange="deviseChampsMaj('${prefix}');${onchange||''}">
+        <option value="HTG">Gourdes (HTG)</option><option value="USD">Dollars (USD)</option>
+      </select></div>
+    <div id="${prefix}-taux-wrap" style="display:none"><label class="pos-label">Taux (G pour 1 $)</label>
+      <input class="pos-input" id="${prefix}-taux" type="number" min="0.0001" step="any" oninput="${onchange||''}"></div>
+  </div>`;
+}
+async function deviseChampsMaj(prefix){
+  const usd = document.getElementById(prefix+'-devise')?.value === 'USD';
+  const w = document.getElementById(prefix+'-taux-wrap'); if(w) w.style.display = usd ? '' : 'none';
+  const t = document.getElementById(prefix+'-taux');
+  if(usd && t && !t.value){ t.value = await tauxUsdDuJour(); t.dispatchEvent(new Event('input')); }
+}
+function deviseLue(prefix){
+  const devise = document.getElementById(prefix+'-devise')?.value || 'HTG';
+  const taux = devise==='USD' ? (parseFloat(document.getElementById(prefix+'-taux')?.value||0) || null) : null;
+  return { devise, taux_change: taux };
+}
+// « 1 300,00 G » ou « 10,00 $ (≈ 1 300,00 G) » selon la devise.
+function montantDevise(devise, montant, montantHtg){
+  if(devise === 'USD') return `${_usd(montant)}${montantHtg!=null?` <span style="color:rgba(255,255,255,.4);font-size:11px">≈ ${posGx(montantHtg)}</span>`:''}`;
+  return posGx(montant);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// DÉPÔT CENTRAL (/api/depot)
+// ══════════════════════════════════════════════════════════════════
+const _DEP_DEST = { DEVANT:'Bar Devant', PISCINE:'Bar Piscine', CLIENT:'Client externe' };
+const _DEP_STATUT = {
+  EN_ATTENTE:['À réceptionner','#fbbf24'], ECART:['Écart — correction','#f87171'], RECEPTIONNE:['Réceptionné','#34d399'], ANNULE:['Annulé','#94a3b8'],
+  PREPAREE:['Préparée','#fbbf24'], VALIDEE:['Validée','#34d399'], ANNULEE:['Annulée','#94a3b8'],
+  NON_PAYEE:['Non payée','#f87171'], PARTIELLE:['Payée en partie','#fbbf24'], PAYEE:['Payée','#34d399'],
+};
+let _depProduits = [];
+let _depAchats = [], _depTx = [], _depLignes = [], _depEditAchat = null;
+
+const depBadge = s => { const [l,c] = _DEP_STATUT[s] || [s,'#94a3b8']; return `<span style="padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700;background:${c}22;color:${c}">${l}</span>`; };
+const depDate = iso => { const d=new Date(iso); return isNaN(d)?'—':d.toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}); };
+const depAdmin = () => _isAdmin() || ['pdg','admin'].includes(_appUser?.role);
+function depHeader(titre, sub, actions){
+  return `<div class="pos-header">
+    <div class="pos-header-icon" style="background:linear-gradient(135deg,#a78bfa,#6d28d9)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-8h6v8"/></svg></div>
+    <div><div class="pos-header-title">${titre}</div><div class="pos-header-sub">${sub}</div></div>
+    <div class="pos-header-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${actions||''}</div></div>`;
+}
+function depOuvrir(html){ document.getElementById('depot-modal').innerHTML = html; document.getElementById('depot-modal-bg').classList.add('open'); }
+function depFermer(){ document.getElementById('depot-modal-bg').classList.remove('open'); }
+async function depChargerProduits(){ _depProduits = await apiFetch('GET','/depot/produits'); return _depProduits; }
+const depOptionsProduits = (sel) => _depProduits.map(p=>`<option value="${p.id}" ${String(p.id)===String(sel)?'selected':''}>${esc(p.nom)} — dépôt ${fmtQ(p.stock_depot)}</option>`).join('');
+
+// ── Inventaire & prix ─────────────────────────────────────────────
+async function loadDepotProduits(){
+  const root = document.getElementById('depot-produits-root');
+  root.innerHTML = depHeader('Dépôt central — Inventaire & prix', 'Stock du dépôt et des bars · prix de vente · quantité minimum',
+    `<input class="pos-input" id="dep-prod-q" placeholder="Rechercher…" oninput="depRendreProduits()" style="width:200px">`)
+    + `<div class="pos-kpi-grid" id="dep-prod-kpi"></div><div class="pos-card"><div class="pos-table-wrap"><table class="pos-table">
+      <thead><tr><th>Produit</th><th>Catégorie</th><th style="text-align:right">Dépôt</th><th style="text-align:right">Bar Devant</th><th style="text-align:right">Bar Piscine</th><th style="text-align:right">Prix vente</th><th style="text-align:right">Min.</th><th style="text-align:right">Coût moyen</th><th style="text-align:right">Valeur</th><th></th></tr></thead>
+      <tbody id="dep-prod-tbody"><tr><td colspan="10" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody></table></div></div>`;
+  try { await depChargerProduits(); depRendreProduits(); } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+function depRendreProduits(){
+  const q = _navNorm(document.getElementById('dep-prod-q')?.value||'');
+  const ps = _depProduits.filter(p => !q || _navNorm(p.nom+' '+(p.categorie||'')).includes(q));
+  const valeur = _depProduits.reduce((s,p)=>s+p.valeur_stock,0);
+  document.getElementById('dep-prod-kpi').innerHTML =
+    `<div class="pos-kpi"><div class="pos-kpi-label">Produits</div><div class="pos-kpi-val">${_depProduits.length}</div></div>
+     <div class="pos-kpi"><div class="pos-kpi-label">Valeur du stock dépôt</div><div class="pos-kpi-val" style="color:#a78bfa">${posGx(valeur)}</div></div>
+     <div class="pos-kpi"><div class="pos-kpi-label">Sous le minimum</div><div class="pos-kpi-val" style="color:#f87171">${_depProduits.filter(p=>p.alerte).length}</div></div>`;
+  const ro = _isReadOnly() && !depAdmin();
+  document.getElementById('dep-prod-tbody').innerHTML = ps.map(p=>`<tr${p.alerte?' style="background:rgba(248,113,113,.06)"':''}>
+    <td><b>${esc(p.nom)}</b>${p.alerte?' <span style="color:#f87171;font-size:11px">sous le minimum</span>':''}</td>
+    <td>${esc(p.categorie||'—')}</td>
+    <td style="text-align:right;font-weight:700">${fmtQ(p.stock_depot)}</td>
+    <td style="text-align:right">${fmtQ(p.stock_devant)}</td><td style="text-align:right">${fmtQ(p.stock_piscine)}</td>
+    <td style="text-align:right">${posGx(p.prix_vente)}</td><td style="text-align:right">${fmtQ(p.seuil_min)}</td>
+    <td style="text-align:right;color:rgba(255,255,255,.55)">${posGx(p.cout_moyen)}</td>
+    <td style="text-align:right">${posGx(p.valeur_stock)}</td>
+    <td>${ro?'':`<button class="pos-btn ghost" style="padding:3px 9px;font-size:12px" onclick="depConfigProduit(${p.id})">Prix / min.</button>`}</td>
+  </tr>`).join('') || '<tr><td colspan="10" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucun produit</td></tr>';
+}
+function depConfigProduit(id){
+  const p = _depProduits.find(x=>x.id===id); if(!p) return;
+  depOuvrir(`<h3>${esc(p.nom)}</h3><div class="pos-form-row">
+    <div><label class="pos-label">Prix de vente (G)</label><input class="pos-input" id="dep-cfg-prix" type="number" min="0.01" step="any" value="${p.prix_vente||''}"></div>
+    <div><label class="pos-label">Quantité minimum (alerte)</label><input class="pos-input" id="dep-cfg-min" type="number" min="0" step="any" value="${p.seuil_min||0}"></div></div>
+    <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Annuler</button><button class="pos-btn primary" onclick="depConfigSauver(${id})">Enregistrer</button></div>`);
+}
+async function depConfigSauver(id){
+  try {
+    await apiFetch('PUT',`/depot/produits/${id}/config`,{
+      prix_vente: parseFloat(document.getElementById('dep-cfg-prix').value)||null,
+      seuil_min:  parseFloat(document.getElementById('dep-cfg-min').value)||0 });
+    depFermer(); posAlert('Produit mis à jour.','ok'); await depChargerProduits(); depRendreProduits();
+  } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+// ── Lignes produit (achat / transaction) — calcul automatique ─────
+function depLignesHtml(mode){
+  return `<table class="pos-table"><thead><tr><th>Produit</th><th style="width:110px">Quantité</th>${mode==='achat'?'<th style="width:130px">Prix d\'achat (G)</th>':'<th style="text-align:right">Prix</th>'}<th style="text-align:right">Sous-total</th><th></th></tr></thead>
+    <tbody>${_depLignes.map((l,i)=>{
+      const p = _depProduits.find(x=>String(x.id)===String(l.produit_id));
+      const prix = mode==='achat' ? (parseFloat(l.prix)||0) : (p?.prix_vente||0);
+      const st = (parseFloat(l.quantite)||0) * prix;
+      const manque = mode!=='achat' && p && (parseFloat(l.quantite)||0) > p.stock_depot;
+      return `<tr><td><select class="pos-select" onchange="_depLignes[${i}].produit_id=this.value;depMajLignes('${mode}')"><option value="">— Produit —</option>${depOptionsProduits(l.produit_id)}</select>
+          ${manque?`<div style="color:#f87171;font-size:12px">Stock insuffisant (dépôt : ${fmtQ(p.stock_depot)})</div>`:''}</td>
+        <td><input class="pos-input" type="number" min="0" step="any" value="${l.quantite||''}" onchange="_depLignes[${i}].quantite=this.value;depMajLignes('${mode}')"></td>
+        ${mode==='achat'?`<td><input class="pos-input" type="number" min="0" step="any" value="${l.prix||''}" onchange="_depLignes[${i}].prix=this.value;depMajLignes('${mode}')"></td>`:`<td style="text-align:right">${posGx(prix)}</td>`}
+        <td style="text-align:right;font-weight:700">${posGx(st)}</td>
+        <td><button class="pos-btn ghost" style="padding:2px 8px" onclick="_depLignes.splice(${i},1);depMajLignes('${mode}')">✕</button></td></tr>`;
+    }).join('')}</tbody></table>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+      <button class="pos-btn ghost" onclick="_depLignes.push({});depMajLignes('${mode}')">+ Ajouter un produit</button>
+      <div style="font-size:18px">Total : <b id="dep-total" style="color:#34d399">${posGx(depTotalLignes(mode))}</b></div></div>`;
+}
+function depTotalLignes(mode){
+  return _depLignes.reduce((s,l)=>{
+    const p = _depProduits.find(x=>String(x.id)===String(l.produit_id));
+    const prix = mode==='achat' ? (parseFloat(l.prix)||0) : (p?.prix_vente||0);
+    return s + (parseFloat(l.quantite)||0)*prix;
+  },0);
+}
+function depMajLignes(mode){ const w=document.getElementById('dep-lignes'); if(w) w.innerHTML = depLignesHtml(mode); }
+
+// ── Achats & réception ────────────────────────────────────────────
+async function loadDepotAchats(){
+  const root = document.getElementById('depot-achats-root');
+  root.innerHTML = depHeader('Achats & réception', 'Enregistrer la facture fournisseur · contrôler la marchandise · entrer en stock',
+    `<select class="pos-select" id="dep-ach-statut" onchange="depChargerAchats()" style="width:170px"><option value="">Tous statuts</option><option value="EN_ATTENTE">À réceptionner</option><option value="ECART">Écart</option><option value="RECEPTIONNE">Réceptionnés</option><option value="ANNULE">Annulés</option></select>
+     ${_isReadOnly()&&!depAdmin()?'':'<button class="pos-btn primary" onclick="depNouvelAchat()">+ Nouvel achat</button>'}`)
+    + `<div class="pos-card"><div class="pos-table-wrap"><table class="pos-table"><thead><tr><th>N°</th><th>Date</th><th>Fournisseur</th><th>Facture</th><th style="text-align:right">Total</th><th>Statut</th><th></th></tr></thead>
+      <tbody id="dep-ach-tbody"><tr><td colspan="7" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody></table></div></div>`;
+  await depChargerProduits().catch(()=>{});
+  await depChargerAchats();
+}
+async function depChargerAchats(){
+  const st = document.getElementById('dep-ach-statut')?.value || '';
+  try { _depAchats = await apiFetch('GET', `/depot/achats${st?'?statut='+st:''}`); } catch(e){ posAlert(e.message,'err'); return; }
+  const ro = _isReadOnly() && !depAdmin();
+  document.getElementById('dep-ach-tbody').innerHTML = _depAchats.map(a=>`<tr>
+    <td><b>${a.numero}</b></td><td>${depDate(a.created_at)}</td><td>${esc(a.fournisseur)}</td><td>${esc(a.numero_facture||'—')}</td>
+    <td style="text-align:right;font-weight:700">${posGx(a.total)}</td>
+    <td>${depBadge(a.statut)}${a.ecart_notes?`<div style="font-size:11px;color:#f87171;max-width:260px">${esc(a.ecart_notes)}</div>`:''}</td>
+    <td style="white-space:nowrap">
+      <button class="pos-btn ghost" style="padding:3px 9px;font-size:12px" onclick="depVoirAchat(${a.id})">Détail</button>
+      ${!ro && ['EN_ATTENTE','ECART'].includes(a.statut)?`<button class="pos-btn teal" style="padding:3px 9px;font-size:12px" onclick="depReception(${a.id})">Réceptionner</button>
+        <button class="pos-btn ghost" style="padding:3px 9px;font-size:12px" onclick="depNouvelAchat(${a.id})">Corriger</button>`:''}
+      ${depAdmin() && ['EN_ATTENTE','ECART'].includes(a.statut)?`<button class="pos-btn ghost" style="padding:3px 9px;font-size:12px;color:#f87171" onclick="depAnnulerAchat(${a.id})">Annuler</button>`:''}
+    </td></tr>`).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucun achat</td></tr>';
+}
+function depNouvelAchat(id){
+  const a = id ? _depAchats.find(x=>x.id===id) : null;
+  _depEditAchat = id || null;
+  _depLignes = a ? a.lignes.map(l=>({produit_id:l.produit_id, quantite:l.quantite, prix:l.prix_achat})) : [{}];
+  depOuvrir(`<h3>${a?'Corriger l\'achat '+a.numero:'Nouvel achat de marchandises'}</h3>
+    <div class="pos-form-row">
+      <div><label class="pos-label">Fournisseur *</label><input class="pos-input" id="dep-a-four" value="${esc(a?.fournisseur||'')}"></div>
+      <div><label class="pos-label">N° facture</label><input class="pos-input" id="dep-a-fact" value="${esc(a?.numero_facture||'')}"></div>
+      <div><label class="pos-label">Date facture</label><input class="pos-input" id="dep-a-date" type="date" value="${a?.date_facture||''}"></div></div>
+    <div id="dep-lignes" style="margin:10px 0">${depLignesHtml('achat')}</div>
+    <div><label class="pos-label">Notes</label><input class="pos-input" id="dep-a-notes" value="${esc(a?.notes||'')}"></div>
+    <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Annuler</button><button class="pos-btn primary" onclick="depSauverAchat()">Enregistrer l'achat</button></div>`);
+}
+async function depSauverAchat(){
+  const lignes = _depLignes.filter(l=>l.produit_id && parseFloat(l.quantite)>0).map(l=>({produit_id:parseInt(l.produit_id), quantite:parseFloat(l.quantite), prix_achat:parseFloat(l.prix)||0}));
+  const body = { fournisseur: document.getElementById('dep-a-four').value.trim(), numero_facture: document.getElementById('dep-a-fact').value.trim()||null,
+                 date_facture: document.getElementById('dep-a-date').value||null, notes: document.getElementById('dep-a-notes').value.trim()||null, lignes };
+  if(!body.fournisseur){ posAlert('Fournisseur requis.','warn'); return; }
+  if(!lignes.length){ posAlert('Ajoutez au moins un produit avec une quantité.','warn'); return; }
+  try {
+    if(_depEditAchat) await apiFetch('PUT',`/depot/achats/${_depEditAchat}`, body); else await apiFetch('POST','/depot/achats', body);
+    depFermer(); posAlert('Achat enregistré — à réceptionner au dépôt.','ok'); await depChargerAchats();
+  } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+function depVoirAchat(id){
+  const a = _depAchats.find(x=>x.id===id); if(!a) return;
+  depOuvrir(`<h3>${a.numero} — ${esc(a.fournisseur)}</h3><div style="margin-bottom:8px">${depBadge(a.statut)} · facture ${esc(a.numero_facture||'—')} · créé par ${esc(a.cree_par||'—')}${a.receptionne_par?` · reçu par ${esc(a.receptionne_par)} le ${depDate(a.date_reception)}`:''}</div>
+    <table class="pos-table"><thead><tr><th>Produit</th><th style="text-align:right">Facturé</th><th style="text-align:right">Reçu</th><th style="text-align:right">Écart</th><th style="text-align:right">Prix</th><th style="text-align:right">Sous-total</th></tr></thead><tbody>
+    ${a.lignes.map(l=>`<tr><td>${esc(l.produit_nom)}</td><td style="text-align:right">${fmtQ(l.quantite)}</td><td style="text-align:right">${l.quantite_recue==null?'—':fmtQ(l.quantite_recue)}</td>
+      <td style="text-align:right;color:${l.ecart?'#f87171':'inherit'}">${l.ecart==null?'—':(l.ecart>0?'+':'')+fmtQ(l.ecart)}</td><td style="text-align:right">${posGx(l.prix_achat)}</td><td style="text-align:right">${posGx(l.sous_total)}</td></tr>`).join('')}
+    </tbody></table><div style="text-align:right;font-size:17px;margin-top:8px">Total : <b>${posGx(a.total)}</b></div>
+    <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Fermer</button></div>`);
+}
+function depReception(id){
+  const a = _depAchats.find(x=>x.id===id); if(!a) return;
+  depOuvrir(`<h3>Réception ${a.numero} — ${esc(a.fournisseur)}</h3>
+    <div style="font-size:13px;color:rgba(255,255,255,.55);margin-bottom:8px">Comptez la marchandise reçue. Si tout est conforme, le stock du dépôt est mis à jour.</div>
+    <table class="pos-table"><thead><tr><th>Produit</th><th style="text-align:right">Facturé</th><th style="width:130px">Reçu (compté)</th><th style="text-align:right">Écart</th></tr></thead><tbody>
+    ${a.lignes.map(l=>`<tr><td>${esc(l.produit_nom)}</td><td style="text-align:right">${fmtQ(l.quantite)}</td>
+      <td><input class="pos-input dep-recu" data-ligne="${l.id}" data-fact="${l.quantite}" type="number" min="0" step="any" value="${l.quantite_recue ?? l.quantite}" oninput="depEcarts()"></td>
+      <td style="text-align:right" class="dep-ecart" data-ligne="${l.id}">0</td></tr>`).join('')}
+    </tbody></table>
+    <div style="margin-top:8px"><label class="pos-label">Remarque (écart, état de la marchandise…)</label><input class="pos-input" id="dep-rec-notes"></div>
+    <div id="dep-rec-msg" style="margin-top:8px;font-size:13px"></div>
+    <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Annuler</button>
+      <button class="pos-btn ghost" id="dep-rec-forcer" style="display:none;color:#fbbf24" onclick="depValiderReception(${id},true)">Valider avec l'écart</button>
+      <button class="pos-btn primary" onclick="depValiderReception(${id},false)">Valider la réception</button></div>`);
+  depEcarts();
+}
+function depEcarts(){
+  let ecart = false;
+  document.querySelectorAll('.dep-recu').forEach(inp=>{
+    const d = (parseFloat(inp.value)||0) - parseFloat(inp.dataset.fact);
+    if(Math.abs(d) > 1e-9) ecart = true;
+    const c = document.querySelector(`.dep-ecart[data-ligne="${inp.dataset.ligne}"]`);
+    if(c){ c.textContent = (d>0?'+':'')+fmtQ(d); c.style.color = d ? '#f87171' : '#34d399'; }
+  });
+  const m = document.getElementById('dep-rec-msg');
+  if(m) m.innerHTML = ecart ? '<span style="color:#f87171">Machandiz pa konfòm : la différence sera enregistrée et une correction demandée — ou validez avec l\'écart (stock = quantités comptées).</span>' : '<span style="color:#34d399">Marchandise conforme.</span>';
+  const f = document.getElementById('dep-rec-forcer'); if(f) f.style.display = ecart ? '' : 'none';
+}
+async function depValiderReception(id, forcer){
+  const lignes = [...document.querySelectorAll('.dep-recu')].map(i=>({ligne_id:parseInt(i.dataset.ligne), quantite_recue:parseFloat(i.value)||0}));
+  try {
+    const r = await apiFetch('POST',`/depot/achats/${id}/reception`,{lignes, forcer, notes: document.getElementById('dep-rec-notes').value.trim()||null});
+    depFermer();
+    posAlert(r.achat.statut==='RECEPTIONNE' ? 'Réception validée — stock du dépôt mis à jour.' : 'Écart enregistré — correction demandée.', r.achat.statut==='RECEPTIONNE'?'ok':'warn');
+    await depChargerAchats();
+  } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+async function depAnnulerAchat(id){
+  if(!confirm('Annuler cet achat ?')) return;
+  try { await apiFetch('POST',`/depot/achats/${id}/annuler`); await depChargerAchats(); } catch(e){ posAlert(e.message,'err'); }
+}
+
+// ── Transferts & ventes (factures) ────────────────────────────────
+async function loadDepotTransactions(){
+  const root = document.getElementById('depot-transactions-root');
+  const j = _pisJour();
+  root.innerHTML = depHeader('Transferts & ventes', 'Bar Devant · Bar Piscine · Client externe — une facture par transaction',
+    _isReadOnly()&&!depAdmin()?'':'<button class="pos-btn primary" onclick="depNouvelleTx()">+ Nouveau transfert / vente</button>')
+    + `<div class="pos-card"><div class="pos-card-hdr" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span style="flex:1">Journal des transferts et ventes</span>
+        <input type="date" class="pos-input" id="dep-tx-deb" value="${_pisDebutMois()}" style="width:135px">
+        <input type="date" class="pos-input" id="dep-tx-fin" value="${j}" style="width:135px">
+        <select class="pos-select" id="dep-tx-dest" style="width:150px"><option value="">Toutes destinations</option><option value="DEVANT">Bar Devant</option><option value="PISCINE">Bar Piscine</option><option value="CLIENT">Client externe</option></select>
+        <select class="pos-select" id="dep-tx-paie" style="width:150px"><option value="">Tout paiement</option><option value="NON_PAYEE">Non payées</option><option value="PARTIELLE">En partie</option><option value="PAYEE">Payées</option></select>
+        <input class="pos-input" id="dep-tx-resp" placeholder="Responsable" style="width:130px">
+        <button class="pos-btn teal" onclick="depChargerTx()">Filtrer</button></div>
+      <div class="pos-table-wrap"><table class="pos-table"><thead><tr><th>Facture</th><th>Date</th><th>Destination</th><th style="text-align:right">Total</th><th style="text-align:right">Payé</th><th style="text-align:right">Reste</th><th>Statut</th><th>Responsable</th><th></th></tr></thead>
+      <tbody id="dep-tx-tbody"><tr><td colspan="9" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody></table></div></div>`;
+  await depChargerProduits().catch(()=>{});
+  await depChargerTx();
+}
+async function depChargerTx(){
+  const g = id => document.getElementById(id)?.value || '';
+  const qs = new URLSearchParams({date_debut:g('dep-tx-deb'), date_fin:g('dep-tx-fin'), destination:g('dep-tx-dest'), statut_paiement:g('dep-tx-paie'), responsable:g('dep-tx-resp')});
+  [...qs.keys()].forEach(k=>{ if(!qs.get(k)) qs.delete(k); });
+  try { _depTx = await apiFetch('GET','/depot/transactions?'+qs.toString()); } catch(e){ posAlert(e.message,'err'); return; }
+  document.getElementById('dep-tx-tbody').innerHTML = _depTx.map(t=>depLigneTx(t)).join('') || '<tr><td colspan="9" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucune transaction</td></tr>';
+}
+function depLigneTx(t){
+  const ro = _isReadOnly() && !depAdmin();
+  return `<tr${t.statut==='ANNULEE'?' style="opacity:.45"':''}>
+    <td><b>${t.numero}</b></td><td>${depDate(t.created_at)}</td>
+    <td>${esc(t.destination_libelle)}${t.client_nom?`<div style="font-size:12px;color:rgba(255,255,255,.5)">${esc(t.client_nom)}</div>`:''}</td>
+    <td style="text-align:right;font-weight:700">${posGx(t.total)}</td>
+    <td style="text-align:right">${posGx(t.paye_htg)}${t.paye_usd?`<div style="color:#38bdf8;font-size:12px">+ ${_usd(t.paye_usd)}</div>`:''}</td>
+    <td style="text-align:right;color:${t.reste>0?'#f87171':'#34d399'}">${posGx(t.reste)}</td>
+    <td>${depBadge(t.statut)} ${t.statut==='VALIDEE'?depBadge(t.statut_paiement):''}</td>
+    <td style="font-size:12px">${esc(t.responsable||'—')}</td>
+    <td style="white-space:nowrap">
+      <button class="pos-btn ghost" style="padding:3px 9px;font-size:12px" onclick="depFacture(${t.id})">Facture</button>
+      ${!ro && t.statut==='PREPAREE'?`<button class="pos-btn teal" style="padding:3px 9px;font-size:12px" onclick="depValiderTx(${t.id})">Valider</button>`:''}
+      ${!ro && t.statut==='VALIDEE' && t.statut_paiement!=='PAYEE'?`<button class="pos-btn primary" style="padding:3px 9px;font-size:12px" onclick="depPayer(${t.id})">Payer</button>`:''}
+      ${depAdmin() && t.statut!=='ANNULEE' && !t.paye_htg && !t.paye_usd?`<button class="pos-btn ghost" style="padding:3px 9px;font-size:12px;color:#f87171" onclick="depAnnulerTx(${t.id})">Annuler</button>`:''}
+    </td></tr>`;
+}
+function depNouvelleTx(){
+  _depLignes = [{}];
+  depOuvrir(`<h3>Nouveau transfert / vente</h3>
+    <div class="pos-form-row"><div><label class="pos-label">Destination *</label>
+      <select class="pos-select" id="dep-tx-d" onchange="document.getElementById('dep-tx-client').style.display=this.value==='CLIENT'?'':'none'">
+        <option value="DEVANT">Bar Devant</option><option value="PISCINE">Bar Piscine</option><option value="CLIENT">Client externe</option></select></div></div>
+    <div class="pos-form-row" id="dep-tx-client" style="display:none">
+      <div><label class="pos-label">Client *</label><input class="pos-input" id="dep-tx-cnom"></div>
+      <div><label class="pos-label">Contact</label><input class="pos-input" id="dep-tx-ccontact"></div></div>
+    <div id="dep-lignes" style="margin:10px 0">${depLignesHtml('tx')}</div>
+    <div><label class="pos-label">Notes</label><input class="pos-input" id="dep-tx-notes"></div>
+    <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Annuler</button>
+      <button class="pos-btn ghost" onclick="depSauverTx(false)">Préparer (sans déplacer le stock)</button>
+      <button class="pos-btn primary" onclick="depSauverTx(true)">Valider le transfert / la vente</button></div>`);
+}
+async function depSauverTx(valider){
+  const lignes = _depLignes.filter(l=>l.produit_id && parseFloat(l.quantite)>0).map(l=>({produit_id:parseInt(l.produit_id), quantite:parseFloat(l.quantite)}));
+  if(!lignes.length){ posAlert('Ajoutez au moins un produit avec une quantité.','warn'); return; }
+  const body = { destination: document.getElementById('dep-tx-d').value, client_nom: document.getElementById('dep-tx-cnom').value.trim()||null,
+                 client_contact: document.getElementById('dep-tx-ccontact').value.trim()||null, notes: document.getElementById('dep-tx-notes').value.trim()||null, lignes, valider };
+  try {
+    const t = await apiFetch('POST','/depot/transactions', body);
+    depFermer(); posAlert(`Facture ${t.numero} — ${posGx(t.total)}${valider?' (stock mis à jour)':''}.`,'ok');
+    await depChargerProduits(); await depChargerTx();
+  } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+async function depValiderTx(id){
+  try { await apiFetch('POST',`/depot/transactions/${id}/valider`); posAlert('Validée — stock déplacé.','ok'); await depChargerTx(); } catch(e){ posAlert(e.message,'err'); }
+}
+async function depAnnulerTx(id){
+  if(!confirm('Annuler cette facture ? Le stock revient au dépôt.')) return;
+  try { await apiFetch('POST',`/depot/transactions/${id}/annuler`); await depChargerTx(); } catch(e){ posAlert(e.message,'err'); }
+}
+
+// ── Caisse dépôt : « Make peman » ─────────────────────────────────
+async function depPayer(id){
+  let t; try { t = await apiFetch('GET',`/depot/transactions/${id}`); } catch(e){ posAlert(e.message,'err'); return; }
+  depOuvrir(`<h3>Paiement — facture ${t.numero}</h3>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:14px">
+      <span>${esc(t.destination_libelle)}${t.client_nom?' · '+esc(t.client_nom):''}</span>
+      <span>Total : <b>${posGx(t.total)}</b></span><span>Déjà payé : <b>${posGx(t.montant_paye)}</b></span>
+      <span>Reste : <b style="color:#f87171" id="dep-p-reste" data-reste="${t.reste}">${posGx(t.reste)}</b></span></div>
+    ${deviseChampsHtml('dep-p','depPaieEquiv()')}
+    <div class="pos-form-row">
+      <div><label class="pos-label" id="dep-p-mlabel">Montant (G) *</label><input class="pos-input" id="dep-p-montant" type="number" min="0.01" step="any" value="${t.reste}" oninput="depPaieEquiv()"></div>
+      <div><label class="pos-label">Méthode</label><select class="pos-select" id="dep-p-methode"><option value="CASH">Cash</option><option value="CARTE">Carte</option><option value="ZELLE">Zelle</option><option value="VIREMENT">Virement</option><option value="CHEQUE">Chèque</option></select></div></div>
+    <div id="dep-p-equiv" style="font-size:13px;color:rgba(255,255,255,.55)"></div>
+    <div><label class="pos-label">Notes</label><input class="pos-input" id="dep-p-notes"></div>
+    <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Annuler</button><button class="pos-btn primary" onclick="depPayerValider(${id})">Enregistrer le paiement</button></div>`);
+  depPaieEquiv();
+}
+async function depPaieEquiv(){
+  const {devise, taux_change} = deviseLue('dep-p');
+  const lbl = document.getElementById('dep-p-mlabel'); if(lbl) lbl.textContent = devise==='USD' ? 'Montant ($ dollars) *' : 'Montant (G) *';
+  const m = parseFloat(document.getElementById('dep-p-montant')?.value||0)||0;
+  const reste = parseFloat(document.getElementById('dep-p-reste')?.dataset.reste||0);
+  const eq = document.getElementById('dep-p-equiv');
+  if(eq) eq.textContent = devise==='USD' && taux_change ? `≈ ${posGx(m*taux_change)} · pour solder : ${_usd(reste/taux_change)}` : '';
+}
+async function depPayerValider(id){
+  const {devise, taux_change} = deviseLue('dep-p');
+  const montant = parseFloat(document.getElementById('dep-p-montant').value||0);
+  if(!(montant>0)){ posAlert('Montant requis.','warn'); return; }
+  try {
+    const r = await apiFetch('POST',`/depot/transactions/${id}/paiements`,{montant, devise, taux_change,
+      methode: document.getElementById('dep-p-methode').value, notes: document.getElementById('dep-p-notes').value.trim()||null});
+    depFermer(); posAlert(`Reçu ${r.recu.numero_recu} — ${devise==='USD'?_usd(montant):posGx(montant)}.`,'ok');
+    depImprimerRecu(r.recu, r.facture);
+    if(currentPage==='depot-caisse') await loadDepotCaisse(); else await depChargerTx();
+  } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+function _depFenetre(titre, corps){
+  const w = window.open('','_blank','width=760,height=900'); if(!w){ posAlert('Autorisez les pop-ups pour imprimer.','err'); return; }
+  const org = (_branding && (_branding.nom || _branding.raison_sociale)) || '';
+  w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>${titre}</title><style>
+    body{font-family:Arial,sans-serif;color:#111;margin:28px;font-size:13px}h1{font-size:20px;margin:0}table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#f1f1f4}.r{text-align:right}.tot{font-size:16px;font-weight:700}</style></head><body>
+    <div style="display:flex;justify-content:space-between"><div><h1>${titre}</h1><div>${org}</div></div><div>${new Date().toLocaleString('fr-FR')}</div></div>${corps}
+    <script>window.onload=function(){window.print()}<\/script></body></html>`);
+  w.document.close();
+}
+async function depFacture(id){
+  let t; try { t = await apiFetch('GET',`/depot/transactions/${id}`); } catch(e){ posAlert(e.message,'err'); return; }
+  _depFenetre(`Facture ${t.numero}`, `<p><b>${t.type==='TRANSFERT'?'Transfert vers':'Vente à'} :</b> ${esc(t.destination_libelle)}${t.client_nom?' — '+esc(t.client_nom):''}<br>
+    <b>Statut :</b> ${(_DEP_STATUT[t.statut]||[t.statut])[0]} · ${(_DEP_STATUT[t.statut_paiement]||[t.statut_paiement])[0]} · Responsable : ${esc(t.responsable||'—')}</p>
+    <table><tr><th>Produit</th><th class="r">Quantité</th><th class="r">Prix</th><th class="r">Sous-total</th></tr>
+    ${t.lignes.map(l=>`<tr><td>${esc(l.produit_nom)}</td><td class="r">${fmtQ(l.quantite)}</td><td class="r">${posGx(l.prix_unitaire)}</td><td class="r">${posGx(l.sous_total)}</td></tr>`).join('')}
+    <tr><td colspan="3" class="r tot">TOTAL</td><td class="r tot">${posGx(t.total)}</td></tr></table>
+    ${t.paiements.length?`<table><tr><th>Reçu</th><th>Date</th><th>Méthode</th><th class="r">Montant</th></tr>${t.paiements.map(p=>`<tr><td>${p.numero_recu}</td><td>${depDate(p.date_paiement)}</td><td>${p.methode}</td><td class="r">${p.devise==='USD'?_usd(p.montant)+' (≈ '+posGx(p.montant_htg)+')':posGx(p.montant)}</td></tr>`).join('')}</table>`:''}
+    <p class="tot">Payé : ${posGx(t.paye_htg)}${t.paye_usd?' + '+_usd(t.paye_usd):''} — Reste : ${posGx(t.reste)}</p>`);
+}
+function depImprimerRecu(p, t){
+  _depFenetre(`Reçu ${p.numero_recu}`, `<p>Facture <b>${t.numero}</b> — ${esc(t.destination_libelle)}${t.client_nom?' — '+esc(t.client_nom):''}</p>
+    <table><tr><th>Montant reçu</th><td class="tot">${p.devise==='USD'?_usd(p.montant)+' (taux '+p.taux_change+' → '+posGx(p.montant_htg)+')':posGx(p.montant)}</td></tr>
+    <tr><th>Méthode</th><td>${p.methode}</td></tr><tr><th>Reste à payer</th><td>${posGx(t.reste)}</td></tr><tr><th>Encaissé par</th><td>${esc(p.encaisse_par||'—')}</td></tr></table>
+    <p style="margin-top:40px">Signature : ______________________</p>`);
+}
+
+async function loadDepotCaisse(){
+  const root = document.getElementById('depot-caisse-root');
+  const j = _pisJour();
+  root.innerHTML = depHeader('Caisse Dépôt', 'Factures à encaisser · paiements en gourdes et en dollars · balance',
+    `<input type="date" class="pos-input" id="dep-c-deb" value="${_pisDebutMois()}" style="width:135px"><input type="date" class="pos-input" id="dep-c-fin" value="${j}" style="width:135px">
+     <button class="pos-btn teal" onclick="loadDepotCaisseDonnees()">Filtrer</button>`)
+    + `<div class="pos-kpi-grid" id="dep-c-kpi"></div>
+      <div class="pos-card" style="margin-bottom:14px"><div class="pos-card-hdr">Factures à encaisser</div><div class="pos-table-wrap"><table class="pos-table">
+        <thead><tr><th>Facture</th><th>Date</th><th>Destination</th><th style="text-align:right">Total</th><th style="text-align:right">Payé</th><th style="text-align:right">Reste</th><th>Statut</th><th>Responsable</th><th></th></tr></thead>
+        <tbody id="dep-c-afaire"></tbody></table></div></div>
+      <div class="pos-card"><div class="pos-card-hdr">Journal de caisse (entrées)</div><div class="pos-table-wrap"><table class="pos-table">
+        <thead><tr><th>Reçu</th><th>Date</th><th>Facture</th><th>Méthode</th><th style="text-align:right">Montant reçu</th><th>Encaissé par</th></tr></thead>
+        <tbody id="dep-c-journal"></tbody></table></div></div>`;
+  await loadDepotCaisseDonnees();
+}
+async function loadDepotCaisseDonnees(){
+  const deb = document.getElementById('dep-c-deb')?.value||'', fin = document.getElementById('dep-c-fin')?.value||'';
+  try {
+    const [c, j, af] = await Promise.all([
+      apiFetch('GET',`/depot/caisse?date_debut=${deb}&date_fin=${fin}`),
+      apiFetch('GET',`/depot/paiements?date_debut=${deb}&date_fin=${fin}`),
+      apiFetch('GET','/depot/transactions?statut=VALIDEE'),
+    ]);
+    document.getElementById('dep-c-kpi').innerHTML =
+      `<div class="pos-kpi"><div class="pos-kpi-label">Reçu en gourdes</div><div class="pos-kpi-val" style="color:#34d399">${posGx(c.balance_htg)}</div></div>
+       <div class="pos-kpi"><div class="pos-kpi-label">Reçu en dollars</div><div class="pos-kpi-val" style="color:#38bdf8">${_usd(c.balance_usd)}</div><div style="font-size:12px;color:rgba(255,255,255,.4)">≈ ${posGx(c.usd_equiv_htg)}</div></div>
+       <div class="pos-kpi"><div class="pos-kpi-label">Reste à encaisser</div><div class="pos-kpi-val" style="color:#f87171">${posGx(c.a_recevoir)}</div></div>
+       <div class="pos-kpi"><div class="pos-kpi-label">Par méthode</div><div style="font-size:13px">${c.par_methode.map(m=>`${m.methode} : ${posGx(m.htg)}${m.usd?' + '+_usd(m.usd):''}`).join('<br>')||'—'}</div></div>`;
+    const afaire = af.filter(t=>t.statut_paiement!=='PAYEE');
+    document.getElementById('dep-c-afaire').innerHTML = afaire.map(t=>depLigneTx(t)).join('') || '<tr><td colspan="9" style="text-align:center;padding:16px;color:rgba(255,255,255,.3)">Aucune facture à encaisser</td></tr>';
+    document.getElementById('dep-c-journal').innerHTML = j.paiements.map(p=>`<tr><td><b>${p.numero_recu}</b></td><td>${depDate(p.date_paiement)}</td>
+      <td>${p.facture} · ${esc(p.destination_libelle||'')}${p.client_nom?' · '+esc(p.client_nom):''}</td><td>${p.methode}</td>
+      <td style="text-align:right;font-weight:700">${montantDevise(p.devise, p.montant, p.devise==='USD'?p.montant_htg:null)}</td><td style="font-size:12px">${esc(p.encaisse_par||'—')}</td></tr>`).join('')
+      || '<tr><td colspan="6" style="text-align:center;padding:16px;color:rgba(255,255,255,.3)">Aucun paiement sur la période</td></tr>';
+  } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+async function loadDepotRapport(){
+  const root = document.getElementById('depot-rapport-root');
+  root.innerHTML = depHeader('Rapport Dépôt', 'Inventaire · ventes et transferts · achats · caisse (gourdes / dollars)',
+    `<input type="date" class="pos-input" id="dep-r-deb" value="${_pisDebutMois()}" style="width:135px"><input type="date" class="pos-input" id="dep-r-fin" value="${_pisJour()}" style="width:135px">
+     <button class="pos-btn teal" onclick="loadDepotRapportDonnees()">Analyser</button><button class="pos-btn ghost" onclick="window.print()">Imprimer</button>`)
+    + `<div id="dep-r-corps"></div>`;
+  await loadDepotRapportDonnees();
+}
+async function loadDepotRapportDonnees(){
+  const deb = document.getElementById('dep-r-deb')?.value||'', fin = document.getElementById('dep-r-fin')?.value||'';
+  try {
+    const r = await apiFetch('GET',`/depot/rapport?date_debut=${deb}&date_fin=${fin}`);
+    const c = r.caisse;
+    document.getElementById('dep-r-corps').innerHTML = `<div class="pos-kpi-grid">
+        <div class="pos-kpi"><div class="pos-kpi-label">Valeur du stock dépôt</div><div class="pos-kpi-val" style="color:#a78bfa">${posGx(r.inventaire.valeur_stock)}</div></div>
+        <div class="pos-kpi"><div class="pos-kpi-label">Ventes & transferts</div><div class="pos-kpi-val">${posGx(r.ventes_transferts.total)}</div><div style="font-size:12px;color:rgba(255,255,255,.4)">${r.ventes_transferts.nb} facture(s)</div></div>
+        <div class="pos-kpi"><div class="pos-kpi-label">Achats réceptionnés</div><div class="pos-kpi-val" style="color:#f87171">${posGx(r.achats.total)}</div><div style="font-size:12px;color:rgba(255,255,255,.4)">${r.achats.nb} achat(s)</div></div>
+        <div class="pos-kpi"><div class="pos-kpi-label">Caisse — gourdes</div><div class="pos-kpi-val" style="color:#34d399">${posGx(c.total_htg)}</div></div>
+        <div class="pos-kpi"><div class="pos-kpi-label">Caisse — dollars</div><div class="pos-kpi-val" style="color:#38bdf8">${_usd(c.total_usd)}</div><div style="font-size:12px;color:rgba(255,255,255,.4)">≈ ${posGx(c.total_usd_equiv_htg)}</div></div></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">
+        <div class="pos-card"><div class="pos-card-hdr">Par destination</div><table class="pos-table"><thead><tr><th>Destination</th><th style="text-align:right">Factures</th><th style="text-align:right">Total</th><th style="text-align:right">Payé</th></tr></thead><tbody>
+          ${r.ventes_transferts.par_destination.map(d=>`<tr><td>${esc(d.libelle)}</td><td style="text-align:right">${d.nb}</td><td style="text-align:right">${posGx(d.total)}</td><td style="text-align:right">${posGx(d.paye)}</td></tr>`).join('')}</tbody></table></div>
+        <div class="pos-card"><div class="pos-card-hdr">Encaissements par méthode</div><table class="pos-table"><thead><tr><th>Méthode</th><th style="text-align:right">Gourdes</th><th style="text-align:right">Dollars</th></tr></thead><tbody>
+          ${c.par_methode.map(m=>`<tr><td>${m.methode}</td><td style="text-align:right">${posGx(m.htg)}</td><td style="text-align:right">${_usd(m.usd)}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:rgba(255,255,255,.3)">—</td></tr>'}</tbody></table></div>
+        <div class="pos-card"><div class="pos-card-hdr">Produits sous le minimum</div><table class="pos-table"><thead><tr><th>Produit</th><th style="text-align:right">Dépôt</th><th style="text-align:right">Min.</th></tr></thead><tbody>
+          ${r.inventaire.en_alerte.map(p=>`<tr><td>${esc(p.nom)}</td><td style="text-align:right;color:#f87171">${fmtQ(p.stock_depot)}</td><td style="text-align:right">${fmtQ(p.seuil_min)}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:rgba(255,255,255,.3)">Aucun</td></tr>'}</tbody></table></div>
+      </div>`;
+  } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+// ══════════════════════════════════════════════════════════════════
 // PISCINE — vente de cartes (/api/piscine)
 // ══════════════════════════════════════════════════════════════════
 let _pisPrix = 0;
@@ -35130,7 +35783,7 @@ async function pisdCharger(){
     set('pisd-brut', posGx(k.montant_brut));
     set('pisd-rabais', posGx(k.rabais));
     set('pisd-net', posGx(k.montant_net));
-    set('pisd-net-sub', `période préc. : ${posGx(p.montant_net)}`);
+    set('pisd-net-sub', `${posGx(k.recu_htg)} en gourdes${k.recu_usd?' + '+_usd(k.recu_usd)+' en dollars':''} · période préc. : ${posGx(p.montant_net)}`);
     set('pisd-dep', posGx(k.depenses));
     const sol = document.getElementById('pisd-solde');
     if(sol){ sol.textContent = posGx(k.solde); sol.style.color = k.solde >= 0 ? '#34d399' : '#f87171'; }
@@ -35182,7 +35835,7 @@ async function pisdCharger(){
       <td>${esc(v.lieu_libelle)}</td>
       <td>${posGx(v.montant_brut)}</td>
       <td style="color:#fbbf24">${v.rabais_montant ? posGx(v.rabais_montant) + (v.rabais_type==='POURCENT' ? ` (${v.rabais_valeur}%)` : '') : '—'}</td>
-      <td style="color:#34d399;font-weight:700">${posGx(v.montant_net)}</td>
+      <td style="color:#34d399;font-weight:700">${posGx(v.montant_net)}${v.devise==='USD'?`<div style="color:#38bdf8;font-size:12px">${_usd(v.montant_devise)}</div>`:''}</td>
       <td style="font-size:12px;color:rgba(255,255,255,.5)">${esc(v.vendeur||'—')}</td>
     </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucune vente sur la période</td></tr>';
   } catch(e){ posAlert(e.message||'Erreur de chargement.','err'); }
@@ -35217,6 +35870,12 @@ function pisvCalculer(){
   set('pisv-brut', posGx(r.brut));
   set('pisv-rabais', r.rabais ? '− ' + posGx(r.rabais) : '—');
   set('pisv-net', posGx(r.net));
+  const dv = deviseLue('pisv'), u = document.getElementById('pisv-net-usd');
+  if(u){
+    const ok = dv.devise==='USD' && dv.taux_change;
+    u.style.display = ok ? 'flex' : 'none';
+    if(ok) u.querySelector('b').textContent = _usd(r.net / dv.taux_change);
+  }
   const al = document.getElementById('pisv-alerte');
   if(al){
     const msg = !_pisPrix ? "Le prix de la carte n'est pas défini — Piscine › Paramètres." : r.erreur;
@@ -35239,10 +35898,13 @@ async function pisvEnregistrer(){
     rabais_valeur: type ? (parseFloat(document.getElementById('pisv-rabais-val')?.value||0) || null) : null,
     client_nom: (document.getElementById('pisv-client')?.value||'').trim() || null,
     notes: (document.getElementById('pisv-notes')?.value||'').trim() || null,
+    ...deviseLue('pisv'),
   };
+  if(body.devise === 'USD' && !body.taux_change){ posAlert('Indiquez le taux du dollar.','warn'); return; }
   try {
     const v = await apiFetch('POST','/piscine/ventes', body);
-    posAlert(`${v.quantite} carte(s) — ${posGx(v.montant_net)} enregistré.`,'ok');
+    posAlert(`${v.quantite} carte(s) — ${v.devise==='USD' ? _usd(v.montant_devise)+' ('+posGx(v.montant_net)+')' : posGx(v.montant_net)} enregistré.`,'ok');
+    const _pd = document.getElementById('pisv-devise'); if(_pd){ _pd.value='HTG'; deviseChampsMaj('pisv'); }
     document.getElementById('pisv-qte').value = 1;
     document.getElementById('pisv-rabais-type').value = '';
     document.getElementById('pisv-rabais-val').value = '';
@@ -35260,7 +35922,7 @@ async function pisvChargerListe(){
   try {
     const d = await apiFetch('GET', `/piscine/ventes?date_debut=${deb}&date_fin=${fin}`);
     const tot = document.getElementById('pisv-totaux');
-    if(tot) tot.innerHTML = `<b style="color:#22d3ee">${d.nb_cartes}</b> carte(s) vendue(s) · <b style="color:#34d399">${posGx(d.montant_net)}</b>`;
+    if(tot) tot.innerHTML = `<b style="color:#22d3ee">${d.nb_cartes}</b> carte(s) vendue(s) · <b style="color:#34d399">${posGx(d.recu_htg)}</b> en gourdes${d.recu_usd?` · <b style="color:#38bdf8">${_usd(d.recu_usd)}</b> en dollars`:''}`;
     const annul = _pisPeutAnnuler();
     tb.innerHTML = d.ventes.length ? d.ventes.map(v=>{
       const ann = v.statut === 'ANNULEE';
@@ -35269,7 +35931,7 @@ async function pisvChargerListe(){
         <td><b>${v.quantite}</b></td>
         <td>${esc(v.lieu_libelle)}</td>
         <td style="color:#fbbf24">${v.rabais_montant ? posGx(v.rabais_montant) : '—'}</td>
-        <td style="color:#34d399;font-weight:700">${posGx(v.montant_net)}</td>
+        <td style="color:#34d399;font-weight:700">${posGx(v.montant_net)}${v.devise==='USD'?`<div style="color:#38bdf8;font-size:12px">${_usd(v.montant_devise)}</div>`:''}</td>
         <td>${ann ? '<span style="font-size:12px">Annulée</span>' : (annul ? `<button class="pos-btn ghost" style="padding:3px 9px;font-size:12px;color:#f87171" onclick="pisvAnnuler(${v.id})">Annuler</button>` : '')}</td>
       </tr>`;
     }).join('') : '<tr><td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucune vente sur la période</td></tr>';

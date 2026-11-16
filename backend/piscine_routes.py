@@ -129,6 +129,8 @@ class VenteIn(BaseModel):
     rabais_valeur: Optional[float] = None
     client_nom:    Optional[str] = None
     notes:         Optional[str] = None
+    devise:        Optional[str] = "HTG"    # HTG | USD (voir devise.py)
+    taux_change:   Optional[float] = None
 
 
 def _vente_dict(v: PiscineVente) -> dict:
@@ -147,6 +149,9 @@ def _vente_dict(v: PiscineVente) -> dict:
         "client_nom":     v.client_nom,
         "notes":          v.notes,
         "statut":         v.statut,
+        "devise":         v.devise or "HTG",
+        "montant_devise": float(v.montant_devise) if v.montant_devise is not None else float(v.montant_net),
+        "taux_change":    float(v.taux_change) if v.taux_change is not None else None,
         "vendeur":        v.utilisateur.nom_complet if v.utilisateur else None,
     }
 
@@ -161,7 +166,10 @@ def enregistrer_vente(data: VenteIn, request: Request, db: Session = Depends(get
         raise HTTPException(422, "Lieu de vente : DEVANT, DERRIERE ou vide.")
     brut = (prix * data.quantite).quantize(_CENT)
     r_type, r_val, r_mt = calculer_rabais(brut, data.rabais_type, data.rabais_valeur)
+    import devise as dv
+    pay = dv.paiement_vente(brut - r_mt, data.devise, data.taux_change, db)
     v = PiscineVente(
+        **pay,
         quantite=data.quantite, prix_unitaire=prix, montant_brut=brut,
         rabais_type=r_type, rabais_valeur=r_val, rabais_montant=r_mt,
         montant_net=brut - r_mt, lieu_vente=lieu,
@@ -202,6 +210,8 @@ def liste_ventes(
         "periode":        {"debut": str(d1), "fin": str(d2)},
         "nb_cartes":      sum(v.quantite for v in valides),
         "montant_net":    round(sum(float(v.montant_net) for v in valides), 2),
+        "recu_htg":       round(sum(float(v.montant_net) for v in valides if (v.devise or "HTG") != "USD"), 2),
+        "recu_usd":       round(sum(float(v.montant_devise or 0) for v in valides if v.devise == "USD"), 2),
         "ventes":         [_vente_dict(v) for v in ventes],
     }
 
@@ -234,14 +244,20 @@ def _resume(ventes, depenses) -> dict:
     rabais  = sum(float(v.rabais_montant) for v in ventes)
     net     = sum(float(v.montant_net) for v in ventes)
     dep     = sum(float(d.montant) for d in depenses)
+    # Gourdes et dollars reçus, séparés (la caisse gourdes n'inclut pas les $).
+    net_htg = sum(float(v.montant_net) for v in ventes if (v.devise or "HTG") != "USD")
+    net_usd = sum(float(v.montant_devise or 0) for v in ventes if v.devise == "USD")
     return {
         "nb_ventes":     len(ventes),
         "nb_cartes":     cartes,
         "montant_brut":  round(brut, 2),
         "rabais":        round(rabais, 2),
         "montant_net":   round(net, 2),
+        "recu_htg":      round(net_htg, 2),
+        "recu_usd":      round(net_usd, 2),
         "depenses":      round(dep, 2),
         "solde":         round(net - dep, 2),
+        "solde_htg":     round(net_htg - dep, 2),
     }
 
 

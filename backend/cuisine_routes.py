@@ -363,6 +363,8 @@ def liste_ventes(
             "date_heure":    v.date_heure.isoformat(),
             "total":         float(_dec(v.total)),
             "mode_paiement": v.mode_paiement,
+            "devise":        v.devise or "HTG",
+            "montant_devise": float(v.montant_devise) if v.montant_devise is not None else None,
             "client_nom":    v.client_nom or "",
             "statut":        v.statut,
             "notes":         v.notes or "",
@@ -412,13 +414,18 @@ def enregistrer_vente(data: dict, db: Session = Depends(get_db)):
             sous_total    = sous,
         ))
 
+    mode = data.get("mode_paiement") or "CASH"
+    import devise as dv
+    # Devise reçue (HTG ou USD) — seulement pour une vente payée comptant.
+    pay = dv.paiement_vente(total, data.get("devise") if mode == "CASH" else "HTG", data.get("taux_change"), db)
     vente = CuisineVente(
         numero_ticket = _generer_ticket(db),
         total         = total,
-        mode_paiement = data.get("mode_paiement") or "CASH",
+        mode_paiement = mode,
         client_nom    = (data.get("client_nom") or "").strip() or None,
         notes         = (data.get("notes") or "").strip() or None,
         statut        = "VALIDEE",
+        **pay,
     )
     for l in ligne_objs:
         l.vente = vente
@@ -428,6 +435,8 @@ def enregistrer_vente(data: dict, db: Session = Depends(get_db)):
         "id":            vente.id,
         "numero_ticket": vente.numero_ticket,
         "total":         float(vente.total),
+        "devise":        vente.devise,
+        "montant_devise": float(vente.montant_devise) if vente.montant_devise is not None else None,
         "message":       "Vente enregistrée",
     }
 

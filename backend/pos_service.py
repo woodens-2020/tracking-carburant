@@ -69,6 +69,19 @@ def filtrer_lieu(query, colonne, lieu: str | None):
     return query.filter(c) if c is not None else query
 
 
+def cash_vente(v) -> tuple[float, float]:
+    """(gourdes, dollars) réellement encaissés à la vente — une vente payée
+    en dollars n'entre jamais dans le cash en gourdes."""
+    if v.mode_paiement not in ("CASH", "MIXTE"):
+        return 0.0, 0.0
+    if getattr(v, "devise", "HTG") == "USD":
+        usd = v.montant_devise
+        if usd is None and v.taux_change:
+            usd = _dec(v.montant_paye) / _dec(v.taux_change)
+        return 0.0, float(_dec(usd))
+    return float(_dec(v.montant_paye)), 0.0
+
+
 def lieu_de(valeur: str | None) -> str:
     """Département effectif d'une ligne : NULL → DEVANT (Bar)."""
     return valeur if valeur in LIEUX_VALIDES else "DEVANT"
@@ -175,9 +188,26 @@ def cmup(produit_id: int, db: Session) -> Decimal:
     )
     total_qte     = sum(_dec(a.quantite) for a in achats)
     total_montant = sum(_dec(a.quantite) * _dec(a.prix_achat_unitaire) for a in achats)
+    # Achats réceptionnés au Dépôt central (v28) : même coût moyen.
+    for q, m in _achats_depot(db, produit_id).values():
+        total_qte += q
+        total_montant += m
     if total_qte == 0:
         return Decimal("0")
     return (total_montant / total_qte).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+
+
+def _achats_depot(db: Session, produit_id: int | None = None) -> dict[int, tuple[Decimal, Decimal]]:
+    """{produit_id: (quantité reçue, montant)} des achats réceptionnés au dépôt."""
+    from models import DepotAchat, DepotAchatLigne
+    q = (db.query(DepotAchatLigne.produit_id,
+                  func.sum(DepotAchatLigne.quantite_recue),
+                  func.sum(DepotAchatLigne.quantite_recue * DepotAchatLigne.prix_achat))
+         .join(DepotAchat, DepotAchatLigne.achat_id == DepotAchat.id)
+         .filter(DepotAchat.statut == "RECEPTIONNE", DepotAchatLigne.quantite_recue > 0))
+    if produit_id is not None:
+        q = q.filter(DepotAchatLigne.produit_id == produit_id)
+    return {pid: (_dec(qt), _dec(mt)) for pid, qt, mt in q.group_by(DepotAchatLigne.produit_id).all()}
 
 
 def cmup_batch(db: Session) -> dict[int, Decimal]:
@@ -196,12 +226,15 @@ def cmup_batch(db: Session) -> dict[int, Decimal]:
         .group_by(BarAchat.produit_id)
         .all()
     )
+    cumul: dict[int, list[Decimal]] = {pid: [_dec(m), _dec(q)] for pid, m, q in rows}
+    for pid, (q, m) in _achats_depot(db).items():
+        c = cumul.setdefault(pid, [Decimal("0"), Decimal("0")])
+        c[0] += m
+        c[1] += q
     result: dict[int, Decimal] = {}
-    for pid, total_montant, total_qte in rows:
-        if total_qte and _dec(total_qte) > 0:
-            result[pid] = (
-                _dec(total_montant) / _dec(total_qte)
-            ).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+    for pid, (total_montant, total_qte) in cumul.items():
+        if total_qte > 0:
+            result[pid] = (total_montant / total_qte).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
         else:
             result[pid] = Decimal("0")
     return result
@@ -416,6 +449,13 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
 
     statut = "CREDIT_EN_COURS" if montant_restant > 0 else "PAYEE"
 
+    # Devise reçue : en dollars, le client remet l'équivalent du montant payé
+    # au taux du jour (montant_paye reste en gourdes pour la comptabilité).
+    import devise as dv
+    dev, taux = dv.valider_devise(data.get("devise"), data.get("taux_change"), db) \
+        if montant_paye > 0 else ("HTG", None)
+    montant_devise = dv.en_dollars(montant_paye, taux) if dev == "USD" else montant_paye
+
     # session_id/lieu_vente résolus plus haut, avant la boucle des lignes
     # (voir le contrôle de cohérence lieu juste au-dessus) — rattache la
     # vente à la session de caisse EN_COURS du caissier (s'il en a une),
@@ -436,6 +476,9 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
         montant_paye    = montant_paye,
         montant_restant = montant_restant,
         lieu            = lieu_vente,
+        devise          = dev,
+        montant_devise  = montant_devise,
+        taux_change     = taux,
     )
     db.add(vente)
     db.flush()   # obtenir l'ID avant les lignes

@@ -32,6 +32,7 @@ from pos_service import (
     encaisser_vente as _encaisser, annuler_vente as _annuler,
     encaisser_commande as _enc_commande, stats_bar,
     LIEUX_VALIDES, DEPARTEMENT_LIBELLE, normaliser_lieu, clause_lieu, filtrer_lieu, lieu_de,
+    cash_vente,
 )
 
 router = APIRouter(prefix="/api/pos", tags=["POS Bar"])
@@ -316,6 +317,9 @@ class VenteIn(BaseModel):
     # Département de l'écran de caisse (DEVANT/PISCINE) — utilisé seulement
     # si le caissier n'a pas de session (la session fait toujours foi).
     lieu:            Optional[str]  = None
+    # Devise remise par le client (voir devise.py) — HTG par défaut.
+    devise:          Optional[str]  = "HTG"
+    taux_change:     Optional[float] = None
 
     @validator("mode_paiement")
     def check_mode(cls, v):
@@ -353,8 +357,10 @@ class EncaisserCommandeIn(BaseModel):
 
 
 class RemboursementIn(BaseModel):
-    montant: float = Field(gt=0)
+    montant: float = Field(gt=0)          # dans la devise ci-dessous
     notes:   Optional[str] = None
+    devise:  Optional[str] = "HTG"        # HTG | USD
+    taux_change: Optional[float] = None
 
 
 class ModifierCreditIn(BaseModel):
@@ -1884,6 +1890,9 @@ def creer_vente(data: VenteIn, request: Request,
         "mode_paiement":   vente.mode_paiement,
         "statut":          vente.statut,
         "lieu":            lieu_de(vente.lieu),
+        "devise":          vente.devise or "HTG",
+        "montant_devise":  float(vente.montant_devise) if vente.montant_devise is not None else None,
+        "taux_change":     float(vente.taux_change) if vente.taux_change is not None else None,
         "date_heure":      vente.date_heure.isoformat(),
     }
 
@@ -1974,6 +1983,8 @@ def liste_ventes(
             "statut":          v.statut,
             "client_nom":      v.client_nom,
             "lieu":            lieu_de(v.lieu),
+            "devise":          v.devise or "HTG",
+            "montant_devise":  float(v.montant_devise) if v.montant_devise is not None else None,
             "caissier_id":     v.caissier_id,
             "caissier_nom":    (v.caissier.nom + " " + v.caissier.prenom) if v.caissier else "Sans caissier",
             "nb_lignes":       len(v.lignes),
@@ -2007,18 +2018,20 @@ def ventes_temps_reel(lieu: Optional[str] = Depends(_dept), db: Session = Depend
     )
 
     ca_jour   = sum(float(v.montant_total) for v in ventes)
-    cash_jour = sum(float(v.montant_paye)  for v in ventes if v.mode_paiement in ("CASH", "MIXTE"))
+    cash_jour = sum(cash_vente(v)[0] for v in ventes)
+    cash_usd  = sum(cash_vente(v)[1] for v in ventes)
 
     par_caissier: dict = {}
     for v in ventes:
         cid  = v.caissier_id or 0
         nom  = v.caissier.nom + " " + v.caissier.prenom if v.caissier else "Sans caissier"
         if cid not in par_caissier:
-            par_caissier[cid] = {"caissier_id": cid, "nom": nom, "nb_ventes": 0, "total": 0.0, "cash": 0.0, "credit": 0.0}
+            par_caissier[cid] = {"caissier_id": cid, "nom": nom, "nb_ventes": 0, "total": 0.0, "cash": 0.0, "cash_usd": 0.0, "credit": 0.0}
         par_caissier[cid]["nb_ventes"] += 1
         par_caissier[cid]["total"]     += float(v.montant_total)
-        if v.mode_paiement in ("CASH", "MIXTE"):
-            par_caissier[cid]["cash"]  += float(v.montant_paye)
+        h, u = cash_vente(v)
+        par_caissier[cid]["cash"]     += h
+        par_caissier[cid]["cash_usd"] += u
         if v.mode_paiement in ("CREDIT", "MIXTE"):
             par_caissier[cid]["credit"] += float(v.montant_restant)
 
@@ -2029,6 +2042,7 @@ def ventes_temps_reel(lieu: Optional[str] = Depends(_dept), db: Session = Depend
         "nb_ventes":    len(ventes),
         "ca_jour":      ca_jour,
         "cash_jour":    cash_jour,
+        "cash_usd":     round(cash_usd, 2),
         "par_caissier": ranked,
     }
 
@@ -2087,7 +2101,8 @@ def dashboard_bar(
     ca_prev = sum(float(v.montant_total) for v in q_prev.all())
 
     ca      = sum(float(v.montant_total)   for v in ventes)
-    cash    = sum(float(v.montant_paye)    for v in ventes if v.mode_paiement in ("CASH",   "MIXTE"))
+    cash    = sum(cash_vente(v)[0] for v in ventes)
+    cash_usd = sum(cash_vente(v)[1] for v in ventes)
     credit  = sum(float(v.montant_restant) for v in ventes if v.mode_paiement in ("CREDIT", "MIXTE"))
 
     par_periode: dict = {}
@@ -2143,7 +2158,8 @@ def dashboard_bar(
             par_caissier[cid] = {"nom": nom, "total": 0.0, "nb_ventes": 0, "cash": 0.0, "credit": 0.0}
         par_caissier[cid]["total"]     += float(v.montant_total)
         par_caissier[cid]["nb_ventes"] += 1
-        if v.mode_paiement in ("CASH",   "MIXTE"): par_caissier[cid]["cash"]   += float(v.montant_paye)
+        par_caissier[cid]["cash"] += cash_vente(v)[0]
+        par_caissier[cid]["cash_usd"] = par_caissier[cid].get("cash_usd", 0.0) + cash_vente(v)[1]
         if v.mode_paiement in ("CREDIT", "MIXTE"): par_caissier[cid]["credit"] += float(v.montant_restant)
 
     # ── Dettes & Remboursements ───────────────────────────────────────
@@ -2210,6 +2226,7 @@ def dashboard_bar(
         "kpis": {
             "ca_jour":     ca,
             "cash_jour":   cash,
+            "cash_usd":    round(cash_usd, 2),
             "credit_jour": credit,
             "nb_ventes":   len(ventes),
             "ca_hier":     ca_prev,
@@ -2634,13 +2651,20 @@ def enregistrer_remboursement(
     if credit.statut == "SOLDE":
         raise HTTPException(422, "Ce crédit est déjà soldé.")
 
-    montant = Decimal(str(data.montant))
-    if montant > credit.solde:
-        raise HTTPException(422, f"Montant ({montant}) supérieur au solde ({credit.solde}).")
+    import devise as dv
+    dev, taux = dv.valider_devise(data.devise, data.taux_change, db)
+    montant_devise = Decimal(str(data.montant))
+    montant = dv.en_gourdes(dev, montant_devise, taux)   # ce qui réduit la dette (gourdes)
+    if montant > credit.solde + (Decimal("0.5") if dev == "USD" else 0):
+        raise HTTPException(422, f"Montant ({montant} G) supérieur au solde ({credit.solde} G).")
+    montant = min(montant, Decimal(str(credit.solde)))
 
     remb = BarRemboursement(
         credit_id      = credit_id,
         montant        = montant,
+        devise         = dev,
+        montant_devise = montant_devise,
+        taux_change    = taux,
         utilisateur_id = _uid(request),
         notes          = data.notes,
     )
@@ -3126,9 +3150,9 @@ def grande_caisse(
         BarVente.statut != "ANNULEE",
         BarVente.date_heure >= dt_debut, BarVente.date_heure <= dt_fin,
     ), BarVente.lieu, lieu)
-    cash_ventes = sum(
-        float(v.montant_paye) for v in q_bv_cash.all() if v.mode_paiement in ("CASH", "MIXTE")
-    )
+    _bv_cash = q_bv_cash.all()
+    cash_ventes = sum(cash_vente(v)[0] for v in _bv_cash)
+    cash_usd    = sum(cash_vente(v)[1] for v in _bv_cash)
     q_remb = db.query(BarRemboursement).filter(
         BarRemboursement.date_remb >= dt_debut, BarRemboursement.date_remb <= dt_fin,
     )
@@ -3137,7 +3161,9 @@ def grande_caisse(
             q_remb.join(BarCredit, BarRemboursement.credit_id == BarCredit.id)
                   .join(BarVente, BarCredit.vente_id == BarVente.id),
             BarVente.lieu, lieu)
-    cash_remb = sum(float(r.montant) for r in q_remb.all())
+    _rembs = q_remb.all()
+    cash_remb = sum(float(r.montant) for r in _rembs if (r.devise or "HTG") != "USD")
+    cash_usd += sum(float(r.montant_devise or 0) for r in _rembs if r.devise == "USD")
     _depts_renfl = [_renfl_departement(lieu)] if lieu else ["BAR", "PISCINE"]
     renflouements_periode = float(
         db.query(func.sum(RenflouementDepartement.montant))
@@ -3171,6 +3197,8 @@ def grande_caisse(
             "depenses":       float(depenses_total),
             "renflouements":  round(renflouements_periode, 2),
             "disponible":     caisse_disponible,
+            # Dollars reçus (ventes + remboursements) — caisse USD séparée.
+            "disponible_usd": round(cash_usd, 2),
         },
         "par_produit":   produits_list,
         "achats_detail": sorted(achats_detail, key=lambda x: x["date_achat"], reverse=True),
