@@ -1337,7 +1337,7 @@ class DepotAchatLigne(Base):
     achat_id       = Column(Integer, ForeignKey("depot_achats.id", ondelete="CASCADE"), nullable=False)
     produit_id     = Column(Integer, ForeignKey("bar_produits.id", ondelete="RESTRICT"), nullable=False)
     quantite       = Column(Numeric(12, 3), nullable=False)          # commandée / facturée
-    prix_achat     = Column(Numeric(12, 2), nullable=False)          # par unité
+    prix_achat     = Column(Numeric(12, 4), nullable=False)          # par unité (4 décimales : prix caisse ÷ unités)
     sous_total     = Column(Numeric(14, 2), nullable=False)
     quantite_recue = Column(Numeric(12, 3), nullable=True)           # comptée à la réception
 

@@ -533,6 +533,15 @@ def _migrate_columns():
             except Exception:
                 conn.rollback()  # contrainte déjà à jour
 
+        # v28 — prix d'achat dépôt à 4 décimales (prix caisse ÷ unités, sans
+        # perte d'arrondi) — élargissement sans perte.
+        with engine.connect() as conn:
+            try:
+                conn.execute(sql_text("ALTER TABLE depot_achat_lignes ALTER COLUMN prix_achat TYPE NUMERIC(12,4)"))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+
         # v28 — Dépôt central : lieu DEPOT et mouvement TRANSFERT sur le
         # stock bar.
         for _nom, _check in (

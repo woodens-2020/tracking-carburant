@@ -69,6 +69,35 @@ def _require_pdg_ou_admin(request: Request, db: Session = Depends(get_db)) -> Ut
     raise HTTPException(403, "Accès réservé au PDG et aux administrateurs")
 
 
+# ── Caisses ───────────────────────────────────────────────────────
+# Au dépôt, la marchandise se compte généralement en CAISSES. Chaque article
+# porte son nombre d'unités par caisse (bar_produits.unites_par_caisse,
+# défini dans Produits Bar ou ici dans Inventaire & prix). Le stock reste
+# enregistré en unités ; l'écran saisit et affiche « caisses + unités ».
+
+def upc(p) -> int:
+    """Unités par caisse de l'article (1 si l'article ne se vend pas par caisse)."""
+    return int(p.unites_par_caisse) if p is not None and p.vendu_par_caisse and p.unites_par_caisse and p.unites_par_caisse > 0 else 1
+
+
+def en_caisses(quantite, n: int) -> dict:
+    """{caisses, unites} pour une quantité en unités (n = unités par caisse)."""
+    q = _d(quantite)
+    if n <= 1:
+        return {"caisses": None, "unites": float(q)}
+    signe = -1 if q < 0 else 1
+    q = abs(q)
+    c = int(q // n)
+    return {"caisses": signe * c, "unites": float(signe * (q - c * n))}
+
+
+def quantite_unites(p, quantite=None, nb_caisses=None, nb_unites=None) -> Decimal:
+    """Quantité en unités depuis (caisses + unités) ou depuis `quantite`."""
+    if nb_caisses is not None or nb_unites is not None:
+        return _d(nb_caisses or 0) * upc(p) + _d(nb_unites or 0)
+    return _d(quantite)
+
+
 def _numero(db: Session, modele, prefixe: str) -> str:
     """Numéro lisible et unique : DA-2026-0001 (achat), FD-… (facture), RD-… (reçu)."""
     col = modele.numero_recu if modele is DepotPaiement else modele.numero
@@ -122,8 +151,17 @@ def produits_depot(actif: bool = True, db: Session = Depends(get_db)):
         seuil = _d(p.seuil_alerte_stock)
         prix = prix_actif(p.id, db) or Decimal("0")
         cout = cmup(p.id, db)
+        n = upc(p)
         out.append({
             "id": p.id, "nom": p.nom, "categorie": p.categorie, "unite": p.unite,
+            "lieu": p.lieu,
+            "par_caisse":    n > 1,
+            "unites_par_caisse": n if n > 1 else None,
+            "stock_depot_caisses":   en_caisses(stock_depot, n),
+            "stock_devant_caisses":  en_caisses(s.get("DEVANT", 0), n),
+            "stock_piscine_caisses": en_caisses(s.get("PISCINE", 0), n),
+            "prix_vente_caisse": float(prix * n) if n > 1 else None,
+            "dernier_prix_achat_caisse": float((derniers[p.id][0] * n).quantize(_CENT)) if p.id in derniers and n > 1 else None,
             "stock_depot":   float(stock_depot),
             "stock_devant":  float(s.get("DEVANT", 0)),
             "stock_piscine": float(s.get("PISCINE", 0)),
@@ -139,8 +177,10 @@ def produits_depot(actif: bool = True, db: Session = Depends(get_db)):
 
 
 class ConfigProduitIn(BaseModel):
-    prix_vente: Optional[float] = Field(default=None, gt=0)
-    seuil_min:  Optional[float] = Field(default=None, ge=0)
+    prix_vente: Optional[float] = Field(default=None, gt=0)     # prix d'UNE unité
+    seuil_min:  Optional[float] = Field(default=None, ge=0)     # en unités
+    # Nombre d'unités dans une caisse (0 ou 1 = article vendu à l'unité).
+    unites_par_caisse: Optional[int] = Field(default=None, ge=0)
 
 
 @router.put("/produits/{produit_id}/config")
@@ -150,6 +190,11 @@ def configurer_produit(produit_id: int, data: ConfigProduitIn, request: Request,
         raise HTTPException(404, "Produit introuvable.")
     if data.seuil_min is not None:
         p.seuil_alerte_stock = Decimal(str(data.seuil_min))
+    if data.unites_par_caisse is not None:
+        if data.unites_par_caisse > 1:
+            p.vendu_par_caisse, p.unites_par_caisse = True, data.unites_par_caisse
+        else:
+            p.vendu_par_caisse, p.unites_par_caisse = False, None
     if data.prix_vente is not None:
         nouveau = Decimal(str(data.prix_vente)).quantize(_CENT)
         if (prix_actif(p.id, db) or Decimal("-1")) != nouveau:
@@ -160,7 +205,8 @@ def configurer_produit(produit_id: int, data: ConfigProduitIn, request: Request,
                 ancien.date_fin = now
             db.add(BarPrixHistorique(produit_id=p.id, prix=nouveau, date_debut=now, utilisateur_id=_uid(request)))
     db.commit()
-    return {"ok": True, "prix_vente": float(prix_actif(p.id, db) or 0), "seuil_min": float(p.seuil_alerte_stock)}
+    return {"ok": True, "prix_vente": float(prix_actif(p.id, db) or 0), "seuil_min": float(p.seuil_alerte_stock),
+            "unites_par_caisse": p.unites_par_caisse if p.vendu_par_caisse else None}
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -169,8 +215,13 @@ def configurer_produit(produit_id: int, data: ConfigProduitIn, request: Request,
 
 class LigneAchatIn(BaseModel):
     produit_id: int
-    quantite:   float = Field(gt=0)
-    prix_achat: float = Field(ge=0)
+    # Quantité : en caisses + unités (nb_caisses / nb_unites), ou directement
+    # en unités (quantite). Prix : par caisse (prix_caisse) ou par unité.
+    quantite:    Optional[float] = Field(default=None, gt=0)
+    nb_caisses:  Optional[float] = Field(default=None, ge=0)
+    nb_unites:   Optional[float] = Field(default=None, ge=0)
+    prix_achat:  Optional[float] = Field(default=None, ge=0)   # par unité
+    prix_caisse: Optional[float] = Field(default=None, ge=0)
 
 
 class AchatIn(BaseModel):
@@ -183,7 +234,9 @@ class AchatIn(BaseModel):
 
 class ReceptionLigneIn(BaseModel):
     ligne_id:       int
-    quantite_recue: float = Field(ge=0)
+    quantite_recue: Optional[float] = Field(default=None, ge=0)   # en unités
+    nb_caisses:     Optional[float] = Field(default=None, ge=0)   # ou caisses + unités comptées
+    nb_unites:      Optional[float] = Field(default=None, ge=0)
 
 
 class ReceptionIn(BaseModel):
@@ -198,10 +251,16 @@ def _achat_dict(a: DepotAchat) -> dict:
     lignes = []
     for l in a.lignes:
         ecart = (float(_d(l.quantite_recue) - _d(l.quantite)) if l.quantite_recue is not None else None)
+        n = upc(l.produit)
         lignes.append({
             "id": l.id, "produit_id": l.produit_id,
             "produit_nom": l.produit.nom if l.produit else str(l.produit_id),
             "unite": l.produit.unite if l.produit else None,
+            "unites_par_caisse": n if n > 1 else None,
+            "quantite_caisses": en_caisses(l.quantite, n),
+            "recue_caisses": en_caisses(l.quantite_recue, n) if l.quantite_recue is not None else None,
+            "ecart_caisses": en_caisses(ecart, n) if ecart is not None else None,
+            "prix_caisse": float((l.prix_achat * n).quantize(_CENT)) if n > 1 else None,
             "quantite": float(l.quantite), "prix_achat": float(l.prix_achat),
             "sous_total": float(l.sous_total),
             "quantite_recue": float(l.quantite_recue) if l.quantite_recue is not None else None,
@@ -226,10 +285,20 @@ def _remplir_lignes(db: Session, a: DepotAchat, lignes: List[LigneAchatIn]):
     a.lignes.clear()
     total = Decimal("0")
     for l in lignes:
-        if not db.get(BarProduit, l.produit_id):
+        p = db.get(BarProduit, l.produit_id)
+        if not p:
             raise HTTPException(404, f"Produit #{l.produit_id} introuvable.")
-        q, px = Decimal(str(l.quantite)), Decimal(str(l.prix_achat)).quantize(_CENT)
-        st = (q * px).quantize(_CENT)
+        q = quantite_unites(p, l.quantite, l.nb_caisses, l.nb_unites)
+        if q <= 0:
+            raise HTTPException(422, f"Quantité nulle pour « {p.nom} ».")
+        if l.prix_caisse is not None:
+            px = (_d(l.prix_caisse) / upc(p)).quantize(Decimal("0.0001"))
+            st = (_d(l.prix_caisse) * q / upc(p)).quantize(_CENT)
+        elif l.prix_achat is not None:
+            px = _d(l.prix_achat).quantize(_CENT)
+            st = (q * px).quantize(_CENT)
+        else:
+            raise HTTPException(422, f"Prix d'achat manquant pour « {p.nom} ».")
         total += st
         a.lignes.append(DepotAchatLigne(produit_id=l.produit_id, quantite=q, prix_achat=px, sous_total=st))
     a.total = total
@@ -291,7 +360,12 @@ def receptionner_achat(achat_id: int, data: ReceptionIn, request: Request, db: S
         raise HTTPException(404, "Achat introuvable.")
     if a.statut in ("RECEPTIONNE", "ANNULE"):
         raise HTTPException(409, "Achat déjà réceptionné ou annulé.")
-    recues = {l.ligne_id: Decimal(str(l.quantite_recue)) for l in data.lignes}
+    produits_lignes = {l.id: l.produit for l in a.lignes}
+    recues = {}
+    for l in data.lignes:
+        if l.quantite_recue is None and l.nb_caisses is None and l.nb_unites is None:
+            raise HTTPException(422, "Quantité reçue manquante.")
+        recues[l.ligne_id] = quantite_unites(produits_lignes.get(l.ligne_id), l.quantite_recue, l.nb_caisses, l.nb_unites)
     ecarts = []
     for l in a.lignes:
         if l.id not in recues:
@@ -345,7 +419,9 @@ def annuler_achat(achat_id: int, db: Session = Depends(get_db),
 
 class LigneTxIn(BaseModel):
     produit_id: int
-    quantite:   float = Field(gt=0)
+    quantite:   Optional[float] = Field(default=None, gt=0)   # en unités
+    nb_caisses: Optional[float] = Field(default=None, ge=0)   # ou caisses + unités
+    nb_unites:  Optional[float] = Field(default=None, ge=0)
 
 
 class TransactionIn(BaseModel):
@@ -378,6 +454,8 @@ def _tx_dict(t: DepotTransaction, avec_lignes: bool = True) -> dict:
         d["lignes"] = [{
             "produit_id": l.produit_id, "produit_nom": l.produit.nom if l.produit else str(l.produit_id),
             "unite": l.produit.unite if l.produit else None,
+            "unites_par_caisse": upc(l.produit) if upc(l.produit) > 1 else None,
+            "quantite_caisses": en_caisses(l.quantite, upc(l.produit)),
             "quantite": float(l.quantite), "prix_unitaire": float(l.prix_unitaire), "sous_total": float(l.sous_total),
         } for l in t.lignes]
         d["paiements"] = [_paiement_dict(p) for p in t.paiements]
@@ -442,7 +520,9 @@ def creer_transaction(data: TransactionIn, request: Request, db: Session = Depen
         prix = prix_actif(p.id, db)
         if prix is None:
             raise HTTPException(422, f"Aucun prix de vente pour « {p.nom} » (Dépôt › Produits).")
-        q = Decimal(str(l.quantite))
+        q = quantite_unites(p, l.quantite, l.nb_caisses, l.nb_unites)
+        if q <= 0:
+            raise HTTPException(422, f"Quantité nulle pour « {p.nom} ».")
         st = (q * prix).quantize(_CENT)
         total += st
         t.lignes.append(DepotTransactionLigne(produit_id=p.id, quantite=q, prix_unitaire=prix, sous_total=st))

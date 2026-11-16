@@ -35353,135 +35353,183 @@ function depHeader(titre, sub, actions){
 function depOuvrir(html){ document.getElementById('depot-modal').innerHTML = html; document.getElementById('depot-modal-bg').classList.add('open'); }
 function depFermer(){ document.getElementById('depot-modal-bg').classList.remove('open'); }
 async function depChargerProduits(){ _depProduits = await apiFetch('GET','/depot/produits'); return _depProduits; }
-const depOptionsProduits = (sel) => _depProduits.map(p=>`<option value="${p.id}" ${String(p.id)===String(sel)?'selected':''}>${esc(p.nom)} — dépôt ${fmtQ(p.stock_depot)}</option>`).join('');
+// ── Caisses : au dépôt, les articles se comptent en caisses ───────
+// Chaque article a son nombre d'unités par caisse (Produits Bar ou
+// Inventaire & prix). Le stock reste en unités ; on saisit et on affiche
+// « caisses + unités ».
+const _depProd = id => _depProduits.find(x=>String(x.id)===String(id));
+const depUpc = p => (p && p.unites_par_caisse > 1) ? p.unites_par_caisse : 1;
+// « 3 cs + 4 u » (ou « 12 u » pour un article vendu à l'unité).
+function depFmtCs(q, n){
+  q = parseFloat(q)||0;
+  if(!(n > 1)) return `${fmtQ(q)} u`;
+  const s = q < 0 ? '−' : '', a = Math.abs(q), c = Math.floor(a / n + 1e-9), u = Math.round((a - c*n)*1000)/1000;
+  if(!c) return `${s}${fmtQ(u)} u`;
+  return `${s}${c} cs${u ? ' + '+fmtQ(u)+' u' : ''}`;
+}
+const depOptionsProduits = (sel) => _depProduits.map(p=>`<option value="${p.id}" ${String(p.id)===String(sel)?'selected':''}>${esc(p.nom)}${p.unites_par_caisse>1?` (cs de ${p.unites_par_caisse})`:''} — dépôt ${depFmtCs(p.stock_depot, depUpc(p))}</option>`).join('');
 
 // ── Inventaire & prix ─────────────────────────────────────────────
 async function loadDepotProduits(){
   const root = document.getElementById('depot-produits-root');
-  root.innerHTML = depHeader('Dépôt central — Inventaire & prix', 'Stock du dépôt et des bars · prix de vente · quantité minimum',
-    `<input class="pos-input" id="dep-prod-q" placeholder="Rechercher…" oninput="depRendreProduits()" style="width:200px">`)
+  root.innerHTML = depHeader('Dépôt central — Inventaire & prix', 'Articles comptés en caisses · stock du dépôt et des bars · prix de vente · minimum',
+    `<input class="pos-input" id="dep-prod-q" placeholder="Rechercher…" oninput="depRendreProduits()" style="width:200px">
+     <select class="pos-select" id="dep-prod-filtre" onchange="depRendreProduits()" style="width:180px">
+       <option value="">Tous les articles</option><option value="STOCK">En stock au dépôt</option><option value="ALERTE">Sous le minimum</option><option value="SANS_CS">Sans nombre par caisse</option></select>`)
     + `<div class="pos-kpi-grid" id="dep-prod-kpi"></div><div class="pos-card"><div class="pos-table-wrap"><table class="pos-table">
-      <thead><tr><th>Produit</th><th>Catégorie</th><th style="text-align:right">Dépôt</th><th style="text-align:right">Bar Devant</th><th style="text-align:right">Bar Piscine</th><th style="text-align:right">Prix vente</th><th style="text-align:right">Min.</th><th style="text-align:right">Dernier prix d'achat</th><th style="text-align:right">Coût moyen</th><th style="text-align:right">Valeur</th><th></th></tr></thead>
+      <thead><tr><th>Article</th><th>Catégorie</th><th style="text-align:right">Unités / caisse</th><th style="text-align:right">Dépôt</th><th style="text-align:right">Bar Devant</th><th style="text-align:right">Bar Piscine</th><th style="text-align:right">Prix vente (u / cs)</th><th style="text-align:right">Min.</th><th style="text-align:right">Dernier achat (cs)</th><th style="text-align:right">Valeur</th><th></th></tr></thead>
       <tbody id="dep-prod-tbody"><tr><td colspan="11" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody></table></div></div>`;
   try { await depChargerProduits(); depRendreProduits(); } catch(e){ posAlert(e.message||'Erreur','err'); }
 }
 function depRendreProduits(){
   const q = _navNorm(document.getElementById('dep-prod-q')?.value||'');
-  const ps = _depProduits.filter(p => !q || _navNorm(p.nom+' '+(p.categorie||'')).includes(q));
+  const f = document.getElementById('dep-prod-filtre')?.value||'';
+  const ps = _depProduits.filter(p => (!q || _navNorm(p.nom+' '+(p.categorie||'')).includes(q))
+    && (f!=='STOCK' || p.stock_depot > 0) && (f!=='ALERTE' || p.alerte) && (f!=='SANS_CS' || !(p.unites_par_caisse > 1)));
   const valeur = _depProduits.reduce((s,p)=>s+p.valeur_stock,0);
+  const sansCs = _depProduits.filter(p=>!(p.unites_par_caisse > 1)).length;
   document.getElementById('dep-prod-kpi').innerHTML =
-    `<div class="pos-kpi"><div class="pos-kpi-label">Produits</div><div class="pos-kpi-val">${_depProduits.length}</div></div>
+    `<div class="pos-kpi"><div class="pos-kpi-label">Articles</div><div class="pos-kpi-val">${_depProduits.length}</div></div>
      <div class="pos-kpi"><div class="pos-kpi-label">Valeur du stock dépôt</div><div class="pos-kpi-val" style="color:#a78bfa">${posGx(valeur)}</div></div>
-     <div class="pos-kpi"><div class="pos-kpi-label">Sous le minimum</div><div class="pos-kpi-val" style="color:#f87171">${_depProduits.filter(p=>p.alerte).length}</div></div>`;
+     <div class="pos-kpi"><div class="pos-kpi-label">Sous le minimum</div><div class="pos-kpi-val" style="color:#f87171">${_depProduits.filter(p=>p.alerte).length}</div></div>
+     <div class="pos-kpi"><div class="pos-kpi-label">Sans nombre par caisse</div><div class="pos-kpi-val amber">${sansCs}</div><div style="font-size:12px;color:rgba(255,255,255,.4)">vendus à l'unité</div></div>`;
   const ro = _isReadOnly() && !depAdmin();
-  document.getElementById('dep-prod-tbody').innerHTML = ps.map(p=>`<tr${p.alerte?' style="background:rgba(248,113,113,.06)"':''}>
+  document.getElementById('dep-prod-tbody').innerHTML = ps.map(p=>{ const n = depUpc(p); return `<tr${p.alerte?' style="background:rgba(248,113,113,.06)"':''}>
     <td><b>${esc(p.nom)}</b>${p.alerte?' <span style="color:#f87171;font-size:11px">sous le minimum</span>':''}</td>
     <td>${esc(p.categorie||'—')}</td>
-    <td style="text-align:right;font-weight:700">${fmtQ(p.stock_depot)}</td>
-    <td style="text-align:right">${fmtQ(p.stock_devant)}</td><td style="text-align:right">${fmtQ(p.stock_piscine)}</td>
-    <td style="text-align:right">${posGx(p.prix_vente)}</td><td style="text-align:right">${fmtQ(p.seuil_min)}</td>
-    <td style="text-align:right">${p.dernier_prix_achat!=null?posGx(p.dernier_prix_achat):'—'}</td>
-    <td style="text-align:right;color:rgba(255,255,255,.55)">${posGx(p.cout_moyen)}</td>
+    <td style="text-align:right">${n>1?`<b>${n}</b>`:'<span style="color:rgba(255,255,255,.35)">à l\'unité</span>'}</td>
+    <td style="text-align:right;font-weight:700">${depFmtCs(p.stock_depot,n)}</td>
+    <td style="text-align:right">${depFmtCs(p.stock_devant,n)}</td><td style="text-align:right">${depFmtCs(p.stock_piscine,n)}</td>
+    <td style="text-align:right">${posGx(p.prix_vente)}${p.prix_vente_caisse?`<div style="font-size:12px;color:rgba(255,255,255,.5)">${posGx(p.prix_vente_caisse)} / cs</div>`:''}</td>
+    <td style="text-align:right">${p.seuil_min?depFmtCs(p.seuil_min,n):'—'}</td>
+    <td style="text-align:right">${p.dernier_prix_achat_caisse!=null?posGx(p.dernier_prix_achat_caisse):(p.dernier_prix_achat!=null?posGx(p.dernier_prix_achat)+' / u':'—')}</td>
     <td style="text-align:right">${posGx(p.valeur_stock)}</td>
-    <td>${ro?'':`<button class="pos-btn ghost" style="padding:3px 9px;font-size:12px" onclick="depConfigProduit(${p.id})">Prix / min.</button>`}</td>
-  </tr>`).join('') || '<tr><td colspan="11" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucun produit</td></tr>';
+    <td>${ro?'':`<button class="pos-btn ghost" style="padding:3px 9px;font-size:12px" onclick="depConfigProduit(${p.id})">Configurer</button>`}</td>
+  </tr>`; }).join('') || '<tr><td colspan="11" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucun article</td></tr>';
 }
 function depConfigProduit(id){
-  const p = _depProduits.find(x=>x.id===id); if(!p) return;
-  depOuvrir(`<h3>${esc(p.nom)}</h3><div class="pos-form-row">
-    <div><label class="pos-label">Prix de vente (G)</label><input class="pos-input" id="dep-cfg-prix" type="number" min="0.01" step="any" value="${p.prix_vente||''}"></div>
-    <div><label class="pos-label">Quantité minimum (alerte)</label><input class="pos-input" id="dep-cfg-min" type="number" min="0" step="any" value="${p.seuil_min||0}"></div></div>
+  const p = _depProd(id); if(!p) return;
+  const n = depUpc(p);
+  depOuvrir(`<h3>${esc(p.nom)}</h3>
+    <div class="pos-form-row">
+      <div><label class="pos-label">Unités par caisse</label><input class="pos-input" id="dep-cfg-upc" type="number" min="0" step="1" value="${n>1?n:''}" placeholder="vide = vendu à l'unité" oninput="depCfgMaj()"></div>
+      <div><label class="pos-label">Prix de vente d'une unité (G)</label><input class="pos-input" id="dep-cfg-prix" type="number" min="0.01" step="any" value="${p.prix_vente||''}" oninput="depCfgMaj()"></div></div>
+    <div class="pos-form-row">
+      <div><label class="pos-label">Minimum au dépôt — caisses</label><input class="pos-input" id="dep-cfg-min-cs" type="number" min="0" step="1" value="${n>1?Math.floor((p.seuil_min||0)/n):''}"></div>
+      <div><label class="pos-label">+ unités</label><input class="pos-input" id="dep-cfg-min-u" type="number" min="0" step="any" value="${n>1?(p.seuil_min||0)%n:(p.seuil_min||0)}"></div></div>
+    <div id="dep-cfg-info" style="font-size:13px;color:rgba(255,255,255,.55)"></div>
     <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Annuler</button><button class="pos-btn primary" onclick="depConfigSauver(${id})">Enregistrer</button></div>`);
+  depCfgMaj();
+}
+function depCfgMaj(){
+  const n = parseInt(document.getElementById('dep-cfg-upc')?.value||0)||0;
+  const px = parseFloat(document.getElementById('dep-cfg-prix')?.value||0)||0;
+  const i = document.getElementById('dep-cfg-info');
+  if(i) i.textContent = n > 1 ? `1 caisse = ${n} unités · prix de vente d'une caisse : ${posGx(px*n)}` : 'Article vendu à l\'unité (pas de caisse).';
 }
 async function depConfigSauver(id){
+  const n = parseInt(document.getElementById('dep-cfg-upc').value||0)||0;
+  const min = (parseFloat(document.getElementById('dep-cfg-min-cs').value||0)||0) * (n>1?n:0) + (parseFloat(document.getElementById('dep-cfg-min-u').value||0)||0);
   try {
     await apiFetch('PUT',`/depot/produits/${id}/config`,{
-      prix_vente: parseFloat(document.getElementById('dep-cfg-prix').value)||null,
-      seuil_min:  parseFloat(document.getElementById('dep-cfg-min').value)||0 });
-    depFermer(); posAlert('Produit mis à jour.','ok'); await depChargerProduits(); depRendreProduits();
+      prix_vente: parseFloat(document.getElementById('dep-cfg-prix').value)||null, seuil_min: min, unites_par_caisse: n });
+    depFermer(); posAlert('Article mis à jour.','ok'); await depChargerProduits(); depRendreProduits();
   } catch(e){ posAlert(e.message||'Erreur','err'); }
 }
 
-// ── Lignes produit (achat / transaction) — calcul automatique ─────
+// ── Lignes (achat / transfert / vente) en caisses + unités ────────
+// _depLignes : {produit_id, caisses, unites, prix}  — prix = prix d'achat
+// d'une CAISSE (ou d'une unité si l'article n'a pas de caisse).
+const depQteLigne = l => { const n = depUpc(_depProd(l.produit_id)); return (parseFloat(l.caisses)||0)*(n>1?n:0) + (parseFloat(l.unites)||0); };
 function depLignesHtml(mode){
-  return `<table class="pos-table"><thead><tr><th>Produit</th><th style="width:110px">Quantité</th>${mode==='achat'?'<th style="width:130px">Prix d\'achat (G)</th>':'<th style="text-align:right">Prix de vente</th>'}<th style="text-align:right">Sous-total</th><th></th></tr></thead>
+  const achat = mode==='achat';
+  return `<table class="pos-table"><thead><tr><th>Article</th><th style="width:90px">Caisses</th><th style="width:90px">Unités</th>${achat?'<th style="width:130px">Prix d\'achat</th>':'<th style="text-align:right">Prix de vente</th>'}<th style="text-align:right">Quantité</th><th style="text-align:right">Sous-total</th><th></th></tr></thead>
     <tbody>${_depLignes.map((l,i)=>{
-      const p = _depProduits.find(x=>String(x.id)===String(l.produit_id));
-      return `<tr><td><select class="pos-select" onchange="depChoisirProduit(${i},this.value,'${mode}')"><option value="">— Produit —</option>${depOptionsProduits(l.produit_id)}</select>
+      const p = _depProd(l.produit_id), n = depUpc(p);
+      return `<tr><td><select class="pos-select" onchange="depChoisirProduit(${i},this.value,'${mode}')"><option value="">— Article —</option>${depOptionsProduits(l.produit_id)}</select>
           <div id="dep-warn-${i}" style="color:#f87171;font-size:12px"></div></td>
-        <td><input class="pos-input" type="number" min="0" step="any" value="${l.quantite||''}" oninput="_depLignes[${i}].quantite=this.value;depMajCalculs('${mode}')"></td>
-        ${mode==='achat'?`<td><input class="pos-input" type="number" min="0" step="any" value="${l.prix??''}" oninput="_depLignes[${i}].prix=this.value;depMajCalculs('${mode}')"></td>`:`<td style="text-align:right">${p?posGx(p.prix_vente):'—'}</td>`}
+        <td><input class="pos-input" type="number" min="0" step="1" value="${l.caisses??''}" ${n>1?'':'disabled placeholder="—"'} oninput="_depLignes[${i}].caisses=this.value;depMajCalculs('${mode}')"></td>
+        <td><input class="pos-input" type="number" min="0" step="any" value="${l.unites??''}" oninput="_depLignes[${i}].unites=this.value;depMajCalculs('${mode}')"></td>
+        ${achat?`<td><input class="pos-input" type="number" min="0" step="any" value="${l.prix??''}" oninput="_depLignes[${i}].prix=this.value;depMajCalculs('${mode}')"><div style="font-size:11px;color:rgba(255,255,255,.4)">${p?(n>1?`par caisse de ${n}`:'par unité'):''}</div></td>`
+              :`<td style="text-align:right">${p?posGx(p.prix_vente)+' / u'+(n>1?`<div style="font-size:11px;color:rgba(255,255,255,.4)">${posGx(p.prix_vente*n)} / cs</div>`:''):'—'}</td>`}
+        <td style="text-align:right" id="dep-qte-${i}">—</td>
         <td style="text-align:right;font-weight:700" id="dep-st-${i}">—</td>
         <td><button class="pos-btn ghost" style="padding:2px 8px" onclick="_depLignes.splice(${i},1);depMajLignes('${mode}')">✕</button></td></tr>`;
     }).join('')}</tbody></table>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
-      <button class="pos-btn ghost" onclick="_depLignes.push({});depMajLignes('${mode}')">+ Ajouter un produit</button>
+      <button class="pos-btn ghost" onclick="_depLignes.push({});depMajLignes('${mode}')">+ Ajouter un article</button>
       <div style="font-size:18px">Total : <b id="dep-total" style="color:#34d399">—</b></div></div>`;
 }
-// Prix d'une ligne : prix d'achat saisi (achat) ou prix de vente configuré (transfert / vente).
-function _depPrixLigne(l, mode){
-  const p = _depProduits.find(x=>String(x.id)===String(l.produit_id));
-  return mode==='achat' ? (parseFloat(l.prix)||0) : (p?.prix_vente||0);
+// Sous-total d'une ligne : achat = prix caisse × caisses + prix caisse ÷ n × unités.
+function depSousTotal(l, mode){
+  const p = _depProd(l.produit_id); if(!p) return 0;
+  const n = depUpc(p), q = depQteLigne(l);
+  return mode==='achat' ? q * (parseFloat(l.prix)||0) / n : q * (p.prix_vente||0);
 }
-function depTotalLignes(mode){
-  return _depLignes.reduce((s,l)=> s + (parseFloat(l.quantite)||0)*_depPrixLigne(l,mode), 0);
-}
-// Besoin total par produit (un même produit sur plusieurs lignes est cumulé).
+function depTotalLignes(mode){ return _depLignes.reduce((s,l)=> s + depSousTotal(l,mode), 0); }
 function _depBesoins(){
   const b = {};
-  _depLignes.forEach(l=>{ if(l.produit_id) b[l.produit_id] = (b[l.produit_id]||0) + (parseFloat(l.quantite)||0); });
+  _depLignes.forEach(l=>{ if(l.produit_id) b[l.produit_id] = (b[l.produit_id]||0) + depQteLigne(l); });
   return b;
 }
-// Recalcul en direct, sans redessiner le tableau (la saisie n'est pas perdue) :
-// sous-totaux, total et contrôle « Stok ase ? » d'un transfert / d'une vente.
+// Recalcul en direct (sans redessiner) : quantités, sous-totaux, total,
+// contrôle « Stok ase ? » (cumul par article) et prix de vente manquant.
 function depMajCalculs(mode){
   const besoin = _depBesoins();
   _depLignes.forEach((l,i)=>{
-    const st = document.getElementById('dep-st-'+i);
-    if(st) st.textContent = l.produit_id ? posGx((parseFloat(l.quantite)||0)*_depPrixLigne(l,mode)) : '—';
-    const w = document.getElementById('dep-warn-'+i);
-    if(!w) return;
-    const p = _depProduits.find(x=>String(x.id)===String(l.produit_id));
+    const p = _depProd(l.produit_id), n = depUpc(p);
+    const qEl = document.getElementById('dep-qte-'+i); if(qEl) qEl.textContent = p ? `${depFmtCs(depQteLigne(l),n)}${n>1?` (${fmtQ(depQteLigne(l))} u)`:''}` : '—';
+    const st = document.getElementById('dep-st-'+i); if(st) st.textContent = p ? posGx(depSousTotal(l,mode)) : '—';
+    const w = document.getElementById('dep-warn-'+i); if(!w) return;
     let msg = '';
     if(mode!=='achat' && p){
       if(!(p.prix_vente>0)) msg = 'Aucun prix de vente — à configurer dans Inventaire & prix.';
-      else if(besoin[l.produit_id] > p.stock_depot) msg = `Stock insuffisant — disponible au dépôt : ${fmtQ(p.stock_depot)}`;
+      else if(besoin[l.produit_id] > p.stock_depot) msg = `Stock insuffisant — disponible au dépôt : ${depFmtCs(p.stock_depot,n)}`;
     }
     w.textContent = msg;
   });
   const tot = document.getElementById('dep-total'); if(tot) tot.textContent = posGx(depTotalLignes(mode));
 }
-// Choix du produit : à l'achat, le prix proposé est le dernier prix d'achat connu.
+// Choix de l'article : à l'achat, le prix proposé est le dernier prix d'achat (par caisse).
 function depChoisirProduit(i, val, mode){
   _depLignes[i].produit_id = val;
-  const p = _depProduits.find(x=>String(x.id)===String(val));
-  if(mode==='achat' && p && (_depLignes[i].prix===undefined || _depLignes[i].prix==='')) _depLignes[i].prix = p.dernier_prix_achat || '';
+  const p = _depProd(val);
+  if(mode==='achat' && p && (_depLignes[i].prix===undefined || _depLignes[i].prix==='')){
+    _depLignes[i].prix = (depUpc(p)>1 ? p.dernier_prix_achat_caisse : p.dernier_prix_achat) ?? '';
+  }
   depMajLignes(mode);
 }
-// Erreurs bloquantes d'un transfert / d'une vente (stock, prix) avant l'envoi.
 function depErreursLignes(){
   const err = [];
   Object.entries(_depBesoins()).forEach(([pid,q])=>{
-    const p = _depProduits.find(x=>String(x.id)===String(pid));
-    if(!p) return;
+    const p = _depProd(pid); if(!p) return;
     if(!(p.prix_vente>0)) err.push(`${p.nom} : pas de prix de vente`);
-    else if(q > p.stock_depot) err.push(`${p.nom} : disponible ${fmtQ(p.stock_depot)}, demandé ${fmtQ(q)}`);
+    else if(q > p.stock_depot) err.push(`${p.nom} : disponible ${depFmtCs(p.stock_depot,depUpc(p))}, demandé ${depFmtCs(q,depUpc(p))}`);
   });
   return err;
 }
 function depMajLignes(mode){ const w=document.getElementById('dep-lignes'); if(w){ w.innerHTML = depLignesHtml(mode); depMajCalculs(mode); } }
+// Lignes à envoyer au serveur (caisses + unités, prix par caisse à l'achat).
+function depLignesPayload(mode){
+  return _depLignes.filter(l=>l.produit_id && depQteLigne(l) > 0).map(l=>{
+    const p = _depProd(l.produit_id), n = depUpc(p);
+    const o = { produit_id: parseInt(l.produit_id), nb_caisses: n>1 ? (parseFloat(l.caisses)||0) : 0, nb_unites: parseFloat(l.unites)||0 };
+    if(mode==='achat'){ if(n>1) o.prix_caisse = parseFloat(l.prix)||0; else o.prix_achat = parseFloat(l.prix)||0; }
+    return o;
+  });
+}
 
 // ── Achats & réception ────────────────────────────────────────────
 async function loadDepotAchats(){
   const root = document.getElementById('depot-achats-root');
-  root.innerHTML = depHeader('Achats & réception', 'Enregistrer la facture fournisseur · contrôler la marchandise · entrer en stock',
+  root.innerHTML = depHeader('Achats & réception', 'Facture fournisseur en caisses · contrôle de la marchandise · entrée en stock',
     `<input type="date" class="pos-input" id="dep-ach-deb" style="width:135px"><input type="date" class="pos-input" id="dep-ach-fin" style="width:135px">
      <input class="pos-input" id="dep-ach-four" placeholder="Fournisseur" style="width:140px">
      <button class="pos-btn teal" onclick="depChargerAchats()">Filtrer</button>
      <select class="pos-select" id="dep-ach-statut" onchange="depChargerAchats()" style="width:170px"><option value="">Tous statuts</option><option value="EN_ATTENTE">À réceptionner</option><option value="ECART">Écart</option><option value="RECEPTIONNE">Réceptionnés</option><option value="ANNULE">Annulés</option></select>
      ${_isReadOnly()&&!depAdmin()?'':'<button class="pos-btn primary" onclick="depNouvelAchat()">+ Nouvel achat</button>'}`)
-    + `<div class="pos-card"><div class="pos-table-wrap"><table class="pos-table"><thead><tr><th>N°</th><th>Date</th><th>Fournisseur</th><th>Facture</th><th style="text-align:right">Total</th><th>Statut</th><th></th></tr></thead>
-      <tbody id="dep-ach-tbody"><tr><td colspan="7" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody></table></div></div>`;
+    + `<div class="pos-card"><div class="pos-table-wrap"><table class="pos-table"><thead><tr><th>N°</th><th>Date</th><th>Fournisseur</th><th>Facture</th><th>Articles</th><th style="text-align:right">Total</th><th>Statut</th><th></th></tr></thead>
+      <tbody id="dep-ach-tbody"><tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody></table></div></div>`;
   await depChargerProduits().catch(()=>{});
   await depChargerAchats();
 }
@@ -35494,6 +35542,7 @@ async function depChargerAchats(){
   const ro = _isReadOnly() && !depAdmin();
   document.getElementById('dep-ach-tbody').innerHTML = _depAchats.map(a=>`<tr>
     <td><b>${a.numero}</b></td><td>${depDate(a.created_at)}</td><td>${esc(a.fournisseur)}</td><td>${esc(a.numero_facture||'—')}</td>
+    <td style="font-size:12px">${a.lignes.map(l=>`${esc(l.produit_nom)} : ${depFmtCs(l.quantite, l.unites_par_caisse||1)}`).join('<br>')}</td>
     <td style="text-align:right;font-weight:700">${posGx(a.total)}</td>
     <td>${depBadge(a.statut)}${a.ecart_notes?`<div style="font-size:11px;color:#f87171;max-width:260px">${esc(a.ecart_notes)}</div>`:''}</td>
     <td style="white-space:nowrap">
@@ -35501,12 +35550,15 @@ async function depChargerAchats(){
       ${!ro && ['EN_ATTENTE','ECART'].includes(a.statut)?`<button class="pos-btn teal" style="padding:3px 9px;font-size:12px" onclick="depReception(${a.id})">Réceptionner</button>
         <button class="pos-btn ghost" style="padding:3px 9px;font-size:12px" onclick="depNouvelAchat(${a.id})">Corriger</button>`:''}
       ${depAdmin() && ['EN_ATTENTE','ECART'].includes(a.statut)?`<button class="pos-btn ghost" style="padding:3px 9px;font-size:12px;color:#f87171" onclick="depAnnulerAchat(${a.id})">Annuler</button>`:''}
-    </td></tr>`).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucun achat</td></tr>';
+    </td></tr>`).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucun achat</td></tr>';
 }
 function depNouvelAchat(id){
   const a = id ? _depAchats.find(x=>x.id===id) : null;
   _depEditAchat = id || null;
-  _depLignes = a ? a.lignes.map(l=>({produit_id:l.produit_id, quantite:l.quantite, prix:l.prix_achat})) : [{}];
+  _depLignes = a ? a.lignes.map(l=>{
+    const n = l.unites_par_caisse||1, c = n>1 ? Math.floor(l.quantite/n + 1e-9) : 0;
+    return {produit_id:l.produit_id, caisses: n>1?c:'', unites: Math.round((l.quantite - c*n)*1000)/1000 || '', prix: n>1 ? l.prix_caisse : l.prix_achat};
+  }) : [{}];
   depOuvrir(`<h3>${a?'Corriger l\'achat '+a.numero:'Nouvel achat de marchandises'}</h3>
     <div class="pos-form-row">
       <div><label class="pos-label">Fournisseur *</label><input class="pos-input" id="dep-a-four" value="${esc(a?.fournisseur||'')}"></div>
@@ -35518,11 +35570,11 @@ function depNouvelAchat(id){
   depMajCalculs('achat');
 }
 async function depSauverAchat(){
-  const lignes = _depLignes.filter(l=>l.produit_id && parseFloat(l.quantite)>0).map(l=>({produit_id:parseInt(l.produit_id), quantite:parseFloat(l.quantite), prix_achat:parseFloat(l.prix)||0}));
+  const lignes = depLignesPayload('achat');
   const body = { fournisseur: document.getElementById('dep-a-four').value.trim(), numero_facture: document.getElementById('dep-a-fact').value.trim()||null,
                  date_facture: document.getElementById('dep-a-date').value||null, notes: document.getElementById('dep-a-notes').value.trim()||null, lignes };
   if(!body.fournisseur){ posAlert('Fournisseur requis.','warn'); return; }
-  if(!lignes.length){ posAlert('Ajoutez au moins un produit avec une quantité.','warn'); return; }
+  if(!lignes.length){ posAlert('Ajoutez au moins un article avec une quantité.','warn'); return; }
   try {
     if(_depEditAchat) await apiFetch('PUT',`/depot/achats/${_depEditAchat}`, body); else await apiFetch('POST','/depot/achats', body);
     depFermer(); posAlert('Achat enregistré — à réceptionner au dépôt.','ok'); await depChargerAchats();
@@ -35531,20 +35583,22 @@ async function depSauverAchat(){
 function depVoirAchat(id){
   const a = _depAchats.find(x=>x.id===id); if(!a) return;
   depOuvrir(`<h3>${a.numero} — ${esc(a.fournisseur)}</h3><div style="margin-bottom:8px">${depBadge(a.statut)} · facture ${esc(a.numero_facture||'—')} · créé par ${esc(a.cree_par||'—')}${a.receptionne_par?` · reçu par ${esc(a.receptionne_par)} le ${depDate(a.date_reception)}`:''}</div>
-    <table class="pos-table"><thead><tr><th>Produit</th><th style="text-align:right">Facturé</th><th style="text-align:right">Reçu</th><th style="text-align:right">Écart</th><th style="text-align:right">Prix</th><th style="text-align:right">Sous-total</th></tr></thead><tbody>
-    ${a.lignes.map(l=>`<tr><td>${esc(l.produit_nom)}</td><td style="text-align:right">${fmtQ(l.quantite)}</td><td style="text-align:right">${l.quantite_recue==null?'—':fmtQ(l.quantite_recue)}</td>
-      <td style="text-align:right;color:${l.ecart?'#f87171':'inherit'}">${l.ecart==null?'—':(l.ecart>0?'+':'')+fmtQ(l.ecart)}</td><td style="text-align:right">${posGx(l.prix_achat)}</td><td style="text-align:right">${posGx(l.sous_total)}</td></tr>`).join('')}
+    <table class="pos-table"><thead><tr><th>Article</th><th style="text-align:right">Facturé</th><th style="text-align:right">Reçu</th><th style="text-align:right">Écart</th><th style="text-align:right">Prix</th><th style="text-align:right">Sous-total</th></tr></thead><tbody>
+    ${a.lignes.map(l=>{ const n = l.unites_par_caisse||1; return `<tr><td>${esc(l.produit_nom)}${n>1?` <span style="font-size:11px;color:rgba(255,255,255,.4)">(cs de ${n})</span>`:''}</td><td style="text-align:right">${depFmtCs(l.quantite,n)}</td><td style="text-align:right">${l.quantite_recue==null?'—':depFmtCs(l.quantite_recue,n)}</td>
+      <td style="text-align:right;color:${l.ecart?'#f87171':'inherit'}">${l.ecart==null?'—':(l.ecart>0?'+':'')+depFmtCs(l.ecart,n)}</td><td style="text-align:right">${n>1?posGx(l.prix_caisse)+' / cs':posGx(l.prix_achat)+' / u'}</td><td style="text-align:right">${posGx(l.sous_total)}</td></tr>`; }).join('')}
     </tbody></table><div style="text-align:right;font-size:17px;margin-top:8px">Total : <b>${posGx(a.total)}</b></div>
     <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Fermer</button></div>`);
 }
 function depReception(id){
   const a = _depAchats.find(x=>x.id===id); if(!a) return;
   depOuvrir(`<h3>Réception ${a.numero} — ${esc(a.fournisseur)}</h3>
-    <div style="font-size:13px;color:rgba(255,255,255,.55);margin-bottom:8px">Comptez la marchandise reçue. Si tout est conforme, le stock du dépôt est mis à jour.</div>
-    <table class="pos-table"><thead><tr><th>Produit</th><th style="text-align:right">Facturé</th><th style="width:130px">Reçu (compté)</th><th style="text-align:right">Écart</th></tr></thead><tbody>
-    ${a.lignes.map(l=>`<tr><td>${esc(l.produit_nom)}</td><td style="text-align:right">${fmtQ(l.quantite)}</td>
-      <td><input class="pos-input dep-recu" data-ligne="${l.id}" data-fact="${l.quantite}" type="number" min="0" step="any" value="${l.quantite_recue ?? l.quantite}" oninput="depEcarts()"></td>
-      <td style="text-align:right" class="dep-ecart" data-ligne="${l.id}">0</td></tr>`).join('')}
+    <div style="font-size:13px;color:rgba(255,255,255,.55);margin-bottom:8px">Comptez les caisses (et les unités en vrac) reçues. Si tout est conforme, le stock du dépôt est mis à jour.</div>
+    <table class="pos-table"><thead><tr><th>Article</th><th style="text-align:right">Facturé</th><th style="width:95px">Caisses reçues</th><th style="width:95px">Unités</th><th style="text-align:right">Écart</th></tr></thead><tbody>
+    ${a.lignes.map(l=>{ const n = l.unites_par_caisse||1, r = l.quantite_recue ?? l.quantite, c = n>1 ? Math.floor(r/n + 1e-9) : 0, u = Math.round((r - c*n)*1000)/1000;
+      return `<tr class="dep-recu" data-ligne="${l.id}" data-fact="${l.quantite}" data-n="${n}"><td>${esc(l.produit_nom)}${n>1?` <span style="font-size:11px;color:rgba(255,255,255,.4)">(cs de ${n})</span>`:''}</td><td style="text-align:right">${depFmtCs(l.quantite,n)}</td>
+      <td><input class="pos-input dep-recu-cs" type="number" min="0" step="1" value="${n>1?c:''}" ${n>1?'':'disabled placeholder="—"'} oninput="depEcarts()"></td>
+      <td><input class="pos-input dep-recu-u" type="number" min="0" step="any" value="${u}" oninput="depEcarts()"></td>
+      <td style="text-align:right" class="dep-ecart">0</td></tr>`; }).join('')}
     </tbody></table>
     <div style="margin-top:8px"><label class="pos-label">Remarque (écart, état de la marchandise…)</label><input class="pos-input" id="dep-rec-notes"></div>
     <div id="dep-rec-msg" style="margin-top:8px;font-size:13px"></div>
@@ -35553,20 +35607,21 @@ function depReception(id){
       <button class="pos-btn primary" onclick="depValiderReception(${id},false)">Valider la réception</button></div>`);
   depEcarts();
 }
+const _depRecuQte = tr => { const n = parseInt(tr.dataset.n)||1; return (parseFloat(tr.querySelector('.dep-recu-cs').value)||0)*(n>1?n:0) + (parseFloat(tr.querySelector('.dep-recu-u').value)||0); };
 function depEcarts(){
   let ecart = false;
-  document.querySelectorAll('.dep-recu').forEach(inp=>{
-    const d = (parseFloat(inp.value)||0) - parseFloat(inp.dataset.fact);
+  document.querySelectorAll('tr.dep-recu').forEach(tr=>{
+    const n = parseInt(tr.dataset.n)||1, d = _depRecuQte(tr) - parseFloat(tr.dataset.fact);
     if(Math.abs(d) > 1e-9) ecart = true;
-    const c = document.querySelector(`.dep-ecart[data-ligne="${inp.dataset.ligne}"]`);
-    if(c){ c.textContent = (d>0?'+':'')+fmtQ(d); c.style.color = d ? '#f87171' : '#34d399'; }
+    const c = tr.querySelector('.dep-ecart');
+    if(c){ c.textContent = Math.abs(d) < 1e-9 ? '0' : (d>0?'+':'')+depFmtCs(d,n); c.style.color = Math.abs(d) > 1e-9 ? '#f87171' : '#34d399'; }
   });
   const m = document.getElementById('dep-rec-msg');
   if(m) m.innerHTML = ecart ? '<span style="color:#f87171">Marchandise non conforme : la différence sera enregistrée et une correction demandée au responsable des achats — ou validez avec l\'écart (le stock prend les quantités comptées).</span>' : '<span style="color:#34d399">Marchandise conforme.</span>';
   const f = document.getElementById('dep-rec-forcer'); if(f) f.style.display = ecart ? '' : 'none';
 }
 async function depValiderReception(id, forcer){
-  const lignes = [...document.querySelectorAll('.dep-recu')].map(i=>({ligne_id:parseInt(i.dataset.ligne), quantite_recue:parseFloat(i.value)||0}));
+  const lignes = [...document.querySelectorAll('tr.dep-recu')].map(tr=>({ligne_id:parseInt(tr.dataset.ligne), quantite_recue:_depRecuQte(tr)}));
   try {
     const r = await apiFetch('POST',`/depot/achats/${id}/reception`,{lignes, forcer, notes: document.getElementById('dep-rec-notes').value.trim()||null});
     depFermer();
@@ -35639,8 +35694,8 @@ function depNouvelleTx(){
   depMajCalculs('tx');
 }
 async function depSauverTx(valider){
-  const lignes = _depLignes.filter(l=>l.produit_id && parseFloat(l.quantite)>0).map(l=>({produit_id:parseInt(l.produit_id), quantite:parseFloat(l.quantite)}));
-  if(!lignes.length){ posAlert('Ajoutez au moins un produit avec une quantité.','warn'); return; }
+  const lignes = depLignesPayload('tx');
+  if(!lignes.length){ posAlert('Ajoutez au moins un article avec une quantité.','warn'); return; }
   const errs = depErreursLignes();
   if(errs.length){ posAlert('Stock insuffisant ou prix manquant — ' + errs.join(' ; '),'warn'); return; }
   if(document.getElementById('dep-tx-d').value==='CLIENT' && !document.getElementById('dep-tx-cnom').value.trim()){ posAlert('Nom du client requis pour une vente externe.','warn'); return; }
@@ -35724,8 +35779,8 @@ async function depFacture(id){
   let t; try { t = await apiFetch('GET',`/depot/transactions/${id}`); } catch(e){ posAlert(e.message,'err'); return; }
   _depFenetre(`Facture ${t.numero}`, `<p><b>${t.type==='TRANSFERT'?'Transfert vers':'Vente à'} :</b> ${esc(t.destination_libelle)}${t.client_nom?' — '+esc(t.client_nom):''}<br>
     <b>Statut :</b> ${(_DEP_STATUT[t.statut]||[t.statut])[0]} · ${(_DEP_STATUT[t.statut_paiement]||[t.statut_paiement])[0]} · Responsable : ${esc(t.responsable||'—')}</p>
-    <table><tr><th>Produit</th><th class="r">Quantité</th><th class="r">Prix</th><th class="r">Sous-total</th></tr>
-    ${t.lignes.map(l=>`<tr><td>${esc(l.produit_nom)}</td><td class="r">${fmtQ(l.quantite)}</td><td class="r">${posGx(l.prix_unitaire)}</td><td class="r">${posGx(l.sous_total)}</td></tr>`).join('')}
+    <table><tr><th>Article</th><th class="r">Quantité</th><th class="r">Prix unitaire</th><th class="r">Sous-total</th></tr>
+    ${t.lignes.map(l=>`<tr><td>${esc(l.produit_nom)}</td><td class="r">${depFmtCs(l.quantite, l.unites_par_caisse||1)}</td><td class="r">${posGx(l.prix_unitaire)}</td><td class="r">${posGx(l.sous_total)}</td></tr>`).join('')}
     <tr><td colspan="3" class="r tot">TOTAL</td><td class="r tot">${posGx(t.total)}</td></tr></table>
     ${t.paiements.length?`<table><tr><th>Reçu</th><th>Date</th><th>Méthode</th><th class="r">Montant</th></tr>${t.paiements.map(p=>`<tr><td>${p.numero_recu}</td><td>${depDate(p.date_paiement)}</td><td>${p.methode}</td><td class="r">${p.devise==='USD'?_usd(p.montant)+' (≈ '+posGx(p.montant_htg)+')':posGx(p.montant)}</td></tr>`).join('')}</table>`:''}
     <p class="tot">Payé : ${posGx(t.paye_htg)}${t.paye_usd?' + '+_usd(t.paye_usd):''} — Reste : ${posGx(t.reste)}</p>`);
@@ -35799,7 +35854,7 @@ async function loadDepotRapportDonnees(){
         <div class="pos-card"><div class="pos-card-hdr">Encaissements par méthode</div><table class="pos-table"><thead><tr><th>Méthode</th><th style="text-align:right">Gourdes</th><th style="text-align:right">Dollars</th></tr></thead><tbody>
           ${c.par_methode.map(m=>`<tr><td>${m.methode}</td><td style="text-align:right">${posGx(m.htg)}</td><td style="text-align:right">${_usd(m.usd)}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:rgba(255,255,255,.3)">—</td></tr>'}</tbody></table></div>
         <div class="pos-card"><div class="pos-card-hdr">Produits sous le minimum</div><table class="pos-table"><thead><tr><th>Produit</th><th style="text-align:right">Dépôt</th><th style="text-align:right">Min.</th></tr></thead><tbody>
-          ${r.inventaire.en_alerte.map(p=>`<tr><td>${esc(p.nom)}</td><td style="text-align:right;color:#f87171">${fmtQ(p.stock_depot)}</td><td style="text-align:right">${fmtQ(p.seuil_min)}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:rgba(255,255,255,.3)">Aucun</td></tr>'}</tbody></table></div>
+          ${r.inventaire.en_alerte.map(p=>`<tr><td>${esc(p.nom)}</td><td style="text-align:right;color:#f87171">${depFmtCs(p.stock_depot,depUpc(p))}</td><td style="text-align:right">${depFmtCs(p.seuil_min,depUpc(p))}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:rgba(255,255,255,.3)">Aucun</td></tr>'}</tbody></table></div>
       </div>`;
   } catch(e){ posAlert(e.message||'Erreur','err'); }
 }

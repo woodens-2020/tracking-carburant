@@ -108,6 +108,36 @@ def test_transfert_vers_bar_piscine_met_le_stock_a_jour(client):
     assert s["stock_depot"] == 14 and s["stock_piscine"] == 6
 
 
+def test_achat_reception_transfert_en_caisses(client):
+    """Articles du dépôt comptés en caisses : 1 caisse = 24 unités."""
+    pid = _produit(client, prix=100)
+    assert client.put(f"/api/depot/produits/{pid}/config", headers=H, json={"unites_par_caisse": 24}).json()["unites_par_caisse"] == 24
+    a = client.post("/api/depot/achats", headers=H, json={"fournisseur": "Brana", "lignes": [
+        {"produit_id": pid, "nb_caisses": 3, "nb_unites": 6, "prix_caisse": 1250}]})
+    assert a.status_code == 201, a.text
+    a = a.json()
+    l = a["lignes"][0]
+    assert l["quantite"] == 78 and l["quantite_caisses"] == {"caisses": 3, "unites": 6.0}
+    assert l["prix_caisse"] == 1250.0 and a["total"] == 4062.5          # 3 cs × 1250 + 6 × 1250/24
+    # Réception : 3 caisses comptées (6 unités manquent) → écart
+    r = client.post(f"/api/depot/achats/{a['id']}/reception", headers=H, json={
+        "lignes": [{"ligne_id": l["id"], "nb_caisses": 3, "nb_unites": 0}]}).json()
+    assert not r["conforme"] and r["achat"]["lignes"][0]["ecart_caisses"] == {"caisses": 0, "unites": -6.0}
+    r = client.post(f"/api/depot/achats/{a['id']}/reception", headers=H, json={
+        "lignes": [{"ligne_id": l["id"], "nb_caisses": 3, "nb_unites": 6}]}).json()
+    assert r["conforme"]
+    s = _stock(client, pid)
+    assert s["stock_depot"] == 78 and s["stock_depot_caisses"] == {"caisses": 3, "unites": 6.0}
+    assert s["unites_par_caisse"] == 24 and s["prix_vente_caisse"] == 2400.0
+    assert s["dernier_prix_achat_caisse"] == 1250.0
+    # Transfert de 2 caisses vers Bar Devant
+    t = client.post("/api/depot/transactions", headers=H, json={
+        "destination": "DEVANT", "lignes": [{"produit_id": pid, "nb_caisses": 2}]}).json()
+    assert t["total"] == 4800.0 and t["lignes"][0]["quantite_caisses"] == {"caisses": 2, "unites": 0.0}
+    s = _stock(client, pid)
+    assert s["stock_depot"] == 30 and s["stock_devant"] == 48
+
+
 def test_stock_depot_hors_stock_bar(client):
     """Le stock du dépôt n'est pas du stock bar : ni affiché ni vendable au Bar."""
     pid = _produit(client)
