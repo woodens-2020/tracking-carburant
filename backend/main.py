@@ -4452,6 +4452,7 @@ def journal_endpoint(
     pompiste_id: List[int] = Query(default=[]),
     certifie: Optional[str] = None,          # "oui" | "non" ; vide = tous
     activite: Optional[str] = None,          # "carburant" | "propane" ; vide = tout
+    source: Optional[str] = None,            # "fiches" | "saisies" ; vide = tout, en attente compris
     db: Session = Depends(get_db),
 ):
     from datetime import date as dt
@@ -4459,9 +4460,9 @@ def journal_endpoint(
     d_fin   = date_fin   or today_haiti()
     d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
 
-    tous = _filtre_certifie(_build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode,
+    tous = _filtre_source(_filtre_certifie(_build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None, periode,
                                                    pompiste_id, inclure_en_attente=True,
-                                                   activite=_activite_valide(activite)), certifie)
+                                                   activite=_activite_valide(activite)), certifie), source)
     # Les rapports pompistes pas encore finalisés sont listés mais ne comptent
     # dans aucun total (ni gallons, ni montant, ni conformité)
     en_attente = [e for e in tous if e["en_attente"]]
@@ -4878,6 +4879,17 @@ def carburant_rapport_jour(
     }
 
 
+def _filtre_source(entries: list, source: Optional[str]) -> list:
+    """source = "fiches" : seulement les relevés des fiches papier de la direction ;
+    "saisies" : tous les relevés du journal ; dans les deux cas, aucun rapport
+    pompiste en attente. Vide : comme avant (rapports en attente compris)."""
+    if source not in (None, "", "fiches", "saisies"):
+        raise HTTPException(400, "source : « fiches » ou « saisies ».")
+    if not source:
+        return entries
+    return [e for e in entries if not e["en_attente"] and (source == "saisies" or e.get("fiche_papier"))]
+
+
 def _filtre_certifie(entries: list, certifie: Optional[str]) -> list:
     if certifie not in (None, "", "oui", "non"):
         raise HTTPException(400, "certifie : « oui » ou « non ».")
@@ -4896,6 +4908,7 @@ def journal_pdf(
     pompiste_id: List[int] = Query(default=[]),
     certifie: Optional[str] = None,
     activite: Optional[str] = None,
+    source: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     import io
@@ -4913,9 +4926,9 @@ def journal_pdf(
     d_fin   = date_fin   or today_haiti()
     d_debut = date_debut or dt(d_fin.year, d_fin.month, 1)
 
-    entries    = [e for e in _filtre_certifie(_build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None,
+    entries    = [e for e in _filtre_source(_filtre_certifie(_build_journal_entries(db, d_debut, d_fin, produit_id, pompe_id or None,
                                                                  periode, pompiste_id, inclure_en_attente=True,
-                                                                 activite=_activite_valide(activite)), certifie)
+                                                                 activite=_activite_valide(activite)), certifie), source)
                   if not e["en_attente"]]
     nb_alertes = sum(1 for e in entries if e["statut"] == "alerte")
     nb_erreurs = sum(1 for e in entries if e["statut"] == "erreur")
@@ -5122,6 +5135,7 @@ def export_releves_xlsx(
     periode:    Optional[str] = None,
     pompiste_id: List[int] = Query(default=[]),
     activite: Optional[str] = None,          # "carburant" | "propane" ; vide = tout
+    source: Optional[str] = None,            # "fiches" : seulement les fiches papier
     db: Session = Depends(get_db),
 ):
     import io
@@ -5142,6 +5156,7 @@ def export_releves_xlsx(
     if pompe_id:    q = q.filter(Releve.pompe_id.in_(pompe_id))
     if periode:     q = q.filter(Releve.periode == periode)
     if pompiste_id: q = q.filter(Releve.pompiste_id.in_(pompiste_id))
+    if source == "fiches": q = q.filter(Releve.fiche_papier.is_(True))
     releves = q.order_by(Releve.date.desc(), Releve.periode, Releve.pompe_id).all()
     act = _activite_valide(activite)
     if act:      # propane et carburant jamais dans le même fichier

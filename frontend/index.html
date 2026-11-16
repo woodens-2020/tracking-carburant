@@ -4875,6 +4875,13 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
             </div>
           </div>
           <div class="filter-group">
+            <label class="filter-label">Source</label>
+            <select id="jf-source" class="filter-select" onchange="loadJournal()">
+              <option value="fiches" selected>📄 Fiches papier seulement</option>
+              <option value="saisies">Toutes les saisies (sans rapports en attente)</option>
+            </select>
+          </div>
+          <div class="filter-group">
             <label class="filter-label">Certification</label>
             <select id="jf-certif" class="filter-select" onchange="loadJournal()">
               <option value="">Tous les meeters</option>
@@ -17894,6 +17901,7 @@ async function loadJournal(){
     pompisteIds.forEach(id=>{ url+=`&pompiste_id=${id}`; });
     const certif=document.getElementById('jf-certif')?.value;
     if(certif) url+=`&certifie=${certif}`;
+    url+=`&source=${document.getElementById('jf-source')?.value || 'fiches'}`;
     const data=await GET(url);
     _jrActivites = [...new Set((products||[]).map(p => /propan/i.test(p.nom) ? 'propane' : 'carburant'))];
     renderJournal(data);
@@ -17930,6 +17938,7 @@ async function downloadJournalPdf(){
   pompisteIds.forEach(id=>{ url+=`&pompiste_id=${id}`; });
   const certif=document.getElementById('jf-certif')?.value;
   if(certif) url+=`&certifie=${certif}`;
+  url+=`&source=${document.getElementById('jf-source')?.value || 'fiches'}`;
   if(act) url+=`&activite=${act}`;
   window.location.href=url;
 }
@@ -17945,6 +17954,7 @@ async function downloadJournalXls(){
   if(!debut||!fin){toast('Sélectionnez une plage de dates','err');return;}
   const pompisteIds=ppIds('jf-pompiste');
   let url=`/api/releves/export?date_debut=${debut}&date_fin=${fin}`;
+  if((document.getElementById('jf-source')?.value || 'fiches') === 'fiches') url+=`&source=fiches`;
   if(prodId)    url+=`&produit_id=${prodId}`;
   pompeIds.forEach(id=>{ url+=`&pompe_id=${id}`; });
   if(periodeId) url+=`&periode=${encodeURIComponent(periodeId)}`;

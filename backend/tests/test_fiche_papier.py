@@ -67,3 +67,29 @@ def test_marquer_fiche_papier(client):
                                                      "metter_avant": 0, "metter_apres": 6})
     assert r.status_code == 200 and _journal(client, d, pompe)[0]["fiche_papier"]
     assert client.post("/api/releves/fiche-papier", headers=H, json={"ids": [999999]}).status_code == 404
+
+
+def test_journal_fiches_seulement(client):
+    """Journal Meeters (source=fiches) : seulement les fiches papier, jamais les rapports en attente."""
+    import main as _m
+    from tz_utils import today_haiti
+    d = str(today_haiti())
+    a, b = _pompe(client), _pompe(client)
+    client.post("/api/releves", headers=H, json={"date": d, "periode": "Matin", "pompe_id": a, "prix_gallon": 500,
+                                                 "metter_avant": 0, "metter_apres": 7, "fiche_papier": True})
+    client.post("/api/releves", headers=H, json={"date": d, "periode": "Matin", "pompe_id": b, "prix_gallon": 500,
+                                                 "metter_avant": 0, "metter_apres": 3})
+    c = client.post("/api/pompiste-supervision/comptes", headers=H, json={"prenom": "So", "nom": f"Urce{time.time_ns()}"}).json()
+    p = TestClient(_m.app)
+    p.post("/api/login/pompiste", json={"username": c["username"], "code_acces": c["code_acces"]})
+    p.post("/api/pompiste/compteurs", json={"date": d, "periode": "Apres-midi", "charte_acceptee": True, "lignes": [
+        {"pompe_id": a, "metter_avant": 7, "metter_apres": 9, "debut_confirme": True}]})
+    p.post("/api/pompiste/terminer", json={"billetterie": [{"coupure": 1000, "billets": 1}]})
+    q = f"/api/journal?date_debut={d}&date_fin={d}&pompe_id={a}&pompe_id={b}"
+    tout = client.get(q, headers=H).json()["entries"]
+    assert any(e["en_attente"] for e in tout)                                   # sans filtre : comme avant
+    fiches = client.get(q + "&source=fiches", headers=H).json()["entries"]
+    assert [(e["pompe_id"], e["fiche_papier"]) for e in fiches] == [(a, True)]
+    saisies = client.get(q + "&source=saisies", headers=H).json()["entries"]
+    assert sorted(e["pompe_id"] for e in saisies) == sorted([a, b]) and not any(e["en_attente"] for e in saisies)
+    assert client.get(q + "&source=autre", headers=H).status_code == 400
