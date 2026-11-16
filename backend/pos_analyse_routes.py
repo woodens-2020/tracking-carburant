@@ -12,7 +12,10 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import BarProduit, BarAchat, BarMouvementStock, BarVente, BarLigneVente
-from pos_service import stock_tous_produits, cmup as _cmup, prix_actif as _prix_actif, stock_courant
+from pos_service import (
+    stock_tous_produits, cmup as _cmup, prix_actif as _prix_actif, stock_courant,
+    normaliser_lieu, filtrer_lieu,
+)
 
 router = APIRouter(prefix="/api/pos/analyse", tags=["Analyse Bar"])
 
@@ -21,29 +24,37 @@ def _dec(v) -> Decimal:
     return Decimal(str(v)) if v is not None else Decimal("0")
 
 
+def _dept(lieu: Optional[str] = Query(None)) -> Optional[str]:
+    """Département analysé : DEVANT (Bar) ou PISCINE — vide = les deux."""
+    try:
+        return normaliser_lieu(lieu)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
 @router.get("/tableau")
-def tableau_controle(db: Session = Depends(get_db)):
-    """Tableau de contrôle complet par article : stock, CMUP, marge, valeur, ventes 30j."""
+def tableau_controle(lieu: Optional[str] = Depends(_dept), db: Session = Depends(get_db)):
+    """Tableau de contrôle complet par article : stock, CMUP, marge, valeur, ventes 30j.
+    `lieu` : catalogue, stock, achats et ventes du seul département."""
+    from sqlalchemy import or_
     today = today_haiti()
     dt_30j, _ = bounds_haiti(today - timedelta(days=30))
 
-    produits = (
-        db.query(BarProduit)
-        .filter(BarProduit.actif == True)
-        .order_by(BarProduit.nom)
-        .all()
-    )
+    q_prod = db.query(BarProduit).filter(BarProduit.actif == True)
+    if lieu:
+        q_prod = q_prod.filter(or_(BarProduit.lieu == lieu, BarProduit.lieu.is_(None)))
+    produits = q_prod.order_by(BarProduit.nom).all()
 
-    stocks = stock_tous_produits(db)
+    stocks = stock_tous_produits(db, lieu=lieu)
 
     achats_totaux: dict[int, dict] = {}
-    for pid, nb, qte, cout, dernier in db.query(
+    for pid, nb, qte, cout, dernier in filtrer_lieu(db.query(
         BarAchat.produit_id,
         func.count(BarAchat.id),
         func.sum(BarAchat.quantite),
         func.sum(BarAchat.quantite * BarAchat.prix_achat_unitaire),
         func.max(BarAchat.date_achat),
-    ).filter(BarAchat.produit_id.isnot(None)).group_by(BarAchat.produit_id).all():
+    ).filter(BarAchat.produit_id.isnot(None)), BarAchat.lieu, lieu).group_by(BarAchat.produit_id).all():
         achats_totaux[pid] = {
             "nb": nb or 0,
             "qte": float(_dec(qte)),
@@ -52,12 +63,12 @@ def tableau_controle(db: Session = Depends(get_db)):
         }
 
     ventes_totales: dict[int, dict] = {}
-    for pid, qte, ca, derniere in db.query(
+    for pid, qte, ca, derniere in filtrer_lieu(db.query(
         BarLigneVente.produit_id,
         func.sum(BarLigneVente.quantite),
         func.sum(BarLigneVente.sous_total),
         func.max(BarVente.date_heure),
-    ).join(BarVente).filter(BarVente.statut != "ANNULEE").group_by(BarLigneVente.produit_id).all():
+    ).join(BarVente).filter(BarVente.statut != "ANNULEE"), BarVente.lieu, lieu).group_by(BarLigneVente.produit_id).all():
         ventes_totales[pid] = {
             "qte": float(_dec(qte)),
             "ca": float(_dec(ca)),
@@ -65,14 +76,14 @@ def tableau_controle(db: Session = Depends(get_db)):
         }
 
     ventes_30j: dict[int, dict] = {}
-    for pid, qte, ca in db.query(
+    for pid, qte, ca in filtrer_lieu(db.query(
         BarLigneVente.produit_id,
         func.sum(BarLigneVente.quantite),
         func.sum(BarLigneVente.sous_total),
     ).join(BarVente).filter(
         BarVente.statut != "ANNULEE",
         BarVente.date_heure >= dt_30j,
-    ).group_by(BarLigneVente.produit_id).all():
+    ), BarVente.lieu, lieu).group_by(BarLigneVente.produit_id).all():
         ventes_30j[pid] = {"qte": float(_dec(qte)), "ca": float(_dec(ca))}
 
     articles = []
@@ -130,6 +141,7 @@ def evolution_ventes(
     date_fin:    Optional[date_type] = Query(default=None),
     produit_id:  Optional[int]       = Query(default=None),
     granularite: str                 = Query(default="jour"),
+    lieu:        Optional[str]       = Depends(_dept),
     db: Session = Depends(get_db),
 ):
     """Évolution temporelle des ventes groupée par jour, semaine ou mois."""
@@ -151,6 +163,7 @@ def evolution_ventes(
             BarVente.date_heure <= dt_fin,
         )
     )
+    q = filtrer_lieu(q, BarVente.lieu, lieu)
     if produit_id:
         q = q.filter(BarLigneVente.produit_id == produit_id)
 
@@ -195,28 +208,28 @@ def evolution_ventes(
 
 
 @router.get("/lots/{produit_id}")
-def suivi_lots_produit(produit_id: int, db: Session = Depends(get_db)):
+def suivi_lots_produit(produit_id: int, lieu: Optional[str] = Depends(_dept), db: Session = Depends(get_db)):
     """Suivi des ventes générées dans la fenêtre temporelle de chaque lot d'achat."""
     produit = db.query(BarProduit).filter_by(id=produit_id).first()
     if not produit:
         raise HTTPException(404, "Produit introuvable")
 
     achats = (
-        db.query(BarAchat)
-        .filter(BarAchat.produit_id == produit_id)
+        filtrer_lieu(db.query(BarAchat)
+        .filter(BarAchat.produit_id == produit_id), BarAchat.lieu, lieu)
         .order_by(BarAchat.date_achat)
         .all()
     )
 
     lignes_vente = (
-        db.query(BarLigneVente)
+        filtrer_lieu(db.query(BarLigneVente)
         .join(BarVente)
-        .filter(BarLigneVente.produit_id == produit_id, BarVente.statut != "ANNULEE")
+        .filter(BarLigneVente.produit_id == produit_id, BarVente.statut != "ANNULEE"), BarVente.lieu, lieu)
         .order_by(BarVente.date_heure)
         .all()
     )
 
-    stk      = stock_courant(produit_id, db)
+    stk      = stock_courant(produit_id, db, lieu=lieu)
     cout_moy = _cmup(produit_id, db)
     prix_v   = _prix_actif(produit_id, db) or Decimal("0")
     now_utc  = datetime.now(timezone.utc)

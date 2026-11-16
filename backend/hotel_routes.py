@@ -16,7 +16,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import HotelChambre, HotelEmploye, HotelReservation, HotelDepense, HotelRapportNote, HotelProforma, RenflouementDepartement, Utilisateur, CategorieDepense
+from models import (
+    HotelChambre, HotelEmploye, HotelReservation, HotelDepense, HotelRapportNote, HotelProforma,
+    HotelPaiement, HotelConfig, RenflouementDepartement, Utilisateur, CategorieDepense,
+)
 import listes_reference as lref
 
 router = APIRouter(prefix="/api/hotel", tags=["Hotel"])
@@ -106,8 +109,97 @@ def _employe_dict(e: HotelEmploye) -> dict:
     }
 
 
-def _res_dict(r: HotelReservation) -> dict:
+# ══════════════════════════════════════════════════════════════════
+# PAIEMENTS EN GOURDES (HTG) OU EN DOLLARS (USD)
+# ══════════════════════════════════════════════════════════════════
+# Chaque encaissement est une ligne HotelPaiement avec sa devise. Le séjour
+# reste facturé en gourdes : un paiement en dollars réduit le solde de son
+# équivalent au taux du jour, mais les dollars restent comptés À PART dans
+# tous les totaux (jamais additionnés aux gourdes).
+
+DEVISES = ("HTG", "USD")
+
+
+def _taux_defaut(db: Session) -> Decimal:
+    cfg = db.get(HotelConfig, 1)
+    return _d(cfg.taux_usd) if cfg and cfg.taux_usd else Decimal("130")
+
+
+def _valider_devise(devise: Optional[str], taux: Optional[float], db: Session) -> tuple[str, Optional[Decimal]]:
+    devise = (devise or "HTG").strip().upper()
+    if devise not in DEVISES:
+        raise HTTPException(422, "Devise invalide — HTG (gourdes) ou USD (dollars).")
+    if devise == "HTG":
+        return devise, None
+    t = _d(taux) if taux else _taux_defaut(db)
+    if t <= 0:
+        raise HTTPException(422, "Taux du dollar invalide (HTG pour 1 USD).")
+    return devise, t
+
+
+def _equivalent_htg(devise: str, montant: Decimal, taux: Optional[Decimal]) -> Decimal:
+    if devise == "USD":
+        return (montant * taux).quantize(Decimal("0.01"))
+    return montant.quantize(Decimal("0.01"))
+
+
+def _ajouter_paiement_ligne(db: Session, r: HotelReservation, devise: str, montant: Decimal,
+                            taux: Optional[Decimal], montant_htg: Decimal, mode: Optional[str],
+                            origine: str, uid: Optional[int]) -> HotelPaiement:
+    p = HotelPaiement(
+        reservation_id = r.id,
+        devise         = devise,
+        montant        = montant,
+        taux_change    = taux,
+        montant_htg    = montant_htg,
+        mode_paiement  = mode,
+        origine        = origine,
+        utilisateur_id = uid,
+    )
+    db.add(p)
+    return p
+
+
+def _paiement_dict(p: HotelPaiement) -> dict:
     return {
+        "id":             p.id,
+        "reservation_id": p.reservation_id,
+        "date_paiement":  p.date_paiement.isoformat() if p.date_paiement else None,
+        "devise":         p.devise,
+        "montant":        float(_d(p.montant)),
+        "taux_change":    float(_d(p.taux_change)) if p.taux_change is not None else None,
+        "montant_htg":    float(_d(p.montant_htg)),
+        "mode_paiement":  p.mode_paiement or "",
+        "origine":        p.origine,
+        "enregistre_par": p.utilisateur.nom_complet if p.utilisateur else None,
+    }
+
+
+def _totaux_devises(reservations) -> dict:
+    """Encaissé par devise pour une liste de séjours : gourdes reçues,
+    dollars reçus, et l'équivalent gourdes de ces dollars (information)."""
+    htg = usd = usd_eq = Decimal("0")
+    for r in reservations:
+        for p in (r.paiements or []):
+            if p.devise == "USD":
+                usd    += _d(p.montant)
+                usd_eq += _d(p.montant_htg)
+            else:
+                htg += _d(p.montant)
+    return {
+        "encaisse_htg":            float(htg),
+        "encaisse_usd":            float(usd),
+        "encaisse_usd_equiv_htg":  float(usd_eq),
+    }
+
+
+def _res_dict(r: HotelReservation) -> dict:
+    tot = _totaux_devises([r])
+    return {
+        "paye_htg":           tot["encaisse_htg"],
+        "paye_usd":           tot["encaisse_usd"],
+        "paye_usd_equiv_htg": tot["encaisse_usd_equiv_htg"],
+        "paiements":          [_paiement_dict(p) for p in (r.paiements or [])],
         "id":                 r.id,
         "chambre_id":         r.chambre_id,
         "chambre_numero":     r.chambre.numero if r.chambre else str(r.chambre_id),
@@ -359,15 +451,23 @@ class ReservationIn(BaseModel):
     nb_nuits:        Optional[int]  = None       # si NUIT
     nb_heures:       Optional[float] = None      # si MOMENT
     montant_facture: Optional[float] = None      # montant réellement facturé (rabais PDG) — fait foi
-    montant_paye:    float          = 0
+    montant_paye:    float          = 0          # dans la devise de paiement ci-dessous
     mode_paiement:   Optional[str]  = None
+    devise_paiement: Optional[str]  = "HTG"      # HTG (gourdes) | USD (dollars)
+    taux_change:     Optional[float] = None      # HTG pour 1 USD — défaut : taux du jour de l'hôtel
     employe_id:      Optional[int]  = None
     notes:           Optional[str]  = None
 
 
 class PaiementIn(BaseModel):
-    montant:       float = Field(gt=0)
+    montant:       float = Field(gt=0)           # dans la devise ci-dessous
     mode_paiement: Optional[str] = None
+    devise:        Optional[str] = "HTG"         # HTG (gourdes) | USD (dollars)
+    taux_change:   Optional[float] = None        # HTG pour 1 USD — défaut : taux du jour
+
+
+class HotelConfigIn(BaseModel):
+    taux_usd: float = Field(gt=0)
 
 
 @router.get("/reservations")
@@ -456,9 +556,23 @@ def creer_reservation(data: ReservationIn, request: Request, db: Session = Depen
         except (ValueError, ArithmeticError):
             pass
 
-    montant_paye = min(Decimal(str(data.montant_paye)), montant)
-    if montant_paye < 0:
-        montant_paye = Decimal("0")
+    devise, taux = _valider_devise(data.devise_paiement, data.taux_change, db)
+    paye_devise = Decimal(str(data.montant_paye or 0))
+    if paye_devise < 0:
+        paye_devise = Decimal("0")
+    if devise == "HTG":
+        # Comportement inchangé en gourdes : plafonné au montant facturé.
+        paye_devise = min(paye_devise, montant)
+        montant_paye = paye_devise
+    else:
+        montant_paye = _equivalent_htg(devise, paye_devise, taux)
+        if montant_paye > montant + Decimal("0.5"):
+            raise HTTPException(
+                422,
+                f"{paye_devise:g} $ × {taux:g} = {montant_paye:,.2f} G dépasse le montant facturé "
+                f"({montant:,.2f} G). Saisissez le montant exact en dollars.",
+            )
+        montant_paye = min(montant_paye, montant)
     solde        = montant - montant_paye
 
     r = HotelReservation(
@@ -481,6 +595,10 @@ def creer_reservation(data: ReservationIn, request: Request, db: Session = Depen
         notes              = data.notes,
     )
     db.add(r)
+    db.flush()
+    if paye_devise > 0:
+        _ajouter_paiement_ligne(db, r, devise, paye_devise, taux, montant_paye,
+                                data.mode_paiement, "RESERVATION", _uid(request))
 
     # Marquer la chambre comme occupée
     chambre.statut = "OCCUPEE"
@@ -503,19 +621,100 @@ def creer_reservation(data: ReservationIn, request: Request, db: Session = Depen
 
 
 @router.post("/reservations/{res_id}/paiement", status_code=200)
-def ajouter_paiement(res_id: int, data: PaiementIn, db: Session = Depends(get_db)):
+def ajouter_paiement(res_id: int, data: PaiementIn, request: Request, db: Session = Depends(get_db)):
     r = db.query(HotelReservation).filter_by(id=res_id).first()
     if not r:
         raise HTTPException(404, "Réservation introuvable.")
     if r.statut != "EN_COURS":
         raise HTTPException(409, "Réservation non active.")
+    devise, taux = _valider_devise(data.devise, data.taux_change, db)
     montant = Decimal(str(data.montant))
-    r.montant_paye += montant
+    montant_htg = _equivalent_htg(devise, montant, taux)
+    _ajouter_paiement_ligne(db, r, devise, montant, taux, montant_htg,
+                            data.mode_paiement, "PAIEMENT", _uid(request))
+    r.montant_paye += montant_htg
     r.solde = max(Decimal("0"), r.montant_total - r.montant_paye)
     if data.mode_paiement:
         r.mode_paiement = data.mode_paiement
     db.commit()
+    db.refresh(r)
     return _res_dict(r)
+
+
+@router.get("/reservations/{res_id}/paiements")
+def paiements_reservation(res_id: int, db: Session = Depends(get_db)):
+    r = db.query(HotelReservation).filter_by(id=res_id).first()
+    if not r:
+        raise HTTPException(404, "Réservation introuvable.")
+    return {"reservation_id": r.id, **_totaux_devises([r]),
+            "paiements": [_paiement_dict(p) for p in r.paiements]}
+
+
+@router.get("/config")
+def lire_config_hotel(db: Session = Depends(get_db)):
+    """Taux du dollar proposé par défaut à la réception (HTG pour 1 USD)."""
+    cfg = db.get(HotelConfig, 1)
+    return {
+        "taux_usd":   float(_taux_defaut(db)),
+        "updated_at": cfg.updated_at.isoformat() if cfg and cfg.updated_at else None,
+        "updated_by": cfg.updated_by if cfg else None,
+    }
+
+
+@router.put("/config")
+def modifier_config_hotel(
+    data: HotelConfigIn, db: Session = Depends(get_db),
+    _user: Utilisateur = Depends(_require_pdg_ou_admin_hotel),
+):
+    cfg = db.get(HotelConfig, 1)
+    if not cfg:
+        cfg = HotelConfig(id=1)
+        db.add(cfg)
+    cfg.taux_usd   = Decimal(str(data.taux_usd))
+    cfg.updated_at = datetime.now(tz=timezone.utc)
+    cfg.updated_by = _user.nom_complet
+    db.commit()
+    return lire_config_hotel(db)
+
+
+@router.get("/paiements")
+def journal_paiements(
+    date_debut: Optional[str] = Query(default=None),
+    date_fin:   Optional[str] = Query(default=None),
+    devise:     Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """Journal des encaissements de la période (date du paiement), avec les
+    totaux en gourdes et en dollars SÉPARÉS."""
+    from datetime import date as date_type
+    today = today_haiti()
+    try:
+        d_debut = date_type.fromisoformat(date_debut) if date_debut else date_type(today.year, today.month, 1)
+        d_fin   = date_type.fromisoformat(date_fin)   if date_fin   else today
+    except ValueError:
+        raise HTTPException(422, "Dates invalides (AAAA-MM-JJ).")
+    dt_debut, dt_fin = _hotel_bornes(d_debut, d_fin)
+    q = db.query(HotelPaiement).filter(
+        HotelPaiement.date_paiement >= dt_debut, HotelPaiement.date_paiement <= dt_fin,
+    )
+    if devise and devise.upper() in DEVISES:
+        q = q.filter(HotelPaiement.devise == devise.upper())
+    rows = q.order_by(HotelPaiement.date_paiement.desc()).all()
+    out = []
+    for p in rows:
+        d = _paiement_dict(p)
+        res = p.reservation
+        d["client_nom"]     = res.client_nom if res else None
+        d["chambre_numero"] = res.chambre.numero if res and res.chambre else None
+        out.append(d)
+    return {
+        "periode":    {"debut": str(d_debut), "fin": str(d_fin)},
+        "total_htg":  round(sum(float(_d(p.montant)) for p in rows if p.devise == "HTG"), 2),
+        "total_usd":  round(sum(float(_d(p.montant)) for p in rows if p.devise == "USD"), 2),
+        "total_usd_equiv_htg": round(sum(float(_d(p.montant_htg)) for p in rows if p.devise == "USD"), 2),
+        "nb":         len(rows),
+        "paiements":  out,
+    }
 
 
 @router.post("/reservations/{res_id}/terminer", status_code=200)
@@ -737,7 +936,15 @@ def fiche_reservation_pdf(res_id: int, db: Session = Depends(get_db)):
     if remise > 0:
         mont_rows.append(["Tarif de référence", _fmt_g(ref)])
         mont_rows.append(["Rabais accordé", "- " + _fmt_g(remise)])
-    mont_rows.append(["Payé", _fmt_g(d["montant_paye"])])
+    if d.get("paye_usd"):
+        mont_rows.append(["Payé en gourdes (HTG)", _fmt_g(d["paye_htg"])])
+        mont_rows.append([
+            "Payé en dollars (USD)",
+            f"{d['paye_usd']:,.2f} $".replace(",", " ") + f"  (≈ {_fmt_g(d['paye_usd_equiv_htg'])})",
+        ])
+        mont_rows.append(["Total payé (équivalent gourdes)", _fmt_g(d["montant_paye"])])
+    else:
+        mont_rows.append(["Payé", _fmt_g(d["montant_paye"])])
     mont_rows.append(["Solde restant", _fmt_g(d["solde"])])
     if r.mode_paiement:
         mont_rows.append(["Mode de paiement", r.mode_paiement])
@@ -863,6 +1070,7 @@ def _hotel_kpis_periode(db: Session, d_debut, d_fin, type_sejour=None, type_cham
         "facture": sum(float(_d(r.montant_total or 0)) for r in reservations),
         "solde":   sum(float(_d(r.solde or 0))          for r in reservations),
         "nb":      len(reservations),
+        **_totaux_devises(reservations),
     }
 
 
@@ -959,7 +1167,10 @@ def dashboard_hotel(
                 RenflouementDepartement.date_renflouement <= dt_fin)
         .scalar() or 0
     )
-    caisse_disponible = round(kpi_periode["revenu"] + renflouements_periode - depenses_periode, 2)
+    # Caisse en gourdes : seules les gourdes reçues (les dollars forment une
+    # caisse à part, caisse_usd, jamais additionnée aux gourdes).
+    caisse_disponible = round(kpi_periode["encaisse_htg"] + renflouements_periode - depenses_periode, 2)
+    caisse_usd        = round(kpi_periode["encaisse_usd"], 2)
 
     # ── Répartition des chambres par statut (donut) ──
     statut_counts: dict[str, int] = {}
@@ -1085,6 +1296,11 @@ def dashboard_hotel(
             "depenses_periode":     round(depenses_periode, 2),
             "renflouements_periode": round(renflouements_periode, 2),
             "caisse_disponible":    caisse_disponible,
+            "caisse_usd":           caisse_usd,
+            "encaisse_htg":         round(kpi_periode["encaisse_htg"], 2),
+            "encaisse_usd":         round(kpi_periode["encaisse_usd"], 2),
+            "encaisse_usd_equiv_htg": round(kpi_periode["encaisse_usd_equiv_htg"], 2),
+            "taux_usd":             float(_taux_defaut(db)),
         },
         "statut_chambres":       statut_chambres,
         "par_type_chambre":      sorted(par_type.values(), key=lambda x: x["revenu"], reverse=True),
@@ -1135,11 +1351,15 @@ def _get_rapport_data(
     def _sum(lst, field):
         return float(sum(_d(getattr(r, field) or 0) for r in lst))
 
-    par_chambre: dict = defaultdict(lambda: {"nb": 0, "revenu": 0.0, "moments": 0, "nuits": 0})
+    par_chambre: dict = defaultdict(lambda: {"nb": 0, "revenu": 0.0, "moments": 0, "nuits": 0,
+                                             "encaisse_htg": 0.0, "encaisse_usd": 0.0})
     for r in reservations:
         ch = r.chambre.numero if r.chambre else str(r.chambre_id)
         par_chambre[ch]["nb"]     += 1
         par_chambre[ch]["revenu"] += float(_d(r.montant_paye or 0))
+        _t = _totaux_devises([r])
+        par_chambre[ch]["encaisse_htg"] += _t["encaisse_htg"]
+        par_chambre[ch]["encaisse_usd"] += _t["encaisse_usd"]
         par_chambre[ch]["moments"] += 1 if r.type_sejour == "MOMENT" else 0
         par_chambre[ch]["nuits"]   += 1 if r.type_sejour == "NUIT"   else 0
 
@@ -1190,12 +1410,17 @@ def _get_rapport_data(
             "revenu_nuits":          _sum(nuits,        "montant_paye"),
             "montant_total_facture": _sum(reservations, "montant_total"),
             "solde_impaye":          _sum(reservations, "solde"),
+            # Encaissé par devise — gourdes et dollars séparés
+            **_totaux_devises(reservations),
+            "moments_devises":       _totaux_devises(moments),
+            "nuits_devises":         _totaux_devises(nuits),
         },
         "aujourd_hui": {
             "nb":      len(today_res),
             "moments": sum(1 for r in today_res if r.type_sejour == "MOMENT"),
             "nuits":   sum(1 for r in today_res if r.type_sejour == "NUIT"),
             "revenu":  sum(float(_d(r.montant_paye or 0)) for r in today_res),
+            **_totaux_devises(today_res),
         },
         "actifs": {
             "nb":               actifs_nb,
@@ -1331,6 +1556,19 @@ def rapport_hotel_pdf(
         [2.5*cm, 2.5*cm, 2.5*cm, 5*cm, 4*cm],
     ))
 
+    def _usd(v):
+        return f"{float(v):,.2f} $".replace(",", " ")
+
+    elems.append(Paragraph("Encaissé par devise (gourdes et dollars séparés)", s_section))
+    elems.append(_tbl(
+        ["Devise", "Montant reçu", "Équivalent gourdes"],
+        [
+            ["Gourdes (HTG)", _gdes(k["encaisse_htg"]), _gdes(k["encaisse_htg"])],
+            ["Dollars (USD)", _usd(k["encaisse_usd"]), _gdes(k["encaisse_usd_equiv_htg"])],
+        ],
+        [5*cm, 5.5*cm, 5.5*cm],
+    ))
+
     elems.append(Paragraph("Revenus par type", s_section))
     elems.append(_tbl(
         ["Type", "Séjours", "Revenu"],
@@ -1442,6 +1680,9 @@ def rapport_hotel_xlsx(
         ("Rev. Nuits",    _gdes(k["revenu_nuits"])),
         ("Montant facturé", _gdes(k["montant_total_facture"])),
         ("Impayé",          _gdes(k["solde_impaye"])),
+        ("Encaissé en gourdes (HTG)", _gdes(k["encaisse_htg"])),
+        ("Encaissé en dollars (USD)", f"{float(k['encaisse_usd']):,.2f} $".replace(",", " ")),
+        ("Dollars — équivalent gourdes", _gdes(k["encaisse_usd_equiv_htg"])),
     ]:
         ws1.cell(r, 1, lbl); ws1.cell(r, 2, val); r += 1
 
@@ -1723,6 +1964,12 @@ class ProformaIn(BaseModel):
 class ConvertirProformaIn(BaseModel):
     chambre_id:    Optional[int] = None
     mode_paiement: Optional[str] = None
+    # Devise dans laquelle l'acompte a été remis. En dollars : montant reçu
+    # en USD (montant_acompte_usd) et taux ; sinon l'acompte (HTG) du pro
+    # forma est repris tel quel en gourdes.
+    devise_acompte:      Optional[str]   = "HTG"
+    montant_acompte_usd: Optional[float] = None
+    taux_change:         Optional[float] = None
 
 
 def _parse_dt_hotel(raw: Optional[str], champ: str, obligatoire: bool = True):
@@ -2038,7 +2285,15 @@ def convertir_proforma(pf_id: int, data: ConvertirProformaIn, request: Request, 
     date_dep = p.date_depart_prevue or (date_arr + timedelta(days=nb_nuits))
     prix_unit = _d(chambre.prix_nuit)
     montant   = _d(p.montant_total) if _d(p.montant_total) > 0 else prix_unit * nb_nuits
-    montant_paye = min(_d(p.acompte), montant)
+    devise_ac, taux_ac = _valider_devise(data.devise_acompte, data.taux_change, db)
+    if devise_ac == "USD":
+        acompte_devise = _d(data.montant_acompte_usd)
+        if acompte_devise <= 0:
+            raise HTTPException(422, "Montant de l'acompte en dollars requis.")
+        montant_paye = min(_equivalent_htg("USD", acompte_devise, taux_ac), montant)
+    else:
+        acompte_devise = min(_d(p.acompte), montant)
+        montant_paye   = acompte_devise
     solde = montant - montant_paye
 
     r = HotelReservation(
@@ -2062,6 +2317,9 @@ def convertir_proforma(pf_id: int, data: ConvertirProformaIn, request: Request, 
     )
     db.add(r)
     db.flush()
+    if acompte_devise > 0:
+        _ajouter_paiement_ligne(db, r, devise_ac, acompte_devise, taux_ac, montant_paye,
+                                data.mode_paiement, "ACOMPTE", _uid(request))
     chambre.statut = "OCCUPEE"
     p.statut = "CONVERTIE"
     p.reservation_id = r.id

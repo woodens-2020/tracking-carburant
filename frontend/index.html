@@ -3435,6 +3435,14 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <button class="nav-item" data-page="pos-depenses" onclick="goTo('pos-depenses')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+      </span>
+      <span>Dépenses Bar</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
     <button class="nav-item" data-page="pos-rentabilite" onclick="goTo('pos-rentabilite')">
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
@@ -3475,6 +3483,79 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-active-dot"></span>
     </button>
 
+    <!-- ── Section Piscine (département séparé du Bar) ── -->
+    <div class="nav-section-label">Piscine</div>
+
+    <button class="nav-item" data-page="piscine-dashboard" onclick="goTo('piscine-dashboard')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 18c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M2 22c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M8 15V5a2 2 0 0 1 4 0M14 15V5a2 2 0 0 1 4 0M8 8h6M8 12h6"/></svg></span>
+      <span>Dashboard Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="piscine-caisse" onclick="goTo('piscine-caisse')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h4M7 11h2"/><rect x="13" y="8" width="4" height="5" rx="1"/></svg></span>
+      <span>Caisse Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="piscine-produits" onclick="goTo('piscine-produits')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/></svg></span>
+      <span>Produits Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="piscine-stock" onclick="goTo('piscine-stock')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg></span>
+      <span>Stock Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="piscine-achats" onclick="goTo('piscine-achats')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg></span>
+      <span>Achats Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="piscine-ventes" onclick="goTo('piscine-ventes')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span>
+      <span>Ventes Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="piscine-credits" onclick="goTo('piscine-credits')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg></span>
+      <span>Crédits Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="piscine-paie" onclick="goTo('piscine-paie')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0112 0v2"/><path d="M16 12v4M14 14h4"/></svg></span>
+      <span>Paie Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="piscine-depenses" onclick="goTo('piscine-depenses')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg></span>
+      <span>Dépenses Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="piscine-rentabilite" onclick="goTo('piscine-rentabilite')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></span>
+      <span>Rentabilité Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="piscine-grande-caisse" onclick="goTo('piscine-grande-caisse')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><circle cx="12" cy="15" r="2"/></svg></span>
+      <span>Caisse Piscine (bilan)</span>
+      <span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="piscine-analyse" onclick="goTo('piscine-analyse')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-8"/></svg></span>
+      <span>Analyse Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="piscine-sessions-caisse" onclick="goTo('piscine-sessions-caisse')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg></span>
+      <span>Sessions Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+    <button class="nav-item" data-page="piscine-rapports-soumis" onclick="goTo('piscine-rapports-soumis')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+      <span>Rapports Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
 
     <!-- ── Section Zelle ── -->
     <div class="nav-section-label">Zelle</div>
@@ -6285,8 +6366,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17h7M17 14v7"/></svg>
           </div>
           <div>
-            <div class="pos-header-title" data-i18n="pos.dash.title">Dashboard Bar</div>
-            <div class="pos-header-sub" id="posdb-date-sub" data-i18n="pos.dash.subtitle">Tableau de bord temps réel — Bar / Restaurant</div>
+            <div class="pos-header-title" data-dept-libelle data-i18n="pos.dash.title">Dashboard Bar</div>
+            <div class="pos-header-sub" id="posdb-date-sub" data-dept-libelle data-i18n="pos.dash.subtitle">Tableau de bord temps réel — Bar / Restaurant</div>
           </div>
           <div class="pos-header-actions" style="align-items:center;gap:14px">
             <div style="display:flex;align-items:center;gap:6px">
@@ -6542,7 +6623,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
           <div>
             <div class="pos-header-title" data-i18n="pos.caisse.title">Caisse POS</div>
-            <div class="pos-header-sub" data-i18n="pos.caisse.subtitle">Encaissement en temps réel — Bar / Restaurant</div>
+            <div class="pos-header-sub" data-dept-libelle data-i18n="pos.caisse.subtitle">Encaissement en temps réel — Bar / Restaurant</div>
           </div>
           <div class="pos-header-actions">
             <select class="pos-select" id="pos-caissier-sel" style="width:180px" onchange="posCaissierChange(this.value)">
@@ -6600,7 +6681,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <div id="pos-caisse-admin-dash" style="display:none;margin-bottom:12px">
           <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-              <div style="font-size:15px;font-weight:700;color:rgba(255,255,255,.9)" data-i18n="pos.caisse.admin.perf">Performance Bar — Aujourd'hui</div>
+              <div style="font-size:15px;font-weight:700;color:rgba(255,255,255,.9)" data-dept-libelle data-i18n="pos.caisse.admin.perf">Performance Bar — Aujourd'hui</div>
               <div style="display:flex;align-items:center;gap:10px">
                 <span id="pos-caisse-admin-updated" style="font-size:12px;color:rgba(255,255,255,.3)"></span>
                 <button onclick="posCaisseBarDashCharger()" style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:8px;cursor:pointer;color:rgba(255,255,255,.5);font-size:13px;padding:3px 10px" data-i18n="pos.caisse.refresh">↻ Actualiser</button>
@@ -6803,7 +6884,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1.5" fill="#a78bfa"/></svg>
             </div>
             <div class="gi-page-header-text">
-              <div class="gi-title">Produits Bar</div>
+              <div class="gi-title" data-dept-libelle>Produits Bar</div>
               <div class="gi-subtitle">Catalogue articles — prix historisés</div>
             </div>
           </div>
@@ -7102,8 +7183,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
              quantités et KPI propres à ce bar), pour ne jamais laisser croire
              qu'un chiffre de Bar Piscine "fait partie" du total de Bar Devant. -->
         <div style="display:flex;gap:8px;margin-bottom:14px">
-          <button class="pos-tab active" id="pos-stock-lieu-devant" onclick="posStockSetLieu('DEVANT')">Bar Devant (Accueil)</button>
-          <button class="pos-tab" id="pos-stock-lieu-piscine" onclick="posStockSetLieu('PISCINE')">Bar Piscine</button>
+          <button class="pos-tab active" id="pos-stock-lieu-devant" data-dept-seul="DEVANT" onclick="posStockSetLieu('DEVANT')">Bar Devant (Accueil)</button>
+          <button class="pos-tab" id="pos-stock-lieu-piscine" data-dept-seul="PISCINE" onclick="posStockSetLieu('PISCINE')">Piscine</button>
         </div>
 
         <!-- ── Recherche + filtre disponibilité ── -->
@@ -8120,6 +8201,81 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       </div>
     </div><!-- /page-pos-paie -->
 
+    <!-- Dépenses Bar / Dépenses Piscine (même écran, département de l'écran) -->
+    <div id="page-pos-depenses" class="page page-gi">
+      <div class="pos-page gi-page">
+        <div class="pos-header">
+          <div class="pos-header-icon" style="background:linear-gradient(135deg,#f87171,#dc2626)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+          </div>
+          <div>
+            <div class="pos-header-title">Dépenses Bar</div>
+            <div class="pos-header-sub">Charges du département — déduites de sa caisse</div>
+          </div>
+          <div class="pos-header-actions">
+            <button class="pos-btn primary" onclick="pdepOuvrirModal()">+ Nouvelle dépense</button>
+          </div>
+        </div>
+
+        <div class="pos-kpi-grid">
+          <div class="pos-kpi"><div class="pos-kpi-label">Total de la période</div><div class="pos-kpi-val" id="pdep-kpi-total">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Nombre de dépenses</div><div class="pos-kpi-val amber" id="pdep-kpi-nb">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Catégorie principale</div><div class="pos-kpi-val" id="pdep-kpi-cat" style="font-size:16px">—</div></div>
+        </div>
+
+        <div class="pos-card">
+          <div class="pos-card-hdr" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="flex:1">Dépenses</span>
+            <input type="date" class="pos-input" id="pdep-debut" style="width:140px">
+            <input type="date" class="pos-input" id="pdep-fin" style="width:140px">
+            <select class="pos-select" id="pdep-filtre-cat" style="width:170px" onchange="pdepAfficher()"><option value="">Toutes catégories</option></select>
+            <button class="pos-btn teal" onclick="pdepCharger()">Filtrer</button>
+          </div>
+          <div class="pos-table-wrap">
+            <table class="pos-table">
+              <thead><tr><th>Date</th><th>Description</th><th>Catégorie</th><th>Fournisseur</th><th>Montant</th><th>Saisie par</th><th></th></tr></thead>
+              <tbody id="pdep-tbody"><tr><td colspan="7" style="color:rgba(255,255,255,.3);text-align:center;padding:20px">Chargement…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-pos-depenses -->
+
+    <div class="pos-modal-bg" id="pdep-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="pos-modal">
+        <h3 id="pdep-modal-titre">Nouvelle dépense</h3>
+        <div class="pos-form-row">
+          <div style="flex:2"><label class="pos-label">Description *</label>
+            <input class="pos-input" id="pdep-desc" maxlength="200" placeholder="Ex : glace, chlore, réparation…">
+          </div>
+          <div><label class="pos-label">Montant (G) *</label>
+            <input class="pos-input" id="pdep-montant" type="number" min="0.01" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div><label class="pos-label">Catégorie</label>
+            <input class="pos-input" id="pdep-cat" list="pdep-cat-list" maxlength="120" placeholder="Ex : Entretien">
+            <datalist id="pdep-cat-list"></datalist>
+          </div>
+          <div><label class="pos-label">Date</label>
+            <input class="pos-input" id="pdep-date" type="date">
+          </div>
+        </div>
+        <div class="pos-form-row">
+          <div><label class="pos-label">Fournisseur</label>
+            <input class="pos-input" id="pdep-fourn" maxlength="150">
+          </div>
+          <div><label class="pos-label">Notes</label>
+            <input class="pos-input" id="pdep-notes" maxlength="300">
+          </div>
+        </div>
+        <div class="pos-modal-footer">
+          <button class="pos-btn ghost" onclick="document.getElementById('pdep-modal-bg').classList.remove('open')">Annuler</button>
+          <button class="pos-btn primary" onclick="pdepEnregistrer()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal paiement employé -->
     <div class="pos-modal-bg" id="pos-pay-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
       <div class="pos-modal">
@@ -8250,15 +8406,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             </select>
             <button class="pos-btn teal" onclick="gcCharger()">Analyser</button>
             <button class="pos-btn ghost" onclick="gcResetFiltres()">Reset</button>
-            <button class="pos-btn" id="gc-btn-renfl" onclick="renflOpenModal('bar')" style="display:none;background:#3fb6a8;color:#0b1628">+ Renflouement Caisse Bar</button>
+            <button class="pos-btn" id="gc-btn-renfl" onclick="renflOpenModal('bar')" data-dept-libelle style="display:none;background:#3fb6a8;color:#0b1628">+ Renflouement Caisse Bar</button>
           </div>
         </div>
 
         <!-- Tabs petites caisses -->
         <div style="display:flex;gap:8px;margin-bottom:14px">
-          <button id="gc-tab-bar" class="pos-btn teal" onclick="gcSetTab('bar')" style="font-size:15px;padding:6px 18px">Bar / Restaurant</button>
-          <button id="gc-tab-hotel" class="pos-btn ghost" onclick="gcSetTab('hotel')" style="font-size:15px;padding:6px 18px;opacity:.5;cursor:not-allowed" disabled title="Bientôt disponible">Hotel</button>
-          <button id="gc-tab-piscine" class="pos-btn ghost" onclick="gcSetTab('piscine')" style="font-size:15px;padding:6px 18px;opacity:.5;cursor:not-allowed" disabled title="Bientôt disponible">Piscine</button>
+          <button id="gc-tab-bar" class="pos-btn teal" onclick="gcSetTab('bar')" data-dept-libelle style="font-size:15px;padding:6px 18px">Bar / Restaurant</button>
         </div>
 
         <!-- KPIs -->
@@ -8282,6 +8436,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="pos-kpi-val amber" id="gc-kpi-paie">—</div>
           </div>
           <div class="pos-kpi">
+            <div class="pos-kpi-label">Dépenses</div>
+            <div class="pos-kpi-val" id="gc-kpi-depenses" style="color:#f87171">—</div>
+          </div>
+          <div class="pos-kpi">
             <div class="pos-kpi-label">Bénéfice Net</div>
             <div class="pos-kpi-val" id="gc-kpi-benef-net">—</div>
           </div>
@@ -8290,9 +8448,9 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <!-- Caisse Bar disponible (cash réel) -->
         <div class="pos-card" style="padding:14px 18px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
           <div>
-            <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em">Caisse Bar disponible (cash réel)</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em" data-dept-libelle>Caisse Bar disponible (cash réel)</div>
             <div style="font-size:26px;font-weight:800" id="gc-kpi-caisse">—</div>
-            <div style="font-size:12.5px;color:rgba(255,255,255,.4)" id="gc-kpi-caisse-sub">Ventes cash + remboursements + renflouements − achats − paie</div>
+            <div style="font-size:12.5px;color:rgba(255,255,255,.4)" id="gc-kpi-caisse-sub">Ventes cash + remboursements + renflouements − achats − paie − dépenses</div>
           </div>
         </div>
 
@@ -10780,9 +10938,18 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
             <div class="gid-kpi-icon" id="hd-caisse-icon" style="background:rgba(63,182,168,.12)">
               <svg viewBox="0 0 24 24" fill="none" stroke="#3fb6a8" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
             </div>
-            <div class="gid-kpi-lbl">Caisse Hôtel disponible</div>
+            <div class="gid-kpi-lbl">Caisse Hôtel — gourdes</div>
             <div class="gid-kpi-val" id="hd-kpi-caisse" style="color:#3fb6a8">—</div>
-            <div class="gid-kpi-sub" id="hd-kpi-caisse-sub">Revenu − Dépenses</div>
+            <div class="gid-kpi-sub" id="hd-kpi-caisse-sub">Gourdes reçues − Dépenses</div>
+          </div>
+          <div class="gid-kpi">
+            <div class="gid-kpi-accent" style="background:#38bdf8"></div>
+            <div class="gid-kpi-icon" style="background:rgba(56,189,248,.12)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div class="gid-kpi-lbl">Caisse Hôtel — dollars</div>
+            <div class="gid-kpi-val" id="hd-kpi-caisse-usd" style="color:#38bdf8">—</div>
+            <div class="gid-kpi-sub" id="hd-kpi-caisse-usd-sub">Dollars reçus (à part)</div>
           </div>
         </div>
 
@@ -10981,7 +11148,17 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <option value="CASH">Cash</option><option value="CARTE">Carte</option><option value="VIREMENT">Virement</option><option value="CREDIT">Crédit</option>
               </select>
             </div>
-            <div><label class="pos-label">Montant payé (G)</label><input class="pos-input" id="hrec-montant-paye" type="number" min="0" step="any" value="0" oninput="hrecCalcSolde()"></div>
+            <div><label class="pos-label">Devise du paiement</label>
+              <select class="pos-input" id="hrec-devise" onchange="hrecDeviseChange()">
+                <option value="HTG">Gourdes (HTG)</option>
+                <option value="USD">Dollars (USD)</option>
+              </select>
+            </div>
+            <div><label class="pos-label" id="hrec-montant-paye-label">Montant payé (G)</label><input class="pos-input" id="hrec-montant-paye" type="number" min="0" step="any" value="0" oninput="hrecCalcSolde()"></div>
+            <div id="hrec-taux-wrap" style="display:none"><label class="pos-label">Taux du dollar (G pour 1 $)</label>
+              <input class="pos-input" id="hrec-taux" type="number" min="0.0001" step="any" oninput="hrecCalcSolde()">
+              <div id="hrec-equiv" style="font-size:12px;color:rgba(255,255,255,.45);margin-top:3px"></div>
+            </div>
             <div><label class="pos-label">Solde restant</label><div id="hrec-solde" style="font-size:20px;font-weight:700;color:#f87171;padding:8px 0">—</div></div>
             <div><label class="pos-label">Réceptionniste</label>
               <select class="pos-input" id="hrec-employe"><option value="">— Optionnel —</option></select>
@@ -11019,7 +11196,18 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
           <input type="hidden" id="hotel-paie-res-id">
           <div style="display:flex;flex-direction:column;gap:12px">
-            <div><label class="pos-label">Montant (G) *</label><input class="pos-input" id="hotel-paie-montant" type="number" min="0" step="any"></div>
+            <div id="hotel-paie-solde-info" style="font-size:13px;color:rgba(255,255,255,.5)"></div>
+            <div><label class="pos-label">Devise *</label>
+              <select class="pos-input" id="hotel-paie-devise" onchange="hotelPaieDeviseChange()">
+                <option value="HTG">Gourdes (HTG)</option>
+                <option value="USD">Dollars (USD)</option>
+              </select>
+            </div>
+            <div><label class="pos-label" id="hotel-paie-montant-label">Montant (G) *</label><input class="pos-input" id="hotel-paie-montant" type="number" min="0" step="any" oninput="hotelPaieEquiv()"></div>
+            <div id="hotel-paie-taux-wrap" style="display:none"><label class="pos-label">Taux du dollar (G pour 1 $)</label>
+              <input class="pos-input" id="hotel-paie-taux" type="number" min="0.0001" step="any" oninput="hotelPaieEquiv()">
+              <div id="hotel-paie-equiv" style="font-size:12px;color:rgba(255,255,255,.45);margin-top:3px"></div>
+            </div>
             <div><label class="pos-label">Mode de paiement</label>
               <select class="pos-input" id="hotel-paie-mode">
                 <option value="CASH">Cash</option><option value="CARTE">Carte</option><option value="VIREMENT">Virement</option>
@@ -11145,6 +11333,17 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
                 <option value="">— Mode —</option>
                 <option value="CASH">Cash</option><option value="CARTE">Carte</option><option value="VIREMENT">Virement</option><option value="CREDIT">Crédit</option>
               </select>
+            </div>
+            <div id="hpf-conv-acompte-wrap"><label class="pos-label">Acompte reçu en</label>
+              <select class="pos-input" id="hpf-conv-devise" onchange="hpfConvDeviseChange()">
+                <option value="HTG">Gourdes (HTG)</option>
+                <option value="USD">Dollars (USD)</option>
+              </select>
+              <div id="hpf-conv-acompte-info" style="font-size:12px;color:rgba(255,255,255,.45);margin-top:3px"></div>
+            </div>
+            <div id="hpf-conv-usd-wrap" style="display:none;gap:8px">
+              <div style="flex:1"><label class="pos-label">Acompte ($ dollars)</label><input class="pos-input" id="hpf-conv-usd" type="number" min="0" step="any"></div>
+              <div style="flex:1"><label class="pos-label">Taux (G pour 1 $)</label><input class="pos-input" id="hpf-conv-taux" type="number" min="0.0001" step="any"></div>
             </div>
           </div>
           <div class="pos-modal-footer">
@@ -11402,7 +11601,32 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-kpi"><div class="pos-kpi-label">Total séjours</div><div class="pos-kpi-val" id="hrpt-kpi-total">—</div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">Moments</div><div class="pos-kpi-val amber" id="hrpt-kpi-mom">—</div></div>
           <div class="pos-kpi"><div class="pos-kpi-label">Nuits</div><div class="pos-kpi-val" id="hrpt-kpi-nuit" style="color:#a78bfa">—</div></div>
-          <div class="pos-kpi"><div class="pos-kpi-label">Revenu encaissé</div><div class="pos-kpi-val" id="hrpt-kpi-rev" style="color:#34d399">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Revenu encaissé (équiv. G)</div><div class="pos-kpi-val" id="hrpt-kpi-rev" style="color:#34d399">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Reçu en gourdes</div><div class="pos-kpi-val" id="hrpt-kpi-htg" style="color:#34d399">—</div></div>
+          <div class="pos-kpi"><div class="pos-kpi-label">Reçu en dollars</div><div class="pos-kpi-val" id="hrpt-kpi-usd" style="color:#38bdf8">—</div><div style="font-size:12px;color:rgba(255,255,255,.4)" id="hrpt-kpi-usd-sub"></div></div>
+        </div>
+
+        <!-- Journal des paiements : gourdes et dollars séparés -->
+        <div class="pos-card" style="margin-bottom:20px">
+          <div class="pos-card-hdr" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="flex:1">Paiements reçus — gourdes et dollars séparés</span>
+            <select class="pos-select" id="hrpt-pay-devise" style="width:160px" onchange="hotelRapportPaiements()">
+              <option value="">Toutes devises</option><option value="HTG">Gourdes (HTG)</option><option value="USD">Dollars (USD)</option>
+            </select>
+            <span id="hrpt-pay-totaux" style="font-size:13px;color:rgba(255,255,255,.6)"></span>
+          </div>
+          <div class="pos-table-wrap" style="max-height:340px;overflow:auto">
+            <table class="pos-table">
+              <thead><tr><th>Date</th><th>Client</th><th>Chambre</th><th>Devise</th><th style="text-align:right">Montant reçu</th><th style="text-align:right">Taux</th><th style="text-align:right">Équiv. G</th><th>Mode</th></tr></thead>
+              <tbody id="hrpt-pay-tbody"><tr><td colspan="8" style="text-align:center;padding:16px;color:rgba(255,255,255,.3)">—</td></tr></tbody>
+            </table>
+          </div>
+          <div id="hrpt-taux-admin" style="display:none;padding:10px 14px;border-top:1px solid rgba(255,255,255,.06);font-size:13px;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="color:rgba(255,255,255,.55)">Taux du jour proposé à la réception :</span>
+            <input class="pos-input" id="hrpt-taux-input" type="number" min="0.0001" step="any" style="width:110px">
+            <span style="color:rgba(255,255,255,.55)">G pour 1 $</span>
+            <button class="pos-btn teal" style="padding:5px 14px" onclick="hotelTauxEnregistrer()">Enregistrer</button>
+          </div>
         </div>
 
         <!-- Synthèse revenus + actifs -->
@@ -12191,6 +12415,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 // ══════════════════════════════════════════════
 let currentDate    = todayStr();
 let currentPage    = 'home';
+let _posDept       = null;   // département POS affiché : 'DEVANT' (Bar) | 'PISCINE' | null
 let products       = [];
 let releves        = [];
 let currentProdId  = null;
@@ -12410,7 +12635,17 @@ async function apiFetch(method,path,body){
   return op.promesse;
 }
 
+// Département Bar / Piscine : toute requête /pos/ faite depuis une page du
+// module porte ?lieu=DEVANT ou ?lieu=PISCINE (sauf si l'appelant l'a déjà
+// précisé) — le serveur filtre ventes, achats, caisse, dépenses, analyses.
+function _posAvecDept(path){
+  if(!_posDept) return path;
+  if(!path.startsWith('/pos/') || /[?&]lieu=/.test(path)) return path;
+  return path + (path.includes('?') ? '&' : '?') + 'lieu=' + _posDept;
+}
+
 async function _apiFetchExec(method,path,body,cleIdem){
+  path = _posAvecDept(path);
   const hdrs={'Content-Type':'application/json'};
   const apiKey=sessionStorage.getItem('api_key');
   if(apiKey) hdrs['X-API-Key']=apiKey;
@@ -14151,6 +14386,26 @@ const PAGE_META={
   'pos-rentabilite':      {title: 'Rentabilité Bar',            sub: 'CA — Bénéfices — Marges — COGS'},
   'pos-sessions-caisse':  {title: 'Sessions Caissières',        sub: 'Suivi · validation · export des rapports de caisse'},
   'rapports-soumis':      {title: 'Rapports Soumis',            sub: 'Évaluation produit par produit des rapports de caisse'},
+  'pos-depenses':         {title: 'Dépenses Bar',               sub: 'Charges du Bar — sortent de la caisse du Bar'},
+  'pos-dashboard-bar':    {title: 'Dashboard Bar',              sub: 'Bar Devant — ventes, caisse, crédits'},
+  'pos-grande-caisse':    {title: 'Grande Caisse Bar',          sub: 'Bar — ventes, achats, paie, dépenses, caisse disponible'},
+  'pos-analyse':          {title: 'Analyse & Contrôle Bar',     sub: 'Contrôle article par article — Bar'},
+  'pos-achats':           {title: 'Achats Bar',                 sub: 'Réceptions de marchandises du Bar'},
+  // ── Département Piscine (séparé du Bar) ──
+  'piscine-dashboard':       {title: 'Dashboard Piscine',          sub: 'Piscine — ventes, caisse, crédits'},
+  'piscine-caisse':          {title: 'Caisse Piscine',             sub: 'Piscine — Encaissement en temps réel'},
+  'piscine-produits':        {title: 'Produits Piscine',           sub: 'Catalogue de la Piscine et historique des prix'},
+  'piscine-stock':           {title: 'Stock Piscine',              sub: 'Mouvements et niveaux de stock de la Piscine'},
+  'piscine-achats':          {title: 'Achats Piscine',             sub: 'Réceptions de marchandises de la Piscine'},
+  'piscine-ventes':          {title: 'Ventes Piscine',             sub: 'Suivi des ventes et encaissements de la Piscine'},
+  'piscine-credits':         {title: 'Crédits Piscine',            sub: 'Clients à crédit de la Piscine et remboursements'},
+  'piscine-paie':            {title: 'Paie Piscine',               sub: 'Paiements des employés de la Piscine'},
+  'piscine-depenses':        {title: 'Dépenses Piscine',           sub: 'Charges de la Piscine — sortent de la caisse Piscine'},
+  'piscine-rentabilite':     {title: 'Rentabilité Piscine',        sub: 'CA — Bénéfices — Marges — COGS de la Piscine'},
+  'piscine-grande-caisse':   {title: 'Caisse Piscine',             sub: 'Piscine — ventes, achats, paie, dépenses, caisse disponible'},
+  'piscine-analyse':         {title: 'Analyse & Contrôle Piscine', sub: 'Contrôle article par article — Piscine'},
+  'piscine-sessions-caisse': {title: 'Sessions Caissières Piscine',sub: 'Suivi · validation · export des rapports de caisse Piscine'},
+  'piscine-rapports-soumis': {title: 'Rapports Soumis Piscine',    sub: 'Évaluation des rapports de caisse de la Piscine'},
   'zelle':                {title: 'Tableau de bord — Zelle',      sub: 'Bilan général · Balance HTG · Répartition par source'},
   'zelle-paiements':      {title: 'Paiements Zelle',              sub: 'Toutes les transactions en gourdes (HTG)'},
   'zelle-fonds':          {title: 'Réception de Fonds',           sub: 'Déclaration des fonds reçus en gourdes (HTG)'},
@@ -14186,19 +14441,28 @@ function goTo(page){
     }
     return;
   }
+  // Département Piscine : ses pages réutilisent les écrans du module Bar
+  // (même page HTML, mêmes fonctions) avec _posDept='PISCINE' — toutes les
+  // requêtes /pos/ portent alors ?lieu=PISCINE (voir _apiFetchExec), et
+  // inversement les pages du Bar portent ?lieu=DEVANT : les deux
+  // départements ne se mélangent jamais (ventes, caisse, dépenses, analyses).
+  const basePage = _PISCINE_ALIAS[page] || page;
+  _posDept = _PISCINE_ALIAS[page] ? 'PISCINE' : (_POS_BAR_PAGES.has(basePage) ? 'DEVANT' : null);
+  document.body.dataset.posDept = _posDept || '';
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item, .mnav-btn').forEach(n=>n.classList.remove('active'));
-  const pageEl=document.getElementById('page-'+page);
+  const pageEl=document.getElementById('page-'+basePage);
   if(!pageEl) return;
   pageEl.classList.add('active');
+  _posAppliquerLibellesDept();
   // "Commandes" n'a pas d'entrée propre dans le menu (accessible via l'onglet
   // dans Ventes) — on garde le sur-lignage sur "Ventes & Commandes" pour elle.
   const navPage = page==='patisserie-commandes' ? 'patisserie-ventes' : page;
   document.querySelectorAll(`[data-page="${navPage}"]`).forEach(navEl=>navEl.classList.add('active'));
   currentPage=page;
   try{ sessionStorage.setItem('konekta_current_page', page); }catch(e){}
-  const m=PAGE_META[page]||{title:()=>page,sub:()=>''};
-  const _isGi = !!(typeof _giPageLoaders !== 'undefined' && _giPageLoaders[page]);
+  const m=PAGE_META[page]||PAGE_META[basePage]||{title:()=>page,sub:()=>''};
+  const _isGi = !!(typeof _giPageLoaders !== 'undefined' && _giPageLoaders[basePage]);
   // Mode GI : .pages devient flex-colonne non-scrollante
   document.getElementById('pages-container').classList.toggle('gi-mode', _isGi);
   // GI pages ont leur propre header riche — masquer la duplication dans le header principal
@@ -14224,8 +14488,105 @@ function goTo(page){
   if(page==='admin')              initAdmin();
   if(page==='rapports-dl')       initRapports();
   if(page==='audit')             initAudit();
-  if(typeof _giPageLoaders !== 'undefined' && _giPageLoaders[page]) _giPageLoaders[page]();
+  if(typeof _giPageLoaders !== 'undefined' && _giPageLoaders[basePage]) _giPageLoaders[basePage]();
 }
+
+// ══════════════════════════════════════════════
+// DÉPARTEMENTS BAR / PISCINE
+// ══════════════════════════════════════════════
+// Pages du département Piscine → écran Bar réutilisé (filtré PISCINE).
+const _PISCINE_ALIAS = {
+  'piscine-dashboard':       'pos-dashboard-bar',
+  'piscine-caisse':          'pos-caisse',
+  'piscine-produits':        'pos-produits',
+  'piscine-stock':           'pos-stock',
+  'piscine-achats':          'pos-achats',
+  'piscine-ventes':          'pos-ventes',
+  'piscine-credits':         'pos-credits',
+  'piscine-paie':            'pos-paie',
+  'piscine-depenses':        'pos-depenses',
+  'piscine-rentabilite':     'pos-rentabilite',
+  'piscine-grande-caisse':   'pos-grande-caisse',
+  'piscine-analyse':         'pos-analyse',
+  'piscine-sessions-caisse': 'pos-sessions-caisse',
+  'piscine-rapports-soumis': 'rapports-soumis',
+};
+const _BAR_VERS_PISCINE = Object.fromEntries(Object.entries(_PISCINE_ALIAS).map(([p,b])=>[b,p]));
+// Pages du Bar filtrées DEVANT (toutes les pages POS + Rapports soumis).
+const _POS_BAR_PAGES = new Set(['pos-dashboard-bar','pos-caisse','pos-produits','pos-stock','pos-achats',
+  'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-depenses','pos-rentabilite','pos-grande-caisse',
+  'pos-analyse','pos-sessions-caisse','rapports-soumis']);
+
+function _posDeptLibelle(d){ return (d||_posDept)==='PISCINE' ? 'Piscine' : 'Bar'; }
+// Page équivalente dans le département courant (ex. 'pos-ventes' → 'piscine-ventes').
+function _posPage(basePage){
+  return _posDept==='PISCINE' && _BAR_VERS_PISCINE[basePage] ? _BAR_VERS_PISCINE[basePage] : basePage;
+}
+// Remplace « Bar » par « Piscine » dans les titres marqués data-dept-libelle
+// (ex. « Stock Bar » → « Stock Piscine ») et masque ce qui ne concerne qu'un
+// seul département (data-dept-seul="DEVANT|PISCINE").
+function _posAppliquerLibellesDept(){
+  const dept = _posDept;
+  const titresPos = dept
+    ? ', .page.active .pos-header-title, .page.active .pos-card-hdr > span:first-child, .page.active .pos-kpi-label'
+    : '';
+  document.querySelectorAll('[data-dept-libelle]' + titresPos).forEach(el=>{
+    if(el.children.length) return;
+    if(!el.dataset.deptOrig) el.dataset.deptOrig = el.textContent;
+    const orig = el.dataset.deptOrig;
+    const citeBar = /Bar Devant|Bar \/ Restaurant|\bBar\b/.test(orig);
+    if(dept==='PISCINE' && citeBar)
+      el.textContent = orig.replace(/Bar Devant( \(Accueil\))?|Bar \/ Restaurant|\bBar\b/g,'Piscine');
+    else if(dept && !citeBar && !/Piscine/.test(orig) && el.classList.contains('pos-header-title'))
+      // Titre générique (« Crédits », « Grande Caisse »…) : on précise le département.
+      el.textContent = `${orig} — ${_posDeptLibelle(dept)}`;
+    else
+      el.textContent = orig;
+  });
+  document.querySelectorAll('[data-dept-seul]').forEach(el=>{
+    el.style.display = (!dept || el.dataset.deptSeul===dept) ? '' : 'none';
+  });
+  // Page Stock : l'onglet affiché est celui du département.
+  if(dept){
+    _posStockLieuFiltre = dept;
+    document.getElementById('pos-stock-lieu-devant')?.classList.toggle('active', dept==='DEVANT');
+    document.getElementById('pos-stock-lieu-piscine')?.classList.toggle('active', dept==='PISCINE');
+  }
+  _posVerrouillerLieux();
+}
+
+// Tout sélecteur « Bar Devant / Bar Piscine » (ouverture de session,
+// approvisionnement, ajustement, filtres…) est fixé sur le département de
+// l'écran : depuis le Bar on ne touche jamais la Piscine, et inversement.
+// Le filtre du catalogue Produits garde ses autres choix (Tous, Non assigné).
+function _posVerrouillerLieux(racine){
+  (racine||document).querySelectorAll('select').forEach(sel=>{
+    const vals = [...sel.options].map(o=>o.value);
+    if(!(vals.includes('DEVANT') && vals.includes('PISCINE'))) return;
+    const filtreCatalogue = sel.id === 'pos-prod-lieu-filter';
+    [...sel.options].forEach(o=>{
+      if(o.value!=='DEVANT' && o.value!=='PISCINE') return;
+      const autre = !!_posDept && o.value !== _posDept;
+      o.hidden = autre; o.disabled = autre;
+      o.textContent = o.textContent.replace(/^Bar Piscine$/, 'Piscine');
+    });
+    if(filtreCatalogue){
+      if(_posDept && (sel.value==='DEVANT'||sel.value==='PISCINE') && sel.value!==_posDept) sel.value='';
+      return;
+    }
+    if(_posDept){ sel.value = _posDept; sel.disabled = true; }
+    else sel.disabled = false;
+  });
+}
+// Les fenêtres (modales) remettent souvent leur sélecteur à zéro en
+// s'ouvrant : on reverrouille à chaque ouverture.
+new MutationObserver(muts=>{
+  if(!_posDept) return;
+  for(const m of muts){
+    const el = m.target;
+    if(el.classList && el.classList.contains('open') && /modal/.test(el.className)){ _posVerrouillerLieux(el); }
+  }
+}).observe(document.documentElement, {subtree:true, attributes:true, attributeFilter:['class']});
 
 // ══════════════════════════════════════════════
 // PAGE ACCUEIL
@@ -17040,8 +17401,12 @@ const _MODULE_PAGES = {
   carburant: ['home','dashboard','saisie','journal','carburant-rapport','rapport-analytique','statistiques',
               'previsions','rapports','stock','gestion','audit','depenses'],
   bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-stock','pos-achats',
-              'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite',
-              'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis'],
+              'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-depenses','pos-rentabilite',
+              'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis',
+              // Département Piscine : mêmes écrans, même module (MODULE_BAR)
+              'piscine-dashboard','piscine-caisse','piscine-produits','piscine-stock','piscine-achats',
+              'piscine-ventes','piscine-credits','piscine-paie','piscine-depenses','piscine-rentabilite',
+              'piscine-grande-caisse','piscine-analyse','piscine-sessions-caisse','piscine-rapports-soumis'],
   hotel:     ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma',
               'hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   zelle:     ['zelle','zelle-paiements','zelle-fonds'],
@@ -17069,8 +17434,14 @@ const _AREA_PAGES = {
     lecture: ['dashboard','journal','statistiques','gi-dashboard'],
   },
   bar: {
-    complet: ['pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
+    complet: ['pos-dashboard-bar','pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits','pos-commandes','pos-stock','pos-paie','pos-depenses','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
     lecture: ['pos-ventes','pos-credits','pos-commandes','pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds'],
+  },
+  // Département Piscine — domaine d'accès propre (rôle : « piscine »). Un
+  // rôle créé avant ce domaine reprend son niveau « bar » (voir _niveauDomaine).
+  piscine: {
+    complet: ['piscine-dashboard','piscine-caisse','piscine-produits','piscine-achats','piscine-ventes','piscine-credits','piscine-stock','piscine-paie','piscine-depenses','piscine-analyse','piscine-grande-caisse','piscine-rentabilite','piscine-sessions-caisse','piscine-rapports-soumis'],
+    lecture: ['piscine-ventes','piscine-credits','piscine-analyse','piscine-grande-caisse','piscine-rentabilite','piscine-sessions-caisse','piscine-rapports-soumis'],
   },
   cuisine: {
     complet: ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse'],
@@ -17097,13 +17468,16 @@ const _AREA_PAGES = {
 // Whitelist stricte des pages accessibles aux comptes caissière (employe_id défini).
 const _CAISSIER_ALLOWED = new Set([
   'pos-caisse','pos-stock','pos-ventes','pos-credits','pos-rentabilite',
+  'piscine-caisse','piscine-stock','piscine-ventes','piscine-credits','piscine-rentabilite',
 ]);
 
 // Whitelist stricte pour les comptes Manager — Bar/Restaurant + Hôtel (sans
 // Tables, Grande Caisse, Chambres ni Réception) + Cuisine complète + Pâtisserie complète.
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
-  'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
+  'pos-stock','pos-paie','pos-depenses','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
+  'piscine-dashboard','piscine-caisse','piscine-produits','piscine-achats','piscine-ventes','piscine-credits',
+  'piscine-stock','piscine-paie','piscine-depenses','piscine-rentabilite','piscine-analyse','piscine-sessions-caisse','piscine-rapports-soumis',
   'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'patisserie-dashboard','patisserie-produits','patisserie-achats','patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse',
@@ -17118,7 +17492,9 @@ const _AD_ALLOWED = new Set([
   'home',
   'dashboard','journal','carburant-rapport','statistiques','gi-dashboard','depenses','achats','caisse',
   'pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes',
-  'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
+  'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis','pos-depenses',
+  'piscine-dashboard','piscine-produits','piscine-stock','piscine-ventes','piscine-credits','piscine-depenses',
+  'piscine-analyse','piscine-grande-caisse','piscine-rentabilite','piscine-sessions-caisse','piscine-rapports-soumis',
   'cuisine-plats','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'employes','payroll',
@@ -17129,11 +17505,13 @@ const _AD_ALLOWED = new Set([
 const _ACCES_POSTE_LEGACY = {
   'Directeur Général': null,
   'Comptable':   ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-depenses','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'piscine-dashboard','piscine-caisse','piscine-produits','piscine-stock','piscine-achats','piscine-ventes','piscine-credits','piscine-paie','piscine-depenses','piscine-rentabilite','piscine-grande-caisse','piscine-analyse','piscine-sessions-caisse','piscine-rapports-soumis',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
-                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-depenses','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
+                  'piscine-dashboard','piscine-caisse','piscine-produits','piscine-stock','piscine-achats','piscine-ventes','piscine-credits','piscine-paie','piscine-depenses','piscine-rentabilite','piscine-grande-caisse','piscine-analyse','piscine-sessions-caisse','piscine-rapports-soumis',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Pompiste':            ['home','saisie'],
@@ -17190,7 +17568,9 @@ function _getAllowedPages(){
     if(perms.admin === true) return null; // null = accès complet
     const allowed = new Set();
     for(const [area, levels] of Object.entries(_AREA_PAGES)){
-      const level = perms[area] || 'aucun';
+      // Domaine « piscine » absent d'un rôle antérieur à sa création : même
+      // niveau que le Bar (aucun accès perdu ni gagné au déploiement).
+      const level = perms[area] || (area==='piscine' ? perms.bar : null) || 'aucun';
       if(level === 'complet') levels.complet.forEach(p => allowed.add(p));
       else if(level === 'operationnel' && levels.operationnel) levels.operationnel.forEach(p => allowed.add(p));
       else if(level === 'lecture') levels.lecture.forEach(p => allowed.add(p));
@@ -21110,6 +21490,8 @@ function _audMsg(msg, type){
    MODULES GESTION INSTITUTIONNELLE — UTILITAIRES
    ══════════════════════════════════════════════════════════════ */
 const _htg = v => new Intl.NumberFormat('fr-HT',{minimumFractionDigits:0,maximumFractionDigits:0}).format(v) + ' HTG';
+// Montant en dollars (paiements hôtel en USD) — toujours affiché à part des gourdes.
+const _usd = v => new Intl.NumberFormat('fr-HT',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v)||0) + ' $';
 const _today = () => todayStr();
 
 function _giAlert(msg, type='error'){
@@ -22457,6 +22839,7 @@ const _giPageLoaders = {
   'pos-credits':     loadPosCredits,
   'pos-commandes':   loadPosCommandes,
   'pos-paie':        loadPosPaie,
+  'pos-depenses':    loadPosDepenses,
   'pos-rentabilite':    loadPosRentabilite,
   'pos-grande-caisse':      loadPosGrandeCaisse,
   'pos-analyse':            loadPosAnalyse,
@@ -22505,6 +22888,7 @@ const _ARM_DOMAINES = [
   { key:'carburant', label:'⛽ Carburant',   color:'#f7a93b' },
   { key:'finance',   label:'💰 Finance',     color:'#34d399' },
   { key:'bar',       label:'🍺 Bar & POS',   color:'#60a5fa' },
+  { key:'piscine',   label:'🏊 Piscine',     color:'#22d3ee' },
   { key:'cuisine',   label:'🍽️ Cuisine',     color:'#fb923c' },
   { key:'patisserie',label:'🍰 Pâtisserie',  color:'#f9a8d4' },
   { key:'hotel',     label:'🏨 Hôtel',       color:'#a78bfa' },
@@ -22527,7 +22911,8 @@ function adminRolesRender(){
   }
   grid.innerHTML = _adminRolesData.map(r => {
     const badges = _ARM_DOMAINES.map(d => {
-      const level = (r.permissions||{})[d.key] || 'aucun';
+      const _p = r.permissions||{};
+      const level = _p[d.key] || (d.key==='piscine' ? _p.bar : null) || 'aucun';
       const col = level==='complet' ? d.color : level==='lecture' ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.08)';
       const txt = level==='complet' ? 'Complet' : level==='lecture' ? 'Lecture' : 'Aucun';
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">
@@ -22564,7 +22949,7 @@ function _armBuildMatrix(perms){
   const matrix = document.getElementById('arm-perms-matrix');
   if(!matrix) return;
   matrix.innerHTML = _ARM_DOMAINES.map(d => {
-    const cur = (perms||{})[d.key] || 'aucun';
+    const cur = (perms||{})[d.key] || (d.key==='piscine' ? (perms||{}).bar : null) || 'aucun';
     const opts = ['complet','lecture','aucun'].map(v =>
       `<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:14px">
         <input type="radio" name="arm-${d.key}" value="${v}" ${cur===v?'checked':''} style="accent-color:${d.color}"> ${v.charAt(0).toUpperCase()+v.slice(1)}
@@ -23630,8 +24015,8 @@ async function loadGiDashboard(){
     //         département sur la page Rapport de Caisse) ─────────
     const ad = d.autres_departements || {ventes_bar:0, ventes_cuisine:0, ventes_hotel:0, achats_bar:0, achats_cuisine:0, depenses_cuisine:0, depenses_hotel:0, payroll_bar:0};
     const ventesTotal   = d.synthese.total_entrees;
-    const achatsTotal   = d.achats.total + ad.achats_bar + ad.achats_cuisine;
-    const depensesTotal = d.depenses.total + ad.depenses_cuisine + ad.depenses_hotel;
+    const achatsTotal   = d.achats.total + ad.achats_bar + (ad.achats_piscine||0) + ad.achats_cuisine;
+    const depensesTotal = d.depenses.total + ad.depenses_cuisine + ad.depenses_hotel + (ad.depenses_bar||0) + (ad.depenses_piscine||0);
 
     document.getElementById('gid-kpi-ventes').textContent      = _htg(ventesTotal);
     document.getElementById('gid-kpi-ventes-sub').textContent  =
@@ -23885,8 +24270,8 @@ async function loadCaisse(){
     // ── KPIs (totaux consolidés — toute l'institution) ────
     const ad = d.autres_departements || {ventes_bar:0, ventes_cuisine:0, ventes_hotel:0, achats_bar:0, achats_cuisine:0, depenses_cuisine:0, depenses_hotel:0, payroll_bar:0};
     const ventesTotal   = d.synthese.total_entrees;
-    const achatsTotal   = d.achats.total + ad.achats_bar + ad.achats_cuisine;
-    const depensesTotal = d.depenses.total + ad.depenses_cuisine + ad.depenses_hotel;
+    const achatsTotal   = d.achats.total + ad.achats_bar + (ad.achats_piscine||0) + ad.achats_cuisine;
+    const depensesTotal = d.depenses.total + ad.depenses_cuisine + ad.depenses_hotel + (ad.depenses_bar||0) + (ad.depenses_piscine||0);
 
     document.getElementById('caisse-kpi-ventes').textContent    = _htg(ventesTotal);
     document.getElementById('caisse-kpi-ventes-gal').textContent = 'dont station : '+d.ventes.gallons.toLocaleString('fr',{minimumFractionDigits:2})+' gal · '+d.ventes.nb_releves+' relevé(s)';
@@ -23905,19 +24290,28 @@ async function loadCaisse(){
     if(adWrap){
       const rows = [
         {label:'Ventes Bar (cash encaissé)',   val: ad.ventes_bar,     sens:'entree'},
+        {label:'Ventes Piscine (cash encaissé)', val: ad.ventes_piscine||0, sens:'entree'},
         {label:'Ventes Cuisine (cash)',        val: ad.ventes_cuisine, sens:'entree'},
-        {label:'Ventes Hôtel (encaissé)',      val: ad.ventes_hotel,   sens:'entree'},
+        {label:'Ventes Hôtel (gourdes reçues)', val: ad.ventes_hotel,  sens:'entree'},
         {label:'Achats Bar (confirmés)',       val: ad.achats_bar,     sens:'sortie'},
+        {label:'Achats Piscine (confirmés)',   val: ad.achats_piscine||0, sens:'sortie'},
         {label:'Achats Cuisine',               val: ad.achats_cuisine, sens:'sortie'},
+        {label:'Dépenses Bar',                 val: ad.depenses_bar||0, sens:'sortie'},
+        {label:'Dépenses Piscine',             val: ad.depenses_piscine||0, sens:'sortie'},
         {label:'Dépenses Cuisine',             val: ad.depenses_cuisine, sens:'sortie'},
         {label:'Dépenses Hôtel',               val: ad.depenses_hotel, sens:'sortie'},
-        {label:'Payiements employés Bar',      val: ad.payroll_bar,    sens:'sortie'},
+        {label:'Paiements employés Bar',       val: ad.payroll_bar,    sens:'sortie'},
+        {label:'Paiements employés Piscine',   val: ad.payroll_piscine||0, sens:'sortie'},
       ];
       adWrap.innerHTML = rows.map(r => `
         <div class="caisse-bar-row" style="justify-content:space-between">
           <div class="caisse-bar-label" style="min-width:0">${r.label}</div>
           <div class="caisse-bar-val" style="color:${r.sens==='entree'?'#22c55e':'#f87171'}">${r.sens==='entree'?'+':'−'} ${_htg(r.val)}</div>
-        </div>`).join('');
+        </div>`).join('') + ((ad.hotel_usd||0) > 0 ? `
+        <div class="caisse-bar-row" style="justify-content:space-between;border-top:1px dashed rgba(255,255,255,.15);margin-top:6px;padding-top:8px">
+          <div class="caisse-bar-label" style="min-width:0">Hôtel — dollars reçus (fonds USD à part, hors cash gourdes)</div>
+          <div class="caisse-bar-val" style="color:#38bdf8">${_usd(ad.hotel_usd)}</div>
+        </div>` : '');
     }
 
     // ── Cash carburant encaissé — total + détail Gazoline / Diesel ──
@@ -24818,12 +25212,18 @@ async function loadPosCaisse(){
   // catalogue se chargeait sans filtre au tout premier rendu de la grille
   // (avant que posCaissierChange ne le corrige plus bas, de façon non
   // synchrone) et affichait les produits des deux bars, même brièvement.
+  // Caisse Bar et Caisse Piscine sont deux écrans distincts : le catalogue
+  // vendu est celui du département de l'écran, sauf session déjà ouverte
+  // dans l'autre département (on y renvoie alors l'employé).
+  if(_posDept && _posSessionLieu && _posSessionLieu !== _posDept) _posSessionLieu = null;
   if(_appUser?.caisse_employe_id && !_posSessionLieu){
     try {
       const d = await apiFetch('GET', `/pos/caisse/dashboard?caissier_id=${_appUser.caisse_employe_id}`);
-      if(d.lieu) _posSessionLieu = d.lieu;
+      if(_posRenvoyerVersSession(d)) return;
+      if(d.lieu && (!_posDept || d.lieu === _posDept)) _posSessionLieu = d.lieu;
     } catch(_){}
   }
+  if(_posDept && !_posSessionLieu) _posSessionLieu = _posDept;
   await Promise.all([_posLoadProduitsCache(_posSessionLieu), _posLoadCuisinePlatsCache()]);
   await _posChargerCaissiers();
   posRenderCatTabs();
@@ -24859,6 +25259,23 @@ async function loadPosCaisse(){
     }
     posCaissierChange(_appUser.caisse_employe_id);
   }
+}
+
+// Une session EN_COURS appartient à UN département : si elle a été ouverte
+// à la Piscine et que l'employé est sur la Caisse Bar (ou l'inverse), on
+// l'emmène sur la caisse de sa session — ses ventes y sont de toute façon
+// rattachées. Renvoie true si une redirection a eu lieu.
+function _posRenvoyerVersSession(d){
+  if(!d || d.session_statut !== 'EN_COURS' || !d.lieu || !_posDept || d.lieu === _posDept) return false;
+  if(!['pos-caisse','piscine-caisse'].includes(currentPage)) return false;
+  const cible = d.lieu === 'PISCINE' ? 'piscine-caisse' : 'pos-caisse';
+  if(!_canAccess(cible)){
+    posAlert(`Votre session en cours est ouverte au département ${_posDeptLibelle(d.lieu)} — soumettez-la avant de vendre ici.`, 'warn');
+    return false;
+  }
+  toast(`Session en cours au département ${_posDeptLibelle(d.lieu)} — caisse ${_posDeptLibelle(d.lieu)} ouverte.`, 'ok');
+  goTo(cible);
+  return true;
 }
 
 async function _posChargerCaissiers(){
@@ -24951,12 +25368,12 @@ async function posConfirmerDemarrage(){
   const cid = document.getElementById('pos-caissier-sel')?.value;
   if(!cid) return;
   const lieu = document.getElementById('pd-lieu-sel')?.value;
-  if(!lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine) avant de démarrer.', 'warn'); return; }
+  if(!lieu){ posAlert('Choisissez le département (Bar ou Piscine) avant de démarrer.', 'warn'); return; }
   try {
     const s = await apiFetch('POST', '/pos/caisse/sessions/ouvrir', {caissier_id: parseInt(cid), lieu});
     _posDashSessionId = s.id;
     document.getElementById('pos-demarrer-modal-bg')?.classList.remove('open');
-    const lieuLabel = lieu === 'PISCINE' ? 'Bar Piscine' : 'Bar Devant';
+    const lieuLabel = lieu === 'PISCINE' ? 'Piscine' : 'Bar Devant';
     const numTxt = s.numero_session > 1 ? `Session #${s.numero_session} ` : '';
     posAlert(`${numTxt}démarrée — ${lieuLabel}.`, 'ok');
   } catch(e){ posAlert(e.message||t('pos.caisse.err.ouvertureSession'), 'err'); return; }
@@ -24967,6 +25384,7 @@ async function posConfirmerDemarrage(){
 async function _posDashLoadData(caissier_id){
   try {
     const d = await apiFetch('GET', `/pos/caisse/dashboard?caissier_id=${caissier_id}`);
+    if(_posRenvoyerVersSession(d)) return;
     _posDashSessionId = d.session_id;
 
     const nomEl = document.getElementById('pos-dash-nom');
@@ -24978,7 +25396,7 @@ async function _posDashLoadData(caissier_id){
     // Le catalogue vendu se filtre sur le lieu de la session dès qu'il est
     // connu (une session pas encore démarrée n'a pas de lieu) — évite de
     // recharger à chaque rafraîchissement périodique (60s) si inchangé.
-    if(d.lieu && d.lieu !== _posSessionLieu){
+    if(d.lieu && d.lieu !== _posSessionLieu && (!_posDept || d.lieu === _posDept || d.session_statut === 'EN_COURS')){
       _posSessionLieu = d.lieu;
       await _posLoadProduitsCache(_posSessionLieu);
       posRenderCatTabs();
@@ -25705,7 +26123,7 @@ async function posClasserLieu(){
 
   let msg = `${apercu.total_sans_lieu} produit(s) sans bar assigné.\n\n`;
   if(apercu.classables.length){
-    const lieuLabel = l => l==='DEVANT' ? 'Bar Devant' : 'Bar Piscine';
+    const lieuLabel = l => l==='DEVANT' ? 'Bar Devant' : 'Piscine';
     msg += `${apercu.classables.length} peuvent être classés automatiquement d'après leur historique :\n`
          + apercu.classables.map(p=>`  • ${p.nom} → ${lieuLabel(p.candidat)}`).join('\n') + '\n\n';
   }
@@ -26169,7 +26587,7 @@ async function posApproSauvegarder(){
     nb_unites_vrac = parseInt(document.getElementById('pos-appro-nb-unite-seul').value)||0;
   }
   if(nb_caisses===0 && nb_unites_vrac===0){ posAlert('Saisir au moins 1 caisse ou 1 unité.'); return; }
-  if(!lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine).'); return; }
+  if(!lieu){ posAlert('Choisissez le département (Bar ou Piscine).'); return; }
   try {
     const res = await apiFetch('POST',`/pos/produits/${prodId}/approvisionnement`,{
       nb_caisses, nb_unites_vrac,
@@ -26230,7 +26648,7 @@ const _POS_MOUV_LABELS = {
   CASSE:        { texte: 'Casse',                couleur: '#f87171' },
   VOLONTAIRE:   { texte: 'Volontaire',            couleur: '#c084fc' },
 };
-const _POS_LIEU_LABELS = { DEVANT: 'Bar Devant', PISCINE: 'Bar Piscine' };
+const _POS_LIEU_LABELS = { DEVANT: 'Bar Devant', PISCINE: 'Piscine' };
 
 /* Verrouille le <select> de lieu sur le bar exclusif du produit (catalogue
    Bar Devant / Bar Piscine, p.lieu) pour ne jamais pouvoir enregistrer un
@@ -26357,7 +26775,7 @@ function _posStockProduitsEligibles(){
 function _posStockRecalculer(){
   const { stockMap } = _posStockCache;
   const prods = _posStockProduitsEligibles();
-  const nomLieu = _posStockLieuFiltre==='PISCINE' ? 'Bar Piscine' : 'Bar Devant';
+  const nomLieu = _posStockLieuFiltre==='PISCINE' ? 'Piscine' : 'Bar Devant';
 
   let totalValeur = 0, nbAlerte = 0, nbProduits = 0;
   (prods||[]).forEach(p=>{
@@ -26446,6 +26864,7 @@ function posStockExportPdf(){
   const recherche = (document.getElementById('pos-stock-recherche')?.value||'').trim();
   if(recherche) params.set('recherche', recherche);
   if(_posStockDispoFiltre) params.set('disponibilite', _posStockDispoFiltre);
+  params.set('lieu', _posDept || _posStockLieuFiltre);
   window.open('/api/pos/stock/export/pdf?'+params.toString(), '_blank');
 }
 
@@ -26464,11 +26883,11 @@ function posStockReinitialiser(produitId, produitNom, lieu, stock){
 async function posStockReinitialiserConfirmer(){
   if(!_posReinitCtx) return;
   const lieu = document.getElementById('pos-reinit-lieu').value;
-  if(!lieu){ toast('Choisissez le bar (Bar Devant ou Bar Piscine).','err'); return; }
+  if(!lieu){ toast('Choisissez le département (Bar ou Piscine).','err'); return; }
   try{
     const res = await apiFetch('POST', `/pos/stock/${_posReinitCtx.produitId}/reinitialiser?lieu=${lieu}`, {});
     document.getElementById('pos-reinit-modal-bg').classList.remove('open');
-    toast(`Stock ${lieu==='DEVANT'?'Bar Devant':'Bar Piscine'} de « ${res.produit_nom} » réinitialisé (${fmtQ(res.stock_avant)} → 0).`,'ok');
+    toast(`Stock ${lieu==='DEVANT'?'Bar Devant':'Piscine'} de « ${res.produit_nom} » réinitialisé (${fmtQ(res.stock_avant)} → 0).`,'ok');
     loadPosStock();
   }catch(e){ toast(e.message||'Erreur lors de la réinitialisation.','err'); }
 }
@@ -26706,7 +27125,7 @@ async function posAjusterStock(){
   const lieu   = document.getElementById('pos-ajust-lieu').value;
   if(!prodId || qteRaw === '' || isNaN(qte) || qte < 0){ posAlert('Produit et quantité requis (0 ou plus).'); return; }
   if(type !== 'AJUSTEMENT' && qte === 0){ posAlert('La quantité doit être supérieure à 0 pour une perte, une casse ou une sortie volontaire.'); return; }
-  if(!lieu){ posAlert('Choisissez le bar (Bar Devant ou Bar Piscine).'); return; }
+  if(!lieu){ posAlert('Choisissez le département (Bar ou Piscine).'); return; }
   try {
     const res = await apiFetch('POST','/pos/stock/ajustement',{
       produit_id: parseInt(prodId), type_mouvement: type, quantite: qte,
@@ -27990,8 +28409,9 @@ async function loadPosVentes(){
   // Titre selon le profil
   const titleEl = document.getElementById('pos-ventes-header-title');
   const subEl   = document.getElementById('pos-ventes-header-sub');
+  if(titleEl) delete titleEl.dataset.deptOrig;
   if(isCaissiere){
-    if(titleEl) titleEl.textContent = 'Mes Ventes';
+    if(titleEl) titleEl.textContent = _posDept==='PISCINE' ? 'Mes Ventes — Piscine' : 'Mes Ventes';
     if(subEl)   subEl.textContent   = 'Suivi exclusif de vos ventes · filtrez par date ou produit';
     const card = document.getElementById('pos-caissiers-card');
     if(card) card.style.display = 'none';
@@ -28000,7 +28420,7 @@ async function loadPosVentes(){
     clearInterval(_posVentesClassementInterval);
     _posVentesClassementInterval = null;
   } else {
-    if(titleEl) titleEl.textContent = 'Ventes Bar';
+    if(titleEl) titleEl.textContent = `Ventes ${_posDeptLibelle()}`;
     if(subEl)   subEl.textContent   = 'Suivi des ventes du jour et historique';
     const card = document.getElementById('pos-caissiers-card');
     if(card) card.style.display = '';
@@ -29371,6 +29791,7 @@ function _gcRender(d){
   _gcKpi('gc-kpi-ventes',    posGx(section.ventes_ca));
   _gcKpi('gc-kpi-benef-brut', posGx(benBrut), colorBrut);
   _gcKpi('gc-kpi-paie',      posGx(section.paie));
+  _gcKpi('gc-kpi-depenses',  posGx(section.depenses||0), '#f87171');
   _gcKpi('gc-kpi-benef-net', posGx(benNet), colorNet);
 
   const nbA = document.getElementById('gc-kpi-nb-achats');
@@ -29956,7 +30377,7 @@ function _ckHeureFmt(d){
 // Lieu (Bar Devant / Bar Piscine) — étiquette partagée par les pages
 // Sessions Caissières, Rapports Soumis et Écarts d'Inventaire.
 function _lieuLabel(lieu){
-  if(lieu === 'PISCINE') return 'Bar Piscine';
+  if(lieu === 'PISCINE') return 'Piscine';
   if(lieu === 'DEVANT')  return 'Bar Devant';
   return null;
 }
@@ -33465,6 +33886,14 @@ async function hotelDashCharger(){
     const caisseNeg = k.caisse_disponible < 0;
     caisseEl.textContent = posGx(k.caisse_disponible);
     caisseEl.style.color = caisseNeg ? '#f87171' : '#3fb6a8';
+    const usdEl = document.getElementById('hd-kpi-caisse-usd');
+    if(usdEl) usdEl.textContent = _usd(k.caisse_usd||0);
+    const usdSub = document.getElementById('hd-kpi-caisse-usd-sub');
+    if(usdSub) usdSub.textContent = `≈ ${posGx(k.encaisse_usd_equiv_htg||0)} · taux du jour ${k.taux_usd||'—'} G`;
+    const revSub2 = document.getElementById('hd-kpi-revenu-sub');
+    if(revSub2 && (k.encaisse_usd||0) > 0){
+      revSub2.innerHTML += `<div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">${posGx(k.encaisse_htg)} en gourdes + ${_usd(k.encaisse_usd)}</div>`;
+    }
     const caisseAccent = document.getElementById('hd-caisse-accent');
     const caisseIcon   = document.getElementById('hd-caisse-icon');
     if(caisseAccent) caisseAccent.style.background = caisseNeg ? '#f87171' : '#3fb6a8';
@@ -33789,12 +34218,39 @@ function hrecRefreshFacture(){
 
 function hrecOnFactureInput(){ hrecRefreshFacture(); }
 
+// ── Paiements hôtel en gourdes OU en dollars ──────────────────────
+// Le séjour reste facturé en gourdes ; un paiement en dollars réduit le
+// solde de son équivalent au taux saisi (proposé : taux du jour de l'hôtel).
+let _hotelTauxUsd = null;
+async function _hotelChargerTaux(){
+  if(_hotelTauxUsd) return _hotelTauxUsd;
+  try { _hotelTauxUsd = (await apiFetch('GET','/hotel/config')).taux_usd; } catch(e){ _hotelTauxUsd = 130; }
+  return _hotelTauxUsd;
+}
+async function hrecDeviseChange(){
+  const usd = document.getElementById('hrec-devise')?.value === 'USD';
+  document.getElementById('hrec-taux-wrap').style.display = usd ? '' : 'none';
+  document.getElementById('hrec-montant-paye-label').textContent = usd ? 'Montant payé ($ dollars)' : 'Montant payé (G)';
+  const taux = document.getElementById('hrec-taux');
+  if(usd && taux && !taux.value) taux.value = await _hotelChargerTaux();
+  hrecCalcSolde();
+}
+// Équivalent gourdes de la saisie (montant × taux si dollars).
+function hrecPayeEquivHtg(){
+  const paye = parseFloat(document.getElementById('hrec-montant-paye').value||0) || 0;
+  if(document.getElementById('hrec-devise')?.value !== 'USD') return paye;
+  const taux = parseFloat(document.getElementById('hrec-taux')?.value||0) || 0;
+  return paye * taux;
+}
+
 function hrecCalcSolde(){
   const total   = hrecEffectiveFacture();
-  const paye    = parseFloat(document.getElementById('hrec-montant-paye').value||0);
+  const paye    = hrecPayeEquivHtg();
   const solde   = Math.max(0, total - paye);
   const soldeEl = document.getElementById('hrec-solde');
   if(soldeEl){ soldeEl.textContent = posGx(solde); soldeEl.style.color = solde>0?'#f87171':'#34d399'; }
+  const eq = document.getElementById('hrec-equiv');
+  if(eq) eq.textContent = document.getElementById('hrec-devise')?.value === 'USD' ? `≈ ${posGx(paye)} (équivalent gourdes, pour le solde)` : '';
 }
 
 async function hrecEnregistrer(){
@@ -33825,6 +34281,9 @@ async function hrecEnregistrer(){
     nb_heures:       _hrecType==='MOMENT' ? nbH  : null,
     montant_facture: montantFacture,
     montant_paye:    parseFloat(document.getElementById('hrec-montant-paye').value||0),
+    devise_paiement: document.getElementById('hrec-devise')?.value || 'HTG',
+    taux_change:     document.getElementById('hrec-devise')?.value === 'USD'
+                       ? (parseFloat(document.getElementById('hrec-taux')?.value||0) || null) : null,
     mode_paiement:   document.getElementById('hrec-mode').value || null,
     employe_id:      document.getElementById('hrec-employe').value ? parseInt(document.getElementById('hrec-employe').value) : null,
     notes:           g('hrec-notes') || null,
@@ -33837,6 +34296,7 @@ async function hrecEnregistrer(){
     });
     document.getElementById('hrec-chambre').value='';
     document.getElementById('hrec-recap').style.display='none';
+    const _dev = document.getElementById('hrec-devise'); if(_dev){ _dev.value='HTG'; hrecDeviseChange(); }
     posAlert('Client enregistré avec succès.','ok');
     // Reçu client — ticket thermique 80mm (imprimante POS)
     if(res && res.id) _hotelTicketRecu(res);
@@ -33898,7 +34358,11 @@ function _hotelTicketRecu(r){
     +'<div class="sep"></div>'
     +(remise>0?(row('Tarif référence :',fg(r.montant_reference))+row('Rabais :','- '+fg(remise))):'')
     +'<div class="box"><div class="l">Montant facturé</div><div class="v">'+fg(r.montant_total)+'</div></div>'
-    +row('Payé :',fg(r.montant_paye))
+    +((parseFloat(r.paye_usd)||0) > 0
+        ? (row('Payé en gourdes :',fg(r.paye_htg))
+           +row('Payé en dollars :',(parseFloat(r.paye_usd)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' $')
+           +row('Total payé (≈ G) :',fg(r.montant_paye)))
+        : row('Payé :',fg(r.montant_paye)))
     +row('Solde :','<span class="b">'+fg(r.solde)+'</span>')
     +(r.mode_paiement?row('Mode :',r.mode_paiement):'')
     +'<div class="sep2"></div>'
@@ -33953,7 +34417,7 @@ function _hotelSejourCard(s){
       <div class="hotel-timer-box" data-type="${s.type_sejour}" data-depart="${s.date_depart_prevue}" data-arrivee="${s.date_arrivee}" style="margin-top:10px;min-height:28px"></div>
       <div style="margin-top:8px;padding:8px;background:rgba(255,255,255,.04);border-radius:6px;display:flex;justify-content:space-between">
         <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Total</div><div style="font-weight:700">${_hFmt(s.montant_total)}</div></div>
-        <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Payé</div><div style="font-weight:700;color:#34d399">${_hFmt(s.montant_paye)}</div></div>
+        <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Payé</div><div style="font-weight:700;color:#34d399">${_hFmt(s.montant_paye)}</div>${(s.paye_usd||0)>0?`<div style="font-size:11px;color:#38bdf8">dont ${_usd(s.paye_usd)} · ${_hFmt(s.paye_htg)} en G</div>`:''}</div>
         <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Solde</div><div style="font-weight:700;color:${hasSolde?'#f87171':'#34d399'}">${_hFmt(s.solde)}</div></div>
       </div>
       <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
@@ -34024,7 +34488,29 @@ function hotelPaiementModal(resId){
   if(!_hotelPeutEcrire()){ _giAlert('Accès lecture seule.','err'); return; }
   document.getElementById('hotel-paie-res-id').value = resId;
   document.getElementById('hotel-paie-montant').value = '';
+  document.getElementById('hotel-paie-devise').value = 'HTG';
+  document.getElementById('hotel-paie-taux').value = '';
+  const s = (_hotelSejoursData||[]).find(x=>x.id===resId);
+  const info = document.getElementById('hotel-paie-solde-info');
+  if(info) info.textContent = s ? `Solde à payer : ${_hFmt(s.solde)}` : '';
+  hotelPaieDeviseChange();
   document.getElementById('hotel-paie-modal-bg').classList.add('open');
+}
+
+async function hotelPaieDeviseChange(){
+  const usd = document.getElementById('hotel-paie-devise')?.value === 'USD';
+  document.getElementById('hotel-paie-taux-wrap').style.display = usd ? '' : 'none';
+  document.getElementById('hotel-paie-montant-label').textContent = usd ? 'Montant ($ dollars) *' : 'Montant (G) *';
+  const taux = document.getElementById('hotel-paie-taux');
+  if(usd && taux && !taux.value) taux.value = await _hotelChargerTaux();
+  hotelPaieEquiv();
+}
+function hotelPaieEquiv(){
+  const eq = document.getElementById('hotel-paie-equiv'); if(!eq) return;
+  if(document.getElementById('hotel-paie-devise')?.value !== 'USD'){ eq.textContent=''; return; }
+  const m = parseFloat(document.getElementById('hotel-paie-montant').value||0)||0;
+  const t = parseFloat(document.getElementById('hotel-paie-taux').value||0)||0;
+  eq.textContent = `≈ ${_hFmt(m*t)} déduits du solde (les dollars restent comptés à part)`;
 }
 
 async function hotelPaiementSauver(){
@@ -34032,9 +34518,12 @@ async function hotelPaiementSauver(){
   const resId  = parseInt(document.getElementById('hotel-paie-res-id').value);
   const montant = parseFloat(document.getElementById('hotel-paie-montant').value||0);
   const mode   = document.getElementById('hotel-paie-mode').value;
+  const devise = document.getElementById('hotel-paie-devise')?.value || 'HTG';
+  const taux   = devise==='USD' ? (parseFloat(document.getElementById('hotel-paie-taux')?.value||0) || null) : null;
   if(!montant || montant<=0){ posAlert('Montant requis.','warn'); return; }
+  if(devise==='USD' && !taux){ posAlert('Taux du dollar requis.','warn'); return; }
   try {
-    await apiFetch('POST',`/hotel/reservations/${resId}/paiement`,{ montant, mode_paiement: mode });
+    await apiFetch('POST',`/hotel/reservations/${resId}/paiement`,{ montant, mode_paiement: mode, devise, taux_change: taux });
     document.getElementById('hotel-paie-modal-bg').classList.remove('open');
     await loadHotelSejours();
     posAlert('Paiement enregistré.','ok');
@@ -34351,18 +34840,41 @@ async function hpfConvertir(id){
     if(c) opts.push(`<option value="${c.id}" selected>Ch. ${c.numero} (actuellement ${c.statut})</option>`);
   }
   sel.innerHTML = opts.join('');
+  const acompte = parseFloat(p.acompte||0) || 0;
+  document.getElementById('hpf-conv-acompte-wrap').style.display = acompte > 0 ? '' : 'none';
+  document.getElementById('hpf-conv-devise').value = 'HTG';
+  document.getElementById('hpf-conv-usd').value = '';
+  document.getElementById('hpf-conv-taux').value = '';
+  document.getElementById('hpf-conv-acompte-info').textContent = acompte > 0 ? `Acompte du document : ${_hFmt(acompte)}` : '';
+  hpfConvDeviseChange();
   document.getElementById('hpf-conv-modal-bg').classList.add('open');
+}
+
+async function hpfConvDeviseChange(){
+  const usd = document.getElementById('hpf-conv-devise')?.value === 'USD';
+  document.getElementById('hpf-conv-usd-wrap').style.display = usd ? 'flex' : 'none';
+  const t = document.getElementById('hpf-conv-taux');
+  if(usd && t && !t.value) t.value = await _hotelChargerTaux();
 }
 
 async function hpfConvertirValider(){
   const id = document.getElementById('hpf-conv-id').value;
   const chambreId = document.getElementById('hpf-conv-chambre').value;
   if(!chambreId){ posAlert('Choisissez une chambre.','warn'); return; }
+  const devise = document.getElementById('hpf-conv-devise')?.value || 'HTG';
+  const acompteWrapVisible = document.getElementById('hpf-conv-acompte-wrap')?.style.display !== 'none';
+  const body = {
+    chambre_id: parseInt(chambreId),
+    mode_paiement: document.getElementById('hpf-conv-mode').value || null,
+    devise_acompte: acompteWrapVisible ? devise : 'HTG',
+  };
+  if(acompteWrapVisible && devise === 'USD'){
+    body.montant_acompte_usd = parseFloat(document.getElementById('hpf-conv-usd').value||0) || null;
+    body.taux_change = parseFloat(document.getElementById('hpf-conv-taux').value||0) || null;
+    if(!body.montant_acompte_usd){ posAlert('Montant de l\'acompte en dollars requis.','warn'); return; }
+  }
   try {
-    await apiFetch('POST', `/hotel/proformas/${id}/convertir`, {
-      chambre_id: parseInt(chambreId),
-      mode_paiement: document.getElementById('hpf-conv-mode').value || null,
-    });
+    await apiFetch('POST', `/hotel/proformas/${id}/convertir`, body);
     document.getElementById('hpf-conv-modal-bg').classList.remove('open');
     posAlert('Séjour ouvert — chambre occupée.','ok');
     await loadHotelProforma();
@@ -34399,7 +34911,7 @@ async function loadHotelHistorique(){
         <td><span style="font-size:13px;padding:2px 7px;background:rgba(255,255,255,.07);border-radius:4px">${r.type_sejour}</span></td>
         <td>${duree}</td>
         <td style="text-align:right">${_hFmt(r.montant_total)}</td>
-        <td style="text-align:right;color:#34d399">${_hFmt(r.montant_paye)}</td>
+        <td style="text-align:right;color:#34d399">${_hFmt(r.montant_paye)}${(r.paye_usd||0)>0?`<br><span style="font-size:11px;color:#38bdf8">dont ${_usd(r.paye_usd)}</span>`:''}</td>
         <td style="text-align:right;color:${r.solde>0?'#f87171':'#34d399'}">${_hFmt(r.solde)}</td>
         <td><span style="font-size:13px;color:${sc};font-weight:600">${r.statut}</span>
           <button class="pos-btn ghost" style="font-size:12px;padding:2px 7px;margin-left:6px" onclick="hotelRecu(${r.id})" title="Reçu client">🧾</button></td>
@@ -34494,6 +35006,119 @@ async function hotelEmpDesactiver(id, nom){
 // ── DÉPENSES HÔTEL ────────────────────────────────────────────────────
 
 let _hdepData = [];
+
+// ══════════════════════════════════════════════════════════════════
+// DÉPENSES BAR / PISCINE — /api/pos/depenses (département de l'écran)
+// ══════════════════════════════════════════════════════════════════
+let _pdepData = [];
+let _pdepEditId = null;
+
+async function loadPosDepenses(){
+  const today = new Date();
+  const fmt = d => d.toISOString().split('T')[0];
+  const dDeb = document.getElementById('pdep-debut');
+  const dFin = document.getElementById('pdep-fin');
+  if(dDeb && !dDeb.value) dDeb.value = fmt(new Date(today.getFullYear(), today.getMonth(), 1));
+  if(dFin && !dFin.value) dFin.value = fmt(today);
+  await pdepCharger();
+}
+
+async function pdepCharger(){
+  const tbody = document.getElementById('pdep-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Chargement…</td></tr>';
+  const debut = document.getElementById('pdep-debut')?.value || '';
+  const fin   = document.getElementById('pdep-fin')?.value || '';
+  try {
+    const d = await apiFetch('GET', `/pos/depenses?date_debut=${debut}&date_fin=${fin}`);
+    _pdepData = d.depenses || [];
+    const cats = [...new Set(_pdepData.map(x=>x.categorie).filter(Boolean))].sort();
+    const sel = document.getElementById('pdep-filtre-cat');
+    if(sel){
+      const v = sel.value;
+      sel.innerHTML = '<option value="">Toutes catégories</option>' + cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+      sel.value = cats.includes(v) ? v : '';
+    }
+    const dl = document.getElementById('pdep-cat-list');
+    if(dl) dl.innerHTML = cats.map(c=>`<option value="${esc(c)}">`).join('');
+    pdepAfficher();
+  } catch(e){
+    if(tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;text-align:center;color:#f87171">${esc(e.message||'Erreur')}</td></tr>`;
+  }
+}
+
+function pdepAfficher(){
+  const tbody = document.getElementById('pdep-tbody'); if(!tbody) return;
+  const cat = document.getElementById('pdep-filtre-cat')?.value || '';
+  const deps = _pdepData.filter(d => !cat || d.categorie === cat);
+  const total = deps.reduce((s,d)=>s+d.montant,0);
+  const parCat = {};
+  deps.forEach(d=>{ const k=d.categorie||'Autre'; parCat[k]=(parCat[k]||0)+d.montant; });
+  const top = Object.entries(parCat).sort((a,b)=>b[1]-a[1])[0];
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  set('pdep-kpi-total', posGx(total));
+  set('pdep-kpi-nb', deps.length);
+  set('pdep-kpi-cat', top ? `${top[0]} · ${posGx(top[1])}` : '—');
+  if(!deps.length){
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune dépense ${_posDeptLibelle()==='Piscine'?'de la Piscine':'du Bar'} sur la période</td></tr>`;
+    return;
+  }
+  const peutSupprimer = _isAdmin() || ['pdg','admin'].includes(_appUser?.role);
+  tbody.innerHTML = deps.map(d=>`<tr>
+    <td style="white-space:nowrap">${_ckDateFmt(d.date_depense)}</td>
+    <td><strong>${esc(d.description)}</strong>${d.notes?`<div style="font-size:12px;color:rgba(255,255,255,.4)">${esc(d.notes)}</div>`:''}</td>
+    <td>${esc(d.categorie||'—')}</td>
+    <td>${esc(d.fournisseur||'—')}</td>
+    <td style="font-weight:700;color:#f87171">${posGx(d.montant)}</td>
+    <td style="font-size:12px;color:rgba(255,255,255,.5)">${esc(d.enregistre_par||'—')}</td>
+    <td style="white-space:nowrap">
+      ${_isReadOnly()?'':`<button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="pdepOuvrirModal(${d.id})">Modifier</button>`}
+      ${peutSupprimer?`<button class="pos-btn ghost" style="padding:4px 10px;font-size:12px;color:#f87171" onclick="pdepSupprimer(${d.id})">Supprimer</button>`:''}
+    </td>
+  </tr>`).join('');
+}
+
+function pdepOuvrirModal(id){
+  if(_isReadOnly()){ posAlert('Accès en lecture seule.','warn'); return; }
+  _pdepEditId = id || null;
+  const d = id ? _pdepData.find(x=>x.id===id) : null;
+  const val = (elId, v) => { const el=document.getElementById(elId); if(el) el.value = v ?? ''; };
+  val('pdep-desc', d?.description); val('pdep-montant', d?.montant);
+  val('pdep-cat', d?.categorie); val('pdep-fourn', d?.fournisseur); val('pdep-notes', d?.notes);
+  val('pdep-date', d ? String(d.date_depense||'').slice(0,10) : new Date().toISOString().split('T')[0]);
+  const titre = document.getElementById('pdep-modal-titre');
+  if(titre) titre.textContent = `${id?'Modifier la':'Nouvelle'} dépense — ${_posDeptLibelle()}`;
+  document.getElementById('pdep-modal-bg').classList.add('open');
+}
+
+async function pdepEnregistrer(){
+  const description = (document.getElementById('pdep-desc')?.value||'').trim();
+  const montant = parseFloat(document.getElementById('pdep-montant')?.value||0);
+  if(!description){ posAlert('Description requise.','warn'); return; }
+  if(!(montant>0)){ posAlert('Montant invalide.','warn'); return; }
+  const body = {
+    description, montant, lieu: _posDept,
+    categorie:   (document.getElementById('pdep-cat')?.value||'').trim() || null,
+    fournisseur: (document.getElementById('pdep-fourn')?.value||'').trim() || null,
+    notes:       (document.getElementById('pdep-notes')?.value||'').trim() || null,
+    date_depense: document.getElementById('pdep-date')?.value || null,
+  };
+  try {
+    if(_pdepEditId) await apiFetch('PUT', `/pos/depenses/${_pdepEditId}`, body);
+    else            await apiFetch('POST', '/pos/depenses', body);
+    document.getElementById('pdep-modal-bg').classList.remove('open');
+    posAlert('Dépense enregistrée.','ok');
+    await pdepCharger();
+  } catch(e){ posAlert(e.message||'Erreur.','err'); }
+}
+
+async function pdepSupprimer(id){
+  const d = _pdepData.find(x=>x.id===id);
+  if(!confirm(`Supprimer la dépense « ${d?.description||id} » ?`)) return;
+  try {
+    await apiFetch('DELETE', `/pos/depenses/${id}`);
+    await pdepCharger();
+  } catch(e){ posAlert(e.message||'Erreur.','err'); }
+}
 
 async function loadHotelDepenses(){
   const today = new Date();
@@ -34669,6 +35294,47 @@ async function _hotelRapportDownload(format){
 function hotelRapportPdf(){ if(_isReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return; } _hotelRapportDownload('pdf'); }
 function hotelRapportXlsx(){ if(_isReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return; } _hotelRapportDownload('xlsx'); }
 
+// Journal des encaissements hôtel de la période, par devise.
+async function hotelRapportPaiements(){
+  const tbody = document.getElementById('hrpt-pay-tbody'); if(!tbody) return;
+  const debut = document.getElementById('hrpt-debut')?.value || '';
+  const fin   = document.getElementById('hrpt-fin')?.value || '';
+  const dev   = document.getElementById('hrpt-pay-devise')?.value || '';
+  try {
+    const j = await apiFetch('GET', `/hotel/paiements?date_debut=${debut}&date_fin=${fin}${dev?'&devise='+dev:''}`);
+    const tot = document.getElementById('hrpt-pay-totaux');
+    if(tot) tot.innerHTML = `<b style="color:#34d399">${_hFmt(j.total_htg)}</b> en gourdes · <b style="color:#38bdf8">${_usd(j.total_usd)}</b> en dollars`;
+    tbody.innerHTML = j.paiements.length ? j.paiements.map(p=>`<tr>
+      <td style="white-space:nowrap">${_ckDateFmt(p.date_paiement)}</td>
+      <td>${esc(p.client_nom||'—')}</td>
+      <td>${esc(p.chambre_numero||'—')}</td>
+      <td><span style="padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700;background:${p.devise==='USD'?'rgba(56,189,248,.15);color:#38bdf8':'rgba(52,211,153,.15);color:#34d399'}">${p.devise==='USD'?'Dollars':'Gourdes'}</span></td>
+      <td style="text-align:right;font-weight:700">${p.devise==='USD'?_usd(p.montant):_hFmt(p.montant)}</td>
+      <td style="text-align:right;color:rgba(255,255,255,.5)">${p.taux_change?p.taux_change:'—'}</td>
+      <td style="text-align:right;color:rgba(255,255,255,.6)">${_hFmt(p.montant_htg)}</td>
+      <td>${esc(p.mode_paiement||'—')}${p.origine==='HISTORIQUE'?' <span style="font-size:11px;color:rgba(255,255,255,.35)">(ancien)</span>':''}</td>
+    </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;padding:16px;color:rgba(255,255,255,.3)">Aucun paiement sur la période</td></tr>';
+  } catch(e){
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:16px;color:#f87171">${esc(e.message||'Erreur')}</td></tr>`;
+  }
+  const adm = document.getElementById('hrpt-taux-admin');
+  if(adm){
+    const ok = _isAdmin() || _appUser?.role === 'pdg';
+    adm.style.display = ok ? 'flex' : 'none';
+    if(ok){ const inp = document.getElementById('hrpt-taux-input'); if(inp && !inp.value) inp.value = await _hotelChargerTaux(); }
+  }
+}
+
+async function hotelTauxEnregistrer(){
+  const v = parseFloat(document.getElementById('hrpt-taux-input')?.value||0);
+  if(!(v>0)){ posAlert('Taux invalide.','warn'); return; }
+  try {
+    const c = await apiFetch('PUT','/hotel/config',{taux_usd: v});
+    _hotelTauxUsd = c.taux_usd;
+    posAlert(`Taux du dollar : ${c.taux_usd} G pour 1 $.`,'ok');
+  } catch(e){ posAlert(e.message||'Erreur.','err'); }
+}
+
 async function loadHotelRapport(){
   const today = new Date();
   const pad   = n => String(n).padStart(2,'0');
@@ -34697,6 +35363,10 @@ async function loadHotelRapport(){
     if(g('hrpt-kpi-mom'))   g('hrpt-kpi-mom').textContent   = r.kpis.nb_moments;
     if(g('hrpt-kpi-nuit'))  g('hrpt-kpi-nuit').textContent  = r.kpis.nb_nuits;
     if(g('hrpt-kpi-rev'))   g('hrpt-kpi-rev').textContent   = _hFmt(r.kpis.revenu_total);
+    if(g('hrpt-kpi-htg'))   g('hrpt-kpi-htg').textContent   = _hFmt(r.kpis.encaisse_htg||0);
+    if(g('hrpt-kpi-usd'))   g('hrpt-kpi-usd').textContent   = _usd(r.kpis.encaisse_usd||0);
+    if(g('hrpt-kpi-usd-sub')) g('hrpt-kpi-usd-sub').textContent = (r.kpis.encaisse_usd||0) > 0 ? `≈ ${_hFmt(r.kpis.encaisse_usd_equiv_htg)}` : '';
+    hotelRapportPaiements();
 
     // Revenus par type
     if(g('hrpt-rev-mom'))    g('hrpt-rev-mom').textContent    = _hFmt(r.kpis.revenu_moments);

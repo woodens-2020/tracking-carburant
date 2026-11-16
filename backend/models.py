@@ -709,6 +709,10 @@ class BarAchat(Base):
     # EN_ATTENTE  → achat enregistré, stock pas encore mis à jour
     # CONFIRME    → stock mis à jour (ou non applicable pour carburants)
 
+    # Département acheteur — DEVANT (Bar) ou PISCINE (département Piscine).
+    # NULL = achat antérieur à la séparation : compté avec le Bar (Devant).
+    lieu             = Column(String(20), nullable=True)
+
     bar_produit      = relationship("BarProduit", back_populates="bar_achats",
                                     foreign_keys=[produit_id])
     station_produit  = relationship("Produit", back_populates="bar_achats",
@@ -729,6 +733,7 @@ class BarAchat(Base):
             name="chk_bar_achat_produit_xor",
         ),
         CheckConstraint("statut IN ('EN_ATTENTE','CONFIRME','ANNULE')", name="chk_bar_achat_statut"),
+        CheckConstraint("lieu IS NULL OR lieu IN ('DEVANT','PISCINE')", name="chk_bar_achat_lieu"),
         Index("idx_bar_achats_produit",         "produit_id"),
         Index("idx_bar_achats_station_produit",  "station_produit_id"),
         Index("idx_bar_achats_date",             "date_achat"),
@@ -774,6 +779,10 @@ class BarVente(Base):
     client_id        = Column(Integer, ForeignKey("clients.id", ondelete="SET NULL"), nullable=True)
     montant_paye     = Column(Numeric(14, 2), nullable=False, default=0)
     montant_restant  = Column(Numeric(14, 2), nullable=False, default=0)
+    # Département de la vente — DEVANT (Bar) ou PISCINE (département
+    # Piscine), repris de la session de caisse à l'encaissement. NULL =
+    # vente historique sans lieu connu : comptée avec le Bar (Devant).
+    lieu             = Column(String(20), nullable=True)
 
     caissier  = relationship("Employe")
     session   = relationship("BarSessionCaisse")
@@ -788,6 +797,8 @@ class BarVente(Base):
         CheckConstraint("montant_restant >= 0", name="chk_bar_vente_restant_pos"),
         CheckConstraint("mode_paiement IN ('CASH','CREDIT','MIXTE')", name="chk_bar_vente_mode"),
         CheckConstraint("statut IN ('PAYEE','CREDIT_EN_COURS','ANNULEE')", name="chk_bar_vente_statut"),
+        CheckConstraint("lieu IS NULL OR lieu IN ('DEVANT','PISCINE')", name="chk_bar_vente_lieu"),
+        Index("idx_bar_ventes_lieu",     "lieu"),
         Index("idx_bar_ventes_date",     "date_heure"),
         Index("idx_bar_ventes_caissier", "caissier_id"),
         Index("idx_bar_ventes_statut",   "statut"),
@@ -993,11 +1004,14 @@ class BarPaiementEmploye(Base):
     mode           = Column(String(20), nullable=False, default="CASH")  # CASH, VIREMENT, CHEQUE
     utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     notes          = Column(String(300), nullable=True)
+    # Département payeur — DEVANT (Bar) ou PISCINE. NULL = historique (Bar).
+    lieu           = Column(String(20), nullable=True)
 
     employe = relationship("Employe")
 
     __table_args__ = (
         CheckConstraint("montant > 0", name="chk_bar_paie_montant_pos"),
+        CheckConstraint("lieu IS NULL OR lieu IN ('DEVANT','PISCINE')", name="chk_bar_paie_lieu"),
         CheckConstraint(
             "type_paiement IN ('SALAIRE','AVANCE','BONUS','COMMISSION')",
             name="chk_bar_paie_type",
@@ -1005,6 +1019,32 @@ class BarPaiementEmploye(Base):
         CheckConstraint("mode IN ('CASH','VIREMENT','CHEQUE')", name="chk_bar_paie_mode"),
         Index("idx_bar_paie_employe", "employe_id"),
         Index("idx_bar_paie_date",    "date_paiement"),
+    )
+
+
+class BarDepense(Base):
+    """Dépense opérationnelle propre à un département boissons : Bar (Devant)
+    ou Piscine — même modèle que HotelDepense / CuisineDepense. Sort de la
+    caisse du département concerné (Grande Caisse Bar / Caisse Piscine)."""
+    __tablename__ = "bar_depenses"
+
+    id             = Column(Integer, primary_key=True)
+    lieu           = Column(String(20),  nullable=False)   # DEVANT | PISCINE
+    description    = Column(String(200), nullable=False)
+    categorie      = Column(String(120), nullable=True)
+    montant        = Column(Numeric(12, 2), nullable=False)
+    date_depense   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    fournisseur    = Column(String(150), nullable=True)
+    notes          = Column(String(300), nullable=True)
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    utilisateur = relationship("Utilisateur")
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_bar_dep_montant_pos"),
+        CheckConstraint("lieu IN ('DEVANT','PISCINE')", name="chk_bar_dep_lieu"),
+        Index("idx_bar_depenses_date", "date_depense"),
+        Index("idx_bar_depenses_lieu", "lieu"),
     )
 
 
@@ -1097,6 +1137,8 @@ class HotelReservation(Base):
 
     chambre = relationship("HotelChambre", back_populates="reservations")
     employe = relationship("HotelEmploye", back_populates="reservations")
+    paiements = relationship("HotelPaiement", back_populates="reservation",
+                             cascade="all, delete-orphan", order_by="HotelPaiement.date_paiement")
 
     __table_args__ = (
         CheckConstraint("type_sejour IN ('NUIT','MOMENT')",   name="chk_hotel_res_type"),
@@ -1196,6 +1238,58 @@ class HotelProforma(Base):
         Index("idx_hotel_pf_statut", "statut"),
         Index("idx_hotel_pf_arrivee", "date_arrivee_prevue"),
     )
+
+
+class HotelPaiement(Base):
+    """Paiement reçu pour un séjour — une ligne par encaissement, avec la
+    DEVISE réellement remise par le client (HTG gourdes ou USD dollars).
+
+    `montant` est le montant dans la devise reçue (ex. 50 $) ; `montant_htg`
+    est son équivalent en gourdes au taux du jour (`taux_change`, HTG pour
+    1 USD) — c'est lui qui réduit le solde du séjour, facturé en gourdes.
+    Les totaux de caisse gardent toujours gourdes et dollars SÉPARÉS : les
+    dollars ne sont jamais additionnés aux gourdes comme s'ils en étaient.
+
+    origine : RESERVATION (payé à l'enregistrement), PAIEMENT (paiement
+    ultérieur), ACOMPTE (acompte d'un pro forma converti), HISTORIQUE
+    (montant payé d'un séjour antérieur à ce registre, repris en HTG)."""
+    __tablename__ = "hotel_paiements"
+
+    id              = Column(Integer, primary_key=True)
+    reservation_id  = Column(Integer, ForeignKey("hotel_reservations.id", ondelete="CASCADE"), nullable=False)
+    date_paiement   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    devise          = Column(String(3), nullable=False, default="HTG")   # HTG | USD
+    montant         = Column(Numeric(12, 2), nullable=False)              # dans la devise reçue
+    taux_change     = Column(Numeric(10, 4), nullable=True)               # HTG pour 1 USD (USD seulement)
+    montant_htg     = Column(Numeric(12, 2), nullable=False)              # équivalent gourdes
+    mode_paiement   = Column(String(20), nullable=True)
+    origine         = Column(String(12), nullable=False, default="PAIEMENT")
+    utilisateur_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    reservation = relationship("HotelReservation", back_populates="paiements")
+    utilisateur = relationship("Utilisateur")
+
+    __table_args__ = (
+        CheckConstraint("devise IN ('HTG','USD')", name="chk_hotel_paie_devise"),
+        CheckConstraint("montant > 0", name="chk_hotel_paie_montant_pos"),
+        CheckConstraint("montant_htg >= 0", name="chk_hotel_paie_htg_pos"),
+        CheckConstraint("origine IN ('RESERVATION','PAIEMENT','ACOMPTE','HISTORIQUE')", name="chk_hotel_paie_origine"),
+        Index("idx_hotel_paie_res",    "reservation_id"),
+        Index("idx_hotel_paie_date",   "date_paiement"),
+        Index("idx_hotel_paie_devise", "devise"),
+    )
+
+
+class HotelConfig(Base):
+    """Configuration de l'hôtel — table singleton (id=1). `taux_usd` : taux
+    du jour proposé par défaut (HTG pour 1 USD) quand un client paie en
+    dollars ; la réception peut l'ajuster paiement par paiement."""
+    __tablename__ = "hotel_config"
+
+    id         = Column(Integer, primary_key=True)
+    taux_usd   = Column(Numeric(10, 4), nullable=False, default=130)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
+    updated_by = Column(String(150), nullable=True)
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -1597,7 +1691,7 @@ class RenflouementDepartement(Base):
     __tablename__ = "renflouements_departement"
 
     id                 = Column(Integer, primary_key=True)
-    departement        = Column(String(20), nullable=False)  # HOTEL, CUISINE, BAR, PATISSERIE
+    departement        = Column(String(20), nullable=False)  # HOTEL, CUISINE, BAR, PISCINE, PATISSERIE
     montant            = Column(Numeric(14, 2), nullable=False)
     source             = Column(String(100), nullable=True)
     date_renflouement  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -1608,7 +1702,7 @@ class RenflouementDepartement(Base):
 
     __table_args__ = (
         CheckConstraint("montant > 0", name="chk_renfl_dept_montant_pos"),
-        CheckConstraint("departement IN ('HOTEL','CUISINE','BAR','PATISSERIE')", name="chk_renfl_dept_departement"),
+        CheckConstraint("departement IN ('HOTEL','CUISINE','BAR','PISCINE','PATISSERIE')", name="chk_renfl_dept_departement"),
         Index("idx_renfl_dept_date", "date_renflouement"),
         Index("idx_renfl_dept_departement", "departement"),
     )

@@ -34,7 +34,9 @@ from models import (
     Employe, Utilisateur,
 )
 from tz_utils import HAITI_TZ, today_haiti, bounds_haiti, fin_fenetre_session
-from pos_service import LIEUX_VALIDES as _LIEUX_VALIDES, session_bar_en_cours
+from pos_service import (
+    LIEUX_VALIDES as _LIEUX_VALIDES, session_bar_en_cours, filtrer_lieu, normaliser_lieu,
+)
 
 router = APIRouter(prefix="/api/pos/caisse", tags=["caisse"])
 
@@ -403,7 +405,12 @@ def liste_sessions(
     if statut:
         q = q.filter(BarSessionCaisse.statut == statut.upper())
     if lieu:
-        q = q.filter(BarSessionCaisse.lieu == lieu.upper())
+        # Département : DEVANT = Bar (sessions sans lieu, antérieures à la
+        # séparation, comprises), PISCINE = Piscine uniquement.
+        try:
+            q = filtrer_lieu(q, BarSessionCaisse.lieu, normaliser_lieu(lieu))
+        except ValueError as e:
+            raise HTTPException(422, str(e))
     if date_debut:
         q = q.filter(BarSessionCaisse.date_session >= date.fromisoformat(date_debut))
     if date_fin:
@@ -457,7 +464,7 @@ class OuvrirIn(BaseModel):
 
 
 @router.post("/sessions/ouvrir")
-def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
+def ouvrir_session(data: OuvrirIn, lieu: Optional[str] = Query(None), db: Session = Depends(get_db)):
     """Ouvre (ou retrouve) une session du jour pour une caissière — jusqu'à
     MAX_SESSIONS_PAR_JOUR sessions par jour (mesure de sécurité : permet de
     repartir sur une session propre après un incident, sans attendre le
@@ -469,6 +476,10 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
     employe = db.query(Employe).filter_by(id=data.caissier_id).first()
     if not employe:
         raise HTTPException(404, "Caissier introuvable")
+    # Département : choisi dans le formulaire, sinon celui de l'écran de
+    # caisse utilisé (Caisse Bar → DEVANT, Caisse Piscine → PISCINE).
+    if not data.lieu and lieu:
+        data.lieu = lieu
 
     aujourd_hui = today_haiti()
     sessions_du_jour = (
@@ -484,7 +495,7 @@ def ouvrir_session(data: OuvrirIn, db: Session = Depends(get_db)):
         if len(sessions_du_jour) >= MAX_SESSIONS_PAR_JOUR and not _employe_est_admin(employe, db):
             raise HTTPException(409, f"Limite de {MAX_SESSIONS_PAR_JOUR} sessions de caisse par jour atteinte pour ce caissier.")
         if not data.lieu or data.lieu.upper() not in _LIEUX_VALIDES:
-            raise HTTPException(422, "Choisissez le bar (Bar Devant ou Bar Piscine) avant de démarrer.")
+            raise HTTPException(422, "Choisissez le département (Bar ou Piscine) avant de démarrer.")
         session = BarSessionCaisse(
             caissier_id     = data.caissier_id,
             date_session    = aujourd_hui,

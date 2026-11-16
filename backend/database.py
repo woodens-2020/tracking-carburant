@@ -232,6 +232,15 @@ def _migrate_columns():
              "ALTER TABLE patisserie_sessions_caisse ADD COLUMN evalue_par_id INTEGER REFERENCES utilisateurs(id)", None),
             ("patisserie_sessions_caisse", "evalue_le",
              "ALTER TABLE patisserie_sessions_caisse ADD COLUMN evalue_le TIMESTAMP", None),
+            # v27 — Piscine, département séparé du Bar : département
+            # (DEVANT / PISCINE) sur ventes, achats et paie bar.
+            ("bar_ventes", "lieu",
+             "ALTER TABLE bar_ventes ADD COLUMN lieu VARCHAR(20)",
+             "CREATE INDEX IF NOT EXISTS idx_bar_ventes_lieu ON bar_ventes(lieu)"),
+            ("bar_achats", "lieu",
+             "ALTER TABLE bar_achats ADD COLUMN lieu VARCHAR(20)", None),
+            ("bar_paiements_employes", "lieu",
+             "ALTER TABLE bar_paiements_employes ADD COLUMN lieu VARCHAR(20)", None),
         ]
     elif _is_postgres:
         new_cols = [
@@ -366,6 +375,15 @@ def _migrate_columns():
              "ALTER TABLE patisserie_sessions_caisse ADD COLUMN evalue_par_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL", None),
             ("patisserie_sessions_caisse", "evalue_le",
              "ALTER TABLE patisserie_sessions_caisse ADD COLUMN evalue_le TIMESTAMP WITH TIME ZONE", None),
+            # v27 — Piscine, département séparé du Bar : département
+            # (DEVANT / PISCINE) sur ventes, achats et paie bar.
+            ("bar_ventes", "lieu",
+             "ALTER TABLE bar_ventes ADD COLUMN lieu VARCHAR(20)",
+             "CREATE INDEX IF NOT EXISTS idx_bar_ventes_lieu ON bar_ventes(lieu)"),
+            ("bar_achats", "lieu",
+             "ALTER TABLE bar_achats ADD COLUMN lieu VARCHAR(20)", None),
+            ("bar_paiements_employes", "lieu",
+             "ALTER TABLE bar_paiements_employes ADD COLUMN lieu VARCHAR(20)", None),
         ]
     else:
         return
@@ -487,7 +505,7 @@ def _migrate_columns():
                 conn.rollback()  # déjà présente
 
         # v23 — module Pâtisserie ajouté à la liste des départements pouvant
-        # recevoir un renflouement manuel de caisse.
+        # recevoir un renflouement manuel de caisse ; v27 — Piscine aussi.
         with engine.connect() as conn:
             try:
                 conn.execute(sql_text(
@@ -495,11 +513,65 @@ def _migrate_columns():
                 ))
                 conn.execute(sql_text(
                     "ALTER TABLE renflouements_departement ADD CONSTRAINT chk_renfl_dept_departement "
-                    "CHECK (departement IN ('HOTEL','CUISINE','BAR','PATISSERIE'))"
+                    "CHECK (departement IN ('HOTEL','CUISINE','BAR','PISCINE','PATISSERIE'))"
                 ))
                 conn.commit()
             except Exception:
                 conn.rollback()  # contrainte déjà à jour
+
+        # v27 — domaine du département (DEVANT / PISCINE) sur ventes,
+        # achats et paie bar : même contrainte que chk_session_lieu.
+        for _table, _nom in (("bar_ventes", "chk_bar_vente_lieu"),
+                             ("bar_achats", "chk_bar_achat_lieu"),
+                             ("bar_paiements_employes", "chk_bar_paie_lieu")):
+            with engine.connect() as conn:
+                try:
+                    conn.execute(sql_text(
+                        f"ALTER TABLE {_table} ADD CONSTRAINT {_nom} "
+                        "CHECK (lieu IS NULL OR lieu IN ('DEVANT','PISCINE'))"
+                    ))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()  # déjà présente
+
+
+def _reprise_piscine_et_paiements_hotel():
+    """Reprises de données idempotentes, relancées à chaque démarrage (ne
+    touchent que ce qui reste à faire) :
+
+    1. bar_ventes.lieu : département d'une vente historique, déduit de sa
+       session de caisse, sinon du lieu de son mouvement de stock. Une vente
+       sans aucun indice reste NULL = comptée avec le Bar (Devant).
+    2. hotel_paiements : tout séjour payé qui n'a encore aucune ligne de
+       paiement reçoit une ligne HISTORIQUE en gourdes (son montant payé
+       d'avant le registre), datée de son arrivée — les rapports par devise
+       retombent ainsi exactement sur les montants déjà affichés."""
+    from sqlalchemy import text as sql_text
+    etapes = [
+        "UPDATE bar_ventes SET lieu = (SELECT s.lieu FROM bar_sessions_caisse s "
+        "WHERE s.id = bar_ventes.session_id) "
+        "WHERE lieu IS NULL AND session_id IS NOT NULL",
+        "UPDATE bar_ventes SET lieu = (SELECT m.lieu FROM bar_mouvements_stock m "
+        "WHERE m.reference_vente_id = bar_ventes.id AND m.type_mouvement = 'SORTIE_VENTE' "
+        "AND m.lieu IS NOT NULL ORDER BY m.id LIMIT 1) "
+        "WHERE lieu IS NULL AND EXISTS (SELECT 1 FROM bar_mouvements_stock m2 "
+        "WHERE m2.reference_vente_id = bar_ventes.id AND m2.type_mouvement = 'SORTIE_VENTE' "
+        "AND m2.lieu IS NOT NULL)",
+        "INSERT INTO hotel_paiements (reservation_id, date_paiement, devise, montant, "
+        "taux_change, montant_htg, mode_paiement, origine) "
+        "SELECT r.id, r.date_arrivee, 'HTG', r.montant_paye, NULL, r.montant_paye, "
+        "r.mode_paiement, 'HISTORIQUE' FROM hotel_reservations r "
+        "WHERE r.montant_paye > 0 AND NOT EXISTS "
+        "(SELECT 1 FROM hotel_paiements p WHERE p.reservation_id = r.id)",
+    ]
+    for sql in etapes:
+        with engine.connect() as conn:
+            try:
+                conn.execute(sql_text(sql))
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                print(f"[reprise v27] étape ignorée : {e}")
 
 
 # ── Initialisation du schéma + données de démarrage ──────────────
@@ -510,6 +582,7 @@ def init_db():
     """
     Base.metadata.create_all(bind=engine)
     _migrate_columns()          # ajoute les colonnes manquantes sur SQLite
+    _reprise_piscine_et_paiements_hotel()
 
     db = SessionLocal()
     try:

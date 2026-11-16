@@ -29,6 +29,50 @@ from tz_utils import today_haiti, bounds_haiti
 # pos_routes.py pour ne jamais dupliquer cet ensemble.
 LIEUX_VALIDES = {"DEVANT", "PISCINE"}
 
+# Depuis la v27, la Piscine est un DÉPARTEMENT à part entière (menu, caisse,
+# ventes, dépenses, analyses), séparé du Bar. Les deux partagent les mêmes
+# tables bar_* ; le département est porté par la colonne `lieu` :
+#   DEVANT  → département Bar (« Bar Devant »)
+#   PISCINE → département Piscine
+# Une ligne sans lieu (NULL : historique d'avant la séparation, achat ou
+# vente sans session) appartient au Bar — jamais à la Piscine, pour que les
+# chiffres de la Piscine ne contiennent que ce qui lui a été attribué.
+DEPARTEMENT_LIBELLE = {"DEVANT": "Bar", "PISCINE": "Piscine"}
+
+
+def normaliser_lieu(lieu: str | None) -> str | None:
+    """'devant'/'PISCINE'/... → 'DEVANT'/'PISCINE' ; vide → None (tous
+    départements). Lève ValueError sur une valeur inconnue."""
+    if lieu is None:
+        return None
+    lieu = str(lieu).strip().upper()
+    if not lieu or lieu in ("TOUS", "ALL"):
+        return None
+    if lieu not in LIEUX_VALIDES:
+        raise ValueError("lieu doit être DEVANT (Bar) ou PISCINE.")
+    return lieu
+
+
+def clause_lieu(colonne, lieu: str | None):
+    """Condition SQL « appartient au département `lieu` » (None = aucune)."""
+    from sqlalchemy import or_
+    if lieu is None:
+        return None
+    if lieu == "PISCINE":
+        return colonne == "PISCINE"
+    return or_(colonne == "DEVANT", colonne.is_(None))
+
+
+def filtrer_lieu(query, colonne, lieu: str | None):
+    """Applique clause_lieu à une requête (inchangée si lieu est None)."""
+    c = clause_lieu(colonne, lieu)
+    return query.filter(c) if c is not None else query
+
+
+def lieu_de(valeur: str | None) -> str:
+    """Département effectif d'une ligne : NULL → DEVANT (Bar)."""
+    return valeur if valeur in LIEUX_VALIDES else "DEVANT"
+
 
 # ──────────────────────────────────────────────────────────────────
 # Helpers de calcul
@@ -243,6 +287,11 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
         session_en_cours = session_bar_en_cours(caissier_id, db)
         session_id = session_en_cours.id if session_en_cours else None
         lieu_vente = session_en_cours.lieu if session_en_cours else None
+    # Sans session (ex. administrateur qui encaisse lui-même), le département
+    # vient de l'écran utilisé (Caisse Bar ou Caisse Piscine). La session,
+    # quand elle existe, fait toujours foi.
+    if lieu_vente is None and data.get("lieu"):
+        lieu_vente = normaliser_lieu(data.get("lieu"))
 
     lignes_traitees = []
     erreurs = []
@@ -386,6 +435,7 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
         client_id       = client.id if client else None,
         montant_paye    = montant_paye,
         montant_restant = montant_restant,
+        lieu            = lieu_vente,
     )
     db.add(vente)
     db.flush()   # obtenir l'ID avant les lignes
@@ -645,17 +695,18 @@ def detecter_anomalies_bar(date_cible: date_type, db: Session) -> list[dict]:
 # Calcul de rentabilité
 # ──────────────────────────────────────────────────────────────────
 
-def stats_bar(date_debut: date_type, date_fin: date_type, db: Session) -> dict:
+def stats_bar(date_debut: date_type, date_fin: date_type, db: Session, lieu: str | None = None) -> dict:
     """
     Calcule les statistiques de rentabilité pour une période donnée.
     CA, COGS (coût moyen pondéré), bénéfice, marges par produit.
     Uniquement des données réelles — jamais de valeurs fabriquées.
+    `lieu` restreint au département (DEVANT = Bar, PISCINE = Piscine).
     """
     dt_debut, _         = bounds_haiti(date_debut)
     _, dt_fin           = bounds_haiti(date_fin)
 
     # Ventes non annulées sur la période
-    lignes = (
+    q_lignes = (
         db.query(BarLigneVente)
         .join(BarVente)
         .filter(
@@ -663,8 +714,8 @@ def stats_bar(date_debut: date_type, date_fin: date_type, db: Session) -> dict:
             BarVente.date_heure >= dt_debut,
             BarVente.date_heure <= dt_fin,
         )
-        .all()
     )
+    lignes = filtrer_lieu(q_lignes, BarVente.lieu, lieu).all()
 
     cmup_map: dict[int, Decimal] = cmup_batch(db)
 
@@ -735,11 +786,11 @@ def stats_bar(date_debut: date_type, date_fin: date_type, db: Session) -> dict:
             (benefice_net / ca_total * 100).quantize(Decimal("0.01"))
             if ca_total > 0 else Decimal("0")
         ),
-        "nb_ventes":     db.query(BarVente).filter(
+        "nb_ventes":     filtrer_lieu(db.query(BarVente).filter(
             BarVente.statut != "ANNULEE",
             BarVente.date_heure >= dt_debut,
             BarVente.date_heure <= dt_fin,
-        ).count(),
+        ), BarVente.lieu, lieu).count(),
         "top_produits":  top_produits,
         "par_produit":   list(par_produit.values()),
     }

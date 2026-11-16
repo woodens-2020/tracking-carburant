@@ -24,16 +24,31 @@ from models import (
     BarMouvementStock, BarVente, BarLigneVente, BarCredit, BarRemboursement,
     BarCommande, BarLigneCommande, BarPaiementEmploye, BarSessionCaisse,
     Employe, Utilisateur, CuisinePlat, RenflouementDepartement, Client,
+    BarDepense,
 )
 from pos_service import (
     stock_courant, stock_tous_produits, stock_par_lieu_tous_produits,
     prix_actif, cmup, cmup_batch, prix_actif_batch,
     encaisser_vente as _encaisser, annuler_vente as _annuler,
     encaisser_commande as _enc_commande, stats_bar,
-    LIEUX_VALIDES,
+    LIEUX_VALIDES, DEPARTEMENT_LIBELLE, normaliser_lieu, clause_lieu, filtrer_lieu, lieu_de,
 )
 
 router = APIRouter(prefix="/api/pos", tags=["POS Bar"])
+
+
+def _dept(lieu: Optional[str] = Query(None, description="DEVANT (Bar) ou PISCINE — vide = tous départements")) -> Optional[str]:
+    """Département demandé par l'écran (Bar ou Piscine) — voir
+    pos_service.DEPARTEMENT_LIBELLE. Toutes les listes, analyses et caisses
+    du module le prennent en paramètre pour ne jamais mélanger les deux."""
+    try:
+        return normaliser_lieu(lieu)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+def _renfl_departement(lieu: Optional[str]) -> str:
+    return "PISCINE" if lieu == "PISCINE" else "BAR"
 
 
 def _user(request: Request):
@@ -240,6 +255,17 @@ class AchatIn(BaseModel):
     fournisseur:         Optional[str] = None
     notes:               Optional[str] = None
     depenses:            List[DepenseItem] = []
+    lieu:                Optional[str] = None   # département acheteur (DEVANT/PISCINE)
+
+
+class BarDepenseIn(BaseModel):
+    description: str
+    montant:     float = Field(gt=0)
+    categorie:   Optional[str] = None
+    fournisseur: Optional[str] = None
+    notes:       Optional[str] = None
+    date_depense: Optional[date_type] = None
+    lieu:        Optional[str] = None
 
 
 class AjustementIn(BaseModel):
@@ -287,6 +313,9 @@ class VenteIn(BaseModel):
     client_id:       Optional[int]  = None
     client_contact:  Optional[str]  = None
     date_echeance:   Optional[date_type] = None
+    # Département de l'écran de caisse (DEVANT/PISCINE) — utilisé seulement
+    # si le caissier n'a pas de session (la session fait toujours foi).
+    lieu:            Optional[str]  = None
 
     @validator("mode_paiement")
     def check_mode(cls, v):
@@ -344,6 +373,7 @@ class PaiementEmployeIn(BaseModel):
     periode_debut: Optional[date_type] = None
     periode_fin:   Optional[date_type] = None
     notes:         Optional[str] = None
+    lieu:          Optional[str] = None   # département payeur (DEVANT/PISCINE)
 
     @validator("type_paiement")
     def check_type_paie(cls, v):
@@ -742,6 +772,7 @@ def approvisionner(produit_id: int, data: ApprovisionnementIn, request: Request,
             prix_achat_unitaire = prix_unitaire,
             utilisateur_id      = _uid(request),
             notes               = f"Caisse G{data.prix_achat_caisse:.2f} / {upc} u.",
+            lieu                = data.lieu,
         )
         db.add(achat)
         db.flush()
@@ -857,10 +888,12 @@ def stock_global(db: Session = Depends(get_db)):
 def export_stock_pdf(
     recherche:     Optional[str] = None,
     disponibilite: Optional[str] = None,   # "disponible" | "non_disponible" | None
+    lieu:          Optional[str] = Depends(_dept),
     db: Session = Depends(get_db),
 ):
     """Export PDF de la liste du stock bar — respecte les mêmes filtres
-    (recherche, disponibilité) que ceux affichés à l'écran."""
+    (recherche, disponibilité) que ceux affichés à l'écran. Avec `lieu`,
+    seul le stock de ce département (Bar ou Piscine) est imprimé."""
     import io
     from datetime import date as date_cls
     from reportlab.lib.pagesizes import A4
@@ -877,10 +910,14 @@ def export_stock_pdf(
     for p in produits:
         if recherche and recherche.strip().lower() not in p.nom.lower():
             continue
+        if lieu and p.lieu and p.lieu != lieu:
+            continue
         row     = stocks.get(p.id, {})
         stock   = float(row.get("total", 0))
         devant  = float(row.get("devant", 0))
         piscine = float(row.get("piscine", 0))
+        if lieu:
+            stock = devant if lieu == "DEVANT" else piscine
         dispo = stock > 0
         if disponibilite == "disponible" and not dispo:
             continue
@@ -888,7 +925,10 @@ def export_stock_pdf(
             continue
         alerte = p.seuil_alerte_stock and stock <= float(p.seuil_alerte_stock)
         etat = "Alerte" if alerte else ("Épuisé" if stock <= 0 else "OK")
-        lignes.append([p.nom, p.categorie or "—", f"{devant:.3f}", f"{piscine:.3f}", f"{stock:.3f}", p.unite or "—", etat])
+        if lieu:
+            lignes.append([p.nom, p.categorie or "—", f"{stock:.3f}", p.unite or "—", etat])
+        else:
+            lignes.append([p.nom, p.categorie or "—", f"{devant:.3f}", f"{piscine:.3f}", f"{stock:.3f}", p.unite or "—", etat])
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4,
@@ -900,7 +940,7 @@ def export_stock_pdf(
     title_style = ParagraphStyle("title", fontSize=16, textColor=DARK, fontName="Helvetica-Bold", spaceAfter=4)
     sub_style   = ParagraphStyle("sub",   fontSize=10, textColor=colors.grey, spaceAfter=12)
 
-    story = [Paragraph("Stock Bar", title_style)]
+    story = [Paragraph("Stock Piscine" if lieu == "PISCINE" else "Stock Bar", title_style)]
     filtre_txt = []
     if recherche: filtre_txt.append(f"Recherche : « {recherche} »")
     if disponibilite == "disponible": filtre_txt.append("Disponibles uniquement")
@@ -911,8 +951,12 @@ def export_stock_pdf(
     story.append(HRFlowable(width="100%", thickness=1.5, color=ORANGE))
     story.append(Spacer(1, 10))
 
-    data = [["Produit", "Catégorie", "Bar Devant", "Bar Piscine", "Total", "Unité", "État"]] + lignes
-    t = Table(data, colWidths=[5.0*cm, 2.8*cm, 2.1*cm, 2.1*cm, 2.1*cm, 1.6*cm, 1.7*cm])
+    if lieu:
+        data = [["Produit", "Catégorie", "Quantité", "Unité", "État"]] + lignes
+        t = Table(data, colWidths=[6.6*cm, 3.6*cm, 2.6*cm, 2.2*cm, 2.4*cm])
+    else:
+        data = [["Produit", "Catégorie", "Bar Devant", "Bar Piscine", "Total", "Unité", "État"]] + lignes
+        t = Table(data, colWidths=[5.0*cm, 2.8*cm, 2.1*cm, 2.1*cm, 2.1*cm, 1.6*cm, 1.7*cm])
     t.setStyle(TableStyle([
         ("BACKGROUND",   (0,0),(-1,0), DARK),
         ("TEXTCOLOR",    (0,0),(-1,0), colors.white),
@@ -920,7 +964,7 @@ def export_stock_pdf(
         ("FONTSIZE",     (0,0),(-1,-1), 9),
         ("ROWBACKGROUNDS",(0,1),(-1,-1), [colors.HexColor("#F5F5F5"), colors.white]),
         ("GRID",         (0,0),(-1,-1), 0.4, colors.HexColor("#CCCCCC")),
-        ("ALIGN",        (2,0),(6,-1), "CENTER"),
+        ("ALIGN",        (2,0),(-1,-1), "CENTER"),
         ("BOTTOMPADDING",(0,0),(-1,-1), 5),
         ("TOPPADDING",   (0,0),(-1,-1), 5),
     ]))
@@ -936,7 +980,7 @@ def export_stock_pdf(
 
     doc.build(story)
     buf.seek(0)
-    fname = f"stock_bar_{today_haiti().isoformat()}.pdf"
+    fname = f"stock_{'piscine' if lieu == 'PISCINE' else 'bar'}_{today_haiti().isoformat()}.pdf"
     return StreamingResponse(
         buf,
         media_type="application/pdf",
@@ -997,11 +1041,13 @@ def stock_produit(produit_id: int, db: Session = Depends(get_db)):
 def bilan_caissiers(
     debut: Optional[str] = Query(None),
     fin:   Optional[str] = Query(None),
+    lieu:  Optional[str] = Depends(_dept),
     db:    Session = Depends(get_db),
 ):
     """
     Bilan complet de l'activité de vente de chaque caissière et administrateur.
     Inclut : CA total, nb ventes, sessions, crédits en cours, breakdown par mode.
+    `lieu` : uniquement l'activité du département (Bar ou Piscine).
     """
     d_debut = date_type.fromisoformat(debut) if debut else None
     d_fin   = date_type.fromisoformat(fin)   if fin   else today_haiti()
@@ -1009,11 +1055,11 @@ def bilan_caissiers(
     # Tout employé actif : caissier/admin par poste ou rôle,
     # OU ayant au moins une vente enregistrée (couvre les admins qui vendent)
     has_vente = (
-        db.query(BarVente.id)
+        filtrer_lieu(db.query(BarVente.id)
         .filter(
             BarVente.caissier_id == Employe.id,
             BarVente.statut.in_(["PAYEE", "CREDIT_EN_COURS"]),
-        )
+        ), BarVente.lieu, lieu)
         .correlate(Employe)
         .exists()
     )
@@ -1049,6 +1095,7 @@ def bilan_caissiers(
                     BarVente.statut.in_(["PAYEE", "CREDIT_EN_COURS"]),
                 )
             )
+            q = filtrer_lieu(q, BarVente.lieu, lieu)
             if d_start:
                 dt, _ = bounds_haiti(d_start)
                 q     = q.filter(BarVente.date_heure >= dt)
@@ -1080,6 +1127,7 @@ def bilan_caissiers(
 
         # — Sessions —
         sq = db.query(BarSessionCaisse).filter(BarSessionCaisse.caissier_id == emp.id)
+        sq = filtrer_lieu(sq, BarSessionCaisse.lieu, lieu)
         if d_debut:
             sq = sq.filter(BarSessionCaisse.date_session >= d_debut)
         sq = sq.filter(BarSessionCaisse.date_session <= d_fin)
@@ -1091,12 +1139,12 @@ def bilan_caissiers(
 
         # — Crédits en cours (via bar_ventes -> bar_credits) —
         credits_res = (
-            db.query(func.count(BarCredit.id), func.sum(BarCredit.solde))
+            filtrer_lieu(db.query(func.count(BarCredit.id), func.sum(BarCredit.solde))
             .join(BarVente, BarCredit.vente_id == BarVente.id)
             .filter(
                 BarVente.caissier_id == emp.id,
                 BarCredit.statut.in_(["OUVERT", "EN_RETARD"]),
-            )
+            ), BarVente.lieu, lieu)
             .first()
         )
         nb_credits    = credits_res[0] or 0
@@ -1162,6 +1210,7 @@ def detail_ventes_caissier(
     fin:           Optional[str] = Query(None),
     mode_paiement: Optional[str] = Query(None),
     statut_filtre: Optional[str] = Query(None),
+    lieu:          Optional[str] = Depends(_dept),
     db:            Session = Depends(get_db),
 ):
     """Retourne les ventes d'une caissière avec détail des lignes et résumé produits."""
@@ -1181,6 +1230,7 @@ def detail_ventes_caissier(
         )
         .order_by(BarVente.date_heure.desc())
     )
+    q = filtrer_lieu(q, BarVente.lieu, lieu)
     if statut_filtre in ("PAYEE", "CREDIT_EN_COURS", "ANNULEE"):
         q = q.filter(BarVente.statut == statut_filtre)
     else:
@@ -1246,18 +1296,17 @@ def detail_ventes_caissier(
 
 
 @router.get("/fiche-technique")
-def fiche_technique_bar(db: Session = Depends(get_db)):
+def fiche_technique_bar(lieu: Optional[str] = Depends(_dept), db: Session = Depends(get_db)):
     """
     Fiche technique du stock bar avant un nouvel achat :
     stock courant + potentiel de CA + marge + ventes depuis dernier achat.
+    `lieu` : catalogue et stock du seul département (Bar ou Piscine).
     """
-    produits = (
-        db.query(BarProduit)
-        .filter_by(actif=True)
-        .order_by(BarProduit.categorie, BarProduit.nom)
-        .all()
-    )
-    stocks    = stock_tous_produits(db)
+    q_prod = db.query(BarProduit).filter_by(actif=True)
+    if lieu:
+        q_prod = q_prod.filter(or_(BarProduit.lieu == lieu, BarProduit.lieu.is_(None)))
+    produits = q_prod.order_by(BarProduit.categorie, BarProduit.nom).all()
+    stocks    = stock_tous_produits(db, lieu=lieu)
     prix_map  = prix_actif_batch(db)
     cmup_map  = cmup_batch(db)
 
@@ -1268,35 +1317,38 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
     # ce cas) — et un mouvement de stock n'existe jamais tant qu'un achat n'est pas
     # confirmé, donc pas besoin de filtrer par statut ici.
     derniers_appros: dict[int, BarMouvementStock] = {}
-    for pid, max_date in (
+    _q_appro = (
         db.query(BarMouvementStock.produit_id, func.max(BarMouvementStock.date_mouvement))
         .filter(BarMouvementStock.type_mouvement == "ENTREE")
-        .group_by(BarMouvementStock.produit_id)
-        .all()
-    ):
-        mvt = (
+    )
+    if lieu:
+        _q_appro = _q_appro.filter(BarMouvementStock.lieu == lieu)
+    for pid, max_date in _q_appro.group_by(BarMouvementStock.produit_id).all():
+        _q_mvt = (
             db.query(BarMouvementStock)
             .filter(
                 BarMouvementStock.produit_id == pid,
                 BarMouvementStock.date_mouvement == max_date,
                 BarMouvementStock.type_mouvement == "ENTREE",
             )
-            .first()
         )
+        if lieu:
+            _q_mvt = _q_mvt.filter(BarMouvementStock.lieu == lieu)
+        mvt = _q_mvt.first()
         if mvt:
             derniers_appros[pid] = mvt
 
     # Dernier achat TOUS STATUTS par produit — sert à l'affichage de la date/qté commande
     derniers_achats_tous: dict[int, BarAchat] = {}
     for pid, max_date in (
-        db.query(BarAchat.produit_id, func.max(BarAchat.date_achat))
-        .filter(BarAchat.produit_id.isnot(None))
+        filtrer_lieu(db.query(BarAchat.produit_id, func.max(BarAchat.date_achat))
+        .filter(BarAchat.produit_id.isnot(None)), BarAchat.lieu, lieu)
         .group_by(BarAchat.produit_id)
         .all()
     ):
         achat = (
-            db.query(BarAchat)
-            .filter(BarAchat.produit_id == pid, BarAchat.date_achat == max_date)
+            filtrer_lieu(db.query(BarAchat)
+            .filter(BarAchat.produit_id == pid, BarAchat.date_achat == max_date), BarAchat.lieu, lieu)
             .first()
         )
         if achat:
@@ -1307,11 +1359,14 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
     for p in produits:
         appro_ref = derniers_appros.get(p.id)
         if appro_ref:
-            qte = db.query(func.sum(BarMouvementStock.quantite)).filter(
+            _q_sortie = db.query(func.sum(BarMouvementStock.quantite)).filter(
                 BarMouvementStock.produit_id == p.id,
                 BarMouvementStock.type_mouvement == "SORTIE_VENTE",
                 BarMouvementStock.date_mouvement >= appro_ref.date_mouvement,
-            ).scalar()
+            )
+            if lieu:
+                _q_sortie = _q_sortie.filter(BarMouvementStock.lieu == lieu)
+            qte = _q_sortie.scalar()
             sorties_depuis_appro[p.id] = abs(float(qte or 0))
 
     resultats = []
@@ -1371,9 +1426,13 @@ def fiche_technique_bar(db: Session = Depends(get_db)):
 
 
 @router.get("/achats/produits-tous")
-def tous_les_produits_achetables(db: Session = Depends(get_db)):
-    """Retourne tous les produits disponibles pour un achat (bar + station)."""
-    bar   = db.query(BarProduit).filter_by(actif=True).order_by(BarProduit.categorie, BarProduit.nom).all()
+def tous_les_produits_achetables(lieu: Optional[str] = Depends(_dept), db: Session = Depends(get_db)):
+    """Retourne tous les produits disponibles pour un achat (bar + station).
+    `lieu` : seulement le catalogue du département (Bar ou Piscine)."""
+    q_bar = db.query(BarProduit).filter_by(actif=True)
+    if lieu:
+        q_bar = q_bar.filter(or_(BarProduit.lieu == lieu, BarProduit.lieu.is_(None)))
+    bar   = q_bar.order_by(BarProduit.categorie, BarProduit.nom).all()
     stati = db.query(Produit).filter_by(actif=True).order_by(Produit.nom).all()
     return {
         "bar": [
@@ -1445,6 +1504,7 @@ def _achat_dict(a: BarAchat) -> dict:
         "fournisseur":         a.fournisseur,
         "notes":               a.notes,
         "statut":              a.statut,
+        "lieu":                lieu_de(a.lieu) if a.produit_id else None,
         "date_achat":          a.date_achat.isoformat(),
         "jours":               (today_haiti() - a.date_achat.date()).days,
         "depenses": [
@@ -1459,10 +1519,16 @@ def liste_achats(
     produit_id:         Optional[int] = None,
     station_produit_id: Optional[int] = None,
     limit: int = Query(100, le=500),
+    lieu: Optional[str] = Depends(_dept),
     db: Session = Depends(get_db),
 ):
-    """Liste des achats (bar + station) avec dépenses et coût total."""
+    """Liste des achats (bar + station) avec dépenses et coût total.
+    `lieu` : uniquement les achats bar du département (Bar ou Piscine) —
+    les achats carburant n'appartiennent à aucun des deux."""
     q = db.query(BarAchat)
+    if lieu:
+        q = q.filter(BarAchat.produit_id.isnot(None))
+        q = filtrer_lieu(q, BarAchat.lieu, lieu)
     if produit_id:
         q = q.filter(BarAchat.produit_id == produit_id)
     if station_produit_id:
@@ -1479,11 +1545,11 @@ def liste_achats(
 
 
 @router.get("/achats/en-attente")
-def achats_en_attente(db: Session = Depends(get_db)):
+def achats_en_attente(lieu: Optional[str] = Depends(_dept), db: Session = Depends(get_db)):
     """Achats bar en attente de confirmation stock (statut=EN_ATTENTE)."""
     achats = (
-        db.query(BarAchat)
-        .filter(BarAchat.statut == "EN_ATTENTE", BarAchat.produit_id.isnot(None))
+        filtrer_lieu(db.query(BarAchat)
+        .filter(BarAchat.statut == "EN_ATTENTE", BarAchat.produit_id.isnot(None)), BarAchat.lieu, lieu)
         .order_by(BarAchat.date_achat.asc())
         .all()
     )
@@ -1502,12 +1568,19 @@ def detail_achat(achat_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/achats", status_code=201)
-def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends(get_db)):
+def recevoir_marchandises(data: AchatIn, request: Request,
+                          lieu_ecran: Optional[str] = Depends(_dept),
+                          db: Session = Depends(get_db)):
     """Enregistre un achat. Stock PAS encore mis à jour pour les produits bar (statut=EN_ATTENTE).
     Les carburants (station) sont directement CONFIRME (pas de stock bar à gérer).
-    Appeler POST /achats/{id}/confirmer pour valider le stock."""
+    Appeler POST /achats/{id}/confirmer pour valider le stock.
+    Un achat bar appartient au département qui l'enregistre (Bar ou Piscine)."""
     if bool(data.produit_id) == bool(data.station_produit_id):
         raise HTTPException(422, "Fournir soit produit_id (bar) soit station_produit_id (station), pas les deux.")
+    try:
+        lieu_achat = normaliser_lieu(data.lieu) or lieu_ecran
+    except ValueError as e:
+        raise HTTPException(422, str(e))
 
     qte_unites    = Decimal(str(data.quantite))
     prix_unitaire = Decimal(str(data.prix_achat_unitaire))
@@ -1516,6 +1589,10 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
         p = db.query(BarProduit).filter_by(id=data.produit_id).first()
         if not p:
             raise HTTPException(404, "Produit bar introuvable")
+        if lieu_achat:
+            _valider_lieu_coherent(p, lieu_achat)
+        elif p.lieu:
+            lieu_achat = p.lieu
         upc = p.unites_par_caisse or 1
         if data.quantite_type == "caisse" and p.vendu_par_caisse and upc > 0:
             # Le prix saisi est un prix PAR CAISSE — le convertir en prix par
@@ -1542,6 +1619,7 @@ def recevoir_marchandises(data: AchatIn, request: Request, db: Session = Depends
         utilisateur_id      = _uid(request),
         notes               = data.notes,
         statut              = statut,
+        lieu                = lieu_achat if data.produit_id else None,
     )
     db.add(achat)
     db.flush()
@@ -1782,10 +1860,15 @@ def reinitialiser_stock(produit_id: int, lieu: str, request: Request, db: Sessio
 # ══════════════════════════════════════════════════════════════════
 
 @router.post("/ventes", status_code=201)
-def creer_vente(data: VenteIn, request: Request, db: Session = Depends(get_db)):
+def creer_vente(data: VenteIn, request: Request,
+                lieu_ecran: Optional[str] = Depends(_dept),
+                db: Session = Depends(get_db)):
     """Encaisse une vente. Transaction atomique avec rollback sur erreur."""
+    payload = data.dict()
+    if not payload.get("lieu"):
+        payload["lieu"] = lieu_ecran
     try:
-        vente = _encaisser(data.dict(), db, utilisateur_id=_uid(request))
+        vente = _encaisser(payload, db, utilisateur_id=_uid(request))
     except ValueError as e:
         raise HTTPException(422, str(e))
     return {
@@ -1800,6 +1883,7 @@ def creer_vente(data: VenteIn, request: Request, db: Session = Depends(get_db)):
         "montant_restant": float(vente.montant_restant),
         "mode_paiement":   vente.mode_paiement,
         "statut":          vente.statut,
+        "lieu":            lieu_de(vente.lieu),
         "date_heure":      vente.date_heure.isoformat(),
     }
 
@@ -1815,9 +1899,10 @@ def liste_ventes(
     heure_debut:   Optional[str]       = None,   # format "HH:MM"
     heure_fin:     Optional[str]       = None,   # format "HH:MM"
     limit:         int = Query(50, le=500),
+    lieu:          Optional[str]       = Depends(_dept),
     db: Session = Depends(get_db),
 ):
-    q = db.query(BarVente)
+    q = filtrer_lieu(db.query(BarVente), BarVente.lieu, lieu)
     if date_debut:
         dt, _ = bounds_haiti(date_debut)
         q     = q.filter(BarVente.date_heure >= dt)
@@ -1888,6 +1973,7 @@ def liste_ventes(
             "mode_paiement":   v.mode_paiement,
             "statut":          v.statut,
             "client_nom":      v.client_nom,
+            "lieu":            lieu_de(v.lieu),
             "caissier_id":     v.caissier_id,
             "caissier_nom":    (v.caissier.nom + " " + v.caissier.prenom) if v.caissier else "Sans caissier",
             "nb_lignes":       len(v.lignes),
@@ -1905,18 +1991,18 @@ def liste_ventes(
 
 
 @router.get("/ventes/temps-reel")
-def ventes_temps_reel(db: Session = Depends(get_db)):
+def ventes_temps_reel(lieu: Optional[str] = Depends(_dept), db: Session = Depends(get_db)):
     """Ventes du jour en cours, agrégées par caissier."""
     today            = today_haiti()
     dt_debut, dt_fin = bounds_haiti(today)
 
     ventes = (
-        db.query(BarVente)
+        filtrer_lieu(db.query(BarVente)
         .filter(
             BarVente.date_heure >= dt_debut,
             BarVente.date_heure <= dt_fin,
             BarVente.statut != "ANNULEE",
-        )
+        ), BarVente.lieu, lieu)
         .all()
     )
 
@@ -1954,8 +2040,10 @@ def dashboard_bar(
     date_fin:      Optional[str] = None,
     caissier_id:   Optional[int] = None,
     mode_paiement: Optional[str] = None,
+    lieu:          Optional[str] = Depends(_dept),
 ):
-    """Dashboard complet bar/restaurant — filtrable par date, employé, mode."""
+    """Dashboard complet bar/restaurant — filtrable par date, employé, mode,
+    et département (`lieu` : DEVANT = Bar, PISCINE = Piscine)."""
     from datetime import timedelta
 
     today = today_haiti()
@@ -1982,17 +2070,18 @@ def dashboard_bar(
             BarVente.date_heure <= dt_fin,
             BarVente.statut     != "ANNULEE",
         )
+        q = filtrer_lieu(q, BarVente.lieu, lieu)
         if caissier_id:   q = q.filter(BarVente.caissier_id   == caissier_id)
         if mode_paiement: q = q.filter(BarVente.mode_paiement == mode_paiement)
         return q
 
     ventes = _base_q().order_by(BarVente.date_heure.desc()).all()
 
-    q_prev = db.query(BarVente).filter(
+    q_prev = filtrer_lieu(db.query(BarVente).filter(
         BarVente.date_heure >= dt_prev_d,
         BarVente.date_heure <= dt_prev_f,
         BarVente.statut     != "ANNULEE",
-    )
+    ), BarVente.lieu, lieu)
     if caissier_id:   q_prev = q_prev.filter(BarVente.caissier_id   == caissier_id)
     if mode_paiement: q_prev = q_prev.filter(BarVente.mode_paiement == mode_paiement)
     ca_prev = sum(float(v.montant_total) for v in q_prev.all())
@@ -2037,6 +2126,7 @@ def dashboard_bar(
             BarVente.statut     != "ANNULEE",
         )
     )
+    top_q = filtrer_lieu(top_q, BarVente.lieu, lieu)
     if caissier_id:   top_q = top_q.filter(BarVente.caissier_id   == caissier_id)
     if mode_paiement: top_q = top_q.filter(BarVente.mode_paiement == mode_paiement)
     top_prods = (
@@ -2058,17 +2148,29 @@ def dashboard_bar(
 
     # ── Dettes & Remboursements ───────────────────────────────────────
     # Totaux globaux (toutes périodes confondues)
-    all_credits = db.query(BarCredit).all()
+    def _credits_q():
+        q = db.query(BarCredit)
+        if lieu:
+            q = filtrer_lieu(q.join(BarVente, BarCredit.vente_id == BarVente.id), BarVente.lieu, lieu)
+        return q
+
+    all_credits = _credits_q().all()
     total_du        = sum(float(c.montant_du)        for c in all_credits)
     total_rembourse = sum(float(c.montant_rembourse) for c in all_credits)
     solde_total     = sum(float(c.solde)             for c in all_credits)
     nb_ouvertes = sum(1 for c in all_credits if c.statut in ("OUVERT", "EN_RETARD"))
     nb_soldes   = sum(1 for c in all_credits if c.statut == "SOLDE")
 
-    rembs_periode = db.query(BarRemboursement).filter(
+    _q_rembs = db.query(BarRemboursement).filter(
         BarRemboursement.date_remb >= dt_debut,
         BarRemboursement.date_remb <= dt_fin,
-    ).all()
+    )
+    if lieu:
+        _q_rembs = filtrer_lieu(
+            _q_rembs.join(BarCredit, BarRemboursement.credit_id == BarCredit.id)
+                    .join(BarVente, BarCredit.vente_id == BarVente.id),
+            BarVente.lieu, lieu)
+    rembs_periode = _q_rembs.all()
     rembs_periode_total = sum(float(r.montant) for r in rembs_periode)
 
     rembs_par_jour: dict = {}
@@ -2078,7 +2180,7 @@ def dashboard_bar(
     rembs_par_jour_list = [{"date": k, "montant": v} for k, v in sorted(rembs_par_jour.items())]
 
     # par_client : crédits créés dans la période sélectionnée
-    credits_periode = db.query(BarCredit).filter(
+    credits_periode = _credits_q().filter(
         BarCredit.date_creation >= dt_debut,
         BarCredit.date_creation <= dt_fin,
     ).all()
@@ -2102,6 +2204,8 @@ def dashboard_bar(
             "date_fin":    d_fin.isoformat(),
             "nb_jours":    nb_jours,
             "is_single":   is_single,
+            "lieu":        lieu,
+            "departement": DEPARTEMENT_LIBELLE.get(lieu, "Bar + Piscine"),
         },
         "kpis": {
             "ca_jour":     ca,
@@ -2430,13 +2534,17 @@ def encaisser_commande_route(
 def liste_credits(
     statut:      Optional[str] = None,
     caissier_id: Optional[int] = None,
+    lieu:        Optional[str] = Depends(_dept),
     db: Session = Depends(get_db),
 ):
     q = db.query(BarCredit)
     if statut:
         q = q.filter(BarCredit.statut == statut.upper())
+    if caissier_id or lieu:
+        q = q.join(BarVente, BarCredit.vente_id == BarVente.id)
     if caissier_id:
-        q = q.join(BarVente, BarCredit.vente_id == BarVente.id).filter(BarVente.caissier_id == caissier_id)
+        q = q.filter(BarVente.caissier_id == caissier_id)
+    q = filtrer_lieu(q, BarVente.lieu, lieu) if lieu else q
     credits = q.order_by(BarCredit.date_creation.desc()).all()
 
     return [
@@ -2454,6 +2562,7 @@ def liste_credits(
             "date_echeance":    str(c.date_echeance) if c.date_echeance else None,
             "nb_remboursements": len(c.remboursements),
             "caissier_id":      c.vente.caissier_id if c.vente else None,
+            "lieu":             lieu_de(c.vente.lieu if c.vente else None),
         }
         for c in credits
     ]
@@ -2592,9 +2701,9 @@ def historique_remboursements(credit_id: int, db: Session = Depends(get_db)):
 # ══════════════════════════════════════════════════════════════════
 
 @router.get("/paiements-employes")
-def liste_paiements_employes(db: Session = Depends(get_db)):
+def liste_paiements_employes(lieu: Optional[str] = Depends(_dept), db: Session = Depends(get_db)):
     paiements = (
-        db.query(BarPaiementEmploye)
+        filtrer_lieu(db.query(BarPaiementEmploye), BarPaiementEmploye.lieu, lieu)
         .order_by(BarPaiementEmploye.date_paiement.desc())
         .limit(200)
         .all()
@@ -2611,16 +2720,23 @@ def liste_paiements_employes(db: Session = Depends(get_db)):
             "periode_debut": str(p.periode_debut) if p.periode_debut else None,
             "periode_fin":   str(p.periode_fin)   if p.periode_fin   else None,
             "notes":         p.notes,
+            "lieu":          lieu_de(p.lieu),
         }
         for p in paiements
     ]
 
 
 @router.post("/paiements-employes", status_code=201)
-def creer_paiement_employe(data: PaiementEmployeIn, request: Request, db: Session = Depends(get_db)):
+def creer_paiement_employe(data: PaiementEmployeIn, request: Request,
+                           lieu_ecran: Optional[str] = Depends(_dept),
+                           db: Session = Depends(get_db)):
     emp = db.query(Employe).filter_by(id=data.employe_id, actif=True).first()
     if not emp:
         raise HTTPException(404, "Employé introuvable ou inactif")
+    try:
+        lieu_paie = normaliser_lieu(data.lieu) or lieu_ecran
+    except ValueError as e:
+        raise HTTPException(422, str(e))
 
     p = BarPaiementEmploye(
         employe_id     = data.employe_id,
@@ -2631,21 +2747,22 @@ def creer_paiement_employe(data: PaiementEmployeIn, request: Request, db: Sessio
         periode_fin    = data.periode_fin,
         utilisateur_id = _uid(request),
         notes          = data.notes,
+        lieu           = lieu_paie,
     )
     db.add(p)
     db.commit()
     db.refresh(p)
-    return {"id": p.id, "montant": float(p.montant)}
+    return {"id": p.id, "montant": float(p.montant), "lieu": lieu_de(p.lieu)}
 
 
 @router.get("/paiements-employes/{employe_id}")
-def historique_paiements_employe(employe_id: int, db: Session = Depends(get_db)):
+def historique_paiements_employe(employe_id: int, lieu: Optional[str] = Depends(_dept), db: Session = Depends(get_db)):
     emp = db.query(Employe).filter_by(id=employe_id).first()
     if not emp:
         raise HTTPException(404, "Employé introuvable")
 
     paiements = (
-        db.query(BarPaiementEmploye)
+        filtrer_lieu(db.query(BarPaiementEmploye), BarPaiementEmploye.lieu, lieu)
         .filter(BarPaiementEmploye.employe_id == employe_id)
         .order_by(BarPaiementEmploye.date_paiement.desc())
         .all()
@@ -2675,14 +2792,14 @@ def historique_paiements_employe(employe_id: int, db: Session = Depends(get_db))
 # STATISTIQUES & RENTABILITÉ
 # ══════════════════════════════════════════════════════════════════
 
-def _periode_precedente(date_debut: date_type, date_fin: date_type, db: Session) -> dict:
+def _periode_precedente(date_debut: date_type, date_fin: date_type, db: Session, lieu: Optional[str] = None) -> dict:
     """Résumé CA/COGS/bénéfice/marge de la période précédente de durée égale,
     immédiatement avant date_debut — pour les badges de comparaison ▲/▼."""
     from datetime import timedelta
     nb_jours   = (date_fin - date_debut).days + 1
     prev_fin   = date_debut - timedelta(days=1)
     prev_debut = prev_fin - timedelta(days=nb_jours - 1)
-    prev       = stats_bar(prev_debut, prev_fin, db)
+    prev       = stats_bar(prev_debut, prev_fin, db, lieu=lieu)
     return {
         "periode":       prev["periode"],
         "ca_total":      prev["ca_total"],
@@ -2697,6 +2814,7 @@ def _periode_precedente(date_debut: date_type, date_fin: date_type, db: Session)
 def statistiques_bar(
     date_debut: date_type = Query(default=None),
     date_fin:   date_type = Query(default=None),
+    lieu:       Optional[str] = Depends(_dept),
     db: Session = Depends(get_db),
 ):
     """CA, bénéfice, COGS, top produits sur la période (données réelles uniquement)."""
@@ -2707,8 +2825,9 @@ def statistiques_bar(
     if not date_fin:
         date_fin = today
 
-    data = stats_bar(date_debut, date_fin, db)
-    data["precedent"] = _periode_precedente(date_debut, date_fin, db)
+    data = stats_bar(date_debut, date_fin, db, lieu=lieu)
+    data["precedent"] = _periode_precedente(date_debut, date_fin, db, lieu=lieu)
+    data["lieu"] = lieu
     return data
 
 
@@ -2716,6 +2835,7 @@ def statistiques_bar(
 def benefices_detail(
     date_debut: date_type = Query(default=None),
     date_fin:   date_type = Query(default=None),
+    lieu:       Optional[str] = Depends(_dept),
     db: Session = Depends(get_db),
 ):
     """Bénéfices détaillés par produit et catégorie, avec CMUP réel."""
@@ -2726,7 +2846,7 @@ def benefices_detail(
     if not date_fin:
         date_fin = today
 
-    data = stats_bar(date_debut, date_fin, db)
+    data = stats_bar(date_debut, date_fin, db, lieu=lieu)
 
     # Regroupement par catégorie
     par_categorie: dict = {}
@@ -2741,7 +2861,8 @@ def benefices_detail(
     return {
         **data,
         "par_categorie": list(par_categorie.values()),
-        "precedent": _periode_precedente(date_debut, date_fin, db),
+        "precedent": _periode_precedente(date_debut, date_fin, db, lieu=lieu),
+        "lieu": lieu,
     }
 
 
@@ -2765,9 +2886,10 @@ def lister_renflouements_bar(
     date_debut: Optional[str] = Query(default=None),
     date_fin:   Optional[str] = Query(default=None),
     limit: int = Query(50, le=200),
+    lieu: Optional[str] = Depends(_dept),
     db: Session = Depends(get_db),
 ):
-    q = db.query(RenflouementDepartement).filter(RenflouementDepartement.departement == "BAR")
+    q = db.query(RenflouementDepartement).filter(RenflouementDepartement.departement == _renfl_departement(lieu))
     if date_debut:
         dt, _ = bounds_haiti(date_type.fromisoformat(date_debut))
         q     = q.filter(RenflouementDepartement.date_renflouement >= dt)
@@ -2781,13 +2903,20 @@ def lister_renflouements_bar(
 @router.post("/renflouements", status_code=201)
 def creer_renflouement_bar(
     data: dict, db: Session = Depends(get_db),
+    lieu: Optional[str] = Depends(_dept),
     _user: Utilisateur = Depends(_require_pdg_ou_admin_pos),
 ):
     montant = float(data.get("montant") or 0)
     if montant <= 0:
         raise HTTPException(400, "Le montant doit être positif.")
+    if data.get("lieu"):
+        try:
+            lieu = normaliser_lieu(data.get("lieu"))
+        except ValueError as e:
+            raise HTTPException(422, str(e))
+    departement = _renfl_departement(lieu)
     r = RenflouementDepartement(
-        departement="BAR",
+        departement=departement,
         montant=montant,
         source=(data.get("source") or "").strip() or None,
         notes=(data.get("notes") or "").strip() or None,
@@ -2797,9 +2926,9 @@ def creer_renflouement_bar(
     from notifications_service import creer_notification
     creer_notification(
         db, module="pos", type_="renflouement_departement",
-        titre=f"Renflouement Caisse Bar — {montant:,.2f} G",
+        titre=f"Renflouement Caisse {'Piscine' if departement == 'PISCINE' else 'Bar'} — {montant:,.2f} G",
         message=(data.get("source") or "Source non précisée"),
-        lien="pos-grande-caisse",
+        lien="piscine-grande-caisse" if departement == "PISCINE" else "pos-grande-caisse",
         dedupe_minutes=None,
     )
     db.commit(); db.refresh(r)
@@ -2816,12 +2945,14 @@ def grande_caisse(
     date_fin:    date_type    = Query(default=None),
     produit_id:  Optional[int] = Query(default=None),
     categorie:   Optional[str] = Query(default=None),
+    lieu:        Optional[str] = Depends(_dept),
     db: Session = Depends(get_db),
 ):
     """
     Dashboard financier consolidé :
     coût réel des achats confirmés vs CA ventes sur la période.
-    Bénéfice brut = ventes - achats.  Bénéfice net = brut - paie.
+    Bénéfice brut = ventes - achats.  Bénéfice net = brut - paie - dépenses.
+    `lieu` : caisse d'un seul département (DEVANT = Bar, PISCINE = Piscine).
     """
     today = today_haiti()
     if not date_debut:
@@ -2845,6 +2976,7 @@ def grande_caisse(
             BarAchat.produit_id.isnot(None),
         )
     )
+    q_achats = filtrer_lieu(q_achats, BarAchat.lieu, lieu)
     if produit_id:
         q_achats = q_achats.filter(BarAchat.produit_id == produit_id)
     if categorie:
@@ -2863,6 +2995,7 @@ def grande_caisse(
             BarVente.date_heure <= dt_fin,
         )
     )
+    q_lignes = filtrer_lieu(q_lignes, BarVente.lieu, lieu)
     if produit_id:
         q_lignes = q_lignes.filter(BarLigneVente.produit_id == produit_id)
     if categorie:
@@ -2873,13 +3006,22 @@ def grande_caisse(
 
     # ── Paie bar sur la période ───────────────────────────────────
     paie_total = _d(
-        db.query(func.sum(BarPaiementEmploye.montant))
+        filtrer_lieu(db.query(func.sum(BarPaiementEmploye.montant))
         .filter(
             BarPaiementEmploye.date_paiement >= dt_debut.date(),
             BarPaiementEmploye.date_paiement <= dt_fin.date(),
-        )
+        ), BarPaiementEmploye.lieu, lieu)
         .scalar()
     )
+
+    # ── Dépenses opérationnelles du (des) département(s) ─────────
+    q_dep = db.query(BarDepense).filter(
+        BarDepense.date_depense >= dt_debut, BarDepense.date_depense <= dt_fin,
+    )
+    if lieu:
+        q_dep = q_dep.filter(BarDepense.lieu == lieu)
+    depenses_rows = q_dep.all()
+    depenses_total = sum((_d(d.montant) for d in depenses_rows), Decimal("0"))
 
     # ── Agrégation achats ─────────────────────────────────────────
     achats_cout_total = Decimal("0")
@@ -2970,7 +3112,7 @@ def grande_caisse(
     produits_list.sort(key=lambda x: x["ventes_ca"], reverse=True)
 
     benefice_brut = ventes_ca_total - achats_cout_total
-    benefice_net  = benefice_brut - paie_total
+    benefice_net  = benefice_brut - paie_total - depenses_total
 
     # ── Caisse Bar disponible : cash réellement encaissé (CASH/MIXTE +
     # crédits remboursés) + renflouements - achats confirmés - paie. Distinct
@@ -2980,32 +3122,43 @@ def grande_caisse(
     # Note : la caisse Bar est un concept global, pas filtrable par produit
     # (un ticket encaissé mélange souvent plusieurs articles) — le filtre
     # produit_id/categorie de cet endpoint ne s'applique pas à ce bloc.
-    q_bv_cash = db.query(BarVente).filter(
+    q_bv_cash = filtrer_lieu(db.query(BarVente).filter(
         BarVente.statut != "ANNULEE",
         BarVente.date_heure >= dt_debut, BarVente.date_heure <= dt_fin,
-    )
+    ), BarVente.lieu, lieu)
     cash_ventes = sum(
         float(v.montant_paye) for v in q_bv_cash.all() if v.mode_paiement in ("CASH", "MIXTE")
     )
     q_remb = db.query(BarRemboursement).filter(
         BarRemboursement.date_remb >= dt_debut, BarRemboursement.date_remb <= dt_fin,
     )
+    if lieu:
+        q_remb = filtrer_lieu(
+            q_remb.join(BarCredit, BarRemboursement.credit_id == BarCredit.id)
+                  .join(BarVente, BarCredit.vente_id == BarVente.id),
+            BarVente.lieu, lieu)
     cash_remb = sum(float(r.montant) for r in q_remb.all())
+    _depts_renfl = [_renfl_departement(lieu)] if lieu else ["BAR", "PISCINE"]
     renflouements_periode = float(
         db.query(func.sum(RenflouementDepartement.montant))
-        .filter(RenflouementDepartement.departement == "BAR",
+        .filter(RenflouementDepartement.departement.in_(_depts_renfl),
                 RenflouementDepartement.date_renflouement >= dt_debut,
                 RenflouementDepartement.date_renflouement <= dt_fin)
         .scalar() or 0
     )
-    caisse_disponible = round(cash_ventes + cash_remb + renflouements_periode - float(achats_cout_total) - float(paie_total), 2)
+    caisse_disponible = round(
+        cash_ventes + cash_remb + renflouements_periode
+        - float(achats_cout_total) - float(paie_total) - float(depenses_total), 2)
 
     return {
         "periode":    {"debut": str(date_debut), "fin": str(date_fin)},
+        "lieu":        lieu,
+        "departement": DEPARTEMENT_LIBELLE.get(lieu, "Bar + Piscine"),
         "bar": {
             "achats_cout":   float(achats_cout_total),
             "ventes_ca":     float(ventes_ca_total),
             "paie":          float(paie_total),
+            "depenses":      float(depenses_total),
             "benefice_brut": float(benefice_brut),
             "benefice_net":  float(benefice_net),
             "nb_achats":     len(achats),
@@ -3015,9 +3168,150 @@ def grande_caisse(
             "ventes_cash":    round(cash_ventes + cash_remb, 2),
             "achats":         float(achats_cout_total),
             "paie":           float(paie_total),
+            "depenses":       float(depenses_total),
             "renflouements":  round(renflouements_periode, 2),
             "disponible":     caisse_disponible,
         },
         "par_produit":   produits_list,
         "achats_detail": sorted(achats_detail, key=lambda x: x["date_achat"], reverse=True),
+        "depenses_detail": [_bar_depense_dict(d) for d in sorted(depenses_rows, key=lambda d: d.date_depense, reverse=True)],
     }
+
+
+# ══════════════════════════════════════════════════════════════════
+# DÉPENSES BAR / PISCINE — sortent de la caisse du département
+# ══════════════════════════════════════════════════════════════════
+
+def _bar_depense_dict(d: BarDepense) -> dict:
+    return {
+        "id":           d.id,
+        "lieu":         d.lieu,
+        "departement":  DEPARTEMENT_LIBELLE.get(d.lieu, d.lieu),
+        "description":  d.description,
+        "categorie":    d.categorie,
+        "montant":      float(d.montant),
+        "date_depense": d.date_depense.isoformat() if d.date_depense else None,
+        "fournisseur":  d.fournisseur,
+        "notes":        d.notes,
+        "enregistre_par": d.utilisateur.nom_complet if d.utilisateur else None,
+    }
+
+
+def _date_depense(d: Optional[date_type]) -> datetime:
+    """Une date choisie est enregistrée à midi heure d'Haïti (jamais à
+    cheval sur deux jours selon le fuseau) ; sans date : maintenant."""
+    if not d:
+        return datetime.now(tz=timezone.utc)
+    return datetime.combine(d, time(12, 0), tzinfo=HAITI_TZ)
+
+
+@router.get("/depenses")
+def liste_depenses_bar(
+    date_debut: Optional[date_type] = Query(default=None),
+    date_fin:   Optional[date_type] = Query(default=None),
+    categorie:  Optional[str] = Query(default=None),
+    lieu:       Optional[str] = Depends(_dept),
+    db: Session = Depends(get_db),
+):
+    """Dépenses du Bar (DEVANT) ou de la Piscine — total et par catégorie."""
+    q = db.query(BarDepense)
+    if lieu:
+        q = q.filter(BarDepense.lieu == lieu)
+    if date_debut:
+        q = q.filter(BarDepense.date_depense >= bounds_haiti(date_debut)[0])
+    if date_fin:
+        q = q.filter(BarDepense.date_depense <= bounds_haiti(date_fin)[1])
+    if categorie:
+        q = q.filter(BarDepense.categorie == categorie)
+    rows = q.order_by(BarDepense.date_depense.desc()).limit(1000).all()
+    par_cat: dict[str, float] = {}
+    for d in rows:
+        k = d.categorie or "Autre"
+        par_cat[k] = round(par_cat.get(k, 0.0) + float(d.montant), 2)
+    return {
+        "lieu":        lieu,
+        "departement": DEPARTEMENT_LIBELLE.get(lieu, "Bar + Piscine"),
+        "total":       round(sum(float(d.montant) for d in rows), 2),
+        "nb":          len(rows),
+        "par_categorie": [{"categorie": k, "montant": v} for k, v in sorted(par_cat.items(), key=lambda x: -x[1])],
+        "depenses":    [_bar_depense_dict(d) for d in rows],
+    }
+
+
+def _lieu_depense(data: BarDepenseIn, lieu_ecran: Optional[str]) -> str:
+    try:
+        lieu = normaliser_lieu(data.lieu) or lieu_ecran
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    if not lieu:
+        raise HTTPException(422, "Précisez le département de la dépense (Bar ou Piscine).")
+    return lieu
+
+
+@router.post("/depenses", status_code=201)
+def creer_depense_bar(
+    data: BarDepenseIn, request: Request,
+    lieu_ecran: Optional[str] = Depends(_dept),
+    db: Session = Depends(get_db),
+):
+    if not data.description.strip():
+        raise HTTPException(422, "Description requise.")
+    lieu = _lieu_depense(data, lieu_ecran)
+    d = BarDepense(
+        lieu           = lieu,
+        description    = data.description.strip(),
+        categorie      = (data.categorie or "").strip() or None,
+        montant        = Decimal(str(data.montant)),
+        date_depense   = _date_depense(data.date_depense),
+        fournisseur    = (data.fournisseur or "").strip() or None,
+        notes          = (data.notes or "").strip() or None,
+        utilisateur_id = _uid(request),
+    )
+    db.add(d)
+    from notifications_service import creer_notification
+    libelle = DEPARTEMENT_LIBELLE.get(lieu, lieu)
+    creer_notification(
+        db, module="pos", type_="depense_departement",
+        titre=f"Dépense {libelle} — {float(d.montant):,.2f} G",
+        message=d.description,
+        lien="piscine-depenses" if lieu == "PISCINE" else "pos-depenses",
+        dedupe_minutes=None,
+    )
+    db.commit(); db.refresh(d)
+    return _bar_depense_dict(d)
+
+
+@router.put("/depenses/{dep_id}")
+def modifier_depense_bar(
+    dep_id: int, data: BarDepenseIn,
+    lieu_ecran: Optional[str] = Depends(_dept),
+    db: Session = Depends(get_db),
+):
+    d = db.query(BarDepense).filter_by(id=dep_id).first()
+    if not d:
+        raise HTTPException(404, "Dépense introuvable.")
+    if not data.description.strip():
+        raise HTTPException(422, "Description requise.")
+    d.lieu        = _lieu_depense(data, lieu_ecran or d.lieu)
+    d.description = data.description.strip()
+    d.categorie   = (data.categorie or "").strip() or None
+    d.montant     = Decimal(str(data.montant))
+    if data.date_depense:
+        d.date_depense = _date_depense(data.date_depense)
+    d.fournisseur = (data.fournisseur or "").strip() or None
+    d.notes       = (data.notes or "").strip() or None
+    db.commit(); db.refresh(d)
+    return _bar_depense_dict(d)
+
+
+@router.delete("/depenses/{dep_id}")
+def supprimer_depense_bar(
+    dep_id: int, db: Session = Depends(get_db),
+    _user: Utilisateur = Depends(_require_pdg_ou_admin_pos),
+):
+    d = db.query(BarDepense).filter_by(id=dep_id).first()
+    if not d:
+        raise HTTPException(404, "Dépense introuvable.")
+    db.delete(d)
+    db.commit()
+    return {"ok": True, "id": dep_id}
