@@ -115,13 +115,20 @@ def stock_courant(produit_id: int, db: Session, lieu: str | None = None) -> Deci
 
     `lieu` restreint aux mouvements de ce lieu uniquement (utilisé pour
     l'ajustement/réinitialisation par lieu) ; par défaut (None), comportement
-    inchangé : somme sur tous les mouvements, quel que soit leur lieu."""
+    inchangé : somme sur tous les mouvements des bars, quel que soit leur
+    lieu — SAUF le Dépôt central (lieu 'DEPOT'), qui n'est pas du stock bar :
+    il se demande explicitement avec lieu='DEPOT'."""
     q = db.query(func.sum(BarMouvementStock.quantite)).filter(
         BarMouvementStock.produit_id == produit_id
     )
-    if lieu is not None:
-        q = q.filter(BarMouvementStock.lieu == lieu)
+    q = q.filter(BarMouvementStock.lieu == lieu) if lieu is not None else q.filter(_hors_depot())
     return _dec(q.scalar())
+
+
+def _hors_depot():
+    """Mouvements des bars (lieu NULL, DEVANT, PISCINE) — sans le Dépôt central."""
+    from sqlalchemy import or_
+    return or_(BarMouvementStock.lieu.is_(None), BarMouvementStock.lieu != "DEPOT")
 
 
 def stock_tous_produits(db: Session, lieu: str | None = None) -> dict[int, Decimal]:
@@ -130,8 +137,7 @@ def stock_tous_produits(db: Session, lieu: str | None = None) -> dict[int, Decim
     `lieu` restreint aux mouvements de ce lieu ; None = comportement
     inchangé (pool global, tous lieux confondus)."""
     q = db.query(BarMouvementStock.produit_id, func.sum(BarMouvementStock.quantite))
-    if lieu is not None:
-        q = q.filter(BarMouvementStock.lieu == lieu)
+    q = q.filter(BarMouvementStock.lieu == lieu) if lieu is not None else q.filter(_hors_depot())
     rows = q.group_by(BarMouvementStock.produit_id).all()
     return {pid: _dec(total) for pid, total in rows}
 
@@ -147,7 +153,7 @@ def stock_par_lieu_tous_produits(db: Session) -> dict[int, dict[str, Decimal]]:
             BarMouvementStock.produit_id,
             func.sum(case((BarMouvementStock.lieu == "DEVANT", BarMouvementStock.quantite), else_=0)),
             func.sum(case((BarMouvementStock.lieu == "PISCINE", BarMouvementStock.quantite), else_=0)),
-            func.sum(BarMouvementStock.quantite),
+            func.sum(case((BarMouvementStock.lieu == "DEPOT", 0), else_=BarMouvementStock.quantite)),
         )
         .group_by(BarMouvementStock.produit_id)
         .all()

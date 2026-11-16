@@ -6773,7 +6773,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               </div>
               <div id="pos-mixte-row" style="display:none;margin-bottom:8px">
                 <label class="pos-label" data-i18n="pos.caisse.paye.label">Montant payé en cash</label>
-                <input class="pos-input" id="pos-montant-paye" type="number" min="0" placeholder="G 0.00">
+                <input class="pos-input" id="pos-montant-paye" type="number" min="0" placeholder="G 0.00" oninput="posCalcMonnaie()">
               </div>
               <button class="pos-encaisser-btn" id="pos-enc-btn" onclick="posEncaisser()" disabled data-i18n="pos.caisse.encaisser">
                 Encaisser
@@ -25650,7 +25650,7 @@ function _posEcartNiveau(ecart, cashAttendu){
   return                 {color:'#f87171', bg:'rgba(248,113,113,.1)', border:'rgba(248,113,113,.3)'};
 }
 
-let _posCashAttendu = 0;
+let _posCashAttendu = 0; let _posCashUsd = 0;
 
 async function posSoumettreSession(){
   if(!_posDashSessionId){
@@ -25667,7 +25667,7 @@ async function posSoumettreSession(){
   let produits = [];
   try {
     const d = await apiFetch('GET', `/pos/caisse/dashboard?caissier_id=${cid}`);
-    _posCashAttendu = d.cash||0;
+    _posCashAttendu = d.cash||0;  _posCashUsd = d.cash_usd||0;
     produits = d.tous_produits||[];
   } catch(e){ posAlert(e.message||t('pos.caisse.err.soumission')); return; }
 
@@ -25678,7 +25678,7 @@ async function posSoumettreSession(){
       : '<tr><td colspan="3" style="text-align:center;color:rgba(255,255,255,.3);padding:12px">Aucune vente</td></tr>';
   }
 
-  document.getElementById('ps-cash-attendu').textContent = posGx(_posCashAttendu);
+  document.getElementById('ps-cash-attendu').innerHTML = posGx(_posCashAttendu) + (_posCashUsd > 0 ? `<div style="font-size:13px;color:#38bdf8">+ ${_usd(_posCashUsd)} en dollars (à remettre à part — non compris dans le comptage en gourdes)</div>` : '');
   document.getElementById('ps-notes').value = '';
   document.getElementById('pos-soumettre-modal-bg').classList.add('open');
 }
@@ -26096,7 +26096,9 @@ function posCalcMonnaie(){
   if(info){
     const usdOk = devise==='USD' && taux > 0 && _posMode !== 'CREDIT';
     info.style.display = usdOk ? '' : 'none';
-    if(usdOk) info.textContent = `À encaisser en dollars : ${_usd(totalG/taux)} (taux ${taux})`;
+    // MIXTE : seule la partie payée comptant (saisie en gourdes) est remise en dollars.
+    const baseG = _posMode==='MIXTE' ? (parseFloat(document.getElementById('pos-montant-paye')?.value||0)||0) : totalG;
+    if(usdOk) info.textContent = `À encaisser en dollars : ${_usd(baseG/taux)} (taux ${taux})`;
   }
   if(_posMode !== 'CASH'){ display.style.display='none'; return; }
   const recu = parseFloat(document.getElementById('pos-montant-recu')?.value||0);

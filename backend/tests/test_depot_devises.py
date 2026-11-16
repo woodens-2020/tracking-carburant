@@ -108,6 +108,17 @@ def test_transfert_vers_bar_piscine_met_le_stock_a_jour(client):
     assert s["stock_depot"] == 14 and s["stock_piscine"] == 6
 
 
+def test_stock_depot_hors_stock_bar(client):
+    """Le stock du dépôt n'est pas du stock bar : ni affiché ni vendable au Bar."""
+    pid = _produit(client)
+    _achat_recu(client, pid, qte=12)
+    p = next(x for x in client.get("/api/pos/produits", headers=H).json() if x["id"] == pid)
+    assert p["stock_courant"] == 0
+    s = next(x for x in client.get("/api/pos/stock", headers=H).json() if x["produit_id"] == pid)
+    assert s["stock_courant"] == 0
+    assert client.post("/api/pos/ventes", headers=H, json={"lignes": [{"produit_id": pid, "quantite": 1}]}).status_code == 422
+
+
 def test_stock_insuffisant_refuse(client):
     pid = _produit(client)
     _achat_recu(client, pid, qte=3)
