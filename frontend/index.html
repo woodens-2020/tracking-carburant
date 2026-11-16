@@ -35361,8 +35361,8 @@ async function loadDepotProduits(){
   root.innerHTML = depHeader('Dépôt central — Inventaire & prix', 'Stock du dépôt et des bars · prix de vente · quantité minimum',
     `<input class="pos-input" id="dep-prod-q" placeholder="Rechercher…" oninput="depRendreProduits()" style="width:200px">`)
     + `<div class="pos-kpi-grid" id="dep-prod-kpi"></div><div class="pos-card"><div class="pos-table-wrap"><table class="pos-table">
-      <thead><tr><th>Produit</th><th>Catégorie</th><th style="text-align:right">Dépôt</th><th style="text-align:right">Bar Devant</th><th style="text-align:right">Bar Piscine</th><th style="text-align:right">Prix vente</th><th style="text-align:right">Min.</th><th style="text-align:right">Coût moyen</th><th style="text-align:right">Valeur</th><th></th></tr></thead>
-      <tbody id="dep-prod-tbody"><tr><td colspan="10" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody></table></div></div>`;
+      <thead><tr><th>Produit</th><th>Catégorie</th><th style="text-align:right">Dépôt</th><th style="text-align:right">Bar Devant</th><th style="text-align:right">Bar Piscine</th><th style="text-align:right">Prix vente</th><th style="text-align:right">Min.</th><th style="text-align:right">Dernier prix d'achat</th><th style="text-align:right">Coût moyen</th><th style="text-align:right">Valeur</th><th></th></tr></thead>
+      <tbody id="dep-prod-tbody"><tr><td colspan="11" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody></table></div></div>`;
   try { await depChargerProduits(); depRendreProduits(); } catch(e){ posAlert(e.message||'Erreur','err'); }
 }
 function depRendreProduits(){
@@ -35380,10 +35380,11 @@ function depRendreProduits(){
     <td style="text-align:right;font-weight:700">${fmtQ(p.stock_depot)}</td>
     <td style="text-align:right">${fmtQ(p.stock_devant)}</td><td style="text-align:right">${fmtQ(p.stock_piscine)}</td>
     <td style="text-align:right">${posGx(p.prix_vente)}</td><td style="text-align:right">${fmtQ(p.seuil_min)}</td>
+    <td style="text-align:right">${p.dernier_prix_achat!=null?posGx(p.dernier_prix_achat):'—'}</td>
     <td style="text-align:right;color:rgba(255,255,255,.55)">${posGx(p.cout_moyen)}</td>
     <td style="text-align:right">${posGx(p.valeur_stock)}</td>
     <td>${ro?'':`<button class="pos-btn ghost" style="padding:3px 9px;font-size:12px" onclick="depConfigProduit(${p.id})">Prix / min.</button>`}</td>
-  </tr>`).join('') || '<tr><td colspan="10" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucun produit</td></tr>';
+  </tr>`).join('') || '<tr><td colspan="11" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucun produit</td></tr>';
 }
 function depConfigProduit(id){
   const p = _depProduits.find(x=>x.id===id); if(!p) return;
@@ -35403,37 +35404,81 @@ async function depConfigSauver(id){
 
 // ── Lignes produit (achat / transaction) — calcul automatique ─────
 function depLignesHtml(mode){
-  return `<table class="pos-table"><thead><tr><th>Produit</th><th style="width:110px">Quantité</th>${mode==='achat'?'<th style="width:130px">Prix d\'achat (G)</th>':'<th style="text-align:right">Prix</th>'}<th style="text-align:right">Sous-total</th><th></th></tr></thead>
+  return `<table class="pos-table"><thead><tr><th>Produit</th><th style="width:110px">Quantité</th>${mode==='achat'?'<th style="width:130px">Prix d\'achat (G)</th>':'<th style="text-align:right">Prix de vente</th>'}<th style="text-align:right">Sous-total</th><th></th></tr></thead>
     <tbody>${_depLignes.map((l,i)=>{
       const p = _depProduits.find(x=>String(x.id)===String(l.produit_id));
-      const prix = mode==='achat' ? (parseFloat(l.prix)||0) : (p?.prix_vente||0);
-      const st = (parseFloat(l.quantite)||0) * prix;
-      const manque = mode!=='achat' && p && (parseFloat(l.quantite)||0) > p.stock_depot;
-      return `<tr><td><select class="pos-select" onchange="_depLignes[${i}].produit_id=this.value;depMajLignes('${mode}')"><option value="">— Produit —</option>${depOptionsProduits(l.produit_id)}</select>
-          ${manque?`<div style="color:#f87171;font-size:12px">Stock insuffisant (dépôt : ${fmtQ(p.stock_depot)})</div>`:''}</td>
-        <td><input class="pos-input" type="number" min="0" step="any" value="${l.quantite||''}" onchange="_depLignes[${i}].quantite=this.value;depMajLignes('${mode}')"></td>
-        ${mode==='achat'?`<td><input class="pos-input" type="number" min="0" step="any" value="${l.prix||''}" onchange="_depLignes[${i}].prix=this.value;depMajLignes('${mode}')"></td>`:`<td style="text-align:right">${posGx(prix)}</td>`}
-        <td style="text-align:right;font-weight:700">${posGx(st)}</td>
+      return `<tr><td><select class="pos-select" onchange="depChoisirProduit(${i},this.value,'${mode}')"><option value="">— Produit —</option>${depOptionsProduits(l.produit_id)}</select>
+          <div id="dep-warn-${i}" style="color:#f87171;font-size:12px"></div></td>
+        <td><input class="pos-input" type="number" min="0" step="any" value="${l.quantite||''}" oninput="_depLignes[${i}].quantite=this.value;depMajCalculs('${mode}')"></td>
+        ${mode==='achat'?`<td><input class="pos-input" type="number" min="0" step="any" value="${l.prix??''}" oninput="_depLignes[${i}].prix=this.value;depMajCalculs('${mode}')"></td>`:`<td style="text-align:right">${p?posGx(p.prix_vente):'—'}</td>`}
+        <td style="text-align:right;font-weight:700" id="dep-st-${i}">—</td>
         <td><button class="pos-btn ghost" style="padding:2px 8px" onclick="_depLignes.splice(${i},1);depMajLignes('${mode}')">✕</button></td></tr>`;
     }).join('')}</tbody></table>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
       <button class="pos-btn ghost" onclick="_depLignes.push({});depMajLignes('${mode}')">+ Ajouter un produit</button>
-      <div style="font-size:18px">Total : <b id="dep-total" style="color:#34d399">${posGx(depTotalLignes(mode))}</b></div></div>`;
+      <div style="font-size:18px">Total : <b id="dep-total" style="color:#34d399">—</b></div></div>`;
+}
+// Prix d'une ligne : prix d'achat saisi (achat) ou prix de vente configuré (transfert / vente).
+function _depPrixLigne(l, mode){
+  const p = _depProduits.find(x=>String(x.id)===String(l.produit_id));
+  return mode==='achat' ? (parseFloat(l.prix)||0) : (p?.prix_vente||0);
 }
 function depTotalLignes(mode){
-  return _depLignes.reduce((s,l)=>{
-    const p = _depProduits.find(x=>String(x.id)===String(l.produit_id));
-    const prix = mode==='achat' ? (parseFloat(l.prix)||0) : (p?.prix_vente||0);
-    return s + (parseFloat(l.quantite)||0)*prix;
-  },0);
+  return _depLignes.reduce((s,l)=> s + (parseFloat(l.quantite)||0)*_depPrixLigne(l,mode), 0);
 }
-function depMajLignes(mode){ const w=document.getElementById('dep-lignes'); if(w) w.innerHTML = depLignesHtml(mode); }
+// Besoin total par produit (un même produit sur plusieurs lignes est cumulé).
+function _depBesoins(){
+  const b = {};
+  _depLignes.forEach(l=>{ if(l.produit_id) b[l.produit_id] = (b[l.produit_id]||0) + (parseFloat(l.quantite)||0); });
+  return b;
+}
+// Recalcul en direct, sans redessiner le tableau (la saisie n'est pas perdue) :
+// sous-totaux, total et contrôle « Stok ase ? » d'un transfert / d'une vente.
+function depMajCalculs(mode){
+  const besoin = _depBesoins();
+  _depLignes.forEach((l,i)=>{
+    const st = document.getElementById('dep-st-'+i);
+    if(st) st.textContent = l.produit_id ? posGx((parseFloat(l.quantite)||0)*_depPrixLigne(l,mode)) : '—';
+    const w = document.getElementById('dep-warn-'+i);
+    if(!w) return;
+    const p = _depProduits.find(x=>String(x.id)===String(l.produit_id));
+    let msg = '';
+    if(mode!=='achat' && p){
+      if(!(p.prix_vente>0)) msg = 'Aucun prix de vente — à configurer dans Inventaire & prix.';
+      else if(besoin[l.produit_id] > p.stock_depot) msg = `Stock insuffisant — disponible au dépôt : ${fmtQ(p.stock_depot)}`;
+    }
+    w.textContent = msg;
+  });
+  const tot = document.getElementById('dep-total'); if(tot) tot.textContent = posGx(depTotalLignes(mode));
+}
+// Choix du produit : à l'achat, le prix proposé est le dernier prix d'achat connu.
+function depChoisirProduit(i, val, mode){
+  _depLignes[i].produit_id = val;
+  const p = _depProduits.find(x=>String(x.id)===String(val));
+  if(mode==='achat' && p && (_depLignes[i].prix===undefined || _depLignes[i].prix==='')) _depLignes[i].prix = p.dernier_prix_achat || '';
+  depMajLignes(mode);
+}
+// Erreurs bloquantes d'un transfert / d'une vente (stock, prix) avant l'envoi.
+function depErreursLignes(){
+  const err = [];
+  Object.entries(_depBesoins()).forEach(([pid,q])=>{
+    const p = _depProduits.find(x=>String(x.id)===String(pid));
+    if(!p) return;
+    if(!(p.prix_vente>0)) err.push(`${p.nom} : pas de prix de vente`);
+    else if(q > p.stock_depot) err.push(`${p.nom} : disponible ${fmtQ(p.stock_depot)}, demandé ${fmtQ(q)}`);
+  });
+  return err;
+}
+function depMajLignes(mode){ const w=document.getElementById('dep-lignes'); if(w){ w.innerHTML = depLignesHtml(mode); depMajCalculs(mode); } }
 
 // ── Achats & réception ────────────────────────────────────────────
 async function loadDepotAchats(){
   const root = document.getElementById('depot-achats-root');
   root.innerHTML = depHeader('Achats & réception', 'Enregistrer la facture fournisseur · contrôler la marchandise · entrer en stock',
-    `<select class="pos-select" id="dep-ach-statut" onchange="depChargerAchats()" style="width:170px"><option value="">Tous statuts</option><option value="EN_ATTENTE">À réceptionner</option><option value="ECART">Écart</option><option value="RECEPTIONNE">Réceptionnés</option><option value="ANNULE">Annulés</option></select>
+    `<input type="date" class="pos-input" id="dep-ach-deb" style="width:135px"><input type="date" class="pos-input" id="dep-ach-fin" style="width:135px">
+     <input class="pos-input" id="dep-ach-four" placeholder="Fournisseur" style="width:140px">
+     <button class="pos-btn teal" onclick="depChargerAchats()">Filtrer</button>
+     <select class="pos-select" id="dep-ach-statut" onchange="depChargerAchats()" style="width:170px"><option value="">Tous statuts</option><option value="EN_ATTENTE">À réceptionner</option><option value="ECART">Écart</option><option value="RECEPTIONNE">Réceptionnés</option><option value="ANNULE">Annulés</option></select>
      ${_isReadOnly()&&!depAdmin()?'':'<button class="pos-btn primary" onclick="depNouvelAchat()">+ Nouvel achat</button>'}`)
     + `<div class="pos-card"><div class="pos-table-wrap"><table class="pos-table"><thead><tr><th>N°</th><th>Date</th><th>Fournisseur</th><th>Facture</th><th style="text-align:right">Total</th><th>Statut</th><th></th></tr></thead>
       <tbody id="dep-ach-tbody"><tr><td colspan="7" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody></table></div></div>`;
@@ -35442,7 +35487,10 @@ async function loadDepotAchats(){
 }
 async function depChargerAchats(){
   const st = document.getElementById('dep-ach-statut')?.value || '';
-  try { _depAchats = await apiFetch('GET', `/depot/achats${st?'?statut='+st:''}`); } catch(e){ posAlert(e.message,'err'); return; }
+  const qs = new URLSearchParams({statut: st, date_debut: document.getElementById('dep-ach-deb')?.value||'',
+    date_fin: document.getElementById('dep-ach-fin')?.value||'', fournisseur: (document.getElementById('dep-ach-four')?.value||'').trim()});
+  [...qs.keys()].forEach(k=>{ if(!qs.get(k)) qs.delete(k); });
+  try { _depAchats = await apiFetch('GET', '/depot/achats?'+qs.toString()); } catch(e){ posAlert(e.message,'err'); return; }
   const ro = _isReadOnly() && !depAdmin();
   document.getElementById('dep-ach-tbody').innerHTML = _depAchats.map(a=>`<tr>
     <td><b>${a.numero}</b></td><td>${depDate(a.created_at)}</td><td>${esc(a.fournisseur)}</td><td>${esc(a.numero_facture||'—')}</td>
@@ -35467,6 +35515,7 @@ function depNouvelAchat(id){
     <div id="dep-lignes" style="margin:10px 0">${depLignesHtml('achat')}</div>
     <div><label class="pos-label">Notes</label><input class="pos-input" id="dep-a-notes" value="${esc(a?.notes||'')}"></div>
     <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Annuler</button><button class="pos-btn primary" onclick="depSauverAchat()">Enregistrer l'achat</button></div>`);
+  depMajCalculs('achat');
 }
 async function depSauverAchat(){
   const lignes = _depLignes.filter(l=>l.produit_id && parseFloat(l.quantite)>0).map(l=>({produit_id:parseInt(l.produit_id), quantite:parseFloat(l.quantite), prix_achat:parseFloat(l.prix)||0}));
@@ -35513,7 +35562,7 @@ function depEcarts(){
     if(c){ c.textContent = (d>0?'+':'')+fmtQ(d); c.style.color = d ? '#f87171' : '#34d399'; }
   });
   const m = document.getElementById('dep-rec-msg');
-  if(m) m.innerHTML = ecart ? '<span style="color:#f87171">Machandiz pa konfòm : la différence sera enregistrée et une correction demandée — ou validez avec l\'écart (stock = quantités comptées).</span>' : '<span style="color:#34d399">Marchandise conforme.</span>';
+  if(m) m.innerHTML = ecart ? '<span style="color:#f87171">Marchandise non conforme : la différence sera enregistrée et une correction demandée au responsable des achats — ou validez avec l\'écart (le stock prend les quantités comptées).</span>' : '<span style="color:#34d399">Marchandise conforme.</span>';
   const f = document.getElementById('dep-rec-forcer'); if(f) f.style.display = ecart ? '' : 'none';
 }
 async function depValiderReception(id, forcer){
@@ -35587,10 +35636,14 @@ function depNouvelleTx(){
     <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Annuler</button>
       <button class="pos-btn ghost" onclick="depSauverTx(false)">Préparer (sans déplacer le stock)</button>
       <button class="pos-btn primary" onclick="depSauverTx(true)">Valider le transfert / la vente</button></div>`);
+  depMajCalculs('tx');
 }
 async function depSauverTx(valider){
   const lignes = _depLignes.filter(l=>l.produit_id && parseFloat(l.quantite)>0).map(l=>({produit_id:parseInt(l.produit_id), quantite:parseFloat(l.quantite)}));
   if(!lignes.length){ posAlert('Ajoutez au moins un produit avec une quantité.','warn'); return; }
+  const errs = depErreursLignes();
+  if(errs.length){ posAlert('Stock insuffisant ou prix manquant — ' + errs.join(' ; '),'warn'); return; }
+  if(document.getElementById('dep-tx-d').value==='CLIENT' && !document.getElementById('dep-tx-cnom').value.trim()){ posAlert('Nom du client requis pour une vente externe.','warn'); return; }
   const body = { destination: document.getElementById('dep-tx-d').value, client_nom: document.getElementById('dep-tx-cnom').value.trim()||null,
                  client_contact: document.getElementById('dep-tx-ccontact').value.trim()||null, notes: document.getElementById('dep-tx-notes').value.trim()||null, lignes, valider };
   try {
@@ -35615,13 +35668,25 @@ async function depPayer(id){
       <span>${esc(t.destination_libelle)}${t.client_nom?' · '+esc(t.client_nom):''}</span>
       <span>Total : <b>${posGx(t.total)}</b></span><span>Déjà payé : <b>${posGx(t.montant_paye)}</b></span>
       <span>Reste : <b style="color:#f87171" id="dep-p-reste" data-reste="${t.reste}">${posGx(t.reste)}</b></span></div>
-    ${deviseChampsHtml('dep-p','depPaieEquiv()')}
+    ${deviseChampsHtml('dep-p','depPaieDevise()')}
     <div class="pos-form-row">
       <div><label class="pos-label" id="dep-p-mlabel">Montant (G) *</label><input class="pos-input" id="dep-p-montant" type="number" min="0.01" step="any" value="${t.reste}" oninput="depPaieEquiv()"></div>
       <div><label class="pos-label">Méthode</label><select class="pos-select" id="dep-p-methode"><option value="CASH">Cash</option><option value="CARTE">Carte</option><option value="ZELLE">Zelle</option><option value="VIREMENT">Virement</option><option value="CHEQUE">Chèque</option></select></div></div>
     <div id="dep-p-equiv" style="font-size:13px;color:rgba(255,255,255,.55)"></div>
     <div><label class="pos-label">Notes</label><input class="pos-input" id="dep-p-notes"></div>
     <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Annuler</button><button class="pos-btn primary" onclick="depPayerValider(${id})">Enregistrer le paiement</button></div>`);
+  depPaieEquiv();
+}
+// Changement de devise ou de taux : le montant proposé devient le reste à
+// payer DANS cette devise (sinon un reste en gourdes serait saisi comme dollars).
+function depPaieDevise(){
+  const {devise, taux_change} = deviseLue('dep-p');
+  const reste = parseFloat(document.getElementById('dep-p-reste')?.dataset.reste||0);
+  const inp = document.getElementById('dep-p-montant');
+  if(inp){
+    if(devise==='USD') inp.value = taux_change ? (Math.round(reste/taux_change*100)/100) : '';
+    else inp.value = reste;
+  }
   depPaieEquiv();
 }
 async function depPaieEquiv(){

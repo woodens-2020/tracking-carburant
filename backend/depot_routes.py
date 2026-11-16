@@ -108,6 +108,13 @@ def produits_depot(actif: bool = True, db: Session = Depends(get_db)):
         q = q.filter(BarProduit.actif == True)
     produits = q.order_by(BarProduit.categorie, BarProduit.nom).all()
     stocks = _stocks_par_lieu(db)
+    # Dernier prix d'achat réceptionné au dépôt (« mete pri acha ajou »).
+    derniers: dict[int, tuple] = {}
+    for pid, prix, dt in (db.query(DepotAchatLigne.produit_id, DepotAchatLigne.prix_achat, DepotAchat.date_reception)
+                          .join(DepotAchat, DepotAchatLigne.achat_id == DepotAchat.id)
+                          .filter(DepotAchat.statut == "RECEPTIONNE")
+                          .order_by(DepotAchat.date_reception, DepotAchatLigne.id).all()):
+        derniers[pid] = (prix, dt)   # trié par date : le dernier écrase les précédents
     out = []
     for p in produits:
         s = stocks.get(p.id, {})
@@ -122,6 +129,8 @@ def produits_depot(actif: bool = True, db: Session = Depends(get_db)):
             "stock_piscine": float(s.get("PISCINE", 0)),
             "prix_vente":    float(prix),
             "cout_moyen":    float(cout),
+            "dernier_prix_achat": float(derniers[p.id][0]) if p.id in derniers else None,
+            "date_dernier_achat": derniers[p.id][1].isoformat() if p.id in derniers and derniers[p.id][1] else None,
             "seuil_min":     float(seuil),
             "alerte":        seuil > 0 and stock_depot <= seuil,
             "valeur_stock":  float((max(stock_depot, Decimal("0")) * cout).quantize(_CENT)),
@@ -228,12 +237,15 @@ def _remplir_lignes(db: Session, a: DepotAchat, lignes: List[LigneAchatIn]):
 
 @router.get("/achats")
 def liste_achats(date_debut: Optional[str] = None, date_fin: Optional[str] = None,
-                 statut: Optional[str] = None, db: Session = Depends(get_db)):
+                 statut: Optional[str] = None, fournisseur: Optional[str] = None,
+                 db: Session = Depends(get_db)):
+    """Journal des achats & réceptions — filtrable par date, statut, fournisseur."""
     dt1, dt2, _, _ = _periode(date_debut, date_fin)
     q = db.query(DepotAchat)
     if dt1: q = q.filter(DepotAchat.created_at >= dt1)
     if dt2: q = q.filter(DepotAchat.created_at <= dt2)
     if statut: q = q.filter(DepotAchat.statut == statut.upper())
+    if fournisseur: q = q.filter(func.lower(DepotAchat.fournisseur).contains(fournisseur.strip().lower()))
     return [_achat_dict(a) for a in q.order_by(DepotAchat.created_at.desc()).limit(500).all()]
 
 
