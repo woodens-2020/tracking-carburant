@@ -17525,7 +17525,9 @@ function hmRendre(){
   };
   const carte=e=>{
     const st=e.en_attente?'attente':e.statut;
-    const src=e.source==='pompiste'
+    const src=e.fiche_papier
+      ? `<span class="hm-src">📄 Fiche papier</span>`
+      : e.source==='pompiste'
       ? `<span class="hm-src pompiste">📨 Rapport n°${e.rapport_pompiste_id}${e.en_attente?' · à confirmer':''}</span>`
       : `<span class="hm-src">✍ Saisie</span>`;
     return `<div class="hm-rel ${st}">
@@ -18182,7 +18184,8 @@ function renderJournal(data){
       <td style="font-weight:600">${esc(e.pompe_nom)}${e.saisie_pompiste?`<div style="font-size:11px;font-weight:600;color:var(--orange,#ea580c)" title="Saisie d'origine du pompiste, conservée">✎ ${e.saisie_pompiste.mauvais_metre?`saisi sur ${esc(e.saisie_pompiste.produit_nom||'')} · ${esc(e.saisie_pompiste.pompe_nom||'')}`:'index corrigés'} : ${e.saisie_pompiste.metter_avant.toFixed(3)} → ${e.saisie_pompiste.metter_apres.toFixed(3)}</div>`:''}</td>
       <td style="font-size:13px">${e.pompiste_nom?esc(e.pompiste_nom):'<span class="c-dim">—</span>'}${!e.en_attente && e.id
         ? ` <button class="btn-ghost" style="font-size:12px;padding:0 4px" title="Attribuer ce relevé à un pompiste"
-             onclick="openPompisteModal([{releveId:${e.id}, pompeNom:${esc(JSON.stringify(e.pompe_nom)).replace(/"/g,'&quot;')}, pompisteId:${e.pompiste_id||'null'}}])">👤</button>` : ''}${e.en_attente
+             onclick="openPompisteModal([{releveId:${e.id}, pompeNom:${esc(JSON.stringify(e.pompe_nom)).replace(/"/g,'&quot;')}, pompisteId:${e.pompiste_id||'null'}}])">👤</button>` : ''}${e.fiche_papier
+        ?`<div><span class="jr-src" title="Saisi d'après la fiche papier de la direction : prioritaire, aucun rapport pompiste ne le remplace">📄 Fiche papier</span></div>`:''}${e.en_attente
         ?`<div><span class="jr-src attente" title="Rapport pompiste pas encore finalisé : ni caisse, ni stock, ni totaux">⏳ En attente de validation — non compté</span></div>`
         : e.source==='pompiste'
         ?`<div><span class="jr-src ${['CONFIRME','RESOLU'].includes(e.rapport_statut)?'ok':''}" title="Saisi par le pompiste sur sa tablette">⛽ Espace pompiste · ${

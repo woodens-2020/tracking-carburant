@@ -1100,6 +1100,10 @@ def _ecrire_journal(db: Session, rap: RapportPompiste, request: Request, *, remp
         av = float(l.metter_avant_corrige if l.metter_avant_corrige is not None else l.metter_avant)
         ap = float(l.metter_apres_corrige if l.metter_apres_corrige is not None else l.metter_apres)
         existant = db.query(Releve).filter_by(date=rap.date, periode=rap.periode, pompe_id=l.pompe_id).first()
+        if existant and existant.fiche_papier:
+            avertissements.append(f"{l.pompe.nom} : le journal garde la fiche papier de la direction "
+                                  "(prioritaire sur le rapport pompiste).")
+            continue
         if existant and existant.rapport_pompiste_id != rap.id and not remplacer_saisie:
             avertissements.append(f"{l.pompe.nom} : déjà saisie dans le module Saisie — "
                                   "le journal garde cette saisie jusqu'à la finalisation du rapport.")
@@ -2071,6 +2075,8 @@ def finaliser(rid: int, data: FinaliserIn, request: Request,
         prec = main._releve_precedent(db, l.pompe_id, rap.date, rap.periode)
         ecart = round(av - float(prec.metter_apres), 4) if prec else 0.0
         existant = db.query(Releve).filter_by(date=rap.date, periode=rap.periode, pompe_id=l.pompe_id).first()
+        if existant and existant.fiche_papier:
+            continue                                  # la fiche papier reste au journal
         motif_existant = existant.motif_ecart_compteur if existant else None
         if abs(ecart) > main.TOLERANCE_ECART_COMPTEUR and len(motif) < main.MOTIF_ECART_MIN_CARACTERES \
                 and not (motif_existant and existant and abs(float(existant.metter_avant) - av) <= TOLERANCE):
@@ -2091,7 +2097,7 @@ def finaliser(rid: int, data: FinaliserIn, request: Request,
     # Le relevé officiel garde la trace de ce que le pompiste avait écrit
     for l in rap.lignes:
         rj = db.query(Releve).filter_by(date=rap.date, periode=rap.periode, pompe_id=l.pompe_id).first()
-        if rj is None:
+        if rj is None or rj.fiche_papier:
             continue
         rj.pompe_saisie_id = l.pompe_saisie_id if l.pompe_saisie_id != l.pompe_id else None
         av_f, ap_f = _valeurs_finales(l)
