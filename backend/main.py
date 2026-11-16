@@ -45,6 +45,7 @@ from zelle_routes import router as zelle_router
 from taches_routes import router as taches_router
 from pieces_jointes_routes import router as pieces_jointes_router
 from listes_reference_routes import router as listes_reference_router
+from piscine_routes import router as piscine_router
 from auth import (
     SESSION_COOKIE, SESSION_DURATION_ADMIN_HOURS, hash_password, verify_password,
     hash_code_acces, verify_code_acces,
@@ -123,6 +124,7 @@ _MODULES = {
     "cuisine":    os.getenv("MODULE_CUISINE",    "true").lower() == "true",
     "zelle":      os.getenv("MODULE_ZELLE",      "true").lower() == "true",
     "patisserie": os.getenv("MODULE_PATISSERIE", "true").lower() == "true",
+    "piscine":    os.getenv("MODULE_PISCINE",    "true").lower() == "true",
 }
 
 app = FastAPI(
@@ -417,6 +419,7 @@ app.include_router(zelle_router)
 app.include_router(taches_router)
 app.include_router(pieces_jointes_router)
 app.include_router(listes_reference_router)
+app.include_router(piscine_router)
 
 
 @app.on_event("startup")
@@ -5912,8 +5915,15 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     if dt_fin:   q_remb = q_remb.filter(BarRemboursement.date_remb <= dt_fin)
     for r, lieu_v in q_remb.all():
         cash_dept[lieu_de(lieu_v)] += float(r.montant)
-    ventes_bar     = round(cash_dept["DEVANT"], 2)
-    ventes_piscine = round(cash_dept["PISCINE"], 2)
+    # Bar : ses deux comptoirs (Bar Devant + Bar Piscine) — tout le module Bar.
+    ventes_bar     = round(cash_dept["DEVANT"] + cash_dept["PISCINE"], 2)
+
+    # ── Entrées : Piscine (vente de cartes, montant net après rabais) ──
+    from models import PiscineVente, PiscineDepense
+    q_pv = db.query(PiscineVente).filter(PiscineVente.statut == "VALIDEE")
+    if dt_debut: q_pv = q_pv.filter(PiscineVente.date_vente >= dt_debut)
+    if dt_fin:   q_pv = q_pv.filter(PiscineVente.date_vente <= dt_fin)
+    ventes_piscine = round(sum(float(v.montant_net) for v in q_pv.all()), 2)
 
     # ── Entrées : Cuisine (mode CASH uniquement — CREDIT pas encore encaissé) ──
     q_cv = db.query(CuisineVente).filter(
@@ -5965,8 +5975,8 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
             float(a.quantite) * float(a.prix_achat_unitaire)
             + sum(float(d.montant) for d in a.depenses)
         )
-    achats_bar     = round(_achats_dept["DEVANT"], 2)
-    achats_piscine = round(_achats_dept["PISCINE"], 2)
+    achats_bar     = round(_achats_dept["DEVANT"] + _achats_dept["PISCINE"], 2)
+    achats_piscine = 0.0   # la Piscine (cartes) n'a pas d'achats de marchandise
 
     # ── Sorties : Achats + Dépenses Cuisine ─────────────────────
     q_ca = db.query(CuisineAchat)
@@ -6003,11 +6013,11 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     q_bd = db.query(BarDepense)
     if dt_debut: q_bd = q_bd.filter(BarDepense.date_depense >= dt_debut)
     if dt_fin:   q_bd = q_bd.filter(BarDepense.date_depense <= dt_fin)
-    _dep_dept = {"DEVANT": 0.0, "PISCINE": 0.0}
-    for d in q_bd.all():
-        _dep_dept[lieu_de(d.lieu)] += float(d.montant)
-    depenses_bar     = round(_dep_dept["DEVANT"], 2)
-    depenses_piscine = round(_dep_dept["PISCINE"], 2)
+    depenses_bar = round(sum(float(d.montant) for d in q_bd.all()), 2)
+    q_pd = db.query(PiscineDepense)
+    if dt_debut: q_pd = q_pd.filter(PiscineDepense.date_depense >= dt_debut)
+    if dt_fin:   q_pd = q_pd.filter(PiscineDepense.date_depense <= dt_fin)
+    depenses_piscine = round(sum(float(d.montant) for d in q_pd.all()), 2)
 
     total_depenses = round(depenses_station + depenses_cuisine + depenses_hotel + depenses_bar + depenses_piscine, 2)
 
@@ -6030,8 +6040,8 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     _paie_dept = {"DEVANT": 0.0, "PISCINE": 0.0}
     for p in q_bpe.all():
         _paie_dept[lieu_de(p.lieu)] += float(p.montant)
-    total_payroll_bar     = round(_paie_dept["DEVANT"], 2)
-    total_payroll_piscine = round(_paie_dept["PISCINE"], 2)
+    total_payroll_bar     = round(_paie_dept["DEVANT"] + _paie_dept["PISCINE"], 2)
+    total_payroll_piscine = 0.0
 
     total_payroll_paye = round(total_payroll_rh + total_payroll_bar + total_payroll_piscine, 2)
 

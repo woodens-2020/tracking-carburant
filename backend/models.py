@@ -1280,6 +1280,75 @@ class HotelPaiement(Base):
     )
 
 
+# ══════════════════════════════════════════════════════════════════
+# PISCINE — vente de cartes d'accès
+# ══════════════════════════════════════════════════════════════════
+
+class PiscineConfig(Base):
+    """Paramètres de la Piscine — singleton (id=1) : prix d'une carte."""
+    __tablename__ = "piscine_config"
+
+    id         = Column(Integer, primary_key=True)
+    prix_carte = Column(Numeric(12, 2), nullable=False, default=0)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
+    updated_by = Column(String(150), nullable=True)
+
+
+class PiscineVente(Base):
+    """Vente de cartes Piscine. Le prix unitaire est figé au moment de la
+    vente (repris des paramètres) ; montant_brut = quantité × prix,
+    rabais_montant calculé depuis rabais_type/rabais_valeur, montant_net =
+    brut − rabais (ce qui entre en caisse)."""
+    __tablename__ = "piscine_ventes"
+
+    id             = Column(Integer, primary_key=True)
+    date_vente     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    quantite       = Column(Integer, nullable=False)
+    prix_unitaire  = Column(Numeric(12, 2), nullable=False)
+    montant_brut   = Column(Numeric(14, 2), nullable=False)
+    rabais_type    = Column(String(12), nullable=True)      # MONTANT | POURCENT | NULL
+    rabais_valeur  = Column(Numeric(12, 2), nullable=True)
+    rabais_montant = Column(Numeric(14, 2), nullable=False, default=0)
+    montant_net    = Column(Numeric(14, 2), nullable=False)
+    lieu_vente     = Column(String(10), nullable=True)      # DEVANT | DERRIERE | NULL (non précisé)
+    client_nom     = Column(String(150), nullable=True)
+    notes          = Column(String(300), nullable=True)
+    statut         = Column(String(10), nullable=False, default="VALIDEE")  # VALIDEE | ANNULEE
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    utilisateur = relationship("Utilisateur")
+
+    __table_args__ = (
+        CheckConstraint("quantite > 0", name="chk_pisc_vente_qte_pos"),
+        CheckConstraint("montant_brut >= 0 AND montant_net >= 0 AND rabais_montant >= 0", name="chk_pisc_vente_montants"),
+        CheckConstraint("rabais_type IS NULL OR rabais_type IN ('MONTANT','POURCENT')", name="chk_pisc_vente_rabais"),
+        CheckConstraint("lieu_vente IS NULL OR lieu_vente IN ('DEVANT','DERRIERE')", name="chk_pisc_vente_lieu"),
+        CheckConstraint("statut IN ('VALIDEE','ANNULEE')", name="chk_pisc_vente_statut"),
+        Index("idx_pisc_vente_date", "date_vente"),
+    )
+
+
+class PiscineDepense(Base):
+    """Dépense de la Piscine (entretien, chlore, personnel…)."""
+    __tablename__ = "piscine_depenses"
+
+    id             = Column(Integer, primary_key=True)
+    description    = Column(String(200), nullable=False)
+    categorie      = Column(String(120), nullable=True)
+    montant        = Column(Numeric(12, 2), nullable=False)
+    date_depense   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    fournisseur    = Column(String(150), nullable=True)
+    notes          = Column(String(300), nullable=True)
+    utilisateur_id = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+
+    utilisateur = relationship("Utilisateur")
+
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="chk_pisc_dep_montant_pos"),
+        Index("idx_pisc_dep_date", "date_depense"),
+    )
+
+
 class HotelConfig(Base):
     """Configuration de l'hôtel — table singleton (id=1). `taux_usd` : taux
     du jour proposé par défaut (HTG pour 1 USD) quand un client paie en

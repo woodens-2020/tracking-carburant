@@ -249,9 +249,79 @@ def test_achat_et_paie_du_departement(client, db):
 def test_rapport_caisse_institution_separe_piscine(client, db):
     d = client.get("/api/caisse/rapport", headers=H).json()
     ad = d["autres_departements"]
-    for k in ("ventes_piscine", "achats_piscine", "depenses_piscine", "payroll_piscine", "depenses_bar", "hotel_usd"):
+    for k in ("ventes_piscine", "depenses_piscine", "depenses_bar", "hotel_usd"):
         assert k in ad
-    assert ad["ventes_piscine"] > 0
+    # Les ventes du comptoir « Bar Piscine » restent dans le Bar
+    assert ad["ventes_bar"] > 0
+
+
+# ══════════════════════════════════════════════════════════════════
+# PISCINE — vente de cartes
+# ══════════════════════════════════════════════════════════════════
+
+def test_vente_cartes_sans_prix_refusee(client, db):
+    from models import PiscineConfig
+    if db.get(PiscineConfig, 1) is None:
+        r = client.post("/api/piscine/ventes", headers=H, json={"quantite": 2})
+        assert r.status_code == 422
+
+
+def test_vente_cartes_calculs_et_rabais(client, db):
+    assert client.put("/api/piscine/config", headers=H, json={"prix_carte": 250}).status_code == 200
+    assert client.get("/api/piscine/config", headers=H).json()["prix_carte"] == 250.0
+
+    r = client.post("/api/piscine/ventes", headers=H, json={"quantite": 4, "lieu_vente": "DEVANT"})
+    assert r.status_code == 201, r.text
+    v = r.json()
+    assert v["montant_brut"] == 1000.0 and v["rabais_montant"] == 0 and v["montant_net"] == 1000.0
+    assert v["lieu_libelle"] == "Devant"
+
+    r = client.post("/api/piscine/ventes", headers=H, json={
+        "quantite": 2, "lieu_vente": "DERRIERE", "rabais_type": "POURCENT", "rabais_valeur": 10})
+    v = r.json()
+    assert v["montant_brut"] == 500.0 and v["rabais_montant"] == 50.0 and v["montant_net"] == 450.0
+
+    r = client.post("/api/piscine/ventes", headers=H, json={
+        "quantite": 1, "rabais_type": "MONTANT", "rabais_valeur": 100})
+    v = r.json()
+    assert v["lieu_vente"] is None and v["montant_net"] == 150.0
+
+    # Rabais supérieur au montant / pourcentage > 100 : refusés
+    assert client.post("/api/piscine/ventes", headers=H, json={
+        "quantite": 1, "rabais_type": "MONTANT", "rabais_valeur": 300}).status_code == 422
+    assert client.post("/api/piscine/ventes", headers=H, json={
+        "quantite": 1, "rabais_type": "POURCENT", "rabais_valeur": 120}).status_code == 422
+    assert client.post("/api/piscine/ventes", headers=H, json={
+        "quantite": 1, "lieu_vente": "COTE"}).status_code == 422
+
+
+def test_dashboard_piscine_et_depenses(client, db):
+    client.put("/api/piscine/config", headers=H, json={"prix_carte": 200})
+    v = client.post("/api/piscine/ventes", headers=H, json={"quantite": 3, "lieu_vente": "DEVANT"}).json()
+    dep = client.post("/api/piscine/depenses", headers=H, json={"description": "Chlore", "montant": 300})
+    assert dep.status_code == 201, dep.text
+
+    d = client.get("/api/piscine/dashboard", headers=H).json()
+    k = d["kpi"]
+    assert k["nb_cartes"] >= 3
+    assert k["depenses"] >= 300
+    assert round(k["montant_net"] - k["depenses"], 2) == k["solde"]
+    assert round(k["montant_brut"] - k["rabais"], 2) == k["montant_net"]
+    assert d["par_lieu"]["DEVANT"]["nb_cartes"] >= 3
+    assert sum(j["nb_cartes"] for j in d["evolution"]) == k["nb_cartes"]
+
+    # Annulation : la vente sort des totaux
+    avant = k["nb_cartes"]
+    assert client.post(f"/api/piscine/ventes/{v['id']}/annuler", headers=H).status_code == 200
+    apres = client.get("/api/piscine/dashboard", headers=H).json()["kpi"]["nb_cartes"]
+    assert apres == avant - 3
+
+    lst = client.get("/api/piscine/depenses", headers=H).json()
+    assert any(x["id"] == dep.json()["id"] for x in lst["depenses"])
+    assert client.delete(f"/api/piscine/depenses/{dep.json()['id']}", headers=H).status_code == 200
+
+    caisse = client.get("/api/caisse/rapport", headers=H).json()["autres_departements"]
+    assert caisse["ventes_piscine"] == client.get("/api/piscine/dashboard", headers=H).json()["kpi"]["montant_net"]
 
 
 def test_lieu_invalide_refuse(client):
