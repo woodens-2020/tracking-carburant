@@ -19,7 +19,12 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
+from datetime import date, timedelta
 from fastapi.testclient import TestClient
+
+# Période large (hier → demain) : la base SQLite de test stocke l'heure UTC
+# sans fuseau ; autour de minuit, « aujourd'hui » diffère entre UTC et Haïti.
+PER = f"date_debut={date.today() - timedelta(days=1)}&date_fin={date.today() + timedelta(days=1)}"
 
 H = {"X-API-Key": "test-piscine-key"}
 
@@ -207,8 +212,8 @@ def test_depenses_et_caisse_par_departement(client, db):
     assert any(d["id"] == r.json()["id"] for d in lp["depenses"])
     assert all(d["lieu"] == "PISCINE" for d in lp["depenses"])
 
-    gp = client.get("/api/pos/grande-caisse?lieu=PISCINE", headers=H).json()
-    gb = client.get("/api/pos/grande-caisse?lieu=DEVANT", headers=H).json()
+    gp = client.get(f"/api/pos/grande-caisse?lieu=PISCINE&{PER}", headers=H).json()
+    gb = client.get(f"/api/pos/grande-caisse?lieu=DEVANT&{PER}", headers=H).json()
     assert gp["caisse"]["depenses"] >= 1500 and gb["caisse"]["depenses"] >= 400
     assert gp["departement"] == "Piscine"
 
@@ -301,7 +306,7 @@ def test_dashboard_piscine_et_depenses(client, db):
     dep = client.post("/api/piscine/depenses", headers=H, json={"description": "Chlore", "montant": 300})
     assert dep.status_code == 201, dep.text
 
-    d = client.get("/api/piscine/dashboard", headers=H).json()
+    d = client.get(f"/api/piscine/dashboard?{PER}", headers=H).json()
     k = d["kpi"]
     assert k["nb_cartes"] >= 3
     assert k["depenses"] >= 300
@@ -313,15 +318,15 @@ def test_dashboard_piscine_et_depenses(client, db):
     # Annulation : la vente sort des totaux
     avant = k["nb_cartes"]
     assert client.post(f"/api/piscine/ventes/{v['id']}/annuler", headers=H).status_code == 200
-    apres = client.get("/api/piscine/dashboard", headers=H).json()["kpi"]["nb_cartes"]
+    apres = client.get(f"/api/piscine/dashboard?{PER}", headers=H).json()["kpi"]["nb_cartes"]
     assert apres == avant - 3
 
-    lst = client.get("/api/piscine/depenses", headers=H).json()
+    lst = client.get(f"/api/piscine/depenses?{PER}", headers=H).json()
     assert any(x["id"] == dep.json()["id"] for x in lst["depenses"])
     assert client.delete(f"/api/piscine/depenses/{dep.json()['id']}", headers=H).status_code == 200
 
     caisse = client.get("/api/caisse/rapport", headers=H).json()["autres_departements"]
-    assert caisse["ventes_piscine"] == client.get("/api/piscine/dashboard", headers=H).json()["kpi"]["montant_net"]
+    assert caisse["ventes_piscine"] == client.get(f"/api/piscine/dashboard?{PER}", headers=H).json()["kpi"]["montant_net"]
 
 
 def test_lieu_invalide_refuse(client):
@@ -389,17 +394,17 @@ def test_taux_par_defaut_et_config(client, db):
 
 
 def test_totaux_separes_dashboard_rapport_journal_et_caisse(client, db):
-    dash = client.get("/api/hotel/dashboard", headers=H).json()["kpi"]
+    dash = client.get(f"/api/hotel/dashboard?{PER}", headers=H).json()["kpi"]
     assert dash["encaisse_usd"] >= 50
     assert dash["caisse_usd"] == dash["encaisse_usd"]
     # La caisse gourdes ne contient pas les dollars
     assert round(dash["caisse_disponible"] - dash["renflouements_periode"] + dash["depenses_periode"], 2) == dash["encaisse_htg"]
 
-    rap = client.get("/api/hotel/rapport", headers=H).json()["kpis"]
+    rap = client.get(f"/api/hotel/rapport?{PER}", headers=H).json()["kpis"]
     assert rap["encaisse_usd"] == dash["encaisse_usd"]
     assert rap["encaisse_htg"] == dash["encaisse_htg"]
 
-    j = client.get("/api/hotel/paiements", headers=H).json()
+    j = client.get(f"/api/hotel/paiements?{PER}", headers=H).json()
     assert j["total_usd"] >= 60 and j["total_htg"] > 0
     assert all(p["devise"] in ("HTG", "USD") for p in j["paiements"])
 

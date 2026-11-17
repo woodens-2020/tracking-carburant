@@ -98,6 +98,35 @@ def quantite_unites(p, quantite=None, nb_caisses=None, nb_unites=None) -> Decima
     return _d(quantite)
 
 
+# ── Articles du dépôt ─────────────────────────────────────────────
+# Le dépôt ne gère que les articles du BAR (boissons…). Les plats (cabri,
+# poulet…) et les cartes piscine en sont exclus. Choix automatique tant que
+# l'utilisateur n'a pas décidé (bar_produits.depot_actif NULL), puis son
+# choix explicite (« Ajouter au dépôt » / « Retirer du dépôt ») fait foi.
+import re as _re
+import unicodedata as _ud
+
+_CATEGORIES_HORS_DEPOT = {"plat", "plats", "repas", "nourriture", "manger", "cuisine", "viande",
+                          "dessert", "desserts", "accompagnement", "accompagnements", "carte", "cartes"}
+_MOTS_HORS_DEPOT = _re.compile(
+    r"\b(cabri|kabrit|poulet|poul|griot|porc|cochon|boeuf|bef|poisson|pwason|lambi|hareng|"
+    r"riz|diri|banane|bannann|frite|frites|sandwich|burger|hamburger|spaghetti|pikliz|legume|"
+    r"soupe|soup|bouillon|tasso|dinde|kodenn|crevette|langouste|omelette|pate|pates|pizza|"
+    r"plat|assiette|carte|kat|ticket|entree)\b")
+
+
+def _norm(s: str) -> str:
+    return "".join(c for c in _ud.normalize("NFKD", s or "") if not _ud.combining(c)).lower()
+
+
+def est_au_depot(p) -> bool:
+    if p.depot_actif is not None:
+        return bool(p.depot_actif)
+    if _norm(p.categorie).strip() in _CATEGORIES_HORS_DEPOT:
+        return False
+    return not _MOTS_HORS_DEPOT.search(_norm(p.nom))
+
+
 def _numero(db: Session, modele, prefixe: str) -> str:
     """Numéro lisible et unique : DA-2026-0001 (achat), FD-… (facture), RD-… (reçu)."""
     col = modele.numero_recu if modele is DepotPaiement else modele.numero
@@ -131,11 +160,15 @@ def _stocks_par_lieu(db: Session) -> dict[int, dict[str, Decimal]]:
 
 
 @router.get("/produits")
-def produits_depot(actif: bool = True, db: Session = Depends(get_db)):
+def produits_depot(actif: bool = True, tous: bool = False, db: Session = Depends(get_db)):
+    """Articles du dépôt (boissons du bar). `tous=true` : tout le catalogue
+    bar, avec `au_depot` — pour choisir les articles à ajouter."""
     q = db.query(BarProduit)
     if actif:
         q = q.filter(BarProduit.actif == True)
     produits = q.order_by(BarProduit.categorie, BarProduit.nom).all()
+    if not tous:
+        produits = [p for p in produits if est_au_depot(p)]
     stocks = _stocks_par_lieu(db)
     # Dernier prix d'achat réceptionné au dépôt (« mete pri acha ajou »).
     derniers: dict[int, tuple] = {}
@@ -154,7 +187,7 @@ def produits_depot(actif: bool = True, db: Session = Depends(get_db)):
         n = upc(p)
         out.append({
             "id": p.id, "nom": p.nom, "categorie": p.categorie, "unite": p.unite,
-            "lieu": p.lieu,
+            "lieu": p.lieu, "au_depot": est_au_depot(p), "a_photo": bool(p.photo_base64),
             "par_caisse":    n > 1,
             "unites_par_caisse": n if n > 1 else None,
             "stock_depot_caisses":   en_caisses(stock_depot, n),
@@ -207,6 +240,130 @@ def configurer_produit(produit_id: int, data: ConfigProduitIn, request: Request,
     db.commit()
     return {"ok": True, "prix_vente": float(prix_actif(p.id, db) or 0), "seuil_min": float(p.seuil_alerte_stock),
             "unites_par_caisse": p.unites_par_caisse if p.vendu_par_caisse else None}
+
+
+class AuDepotIn(BaseModel):
+    au_depot: bool
+
+
+@router.put("/produits/{produit_id}/depot")
+def changer_au_depot(produit_id: int, data: AuDepotIn, db: Session = Depends(get_db)):
+    """Ajouter un article du bar au dépôt, ou l'en retirer (ex. plats, cartes
+    piscine). Le choix est conservé ; l'article reste dans Produits Bar."""
+    p = db.get(BarProduit, produit_id)
+    if not p:
+        raise HTTPException(404, "Article introuvable.")
+    if not data.au_depot and stock_courant(p.id, db, lieu=DEPOT) != 0:
+        raise HTTPException(409, f"« {p.nom} » a encore du stock au dépôt — mettez-le à zéro (Ajuster) avant de le retirer.")
+    p.depot_actif = data.au_depot
+    db.commit()
+    return {"ok": True, "id": p.id, "au_depot": data.au_depot}
+
+
+class NouvelArticleIn(BaseModel):
+    nom:               str
+    categorie:         str = "boisson"
+    unite:             str = "bouteille"
+    unites_par_caisse: Optional[int] = Field(default=None, ge=0)
+    prix_vente:        float = Field(gt=0)            # prix d'une unité
+    seuil_min:         Optional[float] = Field(default=None, ge=0)
+
+
+@router.post("/produits", status_code=201)
+def creer_article(data: NouvelArticleIn, request: Request, db: Session = Depends(get_db)):
+    """Nouvel article créé depuis le dépôt — ajouté aussi au catalogue Bar
+    (vendable aux deux bars)."""
+    nom = data.nom.strip()
+    if not nom:
+        raise HTTPException(422, "Nom requis.")
+    if db.query(BarProduit).filter(func.lower(BarProduit.nom) == nom.lower()).first():
+        raise HTTPException(409, f"Un article « {nom} » existe déjà — ajoutez-le au dépôt depuis la liste.")
+    from models import BarCategorie
+    cat = (data.categorie or "boisson").strip().lower()
+    if not db.query(BarCategorie).filter_by(nom=cat).first():
+        db.add(BarCategorie(nom=cat))
+        db.flush()
+    n = data.unites_par_caisse or 0
+    p = BarProduit(nom=nom, categorie=cat, unite=(data.unite or "unite").strip(), actif=True,
+                   seuil_alerte_stock=Decimal(str(data.seuil_min or 0)),
+                   vendu_par_caisse=n > 1, unites_par_caisse=n if n > 1 else None, depot_actif=True)
+    db.add(p)
+    db.flush()
+    db.add(BarPrixHistorique(produit_id=p.id, prix=Decimal(str(data.prix_vente)).quantize(_CENT),
+                             date_debut=datetime.now(timezone.utc), utilisateur_id=_uid(request)))
+    db.commit()
+    return {"id": p.id, "nom": p.nom}
+
+
+class AjustementDepotIn(BaseModel):
+    nb_caisses: float = Field(default=0, ge=0)
+    nb_unites:  float = Field(default=0, ge=0)
+    motif:      Optional[str] = None
+
+
+@router.post("/produits/{produit_id}/ajustement", status_code=201)
+def ajuster_stock_depot(produit_id: int, data: AjustementDepotIn, request: Request, db: Session = Depends(get_db)):
+    """Inventaire physique d'un article au dépôt, à n'importe quel moment :
+    on saisit ce qui est réellement compté (caisses + unités) ; la différence
+    avec le stock enregistré devient un mouvement AJUSTEMENT tracé."""
+    p = db.get(BarProduit, produit_id)
+    if not p:
+        raise HTTPException(404, "Article introuvable.")
+    compte = quantite_unites(p, None, data.nb_caisses, data.nb_unites)
+    avant = stock_courant(p.id, db, lieu=DEPOT)
+    diff = compte - avant
+    if diff != 0:
+        motif = (data.motif or "").strip() or "Ajustement d'inventaire au dépôt"
+        db.add(BarMouvementStock(produit_id=p.id, type_mouvement="AJUSTEMENT", quantite=diff,
+                                 motif=f"{motif} : {float(avant):g} → {float(compte):g} u", lieu=DEPOT,
+                                 utilisateur_id=_uid(request)))
+        db.commit()
+    n = upc(p)
+    return {"ok": True, "avant": float(avant), "apres": float(compte), "difference": float(diff),
+            "apres_caisses": en_caisses(compte, n)}
+
+
+class RemiseAZeroIn(BaseModel):
+    confirmation: str
+
+
+@router.post("/reinitialiser")
+def remettre_depot_a_zero(data: RemiseAZeroIn, db: Session = Depends(get_db),
+                          user: Utilisateur = Depends(_require_pdg_ou_admin)):
+    """Repart de zéro au Dépôt central (PDG/admin, confirmation écrite
+    « REMETTRE A ZERO ») : supprime achats, factures, paiements du dépôt, tout
+    le stock du dépôt, et les entrées « Reçu du dépôt » dans les bars (un
+    transfert effacé ne doit pas laisser son stock côté bar). Les ventes des
+    bars, les articles et leurs prix ne sont pas touchés."""
+    if (data.confirmation or "").strip().upper() != "REMETTRE A ZERO":
+        raise HTTPException(422, "Écrivez exactement REMETTRE A ZERO pour confirmer.")
+    numeros = [n for (n,) in db.query(DepotTransaction.numero).all()]
+    nb = {
+        "paiements":    db.query(DepotPaiement).count(),
+        "transactions": len(numeros),
+        "achats":       db.query(DepotAchat).count(),
+    }
+    db.query(DepotPaiement).delete(synchronize_session=False)
+    db.query(DepotTransactionLigne).delete(synchronize_session=False)
+    db.query(DepotTransaction).delete(synchronize_session=False)
+    db.query(DepotAchatLigne).delete(synchronize_session=False)
+    db.query(DepotAchat).delete(synchronize_session=False)
+    nb["mouvements_depot"] = db.query(BarMouvementStock).filter(BarMouvementStock.lieu == DEPOT).delete(synchronize_session=False)
+    bar = 0
+    for num in numeros:
+        bar += (db.query(BarMouvementStock)
+                .filter(BarMouvementStock.type_mouvement == "TRANSFERT",
+                        BarMouvementStock.lieu.in_(["DEVANT", "PISCINE"]),
+                        BarMouvementStock.motif.in_([f"Reçu du dépôt — {num}", f"Annulation {num}"]))
+                .delete(synchronize_session=False))
+    nb["entrees_bars"] = bar
+    from activity_log import log_event
+    try:
+        log_event(db, "depot_remise_a_zero", user_id=user.id, details={"par": user.nom_complet, **nb})
+    except Exception:
+        pass
+    db.commit()
+    return {"ok": True, "supprime": nb}
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -288,6 +445,8 @@ def _remplir_lignes(db: Session, a: DepotAchat, lignes: List[LigneAchatIn]):
         p = db.get(BarProduit, l.produit_id)
         if not p:
             raise HTTPException(404, f"Produit #{l.produit_id} introuvable.")
+        if not est_au_depot(p):
+            raise HTTPException(422, f"« {p.nom} » n'est pas un article du dépôt (Inventaire › Ajouter un article).")
         q = quantite_unites(p, l.quantite, l.nb_caisses, l.nb_unites)
         if q <= 0:
             raise HTTPException(422, f"Quantité nulle pour « {p.nom} ».")
@@ -515,6 +674,8 @@ def creer_transaction(data: TransactionIn, request: Request, db: Session = Depen
         p = db.get(BarProduit, l.produit_id)
         if not p:
             raise HTTPException(404, f"Produit #{l.produit_id} introuvable.")
+        if not est_au_depot(p):
+            raise HTTPException(422, f"« {p.nom} » n'est pas un article du dépôt.")
         if dest in ("DEVANT", "PISCINE") and p.lieu and p.lieu != dest:
             raise HTTPException(422, f"« {p.nom} » est réservé à {DESTINATIONS[p.lieu]}.")
         prix = prix_actif(p.id, db)
@@ -703,7 +864,7 @@ def balance_caisse(date_debut: Optional[str] = None, date_fin: Optional[str] = N
 def rapport_depot(date_debut: Optional[str] = None, date_fin: Optional[str] = None,
                   db: Session = Depends(get_db)):
     dt1, dt2, d1, d2 = _periode(date_debut, date_fin)
-    produits = produits_depot(True, db)
+    produits = produits_depot(True, False, db)
 
     q_tx = db.query(DepotTransaction).filter(DepotTransaction.statut == "VALIDEE")
     if dt1: q_tx = q_tx.filter(DepotTransaction.date_validation >= dt1)

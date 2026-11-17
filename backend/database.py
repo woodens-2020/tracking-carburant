@@ -392,6 +392,9 @@ def _migrate_columns():
     # encaissées (voir devise.py), quel que soit le moteur.
     _num14 = "NUMERIC" if _is_sqlite else "NUMERIC(14,2)"
     _num10 = "NUMERIC" if _is_sqlite else "NUMERIC(10,4)"
+    # v29 — article géré (ou non) au Dépôt central
+    new_cols.append(("bar_produits", "depot_actif",
+                     f"ALTER TABLE bar_produits ADD COLUMN depot_actif {'INTEGER' if _is_sqlite else 'BOOLEAN'}", None))
     for _t in ("bar_ventes", "bar_remboursements", "cuisine_ventes", "patisserie_ventes", "piscine_ventes"):
         new_cols += [
             (_t, "devise",         f"ALTER TABLE {_t} ADD COLUMN devise VARCHAR(3) NOT NULL DEFAULT 'HTG'", None),

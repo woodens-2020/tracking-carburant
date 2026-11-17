@@ -35369,44 +35369,185 @@ function depFmtCs(q, n){
 }
 const depOptionsProduits = (sel) => _depProduits.map(p=>`<option value="${p.id}" ${String(p.id)===String(sel)?'selected':''}>${esc(p.nom)}${p.unites_par_caisse>1?` (cs de ${p.unites_par_caisse})`:''} — dépôt ${depFmtCs(p.stock_depot, depUpc(p))}</option>`).join('');
 
-// ── Inventaire & prix ─────────────────────────────────────────────
+// ── Inventaire : mosaïque des articles du dépôt ───────────────────
+// Dès l'ouverture, chaque article (boissons du bar) apparaît en tuile avec
+// sa quantité au dépôt en caisses + unités. Plats et cartes piscine n'y
+// sont pas ; « Ajouter un article » / « Retirer » gèrent la liste.
+let _depVue = (()=>{ try { return localStorage.getItem('depot_vue') || 'mosaique'; } catch(e){ return 'mosaique'; } })();
 async function loadDepotProduits(){
   const root = document.getElementById('depot-produits-root');
-  root.innerHTML = depHeader('Dépôt central — Inventaire & prix', 'Articles comptés en caisses · stock du dépôt et des bars · prix de vente · minimum',
-    `<input class="pos-input" id="dep-prod-q" placeholder="Rechercher…" oninput="depRendreProduits()" style="width:200px">
-     <select class="pos-select" id="dep-prod-filtre" onchange="depRendreProduits()" style="width:180px">
-       <option value="">Tous les articles</option><option value="STOCK">En stock au dépôt</option><option value="ALERTE">Sous le minimum</option><option value="SANS_CS">Sans nombre par caisse</option></select>`)
-    + `<div class="pos-kpi-grid" id="dep-prod-kpi"></div><div class="pos-card"><div class="pos-table-wrap"><table class="pos-table">
-      <thead><tr><th>Article</th><th>Catégorie</th><th style="text-align:right">Unités / caisse</th><th style="text-align:right">Dépôt</th><th style="text-align:right">Bar Devant</th><th style="text-align:right">Bar Piscine</th><th style="text-align:right">Prix vente (u / cs)</th><th style="text-align:right">Min.</th><th style="text-align:right">Dernier achat (cs)</th><th style="text-align:right">Valeur</th><th></th></tr></thead>
-      <tbody id="dep-prod-tbody"><tr><td colspan="11" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody></table></div></div>`;
+  const ro = _isReadOnly() && !depAdmin();
+  root.innerHTML = depHeader('Dépôt central — Inventaire', 'Articles du bar en caisses · quantité disponible de chaque article',
+    `<input class="pos-input" id="dep-prod-q" placeholder="Rechercher…" oninput="depRendreProduits()" style="width:180px">
+     <select class="pos-select" id="dep-prod-filtre" onchange="depRendreProduits()" style="width:170px">
+       <option value="">Tous les articles</option><option value="STOCK">En stock</option><option value="VIDE">Épuisés</option><option value="ALERTE">Sous le minimum</option><option value="SANS_CS">Sans nombre par caisse</option></select>
+     <div style="display:flex;border:1px solid rgba(255,255,255,.14);border-radius:10px;overflow:hidden">
+       <button class="pos-btn ${_depVue==='mosaique'?'teal':'ghost'}" id="dep-vue-mos" style="border-radius:0;padding:6px 12px" onclick="depVue('mosaique')">▦ Mosaïque</button>
+       <button class="pos-btn ${_depVue==='tableau'?'teal':'ghost'}" id="dep-vue-tab" style="border-radius:0;padding:6px 12px" onclick="depVue('tableau')">☰ Tableau</button></div>
+     ${ro?'':'<button class="pos-btn primary" onclick="depAjouterArticle()">+ Ajouter un article</button>'}
+     ${depAdmin()?'<button class="pos-btn ghost" style="color:#f87171;border-color:rgba(248,113,113,.4)" onclick="depRemiseAZero()">Remettre à zéro</button>':''}`)
+    + `<div class="pos-kpi-grid" id="dep-prod-kpi"></div><div id="dep-prod-corps"><div style="text-align:center;padding:30px;color:rgba(255,255,255,.3)">Chargement…</div></div>`;
   try { await depChargerProduits(); depRendreProduits(); } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+function depVue(v){
+  _depVue = v; try { localStorage.setItem('depot_vue', v); } catch(e){}
+  document.getElementById('dep-vue-mos').className = 'pos-btn ' + (v==='mosaique'?'teal':'ghost');
+  document.getElementById('dep-vue-tab').className = 'pos-btn ' + (v==='tableau'?'teal':'ghost');
+  depRendreProduits();
+}
+function _depEtat(p){
+  if(p.stock_depot <= 0) return {lib:'Épuisé', col:'#f87171'};
+  if(p.alerte) return {lib:'Sous le minimum', col:'#fbbf24'};
+  return {lib:'En stock', col:'#34d399'};
 }
 function depRendreProduits(){
   const q = _navNorm(document.getElementById('dep-prod-q')?.value||'');
   const f = document.getElementById('dep-prod-filtre')?.value||'';
   const ps = _depProduits.filter(p => (!q || _navNorm(p.nom+' '+(p.categorie||'')).includes(q))
-    && (f!=='STOCK' || p.stock_depot > 0) && (f!=='ALERTE' || p.alerte) && (f!=='SANS_CS' || !(p.unites_par_caisse > 1)));
+    && (f!=='STOCK' || p.stock_depot > 0) && (f!=='VIDE' || p.stock_depot <= 0) && (f!=='ALERTE' || p.alerte) && (f!=='SANS_CS' || !(p.unites_par_caisse > 1)));
   const valeur = _depProduits.reduce((s,p)=>s+p.valeur_stock,0);
-  const sansCs = _depProduits.filter(p=>!(p.unites_par_caisse > 1)).length;
+  const caisses = _depProduits.reduce((s,p)=> s + (p.unites_par_caisse>1 ? Math.floor(Math.max(p.stock_depot,0)/p.unites_par_caisse) : 0), 0);
   document.getElementById('dep-prod-kpi').innerHTML =
-    `<div class="pos-kpi"><div class="pos-kpi-label">Articles</div><div class="pos-kpi-val">${_depProduits.length}</div></div>
-     <div class="pos-kpi"><div class="pos-kpi-label">Valeur du stock dépôt</div><div class="pos-kpi-val" style="color:#a78bfa">${posGx(valeur)}</div></div>
-     <div class="pos-kpi"><div class="pos-kpi-label">Sous le minimum</div><div class="pos-kpi-val" style="color:#f87171">${_depProduits.filter(p=>p.alerte).length}</div></div>
-     <div class="pos-kpi"><div class="pos-kpi-label">Sans nombre par caisse</div><div class="pos-kpi-val amber">${sansCs}</div><div style="font-size:12px;color:rgba(255,255,255,.4)">vendus à l'unité</div></div>`;
+    `<div class="pos-kpi"><div class="pos-kpi-label">Articles au dépôt</div><div class="pos-kpi-val">${_depProduits.length}</div></div>
+     <div class="pos-kpi"><div class="pos-kpi-label">Caisses pleines en stock</div><div class="pos-kpi-val" style="color:#22d3ee">${caisses}</div></div>
+     <div class="pos-kpi"><div class="pos-kpi-label">Valeur du stock</div><div class="pos-kpi-val" style="color:#a78bfa">${posGx(valeur)}</div></div>
+     <div class="pos-kpi"><div class="pos-kpi-label">Épuisés / sous le min.</div><div class="pos-kpi-val" style="color:#f87171">${_depProduits.filter(p=>p.stock_depot<=0).length} / ${_depProduits.filter(p=>p.alerte && p.stock_depot>0).length}</div></div>`;
+  const corps = document.getElementById('dep-prod-corps');
+  if(!ps.length){ corps.innerHTML = '<div class="pos-card" style="text-align:center;padding:30px;color:rgba(255,255,255,.35)">Aucun article</div>'; return; }
   const ro = _isReadOnly() && !depAdmin();
-  document.getElementById('dep-prod-tbody').innerHTML = ps.map(p=>{ const n = depUpc(p); return `<tr${p.alerte?' style="background:rgba(248,113,113,.06)"':''}>
-    <td><b>${esc(p.nom)}</b>${p.alerte?' <span style="color:#f87171;font-size:11px">sous le minimum</span>':''}</td>
-    <td>${esc(p.categorie||'—')}</td>
-    <td style="text-align:right">${n>1?`<b>${n}</b>`:'<span style="color:rgba(255,255,255,.35)">à l\'unité</span>'}</td>
-    <td style="text-align:right;font-weight:700">${depFmtCs(p.stock_depot,n)}</td>
-    <td style="text-align:right">${depFmtCs(p.stock_devant,n)}</td><td style="text-align:right">${depFmtCs(p.stock_piscine,n)}</td>
-    <td style="text-align:right">${posGx(p.prix_vente)}${p.prix_vente_caisse?`<div style="font-size:12px;color:rgba(255,255,255,.5)">${posGx(p.prix_vente_caisse)} / cs</div>`:''}</td>
-    <td style="text-align:right">${p.seuil_min?depFmtCs(p.seuil_min,n):'—'}</td>
-    <td style="text-align:right">${p.dernier_prix_achat_caisse!=null?posGx(p.dernier_prix_achat_caisse):(p.dernier_prix_achat!=null?posGx(p.dernier_prix_achat)+' / u':'—')}</td>
-    <td style="text-align:right">${posGx(p.valeur_stock)}</td>
-    <td>${ro?'':`<button class="pos-btn ghost" style="padding:3px 9px;font-size:12px" onclick="depConfigProduit(${p.id})">Configurer</button>`}</td>
-  </tr>`; }).join('') || '<tr><td colspan="11" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucun article</td></tr>';
+  if(_depVue === 'mosaique'){
+    corps.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px">${ps.map(p=>{
+      const n = depUpc(p), e = _depEtat(p), c = n>1 ? Math.floor(Math.max(p.stock_depot,0)/n + 1e-9) : null, u = n>1 ? Math.round((Math.max(p.stock_depot,0) - c*n)*1000)/1000 : p.stock_depot;
+      return `<div class="pos-card" style="padding:14px;border-top:3px solid ${e.col};display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between;gap:6px;align-items:flex-start">
+          <div style="font-weight:800;font-size:15px;line-height:1.2">${esc(p.nom)}</div>
+          <span style="font-size:11px;font-weight:700;color:${e.col};white-space:nowrap">${e.lib}</span></div>
+        <div style="font-size:12px;color:rgba(255,255,255,.45)">${esc(p.categorie||'—')} · ${n>1?`caisse de <b style="color:#fff">${n}</b>`:'à l\'unité'}</div>
+        <div style="text-align:center;padding:8px 0">
+          ${n>1 && (c>0 || !u) ? `<div style="font-size:34px;font-weight:900;color:${e.col};line-height:1">${p.stock_depot<0?'−':''}${c}</div><div style="font-size:12px;color:rgba(255,255,255,.55)">caisse${c>1?'s':''}${u?` + <b style="color:#fff">${fmtQ(u)}</b> u`:''}</div>`
+          : n>1 ? `<div style="font-size:34px;font-weight:900;color:${e.col};line-height:1">${fmtQ(u)}</div><div style="font-size:12px;color:rgba(255,255,255,.55)">unité(s) — moins d'une caisse</div>`
+                : `<div style="font-size:34px;font-weight:900;color:${e.col};line-height:1">${fmtQ(p.stock_depot)}</div><div style="font-size:12px;color:rgba(255,255,255,.55)">unité(s)</div>`}
+          <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:3px">${fmtQ(p.stock_depot)} unités au total</div></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.55)"><span>Bar Devant</span><b style="color:#fff">${depFmtCs(p.stock_devant,n)}</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.55)"><span>Bar Piscine</span><b style="color:#fff">${depFmtCs(p.stock_piscine,n)}</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.55)"><span>Prix ${n>1?'caisse':'unité'}</span><b style="color:#fff">${posGx(n>1?p.prix_vente_caisse:p.prix_vente)}</b></div>
+        ${ro?'':`<div style="display:flex;gap:6px;margin-top:4px">
+          <button class="pos-btn teal" style="flex:1;padding:5px;font-size:12px" onclick="depAjuster(${p.id})">Ajuster</button>
+          <button class="pos-btn ghost" style="flex:1;padding:5px;font-size:12px" onclick="depConfigProduit(${p.id})">Configurer</button>
+          <button class="pos-btn ghost" title="Retirer du dépôt" style="padding:5px 8px;font-size:12px;color:#f87171" onclick="depRetirerArticle(${p.id})">✕</button></div>`}
+      </div>`; }).join('')}</div>`;
+    return;
+  }
+  corps.innerHTML = `<div class="pos-card"><div class="pos-table-wrap"><table class="pos-table">
+    <thead><tr><th>Article</th><th>Catégorie</th><th style="text-align:right">Unités / caisse</th><th style="text-align:right">Dépôt</th><th style="text-align:right">Bar Devant</th><th style="text-align:right">Bar Piscine</th><th style="text-align:right">Prix vente (u / cs)</th><th style="text-align:right">Min.</th><th style="text-align:right">Dernier achat (cs)</th><th style="text-align:right">Valeur</th><th></th></tr></thead><tbody>
+    ${ps.map(p=>{ const n = depUpc(p), e = _depEtat(p); return `<tr>
+      <td><b>${esc(p.nom)}</b> <span style="color:${e.col};font-size:11px">${e.lib}</span></td><td>${esc(p.categorie||'—')}</td>
+      <td style="text-align:right">${n>1?`<b>${n}</b>`:'<span style="color:rgba(255,255,255,.35)">à l\'unité</span>'}</td>
+      <td style="text-align:right;font-weight:700">${depFmtCs(p.stock_depot,n)}</td>
+      <td style="text-align:right">${depFmtCs(p.stock_devant,n)}</td><td style="text-align:right">${depFmtCs(p.stock_piscine,n)}</td>
+      <td style="text-align:right">${posGx(p.prix_vente)}${p.prix_vente_caisse?`<div style="font-size:12px;color:rgba(255,255,255,.5)">${posGx(p.prix_vente_caisse)} / cs</div>`:''}</td>
+      <td style="text-align:right">${p.seuil_min?depFmtCs(p.seuil_min,n):'—'}</td>
+      <td style="text-align:right">${p.dernier_prix_achat_caisse!=null?posGx(p.dernier_prix_achat_caisse):(p.dernier_prix_achat!=null?posGx(p.dernier_prix_achat)+' / u':'—')}</td>
+      <td style="text-align:right">${posGx(p.valeur_stock)}</td>
+      <td style="white-space:nowrap">${ro?'':`<button class="pos-btn teal" style="padding:3px 9px;font-size:12px" onclick="depAjuster(${p.id})">Ajuster</button>
+        <button class="pos-btn ghost" style="padding:3px 9px;font-size:12px" onclick="depConfigProduit(${p.id})">Configurer</button>
+        <button class="pos-btn ghost" style="padding:3px 9px;font-size:12px;color:#f87171" onclick="depRetirerArticle(${p.id})">Retirer</button>`}</td>
+    </tr>`; }).join('')}</tbody></table></div></div>`;
 }
+
+// Ajuster le stock d'un article à tout moment : on saisit ce qui est compté.
+function depAjuster(id){
+  const p = _depProd(id); if(!p) return;
+  const n = depUpc(p), c = n>1 ? Math.floor(Math.max(p.stock_depot,0)/n + 1e-9) : 0, u = Math.round((Math.max(p.stock_depot,0) - c*n)*1000)/1000;
+  depOuvrir(`<h3>Ajuster — ${esc(p.nom)}</h3>
+    <div style="font-size:14px;margin-bottom:10px">Stock enregistré au dépôt : <b>${depFmtCs(p.stock_depot,n)}</b>${n>1?` <span style="color:rgba(255,255,255,.45)">(caisse de ${n})</span>`:''}</div>
+    <div class="pos-form-row">
+      <div><label class="pos-label">Caisses comptées</label><input class="pos-input" id="dep-aj-cs" type="number" min="0" step="1" value="${n>1?c:''}" ${n>1?'':'disabled placeholder="—"'} oninput="depAjusterMaj(${id})"></div>
+      <div><label class="pos-label">Unités en plus</label><input class="pos-input" id="dep-aj-u" type="number" min="0" step="any" value="${u}" oninput="depAjusterMaj(${id})"></div></div>
+    <div><label class="pos-label">Motif</label><input class="pos-input" id="dep-aj-motif" placeholder="Inventaire, casse, erreur de saisie…"></div>
+    <div id="dep-aj-info" style="margin-top:8px;font-size:14px"></div>
+    <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Annuler</button><button class="pos-btn primary" onclick="depAjusterValider(${id})">Enregistrer le stock compté</button></div>`);
+  depAjusterMaj(id);
+}
+function _depAjQte(id){ const n = depUpc(_depProd(id)); return (parseFloat(document.getElementById('dep-aj-cs')?.value||0)||0)*(n>1?n:0) + (parseFloat(document.getElementById('dep-aj-u')?.value||0)||0); }
+function depAjusterMaj(id){
+  const p = _depProd(id), n = depUpc(p), q = _depAjQte(id), d = q - p.stock_depot;
+  const i = document.getElementById('dep-aj-info');
+  if(i) i.innerHTML = Math.abs(d) < 1e-9 ? '<span style="color:#34d399">Aucune différence.</span>'
+    : `Nouveau stock : <b>${depFmtCs(q,n)}</b> · différence <b style="color:${d>0?'#34d399':'#f87171'}">${d>0?'+':''}${depFmtCs(d,n)}</b>`;
+}
+async function depAjusterValider(id){
+  const n = depUpc(_depProd(id));
+  try {
+    const r = await apiFetch('POST',`/depot/produits/${id}/ajustement`,{
+      nb_caisses: n>1 ? (parseFloat(document.getElementById('dep-aj-cs').value)||0) : 0,
+      nb_unites: parseFloat(document.getElementById('dep-aj-u').value)||0,
+      motif: document.getElementById('dep-aj-motif').value.trim()||null });
+    depFermer(); posAlert(r.difference ? `Stock ajusté : ${depFmtCs(r.apres,n)}.` : 'Stock déjà à jour.','ok');
+    await depChargerProduits(); depRendreProduits();
+  } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+// Ajouter un article : choisir dans le catalogue du bar, ou en créer un.
+async function depAjouterArticle(){
+  let tous = [];
+  try { tous = await apiFetch('GET','/depot/produits?tous=true'); } catch(e){ posAlert(e.message,'err'); return; }
+  const hors = tous.filter(p=>!p.au_depot);
+  depOuvrir(`<h3>Ajouter un article au dépôt</h3>
+    <div class="pos-card" style="padding:12px;margin-bottom:12px"><div style="font-weight:700;margin-bottom:8px">Depuis le catalogue du bar <span style="font-weight:400;font-size:12px;color:rgba(255,255,255,.45)">(articles pas encore au dépôt : plats, cartes… exclus par défaut)</span></div>
+      <input class="pos-input" placeholder="Rechercher…" oninput="document.querySelectorAll('.dep-hors').forEach(r=>r.style.display=_navNorm(r.dataset.nom).includes(_navNorm(this.value))?'':'none')" style="margin-bottom:8px">
+      <div style="max-height:220px;overflow:auto">${hors.length ? hors.map(p=>`<div class="dep-hors" data-nom="${esc(p.nom)}" style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+        <span>${esc(p.nom)} <span style="font-size:12px;color:rgba(255,255,255,.4)">${esc(p.categorie||'')}</span></span>
+        <button class="pos-btn teal" style="padding:3px 10px;font-size:12px" onclick="depAjouterExistant(${p.id})">Ajouter</button></div>`).join('')
+        : '<div style="color:rgba(255,255,255,.35);font-size:13px">Tous les articles du bar sont déjà au dépôt.</div>'}</div></div>
+    <div class="pos-card" style="padding:12px"><div style="font-weight:700;margin-bottom:8px">Ou créer un nouvel article</div>
+      <div class="pos-form-row"><div style="flex:2"><label class="pos-label">Nom *</label><input class="pos-input" id="dep-na-nom"></div>
+        <div><label class="pos-label">Catégorie</label><input class="pos-input" id="dep-na-cat" value="boisson"></div></div>
+      <div class="pos-form-row"><div><label class="pos-label">Unités par caisse</label><input class="pos-input" id="dep-na-upc" type="number" min="0" step="1" placeholder="ex. 24"></div>
+        <div><label class="pos-label">Prix de vente d'une unité (G) *</label><input class="pos-input" id="dep-na-prix" type="number" min="0.01" step="any"></div>
+        <div><label class="pos-label">Unité</label><input class="pos-input" id="dep-na-unite" value="bouteille"></div></div>
+      <div style="text-align:right"><button class="pos-btn primary" onclick="depCreerArticle()">Créer et ajouter</button></div></div>
+    <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Fermer</button></div>`);
+}
+async function depAjouterExistant(id){
+  try { await apiFetch('PUT',`/depot/produits/${id}/depot`,{au_depot:true}); posAlert('Article ajouté au dépôt.','ok');
+        await depChargerProduits(); depRendreProduits(); depAjouterArticle(); } catch(e){ posAlert(e.message,'err'); }
+}
+async function depCreerArticle(){
+  const nom = document.getElementById('dep-na-nom').value.trim(), prix = parseFloat(document.getElementById('dep-na-prix').value||0);
+  if(!nom){ posAlert('Nom requis.','warn'); return; }
+  if(!(prix>0)){ posAlert('Prix de vente requis.','warn'); return; }
+  try {
+    await apiFetch('POST','/depot/produits',{ nom, categorie: document.getElementById('dep-na-cat').value.trim()||'boisson',
+      unite: document.getElementById('dep-na-unite').value.trim()||'bouteille',
+      unites_par_caisse: parseInt(document.getElementById('dep-na-upc').value||0)||0, prix_vente: prix });
+    depFermer(); posAlert(`« ${nom} » créé et ajouté au dépôt.`,'ok'); await depChargerProduits(); depRendreProduits();
+  } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+async function depRetirerArticle(id){
+  const p = _depProd(id); if(!p) return;
+  if(!confirm(`Retirer « ${p.nom} » du dépôt ? (il reste dans Produits Bar)`)) return;
+  try { await apiFetch('PUT',`/depot/produits/${id}/depot`,{au_depot:false}); posAlert('Article retiré du dépôt.','ok'); await depChargerProduits(); depRendreProduits(); }
+  catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+// Remise à zéro complète du dépôt (PDG/admin) — confirmation écrite.
+function depRemiseAZero(){
+  depOuvrir(`<h3 style="color:#f87171">Remettre le dépôt à zéro</h3>
+    <div style="font-size:14px;line-height:1.6">Ceci <b>supprime définitivement</b> : tous les achats et réceptions du dépôt, toutes les factures de transfert et de vente, tous les paiements de la caisse dépôt, et tout le stock du dépôt (ainsi que les quantités transférées aux bars par ces factures).<br>
+    Les articles, leurs prix, leurs unités par caisse et les ventes des bars ne sont pas touchés.</div>
+    <div style="margin-top:12px"><label class="pos-label">Pour confirmer, écrivez : <b>REMETTRE A ZERO</b></label><input class="pos-input" id="dep-raz-conf" autocomplete="off"></div>
+    <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Annuler</button><button class="pos-btn" style="background:#dc2626;color:#fff" onclick="depRemiseAZeroValider()">Tout remettre à zéro</button></div>`);
+}
+async function depRemiseAZeroValider(){
+  try {
+    const r = await apiFetch('POST','/depot/reinitialiser',{confirmation: document.getElementById('dep-raz-conf').value});
+    depFermer();
+    const s = r.supprime;
+    posAlert(`Dépôt remis à zéro — ${s.achats} achat(s), ${s.transactions} facture(s), ${s.paiements} paiement(s) supprimés.`,'ok');
+    await depChargerProduits(); depRendreProduits();
+  } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
 function depConfigProduit(id){
   const p = _depProd(id); if(!p) return;
   const n = depUpc(p);

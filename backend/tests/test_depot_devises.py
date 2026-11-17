@@ -17,7 +17,12 @@ os.environ["OTP_ENABLED"] = "false"
 os.environ["SECURE_COOKIES"] = "false"
 
 import pytest
+from datetime import date, timedelta
 from fastapi.testclient import TestClient
+
+# Période large (hier → demain) : la base SQLite de test stocke l'heure UTC
+# sans fuseau ; autour de minuit, « aujourd'hui » diffère entre UTC et Haïti.
+PER = f"date_debut={date.today() - timedelta(days=1)}&date_fin={date.today() + timedelta(days=1)}"
 
 H = {"X-API-Key": "test-depot-key"}
 _n = [0]
@@ -138,6 +143,65 @@ def test_achat_reception_transfert_en_caisses(client):
     assert s["stock_depot"] == 30 and s["stock_devant"] == 48
 
 
+def _creer(client, nom, cat="boisson", prix=100):
+    r = client.post("/api/pos/produits", headers=H, json={"nom": nom, "categorie": cat, "prix_initial": prix})
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+def test_seuls_les_articles_du_bar_au_depot(client):
+    ids = {
+        "boisson": _creer(client, "Heineken Dépôt"),
+        "cabri":   _creer(client, "Cabri en sauce", cat="plat", prix=800),
+        "poulet":  _creer(client, "Poulet frit", cat="boisson", prix=600),     # mal classé : exclu par le nom
+        "carte":   _creer(client, "Carte piscine adulte", prix=250),
+    }
+    noms = {p["id"] for p in client.get("/api/depot/produits", headers=H).json()}
+    assert ids["boisson"] in noms
+    assert not ({ids["cabri"], ids["poulet"], ids["carte"]} & noms)
+    tous = {p["id"]: p["au_depot"] for p in client.get("/api/depot/produits?tous=true", headers=H).json()}
+    assert tous[ids["cabri"]] is False
+    # Un plat ne peut pas être acheté ni transféré par le dépôt
+    assert client.post("/api/depot/achats", headers=H, json={"fournisseur": "X", "lignes": [
+        {"produit_id": ids["cabri"], "quantite": 1, "prix_achat": 1}]}).status_code == 422
+    # Ajouter / retirer à la main
+    assert client.put(f"/api/depot/produits/{ids['poulet']}/depot", headers=H, json={"au_depot": True}).status_code == 200
+    assert ids["poulet"] in {p["id"] for p in client.get("/api/depot/produits", headers=H).json()}
+    assert client.put(f"/api/depot/produits/{ids['poulet']}/depot", headers=H, json={"au_depot": False}).status_code == 200
+    assert ids["poulet"] not in {p["id"] for p in client.get("/api/depot/produits", headers=H).json()}
+
+
+def test_creer_article_et_ajuster_stock(client):
+    r = client.post("/api/depot/produits", headers=H, json={
+        "nom": "Malta H", "categorie": "soft", "unites_par_caisse": 24, "prix_vente": 125, "seuil_min": 48})
+    assert r.status_code == 201, r.text
+    pid = r.json()["id"]
+    s = _stock(client, pid)
+    assert s["unites_par_caisse"] == 24 and s["prix_vente"] == 125.0 and s["stock_depot"] == 0
+    a = client.post(f"/api/depot/produits/{pid}/ajustement", headers=H, json={"nb_caisses": 5, "nb_unites": 3}).json()
+    assert a["apres"] == 123 and a["difference"] == 123 and a["apres_caisses"] == {"caisses": 5, "unites": 3.0}
+    a = client.post(f"/api/depot/produits/{pid}/ajustement", headers=H, json={"nb_caisses": 4}).json()
+    assert a["difference"] == -27
+    assert _stock(client, pid)["stock_depot"] == 96
+    # Retirer un article qui a du stock : refusé
+    assert client.put(f"/api/depot/produits/{pid}/depot", headers=H, json={"au_depot": False}).status_code == 409
+
+
+def test_remise_a_zero_du_depot(client):
+    pid = _produit(client)
+    _achat_recu(client, pid, qte=10)
+    client.post("/api/depot/transactions", headers=H, json={"destination": "DEVANT", "lignes": [{"produit_id": pid, "quantite": 4}]})
+    assert _stock(client, pid)["stock_devant"] == 4
+    assert client.post("/api/depot/reinitialiser", headers=H, json={"confirmation": "oui"}).status_code == 422
+    r = client.post("/api/depot/reinitialiser", headers=H, json={"confirmation": "REMETTRE A ZERO"})
+    assert r.status_code == 200, r.text
+    s = _stock(client, pid)
+    assert s["stock_depot"] == 0 and s["stock_devant"] == 0
+    assert client.get("/api/depot/achats", headers=H).json() == []
+    assert client.get("/api/depot/transactions", headers=H).json() == []
+    assert client.get("/api/depot/caisse", headers=H).json()["balance_htg"] == 0
+
+
 def test_stock_depot_hors_stock_bar(client):
     """Le stock du dépôt n'est pas du stock bar : ni affiché ni vendable au Bar."""
     pid = _produit(client)
@@ -209,15 +273,15 @@ def test_config_prix_et_rapport(client):
 def test_vente_bar_en_dollars_hors_cash_gourdes(client):
     pid = _produit(client, prix=260)
     client.post(f"/api/pos/produits/{pid}/approvisionnement", headers=H, json={"nb_unites_vrac": 10, "lieu": "DEVANT"})
-    avant = client.get("/api/pos/dashboard/bar", headers=H).json()["kpis"]
+    avant = client.get(f"/api/pos/dashboard/bar?{PER}", headers=H).json()["kpis"]
     v = client.post("/api/pos/ventes?lieu=DEVANT", headers=H, json={
         "lignes": [{"produit_id": pid, "quantite": 1}], "devise": "USD", "taux_change": 130})
     assert v.status_code == 201, v.text
     assert v.json()["devise"] == "USD" and v.json()["montant_devise"] == 2.0
-    apres = client.get("/api/pos/dashboard/bar", headers=H).json()["kpis"]
+    apres = client.get(f"/api/pos/dashboard/bar?{PER}", headers=H).json()["kpis"]
     assert apres["cash_jour"] == avant["cash_jour"]               # gourdes inchangées
     assert round(apres["cash_usd"] - avant.get("cash_usd", 0), 2) == 2.0
-    assert client.get("/api/pos/grande-caisse", headers=H).json()["caisse"]["disponible_usd"] >= 2.0
+    assert client.get(f"/api/pos/grande-caisse?{PER}", headers=H).json()["caisse"]["disponible_usd"] >= 2.0
 
 
 def test_cuisine_patisserie_piscine_en_dollars(client):
@@ -229,7 +293,7 @@ def test_cuisine_patisserie_piscine_en_dollars(client):
     client.put("/api/piscine/config", headers=H, json={"prix_carte": 260})
     p = client.post("/api/piscine/ventes", headers=H, json={"quantite": 1, "devise": "USD"}).json()
     assert p["devise"] == "USD" and p["montant_devise"] == 2.0
-    d = client.get("/api/piscine/dashboard", headers=H).json()["kpi"]
+    d = client.get(f"/api/piscine/dashboard?{PER}", headers=H).json()["kpi"]
     assert d["recu_usd"] >= 2.0
 
     inst = client.get("/api/caisse/rapport", headers=H).json()["autres_departements"]["dollars"]

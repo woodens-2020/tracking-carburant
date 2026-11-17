@@ -646,6 +646,10 @@ class BarProduit(Base):
     # article (creer_produit dans pos_routes.py) pour ne plus mélanger les
     # deux catalogues.
     lieu               = Column(String(20), nullable=True)
+    # Article géré au Dépôt central ? NULL = décidé automatiquement (les
+    # boissons oui ; les plats et les cartes piscine non — voir
+    # depot_routes.est_au_depot) ; True/False = choix explicite.
+    depot_actif        = Column(Boolean, nullable=True)
 
     prix_historique = relationship("BarPrixHistorique", back_populates="produit",
                                    cascade="all, delete-orphan",
