@@ -406,6 +406,20 @@ def _migrate_columns():
     new_cols.append(("bar_produits", "depot_demarre_le",
                      f"ALTER TABLE bar_produits ADD COLUMN depot_demarre_le {'DATETIME' if _is_sqlite else 'TIMESTAMP WITH TIME ZONE'}", None))
     new_cols.append(("depot_transactions", "recu_par", "ALTER TABLE depot_transactions ADD COLUMN recu_par VARCHAR(100)", None))
+    # v32 — Piscine : cartes Adulte / Jeune / Enfant, correction par l'admin
+    new_cols.append(("piscine_config", "prix_adulte", "ALTER TABLE piscine_config ADD COLUMN prix_adulte NUMERIC(12,2)", None))
+    new_cols.append(("piscine_config", "prix_jeune", "ALTER TABLE piscine_config ADD COLUMN prix_jeune NUMERIC(12,2)", None))
+    new_cols.append(("piscine_config", "prix_enfant", "ALTER TABLE piscine_config ADD COLUMN prix_enfant NUMERIC(12,2)", None))
+    new_cols.append(("piscine_ventes", "qte_adulte", "ALTER TABLE piscine_ventes ADD COLUMN qte_adulte INTEGER", None))
+    new_cols.append(("piscine_ventes", "qte_jeune", "ALTER TABLE piscine_ventes ADD COLUMN qte_jeune INTEGER", None))
+    new_cols.append(("piscine_ventes", "qte_enfant", "ALTER TABLE piscine_ventes ADD COLUMN qte_enfant INTEGER", None))
+    new_cols.append(("piscine_ventes", "prix_adulte", "ALTER TABLE piscine_ventes ADD COLUMN prix_adulte NUMERIC(12,2)", None))
+    new_cols.append(("piscine_ventes", "prix_jeune", "ALTER TABLE piscine_ventes ADD COLUMN prix_jeune NUMERIC(12,2)", None))
+    new_cols.append(("piscine_ventes", "prix_enfant", "ALTER TABLE piscine_ventes ADD COLUMN prix_enfant NUMERIC(12,2)", None))
+    new_cols.append(("piscine_ventes", "corrige_par", "ALTER TABLE piscine_ventes ADD COLUMN corrige_par VARCHAR(150)", None))
+    new_cols.append(("piscine_ventes", "motif_correction", "ALTER TABLE piscine_ventes ADD COLUMN motif_correction VARCHAR(300)", None))
+    new_cols.append(("piscine_ventes", "corrige_le",
+                     f"ALTER TABLE piscine_ventes ADD COLUMN corrige_le {'DATETIME' if _is_sqlite else 'TIMESTAMP WITH TIME ZONE'}", None))
     for _t in ("bar_ventes", "bar_remboursements", "cuisine_ventes", "patisserie_ventes", "piscine_ventes"):
         new_cols += [
             (_t, "devise",         f"ALTER TABLE {_t} ADD COLUMN devise VARCHAR(3) NOT NULL DEFAULT 'HTG'", None),

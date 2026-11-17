@@ -8297,7 +8297,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
           <div>
             <div class="pos-header-title">Vente de cartes</div>
-            <div class="pos-header-sub">Piscine — le montant se calcule tout seul à partir du prix de la carte</div>
+            <div class="pos-header-sub">Piscine — choisissez la catégorie et le nombre de cartes, le montant se calcule tout seul</div>
           </div>
         </div>
 
@@ -8305,10 +8305,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div class="pos-card">
             <div class="pos-card-hdr">Nouvelle vente</div>
             <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+              <div id="pisv-cats" style="display:flex;flex-direction:column;gap:8px"></div>
               <div class="pos-form-row">
-                <div><label class="pos-label">Nombre de cartes *</label>
-                  <input class="pos-input" id="pisv-qte" type="number" min="1" step="1" value="1" oninput="pisvCalculer()" style="font-size:20px;font-weight:700">
-                </div>
                 <div><label class="pos-label">Lieu de vente</label>
                   <select class="pos-select" id="pisv-lieu">
                     <option value="">Non précisé</option>
@@ -8335,8 +8333,8 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               </div>
 
               <div style="background:rgba(34,211,238,.06);border:1px solid rgba(34,211,238,.25);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:14px">
-                <div style="display:flex;justify-content:space-between"><span style="color:rgba(255,255,255,.55)">Prix de la carte</span><b id="pisv-prix">—</b></div>
-                <div style="display:flex;justify-content:space-between"><span style="color:rgba(255,255,255,.55)">Montant (cartes × prix)</span><b id="pisv-brut">—</b></div>
+                <div id="pisv-detail" style="display:flex;flex-direction:column;gap:4px"></div>
+                <div style="display:flex;justify-content:space-between"><span style="color:rgba(255,255,255,.55)">Montant (<span id="pisv-nb">0</span> carte(s))</span><b id="pisv-brut">—</b></div>
                 <div style="display:flex;justify-content:space-between"><span style="color:rgba(255,255,255,.55)">Rabais</span><b id="pisv-rabais" style="color:#fbbf24">—</b></div>
                 <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.1);padding-top:6px;font-size:18px"><span>Total à encaisser</span><b id="pisv-net" style="color:#34d399">—</b></div>
                 <div id="pisv-net-usd" style="display:none;justify-content:space-between;font-size:16px"><span>En dollars</span><b style="color:#38bdf8"></b></div>
@@ -8360,14 +8358,18 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               <button class="pos-btn teal" onclick="pisvChargerListe()">Filtrer</button>
             </div>
             <div style="padding:8px 14px;font-size:13px;color:rgba(255,255,255,.6)" id="pisv-totaux"></div>
+            <div style="padding:0 14px 8px;font-size:13px;color:rgba(255,255,255,.6)" id="pisv-totaux-cat"></div>
             <div class="pos-table-wrap" style="max-height:460px;overflow:auto">
               <table class="pos-table">
-                <thead><tr><th>Date</th><th>Cartes</th><th>Lieu</th><th>Rabais</th><th>Net</th><th></th></tr></thead>
+                <thead><tr><th>Date</th><th>Cartes</th><th>Lieu</th><th>Rabais</th><th>Net</th><th>Vendeur</th><th></th></tr></thead>
                 <tbody id="pisv-tbody"><tr><td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody>
               </table>
             </div>
           </div>
         </div>
+      </div>
+      <div class="pos-modal-bg" id="pisv-corr-bg" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="pos-modal" id="pisv-corr" style="max-width:560px;width:96%"></div>
       </div>
     </div><!-- /page-piscine-ventes -->
 
@@ -8384,13 +8386,16 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
         <div class="pos-card" style="max-width:520px">
-          <div class="pos-card-hdr">Prix de la carte</div>
+          <div class="pos-card-hdr">Prix des cartes</div>
           <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
-            <div><label class="pos-label">Prix d'une carte (G) *</label>
-              <input class="pos-input" id="pisp-prix" type="number" min="0.01" step="any" style="font-size:20px;font-weight:700">
-            </div>
+            <div><label class="pos-label">Carte Adulte (G) *</label>
+              <input class="pos-input" id="pisp-prix" type="number" min="0.01" step="any" style="font-size:20px;font-weight:700"></div>
+            <div><label class="pos-label">Carte Jeune (G)</label>
+              <input class="pos-input" id="pisp-prix-jeune" type="number" min="0" step="any" style="font-size:20px;font-weight:700"></div>
+            <div><label class="pos-label">Carte Enfant (G)</label>
+              <input class="pos-input" id="pisp-prix-enfant" type="number" min="0" step="any" style="font-size:20px;font-weight:700"></div>
             <div id="pisp-maj" style="font-size:12px;color:rgba(255,255,255,.4)"></div>
-            <button class="pos-btn primary" id="pisp-btn" onclick="pispEnregistrer()">Enregistrer le prix</button>
+            <button class="pos-btn primary" id="pisp-btn" onclick="pispEnregistrer()">Enregistrer les prix</button>
             <div style="font-size:12px;color:rgba(255,255,255,.4)">Un changement de prix s'applique aux ventes suivantes ; les ventes déjà enregistrées gardent leur prix.</div>
           </div>
         </div>
@@ -17602,8 +17607,9 @@ const _AREA_PAGES = {
   // rôle créé avant ce domaine reprend son niveau « bar » (voir _niveauDomaine).
   piscine: {
     complet: ['piscine-dashboard','piscine-ventes','piscine-depenses','piscine-parametres'],
-    // Vendeur de cartes : enregistrer les ventes + suivre le tableau de bord
-    operationnel: ['piscine-dashboard','piscine-ventes'],
+    // Caissière / vendeur de cartes : la vente de cartes SEULEMENT — le reste
+    // (tableau de bord, dépenses, paramètres) est réservé à l'administration.
+    operationnel: ['piscine-ventes'],
     lecture: ['piscine-dashboard'],
   },
   // Dépôt central — complet : tout ; opérationnel : réception, transferts,
@@ -36316,14 +36322,24 @@ const _pisJour = () => { const d=new Date(); return `${d.getFullYear()}-${String
 const _pisDebutMois = () => _pisJour().slice(0,8)+'01';
 const _pisPeutAnnuler = () => _isAdmin() || ['pdg','admin'].includes(_appUser?.role);
 
+// Catégories de cartes et leurs prix (Paramètres).
+const _PIS_CATS = [['ADULTE','Adulte','#22d3ee'],['JEUNE','Jeune','#a78bfa'],['ENFANT','Enfant','#fbbf24']];
+let _pisPrixCat = {ADULTE:0, JEUNE:0, ENFANT:0};
 async function _pisChargerPrix(){
-  try { _pisPrix = (await apiFetch('GET','/piscine/config')).prix_carte || 0; } catch(e){ _pisPrix = 0; }
+  try {
+    const c = await apiFetch('GET','/piscine/config');
+    _pisPrixCat = {ADULTE: c.prix_adulte||0, JEUNE: c.prix_jeune||0, ENFANT: c.prix_enfant||0};
+    _pisPrix = c.prix_carte || 0;
+  } catch(e){ _pisPrix = 0; }
   return _pisPrix;
 }
 
 // Rabais calculé exactement comme le serveur (piscine_routes.calculer_rabais).
-function _pisCalcul(qte, type, val){
-  const brut = Math.round(qte * _pisPrix * 100) / 100;
+// `qte` = nombre de cartes Adulte, ou {ADULTE, JEUNE, ENFANT}.
+function _pisCalcul(qte, type, val, prix){
+  const q = typeof qte === 'object' ? qte : {ADULTE: qte};
+  const px = prix || _pisPrixCat;
+  const brut = Math.round(_PIS_CATS.reduce((s,[c])=> s + (q[c]||0) * (px[c]||0), 0) * 100) / 100;
   let rabais = 0, erreur = '';
   if(type && val > 0){
     if(type === 'POURCENT'){ if(val > 100) erreur = 'Le rabais ne peut pas dépasser 100 %.'; else rabais = Math.round(brut * val) / 100; }
@@ -36356,7 +36372,8 @@ async function pisdCharger(){
     set('pisd-dep', posGx(k.depenses));
     const sol = document.getElementById('pisd-solde');
     if(sol){ sol.textContent = posGx(k.solde); sol.style.color = k.solde >= 0 ? '#34d399' : '#f87171'; }
-    set('pisd-sub', `Prix de la carte : ${d.prix_carte ? posGx(d.prix_carte) : 'non défini (Paramètres)'}`);
+    set('pisd-sub', `Prix : ${_PIS_CATS.map(([c,l])=>`${l} ${d.prix&&d.prix[c]?posGx(d.prix[c]):'—'}`).join(' · ')}`);
+    set('pisd-cartes-sub', `${k.nb_ventes} vente(s) · ${(d.par_categorie||[]).filter(x=>x.nb_cartes).map(x=>`${x.libelle.split(' ')[0]} ${x.nb_cartes}`).join(' · ') || 'période préc. : '+p.nb_cartes}`);
     set('pisd-jour', `${d.aujourd_hui.nb_cartes} carte(s) · ${posGx(d.aujourd_hui.montant_net)}`);
 
     const lieux = document.getElementById('pisd-lieux');
@@ -36400,7 +36417,7 @@ async function pisdCharger(){
     const tb = document.getElementById('pisd-tbody');
     if(tb) tb.innerHTML = d.recentes.length ? d.recentes.map(v=>`<tr>
       <td style="white-space:nowrap">${_pisDateHeure(v.date_vente)}</td>
-      <td><b>${v.quantite}</b></td>
+      <td><b>${v.quantite}</b><div style="font-size:12px;color:rgba(255,255,255,.55)">${esc(v.detail||'')}</div></td>
       <td>${esc(v.lieu_libelle)}</td>
       <td>${posGx(v.montant_brut)}</td>
       <td style="color:#fbbf24">${v.rabais_montant ? posGx(v.rabais_montant) + (v.rabais_type==='POURCENT' ? ` (${v.rabais_valeur}%)` : '') : '—'}</td>
@@ -36421,12 +36438,35 @@ async function loadPiscineVentes(){
   if(d1 && !d1.value) d1.value = _pisJour();
   if(d2 && !d2.value) d2.value = _pisJour();
   await _pisChargerPrix();
+  pisvCats();
   pisvCalculer();
   await pisvChargerListe();
 }
 
+// Une ligne par catégorie : prix, − / quantité / +, sous-total.
+function pisvCats(prefix, valeurs, prix){
+  prefix = prefix || 'pisv'; prix = prix || _pisPrixCat;
+  const w = document.getElementById(prefix+'-cats'); if(!w) return;
+  w.innerHTML = _PIS_CATS.map(([c,l,col])=>{
+    const ok = (prix[c]||0) > 0;
+    return `<div style="display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:8px 10px;border-radius:10px;border:1px solid ${col}44;background:${col}10;opacity:${ok?1:.5}">
+      <div><div style="font-weight:800;font-size:16px;color:${col}">${l}</div><div style="font-size:12px;color:rgba(255,255,255,.55)">${ok?posGx(prix[c])+' / carte':'Prix non défini'}</div></div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button type="button" class="pos-btn ghost" style="padding:4px 12px;font-size:18px" ${ok?'':'disabled'} onclick="pisvPlus('${prefix}','${c}',-1)">−</button>
+        <input class="pos-input" id="${prefix}-q-${c}" type="number" min="0" step="1" value="${(valeurs&&valeurs[c])||0}" ${ok?'':'disabled'} oninput="${prefix==='pisv'?'pisvCalculer()':'pisvCorrCalculer()'}" style="width:70px;text-align:center;font-size:20px;font-weight:700">
+        <button type="button" class="pos-btn ghost" style="padding:4px 12px;font-size:18px" ${ok?'':'disabled'} onclick="pisvPlus('${prefix}','${c}',1)">+</button></div>
+      <b id="${prefix}-st-${c}" style="min-width:95px;text-align:right">—</b></div>`;
+  }).join('');
+}
+function pisvPlus(prefix, c, d){
+  const i = document.getElementById(`${prefix}-q-${c}`); if(!i) return;
+  i.value = Math.max(0, (parseInt(i.value)||0) + d);
+  if(prefix==='pisv') pisvCalculer(); else pisvCorrCalculer();
+}
+const _pisvQtes = prefix => Object.fromEntries(_PIS_CATS.map(([c])=>[c, Math.max(0, parseInt(document.getElementById(`${prefix}-q-${c}`)?.value||0)||0)]));
+
 function pisvCalculer(){
-  const qte  = parseInt(document.getElementById('pisv-qte')?.value||0) || 0;
+  const qte  = _pisvQtes('pisv');
   const type = document.getElementById('pisv-rabais-type')?.value || '';
   const wrap = document.getElementById('pisv-rabais-val-wrap');
   if(wrap) wrap.style.display = type ? '' : 'none';
@@ -36435,7 +36475,10 @@ function pisvCalculer(){
   const val = type ? (parseFloat(document.getElementById('pisv-rabais-val')?.value||0) || 0) : 0;
   const r = _pisCalcul(qte, type, val);
   const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
-  set('pisv-prix', _pisPrix ? posGx(_pisPrix) : 'non défini');
+  _PIS_CATS.forEach(([c])=> set('pisv-st-'+c, qte[c] ? posGx(qte[c]*(_pisPrixCat[c]||0)) : '—'));
+  const det = document.getElementById('pisv-detail');
+  if(det) det.innerHTML = _PIS_CATS.filter(([c])=>qte[c]).map(([c,l])=>`<div style="display:flex;justify-content:space-between"><span style="color:rgba(255,255,255,.55)">${qte[c]} × ${l} (${posGx(_pisPrixCat[c])})</span><b>${posGx(qte[c]*_pisPrixCat[c])}</b></div>`).join('');
+  set('pisv-nb', Object.values(qte).reduce((a,b)=>a+b,0));
   set('pisv-brut', posGx(r.brut));
   set('pisv-rabais', r.rabais ? '− ' + posGx(r.rabais) : '—');
   set('pisv-net', posGx(r.net));
@@ -36447,21 +36490,20 @@ function pisvCalculer(){
   }
   const al = document.getElementById('pisv-alerte');
   if(al){
-    const msg = !_pisPrix ? "Le prix de la carte n'est pas défini — Piscine › Paramètres." : r.erreur;
+    const msg = !_PIS_CATS.some(([c])=>_pisPrixCat[c]>0) ? "Les prix des cartes ne sont pas définis — Piscine › Paramètres." : r.erreur;
     al.textContent = msg; al.style.display = msg ? '' : 'none';
   }
   return r;
 }
 
 async function pisvEnregistrer(){
-  const qte = parseInt(document.getElementById('pisv-qte')?.value||0) || 0;
-  if(qte < 1){ posAlert('Indiquez le nombre de cartes.','warn'); return; }
+  const qte = _pisvQtes('pisv');
+  if(!Object.values(qte).some(n=>n>0)){ posAlert('Choisissez la catégorie et le nombre de cartes.','warn'); return; }
   const r = pisvCalculer();
-  if(!_pisPrix){ posAlert("Définissez d'abord le prix de la carte (Paramètres).",'warn'); return; }
   if(r.erreur){ posAlert(r.erreur,'warn'); return; }
   const type = document.getElementById('pisv-rabais-type')?.value || null;
   const body = {
-    quantite: qte,
+    adulte: qte.ADULTE, jeune: qte.JEUNE, enfant: qte.ENFANT,
     lieu_vente: document.getElementById('pisv-lieu')?.value || null,
     rabais_type: type,
     rabais_valeur: type ? (parseFloat(document.getElementById('pisv-rabais-val')?.value||0) || null) : null,
@@ -36472,9 +36514,9 @@ async function pisvEnregistrer(){
   if(body.devise === 'USD' && !body.taux_change){ posAlert('Indiquez le taux du dollar.','warn'); return; }
   try {
     const v = await apiFetch('POST','/piscine/ventes', body);
-    posAlert(`${v.quantite} carte(s) — ${v.devise==='USD' ? _usd(v.montant_devise)+' ('+posGx(v.montant_net)+')' : posGx(v.montant_net)} enregistré.`,'ok');
+    posAlert(`${v.detail} — ${v.devise==='USD' ? _usd(v.montant_devise)+' ('+posGx(v.montant_net)+')' : posGx(v.montant_net)} enregistré.`,'ok');
     const _pd = document.getElementById('pisv-devise'); if(_pd){ _pd.value='HTG'; deviseChampsMaj('pisv'); }
-    document.getElementById('pisv-qte').value = 1;
+    _PIS_CATS.forEach(([c])=>{ const i=document.getElementById('pisv-q-'+c); if(i) i.value = 0; });
     document.getElementById('pisv-rabais-type').value = '';
     document.getElementById('pisv-rabais-val').value = '';
     document.getElementById('pisv-client').value = '';
@@ -36492,19 +36534,89 @@ async function pisvChargerListe(){
     const d = await apiFetch('GET', `/piscine/ventes?date_debut=${deb}&date_fin=${fin}`);
     const tot = document.getElementById('pisv-totaux');
     if(tot) tot.innerHTML = `<b style="color:#22d3ee">${d.nb_cartes}</b> carte(s) vendue(s) · <b style="color:#34d399">${posGx(d.recu_htg)}</b> en gourdes${d.recu_usd?` · <b style="color:#38bdf8">${_usd(d.recu_usd)}</b> en dollars`:''}`;
+    const tc = document.getElementById('pisv-totaux-cat');
+    if(tc) tc.innerHTML = (d.par_categorie||[]).filter(x=>x.nb_cartes).map(x=>`${esc(x.libelle)} : <b style="color:#fff">${x.nb_cartes}</b>`).join(' · ');
     const annul = _pisPeutAnnuler();
+    _pisvVentes = d.ventes;
     tb.innerHTML = d.ventes.length ? d.ventes.map(v=>{
       const ann = v.statut === 'ANNULEE';
       return `<tr style="${ann?'opacity:.45;text-decoration:line-through':''}">
         <td style="white-space:nowrap">${_pisDateHeure(v.date_vente)}</td>
-        <td><b>${v.quantite}</b></td>
+        <td><b>${v.quantite}</b><div style="font-size:12px;color:rgba(255,255,255,.55)">${esc(v.detail||'')}</div>${v.corrige_le?`<div style="font-size:11px;color:#fbbf24" title="${esc(v.motif_correction||'')}">✎ corrigée par ${esc(v.corrige_par||'')}</div>`:''}</td>
         <td>${esc(v.lieu_libelle)}</td>
         <td style="color:#fbbf24">${v.rabais_montant ? posGx(v.rabais_montant) : '—'}</td>
         <td style="color:#34d399;font-weight:700">${posGx(v.montant_net)}${v.devise==='USD'?`<div style="color:#38bdf8;font-size:12px">${_usd(v.montant_devise)}</div>`:''}</td>
-        <td>${ann ? '<span style="font-size:12px">Annulée</span>' : (annul ? `<button class="pos-btn ghost" style="padding:3px 9px;font-size:12px;color:#f87171" onclick="pisvAnnuler(${v.id})">Annuler</button>` : '')}</td>
+        <td style="font-size:12px;color:rgba(255,255,255,.5)">${esc(v.vendeur||'—')}</td>
+        <td style="white-space:nowrap">${ann ? '<span style="font-size:12px">Annulée</span>' : (annul ? `<button class="pos-btn ghost" style="padding:3px 9px;font-size:12px" onclick="pisvCorriger(${v.id})">Corriger</button> <button class="pos-btn ghost" style="padding:3px 9px;font-size:12px;color:#f87171" onclick="pisvAnnuler(${v.id})">Annuler</button>` : '')}</td>
       </tr>`;
-    }).join('') : '<tr><td colspan="6" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucune vente sur la période</td></tr>';
-  } catch(e){ tb.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:#f87171">${esc(e.message||'Erreur')}</td></tr>`; }
+    }).join('') : '<tr><td colspan="7" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucune vente sur la période</td></tr>';
+  } catch(e){ tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#f87171">${esc(e.message||'Erreur')}</td></tr>`; }
+}
+
+// ── Correction d'une erreur de saisie (administrateur seulement) ──
+// Les prix restent ceux du jour de la vente ; motif obligatoire, tracé.
+let _pisvVentes = [], _pisvCorrId = null, _pisvCorrPrix = null;
+function pisvCorriger(id){
+  if(!_pisPeutAnnuler()){ posAlert('Correction réservée aux administrateurs.','err'); return; }
+  const v = _pisvVentes.find(x=>x.id===id); if(!v) return;
+  _pisvCorrId = id;
+  const q = {ADULTE:0, JEUNE:0, ENFANT:0}; const px = {..._pisPrixCat};
+  if(v.categories && v.categories.length) v.categories.forEach(c=>{ q[c.code] = c.quantite; if(c.prix!=null) px[c.code] = c.prix; });
+  else { q.ADULTE = v.quantite; px.ADULTE = v.prix_unitaire; }
+  _pisvCorrPrix = px;
+  const m = document.getElementById('pisv-corr');
+  m.innerHTML = `<h3>Corriger la vente du ${_pisDateHeure(v.date_vente)}</h3>
+    <div style="font-size:13px;color:rgba(255,255,255,.55);margin-bottom:8px">Enregistrée par ${esc(v.vendeur||'—')} : <b style="color:#fff">${esc(v.detail)}</b> — ${posGx(v.montant_net)}. Les prix restent ceux du jour de la vente.</div>
+    <div id="pisvc-cats" style="display:flex;flex-direction:column;gap:8px"></div>
+    <div class="pos-form-row" style="margin-top:10px">
+      <div><label class="pos-label">Lieu de vente</label><select class="pos-select" id="pisvc-lieu"><option value="">Non précisé</option><option value="DEVANT">Devant</option><option value="DERRIERE">Derrière</option></select></div>
+      <div><label class="pos-label">Rabais</label><select class="pos-select" id="pisvc-rabais-type" onchange="pisvCorrCalculer()"><option value="">Aucun rabais</option><option value="POURCENT">Pourcentage (%)</option><option value="MONTANT">Montant (G)</option></select></div>
+      <div><label class="pos-label">Valeur</label><input class="pos-input" id="pisvc-rabais-val" type="number" min="0" step="any" oninput="pisvCorrCalculer()"></div></div>
+    ${deviseChampsHtml('pisvc','pisvCorrCalculer()')}
+    <div><label class="pos-label">Motif de la correction *</label><input class="pos-input" id="pisvc-motif" maxlength="300" placeholder="Ex. : 1 enfant compté comme adulte"></div>
+    <div id="pisvc-total" style="margin-top:10px;font-size:16px"></div>
+    <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="document.getElementById('pisv-corr-bg').classList.remove('open')">Fermer</button>
+      <button class="pos-btn primary" onclick="pisvCorrValider()">Enregistrer la correction</button></div>`;
+  pisvCats('pisvc', q, px);
+  document.getElementById('pisvc-lieu').value = v.lieu_vente || '';
+  document.getElementById('pisvc-rabais-type').value = v.rabais_type || '';
+  document.getElementById('pisvc-rabais-val').value = v.rabais_valeur ?? '';
+  document.getElementById('pisvc-devise').value = v.devise || 'HTG';
+  if(v.devise==='USD'){ document.getElementById('pisvc-taux').value = v.taux_change || ''; }
+  deviseChampsMaj('pisvc');
+  document.getElementById('pisv-corr-bg').classList.add('open');
+  pisvCorrCalculer();
+}
+function pisvCorrCalculer(){
+  const q = _pisvQtes('pisvc');
+  const type = document.getElementById('pisvc-rabais-type')?.value || '';
+  const val = type ? (parseFloat(document.getElementById('pisvc-rabais-val')?.value||0)||0) : 0;
+  const r = _pisCalcul(q, type, val, _pisvCorrPrix);
+  _PIS_CATS.forEach(([c])=>{ const el = document.getElementById('pisvc-st-'+c); if(el) el.textContent = q[c] ? posGx(q[c]*(_pisvCorrPrix[c]||0)) : '—'; });
+  const t = document.getElementById('pisvc-total');
+  if(t) t.innerHTML = r.erreur ? `<span style="color:#f87171">${r.erreur}</span>` : `Nouveau total : <b style="color:#34d399">${posGx(r.net)}</b>${r.rabais?` <span style="color:#fbbf24;font-size:13px">(rabais ${posGx(r.rabais)})</span>`:''}`;
+  return r;
+}
+async function pisvCorrValider(){
+  const q = _pisvQtes('pisvc');
+  if(!Object.values(q).some(n=>n>0)){ posAlert('Au moins une carte.','warn'); return; }
+  const motif = document.getElementById('pisvc-motif').value.trim();
+  if(!motif){ posAlert('Indiquez le motif de la correction.','warn'); return; }
+  const r = pisvCorrCalculer(); if(r.erreur){ posAlert(r.erreur,'warn'); return; }
+  const type = document.getElementById('pisvc-rabais-type').value || null;
+  const body = { adulte: q.ADULTE, jeune: q.JEUNE, enfant: q.ENFANT, motif,
+    lieu_vente: document.getElementById('pisvc-lieu').value || null, rabais_type: type,
+    rabais_valeur: type ? (parseFloat(document.getElementById('pisvc-rabais-val').value||0)||null) : null,
+    ...deviseLue('pisvc') };
+  const v = _pisvVentes.find(x=>x.id===_pisvCorrId);
+  if(v){ body.client_nom = v.client_nom; body.notes = v.notes; }
+  if(body.devise==='USD' && !body.taux_change){ posAlert('Indiquez le taux du dollar.','warn'); return; }
+  try {
+    const c = await apiFetch('PUT', `/piscine/ventes/${_pisvCorrId}`, body);
+    document.getElementById('pisv-corr-bg').classList.remove('open');
+    posAlert(`Vente corrigée : ${c.detail} — ${posGx(c.montant_net)}.`,'ok');
+    await pisvChargerListe();
+  } catch(e){ posAlert(e.message||'Erreur.','err'); }
 }
 
 async function pisvAnnuler(id){
@@ -36518,22 +36630,27 @@ async function loadPiscineParametres(){
   try {
     const c = await apiFetch('GET','/piscine/config');
     _pisPrix = c.prix_carte || 0;
+    _pisPrixCat = {ADULTE: c.prix_adulte||0, JEUNE: c.prix_jeune||0, ENFANT: c.prix_enfant||0};
     const inp = document.getElementById('pisp-prix'); if(inp) inp.value = _pisPrix || '';
+    const ij = document.getElementById('pisp-prix-jeune'); if(ij) ij.value = c.prix_jeune || '';
+    const ie = document.getElementById('pisp-prix-enfant'); if(ie) ie.value = c.prix_enfant || '';
     const maj = document.getElementById('pisp-maj');
     if(maj) maj.textContent = c.updated_at ? `Dernière modification : ${_pisDateHeure(c.updated_at)}${c.updated_by?' par '+c.updated_by:''}` : 'Prix pas encore défini.';
   } catch(e){}
   const peut = _pisPeutAnnuler();
-  const inp = document.getElementById('pisp-prix'); if(inp) inp.disabled = !peut;
+  ['pisp-prix','pisp-prix-jeune','pisp-prix-enfant'].forEach(id=>{ const i = document.getElementById(id); if(i) i.disabled = !peut; });
   const btn = document.getElementById('pisp-btn'); if(btn) btn.style.display = peut ? '' : 'none';
 }
 
 async function pispEnregistrer(){
   const v = parseFloat(document.getElementById('pisp-prix')?.value||0);
-  if(!(v > 0)){ posAlert('Prix invalide.','warn'); return; }
+  if(!(v > 0)){ posAlert('Prix Adulte invalide.','warn'); return; }
+  const j = parseFloat(document.getElementById('pisp-prix-jeune')?.value||0) || 0;
+  const e = parseFloat(document.getElementById('pisp-prix-enfant')?.value||0) || 0;
   try {
-    const c = await apiFetch('PUT','/piscine/config',{prix_carte: v});
+    const c = await apiFetch('PUT','/piscine/config',{prix_adulte: v, prix_jeune: j, prix_enfant: e});
     _pisPrix = c.prix_carte;
-    posAlert(`Prix de la carte : ${posGx(c.prix_carte)}.`,'ok');
+    posAlert(`Prix enregistrés — Adulte ${posGx(c.prix_adulte)} · Jeune ${c.prix_jeune?posGx(c.prix_jeune):'—'} · Enfant ${c.prix_enfant?posGx(c.prix_enfant):'—'}.`,'ok');
     await loadPiscineParametres();
   } catch(e){ posAlert(e.message||'Erreur.','err'); }
 }

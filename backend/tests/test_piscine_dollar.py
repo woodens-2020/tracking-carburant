@@ -492,3 +492,64 @@ def test_tarif_dollars_rabais_et_chambre_sans_prix_usd(client, db):
     # Tarif gourdes par défaut : aucun champ dollars
     d3 = _sejour(client, _chambre(client, prix=2000)).json()
     assert d3["devise_tarif"] == "HTG" and d3["montant_total_usd"] is None and d3["solde_usd"] is None
+
+
+# ══════════════════════════════════════════════════════════════════
+# PISCINE — cartes Adulte / Jeune / Enfant, correction par l'admin
+# ══════════════════════════════════════════════════════════════════
+
+def test_prix_par_categorie_et_vente(client, db):
+    r = client.put("/api/piscine/config", headers=H, json={"prix_adulte": 500, "prix_jeune": 300, "prix_enfant": 200})
+    assert r.status_code == 200, r.text
+    c = r.json()
+    assert (c["prix_adulte"], c["prix_jeune"], c["prix_enfant"], c["prix_carte"]) == (500, 300, 200, 500)
+    assert [x["code"] for x in c["categories"]] == ["ADULTE", "JEUNE", "ENFANT"]
+    # 2 adultes + 1 jeune + 3 enfants = 1000 + 300 + 600 = 1900, rabais 100
+    r = client.post("/api/piscine/ventes", headers=H, json={
+        "adulte": 2, "jeune": 1, "enfant": 3, "rabais_type": "MONTANT", "rabais_valeur": 100, "lieu_vente": "DEVANT"})
+    assert r.status_code == 201, r.text
+    v = r.json()
+    assert v["quantite"] == 6 and v["montant_brut"] == 1900 and v["montant_net"] == 1800
+    assert v["detail"] == "2 Adulte · 1 Jeune · 3 Enfant"
+    assert {x["code"]: x["montant"] for x in v["categories"]} == {"ADULTE": 1000, "JEUNE": 300, "ENFANT": 600}
+    # Ancien écran (quantite seule) = cartes Adulte
+    v2 = client.post("/api/piscine/ventes", headers=H, json={"quantite": 1}).json()
+    assert v2["montant_net"] == 500 and v2["detail"] == "1 Adulte"
+    # Catégorie sans prix : refusée
+    client.put("/api/piscine/config", headers=H, json={"prix_enfant": 0})
+    assert client.post("/api/piscine/ventes", headers=H, json={"enfant": 1}).status_code == 422
+    client.put("/api/piscine/config", headers=H, json={"prix_enfant": 200})
+    assert client.post("/api/piscine/ventes", headers=H, json={}).status_code == 422
+    lst = client.get(f"/api/piscine/ventes?{PER}", headers=H).json()
+    cats = {x["code"]: x["nb_cartes"] for x in lst["par_categorie"]}
+    assert cats["ADULTE"] >= 3 and cats["JEUNE"] >= 1 and cats["ENFANT"] >= 3
+    dash = client.get(f"/api/piscine/dashboard?{PER}", headers=H).json()
+    assert dash["prix"] == {"ADULTE": 500, "JEUNE": 300, "ENFANT": 200} and dash["par_categorie"]
+
+
+def test_correction_par_admin(client, db):
+    client.put("/api/piscine/config", headers=H, json={"prix_adulte": 500, "prix_jeune": 300, "prix_enfant": 200})
+    v = client.post("/api/piscine/ventes", headers=H, json={"adulte": 3}).json()
+    # Le prix change après la vente : la correction garde les prix du jour de la vente
+    client.put("/api/piscine/config", headers=H, json={"prix_adulte": 600})
+    assert client.put(f"/api/piscine/ventes/{v['id']}", headers=H, json={"adulte": 2, "motif": " "}).status_code == 422
+    r = client.put(f"/api/piscine/ventes/{v['id']}", headers=H, json={
+        "adulte": 2, "enfant": 1, "motif": "Erreur : un enfant compté comme adulte"})
+    assert r.status_code == 200, r.text
+    c = r.json()
+    assert c["montant_net"] == 1200 and c["detail"] == "2 Adulte · 1 Enfant"
+    assert c["corrige_par"] and c["motif_correction"].startswith("Erreur")
+    client.put("/api/piscine/config", headers=H, json={"prix_adulte": 500})
+    # Annulée : plus corrigeable
+    client.post(f"/api/piscine/ventes/{v['id']}/annuler", headers=H)
+    assert client.put(f"/api/piscine/ventes/{v['id']}", headers=H, json={"adulte": 1, "motif": "x"}).status_code == 409
+
+
+def test_correction_refusee_a_une_caissiere(client, db):
+    from fastapi import HTTPException
+    from piscine_routes import _require_pdg_ou_admin
+    from types import SimpleNamespace
+    req = SimpleNamespace(state=SimpleNamespace(user=SimpleNamespace(id=999, role="caissier", role_id=None)))
+    with pytest.raises(HTTPException) as e:
+        _require_pdg_ou_admin(req, db)
+    assert e.value.status_code == 403

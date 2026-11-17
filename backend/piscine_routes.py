@@ -1,9 +1,10 @@
 """
 Département Piscine — vente de cartes d'accès.  Préfixe /api/piscine
 
-  GET/PUT  /config                 prix de la carte (PUT : PDG/admin)
-  POST     /ventes                 enregistrer une vente (quantité, lieu, rabais)
+  GET/PUT  /config                 prix des cartes Adulte / Jeune / Enfant (PUT : PDG/admin)
+  POST     /ventes                 enregistrer une vente (cartes par catégorie, lieu, rabais)
   GET      /ventes                 liste filtrable (dates, lieu de vente)
+  PUT      /ventes/{id}            corriger une erreur de saisie (PDG/admin, motif obligatoire)
   POST     /ventes/{id}/annuler    annuler une vente (PDG/admin)
   GET      /dashboard              suivi : cartes vendues, CA, rabais, dépenses, caisse
   GET/POST/PUT/DELETE /depenses    dépenses de la Piscine
@@ -50,9 +51,25 @@ def _require_pdg_ou_admin(request: Request, db: Session = Depends(get_db)) -> Ut
     raise HTTPException(403, "Accès réservé au PDG et aux administrateurs")
 
 
-def _prix_carte(db: Session) -> Decimal:
+# Catégories de cartes : (code, libellé, colonne quantité, colonne prix).
+CATEGORIES = [("ADULTE", "Adulte"), ("JEUNE", "Jeune"), ("ENFANT", "Enfant")]
+
+
+def _prix_categories(db: Session) -> dict[str, Decimal]:
+    """Prix actuel de chaque catégorie. Adulte non renseigné = l'ancien prix
+    unique de la carte (prix_carte)."""
     cfg = db.get(PiscineConfig, 1)
-    return _d(cfg.prix_carte) if cfg else Decimal("0")
+    if not cfg:
+        return {c: Decimal("0") for c, _ in CATEGORIES}
+    return {
+        "ADULTE": _d(cfg.prix_adulte) if cfg.prix_adulte else _d(cfg.prix_carte),
+        "JEUNE":  _d(cfg.prix_jeune),
+        "ENFANT": _d(cfg.prix_enfant),
+    }
+
+
+def _prix_carte(db: Session) -> Decimal:
+    return _prix_categories(db)["ADULTE"]
 
 
 def _periode(date_debut: Optional[str], date_fin: Optional[str]) -> tuple[date_type, date_type]:
@@ -93,14 +110,22 @@ def calculer_rabais(brut: Decimal, rabais_type: Optional[str], rabais_valeur) ->
 # ── Paramètres ────────────────────────────────────────────────────
 
 class ConfigIn(BaseModel):
-    prix_carte: float = Field(gt=0)
+    prix_adulte: Optional[float] = Field(default=None, ge=0)
+    prix_jeune:  Optional[float] = Field(default=None, ge=0)
+    prix_enfant: Optional[float] = Field(default=None, ge=0)
+    prix_carte:  Optional[float] = Field(default=None, gt=0)   # ancien champ = prix Adulte
 
 
 @router.get("/config")
 def lire_config(db: Session = Depends(get_db)):
     cfg = db.get(PiscineConfig, 1)
+    prix = _prix_categories(db)
     return {
-        "prix_carte": float(_prix_carte(db)),
+        "prix_carte":  float(prix["ADULTE"]),
+        "prix_adulte": float(prix["ADULTE"]),
+        "prix_jeune":  float(prix["JEUNE"]),
+        "prix_enfant": float(prix["ENFANT"]),
+        "categories":  [{"code": c, "libelle": l, "prix": float(prix[c])} for c, l in CATEGORIES],
         "updated_at": cfg.updated_at.isoformat() if cfg and cfg.updated_at else None,
         "updated_by": cfg.updated_by if cfg else None,
     }
@@ -113,7 +138,17 @@ def modifier_config(data: ConfigIn, db: Session = Depends(get_db),
     if not cfg:
         cfg = PiscineConfig(id=1)
         db.add(cfg)
-    cfg.prix_carte = Decimal(str(data.prix_carte)).quantize(_CENT)
+    adulte = data.prix_adulte if data.prix_adulte is not None else data.prix_carte
+    if adulte is not None:
+        if adulte <= 0:
+            raise HTTPException(422, "Le prix Adulte doit être supérieur à 0.")
+        cfg.prix_adulte = cfg.prix_carte = Decimal(str(adulte)).quantize(_CENT)
+    if data.prix_jeune is not None:
+        cfg.prix_jeune = Decimal(str(data.prix_jeune)).quantize(_CENT) if data.prix_jeune > 0 else None
+    if data.prix_enfant is not None:
+        cfg.prix_enfant = Decimal(str(data.prix_enfant)).quantize(_CENT) if data.prix_enfant > 0 else None
+    if not cfg.prix_carte:
+        raise HTTPException(422, "Définissez au moins le prix Adulte.")
     cfg.updated_at = datetime.now(timezone.utc)
     cfg.updated_by = user.nom_complet
     db.commit()
@@ -123,7 +158,11 @@ def modifier_config(data: ConfigIn, db: Session = Depends(get_db),
 # ── Ventes de cartes ──────────────────────────────────────────────
 
 class VenteIn(BaseModel):
-    quantite:      int = Field(gt=0)
+    # Cartes par catégorie ; `quantite` seul (ancien écran) = cartes Adulte.
+    adulte:        int = Field(default=0, ge=0)
+    jeune:         int = Field(default=0, ge=0)
+    enfant:        int = Field(default=0, ge=0)
+    quantite:      Optional[int] = Field(default=None, gt=0)
     lieu_vente:    Optional[str] = None     # DEVANT | DERRIERE | vide
     rabais_type:   Optional[str] = None     # MONTANT | POURCENT | vide
     rabais_valeur: Optional[float] = None
@@ -133,9 +172,25 @@ class VenteIn(BaseModel):
     taux_change:   Optional[float] = None
 
 
+def _qtes(v: PiscineVente) -> dict[str, int]:
+    return {"ADULTE": v.qte_adulte or 0, "JEUNE": v.qte_jeune or 0, "ENFANT": v.qte_enfant or 0}
+
+
 def _vente_dict(v: PiscineVente) -> dict:
+    q = _qtes(v)
+    classee = any(q.values())
+    prix_v = {"ADULTE": v.prix_adulte, "JEUNE": v.prix_jeune, "ENFANT": v.prix_enfant}
     return {
         "id":             v.id,
+        "categories":     ([{"code": c, "libelle": l, "quantite": q[c],
+                             "prix": float(prix_v[c]) if prix_v[c] is not None else None,
+                             "montant": float((_d(prix_v[c]) * q[c]).quantize(_CENT))}
+                            for c, l in CATEGORIES if q[c]] if classee else []),
+        "detail":         (" · ".join(f"{q[c]} {l}" for c, l in CATEGORIES if q[c]) if classee
+                           else f"{v.quantite} carte(s) (non classée)"),
+        "corrige_le":     v.corrige_le.isoformat() if v.corrige_le else None,
+        "corrige_par":    v.corrige_par,
+        "motif_correction": v.motif_correction,
         "date_vente":     v.date_vente.isoformat() if v.date_vente else None,
         "quantite":       v.quantite,
         "prix_unitaire":  float(v.prix_unitaire),
@@ -156,28 +211,91 @@ def _vente_dict(v: PiscineVente) -> dict:
     }
 
 
-@router.post("/ventes", status_code=201)
-def enregistrer_vente(data: VenteIn, request: Request, db: Session = Depends(get_db)):
-    prix = _prix_carte(db)
-    if prix <= 0:
-        raise HTTPException(422, "Le prix de la carte n'est pas encore défini (Piscine › Paramètres).")
+def _appliquer(v: PiscineVente, data: VenteIn, prix: dict[str, Decimal], db: Session):
+    """Calcule et écrit une vente : cartes par catégorie × prix, rabais,
+    devise. `prix` = prix figés (vente) ou actuels (nouvelle vente)."""
+    qtes = {"ADULTE": data.adulte, "JEUNE": data.jeune, "ENFANT": data.enfant}
+    if not any(qtes.values()) and data.quantite:
+        qtes["ADULTE"] = data.quantite
+    total_cartes = sum(qtes.values())
+    if total_cartes <= 0:
+        raise HTTPException(422, "Indiquez le nombre de cartes (Adulte, Jeune ou Enfant).")
+    for c, l in CATEGORIES:
+        if qtes[c] and _d(prix.get(c)) <= 0:
+            raise HTTPException(422, f"Le prix de la carte {l} n'est pas défini (Piscine › Paramètres).")
     lieu = (data.lieu_vente or "").strip().upper() or None
     if lieu and lieu not in LIEUX_VENTE:
         raise HTTPException(422, "Lieu de vente : DEVANT, DERRIERE ou vide.")
-    brut = (prix * data.quantite).quantize(_CENT)
+    brut = sum((_d(prix[c]) * qtes[c] for c in qtes), Decimal("0")).quantize(_CENT)
     r_type, r_val, r_mt = calculer_rabais(brut, data.rabais_type, data.rabais_valeur)
     import devise as dv
     pay = dv.paiement_vente(brut - r_mt, data.devise, data.taux_change, db)
-    v = PiscineVente(
-        **pay,
-        quantite=data.quantite, prix_unitaire=prix, montant_brut=brut,
-        rabais_type=r_type, rabais_valeur=r_val, rabais_montant=r_mt,
-        montant_net=brut - r_mt, lieu_vente=lieu,
-        client_nom=(data.client_nom or "").strip() or None,
-        notes=(data.notes or "").strip() or None,
-        utilisateur_id=_uid(request),
-    )
+    for k, val in pay.items():
+        setattr(v, k, val)
+    v.quantite = total_cartes
+    v.prix_unitaire = (brut / total_cartes).quantize(_CENT)
+    v.montant_brut = brut
+    v.rabais_type, v.rabais_valeur, v.rabais_montant = r_type, r_val, r_mt
+    v.montant_net = brut - r_mt
+    v.lieu_vente = lieu
+    v.client_nom = (data.client_nom or "").strip() or None
+    v.notes = (data.notes or "").strip() or None
+    v.qte_adulte, v.qte_jeune, v.qte_enfant = qtes["ADULTE"] or None, qtes["JEUNE"] or None, qtes["ENFANT"] or None
+    v.prix_adulte = _d(prix["ADULTE"]) if qtes["ADULTE"] else None
+    v.prix_jeune  = _d(prix["JEUNE"]) if qtes["JEUNE"] else None
+    v.prix_enfant = _d(prix["ENFANT"]) if qtes["ENFANT"] else None
+
+
+@router.post("/ventes", status_code=201)
+def enregistrer_vente(data: VenteIn, request: Request, db: Session = Depends(get_db)):
+    v = PiscineVente(utilisateur_id=_uid(request))
+    _appliquer(v, data, _prix_categories(db), db)
     db.add(v)
+    db.commit()
+    db.refresh(v)
+    return _vente_dict(v)
+
+
+class CorrectionIn(VenteIn):
+    motif: str
+
+
+@router.put("/ventes/{vente_id}")
+def corriger_vente(vente_id: int, data: CorrectionIn, db: Session = Depends(get_db),
+                   user: Utilisateur = Depends(_require_pdg_ou_admin)):
+    """Corriger une erreur de saisie d'une caissière (administrateur
+    seulement, motif obligatoire). Les prix restent ceux du jour de la vente ;
+    l'ancienne version est gardée au journal d'activité."""
+    v = db.get(PiscineVente, vente_id)
+    if not v:
+        raise HTTPException(404, "Vente introuvable.")
+    if v.statut == "ANNULEE":
+        raise HTTPException(409, "Vente annulée — elle ne peut plus être corrigée.")
+    motif = (data.motif or "").strip()
+    if not motif:
+        raise HTTPException(422, "Indiquez le motif de la correction.")
+    avant = _vente_dict(v)
+    actuels = _prix_categories(db)
+    prix = {
+        "ADULTE": v.prix_adulte if v.prix_adulte is not None else (v.prix_unitaire if not any(_qtes(v).values()) else actuels["ADULTE"]),
+        "JEUNE":  v.prix_jeune if v.prix_jeune is not None else actuels["JEUNE"],
+        "ENFANT": v.prix_enfant if v.prix_enfant is not None else actuels["ENFANT"],
+    }
+    _appliquer(v, data, prix, db)
+    v.corrige_le = datetime.now(timezone.utc)
+    v.corrige_par = user.nom_complet
+    v.motif_correction = motif[:300]
+    db.flush()
+    apres = _vente_dict(v)
+    from activity_log import log_event
+    try:
+        log_event(db, "piscine_vente_corrigee", user_id=user.id, details={
+            "vente_id": v.id, "motif": motif,
+            "avant": {k: avant[k] for k in ("detail", "montant_net", "rabais_montant", "lieu_vente", "devise", "montant_devise")},
+            "apres": {k: apres[k] for k in ("detail", "montant_net", "rabais_montant", "lieu_vente", "devise", "montant_devise")},
+        })
+    except Exception:
+        pass
     db.commit()
     db.refresh(v)
     return _vente_dict(v)
@@ -212,6 +330,7 @@ def liste_ventes(
         "montant_net":    round(sum(float(v.montant_net) for v in valides), 2),
         "recu_htg":       round(sum(float(v.montant_net) for v in valides if (v.devise or "HTG") != "USD"), 2),
         "recu_usd":       round(sum(float(v.montant_devise or 0) for v in valides if v.devise == "USD"), 2),
+        "par_categorie":  _par_categorie(valides),
         "ventes":         [_vente_dict(v) for v in ventes],
     }
 
@@ -236,6 +355,21 @@ def _depenses_periode(db: Session, d1: date_type, d2: date_type):
             .filter(PiscineDepense.date_depense >= bounds_haiti(d1)[0],
                     PiscineDepense.date_depense <= bounds_haiti(d2)[1])
             .order_by(PiscineDepense.date_depense.desc()).all())
+
+
+def _par_categorie(ventes) -> list[dict]:
+    out = []
+    for c, l in CATEGORIES:
+        col_q, col_p = f"qte_{c.lower()}", f"prix_{c.lower()}"
+        n = sum(getattr(v, col_q) or 0 for v in ventes)
+        mt = sum(float(_d(getattr(v, col_p)) * (getattr(v, col_q) or 0)) for v in ventes)
+        out.append({"code": c, "libelle": l, "nb_cartes": n, "montant": round(mt, 2)})
+    anc = [v for v in ventes if not any(_qtes(v).values())]
+    if anc:
+        out.append({"code": "NON_CLASSE", "libelle": "Non classées (avant catégories)",
+                    "nb_cartes": sum(v.quantite for v in anc),
+                    "montant": round(sum(float(v.montant_brut) for v in anc), 2)})
+    return out
 
 
 def _resume(ventes, depenses) -> dict:
@@ -302,6 +436,8 @@ def tableau_de_bord(date_debut: Optional[str] = Query(None), date_fin: Optional[
     return {
         "periode":    {"debut": str(d1), "fin": str(d2)},
         "prix_carte": float(_prix_carte(db)),
+        "prix":       {c: float(p) for c, p in _prix_categories(db).items()},
+        "par_categorie": _par_categorie(ventes),
         "kpi":        _resume(ventes, depenses),
         "precedent":  prec,
         "aujourd_hui": {"nb_cartes": sum(v.quantite for v in du_jour),

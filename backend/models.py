@@ -1465,6 +1465,10 @@ class PiscineConfig(Base):
 
     id         = Column(Integer, primary_key=True)
     prix_carte = Column(Numeric(12, 2), nullable=False, default=0)
+    # Prix par catégorie de carte (v32). Adulte vide → prix_carte (historique).
+    prix_adulte = Column(Numeric(12, 2), nullable=True)
+    prix_jeune  = Column(Numeric(12, 2), nullable=True)
+    prix_enfant = Column(Numeric(12, 2), nullable=True)
     updated_at = Column(DateTime(timezone=True), nullable=True)
     updated_by = Column(String(150), nullable=True)
 
@@ -1495,6 +1499,18 @@ class PiscineVente(Base):
     devise          = Column(String(3), nullable=False, default="HTG", server_default="HTG")
     montant_devise  = Column(Numeric(14, 2), nullable=True)
     taux_change     = Column(Numeric(10, 4), nullable=True)
+    # Cartes par catégorie (v32) et prix figés à la vente. Une vente
+    # d'avant les catégories a ces colonnes vides (« non classée »).
+    qte_adulte  = Column(Integer, nullable=True)
+    qte_jeune   = Column(Integer, nullable=True)
+    qte_enfant  = Column(Integer, nullable=True)
+    prix_adulte = Column(Numeric(12, 2), nullable=True)
+    prix_jeune  = Column(Numeric(12, 2), nullable=True)
+    prix_enfant = Column(Numeric(12, 2), nullable=True)
+    # Correction d'une erreur de saisie (administrateur seulement).
+    corrige_le       = Column(DateTime(timezone=True), nullable=True)
+    corrige_par      = Column(String(150), nullable=True)
+    motif_correction = Column(String(300), nullable=True)
 
     utilisateur = relationship("Utilisateur")
 
