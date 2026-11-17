@@ -331,6 +331,11 @@ def encaisser_vente(data: dict, db: Session, utilisateur_id: int | None = None) 
     # quand elle existe, fait toujours foi.
     if lieu_vente is None and data.get("lieu"):
         lieu_vente = normaliser_lieu(data.get("lieu"))
+    # Aucune vente sans bar : ni session ni écran (ex. Tables, appel direct)
+    # → Bar Devant, le bar principal. Ainsi chaque vente, et sa sortie de
+    # stock, appartient toujours à Bar Devant ou à Bar Piscine.
+    if lieu_vente is None:
+        lieu_vente = "DEVANT"
 
     lignes_traitees = []
     erreurs = []
