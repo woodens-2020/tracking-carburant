@@ -663,6 +663,64 @@ def _reprise_piscine_et_paiements_hotel():
             except Exception as e:
                 conn.rollback()
                 print(f"[reprise v27] étape ignorée : {e}")
+    _reprise_lieux_bars()
+
+
+def _reprise_lieux_bars():
+    """Bar Devant / Bar Piscine : rattache à son bar tout l'historique dont
+    le bar est CERTAIN (idempotent, ne touche que les lignes sans lieu) :
+
+    1. vente sans lieu dont tous les articles sont réservés au même bar ;
+    2. achat sans lieu d'un article réservé à un bar → ce bar.
+
+    Les MOUVEMENTS DE STOCK ne sont jamais réattribués : le stock de chaque
+    bar est celui que les caisses utilisent aujourd'hui (inventaires et
+    ajustements déjà faits) — le modifier après coup le fausserait.
+    Ce qui reste sans lieu (bar impossible à déterminer) est compté avec le
+    Bar Devant. Les comptes restants sont écrits dans le journal du serveur."""
+    from sqlalchemy import text as sql_text
+    etapes = [
+        # 1. articles tous réservés au même bar
+        "UPDATE bar_ventes SET lieu = (SELECT MIN(p.lieu) FROM bar_lignes_vente l "
+        "JOIN bar_produits p ON p.id = l.produit_id WHERE l.vente_id = bar_ventes.id) "
+        "WHERE lieu IS NULL "
+        "AND EXISTS (SELECT 1 FROM bar_lignes_vente l JOIN bar_produits p ON p.id = l.produit_id "
+        "            WHERE l.vente_id = bar_ventes.id AND p.lieu IS NOT NULL) "
+        "AND NOT EXISTS (SELECT 1 FROM bar_lignes_vente l LEFT JOIN bar_produits p ON p.id = l.produit_id "
+        "                WHERE l.vente_id = bar_ventes.id AND (p.lieu IS NULL OR l.produit_id IS NULL)) "
+        "AND (SELECT COUNT(DISTINCT p.lieu) FROM bar_lignes_vente l JOIN bar_produits p ON p.id = l.produit_id "
+        "     WHERE l.vente_id = bar_ventes.id) = 1",
+        # 2. achats d'un article réservé à un bar
+        "UPDATE bar_achats SET lieu = (SELECT p.lieu FROM bar_produits p WHERE p.id = bar_achats.produit_id) "
+        "WHERE lieu IS NULL AND produit_id IS NOT NULL "
+        "AND EXISTS (SELECT 1 FROM bar_produits p2 WHERE p2.id = bar_achats.produit_id AND p2.lieu IS NOT NULL)",
+    ]
+    for sql in etapes:
+        with engine.connect() as conn:
+            try:
+                r = conn.execute(sql_text(sql))
+                conn.commit()
+                if r.rowcount:
+                    print(f"[lieux bars] {r.rowcount} ligne(s) rattachée(s) : {sql[7:40]}…")
+            except Exception as e:
+                conn.rollback()
+                print(f"[lieux bars] étape ignorée : {e}")
+    # Diagnostic : ce qui reste sans bar (lu dans les journaux du serveur).
+    diag = {}
+    with engine.connect() as conn:
+        for nom, sql in [
+            ("ventes", "SELECT lieu, COUNT(*) FROM bar_ventes GROUP BY lieu"),
+            ("mouvements", "SELECT lieu, COUNT(*) FROM bar_mouvements_stock GROUP BY lieu"),
+            ("achats", "SELECT lieu, COUNT(*) FROM bar_achats GROUP BY lieu"),
+            ("paie", "SELECT lieu, COUNT(*) FROM bar_paiements_employes GROUP BY lieu"),
+            ("depenses", "SELECT lieu, COUNT(*) FROM bar_depenses GROUP BY lieu"),
+            ("sessions", "SELECT lieu, COUNT(*) FROM bar_sessions_caisse GROUP BY lieu"),
+        ]:
+            try:
+                diag[nom] = {str(l or "SANS_LIEU"): int(n) for l, n in conn.execute(sql_text(sql)).all()}
+            except Exception as e:
+                diag[nom] = f"erreur : {e}"
+    print(f"[lieux bars] répartition : {diag}")
 
 
 # ── Initialisation du schéma + données de démarrage ──────────────
