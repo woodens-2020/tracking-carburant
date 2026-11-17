@@ -650,6 +650,9 @@ class BarProduit(Base):
     # boissons oui ; les plats et les cartes piscine non — voir
     # depot_routes.est_au_depot) ; True/False = choix explicite.
     depot_actif        = Column(Boolean, nullable=True)
+    # Date du « Démarrer » au dépôt (stock de départ saisi) ; NULL = article
+    # pas encore démarré → l'inventaire propose « Démarrer » au lieu d'« Ajuster ».
+    depot_demarre_le = Column(DateTime(timezone=True), nullable=True)
 
     prix_historique = relationship("BarPrixHistorique", back_populates="produit",
                                    cascade="all, delete-orphan",
@@ -1377,6 +1380,7 @@ class DepotTransaction(Base):
     destination     = Column(String(10), nullable=False)                   # DEVANT | PISCINE | CLIENT
     client_nom      = Column(String(150), nullable=True)
     client_contact  = Column(String(100), nullable=True)
+    recu_par        = Column(String(100), nullable=True)   # qui a reçu au bar / chez le client
     statut          = Column(String(10), nullable=False, default="PREPAREE")
     statut_paiement = Column(String(10), nullable=False, default="NON_PAYEE")
     total           = Column(Numeric(14, 2), nullable=False, default=0)    # en gourdes

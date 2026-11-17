@@ -178,8 +178,13 @@ def test_creer_article_et_ajuster_stock(client):
     pid = r.json()["id"]
     s = _stock(client, pid)
     assert s["unites_par_caisse"] == 24 and s["prix_vente"] == 125.0 and s["stock_depot"] == 0
-    a = client.post(f"/api/depot/produits/{pid}/ajustement", headers=H, json={"nb_caisses": 5, "nb_unites": 3}).json()
+    assert s["demarre"] is False
+    # Pas encore démarré : « Ajuster » refusé, « Démarrer » demande la quantité de départ
+    assert client.post(f"/api/depot/produits/{pid}/ajustement", headers=H, json={"nb_caisses": 1}).status_code == 409
+    a = client.post(f"/api/depot/produits/{pid}/demarrer", headers=H, json={"nb_caisses": 5, "nb_unites": 3}).json()
     assert a["apres"] == 123 and a["difference"] == 123 and a["apres_caisses"] == {"caisses": 5, "unites": 3.0}
+    assert _stock(client, pid)["demarre"] is True
+    assert client.post(f"/api/depot/produits/{pid}/demarrer", headers=H, json={"nb_caisses": 1}).status_code == 409
     a = client.post(f"/api/depot/produits/{pid}/ajustement", headers=H, json={"nb_caisses": 4}).json()
     assert a["difference"] == -27
     assert _stock(client, pid)["stock_depot"] == 96
@@ -305,3 +310,71 @@ def test_taux_commun(client):
     assert client.put("/api/devise/taux", headers=H, json={"taux_usd": 135}).status_code == 200
     assert client.get("/api/devise/taux", headers=H).json()["taux_usd"] == 135.0
     assert client.get("/api/hotel/config", headers=H).json()["taux_usd"] == 135.0
+
+
+
+# ── Démarrage du dépôt, transfert « comme une vente », journal ──────────
+
+def test_demarrage_groupe_et_remise_a_zero(client):
+    a, b = _produit(client), _produit(client)
+    r = client.post("/api/depot/demarrer", headers=H, json={"lignes": [
+        {"produit_id": a, "nb_unites": 12}, {"produit_id": b, "nb_unites": 0}]})
+    assert r.status_code == 201, r.text
+    assert _stock(client, a)["stock_depot"] == 12 and _stock(client, b)["demarre"] is True
+    client.post("/api/depot/reinitialiser", headers=H, json={"confirmation": "REMETTRE A ZERO"})
+    s = _stock(client, a)
+    assert s["stock_depot"] == 0 and s["demarre"] is False
+
+
+def test_remise_a_zero_initiale_une_seule_fois(client):
+    from database import _depot_remise_a_zero_initiale, SessionLocal
+    from models import AuditLog
+    pid = _produit(client)
+    client.post(f"/api/depot/produits/{pid}/demarrer", headers=H, json={"nb_unites": 7})
+    s = SessionLocal()
+    deja = s.query(AuditLog).filter(AuditLog.action == "depot_demarrage_v1").count()
+    s.close()
+    assert deja == 1                       # fait au lancement de l'application
+    _depot_remise_a_zero_initiale()        # relancé : ne refait rien
+    assert _stock(client, pid)["stock_depot"] == 7
+    # Sans le marqueur (base de prod avant ce déploiement) : tout est effacé
+    s = SessionLocal()
+    s.query(AuditLog).filter(AuditLog.action == "depot_demarrage_v1").delete()
+    s.commit(); s.close()
+    _depot_remise_a_zero_initiale()
+    st = _stock(client, pid)
+    assert st["stock_depot"] == 0 and st["demarre"] is False
+    s = SessionLocal()
+    assert s.query(AuditLog).filter(AuditLog.action == "depot_demarrage_v1").count() == 1
+    s.close()
+
+
+def test_transfert_comme_une_vente_et_journal(client):
+    pid = _produit(client, prix=150)
+    client.post(f"/api/depot/produits/{pid}/demarrer", headers=H, json={"nb_unites": 30})
+    r = client.post("/api/depot/transactions", headers=H, json={
+        "destination": "PISCINE", "recu_par": "Marie (bar piscine)",
+        "lignes": [{"produit_id": pid, "quantite": 10}],
+        "paiement": {"montant": 1000, "devise": "HTG", "methode": "CASH"}})
+    assert r.status_code == 201, r.text
+    t = r.json()
+    assert t["recu_par"] == "Marie (bar piscine)" and t["total"] == 1500.0
+    assert t["statut"] == "VALIDEE" and t["statut_paiement"] == "PARTIELLE" and t["paye_htg"] == 1000.0
+    s = _stock(client, pid)
+    assert s["stock_depot"] == 20 and s["stock_piscine"] == 10
+    # Le stock du bar piscine est celui que voient les caisses du bar
+    from database import SessionLocal
+    from pos_service import stock_courant
+    db = SessionLocal()
+    assert stock_courant(pid, db, lieu="PISCINE") == 10
+    db.close()
+    j = client.get(f"/api/depot/transferts/journal?{PER}&produit_id={pid}", headers=H).json()
+    assert len(j["lignes"]) == 1
+    l = j["lignes"][0]
+    assert l["destination"] == "PISCINE" and l["recu_par"] == "Marie (bar piscine)"
+    assert l["quantite"] == 10 and l["montant"] == 1500.0
+    assert j["par_article"][0]["par_destination"] == {"Bar Piscine": 10.0}
+    # Paiement sans validation : refusé
+    assert client.post("/api/depot/transactions", headers=H, json={
+        "destination": "DEVANT", "valider": False, "lignes": [{"produit_id": pid, "quantite": 1}],
+        "paiement": {"montant": 10}}).status_code == 422

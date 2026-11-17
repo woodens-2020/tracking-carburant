@@ -3521,6 +3521,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/></svg></span>
       <span>Transferts &amp; Ventes</span><span class="nav-active-dot"></span>
     </button>
+    <button class="nav-item" data-page="depot-journal-transferts" onclick="goTo('depot-journal-transferts')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h7"/></svg></span>
+      <span>Journal des transferts</span><span class="nav-active-dot"></span>
+    </button>
     <button class="nav-item" data-page="depot-caisse" onclick="goTo('depot-caisse')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
       <span>Caisse Dépôt</span><span class="nav-active-dot"></span>
@@ -8397,6 +8401,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     <div id="page-depot-produits" class="page page-gi"><div class="pos-page gi-page" id="depot-produits-root"></div></div>
     <div id="page-depot-achats" class="page page-gi"><div class="pos-page gi-page" id="depot-achats-root"></div></div>
     <div id="page-depot-transactions" class="page page-gi"><div class="pos-page gi-page" id="depot-transactions-root"></div></div>
+    <div id="page-depot-journal-transferts" class="page page-gi"><div class="pos-page gi-page" id="depot-journal-transferts-root"></div></div>
     <div id="page-depot-caisse" class="page page-gi"><div class="pos-page gi-page" id="depot-caisse-root"></div></div>
     <div id="page-depot-rapport" class="page page-gi"><div class="pos-page gi-page" id="depot-rapport-root"></div></div>
     <div class="pos-modal-bg" id="depot-modal-bg" onclick="if(event.target===this)depFermer()">
@@ -14574,6 +14579,7 @@ const PAGE_META={
   'depot-produits':     {title: 'Dépôt — Inventaire & prix', sub: 'Stock du dépôt central'},
   'depot-achats':       {title: 'Dépôt — Achats & réception', sub: 'Factures fournisseurs et contrôle de la marchandise'},
   'depot-transactions': {title: 'Dépôt — Transferts & ventes', sub: 'Bar Devant · Bar Piscine · Clients externes'},
+  'depot-journal-transferts': {title: 'Dépôt — Journal des transferts', sub: 'Article par article, vers Bar Devant et Bar Piscine'},
   'depot-caisse':       {title: 'Caisse Dépôt',               sub: 'Paiements en gourdes et en dollars'},
   'depot-rapport':      {title: 'Rapport Dépôt',              sub: 'Inventaire · ventes · achats · caisse'},
   'zelle':                {title: 'Tableau de bord — Zelle',      sub: 'Bilan général · Balance HTG · Répartition par source'},
@@ -17561,7 +17567,7 @@ const _MODULE_PAGES = {
               'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-depenses','pos-rentabilite',
               'pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis'],
   piscine:   ['piscine-dashboard','piscine-ventes','piscine-depenses','piscine-parametres'],
-  depot:     ['depot-produits','depot-achats','depot-transactions','depot-caisse','depot-rapport'],
+  depot:     ['depot-produits','depot-achats','depot-transactions','depot-journal-transferts','depot-caisse','depot-rapport'],
   hotel:     ['hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma',
               'hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   zelle:     ['zelle','zelle-paiements','zelle-fonds'],
@@ -17603,9 +17609,9 @@ const _AREA_PAGES = {
   // Dépôt central — complet : tout ; opérationnel : réception, transferts,
   // encaissement (pas de prix) ; lecture : inventaire, caisse, rapport.
   depot: {
-    complet: ['depot-produits','depot-achats','depot-transactions','depot-caisse','depot-rapport'],
-    operationnel: ['depot-produits','depot-achats','depot-transactions','depot-caisse'],
-    lecture: ['depot-produits','depot-caisse','depot-rapport'],
+    complet: ['depot-produits','depot-achats','depot-transactions','depot-journal-transferts','depot-caisse','depot-rapport'],
+    operationnel: ['depot-produits','depot-achats','depot-transactions','depot-journal-transferts','depot-caisse'],
+    lecture: ['depot-produits','depot-journal-transferts','depot-caisse','depot-rapport'],
   },
   cuisine: {
     complet: ['cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse'],
@@ -17642,7 +17648,7 @@ const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-depenses','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
   'piscine-dashboard','piscine-ventes','piscine-depenses','piscine-parametres',
-  'depot-produits','depot-achats','depot-transactions','depot-caisse','depot-rapport',
+  'depot-produits','depot-achats','depot-transactions','depot-journal-transferts','depot-caisse','depot-rapport',
   'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'patisserie-dashboard','patisserie-produits','patisserie-achats','patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse',
@@ -17672,13 +17678,13 @@ const _ACCES_POSTE_LEGACY = {
   'Comptable':   ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-depenses','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'piscine-dashboard','piscine-ventes','piscine-depenses','piscine-parametres',
-                  'depot-produits','depot-achats','depot-transactions','depot-caisse','depot-rapport',
+                  'depot-produits','depot-achats','depot-transactions','depot-journal-transferts','depot-caisse','depot-rapport',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Superviseur': ['home','dashboard','journal','carburant-rapport','statistiques','gi-dashboard','employes','payroll','depenses','achats','caisse',
                   'pos-caisse','pos-produits','pos-stock','pos-ventes','pos-credits','pos-commandes','pos-paie','pos-depenses','pos-rentabilite','pos-grande-caisse','pos-analyse','pos-sessions-caisse','rapports-soumis','zelle','zelle-paiements','zelle-fonds',
                   'piscine-dashboard','piscine-ventes','piscine-depenses','piscine-parametres',
-                  'depot-produits','depot-achats','depot-transactions','depot-caisse','depot-rapport',
+                  'depot-produits','depot-achats','depot-transactions','depot-journal-transferts','depot-caisse','depot-rapport',
                   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
                   'hotel-dashboard','hotel-chambres','hotel-reception','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport'],
   'Pompiste':            ['home','saisie'],
@@ -23025,6 +23031,7 @@ const _giPageLoaders = {
   'depot-produits':     loadDepotProduits,
   'depot-achats':       loadDepotAchats,
   'depot-transactions': loadDepotTransactions,
+  'depot-journal-transferts': loadDepotJournalTransferts,
   'depot-caisse':       loadDepotCaisse,
   'depot-rapport':      loadDepotRapport,
   'pos-rentabilite':    loadPosRentabilite,
@@ -35419,7 +35426,7 @@ function depHeader(titre, sub, actions){
     <div><div class="pos-header-title">${titre}</div><div class="pos-header-sub">${sub}</div></div>
     <div class="pos-header-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${actions||''}</div></div>`;
 }
-function depOuvrir(html){ document.getElementById('depot-modal').innerHTML = html; document.getElementById('depot-modal-bg').classList.add('open'); }
+function depOuvrir(html, largeur){ const m = document.getElementById('depot-modal'); m.style.maxWidth = (largeur||880)+'px'; m.innerHTML = html; document.getElementById('depot-modal-bg').classList.add('open'); }
 function depFermer(){ document.getElementById('depot-modal-bg').classList.remove('open'); }
 async function depChargerProduits(){ _depProduits = await apiFetch('GET','/depot/produits'); return _depProduits; }
 // ── Caisses : au dépôt, les articles se comptent en caisses ───────
@@ -35454,6 +35461,7 @@ async function loadDepotProduits(){
        <button class="pos-btn ${_depVue==='mosaique'?'teal':'ghost'}" id="dep-vue-mos" style="border-radius:0;padding:6px 12px" onclick="depVue('mosaique')">▦ Mosaïque</button>
        <button class="pos-btn ${_depVue==='tableau'?'teal':'ghost'}" id="dep-vue-tab" style="border-radius:0;padding:6px 12px" onclick="depVue('tableau')">☰ Tableau</button></div>
      ${ro?'':'<button class="pos-btn primary" onclick="depAjouterArticle()">+ Ajouter un article</button>'}
+     ${ro?'':'<span id="dep-demarrer-tous"></span>'}
      ${depAdmin()?'<button class="pos-btn ghost" style="color:#f87171;border-color:rgba(248,113,113,.4)" onclick="depRemiseAZero()">Remettre à zéro</button>':''}`)
     + `<div class="pos-kpi-grid" id="dep-prod-kpi"></div><div id="dep-prod-corps"><div style="text-align:center;padding:30px;color:rgba(255,255,255,.3)">Chargement…</div></div>`;
   try { await depChargerProduits(); depRendreProduits(); } catch(e){ posAlert(e.message||'Erreur','err'); }
@@ -35465,6 +35473,7 @@ function depVue(v){
   depRendreProduits();
 }
 function _depEtat(p){
+  if(!p.demarre) return {lib:'À démarrer', col:'#94a3b8'};
   if(p.stock_depot <= 0) return {lib:'Épuisé', col:'#f87171'};
   if(p.alerte) return {lib:'Sous le minimum', col:'#fbbf24'};
   return {lib:'En stock', col:'#34d399'};
@@ -35480,10 +35489,16 @@ function depRendreProduits(){
     `<div class="pos-kpi"><div class="pos-kpi-label">Articles au dépôt</div><div class="pos-kpi-val">${_depProduits.length}</div></div>
      <div class="pos-kpi"><div class="pos-kpi-label">Caisses pleines en stock</div><div class="pos-kpi-val" style="color:#22d3ee">${caisses}</div></div>
      <div class="pos-kpi"><div class="pos-kpi-label">Valeur du stock</div><div class="pos-kpi-val" style="color:#a78bfa">${posGx(valeur)}</div></div>
-     <div class="pos-kpi"><div class="pos-kpi-label">Épuisés / sous le min.</div><div class="pos-kpi-val" style="color:#f87171">${_depProduits.filter(p=>p.stock_depot<=0).length} / ${_depProduits.filter(p=>p.alerte && p.stock_depot>0).length}</div></div>`;
+     <div class="pos-kpi"><div class="pos-kpi-label">Épuisés / sous le min.</div><div class="pos-kpi-val" style="color:#f87171">${_depProduits.filter(p=>p.demarre && p.stock_depot<=0).length} / ${_depProduits.filter(p=>p.alerte && p.stock_depot>0).length}</div></div>`;
+  const aDem = _depProduits.filter(p=>!p.demarre).length;
+  const bd = document.getElementById('dep-demarrer-tous');
+  if(bd) bd.innerHTML = aDem ? `<button class="pos-btn primary" style="background:#22c55e;border-color:#22c55e" onclick="depDemarrerTous()">▶ Démarrer le dépôt (${aDem} article${aDem>1?'s':''})</button>` : '';
   const corps = document.getElementById('dep-prod-corps');
   if(!ps.length){ corps.innerHTML = '<div class="pos-card" style="text-align:center;padding:30px;color:rgba(255,255,255,.35)">Aucun article</div>'; return; }
   const ro = _isReadOnly() && !depAdmin();
+  const btnStock = (p, style) => p.demarre
+    ? `<button class="pos-btn teal" style="${style}" onclick="depAjuster(${p.id})">Ajuster</button>`
+    : `<button class="pos-btn primary" style="${style};background:#22c55e;border-color:#22c55e" onclick="depDemarrer(${p.id})">▶ Démarrer</button>`;
   if(_depVue === 'mosaique'){
     corps.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px">${ps.map(p=>{
       const n = depUpc(p), e = _depEtat(p), c = n>1 ? Math.floor(Math.max(p.stock_depot,0)/n + 1e-9) : null, u = n>1 ? Math.round((Math.max(p.stock_depot,0) - c*n)*1000)/1000 : p.stock_depot;
@@ -35501,7 +35516,7 @@ function depRendreProduits(){
         <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.55)"><span>Bar Piscine</span><b style="color:#fff">${depFmtCs(p.stock_piscine,n)}</b></div>
         <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.55)"><span>Prix ${n>1?'caisse':'unité'}</span><b style="color:#fff">${posGx(n>1?p.prix_vente_caisse:p.prix_vente)}</b></div>
         ${ro?'':`<div style="display:flex;gap:6px;margin-top:4px">
-          <button class="pos-btn teal" style="flex:1;padding:5px;font-size:12px" onclick="depAjuster(${p.id})">Ajuster</button>
+          ${btnStock(p,'flex:1;padding:5px;font-size:12px')}
           <button class="pos-btn ghost" style="flex:1;padding:5px;font-size:12px" onclick="depConfigProduit(${p.id})">Configurer</button>
           <button class="pos-btn ghost" title="Retirer du dépôt" style="padding:5px 8px;font-size:12px;color:#f87171" onclick="depRetirerArticle(${p.id})">✕</button></div>`}
       </div>`; }).join('')}</div>`;
@@ -35518,7 +35533,7 @@ function depRendreProduits(){
       <td style="text-align:right">${p.seuil_min?depFmtCs(p.seuil_min,n):'—'}</td>
       <td style="text-align:right">${p.dernier_prix_achat_caisse!=null?posGx(p.dernier_prix_achat_caisse):(p.dernier_prix_achat!=null?posGx(p.dernier_prix_achat)+' / u':'—')}</td>
       <td style="text-align:right">${posGx(p.valeur_stock)}</td>
-      <td style="white-space:nowrap">${ro?'':`<button class="pos-btn teal" style="padding:3px 9px;font-size:12px" onclick="depAjuster(${p.id})">Ajuster</button>
+      <td style="white-space:nowrap">${ro?'':`${btnStock(p,'padding:3px 9px;font-size:12px')}
         <button class="pos-btn ghost" style="padding:3px 9px;font-size:12px" onclick="depConfigProduit(${p.id})">Configurer</button>
         <button class="pos-btn ghost" style="padding:3px 9px;font-size:12px;color:#f87171" onclick="depRetirerArticle(${p.id})">Retirer</button>`}</td>
     </tr>`; }).join('')}</tbody></table></div></div>`;
@@ -35553,6 +35568,70 @@ async function depAjusterValider(id){
       nb_unites: parseFloat(document.getElementById('dep-aj-u').value)||0,
       motif: document.getElementById('dep-aj-motif').value.trim()||null });
     depFermer(); posAlert(r.difference ? `Stock ajusté : ${depFmtCs(r.apres,n)}.` : 'Stock déjà à jour.','ok');
+    await depChargerProduits(); depRendreProduits();
+  } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+// « Démarrer » : quantité de départ d'un article (une seule fois) — ensuite
+// le bouton laisse la place à « Ajuster ».
+function depDemarrer(id){
+  const p = _depProd(id); if(!p) return;
+  const n = depUpc(p);
+  depOuvrir(`<h3>▶ Démarrer — ${esc(p.nom)}</h3>
+    <div style="font-size:14px;margin-bottom:10px;color:rgba(255,255,255,.6)">Quantité de démarrage : ce qui se trouve au dépôt aujourd'hui${n>1?` (caisse de <b style="color:#fff">${n}</b>)`:''}.</div>
+    <div class="pos-form-row">
+      <div><label class="pos-label">Caisses</label><input class="pos-input" id="dep-dm-cs" type="number" min="0" step="1" ${n>1?'':'disabled placeholder="—"'} oninput="depDemarrerMaj(${id})"></div>
+      <div><label class="pos-label">Unités en plus</label><input class="pos-input" id="dep-dm-u" type="number" min="0" step="any" oninput="depDemarrerMaj(${id})"></div></div>
+    <div id="dep-dm-info" style="margin-top:8px;font-size:14px"></div>
+    <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Annuler</button><button class="pos-btn primary" onclick="depDemarrerValider(${id})">Démarrer avec cette quantité</button></div>`);
+  depDemarrerMaj(id);
+  setTimeout(()=>document.getElementById(n>1?'dep-dm-cs':'dep-dm-u')?.focus(), 50);
+}
+function _depDmQte(id){ const n = depUpc(_depProd(id)); return (parseFloat(document.getElementById('dep-dm-cs')?.value||0)||0)*(n>1?n:0) + (parseFloat(document.getElementById('dep-dm-u')?.value||0)||0); }
+function depDemarrerMaj(id){
+  const p = _depProd(id), q = _depDmQte(id), i = document.getElementById('dep-dm-info');
+  if(i) i.innerHTML = `Stock de départ : <b style="color:#34d399">${depFmtCs(q, depUpc(p))}</b> <span style="color:rgba(255,255,255,.45)">(${fmtQ(q)} unités)</span>`;
+}
+async function depDemarrerValider(id){
+  const n = depUpc(_depProd(id));
+  try {
+    const r = await apiFetch('POST',`/depot/produits/${id}/demarrer`,{
+      nb_caisses: n>1 ? (parseFloat(document.getElementById('dep-dm-cs').value)||0) : 0,
+      nb_unites: parseFloat(document.getElementById('dep-dm-u').value)||0 });
+    depFermer(); posAlert(`Démarré : ${depFmtCs(r.apres,n)}.`,'ok');
+    await depChargerProduits(); depRendreProduits();
+  } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+// Démarrage du dépôt en une fois : tous les articles pas encore démarrés.
+function depDemarrerTous(){
+  const ps = _depProduits.filter(p=>!p.demarre);
+  if(!ps.length){ posAlert('Tous les articles sont déjà démarrés.','ok'); return; }
+  depOuvrir(`<h3>▶ Démarrer le dépôt</h3>
+    <div style="font-size:14px;margin-bottom:10px;color:rgba(255,255,255,.6)">Saisissez ce qui se trouve au dépôt pour chaque article. Une ligne laissée vide n'est pas démarrée.</div>
+    <input class="pos-input" placeholder="Rechercher…" oninput="document.querySelectorAll('#dep-dm-table tbody tr').forEach(tr=>tr.style.display=_navNorm(tr.dataset.nom).includes(_navNorm(this.value))?'':'none')" style="margin-bottom:8px">
+    <div style="max-height:55vh;overflow:auto"><table class="pos-table" id="dep-dm-table"><thead><tr><th>Article</th><th style="width:70px">Caisse de</th><th style="width:100px">Caisses</th><th style="width:100px">Unités</th><th style="text-align:right">Stock de départ</th></tr></thead><tbody>
+    ${ps.map(p=>{ const n = depUpc(p); return `<tr data-id="${p.id}" data-n="${n}" data-nom="${esc(p.nom)}">
+      <td><b>${esc(p.nom)}</b><div style="font-size:11px;color:rgba(255,255,255,.4)">${esc(p.categorie||'')}</div></td>
+      <td>${n>1?n:'—'}</td>
+      <td><input class="pos-input dep-dm-cs" type="number" min="0" step="1" ${n>1?'':'disabled placeholder="—"'} oninput="depDemarrerTousMaj(this)"></td>
+      <td><input class="pos-input dep-dm-u" type="number" min="0" step="any" oninput="depDemarrerTousMaj(this)"></td>
+      <td style="text-align:right" class="dep-dm-tot">—</td></tr>`; }).join('')}
+    </tbody></table></div>
+    <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Annuler</button><button class="pos-btn primary" onclick="depDemarrerTousValider()">Démarrer les articles saisis</button></div>`);
+}
+function depDemarrerTousMaj(inp){
+  const tr = inp.closest('tr'), n = parseInt(tr.dataset.n)||1;
+  const cs = tr.querySelector('.dep-dm-cs').value, u = tr.querySelector('.dep-dm-u').value;
+  const q = (parseFloat(cs)||0)*(n>1?n:0) + (parseFloat(u)||0);
+  tr.querySelector('.dep-dm-tot').innerHTML = (cs!==''||u!=='') ? `<b style="color:#34d399">${depFmtCs(q,n)}</b>` : '—';
+}
+async function depDemarrerTousValider(){
+  const lignes = [...document.querySelectorAll('#dep-dm-table tbody tr')].filter(tr=>tr.querySelector('.dep-dm-cs').value!==''||tr.querySelector('.dep-dm-u').value!=='').map(tr=>({
+    produit_id: parseInt(tr.dataset.id), nb_caisses: parseFloat(tr.querySelector('.dep-dm-cs').value)||0, nb_unites: parseFloat(tr.querySelector('.dep-dm-u').value)||0 }));
+  if(!lignes.length){ posAlert('Saisissez au moins une quantité (0 accepté).','warn'); return; }
+  try {
+    const r = await apiFetch('POST','/depot/demarrer',{lignes});
+    depFermer(); posAlert(`${r.demarres} article(s) démarré(s).`,'ok');
     await depChargerProduits(); depRendreProduits();
   } catch(e){ posAlert(e.message||'Erreur','err'); }
 }
@@ -35656,7 +35735,7 @@ function depLignesHtml(mode){
   return `<table class="pos-table"><thead><tr><th>Article</th><th style="width:90px">Caisses</th><th style="width:90px">Unités</th>${achat?'<th style="width:130px">Prix d\'achat</th>':'<th style="text-align:right">Prix de vente</th>'}<th style="text-align:right">Quantité</th><th style="text-align:right">Sous-total</th><th></th></tr></thead>
     <tbody>${_depLignes.map((l,i)=>{
       const p = _depProd(l.produit_id), n = depUpc(p);
-      return `<tr><td><select class="pos-select" onchange="depChoisirProduit(${i},this.value,'${mode}')"><option value="">— Article —</option>${depOptionsProduits(l.produit_id)}</select>
+      return `<tr><td>${mode==='tx' && p ? `<b>${esc(p.nom)}</b>` : `<select class="pos-select" style="min-width:150px" onchange="depChoisirProduit(${i},this.value,'${mode}')"><option value="">— Article —</option>${depOptionsProduits(l.produit_id)}</select>`}
           <div id="dep-warn-${i}" style="color:#f87171;font-size:12px"></div></td>
         <td><input class="pos-input" type="number" min="0" step="1" value="${l.caisses??''}" ${n>1?'':'disabled placeholder="—"'} oninput="_depLignes[${i}].caisses=this.value;depMajCalculs('${mode}')"></td>
         <td><input class="pos-input" type="number" min="0" step="any" value="${l.unites??''}" oninput="_depLignes[${i}].unites=this.value;depMajCalculs('${mode}')"></td>
@@ -35699,6 +35778,8 @@ function depMajCalculs(mode){
     w.textContent = msg;
   });
   const tot = document.getElementById('dep-total'); if(tot) tot.textContent = posGx(depTotalLignes(mode));
+  if(mode==='tx' && document.getElementById('dep-tx-paiemode')?.value==='OUI') depTxPaieDevise();
+  if(mode==='tx') depTxTuiles();
 }
 // Choix de l'article : à l'achat, le prix proposé est le dernier prix d'achat (par caisse).
 function depChoisirProduit(i, val, mode){
@@ -35887,35 +35968,191 @@ function depLigneTx(t){
       ${depAdmin() && t.statut!=='ANNULEE' && !t.paye_htg && !t.paye_usd?`<button class="pos-btn ghost" style="padding:3px 9px;font-size:12px;color:#f87171" onclick="depAnnulerTx(${t.id})">Annuler</button>`:''}
     </td></tr>`;
 }
+// Transfert / vente « comme une vente » : on choisit la destination, on
+// touche les articles (mosaïque), quantités en caisses, qui reçoit, et le
+// paiement s'il est fait tout de suite. Validé = stock du bar mis à jour.
+let _depTxDest = 'DEVANT', _depTxPaieTouche = false;
 function depNouvelleTx(){
-  _depLignes = [{}];
+  _depLignes = []; _depTxDest = 'DEVANT'; _depTxPaieTouche = false;
   depOuvrir(`<h3>Nouveau transfert / vente</h3>
-    <div class="pos-form-row"><div><label class="pos-label">Destination *</label>
-      <select class="pos-select" id="dep-tx-d" onchange="document.getElementById('dep-tx-client').style.display=this.value==='CLIENT'?'':'none'">
-        <option value="DEVANT">Bar Devant</option><option value="PISCINE">Bar Piscine</option><option value="CLIENT">Client externe</option></select></div></div>
-    <div class="pos-form-row" id="dep-tx-client" style="display:none">
-      <div><label class="pos-label">Client *</label><input class="pos-input" id="dep-tx-cnom"></div>
-      <div><label class="pos-label">Contact</label><input class="pos-input" id="dep-tx-ccontact"></div></div>
-    <div id="dep-lignes" style="margin:10px 0">${depLignesHtml('tx')}</div>
-    <div><label class="pos-label">Notes</label><input class="pos-input" id="dep-tx-notes"></div>
+    <div id="dep-tx-dests" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px"></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;align-items:start">
+      <div>
+        <input class="pos-input" id="dep-tx-q" placeholder="Rechercher un article…" oninput="depTxTuiles()" style="margin-bottom:8px">
+        <div id="dep-tx-tuiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;max-height:52vh;overflow:auto;padding-right:4px"></div>
+      </div>
+      <div>
+        <div id="dep-lignes">${depLignesHtml('tx')}</div>
+        <div class="pos-form-row" id="dep-tx-client" style="display:none;margin-top:10px">
+          <div><label class="pos-label">Client *</label><input class="pos-input" id="dep-tx-cnom"></div>
+          <div><label class="pos-label">Contact</label><input class="pos-input" id="dep-tx-ccontact"></div></div>
+        <div class="pos-form-row" style="margin-top:10px">
+          <div><label class="pos-label" id="dep-tx-recu-lbl">Reçu au bar par</label><input class="pos-input" id="dep-tx-recu" placeholder="Nom de la personne qui reçoit"></div>
+          <div><label class="pos-label">Notes</label><input class="pos-input" id="dep-tx-notes"></div></div>
+        <div style="margin-top:10px;padding:10px;border:1px solid rgba(255,255,255,.1);border-radius:10px">
+          <label class="pos-label">Paiement</label>
+          <select class="pos-select" id="dep-tx-paiemode" onchange="depTxPaieMode()">
+            <option value="NON">Pas encore payé (à payer plus tard)</option>
+            <option value="OUI">Payé maintenant</option></select>
+          <div id="dep-tx-paie-champs" style="display:none;margin-top:8px">
+            ${deviseChampsHtml('dep-tx-p','depTxPaieDevise()')}
+            <div class="pos-form-row">
+              <div><label class="pos-label" id="dep-tx-p-mlabel">Montant reçu (G)</label><input class="pos-input" id="dep-tx-p-montant" type="number" min="0" step="any" oninput="_depTxPaieTouche=true;depTxPaieInfo()"></div>
+              <div><label class="pos-label">Méthode</label><select class="pos-select" id="dep-tx-p-methode"><option value="CASH">Cash</option><option value="CARTE">Carte</option><option value="ZELLE">Zelle</option><option value="VIREMENT">Virement</option><option value="CHEQUE">Chèque</option></select></div></div>
+            <div id="dep-tx-p-info" style="font-size:13px;color:rgba(255,255,255,.55)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="depFermer()">Annuler</button>
-      <button class="pos-btn ghost" onclick="depSauverTx(false)">Préparer (sans déplacer le stock)</button>
-      <button class="pos-btn primary" onclick="depSauverTx(true)">Valider le transfert / la vente</button></div>`);
+      <button class="pos-btn primary" id="dep-tx-valider" onclick="depSauverTx(true)">Valider</button></div>`, 1180);
+  depTxDest('DEVANT');
   depMajCalculs('tx');
+}
+function depTxDest(d){
+  _depTxDest = d;
+  const lib = {DEVANT:['Bar Devant','🍺'], PISCINE:['Bar Piscine','🏊'], CLIENT:['Client externe','🧾']};
+  document.getElementById('dep-tx-dests').innerHTML = Object.entries(lib).map(([k,[l,ic]])=>
+    `<button type="button" class="pos-btn ${k===d?'primary':'ghost'}" style="padding:10px;font-size:15px;font-weight:700" onclick="depTxDest('${k}')">${ic} ${l}</button>`).join('');
+  document.getElementById('dep-tx-client').style.display = d==='CLIENT' ? '' : 'none';
+  document.getElementById('dep-tx-recu-lbl').textContent = d==='CLIENT' ? 'Remis à' : `Reçu au ${lib[d][0]} par`;
+  document.getElementById('dep-tx-valider').textContent = d==='CLIENT' ? 'Valider la vente' : `Valider — stock du ${lib[d][0]} mis à jour`;
+  // Un article réservé à l'autre bar ne peut pas y aller.
+  _depLignes = _depLignes.filter(l=>{ const p=_depProd(l.produit_id); return !p || !p.lieu || d==='CLIENT' || p.lieu===d; });
+  depMajLignes('tx'); depTxTuiles();
+}
+function depTxTuiles(){
+  const w = document.getElementById('dep-tx-tuiles'); if(!w) return;
+  const q = _navNorm(document.getElementById('dep-tx-q')?.value||'');
+  const ps = _depProduits.filter(p => (!q || _navNorm(p.nom+' '+(p.categorie||'')).includes(q)) && (!p.lieu || _depTxDest==='CLIENT' || p.lieu===_depTxDest));
+  const pris = _depBesoins();
+  w.innerHTML = ps.map(p=>{
+    const n = depUpc(p), reste = p.stock_depot - (pris[p.id]||0), vide = reste <= 0;
+    return `<button type="button" onclick="depTxAjouter(${p.id})" ${vide?'disabled':''} style="text-align:left;padding:8px;border-radius:10px;border:1px solid ${pris[p.id]?'#22d3ee':'rgba(255,255,255,.12)'};background:${pris[p.id]?'rgba(34,211,238,.1)':'rgba(255,255,255,.03)'};color:inherit;cursor:${vide?'not-allowed':'pointer'};opacity:${vide?.45:1}">
+      <div style="font-weight:700;font-size:13px;line-height:1.2">${esc(p.nom)}</div>
+      <div style="font-size:12px;color:${vide?'#f87171':'#34d399'};margin-top:3px">${depFmtCs(Math.max(reste,0),n)}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.45)">${posGx(n>1?p.prix_vente_caisse:p.prix_vente)} / ${n>1?'cs':'u'}${pris[p.id]?` · <b style="color:#22d3ee">${depFmtCs(pris[p.id],n)}</b>`:''}</div></button>`;
+  }).join('') || '<div style="color:rgba(255,255,255,.35);padding:12px">Aucun article</div>';
+}
+// Un clic = une caisse de plus (ou une unité pour un article vendu à l'unité).
+function depTxAjouter(id){
+  const p = _depProd(id); if(!p) return;
+  const n = depUpc(p);
+  let l = _depLignes.find(x=>String(x.produit_id)===String(id));
+  if(!l){ l = {produit_id: String(id)}; _depLignes.push(l); }
+  if(n>1) l.caisses = (parseFloat(l.caisses)||0) + 1; else l.unites = (parseFloat(l.unites)||0) + 1;
+  depMajLignes('tx'); depTxTuiles();
+}
+function depTxPaieMode(){
+  const oui = document.getElementById('dep-tx-paiemode').value === 'OUI';
+  document.getElementById('dep-tx-paie-champs').style.display = oui ? '' : 'none';
+  if(oui){ _depTxPaieTouche = false; depTxPaieDevise(); }
+}
+// Montant proposé = total de la facture dans la devise choisie.
+function depTxPaieDevise(){
+  const {devise, taux_change} = deviseLue('dep-tx-p');
+  const tot = depTotalLignes('tx');
+  const inp = document.getElementById('dep-tx-p-montant');
+  if(inp && !_depTxPaieTouche) inp.value = devise==='USD' ? (taux_change ? Math.round(tot/taux_change*100)/100 : '') : Math.round(tot*100)/100;
+  const lbl = document.getElementById('dep-tx-p-mlabel'); if(lbl) lbl.textContent = devise==='USD' ? 'Montant reçu ($ dollars)' : 'Montant reçu (G)';
+  depTxPaieInfo();
+}
+function depTxPaieInfo(){
+  const i = document.getElementById('dep-tx-p-info'); if(!i) return;
+  const {devise, taux_change} = deviseLue('dep-tx-p');
+  const m = parseFloat(document.getElementById('dep-tx-p-montant')?.value||0)||0;
+  const g = devise==='USD' ? m*(taux_change||0) : m, tot = depTotalLignes('tx');
+  i.innerHTML = `Total ${posGx(tot)} · reçu ≈ ${posGx(g)} · reste <b style="color:${tot-g>0.5?'#f87171':'#34d399'}">${posGx(Math.max(tot-g,0))}</b>`;
 }
 async function depSauverTx(valider){
   const lignes = depLignesPayload('tx');
-  if(!lignes.length){ posAlert('Ajoutez au moins un article avec une quantité.','warn'); return; }
+  if(!lignes.length){ posAlert('Touchez au moins un article (ou saisissez une quantité).','warn'); return; }
   const errs = depErreursLignes();
   if(errs.length){ posAlert('Stock insuffisant ou prix manquant — ' + errs.join(' ; '),'warn'); return; }
-  if(document.getElementById('dep-tx-d').value==='CLIENT' && !document.getElementById('dep-tx-cnom').value.trim()){ posAlert('Nom du client requis pour une vente externe.','warn'); return; }
-  const body = { destination: document.getElementById('dep-tx-d').value, client_nom: document.getElementById('dep-tx-cnom').value.trim()||null,
-                 client_contact: document.getElementById('dep-tx-ccontact').value.trim()||null, notes: document.getElementById('dep-tx-notes').value.trim()||null, lignes, valider };
+  const dest = _depTxDest;
+  if(dest==='CLIENT' && !document.getElementById('dep-tx-cnom').value.trim()){ posAlert('Nom du client requis pour une vente externe.','warn'); return; }
+  let paiement = null;
+  if(document.getElementById('dep-tx-paiemode').value === 'OUI'){
+    const {devise, taux_change} = deviseLue('dep-tx-p');
+    const montant = parseFloat(document.getElementById('dep-tx-p-montant').value||0);
+    if(!(montant>0)){ posAlert('Montant du paiement requis (ou choisissez « Pas encore payé »).','warn'); return; }
+    if(devise==='USD' && !taux_change){ posAlert('Taux du dollar requis.','warn'); return; }
+    paiement = { montant, devise, taux_change, methode: document.getElementById('dep-tx-p-methode').value };
+  }
+  const body = { destination: dest, client_nom: document.getElementById('dep-tx-cnom').value.trim()||null,
+                 client_contact: document.getElementById('dep-tx-ccontact').value.trim()||null,
+                 recu_par: document.getElementById('dep-tx-recu').value.trim()||null,
+                 notes: document.getElementById('dep-tx-notes').value.trim()||null, lignes, valider, paiement };
   try {
     const t = await apiFetch('POST','/depot/transactions', body);
-    depFermer(); posAlert(`Facture ${t.numero} — ${posGx(t.total)}${valider?' (stock mis à jour)':''}.`,'ok');
-    await depChargerProduits(); await depChargerTx();
+    depFermer();
+    posAlert(`Facture ${t.numero} — ${posGx(t.total)}${dest!=='CLIENT'?` · stock du ${t.destination_libelle} mis à jour`:''}${t.montant_paye?` · payé ${posGx(t.montant_paye)}`:''}.`,'ok');
+    await depChargerProduits();
+    if(currentPage==='depot-journal-transferts') await depChargerJournalTx(); else await depChargerTx();
   } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
+// ── Journal des transferts — ligne par ligne ───────────────────────
+let _depJx = null;
+async function loadDepotJournalTransferts(){
+  const root = document.getElementById('depot-journal-transferts-root');
+  root.innerHTML = depHeader('Journal des transferts', 'Chaque article envoyé du dépôt vers Bar Devant / Bar Piscine — qui, quand, combien',
+    `<input type="date" class="pos-input" id="dep-jx-deb" value="${_pisDebutMois()}" style="width:135px">
+     <input type="date" class="pos-input" id="dep-jx-fin" value="${_pisJour()}" style="width:135px">
+     <select class="pos-select" id="dep-jx-dest" style="width:150px"><option value="">Les deux bars</option><option value="DEVANT">Bar Devant</option><option value="PISCINE">Bar Piscine</option></select>
+     <select class="pos-select" id="dep-jx-prod" style="width:180px"><option value="">Tous les articles</option></select>
+     <label style="display:flex;align-items:center;gap:5px;font-size:13px"><input type="checkbox" id="dep-jx-ventes"> + ventes clients</label>
+     <button class="pos-btn teal" onclick="depChargerJournalTx()">Filtrer</button>
+     <button class="pos-btn ghost" onclick="depImprimerJournalTx()">Imprimer</button>
+     ${_isReadOnly()&&!depAdmin()?'':'<button class="pos-btn primary" onclick="depNouvelleTx()">+ Nouveau transfert</button>'}`)
+    + `<div class="pos-kpi-grid" id="dep-jx-kpi"></div>
+       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-bottom:12px">
+         <div class="pos-card"><div class="pos-card-hdr">Par article</div><div class="pos-table-wrap"><table class="pos-table"><thead><tr><th>Article</th><th style="text-align:right">Bar Devant</th><th style="text-align:right">Bar Piscine</th><th style="text-align:right">Total</th><th style="text-align:right">Montant</th></tr></thead><tbody id="dep-jx-art"></tbody></table></div></div>
+       </div>
+       <div class="pos-card"><div class="pos-card-hdr">Détail des transferts</div><div class="pos-table-wrap"><table class="pos-table"><thead><tr><th>Date</th><th>Facture</th><th>Destination</th><th>Article</th><th style="text-align:right">Quantité</th><th style="text-align:right">Prix</th><th style="text-align:right">Montant</th><th>Reçu par</th><th>Envoyé par</th><th>Paiement</th></tr></thead>
+       <tbody id="dep-jx-tbody"><tr><td colspan="10" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Chargement…</td></tr></tbody></table></div></div>`;
+  await depChargerProduits().catch(()=>{});
+  const sel = document.getElementById('dep-jx-prod');
+  if(sel) sel.innerHTML += _depProduits.map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
+  await depChargerJournalTx();
+}
+async function depChargerJournalTx(){
+  const g = id => document.getElementById(id)?.value || '';
+  const qs = new URLSearchParams({date_debut:g('dep-jx-deb'), date_fin:g('dep-jx-fin'), destination:g('dep-jx-dest'), produit_id:g('dep-jx-prod')});
+  if(document.getElementById('dep-jx-ventes')?.checked) qs.set('inclure_ventes','true');
+  [...qs.keys()].forEach(k=>{ if(!qs.get(k)) qs.delete(k); });
+  try { _depJx = await apiFetch('GET','/depot/transferts/journal?'+qs.toString()); } catch(e){ posAlert(e.message,'err'); return; }
+  const j = _depJx, pd = k => (j.par_destination.find(x=>x.destination===k)||{montant:0,nb_factures:0});
+  document.getElementById('dep-jx-kpi').innerHTML =
+    `<div class="pos-kpi"><div class="pos-kpi-label">Transferts (factures)</div><div class="pos-kpi-val">${j.nb_factures}</div></div>
+     <div class="pos-kpi"><div class="pos-kpi-label">Vers Bar Devant</div><div class="pos-kpi-val" style="color:#22d3ee">${posGx(pd('Bar Devant').montant)}</div></div>
+     <div class="pos-kpi"><div class="pos-kpi-label">Vers Bar Piscine</div><div class="pos-kpi-val" style="color:#38bdf8">${posGx(pd('Bar Piscine').montant)}</div></div>
+     <div class="pos-kpi"><div class="pos-kpi-label">Total</div><div class="pos-kpi-val" style="color:#34d399">${posGx(j.total)}</div></div>`;
+  const n = a => a.unites_par_caisse || 1;
+  document.getElementById('dep-jx-art').innerHTML = j.par_article.map(a=>`<tr><td><b>${esc(a.produit_nom)}</b></td>
+    <td style="text-align:right">${a.par_destination['Bar Devant']?depFmtCs(a.par_destination['Bar Devant'],n(a)):'—'}</td>
+    <td style="text-align:right">${a.par_destination['Bar Piscine']?depFmtCs(a.par_destination['Bar Piscine'],n(a)):'—'}</td>
+    <td style="text-align:right;font-weight:700">${depFmtCs(a.quantite,n(a))}</td><td style="text-align:right">${posGx(a.montant)}</td></tr>`).join('')
+    || '<tr><td colspan="5" style="text-align:center;padding:14px;color:rgba(255,255,255,.3)">Aucun transfert</td></tr>';
+  document.getElementById('dep-jx-tbody').innerHTML = j.lignes.map(l=>`<tr>
+    <td style="white-space:nowrap">${depDate(l.date)}</td><td><a href="#" onclick="depFacture(${l.transaction_id});return false" style="color:#22d3ee">${l.facture}</a></td>
+    <td>${esc(l.destination_libelle)}${l.client_nom?`<div style="font-size:12px;color:rgba(255,255,255,.5)">${esc(l.client_nom)}</div>`:''}</td>
+    <td><b>${esc(l.produit_nom)}</b></td>
+    <td style="text-align:right">${depFmtCs(l.quantite, l.unites_par_caisse||1)}</td>
+    <td style="text-align:right">${posGx(l.prix_unitaire)} / u</td><td style="text-align:right;font-weight:700">${posGx(l.montant)}</td>
+    <td>${esc(l.recu_par||'—')}</td><td style="font-size:12px">${esc(l.responsable||'—')}</td><td>${depBadge(l.statut_paiement)}</td></tr>`).join('')
+    || '<tr><td colspan="10" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucun transfert sur la période</td></tr>';
+}
+function depImprimerJournalTx(){
+  const j = _depJx; if(!j) return;
+  const deb = document.getElementById('dep-jx-deb')?.value||'', fin = document.getElementById('dep-jx-fin')?.value||'';
+  const f = v => (parseFloat(v)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' G';
+  _depFenetre('Journal des transferts', `<div>Période : ${deb} → ${fin}</div>
+    <table><tr><th>Article</th><th class="r">Bar Devant</th><th class="r">Bar Piscine</th><th class="r">Total</th><th class="r">Montant</th></tr>
+    ${j.par_article.map(a=>`<tr><td>${esc(a.produit_nom)}</td><td class="r">${a.par_destination['Bar Devant']?depFmtCs(a.par_destination['Bar Devant'],a.unites_par_caisse||1):'—'}</td><td class="r">${a.par_destination['Bar Piscine']?depFmtCs(a.par_destination['Bar Piscine'],a.unites_par_caisse||1):'—'}</td><td class="r">${depFmtCs(a.quantite,a.unites_par_caisse||1)}</td><td class="r">${f(a.montant)}</td></tr>`).join('')}</table>
+    <table><tr><th>Date</th><th>Facture</th><th>Destination</th><th>Article</th><th class="r">Quantité</th><th class="r">Montant</th><th>Reçu par</th></tr>
+    ${j.lignes.map(l=>`<tr><td>${depDate(l.date)}</td><td>${l.facture}</td><td>${esc(l.destination_libelle)}</td><td>${esc(l.produit_nom)}</td><td class="r">${depFmtCs(l.quantite,l.unites_par_caisse||1)}</td><td class="r">${f(l.montant)}</td><td>${esc(l.recu_par||'')}</td></tr>`).join('')}</table>
+    <div class="tot" style="margin-top:10px">Total : ${f(j.total)}</div>`);
 }
 async function depValiderTx(id){
   try { await apiFetch('POST',`/depot/transactions/${id}/valider`); posAlert('Validée — stock déplacé.','ok'); await depChargerTx(); } catch(e){ posAlert(e.message,'err'); }
@@ -35987,7 +36224,7 @@ function _depFenetre(titre, corps){
 }
 async function depFacture(id){
   let t; try { t = await apiFetch('GET',`/depot/transactions/${id}`); } catch(e){ posAlert(e.message,'err'); return; }
-  _depFenetre(`Facture ${t.numero}`, `<p><b>${t.type==='TRANSFERT'?'Transfert vers':'Vente à'} :</b> ${esc(t.destination_libelle)}${t.client_nom?' — '+esc(t.client_nom):''}<br>
+  _depFenetre(`Facture ${t.numero}`, `<p><b>${t.type==='TRANSFERT'?'Transfert vers':'Vente à'} :</b> ${esc(t.destination_libelle)}${t.client_nom?' — '+esc(t.client_nom):''}${t.recu_par?'<br><b>Reçu par :</b> '+esc(t.recu_par):''}<br>
     <b>Statut :</b> ${(_DEP_STATUT[t.statut]||[t.statut])[0]} · ${(_DEP_STATUT[t.statut_paiement]||[t.statut_paiement])[0]} · Responsable : ${esc(t.responsable||'—')}</p>
     <table><tr><th>Article</th><th class="r">Quantité</th><th class="r">Prix unitaire</th><th class="r">Sous-total</th></tr>
     ${t.lignes.map(l=>`<tr><td>${esc(l.produit_nom)}</td><td class="r">${depFmtCs(l.quantite, l.unites_par_caisse||1)}</td><td class="r">${posGx(l.prix_unitaire)}</td><td class="r">${posGx(l.sous_total)}</td></tr>`).join('')}

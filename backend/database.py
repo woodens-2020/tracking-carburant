@@ -402,6 +402,10 @@ def _migrate_columns():
     new_cols.append(("hotel_reservations", "prix_unitaire_usd", "ALTER TABLE hotel_reservations ADD COLUMN prix_unitaire_usd NUMERIC(12,2)", None))
     new_cols.append(("hotel_reservations", "montant_total_usd", "ALTER TABLE hotel_reservations ADD COLUMN montant_total_usd NUMERIC(12,2)", None))
     new_cols.append(("hotel_reservations", "taux_tarif", "ALTER TABLE hotel_reservations ADD COLUMN taux_tarif NUMERIC(10,4)", None))
+    # v31 — dépôt : « Démarrer » par article, « reçu par » sur les transferts
+    new_cols.append(("bar_produits", "depot_demarre_le",
+                     f"ALTER TABLE bar_produits ADD COLUMN depot_demarre_le {'DATETIME' if _is_sqlite else 'TIMESTAMP WITH TIME ZONE'}", None))
+    new_cols.append(("depot_transactions", "recu_par", "ALTER TABLE depot_transactions ADD COLUMN recu_par VARCHAR(100)", None))
     for _t in ("bar_ventes", "bar_remboursements", "cuisine_ventes", "patisserie_ventes", "piscine_ventes"):
         new_cols += [
             (_t, "devise",         f"ALTER TABLE {_t} ADD COLUMN devise VARCHAR(3) NOT NULL DEFAULT 'HTG'", None),
@@ -583,6 +587,31 @@ def _migrate_columns():
                     conn.rollback()  # déjà présente
 
 
+def _depot_remise_a_zero_initiale():
+    """Une seule fois (demande de la direction, 17/11/2026) : le Dépôt
+    central repart de zéro — achats, factures, paiements, stock du dépôt et
+    entrées « Reçu du dépôt » des bars effacés, tous les articles « à
+    démarrer ». Marqueur : l'événement d'audit depot_demarrage_v1."""
+    from models import AuditLog
+    db = SessionLocal()
+    try:
+        if db.query(AuditLog).filter(AuditLog.action == "depot_demarrage_v1").first():
+            return
+        import json
+        from depot_routes import remise_a_zero
+        nb = remise_a_zero(db)
+        # Marqueur écrit dans la MÊME transaction que l'effacement : jamais
+        # rejoué au démarrage suivant.
+        db.add(AuditLog(action="depot_demarrage_v1", details=json.dumps({"auto": True, **nb})))
+        db.commit()
+        print(f"[depot] remise à zéro initiale : {nb}")
+    except Exception as e:
+        db.rollback()
+        print(f"[depot] remise à zéro initiale non faite : {e}")
+    finally:
+        db.close()
+
+
 def _reprise_piscine_et_paiements_hotel():
     """Reprises de données idempotentes, relancées à chaque démarrage (ne
     touchent que ce qui reste à faire) :
@@ -631,6 +660,7 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     _migrate_columns()          # ajoute les colonnes manquantes sur SQLite
     _reprise_piscine_et_paiements_hotel()
+    _depot_remise_a_zero_initiale()
 
     db = SessionLocal()
     try:

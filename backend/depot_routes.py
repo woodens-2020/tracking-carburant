@@ -4,6 +4,9 @@ Dépôt central — préfixe /api/depot
   PRODUITS / INVENTAIRE
     GET  /produits                         stock dépôt + bars, prix de vente, seuil
     PUT  /produits/{id}/config             prix de vente et quantité minimum
+    POST /produits/{id}/demarrer           stock de départ (une fois) — ensuite « Ajuster »
+    POST /demarrer                         démarrage de plusieurs articles d'un coup
+    GET  /transferts/journal               journal ligne par ligne des transferts
   ACHATS & RÉCEPTION
     GET  /achats   POST /achats   PUT /achats/{id}
     POST /achats/{id}/reception            quantités reçues → stock dépôt (ou écart)
@@ -188,6 +191,8 @@ def produits_depot(actif: bool = True, tous: bool = False, db: Session = Depends
         out.append({
             "id": p.id, "nom": p.nom, "categorie": p.categorie, "unite": p.unite,
             "lieu": p.lieu, "au_depot": est_au_depot(p), "a_photo": bool(p.photo_base64),
+            "demarre": p.depot_demarre_le is not None,
+            "demarre_le": p.depot_demarre_le.isoformat() if p.depot_demarre_le else None,
             "par_caisse":    n > 1,
             "unites_par_caisse": n if n > 1 else None,
             "stock_depot_caisses":   en_caisses(stock_depot, n),
@@ -309,18 +314,77 @@ def ajuster_stock_depot(produit_id: int, data: AjustementDepotIn, request: Reque
     p = db.get(BarProduit, produit_id)
     if not p:
         raise HTTPException(404, "Article introuvable.")
-    compte = quantite_unites(p, None, data.nb_caisses, data.nb_unites)
+    if p.depot_demarre_le is None:
+        raise HTTPException(409, f"« {p.nom} » n'est pas encore démarré — cliquez d'abord sur « Démarrer ».")
+    r = _fixer_stock(db, p, data.nb_caisses, data.nb_unites,
+                     (data.motif or "").strip() or "Ajustement d'inventaire au dépôt", _uid(request))
+    db.commit()
+    return r
+
+
+def _fixer_stock(db: Session, p: BarProduit, nb_caisses, nb_unites, motif: str, uid) -> dict:
+    """Met le stock du dépôt d'un article à la quantité comptée ; la
+    différence devient un mouvement AJUSTEMENT tracé."""
+    compte = quantite_unites(p, None, nb_caisses, nb_unites)
     avant = stock_courant(p.id, db, lieu=DEPOT)
     diff = compte - avant
     if diff != 0:
-        motif = (data.motif or "").strip() or "Ajustement d'inventaire au dépôt"
         db.add(BarMouvementStock(produit_id=p.id, type_mouvement="AJUSTEMENT", quantite=diff,
                                  motif=f"{motif} : {float(avant):g} → {float(compte):g} u", lieu=DEPOT,
-                                 utilisateur_id=_uid(request)))
-        db.commit()
+                                 utilisateur_id=uid))
     n = upc(p)
-    return {"ok": True, "avant": float(avant), "apres": float(compte), "difference": float(diff),
+    return {"ok": True, "id": p.id, "avant": float(avant), "apres": float(compte), "difference": float(diff),
             "apres_caisses": en_caisses(compte, n)}
+
+
+class DemarrageIn(BaseModel):
+    nb_caisses: float = Field(default=0, ge=0)
+    nb_unites:  float = Field(default=0, ge=0)
+
+
+def _demarrer(db: Session, p: BarProduit, nb_caisses, nb_unites, uid) -> dict:
+    if not est_au_depot(p):
+        raise HTTPException(422, f"« {p.nom} » n'est pas un article du dépôt.")
+    if p.depot_demarre_le is not None:
+        raise HTTPException(409, f"« {p.nom} » est déjà démarré — utilisez « Ajuster ».")
+    r = _fixer_stock(db, p, nb_caisses, nb_unites, "Stock de démarrage", uid)
+    p.depot_demarre_le = datetime.now(timezone.utc)
+    return r
+
+
+@router.post("/produits/{produit_id}/demarrer", status_code=201)
+def demarrer_article(produit_id: int, data: DemarrageIn, request: Request, db: Session = Depends(get_db)):
+    """Démarrage d'un article au dépôt : on saisit la quantité de départ
+    (caisses + unités). Une seule fois — ensuite seul « Ajuster » reste."""
+    p = db.get(BarProduit, produit_id)
+    if not p:
+        raise HTTPException(404, "Article introuvable.")
+    r = _demarrer(db, p, data.nb_caisses, data.nb_unites, _uid(request))
+    db.commit()
+    return r
+
+
+class DemarrageLigneIn(DemarrageIn):
+    produit_id: int
+
+
+class DemarrageGroupeIn(BaseModel):
+    lignes: List[DemarrageLigneIn]
+
+
+@router.post("/demarrer", status_code=201)
+def demarrer_plusieurs(data: DemarrageGroupeIn, request: Request, db: Session = Depends(get_db)):
+    """Démarrage du dépôt en une fois : quantité de départ de chaque article."""
+    if not data.lignes:
+        raise HTTPException(422, "Aucun article.")
+    out = []
+    for l in data.lignes:
+        p = db.get(BarProduit, l.produit_id)
+        if not p:
+            raise HTTPException(404, f"Article #{l.produit_id} introuvable.")
+        out.append(_demarrer(db, p, l.nb_caisses, l.nb_unites, _uid(request)))
+    db.commit()
+    return {"ok": True, "demarres": len(out), "articles": out}
 
 
 class RemiseAZeroIn(BaseModel):
@@ -337,6 +401,20 @@ def remettre_depot_a_zero(data: RemiseAZeroIn, db: Session = Depends(get_db),
     bars, les articles et leurs prix ne sont pas touchés."""
     if (data.confirmation or "").strip().upper() != "REMETTRE A ZERO":
         raise HTTPException(422, "Écrivez exactement REMETTRE A ZERO pour confirmer.")
+    nb = remise_a_zero(db)
+    from activity_log import log_event
+    try:
+        log_event(db, "depot_remise_a_zero", user_id=user.id, details={"par": user.nom_complet, **nb})
+    except Exception:
+        pass
+    db.commit()
+    return {"ok": True, "supprime": nb}
+
+
+def remise_a_zero(db: Session) -> dict:
+    """Efface tout le Dépôt central (sans commit) ; tous les articles
+    redeviennent « à démarrer ». Utilisé par le bouton PDG/admin et par la
+    remise à zéro initiale au démarrage du serveur (database.py)."""
     numeros = [n for (n,) in db.query(DepotTransaction.numero).all()]
     nb = {
         "paiements":    db.query(DepotPaiement).count(),
@@ -357,13 +435,9 @@ def remettre_depot_a_zero(data: RemiseAZeroIn, db: Session = Depends(get_db),
                         BarMouvementStock.motif.in_([f"Reçu du dépôt — {num}", f"Annulation {num}"]))
                 .delete(synchronize_session=False))
     nb["entrees_bars"] = bar
-    from activity_log import log_event
-    try:
-        log_event(db, "depot_remise_a_zero", user_id=user.id, details={"par": user.nom_complet, **nb})
-    except Exception:
-        pass
-    db.commit()
-    return {"ok": True, "supprime": nb}
+    nb["articles_a_demarrer"] = (db.query(BarProduit).filter(BarProduit.depot_demarre_le.isnot(None))
+                                 .update({BarProduit.depot_demarre_le: None}, synchronize_session=False))
+    return nb
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -588,8 +662,11 @@ class TransactionIn(BaseModel):
     client_nom:     Optional[str] = None
     client_contact: Optional[str] = None
     notes:          Optional[str] = None
+    recu_par:       Optional[str] = None   # qui reçoit au bar / chez le client
     lignes:         List[LigneTxIn]
     valider:        bool = True         # valider tout de suite (stock déplacé)
+    # Paiement reçu tout de suite, comme à une vente (optionnel).
+    paiement:       Optional["PaiementIn"] = None
 
 
 def _tx_dict(t: DepotTransaction, avec_lignes: bool = True) -> dict:
@@ -598,6 +675,7 @@ def _tx_dict(t: DepotTransaction, avec_lignes: bool = True) -> dict:
         "id": t.id, "numero": t.numero, "type": t.type, "destination": t.destination,
         "destination_libelle": DESTINATIONS.get(t.destination, t.destination),
         "client_nom": t.client_nom, "client_contact": t.client_contact,
+        "recu_par": t.recu_par,
         "statut": t.statut, "statut_paiement": t.statut_paiement,
         "total": float(t.total), "montant_paye": float(t.montant_paye),
         "reste": float(max(_d(t.total) - _d(t.montant_paye), Decimal("0"))),
@@ -668,6 +746,7 @@ def creer_transaction(data: TransactionIn, request: Request, db: Session = Depen
         client_nom=(data.client_nom or "").strip() or None,
         client_contact=(data.client_contact or "").strip() or None,
         notes=(data.notes or "").strip() or None, responsable_id=_uid(request),
+        recu_par=(data.recu_par or "").strip() or None,
     )
     total = Decimal("0")
     for l in data.lignes:
@@ -695,6 +774,10 @@ def creer_transaction(data: TransactionIn, request: Request, db: Session = Depen
     db.flush()
     if data.valider:
         _valider(db, t, _uid(request))
+        if data.paiement and data.paiement.montant > 0:
+            _encaisser(db, t, data.paiement, _uid(request))
+    elif data.paiement and data.paiement.montant > 0:
+        raise HTTPException(422, "Un paiement exige un transfert validé.")
     db.commit(); db.refresh(t)
     return _tx_dict(t)
 
@@ -777,6 +860,9 @@ class PaiementIn(BaseModel):
     notes:       Optional[str] = None
 
 
+TransactionIn.model_rebuild()   # paiement : PaiementIn défini après TransactionIn
+
+
 def _paiement_dict(p: DepotPaiement) -> dict:
     t = p.transaction
     return {
@@ -801,6 +887,12 @@ def payer_transaction(tx_id: int, data: PaiementIn, request: Request, db: Sessio
         raise HTTPException(409, "La facture doit être validée avant paiement.")
     if t.statut_paiement == "PAYEE":
         raise HTTPException(409, "Facture déjà payée.")
+    p = _encaisser(db, t, data, _uid(request))
+    db.commit(); db.refresh(p); db.refresh(t)
+    return {"recu": _paiement_dict(p), "facture": _tx_dict(t)}
+
+
+def _encaisser(db: Session, t: DepotTransaction, data: "PaiementIn", uid) -> DepotPaiement:
     methode = (data.methode or "CASH").upper()
     if methode not in METHODES:
         raise HTTPException(422, f"Méthode : {', '.join(METHODES)}.")
@@ -813,12 +905,73 @@ def payer_transaction(tx_id: int, data: PaiementIn, request: Request, db: Sessio
     p = DepotPaiement(transaction_id=t.id, numero_recu=_numero(db, DepotPaiement, "RD"),
                       devise=devise, montant=montant, taux_change=taux,
                       montant_htg=min(montant_htg, reste), methode=methode,
-                      notes=(data.notes or "").strip() or None, utilisateur_id=_uid(request))
+                      notes=(data.notes or "").strip() or None, utilisateur_id=uid)
     db.add(p)
     t.montant_paye = _d(t.montant_paye) + p.montant_htg
     t.statut_paiement = "PAYEE" if t.montant_paye >= _d(t.total) else "PARTIELLE"
-    db.commit(); db.refresh(p); db.refresh(t)
-    return {"recu": _paiement_dict(p), "facture": _tx_dict(t)}
+    db.flush()
+    return p
+
+
+# ══════════════════════════════════════════════════════════════════
+# JOURNAL DES TRANSFERTS — ligne par ligne
+# ══════════════════════════════════════════════════════════════════
+
+@router.get("/transferts/journal")
+def journal_transferts(date_debut: Optional[str] = None, date_fin: Optional[str] = None,
+                       destination: Optional[str] = None, produit_id: Optional[int] = None,
+                       inclure_ventes: bool = False, db: Session = Depends(get_db)):
+    """Chaque article transféré (validé) : date, facture, destination, reçu
+    par, quantité en caisses, prix, montant, paiement. Totaux par
+    destination et par article. `inclure_ventes` ajoute les clients externes."""
+    dt1, dt2, _, _ = _periode(date_debut, date_fin)
+    q = (db.query(DepotTransactionLigne, DepotTransaction)
+         .join(DepotTransaction, DepotTransactionLigne.transaction_id == DepotTransaction.id)
+         .filter(DepotTransaction.statut == "VALIDEE"))
+    if not inclure_ventes:
+        q = q.filter(DepotTransaction.type == "TRANSFERT")
+    date_col = func.coalesce(DepotTransaction.date_validation, DepotTransaction.created_at)
+    if dt1: q = q.filter(date_col >= dt1)
+    if dt2: q = q.filter(date_col <= dt2)
+    if destination: q = q.filter(DepotTransaction.destination == destination.upper())
+    if produit_id: q = q.filter(DepotTransactionLigne.produit_id == produit_id)
+    rows = q.order_by(date_col.desc(), DepotTransaction.id.desc(), DepotTransactionLigne.id).all()
+    lignes, par_dest, par_art = [], {}, {}
+    for l, t in rows:
+        pr = l.produit
+        n = upc(pr) if pr else 1
+        d = t.date_validation or t.created_at
+        lignes.append({
+            "date": d.isoformat() if d else None, "facture": t.numero, "transaction_id": t.id,
+            "destination": t.destination, "destination_libelle": DESTINATIONS.get(t.destination, t.destination),
+            "client_nom": t.client_nom, "recu_par": t.recu_par,
+            "responsable": t.responsable.nom_complet if t.responsable else None,
+            "produit_id": l.produit_id, "produit_nom": pr.nom if pr else str(l.produit_id),
+            "unites_par_caisse": n if n > 1 else None,
+            "quantite": float(l.quantite), "quantite_caisses": en_caisses(l.quantite, n),
+            "prix_unitaire": float(l.prix_unitaire), "montant": float(l.sous_total),
+            "statut_paiement": t.statut_paiement,
+        })
+        k = DESTINATIONS.get(t.destination, t.destination)
+        dd = par_dest.setdefault(k, {"destination": k, "montant": 0.0, "factures": set()})
+        dd["montant"] += float(l.sous_total); dd["factures"].add(t.id)
+        a = par_art.setdefault(l.produit_id, {"produit_nom": pr.nom if pr else str(l.produit_id),
+                                              "unites_par_caisse": n if n > 1 else None,
+                                              "quantite": Decimal("0"), "montant": 0.0, "par_destination": {}})
+        a["quantite"] += _d(l.quantite); a["montant"] += float(l.sous_total)
+        a["par_destination"][k] = a["par_destination"].get(k, 0.0) + float(l.quantite)
+    return {
+        "lignes": lignes,
+        "total": round(sum(x["montant"] for x in lignes), 2),
+        "nb_factures": len({x["transaction_id"] for x in lignes}),
+        "par_destination": [{"destination": v["destination"], "montant": round(v["montant"], 2),
+                             "nb_factures": len(v["factures"])} for v in par_dest.values()],
+        "par_article": sorted([{**{k: v for k, v in a.items() if k != "quantite"},
+                                "quantite": float(a["quantite"]),
+                                "quantite_caisses": en_caisses(a["quantite"], a["unites_par_caisse"] or 1),
+                                "montant": round(a["montant"], 2)} for a in par_art.values()],
+                              key=lambda x: -x["montant"]),
+    }
 
 
 @router.get("/paiements")
