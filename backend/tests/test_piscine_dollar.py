@@ -437,3 +437,58 @@ def test_fiche_pdf_avec_dollars(client, db):
     ch = _chambre(client, prix=5000)
     d = _sejour(client, ch, montant_paye=20, devise_paiement="USD", taux_change=130).json()
     assert client.get(f"/api/hotel/reservations/{d['id']}/fiche.pdf", headers=H).status_code == 200
+
+
+# ══════════════════════════════════════════════════════════════════
+# HÔTEL — prix des chambres en dollars, tarif choisi par le client
+# ══════════════════════════════════════════════════════════════════
+
+def test_prix_chambre_en_dollars(client, db):
+    r = client.post("/api/hotel/chambres", headers=H, json={
+        "numero": f"U{_num()}", "prix_nuit": 2600, "prix_nuit_usd": 20,
+        "prix_moment": 1000, "prix_moment_usd": 8})
+    assert r.status_code == 201, r.text
+    c = r.json()
+    assert c["prix_nuit_usd"] == 20.0 and c["prix_moment_usd"] == 8.0
+    dispo = client.get("/api/hotel/chambres/disponibles", headers=H).json()
+    assert any(x["id"] == c["id"] and x["prix_nuit_usd"] == 20.0 for x in dispo)
+    body = {"numero": c["numero"], "prix_nuit": 2600, "prix_nuit_usd": 25}
+    r = client.put(f"/api/hotel/chambres/{c['id']}", headers=H, json=body)
+    assert r.status_code == 200 and r.json()["prix_nuit_usd"] == 25.0 and r.json()["prix_moment_usd"] is None
+
+
+def test_sejour_au_tarif_dollars(client, db):
+    r = client.post("/api/hotel/chambres", headers=H, json={
+        "numero": f"U{_num()}", "prix_nuit": 2600, "prix_nuit_usd": 20})
+    ch = r.json()["id"]
+    # 2 nuits × 20 $ = 40 $, taux 131 → 5 240 G ; payé 30 $
+    r = _sejour(client, ch, devise_tarif="USD", devise_paiement="USD", taux_change=131, montant_paye=30)
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["devise_tarif"] == "USD"
+    assert d["montant_total_usd"] == 40.0 and d["prix_unitaire_usd"] == 20.0
+    assert d["montant_total"] == 5240.0 and d["taux_tarif"] == 131.0
+    assert d["paye_usd"] == 30.0 and d["solde_usd"] == 10.0 and d["solde"] == 1310.0
+    # Solde payé en dollars sans taux : celui de l'arrivée s'applique → soldé exactement
+    client.put("/api/hotel/config", headers=H, json={"taux_usd": 140})
+    r2 = client.post(f"/api/hotel/reservations/{d['id']}/paiement", headers=H,
+                     json={"montant": 10, "devise": "USD"})
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["solde"] == 0.0 and r2.json()["paye_usd"] == 40.0
+    assert client.get(f"/api/hotel/reservations/{d['id']}/fiche.pdf", headers=H).status_code == 200
+
+
+def test_tarif_dollars_rabais_et_chambre_sans_prix_usd(client, db):
+    r = client.post("/api/hotel/chambres", headers=H, json={
+        "numero": f"U{_num()}", "prix_nuit": 2600, "prix_nuit_usd": 20})
+    ch = r.json()["id"]
+    r = _sejour(client, ch, devise_tarif="USD", devise_paiement="USD", taux_change=130, montant_facture=35)
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["montant_total_usd"] == 35.0 and d["montant_total"] == 4550.0 and d["solde_usd"] == 35.0
+    # Chambre sans prix dollars : tarif USD refusé
+    ch2 = _chambre(client, prix=2000)
+    assert _sejour(client, ch2, devise_tarif="USD", devise_paiement="USD", taux_change=130).status_code == 422
+    # Tarif gourdes par défaut : aucun champ dollars
+    d3 = _sejour(client, _chambre(client, prix=2000)).json()
+    assert d3["devise_tarif"] == "HTG" and d3["montant_total_usd"] is None and d3["solde_usd"] is None

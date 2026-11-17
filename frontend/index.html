@@ -11232,7 +11232,10 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
             <div><label class="pos-label">Prix / nuit (G) *</label><input class="pos-input" id="hcm-prix-nuit" type="number" min="0" step="any" placeholder="2500"></div>
             <div><label class="pos-label">Prix / moment (G)</label><input class="pos-input" id="hcm-prix-moment" type="number" min="0" step="any" placeholder="1000"></div>
+            <div><label class="pos-label">Prix / nuit ($ dollars)</label><input class="pos-input" id="hcm-prix-nuit-usd" type="number" min="0" step="any" placeholder="20"></div>
+            <div><label class="pos-label">Prix / moment ($ dollars)</label><input class="pos-input" id="hcm-prix-moment-usd" type="number" min="0" step="any" placeholder="8"></div>
           </div>
+          <div style="font-size:12px;color:rgba(255,255,255,.4);margin:-8px 0 14px">Le client choisit à la réception de payer au prix en gourdes ou au prix en dollars.</div>
           <div><label class="pos-label">Description</label><textarea class="pos-input" id="hcm-description" rows="2" placeholder="Chambre avec vue, AC, TV…" style="resize:none;height:54px"></textarea></div>
           <div class="pos-modal-footer">
             <button class="pos-btn ghost" onclick="document.getElementById('hotel-chambre-modal-bg').classList.remove('open')">Annuler</button>
@@ -11300,10 +11303,12 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
               </div>
               <!-- Recap prix -->
               <div id="hrec-recap" style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:8px;padding:12px;display:none">
+                <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.4);margin-bottom:6px">Le client paie en — choisir le prix</div>
+                <div id="hrec-prix-choix" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px"></div>
                 <div style="display:flex;justify-content:space-between;font-size:14px;color:rgba(255,255,255,.55)"><span id="hrec-recap-label">Prix / nuit</span><span id="hrec-recap-prix">—</span></div>
                 <div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,.4);margin-top:4px"><span>Tarif de référence</span><span id="hrec-recap-total">—</span></div>
                 <div style="margin-top:8px">
-                  <label class="pos-label" style="display:flex;align-items:center;gap:6px">Montant à facturer (G) <span style="font-size:11px;color:rgba(255,255,255,.35)">— rabais PDG possible</span></label>
+                  <label class="pos-label" style="display:flex;align-items:center;gap:6px"><span id="hrec-facture-label">Montant à facturer (G)</span> <span style="font-size:11px;color:rgba(255,255,255,.35)">— rabais PDG possible</span></label>
                   <input class="pos-input" id="hrec-montant-facture" type="number" min="0" step="any" placeholder="Laisser vide = tarif de référence" oninput="hrecOnFactureInput()">
                 </div>
                 <div id="hrec-remise-row" style="display:none;justify-content:space-between;font-size:13px;margin-top:4px;color:#fbbf24"><span>Rabais accordé</span><span id="hrec-remise-val">—</span></div>
@@ -34335,8 +34340,8 @@ function _hotelChambreCard(c){
         <span style="font-size:13px;font-weight:700;padding:3px 10px;border-radius:20px;background:${clr}22;color:${clr};border:1px solid ${clr}44">${c.statut}</span>
       </div>
       <div style="margin-top:12px;display:flex;flex-direction:column;gap:4px">
-        <div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:rgba(255,255,255,.45)">Nuit</span><strong>${_hFmt(c.prix_nuit)}</strong></div>
-        ${c.prix_moment!=null?`<div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:rgba(255,255,255,.45)">Moment/h</span><strong>${_hFmt(c.prix_moment)}</strong></div>`:''}
+        <div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:rgba(255,255,255,.45)">Nuit</span><strong>${_hFmt(c.prix_nuit)}${c.prix_nuit_usd?` <span style="color:#38bdf8">· ${_usd(c.prix_nuit_usd)}</span>`:''}</strong></div>
+        ${c.prix_moment!=null||c.prix_moment_usd?`<div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:rgba(255,255,255,.45)">Moment/h</span><strong>${c.prix_moment!=null?_hFmt(c.prix_moment):'—'}${c.prix_moment_usd?` <span style="color:#38bdf8">· ${_usd(c.prix_moment_usd)}</span>`:''}</strong></div>`:''}
         ${c.description?`<div style="font-size:13px;color:rgba(255,255,255,.35);margin-top:4px;font-style:italic">${c.description}</div>`:''}
       </div>
       <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
@@ -34362,10 +34367,12 @@ function hotelChambreModal(id){
       el('hcm-capacite').value     = c.capacite;
       el('hcm-prix-nuit').value    = c.prix_nuit;
       el('hcm-prix-moment').value  = c.prix_moment ?? '';
+      el('hcm-prix-nuit-usd').value   = c.prix_nuit_usd ?? '';
+      el('hcm-prix-moment-usd').value = c.prix_moment_usd ?? '';
       el('hcm-description').value  = c.description ?? '';
     }
   } else {
-    ['hcm-numero','hcm-etage','hcm-prix-nuit','hcm-prix-moment','hcm-description'].forEach(n=>{ el(n).value=''; });
+    ['hcm-numero','hcm-etage','hcm-prix-nuit','hcm-prix-moment','hcm-prix-nuit-usd','hcm-prix-moment-usd','hcm-description'].forEach(n=>{ el(n).value=''; });
     el('hcm-type').value     = 'SIMPLE';
     el('hcm-capacite').value = '1';
   }
@@ -34385,6 +34392,8 @@ async function hotelChambreSauver(){
     capacite:     parseInt(el('hcm-capacite').value||1),
     prix_nuit:    pn,
     prix_moment:  el('hcm-prix-moment').value ? parseFloat(el('hcm-prix-moment').value) : null,
+    prix_nuit_usd:   parseFloat(el('hcm-prix-nuit-usd').value) > 0 ? parseFloat(el('hcm-prix-nuit-usd').value) : null,
+    prix_moment_usd: parseFloat(el('hcm-prix-moment-usd').value) > 0 ? parseFloat(el('hcm-prix-moment-usd').value) : null,
     description:  el('hcm-description').value.trim() || null,
     actif:        true,
   };
@@ -34418,8 +34427,8 @@ async function loadHotelReception(){
     const selCh = document.getElementById('hrec-chambre');
     if(selCh){
       selCh.innerHTML = '<option value="">— Choisir une chambre disponible —</option>' +
-        (dispo||[]).map(c=>`<option value="${c.id}" data-prix-nuit="${c.prix_nuit}" data-prix-moment="${c.prix_moment||0}" data-has-moment="${c.prix_moment?1:0}">
-          Chambre ${c.numero} — ${_TYPE_CHAMBRE_LABEL[c.type_chambre]||c.type_chambre}</option>`).join('');
+        (dispo||[]).map(c=>`<option value="${c.id}" data-prix-nuit="${c.prix_nuit}" data-prix-moment="${c.prix_moment||0}" data-has-moment="${c.prix_moment?1:0}" data-prix-nuit-usd="${c.prix_nuit_usd||0}" data-prix-moment-usd="${c.prix_moment_usd||0}">
+          Chambre ${c.numero} — ${_TYPE_CHAMBRE_LABEL[c.type_chambre]||c.type_chambre} · ${posGx(c.prix_nuit)}${c.prix_nuit_usd?' / '+_usd(c.prix_nuit_usd):''}</option>`).join('');
     }
     const selEmp = document.getElementById('hrec-employe');
     if(selEmp){
@@ -34455,27 +34464,66 @@ function hrecCalcTotal(){
   if(!opt || !opt.value){ document.getElementById('hrec-recap').style.display='none'; return; }
   const prixNuit   = parseFloat(opt.dataset.prixNuit||0);
   const prixMoment = parseFloat(opt.dataset.prixMoment||0);
+  const usdNuit    = parseFloat(opt.dataset.prixNuitUsd||0);
+  const usdMoment  = parseFloat(opt.dataset.prixMomentUsd||0);
   const nbN  = parseInt(document.getElementById('hrec-nb-nuits').value||1);
   const nbH  = parseFloat(document.getElementById('hrec-nb-heures').value||2);
   const arr  = document.getElementById('hrec-arrivee').value;
+  const nuit = _hrecType === 'NUIT';
+  const qte  = nuit ? nbN : nbH;
+  const pG   = nuit ? prixNuit : prixMoment;
+  const pU   = nuit ? usdNuit  : usdMoment;
+  const unite = nuit ? `${nbN} nuit(s)` : `${nbH}h`;
 
-  let total = 0, labelPrix = '', depStr = '—';
-  if(_hrecType === 'NUIT'){
-    total    = prixNuit * nbN;
-    labelPrix = `${posGx(prixNuit)} × ${nbN} nuit(s)`;
-    if(arr){ const d=new Date(arr); d.setDate(d.getDate()+nbN); depStr=d.toLocaleString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
-  } else {
-    total    = prixMoment * nbH;
-    labelPrix = `${posGx(prixMoment)} × ${nbH}h`;
-    if(arr){ const d=new Date(arr); d.setTime(d.getTime()+nbH*3600000); depStr=d.toLocaleString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
+  // Tarif appliqué = devise choisie par le client (dollars seulement si la
+  // chambre a un prix en dollars ; sinon le prix gourdes reste la référence).
+  const devSel = document.getElementById('hrec-devise')?.value || 'HTG';
+  _hrecTarif = (devSel === 'USD' && pU > 0) ? 'USD' : 'HTG';
+  const fmt = _hrecTarif === 'USD' ? _usd : posGx;
+  const prix = _hrecTarif === 'USD' ? pU : pG;
+  const total = prix * qte;
+
+  // Les deux prix sont toujours affichés ; un clic choisit la devise.
+  const choix = document.getElementById('hrec-prix-choix');
+  if(choix){
+    const carte = (dev, p, tot, lib) => {
+      const actif = _hrecTarif === dev;
+      const dispo = p > 0;
+      const clr = dev === 'USD' ? '56,189,248' : '167,139,250';
+      return `<button type="button" ${dispo?`onclick="hrecChoisirDevise('${dev}')"`:'disabled'} style="text-align:left;cursor:${dispo?'pointer':'not-allowed'};padding:8px 10px;border-radius:8px;border:2px solid ${actif?`rgb(${clr})`:'rgba(255,255,255,.12)'};background:${actif?`rgba(${clr},.15)`:'rgba(255,255,255,.03)'};color:inherit;opacity:${dispo?1:.5}">
+        <div style="font-size:12px;color:rgba(255,255,255,.5)">${lib}${actif?' ✓':''}</div>
+        <div style="font-size:16px;font-weight:800;color:rgb(${clr})">${dispo?(dev==='USD'?_usd(p):posGx(p)):'Non configuré'}</div>
+        ${dispo?`<div style="font-size:12px;color:rgba(255,255,255,.45)">× ${unite} = <strong>${dev==='USD'?_usd(tot):posGx(tot)}</strong></div>`:''}
+      </button>`;
+    };
+    choix.innerHTML = carte('HTG', pG, pG*qte, 'Gourdes (HTG)') + carte('USD', pU, pU*qte, 'Dollars (USD)');
+  }
+
+  let depStr = '—';
+  if(arr){
+    const d=new Date(arr);
+    if(nuit) d.setDate(d.getDate()+nbN); else d.setTime(d.getTime()+nbH*3600000);
+    depStr=d.toLocaleString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
   }
   _hrecRefTotal = total;
   document.getElementById('hrec-recap').style.display     = '';
-  document.getElementById('hrec-recap-label').textContent = labelPrix;
-  document.getElementById('hrec-recap-prix').textContent  = posGx(_hrecType==='NUIT'?prixNuit:prixMoment);
-  document.getElementById('hrec-recap-total').textContent = posGx(total);
+  document.getElementById('hrec-recap-label').textContent = `${fmt(prix)} × ${unite}`;
+  document.getElementById('hrec-recap-prix').textContent  = fmt(prix);
+  document.getElementById('hrec-recap-total').textContent = fmt(total);
   document.getElementById('hrec-recap-depart').textContent = depStr;
+  const fl = document.getElementById('hrec-facture-label');
+  if(fl) fl.textContent = _hrecTarif === 'USD' ? 'Montant à facturer ($ dollars)' : 'Montant à facturer (G)';
   hrecRefreshFacture();
+}
+
+let _hrecTarif = 'HTG';
+function hrecChoisirDevise(dev){
+  const sel = document.getElementById('hrec-devise');
+  if(sel && sel.value !== dev){
+    sel.value = dev;
+    const mf = document.getElementById('hrec-montant-facture'); if(mf) mf.value = '';
+    hrecDeviseChange();
+  }
 }
 
 // Montant réellement facturé : la saisie de la réception si > 0, sinon le tarif de référence.
@@ -34485,16 +34533,17 @@ function hrecEffectiveFacture(){
 }
 
 function hrecRefreshFacture(){
+  const fmt = _hrecTarif === 'USD' ? _usd : posGx;
   const fact  = hrecEffectiveFacture();
   const remise = Math.max(0, _hrecRefTotal - fact);
   const rRow = document.getElementById('hrec-remise-row');
   if(rRow){
     rRow.style.display = remise > 0 ? 'flex' : 'none';
-    document.getElementById('hrec-remise-val').textContent = '- ' + posGx(remise);
+    document.getElementById('hrec-remise-val').textContent = '- ' + fmt(remise);
   }
   const fEl = document.getElementById('hrec-recap-facture');
   if(fEl){
-    fEl.textContent = posGx(fact);
+    fEl.textContent = fmt(fact);
     fEl.style.color = remise > 0 ? '#fbbf24' : (fact > _hrecRefTotal ? '#f87171' : '#a78bfa');
   }
   hrecCalcSolde();
@@ -34517,6 +34566,7 @@ async function hrecDeviseChange(){
   document.getElementById('hrec-montant-paye-label').textContent = usd ? 'Montant payé ($ dollars)' : 'Montant payé (G)';
   const taux = document.getElementById('hrec-taux');
   if(usd && taux && !taux.value) taux.value = await _hotelChargerTaux();
+  hrecCalcTotal();
   hrecCalcSolde();
 }
 // Équivalent gourdes de la saisie (montant × taux si dollars).
@@ -34529,12 +34579,22 @@ function hrecPayeEquivHtg(){
 
 function hrecCalcSolde(){
   const total   = hrecEffectiveFacture();
+  const soldeEl = document.getElementById('hrec-solde');
+  const eq = document.getElementById('hrec-equiv');
+  const taux = parseFloat(document.getElementById('hrec-taux')?.value||0) || 0;
+  if(_hrecTarif === 'USD'){
+    // Séjour au prix dollars, payé en dollars : solde en dollars.
+    const paye  = parseFloat(document.getElementById('hrec-montant-paye').value||0) || 0;
+    const solde = Math.max(0, total - paye);
+    if(soldeEl){ soldeEl.textContent = _usd(solde); soldeEl.style.color = solde>0?'#f87171':'#34d399'; }
+    if(eq) eq.textContent = taux ? `Total ${_usd(total)} ≈ ${posGx(total*taux)} au taux du jour` : '';
+    return;
+  }
   const paye    = hrecPayeEquivHtg();
   const solde   = Math.max(0, total - paye);
-  const soldeEl = document.getElementById('hrec-solde');
   if(soldeEl){ soldeEl.textContent = posGx(solde); soldeEl.style.color = solde>0?'#f87171':'#34d399'; }
-  const eq = document.getElementById('hrec-equiv');
-  if(eq) eq.textContent = document.getElementById('hrec-devise')?.value === 'USD' ? `≈ ${posGx(paye)} (équivalent gourdes, pour le solde)` : '';
+  if(eq) eq.textContent = document.getElementById('hrec-devise')?.value === 'USD'
+    ? `≈ ${posGx(paye)} (équivalent gourdes, pour le solde) — chambre sans prix en dollars` : '';
 }
 
 async function hrecEnregistrer(){
@@ -34568,6 +34628,7 @@ async function hrecEnregistrer(){
     devise_paiement: document.getElementById('hrec-devise')?.value || 'HTG',
     taux_change:     document.getElementById('hrec-devise')?.value === 'USD'
                        ? (parseFloat(document.getElementById('hrec-taux')?.value||0) || null) : null,
+    devise_tarif:    _hrecTarif,
     mode_paiement:   document.getElementById('hrec-mode').value || null,
     employe_id:      document.getElementById('hrec-employe').value ? parseInt(document.getElementById('hrec-employe').value) : null,
     notes:           g('hrec-notes') || null,
@@ -34641,13 +34702,17 @@ function _hotelTicketRecu(r){
     +row('Durée :',duree)
     +'<div class="sep"></div>'
     +(remise>0?(row('Tarif référence :',fg(r.montant_reference))+row('Rabais :','- '+fg(remise))):'')
-    +'<div class="box"><div class="l">Montant facturé</div><div class="v">'+fg(r.montant_total)+'</div></div>'
+    +(r.devise_tarif==='USD'
+        ? '<div class="box"><div class="l">Montant facturé</div><div class="v">'+(parseFloat(r.montant_total_usd)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' $</div><div style="font-size:8pt">≈ '+fg(r.montant_total)+' (taux '+(r.taux_tarif||'')+')</div></div>'
+        : '<div class="box"><div class="l">Montant facturé</div><div class="v">'+fg(r.montant_total)+'</div></div>')
     +((parseFloat(r.paye_usd)||0) > 0
         ? (row('Payé en gourdes :',fg(r.paye_htg))
            +row('Payé en dollars :',(parseFloat(r.paye_usd)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' $')
            +row('Total payé (≈ G) :',fg(r.montant_paye)))
         : row('Payé :',fg(r.montant_paye)))
-    +row('Solde :','<span class="b">'+fg(r.solde)+'</span>')
+    +row('Solde :','<span class="b">'+(r.devise_tarif==='USD'&&r.solde_usd!=null
+        ? (parseFloat(r.solde_usd)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' $'
+        : fg(r.solde))+'</span>')
     +(r.mode_paiement?row('Mode :',r.mode_paiement):'')
     +'<div class="sep2"></div>'
     +(recepteur?'<div style="font-size:8.5pt">Reçu par : '+recepteur+'</div>':'')
@@ -34700,9 +34765,9 @@ function _hotelSejourCard(s){
       ${s.client_contact?`<div style="font-size:13px;color:rgba(255,255,255,.4);margin-top:2px">${s.client_contact}</div>`:''}
       <div class="hotel-timer-box" data-type="${s.type_sejour}" data-depart="${s.date_depart_prevue}" data-arrivee="${s.date_arrivee}" style="margin-top:10px;min-height:28px"></div>
       <div style="margin-top:8px;padding:8px;background:rgba(255,255,255,.04);border-radius:6px;display:flex;justify-content:space-between">
-        <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Total</div><div style="font-weight:700">${_hFmt(s.montant_total)}</div></div>
-        <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Payé</div><div style="font-weight:700;color:#34d399">${_hFmt(s.montant_paye)}</div>${(s.paye_usd||0)>0?`<div style="font-size:11px;color:#38bdf8">dont ${_usd(s.paye_usd)} · ${_hFmt(s.paye_htg)} en G</div>`:''}</div>
-        <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Solde</div><div style="font-weight:700;color:${hasSolde?'#f87171':'#34d399'}">${_hFmt(s.solde)}</div></div>
+        <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Total</div>${s.devise_tarif==='USD'?`<div style="font-weight:700;color:#38bdf8">${_usd(s.montant_total_usd)}</div><div style="font-size:11px;color:rgba(255,255,255,.4)">≈ ${_hFmt(s.montant_total)}</div>`:`<div style="font-weight:700">${_hFmt(s.montant_total)}</div>`}</div>
+        <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Payé</div>${s.devise_tarif==='USD'?`<div style="font-weight:700;color:#34d399">${_usd(s.paye_usd)}</div>${(s.paye_htg||0)>0?`<div style="font-size:11px;color:#38bdf8">+ ${_hFmt(s.paye_htg)} en G</div>`:''}`:`<div style="font-weight:700;color:#34d399">${_hFmt(s.montant_paye)}</div>`}${s.devise_tarif!=='USD'&&(s.paye_usd||0)>0?`<div style="font-size:11px;color:#38bdf8">dont ${_usd(s.paye_usd)} · ${_hFmt(s.paye_htg)} en G</div>`:''}</div>
+        <div style="text-align:center"><div style="font-size:12px;color:rgba(255,255,255,.35)">Solde</div><div style="font-weight:700;color:${hasSolde?'#f87171':'#34d399'}">${s.devise_tarif==='USD'&&s.solde_usd!=null?_usd(s.solde_usd):_hFmt(s.solde)}</div>${s.devise_tarif==='USD'&&hasSolde?`<div style="font-size:11px;color:rgba(255,255,255,.4)">≈ ${_hFmt(s.solde)}</div>`:''}</div>
       </div>
       <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
         <button class="pos-btn ghost" style="flex:1;font-size:13px" onclick="hotelRecu(${s.id})">🧾 Reçu</button>
@@ -34772,11 +34837,15 @@ function hotelPaiementModal(resId){
   if(!_hotelPeutEcrire()){ _giAlert('Accès lecture seule.','err'); return; }
   document.getElementById('hotel-paie-res-id').value = resId;
   document.getElementById('hotel-paie-montant').value = '';
-  document.getElementById('hotel-paie-devise').value = 'HTG';
-  document.getElementById('hotel-paie-taux').value = '';
   const s = (_hotelSejoursData||[]).find(x=>x.id===resId);
+  const enUsd = s && s.devise_tarif === 'USD';
+  // Séjour au prix dollars : paiement proposé en dollars, au taux de l'arrivée.
+  document.getElementById('hotel-paie-devise').value = enUsd ? 'USD' : 'HTG';
+  document.getElementById('hotel-paie-taux').value = enUsd && s.taux_tarif ? s.taux_tarif : '';
   const info = document.getElementById('hotel-paie-solde-info');
-  if(info) info.textContent = s ? `Solde à payer : ${_hFmt(s.solde)}` : '';
+  if(info) info.textContent = !s ? '' : (enUsd && s.solde_usd!=null
+    ? `Solde à payer : ${_usd(s.solde_usd)} (≈ ${_hFmt(s.solde)})`
+    : `Solde à payer : ${_hFmt(s.solde)}`);
   hotelPaieDeviseChange();
   document.getElementById('hotel-paie-modal-bg').classList.add('open');
 }

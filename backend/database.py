@@ -395,6 +395,13 @@ def _migrate_columns():
     # v29 — article géré (ou non) au Dépôt central
     new_cols.append(("bar_produits", "depot_actif",
                      f"ALTER TABLE bar_produits ADD COLUMN depot_actif {'INTEGER' if _is_sqlite else 'BOOLEAN'}", None))
+    # v30 — prix des chambres en dollars et tarif du séjour en USD
+    new_cols.append(("hotel_chambres", "prix_nuit_usd", "ALTER TABLE hotel_chambres ADD COLUMN prix_nuit_usd NUMERIC(12,2)", None))
+    new_cols.append(("hotel_chambres", "prix_moment_usd", "ALTER TABLE hotel_chambres ADD COLUMN prix_moment_usd NUMERIC(12,2)", None))
+    new_cols.append(("hotel_reservations", "devise_tarif", "ALTER TABLE hotel_reservations ADD COLUMN devise_tarif VARCHAR(3)", None))
+    new_cols.append(("hotel_reservations", "prix_unitaire_usd", "ALTER TABLE hotel_reservations ADD COLUMN prix_unitaire_usd NUMERIC(12,2)", None))
+    new_cols.append(("hotel_reservations", "montant_total_usd", "ALTER TABLE hotel_reservations ADD COLUMN montant_total_usd NUMERIC(12,2)", None))
+    new_cols.append(("hotel_reservations", "taux_tarif", "ALTER TABLE hotel_reservations ADD COLUMN taux_tarif NUMERIC(10,4)", None))
     for _t in ("bar_ventes", "bar_remboursements", "cuisine_ventes", "patisserie_ventes", "piscine_ventes"):
         new_cols += [
             (_t, "devise",         f"ALTER TABLE {_t} ADD COLUMN devise VARCHAR(3) NOT NULL DEFAULT 'HTG'", None),

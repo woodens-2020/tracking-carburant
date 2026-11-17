@@ -1079,6 +1079,8 @@ class HotelChambre(Base):
     capacite      = Column(Integer,     nullable=False, default=1)
     prix_nuit     = Column(Numeric(12,2), nullable=False)
     prix_moment   = Column(Numeric(12,2), nullable=True)   # prix/heure pour séjour moment
+    prix_nuit_usd   = Column(Numeric(12,2), nullable=True)  # prix/nuit en dollars (optionnel)
+    prix_moment_usd = Column(Numeric(12,2), nullable=True)  # prix moment en dollars (optionnel)
     statut        = Column(String(20),  nullable=False, default="DISPONIBLE")
     description   = Column(String(300), nullable=True)
     actif         = Column(Boolean,     nullable=False, default=True)
@@ -1143,6 +1145,13 @@ class HotelReservation(Base):
     nb_heures          = Column(Numeric(5,2), nullable=True)
     prix_unitaire      = Column(Numeric(12,2), nullable=False)
     montant_total      = Column(Numeric(12,2), nullable=False)
+    # Tarif choisi par le client : HTG (défaut) ou USD. En USD, le séjour est
+    # facturé au prix dollars de la chambre (montant_total_usd) ; montant_total
+    # garde son équivalent gourdes au taux du séjour (taux_tarif).
+    devise_tarif       = Column(String(3), nullable=True)
+    prix_unitaire_usd  = Column(Numeric(12,2), nullable=True)
+    montant_total_usd  = Column(Numeric(12,2), nullable=True)
+    taux_tarif         = Column(Numeric(10,4), nullable=True)
     montant_paye       = Column(Numeric(12,2), nullable=False, default=0)
     solde              = Column(Numeric(12,2), nullable=False, default=0)
     statut             = Column(String(20),  nullable=False, default="EN_COURS")

@@ -86,6 +86,8 @@ def _chambre_dict(c: HotelChambre, nb_actives: int = 0) -> dict:
         "capacite":     c.capacite,
         "prix_nuit":    float(_d(c.prix_nuit)),
         "prix_moment":  float(_d(c.prix_moment)) if c.prix_moment else None,
+        "prix_nuit_usd":   float(_d(c.prix_nuit_usd)) if c.prix_nuit_usd else None,
+        "prix_moment_usd": float(_d(c.prix_moment_usd)) if c.prix_moment_usd else None,
         "statut":       c.statut,
         "description":  c.description or "",
         "actif":        c.actif,
@@ -216,6 +218,13 @@ def _res_dict(r: HotelReservation) -> dict:
         "prix_unitaire":      float(_d(r.prix_unitaire)),
         "montant_reference":  float(_d(r.prix_unitaire) * (r.nb_nuits or _d(r.nb_heures) or 1)),
         "montant_total":      float(_d(r.montant_total)),
+        # Tarif en dollars (client facturé au prix USD de la chambre)
+        "devise_tarif":       r.devise_tarif or "HTG",
+        "prix_unitaire_usd":  float(_d(r.prix_unitaire_usd)) if r.prix_unitaire_usd is not None else None,
+        "montant_total_usd":  float(_d(r.montant_total_usd)) if r.montant_total_usd is not None else None,
+        "taux_tarif":         float(_d(r.taux_tarif)) if r.taux_tarif is not None else None,
+        "solde_usd":          (float((_d(r.solde) / _d(r.taux_tarif)).quantize(Decimal("0.01")))
+                               if r.devise_tarif == "USD" and r.taux_tarif else None),
         "remise":             max(0.0, float(_d(r.prix_unitaire) * (r.nb_nuits or _d(r.nb_heures) or 1) - _d(r.montant_total))),
         "montant_paye":       float(_d(r.montant_paye)),
         "solde":              float(_d(r.solde)),
@@ -239,6 +248,8 @@ class ChambreIn(BaseModel):
     capacite:     int             = 1
     prix_nuit:    float           = Field(gt=0)
     prix_moment:  Optional[float] = Field(default=None, gt=0)
+    prix_nuit_usd:   Optional[float] = Field(default=None, gt=0)   # prix en dollars (optionnel)
+    prix_moment_usd: Optional[float] = Field(default=None, gt=0)
     description:  Optional[str]   = None
     actif:        bool            = True
 
@@ -286,6 +297,8 @@ def creer_chambre(data: ChambreIn, db: Session = Depends(get_db)):
         capacite     = data.capacite,
         prix_nuit    = Decimal(str(data.prix_nuit)),
         prix_moment  = Decimal(str(data.prix_moment)) if data.prix_moment else None,
+        prix_nuit_usd   = Decimal(str(data.prix_nuit_usd)) if data.prix_nuit_usd else None,
+        prix_moment_usd = Decimal(str(data.prix_moment_usd)) if data.prix_moment_usd else None,
         statut       = "DISPONIBLE",
         description  = data.description,
         actif        = data.actif,
@@ -313,6 +326,8 @@ def modifier_chambre(chambre_id: int, data: ChambreIn, db: Session = Depends(get
     c.capacite     = data.capacite
     c.prix_nuit    = Decimal(str(data.prix_nuit))
     c.prix_moment  = Decimal(str(data.prix_moment)) if data.prix_moment else None
+    c.prix_nuit_usd   = Decimal(str(data.prix_nuit_usd)) if data.prix_nuit_usd else None
+    c.prix_moment_usd = Decimal(str(data.prix_moment_usd)) if data.prix_moment_usd else None
     c.description  = data.description
     c.actif        = data.actif
     db.commit()
@@ -455,6 +470,9 @@ class ReservationIn(BaseModel):
     mode_paiement:   Optional[str]  = None
     devise_paiement: Optional[str]  = "HTG"      # HTG (gourdes) | USD (dollars)
     taux_change:     Optional[float] = None      # HTG pour 1 USD — défaut : taux du jour de l'hôtel
+    # Tarif appliqué : HTG (prix gourdes) ou USD (prix dollars de la chambre).
+    # En USD, montant_facture est saisi en dollars.
+    devise_tarif:    Optional[str]  = "HTG"
     employe_id:      Optional[int]  = None
     notes:           Optional[str]  = None
 
@@ -544,19 +562,48 @@ def creer_reservation(data: ReservationIn, request: Request, db: Session = Depen
         date_dep  = date_arr + timedelta(hours=float(nb_heures))
         montant_ref = prix_unit * nb_heures
 
+    # Tarif en dollars : le client est facturé au prix USD de la chambre ;
+    # le séjour garde son équivalent gourdes au taux du séjour (solde, rapports).
+    devise_tarif = (data.devise_tarif or "HTG").strip().upper()
+    if devise_tarif not in DEVISES:
+        raise HTTPException(422, "Tarif invalide — HTG (gourdes) ou USD (dollars).")
+    prix_usd = montant_usd = taux_tarif = None
+    if devise_tarif == "USD":
+        prix_usd = _d(chambre.prix_nuit_usd if data.type_sejour == "NUIT" else chambre.prix_moment_usd)
+        if prix_usd <= 0:
+            raise HTTPException(
+                422, f"La chambre {chambre.numero} n'a pas de prix en dollars configuré "
+                     f"({'nuit' if data.type_sejour == 'NUIT' else 'moment'}).")
+        _, taux_tarif = _valider_devise("USD", data.taux_change, db)
+        qte = Decimal(nb_nuits) if data.type_sejour == "NUIT" else nb_heures
+        montant_usd = (prix_usd * qte).quantize(Decimal("0.01"))
+
     # Le montant facturé saisi par la réception fait foi (le PDG accorde
     # parfois un rabais à certains clients). Robuste : une saisie absente /
     # vide / ≤ 0 / illisible retombe sur le prix de référence calculé.
+    # En tarif USD, la saisie est en dollars.
     montant = montant_ref
+    mf = None
     if data.montant_facture is not None:
         try:
             mf = Decimal(str(data.montant_facture))
-            if mf > 0:
-                montant = mf
+            if mf <= 0:
+                mf = None
         except (ValueError, ArithmeticError):
-            pass
+            mf = None
+    if devise_tarif == "USD":
+        if mf is not None:
+            montant_usd = mf.quantize(Decimal("0.01"))
+        montant = (montant_usd * taux_tarif).quantize(Decimal("0.01"))
+        prix_unit = (prix_usd * taux_tarif).quantize(Decimal("0.01"))
+        montant_ref = (prix_usd * (Decimal(nb_nuits) if nb_nuits else nb_heures) * taux_tarif).quantize(Decimal("0.01"))
+    elif mf is not None:
+        montant = mf
 
     devise, taux = _valider_devise(data.devise_paiement, data.taux_change, db)
+    if devise == "USD" and devise_tarif == "USD" and not data.taux_change:
+        taux = taux_tarif
+    paye_usd_exact = devise == "USD" and devise_tarif == "USD" and taux == taux_tarif
     paye_devise = Decimal(str(data.montant_paye or 0))
     if paye_devise < 0:
         paye_devise = Decimal("0")
@@ -565,6 +612,9 @@ def creer_reservation(data: ReservationIn, request: Request, db: Session = Depen
         paye_devise = min(paye_devise, montant)
         montant_paye = paye_devise
     else:
+        if paye_usd_exact:
+            # Séjour au tarif dollars payé en dollars : plafonné au prix USD.
+            paye_devise = min(paye_devise, montant_usd)
         montant_paye = _equivalent_htg(devise, paye_devise, taux)
         if montant_paye > montant + Decimal("0.5"):
             raise HTTPException(
@@ -587,6 +637,10 @@ def creer_reservation(data: ReservationIn, request: Request, db: Session = Depen
         nb_heures          = nb_heures,
         prix_unitaire      = prix_unit,
         montant_total      = montant,
+        devise_tarif       = devise_tarif,
+        prix_unitaire_usd  = prix_usd,
+        montant_total_usd  = montant_usd,
+        taux_tarif         = taux_tarif,
         montant_paye       = montant_paye,
         solde              = solde,
         statut             = "EN_COURS",
@@ -610,7 +664,9 @@ def creer_reservation(data: ReservationIn, request: Request, db: Session = Depen
     creer_notification(
         db, module="hotel", type_="nouvelle_reservation",
         titre=f"Nouvelle réservation — {r.client_nom}",
-        message=f"Chambre {chambre.numero} · {r.type_sejour} · {montant:g} G{_remise_txt}",
+        message=(f"Chambre {chambre.numero} · {r.type_sejour} · "
+                 + (f"{montant_usd:g} $ (≈ {montant:g} G)" if devise_tarif == "USD" else f"{montant:g} G")
+                 + _remise_txt),
         lien="hotel-reservation",
         dedupe_minutes=None,
     )
@@ -628,6 +684,8 @@ def ajouter_paiement(res_id: int, data: PaiementIn, request: Request, db: Sessio
     if r.statut != "EN_COURS":
         raise HTTPException(409, "Réservation non active.")
     devise, taux = _valider_devise(data.devise, data.taux_change, db)
+    if devise == "USD" and r.devise_tarif == "USD" and r.taux_tarif and not data.taux_change:
+        taux = _d(r.taux_tarif)   # séjour au tarif dollars : même taux qu'à l'arrivée
     montant = Decimal(str(data.montant))
     montant_htg = _equivalent_htg(devise, montant, taux)
     _ajouter_paiement_ligne(db, r, devise, montant, taux, montant_htg,
