@@ -3361,13 +3361,13 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
     </button>
 
     <!-- ── Section Bar / Restaurant ── -->
-    <div class="nav-section-label">Bar / Restaurant</div>
+    <div class="nav-section-label">Bar Devant</div>
 
     <button class="nav-item" data-page="pos-dashboard-bar" onclick="goTo('pos-dashboard-bar')">
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17h7M17 14v7"/></svg>
       </span>
-      <span>Dashboard Bar</span>
+      <span>Dashboard Bar Devant</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -3375,7 +3375,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h4M7 11h2"/><rect x="13" y="8" width="4" height="5" rx="1"/></svg>
       </span>
-      <span>Caisse POS</span>
+      <span>Caisse Bar Devant</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -3383,7 +3383,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/></svg>
       </span>
-      <span>Produits Bar</span>
+      <span>Produits Bar (les deux bars)</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -3391,7 +3391,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
       </span>
-      <span>Stock Bar</span>
+      <span>Stock Bar Devant</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -3399,7 +3399,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
       </span>
-      <span>Achats Bar</span>
+      <span>Achats Bar Devant</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -3407,7 +3407,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
       </span>
-      <span>Ventes Bar</span>
+      <span>Ventes Bar Devant</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -3431,7 +3431,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0112 0v2"/><path d="M16 12v4M14 14h4"/></svg>
       </span>
-      <span>Paie Bar</span>
+      <span>Paie Bar Devant</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -3439,7 +3439,7 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
       <span class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
       </span>
-      <span>Dépenses Bar</span>
+      <span>Dépenses Bar Devant</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -3480,6 +3480,105 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       </span>
       <span>Rapports Soumis</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <!-- ── Section Bar Piscine (département séparé du Bar Devant) ── -->
+    <div class="nav-section-label">Bar Piscine</div>
+
+    <button class="nav-item" data-page="barp-dashboard" onclick="goTo('barp-dashboard')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17h7M17 14v7"/></svg>
+      </span>
+      <span>Dashboard Bar Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="barp-caisse" onclick="goTo('barp-caisse')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h4M7 11h2"/><rect x="13" y="8" width="4" height="5" rx="1"/></svg>
+      </span>
+      <span>Caisse Bar Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="barp-stock" onclick="goTo('barp-stock')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+      </span>
+      <span>Stock Bar Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="barp-achats" onclick="goTo('barp-achats')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+      </span>
+      <span>Achats Bar Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="barp-ventes" onclick="goTo('barp-ventes')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      </span>
+      <span>Ventes Bar Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="barp-credits" onclick="goTo('barp-credits')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
+      </span>
+      <span>Crédits Bar Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="barp-paie" onclick="goTo('barp-paie')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0112 0v2"/><path d="M16 12v4M14 14h4"/></svg>
+      </span>
+      <span>Paie Bar Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="barp-depenses" onclick="goTo('barp-depenses')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+      </span>
+      <span>Dépenses Bar Piscine</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="barp-rentabilite" onclick="goTo('barp-rentabilite')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      </span>
+      <span>Rentabilité</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="barp-grande-caisse" onclick="goTo('barp-grande-caisse')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><circle cx="12" cy="15" r="2"/><path d="M6 15h.01M18 15h.01"/></svg>
+      </span>
+      <span>Grande Caisse</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="barp-analyse" onclick="goTo('barp-analyse')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-8"/></svg>
+      </span>
+      <span>Analyse & Contrôle</span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="barp-sessions-caisse" onclick="goTo('barp-sessions-caisse')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/><path d="M8 14h2M12 14h4M8 18h2M12 18h2"/></svg>
+      </span>
+      <span>Sessions Caissières</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -12829,7 +12928,7 @@ async function apiFetch(method,path,body){
 // module porte ?lieu=DEVANT ou ?lieu=PISCINE (sauf si l'appelant l'a déjà
 // précisé) — le serveur filtre ventes, achats, caisse, dépenses, analyses.
 function _posAvecDept(path){
-  if(!_posDept) return path;
+  if(!_posDept || _posDept==='CARTES') return path;
   if(!path.startsWith('/pos/') || /[?&]lieu=/.test(path)) return path;
   return path + (path.includes('?') ? '&' : '?') + 'lieu=' + _posDept;
 }
@@ -14627,8 +14726,8 @@ function goTo(page){
   // requêtes /pos/ portent alors ?lieu=PISCINE (voir _apiFetchExec), et
   // inversement les pages du Bar portent ?lieu=DEVANT : les deux
   // départements ne se mélangent jamais (ventes, caisse, dépenses, analyses).
-  const basePage = _PISCINE_ALIAS[page] || page;
-  _posDept = _PISCINE_ALIAS[page] ? 'PISCINE' : (_POS_BAR_PAGES.has(basePage) ? 'DEVANT' : null);
+  const basePage = _PISCINE_ALIAS[page] || _BARP_ALIAS[page] || page;
+  _posDept = _PISCINE_ALIAS[page] ? 'CARTES' : _BARP_ALIAS[page] ? 'PISCINE' : (_POS_BAR_PAGES.has(basePage) ? 'DEVANT' : null);
   document.body.dataset.posDept = _posDept || '';
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item, .mnav-btn').forEach(n=>n.classList.remove('active'));
@@ -14682,14 +14781,36 @@ const _PISCINE_ALIAS = {
   'piscine-depenses':        'pos-depenses',
 };
 const _BAR_VERS_PISCINE = Object.fromEntries(Object.entries(_PISCINE_ALIAS).map(([p,b])=>[b,p]));
-// Le module Bar garde ses écrans d'origine (Bar Devant + Bar Piscine) ; seule
-// la page Dépenses Bar a besoin du département.
-const _POS_BAR_PAGES = new Set(['pos-depenses']);
+// Bar Piscine : département à part entière — mêmes écrans que le Bar,
+// toujours filtrés lieu=PISCINE (ventes, caisse, sessions, achats, stock,
+// dépenses, crédits, paie, analyses). Le Bar (pages pos-*) = Bar Devant
+// seulement (lieu=DEVANT). Le catalogue Produits et les Tables restent communs.
+const _BARP_ALIAS = {
+  'barp-dashboard': 'pos-dashboard-bar',
+  'barp-caisse': 'pos-caisse',
+  'barp-stock': 'pos-stock',
+  'barp-achats': 'pos-achats',
+  'barp-ventes': 'pos-ventes',
+  'barp-credits': 'pos-credits',
+  'barp-paie': 'pos-paie',
+  'barp-depenses': 'pos-depenses',
+  'barp-rentabilite': 'pos-rentabilite',
+  'barp-grande-caisse': 'pos-grande-caisse',
+  'barp-analyse': 'pos-analyse',
+  'barp-sessions-caisse': 'pos-sessions-caisse',
+};
+const _BAR_VERS_BARP = Object.fromEntries(Object.entries(_BARP_ALIAS).map(([p,b])=>[b,p]));
+const _POS_BAR_PAGES = new Set(Object.values(_BARP_ALIAS));
 
-function _posDeptLibelle(d){ return (d||_posDept)==='PISCINE' ? 'Piscine' : 'Bar'; }
-// Page équivalente dans le département courant (ex. 'pos-ventes' → 'piscine-ventes').
+// 'DEVANT' = Bar Devant · 'PISCINE' = Bar Piscine · 'CARTES' = Piscine (cartes).
+function _posDeptLibelle(d){ d = d||_posDept; return d==='PISCINE' ? 'Bar Piscine' : d==='CARTES' ? 'Piscine' : 'Bar Devant'; }
+// Lieu de stock / vente du département courant (null hors Bar).
+const _posLieuDept = () => (_posDept==='DEVANT' || _posDept==='PISCINE') ? _posDept : null;
+// Page équivalente dans le département courant (ex. 'pos-ventes' → 'barp-ventes').
 function _posPage(basePage){
-  return _posDept==='PISCINE' && _BAR_VERS_PISCINE[basePage] ? _BAR_VERS_PISCINE[basePage] : basePage;
+  if(_posDept==='PISCINE' && _BAR_VERS_BARP[basePage]) return _BAR_VERS_BARP[basePage];
+  if(_posDept==='CARTES' && _BAR_VERS_PISCINE[basePage]) return _BAR_VERS_PISCINE[basePage];
+  return basePage;
 }
 // Remplace « Bar » par « Piscine » dans les titres marqués data-dept-libelle
 // (ex. « Stock Bar » → « Stock Piscine ») et masque ce qui ne concerne qu'un
@@ -14704,7 +14825,9 @@ function _posAppliquerLibellesDept(){
     if(!el.dataset.deptOrig) el.dataset.deptOrig = el.textContent;
     const orig = el.dataset.deptOrig;
     const citeBar = /Bar Devant|Bar \/ Restaurant|\bBar\b/.test(orig);
-    if(dept==='PISCINE' && citeBar)
+    if((dept==='PISCINE' || dept==='DEVANT') && citeBar)
+      el.textContent = orig.replace(/Bar Devant( \(Accueil\))?|Bar \/ Restaurant|\bBar\b(?! Piscine| Devant)/g, _posDeptLibelle(dept));
+    else if(dept==='CARTES' && citeBar)
       el.textContent = orig.replace(/Bar Devant( \(Accueil\))?|Bar \/ Restaurant|\bBar\b/g,'Piscine');
     else if(dept && !citeBar && !/Piscine/.test(orig) && el.classList.contains('pos-header-title'))
       // Titre générique (« Crédits », « Grande Caisse »…) : on précise le département.
@@ -14716,7 +14839,7 @@ function _posAppliquerLibellesDept(){
     el.style.display = (!dept || el.dataset.deptSeul===dept) ? '' : 'none';
   });
   // Page Stock : l'onglet affiché est celui du département.
-  if(dept){
+  if(dept==='DEVANT' || dept==='PISCINE'){
     _posStockLieuFiltre = dept;
     document.getElementById('pos-stock-lieu-devant')?.classList.toggle('active', dept==='DEVANT');
     document.getElementById('pos-stock-lieu-piscine')?.classList.toggle('active', dept==='PISCINE');
@@ -14735,21 +14858,21 @@ function _posVerrouillerLieux(racine){
     const filtreCatalogue = sel.id === 'pos-prod-lieu-filter';
     [...sel.options].forEach(o=>{
       if(o.value!=='DEVANT' && o.value!=='PISCINE') return;
-      const autre = !!_posDept && o.value !== _posDept;
+      const autre = !!_posLieuDept() && o.value !== _posLieuDept();
       o.hidden = autre; o.disabled = autre;
     });
     if(filtreCatalogue){
-      if(_posDept && (sel.value==='DEVANT'||sel.value==='PISCINE') && sel.value!==_posDept) sel.value='';
+      if(_posLieuDept() && (sel.value==='DEVANT'||sel.value==='PISCINE') && sel.value!==_posLieuDept()) sel.value='';
       return;
     }
-    if(_posDept){ sel.value = _posDept; sel.disabled = true; }
+    if(_posLieuDept()){ sel.value = _posLieuDept(); sel.disabled = true; }
     else sel.disabled = false;
   });
 }
 // Les fenêtres (modales) remettent souvent leur sélecteur à zéro en
 // s'ouvrant : on reverrouille à chaque ouverture.
 new MutationObserver(muts=>{
-  if(!_posDept) return;
+  if(!_posLieuDept()) return;
   for(const m of muts){
     const el = m.target;
     if(el.classList && el.classList.contains('open') && /modal/.test(el.className)){ _posVerrouillerLieux(el); }
@@ -17781,6 +17904,7 @@ function _pageInterditeRole(page){
 
 function _canAccess(page){
   if(!_appUser) return false;
+  if(_BARP_ALIAS[page]) return _canAccess(_BARP_ALIAS[page]);
   const _rnCanAccess = (_appUser.role_nom||_appUser.poste||'').toLowerCase();
   const _isCaissiereAccess = !!_appUser.employe_id || _rnCanAccess.startsWith('caissier');
   // Notifications et Tâches : accessibles à tous les rôles sans exception,
@@ -24491,20 +24615,37 @@ async function loadCaisse(){
     // ── Autres départements — détail ──────────────────────
     const adWrap = document.getElementById('caisse-autres-dept-wrap');
     if(adWrap){
+      // Bar Devant et Bar Piscine : deux départements, chacun ses lignes.
+      const _b = ad.bars || {};
+      const _bl = (code, k) => (_b[code] ? _b[code][k] : 0) || 0;
+      const rowsBars = ad.bars ? [
+        {label:'Ventes Bar Devant (cash encaissé)',  val:_bl('DEVANT','entrees'),  sens:'entree'},
+        {label:'Ventes Bar Piscine (cash encaissé)', val:_bl('PISCINE','entrees'), sens:'entree'},
+      ] : [{label:'Ventes Bar (cash encaissé)', val: ad.ventes_bar, sens:'entree'}];
+      const rowsBarsSorties = ad.bars ? [
+        {label:'Achats Bar Devant',              val:_bl('DEVANT','achats'),   sens:'sortie'},
+        {label:'Achats Bar Piscine',             val:_bl('PISCINE','achats'),  sens:'sortie'},
+        {label:'Dépenses Bar Devant',            val:_bl('DEVANT','depenses'), sens:'sortie'},
+        {label:'Dépenses Bar Piscine',           val:_bl('PISCINE','depenses'),sens:'sortie'},
+        {label:'Paiements employés Bar Devant',  val:_bl('DEVANT','payroll'),  sens:'sortie'},
+        {label:'Paiements employés Bar Piscine', val:_bl('PISCINE','payroll'), sens:'sortie'},
+      ] : [
+        {label:'Achats Bar (confirmés)', val: ad.achats_bar, sens:'sortie'},
+        {label:'Dépenses Bar', val: ad.depenses_bar||0, sens:'sortie'},
+        {label:'Paiements employés Bar', val: ad.payroll_bar, sens:'sortie'},
+      ];
       const rows = [
-        {label:'Ventes Bar (cash encaissé)',   val: ad.ventes_bar,     sens:'entree'},
+        ...rowsBars,
         {label:'Piscine — ventes de cartes',  val: ad.ventes_piscine||0, sens:'entree'},
         {label:'Dépôt — paiements clients externes', val: ad.ventes_depot||0, sens:'entree'},
         {label:'Dépôt — achats réceptionnés',  val: ad.achats_depot||0, sens:'sortie'},
         {label:'Ventes Cuisine (cash)',        val: ad.ventes_cuisine, sens:'entree'},
         {label:'Ventes Hôtel (gourdes reçues)', val: ad.ventes_hotel,  sens:'entree'},
-        {label:'Achats Bar (confirmés)',       val: ad.achats_bar,     sens:'sortie'},
         {label:'Achats Cuisine',               val: ad.achats_cuisine, sens:'sortie'},
-        {label:'Dépenses Bar',                 val: ad.depenses_bar||0, sens:'sortie'},
         {label:'Dépenses Piscine',             val: ad.depenses_piscine||0, sens:'sortie'},
         {label:'Dépenses Cuisine',             val: ad.depenses_cuisine, sens:'sortie'},
         {label:'Dépenses Hôtel',               val: ad.depenses_hotel, sens:'sortie'},
-        {label:'Paiements employés Bar',       val: ad.payroll_bar,    sens:'sortie'},
+        ...rowsBarsSorties,
       ];
       adWrap.innerHTML = rows.map(r => `
         <div class="caisse-bar-row" style="justify-content:space-between">
@@ -25467,8 +25608,8 @@ async function loadPosCaisse(){
 // rattachées. Renvoie true si une redirection a eu lieu.
 function _posRenvoyerVersSession(d){
   if(!d || d.session_statut !== 'EN_COURS' || !d.lieu || !_posDept || d.lieu === _posDept) return false;
-  if(!['pos-caisse','piscine-caisse'].includes(currentPage)) return false;
-  const cible = d.lieu === 'PISCINE' ? 'piscine-caisse' : 'pos-caisse';
+  if(!['pos-caisse','barp-caisse'].includes(currentPage)) return false;
+  const cible = d.lieu === 'PISCINE' ? 'barp-caisse' : 'pos-caisse';
   if(!_canAccess(cible)){
     posAlert(`Votre session en cours est ouverte au département ${_posDeptLibelle(d.lieu)} — soumettez-la avant de vendre ici.`, 'warn');
     return false;
@@ -27115,7 +27256,7 @@ function posStockExportPdf(){
   const recherche = (document.getElementById('pos-stock-recherche')?.value||'').trim();
   if(recherche) params.set('recherche', recherche);
   if(_posStockDispoFiltre) params.set('disponibilite', _posStockDispoFiltre);
-  params.set('lieu', _posDept || _posStockLieuFiltre);
+  params.set('lieu', _posLieuDept() || _posStockLieuFiltre);
   window.open('/api/pos/stock/export/pdf?'+params.toString(), '_blank');
 }
 
@@ -28662,7 +28803,7 @@ async function loadPosVentes(){
   const subEl   = document.getElementById('pos-ventes-header-sub');
   if(titleEl) delete titleEl.dataset.deptOrig;
   if(isCaissiere){
-    if(titleEl) titleEl.textContent = _posDept==='PISCINE' ? 'Mes Ventes — Piscine' : 'Mes Ventes';
+    if(titleEl) titleEl.textContent = _posLieuDept() ? `Mes Ventes — ${_posDeptLibelle()}` : 'Mes Ventes';
     if(subEl)   subEl.textContent   = 'Suivi exclusif de vos ventes · filtrez par date ou produit';
     const card = document.getElementById('pos-caissiers-card');
     if(card) card.style.display = 'none';
@@ -34786,6 +34927,7 @@ function _hotelSejourCard(s){
         <button class="pos-btn ghost" style="flex:1;font-size:13px" onclick="hotelRecu(${s.id})">🧾 Reçu</button>
         ${_hotelPeutEcrire()&&hasSolde?`<button class="pos-btn ghost" style="flex:1;font-size:13px;color:#34d399;border-color:rgba(52,211,153,.3)" onclick="hotelPaiementModal(${s.id})">+ Paiement</button>`:''}
         ${_hotelPeutEcrire()?`<button class="pos-btn teal" style="flex:1;font-size:14px" onclick="hotelTerminer(${s.id})">✓ Marquer terminé</button>`:''}
+        ${_hotelPeutSupprimer()?`<button class="pos-btn ghost" style="font-size:13px;color:#f87171;border-color:rgba(248,113,113,.3)" onclick="hotelSupprimer(${s.id})" title="Supprimer (enregistré par erreur)">🗑 Supprimer</button>`:''}
       </div>
     </div>
   </div>`;
@@ -34903,6 +35045,27 @@ async function hotelTerminer(id){
     await loadHotelSejours();
     posAlert('Séjour terminé — chambre libérée.','ok');
   } catch(e){ posAlert(e.message||'Erreur.'); }
+}
+
+// Séjour enregistré par erreur : suppression (PDG/admin, motif obligatoire) —
+// il ne compte plus nulle part (caisse, tableaux de bord, rapports).
+const _hotelPeutSupprimer = () => _isAdmin() || ['pdg','admin'].includes(_appUser?.role);
+async function hotelSupprimer(id){
+  if(!_hotelPeutSupprimer()){ _giAlert('Suppression réservée aux administrateurs.','err'); return; }
+  const r = (_hotelSejoursData||[]).find(x=>x.id===id) || (_hotelHistData||[]).find(x=>x.id===id);
+  const nom = r ? `${r.client_nom} — chambre ${r.chambre_numero}` : `#${id}`;
+  const motif = prompt(`Supprimer le séjour ${nom} ?
+
+Il ne sera plus compté (caisse, rapports) et ses paiements seront retirés. Action définitive.
+
+Motif de la suppression :`);
+  if(motif === null) return;
+  if(!motif.trim()){ posAlert('Indiquez le motif de la suppression.','warn'); return; }
+  try {
+    await apiFetch('POST',`/hotel/reservations/${id}/supprimer`,{motif: motif.trim()});
+    posAlert('Séjour supprimé — il n’est plus comptabilisé.','ok');
+    if(currentPage==='hotel-historique') await loadHotelHistorique(); else await loadHotelSejours();
+  } catch(e){ posAlert(e.message||'Erreur.','err'); }
 }
 
 async function hotelAnnuler(id, nom){
@@ -35280,7 +35443,8 @@ async function loadHotelHistorique(){
         <td style="text-align:right;color:#34d399">${_hFmt(r.montant_paye)}${(r.paye_usd||0)>0?`<br><span style="font-size:11px;color:#38bdf8">dont ${_usd(r.paye_usd)}</span>`:''}</td>
         <td style="text-align:right;color:${r.solde>0?'#f87171':'#34d399'}">${_hFmt(r.solde)}</td>
         <td><span style="font-size:13px;color:${sc};font-weight:600">${r.statut}</span>
-          <button class="pos-btn ghost" style="font-size:12px;padding:2px 7px;margin-left:6px" onclick="hotelRecu(${r.id})" title="Reçu client">🧾</button></td>
+          <button class="pos-btn ghost" style="font-size:12px;padding:2px 7px;margin-left:6px" onclick="hotelRecu(${r.id})" title="Reçu client">🧾</button>
+          ${_hotelPeutSupprimer()?`<button class="pos-btn ghost" style="font-size:12px;padding:2px 7px;margin-left:4px;color:#f87171" onclick="hotelSupprimer(${r.id})" title="Supprimer (enregistré par erreur)">🗑</button>`:''}</td>
       </tr>`;
     }).join('');
   } catch(e){ if(tbody) tbody.innerHTML = `<tr><td colspan="9" style="color:#f87171;text-align:center;padding:20px">${e.message||'Erreur'}</td></tr>`; }
@@ -36661,7 +36825,7 @@ async function pispEnregistrer(){
 let _pdepData = [];
 let _pdepEditId = null;
 // Même écran pour les deux départements : Bar → /pos/depenses, Piscine → /piscine/depenses.
-function _pdepBase(){ return _posDept==='PISCINE' ? '/piscine/depenses' : '/pos/depenses'; }
+function _pdepBase(){ return _posDept==='CARTES' ? '/piscine/depenses' : '/pos/depenses'; }
 
 async function loadPosDepenses(){
   const today = new Date();
@@ -36709,7 +36873,7 @@ function pdepAfficher(){
   set('pdep-kpi-nb', deps.length);
   set('pdep-kpi-cat', top ? `${top[0]} · ${posGx(top[1])}` : '—');
   if(!deps.length){
-    tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune dépense ${_posDeptLibelle()==='Piscine'?'de la Piscine':'du Bar'} sur la période</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:rgba(255,255,255,.3)">Aucune dépense — ${_posDeptLibelle()} — sur la période</td></tr>`;
     return;
   }
   const peutSupprimer = _isAdmin() || ['pdg','admin'].includes(_appUser?.role);
@@ -36746,7 +36910,7 @@ async function pdepEnregistrer(){
   if(!description){ posAlert('Description requise.','warn'); return; }
   if(!(montant>0)){ posAlert('Montant invalide.','warn'); return; }
   const body = {
-    description, montant, lieu: _posDept,
+    description, montant, lieu: _posLieuDept(),
     categorie:   (document.getElementById('pdep-cat')?.value||'').trim() || null,
     fournisseur: (document.getElementById('pdep-fourn')?.value||'').trim() || null,
     notes:       (document.getElementById('pdep-notes')?.value||'').trim() || null,

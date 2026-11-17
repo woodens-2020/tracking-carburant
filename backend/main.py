@@ -5913,10 +5913,12 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     # remboursement payé en USD n'entre jamais dans le cash en gourdes.
     from pos_service import cash_vente
     cash_dept = {"DEVANT": 0.0, "PISCINE": 0.0}
+    usd_bar_dept = {"DEVANT": 0.0, "PISCINE": 0.0}
     usd = {"bar": 0.0, "piscine": 0.0, "cuisine": 0.0, "hotel": 0.0, "depot": 0.0}
     for v in q_bv.all():
         h, u = cash_vente(v)
         cash_dept[lieu_de(v.lieu)] += h
+        usd_bar_dept[lieu_de(v.lieu)] += u
         usd["bar"] += u
     q_remb = (db.query(BarRemboursement, BarVente.lieu)
               .join(BarCredit, BarRemboursement.credit_id == BarCredit.id)
@@ -5926,6 +5928,7 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     for r, lieu_v in q_remb.all():
         if r.devise == "USD":
             usd["bar"] += float(r.montant_devise or 0)
+            usd_bar_dept[lieu_de(lieu_v)] += float(r.montant_devise or 0)
         else:
             cash_dept[lieu_de(lieu_v)] += float(r.montant)
     # Bar : ses deux comptoirs (Bar Devant + Bar Piscine) — tout le module Bar.
@@ -6048,7 +6051,10 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     q_bd = db.query(BarDepense)
     if dt_debut: q_bd = q_bd.filter(BarDepense.date_depense >= dt_debut)
     if dt_fin:   q_bd = q_bd.filter(BarDepense.date_depense <= dt_fin)
-    depenses_bar = round(sum(float(d.montant) for d in q_bd.all()), 2)
+    _dep_bar_dept = {"DEVANT": 0.0, "PISCINE": 0.0}
+    for d in q_bd.all():
+        _dep_bar_dept[lieu_de(d.lieu)] += float(d.montant)
+    depenses_bar = round(_dep_bar_dept["DEVANT"] + _dep_bar_dept["PISCINE"], 2)
     q_pd = db.query(PiscineDepense)
     if dt_debut: q_pd = q_pd.filter(PiscineDepense.date_depense >= dt_debut)
     if dt_fin:   q_pd = q_pd.filter(PiscineDepense.date_depense <= dt_fin)
@@ -6079,6 +6085,18 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
     total_payroll_piscine = 0.0
 
     total_payroll_paye = round(total_payroll_rh + total_payroll_bar + total_payroll_piscine, 2)
+
+    # Bar Devant et Bar Piscine : deux départements séparés (les totaux
+    # « bar » ci-dessus restent leur somme, pour la caisse de l'entreprise).
+    bars = {}
+    for code, lib in (("DEVANT", "Bar Devant"), ("PISCINE", "Bar Piscine")):
+        e = round(cash_dept[code], 2)
+        a_ = round(_achats_dept[code], 2)
+        dp = round(_dep_bar_dept[code], 2)
+        py = round(_paie_dept[code], 2)
+        bars[code] = {"libelle": lib, "entrees": e, "achats": a_, "depenses": dp, "payroll": py,
+                      "sorties": round(a_ + dp + py, 2), "solde": round(e - a_ - dp - py, 2),
+                      "usd": round(usd_bar_dept[code], 2)}
 
     total_sorties     = round(total_achats + total_payroll_paye + total_depenses, 2)
     cash_disponible   = round(total_entrees - total_sorties, 2)
@@ -6122,6 +6140,7 @@ def _synthese_cash_institution(db: Session, date_debut: Optional[date_type], dat
             "total_payroll":    total_payroll_paye,
             "total":            total_sorties,
         },
+        "bars": bars,
         "depenses_par_categorie": depenses_par_cat,
         "nb_achats":     len(achats_station_rows),
         "nb_depenses":   len(depenses),
@@ -6184,6 +6203,7 @@ def rapport_caisse(
         },
         "autres_departements": {
             "ventes_bar":     synth["entrees"]["bar"],
+            "bars":           synth["bars"],
             "ventes_piscine": synth["entrees"]["piscine"],
             "ventes_cuisine": synth["entrees"]["cuisine"],
             "ventes_hotel":   synth["entrees"]["hotel"],
@@ -6369,6 +6389,7 @@ def gi_dashboard(
         },
         "autres_departements": {
             "ventes_bar":       synth["entrees"]["bar"],
+            "bars":             synth["bars"],
             "ventes_piscine":   synth["entrees"]["piscine"],
             "ventes_cuisine":   synth["entrees"]["cuisine"],
             "ventes_hotel":     synth["entrees"]["hotel"],

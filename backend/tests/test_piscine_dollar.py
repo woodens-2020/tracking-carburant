@@ -553,3 +553,37 @@ def test_correction_refusee_a_une_caissiere(client, db):
     with pytest.raises(HTTPException) as e:
         _require_pdg_ou_admin(req, db)
     assert e.value.status_code == 403
+
+
+def test_supprimer_sejour_saisi_par_erreur(client, db):
+    ch = _chambre(client, prix=1000)
+    d = _sejour(client, ch, montant_paye=20, devise_paiement="USD", taux_change=100).json()
+    avant = client.get(f"/api/hotel/dashboard?{PER}", headers=H).json()["kpi"]
+    assert client.post(f"/api/hotel/reservations/{d['id']}/supprimer", headers=H, json={"motif": ""}).status_code == 422
+    r = client.post(f"/api/hotel/reservations/{d['id']}/supprimer", headers=H, json={"motif": "Doublon"})
+    assert r.status_code == 200, r.text
+    assert client.get(f"/api/hotel/reservations/{d['id']}", headers=H).status_code == 404
+    apres = client.get(f"/api/hotel/dashboard?{PER}", headers=H).json()["kpi"]
+    assert round(avant["encaisse_usd"] - apres["encaisse_usd"], 2) == 20.0
+    chs = {c["id"]: c["statut"] for c in client.get("/api/hotel/chambres", headers=H).json()}
+    assert chs[ch] == "DISPONIBLE"
+    from models import AuditLog
+    assert db.query(AuditLog).filter(AuditLog.action == "hotel_sejour_supprime").count() >= 1
+
+
+def test_caisse_bar_devant_et_bar_piscine_separes(client, db):
+    for lieu, mt in (("DEVANT", 700), ("PISCINE", 300)):
+        r = client.post(f"/api/pos/depenses?lieu={lieu}", headers=H, json={
+            "description": f"Glace {lieu}", "montant": mt, "lieu": lieu})
+        assert r.status_code in (200, 201), r.text
+    ad = client.get("/api/caisse/rapport", headers=H).json()["autres_departements"]
+    b = ad["bars"]
+    assert set(b) == {"DEVANT", "PISCINE"}
+    assert b["DEVANT"]["libelle"] == "Bar Devant" and b["PISCINE"]["libelle"] == "Bar Piscine"
+    # Les deux bars font exactement le total « bar »
+    assert round(b["DEVANT"]["entrees"] + b["PISCINE"]["entrees"], 2) == ad["ventes_bar"]
+    assert round(b["DEVANT"]["depenses"] + b["PISCINE"]["depenses"], 2) == ad["depenses_bar"]
+    assert round(b["DEVANT"]["achats"] + b["PISCINE"]["achats"], 2) == ad["achats_bar"]
+    assert b["DEVANT"]["depenses"] >= 700 and b["PISCINE"]["depenses"] >= 300
+    for v in b.values():
+        assert v["solde"] == round(v["entrees"] - v["sorties"], 2)

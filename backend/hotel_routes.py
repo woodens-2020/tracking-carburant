@@ -806,6 +806,50 @@ def annuler_reservation(res_id: int, db: Session = Depends(get_db)):
     return _res_dict(r)
 
 
+class SuppressionSejourIn(BaseModel):
+    motif: str
+
+
+@router.post("/reservations/{res_id}/supprimer", status_code=200)
+def supprimer_reservation(res_id: int, data: SuppressionSejourIn, db: Session = Depends(get_db),
+                          user: Utilisateur = Depends(_require_pdg_ou_admin_hotel)):
+    """Supprime un séjour enregistré PAR ERREUR (PDG/admin, motif
+    obligatoire) : le séjour et ses paiements disparaissent de la caisse,
+    des tableaux de bord et des rapports. La chambre est libérée si elle
+    était occupée par ce séjour ; un pro forma converti redevient
+    « confirmé ». Le contenu supprimé est gardé au journal d'activité."""
+    r = db.query(HotelReservation).filter_by(id=res_id).first()
+    if not r:
+        raise HTTPException(404, "Séjour introuvable.")
+    motif = (data.motif or "").strip()
+    if not motif:
+        raise HTTPException(422, "Indiquez le motif de la suppression.")
+    copie = _res_dict(r)
+    chambre = r.chambre
+    if r.statut == "EN_COURS" and chambre and chambre.statut == "OCCUPEE":
+        autres = (db.query(HotelReservation)
+                  .filter(HotelReservation.chambre_id == chambre.id, HotelReservation.statut == "EN_COURS",
+                          HotelReservation.id != r.id).count())
+        if not autres:
+            chambre.statut = "DISPONIBLE"
+    for pf in db.query(HotelProforma).filter(HotelProforma.reservation_id == r.id).all():
+        pf.reservation_id = None
+        if pf.statut == "CONVERTIE":
+            pf.statut = "CONFIRMEE"
+    db.delete(r)   # paiements supprimés avec (cascade)
+    from activity_log import log_event
+    try:
+        log_event(db, "hotel_sejour_supprime", user_id=user.id, details={
+            "motif": motif, "par": user.nom_complet,
+            "sejour": {k: copie[k] for k in ("id", "client_nom", "chambre_numero", "type_sejour", "date_arrivee",
+                                              "montant_total", "montant_paye", "paye_htg", "paye_usd", "statut")},
+        })
+    except Exception:
+        pass
+    db.commit()
+    return {"ok": True, "id": res_id, "client_nom": copie["client_nom"]}
+
+
 # ══════════════════════════════════════════════════════════════════
 # DOCUMENTS IMPRIMABLES — reçu client / pro forma
 # ══════════════════════════════════════════════════════════════════
