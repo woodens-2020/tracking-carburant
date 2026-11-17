@@ -653,6 +653,9 @@ class BarProduit(Base):
     # Date du « Démarrer » au dépôt (stock de départ saisi) ; NULL = article
     # pas encore démarré → l'inventaire propose « Démarrer » au lieu d'« Ajuster ».
     depot_demarre_le = Column(DateTime(timezone=True), nullable=True)
+    # Famille pour les rapports : MANGER | BOISSON ; NULL = classement
+    # automatique (catégorie / nom — voir pos_service.famille_produit).
+    famille = Column(String(10), nullable=True)
 
     prix_historique = relationship("BarPrixHistorique", back_populates="produit",
                                    cascade="all, delete-orphan",

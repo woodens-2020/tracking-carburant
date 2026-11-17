@@ -418,6 +418,8 @@ def _migrate_columns():
     new_cols.append(("piscine_ventes", "prix_enfant", "ALTER TABLE piscine_ventes ADD COLUMN prix_enfant NUMERIC(12,2)", None))
     new_cols.append(("piscine_ventes", "corrige_par", "ALTER TABLE piscine_ventes ADD COLUMN corrige_par VARCHAR(150)", None))
     new_cols.append(("piscine_ventes", "motif_correction", "ALTER TABLE piscine_ventes ADD COLUMN motif_correction VARCHAR(300)", None))
+    # v33 — famille Manger / Boisson des articles du bar (rapports)
+    new_cols.append(("bar_produits", "famille", "ALTER TABLE bar_produits ADD COLUMN famille VARCHAR(10)", None))
     new_cols.append(("piscine_ventes", "corrige_le",
                      f"ALTER TABLE piscine_ventes ADD COLUMN corrige_le {'DATETIME' if _is_sqlite else 'TIMESTAMP WITH TIME ZONE'}", None))
     for _t in ("bar_ventes", "bar_remboursements", "cuisine_ventes", "patisserie_ventes", "piscine_ventes"):

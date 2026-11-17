@@ -2221,7 +2221,7 @@ def dashboard_bar(
             "nb_jours":    nb_jours,
             "is_single":   is_single,
             "lieu":        lieu,
-            "departement": DEPARTEMENT_LIBELLE.get(lieu, "Bar + Piscine"),
+            "departement": DEPARTEMENT_LIBELLE.get(lieu, "Bar Devant + Bar Piscine"),
         },
         "kpis": {
             "ca_jour":     ca,
@@ -2260,6 +2260,134 @@ def dashboard_bar(
             "par_client":      par_client_list,
         },
     }
+
+
+# ── Ventes : Manger / Boissons (analyse cuisine) ────────────────────
+
+@router.get("/ventes/familles")
+def ventes_par_famille(
+    date_debut:    Optional[str] = None,
+    date_fin:      Optional[str] = None,
+    caissier_id:   Optional[int] = None,
+    mode_paiement: Optional[str] = None,
+    lieu:          Optional[str] = Depends(_dept),
+    db: Session = Depends(get_db),
+):
+    """Ventes du bar séparées en MANGER (plats de la cuisine + articles
+    classés « manger ») et BOISSONS : chiffre d'affaires, quantités, tickets
+    (boissons seules / repas seuls / mixtes), panier moyen, heures et jours,
+    articles, coût et marge des plats de la cuisine."""
+    from datetime import timedelta
+    from pos_service import famille_produit, famille_auto, FAMILLES
+    today = today_haiti()
+    try:    d1 = date_type.fromisoformat(date_debut) if date_debut else today
+    except ValueError: d1 = today
+    try:    d2 = date_type.fromisoformat(date_fin) if date_fin else today
+    except ValueError: d2 = today
+    if d2 < d1: d2 = d1
+    dt1, _ = bounds_haiti(d1)
+    _, dt2 = bounds_haiti(d2)
+
+    q = (db.query(BarLigneVente, BarVente, BarProduit, CuisinePlat)
+         .join(BarVente, BarVente.id == BarLigneVente.vente_id)
+         .outerjoin(BarProduit, BarProduit.id == BarLigneVente.produit_id)
+         .outerjoin(CuisinePlat, CuisinePlat.id == BarLigneVente.cuisine_plat_id)
+         .filter(BarVente.date_heure >= dt1, BarVente.date_heure <= dt2, BarVente.statut != "ANNULEE"))
+    q = filtrer_lieu(q, BarVente.lieu, lieu)
+    if caissier_id:   q = q.filter(BarVente.caissier_id == caissier_id)
+    if mode_paiement: q = q.filter(BarVente.mode_paiement == mode_paiement)
+    rows = q.all()
+
+    single = d1 == d2
+    fam = {k: {"code": k, "libelle": l, "ca": 0.0, "quantite": 0.0, "nb_lignes": 0, "tickets": set()}
+           for k, l in FAMILLES.items()}
+    tickets: dict[int, set] = {}
+    periodes: dict[str, dict] = {}
+    heures = {h: {"heure": f"{h:02d}h", "MANGER": 0.0, "BOISSON": 0.0} for h in range(24)}
+    articles: dict[tuple, dict] = {}
+    cout_plats = ca_plats_cout = 0.0
+    for l, v, p, plat in rows:
+        if plat is not None:
+            f, auto, source, nom, cle = "MANGER", True, "Cuisine", plat.nom, ("PLAT", plat.id)
+        elif p is not None:
+            f, auto, source, nom, cle = famille_produit(p), p.famille is None, "Bar", p.nom, ("PRODUIT", p.id)
+        else:
+            continue
+        st, qte = float(l.sous_total or 0), float(l.quantite or 0)
+        g = fam[f]
+        g["ca"] += st; g["quantite"] += qte; g["nb_lignes"] += 1; g["tickets"].add(v.id)
+        tickets.setdefault(v.id, set()).add(f)
+        dh = v.date_heure.astimezone(HAITI_TZ)
+        k = dh.strftime("%H") if single else dh.date().isoformat()
+        per = periodes.setdefault(k, {"cle": k, "label": (k + "h") if single else dh.strftime("%d/%m"),
+                                      "MANGER": 0.0, "BOISSON": 0.0})
+        per[f] += st
+        heures[dh.hour][f] += st
+        a = articles.setdefault(cle, {"type": cle[0], "id": cle[1], "nom": nom, "source": source,
+                                      "famille": f, "auto": auto, "quantite": 0.0, "ca": 0.0,
+                                      "cout_unitaire": None, "categorie": (plat.categorie if plat else p.categorie)})
+        a["quantite"] += qte; a["ca"] += st
+        if plat is not None and plat.cout_estime is not None:
+            a["cout_unitaire"] = float(plat.cout_estime)
+            cout_plats += float(plat.cout_estime) * qte
+            ca_plats_cout += st
+
+    ca_tot = sum(g["ca"] for g in fam.values()) or 0.0
+    nb_tk = {"BOISSON": 0, "MANGER": 0, "MIXTE": 0}
+    for fs in tickets.values():
+        nb_tk["MIXTE" if len(fs) > 1 else next(iter(fs))] += 1
+    out_fam = {}
+    for k, g in fam.items():
+        n = len(g["tickets"])
+        out_fam[k] = {"code": k, "libelle": g["libelle"], "ca": round(g["ca"], 2),
+                      "quantite": round(g["quantite"], 3), "nb_lignes": g["nb_lignes"], "nb_tickets": n,
+                      "part": round(g["ca"] / ca_tot * 100, 1) if ca_tot else 0.0,
+                      "panier_moyen": round(g["ca"] / n, 2) if n else 0.0}
+    arts = sorted(articles.values(), key=lambda a: -a["ca"])
+    for a in arts:
+        a["quantite"] = round(a["quantite"], 3); a["ca"] = round(a["ca"], 2)
+        a["prix_moyen"] = round(a["ca"] / a["quantite"], 2) if a["quantite"] else 0.0
+        if a["cout_unitaire"] is not None:
+            a["marge"] = round(a["ca"] - a["cout_unitaire"] * a["quantite"], 2)
+    pointe = max(heures.values(), key=lambda h: h["MANGER"]) if any(h["MANGER"] for h in heures.values()) else None
+    return {
+        "periode": {"debut": d1.isoformat(), "fin": d2.isoformat(), "jour_unique": single},
+        "lieu": lieu, "departement": DEPARTEMENT_LIBELLE.get(lieu, "Bar Devant + Bar Piscine"),
+        "total": round(ca_tot, 2),
+        "familles": out_fam,
+        "tickets": {"boissons_seules": nb_tk["BOISSON"], "repas_seuls": nb_tk["MANGER"],
+                    "mixtes": nb_tk["MIXTE"], "total": len(tickets),
+                    "taux_repas": round((nb_tk["MANGER"] + nb_tk["MIXTE"]) / len(tickets) * 100, 1) if tickets else 0.0},
+        "par_periode": [periodes[k] for k in sorted(periodes)],
+        "par_heure": [h for h in heures.values() if h["MANGER"] or h["BOISSON"]],
+        "heure_pointe_manger": pointe["heure"] if pointe else None,
+        "cuisine": {"ca_plats_avec_cout": round(ca_plats_cout, 2), "cout_estime": round(cout_plats, 2),
+                    "marge_estimee": round(ca_plats_cout - cout_plats, 2),
+                    "taux_marge": round((ca_plats_cout - cout_plats) / ca_plats_cout * 100, 1) if ca_plats_cout else None},
+        "top_manger":  [a for a in arts if a["famille"] == "MANGER"][:8],
+        "top_boisson": [a for a in arts if a["famille"] == "BOISSON"][:8],
+        "articles": arts,
+    }
+
+
+class FamilleIn(BaseModel):
+    famille: Optional[str] = None   # MANGER | BOISSON | vide = automatique
+
+
+@router.put("/produits/{produit_id}/famille")
+def classer_produit_famille(produit_id: int, data: FamilleIn, db: Session = Depends(get_db)):
+    """Corrige le classement Manger / Boissons d'un article du bar (vide =
+    retour au classement automatique)."""
+    from pos_service import famille_produit, FAMILLES
+    p = db.get(BarProduit, produit_id)
+    if not p:
+        raise HTTPException(404, "Article introuvable.")
+    f = (data.famille or "").strip().upper() or None
+    if f and f not in FAMILLES:
+        raise HTTPException(422, "Famille : MANGER, BOISSON ou vide (automatique).")
+    p.famille = f
+    db.commit()
+    return {"id": p.id, "nom": p.nom, "famille": famille_produit(p), "auto": p.famille is None}
 
 
 @router.get("/ventes/{vente_id}")
@@ -3179,7 +3307,7 @@ def grande_caisse(
     return {
         "periode":    {"debut": str(date_debut), "fin": str(date_fin)},
         "lieu":        lieu,
-        "departement": DEPARTEMENT_LIBELLE.get(lieu, "Bar + Piscine"),
+        "departement": DEPARTEMENT_LIBELLE.get(lieu, "Bar Devant + Bar Piscine"),
         "bar": {
             "achats_cout":   float(achats_cout_total),
             "ventes_ca":     float(ventes_ca_total),
@@ -3258,7 +3386,7 @@ def liste_depenses_bar(
         par_cat[k] = round(par_cat.get(k, 0.0) + float(d.montant), 2)
     return {
         "lieu":        lieu,
-        "departement": DEPARTEMENT_LIBELLE.get(lieu, "Bar + Piscine"),
+        "departement": DEPARTEMENT_LIBELLE.get(lieu, "Bar Devant + Bar Piscine"),
         "total":       round(sum(float(d.montant) for d in rows), 2),
         "nb":          len(rows),
         "par_categorie": [{"categorie": k, "montant": v} for k, v in sorted(par_cat.items(), key=lambda x: -x[1])],

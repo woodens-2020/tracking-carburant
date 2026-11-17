@@ -153,7 +153,7 @@ def test_listes_et_dashboard_separes(client, db):
     dp = client.get("/api/pos/dashboard/bar?lieu=PISCINE", headers=H).json()
     db_ = client.get("/api/pos/dashboard/bar?lieu=DEVANT", headers=H).json()
     tout = client.get("/api/pos/dashboard/bar", headers=H).json()
-    assert dp["meta"]["departement"] == "Piscine"
+    assert dp["meta"]["departement"] == "Bar Piscine"
     assert round(dp["kpis"]["ca_jour"] + db_["kpis"]["ca_jour"], 2) == round(tout["kpis"]["ca_jour"], 2)
 
     sp = client.get("/api/pos/stats?lieu=PISCINE", headers=H).json()
@@ -215,7 +215,7 @@ def test_depenses_et_caisse_par_departement(client, db):
     gp = client.get(f"/api/pos/grande-caisse?lieu=PISCINE&{PER}", headers=H).json()
     gb = client.get(f"/api/pos/grande-caisse?lieu=DEVANT&{PER}", headers=H).json()
     assert gp["caisse"]["depenses"] >= 1500 and gb["caisse"]["depenses"] >= 400
-    assert gp["departement"] == "Piscine"
+    assert gp["departement"] == "Bar Piscine"
 
     rr = client.post("/api/pos/renflouements?lieu=PISCINE", headers=H, json={"montant": 2000, "source": "Direction"})
     assert rr.status_code == 201, rr.text
@@ -600,3 +600,54 @@ def test_historique_bars_laisse_tel_quel(client, db):
     _reprise_lieux_bars()
     db.expire_all()
     assert db.get(BarVente, v.id).lieu is None and db.get(BarAchat, a.id).lieu is None
+
+
+# ══════════════════════════════════════════════════════════════════
+# VENTES DU BAR : MANGER / BOISSONS
+# ══════════════════════════════════════════════════════════════════
+
+def test_classement_automatique_manger_boisson():
+    from pos_service import famille_auto
+    assert famille_auto("Cabri en sauce", "boisson") == "MANGER"
+    assert famille_auto("Griot ak bannann", None) == "MANGER"
+    assert famille_auto("Assiette spéciale", "") == "MANGER"
+    assert famille_auto("Prestige 65cl", "boisson") == "BOISSON"
+    assert famille_auto("Jus de fruit", "soft") == "BOISSON"
+    assert famille_auto("Truc", "Plats") == "MANGER"
+
+
+def test_ventes_separees_manger_boissons(client, db):
+    from models import CuisinePlat
+    biere = _produit(client)                                   # « Article n », boisson
+    r = client.post("/api/pos/produits", headers=H, json={"nom": f"Poulet frit {_num()}", "categorie": "boisson", "prix_initial": 400})
+    poulet = r.json()["id"]
+    plat = CuisinePlat(nom=f"Diri ak pwa {_num()}", prix_vente=500, cout_estime=200, actif=True)
+    db.add(plat); db.commit()
+    for pid in (biere, poulet):
+        _stock(client, pid, "DEVANT")
+    lieu = "DEVANT"
+    # Ticket 1 : boisson seule · ticket 2 : repas seul · ticket 3 : mixte
+    for lignes in ([{"produit_id": biere, "quantite": 2}],
+                   [{"cuisine_plat_id": plat.id, "quantite": 1}],
+                   [{"produit_id": biere, "quantite": 1}, {"produit_id": poulet, "quantite": 1}]):
+        r = client.post(f"/api/pos/ventes?lieu={lieu}", headers=H, json={"lignes": lignes})
+        assert r.status_code == 201, r.text
+    d = client.get(f"/api/pos/ventes/familles?{PER}&lieu=DEVANT", headers=H).json()
+    m, b = d["familles"]["MANGER"], d["familles"]["BOISSON"]
+    assert m["ca"] >= 900 and b["ca"] >= 300           # 500 + 400 manger · 3 × 100 boissons
+    noms = {a["nom"]: a for a in d["articles"]}
+    assert noms[plat.nom]["famille"] == "MANGER" and noms[plat.nom]["source"] == "Cuisine"
+    assert noms[plat.nom]["marge"] == 300.0
+    pnom = next(a["nom"] for a in d["articles"] if a["type"] == "PRODUIT" and a["id"] == poulet)
+    assert noms[pnom]["famille"] == "MANGER" and noms[pnom]["auto"] is True
+    t = d["tickets"]
+    assert t["boissons_seules"] >= 1 and t["repas_seuls"] >= 1 and t["mixtes"] >= 1
+    assert round(m["part"] + b["part"], 1) == 100.0
+    assert d["departement"] == "Bar Devant"
+    # Correction manuelle : le poulet passe en boisson, puis retour à l'automatique
+    r = client.put(f"/api/pos/produits/{poulet}/famille", headers=H, json={"famille": "BOISSON"})
+    assert r.status_code == 200 and r.json()["famille"] == "BOISSON" and r.json()["auto"] is False
+    d2 = client.get(f"/api/pos/ventes/familles?{PER}&lieu=DEVANT", headers=H).json()
+    assert d2["familles"]["MANGER"]["ca"] == round(m["ca"] - 400, 2)
+    assert client.put(f"/api/pos/produits/{poulet}/famille", headers=H, json={"famille": "X"}).status_code == 422
+    assert client.put(f"/api/pos/produits/{poulet}/famille", headers=H, json={"famille": None}).json()["famille"] == "MANGER"

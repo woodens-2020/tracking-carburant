@@ -6555,6 +6555,21 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
           </div>
         </div>
 
+        <!-- Manger vs Boissons (analyse cuisine) -->
+        <div class="pos-card" id="posdb-familles" style="padding:16px;margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <div style="font-size:15px;font-weight:700">🍽 Manger &nbsp;vs&nbsp; 🍹 Boissons</div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span id="posdb-fam-info" style="font-size:12px;color:rgba(255,255,255,.45)"></span>
+              <button class="pos-btn ghost" style="padding:4px 10px;font-size:12px" onclick="posFamDetail()">Détail & classement</button>
+            </div>
+          </div>
+          <div id="posdb-fam-corps" style="color:rgba(255,255,255,.35);font-size:13px">Chargement…</div>
+        </div>
+        <div class="pos-modal-bg" id="posfam-modal-bg" onclick="if(event.target===this)this.classList.remove('open')">
+          <div class="pos-modal" id="posfam-modal" style="max-width:980px;width:96%"></div>
+        </div>
+
         <!-- Charts Row -->
         <div style="display:grid;grid-template-columns:3fr 2fr;gap:12px;margin-bottom:12px">
           <!-- Hourly area chart -->
@@ -25050,6 +25065,76 @@ async function loadPosDashboardBar(){
   }, 60000);
 }
 
+// ── Manger vs Boissons : ventes du bar séparées pour l'analyse cuisine ──
+let _posFam = null, _posFamChart = null;
+async function _posDbFamilles(qs){
+  const corps = document.getElementById('posdb-fam-corps'); if(!corps) return;
+  try { _posFam = await apiFetch('GET', '/pos/ventes/familles?' + qs); }
+  catch(e){ corps.innerHTML = `<span style="color:#f87171">${esc(e.message||'Erreur')}</span>`; return; }
+  const d = _posFam, m = d.familles.MANGER, b = d.familles.BOISSON, t = d.tickets, c = d.cuisine;
+  const info = document.getElementById('posdb-fam-info');
+  if(info) info.textContent = d.heure_pointe_manger ? `Pointe repas : ${d.heure_pointe_manger}` : '';
+  if(!d.total){ corps.innerHTML = 'Aucune vente sur la période.'; return; }
+  const tuile = (f, ic, col) => `<div style="flex:1;min-width:220px;padding:12px;border-radius:12px;background:${col}14;border:1px solid ${col}44">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-weight:800;color:${col}">${ic} ${f.libelle}</span><span style="font-size:22px;font-weight:900;color:${col}">${f.part}%</span></div>
+      <div style="font-size:22px;font-weight:800;margin:4px 0;color:#fff">${posGx(f.ca)}</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.55)">${fmtQ(f.quantite)} article(s) · ${f.nb_tickets} ticket(s) · panier moyen ${posGx(f.panier_moyen)}</div></div>`;
+  const top = (l, col) => l.slice(0,5).map(a=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:2px 0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.nom)} <span style="color:rgba(255,255,255,.4)">× ${fmtQ(a.quantite)}</span></span><b style="color:${col}">${posGx(a.ca)}</b></div>`).join('') || '<div style="font-size:12px;color:rgba(255,255,255,.35)">—</div>';
+  corps.innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap">${tuile(m,'🍽','#f59e0b')}${tuile(b,'🍹','#22d3ee')}</div>
+    <div style="display:flex;height:10px;border-radius:5px;overflow:hidden;margin:10px 0 6px;background:rgba(255,255,255,.06)">
+      <div style="width:${m.part}%;background:#f59e0b"></div><div style="width:${b.part}%;background:#22d3ee"></div></div>
+    <div style="font-size:12px;color:rgba(255,255,255,.55);margin-bottom:10px">Tickets : <b style="color:#fff">${t.boissons_seules}</b> boissons seules · <b style="color:#fff">${t.repas_seuls}</b> repas seuls · <b style="color:#fff">${t.mixtes}</b> mixtes — <b style="color:#f59e0b">${t.taux_repas}%</b> des clients mangent${c.taux_marge!=null?` · marge estimée des plats cuisine : <b style="color:#4ade80">${posGx(c.marge_estimee)}</b> (${c.taux_marge}%)`:''}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+      <div><div style="font-size:12px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Top manger</div>${top(d.top_manger,'#f59e0b')}</div>
+      <div><div style="font-size:12px;font-weight:700;color:#22d3ee;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Top boissons</div>${top(d.top_boisson,'#22d3ee')}</div>
+      <div style="height:170px"><canvas id="posdb-fam-chart"></canvas></div>
+    </div>`;
+  const cv = document.getElementById('posdb-fam-chart');
+  if(cv && typeof Chart !== 'undefined'){
+    if(_posFamChart){ _posFamChart.destroy(); _posFamChart = null; }
+    const per = d.periode.jour_unique ? d.par_heure.map(h=>({label:h.heure, MANGER:h.MANGER, BOISSON:h.BOISSON})) : d.par_periode;
+    _posFamChart = new Chart(cv.getContext('2d'), { type:'bar',
+      data:{ labels: per.map(p=>p.label), datasets:[
+        {label:'Manger', data: per.map(p=>p.MANGER), backgroundColor:'rgba(245,158,11,.75)', stack:'s'},
+        {label:'Boissons', data: per.map(p=>p.BOISSON), backgroundColor:'rgba(34,211,238,.6)', stack:'s'}]},
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'rgba(255,255,255,.6)',font:{size:10}}}},
+        scales:{ x:{stacked:true, ticks:{color:'rgba(255,255,255,.5)',font:{size:9}}, grid:{display:false}},
+                 y:{stacked:true, ticks:{color:'rgba(255,255,255,.5)',font:{size:9}}, grid:{color:'rgba(255,255,255,.05)'}} } } });
+  }
+}
+// Détail par article + correction du classement (Auto / Manger / Boissons).
+function posFamDetail(){
+  const d = _posFam; if(!d) return;
+  const peut = !_isReadOnly();
+  document.getElementById('posfam-modal').innerHTML = `<h3>Ventes ${esc(d.departement)} — Manger / Boissons</h3>
+    <div style="font-size:13px;color:rgba(255,255,255,.55);margin-bottom:8px">Du ${d.periode.debut} au ${d.periode.fin}. Le classement est automatique (plats de la cuisine, catégorie, nom) ; ${peut?'corrigez un article mal classé avec la liste — le changement s\'applique à tous les rapports.':'seul un responsable peut le corriger.'}</div>
+    <input class="pos-input" placeholder="Rechercher…" oninput="document.querySelectorAll('#posfam-table tbody tr').forEach(tr=>tr.style.display=_navNorm(tr.dataset.nom).includes(_navNorm(this.value))?'':'none')" style="margin-bottom:8px">
+    <div style="max-height:60vh;overflow:auto"><table class="pos-table" id="posfam-table"><thead><tr><th>Article</th><th>Source</th><th>Famille</th><th style="text-align:right">Quantité</th><th style="text-align:right">Prix moyen</th><th style="text-align:right">Ventes</th><th style="text-align:right">Marge</th></tr></thead><tbody>
+    ${d.articles.map(a=>`<tr data-nom="${esc(a.nom)}">
+      <td><b>${esc(a.nom)}</b><div style="font-size:11px;color:rgba(255,255,255,.4)">${esc(a.categorie||'')}</div></td>
+      <td style="font-size:12px">${a.source}</td>
+      <td>${a.type==='PRODUIT' && peut ? `<select class="pos-select" style="padding:3px 6px;font-size:12px" onchange="posFamClasser(${a.id}, this.value)">
+          <option value="" ${a.auto?'selected':''}>Auto (${a.auto?(a.famille==='MANGER'?'manger':'boisson'):'—'})</option>
+          <option value="MANGER" ${!a.auto&&a.famille==='MANGER'?'selected':''}>🍽 Manger</option>
+          <option value="BOISSON" ${!a.auto&&a.famille==='BOISSON'?'selected':''}>🍹 Boisson</option></select>`
+        : `<span style="color:${a.famille==='MANGER'?'#f59e0b':'#22d3ee'}">${a.famille==='MANGER'?'🍽 Manger':'🍹 Boisson'}</span>`}</td>
+      <td style="text-align:right">${fmtQ(a.quantite)}</td><td style="text-align:right">${posGx(a.prix_moyen)}</td>
+      <td style="text-align:right;font-weight:700">${posGx(a.ca)}</td>
+      <td style="text-align:right;color:#4ade80">${a.marge!=null?posGx(a.marge):'—'}</td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="pos-modal-footer"><button class="pos-btn ghost" onclick="document.getElementById('posfam-modal-bg').classList.remove('open')">Fermer</button></div>`;
+  document.getElementById('posfam-modal-bg').classList.add('open');
+}
+async function posFamClasser(id, famille){
+  try {
+    const r = await apiFetch('PUT', `/pos/produits/${id}/famille`, {famille: famille || null});
+    posAlert(`« ${r.nom} » : ${r.famille==='MANGER'?'Manger':'Boissons'}${r.auto?' (automatique)':''}.`,'ok');
+    document.getElementById('posfam-modal-bg').classList.remove('open');
+    await _posDbDashLoad();
+  } catch(e){ posAlert(e.message||'Erreur','err'); }
+}
+
 async function _posDbDashLoad(){
   const deb     = document.getElementById('posdb-f-debut')?.value    || '';
   const fin     = document.getElementById('posdb-f-fin')?.value      || '';
@@ -25062,6 +25147,7 @@ async function _posDbDashLoad(){
   if(caissId) url += `caissier_id=${caissId}&`;
   if(mode)    url += `mode_paiement=${mode}&`;
   url = url.replace(/&$/, '');
+  _posDbFamilles(url.split('?')[1] || '');
 
   // Indicateur chargement léger sur les KPIs
   ['posdb-kpi-ca','posdb-kpi-cash','posdb-kpi-credit','posdb-kpi-nb','posdb-kpi-hier'].forEach(id=>{

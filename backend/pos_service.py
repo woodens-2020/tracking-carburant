@@ -37,7 +37,7 @@ LIEUX_VALIDES = {"DEVANT", "PISCINE"}
 # Une ligne sans lieu (NULL : historique d'avant la séparation, achat ou
 # vente sans session) appartient au Bar — jamais à la Piscine, pour que les
 # chiffres de la Piscine ne contiennent que ce qui lui a été attribué.
-DEPARTEMENT_LIBELLE = {"DEVANT": "Bar", "PISCINE": "Piscine"}
+DEPARTEMENT_LIBELLE = {"DEVANT": "Bar Devant", "PISCINE": "Bar Piscine"}
 
 
 def normaliser_lieu(lieu: str | None) -> str | None:
@@ -848,3 +848,43 @@ def stats_bar(date_debut: date_type, date_fin: date_type, db: Session, lieu: str
         "top_produits":  top_produits,
         "par_produit":   list(par_produit.values()),
     }
+
+
+# ══════════════════════════════════════════════════════════════════
+# FAMILLES : MANGER / BOISSON (rapports de ventes du bar)
+# ══════════════════════════════════════════════════════════════════
+import re as _re_fam
+import unicodedata as _ud_fam
+
+FAMILLES = {"MANGER": "Manger", "BOISSON": "Boissons"}
+_CATEGORIES_MANGER = {
+    "plat", "plats", "repas", "nourriture", "manger", "cuisine", "viande", "viandes",
+    "dessert", "desserts", "accompagnement", "accompagnements", "snack", "snacks",
+    "fritaille", "fritay", "grillade", "grillades", "entree", "entrees", "sandwich",
+    "sandwichs", "pizza", "pizzas", "fruits de mer", "poisson", "poissons", "soupe", "soupes",
+}
+_MOTS_MANGER = _re_fam.compile(
+    r"\b(cabri|kabrit|poulet|poul|griot|griyo|porc|cochon|boeuf|bef|poisson|pwason|lambi|hareng|"
+    r"riz|diri|banane|bannann|frite|frites|sandwich|burger|hamburger|spaghetti|pikliz|legume|"
+    r"soupe|soup|bouillon|tasso|dinde|kodenn|crevette|langouste|omelette|pate|pates|pizza|"
+    r"plat|assiette|salade|accra|akra|marinade|fritay|fritaille|hot ?dog|wings|ailes|"
+    r"chicken|fish|beef|pork|steak|brochette|tchaka|mayi|mais|patate|igname|yanm|pain|chips)\b")
+
+
+def _norm_fam(s) -> str:
+    return "".join(c for c in _ud_fam.normalize("NFKD", s or "") if not _ud_fam.combining(c)).lower().strip()
+
+
+def famille_auto(nom: str | None, categorie: str | None) -> str:
+    """Classement automatique : catégorie de cuisine ou nom de plat → MANGER,
+    sinon BOISSON."""
+    if _norm_fam(categorie) in _CATEGORIES_MANGER:
+        return "MANGER"
+    return "MANGER" if _MOTS_MANGER.search(_norm_fam(nom)) else "BOISSON"
+
+
+def famille_produit(p) -> str:
+    """Famille d'un article du bar : choix manuel s'il existe, sinon auto."""
+    if getattr(p, "famille", None) in FAMILLES:
+        return p.famille
+    return famille_auto(p.nom, p.categorie)
