@@ -589,26 +589,14 @@ def test_caisse_bar_devant_et_bar_piscine_separes(client, db):
         assert v["solde"] == round(v["entrees"] - v["sorties"], 2)
 
 
-def test_reprise_lieux_bars_sans_toucher_au_stock(client, db):
-    from models import BarVente, BarLigneVente, BarAchat
+def test_historique_bars_laisse_tel_quel(client, db):
+    from models import BarVente, BarAchat
     from database import _reprise_lieux_bars
-    from pos_service import stock_courant
     pid_p = _produit(client, lieu="PISCINE")
-    pid_x = _produit(client)                    # article des deux bars
-    v1 = BarVente(numero_ticket=f"R{pid_p}", montant_total=100, montant_paye=100,
-                  mode_paiement="CASH", statut="PAYEE", lieu=None)
-    db.add(v1); db.flush()
-    db.add(BarLigneVente(vente_id=v1.id, produit_id=pid_p, quantite=1, prix_unitaire_applique=100, sous_total=100))
-    v2 = BarVente(numero_ticket=f"T-REP2-{pid_x}", montant_total=100, montant_paye=100,
-                  mode_paiement="CASH", statut="PAYEE", lieu=None)
-    db.add(v2); db.flush()
-    db.add(BarLigneVente(vente_id=v2.id, produit_id=pid_x, quantite=1, prix_unitaire_applique=100, sous_total=100))
+    v = BarVente(numero_ticket=f"H{pid_p}", montant_total=100, montant_paye=100,
+                 mode_paiement="CASH", statut="PAYEE", lieu=None)
     a = BarAchat(produit_id=pid_p, quantite=5, prix_achat_unitaire=10, statut="CONFIRME", lieu=None)
-    db.add(a); db.commit()
-    avant = (stock_courant(pid_p, db, lieu="PISCINE"), stock_courant(pid_p, db, lieu="DEVANT"))
+    db.add_all([v, a]); db.commit()
     _reprise_lieux_bars()
     db.expire_all()
-    assert db.get(BarVente, v1.id).lieu == "PISCINE"
-    assert db.get(BarVente, v2.id).lieu is None            # bar impossible à déterminer
-    assert db.get(BarAchat, a.id).lieu == "PISCINE"
-    assert (stock_courant(pid_p, db, lieu="PISCINE"), stock_courant(pid_p, db, lieu="DEVANT")) == avant
+    assert db.get(BarVente, v.id).lieu is None and db.get(BarAchat, a.id).lieu is None

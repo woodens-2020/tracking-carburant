@@ -667,44 +667,12 @@ def _reprise_piscine_et_paiements_hotel():
 
 
 def _reprise_lieux_bars():
-    """Bar Devant / Bar Piscine : rattache à son bar tout l'historique dont
-    le bar est CERTAIN (idempotent, ne touche que les lignes sans lieu) :
-
-    1. vente sans lieu dont tous les articles sont réservés au même bar ;
-    2. achat sans lieu d'un article réservé à un bar → ce bar.
-
-    Les MOUVEMENTS DE STOCK ne sont jamais réattribués : le stock de chaque
-    bar est celui que les caisses utilisent aujourd'hui (inventaires et
-    ajustements déjà faits) — le modifier après coup le fausserait.
-    Ce qui reste sans lieu (bar impossible à déterminer) est compté avec le
-    Bar Devant. Les comptes restants sont écrits dans le journal du serveur."""
+    """Bar Devant / Bar Piscine : l'historique reste TEL QUEL (décision de la
+    direction, 17/11/2026) — aucune vente, aucun achat ni mouvement de stock
+    ancien n'est réattribué. La séparation vaut à partir d'aujourd'hui :
+    chaque nouvelle opération porte son bar. Diagnostic seulement : la
+    répartition par bar est écrite dans le journal du serveur."""
     from sqlalchemy import text as sql_text
-    etapes = [
-        # 1. articles tous réservés au même bar
-        "UPDATE bar_ventes SET lieu = (SELECT MIN(p.lieu) FROM bar_lignes_vente l "
-        "JOIN bar_produits p ON p.id = l.produit_id WHERE l.vente_id = bar_ventes.id) "
-        "WHERE lieu IS NULL "
-        "AND EXISTS (SELECT 1 FROM bar_lignes_vente l JOIN bar_produits p ON p.id = l.produit_id "
-        "            WHERE l.vente_id = bar_ventes.id AND p.lieu IS NOT NULL) "
-        "AND NOT EXISTS (SELECT 1 FROM bar_lignes_vente l LEFT JOIN bar_produits p ON p.id = l.produit_id "
-        "                WHERE l.vente_id = bar_ventes.id AND (p.lieu IS NULL OR l.produit_id IS NULL)) "
-        "AND (SELECT COUNT(DISTINCT p.lieu) FROM bar_lignes_vente l JOIN bar_produits p ON p.id = l.produit_id "
-        "     WHERE l.vente_id = bar_ventes.id) = 1",
-        # 2. achats d'un article réservé à un bar
-        "UPDATE bar_achats SET lieu = (SELECT p.lieu FROM bar_produits p WHERE p.id = bar_achats.produit_id) "
-        "WHERE lieu IS NULL AND produit_id IS NOT NULL "
-        "AND EXISTS (SELECT 1 FROM bar_produits p2 WHERE p2.id = bar_achats.produit_id AND p2.lieu IS NOT NULL)",
-    ]
-    for sql in etapes:
-        with engine.connect() as conn:
-            try:
-                r = conn.execute(sql_text(sql))
-                conn.commit()
-                if r.rowcount:
-                    print(f"[lieux bars] {r.rowcount} ligne(s) rattachée(s) : {sql[7:40]}…")
-            except Exception as e:
-                conn.rollback()
-                print(f"[lieux bars] étape ignorée : {e}")
     # Diagnostic : ce qui reste sans bar (lu dans les journaux du serveur).
     diag = {}
     with engine.connect() as conn:
