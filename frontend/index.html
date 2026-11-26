@@ -10165,6 +10165,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
             <span class="zelle-taux-val" style="font-size:1.05rem;font-weight:800;color:var(--accent);">—</span>
             <span style="font-size:.78rem;color:rgba(255,255,255,.35);">HTG/USD</span>
             <button id="btn-zelle-config" class="gi-btn-secondary" onclick="zelleOpenConfig()">&#9881; Configurer taux</button>
+            <button class="gi-btn-secondary zx-dl" onclick="zelleExporter('tableau','pdf')" title="Télécharger en PDF" style="padding:8px 12px;font-size:.82rem;white-space:nowrap;">&#128438; PDF</button><button class="gi-btn-secondary zx-dl" onclick="zelleExporter('tableau','xls')" title="Télécharger en Excel" style="padding:8px 12px;font-size:.82rem;white-space:nowrap;">&#128196; Excel</button>
           </div>
         </div>
 
@@ -10228,9 +10229,12 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
               Déduites du solde uniquement après validation du PDG ou d'un admin · <span id="zdep-attente-count">0</span> en attente
             </div>
           </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <button class="gi-btn-secondary zx-dl" onclick="zelleExporter('depenses','pdf')" title="Télécharger en PDF" style="padding:6px 10px;font-size:.78rem;white-space:nowrap;">&#128438; PDF</button><button class="gi-btn-secondary zx-dl" onclick="zelleExporter('depenses','xls')" title="Télécharger en Excel" style="padding:6px 10px;font-size:.78rem;white-space:nowrap;">&#128196; Excel</button>
           <button class="gi-btn-primary" style="padding:8px 16px;font-size:.85rem;" onclick="zdepOpenModal()">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nouvelle dépense
           </button>
+          </div>
         </div>
         <div class="gi-form-lbl" style="margin-bottom:10px;">Suivi des Dépenses</div>
         <div style="position:relative;height:220px;margin-bottom:20px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px;">
@@ -10358,9 +10362,12 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
             </div>
             <p class="gi-page-sub" style="margin-left:70px;">Toutes les transactions &mdash; montants en gourdes (HTG)</p>
           </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <button class="gi-btn-secondary zx-dl" onclick="zelleExporter('paiements','pdf')" title="Télécharger en PDF" style="padding:8px 12px;font-size:.82rem;white-space:nowrap;">&#128438; PDF</button><button class="gi-btn-secondary zx-dl" onclick="zelleExporter('paiements','xls')" title="Télécharger en Excel" style="padding:8px 12px;font-size:.82rem;white-space:nowrap;">&#128196; Excel</button>
           <button id="btn-zelle-new-tx" class="gi-btn-primary" onclick="zelleOpenForm()" style="padding:9px 18px;font-size:.9rem;white-space:nowrap;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nouvelle transaction
           </button>
+          </div>
         </div>
 
         <!-- ── Cartes métriques ── -->
@@ -10440,9 +10447,12 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
             </div>
             <p class="gi-page-sub" style="margin-left:70px;">Déclaration des fonds reçus &mdash; montants en gourdes (HTG)</p>
           </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <button class="gi-btn-secondary zx-dl" onclick="zelleExporter('fonds','pdf')" title="Télécharger en PDF" style="padding:8px 12px;font-size:.82rem;white-space:nowrap;">&#128438; PDF</button><button class="gi-btn-secondary zx-dl" onclick="zelleExporter('fonds','xls')" title="Télécharger en Excel" style="padding:8px 12px;font-size:.82rem;white-space:nowrap;">&#128196; Excel</button>
           <button id="btn-zelle-new-fond" class="gi-btn-primary" onclick="zelleOpenFondForm()" style="padding:9px 18px;font-size:.9rem;white-space:nowrap;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px;vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Déclarer un renflouement
           </button>
+          </div>
         </div>
 
         <!-- ── Cartes métriques ── -->
@@ -20438,6 +20448,7 @@ function _applyNavAccess(){
     const el = document.getElementById(id);
     if(el) el.style.display = _roZelle ? 'none' : '';
   });
+  document.querySelectorAll('.zx-dl').forEach(function(el){ el.style.display = _roZelle ? 'none' : ''; });
   _updateNavSectionVisibility();
 }
 
@@ -43031,6 +43042,308 @@ function zellePreFondXLS(){
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ══ Exports Zelle : PDF + Excel pour chaque rapport ═════════════════
+// Un rapport = { titre, sousTitre, fichier, infos:[texte], metriques:[{label,val}],
+//   sections:[{titre, colonnes:[{label, num}], lignes:[[cellule…]], total:[cellule…]}] }
+// Cellule : texte, ou {htg:n} / {usd:n} / {n:n} (nombre, typé Number dans Excel).
+function _zxEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _zxDate(s){ if(!s) return ''; const p=String(s).substring(0,10).split('-'); return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : String(s); }
+function _zxTexte(c){
+  if(c==null) return '';
+  if(typeof c==='object'){
+    if('htg' in c) return _zelleHtg(c.htg);
+    if('usd' in c) return _zelleUsd(c.usd);
+    if('n' in c)   return String(c.n);
+  }
+  return String(c);
+}
+function _zxNombre(c){
+  if(c && typeof c==='object'){ const v = 'htg' in c ? c.htg : 'usd' in c ? c.usd : c.n; return Number(v)||0; }
+  return null;
+}
+function _zxStatutTx(s){ return s==='REMIS' ? 'Remis' : s==='ANNULE' ? 'Annulé' : 'En attente'; }
+function _zxStatutDep(s){ return s==='APPROUVEE' ? 'Approuvée' : s==='REJETEE' ? 'Rejetée' : 'En attente'; }
+function _zxMaintenant(){
+  const n=new Date();
+  return String(n.getDate()).padStart(2,'0')+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+n.getFullYear()
+       +' '+String(n.getHours()).padStart(2,'0')+'h'+String(n.getMinutes()).padStart(2,'0');
+}
+function _zxAutorise(){
+  if(_isZelleReadOnly()){ _giAlert('Téléchargement non autorisé.','err'); return false; }
+  return true;
+}
+
+function _zxPdf(r){
+  const gen = _zxMaintenant();
+  let corps = '';
+  for(const s of (r.sections||[])){
+    corps += '<h2>'+_zxEsc(s.titre)+'</h2>';
+    if(!s.lignes.length){ corps += '<p class="vide">Aucune donnée.</p>'; continue; }
+    corps += '<table><thead><tr>'+s.colonnes.map(function(c){ return '<th'+(c.num?' class="r"':'')+'>'+_zxEsc(c.label)+'</th>'; }).join('')+'</tr></thead><tbody>';
+    for(const l of s.lignes){
+      corps += '<tr>'+l.map(function(c,i){ return '<td'+(s.colonnes[i]&&s.colonnes[i].num?' class="r"':'')+'>'+_zxEsc(_zxTexte(c))+'</td>'; }).join('')+'</tr>';
+    }
+    if(s.total) corps += '<tr class="tot">'+s.total.map(function(c,i){ return '<td'+(s.colonnes[i]&&s.colonnes[i].num?' class="r"':'')+'>'+_zxEsc(_zxTexte(c))+'</td>'; }).join('')+'</tr>';
+    corps += '</tbody></table>';
+  }
+  const mets = (r.metriques||[]).map(function(m){ return '<div class="met"><div class="met-l">'+_zxEsc(m.label)+'</div><div class="met-v">'+_zxEsc(_zxTexte(m.val))+'</div></div>'; }).join('');
+  const html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>'+_zxEsc(r.fichier)+'</title>'
+    +'<style>*{box-sizing:border-box;margin:0;padding:0;}'
+    +'body{font-family:Georgia,serif;font-size:10pt;color:#111;background:#fff;padding:4mm;}'
+    +'@page{size:A4 landscape;margin:12mm 10mm;}'
+    +'.entete{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #1a2f5e;padding-bottom:10px;}'
+    +'.cie-nom{font-size:1.15rem;font-weight:900;color:#1a2f5e;text-transform:uppercase;}'
+    +'.cie-sous{font-size:.65rem;color:#c9a020;font-weight:700;letter-spacing:.12em;text-transform:uppercase;}'
+    +'.ref{text-align:right;font-size:.7rem;color:#444;}'
+    +'.titre{background:#1a2f5e;color:#fff;text-align:center;padding:8px;font-size:.95rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:0 0 12px;}'
+    +'.titre span{color:#c9a020;font-size:.68rem;font-weight:400;display:block;margin-top:2px;text-transform:none;letter-spacing:0;}'
+    +'.infos{font-size:.75rem;color:#444;margin-bottom:10px;}'
+    +'.mets{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px;}'
+    +'.met{border:1px solid #ddd;border-radius:5px;padding:7px 10px;}'
+    +'.met-l{font-size:.6rem;color:#666;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;}'
+    +'.met-v{font-size:.92rem;font-weight:800;color:#1a2f5e;}'
+    +'h2{font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:#1a2f5e;border-bottom:1px solid #c9a020;padding-bottom:3px;margin:14px 0 6px;}'
+    +'table{width:100%;border-collapse:collapse;font-size:.72rem;}'
+    +'thead{background:#1a2f5e;color:#fff;}'
+    +'th{padding:5px 7px;text-align:left;font-size:.62rem;text-transform:uppercase;letter-spacing:.04em;}'
+    +'td{padding:4px 7px;border-bottom:1px solid #eee;}'
+    +'.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}'
+    +'.tot td{background:#f5f5f5;font-weight:700;border-top:2px solid #1a2f5e;}'
+    +'.vide{font-size:.75rem;color:#888;padding:6px 0;}'
+    +'.footer{margin-top:16px;border-top:2px solid #1a2f5e;padding-top:6px;display:flex;justify-content:space-between;font-size:.6rem;color:#888;}'
+    +'@media print{body{padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}tr{page-break-inside:avoid;}}'
+    +'</style></head><body>'
+    +'<div class="entete"><div><div class="cie-nom">'+_zxEsc(_branding.complexe)+'</div><div class="cie-sous">'+_zxEsc(_branding.raison_sociale)+' &mdash; Département Zelle</div></div>'
+    +'<div class="ref"><strong>Généré le '+gen+'</strong><br>Taux : '+Number(_zelleConfig.taux||0).toFixed(2)+' HTG/USD</div></div>'
+    +'<div class="titre">'+_zxEsc(r.titre)+(r.sousTitre?'<span>'+_zxEsc(r.sousTitre)+'</span>':'')+'</div>'
+    +((r.infos&&r.infos.length)?'<div class="infos">'+r.infos.map(_zxEsc).join(' &nbsp;·&nbsp; ')+'</div>':'')
+    +(mets?'<div class="mets">'+mets+'</div>':'')
+    +corps
+    +'<div class="footer"><div>Généré le '+gen+'</div><div>'+_zxEsc(_branding.complexe)+' &mdash; '+_zxEsc(String(_branding.raison_sociale).toUpperCase())+'</div><div>Document confidentiel</div></div>'
+    +'<script>window.onload=function(){ window.print(); };<\/script>'
+    +'</body></html>';
+  const w = window.open('','_blank','width=1100,height=860,scrollbars=yes');
+  if(!w){ _giAlert('Autorisez les fenêtres pop-up pour le PDF.','err'); return; }
+  w.document.write(html);
+  w.document.close();
+}
+
+function _zxXls(r){
+  function cell(c, style){
+    const n = _zxNombre(c);
+    const st = style ? ' ss:StyleID="'+style+'"' : (n!==null ? ' ss:StyleID="num"' : '');
+    if(n!==null) return '<Cell'+st+'><Data ss:Type="Number">'+n.toFixed(2)+'</Data></Cell>';
+    return '<Cell'+st+'><Data ss:Type="String">'+_zxEsc(_zxTexte(c))+'</Data></Cell>';
+  }
+  function nomFeuille(s){ return String(s).replace(/[\\\/\?\*\[\]:]/g,' ').substring(0,31); }
+  const largeur = Math.max(2, ...(r.sections||[]).map(function(s){ return s.colonnes.length; }));
+  let entete = '<Row><Cell ss:MergeAcross="'+(largeur-1)+'" ss:StyleID="titre"><Data ss:Type="String">'
+    +_zxEsc(String(_branding.complexe).toUpperCase()+' — '+String(_branding.raison_sociale).toUpperCase()+' — '+r.titre)+'</Data></Cell></Row>'
+    +'<Row><Cell ss:MergeAcross="'+(largeur-1)+'"><Data ss:Type="String">'+_zxEsc('Généré le '+_zxMaintenant()+' — Taux : '+Number(_zelleConfig.taux||0).toFixed(2)+' HTG/USD')+'</Data></Cell></Row>';
+  for(const i of (r.infos||[])) entete += '<Row><Cell ss:MergeAcross="'+(largeur-1)+'"><Data ss:Type="String">'+_zxEsc(i)+'</Data></Cell></Row>';
+  let feuilles = '';
+  if(r.metriques && r.metriques.length){
+    let rows = entete+'<Row></Row>';
+    for(const m of r.metriques) rows += '<Row>'+cell(m.label,'b')+cell(m.val)+'</Row>';
+    feuilles += '<Worksheet ss:Name="Synthèse"><Table><Column ss:Width="220"/><Column ss:Width="140"/>'+rows+'</Table></Worksheet>';
+  }
+  const pris = {};
+  for(const s of (r.sections||[])){
+    let nom = nomFeuille(s.titre), k = 2;
+    while(pris[nom]) nom = nomFeuille(s.titre).substring(0,28)+' '+(k++);
+    pris[nom] = 1;
+    let rows = entete+'<Row></Row>'
+      +'<Row>'+s.colonnes.map(function(c){ return cell(c.label,'hdr'); }).join('')+'</Row>';
+    for(const l of s.lignes) rows += '<Row>'+l.map(function(c){ return cell(c); }).join('')+'</Row>';
+    if(s.total) rows += '<Row>'+s.total.map(function(c){ return cell(c, _zxNombre(c)!==null ? 'totn' : 'tot'); }).join('')+'</Row>';
+    const cols = s.colonnes.map(function(c){ return '<Column ss:Width="'+(c.num?110:140)+'"/>'; }).join('');
+    feuilles += '<Worksheet ss:Name="'+_zxEsc(nom)+'"><Table>'+cols+rows+'</Table></Worksheet>';
+  }
+  const xls = '<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?>'
+    +'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:x="urn:schemas-microsoft-com:office:excel">'
+    +'<Styles>'
+    +'<Style ss:ID="titre"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#1A2F5E" ss:Pattern="Solid"/></Style>'
+    +'<Style ss:ID="hdr"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#1A2F5E" ss:Pattern="Solid"/></Style>'
+    +'<Style ss:ID="b"><Font ss:Bold="1"/></Style>'
+    +'<Style ss:ID="num"><NumberFormat ss:Format="#,##0.00"/></Style>'
+    +'<Style ss:ID="tot"><Font ss:Bold="1"/><Interior ss:Color="#F0F0F0" ss:Pattern="Solid"/></Style>'
+    +'<Style ss:ID="totn"><Font ss:Bold="1"/><Interior ss:Color="#F0F0F0" ss:Pattern="Solid"/><NumberFormat ss:Format="#,##0.00"/></Style>'
+    +'</Styles>'+feuilles+'</Workbook>';
+  const blob = new Blob(['﻿'+xls], {type:'application/vnd.ms-excel;charset=UTF-8'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = r.fichier+'.xls';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+
+// Point d'entrée des boutons : zelleExporter('paiements'|'fonds'|'depenses'|'tableau', 'pdf'|'xls')
+async function zelleExporter(rapport, format){
+  if(!_zxAutorise()) return;
+  try{
+    const builders = {paiements:_zxRapportPaiements, fonds:_zxRapportFonds, depenses:_zxRapportDepenses, tableau:_zxRapportTableau};
+    const r = await builders[rapport]();
+    if(format==='pdf') _zxPdf(r); else _zxXls(r);
+  }catch(e){ _giAlert('Export impossible : '+(e.message||e),'err'); }
+}
+
+function _zxFiltres(ids){
+  const out = [];
+  for(const [id, label] of ids){
+    const el = document.getElementById(id);
+    if(!el || !el.value) continue;
+    const txt = el.tagName==='SELECT' ? el.options[el.selectedIndex].text : (el.type==='date' ? _zxDate(el.value) : el.value);
+    out.push(label+' : '+txt);
+  }
+  return out.length ? ['Filtres — '+out.join(', ')] : ['Toutes les données (aucun filtre)'];
+}
+
+function _zxSectionPaiements(txs, titre){
+  const taux = _zelleConfig.taux || 130;
+  const lignes = txs.map(function(t){ return [
+    t.numero_int||'', t.nom_prenom||'', t.identifiant||'', t.contact||'',
+    t.expediteur_nom||'', t.expediteur_contact||'',
+    {htg:t.montant_ht||0}, {usd:t.montant_usd||0}, {usd:t.frais||0}, {htg:t.a_remettre_ht||0},
+    t.source_fond||'', _zxStatutTx(t.statut), _zxDate(t.date_transaction), t.notes||'',
+  ]; });
+  const sum = function(f){ return txs.reduce(function(a,t){ return a+(f(t)||0); },0); };
+  return {
+    titre: titre || 'Paiements',
+    colonnes: [{label:'#'},{label:'Bénéficiaire'},{label:'Identifiant Zelle'},{label:'Contact'},{label:'Expéditeur'},{label:'Tél. expéditeur'},
+      {label:'Montant HTG',num:1},{label:'Montant USD',num:1},{label:'Frais USD',num:1},{label:'À remettre HTG',num:1},
+      {label:'Source'},{label:'Statut'},{label:'Date'},{label:'Notes'}],
+    lignes: lignes,
+    total: ['TOTAL','','','','','', {htg:sum(function(t){return t.montant_ht;})}, {usd:sum(function(t){return t.montant_usd;})},
+      {usd:sum(function(t){return t.frais;})}, {htg:sum(function(t){return t.a_remettre_ht;})}, '','','',''],
+    _fraisHtg: sum(function(t){ return (t.frais||0)*(t.taux_applique||taux); }),
+  };
+}
+
+async function _zxRapportPaiements(){
+  await loadZellePaiements();
+  const txs = _zelleData || [];
+  const s = _zxSectionPaiements(txs, 'Paiements Zelle');
+  const actifs = txs.filter(function(t){ return t.statut!=='ANNULE'; });
+  return {
+    titre: 'Rapport des paiements Zelle', sousTitre: 'Montants en gourdes (HTG) et dollars (USD)',
+    fichier: 'zelle-paiements-'+_ymd(new Date()),
+    infos: _zxFiltres([['zpay-statut','Statut'],['zpay-source','Source'],['zpay-debut','Du'],['zpay-fin','Au']]),
+    metriques: [
+      {label:'Transactions', val:{n:txs.length}},
+      {label:'Remises', val:{n:txs.filter(function(t){return t.statut==='REMIS';}).length}},
+      {label:'En attente', val:{n:txs.filter(function(t){return t.statut==='EN_ATTENTE';}).length}},
+      {label:'Annulées', val:{n:txs.filter(function(t){return t.statut==='ANNULE';}).length}},
+      {label:'Total reçu HTG', val:{htg:txs.reduce(function(a,t){return a+(t.montant_ht||0);},0)}},
+      {label:'Total à remettre HTG', val:{htg:txs.reduce(function(a,t){return a+(t.a_remettre_ht||0);},0)}},
+      {label:'Total à remettre HTG (hors annulées)', val:{htg:actifs.reduce(function(a,t){return a+(t.a_remettre_ht||0);},0)}},
+      {label:'Total frais HTG', val:{htg:s._fraisHtg}},
+    ],
+    sections: [s],
+  };
+}
+
+function _zxSectionFonds(fonds, titre){
+  return {
+    titre: titre || 'Renflouements',
+    colonnes: [{label:'Source'},{label:'Montant HTG',num:1},{label:'Équiv. USD',num:1},{label:'Date de réception'},{label:'Notes'}],
+    lignes: fonds.map(function(f){ return [f.source||'', {htg:f.montant_ht||0}, {usd:f.montant_usd||0}, _zxDate(f.date_reception), f.notes||'']; }),
+    total: ['TOTAL', {htg:fonds.reduce(function(a,f){return a+(f.montant_ht||0);},0)}, {usd:fonds.reduce(function(a,f){return a+(f.montant_usd||0);},0)}, '', ''],
+  };
+}
+
+async function _zxRapportFonds(){
+  await loadZelleFonds();
+  const fonds = _zelleFonds || [];
+  const parSrc = function(src){ return fonds.filter(function(f){ return f.source===src; }).reduce(function(a,f){ return a+(f.montant_ht||0); },0); };
+  return {
+    titre: 'Rapport des renflouements Zelle', sousTitre: 'Réception de fonds — montants en gourdes (HTG)',
+    fichier: 'zelle-renflouements-'+_ymd(new Date()),
+    infos: _zxFiltres([['zfd-source','Source'],['zfd-debut','Du'],['zfd-fin','Au']]),
+    metriques: [
+      {label:'Renflouements', val:{n:fonds.length}},
+      {label:'Total reçu HTG', val:{htg:fonds.reduce(function(a,f){return a+(f.montant_ht||0);},0)}},
+      {label:'Total reçu USD', val:{usd:fonds.reduce(function(a,f){return a+(f.montant_usd||0);},0)}},
+      {label:'PDG', val:{htg:parSrc('PDG')}},
+      {label:'Gaz', val:{htg:parSrc('Gaz')}},
+      {label:'Autre', val:{htg:parSrc('Autre')}},
+    ],
+    sections: [_zxSectionFonds(fonds)],
+  };
+}
+
+function _zxSectionDepenses(deps, titre){
+  const ok = deps.filter(function(d){ return d.statut==='APPROUVEE'; });
+  return {
+    titre: titre || 'Dépenses',
+    colonnes: [{label:'Description'},{label:'Catégorie'},{label:'Montant USD',num:1},{label:'Montant HTG',num:1},{label:'Demandeur'},{label:'Statut'},{label:'Date'},{label:'Justificatif'},{label:'Notes'}],
+    lignes: deps.map(function(d){ return [d.description||'', d.categorie||'', {usd:d.montant_usd||0}, {htg:d.montant_htg||0},
+      d.demandeur_nom||'', _zxStatutDep(d.statut), _zxDate(d.date_depense), d.sans_justificatif ? 'Manquant' : 'OK', d.notes||'']; }),
+    total: ['TOTAL APPROUVÉ (déduit du solde)', '', {usd:ok.reduce(function(a,d){return a+(d.montant_usd||0);},0)}, {htg:ok.reduce(function(a,d){return a+(d.montant_htg||0);},0)}, '','','','',''],
+  };
+}
+
+async function _zxChargerDepenses(){
+  const catF = document.getElementById('zdep-filtre-cat')?.value || '';
+  const d = await apiFetch('GET','/zelle/depenses' + (catF ? '?categorie='+encodeURIComponent(catF) : ''));
+  return d.depenses || [];
+}
+
+async function _zxRapportDepenses(){
+  const deps = await _zxChargerDepenses();
+  const somme = function(st){ return deps.filter(function(d){ return d.statut===st; }).reduce(function(a,d){ return a+(d.montant_htg||0); },0); };
+  return {
+    titre: 'Rapport des dépenses Zelle', sousTitre: 'Seules les dépenses approuvées sont déduites du solde',
+    fichier: 'zelle-depenses-'+_ymd(new Date()),
+    infos: _zxFiltres([['zdep-filtre-cat','Catégorie']]),
+    metriques: [
+      {label:'Dépenses', val:{n:deps.length}},
+      {label:'Approuvées HTG', val:{htg:somme('APPROUVEE')}},
+      {label:'En attente HTG', val:{htg:somme('EN_ATTENTE')}},
+      {label:'Rejetées HTG', val:{htg:somme('REJETEE')}},
+    ],
+    sections: [_zxSectionDepenses(deps)],
+  };
+}
+
+async function _zxRapportTableau(){
+  const [b, txs, fonds, deps, evo] = await Promise.all([
+    apiFetch('GET','/zelle/bilan'),
+    apiFetch('GET','/zelle/transactions'),
+    apiFetch('GET','/zelle/fonds'),
+    _zxChargerDepenses(),
+    apiFetch('GET','/zelle/evolution?jours=' + _zevolJours),
+  ]);
+  if(b.taux) _zelleConfig.taux = b.taux;
+  const srcs = ['PDG','Gaz','Autre'].map(function(k){
+    const s = (b.sources||{})[k] || {fonds_ht:0,remis_ht:0,net_ht:0};
+    return [k, {htg:s.fonds_ht||0}, {htg:s.remis_ht||0}, {htg:s.net_ht||0}];
+  });
+  // Jours sans aucun mouvement retirés : le rapport ne garde que les jours actifs.
+  const serie = ((evo && evo.serie) || []).filter(function(s){ return (s.paiements_ht||0) || (s.depenses_ht||0) || (s.renflouements_ht||0); });
+  return {
+    titre: 'Tableau de bord Zelle — rapport complet', sousTitre: 'Fonds · Paiements · Dépenses · Balance',
+    fichier: 'zelle-tableau-de-bord-'+_ymd(new Date()),
+    infos: ['Évolution sur '+_zevolJours+' jours'],
+    metriques: [
+      {label:'Total fonds reçus', val:{htg:b.total_fonds_ht||0}},
+      {label:'Total entré Zelle', val:{htg:b.entree_ht||0}},
+      {label:'Total à remettre', val:{htg:b.total_remis_ht||0}},
+      {label:'Total frais perçus', val:{htg:b.total_frais_ht||0}},
+      {label:'Balance disponible', val:{htg:b.balance_ht||0}},
+      {label:'Dépenses en attente', val:{n:b.nb_depenses_attente||0}},
+    ],
+    sections: [
+      {titre:'Répartition par source', colonnes:[{label:'Source'},{label:'Fonds reçus HTG',num:1},{label:'Total remis HTG',num:1},{label:'Net HTG',num:1}], lignes: srcs},
+      {titre:'Évolution ('+_zevolJours+' j, jours actifs)', colonnes:[{label:'Date'},{label:'Paiements HTG',num:1},{label:'Dépenses HTG',num:1},{label:'Renflouements HTG',num:1}],
+        lignes: serie.map(function(s){ return [_zxDate(s.date), {htg:s.paiements_ht||0}, {htg:s.depenses_ht||0}, {htg:s.renflouements_ht||0}]; }),
+        total: ['TOTAL', {htg:serie.reduce(function(a,s){return a+(s.paiements_ht||0);},0)}, {htg:serie.reduce(function(a,s){return a+(s.depenses_ht||0);},0)}, {htg:serie.reduce(function(a,s){return a+(s.renflouements_ht||0);},0)}]},
+      _zxSectionDepenses(deps, 'Dépenses'),
+      _zxSectionFonds(fonds, 'Renflouements'),
+      _zxSectionPaiements(txs, 'Paiements'),
+    ],
+  };
 }
 
 // ── Form Fond ──────────────────────────────────────────────────
